@@ -19,13 +19,50 @@ struct Slices {
     const mk_lattice_candidate *candidates;
     unsigned size()const{return count;}
     bool empty()const{return count==0;}
+    const mk_lattice_candidate &candidate(unsigned i)const{return candidates[i];}
     CandidateSlice operator[](unsigned i)const{return {candidates?candidates+samples[i].first_candidate:nullptr,samples[i].candidate_count};}
 };
+struct CompactCandidate {
+    const double *joints;const uint32_t *external_coordinates;
+    unsigned roll_index,tilt_index,azimuth_index,branch;
+};
+struct CompactSlice {
+    const double *joints;const uint32_t *coordinates;
+    unsigned count,joint_count,external_count;
+    unsigned size()const{return count;}
+    bool empty()const{return count==0;}
+    CompactCandidate operator[](unsigned i)const {
+        auto c=coordinates+i*(external_count+4);
+        return {joints+i*joint_count,c,c[external_count],c[external_count+1],c[external_count+2],c[external_count+3]};
+    }
+    struct Iterator {
+        const CompactSlice *slice;unsigned index;
+        CompactCandidate operator*()const{return (*slice)[index];}
+        Iterator &operator++(){++index;return *this;}
+        bool operator!=(const Iterator &other)const{return index!=other.index;}
+    };
+    Iterator begin()const{return {this,0};}
+    Iterator end()const{return {this,count};}
+};
+struct CompactSlices {
+    const mk_configuration_sample *samples;unsigned count;
+    const double *joints;const uint32_t *coordinates;unsigned joint_count,external_count;
+    unsigned size()const{return count;}
+    bool empty()const{return count==0;}
+    CompactCandidate candidate(unsigned i)const{return CompactSlice{joints,coordinates,0,joint_count,external_count}[i];}
+    CompactSlice operator[](unsigned i)const {
+        auto first=samples[i].first_candidate;
+        return {joints?joints+size_t(first)*joint_count:nullptr,
+            coordinates?coordinates+size_t(first)*(external_count+4):nullptr,
+            samples[i].candidate_count,joint_count,external_count};
+    }
+};
 using State=descartes_light::State<double>;
+template<class Slice>
 class SmallSampler final:public descartes_light::WaypointSamplerD {
-    const CandidateSlice slice;const double *costs;const motionkit::LadderSettings &settings;bool first;
+    const Slice slice;const double *costs;const motionkit::LadderSettings &settings;bool first;
 public:
-    SmallSampler(CandidateSlice slice,const double *costs,const motionkit::LadderSettings &settings,bool first)
+    SmallSampler(Slice slice,const double *costs,const motionkit::LadderSettings &settings,bool first)
         :slice(slice),costs(costs),settings(settings),first(first){}
     std::vector<descartes_light::StateSample<double>> sample()const override{
         std::vector<descartes_light::StateSample<double>> result;
@@ -37,11 +74,12 @@ public:
         }return result;
     }
 };
+template<class Slice>
 class SmallEdge final:public descartes_light::EdgeEvaluatorD {
-    CandidateSlice prior,current;const motionkit::LadderSettings &settings;uint64_t &tested;
+    Slice prior,current;const motionkit::LadderSettings &settings;uint64_t &tested;
     unsigned layer;const std::function<bool(unsigned,unsigned,unsigned)> &allowed;
 public:
-    SmallEdge(CandidateSlice prior,CandidateSlice current,const motionkit::LadderSettings &settings,uint64_t &tested,
+    SmallEdge(Slice prior,Slice current,const motionkit::LadderSettings &settings,uint64_t &tested,
         unsigned layer,const std::function<bool(unsigned,unsigned,unsigned)> &allowed)
         :prior(prior),current(current),settings(settings),tested(tested),layer(layer),allowed(allowed){}
     std::pair<bool,double> evaluate(const State &a,const State &b)const override{
@@ -60,7 +98,8 @@ public:
     }
 };
 // A bounded all-pairs graph uses Descartes; large ladders retain indexed DP.
-motionkit::LadderResult small_ladder(const Slices &layers,const motionkit::LadderSettings &settings,
+template<class Layers>
+motionkit::LadderResult small_ladder(const Layers &layers,const motionkit::LadderSettings &settings,
         const std::vector<std::vector<double>> &costs,const std::function<bool(unsigned,unsigned,unsigned)> &allowed) {
     // Validate with the same shared contract, including singleton handling.
     // The structured reference also supplies authoritative failure diagnostics.
@@ -70,8 +109,8 @@ motionkit::LadderResult small_ladder(const Slices &layers,const motionkit::Ladde
     std::string log;console_bridge::ScopedDiagnosticSink sink(log);
     std::vector<descartes_light::WaypointSamplerD::ConstPtr> samplers;
     std::vector<descartes_light::EdgeEvaluatorD::ConstPtr> edges;
-    for(unsigned i=0;i<layers.size();++i){samplers.push_back(std::make_shared<SmallSampler>(layers[i],costs[i].data(),settings,i==0));
-        if(i)edges.push_back(std::make_shared<SmallEdge>(layers[i-1],layers[i],settings,tested,i,allowed));}
+    for(unsigned i=0;i<layers.size();++i){samplers.push_back(std::make_shared<SmallSampler<decltype(layers[0])>>(layers[i],costs[i].data(),settings,i==0));
+        if(i)edges.push_back(std::make_shared<SmallEdge<decltype(layers[0])>>(layers[i-1],layers[i],settings,tested,i,allowed));}
     try {
     descartes_light::LadderGraphSolverD solver(1);
     if(!solver.build(samplers,edges,{}))return reference;
@@ -83,13 +122,14 @@ motionkit::LadderResult small_ladder(const Slices &layers,const motionkit::Ladde
 }
 
 }
-extern "C" mk_result MK_CALL mk_search_ladder_filtered(const mk_ladder_request *request,
+template<class Layers>
+static mk_result search_ladder(const Layers &slices,const mk_ladder_request *request,
     const mk_configuration_sample *samples,uint32_t sample_count,
-    const mk_lattice_candidate *candidates,const double *state_costs,uint32_t candidate_count,
+    const double *state_costs,uint32_t candidate_count,
     const mk_ladder_edge *blocked_edges,uint32_t blocked_edge_count,
     uint32_t *out_indices,mk_ladder_result *out_result) {
     if(!request || request->struct_size!=sizeof(*request) || !samples || !sample_count ||
-        (candidate_count && (!candidates || !state_costs)) || !out_indices || !out_result)
+        (candidate_count && !state_costs) || !out_indices || !out_result)
         return MK_ERROR_INVALID_ARGUMENT;
     if(blocked_edge_count && !blocked_edges)return MK_ERROR_INVALID_ARGUMENT;
     *out_result={};out_result->struct_size=sizeof(*out_result);out_result->failed_sample=UINT32_MAX;
@@ -102,10 +142,9 @@ extern "C" mk_result MK_CALL mk_search_ladder_filtered(const mk_ladder_request *
     if(request->joint_count==0 || request->joint_count>MK_MAX_JOINTS || request->external_count>request->joint_count ||
         request->roll_count==0 || request->tilt_count==0 || request->azimuth_count==0)
         return MK_ERROR_INVALID_ARGUMENT;
-    for(unsigned i=0;i<candidate_count;++i){const auto &c=candidates[i];
-        if(c.struct_size!=sizeof(c) || c.roll_index>=request->roll_count || c.tilt_index>=request->tilt_count ||
-            c.azimuth_index>=request->azimuth_count || std::isnan(state_costs[i]) || state_costs[i]<0)
-            return MK_ERROR_INVALID_ARGUMENT;
+    for(unsigned i=0;i<candidate_count;++i){auto c=slices.candidate(i);auto cost=state_costs[i];
+        if(c.roll_index>=request->roll_count || c.tilt_index>=request->tilt_count ||
+            c.azimuth_index>=request->azimuth_count || std::isnan(cost) || cost<0)return MK_ERROR_INVALID_ARGUMENT;
         for(unsigned j=0;j<request->joint_count;++j)if(!std::isfinite(c.joints[j]))return MK_ERROR_INVALID_ARGUMENT;
     }
     for(unsigned i=0;i<blocked_edge_count;++i){const auto &e=blocked_edges[i];
@@ -126,7 +165,6 @@ extern "C" mk_result MK_CALL mk_search_ladder_filtered(const mk_ladder_request *
         std::vector<std::vector<double>> costs(sample_count);
         for(unsigned i=0;i<sample_count;++i)if(samples[i].candidate_count)
             costs[i].assign(state_costs+samples[i].first_candidate,state_costs+samples[i].first_candidate+samples[i].candidate_count);
-        auto slices=Slices{samples,sample_count,candidates};
         uint64_t pairs=0;bool small=sample_count>1;
         for(unsigned i=0;i<sample_count;++i){small=small && samples[i].candidate_count<=32;
             if(i)pairs+=uint64_t(samples[i-1].candidate_count)*samples[i].candidate_count;}
@@ -141,6 +179,30 @@ extern "C" mk_result MK_CALL mk_search_ladder_filtered(const mk_ladder_request *
         return MK_OK;
     }catch(const std::invalid_argument &){return MK_ERROR_INVALID_ARGUMENT;}
     catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
+}
+
+extern "C" mk_result MK_CALL mk_search_ladder_filtered(const mk_ladder_request *request,
+    const mk_configuration_sample *samples,uint32_t sample_count,
+    const mk_lattice_candidate *candidates,const double *state_costs,uint32_t candidate_count,
+    const mk_ladder_edge *blocked_edges,uint32_t blocked_edge_count,
+    uint32_t *out_indices,mk_ladder_result *out_result) {
+    if(candidate_count && !candidates)return MK_ERROR_INVALID_ARGUMENT;
+    for(unsigned i=0;i<candidate_count;++i)if(candidates[i].struct_size!=sizeof(candidates[i]))return MK_ERROR_INVALID_ARGUMENT;
+    return search_ladder(Slices{samples,sample_count,candidates},request,samples,sample_count,
+        state_costs,candidate_count,blocked_edges,blocked_edge_count,out_indices,out_result);
+}
+extern "C" mk_result MK_CALL mk_search_ladder_compact_filtered(const mk_ladder_request *request,
+    const mk_configuration_sample *samples,uint32_t sample_count,
+    const double *joints,uint32_t joint_value_count,const uint32_t *coordinates,uint32_t coordinate_count,
+    const double *state_costs,uint32_t candidate_count,
+    const mk_ladder_edge *blocked_edges,uint32_t blocked_edge_count,
+    uint32_t *out_indices,mk_ladder_result *out_result) {
+    if(!request || request->struct_size!=sizeof(*request) ||
+        uint64_t(candidate_count)*request->joint_count!=joint_value_count ||
+        uint64_t(candidate_count)*(uint64_t(request->external_count)+4)!=coordinate_count ||
+        (candidate_count && (!joints || !coordinates)))return MK_ERROR_INVALID_ARGUMENT;
+    return search_ladder(CompactSlices{samples,sample_count,joints,coordinates,request->joint_count,request->external_count},
+        request,samples,sample_count,state_costs,candidate_count,blocked_edges,blocked_edge_count,out_indices,out_result);
 }
 
 extern "C" mk_result MK_CALL mk_search_ladder(const mk_ladder_request *request,

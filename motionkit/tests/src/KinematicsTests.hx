@@ -1331,7 +1331,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var partitionCost=(sample:Int,candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->
       10*Math.pow(candidate.q[3]-Math.PI/2,2);
     var completeRoute=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost);
-    var packetBudget=mk_lattice_candidate.size()*4;
+    var packetBudget=motionkit.robot.StructuredLadder.packetCandidateBytes(partitionProblem)*4;
     var componentRoute=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost,null,null,packetBudget);
     near(componentRoute.cost,completeRoute.cost,"component packets preserve exhaustive optimal cost",1e-12);
     for(i in 0...completeRoute.candidates.length)for(j in 0...4)
@@ -1347,7 +1347,7 @@ class KinematicsTests extends MotionKitTestSupport {
       near(componentFiltered.candidates[i].q[j],fullFiltered.candidates[i].q[j],
         "component packet blocked edges retain the exhaustive alternative route",1e-12);
     throws(function() motionkit.robot.StructuredLadder.search(partitionProblem,null,0,null,null,null,
-      mk_lattice_candidate.size()),"connected components exceeding a packet are diagnosed without pruning states");
+      motionkit.robot.StructuredLadder.packetCandidateBytes(partitionProblem)),"connected components exceeding a packet are diagnosed without pruning states");
     // Abstract ladder coordinates outside the integer-bin range retain the
     // exhaustive typed-sort fallback; no physical model solve is involved.
     for(layer in partitionProblem.samples)for(candidate in layer.candidates)candidate.q[0]+=3e9;

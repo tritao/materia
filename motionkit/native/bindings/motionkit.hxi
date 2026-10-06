@@ -83,6 +83,14 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 */
 	extern fn mk_search_ladder(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_lattice_candidate>> @in_array("candidate_count"), state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result> @out) -> mk_result;
 	/**
+	 * Compact equivalent of filtered ladder search. Joints are candidate-major,
+	 * with joint_count values per candidate. Coordinates are candidate-major:
+	 * external_count external cells, then roll, tilt, azimuth and branch.
+	 * Wrap and singular metadata stay with the caller; search uses physical joints.
+	 * Array lengths must exactly match these dimensions.
+	 */
+	extern fn mk_search_ladder_compact_filtered(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, joints: ptr<const<f64>> @in_array("joint_value_count"), joint_value_count: u32, coordinates: ptr<const<u32>> @in_array("coordinate_count"), coordinate_count: u32, state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, blocked_edges: ptr<const<mk_ladder_edge>> @in_array("blocked_edge_count"), blocked_edge_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result> @out) -> mk_result;
+	/**
 	 * Same search with collision-excluded transitions; endpoint states remain available.
 	 */
 	extern fn mk_search_ladder_filtered(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_lattice_candidate>> @in_array("candidate_count"), state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, blocked_edges: ptr<const<mk_ladder_edge>> @in_array("blocked_edge_count"), blocked_edge_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result> @out) -> mk_result;

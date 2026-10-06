@@ -126,6 +126,20 @@ int main(){
         unsigned indices[4];mk_ladder_result report;
         auto status=mk_search_ladder(&request,samples,4,flat.data(),prices.data(),flat.size(),indices,&report);
         assert(status==(failed==UINT32_MAX?MK_OK:MK_ERROR_GENERATION));assert(report.failed_sample==failed);
+        std::vector<double> compact_joints;std::vector<uint32_t> compact_cells;
+        for(const auto &layer:compact){compact_joints.insert(compact_joints.end(),layer.joints.begin(),layer.joints.end());
+            compact_cells.insert(compact_cells.end(),layer.cells.begin(),layer.cells.end());}
+        unsigned compact_indices[4];mk_ladder_result compact_report;
+        auto compact_status=mk_search_ladder_compact_filtered(&request,samples,4,
+            compact_joints.data(),compact_joints.size(),compact_cells.data(),compact_cells.size(),
+            prices.data(),flat.size(),nullptr,0,compact_indices,&compact_report);
+        assert(compact_status==status && compact_report.failed_sample==report.failed_sample);
+        assert(compact_report.cost==report.cost && compact_report.backend==report.backend);
+        if(status==MK_OK)assert(std::equal(indices,indices+4,compact_indices));
+        assert(mk_search_ladder_compact_filtered(&request,samples,4,
+            compact_joints.data(),compact_joints.size()-1,compact_cells.data(),compact_cells.size(),
+            prices.data(),flat.size(),nullptr,0,compact_indices,&compact_report)==MK_ERROR_INVALID_ARGUMENT);
+
         if(status==MK_OK){assert(report.backend==3);assert(std::abs(report.cost-result.cost)<1e-10);}
         if(status==MK_OK){
             mk_ladder_edge blocked{sizeof(mk_ladder_edge),1,indices[0]-samples[0].first_candidate,indices[1]-samples[1].first_candidate};
@@ -140,6 +154,12 @@ int main(){
                 auto filtered=mk_search_ladder_filtered(&request,samples,4,flat.data(),prices.data(),flat.size(),&blocked,1,indices,&report);
                 assert(filtered==(expected.failed==UINT32_MAX?MK_OK:MK_ERROR_GENERATION));
                 assert(report.failed_sample==expected.failed);
+                auto compact_filtered_status=mk_search_ladder_compact_filtered(&request,samples,4,
+                    compact_joints.data(),compact_joints.size(),compact_cells.data(),compact_cells.size(),
+                    prices.data(),flat.size(),&blocked,1,compact_indices,&compact_report);
+                assert(compact_filtered_status==filtered && compact_report.failed_sample==report.failed_sample);
+                assert(compact_report.cost==report.cost && compact_report.backend==report.backend);
+                if(filtered==MK_OK)assert(std::equal(indices,indices+4,compact_indices));
                 if(filtered==MK_OK){assert(report.backend==(coarse_stride?2u:3u));assert(std::abs(report.cost-expected.cost)<1e-10);
                     assert(indices[0]-samples[0].first_candidate!=blocked.from_candidate || indices[1]-samples[1].first_candidate!=blocked.to_candidate);}
             }

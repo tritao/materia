@@ -427,6 +427,19 @@ MK_API mk_result MK_CALL mk_search_ladder_filtered(const mk_ladder_request *requ
     const mk_ladder_edge *blocked_edges MK_IN_ARRAY(blocked_edge_count), uint32_t blocked_edge_count,
     uint32_t *out_indices MK_OUT_ARRAY(sample_count), mk_ladder_result *out_result MK_OUT);
 
+/** Compact equivalent of filtered ladder search. Joints are candidate-major,
+ * with joint_count values per candidate. Coordinates are candidate-major:
+ * external_count external cells, then roll, tilt, azimuth and branch.
+ * Wrap and singular metadata stay with the caller; search uses physical joints.
+ * Array lengths must exactly match these dimensions. */
+MK_API mk_result MK_CALL mk_search_ladder_compact_filtered(const mk_ladder_request *request,
+    const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
+    const double *joints MK_IN_ARRAY(joint_value_count), uint32_t joint_value_count,
+    const uint32_t *coordinates MK_IN_ARRAY(coordinate_count), uint32_t coordinate_count,
+    const double *state_costs MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
+    const mk_ladder_edge *blocked_edges MK_IN_ARRAY(blocked_edge_count), uint32_t blocked_edge_count,
+    uint32_t *out_indices MK_OUT_ARRAY(sample_count), mk_ladder_result *out_result MK_OUT);
+
 MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
     const mk_configuration_candidate *candidates MK_IN_ARRAY(candidate_count), uint32_t candidate_count,

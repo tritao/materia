@@ -33,13 +33,18 @@ class StructuredLadder {
 
   public static function search(problem:CandidateProblem,?weights:Array<Float>,rollWeight:Float=0,
       ?stateCost:(Int,LatticeCandidate)->Float,?coarse:CoarseSearchOptions,?blockedEdges:Array<BlockedLadderEdge>,maxPacketBytes:Int=268435456):LadderSelection {
-    if(maxPacketBytes<mk_lattice_candidate.size() || maxPacketBytes>268435456)
+    if(problem==null)throw "Ladder search requires a problem";
+    if(maxPacketBytes<packetCandidateBytes(problem) || maxPacketBytes>268435456)
       throw "Ladder packet budget must hold a candidate and stay within the FFI safety limit";
     return searchRegion(problem,weights,rollWeight,stateCost,coarse,blockedEdges,candidate->true,maxPacketBytes);
   }
 
+  public static function packetCandidateBytes(problem:CandidateProblem):Int {
+    return problem.request.startQ.length*8+(problem.externalJoints.length+4)*4+8;
+  }
+
   // A gap wider than the jump bound in any joint disconnects the graph.
-  // Search those components separately when fixed-capacity ABI records would
+  // Search those components separately when compact candidate arrays would
   // exceed the FFI packet limit. Every state/edge and its cost is retained.
   static function searchRegion(problem:CandidateProblem,weights:Null<Array<Float>>,rollWeight:Float,
       stateCost:Null<(Int,LatticeCandidate)->Float>,coarse:Null<CoarseSearchOptions>,
@@ -47,7 +52,7 @@ class StructuredLadder {
     if(problem==null || problem.samples.length==0)throw "Ladder search requires candidate layers";
     var count=0;
     for(layer in problem.samples)for(candidate in layer.candidates)if(allowed(candidate))count++;
-    if(count>Std.int(maxPacketBytes/mk_lattice_candidate.size())) {
+    if(count>Std.int(maxPacketBytes/packetCandidateBytes(problem))) {
       for(joint in 0...problem.request.startQ.length){
         // Values inside a jump-width bin cannot be separated by a legal
         // disconnection. Retain its extremes, rather than sorting one value
@@ -105,24 +110,22 @@ class StructuredLadder {
       request.set_corridor_radius(coarse.radius);request.set_corridor_widenings(coarse.widenings);}
     for(j in 0...n){request.set_max_jump(j,path.maxJump[j]);request.set_velocity(j,path.velocity[j]);
       request.set_weights(j,weights==null ? 1.0 : weights[j]);request.set_start_joints(j,path.startQ[j]);}
-    var samples:Array<mk_configuration_sample> = [],candidates:Array<mk_lattice_candidate> = [],costs:Array<Float> = [];
+    var samples:Array<mk_configuration_sample> = [],joints:Array<Float> = [],coordinates:Array<Int> = [],costs:Array<Float> = [];
     var originals:Array<LatticeCandidate> = [];
     var localMaps:Array<Array<Int>> = [];
     for(i in 0...problem.samples.length){var layer=problem.samples[i];
       var sample=new mk_configuration_sample();sample.set_struct_size(mk_configuration_sample.size());sample.set_distance(layer.distance);
-      sample.set_first_candidate(candidates.length);samples.push(sample);
+      sample.set_first_candidate(originals.length);samples.push(sample);
       var localMap:Array<Int> = [],localCount=0;localMaps.push(localMap);
       for(c in layer.candidates){
         if(!allowed(c)){localMap.push(-1);continue;}
         localMap.push(localCount++);
         if(c.q.length!=n || c.wraps.length!=n || c.external.length!=problem.externalJoints.length)
           throw "Ladder candidate dimensions must match the problem";
-        var record=new mk_lattice_candidate();record.set_struct_size(mk_lattice_candidate.size());
-        for(j in 0...n){record.set_joints(j,c.q[j]);record.set_wraps(j,c.wraps[j]);}
-        for(j in 0...c.external.length)record.set_external_coordinates(j,c.external[j]);
-        record.set_roll_index(c.roll);record.set_tilt_index(c.tilt);record.set_azimuth_index(c.azimuth);
-        record.set_branch(c.branch);record.set_singular(c.singular);
-        candidates.push(record);originals.push(c);
+        for(value in c.q)joints.push(value);
+        for(value in c.external)coordinates.push(value);
+        coordinates.push(c.roll);coordinates.push(c.tilt);coordinates.push(c.azimuth);coordinates.push(c.branch);
+        originals.push(c);
       }
       sample.set_candidate_count(localCount);
     }
@@ -144,9 +147,9 @@ class StructuredLadder {
     }
     var costSeconds=profiling?Sys.time()-costStarted:0.0;
     var nativeStarted=profiling?Sys.time():0.0;
-    var result=MotionKitNative.mk_search_ladder_filtered(request,samples,candidates,costs,exclusions);
+    var result=MotionKitNative.mk_search_ladder_compact_filtered(request,samples,joints,coordinates,costs,exclusions);
     if(profiling)Sys.println("PROCESS_PATH_LADDER_PROFILE "+haxe.Json.stringify({
-      samples:samples.length,candidates:candidates.length,packetBytes:candidates.length*mk_lattice_candidate.size(),
+      samples:samples.length,candidates:originals.length,packetBytes:originals.length*packetCandidateBytes(problem),
       packingSeconds:packingSeconds,stateCostSeconds:costSeconds,nativeCallSeconds:Sys.time()-nativeStarted}));
     if(result.status==TrajectoryCoreConstants.MK_ERROR_GENERATION){var report=result.out_result;
       return new LadderSelection([],report.get_cost(),report.get_failed_sample(),report.get_failed_distance(),
