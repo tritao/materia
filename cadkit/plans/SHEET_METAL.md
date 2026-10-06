@@ -1016,7 +1016,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM13 | blocked: waits for SM11 and SM12; MT8 full gripper/tool-kind support and MT10 `signal`/`waitFor`/`moveVia` mission steps are not on local main 3bc5f73aa; MT3 `CobotArm` is present, while MT6/MT7 remain prerequisites through SM11 | |
 | SM14 | blocked: requires the SM13 one-bend cell; SM13 waits for SM11/SM12 and MT8/MT10, while SM11 waits for MT6/MT7 on local main 3bc5f73aa | |
 | SM15 | blocked: requires SM14 multi-bend simulation to supply measured bends for calibration | |
-| SM16 | planned | |
+| SM16 | blocked: requires SM15 calibration and the preceding simulated bending cell (SM13–SM15) for safe-state fault and recovery scenarios | |
 | SM17 | later | |
 | SM18 | later | |
 
