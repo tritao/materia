@@ -481,6 +481,9 @@ class MotionSystem {
   public function homingStatus():String
     return homingCycle == null ? "Idle" : homingCycle.status();
 
+  public function homingAxis():Null<String>
+    return homingCycle == null ? null : homingCycle.axisId();
+
   /** Sensor homing when authored switches exist; coordinate move for unswitched robots. */
   public function home(?options:MotionOptions):Null<Trajectory> {
     if (homingAxes.length > 0) {

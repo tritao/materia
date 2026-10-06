@@ -815,7 +815,7 @@ class ProjectSourceTests {
   }
 
   /** Runs the actual Cartesian picker mission and measures its placement and drive budget. */
-  static function checkGantryPicker(root:String, yaw:Bool = false):Void {
+  static function checkGantryPicker(root:String, yaw:Bool = false, paced:Bool = false):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/gantry-picker/" + (yaw ? "materia.yaw.project.json" : "materia.project.json"));
     var generated = MateriaProjectRunner.loadProject(manifest);
     var definition:AssemblyDefinition = cast generated.assemblyDefinition;
@@ -848,6 +848,9 @@ class ProjectSourceTests {
         if (found.length != 1) throw "picker has no unique pose for " + id;
         return found[0];
       }
+      check(mission.statusLabel() == "Waiting for home switches", "picker explains its startup wait");
+      if (paced) simulation.start();
+      var lastReport = Sys.time();
       var lastDone = 0, placed = 0, ticks = 0;
       var bytes = 0.0, measuredTicks = 0;
       var previousPlan:Null<motionkit.trajectory.ExecutionPlan> = null;
@@ -865,7 +868,14 @@ class ProjectSourceTests {
       while (!mission.finished && simulation.activeSession().simulationTime() < 600) {
         var before = hl.Gc.totalAllocated();
         var priorPlan = motion.executor.plan;
-        simulation.step();
+        if (paced) {
+          simulation.runTicks(1);
+          Sys.sleep(simulation.timestep);
+          if (Sys.time() - lastReport >= 5) {
+            lastReport = Sys.time();
+            Sys.println('picker realtime: t=${simulation.activeSession().simulationTime()} completed=${mission.completed} homing=${mission.homingSeconds} status=${mission.statusLabel(true)} failure=${mission.failure}');
+          }
+        } else simulation.step();
         var currentHandling:Null<motionkit.robot.HandlingPlanRunner> = mission.handling;
         if (currentHandling == null) throw "Picker handling runner disappeared";
         motion = currentHandling.motion;
@@ -940,7 +950,10 @@ class ProjectSourceTests {
           check(held.join(",") == "project:" + at.occurrence, "picker picks the intended carton");
         } else {
           check(held.length == 0, "picker releases each carton");
-          for (_ in 0...50) simulation.step();
+          for (_ in 0...50) {
+            if (paced) { simulation.runTicks(1); Sys.sleep(simulation.timestep); }
+            else simulation.step();
+          }
           var at = step.at;
           if (at == null) throw "picker place has no slot";
           var seat = placement.worldConnector(at.occurrence, at.connector);
@@ -962,10 +975,11 @@ class ProjectSourceTests {
         mission.completed + ", placed=" + placed + ", plans=" + planned + ", homing=" + mission.homingSeconds +
         ", time=" + simulation.activeSession().simulationTime() + ", motion=" + motion.sessionState() +
         ", q=" + mission.robot.runtime.snapshot().q.toArray().join(","));
+      check(mission.statusLabel() == "Mission complete", "picker reports mission completion");
       check(planned > 0 && motion.checks.plans > 0, "picker executes physically checked plans");
       check(motion.checks.count(PlanDiagnosticKind.StepperStall) == 0, "picker drive checks report no stall");
       check(measuredTicks > 0 && bytes / measuredTicks < 200000, "picker allocates below its assumed 200 KB execution-tick budget");
-      Sys.println((yaw ? "gantry C-head yaw picker mission: " : "gantry picker mission: ") + simulation.activeSession().simulationTime() + " s, six cartons; " +
+      Sys.println((yaw ? "gantry C-head yaw picker mission: " : "gantry picker mission: ") + simulation.activeSession().simulationTime() + " s, six cartons; homing " + mission.homingSeconds + " s; " +
         Math.round(bytes / measuredTicks) + " bytes per execution tick; " + planned + " plans, no stalls");
       simulation.clear(); session.dispose();
     } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
@@ -2915,6 +2929,10 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-yaw") {
       checkGantryPicker(root, true);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-realtime") {
+      checkGantryPicker(root, false, true);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry") {

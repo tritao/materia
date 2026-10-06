@@ -53,6 +53,7 @@ class HomingCycle {
   }
 
   public function status():String return Std.string(phase);
+  public function axisId():Null<String> return index < axes.length ? axes[index].id : null;
   public function isComplete():Bool return phase == Complete;
   public function isActive():Bool return phase != Idle && phase != Complete && phase != Fault;
 

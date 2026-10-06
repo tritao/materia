@@ -451,6 +451,28 @@ class MissionPlayer implements SessionMember {
     homing = view; homingComplete = false;
   }
 
+  /** User-facing progress, including the startup sequence before the first mission step. */
+  public function statusLabel(detailed:Bool = false):String {
+    if (failure != null) return detailed ? "Mission failed: " + failure : "Mission failed";
+    if (finished) return "Mission complete";
+    var homeView = homing;
+    if (!homingComplete && homeView != null) {
+      if (!homingStarted) return "Waiting for home switches";
+      var axis = homeView.homingAxis();
+      var label = "Homing" + (axis == null ? "" : " " + axis.split("/").pop().toUpperCase());
+      if (!detailed) return label;
+      var phase = switch homeView.homingStatus() {
+        case "Seek": "finding switch";
+        case "Backoff": "backing off switch";
+        case "Approach": "locating switch edge";
+        case "Return": "returning to home";
+        default: "waiting for drive confirmation";
+      };
+      return label + " · " + phase;
+    }
+    return "Step " + (completed + 1) + " / " + mission.steps.length + " · " + mission.steps[stepIndex].kind;
+  }
+
   public function feed():Void {
     if (failure != null || finished) return;
     var homeView = homing;

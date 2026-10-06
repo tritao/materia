@@ -634,6 +634,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   // The worker-thread build behind startLoading, when the example is a project.
   var startJob:Null<ProjectLoadJob> = null;
   var startFailure:Null<String> = null;
+  var reportedMissionFailure:Null<String> = null;
   final startExamples = new app.editor.ExampleBrowser();
   // The Start page was opened only to show a launch project's progress, so it closes once that opens.
   var closeStartAfterOpen:Bool = false;
@@ -1030,6 +1031,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
       simulation.pump();
       if (hostContext != null) hostContext.requestFrame();
     }
+    var activeMission = simulation.missionPlayer();
+    var missionFailure = activeMission == null ? null : activeMission.failure;
+    if (missionFailure != reportedMissionFailure) {
+      reportedMissionFailure = missionFailure;
+      if (missionFailure != null) log("Mission failed: " + missionFailure);
+    }
     if (characterPreview != null) {
       characterPreview.advance(scene);
       if (hostContext != null) hostContext.requestFrame();
@@ -1406,9 +1413,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function simulationStateChip():View {
     var tokens = appearance.theme.tokens;
     var active = simulation.isActive();
-    var text = simulation.isRunning() ? "Running" : active ? "Paused" : "Design";
+    var mission = simulation.missionPlayer();
+    var missionFailed = mission != null && mission.failure != null;
+    var text = missionFailed || (simulation.isRunning() && mission != null)
+      ? mission.statusLabel() : simulation.isRunning() ? "Running" : active ? "Paused" : "Design";
     if (active && simulation.pending(sensors, scene)) text += " · rebuild pending";
-    var dotColor = simulation.isRunning() ? tokens.success : active ? tokens.warning : tokens.textSecondary;
+    var dotColor = missionFailed ? tokens.danger : simulation.isRunning() ? tokens.success : active ? tokens.warning : tokens.textSecondary;
     var chip = new LayoutStyle();
     chip.direction = LayoutDirection.LeftToRight;
     chip.childAlignY = LayoutAlignmentY.Center;
@@ -1453,6 +1463,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var selected = scene.object(scene.selectedId);
     var left = simulation.error != null ? "Simulation error: " + simulation.error :
       selected == null ? "Ready" : selected.label + " selected";
+    var mission = simulation.missionPlayer();
+    if (mission != null && simulation.isActive() && (simulation.isRunning() || mission.failure != null))
+      left = mission.statusLabel(true);
     var staleCount = session.staleEdits().length;
     if (staleCount > 0) left = staleCount + " stale project edit" + (staleCount == 1 ? "" : "s");
     var mode = simulation.isRunning() ? "Running" : simulation.isActive() ? "Paused" : "Design";
