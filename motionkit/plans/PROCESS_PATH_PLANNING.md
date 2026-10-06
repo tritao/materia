@@ -1565,3 +1565,20 @@ The initial integration regression caught global-prefix subtraction changing a l
 MotionKit compiler-only passes. Final C4 passes 1,150,875 assertions (`process-path-whole-sections-c4-events.log` in external scratch). Physical mixed-contact sections retain shared joints and locally timed coordinates; missing stop knots are rejected. A two-leg corner compiles to two stopped plans while its state costs receive one global nine-sample ladder. Distance events at the corner and final endpoint belong to the outgoing/final section, and worker compilation uses the same global selection. Tool freedom (340 assertions) and plan check (3,292 assertions) pass (`process-path-whole-sections-freedom.log` and `process-path-whole-sections-plancheck.log`), before only the added frame validation and event/worker regressions.
 
 This completes global section orchestration for structured FollowPath, not all PP6 or PP8: joined approach/retreat operations, remaining group defaults, geometric branch/chart segmentation, WeldPathPlanner search deletion and authored performance/quality gates remain outstanding. No full phase gate or production benchmark is claimed.
+
+### PP9 authored surface acceptance after global section selection
+
+Both WallFinishing backends pass against compiled source at clean production revision f46dd49d3. Compiler-only builds of the standard RobotKit tests and the separate MuJoCo project pass; existing native outputs were used without rebuilding them.
+
+| Backend | Planning seconds (three patches) | Cycle seconds | Numeric pose IK | Coverage | Maximum tracking error |
+|---|---|---|---|---|---|
+| Default | 0.823407 / 0.964375 / 0.924055 | 86.119952 / 85.144768 / 85.145687 | 0 / 0 / 0 | 0.9959946595 | 8.7595e-16 m |
+| MuJoCo | 0.832309 / 0.964837 / 0.985229 | 86.120070 / 85.144929 / 85.145073 | 0 / 0 / 0 | 0.9959946595 | 5.3762e-8 m |
+
+The default-backend mission passes 71 assertions, retaining exact cycle/quality records from the preceding bounded-construction migration and zero exclusion coverage. Planning remains near the PP0 0.91–1.01 s range. Its profile now covers complete 306/308-sample raster routes rather than separately selected corner sections. Records: external scratch `process-path-whole-sections-surface/results.json` and mission log.
+
+The separate MuJoCo runner passes 64 wall-finishing assertions, plus its preceding simulation pose-reset checks, with zero exclusion coverage and RMS tracking error 4.6417e-8 m. Its direct-run log and extracted records are `process-path-whole-sections-surface-mujoco.log` and `process-path-whole-sections-surface-mujoco-results.json`. This closes the previously missing focused MuJoCo Surface gate, not the full PP9 phase gate.
+
+The benchmark harness now includes `wall-finishing-mujoco`, using the separate project's module, standard test cwd and the MuJoCo native workspace libraries ahead of standard backend libraries. The new harness case was executed successfully: 64 assertions, planning 0.824284 / 0.945753 / 0.985022 s and identical cycle/quality records, retained in `process-path-whole-sections-surface-mujoco-harness/results.json`. That collection records f46dd49d3 plus the then-uncommitted harness patch; the compiled mission source is unchanged from the clean direct run.
+
+Weld search migration, toolpath migration, joined approaches/retreats, remaining mission gates, full phase boundaries and the required weld speedups remain outstanding. No weld performance acceptance is inferred from these surface results.

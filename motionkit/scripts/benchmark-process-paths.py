@@ -2,6 +2,7 @@
 """Run compiled acceptance checks and retain their measured planning/quality records.
 
 Build app/haxeon.project-source.json and robotkit/tests/haxeon.json first.
+For wall-finishing-mujoco, also build robotkit/tests/mujoco/haxeon.json.
 No historical values or estimates are substituted for missing measurements.
 Set PROCESS_PATH_PROFILE=1 to retain structured planner phase timings too.
 """
@@ -19,6 +20,7 @@ CASES = {
     "welder": ("app", "PROJECT_SOURCE_ONLY", "welder"),
     "gantry-welder": ("app", "PROJECT_SOURCE_ONLY", "gantry-welder"),
     "wall-finishing": ("robotkit/tests", "ROBOTKIT_ONLY", "wall-finishing"),
+    "wall-finishing-mujoco": ("robotkit/tests/mujoco", "ROBOTKIT_ONLY", "wall-finishing"),
     "handling": ("app", "PROJECT_SOURCE_ONLY", "arm"),
 }
 
@@ -42,7 +44,13 @@ def main():
         for key in ("PROJECT_SOURCE_ONLY", "ROBOTKIT_ONLY", "MOTIONKIT_HOMING_ONLY"):
             env.pop(key, None)
         env.update({selector: value, "PROCESS_PATH_BENCHMARK": "1", "HAXEON_HOME": str(ROOT / "haxeon")})
-        paths = [ROOT / "haxeon/out", ROOT / "haxeon/.tools/hashlink"]
+        paths = []
+        if name == "wall-finishing-mujoco":
+            # This backend's robotd/runtime must precede the standard test
+            # project's staged libraries. The compiler-only project shares
+            # the already-built native workspace outputs.
+            paths.append(ROOT / "build/workspace/host/cmake/robotkit-robotd-native-mujoco--robotd_native/out")
+        paths.extend([ROOT / "haxeon/out", ROOT / "haxeon/.tools/hashlink"])
         for native in (directory / "build/host/native", ROOT / "robotkit/tests/build/host/native"):
             if native.exists():
                 paths.extend(sorted({p.parent for pattern in ("*.hdll", "*.so", "*.so.*") for p in native.rglob(pattern)}))
@@ -55,7 +63,7 @@ def main():
         records = []
         log = args.output / (name + ".log")
         with log.open("w") as out:
-            process = subprocess.Popen(command, cwd=directory if project == "robotkit/tests" else ROOT,
+            process = subprocess.Popen(command, cwd=ROOT / "robotkit/tests" if project.startswith("robotkit/tests") else ROOT,
                                        env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             for line in process.stdout:
                 out.write(line)
