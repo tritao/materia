@@ -124,7 +124,7 @@ class WeldPathProgram {
   /** One compiler pass, including generated entry, drive/task/clearance checks
    * and rates derived from the final timed deposition sections. */
   public function compile(compiler:ProgramCompiler,group:KinematicGroup,start:Array<Float>,planId:Int64,
-      ?clearance:ArmClearance):CompiledProgram {
+      ?clearance:ArmClearance,?configuration:motionkit.kinematics.SixAxisConfiguration):CompiledProgram {
     var checking=new StructuredJointPathPlanner(group,null,null,clearance,8,false,
       null,null,null,0,null,problem.contact);
     var selected=new SelectedJointPathPlanner(compiler.solver,checking,problem.sections,curves);
@@ -139,7 +139,7 @@ class WeldPathProgram {
           Math.max(0.0,Math.min(lengths[section],overlap-seamOffsets[section])),
           processkit.tool.WeldArcModel.MIN_WIRE_SPEED);
     };
-    return execution.compile(program,start,planId);
+    return execution.compile(configuration==null ? program : new MotionProgram(program.ops,configuration),start,planId);
   }
 }
 

@@ -522,6 +522,12 @@ class MissionPlayer implements SessionMember {
     case _:
   }
 
+  function configurationFor(step:SceneArtifactMissionStep):Null<motionkit.kinematics.SixAxisConfiguration> {
+    if(step.configuration==null)return null;
+    var pin:materia.project.SceneArtifact.SceneArtifactArmConfiguration=cast step.configuration;
+    return new motionkit.kinematics.SixAxisConfiguration(pin.shoulder,pin.elbow,pin.wrist,pin.turns);
+  }
+
   function skillFor(step:SceneArtifactMissionStep):Skill {
     switch step.kind {
       case "moveJoints":
@@ -531,16 +537,18 @@ class MissionPlayer implements SessionMember {
         return new GoTo(activeNavigator, new NavigationGoal(floorPose(step), FRAME, POSITION_TOLERANCE, HEADING_TOLERANCE),
           observe);
       case "pick":
+        cast(handling,HandlingPlanRunner).configuration=configurationFor(step);
         var at:SceneArtifactPlace = cast step.at;
         grasped = at;
         return HandlePart.pick(cast handling, localization, () -> graspPoint(at), vacuumSensor, 40.0, handlingOrientation(step));
       case "place":
+        cast(handling,HandlingPlanRunner).configuration=configurationFor(step);
         var at:SceneArtifactPlace = cast step.at;
         return HandlePart.place(cast handling, localization, () -> placeContact(at, step.yaw), vacuumSensor, 40.0, handlingOrientation(step));
       case "weld":
         var weld:SceneArtifactWeld = cast step.weld;
         return new processkit.skill.WeldPasses([for (pass in weld.passes)
-          () -> weldPassSkill(weld, pass)],
+          () -> weldPassSkill(weld, pass,configurationFor(step))],
           [for (pass in weld.passes) pass.interpassDwell]);
       default:
         throw 'Mission step kind "${step.kind}" is not supported';
@@ -603,14 +611,15 @@ class MissionPlayer implements SessionMember {
       if (!found) throw 'Joint "${target.joint}" is outside the chain ending at "$name"';
     }
     return new MotionProgramSkill(motion, new MotionProgram([
-      MotionOp.MoveJ(MoveTarget.JointTarget(q), new MotionOptions(), Blend.ExactStop)]));
+      MotionOp.MoveJ(MoveTarget.JointTarget(q), new MotionOptions(), Blend.ExactStop)],configurationFor(step)));
   }
 
   /** Builds one weld pass using the shared welding runner. */
-  function weldPassSkill(weld:SceneArtifactWeld, pass:materia.project.SceneArtifact.SceneArtifactWeldPass):Skill {
+  function weldPassSkill(weld:SceneArtifactWeld, pass:materia.project.SceneArtifact.SceneArtifactWeldPass,?configuration:motionkit.kinematics.SixAxisConfiguration):Skill {
     var factory = newWelding;
     if (factory == null) throw "Weld mission has no welding runner";
     welding = factory();
+    cast(welding,WeldingPlanRunner).configuration=configuration;
     return new WeldSeam(cast welding, localization, () -> weldPlan(weld, pass), cast weldSensor);
   }
 

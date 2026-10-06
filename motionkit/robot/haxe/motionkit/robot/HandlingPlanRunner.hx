@@ -30,6 +30,7 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
 
   public final motion:ManipulatorMotion;
   public final channel:String;
+  public var configuration:Null<motionkit.kinematics.SixAxisConfiguration> = null;
   /** The arm's home joints, in its chain order, and the tool's pose there in the base frame. */
   public final home:Array<Float>;
   public final homePose:Pose3;
@@ -106,7 +107,7 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
       MotionOp.Dwell(dwell),
       MotionOp.MoveL(above, FRAME, contactSpeed, Blend.ExactStop, policy),
       MotionOp.MoveJ(MoveTarget.JointTarget(home), new MotionOptions(), Blend.ExactStop)
-    ]);
+    ],configuration);
   }
 
   public function update(dtSeconds:Float):Void motion.update(dtSeconds);

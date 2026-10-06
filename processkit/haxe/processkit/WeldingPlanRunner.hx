@@ -106,6 +106,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   /** Cartesian accuracy the seam is followed to, in metres. */
   public static inline var PATH_TOLERANCE:Float = 0.0005;
   public final motion:ManipulatorMotion;
+  public var configuration:Null<motionkit.kinematics.SixAxisConfiguration> = null;
   public final channels:WelderChannels;
   public final maxRestarts:Int;
   /** The process run of the weld in progress. */
@@ -271,7 +272,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var group=cast(motion.compiler.solver,ManipulatorKinematics).manipulator;
     var began=Sys.time(),before=group.numericSolveCount();
     var program=new WeldPathProgram(problem,curves,channels);
-    var compiled=program.compile(motion.compiler,group,startPositions(),motion.compilationPlanId(),clearance);
+    var compiled=program.compile(motion.compiler,group,startPositions(),motion.compilationPlanId(),clearance,configuration);
     try {
       selectedProblem=problem;selectedProgram=program;selectedCompilation=compiled;
       var last=curves[curves.length-1],checked=0;
@@ -299,7 +300,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       var points=span==0 ? 1 : Std.int(Math.ceil(span/(request.maxJump[joint]*0.5)))+1;
       ranges.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,limits.lower,limits.upper,points));
     }
-    var sampling=new motionkit.robot.CandidateProblem.CandidateSamplingOptions(8,3,8,false,ranges);
+    var sampling=new motionkit.robot.CandidateProblem.CandidateSamplingOptions(8,3,8,false,ranges,null,configuration);
     return problem.selectWithCost(group,request,sampling,clearance,(from,to)->{
       var entry=motion.compiler.generateEntry(from,to);
       try {
@@ -431,7 +432,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
         var began=Sys.time(),before=group.numericSolveCount();
         var curves=selectProblem(problem,stopped).curves;
         var program=new WeldPathProgram(problem,curves,channels,process.interruptedAt);
-        var compiled=program.compile(motion.compiler,group,stopped,motion.compilationPlanId(),clearance);
+        var compiled=program.compile(motion.compiler,group,stopped,motion.compilationPlanId(),clearance,configuration);
         if(selectedCompilation!=null)selectedCompilation.dispose();
         selectedProgram=program;selectedCompilation=compiled;
         planningSeconds+=Sys.time()-began;planningIkSolves+=group.numericSolveCount()-before;

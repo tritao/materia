@@ -6,6 +6,7 @@ import motionkit.planner.JointPathSamples;
 
 /** Select and refine one path; timing consumes the returned joint curve. */
 interface JointPathPlanner {
+  function withConfiguration(configuration:motionkit.kinematics.SixAxisConfiguration):JointPathPlanner;
   function withSolver(solver:motionkit.kinematics.KinematicsSolver):JointPathPlanner;
   function allowsFreeStart():Bool;
   function retreatTarget():Null<Array<Float>>;

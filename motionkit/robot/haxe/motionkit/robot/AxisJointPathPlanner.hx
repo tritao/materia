@@ -14,6 +14,8 @@ class AxisJointPathPlanner implements JointPathPlanner {
     if (solver == null) throw "Axis path planner requires axis kinematics";
     this.solver = solver;
   }
+  public function withConfiguration(configuration:motionkit.kinematics.SixAxisConfiguration):JointPathPlanner
+    throw "Configuration pin requires a labelled six-axis geometric backend";
   public function withSolver(worker:KinematicsSolver):JointPathPlanner {
     if (!Std.isOfType(worker, AxisKinematics)) throw "Axis planner worker requires axis kinematics";
     return new AxisJointPathPlanner(cast worker);

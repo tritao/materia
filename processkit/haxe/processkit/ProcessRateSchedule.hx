@@ -83,7 +83,7 @@ class ProcessRateSchedule {
         ops[op] = MotionOp.FollowPath(path, frame, feed, scheduled);
       case _: throw "A process rate schedule requires a FollowPath operation";
     }
-    return new MotionProgram(ops);
+    return new MotionProgram(ops,program.configuration);
   }
 
   /** Keep a process engaged over already deposited material, restoring the normal dose exactly at its end. */

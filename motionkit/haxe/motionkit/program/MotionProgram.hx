@@ -5,11 +5,15 @@ import motionkit.event.EventValueTools;
 /** Ordered motion request with structural validation and a copied operation list. */
 class MotionProgram {
   public final ops:Array<MotionOp>;
+  /** Hard geometric configuration and optional physical turns for the complete program. */
+  public final configuration:Null<motionkit.kinematics.SixAxisConfiguration>;
 
-  public function new(ops:Array<MotionOp>) {
+  public function new(ops:Array<MotionOp>, ?configuration:motionkit.kinematics.SixAxisConfiguration) {
     var error = validate(ops);
     if (error != null) throw error;
     this.ops = ops.copy();
+    this.configuration = configuration == null ? null : new motionkit.kinematics.SixAxisConfiguration(
+      configuration.shoulder, configuration.elbow, configuration.wrist, configuration.turns);
   }
 
   /** Returns the first structural error, including the operation index. */

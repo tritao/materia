@@ -181,6 +181,18 @@ class ProjectKitTests {
     var jointBack = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
     check(jointBack != null && jointBack.steps[0].joints[0].position == 0.02 &&
       jointBack.steps[0].joints[0].joint == "lift", "absolute joint mission round trip in metres");
+    jointStep.configuration={shoulder:"front",elbow:"up",wrist:"no-flip",turns:[0,0,0,0,0,2]};
+    var pinnedMission=SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    if(pinnedMission==null || pinnedMission.steps[0].configuration==null)throw "Mission configuration was lost";
+    var restoredPin:materia.project.SceneArtifact.SceneArtifactArmConfiguration=cast pinnedMission.steps[0].configuration;
+    var restoredTurns:Array<Int> =cast restoredPin.turns;
+    check(restoredTurns[5]==2,"mission configuration and physical turns round trip");
+    var authoredPin:materia.project.SceneArtifact.SceneArtifactArmConfiguration=cast jointStep.configuration;
+    authoredPin.turns=[0];
+    rejects(function() SceneArtifact.encode(data),"mission rejects malformed configuration turns");
+    authoredPin.turns=null;authoredPin.shoulder="left";
+    rejects(function() SceneArtifact.encode(data),"mission rejects an unknown shoulder configuration");
+    jointStep.configuration=null;
     jointStep.joints.push({joint: "lift", position: 0.03});
     rejects(function() SceneArtifact.encode(data), "joint mission repeats a joint");
     jointStep.joints.pop(); jointStep.joints[0].joint = "missing";

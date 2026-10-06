@@ -1,5 +1,7 @@
 package motionkit.robot;
 
+import motionkit.kinematics.SixAxisConfiguration;
+
 import motionkit.path.OrientationPolicy;
 import motionkit.robot.AnalyticIk.AnalyticBranch;
 

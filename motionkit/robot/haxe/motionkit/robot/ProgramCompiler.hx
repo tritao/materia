@@ -73,6 +73,7 @@ class ProgramCompiler {
   final jointIds:Null<Array<String>>;
   final couplings:Null<Array<JointCoupling>>;
   final controllerPeriodSeconds:Float;
+  var configurationConstraint:Null<ConfigurationConstraint> = null;
   /**
    * The plan check every compiled program goes through, or null for none, for simulation and device.
    * Its findings are on `ExecutionPlan.checked`. Direct MotionSystem moves and live ServoSession
@@ -93,6 +94,7 @@ class ProgramCompiler {
       ikTolerance,planner,perJointMaxJump,jointIds,couplings,controllerPeriodSeconds);
     result.planningAssumptions=planningAssumptions.copy();
     result.planCheck=planCheck==null?null:planCheck.fork();
+    result.configurationConstraint=configurationConstraint;
     result.motorSpace=motorSpace;result.pathEventSchedule=pathEventSchedule;
     return result;
   }
@@ -112,6 +114,8 @@ class ProgramCompiler {
     // The worker plans one program in order, so it remembers which way each axis last moved.
     worker.planningAssumptions = planningAssumptions.copy();
     if (planCheck != null) worker.planCheck = planCheck.fork();
+    worker.configurationConstraint = configurationConstraint == null ? null :
+      new ConfigurationConstraint(forked,configurationConstraint.configuration);
     worker.motorSpace = motorSpace;
     worker.pathEventSchedule = pathEventSchedule;
     return worker;
@@ -242,8 +246,20 @@ class ProgramCompiler {
 
   /** Starts planning `program` one op at a time into `sink`; see `ProgramCompilation`. */
   public function begin(program:MotionProgram, initialQ:Array<Float>, firstPlanId:Int64,
-      firstOp:Int, speedScale:Float, sink:ProgramSink):ProgramCompilation
-    return new ProgramCompilation(this, program, initialQ, firstPlanId, firstOp, speedScale, sink);
+      firstOp:Int, speedScale:Float, sink:ProgramSink):ProgramCompilation {
+    if(program==null || initialQ==null || initialQ.length!=solver.jointCount())
+      throw "Program compiler needs a program and complete start position";
+    for(value in initialQ)if(!Math.isFinite(value))throw "Non-finite program start position";
+    var compiler=this;
+    if(program.configuration!=null){
+      var pin:motionkit.kinematics.SixAxisConfiguration=cast program.configuration;
+      if(jointPathPlanner==null)throw "Configuration-pinned program requires a joint path planner";
+      compiler=withJointPathPlanner(jointPathPlanner.withConfiguration(pin));
+      compiler.configurationConstraint=new ConfigurationConstraint(solver,pin);
+    }
+    if(compiler.configurationConstraint!=null)compiler.configurationConstraint.require(initialQ);
+    return new ProgramCompilation(compiler, program, initialQ, firstPlanId, firstOp, speedScale, sink);
+  }
 
   /** Finishes the pending motion as a plan and delivers it. */
   function retire(c:ProgramCompilation):Void {
@@ -586,6 +602,8 @@ class ProgramCompiler {
         if (failure != null)
           throw 'compiled trajectory clearance (${failure.a}, ${failure.b}): ${failure.distance} < ${failure.required}';
       }
+      if(configurationConstraint!=null)configurationConstraint.checkTrajectory(
+        projected == null ? pending.trajectory : projected,controllerPeriodSeconds);
       plan = ExecutionPlan.create(projected == null ? pending.trajectory : projected,
         pending.path == null ? limits : limits.withoutJerk(), id, pending.startQ,
         zeros(), zeros(), startTolerances.position, startTolerances.velocity,
@@ -633,7 +651,8 @@ class ProgramCompiler {
         joints.copy();
       case PoseTarget(pose, requestedFrame, _):
         requireFrame(requestedFrame, index);
-        var candidates = solver.sampleCandidates(pose, 32, ikTolerance, null);
+        var candidates = configurationConstraint==null ? solver.sampleCandidates(pose, 32, ikTolerance, null) :
+          configurationConstraint.candidates(pose,start);
         if (candidates.length == 0) throw 'Motion program op $index unreachable pose';
         var best:Null<Array<Float>> = null;
         var bestCost = Math.POSITIVE_INFINITY;

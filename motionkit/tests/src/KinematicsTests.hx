@@ -1845,14 +1845,14 @@ class KinematicsTests extends MotionKitTestSupport {
     var labels=["front/up/no-flip","front/down/no-flip","back/up/no-flip","back/down/no-flip",
       "front/up/flip","front/down/flip","back/up/flip","back/down/flip"];
     for(slot in 0...8){
-      var configuration=motionkit.robot.SixAxisConfiguration.of("OPW",slot,[0,0,0,0,0,0]);
+      var configuration=motionkit.kinematics.SixAxisConfiguration.of("OPW",slot,[0,0,0,0,0,0]);
       check(configuration.label()==labels[slot]+" turns=[0,0,0,0,0,0]","OPW slots have explicit controller-style conventions");
     }
-    var counted=motionkit.robot.SixAxisConfiguration.of("OPW",0,[-2*Math.PI-0.1,-Math.PI,Math.PI,2*Math.PI+0.1,0,4*Math.PI+0.2]);
+    var counted=motionkit.kinematics.SixAxisConfiguration.of("OPW",0,[-2*Math.PI-0.1,-Math.PI,Math.PI,2*Math.PI+0.1,0,4*Math.PI+0.2]);
     check(haxe.Json.stringify(counted.turns)=="[-1,0,1,1,0,2]","physical turn counts use the half-open principal interval");
-    check(new motionkit.robot.SixAxisConfiguration("front","up","no-flip").accepts(counted),"geometric pins leave physical turns free");
-    check(!new motionkit.robot.SixAxisConfiguration("front","up","no-flip",[0,0,0,0,0,0]).accepts(counted),"turn pins reject a different periodic lift");
-    var urConvention=motionkit.robot.SixAxisConfiguration.of("UR6R",4,[0,0,0,0,0,0]);
+    check(new motionkit.kinematics.SixAxisConfiguration("front","up","no-flip").accepts(counted),"geometric pins leave physical turns free");
+    check(!new motionkit.kinematics.SixAxisConfiguration("front","up","no-flip",[0,0,0,0,0,0]).accepts(counted),"turn pins reject a different periodic lift");
+    var urConvention=motionkit.kinematics.SixAxisConfiguration.of("UR6R",4,[0,0,0,0,0,0]);
     check(urConvention.shoulder=="back" && urConvention.wrist=="no-flip","UR shoulder and wrist bits differ from OPW");
 
     var model = new RobotModel("opw-abb-test");
@@ -2032,7 +2032,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var wrappedQ = [0.2, -0.3, 0.4, -0.5, 0.6, 3 * Math.PI + 0.2];
     var wrappedTarget = new ManipulatorKinematics(wrappedArm).forward(wrappedQ);
     var foundOriginal = false;
-    var originalConfiguration:Null<motionkit.robot.SixAxisConfiguration> = null;
+    var originalConfiguration:Null<motionkit.kinematics.SixAxisConfiguration> = null;
     for (branch in shared.branches(wrappedTarget, wrappedQ)) {
       check(branch.branch >= 0 && branch.branch < 8, "OPW shared interface preserves native branch identity");
       var same = true;
@@ -2041,7 +2041,7 @@ class KinematicsTests extends MotionKitTestSupport {
       if(same)originalConfiguration=branch.configuration;
       foundOriginal = foundOriginal || same;
     }
-    var pin:motionkit.robot.SixAxisConfiguration=cast originalConfiguration;
+    var pin:motionkit.kinematics.SixAxisConfiguration=cast originalConfiguration;
     var pinRequest=new PathRequest([0.0,1.0],[wrappedTarget,wrappedTarget],wrappedQ,new IkTolerance(1e-6,1e-6),
       [for(_ in wrappedQ)7.0],[for(_ in wrappedQ)1.0]);
     var pinned=new motionkit.robot.CandidateProblem(wrappedArm,pinRequest,
@@ -2059,6 +2059,51 @@ class KinematicsTests extends MotionKitTestSupport {
     var refinedPin=pinnedRefiner.sample(0.5,wrappedTarget,OrientationPolicy.Fixed,otherTurn);
     check(pin.accepts(refinedPin.configuration),"refinement re-solves preserve the hard configuration pin");
     near(refinedPin.q[5],wrappedQ[5],"refinement rejects the nearer unpinned wrist revolution",1e-5);
+    var pinnedCompiler=new ProgramCompiler(wrappedAnalytic,limits,"work",
+      [for(_ in 0...6)2.0],[for(_ in 0...6)4.0],[for(_ in 0...6)20.0],
+      StartTolerances.uniform(6,0.02,0.02,0.02));
+    var nextPinned=wrappedQ.copy();nextPinned[0]+=0.01;
+    var pinnedProgram=new MotionProgram([MotionOp.MoveL(wrappedAnalytic.forward(nextPinned),"work",0.1,Blend.ExactStop)],pin);
+    var pinnedCompilation=pinnedCompiler.compile(pinnedProgram,wrappedQ,Int64.ofInt(910));
+    check(pinnedCompilation.blocks[0].plans.length==1,"authored configuration pin compiles through the program path");
+    pinnedCompilation.dispose();
+    var workerPinned=pinnedCompiler.forWorker().compile(pinnedProgram,wrappedQ,Int64.ofInt(911));
+    check(workerPinned.blocks[0].plans.length==1,"worker compilation preserves authored configuration pins");
+    workerPinned.dispose();
+    var pinnedPoseMove=pinnedCompiler.compile(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.PoseTarget(wrappedAnalytic.forward(nextPinned),"work",null),new MotionOptions(),Blend.ExactStop)],pin),
+      wrappedQ,Int64.ofInt(915));
+    check(pinnedPoseMove.blocks[0].plans.length==1,"pose-target joint moves select the pinned analytic lift");
+    pinnedPoseMove.dispose();
+    var retainedPath=new motionkit.path.PosePath("work",[new motionkit.path.PoseLine(
+      new motionkit.path.PoseWaypoint(wrappedTarget,1e-6,1e-6),
+      new motionkit.path.PoseWaypoint(wrappedAnalytic.forward(nextPinned),1e-6,1e-6),OrientationPolicy.Interpolated,0.01,0.1)]);
+    var retainedRequest=new PathRequest([0.0,retainedPath.length()],[wrappedTarget,wrappedAnalytic.forward(nextPinned)],wrappedQ,
+      new IkTolerance(1e-6,1e-6),[for(_ in wrappedQ)1.0],[for(_ in wrappedQ)1.0]);
+    var retainedChecking=new motionkit.robot.StructuredJointPathPlanner(wrappedArm);
+    var retainedCurve=retainedChecking.withConfiguration(pin).plan(retainedPath,retainedRequest);
+    var retainedPlanner=new motionkit.robot.SelectedJointPathPlanner(wrappedAnalytic,retainedChecking,[retainedPath],[retainedCurve]);
+    check(retainedPlanner.withConfiguration(pin)!=null,"retained execution accepts a matching configuration pin");
+    var wrongTurns:Array<Int> = cast pin.turns;wrongTurns=wrongTurns.copy();wrongTurns[5]-=1;
+    var retainedMismatch="";
+    try retainedPlanner.withConfiguration(new motionkit.kinematics.SixAxisConfiguration(pin.shoulder,pin.elbow,pin.wrist,wrongTurns))
+      catch(error:Dynamic)retainedMismatch=Std.string(error);
+    check(retainedMismatch.indexOf("configuration pin")>=0,"retained execution rejects conflicting physical turns");
+    var badPinStart="";
+    try pinnedCompiler.compile(pinnedProgram,otherTurn,Int64.ofInt(912)) catch(error:Dynamic)badPinStart=Std.string(error);
+    check(badPinStart.indexOf("configuration pin")>=0,"program rejects a physical start on a different pinned turn");
+    var badPinMove="";
+    try pinnedCompiler.compile(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(otherTurn),new MotionOptions(),Blend.ExactStop)],pin),
+      wrappedQ,Int64.ofInt(913)) catch(error:Dynamic)badPinMove=Std.string(error);
+    check(badPinMove.indexOf("configuration pin")>=0,"joint moves cannot leave the program configuration pin");
+    var unconstrained=pinnedCompiler.compile(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(otherTurn),new MotionOptions(),Blend.ExactStop)]),
+      wrappedQ,Int64.ofInt(914));
+    check(unconstrained.blocks[0].plans.length==1,"program pins do not mutate the reusable compiler");
+    unconstrained.dispose();
+    var unsupportedPin="";
+    try new motionkit.robot.ConfigurationConstraint(new ManipulatorKinematics(buildSevenAxisArmFixture().arm),pin)
+      catch(error:Dynamic)unsupportedPin=Std.string(error);
+    check(unsupportedPin.indexOf("labelled six-axis")>=0,"unsupported kinematics reject a hard pin explicitly");
     check(foundOriginal, "OPW enumerates legal periodic lifts beyond the nearest plus/minus turn");
     var singularQ = wrappedQ.copy();
     singularQ[4] = wrappedAnalytic.parameters.offsets[4] / wrappedAnalytic.parameters.signCorrections[4];

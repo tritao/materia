@@ -539,7 +539,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | Step | State | Commits |
 |------|-------|---------|
 | PP0 | in progress: harness and diagnostics; baseline completion pending | `0d43b32c0` (partial) |
-| PP0a | in progress: offset prototypes deleted; spherical clevis passes authored OPW extraction; proportions/zero/configurations/re-baselines pending | see progress |
+| PP0a | in progress: industrial geometry/zero, IK labels and program/mission pins implemented; all-size branch coverage, limit/load checks, re-baselines and phase gate pending | see progress |
 | PP1a | planned (revision 2026-10-06): EAIK spike | — |
 | PP1 | in progress: Cartesian, OPW and authored Cobot UR verified; offset RobotArm unresolved | `0d43b32c0`, `bfec0fa28`, `8569a2a98` (partial) |
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
@@ -2099,3 +2099,45 @@ a jump bound large enough to admit both lifts, and verifies the pinned lift wins
 This covers refinement re-solves; it does not establish continuous timed-curve
 pin acceptance. Program/mission propagation and the remaining PP0a gates remain
 open, and PP1a has not started.
+
+### PP0a authored program and mission configuration pins
+
+The shared SixAxisConfiguration type now lives in MotionKit core kinematics,
+allowing MotionProgram.configuration without a dependency on the robot adapter
+package. Programs snapshot their pin. ProgramCompiler binds a separate planner
+for each pinned compilation, filters pose-target joint moves through labelled
+IK, and rejects incompatible physical starting states and generated motion.
+Worker compilers preserve the constraint with their own solver. Unpinned programs
+remain unaffected by previous pinned compilations.
+
+JointPathPlanner.withConfiguration preserves sampling/clearance policies;
+structured planning combines compatible geometric/turn constraints, retained
+selection validates its stored joint states, and axis-only planners reject pins.
+Generated execution states are checked at controller ticks and polynomial
+segment boundaries. This remains a sampled geometric contract, not a continuous
+branch certificate.
+
+Scene mission steps optionally carry configuration {shoulder, elbow, wrist,
+turns}; the scene codec validates and round-trips it without importing MotionKit.
+MissionPlayer passes it to pick/place programs, joint moves and each weld pass.
+Weld selection, retained compilation and interruption recovery carry the same
+pin. Rate scheduling preserves the pin when it reconstructs a program. The pin
+covers the entire step/program, including entry and return; incompatible starts
+and unsupported kinematics fail explicitly rather than silently ignoring it.
+
+Final MotionKit, app and ProcessKit compiler-only passes succeeded
+(`process-path-pins-final-{0,1,2}-build.log`). Focused C4 passed with 1,152,135
+assertions (`process-path-pins-final-motion-runtime.log`), including pinned
+Cartesian/pose-target/joint compilation, worker propagation, conflicting start
+and turn rejection, retained curve validation and compiler reuse. ProjectKit
+scene tests passed with 146 assertions (`process-path-mission-pins-codec-build-final.log`,
+`process-path-mission-pins-codec-runtime.log`). The first codec-test compile needed
+explicit nullable-field locals; the final build/run passed.
+
+Focused ProcessKit planning runtime also exited zero: welder 66 assertions,
+weld planning 490, rate scheduling 20 (`process-path-pins-final-process-runtime.log`).
+
+All-size authored RobotArm branch acceptance, physical limit/load checks,
+all-user re-baselines and the full PP0a phase gate remain open. Mission runtime
+re-baselines have not been claimed by these compiler/codec checks. PP1a has not
+started.

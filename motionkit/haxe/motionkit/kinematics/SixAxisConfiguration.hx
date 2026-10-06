@@ -1,4 +1,4 @@
-package motionkit.robot;
+package motionkit.kinematics;
 
 /** Controller-style geometric configuration and physical joint turn counts.
  * Conventions are explicit per backend, not inferred from a lifted joint sign.

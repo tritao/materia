@@ -29,6 +29,13 @@ class SelectedJointPathPlanner implements JointPathPlanner {
       records.push({frame:path.frameId,geometry:geometryOf(path),curve:copy(curve),tasks:[for(s in curve.s)snapshot(provider.at(Math.min(path.length(),s)))]});
     }
   }
+  public function withConfiguration(configuration:motionkit.kinematics.SixAxisConfiguration):JointPathPlanner {
+    var guard=new ConfigurationConstraint(solver,configuration);
+    for(record in records)for(q in record.curve.q)guard.require(q);
+    var pinned=new SelectedJointPathPlanner(solver,checking.withConfiguration(configuration),[],[]);
+    pinned.records=records;
+    return pinned;
+  }
   public function withSolver(solver:KinematicsSolver):JointPathPlanner {
     var worker=new SelectedJointPathPlanner(solver,checking.withSolver(solver),[],[]);
     // Private snapshots are read-only; each returned curve is copied.

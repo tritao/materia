@@ -60,6 +60,21 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     this.group=group;this.sampling=sampling;this.coarse=coarse;
     this.clearance=clearance;this.collisionRounds=collisionRounds;this.contact=contact;this.stateCost=stateCost;
   }
+  public function withConfiguration(configuration:motionkit.kinematics.SixAxisConfiguration):JointPathPlanner {
+    if(configuration==null)throw "Configuration pin is required";
+    var original=sampling==null ? new CandidateSamplingOptions() : sampling;
+    if(original.configuration!=null){
+      var existing:motionkit.kinematics.SixAxisConfiguration=cast original.configuration;
+      var geometric=new motionkit.kinematics.SixAxisConfiguration(configuration.shoulder,configuration.elbow,configuration.wrist);
+      if(!geometric.accepts(existing) || existing.turns!=null && configuration.turns!=null && !existing.accepts(configuration))
+        throw "Conflicting planner and program configuration pins";
+      if(configuration.turns==null)configuration=existing;
+    }
+    var settings=new CandidateSamplingOptions(original.rollCount,original.tiltRings,original.azimuthCount,
+      original.pinStart,original.externalRanges,original.externalRule,configuration);
+    return new StructuredJointPathPlanner(group,settings,coarse,clearance,collisionRounds,contact,stateCost,
+      retreat,weights,rollWeight,preferenceSource,contactPose);
+  }
   public function withSolver(solver:motionkit.kinematics.KinematicsSolver):JointPathPlanner {
     var workerGroup:KinematicGroup;
     if (Std.isOfType(solver, ManipulatorKinematics)) {

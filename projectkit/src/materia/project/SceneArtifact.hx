@@ -212,6 +212,14 @@ typedef SceneArtifactMission = {
 	@:optional var powerUpSideOffsets:Array<SceneArtifactPowerUpSideOffset>;
 }
 
+/** Generic geometric labels, with optional physical arm turn counts. */
+typedef SceneArtifactArmConfiguration = {
+	var shoulder:String;
+	var elbow:String;
+	var wrist:String;
+	@:optional var turns:Array<Int>;
+}
+
 /**
  * One step of a mission.
  * - `goTo`: drive the mobile base to `pose`, in the assembly frame on the floor.
@@ -224,6 +232,8 @@ typedef SceneArtifactMission = {
  */
 typedef SceneArtifactMissionStep = {
 	var kind:String;
+	/** Hard pin for all arm motion in this step, including entry and return. */
+	@:optional var configuration:SceneArtifactArmConfiguration;
 	@:optional var pose:SceneArtifactFloorPose;
 	@:optional var at:SceneArtifactPlace;
 	/** Requested part heading in world radians; omission leaves tool spin free. */
@@ -814,6 +824,14 @@ class SceneArtifact {
 		for (index in 0...mission.steps.length) {
 			var step = mission.steps[index];
 			if (step == null) fail('step $index is empty');
+			if(step.configuration!=null){
+				var pin:SceneArtifactArmConfiguration=cast step.configuration;
+				if(step.kind!="pick" && step.kind!="place" && step.kind!="weld" && step.kind!="moveJoints")
+					fail('step $index cannot carry an arm configuration pin');
+				if((pin.shoulder!="front" && pin.shoulder!="back") || (pin.elbow!="up" && pin.elbow!="down") ||
+					(pin.wrist!="no-flip" && pin.wrist!="flip"))fail('step $index has an invalid arm configuration');
+				if(pin.turns!=null && pin.turns.length!=6)fail('step $index configuration turns need six arm joints');
+			}
 			switch step.kind {
 				case "goTo":
 					if (data.mobileBase == null) fail('step $index drives, but the assembly has no mobile base');
@@ -1091,6 +1109,22 @@ class SceneArtifact {
 			var kind:Dynamic = Reflect.field(raw, "kind");
 			if (!Std.isOfType(kind, String)) fail();
 			var step:SceneArtifactMissionStep = {kind: kind};
+			var configuration:Dynamic=Reflect.field(raw,"configuration");
+			if(configuration!=null){
+				var shoulder:Dynamic=Reflect.field(configuration,"shoulder"),elbow:Dynamic=Reflect.field(configuration,"elbow"),
+					wrist:Dynamic=Reflect.field(configuration,"wrist");
+				if(!Std.isOfType(shoulder,String) || !Std.isOfType(elbow,String) || !Std.isOfType(wrist,String))fail();
+				var pin:SceneArtifactArmConfiguration={shoulder:shoulder,elbow:elbow,wrist:wrist};
+				var turns:Dynamic=Reflect.field(configuration,"turns");
+				if(turns!=null){
+					if(!Std.isOfType(turns,Array))fail();
+					pin.turns=[for(turn in (cast turns:Array<Dynamic>)){
+						if(!Std.isOfType(turn,Int))fail();
+						(turn:Int);
+					}];
+				}
+				step.configuration=pin;
+			}
 			var pose:Dynamic = Reflect.field(raw, "pose");
 			if (pose != null) step.pose = {x: number(pose, "x"), y: number(pose, "y"), yaw: number(pose, "yaw")};
 			var at:Dynamic = Reflect.field(raw, "at");

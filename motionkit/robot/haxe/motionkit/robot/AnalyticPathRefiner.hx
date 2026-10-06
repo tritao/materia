@@ -1,5 +1,7 @@
 package motionkit.robot;
 
+import motionkit.kinematics.SixAxisConfiguration;
+
 import motionkit.kinematics.Pose3;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.PoseMath;
