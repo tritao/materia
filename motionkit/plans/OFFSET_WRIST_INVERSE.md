@@ -232,3 +232,23 @@ polynomial recovery for these factors, not a general all-target inverse certific
 The option currently applies to the original target only; boundary/random fixtures
 retain their earlier floating quadratic mode. Projected-axis/continuum and other
 singular factors still need specialized recovery, and production remains unchanged.
+
+## Rational coordinate enclosures
+
+Certified mode now evaluates the recovered coordinate polynomial by exact rational
+interval Horner arithmetic over the isolated final-angle interval. Root intervals
+are refined until both chart coordinates have decided membership in [-1,1] and
+the base-coordinate enclosure width is at most 1e-14. Outside-chart intervals are
+rejected by exact bounds; no floating membership tolerance is used for that step.
+The midpoint of the enclosed coordinate is then converted to Float. Output retains
+both coordinate intervals and refinement counts. This replaces the previous
+uncertified coordinate-midpoint conversion, while atan/trigonometric reconstruction,
+singular thresholds and FK acceptance remain floating and uncertified.
+
+Final `--certify` experiment exits zero: eight solutions/eight retained chart
+coordinate enclosures, maximum base width 4.829e-17, FK error at most 1.34e-15.
+A separate high-cancellation polynomial enclosure around sqrt(1/2) requires seven
+refinements and verifies its true coordinate using rational squared inequalities.
+An exact chart-boundary coordinate is retained and an outside-chart coordinate
+rejected. Evidence: `process-path-offset-intervals-final.json`, total 4.436 s.
+These helper checks validate refinement, not all-target/singular-family completeness.

@@ -109,6 +109,58 @@ def certify_recovery(F,G,u,t,factor,linear):
     return coordinate
 
 
+def polynomial_interval(polynomial, interval):
+    """Exact rational Horner enclosure (including dependency overestimation)."""
+    low,high=s.Rational(0),s.Rational(0)
+    left,right=interval
+    for coefficient in polynomial.all_coeffs():
+        products=[low*left,low*right,high*left,high*right]
+        low,high=min(products)+coefficient,max(products)+coefficient
+    return low,high
+
+
+def bounded_recovery(factor, coordinate, interval):
+    """Refine the isolated root until both chart coordinates are enclosed."""
+    tolerance=s.Rational(1,10**14)
+    refinements=0
+    def membership(bounds):
+        low,high=bounds
+        if high < -1 or low > 1:
+            return False
+        if low >= -1 and high <= 1:
+            return True
+        return None
+    while True:
+        t_member=membership(interval)
+        bounds=polynomial_interval(coordinate,interval)
+        u_member=membership(bounds)
+        if t_member is False or u_member is False:
+            return None
+        if t_member is True and u_member is True and bounds[1]-bounds[0]<=tolerance:
+            return {'wrist_interval':interval,'base_interval':bounds,'refinements':refinements}
+        if interval[0]==interval[1]:
+            raise ValueError('Exact root cannot refine an undecided chart enclosure')
+        interval=factor.refine_root(interval[0],interval[1],eps=(interval[1]-interval[0])/1024)
+        refinements+=1
+
+
+def interval_checks():
+    t=s.symbols('t')
+    factor=s.Poly(2*t*t-1,t,domain=s.QQ)
+    coordinate=s.Poly(10**6*(2*t*t-1)+t/2,t,domain=s.QQ)
+    result=bounded_recovery(factor,coordinate,(s.Rational(0),s.Rational(1)))
+    low,high=result['base_interval']
+    assert low>0 and (4*low)**2<=2<=(4*high)**2
+    assert high-low<=s.Rational(1,10**14) and result['refinements']>0
+    boundary=bounded_recovery(s.Poly(5*t-3,t),s.Poly(1,t),(s.Rational(3,5),s.Rational(3,5)))
+    assert boundary['base_interval']==(1,1)
+    outside=bounded_recovery(factor,s.Poly(2,t),(s.Rational(0),s.Rational(1)))
+    assert outside is None
+    return {'cancellation_refinements':result['refinements'],
+            'base_interval':list(map(str,result['base_interval'])),
+            'exact_boundary_retained':True,'outside_chart_rejected':True}
+
+
 def solve(rotation, position, dimensions, certify=False):
     solutions=[]
     charts=[]
@@ -120,6 +172,7 @@ def solve(rotation, position, dimensions, certify=False):
                 raise ValueError('Identically zero resultant requires degenerate-system isolation')
             recovery_sequence=s.subresultants(F.as_expr(),G.as_expr(),u) if certify else None
             factors=[]
+            enclosures=[]
             for expression,multiplicity in s.factor_list(resultant.as_expr())[1]:
                 factor=s.Poly(expression,t)
                 real_count=int(factor.count_roots(-s.oo,s.oo))
@@ -131,13 +184,21 @@ def solve(rotation, position, dimensions, certify=False):
                 factors.append({'degree':factor.degree(),'multiplicity':multiplicity,
                                 'real_roots':real_count,'exact_coupled_recovery':certificate})
                 for interval,_ in factor.intervals(eps=s.Rational(1,10**20)):
-                    t_value=float((interval[0]+interval[1])/2)
-                    if abs(t_value)>1+1e-12:
-                        continue
                     if recovered_coordinate is not None:
-                        midpoint=(interval[0]+interval[1])/2
-                        roots=[float(recovered_coordinate.eval(midpoint))]
+                        enclosure=bounded_recovery(factor,recovered_coordinate,interval)
+                        if enclosure is None:
+                            continue
+                        interval=enclosure['wrist_interval']
+                        base_bounds=enclosure['base_interval']
+                        roots=[float((base_bounds[0]+base_bounds[1])/2)]
+                        enclosures.append({'wrist_interval':list(map(str,interval)),
+                                           'base_interval':list(map(str,base_bounds)),
+                                           'refinements':enclosure['refinements']})
+                        t_value=float((interval[0]+interval[1])/2)
                     else:
+                        t_value=float((interval[0]+interval[1])/2)
+                        if abs(t_value)>1+1e-12:
+                            continue
                         coefficients=[float(c.subs(t,t_value)) for c in s.Poly(F.as_expr(),u).all_coeffs()]
                         while len(coefficients)>1 and abs(coefficients[0])<1e-12:
                             coefficients.pop(0)
@@ -164,7 +225,7 @@ def solve(rotation, position, dimensions, certify=False):
                                 continue
                             solutions.append(solution)
             charts.append({'inverse_base':inverse_base,'inverse_wrist':inverse_wrist,
-                           'resultant_degree':resultant.degree(),'factors':factors})
+                           'resultant_degree':resultant.degree(),'factors':factors,'coordinate_enclosures':enclosures})
     return {'solutions':solutions,'charts':charts}
 
 
@@ -250,6 +311,8 @@ def main():
     dimensions=list(map(s.Rational,['.17','-.09','.08','.4','.6','.5','.12','.035']))
     started=time.monotonic()
     result=solve(rotation,position,dimensions,certify='--certify' in sys.argv)
+    if '--certify' in sys.argv:
+        result['interval_checks']=interval_checks()
     if '--check-boundaries' in sys.argv:
         result['boundary_checks']=boundary_checks(dimensions)
     for argument in sys.argv[1:]:

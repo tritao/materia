@@ -1904,3 +1904,7 @@ Added shared exact-rational FK generation and `--check-random=N` to the research
 ### PP1 exact coupled-polynomial base recovery
 
 Research `--certify` mode verifies a linear subresultant recovery map in QQ[t]/each real-root resultant factor, exact vanishing of both polynomial constraints and preserved leading degrees. It uses that map instead of floating quadratic back-substitution. Original rational target experiment exits zero: degree-16/eight-real-root recovery certified in all four charts, eight final solutions, FK error at most 1.34e-15, 4.377 s (`process-path-offset-certificate-final.json`). This certifies those polynomial recoveries, not floating reconstruction bounds, singular-factor handling or general family completeness. Boundary/random experiment mode is unchanged, native integration and all original acceptance gates remain open.
+
+### PP1 rational recovered-coordinate enclosure
+
+Certified research mode now encloses the recovered base coordinate by exact rational interval arithmetic and refines isolated final-coordinate roots until both chart memberships and base width <=1e-14 are decided. Original target retains eight FK-verified solutions, max enclosure width 4.829e-17. Cancellation stress needs seven refinements and passes exact squared-bound assertions; exact boundary/outside-chart checks pass. Actual final exit zero (`process-path-offset-intervals-final.json`, 4.436 s). Trigonometric/singular reconstruction, generic completeness, parameterized continua, native integration and all whole-plan gates remain open.
