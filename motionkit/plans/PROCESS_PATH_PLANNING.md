@@ -482,9 +482,36 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
   edges (jump).
 - The structured DP is the only search (revision 3). Remove the Descartes dispatch in this step's
   close-out; small problems are just small lattices.
+- **Close-out (2026-10-06): we keep Descartes' strategy, not its library.**
+  - The structured DP is the same ladder-graph idea, with neighbour edges instead of all pairs.
+  - Two of its rules must be justified physically, or measured, before Descartes goes.
+  - **Same-configuration step from physics, not a fixed ±1 cell.**
+    - Today a same-branch edge may move each external coordinate and the roll by at most one lattice
+      cell per sample, even when the joints allow more. That is an arbitrary smoothness rule. With a
+      finer lattice, or the coarse pass's sample stride, it can reject a physical route that
+      all-pairs would accept.
+    - Derive the allowed cells per sample, per redundant coordinate, from the drive: cells =
+      max(1, ceil(v_max × Δt / cell size)), where Δt is the time between the two samples at the
+      process's planned speed (the same v_max and planned speed PP-D12 uses). Use the coarse pass's
+      actual sample spacing.
+    - The joint-jump check stays exact on top.
+    - Diagnostics report when the step limit, rather than the joint jump, disconnected a layer.
+  - **Measured corridor gap.**
+    - The coarse-to-fine corridor is approximate: it widens, then falls back to the full graph, so
+      it never misses a feasible route, but it can return a costlier one.
+    - Add a non-default exact mode (full fine graph, no corridor).
+    - On G17, the robot-welder whole weldment and the gantry welder, record the corridor result's
+      cost against the exact optimum, per section.
+    - Fail the check if any section is more than 1 % worse, or if the exact optimum chooses a
+      different configuration label or travel direction.
+    - Record the gap and the exact mode's run time.
+  - The existing brute-force reference stays as the test oracle (100 random trials), extended to
+    the physical step rule. Descartes is not needed as an oracle.
 - **Tests:**
-  - brute-force agreement on small problems;
+  - brute-force agreement on small problems, including the physical step rule;
   - a dead-end branch avoided, as in `testPathConfigurationSelector`;
+  - a route that needs more than one cell per sample at the coarse stride is found;
+  - corridor vs exact gap within 1 % on the authored welds;
   - a 2.6 m track path at 2 mm with 7700 candidates per sample searched in under 1 s native (Release).
 
 **PP4. Continuous refinement.**
