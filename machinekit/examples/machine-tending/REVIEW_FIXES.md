@@ -361,3 +361,7 @@ Rebase and mill attribution follow-up (2026-10-06):
 - Rebased the reviewed branch onto local main `5e4bca72b` and incorporated Haxeon `80d00f54`. The extracted GPU/platform packages and NativeKit dependency were populated at their pins. The app project-source build passed with 1,944 Haxe sources and native libraries; no full suite was repeated.
 - Closed the mill attribution finding with a controlled source comparison. With main's balanced-tree `Part.fuseAll`, the current mill measures 52.55/53.22 s and X/Y/Z tracking 0.048472/0.051497/0.060011 mm. Temporarily restoring only the previous sequential `Part.fuseAll` implementation measures 52.58/53.23 s and 0.085940/0.051497/0.060011 mm. The temporary edit was reverted. `MillCasting.geometry` reaches this shared fusion method through `Solids.union`; the fusion tree change is the cause. Keep the shared performance improvement and use the current measurements.
 - MT7–MT12 remain planned and have not started.
+
+Haxeon source-root and typing correction (2026-10-06):
+
+- The branch pins Haxeon `ccfd1dd6`, which fixes source-root typing and nullable array refinements. Materia commit `65ec9349e` integrates that pin and declares package-scoped and unscoped example roots explicitly; application sources use the repaired compiler without a local typing workaround.
