@@ -108,8 +108,10 @@ class ToolFreedom {
       2.0*(pose.qy*pose.qz - pose.qw*pose.qx),
       1.0 - 2.0*(pose.qx*pose.qx + pose.qy*pose.qy)];
 
-  static function axisAngle(a:Array<Float>, b:Array<Float>):Float
-    return Math.acos(Math.max(-1.0, Math.min(1.0, a[0]*b[0] + a[1]*b[1] + a[2]*b[2])));
+  static function axisAngle(a:Array<Float>, b:Array<Float>):Float {
+    var x = a[1]*b[2] - a[2]*b[1], y = a[2]*b[0] - a[0]*b[2], z = a[0]*b[1] - a[1]*b[0];
+    return Math.atan2(Math.sqrt(x*x + y*y + z*z), a[0]*b[0] + a[1]*b[1] + a[2]*b[2]);
+  }
 
   static function coneAxis(axis:Array<Float>, halfAngle:Float):Array<Float> {
     if (axis == null || axis.length != 3 || !Math.isFinite(halfAngle) || halfAngle < 0 || halfAngle > Math.PI)

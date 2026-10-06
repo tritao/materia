@@ -56,12 +56,17 @@ class SelectedJointPathPlanner implements JointPathPlanner {
         !Math.isFinite(request.velocity[j]) || request.velocity[j]<=0)
       throw "Selected curve execution requires finite start and positive limits";
     var geometry=geometryOf(path),provider=new PosePathRefinement(path);
+    var mismatches:Array<String> = [];
     for(record in records){
       var curve=record.curve;
-      if(record.frame!=path.frameId || record.geometry!=geometry || curve.s.length!=request.distances.length ||
-          curve.jointCount!=request.startQ.length || Math.abs(curve.end()-path.length())>1e-12)continue;
+      if(record.frame!=path.frameId || record.geometry!=geometry)continue;
+      if(curve.s.length!=request.distances.length || curve.jointCount!=request.startQ.length || Math.abs(curve.end()-path.length())>1e-12){
+        mismatches.push('grid/count: retained=${curve.s.length}, requested=${request.distances.length}, lengths=${curve.end()}/${path.length()}');continue;
+      }
       var matches=true;
-      for(j in 0...curve.jointCount)if(Math.abs(curve.q[0][j]-request.startQ[j])>1e-7)matches=false;
+      for(j in 0...curve.jointCount)if(Math.abs(curve.q[0][j]-request.startQ[j])>1e-7){
+        mismatches.push('start joint $j: retained=${curve.q[0][j]}, requested=${request.startQ[j]}');matches=false;
+      }
       for(i in 0...curve.s.length){
         if(!Math.isFinite(request.distances[i]) || Math.abs(curve.s[i]-request.distances[i])>1e-12){matches=false;break;}
         var authored=provider.at(Math.min(path.length(),curve.s[i])),stored=record.tasks[i];
@@ -76,7 +81,7 @@ class SelectedJointPathPlanner implements JointPathPlanner {
             Math.abs(authored.acceleration[axis]-stored.acceleration[axis])>1e-9 ||
             Math.abs(authored.accelerationBefore[axis]-stored.accelerationBefore[axis])>1e-9)matches=false;
       }
-      if(!matches)continue;
+      if(!matches){if(mismatches.length==0)mismatches.push("authored task or derivatives differ");continue;}
       for(i in 0...curve.q.length){
         var actual=solver.forward(curve.q[i]);
         if(PoseMath.distance(actual,request.poses[i])>request.tolerance.position ||
@@ -87,7 +92,8 @@ class SelectedJointPathPlanner implements JointPathPlanner {
       }
       return new JointPathSamples(request.distances,curve.q,curve.qPrime,curve.qDoublePrime,curve.qDoublePrimeBefore);
     }
-    throw "No retained selected curve matches the execution task, grid and start";
+    throw "No retained selected curve matches the execution task, grid and start"+
+      (mismatches.length==0 ? " (authored geometry differs)" : ": "+mismatches.join("; "));
   }
   static function geometryOf(path:PosePath):String
     return haxe.Json.stringify({frame:path.frameId,primitives:[for(primitive in path.primitives)geometryPrimitive(primitive)]});

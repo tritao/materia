@@ -22,8 +22,8 @@ class MobileWelderPreview {
     var model = new AssemblyModel("mm");
     cell.addTo(model, "");
     var state = new AssemblyState(model.definition(ASSEMBLY_ID));
-    var shoulder = 0.25, elbow = -1.4;
-    var ready = [0.0, shoulder, elbow, 0.0, Math.PI - shoulder + elbow, 0.0];
+    var shoulder = 0.25, elbow = Math.PI / 2 - 1.4;
+    var ready = [0.0, shoulder, elbow, 0.0, Math.PI / 2 - shoulder + elbow, 0.0];
     for (index in 0...6) state.setJoint('robot/arm/j${index + 1}', ready[index]);
     scene.assemblyState = state.record();
     var arm:RobotArm = cast cell.robot.arm;

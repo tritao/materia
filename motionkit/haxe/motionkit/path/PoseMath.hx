@@ -9,8 +9,12 @@ class PoseMath {
   }
 
   public static function angle(a:Pose3, b:Pose3):Float {
-    var dot = Math.abs(a.qx * b.qx + a.qy * b.qy + a.qz * b.qz + a.qw * b.qw);
-    return 2.0 * Math.acos(Math.min(1.0, dot));
+    // Relative quaternion avoids acos magnifying unit-norm roundoff near zero.
+    var x = b.qx*a.qw - b.qw*a.qx + b.qz*a.qy - b.qy*a.qz;
+    var y = b.qy*a.qw - b.qw*a.qy + b.qx*a.qz - b.qz*a.qx;
+    var z = b.qz*a.qw - b.qw*a.qz + b.qy*a.qx - b.qx*a.qy;
+    var dot = Math.abs(a.qx*b.qx + a.qy*b.qy + a.qz*b.qz + a.qw*b.qw);
+    return 2.0 * Math.atan2(Math.sqrt(x*x + y*y + z*z), dot);
   }
 
   public static function interpolate(a:PoseWaypoint, b:PoseWaypoint, t:Float,

@@ -535,8 +535,8 @@ class RobotWelderChecks {
 	/** Starting poses for the solver: the ready pose, and the arm leaning further out and in, tool kept down. */
 	public static function seeds(ready:ArmPose):Array<ArmPose> {
 		var result = [ready];
-		for (shoulder in [0.4, 0.8, 1.2]) for (elbow in [-1.4, -0.9, -0.4]) for (turn in [0.0, 0.5, -0.5])
-			result.push([turn, shoulder, elbow, 0, Math.PI - (shoulder - elbow), 0]);
+		for (shoulder in [0.4, 0.8, 1.2]) for (elbow in [Math.PI / 2 - 1.4, Math.PI / 2 - 0.9, Math.PI / 2 - 0.4]) for (turn in [0.0, 0.5, -0.5])
+			result.push([turn, shoulder, elbow, 0, Math.PI / 2 - (shoulder - elbow), 0]);
 		return result;
 	}
 

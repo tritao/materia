@@ -33,6 +33,13 @@ class ToolFreedomTests extends MotionKitTestSupport {
   public function new() { super(); }
 
   public function testFreeSpinPath():Void {
+    var rounded = new Pose3(0, 0, 0, 0.1, 0.2, 0.3, Math.sqrt(0.86)*(1-1e-15));
+    near(motionkit.path.PoseMath.angle(rounded, rounded), 0, "Identical rounded quaternion has zero error", 1e-12);
+    near(ToolFreedom.orientationError(rounded, rounded, OrientationPolicy.FreeAboutTool), 0,
+      "Identical rounded tool axis has zero error", 1e-12);
+    var small = new Pose3(0, 0, 0, 0, 0, Math.sin(5e-10), Math.cos(5e-10));
+    near(motionkit.path.PoseMath.angle(new Pose3(0,0,0,0,0,0,1),small),1e-9,
+      "Tiny distinct rotations remain distinguishable",1e-15);
     var solver = cartesian(true);
     var seed = [0.0, 0.0, 0.0, 0.0];
     var target = new Pose3(0.2, 0.1, 0.1, 0, 0, Math.sin(0.5), Math.cos(0.5));

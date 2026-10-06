@@ -2211,3 +2211,23 @@ initial test compile needed a typed actuator array before successful builds.
 The physical acceptance is registered in MachineKitSmoke for the phase gate.
 
 All-user re-baselines and the complete PP0a gate remain open; PP1a has not started.
+
+
+### PP0a user posture port and stable retained-task orientation
+
+Updated fixed, mobile and track welder authored ready poses and numeric preview
+seeds to the industrial shoulder/elbow zero while preserving their physical
+posture. Retained execution exposed a quaternion self-comparison error: acos of
+a rounded unit quaternion dot product produced a nonzero angle above the strict
+metadata tolerance. PoseMath now uses the relative quaternion atan2 angle, and
+tool-axis comparison uses cross/dot atan2, preserving small real rotations.
+
+Compiler-only app, MotionKit and ProcessKit builds passed. Focused tool freedom
+passed 343 assertions (including rounded self-comparison and tiny rotation), C4
+passed 1,152,135, and process planning passed 66 welder, 490 planning and 20 rate
+schedule assertions. Handling completed all four steps with zero numeric IK
+calls and a 23.42 s cycle. The fixed welder now executes its first three runs
+with zero numeric IK calls, but its fourth run cannot select a complete route.
+It is not an accepted complete re-baseline; bounded candidate construction and
+physical reach/limits remain under investigation. All-user re-baselines and
+the PP0a phase gate remain open; PP1a has not started.

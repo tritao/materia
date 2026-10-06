@@ -14,7 +14,7 @@ class TrackWelderPreview {
 		var scene = AssemblyPreview.scene(cell, "track-welder");
 		scene.robotTools = RobotScene.robotTools(cell.arm.tool, "arm/tool", cell.equipment());
 		var state = new AssemblyState(scene.assemblyDefinition);
-		var ready = [0.0, 0.25, -1.4, 0.0, Math.PI - 0.25 - 1.4, 0.0];
+		var ready = [0.0, 0.25, Math.PI / 2 - 1.4, 0.0, Math.PI - 0.25 - 1.4, 0.0];
 		for (i in 0...ready.length) state.setJoint("arm/" + cell.arm.specs[i].id, ready[i]);
 		state.forwardKinematics();
 		scene.assemblyState = state.record();
