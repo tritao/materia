@@ -350,6 +350,28 @@ class KinematicsTests extends MotionKitTestSupport {
       var numeric = new ManipulatorKinematics(group);
       check(analytic.jointCount() == (withPositioner ? 8 : 7), "UR group preserves arm and external DOFs");
       var before = group.numericSolveCount();
+      var seed = [for (i in 0...group.group.count()) 0.3*Math.sin(i+0.4)];
+      var ranges = [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,-0.2,0.2,3)];
+      if (withPositioner) ranges.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(seed.length-1,-0.4,0.4,2));
+      var cells = motionkit.robot.ExternalAxisGrid.sample(group,seed,ranges);
+      check(cells.length == (withPositioner ? 6 : 3),"native external grid Cartesian-product count");
+      for (i in 0...cells.length) {
+        var cell = cells[i];
+        check(cell.coordinates[0] == (withPositioner ? Std.int(i/2) : i),"track lattice coordinate follows group ordering");
+        if (withPositioner) check(cell.coordinates[1] == i%2,"positioner lattice coordinate varies fastest");
+        for (joint in 0...seed.length) if (!group.external[joint])
+          near(cell.q[joint],seed[joint],"native external grid retains arm joints",1e-12);
+        var target = numeric.forward(cell.q),found = false;
+        for (branch in analytic.branches(target,cell.q)) {
+          var same = true;
+          for (joint in 0...seed.length) if (Math.abs(branch.q[joint]-cell.q[joint]) > 1e-5) same = false;
+          found = found || same;
+        }
+        check(found,"native rotated track/positioner cell retains original UR branch");
+      }
+      var heldCells = motionkit.robot.ExternalAxisGrid.sample(group,seed,[]);
+      check(heldCells.length == 1,"unspecified external axes become one-point rules");
+      for (joint in 0...seed.length) near(heldCells[0].q[joint],seed[joint],"held external cell copies complete seed",1e-12);
       for (sample in 0...30) {
         var q = [for (joint in 0...group.group.count()) (joint == 0 ? 0.8 : 1.4) * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q), original = false;

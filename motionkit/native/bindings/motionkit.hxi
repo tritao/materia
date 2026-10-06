@@ -20,6 +20,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 */
 	extern fn mk_analytic_ur_inverse(parameters: ptr<const<mk_ur_parameters>>, target: ptr<const<mk_opw_pose>>, singular_q6_seed: f64, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_enumerate_joint_lifts(request: ptr<const<mk_joint_lift_request>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_lifts: ptr<mk_joint_lift> @out_array("lift_capacity"), lift_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_external_lattice_count(lattice: ptr<const<mk_external_lattice>>, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Converts Ruckig Community's offline phases to degree-3 native segments.
 	 */
@@ -55,6 +56,11 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * One call replaces a bisection of mk_path_distance_to_time per sample.
 	 */
 	extern fn mk_path_times_to_distances(law: mk_time_law_handle, seconds: ptr<const<f64>> @in_array("count"), count: u32, out_distances: ptr<f64> @out_array("count")) -> mk_result;
+	/**
+	 * Axis endpoints are included; the last external coordinate varies fastest.
+	 * Non-external joints are copied from the seed. Zero external axes yields one cell.
+	 */
+	extern fn mk_sample_external_cells(lattice: ptr<const<mk_external_lattice>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_cells: ptr<mk_external_cell> @out_array("cell_capacity"), cell_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_sample_orientations(lattice: ptr<const<mk_orientation_lattice>>, target: ptr<const<mk_opw_pose>>, out_samples: ptr<mk_orientation_sample> @out_array("sample_capacity"), sample_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected.
@@ -135,6 +141,26 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		failed_distance: f64 @offset(528);
 		cost: f64 @offset(536);
 		diagnostic: array<i8, 256> @offset(544);
+	}
+	struct mk_external_cell @layout(776, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		joints: array<f64, 64> @offset(8);
+		/**
+		 * < In external-axis descriptor order.
+		 */
+		coordinates: array<u32, 64> @offset(520);
+	}
+	/**
+	 * External-axis Cartesian product. A rule is a one-point equal-bound range.
+	 */
+	struct mk_external_lattice @layout(1552, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		joint_count: u32 @offset(4);
+		axis_count: u32 @offset(8);
+		joint_indices: array<u32, 64> @offset(12);
+		point_counts: array<u32, 64> @offset(268);
+		lower: array<f64, 64> @offset(528);
+		upper: array<f64, 64> @offset(1040);
 	}
 	struct mk_joint_lift @layout(776, 8) {
 		struct_size: u32 @offset(0) @struct_size;

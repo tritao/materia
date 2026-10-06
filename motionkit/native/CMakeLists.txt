@@ -116,7 +116,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/shims/no_openmp")
 endif()
 
-add_library(motionkit_core ${MK_LIBRARY_TYPE} src/generator.cpp src/path.cpp src/opw.cpp src/analytic_cartesian.cpp src/analytic_ur.cpp src/orientation_lattice.cpp src/joint_lifts.cpp src/configuration.cpp)
+add_library(motionkit_core ${MK_LIBRARY_TYPE} src/generator.cpp src/path.cpp src/opw.cpp src/analytic_cartesian.cpp src/analytic_ur.cpp src/orientation_lattice.cpp src/joint_lifts.cpp src/external_lattice.cpp src/configuration.cpp)
 target_compile_features(motionkit_core PUBLIC cxx_std_17)
 target_link_libraries(motionkit_core PUBLIC trajectory_core PRIVATE ruckig::ruckig toppra Eigen3::Eigen motionkit_descartes_core)
 target_include_directories(motionkit_core PUBLIC
@@ -169,6 +169,10 @@ if(BUILD_TESTING)
     add_executable(motionkit_joint_lift_tests tests/joint_lifts.cpp)
     target_link_libraries(motionkit_joint_lift_tests PRIVATE motionkit_core)
     add_test(NAME motionkit_joint_lifts COMMAND motionkit_joint_lift_tests)
+
+    add_executable(motionkit_external_lattice_tests tests/external_lattice.cpp)
+    target_link_libraries(motionkit_external_lattice_tests PRIVATE motionkit_core)
+    add_test(NAME motionkit_external_lattice COMMAND motionkit_external_lattice_tests)
 
     # Every executable in this directory is a test; the library remains unaffected.
     get_property(motionkit_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)

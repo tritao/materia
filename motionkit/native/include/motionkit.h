@@ -110,6 +110,23 @@ typedef struct mk_joint_lift {
     int32_t wraps[MK_MAX_JOINTS];
 } mk_joint_lift;
 
+/** External-axis Cartesian product. A rule is a one-point equal-bound range. */
+typedef struct mk_external_lattice {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count;
+    uint32_t axis_count;
+    uint32_t joint_indices[MK_MAX_JOINTS];
+    uint32_t point_counts[MK_MAX_JOINTS];
+    double lower[MK_MAX_JOINTS];
+    double upper[MK_MAX_JOINTS];
+} mk_external_lattice;
+
+typedef struct mk_external_cell {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double joints[MK_MAX_JOINTS];
+    uint32_t coordinates[MK_MAX_JOINTS]; /**< In external-axis descriptor order. */
+} mk_external_cell;
+
 /** Candidate sets for one Descartes ladder-graph selection call. */
 typedef struct mk_configuration_request {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -245,6 +262,13 @@ MK_API mk_result MK_CALL mk_joint_lift_count(const mk_joint_lift_request *reques
 MK_API mk_result MK_CALL mk_enumerate_joint_lifts(const mk_joint_lift_request *request,
     const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_joint_lift *out_lifts MK_OUT_ARRAY(lift_capacity), uint32_t lift_capacity, uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_external_lattice_count(const mk_external_lattice *lattice,
+    uint32_t *out_count MK_OUT);
+/** Axis endpoints are included; the last external coordinate varies fastest.
+ * Non-external joints are copied from the seed. Zero external axes yields one cell. */
+MK_API mk_result MK_CALL mk_sample_external_cells(const mk_external_lattice *lattice,
+    const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    mk_external_cell *out_cells MK_OUT_ARRAY(cell_capacity), uint32_t cell_capacity, uint32_t *out_count MK_OUT);
 /** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */
 MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,

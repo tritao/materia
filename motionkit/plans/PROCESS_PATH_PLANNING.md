@@ -669,3 +669,18 @@ coordinates for the forthcoming candidate lattice. OPW's existing seeded
 unbounded-range policy has not been replaced here. Native external-axis cell
 products and combined analytic candidate assembly are still outstanding; PP2
 remains incomplete.
+
+PP2 external lattice preparation: native Cartesian-product sampling now emits
+complete seeded joint configurations plus external-axis coordinates, with
+included endpoints and deterministic last-coordinate-fastest ordering. Rules
+are one-point ranges; no external axes gives a single unchanged configuration.
+Validation rejects duplicate joint indices, invalid/duplicate sample ranges,
+nonfinite seeds and product overflow. Weighted endpoint interpolation avoids
+finite-range subtraction overflow. All 13 native CTests and the four-platform
+ABI audit pass. Haxe ExternalAxisGrid validates descriptor ranges against the
+compiled group limits, orders axes by group DOF, and holds omitted axes at the
+sample seed. Rotated-track and track-plus-positioner grids verify cell counts,
+coordinates, preserved arm joints and original analytic UR branches in each
+cell, with zero numeric IK calls. Compiler-only build and focused C4 runtime
+pass (182,310 assertions). Combined native cell × orientation × branch/wrap
+candidate assembly remains outstanding; this does not complete PP2.
