@@ -976,7 +976,38 @@ class KinematicsTests extends MotionKitTestSupport {
     var serialCompiler=new ProgramCompiler(solver,serialLimits,"task",
       [for(_ in start)1.0],[for(_ in start)2.0],[for(_ in start)20.0],
       StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,
-      null,new motionkit.robot.StructuredJointPathPlanner(fixture.arm));
+      null);
+    check(Std.isOfType(serialCompiler.jointPathPlanner,motionkit.robot.StructuredJointPathPlanner),
+      "standalone UR adapter defaults to structured planning");
+    var savedPosture=start.copy();
+    solver.preferredPosture=savedPosture;
+    var snapshot=new motionkit.robot.JointPathPreferences(solver);
+    near(snapshot.cost(fixture.arm,request.poses[0],start),0,"preferred posture has zero state cost",1e-12);
+    savedPosture[0]+=1;
+    near(snapshot.cost(fixture.arm,request.poses[0],start),0,"request preferences copy mutable posture",1e-12);
+    var updatedSnapshot=new motionkit.robot.JointPathPreferences(solver);
+    near(updatedSnapshot.cost(fixture.arm,request.poses[0],start),1,"new request sees updated preferences",1e-12);
+    var preferenceWorker:ManipulatorKinematics=cast solver.fork();
+    savedPosture[0]+=1;
+    near(new motionkit.robot.JointPathPreferences(preferenceWorker).cost(fixture.arm,request.poses[0],start),1,
+      "worker preferences remain independent of caller mutation",1e-12);
+    solver.preferredPosture=[0.0];
+    throws(function() new motionkit.robot.JointPathPreferences(solver),
+      "structured posture preferences reject incomplete joint vectors");
+    solver.preferredPosture=start.copy();solver.preferredPosture[0]=Math.NaN;
+    throws(function() new motionkit.robot.JointPathPreferences(solver),
+      "structured posture preferences reject nonfinite joints");
+    solver.preferredPosture=null;
+    solver.preferredOrientation=solver.forward(start);
+    var orientationSnapshot=new motionkit.robot.JointPathPreferences(solver);
+    solver.preferredOrientation=null;
+    near(orientationSnapshot.cost(fixture.arm,request.poses[1],start),0,
+      "explicit orientation preference overrides authored rotation",1e-12);
+    solver.preferTargetOrientation=true;
+    var targetSnapshot=new motionkit.robot.JointPathPreferences(solver);
+    check(targetSnapshot.cost(fixture.arm,request.poses[1],start)>0,
+      "authored target orientation supplies a soft state cost");
+    solver.preferTargetOrientation=false;
     var serialProgram=new MotionProgram([MotionOp.MoveL(solver.forward(end),"task",0.1,Blend.ExactStop)]);
     var serialCompiled=serialCompiler.compile(serialProgram,start,Int64.ofInt(920));
     check(serialCompiled.blocks[0].plans.length==1,"UR MoveL compiles through structured selection and differential refinement");

@@ -22,11 +22,12 @@ class StructuredJointPathPlanner implements JointPathPlanner {
   final retreat:Null<Array<Float>>;
   final weights:Null<Array<Float>>;
   final rollWeight:Float;
+  final preferenceSource:Null<ManipulatorKinematics>;
   final stateCost:Null<(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float>;
   public function new(group:KinematicGroup,?sampling:CandidateSamplingOptions,?coarse:CoarseSearchOptions,
       ?clearance:ArmClearance,collisionRounds:Int=8,contact:Bool=false,
       ?stateCost:(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float,
-      ?retreat:Array<Float>,?weights:Array<Float>,rollWeight:Float=0) {
+      ?retreat:Array<Float>,?weights:Array<Float>,rollWeight:Float=0,?preferenceSource:ManipulatorKinematics) {
     if(group==null || collisionRounds<1)throw "Joint path planner requires a compiled group and positive collision round budget";
     if (!Math.isFinite(rollWeight) || rollWeight < 0)
       throw "Roll motion cost must be finite and nonnegative";
@@ -35,6 +36,9 @@ class StructuredJointPathPlanner implements JointPathPlanner {
       for (weight in weights) if (!Math.isFinite(weight) || weight < 0)
         throw "Joint motion weights must be finite and nonnegative";
     }
+    if (preferenceSource != null && preferenceSource.manipulator != group)
+      throw "Planner preferences must belong to its compiled group";
+    this.preferenceSource = preferenceSource;
     this.weights = weights == null ? null : weights.copy();
     this.rollWeight = rollWeight;
     if (retreat != null) {
@@ -60,7 +64,9 @@ class StructuredJointPathPlanner implements JointPathPlanner {
       workerGroup = adapter.manipulator;
     } else throw "Structured planner worker requires compiled group kinematics";
     return new StructuredJointPathPlanner(workerGroup, sampling, coarse,
-      clearance == null ? null : clearance.withGroup(workerGroup), collisionRounds, contact, stateCost, retreat, weights, rollWeight);
+      clearance == null ? null : clearance.withGroup(workerGroup), collisionRounds, contact, stateCost, retreat, weights, rollWeight,
+      preferenceSource == null ? null : Std.isOfType(solver,ManipulatorKinematics) ? cast solver :
+        throw "Planner preference worker requires manipulator kinematics");
   }
   public static function sameFreedom(a:motionkit.path.OrientationPolicy,b:motionkit.path.OrientationPolicy):Bool {
     return switch a {
@@ -111,11 +117,16 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     fallbackDiagnostic=problem.diagnostic;
     var refined:Null<JointPathSamples> = null;
     var world=clearance;
-    var cost = stateCost;
+    var preferences = preferenceSource == null ? null : new JointPathPreferences(preferenceSource);
+    var cost = preferences == null ? stateCost :
+      (sample:Int,candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate) ->
+        (stateCost == null ? 0.0 : stateCost(sample,candidate)) +
+          preferences.cost(group,request.poses[sample],candidate.q);
     if (exitCheck != null && retreat != null) {
       var destination:Array<Float> = retreat.copy();
+      var precedingCost = cost;
       cost = (sample:Int,candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate) -> {
-        var value = stateCost == null ? 0.0 : stateCost(sample,candidate);
+        var value = precedingCost == null ? 0.0 : precedingCost(sample,candidate);
         if (sample == problem.samples.length - 1)
           for (joint in 0...destination.length) value += (weights == null ? 1.0 : weights[joint])*Math.abs(destination[joint]-candidate.q[joint])/request.velocity[joint];
         return value;

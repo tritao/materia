@@ -199,6 +199,13 @@ class ProgramCompiler {
       if (opw.manipulator.external.indexOf(true) < 0 && opw.manipulator.workFrame == null)
         return new StructuredJointPathPlanner(opw.manipulator);
     }
+    if (Std.isOfType(solver, ManipulatorKinematics)) {
+      var adapter:ManipulatorKinematics = cast solver;
+      if (adapter.jointCount() == 6 && adapter.manipulator.external.indexOf(true) < 0 &&
+          adapter.manipulator.workFrame == null)
+        return new StructuredJointPathPlanner(adapter.manipulator,null,null,null,8,false,
+          null,null,null,0,adapter);
+    }
     return null;
   }
 
