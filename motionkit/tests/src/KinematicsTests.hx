@@ -2150,6 +2150,24 @@ class KinematicsTests extends MotionKitTestSupport {
       "compiler defaults to the exact logical-axis planner");
     check(axisCompiler.forWorker().jointPathPlanner != axisCompiler.jointPathPlanner,
       "axis worker owns its path planner");
+    axisCompiler.pathEventSchedule=(op,offset,last,ds,ts,events)->events.concat([
+      new motionkit.event.PathEvent(ds[1],"timed-dose",motionkit.event.EventValue.Analog(ts[1]))]);
+    var scheduledProgram=new motionkit.program.MotionProgram([
+      motionkit.program.MotionOp.FollowPath(path,"work",0.1,[])]);
+    for(scheduledCompiler in [axisCompiler,axisCompiler.forWorker()]){
+      var compiled=scheduledCompiler.compile(scheduledProgram,q,Int64.ofInt(400));
+      try {
+        var event=compiled.blocks[0].plans[0].events[0];
+        check(event.channel=="timed-dose","final timing callback reaches the native execution plan and its worker copy");
+        switch event.value {
+          case Analog(seconds):near(Int64.toFloat(event.timeNs)*1e-9,seconds,
+            "scheduled output uses the actual section clock",1e-9);
+          case _:throw "Expected timed analog output";
+        }
+      } catch(error:Dynamic){compiled.dispose();throw error;}
+      compiled.dispose();
+    }
+    axisCompiler.pathEventSchedule=null;
     var measured = q.copy(); measured[0] += 0.00009; measured[1] -= 0.000135;
     var measuredCurve = planner.plan(path, new PathRequest([0.0,path.length()],
       [target,path.poseAt(path.length())],measured,new IkTolerance(0.0001,0.0001),

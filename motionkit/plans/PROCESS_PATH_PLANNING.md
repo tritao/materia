@@ -387,7 +387,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP5 | complete: lazy sample/edge/refined retries, physical acceptance and full native/Haxe gate | `e1435022f`, `e5336893f`, `bfd03d585` |
 | PP6 | in progress: planner argument, axis/standalone OPW defaults, class removal and free entry verified; remaining defaults and joined approach/retreat pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
 | PP7 | complete: generated entry/retreat selection, retries and emission; full MotionKit/native gate passed | `92b8c69ee`, `093e65a46`, `e41bdfffa`; retreat gate below |
-| PP8 | planned | — |
+| PP8 | in progress: launch rate precompile removed; weld problem builder/search migration and acceptance pending | final-clock rate scheduling below |
 | PP9 | in progress: handling and surface use the structured planner and authored missions pass; toolpaths/deletions/remaining mission gate pending | runner migrations below |
 | PP10 | planned | — |
 | PP11 | planned | — |
@@ -1489,3 +1489,13 @@ External-axis grids keep their authored physical ranges and coordinate indices. 
 MotionKit and RobotKit compiler-only builds pass; C4 passes 1,149,296 assertions (`process-path-bounded-construction-c4.log`). Default-backend WallFinishing passes 71 assertions. Profiled planning is 0.807167, 0.872686 and 0.922503 s, down from 1.866827/2.153304/2.284093 s before this change and near/below PP0's 0.91–1.01 s range. Cycle times, coverage and tracking records remain identical, with zero numeric IK queries. A typical 46-sample section's candidate construction now takes 1–2 ms, retaining 46 candidates. This establishes the Surface improvement; the weld performance acceptance, MuJoCo Surface gate and full phase close-out remain unproven.
 
 External scratch `process-path-bounded-construction-surface/results.json` retains all 84 phase records and four run/quality records, measured at fa4ab9b97 plus this then-uncommitted patch. No native ABI/source rebuild was needed: the existing lift request already accepts narrower arm limits.
+
+### PP8 rate scheduling on the final compilation
+
+`ProgramCompiler.pathEventSchedule` is a pure worker-safe callback invoked after a path section is timed and before its native execution plan is created. It receives whole-operation distances, section-local times, authored events and the last-section flag. Its events are mapped with the same exact time law and receive the normal validation/checks. Worker compilers retain the immutable callback. The compiler rejects events outside the timed section and handles endpoint subtraction roundoff.
+
+`WeldingPlanRunner.launch()` now captures its rate recipe as immutable scalar values and submits the process program once. The worker's actual compilation schedules wire feed directly through `ProcessRateSchedule.timedSection()`, preserving other channels, maintenance feed on already deposited prefixes, exact overlap restoration and final feed. The former synchronous rate-only compilation, disposal and subsequent recompilation of an edited program are removed. A new weld clears the preceding rate callback before candidate verification.
+
+MotionKit, ProcessKit and app compiler-only builds pass. C4 passes 1,149,300 assertions (`process-path-final-rate-c4.log`), including native event clocks from direct and worker compilers. `PROCESSKIT_ONLY=planning` passes welder-process (56), weld-planning (53) and rate-schedule (20) assertions (`process-path-final-rate-processkit-v2.log`). Rate tests cover recovery spanning section boundaries, internal transition rejection and final-endpoint roundoff. These are focused checks; authored runner execution and full phase gates remain pending.
+
+PP8 remains incomplete: `WeldPathPlanner` still has its roll/entry/corner loops and candidate compile-and-verify, and its accepted candidate compilation is not yet retained for execution. This increment removes the distinct rate-scheduling duplicate in `launch()`, not those earlier compilations. Track/weldment speed, clearance, cycle and deposited-leg acceptance still require the completed migration and clean-revision benchmarks.

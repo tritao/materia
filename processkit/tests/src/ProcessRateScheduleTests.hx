@@ -48,6 +48,20 @@ class ProcessRateScheduleTests {
     check(recovery[2] == normal[1], "later joint-limit rate changes are preserved");
     var exact = ProcessRateSchedule.overlap(normal, 0.004, 1.0);
     check(exact.length == 2 && exact[1] == normal[1], "a boundary coinciding with a rate change is not duplicated");
+    var early=ProcessRateSchedule.timedSection("wire",2,[0.0,0.01],[0.0,1.0],[],false,8,0.015,1);
+    check(early.length==1 && early[0].distance==0,"covered section emits maintenance without an out-of-section restore");
+    var late=ProcessRateSchedule.timedSection("wire",2,[0.01,0.02,0.03],[0.0,2.0,3.0],
+      [new PathEvent(0.02,"arc",EventValue.Digital(true))],true,8,0.015,1);
+    check(late.length==5 && late[1].distance==0.015 && late[4].distance==0.03,
+      "later timed section restores normal feed inside the overlap and emits its final rate");
+    var internalRejected=false;
+    try ProcessRateSchedule.timedSection("wire",2,[0.01,0.02],[0.0,1.0],
+      [new PathEvent(0.01,"wire",EventValue.Analog(3))],true,8) catch (_:Dynamic) internalRejected=true;
+    check(internalRejected,"section boundaries cannot hide an internal continuous-process transition");
+    var roundedEnd=ProcessRateSchedule.timedSection("wire",2,[0.01,0.03],[0.0,1.0],
+      [new PathEvent(0.03-1e-15,"wire",EventValue.Analog(0))],true,8);
+    check(roundedEnd.length==2 && roundedEnd[1].distance==0.03,
+      "whole-path endpoint roundoff still replaces the authored final rate");
     Sys.println('ProcessKit rate schedule tests passed ($assertions assertions)');
   }
 

@@ -81,6 +81,9 @@ class ProgramCompiler {
   public var planCheck:Null<PlanCheck> = null;
   /** Linear motor sums for machines whose axis velocities use the single-axis envelope. */
   public var motorSpace:Null<MotorSpaceConstraints> = null;
+  /** Pure, worker-safe event scheduling on the actual timed path section.
+   * Distances/events use whole-operation coordinates; times are section-local. */
+  public var pathEventSchedule:Null<(Int,Float,Bool,Array<Float>,Array<Float>,Array<PathEvent>)->Array<PathEvent>> = null;
 
   /**
    * This compiler for a planning thread, on a fork of its solver: the worker never shares solver
@@ -98,6 +101,7 @@ class ProgramCompiler {
     worker.planningAssumptions = planningAssumptions.copy();
     if (planCheck != null) worker.planCheck = planCheck.fork();
     worker.motorSpace = motorSpace;
+    worker.pathEventSchedule = pathEventSchedule;
     return worker;
   }
 
@@ -443,7 +447,7 @@ class ProgramCompiler {
       pending = lowerPath(c.speedScale, section.path, pathStart, c.sectionFeed, [for (event in c.sectionEvents)
       if (event.distance >= section.offset && (last || event.distance < end))
         new PathEvent(event.distance - section.offset, event.channel, event.value,
-          event.leadSeconds, event.holdPolicy)], c.currentIndex,null,0.0,curve);
+          event.leadSeconds, event.holdPolicy)], c.currentIndex,null,0.0,curve,section.offset,last);
     } catch (error:Dynamic) { releaseTransitions(); throw error; }
     try {
       var moved = false;
@@ -615,7 +619,7 @@ class ProgramCompiler {
   function lowerPath(speedScale:Float, path:PosePath, startQ:Array<Float>, feed:Float,
       authoredEvents:Array<PathEvent>, index:Int,
       ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0,
-      ?preplannedCurve:JointPathSamples):PendingMotion {
+      ?preplannedCurve:JointPathSamples, eventOffset:Float=0.0, eventLast:Bool=true):PendingMotion {
     if (path.length() <= 0.0) throw 'Motion program op $index has zero path length';
     var samples = pathSamples(path);
     var count = samples.length - 1;
@@ -700,13 +704,27 @@ class ProgramCompiler {
     var timed = motors == null ? timing.time(jointPath, timingLimits) : motors.time(timing, jointPath, timingLimits);
     try {
       var events:Array<TimedEvent> = [];
+      var timeMap = [for (distance in distances) timed.distanceToTime(distance)];
+      var schedule=pathEventSchedule;
+      if(schedule!=null){
+        var scheduled=schedule(index,eventOffset,eventLast,[for(distance in distances)distance+eventOffset],
+          timeMap.copy(),[for(event in authoredEvents)new PathEvent(event.distance+eventOffset,
+            event.channel,event.value,event.leadSeconds,event.holdPolicy)]);
+        if(scheduled==null)throw "Path event schedule must return events";
+        authoredEvents=[];
+        for(event in scheduled){
+          if(event==null || event.distance<eventOffset || event.distance>eventOffset+path.length())
+            throw "Scheduled event lies outside its timed path section";
+          authoredEvents.push(new PathEvent(Math.min(path.length(),Math.max(0.0,event.distance-eventOffset)),
+            event.channel,event.value,event.leadSeconds,event.holdPolicy));
+        }
+      }
       for (event in authoredEvents) {
         var seconds = Math.max(0.0,
           timed.distanceToTime(event.distance) - event.leadSeconds);
         events.push(new TimedEvent(Trajectory.nanoseconds(seconds), event.channel,
           event.value, event.holdPolicy));
       }
-      var timeMap = [for (distance in distances) timed.distanceToTime(distance)];
       // The task-space check inspects the path between samples too. Time the inspected distances exactly:
       // interpolating between sample times is wrong where the path speed changes fast, e.g. braking to rest
       // over the last sample interval, where distance goes with the square of time.

@@ -21,6 +21,12 @@ class ProcessKitTests {
   static var assertions = 0;
 
   public static function main():Void {
+    if(Sys.getEnv("PROCESSKIT_ONLY")=="planning") {
+      WelderProcessTests.run();
+      WeldPlanningTests.run();
+      ProcessRateScheduleTests.run();
+      return;
+    }
     paintFaultRecovery();
     dispenseAdapt();
     rejectOverride();

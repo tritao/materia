@@ -9,6 +9,27 @@ import motionkit.robot.CompiledProgram;
 
 /** Constant quantity per authored metre, scheduled against the validated motion's clock. */
 class ProcessRateSchedule {
+  /** Schedule one final compiler section without compiling its motion again. */
+  public static function timedSection(channel:String, quantity:Float, distances:Array<Float>,
+      times:Array<Float>, authored:Array<PathEvent>, last:Bool, endRate:Float,
+      coveredPrefix:Float=0.0, maintenanceRate:Float=0.0):Array<PathEvent> {
+    var scheduled=section(channel,quantity,distances,times);
+    var start=distances[0],end=distances[distances.length-1];
+    if(!Math.isFinite(coveredPrefix) || coveredPrefix<0)throw "Covered process prefix must be finite and nonnegative";
+    if(last && coveredPrefix>end)throw "Covered process prefix lies beyond the path";
+    if(coveredPrefix>start){
+      scheduled=overlap(scheduled,coveredPrefix,maintenanceRate);
+      scheduled=[for(event in scheduled)if(event.distance<end)event];
+    }
+    for(event in authored){
+      if(event.channel!=channel)scheduled.push(event);
+      else if(event.distance!=0.0 && !(last && Math.abs(event.distance-end)<=1e-12))
+        throw "A continuous process rate schedule cannot replace internal process transitions";
+    }
+    if(last)scheduled.push(new PathEvent(end,channel,EventValue.Analog(endRate)));
+    scheduled.sort((a,b)->a.distance<b.distance ? -1 : a.distance>b.distance ? 1 : 0);
+    return scheduled;
+  }
   /**
    * Each held rate deposits exactly the requested quantity over its timed interval.
    * Distances belong to the whole FollowPath operation; times belong to one native section.

@@ -244,6 +244,8 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   public function run(requested:WeldPlan):Void {
     if (running()) throw "A weld is already running";
+    // Candidate verification must not inherit a previous weld's rate recipe.
+    motion.compiler.pathEventSchedule=null;
     // Plan first: the rolls of the torch, how it comes in and leaves, reach and clearance all along. A weld that cannot be
     // done fails here, with the reasons.
     var began = Sys.time();
@@ -385,18 +387,14 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var program = new MotionProgram(ops);
     // Joint limits can slow a corner below the requested feed. Schedule wire quantity against that
     // validated clock before submitting the program, so the device applies it with the motion.
-    var timed = motion.compiler.compile(program, startPositions(), haxe.Int64.ofInt(1));
-    var scheduled:MotionProgram;
-    try {
-      scheduled = ProcessRateSchedule.apply(program, timed, followIndex, channels.wireSpeed,
-        process.recipe.quantityPerDistance, cast(plan, WeldPlan).parameters.wireSpeed,
-        first ? 0.0 : Math.max(0.0, process.interruptedAt - process.lastProgramStart), WeldArcModel.MIN_WIRE_SPEED);
-    } catch (error:Dynamic) {
-      timed.dispose();
-      throw error;
-    }
-    timed.dispose();
-    motion.run(scheduled);
+    var scheduledOp=followIndex,channel=channels.wireSpeed;
+    var quantity=process.recipe.quantityPerDistance;
+    var endRate=cast(plan,WeldPlan).parameters.wireSpeed;
+    var coveredPrefix=first ? 0.0 : Math.max(0.0,process.interruptedAt-process.lastProgramStart);
+    motion.compiler.pathEventSchedule=(op,offset,last,distances,times,events)->
+      op!=scheduledOp ? events : ProcessRateSchedule.timedSection(channel,quantity,distances,times,
+        events,last,endRate,coveredPrefix,WeldArcModel.MIN_WIRE_SPEED);
+    motion.run(program);
     phase = Welding;
   }
 
