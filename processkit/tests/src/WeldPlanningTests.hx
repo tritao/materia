@@ -267,7 +267,7 @@ class WeldPlanningTests {
         default:
       }
       return batch;
-    },channels,motionkit.robot.PlanningLimits.ofGroup(fixture.arm,new robotkit.model.SteadyLoads(),2.0),0,world);
+    },channels,motionkit.robot.PlanningLimits.ofGroup(fixture.arm,new robotkit.model.SteadyLoads(),2.0),1,world);
     var executionProblem=new processkit.WeldPathProblem(requested,WRIST,[WeldCorner.AROUND],processkit.WeldingPlanRunner.FRAME);
     try {
       runner.runSelected(executionProblem,freeCurves);
@@ -282,6 +282,26 @@ class WeldPlanningTests {
         "selected runner launch performs no additional compilation");
       check(runner.restarts()==0 && !arc,"selected runner completes burnback without a recovery or active arc");
       check(cast(runner.current,processkit.ProcessRun).state==processkit.ProcessRunState.Completion,"selected runner completes through the process lifecycle");
+      runner.runSelected(executionProblem,freeCurves);
+      var interrupted=false;
+      for(_ in 0...5000){
+        var cursor=runner.motion.progress();
+        var inject=!interrupted && arc && cursor.pathDistance>0.04;
+        if(inject)interrupted=true;
+        runner.update(0.01,{arc:arc && !inject,currentA:arc?200.0:0.0,voltageV:24.0,touch:false,
+          fault:inject?processkit.tool.WeldFault.ArcLost:processkit.tool.WeldFault.None,powerW:arc?4800.0:0.0});
+        harness.step(haxe.Int64.ofInt(++tick));
+        if(runner.completed() || runner.failure()!=null)break;
+      }
+      check(interrupted && runner.restarts()==1,"selected runner handles one injected arc loss");
+      near(cast(runner.current,processkit.ProcessRun).interruptedAt-cast(runner.current,processkit.ProcessRun).lastProgramStart,
+        processkit.WeldingPlanRunner.BACKOFF,1e-12,"selected recovery activates the original-coordinate backoff boundary");
+      check(runner.completed() && runner.failure()==null,'selected recovery completes: ${runner.failure()}');
+      check(runner.motion.planningMetrics().seconds==0 && runner.planningIkSolves==0,
+        "selected recovery submits retained compilation with no worker or numeric solve");
+      check(!arc && cast(runner.current,processkit.ProcessRun).state==processkit.ProcessRunState.Completion,
+        "selected recovery completes through process lifecycle with arc off");
+
     }catch(error:Dynamic){runner.abort();harness.dispose();throw error;}
     harness.dispose();
 

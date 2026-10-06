@@ -130,6 +130,9 @@ class ProcessRun {
     transition(ProcessRunState.Active,expected,expected>0.0?"resume after backoff":"begin process");
   }
 
+  /** Current validated start boundary, without activating the process. */
+  public function preparedStart():Float return availableStart();
+
   function availableStart():Float {
     if(state==null || state!=ProcessRunState.Ready && state!=ProcessRunState.Recovery)
       throw "Process program is available only when ready or recovering";

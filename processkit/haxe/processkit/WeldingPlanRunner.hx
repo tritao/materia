@@ -114,6 +114,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   final planner:WeldPathPlanner;
   final wrist:WristLimits;
   final clearance:Null<ArmClearance>;
+  var selectedProblem:Null<WeldPathProblem> = null;
   var selectedProgram:Null<WeldPathProgram> = null;
   var selectedCompilation:Null<motionkit.robot.CompiledProgram> = null;
   var selectedActive:Bool = false;
@@ -275,7 +276,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var program=new WeldPathProgram(problem,curves,channels);
     var compiled=program.compile(motion.compiler,group,startPositions(),motion.compilationPlanId(),clearance);
     try {
-      selectedProgram=program;selectedCompilation=compiled;planned=null;
+      selectedProblem=problem;selectedProgram=program;selectedCompilation=compiled;planned=null;
       prepareWeld(problem.plan,problem.seam,problem.retreat);
       planningSeconds=Sys.time()-began;planningIkSolves=group.numericSolveCount()-before;
     }catch(error:Dynamic){releaseSelected();throw error;}
@@ -391,8 +392,26 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   /** Starts the process run's program, the first time from a joint move to the approach pose. */
   function launch(first:Bool):Void {
     var process = cast(current, ProcessRun);
-    if(first && selectedProgram!=null && selectedCompilation!=null){
-      process.activatePrepared(0);outputs.drain();
+    if(selectedProblem!=null){
+      var start=process.preparedStart();
+      if(!first){
+        var problem=cast(selectedProblem,WeldPathProblem).recovery(start);
+        var group=cast(motion.compiler.solver,ManipulatorKinematics).manipulator;
+        // Recovery starts at the measured stopped state, never the prior program's endpoint.
+        var positions=motion.robot.snapshot().positions;
+        var stopped=[for(index in motion.jointIndices)positions.get(index)];
+        var began=Sys.time(),before=group.numericSolveCount();
+        var request=problem.request(stopped,motion.compiler.ikTolerance,
+          motion.compiler.perJointMaxJump,motion.compiler.maxVelocity);
+        var curves=problem.select(group,request,null,clearance,null,null,null,null,0,
+          cast(motion.compiler.solver,ManipulatorKinematics));
+        var program=new WeldPathProgram(problem,curves,channels,process.interruptedAt);
+        var compiled=program.compile(motion.compiler,group,stopped,motion.compilationPlanId(),clearance);
+        if(selectedCompilation!=null)selectedCompilation.dispose();
+        selectedProgram=program;selectedCompilation=compiled;
+        planningSeconds+=Sys.time()-began;planningIkSolves+=group.numericSolveCount()-before;
+      }
+      process.activatePrepared(start);outputs.drain();
       selectedActive=true;igniteIndex=cast(selectedProgram,WeldPathProgram).ignitionOp;waiting=0;
       motion.runCompiled(selectedCompilation);phase=Welding;return;
     }
@@ -458,7 +477,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   function releaseSelected():Void {
     if(selectedCompilation!=null)selectedCompilation.dispose();
-    selectedCompilation=null;selectedProgram=null;selectedActive=false;
+    selectedCompilation=null;selectedProgram=null;selectedProblem=null;selectedActive=false;
   }
 
   /** Where the arm's joints are now, or will be when the program running ends: where the next program starts. */
