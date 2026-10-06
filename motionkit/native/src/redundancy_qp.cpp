@@ -149,7 +149,7 @@ extern "C" mk_result MK_CALL mk_refine_redundancy(const mk_refinement_limits *l,
         const Eigen::VectorXd low=Eigen::Map<const Eigen::VectorXd>(inequality.lower.data(),inequality.lower.size());
         const Eigen::VectorXd high=Eigen::Map<const Eigen::VectorXd>(inequality.upper.data(),inequality.upper.size());
         proxsuite::proxqp::sparse::QP<double,int> qp(width,A.rows(),C.rows());
-        qp.settings.eps_abs=1e-8;qp.settings.eps_rel=0;qp.settings.max_iter=500;qp.settings.max_iter_in=50;
+        qp.settings.eps_abs=1e-8;qp.settings.eps_rel=0;qp.settings.max_iter=5000;qp.settings.max_iter_in=50;
         qp.settings.sparse_backend=proxsuite::proxqp::SparseBackend::SparseCholesky;
         qp.settings.verbose=false;qp.settings.compute_timings=false;
         const auto began=std::chrono::steady_clock::now();

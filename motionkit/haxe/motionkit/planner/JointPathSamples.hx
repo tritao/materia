@@ -13,6 +13,7 @@ class JointPathSamples {
   **/
   public final qDoublePrimeBefore:Array<Array<Float>>;
   public final jointCount:Int;
+  public var clearanceProof:Null<JointPathClearanceProof> = null;
 
   public function new(s:Array<Float>, q:Array<Array<Float>>,
       qPrime:Array<Array<Float>>, qDoublePrime:Array<Array<Float>>,

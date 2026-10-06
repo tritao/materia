@@ -47,7 +47,7 @@ class WeldPathProgram {
       throw "Weld recovery interruption lies outside the remaining seam";
     coveredPrefix=recovering ? cast(interruptedAt,Float)-problem.startDistance : 0.0;
     this.problem=problem;this.channels={arc:channels.arc,wireSpeed:channels.wireSpeed,voltage:channels.voltage};
-    this.curves=[for(curve in curves)new JointPathSamples(curve.s,curve.q,curve.qPrime,curve.qDoublePrime,curve.qDoublePrimeBefore)];
+    this.curves=[for(curve in curves){var copy=new JointPathSamples(curve.s,curve.q,curve.qPrime,curve.qDoublePrime,curve.qDoublePrimeBefore);copy.clearanceProof=curve.clearanceProof;copy;}];
     var parameters=problem.plan.parameters;
     phases=problem.phases.copy();quantity=parameters.wireSpeed/parameters.travelSpeed;endRate=parameters.wireSpeed;
     var ops:Array<MotionOp> = [
@@ -126,7 +126,7 @@ class WeldPathProgram {
   public function compile(compiler:ProgramCompiler,group:KinematicGroup,start:Array<Float>,planId:Int64,
       ?clearance:ArmClearance,?configuration:motionkit.kinematics.SixAxisConfiguration):CompiledProgram {
     var checking=new StructuredJointPathPlanner(group,null,null,clearance,8,false,
-      null,null,null,0,null,problem.contact);
+      null,null,null,0,null,problem.contact,problem.contactNeighborhood);
     var selected=new SelectedJointPathPlanner(compiler.solver,checking,problem.sections,curves);
     var execution=compiler.withJointPathPlanner(selected),quantity=this.quantity;
     var sectionOps=this.sectionOps.copy(),phases=this.phases.copy(),channel=channels.wireSpeed;

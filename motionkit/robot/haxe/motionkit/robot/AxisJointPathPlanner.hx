@@ -22,6 +22,7 @@ class AxisJointPathPlanner implements JointPathPlanner {
   }
   public function allowsFreeStart():Bool return false;
   public function retreatTarget():Null<Array<Float>> return null;
+  public function checkPathClearance(path:JointPathSamples,tolerance:Float):Bool return false;
   public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<robotkit.manipulation.ArmClearance.ClearanceViolation> return null;
   public function plan(path:PosePath, request:PathRequest, ?pinStart:Bool,
       ?entryCheck:(Array<Float>,Array<Float>)->Null<robotkit.manipulation.ArmClearance.ClearanceViolation>,

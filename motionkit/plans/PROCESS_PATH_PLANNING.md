@@ -619,10 +619,10 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
 | PP3 | in progress: structured/coarse search and Descartes dispatch implemented; authored gate pending | `7cb639434`, `489f2c360`, `f8e88ad4d`, `09cb60fbb` |
 | PP4 | drive-aware revision 7 implemented: native banded QP, exact rechecks and strict process timing; G17 cycle/posture and phase gates pass; broader transition close-out remains | drive-aware evidence below |
-| PP5 | original lazy sample/edge/refined phase complete; revision 7 inflated geometric clearance and timed-pass removal pending | `e1435022f`, `e5336893f`, `bfd03d585` |
+| PP5 | revision 7 continuous quintic certificate, lowering displacement and timed-pass removal complete; phase gate passes | original phase: `e1435022f`, `e5336893f`, `bfd03d585`; revision 7 evidence below |
 | PP6 | in progress: planner argument, axis/standalone OPW defaults, class removal and free entry verified; remaining defaults and joined approach/retreat pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
 | PP7 | complete: generated entry/retreat selection, retries and emission; full MotionKit/native gate passed | `92b8c69ee`, `093e65a46`, `e41bdfffa`; retreat gate below |
-| PP8 | in progress: G17 cycle/posture restored by drive-aware refinement; 42.86 s planning still misses 15 s; clearance and wrapper/candidate work follow in that order | per-step profiles below |
+| PP8 | in progress: G17 cycle/posture restored; PP4/PP5 profiles and clearance gate pass; 32.26 s planning still misses 15 s; wrapper/candidates next | per-step profiles below |
 | PP9 | in progress: handling and surface use the structured planner and authored missions pass; toolpaths/deletions/remaining mission gate pending | runner migrations below |
 | PP10 | planned | — |
 | PP11 | planned | — |
@@ -2725,3 +2725,145 @@ Planning still fails the **under-15-second** gate. PP5's single geometric
 clearance check is next; only after its profile should wrapper/candidate
 optimization begin. Logs and parsed data: external scratch
 `process-path-pp4-qp-g17-accepted-profile.log` and `.json`.
+
+
+### PP5 revision 7: continuous geometry certificate (phase gate in progress)
+
+The refined quintic joint curve now carries immutable clearance evidence.
+`JointPathPolynomial` matches native quintic Hermite interpolation (including
+incoming curvature at section boundaries). Bernstein subdivision bounds all
+interior joint configurations. Each midpoint hull query reserves its full
+interval motion plus 1.01 times the requested lowering tolerance. This extra
+one percent also bounds coefficient changes when the compiler realigns a
+retained section's distance grid. Evidence compares whole polynomial
+coefficients, not just endpoint positions, and public-array mutation invalidates
+reuse. Evidence is scoped to its actual collision world and contact policy.
+
+`ClearanceMotionBounds` uses the compiled kinematic forest and the exact hull
+corners queried by GJK. Revolute displacement is bounded by angle times reach;
+prismatic displacement by travel. Reach includes fixed mounts and the complete
+prismatic neighborhood. Compiled affine terms propagate every coupling's
+absolute gain, including multi-source followers. Relative pair clearance
+reserves **both** bodies' displacement. A moving work frame's translation and
+rotation also enter the TCP neighborhood used for contact permission.
+
+Contact permission near a weld seam is shrunk by the TCP displacement bound:
+distance to a fixed seam segment is 1-Lipschitz. An arbitrary contact callback
+without a conservative neighborhood guard retains timed checking. Timing
+backends without a declared native lowering bound likewise retain their check.
+The native TOPP-RA path skips dense timed clearance only after the matching
+geometric certificate passes. Generated entry moves and holds continue to be
+checked. Compiler-side coupling projections currently retain timed checking;
+compiled group followers are already included in the certificate's bounds.
+
+`PROCESS_PATH_VERIFY_CLEARANCE=1` is a phase acceptance audit. It restores the
+old timed-clearance check and compares actual lowered joint values with the
+quintic at distances from the native time law. At a 100 ms cadence plus endpoints
+it places the same hull corners in the fixed root frame and verifies observed
+displacement against the analytical bound. Sampling is an audit of the bound;
+the continuous proof comes from the interval and triangle-inequality bounds.
+
+Initial focused C4 validation passes **1,152,623 assertions**, including a
+quintic with clear endpoints and an interior collision, rejection solely from
+lowering-margin inflation, mutation and grid-realignment checks, and 100
+rotary/prismatic/multi-source follower neighborhoods with a moving work frame.
+This precedes the moving-body classifier amendment that checks every compiled
+coupling term. Full phase and whole-weldment gates remain pending.
+
+### PP8 profile after the PP5 geometry certificate
+
+Normal G17 run `process-path-pp5-g17-profile.log/.json` exits zero:
+**32.260002 s** planning, zero numeric pose queries, 1,429 checked task poses.
+Cycle is **232.5 s**, posture margin **0.778094423 rad**, rail travel
+**2.557556349 m**, 2,600 mm bead, 4.998146645 mm leg, 27.251 micrometres maximum
+seam error, and no clearance violation. Strict weld timing still takes its
+first attempt with factor 1 and peak rail acceleration **0.591757714 m/s²**.
+The original cycle/posture gates pass; **under 15 s planning still fails**.
+
+| Stage | Seconds |
+|---|---:|
+| Candidate construction, both alternatives | 12.201922 |
+| Inclusive search and clearance, both alternatives | 14.656183 |
+| Drive-aware refinement, both alternatives | 0.860873 |
+| Retained program compilation | 4.528420 |
+
+Within search, native calls take 2.181750 s, packing 0.376276 s, state costs
+3.619269 s, and continuous geometric certificates 4.826586 s. These are parts
+of the inclusive search value, not additional top-level time. Within retained
+compilation, time laws take 2.133576 s, clearance **0.093137 s** (generated
+entry/holds; covered path sections are microseconds), execution-plan creation
+0.785016 s, task-space checking 0.957554 s, and load checks 0.437057 s.
+The PP4 retained compilation value was 16.314596 s, with 12.055303 s of dense
+timed clearance. This profile is observational; a focused C4 check overlapped
+the initial source compilation. No search/candidate optimization has been made
+before the PP4 and PP5 profiles.
+
+G17's separate acceptance audit has checked the weld's 2,270 sampled lowered
+configurations: maximum joint error 5.80225e-12, maximum observed hull
+ displacement / analytical bound 5.74480e-6. Across the approach and retreat
+sections the observed ratio is at most 3.22793e-5; reserved maximum single-hull
+lowering displacement is **5.81275 micrometres**. The audit VM and whole-weldment
+phase evidence are not yet closed out at this entry.
+
+
+### PP5 revision 7: acceptance and full phase gate
+
+G17's acceptance-audit VM exits zero (`process-path-pp5-g17-audit.log`).
+Its cycle/posture/deposition records match the normal 32.26 s run. Audit
+planning is 45.757923 s because it intentionally restores dense timed checks;
+this is not the ordinary planning measurement.
+
+The first whole-weldment audit exposed a feasible roll-only QP that the
+500-iteration solver budget rejected. Both captured directional problems are
+feasible in an independent linear feasibility diagnostic. With a deterministic
+**5,000-iteration** budget they converge in **874 / 1,440 iterations**, taking
+64 / 91 ms in the isolated native reproduction, at the same 1e-8 absolute
+solver tolerance. Actual-unit constraint checks are unchanged. No drive limit,
+planned feed, branch rule or timing acceptance was weakened. A captured
+34-knot/943-row production problem is now a native regression fixture, checking
+all local bound values after solution. Host and Node/WASM tests pass it.
+The temporary input-dump instrumentation was removed.
+
+The final whole-weldment audit exits zero, including both backends, single-seam
+arc-loss restart, no-arc refusal, crater fault, displaced work, four-sided post,
+7 mm weave and 10 mm multipass quality checks. Both whole missions weld all
+**10 seams in 4 runs**, cycle **99.9 s**, with no clearance violation; MuJoCo
+maximum seam error is **31.7767 micrometres**. Deposited lengths remain
+40/40/40/40/180/180/40/40/40/40 mm. Leg sizes pass the existing quality gates.
+Evidence is `process-path-pp5-weldment-final-audit-profile.log/.json`.
+Across that complete check, **6,486** sampled lowered configurations pass the
+hull displacement audit: maximum joint error **3.07209e-10**, maximum measured
+hull displacement / reserved analytical bound **8.49912e-5**. The weldment's
+maximum reserved single-hull lowering displacement is **4.80275 micrometres**.
+The conservative pair allowance is the sum of each body's bound.
+
+This whole-weldment profile includes acceptance audit costs. MuJoCo per-run
+planning is **2.419804 / 2.097711 / 4.914602 / 12.071084 s**; test-backend values
+are **2.749885 / 2.069645 / 4.981815 / 12.006781 s**. It establishes functionality
+and the clearance bound, not a clean ordinary-planning speedup. The G17 normal
+profile, PP4 profile and these complete phase records precede all subsequent
+candidate/search optimization.
+
+The full phase gate passes on the final code:
+
+- `machinekit/scripts/test-haxeon`: complete smoke suite, exit zero
+  (`process-path-pp5-machine-phase.log`).
+- Compiler-only: app, MotionKit, ProcessKit, RobotKit, CadBridge and ToolpathKit
+  Motion; each exits zero (`process-path-pp5-*-final-phase-compiler.log`).
+- MotionKit full runtime: **1,223,914 assertions**, exit zero.
+- ProcessKit full runtime: exit zero, including **511** weld-planning assertions.
+- CadBridge full runtime: **173 assertions**, exit zero.
+- ToolpathKit Motion full runtime: **3,034 assertions**, exit zero.
+- RobotKit full runtime: exit zero, including **5,431** world assertions and the
+  excavator suites. Runtime logs are `process-path-pp5-*-phase-runtime.log`.
+- Native final build and **16/16 CTests** pass
+  (`process-path-pp5-native-phase-build.log`, `process-path-pp5-native-phase-ctest.log`).
+- Node/WASM QP suite passes, including the captured production fixture
+  (`process-path-pp5-wasm-qp-build.log`, `process-path-pp5-wasm-qp-runtime.log`).
+
+No schema or native ABI changes were needed in this phase. Unsupported opaque
+contact policies, other timing backends and compiler-side coupling projections
+retain their existing checks. The production weld path's bounded native
+lowering uses the continuous geometric certificate; generated entry/hold
+motions keep timed checking. PP8's under-15-second G17 planning target remains
+unmet and the whole-weldment ordinary-planning gains still need measurement.

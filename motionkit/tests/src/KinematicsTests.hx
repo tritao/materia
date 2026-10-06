@@ -1702,6 +1702,48 @@ class KinematicsTests extends MotionKitTestSupport {
     var clearSweep=world.closestSweep([0.0],[0.5]);
     if(clearSweep!=null)near(clearSweep.distance,0.48,"closest sweep aggregates clear route distances",1e-8);
     throws(function() world.closestSweep([0.0],[0.5],false,Math.POSITIVE_INFINITY),"closest sweep rejects an infinite sampling step");
+    var displacement=world.displacementBounds([0.0],[0.002]);
+    near(displacement[0],0.002,"prismatic hull motion includes complete lowering neighborhood",1e-12);
+    near(displacement[1],0,"held hull has zero displacement",1e-12);
+    var certifiedCurve=new JointPathSamples([0.0,1.0],[[0.0],[0.5]],[[0.5],[0.5]],[[0.0],[0.0]]);
+    var certificate=new motionkit.robot.JointCurveClearance(world,certifiedCurve,1e-6,false);
+    check(!certificate.covers(certifiedCurve,1e-6),"unchecked curve is not clearance evidence");
+    check(certificate.check(),"Bernstein subdivision certifies the continuous quintic curve");
+    check(certificate.covers(certifiedCurve,1e-6),"certificate covers exact curve and lowering budget");
+    check(!certificate.covers(certifiedCurve,2e-6),"larger lowering error needs a fresh certificate");
+    var realigned=new JointPathSamples([0.0,1.0+1e-13],certifiedCurve.q,certifiedCurve.qPrime,certifiedCurve.qDoublePrime);
+    check(certificate.covers(realigned,1e-6),"coefficient bound covers floating-point grid realignment");
+    certifiedCurve.q[1][0]=1.2;
+    check(!certificate.covers(certifiedCurve,1e-6),"mutating public curve arrays invalidates clearance evidence");
+    var bowed=new JointPathSamples([0.0,1.0],[[0.0],[0.0]],[[4.0],[-4.0]],[[0.0],[0.0]]);
+    check(world.violation(bowed.q[0])==null && world.violation(bowed.q[1])==null,
+      "quintic interior collision fixture has clear endpoints");
+    var bowedProof=new motionkit.robot.JointCurveClearance(world,bowed,1e-6,false);
+    check(!bowedProof.check() && bowedProof.failure!=null,"continuous certificate catches collision missed by endpoint chord");
+    var nearCurve=new JointPathSamples([0.0,1.0],[[0.9749995],[0.9749995]],[[0.0],[0.0]],[[0.0],[0.0]]);
+    check(world.violation(nearCurve.q[0])==null,"lowering-margin fixture is clear without inflation");
+    check(!new motionkit.robot.JointCurveClearance(world,nearCurve,1e-6,false).check(),
+      "lowering hull displacement rejects an insufficient geometric margin");
+    var coupledModel=new RobotModel("coupled-clearance-bounds"),root=coupledModel.addLink(new Link("root")),
+      turnLink=coupledModel.addLink(new Link("turn-link")),slideLink=coupledModel.addLink(new Link("slide-link")),
+      followerLink=coupledModel.addLink(new Link("follower-link"));
+    var turn=coupledModel.addJoint(new Joint("turn",JointType.Revolute,root,turnLink));
+    turn.limits.lower=-3;turn.limits.upper=3;turn.childFramePosition=[-0.2,0,0];
+    var travel=coupledModel.addJoint(new Joint("travel",JointType.Prismatic,turnLink,slideLink));
+    travel.axis=[1,0,0];travel.limits.lower=-2;travel.limits.upper=2;
+    var follower=coupledModel.addJoint(new Joint("follower",JointType.Revolute,slideLink,followerLink));
+    follower.parentFramePosition=[0.3,0,0];
+    coupledModel.addCoupling(new JointCoupling("travel-drive",travel.id,follower.id,12,0.1));
+    coupledModel.addCoupling(new JointCoupling("turn-drive",turn.id,follower.id,-0.5,0));
+    var flange=coupledModel.addFrame(new Frame("flange",followerLink)),work=coupledModel.addFrame(new Frame("work",slideLink));
+    var coupledGroup=new robotkit.manipulation.KinematicGroup(coupledModel,root.id,flange.id,work.id);
+    var coupledWorld=new robotkit.manipulation.ArmClearance(coupledGroup,[
+      {name:"coupled-tool",link:followerLink.id,vertices:cube(0.4),tool:true}],[0,0]);
+    for(i in 0...100){var q=[Math.sin(i*0.31)*2,Math.cos(i*0.17)*1.5],errors=[0.002,0.001],
+      perturbed=[q[0]+errors[0]*(i%2==0?1:-1),q[1]+errors[1]*(i%3==0?1:-1)];
+      check(coupledWorld.auditDisplacement(q,perturbed,errors)<=1+1e-8,
+        "rotary, prismatic and multi-source follower hull motion stays inside CL-D5 bound");
+    }
     var emptyWorld=new robotkit.manipulation.ArmClearance(clearanceGroup,[],[0.0]);
     check(emptyWorld.closest([0.0])==null,"empty clearance world has no closest pair");
     function waypoint(x:Float,y:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x,y,0),1e-6,1e-6);

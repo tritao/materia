@@ -44,6 +44,8 @@ class SelectedJointPathPlanner implements JointPathPlanner {
   }
   public function allowsFreeStart():Bool return false;
   public function retreatTarget():Null<Array<Float>> return null;
+  public function checkPathClearance(path:JointPathSamples,tolerance:Float):Bool
+    return checking.checkPathClearance(path,tolerance);
   public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<ArmClearance.ClearanceViolation>
     return checking.checkMotion(trajectory);
   public function plan(path:PosePath,request:PathRequest,?pinStart:Bool,
@@ -90,7 +92,8 @@ class SelectedJointPathPlanner implements JointPathPlanner {
         if(i>0)for(j in 0...curve.jointCount)if(Math.abs(curve.q[i][j]-curve.q[i-1][j])>request.maxJump[j]+1e-12)
           throw "Selected curve exceeds execution continuity bounds";
       }
-      return new JointPathSamples(request.distances,curve.q,curve.qPrime,curve.qDoublePrime,curve.qDoublePrimeBefore);
+      var result=new JointPathSamples(request.distances,curve.q,curve.qPrime,curve.qDoublePrime,curve.qDoublePrimeBefore);
+      result.clearanceProof=curve.clearanceProof;return result;
     }
     throw "No retained selected curve matches the execution task, grid and start"+
       (mismatches.length==0 ? " (authored geometry differs)" : ": "+mismatches.join("; "));
@@ -112,7 +115,8 @@ class SelectedJointPathPlanner implements JointPathPlanner {
     return new RefinementTarget(task.pose,freedom,task.velocity,task.acceleration,task.accelerationBefore);
   }
   static function copy(curve:JointPathSamples):JointPathSamples
-    return new JointPathSamples(curve.s,curve.q,curve.qPrime,curve.qDoublePrime,curve.qDoublePrimeBefore);
+    {var result=new JointPathSamples(curve.s,curve.q,curve.qPrime,curve.qDoublePrime,curve.qDoublePrimeBefore);
+      result.clearanceProof=curve.clearanceProof;return result;}
 }
 private typedef SelectedPath = {
   final frame:String;

@@ -24,6 +24,8 @@ class StructuredJointPathPlanner implements JointPathPlanner {
   final collisionRounds:Int;
   final contact:Bool;
   final contactPose:Null<motionkit.kinematics.Pose3->Bool>;
+  /** Proves contact permission throughout a TCP position ball. */
+  final contactGuard:Null<(motionkit.kinematics.Pose3,Float)->Bool>;
   final retreat:Null<Array<Float>>;
   final weights:Null<Array<Float>>;
   final rollWeight:Float;
@@ -32,7 +34,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
   public function new(group:KinematicGroup,?sampling:CandidateSamplingOptions,?coarse:CoarseSearchOptions,
       ?clearance:ArmClearance,collisionRounds:Int=8,contact:Bool=false,
       ?stateCost:(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float,
-      ?retreat:Array<Float>,?weights:Array<Float>,rollWeight:Float=0,?preferenceSource:ManipulatorKinematics,?contactPose:motionkit.kinematics.Pose3->Bool) {
+      ?retreat:Array<Float>,?weights:Array<Float>,rollWeight:Float=0,?preferenceSource:ManipulatorKinematics,?contactPose:motionkit.kinematics.Pose3->Bool,?contactGuard:(motionkit.kinematics.Pose3,Float)->Bool) {
     if(group==null || collisionRounds<1)throw "Joint path planner requires a compiled group and positive collision round budget";
     if (!Math.isFinite(rollWeight) || rollWeight < 0)
       throw "Roll motion cost must be finite and nonnegative";
@@ -44,7 +46,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     if (preferenceSource != null && preferenceSource.manipulator != group)
       throw "Planner preferences must belong to its compiled group";
     this.preferenceSource = preferenceSource;
-    this.contactPose = contactPose;
+    this.contactPose = contactPose;this.contactGuard=contactGuard;
     this.weights = weights == null ? null : weights.copy();
     this.rollWeight = rollWeight;
     if (retreat != null) {
@@ -73,7 +75,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     var settings=new CandidateSamplingOptions(original.rollCount,original.tiltRings,original.azimuthCount,
       original.pinStart,original.externalRanges,original.externalRule,configuration);
     return new StructuredJointPathPlanner(group,settings,coarse,clearance,collisionRounds,contact,stateCost,
-      retreat,weights,rollWeight,preferenceSource,contactPose);
+      retreat,weights,rollWeight,preferenceSource,contactPose,contactGuard);
   }
   public function withSolver(solver:motionkit.kinematics.KinematicsSolver):JointPathPlanner {
     var workerGroup:KinematicGroup;
@@ -87,7 +89,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     return new StructuredJointPathPlanner(workerGroup, sampling, coarse,
       clearance == null ? null : clearance.withGroup(workerGroup), collisionRounds, contact, stateCost, retreat, weights, rollWeight,
       preferenceSource == null ? null : Std.isOfType(solver,ManipulatorKinematics) ? cast solver :
-        throw "Planner preference worker requires manipulator kinematics",contactPose);
+        throw "Planner preference worker requires manipulator kinematics",contactPose,contactGuard);
   }
   public static function sameFreedom(a:motionkit.path.OrientationPolicy,b:motionkit.path.OrientationPolicy):Bool {
     return switch a {
@@ -110,6 +112,22 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     var fk = group.tcpPose(q);
     return contactPose(new motionkit.kinematics.Pose3(fk.translation.x,fk.translation.y,fk.translation.z,
       fk.rotation.x,fk.rotation.y,fk.rotation.z,fk.rotation.w));
+  }
+  public function checkPathClearance(path:JointPathSamples,tolerance:Float):Bool {
+    if(clearance==null)return true;
+    if(contactPose!=null && contactGuard==null)return false;
+    var retained=path.clearanceProof;
+    if(Std.isOfType(retained,JointCurveClearance)){
+      var proof:JointCurveClearance=cast retained;
+      if(proof.samePolicy(clearance,contact,contactPose,contactGuard) && proof.covers(path,tolerance))return true;
+    }
+    var proof=new JointCurveClearance(clearance,path,tolerance,contact,contactPose,contactGuard),began=Sys.time();
+    if(!proof.check()){var failure:ArmClearance.ClearanceViolation=cast proof.failure;
+      throw 'refined curve clearance (${failure.a}, ${failure.b}): ${failure.distance} < ${failure.required} at span ${proof.failedSpan}';}
+    path.clearanceProof=proof;
+    if(Sys.getEnv("PROCESS_PATH_PROFILE")=="1")Sys.println("PROCESS_PATH_GEOMETRY_CLEARANCE "+haxe.Json.stringify({seconds:Sys.time()-began,
+      spans:path.s.length-1,queries:proof.queries,loweringTolerance:tolerance,maximumBodyDelta:proof.maximumDelta}));
+    return true;
   }
   public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<ArmClearance.ClearanceViolation>
     return clearance == null ? null : TrajectoryClearance.violation(clearance,trajectory,contact,0.01,contactPose == null ? null : contactAt);
@@ -218,11 +236,16 @@ class StructuredJointPathPlanner implements JointPathPlanner {
           if(profile){refinementSeconds+=Sys.time()-refinementStarted;refinementAttempts++;}
           for(section in 0...curves.length){
             var curve=curves[section],base=request.distances.indexOf(offsets[section]);
-            for(i in 0...curve.q.length){
-              var sample=base+i;
-              var failure=world.violation(curve.q[i],contactAt(curve.q[i]));
+            if(contactPose==null || contactGuard!=null){
+              var proofBegan=Sys.time(),proof=new JointCurveClearance(world,curve,1e-6,contact,contactPose,contactGuard);
+              if(!proof.check())return new motionkit.robot.LazyCollisionLadder.RefinedCollision(base+proof.failedSpan+1,true,cast proof.failure);
+              curve.clearanceProof=proof;
+              if(profile)Sys.println("PROCESS_PATH_GEOMETRY_CLEARANCE "+haxe.Json.stringify({section:section,seconds:Sys.time()-proofBegan,
+                spans:curve.s.length-1,queries:proof.queries,loweringTolerance:1e-6,maximumBodyDelta:proof.maximumDelta}));
+            } else for(i in 0...curve.q.length){
+              var sample=base+i,failure=world.violation(curve.q[i],contactAt(curve.q[i]));
               if(failure!=null)return new motionkit.robot.LazyCollisionLadder.RefinedCollision(sample,false,failure);
-              if(i>0){failure=world.sweep(curve.q[i-1],curve.q[i],contact,0.02,null,contactPose == null ? null : contactAt);
+              if(i>0){failure=world.sweep(curve.q[i-1],curve.q[i],contact,0.02,null,contactAt);
                 if(failure!=null)return new motionkit.robot.LazyCollisionLadder.RefinedCollision(sample,true,failure);}
             }
           }

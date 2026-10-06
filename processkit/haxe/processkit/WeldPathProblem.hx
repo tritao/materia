@@ -173,19 +173,23 @@ class WeldPathProblem {
     var source=preferences;
     if(source==null){source=new ManipulatorKinematics(group);source.preferTargetOrientation=true;}
     var planner=new StructuredJointPathPlanner(group,options,null,clearance,8,false,
-      null,retreatJoints,weights,rollWeight,source,contact);
+      null,retreatJoints,weights,rollWeight,source,contact,contactNeighborhood);
     var curves=planner.planSections(sections,request,null,entryCheck,exitCheck);
     return new WeldPathSelection(this,curves,cast(planner.selectionCost,Float));
   }
 
   /** Geometric contact permission, evaluated at actual TCP poses in the task
    * frame. It also covers the nearby approach and burnback lift. */
-  public function contact(pose:Pose3):Bool {
+  public function contact(pose:Pose3):Bool return contactNeighborhood(pose,0.0);
+
+  /** Distance to a fixed seam is 1-Lipschitz in TCP position. */
+  public function contactNeighborhood(pose:Pose3,displacement:Float):Bool {
+    if(!Math.isFinite(displacement) || displacement<0 || displacement>WeldPathPlanner.CONTACT_ZONE)return false;
     var point=new Vec3(pose.x,pose.y,pose.z);
     for(segment in contactSegments){
       var direction=segment.to.sub(segment.from),length2=direction.dot(direction);
       var fraction=length2==0 ? 0.0 : Math.max(0.0,Math.min(1.0,point.sub(segment.from).dot(direction)/length2));
-      if(point.sub(segment.from.add(direction.scale(fraction))).norm()<=WeldPathPlanner.CONTACT_ZONE)return true;
+      if(point.sub(segment.from.add(direction.scale(fraction))).norm()<=WeldPathPlanner.CONTACT_ZONE-displacement)return true;
     }
     return false;
   }

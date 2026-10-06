@@ -506,6 +506,7 @@ class ProgramCompiler {
           for(sample in 0...local.length)if(Math.abs(local[sample]-curve.s[sample])>1e-12)
             throw "Global section refinement changed its local sample grid";
           c.sectionCurves[part]=new JointPathSamples(local,curve.q,curve.qPrime,curve.qDoublePrime,curve.qDoublePrimeBefore);
+          c.sectionCurves[part].clearanceProof=curve.clearanceProof;
         }
       }
       if(c.sectionCurves!=null){
@@ -610,7 +611,12 @@ class ProgramCompiler {
       if (motors != null) motors.validate(pending.trajectory);
       if (couplingIndices.length > 0) projected = projectCouplings(pending.trajectory);
       mark("motorValidationAndCouplings");
-      if (jointPathPlanner != null) {
+      if(pending.geometryCurve!=null && pending.geometryClearance && Sys.getEnv("PROCESS_PATH_VERIFY_CLEARANCE")=="1"){
+        var curve:JointPathSamples=cast pending.geometryCurve;
+        if(Std.isOfType(curve.clearanceProof,JointCurveClearance)){var proof:JointCurveClearance=cast curve.clearanceProof;
+          proof.auditTrajectory(curve,pending.trajectory,pending.taskSampleDistances);}
+      }
+      if (jointPathPlanner != null && (!pending.geometryClearance || Sys.getEnv("PROCESS_PATH_VERIFY_CLEARANCE")=="1")) {
         var failure = jointPathPlanner.checkMotion(projected == null ? pending.trajectory : projected);
         if (failure != null)
           throw 'compiled trajectory clearance (${failure.a}, ${failure.b}): ${failure.distance} < ${failure.required}';
@@ -808,6 +814,11 @@ class ProgramCompiler {
       }
     }
     var jointPath = refined==null ? new JointPathSamples(distances, positions, first, second, secondBefore) : refined;
+    var geometryClearance=false;
+    if(jointPathPlanner!=null && Std.isOfType(timing,ToppraPathTiming) && couplingIndices.length==0){
+      var nativeTiming:ToppraPathTiming=cast timing;
+      geometryClearance=jointPathPlanner.checkPathClearance(jointPath,nativeTiming.loweringTolerance);
+    }
     var timingLimits = new PathTimingLimits(maxVelocity, maxAcceleration, caps,0,0,requireFeasiblePath!=null && requireFeasiblePath(index));
     var motors = motorSpace;
     var timingBegan = Sys.time();
@@ -877,6 +888,7 @@ class ProgramCompiler {
       var made = new PendingMotion(index, startQ, positions[count], timed.trajectory, events,
         path, distances, timeMap, authoredPolyline, blendTolerance,
         taskSampleDistances, checkDistances, checkTimes);
+      made.geometryClearance=geometryClearance;made.geometryCurve=jointPath;
       made.feed = feed;
       return made;
     } catch (error:Dynamic) {
@@ -1142,6 +1154,8 @@ class PendingMotion {
   public var distanceOffset:Float = 0.0;
   /** The programmed speed of a path move in m/s, 0 for a joint move. */
   public var feed:Float = 0.0;
+  public var geometryClearance:Bool = false;
+  public var geometryCurve:Null<JointPathSamples> = null;
 
   public function new(opIndex:Int, startQ:Array<Float>, endQ:Array<Float>,
       trajectory:Trajectory, events:Array<TimedEvent>, path:Null<PosePath>,

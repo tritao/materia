@@ -187,7 +187,9 @@ class ArmClearance {
    * The first pair closer than it may be with the arm at `q`, or null. With `contact` the tool's bodies may come as close to
    * the fixed bodies as `contactMargin`. `wanted`, when given, is a smaller margin than the default for the others.
    */
-  public function violation(q:Array<Float>, contact:Bool = false, ?wanted:Float):Null<ClearanceViolation> {
+  public function violation(q:Array<Float>, contact:Bool = false, ?wanted:Float, ?displacements:Array<Float>):Null<ClearanceViolation> {
+    if(displacements!=null && displacements.length!=bodies.length)throw "Clearance displacement count differs from bodies";
+    if(displacements!=null)for(value in displacements)if(!Math.isFinite(value) || value<0)throw "Clearance displacements must be finite and nonnegative";
     var poses = arm.linkPoses(q, links);
     var centres = [for (body in bodies) body.centreIn(poses[body.linkIndex])];
     var placed:Array<Null<Array<Float>>> = [for (_ in bodies) null];
@@ -216,6 +218,7 @@ class ArmClearance {
     for (pair in pairs) {
       var a = bodies[pair[0]], b = bodies[pair[1]];
       var required = contact && (a.tool && !b.moving || b.tool && !a.moving) ? contactMargin : (wanted == null ? margin : Math.min(margin, wanted));
+      if(displacements!=null)required+=displacements[pair[0]]+displacements[pair[1]];
       // Whole bodies clear by more than the margin: bounding spheres.
       var gap = centres[pair[0]].sub(centres[pair[1]]).norm() - a.radius - b.radius;
       if (gap > required) continue;
@@ -232,6 +235,42 @@ class ArmClearance {
       if (apart < required) return {a: a.name, b: b.name, distance: apart, required: required};
     }
     return null;
+  }
+
+  /** CL-D5 displacement bound for the same hull corners used by GJK.
+   * Bounds are in fixed root coordinates; pair distances are unchanged by the
+   * common task-frame transform. Every coupled term contributes its absolute
+   * gain. Prismatic reach includes the complete supplied joint neighborhood. */
+  public function displacementBounds(q:Array<Float>, errors:Array<Float>):Array<Float> {
+    var bounds=new ClearanceMotionBounds(arm,q,errors);
+    return [for(body in bodies)bounds.point(body.link,originRadius(body.corners))];
+  }
+
+  public function tcpDisplacementBound(q:Array<Float>,errors:Array<Float>):Float
+    return new ClearanceMotionBounds(arm,q,errors).tcp();
+
+  /** Acceptance audit of the analytical bound using these exact hull corners.
+   * Both placements are brought to the fixed group root before comparison. */
+  public function auditDisplacement(q:Array<Float>,perturbed:Array<Float>,errors:Array<Float>):Float {
+    var bounds=displacementBounds(q,errors),a=arm.linkPoses(q,links),b=arm.linkPoses(perturbed,links),
+      rootA=arm.workPose(q),rootB=arm.workPose(perturbed),ratio=0.0;
+    for(i in 0...bodies.length){var body=bodies[i],pa=body.placed(rootA.compose(a[body.linkIndex])),pb=body.placed(rootB.compose(b[body.linkIndex]));
+      for(k in 0...Std.int(pa.length/3)){var dx=pa[3*k]-pb[3*k],dy=pa[3*k+1]-pb[3*k+1],dz=pa[3*k+2]-pb[3*k+2],
+        moved=Math.sqrt(dx*dx+dy*dy+dz*dz);
+        if(moved>bounds[i]+1e-10)throw 'Hull displacement exceeds CL-D5 bound for ${body.name}: $moved > ${bounds[i]}';
+        if(bounds[i]>0)ratio=Math.max(ratio,moved/bounds[i]);
+      }
+    }
+    var moved=arm.tcpPose(q).translation.sub(arm.tcpPose(perturbed).translation).norm(),tcp=tcpDisplacementBound(q,errors);
+    if(moved>tcp+1e-10)throw 'TCP displacement exceeds contact neighborhood bound: $moved > $tcp';
+    return ratio;
+  }
+
+  static function originRadius(corners:Array<Float>):Float {
+    var radius=0.0;
+    for(i in 0...Std.int(corners.length/3))radius=Math.max(radius,
+      Math.sqrt(corners[3*i]*corners[3*i]+corners[3*i+1]*corners[3*i+1]+corners[3*i+2]*corners[3*i+2]));
+    return radius;
   }
 
   /** Closest checked pair, including clear pairs, or null for an empty world.

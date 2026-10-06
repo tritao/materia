@@ -2,9 +2,11 @@
 #undef NDEBUG
 #endif
 #include "motionkit.h"
+#include "redundancy_qp_fixtures.h"
 #include <cassert>
 #include <cmath>
 #include <vector>
+#include <iterator>
 
 int main() {
     constexpr unsigned n=51;
@@ -52,4 +54,27 @@ int main() {
     assert(mk_refine_redundancy(&limits,s.data(),n,bounds.data(),3,q.data())==MK_ERROR_GENERATION);
     s[1].s=s[0].s;
     assert(mk_refine_redundancy(&limits,s.data(),n,bounds.data(),2,q.data())==MK_ERROR_INVALID_ARGUMENT);
+    // Actual roll-only weldment input, with nonuniform stopped-section knots.
+    // The original 500-iteration budget rejected this feasible problem.
+    std::vector<mk_refinement_sample> captured(std::size(weldment_samples));
+    std::vector<mk_refinement_bound> capturedBounds(std::size(weldment_bounds));
+    for(size_t i=0;i<captured.size();++i){auto &k=captured[i];k={};k.struct_size=sizeof(k);
+        k.s=weldment_samples[i][0];k.feed=weldment_samples[i][1];
+        k.route[0]=weldment_samples[i][2];k.seed[0]=weldment_samples[i][3];
+        k.gradient[0]=weldment_samples[i][4];k.lower[0]=-1e6;k.upper[0]=1e6;
+    }
+    for(size_t i=0;i<capturedBounds.size();++i){auto &b=capturedBounds[i];b={};b.struct_size=sizeof(b);
+        b.sample=static_cast<uint32_t>(weldment_bounds[i][0]);b.derivative=static_cast<uint32_t>(weldment_bounds[i][1]);
+        b.coefficients[0]=weldment_bounds[i][2];b.lower=weldment_bounds[i][3];b.upper=weldment_bounds[i][4];
+    }
+    limits.max_velocity[0]=1e6;limits.max_acceleration[0]=8e5;
+    limits.route_weight=1;limits.seed_weight=10;limits.curvature_weight=.01;
+    std::vector<mk_refinement_solution> checked(captured.size());
+    assert(mk_refine_redundancy(&limits,captured.data(),static_cast<uint32_t>(captured.size()),
+        capturedBounds.data(),static_cast<uint32_t>(capturedBounds.size()),checked.data())==MK_OK);
+    for(const auto &b:capturedBounds){const auto &v=checked[b.sample];
+        const double value=b.coefficients[0]*(b.derivative==0?v.value[0]:b.derivative==1?v.first[0]:v.second[0]);
+        assert(value>=b.lower-1e-7 && value<=b.upper+1e-7);
+    }
+
 }
