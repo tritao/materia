@@ -119,6 +119,76 @@ class OffsetWristGeometry {
     return probes;
   }
 
+  /** Prototype isolation of sign-changing consistency roots. Tangent roots,
+   * singular continuums and narrow validity intervals are not certified; this
+   * must not be registered as a complete production inverse family. */
+  public function simpleRoots(target:Pose3,cell:Array<Float>,intervals:Int=128):Array<OffsetWristProbe> {
+    if(intervals<4)throw "Offset wrist root scan requires at least four intervals";
+    var roots:Array<OffsetWristProbe> = [];
+    function branchAt(probes:Array<OffsetWristProbe>,branch:Int):Null<OffsetWristProbe>{
+      for(probe in probes)if(probe.branch==branch)return probe;
+      return null;
+    }
+    function retain(probe:OffsetWristProbe):Void {
+      if(Math.abs(probe.residual)>1e-8)return;
+      var actual=forward(probe.q);
+      if(motionkit.path.PoseMath.distance(actual,target)>1e-6 || motionkit.path.PoseMath.angle(actual,target)>1e-6)return;
+      for(old in roots){
+        var same=true;
+        for(j in armIndices){var d=old.q[j]-probe.q[j];if(Math.abs(Math.atan2(Math.sin(d),Math.cos(d)))>1e-6)same=false;}
+        if(same)return;
+      }
+      roots.push(probe);
+    }
+    function refineInterval(a:Float,b:Float,left:OffsetWristProbe,right:OffsetWristProbe,depth:Int):Void {
+      if(Math.abs(left.residual-right.residual)>=Math.PI || depth>20)return;
+      var mid=(a+b)*0.5,value=branchAt(inverseSlice(target,cell,mid),right.branch);
+      if(value==null)return;
+      var probe=cast(value,OffsetWristProbe);retain(probe);
+      if(left.residual*right.residual<0){
+        var lo=a,hi=b,fa=left.residual;
+        for(_ in 0...48){
+          var x=(lo+hi)*0.5,v=branchAt(inverseSlice(target,cell,x),right.branch);
+          if(v==null)break;
+          var p=cast(v,OffsetWristProbe);
+          if(Math.abs(p.residual)<1e-10){retain(p);break;}
+          if(fa*p.residual<=0)hi=x;else {lo=x;fa=p.residual;}
+        }
+        return;
+      }
+      var sign=left.residual>=0?1.0:-1.0;
+      var l=sign*left.residual,c=sign*probe.residual,r=sign*right.residual;
+      var curvature=(l+r)*0.5-c,slope=(r-l)*0.5;
+      var possible=c<=0;
+      if(curvature>0){
+        var vertex=-slope/(2*curvature);
+        if(Math.abs(vertex)<1 && c-slope*slope/(4*curvature)<=0)possible=true;
+      }
+      // Two nearby roots can share an initial scan interval. Refine intervals
+      // whose midpoint or quadratic estimate exposes that possibility.
+      if(possible){refineInterval(a,mid,left,probe,depth+1);refineInterval(mid,b,probe,right,depth+1);}
+    }
+    function refineBoundary(a:Float,b:Float,left:Null<OffsetWristProbe>,right:Null<OffsetWristProbe>,branch:Int,depth:Int):Void {
+      if(depth>32)return;
+      if(left!=null && right!=null){refineInterval(a,b,cast(left,OffsetWristProbe),cast(right,OffsetWristProbe),0);return;}
+      var mid=(a+b)*0.5,value=branchAt(inverseSlice(target,cell,mid),branch);
+      if(value==null && left==null && right==null)return;
+      if(value!=null)retain(cast(value,OffsetWristProbe));
+      refineBoundary(a,mid,left,value,branch,depth+1);
+      refineBoundary(mid,b,value,right,branch,depth+1);
+    }
+    var lower=-Math.PI,previous=inverseSlice(target,cell,lower);
+    for(probe in previous)retain(probe);
+    for(i in 1...intervals+1){
+      var upper=-Math.PI+2*Math.PI*i/intervals,current=inverseSlice(target,cell,upper);
+      for(probe in current)retain(probe);
+      for(branch in 0...8)
+        refineBoundary(lower,upper,branchAt(previous,branch),branchAt(current,branch),branch,0);
+      lower=upper;previous=current;
+    }
+    return roots;
+  }
+
   public function forward(q:Array<Float>):Pose3 {
     if(q==null || q.length!=group.group.count())throw "Offset wrist forward requires complete joints";
     for(value in q)if(!Math.isFinite(value))throw "Offset wrist joints must be finite";

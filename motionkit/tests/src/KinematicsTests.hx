@@ -2027,6 +2027,18 @@ class KinematicsTests extends MotionKitTestSupport {
         if(same){found=true;near(probe.residual,0,"known final angle makes offset inverse slice consistent",1e-6);}
       }
       check(found,"offset inverse slice contains original arm configuration modulo turns");
+      var roots=offsetGeometry.simpleRoots(expected,[for(_ in q)0.0]),rootFound=false;
+      for(root in roots){
+        var same=true;
+        for(j in 0...6){var d=root.q[j]-q[j];if(Math.abs(Math.atan2(Math.sin(d),Math.cos(d)))>1e-5)same=false;}
+        rootFound=rootFound || same;
+      }
+      if(!rootFound)Sys.println("OFFSET_ROOT_DIAGNOSTIC "+haxe.Json.stringify({theta:theta,
+        samples:[for(i in -10...11){angle:theta+i*0.005,
+          probes:[for(p in offsetGeometry.inverseSlice(expected,[for(_ in q)0.0],theta+i*0.005))
+            {branch:p.branch,residual:p.residual,q:p.q}]}]}));
+      check(rootFound,'unknown-angle scalar search sample $sample q=${haxe.Json.stringify(q)} roots=${haxe.Json.stringify([for(root in roots)root.q])}');
+
 
     }
     model.joints[5].parentFramePosition[1]=originalWristPosition;
