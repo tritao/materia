@@ -724,6 +724,20 @@ class CadBridgeTests {
       "translated assembly is a valid RobotKit runtime model");
     check(translated.model.actuators.length == 1 && translated.model.actuators[0].fullStepsPerRevolution == 200,
       "a stepper's full steps reach the robot actuator");
+    var declaredPhysical:cadbridge.AssemblySimulationBridge.AssemblyPhysicalData = {metresPerUnit: 0.001,
+      parts: [for (id in ["base", "slider"]) {id: id, materialId: "machined-steel",
+        volume: 1000000.0, centerOfMass: [0.0, 0.0, 0.0],
+        inertia: [10000000000.0, 0, 0, 0, 10000000000.0, 0, 0, 0, 10000000000.0], density: 7850.0,
+        physicalMassKg: id == "slider" ? 12.0 : null,
+        physicalMassDeclared: id == "slider",
+        physicalInertiaKgM2: id == "slider" ? [0.25, 0, 0, 0, 0.5, 0, 0, 0, 0.75] : null
+      }]};
+    var physicalBridge = AssemblySimulationBridge.toRobotModel(assembly.definition("bridge-test"), declaredPhysical);
+    check(Math.abs(physicalBridge.model.links[1].mass - 12.0) < 1e-9 &&
+      Math.abs(physicalBridge.model.links[1].inertiaTensor[0] - 0.25) < 1e-9 &&
+      Math.abs(physicalBridge.model.links[1].inertiaTensor[4] - 0.5) < 1e-9 &&
+      Math.abs(physicalBridge.model.links[1].inertiaTensor[8] - 0.75) < 1e-9,
+      "declared physical mass and SI inertia survive the scene-to-robot bridge");
     // A drive kind with its torque-speed curve reaches the actuator, a servo's too, and a bare stepper stays a bare stepper.
     var driven = new AssemblyModel();
     driven.add("base");

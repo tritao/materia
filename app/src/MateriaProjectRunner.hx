@@ -410,6 +410,9 @@ class MateriaProjectRunner {
         volume: component.volume == null ? properties.volume : component.volume,
         centerOfMass: component.centerOfMass == null ? properties.centerOfMass : component.centerOfMass.copy(),
         inertia: component.inertia == null ? properties.inertia : component.inertia.copy(),
+        physicalMassKg: component.physicalMassKg,
+        physicalMassDeclared: component.physicalMassDeclared,
+        physicalInertiaKgM2: component.physicalInertiaKgM2 == null ? null : component.physicalInertiaKgM2.copy(),
         density: component.materialDensity == null
           ? MaterialLibrary.require(materialId).physical.density : component.materialDensity});
     }
@@ -563,7 +566,8 @@ class MateriaProjectRunner {
     var materialId = component.materialId == null ? "neutral" : component.materialId;
     var density = component.materialDensity == null
       ? MaterialLibrary.require(materialId).physical.density : component.materialDensity;
-    var mass = volume * scale * scale * scale * density;
+    var mass = component.physicalMassKg == null
+      ? volume * scale * scale * scale * density : cast component.physicalMassKg;
     if (!Math.isFinite(mass) || mass <= 0) throw 'Invalid mass for generated part "$occurrenceId"';
     records.push({id: "project:" + occurrenceId, label: label, type: "cad-preview",
       x: center.x * scale, y: center.y * scale, z: center.z * scale,

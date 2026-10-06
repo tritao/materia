@@ -127,11 +127,16 @@ class ProjectKitTests {
       metresPerUnit: 0.001, parts: [{id: "part", name: "Part", red: 0.2,
         green: 0.3, blue: 0.4, appearance: Appearances.machinedSteel(),
         vertexCount: 4, indexCount: 12, vertices: vertices, normals: normals,
-        indices: indices, faceRanges: [], faceDescriptors: "[{\"index\":0}]"}], recipeDocument: "cube", recipeDiagnostics: ["ok"]};
+        indices: indices, faceRanges: [], faceDescriptors: "[{\"index\":0}]",
+        physicalMassKg: 2.4, physicalMassDeclared: true,
+        physicalInertiaKgM2: [0.2, 0, 0, 0, 0.3, 0, 0, 0, 0.4]}], recipeDocument: "cube", recipeDiagnostics: ["ok"]};
     var encoded = SceneArtifact.encode(data);
     check(encoded.getInt32(4) == SceneArtifact.VERSION, "current scene version");
     var restored = SceneArtifact.decode(encoded);
     check(restored.parts[0].id == "part", "scene part round trip");
+    check(restored.parts[0].physicalMassKg == 2.4 && restored.parts[0].physicalMassDeclared == true &&
+      restored.parts[0].physicalInertiaKgM2[0] == 0.2 && restored.parts[0].physicalInertiaKgM2[8] == 0.4,
+      "resolved physical mass and inertia round trip");
     var appearance = restored.parts[0].appearance;
     check(appearance != null && appearance.finish == "machined-steel", "scene appearance round trip");
     check(restored.recipeDocument == "cube", "scene source round trip");
@@ -142,7 +147,7 @@ class ProjectKitTests {
     truncated.blit(0, encoded, 0, 10);
     rejects(function() SceneArtifact.decode(truncated), "truncated scene");
     var badVersion = Bytes.alloc(encoded.length); badVersion.blit(0, encoded, 0, encoded.length);
-    badVersion.setInt32(4, 15);
+    badVersion.setInt32(4, SceneArtifact.VERSION - 1);
     rejects(function() SceneArtifact.decode(badVersion), "previous scene version is rejected");
     var invalidScale = Bytes.alloc(encoded.length);
     invalidScale.blit(0, encoded, 0, encoded.length);

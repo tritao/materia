@@ -30,6 +30,12 @@ typedef SceneArtifactPart = {
 	@:optional var volume:Float;
 	@:optional var centerOfMass:Array<Float>;
 	@:optional var inertia:Array<Float>;
+	/** Resolved physical mass; assembly coordinates still follow the scene unit. */
+	@:optional var physicalMassKg:Float;
+	/** Whether the mass is explicitly declared, so a later material edit does not replace it. */
+	@:optional var physicalMassDeclared:Bool;
+	/** Centroidal inertia in kg m², row-major, about `centerOfMass`. */
+	@:optional var physicalInertiaKgM2:Array<Float>;
 	var vertexCount:Int;
 	var indexCount:Int;
 	var vertices:Bytes;
@@ -403,7 +409,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 17;
+	public static inline var VERSION:Int = 18;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -414,7 +420,8 @@ class SceneArtifact {
 		var unit = data.lengthUnit == null ? LengthUnit.fromScale(data.metresPerUnit) : data.lengthUnit;
 		var unitText = Bytes.ofString(unit);
 		var names:Array<{id:Bytes, name:Bytes, finish:Bytes, materialId:Bytes, materialSpec:Bytes,
-			density:Float, volume:Float, center:Array<Float>, inertia:Array<Float>, faces:Bytes}> = [];
+			density:Float, volume:Float, center:Array<Float>, inertia:Array<Float>, physicalMass:Float,
+			physicalMassDeclared:Bool, physicalInertia:Array<Float>, faces:Bytes}> = [];
 		var assemblyDefinition = data.assemblyDefinition == null ? Bytes.alloc(0)
 			: Bytes.ofString(AssemblyDefinitionCodec.encode(data.assemblyDefinition));
 		var assemblyState = data.assemblyState == null ? Bytes.alloc(0)
@@ -451,14 +458,25 @@ class SceneArtifact {
 			var materialSpec = Bytes.ofString(spec);
 			var density = part.materialDensity == null ? MaterialLibrary.require(idValue).physical.density : part.materialDensity;
 			var meshProperties = MeshMassProperties.compute(part.vertices, part.indices);
+			var volume = part.volume == null ? meshProperties.volume : part.volume;
+			var physicalMass = part.physicalMassKg == null
+				? volume * density * Math.pow(data.metresPerUnit, 3) : cast part.physicalMassKg;
+			var physicalInertia = part.physicalInertiaKgM2 == null
+				? [for (value in (part.inertia == null ? meshProperties.inertia : part.inertia))
+					value * density * Math.pow(data.metresPerUnit, 5) *
+					(physicalMass / (volume * density * Math.pow(data.metresPerUnit, 3)))]
+				: part.physicalInertiaKgM2.copy();
 			var faceDescriptors = part.faceDescriptors;
 			var faces = faceDescriptors == null ? Bytes.alloc(0) : Bytes.ofString(faceDescriptors);
 			names.push({id: id, name: name, finish: finish, materialId: materialId,
 				materialSpec: materialSpec, density: density, faces: faces,
-				volume: part.volume == null ? meshProperties.volume : part.volume,
+				volume: volume,
 				center: part.centerOfMass == null ? meshProperties.centerOfMass : part.centerOfMass,
-				inertia: part.inertia == null ? meshProperties.inertia : part.inertia});
-			length += 168 + finish.length + materialId.length + materialSpec.length + id.length + name.length + part.vertices.length + part.normals.length
+				inertia: part.inertia == null ? meshProperties.inertia : part.inertia,
+				physicalMass: physicalMass,
+				physicalMassDeclared: part.physicalMassDeclared == null ? part.physicalMassKg != null : part.physicalMassDeclared,
+				physicalInertia: physicalInertia});
+			length += 249 + finish.length + materialId.length + materialSpec.length + id.length + name.length + part.vertices.length + part.normals.length
 				+ part.indices.length + (part.edgeSegments == null ? 0 : part.edgeSegments.length)
 				+ (part.edgeIds == null ? 0 : part.edgeIds.length)
 				+ part.faceRanges.length * 12 + 4 + faces.length;
@@ -493,6 +511,9 @@ class SceneArtifact {
 			result.setDouble(offset, text.volume); offset += 8;
 			for (coordinate in text.center) { result.setDouble(offset, coordinate); offset += 8; }
 			for (component in text.inertia) { result.setDouble(offset, component); offset += 8; }
+			result.setDouble(offset, text.physicalMass); offset += 8;
+			result.set(offset++, text.physicalMassDeclared ? 1 : 0);
+			for (component in text.physicalInertia) { result.setDouble(offset, component); offset += 8; }
 			offset = putInt(result, offset, part.vertexCount);
 			offset = putInt(result, offset, part.indexCount);
 			offset = putInt(result, offset, part.faceRanges.length);
@@ -1351,12 +1372,16 @@ class SceneArtifact {
 			throw 'Scene artifact part "${part.id}" has an invalid material specification';
 		if (part.volume != null && (!finite(part.volume) || part.volume <= 0) ||
 			part.centerOfMass != null && part.centerOfMass.length != 3 ||
-			part.inertia != null && part.inertia.length != 9)
+			part.inertia != null && part.inertia.length != 9 ||
+			part.physicalMassKg != null && (!finite(part.physicalMassKg) || part.physicalMassKg <= 0) ||
+			part.physicalInertiaKgM2 != null && part.physicalInertiaKgM2.length != 9)
 			throw 'Scene artifact part "${part.id}" has invalid mass properties';
 		if (part.centerOfMass != null) for (coordinate in part.centerOfMass)
 			if (!finite(coordinate)) throw 'Scene artifact part "${part.id}" has invalid centre of mass';
 		if (part.inertia != null) for (component in part.inertia)
 			if (!finite(component)) throw 'Scene artifact part "${part.id}" has invalid inertia';
+		if (part.physicalInertiaKgM2 != null) for (component in part.physicalInertiaKgM2)
+			if (!finite(component)) throw 'Scene artifact part "${part.id}" has invalid physical inertia';
 		if (appearance != null && (appearance.finish == null ||
 			StringTools.trim(appearance.finish).length == 0 ||
 			Bytes.ofString(appearance.finish).length > 4096 ||
@@ -1418,6 +1443,11 @@ private class SceneArtifactReader {
 			var volume = readDouble();
 			var center = [for (_ in 0...3) readDouble()];
 			var inertia = [for (_ in 0...9) readDouble()];
+			var physicalMassKg = readDouble();
+			var physicalMassDeclared = readByte();
+			if (physicalMassDeclared != 0 && physicalMassDeclared != 1)
+				throw 'Scene artifact part "$id" has invalid physical mass provenance';
+			var physicalInertiaKgM2 = [for (_ in 0...9) readDouble()];
 			var vertexCount = readInt(), indexCount = readInt(), rangeCount = readInt();
 			var edgeByteCount = readInt();
 			if (vertexCount <= 0 || vertexCount > 2000000 || indexCount <= 0 ||
@@ -1434,6 +1464,8 @@ private class SceneArtifactReader {
 			var part:SceneArtifactPart = {id: id, name: name, red: red, green: green, blue: blue,
 				appearance: appearance, materialId: materialId, materialDensity: density, materialSpec: materialSpec,
 				volume: volume, centerOfMass: center, inertia: inertia,
+				physicalMassKg: physicalMassKg, physicalMassDeclared: physicalMassDeclared == 1,
+				physicalInertiaKgM2: physicalInertiaKgM2,
 				vertexCount: vertexCount, indexCount: indexCount, vertices: vertices, normals: normals,
 				indices: indices, edgeSegments: edgeSegments, edgeIds: edgeIds,
 				faceRanges: faceRanges};

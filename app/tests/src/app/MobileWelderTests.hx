@@ -209,6 +209,14 @@ class MobileWelderTests {
     for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
       var session = new ProjectDocumentSession(null, false);
       session.openGeneratedProject(generated, manifest);
+      var physical = session.projectPhysical;
+      if (physical == null) throw "Mobile weld scene lost its physical component properties";
+      var declaredPack = false;
+      for (part in physical.parts) if (part.physicalMassDeclared == true && part.physicalMassKg != null &&
+          Math.abs(part.physicalMassKg - 230.0) < 1e-9 && part.physicalInertiaKgM2 != null &&
+          part.physicalInertiaKgM2.length == 9 && part.physicalInertiaKgM2[0] > 0 &&
+          part.physicalInertiaKgM2[4] > 0 && part.physicalInertiaKgM2[8] > 0) declaredPack = true;
+      if (!declaredPack) throw "The mobile scene did not carry the pack's declared mass and CAD inertia into runtime physics";
       var simulation = new ApplicationSimulation(new RobotWorld());
       simulation.setBackend(backend);
       try {
