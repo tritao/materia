@@ -37,7 +37,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     return new StructuredJointPathPlanner(workerGroup, sampling, coarse,
       clearance == null ? null : clearance.withGroup(workerGroup), collisionRounds, contact);
   }
-  static function sameFreedom(a:motionkit.path.OrientationPolicy,b:motionkit.path.OrientationPolicy):Bool {
+  public static function sameFreedom(a:motionkit.path.OrientationPolicy,b:motionkit.path.OrientationPolicy):Bool {
     return switch a {
       case Fixed | Interpolated:ToolFreedom.isFull(b);
       case FreeAboutTool:switch b {case FreeAboutTool:true;default:false;};

@@ -183,7 +183,8 @@ class ProgramCompiler {
     this.positionTolerance = positionTolerance;
     this.orientationTolerance = orientationTolerance;
     this.ikTolerance = ikTolerance == null ? new IkTolerance() : ikTolerance;
-    this.jointPathPlanner = jointPathPlanner;
+    this.jointPathPlanner = jointPathPlanner != null ? jointPathPlanner :
+      Std.isOfType(solver, AxisKinematics) ? new AxisJointPathPlanner(cast solver) : null;
   }
 
   /**

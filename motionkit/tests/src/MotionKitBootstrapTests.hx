@@ -107,6 +107,7 @@ class MotionKitBootstrapTests {
       return;
     }
     if (Sys.getEnv("MOTIONKIT_C4_ONLY") == "1") {
+      kinematicsTests.testAxisKinematics();
       kinematicsTests.testOpwKinematics();
       kinematicsTests.testCartesianAnalyticIk();
       kinematicsTests.testExternalOpwIk();

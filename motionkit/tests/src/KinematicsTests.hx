@@ -1859,6 +1859,56 @@ class KinematicsTests extends MotionKitTestSupport {
     near(velocity[0], 0.02, "axis differential IK maps X velocity");
     near(velocity[1], -0.03,
       "axis differential IK keeps follower velocity in proportion");
+    var path = new PosePath("work", [new PoseLine(new PoseWaypoint(target, 1e-6, 1e-6),
+      new PoseWaypoint(new Pose3(0.03, 0.02, -0.03), 1e-6, 1e-6), OrientationPolicy.Fixed, 0.1, 0.1)]);
+    var planner = new motionkit.robot.AxisJointPathPlanner(solver);
+    var curve = planner.plan(path, new PathRequest([0.0, path.length()],
+      [target, path.poseAt(path.length())], q, new IkTolerance(),
+      [for (_ in 0...4) 0.1], [for (_ in 0...4) 0.1], 32,
+      [OrientationPolicy.Fixed, OrientationPolicy.Fixed]));
+    near(curve.q[1][1], -0.025, "axis path retains follower offset");
+    near(curve.qPrime[1][0], 1.0, "axis path has exact leader derivative");
+    near(curve.qPrime[1][1], -1.5, "axis path has exact follower derivative");
+    near(curve.qDoublePrime[1][1], 0.0, "axis line has zero follower curvature");
+    var freePath = new PosePath("work", [new PoseLine(new PoseWaypoint(target, 1e-6, 1e-6),
+      new PoseWaypoint(new Pose3(0.03, 0.02, -0.03, 0.0, 0.0, Math.sin(0.2), Math.cos(0.2)), 1e-6, 1e-6),
+      OrientationPolicy.Free, 0.1, 0.1)]);
+    var freeCurve = planner.plan(freePath, new PathRequest([0.0, freePath.length()],
+      [target, freePath.poseAt(freePath.length())], q, new IkTolerance(),
+      [for (_ in 0...4) 0.1], [for (_ in 0...4) 0.1], 32,
+      [OrientationPolicy.Free, OrientationPolicy.Free]));
+    near(freeCurve.q[1][0], 0.03, "axis free-orientation path ignores authored rotation");
+    var axisCompiler = new ProgramCompiler(solver, new ValidationLimits(4, Int64.ofInt(1), Int64.ofInt(0)), "work",
+      [for (_ in 0...4) 0.1], [for (_ in 0...4) 0.4], [for (_ in 0...4) 4.0],
+      StartTolerances.uniform(4, 0.001, 0.001, 0.001));
+    check(Std.isOfType(axisCompiler.jointPathPlanner, motionkit.robot.AxisJointPathPlanner),
+      "compiler defaults to the exact logical-axis planner");
+    check(axisCompiler.forWorker().jointPathPlanner != axisCompiler.jointPathPlanner,
+      "axis worker owns its path planner");
+    var arcStart = new Pose3(0.02, 0.0, 0.0);
+    var joined = new PosePath("work", [
+      new PoseLine(new PoseWaypoint(new Pose3(0.02, -0.01, 0.0), 1e-6, 1e-6),
+        new PoseWaypoint(arcStart, 1e-6, 1e-6), OrientationPolicy.Fixed, 0.1, 0.1),
+      new motionkit.path.PoseArc(new PoseWaypoint(arcStart, 1e-6, 1e-6),
+        new PoseWaypoint(new Pose3(0.02 / Math.sqrt(2.0), 0.02 / Math.sqrt(2.0), 0.0), 1e-6, 1e-6),
+        new PoseWaypoint(new Pose3(0.0, 0.02, 0.0), 1e-6, 1e-6), OrientationPolicy.Fixed, 0.1)]);
+    var distances = [0.0, joined.primitives[0].length(), joined.length()];
+    var start = solver.solvePose(joined.poseAt(0.0), q, new IkTolerance(), OrientationPolicy.Fixed);
+    var joinedCurve = planner.plan(joined, new PathRequest(distances,
+      [for (s in distances) joined.poseAt(s)], start, new IkTolerance(),
+      [for (_ in 0...4) 0.1], [for (_ in 0...4) 0.1], 32,
+      [for (_ in distances) OrientationPolicy.Fixed]));
+    near(joinedCurve.qDoublePrime[1][0], -50.0, "axis arc preserves exact outgoing curvature", 1e-6);
+    near(joinedCurve.qDoublePrime[1][1], 75.0, "axis arc scales follower curvature", 1e-6);
+    near(joinedCurve.qDoublePrimeBefore[1][1], 0.0, "axis join retains incoming line curvature");
+    var invalidStart = q.copy(); invalidStart[1] += 0.001;
+    var failure = "";
+    try planner.plan(path, new PathRequest([0.0, path.length()],
+      [target, path.poseAt(path.length())], invalidStart, new IkTolerance(),
+      [for (_ in 0...4) 0.1], [for (_ in 0...4) 0.1], 32,
+      [OrientationPolicy.Fixed, OrientationPolicy.Fixed]))
+    catch (error:Dynamic) failure = Std.string(error);
+    check(failure.indexOf("joint mapping") >= 0, "axis planner rejects an inconsistent pinned follower");
     check(solver.solvePose(new Pose3(0.06), q, new IkTolerance(), null) == null,
       "axis IK rejects poses beyond logical limits");
   }

@@ -22,11 +22,7 @@ class PosePathRefinement {
       start=end;
     }
     var primitive=path.primitives[index],policy=primitive.orientationPolicy();
-    switch policy {
-      case Cone(_, _):
-      case Free: throw "Full-free refinement requires an explicit orientation centre";
-      default:
-    }
+    // The authored primitive supplies an orientation centre even when rotation is free.
     var pose=primitive.waypointAt(local).pose;
     var outgoing=centreRates(pose,policy,primitive.derivativesAt(local)),incoming=outgoing;
     if(index>0 && local==0){
