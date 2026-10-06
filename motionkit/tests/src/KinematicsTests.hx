@@ -713,6 +713,24 @@ class KinematicsTests extends MotionKitTestSupport {
     check(preferredRetry.candidates[1] != preferredRoute.candidates[1] &&
       preferredRetry.candidates[1] != initialRoute.candidates[1],
       "collision retries retain process preferences while excluding blocked states");
+    var motionWeights = [0.1,0.2,0.3,2.0,3.0,4.0];
+    var weightedRoute = motionkit.robot.StructuredLadder.search(rerouteProblem,motionWeights,0.5,preference);
+    var weightedClear = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> null,
+      2,null,null,null,preference,null,null,motionWeights,0.5);
+    near(weightedClear.cost,weightedRoute.cost,"lazy clearance retains weighted motion and preference costs",1e-12);
+    check(weightedClear.candidates[1] == weightedRoute.candidates[1],
+      "lazy clearance retains the weighted winning route");
+    var weightedChecks = 0;
+    var weightedRetry = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> {
+      weightedChecks++;
+      return q == weightedRoute.candidates[1].q ? {a:"tool",b:"weighted-post",distance:0.0,required:0.01} : null;
+    },2,null,null,null,preference,null,null,motionWeights,0.5);
+    check(weightedRetry.candidates[1] != weightedRoute.candidates[1] && weightedChecks == 4,
+      "weighted collision search retries within the same round bound");
+    throws(function() new motionkit.robot.StructuredJointPathPlanner(fixture.arm,null,null,null,8,false,null,null,
+      [1.0],0.0),"planner rejects a mismatched motion weight vector");
+    throws(function() new motionkit.robot.StructuredJointPathPlanner(fixture.arm,null,null,null,8,false,null,null,
+      null,-1.0),"planner rejects a negative roll-change cost");
     var exitChecks = 0;
     var clearExit = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> null,
       2,null,null,null,null,null,q -> {
@@ -1149,11 +1167,18 @@ class KinematicsTests extends MotionKitTestSupport {
     var rollPath=new motionkit.path.PosePath("task",[new PoseLine(
       new PoseWaypoint(rollRequest.poses[0],1e-6,1e-6),new PoseWaypoint(rollRequest.poses[1],1e-6,1e-6),
       motionkit.path.OrientationPolicy.FreeAboutTool,0.1,0.1)]);
+    var plannerWeights = [0.1,0.1,0.1,1.0];
     var physicalPlanner=new motionkit.robot.StructuredJointPathPlanner(rollGroup,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1),null,rollWorld,3);
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1),null,rollWorld,3,false,null,null,
+      plannerWeights,0.2);
+    plannerWeights[3] = -1.0; // A caller's later mutation must not corrupt the owned native weights.
     var physicalCurve=physicalPlanner.plan(rollPath,rollRequest);
     check(Math.abs(physicalCurve.q[1][3])>1,"integrated planner refines the physical obstacle-avoiding roll");
     check(rollWorld.sweep(physicalCurve.q[0],physicalCurve.q[1])==null,"integrated refined route has a clear sampled sweep");
+    var weightedWorkerCurve = physicalPlanner.withSolver(rollSolver.fork()).plan(rollPath,rollRequest);
+    for (sample in 0...physicalCurve.q.length) for (joint in 0...4)
+      near(weightedWorkerCurve.q[sample][joint],physicalCurve.q[sample][joint],
+        "weighted planner worker retains the physical route despite caller mutation",1e-7);
     var finalCompiler = new ProgramCompiler(rollSolver,new ValidationLimits(4,Int64.ofInt(1),Int64.ofInt(0)),
       "task",[1.0,1.0,1.0,1.0],[2.0,2.0,2.0,2.0],[20.0,20.0,20.0,20.0],
       StartTolerances.uniform(4,0.01,0.01,0.01),null,0.005,2.0,0.001,0.001,null,physicalPlanner);

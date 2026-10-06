@@ -30,13 +30,14 @@ class LazyCollisionLadder {
       ?refinedCheck:LadderSelection->Null<RefinedCollision>,
       ?stateCost:(Int,LatticeCandidate)->Float,
       ?entrySweep:(Array<Float>,Array<Float>)->Null<ClearanceViolation>,
-      ?exitCheck:Array<Float>->Null<ClearanceViolation>):LadderSelection {
+      ?exitCheck:Array<Float>->Null<ClearanceViolation>,
+      ?weights:Array<Float>,rollWeight:Float=0):LadderSelection {
     if(problem==null || check==null || rounds<1)throw "Lazy collision selection requires a problem, checker and positive round budget";
     var blocked=[for(_ in problem.samples)new haxe.ds.ObjectMap<LatticeCandidate,Bool>()];
     var edges:Array<BlockedLadderEdge> = [];
     var last:Null<ClearanceViolation> = null,lastSample=-1;
     for(round in 0...rounds){
-      var route=StructuredLadder.search(problem,null,0,(sample,candidate) ->
+      var route=StructuredLadder.search(problem,weights,rollWeight,(sample,candidate) ->
         blocked[sample].exists(candidate) ? Math.POSITIVE_INFINITY :
           stateCost == null ? 0.0 : stateCost(sample,candidate),coarse,edges);
       if(route.diagnostic!=null){
