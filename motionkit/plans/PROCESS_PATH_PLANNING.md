@@ -388,7 +388,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP6 | in progress: planner argument, axis/standalone OPW defaults, class removal and free entry verified; remaining defaults and joined approach/retreat pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
 | PP7 | complete: generated entry/retreat selection, retries and emission; full MotionKit/native gate passed | `92b8c69ee`, `093e65a46`, `e41bdfffa`; retreat gate below |
 | PP8 | planned | — |
-| PP9 | planned | — |
+| PP9 | in progress: handling uses the structured planner and authored mission passes; other runners/deletions/mission gate pending | handling migration below |
 | PP10 | planned | — |
 | PP11 | planned | — |
 
@@ -1444,3 +1444,16 @@ Compiler-only validation passes. The focused C4 runtime passes 1,149,251 asserti
 `StructuredJointPathPlanner` now accepts nonnegative per-joint motion weights and a roll-cell transition cost. The native ladder receives them in direct and lazy sample/edge/refined/entry/exit searches. Retreat travel uses the same joint weights. The planner validates and copies the vector, and worker rebinding retains both preferences. Process builders can therefore price external-axis motion differently from arm motion and penalize roll changes without importing process types into the planner.
 
 Compiler-only validation passes. The focused C4 runtime passes 1,149,264 assertions (`process-path-pp6-weights-haxe.log`), including weighted clear-route costs, bounded collision retry, invalid preference diagnostics, a weighted physical obstacle-avoiding route, caller-vector mutation and equivalent worker refinement. This establishes shared preference inputs; authored process builders and remaining compiled-group defaults still require migration. No full phase gate or production benchmark is claimed for this increment.
+
+### PP9 handling runner migration
+
+`HandlingPlanRunner.create()` now supplies `StructuredJointPathPlanner` explicitly. Its authored home orientation becomes a pure candidate orientation cost, evaluated from FK so numeric fallback candidates receive the preference too. Independent external axes use the held default lattice. The old `solver.preferredOrientation` assignment is removed; handling path compilation no longer calls the legacy path-selection methods. Shared legacy classes remain because the other runners and non-process solver callers are still pending migration.
+
+Validation:
+- MotionKit/app compiler-only builds pass.
+- Plan-check focus passes 3,292 assertions, including coupled-drive/runtime handling and zero numeric pose IK queries for the Cartesian handling worker.
+- The authored robot-arm MuJoCo mission completes all four pick/place steps, with 0.1412808 m lift and 25.46 s cycle (`process-path-pp9-handling-draft-v2/results.json` in external scratch). Per-step planning is 0.524431, 0.494917, 0.540350 and 0.519964 s; numeric pose queries are 3,078, 1,768, 1,810 and 2,770.
+
+This authored case is slower than PP0 (0.189–0.278 s per step and 23.46 s cycle): cycle rises about 8.5%, and numeric candidate generation costs more than the old continuation. No handling speedup or final benchmark acceptance is claimed. The measurement records base revision b90a32b92 plus this uncommitted runner patch; the committed source below has the same runner behavior. Final PP11 benchmarking must use the completed pipeline at a clean revision.
+
+The initial authored attempt stopped on a stale staged app MotionKit library missing `mk_external_lattice_count`, before planner acceptance. Its failed log is retained separately. The already-tested workspace library was atomically staged into the app's generated native directory; no native source changes were made. The rerun passes. PP9 remains incomplete: SurfacePlanRunner, ToolpathPlanRunner, legacy deletions and the other named mission gates are outstanding.

@@ -268,6 +268,8 @@ class PlanCheckTests extends MotionKitTestSupport {
       [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
     var runner = HandlingPlanRunner.create(robot, group, () -> runtime.pollEvents(), "tool.hold", planning,
       0.02, 0.08, 0.02, 0.02, 0.001);
+    check(Std.isOfType(runner.motion.compiler.jointPathPlanner,motionkit.robot.StructuredJointPathPlanner),
+      "handling uses geometric ladder planning instead of legacy path solving");
     for (index in 0...3) {
       near(runner.motion.compiler.maxVelocity[index], rates[index] / 100.0,
         'handling joint ${ids[index]} plans at its coupled speed');
@@ -310,6 +312,8 @@ class PlanCheckTests extends MotionKitTestSupport {
       'the runtime accepts the entire handling program (${runner.failure()})');
     check(runner.motion.checks.plans > 0 && runner.motion.checks.count(PlanDiagnosticKind.StepperStall) == 0,
       "every handling plan is checked and no screw motor stalls");
+    check(runner.motion.planningMetrics().numericIkSolves == 0,
+      "Cartesian handling worker uses model-derived candidates without numeric pose IK");
     harness.dispose();
   }
 

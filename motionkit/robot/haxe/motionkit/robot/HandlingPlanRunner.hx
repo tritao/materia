@@ -52,11 +52,19 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     // A positioning axis stays at its current station while the arm returns
     // to its home posture. Arm coordinates remain relative to the saved pose.
     var home = [for (index in 0...count) manipulator.external[index] ? positions.get(indices[index]) : 0.0];
-    solver.preferredOrientation = solver.forward(home);
+    // The authored poses use the home orientation. Prefer its spin softly in the
+    // geometric ladder; omitted external ranges hold independent station axes.
+    var preferred = solver.forward(home);
+    var pathPlanner = new StructuredJointPathPlanner(manipulator,null,null,null,8,false,
+      (sample,candidate) -> {
+        // Numeric fallback candidates do not carry discrete roll indices.
+        var angle = motionkit.path.PoseMath.angle(solver.forward(candidate.q),preferred);
+        return angle*angle;
+      });
     var compiler = new ProgramCompiler(solver, limits, FRAME,
       planning.velocity, planning.acceleration, planning.jerk,
       planning.startTolerances(0.005),
-      null, 0.0075, 0.2, 0.002, 0.02, new IkTolerance(2e-3, 5e-3, 300, 0.03));
+      null, 0.0075, 0.2, 0.002, 0.02, new IkTolerance(2e-3, 5e-3, 300, 0.03),pathPlanner);
     compiler.planningAssumptions = planning.assumptions.copy();
     compiler.planCheck = planning.check();
     var motion = new ManipulatorMotion(robot, compiler, function(_) return null, eventSource, indices);
