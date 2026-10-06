@@ -32,6 +32,7 @@ class ProgramCompilation {
   /** The current path op's stretches between sharp corners, planned one a step. */
   var sections:Array<{path:PosePath, offset:Float}> = [];
   var sectionIndex:Int = 0;
+  var sectionCurves:Null<Array<motionkit.planner.JointPathSamples>> = null;
   var sectionFeed:Float = 0.0;
   var sectionEvents:Array<PathEvent> = [];
 
@@ -63,5 +64,6 @@ class ProgramCompilation {
     var unfinished = pending;
     if (unfinished != null) unfinished.trajectory.dispose();
     pending = null;
+    sectionCurves = null;
   }
 }

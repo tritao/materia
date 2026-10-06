@@ -1362,6 +1362,53 @@ class KinematicsTests extends MotionKitTestSupport {
     var mixedRequest=new PathRequest(mixedDistances,[for(s in mixedDistances)mixedPath.poseAt(s)],policyFrom,
       new IkTolerance(1e-6,1e-6),[1.0,1.0,1.0,1.0],[1.0,1.0,1.0,1.0],32,
       [for(_ in mixedDistances)OrientationPolicy.Fixed]);
+    var mixedSections=[new PosePath("task",[new PoseLine(
+      new PoseWaypoint(rollSolver.forward(policyFrom),1e-6,1e-6),new PoseWaypoint(rollSolver.forward(rollStart),1e-6,1e-6),
+      OrientationPolicy.Fixed,0.1,0.1)]),new PosePath("task",[new PoseLine(
+      new PoseWaypoint(rollSolver.forward(rollStart),1e-6,1e-6),new PoseWaypoint(rollSolver.forward(policyTo),1e-6,1e-6),
+      OrientationPolicy.Fixed,0.1,0.1)])];
+    var joinedCurves=mixedPlanner.planSections(mixedSections,mixedRequest);
+    check(joinedCurves.length==2 && joinedCurves[0].s[0]==0 && joinedCurves[1].s[0]==0,
+      "whole-route selection returns locally timed section curves");
+    for(j in 0...4)near(joinedCurves[0].q[2][j],joinedCurves[1].q[0][j],
+      "whole-route sections retain a shared selected configuration",1e-9);
+    throws(function() mixedPlanner.planSections(mixedSections,new PathRequest([0.0,0.08],
+      [rollSolver.forward(policyFrom),rollSolver.forward(policyTo)],policyFrom,new IkTolerance(1e-6,1e-6),
+      [1.0,1.0,1.0,1.0],[1.0,1.0,1.0,1.0],32,[OrientationPolicy.Fixed,OrientationPolicy.Fixed])),
+      "whole-route planning requires sampled timing stops");
+    var farthestSample=[-1];
+    var cornerPlanner=new motionkit.robot.StructuredJointPathPlanner(rollGroup,null,null,null,8,false,
+      (sample,candidate)->{farthestSample[0]=Std.int(Math.max(farthestSample[0],sample));return 0.0;});
+    var cornerPath=new PosePath("task",[mixedSections[0].primitives[0],new PoseLine(
+      new PoseWaypoint(rollSolver.forward(rollStart),1e-6,1e-6),
+      new PoseWaypoint(rollSolver.forward([0.04,0.0,0.0,0.0]),1e-6,1e-6),OrientationPolicy.Fixed,0.1,0.1)]);
+    var cornerCompiler=new ProgramCompiler(rollSolver,new ValidationLimits(4,Int64.ofInt(1),Int64.ofInt(0)),"task",
+      [1.0,1.0,1.0,1.0],[2.0,2.0,2.0,2.0],[20.0,20.0,20.0,20.0],
+      StartTolerances.uniform(4,0.01,0.01,0.01),null,0.01,1.0,1e-4,1e-4,null,cornerPlanner);
+    var cornerProgram=new MotionProgram([MotionOp.FollowPath(cornerPath,"task",0.1,[
+      new motionkit.event.PathEvent(0.04,"corner-marker",motionkit.event.EventValue.Digital(true)),
+      new motionkit.event.PathEvent(0.08,"end-marker",motionkit.event.EventValue.Digital(true))])]);
+    var cornerCompiled=cornerCompiler.compile(cornerProgram,policyFrom,Int64.ofInt(940));
+    try {
+      check(cornerCompiled.blocks[0].plans.length==2,"global selection retains two sharp-corner timing stops");
+      check(farthestSample[0]==8,"compiler costs all sections on one global ladder sample index");
+      var beforeCorner=cornerCompiled.blocks[0].plans[0],afterCorner=cornerCompiled.blocks[0].plans[1];
+      check(beforeCorner.events.length==0 && afterCorner.events.length==2 &&
+        afterCorner.events[0].channel=="corner-marker" && afterCorner.events[1].channel=="end-marker",
+        "global corner distance events retain outgoing section ownership");
+      var arrival=beforeCorner.evaluate(beforeCorner.durationSeconds),departure=afterCorner.evaluate(0);
+      for(j in 0...4){near(arrival.positions[j],departure.positions[j],"global corner plans share physical joints",1e-8);
+        near(arrival.velocities[j],0,"global corner stops arriving motion",1e-7);
+        near(departure.velocities[j],0,"global corner starts departing motion from rest",1e-7);}
+    } catch(error:Dynamic){cornerCompiled.dispose();throw error;}
+    cornerCompiled.dispose();
+    farthestSample[0]=-1;
+    var cornerWorkerPlan=cornerCompiler.forWorker().compile(cornerProgram,policyFrom,Int64.ofInt(942));
+    try {
+      check(cornerWorkerPlan.blocks[0].plans.length==2 && farthestSample[0]==8,
+        "worker compiler uses the same whole-route selection and timing stops");
+    } catch(error:Dynamic){cornerWorkerPlan.dispose();throw error;}
+    cornerWorkerPlan.dispose();
     var mixedCurve=mixedPlanner.plan(mixedPath,mixedRequest);
     check(mixedCurve.q.length==5,"lazy route and refinement accept mixed air/contact margins");
     throws(function() airInteriorPlanner.plan(mixedPath,mixedRequest),

@@ -99,13 +99,40 @@ class StructuredJointPathPlanner implements JointPathPlanner {
   public function plan(path:PosePath,request:PathRequest,?pinStart:Bool,
       ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>,
       ?exitCheck:Array<Float>->Null<ArmClearance.ClearanceViolation>):JointPathSamples {
-    if(path==null || request==null || request.distances.length<2 || request.distances[0]!=0 ||
-        request.distances[request.distances.length-1]!=path.length())
-      throw "Joint path request must span its complete authored path";
-    // Refine the same geometric task that was searched. A caller may use
-    // coarse samples, but cannot substitute a different pose path afterwards.
-    var provider=new PosePathRefinement(path);
-    for(i in 0...request.distances.length){var task=provider.at(request.distances[i]);
+    return planSections([path],request,pinStart,entryCheck,exitCheck)[0];
+  }
+
+  /** One ladder over all timing sections; stop derivatives remain per section. */
+  public function planSections(paths:Array<PosePath>,request:PathRequest,?pinStart:Bool,
+      ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>,
+      ?exitCheck:Array<Float>->Null<ArmClearance.ClearanceViolation>):Array<JointPathSamples> {
+    if(paths==null || paths.length==0 || request==null || request.distances.length<2 || request.distances[0]!=0)
+      throw "Joint path sections require a complete sampled request";
+    var offsets:Array<Float> = [],providers:Array<PosePathRefinement> = [],total=0.0;
+    for(path in paths){
+      if(path==null)throw "Missing authored path section";
+      if(path.frameId!=paths[0].frameId)throw "Joint path sections must share a task frame";
+      offsets.push(total);providers.push(new PosePathRefinement(path));total+=path.length();
+    }
+    if(request.distances[request.distances.length-1]!=total)
+      throw "Joint path request must span all authored sections";
+    // Require every stop as a ladder knot. At a stop, the outgoing task is
+    // sampled; the incoming task must describe the same hard geometry.
+    for(section in 1...paths.length){
+      if(request.distances.indexOf(offsets[section])<0)throw "Timing stop must be a sampled route knot";
+      var incoming=paths[section-1].primitives[paths[section-1].primitives.length-1];
+      var outgoing=paths[section].primitives[0];
+      if(!sameFreedom(incoming.orientationPolicy(),outgoing.orientationPolicy()) ||
+          PoseMath.distance(incoming.endWaypoint().pose,outgoing.startWaypoint().pose)>request.tolerance.position ||
+          ToolFreedom.orientationError(incoming.endWaypoint().pose,outgoing.startWaypoint().pose,
+            outgoing.orientationPolicy())>request.tolerance.orientation)
+        throw "Timing sections must share their hard endpoint task";
+    }
+    for(i in 0...request.distances.length){
+      var section=paths.length-1;
+      for(k in 1...paths.length)if(request.distances[i]<offsets[k]){section=k-1;break;}
+      var local=Math.max(0.0,Math.min(paths[section].length(),request.distances[i]-offsets[section]));
+      var task=providers[section].at(local);
       if(!sameFreedom(task.freedom,request.freedoms[i]))
         throw 'Joint path request differs from authored freedom at sample $i';
       if(PoseMath.distance(task.pose,request.poses[i])>request.tolerance.position ||
@@ -125,7 +152,20 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     var buildSeconds=profile ? Sys.time()-buildStarted : 0.0;
     var refinementSeconds=0.0,refinementAttempts=0;
     fallbackDiagnostic=problem.diagnostic;
-    var refined:Null<JointPathSamples> = null;
+    var refined:Null<Array<JointPathSamples>> = null;
+    function refine(route:motionkit.robot.StructuredLadder.LadderSelection):Array<JointPathSamples> {
+      var refiner=new AnalyticPathRefiner(group,problem,route),curves:Array<JointPathSamples> = [];
+      for(section in 0...paths.length){
+        var offset=offsets[section],end=section+1<paths.length?offsets[section+1]:request.distances[request.distances.length-1];
+        var distances=[for(distance in request.distances)if(distance>=offset && distance<=end)distance];
+        var provider=providers[section],length=paths[section].length();
+        var curve=refiner.refineSection(distances,distance->provider.at(Math.max(0.0,Math.min(length,distance-offset))));
+        var local=[for(distance in curve.s)Math.max(0.0,Math.min(length,distance-offset))];
+        local[local.length-1]=length;
+        curves.push(new JointPathSamples(local,curve.q,curve.qPrime,curve.qDoublePrime,curve.qDoublePrimeBefore));
+      }
+      return curves;
+    }
     var world=clearance;
     var preferences = preferenceSource == null ? null : new JointPathPreferences(preferenceSource);
     var cost = preferences == null ? stateCost :
@@ -147,21 +187,25 @@ class StructuredJointPathPlanner implements JointPathPlanner {
       : LazyCollisionLadder.selectWithChecks(problem,q -> world.violation(q,contactAt(q)),collisionRounds,
         (from,to) -> world.sweep(from,to,contact,0.02,null,contactPose == null ? null : contactAt),coarse,route -> {
           var refinementStarted=profile ? Sys.time() : 0.0;
-          var curve=new AnalyticPathRefiner(group,problem,route).refinePath(request.distances,provider.at);
+          var curves=refine(route);
           if(profile){refinementSeconds+=Sys.time()-refinementStarted;refinementAttempts++;}
-          for(i in 0...curve.q.length){
-            var failure=world.violation(curve.q[i],contactAt(curve.q[i]));
-            if(failure!=null)return new motionkit.robot.LazyCollisionLadder.RefinedCollision(i,false,failure);
-            if(i>0){failure=world.sweep(curve.q[i-1],curve.q[i],contact,0.02,null,contactPose == null ? null : contactAt);
-              if(failure!=null)return new motionkit.robot.LazyCollisionLadder.RefinedCollision(i,true,failure);}
+          for(section in 0...curves.length){
+            var curve=curves[section],base=request.distances.indexOf(offsets[section]);
+            for(i in 0...curve.q.length){
+              var sample=base+i;
+              var failure=world.violation(curve.q[i],contactAt(curve.q[i]));
+              if(failure!=null)return new motionkit.robot.LazyCollisionLadder.RefinedCollision(sample,false,failure);
+              if(i>0){failure=world.sweep(curve.q[i-1],curve.q[i],contact,0.02,null,contactPose == null ? null : contactAt);
+                if(failure!=null)return new motionkit.robot.LazyCollisionLadder.RefinedCollision(sample,true,failure);}
+            }
           }
-          refined=curve;return null;
+          refined=curves;return null;
         },cost, problem.pinnedStart ? null : entryCheck != null ? entryCheck : (from,to) -> world.sweep(from,to,contact,0.02,null,contactPose == null ? null : contactAt),exitCheck,weights,rollWeight);
     if(selected.diagnostic!=null)throw 'Joint path selection failed at distance ${selected.failedDistance}: ${selected.diagnostic}';
     var searchAndChecksSeconds=profile ? Sys.time()-searchStarted-refinementSeconds : 0.0;
     if(refined==null){
       var refinementStarted=profile ? Sys.time() : 0.0;
-      refined=new AnalyticPathRefiner(group,problem,selected).refinePath(request.distances,provider.at);
+      refined=refine(selected);
       if(profile){refinementSeconds+=Sys.time()-refinementStarted;refinementAttempts++;}
     }
     if(profile){

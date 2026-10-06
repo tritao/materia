@@ -272,6 +272,7 @@ class ProgramCompiler {
         lowerSection(c);
         return true;
       }
+      c.sectionCurves = null;
       if (c.cursor >= program.ops.length) {
         retire(c);
         if (c.leadingOutputs.length > 0)
@@ -375,6 +376,7 @@ class ProgramCompiler {
           // Following a sharp corner exactly means stopping there, so each
           // stretch between corners is its own plan of this op, one a step.
           c.sections = cornerSections(path);
+          c.sectionCurves = null;
           c.sectionIndex = 0;
           c.sectionFeed = feed;
           c.sectionEvents = events;
@@ -429,7 +431,50 @@ class ProgramCompiler {
       return generated;
     }
     try {
-      if (jointPathPlanner != null && (k == 0 && jointPathPlanner.allowsFreeStart() || retreat != null)) {
+      if(k==0 && c.sections.length>1 && Std.isOfType(jointPathPlanner,StructuredJointPathPlanner)) {
+        var structured:StructuredJointPathPlanner=cast jointPathPlanner;
+        var distances:Array<Float> = [],poses:Array<Pose3> = [],freedoms:Array<OrientationPolicy> = [],plannedOffset=0.0;
+        for(part in c.sections){
+          var samples=pathSamples(part.path);
+          // The outgoing section owns the shared ladder knot; its incoming
+          // endpoint is checked by the planner and refined independently.
+          if(distances.length>0){distances.pop();poses.pop();freedoms.pop();}
+          for(sample in samples){
+            distances.push(plannedOffset+sample.distance);
+            poses.push(sample.primitive.waypointAt(sample.local).pose);
+            freedoms.push(sample.primitive.orientationPolicy());
+          }
+          plannedOffset+=part.path.length();
+        }
+        if(distances.length>10001)throw 'Motion program op ${c.currentIndex} exceeds Cartesian sample budget';
+        var destination=structured.retreatTarget();
+        c.sectionCurves=structured.planSections([for(part in c.sections)part.path],new PathRequest(
+          distances,poses,c.q,ikTolerance,perJointMaxJump,maxVelocity,48,freedoms),
+          !structured.allowsFreeStart(),(from,to)->{
+            if(entryTrajectory!=null){entryTrajectory.dispose();entryTrajectory=null;}
+            entryTrajectory=generateEntry(from,to);
+            return structured.checkMotion(entryTrajectory);
+          },destination==null?null:from->{
+            var generated=generateEntry(from,destination);
+            try {var failure=structured.checkMotion(generated);generated.dispose();return failure;}
+            catch(error:Dynamic){generated.dispose();throw error;}
+          });
+        // Subtracting a global prefix can change a local distance by an ulp.
+        // Retain the compiler's original local grid for exact timing alignment.
+        for(part in 0...c.sections.length){
+          var curve=c.sectionCurves[part],local=[for(sample in pathSamples(c.sections[part].path))sample.distance];
+          if(local.length!=curve.s.length)throw "Global section refinement changed its sample count";
+          for(sample in 0...local.length)if(Math.abs(local[sample]-curve.s[sample])>1e-12)
+            throw "Global section refinement changed its local sample grid";
+          c.sectionCurves[part]=new JointPathSamples(local,curve.q,curve.qPrime,curve.qDoublePrime,curve.qDoublePrimeBefore);
+        }
+      }
+      if(c.sectionCurves!=null){
+        curve=c.sectionCurves[k];pathStart=curve.q[0];
+        if(k>0)for(joint in 0...c.q.length)if(Math.abs(pathStart[joint]-c.q[joint])>1e-7)
+          throw "Globally selected timing sections disagree at their shared configuration";
+      }
+      if (c.sectionCurves == null && jointPathPlanner != null && (k == 0 && jointPathPlanner.allowsFreeStart() || retreat != null)) {
         var freeStart = k == 0 && jointPathPlanner.allowsFreeStart();
         var samples = pathSamples(section.path);
         if (samples.length > 10001) throw 'Motion program op ${c.currentIndex} exceeds Cartesian sample budget';
