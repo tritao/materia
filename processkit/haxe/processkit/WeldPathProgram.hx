@@ -33,11 +33,19 @@ class WeldPathProgram {
   final endRate:Float;
   final lengths:Array<Float>;
   final seamOffsets:Array<Float>;
+  final coveredPrefix:Float;
   public final ignitionOp:Int;
 
-  public function new(problem:WeldPathProblem,curves:Array<JointPathSamples>,channels:WelderChannels) {
+  public function new(problem:WeldPathProblem,curves:Array<JointPathSamples>,channels:WelderChannels,?interruptedAt:Float) {
     if(problem==null || curves==null || curves.length!=problem.sections.length || channels==null)
       throw "Weld execution requires aligned globally selected sections and channels";
+    var recovering=interruptedAt!=null;
+    if(!recovering && problem.startDistance!=0)
+      throw "A sliced weld requires explicit recovery engagement";
+    if(recovering && (!Math.isFinite(cast interruptedAt) || cast(interruptedAt,Float)<problem.startDistance ||
+        cast(interruptedAt,Float)>=problem.fullSeamLength))
+      throw "Weld recovery interruption lies outside the remaining seam";
+    coveredPrefix=recovering ? cast(interruptedAt,Float)-problem.startDistance : 0.0;
     this.problem=problem;this.channels={arc:channels.arc,wireSpeed:channels.wireSpeed,voltage:channels.voltage};
     this.curves=[for(curve in curves)new JointPathSamples(curve.s,curve.q,curve.qPrime,curve.qDoublePrime,curve.qDoublePrimeBefore)];
     var parameters=problem.plan.parameters;
@@ -55,12 +63,12 @@ class WeldPathProgram {
     for(i in 0...problem.sections.length){
       var phase=phases[i],path=problem.sections[i];
       if(phase==Weld && !engaged){
-        ops.push(MotionOp.SetOutput(channels.wireSpeed,EventValue.Analog(parameters.wireSpeed)));
+        ops.push(MotionOp.SetOutput(channels.wireSpeed,EventValue.Analog(recovering?processkit.tool.WeldArcModel.MIN_WIRE_SPEED:parameters.wireSpeed)));
         ops.push(MotionOp.SetOutput(channels.arc,EventValue.Digital(true)));
         ignition=ops.length;
         ops.push(MotionOp.WaitInput(WeldingPlanRunner.ARC_ESTABLISHED,
           InputPredicate.Equals(EventValue.Digital(true)),WeldingPlanRunner.IGNITION_TIMEOUT));
-        if(parameters.startDwell>0)ops.push(MotionOp.Dwell(parameters.startDwell));
+        if(!recovering && parameters.startDwell>0)ops.push(MotionOp.Dwell(parameters.startDwell));
         engaged=true;
       }
       if(phase==Burnback){
@@ -82,31 +90,31 @@ class WeldPathProgram {
   public function progress(compiled:CompiledProgram,current:motionkit.robot.ManipulatorProgress,
       completed:Bool=false):WeldPathProgress {
     if(compiled==null || current==null)throw "Weld progress requires its compilation and motion cursor";
-    var end=problem.seamLength;
+    var end=problem.fullSeamLength,start=problem.startDistance;
     if(completed)return new WeldPathProgress(Complete,end);
     var section=sectionOps.indexOf(current.op);
     if(section>=0){
       var distance=Math.max(0.0,Math.min(lengths[section],current.pathDistance));
       return switch phases[section] {
-        case Approach:new WeldPathProgress(Approaching,0);
-        case Weld:new WeldPathProgress(Depositing,Math.min(end,seamOffsets[section]+distance));
+        case Approach:new WeldPathProgress(Approaching,start);
+        case Weld:new WeldPathProgress(Depositing,Math.min(end,start+seamOffsets[section]+distance));
         case Burnback:new WeldPathProgress(BurningBack,end);
         case Retreat:new WeldPathProgress(Retreating,end);
       };
     }
     if(current.barrier!=null)return switch current.barrier {
-      case WaitInput(_,_,_):new WeldPathProgress(WaitingForArc,0);
+      case WaitInput(_,_,_):new WeldPathProgress(WaitingForArc,start);
       case Dwell(_):
         var welded=false;
         for(block in 0...Std.int(Math.min(compiled.blocks.length,current.block+1)))
           for(op in compiled.blocks[block].opIndices){var index=sectionOps.indexOf(op);
             if(index>=0 && phases[index]==Weld)welded=true;}
-        new WeldPathProgress(welded?FillingCrater:Pooling,welded?end:0);
+        new WeldPathProgress(welded?FillingCrater:Pooling,welded?end:start);
     };
     if(current.op>=ignitionOp && current.op<firstWeldOp())
-      return new WeldPathProgress(current.op==ignitionOp?WaitingForArc:Pooling,0);
+      return new WeldPathProgress(current.op==ignitionOp?WaitingForArc:Pooling,start);
     if(current.op>lastWeldOp)return new WeldPathProgress(FillingCrater,end);
-    return new WeldPathProgress(Approaching,0);
+    return new WeldPathProgress(Approaching,start);
   }
   function firstWeldOp():Int {
     for(i in 0...phases.length)if(phases[i]==Weld)return sectionOps[i];
@@ -123,10 +131,13 @@ class WeldPathProgram {
     var execution=compiler.withJointPathPlanner(selected),quantity=this.quantity;
     var sectionOps=this.sectionOps.copy(),phases=this.phases.copy(),channel=channels.wireSpeed;
     var lastOp=lastWeldOp,endRate=this.endRate;
+    var overlap=this.coveredPrefix,seamOffsets=this.seamOffsets.copy();
     execution.pathEventSchedule=(op,offset,last,distances,times,events)->{
       var section=sectionOps.indexOf(op);
       return section<0 || phases[section]!=Weld ? events :
-        ProcessRateSchedule.timedSection(channel,quantity,distances,times,events,op==lastOp && last,endRate);
+        ProcessRateSchedule.timedSection(channel,quantity,distances,times,events,op==lastOp && last,endRate,
+          Math.max(0.0,Math.min(lengths[section],overlap-seamOffsets[section])),
+          processkit.tool.WeldArcModel.MIN_WIRE_SPEED);
     };
     return execution.compile(program,start,planId);
   }

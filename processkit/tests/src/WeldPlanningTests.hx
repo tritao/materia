@@ -154,8 +154,32 @@ class WeldPlanningTests {
     var recoveryRequest=recoveryProblem.request(measured,compiler.ikTolerance,compiler.perJointMaxJump,compiler.maxVelocity);
     var recoveryCurves=recoveryProblem.select(fixture.arm,recoveryRequest,null,world);
     var recoveryProgram=new processkit.WeldPathProgram(recoveryProblem,recoveryCurves,
-      {arc:"arc",wireSpeed:"wire",voltage:"voltage"});
+      {arc:"arc",wireSpeed:"wire",voltage:"voltage"},0.039);
     var recoveryCompiled=recoveryProgram.compile(compiler,fixture.arm,measured,haxe.Int64.ofInt(701),world);
+    try {
+      var dwells=0,maintenance=false,restored=false;
+      for(block in recoveryCompiled.blocks){
+        switch block.barrier {case Dwell(_):dwells++;default:}
+        for(i in 0...block.plans.length){
+          var section=recoveryProgram.sectionOps.indexOf(block.opIndices[i]);
+          if(section>=0 && recoveryProblem.phases[section]==processkit.WeldPathProblem.WeldPathPhase.Weld){
+            var status=recoveryProgram.progress(recoveryCompiled,new motionkit.robot.ManipulatorProgress(
+              recoveryCompiled.blocks.indexOf(block),block.opIndices[i],0.001));
+            near(status.seamDistance,0.038,1e-12,"recovery progress stays in original seam coordinates");
+            for(event in block.plans[i].events)if(event.channel=="wire")switch event.value {
+              case Analog(rate):
+                if(rate==processkit.tool.WeldArcModel.MIN_WIRE_SPEED)maintenance=true;
+                else if(maintenance && haxe.Int64.toFloat(event.timeNs)*1e-9<block.plans[i].durationSeconds-1e-8)restored=true;
+              default:
+            }
+          }
+        }
+      }
+      check(dwells==1,"restrike omits pooling while preserving crater dwell");
+      check(maintenance && restored,"recovery maintains arc across overlap then restores deposition");
+      var done=recoveryProgram.progress(recoveryCompiled,new motionkit.robot.ManipulatorProgress(0,-1,0),true);
+      near(done.seamDistance,problem.seamLength,0,"recovery completion reaches original seam extent");
+    }catch(error:Dynamic){recoveryCompiled.dispose();throw error;}
     recoveryCompiled.dispose();
     check(fixture.arm.numericSolveCount()==before,"sliced recovery selection and retained compilation use analytic kinematics");
     var selectedProgram=new processkit.WeldPathProgram(problem,freeCurves,{arc:"arc",wireSpeed:"wire",voltage:"voltage"});
