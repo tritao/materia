@@ -555,7 +555,7 @@ class MachineAssembly {
 			returning: phases.returning, changePoint: phases.changePoint};
 		for (edge in mechanical.joints) if (edge.id == joint && edge.passive == true)
 			throw 'Passive assembly joint "$joint" cannot have a cylinder';
-		DriveSystem.checkCylinder(flat(), record);
+		DriveSystem.checkCylinder(flat(), record, phases);
 		drives.cylinders.push(DriveSystem.copyCylinder(record, same));
 		changed();
 	}

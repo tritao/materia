@@ -489,7 +489,8 @@ class DriveSystem {
 	}
 
 	/** Check a cylinder binding: typed cylinder and valve parts on a prismatic tree joint with no other drive. */
-	public static function checkCylinder(flat:FlatAssembly, record:CylinderRecord):Void {
+	public static function checkCylinder(flat:FlatAssembly, record:CylinderRecord,
+			phases:Null<CylinderPhaseSpeeds>):Void {
 		var cylinder = flat.member(record.cylinder).cylinderSpec();
 		var valve = flat.member(record.valve).valveSpec();
 		if (cylinder == null || valve == null)
@@ -502,9 +503,11 @@ class DriveSystem {
 					case ValveControlSpec.PressureEffort(_, _):
 				}
 			case CylinderControlSpec.FlowLimited:
-				if (record.phases == null || cylinderPhases(record, cylinder.strokeMm()) == null)
+				if (phases == null || record.phases == null ||
+					Math.abs(phases.stroke - cylinder.strokeMm()) > 1e-6 ||
+					cylinderPhases(record, cylinder.strokeMm()) == null)
 					throw "Hydraulic binding needs explicit phase speeds for its cylinder stroke";
-					switch valve.controlSpec() {
+				switch valve.controlSpec() {
 					case ValveControlSpec.PressureEffort(_, _): throw "Hydraulic cylinder needs a closed-centre hydraulic valve";
 					case ValveControlSpec.ClosedCentre:
 				}
