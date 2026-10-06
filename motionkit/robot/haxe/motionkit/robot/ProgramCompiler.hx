@@ -375,7 +375,7 @@ class ProgramCompiler {
             throw 'Motion program op $index path frame does not match $frameId';
           // Following a sharp corner exactly means stopping there, so each
           // stretch between corners is its own plan of this op, one a step.
-          c.sections = cornerSections(path);
+          c.sections = timingSections(path);
           c.sectionCurves = null;
           c.sectionIndex = 0;
           c.sectionFeed = feed;
@@ -937,7 +937,8 @@ class ProgramCompiler {
     `path` split at its sharp corners, where one primitive's end tangent is
     not the next one's start tangent, with each section's distance along it.
   **/
-  static function cornerSections(path:PosePath):Array<{path:PosePath, offset:Float}> {
+  /** Split authored task-velocity discontinuities into independently timed stops. */
+  public static function timingSections(path:PosePath):Array<{path:PosePath, offset:Float}> {
     var sections:Array<{path:PosePath, offset:Float}> = [];
     var start = 0, offset = 0.0, sectionOffset = 0.0;
     for (k in 0...path.primitives.length) {

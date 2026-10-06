@@ -30,6 +30,7 @@ class WeldPlanningTests {
   public static function run():Int {
     assertions = 0;
     testCornerTurn();
+    testJoinedPathProblem();
     testRotaryWristSelection();
     testRollAvoidsTheWall();
     testEntryBranchReachesTheWholeWeld();
@@ -42,6 +43,50 @@ class WeldPlanningTests {
     testCollidingWeldIsRefused();
     Sys.println('ProcessKit weld planning tests passed ($assertions assertions)');
     return assertions;
+  }
+
+  static function testJoinedPathProblem():Void {
+    var requested=seam();
+    var problem=new processkit.WeldPathProblem(requested,WRIST,[WeldCorner.AROUND],"weld-task");
+    near(problem.seamOffset,PARAMETERS.approach,1e-12,"joined weld retains approach distance before deposition");
+    near(problem.seamLength,requested.length(),1e-12,"joined weld preserves deposited seam length");
+    near(problem.path.length(),requested.length()+2*PARAMETERS.approach,1e-12,
+      "joined geometric route covers approach, seam and retreat");
+    check(problem.sections.length==3,"wire approach and retreat retain their task-velocity stops");
+    check(!problem.contact(problem.approach) && !problem.contact(problem.retreat),
+      "air endpoints keep the air clearance margin");
+    check(problem.contact(problem.seam.poseAt(0.05)),"seam positions permit the contact margin");
+    check(problem.contact(new motionkit.kinematics.Pose3(0.4,0.2,0.155)),
+      "burnback lift remains inside the geometric contact zone");
+    var fixture=arm(),solver=new ManipulatorKinematics(fixture.arm),before=fixture.arm.numericSolveCount();
+    var backend=motionkit.robot.BranchIk.of(fixture.arm);
+    check(backend.family()=="UR6R","authored weld fixture has a model-derived analytic family");
+    var goals=backend.branches(problem.approach,[0.0,-1.5708,1.5708,-1.5708,-1.5708,0.0]);
+    check(goals.length>0,"joined wire approach has an analytic start");
+    var start=goals[0].q;
+    var request=problem.request(start,new IkTolerance(1e-6,1e-6),[for(_ in start)0.2],[for(_ in start)3.0]);
+    var world=cell(null).clearance.withGroup(fixture.arm);
+    var planner=new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(8,2,4),null,world,8,false,
+      null,null,null,0,null,problem.contact);
+    var curves=planner.planSections(problem.sections,request);
+    check(curves.length==3,"one joined weld problem refines all three timing sections");
+    var offset=0.0;
+    for(section in 0...curves.length){
+      var curve=curves[section];
+      for(i in 0...curve.q.length){
+        var target=problem.sections[section].poseAt(curve.s[i]);
+        near(motionkit.path.PoseMath.distance(solver.forward(curve.q[i]),target),0,1e-6,
+          "joined weld refinement preserves authored TCP positions");
+        check(world.violation(curve.q[i],problem.contact(solver.forward(curve.q[i])))==null,
+          "joined weld curve respects physical air/contact clearance");
+      }
+      if(section>0)for(j in 0...start.length)near(curves[section-1].q[curves[section-1].q.length-1][j],curve.q[0][j],
+        1e-7,"joined approach/seam/retreat share physical boundary joints");
+      offset+=problem.sections[section].length();
+    }
+    near(request.distances[request.distances.length-1],offset,0,"joined request covers the full global route");
+    check(fixture.arm.numericSolveCount()==before,"joined weld builder and selection need no numeric pose IK");
   }
 
   static function testRotaryWristSelection():Void {
