@@ -95,3 +95,6 @@
 	path = robotkit/vendor/lz4
 	url = https://github.com/lz4/lz4.git
 	shallow = true
+[submodule "motionkit/native/vendor/eaik"]
+	path = motionkit/native/vendor/eaik
+	url = https://github.com/OstermD/EAIK.git

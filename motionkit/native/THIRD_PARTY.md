@@ -67,3 +67,25 @@ upstream `.cpp` files are compiled. The local `vendor/shims/console_bridge/conso
 captures core diagnostics, and `vendor/shims/no_openmp/omp.h` satisfies its
 header include when OpenMP is absent. The pinned core uses OpenMP pragmas but
 calls no `omp_*` functions.
+
+
+## EAIK C++ spike
+
+- Upstream: <https://github.com/OstermD/EAIK>.
+- Git submodule: `vendor/eaik` at
+  `3d973f6b7e7c87ca32928ec5b7eb5e50d956a7f5`.
+- License: BSD-3-Clause; full text at `vendor/eaik/LICENSE`.
+- Nested dependency: `CPP/external/ik-geo`, upstream
+  <https://github.com/OstermD/ik-geo>, pinned by EAIK at
+  `fea1d2e7e3fa4c5e3777c37b0af0e0612b3a13e9`.
+  License: BSD-3-Clause; full text in its `LICENSE`.
+- Eigen: MotionKit's existing pinned Eigen, provided by `Eigen3::Eigen`.
+  EAIK's separate Eigen submodule is neither initialized nor built.
+
+`MK_BUILD_EAIK_SPIKE=ON` enters only `CPP/src` and its IK-Geo C++
+subproblem dependency. Python bindings, wheels and upstream tests are excluded.
+The C++ source set includes EAIK/remodeling utilities, 1R–6R decompositions
+and IK-Geo subproblems. All three upstream targets use position-independent
+code. The local opt-in executable checks four OPW fixtures; it does not change
+the production backend choice. Compiled-model parity, browser compilation and
+single-thread speed acceptance are still required before adoption.

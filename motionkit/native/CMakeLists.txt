@@ -111,6 +111,28 @@ string(REPLACE "  T theta5_i = std::atan2" [=[  // Roundoff in the unit-axis dot
   T theta5_i = std::atan2]=] MK_OPW_SOURCE "${MK_OPW_SOURCE}")
 file(WRITE "${MK_OPW_IMPL}" "${MK_OPW_SOURCE}")
 
+# Keep the spike opt-in until compiled-model parity, browser builds and the
+# prescribed single-thread timings decide which 6R backend to adopt.
+option(MK_BUILD_EAIK_SPIKE "Build the pinned EAIK C++ parity spike" OFF)
+if(MK_BUILD_EAIK_SPIKE)
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/eaik/CPP/external/ik-geo/cpp/subproblems/CMakeLists.txt")
+        message(FATAL_ERROR "Initialize EAIK and its CPP/external/ik-geo submodule")
+    endif()
+    add_subdirectory(vendor/eaik/CPP/src eaik EXCLUDE_FROM_ALL)
+    foreach(MK_EAIK_TARGET EAIK EAIK_Kinematics SUBPROBLEMS)
+        target_link_libraries(${MK_EAIK_TARGET} Eigen3::Eigen)
+        set_target_properties(${MK_EAIK_TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    endforeach()
+    find_package(Threads REQUIRED)
+    target_link_libraries(EAIK Threads::Threads)
+    add_executable(motionkit_eaik_spike tests/eaik_spike.cpp)
+    target_include_directories(motionkit_eaik_spike PRIVATE "${MK_OPW_INCLUDE}")
+    target_link_libraries(motionkit_eaik_spike PRIVATE EAIK)
+    if(BUILD_TESTING)
+        add_test(NAME motionkit_eaik_spike COMMAND motionkit_eaik_spike)
+    endif()
+endif()
+
 set(MK_DESCARTES_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/vendor/descartes_light/descartes_light/core/include")
 if(NOT EXISTS "${MK_DESCARTES_INCLUDE}/descartes_light/solvers/ladder_graph/ladder_graph_solver.h")
     message(FATAL_ERROR "Initialize motionkit/native/vendor/descartes_light submodule")

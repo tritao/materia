@@ -540,7 +540,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 |------|-------|---------|
 | PP0 | in progress: harness and diagnostics; baseline completion pending | `0d43b32c0` (partial) |
 | PP0a | complete: industrial geometry/zero, configuration pins, all-size analytic/physical acceptance, all-user re-baselines and phase gate passed | see progress |
-| PP1a | planned (revision 2026-10-06): EAIK spike | — |
+| PP1a | in progress: pinned C++/IK-Geo integration and four-fixture parity passed; compiled-model, singularity, browser and timing gates pending | see progress |
 | PP1 | in progress: Cartesian, OPW and authored Cobot UR verified; offset RobotArm unresolved | `0d43b32c0`, `bfec0fa28`, `8569a2a98` (partial) |
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
 | PP3 | in progress: structured/coarse search and Descartes dispatch implemented; authored gate pending | `7cb639434`, `489f2c360`, `f8e88ad4d`, `09cb60fbb` |
@@ -2336,3 +2336,32 @@ correct 40/180 mm extents and clear stow. Every accepted industrial re-baseline
 is recorded externally with reason **industrial spherical-wrist RobotArm**.
 PP0a is complete. PP1a is next. The 88.204 s track planning measurement remains
 functional evidence only; the under-15-second planning target is still open.
+
+
+### PP1a pinned C++ foundation and OPW fixture parity
+
+Pinned EAIK at `3d973f6b7e7c87ca32928ec5b7eb5e50d956a7f5`, including
+its IK-Geo submodule at `fea1d2e7e3fa4c5e3777c37b0af0e0612b3a13e9`.
+Both BSD-3-Clause licenses and source scope are recorded in native
+THIRD_PARTY.md. The opt-in `MK_BUILD_EAIK_SPIKE` enters only CPP/src,
+uses MotionKit's existing Eigen and excludes Python/wheels/upstream tests.
+Production backend selection is unchanged while acceptance is incomplete.
+
+The native Release spike builds and its CTest passes: 1,000 fixed-seed reachable
+targets for each published fixture, IRB2400/KR6/R2000/TX40. EAIK contains
+7,384/7,564/6,708/8,000 valid OPW solutions respectively, with every joint
+within 1e-9 rad after wrapping. Independent OPW/EAIK FK agrees within
+1e-9 m and 1e-9 rad, and repeated all-solutions calls are deterministic.
+EAIK explicitly marked least-squares alternatives are excluded from exact
+solution comparisons; this does not discard any valid OPW solution.
+
+Commands: `cmake -S motionkit/native -B build/pp1a-eaik -G Ninja
+-DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DMK_BUILD_EAIK_SPIKE=ON`,
+`cmake --build build/pp1a-eaik --target motionkit_eaik_spike --parallel 4`,
+and `ctest --test-dir build/pp1a-eaik -R '^motionkit_eaik_spike$'
+--output-on-failure`. Logs: external scratch `process-path-pp1a-eaik-*`.
+
+These are fixture checks, not compiled RobotModel acceptance or speed results.
+Compiled RobotArm/Cobot H/P extraction, singularity/search-case checks,
+Emscripten compilation and the two 100,000-target uncontended timing runs remain
+pending. No R ratio or backend-adoption outcome is claimed. PP1a remains open.
