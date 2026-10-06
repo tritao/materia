@@ -222,6 +222,7 @@ typedef SceneArtifactMission = {
  * - `moveJoints`: move the chain ending at `at` to absolute joint coordinates in radians or metres.
  * - `weld`: weld the seam `weld` describes with the robot's torch.
  * - `findWork`: measure the named work frame from contact probes on saved nominal CAD faces.
+ * - `stow`: return the welding arm to its CAD ready posture using its measured joints and live cell clearance.
  */
 typedef SceneArtifactMissionStep = {
 	var kind:String;
@@ -854,6 +855,8 @@ class SceneArtifact {
 						if (tool.kind == "torch" && step.at != null && tool.contact.occurrence == step.at.occurrence && tool.contact.connector == step.at.connector) tool];
 					if (contactTool.length != 1) fail('step $index needs the torch contact connector');
 					SceneContactRegistration.validate(cast step.contactWork, flat == null ? [] : [for (item in flat.occurrences) item.id]);
+				case "stow":
+					welds = true;
 				default: fail('step $index has unknown kind "${step.kind}"');
 			}
 		}
