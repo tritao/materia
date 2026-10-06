@@ -256,15 +256,18 @@ class ArmClearance {
 
   /**
    * The first violation along the straight joint-space motion from `from` to `to`, sampled so that no joint turns more than
-   * `maxJointStep` radians between samples, or null.
+   * `maxJointStep` radians between samples, or null. `contactAt`, when supplied,
+   * selects the margin independently at every sampled configuration.
    */
-  public function sweep(from:Array<Float>, to:Array<Float>, ?contact:Bool = false, ?maxJointStep:Float = 0.02, ?wanted:Float):Null<ClearanceViolation> {
+  public function sweep(from:Array<Float>, to:Array<Float>, ?contact:Bool = false, ?maxJointStep:Float = 0.02, ?wanted:Float,
+      ?contactAt:Array<Float>->Bool):Null<ClearanceViolation> {
     if (from == null || to == null || from.length != to.length || !(maxJointStep > 0.0)) throw "A clearance sweep needs matching joint values and a positive step";
     var steps = 1;
     for (joint in 0...from.length) steps = Std.int(Math.max(steps, Math.ceil(Math.abs(to[joint] - from[joint]) / maxJointStep)));
     for (step in 0...steps + 1) {
       var t = step / steps;
-      var found = violation([for (joint in 0...from.length) from[joint] + (to[joint] - from[joint]) * t], contact, wanted);
+      var q = [for (joint in 0...from.length) from[joint] + (to[joint] - from[joint]) * t];
+      var found = violation(q, contactAt == null ? contact : contactAt(q), wanted);
       if (found != null) return found;
     }
     return null;

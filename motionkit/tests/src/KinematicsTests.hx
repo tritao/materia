@@ -1290,6 +1290,45 @@ class KinematicsTests extends MotionKitTestSupport {
     var rollWorld=new robotkit.manipulation.ArmClearance(rollGroup,[
       {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
       {name:"post",link:rollBase.id,vertices:rollHull(0.3),tool:false}],rollStart);
+    var marginWorld=new robotkit.manipulation.ArmClearance(rollGroup,[
+      {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
+      {name:"contact-work",link:rollBase.id,vertices:rollHull(0.124),tool:false}],rollStart,0.01,0.001);
+    check(marginWorld.violation(rollStart,false)!=null && marginWorld.violation(rollStart,true)==null,
+      "contact policy fixture distinguishes air from contact clearance");
+    var policyFrom=[0.0,-0.04,0.0,0.0],policyTo=[0.0,0.04,0.0,0.0];
+    check(marginWorld.sweep(policyFrom,policyTo,false)!=null,
+      "air-only sweep rejects close approach at its interior");
+    check(marginWorld.sweep(policyFrom,policyTo,false,0.005,null,q->Math.abs(q[1])<0.035)==null,
+      "sweep evaluates contact permission at interior configurations");
+    check(marginWorld.sweep(policyFrom,policyTo,true,0.005,null,q->Math.abs(q[1])>0.035)!=null,
+      "interior air policy overrides permissive endpoint contact");
+    var mixedTrajectory=Trajectory.fromSegments([{
+      timeFromStartNs:Int64.ofInt(0),durationNs:Trajectory.nanoseconds(1.0),
+      coefficients:[[0.0,0.0,0.0],[-0.04,0.08,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]]
+    }]);
+    var mixedPlanner=new motionkit.robot.StructuredJointPathPlanner(rollGroup,null,null,marginWorld,
+      8,false,null,null,null,0,null,p->Math.abs(p.y)<0.035);
+    check(mixedPlanner.checkMotion(mixedTrajectory)==null,
+      "final timed trajectory uses the pose-dependent contact margin");
+    var mixedWorker=mixedPlanner.withSolver(rollSolver.fork());
+    check(mixedWorker.checkMotion(mixedTrajectory)==null,
+      "worker planner retains contact geometry policy");
+    var airInteriorPlanner=new motionkit.robot.StructuredJointPathPlanner(rollGroup,null,null,marginWorld,
+      8,true,null,null,null,0,null,p->Math.abs(p.y)>0.035);
+    check(airInteriorPlanner.checkMotion(mixedTrajectory)!=null,
+      "final timed checks enforce air margins inside mixed-contact motion");
+    var mixedPath=new PosePath("task",[new PoseLine(
+      new PoseWaypoint(rollSolver.forward(policyFrom),1e-6,1e-6),
+      new PoseWaypoint(rollSolver.forward(policyTo),1e-6,1e-6),OrientationPolicy.Fixed,0.1,0.1)]);
+    var mixedDistances=[for(i in 0...5)mixedPath.length()*i/4];
+    var mixedRequest=new PathRequest(mixedDistances,[for(s in mixedDistances)mixedPath.poseAt(s)],policyFrom,
+      new IkTolerance(1e-6,1e-6),[1.0,1.0,1.0,1.0],[1.0,1.0,1.0,1.0],32,
+      [for(_ in mixedDistances)OrientationPolicy.Fixed]);
+    var mixedCurve=mixedPlanner.plan(mixedPath,mixedRequest);
+    check(mixedCurve.q.length==5,"lazy route and refinement accept mixed air/contact margins");
+    throws(function() airInteriorPlanner.plan(mixedPath,mixedRequest),
+      "lazy route rejects a contact configuration designated as air");
+    mixedTrajectory.dispose();
     var excursion = Trajectory.fromSegments([{
       timeFromStartNs:Int64.ofInt(0),durationNs:Trajectory.nanoseconds(1.0),
       coefficients:[[0.0,0.8,-0.8],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]]
