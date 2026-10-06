@@ -825,3 +825,9 @@ pose against FK. All 14 native CTest cases pass after this correction.
 The preceding full MotionKit gate passed 1,214,827 assertions; that gate
 predates this correction, which has native regression coverage. Production
 planning migration and the remaining plan phases are still outstanding.
+
+PP2 Haxe wrist-pole regression: CandidateProblem retains exactly one pinned
+OPW start at both wrist poles, keeps the full seed exact, reports singularity
+and performs no numeric IK. Compiler-only build and the focused analytic/
+candidate suite pass (1,143,558 assertions) against the corrected native
+library. Structured ladder search (PP3) remains the next implementation step.

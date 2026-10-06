@@ -726,6 +726,21 @@ class KinematicsTests extends MotionKitTestSupport {
     near(solver.parameters.a1, 0.1, "OPW extracts a1", 1e-9);
     near(solver.parameters.a2, -0.135, "OPW extracts a2", 1e-9);
     near(solver.parameters.c1, 0.615, "OPW extracts c1", 1e-9);
+    for (pole in [0.0, Math.PI]) {
+      var seed = [0.2,-0.3,0.4,0.5,pole,0.7];
+      var before = arm.numericSolveCount();
+      var request = new PathRequest([0.0],[solver.forward(seed)],seed,new IkTolerance(1e-6,1e-6),
+        [for (_ in seed)0.5],[for (_ in seed)1.0]);
+      var problem = new motionkit.robot.CandidateProblem(arm,request);
+      check(problem.family == "OPW" && problem.samples[0].candidates.length == 1,
+        "OPW wrist-pole path retains its pinned start");
+      if (problem.samples[0].candidates.length == 1) {
+        var candidate = problem.samples[0].candidates[0];
+        check(candidate.singular != 0,"OPW pinned wrist-pole candidate reports singularity");
+        for (joint in 0...6)near(candidate.q[joint],seed[joint],"OPW singular pinned joints remain exact",1e-12);
+      }
+      check(arm.numericSolveCount() == before,"OPW wrist-pole pinning uses no numeric IK");
+    }
     // Through the interface: type tests work, and the solver runs its own (analytic) path search.
     {
       var general:KinematicsSolver = solver;
