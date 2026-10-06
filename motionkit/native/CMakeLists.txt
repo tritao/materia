@@ -95,6 +95,22 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/opw_kinematics/include/opw_kin
     message(FATAL_ERROR "Initialize motionkit/native/vendor/opw_kinematics submodule")
 endif()
 
+# Keep the pinned vendor pristine; apply the wrist-pole roundoff correction
+# to a private build copy of its headers.
+set(MK_OPW_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/opw-patched/include")
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/vendor/opw_kinematics/include/"
+    DESTINATION "${MK_OPW_INCLUDE}")
+set(MK_OPW_IMPL "${MK_OPW_INCLUDE}/opw_kinematics/opw_kinematics_impl.h")
+file(READ "${MK_OPW_IMPL}" MK_OPW_SOURCE)
+string(REPLACE "  T theta5_i = std::atan2" [=[  // Roundoff in the unit-axis dot product may exceed either wrist pole.
+  // Preserve NaNs from unreachable arm geometry while clamping finite cosines.
+  for (auto& cosine : m)
+    if (std::isfinite(cosine))
+      cosine = std::max(T(-1), std::min(T(1), cosine));
+
+  T theta5_i = std::atan2]=] MK_OPW_SOURCE "${MK_OPW_SOURCE}")
+file(WRITE "${MK_OPW_IMPL}" "${MK_OPW_SOURCE}")
+
 set(MK_DESCARTES_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/vendor/descartes_light/descartes_light/core/include")
 if(NOT EXISTS "${MK_DESCARTES_INCLUDE}/descartes_light/solvers/ladder_graph/ladder_graph_solver.h")
     message(FATAL_ERROR "Initialize motionkit/native/vendor/descartes_light submodule")
@@ -123,7 +139,7 @@ target_include_directories(motionkit_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
 target_include_directories(motionkit_core PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/opw_kinematics/include)
+    ${MK_OPW_INCLUDE})
 target_compile_definitions(motionkit_core PRIVATE MK_BUILDING_LIBRARY)
 if(NOT MK_BUILD_SHARED)
     target_compile_definitions(motionkit_core PUBLIC MK_STATIC)

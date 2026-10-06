@@ -130,4 +130,31 @@ int main() {
         assert(mk_cartesian_candidate_count(&cart,&model,&external,&orientation,&limits,&target,seed,n,&invalid_count)==MK_ERROR_INVALID_ARGUMENT);
     }
 
+    for(unsigned conventions=0;conventions<2;++conventions)for(unsigned pole=0;pole<2;++pole) {
+        mk_opw_parameters opw={};opw.struct_size=sizeof(opw);opw.a1=.1;opw.a2=-.135;
+        opw.c1=.615;opw.c2=.705;opw.c3=.755;opw.c4=.085;
+        for(unsigned i=0;i<6;++i){opw.sign_corrections[i]=conventions && i%2 ? -1 : 1;opw.offsets[i]=conventions ? .1*i : 0;}
+        mk_serial_cell_model model={};model.struct_size=sizeof(model);model.joint_count=6;model.arm_joint_count=6;
+        model.base_quaternion[3]=model.work_quaternion[3]=model.tool_quaternion[3]=1;
+        for(unsigned i=0;i<6;++i)model.arm_joint_indices[i]=i;
+        mk_external_lattice external={};external.struct_size=sizeof(external);external.joint_count=6;
+        mk_orientation_lattice orientation={};orientation.struct_size=sizeof(orientation);
+        mk_joint_lift_request limits={};limits.struct_size=sizeof(limits);limits.joint_count=6;
+        for(unsigned i=0;i<6;++i){limits.lower[i]=-7;limits.upper[i]=7;limits.periodic[i]=1;}
+        double canonical[]={.2,-.3,.4,.5,pole*acos(-1.0),.7},seed[6];
+        for(unsigned i=0;i<6;++i)seed[i]=(canonical[i]+opw.offsets[i])*opw.sign_corrections[i];
+        mk_opw_pose target;assert(mk_opw_forward(&opw,seed,6,&target)==MK_OK);
+        uint32_t count=0,written=0;assert(mk_opw_candidate_count(&opw,&model,&external,&orientation,&limits,&target,seed,6,&count)==MK_OK);
+        std::vector<mk_lattice_candidate> candidates(count);
+        assert(mk_sample_opw_candidates(&opw,&model,&external,&orientation,&limits,&target,seed,6,candidates.data(),count,&written)==MK_OK);
+        bool original=false;
+        for(const auto &c:candidates) {
+            bool same=true;for(unsigned i=0;i<6;++i)if(std::abs(c.joints[i]-seed[i])>1e-6)same=false;
+            if(same){original=true;assert(c.singular);}
+            mk_opw_pose actual;assert(mk_opw_forward(&opw,c.joints,6,&actual)==MK_OK);
+            assert((pose(actual.position,actual.quaternion).matrix()-pose(target.position,target.quaternion).matrix()).norm()<1e-7);
+        }
+        assert(original);
+    }
+
 }

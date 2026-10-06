@@ -815,3 +815,13 @@ found OPW's singular inverse chooses a zero q4 representative, so a valid pinned
 start with nonzero q4 can be absent. A seeded q4/q6 coupling correction and
 zero/pi wrist tests with signed/offset conventions are staged, awaiting native
 validation after the running gate releases the shared library. PP2 remains open.
+
+PP2 wrist-pole acceptance: combined OPW sampling now preserves seeded q4 at
+both q5=0 and q5=pi and derives the coupled q6 from the target rotation.
+Signed/offset conventions exposed a roundoff-induced negative square root in
+the vendor wrist cosine; finite cosine clamping fixes that without masking
+unreachable-arm NaNs. Four native seed-retention cases verify every emitted
+pose against FK. All 14 native CTest cases pass after this correction.
+The preceding full MotionKit gate passed 1,214,827 assertions; that gate
+predates this correction, which has native regression coverage. Production
+planning migration and the remaining plan phases are still outstanding.

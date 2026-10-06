@@ -98,6 +98,25 @@ mk_result run(const mk_ur_parameters *p,const mk_opw_parameters *opw,const mk_an
                 if(status==MK_OK)for(unsigned i=0;i<8;++i)if(slots[i].valid) {
                     auto &branch=branches[nb++];branch={};branch.struct_size=sizeof(branch);branch.branch=i;branch.singular=slots[i].singular;
                     for(unsigned j=0;j<6;++j)branch.joints[j]=slots[i].joints[j];
+                    const double wrist=branch.joints[4]*opw->sign_corrections[4]-opw->offsets[4];
+                    if(std::abs(std::sin(wrist))<1e-6) {
+                        // At either wrist pole, retain seeded q4 and recover the
+                        // coupled q6 directly from the target rotation. The raw
+                        // inverse representative is unstable at the pi pole.
+                        auto seeded=branch;
+                        seeded.joints[3]=arm_seed[3];
+                        seeded.joints[4]=((std::cos(wrist)>0 ? 0.0 : 3.14159265358979323846)+opw->offsets[4])*opw->sign_corrections[4];
+                        seeded.joints[5]=opw->offsets[5]*opw->sign_corrections[5];
+                        mk_opw_pose zero_spin;
+                        if(mk_opw_forward(opw,seeded.joints,6,&zero_spin)==MK_OK) {
+                            const Eigen::Matrix3d rotation=pose(zero_spin.position,zero_spin.quaternion).linear().transpose()*pose(goal.position,goal.quaternion).linear();
+                            seeded.joints[5]=(std::atan2(rotation(1,0),rotation(0,0))+opw->offsets[5])*opw->sign_corrections[5];
+                            mk_opw_pose checked;
+                            if(mk_opw_forward(opw,seeded.joints,6,&checked)==MK_OK &&
+                                (pose(checked.position,checked.quaternion).matrix()-pose(goal.position,goal.quaternion).matrix()).norm()<1e-8)
+                                branch=seeded;
+                        }
+                    }
                 }
             }
             if(status!=MK_OK)return status;
