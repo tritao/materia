@@ -383,9 +383,9 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP1 | in progress: Cartesian, OPW and authored Cobot UR verified; offset RobotArm unresolved | `0d43b32c0`, `bfec0fa28`, `8569a2a98` (partial) |
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
 | PP3 | in progress: structured/coarse search and Descartes dispatch implemented; authored gate pending | `7cb639434`, `489f2c360`, `f8e88ad4d`, `09cb60fbb` |
-| PP4 | in progress: splines, serial refinement and differential solve; full path/timing integration pending | `1244858e1`, `01b20cbcc` |
-| PP5 | planned | — |
-| PP6 | planned | — |
+| PP4 | in progress: analytic/numeric refinement, cone rates and timing verified; transitions/authored gate pending | `4b9e750ff`, `0e5edbc06`, `39b6081c1` |
+| PP5 | in progress: lazy sample/edge/refined retries and physical obstacle acceptance; full gate running | `e1435022f`, `e5336893f`, `bfd03d585` |
+| PP6 | in progress: optional compiler/worker integration verified; default migration and selector removal pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
 | PP7 | planned | — |
 | PP8 | planned | — |
 | PP9 | planned | — |
@@ -1354,3 +1354,10 @@ free-spin policies; explicit policy/cone-parameter comparison fixes it.
 Compiler-only and focused runtime pass (1,148,967 assertions). Full phase
 validation, branch/chart transitions, default migration and authored
 performance gates remain open.
+
+PP5 phase-boundary gate started: all 16 native CTests pass on the current
+native build. The fresh full MotionKit Haxe module is running without
+focused-test environment switches. It has passed new refinement/collision
+coverage, existing compiler tests, redundant-arm paths and coordinated
+external axes; the asynchronous ProgramPlanner group is still running.
+No full-suite pass or PP5 completion is recorded until it terminates.
