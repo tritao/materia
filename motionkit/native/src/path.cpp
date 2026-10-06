@@ -4,6 +4,9 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -753,6 +756,15 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             if (acceleration_check.status == MK_CHECK_FAILED)
                 factor = std::max(factor, std::sqrt(acceleration_check.value /
                     acceleration_check.limit));
+            const char *profile = std::getenv("PROCESS_PATH_PROFILE");
+            if (profile && std::strcmp(profile, "1") == 0) {
+                const auto &last = stages.back();
+                std::fprintf(stderr, "PROCESS_PATH_TIMING_CHECK {\"attempt\":%d,\"stages\":%zu,\"durationSeconds\":%.12g,\"factor\":%.12g,\"velocityJoint\":%u,\"velocityValue\":%.12g,\"velocityLimit\":%.12g,\"accelerationJoint\":%u,\"accelerationValue\":%.12g,\"accelerationLimit\":%.12g,\"accelerationTime\":%.12g}\n",
+                    attempt, stages.size(), (last.start_ns + last.duration_ns) * 1e-9,
+                    factor, velocity_check.joint, velocity_check.value, velocity_check.limit,
+                    acceleration_check.joint, acceleration_check.value,
+                    acceleration_check.limit, acceleration_check.time_seconds);
+            }
             if (factor <= 1.0) {
                 accepted = true;
                 *out_trajectory = lowered;

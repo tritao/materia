@@ -481,7 +481,9 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
   again in `launch()`.
 - **Acceptance (on the PP0 benchmarks):**
   - G17 track weld under 15 s planning: 2600 mm, 5 mm leg, arm margin ≥ the PP0 value, no clearance
-    violation, cycle time within 5 % of PP0;
+    violation, cycle time within 5 % of PP0 (**<=248.43 s**, from 236.6 s),
+    arm margin **>=0.775421815 rad**. Industrial re-baselines do not reset these
+    acceptance thresholds; the current 383.4 s / 0.628358847 rad result fails both;
   - robot-welder and gantry-welder whole weldments at least 10× faster, with every seam welded and leg
     sizes and the `WeldPlanningTests` cases unchanged.
 
@@ -2393,3 +2395,90 @@ adapter, preserve physical configuration labels/turns in candidate sampling,
 then remove OPW and the handwritten UR solver and run the adoption phase gate.
 Production execution has not been switched by the spike. The overall plan and
 the under-15-second track-planning target remain incomplete.
+
+
+### G17 acceptance correction and required diagnostic order
+
+Industrial re-baselining records the new mechanism's functional behavior; it
+must not replace PP8's original performance/posture acceptance thresholds.
+The current 383.4 s cycle is 146.8 s (62.0456%) longer than PP0's 236.6 s.
+It exceeds the 248.43 s cap by 134.97 s. Its 0.628358847 rad posture margin is
+0.147062968 rad below the required 0.775421815 rad. Both are open regressions,
+separate from PP0a's industrial geometry/physical acceptance. No G17 or PP8
+performance acceptance is claimed by the successful industrial mission run.
+
+A current-backend diagnostic records the retained program's entry/dwell,
+approach, weld, burnback and retreat durations to explain the cycle increase.
+Existing PROCESS_PATH_PROFILE records candidate construction, native ladder
+packing/cost/search, refinement and combined collision checks; weld compilation
+now reports its elapsed time and per-phase execution clocks. That diagnostic
+is not a post-adoption benchmark. After PP1a production adoption is complete,
+run a dedicated track profile before additional planning changes and preserve
+these original gates. PP1's current row already records industrial RobotArm
+resolved and EAIK adoption/OPW-UR removal pending.
+
+
+### G17 cycle diagnosis (current OPW backend)
+
+The diagnostic retains the original acceptance limits above. It changes no
+planning or execution policy. At the authored 11.46053 mm/s feed, 2600 mm
+would take 226.866 s. The actual weld takes **378.031832 s**; entry/dwell,
+approach, burnback and retreat total **4.927457 s**, with approximately 0.441 s
+of remaining dispatch/barrier overhead in the 383.4 s mission. The regression
+is in the weld time law, rather than slower air moves. Recipe travel speed is
+a cap, and the wire schedule follows the actual time law to preserve bead size.
+Historical PP0 has no per-section clocks, so its exact phase-by-phase delta
+cannot be recovered from the recorded 236.6 s aggregate alone.
+
+Native lowering/validation identifies **joint 0, the external track**, as the
+binding acceleration constraint. The initial 41,600-stage weld law lasts
+246.994455 s and its lowered trajectory peaks at **2.261261 m/s²**, against
+**0.739547499 m/s²** allowed. Twenty local smoothing retries increase the law
+to 271.907069 s but still leave a 1.423792 m/s² peak. The fallback uniformly
+stretches it by `sqrt(1.423792 / 0.739547499) * 1.002 = 1.390298065`, producing
+378.031832 s and an accepted 0.736598171 m/s² peak. Arm velocity checks pass
+throughout; slower arm speed caps are not the demonstrated cause. The remaining
+question is why candidate/refined rail motion develops these acceleration
+peaks, and how to avoid them without relaxing physical limits or correctness
+checks. The changed 2.2 m rail / 0.628 rad posture selection remains a separate
+posture regression requiring resolution.
+
+Instrumentation under `PROCESS_PATH_PROFILE=1` now reports native timing
+validation attempts, compiler clearance/configuration/task-space/plan checks,
+retained compilation wall time, and section execution clocks. The detailed current-backend run uses the completed PP1a evaluation but still
+uses production OPW; it is not an EAIK production benchmark. The run exits zero, reproduces the 383.4 s cycle and 0.628358847 rad margin,
+and measures **88.161742 s overall planning**. Wall times are observations,
+not an uncontended performance acceptance run:
+
+| Planning work | Seconds |
+|---|---:|
+| Candidate construction, both seam directions | 4.437 |
+| Search/checks, both directions (inclusive of packing/cost/native call) | 13.722 |
+| Refinement, both directions | 0.177 |
+| Retained program compilation | 69.807 |
+| Native time-law generation inside compilation | 46.570 |
+| Compiled-trajectory clearance inside compilation | 20.556 |
+| Execution-plan creation inside compilation | 0.849 |
+| Task-space checks inside compilation | 1.253 |
+| Drive/load plan checks inside compilation | 0.464 |
+| Remaining compilation preparation/disposal | 0.115 |
+
+Each direction builds 977,992 candidates over 1,424 samples. Native search calls
+take 1.080 and 1.127 s, still slightly above PP3's 1 s target. Packing totals
+0.416 s and state costs 3.792 s; the other 7.308 s of search/check time includes
+clearance and other wrapper work and must not be called pure native search or
+pure collision. The compilation subrows are included in 69.807 s, not added
+to it. Its weld time-law generation alone is 46.403 s, and its weld trajectory
+clearance is 20.236 s. Zero numeric IK does not remove either cost.
+
+The first optimization investigation should target the refined rail path's
+acceleration peaks and repeated full lowering/validation, then compiled
+trajectory clearance. Optimizing only the approximately 1.1 s native search
+cannot reach the 15 s overall target. Preserve all physical limits and original
+cycle/posture gates. Repeat this same split after production EAIK adoption;
+the accepted PP1a spike does not switch the production backend.
+
+Detailed log: external scratch `process-path-g17-detailed-diagnostic.log`;
+compiler log: `process-path-g17-detailed-build.log`. The earlier, less detailed
+run (`process-path-g17-cycle-diagnostic.log`) measured 91.189 s overall planning
+and 71.958 s retained compilation, consistent with this split.

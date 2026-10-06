@@ -139,7 +139,20 @@ class WeldPathProgram {
           Math.max(0.0,Math.min(lengths[section],overlap-seamOffsets[section])),
           processkit.tool.WeldArcModel.MIN_WIRE_SPEED);
     };
-    return execution.compile(configuration==null ? program : new MotionProgram(program.ops,configuration),start,planId);
+    var began=Sys.time();
+    var compiled=execution.compile(configuration==null ? program : new MotionProgram(program.ops,configuration),start,planId);
+    if(Sys.getEnv("PROCESS_PATH_PROFILE")=="1"){
+      var rows:Array<Dynamic> = [];
+      for(block in compiled.blocks)for(i in 0...block.plans.length){
+        var section=sectionOps.indexOf(block.opIndices[i]);
+        rows.push({op:block.opIndices[i],phase:section<0 ? "entry/dwell" : Std.string(phases[section]),
+          lengthMetres:block.pathLengths[i],durationSeconds:block.plans[i].durationSeconds});
+      }
+      Sys.println("PROCESS_PATH_WELD_CLOCK "+haxe.Json.stringify({compileSeconds:Sys.time()-began,
+        authoredTravelSpeed:problem.plan.parameters.travelSpeed,sections:rows,
+        maxVelocity:compiler.maxVelocity,maxAcceleration:compiler.maxAcceleration}));
+    }
+    return compiled;
   }
 }
 

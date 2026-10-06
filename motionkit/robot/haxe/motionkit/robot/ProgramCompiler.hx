@@ -591,26 +591,39 @@ class ProgramCompiler {
 
   function finish(pending:PendingMotion, id:Int64):ExecutionPlan {
     pending.events.sort(function(a, b) return Int64.compare(a.timeNs, b.timeNs));
+    var profiling = Sys.getEnv("PROCESS_PATH_PROFILE") == "1";
+    var profileBegan = Sys.time();
+    var profileRows:Array<Dynamic> = [];
+    var mark = function(stage:String) {
+      var now = Sys.time();
+      if (profiling) profileRows.push({stage:stage, seconds:now-profileBegan});
+      profileBegan = now;
+    };
     var plan:Null<ExecutionPlan> = null;
     var projected:Null<Trajectory> = null;
     try {
       var motors = motorSpace;
       if (motors != null) motors.validate(pending.trajectory);
       if (couplingIndices.length > 0) projected = projectCouplings(pending.trajectory);
+      mark("motorValidationAndCouplings");
       if (jointPathPlanner != null) {
         var failure = jointPathPlanner.checkMotion(projected == null ? pending.trajectory : projected);
         if (failure != null)
           throw 'compiled trajectory clearance (${failure.a}, ${failure.b}): ${failure.distance} < ${failure.required}';
       }
+      mark("trajectoryClearance");
       if(configurationConstraint!=null)configurationConstraint.checkTrajectory(
         projected == null ? pending.trajectory : projected,controllerPeriodSeconds);
+      mark("configurationCheck");
       plan = ExecutionPlan.create(projected == null ? pending.trajectory : projected,
         pending.path == null ? limits : limits.withoutJerk(), id, pending.startQ,
         zeros(), zeros(), startTolerances.position, startTolerances.velocity,
         startTolerances.acceleration, pending.events);
+      mark("executionPlanCreation");
       if (pending.path != null) checkTaskSpace(plan, pending.path, pending.checkDistances,
         pending.checkTimes, pending.opIndex, pending.authoredPolyline,
         pending.blendTolerance, pending.taskSampleDistances);
+      mark("taskSpaceCheck");
       var check = planCheck;
       if (check != null && check.checks()) {
         var result = check.check(plan, pending.opIndex, pending.feed);
@@ -619,6 +632,8 @@ class ProgramCompiler {
         if (check.options.rejects && result.diagnostics.length > 0)
           throw 'plan check: ${[for (diagnostic in result.diagnostics) diagnostic.describe()].join("; ")}';
       }
+      mark("planCheck");
+      if (profiling) Sys.println("PROCESS_PATH_COMPILE_CHECKS " + haxe.Json.stringify({op:pending.opIndex, stages:profileRows}));
       pending.trajectory.dispose();
       if (projected != null) projected.dispose();
       return plan;
@@ -791,7 +806,9 @@ class ProgramCompiler {
     var jointPath = refined==null ? new JointPathSamples(distances, positions, first, second, secondBefore) : refined;
     var timingLimits = new PathTimingLimits(maxVelocity, maxAcceleration, caps);
     var motors = motorSpace;
+    var timingBegan = Sys.time();
     var timed = motors == null ? timing.time(jointPath, timingLimits) : motors.time(timing, jointPath, timingLimits);
+    if (Sys.getEnv("PROCESS_PATH_PROFILE") == "1") Sys.println("PROCESS_PATH_TIME_LAW " + haxe.Json.stringify({op:index, seconds:Sys.time()-timingBegan}));
     try {
       var events:Array<TimedEvent> = [];
       var timeMap = [for (distance in distances) timed.distanceToTime(distance)];
