@@ -627,3 +627,16 @@ mission flange connector; extraction reads model frames/axes, not CobotReference
 size tables. Each check observes zero numeric pose queries. App compiler-only
 build and authored runtime exit successfully; log
 `process-path-pp1-cobot-runtime.log` is retained in external scratch.
+
+PP1 unsupported-family fallback now exists behind the shared branch interface.
+BranchIk selects FK-verified Cartesian/OPW/UR geometry or returns NumericBranchIk
+with the failed extraction diagnostics. Numeric enumeration tries neighbouring
+seeds followed by a deterministic centre/axis seed set, deduplicates converged
+configurations and holds external coordinates at the supplied lattice cell.
+Numeric seed IDs are explicitly not persistent geometric branch IDs, and their
+singularity classification is explicitly unknown (`singularityKnown=false`).
+Tests cover family selection, repeated deterministic results, neighbour
+retention/deduplication, task residuals and held external coordinates. Compiler
+build and focused C4 runtime pass (180,958 assertions). This factory is not yet
+wired into production planning; PP2–PP9 migrations remain outstanding, as does
+the authored RobotArm geometry decision noted above. PP1 is not complete.

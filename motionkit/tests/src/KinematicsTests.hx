@@ -373,6 +373,38 @@ class KinematicsTests extends MotionKitTestSupport {
     }
   }
 
+  public function testNumericBranchFallback():Void {
+    var fixture = buildSevenAxisArmFixture();
+    var fallback = new motionkit.robot.NumericBranchIk(fixture.arm,"seven-axis test arm",new IkTolerance(1e-6,1e-6,60));
+    check(fallback.family() == "numeric-fallback" && fallback.diagnostic.indexOf("seven-axis test arm") >= 0,
+      "unsupported geometry has an explicit numeric fallback diagnostic");
+    var q = [for (i in 0...7) 0.3*Math.sin(i+0.4)];
+    check(motionkit.robot.BranchIk.of(fixture.arm).family() == "numeric-fallback","unsupported model selects the numeric fallback");
+    var target = fallback.forward(q);
+    var first = fallback.branchesFromNeighbours(target,[q,q],q), second = fallback.branchesFromNeighbours(target,[q,q],q);
+    check(first.length > 0 && first.length == second.length,"numeric fallback is deterministic and keeps the neighbour solution");
+    for (i in 0...first.length) {
+      check(first[i].branch == second[i].branch,"numeric fallback seed identity is deterministic");
+      check(!first[i].singularityKnown,"numeric fallback reports singularity classification as unknown");
+      near(motionkit.path.PoseMath.distance(fallback.forward(first[i].q),target),0,"numeric fallback satisfies task position",1e-6);
+      near(motionkit.robot.ToolFreedom.orientationError(fallback.forward(first[i].q),target,motionkit.path.OrientationPolicy.Fixed),0,
+        "numeric fallback satisfies task orientation",1e-6);
+      for (j in 0...7) near(first[i].q[j],second[i].q[j],"numeric fallback deterministic joints",1e-9);
+      for (j in 0...i) {
+        var distance = 0.0;
+        for (k in 0...7) distance += Math.pow(first[i].q[k]-first[j].q[k],2);
+        check(Math.sqrt(distance) >= 1e-3,"numeric fallback deduplicates neighbour seeds");
+      }
+    }
+    var cell = buildWorkcellFixture();
+    var held = new motionkit.robot.NumericBranchIk(cell.group,"test external arm",new IkTolerance(1e-6,1e-6,30));
+    var complete = [for (i in 0...cell.group.group.count()) 0.1*Math.sin(i+0.3)];
+    var candidates = held.branches(held.forward(complete),complete);
+    check(candidates.length > 0,"numeric fallback accepts an external lattice cell");
+    for (candidate in candidates) for (i in 0...complete.length) if (cell.group.external[i])
+      near(candidate.q[i],complete[i],"numeric fallback holds external coordinates",1e-12);
+  }
+
   public function testCartesianAnalyticIk():Void {
     for (count in 3...6) {
       var model = new RobotModel('analytic-cartesian-$count');
@@ -586,6 +618,7 @@ class KinematicsTests extends MotionKitTestSupport {
     check([for (branch in singularBranches) if (branch.singular) branch].length > 0,
       "OPW shared interface explicitly reports wrist singularity");
     var ur = new motionkit.robot.UrAnalyticIk(bad.arm);
+    check(motionkit.robot.BranchIk.of(bad.arm).family() == "UR6R","model-derived family selection recognizes UR geometry");
     for (sample in 0...30) {
       var q = [for (joint in 0...6) 0.7 * Math.sin(sample * 0.37 + joint * 0.61)];
       var actual = bad.arm.tcpPose(q), predicted = ur.forward(q);

@@ -16,8 +16,11 @@ class AnalyticBranch {
   public final q:Array<Float>;
   public final branch:Int;
   public final singular:Bool;
+  /** Numeric fallback cannot classify geometric singularities. */
+  public final singularityKnown:Bool;
 
-  public function new(q:Array<Float>, branch:Int, singular:Bool) {
+  public function new(q:Array<Float>, branch:Int, singular:Bool, singularityKnown:Bool = true) {
     this.q = q.copy(); this.branch = branch; this.singular = singular;
+    this.singularityKnown = singularityKnown;
   }
 }
