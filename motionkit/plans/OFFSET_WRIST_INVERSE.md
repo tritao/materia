@@ -205,3 +205,30 @@ This finite sweep does not prove all-root completeness; it verifies original-roo
 recovery and checks every returned candidate against FK. Certified coupled-root
 back-substitution and continuum representation remain necessary before default
 family integration.
+
+## Exact coupled polynomial recovery certificate
+
+`--certify` computes the subresultant sequence in the base coordinate. For each
+irreducible resultant factor having real roots, the penultimate subresultant must
+be linear a(t)*u+b(t). The prototype inverts a in QQ[t]/factor and constructs
+u=-b/a in that quotient field. It verifies exactly, by modular Horner substitution,
+that both lateral and eliminated-length polynomials vanish at this coordinate.
+It also checks that their leading base coefficients do not vanish modulo the
+factor, avoiding a degree-drop claim based on unspecialized subresultants.
+Nonlinear/vanishing recovery or leading-degree drops produce explicit diagnostics.
+
+Certified factors use this exact coordinate map for back-substitution rather than
+the floating quadratic's discriminant/degree thresholds. The isolated t interval
+midpoint is rational; coordinate evaluation uses exact rational arithmetic before
+conversion to Float. This is not an interval enclosure for the resulting u or a
+bound on midpoint reconstruction error; certified adaptive conversion remains open.
+
+Final `--certify` experiment exits zero on the original rational target. All four
+charts certify the degree-16 factor, each with eight real roots; the other factors
+have no real roots. Deduplicated reconstruction retains eight FK-verified solutions,
+maximum error 1.3322676295501878e-15, elapsed 4.377 seconds. Evidence:
+`process-path-offset-certificate-final.json`. This establishes exact coupled
+polynomial recovery for these factors, not a general all-target inverse certificate.
+The option currently applies to the original target only; boundary/random fixtures
+retain their earlier floating quadratic mode. Projected-axis/continuum and other
+singular factors still need specialized recovery, and production remains unchanged.

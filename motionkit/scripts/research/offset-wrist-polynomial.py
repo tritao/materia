@@ -86,7 +86,30 @@ def reconstruct(rotation, position, dimensions, alpha, gamma):
     return result
 
 
-def solve(rotation, position, dimensions):
+def certify_recovery(F,G,u,t,factor,linear):
+    """Verify a base-coordinate map in QQ[t]/factor for an irreducible factor."""
+    line=s.Poly(linear,u)
+    if line.degree()!=1:
+        raise ValueError('Nonlinear common-root recovery requires separate algebraic isolation')
+    a,b=[s.Poly(c,t,domain=s.QQ).rem(factor) for c in line.all_coeffs()]
+    if a.is_zero:
+        raise ValueError('Vanishing recovery coefficient requires a singular subresultant system')
+    coordinate=(-b*s.invert(a,factor)).rem(factor)
+    def substitute_modulo(polynomial):
+        result=s.Poly(0,t,domain=s.QQ)
+        for coefficient in s.Poly(polynomial.as_expr(),u).all_coeffs():
+            result=(result*coordinate+s.Poly(coefficient,t,domain=s.QQ)).rem(factor)
+        return result
+    assert substitute_modulo(F).is_zero and substitute_modulo(G).is_zero
+    # Preserve degrees over the factor field before using the linear gcd claim.
+    for polynomial in [F,G]:
+        leading=s.Poly(s.Poly(polynomial.as_expr(),u).LC(),t,domain=s.QQ).rem(factor)
+        if leading.is_zero:
+            raise ValueError('Leading degree drop requires specialized subresultants')
+    return coordinate
+
+
+def solve(rotation, position, dimensions, certify=False):
     solutions=[]
     charts=[]
     for inverse_base in [False,True]:
@@ -95,30 +118,41 @@ def solve(rotation, position, dimensions):
             resultant=s.Poly(s.resultant(F.as_expr(),G.as_expr(),u),t)
             if resultant.is_zero:
                 raise ValueError('Identically zero resultant requires degenerate-system isolation')
+            recovery_sequence=s.subresultants(F.as_expr(),G.as_expr(),u) if certify else None
             factors=[]
             for expression,multiplicity in s.factor_list(resultant.as_expr())[1]:
                 factor=s.Poly(expression,t)
+                real_count=int(factor.count_roots(-s.oo,s.oo))
+                certificate=False
+                recovered_coordinate=None
+                if certify and real_count:
+                    recovered_coordinate=certify_recovery(F,G,u,t,factor,recovery_sequence[-2])
+                    certificate=True
                 factors.append({'degree':factor.degree(),'multiplicity':multiplicity,
-                                'real_roots':int(factor.count_roots(-s.oo,s.oo))})
+                                'real_roots':real_count,'exact_coupled_recovery':certificate})
                 for interval,_ in factor.intervals(eps=s.Rational(1,10**20)):
                     t_value=float((interval[0]+interval[1])/2)
                     if abs(t_value)>1+1e-12:
                         continue
-                    coefficients=[float(c.subs(t,t_value)) for c in s.Poly(F.as_expr(),u).all_coeffs()]
-                    while len(coefficients)>1 and abs(coefficients[0])<1e-12:
-                        coefficients.pop(0)
-                    if len(coefficients)==3:
-                        a,bq,c=coefficients
-                        discriminant=bq*bq-4*a*c
-                        if discriminant<0:
-                            continue
-                        roots=[(-bq-math.sqrt(discriminant))/(2*a),(-bq+math.sqrt(discriminant))/(2*a)]
-                    elif len(coefficients)==2:
-                        roots=[-coefficients[1]/coefficients[0]]
-                    elif abs(coefficients[0])<1e-12:
-                        raise ValueError('Vanishing lateral equation requires joint-system back-substitution')
+                    if recovered_coordinate is not None:
+                        midpoint=(interval[0]+interval[1])/2
+                        roots=[float(recovered_coordinate.eval(midpoint))]
                     else:
-                        roots=[]
+                        coefficients=[float(c.subs(t,t_value)) for c in s.Poly(F.as_expr(),u).all_coeffs()]
+                        while len(coefficients)>1 and abs(coefficients[0])<1e-12:
+                            coefficients.pop(0)
+                        if len(coefficients)==3:
+                            a,bq,c=coefficients
+                            discriminant=bq*bq-4*a*c
+                            if discriminant<0:
+                                continue
+                            roots=[(-bq-math.sqrt(discriminant))/(2*a),(-bq+math.sqrt(discriminant))/(2*a)]
+                        elif len(coefficients)==2:
+                            roots=[-coefficients[1]/coefficients[0]]
+                        elif abs(coefficients[0])<1e-12:
+                            raise ValueError('Vanishing lateral equation requires joint-system back-substitution')
+                        else:
+                            roots=[]
                     for u_value in roots:
                         if abs(u_value)>1+1e-12:
                             continue
@@ -215,7 +249,7 @@ def main():
     position=s.Matrix([s.Rational(3,5),s.Rational(1,5),s.Rational(7,10)])
     dimensions=list(map(s.Rational,['.17','-.09','.08','.4','.6','.5','.12','.035']))
     started=time.monotonic()
-    result=solve(rotation,position,dimensions)
+    result=solve(rotation,position,dimensions,certify='--certify' in sys.argv)
     if '--check-boundaries' in sys.argv:
         result['boundary_checks']=boundary_checks(dimensions)
     for argument in sys.argv[1:]:
