@@ -173,6 +173,15 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     var refined:Null<Array<JointPathSamples>> = null;
     function refine(route:motionkit.robot.StructuredLadder.LadderSelection):Array<JointPathSamples> {
       var refiner=new AnalyticPathRefiner(group,problem,route),curves:Array<JointPathSamples> = [];
+      if(request.drives!=null){
+        var tasks:Array<AnalyticPathRefiner.RefinementTarget> = [];
+        for(distance in request.distances){var section=paths.length-1;
+          for(k in 1...paths.length)if(distance<offsets[k]){section=k-1;break;}
+          tasks.push(providers[section].at(Math.max(0.0,Math.min(paths[section].length(),distance-offsets[section]))));
+        }
+        refiner.constrain(tasks,[for(section in 0...paths.length){first:request.distances.indexOf(offsets[section]),
+          last:section+1<paths.length?request.distances.indexOf(offsets[section+1]):request.distances.length-1}]);
+      }
       for(section in 0...paths.length){
         var offset=offsets[section],end=section+1<paths.length?offsets[section+1]:request.distances[request.distances.length-1];
         var distances=[for(distance in request.distances)if(distance>=offset && distance<=end)distance];

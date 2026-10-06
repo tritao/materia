@@ -618,11 +618,11 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP1 | complete: production EAIK chain/base adapter, labels/turns, Cartesian backends and explicit numeric fallback; OPW/UR deleted; adoption gate passes | see EAIK_SPIKE_RESULTS.md |
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
 | PP3 | in progress: structured/coarse search and Descartes dispatch implemented; authored gate pending | `7cb639434`, `489f2c360`, `f8e88ad4d`, `09cb60fbb` |
-| PP4 | in progress: analytic/numeric refinement, cone rates and timing verified; transitions/authored gate pending | `4b9e750ff`, `0e5edbc06`, `39b6081c1` |
-| PP5 | complete: lazy sample/edge/refined retries, physical acceptance and full native/Haxe gate | `e1435022f`, `e5336893f`, `bfd03d585` |
+| PP4 | drive-aware revision 7 implemented: native banded QP, exact rechecks and strict process timing; G17 cycle/posture and phase gates pass; broader transition close-out remains | drive-aware evidence below |
+| PP5 | original lazy sample/edge/refined phase complete; revision 7 inflated geometric clearance and timed-pass removal pending | `e1435022f`, `e5336893f`, `bfd03d585` |
 | PP6 | in progress: planner argument, axis/standalone OPW defaults, class removal and free entry verified; remaining defaults and joined approach/retreat pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
 | PP7 | complete: generated entry/retreat selection, retries and emission; full MotionKit/native gate passed | `92b8c69ee`, `093e65a46`, `e41bdfffa`; retreat gate below |
-| PP8 | in progress: launch rate precompile removed; weld problem builder/search migration and acceptance pending | final-clock rate scheduling below |
+| PP8 | in progress: G17 cycle/posture restored by drive-aware refinement; 42.86 s planning still misses 15 s; clearance and wrapper/candidate work follow in that order | per-step profiles below |
 | PP9 | in progress: handling and surface use the structured planner and authored missions pass; toolpaths/deletions/remaining mission gate pending | runner migrations below |
 | PP10 | planned | — |
 | PP11 | planned | — |
@@ -2633,3 +2633,95 @@ Per the required order, implement PP-D12 first, then inflated geometric
 clearance, and profile each before optimizing candidates or search wrappers.
 Logs/parsed records: external scratch `process-path-pp1-production-g17-profile.log`
 and `.json`.
+
+
+### PP4 / PP-D12 drive-aware refinement and phase gate
+
+Production weld requests now carry planned feeds and compiled drive acceleration
+limits into refinement. A native ProxQP sparse banded QP replaces unconstrained
+redundancy interpolation for those requests. It optimizes redundant coordinate
+values and first derivatives; local equalities make the Hermite cubics C2.
+Bernstein polygons bound every span's position, velocity and acceleration at
+its feed, including the conservative feed-gradient term. The objective retains
+the ladder route, penalizes integrated curvature, follows a feasible seed and
+adds a linearized posture objective. Arm position/velocity/acceleration rows
+are linearized around exact IK, with up to three re-linearizations and exact
+branch/configuration/jump/task-space/drive rechecks on the complete fine grid.
+A straight seam parallel to a physical prismatic axis supplies a constant-arm
+track-follows-tool seed on the selected branch, with the best legal posture.
+It does not select a separate timing or planning algorithm.
+
+The QP uses at most 25 mm between control knots and retains every timing stop;
+G17 uses 114 controls / 456 variables for the full joined geometry, followed
+by 1,424 exact fine-grid checks. One global banded solve preserves identical
+positions at shared stops. The explored full-grid QP was too expensive and was
+terminated; it is not acceptance evidence. A later reversed alternative hit
+the initial iteration budget, then exposed a 0.36 nm negative rail-bound
+roundoff. The final solver has a bounded 500/50 outer/inner budget and reports
+iteration exhaustion separately from infeasibility. A uniform affine
+normalization puts the cubic Bernstein polygon inside exact physical bounds
+while preserving C2 and derivative consistency; exact IK/drive rechecks follow
+that correction. Both G17 directions now solve and are collision-checked,
+rather than silently dropping the reversed alternative. Simple impossible
+position/drive boxes reject before iteration; infeasible pinned feed reports
+the binding coordinate and a necessary sustainable feed scale.
+
+Weld-section timing explicitly forbids retry smoothing or uniform stretch.
+Native timing metadata reports a binding joint/derivative and sustainable
+scale if lowering violates a drive. Other motion retains its existing timing
+contract. Native tests cover strict acceptance and rejection, physical bounds
+throughout cubic spans, coupled linear bounds, pins and infeasibility; Haxe
+tests cross-check derivatives by finite differences and numerical-bound
+normalization. No numeric IK polish, relaxed drive limits or schema change is
+introduced.
+
+Phase gate passes: native CTest **16/16**, four-platform canonical FFI audit,
+full MachineKit script, compiler-only app/ProcessKit/RobotKit/CadBridge/Toolpath
+motion builds, and their runtimes. Full MotionKit passes **1,223,799 assertions**
+before the final native convergence/bound-normalization adjustments; final
+rebuilt native CTest and C4 (**1,152,511 assertions**) cover those adjustments.
+ProcessKit passes including **511** planning assertions; CadBridge **173**,
+Toolpath motion **3,034**, and RobotKit's full scenarios/world pass. Emscripten
+QP and strict path/timing runtimes pass under Node. The large path fixture
+needs a 1 MiB test stack and growing test heap; those link settings apply to
+that executable, not the production core.
+
+Evidence: external scratch `process-path-pp4-qp-*`. The accepted G17 profile
+below includes the final physical-bound normalization and both alternatives;
+the earlier forward-only diagnostic is not the final benchmark.
+
+### PP8 profile after PP-D12 (before geometric clearance certificate)
+
+With PROCESS_PATH_PROFILE=1, G17 exits zero: **42.856509 s planning**, zero
+numeric IK, **232.5 s cycle**, **0.778094423 rad** margin, **2.557556349 m**
+track travel and **0.591757714 m/s²** peak track acceleration. Both original
+cycle/posture gates pass: <=248.43 s and >=0.775421815 rad. The entire
+226.882787 s weld time law accepts on **attempt 0**, with factor 1, under the
+strict no-retry/no-stretch contract. This closely matches the 226.866 s
+nominal 2600 mm feed time. The optimizer retains about 42 mm of arm travel
+rather than forcing the seed's constant posture; its margin remains above
+the original gate. Bead extent is 2600 mm, mean leg **4.998147 mm**, maximum
+seam error **0.027251 mm**, with no clearance violation.
+
+| Planning work | Seconds |
+|---|---:|
+| Candidate construction, both directions | 12.332 |
+| Search/checks, both directions (inclusive) | 13.285 |
+| Refinement, both directions | 0.907 |
+| Native QPs inside refinement | 0.137 / 0.183 |
+| Retained program compilation | 16.315 |
+| Time-law generation inside compilation | 2.110 |
+| Compiled-trajectory clearance inside compilation | 12.055 |
+| Execution-plan creation inside compilation | 0.788 |
+| Task-space checks inside compilation | 0.804 |
+| Drive/load checks inside compilation | 0.432 |
+| Remaining compilation preparation/disposal | 0.125 |
+
+Each direction still constructs 977,992 candidates. Native search calls take
+1.069 / 1.097 s; packing totals 0.365 s, state costs 3.780 s, and the remaining
+inclusive search/check work 6.973 s. The final profile ran around focused
+verification and is observational, not an uncontended timing acceptance.
+Planning still fails the **under-15-second** gate. PP5's single geometric
+clearance check is next; only after its profile should wrapper/candidate
+optimization begin. Logs and parsed data: external scratch
+`process-path-pp4-qp-g17-accepted-profile.log` and `.json`.

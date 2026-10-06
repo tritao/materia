@@ -130,6 +130,7 @@ class WeldPathProgram {
     var selected=new SelectedJointPathPlanner(compiler.solver,checking,problem.sections,curves);
     var execution=compiler.withJointPathPlanner(selected),quantity=this.quantity;
     var sectionOps=this.sectionOps.copy(),phases=this.phases.copy(),channel=channels.wireSpeed;
+    execution.requireFeasiblePath=op->{var section=sectionOps.indexOf(op);return section>=0 && phases[section]==Weld;};
     var lastOp=lastWeldOp,endRate=this.endRate;
     var overlap=this.coveredPrefix,seamOffsets=this.seamOffsets.copy();
     execution.pathEventSchedule=(op,offset,last,distances,times,events)->{

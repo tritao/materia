@@ -106,7 +106,7 @@ int main() {
     const double acceleration_limit[1] = {1.0};
     mk_trajectory_handle timed_trajectory{};
     assert(mk_time_path(path, velocity_limit, acceleration_limit, 1,
-        nullptr, 0, 0.0, 0.0, 1e-6, &law, &timed_trajectory) == MK_OK);
+        nullptr, 0, 0.0, 0.0, 1e-6, 0, nullptr, &law, &timed_trajectory) == MK_OK);
     assert(timed_trajectory.id != 0);
     mk_trajectory_state timed_state{};
     timed_state.struct_size = sizeof(timed_state);
@@ -129,8 +129,10 @@ int main() {
     mk_trajectory_destroy(timed_trajectory);
     mk_time_law_destroy(law);
     const double boundary_velocity_limit[1] = {0.2};
+    mk_timing_report strict_report{};
     assert(mk_time_path(path, boundary_velocity_limit, acceleration_limit, 1,
-        nullptr, 0, 0.15, 0.15, 1e-8, &law, &tight) == MK_OK);
+        nullptr, 0, 0.15, 0.15, 1e-8, 1, &strict_report, &law, &tight) == MK_OK);
+    assert(strict_report.adjustments==0 && strict_report.derivative==0);
     mk_trajectory_state moving_boundary{};
     moving_boundary.struct_size = sizeof(moving_boundary);
     assert(mk_trajectory_evaluate(tight, 0, &moving_boundary) == MK_OK);
@@ -225,8 +227,13 @@ int main() {
     assert(mk_path_create(kinked, 3, &path) == MK_OK);
     const double kink_velocity[1] = {1.0}, kink_acceleration[1] = {2.0};
     mk_trajectory_handle kink_trajectory{};
+    assert(mk_time_path(path,kink_velocity,kink_acceleration,1,nullptr,0,
+        0,0,1e-9,1,&strict_report,&law,&kink_trajectory)==MK_ERROR_GENERATION);
+    assert(!law.id && !kink_trajectory.id && strict_report.adjustments==0);
+    assert(strict_report.joint==0 && strict_report.derivative==1 && strict_report.value>strict_report.limit);
+    assert(strict_report.sustainable_scale>0 && strict_report.sustainable_scale<1);
     assert(mk_time_path(path, kink_velocity, kink_acceleration, 1, nullptr, 0,
-        0.0, 0.0, 1e-9, &law, &kink_trajectory) == MK_OK);
+        0.0, 0.0, 1e-9, 0, nullptr, &law, &kink_trajectory) == MK_OK);
     for (double at : {0.5, 1.5, 1.9}) {
         double seconds = 0.0;
         assert(mk_path_distance_to_time(law, at, &seconds) == MK_OK);
@@ -260,7 +267,7 @@ int main() {
     std::vector<double> rapid_caps(rapid.size() - 1, 0.08);
     mk_trajectory_handle rapid_trajectory{};
     assert(mk_time_path(path, axis_velocity, axis_acceleration, 3, rapid_caps.data(),
-        static_cast<uint32_t>(rapid_caps.size()), 0.0, 0.0, 1e-6, &law,
+        static_cast<uint32_t>(rapid_caps.size()), 0.0, 0.0, 1e-6, 0, nullptr, &law,
         &rapid_trajectory) == MK_OK);
     mk_trajectory_destroy(rapid_trajectory);
     mk_time_law_destroy(law);

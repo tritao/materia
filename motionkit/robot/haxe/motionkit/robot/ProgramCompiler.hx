@@ -86,6 +86,9 @@ class ProgramCompiler {
    * Distances/events use whole-operation coordinates; times are section-local. */
   public var pathEventSchedule:Null<(Int,Float,Bool,Array<Float>,Array<Float>,Array<PathEvent>)->Array<PathEvent>> = null;
 
+  /** Process sections reject a time-law retry or stretch after refinement. */
+  public var requireFeasiblePath:Null<Int->Bool> = null;
+
   /** Preserve compiler limits/checks while timing an already selected route. */
   public function withJointPathPlanner(planner:JointPathPlanner):ProgramCompiler {
     if(planner==null)throw "A replacement joint path planner is required";
@@ -95,7 +98,7 @@ class ProgramCompiler {
     result.planningAssumptions=planningAssumptions.copy();
     result.planCheck=planCheck==null?null:planCheck.fork();
     result.configurationConstraint=configurationConstraint;
-    result.motorSpace=motorSpace;result.pathEventSchedule=pathEventSchedule;
+    result.motorSpace=motorSpace;result.pathEventSchedule=pathEventSchedule;result.requireFeasiblePath=requireFeasiblePath;
     return result;
   }
 
@@ -113,6 +116,7 @@ class ProgramCompiler {
       perJointMaxJump, jointIds, couplings, controllerPeriodSeconds);
     // The worker plans one program in order, so it remembers which way each axis last moved.
     worker.planningAssumptions = planningAssumptions.copy();
+    worker.requireFeasiblePath=requireFeasiblePath;
     if (planCheck != null) worker.planCheck = planCheck.fork();
     worker.configurationConstraint = configurationConstraint == null ? null :
       new ConfigurationConstraint(forked,configurationConstraint.configuration);
@@ -804,7 +808,7 @@ class ProgramCompiler {
       }
     }
     var jointPath = refined==null ? new JointPathSamples(distances, positions, first, second, secondBefore) : refined;
-    var timingLimits = new PathTimingLimits(maxVelocity, maxAcceleration, caps);
+    var timingLimits = new PathTimingLimits(maxVelocity, maxAcceleration, caps,0,0,requireFeasiblePath!=null && requireFeasiblePath(index));
     var motors = motorSpace;
     var timingBegan = Sys.time();
     var timed = motors == null ? timing.time(jointPath, timingLimits) : motors.time(timing, jointPath, timingLimits);

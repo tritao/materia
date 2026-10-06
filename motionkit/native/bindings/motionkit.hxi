@@ -73,6 +73,11 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * One call replaces a bisection of mk_path_distance_to_time per sample.
 	 */
 	extern fn mk_path_times_to_distances(law: mk_time_law_handle, seconds: ptr<const<f64>> @in_array("count"), count: u32, out_distances: ptr<f64> @out_array("count")) -> mk_result;
+	/**
+	 * Deterministic sparse banded C2 cubic smoothing QP. Every span is bounded
+	 * using its Bernstein control polygons, including between authored knots.
+	 */
+	extern fn mk_refine_redundancy(limits: ptr<const<mk_refinement_limits>>, samples: ptr<const<mk_refinement_sample>> @in_array("sample_count"), sample_count: u32, bounds: ptr<const<mk_refinement_bound>> @in_array("bound_count"), bound_count: u32, out_solutions: ptr<mk_refinement_solution> @out_array("sample_count")) -> mk_result;
 	extern fn mk_sample_cartesian_candidates(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_sample_cartesian_candidates_compact(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_joints: ptr<f64> @out_array("joint_value_count"), out_wraps: ptr<i32> @out_array("joint_value_count"), joint_value_count: u32, out_coordinates: ptr<u32> @out_array("coordinate_count"), coordinate_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_sample_eaik_candidates(solver: mk_eaik_handle, configuration: ptr<const<mk_eaik_configuration>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
@@ -108,8 +113,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	extern fn mk_time_law_get_binding(law: mk_time_law_handle, index: u32, out_binding: ptr<mk_timing_binding>) -> mk_result;
 	/**
 	 * Reachability-based TOPP-RA timing and its validated lowered trajectory.
+	 * require_feasible_path=1 forbids smoothing retries and uniform stretch.
 	 */
-	extern fn mk_time_path(path: mk_path_handle, max_velocity: ptr<const<f64>> @in_array("joint_count"), max_acceleration: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, speed_caps: ptr<const<f64>> @in_array("speed_cap_count"), speed_cap_count: u32, start_speed: f64, end_speed: f64, lowering_tolerance: f64, out_law: ptr<mk_time_law_handle> @out @owned, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	extern fn mk_time_path(path: mk_path_handle, max_velocity: ptr<const<f64>> @in_array("joint_count"), max_acceleration: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, speed_caps: ptr<const<f64>> @in_array("speed_cap_count"), speed_cap_count: u32, start_speed: f64, end_speed: f64, lowering_tolerance: f64, require_feasible_path: u32, out_report: ptr<mk_timing_report> @out, out_law: ptr<mk_time_law_handle> @out @owned, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	/**
 	 * Cartesian chain represented by its zero-pose space screws and TCP pose.
 	 * The three translation axes are columns of translation_axes. Optional C/A
@@ -386,6 +392,51 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		second_before: array<f64, 64> @offset(1560);
 	}
 	/**
+	 * Local linearized arm bound on value (0), first (1), or second (2).
+	 * Coefficients multiply the redundant coordinates at one knot.
+	 */
+	struct mk_refinement_bound @layout(544, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		sample: u32 @offset(4);
+		derivative: u32 @offset(8);
+		coefficients: array<f64, 64> @offset(16);
+		lower: f64 @offset(528);
+		upper: f64 @offset(536);
+	}
+	struct mk_refinement_limits @layout(1056, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		coordinate_count: u32 @offset(4);
+		max_velocity: array<f64, 64> @offset(8);
+		max_acceleration: array<f64, 64> @offset(520);
+		route_weight: f64 @offset(1032);
+		seed_weight: f64 @offset(1040);
+		curvature_weight: f64 @offset(1048);
+	}
+	/**
+	 * One knot of a drive-aware redundancy curve. Units are joint units and
+	 * metres of path distance. feed and feed_gradient are conservative span caps.
+	 */
+	struct mk_refinement_sample @layout(2592, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		s: f64 @offset(8);
+		feed: f64 @offset(16);
+		feed_gradient: f64 @offset(24);
+		route: array<f64, 64> @offset(32);
+		seed: array<f64, 64> @offset(544);
+		lower: array<f64, 64> @offset(1056);
+		upper: array<f64, 64> @offset(1568);
+		/**
+		 * < Linear posture objective.
+		 */
+		gradient: array<f64, 64> @offset(2080);
+	}
+	struct mk_refinement_solution @layout(1544, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		value: array<f64, 64> @offset(8);
+		first: array<f64, 64> @offset(520);
+		second: array<f64, 64> @offset(1032);
+	}
+	/**
 	 * Space screws of external joints, in a common root frame at q=0.
 	 * Entries follow each chain's root-to-tip order. Scope 0 moves the arm base,
 	 * scope 1 moves the work frame, scope 2 moves both. Kind 0 is prismatic, kind 1 is revolute.
@@ -455,6 +506,22 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		 */
 		joint: u32 @offset(12);
 		limit: f64 @offset(16);
+	}
+	/**
+	 * Validation metadata for a time law. Strict process mode reports a binding
+	 * joint and sustainable speed scale instead of retrying or stretching.
+	 */
+	struct mk_timing_report @layout(40, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		adjustments: u32 @offset(4);
+		joint: u32 @offset(8);
+		/**
+		 * < 1 velocity, 2 acceleration; zero on acceptance.
+		 */
+		derivative: u32 @offset(12);
+		value: f64 @offset(16);
+		limit: f64 @offset(24);
+		sustainable_scale: f64 @offset(32);
 	}
 	handle mk_eaik_handle : u32 @destroy("mk_eaik_destroy");
 	handle mk_path_handle : u32 @destroy("mk_path_destroy");

@@ -282,7 +282,10 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
           var alternative=clearanceDistance==0 ? direction : direction.withAirClearance(clearanceDistance);
           var selected=selectProblem(compiler,clearance,alternative,start,configuration);
           if(best==null || selected.cost<cast(best,processkit.WeldPathProblem.WeldPathSelection).cost)best=selected;
-        }catch(error:Dynamic){reasons.push(Std.string(error));}
+        }catch(error:Dynamic){reasons.push(Std.string(error));
+          if(Sys.getEnv("PROCESS_PATH_PROFILE")=="1")Sys.println("PROCESS_PATH_ALTERNATIVE_REJECTED "+haxe.Json.stringify({
+            reversed:direction!=problem,airClearance:clearanceDistance,reason:Std.string(error)}));
+        }
       }
       if(best!=null)break;
     }
@@ -316,7 +319,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       start:Array<Float>,configuration:Null<motionkit.kinematics.SixAxisConfiguration>):processkit.WeldPathProblem.WeldPathSelection {
     var solver=cast(compiler.solver,ManipulatorKinematics),group=solver.manipulator;
     var request=problem.request(start,compiler.ikTolerance,
-      compiler.perJointMaxJump,compiler.maxVelocity);
+      compiler.perJointMaxJump,compiler.maxVelocity,WeldPathPlanner.STEP,compiler.maxAcceleration);
     // Omitted ranges hold axes at the seed. Welds with a work positioner or
     // rail must search its physical range rather than freezing it there.
     var ranges:Array<motionkit.robot.ExternalAxisGrid.ExternalAxisRange> = [];

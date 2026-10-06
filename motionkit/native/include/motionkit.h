@@ -273,6 +273,52 @@ typedef struct mk_path_sample {
     double second_before[MK_MAX_JOINTS];
 } mk_path_sample;
 
+/** One knot of a drive-aware redundancy curve. Units are joint units and
+ * metres of path distance. feed and feed_gradient are conservative span caps. */
+typedef struct mk_refinement_sample {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double s;
+    double feed;
+    double feed_gradient;
+    double route[MK_MAX_JOINTS];
+    double seed[MK_MAX_JOINTS];
+    double lower[MK_MAX_JOINTS];
+    double upper[MK_MAX_JOINTS];
+    double gradient[MK_MAX_JOINTS]; /**< Linear posture objective. */
+} mk_refinement_sample;
+typedef struct mk_refinement_limits {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t coordinate_count;
+    double max_velocity[MK_MAX_JOINTS];
+    double max_acceleration[MK_MAX_JOINTS];
+    double route_weight;
+    double seed_weight;
+    double curvature_weight;
+} mk_refinement_limits;
+/** Local linearized arm bound on value (0), first (1), or second (2).
+ * Coefficients multiply the redundant coordinates at one knot. */
+typedef struct mk_refinement_bound {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t sample;
+    uint32_t derivative;
+    double coefficients[MK_MAX_JOINTS];
+    double lower;
+    double upper;
+} mk_refinement_bound;
+typedef struct mk_refinement_solution {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double value[MK_MAX_JOINTS];
+    double first[MK_MAX_JOINTS];
+    double second[MK_MAX_JOINTS];
+} mk_refinement_solution;
+/** Deterministic sparse banded C2 cubic smoothing QP. Every span is bounded
+ * using its Bernstein control polygons, including between authored knots. */
+MK_API mk_result MK_CALL mk_refine_redundancy(
+    const mk_refinement_limits *limits,
+    const mk_refinement_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
+    const mk_refinement_bound *bounds MK_IN_ARRAY(bound_count), uint32_t bound_count,
+    mk_refinement_solution *out_solutions MK_OUT_ARRAY(sample_count));
+
 /** s(t) = start_s + speed*tau + acceleration*tau^2/2, tau in seconds. */
 typedef struct mk_time_stage {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -469,12 +515,25 @@ MK_API mk_result MK_CALL mk_path_times_to_distances(mk_time_law_handle law,
 /** Quintic Hermite lowering, with adaptive knots and exact polynomial-deviation extrema. */
 MK_API mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
     double tolerance, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
-/** Reachability-based TOPP-RA timing and its validated lowered trajectory. */
+/** Validation metadata for a time law. Strict process mode reports a binding
+ * joint and sustainable speed scale instead of retrying or stretching. */
+typedef struct mk_timing_report {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t adjustments;
+    uint32_t joint;
+    uint32_t derivative; /**< 1 velocity, 2 acceleration; zero on acceptance. */
+    double value;
+    double limit;
+    double sustainable_scale;
+} mk_timing_report;
+/** Reachability-based TOPP-RA timing and its validated lowered trajectory.
+ * require_feasible_path=1 forbids smoothing retries and uniform stretch. */
 MK_API mk_result MK_CALL mk_time_path(mk_path_handle path,
     const double *max_velocity MK_IN_ARRAY(joint_count),
     const double *max_acceleration MK_IN_ARRAY(joint_count), uint32_t joint_count,
     const double *speed_caps MK_IN_ARRAY(speed_cap_count), uint32_t speed_cap_count,
-    double start_speed, double end_speed, double lowering_tolerance,
+    double start_speed, double end_speed, double lowering_tolerance, uint32_t require_feasible_path,
+    mk_timing_report *out_report MK_OUT,
     mk_time_law_handle *out_law MK_OUT MK_OWNED,
     mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
 MK_API mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,

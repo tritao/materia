@@ -17,11 +17,12 @@ class PathRequest {
   public final maxJump:Array<Float>;
   public final velocity:Array<Float>;
   public final maxCandidates:Int;
+  public final drives:Null<PathDriveLimits>;
   /** One hard orientation policy per sample. */
   public final freedoms:Array<OrientationPolicy>;
 
   public function new(distances:Array<Float>, poses:Array<Pose3>, startQ:Array<Float>, tolerance:IkTolerance,
-      maxJump:Array<Float>, velocity:Array<Float>, ?maxCandidates:Int = 32, ?freedoms:Array<OrientationPolicy>) {
+      maxJump:Array<Float>, velocity:Array<Float>, ?maxCandidates:Int = 32, ?freedoms:Array<OrientationPolicy>,?drives:PathDriveLimits) {
     if (distances == null || poses == null || distances.length != poses.length || distances.length == 0 ||
         startQ == null || tolerance == null || maxJump == null || velocity == null ||
         maxJump.length != startQ.length || velocity.length != startQ.length || maxCandidates < 1)
@@ -33,6 +34,9 @@ class PathRequest {
     this.maxJump = maxJump.copy();
     this.velocity = velocity.copy();
     this.maxCandidates = maxCandidates;
+    if(drives!=null && (drives.acceleration.length!=startQ.length || drives.feed.length!=poses.length))
+      throw "Drive refinement limits must match path samples and compiled joints";
+    this.drives=drives;
     if (freedoms != null && freedoms.length != poses.length)
       throw "Path freedoms must align with pose samples";
     this.freedoms = freedoms == null ? [for (_ in poses) OrientationPolicy.Interpolated] : freedoms.copy();

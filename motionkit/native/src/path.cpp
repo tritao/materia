@@ -584,12 +584,15 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
                                const double *max_acceleration, uint32_t joint_count,
                                const double *speed_caps, uint32_t speed_cap_count,
                                double start_speed, double end_speed,
-                               double lowering_tolerance,
+                               double lowering_tolerance, uint32_t require_feasible_path,
+                               mk_timing_report *out_report,
                                mk_time_law_handle *out_law,
                                mk_trajectory_handle *out_trajectory) {
     if (!out_law || !out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
     out_law->id = 0;
     out_trajectory->id = 0;
+    if(out_report){*out_report={};out_report->struct_size=sizeof(*out_report);out_report->joint=UINT32_MAX;out_report->sustainable_scale=1;}
+    if(require_feasible_path>1)return MK_ERROR_INVALID_ARGUMENT;
     if (!std::isfinite(lowering_tolerance) || lowering_tolerance <= 0.0)
         return MK_ERROR_INVALID_ARGUMENT;
     std::vector<mk_path_sample> samples;
@@ -756,6 +759,16 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             if (acceleration_check.status == MK_CHECK_FAILED)
                 factor = std::max(factor, std::sqrt(acceleration_check.value /
                     acceleration_check.limit));
+            if(out_report){
+                out_report->adjustments=static_cast<uint32_t>(attempt);
+                if(factor>1){
+                    const bool acceleration=acceleration_check.status==MK_CHECK_FAILED &&
+                        (velocity_check.status!=MK_CHECK_FAILED || std::sqrt(acceleration_check.value/acceleration_check.limit)>=velocity_check.value/velocity_check.limit);
+                    const auto &binding=acceleration?acceleration_check:velocity_check;
+                    out_report->joint=binding.joint;out_report->derivative=acceleration?2u:1u;
+                    out_report->value=binding.value;out_report->limit=binding.limit;out_report->sustainable_scale=1/factor;
+                }else {out_report->derivative=0;out_report->joint=UINT32_MAX;out_report->sustainable_scale=1;}
+            }
             const char *profile = std::getenv("PROCESS_PATH_PROFILE");
             if (profile && std::strcmp(profile, "1") == 0) {
                 const auto &last = stages.back();
@@ -772,6 +785,7 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             }
             mk_trajectory_destroy(lowered);
             mk_time_law_destroy(created);
+            if(require_feasible_path)return MK_ERROR_GENERATION;
             // Uniform stretching would change an authored moving endpoint
             // speed, so report infeasibility instead of returning a law with
             // a different boundary contract.

@@ -31,6 +31,9 @@
         "native/src/path.cpp",
         "native/src/configuration.cpp",
         "native/src/eaik.cpp",
+        "native/src/redundancy_qp.cpp",
+        "../kinematicskit/native/vendor/proxsuite/include",
+        "../kinematicskit/native/src/proxsuite_config",
         "native/vendor/eaik/CPP/src",
         "native/vendor/eaik/CPP/external/ik-geo/cpp/subproblems"
       ]

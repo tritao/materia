@@ -8,10 +8,11 @@ class PathTimingLimits {
   public final speedCaps:Array<Float>;
   public final startPathSpeed:Float;
   public final endPathSpeed:Float;
+  public final requireFeasiblePath:Bool;
 
   public function new(maxVelocity:Array<Float>, maxAcceleration:Array<Float>,
       ?speedCaps:Array<Float>, ?startPathSpeed:Float = 0.0,
-      ?endPathSpeed:Float = 0.0) {
+      ?endPathSpeed:Float = 0.0,requireFeasiblePath:Bool=false) {
     if (maxVelocity == null || maxAcceleration == null || maxVelocity.length == 0 ||
         maxVelocity.length != maxAcceleration.length)
       throw "Path timing needs matching per-joint limits";
@@ -33,5 +34,6 @@ class PathTimingLimits {
     this.speedCaps = caps;
     this.startPathSpeed = startPathSpeed;
     this.endPathSpeed = endPathSpeed;
+    this.requireFeasiblePath=requireFeasiblePath;
   }
 }

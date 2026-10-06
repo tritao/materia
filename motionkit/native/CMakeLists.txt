@@ -139,8 +139,16 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/shims/no_openmp")
 endif()
 
-add_library(motionkit_core ${MK_LIBRARY_TYPE} src/generator.cpp src/eaik.cpp src/path.cpp src/analytic_cartesian.cpp src/orientation_lattice.cpp src/joint_lifts.cpp src/external_lattice.cpp src/candidate_sampling.cpp src/configuration.cpp src/structured_ladder.cpp src/path_differential.cpp)
+add_library(motionkit_core ${MK_LIBRARY_TYPE} src/generator.cpp src/eaik.cpp src/path.cpp src/analytic_cartesian.cpp src/orientation_lattice.cpp src/joint_lifts.cpp src/external_lattice.cpp src/candidate_sampling.cpp src/configuration.cpp src/structured_ladder.cpp src/path_differential.cpp src/redundancy_qp.cpp)
 target_compile_features(motionkit_core PUBLIC cxx_std_17)
+# Reuse the pinned ProxQP headers; no additional vendor or optional dependencies.
+set(MK_PROXSUITE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../kinematicskit/native/vendor/proxsuite")
+if(NOT EXISTS "${MK_PROXSUITE_DIR}/include/proxsuite/proxqp/sparse/sparse.hpp")
+    message(FATAL_ERROR "Initialize kinematicskit/native/vendor/proxsuite submodule")
+endif()
+target_include_directories(motionkit_core SYSTEM PRIVATE
+    "${MK_PROXSUITE_DIR}/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../kinematicskit/native/src/proxsuite_config")
 target_link_libraries(motionkit_core PUBLIC trajectory_core PRIVATE EAIK ruckig::ruckig toppra Eigen3::Eigen motionkit_descartes_core)
 target_include_directories(motionkit_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -160,6 +168,9 @@ set_target_properties(motionkit_core PROPERTIES
     SOVERSION 0)
 
 if(BUILD_TESTING)
+    add_executable(motionkit_redundancy_qp_tests tests/redundancy_qp.cpp)
+    target_link_libraries(motionkit_redundancy_qp_tests PRIVATE motionkit_core)
+    add_test(NAME motionkit_redundancy_qp COMMAND motionkit_redundancy_qp_tests)
     add_executable(motionkit_path_differential_tests tests/path_differential.cpp)
     target_link_libraries(motionkit_path_differential_tests PRIVATE motionkit_core)
     add_test(NAME motionkit_path_differential COMMAND motionkit_path_differential_tests)
@@ -183,6 +194,10 @@ if(BUILD_TESTING)
     add_test(NAME motionkit_generator COMMAND motionkit_generator_tests)
     add_executable(motionkit_path_tests tests/path.cpp)
     target_link_libraries(motionkit_path_tests PRIVATE motionkit_core)
+    if(EMSCRIPTEN)
+        # This fixture keeps several maximum-width ABI records on main's stack.
+        target_link_options(motionkit_path_tests PRIVATE -sSTACK_SIZE=1048576 -sALLOW_MEMORY_GROWTH=1)
+    endif()
     add_test(NAME motionkit_path COMMAND motionkit_path_tests)
     add_executable(motionkit_eaik_tests tests/eaik.cpp)
     target_link_libraries(motionkit_eaik_tests PRIVATE motionkit_core Eigen3::Eigen)

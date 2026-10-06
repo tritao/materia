@@ -78,3 +78,15 @@ and adoption decision are retained in `../plans/EAIK_SPIKE_RESULTS.md`; OPW's
 implementation/vendor and the handwritten UR inverse are removed.
 Emscripten targets enable C++ exception handling so unknown decompositions are
 rejected through the same checked error path as native.
+
+
+## ProxQP sparse solver
+
+- Reuses KinematicsKit's pinned proxsuite v0.7.3, commit
+  `b93d7778ffc3299d84b5cb0851022a29bf24a596`, at
+  `../../kinematicskit/native/vendor/proxsuite`.
+- BSD-2-Clause; full text at that submodule's `LICENSE`.
+- Header-only sparse QP and its linalg/helpers headers, from redundancy_qp.cpp,
+  with MotionKit's Eigen and KinematicsKit's generated-version stand-in.
+- No upstream CMake, Python, serialization, parallel solver, SIMD extras or
+  uninitialized upstream submodules are used.

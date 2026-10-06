@@ -4,7 +4,7 @@ package motionkit.robot;
  * before fitting; outputs remain unwrapped so their derivatives stay continuous.
  * Bounds are checked by the downstream analytic refinement, since cubic
  * interpolation can overshoot its knots. */
-class RedundancySpline {
+class RedundancySpline implements RedundancyCurve {
   final distances:Array<Float>;
   final values:Array<Float>;
   final coefficients:Array<Array<Float>>;

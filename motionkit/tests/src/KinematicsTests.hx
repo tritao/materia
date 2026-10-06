@@ -1330,6 +1330,29 @@ class KinematicsTests extends MotionKitTestSupport {
     var two=new motionkit.robot.RedundancySpline([0.0,1.0],[0.2,0.6]);
     near(two.evaluate(0.3).value,0.32,"two-knot spline remains linear",1e-12);
     near(two.evaluate(0.3).first,0.4,"two-knot spline has the exact derivative",1e-12);
+    var drives=new motionkit.kinematics.PathDriveLimits([0.0004],[for(_ in knots)0.01]);
+    var pins=[motionkit.robot.DriveAwareRefinement.bound(0,[1.0],0,0),
+      motionkit.robot.DriveAwareRefinement.bound(knots.length-1,[1.0],1,1)];
+    var constrained=motionkit.robot.DriveAwareRefinement.fit(knots,[[0.0,0.4,0.5,1.0]],[knots.copy()],
+      [-0.1],[1.1],[0.03],[0.0004],drives,pins)[0];
+    near(constrained.evaluate(0).value,0,"QP keeps the start pin",1e-7);
+    near(constrained.evaluate(1).value,1,"QP keeps the end pin",1e-7);
+    for(i in 1...100){var x=i/100.0,h=1e-5,at=constrained.evaluate(x);
+      var before=constrained.evaluate(x-h),after=constrained.evaluate(x+h);
+      near(at.first,(after.value-before.value)/(2*h),"QP first derivative matches finite differences",1e-6);
+      near(at.second,(after.first-before.first)/(2*h),"QP second derivative matches finite differences",0.002);
+      check(Math.abs(at.first)*0.01<=0.03+1e-8,"QP respects drive speed between knots");
+      check(Math.abs(at.second)*0.0001<=0.0004+1e-8,"QP respects drive acceleration between knots");
+    }
+    var corrected=new motionkit.robot.CubicRedundancyCurve([0.0,1.0],[-1e-10,1+1e-10],[1+2e-10,1+2e-10],0,1);
+    near(corrected.evaluate(0).value,0,"QP tolerance normalization keeps the exact lower physical bound",1e-15);
+    near(corrected.evaluate(1).value,1,"QP tolerance normalization keeps the exact upper physical bound",1e-15);
+    near(corrected.evaluate(0.4).first,1,"affine QP normalization preserves consistent derivatives",1e-12);
+    var diagnosis="";try motionkit.robot.DriveAwareRefinement.fit(knots,[knots.copy()],[knots.copy()],
+      [-0.1],[1.1],[0.005],[0.0004],drives,pins) catch(error:Dynamic)diagnosis=Std.string(error);
+    check(diagnosis.indexOf("coordinate 0")>=0 && diagnosis.indexOf("sustainable feed")>=0,
+      "infeasible feed reports its binding coordinate and sustainable scale");
+
 
   }
 

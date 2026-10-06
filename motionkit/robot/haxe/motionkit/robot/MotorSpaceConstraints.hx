@@ -109,7 +109,7 @@ class MotorSpaceConstraints {
       augment(path.qDoublePrime), augment(path.qDoublePrimeBefore)),
       new PathTimingLimits(limits.maxVelocity.concat(rates),
         limits.maxAcceleration.concat([for (_ in rows) 1e12]), limits.speedCaps,
-        limits.startPathSpeed, limits.endPathSpeed));
+        limits.startPathSpeed, limits.endPathSpeed,limits.requireFeasiblePath));
     try {
       var trajectory = Trajectory.fromSegments([for (segment in timed.trajectory.segments()) {
         timeFromStartNs: segment.timeFromStartNs, durationNs: segment.durationNs,
