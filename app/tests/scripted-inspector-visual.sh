@@ -16,6 +16,7 @@ esac
 test -f "$workspace"
 cleanup() {
   test ! -f "$workspace" || unlink "$workspace"
+  test ! -f "$(dirname "$workspace")/incompatible.materia" || unlink "$(dirname "$workspace")/incompatible.materia"
   rmdir "$(dirname "$workspace")" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -38,7 +39,7 @@ tree = (capture / "ui-tree.txt").read_text()
 with (capture / "frame.png").open("rb") as image:
     header = image.read(24)
 assert header[:8] == b"\x89PNG\r\n\x1a\n"
-assert struct.unpack(">II", header[16:24]) == (1320, 900)
+assert struct.unpack(">II", header[16:24]) == (1600, 1000)
 assert state["scene"]["selectedId"] == "moving-obstacle"
 assert [item["id"] for item in state["scene"]["objects"]] == ["moving-obstacle"]
 for label in ("Reload script", "Enable overrides", "Apply", "Run", "Pause", "Reset"):
