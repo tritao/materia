@@ -70,6 +70,7 @@ class ProgramCompiler {
   public final orientationTolerance:Float;
   public final ikTolerance:IkTolerance;
   public final configurationSelector:Null<PathConfigurationSelector>;
+  public final jointPathPlanner:Null<JointPathPlanner>;
   final jointIds:Null<Array<String>>;
   final couplings:Null<Array<JointCoupling>>;
   final controllerPeriodSeconds:Float;
@@ -93,7 +94,8 @@ class ProgramCompiler {
       startTolerances, timing, cartesianResolution, maxJointJump, positionTolerance,
       orientationTolerance, ikTolerance,
       configurationSelector == null ? null : configurationSelector.withSolver(forked),
-      perJointMaxJump, jointIds, couplings, controllerPeriodSeconds);
+      perJointMaxJump, jointIds, couplings, controllerPeriodSeconds,
+      jointPathPlanner==null ? null : jointPathPlanner.withSolver(forked));
     // The worker plans one program in order, so it remembers which way each axis last moved.
     worker.planningAssumptions = planningAssumptions.copy();
     if (planCheck != null) worker.planCheck = planCheck.fork();
@@ -108,7 +110,7 @@ class ProgramCompiler {
       ?positionTolerance:Float = 0.005, ?orientationTolerance:Float = 0.02,
       ?ikTolerance:IkTolerance, ?configurationSelector:PathConfigurationSelector,
       ?perJointMaxJump:Array<Float>, ?jointIds:Array<String>,
-      ?couplings:Array<JointCoupling>, ?controllerPeriodSeconds:Float = 0.01) {
+      ?couplings:Array<JointCoupling>, ?controllerPeriodSeconds:Float = 0.01, ?jointPathPlanner:JointPathPlanner) {
     if (solver == null || limits == null || solver.jointCount() != limits.jointCount)
       throw "Program compiler needs matching kinematics and validation limits";
     if (frameId == null || StringTools.trim(frameId).length == 0)
@@ -187,6 +189,7 @@ class ProgramCompiler {
       throw "Program compiler selector must use its kinematics solver";
     // An explicit selector forces the generic sampled search; otherwise each solver searches its own way.
     this.configurationSelector = configurationSelector;
+    this.jointPathPlanner=jointPathPlanner;
   }
 
   /**
@@ -534,7 +537,11 @@ class ProgramCompiler {
     for (freedom in freedoms) if (!ToolFreedom.isFull(freedom)) fullOrientation = false;
     var selected:Array<Null<Array<Float>>> = [];
     var redundancyRates:Null<Array<Array<Float>>> = null;
-    if (configurationSelector != null && fullOrientation)
+    var refined:Null<JointPathSamples> = null;
+    if(jointPathPlanner!=null){
+      refined=jointPathPlanner.plan(path,new PathRequest(distances,pathPoses,startQ,ikTolerance,perJointMaxJump,maxVelocity,48,freedoms));
+      for(q in refined.q)selected.push(q);
+    } else if (configurationSelector != null && fullOrientation)
       for (q in configurationSelector.selectPoses(distances, pathPoses, startQ, ikTolerance)) selected.push(q);
     else {
       var request = new PathRequest(distances, pathPoses, startQ, ikTolerance, perJointMaxJump, maxVelocity, 48, freedoms);
@@ -567,7 +574,7 @@ class ProgramCompiler {
     var first:Array<Array<Float>> = [];
     var second:Array<Array<Float>> = [];
     var secondBefore:Array<Array<Float>> = [];
-    for (k in 0...samples.length) {
+    if(refined==null)for (k in 0...samples.length) {
       var sample = samples[k], q = positions[k];
       var leaving = sample.primitive.derivativesAt(sample.local);
       var redundancy = redundancyRates == null ? null : redundancyRates[k];
@@ -591,7 +598,7 @@ class ProgramCompiler {
         secondBefore.push(jointCurvature(q, rate, before, redundancy, arriving.primitive.orientationPolicy()));
       }
     }
-    var jointPath = new JointPathSamples(distances, positions, first, second, secondBefore);
+    var jointPath = refined==null ? new JointPathSamples(distances, positions, first, second, secondBefore) : refined;
     var timingLimits = new PathTimingLimits(maxVelocity, maxAcceleration, caps);
     var motors = motorSpace;
     var timed = motors == null ? timing.time(jointPath, timingLimits) : motors.time(timing, jointPath, timingLimits);

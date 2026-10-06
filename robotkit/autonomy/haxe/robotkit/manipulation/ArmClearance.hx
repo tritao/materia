@@ -103,6 +103,7 @@ class ArmClearance {
   public final margin:Float;
   public final contactMargin:Float;
 
+  final reference:Array<Float>;
   final bodies:Array<ClearanceBody> = [];
   final links:Array<LinkId> = [];
   /** The pairs checked, as indices into `bodies`. */
@@ -116,7 +117,7 @@ class ArmClearance {
       ?contactMargin:Float = CONTACT_MARGIN) {
     if (arm == null || data == null || reference == null) throw "Arm clearance needs an arm, its bodies and a reference configuration";
     if (!(margin >= 0.0) || !(contactMargin >= 0.0) || contactMargin > margin) throw "Clearance margins must not be negative, the contact margin at most the margin";
-    this.arm = arm;
+    this.arm = arm;this.reference=reference.copy();
     this.margin = margin;
     this.contactMargin = contactMargin;
     var movingLinks = new Map<LinkId, Bool>();
@@ -168,6 +169,12 @@ class ArmClearance {
   }
 
   /** How many pairs of bodies are checked. */
+  /** Same collision geometry on a worker's independent compiled group. */
+  public function withGroup(group:KinematicGroup):ArmClearance {
+    return new ArmClearance(group,[for(body in bodies){name:body.name,link:body.link,
+      vertices:body.corners.copy(),tool:body.tool}],reference,margin,contactMargin);
+  }
+
   public function pairCount():Int return pairs.length;
 
   /** How many bodies there are. */

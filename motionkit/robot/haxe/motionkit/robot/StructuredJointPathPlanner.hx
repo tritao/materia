@@ -24,6 +24,12 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     this.group=group;this.sampling=sampling;this.coarse=coarse;
     this.clearance=clearance;this.collisionRounds=collisionRounds;this.contact=contact;
   }
+  public function withSolver(solver:motionkit.kinematics.KinematicsSolver):JointPathPlanner {
+    if(!Std.isOfType(solver,ManipulatorKinematics))throw "Structured planner worker requires compiled group kinematics";
+    var adapter:ManipulatorKinematics=cast solver;
+    return new StructuredJointPathPlanner(adapter.manipulator,sampling,coarse,
+      clearance==null ? null : clearance.withGroup(adapter.manipulator),collisionRounds,contact);
+  }
   public function plan(path:PosePath,request:PathRequest):JointPathSamples {
     if(path==null || request==null || request.distances.length<2 || request.distances[0]!=0 ||
         request.distances[request.distances.length-1]!=path.length())

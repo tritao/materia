@@ -1238,3 +1238,17 @@ plus both body names. Compiler-only and focused runtime pass (1,148,591
 assertions). Phase-boundary full-suite validation, refined collision
 re-search and production/compiler migration remain outstanding; no authored
 weld performance or full-plan completion claim is made.
+
+PP6 optional compiler path: ProgramCompiler now accepts JointPathPlanner
+and lowerPath consumes its complete JointPathSamples directly in the
+existing timing/event/feed-cap/motor-space and trajectory-validation flow.
+It does not recompute joint derivatives through the old solver for these
+paths. JointPathPlanner.withSolver rebuilds structured planning on worker
+ManipulatorKinematics; ArmClearance.withGroup reconstructs collision
+geometry/reference exclusions on the worker's independent group. XYZ,
+XYZ+C and XYZ+C+A MoveL programs compile through this path and through
+forked workers. Compiler-only and focused runtime pass (1,148,600 assertions).
+This is opt-in integration: default planner construction, fallback/cone/
+branch support, approach/retreat/k-best behavior, selector removal and the
+full phase-boundary integration suites remain outstanding. PP6 and the
+full plan are not complete.

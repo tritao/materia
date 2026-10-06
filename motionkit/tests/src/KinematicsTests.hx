@@ -1023,6 +1023,21 @@ class KinematicsTests extends MotionKitTestSupport {
         near(authoredSamples.q[i][j],markedQ[j]+(j==0?0.002*i:0),"authored pose path drives analytic refinement",1e-7);
         near(authoredSamples.qPrime[i][j],j==0?1.0:0,"authored primitive supplies task rates",1e-6);
       }
+      var plannerSolver=new ManipulatorKinematics(marked);
+      var plannerLimits=new ValidationLimits(count,Int64.ofInt(1),Int64.ofInt(0));
+      var plannerCompiler=new ProgramCompiler(plannerSolver,plannerLimits,"task",
+        [for(_ in markedQ)1.0],[for(_ in markedQ)2.0],[for(_ in markedQ)20.0],
+        StartTolerances.uniform(count,0.02,0.02,0.02),null,0.01,0.5,0.005,0.02,
+        null,null,null,null,null,0.01,new motionkit.robot.StructuredJointPathPlanner(marked));
+      var plannerProgram=new MotionProgram([MotionOp.MoveL(delta,"task",0.1,Blend.ExactStop)]);
+      var compiledPlanner=plannerCompiler.compile(plannerProgram,markedQ,Int64.ofInt(910));
+      check(compiledPlanner.blocks[0].plans.length==1,"compiler consumes structured timing-ready joint path");
+      compiledPlanner.dispose();
+      var workerCompiler=plannerCompiler.forWorker();
+      check(workerCompiler.jointPathPlanner!=plannerCompiler.jointPathPlanner,"worker compiler rebuilds its structured planner");
+      var workerPlan=workerCompiler.compile(plannerProgram,markedQ,Int64.ofInt(911));
+      check(workerPlan.blocks[0].plans.length==1,"worker compiler plans with independent analytic kinematics");
+      workerPlan.dispose();
       if(count>3) {
         var opposite=markedQ.copy();opposite[3]+=Math.PI;
         var oppositePose=new ManipulatorKinematics(marked).forward(opposite);
