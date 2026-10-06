@@ -302,6 +302,34 @@ def random_checks(dimensions, count, certify=False):
     return records
 
 
+def native_coefficient_check(executable,rotation,position,dimensions):
+    import subprocess
+    from decimal import Decimal,localcontext
+    reference={}
+    for base in range(2):
+        for wrist in range(2):
+            _,_,F,G=constraints(rotation,position,dimensions,base,wrist)
+            reference[base,wrist]=[F,G]
+    output=subprocess.check_output([executable],text=True)
+    seen=set();worst=Decimal(0)
+    with localcontext() as context:
+        context.prec=60
+        for line in output.splitlines():
+            base,wrist,kind,i,j,value=line.split()
+            key=tuple(map(int,[base,wrist,kind,i,j]))
+            assert key not in seen
+            seen.add(key)
+            base,wrist,kind,i,j=key
+            exact=reference[base,wrist][kind].coeff_monomial((i,j))
+            expected=Decimal(int(s.numer(exact)))/Decimal(int(s.denom(exact)))
+            error=abs(Decimal(value)-expected)
+            worst=max(worst,error)
+            assert error<Decimal('1e-17'),(key,error)
+    assert seen=={(b,w,k,i,j) for b in range(2) for w in range(2)
+                 for k in range(2) for i in range(9) for j in range(9)}
+    return {'coefficients':len(seen),'charts':4,'max_absolute_error':str(worst),'status':'passed'}
+
+
 def main():
     rotation=s.Matrix([[s.Rational(2,15),-s.Rational(2,3),s.Rational(11,15)],
                        [s.Rational(14,15),s.Rational(1,3),s.Rational(2,15)],
@@ -309,6 +337,10 @@ def main():
     assert rotation.T*rotation==s.eye(3) and rotation.det()==1
     position=s.Matrix([s.Rational(3,5),s.Rational(1,5),s.Rational(7,10)])
     dimensions=list(map(s.Rational,['.17','-.09','.08','.4','.6','.5','.12','.035']))
+    for argument in sys.argv[1:]:
+        if argument.startswith('--check-native='):
+            print(json.dumps(native_coefficient_check(argument.split('=',1)[1],rotation,position,dimensions),indent=2))
+            return
     started=time.monotonic()
     result=solve(rotation,position,dimensions,certify='--certify' in sys.argv)
     if '--certify' in sys.argv:

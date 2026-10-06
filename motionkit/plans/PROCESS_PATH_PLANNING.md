@@ -1912,3 +1912,7 @@ Certified research mode now encloses the recovered base coordinate by exact rati
 ### PP1 certified reachable-target sweep
 
 `--certify --check-random=12` now uses exact coupled-polynomial recovery and rational coordinate enclosures for every sweep target. Actual exit zero: all twelve originals recovered modulo turns, four to eight solutions each, maximum FK error 3.22e-14; q4=0, q5=0 and exact base chart-overlap targets are included. Evidence `process-path-offset-certified-sweep.json` and log, total symbolic runtime 138.363 s. This extends the reference certificate evidence, not generic completeness or native/bulk performance. Continuum representation, floating trigonometric certification, native/model integration and all original acceptance requirements remain open.
+
+### PP1 native offset polynomial coefficient prototype
+
+Added internal fixed-storage long-double coefficient construction plus a reproducible C++ emitter/exact-reference Python checker. Strict standalone C++17 -O2 -Wall -Wextra -Werror compile and committed checker both exit zero; all 648 slots/four charts agree within 1.21e-18 (`process-path-native-offset-coefficients-final.json`). No ABI/family/default sampler changes yet. Native root isolation/recovery, generic conditioning/input validation and all original phase/acceptance gates remain open; standalone compile is not the native runtime/ctest phase gate.

@@ -273,3 +273,28 @@ floating. Symbolic runtime is unsuitable for bulk planning: this reference must
 inform native polynomial generation/isolation and actual compiled model acceptance,
 not become the production candidate sampler. No authored track or full phase gate
 was rerun or accepted from this evidence.
+
+## Native coefficient prototype
+
+`motionkit/native/src/offset_wrist_polynomial.h` constructs the two bivariate
+polynomial numerators in fixed 9-by-9 long-double storage for each projective
+chart. Polynomial operations diagnose storage overflow; no ABI, inverse family,
+root search or production candidate path is added. This is an internal prototype.
+The builder currently assumes valid finite dimensions and a proper rotation;
+input validation belongs in the eventual native solver boundary.
+
+Reproduce the exact-reference comparison with:
+
+```
+c++ -std=c++17 -O2 -Wall -Wextra -Werror motionkit/scripts/research/offset-wrist-coefficients.cpp -o /tmp/offset-wrist-coefficients
+python3 motionkit/scripts/research/offset-wrist-polynomial.py --check-native=/tmp/offset-wrist-coefficients
+```
+
+The retained scratch executable was built and the committed checker actually run;
+both exit zero. Every one of 648 coefficient slots across all four charts is
+checked, including zeros and the exact expected key set. Maximum absolute error
+against rational coefficients is 1.204271456790123456790123456790123456790123e-18.
+Evidence: `process-path-native-offset-coefficients-final.json`. This proves the
+coefficient translation for one rational target, not generic conditioning,
+root isolation/recovery, a runtime-family integration or authored performance.
+Full native/runtime phase gates remain pending until implementation integration.

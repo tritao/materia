@@ -1,0 +1,89 @@
+#ifndef MOTIONKIT_OFFSET_WRIST_POLYNOMIAL_H
+#define MOTIONKIT_OFFSET_WRIST_POLYNOMIAL_H
+
+// Internal coefficient prototype. Not an inverse solver or registered family.
+// Coefficients are indexed [base half-angle power][final-wrist power].
+#include <array>
+#include <stdexcept>
+
+namespace motionkit_offset {
+struct Polynomial {
+    static constexpr int extent = 9;
+    std::array<std::array<long double, extent>, extent> coefficients{};
+    int base_degree = 0, wrist_degree = 0;
+    Polynomial(long double scalar = 0) { coefficients[0][0] = scalar; }
+    static Polynomial monomial(int base, int wrist, long double scalar = 1) {
+        if (base < 0 || wrist < 0 || base >= extent || wrist >= extent)
+            throw std::overflow_error("Offset polynomial degree exceeds storage");
+        Polynomial result;
+        result.base_degree = base; result.wrist_degree = wrist;
+        result.coefficients[base][wrist] = scalar;
+        return result;
+    }
+};
+inline Polynomial operator+(const Polynomial &a, const Polynomial &b) {
+    Polynomial result;
+    result.base_degree = a.base_degree > b.base_degree ? a.base_degree : b.base_degree;
+    result.wrist_degree = a.wrist_degree > b.wrist_degree ? a.wrist_degree : b.wrist_degree;
+    for (int i=0;i<Polynomial::extent;++i)
+        for (int j=0;j<Polynomial::extent;++j)
+            result.coefficients[i][j]=a.coefficients[i][j]+b.coefficients[i][j];
+    return result;
+}
+inline Polynomial operator-(const Polynomial &a, const Polynomial &b) {
+    Polynomial negative=b;
+    for (auto &row:negative.coefficients) for (auto &value:row) value=-value;
+    return a+negative;
+}
+inline Polynomial operator*(const Polynomial &a, const Polynomial &b) {
+    Polynomial result;
+    for (int i=0;i<=a.base_degree;++i) for(int j=0;j<=a.wrist_degree;++j) {
+        if(a.coefficients[i][j]==0) continue;
+        for(int k=0;k<=b.base_degree;++k) for(int l=0;l<=b.wrist_degree;++l) {
+            if(b.coefficients[k][l]==0) continue;
+            if(i+k>=Polynomial::extent || j+l>=Polynomial::extent)
+                throw std::overflow_error("Offset polynomial degree exceeds storage");
+            result.coefficients[i+k][j+l]+=a.coefficients[i][j]*b.coefficients[k][l];
+            if(i+k>result.base_degree) result.base_degree=i+k;
+            if(j+l>result.wrist_degree) result.wrist_degree=j+l;
+        }
+    }
+    return result;
+}
+using Vector = std::array<Polynomial,3>;
+inline Polynomial dot(const Vector &a,const Vector &b) {
+    Polynomial result;
+    for(int i=0;i<3;++i) result=result+a[i]*b[i];
+    return result;
+}
+struct Constraints { Polynomial lateral, length; };
+
+// Dimensions: a1,a2,b,c1,c2,c3,c4,middle-axis offset. Rotation: row-major.
+inline Constraints constraints(const std::array<long double,9> &rotation,
+                               const std::array<long double,3> &position,
+                               const std::array<long double,8> &dimensions,
+                               bool reciprocal_base=false,bool reciprocal_wrist=false) {
+    const auto a1=dimensions[0],a2=dimensions[1],b=dimensions[2],c1=dimensions[3];
+    const auto c2=dimensions[4],c3=dimensions[5],c4=dimensions[6],d=dimensions[7];
+    const auto u=Polynomial::monomial(1,0),t=Polynomial::monomial(0,1);
+    const auto D=Polynomial(1)+u*u,E=Polynomial(1)+t*t;
+    const auto base_cos=reciprocal_base ? u*u-Polynomial(1) : Polynomial(1)-u*u;
+    const auto wrist_cos=reciprocal_wrist ? t*t-Polynomial(1) : Polynomial(1)-t*t;
+    const Vector xn={base_cos,Polynomial(2)*u,Polynomial(0)};
+    const Vector yn={Polynomial(0)-Polynomial(2)*u,base_cos,Polynomial(0)};
+    Vector mn,origin,wn;
+    for(int i=0;i<3;++i) {
+        mn[i]=Polynomial(rotation[3*i])*Polynomial(2)*t+Polynomial(rotation[3*i+1])*wrist_cos;
+        origin[i]=Polynomial(position[i]-c4*rotation[3*i+2]);
+        wn[i]=E*origin[i]-Polynomial(d)*mn[i];
+    }
+    const auto wxn=dot(wn,xn);
+    const auto Xn=wxn-Polynomial(a1)*D*E,Zn=D*(wn[2]-Polynomial(c1)*E);
+    const auto Mn=dot(mn,xn),Nn=D*mn[2];
+    const auto Ln=D*(E*(dot(origin,origin)+Polynomial(d*d-b*b+a1*a1+c1*c1+a2*a2+c3*c3-c2*c2))
+                        -Polynomial(2*d)*dot(origin,mn)-Polynomial(2*c1)*wn[2])-Polynomial(2*a1)*wxn;
+    const auto Kn=(Polynomial(a2)*Xn+Polynomial(c3)*Zn)*Mn-(Polynomial(c3)*Xn-Polynomial(a2)*Zn)*Nn;
+    return {dot(wn,yn)-Polynomial(b)*D*E,Ln*Ln*(Mn*Mn+Nn*Nn)-Polynomial(4)*Kn*Kn};
+}
+} // namespace motionkit_offset
+#endif
