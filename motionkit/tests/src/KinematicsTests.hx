@@ -645,6 +645,37 @@ class KinematicsTests extends MotionKitTestSupport {
     var selected=motionkit.robot.StructuredLadder.search(problem);
     check(selected.diagnostic==null && selected.candidates.length==2,"Haxe structured ladder selects a complete native route");
     var selectedAgain=motionkit.robot.StructuredLadder.search(problem);
+    var bounded=new motionkit.robot.CandidateProblem(fixture.arm,request);
+    var unboundedCount=bounded.samples[1].candidates.length;
+    bounded.pruneUnreachableBounds();
+    check(bounded.samples[1].candidates.length<unboundedCount,
+      "forward jump bounds remove unreachable periodic lifts");
+    var boundedRoute=motionkit.robot.StructuredLadder.search(bounded);
+    check(boundedRoute.diagnostic==null,"bounded candidate problem retains a complete route");
+    near(boundedRoute.cost,selected.cost,"forward bounds preserve the exact optimal route cost",1e-12);
+    for(i in 0...selected.candidates.length)for(j in 0...start.length)
+      near(boundedRoute.candidates[i].q[j],selected.candidates[i].q[j],
+        "forward bounds preserve selected physical joints",1e-12);
+    var serialSampler=new motionkit.robot.SerialCandidateSampler(fixture.arm);
+    var boundedSamples=serialSampler.sample(solver.forward(end),start,
+      motionkit.path.OrientationPolicy.Fixed,[],1,1,1,request.maxJump);
+    var allSamples=serialSampler.sample(solver.forward(end),start,
+      motionkit.path.OrientationPolicy.Fixed,[],1,1,1);
+    var feasible=[for(candidate in allSamples){
+      var legal=true;for(j in 0...start.length)
+        if(Math.abs(candidate.q[j]-start[j])>request.maxJump[j]+1e-12)legal=false;
+      if(legal)candidate;
+    }];
+    check(boundedSamples.length==feasible.length && boundedSamples.length>0,
+      "native bounded sampling retains every feasible periodic lift");
+    for(candidate in feasible){
+      var found=false;
+      for(actual in boundedSamples){var same=candidate.branch==actual.branch;
+        for(j in 0...start.length)if(Math.abs(candidate.q[j]-actual.q[j])>1e-10)same=false;
+        if(same)found=true;
+      }
+      check(found,"native bounded sampling preserves feasible branches and joints");
+    }
     var coarseSelected=motionkit.robot.StructuredLadder.search(problem,null,0,null,
       new motionkit.robot.StructuredLadder.CoarseSearchOptions(1,1,24,0));
     check(coarseSelected.diagnostic==null && coarseSelected.candidates.length==selected.candidates.length,

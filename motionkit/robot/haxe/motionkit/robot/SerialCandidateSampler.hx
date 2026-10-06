@@ -30,8 +30,22 @@ class SerialCandidateSampler {
     }
   }
   public function sample(target:Pose3,seed:Array<Float>,freedom:OrientationPolicy,ranges:Array<ExternalAxisRange>,
-      rollCount:Int=12,tiltRings:Int=3,azimuthCount:Int=8):Array<LatticeCandidate> {
+      rollCount:Int=12,tiltRings:Int=3,azimuthCount:Int=8,?maxJump:Array<Float>):Array<LatticeCandidate> {
     if(target==null)throw "Serial candidate sampling requires a target";
+    var liftLimits=limits;
+    if(maxJump!=null){
+      if(seed==null || seed.length!=group.group.count() || maxJump.length!=seed.length)
+        throw "Serial jump bounds must match complete joints";
+      liftLimits=new mk_joint_lift_request();liftLimits.set_struct_size(mk_joint_lift_request.size());
+      liftLimits.set_joint_count(seed.length);
+      for(j in 0...seed.length){
+        if(!Math.isFinite(maxJump[j]) || maxJump[j]<=0)throw "Serial jump bounds must be finite and positive";
+        var bound=group.group.limitsOf(j);
+        liftLimits.set_lower(j,Math.max(bound.lower,seed[j]-maxJump[j]-1e-12));
+        liftLimits.set_upper(j,Math.min(bound.upper,seed[j]+maxJump[j]+1e-12));
+        liftLimits.set_periodic(j,group.external[j] ? 0 : 1);
+      }
+    }
     var external=ExternalAxisGrid.describe(group,seed,ranges);
     var orientation=OrientationLattice.describe(freedom,rollCount,tiltRings,azimuthCount);
     var centre=OrientationLattice.centre(target,freedom);
@@ -39,17 +53,17 @@ class SerialCandidateSampler {
     var p=[centre.x,centre.y,centre.z],r=[centre.qx,centre.qy,centre.qz,centre.qw];
     for(i in 0...3)pose.set_position(i,p[i]);for(i in 0...4)pose.set_quaternion(i,r[i]);
     if(ur!=null) {
-      var size=MotionKitNative.mk_ur_candidate_count(ur.nativeModel(),model.native,external,orientation,limits,pose,seed);
+      var size=MotionKitNative.mk_ur_candidate_count(ur.nativeModel(),model.native,external,orientation,liftLimits,pose,seed);
       if(size.status!=TrajectoryCoreConstants.MK_OK)throw 'Native UR candidate count failed: ${size.status}';
       if(size.out_count==0)return [];
-      var result=MotionKitNative.mk_sample_ur_candidates(ur.nativeModel(),model.native,external,orientation,limits,pose,seed,size.out_count);
+      var result=MotionKitNative.mk_sample_ur_candidates(ur.nativeModel(),model.native,external,orientation,liftLimits,pose,seed,size.out_count);
       if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native UR candidate sampling failed: ${result.status}';
       return decode(result.out_candidates,result.out_count);
     }
-    var size=MotionKitNative.mk_opw_candidate_count(opw.nativeModel(),model.native,external,orientation,limits,pose,seed);
+    var size=MotionKitNative.mk_opw_candidate_count(opw.nativeModel(),model.native,external,orientation,liftLimits,pose,seed);
     if(size.status!=TrajectoryCoreConstants.MK_OK)throw 'Native OPW candidate count failed: ${size.status}';
     if(size.out_count==0)return [];
-    var result=MotionKitNative.mk_sample_opw_candidates(opw.nativeModel(),model.native,external,orientation,limits,pose,seed,size.out_count);
+    var result=MotionKitNative.mk_sample_opw_candidates(opw.nativeModel(),model.native,external,orientation,liftLimits,pose,seed,size.out_count);
     if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native OPW candidate sampling failed: ${result.status}';
     return decode(result.out_candidates,result.out_count);
   }

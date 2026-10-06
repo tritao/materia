@@ -3,6 +3,7 @@
 
 Build app/haxeon.project-source.json and robotkit/tests/haxeon.json first.
 No historical values or estimates are substituted for missing measurements.
+Set PROCESS_PATH_PROFILE=1 to retain structured planner phase timings too.
 """
 import argparse
 import json
@@ -59,7 +60,7 @@ def main():
             for line in process.stdout:
                 out.write(line)
                 out.flush()
-                if line.startswith(("PROCESS_PATH_RUN ", "PROCESS_PATH_QUALITY ")):
+                if line.startswith(("PROCESS_PATH_RUN ", "PROCESS_PATH_QUALITY ", "PROCESS_PATH_PROFILE ")):
                     kind, data = line.split(" ", 1)
                     records.append({"kind": kind, **json.loads(data)})
                     print(name, line.rstrip(), flush=True)

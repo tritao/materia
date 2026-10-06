@@ -102,7 +102,12 @@ class StructuredJointPathPlanner implements JointPathPlanner {
       settings = new CandidateSamplingOptions(original.rollCount,original.tiltRings,original.azimuthCount,
         pinStart,original.externalRanges,original.externalRule);
     }
+    var profile=Sys.getEnv("PROCESS_PATH_PROFILE")=="1";
+    var buildStarted=profile ? Sys.time() : 0.0;
     var problem=new CandidateProblem(group,request,settings);
+    problem.pruneUnreachableBounds();
+    var buildSeconds=profile ? Sys.time()-buildStarted : 0.0;
+    var refinementSeconds=0.0,refinementAttempts=0;
     fallbackDiagnostic=problem.diagnostic;
     var refined:Null<JointPathSamples> = null;
     var world=clearance;
@@ -116,10 +121,13 @@ class StructuredJointPathPlanner implements JointPathPlanner {
         return value;
       };
     }
+    var searchStarted=profile ? Sys.time() : 0.0;
     var selected=world==null ? StructuredLadder.search(problem,weights,rollWeight,cost,coarse)
       : LazyCollisionLadder.selectWithChecks(problem,q -> world.violation(q,contact),collisionRounds,
         (from,to) -> world.sweep(from,to,contact),coarse,route -> {
+          var refinementStarted=profile ? Sys.time() : 0.0;
           var curve=new AnalyticPathRefiner(group,problem,route).refinePath(request.distances,provider.at);
+          if(profile){refinementSeconds+=Sys.time()-refinementStarted;refinementAttempts++;}
           for(i in 0...curve.q.length){
             var failure=world.violation(curve.q[i],contact);
             if(failure!=null)return new motionkit.robot.LazyCollisionLadder.RefinedCollision(i,false,failure);
@@ -129,6 +137,19 @@ class StructuredJointPathPlanner implements JointPathPlanner {
           refined=curve;return null;
         },cost, problem.pinnedStart ? null : entryCheck != null ? entryCheck : (from,to) -> world.sweep(from,to,contact),exitCheck,weights,rollWeight);
     if(selected.diagnostic!=null)throw 'Joint path selection failed at distance ${selected.failedDistance}: ${selected.diagnostic}';
-    return refined==null ? new AnalyticPathRefiner(group,problem,selected).refinePath(request.distances,provider.at) : refined;
+    var searchAndChecksSeconds=profile ? Sys.time()-searchStarted-refinementSeconds : 0.0;
+    if(refined==null){
+      var refinementStarted=profile ? Sys.time() : 0.0;
+      refined=new AnalyticPathRefiner(group,problem,selected).refinePath(request.distances,provider.at);
+      if(profile){refinementSeconds+=Sys.time()-refinementStarted;refinementAttempts++;}
+    }
+    if(profile){
+      var candidates=0;for(layer in problem.samples)candidates+=layer.candidates.length;
+      Sys.println("PROCESS_PATH_PROFILE "+haxe.Json.stringify({family:problem.family,
+        samples:problem.samples.length,candidates:candidates,buildSeconds:buildSeconds,
+        searchAndChecksSeconds:searchAndChecksSeconds,refinementSeconds:refinementSeconds,
+        refinementAttempts:refinementAttempts}));
+    }
+    return refined;
   }
 }

@@ -20,6 +20,30 @@ class CandidateProblem {
   public final tiltCount:Int;
   public final azimuthCount:Int;
 
+  /** Conservative forward reachability bounds. A state outside any joint's
+   * predecessor envelope cannot belong to a legal complete route. */
+  public function pruneUnreachableBounds():Void {
+    for(index in 1...samples.length){
+      var previous=samples[index-1].candidates;
+      if(previous.length==0)continue;
+      var lower=previous[0].q.copy(),upper=lower.copy();
+      for(candidate in previous)for(joint in 0...lower.length){
+        lower[joint]=Math.min(lower[joint],candidate.q[joint]);
+        upper[joint]=Math.max(upper[joint],candidate.q[joint]);
+      }
+      var retained:Array<LatticeCandidate> = [];
+      for(candidate in samples[index].candidates){
+        var legal=true;
+        for(joint in 0...lower.length)
+          if(candidate.q[joint]<lower[joint]-request.maxJump[joint]-1e-12 ||
+              candidate.q[joint]>upper[joint]+request.maxJump[joint]+1e-12)legal=false;
+        if(legal)retained.push(candidate);
+      }
+      var layer=samples[index].candidates;
+      layer.resize(0);for(candidate in retained)layer.push(candidate);
+    }
+  }
+
   public function new(group:KinematicGroup,request:PathRequest,?options:CandidateSamplingOptions) {
     if(group==null || request==null || request.startQ.length!=group.group.count())
       throw "Candidate problem requires a group and complete path request";
