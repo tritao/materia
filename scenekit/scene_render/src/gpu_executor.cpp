@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -3149,7 +3150,9 @@ nkgpu_result NativeKitGpuExecutor::pick_pixel(const RenderPlan &plan, const Scen
     auto result = begin_pick_pixel(plan, snapshot, width, height, x, y, request);
     if (result != NKGPU_OK)
         return result;
-    for (int attempt = 0; attempt < 100; ++attempt) {
+    // GL fences can take whole frames to signal, so bound the wait by time, not by polls.
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (std::chrono::steady_clock::now() < deadline) {
         nkgpu_result error = NKGPU_OK;
         const auto state = poll_pick_pixel(*request, plan, snapshot, out_result, &error);
         if (state == NKS_RENDER_PICK_READY)
