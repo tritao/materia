@@ -1511,3 +1511,11 @@ Per-run planning is 3.344234, 23.282064, 19.673083 and 48.681022 s (94.980403 s 
 Tracing safe retreat selection exposed a duplicated exit-check block inside the failed-search branch of `LazyCollisionLadder`: an unreachable ladder with a configured exit check attempted to dereference an endpoint of its empty route. Failed search now immediately returns its native diagnostic (or the existing preceding-collision report). Exit checks still run on successfully selected/refined routes. A regression verifies the failed sample and empty route, and that neither sample nor exit clearance is evaluated without a route.
 
 MotionKit compiler-only validation passes, and C4 passes 1,149,301 assertions (`process-path-empty-exit-c4.log`). The authored gantry-welder result above belongs to the preceding clean revision; its module does not include this independent diagnostic fix. Full phase gates and the remaining PP8 migration remain outstanding.
+
+### PP2 full-free orientation lattice
+
+`OrientationLattice.describe(Free)` now uses the existing native cone lattice with half-angle pi: the tool axis spans the full sphere, with independent spin about each sampled axis. The authored quaternion supplies the lattice centre without becoming a hard orientation constraint. This removes the unconditional serial full-free sampling rejection without changing the native ABI or adding another sampler path.
+
+MotionKit compiler-only validation passes; C4 passes 1,150,514 assertions (`process-path-full-free-lattice-compiler-c4.log`). Tests verify deterministic full-sphere/spin cells, unchanged target positions, inclusion of the opposite tool axis, regular UR full-free selection/refinement with zero numeric pose IK queries, and native validated timing preserving the pinned initial joints.
+
+This establishes regular serial sampling/refinement, not complete PP2/PP4 or remaining compiler-default migration. Antipodal orientation-chart transitions still need segmentation. Underactuated Cartesian groups need their own reachable-orientation treatment rather than assuming a finite full-SO(3) lattice contains their exact fixed/limited orientation. `ManipulatorKinematics` defaults still need preference handling and explicit external positioning rules; they remain unchanged by this increment. PP8 weld search and PP9 toolpath migration remain outstanding.

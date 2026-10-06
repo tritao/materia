@@ -661,6 +661,33 @@ class KinematicsTests extends MotionKitTestSupport {
     var selected=motionkit.robot.StructuredLadder.search(problem);
     check(selected.diagnostic==null && selected.candidates.length==2,"Haxe structured ladder selects a complete native route");
     var selectedAgain=motionkit.robot.StructuredLadder.search(problem);
+    var freeOrientationPath=new PosePath("task",[new PoseLine(
+      new PoseWaypoint(request.poses[0],1e-6,1e-6),new PoseWaypoint(request.poses[1],1e-6,1e-6),
+      OrientationPolicy.Free,0.1,0.1)]);
+    var freeOrientationDistances=[for(i in 0...3)freeOrientationPath.length()*i/2];
+    var freeOrientationRequest=new PathRequest(freeOrientationDistances,
+      [for(s in freeOrientationDistances)freeOrientationPath.poseAt(s)],start,request.tolerance,
+      request.maxJump,request.velocity,32,[for(_ in freeOrientationDistances)OrientationPolicy.Free]);
+    var freeBefore=fixture.arm.numericSolveCount();
+    var freeOrientationCurve=new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,2,4)).plan(freeOrientationPath,freeOrientationRequest);
+    check(fixture.arm.numericSolveCount()==freeBefore,"UR full-free structured refinement needs no numeric pose IK");
+    for(i in 0...freeOrientationCurve.q.length)
+      near(motionkit.path.PoseMath.distance(solver.forward(freeOrientationCurve.q[i]),freeOrientationRequest.poses[i]),0,
+        "full-free serial refinement retains its hard position task",1e-6);
+    var freeCompiler=new ProgramCompiler(solver,new ValidationLimits(6,Int64.ofInt(1),Int64.ofInt(0)),"task",
+      [for(_ in start)1.0],[for(_ in start)2.0],[for(_ in start)20.0],StartTolerances.uniform(6,0.01,0.01,0.01),
+      null,0.01,0.5,1e-4,1e-4,request.tolerance,new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
+        new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,2,4)));
+    var freeCompiled=freeCompiler.compile(new MotionProgram([
+      MotionOp.FollowPath(freeOrientationPath,"task",0.1,[])]),start,Int64.ofInt(810));
+    try {
+      check(freeCompiled.blocks[0].plans.length>0,"full-free serial path reaches native validated timing");
+      var nativePath=freeCompiled.blocks[0].plans[0];
+      for(j in 0...start.length)near(nativePath.evaluate(0).positions[j],start[j],
+        "compiled full-free path preserves the pinned configuration",1e-12);
+    } catch(error:Dynamic){freeCompiled.dispose();throw error;}
+    freeCompiled.dispose();
     var bounded=new motionkit.robot.CandidateProblem(fixture.arm,request);
     var unboundedCount=bounded.samples[1].candidates.length;
     bounded.pruneUnreachableBounds();
@@ -1139,7 +1166,7 @@ class KinematicsTests extends MotionKitTestSupport {
     near(motionkit.robot.ToolFreedom.orientationError(flipped,target,motionkit.path.OrientationPolicy.Cone(opposite,0.2)),0,
       "cone centre handles the antipodal axis",1e-7);
 
-    for (freedom in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,
+    for (freedom in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,motionkit.path.OrientationPolicy.Free,
         motionkit.path.OrientationPolicy.Cone([0.3,0.4,0.5],0.4)]) {
       var cells = motionkit.robot.OrientationLattice.sample(target,freedom);
       var expected = switch freedom {case Fixed: 1; case FreeAboutTool: 12; default: 300;};
@@ -1152,6 +1179,12 @@ class KinematicsTests extends MotionKitTestSupport {
         check(cells[i].roll == repeated[i].roll && cells[i].tilt == repeated[i].tilt && cells[i].azimuth == repeated[i].azimuth,
           "orientation lattice coordinates are deterministic");
         near(motionkit.path.PoseMath.angle(cells[i].pose,repeated[i].pose),0,"orientation lattice pose is deterministic",1e-7);
+      }
+      if(freedom==motionkit.path.OrientationPolicy.Free){
+        var axis=rotation.rotate(new Vec3(0,0,1)),oppositeFound=false;
+        for(cell in cells){var q=new Quat(cell.pose.qx,cell.pose.qy,cell.pose.qz,cell.pose.qw);
+          if(q.rotate(new Vec3(0,0,1)).dot(axis)<-1+1e-10)oppositeFound=true;}
+        check(oppositeFound,"full-free orientation samples include the opposite tool axis");
       }
     }
   }

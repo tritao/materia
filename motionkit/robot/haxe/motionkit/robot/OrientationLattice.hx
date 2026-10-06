@@ -37,7 +37,9 @@ class OrientationLattice {
       case null | Fixed | Interpolated: lattice.set_mode(0);
       case FreeAboutTool: lattice.set_mode(1);
       case Cone(_,halfAngle): lattice.set_mode(2);lattice.set_half_angle(halfAngle);
-      case Free: throw "Free orientation needs a full rotation lattice";
+      // A full sphere of tool axes, with independent spin about each axis,
+      // covers SO(3). The authored rotation remains only the lattice centre.
+      case Free: lattice.set_mode(2);lattice.set_half_angle(Math.PI);
     }
     return lattice;
   }
