@@ -21,17 +21,19 @@ class RobotScene {
 		var controls = EndEffectorControls.derive(tool, prefix);
 		if (controls.arcs.length > 0) return torchTools(controls, prefix, welding);
 		if (controls.grippers.length > 0) {
-			if (controls.grippers.length != 1 || controls.suctions.length != 0)
-				throw "A robot tool needs one physical gripper or suction contacts, not a mixture";
-			var channel = controls.gripperChannel();
-			if (channel == null) throw "The parallel gripper has no close control";
-			var grip = controls.grippers[0];
-			return [{kind: "gripper", contact: {occurrence: prefix + "/" + grip.member,
-				connector: grip.connector}, channel: channel, sensor: grip.sensor,
-				gripper: {minimumPartWidthMm: grip.minimumPartWidthMm,
-					nominalPartWidthMm: grip.nominalPartWidthMm, maximumPartWidthMm: grip.maximumPartWidthMm,
-					fingerLengthMm: grip.fingerLengthMm,
-					fingerPadFrictionCoefficient: grip.fingerPadFrictionCoefficient}}];
+			if (controls.suctions.length != 0)
+				throw "A robot end effector cannot mix physical grippers and suction contacts";
+			return [for (grip in controls.grippers) {
+				var channel = controls.gripperChannel(grip.member);
+				if (channel == null) throw 'Parallel gripper "${grip.member}" has no close control';
+				var entry:SceneArtifactRobotTool = {kind: "gripper", contact: {occurrence: prefix + "/" + grip.member,
+					connector: grip.connector}, channel: channel, sensor: grip.sensor,
+					gripper: {minimumPartWidthMm: grip.minimumPartWidthMm,
+						nominalPartWidthMm: grip.nominalPartWidthMm, maximumPartWidthMm: grip.maximumPartWidthMm,
+						fingerLengthMm: grip.fingerLengthMm,
+						fingerPadFrictionCoefficient: grip.fingerPadFrictionCoefficient}};
+				entry;
+			}];
 		}
 		var channel = controls.vacuumChannel();
 		if (channel == null) throw "The suction tool has no vacuum control";

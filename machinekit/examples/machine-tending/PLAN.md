@@ -716,6 +716,7 @@ Done. What was built and decided:
 - `HandlingPlanRunner` gets oriented approach and retract along the grasp frame's approach axis, and stays compatible with suction.
 - With an explicit grasp orientation, the runner stops at the raised retreat pose so the next handling operation starts there and carries the part without folding the loaded arm through its generic home posture. Unoriented suction handling retains its home return.
 - The grasp is judged from the jaw switch: the gripped band means OK, closed-empty means missed.
+- The logical gripper command keeps its value through a controlled stop or aborted motion so the held part remains gripped. A fault or emergency stop sets the command safe; double-solenoid valve state remains latched when its coils de-energise.
 - Tests on MuJoCo:
   - pick, carry and place a blank 50 times on a table;
   - slip relative to the fingers stays under 0.5 mm at the arm's planned accelerations;
@@ -726,6 +727,8 @@ Done. What was built and measured:
 - The physical gripper assembly has a routed double-solenoid valve, a cylinder-driven jaw and a
   mirrored jaw. Saved tool limits, finger reach and the assumed rubber friction stay together in
   SceneArtifact v19. Open, gripped and closed-empty switches use derived jaw-travel windows.
+- The housing CAD solid and collision hull leave derived reliefs for the full jaw-carriage sweep;
+  the reach study exposed that a solid housing box falsely collided with the moving jaws.
 - The tending cell uses 50 mm flat fingers derived from the 50 mm housing depth. MuJoCo completed
   50 physical pick/carry/place round trips with a free dynamic blank: **0.373 mm** peak slip from
   the TCP, **0.208 mm** pickup seating, and **51.99 N m** peak arm-joint effort. The empty grasp
@@ -757,13 +760,14 @@ Done. What was built and measured:
 - The reach study now checks the actual pocket and table collision geometry used by the assembled cell. The cell uses its checked outward-facing park pose while the mill runs; the loaded reference blank remains only in the reach and work-datum geometry.
 
 **MT10. The tending cell and its mission.**
-- `TendingCell` includes the mill (`include("mill", new BenchMill(...))`), the `CobotArm` class with `ArmGripperTool` on the riser chosen in MT4, the trays, the cabinets, the air supply and the wiring.
+- `TendingControllers` assembles the empty-vise `EnclosedBenchMill(false)` under `mill/`, the selected `CobotArm` with `DualArmGripperTool` on the shared `TendingCellRiser`, six free infeed blanks, pocketed trays and their table, both controller cabinets, air service and wiring. `TendingCell` saves the generated mission with that cell.
 - `machine-tending/materia.project.json`, plus a Start-page entry.
-- Mission steps, each with a timeout:
+- SceneArtifact v25 stores signal, wait, via-motion, timeout, metric handling approach, fault-retry command references, per-step handling-tool selection and a tool-roll field separate from part heading; CNC jobs and missions may coexist only under distinct controller owners. The scene producer and fixtures use the current format directly.
+- Mission steps:
   - `signal{name, value}`;
   - `waitFor{name, value, timeout}`;
-  - `moveVia{poses}`, joint- or pose-space via-points;
-  - oriented `pick`/`place` on `{occurrence, connector}` or a grasp.
+  - `moveVia{poses}`, joint- or pose-space via-points with a simulation-time deadline;
+  - oriented `pick`/`place` on `{occurrence, connector}` or a grasp, with a simulation-time deadline.
 - `TendingMission.generate(cell, slots)` produces the steps per part, unrolled like `WeldingMission.generate`:
   1. pick from infeed;
   2. request door open, wait for door open;
@@ -771,12 +775,14 @@ Done. What was built and measured:
   4. place in the vise, request clamp, wait for clamped and part present, release;
   5. via-poses out, signal clear;
   6. request door close and cycle start, wait for cycle complete;
-  7. wait for CNC ready after physical spindle standstill, request door open and go in, grip, request unclamp, wait for unclamped;
+  7. wait for CNC ready after physical spindle standstill, request door open and go in, request unclamp, wait for unclamped, then grip;
   8. come out and place in the outfeed slot.
-- Via-poses come from the door opening frame and the vise datum. Every segment is swept with `ArmClearance` against the cell hulls with the door open when the mission is generated (MT-D9).
-- "Robot clear" comes from the arm and tool hulls against the machine zone, each tick.
+- The grasp approach distance is saved on each pick/place step and comes from the tray-seat height plus two collision margins. The selected tool roll is saved independently from part heading and compensated between grasp and placement. The same approach value drives reach checking and the physical handling planner; the former generic 120 mm handling default does not describe this cell.
+- On unload, the mission requests and confirms unclamp while the blank is still supported on the vise parallels, then picks and retracts it. The handling skill includes its retract, so waiting for unclamp first avoids pulling the part against the clamp.
+- Vise, doorway and tray targets come from their assembled geometry and the shared reach result. Each `moveVia` is admitted against the arm, tool and cell hulls by `ArmPlanClearance`; the mission asserts `robot.clear` only after reaching an outside-door waypoint and drops it before entering.
 - Acceptance (`ProjectSourceTests.checkMachineTending`, MuJoCo):
   - 4 parts unattended, 4 finished parts in the outfeed;
+  - all four selected outfeed pockets report their physical presence switches;
   - every removed volume within 2 %;
   - 0 collisions and 0 interlock alarms;
   - cycle time and spindle use reported;
@@ -794,10 +800,15 @@ Done. What was built and measured:
 - After `robot.fault_reset` and the cause removed, the mission resumes at the step that failed. Parts already finished stay finished.
 - Tests: one scenario per fault.
 
+Recovery policy: mission failures carry stable application alarm codes. A failed wait may point to the asserted output request that owns it; retry repeats that request, pulses `robot.fault_reset` for one controller image, and keeps the completed-step count and physical object state. Emergency stop uses RobotKit's safety-stop and explicit reset path before mission retry. A carried workpiece is monitored through via-motion and a lost jaw signal latches the mission as `PartDropped`.
+
 **MT12. Throughput.**
 - Pre-staging: while the mill cuts, the arm picks the next blank and waits outside the door.
-- A dual gripper (two grippers at 90° on one plate, `ArmTool`) swaps the finished part and the next blank in one door opening.
-- The timeline is a per-cycle breakdown: door, load, clamp, cut, unload, idle. The panel shows spindle use.
+- A dual gripper (`DualArmGripperTool`) mounts two independently valved physical grippers at 90° on one plate. Each has its own cylinder, channels, sensor and contact frame.
+- The reach study derives the fixed TCP transform between the two grippers, solves the cell poses for each actual TCP, and checks both tool envelopes against the machine, doorway, fixed tray/table hulls and all six blanks in the initial infeed layout. The generated `moveVia` steps use the checked poses for the gripper that handles the next part. Each mission plan also checks live blank and carried-object poses as inventory changes.
+- Tray pitch is derived from stock size, the assumed inter-gripper envelope clearance and the general collision margin on both sides; the same cell-derived pitch builds the reach geometry and the assembled trays.
+- While cutting, the free gripper collects the next blank and stages it outside. After `cnc.ready`, one door opening unloads the finished blank and loads the staged blank; the two physical grippers retain their separate parts during the exchange.
+- The CNC dock panel measures spindle utilization from its encoder only during active CNC-cycle intervals, preserving the last completed measurement during idle time. The app acceptance check compares it with an independent encoder sample over the same signal window. The four-cycle acceptance records each interval and the overall mission time.
 - Target: spindle use ≥ 75 % for the bearing-block job, with numbers recorded here.
 
 **MT13. Wrist camera for the trays.**

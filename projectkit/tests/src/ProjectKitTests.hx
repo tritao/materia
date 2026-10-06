@@ -253,7 +253,8 @@ class ProjectKitTests {
     rejects(function() SceneArtifact.encode(data), "mission step of an unknown kind");
     mission.steps[1].kind = "goTo";
     // Picking and placing name connectors of occurrences, and the tool that holds.
-    mission.steps.push({kind: "pick", at: {occurrence: "mast", connector: "pin"}});
+    mission.steps.push({kind: "pick", at: {occurrence: "mast", connector: "pin"},
+      yaw: 0.3, toolYaw: Math.PI / 2});
     rejects(function() SceneArtifact.encode(data), "picking mission without a suction tool");
     data.robotTools = [{kind: "suction", contact: {occurrence: "chassis", connector: "pin"}, channel: "tool/cup.enable",
       sensor: "tool/sensor.pressureSignal"}];
@@ -261,8 +262,23 @@ class ProjectKitTests {
     var picking = picked.mission, tools = picked.robotTools;
     if (picking == null || tools == null || picking.steps[2].at == null) throw "picking mission round trip lost data";
     var pickAt:materia.project.SceneArtifact.SceneArtifactPlace = cast picking.steps[2].at;
-    check(pickAt.occurrence == "mast" && tools.length == 1 && tools[0].channel == "tool/cup.enable" &&
+    check(pickAt.occurrence == "mast" && picking.steps[2].yaw == 0.3 && picking.steps[2].toolYaw == Math.PI / 2 &&
+      tools.length == 1 && tools[0].channel == "tool/cup.enable" &&
       tools[0].contact.connector == "pin" && tools[0].sensor == "tool/sensor.pressureSignal", "picking mission and tool round trip");
+    data.robotTools.push({kind: "suction", contact: {occurrence: "mast", connector: "pin"}, channel: "tool/cup2.enable"});
+    mission.steps[2].tool = "tool/cup2.enable";
+    var selectedTool = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    check(selectedTool != null && selectedTool.steps[2].tool == "tool/cup2.enable",
+      "handling mission can select one of multiple physical tools");
+    mission.steps[2].tool = null;
+    rejects(function() SceneArtifact.encode(data), "multi-tool handling step must select a tool");
+    mission.steps[2].tool = "tool/cup.enable"; data.robotTools.pop();
+    mission.steps[2].toolYaw = Math.NaN;
+    rejects(function() SceneArtifact.encode(data), "handling mission has a finite tool yaw");
+    mission.steps[2].toolYaw = Math.PI / 2;
+    mission.steps[1].toolYaw = 0.0;
+    rejects(function() SceneArtifact.encode(data), "non-handling mission cannot set a tool yaw");
+    mission.steps[1].toolYaw = null;
     mission.steps.push({kind: "place", at: {occurrence: "mast", connector: "seat"}});
     rejects(function() SceneArtifact.encode(data), "placing on a connector the occurrence lacks");
     mission.steps.pop();
@@ -286,6 +302,32 @@ class ProjectKitTests {
     data.robotSensors[0].rayCount = 64; data.robotSensors.push({kind: "lidar", id: "chassis/scanner",
       mount: {occurrence: "chassis", connector: "pin"}, rayCount: 64, maxRange: 6.0, updateRate: 10.0});
     rejects(function() SceneArtifact.encode(data), "two sensors with one id");
+    data.robotSensors.pop();
+    robot.sensors = [{id: "chassis/presence", kind: "presence", occurrence: "chassis",
+      connector: "pin", range: 0.02}];
+    data.controllers = [{id: "robotController", kind: "robot", joints: ["wheel_l", "wheel_r", "lift"],
+      sensors: ["chassis/presence"], channels: []}];
+    data.signals = [];
+    data.mission = {controllerId: "robotController", steps: [{kind: "waitFor",
+      waitFor: {name: "chassis/presence", value: true, timeout: 1.0}}]};
+    var localSensorMission = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    var localSensorWaitName = "";
+    if (localSensorMission != null && localSensorMission.steps.length > 0) {
+      var localSensorWait = localSensorMission.steps[0].waitFor;
+      if (localSensorWait != null) localSensorWaitName = localSensorWait.name;
+    }
+    check(localSensorWaitName == "chassis/presence",
+      "robot mission can wait on a locally owned field sensor");
+    var localInputMission = data.mission;
+    if (localInputMission == null || localInputMission.steps.length == 0 ||
+        localInputMission.steps[0].waitFor == null)
+      throw "local sensor wait fixture was not retained";
+    var localInputWait = localInputMission.steps[0].waitFor;
+    localInputWait.name = "unowned/presence";
+    var unownedInput = refusal(function() SceneArtifact.encode(data));
+    check(unownedInput.indexOf("reads no input signal or sensor") >= 0,
+      "robot mission cannot wait on an input owned by no signal or sensor");
+    data.mission = mission; data.controllers = null; data.signals = null; robot.sensors = null;
     data.mobileBase = null;
     rejects(function() SceneArtifact.encode(data), "driving mission without a mobile base");
     data.mobileBase = base; data.mission = null; data.assemblyDefinition = null;

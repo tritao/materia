@@ -10,6 +10,9 @@ import machinekit.component.Solids;
 
 /** A field switch or presence head with one digital output terminal. */
 class DigitalSensor extends MachineComponent {
+	public static inline final BODY_WIDTH:Float = 12;
+	public static inline final BODY_DEPTH:Float = 8;
+	public static inline final BODY_HEIGHT:Float = 20;
 	public final kind:String;
 	static var recipe:Null<ComponentType>;
 
@@ -33,5 +36,5 @@ class DigitalSensor extends MachineComponent {
 		return new ComponentValues().setToken("kind", kind).setToken("material", materialSpec());
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.named(Part.box(12, 8, 20), "sensor-head");
+		return Solids.named(Part.box(BODY_WIDTH, BODY_DEPTH, BODY_HEIGHT), "sensor-head");
 }

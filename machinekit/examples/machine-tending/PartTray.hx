@@ -9,6 +9,7 @@ import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 typedef PartTraySlot = {var name:String; var frame:AssemblyFrame;}
+typedef PartTrayPlaceTarget = {var occurrence:String; var connector:String;}
 typedef PartTrayCollisionPiece = {
 	var id:String;
 	var frame:AssemblyFrame;
@@ -92,6 +93,12 @@ class PartTray extends MachineAssembly {
 		if (row < 0 || row >= rows || column < 0 || column >= columns)
 			throw 'Part tray slot $row-$column is outside ${rows}x${columns}';
 		return 'slot-$row-$column';
+	}
+
+	/** The fixed datum pad that carries this pocket's seat connector. */
+	public function placeTarget(row:Int, column:Int):PartTrayPlaceTarget {
+		slot(row, column);
+		return {occurrence: 'seat-r$row-c$column-x-1-y-1', connector: "seat"};
 	}
 
 	/** Blank bottom datum at the top of the four chamfered support pads. */

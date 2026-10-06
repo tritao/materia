@@ -9,6 +9,7 @@ import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.SimulationHarness;
+import robotkit.tool.GripperChannels;
 import robotkit.tool.SuctionChannels;
 import processkit.tool.WeldChannels;
 import robotkit.execution.ExecutionPlanSubmission;
@@ -17,10 +18,9 @@ import robotkit.execution.ProcessTimedEvent;
 import robotkit.execution.TrajectorySegment;
 
 /**
- * The welder's channels in the real RobotKit runtime, set up only by adding the tools (`RobotRuntimeBlueprint.addTool`):
- * the stop policy comes with the tool, not from the application that sets the robot up. Whatever stops the robot, the arc
- * goes off and the wire stops; a suction tool on the same robot keeps its vacuum through a commanded stop and an abort,
- * as it does on a mobile base. The runtime enforces this on its own, so it holds for every way of running the robot.
+ * The welder, gripper and suction channels in the real RobotKit runtime, set up by adding tools (`RobotRuntimeBlueprint.addTool`):
+ * the stop policy comes with each tool, not from the application. Whatever stops the robot, the arc goes off and the wire
+ * stops; gripper and suction commands remain through a commanded stop and an abort. The runtime enforces this on its own.
  * A setup that declared one of the tool's channels another way is refused.
  */
 class WeldChannelTests {
@@ -28,6 +28,7 @@ class WeldChannelTests {
   static inline var ARC = "torch.arc";
   static inline var WIRE = "torch.wire_speed";
   static inline var VOLTAGE = "torch.voltage";
+  static inline var GRIPPER = "tool.gripper.close";
   static inline var SUCTION = "tool.vacuum";
   static inline var TICK = 10000000;
 
@@ -51,6 +52,7 @@ class WeldChannelTests {
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     // The robot is set up with its tools and nothing else: the stop policy comes with each tool.
     blueprint.addTool(new WeldChannels(ARC, WIRE, VOLTAGE));
+    blueprint.addTool(new GripperChannels(GRIPPER));
     blueprint.addTool(new SuctionChannels(SUCTION));
     var harness = new SimulationHarness();
     var runtime = harness.simulation.addRobot(blueprint);
@@ -62,6 +64,7 @@ class WeldChannelTests {
       [new ProcessTimedEvent(at, VOLTAGE, ProcessEventValue.Analog(24.0)),
        new ProcessTimedEvent(at, WIRE, ProcessEventValue.Analog(8.0)),
        new ProcessTimedEvent(at, ARC, ProcessEventValue.Digital(true)),
+       new ProcessTimedEvent(at, GRIPPER, ProcessEventValue.Digital(true)),
        new ProcessTimedEvent(at, SUCTION, ProcessEventValue.Digital(true))]), 1);
     for (tick in 1...11) harness.step(Int64.ofInt(tick * TICK));
     return {harness: harness, runtime: runtime};
@@ -81,7 +84,8 @@ class WeldChannelTests {
 
   /** Whether the arc, wire, voltage and vacuum are all up, as the plan set them. */
   static function running(runtime:RobotRuntime):Bool
-    return digital(runtime, ARC) && analog(runtime, WIRE) == 8.0 && analog(runtime, VOLTAGE) == 24.0 && digital(runtime, SUCTION);
+    return digital(runtime, ARC) && analog(runtime, WIRE) == 8.0 && analog(runtime, VOLTAGE) == 24.0 &&
+      digital(runtime, GRIPPER) && digital(runtime, SUCTION);
 
   static function testStopsTakeTheArcOff():Void {
     // A commanded stop and an abort end the welding motion: the arc goes off and the wire stops. The voltage setpoint and
@@ -96,6 +100,7 @@ class WeldChannelTests {
       check(!digital(rig.runtime, ARC), '${case_.label} takes the arc off');
       check(analog(rig.runtime, WIRE) == 0.0, '${case_.label} stops the wire');
       check(analog(rig.runtime, VOLTAGE) == 24.0, '${case_.label} keeps the voltage setpoint');
+      check(digital(rig.runtime, GRIPPER), '${case_.label} keeps the gripper command so a held part is not released');
       check(digital(rig.runtime, SUCTION), '${case_.label} keeps a suction tool holding');
       rig.harness.dispose();
     }
@@ -104,7 +109,8 @@ class WeldChannelTests {
     emergency.runtime.submitStop(2, true);
     for (tick in 11...20) emergency.harness.step(Int64.ofInt(tick * TICK));
     check(!digital(emergency.runtime, ARC) && analog(emergency.runtime, WIRE) == 0.0, "an emergency stop takes the arc off and stops the wire");
-    check(analog(emergency.runtime, VOLTAGE) == 0.0 && !digital(emergency.runtime, SUCTION), "an emergency stop takes every channel safe");
+    check(analog(emergency.runtime, VOLTAGE) == 0.0 && !digital(emergency.runtime, GRIPPER) && !digital(emergency.runtime, SUCTION),
+      "an emergency stop takes every tool channel to its safe value");
     emergency.harness.dispose();
     // A robot fault does the same: here a position target beyond the joint's limit, which the runtime refuses and latches.
     var faulted = rig(902);
@@ -112,7 +118,8 @@ class WeldChannelTests {
     for (tick in 11...20) faulted.harness.step(Int64.ofInt(tick * TICK));
     check(faulted.runtime.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT, "the refused target faults the robot");
     check(!digital(faulted.runtime, ARC) && analog(faulted.runtime, WIRE) == 0.0, "a robot fault takes the arc off and stops the wire");
-    check(analog(faulted.runtime, VOLTAGE) == 0.0 && !digital(faulted.runtime, SUCTION), "a robot fault takes every channel safe");
+    check(analog(faulted.runtime, VOLTAGE) == 0.0 && !digital(faulted.runtime, GRIPPER) && !digital(faulted.runtime, SUCTION),
+      "a robot fault takes every tool channel to its safe value");
     faulted.harness.dispose();
   }
 
@@ -151,8 +158,10 @@ class WeldChannelTests {
     check(agreeing.channels.length == 3, "a declaration that agrees with the tool is not doubled");
     var plain = blueprint();
     plain.addTool(new WeldChannels(ARC, WIRE, VOLTAGE));
+    plain.addTool(new GripperChannels(GRIPPER));
     var kept = [for (channel in plain.channels) if (channel.keepOnStop) channel.id];
-    check(kept.join(",") == VOLTAGE, 'only the voltage setpoint keeps its output on a stop, got ${kept.join(",")}');
+    check(kept.indexOf(VOLTAGE) >= 0 && kept.indexOf(GRIPPER) >= 0 && kept.length == 2,
+      'only the voltage setpoint and gripper command keep their outputs on a normal stop, got ${kept.join(",")}');
   }
 
   static function check(value:Bool, message:String):Void {

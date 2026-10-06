@@ -1089,9 +1089,10 @@ clears the observed pickup.
 `SimulatedToolSensorAdapter` routes `tool_contact` (0/1) and
 `tool_vacuum_kpa` (non-negative vacuum magnitude) `SensorFrame` values from a
 robot snapshot to the selected tool. Bindings use configuration-specific sensor
-IDs. A frame must use the same source clock as the tool selection, such as
-`robotkit.monotonic` or the logical `robotkit.simulation` clock, so older
-observations can be ignored; repeated sequences are ignored too.
+IDs. A frame must use the current endpoint source-clock ID selected with the
+tool. Endpoint IDs include their domain and reset epoch (for example, a
+`robotkit.simulation` endpoint ID), so observations from before a reset cannot
+be mistaken for current feedback; repeated sequences are ignored too.
 The runtime accepts both kinds as externally published sensors at authored
 mounts, allowing a simulation sensor producer to publish them without a native
 physics sensor.
@@ -1146,8 +1147,8 @@ sensor mount on the robot flange before runtime creation. Attaching the producer
 to `Simulation` publishes one `tool_vacuum_kpa` frame per explicit step of its
 private clock or the owning `SimSession` clock, so
 runtime snapshots, RobotWorld recordings, and replay see the same observations.
-These frames use the logical `robotkit.simulation` source clock, which must also
-be used when selecting the tool. An enabled vacuum command and geometric cup
+These frames use the robot endpoint's current simulation source-clock ID, which
+must also be used when selecting the tool. An enabled vacuum command and geometric cup
 touch produce a caller-specified sealed pressure; proximity alone, contact loss, or a disabled
 command produce zero. Contact is only a seal proxy: this model does not predict
 leakage, evacuation time, or seal quality. Designs with multiple cups or a cup

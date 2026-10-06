@@ -497,8 +497,7 @@ class Simulation {
     var endpoint = virtualDevice == null
       ? SimulationEndpoints.simulation(result.out_runtime, capture)
       : SimulationEndpoints.virtualDevice(result.out_runtime, capture);
-    runtime = RobotRuntime.create(blueprint, endpoint,
-      virtualDevice == null ? "robotkit.simulation" : "robotkit.device");
+    runtime = RobotRuntime.create(blueprint, endpoint);
     robots.push(runtime);
     robotBlueprints.push(blueprint);
     // Native simulation samples actual physics coordinates, including applied slip.

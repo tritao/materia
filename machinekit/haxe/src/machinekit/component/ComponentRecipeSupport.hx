@@ -91,6 +91,9 @@ class ComponentRecipeSupport {
 	public static function optionalScalar(name:String):ComponentParameter
 		return new ComponentParameter(name, Optional(Scalar), Unset);
 
+	public static function optionalLength(name:String):ComponentParameter
+		return new ComponentParameter(name, Optional(Length), Unset, "mm");
+
 	public static function optionalText(name:String):ComponentParameter
 		return new ComponentParameter(name, Optional(Text), Unset);
 

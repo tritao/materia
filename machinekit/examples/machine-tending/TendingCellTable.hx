@@ -29,10 +29,16 @@ class TendingCellTable extends MachineAssembly {
 		for (bank in [-1, 1]) {
 			var centreX = bank * bankOffsetX;
 			addBox('top-$bank', bankWidth, depth, TOP_THICKNESS, centreX, 0, topHeight - TOP_THICKNESS);
-			for (sideX in [-1, 1]) for (sideY in [-1, 1])
+			for (sideX in [-1, 1]) for (sideY in [-1, 1]) {
+				var y = sideY * (depth * 0.5 - LEG_SIZE * 0.5);
+				// The robot works from negative Y. Move that support row inward by
+				// two leg widths so it stays clear of the base and approach sweep,
+				// while all four legs remain beneath the load-bearing top.
+				if (sideY < 0) y += 2 * LEG_SIZE;
 				addBox('leg-$bank-$sideX-$sideY', LEG_SIZE, LEG_SIZE, legHeight,
 					centreX + sideX * (bankWidth * 0.5 - LEG_SIZE * 0.5),
-					sideY * (depth * 0.5 - LEG_SIZE * 0.5), 0);
+					y, 0);
+			}
 		}
 	}
 

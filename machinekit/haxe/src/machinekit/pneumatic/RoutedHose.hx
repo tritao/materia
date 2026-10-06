@@ -4,6 +4,7 @@ import cadkit.InertiaTensor;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
+import machinekit.component.CollisionHullFacet;
 import machinekit.component.MachineComponent;
 import machinekit.component.PortKind;
 import machinekit.component.Solids;
@@ -13,6 +14,7 @@ import machinekit.component.ComponentType;
 /** One cut hose with an authored centreline in its member frame (millimetres).
  * The solid envelope follows the route; mass follows centreline length. */
 class RoutedHose extends MachineComponent {
+	static inline var COLLISION_SIDES:Int = 12;
 	public final route:Array<Vector>;
 	public final outerDiameterMm:Float;
 	public final innerDiameterMm:Float;
@@ -87,6 +89,32 @@ class RoutedHose extends MachineComponent {
 				.shifted(segmentMass, centreX, centreY, centreZ));
 		}
 		declareMass(mass, new Vector(weightedX, weightedY, weightedZ), tensor);
+		// The CAD union follows the routed centreline, but a single convex hull of
+		// the whole hose would fill the empty space inside every bend. Keep one
+		// conservative capsule hull per straight tube segment for collision use.
+		addFacet(new CollisionHullFacet(segmentCollisionHulls(copied, outerDiameterMm / 2)));
+	}
+
+	static function segmentCollisionHulls(route:Array<Vector>, radius:Float):Array<Array<Float>> {
+		var expanded = radius / Math.cos(Math.PI / COLLISION_SIDES);
+		var result:Array<Array<Float>> = [];
+		for (i in 0...route.length - 1) {
+			var start = route[i], end = route[i + 1];
+			var direction = end.subtract(start).normalized();
+			var reference = Math.abs(direction.z) < 0.9 ? Vector.Z() : Vector.X();
+			var u = direction.cross(reference).normalized();
+			var v = direction.cross(u).normalized();
+			var first = start.subtract(direction.scale(radius));
+			var last = end.add(direction.scale(radius));
+			var hull:Array<Float> = [];
+			for (centre in [first, last]) for (side in 0...COLLISION_SIDES) {
+				var angle = 2 * Math.PI * side / COLLISION_SIDES;
+				var point = centre.add(u.scale(expanded * Math.cos(angle))).add(v.scale(expanded * Math.sin(angle)));
+				hull.push(point.x); hull.push(point.y); hull.push(point.z);
+			}
+			result.push(hull);
+		}
+		return result;
 	}
 
 	static var recipeTypeCache:Null<ComponentType>;

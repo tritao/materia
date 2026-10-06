@@ -56,11 +56,14 @@ class CobotArm extends MachineAssembly {
 			addComponent(gearboxId, modules[i].gearbox);
 			addMate('$gearboxId-mount', "fixed", moduleId, "gearheadSeat", gearboxId, "input");
 		}
-		addComponent("powerSupply", new PowerSupply(new machinekit.power.DcVoltage(48), new machinekit.power.DcCurrent(150), 6, 240, 120, 100, 6000), AssemblyFrames.translation(600, -180, 0));
+		// The supply and drives are offboard service hardware. Put them beyond
+		// the published arm reach, rather than in the robot's swept workspace.
+		var serviceX = reference.reach + 2 * baseFlange.flangeDiameter;
+		addComponent("powerSupply", new PowerSupply(new machinekit.power.DcVoltage(48), new machinekit.power.DcCurrent(150), 6, 240, 120, 100, 6000), AssemblyFrames.translation(serviceX, -180, 0));
 		for (i in 0...6) {
 			var driverId = 'driver${i + 1}', moduleId = 'joint${i + 1}', jointId = 'j${i + 1}';
 			addComponent(driverId, new MotorDriver("GENERIC-LV-SERVO-AMP", modules[i].driverCurrent),
-				AssemblyFrames.translation(600, i * 80, 0));
+				AssemblyFrames.translation(serviceX, i * 80, 0));
 			connectPorts('$driverId-power', "powerSupply", 'power${i + 1}', driverId, "power");
 			addMotor('drive_$jointId', jointId, moduleId, driverId, 0.5, 'gearbox${i + 1}');
 			addEncoder('encoder_$jointId', jointId, moduleId, 'drive_$jointId');

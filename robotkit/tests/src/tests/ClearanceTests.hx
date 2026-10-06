@@ -26,6 +26,7 @@ class ClearanceTests {
     testPosesAndPath();
     testMargins();
     testTouchingByDesign();
+    testNamedJointInterfaces();
     testCoupledDriveContact();
     testMovingRackContact();
     testCrossingEdges();
@@ -200,6 +201,40 @@ class ClearanceTests {
     check(cell.clearance.violation([0.0, 0.0]) == null, "bars that meet at the elbow are not a collision");
     check(cell.clearance.violation([0.0, 2.0]) == null, "the elbow turning does not make its own bars collide");
     check(cell.clearance.pairCount() == 0, "no pair is checked in an arm of two neighbouring links");
+  }
+
+  static function testNamedJointInterfaces():Void {
+    var model = new RobotModel("named-clearance-interface");
+    var base = model.addLink(new Link("base"));
+    var moving = model.addLink(new Link("moving"));
+    var hinge = model.addJoint(new Joint("hinge", JointType.Revolute, base, moving));
+    hinge.axis = [0.0, 0.0, 1.0];
+    var tip = model.addFrame(new Frame("tip", moving));
+    var arm = new Manipulator(model, base.id, tip.id);
+    var bodies = [
+      {name: "housing", link: base.id, vertices: box(-0.1, 0.0, -0.02, 0.02, -0.02, 0.02), tool: false},
+      {name: "moving-bracket", link: moving.id, vertices: box(0.0005, 0.1, -0.02, 0.02, -0.02, 0.02), tool: false}
+    ];
+    var defaultPolicy = new ArmClearance(arm, bodies, [0.0]);
+    check(defaultPolicy.violation([0.0]) == null,
+      "ordinary adjacent link bodies keep their reference-pose contact exemption");
+    var named = new ArmClearance(arm, bodies, [0.0], ArmClearance.MARGIN,
+      ArmClearance.CONTACT_MARGIN, null, [
+        {first: "housing", second: "moving-bracket", margin: ArmClearance.INTERFACE_MARGIN}
+      ]);
+    var hit = named.violation([0.0]);
+    check(hit != null && hit.a == "housing" && hit.b == "moving-bracket" &&
+      Math.abs(hit.required - ArmClearance.INTERFACE_MARGIN) < 1e-12,
+      "a named joint interface keeps its derived 1 mm clearance policy");
+    var touchingBodies = bodies.copy();
+    touchingBodies[1] = {name: "moving-bracket", link: moving.id,
+      vertices: box(0.0, 0.1, -0.02, 0.02, -0.02, 0.02), tool: false};
+    var mating = new ArmClearance(arm, touchingBodies, [0.0], ArmClearance.MARGIN,
+      ArmClearance.CONTACT_MARGIN, null, [
+        {first: "housing", second: "moving-bracket", margin: ArmClearance.INTERFACE_MARGIN}
+      ]);
+    check(mating.violation([0.0]) == null,
+      "an exact zero-gap joint face remains a valid mechanical interface");
   }
 
   static function testCrossingEdges():Void {

@@ -24,12 +24,14 @@ class GantryPicker extends Gantry {
 
 	public function new(?headKind:GantryHead = GantryHead.None) {
 		var belt:GantryDrive = Belt(TimingBeltProfile.GT2, 20, 9);
+		var driveBus = headKind == GantryHead.None ? new machinekit.power.DcVoltage(24) :
+			machinekit.motion.ServoMotor.LOW_VOLTAGE_BUS;
 		// The suction tool projects in front of the slide. Keep the front crossbar
 		// beyond its vertical sweep, including the guide's homing overtravel.
 		// A rotating carton needs its diagonal reach, preserving the original
 		// clearance to the Z switch mount during turns at the home height.
 		super(new GantrySpec(1500, 1000, 500, belt, belt, belt, true, "MGN12C", 23,
-			"HFS5-4040", "HFS5-4040", false, headKind, 0.5, 24, 16, 200, 100, 50,
+			"HFS5-4040", "HFS5-4040", false, headKind, 0.5, driveBus, 16, 200, 100, 50,
 			headKind == GantryHead.None ? 60 : 60 + BOX_WIDTH * (Math.sqrt(2) - 1) / 2));
 		var flange:RobotFlange = head == null ? cast component("flange") : head.flange;
 		tool = new SuctionTool(flange);

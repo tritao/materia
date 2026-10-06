@@ -47,10 +47,12 @@ class ParallelGripperFinger extends MachineComponent {
 			ComponentRecipeSupport.length("fingerLength", 60),
 			ComponentRecipeSupport.length("openingTravel", 16),
 			ComponentRecipeSupport.choice("side", ["left", "right"], "left"),
-			ComponentRecipeSupport.flag("supportStep", false)
+			ComponentRecipeSupport.flag("supportStep", false),
+			ComponentRecipeSupport.optionalLength("fingerDepth"),
+			ComponentRecipeSupport.optionalLength("fingerWidth")
 		], v -> new ParallelGripperFinger(new ParallelGripperSpec(v.integer("size"),
 			v.number("expectedPartWidth"), v.number("fingerLength"), v.number("openingTravel"),
-			v.boolean("supportStep")),
+			v.boolean("supportStep"), v.optionalNumber("fingerDepth"), v.optionalNumber("fingerWidth")),
 			v.token("side") == "left" ? -1 : 1), true);
 		return recipe;
 	}
@@ -63,6 +65,7 @@ class ParallelGripperFinger extends MachineComponent {
 		.setNumber("fingerLength", spec.fingerLength).setNumber("openingTravel", spec.openingTravel)
 		.setToken("side", side < 0 ? "left" : "right")
 		.setBoolean("supportStep", spec.supportStep)
+		.setNumber("fingerDepth", spec.fingerDepth).setNumber("fingerWidth", spec.fingerWidth)
 		.setToken("material", materialSpec());
 
 	override public function hasGeometry():Bool return true;

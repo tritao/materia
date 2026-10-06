@@ -15,6 +15,7 @@ import RobotArm;
 import BenchMill;
 import BenchMillPreview;
 import TendingControllers;
+import machinekit.robotics.DualArmGripperTool;
 import machinekit.robotics.ArmGripperTool;
 import machinekit.robot.RobotScene;
 import machinekit.assembly.AssemblyPreview;
@@ -25,6 +26,7 @@ import cadkit.modeling.AssemblyState;
 import materia.assembly.AssemblyFrames;
 import app.ApplicationSimulation;
 import robotkit.world.RobotWorld;
+import robotkit.core.Robot;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 import materia.assembly.AssemblyDefinition;
@@ -60,6 +62,7 @@ import sys.FileSystem;
 import sys.io.File;
 import haxe.io.Bytes;
 import materia.project.SceneArtifact;
+import materia.project.SceneArtifact.SceneArtifactMissionStep;
 import cnckit.controller.RobotInterfaceAlarm;
 import cnckit.controller.RobotInterfaceChannels;
 
@@ -74,6 +77,37 @@ import cnckit.controller.RobotInterfaceChannels;
 class ProjectSourceTests {
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
+  }
+
+  static function checkTendingAlarmClassification():Void {
+    function timeoutAlarm(channel:String):MissionAlarmCode {
+      var step:SceneArtifactMissionStep = {kind: "waitFor", waitFor: {name: channel, value: true, timeout: 0.1}};
+      return MissionAlarmClassifier.classify(step, "controller input timed out", false, false);
+    }
+    check(timeoutAlarm(RobotInterfaceChannels.DOOR_OPEN) == MissionAlarmCode.DoorJam &&
+      timeoutAlarm(RobotInterfaceChannels.DOOR_CLOSED) == MissionAlarmCode.DoorJam,
+      "door switch timeouts map to the stable door-jam alarm");
+    check(timeoutAlarm(RobotInterfaceChannels.CLAMPED) == MissionAlarmCode.ClampWithoutPart &&
+      timeoutAlarm(RobotInterfaceChannels.PART_PRESENT) == MissionAlarmCode.ClampWithoutPart,
+      "vise and presence timeouts map to the stable clamp-without-part alarm");
+    check(timeoutAlarm(RobotInterfaceChannels.CNC_READY) == MissionAlarmCode.CncAlarm &&
+      timeoutAlarm(RobotInterfaceChannels.IN_CYCLE) == MissionAlarmCode.CncAlarm &&
+      timeoutAlarm(RobotInterfaceChannels.CYCLE_COMPLETE) == MissionAlarmCode.CncAlarm &&
+      timeoutAlarm(RobotInterfaceChannels.ALARM) == MissionAlarmCode.CncAlarm,
+      "cycle and CNC alarm timeouts map to the stable CNC alarm");
+  }
+
+  static function singleHandlingChannel(mission:MissionPlayer):String {
+    var channels:Array<String> = [];
+    for (channel in mission.handlingTools.keys()) channels.push(channel);
+    if (channels.length != 1) throw 'Expected one handling tool, found ${channels.length}';
+    return channels[0];
+  }
+
+  static function handlingRunner(mission:MissionPlayer, channel:String):motionkit.robot.HandlingPlanRunner {
+    var runner = mission.handlingRunners.get(channel);
+    if (runner == null) throw 'Handling runner "$channel" is unavailable';
+    return runner;
   }
 
   static function checkCoupling(backend:Int):Void {
@@ -854,8 +888,13 @@ class ProjectSourceTests {
     try {
       check(simulation.rebuild(session.sensors, session.scene, session), "gantry picker builds: " + simulation.error);
       var mission = simulation.missionPlayer();
-      if (mission == null || mission.handling == null) throw "gantry picker has no handling mission";
-      var motion = mission.handling.motion;
+      if (mission == null) throw "gantry picker has no mission";
+      var handlingChannel = singleHandlingChannel(mission);
+      var initialHandling = handlingRunner(mission, handlingChannel);
+      var toolKinematics = mission.toolKinematics.get(handlingChannel);
+      if (toolKinematics == null) throw "gantry picker has no tool kinematics";
+      var toolLink = toolKinematics.link;
+      var motion = initialHandling.motion;
       var model = mission.robot.model;
       check(motion.compiler.solver.jointCount() == (yaw ? 4 : 3), "picker plans XYZ and its selected C head");
       var restoredModel = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(model));
@@ -918,8 +957,7 @@ class ProjectSourceTests {
             Sys.println('picker realtime: t=${simulation.activeSession().simulationTime()} completed=${mission.completed} homing=${mission.homingSeconds} status=${mission.statusLabel(true)} failure=${mission.failure}');
           }
         } else simulation.step();
-        var currentHandling:Null<motionkit.robot.HandlingPlanRunner> = mission.handling;
-        if (currentHandling == null) throw "Picker handling runner disappeared";
+        var currentHandling = handlingRunner(mission, handlingChannel);
         motion = currentHandling.motion;
         var allocated = hl.Gc.totalAllocated() - before;
         ticks++;
@@ -961,7 +999,7 @@ class ProjectSourceTests {
                 Math.abs(contact.position.z - seat.z) <= supportDepth) supported = true;
           }
           if (supported) continue;
-          if (contact.linkIndex != mission.toolLink) {
+          if (contact.linkIndex != toolLink) {
             var body = mission.simulation.linkPose(0, contact.linkIndex);
             for (hull in mission.robot.hulls) if (hull.link == contact.linkIndex) {
               var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
@@ -981,7 +1019,7 @@ class ProjectSourceTests {
             }
           }
           // The compliant cup deliberately presses at most 3 mm into its intended grasp surface.
-          check(contact.linkIndex == mission.toolLink && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
+          check(contact.linkIndex == toolLink && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
             contact.distance >= -0.004, "picker has no unintended robot contact: link=" + contact.linkIndex +
               " (" + model.links[contact.linkIndex].id + "), otherKind=" + contact.otherKind +
               ", otherLink=" + contact.otherLink + ", object=" + contact.otherObject +
@@ -1074,10 +1112,11 @@ class ProjectSourceTests {
         if (mission == null) throw "analytic gantry has no mission group";
         var motion:motionkit.robot.ManipulatorMotion;
         if (fixture.example == "gantry-welder") {
-          var welding:processkit.WeldingPlanRunner = cast mission.welding;
+          var welding = mission.welding;
+          if (welding == null) throw "analytic welder has no welding group";
           motion = welding.motion;
         } else {
-          var handling:motionkit.robot.HandlingPlanRunner = cast mission.handling;
+          var handling = handlingRunner(mission, singleHandlingChannel(mission));
           motion = handling.motion;
         }
         var numeric:motionkit.robot.ManipulatorKinematics = cast motion.compiler.solver;
@@ -1189,8 +1228,8 @@ class ProjectSourceTests {
     try {
       check(simulation.rebuild(session.sensors, session.scene, session), "analytic arm model builds: " + simulation.error);
       var mission = simulation.missionPlayer();
-      if (mission == null || mission.handling == null) throw "analytic arm fixture has no handling group";
-      var handling:motionkit.robot.HandlingPlanRunner = cast mission.handling;
+      if (mission == null) throw "analytic arm fixture has no mission group";
+      var handling = handlingRunner(mission, singleHandlingChannel(mission));
       var numeric:motionkit.robot.ManipulatorKinematics = cast handling.motion.compiler.solver;
       var group = numeric.manipulator;
       var arm = new robotkit.manipulation.Manipulator(group.robot, group.rootLink, group.flangeFrame,
@@ -1360,7 +1399,7 @@ class ProjectSourceTests {
       if (mission.completed == lastDone) continue;
       var step = steps[lastDone];
       if (Sys.getEnv("PROCESS_PATH_BENCHMARK") == "1") {
-        var handling:motionkit.robot.HandlingPlanRunner = cast mission.handling;
+        var handling = handlingRunner(mission, singleHandlingChannel(mission));
         var metrics = handling.motion.planningMetrics();
         Sys.println("PROCESS_PATH_RUN " + haxe.Json.stringify({example: "handling", backend: ApplicationSimulation.MUJOCO,
           run: mission.completed, planningSeconds: metrics.seconds - previousPlanningSeconds,
@@ -1437,8 +1476,9 @@ class ProjectSourceTests {
     try {
       check(simulation.rebuild(session.sensors, session.scene, session), "track arm builds: " + simulation.error);
       var mission = simulation.missionPlayer();
-      if (mission == null || mission.handling == null) throw "Track arm has no handling mission";
-      var indices = mission.handling.motion.jointIndices;
+      if (mission == null) throw "Track arm has no mission";
+      var handlingChannel = singleHandlingChannel(mission);
+      var indices = handlingRunner(mission, handlingChannel).motion.jointIndices;
       check(indices.length == 7 && mission.robot.model.joints[indices[0]].name == "track",
         "track leads six logical arm joints");
       var travel = 0.0, lastDone = 0;
@@ -1456,7 +1496,7 @@ class ProjectSourceTests {
       check(travel >= 2.9, "track carries the arm between table stations");
       var work = [for (part in simulation.capturePresentationSnapshot().environment) if (part.id == "project:workpiece") part];
       check(work.length == 1 && Math.abs(work[0].position[0] - 2.85) < 0.005, "part reaches the far landing pad");
-      var make = mission.newHandling;
+      var make = mission.newHandlingByChannel.get(handlingChannel);
       if (make == null) throw "Track arm cannot create coordinated motion";
       var runner = make();
       check(Math.abs(runner.home[0] - 3.0) < 0.001, "handling retains its current external station");
@@ -1468,6 +1508,7 @@ class ProjectSourceTests {
 
   static function checkTrackArmPath(simulation:ApplicationSimulation, mission:MissionPlayer,
       motion:motionkit.robot.ManipulatorMotion):Void {
+    var handlingChannel = singleHandlingChannel(mission);
     var solver = motion.compiler.solver;
     var entry = [0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     motion.run(new motionkit.program.MotionProgram([
@@ -1507,7 +1548,7 @@ class ProjectSourceTests {
       motion.update(simulation.timestep); simulation.step();
       var feedback = mission.robot.robot.snapshot().positions;
       last = [for (index in motion.jointIndices) feedback.get(index)];
-      var tip = mission.toolContact();
+      var tip = mission.toolContact(handlingChannel);
       var along = Math.max(0.0, Math.min(2.6, tip.x - start.x));
       worst = Math.max(worst, Math.sqrt(Math.pow(tip.x - start.x - along, 2) + Math.pow(tip.y - start.y, 2) + Math.pow(tip.z - start.z, 2)));
       for (index in 1...7) {
@@ -1520,7 +1561,7 @@ class ProjectSourceTests {
       previous = last.copy();
     }
     check(motion.completed && motion.failure == null, "track coordinated path: " + motion.failure);
-    var end = mission.toolContact();
+    var end = mission.toolContact(handlingChannel);
     check(Math.sqrt(Math.pow(end.x - stop.x, 2) + Math.pow(end.y - stop.y, 2) + Math.pow(end.z - stop.z, 2)) < 0.002, "coordinated TCP reaches its endpoint within 2 mm");
     check(worst < 0.002, 'track path error stays within 2 mm ($worst m)');
     check(last[0] - entry[0] > 0.8 * 2.6, "track supplies most of the coordinated travel");
@@ -2421,6 +2462,17 @@ class ProjectSourceTests {
     var nextTick = bus.input(first.to.controller, first.name);
     check(nextTick != null && switch nextTick {case Digital(on): on; case _: false;} && published,
       "the wired digital output reaches the next controller tick and its sensor");
+    var writtenController:Null<String> = null, writtenName:Null<String> = null, writtenValue = false;
+    var writerBus = new CellSignals(wires, () -> now, (_controller, _channel) -> false,
+      (_controller, _channel, _on, _sequence, _stamp) -> {},
+      (controller, channel, on) -> {writtenController = controller; writtenName = channel; writtenValue = on;});
+    var writeRobotOutput = writerBus.outputFor(first.from.controller);
+    writeRobotOutput(first.name, true);
+    check(writtenController == first.from.controller && writtenName == first.name && writtenValue,
+      "a mission's typed output callback writes through its owning controller");
+    var crossControllerWriteRejected = false;
+    try writerBus.writeControllerSignal(first.to.controller, first.name, true) catch (_:Dynamic) crossControllerWriteRejected = true;
+    check(crossControllerWriteRejected, "a robot mission cannot write an output owned by the CNC cabinet");
     // This scenario isolates cabinet outputs, physical valves and belt refresh when no CNC player
     // owns the spindle; the full physical cut is covered by checkTendingRobotInterface.
     generated.cncJob = null;
@@ -2638,6 +2690,9 @@ class ProjectSourceTests {
       var mission = simulation.missionPlayer();
       var blank = simulation.environmentObject("project:arm/workpiece");
       if (mission == null || blank == null) throw "Physical-gripper mission lost its player or dynamic blank";
+      var handlingChannel = singleHandlingChannel(mission);
+      var toolKinematics = mission.toolKinematics.get(handlingChannel);
+      if (toolKinematics == null) throw "Physical-gripper mission has no tool kinematics";
       var jawIndex = -1;
       for (index in 0...mission.robot.model.joints.length)
         if (mission.robot.model.joints[index].id == "arm/tool/gripper/jaw-left-slide") jawIndex = index;
@@ -2716,9 +2771,8 @@ class ProjectSourceTests {
           carryActive = true;
           remainedFreeDynamicBody = remainedFreeDynamicBody &&
             mission.simulation.objectCarrier(workpiece).rawValue() == 0;
-          var link = mission.simulation.linkPose(mission.robotIndex, mission.toolLink);
-          var toolTip = mission.toolTip;
-          if (toolTip == null) throw "Physical gripper has no TCP for the slip measurement";
+          var link = mission.simulation.linkPose(mission.robotIndex, toolKinematics.link);
+          var toolTip = toolKinematics.tip;
           var world_T_link = new robotkit.spatial.Transform3(
             robotkit.spatial.Vec3.fromArray(link.position), robotkit.spatial.Quat.fromArray(link.rotation));
           var link_T_tcp = new robotkit.spatial.Transform3(
@@ -3155,7 +3209,7 @@ class ProjectSourceTests {
       check(player.completedStocks.length == 1 && player.completedStocks[0].occurrence == "interface-test-blank",
         "the presence input selects and finishes the loose blank occurrence");
       var finished = player.completedStocks[0];
-      var expectedRemoval = (Math.PI * (121 * 7 + 2 * 25 * 5) + (144 - (4 - Math.PI) * 12.25) * 3) / 1e9;
+      var expectedRemoval = expectedBearingBlockRemoval();
       check(Math.abs(finished.removedVolume - expectedRemoval) < expectedRemoval * 0.02,
         'the free blank removes the bearing-block volume within 2%, got ${finished.removedVolume * 1e9} mm³');
       check(finished.targetMass > 0 && finished.massError < 0.02,
@@ -3195,6 +3249,220 @@ class ProjectSourceTests {
     }
     simulation.dispose(); session.dispose();
   }
+
+  /** Four real blank-to-outfeed cycles through the saved robot mission and wired CNC interface. */
+  static function checkMachineTending(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/machine-tending/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var savedMission = generated.mission;
+    if (savedMission == null || savedMission.steps.length == 0)
+      throw "The playable tending project does not save its robot mission";
+    for (step in savedMission.steps) if (step.kind == "pick" || step.kind == "place")
+      check(step.yaw == null && step.toolYaw != null && Math.isFinite(step.toolYaw),
+        "each reach-certified tending grasp saves its tool roll separately from part heading");
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    try {
+      check(simulation.rebuild(session.sensors, session.scene, session),
+        "the playable tending cell builds: " + simulation.error);
+      var mission = simulation.missionPlayer(), cnc = simulation.cncPlayer();
+      if (mission == null || cnc == null) throw "Playable tending project lost its mission or CNC player";
+      checkTendingAlarmClassification();
+      var blank = simulation.environmentObject("project:infeed/blank-0-0");
+      if (blank == null) throw "Tending cell has no free first infeed blank";
+      var blankVisuals = simulation.capturePresentationSnapshot().environment;
+      var blankPose = [for (entry in blankVisuals) if (entry.id == "project:infeed/blank-0-0") entry];
+      if (blankPose.length != 1) throw "Tending cell could not capture its initial blank pose";
+      var originalBlank = new nativekit.sim.SimPose(blankPose[0].position[0], blankPose[0].position[1],
+        blankPose[0].position[2], blankPose[0].rotation[0], blankPose[0].rotation[1],
+        blankPose[0].rotation[2], blankPose[0].rotation[3]);
+      blank.teleport(new nativekit.sim.SimPose(3.0, 3.0, 3.0));
+      check(simulation.emergencyStopRobot(mission.robotId()),
+        "the tending cell accepts a targeted emergency stop for its robot");
+      for (_ in 0...5) {
+        if (mission.failure != null) break;
+        simulation.step();
+      }
+      check(mission.failure != null && mission.alarmCode == MissionAlarmCode.EmergencyStop,
+        "an emergency stop fails the active mission with the stable emergency alarm code");
+      var completedBeforeRecovery = mission.completed;
+      check(simulation.retryMission(),
+        "after the stop is acknowledged, the mission can request safety reset and retry");
+      for (_ in 0...5) {
+        if (mission.failure == null) break;
+        simulation.step();
+      }
+      check(mission.failure == null && mission.completed == completedBeforeRecovery,
+        "emergency-stop recovery resumes the failed mission step and preserves its completed-step count");
+      for (_ in 0...600) {
+        if (mission.failure != null) break;
+        simulation.step();
+      }
+      check(mission.failure != null && mission.alarmCode == MissionAlarmCode.EmptyInfeed &&
+        mission.completed == completedBeforeRecovery,
+        "an empty infeed pocket stops before grasp with the stable empty-infeed alarm");
+      blank.setPoseForNextTick(originalBlank);
+      check(simulation.retryMission(), "restocking the empty pocket makes its failed presence wait recoverable");
+      // Restocking reaches physics at the next step; the presence adapter samples
+      // after that step, and the controller consumes the fresh frame on the one after.
+      for (_ in 0...12) simulation.step();
+      var infeedPresence = "missing";
+      for (frame in mission.robot.runtime.snapshot().sensors.toArray())
+        if (frame.sensorId == "infeed/slot-0-0-present" && frame.values.length > 0)
+          infeedPresence = Std.string(frame.values.get(0));
+      check(mission.failure == null && mission.completed > completedBeforeRecovery,
+        'restocking clears the fault and resumes at the infeed-presence check ' +
+          '(failure=${mission.failure}, alarm=${mission.alarmCode}, completed=${mission.completed}, ' +
+          'before=$completedBeforeRecovery, step=${mission.stepIndex}, presence=$infeedPresence, ' +
+          'runner=${mission.runner.status()})');
+      var firstPick = -1;
+      for (index in 0...mission.mission.steps.length) {
+        var step = mission.mission.steps[index];
+        if (step.kind == "pick" && step.at != null && step.at.occurrence == "infeed/blank-0-0") {
+          firstPick = index;
+          break;
+        }
+      }
+      if (firstPick < 0) throw "Tending mission has no first infeed pick to fault-inject";
+      var approachTicks = 0;
+      while (mission.stepIndex < firstPick && mission.failure == null && approachTicks < 2000) {
+        simulation.step(); approachTicks++;
+      }
+      check(mission.stepIndex == firstPick && mission.failure == null,
+        "the mission confirms infeed presence and reaches its first pick after empty-slot recovery");
+      var firstPickStep = mission.mission.steps[firstPick];
+      var originalPickTimeout = firstPickStep.timeoutSeconds;
+      firstPickStep.timeoutSeconds = 0.25;
+      blank.teleport(new nativekit.sim.SimPose(3.0, 3.0, 3.0));
+      for (_ in 0...100) {
+        if (mission.failure != null) break;
+        simulation.step();
+      }
+      check(mission.failure != null && mission.alarmCode == MissionAlarmCode.MissedGrasp,
+        "a blank lost after its presence check faults the pick with the stable missed-grasp alarm");
+      firstPickStep.timeoutSeconds = originalPickTimeout;
+      blank.setPoseForNextTick(originalBlank);
+      check(simulation.retryMission(),
+        "restoring the missing workpiece makes the failed pick recoverable without clearing other controllers");
+      var retryTicks = 0;
+      while (mission.stepIndex <= firstPick && mission.failure == null && retryTicks < 2000) {
+        simulation.step(); retryTicks++;
+      }
+      check(mission.failure == null && mission.stepIndex > firstPick,
+        "the restored blank is physically grasped after retrying the failed pick");
+      var carriedVisuals = simulation.capturePresentationSnapshot().environment;
+      var carriedPose = [for (entry in carriedVisuals) if (entry.id == "project:infeed/blank-0-0") entry];
+      if (carriedPose.length != 1) throw "The first blank disappeared before the part-drop fault check";
+      var beforeDrop = new nativekit.sim.SimPose(carriedPose[0].position[0], carriedPose[0].position[1],
+        carriedPose[0].position[2], carriedPose[0].rotation[0], carriedPose[0].rotation[1],
+        carriedPose[0].rotation[2], carriedPose[0].rotation[3]);
+      mission.robot.runtime.writeDigitalOutput(DualArmGripperTool.TOOL_CHANNEL_A, false);
+      for (_ in 0...150) {
+        if (mission.failure != null) break;
+        simulation.step();
+      }
+      check(mission.failure != null && mission.alarmCode == MissionAlarmCode.PartDropped,
+        "a physical jaw opening while carrying latches the stable part-dropped alarm");
+      check(Std.string(mission.runner.status()) != "Running",
+        "a mission fault cancels the active arm plan instead of leaving motion running");
+      blank.setPoseForNextTick(beforeDrop);
+      mission.robot.runtime.writeDigitalOutput(DualArmGripperTool.TOOL_CHANNEL_A, true);
+      var gripRestored = false;
+      for (_ in 0...150) {
+        simulation.step();
+        for (frame in mission.robot.runtime.snapshot().sensors.toArray())
+          if (frame.sensorId == "arm/tool/gripperA/gripped" && frame.values.length > 0 && frame.values.get(0) >= 0.5)
+            gripRestored = true;
+        if (gripRestored) break;
+      }
+      check(gripRestored, "restoring the blank to the physical jaws closes the gripper switch");
+      check(simulation.retryMission(), "the recovered jaw and blank allow the failed carry to resume");
+      for (_ in 0...8) {
+        simulation.step();
+        if (mission.failure == null) break;
+      }
+      check(mission.failure == null && mission.stepIndex > firstPick,
+        "part-drop recovery preserves the held part and resumes the interrupted carry step");
+      var ticks = 0, spindleTicks = 0, observedStocks = 0, maxSimultaneousHeld = 0;
+      var lastCycleStart = 0.0, lastCycleTime = 0.0, wasCycleActive = false;
+      var cycleTimes:Array<Float> = [];
+      var expectedRemoval = expectedBearingBlockRemoval();
+      while (!mission.finished && simulation.activeSession().simulationTime() < 800) {
+        simulation.step();
+        var heldNow = simulation.heldObjectIds().length;
+        if (heldNow > maxSimultaneousHeld) maxSimultaneousHeld = heldNow;
+        var signalBus = simulation.cellSignals;
+        if (mission.failure != null)
+          throw 'Tending mission failed at step ${mission.stepIndex}/${mission.mission.steps.length}: ${mission.failure}';
+        var machine:Null<Robot> = null;
+        for (id in simulation.simulatedRobotIds()) if (StringTools.endsWith(id, ":mill/cncController"))
+          machine = simulation.world.robot(id);
+        if (machine == null) throw "Playable tending cell lost its CNC controller runtime";
+        var spindle = machine.description().joints.indexOf("mill/mill/spindle-turn");
+        if (spindle < 0) throw "Playable tending cell has no spindle encoder";
+        var cycleState = signalBus == null ? null : signalBus.input("robotController", RobotInterfaceChannels.IN_CYCLE);
+        var cycleActive = cycleState != null && switch cycleState {case Digital(value): value; case _: false;};
+        if (cycleActive && !wasCycleActive) lastCycleStart = simulation.activeSession().simulationTime();
+        wasCycleActive = cycleActive;
+        if (cycleActive) ticks++;
+        if (cycleActive &&
+            Math.abs(machine.snapshot().velocities.get(spindle)) > 5.0 * 2 * Math.PI / 60.0) spindleTicks++;
+        if (cnc.interfaceAlarm != RobotInterfaceAlarm.None)
+          throw 'Tending CNC interface alarm ${cnc.interfaceAlarm} after ${simulation.activeSession().simulationTime()} s';
+        var finished = cnc.completedStocks;
+        while (observedStocks < finished.length) {
+          var stock = finished[observedStocks++];
+          check(Math.abs(stock.removedVolume - expectedRemoval) < expectedRemoval * 0.02,
+            'tending blank ${stock.occurrence} removes the bearing-block volume within 2%, got ${stock.removedVolume * 1e9} mm³');
+          check(stock.targetMass > 0 && stock.massError <= 0.02,
+            'finished blank mass is within 2% of its CAD target (${stock.massError * 100}%)');
+          check(stock.rapidContacts == 0 && stock.collisions == 0,
+            'finished blank ${stock.occurrence} has no cutter rapid contacts or collisions');
+          var now = simulation.activeSession().simulationTime();
+          if (lastCycleStart <= 0) throw 'CNC cycle start was not observed before finishing ${stock.occurrence}';
+          lastCycleTime = now - lastCycleStart;
+          cycleTimes.push(lastCycleTime);
+        }
+      }
+      check(mission.finished && mission.completed == mission.mission.steps.length,
+        'the unattended tending mission finishes every declared step (${mission.completed}/${mission.mission.steps.length})');
+      check(cnc.completedStocks.length == 4,
+        'four loose infeed blanks are machined and reported, got ${cnc.completedStocks.length}');
+      check(cnc.interfaceAlarm == RobotInterfaceAlarm.None && simulation.cncFailure() == null,
+        'four tending cycles finish without an interlock or CNC alarm');
+      var outfeedCount = 0;
+      for (frame in mission.robot.runtime.snapshot().sensors.toArray())
+        if (StringTools.startsWith(frame.sensorId, "outfeed/slot-") && frame.values.length > 0 && frame.values.get(0) >= 0.5)
+          outfeedCount++;
+      check(outfeedCount == 4,
+        'four finished blanks occupy their sensed outfeed seats, got $outfeedCount');
+      check(maxSimultaneousHeld == 2,
+        'the dual grippers carry the staged raw blank and finished blank together during exchange, max $maxSimultaneousHeld');
+      check(cycleTimes.length == 4 && lastCycleTime > 0 && ticks > 0 && spindleTicks > 0,
+        'the tending run reports all four CNC cycle intervals and spindle time');
+      var elapsed = simulation.activeSession().simulationTime();
+      var spindleUse = spindleTicks / ticks;
+      check(cnc.spindleUtilization >= 0.75,
+        'dual-gripper tending keeps measured spindle utilization at or above 75%, got ${cnc.spindleUtilization * 100}%');
+      check(Math.abs(cnc.spindleUtilization - spindleUse) < 0.05,
+        'CNC-panel spindle utilization agrees with encoder sampling, got ${cnc.spindleUtilization * 100}% vs ${spindleUse * 100}%');
+      var measuredUse = cnc.spindleUtilization;
+      for (_ in 0...20) simulation.step();
+      check(Math.abs(cnc.spindleUtilization - measuredUse) < 1e-12,
+        "spindle utilization holds its completed-cycle measurement while the cell is idle");
+      Sys.println('tending mission: ${cnc.completedStocks.length} blanks, ${elapsed} s elapsed, ' +
+        'spindle active ${Math.round(cnc.spindleUtilization * 1000) / 10}%, cycle intervals ${cycleTimes.join(", ")} s');
+    } catch (error:Dynamic) {
+      simulation.dispose(); session.dispose(); throw error;
+    }
+    simulation.dispose(); session.dispose();
+  }
+
+  /** Nominal material removed by the checked bearing-block toolpath, in cubic metres. */
+  static function expectedBearingBlockRemoval():Float
+    return (Math.PI * (121 * 7 + 2 * 25 * 5) + (144 - (4 - Math.PI) * 12.25) * 3) / 1e9;
 
   /** Run the assembled cylinders' real pressure and flow limits in MuJoCo. */
   static function checkPneumaticDynamics(model:RobotModel, doorActuator:Actuator, viseActuator:Actuator,
@@ -3986,6 +4254,7 @@ class ProjectSourceTests {
     checkEnclosedMillProject(root);
     checkTendingControllers(root);
     checkTendingRobotInterface(root);
+    checkMachineTending(root);
     checkVirtualRouterHoming(root);
     checkCncRouter(root);
     checkBeltRouter(root);
@@ -4182,6 +4451,10 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "interface") {
       checkTendingRobotInterface(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending") {
+      checkMachineTending(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "identity") {

@@ -30,7 +30,8 @@ class AxisBuilderChecks {
 		builder.driveRack(axis, "pinion", "motor", pinion, AxisBuilder.orient(60, 0, 10, up, [0, 1, 0]),
 			[0.0, 1, 0], "rack", rack, AxisBuilder.orient(0, 0, 0, up, along), "rail", 1.0,
 			_ -> {
-				builder.attach("driver", new MotorDriver("GENERIC-TMC2209", 1.5, 16, 24),
+				builder.attach("driver", new MotorDriver("GENERIC-TMC2209",
+					new machinekit.power.PhaseRmsCurrent(1.5), 16, new machinekit.power.DcVoltage(24)),
 					AssemblyFrames.translation(0, -100, 0), "rail");
 				return "driver";
 			});

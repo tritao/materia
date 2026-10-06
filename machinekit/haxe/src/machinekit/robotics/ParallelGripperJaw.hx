@@ -31,8 +31,10 @@ class ParallelGripperJaw extends MachineComponent {
 
 	public static function recipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.robotics.parallel-gripper-jaw", [
-			ComponentRecipeSupport.count("size", 32), ComponentRecipeSupport.choice("side", ["left", "right"], "left")
-		], v -> new ParallelGripperJaw(new ParallelGripperSpec(v.integer("size")),
+			ComponentRecipeSupport.count("size", 32), ComponentRecipeSupport.choice("side", ["left", "right"], "left"),
+			ComponentRecipeSupport.optionalLength("fingerWidth")
+		], v -> new ParallelGripperJaw(new ParallelGripperSpec(v.integer("size"), 60, 60, 16, false,
+			null, v.optionalNumber("fingerWidth")),
 			v.token("side") == "left" ? -1 : 1), true);
 		return recipe;
 	}
@@ -42,6 +44,7 @@ class ParallelGripperJaw extends MachineComponent {
 
 	override public function values():ComponentValues return new ComponentValues()
 		.setInteger("size", spec.size).setToken("side", side < 0 ? "left" : "right")
+		.setNumber("fingerWidth", spec.fingerWidth)
 		.setToken("material", materialSpec());
 
 	override public function hasGeometry():Bool return true;

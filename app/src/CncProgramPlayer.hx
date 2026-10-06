@@ -172,6 +172,10 @@ class CncProgramPlayer implements SessionMember {
 	public var motionSeconds(default, null):Float = 0.0;
 	public var runSeconds(default, null):Float = 0.0;
 	public var slowestUpdate(default, null):Float = 0.0;
+	/** Fraction of active CNC-cycle time with the spindle turning. */
+	public var spindleUtilization(default, null):Float = 0.0;
+	var spindleIntervalSeconds:Float = 0.0;
+	var spindleTurningSeconds:Float = 0.0;
 	var commandedKind:MoveKind = MoveKind.Rapid;
 	var commandedOp = -1;
 	var commandedProvenance = new Provenance(0, 0, 0);
@@ -595,6 +599,17 @@ class CncProgramPlayer implements SessionMember {
 		motion.update(session.fixedTimestep());
 		if (encoders.readings.length > 0) {
 			var seen = robot.robot.snapshot();
+			var spindleWindow = if (interfaceManaged)
+				lastInterfaceOutputs != null && lastInterfaceOutputs.inCycle
+			else started && motion.running;
+			if (spindleWindow) {
+				var elapsed = session.fixedTimestep();
+				spindleIntervalSeconds += elapsed;
+				if (spindleVelocityJoint >= 0 && spindleVelocityJoint < seen.velocities.length &&
+					Math.abs(seen.velocities.get(spindleVelocityJoint)) > SPINDLE_STANDSTILL_RPM * (2.0 * Math.PI / 60.0))
+					spindleTurningSeconds += elapsed;
+				spindleUtilization = spindleTurningSeconds / spindleIntervalSeconds;
+			}
 			encoders.observe(seen.positions.toArray(), seen.setpointPositions.toArray(), session.simulationTime());
 			for (axis in 0...axisJoints.length) {
 				var joint = axisJoints[axis];
@@ -950,6 +965,9 @@ class CncProgramPlayer implements SessionMember {
 		}
 		failure = null;
 		passes = 0;
+		spindleUtilization = 0.0;
+		spindleIntervalSeconds = 0.0;
+		spindleTurningSeconds = 0.0;
 		passCounted = false;
 		for (cut in allStocks) cut.dispose();
 		allStocks.splice(0, allStocks.length);

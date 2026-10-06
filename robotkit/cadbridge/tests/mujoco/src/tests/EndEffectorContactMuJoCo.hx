@@ -124,7 +124,7 @@ class EndEffectorContactMuJoCo {
       [0, 0, 0], [0, 0, 0, 1], null, null, null, null,
       bundle.runtime.tool.collision, 0, 0, 0.01);
     var selection = new ToolRuntimeSelection();
-    selection.select(bundle.runtime, simulation.sourceTimestampNs(), "robotkit.simulation");
+    selection.select(bundle.runtime, simulation.sourceTimestampNs(), robot.sourceClockId);
     var feedback = new EndEffectorVacuumFeedback(set, "sensed", selection, bundle, robot, 55);
     feedback.attach(simulation);
     selection.apply(new FiredProcessEvent(Int64.ofInt(1), "sensed/tool/generator.enable",
@@ -135,7 +135,7 @@ class EndEffectorContactMuJoCo {
     var nearbyStep = simulation.stepIndex();
     var nearbyFrame = pressureFrame(robot, authored.id);
     if (nearbyFrame.values.get(0) != 0 || vacuum.isHolding() ||
-        vacuum.vacuumKpa() != 0 || nearbyFrame.sourceClockId != "robotkit.simulation")
+        vacuum.vacuumKpa() != 0 || nearbyFrame.sourceClockId != robot.sourceClockId)
       throw "Cup proximity must not produce a seal pressure";
     var touchingObject = simulationHarness.spawnBox([bounds.centre.x, bounds.centre.y,
       bounds.centre.z + bounds.halfExtents.z + 0.003], [0.005, 0.005, 0.005]);
@@ -169,7 +169,7 @@ class EndEffectorContactMuJoCo {
     if (sensorValue(replay.streams().latestFrames(), authored.id) != 55 || !replay.advance() ||
         sensorValue(replay.streams().latestFrames(), authored.id) != 0)
       throw "Recorded pressure frames must replay in order";
-    selection.select(null, simulation.sourceTimestampNs(), "robotkit.simulation");
+    selection.select(null, simulation.sourceTimestampNs(), robot.sourceClockId);
     simulationHarness.step(Int64.ofInt(5));
     if (vacuum.isHolding() || pressureFrame(robot, authored.id).values.get(0) != 0)
       throw "Deselecting the tool must release its vacuum state";

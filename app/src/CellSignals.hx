@@ -46,6 +46,22 @@ class CellSignals implements SessionMember {
     throw 'Unknown cell signal "$name"';
   }
 
+  /** Output callback scoped to one cabinet; a robot mission cannot write a CNC-owned output. */
+  public function outputFor(controller:String):String->Bool->Void
+    return (name, value) -> writeControllerSignal(controller, name, value);
+
+  public function writeControllerSignal(controller:String, name:String, value:Bool):Void {
+    var writer = writeOutput;
+    if (writer == null) throw "This cell signal bus has no controller output writer";
+    for (wire in wires) if (wire.name == name) {
+      if (wire.from.controller != controller)
+        throw 'Controller "$controller" does not own output "$name"';
+      writer(controller, wire.name, value);
+      return;
+    }
+    throw 'Unknown cell signal "$name"';
+  }
+
   public function feed():Void {
     sequence++;
     var stamp = Int64.fromFloat(simulationTime() * 1e9);

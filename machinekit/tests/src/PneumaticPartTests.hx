@@ -5,6 +5,8 @@ import materia.assembly.AssemblyFrames;
 import machinekit.pneumatic.PneumaticCylinder;
 import machinekit.pneumatic.AirSupply;
 import machinekit.pneumatic.SolenoidValve;
+import machinekit.pneumatic.RoutedHose;
+import machinekit.component.CollisionHullFacet;
 import machinekit.document.MachineAssemblyDocuments;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
@@ -43,6 +45,12 @@ class PneumaticPartTests {
 		if (!latched.routesToA(false, false, true) || latched.routesToA(false, false, false) ||
 			!latched.routesToA(true, false, false) || latched.routesToA(false, true, true) ||
 			!latched.routesToA(true, true, true)) throw "Double-solenoid valve latching";
+		var routedHose = new RoutedHose("CHECK-HOSE", [new cadkit.modeling.Vector(),
+			new cadkit.modeling.Vector(0, 100, 0), new cadkit.modeling.Vector(100, 100, 0)], 6, 4, 0.03);
+		var hoseCollision = CollisionHullFacet.of(routedHose);
+		if (hoseCollision == null || hoseCollision.hulls.length != 2 ||
+			hoseCollision.hulls[0].length != 72 || hoseCollision.hulls[1].length != 72)
+			throw "Routed-hose collision geometry must retain one convex capsule per straight segment";
 		var assembly = new MachineAssembly();
 		assembly.addComponent("supply", new AirSupply());
 		assembly.addComponent("valve", valve);

@@ -30,8 +30,8 @@ import sys.thread.Mutex;
  */
 class RobotRuntime {
   public final endpoint:RuntimeEndpoint;
-  /** Identity of the native source timestamp domain; receipt time has a separate clock. */
-  public final sourceClockId:String;
+  /** Current identity of the endpoint timeline, including its reset epoch. */
+  public var sourceClockId(get, never):String;
   var references:JointReferenceState;
   final referenceMutex = new Mutex();
   final defaultMaxRates:Array<Null<Float>>;
@@ -61,9 +61,8 @@ class RobotRuntime {
   static final jointMapScratch = new Arena(256);
   var disposed:Bool = false;
 
-  private function new(endpoint:RuntimeEndpoint, blueprint:RobotRuntimeBlueprint, sourceClockId:String) {
+  private function new(endpoint:RuntimeEndpoint, blueprint:RobotRuntimeBlueprint) {
     this.endpoint = endpoint;
-    this.sourceClockId = sourceClockId;
     defaultMaxRates = [for (joint in blueprint.joints) joint.maxRate];
     defaultMaxEfforts = [for (joint in blueprint.joints) joint.maxEffort];
     sensorLayout = blueprint.nativeSensorLayout();
@@ -102,16 +101,16 @@ class RobotRuntime {
   }
 
   /** Creates a runtime from a compiled model and an endpoint factory's result. */
-  public static function create(blueprint:RobotRuntimeBlueprint, ?endpoint:RuntimeEndpoint,
-      ?sourceClockId:String = "unspecified"):RobotRuntime {
+  public static function create(blueprint:RobotRuntimeBlueprint, ?endpoint:RuntimeEndpoint):RobotRuntime {
     if (blueprint == null) throw "Runtime requires a compiled blueprint";
-    if (sourceClockId == null || sourceClockId.length == 0) throw "Runtime source clock requires an ID";
     if (endpoint == null) endpoint = RuntimeEndpoints.inMemory(blueprint);
-    try return new RobotRuntime(endpoint, blueprint, sourceClockId) catch (error:Dynamic) {
+    try return new RobotRuntime(endpoint, blueprint) catch (error:Dynamic) {
       endpoint.close();
       throw error;
     }
   }
+
+  function get_sourceClockId():String return endpoint.sourceClockId();
 
   /** Starts a standalone runtime worker; Simulation-owned runtimes reject this. */
   public function start():Void {

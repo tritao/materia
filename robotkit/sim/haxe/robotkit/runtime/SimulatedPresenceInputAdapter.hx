@@ -54,7 +54,7 @@ class SimulatedPresenceInputAdapter implements SimulationStepObserver {
         break;
       }
       runtime.publishSensorFrame(sensor.id, [present ? 1.0 : 0.0], sequence, sourceTimestampNs,
-        "robotkit.simulation");
+        runtime.sourceClockId);
     }
   }
 }

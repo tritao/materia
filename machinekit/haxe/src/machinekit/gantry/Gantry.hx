@@ -145,7 +145,9 @@ class Gantry extends AxisBuilder {
 			headMountZero = state.worldPose("head/mount");
 			flangeZero = state.worldPose("head/outputFlange");
 		}
-		attach("powerSupply", new PowerSupply(spec.supplyVoltage, 20, (spec.dualY ? 4 : 3) + (head == null ? 0 : head.rotaryJoints.length)),
+		attach("powerSupply", new PowerSupply(spec.supplyVoltage, new machinekit.power.DcCurrent(20),
+			(spec.dualY ? 4 : 3) + (head == null ? 0 : head.rotaryJoints.length), 120, 60, 30,
+			head == null ? 0 : head.regenerativePower),
 			AssemblyFrames.translation(left - 180, front, 30), "frameFront");
 		buildDrive(axes[1], spec.driveY, "YLeft", "frameLeft", "beamFootLeft",
 			[left - 70, 0.0, feetZ + 6], alongY);
@@ -162,7 +164,7 @@ class Gantry extends AxisBuilder {
 			var drivers:Array<String> = [];
 			for (joint in head.rotaryJoints) {
 				var id = joint.id + "HeadDriver";
-				attach(id, new MotorDriver("GENERIC-SERVO-AMP", 5),
+				attach(id, new MotorDriver("GENERIC-SERVO-AMP", head.driverPhaseCurrent),
 					AssemblyFrames.translation(-railMargin - 180, -railMargin - 130 - 125 * driverIndex, 30), "frameFront");
 				driverIndex++;
 				connectPorts(id + "-power", "powerSupply", 'power$driverIndex', id, "power");
@@ -330,9 +332,11 @@ class Gantry extends AxisBuilder {
 		var motor:NemaStepper = cast component(motorId);
 		var rating = motor.rating();
 		if (rating == null) throw "Gantry motor needs rated drive data";
-		var family = rating.ratedCurrent <= 2 && spec.supplyVoltage <= 29 ? "GENERIC-TMC2209" : "GENERIC-DM542";
+		var family = rating.ratedCurrent <= 2 && spec.supplyVoltage.volts() <= 29 ? "GENERIC-TMC2209" : "GENERIC-DM542";
 		var id = motorId + "Driver";
-		attach(id, new MotorDriver(family, Math.min(rating.ratedCurrent, family == "GENERIC-TMC2209" ? 2.0 : 3.0), spec.microsteps),
+		attach(id, new MotorDriver(family,
+			new machinekit.power.PhaseRmsCurrent(Math.min(rating.ratedCurrent, family == "GENERIC-TMC2209" ? 2.0 : 3.0)),
+			spec.microsteps),
 			AssemblyFrames.translation(-railMargin - 180, -railMargin - 130 - 125 * driverIndex, 30), "frameFront");
 		driverIndex++;
 		connectPorts(id + "-power", "powerSupply", 'power$driverIndex', id, "power");

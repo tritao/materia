@@ -41,7 +41,7 @@ class GantryWelder extends machinekit.gantry.Gantry {
 			machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.Ball, 16, 10));
 		super(new machinekit.gantry.GantrySpec(1200, 1000, 600, screw, screw, screw, true,
 			"MGN12C", 23, "HFS5-4040", "HFS5-4040", false, machinekit.gantry.GantrySpec.GantryHead.CA,
-			0.5, 48, 16, 200, 100, 500, 250));
+			0.5, machinekit.motion.ServoMotor.LOW_VOLTAGE_BUS, 16, 200, 100, 500, 250));
 		var head:machinekit.gantry.RotaryHead = cast this.head;
 		tool = new ArmWeldingTool().build(head.flange);
 		include("tool", tool);

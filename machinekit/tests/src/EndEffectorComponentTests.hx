@@ -23,9 +23,11 @@ import machinekit.robotics.FrameBar;
 import machinekit.robotics.ParallelGripper;
 import machinekit.robotics.ParallelGripperBody;
 import machinekit.robotics.ParallelGripperSpec;
+import machinekit.robotics.ParallelGripperJaw;
 import machinekit.robotics.ParallelGripperFinger;
 import machinekit.component.CollisionHullFacet;
 import machinekit.robotics.ArmGripperTool;
+import machinekit.robotics.DualArmGripperTool;
 import machinekit.robot.EndEffectorControls;
 import machinekit.robotics.RobotFlange;
 import machinekit.robot.RobotScene;
@@ -150,9 +152,20 @@ class EndEffectorComponentTests {
 		if (gripper.components().filter(entry -> entry.id == "jawLeft" || entry.id == "jawRight").length != 2)
 			gripperIssues.push("paired jaws");
 		if (gripperIssues.length > 0) throw 'Pneumatic gripper assembly interface is incomplete: ${gripperIssues.join(", ")}';
-		var tendingSpec = new ParallelGripperSpec(32, 60, 60, 16);
-		if (tendingSpec.fingerDepth != 50 || tendingSpec.fingerDepth >= tendingSpec.expectedPartWidth)
-			throw "The tending pads must stay inside the housing depth so they clear the vise jaws";
+		var tendingSpec = new ParallelGripperSpec(32, 60, 60, 16, false, 40, 6);
+		var tendingFinger = new ParallelGripperFinger(tendingSpec, -1);
+		var tendingFingerRecipe = tendingFinger.componentType();
+		var tendingJaw = new ParallelGripperJaw(tendingSpec, -1);
+		var tendingJawRecipe = tendingJaw.componentType();
+		if (tendingSpec.fingerDepth != 40 || tendingSpec.fingerDepth >= tendingSpec.bodyDepth ||
+			tendingSpec.fingerWidth != 6 ||
+			tendingFingerRecipe == null ||
+			tendingJawRecipe == null ||
+			(cast tendingFingerRecipe.create(tendingFinger.values()):ParallelGripperFinger).spec.fingerDepth != 40 ||
+			(cast tendingFingerRecipe.create(tendingFinger.values()):ParallelGripperFinger).spec.fingerWidth != 6 ||
+			Math.abs((cast tendingJawRecipe.create(tendingJaw.values()):ParallelGripperJaw)
+				.connector("fingerSeat").frame.x - tendingJaw.connector("fingerSeat").frame.x) > 1e-9)
+			throw "Tending contact finger dimensions must survive saved part recipes";
 		var supportedGripper = new ParallelGripper(new ParallelGripperSpec(32, 60, 60, 16, true));
 		var leftFinger = [for (entry in supportedGripper.components()) if (entry.id == "fingerLeft") entry.component][0];
 		var rightFinger = [for (entry in supportedGripper.components()) if (entry.id == "fingerRight") entry.component][0];
@@ -181,7 +194,7 @@ class EndEffectorComponentTests {
 		var gripperTool = new ArmGripperTool(32, 50, 60, 12).build(new RobotFlange(50));
 		var gripperControls = EndEffectorControls.derive(gripperTool, "tool");
 		if (gripperControls.grippers.length != 1 || gripperControls.grippers[0].sensor != "tool/gripper/gripped" ||
-			gripperControls.gripperChannel() != "tool/gripper/body.close" ||
+			gripperControls.gripperChannel(gripperControls.grippers[0].member) != "tool/gripper/body.close" ||
 			gripperControls.grippers[0].minimumPartWidthMm != 38 ||
 			gripperControls.grippers[0].maximumPartWidthMm != 62 ||
 			gripperControls.grippers[0].fingerPadFrictionCoefficient != ParallelGripperSpec.FINGER_PAD_FRICTION_COEFFICIENT)
@@ -191,7 +204,7 @@ class EndEffectorComponentTests {
 			gripperSceneTools[0].contact.occurrence != "tool/gripper/body" ||
 			gripperSceneTools[0].sensor != "tool/gripper/gripped")
 			throw "Robot scene must bind the physical TCP, close channel and jaw switch";
-		var logicalGripper = new GripperChannels(gripperControls.gripperChannel());
+		var logicalGripper = new GripperChannels(gripperControls.gripperChannel(gripperControls.grippers[0].member));
 		var logicalDeclaration = logicalGripper.declarations()[0];
 		var safeOpen = switch logicalDeclaration.safeValue {case Digital(value): !value; case _: false;};
 		if (logicalDeclaration.id != "tool/gripper/body.close" || !safeOpen || !logicalDeclaration.keepOnStop)
@@ -242,6 +255,25 @@ class EndEffectorComponentTests {
 		var measuredFaces = GeometricConnectors.planarFaces(GeometricConnectors.describeFaces(measuredBox.shape));
 		measuredBox.close();
 		if (measuredFaces.length != 6) throw "Saved CAD face descriptors must decode as typed planar faces";
+		var dualTool = new DualArmGripperTool(32, 60, 60, 16);
+		var dualEffector = dualTool.build(new RobotFlange(50));
+		var dualControls = EndEffectorControls.derive(dualEffector, "tool");
+		var dualPoses = dualEffector.solvedPoses();
+		var dualA = dualPoses.get("gripperA/body"), dualB = dualPoses.get("gripperB/body");
+		if (dualA == null || dualB == null) throw "Dual gripper adapter lost one of its two mounted bodies";
+		if (dualControls.grippers.length != 2 ||
+			dualControls.gripperChannel("gripperA/body") != "tool/gripperA/body.close" ||
+			dualControls.gripperChannel("gripperB/body") != "tool/gripperB/body.close")
+			throw "Dual gripper controls must derive two independently supplied close channels";
+		var dualSceneTools = RobotScene.robotTools(dualEffector, "tool");
+		if (dualSceneTools.length != 2 || dualSceneTools[0].channel != "tool/gripperA/body.close" ||
+			dualSceneTools[1].channel != "tool/gripperB/body.close")
+			throw "Robot scene must expose both supplied gripper controls";
+		var stationX = dualA.x - dualB.x, stationY = dualA.y - dualB.y;
+		var stationDistance = Math.sqrt(stationX * stationX + stationY * stationY);
+		if (Math.abs(dualA.z - dualB.z) > 1e-6 ||
+			Math.abs(stationDistance - 2 * dualTool.mountOffsetMm) > 1e-6)
+			throw "Dual grippers must sit at opposing stations in the adapter plate plane";
 		var mountedArm = new CobotArm(Reach850, new ArmGripperTool(32, 60, 60, 16, true));
 		var armCell = new MachineAssembly();
 		armCell.include("arm", mountedArm);

@@ -19,12 +19,15 @@ class RotaryHeadCheck {
 
 	static function powered(head:RotaryHead):MachineAssembly {
 		var machine = new MachineAssembly();
-		machine.addComponent("supply", new PowerSupply(24, 20, head.rotaryJoints.length), AssemblyFrames.translation(-300, 0, 0));
+		machine.addComponent("supply", new PowerSupply(machinekit.motion.ServoMotor.LOW_VOLTAGE_BUS,
+			new machinekit.power.DcCurrent(20), head.rotaryJoints.length, 120, 60, 30,
+			head.regenerativePower), AssemblyFrames.translation(-300, 0, 0));
 		machine.include("head", head);
 		var drivers:Array<String> = [];
 		for (index in 0...head.rotaryJoints.length) {
 			var id = 'driver$index';
-			machine.addComponent(id, new MotorDriver("GENERIC-SERVO-AMP", 5), AssemblyFrames.translation(-250, index * 80, 0));
+			machine.addComponent(id, new MotorDriver("GENERIC-SERVO-AMP",
+				head.driverPhaseCurrent), AssemblyFrames.translation(-250, index * 80, 0));
 			machine.connectPorts('power$index', "supply", 'power${index + 1}', id, "power");
 			drivers.push(id);
 		}
@@ -74,7 +77,8 @@ class RotaryHeadCheck {
 		var plain = new Gantry(new GantrySpec(300, 300, 150));
 		for (selection in [GantryHead.C, GantryHead.CA]) {
 			var gantry = new Gantry(new GantrySpec(300, 300, 150, null, null, null, true,
-				"MGN12C", 23, "HFS5-4040", "HFS5-4040", false, selection));
+				"MGN12C", 23, "HFS5-4040", "HFS5-4040", false, selection, 0.5,
+				machinekit.motion.ServoMotor.LOW_VOLTAGE_BUS));
 			var head = gantry.head;
 			if (head == null || head.hasTilt != (selection == GantryHead.CA)) throw "GantrySpec selects its rotary head";
 			var flange = gantry.connector("toolFlange");

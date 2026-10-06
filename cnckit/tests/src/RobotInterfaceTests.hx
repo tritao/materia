@@ -85,5 +85,16 @@ class RobotInterfaceTests {
       false, false, true, true, true, true, true), 0.01);
     check(output.alarm == RobotInterfaceAlarm.DoorOpenedDuringCycle && output.holdCycle,
       "losing the closed-door switch during a cycle requests a hold and alarms");
+
+    fsm = new RobotInterface();
+    output = fsm.update(input(false, false, false, false, true), 0.01);
+    output = fsm.update(input(false, false, false, false, false, false,
+      false, true, true, false, true, true, true, true, false, true), 0.01);
+    check(output.alarm == RobotInterfaceAlarm.ToolChangeRequired && output.holdCycle && output.inCycle,
+      "a tool-change request during a cut holds the cycle and raises the CNC alarm");
+    output = fsm.update(input(false, false, false, false, false, true,
+      false, true, true, false, true, true, true, true), 0.01);
+    check(output.alarm == RobotInterfaceAlarm.None && output.ready,
+      "after the tool-change cause is removed, a safe fault reset clears the CNC alarm");
   }
 }

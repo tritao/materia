@@ -97,10 +97,12 @@ class LinearTrack extends AxisBuilder {
 			AssemblyFrames.translation(end == 0 ? start + 30 : start + length - 30, -227.5, 20), "frameLeft");
 		var pinionPose = AssemblyFrames.compose(AxisBuilder.orient(0, pinionY, motorFace.z, up, [0.0, 1, 0]),
 			AssemblyFrames.fromRotationMatrix(0, 0, 0, [0.0, 1, 0, -1, 0, 0, 0, 0, 1]));
-		attach("powerSupply", new PowerSupply(48, 10, 1), AssemblyFrames.translation(start, 550, 0), "frameLeft");
+		attach("powerSupply", new PowerSupply(new machinekit.power.DcVoltage(48),
+			new machinekit.power.DcCurrent(10), 1), AssemblyFrames.translation(start, 550, 0), "frameLeft");
 		driveRack(axis, "pinion", "motor", pinion, pinionPose, [0.0, 1, 0], "rack", rack,
 			AxisBuilder.orient(-rackMargin, pinionY + width, rackZ, up, along), "rackSupport", -1.0, _ -> {
-				attach("driver", new MotorDriver("GENERIC-DM542", driverCurrent, 16),
+				attach("driver", new MotorDriver("GENERIC-DM542",
+					new machinekit.power.PhaseRmsCurrent(driverCurrent), 16),
 					AssemblyFrames.translation(start + 150, 550, 0), "frameLeft");
 				connectPorts("driver-power", "powerSupply", "power1", "driver", "power");
 				return "driver";

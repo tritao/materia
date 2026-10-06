@@ -2554,6 +2554,7 @@ class MachineKitSmoke {
 			return;
 		}
 		var everything = Shards.run([
+			{name: "TendingCell.TendingMissionChecks.run", run: () -> TendingCell.TendingMissionChecks.run(), weight: 1.0},
 			{name: "AxisBuilderChecks.run", run: () -> AxisBuilderChecks.run(), weight: 1.0},
 			{name: "GantryChecks.run", run: () -> GantryChecks.run(), weight: 1.0},
 			{name: "RotaryHeadCheck.run", run: () -> RotaryHeadCheck.run(), weight: 1.0},

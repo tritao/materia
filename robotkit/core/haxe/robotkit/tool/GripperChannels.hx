@@ -6,6 +6,8 @@ import robotkit.execution.ProcessEventValue;
 /** One logical jaw command. It defaults open on a fault and retains its value
  * through an ordinary stop so a stopped arm keeps the part it is carrying. */
 class GripperChannels implements ToolChannels {
+	public static inline var KEEPS_ON_STOP:Bool = true;
+
 	public final channel:String;
 
 	public function new(channel:String) {
@@ -14,5 +16,5 @@ class GripperChannels implements ToolChannels {
 	}
 
 	public function declarations():Array<ProcessChannelDeclaration>
-		return [new ProcessChannelDeclaration(channel, ProcessEventValue.Digital(false), true)];
+		return [new ProcessChannelDeclaration(channel, ProcessEventValue.Digital(false), KEEPS_ON_STOP)];
 }

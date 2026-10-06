@@ -76,7 +76,7 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
         drives[i].position(positions[joint]);
       runtime.publishSensorFrame(value.source.id,
         [active ? 1.0 : 0.0, edge == null ? 0.0 : 1.0, edge == null ? 0.0 : edge, value.closingEdges], sequence,
-        snapshot.sourceTimestampNs, runtime.endpoint.sourceClockId(), null);
+        snapshot.sourceTimestampNs, runtime.sourceClockId, null);
     }
   }
 }

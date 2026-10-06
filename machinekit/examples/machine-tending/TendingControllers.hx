@@ -7,14 +7,13 @@ import machinekit.milling.MillPanel;
 import BenchMillPreview;
 import machinekit.robotics.CobotArm;
 import machinekit.robotics.CobotClass;
-import machinekit.robotics.ArmGripperTool;
+import machinekit.robotics.DualArmGripperTool;
 import machinekit.robot.RobotScene;
 import machinekit.control.DigitalSensor;
 import materia.assembly.AssemblyFrames;
 import materia.project.SceneArtifact;
 import haxe.io.Bytes;
 import cnckit.controller.RobotInterfaceChannels;
-import CncRouter.RouterPlate;
 
 /** The two independently controlled machines of the tending cell, before interlock logic. */
 class TendingControllers extends MachineAssembly {
@@ -25,6 +24,14 @@ class TendingControllers extends MachineAssembly {
 	public final outfeedTray:PartTray;
 	public final cellTable:TendingCellTable;
 
+	public function viseDatumPlace():SceneArtifact.SceneArtifactPlace
+		return {occurrence: "mill/mill/vise/body", connector: "datum"};
+
+	public function outfeedPlace(row:Int, column:Int):SceneArtifact.SceneArtifactPlace {
+		var target = outfeedTray.placeTarget(row, column);
+		return {occurrence: 'outfeedTray/${target.occurrence}', connector: target.connector};
+	}
+
 	public function new() {
 		super();
 		// Tended stock enters as a free infeed blank; keep the vise empty in the machine body.
@@ -33,16 +40,15 @@ class TendingControllers extends MachineAssembly {
 		var infeed = [for (tray in reach.trays) if (tray.id == "infeedTray") tray][0];
 		var outfeed = [for (tray in reach.trays) if (tray.id == "outfeedTray") tray][0];
 		infeedTray = new PartTray(2, 3, BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH,
-			BenchMill.STOCK_WIDTH + 20, BenchMill.STOCK_DEPTH + 20);
+			TendingReach.trayPitchX(), TendingReach.trayPitchY());
 		outfeedTray = new PartTray(2, 3, BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH,
-			BenchMill.STOCK_WIDTH + 20, BenchMill.STOCK_DEPTH + 20);
+			TendingReach.trayPitchX(), TendingReach.trayPitchY());
 		cellTable = new TendingCellTable(reach.tableWidth, reach.tableDepth, reach.tableTop, reach.tableOffset);
 		var infeedBlanks = new MachineAssembly();
 		for (slot in infeed.slots) {
 			var local = AssemblyFrames.compose(AssemblyFrames.inverse(infeed.frame), slot.frame);
 			infeedBlanks.addComponent('blank-${slot.name.substr(5)}',
-				new RouterPlate(BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH,
-					BenchMill.STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"), local);
+				new TendingBlank(BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH, BenchMill.STOCK_HEIGHT), local);
 			infeedBlanks.addComponent(slot.name + "-present", new DigitalSensor("presence"),
 				AssemblyFrames.compose(local, AssemblyFrames.translation(-BenchMill.STOCK_WIDTH * 0.5 - 10, 0, 10)));
 		}
@@ -52,24 +58,29 @@ class TendingControllers extends MachineAssembly {
 			outfeedSensors.addComponent(slot.name + "-present", new DigitalSensor("presence"),
 				AssemblyFrames.compose(local, AssemblyFrames.translation(-BenchMill.STOCK_WIDTH * 0.5 - 10, 0, 10)));
 		}
-		arm = new CobotArm(reach.cls, new ArmGripperTool(32, BenchMill.STOCK_WIDTH, 60, 16));
+		arm = new CobotArm(reach.cls, TendingReach.tendingTool());
 		include("mill", mill);
 		exposePort("mains", "mill/mill/powerSupply", "mains");
-		var baseX = reach.armBase.x, baseY = reach.armBase.y;
+		var baseX = reach.armPlacement.x, baseY = reach.armPlacement.y;
 		var riserHeight = reach.riser;
+		var cncNames = RobotInterfaceChannels.cncOutputs();
+		var robotNames = RobotInterfaceChannels.robotRequests();
+		var fieldSensorCount = infeed.slots.length + outfeed.slots.length;
 		var riserPose = AssemblyFrames.translation(baseX, baseY, 0);
-		addComponent("armRiser", new MillPanel(120, 120, riserHeight, "steel"), riserPose);
-		include("arm", arm, reach.armBase);
-		addMemberConnector("armRiser", "armSeat", AssemblyFrames.compose(AssemblyFrames.inverse(riserPose), reach.armBase));
+		addComponent("armRiser", new TendingCellRiser(riserHeight), riserPose);
+		include("arm", arm, reach.armPlacement);
+		addMemberConnector("armRiser", "armSeat",
+			TendingCellRiser.armSeatFrame(arm, riserPose, reach.armPlacement));
 		addMate("arm-riser", "fixed", "armRiser", "armSeat", "arm/baseFlange", "floor");
-		addComponent("robotController", new RobotController(6, RobotInterfaceChannels.cncOutputs().length + 12),
+		addComponent("robotController", new RobotController(arm.modules.length,
+			cncNames.length + fieldSensorCount, robotNames.length, DualArmGripperTool.VALVE_COIL_OUTPUTS),
 			AssemblyFrames.translation(baseX + 350, baseY, 0));
 		include(infeed.id, infeedTray, infeed.frame);
 		include("infeed", infeedBlanks, infeed.frame);
 		include(outfeed.id, outfeedTray, outfeed.frame);
 		include("outfeed", outfeedSensors, outfeed.frame);
 		include("cellTable", cellTable, reach.tableFrame);
-		var robotInput = RobotInterfaceChannels.cncOutputs().length + 1;
+		var robotInput = cncNames.length + 1;
 		for (slot in infeed.slots) {
 			var id = 'infeed/${slot.name}-present';
 			addPresence(id, 'infeedTray/${slot.name}', BenchMill.STOCK_HEIGHT + 5);
@@ -82,16 +93,16 @@ class TendingControllers extends MachineAssembly {
 		}
 		addComponent("floorMarker", new MillPanel(100, 100, 2, "steel"),
 			AssemblyFrames.translation(-1000, -1000, 0));
-		for (index in 0...6) connectPorts('robot-axis${index + 1}', "robotController", 'axis${index + 1}',
+		for (index in 0...arm.modules.length) connectPorts('robot-axis${index + 1}', "robotController", 'axis${index + 1}',
 			'arm/driver${index + 1}', "bus");
-		connectPorts("robot-gripper-close-coil", "robotController", "valve1", "arm/tool/valve", "coilA");
-		connectPorts("robot-gripper-open-coil", "robotController", "valve2", "arm/tool/valve", "coilB");
+		connectPorts("robot-gripper-a-close-coil", "robotController", "valve1", "arm/tool/valveA", "coilA");
+		connectPorts("robot-gripper-a-open-coil", "robotController", "valve2", "arm/tool/valveA", "coilB");
+		connectPorts("robot-gripper-b-close-coil", "robotController", "valve3", "arm/tool/valveB", "coilA");
+		connectPorts("robot-gripper-b-open-coil", "robotController", "valve4", "arm/tool/valveB", "coilB");
 		connectPorts("robot-gripper-air", "mill/airManifold", "out3", "arm", "compressedAir");
 		connectPorts(RobotInterfaceChannels.CNC_READY, "mill/cncController", "output1", "robotController", "input1");
-		var cncNames = RobotInterfaceChannels.cncOutputs();
 		for (index in 1...cncNames.length)
 			connectPorts(cncNames[index], "mill/cncController", 'output${index + 1}', "robotController", 'input${index + 1}');
-		var robotNames = RobotInterfaceChannels.robotRequests();
 		for (index in 0...robotNames.length)
 			connectPorts(robotNames[index], "robotController", 'output${index + 1}', "mill/cncController", 'input${index + 6}');
 	}
@@ -142,9 +153,10 @@ class TendingControllerChecks {
 		if (scene.controllers == null || scene.controllers.length != 2 || scene.signals == null ||
 			scene.signals.length != RobotInterfaceChannels.cncOutputs().length + RobotInterfaceChannels.robotRequests().length)
 			throw "Tending cell needs two controllers and every robot-interface signal wire";
-		if (scene.robotTools == null || scene.robotTools.length != 1 || scene.robotTools[0].kind != "gripper" ||
-			scene.robotTools[0].gripper == null || scene.robotTools[0].sensor != "arm/tool/gripper/gripped")
-			throw "Tending cell must save its mounted physical gripper and jaw feedback";
+		if (scene.robotTools == null || scene.robotTools.length != 2)
+			throw "Tending cell must save both mounted grippers";
+		for (tool in scene.robotTools) if (tool.kind != "gripper" || tool.gripper == null || tool.sensor == null)
+			throw "Each tending gripper needs physical jaw limits and feedback";
 		var owners = new Map<String, String>();
 		for (control in scene.controllers) for (joint in control.joints) {
 			if (owners.exists(joint)) throw 'Joint "$joint" belongs to two controllers';
@@ -173,10 +185,11 @@ class TendingControllerChecks {
 			throw 'The tending CNC job omits infeed stock "$id"';
 		var mill = [for (control in scene.controllers) if (control.id == "mill/cncController") control][0];
 		var robot = [for (control in scene.controllers) if (control.id == "robotController") control][0];
-		if (robot.channels.indexOf("arm/tool/valve/coilA") < 0 ||
-			robot.channels.indexOf("arm/tool/valve/coilB") < 0 ||
-			robot.joints.filter(joint -> StringTools.endsWith(joint, "gripper/jaw-left-slide")).length != 1)
-			throw "Robot cabinet must own both gripper valve coils and the pneumatic jaw joint";
+		for (channel in ["arm/tool/valveA/coilA", "arm/tool/valveA/coilB", "arm/tool/valveB/coilA", "arm/tool/valveB/coilB"])
+			if (robot.channels.indexOf(channel) < 0) throw 'Robot cabinet must own gripper coil "$channel"';
+		if (robot.joints.filter(joint -> StringTools.endsWith(joint, "gripperA/jaw-left-slide")).length != 1 ||
+			robot.joints.filter(joint -> StringTools.endsWith(joint, "gripperB/jaw-left-slide")).length != 1)
+			throw "Robot cabinet must own both gripper cylinder joints";
 		PartTrayChecks.run();
 		if (sceneDefinition.occurrences.filter(item -> StringTools.startsWith(item.id, "infeed/blank-")).length != 6 ||
 			robot.sensors.filter(sensor -> StringTools.startsWith(sensor, "infeed/") || StringTools.startsWith(sensor, "outfeed/")).length != 12)
@@ -200,10 +213,10 @@ class TendingControllerChecks {
 				cell.reach.parkPose[index]) > 1e-9)
 				throw "Tending cell start state differs from the arm's checked mill-clear park pose";
 		var layout = cell.reach;
-		if (layout.cls != Reach850 || layout.riser != 550 || layout.names.length != 15 ||
+		if (layout.cls != Reach850 || layout.riser != 550 || layout.poses.length != 56 ||
 			layout.jointMargin < 0.1 || layout.wristSine < 0.2 || cell.arm.cls != layout.cls)
 			throw 'Tending cell must use the asserted reach result: ' +
-				'${layout.cls}/${layout.riser}/${layout.names.length}, joint=${layout.jointMargin}, wrist=${layout.wristSine}';
+				'${layout.cls}/${layout.riser}/${layout.poses.length}, joint=${layout.jointMargin}, wrist=${layout.wristSine}';
 		var cellScene = AssemblyPreview.scene(cell, "tending-cell-layout");
 		var cellDefinition = cellScene.assemblyDefinition;
 		if (cellDefinition == null) throw "Tending cell layout preview has no assembly definition";
@@ -213,13 +226,22 @@ class TendingControllerChecks {
 			throw "Both tray banks need table tops and four floor-supported legs each";
 		var state = new AssemblyState(cellDefinition, cellScene.assemblyState);
 		var baseFloor = state.worldConnector("arm/baseFlange", "floor");
-		if (Math.abs(baseFloor.x - layout.armBase.x) > 1e-6 ||
-			Math.abs(baseFloor.y - layout.armBase.y) > 1e-6 ||
-			Math.abs(baseFloor.z - layout.armBase.z) > 1e-6)
-			throw "Tending cell mounting pose must be the pose accepted by the reach study";
+		var expectedFloor = TendingCellRiser.armFloorFrame(cell.arm, layout.armPlacement);
+		if (!sameFrame(baseFloor, expectedFloor))
+			throw "Tending cell riser seat differs from the reach-study arm placement";
+		var baseFlange = state.worldPose("arm/baseFlange");
+		if (!sameFrame(baseFlange, layout.armBaseFlange))
+			throw "Tending cell base-flange frame differs from the fixed mount used by its reach study";
 		var model = new AssemblyModel("mm");
 		cell.addTo(model, "");
 		if (owners.keys().hasNext() == false) throw "Tending cell has no moving joints";
+	}
+
+	static function sameFrame(first:materia.assembly.AssemblyRecord.AssemblyFrame,
+		second:materia.assembly.AssemblyRecord.AssemblyFrame):Bool {
+		var dot = first.qx * second.qx + first.qy * second.qy + first.qz * second.qz + first.qw * second.qw;
+		return Math.abs(first.x - second.x) <= 1e-6 && Math.abs(first.y - second.y) <= 1e-6 &&
+			Math.abs(first.z - second.z) <= 1e-6 && 1 - Math.abs(dot) <= 1e-9;
 	}
 
 	static function rejects(scene:materia.project.SceneArtifact.SceneArtifactData, expected:String, message:String):Void {

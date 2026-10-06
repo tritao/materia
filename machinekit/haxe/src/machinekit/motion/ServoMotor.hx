@@ -39,11 +39,13 @@ typedef ServoRating = {
  * CAD frame: mounting face at z=0, body toward -Z, shaft along +Z. Connectors: `mountFace`, `shaftAxis`.
  */
 class ServoMotor extends MachineComponent implements MotorDrive {
+	/** Assumed DC bus for the low-voltage servo winding family. */
+	public static final LOW_VOLTAGE_BUS:machinekit.power.DcVoltage = new machinekit.power.DcVoltage(48);
 	/** Assumed 48 V winding: back EMF uses at most eighty percent of the bus
 	 * at maximum speed, capped at 0.06 V/(rad/s) line RMS. Rated copper loss
 	 * is five percent of mechanical output. Resistance scales with the motor. */
 	public static function lowVoltageWinding(ratedTorque:Float, ratedSpeed:Float, maxSpeed:Float):ServoElectricalRating {
-		var backEmf = Math.min(0.06, 0.8 * 48 / (Math.sqrt(2.0) * maxSpeed));
+		var backEmf = Math.min(0.06, 0.8 * LOW_VOLTAGE_BUS.volts() / (Math.sqrt(2.0) * maxSpeed));
 		var constant = backEmf * Math.sqrt(3.0);
 		var current = ratedTorque / constant;
 		return {torqueConstant: constant, backEmfConstant: backEmf,

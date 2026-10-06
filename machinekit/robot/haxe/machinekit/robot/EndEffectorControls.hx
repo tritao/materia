@@ -78,10 +78,10 @@ class EndEffectorControls {
 		return null;
 	}
 
-	/** The physical gripper's single logical close channel, or null when absent. */
-	public function gripperChannel():Null<String> {
+	/** A physical gripper's logical close channel, by its assembly member ID. */
+	public function gripperChannel(member:String):Null<String> {
 		for (control in controls) switch control {
-			case Gripper(channel, _, _, _): return channel;
+			case Gripper(channel, owner, _, _) if (owner == member): return channel;
 			case _:
 		}
 		return null;
@@ -94,7 +94,7 @@ class EndEffectorControls {
 		var grippers:Array<GripperContact> = [];
 		var arcs:Array<ArcTorchControl> = [];
 		var sensorId:Null<String> = null;
-		var hasGripper = false, hasVacuum = false, hasLock = false;
+		var hasVacuum = false, hasLock = false;
 		var hasExplicitVacuumValve = false;
 		for (member in configuration.components()) if (machinekit.pneumatic.VacuumValveFacet.of(member.component) != null)
 			hasExplicitVacuumValve = true;
@@ -102,7 +102,7 @@ class EndEffectorControls {
 			var name = '$prefix/${member.id}';
 			if (Std.isOfType(facet, GripFacet)) {
 				var grip:GripFacet = cast facet;
-				if (hasGripper || grip.openPort == grip.closePort) throw "Ambiguous gripper runtime ports";
+				if (grip.openPort == grip.closePort) throw "Ambiguous gripper runtime ports";
 				requireInlet(configuration, member.id, grip.openPort, [PortKind.Pneumatic, PortKind.Signal]);
 				requireInlet(configuration, member.id, grip.closePort, [PortKind.Pneumatic, PortKind.Signal]);
 				controls.push(Gripper('$name.close', member.id, grip.openPort, grip.closePort));
@@ -116,7 +116,6 @@ class EndEffectorControls {
 					minimumPartWidthMm: grip.minimumPartWidthMm, nominalPartWidthMm: grip.nominalPartWidthMm,
 					maximumPartWidthMm: grip.maximumPartWidthMm, fingerLengthMm: grip.fingerLengthMm,
 					fingerPadFrictionCoefficient: grip.fingerPadFrictionCoefficient});
-				hasGripper = true;
 			} else if (Std.isOfType(facet, machinekit.pneumatic.VacuumActuatorFacet)) {
 				var actuator:machinekit.pneumatic.VacuumActuatorFacet = cast facet;
 				if (hasExplicitVacuumValve) continue;

@@ -389,7 +389,8 @@ class ApplicationSimulation {
         if (candidateAssembly == null) throw "A mission needs the project's assembly";
         candidateMission = new MissionPlayer(work, candidateAssembly, candidate, assemblyIndex, timestep, heldBoxes,
           candidateTools.objectsByScene(), session, [for (id in candidateByController.keys()) candidateByController.get(id)],
-          candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId), null,
+          candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId),
+          candidateSignals == null || work.controllerId == null ? null : candidateSignals.outputFor(work.controllerId), null,
           virtualWelder ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
             : MissionPlayer.ARM_ACCELERATION);
         // A mission that welds lays the weld metal as the welder deposits it.
@@ -531,6 +532,41 @@ class ApplicationSimulation {
     presentationEpoch++; return true;
   }
   public function isRunning():Bool return running;
+
+  /** Latch an emergency stop on every robot in this shared simulated cell. */
+  public function emergencyStop():Bool {
+    if (simulation == null || simulatedIds.length == 0) return false;
+    for (id in simulatedIds) {
+      emergencyStopRobot(id);
+    }
+    return true;
+  }
+
+  /** Emergency stop one simulated robot by its world ID. */
+  public function emergencyStopRobot(id:robotkit.core.RobotId):Bool {
+    var robot = simulation == null || simulatedIds.indexOf(id) < 0 ? null : world.robot(id);
+    if (robot == null) return false;
+    robot.stop(robotkit.core.StopMode.Emergency);
+    return true;
+  }
+
+  function resetRobotSafety(id:robotkit.core.RobotId):Bool {
+    var robot = simulation == null || simulatedIds.indexOf(id) < 0 ? null : world.robot(id);
+    if (robot == null) return false;
+    var safety = robot.snapshot().safety;
+    if (safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT ||
+        safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP)
+      robot.resetSafety();
+    return true;
+  }
+
+  /** Reset only the failed mission robot, then ask its cell controller to retry the failed step. */
+  public function retryMission():Bool {
+    if (mission == null || mission.failure == null || simulation == null) return false;
+    if (!resetRobotSafety(mission.robotId())) return false;
+    return mission.retryFailedStep();
+  }
+
   /** Scene ids of the objects the tool links are holding right now. */
   public function heldObjectIds():Array<String> return tools == null ? [] : tools.heldIds();
 

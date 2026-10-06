@@ -94,9 +94,9 @@ class EndEffectorVacuumFeedback implements SimulationStepObserver {
     if (timestampNs == null || Int64.compare(timestampNs, Int64.ofInt(0)) < 0 ||
         (lastTimestampNs != null && Int64.compare(timestampNs, lastTimestampNs) <= 0))
       throw "Vacuum feedback needs increasing non-negative simulation timestamps";
-    if (selection.active() == bundle.runtime &&
-        selection.selectedClockId() != "robotkit.simulation")
-      throw "Vacuum feedback selection needs the robotkit.simulation source clock";
+    var sourceClockId = robot.sourceClockId;
+    if (selection.active() == bundle.runtime && selection.selectedClockId() != sourceClockId)
+      throw "Vacuum feedback selection needs the robot endpoint's current source clock";
     var vacuum:SimulatedVacuum = cast bundle.runtime.vacuum;
     var sealed = false;
     if (selection.active() == bundle.runtime && vacuum.isEnabled())
@@ -108,7 +108,7 @@ class EndEffectorVacuumFeedback implements SimulationStepObserver {
     var nextSequence = Int64.add(sequence, Int64.ofInt(1));
     var frame = robot.publishSensorFrameAndGet(bundle.bindings.vacuumSensorId,
       [sealed ? sealedVacuumKpa : 0.0], nextSequence, timestampNs,
-      "robotkit.simulation");
+      sourceClockId);
     sequence = nextSequence;
     lastTimestampNs = timestampNs;
     return adapter.apply(frame);

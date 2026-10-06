@@ -28,10 +28,15 @@ typedef RotaryHeadJoint = {
  * Dimensions, cable allowances and generic drive ratings are stated design assumptions.
  */
 class RotaryHead extends AxisBuilder {
+	/** Assumed low-voltage winding for a 48 V DC servo bus. */
+	static inline var SERVO_DESIGNATION:String = "GENERIC-LV-SERVO-50W";
 	public final rotaryJoints:Array<RotaryHeadJoint> = [];
 	public final flange:RobotFlange;
 	public final flangeZero:AssemblyFrame;
 	public final hasTilt:Bool;
+	/** Driver phase current and brake-resistor demand derived from the installed motor curve. */
+	public final driverPhaseCurrent:machinekit.power.PhaseRmsCurrent;
+	public final regenerativePower:Float;
 	/** Conservative radial clearance for every permitted C/A pose, in millimetres. */
 	public final radialEnvelopeMm:Float;
 	/** Furthest extent toward the tool over permitted poses, in millimetres. */
@@ -48,7 +53,9 @@ class RotaryHead extends AxisBuilder {
 				throw "A rotary head cable allowance must be positive and at most one full turn";
 		this.hasTilt = hasTilt;
 		flange = new RobotFlange(50);
-		var servo = ServoMotor.model("GENERIC-SERVO-50W");
+		var servo = ServoMotor.model(SERVO_DESIGNATION);
+		driverPhaseCurrent = new machinekit.power.PhaseRmsCurrent(
+			servo.rating.peakTorque / servo.rating.electrical.torqueConstant);
 		radialEnvelopeMm = hasTilt ? Math.sqrt(Math.pow(126 + servo.rating.bodyLength, 2) +
 			Math.pow(servo.rating.bodyDiameter / 2, 2)) : Math.sqrt(50 * 50 + 40 * 40);
 		axialEnvelopeMm = hasTilt ? A_AXIS + Math.max(Math.sqrt(A_REACH * A_REACH +
@@ -62,7 +69,7 @@ class RotaryHead extends AxisBuilder {
 			new GantryPlate("head motor support", 20, 80, 77), AssemblyFrames.translation(side * 40, 0, 8), "mount");
 		attach("motorPlate", new GantryBoredBracket("head motor plate", 100, 80, 8,
 			AssemblyFrames.identity(), 10.5), AssemblyFrames.translation(0, 0, 85), "supportLeft");
-		attach("cMotor", ServoMotor.model("GENERIC-SERVO-50W"), AssemblyFrames.translation(0, 0, 85), "motorPlate");
+		attach("cMotor", ServoMotor.model(SERVO_DESIGNATION), AssemblyFrames.translation(0, 0, 85), "motorPlate");
 		attach("cGearbox", new Gearbox(130, 0.85, 60, 40, 10, true),
 			AssemblyFrames.translation(0, 0, 93), "motorPlate");
 		turn("c", "cGearbox", "cShaft", new GantryIdlerPin(10, 18),
@@ -75,6 +82,7 @@ class RotaryHead extends AxisBuilder {
 			flangeZero = AssemblyFrames.translation(0, 0, C_OUTPUT + flange.thickness);
 			attach("outputFlange", flange, flangeZero, "cShaft");
 		}
+		regenerativePower = rotaryJoints.length * servo.rating.peakTorque * servo.rating.ratedSpeed;
 		exposeConnector("toolFlange", "outputFlange", "face");
 	}
 
@@ -87,7 +95,7 @@ class RotaryHead extends AxisBuilder {
 			new GantryBoredBracket("rotary fork arm", 12, 180, 149, axisFrame,
 				side < 0 ? 10.5 : bearing.outside),
 			AssemblyFrames.translation(side * 120, 0, C_OUTPUT + 8), "forkBase");
-		attach("aMotor", ServoMotor.model("GENERIC-SERVO-50W"),
+		attach("aMotor", ServoMotor.model(SERVO_DESIGNATION),
 			orient(-126, 0, A_AXIS, [0.0, 0, 1], [1.0, 0, 0]), "forkLeft");
 		attach("aGearbox", new Gearbox(130, 0.85, 60, 40, 10, true),
 			orient(-114, 0, A_AXIS, [0.0, 0, 1], [1.0, 0, 0]), "forkLeft");

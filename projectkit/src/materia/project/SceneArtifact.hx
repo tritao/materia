@@ -253,6 +253,27 @@ typedef SceneArtifactArmConfiguration = {
 	@:optional var turns:Array<Int>;
 }
 
+/** One digital output command owned by a cell controller. */
+typedef SceneArtifactMissionSignal = {
+	var name:String;
+	var value:Bool;
+}
+
+/** A controller input condition with a simulation-time deadline. */
+typedef SceneArtifactMissionWait = {
+	var name:String;
+	var value:Bool;
+	var timeout:Float;
+	/** Earlier output step to repeat after an operator removes the cause and resets the fault. */
+	@:optional var retryStep:Int;
+}
+
+/** A waypoint is exactly one of a joint target or a robot-root-frame Cartesian pose. */
+typedef SceneArtifactMissionWaypoint = {
+	@:optional var joints:Array<SceneArtifactJointTarget>;
+	@:optional var pose:SceneArtifactTorchPose;
+}
+
 /**
  * One step of a mission.
  * - `goTo`: drive the mobile base to `pose`, in the assembly frame on the floor.
@@ -261,6 +282,9 @@ typedef SceneArtifactArmConfiguration = {
  * - `place`: set what the tool holds down with its base on the connector `at.connector` of
  *   `at.occurrence`, and let go.
  * - `moveJoints`: move the chain ending at `at` to absolute joint coordinates in radians or metres.
+ * - `signal`: set one digital output on the mission's controller.
+ * - `waitFor`: wait for one digital input on the mission's controller until its simulation-time timeout.
+ * - `moveVia`: move the chain ending at `at` through exact-stop joint or robot-root-frame pose waypoints.
  * - `weld`: weld the seam `weld` describes with the robot's torch.
  * - `findWork`: measure the named work frame from contact probes on saved nominal CAD faces.
  * - `stow`: return the welding arm to its CAD ready posture using its measured joints and live cell clearance.
@@ -273,9 +297,20 @@ typedef SceneArtifactMissionStep = {
 	@:optional var at:SceneArtifactPlace;
 	/** Requested part heading in world radians; omission leaves tool spin free. */
 	@:optional var yaw:Float;
+	/** Requested handling-tool roll about world +Z in radians; independent of part heading. */
+	@:optional var toolYaw:Float;
 	@:optional var weld:SceneArtifactWeld;
 	@:optional var joints:Array<SceneArtifactJointTarget>;
 	@:optional var contactWork:SceneContactRegistration.SceneContactWork;
+	@:optional var signal:SceneArtifactMissionSignal;
+	@:optional var waitFor:SceneArtifactMissionWait;
+	@:optional var poses:Array<SceneArtifactMissionWaypoint>;
+	/** Simulation-time deadline for an asynchronous handling or motion step. */
+	@:optional var timeoutSeconds:Float;
+	/** Cartesian pickup/place approach height in metres. */
+	@:optional var approachDistance:Float;
+	/** Logical tool channel used when a robot has more than one handling tool. */
+	@:optional var tool:String;
 }
 
 /** Absolute mechanical joint position, in radians or metres. */
@@ -439,7 +474,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 20;
+	public static inline var VERSION:Int = 25;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -658,8 +693,10 @@ class SceneArtifact {
 			if (data.assemblyState != null)
 				AssemblyDefinitionCodec.validateState(assemblyDefinition, data.assemblyState);
 		}
-		if (data.machining != null && data.mission != null)
-			throw "Scene artifact cannot combine machining and a mission";
+		if (data.machining != null && data.mission != null &&
+			(data.machining.controllerId == null || data.mission.controllerId == null ||
+			 data.machining.controllerId == data.mission.controllerId))
+			throw "Scene artifact CNC job and mission need distinct controller owners";
 		if (data.machining != null) validateMachining(data.machining, ids, data.assemblyDefinition);
 		if (data.mobileBase != null) validateMobileBase(data.mobileBase, data.assemblyDefinition);
 		if (data.robotTools != null) validateRobotTools(data.robotTools, data);
@@ -1017,6 +1054,24 @@ class SceneArtifact {
 		if (mission.steps == null || mission.steps.length == 0) fail("has no steps");
 		var definition = data.assemblyDefinition;
 		var flat = definition == null ? null : AssemblyDefinitionFlattener.flatten(definition);
+		var missionController:Null<SceneArtifactCellController> = null;
+		if (mission.controllerId != null && data.controllers != null)
+			for (controller in data.controllers) if (controller.id == mission.controllerId) missionController = controller;
+		function requiresRobotController(index:Int):Void {
+			if (mission.controllerId == null || missionController == null || missionController.kind != "robot")
+				fail('step $index needs a robot mission controller');
+		}
+		function hasSignal(name:String, output:Bool):Bool {
+			if (data.signals == null || mission.controllerId == null) return false;
+			for (wire in data.signals) if (wire.name == name &&
+				(output ? wire.from.controller == mission.controllerId : wire.to.controller == mission.controllerId)) return true;
+			return false;
+		}
+		function hasInput(name:String):Bool {
+			// A wait can observe either a local field sensor or a signal routed from
+			// another controller. Both are inputs owned by this controller.
+			return (missionController != null && missionController.sensors.indexOf(name) >= 0) || hasSignal(name, false);
+		}
 		/** Whether `place` names an existing connector of an existing occurrence. */
 		function exists(place:Null<SceneArtifactPlace>):Bool {
 			if (place == null || flat == null) return false;
@@ -1027,17 +1082,33 @@ class SceneArtifact {
 			return false;
 		}
 		var handles = false, welds = false;
+		var handlingTools:Array<SceneArtifactRobotTool> = data.robotTools == null ? [] : [for (tool in data.robotTools)
+			if (tool.kind == "gripper" || tool.kind == "suction") tool];
 		for (index in 0...mission.steps.length) {
 			var step = mission.steps[index];
 			if (step == null) fail('step $index is empty');
-			if(step.configuration!=null){
-				var pin:SceneArtifactArmConfiguration=cast step.configuration;
-				if(step.kind!="pick" && step.kind!="place" && step.kind!="weld" && step.kind!="moveJoints")
+			if (step.configuration != null) {
+				var pin:SceneArtifactArmConfiguration = step.configuration;
+				if (step.kind != "pick" && step.kind != "place" && step.kind != "weld" &&
+					step.kind != "moveJoints" && step.kind != "moveVia")
 					fail('step $index cannot carry an arm configuration pin');
-				if((pin.shoulder!="front" && pin.shoulder!="back") || (pin.elbow!="up" && pin.elbow!="down") ||
-					(pin.wrist!="no-flip" && pin.wrist!="flip"))fail('step $index has an invalid arm configuration');
-				if(pin.turns!=null && pin.turns.length!=6)fail('step $index configuration turns need six arm joints');
+				if ((pin.shoulder != "front" && pin.shoulder != "back") ||
+					(pin.elbow != "up" && pin.elbow != "down") || (pin.wrist != "no-flip" && pin.wrist != "flip"))
+					fail('step $index has an invalid arm configuration');
+				if (pin.turns != null && pin.turns.length != 6) fail('step $index configuration turns need six arm joints');
 			}
+			if (step.timeoutSeconds != null &&
+				(!finite(step.timeoutSeconds) || step.timeoutSeconds <= 0 || step.timeoutSeconds > 3600))
+				fail('step $index needs a finite timeout between 0 and 3600 seconds');
+			if (step.approachDistance != null && step.kind != "pick" && step.kind != "place")
+				fail('step $index can set a handling approach only for pick or place');
+			if (step.approachDistance != null &&
+				(!finite(step.approachDistance) || step.approachDistance <= 0 || step.approachDistance > 1))
+				fail('step $index needs a finite handling approach between 0 and 1 metre');
+			if (step.tool != null && step.kind != "pick" && step.kind != "place")
+				fail('step $index can select a tool only for pick or place');
+			if (step.toolYaw != null && step.kind != "pick" && step.kind != "place")
+				fail('step $index can set a tool yaw only for pick or place');
 			switch step.kind {
 				case "goTo":
 					if (data.mobileBase == null) fail('step $index drives, but the assembly has no mobile base');
@@ -1045,7 +1116,13 @@ class SceneArtifact {
 				case "pick" | "place":
 					handles = true;
 					if (step.yaw != null && !finite(step.yaw)) fail('step $index needs a finite yaw');
+					if (step.toolYaw != null && !finite(step.toolYaw)) fail('step $index needs a finite tool yaw');
 					if (!exists(step.at)) fail('step $index names no connector of an occurrence in the assembly');
+					if (handlingTools.length == 0) fail('step $index needs a handling tool');
+					if (handlingTools.length > 1 && step.tool == null)
+						fail('step $index must select a tool because this robot has multiple handling tools');
+					if (step.tool != null && [for (tool in handlingTools) if (tool.channel == step.tool) tool].length != 1)
+						fail('step $index names no unique handling tool channel "${step.tool}"');
 				case "moveJoints":
 					if (!exists(step.at)) fail('step $index names no connector of an occurrence in the assembly');
 					if (step.joints == null || step.joints.length == 0 || step.joints.length > 64)
@@ -1066,6 +1143,82 @@ class SceneArtifact {
 							(joint.limits.upper != null && target.position > joint.limits.upper * scale))
 							fail('step $index targets joint "${target.joint}" past its limits');
 					}
+				case "signal":
+					requiresRobotController(index);
+					if (step.signal == null || step.signal.name == null || step.signal.name.length == 0)
+						fail('step $index needs a named digital output');
+					else if (!hasSignal(step.signal.name, true))
+						fail('step $index writes no output wire owned by controller "${mission.controllerId}"');
+				case "waitFor":
+					requiresRobotController(index);
+					var condition = step.waitFor;
+					if (condition == null || condition.name == null || condition.name.length == 0)
+						fail('step $index needs a named digital input');
+					else {
+						if (!hasInput(condition.name))
+							fail('step $index reads no input signal or sensor owned by controller "${mission.controllerId}"');
+						if (!finite(condition.timeout) || condition.timeout <= 0 || condition.timeout > 3600)
+							fail('step $index needs a finite timeout between 0 and 3600 seconds');
+							if (condition.retryStep != null) {
+								var retry = condition.retryStep;
+							var retryCommand = retry >= 0 && retry < mission.steps.length ? mission.steps[retry] : null;
+							if (retry < 0 || retry >= index || retryCommand == null || retryCommand.kind != "signal" ||
+								retryCommand.signal == null)
+								fail('step $index retryStep must name an earlier digital output command');
+							else if (retryCommand.signal.value != true)
+								fail('step $index retryStep must repeat an asserted output request');
+						}
+					}
+				case "moveVia":
+					requiresRobotController(index);
+					if (!exists(step.at)) fail('step $index names no connector of an occurrence in the assembly');
+					if (step.poses == null || step.poses.length == 0 || step.poses.length > 64)
+						fail('step $index needs between one and 64 via-points');
+					var jointSpace:Null<Bool> = null;
+					for (waypoint in step.poses) {
+						if (waypoint == null || (waypoint.joints == null) == (waypoint.pose == null)) {
+							fail('step $index via-points need exactly one joint or pose target');
+							continue;
+						}
+						var usesJoints = waypoint.joints != null;
+						if (jointSpace != null && jointSpace != usesJoints)
+							fail('step $index cannot mix joint and pose via-points');
+						jointSpace = usesJoints;
+						if (usesJoints) {
+							var targets = waypoint.joints;
+							if (targets == null || targets.length == 0 || targets.length > 64)
+							fail('step $index joint via-point needs between one and 64 targets');
+							var seen = new Map<String, Bool>();
+							for (target in targets) {
+								if (target == null || target.joint == null || !finite(target.position) || seen.exists(target.joint))
+									fail('step $index has an invalid or repeated via-point joint');
+								seen.set(target.joint, true);
+								if (missionController == null || missionController.joints.indexOf(target.joint) < 0)
+									fail('step $index targets joint "${target.joint}" outside its controller');
+								var mechanism:AssemblyDefinition = cast flat;
+								var found = [for (joint in mechanism.joints) if (joint.id == target.joint) joint];
+								if (found.length != 1 || Std.string(found[0].role) != "tree" ||
+									(Std.string(found[0].type) != "revolute" && Std.string(found[0].type) != "continuous" && Std.string(found[0].type) != "prismatic"))
+									fail('step $index names no movable joint "${target.joint}"');
+								else {
+									var joint = found[0], scale = Std.string(joint.type) == "prismatic" ? data.metresPerUnit : 1.0;
+									if ((joint.limits.lower != null && target.position < joint.limits.lower * scale) ||
+										(joint.limits.upper != null && target.position > joint.limits.upper * scale))
+										fail('step $index targets joint "${target.joint}" past its limits');
+								}
+							}
+						} else {
+							var pose = waypoint.pose;
+							if (pose == null || pose.position == null || pose.position.length != 3 || pose.rotation == null || pose.rotation.length != 4)
+								fail('step $index has a via pose without three position and four rotation values');
+							else {
+								for (value in pose.position.concat(pose.rotation)) if (!finite(value)) fail('step $index has a non-finite via pose');
+								var norm = Math.sqrt(pose.rotation[0] * pose.rotation[0] + pose.rotation[1] * pose.rotation[1] +
+									pose.rotation[2] * pose.rotation[2] + pose.rotation[3] * pose.rotation[3]);
+								if (Math.abs(norm - 1) > 1e-3) fail('step $index has a via-pose rotation that is not a unit quaternion');
+							}
+						}
+					}
 				case "weld":
 					welds = true;
 					validateWeld(step.weld, index, flat, fail);
@@ -1083,7 +1236,9 @@ class SceneArtifact {
 		}
 		var suctions = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "suction") tool].length;
 		var grippers = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "gripper") tool].length;
-		if (handles && suctions + grippers != 1) fail('picks and places, but the robot has $suctions suction tools and $grippers grippers');
+		if (handles && suctions + grippers == 0) fail("picks and places, but the robot has no suction or gripper tool");
+		if (handles && suctions > 0 && grippers > 0)
+			fail("picks and places with both suction and gripper tools; the robot must use one handling tool type");
 		var torches = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "torch") tool].length;
 		if (welds && torches != 1) fail('welds, but the robot has $torches torches, not one');
 		var tools = data.robotTools;
@@ -1319,6 +1474,20 @@ class SceneArtifact {
 			if (!Std.isOfType(occurrence, String) || !Std.isOfType(connector, String)) fail();
 			return {occurrence: occurrence, connector: connector};
 		}
+		function bool(value:Dynamic, name:String):Bool {
+			var item:Dynamic = Reflect.field(value, name);
+			return Std.isOfType(item, Bool) ? (item:Bool) : fail();
+		}
+		function missionPose(value:Dynamic):SceneArtifactTorchPose {
+			if (value == null) fail();
+			var position:Dynamic = Reflect.field(value, "position"), rotation:Dynamic = Reflect.field(value, "rotation");
+			if (!Std.isOfType(position, Array) || (cast position:Array<Dynamic>).length != 3 ||
+				!Std.isOfType(rotation, Array) || (cast rotation:Array<Dynamic>).length != 4) fail();
+			return {position: [for (item in (cast position:Array<Dynamic>))
+				Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail()],
+				rotation: [for (item in (cast rotation:Array<Dynamic>))
+				Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail()]};
+		}
 		var steps:Dynamic = Reflect.field(decoded, "steps");
 		if (!Std.isOfType(steps, Array)) fail();
 		var mission:SceneArtifactMission = {steps: [for (raw in (cast steps:Array<Dynamic>)) {
@@ -1346,6 +1515,7 @@ class SceneArtifact {
 			var at:Dynamic = Reflect.field(raw, "at");
 			if (at != null) step.at = place(at);
 			if (Reflect.field(raw, "yaw") != null) step.yaw = number(raw, "yaw");
+			if (Reflect.field(raw, "toolYaw") != null) step.toolYaw = number(raw, "toolYaw");
 			var targets:Dynamic = Reflect.field(raw, "joints");
 			if (targets != null) {
 				if (!Std.isOfType(targets, Array)) fail();
@@ -1359,6 +1529,52 @@ class SceneArtifact {
 			if (weld != null) step.weld = decodeWeld(weld);
 			var contact:Dynamic = Reflect.field(raw, "contactWork");
 			if (contact != null) step.contactWork = SceneContactRegistration.decode(contact);
+			var signal:Dynamic = Reflect.field(raw, "signal");
+			if (signal != null) {
+				var name:Dynamic = Reflect.field(signal, "name");
+				if (!Std.isOfType(name, String)) fail();
+				step.signal = {name: name, value: bool(signal, "value")};
+			}
+			var waitFor:Dynamic = Reflect.field(raw, "waitFor");
+			if (waitFor != null) {
+				var name:Dynamic = Reflect.field(waitFor, "name");
+				if (!Std.isOfType(name, String)) fail();
+				step.waitFor = {name: name, value: bool(waitFor, "value"), timeout: number(waitFor, "timeout")};
+				var retryStep:Dynamic = Reflect.field(waitFor, "retryStep");
+				if (retryStep != null) {
+					var retry = number(waitFor, "retryStep");
+					if (retry < 0 || retry != Std.int(retry)) fail();
+					step.waitFor.retryStep = Std.int(retry);
+				}
+			}
+			var poses:Dynamic = Reflect.field(raw, "poses");
+			if (poses != null) {
+				if (!Std.isOfType(poses, Array)) fail();
+				step.poses = [for (waypoint in (cast poses:Array<Dynamic>)) {
+					var result:SceneArtifactMissionWaypoint = {};
+					var waypointJoints:Dynamic = Reflect.field(waypoint, "joints");
+					if (waypointJoints != null) {
+						if (!Std.isOfType(waypointJoints, Array)) fail();
+						result.joints = [for (target in (cast waypointJoints:Array<Dynamic>)) {
+							var joint:Dynamic = Reflect.field(target, "joint");
+							if (!Std.isOfType(joint, String)) fail();
+							{joint: joint, position: number(target, "position")};
+						}];
+					}
+					var targetPose:Dynamic = Reflect.field(waypoint, "pose");
+					if (targetPose != null) result.pose = missionPose(targetPose);
+					result;
+				}];
+			}
+			if (Reflect.field(raw, "timeoutSeconds") != null)
+				step.timeoutSeconds = number(raw, "timeoutSeconds");
+			if (Reflect.field(raw, "approachDistance") != null)
+				step.approachDistance = number(raw, "approachDistance");
+			var tool:Dynamic = Reflect.field(raw, "tool");
+			if (tool != null) {
+				if (!Std.isOfType(tool, String) || (tool:String).length == 0) fail();
+				step.tool = tool;
+			}
 			step;
 		}]};
 		var loop:Dynamic = Reflect.field(decoded, "loop");

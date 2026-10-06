@@ -45,7 +45,7 @@ class GantrySpec {
 	/** Allowed side-to-side displacement; a stated design assumption until measured. */
 	public final racking:Float;
 	public final rackingBasis:ValueBasis;
-	public final supplyVoltage:Float;
+	public final supplyVoltage:machinekit.power.DcVoltage;
 	public final microsteps:Int;
 	/** Provenance for the authored machine layout and electrical settings. */
 	public final assumedFields:Array<String>;
@@ -55,8 +55,8 @@ class GantrySpec {
 			railProfile:String = "MGN12C", motorFrame:Int = 23,
 			frameProfile:String = "HFS5-4040", beamProfile:String = "HFS5-4040",
 			tableMounted:Bool = false, head:GantryHead = None, racking:Float = 0.5,
-			supplyVoltage:Float = 24, microsteps:Int = 16, frontExtension:Float = 0, sideExtension:Float = 0, frameLift:Float = 0, toolReach:Float = 0) {
-		for (value in [travelX, travelY, travelZ, racking, supplyVoltage])
+			?supplyVoltage:machinekit.power.DcVoltage, microsteps:Int = 16, frontExtension:Float = 0, sideExtension:Float = 0, frameLift:Float = 0, toolReach:Float = 0) {
+		for (value in [travelX, travelY, travelZ, racking])
 			if (!Math.isFinite(value) || value <= 0) throw "Gantry dimensions and electrical limits must be finite and positive";
 		if (microsteps <= 0) throw "Gantry microsteps must be positive";
 		if (!Math.isFinite(frontExtension) || frontExtension < 0) throw "Gantry front extension must be finite and non-negative";
@@ -76,7 +76,8 @@ class GantrySpec {
 		if (!Math.isFinite(toolReach) || toolReach < 0) throw "Gantry tool reach must be finite and non-negative";
 		this.toolReach = toolReach;
 		this.racking = racking; rackingBasis = ValueBasis.Assumed;
-		this.supplyVoltage = supplyVoltage; this.microsteps = microsteps;
+		this.supplyVoltage = supplyVoltage == null ? new machinekit.power.DcVoltage(24) : supplyVoltage;
+		this.microsteps = microsteps;
 		assumedFields = ["travelX", "travelY", "travelZ", "driveX", "driveY", "driveZ", "dualY",
 			"railProfile", "motorFrame", "frameProfile", "beamProfile", "tableMounted", "head",
 			"racking", "supplyVoltage", "microsteps", "frontExtension", "sideExtension", "frameLift", "toolReach"];

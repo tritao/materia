@@ -14,7 +14,6 @@ class RoboticsComponents {
 		registry.register(ArmJoint.recipeType());
 		registry.register(ArmLink.recipeType());
 		registry.register(ArmWristFork.recipeType());
-		registry.register(ParallelGripper.recipeType());
 		registry.register(ParallelGripperBody.recipeType());
 		registry.register(ParallelGripperJaw.recipeType());
 		registry.register(ParallelGripperFinger.recipeType());

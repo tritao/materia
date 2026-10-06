@@ -72,7 +72,7 @@ class SerialRuntimeEndpoint {
       baud:Int = 115200, ?linkLossTimeoutNs:haxe.Int64, ?clockSyncBoundNs:haxe.Int64):RobotRuntime {
     var endpoint = create(blueprint, devicePath, controllerHex, binding, maxTargetError,
       baud, linkLossTimeoutNs, clockSyncBoundNs);
-    var runtime = RobotRuntime.create(blueprint, endpoint, "robotkit.device");
+    var runtime = RobotRuntime.create(blueprint, endpoint);
     try {
       var switches = new robotkit.device.DeviceSwitchSensorAdapter(blueprint, runtime, binding);
       runtime.installSensorPoller(snapshot -> switches.poll(snapshot));

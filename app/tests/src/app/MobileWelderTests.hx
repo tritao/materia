@@ -105,6 +105,9 @@ class MobileWelderTests {
       try {
         if (!simulation.rebuild(session.sensors, session.scene, session)) throw simulation.error;
         var mission:MissionPlayer = cast simulation.missionPlayer();
+        var torches = [for (tool in mission.project.robotTools) if (tool.kind == "torch") tool];
+        if (torches.length != 1) throw 'Contact registration needs one torch, found ${torches.length}';
+        var torchChannel = torches[0].channel;
         var physics:robotkit.runtime.Simulation = cast simulation.simulation;
         var injected = false;
         var touchEpisodes = 0, touching = false;
@@ -150,7 +153,7 @@ class MobileWelderTests {
               var rootPose = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(body.position),
                 robotkit.spatial.Quat.fromArray(body.rotation));
               var expectedTip = rootPose.transformPoint(planner.arm.tcpPose(joints).translation);
-              var error = expectedTip.sub(mission.toolContact()).norm();
+              var error = expectedTip.sub(mission.toolContact(torchChannel)).norm();
               throw 'Unexpected wire touch during checked air approach: FK error $error m, clearance ${haxe.Json.stringify(planner.violation(joints))}, joints ${joints.join(",")}';
             }
             if (reading.touch && !touching) {

@@ -19,6 +19,8 @@ class RuntimeEndpointTests {
     runtime.start();
     runtime.submitPositions([0.25], 7);
     var observation = runtime.snapshot();
+    if (runtime.sourceClockId != endpoint.sourceClockId())
+      throw "RobotRuntime did not expose its endpoint's current source-clock identity";
     runtime.stop();
     if (endpoint.starts != 1 || endpoint.submits != 1 || endpoint.observations != 1 ||
         endpoint.stops != 1 || observation.q.length != 1)
@@ -81,7 +83,7 @@ private class TrackingEndpoint extends NativeRuntimeEndpoint {
   public var closes:Int = 0;
   public var sequence:Int = 0;
   public function new(owner:Ownedrk_robot_runtime)
-    super(owner,new robotkit.time.SourceClock("robotkit.monotonic"));
+    super(owner, new robotkit.time.SourceClock("robotkit.test"));
   override public function start():Int { starts++; return super.start(); }
   override public function submit(command:rk_robot_command):Int {
     submits++;

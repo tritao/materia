@@ -64,6 +64,16 @@ class SimulationCommands {
     app.commands.register(new Command("sim.reset", "Simulation: Reset", transport(function() {
       app.log(simulation.reset() ? "Shared simulation reset" : "No simulation to reset");
     }), new Shortcut(UiKey.F5, UiModifier.Shift), function() return available() && simulation.isActive()));
+    app.commands.register(new Command("sim.emergency-stop", "Simulation: Emergency Stop",
+      transport(function() app.log(simulation.emergencyStop() ?
+        "Emergency stop requested for every simulated robot" : "No simulated robots to stop")), null,
+      function() return available() && simulation.isActive()));
+    app.commands.register(new Command("sim.retry-mission", "Simulation: Reset Fault and Retry Mission",
+      transport(function() app.log(simulation.retryMission() ? "Mission recovery requested" :
+        "No recoverable mission fault")), null, function() {
+          var mission = simulation.missionPlayer();
+          return available() && mission != null && mission.failure != null;
+        }));
     app.commands.register(new Command("sim.stop", "Simulation: Stop and return to Design",
       transport(function() {
         simulation.clear();

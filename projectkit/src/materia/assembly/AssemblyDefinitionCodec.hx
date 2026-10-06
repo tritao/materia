@@ -258,10 +258,6 @@ class AssemblyDefinitionCodec {
 					throw 'Assembly sensor "${sensor.id}" has an invalid presence connector or range';
 			}
 		}
-		if (sensors.length > 0 && definition.schemaVersion < SENSOR_VERSION)
-			throw "Native assembly sensors require schema v$SENSOR_VERSION";
-		if (definition.schemaVersion < CONTROL_VERSION) for (sensor in sensors)
-			if (sensor.kind == "at_speed") throw 'Command-relative at-speed sensors require schema v$CONTROL_VERSION';
 		var switches = definition.switches == null ? [] : definition.switches;
 		if (switches.length > 4000) throw "Assembly has too many switches";
 		var switchIds = new Map<String, Bool>();

@@ -38,6 +38,8 @@ typedef AssemblySimulationModel = {
   var profile:robotkit.profile.RobotProfile;
   /** Each part's convex hull, in its link's frame, for Simulation.addRobotAtPose. */
   var linkHulls:Array<AssemblyLinkHull>;
+  /** Part pairs that form designed interfaces across a moving assembly joint. */
+  var jointInterfaces:Array<AssemblyJointInterface>;
   /** Each simulated part's link and its frame within that link. */
   var partLinks:Map<String, AssemblyPartLink>;
   var closureIds:Array<String>;
@@ -49,6 +51,12 @@ typedef AssemblyLinkHull = {
   var link:Int;
   var part:String;
   var vertices:Array<Float>;
+}
+
+/** Two occurrence hulls that meet as a designed mechanical joint interface. */
+typedef AssemblyJointInterface = {
+	var first:String;
+	var second:String;
 }
 
 /** Where a part rides: link `link`, at `offset` (metres) in the link's frame. */
@@ -272,12 +280,24 @@ class AssemblySimulationBridge {
     for (index in 0...links.length) combine(links[index], masses[index]);
     function linkOf(id:String):Link {
       var index = linkIndexOfPart.get(id);
-      if (index == null) throw 'Assembly occurrence "$id" has no simulated link';
+      if (index == null) {
+        var bodyNames = [for (body in AssemblyBodies.of(definition))
+          if (body.occurrences.indexOf(id) >= 0) '${body.id} (joint=${body.joint})'];
+        var ownerJoints = ownedJoints == null ? "all" : ownedJoints.join(",");
+        throw 'Assembly occurrence "$id" has no simulated link (free=${free.exists(id)}, ' +
+          'selected joints=$ownerJoints, rigid bodies=${bodyNames.join("; ")})';
+      }
       return links[index];
     }
     function offsetOf(id:String):AssemblyFrame {
       var offset = offsets.get(id);
-      if (offset == null) throw 'Assembly occurrence "$id" has no simulated link';
+      if (offset == null) {
+        var bodyNames = [for (body in AssemblyBodies.of(definition)) if (body.occurrences.indexOf(id) >= 0)
+          '${body.id} (joint=${body.joint})'];
+        var ownerJoints = ownedJoints == null ? "all" : ownedJoints.join(",");
+        throw 'Assembly occurrence "$id" has no simulated link offset (free=${free.exists(id)}, ' +
+          'selected joints=$ownerJoints, rigid bodies=${bodyNames.join("; ")})';
+      }
       return offset;
     }
     var closures:Array<String> = [];
@@ -569,6 +589,10 @@ class AssemblySimulationBridge {
     // Preserve the physical flange and its owning include after fixed parts collapse into links.
     for (occurrence in definition.occurrences) {
       if (free.exists(occurrence.id)) continue;
+      // Controller-scoped robot models can contain fixed environment anchors,
+      // but they must not publish frames for a flange in another controller's
+      // excluded moving tree.
+      if (ownedJoints != null && !offsets.exists(occurrence.id)) continue;
       var component:materia.assembly.AssemblyDefinition.AssemblyComponentDefinition = definitions.get(occurrence.definition);
       if (component == null) throw "Missing assembly component definition";
       if (component.robotFlangeConnector == null) continue;
@@ -589,7 +613,8 @@ class AssemblySimulationBridge {
         mobileBase.maxLinearAcceleration, mobileBase.maxAngularAcceleration,
         mobileBase.footprintLength, mobileBase.footprintWidth);
     }
-    return {model: model, profile: profile, linkHulls: linkHulls, partLinks: partLinks,
+    return {model: model, profile: profile, linkHulls: linkHulls,
+      jointInterfaces: jointInterfaces(definition, model, linkHulls), partLinks: partLinks,
       closureIds: closures, closures: closureGeometry};
   }
 

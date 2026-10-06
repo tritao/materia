@@ -74,7 +74,7 @@ class SimulatedSuctionTool implements SimulationStepObserver {
     var sensor = sensorId;
     if (sensor != null)
       runtime.publishSensorFrame(sensor, [held == null ? 0.0 : sealedKpa], Int64.ofInt(++sequence), sourceTimestampNs,
-        "robotkit.simulation");
+        runtime.sourceClockId);
   }
 
   /** The session reset restored every object and the robot's channels: forget what was held. */

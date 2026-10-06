@@ -46,6 +46,8 @@ class AssemblyRobot {
   public final parts:Array<AssemblyPart>;
   /** The collision hull of each part that has one, in the frame of the link that carries it (metres), by occurrence id. */
   public final hulls:Array<cadbridge.AssemblySimulationBridge.AssemblyLinkHull>;
+  /** Part pairs that meet as designed interfaces across moving joints. */
+  public final jointInterfaces:Array<cadbridge.AssemblySimulationBridge.AssemblyJointInterface>;
   /** Parts whose collision shape could not be made exact, each tagged with its part. */
   public final warnings:Array<String>;
   /**
@@ -61,7 +63,8 @@ class AssemblyRobot {
   public final missionFrames:Map<String, robotkit.model.Frame>;
 
   function new(robot:SimulatedRobot, runtime:RobotRuntime, model:RobotModel, blueprint:RobotRuntimeBlueprint,
-      parts:Array<AssemblyPart>, hulls:Array<cadbridge.AssemblySimulationBridge.AssemblyLinkHull>, warnings:Array<String>,
+      parts:Array<AssemblyPart>, hulls:Array<cadbridge.AssemblySimulationBridge.AssemblyLinkHull>,
+      jointInterfaces:Array<cadbridge.AssemblySimulationBridge.AssemblyJointInterface>, warnings:Array<String>,
       mobile:Null<MobileBase>, toolFrames:Map<String, robotkit.model.Frame>, missionFrames:Map<String, robotkit.model.Frame>) {
     this.robot = robot;
     this.runtime = runtime;
@@ -69,6 +72,7 @@ class AssemblyRobot {
     this.blueprint = blueprint;
     this.parts = parts;
     this.hulls = hulls;
+    this.jointInterfaces = jointInterfaces;
     this.warnings = warnings;
     this.mobile = mobile;
     this.toolFrames = toolFrames;
@@ -363,7 +367,7 @@ class AssemblyRobot {
         converted.model.addSensor(new robotkit.model.Sensor(wire.name, "digital_input", 0.0, wire.name));
     var missionFrames = new Map<String, robotkit.model.Frame>();
     if (session.mission != null && (control == null || session.mission.controllerId == control.id))
-      for (step in session.mission.steps) if (step.kind == "moveJoints") {
+      for (step in session.mission.steps) if (step.kind == "moveJoints" || step.kind == "moveVia") {
       var at:SceneArtifactPlace = cast step.at;
       var name = missionFrameName(at);
       if (!missionFrames.exists(name)) missionFrames.set(name, mountFrame(name, at));
@@ -464,11 +468,14 @@ class AssemblyRobot {
       if (control != null && placed == null) continue;
       var center = session.assemblyPreviewCenter(occurrence.definition);
       if (center == null) throw 'Assembly part "${occurrence.definition}" has no preview center';
-      if (placed == null) throw 'Assembly occurrence "${occurrence.id}" has no simulated link';
+      if (placed == null) throw 'Assembly occurrence "${occurrence.id}" has no simulated link ' +
+        '(controller=${control == null ? "all" : control.id}, controllers=${session.controllers.length}, ' +
+        'robot=${converted.model.name}, owned joints=${ownedJoints == null ? "all" : ownedJoints.join(",")})';
       parts.push({id: "project:" + occurrence.id, robotIndex: robotIndex, linkIndex: placed.link,
         offset: placed.offset, center: [for (coordinate in center) coordinate * physical.metresPerUnit]});
     }
-    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, converted.linkHulls, warnings, mobile,
+    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, converted.linkHulls,
+      converted.jointInterfaces, warnings, mobile,
       toolFrames, missionFrames);
   }
 }

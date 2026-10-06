@@ -50,7 +50,9 @@ class MachiningRunTests {
     homeFixture(robot, blueprint, runtime, simulationHarness);
     var binding = new MachineBinding("work", "x", "y", "z", 0.02,
       new toolpathkit.motion.ToolpathChannels(""));
-    var robotBinding = new ToolpathMotionBinding(binding, blueprint);
+    var revisions = runtime.snapshot();
+    var robotBinding = new ToolpathMotionBinding(binding, blueprint,
+      revisions.modelRevision, revisions.calibrationRevision);
     var contour = new CamContour([
       new Point3(0.004, 0.004, 0.01), new Point3(0.012, 0.004, 0.01),
       new Point3(0.012, 0.012, 0.01), new Point3(0.004, 0.012, 0.01)

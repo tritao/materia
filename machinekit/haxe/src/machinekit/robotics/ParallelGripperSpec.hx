@@ -36,7 +36,7 @@ class ParallelGripperSpec {
 	public final cylinderSpeed:Float;
 
 	public function new(size:Int, expectedPartWidth:Float = 60.0, fingerLength:Float = 60.0,
-			openingTravel:Float = 16.0, supportStep:Bool = false) {
+			openingTravel:Float = 16.0, supportStep:Bool = false, ?fingerDepth:Float, ?fingerWidth:Float) {
 		if (size != 25 && size != 32 && size != 40)
 			throw 'Unsupported assumed gripper size $size; use 25, 32 or 40 mm';
 		if (!(expectedPartWidth > openingTravel) || !(fingerLength > 0) || !(openingTravel > 2.0) ||
@@ -44,16 +44,22 @@ class ParallelGripperSpec {
 			throw "Gripper width and finger length must be finite and positive, with more than 2 mm of opening travel";
 		this.size = size;
 		this.bodyDepth = size == 25 ? 48 : size == 32 ? 50 : 58;
+		var actualFingerDepth = fingerDepth == null ? bodyDepth : fingerDepth;
+		if (!(actualFingerDepth > 0 && actualFingerDepth <= bodyDepth) || !Math.isFinite(actualFingerDepth))
+			throw 'Gripper contact finger depth must be positive and fit its ${bodyDepth} mm housing';
 		this.bodyLength = 80;
 		this.jawWidth = 10;
 		this.jawHeight = 20;
+		var actualFingerWidth = fingerWidth == null ? 8.0 : fingerWidth;
+		if (!(actualFingerWidth > 0 && actualFingerWidth <= jawWidth) || !Math.isFinite(actualFingerWidth))
+			throw 'Gripper contact finger width must be positive and fit its ${jawWidth} mm jaw';
 		this.totalJawTravel = openingTravel * 2;
 		this.openingTravel = openingTravel;
 		this.expectedPartWidth = expectedPartWidth;
-		this.fingerWidth = 8;
+		this.fingerWidth = actualFingerWidth;
 		// Keep the replaceable pad within the housing's depth envelope. Extending
 		// it across the nominal blank width would run into the vise jaws at load.
-		this.fingerDepth = bodyDepth;
+		this.fingerDepth = actualFingerDepth;
 		this.fingerLength = fingerLength;
 		this.fingerPadFrictionCoefficient = FINGER_PAD_FRICTION_COEFFICIENT;
 		this.supportStep = supportStep;
@@ -69,6 +75,7 @@ class ParallelGripperSpec {
 		this.ratedGripForce = cylinder.extendForce(600000);
 		this.assumptions = ["generic gripper envelope", "cylinder bore matched to gripper size",
 			"housing has at least 1 mm clearance from each open-jaw face",
+			'contact finger ${this.fingerWidth} x ${this.fingerDepth} mm (assumed, replaceable)',
 			"600 kPa supply", "300 mm/s flow-limited cylinder speed",
 			'finger-pad friction coefficient ${FINGER_PAD_FRICTION_COEFFICIENT} (assumed)',
 			supportStep
@@ -106,4 +113,7 @@ class ParallelGripperSpec {
 	/** Jaw centre distance at maximum opening, including the jaw carriage thickness. */
 	public function openJawCentre():Float
 		return expectedPartWidth / 2.0 + openingTravel / 2.0 + jawWidth / 2.0;
+
+	/** Valve mounting station in the housing's jaw-travel axis. */
+	public function valveSeatX():Float return bodyWidth / 2.0 - 30.0;
 }
