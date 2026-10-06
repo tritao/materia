@@ -7,7 +7,7 @@ import motionkit.robot.CartesianCandidateSampler.LatticeCandidate;
 /** Native structured selection over all candidates retained by CandidateProblem. */
 class StructuredLadder {
   public static function search(problem:CandidateProblem,?weights:Array<Float>,rollWeight:Float=0,
-      ?stateCost:(Int,LatticeCandidate)->Float):LadderSelection {
+      ?stateCost:(Int,LatticeCandidate)->Float,?coarse:CoarseSearchOptions):LadderSelection {
     if(problem==null || problem.samples.length==0)throw "Ladder search requires candidate layers";
     var path=problem.request,n=path.startQ.length;
     if(weights!=null && weights.length!=n)throw "Ladder weight count must match joints";
@@ -15,6 +15,8 @@ class StructuredLadder {
     request.set_joint_count(n);request.set_external_count(problem.externalJoints.length);
     request.set_roll_count(problem.rollCount);request.set_tilt_count(problem.tiltCount);request.set_azimuth_count(problem.azimuthCount);
     request.set_roll_weight(rollWeight);
+    if(coarse!=null){request.set_coarse_sample_stride(coarse.sampleStride);request.set_coarse_lattice_stride(coarse.latticeStride);
+      request.set_corridor_radius(coarse.radius);request.set_corridor_widenings(coarse.widenings);}
     for(j in 0...n){request.set_max_jump(j,path.maxJump[j]);request.set_velocity(j,path.velocity[j]);
       request.set_weights(j,weights==null ? 1.0 : weights[j]);request.set_start_joints(j,path.startQ[j]);}
     var samples:Array<mk_configuration_sample> = [],candidates:Array<mk_lattice_candidate> = [],costs:Array<Float> = [];
@@ -51,4 +53,16 @@ class LadderSelection {
     this.candidates=candidates;this.cost=cost;this.failedSample=failedSample;this.failedDistance=failedDistance;this.diagnostic=diagnostic;
   }
   public function joints():Array<Array<Float>> return [for(candidate in candidates)candidate.q.copy()];
+}
+
+/** Approximate corridor optimization; disconnected corridors widen or revert to full search. */
+class CoarseSearchOptions {
+  public final sampleStride:Int;
+  public final latticeStride:Int;
+  public final radius:Int;
+  public final widenings:Int;
+  public function new(sampleStride:Int=10,latticeStride:Int=4,radius:Int=2,widenings:Int=2){
+    if(sampleStride<1 || latticeStride<1 || radius<1 || widenings<0 || widenings>16)throw "Invalid coarse ladder resolution";
+    this.sampleStride=sampleStride;this.latticeStride=latticeStride;this.radius=radius;this.widenings=widenings;
+  }
 }

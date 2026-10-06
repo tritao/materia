@@ -84,6 +84,12 @@ int main(){
     cells[1].joints[0]=.1;double costs[]={0,.03};unsigned selected[2];mk_ladder_result report;
     assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_OK);
     assert(selected[0]==0 && selected[1]==1 && std::abs(report.cost-.13)<1e-12 && report.failed_sample==UINT32_MAX);
+    request.coarse_sample_stride=2;request.coarse_lattice_stride=2;request.corridor_radius=1;
+    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_OK);
+    assert(selected[0]==0 && selected[1]==1 && std::abs(report.cost-.13)<1e-12);
+    request.coarse_lattice_stride=0;
+    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_INVALID_ARGUMENT);
+    request.coarse_lattice_stride=2;
     cells[1].joints[0]=1;
     assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_GENERATION);
     assert(report.failed_sample==1 && report.failure_kind==2 && report.failed_distance==.1 && selected[0]==UINT32_MAX);

@@ -914,3 +914,15 @@ This is one preliminary Release measurement including synthetic streamed
 generation, not authored-track acceptance or a production speedup claim.
 Coarse-to-fine remains internal: native/Haxe API integration, Descartes
 dispatch and authored performance verification are outstanding.
+
+PP3 coarse API integration: native mk_ladder_request now exposes opt-in
+sample/lattice strides, corridor radius and widening count. Its default
+remains the full structured graph. The native wrapper validates all input
+candidate records, coordinates and state costs before corridor filtering,
+so invalid excluded records cannot silently pass. Haxe CoarseSearchOptions
+exports the same settings through StructuredLadder.search. Native API tests
+exercise coarse selection and invalid options; Haxe verifies full-corridor
+selection agrees with full search. Compiler-only and focused runtime pass
+(1,143,581 assertions), all 15 native CTest cases pass, and the portable
+four-platform ABI audit passes. Descartes small-ladder dispatch, authored
+large-path acceptance and production migration remain outstanding.

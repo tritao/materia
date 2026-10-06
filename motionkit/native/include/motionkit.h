@@ -175,6 +175,10 @@ typedef struct mk_ladder_request {
     double velocity[MK_MAX_JOINTS];
     double start_joints[MK_MAX_JOINTS];
     double roll_weight;
+    uint32_t coarse_sample_stride; /**< 0 disables corridor optimization. */
+    uint32_t coarse_lattice_stride;
+    uint32_t corridor_radius;
+    uint32_t corridor_widenings;
 } mk_ladder_request;
 
 typedef struct mk_ladder_result {

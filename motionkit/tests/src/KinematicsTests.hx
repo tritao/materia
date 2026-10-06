@@ -574,6 +574,11 @@ class KinematicsTests extends MotionKitTestSupport {
     var selected=motionkit.robot.StructuredLadder.search(problem);
     check(selected.diagnostic==null && selected.candidates.length==2,"Haxe structured ladder selects a complete native route");
     var selectedAgain=motionkit.robot.StructuredLadder.search(problem);
+    var coarseSelected=motionkit.robot.StructuredLadder.search(problem,null,0,null,
+      new motionkit.robot.StructuredLadder.CoarseSearchOptions(1,1,24,0));
+    check(coarseSelected.diagnostic==null && coarseSelected.candidates.length==selected.candidates.length,
+      "Haxe coarse ladder selects a complete path");
+    near(coarseSelected.cost,selected.cost,"full-corridor coarse route agrees with exact native search",1e-12);
     near(selected.cost,selectedAgain.cost,"structured native route cost is deterministic",1e-12);
     for(sample in 0...2){var actual=solver.forward(selected.candidates[sample].q);
       near(motionkit.path.PoseMath.distance(actual,request.poses[sample]),0,"selected native route retains task position",1e-6);
