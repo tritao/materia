@@ -1290,3 +1290,13 @@ ambiguous there. Independent lattice-centre quaternion differences over
 velocity and acceleration. Compiler-only and focused runtime pass
 (1,148,928 assertions). End-to-end cone compiler acceptance, branch/numeric
 support, default migration and authored performance gates remain open.
+
+PP4/PP6 end-to-end cone acceptance: a UR FollowPath with a fixed authored
+cone axis and changing orientation now compiles through native orientation
+sampling, structured selection, spline refinement, projected-centre rates,
+shared timing and compiler task-space/trajectory validation. The compiled
+group records no numeric pose IK calls. Compiler-only and focused runtime
+pass (1,148,930 assertions). This verifies a serial cone fixture, not all
+cone/path-policy joins or authored welding missions. Numeric/branch support,
+default migration, selector removal and full integration/performance gates
+remain outstanding; the overall plan remains active.

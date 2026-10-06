@@ -722,6 +722,21 @@ class KinematicsTests extends MotionKitTestSupport {
     var serialWorkerPlan=serialWorker.compile(serialProgram,start,Int64.ofInt(921));
     check(serialWorkerPlan.blocks[0].plans.length==1,"UR worker compiles through independent structured planning");
     serialWorkerPlan.dispose();
+    var coneStartPose=solver.forward(start),coneEndPose=solver.forward(end);
+    var coneAxis=fixture.arm.tcpPose(start).transformVector(new Vec3(0,0,1)).toArray();
+    var authoredCone=new motionkit.path.PosePath("task",[new PoseLine(
+      new PoseWaypoint(coneStartPose,1e-6,1e-6),new PoseWaypoint(coneEndPose,1e-6,1e-6),
+      motionkit.path.OrientationPolicy.Cone(coneAxis,0.1),0.1,0.1)]);
+    var coneCompiler=new ProgramCompiler(solver,serialLimits,"task",
+      [for(_ in start)1.0],[for(_ in start)2.0],[for(_ in start)20.0],
+      StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,
+      null,null,null,null,null,0.01,new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
+        new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,4)));
+    var coneCompiled=coneCompiler.compile(new MotionProgram([MotionOp.FollowPath(authoredCone,"task",0.1,[])]),
+      start,Int64.ofInt(922));
+    check(coneCompiled.blocks[0].plans.length==1,"UR cone path compiles through projected-centre refinement and timing");
+    coneCompiled.dispose();
+    check(fixture.arm.numericSolveCount()==nativeCompileBefore,"structured cone compilation uses no numeric pose IK");
     function cornerQ(distance:Float):Array<Float> {
       var q=start.copy();q[0]+=0.75*distance-0.1*0.02*0.02+(distance<0.02?0.1*(distance-0.02)*(distance-0.02):0);return q;
     }
