@@ -24,8 +24,10 @@ if(NOT MSVC)
 endif()
 
 get_filename_component(MATERIA_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
-set(MATERIA_NATIVEKIT_DIR "${MATERIA_SOURCE_ROOT}/nativekit")
+set(MATERIA_NATIVEKIT_DIR "${MATERIA_SOURCE_ROOT}/haxeon/vendor/nativekit")
 set(MATERIA_UIKIT_DIR "${MATERIA_SOURCE_ROOT}/uikit")
+# All providers must use the aggregate host's NativeKit, including existing CMake caches.
+set(NKUI_NATIVEKIT_DIR "${MATERIA_NATIVEKIT_DIR}")
 
 add_subdirectory("${MATERIA_NATIVEKIT_DIR}" nativekit)
 add_subdirectory("${MATERIA_UIKIT_DIR}" uikit)

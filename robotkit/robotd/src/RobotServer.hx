@@ -2,10 +2,10 @@ package robotd;
 import nativekit.ffi.NativeKitTypes;
 
 import nativekit.ffi.NativeKit;
-import NativeKitEventBytes;
-import NativeKitEventValue;
-import NativeKitEvents.NativeKitEventSubscription;
-import NativeKitRuntime;
+import haxeon.platform.NativeKitEventBytes;
+import haxeon.platform.NativeKitEventValue;
+import haxeon.platform.NativeKitEvents.NativeKitEventSubscription;
+import haxeon.platform.NativeKitRuntime;
 import haxe.Int64;
 import haxe.io.Bytes;
 import haxeon.wire.MessagePack;

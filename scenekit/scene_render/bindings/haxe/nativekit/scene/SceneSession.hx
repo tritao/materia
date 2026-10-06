@@ -1,6 +1,6 @@
 package nativekit.scene;
 
-import nativekit.gpu.Renderer;
+import haxeon.gpu.Renderer;
 
 /**
  * Thin Haxeon owner for the NativeKit scene/render frame loop.

@@ -1,8 +1,8 @@
 import processkit.testing.FakeModbusServer;
 import nativekit.ffi.NativeKitTypes;
-import NativeKitRuntime;
-import NativeKitEventValue;
-import NativeKitEventBytes;
+import haxeon.platform.NativeKitRuntime;
+import haxeon.platform.NativeKitEventValue;
+import haxeon.platform.NativeKitEventBytes;
 import robotkit.transport.NativeTransport;
 import processkit.modbus.ModbusTcpClient;
 import processkit.modbus.ModbusWelder;

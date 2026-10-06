@@ -2,9 +2,9 @@ import nativekit.ffi.NativeKitTypes;
 import nativekit.ffi.NativeKitConstants;
 import nativekit.ffi.NativeKit;
 import haxe.io.Bytes;
-import NativeKitEvents;
-import NativeKitEventValue;
-import NativeKitRuntime;
+import haxeon.platform.NativeKitEvents;
+import haxeon.platform.NativeKitEventValue;
+import haxeon.platform.NativeKitRuntime;
 
 class Transaction {
 	static function main():Int {

@@ -21,6 +21,9 @@
     "cadkit": {
       "path": "../cadkit"
     },
+    "machinekit": {
+      "path": "../machinekit"
+    },
     "bimkit": {
       "path": "../bimkit"
     },
@@ -30,8 +33,50 @@
     "robotkit": {
       "path": "../robotkit"
     },
+    "simkit": {
+      "path": "../simkit"
+    },
+    "cadbridge": {
+      "path": "../robotkit/cadbridge"
+    },
     "scenekit": {
       "path": "../scenekit"
+    },
+    "animkit": {
+      "path": "../animkit"
+    },
+    "humankit": {
+      "path": "../humankit"
+    },
+    "humankit-sim": {
+      "path": "../humankit/sim"
+    },
+    "humankit-facility": {
+      "path": "../humankit/facility"
+    },
+    "materia-automation": {
+      "path": "../automationkit"
+    },
+    "stockkit": {
+      "path": "../stockkit"
+    },
+    "camkit": {
+      "path": "../camkit"
+    },
+    "cnckit": {
+      "path": "../cnckit"
+    },
+    "toolpathkit": {
+      "path": "../toolpathkit"
+    },
+    "toolpathkit-motion": {
+      "path": "../toolpathkit/motion"
+    },
+    "motionkit": {
+      "path": "../motionkit"
+    },
+    "motionkit-robot": {
+      "path": "../motionkit/robot"
     },
     "processkit": {
       "path": "../processkit"
@@ -43,17 +88,20 @@
       "target": "haxeon_app_native",
       "inputs": [
         "native/CMakeLists.txt",
-        "../nativekit/CMakeLists.txt",
-        "../nativekit/modules/gpu/CMakeLists.txt",
+        "../haxeon/vendor/nativekit/CMakeLists.txt",
+        "../haxeon/vendor/nativekit/modules/gpu/CMakeLists.txt",
         "../uikit/CMakeLists.txt",
         "../scenekit/scene/CMakeLists.txt",
         "../scenekit/scene_render/CMakeLists.txt",
         "../simkit/sim_core/CMakeLists.txt",
         "../simkit/sim_mujoco/CMakeLists.txt",
-        "../cadkit/CMakeLists.txt",
-        "../cadkit/core/CMakeLists.txt",
         "../robotkit/CMakeLists.txt",
-        "../robotkit/runtime/CMakeLists.txt"
+        "../robotkit/runtime/CMakeLists.txt",
+        "../animkit/native/CMakeLists.txt",
+        "../animkit/native/include/animkit.h",
+        "../animkit/native/src/api.cpp",
+        "../animkit/native/src/import.cpp",
+        "../animkit/native/src/runtime.cpp"
       ]
     }
   },

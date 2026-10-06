@@ -4,8 +4,8 @@ import nativekit.ui.widgets.text.Text;
 
 
 import nativekit.ffi.NativeKitTypes.Result;
-import NativeKitSurface;
-import NativeKitTextInput;
+import haxeon.platform.NativeKitSurface;
+import haxeon.platform.NativeKitTextInput;
 import Rect;
 import nativekit.ui.widgets.text.TextInputWindow;
 

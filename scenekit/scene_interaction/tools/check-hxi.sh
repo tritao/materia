@@ -4,7 +4,7 @@ set -euo pipefail
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 scenekit_dir=$(dirname "$module_dir")
 materia_dir=$(dirname "$scenekit_dir")
-nativekit_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+nativekit_dir=${NATIVEKIT_DIR:-"$materia_dir/haxeon/vendor/nativekit"}
 haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 output=${1:-"$module_dir/bindings/nativekit-scene-interaction.hxi"}
 
@@ -20,8 +20,8 @@ output=${1:-"$module_dir/bindings/nativekit-scene-interaction.hxi"}
     --depends=NativeKitScene \
     --depends=NativeKitGpu \
     --dependency-hxi="$scenekit_dir/scene/bindings/nativekit-scene.hxi" \
-    --dependency-hxi="$nativekit_dir/bindings/haxe/nativekit.hxi" \
-    --dependency-hxi="$nativekit_dir/modules/gpu/bindings/nativekit-gpu.hxi" \
+    --dependency-hxi="${haxeon_dir}/packages/platform/bindings/nativekit.hxi" \
+    --dependency-hxi="${haxeon_dir}/packages/gpu/bindings/nativekit-gpu.hxi" \
     --dependency-hxi="$scenekit_dir/scene_render/bindings/nativekit-scene-render.hxi" \
     --include="$module_dir/include" \
     --include="$scenekit_dir/scene_render/include" \

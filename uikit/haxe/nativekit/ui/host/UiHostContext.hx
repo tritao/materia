@@ -1,7 +1,7 @@
 package nativekit.ui.host;
 
 import FontCollection;
-import NativeKitEvents;
+import haxeon.platform.NativeKitEvents;
 import haxe.Int64;
 import nativekit.ffi.NativeKit;
 

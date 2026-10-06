@@ -8,7 +8,7 @@ import LayoutAxis;
 import LayoutPositioning;
 import LayoutStyle;
 import LayoutVisualKind;
-import NativeKitEventValue.NativeKitTextEdit;
+import haxeon.platform.NativeKitEventValue.NativeKitTextEdit;
 import ParagraphStyle;
 import Rect;
 import ResolvedLayoutItem;

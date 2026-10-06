@@ -3,7 +3,7 @@ set -euo pipefail
 
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 materia_dir=$(dirname "$module_dir")
-nativekit_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+nativekit_dir=${NATIVEKIT_DIR:-"$materia_dir/haxeon/vendor/nativekit"}
 haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 build_dir=${NATIVEKIT_BUILD_DIR:-"$nativekit_dir/build-ui"}
 

@@ -30,10 +30,11 @@ set(NK_BUILD_GPU ON CACHE BOOL "The editor viewport renders through NativeKit GP
 set(NK_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(NK_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(NK_SOKOL_BACKEND gles3 CACHE STRING "WebGL2" FORCE)
-add_subdirectory("${MATERIA_SOURCE_ROOT}/nativekit" nativekit)
+set(NKUI_NATIVEKIT_DIR "${MATERIA_SOURCE_ROOT}/haxeon/vendor/nativekit")
+add_subdirectory("${NKUI_NATIVEKIT_DIR}" nativekit)
 add_subdirectory("${MATERIA_SOURCE_ROOT}/uikit" uikit)
 
-set(NKSCENE_NATIVEKIT_DIR "${MATERIA_SOURCE_ROOT}/nativekit")
+set(NKSCENE_NATIVEKIT_DIR "${MATERIA_SOURCE_ROOT}/haxeon/vendor/nativekit")
 set(NK_LIBRARY_TYPE STATIC)
 add_subdirectory("${MATERIA_SOURCE_ROOT}/scenekit/scene" scene)
 add_subdirectory("${MATERIA_SOURCE_ROOT}/scenekit/scene_render" scene_render)

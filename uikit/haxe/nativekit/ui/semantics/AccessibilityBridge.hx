@@ -3,7 +3,7 @@ import nativekit.ffi.NativeKitConstants;
 import nativekit.ffi.NativeKitTypes;
 
 import nativekit.ffi.NativeKit;
-import NativeKitSurface;
+import haxeon.platform.NativeKitSurface;
 import Rect;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.WidgetId;

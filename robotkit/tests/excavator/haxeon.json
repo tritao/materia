@@ -39,7 +39,7 @@
         "../../../trajectorykit/native/CMakeLists.txt",
         "../../../trajectorykit/native/include/trajectory_core.h",
         "../../../trajectorykit/native/include/trajectory_core.hpp",
-        "../../../nativekit/CMakeLists.txt",
+        "../../../haxeon/vendor/nativekit/CMakeLists.txt",
         "../../../simkit/CMakeLists.txt",
         "../../inference/CMakeLists.txt",
         "../../inference/src/inference.cpp",

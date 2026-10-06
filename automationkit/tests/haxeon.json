@@ -16,7 +16,7 @@
 				"../../robotkit/CMakeLists.txt",
 				"../../robotkit/runtime/CMakeLists.txt",
 				"../../robotkit/runtime/include/robotkit_runtime.h",
-				"../../nativekit/CMakeLists.txt",
+				"../../haxeon/vendor/nativekit/CMakeLists.txt",
 				"../../simkit/CMakeLists.txt"
 			]
 		}

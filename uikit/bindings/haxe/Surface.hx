@@ -1,6 +1,6 @@
 /** A host-owned native surface capability accepted by Renderer. */
 import nativekit.ffi.NativeKitTypes.SurfaceHandle;
-import NativeKitSurface;
+import haxeon.platform.NativeKitSurface;
 
 class Surface {
 	final value:SurfaceHandle;

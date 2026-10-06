@@ -3,7 +3,7 @@ set -euo pipefail
 
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 materia_dir=$(dirname "$module_dir")
-repo_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+repo_dir=${NATIVEKIT_DIR:-"$materia_dir/haxeon/vendor/nativekit"}
 haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 compiler_module=${NATIVEKIT_HAXEON_COMPILER_MODULE:-"$haxeon_dir/bootstrap/compiler.hl"}
 haxe_bin=${NATIVEKIT_HAXE_BIN:-"$haxeon_dir/.tools/haxe/haxe"}
@@ -83,7 +83,7 @@ mkdir -p "$build_dir"
 if [[ ${NATIVEKIT_HAXEON_SKIP_HXI_CHECK:-0} == 1 ]]; then
 	echo "showcase-wasm: skipped standalone HXI freshness audits"
 else
-	HAXEON_DIR="$haxeon_dir" "$repo_dir/tools/update-haxeon-wasm-hxi.sh" --check
+	HAXEON_DIR="$haxeon_dir" "${haxeon_dir}/packages/platform/tools/update-haxeon-wasm-hxi.sh" --check
 	HAXEON_DIR="$haxeon_dir" "$module_dir/tools/update-haxeon-wasm-hxi.sh" --check
 fi
 
@@ -106,9 +106,9 @@ compiler_args=(
 	--root="$module_dir/haxe"
 	--root="$materia_dir/editorkit/haxe"
 	--root="$module_dir/bindings/haxe"
-	--root="$repo_dir/bindings/haxe"
-	--ffi-interface="$repo_dir/bindings/haxe/nativekit-wasm.hxi"
-	--ffi-projection="$repo_dir/bindings/haxe/nativekit.hxmap"
+	--root="${haxeon_dir}/packages/platform/src"
+	--ffi-interface="${haxeon_dir}/packages/platform/bindings/nativekit-wasm.hxi"
+	--ffi-projection="${haxeon_dir}/packages/platform/bindings/nativekit.hxmap"
 	--ffi-interface="$module_dir/bindings/nativekit-ui-wasm.hxi"
 	--ffi-projection="$module_dir/bindings/nativekit-ui.hxmap"
 	--ffi-interface="$module_dir/bindings/nativekit-ui-showcase-wasm.hxi"
@@ -142,21 +142,21 @@ compiler_args=(
 	"$module_dir/haxe/nativekit/ui/gestures/"*.hx
 	"$module_dir/haxe/nativekit/ui/animation/"*.hx
 	"$module_dir/haxe/nativekit/ui/host/"*.hx
-	"$repo_dir/bindings/haxe/GraphicsImageRef.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/GraphicsImageRef.hx"
 	"$module_dir/bindings/haxe/"*.hx
-	"$repo_dir/bindings/haxe/NativeKitEvent.hx"
-	"$repo_dir/bindings/haxe/NativeKitEvents.hx"
-	"$repo_dir/bindings/haxe/NativeKitEventValue.hx"
-	"$repo_dir/bindings/haxe/NativeKitEventContext.hx"
-	"$repo_dir/bindings/haxe/NativeKitEventBytes.hx"
-	"$repo_dir/bindings/haxe/NativeKitWindowEvents.hx"
-	"$repo_dir/bindings/haxe/NativeKitInputEvents.hx"
-	"$repo_dir/bindings/haxe/NativeKitServiceEvents.hx"
-	"$repo_dir/bindings/haxe/NativeKitResourceEvents.hx"
-	"$repo_dir/bindings/haxe/NativeKitRequests.hx"
-	"$repo_dir/bindings/haxe/NativeKitRequestOutcome.hx"
-	"$repo_dir/bindings/haxe/NativeKitWindow.hx"
-	"$repo_dir/bindings/haxe/NativeKitWebView.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitEvent.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitEvents.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitEventValue.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitEventContext.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitEventBytes.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitWindowEvents.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitInputEvents.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitServiceEvents.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitResourceEvents.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitRequests.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitRequestOutcome.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitWindow.hx"
+	"${haxeon_dir}/packages/platform/src/haxeon/platform/NativeKitWebView.hx"
 )
 
 wasm_exports=${NATIVEKIT_UI_WASM_EXPORTS:-ShowcaseWeb.main,ShowcaseWeb.configure,ShowcaseWeb.configureMode,ShowcaseWeb.configureUiVisual,ShowcaseWeb.configureBenchmark,ShowcaseWeb.frame,ShowcaseWeb.status,ShowcaseWeb.diagnostic,ShowcaseWeb.caretOffset,ShowcaseWeb.caretAffinity,ShowcaseWeb.caretDirection,ShowcaseWeb.shutdown}

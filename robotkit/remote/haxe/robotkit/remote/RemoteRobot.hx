@@ -19,7 +19,7 @@ import trajectorykit.validation.ValidationGuarantee;
 
 import RobotKitRuntime;
 import nativekit.ffi.NativeKit;
-import NativeKitEvents;
+import haxeon.platform.NativeKitEvents;
 import haxe.Int64;
 import robotkit.client.RobotClient;
 import robotkit.protocol.CameraFrameData;

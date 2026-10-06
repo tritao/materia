@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ('core', 'sim', 'remote', 'serial', 'recording', 'autonomy', 'inference', 'policy')
 configs = {name: json.loads((ROOT / 'robotkit' / name / 'haxeon.json').read_text()) for name in PACKAGES}
-assert set(configs['core']['dependencies']) == {'nativekit', 'trajectorykit'}, 'Core dependency boundary changed'
+assert set(configs['core']['dependencies']) == {'haxeon-platform', 'trajectorykit'}, 'Core dependency boundary changed'
 assert all('simkit' not in config['dependencies'] for name, config in configs.items() if name != 'sim'), 'SimKit must enter through robotkit-sim'
 assert all('visionkit' not in config['dependencies'] for name, config in configs.items() if name != 'autonomy'), 'VisionKit must enter through robotkit-autonomy'
 umbrella = json.loads((ROOT / 'robotkit/haxeon.json').read_text())
@@ -22,9 +22,9 @@ def closure(manifest):
     for dep in config.get('dependencies', {}).values():
         closure(manifest.parent / dep['path'] / 'haxeon.json')
 closure(ROOT / 'robotkit/core/haxeon.json')
-assert {json.loads(path.read_text())['package']['name'] for path in seen} == {'robotkit-core', 'nativekit', 'trajectorykit'}, 'Core has an unexpected transitive dependency'
+assert {json.loads(path.read_text())['package']['name'] for path in seen} == {'robotkit-core', 'haxeon-platform', 'trajectorykit'}, 'Core has an unexpected transitive dependency'
 for path in (ROOT / 'robotkit/core/haxe').rglob('*.hx'):
     source = path.read_text()
     for forbidden in ('import visionkit.', 'import kinematicskit.', 'import nativekit.sim.', 'import robotkit.inference.', 'import robotkit.policy.'):
         assert forbidden not in source, f'{path}: forbidden core import {forbidden}'
-print('RobotKit package boundaries passed: core -> NativeKit + TrajectoryKit; simulation, vision and ONNX are separate')
+print('RobotKit package boundaries passed: core -> Haxeon platform + TrajectoryKit; simulation, vision and ONNX are separate')

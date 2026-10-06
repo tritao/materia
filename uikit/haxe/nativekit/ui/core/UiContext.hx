@@ -15,7 +15,7 @@ import FrameInfo;
 import Rect;
 import ResolvedLayoutItem;
 import FontCollection;
-import NativeKitSurface;
+import haxeon.platform.NativeKitSurface;
 import nativekit.ffi.NativeKit;
 import nativekit.ui.core.CursorShape as UiCursorShape;
 import nativekit.ui.semantics.AccessibilityBridge;
@@ -406,6 +406,7 @@ class UiContext {
 		// be able to access widget state while that event is being dispatched.
 		stateStore.endFrame();
 		buildContext.pruneSelfUpdatingBuilds(nodesById);
+		buildContext.pruneKeyCaches(nodesById);
 		buildContext.stateStore.prunePaths(nodesById);
 		submittedStateRevision = resolvedStateRevision;
 		submittedInteractionRevision = interactionStates.revision;

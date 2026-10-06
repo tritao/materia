@@ -7,7 +7,7 @@ include(CTest)
 
 option(NK_BUILD_SHARED "Build SceneKit and NativeKit as shared libraries" ON)
 option(NK_BUILD_TESTS "Build SceneKit and NativeKit tests" ${BUILD_TESTING})
-set(NKSCENE_NATIVEKIT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../nativekit" CACHE PATH
+set(NKSCENE_NATIVEKIT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../haxeon/vendor/nativekit" CACHE PATH
     "Path to the NativeKit source checkout")
 
 set(NK_BUILD_GPU ON CACHE BOOL "Build NativeKit GPU for SceneKit" FORCE)

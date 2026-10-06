@@ -20,7 +20,7 @@
         "../native/src/import.cpp",
         "../native/src/runtime.cpp",
         "../../scenekit/scene/CMakeLists.txt",
-        "../../nativekit/CMakeLists.txt"
+        "../../haxeon/vendor/nativekit/CMakeLists.txt"
       ]
     }
   },

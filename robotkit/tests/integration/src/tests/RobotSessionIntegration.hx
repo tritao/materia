@@ -3,7 +3,7 @@ package tests;
 import haxe.Int64;
 import nativekit.ffi.NativeKit;
 import RobotKitRuntime;
-import NativeKitRuntime;
+import haxeon.platform.NativeKitRuntime;
 import robotkit.client.RobotClient;
 
 /** Exercises controller leases, observer fanout, and reconnect sessions. */

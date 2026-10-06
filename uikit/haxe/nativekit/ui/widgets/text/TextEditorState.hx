@@ -10,7 +10,7 @@ import LayoutMeasureConstraints;
 import LayoutMeasureResult;
 import LayoutMeasuredContent;
 import LayoutRenderableContent;
-import NativeKitEventValue.NativeKitTextEdit;
+import haxeon.platform.NativeKitEventValue.NativeKitTextEdit;
 import ParagraphStyle;
 import Rect;
 import TextStyle;

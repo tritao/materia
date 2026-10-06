@@ -1,7 +1,7 @@
 package tests;
 
 import haxe.Int64;
-import NativeKitRuntime;
+import haxeon.platform.NativeKitRuntime;
 import robotkit.behavior.WorldBehavior;
 import robotkit.behavior.WorldBehaviorContext;
 import robotkit.behavior.WorldBehaviorRunner;

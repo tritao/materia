@@ -5,7 +5,7 @@ import NativeKitScene;
 import NativeKitSceneRender;
 import NativeKitSceneRenderConstants;
 import haxe.io.Bytes;
-import GraphicsImageRef;
+import haxeon.platform.GraphicsImageRef;
 
 /**
  * Keeps render-plan and NativeKit GPU synchronization behind one explicit
