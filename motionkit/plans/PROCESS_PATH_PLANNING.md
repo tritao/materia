@@ -852,3 +852,15 @@ physical continuity despite changing wrap labels. Hash bucket width includes
 the jump comparison tolerance so boundary branch changes are not lost.
 The focused native structured-ladder test passes with Release assertions
 enabled; no public API or production planning migration is claimed yet.
+
+PP3 scale investigation: added an explicit synthetic track-shaped benchmark
+(8 branches x 24 rolls x 40 track cells plus 20 periodic lifts = 7700
+candidates). This is a performance probe, not an authored-track acceptance
+fixture. The initial 1301-layer materialization terminated with exit 143
+without a timing result; its observed resident memory exceeded 10 GB. The
+current fixed-size 64-joint candidate representation therefore needs a
+streamed/compact layer interface before repeating the full-size probe.
+Exact branch bounding boxes now skip impossible cross-branch searches, and
+single-cell orientation coordinates skip redundant neighbour probes. The
+small random-reference test still passes; a 21-layer optimized probe took
+0.183113 s and tested 1,367,600 edges. The <1 s requirement is not achieved.

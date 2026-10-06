@@ -119,6 +119,18 @@ inline LadderResult structured_ladder(const std::vector<LadderLayer> &layers,
             for(unsigned i=0;i<prior.size();++i)if(std::isfinite(previous[i])){
                 lattice[lattice_key(prior[i],s.externals)].push_back(i);joints[joint_key(prior[i])].push_back(i);
             }
+            struct Bounds {std::array<double,MK_MAX_JOINTS> lo,hi;};
+            auto bounds=[&](const LadderLayer &cells){std::unordered_map<unsigned,Bounds> result;
+                for(const auto &c:cells){auto found=result.find(c.branch);
+                    if(found==result.end()){Bounds b;for(unsigned j=0;j<s.joints;++j)b.lo[j]=b.hi[j]=c.joints[j];result.emplace(c.branch,b);}
+                    else for(unsigned j=0;j<s.joints;++j){found->second.lo[j]=std::min(found->second.lo[j],c.joints[j]);found->second.hi[j]=std::max(found->second.hi[j],c.joints[j]);}}
+                return result;};
+            auto prior_bounds=bounds(prior),current_bounds=bounds(current);
+            std::unordered_map<unsigned,bool> can_flip;
+            for(const auto &c:current_bounds){bool possible=false;
+                for(const auto &p:prior_bounds)if(c.first!=p.first){bool close=true;
+                    for(unsigned j=0;j<s.joints;++j)if(c.second.lo[j]-p.second.hi[j]>s.jump[j]+1e-12 || p.second.lo[j]-c.second.hi[j]>s.jump[j]+1e-12)close=false;
+                    possible=possible || close;}can_flip[c.first]=possible;}
             for(unsigned i=0;i<current.size();++i){
                 const auto &c=current[i];
                 auto consider=[&](unsigned p){double cost=previous[p]+edge(prior[p].joints,c.joints);
@@ -129,6 +141,8 @@ inline LadderResult structured_ladder(const std::vector<LadderLayer> &layers,
                 auto key=lattice_key(c,s.externals);
                 auto visit=[&](auto &&self,unsigned dimension)->void{
                     if(dimension==s.externals+3){auto found=lattice.find(key);if(found!=lattice.end())for(auto p:found->second)consider(p);return;}
+                    if(dimension>=s.externals){unsigned count=dimension==s.externals?s.rolls:dimension==s.externals+1?s.tilts:s.azimuths;
+                        if(count==1){self(self,dimension+1);return;}}
                     unsigned original=key.cell[dimension];
                     unsigned period=dimension==s.externals?s.rolls:dimension==s.externals+2?s.azimuths:0;
                     std::array<unsigned,3> values{};unsigned n=0;
@@ -142,7 +156,7 @@ inline LadderResult structured_ladder(const std::vector<LadderLayer> &layers,
                 auto flips=[&](auto &&self,unsigned d)->void{
                     if(d==nd){auto found=joints.find(hash);if(found!=joints.end())for(auto p:found->second)if(prior[p].branch!=c.branch)consider(p);return;}
                     auto original=hash.cell[d];for(int delta=-1;delta<=1;++delta){hash.cell[d]=original+delta;self(self,d+1);}hash.cell[d]=original;
-                };flips(flips,0);
+                };if(can_flip[c.branch])flips(flips,0);
             }
         }
         bool reachable=false;
