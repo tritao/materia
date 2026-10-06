@@ -1127,3 +1127,16 @@ Compiler-only and focused runtime pass (1,148,562 assertions). This is
 preparation: ProgramCompiler still uses its existing path lowering, and
 collision filtering, unsupported-family fallback, branch segmentation,
 k-best starts and selector removal remain outstanding. PP6 is not complete.
+
+PP5 sample-filter preparation: LazyCollisionLadder searches first, checks
+only selected candidates, disables colliding states with infinite costs
+and retries within an explicit round budget. It integrates ArmClearance
+pose and sweep checks through a concrete wrapper, with checker injection
+for deterministic tests. An impossible pinned state reports the blocking
+pair and sample. Sweep blockage reports its edge and pair explicitly;
+edge exclusion is still required, rather than incorrectly deleting either
+endpoint. Clear-route, selected-only checking, impossible-start and sweep
+rejection tests pass. Compiler-only and focused runtime pass (1,148,566
+assertions). Native edge exclusion, physical obstacle rerouting acceptance,
+closest-clearance reporting and refined-curve checking remain outstanding;
+PP5 is not complete and this is not yet wired into production planning.

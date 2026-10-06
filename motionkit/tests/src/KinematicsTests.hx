@@ -621,6 +621,14 @@ class KinematicsTests extends MotionKitTestSupport {
       near(motionkit.path.PoseMath.angle(actual,request.poses[sample]),0,"selected native route retains task orientation",1e-6);
       for(j in 0...6)near(selected.candidates[sample].q[j],selectedAgain.candidates[sample].q[j],"structured route is deterministic",1e-12);
     }
+    var collisionChecks=0;
+    var collisionRoute=motionkit.robot.LazyCollisionLadder.selectWithChecks(problem,q -> {collisionChecks++;return null;});
+    near(collisionRoute.cost,selected.cost,"clear route retains native ladder cost",1e-12);
+    check(collisionChecks==problem.samples.length,"lazy collision checks only selected samples");
+    throws(function() motionkit.robot.LazyCollisionLadder.selectWithChecks(problem,q ->
+      ({a:"arm",b:"fixture",distance:0.0,required:0.01})),"impossible pinned start reports collision blockage");
+    throws(function() motionkit.robot.LazyCollisionLadder.selectWithChecks(problem,q -> null,8,
+      (from,to) -> ({a:"tool",b:"post",distance:0.0,required:0.01})),"sweep blockage cannot return a clear route");
     var refiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,problem,selected);
     var previous=start.copy();
     for(i in 0...11){var q=start.copy();q[0]+=0.003*i;var target=solver.forward(q);
