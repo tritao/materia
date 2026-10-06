@@ -172,6 +172,15 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 - The camera finds parts; it never feeds an interlock. It never enters the machine (chips and coolant): the vise keeps its air-gauge presence sensor and the gripper its jaw switches.
 - **Rejected:** a fixed mast camera. It wins only when the cell needs observation while the arm is busy, which this cell does not.
 
+**MT-D13. Cell collision geometry is one description; `ArmClearance` is its current engine.**
+- One builder produces the cell's collision description:
+  - bodies: hull, owner (a robot's link, or world) and a stable id;
+  - pair rules: margin per pair, allowed contacts and process interfaces, each with its reason.
+- The static reach study, the app's mission clearance and the welder stations all consume it. Today they each assemble their own bodies and margins, and a mismatch between such builders looks like the track welder's 4.0 mm rejection.
+- Clearance queries go only through `ArmClearance` and `ArmPlanClearance`. No new checker, and no direct `ConvexDistance` calls.
+- The collision plan (collisionkit on coal, CL2–CL4) takes this same description and replaces the engine. A shared corpus of cases with expected answers proves the two engines agree.
+- **Known limitation:** planning uses a snapshot of the other robot's and the loose objects' poses taken when a skill starts. It is safe here because the interlocks keep the mill still while the arm is inside. The collision plan's pose-driven world removes it.
+
 ## The machine (starting numbers, fixed in MT1–MT4)
 
 | Item | Value |
@@ -811,6 +820,31 @@ Recovery policy: mission failures carry stable application alarm codes. A failed
 - The CNC dock panel measures spindle utilization from its encoder only during active CNC-cycle intervals, preserving the last completed measurement during idle time. The app acceptance check compares it with an independent encoder sample over the same signal window. The four-cycle acceptance records each interval and the overall mission time.
 - Target: spindle use ≥ 75 % for the bearing-block job, with numbers recorded here.
 
+**MT12b. One cell collision description.**
+- **`CellCollisionScene`.** A typed description (bodies, owners, stable ids, pair rules with reasons) with one builder from the cell assembly, its controllers and the scene's loose objects.
+  - It lives where both MachineKit's `TendingReach` and the app's `MissionPlayer` can depend on it: cadbridge or RobotKit, next to the bridge's hulls.
+  - Door, vise and other robot poses are inputs, never baked in.
+- **Pair rules are data.** Vise jaws and gripper pads may touch the blank at the contact margin; welder interfaces keep their margin; everything else gets the default 5 mm. They live in the description, not in branches at each call site.
+- **Migration, clean break:**
+  - `TendingReach`, `MissionPlayer.cellClearance` and `MobileWeldStations` build their `ArmClearance` from the description;
+  - the per-site body gathering and contact lists are deleted;
+  - a single construction site remains.
+- **Collision corpus.** Data fixtures, each with geometry, poses, rules and the expected verdict and distance, run in the RobotKit suite against `ArmClearance`:
+  - the thin door edge (clear at both ends and the midpoint, unsafe inside);
+  - gripper B against the neighbouring tray blank;
+  - the vise contact allowance;
+  - tray neighbours;
+  - the track welder's 4.0 mm case;
+  - a cross-robot pair (arm against mill door).
+
+  The coal backend must later pass the same fixtures.
+- **Acceptance:**
+  - reach study result unchanged (class, riser, margin);
+  - every mission clearance verdict in the tending, cobot and welder project-source cases unchanged, or explained;
+  - the track welder's case resolved in the shared description, not by loosening its margin;
+  - the corpus passes;
+  - the full sequential gate passes.
+
 **MT13. Wrist camera for the trays.**
 - **Hardware:**
   - `CameraBracket` and a camera part (MachineKit) on the `ArmGripperTool` plate, beside the gripper, looking along the approach axis.
@@ -858,7 +892,7 @@ Recovery policy: mission failures carry stable application alarm codes. A failed
 ```
 MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
      ├─ MT3 (arms) ─┘                     ├─ MT6 ── MT7 ─┐
-     └─ (welder + X7/X8 merged) ──────────┘              ├─ MT10 ── MT11 ── MT12 ── MT13
+     └─ (welder + X7/X8 merged) ──────────┘              ├─ MT10 ── MT11 ── MT12 ── MT12b ── MT13
                         MT5 (after MT4) ── MT8 ── MT9 ───┘
 ```
 
@@ -866,6 +900,7 @@ MT0 ─┬─ MT1 ── MT2 ─┬─ MT4 (reach study) ─┐
 - MT5 is independent of controllers, but the gripper (MT8) and the vise and door actuation need it.
 - MT6 needs X8 wiring.
 - MT10 needs everything before it.
+- MT12b comes after MT12, so it doesn't disturb MT10–MT12 in flight, and before MT13, whose camera housing joins the tool hulls through it.
 - MT13 needs MT8's tool, MT10's mission and MT12's dual-gripper envelope. It replaces MT9's per-slot tray sensors.
 
 **Articulated inertia and joint-plan admission (MT5b follow-up).**
@@ -901,6 +936,7 @@ Done. What was built and decided:
 | MT10 | planned | |
 | MT11 | planned | |
 | MT12 | planned | |
+| MT12b | planned | |
 | MT13 | planned | |
 
 **Environment clearance and support geometry (MT5b follow-up, verified in `8b22593be` and `20f0d3e16`).**
