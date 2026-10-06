@@ -34,6 +34,9 @@ class WeldPathProblem {
   public final phases:Array<WeldPathPhase>;
   public final seamOffset:Float;
   public final seamLength:Float;
+  /** Distance in the original seam where this execution begins. */
+  public final startDistance:Float;
+  public final fullSeamLength:Float;
   public final seamEnd:Float;
   public final burnbackEnd:Float;
   public final lift:Pose3;
@@ -42,7 +45,7 @@ class WeldPathProblem {
   final contactSegments:Array<{from:Vec3,to:Vec3}>;
 
   public function new(plan:WeldPlan,wrist:WristLimits,styles:Array<Int>,frame:String,
-      approachSpeed:Float=0.05) {
+      approachSpeed:Float=0.05,startDistance:Float=0.0) {
     if(plan==null || wrist==null || styles==null || styles.length!=plan.segments.length ||
         frame==null || frame=="" || !Math.isFinite(approachSpeed) || approachSpeed<=0)
       throw "Weld path problem requires a plan, corner styles, task frame and approach speed";
@@ -50,11 +53,17 @@ class WeldPathProblem {
     this.plan=plan;this.styles=styles.copy();
     this.wrist={angularSpeed:wrist.angularSpeed,angularAcceleration:wrist.angularAcceleration};
     this.approachSpeed=approachSpeed;
-    seam=new PosePath(frame,WeldingPlanRunner.pathOf(plan,plan.parameters.travelSpeed,wrist,styles));
+    var authored=new PosePath(frame,WeldingPlanRunner.pathOf(plan,plan.parameters.travelSpeed,wrist,styles));
+    if(!Math.isFinite(startDistance) || startDistance<0 || startDistance>=authored.length())
+      throw "Weld restart distance lies outside the authored seam";
+    this.startDistance=startDistance;fullSeamLength=authored.length();
+    seam=startDistance==0 ? authored : ProcessPathSlice.from(authored,startDistance);
     seamLength=seam.length();
     var first=plan.start(),last=plan.stop();
-    var start=pose(first),stop=pose(last);
-    approach=displaced(first,-plan.parameters.approach);
+    var start=seam.poseAt(0),stop=pose(last);
+    var restartFrame=new Transform3(new Vec3(start.x,start.y,start.z),
+      new robotkit.spatial.Quat(start.qx,start.qy,start.qz,start.qw));
+    approach=displaced(restartFrame,-plan.parameters.approach);
     retreat=displaced(last,-plan.parameters.approach);
     lift=displaced(last,-WeldPathPlanner.LIFT);
     var groups:Array<{phase:WeldPathPhase,path:PosePath}> = [
@@ -85,6 +94,11 @@ class WeldPathProblem {
       to:new Vec3(segment.stop.translation.x,segment.stop.translation.y,segment.stop.translation.z)
     }];
   }
+
+  /** Resume the same authored geometry; corner turns and weave phase stay at
+   * their original coordinates rather than being regenerated from a shorter plan. */
+  public function recovery(distance:Float):WeldPathProblem
+    return new WeldPathProblem(plan,wrist,styles,path.frameId,approachSpeed,distance);
 
   /** The opposite travel alternative, preserving each physical corner style. */
   public function reversed():WeldPathProblem {

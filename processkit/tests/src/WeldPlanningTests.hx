@@ -79,6 +79,17 @@ class WeldPlanningTests {
       near(shortProblem.path.length(),requested.length()+approach+WeldPathPlanner.LIFT+
         Math.abs(approach-WeldPathPlanner.LIFT),1e-12,"short retreat preserves actual execution travel");
     }
+    var restart=problem.recovery(0.037);
+    near(restart.startDistance,0.037,0,"recovery retains original seam coordinates");
+    near(restart.fullSeamLength,problem.seamLength,0,"recovery retains complete authored extent");
+    near(restart.seamLength,problem.seamLength-0.037,1e-12,"recovery selects only remaining geometry");
+    for(distance in [0.0,0.01,restart.seamLength]){
+      var expected=problem.seam.poseAt(distance+restart.startDistance),actual=restart.seam.poseAt(distance);
+      near(motionkit.path.PoseMath.distance(expected,actual),0,1e-12,"restart preserves authored TCP geometry");
+      near(motionkit.path.PoseMath.angle(expected,actual),0,1e-7,"restart preserves authored orientation");
+    }
+    var rejected=false;try problem.recovery(problem.seamLength) catch(_:Dynamic)rejected=true;
+    check(rejected,"restart at the completed seam is refused");
     var fixture=arm(),solver=new ManipulatorKinematics(fixture.arm),before=fixture.arm.numericSolveCount();
     var backend=motionkit.robot.BranchIk.of(fixture.arm);
     check(backend.family()=="UR6R","authored weld fixture has a model-derived analytic family");
