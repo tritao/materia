@@ -45,11 +45,26 @@ def reconstruct(rotation, position, dimensions, alpha, gamma):
     m=rotation*s.Matrix([math.sin(gamma),math.cos(gamma),0])
     w=position-c4*rotation[:,2]-d*m
     M,N=float(m.dot(x)),float(m[2])
-    if math.hypot(M,N)<1e-10:
-        raise ValueError('Degenerate projected axis requires separate beta isolation')
+    projected_degenerate=math.hypot(M,N)<1e-10
+    if projected_degenerate:
+        X,Z=float(w.dot(x))-a1,float(w[2])-c1
+        A,B=a2*X+c3*Z,c3*X-a2*Z
+        L=X*X+Z*Z+a2*a2+c3*c3-c2*c2
+        amplitude=math.hypot(A,B)
+        if amplitude<1e-12:
+            if abs(L)<1e-10:
+                raise ValueError('Continuous beta solution family requires parameterized output')
+            return []
+        ratio=L/(2*amplitude)
+        if abs(ratio)>1+1e-10:
+            return []
+        phase=math.atan2(B,A)
+        displacement=math.acos(max(-1,min(1,ratio)))
+        betas=[phase-displacement,phase+displacement]
+    else:
+        betas=[math.atan2(-sign*N,sign*M) for sign in [-1,1]]
     result=[]
-    for sign in [-1,1]:
-        beta=math.atan2(-sign*N,sign*M)
+    for beta in betas:
         f=(a2*math.cos(beta)+c3*math.sin(beta))*x+(-a2*math.sin(beta)+c3*math.cos(beta))*z
         v=w-a1*x-c1*z-f
         if abs(float(v.dot(v))-b*b-c2*c2)>1e-8:
@@ -65,7 +80,8 @@ def reconstruct(rotation, position, dimensions, alpha, gamma):
         actual_p=rz(alpha)*local+c4*actual_r[:,2]+d*(actual_r*s.Matrix([math.sin(gamma),math.cos(gamma),0]))
         error=max(max(abs(float(e)) for e in actual_r-rotation),max(abs(float(e)) for e in actual_p-position))
         if error<1e-8:
-            result.append({'q':[alpha,q2,q3,q4,q5,gamma],'fk_error':error})
+            result.append({'q':[alpha,q2,q3,q4,q5,gamma],'fk_error':error,
+                           'projected_degenerate':projected_degenerate})
     return result
 
 
@@ -129,8 +145,12 @@ def boundary_checks(dimensions):
             return s.Matrix([[cs,-sn,0],[sn,cs,0],[0,0,1]])
         return s.Matrix([[cs,0,sn],[0,1,0],[-sn,0,cs]])
     records=[]
-    for base,wrist in [(None,s.Rational(1,5)),(s.Rational(1,7),None),(None,None)]:
-        tangents=[base,s.Rational(1,3),s.Rational(-1,4),s.Rational(2,5),s.Rational(1,2),wrist]
+    for base,wrist,middle_start in [(None,s.Rational(1,5),s.Rational(2,5)),
+                                     (s.Rational(1,7),None,s.Rational(2,5)),
+                                     (None,None,s.Rational(2,5)),
+                                     (s.Rational(1,7),s.Rational(1,5),s.Integer(0)),
+                                     (s.Rational(1,7),s.Rational(1,5),None)]:
+        tangents=[base,s.Rational(1,3),s.Rational(-1,4),middle_start,s.Rational(1,2),wrist]
         matrices=[rotation(axis,t) for axis,t in zip('zyyzyz',tangents)]
         R=s.eye(3)
         for matrix in matrices:
@@ -146,9 +166,20 @@ def boundary_checks(dimensions):
         recovered=any(all(abs(math.atan2(math.sin(a-b),math.cos(a-b)))<1e-7
                           for a,b in zip(original,item['q'])) for item in result['solutions'])
         assert recovered, {'original':original,'result':result}
-        records.append({'base_pi':base is None,'wrist_pi':wrist is None,
+        records.append({'base_pi':base is None,'wrist_pi':wrist is None, 'q4_tangent':str(middle_start),
+                        'degenerate_reconstructions':sum(item['projected_degenerate'] for item in result['solutions']),
                         'solutions':len(result['solutions']),'original_recovered':recovered,
                         'max_fk_error':max(item['fk_error'] for item in result['solutions'])})
+    continuum_dimensions=list(map(s.Rational,['.17','.3','.08','.4','.5','.4','.12','.035']))
+    a1,a2,b,c1,c2,c3,c4,d=continuum_dimensions
+    continuum_position=s.Matrix([a1,b+d,c1+c4])
+    try:
+        reconstruct(s.eye(3),continuum_position,continuum_dimensions,0,0)
+    except ValueError as error:
+        assert 'Continuous beta' in str(error)
+        records.append({'continuous_beta_diagnostic':str(error)})
+    else:
+        raise AssertionError('Continuous solution family was silently converted to finite roots')
     return records
 
 

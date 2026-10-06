@@ -165,3 +165,23 @@ still lose close or repeated roots. The exact univariate root isolation does
 not certify the subsequent floating reconstruction. Generic factor classification,
 projected-axis special systems and positive-dimensional families remain open,
 as do native runtime performance, real model limits and authored acceptance.
+
+## Projected-axis degeneracy reconstruction
+
+When M=N=0, isolate beta using A*cos(beta)+B*sin(beta)=L/2 directly.
+For amplitude hypot(A,B)>0, beta=atan2(B,A) +/- acos(L/(2*amplitude));
+then apply the original length and full FK checks. If amplitude=0 and L!=0
+there is no solution; if amplitude=L=0, beta is a continuous family and the
+prototype raises an explicit parameterized-output diagnostic. Floating thresholds
+remain experimental, with no certification near these degeneracies.
+
+The boundary experiment additionally generates exact-rational targets with q4=0
+and q4=pi. Both recover their generating configurations; each returns four
+solutions, two through the special projected-axis reconstruction. Maximum FK
+errors are 1.12e-16 and 6.67e-16 respectively. A separate constructed target
+with a2=.3,c3=.4,c2=.5 and zero X,Z checks that the continuous-beta case raises
+the intended diagnostic instead of returning a finite root list. The final full
+research experiment exits zero; evidence is
+`process-path-offset-degenerate-final.json`. These checks support the special
+reconstruction formula but do not implement parameterized continuum output or
+certify the elimination/back-substitution in other singular systems.
