@@ -98,7 +98,11 @@ class MobileWelderTests {
         var stowClearance:Null<robotkit.manipulation.ArmClearance> = null;
         while (!mission.finished && simulation.activeSession().simulationTime() < limit) {
           simulation.step(); tick++;
-          if (mission.failure != null) throw 'Mobile weld failed at ${simulation.activeSession().simulationTime()} s: ${mission.failure}';
+          if (mission.failure != null) {
+            var overlay = mission.overlay();
+            var step = authored.steps[mission.completed];
+            throw 'Mobile weld ($backend) failed at ${simulation.activeSession().simulationTime()} s: ${mission.failure}; goal=${haxe.Json.stringify(step.pose)}, odometry=${haxe.Json.stringify(overlay == null ? null : overlay.odometry)}';
+          }
           var weldStep = mission.weldingStep();
           if (weldStep >= 0) {
             var tip = beads.toFrame(weldStep, welder.tip());

@@ -539,7 +539,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | Step | State | Commits |
 |------|-------|---------|
 | PP0 | in progress: harness and diagnostics; baseline completion pending | `0d43b32c0` (partial) |
-| PP0a | in progress: industrial geometry/zero, IK labels and program/mission pins implemented; all-size branch acceptance passed; physical limit/load/BOM acceptance passed; re-baselines and phase gate pending | see progress |
+| PP0a | complete: industrial geometry/zero, configuration pins, all-size analytic/physical acceptance, all-user re-baselines and phase gate passed | see progress |
 | PP1a | planned (revision 2026-10-06): EAIK spike | — |
 | PP1 | in progress: Cartesian, OPW and authored Cobot UR verified; offset RobotArm unresolved | `0d43b32c0`, `bfec0fa28`, `8569a2a98` (partial) |
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
@@ -2311,3 +2311,28 @@ passes the path end with reverse disabled. That mission is not an accepted
 re-baseline. The prior interrupted legacy-generation run is not a pass either.
 External accepted baseline records retain the reason **industrial
 spherical-wrist RobotArm**. PP0a remains open; PP1a has not started.
+
+
+### PP0a acceptance and mobile endpoint recovery
+
+The complete MachineKit gate passes, including stable wrist-fork names,
+1,000 compiled-model FK/IK targets per size, all eight configurations, and
+all-size physical/BOM/drive checks. App, MotionKit, CadBridge, Toolpath motion,
+ProcessKit and RobotKit compiler builds pass. Full runtime suites pass;
+RobotKit world tests include 5,431 assertions. Native MotionKit CTest passes
+16/16 and standard RobotKit runtime CTest passes 17/17.
+
+The remaining mobile failure came from lateral error at the final navigation
+segment: 65 mm beyond the end and 62 mm sideways, with a goal almost exactly
+beside the body. A forward-only differential base now turns toward the endpoint
+outside the final path corridor. Inside the corridor it still rejects backward
+overshoot; bases without in-place rotation retain the rejection. Two turning
+regressions and the existing straight-overshoot test pass. Failure reports
+include the navigation truth pose, target, progress and commanded speed.
+
+The complete mobile weld mission exits zero on both deterministic and MuJoCo
+backends: two stations, all ten seams, 271.4 s cycles, 4.9–5.0 mm bead legs,
+correct 40/180 mm extents and clear stow. Every accepted industrial re-baseline
+is recorded externally with reason **industrial spherical-wrist RobotArm**.
+PP0a is complete. PP1a is next. The 88.204 s track planning measurement remains
+functional evidence only; the under-15-second planning target is still open.

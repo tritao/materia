@@ -249,9 +249,12 @@ class Navigation {
     var pathDirection = Math.cos(Pose2.wrapAngle(projection.tangentYaw - pathHeading));
     var direction = allowReverse && pathDirection < 0.0 ? -1.0 : 1.0;
     if (atPathEnd && goalDistance > goal.positionTolerance && localTarget.x < -1e-6) {
-      if (!allowReverse)
-        return fail("Navigation passed the path end and reverse motion is disabled");
-      direction = -1.0;
+      // Off the final segment, a goal behind the body is a lateral tracking
+      // error that a differential base can close by turning and driving
+      // forward. Reserve the overshoot rejection for the final path corridor.
+      if (!allowReverse && (Math.abs(crossTrackError) <= goal.positionTolerance || !base.driveModel.supportsInPlaceRotation()))
+        return fail('Navigation passed the path end and reverse motion is disabled; pose=(${state.pose.x}, ${state.pose.y}, ${state.pose.yaw}), goalDistance=$goalDistance, localTarget=(${localTarget.x}, ${localTarget.y}), tangent=${projection.tangentYaw}, crossTrack=$crossTrackError, speed=$commandedLinearSpeed');
+      if (allowReverse) direction = -1.0;
     }
     // Brake to stop at the goal itself, not at the edge of its tolerance: the base keeps rolling while
     // it decelerates at its limit. The straight line to the goal is never longer than the route left,

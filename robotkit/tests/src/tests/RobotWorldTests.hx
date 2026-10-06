@@ -2018,6 +2018,14 @@ class RobotWorldTests {
       case _: false;
     }, "Navigation reports an unrecoverable path-end overshoot when reverse is disabled");
 
+    for (yaw in [0.0, 1.8]) {
+      overshootLocalization.reset(new Pose2(1.2, 0.08, yaw));
+      overshootLocalization.update(wheelSample("nav-overshoot", 6, 12.0));
+      noReverseNavigation.follow(new Path([new Pose2(), straightGoal.pose], "odom"), straightGoal);
+      check(switch noReverseNavigation.update(0.1) { case Following: spinning(overshootRobot); case _: false; },
+        "Forward-only navigation turns back toward an endpoint outside the final path corridor");
+    }
+
     function commandedSpeedAt(x:Float, id:String):Float {
       var speedRobot = new FakeRobot(id);
       speedRobot.positions = [0.0, 0.0];
