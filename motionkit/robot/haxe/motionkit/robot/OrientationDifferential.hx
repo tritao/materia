@@ -24,6 +24,33 @@ class OrientationDifferential {
     var swing=[sy.mul(factor).scale(-1),sx.mul(factor),new ScalarJet(0),cosine];
     var twist=[new ScalarJet(0),new ScalarJet(0),spin.sin(),spin.cos()];
     var result=compose(compose(base,swing),twist);
+    return motion(result);
+  }
+  /** Differentiate the minimal rotation aligning tool Z to a fixed cone axis. */
+  public static function cone(orientation:Quat,omega:Array<Float>,alpha:Array<Float>,axis:Array<Float>):OrientationMotion {
+    if(orientation==null || omega==null || alpha==null || omega.length!=3 || alpha.length!=3 || axis==null || axis.length!=3)
+      throw "Cone centre needs an orientation, angular rates and axis";
+    for(v in omega.concat(alpha).concat(axis))if(!Math.isFinite(v))throw "Cone centre data must be finite";
+    var norm=Math.sqrt(axis[0]*axis[0]+axis[1]*axis[1]+axis[2]*axis[2]);
+    if(norm<1e-12)throw "Cone centre axis must be nonzero";
+    var wanted=[for(v in axis)new ScalarJet(v/norm)];
+    var q=[orientation.x,orientation.y,orientation.z,orientation.w];
+    var dq=product([omega[0],omega[1],omega[2],0.0],q);
+    var ddq=product([alpha[0],alpha[1],alpha[2],0.0],q);
+    var wwq=product([omega[0],omega[1],omega[2],0.0],dq);
+    var base=[for(i in 0...4)new ScalarJet(q[i],0.5*dq[i],0.5*ddq[i]+0.25*wwq[i])];
+    var conjugate=[base[0].scale(-1),base[1].scale(-1),base[2].scale(-1),base[3]];
+    var from=compose(compose(base,[new ScalarJet(0),new ScalarJet(0),new ScalarJet(1),new ScalarJet(0)]),conjugate);
+    var dot=from[0].mul(wanted[0]).add(from[1].mul(wanted[1])).add(from[2].mul(wanted[2]));
+    if(dot.value<-1+1e-10)throw "Cone centre derivatives are undefined at antipodal alignment";
+    var turn=[from[1].mul(wanted[2]).add(from[2].mul(wanted[1]).scale(-1)),
+      from[2].mul(wanted[0]).add(from[0].mul(wanted[2]).scale(-1)),
+      from[0].mul(wanted[1]).add(from[1].mul(wanted[0]).scale(-1)),dot.add(new ScalarJet(1))];
+    var square=new ScalarJet(0);for(c in turn)square=square.add(c.mul(c));
+    var inverse=square.sqrt().inverse();turn=[for(c in turn)c.mul(inverse)];
+    return motion(compose(turn,base));
+  }
+  static function motion(result:Array<ScalarJet>):OrientationMotion {
     var value=[for(c in result)c.value],first=[for(c in result)c.first],second=[for(c in result)c.second];
     var conjugate=[-value[0],-value[1],-value[2],value[3]];
     var velocity=product(first,conjugate),acceleration=product(second,conjugate);

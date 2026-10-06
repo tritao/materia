@@ -1278,3 +1278,15 @@ pass (1,148,753 assertions). Projected cone-centre derivatives, branch/
 numeric support, default migration and authored performance gates remain
 outstanding; authored quaternion rates do not yet supply projected cone
 centre rates.
+
+PP4 cone-centre rates: OrientationDifferential.cone differentiates the
+minimal tool-Z alignment to each primitive's fixed cone axis with
+second-order quaternion jets, including normalization and authored spin.
+PosePathRefinement supplies these projected-centre angular rates and
+curvature to refinement, including the incoming primitive at joins.
+Antipodal alignment is explicitly diagnosed because minimal alignment is
+ambiguous there. Independent lattice-centre quaternion differences over
+25 small/large authored rotation cases verify centre pose, spatial angular
+velocity and acceleration. Compiler-only and focused runtime pass
+(1,148,928 assertions). End-to-end cone compiler acceptance, branch/numeric
+support, default migration and authored performance gates remain open.

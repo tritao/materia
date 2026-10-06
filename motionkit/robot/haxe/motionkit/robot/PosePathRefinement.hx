@@ -1,7 +1,8 @@
 package motionkit.robot;
 
 import motionkit.path.PosePath;
-import motionkit.path.PosePrimitive;
+import motionkit.path.PoseDerivatives;
+import motionkit.kinematics.Pose3;
 import motionkit.robot.AnalyticPathRefiner.RefinementTarget;
 
 /** Task data from authored primitives, retaining both sides of path knots.
@@ -22,20 +23,30 @@ class PosePathRefinement {
     }
     var primitive=path.primitives[index],policy=primitive.orientationPolicy();
     switch policy {
-      case Cone(_, _): throw "Cone refinement requires derivatives of its projected orientation centre";
+      case Cone(_, _):
       case Free: throw "Full-free refinement requires an explicit orientation centre";
       default:
     }
-    var outgoing=primitive.derivativesAt(local),incoming=outgoing;
+    var pose=primitive.waypointAt(local).pose;
+    var outgoing=centreRates(pose,policy,primitive.derivativesAt(local)),incoming=outgoing;
     if(index>0 && local==0){
       var previous=path.primitives[index-1];
-      incoming=previous.derivativesAt(previous.length());
+      incoming=centreRates(previous.endWaypoint().pose,previous.orientationPolicy(),previous.derivativesAt(previous.length()));
       for(axis in 0...3)if(Math.abs(incoming.linear[axis]-outgoing.linear[axis])>1e-6 ||
           Math.abs(incoming.angular[axis]-outgoing.angular[axis])>1e-6)
         throw "Refinement must split or blend a task-velocity discontinuity";
     }
-    return new RefinementTarget(primitive.waypointAt(local).pose,policy,
+    return new RefinementTarget(pose,policy,
       outgoing.linear.concat(outgoing.angular),outgoing.linearSecond.concat(outgoing.angularSecond),
       incoming.linearSecond.concat(incoming.angularSecond));
   }
+  static function centreRates(pose:Pose3,policy:motionkit.path.OrientationPolicy,rates:PoseDerivatives):PoseDerivatives {
+    return switch policy {
+      case Cone(axis,_):
+        var projected=OrientationDifferential.cone(new robotkit.spatial.Quat(pose.qx,pose.qy,pose.qz,pose.qw),rates.angular,rates.angularSecond,axis);
+        new PoseDerivatives(rates.linear,projected.velocity,rates.linearSecond,projected.acceleration);
+      default:rates;
+    };
+  }
+
 }

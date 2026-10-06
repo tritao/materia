@@ -792,6 +792,18 @@ class KinematicsTests extends MotionKitTestSupport {
         var omega=poseRotationDelta(line.waypointAt(distance-h).pose,line.waypointAt(distance+h).pose,1/(2*h));
         var before=poseRotationDelta(line.waypointAt(distance-2*h).pose,p,1/(2*h));
         var after=poseRotationDelta(p,line.waypointAt(distance+2*h).pose,1/(2*h));
+        var conePolicy=motionkit.path.OrientationPolicy.Cone([0.2,0.3,1.0],0.2);
+        var projected=motionkit.robot.OrientationDifferential.cone(new Quat(p.qx,p.qy,p.qz,p.qw),rates.angular,rates.angularSecond,[0.2,0.3,1.0]);
+        function projectedPose(s:Float):Pose3 return motionkit.robot.OrientationLattice.centre(line.waypointAt(s).pose,conePolicy);
+        var centre=projectedPose(distance),centreMinus=projectedPose(distance-h),centrePlus=projectedPose(distance+h);
+        var centreOmega=poseRotationDelta(centreMinus,centrePlus,1/(2*h));
+        var centreBefore=poseRotationDelta(projectedPose(distance-2*h),centre,1/(2*h));
+        var centreAfter=poseRotationDelta(centre,projectedPose(distance+2*h),1/(2*h));
+        near(motionkit.path.PoseMath.angle(new Pose3(centre.x,centre.y,centre.z,projected.rotation.x,projected.rotation.y,
+          projected.rotation.z,projected.rotation.w),centre),0,"cone differential uses the lattice centre rotation",1e-7);
+        for(axis in 0...3){near(projected.velocity[axis],centreOmega[axis],"cone centre velocity matches independent quaternion differences",1e-7);
+          near(projected.acceleration[axis],(centreAfter[axis]-centreBefore[axis])/(2*h),
+            "cone centre acceleration matches independent quaternion differences",1e-5);}
         for(axis in 0...3){near(rates.angular[axis],omega[axis],"primitive angular velocity matches quaternion differences",1e-7);
           near(rates.angularSecond[axis],(after[axis]-before[axis])/(2*h),"primitive angular acceleration matches quaternion differences",1e-6);}
       }
