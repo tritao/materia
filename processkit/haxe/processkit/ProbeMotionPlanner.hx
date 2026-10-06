@@ -27,8 +27,11 @@ class CheckedProbeMove {
   }
 }
 
+
 /** Contact probing's approach/refinement/retreat checks, without weld deposition semantics. */
 class ProbeMotionPlanner {
+  static inline final CORRIDOR_STEP = 0.001;
+  static inline final MIN_CORRIDOR_STEP = 0.000125;
   public final arm:Manipulator;
   public final compiler:ProgramCompiler;
   public final clearance:Null<ArmClearance>;
@@ -215,16 +218,33 @@ class ProbeMotionPlanner {
   public function corridorReachable(start:Array<Float>, direction:Vec3, distance:Float):Bool {
     if (start == null || start.length != arm.group.count() || direction == null || Math.abs(direction.norm() - 1) > 1e-8 ||
         !Math.isFinite(distance) || !(distance > 0)) throw "Probe corridor needs observed joints, a unit direction and finite distance";
-    var from = arm.tcpPose(start);
-    var q = start.copy();
-    var steps = Std.int(Math.max(1.0, Math.ceil(distance / 0.001)));
-    for (step in 1...steps + 1) {
-      var at = from.translation.add(direction.scale(distance * step / steps));
+    return continuationCorridor(start, direction, distance) != null;
+  }
+
+  /** Continue locally along a bounded Cartesian ray, refining only where the current IK branch needs it. */
+  function continuationCorridor(start:Array<Float>, direction:Vec3, distance:Float):Null<Array<Array<Float>>> {
+    var from = arm.tcpPose(start), q = start.copy(), traveled = 0.0;
+    var step = Math.min(CORRIDOR_STEP, distance), attempts = 0;
+    var maxAttempts = Std.int(Math.ceil(distance / MIN_CORRIDOR_STEP)) * 4 + 4;
+    var samples:Array<Array<Float>> = [q.copy()];
+    while (traveled < distance) {
+      if (++attempts > maxAttempts) return null;
+      var remaining = distance - traveled;
+      var advance = Math.min(step, remaining);
+      var nextDistance = advance >= remaining ? distance : traveled + advance;
+      var at = from.translation.add(direction.scale(nextDistance));
       var next = compiler.solver.solvePose(pose(new Transform3(at, from.rotation)), q, compiler.ikTolerance);
-      if (next == null) return false;
+      if (next == null) {
+        if (advance <= MIN_CORRIDOR_STEP) return null;
+        step = advance * 0.5;
+        continue;
+      }
+      traveled = nextDistance;
       q = next;
+      samples.push(q.copy());
+      step = Math.min(CORRIDOR_STEP, distance - traveled);
     }
-    return true;
+    return samples;
   }
 
   /** Bound wire travel during sensor age, a missed command deadline and joint braking using CAD lever lengths. */
@@ -261,15 +281,10 @@ class ProbeMotionPlanner {
         distal += Math.max(Math.abs(travel.lower), Math.abs(travel.upper));
       }
     }
-    var from = arm.tcpPose(start), q = start.copy(), speed = requested;
-    var steps = Std.int(Math.max(1.0, Math.ceil(distance / 0.001)));
-    for (step in 0...steps + 1) {
-      if (step > 0) {
-        var at = from.translation.add(direction.scale(distance * step / steps));
-        var next = compiler.solver.solvePose(pose(new Transform3(at, from.rotation)), q, compiler.ikTolerance);
-        if (next == null) throw "Probe speed corridor leaves the executed IK branch";
-        q = next;
-      }
+    var samples = continuationCorridor(start, direction, distance);
+    if (samples == null) throw 'Probe speed corridor leaves the executed IK branch at ${MIN_CORRIDOR_STEP * 1000} mm minimum continuation step';
+    var speed = requested;
+    for (q in samples) {
       var rates = compiler.solver.solveDifferential(q, new Twist6(direction.x, direction.y, direction.z, 0, 0, 0));
       if (rates == null) throw "Probe sensing ray has no finite differential motion";
       var hold = 0.0, brake = 0.0;
@@ -322,7 +337,8 @@ class ProbeMotionPlanner {
         var direction = v < 0 ? -1.0 : 1.0;
         var end = start[joint] + v * (hold + braking) - direction * 0.5 * acceleration * braking * braking;
         var limits = arm.group.limitsOf(joint);
-        if (limits.lower < limits.upper && (end < limits.lower || end > limits.upper))
+        var roundoff = 1e-12 * Math.max(1.0, Math.max(Math.abs(limits.lower), Math.abs(limits.upper)));
+        if (limits.lower < limits.upper && (end < limits.lower - roundoff || end > limits.upper + roundoff))
           return {a: arm.robot.joints[arm.jointIndices()[joint]].id, b: "joint travel bound",
             distance: Math.min(end - limits.lower, limits.upper - end), required: 0.0};
         q.push(end);

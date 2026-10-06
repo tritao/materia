@@ -137,7 +137,7 @@ class ContactProbeRunner {
               case Approaching:
                 beginSearch(requested.coarseSpeed, requested.distance); phase = Coarse;
               case Backoff:
-                beginSearch(requested.fineSpeed, requested.backoff + requested.contactOffset); phase = Fine;
+                beginSearch(requested.fineSpeed, requested.backoff); phase = Fine;
               case Retreat: phase = Done;
               case _:
             }
