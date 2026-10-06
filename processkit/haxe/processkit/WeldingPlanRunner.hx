@@ -403,7 +403,14 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
         var began=Sys.time(),before=group.numericSolveCount();
         var request=problem.request(stopped,motion.compiler.ikTolerance,
           motion.compiler.perJointMaxJump,motion.compiler.maxVelocity);
-        var curves=problem.select(group,request,null,clearance,null,null,null,null,0,
+        var curves=problem.select(group,request,null,clearance,(from,to)->{
+          var entry=motion.compiler.generateEntry(from,to);
+          try {
+            var violation=clearance==null ? null : motionkit.robot.TrajectoryClearance.violation(
+              clearance,entry,false,0.01,q->problem.contact(motion.compiler.solver.forward(q)));
+            entry.dispose();return violation;
+          }catch(error:Dynamic){entry.dispose();throw error;}
+        },null,null,null,0,
           cast(motion.compiler.solver,ManipulatorKinematics));
         var program=new WeldPathProgram(problem,curves,channels,process.interruptedAt);
         var compiled=program.compile(motion.compiler,group,stopped,motion.compilationPlanId(),clearance);

@@ -152,7 +152,18 @@ class WeldPlanningTests {
       0.001,0.02,new IkTolerance(1e-6,1e-6));
     var recoveryProblem=problem.recovery(0.037);
     var recoveryRequest=recoveryProblem.request(measured,compiler.ikTolerance,compiler.perJointMaxJump,compiler.maxVelocity);
-    var recoveryCurves=recoveryProblem.select(fixture.arm,recoveryRequest,null,world);
+    var recoveryEntries=0;
+    var recoveryCurves=recoveryProblem.select(fixture.arm,recoveryRequest,null,world,(from,to)->{
+      recoveryEntries++;
+      var entry=compiler.generateEntry(from,to);
+      try {
+        var violation=motionkit.robot.TrajectoryClearance.violation(world,entry,false,0.01,
+          q->recoveryProblem.contact(solver.forward(q)));
+        entry.dispose();
+        return recoveryEntries==1 ? {a:"entry",b:"blocked test route",distance:0.0,required:0.003} : violation;
+      }catch(error:Dynamic){entry.dispose();throw error;}
+    });
+    check(recoveryEntries>1,"recovery ladder retries after rejecting a generated entry motion");
     var recoveryProgram=new processkit.WeldPathProgram(recoveryProblem,recoveryCurves,
       {arc:"arc",wireSpeed:"wire",voltage:"voltage"},0.039);
     var recoveryCompiled=recoveryProgram.compile(compiler,fixture.arm,measured,haxe.Int64.ofInt(701),world);

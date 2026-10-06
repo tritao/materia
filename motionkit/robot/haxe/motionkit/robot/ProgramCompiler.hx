@@ -412,6 +412,29 @@ class ProgramCompiler {
   }
 
   /** Plans the next stretch of the current path op. */
+  /** The stopped joint transition used for free path entry/exit checks.
+   * Caller owns and must dispose the returned trajectory. */
+  public function generateEntry(from:Array<Float>,to:Array<Float>):Trajectory {
+    if(from==null || to==null || from.length!=solver.jointCount() || to.length!=from.length)
+      throw "Generated entry requires aligned joint configurations";
+    for(q in [from,to])for(value in q)if(!Math.isFinite(value))
+      throw "Generated entry requires finite joint positions";
+    var moved = false;
+    for (joint in 0...from.length) if (Math.abs(from[joint]-to[joint]) > 1e-7) moved = true;
+    if (!moved) return Trajectory.fromSegments([{
+      timeFromStartNs:Int64.ofInt(0),durationNs:Trajectory.nanoseconds(controllerPeriodSeconds),
+      coefficients:[for (position in from) [position,0.0]]
+    }]);
+    var motors = motorSpace;
+    var generated = motors == null ? Trajectory.generateStateToState(from,zeros(),zeros(),to,
+      maxVelocity,maxAcceleration,maxJerk) : motors.move(from,to,maxVelocity,maxAcceleration,maxJerk);
+    if (couplingIndices.length > 0) {
+      try { var projected = projectCouplings(generated); generated.dispose(); return projected; }
+      catch (error:Dynamic) { generated.dispose(); throw error; }
+    }
+    return generated;
+  }
+
   function lowerSection(c:ProgramCompilation):Void {
     retire(c);
     var k = c.sectionIndex++;
@@ -425,22 +448,6 @@ class ProgramCompiler {
     function releaseTransitions():Void {
       if (entryTrajectory != null) { entryTrajectory.dispose(); entryTrajectory = null; }
       if (exitTrajectory != null) { exitTrajectory.dispose(); exitTrajectory = null; }
-    }
-    function generateEntry(from:Array<Float>,to:Array<Float>):Trajectory {
-      var moved = false;
-      for (joint in 0...from.length) if (Math.abs(from[joint]-to[joint]) > 1e-7) moved = true;
-      if (!moved) return Trajectory.fromSegments([{
-        timeFromStartNs:Int64.ofInt(0),durationNs:Trajectory.nanoseconds(controllerPeriodSeconds),
-        coefficients:[for (position in from) [position,0.0]]
-      }]);
-      var motors = motorSpace;
-      var generated = motors == null ? Trajectory.generateStateToState(from,zeros(),zeros(),to,
-        maxVelocity,maxAcceleration,maxJerk) : motors.move(from,to,maxVelocity,maxAcceleration,maxJerk);
-      if (couplingIndices.length > 0) {
-        try { var projected = projectCouplings(generated); generated.dispose(); return projected; }
-        catch (error:Dynamic) { generated.dispose(); throw error; }
-      }
-      return generated;
     }
     try {
       if(k==0 && c.sections.length>1 && Std.isOfType(jointPathPlanner,StructuredJointPathPlanner)) {
