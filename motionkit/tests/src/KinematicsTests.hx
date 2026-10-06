@@ -713,6 +713,20 @@ class KinematicsTests extends MotionKitTestSupport {
     check(preferredRetry.candidates[1] != preferredRoute.candidates[1] &&
       preferredRetry.candidates[1] != initialRoute.candidates[1],
       "collision retries retain process preferences while excluding blocked states");
+    var exitChecks = 0;
+    var clearExit = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> null,
+      2,null,null,null,null,null,q -> {
+        exitChecks++;
+        return q == initialRoute.candidates[1].q ? {a:"tool",b:"retreat-post",distance:0.0,required:0.01} : null;
+      });
+    check(exitChecks == 2 && clearExit.candidates[1] != initialRoute.candidates[1],
+      "blocked retreat retries an alternative complete route");
+    var impossibleExit = "";
+    try motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> null,
+      2,null,null,null,null,null,q -> ({a:"tool",b:"retreat-post",distance:0.0,required:0.01}))
+    catch (error:Dynamic) impossibleExit = Std.string(error);
+    check(impossibleExit.indexOf("retreat-post") >= 0 && impossibleExit.indexOf("sample 1") >= 0,
+      "impossible retreat identifies the blocking pair and final sample within the shared budget");
     var blockedEndpoint=initialRoute.candidates[1].q,rerouteChecks=0;
     var rerouted=motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> {
       rerouteChecks++;
@@ -840,6 +854,27 @@ class KinematicsTests extends MotionKitTestSupport {
     var entered = entryCompiler.compile(entryProgram,start,Int64.ofInt(926));
     check(entered.blocks[0].plans.length == 1, "an already selected start omits zero-length entry motion");
     entered.dispose();
+    var retreatPlanner = new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12,3,8,false),null,
+      new robotkit.manipulation.ArmClearance(fixture.arm,[],start),8,false,null,current);
+    var retreatCompiler = new ProgramCompiler(solver,serialLimits,"task",
+      [for (_ in start) 1.0],[for (_ in start) 2.0],[for (_ in start) 20.0],
+      StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,null,retreatPlanner);
+    var retreated = retreatCompiler.compile(entryProgram,current,Int64.ofInt(930));
+    check(retreated.blocks[0].plans.length == 3, "free path emits entry, process and safe retreat motions");
+    var retreatPlan = retreated.blocks[0].plans[2];
+    check(retreated.blocks[0].pathLengths[2] == 0.0 && retreatPlan.events.length == 0,
+      "retreat has no process progress or inherited events");
+    for (joint in 0...current.length) {
+      near(retreatPlan.evaluate(0.0).positions[joint],
+        retreated.blocks[0].plans[1].evaluate(retreated.blocks[0].plans[1].durationSeconds).positions[joint],
+        "retreat joins the process endpoint",1e-7);
+      near(retreatPlan.evaluate(retreatPlan.durationSeconds).positions[joint],current[joint],
+        "retreat reaches the requested safe joints",1e-7);
+    }
+    retreated.dispose();
+    var copiedRetreat = retreatPlanner.retreatTarget(); copiedRetreat[0] += 0.1;
+    near(retreatPlanner.retreatTarget()[0],current[0],"retreat target is protected from caller mutation");
     var coneStartPose=solver.forward(start),coneEndPose=solver.forward(end);
     var coneAxis=fixture.arm.tcpPose(start).transformVector(new Vec3(0,0,1)).toArray();
     var authoredCone=new motionkit.path.PosePath("task",[new PoseLine(
@@ -1074,7 +1109,7 @@ class KinematicsTests extends MotionKitTestSupport {
       new PoseWaypoint(new Pose3(0.2,0.1,0.0),1e-6,1e-6),
       new PoseWaypoint(new Pose3(0.21,0.1,0.0),1e-6,1e-6),OrientationPolicy.FreeAboutTool,0.1,0.1)]);
     var physicalEntryPlanner = new motionkit.robot.StructuredJointPathPlanner(rollGroup,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1,false),null,entryWorld,4);
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1,false),null,entryWorld,4,false,null,entryCurrent);
     var physicalEntryCompiler = new ProgramCompiler(rollSolver,
       new ValidationLimits(4,Int64.ofInt(1),Int64.ofInt(0)),"task",
       [1.0,1.0,1.0,1.0],[2.0,2.0,2.0,2.0],[20.0,20.0,20.0,20.0],
@@ -1087,12 +1122,17 @@ class KinematicsTests extends MotionKitTestSupport {
     rejectedEntry.dispose();
     var physicalEntryPlan = physicalEntryCompiler.compile(new MotionProgram([
       MotionOp.FollowPath(entryPath,"task",0.1,[])]),entryCurrent,Int64.ofInt(950));
-    check(physicalEntryPlan.blocks[0].plans.length == 2 &&
+    check(physicalEntryPlan.blocks[0].plans.length == 3 &&
       Math.abs(physicalEntryPlan.blocks[0].plans[1].evaluate(0.0).positions[3]) > 1.0,
       "compiler retries a blocked generated entry with a clear rolled start");
     var acceptedEntry = physicalEntryPlan.blocks[0].plans[0];
     for (i in 0...101) check(entryWorld.violation(acceptedEntry.evaluate(acceptedEntry.durationSeconds*i/100.0).positions) == null,
       "emitted alternative entry remains clear of the physical post");
+    var acceptedExit = physicalEntryPlan.blocks[0].plans[2];
+    for (i in 0...101) check(entryWorld.violation(acceptedExit.evaluate(acceptedExit.durationSeconds*i/100.0).positions) == null,
+      "emitted retreat remains clear of the physical post");
+    for (joint in 0...4) near(acceptedExit.evaluate(acceptedExit.durationSeconds).positions[joint],entryCurrent[joint],
+      "physical retreat reaches its safe station",1e-7);
     physicalEntryPlan.dispose();
     var unobstructed=motionkit.robot.StructuredLadder.search(rollProblem);
     check(rollWorld.violation(unobstructed.candidates[1].q)!=null,"physical post blocks the cheapest roll route");
@@ -1999,6 +2039,12 @@ class KinematicsTests extends MotionKitTestSupport {
       "compiler defaults to the exact logical-axis planner");
     check(axisCompiler.forWorker().jointPathPlanner != axisCompiler.jointPathPlanner,
       "axis worker owns its path planner");
+    var measured = q.copy(); measured[0] += 0.00009; measured[1] -= 0.000135;
+    var measuredCurve = planner.plan(path, new PathRequest([0.0,path.length()],
+      [target,path.poseAt(path.length())],measured,new IkTolerance(0.0001,0.0001),
+      [for (_ in 0...4) 0.1],[for (_ in 0...4) 0.1],32,[OrientationPolicy.Fixed,OrientationPolicy.Fixed]));
+    near(measuredCurve.q[0][0],measured[0],"axis planner preserves an admissible measured leader start");
+    near(measuredCurve.q[0][1],measured[1],"axis planner preserves the measured follower in logical tolerance");
     var arcStart = new Pose3(0.02, 0.0, 0.0);
     var joined = new PosePath("work", [
       new PoseLine(new PoseWaypoint(new Pose3(0.02, -0.01, 0.0), 1e-6, 1e-6),

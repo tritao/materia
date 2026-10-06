@@ -395,6 +395,12 @@ class ProgramCompiler {
     var curve:Null<JointPathSamples> = null;
     var pathStart = c.q;
     var entryTrajectory:Null<Trajectory> = null;
+    var exitTrajectory:Null<Trajectory> = null;
+    var retreat = last && jointPathPlanner != null ? jointPathPlanner.retreatTarget() : null;
+    function releaseTransitions():Void {
+      if (entryTrajectory != null) { entryTrajectory.dispose(); entryTrajectory = null; }
+      if (exitTrajectory != null) { exitTrajectory.dispose(); exitTrajectory = null; }
+    }
     function generateEntry(from:Array<Float>,to:Array<Float>):Trajectory {
       var moved = false;
       for (joint in 0...from.length) if (Math.abs(from[joint]-to[joint]) > 1e-7) moved = true;
@@ -412,28 +418,33 @@ class ProgramCompiler {
       return generated;
     }
     try {
-      if (k == 0 && jointPathPlanner != null && jointPathPlanner.allowsFreeStart()) {
+      if (jointPathPlanner != null && (k == 0 && jointPathPlanner.allowsFreeStart() || retreat != null)) {
+        var freeStart = k == 0 && jointPathPlanner.allowsFreeStart();
         var samples = pathSamples(section.path);
         if (samples.length > 10001) throw 'Motion program op ${c.currentIndex} exceeds Cartesian sample budget';
         curve = jointPathPlanner.plan(section.path,new PathRequest(
           [for (sample in samples) sample.distance],
           [for (sample in samples) sample.primitive.waypointAt(sample.local).pose],
           c.q,ikTolerance,perJointMaxJump,maxVelocity,48,
-          [for (sample in samples) sample.primitive.orientationPolicy()]),false,(from,to) -> {
+          [for (sample in samples) sample.primitive.orientationPolicy()]),!freeStart,(from,to) -> {
             if (entryTrajectory != null) { entryTrajectory.dispose(); entryTrajectory = null; }
             entryTrajectory = generateEntry(from,to);
             return jointPathPlanner.checkMotion(entryTrajectory);
+          },retreat == null ? null : from -> {
+            if (exitTrajectory != null) { exitTrajectory.dispose(); exitTrajectory = null; }
+            exitTrajectory = generateEntry(from,retreat);
+            return jointPathPlanner.checkMotion(exitTrajectory);
           });
         pathStart = curve.q[0];
       }
-    } catch (error:Dynamic) { if (entryTrajectory != null) entryTrajectory.dispose(); throw error; }
+    } catch (error:Dynamic) { releaseTransitions(); throw error; }
     var pending:PendingMotion;
     try {
       pending = lowerPath(c.speedScale, section.path, pathStart, c.sectionFeed, [for (event in c.sectionEvents)
       if (event.distance >= section.offset && (last || event.distance < end))
         new PathEvent(event.distance - section.offset, event.channel, event.value,
           event.leadSeconds, event.holdPolicy)], c.currentIndex,null,0.0,curve);
-    } catch (error:Dynamic) { if (entryTrajectory != null) entryTrajectory.dispose(); throw error; }
+    } catch (error:Dynamic) { releaseTransitions(); throw error; }
     try {
       var moved = false;
       for (joint in 0...c.q.length) if (Math.abs(pathStart[joint]-c.q[joint]) > 1e-7) moved = true;
@@ -447,14 +458,29 @@ class ProgramCompiler {
         retire(c);
       }
     } catch (error:Dynamic) {
-      if (entryTrajectory != null) entryTrajectory.dispose();
+      releaseTransitions();
       pending.trajectory.dispose(); throw error;
     }
-    if (entryTrajectory != null) entryTrajectory.dispose();
+    if (entryTrajectory != null) { entryTrajectory.dispose(); entryTrajectory = null; }
     pending.distanceOffset = section.offset;
     c.pending = pending;
     c.q = pending.endQ.copy();
     if (k == 0) attachLeadingOutputs(pending, c.leadingOutputs);
+    if (retreat != null) {
+      try {
+        var moved = false;
+        for (joint in 0...c.q.length) if (Math.abs(retreat[joint]-c.q[joint]) > 1e-7) moved = true;
+        if (moved) {
+          checkJointPosition(retreat,c.currentIndex,null);
+          if (exitTrajectory == null) exitTrajectory = generateEntry(c.q,retreat);
+          retire(c);
+          c.pending = new PendingMotion(c.currentIndex,c.q,retreat,exitTrajectory,[],null,null);
+          exitTrajectory = null;
+          c.q = retreat.copy();
+        }
+      } catch (error:Dynamic) { releaseTransitions(); throw error; }
+    }
+    releaseTransitions();
     if (last) {
       c.sections = [];
       c.sectionIndex = 0;

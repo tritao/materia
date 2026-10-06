@@ -19,9 +19,11 @@ class AxisJointPathPlanner implements JointPathPlanner {
     return new AxisJointPathPlanner(cast worker);
   }
   public function allowsFreeStart():Bool return false;
+  public function retreatTarget():Null<Array<Float>> return null;
   public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<robotkit.manipulation.ArmClearance.ClearanceViolation> return null;
   public function plan(path:PosePath, request:PathRequest, ?pinStart:Bool,
-      ?entryCheck:(Array<Float>,Array<Float>)->Null<robotkit.manipulation.ArmClearance.ClearanceViolation>):JointPathSamples {
+      ?entryCheck:(Array<Float>,Array<Float>)->Null<robotkit.manipulation.ArmClearance.ClearanceViolation>,
+      ?exitCheck:Array<Float>->Null<robotkit.manipulation.ArmClearance.ClearanceViolation>):JointPathSamples {
     if (path == null || request == null || request.distances.length < 2 ||
         request.distances[0] != 0 || request.distances[request.distances.length - 1] != path.length())
       throw "Axis path request must span its complete authored path";
@@ -40,9 +42,14 @@ class AxisJointPathPlanner implements JointPathPlanner {
           ToolFreedom.orientationError(solver.forward(q), task.pose, task.freedom) > request.tolerance.orientation ||
           solver.solvePose(task.pose, q, request.tolerance, task.freedom) == null)
         throw 'Axis path is unreachable at sample $i, distance ${request.distances[i]}';
-      var exact = solver.solvePose(task.pose, q, request.tolerance, task.freedom);
-      for (joint in 0...q.length) if (Math.abs(q[joint] - exact[joint]) > request.tolerance.position)
-        throw 'Axis path start violates joint mapping at sample $i';
+      // A measured start may differ from the authored pose within task tolerance.
+      // Validate its own affine mapping in logical metres, including rotary motor scales.
+      var exact = solver.solvePose(solver.forward(q), q, request.tolerance, motionkit.path.OrientationPolicy.Interpolated);
+      for (axis in [solver.x,solver.y,solver.z]) for (slot in 0...axis.jointIndices.length) {
+        var joint = axis.jointIndices[slot];
+        if (Math.abs(q[joint]-exact[joint])/Math.abs(axis.jointScale(slot)) > request.tolerance.position)
+          throw 'Axis path start violates joint mapping at sample $i';
+      }
       for (joint in 0...q.length) if (Math.abs(q[joint] - previous[joint]) > request.maxJump[joint])
         throw 'Axis path exceeds joint $joint jump at sample $i, distance ${request.distances[i]}';
       function map(values:Array<Float>):Array<Float> {

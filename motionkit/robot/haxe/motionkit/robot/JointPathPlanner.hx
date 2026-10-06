@@ -8,7 +8,9 @@ import motionkit.planner.JointPathSamples;
 interface JointPathPlanner {
   function withSolver(solver:motionkit.kinematics.KinematicsSolver):JointPathPlanner;
   function allowsFreeStart():Bool;
+  function retreatTarget():Null<Array<Float>>;
   function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<robotkit.manipulation.ArmClearance.ClearanceViolation>;
   function plan(path:PosePath,request:PathRequest,?pinStart:Bool,
-    ?entryCheck:(Array<Float>,Array<Float>)->Null<robotkit.manipulation.ArmClearance.ClearanceViolation>):JointPathSamples;
+    ?entryCheck:(Array<Float>,Array<Float>)->Null<robotkit.manipulation.ArmClearance.ClearanceViolation>,
+    ?exitCheck:Array<Float>->Null<robotkit.manipulation.ArmClearance.ClearanceViolation>):JointPathSamples;
 }

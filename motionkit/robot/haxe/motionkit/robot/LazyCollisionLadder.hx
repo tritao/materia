@@ -29,7 +29,8 @@ class LazyCollisionLadder {
       ?sweep:(Array<Float>,Array<Float>)->Null<ClearanceViolation>,?coarse:CoarseSearchOptions,
       ?refinedCheck:LadderSelection->Null<RefinedCollision>,
       ?stateCost:(Int,LatticeCandidate)->Float,
-      ?entrySweep:(Array<Float>,Array<Float>)->Null<ClearanceViolation>):LadderSelection {
+      ?entrySweep:(Array<Float>,Array<Float>)->Null<ClearanceViolation>,
+      ?exitCheck:Array<Float>->Null<ClearanceViolation>):LadderSelection {
     if(problem==null || check==null || rounds<1)throw "Lazy collision selection requires a problem, checker and positive round budget";
     var blocked=[for(_ in problem.samples)new haxe.ds.ObjectMap<LatticeCandidate,Bool>()];
     var edges:Array<BlockedLadderEdge> = [];
@@ -40,7 +41,21 @@ class LazyCollisionLadder {
           stateCost == null ? 0.0 : stateCost(sample,candidate),coarse,edges);
       if(route.diagnostic!=null){
         if(last!=null)throw 'Collision blocks sample $lastSample (${last.a}, ${last.b}): ${route.diagnostic}';
-        return route;
+        if (exitCheck != null) {
+        var sample = route.candidates.length - 1;
+        var chosen = route.candidates[sample];
+        var exit = exitCheck(chosen.q);
+        if (exit != null) {
+          for (candidate in problem.samples[sample].candidates) {
+            var same = true;
+            for (joint in 0...chosen.q.length)
+              if (Math.abs(candidate.q[joint] - chosen.q[joint]) > 1e-7) same = false;
+            if (same) blocked[sample].set(candidate,true);
+          }
+          last=exit;lastSample=sample;continue;
+        }
+      }
+      return route;
       }
       if (entrySweep != null) {
         var entry = entrySweep(problem.request.startQ,route.candidates[0].q);
@@ -76,6 +91,20 @@ class LazyCollisionLadder {
             problem.samples[i-1].candidates.indexOf(route.candidates[i-1]),problem.samples[i].candidates.indexOf(route.candidates[i])));
           else blocked[i].set(route.candidates[i],true);
           last=failure.failure;lastSample=i;continue;
+        }
+      }
+      if (exitCheck != null) {
+        var sample = route.candidates.length - 1;
+        var chosen = route.candidates[sample];
+        var exit = exitCheck(chosen.q);
+        if (exit != null) {
+          for (candidate in problem.samples[sample].candidates) {
+            var same = true;
+            for (joint in 0...chosen.q.length)
+              if (Math.abs(candidate.q[joint] - chosen.q[joint]) > 1e-7) same = false;
+            if (same) blocked[sample].set(candidate,true);
+          }
+          last=exit;lastSample=sample;continue;
         }
       }
       return route;

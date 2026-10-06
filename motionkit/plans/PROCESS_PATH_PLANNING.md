@@ -385,8 +385,8 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP3 | in progress: structured/coarse search and Descartes dispatch implemented; authored gate pending | `7cb639434`, `489f2c360`, `f8e88ad4d`, `09cb60fbb` |
 | PP4 | in progress: analytic/numeric refinement, cone rates and timing verified; transitions/authored gate pending | `4b9e750ff`, `0e5edbc06`, `39b6081c1` |
 | PP5 | complete: lazy sample/edge/refined retries, physical acceptance and full native/Haxe gate | `e1435022f`, `e5336893f`, `bfd03d585` |
-| PP6 | in progress: compiler planner argument, OPW worker isolation and legacy class removal verified; default migration and entry handling pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
-| PP7 | planned | — |
+| PP6 | in progress: planner argument, axis/standalone OPW defaults, class removal and free entry verified; remaining defaults and joined approach/retreat pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
+| PP7 | complete: generated entry/retreat selection, retries and emission; full MotionKit/native gate passed | `92b8c69ee`, `093e65a46`, `e41bdfffa`; retreat gate below |
 | PP8 | planned | — |
 | PP9 | planned | — |
 | PP10 | planned | — |
@@ -1417,3 +1417,18 @@ Compiler-only validation passes. The focused C4 runtime passes 1,149,019 asserti
 The compiler supplies an entry-check callback to structured free-start selection. Each attempted entry uses the same state-to-state/motor-space generator and coupling projection as the emitted motion. `TrajectoryClearance` samples that generated joint curve at 10 ms and sweeps between those states with ArmClearance; this retains the existing sampled collision contract. A failed entry excludes its physical start and retries within the shared collision round bound. The accepted trajectory is retained and emitted, rather than generated again. Rejected/interrupted candidates and unused zero-motion entries release their native trajectories.
 
 MotionKit and app compiler-only builds pass. The focused C4 runtime passes 1,149,124 assertions. New physical coverage proves that a curved motion with clear endpoint interpolation can hit a mid-motion post; an end-to-end Cartesian cell test rejects the cheapest blocked generated entry, selects a rolled start, and verifies the emitted alternative entry against the physical world. Existing free-entry compiler acceptance now uses a clearance world, including an already-selected zero-motion start. The earlier straight-entry limitation is addressed for compiler-driven free starts. Direct planner callers without an entry callback still request a sampled straight joint entry. Safe retreat selection/emission, joined approach/retreat, process migration and the complete phase gate remain outstanding; PP7 is incomplete.
+
+### PP7 safe retreat integration and full gate
+
+Structured planners accept an optional safe retreat configuration, validate and copy its joints, retain it when rebinding workers, and expose a defensive copy. The last FollowPath section includes travel to that retreat in its route cost. Lazy selection checks the generated exit trajectory after route/refinement checks; blocked physical endpoints are excluded and complete routes retried within the shared round bound. The compiler retains and emits the accepted exit after the process path, with no path progress or inherited events, and omits a zero-motion retreat. This completes PP7's generated joint entry/exit orchestration; the process builder supplies the safe configuration and clearance world.
+
+The first full gate exposed a separate axis-default regression: pinned measured starts were compared against authored positions using a metre tolerance on physical motor joints. AxisJointPathPlanner now checks the measured start's own affine mapping in logical metres, preserving admissible measured starts and rejecting inconsistent followers. The coupled measured-start regression and the existing XYZ gantry integration pass.
+
+Validation on the final behavior:
+- Focused C4: 1,149,248 assertions, including entry/process/retreat continuity, event/progress metadata, target ownership and physical checks of both emitted connection motions.
+- MachineKit compiler focus: 74 assertions, including the previously failing compiled XYZ gantry.
+- Normal full MotionKit runtime: 1,220,521 assertions, exit zero (`process-path-pp7-entry-exit-full-v2-haxe.log`). The preceding failed run is retained separately and is not a passing gate.
+- Native CTest: 16/16 pass.
+- Compiler-only: MotionKit tests, app, robotkit/cadbridge/tests and toolpathkit/motion/tests pass.
+
+PP6 remains incomplete: joined authored approach/retreat lines, remaining compiled-group defaults and process preferences still need integration. The final timed process trajectory also needs the configured world's clearance check; current structured refinement checks its sampled joint curve, while generated entry and exit motions now receive their actual trajectory checks. PP8–PP11 migration, authored benchmarks and final downstream runtime gates remain outstanding. No production speedup is claimed by this increment.

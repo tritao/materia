@@ -19,11 +19,23 @@ class StructuredJointPathPlanner implements JointPathPlanner {
   final clearance:Null<ArmClearance>;
   final collisionRounds:Int;
   final contact:Bool;
+  final retreat:Null<Array<Float>>;
   final stateCost:Null<(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float>;
   public function new(group:KinematicGroup,?sampling:CandidateSamplingOptions,?coarse:CoarseSearchOptions,
       ?clearance:ArmClearance,collisionRounds:Int=8,contact:Bool=false,
-      ?stateCost:(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float) {
+      ?stateCost:(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float,
+      ?retreat:Array<Float>) {
     if(group==null || collisionRounds<1)throw "Joint path planner requires a compiled group and positive collision round budget";
+    if (retreat != null) {
+      if (retreat.length != group.group.count()) throw "Retreat target must match compiled joints";
+      for (joint in 0...retreat.length) {
+        var limits = group.group.limitsOf(joint);
+        if (!Math.isFinite(retreat[joint]) || limits.lower < limits.upper &&
+            (retreat[joint] < limits.lower || retreat[joint] > limits.upper))
+          throw 'Retreat target violates joint $joint planning limits';
+      }
+    }
+    this.retreat = retreat == null ? null : retreat.copy();
     this.group=group;this.sampling=sampling;this.coarse=coarse;
     this.clearance=clearance;this.collisionRounds=collisionRounds;this.contact=contact;this.stateCost=stateCost;
   }
@@ -37,7 +49,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
       workerGroup = adapter.manipulator;
     } else throw "Structured planner worker requires compiled group kinematics";
     return new StructuredJointPathPlanner(workerGroup, sampling, coarse,
-      clearance == null ? null : clearance.withGroup(workerGroup), collisionRounds, contact, stateCost);
+      clearance == null ? null : clearance.withGroup(workerGroup), collisionRounds, contact, stateCost, retreat);
   }
   public static function sameFreedom(a:motionkit.path.OrientationPolicy,b:motionkit.path.OrientationPolicy):Bool {
     return switch a {
@@ -53,11 +65,13 @@ class StructuredJointPathPlanner implements JointPathPlanner {
       };
     };
   }
+  public function retreatTarget():Null<Array<Float>> return retreat == null ? null : retreat.copy();
   public function allowsFreeStart():Bool return sampling != null && !sampling.pinStart;
   public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<ArmClearance.ClearanceViolation>
     return clearance == null ? null : TrajectoryClearance.violation(clearance,trajectory,contact);
   public function plan(path:PosePath,request:PathRequest,?pinStart:Bool,
-      ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>):JointPathSamples {
+      ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>,
+      ?exitCheck:Array<Float>->Null<ArmClearance.ClearanceViolation>):JointPathSamples {
     if(path==null || request==null || request.distances.length<2 || request.distances[0]!=0 ||
         request.distances[request.distances.length-1]!=path.length())
       throw "Joint path request must span its complete authored path";
@@ -81,7 +95,17 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     fallbackDiagnostic=problem.diagnostic;
     var refined:Null<JointPathSamples> = null;
     var world=clearance;
-    var selected=world==null ? StructuredLadder.search(problem,null,0,stateCost,coarse)
+    var cost = stateCost;
+    if (exitCheck != null && retreat != null) {
+      var destination:Array<Float> = retreat.copy();
+      cost = (sample:Int,candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate) -> {
+        var value = stateCost == null ? 0.0 : stateCost(sample,candidate);
+        if (sample == problem.samples.length - 1)
+          for (joint in 0...destination.length) value += Math.abs(destination[joint]-candidate.q[joint])/request.velocity[joint];
+        return value;
+      };
+    }
+    var selected=world==null ? StructuredLadder.search(problem,null,0,cost,coarse)
       : LazyCollisionLadder.selectWithChecks(problem,q -> world.violation(q,contact),collisionRounds,
         (from,to) -> world.sweep(from,to,contact),coarse,route -> {
           var curve=new AnalyticPathRefiner(group,problem,route).refinePath(request.distances,provider.at);
@@ -92,7 +116,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
               if(failure!=null)return new motionkit.robot.LazyCollisionLadder.RefinedCollision(i,true,failure);}
           }
           refined=curve;return null;
-        },stateCost, problem.pinnedStart ? null : entryCheck != null ? entryCheck : (from,to) -> world.sweep(from,to,contact));
+        },cost, problem.pinnedStart ? null : entryCheck != null ? entryCheck : (from,to) -> world.sweep(from,to,contact),exitCheck);
     if(selected.diagnostic!=null)throw 'Joint path selection failed at distance ${selected.failedDistance}: ${selected.diagnostic}';
     return refined==null ? new AnalyticPathRefiner(group,problem,selected).refinePath(request.distances,provider.at) : refined;
   }
