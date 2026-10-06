@@ -151,6 +151,10 @@ set_target_properties(motionkit_core PROPERTIES
     SOVERSION 0)
 
 if(BUILD_TESTING)
+    add_executable(motionkit_structured_ladder_tests tests/structured_ladder.cpp)
+    target_include_directories(motionkit_structured_ladder_tests PRIVATE include "${CMAKE_CURRENT_SOURCE_DIR}/../../trajectorykit/native/include")
+    target_compile_features(motionkit_structured_ladder_tests PRIVATE cxx_std_17)
+    add_test(NAME motionkit_structured_ladder COMMAND motionkit_structured_ladder_tests)
     add_executable(motionkit_trajectory_tests tests/trajectory.cpp)
     target_link_libraries(motionkit_trajectory_tests PRIVATE motionkit_core)
     add_test(NAME motionkit_trajectory COMMAND motionkit_trajectory_tests)

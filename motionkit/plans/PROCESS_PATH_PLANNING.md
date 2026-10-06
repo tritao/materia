@@ -831,3 +831,15 @@ OPW start at both wrist poles, keeps the full seed exact, reports singularity
 and performs no numeric IK. Compiler-only build and the focused analytic/
 candidate suite pass (1,143,558 assertions) against the corrected native
 library. Structured ladder search (PP3) remains the next implementation step.
+
+PP3 initial implementation: an internal native structured DP indexes same-
+branch lattice neighbours (periodic roll/azimuth) and uses a three-coordinate
+joint hash for nearby cross-branch moves, checking all joint jumps exactly.
+It retains two cost layers plus route predecessors, includes weighted joint/
+velocity travel, roll changes and supplied state costs, and reports the first
+disconnected layer with empty-candidate versus no-edge classification.
+One hundred random small problems agree with a brute-force structured-graph
+reference, and dead-end/empty-layer/jump-disconnection cases pass with native
+assertions enabled in Release. This is internal preparation: public ABI/Haxe
+integration, Descartes dispatch, coarse-to-fine and the 1301 x 7700 performance
+gate remain outstanding; PP3 is not complete.
