@@ -1154,6 +1154,24 @@ class KinematicsTests extends MotionKitTestSupport {
     var physicalCurve=physicalPlanner.plan(rollPath,rollRequest);
     check(Math.abs(physicalCurve.q[1][3])>1,"integrated planner refines the physical obstacle-avoiding roll");
     check(rollWorld.sweep(physicalCurve.q[0],physicalCurve.q[1])==null,"integrated refined route has a clear sampled sweep");
+    var finalCompiler = new ProgramCompiler(rollSolver,new ValidationLimits(4,Int64.ofInt(1),Int64.ofInt(0)),
+      "task",[1.0,1.0,1.0,1.0],[2.0,2.0,2.0,2.0],[20.0,20.0,20.0,20.0],
+      StartTolerances.uniform(4,0.01,0.01,0.01),null,0.005,2.0,0.001,0.001,null,physicalPlanner);
+    var unsafeEnd = [0.4,0.0,0.0,0.0];
+    check(rollWorld.violation(rollStart) == null && rollWorld.violation(unsafeEnd) == null,
+      "compiled motion clearance fixture has clear endpoints");
+    var finalFailure = "";
+    try finalCompiler.compile(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(unsafeEnd),
+      new MotionOptions(),Blend.ExactStop)]),rollStart,Int64.ofInt(960))
+    catch (error:Dynamic) finalFailure = Std.string(error);
+    check(finalFailure.indexOf("compiled trajectory clearance") >= 0 && finalFailure.indexOf("post") >= 0 &&
+      finalFailure.indexOf("op 0") >= 0,
+      "final compiler check rejects an interior collision and names the physical pair and operation");
+    var finalSafe = finalCompiler.compile(new MotionProgram([MotionOp.FollowPath(rollPath,"task",0.1,[])]),
+      rollStart,Int64.ofInt(961));
+    check(finalSafe.blocks[0].plans.length == 1,
+      "final compiler check accepts the obstacle-avoiding timed path after a rejected motion");
+    finalSafe.dispose();
     var blockedWorld=new robotkit.manipulation.ArmClearance(rollGroup,[
       {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
       {name:"blocking-post",link:rollBase.id,vertices:rollHull(0.1),tool:false}],rollStart);

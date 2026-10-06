@@ -1432,3 +1432,9 @@ Validation on the final behavior:
 - Compiler-only: MotionKit tests, app, robotkit/cadbridge/tests and toolpathkit/motion/tests pass.
 
 PP6 remains incomplete: joined authored approach/retreat lines, remaining compiled-group defaults and process preferences still need integration. The final timed process trajectory also needs the configured world's clearance check; current structured refinement checks its sampled joint curve, while generated entry and exit motions now receive their actual trajectory checks. PP8–PP11 migration, authored benchmarks and final downstream runtime gates remain outstanding. No production speedup is claimed by this increment.
+
+### PP6 final compiled trajectory clearance
+
+`ProgramCompiler.finish()` now checks the final trajectory through its JointPathPlanner's clearance world, after motor validation and coupling projection and before creating the execution plan. This covers timed process curves and ordinary joint moves as well as entry/retreat motions; it closes the previously recorded gap between checking sampled refined joints and checking the emitted polynomial trajectory. A failure rejects the compilation and identifies the operation, physical pair, distance and required clearance. This is a final acceptance check; it does not run another ladder search after timing fails clearance.
+
+Compiler-only validation passes. The focused C4 runtime passes 1,149,251 assertions (`process-path-pp6-final-clearance-haxe.log`). A physical post fixture proves clear endpoints can still yield a rejected interior collision and verifies a subsequent obstacle-avoiding timed path succeeds using the same compiler. The preceding full 1,220,521-assertion integration gate belongs to `f253269ab`, before this increment; no full-suite rerun is claimed here. Remaining compiled-group defaults, process preferences and joined approach/retreat geometry remain outstanding in PP6.

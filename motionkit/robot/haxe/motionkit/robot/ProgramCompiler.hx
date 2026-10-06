@@ -506,6 +506,11 @@ class ProgramCompiler {
       var motors = motorSpace;
       if (motors != null) motors.validate(pending.trajectory);
       if (couplingIndices.length > 0) projected = projectCouplings(pending.trajectory);
+      if (jointPathPlanner != null) {
+        var failure = jointPathPlanner.checkMotion(projected == null ? pending.trajectory : projected);
+        if (failure != null)
+          throw 'compiled trajectory clearance (${failure.a}, ${failure.b}): ${failure.distance} < ${failure.required}';
+      }
       plan = ExecutionPlan.create(projected == null ? pending.trajectory : projected,
         pending.path == null ? limits : limits.withoutJerk(), id, pending.startQ,
         zeros(), zeros(), startTolerances.position, startTolerances.velocity,
