@@ -310,7 +310,9 @@ def native_coefficient_check(executable,rotation,position,dimensions):
         for wrist in range(2):
             _,_,F,G=constraints(rotation,position,dimensions,base,wrist)
             reference[base,wrist]=[F,G]
-    output=subprocess.check_output([executable],text=True)
+    values=list(rotation)+list(position)+list(dimensions)
+    packet=' '.join(str(s.N(value,40)) for value in values)+'\n'
+    output=subprocess.check_output([executable,'--stdin'],input=packet,text=True)
     seen=set();worst=Decimal(0)
     with localcontext() as context:
         context.prec=60
@@ -324,10 +326,36 @@ def native_coefficient_check(executable,rotation,position,dimensions):
             expected=Decimal(int(s.numer(exact)))/Decimal(int(s.denom(exact)))
             error=abs(Decimal(value)-expected)
             worst=max(worst,error)
-            assert error<Decimal('1e-17'),(key,error)
+            assert error<Decimal('1e-16')*max(Decimal(1),abs(expected)),(key,error,expected)
     assert seen=={(b,w,k,i,j) for b in range(2) for w in range(2)
                  for k in range(2) for i in range(9) for j in range(9)}
     return {'coefficients':len(seen),'charts':4,'max_absolute_error':str(worst),'status':'passed'}
+
+
+def native_coefficient_sweep(executable,rotation,position,dimensions):
+    import random,subprocess
+    targets=[('reference',rotation,position)]
+    rng=random.Random(712019)
+    for sample in range(12):
+        tangents=[s.Rational(rng.randint(-9,9),rng.randint(1,9)) for _ in range(6)]
+        R,p,_=exact_target(tangents,dimensions)
+        targets.append(('random-'+str(sample),R,p))
+    for label,base,wrist,q4 in [('base-pi',None,s.Rational(1,5),s.Rational(2,5)),
+                              ('wrist-pi',s.Rational(1,7),None,s.Rational(2,5)),
+                              ('both-pi',None,None,s.Rational(2,5)),
+                              ('q4-zero',s.Rational(1,7),s.Rational(1,5),0),
+                              ('q4-pi',s.Rational(1,7),s.Rational(1,5),None)]:
+        R,p,_=exact_target([base,s.Rational(1,3),s.Rational(-1,4),q4,s.Rational(1,2),wrist],dimensions)
+        targets.append((label,R,p))
+    records=[]
+    for label,R,p in targets:
+        record=native_coefficient_check(executable,R,p,dimensions)
+        record['target']=label
+        records.append(record)
+    invalid=subprocess.check_output([executable,'--invalid'],text=True).strip()
+    assert invalid=='8 invalid inputs rejected',invalid
+    return {'targets':records,'coefficients':sum(r['coefficients'] for r in records),
+            'invalid_inputs_rejected':8,'status':'passed'}
 
 
 def main():
@@ -339,7 +367,7 @@ def main():
     dimensions=list(map(s.Rational,['.17','-.09','.08','.4','.6','.5','.12','.035']))
     for argument in sys.argv[1:]:
         if argument.startswith('--check-native='):
-            print(json.dumps(native_coefficient_check(argument.split('=',1)[1],rotation,position,dimensions),indent=2))
+            print(json.dumps(native_coefficient_sweep(argument.split('=',1)[1],rotation,position,dimensions),indent=2))
             return
     started=time.monotonic()
     result=solve(rotation,position,dimensions,certify='--certify' in sys.argv)

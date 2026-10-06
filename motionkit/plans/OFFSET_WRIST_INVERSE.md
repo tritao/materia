@@ -298,3 +298,28 @@ Evidence: `process-path-native-offset-coefficients-final.json`. This proves the
 coefficient translation for one rational target, not generic conditioning,
 root isolation/recovery, a runtime-family integration or authored performance.
 Full native/runtime phase gates remain pending until implementation integration.
+
+## Native coefficient sweep and validation
+
+The native prototype now rejects nonfinite target/dimension values, nonpositive
+c2/c3, negative c4, nonorthonormal/improper rotations and nonfinite arithmetic
+results. Rotation orthogonality/determinant tolerance is 1e-10. This is internal
+validation, not an exported ABI boundary.
+
+The committed emitter accepts target packets on stdin. `--check-native=...` now
+checks eighteen targets: the original rational target, twelve deterministic
+reachable targets and five chart/projected-axis boundary targets. Strict standalone
+compilation and final checker exit zero. All 11,664 coefficient slots match their
+exact-rational references; maximum absolute difference 2.68701421224109e-17.
+Eight invalid-input cases (nonfinite rotation/position/offset, invalid lengths,
+nonorthogonal rotation and reflection) are rejected. Evidence:
+`process-path-native-offset-sweep-final.json`.
+
+The first expanded sweep exited one because a coefficient error 1.186e-17
+exceeded the former fixed 1e-17 envelope. The checker now uses the explicitly
+scaled envelope 1e-16*max(1,abs(exact coefficient)); this tests coefficient
+translation rather than imposing the first target's measured absolute precision
+on differently sized coefficients. The preceding failure is not reported as green.
+This finite sweep does not bound conditioning for all inputs, validate the arithmetic
+overflow branch itself, isolate roots, register a native solver, or satisfy runtime
+phase/track acceptance. Those original requirements remain open.

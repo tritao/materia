@@ -1916,3 +1916,7 @@ Certified research mode now encloses the recovered base coordinate by exact rati
 ### PP1 native offset polynomial coefficient prototype
 
 Added internal fixed-storage long-double coefficient construction plus a reproducible C++ emitter/exact-reference Python checker. Strict standalone C++17 -O2 -Wall -Wextra -Werror compile and committed checker both exit zero; all 648 slots/four charts agree within 1.21e-18 (`process-path-native-offset-coefficients-final.json`). No ABI/family/default sampler changes yet. Native root isolation/recovery, generic conditioning/input validation and all original phase/acceptance gates remain open; standalone compile is not the native runtime/ctest phase gate.
+
+### PP1 native coefficient sweep and input validation
+
+The internal native builder validates finite dimensions/poses, positive arm lengths/nonnegative flange length, proper rotation and finite coefficient results. Expanded committed checker passes all 11,664 slots across eighteen targets and eight invalid-input cases; strict standalone compile and actual checker exit zero (`process-path-native-offset-sweep-final.json`), max absolute error 2.69e-17. First expanded run failed the old absolute 1e-17 envelope; final envelope is explicitly 1e-16*max(1,abs(coefficient)), and that failure is retained as failed evidence. Generic conditioning/overflow-case checks, native isolation/recovery, production integration and all original phase/acceptance requirements remain unresolved.
