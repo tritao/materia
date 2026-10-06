@@ -31,6 +31,7 @@ class WeldPlanningTests {
     assertions = 0;
     testCornerTurn();
     testJoinedPathProblem();
+    testProblemTravelAlternatives();
     testRotaryWristSelection();
     testRollAvoidsTheWall();
     testEntryBranchReachesTheWholeWeld();
@@ -87,6 +88,41 @@ class WeldPlanningTests {
     }
     near(request.distances[request.distances.length-1],offset,0,"joined request covers the full global route");
     check(fixture.arm.numericSolveCount()==before,"joined weld builder and selection need no numeric pose IK");
+  }
+
+  static function testProblemTravelAlternatives():Void {
+    var lean=Quat.fromAxisAngle(new Vec3(1,0,0),0.75*Math.PI);
+    var points=[new Vec3(0.35,0.2,0.15),new Vec3(0.45,0.2,0.15),new Vec3(0.45,0.3,0.15),new Vec3(0.35,0.3,0.15)];
+    var segments:Array<processkit.skill.WeldPlan.WeldSegment> = [];
+    for(i in 0...3){var rotation=Quat.fromAxisAngle(new Vec3(0,0,1),i*Math.PI/2).multiply(lean);
+      segments.push(new processkit.skill.WeldPlan.WeldSegment(new Transform3(points[i],rotation),
+        new Transform3(points[i+1],rotation),'side$i',new Vec3(0,0,1)));}
+    var authored=new WeldPlan(segments,PARAMETERS),styles=[WeldCorner.AROUND,WeldCorner.ARC,WeldCorner.ROTATION];
+    var original=new processkit.WeldPathProblem(authored,WRIST,styles,"weld-task");
+    styles[1]=WeldCorner.AROUND; // Caller mutation must not change the saved alternative.
+    var reversed=original.reversed();
+    check([for(s in reversed.plan.segments)s.name].join(",")=="side2,side1,side0",
+      "reversed problem visits each seam once in opposite order");
+    near(reversed.plan.length(),authored.length(),1e-12,"reversed problem preserves deposited length");
+    check(authored.segments[0].name=="side0","travel alternative leaves authored seam order intact");
+    var expected=new processkit.WeldPathProblem(authored.reversed(),WRIST,
+      [WeldCorner.AROUND,WeldCorner.ROTATION,WeldCorner.ARC],"weld-task");
+    for(i in 0...21){var distance=expected.seam.length()*i/20;
+      near(motionkit.path.PoseMath.distance(reversed.seam.poseAt(distance),expected.seam.poseAt(distance)),0,1e-9,
+        "reversed problem preserves physical corner positions");
+      near(motionkit.path.PoseMath.angle(reversed.seam.poseAt(distance),expected.seam.poseAt(distance)),0,1e-7,
+        "reversed problem maps each saved corner style to its physical join");}
+    var restored=authored.reversed().reversed();
+    for(i in 0...segments.length){
+      near(restored.segments[i].start.rotation.angularDistance(segments[i].start.rotation),0,1e-7,
+        "reversing twice restores authored orientation");
+      check(restored.segments[i].open==segments[i].open,"reversed travel preserves the material open-side frame");}
+    var alternative=original.withCornerStyles([WeldCorner.AROUND,WeldCorner.AROUND,WeldCorner.AROUND]);
+    var changed=false;
+    for(i in 0...101){var distance=original.seam.length()*i/100;
+      if(motionkit.path.PoseMath.angle(original.seam.poseAt(distance),alternative.seam.poseAt(distance))>1e-4)changed=true;}
+    check(changed,"corner alternatives are distinct geometric problems before IK or timing");
+    near(alternative.seam.length(),original.seam.length(),1e-12,"corner alternatives preserve deposited length");
   }
 
   static function testRotaryWristSelection():Void {

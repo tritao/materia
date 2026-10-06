@@ -3,6 +3,7 @@ package processkit.skill;
 import robotkit.skill.*;
 
 import robotkit.spatial.Transform3;
+import robotkit.spatial.Quat;
 import robotkit.spatial.Vec3;
 
 /**
@@ -92,6 +93,23 @@ class WeldPlan {
     var sum = 0.0;
     for (segment in segments) sum += segment.length();
     return sum;
+  }
+
+  /** Reverse travel and its push angle while keeping the wire's component in the faces' cross-section. */
+  public function reversed():WeldPlan {
+    var reversedSegments:Array<WeldSegment> = [];
+    for (index in 0...this.segments.length) {
+      var segment = this.segments[this.segments.length - index - 1];
+      var travel = segment.stop.translation.sub(segment.start.translation).normalized();
+      function reversed(rotation:Quat):Quat {
+        var wire = rotation.rotate(new Vec3(0.0, 0.0, 1.0));
+        var crossSection = wire.sub(travel.scale(wire.dot(travel))).normalized();
+        return Quat.fromAxisAngle(crossSection, Math.PI).multiply(rotation);
+      }
+      reversedSegments.push(new WeldSegment(new Transform3(segment.stop.translation, reversed(segment.stop.rotation)),
+        new Transform3(segment.start.translation, reversed(segment.start.rotation)), segment.name, segment.open));
+    }
+    return new WeldPlan(reversedSegments, parameters);
   }
 
   /** The plan in the frame `frame_T_this` leads to: its poses become `frame_T_this * pose`. */

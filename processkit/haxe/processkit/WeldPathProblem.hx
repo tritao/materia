@@ -17,6 +17,10 @@ import robotkit.spatial.Vec3;
 /** Authored geometry for one weld alternative. Selection and timing are callers'
  * responsibilities; this builder performs no IK, collision queries or retries. */
 class WeldPathProblem {
+  public final plan:WeldPlan;
+  final styles:Array<Int>;
+  final wrist:WristLimits;
+  final approachSpeed:Float;
   public final seam:PosePath;
   public final path:PosePath;
   public final sections:Array<PosePath>;
@@ -32,6 +36,9 @@ class WeldPathProblem {
         frame==null || frame=="" || !Math.isFinite(approachSpeed) || approachSpeed<=0)
       throw "Weld path problem requires a plan, corner styles, task frame and approach speed";
     for(style in styles)if(style<0 || style>=WeldCorner.STYLES)throw "Unknown weld corner style";
+    this.plan=plan;this.styles=styles.copy();
+    this.wrist={angularSpeed:wrist.angularSpeed,angularAcceleration:wrist.angularAcceleration};
+    this.approachSpeed=approachSpeed;
     seam=new PosePath(frame,WeldingPlanRunner.pathOf(plan,plan.parameters.travelSpeed,wrist,styles));
     seamLength=seam.length();
     var first=plan.start(),last=plan.stop();
@@ -51,6 +58,18 @@ class WeldPathProblem {
       to:new Vec3(segment.stop.translation.x,segment.stop.translation.y,segment.stop.translation.z)
     }];
   }
+
+  /** The opposite travel alternative, preserving each physical corner style. */
+  public function reversed():WeldPathProblem {
+    var reversedStyles=[WeldCorner.AROUND];
+    for(index in 1...styles.length)reversedStyles.push(styles[styles.length-index]);
+    return new WeldPathProblem(plan.reversed(),wrist,reversedStyles,path.frameId,approachSpeed);
+  }
+
+  /** Author a corner alternative as geometry, without enumerating roll/entry
+   * solves or compiling candidate programs. */
+  public function withCornerStyles(alternative:Array<Int>):WeldPathProblem
+    return new WeldPathProblem(plan,wrist,alternative,path.frameId,approachSpeed);
 
   /** Geometric contact permission, evaluated at actual TCP poses in the task
    * frame. It also covers the nearby approach and burnback lift. */
