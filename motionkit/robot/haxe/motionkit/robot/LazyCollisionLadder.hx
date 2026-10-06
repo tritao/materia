@@ -26,7 +26,8 @@ class LazyCollisionLadder {
   }
   public static function selectWithChecks(problem:CandidateProblem,
       check:Array<Float>->Null<ClearanceViolation>,rounds:Int=8,
-      ?sweep:(Array<Float>,Array<Float>)->Null<ClearanceViolation>,?coarse:CoarseSearchOptions):LadderSelection {
+      ?sweep:(Array<Float>,Array<Float>)->Null<ClearanceViolation>,?coarse:CoarseSearchOptions,
+      ?refinedCheck:LadderSelection->Null<RefinedCollision>):LadderSelection {
     if(problem==null || check==null || rounds<1)throw "Lazy collision selection requires a problem, checker and positive round budget";
     var blocked=[for(_ in problem.samples)new haxe.ds.ObjectMap<LatticeCandidate,Bool>()];
     var edges:Array<BlockedLadderEdge> = [];
@@ -51,9 +52,29 @@ class LazyCollisionLadder {
         }
       }
       if(rejected)continue;
+      if(refinedCheck!=null){var failure=refinedCheck(route);
+        if(failure!=null){var i=failure.sample;
+          if(i<0 || i>=route.candidates.length || (failure.edge && i==0))throw "Refined collision must address a route sample or incoming edge";
+          if(failure.edge)edges.push(new BlockedLadderEdge(i,
+            problem.samples[i-1].candidates.indexOf(route.candidates[i-1]),problem.samples[i].candidates.indexOf(route.candidates[i])));
+          else blocked[i].set(route.candidates[i],true);
+          last=failure.failure;lastSample=i;continue;
+        }
+      }
       return route;
     }
     if(last!=null)throw 'Collision selection exhausted $rounds rounds at sample $lastSample (${last.a}, ${last.b})';
     throw 'Collision selection exhausted $rounds rounds';
+  }
+}
+
+/** A refined sample failure or the sweep arriving at that sample. */
+class RefinedCollision {
+  public final sample:Int;
+  public final edge:Bool;
+  public final failure:ClearanceViolation;
+  public function new(sample:Int,edge:Bool,failure:ClearanceViolation){
+    if(failure==null)throw "Refined collision requires a blocking pair";
+    this.sample=sample;this.edge=edge;this.failure=failure;
   }
 }

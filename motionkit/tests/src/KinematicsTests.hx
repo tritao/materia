@@ -717,6 +717,14 @@ class KinematicsTests extends MotionKitTestSupport {
       "Haxe edge records reach filtered native search");
     throws(function() motionkit.robot.StructuredLadder.search(rerouteProblem,null,0,null,null,
       [new motionkit.robot.StructuredLadder.BlockedLadderEdge(0,0,0)]),"Haxe rejects a nonadjacent blocked edge");
+    var refinementChecks=0;
+    var refinedReroute=motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> null,2,null,null,route -> {
+      refinementChecks++;
+      return route.candidates[1].q==blockedEndpoint ? new motionkit.robot.LazyCollisionLadder.RefinedCollision(1,true,
+        {a:"refined-tool",b:"post",distance:0.0,required:0.01}) : null;
+    });
+    check(refinementChecks==2 && refinedReroute.candidates[1].q!=blockedEndpoint,
+      "refined sweep failure reroutes within the shared collision budget");
     var originalRoute=motionkit.robot.StructuredLadder.search(rerouteProblem);
     check(originalRoute.candidates[1].q==blockedEndpoint,"lazy collision filtering leaves the source candidate problem unchanged");
     var refiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,problem,selected);
@@ -1008,6 +1016,14 @@ class KinematicsTests extends MotionKitTestSupport {
     check(avoided.closestClearance!=null,"physical reroute returns its closest sampled clearance");
     if(avoided.closestClearance!=null)check(avoided.closestClearance.distance>=avoided.closestClearance.required,
       "physical reroute clearance exceeds the required margin");
+    var rollPath=new motionkit.path.PosePath("task",[new PoseLine(
+      new PoseWaypoint(rollRequest.poses[0],1e-6,1e-6),new PoseWaypoint(rollRequest.poses[1],1e-6,1e-6),
+      motionkit.path.OrientationPolicy.FreeAboutTool,0.1,0.1)]);
+    var physicalPlanner=new motionkit.robot.StructuredJointPathPlanner(rollGroup,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1),null,rollWorld,3);
+    var physicalCurve=physicalPlanner.plan(rollPath,rollRequest);
+    check(Math.abs(physicalCurve.q[1][3])>1,"integrated planner refines the physical obstacle-avoiding roll");
+    check(rollWorld.sweep(physicalCurve.q[0],physicalCurve.q[1])==null,"integrated refined route has a clear sampled sweep");
     var blockedWorld=new robotkit.manipulation.ArmClearance(rollGroup,[
       {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
       {name:"blocking-post",link:rollBase.id,vertices:rollHull(0.1),tool:false}],rollStart);

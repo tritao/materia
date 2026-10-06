@@ -1340,3 +1340,17 @@ refined endpoint and passes native extrema position/velocity/acceleration
 limits. externalState also rejects internal profile indices. Compiler-only
 and focused runtime pass (1,148,964 assertions). Chart/branch transitions,
 default migration and authored full-plan gates remain outstanding.
+
+PP5 refined-path retry: LazyCollisionLadder now accepts a final refined
+route checker reporting a blocked sample or incoming transition. It maps
+that failure back to the selected candidate/edge and retries within the
+same collision budget. StructuredJointPathPlanner runs analytic/numeric
+refinement inside this loop and caches the accepted curve, checking its
+samples and sweeps before release. Injected refinement failure acceptance
+verifies two-round edge rerouting; the integrated XYZ+C planner also
+refines the physical obstacle-avoiding free-roll fixture with a clear
+sampled sweep. This exposed generic enum comparison rejecting identical
+free-spin policies; explicit policy/cone-parameter comparison fixes it.
+Compiler-only and focused runtime pass (1,148,967 assertions). Full phase
+validation, branch/chart transitions, default migration and authored
+performance gates remain open.
