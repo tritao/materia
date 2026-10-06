@@ -540,8 +540,8 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 |------|-------|---------|
 | PP0 | in progress: harness and diagnostics; baseline completion pending | `0d43b32c0` (partial) |
 | PP0a | complete: industrial geometry/zero, configuration pins, all-size analytic/physical acceptance, all-user re-baselines and phase gate passed | see progress |
-| PP1a | in progress: pinned C++/IK-Geo integration and four-fixture parity passed; compiled-model, singularity, browser and timing gates pending | see progress |
-| PP1 | in progress: Cartesian, OPW and authored Cobot UR verified; offset RobotArm unresolved | `0d43b32c0`, `bfec0fa28`, `8569a2a98` (partial) |
+| PP1a | spike accepted: compiled-model/singularity/browser gates pass; worst median R=1.27263; production adoption pending | see EAIK_SPIKE_RESULTS.md |
+| PP1 | in progress: industrial RobotArm resolved; EAIK accepted, production 6R adapter and OPW/UR deletion pending | see EAIK_SPIKE_RESULTS.md |
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
 | PP3 | in progress: structured/coarse search and Descartes dispatch implemented; authored gate pending | `7cb639434`, `489f2c360`, `f8e88ad4d`, `09cb60fbb` |
 | PP4 | in progress: analytic/numeric refinement, cone rates and timing verified; transitions/authored gate pending | `4b9e750ff`, `0e5edbc06`, `39b6081c1` |
@@ -2365,3 +2365,31 @@ These are fixture checks, not compiled RobotModel acceptance or speed results.
 Compiled RobotArm/Cobot H/P extraction, singularity/search-case checks,
 Emscripten compilation and the two 100,000-target uncontended timing runs remain
 pending. No R ratio or backend-adoption outcome is claimed. PP1a remains open.
+
+
+### PP1a compiled-model acceptance and backend decision
+
+[EAIK_SPIKE_RESULTS.md](EAIK_SPIKE_RESULTS.md) records the complete evaluation.
+All three compiled RobotArm sizes and all four Cobot sizes pass 1,000 regular
+and five independently compiled wrist-singularity targets, deterministic
+all-solutions calls and FK tolerances of 1e-9 m/rad. Every valid OPW solution
+for the industrial models is contained within 1e-9 rad after wrapping.
+Native CTest passes 17/17. Emscripten 6.0.9 builds the C++ core/spike, and its
+four-fixture/unsupported-family runtime check passes with exception handling
+enabled. This pinned EAIK has no general 1-D search backend: unknown 6R
+families explicitly refuse, and no search-case timing is invented.
+
+The accepted single-thread, native Release run has 100,000 fixed-RNG reachable
+targets per arm. OPW/EAIK medians are 2.861/3.641 us for the default RobotArm
+and 2.987/3.606 us for IRB2400. Worst R = **1.27263 <= 2**. The accepted run
+used a core without an SMT sibling, with 1.677677 s elapsed / 1.677440 s CPU.
+Later runs with measurable competing CPU activity are not used for acceptance.
+Adding independent singularity records after the accepted timing run did not
+change the sampled benchmark targets or either timed backend implementation.
+
+Decision: **adopt EAIK as the single supported 6R backend**. The spike is
+accepted; production adoption remains open: implement the compiled-chain/base
+adapter, preserve physical configuration labels/turns in candidate sampling,
+then remove OPW and the handwritten UR solver and run the adoption phase gate.
+Production execution has not been switched by the spike. The overall plan and
+the under-15-second track-planning target remain incomplete.

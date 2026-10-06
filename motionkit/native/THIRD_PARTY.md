@@ -87,5 +87,7 @@ subproblem dependency. Python bindings, wheels and upstream tests are excluded.
 The C++ source set includes EAIK/remodeling utilities, 1R–6R decompositions
 and IK-Geo subproblems. All three upstream targets use position-independent
 code. The local opt-in executable checks four OPW fixtures; it does not change
-the production backend choice. Compiled-model parity, browser compilation and
-single-thread speed acceptance are still required before adoption.
+the production backend choice. Compiled-model parity, browser compilation and single-thread speed acceptance
+passed (see `../plans/EAIK_SPIKE_RESULTS.md`). Production adoption remains
+pending. Emscripten targets enable C++ exception handling so unknown
+decompositions are rejected through the same checked error path as native.
