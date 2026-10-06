@@ -94,16 +94,7 @@ class ProcessRun {
    * output change, so when the recipe's engagement exit ends on one the caller gives the `closing` motion that follows it.
    */
   public function takeProgram(?closing:MotionOp):MotionProgram {
-    if (state != ProcessRunState.Ready && state != ProcessRunState.Recovery)
-      throw "Process program is available only when ready or recovering";
-    if (pausedForFeed) throw "Process feed override is paused";
-    if (state == ProcessRunState.Recovery && !canRecover())
-      throw "Process recovery requires held or idle motion";
-    if (!device.ready()) throw "Process device is not ready";
-    var startDistance = state == ProcessRunState.Recovery ?
-      Math.max(0.0, interruptedAt - pendingBackoff) : 0.0;
-    if (startDistance >= path.length()) throw "Process restart is at the path end";
-    lastProgramStart = startDistance;
+    var startDistance=availableStart();
     var continuation = ProcessPathSlice.from(path, startDistance);
     var events = processEvents(startDistance, currentFeed);
     var approach = recipe.approachSpeed;
@@ -125,9 +116,30 @@ class ProcessRun {
       default:
     }
     var program = new MotionProgram(ops);
-    transition(ProcessRunState.Active, startDistance,
-      startDistance > 0.0 ? "resume after backoff" : "begin process");
+    activatePrepared(startDistance);
     return program;
+  }
+
+  /** Activate a caller's already checked program without rebuilding geometry
+   * or events. Its start must match the current initial/recovery boundary. */
+  public function activatePrepared(startDistance:Float):Void {
+    var expected=availableStart();
+    if(!Math.isFinite(startDistance) || Math.abs(startDistance-expected)>1e-12)
+      throw "Prepared process program does not match the current recovery start";
+    lastProgramStart=expected;
+    transition(ProcessRunState.Active,expected,expected>0.0?"resume after backoff":"begin process");
+  }
+
+  function availableStart():Float {
+    if(state==null || state!=ProcessRunState.Ready && state!=ProcessRunState.Recovery)
+      throw "Process program is available only when ready or recovering";
+    if(pausedForFeed)throw "Process feed override is paused";
+    if(state==ProcessRunState.Recovery && !canRecover())
+      throw "Process recovery requires held or idle motion";
+    if(!device.ready())throw "Process device is not ready";
+    var start=state==ProcessRunState.Recovery?Math.max(0.0,interruptedAt-pendingBackoff):0.0;
+    if(start>=path.length())throw "Process restart is at the path end";
+    return start;
   }
 
   /**

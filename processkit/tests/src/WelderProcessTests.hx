@@ -131,6 +131,7 @@ class WelderProcessTests {
       "channels must be distinct");
     expectFailure(function() new WelderProcessDevice(supply, supply, channels, {voltage: 0.0}), "a setpoint voltage must be positive");
     runEngagement();
+    runPreparedActivation();
     runRestartPoint();
     runPrepareTimeout();
     runChannelOutputs();
@@ -145,6 +146,32 @@ class WelderProcessTests {
    * A restart backs up from where the metal stopped, once. A re-strike that fails, over and over, retries the same point
    * and does not move further back each time; a restart that gets some way along and then stops backs up from there.
    */
+  static function runPreparedActivation():Void {
+    var supply=new ModelWelder(),channels={arc:"a",wireSpeed:"w",voltage:"v"};
+    var device=new WelderProcessDevice(supply,supply,channels,{voltage:24.0});
+    var recipe=new ProcessRecipe(0.005,0.03,0.0115,0.0,OrientationPolicy.FreeAboutTool,0.001,
+      8.0/0.0115,0.0,0.01,FeedChangePolicy.Reject,
+      new ProcessEngagement([], [MotionOp.SetOutput("a",EventValue.Digital(false))]),0.08);
+    var session=new MotionSession(),run=new ProcessRun(recipe,seamPath(),device,"w",session);
+    expectFailure(()->run.activatePrepared(0),"prepared activation requires a ready process");
+    run.start();run.update(0);
+    expectFailure(()->run.activatePrepared(0.01),"prepared initial program must begin at the seam start");
+    check(run.state==ProcessRunState.Ready,"rejected prepared activation leaves readiness unchanged");
+    run.activatePrepared(0);
+    check(run.state==ProcessRunState.Active && run.lastProgramStart==0,"prepared program activates without constructing another program");
+    expectFailure(()->run.activatePrepared(0),"an active prepared program cannot be activated again");
+    run.interruptNow(0.09,"arc lost");session.begin();run.update(0.09);
+    expectFailure(()->run.activatePrepared(0.08),"prepared recovery waits for physical motion to stop");
+    session.stop(motionkit.robot.StopDisposition.Discard,[]);session.rest();run.update(0.09);
+    check(run.state==ProcessRunState.Recovery,"prepared interruption uses the ordinary recovery lifecycle");
+    expectFailure(()->run.activatePrepared(0.09),"prepared recovery must include the required backoff");
+    run.activatePrepared(0.08);
+    near(run.lastProgramStart,0.08,"prepared recovery activates at its validated backoff boundary");
+    run.finish();
+    check(run.state==ProcessRunState.Completion && !supply.arc && supply.wireSpeed==0,
+      "prepared completion makes the welder safe through the ordinary process lifecycle");
+  }
+
   static function runRestartPoint():Void {
     var supply = new ModelWelder();
     var channels = {arc: "tool/torch.arc", wireSpeed: "tool/torch.wire_speed", voltage: "tool/torch.voltage"};
