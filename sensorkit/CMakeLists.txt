@@ -45,3 +45,15 @@ if(NKSENSOR_BUILD_RENDER)
     endif()
     add_subdirectory(sensor_render)
 endif()
+
+# Test setup uses assert expressions; Release must execute them as well as the checks.
+foreach(test_target IN ITEMS nativekit_sensor_core_tests nativekit_sensor_wire_tests
+        nativekit_sensor_stream_tests nativekit_sensor_sim_tests nativekit_sensor_render_tests)
+    if(TARGET ${test_target})
+        if(MSVC)
+            target_compile_options(${test_target} PRIVATE /UNDEBUG)
+        else()
+            target_compile_options(${test_target} PRIVATE -UNDEBUG)
+        endif()
+    endif()
+endforeach()
