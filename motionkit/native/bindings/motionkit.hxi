@@ -75,7 +75,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	/**
 	 * Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected.
 	 */
-	extern fn mk_search_ladder(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_lattice_candidate>> @in_array("candidate_count"), state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result>) -> mk_result;
+	extern fn mk_search_ladder(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_lattice_candidate>> @in_array("candidate_count"), state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result> @out) -> mk_result;
 	extern fn mk_select_configurations(request: ptr<const<mk_configuration_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_configuration_candidate>> @in_array("candidate_count"), candidate_count: u32, out_sequence: ptr<mk_configuration_solution> @out_array("sample_count")) -> mk_result;
 	/**
 	 * Samples OPW's eight IK branches natively before the same Descartes search.

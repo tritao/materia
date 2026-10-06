@@ -16,12 +16,16 @@ class CandidateProblem {
   public final samples:Array<CandidateLayer>;
   public final externalJoints:Array<Int>;
   public final pinnedStart:Bool;
+  public final rollCount:Int;
+  public final tiltCount:Int;
+  public final azimuthCount:Int;
 
   public function new(group:KinematicGroup,request:PathRequest,?options:CandidateSamplingOptions) {
     if(group==null || request==null || request.startQ.length!=group.group.count())
       throw "Candidate problem requires a group and complete path request";
     var settings=options==null ? new CandidateSamplingOptions() : options;
     this.request=request;this.pinnedStart=settings.pinStart;
+    rollCount=settings.rollCount;tiltCount=settings.tiltRings+1;azimuthCount=settings.azimuthCount;
     for(i in 0...request.distances.length) {
       if(!Math.isFinite(request.distances[i]) || request.distances[i]<0 ||
           (i>0 && request.distances[i]<=request.distances[i-1]) || request.poses[i]==null)

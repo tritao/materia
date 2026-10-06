@@ -887,3 +887,15 @@ layers, invalid slices and invalid limits. All 15 native CTest cases pass,
 and the regenerated portable ABI passes Linux/Windows/macOS x86_64/arm64
 audit. Haxe bridging, small-problem Descartes dispatch, coarse-to-fine and
 the subsecond large-path gate remain outstanding.
+
+PP3 Haxe bridge: StructuredLadder.search exports CandidateProblem layers,
+compiled request jumps/speeds, process joint weights, roll cost and optional
+state-cost callback to mk_search_ladder. Selection retains full lattice
+candidates and typed failed-sample/distance diagnostics; +infinity state
+costs disable candidates for later lazy pruning. CandidateProblem retains
+its configured orientation dimensions. The output report is now explicitly
+annotated for FFI ownership/projection, and the four-platform ABI audit
+passes. Compiler-only build and focused runtime pass (1,143,579 assertions),
+including deterministic selected-route FK, disabled-state and empty-layer
+diagnostics and no numeric IK calls. This bridge is not yet wired into
+production compiler selection; PP3/PP6 and later phases remain outstanding.

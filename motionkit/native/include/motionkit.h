@@ -375,7 +375,7 @@ MK_API mk_result MK_CALL mk_search_ladder(const mk_ladder_request *request,
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
     const mk_lattice_candidate *candidates MK_IN_ARRAY(candidate_count),
     const double *state_costs MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
-    uint32_t *out_indices MK_OUT_ARRAY(sample_count), mk_ladder_result *out_result);
+    uint32_t *out_indices MK_OUT_ARRAY(sample_count), mk_ladder_result *out_result MK_OUT);
 
 MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,

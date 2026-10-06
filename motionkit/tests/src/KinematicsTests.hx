@@ -571,6 +571,19 @@ class KinematicsTests extends MotionKitTestSupport {
       }
     }
     check(fixture.arm.numericSolveCount() == before,"native PathRequest candidate construction makes no numeric IK calls");
+    var selected=motionkit.robot.StructuredLadder.search(problem);
+    check(selected.diagnostic==null && selected.candidates.length==2,"Haxe structured ladder selects a complete native route");
+    var selectedAgain=motionkit.robot.StructuredLadder.search(problem);
+    near(selected.cost,selectedAgain.cost,"structured native route cost is deterministic",1e-12);
+    for(sample in 0...2){var actual=solver.forward(selected.candidates[sample].q);
+      near(motionkit.path.PoseMath.distance(actual,request.poses[sample]),0,"selected native route retains task position",1e-6);
+      near(motionkit.path.PoseMath.angle(actual,request.poses[sample]),0,"selected native route retains task orientation",1e-6);
+      for(j in 0...6)near(selected.candidates[sample].q[j],selectedAgain.candidates[sample].q[j],"structured route is deterministic",1e-12);
+    }
+    var excluded=motionkit.robot.StructuredLadder.search(problem,null,0,(sample,candidate)->sample==1 ? Math.POSITIVE_INFINITY : 0.0);
+    check(excluded.failedSample==1 && excluded.failedDistance==request.distances[1] && excluded.diagnostic!=null,
+      "Haxe native ladder reports disabled-state disconnection at its sample distance");
+    check(fixture.arm.numericSolveCount()==before,"native structured selection makes no numeric IK calls");
     var free = new motionkit.robot.CandidateProblem(fixture.arm,request,
       new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,4,false));
     check(free.samples[0].candidates.length > 1,"free-start candidate problem retains the full first layer");
@@ -581,6 +594,11 @@ class KinematicsTests extends MotionKitTestSupport {
       new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1,1,1));
     check(coneProblem.samples[0].candidates.length==1,"pinned cone start preserves its exact spin beyond the orientation grid");
     for(joint in 0...6)near(coneProblem.samples[0].candidates[0].q[joint],start[joint],"pinned cone start remains exact",1e-12);
+    problem.samples[1].candidates.resize(0);
+    var empty=motionkit.robot.StructuredLadder.search(problem);
+    check(empty.failedSample==1 && empty.diagnostic=="no candidates (unreachable or joint limits)",
+      "Haxe native ladder distinguishes an empty candidate layer");
+
 
   }
 
