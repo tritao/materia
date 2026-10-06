@@ -28,6 +28,10 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 */
 	extern fn mk_opw_forward(parameters: ptr<const<mk_opw_parameters>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_opw_pose> @out) -> mk_result;
 	extern fn mk_opw_inverse(parameters: ptr<const<mk_opw_parameters>>, pose: ptr<const<mk_opw_pose>>, out_solutions: ptr<mk_opw_solution> @out_array("solution_count"), solution_count: u32) -> mk_result;
+	/**
+	 * Count first, then allocate exactly enough output. Invalid requests fail before writing.
+	 */
+	extern fn mk_orientation_lattice_count(lattice: ptr<const<mk_orientation_lattice>>, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_path_create(samples: ptr<const<mk_path_sample>> @in_array("sample_count"), sample_count: u32, out_path: ptr<mk_path_handle> @out @owned) -> mk_result;
 	extern fn mk_path_destroy(path: mk_path_handle) -> void;
 	/**
@@ -45,6 +49,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * One call replaces a bisection of mk_path_distance_to_time per sample.
 	 */
 	extern fn mk_path_times_to_distances(law: mk_time_law_handle, seconds: ptr<const<f64>> @in_array("count"), count: u32, out_distances: ptr<f64> @out_array("count")) -> mk_result;
+	extern fn mk_sample_orientations(lattice: ptr<const<mk_orientation_lattice>>, target: ptr<const<mk_opw_pose>>, out_samples: ptr<mk_orientation_sample> @out_array("sample_capacity"), sample_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected.
 	 */
@@ -83,7 +88,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		joints: array<f64, 6> @offset(8);
 		branch: u32 @offset(56);
 		/**
-		 * < C is undetermined at an axial tool direction.
+		 * < Family-specific flags; Cartesian C axis or UR wrist/elbow.
 		 */
 		singular: u32 @offset(60);
 	}
@@ -162,6 +167,40 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		joints: array<f64, 6> @offset(8);
 		valid: u8 @offset(56);
 		singular: u8 @offset(57);
+	}
+	/**
+	 * Deterministic orientation lattice in the target TCP frame.
+	 */
+	struct mk_orientation_lattice @layout(32, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		/**
+		 * < 0 fixed, 1 free TCP spin, 2 cone plus free spin.
+		 */
+		mode: u32 @offset(4);
+		roll_count: u32 @offset(8);
+		/**
+		 * < Cone rings excluding its centre.
+		 */
+		tilt_rings: u32 @offset(12);
+		azimuth_count: u32 @offset(16);
+		/**
+		 * < Cone half-angle in radians, [0, pi].
+		 */
+		half_angle: f64 @offset(24);
+	}
+	struct mk_orientation_sample @layout(80, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		position: array<f64, 3> @offset(8);
+		/**
+		 * < x, y, z, w.
+		 */
+		quaternion: array<f64, 4> @offset(32);
+		roll_index: u32 @offset(64);
+		/**
+		 * < 0 is the cone centre.
+		 */
+		tilt_index: u32 @offset(68);
+		azimuth_index: u32 @offset(72);
 	}
 	/**
 	 * Joint path derivatives are with respect to path parameter s. `second` is the

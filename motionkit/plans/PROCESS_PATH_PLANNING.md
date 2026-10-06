@@ -640,3 +640,17 @@ retention/deduplication, task residuals and held external coordinates. Compiler
 build and focused C4 runtime pass (180,958 assertions). This factory is not yet
 wired into production planning; PP2–PP9 migrations remain outstanding, as does
 the authored RobotArm geometry decision noted above. PP1 is not complete.
+
+PP2 preparation: native orientation lattice sampling now enumerates fixed
+orientation, free TCP-spin grids and concentric cone tilt/azimuth rings with
+free-spin grids. Every sample carries roll/tilt/azimuth coordinates. Count and
+sampling APIs validate dimensions, capacity, finite poses and overflow before
+writing. Native tests cover deterministic counts/coordinates, rotated targets,
+unit quaternions, preserved position, exact ring tilt, invalid requests and
+zero-angle cone reduction. All 11 native CTests and the four-platform ABI audit
+pass. The Haxe adapter respects Cone's independent axis in the path frame;
+313 orientation samples pass existing ToolFreedom constraint checks, including
+a tilted cone axis. Compiler-only build and focused C4 runtime pass (182,213
+assertions). This is the orientation part only: native external-axis Cartesian
+products, analytic branch/wrap filtering, and full candidate assembly remain
+outstanding. PP2 is not complete and production planning remains unchanged.

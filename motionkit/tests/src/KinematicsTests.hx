@@ -405,6 +405,26 @@ class KinematicsTests extends MotionKitTestSupport {
       near(candidate.q[i],complete[i],"numeric fallback holds external coordinates",1e-12);
   }
 
+  public function testOrientationLattice():Void {
+    var rotation = Quat.fromAxisAngle(new Vec3(1,2,3).normalized(),0.73);
+    var target = new Pose3(0.4,-0.1,0.8,rotation.x,rotation.y,rotation.z,rotation.w);
+    for (freedom in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,
+        motionkit.path.OrientationPolicy.Cone([0.3,0.4,0.5],0.4)]) {
+      var cells = motionkit.robot.OrientationLattice.sample(target,freedom);
+      var expected = switch freedom {case Fixed: 1; case FreeAboutTool: 12; default: 300;};
+      check(cells.length == expected,"native orientation lattice count matches policy");
+      var repeated = motionkit.robot.OrientationLattice.sample(target,freedom);
+      for (i in 0...cells.length) {
+        near(motionkit.robot.ToolFreedom.orientationError(cells[i].pose,target,freedom),0,
+          "native orientation lattice satisfies ToolFreedom",1e-7);
+        near(motionkit.path.PoseMath.distance(cells[i].pose,target),0,"orientation lattice preserves position",1e-12);
+        check(cells[i].roll == repeated[i].roll && cells[i].tilt == repeated[i].tilt && cells[i].azimuth == repeated[i].azimuth,
+          "orientation lattice coordinates are deterministic");
+        near(motionkit.path.PoseMath.angle(cells[i].pose,repeated[i].pose),0,"orientation lattice pose is deterministic",1e-7);
+      }
+    }
+  }
+
   public function testCartesianAnalyticIk():Void {
     for (count in 3...6) {
       var model = new RobotModel('analytic-cartesian-$count');

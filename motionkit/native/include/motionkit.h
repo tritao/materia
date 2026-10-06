@@ -64,7 +64,7 @@ typedef struct mk_analytic_solution {
     uint32_t struct_size MK_STRUCT_SIZE;
     double joints[6];
     uint32_t branch;
-    uint32_t singular; /**< C is undetermined at an axial tool direction. */
+    uint32_t singular; /**< Family-specific flags; Cartesian C axis or UR wrist/elbow. */
 } mk_analytic_solution;
 
 /** UR DH family: alpha = [pi/2, 0, 0, pi/2, -pi/2, 0].
@@ -75,6 +75,25 @@ typedef struct mk_ur_parameters {
     double offsets[6];
     int8_t sign_corrections[6];
 } mk_ur_parameters;
+
+/** Deterministic orientation lattice in the target TCP frame. */
+typedef struct mk_orientation_lattice {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t mode; /**< 0 fixed, 1 free TCP spin, 2 cone plus free spin. */
+    uint32_t roll_count;
+    uint32_t tilt_rings; /**< Cone rings excluding its centre. */
+    uint32_t azimuth_count;
+    double half_angle; /**< Cone half-angle in radians, [0, pi]. */
+} mk_orientation_lattice;
+
+typedef struct mk_orientation_sample {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double position[3];
+    double quaternion[4]; /**< x, y, z, w. */
+    uint32_t roll_index;
+    uint32_t tilt_index; /**< 0 is the cone centre. */
+    uint32_t azimuth_index;
+} mk_orientation_sample;
 
 /** Candidate sets for one Descartes ladder-graph selection call. */
 typedef struct mk_configuration_request {
@@ -198,6 +217,12 @@ MK_API mk_result MK_CALL mk_analytic_ur_inverse(const mk_ur_parameters *paramete
     const mk_opw_pose *target, double singular_q6_seed,
     mk_analytic_solution *out_solutions MK_OUT_ARRAY(solution_capacity), uint32_t solution_capacity,
     uint32_t *out_count MK_OUT);
+/** Count first, then allocate exactly enough output. Invalid requests fail before writing. */
+MK_API mk_result MK_CALL mk_orientation_lattice_count(const mk_orientation_lattice *lattice,
+    uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_sample_orientations(const mk_orientation_lattice *lattice,
+    const mk_opw_pose *target, mk_orientation_sample *out_samples MK_OUT_ARRAY(sample_capacity),
+    uint32_t sample_capacity, uint32_t *out_count MK_OUT);
 /** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */
 MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
