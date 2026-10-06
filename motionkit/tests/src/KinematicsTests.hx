@@ -811,7 +811,8 @@ class KinematicsTests extends MotionKitTestSupport {
     check(serialWorkerPlan.blocks[0].plans.length==1,"UR worker compiles through independent structured planning");
     serialWorkerPlan.dispose();
     var entryPlanner = new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
-      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12,3,8,false));
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12,3,8,false),null,
+      new robotkit.manipulation.ArmClearance(fixture.arm,[],start));
     var entryCompiler = new ProgramCompiler(solver,serialLimits,"task",
       [for (_ in start) 1.0],[for (_ in start) 2.0],[for (_ in start) 20.0],
       StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,null,entryPlanner);
@@ -1055,6 +1056,44 @@ class KinematicsTests extends MotionKitTestSupport {
     var rollWorld=new robotkit.manipulation.ArmClearance(rollGroup,[
       {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
       {name:"post",link:rollBase.id,vertices:rollHull(0.3),tool:false}],rollStart);
+    var excursion = Trajectory.fromSegments([{
+      timeFromStartNs:Int64.ofInt(0),durationNs:Trajectory.nanoseconds(1.0),
+      coefficients:[[0.0,0.8,-0.8],[0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]]
+    }]);
+    check(rollWorld.sweep(excursion.evaluate(0.0).positions,excursion.evaluate(1.0).positions) == null,
+      "straight entry endpoints miss a curved trajectory's obstacle");
+    var excursionFailure = motionkit.robot.TrajectoryClearance.violation(rollWorld,excursion);
+    check(excursionFailure != null && (excursionFailure.a == "post" || excursionFailure.b == "post"),
+      "generated trajectory clearance detects the physical mid-motion obstacle");
+    excursion.dispose();
+    var entryCurrent = [0.0,-0.1,0.0,0.0];
+    var entryWorld = new robotkit.manipulation.ArmClearance(rollGroup,[
+      {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
+      {name:"entry-post",link:rollBase.id,vertices:rollHull(0.2),tool:false}],entryCurrent);
+    var entryPath = new PosePath("task",[new PoseLine(
+      new PoseWaypoint(new Pose3(0.2,0.1,0.0),1e-6,1e-6),
+      new PoseWaypoint(new Pose3(0.21,0.1,0.0),1e-6,1e-6),OrientationPolicy.FreeAboutTool,0.1,0.1)]);
+    var physicalEntryPlanner = new motionkit.robot.StructuredJointPathPlanner(rollGroup,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1,false),null,entryWorld,4);
+    var physicalEntryCompiler = new ProgramCompiler(rollSolver,
+      new ValidationLimits(4,Int64.ofInt(1),Int64.ofInt(0)),"task",
+      [1.0,1.0,1.0,1.0],[2.0,2.0,2.0,2.0],[20.0,20.0,20.0,20.0],
+      StartTolerances.uniform(4,0.01,0.01,0.01),null,0.005,2.0,0.001,0.001,null,physicalEntryPlanner);
+    var rejectedEntry = Trajectory.generateStateToState(entryCurrent,[0.0,0.0,0.0,0.0],
+      [0.0,0.0,0.0,0.0],[0.2,0.1,0.0,0.0],
+      [1.0,1.0,1.0,1.0],[2.0,2.0,2.0,2.0],[20.0,20.0,20.0,20.0]);
+    check(physicalEntryPlanner.checkMotion(rejectedEntry) != null,
+      "cheapest generated entry is physically blocked");
+    rejectedEntry.dispose();
+    var physicalEntryPlan = physicalEntryCompiler.compile(new MotionProgram([
+      MotionOp.FollowPath(entryPath,"task",0.1,[])]),entryCurrent,Int64.ofInt(950));
+    check(physicalEntryPlan.blocks[0].plans.length == 2 &&
+      Math.abs(physicalEntryPlan.blocks[0].plans[1].evaluate(0.0).positions[3]) > 1.0,
+      "compiler retries a blocked generated entry with a clear rolled start");
+    var acceptedEntry = physicalEntryPlan.blocks[0].plans[0];
+    for (i in 0...101) check(entryWorld.violation(acceptedEntry.evaluate(acceptedEntry.durationSeconds*i/100.0).positions) == null,
+      "emitted alternative entry remains clear of the physical post");
+    physicalEntryPlan.dispose();
     var unobstructed=motionkit.robot.StructuredLadder.search(rollProblem);
     check(rollWorld.violation(unobstructed.candidates[1].q)!=null,"physical post blocks the cheapest roll route");
     var avoided=motionkit.robot.LazyCollisionLadder.select(rollProblem,rollWorld,3);

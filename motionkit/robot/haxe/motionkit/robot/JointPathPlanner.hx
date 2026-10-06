@@ -8,5 +8,7 @@ import motionkit.planner.JointPathSamples;
 interface JointPathPlanner {
   function withSolver(solver:motionkit.kinematics.KinematicsSolver):JointPathPlanner;
   function allowsFreeStart():Bool;
-  function plan(path:PosePath,request:PathRequest,?pinStart:Bool):JointPathSamples;
+  function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<robotkit.manipulation.ArmClearance.ClearanceViolation>;
+  function plan(path:PosePath,request:PathRequest,?pinStart:Bool,
+    ?entryCheck:(Array<Float>,Array<Float>)->Null<robotkit.manipulation.ArmClearance.ClearanceViolation>):JointPathSamples;
 }

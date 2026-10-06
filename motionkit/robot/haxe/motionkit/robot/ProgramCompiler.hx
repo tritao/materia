@@ -394,34 +394,63 @@ class ProgramCompiler {
     var end = section.offset + section.path.length();
     var curve:Null<JointPathSamples> = null;
     var pathStart = c.q;
-    if (k == 0 && jointPathPlanner != null && jointPathPlanner.allowsFreeStart()) {
-      var samples = pathSamples(section.path);
-      if (samples.length > 10001) throw 'Motion program op ${c.currentIndex} exceeds Cartesian sample budget';
-      curve = jointPathPlanner.plan(section.path,new PathRequest(
-        [for (sample in samples) sample.distance],
-        [for (sample in samples) sample.primitive.waypointAt(sample.local).pose],
-        c.q,ikTolerance,perJointMaxJump,maxVelocity,48,
-        [for (sample in samples) sample.primitive.orientationPolicy()]),false);
-      pathStart = curve.q[0];
+    var entryTrajectory:Null<Trajectory> = null;
+    function generateEntry(from:Array<Float>,to:Array<Float>):Trajectory {
+      var moved = false;
+      for (joint in 0...from.length) if (Math.abs(from[joint]-to[joint]) > 1e-7) moved = true;
+      if (!moved) return Trajectory.fromSegments([{
+        timeFromStartNs:Int64.ofInt(0),durationNs:Trajectory.nanoseconds(controllerPeriodSeconds),
+        coefficients:[for (position in from) [position,0.0]]
+      }]);
+      var motors = motorSpace;
+      var generated = motors == null ? Trajectory.generateStateToState(from,zeros(),zeros(),to,
+        maxVelocity,maxAcceleration,maxJerk) : motors.move(from,to,maxVelocity,maxAcceleration,maxJerk);
+      if (couplingIndices.length > 0) {
+        try { var projected = projectCouplings(generated); generated.dispose(); return projected; }
+        catch (error:Dynamic) { generated.dispose(); throw error; }
+      }
+      return generated;
     }
-    var pending = lowerPath(c.speedScale, section.path, pathStart, c.sectionFeed, [for (event in c.sectionEvents)
+    try {
+      if (k == 0 && jointPathPlanner != null && jointPathPlanner.allowsFreeStart()) {
+        var samples = pathSamples(section.path);
+        if (samples.length > 10001) throw 'Motion program op ${c.currentIndex} exceeds Cartesian sample budget';
+        curve = jointPathPlanner.plan(section.path,new PathRequest(
+          [for (sample in samples) sample.distance],
+          [for (sample in samples) sample.primitive.waypointAt(sample.local).pose],
+          c.q,ikTolerance,perJointMaxJump,maxVelocity,48,
+          [for (sample in samples) sample.primitive.orientationPolicy()]),false,(from,to) -> {
+            if (entryTrajectory != null) { entryTrajectory.dispose(); entryTrajectory = null; }
+            entryTrajectory = generateEntry(from,to);
+            return jointPathPlanner.checkMotion(entryTrajectory);
+          });
+        pathStart = curve.q[0];
+      }
+    } catch (error:Dynamic) { if (entryTrajectory != null) entryTrajectory.dispose(); throw error; }
+    var pending:PendingMotion;
+    try {
+      pending = lowerPath(c.speedScale, section.path, pathStart, c.sectionFeed, [for (event in c.sectionEvents)
       if (event.distance >= section.offset && (last || event.distance < end))
         new PathEvent(event.distance - section.offset, event.channel, event.value,
           event.leadSeconds, event.holdPolicy)], c.currentIndex,null,0.0,curve);
+    } catch (error:Dynamic) { if (entryTrajectory != null) entryTrajectory.dispose(); throw error; }
     try {
       var moved = false;
       for (joint in 0...c.q.length) if (Math.abs(pathStart[joint]-c.q[joint]) > 1e-7) moved = true;
       if (moved) {
         checkJointPosition(pathStart,c.currentIndex,null);
-        var motors = motorSpace;
-        var generated = motors == null ? Trajectory.generateStateToState(c.q,zeros(),zeros(),pathStart,
-          maxVelocity,maxAcceleration,maxJerk) : motors.move(c.q,pathStart,maxVelocity,maxAcceleration,maxJerk);
+        var generated = entryTrajectory == null ? generateEntry(c.q,pathStart) : entryTrajectory;
+        entryTrajectory = null; // PendingMotion now owns the accepted trajectory.
         c.pending = new PendingMotion(c.currentIndex,c.q,pathStart,generated,[],null,null);
         // Explicit preceding outputs retain program order; distance events stay on the path.
         attachLeadingOutputs(c.pending,c.leadingOutputs);
         retire(c);
       }
-    } catch (error:Dynamic) { pending.trajectory.dispose(); throw error; }
+    } catch (error:Dynamic) {
+      if (entryTrajectory != null) entryTrajectory.dispose();
+      pending.trajectory.dispose(); throw error;
+    }
+    if (entryTrajectory != null) entryTrajectory.dispose();
     pending.distanceOffset = section.offset;
     c.pending = pending;
     c.q = pending.endQ.copy();

@@ -19,7 +19,9 @@ class AxisJointPathPlanner implements JointPathPlanner {
     return new AxisJointPathPlanner(cast worker);
   }
   public function allowsFreeStart():Bool return false;
-  public function plan(path:PosePath, request:PathRequest, ?pinStart:Bool):JointPathSamples {
+  public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<robotkit.manipulation.ArmClearance.ClearanceViolation> return null;
+  public function plan(path:PosePath, request:PathRequest, ?pinStart:Bool,
+      ?entryCheck:(Array<Float>,Array<Float>)->Null<robotkit.manipulation.ArmClearance.ClearanceViolation>):JointPathSamples {
     if (path == null || request == null || request.distances.length < 2 ||
         request.distances[0] != 0 || request.distances[request.distances.length - 1] != path.length())
       throw "Axis path request must span its complete authored path";

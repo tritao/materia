@@ -54,7 +54,10 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     };
   }
   public function allowsFreeStart():Bool return sampling != null && !sampling.pinStart;
-  public function plan(path:PosePath,request:PathRequest,?pinStart:Bool):JointPathSamples {
+  public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<ArmClearance.ClearanceViolation>
+    return clearance == null ? null : TrajectoryClearance.violation(clearance,trajectory,contact);
+  public function plan(path:PosePath,request:PathRequest,?pinStart:Bool,
+      ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>):JointPathSamples {
     if(path==null || request==null || request.distances.length<2 || request.distances[0]!=0 ||
         request.distances[request.distances.length-1]!=path.length())
       throw "Joint path request must span its complete authored path";
@@ -89,7 +92,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
               if(failure!=null)return new motionkit.robot.LazyCollisionLadder.RefinedCollision(i,true,failure);}
           }
           refined=curve;return null;
-        },stateCost, problem.pinnedStart ? null : (from,to) -> world.sweep(from,to,contact));
+        },stateCost, problem.pinnedStart ? null : entryCheck != null ? entryCheck : (from,to) -> world.sweep(from,to,contact));
     if(selected.diagnostic!=null)throw 'Joint path selection failed at distance ${selected.failedDistance}: ${selected.diagnostic}';
     return refined==null ? new AnalyticPathRefiner(group,problem,selected).refinePath(request.distances,provider.at) : refined;
   }
