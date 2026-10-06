@@ -126,15 +126,34 @@ class AnalyticPathRefiner {
     if(distances==null || distances.length<2 || task==null ||
         distances[0]!=problem.samples[0].distance || distances[distances.length-1]!=problem.samples[problem.samples.length-1].distance)
       throw "Refined path must cover the complete selected path range";
+    return refineRange(distances,task,0);
+  }
+
+  /** Refine a timing section of the globally selected route. Distances and
+   * task coordinates remain global, so redundancy splines are shared across
+   * stops. The section task supplies its own one-sided endpoint derivatives. */
+  public function refineSection(distances:Array<Float>,task:Float->RefinementTarget):motionkit.planner.JointPathSamples {
+    if(distances==null || distances.length<2 || task==null)
+      throw "Refinement section requires at least two samples and its task";
+    var first=-1,last=-1;
+    for(i in 0...problem.samples.length){
+      if(problem.samples[i].distance==distances[0])first=i;
+      if(problem.samples[i].distance==distances[distances.length-1])last=i;
+    }
+    if(first<0 || last<=first)throw "Refinement section endpoints must be selected route knots";
+    return refineRange(distances,task,first);
+  }
+
+  function refineRange(distances:Array<Float>,task:Float->RefinementTarget,firstSample:Int):motionkit.planner.JointPathSamples {
     for(i in 0...distances.length)if(!Math.isFinite(distances[i]) || i>0 && distances[i]<=distances[i-1])
       throw "Refined path distances must increase finitely";
     var positions:Array<Array<Float>> = [],first:Array<Array<Float>> = [],second:Array<Array<Float>> = [],before:Array<Array<Float>> = [];
-    var previous=selection.candidates[0].q.copy();
+    var previous=selection.candidates[firstSample].q.copy();
     for(i in 0...distances.length){var distance=distances[i],target=task(distance);
       if(target==null)throw 'Missing refinement task at distance $distance';
       var candidate=sample(distance,target.pose,target.freedom,previous),q=candidate.q.copy();
       if(i==0){var same=true;for(j in 0...q.length)if(Math.abs(q[j]-previous[j])>1e-7)same=false;
-        if(problem.pinnedStart && !same)throw "Refinement changed the pinned initial configuration";
+        if(firstSample==0 && problem.pinnedStart && !same)throw "Refinement changed the pinned initial configuration";
         if(same)q=previous.copy();}
       var rates=refinedDerivatives(distance,q,target.pose,target.freedom,target.velocity,target.acceleration);
       var sameCurvature=true;for(row in 0...6)if(target.acceleration[row]!=target.accelerationBefore[row])sameCurvature=false;

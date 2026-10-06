@@ -956,6 +956,44 @@ class KinematicsTests extends MotionKitTestSupport {
       near(refinedPath.qPrime[i][j],j==0?0.75:0,"refined joint path carries differential velocity",1e-6);
       near(refinedPath.qDoublePrime[i][j],0,"refined joint path carries differential curvature",1e-5);
     }
+    var globalTask=(distance:Float)->{
+      var q=start.copy();q[0]+=0.75*distance;var p=solver.forward(q);
+      return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(p,OrientationPolicy.Fixed,
+        [-0.75*p.y,0.75*p.x,0.0,0.0,0.0,0.75],[-0.5625*p.x,-0.5625*p.y,0.0,0.0,0.0,0.0]);
+    };
+    var sectionProblem=new motionkit.robot.CandidateProblem(fixture.arm,new PathRequest([0.0,0.02,0.04],
+      [for(s in [0.0,0.02,0.04])globalTask(s).pose],start,request.tolerance,request.maxJump,request.velocity,32,
+      [OrientationPolicy.Fixed,OrientationPolicy.Fixed,OrientationPolicy.Fixed]),null,true);
+    var sectionSelection=motionkit.robot.StructuredLadder.search(sectionProblem);
+    var sectionRefiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,sectionProblem,sectionSelection);
+    var firstSection=sectionRefiner.refineSection(refinedPath.s.slice(0,11),globalTask);
+    var secondSection=sectionRefiner.refineSection(refinedPath.s.slice(10),globalTask);
+    for(section in [firstSection,secondSection])for(i in 0...section.s.length){
+      var globalIndex=Std.int(Math.round(section.s[i]/0.002));
+      for(j in 0...start.length){
+        near(section.q[i][j],refinedPath.q[globalIndex][j],"section refinement retains global selected geometry",1e-9);
+        near(section.qPrime[i][j],refinedPath.qPrime[globalIndex][j],"section refinement retains global redundancy rates",1e-9);
+      }
+    }
+    for(j in 0...start.length)near(firstSection.q[firstSection.q.length-1][j],secondSection.q[0][j],
+      "independently timed sections share the same physical knot",1e-9);
+    var reversalProblem=new motionkit.robot.CandidateProblem(fixture.arm,new PathRequest([0.0,0.02,0.04],
+      [globalTask(0).pose,globalTask(0.02).pose,globalTask(0).pose],start,request.tolerance,
+      request.maxJump,request.velocity,32,[OrientationPolicy.Fixed,OrientationPolicy.Fixed,OrientationPolicy.Fixed]),null,true);
+    var reversalRefiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,reversalProblem,
+      motionkit.robot.StructuredLadder.search(reversalProblem));
+    var arrivingSection=reversalRefiner.refineSection([0.0,0.01,0.02],globalTask);
+    var departingSection=reversalRefiner.refineSection([0.02,0.03,0.04],distance->{
+      var task=globalTask(0.04-distance);
+      return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(task.pose,task.freedom,
+        [for(value in task.velocity)-value],task.acceleration);
+    });
+    for(j in 0...start.length)near(arrivingSection.q[2][j],departingSection.q[0][j],
+      "stop-and-reverse sections share their selected physical corner",1e-9);
+    near(arrivingSection.qPrime[2][0],0.75,"corner arrival retains its own derivative",1e-6);
+    near(departingSection.qPrime[0][0],-0.75,"corner departure retains its own derivative",1e-6);
+    throws(function() refiner.refineSection([0.001,0.04],globalTask),
+      "section refinement rejects endpoints missing from the selected route");
     var timed=new ToppraPathTiming().time(refinedPath,new PathTimingLimits([for(_ in start)1.0],[for(_ in start)2.0]));
     try {
       var duration=timed.trajectory.durationSeconds();check(duration>0 && Math.isFinite(duration),"refined path succeeds in one TOPP-RA timing pass");
