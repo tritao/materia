@@ -10,6 +10,14 @@
     "../machinekit/examples/bench-mill",
     "../machinekit/examples/cnc-router",
     "../machinekit/examples/machine-tending",
+    "../machinekit/examples/robot-arm",
+    "../processkit/tests/modbus"
+  ],
+  "unscopedSourceRoots": [
+    "../machinekit/examples/bench-mill",
+    "../machinekit/examples/cnc-router",
+    "../machinekit/examples/machine-tending",
+    "../machinekit/examples/robot-arm",
     "../processkit/tests/modbus"
   ],
   "dependencies": {
