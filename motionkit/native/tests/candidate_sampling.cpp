@@ -17,7 +17,7 @@ void store(const T &t,double *p,double *r) {
 int main() {
     mk_ur_parameters p={};p.struct_size=sizeof(p);p.a2=-.425;p.a3=-.39225;p.d1=.089159;p.d4=.10915;p.d5=.09465;p.d6=.0823;
     for(auto &sign:p.sign_corrections)sign=1;
-    mk_serial_cell_model model={};model.struct_size=sizeof(model);model.joint_count=8;model.external_count=2;
+    mk_serial_cell_model model={};model.struct_size=sizeof(model);model.joint_count=8;model.external_count=2;model.arm_joint_count=6;
     for(unsigned i=0;i<6;++i)model.arm_joint_indices[i]=i+1;
     model.external_joint_indices[0]=0;model.external_joint_indices[1]=7;
     model.external_scopes[1]=1;model.external_kinds[1]=1;
@@ -82,4 +82,47 @@ int main() {
     const auto original=model.arm_joint_indices[0];model.arm_joint_indices[0]=model.arm_joint_indices[1];
     assert(candidate_count(&count)==MK_ERROR_INVALID_ARGUMENT);model.arm_joint_indices[0]=original;
     }
+    for(unsigned n=3;n<=5;++n) {
+        mk_analytic_cartesian_model cart={};cart.struct_size=sizeof(cart);cart.joint_count=n;
+        cart.translation_axes[0]=cart.translation_axes[4]=cart.translation_axes[8]=1;
+        cart.rotary_axes[2]=1;cart.rotary_axes[4]=1;cart.home_quaternion[3]=1;
+        cart.home_position[0]=.1;cart.home_position[2]=.3;
+        mk_serial_cell_model model={};model.struct_size=sizeof(model);model.joint_count=n;model.arm_joint_count=n;
+        model.base_quaternion[3]=model.work_quaternion[3]=model.tool_quaternion[3]=1;
+        for(unsigned i=0;i<n;++i)model.arm_joint_indices[i]=i;
+        mk_external_lattice external={};external.struct_size=sizeof(external);external.joint_count=n;
+        mk_joint_lift_request limits={};limits.struct_size=sizeof(limits);limits.joint_count=n;
+        for(unsigned i=0;i<n;++i){limits.lower[i]=i<3 ? -2 : -3.2;limits.upper[i]=i<3 ? 2 : 3.2;limits.periodic[i]=i>=3;}
+        double seed[]={.1,.2,.3,.7,.4};mk_opw_pose target;
+        assert(mk_analytic_cartesian_forward(&cart,seed,n,&target)==MK_OK);
+        mk_orientation_lattice orientation={};orientation.struct_size=sizeof(orientation);orientation.roll_count=4;
+        orientation.tilt_rings=1;orientation.azimuth_count=4;orientation.half_angle=.1;
+        for(unsigned mode=0;mode<3;++mode) {
+            orientation.mode=mode;uint32_t count=0,written=0;
+            assert(mk_cartesian_candidate_count(&cart,&model,&external,&orientation,&limits,&target,seed,n,&count)==MK_OK && count>0);
+            if(mode==0)assert(count==1);
+            if(mode==1)assert(count==(n==3?1u:n==4?4u:2u));
+            std::vector<mk_lattice_candidate> candidates(count);
+            assert(mk_sample_cartesian_candidates(&cart,&model,&external,&orientation,&limits,&target,seed,n,candidates.data(),count,&written)==MK_OK && written==count);
+            bool original=false;
+            const auto wanted=pose(target.position,target.quaternion);
+            for(const auto &candidate:candidates) {
+                bool same=true;for(unsigned i=0;i<n;++i)if(std::abs(candidate.joints[i]-seed[i])>1e-7)same=false;
+                original|=same;
+                mk_opw_pose fk;assert(mk_analytic_cartesian_forward(&cart,candidate.joints,n,&fk)==MK_OK);
+                auto actual=pose(fk.position,fk.quaternion);
+                assert((actual.translation()-wanted.translation()).norm()<1e-7);
+                double angle=acos(std::max(-1.0,std::min(1.0,actual.linear().col(2).dot(wanted.linear().col(2)))));
+                assert(angle<(mode==2?.100001:1e-7));
+                if(mode==0)assert((actual.linear()-wanted.linear()).norm()<1e-7);
+                for(unsigned i=0;i<n;++i)assert(candidate.joints[i]>=limits.lower[i]-1e-9 && candidate.joints[i]<=limits.upper[i]+1e-9);
+            }
+            assert(original);
+        }
+        model.tool_position[0]=.1;uint32_t invalid_count=0;
+        assert(mk_cartesian_candidate_count(&cart,&model,&external,&orientation,&limits,&target,seed,n,&invalid_count)==MK_ERROR_INVALID_ARGUMENT);
+        model.tool_position[0]=0;limits.periodic[0]=1;
+        assert(mk_cartesian_candidate_count(&cart,&model,&external,&orientation,&limits,&target,seed,n,&invalid_count)==MK_ERROR_INVALID_ARGUMENT);
+    }
+
 }

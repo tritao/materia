@@ -19,6 +19,11 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * singular bits: 1 wrist, 2 elbow. Limits and periodic lifts belong to sampling.
 	 */
 	extern fn mk_analytic_ur_inverse(parameters: ptr<const<mk_ur_parameters>>, target: ptr<const<mk_opw_pose>>, singular_q6_seed: f64, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	/**
+	 * Cartesian free-spin/cone cells solve the tool-axis constraint. Repeated
+	 * geometric configurations retain their first lattice coordinates.
+	 */
+	extern fn mk_cartesian_candidate_count(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_enumerate_joint_lifts(request: ptr<const<mk_joint_lift_request>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_lifts: ptr<mk_joint_lift> @out_array("lift_capacity"), lift_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_external_lattice_count(lattice: ptr<const<mk_external_lattice>>, out_count: ptr<u32> @out) -> mk_result;
 	/**
@@ -57,6 +62,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * One call replaces a bisection of mk_path_distance_to_time per sample.
 	 */
 	extern fn mk_path_times_to_distances(law: mk_time_law_handle, seconds: ptr<const<f64>> @in_array("count"), count: u32, out_distances: ptr<f64> @out_array("count")) -> mk_result;
+	extern fn mk_sample_cartesian_candidates(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Axis endpoints are included; the last external coordinate varies fastest.
 	 * Non-external joints are copied from the seed. Zero external axes yields one cell.
@@ -293,10 +299,14 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		struct_size: u32 @offset(0) @struct_size;
 		joint_count: u32 @offset(4);
 		external_count: u32 @offset(8);
-		arm_joint_indices: array<u32, 6> @offset(12);
-		external_joint_indices: array<u32, 64> @offset(36);
-		external_scopes: array<u32, 64> @offset(292);
-		external_kinds: array<u32, 64> @offset(548);
+		/**
+		 * < 3–5 Cartesian joints or 6 serial-arm joints.
+		 */
+		arm_joint_count: u32 @offset(12);
+		arm_joint_indices: array<u32, 6> @offset(16);
+		external_joint_indices: array<u32, 64> @offset(40);
+		external_scopes: array<u32, 64> @offset(296);
+		external_kinds: array<u32, 64> @offset(552);
 		external_axes: array<f64, 192> @offset(808);
 		external_origins: array<f64, 192> @offset(2344);
 		base_position: array<f64, 3> @offset(3880);

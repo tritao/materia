@@ -700,3 +700,18 @@ unreachable/duplicate-driver cases also pass the focused candidate test.
 Haxe export of the native space-screw model and combined Cartesian sampling
 remain outstanding. These APIs are not yet called by production planning;
 PP2 is still incomplete.
+
+PP2 combined Cartesian native sampling is now implemented alongside UR/OPW.
+The shared descriptor records the actual arm joint count (3–6). XYZ, XYZ+C and
+XYZ+C+A use native analytic branches and limit/lift enumeration. Free-spin and
+cone constraints solve the tool axis directly; singular C samples use the roll
+grid as seeded C choices, while repeated nonsingular geometric configurations
+retain their first lattice coordinates. This avoids losing C+A branches by
+requiring an unrelated discretized full rotation. Native tests verify original
+configurations, branch counts, legal limits and FK task constraints for all
+three Cartesian families across fixed/roll/cone policies. All 14 native CTests
+and the four-platform ABI audit pass. Additional focused checks reject double
+application of a Cartesian TCP offset and periodic XYZ flags. Cartesian's native
+model already contains its full TCP; its separate tool transform must be
+identity. Haxe model-derived export and combined sampler invocation still need
+to be implemented. PP2 remains incomplete and production planning is unchanged.

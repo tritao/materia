@@ -134,6 +134,7 @@ typedef struct mk_serial_cell_model {
     uint32_t struct_size MK_STRUCT_SIZE;
     uint32_t joint_count;
     uint32_t external_count;
+    uint32_t arm_joint_count; /**< 3–5 Cartesian joints or 6 serial-arm joints. */
     uint32_t arm_joint_indices[6];
     uint32_t external_joint_indices[MK_MAX_JOINTS];
     uint32_t external_scopes[MK_MAX_JOINTS];
@@ -322,6 +323,20 @@ MK_API mk_result MK_CALL mk_opw_candidate_count(const mk_opw_parameters *paramet
     const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     uint32_t *out_count MK_OUT);
 MK_API mk_result MK_CALL mk_sample_opw_candidates(const mk_opw_parameters *parameters,
+    const mk_serial_cell_model *model, const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
+    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
+    uint32_t *out_count MK_OUT);
+/** Cartesian free-spin/cone cells solve the tool-axis constraint. Repeated
+ * geometric configurations retain their first lattice coordinates. The Cartesian
+ * descriptor includes its TCP, so model.tool must be identity and XYZ nonperiodic. */
+MK_API mk_result MK_CALL mk_cartesian_candidate_count(const mk_analytic_cartesian_model *parameters,
+    const mk_serial_cell_model *model, const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
+    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_sample_cartesian_candidates(const mk_analytic_cartesian_model *parameters,
     const mk_serial_cell_model *model, const mk_external_lattice *external,
     const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
     const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
