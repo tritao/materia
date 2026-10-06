@@ -668,6 +668,36 @@ class KinematicsTests extends MotionKitTestSupport {
       [for(_ in start)10.0],request.velocity);
     var rerouteProblem=new motionkit.robot.CandidateProblem(fixture.arm,rerouteRequest);
     var initialRoute=motionkit.robot.StructuredLadder.search(rerouteProblem);
+    var freeStarts = new motionkit.robot.CandidateProblem(fixture.arm,rerouteRequest,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12,3,8,false));
+    var entries = motionkit.robot.StructuredLadder.kBestStarts(freeStarts,3);
+    check(entries.length == 3, "free start retains three complete alternative entries");
+    near(entries[0].cost, motionkit.robot.StructuredLadder.search(freeStarts).cost,
+      "first alternative is the cheapest complete route including entry cost", 1e-12);
+    for (i in 1...entries.length) {
+      check(entries[i].cost >= entries[i-1].cost - 1e-12, "alternative entries retain cost order");
+      var distinct = false;
+      for (joint in 0...start.length)
+        if (Math.abs(entries[i].candidates[0].q[joint] - entries[0].candidates[0].q[joint]) > 1e-7) distinct = true;
+      check(distinct, "alternative entry changes physical joints");
+    }
+    var entryChecks = 0;
+    var secondEntry = motionkit.robot.LazyCollisionLadder.selectWithChecks(freeStarts,q -> null,
+      2,null,null,null,null,(from,to) -> {
+        entryChecks++;
+        return to == entries[0].candidates[0].q ? {a:"tool",b:"entry-post",distance:0.0,required:0.01} : null;
+      });
+    check(secondEntry.candidates[0] == entries[1].candidates[0] && entryChecks == 2,
+      "blocked first entry falls back to the second complete route");
+    var impossibleEntry = "";
+    try motionkit.robot.LazyCollisionLadder.selectWithChecks(freeStarts,q -> null,2,null,null,null,null,
+      (from,to) -> ({a:"tool",b:"entry-post",distance:0.0,required:0.01}))
+    catch (error:Dynamic) impossibleEntry = Std.string(error);
+    check(impossibleEntry.indexOf("entry-post") >= 0 && impossibleEntry.indexOf("sample 0") >= 0,
+      "blocked entries report the physical pair and start sample within the retry budget");
+    check(motionkit.robot.StructuredLadder.kBestStarts(problem,3).length == 1,
+      "a pinned start produces one entry alternative");
+
     var preference = (sample:Int, candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate) ->
       sample == 1 && candidate == initialRoute.candidates[1] ? 1000.0 : 0.0;
     var preferredRoute = motionkit.robot.StructuredLadder.search(rerouteProblem, null, 0, preference);

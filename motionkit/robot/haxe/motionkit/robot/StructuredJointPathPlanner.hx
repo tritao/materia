@@ -82,7 +82,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
               if(failure!=null)return new motionkit.robot.LazyCollisionLadder.RefinedCollision(i,true,failure);}
           }
           refined=curve;return null;
-        },stateCost);
+        },stateCost, problem.pinnedStart ? null : (from,to) -> world.sweep(from,to,contact));
     if(selected.diagnostic!=null)throw 'Joint path selection failed at distance ${selected.failedDistance}: ${selected.diagnostic}';
     return refined==null ? new AnalyticPathRefiner(group,problem,selected).refinePath(request.distances,provider.at) : refined;
   }

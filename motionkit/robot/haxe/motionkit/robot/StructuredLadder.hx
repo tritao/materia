@@ -6,6 +6,31 @@ import motionkit.robot.CartesianCandidateSampler.LatticeCandidate;
 
 /** Native structured selection over all candidates retained by CandidateProblem. */
 class StructuredLadder {
+  /** Cheapest complete routes with distinct entry configurations, including current-state cost. */
+  public static function kBestStarts(problem:CandidateProblem,count:Int,
+      ?weights:Array<Float>,rollWeight:Float=0,?stateCost:(Int,LatticeCandidate)->Float,
+      ?coarse:CoarseSearchOptions,?blockedEdges:Array<BlockedLadderEdge>):Array<LadderSelection> {
+    if (problem == null || count < 1) throw "Alternative starts require a problem and positive count";
+    var routes:Array<LadderSelection> = [];
+    var excluded = new haxe.ds.ObjectMap<LatticeCandidate,Bool>();
+    for (_ in 0...count) {
+      var route = search(problem,weights,rollWeight,(sample,candidate) ->
+        sample == 0 && excluded.exists(candidate) ? Math.POSITIVE_INFINITY :
+          stateCost == null ? 0.0 : stateCost(sample,candidate),coarse,blockedEdges);
+      if (route.diagnostic != null) break;
+      routes.push(route);
+      // Different IK records can describe the same physical entry (wrap/branch degeneracy).
+      var chosen = route.candidates[0];
+      for (candidate in problem.samples[0].candidates) {
+        var same = true;
+        for (joint in 0...chosen.q.length)
+          if (Math.abs(candidate.q[joint] - chosen.q[joint]) > 1e-7) same = false;
+        if (same) excluded.set(candidate,true);
+      }
+    }
+    return routes;
+  }
+
   public static function search(problem:CandidateProblem,?weights:Array<Float>,rollWeight:Float=0,
       ?stateCost:(Int,LatticeCandidate)->Float,?coarse:CoarseSearchOptions,?blockedEdges:Array<BlockedLadderEdge>):LadderSelection {
     if(problem==null || problem.samples.length==0)throw "Ladder search requires candidate layers";
