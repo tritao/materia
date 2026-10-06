@@ -982,3 +982,20 @@ runtime pass (1,144,398 assertions). This does not complete PP4: fixed-
 branch analytic arm re-solving, differential joint derivatives,
 JointPathSamples/timing integration and authored-track acceptance remain
 outstanding, as do the earlier PP1/PP3 authored gates.
+
+PP4 serial analytic refinement preparation: AnalyticPathRefiner fits
+external values and orientation swing/twist from selected configurations
+using actual FK, then re-solves a fixed geometric branch through the
+combined native serial sampler at each supplied fine target. Recovering
+spin from FK preserves pinned starts whose task pose has different free
+spin, instead of assuming the pinned lattice roll index is their spin.
+Every output is checked against compiled limits, original joint-jump
+limits and task position/orientation tolerance. External spline overshoot
+and unreachable branches are diagnosed. Explicit branch transitions must
+be segmented; numeric and Cartesian refinement support remain separate
+outstanding work. UR tests cover eleven fine fixed-orientation samples
+and eleven free-roll samples, exact pinned spin recovery, continuous lifts
+and no numeric IK calls. Compiler-only and focused runtime pass
+(1,144,570 assertions). Differential q-prime/q-double-prime, complete
+JointPathSamples/timing integration and authored acceptance are not done;
+this helper alone does not complete PP4.

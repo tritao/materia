@@ -585,6 +585,34 @@ class KinematicsTests extends MotionKitTestSupport {
       near(motionkit.path.PoseMath.angle(actual,request.poses[sample]),0,"selected native route retains task orientation",1e-6);
       for(j in 0...6)near(selected.candidates[sample].q[j],selectedAgain.candidates[sample].q[j],"structured route is deterministic",1e-12);
     }
+    var refiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,problem,selected);
+    var previous=start.copy();
+    for(i in 0...11){var q=start.copy();q[0]+=0.003*i;var target=solver.forward(q);
+      var refined=refiner.sample(0.004*i,target,motionkit.path.OrientationPolicy.Fixed,previous);
+      check(refined.branch==selected.candidates[0].branch,"refinement retains the selected geometric branch");
+      near(motionkit.path.PoseMath.distance(solver.forward(refined.q),target),0,"refined analytic TCP preserves the task",1e-6);
+      for(j in 0...q.length)near(refined.q[j],q[j],"fixed-orientation refinement retains the continuous joint lift",1e-6);
+      previous=refined.q;
+    }
+    var spinTargets=[for(p in request.poses){var rotation=new Quat(p.qx,p.qy,p.qz,p.qw).multiply(Quat.fromAxisAngle(new Vec3(0,0,1),0.17));
+      new Pose3(p.x,p.y,p.z,rotation.x,rotation.y,rotation.z,rotation.w);}];
+    var spinRequest=new PathRequest(request.distances,spinTargets,start,new IkTolerance(1e-6,1e-6),request.maxJump,request.velocity,1,
+      [for(_ in spinTargets)motionkit.path.OrientationPolicy.FreeAboutTool]);
+    var spinProblem=new motionkit.robot.CandidateProblem(fixture.arm,spinRequest);
+    var spinSelected=motionkit.robot.StructuredLadder.search(spinProblem);
+    check(spinSelected.diagnostic==null,"free-spin refinement fixture has a selected path");
+    var spinRefiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,spinProblem,spinSelected);
+    previous=start.copy();
+    for(i in 0...11){var q=start.copy();q[0]+=0.003*i;var p=solver.forward(q);
+      var rotation=new Quat(p.qx,p.qy,p.qz,p.qw).multiply(Quat.fromAxisAngle(new Vec3(0,0,1),0.17));
+      var target=new Pose3(p.x,p.y,p.z,rotation.x,rotation.y,rotation.z,rotation.w);
+      var refined=spinRefiner.sample(0.004*i,target,motionkit.path.OrientationPolicy.FreeAboutTool,previous);
+      near(motionkit.robot.ToolFreedom.orientationError(solver.forward(refined.q),target,motionkit.path.OrientationPolicy.FreeAboutTool),0,
+        "smoothed free roll remains within task freedom",1e-6);
+      if(i==0)for(j in 0...q.length)near(refined.q[j],start[j],"refinement recovers pinned spin from actual FK",1e-6);
+      for(j in 0...q.length)check(Math.abs(refined.q[j]-previous[j])<request.maxJump[j],"free-roll refinement stays continuous");
+      previous=refined.q;
+    }
     var excluded=motionkit.robot.StructuredLadder.search(problem,null,0,(sample,candidate)->sample==1 ? Math.POSITIVE_INFINITY : 0.0);
     check(excluded.failedSample==1 && excluded.failedDistance==request.distances[1] && excluded.diagnostic!=null,
       "Haxe native ladder reports disabled-state disconnection at its sample distance");
