@@ -848,7 +848,7 @@ Done. What was built and decided:
 | MT6 | done, second-review corrections verified | 4c9e6ebec, daf20e12d, 3c5eef1dd |
 | MT7 | done | 1780b60fa |
 | MT8 | done | 371070b1d |
-| MT9 | implemented; focused checks passed, full closing gate pending | |
+| MT9 | implemented; focused checks passed, full closing gate pending | 7bd3b9fa8 |
 | MT10 | planned | |
 | MT11 | planned | |
 | MT12 | planned | |
