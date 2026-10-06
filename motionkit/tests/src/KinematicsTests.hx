@@ -32,7 +32,6 @@ import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.StartTolerances;
-import motionkit.robot.PathConfigurationSelector;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;
@@ -121,28 +120,6 @@ import MotionKitTestSupport.TrialRig;
 
 class KinematicsTests extends MotionKitTestSupport {
   public function new() { super(); }
-
-  public function testPathConfigurationSelector():Void {
-    var selector = new PathConfigurationSelector(new PlanarSolver(),
-      [for (_ in 0...6) -20.0], [for (_ in 0...6) 20.0],
-      [for (_ in 0...6) 2.0], [for (_ in 0...6) 1.0]);
-    var candidate = (x:Float) -> [x, 0.0, 0.0, 0.0, 0.0, 0.0];
-    var chosen = selector.select([0.0, 0.5, 1.0], [
-      [candidate(0.0), candidate(10.0)],
-      [candidate(1.0), candidate(9.0)], [candidate(10.0)]]);
-    near(chosen[0][0], 10.0, "Descartes avoids an unreachable nearest branch");
-    near(chosen[1][0], 9.0, "Descartes keeps the continuous branch");
-    var narrow = new PathConfigurationSelector(new PlanarSolver(),
-      [for (_ in 0...6) -20.0], [for (_ in 0...6) 20.0],
-      [for (_ in 0...6) 0.5], [for (_ in 0...6) 1.0]);
-    var message = "";
-    try narrow.select([0.0, 0.5, 1.0], [
-      [candidate(0.0), candidate(10.0)],
-      [candidate(1.0), candidate(9.0)], [candidate(10.0)]])
-    catch (error:Dynamic) message = Std.string(error);
-    check(message.indexOf("0.500000") >= 0,
-      "Descartes reports the first disconnected sample distance");
-  }
 
   /** One group serves several threads at once: each evaluates in data of its own. */
   public function testSharedGroupAcrossThreads():Void {
@@ -1308,7 +1285,13 @@ class KinematicsTests extends MotionKitTestSupport {
     var chosen = solver.solvePath(new PathRequest([0.0, 0.04], [solver.forward(q), solver.forward(next)], q,
       new IkTolerance(), [for (_ in 0...6) 0.5], [for (_ in 0...6) 1.0]));
     var second:Array<Float> = chosen[1];
-    near(second[0], next[0], "Descartes samples OPW branches natively across a path", 1e-6);
+    near(second[0], next[0], "structured ladder selects OPW branches natively across a path", 1e-6);
+    var disconnected = "";
+    try solver.solvePath(new PathRequest([0.0, 0.04], [solver.forward(q), solver.forward(next)], q,
+      new IkTolerance(), [for (_ in 0...6) 1e-6], [for (_ in 0...6) 1.0]))
+    catch (error:Dynamic) disconnected = Std.string(error);
+    check(disconnected.indexOf("sample 1") >= 0 && disconnected.indexOf("0.04") >= 0,
+      "OPW structured selection reports the first disconnected sample and distance");
     var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0));
     var compiler = new ProgramCompiler(solver, limits, "work",
       [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],

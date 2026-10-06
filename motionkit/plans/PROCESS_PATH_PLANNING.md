@@ -384,8 +384,8 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
 | PP3 | in progress: structured/coarse search and Descartes dispatch implemented; authored gate pending | `7cb639434`, `489f2c360`, `f8e88ad4d`, `09cb60fbb` |
 | PP4 | in progress: analytic/numeric refinement, cone rates and timing verified; transitions/authored gate pending | `4b9e750ff`, `0e5edbc06`, `39b6081c1` |
-| PP5 | in progress: lazy sample/edge/refined retries and physical obstacle acceptance; traced full gate passed, normal gate pending | `e1435022f`, `e5336893f`, `bfd03d585` |
-| PP6 | in progress: compiler planner argument and OPW worker isolation verified; default migration and legacy class removal pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
+| PP5 | complete: lazy sample/edge/refined retries, physical acceptance and full native/Haxe gate | `e1435022f`, `e5336893f`, `bfd03d585` |
+| PP6 | in progress: compiler planner argument, OPW worker isolation and legacy class removal verified; default migration and entry handling pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
 | PP7 | planned | — |
 | PP8 | planned | — |
 | PP9 | planned | — |
@@ -1373,3 +1373,11 @@ No full-suite pass or PP5 completion is recorded until it terminates.
 `ProgramCompiler` now takes `JointPathPlanner` in the former configuration-selector argument; the extra trailing planner argument and compiler selector branch are gone. Structured compiler callers use that argument directly. `forWorker()` always creates a compiler with its own planner and planning assumptions, including when an immutable OPW solver returns itself from `fork()`. Structured planner rebinding accepts both compiled manipulator and OPW adapters.
 
 Compiler-only validation passes. The focused C4 runtime passes 1,148,969 assertions, including direct and worker OPW, UR and Cartesian compilation. Default process-runner migration and deletion of the legacy `PathConfigurationSelector` class (still used by OPW's transport-level `solvePath()` and its tests) remain pending. This is not PP6 close-out.
+
+PP5 normal phase gate now passes on the restored production/test code: 1,220,252 MotionKit assertions, with `HL_STDOUT_FLUSH=1`, and the preceding 16/16 native CTest pass. The run validates PP5 before the subsequent PP6 constructor/worker migration. No planner or GC deadlock was established; the earlier interrupted runs were a buffered-output observation error.
+
+### PP6 legacy selector removal
+
+`PathConfigurationSelector` and all Haxe imports are deleted. Standalone OPW full-orientation `solvePath()` now builds a `CandidateProblem` and searches it with `StructuredLadder`; disconnected paths identify the failing sample and distance. External-group and reduced-orientation transport calls still use the differential solver until production migration. The obsolete selector-specific three-assertion test is removed; the OPW integration test now verifies disconnected-path diagnostics alongside successful branch selection.
+
+Compiler-only validation passes with the class absent. The focused C4 runtime passes 1,148,970 assertions (`process-path-pp6-selector-removal-haxe.log`). Default compiler/process-runner migration, joined approach/retreat sections and k-best starts remain outstanding; PP6 is incomplete.

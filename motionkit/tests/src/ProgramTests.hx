@@ -29,7 +29,6 @@ import motionkit.robot.ProgramBlocks;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.ProgramPlanner;
 import motionkit.robot.StartTolerances;
-import motionkit.robot.PathConfigurationSelector;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;

@@ -268,29 +268,15 @@ class OpwKinematics implements KinematicsSolver implements AnalyticIk {
       ?redundancyRate:Array<Float>, ?freedom:OrientationPolicy):Null<Array<Float>>
     return differential.solveDifferential(q, twist, redundancyRate, freedom);
 
-  /**
-   * The path across the arm's analytic branches: every sample's OPW
-   * solutions and the cheapest continuous route through them, in one native
-   * call (`mk_select_opw_configurations`).
-   */
+  /** Select the standalone arm's analytic branches with the structured ladder. */
   public function solvePath(request:PathRequest):Array<Null<Array<Float>>> {
     if (groupBackend != null) return differential.solvePath(request);
     for (freedom in request.freedoms) if (!ToolFreedom.isFull(freedom)) return differential.solvePath(request);
-    var lower:Array<Float> = [], upper:Array<Float> = [];
-    for (joint in 0...jointCount()) {
-      var bounds = manipulator.group.limitsOf(joint);
-      lower.push(bounds.lower < bounds.upper ? bounds.lower : -1e6);
-      upper.push(bounds.lower < bounds.upper ? bounds.upper : 1e6);
-    }
-    var selector = new PathConfigurationSelector(this, lower, upper, request.maxJump, request.velocity, null, 1,
-      request.maxCandidates);
-    var samples = [for (index in 0...request.poses.length) nativePathSample(request.distances[index],
-      request.poses[index])];
-    var selected = MotionKitNative.mk_select_opw_configurations(selector.nativeRequest(), native, samples,
-      request.startQ);
-    var result:Array<Null<Array<Float>>> = [];
-    for (q in selector.readResult(selected.status, selected.out_sequence)) result.push(q);
-    return result;
+    var problem = new CandidateProblem(manipulator, request);
+    var selected = StructuredLadder.search(problem);
+    if (selected.diagnostic != null)
+      throw 'OPW path selection failed at sample ${selected.failedSample}, distance ${selected.failedDistance}: ${selected.diagnostic}';
+    return [for (candidate in selected.candidates) candidate.q.copy()];
   }
 
   public function nativeParameters():mk_opw_parameters return native;

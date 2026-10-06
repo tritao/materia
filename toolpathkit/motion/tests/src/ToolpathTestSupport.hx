@@ -30,7 +30,6 @@ import toolpathkit.motion.ToolpathMotion;
 import toolpathkit.motion.ToolpathMotionBinding;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.StartTolerances;
-import motionkit.robot.PathConfigurationSelector;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;

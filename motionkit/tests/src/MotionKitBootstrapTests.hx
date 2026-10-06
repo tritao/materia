@@ -103,7 +103,6 @@ class MotionKitBootstrapTests {
       programTests.testRedundantArmPaths();
       programTests.testExternalPathPosture();
       programTests.testCoordinatedExternalAxes();
-      kinematicsTests.testPathConfigurationSelector();
       Sys.println('Redundancy focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
@@ -164,7 +163,6 @@ class MotionKitBootstrapTests {
       {name: "programTests.testCoordinatedExternalAxes", run: () -> programTests.testCoordinatedExternalAxes(), weight: 8.7},
       {name: "programTests.testProgramStartTolerances", run: () -> programTests.testProgramStartTolerances(), weight: 0.1},
       {name: "programTests.testProgramPlanner", run: () -> programTests.testProgramPlanner(), weight: 0.2},
-      {name: "kinematicsTests.testPathConfigurationSelector", run: () -> kinematicsTests.testPathConfigurationSelector(), weight: 0.05},
       {name: "kinematicsTests.testAxisKinematics", run: () -> kinematicsTests.testAxisKinematics(), weight: 0.05},
       {name: "kinematicsTests.testManipulatorServo", run: () -> kinematicsTests.testManipulatorServo(), weight: 0.05},
       {name: "kinematicsTests.testServoSession", run: () -> kinematicsTests.testServoSession(), weight: 0.1},
