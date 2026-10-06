@@ -60,10 +60,23 @@ class WeldPlanning {
   public final compiler:ProgramCompiler;
   public final wrist:WristLimits;
   public final planner:WeldPathPlanner;
-  public function new(compiler:ProgramCompiler, wrist:WristLimits, planner:WeldPathPlanner) {
+  final clearance:Null<ArmClearance>;
+  public function new(compiler:ProgramCompiler, wrist:WristLimits, planner:WeldPathPlanner,?clearance:ArmClearance) {
+    this.clearance=clearance;
     this.compiler = compiler;
     this.planner = planner;
     this.wrist = wrist;
+  }
+
+  /** Offline station verification uses execution's geometric choice and the
+   * same retained, timed program checks, without submitting a device command. */
+  public function checked(requested:WeldPlan,start:Array<Float>):processkit.WeldPathProblem.WeldPathSelection {
+    var selected=WeldingPlanRunner.selectWeld(compiler,wrist,clearance,requested,start);
+    var group=cast(compiler.solver,ManipulatorKinematics).manipulator;
+    var program=new WeldPathProgram(selected.problem,selected.curves,
+      {arc:"station.arc",wireSpeed:"station.wire",voltage:"station.voltage"});
+    var compiled=program.compile(compiler,group,start,haxe.Int64.ofInt(1),clearance);
+    compiled.dispose();return selected;
   }
 }
 
@@ -181,7 +194,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var wrist:WristLimits = {angularSpeed: wristSpeed, angularAcceleration: wristAcceleration};
     var planner = new WeldPathPlanner(compiler.solver, compiler.ikTolerance, compiler.maxVelocity, wrist, clearance, compiler.perJointMaxJump,
       function(planned, start) return compileWeld(compiler, wrist, planned, start));
-    return new WeldPlanning(compiler, wrist, planner);
+    return new WeldPlanning(compiler, wrist, planner,clearance);
   }
 
   /**
@@ -248,6 +261,14 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var began=Sys.time();
     var group=cast(motion.compiler.solver,ManipulatorKinematics).manipulator;
     var before=group.numericSolveCount(),start=startPositions();
+    var chosen=selectWeld(motion.compiler,wrist,clearance,requested,start,configuration);
+    runSelected(chosen.problem,chosen.curves);
+    planningSeconds=Sys.time()-began;planningIkSolves=group.numericSolveCount()-before;
+  }
+
+  /** Shared geometry and air policy for runtime and offline cell verification. */
+  public static function selectWeld(compiler:ProgramCompiler,wrist:WristLimits,clearance:Null<ArmClearance>,
+      requested:WeldPlan,start:Array<Float>,?configuration:motionkit.kinematics.SixAxisConfiguration):processkit.WeldPathProblem.WeldPathSelection {
     var problem=new WeldPathProblem(requested,wrist,[for(_ in requested.segments)WeldCorner.AROUND],FRAME,APPROACH_SPEED);
     var best:Null<processkit.WeldPathProblem.WeldPathSelection> = null;
     var reasons:Array<String> = [];
@@ -259,16 +280,14 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       for(direction in [problem,problem.reversed()]){
         try {
           var alternative=clearanceDistance==0 ? direction : direction.withAirClearance(clearanceDistance);
-          var selected=selectProblem(alternative,start);
+          var selected=selectProblem(compiler,clearance,alternative,start,configuration);
           if(best==null || selected.cost<cast(best,processkit.WeldPathProblem.WeldPathSelection).cost)best=selected;
         }catch(error:Dynamic){reasons.push(Std.string(error));}
       }
       if(best!=null)break;
     }
     if(best==null)throw 'Cannot select either weld travel direction: ${reasons.join("; ")}';
-    var chosen=cast(best,processkit.WeldPathProblem.WeldPathSelection);
-    runSelected(chosen.problem,chosen.curves);
-    planningSeconds=Sys.time()-began;planningIkSolves=group.numericSolveCount()-before;
+    return cast(best,processkit.WeldPathProblem.WeldPathSelection);
   }
 
   /** Execute a global selection without running the legacy roll/entry search.
@@ -293,10 +312,11 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     }catch(error:Dynamic){releaseSelected();throw error;}
   }
 
-  function selectProblem(problem:WeldPathProblem,start:Array<Float>):processkit.WeldPathProblem.WeldPathSelection {
-    var solver=cast(motion.compiler.solver,ManipulatorKinematics),group=solver.manipulator;
-    var request=problem.request(start,motion.compiler.ikTolerance,
-      motion.compiler.perJointMaxJump,motion.compiler.maxVelocity);
+  static function selectProblem(compiler:ProgramCompiler,clearance:Null<ArmClearance>,problem:WeldPathProblem,
+      start:Array<Float>,configuration:Null<motionkit.kinematics.SixAxisConfiguration>):processkit.WeldPathProblem.WeldPathSelection {
+    var solver=cast(compiler.solver,ManipulatorKinematics),group=solver.manipulator;
+    var request=problem.request(start,compiler.ikTolerance,
+      compiler.perJointMaxJump,compiler.maxVelocity);
     // Omitted ranges hold axes at the seed. Welds with a work positioner or
     // rail must search its physical range rather than freezing it there.
     var ranges:Array<motionkit.robot.ExternalAxisGrid.ExternalAxisRange> = [];
@@ -313,7 +333,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     }
     var sampling=new motionkit.robot.CandidateProblem.CandidateSamplingOptions(8,3,8,false,ranges,null,configuration);
     return problem.selectWithCost(group,request,sampling,clearance,(from,to)->{
-      var entry=motion.compiler.generateEntry(from,to);
+      var entry=compiler.generateEntry(from,to);
       try {
         var violation=clearance==null ? null : motionkit.robot.TrajectoryClearance.violation(
           clearance,entry,false,0.01,q->problem.contact(solver.forward(q)));
@@ -441,7 +461,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
         var positions=motion.robot.snapshot().positions;
         var stopped=[for(index in motion.jointIndices)positions.get(index)];
         var began=Sys.time(),before=group.numericSolveCount();
-        var curves=selectProblem(problem,stopped).curves;
+        var curves=selectProblem(motion.compiler,clearance,problem,stopped,configuration).curves;
         var program=new WeldPathProgram(problem,curves,channels,process.interruptedAt);
         var compiled=program.compile(motion.compiler,group,stopped,motion.compilationPlanId(),clearance,configuration);
         if(selectedCompilation!=null)selectedCompilation.dispose();

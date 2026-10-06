@@ -48,10 +48,10 @@ class ArmWristFork extends MachineComponent {
 			.setNumber("wall", wall).setNumber("depth", depth).setToken("material", materialSpec());
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var pieces = [Part.box(span + 2 * wall, depth, wall)
-			.translated(new Vector(0, 0, length - wall))];
-		for (side in [-1, 1]) pieces.push(Part.box(wall, depth, length)
-			.translated(new Vector(side * (span + wall) / 2, 0, 0)));
+		var pieces = [Solids.named(Part.box(span + 2 * wall, depth, wall)
+			.translated(new Vector(0, 0, length - wall)), "crossbar")];
+		for (side in [-1, 1]) pieces.push(Solids.named(Part.box(wall, depth, length)
+			.translated(new Vector(side * (span + wall) / 2, 0, 0)), side < 0 ? "left-cheek" : "right-cheek"));
 		return Solids.union(pieces);
 	}
 }

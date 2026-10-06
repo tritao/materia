@@ -147,6 +147,14 @@ class WeldPlanningTests {
       check(fixture.arm.numericSolveCount()==before,"free-start weld selection needs no numeric pose IK");
     } catch(error:Dynamic){if(acceptedEntry!=null)acceptedEntry.dispose();throw error;}
     if(acceptedEntry!=null)acceptedEntry.dispose();
+    var offline=processkit.WeldingPlanRunner.planning(fixture.arm,2.0,world);
+    var offlineSelection=offline.checked(requested,measured);
+    check(offlineSelection.curves.length==offlineSelection.problem.sections.length,
+      "offline station verification returns execution's complete selected route");
+    check(fixture.arm.numericSolveCount()==before,"offline station verification performs no numeric pose IK");
+    var offlineLast=offlineSelection.curves[offlineSelection.curves.length-1];
+    check(world.violation(offlineLast.q[offlineLast.q.length-1],false)==null,
+      "offline verified departure satisfies the air margin");
     var compiler=new motionkit.robot.ProgramCompiler(solver,
       new motionkit.trajectory.ValidationLimits(6,haxe.Int64.ofInt(1),haxe.Int64.ofInt(0)),"weld-task",
       [for(_ in measured)3.0],[for(_ in measured)2.0],[for(_ in measured)20.0],

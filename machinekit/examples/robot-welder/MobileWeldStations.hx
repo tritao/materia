@@ -48,7 +48,6 @@ class MobileWeldStations {
   final boxes:Array<FloorBox> = [];
   final planning:Map<String, WeldPlanning> = new Map();
   final clearances:Map<String, ArmClearance> = new Map();
-  final reversed:Map<String, Map<String, Bool>> = new Map();
   final candidates:Array<WeldStationCandidate>;
   final navigation:AStarPlanner;
   final start:Pose2;
@@ -166,23 +165,19 @@ class MobileWeldStations {
     var found = [for (seam in seams) if (seam.name() == name) seam][0];
     var selected = context(station);
     var where = Transform3.fromPose2(station.pose).inverse().compose(work);
-    var reason = "";
-    for (reverse in [false, true]) {
-      var step = WeldingRecipe.passStep(found.legSize, {diameterMm: cell.robot.feeder.wireDiameterMm,
-        depositionEfficiency: cell.robot.feeder.depositionEfficiency, maxSpeedMPerMin: cell.robot.feeder.maxSpeedMPerMin},
-        [reverse ? found.reversed() : found], cell.weldment().reference, metal, scene.metresPerUnit);
-      var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast step.weld;
-      try {
-        var q = ready.copy();
-        for (pass in weld.passes) q = selected.planner.plan(WeldScenePlan.pass(weld, pass, where), q).endJoints;
-        var directions = reversed.get(station.id);
-        if (directions == null) { directions = new Map(); reversed.set(station.id, directions); }
-        directions.set(name, reverse);
-        Sys.println('Mobile station ${station.id} proves $name ($reverse reverse)');
-        return null;
-      } catch (error:Dynamic) reason = Std.string(error);
-    }
-    return reason;
+    var step = WeldingRecipe.passStep(found.legSize, {diameterMm: cell.robot.feeder.wireDiameterMm,
+      depositionEfficiency: cell.robot.feeder.depositionEfficiency, maxSpeedMPerMin: cell.robot.feeder.maxSpeedMPerMin},
+      [found], cell.weldment().reference, metal, scene.metresPerUnit);
+    var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast step.weld;
+    try {
+      var q = ready.copy();
+      for(pass in weld.passes){
+        var selection=selected.checked(WeldScenePlan.pass(weld,pass,where),q);
+        var last=selection.curves[selection.curves.length-1];q=last.q[last.q.length-1];
+      }
+      Sys.println('Mobile station ${station.id} proves $name with shared path selection');
+      return null;
+    }catch(error:Dynamic)return Std.string(error);
   }
 
   /** Validate the same exact-stop joint motion emitted to the application, including its time law. */
@@ -232,7 +227,10 @@ class MobileWeldStations {
       var where = Transform3.fromPose2(station.pose).inverse().compose(work);
       for (step in generated.require()) {
         var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast step.weld;
-        for (pass in weld.passes) q = selected.planner.plan(WeldScenePlan.pass(weld, pass, where), q).endJoints;
+        for(pass in weld.passes){
+          var selection=selected.checked(WeldScenePlan.pass(weld,pass,where),q);
+          var last=selection.curves[selection.curves.length-1];q=last.q[last.q.length-1];
+        }
       }
       result.push({kind: "goTo", pose: {x: station.pose.x, y: station.pose.y, yaw: station.pose.yaw}});
       for (step in generated.steps) result.push(step);

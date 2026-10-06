@@ -2284,3 +2284,30 @@ Re-baseline reason: **industrial spherical-wrist RobotArm**. Accepted control,
 quality and track logs live in external scratch with the
 `process-path-industrial-baseline-*` prefix. Mobile users, a fresh complete fixed
 welder selector, and the complete PP0a phase gate remain open. PP1a has not started.
+
+
+### PP0a offline station planning and phase gate progress
+
+MobileWeldStations now verifies seams and successive passes with execution's
+shared structured selection, then compiles the retained timed curves with the
+same clearance checks. It no longer invokes the legacy numeric roll search.
+The offline API submits no device command. Its regression verifies complete
+curves, zero numeric IK calls and the final air margin.
+
+App and ProcessKit compiler-only builds pass. The updated full ProcessKit suite
+passes, including 511 planning assertions. MotionKit's full suite passes
+1,223,466 assertions, CadBridge 173 and Toolpath motion 3,034. MotionKit native
+CTest passes 16/16. The standard RobotKit native runtime builds with virtual and
+serial device backends enabled, and CTest passes 17/17. Disabled-device builds
+exposed existing unsupported configuration defects; those are not counted as
+passed. The initial MachineKit gate exposed unnamed wrist-fork bodies; the
+crossbar and each cheek now have stable body tags, with the full gate rerunning.
+
+The fresh complete fixed-welder selector passes both backends, recovery and
+woven/multi-pass quality checks. Mobile driving, displaced-work frames and
+joint-owner handoff pass both backends. Mobile weld mission generation now
+completes, but execution fails at step 7 (goTo), 218.03 s, because navigation
+passes the path end with reverse disabled. That mission is not an accepted
+re-baseline. The prior interrupted legacy-generation run is not a pass either.
+External accepted baseline records retain the reason **industrial
+spherical-wrist RobotArm**. PP0a remains open; PP1a has not started.
