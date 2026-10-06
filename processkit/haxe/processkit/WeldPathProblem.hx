@@ -9,13 +9,20 @@ import motionkit.path.PosePath;
 import motionkit.path.PosePrimitive;
 import motionkit.path.PoseWaypoint;
 import motionkit.robot.ProgramCompiler;
+import motionkit.robot.StructuredJointPathPlanner;
+import motionkit.robot.ManipulatorKinematics;
+import motionkit.robot.CandidateProblem.CandidateSamplingOptions;
+import motionkit.planner.JointPathSamples;
+import robotkit.manipulation.KinematicGroup;
+import robotkit.manipulation.ArmClearance;
 import processkit.WeldCorner.WristLimits;
 import processkit.skill.WeldPlan;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 
-/** Authored geometry for one weld alternative. Selection and timing are callers'
- * responsibilities; this builder performs no IK, collision queries or retries. */
+/** Authored geometry for one weld alternative. Construction performs no IK or
+ * collision queries. select delegates the complete problem to the shared ladder;
+ * timing and process engagement remain the caller's responsibilities. */
 class WeldPathProblem {
   public final plan:WeldPlan;
   final styles:Array<Int>;
@@ -70,6 +77,23 @@ class WeldPathProblem {
    * solves or compiling candidate programs. */
   public function withCornerStyles(alternative:Array<Int>):WeldPathProblem
     return new WeldPathProblem(plan,wrist,alternative,path.frameId,approachSpeed);
+
+  /** Select this complete geometry from the measured robot state. The default
+   * leaves the approach start free; external lattice/rules and motion weights
+   * remain explicit inputs from the cell/process. No candidate is timed. */
+  public function select(group:KinematicGroup,request:PathRequest,?sampling:CandidateSamplingOptions,
+      ?clearance:ArmClearance,
+      ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>,
+      ?exitCheck:Array<Float>->Null<ArmClearance.ClearanceViolation>,
+      ?retreatJoints:Array<Float>,?weights:Array<Float>,rollWeight:Float=0,
+      ?preferences:ManipulatorKinematics):Array<JointPathSamples> {
+    var options=sampling==null ? new CandidateSamplingOptions(8,3,8,false) : sampling;
+    var source=preferences;
+    if(source==null){source=new ManipulatorKinematics(group);source.preferTargetOrientation=true;}
+    var planner=new StructuredJointPathPlanner(group,options,null,clearance,8,false,
+      null,retreatJoints,weights,rollWeight,source,contact);
+    return planner.planSections(sections,request,null,entryCheck,exitCheck);
+  }
 
   /** Geometric contact permission, evaluated at actual TCP poses in the task
    * frame. It also covers the nearby approach and burnback lift. */

@@ -1325,6 +1325,9 @@ class KinematicsTests extends MotionKitTestSupport {
     var partitionProblem=new motionkit.robot.CandidateProblem(rollGroup,new PathRequest(rollRequest.distances,
       rollRequest.poses,rollStart,rollRequest.tolerance,[1.0,1.0,1.0,0.1],rollRequest.velocity,32,rollRequest.freedoms),
       new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,1,false));
+    // Small joint drift crosses a bin boundary near zero without separating
+    // its physical component. Packet partitioning must match the full graph.
+    for(candidate in partitionProblem.samples[1].candidates)candidate.q[3]-=0.01;
     var partitionCost=(sample:Int,candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->
       10*Math.pow(candidate.q[3]-Math.PI/2,2);
     var completeRoute=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost);
@@ -1345,6 +1348,15 @@ class KinematicsTests extends MotionKitTestSupport {
         "component packet blocked edges retain the exhaustive alternative route",1e-12);
     throws(function() motionkit.robot.StructuredLadder.search(partitionProblem,null,0,null,null,null,
       mk_lattice_candidate.size()),"connected components exceeding a packet are diagnosed without pruning states");
+    // Abstract ladder coordinates outside the integer-bin range retain the
+    // exhaustive typed-sort fallback; no physical model solve is involved.
+    for(layer in partitionProblem.samples)for(candidate in layer.candidates)candidate.q[0]+=3e9;
+    partitionProblem.request.startQ[0]+=3e9;
+    var wideFull=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost);
+    var widePackets=motionkit.robot.StructuredLadder.search(partitionProblem,null,0,partitionCost,null,null,packetBudget);
+    near(widePackets.cost,wideFull.cost,"large-coordinate fallback preserves exhaustive route cost",1e-12);
+    for(i in 0...wideFull.candidates.length)for(j in 0...4)near(widePackets.candidates[i].q[j],wideFull.candidates[i].q[j],
+      "large-coordinate fallback preserves exhaustive route joints",1e-12);
     function rollHull(x:Float):Array<Float>{var vertices:Array<Float> = [];
       for(dx in [-0.01,0.01])for(y in [-0.01,0.01])for(z in [-0.01,0.01]){
         vertices.push(x+dx);vertices.push(y);vertices.push(z);}

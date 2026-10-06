@@ -88,6 +88,29 @@ class WeldPlanningTests {
     }
     near(request.distances[request.distances.length-1],offset,0,"joined request covers the full global route");
     check(fixture.arm.numericSolveCount()==before,"joined weld builder and selection need no numeric pose IK");
+    var measured=[0.0,-1.5708,1.5708,-1.5708,-1.5708,0.0],entryChecks=0;
+    var acceptedEntry:Null<motionkit.trajectory.Trajectory> = null;
+    var freeRequest=problem.request(measured,new IkTolerance(1e-6,1e-6),
+      [for(_ in measured)0.2],[for(_ in measured)3.0]);
+    var freeCurves:Array<motionkit.planner.JointPathSamples>;
+    try {
+      freeCurves=problem.select(fixture.arm,freeRequest,null,world,(from,to)->{
+        entryChecks++;
+        if(acceptedEntry!=null){acceptedEntry.dispose();acceptedEntry=null;}
+        acceptedEntry=motionkit.trajectory.Trajectory.generateStateToState(from,[for(_ in from)0.0],
+          [for(_ in from)0.0],to,[for(_ in from)3.0],[for(_ in from)2.0],[for(_ in from)20.0]);
+        return motionkit.robot.TrajectoryClearance.violation(world,acceptedEntry,false,0.01,
+          q->problem.contact(solver.forward(q)));
+      });
+      check(entryChecks>0 && acceptedEntry!=null,"free weld start checks its actual generated entry motion");
+      var entered=acceptedEntry.evaluate(acceptedEntry.durationSeconds()).positions;
+      for(j in 0...measured.length)near(entered[j],freeCurves[0].q[0][j],1e-7,
+        "accepted free-entry motion reaches the globally selected approach start");
+      check(freeCurves.length==3,"free entry choice covers the complete approach, weld and retreat");
+      check(fixture.arm.numericSolveCount()==before,"free-start weld selection needs no numeric pose IK");
+    } catch(error:Dynamic){if(acceptedEntry!=null)acceptedEntry.dispose();throw error;}
+    if(acceptedEntry!=null)acceptedEntry.dispose();
+
   }
 
   static function testProblemTravelAlternatives():Void {

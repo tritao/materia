@@ -49,9 +49,25 @@ class StructuredLadder {
     for(layer in problem.samples)for(candidate in layer.candidates)if(allowed(candidate))count++;
     if(count>Std.int(maxPacketBytes/mk_lattice_candidate.size())) {
       for(joint in 0...problem.request.startQ.length){
+        // Values inside a jump-width bin cannot be separated by a legal
+        // disconnection. Retain its extremes, rather than sorting one value
+        // for every periodic lift at every path sample.
+        var bins=new Map<Int,{lower:Float,upper:Float}>(),compact=true;
+        var width=problem.request.maxJump[joint];
+        for(layer in problem.samples)for(candidate in layer.candidates)if(allowed(candidate) && compact){
+          var value=candidate.q[joint],scaled=value/width;
+          if(!Math.isFinite(scaled) || scaled < -2147483648.0 || scaled >= 2147483647.0){compact=false;continue;}
+          var index=Math.floor(scaled),bin=bins.get(index);
+          if(bin==null)bins.set(index,{lower:value,upper:value});
+          else {bin.lower=Math.min(bin.lower,value);bin.upper=Math.max(bin.upper,value);}
+        }
+        // Verify the span rather than assuming floating division has exact
+        // bin boundaries. Large coordinates retain the exhaustive fallback.
+        for(bin in bins)if(bin.upper-bin.lower>width+1e-12)compact=false;
         var values:Array<Float> = [];
-        for(layer in problem.samples)for(candidate in layer.candidates)if(allowed(candidate))values.push(candidate.q[joint]);
-        values.sort(Reflect.compare);
+        if(compact)for(bin in bins){values.push(bin.lower);values.push(bin.upper);}
+        else for(layer in problem.samples)for(candidate in layer.candidates)if(allowed(candidate))values.push(candidate.q[joint]);
+        values.sort((a:Float,b:Float)->a<b?-1:a>b?1:0);
         var boundaries:Array<Float> = [];
         for(i in 1...values.length)if(values[i]-values[i-1]>problem.request.maxJump[joint]+1e-12)
           boundaries.push((values[i]+values[i-1])/2);
