@@ -32,6 +32,18 @@ int main(){
     CachedLayers edge_stream{edge_layers};
     auto streamed_edge_route=structured_ladder(edge_stream,edge_settings,{},exclude);
     assert(streamed_edge_route.route==edge_route.route && streamed_edge_route.cost==edge_route.cost);
+    for(unsigned stride:{1u,2u}){
+        auto coarse_edge_route=coarse_ladder(edge_layers,edge_settings,CoarseLadderSettings{stride,1,2,1},{},exclude);
+        assert(coarse_edge_route.failed==UINT32_MAX && coarse_edge_route.route==edge_route.route);
+        assert(coarse_edge_route.cost==edge_route.cost);
+    }
+    auto remapped_layers=edge_layers;auto remapped_settings=edge_settings;remapped_settings.rolls=4;
+    for(auto &layer:remapped_layers){mk_lattice_candidate decoy{};decoy.roll_index=3;decoy.joints[0]=3;
+        layer.insert(layer.begin(),decoy);}
+    auto remapped_exclude=[](unsigned layer,unsigned from,unsigned to){return !(layer==1 && from==1 && to==1);};
+    auto remapped_route=coarse_ladder(remapped_layers,remapped_settings,CoarseLadderSettings{2,2,1,0},{},remapped_exclude);
+    assert(remapped_route.failed==UINT32_MAX && remapped_route.backend==2);
+    assert(remapped_route.route==std::vector<unsigned>({2,1,1}) && std::abs(remapped_route.cost-.4)<1e-12);
     auto impossible_edge=structured_ladder(edge_layers,edge_settings,{},
         [](unsigned layer,unsigned,unsigned){return layer!=1;});
     assert(impossible_edge.failed==1 && !impossible_edge.no_candidates);

@@ -45,11 +45,12 @@ template<class Layers> struct CorridorLayers {
  * jump limits. Disconnected corridors widen, then revert to the complete graph.
  * All branches and legal wrap representatives inside the corridor remain. */
 template<class Layers> LadderResult coarse_ladder(const Layers &source,const LadderSettings &settings,
-        const CoarseLadderSettings &options={},const std::vector<std::vector<double>> &state_cost={}) {
+        const CoarseLadderSettings &options={},const std::vector<std::vector<double>> &state_cost={},
+        const std::function<bool(unsigned,unsigned,unsigned)> &edge_allowed={}) {
     validate_ladder_settings(settings);
     if(options.sample_stride==0 || options.lattice_stride==0 || options.corridor_radius==0 || options.widenings>16)
         throw std::invalid_argument("Invalid coarse ladder resolution");
-    if(source.empty())return structured_ladder(source,settings,state_cost);
+    if(source.empty())return structured_ladder(source,settings,state_cost,edge_allowed);
     if(!state_cost.empty() && state_cost.size()!=source.size())throw std::invalid_argument("Coarse state-cost layer mismatch");
     unsigned stride=options.lattice_stride;
     std::vector<unsigned> anchors;
@@ -77,13 +78,19 @@ template<class Layers> LadderResult coarse_ladder(const Layers &source,const Lad
     coarse_settings.roll_weight*=stride;
     // Prefer conservative coarse jumps: large scaled jump boxes admit many
     // branch flips that cannot survive the fine graph. Relax only if needed.
-    auto route=structured_ladder(coarse,coarse_settings,costs);
+    // A skipped anchor edge is only a corridor hint. Adjacent anchors can
+    // honor exact exclusions; every fine edge is checked below.
+    auto coarse_allowed=[&](unsigned layer,unsigned from,unsigned to){
+        return !edge_allowed || anchors[layer]!=anchors[layer-1]+1 ||
+            edge_allowed(anchors[layer],mapping[layer-1][from],mapping[layer][to]);
+    };
+    auto route=structured_ladder(coarse,coarse_settings,costs,coarse_allowed);
     uint64_t coarse_tested=route.tested_edges;
     if(route.failed!=UINT32_MAX && options.sample_stride>1){
         for(unsigned j=0;j<settings.joints;++j)coarse_settings.jump[j]*=options.sample_stride;
-        route=structured_ladder(coarse,coarse_settings,costs);coarse_tested+=route.tested_edges;
+        route=structured_ladder(coarse,coarse_settings,costs,coarse_allowed);coarse_tested+=route.tested_edges;
     }
-    if(route.failed!=UINT32_MAX){auto complete=structured_ladder(source,settings,state_cost);
+    if(route.failed!=UINT32_MAX){auto complete=structured_ladder(source,settings,state_cost,edge_allowed);
         complete.tested_edges+=coarse_tested;return complete;}
     std::vector<mk_lattice_candidate> centres;
     for(unsigned i=0;i<anchors.size();++i)centres.push_back(source[anchors[i]][mapping[i][route.route[i]]]);
@@ -96,12 +103,15 @@ template<class Layers> LadderResult coarse_ladder(const Layers &source,const Lad
             if(state_cost[i].size()!=source[i].size())throw std::invalid_argument("Fine state-cost candidate mismatch");
             for(auto price:state_cost[i])if(std::isnan(price) || price<0)throw std::invalid_argument("Invalid fine state cost");
             for(auto index:corridor.mapping[i%2])prices.push_back(state_cost[i][index]);fine_costs.push_back(std::move(prices));}
-        auto fine=structured_ladder(corridor,settings,fine_costs);tested+=fine.tested_edges;
+        auto fine_allowed=[&](unsigned layer,unsigned from,unsigned to){
+            return !edge_allowed || edge_allowed(layer,corridor.all_mapping[layer-1][from],corridor.all_mapping[layer][to]);
+        };
+        auto fine=structured_ladder(corridor,settings,fine_costs,fine_allowed);tested+=fine.tested_edges;
         if(fine.failed==UINT32_MAX){for(unsigned i=0;i<fine.route.size();++i)fine.route[i]=corridor.all_mapping[i][fine.route[i]];
             fine.tested_edges=tested;fine.backend=2;return fine;}
         if(radius>UINT32_MAX/2)break;radius*=2;
     }
-    auto complete=structured_ladder(source,settings,state_cost);complete.tested_edges+=tested;return complete;
+    auto complete=structured_ladder(source,settings,state_cost,edge_allowed);complete.tested_edges+=tested;return complete;
 }
 }
 #endif

@@ -1165,3 +1165,14 @@ Native rebuild and focused structured-ladder CTest pass. Public native/
 Haxe blocked-edge records, coarse index mapping, Descartes handling and
 lazy sweep retry integration remain outstanding. This internal primitive
 alone does not complete PP5.
+
+PP5 coarse edge-exclusion mapping: coarse_ladder now accepts the same
+source-index transition predicate. Adjacent coarse anchors map their
+indices back before checking it; skipped anchor transitions remain hints.
+Every fine corridor edge maps both endpoints to original candidate
+indices, and widening/full-search fallbacks retain exclusions. Native
+acceptance covers adjacent/skipped anchors and a narrow corridor that
+removes decoys, changes local indices and still returns the exact allowed
+route/cost with the corridor backend. Native rebuild and focused
+structured-ladder CTest pass. Public ABI/Haxe records, Descartes handling,
+lazy sweep retry, closest clearance and physical acceptance remain open.
