@@ -162,6 +162,10 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
 rk_result RK_CALL rk_serial_device_identify(const char *device_path, uint32_t baud,
                                             rk_controller_id *out_controller) {
     if (!device_path || !*device_path || !out_controller) return RK_ERROR_INVALID_ARGUMENT;
+#if !defined(RK_HAS_SERIAL_DEVICE)
+    (void)baud;
+    return RK_ERROR_UNSUPPORTED;
+#else
     try {
         std::array<std::uint8_t, 16> controller{};
         const auto result = robotkit::DeviceSerialEndpoint::identify(device_path, baud, controller);
@@ -172,6 +176,7 @@ rk_result RK_CALL rk_serial_device_identify(const char *device_path, uint32_t ba
     } catch (...) {
         return RK_ERROR_BACKEND;
     }
+#endif
 }
 
 void RK_CALL rk_robot_runtime_destroy(rk_robot_runtime runtime) {
