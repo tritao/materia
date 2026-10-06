@@ -799,14 +799,16 @@ class ProgramTests extends MotionKitTestSupport {
     check(ProgramPlanner.active()==workers,"precompiled submission starts no planning worker");
     throws(()->motion.setSpeedOverride(0.5),"running compiled plans retain their validated process clock");
     near(motion.speedOverride,1.0,"rejected compiled override does not change motion state",0);
-    var tick=0;
+    var tick=0,sawWait=false,sawDwell=false;
     for(i in 0...400){
+      switch motion.progress().barrier {case WaitInput(_,_,_):sawWait=true;case Dwell(_):sawDwell=true;case null:}
       if(i==100)ready=true;
       motion.update(0.01);harness.step(Int64.ofInt(++tick));
       if(motion.completed || motion.failure!=null)break;
     }
     check(motion.completed && motion.failure==null,'precompiled motion completes through wait/dwell barriers: ${motion.failure}');
     near(robot.snapshot().positions.get(0),0.0,"precompiled program reaches its selected endpoint",1e-4);
+    check(sawWait && sawDwell,"runtime progress identifies the actual wait and dwell barriers");
     var fired=motion.firedEvents();
     check(Lambda.exists(fired,event->event.channel=="compiled.enabled" && switch event.value {
       case ProcessEventValue.Digital(true):true;default:false;

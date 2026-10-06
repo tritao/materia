@@ -146,14 +146,30 @@ class WeldPlanningTests {
       for(block in compiled.blocks){
         switch block.barrier {
           case WaitInput(channel,_,_):check(channel==processkit.WeldingPlanRunner.ARC_ESTABLISHED,
-            "selected execution waits for established arc");waits++;
-          case Dwell(_):dwells++;
+            "selected execution waits for established arc");
+            var blockIndex=compiled.blocks.indexOf(block);
+            var cursor=new motionkit.robot.ManipulatorProgress(blockIndex,-1,0,null,block.barrier);
+            var status=selectedProgram.progress(compiled,cursor);
+            check(status.phase==processkit.WeldPathProgram.WeldExecutionPhase.WaitingForArc && status.seamDistance==0,
+              "selected progress distinguishes ignition before deposition");waits++;
+          case Dwell(_):
+            var status=selectedProgram.progress(compiled,new motionkit.robot.ManipulatorProgress(
+              compiled.blocks.indexOf(block),-1,0,null,block.barrier));
+            check(status.phase==(dwells==0?processkit.WeldPathProgram.WeldExecutionPhase.Pooling:
+              processkit.WeldPathProgram.WeldExecutionPhase.FillingCrater),"selected progress distinguishes start and crater dwells");
+            near(status.seamDistance,dwells==0?0:problem.seamLength,0,"dwell progress retains authored deposition extent");
+            dwells++;
           case null:
         }
         for(index in 0...block.plans.length){
           var section=selectedProgram.sectionOps.indexOf(block.opIndices[index]);
           if(section<0)continue;
           sectionsFound++;var timed=block.plans[index],curve=freeCurves[section];
+          var halfway=problem.sections[section].length()/2;
+          var status=selectedProgram.progress(compiled,new motionkit.robot.ManipulatorProgress(
+            compiled.blocks.indexOf(block),block.opIndices[index],halfway));
+          near(status.seamDistance,section==0?0:section==1?halfway:problem.seamLength,1e-12,
+            "selected progress counts deposition while excluding approach, burnback and retreat travel");
           var begin=timed.evaluate(0),end=timed.evaluate(timed.durationSeconds);
           for(j in 0...6){near(begin.positions[j],curve.q[0][j],1e-7,"timed weld reuses selected section entry");
             near(end.positions[j],curve.q[curve.q.length-1][j],1e-7,"timed weld reuses selected section exit");
@@ -181,6 +197,12 @@ class WeldPlanningTests {
       near(quantity,PARAMETERS.wireSpeed/PARAMETERS.travelSpeed*problem.seamLength,1e-6,
         "selected execution deposits the authored quantity over the final clock");
       check(fixture.arm.numericSolveCount()==before,"selected weld compilation performs no numeric pose IK");
+      var stopped=selectedProgram.progress(compiled,new motionkit.robot.ManipulatorProgress(0,-1,0));
+      check(stopped.phase==processkit.WeldPathProgram.WeldExecutionPhase.Approaching && stopped.seamDistance==0,
+        "an inactive cursor does not falsely report a completed weld");
+      var finished=selectedProgram.progress(compiled,new motionkit.robot.ManipulatorProgress(0,-1,0),true);
+      check(finished.phase==processkit.WeldPathProgram.WeldExecutionPhase.Complete && finished.seamDistance==problem.seamLength,
+        "only confirmed execution completion closes the deposited seam");
     }catch(error:Dynamic){compiled.dispose();throw error;}
     compiled.dispose();
 

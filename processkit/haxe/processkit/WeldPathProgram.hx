@@ -31,6 +31,9 @@ class WeldPathProgram {
   final phases:Array<WeldPathPhase>;
   final quantity:Float;
   final endRate:Float;
+  final lengths:Array<Float>;
+  final seamOffsets:Array<Float>;
+  public final ignitionOp:Int;
 
   public function new(problem:WeldPathProblem,curves:Array<JointPathSamples>,channels:WelderChannels) {
     if(problem==null || curves==null || curves.length!=problem.sections.length || channels==null)
@@ -45,12 +48,16 @@ class WeldPathProgram {
       MotionOp.SetOutput(channels.voltage,EventValue.Analog(parameters.voltage)),
       MotionOp.MoveJ(MoveTarget.JointTarget(this.curves[0].q[0].copy()),new MotionOptions(),Blend.ExactStop)
     ];
-    sectionOps=[];var engaged=false,finalWeld=-1;
+    lengths=[for(path in problem.sections)path.length()];seamOffsets=[];
+    var seamProgress=0.0;
+    for(i in 0...phases.length){seamOffsets.push(seamProgress);if(phases[i]==Weld)seamProgress+=lengths[i];}
+    sectionOps=[];var engaged=false,finalWeld=-1,ignition=-1;
     for(i in 0...problem.sections.length){
       var phase=phases[i],path=problem.sections[i];
       if(phase==Weld && !engaged){
         ops.push(MotionOp.SetOutput(channels.wireSpeed,EventValue.Analog(parameters.wireSpeed)));
         ops.push(MotionOp.SetOutput(channels.arc,EventValue.Digital(true)));
+        ignition=ops.length;
         ops.push(MotionOp.WaitInput(WeldingPlanRunner.ARC_ESTABLISHED,
           InputPredicate.Equals(EventValue.Digital(true)),WeldingPlanRunner.IGNITION_TIMEOUT));
         if(parameters.startDwell>0)ops.push(MotionOp.Dwell(parameters.startDwell));
@@ -67,7 +74,43 @@ class WeldPathProgram {
         Math.max(WeldPathPlanner.LIFT/parameters.burnback,0.01):path.primitives[0].speedLimit();
       ops.push(MotionOp.FollowPath(path,path.frameId,feed,events));
     }
-    lastWeldOp=finalWeld;program=new MotionProgram(ops);
+    ignitionOp=ignition;lastWeldOp=finalWeld;program=new MotionProgram(ops);
+  }
+
+  /** Pure progress mapping; barriers use the adopted compilation's block
+   * metadata. Air/lift travel never counts toward deposited seam distance. */
+  public function progress(compiled:CompiledProgram,current:motionkit.robot.ManipulatorProgress,
+      completed:Bool=false):WeldPathProgress {
+    if(compiled==null || current==null)throw "Weld progress requires its compilation and motion cursor";
+    var end=problem.seamLength;
+    if(completed)return new WeldPathProgress(Complete,end);
+    var section=sectionOps.indexOf(current.op);
+    if(section>=0){
+      var distance=Math.max(0.0,Math.min(lengths[section],current.pathDistance));
+      return switch phases[section] {
+        case Approach:new WeldPathProgress(Approaching,0);
+        case Weld:new WeldPathProgress(Depositing,Math.min(end,seamOffsets[section]+distance));
+        case Burnback:new WeldPathProgress(BurningBack,end);
+        case Retreat:new WeldPathProgress(Retreating,end);
+      };
+    }
+    if(current.barrier!=null)return switch current.barrier {
+      case WaitInput(_,_,_):new WeldPathProgress(WaitingForArc,0);
+      case Dwell(_):
+        var welded=false;
+        for(block in 0...Std.int(Math.min(compiled.blocks.length,current.block+1)))
+          for(op in compiled.blocks[block].opIndices){var index=sectionOps.indexOf(op);
+            if(index>=0 && phases[index]==Weld)welded=true;}
+        new WeldPathProgress(welded?FillingCrater:Pooling,welded?end:0);
+    };
+    if(current.op>=ignitionOp && current.op<firstWeldOp())
+      return new WeldPathProgress(current.op==ignitionOp?WaitingForArc:Pooling,0);
+    if(current.op>lastWeldOp)return new WeldPathProgress(FillingCrater,end);
+    return new WeldPathProgress(Approaching,0);
+  }
+  function firstWeldOp():Int {
+    for(i in 0...phases.length)if(phases[i]==Weld)return sectionOps[i];
+    throw "Weld program has no deposition section";
   }
 
   /** One compiler pass, including generated entry, drive/task/clearance checks
@@ -87,4 +130,21 @@ class WeldPathProgram {
     };
     return execution.compile(program,start,planId);
   }
+}
+
+/** Explicit engagement state and authored deposited distance for recovery. */
+class WeldPathProgress {
+  public final phase:WeldExecutionPhase;
+  public final seamDistance:Float;
+  public function new(phase:WeldExecutionPhase,seamDistance:Float){this.phase=phase;this.seamDistance=seamDistance;}
+}
+enum WeldExecutionPhase {
+  Approaching;
+  WaitingForArc;
+  Pooling;
+  Depositing;
+  FillingCrater;
+  BurningBack;
+  Retreating;
+  Complete;
 }
