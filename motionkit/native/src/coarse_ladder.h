@@ -75,12 +75,19 @@ template<class Layers> LadderResult coarse_ladder(const Layers &source,const Lad
     auto coarse_settings=settings;
     coarse_settings.rolls=(settings.rolls-1)/stride+1;coarse_settings.tilts=(settings.tilts-1)/stride+1;coarse_settings.azimuths=(settings.azimuths-1)/stride+1;
     coarse_settings.roll_weight*=stride;
-    for(unsigned j=0;j<settings.joints;++j)coarse_settings.jump[j]*=options.sample_stride;
+    // Prefer conservative coarse jumps: large scaled jump boxes admit many
+    // branch flips that cannot survive the fine graph. Relax only if needed.
     auto route=structured_ladder(coarse,coarse_settings,costs);
-    if(route.failed!=UINT32_MAX)return structured_ladder(source,settings,state_cost);
+    uint64_t coarse_tested=route.tested_edges;
+    if(route.failed!=UINT32_MAX && options.sample_stride>1){
+        for(unsigned j=0;j<settings.joints;++j)coarse_settings.jump[j]*=options.sample_stride;
+        route=structured_ladder(coarse,coarse_settings,costs);coarse_tested+=route.tested_edges;
+    }
+    if(route.failed!=UINT32_MAX){auto complete=structured_ladder(source,settings,state_cost);
+        complete.tested_edges+=coarse_tested;return complete;}
     std::vector<mk_lattice_candidate> centres;
     for(unsigned i=0;i<anchors.size();++i)centres.push_back(source[anchors[i]][mapping[i][route.route[i]]]);
-    uint64_t tested=route.tested_edges;
+    uint64_t tested=coarse_tested;
     unsigned radius=options.corridor_radius;
     for(unsigned attempt=0;attempt<=options.widenings;++attempt){
         CorridorLayers<Layers> corridor{source,settings,anchors,centres,radius};

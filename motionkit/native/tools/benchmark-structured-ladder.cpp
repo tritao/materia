@@ -6,6 +6,7 @@ using namespace motionkit;
 struct TrackLayers {
     unsigned count;
     mutable std::array<LadderLayer,2> cache;
+    mutable double generation_seconds=0;
     mutable std::array<unsigned,2> cached{{UINT32_MAX,UINT32_MAX}};
     unsigned size()const{return count;}
     bool empty()const{return count==0;}
@@ -13,6 +14,7 @@ struct TrackLayers {
         const unsigned slot=layer%2;
         auto &cells=cache[slot];
         if(cached[slot]==layer)return cells;
+        const auto generated_at=std::chrono::steady_clock::now();
         cells.clear();cells.reserve(7700);
         for(unsigned branch=0;branch<8;++branch)for(unsigned roll=0;roll<24;++roll)for(unsigned track=0;track<40;++track){
             mk_lattice_candidate c{};c.struct_size=sizeof(c);c.branch=branch;c.roll_index=roll;c.external_coordinates[0]=track;
@@ -25,6 +27,7 @@ struct TrackLayers {
             cells.push_back(c);
         }
         for(unsigned wrap=0;wrap<20;++wrap){auto c=cells[wrap];c.joints[4]+=6.283185307179586;c.wraps[4]=1;cells.push_back(c);}
+        generation_seconds+=std::chrono::duration<double>(std::chrono::steady_clock::now()-generated_at).count();
         cached[slot]=layer;return cells;
     }
 };
@@ -33,9 +36,11 @@ int main(int argc,char **argv){
     if(samples<2 || samples>1301)return 2;
     LadderSettings settings;settings.joints=7;settings.externals=1;settings.rolls=24;
     for(unsigned j=0;j<7;++j){settings.jump[j]=.15;settings.velocity[j]=1;settings.weight[j]=1;}
+    CoarseLadderSettings coarse;coarse.corridor_radius=argc>3?std::strtoul(argv[3],nullptr,10):2;
+    if(coarse.corridor_radius==0 || coarse.corridor_radius>40)return 2;
     TrackLayers layers{samples};
-    const auto start=std::chrono::steady_clock::now();auto result=argc>2 ? coarse_ladder(layers,settings) : structured_ladder(layers,settings);
+    const auto start=std::chrono::steady_clock::now();auto result=argc>2 ? coarse_ladder(layers,settings,coarse) : structured_ladder(layers,settings);
     const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
-    std::printf("synthetic track-shaped ladder: samples=%u candidates=7700 seconds=%.6f tested_edges=%llu cost=%.9f failed=%u\n",samples,seconds,(unsigned long long)result.tested_edges,result.cost,result.failed);
+    std::printf("synthetic track-shaped ladder: samples=%u candidates=7700 radius=%u total_seconds=%.6f generation_seconds=%.6f search_seconds=%.6f tested_edges=%llu cost=%.9f failed=%u\n",samples,coarse.corridor_radius,seconds,layers.generation_seconds,seconds-layers.generation_seconds,(unsigned long long)result.tested_edges,result.cost,result.failed);
     return result.route.size()==samples ? 0:1;
 }

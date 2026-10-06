@@ -118,7 +118,7 @@ int main(){
     for(unsigned l=0;l<5;++l){mk_lattice_candidate c{};c.joints[0]=.1*l;c.external_coordinates[0]=coordinates[l];bend[l].push_back(c);}
     auto exact_bend=structured_ladder(bend,corridor_settings);
     auto widened=coarse_ladder(bend,corridor_settings,CoarseLadderSettings{4,2,1,1});
-    assert(widened.failed==UINT32_MAX && widened.route==exact_bend.route && widened.cost==exact_bend.cost);
+    assert(widened.failed==UINT32_MAX && widened.route==exact_bend.route && widened.cost==exact_bend.cost && widened.backend==2);
     assert(widened.tested_edges>exact_bend.tested_edges);
     auto fallback=coarse_ladder(bend,corridor_settings,CoarseLadderSettings{4,2,1,0});
     assert(fallback.failed==UINT32_MAX && fallback.route==exact_bend.route && fallback.cost==exact_bend.cost);

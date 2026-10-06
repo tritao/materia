@@ -955,3 +955,16 @@ Authored TrackWelder inspection confirms it includes RobotArm, whose
 35 mm offset wrist remains unsupported by OPW. A user geometry decision
 (preserve offset wrist and add a supported solver, or redesign for OPW)
 is pending; the authored OPW/track acceptance requirement is still open.
+
+PP3 conservative coarse connectivity: initially use the original joint-jump
+limits at coarse anchors, then retry with stride-scaled jumps only when
+that coarse graph disconnects. This avoids building a dense cross-branch
+coarse graph on paths whose arm posture moves little. Fine legality is
+unchanged, and the off-centre bend test explicitly proves relaxation plus
+corridor widening still finishes with the corridor backend. Focused native
+regressions pass. The full synthetic 1301 x 7700 probe now tests 1,546,870
+edges (previously 17,653,870); three measurements were 0.867291, 0.915042,
+0.811200 s total. Candidate generation consumed 0.591217, 0.627135,
+0.524589 s; search consumed 0.276073, 0.287907, 0.286611 s respectively.
+All retained cost 2.602. This proves the synthetic search scale only;
+authored-track acceptance and overall production planning remain open.
