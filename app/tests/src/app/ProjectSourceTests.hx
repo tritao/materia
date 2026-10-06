@@ -1110,7 +1110,7 @@ class ProjectSourceTests {
     }
   }
 
-  static function checkRobotArmAnalytic(root:String,offsetOnly:Bool=false):Void {
+  static function checkRobotArmAnalytic(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var session = new ProjectDocumentSession(null, false);
@@ -1135,39 +1135,6 @@ class ProjectSourceTests {
         at = frame.compose(robotkit.spatial.Transform3.fromArrays(joint.childFramePosition, joint.childFrameRotation).inverse());
       }
       Sys.println("Authored RobotArm joint geometry " + haxe.Json.stringify(geometry));
-      if(offsetOnly){
-        var extracted=new motionkit.robot.OffsetWristGeometry(arm),before=arm.numericSolveCount();
-        check(Math.abs(Math.abs(extracted.offset)-0.035)<1e-6,"authored wrist offset is derived from axis lines");
-        for(sample in 0...100){
-          var q=[for(joint in 0...6){
-            var bounds=arm.group.limitsOf(joint);
-            var fraction=0.5+0.45*Math.sin((sample+1)*(joint+1)*1.61803398875);
-            bounds.lower+fraction*(bounds.upper-bounds.lower);
-          }];
-          var actual=extracted.forward(q),expected=numeric.forward(q);
-          check(motionkit.path.PoseMath.distance(actual,expected)<1e-6,"authored offset position matches compiled FK");
-          check(motionkit.path.PoseMath.angle(actual,expected)<1e-6,"authored offset orientation matches compiled FK");
-          var theta=q[5]*extracted.parameters.signCorrections[5]-extracted.parameters.offsets[5],found=false;
-          for(probe in extracted.inverseSlice(expected,q,theta)){
-            var same=true;
-            for(j in 0...6){var delta=probe.q[j]-q[j];if(Math.abs(Math.atan2(Math.sin(delta),Math.cos(delta)))>1e-5)same=false;}
-            if(same){found=true;check(Math.abs(probe.residual)<1e-6,"authored known wrist angle has zero inverse consistency residual");}
-          }
-          check(found,"authored inverse slice preserves original joints modulo turns");
-          var roots=extracted.simpleRoots(expected,[for(_ in q)0.0]),recovered=false;
-          for(root in roots){
-            var same=true;
-            for(j in 0...6){var d=root.q[j]-q[j];if(Math.abs(Math.atan2(Math.sin(d),Math.cos(d)))>1e-5)same=false;}
-            recovered=recovered || same;
-          }
-          check(recovered,'authored unknown-angle root search recovers sample $sample');
-
-
-        }
-        check(arm.numericSolveCount()==before,"authored offset forward verification uses no inverse queries");
-        Sys.println("Authored RobotArm offset geometry: 100 forward, known-angle slice and unknown-angle root comparisons passed");
-        simulation.dispose();session.dispose();return;
-      }
       var analytic = new motionkit.robot.OpwKinematics(group.robot, arm);
       var tolerance = new motionkit.kinematics.IkTolerance(1e-6, 1e-6);
       for (sample in 0...100) {
@@ -2928,10 +2895,6 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cobot-analytic") {
       checkCobotAnalytic(root);
-      return 0;
-    }
-    if(Sys.getEnv("PROJECT_SOURCE_ONLY")=="arm-offset-geometry"){
-      checkRobotArmAnalytic(root,true);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm-analytic") {

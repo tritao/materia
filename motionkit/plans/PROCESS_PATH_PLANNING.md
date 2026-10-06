@@ -1988,100 +1988,23 @@ After the measured construction gate failure, the exact command of PID 3587281 w
 
 The user has been asked which RobotArm model to target: preserve its 35 mm offset wrist and add a suitable solver, or change it to the documented spherical wrist. No geometry change is authorized by an unanswered preference request; retain the model meanwhile. The original goal remains active: supported authored-family proof and track performance still need implementation, alongside global closed-start/corner choices, standalone legacy deletion, other runner migration and all remaining full phase/acceptance gates. This evidence does not justify a smaller completion target or fallback-only acceptance.
 
-### PP1 model-derived middle-axis offset wrist forward geometry
+### PP0a remove the superseded offset-wrist solver work
 
-OffsetWristGeometry derives an OPW axis pattern with a displacement along the middle wrist axis, while retaining the physical model. It isolates six internal rotary joints from upstream external axes, recovers the canonical reference using the existing geometric axis-line helpers, extracts the middle-axis displacement, and calibrates the flange/tool transform. Its forward result adds the displacement along the middle wrist axis derived from OPW orientation and the final wrist angle, then applies the actual cell arm-base transform. Unsupported axis patterns/displacements are rejected. This class exposes forward geometry only; it is not registered as an inverse family, and no numeric fallback is falsely relabelled analytic.
+Per Revision 2026-10-06 and the user's resolved geometry decision, removed the
+entire offset-wrist implementation: `OffsetWristGeometry`/`OffsetWristProbe`
+(forward extraction, inverse slices, heuristic scalar roots and probe caching),
+`offset_wrist_polynomial.h` (coefficients and scalar resultants), both research
+scripts (`offset-wrist-polynomial.py`, `offset-wrist-coefficients.cpp`, including
+polynomial elimination, projective charts, certificates and interval machinery),
+and `OFFSET_WRIST_INVERSE.md`. Removed the offset fixtures from KinematicsTests
+and the authored offset selector/checks from ProjectSourceTests. Existing OPW
+fixtures and `arm-analytic` checks remain to validate the redesigned spherical arm.
+Superseded research progress entries were removed; old external experiment logs
+are historical evidence only and are not retained implementation or a planned backend.
 
-MotionKit compiler-only passes (`process-path-offset-geometry-build-final.log`); focused C4 runtime exits zero with 1,151,164 assertions (`process-path-offset-geometry-runtime.log`). Added coverage displaces the final wrist axis by 35 mm along the middle axis in the shifted-reference OPW fixture, verifies extraction, and compares positions/rotations against the compiled model over 40 configurations. The fixture mutation is restored before existing spherical-wrist tests. Constructor probes also verify independent joint motions.
-
-This establishes the offset-family forward formula on that fixture, not yet the authored RobotArm extraction/round-trip requirement. Next work must verify the actual authored arm and implement its inverse branch enumeration/native sampling and refinement before any authored speed claim. The outstanding user geometry preference does not authorize remodeling; the model remains unchanged. Original phase, global geometry-choice, legacy deletion and downstream/acceptance requirements remain open. No owned jobs remain live.
-
-### PP1 authored RobotArm offset forward-model proof
-
-The new arm-offset-geometry app selector loads the actual RobotArm generated project and its mounted tool, derives OffsetWristGeometry from the compiled group, checks the physical 35 mm offset, and compares position/orientation over 100 joint configurations sampled within real limits. It preserves the existing arm-analytic inverse selector rather than passing that unmet requirement through a forward-only substitute. RobotArm's source description now accurately names its offset wrist and axis-line separation; no mechanical geometry changed.
-
-App compiler-only passes (`process-path-authored-offset-build.log`); the focused authored runtime exits zero (`process-path-authored-offset-runtime.log`), after decoding the actual 38-component assembly, and prints 100 forward comparisons passed. Position and orientation each agree within 1e-6 and inverse query count stays unchanged. This proves the new forward formula on the authored arm, not inverse completeness, native sampling/refinement integration, track performance or full phase acceptance. Next solver work can now use the verified middle-axis displacement instead of pretending it is spherical. The user preference remains unanswered, so mechanical geometry is retained. All remaining original requirements stay open. No owned job remains live.
-
-### PP1 offset inverse reduction at a known final-wrist angle
-
-OffsetWristGeometry.inverseSlice() transforms a target into its canonical flange frame, removes the middle-axis displacement for an explicitly chosen canonical final-wrist angle, and evaluates the resulting OPW branches. Each probe reports the wrapped difference between its solved final angle and the chosen angle. A zero residual establishes the consistency condition for this reduction. External-cell coordinates are preserved. Probes are explicitly not complete inverse enumeration, legal periodic lifts, or a registered analytic family.
-
-MotionKit compiler-only and focused C4 pass: 1,151,244 assertions (`process-path-offset-slice-build.log`, `process-path-offset-slice-runtime.log`). Across 40 shifted-reference offset fixtures, the slice at the known actual final angle contains the original configuration modulo turns and its consistency residual is zero. App compiler-only and authored runtime also pass (`process-path-authored-offset-slice-build.log`, `process-path-authored-offset-slice-runtime.log`): 100 actual RobotArm forward and known-angle inverse-slice comparisons, with unchanged numeric-query count. Geometry remains unchanged.
-
-This proves the inverse reduction, not finding the final angle from an unknown target. Root isolation/completeness, singular cases, stable branch identities, periodic lifts, native bulk sampling and refinement remain necessary before replacing fallback or claiming PP1/PP8 acceptance. Track performance, other global geometry choices, legacy removal, downstream/full phase gates and the entire original objective remain incomplete. No owned job remains live.
-
-### PP1 unknown-angle scalar root-search prototype
-
-OffsetWristGeometry.simpleRoots() now explores consistency roots without receiving the solution's final angle. It scans native OPW branch residuals, bisects sign changes, refines possible nearby-root intervals and follows branch validity boundaries. Returned roots are deduplicated modulo rotary turns and verified against the full offset forward target. This remains an explicitly incomplete prototype outside BranchIk/default sampling: narrow validity islands, tangent roots, singular continuums and complete root isolation are not certified, and legal periodic lifts/native integration are absent. Its finite scan/heuristic refinement must not substitute for final family completeness.
-
-The initial scan failed fixture sample 39. Diagnostic probes show branch 7 appears near theta=1.4181677; the original root was skipped because a scan endpoint had no branch. Midpoint/quadratic refinement alone did not fix it. Adding validity-boundary refinement does. The failed runtime logs (`process-path-offset-roots-runtime.log`, `process-path-offset-roots-runtime-final.log`, `process-path-offset-roots-counterexample-runtime.log`) have actual exit 1 and are not passing evidence.
-
-Final MotionKit compiler-only passes (`process-path-offset-roots-boundary-build.log`); focused C4 exits zero with 1,151,284 assertions (`process-path-offset-roots-boundary-runtime.log`). All 40 shifted-reference offset fixtures now recover their original configuration modulo turns from target poses and zero arm seeds, without supplying the known final angle. This is fixture evidence for the reduction/search approach, not actual RobotArm unknown-angle proof, complete inverse enumeration or any performance gate. The authored unknown-angle checks and rigorous/native solver implementation remain next, alongside all unresolved original plan requirements. No owned jobs remain live.
-
-### PP1 authored RobotArm unknown-angle recovery
-
-The arm-offset-geometry selector now runs simpleRoots() against all 100 authored RobotArm target poses using zero arm seeds, without supplying each target's actual final angle. It checks that the original configuration is among returned roots modulo turns, in addition to the earlier forward and known-angle slice checks. App compiler-only passes (`process-path-authored-roots-build.log`), and the actual authored runtime exits zero (`process-path-authored-roots-runtime.log`), printing 100 forward, known-angle slice and unknown-angle root comparisons passed. Numeric pose-query count remains unchanged.
-
-This extends the prototype's evidence to the real mounted arm. It is not an all-roots/completeness certificate and does not satisfy the original OPW round-trip selector, production branch semantics, periodic limits, singular continuums, native sampling/refinement or track planning-time acceptance. The prototype remains outside default family selection. Those solver requirements and every other unresolved original phase/acceptance deliverable remain open. No owned jobs remain live.
-
-### PP1 reuse exact offset-root probes and immutable target frames
-
-The root prototype now transforms the target into its canonical arm/flange frame once per search and reuses OPW probe sets for exactly equal scalar angles. String keys only select cache buckets; exact Float equality guards reuse. Validity-boundary and interval refinement retain their existing logic and all accepted roots still pass full offset FK verification. inverseSlice() shares the same local-frame reduction helper.
-
-MotionKit compiler-only passes (`process-path-root-reuse-build.log`); focused C4 exits zero with 1,151,284 assertions (`process-path-root-reuse-runtime.log`), retaining all 40 unknown-angle fixture recoveries and their boundary counterexample. This removes repeated frame evaluation/native probes, not root-completeness uncertainty. The preceding 100 authored-arm recovery proof belongs to d6c546a22; it was not rerun for this cache increment. No prototype or production speedup is measured or claimed. Rigorous root isolation, singular/branch/periodic handling, native family and sampler/refiner integration, all authored/full phase gates and the original whole-plan objective remain outstanding. No owned jobs remain live.
-
-### PP1 independent offset-family solver research
-
-Inspected the primary IK-Geo implementations, rather than treating its README all-solutions claim as proof for this arm. Its MATLAB `IK_2_parallel_2_intersecting` matches the relevant topology (h2/h3 parallel and h4/h5 intersecting). It searches q1, solves q6 and q4 through circle/plane subproblems, then recovers q2, q3 and q5. Its scalar residual compares the reconstructed upper-arm vector length against the actual upper-arm length. This provides an independent reduction to compare with our final-wrist-angle OPW reduction.
-
-However, that implementation calls `search_1D` with 2,000 samples and explicitly retains an unresolved NaN edge case. The general two-parallel-axis MATLAB solver likewise uses a finite sampled search. The corresponding C++ implementation has TODOs for correctness verification and an unimplemented search, with incomplete reconstruction. Neither inspected implementation establishes certified root isolation or supplies a production replacement as-is. No dependency was added or solver registered, and no new build/runtime evidence is claimed.
-
-Primary sources: https://github.com/rpiRobotics/ik-geo/blob/main/matlab/%2BIK/IK_2_parallel_2_intersecting.m ; https://github.com/rpiRobotics/ik-geo/blob/main/matlab/%2BIK/IK_2_parallel.m ; https://github.com/rpiRobotics/ik-geo/blob/main/cpp/IK/IK_2_parallel.cpp . The companion https://github.com/rpiRobotics/subproblem-polynomial contains polynomial elimination implementations for general 6R and intersecting-axis families; no dedicated two-parallel polynomial implementation was found in its inspected main tree. Next solver work should derive an algebraic isolation formulation for the verified offset geometry or verify an applicable elimination implementation, including degenerate cases, before production integration. Mechanical geometry and the full original plan scope remain unchanged.
-
-### PP1 algebraic offset-wrist constraint reduction
-
-`OFFSET_WRIST_INVERSE.md` derives three coupled polynomial-ready constraints in canonical q1, q2+q3 and q6, with explicit joint reconstruction and projective half-angle boundary requirements. An independent deterministic 1,000-configuration canonical FK experiment exited zero; maximum lateral/orientation/squared-length residuals were 1.81e-16/2.23e-16/3.89e-16. This is reduction evidence, not a root isolator or inverse-family acceptance. Polynomial elimination, multiple roots/continua, periodic limits/native integration and all existing original requirements remain open. No build or production runtime was rerun.
-
-### PP1 eliminate shoulder/elbow sum from offset polynomial system
-
-The offset inverse derivation now eliminates q2+q3 analytically using the orientation constraint and squared arm-length equation, reducing isolation to base/final-wrist angles. It explicitly retains both reconstruction signs and the zero projected middle-axis degeneracy. An exact-rational SymPy instance verified rotation orthogonality and produced lateral/length bidegrees (2,2)/(8,8), a degree-32 resultant, and factors of degrees/multiplicities (2,4), (4,2), (16,1); actual experiment exit zero. Generic factor classification and all-real-root recovery remain unproven, so this is algebraic reduction evidence, not production inverse enumeration or a performance gate. No native integration or test-suite rerun occurred.
-
-### PP1 exact isolated-root reconstruction experiment
-
-Added reproducible research script `scripts/research/offset-wrist-polynomial.py`. Direct numerator construction avoids expensive symbolic rational cancellation. For the documented rational target, exact factor root counts give zero real roots for degree-2/degree-4 factors and eight for the degree-16 factor. Rational interval isolation, lateral back-substitution and both beta-sign reconstruction return eight FK-verified solutions, maximum error 3.89e-15; actual exit zero, total 0.439 s. JSON evidence is `process-path-offset-polynomial.json`. This prototype deliberately remains outside production; final-wrist affine chart boundaries, projected-axis degeneracies, generic factor/continuum handling, limits and native performance still require implementation. No full phase gate is claimed.
-
-### PP1 complementary offset inverse charts
-
-The algebraic research prototype now solves all four direct/reciprocal half-angle chart combinations, bounds retained chart coordinates to unit magnitude, reconstructs linear lateral degree drops and deduplicates modulo turns. Actual `--check-boundaries` experiment exits zero and recovers original configurations for base pi, wrist pi and both pi; each has four FK-verified solutions with error at most 2.23e-16. The earlier rational target retains eight solutions. Evidence: `process-path-offset-boundaries.json` (6.844 s), `process-path-offset-charts.json` (1.467 s). These timings are research-script evidence, not native or track performance. Projected-axis/continuum degeneracies and floating back-substitution certification remain open; no production integration or original phase gate is claimed.
-
-### PP1 projected middle-axis special reconstruction
-
-The research inverse now reconstructs beta directly from its unsquared length equation when the middle-axis projection vanishes. Exact-rational q4=0/pi targets recover originals and each returns four FK-verified solutions (two special reconstructions), maximum errors 1.12e-16/6.67e-16. A constructed continuous-beta target verifies an explicit diagnostic rather than silent finite enumeration. Final experiment exits zero (`process-path-offset-degenerate-final.json`); prior boundary checks still pass. Parameterized continuum output, numerical certification/generic singular systems, native/model integration and all original gates remain unresolved.
-
-### PP1 deterministic algebraic reachable-target sweep
-
-Added shared exact-rational FK generation and `--check-random=N` to the research prototype. Actual combined 12-target/boundary experiment exits zero, recovers every original modulo turns, returns four to eight FK-verified solutions per random target, and preserves all finite boundary/degeneracy fixtures plus the continuum diagnostic. Maximum random FK error 2.51e-13, combined research runtime 32.803 s (`process-path-offset-random-final.json`, progress log of the same stem). Initial helper refactor exited one on an undefined local and was corrected before that passing run. This remains finite original-root evidence, not complete enumeration, native performance or authored/full-plan acceptance.
-
-### PP1 exact coupled-polynomial base recovery
-
-Research `--certify` mode verifies a linear subresultant recovery map in QQ[t]/each real-root resultant factor, exact vanishing of both polynomial constraints and preserved leading degrees. It uses that map instead of floating quadratic back-substitution. Original rational target experiment exits zero: degree-16/eight-real-root recovery certified in all four charts, eight final solutions, FK error at most 1.34e-15, 4.377 s (`process-path-offset-certificate-final.json`). This certifies those polynomial recoveries, not floating reconstruction bounds, singular-factor handling or general family completeness. Boundary/random experiment mode is unchanged, native integration and all original acceptance gates remain open.
-
-### PP1 rational recovered-coordinate enclosure
-
-Certified research mode now encloses the recovered base coordinate by exact rational interval arithmetic and refines isolated final-coordinate roots until both chart memberships and base width <=1e-14 are decided. Original target retains eight FK-verified solutions, max enclosure width 4.829e-17. Cancellation stress needs seven refinements and passes exact squared-bound assertions; exact boundary/outside-chart checks pass. Actual final exit zero (`process-path-offset-intervals-final.json`, 4.436 s). Trigonometric/singular reconstruction, generic completeness, parameterized continua, native integration and all whole-plan gates remain open.
-
-### PP1 certified reachable-target sweep
-
-`--certify --check-random=12` now uses exact coupled-polynomial recovery and rational coordinate enclosures for every sweep target. Actual exit zero: all twelve originals recovered modulo turns, four to eight solutions each, maximum FK error 3.22e-14; q4=0, q5=0 and exact base chart-overlap targets are included. Evidence `process-path-offset-certified-sweep.json` and log, total symbolic runtime 138.363 s. This extends the reference certificate evidence, not generic completeness or native/bulk performance. Continuum representation, floating trigonometric certification, native/model integration and all original acceptance requirements remain open.
-
-### PP1 native offset polynomial coefficient prototype
-
-Added internal fixed-storage long-double coefficient construction plus a reproducible C++ emitter/exact-reference Python checker. Strict standalone C++17 -O2 -Wall -Wextra -Werror compile and committed checker both exit zero; all 648 slots/four charts agree within 1.21e-18 (`process-path-native-offset-coefficients-final.json`). No ABI/family/default sampler changes yet. Native root isolation/recovery, generic conditioning/input validation and all original phase/acceptance gates remain open; standalone compile is not the native runtime/ctest phase gate.
-
-### PP1 native coefficient sweep and input validation
-
-The internal native builder validates finite dimensions/poses, positive arm lengths/nonnegative flange length, proper rotation and finite coefficient results. Expanded committed checker passes all 11,664 slots across eighteen targets and eight invalid-input cases; strict standalone compile and actual checker exit zero (`process-path-native-offset-sweep-final.json`), max absolute error 2.69e-17. First expanded run failed the old absolute 1e-17 envelope; final envelope is explicitly 1e-16*max(1,abs(coefficient)), and that failure is retained as failed evidence. Generic conditioning/overflow-case checks, native isolation/recovery, production integration and all original phase/acceptance requirements remain unresolved.
-
-### PP1 native scalar resultant evaluation
-
-Added internal Horner/Sylvester determinant evaluation with polynomial scaling, partial pivoting and nonfinite diagnostics. Strict standalone compile and reproducible exact-reference checker exit zero; twenty points across four charts match rational resultants with max relative error 8.99e-19 (`process-path-native-resultants-final.json`). This scalar evaluator does not isolate/certify roots or signs near singularities; leading-degree drops and underflow remain explicit limitations. Native isolation/recovery/integration and all original phase/acceptance gates stay open.
+Validation at removal: source-reference search finds no remaining offset prototype,
+selector or diagnostic references outside this historical removal list/revision.
+`git diff --check` passes. No runtime/phase gate is claimed: geometry, size classes,
+configuration labels and every RobotArm user re-baseline still need PP0a work.
+The first PP0a commit removes these artifacts; subsequent work follows PP0a then
+PP1a's EAIK parity/speed/Emscripten decision before the revised downstream plan.
