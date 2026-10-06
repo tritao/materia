@@ -311,6 +311,21 @@ class KinematicsTests extends MotionKitTestSupport {
         check(original,"combined native serial sampling retains the original centre-cell branch");
       }
       check(group.numericSolveCount()==nativeBefore,"combined serial native sampler uses no numeric IK");
+      var ruleEnd = nativeSeed.copy();ruleEnd[0] += 0.005;
+      if(withPositioner)ruleEnd[ruleEnd.length-1] += 0.005;
+      var pathRequest = new PathRequest([0.0,0.01],[nativeTarget,numeric.forward(ruleEnd)],nativeSeed,new IkTolerance(1e-6,1e-6),
+        [for(_ in nativeSeed)0.5],[for(_ in nativeSeed)1.0]);
+      var options = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,4,true,null,
+        (index,distance,target) -> {
+          var q = index == 0 ? nativeSeed : ruleEnd;
+          return [for(joint in 0...q.length)if(group.external[joint])new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,q[joint],q[joint],1)];
+        });
+      var pathProblem = new motionkit.robot.CandidateProblem(group,pathRequest,options);
+      check(pathProblem.samples[0].candidates.length == 1 && pathProblem.samples[1].candidates.length > 0,
+        "per-sample external rules build a populated path ladder");
+      for(candidate in pathProblem.samples[1].candidates)for(joint in 0...ruleEnd.length)if(group.external[joint])
+        near(candidate.q[joint],ruleEnd[joint],"path ladder holds the per-sample external rule",1e-12);
+
       for (sample in 0...30) {
         var q = [for (joint in 0...group.group.count()) (joint == 0 ? 0.8 : 1.4) * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q), original = false;
@@ -420,6 +435,21 @@ class KinematicsTests extends MotionKitTestSupport {
         check(original,"combined native serial sampling retains the original centre-cell branch");
       }
       check(group.numericSolveCount()==nativeBefore,"combined serial native sampler uses no numeric IK");
+      var ruleEnd = nativeSeed.copy();ruleEnd[0] += 0.005;
+      if(withPositioner)ruleEnd[ruleEnd.length-1] += 0.005;
+      var pathRequest = new PathRequest([0.0,0.01],[nativeTarget,numeric.forward(ruleEnd)],nativeSeed,new IkTolerance(1e-6,1e-6),
+        [for(_ in nativeSeed)0.5],[for(_ in nativeSeed)1.0]);
+      var options = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,4,true,null,
+        (index,distance,target) -> {
+          var q = index == 0 ? nativeSeed : ruleEnd;
+          return [for(joint in 0...q.length)if(group.external[joint])new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,q[joint],q[joint],1)];
+        });
+      var pathProblem = new motionkit.robot.CandidateProblem(group,pathRequest,options);
+      check(pathProblem.samples[0].candidates.length == 1 && pathProblem.samples[1].candidates.length > 0,
+        "per-sample external rules build a populated path ladder");
+      for(candidate in pathProblem.samples[1].candidates)for(joint in 0...ruleEnd.length)if(group.external[joint])
+        near(candidate.q[joint],ruleEnd[joint],"path ladder holds the per-sample external rule",1e-12);
+
       for (sample in 0...30) {
         var q = [for (joint in 0...group.group.count()) (joint == 0 ? 0.8 : 1.4) * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q), original = false;
@@ -473,6 +503,41 @@ class KinematicsTests extends MotionKitTestSupport {
     check(candidates.length > 0,"numeric fallback accepts an external lattice cell");
     for (candidate in candidates) for (i in 0...complete.length) if (cell.group.external[i])
       near(candidate.q[i],complete[i],"numeric fallback holds external coordinates",1e-12);
+  }
+
+  public function testCandidateProblem():Void {
+    var fixture = buildContractArmFixture();
+    var solver = new ManipulatorKinematics(fixture.arm);
+    var start = [0.2,-0.8,0.6,-0.4,0.5,0.3],end = start.copy();end[0] += 0.03;
+    var request = new PathRequest([0.0,0.04],[solver.forward(start),solver.forward(end)],start,new IkTolerance(1e-6,1e-6),
+      [for(_ in start)0.5],[for(_ in start)1.0],1);
+    var before = fixture.arm.numericSolveCount();
+    var problem = new motionkit.robot.CandidateProblem(fixture.arm,request);
+    check(problem.family == "UR6R" && problem.diagnostic == null,"path request selects the native UR family");
+    check(problem.samples.length == 2 && problem.samples[0].candidates.length == 1,"path problem pins the first complete configuration");
+    check(problem.samples[1].candidates.length > request.maxCandidates,"native candidate problem retains all branches beyond the legacy cap");
+    for(joint in 0...6)near(problem.samples[0].candidates[0].q[joint],start[joint],"pinned start stays exact",1e-12);
+    var repeated = new motionkit.robot.CandidateProblem(fixture.arm,request);
+    for(sample in 0...2) {
+      check(problem.samples[sample].candidates.length == repeated.samples[sample].candidates.length,"candidate problem counts are deterministic");
+      for(i in 0...problem.samples[sample].candidates.length) {
+        var candidate = problem.samples[sample].candidates[i],again = repeated.samples[sample].candidates[i];
+        check(candidate.branch == again.branch,"candidate problem branch order is deterministic");
+        for(joint in 0...6)near(candidate.q[joint],again.q[joint],"candidate problem joints are deterministic",1e-12);
+      }
+    }
+    check(fixture.arm.numericSolveCount() == before,"native PathRequest candidate construction makes no numeric IK calls");
+    var free = new motionkit.robot.CandidateProblem(fixture.arm,request,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,4,false));
+    check(free.samples[0].candidates.length > 1,"free-start candidate problem retains the full first layer");
+    var toolAxis=fixture.arm.tcpPose(start).transformVector(new Vec3(0,0,1)).toArray();
+    var coneRequest=new PathRequest([0.0],[solver.forward(start)],start,new IkTolerance(1e-6,1e-6),
+      [for(_ in start)0.5],[for(_ in start)1.0],1,[motionkit.path.OrientationPolicy.Cone(toolAxis,0.1)]);
+    var coneProblem=new motionkit.robot.CandidateProblem(fixture.arm,coneRequest,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1,1,1));
+    check(coneProblem.samples[0].candidates.length==1,"pinned cone start preserves its exact spin beyond the orientation grid");
+    for(joint in 0...6)near(coneProblem.samples[0].candidates[0].q[joint],start[joint],"pinned cone start remains exact",1e-12);
+
   }
 
   public function testOrientationLattice():Void {

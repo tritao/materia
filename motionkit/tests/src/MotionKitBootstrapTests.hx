@@ -114,6 +114,7 @@ class MotionKitBootstrapTests {
       kinematicsTests.testExternalUrIk();
       kinematicsTests.testNumericBranchFallback();
       kinematicsTests.testOrientationLattice();
+      kinematicsTests.testCandidateProblem();
       Sys.println('C4 focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
@@ -152,6 +153,7 @@ class MotionKitBootstrapTests {
       {name: "kinematicsTests.testExternalUrIk", run: () -> kinematicsTests.testExternalUrIk(), weight: 0.1},
       {name: "kinematicsTests.testNumericBranchFallback", run: () -> kinematicsTests.testNumericBranchFallback(), weight: 0.1},
       {name: "kinematicsTests.testOrientationLattice", run: () -> kinematicsTests.testOrientationLattice(), weight: 0.05},
+      {name: "kinematicsTests.testCandidateProblem", run: () -> kinematicsTests.testCandidateProblem(), weight: 0.05},
       {name: "programTests.testMotionProgramContracts", run: () -> programTests.testMotionProgramContracts(), weight: 0.05},
       {name: "programTests.testProgramCompiler", run: () -> programTests.testProgramCompiler(), weight: 0.1},
       {name: "programTests.testRedundantArmPaths", run: () -> programTests.testRedundantArmPaths(), weight: 0.3},

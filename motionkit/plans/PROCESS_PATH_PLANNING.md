@@ -748,3 +748,21 @@ all 14 native CTests, four-platform ABI audit and focused C4 runtime pass
 (262,066 assertions). PathRequest problem building, cone integration across
 serial groups, authored combined-sampler acceptance and production migration
 remain outstanding; PP2 is not yet complete.
+
+PP2 PathRequest candidate construction is now implemented as CandidateProblem.
+It selects the model-derived native family, validates aligned path/joint inputs,
+passes each sample's orientation freedom and external grid/rule to the combined
+sampler, and retains complete candidate layers with lattice metadata. The old
+PathRequest.maxCandidates cap does not truncate native enumeration. Unsupported
+geometry retains its explicit diagnostic and numeric neighbour-seed fallback;
+its singularity metadata remains unknown. Options support pinned or free first
+layers and per-sample external-axis rules. A pinned first layer samples the
+start's exact FK pose after verifying the original task constraint, so valid
+cone-start spin is independent of orientation-grid resolution. Tests verify
+pinned/free starts, deterministic branch/joint ordering, complete native layers
+beyond the legacy cap, one-point track/positioner rules for both serial families,
+zero native-family numeric queries and a one-roll-grid pinned cone start.
+Compiler-only build and focused C4 runtime pass (265,425 assertions).
+Broader authored combined-sampler acceptance and serial cone/determinism checks
+remain outstanding; this builder is not wired into production selection yet.
+PP2 is not claimed complete, and PP3–PP11 remain to be implemented/verified.
