@@ -392,10 +392,36 @@ class ProgramCompiler {
     var k = c.sectionIndex++;
     var section = c.sections[k], last = k == c.sections.length - 1;
     var end = section.offset + section.path.length();
-    var pending = lowerPath(c.speedScale, section.path, c.q, c.sectionFeed, [for (event in c.sectionEvents)
+    var curve:Null<JointPathSamples> = null;
+    var pathStart = c.q;
+    if (k == 0 && jointPathPlanner != null && jointPathPlanner.allowsFreeStart()) {
+      var samples = pathSamples(section.path);
+      if (samples.length > 10001) throw 'Motion program op ${c.currentIndex} exceeds Cartesian sample budget';
+      curve = jointPathPlanner.plan(section.path,new PathRequest(
+        [for (sample in samples) sample.distance],
+        [for (sample in samples) sample.primitive.waypointAt(sample.local).pose],
+        c.q,ikTolerance,perJointMaxJump,maxVelocity,48,
+        [for (sample in samples) sample.primitive.orientationPolicy()]),false);
+      pathStart = curve.q[0];
+    }
+    var pending = lowerPath(c.speedScale, section.path, pathStart, c.sectionFeed, [for (event in c.sectionEvents)
       if (event.distance >= section.offset && (last || event.distance < end))
         new PathEvent(event.distance - section.offset, event.channel, event.value,
-          event.leadSeconds, event.holdPolicy)], c.currentIndex);
+          event.leadSeconds, event.holdPolicy)], c.currentIndex,null,0.0,curve);
+    try {
+      var moved = false;
+      for (joint in 0...c.q.length) if (Math.abs(pathStart[joint]-c.q[joint]) > 1e-7) moved = true;
+      if (moved) {
+        checkJointPosition(pathStart,c.currentIndex,null);
+        var motors = motorSpace;
+        var generated = motors == null ? Trajectory.generateStateToState(c.q,zeros(),zeros(),pathStart,
+          maxVelocity,maxAcceleration,maxJerk) : motors.move(c.q,pathStart,maxVelocity,maxAcceleration,maxJerk);
+        c.pending = new PendingMotion(c.currentIndex,c.q,pathStart,generated,[],null,null);
+        // Explicit preceding outputs retain program order; distance events stay on the path.
+        attachLeadingOutputs(c.pending,c.leadingOutputs);
+        retire(c);
+      }
+    } catch (error:Dynamic) { pending.trajectory.dispose(); throw error; }
     pending.distanceOffset = section.offset;
     c.pending = pending;
     c.q = pending.endQ.copy();
@@ -528,7 +554,8 @@ class ProgramCompiler {
 
   function lowerPath(speedScale:Float, path:PosePath, startQ:Array<Float>, feed:Float,
       authoredEvents:Array<PathEvent>, index:Int,
-      ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0):PendingMotion {
+      ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0,
+      ?preplannedCurve:JointPathSamples):PendingMotion {
     if (path.length() <= 0.0) throw 'Motion program op $index has zero path length';
     var samples = pathSamples(path);
     var count = samples.length - 1;
@@ -543,7 +570,8 @@ class ProgramCompiler {
     var redundancyRates:Null<Array<Array<Float>>> = null;
     var refined:Null<JointPathSamples> = null;
     if(jointPathPlanner!=null){
-      refined=jointPathPlanner.plan(path,new PathRequest(distances,pathPoses,startQ,ikTolerance,perJointMaxJump,maxVelocity,48,freedoms));
+      refined=preplannedCurve != null ? preplannedCurve :
+        jointPathPlanner.plan(path,new PathRequest(distances,pathPoses,startQ,ikTolerance,perJointMaxJump,maxVelocity,48,freedoms),true);
       if(refined==null || refined.jointCount!=startQ.length || refined.s.length!=distances.length)
         throw 'Motion program op $index joint planner returned incompatible samples';
       for(sample in 0...distances.length)if(refined.s[sample]!=distances[sample])

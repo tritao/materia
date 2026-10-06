@@ -810,6 +810,35 @@ class KinematicsTests extends MotionKitTestSupport {
     var serialWorkerPlan=serialWorker.compile(serialProgram,start,Int64.ofInt(921));
     check(serialWorkerPlan.blocks[0].plans.length==1,"UR worker compiles through independent structured planning");
     serialWorkerPlan.dispose();
+    var entryPlanner = new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12,3,8,false));
+    var entryCompiler = new ProgramCompiler(solver,serialLimits,"task",
+      [for (_ in start) 1.0],[for (_ in start) 2.0],[for (_ in start) 20.0],
+      StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,null,entryPlanner);
+    var entryPath = new PosePath("task",[new PoseLine(new PoseWaypoint(solver.forward(start),0.005,0.02),
+      new PoseWaypoint(solver.forward(end),0.005,0.02),OrientationPolicy.Interpolated,0.1,0.1)]);
+    var current = start.copy(); current[0] -= 0.02;
+    var entryProgram = new MotionProgram([
+      MotionOp.SetOutput("process-ready",motionkit.event.EventValue.Digital(true)),
+      MotionOp.FollowPath(entryPath,"task",0.1,
+        [new motionkit.event.PathEvent(0.0,"process-on",motionkit.event.EventValue.Digital(true))])]);
+    var entryCompiled = entryCompiler.compile(entryProgram,current,Int64.ofInt(924));
+    var entryBlock = entryCompiled.blocks[0];
+    check(entryBlock.plans.length == 2, "free-start FollowPath emits an entry motion then a path motion");
+    check(entryBlock.pathLengths[0] == 0.0 && entryBlock.pathLengths[1] == entryPath.length(),
+      "joint entry has no process path progress");
+    check(entryBlock.plans[0].events.length == 1 && entryBlock.plans[1].events.length == 1 &&
+      entryBlock.plans[0].events[0].channel == "process-ready" && entryBlock.plans[1].events[0].channel == "process-on",
+      "explicit outputs retain program order and distance events begin after entry");
+    for (joint in 0...start.length) {
+      near(entryBlock.plans[0].evaluate(0.0).positions[joint],current[joint],"entry begins at current state",1e-7);
+      near(entryBlock.plans[0].evaluate(entryBlock.plans[0].durationSeconds).positions[joint],
+        entryBlock.plans[1].evaluate(0.0).positions[joint],"entry joins selected path without a joint jump",1e-7);
+    }
+    entryCompiled.dispose();
+    var entered = entryCompiler.compile(entryProgram,start,Int64.ofInt(926));
+    check(entered.blocks[0].plans.length == 1, "an already selected start omits zero-length entry motion");
+    entered.dispose();
     var coneStartPose=solver.forward(start),coneEndPose=solver.forward(end);
     var coneAxis=fixture.arm.tcpPose(start).transformVector(new Vec3(0,0,1)).toArray();
     var authoredCone=new motionkit.path.PosePath("task",[new PoseLine(

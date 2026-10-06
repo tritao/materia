@@ -53,7 +53,8 @@ class StructuredJointPathPlanner implements JointPathPlanner {
       };
     };
   }
-  public function plan(path:PosePath,request:PathRequest):JointPathSamples {
+  public function allowsFreeStart():Bool return sampling != null && !sampling.pinStart;
+  public function plan(path:PosePath,request:PathRequest,?pinStart:Bool):JointPathSamples {
     if(path==null || request==null || request.distances.length<2 || request.distances[0]!=0 ||
         request.distances[request.distances.length-1]!=path.length())
       throw "Joint path request must span its complete authored path";
@@ -67,7 +68,13 @@ class StructuredJointPathPlanner implements JointPathPlanner {
           ToolFreedom.orientationError(task.pose,request.poses[i],task.freedom)>request.tolerance.orientation)
         throw 'Joint path request differs from authored geometry at sample $i';
     }
-    var problem=new CandidateProblem(group,request,sampling);
+    var settings = sampling;
+    if (pinStart != null) {
+      var original = settings == null ? new CandidateSamplingOptions() : settings;
+      settings = new CandidateSamplingOptions(original.rollCount,original.tiltRings,original.azimuthCount,
+        pinStart,original.externalRanges,original.externalRule);
+    }
+    var problem=new CandidateProblem(group,request,settings);
     fallbackDiagnostic=problem.diagnostic;
     var refined:Null<JointPathSamples> = null;
     var world=clearance;
