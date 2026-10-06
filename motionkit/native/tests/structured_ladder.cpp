@@ -40,4 +40,22 @@ int main(){
     s.jump[0]=.15;auto route=structured_ladder(layers,s);assert(route.failed==UINT32_MAX && route.route[0]==1);
     layers[1].clear();route=structured_ladder(layers,s);assert(route.failed==1 && route.no_candidates);
     layers[1].push_back(dead);layers[1][0].joints[0]=2;route=structured_ladder(layers,s);assert(route.failed==1 && !route.no_candidates);
+    // Adjacent periodic roll cells connect across the seam even when inverse
+    // representatives change wrap labels, provided physical joints stay close.
+    layers.assign(2,{});mk_lattice_candidate a{},b{};
+    a.roll_index=3;a.joints[0]=.3;a.wraps[0]=0;
+    b.roll_index=0;b.joints[0]=.4;b.wraps[0]=1;
+    layers[0].push_back(a);layers[1].push_back(b);
+    route=structured_ladder(layers,s);assert(route.failed==UINT32_MAX);
+    assert(std::abs(route.cost-(.4+s.roll_weight))<1e-12);
+    auto invalid=[&](const LadderSettings &settings,const std::vector<std::vector<double>> &costs={}){
+        bool rejected=false;try{structured_ladder(layers,settings,costs);}catch(const std::invalid_argument &){rejected=true;}assert(rejected);
+    };
+    auto bad=s;bad.jump[0]=0;invalid(bad);
+    bad=s;bad.velocity[0]=NAN;invalid(bad);
+    bad=s;bad.externals=MK_MAX_JOINTS+1;invalid(bad);
+    invalid(s,{{0}});invalid(s,{{0},{NAN}});
+    layers[1][0].roll_index=s.rolls;invalid(s);
+    layers[1][0].roll_index=0;layers[1][0].joints[0]=INFINITY;invalid(s);
+
 }

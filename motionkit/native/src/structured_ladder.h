@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
@@ -54,6 +55,29 @@ struct JointHash {
  * a wrap seam between samples; physical joint jumps decide connectivity. */
 inline LadderResult structured_ladder(const std::vector<LadderLayer> &layers,
         const LadderSettings &s,const std::vector<std::vector<double>> &state_cost={}) {
+    if(s.joints==0 || s.joints>MK_MAX_JOINTS || s.externals>MK_MAX_JOINTS ||
+        s.rolls==0 || s.tilts==0 || s.azimuths==0 ||
+        !std::isfinite(s.roll_weight) || s.roll_weight<0)
+        throw std::invalid_argument("Invalid ladder dimensions or roll cost");
+    for(unsigned j=0;j<s.joints;++j)
+        if(!std::isfinite(s.jump[j]) || s.jump[j]<=0 || !std::isfinite(s.velocity[j]) || s.velocity[j]<=0 ||
+            !std::isfinite(s.weight[j]) || s.weight[j]<0 || !std::isfinite(s.start[j]))
+            throw std::invalid_argument("Ladder requires finite joints, positive jumps/speeds and nonnegative weights");
+    if(!state_cost.empty() && state_cost.size()!=layers.size())
+        throw std::invalid_argument("Ladder state-cost layer count mismatch");
+    for(unsigned l=0;l<layers.size();++l){
+        if(!state_cost.empty() && state_cost[l].size()!=layers[l].size())
+            throw std::invalid_argument("Ladder state-cost candidate count mismatch");
+        for(unsigned i=0;i<layers[l].size();++i){const auto &c=layers[l][i];
+            if(c.roll_index>=s.rolls || c.tilt_index>=s.tilts || c.azimuth_index>=s.azimuths)
+                throw std::invalid_argument("Ladder orientation coordinate out of range");
+            for(unsigned j=0;j<s.joints;++j)
+                if(!std::isfinite(c.joints[j]) || std::abs(c.joints[j]/s.jump[j])>0x1p60)
+                    throw std::invalid_argument("Ladder joint cannot be represented in the spatial hash");
+            if(!state_cost.empty() && (std::isnan(state_cost[l][i]) || state_cost[l][i]<0))
+                throw std::invalid_argument("Ladder state costs must be nonnegative");
+        }
+    }
     LadderResult out;
     if(layers.empty())return out;
     std::vector<std::vector<unsigned>> predecessor(layers.size());
@@ -91,14 +115,14 @@ inline LadderResult structured_ladder(const std::vector<LadderLayer> &layers,
             std::sort(spread.rbegin(),spread.rend());
             unsigned nd=std::min(3u,s.joints);for(unsigned d=0;d<nd;++d)dimensions[d]=spread[d].second;
             auto joint_key=[&](const mk_lattice_candidate &c){JointKey k;
-                for(unsigned d=0;d<nd;++d)k.cell[d]=static_cast<int64_t>(std::floor(c.joints[dimensions[d]]/s.jump[dimensions[d]]));return k;};
+                for(unsigned d=0;d<nd;++d)k.cell[d]=static_cast<int64_t>(std::floor(c.joints[dimensions[d]]/(s.jump[dimensions[d]]+1e-12)));return k;};
             for(unsigned i=0;i<prior.size();++i)if(std::isfinite(previous[i])){
                 lattice[lattice_key(prior[i],s.externals)].push_back(i);joints[joint_key(prior[i])].push_back(i);
             }
             for(unsigned i=0;i<current.size();++i){
                 const auto &c=current[i];
                 auto consider=[&](unsigned p){double cost=previous[p]+edge(prior[p].joints,c.joints);
-                    unsigned rd=std::abs(static_cast<int>(prior[p].roll_index)-static_cast<int>(c.roll_index));
+                    unsigned rd=prior[p].roll_index>c.roll_index ? prior[p].roll_index-c.roll_index : c.roll_index-prior[p].roll_index;
                     if(s.rolls>1)rd=std::min(rd,s.rolls-rd);
                     cost+=s.roll_weight*rd;
                     if(cost<costs[i] || (cost==costs[i] && p<predecessor[layer][i])){costs[i]=cost;predecessor[layer][i]=p;}};

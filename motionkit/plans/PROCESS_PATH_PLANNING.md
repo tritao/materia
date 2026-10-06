@@ -843,3 +843,12 @@ reference, and dead-end/empty-layer/jump-disconnection cases pass with native
 assertions enabled in Release. This is internal preparation: public ABI/Haxe
 integration, Descartes dispatch, coarse-to-fine and the 1301 x 7700 performance
 gate remain outstanding; PP3 is not complete.
+
+PP3 input and seam checks: the internal structured solver rejects invalid
+dimensions, nonfinite/invalid jump and speed values, unrepresentable hash
+coordinates, out-of-range orientation indices and mismatched/invalid state
+cost arrays before searching. A periodic-roll seam regression verifies legal
+physical continuity despite changing wrap labels. Hash bucket width includes
+the jump comparison tolerance so boundary branch changes are not lost.
+The focused native structured-ladder test passes with Release assertions
+enabled; no public API or production planning migration is claimed yet.
