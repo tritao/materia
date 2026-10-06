@@ -18,6 +18,7 @@ import robotkit.device.DeviceBinding;
 import robotkit.device.DeviceLayout;
 import robotkit.model.SteadyLoads;
 import robotkit.runtime.Simulation;
+import app.SimulationAssemblyParts.SimulationAssemblyPart;
 import robotkit.execution.ProcessChannelDeclaration;
 import robotkit.execution.ProcessEventValue;
 import toolpathkit.motion.ToolpathSourceMap;
@@ -42,6 +43,7 @@ import motionkit.robot.PlanCheckSummary;
 import motionkit.robot.StepperSlip;
 import robotkit.runtime.EncoderMonitor;
 import nativekit.sim.SimSession;
+import nativekit.sim.SimPose;
 import toolpathkit.motion.MachineBinding;
 import toolpathkit.motion.ToolpathChannels;
 import toolpathkit.motion.ToolpathMotion;
@@ -58,6 +60,15 @@ import toolpathkit.path.Point3;
  * coordinates of the spindle's gauge line: the origin of the `spindle` part, whose +Z runs up the
  * spindle axis. Each tool hangs its length below it.
  */
+typedef CncJobStock = {
+	var occurrence:String;
+	var minimum:Array<Float>;
+	var maximum:Array<Float>;
+	var center:Array<Float>;
+	var density:Float;
+	var mesh:{positions:Array<Float>, indices:Array<Int>};
+}
+
 typedef CncJob = {
 	@:optional var powerUpSideOffsets:Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>;
 	@:optional var powerUpOffsets:Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset>;
@@ -71,10 +82,10 @@ typedef CncJob = {
 	/** The tool table; G43 H numbers are tool numbers. */
 	var tools:Array<Tool>;
 	var loop:Bool;
-	/** The part the job machines, cut as the tool moves; null for a job that cuts nothing. */
-	@:optional var stock:String;
-	/** The stock part's mesh in its own frame, the raw stock. */
-	@:optional var stockMesh:{positions:Array<Float>, indices:Array<Int>};
+	/** All stock occurrences the job may cut, selected by the machine's part-presence input. */
+	var stocks:Array<String>;
+	/** Each stock occurrence's raw geometry and CAD bounds in metres. */
+	var stockSources:Array<CncJobStock>;
 	/** The finished part, a closed mesh in the stock part's frame: the cut stock is compared with it. */
 	@:optional var target:{positions:Array<Float>, indices:Array<Int>};
 	/** The part showing the tool in the spindle; each loaded tool's shape replaces its geometry. */
@@ -119,6 +130,9 @@ class CncProgramPlayer implements SessionMember {
 
 	final session:SimSession;
 	final project:ProjectDocumentSession;
+	final job:CncJob;
+	final simulation:Simulation;
+	final assemblyParts:SimulationAssemblyParts;
 	final compileFrom:Point3->ToolpathProgram;
 	final robot:AssemblyRobot;
 	/** Machine coordinates from the axis joints' positions, and those joints' indices on the robot. */
@@ -129,8 +143,17 @@ class CncProgramPlayer implements SessionMember {
 	var program:MotionProgram;
 	var sourceMap:ToolpathSourceMap;
 	final kindByLine = new Map<Int, MoveKind>();
-	final newStock:Null<Void->MachiningStock>;
-	final stockObject:Null<String>;
+	final stockSources:Map<String, {part:SimulationAssemblyPart, source:CncJobStock}> = new Map();
+	var stockObject:Null<String>;
+	var activeStockOccurrence:Null<String>;
+	var activeRawVolume:Float = 0.0;
+	final spindlePart:SimulationAssemblyPart;
+	final machineRobotIndex:Int;
+	var activeStock:Null<MachiningStock> = null;
+	final allStocks:Array<MachiningStock> = [];
+	public final completedStocks:Array<{occurrence:String, removedVolume:Float, rawVolume:Float,
+		finishedMass:Float, targetMass:Float, massError:Float, leftover:Float, gouge:Float,
+		rapidContacts:Int, collisions:Int}> = [];
 	final channels:ToolpathChannels;
 	final toolsByNumber = new Map<Int, Tool>();
 	/** The tool in the spindle at the start, and now; -1 for none. */
@@ -218,14 +241,18 @@ class CncProgramPlayer implements SessionMember {
 	 * with that pose as its offset.
 	 */
 	public function new(job:CncJob, robot:AssemblyRobot, simulation:Simulation,
-			project:ProjectDocumentSession, session:SimSession, ?cellInput:String->Null<EventValue>,
+			project:ProjectDocumentSession, session:SimSession, assemblyParts:SimulationAssemblyParts,
+			?cellInput:String->Null<EventValue>,
 			?check:PlanCheckOptions, interfaceManaged:Bool = false) {
 		if (job.axes.length != 3) throw "A CNC job needs its X, Y and Z axes";
 		var definition = project.projectAssemblyDefinition, physical = project.projectPhysical;
 		if (definition == null || physical == null) throw "A CNC job needs the project's machine";
 		var metresPerUnit = physical.metresPerUnit, state = project.projectAssemblyState;
 		channels = channelsFor(job);
+		this.job = job;
 		this.session = session;
+		this.simulation = simulation;
+		this.assemblyParts = assemblyParts;
 		this.cellInput = cellInput;
 		this.project = project;
 		this.loop = job.loop;
@@ -327,17 +354,19 @@ class CncProgramPlayer implements SessionMember {
 			viseCoils = null;
 			interfaceSensorIds = null;
 		}
-		var spindlePart = robot.part("project:" + job.spindle);
-	var sensorId:Null<String> = null;
-	var sensorJoint = -1;
+		var spindleLink = robot.part("project:" + job.spindle);
+		this.spindlePart = assemblyParts.get("project:" + job.spindle);
+		machineRobotIndex = spindleLink.robotIndex;
+		var sensorId:Null<String> = null;
+		var sensorJoint = -1;
 		for (sensor in robot.blueprint.sensors) if (sensor.kind == "at_speed" && sensor.joint >= 0 &&
-				robot.blueprint.joints[sensor.joint].childLink == spindlePart.linkIndex) {
+				robot.blueprint.joints[sensor.joint].childLink == spindleLink.linkIndex) {
 			if (sensorId != null) throw 'Spindle "${job.spindle}" has multiple readiness sensors';
 			sensorId = sensor.id;
 			sensorJoint = sensor.joint;
 		}
 		var processOwned = robot.blueprint.processJoints();
-		for (joint in robot.blueprint.joints) if (joint.childLink == spindlePart.linkIndex &&
+		for (joint in robot.blueprint.joints) if (joint.childLink == spindleLink.linkIndex &&
 				processOwned[joint.joint] && sensorId == null)
 			throw 'Process spindle "${job.spindle}" needs its own readiness sensor';
 		atSpeedSensorId = sensorId;
@@ -366,32 +395,17 @@ class CncProgramPlayer implements SessionMember {
 		}
 		initialTool = job.loadedTool == null ? -1 : job.loadedTool;
 		loadedTool = initialTool;
-		var spindleLink = robot.part("project:" + job.spindle);
-		var stockPart = job.stock;
-		if (stockPart == null) {
-			newStock = null;
-			stockObject = null;
-		} else {
-			var stockLink = robot.part("project:" + stockPart);
-			var occurrence = [for (item in definition.occurrences) if (item.id == stockPart) item];
-			var part = [for (item in physical.parts) if (occurrence.length == 1 && item.id == occurrence[0].definition) item];
-			var center = occurrence.length == 1 ? project.assemblyPreviewCenter(occurrence[0].definition) : null;
-			var hull = part.length == 1 ? part[0].collisionHull : null;
-			if (hull == null || center == null) throw 'CNC stock part "$stockPart" has no shape to cut';
-			var minimum = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
-			var maximum = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
-			for (index in 0...hull.length) {
-				minimum[index % 3] = Math.min(minimum[index % 3], hull[index] * metresPerUnit);
-				maximum[index % 3] = Math.max(maximum[index % 3], hull[index] * metresPerUnit);
-			}
-			var centerMetres = [for (coordinate in center) coordinate * metresPerUnit];
-			newStock = () -> {
-				var stock = new MachiningStock(minimum, maximum, centerMetres, STOCK_SPACING, simulation, stockLink, spindleLink,
-					job.target, job.stockMesh);
-				stock.load(toolsByNumber.get(loadedTool));
-				return stock;
-			};
-			stockObject = "project:" + stockPart;
+		stockObject = null;
+		activeStockOccurrence = null;
+		if (job.stocks == null || job.stockSources == null || job.stockSources.length != job.stocks.length)
+			throw "CNC job stock occurrences and generated stock geometry do not match";
+		for (source in job.stockSources) {
+			if (job.stocks.indexOf(source.occurrence) < 0 || stockSources.exists(source.occurrence))
+				throw 'CNC stock geometry has an unexpected occurrence "${source.occurrence}"';
+			var part = assemblyParts.get("project:" + source.occurrence);
+			if (interfaceManaged && !part.freeObject)
+				throw 'Robot-tended CNC stock "${source.occurrence}" must be a free dynamic part';
+			stockSources.set(source.occurrence, {part: part, source: source});
 		}
 		toolObject = job.toolPart == null ? null : "project:" + job.toolPart;
 		toolShape = job.toolPart == null ? null : toolShapeIn(job.toolPart, job.spindle, placement, project, metresPerUnit);
@@ -456,6 +470,21 @@ class CncProgramPlayer implements SessionMember {
 				return EventValue.Digital(frame.values.length > 0 && frame.values.get(0) >= 0.5);
 		}
 		return EventValue.Digital(false);
+	}
+
+	/**
+	 * A successfully completed move plans its successor from the exact terminal setpoint. Use that
+	 * same machine pose when compiling the next CNC program; measured feedback can differ by a few
+	 * micrometres while still satisfying the motion completion tolerance.
+	 */
+	function machinePositionAtMotionEnd():Point3 {
+		var joints = motion.commandedPositions();
+		if (joints == null) {
+			var actual = robot.robot.snapshot().positions;
+			joints = [for (index in axisJoints) actual.get(index)];
+		}
+		var pose = solver.forward(joints);
+		return new Point3(pose.x, pose.y, pose.z);
 	}
 
 
@@ -526,9 +555,7 @@ class CncProgramPlayer implements SessionMember {
 			}
 			if (motion.completed) {
 				parkingComplete = true;
-				var positions = robot.robot.snapshot().positions;
-				var pose = solver.forward([for (index in axisJoints) positions.get(index)]);
-				compileFrom(new Point3(pose.x, pose.y, pose.z));
+				compileFrom(machinePositionAtMotionEnd());
 				motion = newMotion();
 				if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
 			}
@@ -542,19 +569,20 @@ class CncProgramPlayer implements SessionMember {
 			passes++;
 			passCounted = true;
 		}
-		if ((!started && (!interfaceManaged || startRequested)) ||
+		var newCycle = !started && (!interfaceManaged || startRequested);
+		var requestedNextCycle = interfaceManaged && started && startRequested &&
+			motion.completed && !motion.running && passCounted;
+		if (newCycle || requestedNextCycle ||
 				(!interfaceManaged && loop && motion.completed && !motion.running && pendingContinuation == null)) {
+			if (job.stocks.length > 0) {
+				if (interfaceManaged) activateStock(stockAtPresenceInput());
+				else if (activeStock == null) activateStock(job.stocks[0]);
+			}
 			continuation = null;
 			if (started) {
 				// A program runs from wherever the machine is: the position the planner last
 				// commanded, or where the robot stands when there is none.
-				var commanded = motion.commandedPositions();
-				var joints = commanded != null ? commanded : {
-					var actual = robot.robot.snapshot().positions;
-					[for (index in axisJoints) actual.get(index)];
-				};
-				var machine = solver.forward(joints);
-				compileFrom(new Point3(machine.x, machine.y, machine.z));
+				compileFrom(machinePositionAtMotionEnd());
 			}
 			motion.run(program);
 			started = true;
@@ -584,8 +612,8 @@ class CncProgramPlayer implements SessionMember {
 			continuation.originalAt(progress.op, progress.pathDistance);
 		var provenance = at.op < 0 ? null : sourceMap.provenanceAt(at.op, at.distance);
 		currentLine = provenance == null ? 0 : provenance.line;
-		if (newStock != null) {
-			if (stock == null) stock = newStock();
+		var cutting = activeStock;
+		if (cutting != null) {
 			clock = Sys.time();
 			var kind = provenance == null ? null : kindByLine.get(provenance.line);
 			var now = kind == null ? MoveKind.Rapid : kind;
@@ -595,13 +623,14 @@ class CncProgramPlayer implements SessionMember {
 			// that runs from a rapid into a cutting move cut under the cutting move: the rapid's part
 			// of it is at most one tick, and a rapid that does enter the stock cuts on the ticks after.
 			if (commandedKind == MoveKind.Rapid && now != MoveKind.Rapid)
-				stock.follow(now, at.op, nowProvenance);
+				cutting.follow(now, at.op, nowProvenance);
 			else
-				stock.follow(commandedKind, commandedOp, commandedProvenance);
+				cutting.follow(commandedKind, commandedOp, commandedProvenance);
 			commandedKind = now;
 			commandedOp = at.op;
 			commandedProvenance = nowProvenance;
 			cuttingSeconds += Sys.time() - clock;
+			if (interfaceManaged && passFinished) finishActiveStock();
 		}
 
 	}
@@ -678,6 +707,82 @@ class CncProgramPlayer implements SessionMember {
 			case Digital(value): value;
 			case _: false;
 		};
+	}
+
+	/** Selects the unique free blank inside the same oriented volume sampled by the vise sensor. */
+	function stockAtPresenceInput():String {
+		var ids = interfaceSensorIds;
+		if (ids == null) throw "Stock selection needs the machine's part-presence sensor";
+		var sensor:Null<robotkit.runtime.RobotRuntimeSensorBlueprint> = null;
+		for (candidate in robot.blueprint.sensors) if (candidate.id == ids.presence) sensor = candidate;
+		if (sensor == null || sensor.kind != "presence_input" || sensor.link < 0)
+			throw 'CNC part-presence input "${ids.presence}" has no live sensor mount';
+		var range = sensor.maxRange;
+		if (!Math.isFinite(range) || range <= 0.0)
+			throw 'CNC part-presence input "${ids.presence}" has no positive sensing range';
+		var mount = AssemblyRobot.compose(simulation.linkPose(machineRobotIndex, sensor.link), {
+			x: sensor.position.get(0), y: sensor.position.get(1), z: sensor.position.get(2),
+			qx: sensor.rotation.get(0), qy: sensor.rotation.get(1),
+			qz: sensor.rotation.get(2), qw: sensor.rotation.get(3)});
+		var direction = AssemblyRobot.rotate(mount.rotation, [0.0, 0.0, 1.0]);
+		var center = [for (axis in 0...3) mount.position[axis] + direction[axis] * range * 0.5];
+		var volume = new SimPose(center[0], center[1], center[2], mount.rotation[0], mount.rotation[1],
+			mount.rotation[2], mount.rotation[3]);
+		var halfExtents = [range, range, range * 0.5];
+		var selected:Null<String> = null;
+		for (occurrence in job.stocks) {
+			var candidate = stockSources.get(occurrence);
+			if (candidate == null) throw 'CNC stock "$occurrence" has no simulated body';
+			if (candidate.part.overlapsVolume(volume, halfExtents)) {
+				if (selected != null)
+					throw 'More than one CNC blank overlaps the vise part-presence volume: "$selected" and "$occurrence"';
+				selected = occurrence;
+			}
+		}
+		if (selected == null) throw 'No CNC blank overlaps the vise part-presence volume "${ids.presence}"';
+		return selected;
+	}
+
+	function activateStock(occurrence:String):Void {
+		if (activeStock != null) throw 'CNC stock "${activeStockOccurrence}" is still active at the next cycle start';
+		var selected = stockSources.get(occurrence);
+		if (selected == null) throw 'CNC job selected undeclared stock "$occurrence"';
+		var source = selected.source;
+		var cut = new MachiningStock(source.minimum, source.maximum, source.center, STOCK_SPACING,
+			selected.part, spindlePart, job.target, source.mesh);
+		if (loadedTool >= 0) cut.load(toolsByNumber.get(loadedTool));
+		stock = cut;
+		activeStock = cut;
+		activeStockOccurrence = occurrence;
+		stockObject = "project:" + occurrence;
+		stockShownAt = Math.NEGATIVE_INFINITY;
+		activeRawVolume = cut.stock.volume();
+		allStocks.push(cut);
+		commandedKind = MoveKind.Rapid;
+		commandedOp = -1;
+		commandedProvenance = new Provenance(0, 0, 0);
+	}
+
+	/** Persists the finished contour and the matching inertial mass on the blank occurrence. */
+	function finishActiveStock():Void {
+		var cut = activeStock, occurrence = activeStockOccurrence;
+		if (cut == null || occurrence == null) return;
+		var selected = stockSources.get(occurrence);
+		if (selected == null) throw 'Finished CNC stock "$occurrence" lost its physical definition';
+		var geometry = cut.geometry();
+		project.scene.setRuntimeGeometry("project:" + occurrence, geometry);
+		var finishedMass = cut.stock.volume() * selected.source.density;
+		selected.part.setMass(finishedMass);
+		var targetMass = cut.target == null ? 0.0 : cut.target.volume() * selected.source.density;
+		var massError = targetMass <= 0.0 ? 0.0 : Math.abs(finishedMass - targetMass) / targetMass;
+		var deviation = cut.target == null ? {leftover: 0.0, gouge: 0.0} : cut.deviation();
+		completedStocks.push({occurrence: occurrence, removedVolume: cut.removed,
+			rawVolume: activeRawVolume, finishedMass: finishedMass, targetMass: targetMass,
+			massError: massError, leftover: deviation.leftover, gouge: deviation.gouge,
+			rapidContacts: cut.rapidContacts, collisions: cut.collisions});
+		activeStock = null;
+		activeStockOccurrence = null;
+		activeRawVolume = 0.0;
 	}
 
 	function spindleStopped():Bool {
@@ -846,13 +951,16 @@ class CncProgramPlayer implements SessionMember {
 		failure = null;
 		passes = 0;
 		passCounted = false;
-		if (stock != null) {
-			stock.dispose();
-			stock = null;
-			stockShownAt = Math.NEGATIVE_INFINITY;
-		}
-		// The fresh stock shows as the raw part until its first contour arrives.
-		if (stockObject != null) project.scene.clearRuntimeGeometry(stockObject);
+		for (cut in allStocks) cut.dispose();
+		allStocks.splice(0, allStocks.length);
+		for (occurrence in job.stocks) project.scene.clearRuntimeGeometry("project:" + occurrence);
+		stock = null;
+		activeStock = null;
+		activeStockOccurrence = null;
+		activeRawVolume = 0.0;
+		stockObject = null;
+		stockShownAt = Math.NEGATIVE_INFINITY;
+		completedStocks.splice(0, completedStocks.length);
 	}
 
 	/**
@@ -879,9 +987,13 @@ class CncProgramPlayer implements SessionMember {
 
 	/** Stops cutting and gives the stock and tool parts their own geometry back. */
 	public function dispose():Void {
-		if (stock != null) stock.dispose();
+		for (cut in allStocks) cut.dispose();
+		allStocks.splice(0, allStocks.length);
 		stock = null;
-		for (id in [stockObject, toolObject]) if (id != null) project.scene.clearRuntimeGeometry(id);
+		activeStock = null;
+		activeStockOccurrence = null;
+		for (occurrence in job.stocks) project.scene.clearRuntimeGeometry("project:" + occurrence);
+		if (toolObject != null) project.scene.clearRuntimeGeometry(toolObject);
 		shownTool = -1;
 	}
 

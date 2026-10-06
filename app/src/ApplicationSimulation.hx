@@ -3,7 +3,10 @@ package app;
 import haxe.Int64;
 import humankit.sim.HumanWorker;
 import humankit.sim.HumanWorkerSignals;
+import robotkit.runtime.RobotRuntime;
+import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
+import robotkit.runtime.SimulatedPresenceInputAdapter;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationSpace;
 import robotkit.runtime.SimulationPresentationSnapshot;
@@ -17,6 +20,8 @@ import nativekit.sim.SimObject;
 import nativekit.sim.SimPose;
 import nativekit.sim.SimSession;
 import nativekit.sim.SimShape;
+import app.CncProgramPlayer.CncJob;
+import motionkit.event.EventValue;
 
 typedef SimulationRobotVisual={
   var id:String;
@@ -143,11 +148,15 @@ class ApplicationSimulation {
     var candidateRobots:Array<SimulatedRobot> = [];
     var candidateLinks:Array<Array<String>> = [];
     var candidateRobotModels:Array<robotkit.model.RobotModel> = [];
+    var candidateRuntimes:Array<RobotRuntime> = [];
+    var candidateBlueprints:Array<RobotRuntimeBlueprint> = [];
     var candidateObjects:Array<{id:String,object:SimObject}> = [];
     var candidateWorkforce:Null<HumanWorkforce> = null;
     var candidateAssemblyParts:Array<AssemblyPart> = [];
     var candidateWarnings:Array<String> = [];
     var candidateCnc:Null<CncProgramPlayer> = null;
+    var pendingCnc:Null<{job:CncJob, robot:AssemblyRobot,
+      input:Null<String->Null<EventValue>>, interfaceManaged:Bool}> = null;
     var candidateBelts:Array<BeltVisuals> = [];
     var candidateProgram:Null<MachineProgramPlayer> = null;
     var candidateMobile:Null<robotkit.mobile.MobileBase> = null;
@@ -207,6 +216,8 @@ class ApplicationSimulation {
           [for (link in editable.model.links) link.id], [for (joint in editable.model.joints) joint.id]));
         candidateLinks.push([for (link in editable.model.links) link.id]);
         candidateRobotModels.push(editable.model);
+        candidateRuntimes.push(runtime);
+        candidateBlueprints.push(blueprint);
       }
       var candidateMotions = session == null ? [] : session.robotMotions;
       if (assembly != null && session != null) {
@@ -227,6 +238,8 @@ class ApplicationSimulation {
           candidateRobots.push(built.robot);
           candidateLinks.push([for (link in built.model.links) link.id]);
           candidateRobotModels.push(built.model);
+          candidateRuntimes.push(built.runtime);
+          candidateBlueprints.push(built.blueprint);
           for (part in built.parts) candidateAssemblyParts.push(part);
           for (warning in built.warnings) candidateWarnings.push(warning);
           if (control != null) {
@@ -239,9 +252,12 @@ class ApplicationSimulation {
             candidateAssembly = built;
             assemblyIndex = robotIndex;
           }
-		  if (job != null && ownsJob) candidateCnc = new CncProgramPlayer(job, built, candidate, session,
-		    createdSpace.session, candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id),
-		    null, interfaceManaged);
+		  if (job != null && ownsJob) {
+		    if (pendingCnc != null) throw "A project simulation can run only one generated CNC job";
+		    pendingCnc = {job: job, robot: built,
+		      input: candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id),
+		      interfaceManaged: interfaceManaged};
+		  }
           var machine = session.machineMotion;
           if (machine != null) {
             var jointIds = [for (joint in built.model.joints) joint.id];
@@ -316,7 +332,28 @@ class ApplicationSimulation {
       }
       // The robot's tools act on the free objects after each step, as their channels say.
       var candidateTools = new SimulatedTools([for (entry in candidateObjects) {id: entry.id, object: entry.object}]);
+      var cncToBuild = pendingCnc;
+      if (cncToBuild != null) {
+        var cncParts = new SimulationAssemblyParts(candidate, cncToBuild.robot,
+          candidateTools.objectsByScene(), session);
+        candidateCnc = new CncProgramPlayer(cncToBuild.job, cncToBuild.robot, candidate,
+          session, createdSpace.session, cncParts, cncToBuild.input, null, cncToBuild.interfaceManaged);
+        if (cncToBuild.interfaceManaged) {
+          var cutterOccurrence = cncToBuild.job.toolPart == null
+            ? cncToBuild.job.spindle : cncToBuild.job.toolPart;
+          var cutter = cncToBuild.robot.part("project:" + cutterOccurrence);
+          for (stock in cncToBuild.job.stocks)
+            cncParts.get("project:" + stock).excludeContactWith(cutter.robotIndex, cutter.linkIndex);
+        }
+      }
       var freeObjects = [for (entry in candidateObjects) entry.object];
+      for (index in 0...candidateBlueprints.length) {
+        var hasPresenceInput = false;
+        for (sensor in candidateBlueprints[index].externalSensorLayout())
+          if (sensor.kind == "presence_input") hasPresenceInput = true;
+        if (hasPresenceInput) candidate.addStepObserver(new SimulatedPresenceInputAdapter(candidate,
+          candidateRuntimes[index], candidateBlueprints[index], index, freeObjects));
+      }
       if (session != null && candidateAssembly != null) for (tool in session.robotTools) {
         var toolRobot = candidateAssembly;
         var toolIndex = assemblyIndex;

@@ -173,6 +173,47 @@ class SimSession {
         return new SimObject(this, handle, motion, shape);
     }
 
+    /** Tests one free dynamic object against an oriented query box. */
+    @:allow(SimObject)
+    private function objectOverlapsVolume(object:SimObject, pose:SimPose,
+            halfExtents:Array<Float>):Bool {
+        ensureLive();
+        if (object.session != this || halfExtents == null || halfExtents.length != 3)
+            throw "Object volume query needs this session's object and three half extents";
+        var result = NativeKitSim.nksim_session_object_overlaps_volume(owner.borrow(), object.handle,
+            pose.toNative(), halfExtents[0], halfExtents[1], halfExtents[2]);
+        SimWorld.check(result.status, "session.objectOverlapsVolume");
+        return result.out_overlaps != 0;
+    }
+
+    /** Updates a dynamic object's mass while preserving its current state. */
+    @:allow(SimObject)
+    private function setObjectMass(object:SimObject, mass:Float):Void {
+        ensureLive();
+        if (object.session != this || object.motion != MotionType.Dynamic ||
+                !Math.isFinite(mass) || mass <= 0.0)
+            throw "Object mass update needs this session's dynamic object and a positive finite mass";
+        SimWorld.check(NativeKitSim.nksim_session_set_object_mass(owner.borrow(), object.handle, mass),
+            "session.setObjectMass");
+    }
+
+    /** Excludes contacts between two simulation bodies before this session's first tick. */
+    public function excludeContactPair(first:nksim_body, second:nksim_body):Void {
+        ensureLive();
+        SimWorld.check(NativeKitSim.nksim_session_exclude_body_pair(owner.borrow(), first, second),
+            "session.excludeContactPair");
+    }
+
+    /** Excludes a robot body from a session-owned object without exposing the object's body handle. */
+    public function excludeObjectContactPair(body:nksim_body, object:SimObject):Void {
+        ensureLive();
+        if (object == null || object.session != this)
+            throw "Contact exclusion needs this session's object";
+        var found = NativeKitSim.nksim_session_get_object_body(owner.borrow(), object.handle);
+        SimWorld.check(found.status, "session.objectBodyForContactExclusion");
+        excludeContactPair(body, found.out_body);
+    }
+
     /** Drive a dynamic object from a carrier body's frame on every tick. */
     public function holdObject(object:SimObject, carrier:nksim_body, ?offset:SimPose):Void {
         ensureLive();

@@ -642,6 +642,22 @@ public:
         return NKSIM_OK;
     }
 
+    nksim_result set_object_mass(nksim_object id, double mass) {
+        if (!std::isfinite(mass) || mass <= 0.0) return NKSIM_ERROR_INVALID_ARGUMENT;
+        std::lock_guard lock(mutex);
+        auto found = objects_.find(id);
+        if (found == objects_.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        if (found->second.motion_type != NKSIM_MOTION_DYNAMIC) return NKSIM_ERROR_INVALID_STATE;
+        return host_ != 0 ? host_submit_body_mass(host_, found->second.part.body, mass)
+                          : nksim::resolve_world(world_)->set_body_mass(found->second.part.body, mass);
+    }
+
+    nksim_result exclude_body_pair(nksim_body first, nksim_body second) {
+        std::lock_guard lock(mutex);
+        if (host_ != 0 || sealed_) return NKSIM_ERROR_INVALID_STATE;
+        return nksim::resolve_world(world_)->exclude_body_pair(first, second);
+    }
+
     nksim_result find_object(nksim_body body, nksim_object &out) {
         std::lock_guard lock(mutex);
         for (const auto &[id, object] : objects_)
@@ -769,6 +785,29 @@ public:
                 break;
             }
         }
+        return NKSIM_OK;
+    }
+
+    nksim_result object_overlaps_volume(nksim_object id, const nksim_pose &pose,
+                                        const double half_extents[3], uint32_t &out) {
+        if (pose.struct_size < sizeof(pose) || !valid_pose(pose))
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        for (int axis = 0; axis < 3; ++axis)
+            if (!std::isfinite(half_extents[axis]) || half_extents[axis] <= 0.0)
+                return NKSIM_ERROR_INVALID_ARGUMENT;
+        std::lock_guard lock(mutex);
+        out = 0;
+        const auto found = objects_.find(id);
+        if (found == objects_.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        const auto &object = found->second;
+        if (object.motion_type != NKSIM_MOTION_DYNAMIC || object.carrier != 0) return NKSIM_OK;
+        nksim_body_state state{};
+        state.struct_size = sizeof(state);
+        if (const auto result = body_state(object.part.body, state); result != NKSIM_OK) return result;
+        bool overlaps = false;
+        if (const auto result = volume_overlap(pose, half_extents, state, object.part.shape_desc,
+                overlaps, object.part.vertices); result != NKSIM_OK) return result;
+        out = overlaps ? 1u : 0u;
         return NKSIM_OK;
     }
 
@@ -1421,6 +1460,18 @@ nksim_result NKSIM_CALL nksim_session_get_object_body(nksim_session session, nks
     return value->object_body(object, *out_body);
 }
 
+nksim_result NKSIM_CALL nksim_session_set_object_mass(nksim_session session, nksim_object object,
+                                                       double mass) {
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->set_object_mass(object, mass);
+}
+
+nksim_result NKSIM_CALL nksim_session_exclude_body_pair(nksim_session session,
+                                                         nksim_body first, nksim_body second) {
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->exclude_body_pair(first, second);
+}
+
 nksim_result NKSIM_CALL nksim_session_find_object(nksim_session session, nksim_body body,
                                                   nksim_object *out_object) {
     if (!out_object) return NKSIM_ERROR_INVALID_ARGUMENT;
@@ -1477,6 +1528,15 @@ nksim_result NKSIM_CALL nksim_session_overlap_free_objects(nksim_session session
             return NKSIM_ERROR_INVALID_ARGUMENT;
     NKSIM_SESSION_OR_FAIL(value);
     return value->overlap_free_objects(*pose, half_extents, *out_present);
+}
+
+nksim_result NKSIM_CALL nksim_session_object_overlaps_volume(nksim_session session,
+    nksim_object object, const nksim_pose *pose, double half_extent_x, double half_extent_y,
+    double half_extent_z, uint32_t *out_overlaps) {
+    if (!pose || !out_overlaps) return NKSIM_ERROR_INVALID_ARGUMENT;
+    NKSIM_SESSION_OR_FAIL(value);
+    const double half_extents[3] = {half_extent_x, half_extent_y, half_extent_z};
+    return value->object_overlaps_volume(object, *pose, half_extents, *out_overlaps);
 }
 
 nksim_result NKSIM_CALL nksim_session_capture(nksim_session session, nksim_frame *out_frame) {

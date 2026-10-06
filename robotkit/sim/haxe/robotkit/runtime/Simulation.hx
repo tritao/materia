@@ -963,6 +963,16 @@ class Simulation {
     return poseValue(pose);
   }
 
+  /** Excludes one robot link from one free scene object for this session's physics. */
+  public function excludeContactPair(robotIndex:Int, linkIndex:Int,
+      object:nativekit.sim.SimObject):Void {
+    ensureLive();
+    if (object == null) throw "A contact exclusion needs a free object";
+    var result = RobotKitSimKit.rk_simulation_get_link_body(owner.borrow(), robotIndex, linkIndex);
+    check(result.status, "simulation.getLinkBodyForContactExclusion");
+    session.excludeObjectContactPair(result.out_body, object);
+  }
+
   /** Copies every presentation body pose under one native simulation lock. */
   public function capturePresentation():SimulationPresentationSnapshot {
     ensureLive();

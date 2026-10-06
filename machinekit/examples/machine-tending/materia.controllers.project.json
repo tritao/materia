@@ -2,6 +2,10 @@
 	"format": "materia.project",
 	"version": 1,
 	"name": "Machine tending controllers",
+	"dynamicParts": [
+		"infeed/blank-0-0", "infeed/blank-0-1", "infeed/blank-0-2",
+		"infeed/blank-1-0", "infeed/blank-1-1", "infeed/blank-1-2"
+	],
 	"defaultEntrypoint": "cell",
 	"build": {
 		"system": "haxeon",

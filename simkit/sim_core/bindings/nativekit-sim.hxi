@@ -182,6 +182,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_session_find_object(session: nksim_session, body: nksim_body, out_object: ptr<nksim_object> @out) -> nksim_result;
 	extern fn nksim_session_get_actor_body(session: nksim_session, actor: nksim_actor, part: u32, out_body: ptr<nksim_body> @out) -> nksim_result;
 	extern fn nksim_session_get_object_body(session: nksim_session, object: nksim_object, out_body: ptr<nksim_body> @out) -> nksim_result;
+	/** Changes a dynamic object's inertial mass without resetting its pose or velocity. */
+	extern fn nksim_session_set_object_mass(session: nksim_session, object: nksim_object, mass: f64) -> nksim_result;
+	/** Excludes contacts between two bodies before the session's first tick. */
+	extern fn nksim_session_exclude_body_pair(session: nksim_session, first: nksim_body, second: nksim_body) -> nksim_result;
 	/**
 	 * Returns zero in out_carrier when the object is free.
 	 */
@@ -199,6 +203,8 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * objects are excluded. Query dimensions are positive half extents.
 	 */
 	extern fn nksim_session_overlap_free_objects(session: nksim_session, pose: ptr<const<nksim_pose>>, half_extents: ptr<const<f64>>, out_present: ptr<u32> @out) -> nksim_result;
+	/** Tests one free dynamic object against the same oriented volume. */
+	extern fn nksim_session_object_overlaps_volume(session: nksim_session, object: nksim_object, pose: ptr<const<nksim_pose>>, half_extent_x: f64, half_extent_y: f64, half_extent_z: f64, out_overlaps: ptr<u32> @out) -> nksim_result;
 	/**
 	 * Adds a keyframe to an actor's trajectory: the pose of every part at
 	 * simulation time `time`, while stopped or running. Each tick moves every

@@ -5,6 +5,7 @@ import app.SimulatedTools.GripObject;
 import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
 import nativekit.sim.SimObject;
+import nativekit.sim.SimPose;
 import robotkit.runtime.Simulation;
 
 /** A CAD occurrence's live frame and collision hull, whether carried by a robot or a scene object. */
@@ -31,9 +32,33 @@ class SimulationAssemblyPart {
 
   public function pose():{position:Array<Float>, rotation:Array<Float>} {
     if (part != null) return AssemblyRobot.partPose(simulation, part);
-    var live = simulation.objectPose(cast object);
+    var body = object;
+    if (body == null) throw 'Assembly occurrence "$id" lost its free-object carrier';
+    var live = simulation.objectPose(body);
     return AssemblyRobot.compose({position: [live.x, live.y, live.z], rotation: [live.qx, live.qy, live.qz, live.qw]},
       AssemblyFrames.translation(-center[0], -center[1], -center[2]));
+  }
+
+  /** Whether this exact free body overlaps an oriented volume, using SimKit's shape-level test. */
+  public function overlapsVolume(pose:SimPose, halfExtents:Array<Float>):Bool {
+    var body = object;
+    return body != null && body.overlapsVolume(pose, halfExtents);
+  }
+
+  /** Changes the live free body's inertial mass after machining changes its material volume. */
+  public function setMass(mass:Float):Void {
+    var body = object;
+    if (body == null) throw 'Assembly occurrence "$id" is carried by the robot and has no free mass';
+    body.setMass(mass);
+  }
+
+  public var freeObject(get, never):Bool;
+  function get_freeObject():Bool return object != null;
+
+  /** Excludes only this free workpiece from one cutter link's rigid-body contacts. */
+  public function excludeContactWith(robotIndex:Int, linkIndex:Int):Void {
+    var body = object;
+    if (body != null) simulation.excludeContactPair(robotIndex, linkIndex, body);
   }
 }
 
@@ -70,8 +95,9 @@ class SimulationAssemblyParts {
     var vertices:Array<Float> = [];
     if (record.collisionEnabled) {
       var found = [for (body in physical.parts) if (body.id == definition) body];
-      if (found.length != 1 || found[0].collisionHull == null) throw 'No CAD collision hull for "$id"';
-      var hull:Array<Float> = cast found[0].collisionHull;
+      if (found.length != 1) throw 'No CAD collision hull for "$id"';
+      var hull = found[0].collisionHull;
+      if (hull == null) throw 'No CAD collision hull for "$id"';
       vertices = [for (value in hull) value * physical.metresPerUnit];
     }
     var parts = [for (part in robot.parts) if (part.id == id) part];

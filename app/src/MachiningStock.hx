@@ -2,7 +2,7 @@ package app;
 
 import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
-import robotkit.runtime.Simulation;
+import app.SimulationAssemblyParts.SimulationAssemblyPart;
 import stockkit.CutMotion;
 import stockkit.CutMove;
 import stockkit.Stock;
@@ -53,9 +53,8 @@ class MachiningStock {
 	var chunkMeshes:Array<Null<StockMesh>> = [];
 	/** The tool in the spindle; nothing cuts until one is loaded. */
 	var tool:Null<Tool> = null;
-	final simulation:Simulation;
-	final stockPart:AssemblyRobot.AssemblyPart;
-	final spindlePart:AssemblyRobot.AssemblyPart;
+	final stockPart:SimulationAssemblyPart;
+	final spindlePart:SimulationAssemblyPart;
 	final center:Array<Float>;
 	var last:Null<Point3> = null;
 	var changed = true;
@@ -71,9 +70,8 @@ class MachiningStock {
 	 * box. `spacing` is the stock's ray spacing.
 	 */
 	public function new(minimum:Array<Float>, maximum:Array<Float>, center:Array<Float>, spacing:Float,
-			simulation:Simulation, stockPart:AssemblyRobot.AssemblyPart, spindlePart:AssemblyRobot.AssemblyPart,
+			stockPart:SimulationAssemblyPart, spindlePart:SimulationAssemblyPart,
 			?targetMesh:{positions:Array<Float>, indices:Array<Int>}, ?stockMesh:{positions:Array<Float>, indices:Array<Int>}) {
-		this.simulation = simulation;
 		this.stockPart = stockPart;
 		this.spindlePart = spindlePart;
 		this.center = center.copy();
@@ -211,7 +209,7 @@ class MachiningStock {
 
 	/** The tip of `loaded`, its length below the gauge line, in the stock's frame. */
 	function toolTip(loaded:Tool):Point3 {
-		var stockPose = AssemblyRobot.partPose(simulation, stockPart), spindlePose = AssemblyRobot.partPose(simulation, spindlePart);
+		var stockPose = stockPart.pose(), spindlePose = spindlePart.pose();
 		var down = rotate(spindlePose.rotation, [0.0, 0.0, -loaded.length]);
 		var local = inverseRotate(stockPose.rotation,
 			[for (axis in 0...3) spindlePose.position[axis] + down[axis] - stockPose.position[axis]]);
@@ -220,7 +218,7 @@ class MachiningStock {
 
 	/** The spindle's +Z in the stock's frame. */
 	function spindleAxis():Array<Float> {
-		var stockPose = AssemblyRobot.partPose(simulation, stockPart), spindlePose = AssemblyRobot.partPose(simulation, spindlePart);
+		var stockPose = stockPart.pose(), spindlePose = spindlePart.pose();
 		return inverseRotate(stockPose.rotation, rotate(spindlePose.rotation, [0.0, 0.0, 1.0]));
 	}
 

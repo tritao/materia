@@ -2421,6 +2421,9 @@ class ProjectSourceTests {
     var nextTick = bus.input(first.to.controller, first.name);
     check(nextTick != null && switch nextTick {case Digital(on): on; case _: false;} && published,
       "the wired digital output reaches the next controller tick and its sensor");
+    // This scenario isolates cabinet outputs, physical valves and belt refresh when no CNC player
+    // owns the spindle; the full physical cut is covered by checkTendingRobotInterface.
+    generated.cncJob = null;
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedProject(generated, manifest);
     var simulation = new ApplicationSimulation(new RobotWorld());
@@ -2855,21 +2858,21 @@ class ProjectSourceTests {
     if (cellAssembly == null || cellAssemblyState == null)
       throw "Tending CNC preview has no assembly state";
     var loadCell = new AssemblyState(cellAssembly, cellAssemblyState);
-    var stockOccurrence = [for (item in cellAssembly.occurrences) if (item.id == "mill/mill/stock") item];
-    if (stockOccurrence.length != 1) throw "Tending cell has no bearing-block stock occurrence";
+    var infeedBlanks = [for (item in cellAssembly.occurrences)
+      if (StringTools.startsWith(item.id, "infeed/blank-")) item];
+    if (infeedBlanks.length != 6) throw "Tending cell has no six free infeed blank occurrences";
     for (index in 0...3) {
       var axis = ["x", "y", "z"][index];
       loadCell.setJoint('mill/mill/$axis', tendingCell.mill.loadPosition[index]);
     }
     loadCell.setJoint("mill/door", 0.0);
-    var stockPose = loadCell.worldPose("mill/mill/stock");
+    var trayBlankPose = loadCell.worldPose(infeedBlanks[0].id);
     // Keep the scripted probe outside the machine's collision envelope until the door opens.
-    var blankStagePose = {x: stockPose.x - 2000, y: stockPose.y, z: stockPose.z,
-      qx: stockPose.qx, qy: stockPose.qy, qz: stockPose.qz, qw: stockPose.qw};
-    // A second occurrence of the stock geometry is the loose test blank. It starts away from
-    // the vise and is moved into the seat by the scripted test, as the operator/robot would.
+    var blankStagePose = {x: trayBlankPose.x - 2000, y: trayBlankPose.y, z: trayBlankPose.z,
+      qx: trayBlankPose.qx, qy: trayBlankPose.qy, qz: trayBlankPose.qz, qw: trayBlankPose.qw};
+    // Reuse the real infeed blank definition as the free probe that the scripted robot loads.
     cellAssembly.occurrences.push({id: "interface-test-blank",
-      definition: stockOccurrence[0].definition, initialPose: blankStagePose});
+      definition: infeedBlanks[0].definition, initialPose: blankStagePose});
     var cellState = new AssemblyState(cellAssembly, cellAssemblyState);
     for (axis in ["x", "y", "z"]) {
       var jointId = 'mill/mill/$axis';
@@ -2885,9 +2888,11 @@ class ProjectSourceTests {
     var enclosed = SceneArtifact.decode(BenchMillPreview.enclosed());
     var job = enclosed.machining;
     if (job == null) throw "Enclosed mill has no bearing-block job";
-    job.axes = [for (axis in job.axes) "mill/" + axis];
-    job.spindle = "mill/" + job.spindle;
-    if (job.stock != null) job.stock = "mill/" + job.stock;
+	job.axes = [for (axis in job.axes) "mill/" + axis];
+	job.spindle = "mill/" + job.spindle;
+	// The static vise blank is the source geometry, but this run must machine the
+	// free scripted blank so presence selection, contacts, and mass all use its body.
+	job.stocks = ["interface-test-blank"];
     if (job.toolPart != null) job.toolPart = "mill/" + job.toolPart;
     job.channelScope = "mill/" + job.channelScope;
     job.controllerId = "mill/cncController";
@@ -2895,19 +2900,20 @@ class ProjectSourceTests {
     if (targetId == null) throw "Enclosed job has no target part";
     var targetParts = [for (part in enclosed.parts) if (part.id == targetId) part];
     if (targetParts.length != 1) throw "Enclosed job target geometry is missing";
-    cell.parts.push(targetParts[0]);
+    var cellTargets = [for (part in cell.parts) if (part.id == targetId) part];
+    if (cellTargets.length == 0) cell.parts.push(targetParts[0]);
+    else if (cellTargets.length != 1) throw "Generated tending project has duplicate machining target geometry";
     cell.machining = job;
     var generated = MateriaProjectRunner.generatedFromArtifact(SceneArtifact.encode(cell));
     if (generated.assemblyDefinition == null || generated.assemblyState == null)
       throw "Generated tending CNC project has no assembly state";
-    var testBlank:Null<SceneObjectData> = null, seatedStock:Null<SceneObjectData> = null;
+    var testBlank:Null<SceneObjectData> = null;
     for (object in generated.objects) {
       if (object.id == "project:interface-test-blank") testBlank = object;
-      if (object.id == "project:mill/mill/stock") seatedStock = object;
     }
-    if (testBlank == null || seatedStock == null)
-      throw "Generated tending CNC project lost its scripted blank or vise stock";
+    if (testBlank == null) throw "Generated tending CNC project lost its scripted blank";
     testBlank.dynamicBody = true;
+    testBlank.collisionEnabled = true;
     var generatedState = new cadkit.modeling.AssemblyState(generated.assemblyDefinition, generated.assemblyState);
     var generatedSensors = generated.assemblyDefinition.sensors;
     if (generatedSensors == null) throw "Generated tending cell lost its field sensors";
@@ -2917,9 +2923,6 @@ class ProjectSourceTests {
     if (sensorOccurrence == null || sensorConnector == null)
       throw "Generated tending cell lost its vise presence-sensor connector";
     var sensorPose = generatedState.worldConnector(sensorOccurrence, sensorConnector);
-    var stockInSensor = materia.assembly.AssemblyFrames.transformPoint(
-      materia.assembly.AssemblyFrames.inverse(sensorPose), seatedStock.x / generated.metresPerUnit,
-      seatedStock.y / generated.metresPerUnit, seatedStock.z / generated.metresPerUnit);
     if (Math.abs(generatedState.joint("mill/mill/y") -
         (cellState.joint("mill/mill/y"))) > 1e-9)
       throw 'Generated tending CNC project changed Y from ${cellState.joint("mill/mill/y")} to ${generatedState.joint("mill/mill/y")}';
@@ -2934,6 +2937,8 @@ class ProjectSourceTests {
       var player = simulation.cncPlayer();
       var signals = simulation.cellSignals;
       if (player == null || signals == null) throw "Tending CNC cell lost its interface runtime";
+      var physicalSimulation:Simulation = @:privateAccess simulation.simulation;
+      var machineRuntime = (@:privateAccess player.robot).runtime;
       function signal(name:String):Bool {
         var value = signals.input("robotController", name);
         return value != null && switch value {case Digital(on): on; case _: false;};
@@ -2997,8 +3002,7 @@ class ProjectSourceTests {
         }
         return 'blank=(${pose.x},${pose.y},${pose.z}); ' +
           'stock-sensor=(${sensorPose.x * generated.metresPerUnit},' +
-          '${sensorPose.y * generated.metresPerUnit},${sensorPose.z * generated.metresPerUnit}); ' +
-          'stock-local=(${stockInSensor.x},${stockInSensor.y},${stockInSensor.z}); $liveSensor';
+          '${sensorPose.y * generated.metresPerUnit},${sensorPose.z * generated.metresPerUnit}); $liveSensor';
       }
       function awaitSignal(name:String, expected:Bool, maxTicks:Int):Void {
         for (_ in 0...maxTicks) {
@@ -3055,17 +3059,33 @@ class ProjectSourceTests {
             var owner = simulation.world.robot("assembly:tending-controllers:mill/cncController");
             var state = owner == null ? null : owner.snapshot();
             var joints = owner == null ? [] : owner.description().joints;
+            var links = owner == null ? [] : owner.description().links;
+            var robotIds = simulation.simulatedRobotIds();
+            var watchedLinks = [for (name in ["mill/mill/spindle",
+              "mill/mill/spindleMotorPulley", "mill/mill/holder", "mill/mill/tool"])
+              links.indexOf(name)];
+            var watchedContacts = [for (contact in physicalSimulation.robotContacts(machineRuntime))
+              if (contact.active && watchedLinks.indexOf(contact.linkIndex) >= 0) {
+                var otherRobotId = contact.otherRobot >= 0 && contact.otherRobot < robotIds.length
+                  ? robotIds[contact.otherRobot] : "<unmapped robot>";
+                var otherRobot = simulation.world.robot(otherRobotId);
+                var otherLinks = otherRobot == null ? [] : otherRobot.description().links;
+                var otherLink = contact.otherLink >= 0 && contact.otherLink < otherLinks.length
+                  ? otherLinks[contact.otherLink] : 'link-${contact.otherLink}';
+                '${links[contact.linkIndex]} -> ${contact.otherKind}/$otherRobotId/$otherLink d=${contact.distance}';
+              }];
             var motionState:Array<String> = [];
             if (state != null) for (name in ["mill/mill/x", "mill/mill/y", "mill/mill/z",
                 "mill/mill/spindle-turn", "mill/mill/spindle-motor-turn"]) {
               var joint = joints.indexOf(name);
               if (joint >= 0) motionState.push('$name q=${state.positions.get(joint)}, ' +
-                'target=${state.setpointPositions.get(joint)}, v=${state.velocities.get(joint)}');
+                'target=${state.setpointPositions.get(joint)}, v=${state.velocities.get(joint)}, e=${state.efforts.get(joint)}');
             }
             'line=${player.currentLine} "$line", progress=${progress.op}/${progress.pathDistance}, ' +
               'passes=${player.passes}, CNC failure=${player.failure}, simulation failure=${simulation.cncFailure()}, ' +
               'spindle-command-rpm=$spindleCommand, direction=$spindleDirection, drive=${spindleDrive.join("; ")}, ' +
-              'signals=${sensorImage()}, joints=${motionState.join("; ")}';
+              'signals=${sensorImage()}, spindle-contacts=${watchedContacts.join("; ")}, ' +
+              'joints=${motionState.join("; ")}';
           } : "";
         throw 'Timed out waiting for $name=$expected at ${simulation.activeSession().simulationTime()} s $detail';
       }
@@ -3078,6 +3098,14 @@ class ProjectSourceTests {
 
       // Readiness is delayed until the derived G53 load position has been reached.
       awaitSignal(RobotInterfaceChannels.CNC_READY, true, 10000);
+      var machineRobot = simulation.world.robot("assembly:tending-controllers:mill/cncController");
+      if (machineRobot == null) throw "Tending CNC controller disappeared after reaching its load position";
+      var armContacts = [for (contact in physicalSimulation.robotContacts(machineRuntime))
+        if (contact.otherKind == robotkit.runtime.RobotContactOtherKind.RobotLink && contact.active)
+          contact];
+      check(armContacts.length == 0,
+        'the checked ready pose leaves the CNC machine physically clear at its load position; ' +
+        'contacts=${[for (contact in armContacts) "${contact.otherRobot}/${contact.otherLink} on ${contact.linkIndex}"].join("; ")}');
       signals.writeSignal(RobotInterfaceChannels.ROBOT_CLEAR, true);
       simulation.step();
       request(RobotInterfaceChannels.REQUEST_DOOR_OPEN, RobotInterfaceChannels.DOOR_OPEN, 800);
@@ -3101,15 +3129,67 @@ class ProjectSourceTests {
       if (!signal(RobotInterfaceChannels.CLAMPED)) throw 'Vise lost its clamped switch during door close (${sensorImage()}; ${looseBlankImage()})';
       if (!signal(RobotInterfaceChannels.PART_PRESENT))
         throw 'The seated blank left the vise before machining (${sensorImage()}; ${looseBlankImage()})';
-      request(RobotInterfaceChannels.CYCLE_START, RobotInterfaceChannels.CYCLE_COMPLETE, 11000);
+      function blankPosition():Array<Float> {
+        var active = simulation.activeSession();
+        var body = simulation.environmentObject("project:interface-test-blank");
+        if (body == null) throw "The seated CNC blank lost its physics body";
+        var frame = active.capture();
+        var pose = frame.objectPose(body);
+        frame.dispose();
+        return [pose.x, pose.y, pose.z];
+      }
+      var seatedBeforeCut = blankPosition();
+		request(RobotInterfaceChannels.CYCLE_START, RobotInterfaceChannels.CYCLE_COMPLETE, 11000);
       check(player.passes == 1, "the CNC controller runs one pass after cycle_start");
       check(player.interfaceAlarm == RobotInterfaceAlarm.None,
         "the scripted cycle completes without interlock alarms");
+      var seatedAfterCut = blankPosition();
+      var blankTravelSquared = 0.0;
+      for (axis in 0...3) {
+        var difference = seatedAfterCut[axis] - seatedBeforeCut[axis];
+        blankTravelSquared += difference * difference;
+      }
+      var blankTravel = Math.sqrt(blankTravelSquared);
+      check(blankTravel < 0.00005,
+        'the vise holds the free blank within 0.05 mm through real CNC accelerations, moved ${blankTravel * 1000} mm');
+      check(player.completedStocks.length == 1 && player.completedStocks[0].occurrence == "interface-test-blank",
+        "the presence input selects and finishes the loose blank occurrence");
+      var finished = player.completedStocks[0];
+      var expectedRemoval = (Math.PI * (121 * 7 + 2 * 25 * 5) + (144 - (4 - Math.PI) * 12.25) * 3) / 1e9;
+      check(Math.abs(finished.removedVolume - expectedRemoval) < expectedRemoval * 0.02,
+        'the free blank removes the bearing-block volume within 2%, got ${finished.removedVolume * 1e9} mm³');
+      check(finished.targetMass > 0 && finished.massError < 0.02,
+        'the machined blank mass matches the CAD target within 2%, got ${finished.finishedMass} kg vs ${finished.targetMass} kg');
+      check(finished.rapidContacts == 0 && finished.collisions == 0,
+        'the free-blank cutting path has no rapid contacts or holder collisions');
+      check(signal(RobotInterfaceChannels.DOOR_CLOSED),
+        "the enclosure remains closed immediately after the CNC cycle");
+      check(!signal(RobotInterfaceChannels.CNC_READY),
+        "the CNC interface stays not-ready while the spindle coasts down");
+      var coastTicks = 0;
+      while (!signal(RobotInterfaceChannels.CNC_READY) && coastTicks < 11000) {
+        simulation.step();
+        coastTicks++;
+        if (!signal(RobotInterfaceChannels.DOOR_CLOSED))
+          throw "The enclosure unlocked before the spindle reached standstill";
+        if (player.interfaceAlarm != RobotInterfaceAlarm.None)
+          throw 'Robot interface alarm ${player.interfaceAlarm} while waiting for spindle coast-down';
+      }
+      if (!signal(RobotInterfaceChannels.CNC_READY)) {
+        var spindleIndex = machineRobot.description().joints.indexOf("mill/mill/spindle-turn");
+        var spindleVelocity = spindleIndex < 0 ? Math.NaN :
+          machineRobot.snapshot().velocities.get(spindleIndex);
+        throw 'CNC did not become ready after spindle coast-down in ${coastTicks * 0.01} s; ' +
+          'spindle velocity=$spindleVelocity rad/s, signals=${sensorImage()}';
+      }
       request(RobotInterfaceChannels.REQUEST_DOOR_OPEN, RobotInterfaceChannels.DOOR_OPEN, 800);
       request(RobotInterfaceChannels.REQUEST_UNCLAMP, RobotInterfaceChannels.UNCLAMPED, 800);
       check(simulation.activeSession().simulationTime() < 120,
         "the scripted load/cut/unload sequence stays within two minutes");
-      Sys.println('tending robot interface: one physical CNC pass in ${simulation.activeSession().simulationTime()} s');
+      Sys.println('tending MT9 stock: ${finished.occurrence}, ${finished.removedVolume * 1e9} mm³ removed, ' +
+        '${finished.finishedMass} kg / ${finished.targetMass} kg, held ${blankTravel * 1000} mm');
+      Sys.println('tending robot interface: one physical CNC pass, ${coastTicks * 0.01} s spindle coast-down, ' +
+        '${simulation.activeSession().simulationTime()} s total');
     } catch (error:Dynamic) {
       simulation.dispose(); session.dispose(); throw error;
     }
@@ -3377,7 +3457,7 @@ class ProjectSourceTests {
     }
     Sys.println('cnc $kind axes with the controller and steady loads: ${derived.join("; ")}');
     Sys.println('cnc $kind axes from their motors and screws alone: ${free.join("; ")}');
-    check(job != null && job.loop && job.stock == "stock" && job.spindle == "spindle" && job.target != null &&
+	check(job != null && job.loop && job.stocks.length == 1 && job.stocks[0] == "stock" && job.spindle == "spindle" && job.target != null &&
       job.loadedTool == 1 && [for (tool in job.tools) tool.number].join(",") == "1,2",
       "the router generates a looping job that machines its stock to a target part with an end mill and a drill");
     if (job != null) {

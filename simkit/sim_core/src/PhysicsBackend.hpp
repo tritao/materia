@@ -149,6 +149,10 @@ public:
     virtual nksim_result body_destroy(std::uint64_t body) = 0;
     virtual nksim_result body_set_state(std::uint64_t body,
                                         const BackendBodyState &state) = 0;
+    /** Changes the inertial mass of a free environment body, preserving its geometry and velocity. */
+    virtual nksim_result body_set_mass(std::uint64_t, double) { return NKSIM_ERROR_UNSUPPORTED; }
+    /** Excludes contacts between two bodies for this compiled world. */
+    virtual nksim_result body_exclude_pair(std::uint64_t, std::uint64_t) { return NKSIM_ERROR_UNSUPPORTED; }
     /** Switch a free body's dynamics without changing the compiled topology. */
     virtual nksim_result body_set_motion_type(std::uint64_t, std::uint32_t, double) {
         return NKSIM_ERROR_UNSUPPORTED;

@@ -930,6 +930,28 @@ nksim_result World::set_body_state(nksim_body body, const nksim_body_state &stat
     return pull_backend_state();
 }
 
+nksim_result World::set_body_mass(nksim_body body, double mass) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!finite_positive(mass)) return NKSIM_ERROR_INVALID_ARGUMENT;
+    auto *value = bodies.get(body);
+    if (!value) return NKSIM_ERROR_INVALID_HANDLE;
+    if (value->desc.motion_type == NKSIM_MOTION_STATIC)
+        return NKSIM_ERROR_INVALID_STATE;
+    const auto previous = value->desc.mass;
+    value->desc.mass = mass;
+    const auto result = backend->body_set_mass(value->backend_body, mass);
+    if (result != NKSIM_OK) value->desc.mass = previous;
+    return result;
+}
+
+nksim_result World::exclude_body_pair(nksim_body first, nksim_body second) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (first == second) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto *a = bodies.get(first), *b = bodies.get(second);
+    if (!a || !b) return NKSIM_ERROR_INVALID_HANDLE;
+    return backend->body_exclude_pair(a->backend_body, b->backend_body);
+}
+
 nksim_result World::set_body_motion_type(nksim_body body, std::uint32_t motion_type) {
     if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
     auto *value = bodies.get(body);

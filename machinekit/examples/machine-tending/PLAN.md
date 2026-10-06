@@ -740,7 +740,14 @@ Done. What was built and measured:
   - a clamped blank moves less than 0.05 mm relative to the vise during the cutting pass, at the mill's real accelerations;
   - removed volume within 2 %;
   - the finished part's mass is within 2 % of the CAD target's;
-  - nothing reports `rapidContacts` or `collisions`.
+  - nothing reports `rapidContacts` or `collisions`;
+  - after cycle complete, the robot waits for `cnc.ready` (including physical spindle standstill) before requesting the door; the door stays closed while the spindle coasts.
+
+**Done. What was built and decided:**
+- The tending cell has six free dynamic infeed blanks and six pocketed outfeed positions, mounted on the cell table. Each tray slot has its own wired presence sensor. The vise starts empty; machining uses the blank selected by the vise's volume-presence sensor.
+- The CNC simulation updates the selected free body's pose, stock contour and mass through cutting, and excludes only that blank from cutter collision. The bearing-block cut removed **3,843.89 mm³**; the finished body is **0.184021 kg** against a **0.183962 kg** CAD target (0.033% error), with no rapid contacts or collisions.
+- At the mill's real accelerations, the clamped blank slipped **0.00265 mm**. After the final CNC motion, `cnc.ready` stayed false until the unpowered spindle coasted to the 5 rpm standstill threshold; this took **0.67 s**, while the door remained closed. The scripted load/cut/unload sequence took **59.71 s**.
+- The reach study now checks the actual pocket and table collision geometry used by the assembled cell. The cell uses its checked outward-facing park pose while the mill runs; the loaded reference blank remains only in the reach and work-datum geometry.
 
 **MT10. The tending cell and its mission.**
 - `TendingCell` includes the mill (`include("mill", new BenchMill(...))`), the `CobotArm` class with `ArmGripperTool` on the riser chosen in MT4, the trays, the cabinets, the air supply and the wiring.
@@ -757,7 +764,7 @@ Done. What was built and measured:
   4. place in the vise, request clamp, wait for clamped and part present, release;
   5. via-poses out, signal clear;
   6. request door close and cycle start, wait for cycle complete;
-  7. request door open and go in, grip, request unclamp, wait for unclamped;
+  7. wait for CNC ready after physical spindle standstill, request door open and go in, grip, request unclamp, wait for unclamped;
   8. come out and place in the outfeed slot.
 - Via-poses come from the door opening frame and the vise datum. Every segment is swept with `ArmClearance` against the cell hulls with the door open when the mission is generated (MT-D9).
 - "Robot clear" comes from the arm and tool hulls against the machine zone, each tick.
@@ -841,7 +848,7 @@ Done. What was built and decided:
 | MT6 | done, second-review corrections verified | 4c9e6ebec, daf20e12d, 3c5eef1dd |
 | MT7 | done | 1780b60fa |
 | MT8 | done | 371070b1d |
-| MT9 | planned | |
+| MT9 | implemented; focused checks passed, full closing gate pending | |
 | MT10 | planned | |
 | MT11 | planned | |
 | MT12 | planned | |

@@ -407,6 +407,7 @@ public:
             saved_couplings = couplings;
             saved_closures = closures;
             saved_contact_pairs = contact_pairs;
+            saved_manual_excludes = manual_excludes;
             saved_next_body = next_body;
             saved_next_joint = next_joint;
         } catch (const std::bad_alloc &) {
@@ -430,6 +431,7 @@ public:
             couplings.swap(saved_couplings);
             closures.swap(saved_closures);
             contact_pairs.swap(saved_contact_pairs);
+            manual_excludes.swap(saved_manual_excludes);
             next_body = saved_next_body;
             next_joint = saved_next_joint;
             (void)rebuild();
@@ -485,6 +487,10 @@ public:
         contact_pairs.erase(std::remove_if(contact_pairs.begin(), contact_pairs.end(),
             [id](const nksim::BackendContactPair &pair) { return pair.body_a == id || pair.body_b == id; }),
             contact_pairs.end());
+        for (auto pair = manual_excludes.begin(); pair != manual_excludes.end();) {
+            if (pair->first == id || pair->second == id) pair = manual_excludes.erase(pair);
+            else ++pair;
+        }
         bodies.erase(found);
         body_order.erase(std::remove(body_order.begin(), body_order.end(), id), body_order.end());
         return topology_update ? NKSIM_OK : rebuild();
@@ -543,6 +549,56 @@ public:
         // (collision included) per body.
         derived_stale = true;
         return NKSIM_OK;
+    }
+
+    nksim_result body_set_mass(std::uint64_t id, double mass) override {
+        auto found = bodies.find(id);
+        if (found == bodies.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        if (!std::isfinite(mass) || mass <= 0.0) return NKSIM_ERROR_INVALID_ARGUMENT;
+        auto &record = found->second;
+        if (record.desc.motion_type == NKSIM_MOTION_STATIC) return NKSIM_ERROR_INVALID_STATE;
+        const int body_id = model_body_id(id);
+        if (body_id < 0) return NKSIM_ERROR_INVALID_HANDLE;
+        const int joint_id = model->body_jntadr[body_id];
+        if (joint_id < 0 || model->jnt_type[joint_id] != mjJNT_FREE)
+            return NKSIM_ERROR_UNSUPPORTED;
+
+        const bool held = record.desc.motion_type == NKSIM_MOTION_KINEMATIC;
+        if (held) {
+            if (!record.free_inertia_saved) {
+                record.free_mass = model->body_mass[body_id];
+                std::copy_n(model->body_inertia + 3 * body_id, 3, record.free_inertia.begin());
+                record.free_inertia_saved = true;
+            }
+            const double ratio = mass / record.free_mass;
+            record.free_mass = mass;
+            for (int axis = 0; axis < 3; ++axis) record.free_inertia[axis] *= ratio;
+        } else {
+            const double ratio = mass / model->body_mass[body_id];
+            model->body_mass[body_id] = mass;
+            for (int axis = 0; axis < 3; ++axis) model->body_inertia[3 * body_id + axis] *= ratio;
+            if (record.free_inertia_saved) {
+                record.free_mass = mass;
+                for (int axis = 0; axis < 3; ++axis) record.free_inertia[axis] *= ratio;
+            }
+        }
+        record.desc.mass = mass;
+        const std::vector<mjtNum> qpos(data->qpos, data->qpos + model->nq);
+        const std::vector<mjtNum> qvel(data->qvel, data->qvel + model->nv);
+        mj_setConst(model, data);
+        std::copy(qpos.begin(), qpos.end(), data->qpos);
+        std::copy(qvel.begin(), qvel.end(), data->qvel);
+        mj_forward(model, data);
+        derived_stale = true;
+        return NKSIM_OK;
+    }
+
+    nksim_result body_exclude_pair(std::uint64_t first, std::uint64_t second) override {
+        if (bodies.find(first) == bodies.end() || bodies.find(second) == bodies.end())
+            return NKSIM_ERROR_INVALID_HANDLE;
+        if (first == second) return NKSIM_ERROR_INVALID_ARGUMENT;
+        manual_excludes.emplace(std::min(first, second), std::max(first, second));
+        return topology_update ? NKSIM_OK : rebuild();
     }
 
     nksim_result body_set_motion_type(std::uint64_t id, std::uint32_t motion_type,
@@ -1046,6 +1102,7 @@ private:
         saved_couplings.clear();
         saved_closures.clear();
         saved_contact_pairs.clear();
+        saved_manual_excludes.clear();
     }
 
     const JointRecord *parent_joint(std::uint64_t body_id) const {
@@ -1577,6 +1634,13 @@ private:
                 mjs_setString(exclude->bodyname1, body_a.name.c_str());
                 mjs_setString(exclude->bodyname2, body_b.name.c_str());
             }
+        }
+        for (const auto &pair : manual_excludes) {
+            real_excludes.insert(pair);
+            auto *exclude = mjs_addExclude(spec);
+            if (!exclude) return NKSIM_ERROR_OUT_OF_MEMORY;
+            mjs_setString(exclude->bodyname1, bodies.at(pair.first).name.c_str());
+            mjs_setString(exclude->bodyname2, bodies.at(pair.second).name.c_str());
         }
         return NKSIM_OK;
     }
@@ -2198,6 +2262,7 @@ private:
     struct ProximityCandidate { int first; int second; double detection; };
     std::vector<ProximityCandidate> proximity_candidates;
     std::set<std::pair<std::uint64_t, std::uint64_t>> real_excludes;
+    std::set<std::pair<std::uint64_t, std::uint64_t>> manual_excludes;
     std::vector<std::uint64_t> body_order;
     std::unordered_map<std::uint64_t, JointRecord> joints;
     std::vector<std::uint64_t> joint_order;
@@ -2246,6 +2311,7 @@ private:
     std::vector<nksim::BackendClosure> saved_closures;
     std::vector<nksim::BackendContactPair> contact_pairs;
     std::vector<nksim::BackendContactPair> saved_contact_pairs;
+    std::set<std::pair<std::uint64_t, std::uint64_t>> saved_manual_excludes;
     std::uint64_t next_body = 1;
     std::uint64_t next_joint = 1;
     std::uint64_t saved_next_body = 1;

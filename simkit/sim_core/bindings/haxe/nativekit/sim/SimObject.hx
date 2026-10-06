@@ -32,6 +32,14 @@ class SimObject {
     public function setPoseForNextTick(pose:SimPose):Void
         session.setObjectPoseForNextTick(this, pose);
 
+    /** Whether this free dynamic body intersects an oriented volume. */
+    public function overlapsVolume(pose:SimPose, halfExtents:Array<Float>):Bool
+        return session.objectOverlapsVolume(this, pose, halfExtents);
+
+    /** Changes this dynamic body's inertial mass without teleporting it. */
+    public function setMass(mass:Float):Void
+        session.setObjectMass(this, mass);
+
     /** Removes the object while stopped. */
     public function dispose():Void
         SimWorld.check(NativeKitSim.nksim_session_destroy_object(session.nativeHandle(), handle),

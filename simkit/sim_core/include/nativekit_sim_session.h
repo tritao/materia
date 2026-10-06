@@ -173,6 +173,12 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_get_object_carrier(
     nksim_session session, nksim_object object, nksim_body *out_carrier NK_OUT);
 NKSIM_API nksim_result NKSIM_CALL nksim_session_get_object_body(
     nksim_session session, nksim_object object, nksim_body *out_body NK_OUT);
+/** Changes a dynamic object's inertial mass without resetting its pose or velocity. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_set_object_mass(
+    nksim_session session, nksim_object object, double mass);
+/** Excludes contacts between two bodies before the session's first tick. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_exclude_body_pair(
+    nksim_session session, nksim_body first, nksim_body second);
 /**
  * The session object bound to a body, for a body a session participant
  * observes in a contact or elsewhere. Returns NKSIM_ERROR_INVALID_HANDLE if
@@ -232,6 +238,11 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_raycast(
 NKSIM_API nksim_result NKSIM_CALL nksim_session_overlap_free_objects(
     nksim_session session, const nksim_pose *pose,
     const double half_extents[3], uint32_t *out_present NK_OUT);
+/** Tests one free dynamic object against the same oriented volume. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_object_overlaps_volume(
+    nksim_session session, nksim_object object, const nksim_pose *pose,
+    double half_extent_x, double half_extent_y, double half_extent_z,
+    uint32_t *out_overlaps NK_OUT);
 
 /** Captures the clock and every body's state under one session lock. */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_capture(

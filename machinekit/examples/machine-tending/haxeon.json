@@ -7,6 +7,8 @@
 	"sources": [
 		"TendingReach.hx",
 		"TendingControllers.hx",
+		"PartTray.hx",
+		"TendingCellTable.hx",
 		"../bench-mill/EnclosedBenchMill.hx",
 		"../bench-mill/BenchMill.hx",
 		"../cnc-router/CncRouter.hx"

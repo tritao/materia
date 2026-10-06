@@ -12,7 +12,7 @@ namespace {
 constexpr std::uint32_t default_command_capacity = 256;
 
 struct Command {
-    enum class Kind { Forces, JointTargets, BodyStates, BodyDrives, BodyMotionType, BrakeOutputs };
+    enum class Kind { Forces, JointTargets, BodyStates, BodyDrives, BodyMotionType, BodyMass, BrakeOutputs };
 
     Kind kind = Kind::Forces;
     std::vector<nksim_body_force> forces;
@@ -21,6 +21,7 @@ struct Command {
     std::vector<nksim_body_state> body_states;
     nksim_body body = 0;
     std::uint32_t motion_type = 0;
+    double mass = 0.0;
 };
 
 struct StepRequest {
@@ -235,6 +236,15 @@ public:
         return enqueue(std::move(command));
     }
 
+    nksim_result submit_body_mass(nksim_body body, double mass) {
+        if (!std::isfinite(mass) || mass <= 0.0) return NKSIM_ERROR_INVALID_ARGUMENT;
+        Command command;
+        command.kind = Command::Kind::BodyMass;
+        command.body = body;
+        command.mass = mass;
+        return enqueue(std::move(command));
+    }
+
     nksim_result get_snapshot(nksim_snapshot *out_snapshot) {
         if (!out_snapshot)
             return NKSIM_ERROR_INVALID_ARGUMENT;
@@ -290,7 +300,7 @@ public:
 
 private:
     nksim_result enqueue(Command command) {
-        if (command.kind != Command::Kind::BodyMotionType && command.forces.empty() &&
+        if (command.kind != Command::Kind::BodyMotionType && command.kind != Command::Kind::BodyMass && command.forces.empty() &&
             command.joint_targets.empty() && command.brake_outputs.empty() && command.body_states.empty())
             return NKSIM_OK;
         std::lock_guard lock(mutex);
@@ -337,6 +347,8 @@ private:
                     static_cast<uint32_t>(command.brake_outputs.size()));
             } else if (command.kind == Command::Kind::BodyMotionType) {
                 result = world->set_body_motion_type(command.body, command.motion_type);
+            } else if (command.kind == Command::Kind::BodyMass) {
+                result = world->set_body_mass(command.body, command.mass);
             } else {
                 const bool drive = command.kind == Command::Kind::BodyDrives;
                 for (const auto &state : command.body_states) {
@@ -478,6 +490,11 @@ nksim_result host_submit_body_motion_type(nksim_host host, nksim_body body,
     const auto value = resolve_host(host);
     return value ? value->submit_body_motion_type(body, motion_type)
                  : NKSIM_ERROR_INVALID_HANDLE;
+}
+
+nksim_result host_submit_body_mass(nksim_host host, nksim_body body, double mass) {
+    const auto value = resolve_host(host);
+    return value ? value->submit_body_mass(body, mass) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
 } // namespace nksim

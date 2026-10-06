@@ -84,7 +84,7 @@ class BenchMill extends MachineAssembly {
 	final zeroPoses = new Map<String, AssemblyFrame>();
 	final overtravel = new Map<String, Float>();
 
-	public function new(withVise:Bool = false) {
+	public function new(withVise:Bool = false, includeWorkpiece:Bool = true) {
 		super();
 		vise = withVise ? new machinekit.milling.PneumaticVise(STOCK_DEPTH, STOCK_WIDTH) : null;
 		var railSpec = guideBlock.spec;
@@ -174,19 +174,22 @@ class BenchMill extends MachineAssembly {
 		attach("holder", holder, gaugeZero, "spindle");
 		attach("tool", tool, AssemblyFrames.translation(0, spindleY, gaugeZero.z - tool.stickout), "spindle");
 		if (vise == null) {
-			attach("stock", new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
-				AssemblyFrames.translation(tableX, saddleY, tableTop), "table");
-			// Both clamps hold the back corners, clear of the bearing seat and fastening recesses.
-			for (side in [-1, 1]) attach(side < 0 ? "clampLeft" : "clampRight", new ToeClamp(STOCK_HEIGHT),
-				AssemblyFrames.fromRotationMatrix(tableX + side * (STOCK_WIDTH / 2 - 8), saddleY + STOCK_DEPTH / 2, tableTop,
-					[0.0, -1, 0, 1.0, 0, 0, 0.0, 0, 1]), "table");
+			if (includeWorkpiece) {
+				attach("stock", new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
+					AssemblyFrames.translation(tableX, saddleY, tableTop), "table");
+				// Both clamps hold the back corners, clear of the bearing seat and fastening recesses.
+				for (side in [-1, 1]) attach(side < 0 ? "clampLeft" : "clampRight", new ToeClamp(STOCK_HEIGHT),
+					AssemblyFrames.fromRotationMatrix(tableX + side * (STOCK_WIDTH / 2 - 8), saddleY + STOCK_DEPTH / 2, tableTop,
+						[0.0, -1, 0, 1.0, 0, 0, 0.0, 0, 1]), "table");
+			}
 		} else {
 			include("vise", vise, AssemblyFrames.translation(tableX, saddleY, tableTop));
 			zeroPoses.set("vise/body", AssemblyFrames.translation(tableX, saddleY, tableTop));
 			connect("table", "vise/body");
 			addMate("vise-mount", "fixed", "table", "to-vise/body", "vise/body", "attach-vise/body");
-			attach("stock", new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
-				AssemblyFrames.translation(tableX, saddleY, tableTop + vise.datum.z), "vise/body");
+			if (includeWorkpiece)
+				attach("stock", new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
+					AssemblyFrames.translation(tableX, saddleY, tableTop + vise.datum.z), "vise/body");
 		}
 
 		exposeConnector("gaugeLine", "spindle", "gaugeLine");

@@ -149,7 +149,7 @@ class AssemblyRobot {
     var sceneParts = new Map<String, SceneObjectData>();
     for (record in scene.records()) sceneParts.set(record.id, record);
     var free = new Map<String, Bool>();
-    for (occurrence in assembly.occurrences) {
+    for (occurrence in AssemblyDefinitionFlattener.flatten(assembly).occurrences) {
       var record = sceneParts.get("project:" + occurrence.id);
       if (record != null && record.dynamicBody) free.set(occurrence.id, true);
     }

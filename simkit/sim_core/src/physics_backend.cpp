@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <set>
 #include <memory>
 #include <vector>
 
@@ -161,6 +162,22 @@ public:
         // F4: a root's new pose (or a reset child's zeroed joint) must
         // propagate to every descendant immediately, not just at the next step.
         return recompute_articulated_poses(0.0);
+    }
+
+    nksim_result body_set_mass(std::uint64_t id, double mass) override {
+        auto *body = find_body(id);
+        if (!body) return NKSIM_ERROR_INVALID_HANDLE;
+        if (!std::isfinite(mass) || mass <= 0.0) return NKSIM_ERROR_INVALID_ARGUMENT;
+        if (body->desc.motion_type == NKSIM_MOTION_STATIC) return NKSIM_ERROR_INVALID_STATE;
+        body->desc.mass = mass;
+        return NKSIM_OK;
+    }
+
+    nksim_result body_exclude_pair(std::uint64_t first, std::uint64_t second) override {
+        if (!find_body(first) || !find_body(second)) return NKSIM_ERROR_INVALID_HANDLE;
+        if (first == second) return NKSIM_ERROR_INVALID_ARGUMENT;
+        excluded_pairs.emplace(std::min(first, second), std::max(first, second));
+        return NKSIM_OK;
     }
 
     nksim_result body_set_motion_type(std::uint64_t id, std::uint32_t motion_type,
@@ -357,6 +374,8 @@ public:
                     continue;
                 for (const auto &obstacle : bodies) {
                     if (obstacle.id == moving.id ||
+                        excluded_pairs.count({std::min(moving.id, obstacle.id),
+                                              std::max(moving.id, obstacle.id)}) != 0 ||
                         (obstacle.desc.motion_type == NKSIM_MOTION_DYNAMIC &&
                          parent_joint(obstacle.id) == nullptr) ||
                         (obstacle.desc.shape_type != NKSIM_SHAPE_BOX &&
@@ -604,6 +623,7 @@ private:
 
     std::array<double, 3> gravity{};
     std::vector<TestBody> bodies;
+    std::set<std::pair<std::uint64_t, std::uint64_t>> excluded_pairs;
     std::vector<TestJoint> joints;
     std::vector<BackendJointCoupling> couplings;
     std::vector<std::uint64_t> follower_order;

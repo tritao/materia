@@ -489,7 +489,7 @@ class ProjectKitTests {
     var job:materia.project.SceneArtifact.SceneArtifactMachining = {program: "G0 X1\nM2\n",
       axes: ["x", "y", "z"], spindle: "spindle", channelScope: "cabinet/process", workOffset: [0.1, 0.1, -0.05],
       tools: [{number: 1, length: 0.03, profile: [[0.0, 0.0, 0.0, 0.0, 0.003, 0.0], [0.0, 0.0, 0.003, 0.0, 0.003, 0.02]]}],
-      stock: "bed", sacrificial: ["gantry"], toolPart: "spindle", loadedTool: 1, target: "finished", loop: true,
+		stocks: ["bed"], sacrificial: ["gantry"], toolPart: "spindle", loadedTool: 1, target: "finished", loop: true,
       controller: {stepTickHz: 40000}};
     var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
       parts: [part("body"), part("finished")], assemblyDefinition: machine, machining: job};
@@ -497,7 +497,7 @@ class ProjectKitTests {
     if (restored == null) throw "machining job round trip lost the job";
     check(restored.program == job.program && restored.axes.join(",") == "x,y,z" &&
       restored.channelScope == "cabinet/process" &&
-      restored.spindle == "spindle" && restored.toolPart == "spindle" && restored.loadedTool == 1 && restored.stock == "bed" && restored.sacrificial[0] == "gantry" &&
+		restored.spindle == "spindle" && restored.toolPart == "spindle" && restored.loadedTool == 1 && restored.stocks.length == 1 && restored.stocks[0] == "bed" && restored.sacrificial[0] == "gantry" &&
       restored.target == "finished" && restored.loop == true, "machining job round trip");
     check(restored.tools.length == 1 && restored.tools[0].number == 1 && restored.tools[0].length == 0.03 &&
       restored.tools[0].profile[1][5] == 0.02, "machining tool table round trip");

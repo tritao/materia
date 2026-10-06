@@ -20,6 +20,8 @@ typedef MillBounds = {var low:Array<Float>; var high:Array<Float>;}
 /** The tending mill: the bare machine on its stand, with a preset vise and convex enclosure panels. */
 class EnclosedBenchMill extends MachineAssembly {
 	public final mill:BenchMill;
+	/** Whether a seated reference workpiece is part of the machine assembly. Tended stock is free. */
+	public final includesWorkpiece:Bool;
 	public final standHeight:Float = 750;
 	public final trayThickness:Float = 2;
 	public final panelThickness:Float = 2;
@@ -35,9 +37,10 @@ class EnclosedBenchMill extends MachineAssembly {
 	public final standIds:Array<String> = [];
 	final poses = new Map<String, AssemblyFrame>();
 
-	public function new() {
+	public function new(includesWorkpiece:Bool = true) {
 		super();
-		mill = new BenchMill(true);
+		this.includesWorkpiece = includesWorkpiece;
+		mill = new BenchMill(true, includesWorkpiece);
 		floorOffset = standHeight + trayThickness;
 		envelope = sweptBounds(mill);
 		var left = envelope.low[0] - 30;

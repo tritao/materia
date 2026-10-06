@@ -28,11 +28,23 @@ typedef TendingReachResult = {
 	var armBase:AssemblyFrame;
 	var jointMargin:Float;
 	var wristSine:Float;
+	/** Joint pose that parks the arm facing away from the mill during CNC cutting. */
+	var parkPose:Array<Float>;
 	var positions:Array<Array<Float>>;
 	var names:Array<String>;
 	/** Required world TCP frames in millimetres, for the later cell generator. */
 	var targets:Array<AssemblyFrame>;
+	/** The actual cell-fixed pocket trays and their seat-floor poses, all in millimetres. */
+	var trays:Array<TendingTrayLayout>;
+	var tableFrame:AssemblyFrame;
+	var tableOffset:Float;
+	var tableWidth:Float;
+	var tableDepth:Float;
+	var tableTop:Float;
 }
+
+typedef TendingTraySlot = {var name:String; var frame:AssemblyFrame;}
+typedef TendingTrayLayout = {var id:String; var frame:AssemblyFrame; var slots:Array<TendingTraySlot>;}
 
 /** Static reach, with the physical pneumatic gripper TCP at the vise, tray slots and both sides
  * of the doorway. Mill and blank geometry decide the poses; the gripper supplies its own envelope.
@@ -49,6 +61,9 @@ class TendingReach {
 	}
 
 	public static function study(cell:EnclosedBenchMill):TendingReachResult {
+		// Reach uses the same physical blank hull as machining, but the tending cell starts with an
+		// empty vise. Study a loaded reference machine so the stock remains geometry input only.
+		if (!cell.includesWorkpiece) return study(new EnclosedBenchMill());
 		var failures:Array<String> = [];
 		var armTool = new ArmGripperTool(32, BenchMill.STOCK_WIDTH, 60, 16);
 		var gripper = armTool.spec;
@@ -99,28 +114,63 @@ class TendingReach {
 			}
 			{name: occurrence.id, vertices: vertices};
 		}];
+		// Build and check the real pocket geometry. The old tray envelope sat 10 mm
+		// below the blank and missed the collision body the arm would actually meet.
+		var trayAssembly = new PartTray(2, 3, BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH,
+			BenchMill.STOCK_WIDTH + 20, BenchMill.STOCK_DEPTH + 20);
 		// The two tray banks are fixed to the tending cell, independent of tool or
-		// arm selection. Slot pitch follows the stock blank and clearance; the
-		// banks sit outside each side of the door opening, in front of the machine.
+		// arm selection. Their positions are derived from the cell opening and the
+		// real blank-seat height. These same layouts become assembled cell parts.
 		var pitchX = BenchMill.STOCK_WIDTH + 20;
 		var pitchY = BenchMill.STOCK_DEPTH + 20;
-		var trayWidth = 3 * pitchX + 20, trayDepth = 2 * pitchY + 20;
+		var trayWidth = trayAssembly.width, trayDepth = trayAssembly.depth;
 		var trayOffset = cell.openingWidth / 2 + trayWidth / 2 + 20;
 		var trayX = cell.opening.x;
 		var trayY = cell.opening.y - (BenchMill.STOCK_DEPTH + cell.mill.column.width / 2 + 20);
-		// Reserve 10 mm below the fingertip plane for the future pocket rails;
-		// tray poses are the 10 mm approach above that support surface.
-		var trayTop = graspWorld.z - 10;
+		var traySeatZ = graspWorld.z;
+		var trayLayouts:Array<TendingTrayLayout> = [];
 		for (side in [-1, 1]) {
 			var centre = trayX + side * trayOffset;
-			environment.push({name: side < 0 ? "tray:infeed" : "tray:outfeed",
-				vertices: boxVertices(centre - trayWidth / 2, centre + trayWidth / 2,
-					trayY - trayDepth / 2, trayY + trayDepth / 2, trayTop - 20, trayTop)});
+			var id = side < 0 ? "infeedTray" : "outfeedTray";
+			var frame = AssemblyFrames.translation(centre, trayY, traySeatZ - trayAssembly.seat(0, 0).z);
+			var slots:Array<TendingTraySlot> = [for (slot in trayAssembly.seatFrames())
+				{name: slot.name, frame: AssemblyFrames.compose(frame, slot.frame)}];
+			trayLayouts.push({id: id, frame: frame, slots: slots});
+			for (piece in trayAssembly.collisionPieces()) {
+				var pieceFrame = AssemblyFrames.compose(frame, piece.frame);
+				var vertices:Array<Float> = [];
+				for (index in 0...Std.int(piece.vertices.length / 3)) {
+					var point = AssemblyFrames.transformPoint(pieceFrame, piece.vertices[index * 3],
+						piece.vertices[index * 3 + 1], piece.vertices[index * 3 + 2]);
+					vertices.push(point.x / 1000); vertices.push(point.y / 1000); vertices.push(point.z / 1000);
+				}
+				environment.push({name: '$id/${piece.id}', vertices: vertices});
+			}
+		}
+		var tableTop = traySeatZ - PartTray.SEAT_Z;
+		var tableWidth = trayWidth + 40;
+		var tableDepth = trayDepth + 40;
+		var tableOffset = trayOffset;
+		var tableFrame = AssemblyFrames.translation(cell.opening.x, trayY, 0);
+		var table = new TendingCellTable(tableWidth, tableDepth, tableTop, tableOffset);
+		for (piece in table.collisionPieces()) {
+			var pieceFrame = AssemblyFrames.compose(tableFrame, piece.frame);
+			var vertices:Array<Float> = [];
+			for (index in 0...Std.int(piece.vertices.length / 3)) {
+				var point = AssemblyFrames.transformPoint(pieceFrame, piece.vertices[index * 3],
+					piece.vertices[index * 3 + 1], piece.vertices[index * 3 + 2]);
+				vertices.push(point.x / 1000); vertices.push(point.y / 1000); vertices.push(point.z / 1000);
+			}
+			environment.push({name: 'cellTable/${piece.id}', vertices: vertices});
 		}
 		for (cls in [Reach850, Reach1300]) {
 			var firstClassFailure:Null<String> = null, lastClassFailure:Null<String> = null;
 			var riserFailure:Null<String> = null;
 			var source = new CobotArm(cls, armTool);
+			var parkPose = source.ready();
+			// The base joint turns the folded ready posture out of the enclosure. Keeping
+			// this cell-specific park explicit avoids occupying the spindle's travel lane.
+			parkPose[0] = Math.PI;
 			var reachAssembly = new MachineAssembly();
 			reachAssembly.include("arm", source);
 			reachAssembly.addComponent("airSupply", new AirSupply(), AssemblyFrames.translation(1200, -500, 0));
@@ -169,10 +219,10 @@ class TendingReach {
 			if (viaZ <= cell.opening.z + ArmClearance.MARGIN * 1000) throw "Wrist and tool do not fit through the doorway";
 			var allNames = names.copy(), allPoints = [points[0],
 				[graspWorld.x, cell.opening.y - toolDepth, viaZ], [graspWorld.x, cell.opening.y + toolDepth, viaZ]];
-			for (side in [-1, 1]) for (row in 0...2) for (column in 0...3) {
-				allNames.push((side < 0 ? "infeed" : "outfeed") + '-$row-$column');
-				allPoints.push([trayX + side * trayOffset + (column - 1) * pitchX,
-					trayY + (row - 0.5) * pitchY, graspWorld.z]);
+			for (tray in trayLayouts) for (slot in tray.slots) {
+				allNames.push(tray.id == "infeedTray" ? StringTools.replace(slot.name, "slot-", "infeed-")
+					: StringTools.replace(slot.name, "slot-", "outfeed-"));
+				allPoints.push([slot.frame.x, slot.frame.y, slot.frame.z]);
 			}
 			var options = new IkOptions(0.00001, 0.0001, 250, 0.001).reaching();
 			for (level in 0...25) {
@@ -242,12 +292,19 @@ class TendingReach {
 					}
 					// Only tool-to-vise pairs get the reduced work-contact margin, and
 					// only at the vise grasp pose. Door, mill, floor and trays keep 5 mm.
-					var viseContactBodies = [for (body in environment)
-						if (StringTools.startsWith(body.name, "mill/vise/")) "machine:" + body.name];
-					var full = new ArmClearance(arm, bodies, source.ready(),
-						ArmClearance.MARGIN, ArmClearance.CONTACT_MARGIN, viseContactBodies, interfaces);
-					for (i in 0...solved.length) {
-						var hit = full.violation(solved[i], i == 0);
+						var viseContactBodies = [for (body in environment)
+							if (StringTools.startsWith(body.name, "mill/vise/")) "machine:" + body.name];
+						var full = new ArmClearance(arm, bodies, parkPose,
+							ArmClearance.MARGIN, ArmClearance.CONTACT_MARGIN, viseContactBodies, interfaces);
+						var readyHit = full.violation(parkPose);
+						if (readyHit != null) {
+							failedAt = "ready";
+							failedReason = 'clearance ${readyHit.a}/${readyHit.b} (${readyHit.distance} m)';
+							valid = false;
+						}
+						for (i in 0...solved.length) {
+							if (!valid) break;
+							var hit = full.violation(solved[i], i == 0);
 						if (hit == null) continue;
 						var point = allPoints[i];
 						var alternative:Null<Array<Float>> = null;
@@ -290,12 +347,15 @@ class TendingReach {
 							wrist = Math.min(wrist, Math.abs(Math.sin(q[4])));
 						}
 						return {cls: cls, riser: height, armBase: base, jointMargin: margin, wristSine: wrist,
-							positions: solved, names: allNames,
-							targets: targets};
+							parkPose: parkPose.copy(), positions: solved, names: allNames, targets: targets, trays: trayLayouts,
+							tableFrame: tableFrame, tableOffset: tableOffset, tableWidth: tableWidth,
+							tableDepth: tableDepth, tableTop: tableTop};
 					}
 				}
 				if (!valid && failedAt != null) {
-					var failure = '$height mm at $failedAt (${allPoints[allNames.indexOf(failedAt)]}): $failedReason';
+					var failure = failedAt == "ready"
+						? '$height mm at ready pose: $failedReason'
+						: '$height mm at $failedAt (${allPoints[allNames.indexOf(failedAt)]}): $failedReason';
 					if (firstClassFailure == null) firstClassFailure = failure;
 					lastClassFailure = failure;
 					if (height == 550) riserFailure = failure;
@@ -317,13 +377,6 @@ class TendingReach {
 	}
 	static function withinMargins(arm:Manipulator, q:Array<Float>):Bool
 		return jointMargin(arm, q) >= 0.1 && Math.abs(Math.sin(q[4])) >= 0.2;
-	static function boxVertices(x0:Float, x1:Float, y0:Float, y1:Float, z0:Float, z1:Float):Array<Float> {
-		var vertices:Array<Float> = [];
-		for (x in [x0, x1]) for (y in [y0, y1]) for (z in [z0, z1]) {
-			vertices.push(x / 1000); vertices.push(y / 1000); vertices.push(z / 1000);
-		}
-		return vertices;
-	}
 	static function graspFrame(point:Array<Float>, grasp:AssemblyFrame, yaw:Float):AssemblyFrame {
 		var roll = Quat.fromAxisAngle(new Vec3(0, 0, 1), yaw);
 		var rotation = roll.multiply(new Quat(grasp.qx, grasp.qy, grasp.qz, grasp.qw));

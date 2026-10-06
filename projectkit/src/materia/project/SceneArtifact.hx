@@ -387,13 +387,13 @@ typedef SceneArtifactFloorPose = {
 
 /**
  * A machining job the generator made for its own machine, with everything needed to run it (since
- * version 12). Lengths are metres, whatever the scene's unit.
+ * version 20). Lengths are metres, whatever the scene's unit.
  *
  * The machine's `axes` are three prismatic joints whose positions are machine X, Y and Z, and machine
- * coordinates name where the spindle's gauge line is: the origin of the `spindle` occurrence, whose
- * +Z runs up the spindle axis. `workOffset` is G54 in machine coordinates. Each tool in `tools` hangs
+	 * coordinates name where the spindle's gauge line is: the origin of the `spindle` occurrence, whose
+	 * +Z runs up the spindle axis. `workOffset` is G54 in machine coordinates. Each tool in `tools` hangs
  * `length` below the gauge line and has the shape `profile` (a toolpath cutter profile's `encode`),
- * so the program's G43 H numbers are the tool numbers. `stock` is the occurrence the tool cuts and
+	 * so the program's G43 H numbers are the tool numbers. `stocks` are the occurrences the tool may cut and
  * `sacrificial` those it may run into without harm, such as a spoilboard under through holes.
  * `toolPart` is the occurrence that shows the tool in the spindle, whose shape changes with the tool,
  * and `loadedTool` the number of the tool in the spindle when the job starts.
@@ -412,7 +412,7 @@ typedef SceneArtifactMachining = {
 	var channelScope:String;
 	var workOffset:Array<Float>;
 	var tools:Array<SceneArtifactTool>;
-	@:optional var stock:String;
+	var stocks:Array<String>;
 	@:optional var sacrificial:Array<String>;
 	@:optional var toolPart:String;
 	@:optional var loadedTool:Int;
@@ -439,7 +439,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 19;
+	public static inline var VERSION:Int = 20;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -1449,8 +1449,13 @@ class SceneArtifact {
 			if (!joints.exists(axis) || machining.axes.indexOf(axis) != index) fail('axis "$axis" is not a distinct joint');
 		}
 		if (!occurrences.exists(machining.spindle)) fail('spindle "${machining.spindle}" is not an occurrence');
-		if (machining.stock != null && !occurrences.exists(machining.stock))
-			fail('stock "${machining.stock}" is not an occurrence');
+		if (machining.stocks == null) fail("needs a stock occurrence list");
+		var stockIds = new Map<String, Bool>();
+		for (stock in machining.stocks) {
+			if (!occurrences.exists(stock)) fail('stock "$stock" is not an occurrence');
+			if (stockIds.exists(stock)) fail('stock "$stock" is listed more than once');
+			stockIds.set(stock, true);
+		}
 		if (machining.sacrificial != null) for (id in machining.sacrificial)
 			if (!occurrences.exists(id)) fail('sacrificial part "$id" is not an occurrence');
 		if (machining.toolPart != null && !occurrences.exists(machining.toolPart))
@@ -1497,9 +1502,8 @@ class SceneArtifact {
 			spindle: text(Reflect.field(decoded, "spindle")),
 			channelScope: text(Reflect.field(decoded, "channelScope")),
 			workOffset: [for (value in list(Reflect.field(decoded, "workOffset"))) number(value)],
-			tools: tools};
-		var stock:Dynamic = Reflect.field(decoded, "stock");
-		if (stock != null) machining.stock = text(stock);
+			tools: tools,
+			stocks: [for (stock in list(Reflect.field(decoded, "stocks"))) text(stock)]};
 		var sacrificial:Dynamic = Reflect.field(decoded, "sacrificial");
 		if (sacrificial != null) machining.sacrificial = [for (id in list(sacrificial)) text(id)];
 		var toolPart:Dynamic = Reflect.field(decoded, "toolPart");

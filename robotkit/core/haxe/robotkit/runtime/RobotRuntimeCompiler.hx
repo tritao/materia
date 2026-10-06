@@ -648,6 +648,9 @@ class RobotRuntimeCompiler {
       if (sensor.kind == "presence" && (!Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0))
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_RANGE", '$path.maxRange',
           "presence range must be positive"));
+      if (sensor.kind == "presence_input" && (!Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0))
+        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_RANGE", '$path.maxRange',
+          "presence input range must be positive"));
       if (!Math.isFinite(sensor.updateRate) || sensor.updateRate < 0.0)
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_RATE", '$path.updateRate',
           "sensor update rate must be non-negative"));

@@ -482,7 +482,11 @@ class AssemblySimulationBridge {
     }
     if (definition.sensors != null) for (sensor in definition.sensors) {
 			if (ownedSensors != null && !selectedSensors.exists(sensor.id)) continue;
-      var added = model.addSensor(new Sensor(sensor.id, sensor.kind, 0.0, sensor.id));
+      // Assembly presence heads are cabinet inputs backed by the simulated
+      // free-object volume source. Keep that source external to RobotKit's
+      // bounded native sensor pool, just like wired cell digital inputs.
+      var runtimeKind = sensor.kind == "presence" ? "presence_input" : sensor.kind;
+      var added = model.addSensor(new Sensor(sensor.id, runtimeKind, 0.0, sensor.id));
       if (sensor.kind == "brake_released") {
         if (sensor.joint == null) throw 'Brake contact "${sensor.id}" has no motor joint';
         added.joint = sensor.joint;
@@ -506,9 +510,32 @@ class AssemblySimulationBridge {
           throw 'Assembly presence sensor "${sensor.id}" has no connector or range';
         var definitionId = occurrenceDefinition(definition, sensor.occurrence);
         var local = connector(definitions.get(definitionId), sensor.connector);
-        var mounted = AssemblyFrames.compose(offsetOf(sensor.occurrence), local);
         var index = linkIndexOfPart.get(sensor.occurrence);
-        if (index == null) throw 'Assembly presence sensor "${sensor.id}" has no simulated link';
+        var mounted:AssemblyFrame;
+        if (index == null) {
+          // Cell-fixed sensors can belong to the controller while their mounting geometry is
+          // outside its moving tree (for example, a slot sensor on a shared infeed tray). Keep
+          // that frame in the robot's fixed root, but never attach a sensor to a free or foreign
+          // moving body: its pose would then be unrelated to the controller that reads it.
+          var bodyId:Null<String> = null;
+          var bodyJoint:Null<String> = null;
+          for (body in AssemblyBodies.of(definition)) if (body.occurrences.indexOf(sensor.occurrence) >= 0) {
+            bodyId = body.id;
+            bodyJoint = body.joint;
+          }
+          if (bodyId == null)
+            throw 'Assembly presence sensor "${sensor.id}" is mounted on no rigid body';
+          if (free.exists(sensor.occurrence) || free.exists(bodyId))
+            throw 'Assembly presence sensor "${sensor.id}" cannot be mounted on a free body';
+          if (bodyJoint != null) {
+            if (ownedJoints != null && !selected.exists(bodyJoint))
+              throw 'Assembly presence sensor "${sensor.id}" is mounted on a moving body owned by another controller';
+            throw 'Assembly presence sensor "${sensor.id}" has no simulated link for its moving body';
+          }
+          var worldMount = AssemblyFrames.compose(placement.worldPose(sensor.occurrence), local);
+          mounted = AssemblyFrames.compose(AssemblyFrames.inverse(rootFrame), worldMount);
+          index = 0;
+        } else mounted = AssemblyFrames.compose(offsetOf(sensor.occurrence), local);
         var frame = model.addFrame(new Frame(sensor.id, links[index], "frame/" + sensor.id));
         frame.position = [mounted.x * scale, mounted.y * scale, mounted.z * scale];
         frame.rotation = [mounted.qx, mounted.qy, mounted.qz, mounted.qw];

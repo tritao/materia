@@ -1,6 +1,7 @@
 package app;
 
 import app.CncProgramPlayer.CncJob;
+import app.CncProgramPlayer.CncJobStock;
 import toolpathkit.tool.CutterProfile;
 import toolpathkit.tool.Tool;
 
@@ -110,6 +111,8 @@ class MateriaProjectRunner {
       var found = false;
       for (record in scene.objects) if (record.id == "project:" + id) {
         record.dynamicBody = true;
+        if (scene.cncJob != null && scene.cncJob.stocks.indexOf(id) >= 0)
+          record.collisionEnabled = true;
         found = true;
       }
       if (!found) throw 'Project dynamic part "$id" is not a part of the generated scene';
@@ -459,22 +462,43 @@ class MateriaProjectRunner {
       var mesh = artifactMesh([for (part in artifact.parts) if (part.id == id) part][0]);
       return {positions: [for (value in mesh.positions) value * scale], indices: mesh.indices};
     }
-    var stockMesh:Null<IndexedMesh> = null;
-    var stock = machining.stock;
-    if (stock != null) {
-      var definition = artifact.assemblyDefinition;
-      var occurrence = definition == null ? [] : [for (item in definition.occurrences) if (item.id == stock) item];
-      if (occurrence.length == 1) stockMesh = partMesh(occurrence[0].definition);
+    var definition = artifact.assemblyDefinition;
+    var stockSources:Array<CncJobStock> = [];
+    for (stock in machining.stocks) {
+      var occurrences = definition == null ? [] : [for (item in definition.occurrences) if (item.id == stock) item];
+      if (occurrences.length != 1) throw 'Machining stock "$stock" must be one assembly occurrence';
+      var component = [for (part in artifact.parts) if (part.id == occurrences[0].definition) part];
+      if (component.length != 1) throw 'Machining stock "$stock" has no unique geometry definition';
+      var hull = cadkit.ConvexHullVertices.safeFromMesh(component[0].vertices,
+        component[0].vertexCount, 0.0005 / scale);
+      if (hull.vertices == null) throw 'Machining stock "$stock" has no physical collision hull';
+      // Match the centre used by the scene preview and SimulationAssemblyParts. The convex hull is
+      // a physics approximation; it must not shift the stock's visible/cutting coordinate frame.
+      var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+      var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+      for (vertex in 0...component[0].vertexCount) for (axis in 0...3) {
+        var coordinate = component[0].vertices.getDouble(vertex * 24 + axis * 8);
+        low[axis] = Math.min(low[axis], coordinate);
+        high[axis] = Math.max(high[axis], coordinate);
+      }
+      var material = component[0].materialId == null ? "neutral" : component[0].materialId;
+      stockSources.push({occurrence: stock,
+        minimum: [for (value in low) value * scale], maximum: [for (value in high) value * scale],
+        center: [for (axis in 0...3) (low[axis] + high[axis]) * 0.5 * scale],
+        density: component[0].materialDensity == null ? MaterialLibrary.require(material).physical.density
+          : component[0].materialDensity,
+        mesh: partMesh(component[0].id)});
     }
     var entered = machining.sacrificial == null ? [] : machining.sacrificial.copy();
-    if (stock != null) entered.push(stock);
+    for (stock in machining.stocks) entered.push(stock);
     for (id in entered) for (record in records) if (record.id == "project:" + id) record.collisionEnabled = false;
     var target = machining.target;
     return {source: machining.program, axes: machining.axes, spindle: machining.spindle,
       channelScope: machining.channelScope,
       workOffset: machining.workOffset, loop: machining.loop == true,
       tools: [for (tool in machining.tools) Tool.shaped(tool.number, tool.length, CutterProfile.decode(tool.profile))],
-      stock: stock, stockMesh: stockMesh, target: target == null ? null : partMesh(target),
+      stocks: machining.stocks.copy(), stockSources: stockSources,
+      target: target == null ? null : partMesh(target),
       toolPart: machining.toolPart, loadedTool: machining.loadedTool, controller: machining.controller,
       controllerId: machining.controllerId, powerUpOffsets: machining.powerUpOffsets,
       powerUpSideOffsets: machining.powerUpSideOffsets};

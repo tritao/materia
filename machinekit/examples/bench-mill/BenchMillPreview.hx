@@ -25,7 +25,7 @@ class BenchMillPreview {
 		scene.machining = {program: program, axes: ["x", "y", "z"], spindle: "spindle", channelScope: "",
 			workOffset: [for (v in mill.workOffset()) v / 1000],
 			tools: [for (tool in mill.tools()) {number: tool.number, length: tool.length, profile: tool.profile().encode()}],
-			stock: "stock", toolPart: "tool", loadedTool: 1, target: TARGET_PART, loop: true,
+			stocks: ["stock"], toolPart: "tool", loadedTool: 1, target: TARGET_PART, loop: true,
 			controller: {stepTickHz: BenchMill.STEP_TICK_HZ}};
 		return SceneArtifact.encode(scene);
 	}
@@ -43,7 +43,7 @@ class BenchMillPreview {
 		scene.machining = {program: program, axes: ["mill/x", "mill/y", "mill/z"], spindle: "mill/spindle", channelScope: "mill",
 			workOffset: [for (v in mill.workOffset()) v / 1000],
 			tools: [for (tool in mill.tools()) {number: tool.number, length: tool.length, profile: tool.profile().encode()}],
-			stock: "mill/stock", toolPart: "mill/tool", loadedTool: 1, target: TARGET_PART, loop: true,
+			stocks: ["mill/stock"], toolPart: "mill/tool", loadedTool: 1, target: TARGET_PART, loop: true,
 			controller: {stepTickHz: BenchMill.STEP_TICK_HZ}, controllerId: "cncController"};
 		return SceneArtifact.encode(scene);
 	}
