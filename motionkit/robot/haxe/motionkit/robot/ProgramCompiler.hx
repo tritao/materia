@@ -85,6 +85,18 @@ class ProgramCompiler {
    * Distances/events use whole-operation coordinates; times are section-local. */
   public var pathEventSchedule:Null<(Int,Float,Bool,Array<Float>,Array<Float>,Array<PathEvent>)->Array<PathEvent>> = null;
 
+  /** Preserve compiler limits/checks while timing an already selected route. */
+  public function withJointPathPlanner(planner:JointPathPlanner):ProgramCompiler {
+    if(planner==null)throw "A replacement joint path planner is required";
+    var result=new ProgramCompiler(solver,limits,frameId,maxVelocity,maxAcceleration,maxJerk,
+      startTolerances,timing,cartesianResolution,maxJointJump,positionTolerance,orientationTolerance,
+      ikTolerance,planner,perJointMaxJump,jointIds,couplings,controllerPeriodSeconds);
+    result.planningAssumptions=planningAssumptions.copy();
+    result.planCheck=planCheck==null?null:planCheck.fork();
+    result.motorSpace=motorSpace;result.pathEventSchedule=pathEventSchedule;
+    return result;
+  }
+
   /**
    * This compiler for a planning thread, on a fork of its solver: the worker never shares solver
    * state with the caller, who keeps using the same kinematics while plans execute.

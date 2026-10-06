@@ -134,6 +134,55 @@ class WeldPlanningTests {
       check(fixture.arm.numericSolveCount()==before,"free-start weld selection needs no numeric pose IK");
     } catch(error:Dynamic){if(acceptedEntry!=null)acceptedEntry.dispose();throw error;}
     if(acceptedEntry!=null)acceptedEntry.dispose();
+    var compiler=new motionkit.robot.ProgramCompiler(solver,
+      new motionkit.trajectory.ValidationLimits(6,haxe.Int64.ofInt(1),haxe.Int64.ofInt(0)),"weld-task",
+      [for(_ in measured)3.0],[for(_ in measured)2.0],[for(_ in measured)20.0],
+      motionkit.robot.StartTolerances.uniform(6,0.01,0.01,0.01),null,0.002,0.2,
+      0.001,0.02,new IkTolerance(1e-6,1e-6));
+    var selectedProgram=new processkit.WeldPathProgram(problem,freeCurves,{arc:"arc",wireSpeed:"wire",voltage:"voltage"});
+    var compiled=selectedProgram.compile(compiler,fixture.arm,measured,haxe.Int64.ofInt(801),world);
+    try {
+      var sectionsFound=0,waits=0,dwells=0,quantity=0.0,arcEnds=0;
+      for(block in compiled.blocks){
+        switch block.barrier {
+          case WaitInput(channel,_,_):check(channel==processkit.WeldingPlanRunner.ARC_ESTABLISHED,
+            "selected execution waits for established arc");waits++;
+          case Dwell(_):dwells++;
+          case null:
+        }
+        for(index in 0...block.plans.length){
+          var section=selectedProgram.sectionOps.indexOf(block.opIndices[index]);
+          if(section<0)continue;
+          sectionsFound++;var timed=block.plans[index],curve=freeCurves[section];
+          var begin=timed.evaluate(0),end=timed.evaluate(timed.durationSeconds);
+          for(j in 0...6){near(begin.positions[j],curve.q[0][j],1e-7,"timed weld reuses selected section entry");
+            near(end.positions[j],curve.q[curve.q.length-1][j],1e-7,"timed weld reuses selected section exit");
+            near(begin.velocities[j],0,1e-7,"engagement section starts stopped");
+            near(end.velocities[j],0,1e-7,"engagement section ends stopped");}
+          var rates=[for(event in timed.events)if(event.channel=="wire")event];
+          if(problem.phases[section]==processkit.WeldPathProblem.WeldPathPhase.Weld){
+            check(rates.length>1,"deposition rates use the actual compiled clock");
+            for(i in 0...rates.length-1)switch rates[i].value {
+              case Analog(rate):quantity+=rate*haxe.Int64.toFloat(haxe.Int64.sub(rates[i+1].timeNs,rates[i].timeNs))*1e-9;
+              case _:throw "Expected timed wire rate";
+            }
+          }
+          if(problem.phases[section]==processkit.WeldPathProblem.WeldPathPhase.Burnback){
+            for(event in timed.events)if(event.channel=="arc")switch event.value {
+              case Digital(false):near(haxe.Int64.toFloat(event.timeNs)*1e-9,timed.durationSeconds,1e-8,
+                "arc turns off at the completed burnback lift");arcEnds++;
+              case _:throw "Expected burnback arc off";
+            }
+          }
+        }
+      }
+      check(sectionsFound==4 && waits==1 && dwells==2 && arcEnds==1,
+        "one selected compilation retains all process phases and engagement barriers");
+      near(quantity,PARAMETERS.wireSpeed/PARAMETERS.travelSpeed*problem.seamLength,1e-6,
+        "selected execution deposits the authored quantity over the final clock");
+      check(fixture.arm.numericSolveCount()==before,"selected weld compilation performs no numeric pose IK");
+    }catch(error:Dynamic){compiled.dispose();throw error;}
+    compiled.dispose();
 
   }
 
