@@ -31,7 +31,9 @@ Work already done stays where it fits; what doesn't is reworked in the step name
    - A spike decides it (PP1a). If it passes:
      - EAIK becomes the 6R backend;
      - the hand-written UR solver goes;
-     - OPW (and its vendored library) is deleted once EAIK matches it on every arm OPW handled.
+     - OPW (and its vendored library) is deleted once EAIK matches it on every arm OPW handled *and*
+       is at most 2× OPW's median time per call (PP1a's speed rule). Otherwise OPW stays as the fast
+       path for its family.
    - **No hand-derived polynomial or algebraic IK in materia.** The offset-wrist research work
      (`offset_wrist_polynomial.h`, `scripts/research/offset-wrist-polynomial.py` and the commits that
      prototype it) is replaced by EAIK if the spike shows EAIK solves `RobotArm` as authored.
@@ -350,13 +352,36 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
   - every OPW-tested arm (IRB2400, KR6, R2000, TX40): EAIK's solutions contain OPW's, FK round trip;
   - `RobotArm` after PP0a: EAIK agrees with OPW;
   - `CobotArm` size classes: same;
-  - cost per solve (closed-form vs 1-D search cases) against the ladder's budget;
+  - cost per solve, closed-form and 1-D search cases, against the ladder's budget;
   - an Emscripten build compiles;
   - determinism, and behaviour at singularities.
+- **Speed measurement** (makes the decision mechanical):
+  - Native Release build, single thread, same machine, back to back.
+  - 100,000 reachable targets from fixed-seed random joint vectors, on the PP0a `RobotArm` (default
+    size class) and on IRB2400.
+  - Time all-solutions calls for OPW and for EAIK, and report the median and the 95th percentile per
+    call (µs).
+  - Ratio R = EAIK median / OPW median, taken as the worse of the two arms.
+  - Report numbers only from completed, uncontended runs, with the commands recorded.
 - **Outcome recorded here.**
-  - Pass: EAIK is the 6R backend for arms other than OPW's family; continue PP1 on it, and delete
-    the UR closed form.
-  - Fail: record why, and keep per-family solvers only for what EAIK can't do.
+  - **Correctness** is required for every outcome below. For every OPW-tested arm and for `RobotArm`:
+    - EAIK's solution set contains OPW's (each joint within 1e-9 rad, after wrapping);
+    - FK round trips hold within 1e-9 m and 1e-9 rad.
+
+    If it fails, EAIK is not used for that family.
+  - **R ≤ 2:** EAIK is the single 6R backend.
+    - Switch `RobotArm` and every other 6R arm to it.
+    - Delete OPW: `OpwKinematics`, `mk_opw_*`, the `opw_kinematics` submodule and its tests (keep the
+      four published-arm checks, now run against EAIK).
+    - Delete the UR closed form.
+  - **R > 2:** two backends behind the same all-solutions interface, each justified by the measurement.
+    - OPW stays the fast path for ortho-parallel spherical-wrist arms (`RobotArm`), selected
+      automatically when OPW can extract the model's parameters.
+    - EAIK serves every other arm (`CobotArm`, future arms).
+    - Delete the UR closed form.
+    - Record R, so the choice can be revisited if EAIK gets faster.
+  - **EAIK fails correctness or the Emscripten build:** OPW for its family. Keep per-family solvers only
+    for what EAIK can't do. Record why.
 
 **PP1. Analytic IK backends** (PP-D3; revised by PP1a).
 - A native `mk_analytic_*` family behind one Haxe interface. Given an arm sub-chain and a base pose, it
