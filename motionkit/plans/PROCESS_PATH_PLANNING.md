@@ -1,8 +1,9 @@
 # Process path planning plan
 
-Status: planned (2026-10-05). Runs on branch `gantries` in `/home/joao/dev/materia-worktrees/gantries`,
-after the gantries plan (`machinekit/GANTRY_PLAN.md`). Same worktree, same Codex session, and its
-benchmarks (G17 track weld, gantry welder) are the starting point.
+Status: in progress (see Progress). Planned 2026-10-05, revised 2026-10-06 (see "Revision
+2026-10-06"). Runs in `/home/joao/dev/materia-worktrees/gantries` with the same Codex session; the
+gantries work it builds on is on local main. The G17 track weld and gantry welder benchmarks are the
+starting point.
 
 **Goal.** Plan long process paths (welds, surface passes, arm toolpaths, arm + track or positioner) in
 seconds instead of minutes. Decide the discrete choices once, globally:
@@ -14,6 +15,55 @@ Then make the path smooth, time it once, and check collisions only where the cho
 
 Target: the G17 2.6 m track weld plans in under 15 s, down from about 306 s. The robot-welder and
 gantry-welder whole-weldment missions plan at least 10× faster with the same weld quality.
+
+## Revision 2026-10-06
+
+After an architecture review, five decisions change. They supersede anything below that disagrees.
+Work already done stays where it fits; what doesn't is reworked in the step named.
+
+1. **IK comes from one general geometric method, not hand-derived families** (PP-D3, PP1).
+   - Use **EAIK** (`github.com/OstermD/EAIK`, BSD-3-Clause, C++ core with Eigen; build only the C++
+     library, no Python). It derives a subproblem decomposition from the joint axes and positions
+     (H/P vectors), returns all solutions (least squares at boundaries) and locks joints for redundant
+     chains.
+   - EAIK covers spherical-wrist arms (OPW's family), three-parallel-axis (UR-type) arms, and other
+     6R arms with intersecting or parallel axes, through 1-D/2-D search where there is no closed form.
+   - A spike decides it (PP1a). If it passes:
+     - EAIK becomes the 6R backend;
+     - the hand-written UR solver goes;
+     - OPW (and its vendored library) is deleted once EAIK matches it on every arm OPW handled.
+   - **No hand-derived polynomial or algebraic IK in materia.** The offset-wrist research work
+     (`offset_wrist_polynomial.h`, `scripts/research/offset-wrist-polynomial.py` and the commits that
+     prototype it) is replaced by EAIK if the spike shows EAIK solves `RobotArm` as authored.
+   - Cartesian machines and their C/C+A heads keep our own small closed form: they have prismatic
+     joints, and EAIK targets revolute chains.
+   - `RobotArm`'s 35 mm wrist offset (documented as a spherical wrist) is a geometry decision for the
+     user. EAIK handles either answer. Do not change the arm's geometry without that decision.
+2. **One collision world: collisionkit** (PP-D5, PP-D6, PP5, PP10).
+   - The coal collision plan (`kinematicskit/plans/COLLISION.md`, CL0–CL8; CL1 done on branch
+     `collision`) owns collision: a native world posed from body poses (CL2 collisionkit, CL3 cell
+     geometry, CL4 plan validation), avoidance rows (CL5), collision-aware path search (CL6) and
+     RRT-Connect (CL7).
+   - This plan does not add a second collision system. PP5's lazy checks go through a narrow
+     clearance interface. `ArmClearance` implements it until CL2–CL4 land; then collisionkit does,
+     and the `ArmClearance` path is deleted.
+   - PP10 is now "adopt collisionkit", not a coal API in kinematicskit.
+   - CL6 and PP5 are the same job for process paths: when the collision plan reaches CL6, it reuses
+     PP5's interface rather than writing a second path search.
+3. **One graph search, owned by us** (PP3).
+   - The structured ladder DP (neighbour edges, coarse to fine) is the only search. The Descartes
+     dispatch is removed in PP3's close-out.
+   - The vendored `descartes_light` submodule is deleted once nothing calls it (PP9).
+4. **One route from Cartesian paths to joint paths** (PP6).
+   - Every MoveL and FollowPath section in `ProgramCompiler` gets its joint path from the
+     `JointPathPlanner`. A short move is a ladder with one candidate per sample.
+   - Point-by-point path IK, `RedundancyResolver` and its parameterizations are deleted (PP9), with
+     no parallel code path kept for "other" cases.
+5. **Refinement is an interface** (PP4).
+   - The spline smoothing plus exact re-solve is the first implementation behind a
+     `PathRefinement`-style interface.
+   - A constrained optimizer (clearance from collisionkit, CL5 avoidance rows, Lane D's QP) can
+     replace it later without changing search, timing or callers.
 
 ## Why the current planner is slow (survey 2026-10-05, at `878931b06`)
 
@@ -124,13 +174,14 @@ and OPW are built and tested, but no production code uses them.
   - numeric beam search (`RedundancyResolver`);
   - per-candidate generate-and-test (the weld planner's roll × entry × corner loops).
 
-**PP-D3. Analytic IK wherever the mechanism allows, derived from the model.**
-- Analytic solvers return *all* branches. Supported families:
-  - OPW 6R (spherical wrist);
-  - UR-type 6R (three parallel axes, offset wrist);
-  - Cartesian machines and their rotary heads (XYZ, XYZ+C, XYZ+C+A).
-- Parameters are always extracted from the `RobotModel` and verified by FK, never typed in.
-- Other arms use multi-seed numeric IK as a slower fallback. It is flagged in diagnostics.
+**PP-D3. Geometric IK derived from the model, all solutions** (revised 2026-10-06).
+- 6R arms use EAIK's subproblem decomposition, derived from the `RobotModel`'s joint axes and
+  positions and verified by FK. That covers spherical-wrist, UR-type and other intersecting/parallel
+  axis arms.
+- Cartesian machines and their rotary heads (XYZ, XYZ+C, XYZ+C+A) use our own closed form.
+- Every solver returns *all* branches.
+- Arms EAIK cannot decompose use multi-seed numeric IK as a slower fallback, flagged in diagnostics.
+- **Rejected:** hand-derived per-family or polynomial solvers in materia.
 
 **PP-D4. External axes are part of the graph, not a second solver.**
 - A group splits into an external chain (track, gantry axes, positioner) and an arm sub-chain whose
@@ -153,8 +204,9 @@ and OPW are built and tested, but no production code uses them.
 - Candidate generation, graph build, search and refinement are C++ in MotionKit's native library,
   next to `configuration.cpp`.
 - Haxe passes the problem in and gets a joint path plus diagnostics back.
-- Collision checks start in Haxe (`ArmClearance`), because lazy checking makes them rare. They move
-  native (coal) only if profiling says so (PP10).
+- Collision goes through a narrow clearance interface. `ArmClearance` serves it until collisionkit
+  (collision plan CL2–CL4) lands; then collisionkit's native world does (PP10). No second collision
+  system.
 
 **PP-D7. Deterministic.** The same inputs give the same path: single-threaded by default, with stable
 candidate ordering and tie-breaks.
@@ -167,6 +219,14 @@ candidate ordering and tie-breaks.
   - posture and limit-margin weights;
   - external-axis cost.
 - The planner never imports ProcessKit.
+
+**PP-D10. One search, one route, one collision world** (2026-10-06).
+- The structured ladder DP is the only graph search (Descartes removed).
+- `JointPathPlanner` is the only Cartesian-to-joint route in `ProgramCompiler`.
+- collisionkit is the only collision world once it lands.
+
+**PP-D11. Refinement behind an interface** (2026-10-06). Spline plus exact re-solve first; a
+constrained optimizer can replace it without touching search, timing or callers.
 
 **PP-D9. No legacy paths.** When a runner moves to the new planner, its old search code is deleted in
 the same step. `RedundancyResolver` and `PathConfigurationSelector` are deleted once nothing uses them
@@ -235,7 +295,23 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 - Record every number in this plan's Progress section. They are the targets PP8–PP9 must beat,
   with weld quality unchanged.
 
-**PP1. Analytic IK backends** (PP-D3).
+**PP1a. EAIK spike** (revision 1). Decide EAIK before more IK work.
+- Vendor `OstermD/EAIK` as a pinned submodule (BSD-3-Clause; record it in `THIRD_PARTY.md`). Build only
+  its C++ core (`CPP/src`, CMake) into MotionKit native, using MotionKit's Eigen.
+- Feed it H/P vectors from the `RobotModel` arm sub-chain (with the base pose from external joints).
+- **Checks:**
+  - every OPW-tested arm (IRB2400, KR6, R2000, TX40): EAIK's solutions contain OPW's, FK round trip;
+  - `RobotArm` as authored (35 mm offset wrist): all solutions, FK round trip;
+  - `CobotArm` size classes: same;
+  - cost per solve (closed-form vs 1-D search cases) against the ladder's budget;
+  - an Emscripten build compiles;
+  - determinism, and behaviour at singularities.
+- **Outcome recorded here.**
+  - Pass: EAIK is the 6R backend; continue PP1 on it, delete the offset-wrist research code and the
+    UR closed form.
+  - Fail: record why, and keep per-family solvers only for what EAIK can't do.
+
+**PP1. Analytic IK backends** (PP-D3; revised by PP1a).
 - A native `mk_analytic_*` family behind one Haxe interface. Given an arm sub-chain and a base pose, it
   returns all branches.
 - **OPW:** reuse `mk_opw_inverse`, extended to a sub-chain whose base comes from upstream joints.
@@ -268,8 +344,8 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 - Native DP with the connectivity and costs in "Design", coarse-to-fine.
 - Diagnostics name the first disconnected sample and why: no candidates (unreachable or limits), or no
   edges (jump).
-- Use Descartes' `LadderGraphSolver` where its all-pairs edges are affordable (small C). Otherwise use
-  the structured DP. Both sit behind one function.
+- The structured DP is the only search (revision 3). Remove the Descartes dispatch in this step's
+  close-out; small problems are just small lattices.
 - **Tests:**
   - brute-force agreement on small problems;
   - a dead-end branch avoided, as in `testPathConfigurationSelector`;
@@ -282,6 +358,8 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 - q'(s) and q''(s) come from the differential relation, with the redundancy rates known from the
   spline, cross-checked by finite differences.
 - Output `JointPathSamples` for `ToppraPathTiming`.
+- The spline-and-re-solve is one implementation of a refinement interface (revision 5). Callers and
+  timing depend only on the interface.
 - **Tests:**
   - task-space error ≤ the compiler's path tolerance by construction;
   - no jumps;
@@ -289,8 +367,9 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
   - TOPP-RA succeeds on the track weld without retries.
 
 **PP5. Lazy collision** (PP-D5).
-- After each search, check the route's samples and the joint-space interpolation between them with
-  `ArmClearance` (broad phase plus GJK).
+- After each search, check the route's samples and the joint-space interpolation between them through
+  the clearance interface (revision 2). `ArmClearance` (broad phase plus GJK) implements it until
+  collisionkit lands (PP10).
 - Remove the failing candidates, or the failing edge for a sweep failure, and search again, up to N
   rounds.
 - Return the closest clearance on the final route.
@@ -300,7 +379,8 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 
 **PP6. Compiler integration.**
 - `ProgramCompiler` takes a `JointPathPlanner`, replacing the unused `configurationSelector` argument.
-  `lowerPath` asks it for the joint path of each FollowPath / MoveL section, with the section's
+  It is the only Cartesian-to-joint route (revision 4): every MoveL and FollowPath, short moves
+  included. `lowerPath` asks it for the joint path of each FollowPath / MoveL section, with the section's
   freedoms and the process preferences. The result goes straight to timing.
 - Approach and retreat lines join their path section.
 - The free start is costed against the current state, with k-best starts kept.
@@ -312,6 +392,8 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 - The joint move from the current state to the chosen start is swept for clearance. If blocked, try the
   next of the k-best starts, then report.
 - The exit mirrors this to a safe retreat configuration.
+- When collisionkit reaches CL7 (RRT-Connect), a blocked entry with no clear k-best start uses it,
+  instead of failing.
 - **Tests:** a blocked first-choice entry falls back to the second start; this mirrors
   `WeldPlanningTests`' blocked-entry case.
 
@@ -334,16 +416,19 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 **PP9. Other runners.**
 - `SurfacePlanRunner`, `ToolpathPlanRunner` (FollowPath instead of MoveJ per waypoint) and
   `HandlingPlanRunner` use the planner.
-- Delete `RedundancyResolver`, `SwivelParameterization` and `ExternalAxesParameterization`, unless a
-  non-process user remains (live servo uses the QP differential IK, not these). Record what was kept
-  and why.
+- Delete `RedundancyResolver`, `SwivelParameterization`, `ExternalAxesParameterization`, point-by-point
+  path IK and `PathConfigurationSelector` (revision 4).
+- Delete the vendored `descartes_light` and, after PP1a's parity check, OPW and its vendored library
+  (revisions 1 and 3).
+- Live servo uses the QP differential IK, not these. If anything else turns out to need one, record it.
 - **Tests:** WallFinishing, excavator toolpaths, handling, mobile-base missions, gantry picker, and the
   machine-tending missions if on main.
 
-**PP10. Native clearance (only if profiling demands it).**
-- If lazy checks still dominate after PP8, add a coal-based distance API to kinematicskit native
-  (hulls from the same link geometry) and use it in PP5.
-- Otherwise record that it wasn't needed.
+**PP10. Adopt collisionkit** (revision 2).
+- When the collision plan's CL2–CL4 are on main, implement the clearance interface with collisionkit's
+  native world. Delete the `ArmClearance` path from process planning.
+- Same checks as PP5, plus the PP8 benchmarks with collision time recorded.
+- If CL2–CL4 haven't landed when PP9 is done, record that PP10 is waiting and finish PP11.
 
 **PP11. Cleanup and docs.**
 - Update `motionkit/plans/README.md`, `LANE_C_PLANNING.md` (C5 configuration selection superseded) and
@@ -353,17 +438,19 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 ## Order
 
 ```
-PP0 → PP1 → PP2 → PP3 → PP4 → PP5 → PP6 → PP7 → PP8 → PP9 → PP11
-                                              PP8 → PP10 (only if needed)
+PP0 → PP1a → PP1 → PP2 → PP3 → PP4 → PP5 → PP6 → PP7 → PP8 → PP9 → PP11
+                                   (collision plan CL2–CL4 on main) → PP10
 ```
 
-PP1's three IK families are independent and can land in any order. OPW first, since both welders use
-`RobotArm`.
+PP1a comes first: the IK backend decides how the welders' `RobotArm` is solved, and with it the
+track-weld benchmark.
 
 ## Later
 
-- Joint-space sampling-based planning (RRT-Connect) for entries blocked by clutter.
-- Whole-path trajectory optimization (TrajOpt-style) for clearance margin, warm-started from the ladder.
+- Whole-path trajectory optimization (TrajOpt-style) for clearance margin, warm-started from the
+  ladder: a second refinement implementation (PP-D11), using collisionkit and CL5.
+- 7-axis arms: the stereographic SEW angle (`rpiRobotics/stereo-sew`) as one more lattice dimension,
+  with EAIK solving the arm at each SEW value. Check its licence first.
 - Multi-threaded candidate generation (deterministic ordering kept).
 - Coordinated multi-robot paths (after MT6 controllers).
 
@@ -380,6 +467,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | Step | State | Commits |
 |------|-------|---------|
 | PP0 | in progress: harness and diagnostics; baseline completion pending | `0d43b32c0` (partial) |
+| PP1a | planned (revision 2026-10-06): EAIK spike | — |
 | PP1 | in progress: Cartesian, OPW and authored Cobot UR verified; offset RobotArm unresolved | `0d43b32c0`, `bfec0fa28`, `8569a2a98` (partial) |
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
 | PP3 | in progress: structured/coarse search and Descartes dispatch implemented; authored gate pending | `7cb639434`, `489f2c360`, `f8e88ad4d`, `09cb60fbb` |
