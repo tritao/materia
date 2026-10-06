@@ -65,11 +65,25 @@ class ProbePosePlanner {
   }
 
   function axisGoals(target:Pose3, start:Array<Float>, discover:Bool):Array<Array<Float>> {
-    if (discover) return motion.compiler.solver.sampleCandidates(target, 12,
-      motion.compiler.ikTolerance, OrientationPolicy.FreeAboutTool);
+    if (discover) {
+      var goals = motion.compiler.solver.sampleCandidates(target, 12,
+        motion.compiler.ikTolerance, OrientationPolicy.FreeAboutTool);
+      goals.sort((a, b) -> Reflect.compare(travelCost(a, start), travelCost(b, start)));
+      return goals;
+    }
     var q = motion.compiler.solver.solvePose(target, start,
       motion.compiler.ikTolerance, OrientationPolicy.FreeAboutTool);
     return q == null ? [] : [q];
+  }
+
+  /** Candidate sampling discovers IK branches; execution policy prefers the least joint travel. */
+  function travelCost(goal:Array<Float>, start:Array<Float>):Float {
+    var cost = 0.0;
+    for (joint in 0...start.length) {
+      var time = (goal[joint] - start[joint]) / motion.compiler.maxVelocity[joint];
+      cost += time * time;
+    }
+    return cost;
   }
 
   function axisMatches(q:Array<Float>, point:Vec3, outward:Vec3):Bool {

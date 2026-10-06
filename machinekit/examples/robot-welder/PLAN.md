@@ -2565,3 +2565,21 @@ app compiler passes 1,937 sources (27.3 s). These checks do not establish that
 the final registration face is reachable: the full two-station mission has not
 yet passed with this ordering. MachineKit smoke, the current displacement
 boundary, full mission, and milestone app checks remain open.
+
+### P3 contact branch execution order (2026-10-06)
+
+Global contact-axis discovery returns IK branches in seed-sampling order, which
+is not an execution policy. ProcessKit now sorts those branches by squared joint
+travel time before clearance and approach checks, matching the cost used for
+checked probe moves. Search limits and candidate contents are unchanged. The
+focused native contact-motion suite passes 106 assertions, including a reversed
+sampler-order case.
+
+The 20 mm / 2-degree boundary run on this seed ordering passed the deterministic
+backend with twelve contact episodes, 0.012279905 mm seam-frame error, and the
+first weld's bead checks. MuJoCo failed while planning the first fine-probe
+retreat: at 11.760731 mm along the line, IK residuals were 0.196619 mm and
+0.000280402 rad. A prior revision passed both backends, so this is a real
+backend regression and the boundary must be rerun after branch ranking. The
+captured 1,007-sample profile attributes 76.56% inclusive time to damped-least-
+squares IK during contact candidate screening. No full-mission pass is claimed.
