@@ -668,6 +668,21 @@ class KinematicsTests extends MotionKitTestSupport {
       [for(_ in start)10.0],request.velocity);
     var rerouteProblem=new motionkit.robot.CandidateProblem(fixture.arm,rerouteRequest);
     var initialRoute=motionkit.robot.StructuredLadder.search(rerouteProblem);
+    var preference = (sample:Int, candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate) ->
+      sample == 1 && candidate == initialRoute.candidates[1] ? 1000.0 : 0.0;
+    var preferredRoute = motionkit.robot.StructuredLadder.search(rerouteProblem, null, 0, preference);
+    var preferredClearRoute = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,
+      q -> null, 2, null, null, null, preference);
+    check(preferredClearRoute.candidates[1] == preferredRoute.candidates[1] &&
+      preferredClearRoute.candidates[1] != initialRoute.candidates[1],
+      "lazy clearance retains process state preferences");
+    near(preferredClearRoute.cost, preferredRoute.cost, "lazy clearance retains preference cost", 1e-12);
+    var preferredRetry = motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,
+      q -> q == preferredRoute.candidates[1].q ? {a:"tool", b:"post", distance:0.0, required:0.01} : null,
+      2, null, null, null, preference);
+    check(preferredRetry.candidates[1] != preferredRoute.candidates[1] &&
+      preferredRetry.candidates[1] != initialRoute.candidates[1],
+      "collision retries retain process preferences while excluding blocked states");
     var blockedEndpoint=initialRoute.candidates[1].q,rerouteChecks=0;
     var rerouted=motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> {
       rerouteChecks++;

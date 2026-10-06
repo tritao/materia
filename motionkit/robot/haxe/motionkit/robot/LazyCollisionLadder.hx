@@ -27,14 +27,16 @@ class LazyCollisionLadder {
   public static function selectWithChecks(problem:CandidateProblem,
       check:Array<Float>->Null<ClearanceViolation>,rounds:Int=8,
       ?sweep:(Array<Float>,Array<Float>)->Null<ClearanceViolation>,?coarse:CoarseSearchOptions,
-      ?refinedCheck:LadderSelection->Null<RefinedCollision>):LadderSelection {
+      ?refinedCheck:LadderSelection->Null<RefinedCollision>,
+      ?stateCost:(Int,LatticeCandidate)->Float):LadderSelection {
     if(problem==null || check==null || rounds<1)throw "Lazy collision selection requires a problem, checker and positive round budget";
     var blocked=[for(_ in problem.samples)new haxe.ds.ObjectMap<LatticeCandidate,Bool>()];
     var edges:Array<BlockedLadderEdge> = [];
     var last:Null<ClearanceViolation> = null,lastSample=-1;
     for(round in 0...rounds){
       var route=StructuredLadder.search(problem,null,0,(sample,candidate) ->
-        blocked[sample].exists(candidate) ? Math.POSITIVE_INFINITY : 0.0,coarse,edges);
+        blocked[sample].exists(candidate) ? Math.POSITIVE_INFINITY :
+          stateCost == null ? 0.0 : stateCost(sample,candidate),coarse,edges);
       if(route.diagnostic!=null){
         if(last!=null)throw 'Collision blocks sample $lastSample (${last.a}, ${last.b}): ${route.diagnostic}';
         return route;

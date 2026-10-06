@@ -19,11 +19,13 @@ class StructuredJointPathPlanner implements JointPathPlanner {
   final clearance:Null<ArmClearance>;
   final collisionRounds:Int;
   final contact:Bool;
+  final stateCost:Null<(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float>;
   public function new(group:KinematicGroup,?sampling:CandidateSamplingOptions,?coarse:CoarseSearchOptions,
-      ?clearance:ArmClearance,collisionRounds:Int=8,contact:Bool=false) {
+      ?clearance:ArmClearance,collisionRounds:Int=8,contact:Bool=false,
+      ?stateCost:(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float) {
     if(group==null || collisionRounds<1)throw "Joint path planner requires a compiled group and positive collision round budget";
     this.group=group;this.sampling=sampling;this.coarse=coarse;
-    this.clearance=clearance;this.collisionRounds=collisionRounds;this.contact=contact;
+    this.clearance=clearance;this.collisionRounds=collisionRounds;this.contact=contact;this.stateCost=stateCost;
   }
   public function withSolver(solver:motionkit.kinematics.KinematicsSolver):JointPathPlanner {
     var workerGroup:KinematicGroup;
@@ -35,7 +37,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
       workerGroup = adapter.manipulator;
     } else throw "Structured planner worker requires compiled group kinematics";
     return new StructuredJointPathPlanner(workerGroup, sampling, coarse,
-      clearance == null ? null : clearance.withGroup(workerGroup), collisionRounds, contact);
+      clearance == null ? null : clearance.withGroup(workerGroup), collisionRounds, contact, stateCost);
   }
   public static function sameFreedom(a:motionkit.path.OrientationPolicy,b:motionkit.path.OrientationPolicy):Bool {
     return switch a {
@@ -69,7 +71,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     fallbackDiagnostic=problem.diagnostic;
     var refined:Null<JointPathSamples> = null;
     var world=clearance;
-    var selected=world==null ? StructuredLadder.search(problem,null,0,null,coarse)
+    var selected=world==null ? StructuredLadder.search(problem,null,0,stateCost,coarse)
       : LazyCollisionLadder.selectWithChecks(problem,q -> world.violation(q,contact),collisionRounds,
         (from,to) -> world.sweep(from,to,contact),coarse,route -> {
           var curve=new AnalyticPathRefiner(group,problem,route).refinePath(request.distances,provider.at);
@@ -80,7 +82,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
               if(failure!=null)return new motionkit.robot.LazyCollisionLadder.RefinedCollision(i,true,failure);}
           }
           refined=curve;return null;
-        });
+        },stateCost);
     if(selected.diagnostic!=null)throw 'Joint path selection failed at distance ${selected.failedDistance}: ${selected.diagnostic}';
     return refined==null ? new AnalyticPathRefiner(group,problem,selected).refinePath(request.distances,provider.at) : refined;
   }
