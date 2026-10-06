@@ -588,6 +588,36 @@ class KinematicsTests extends MotionKitTestSupport {
     check(sevenSamples.jointCount==7,"numeric refinement prescribes internal redundancy for a seven-axis arm");
     for(i in 0...sevenDistances.length)near(motionkit.path.PoseMath.distance(sevenSolver.forward(sevenSamples.q[i]),sevenPath.poseAt(sevenDistances[i])),0,
       "seven-axis differential refinement preserves authored task geometry",1e-6);
+    var sevenMid=2,sevenQ=sevenSamples.q[sevenMid],sevenRate=sevenSamples.qPrime[sevenMid],sevenCurve=sevenSamples.qDoublePrime[sevenMid];
+    var sevenStep=1e-5;
+    function sevenDerivativePose(offset:Float):Pose3 return sevenSolver.forward([for(j in 0...7)
+      sevenQ[j]+offset*sevenRate[j]+0.5*offset*offset*sevenCurve[j]]);
+    var sevenCentre=sevenDerivativePose(0),sevenMinus=sevenDerivativePose(-sevenStep),sevenPlus=sevenDerivativePose(sevenStep);
+    var sevenTask=sevenLine.derivativesAt(sevenDistances[sevenMid]);
+    var sevenLinear=[(sevenPlus.x-sevenMinus.x)/(2*sevenStep),(sevenPlus.y-sevenMinus.y)/(2*sevenStep),(sevenPlus.z-sevenMinus.z)/(2*sevenStep)];
+    var sevenSecond=[(sevenPlus.x-2*sevenCentre.x+sevenMinus.x)/(sevenStep*sevenStep),
+      (sevenPlus.y-2*sevenCentre.y+sevenMinus.y)/(sevenStep*sevenStep),(sevenPlus.z-2*sevenCentre.z+sevenMinus.z)/(sevenStep*sevenStep)];
+    var sevenAngular=poseRotationDelta(sevenMinus,sevenPlus,1/(2*sevenStep));
+    var sevenAngularBefore=poseRotationDelta(sevenDerivativePose(-2*sevenStep),sevenCentre,1/(2*sevenStep));
+    var sevenAngularAfter=poseRotationDelta(sevenCentre,sevenDerivativePose(2*sevenStep),1/(2*sevenStep));
+    for(axis in 0...3){
+      near(sevenLinear[axis],sevenTask.linear[axis],"seven-axis rates recover task velocity through independent FK",1e-5);
+      near(sevenSecond[axis],sevenTask.linearSecond[axis],"seven-axis curvature recovers task acceleration through independent FK",1e-3);
+      near(sevenAngular[axis],sevenTask.angular[axis],"seven-axis rates recover task angular velocity",1e-5);
+      near((sevenAngularAfter[axis]-sevenAngularBefore[axis])/(2*sevenStep),sevenTask.angularSecond[axis],
+        "seven-axis curvature recovers task angular acceleration",1e-3);
+    }
+    var sevenTimed=new ToppraPathTiming().time(sevenSamples,new PathTimingLimits([for(_ in sevenStart)1.0],[for(_ in sevenStart)2.0]));
+    try {
+      var sevenDuration=sevenTimed.trajectory.durationSeconds();check(sevenDuration>0,"internally redundant refinement succeeds in TOPP-RA");
+      var sevenFinal=sevenTimed.trajectory.evaluate(sevenDuration);
+      for(j in 0...7)near(sevenFinal.positions[j],sevenSamples.q[sevenSamples.q.length-1][j],"timed seven-axis path reaches its refined endpoint",1e-6);
+      var sevenBounds=new ValidationLimits(7,Int64.ofInt(0),Int64.ofInt(0));
+      for(j in 0...7){var bound=fixture.arm.group.limitsOf(j);sevenBounds.position(j,bound.lower,bound.upper);
+        sevenBounds.velocity(j,1.00001);sevenBounds.acceleration(j,2.00001);}
+      check(!sevenTimed.trajectory.validate(sevenBounds).hasFailure(),"timed seven-axis path passes native extrema limits");
+    }catch(error:Dynamic){sevenTimed.releaseDistanceMap();sevenTimed.trajectory.dispose();throw error;}
+    sevenTimed.releaseDistanceMap();sevenTimed.trajectory.dispose();
     var unsupportedFixture=buildContractArmFixture();
     unsupportedFixture.arm.robot.joints[4].axis=[0.1,0.0,Math.sqrt(0.99)];
     var unsupported=new robotkit.manipulation.KinematicGroup(unsupportedFixture.arm.robot,

@@ -66,6 +66,9 @@ class AnalyticPathRefiner {
     var rolls:Array<Float> = [],xs:Array<Float> = [],ys:Array<Float> = [];
     for(i in 0...selection.candidates.length){
       var actual=group.tcpPose(selection.candidates[i].q),layer=problem.samples[i];
+      // Full orientation has no redundancy to smooth. Fitting IK residuals
+      // would turn numerical pose error into artificial spline curvature.
+      if(ToolFreedom.isFull(layer.freedom)){rolls.push(0);xs.push(0);ys.push(0);continue;}
       var centre=OrientationLattice.centre(layer.target,layer.freedom);
       var reference=new Quat(centre.qx,centre.qy,centre.qz,centre.qw);
       var relative=reference.conjugate().multiply(actual.rotation),length=Math.sqrt(relative.z*relative.z+relative.w*relative.w);
@@ -79,7 +82,7 @@ class AnalyticPathRefiner {
     swingX=new RedundancySpline(distances,xs);swingY=new RedundancySpline(distances,ys);
   }
   public function externalState(index:Int,distance:Float):motionkit.robot.RedundancySpline.SplineSample {
-    if(index<0 || index>=external.length)throw "Unknown refinement external axis";
+    if(index<0 || index>=problem.externalJoints.length)throw "Unknown refinement external axis";
     return external[index].evaluate(distance);
   }
   /** Task rates must describe the refined TCP pose, including its smoothed

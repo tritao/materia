@@ -1327,3 +1327,16 @@ its authored pose-path geometry. Compiler-only and focused runtime pass
 (1,148,943 assertions). Chart-transition segmentation, authored-model and
 broader derivative/timing acceptance, default migration and final gates
 remain open; this is not proof of all redundant arm geometries.
+
+PP4 seven-axis derivative/timing acceptance: independent full-model FK
+perturbations cross-check linear/angular task velocity and acceleration
+from the internally redundant curve. This exposed artificial angular
+curvature from splines fitted to tiny numeric IK residuals in fully
+constrained orientation. Refinement now uses zero orientation redundancy
+for Fixed/Interpolated tasks, preserving their authored centre derivatives;
+free/cone tasks retain their fitted freedom coordinates. The seven-axis
+curve now passes these checks, succeeds in one TOPP-RA call, reaches its
+refined endpoint and passes native extrema position/velocity/acceleration
+limits. externalState also rejects internal profile indices. Compiler-only
+and focused runtime pass (1,148,964 assertions). Chart/branch transitions,
+default migration and authored full-plan gates remain outstanding.
