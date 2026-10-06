@@ -557,19 +557,19 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G3 | Complete; full gate passed | `d9d6de8f7` |
 | G4 | R0–R6/W4/W5 gates passed; X9e implemented, final gate stopped at user request | `05271b08d`, `bd2ccec83`, `0ec408c0d`; `c75e5d1a3`; source boundaries `bce647683`, `af673c4f4`, `757127cf0`, `b25366059` |
 | G5 | complete; full gate passed | `13e993340`; shared axis builder and physical rack regression |
-| G6 | implemented; build/runtime validation deferred at user request | `d11e4dacb` |
-| G7 | implemented; build/runtime validation deferred at user request | `11e9bc82b` |
-| G8 | implementation added; runtime and firmware verification deferred | `823de3191`, `6ac44c34e` |
-| G9 | implementation added; migration verification deferred | `cd7853a82` |
-| G10 | implementation added; mechanical/simulation verification deferred | see progress notes |
-| G11 | in progress; reference-state foundation added | see progress notes |
+| G6 | complete; validated by the G12 build checkpoint and the Phase C gate | `d11e4dacb` |
+| G7 | complete; picker validated by the G12 checkpoint and the Phase C gate | `11e9bc82b` |
+| G8 | complete; validated with G13's device work and the Phase C gate | `823de3191`, `6ac44c34e` |
+| G9 | complete; validated by the Phase C gate | `cd7853a82` |
+| G10 | complete; validated by the G12 checkpoint and the Phase C gate | see progress notes |
+| G11 | complete; homing validated by the G12 checkpoint and the Phase C gate | see progress notes |
 | G12 | implemented; requested compiler/runtime/picker/homing checkpoint passed | see progress notes |
 | G13 | complete; restructure and Phase C gate passed | `38f15b995`, `ad5211f04`, `acb1ab460`; see progress notes |
 | G14 | complete; Phase D build/runtime gate passed | `7822171b5`, `58075ec63`; see progress notes |
 | G15 | complete; four-run/ten-seam MuJoCo mission and Phase D gate passed | see progress notes |
 | G16 | complete; focused FK, solid/runtime clearance, drive and ownership checks passed | see progress notes |
 | G17 | complete | Two-station handling, 2.6 m FollowPath and CAD fillet pass; full Phase E gate passes. |
-| G18 | planned | — |
+| G18 | deferred (optional): inverted arm on an overhead gantry | — |
 
 ### G0 — merged-base baseline (2026-10-04)
 

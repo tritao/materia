@@ -612,6 +612,13 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
   Re-profile after each step and record the split here.
   4. Then revision 8's two savings: choose the travel direction from the coarse pass, and certify the
      task-space and execution checks for refined sections.
+  5. **Gantry welder (2026-10-06).** It plans in 69.17 s against a ≤ 9.63 s target (1.39×), while the
+     arm welds meet theirs.
+     - The gantry has no redundancy lattice (its five axes are solved directly), so the time is
+       elsewhere.
+     - Profile it with `PROCESS_PATH_PROFILE=1` before further G17 tuning, and record the split here.
+     - Suspects: corner-slowing time laws, sections without a proof that still run dense checks, and
+       per-section overhead across its four runs.
 - **Acceptance (on the PP0 benchmarks):**
   - G17 track weld under 15 s planning: 2600 mm, 5 mm leg, arm margin ≥ the PP0 value, no clearance
     violation, cycle time within 5 % of PP0 (**<=248.43 s**, from 236.6 s),
@@ -640,6 +647,21 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 - Same checks as PP5, plus the PP8 benchmarks with collision time recorded.
 - If CL2–CL4 haven't landed when PP9 is done, record that PP10 is waiting and finish PP11.
 
+**PP12. Integrate main** (2026-10-06). `gantries` is 68 commits behind local main and growing.
+- The mobile welder's P3 (touch searches, registration, checked stow) and the rest landed there. They
+  were built on the old offset-wrist `RobotArm` and the old planner.
+- PP0a and PP1 changed both, so this can't wait for the end. Do it at the next phase boundary (after
+  the current PP8 saving), and again whenever main gains welder or arm work.
+- **Steps:**
+  - merge local main into `gantries`;
+  - port P2/P3 code to the industrial `RobotArm` (configuration labels, EAIK), the structured
+    planner and the clearance certificate;
+  - delete any old-planner paths the merge brings back (PP-D9).
+- **Acceptance:** on both backends, the complete mobile weld mission (stations, touch registration,
+  all seams, stow) plus every PP0a baseline user, and the full suite. Record moved numbers with
+  reasons.
+- Landing on local main stays the user's call. This step leaves `gantries` mergeable.
+
 **PP11. Cleanup and docs.**
 - Update `motionkit/plans/README.md`, `LANE_C_PLANNING.md` (C5 configuration selection superseded) and
   `robotkit/ARCHITECTURE.md`.
@@ -648,6 +670,8 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 ## Order
 
 ```
+PP12 (integrate main) runs at the next phase boundary and again whenever main gains welder or arm
+work.
 PP0 → PP0a → PP1a → PP1 → PP2 → PP3 → PP4 → PP5 → PP6 → PP7 → PP8 → PP9 → PP11
                                    (collision plan CL2–CL4 on main) → PP10
 ```
