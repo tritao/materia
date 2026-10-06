@@ -348,6 +348,8 @@ class KinematicsTests extends MotionKitTestSupport {
       for(candidate in pathProblem.samples[1].candidates)for(joint in 0...ruleEnd.length)if(group.external[joint])
         near(candidate.q[joint],ruleEnd[joint],"path ladder holds the per-sample external rule",1e-12);
 
+      checkMovingExternalRefinement(group,pathProblem,nativeSeed);
+
       for (sample in 0...30) {
         var q = [for (joint in 0...group.group.count()) (joint == 0 ? 0.8 : 1.4) * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q), original = false;
@@ -494,6 +496,8 @@ class KinematicsTests extends MotionKitTestSupport {
       for(candidate in pathProblem.samples[1].candidates)for(joint in 0...ruleEnd.length)if(group.external[joint])
         near(candidate.q[joint],ruleEnd[joint],"path ladder holds the per-sample external rule",1e-12);
 
+      checkMovingExternalRefinement(group,pathProblem,nativeSeed);
+
       for (sample in 0...30) {
         var q = [for (joint in 0...group.group.count()) (joint == 0 ? 0.8 : 1.4) * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q), original = false;
@@ -514,6 +518,38 @@ class KinematicsTests extends MotionKitTestSupport {
         check(original, "External UR includes the original arm branch");
       }
       check(group.numericSolveCount() == before, "External UR uses no numeric pose queries");
+    }
+  }
+
+  function checkMovingExternalRefinement(group:robotkit.manipulation.KinematicGroup,
+      pathProblem:motionkit.robot.CandidateProblem,nativeSeed:Array<Float>):Void {
+    var numeric = new ManipulatorKinematics(group);
+    var selected = motionkit.robot.StructuredLadder.search(pathProblem);
+    check(selected.diagnostic == null,"moving external axes have a connected analytic route");
+    var refiner = new motionkit.robot.AnalyticPathRefiner(group,pathProblem,selected);
+    // Independent full-model FK differences supply task rates. Arm joints
+    // remain constant while the track and optional work frame move together.
+    function externalPose(s:Float):Pose3 {
+      var q = nativeSeed.copy();
+      for(j in 0...q.length)if(group.external[j])q[j] += 0.5*s;
+      return numeric.forward(q);
+    }
+    var refinedSeed = nativeSeed.copy(),h = 1e-4;
+    for(i in 0...11) {
+      var s = 0.001*i,p = externalPose(s),minus = externalPose(s-h),plus = externalPose(s+h);
+      var omega = poseRotationDelta(minus,plus,1/(2*h));
+      var omegaBefore = poseRotationDelta(externalPose(s-2*h),p,1/(2*h));
+      var omegaAfter = poseRotationDelta(p,externalPose(s+2*h),1/(2*h));
+      var velocity = [(plus.x-minus.x)/(2*h),(plus.y-minus.y)/(2*h),(plus.z-minus.z)/(2*h)].concat(omega);
+      var acceleration = [(plus.x-2*p.x+minus.x)/(h*h),(plus.y-2*p.y+minus.y)/(h*h),
+        (plus.z-2*p.z+minus.z)/(h*h)].concat([for(k in 0...3)(omegaAfter[k]-omegaBefore[k])/(2*h)]);
+      refinedSeed = refiner.sample(s,p,motionkit.path.OrientationPolicy.Fixed,refinedSeed).q;
+      var derivatives = refiner.refinedDerivatives(s,refinedSeed,p,motionkit.path.OrientationPolicy.Fixed,velocity,acceleration);
+      for(j in 0...refinedSeed.length) {
+        near(refinedSeed[j],nativeSeed[j]+(group.external[j]?0.5*s:0),"moving-frame refinement preserves the selected arm configuration",1e-6);
+        near(derivatives.first[j],group.external[j]?0.5:0,"moving-frame differential rates separate arm and external motion",1e-6);
+        near(derivatives.second[j],0,"moving-frame differential acceleration cancels reference curvature",1e-4);
+      }
     }
   }
 

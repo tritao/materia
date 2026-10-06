@@ -1052,3 +1052,16 @@ a serial fixture integration, not the authored track one-pass timing
 acceptance; Cartesian/numeric refinement, geometric centre derivative
 providers, moving-reference/OPW coverage and production integration remain
 outstanding, so PP4 and the overall plan remain incomplete.
+
+PP4 moving-reference acceptance: shared OPW and UR fixtures now refine
+selected routes with a moving rotated track, both with and without a
+simultaneously rotating work frame. Independent full-model FK differences
+supply task derivatives at eleven fine samples. The analytic solve keeps
+all arm joints constant, holds the spline external coordinates exactly,
+recovers their prescribed 0.5 path-unit rates, and cancels moving-reference
+curvature to zero joint acceleration. Existing numeric-query counters
+also prove these refinement checks do not invoke numeric pose IK.
+Compiler-only and focused runtime pass (1,147,331 assertions). Production
+integration, Cartesian/numeric refinement, branch segmentation, geometric
+centre derivative providers and authored timing/performance gates remain
+outstanding; this does not complete PP4.
