@@ -185,7 +185,9 @@ class AnalyticPathRefiner {
         new LatticeCandidate(c.q,[for(_ in c.q)0],[for(_ in problem.externalJoints)0],0,0,0,c.branch,0,false)];
     }else candidates=cartesian!=null ? cartesian.sample(refined,q,OrientationPolicy.Fixed,1,1,1)
       : sampler.sample(refined,q,OrientationPolicy.Fixed,ranges,1,1,1,problem.request.maxJump);
-    for(c in candidates)if(numeric!=null || c.branch==branch){
+    var configuration=problem.configuration;
+    for(c in candidates)if((numeric!=null || c.branch==branch) &&
+        (configuration==null || cast(configuration,SixAxisConfiguration).accepts(c.configuration))){
       var d=0.0,legal=true;for(j in 0...q.length){d+=Math.abs(c.q[j]-q[j]);
         if(Math.abs(c.q[j]-previous[j])>problem.request.maxJump[j]+1e-12)legal=false;}
       if(legal && d<bestDistance){best=c;bestDistance=d;}}

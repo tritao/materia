@@ -2084,3 +2084,18 @@ This implements IK/candidate labels and sampling pins, not yet authored program 
 mission pin fields, full refined-path pin enforcement or all-eight labelled authored
 RobotArm branch acceptance. Those remain PP0a work before class load/interference
 checks, all-user re-baselines and the full phase suite. PP1a has not started.
+
+### PP0a refinement configuration pins
+
+CandidateProblem now retains its hard configuration constraint, and
+AnalyticPathRefiner applies it to each analytic re-solve as well as the selected
+geometric branch. This prevents proximity to a seed on another periodic lift
+from overriding an authored physical-turn pin.
+
+Compiler-only and focused C4 runtime passed (1,152,126 assertions):
+`process-path-refinement-pin-build.log`, `process-path-refinement-pin-runtime.log`.
+The regression starts refinement from a different legal wrist revolution with
+a jump bound large enough to admit both lifts, and verifies the pinned lift wins.
+This covers refinement re-solves; it does not establish continuous timed-curve
+pin acceptance. Program/mission propagation and the remaining PP0a gates remain
+open, and PP1a has not started.

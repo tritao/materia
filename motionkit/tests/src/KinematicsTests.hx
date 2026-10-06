@@ -2043,13 +2043,22 @@ class KinematicsTests extends MotionKitTestSupport {
     }
     var pin:motionkit.robot.SixAxisConfiguration=cast originalConfiguration;
     var pinRequest=new PathRequest([0.0,1.0],[wrappedTarget,wrappedTarget],wrappedQ,new IkTolerance(1e-6,1e-6),
-      [for(_ in wrappedQ)1.0],[for(_ in wrappedQ)1.0]);
+      [for(_ in wrappedQ)7.0],[for(_ in wrappedQ)1.0]);
     var pinned=new motionkit.robot.CandidateProblem(wrappedArm,pinRequest,
       new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1,1,1,true,null,null,pin));
     for(layer in pinned.samples){
       check(layer.candidates.length>0,"configuration-pinned ladder retains the authored branch");
       for(candidate in layer.candidates)check(pin.accepts(candidate.configuration),"every pinned candidate preserves branch and turn labels");
     }
+    var pinnedSelection=motionkit.robot.StructuredLadder.search(pinned);
+    check(pinnedSelection.diagnostic==null,"configuration-pinned ladder selects a complete route");
+    var pinnedRefiner=new motionkit.robot.AnalyticPathRefiner(wrappedArm,pinned,pinnedSelection);
+    // Seed the same geometric branch on a different legal wrist revolution.
+    // Refinement must honor the authored turn constraint rather than proximity.
+    var otherTurn=wrappedQ.copy();otherTurn[5]-=2*Math.PI;
+    var refinedPin=pinnedRefiner.sample(0.5,wrappedTarget,OrientationPolicy.Fixed,otherTurn);
+    check(pin.accepts(refinedPin.configuration),"refinement re-solves preserve the hard configuration pin");
+    near(refinedPin.q[5],wrappedQ[5],"refinement rejects the nearer unpinned wrist revolution",1e-5);
     check(foundOriginal, "OPW enumerates legal periodic lifts beyond the nearest plus/minus turn");
     var singularQ = wrappedQ.copy();
     singularQ[4] = wrappedAnalytic.parameters.offsets[4] / wrappedAnalytic.parameters.signCorrections[4];

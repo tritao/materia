@@ -16,6 +16,8 @@ class CandidateProblem {
   public final samples:Array<CandidateLayer>;
   public final externalJoints:Array<Int>;
   public final pinnedStart:Bool;
+  /** Hard branch/lift constraint, also applied to refinement re-solves. */
+  public final configuration:Null<SixAxisConfiguration>;
   public final rollCount:Int;
   public final tiltCount:Int;
   public final azimuthCount:Int;
@@ -50,6 +52,7 @@ class CandidateProblem {
       throw "Candidate problem requires a group and complete path request";
     var settings=options==null ? new CandidateSamplingOptions() : options;
     this.request=request;this.pinnedStart=settings.pinStart;
+    this.configuration=settings.configuration;
     rollCount=settings.rollCount;tiltCount=settings.tiltRings+1;azimuthCount=settings.azimuthCount;
     for(i in 0...request.distances.length) {
       if(!Math.isFinite(request.distances[i]) || request.distances[i]<0 ||
