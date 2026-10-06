@@ -28,6 +28,8 @@ class WeldEntry {
 /** A weld planned for an arm: the plan with the torch's rolls chosen, and how it comes in and leaves. */
 class PlannedWeld {
   public final plan:WeldPlan;
+  /** Continuous joint selection has no single constant roll per segment. */
+  public final selected:Bool;
   /** The roll of the torch about its wire chosen for each segment, in radians. */
   public final rolls:Array<Float>;
   public final entry:WeldEntry;
@@ -42,7 +44,8 @@ class PlannedWeld {
   public final endJoints:Array<Float>;
 
   public function new(plan:WeldPlan, rolls:Array<Float>, styles:Array<Int>, entry:WeldEntry, retreat:Pose3, exitName:String, checked:Int,
-      endJoints:Array<Float>) {
+      endJoints:Array<Float>,selected:Bool=false) {
+    this.selected=selected;
     this.styles = styles;
     this.plan = plan;
     this.rolls = rolls;

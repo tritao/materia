@@ -488,6 +488,7 @@ class MissionPlayer implements SessionMember {
     var active = cast(welding, WeldingPlanRunner);
     var plan = active.lastPlan();
     if (plan == null) return "";
+    if(plan.selected)return '${Math.round(active.planningSeconds * 100) / 100} s, ${plan.checked} poses, globally selected joint path';
     return '${Math.round(active.planningSeconds * 100) / 100} s, ${plan.checked} poses, rolls ${[for (roll in plan.rolls) Math.round(roll * 180 / Math.PI)].join("/")} deg, in ${plan.entry.name}, out ${plan.exitName}';
   }
 

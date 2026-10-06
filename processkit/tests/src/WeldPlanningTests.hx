@@ -281,13 +281,14 @@ class WeldPlanningTests {
     },channels,motionkit.robot.PlanningLimits.ofGroup(fixture.arm,new robotkit.model.SteadyLoads(),2.0),1,world);
     var executionProblem=new processkit.WeldPathProblem(requested,WRIST,[WeldCorner.AROUND],processkit.WeldingPlanRunner.FRAME);
     try {
-      runner.runSelected(executionProblem,freeCurves);
+      runner.run(requested);
       for(_ in 0...4000){
         runner.update(0.01,{arc:arc,currentA:arc?200.0:0.0,voltageV:24.0,touch:false,
           fault:processkit.tool.WeldFault.None,powerW:arc?4800.0:0.0});
         harness.step(haxe.Int64.ofInt(++tick));
         if(runner.completed() || runner.failure()!=null)break;
       }
+      check(cast(runner.lastPlan(),processkit.WeldPathPlanner.PlannedWeld).selected,"default runner uses global joint selection");
       check(runner.completed() && runner.failure()==null,'selected runner executes its retained compilation: ${runner.failure()}');
       check(runner.motion.planningMetrics().seconds==0 && runner.motion.planningMetrics().numericIkSolves==0,
         "selected runner launch performs no additional compilation");

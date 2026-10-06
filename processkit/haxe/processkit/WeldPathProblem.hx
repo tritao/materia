@@ -95,6 +95,8 @@ class WeldPathProblem {
     }];
   }
 
+  public function cornerStyles():Array<Int> return styles.copy();
+
   /** Resume the same authored geometry; corner turns and weave phase stay at
    * their original coordinates rather than being regenerated from a shorter plan. */
   public function recovery(distance:Float):WeldPathProblem
