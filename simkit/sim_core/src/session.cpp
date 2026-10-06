@@ -529,7 +529,7 @@ public:
         const auto result = create_part(object.part, desc.shape, desc.pose, desc.motion_type,
             desc.motion_type == NKSIM_MOTION_DYNAMIC ? desc.mass : 0.0,
             default_layers ? 1u : desc.collision_layer, default_layers ? 1u : desc.collision_mask,
-            desc.rest_contact_group);
+            desc.rest_contact_group, desc.surface.struct_size == 0 ? nullptr : &desc.surface);
         if (result != NKSIM_OK) return result;
         out = next_object_++;
         objects_.emplace(out, std::move(object));
@@ -1029,7 +1029,8 @@ private:
 
     nksim_result create_part(Part &part, const nksim_shape_desc &shape, const nksim_pose &pose,
                              uint32_t motion_type, double mass, uint32_t layer, uint32_t mask,
-                             uint64_t rest_contact_group = 0) {
+                             uint64_t rest_contact_group = 0,
+                             const nksim_surface *surface = nullptr) {
         part.shape_desc = shape;
         part.initial = part.pose = part.tick_pose = pose;
         nkscene_transaction transaction = 0;
@@ -1050,6 +1051,10 @@ private:
             nksim_shape_create_convex(world_, part.vertices.data(), part.vertices.size(), &part.shape) :
             nksim_shape_create(world_, &shape_desc, &part.shape);
         if (result != NKSIM_OK) {
+            destroy_part(part);
+            return result;
+        }
+        if (surface && (result = nksim_shape_set_surface(world_, part.shape, surface)) != NKSIM_OK) {
             destroy_part(part);
             return result;
         }

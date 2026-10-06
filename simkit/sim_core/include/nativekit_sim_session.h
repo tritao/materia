@@ -74,7 +74,7 @@ typedef struct nksim_object_desc {
     uint32_t collision_layer;
     uint32_t collision_mask;
     uint64_t rest_contact_group; /**< Same mounted-contact policy as nksim_body_desc. */
-    uint64_t reserved[1];
+    nksim_surface surface; /**< Contact surface of this environment object's shape. */
 } nksim_object_desc;
 
 /** One kinematic body of an actor. */
@@ -246,6 +246,10 @@ NKSIM_API nksim_result NKSIM_CALL nksim_frame_get_object_pose(
 NKSIM_API nksim_result NKSIM_CALL nksim_frame_get_actor_pose(
     nksim_frame frame, nksim_actor actor, uint32_t part, nksim_pose *out_pose NK_INOUT);
 
+/** Writes physical body states for the next tick; each body must belong to this session. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_set_body_states(
+    nksim_session session, const nksim_body_state *states NK_IN_ARRAY(count), uint32_t count);
+
 #ifndef NKSIM_HAXEON_IMPORT
 
 /**
@@ -327,9 +331,7 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_submit_brake_outputs(
 NKSIM_API nksim_result NKSIM_CALL nksim_session_submit_forces(
     nksim_session session, const nksim_body_force *forces NK_IN_ARRAY(count), uint32_t count);
 NKSIM_API nksim_result NKSIM_CALL nksim_session_drive_bodies(
-    nksim_session session, const nksim_body_state *states, uint32_t count);
-NKSIM_API nksim_result NKSIM_CALL nksim_session_set_body_states(
-    nksim_session session, const nksim_body_state *states, uint32_t count);
+    nksim_session session, const nksim_body_state *states NK_IN_ARRAY(count), uint32_t count);
 /** The frame's snapshot, borrowed for the frame's lifetime. */
 NKSIM_API nksim_snapshot NKSIM_CALL nksim_frame_snapshot(nksim_frame frame);
 

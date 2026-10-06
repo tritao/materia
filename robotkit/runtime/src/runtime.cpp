@@ -46,6 +46,37 @@ rk_result RobotRuntime::channel_value(const char *channel, rk_event_value &out_v
     return RK_ERROR_INVALID_ARGUMENT;
 }
 
+rk_result RobotRuntime::write_output(const char *channel, const rk_event_value &value) {
+    if (!channel || channel[0] == '\0') return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    uint32_t index = blueprint_.channel_count;
+    for (uint32_t i = 0; i < blueprint_.channel_count; ++i) {
+        if (std::strncmp(blueprint_.channels[i].id, channel,
+                sizeof(blueprint_.channels[i].id)) == 0) {
+            index = i;
+            break;
+        }
+    }
+    if (index == blueprint_.channel_count ||
+        blueprint_.channels[index].safe_value.kind != value.kind ||
+        (value.kind != RK_EVENT_DIGITAL && value.kind != RK_EVENT_ANALOG) ||
+        (value.kind == RK_EVENT_DIGITAL && value.digital > 1) ||
+        (value.kind == RK_EVENT_ANALOG && !std::isfinite(value.analog)))
+        return RK_ERROR_INVALID_ARGUMENT;
+
+    const auto &safe = blueprint_.channels[index].safe_value;
+    const bool is_safe = value.kind == RK_EVENT_DIGITAL
+        ? value.digital == safe.digital : value.analog == safe.analog;
+    if (state_.safety != RK_SAFETY_READY && !is_safe)
+        return RK_ERROR_INVALID_STATE;
+    const auto &current = channel_outputs_[index];
+    const bool unchanged = value.kind == RK_EVENT_DIGITAL
+        ? current.digital == value.digital : current.analog == value.analog;
+    if (unchanged) return RK_OK;
+    record_event(index, value, 0, 0, state_.source_timestamp_ns, RK_EVENT_CONTROLLER);
+    return RK_OK;
+}
+
 void RobotRuntime::record_event(uint32_t channel_index, const rk_event_value &value,
     uint64_t plan_id, uint64_t scheduled_ns, uint64_t owner_ns, rk_event_cause cause) {
     control_.channel_values[channel_index] = value;

@@ -242,6 +242,8 @@ public:
     rk_result poll_events(rk_event_record_batch &out_batch);
     /** The current output value of a declared process channel. */
     rk_result channel_value(const char *channel, rk_event_value &out_value) const;
+    /** Set a declared process output from controller logic. */
+    rk_result write_output(const char *channel, const rk_event_value &value);
     /** Reports whether the endpoint accepts buffered trajectory chunks. */
     bool supports_trajectory_queue() const noexcept {
         return endpoint_ != nullptr && endpoint_->supports_trajectory_queue();

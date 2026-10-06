@@ -6,6 +6,11 @@ import nativekit.scene.GeometryData;
 import cnckit.CncCompiler;
 import cnckit.CncController;
 import cnckit.CncDiagnostic.CncSeverity;
+import cnckit.controller.RobotInterface;
+import cnckit.controller.RobotInterfaceAlarm;
+import cnckit.controller.RobotInterfaceChannels;
+import cnckit.controller.RobotInterfaceInput;
+import cnckit.controller.RobotInterfaceOutputs;
 import robotkit.model.Joint;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
@@ -20,6 +25,8 @@ import toolpathkit.path.MoveKind;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;
+import toolpathkit.path.ToolpathFrame;
+import toolpathkit.path.GeometryTools;
 import toolpathkit.tool.Tool;
 import motionkit.axis.MotionAxisBlueprint;
 import motionkit.event.EventValue;
@@ -89,20 +96,25 @@ class CncProgramPlayer implements SessionMember {
 	static inline final STOCK_REFRESH = 0.05;
 	/** Ray spacing of the simulated stock, in metres. */
 	static inline final STOCK_SPACING = 0.0005;
+	/** Assumed encoder deadband: the cell treats the spindle as stopped below 5 rpm. */
+	static inline final SPINDLE_STANDSTILL_RPM = 5.0;
 
 	/** Spindle and coolant channels a CNC program's events need on the machine's runtime. */
 	public static function channelsFor(job:CncJob):ToolpathChannels {
 		return new ToolpathChannels(job.channelScope);
 	}
 
-	public static function processChannels(job:CncJob):Array<ProcessChannelDeclaration> {
+	public static function processChannels(job:CncJob, interfaceManaged:Bool = false):Array<ProcessChannelDeclaration> {
 		var channels = channelsFor(job);
-		return [
+		var result = [
 			new ProcessChannelDeclaration(channels.spindleSpeed, ProcessEventValue.Analog(0.0)),
 			new ProcessChannelDeclaration(channels.spindleDirection, ProcessEventValue.Analog(0.0)),
 			new ProcessChannelDeclaration(channels.coolantMist, ProcessEventValue.Digital(false)),
 			new ProcessChannelDeclaration(channels.coolantFlood, ProcessEventValue.Digital(false))
 		];
+		if (interfaceManaged) result.push(new ProcessChannelDeclaration(
+			RobotInterfaceChannels.alarmCodeChannel(job.channelScope), ProcessEventValue.Analog(0.0)));
+		return result;
 	}
 
 	final session:SimSession;
@@ -143,6 +155,19 @@ class CncProgramPlayer implements SessionMember {
 	final newMotion:Void->ManipulatorMotion;
 	var motion:ManipulatorMotion;
 	final loop:Bool;
+	final interfaceManaged:Bool;
+	var robotInterface:Null<RobotInterface>;
+	final interfaceAlarmCodeChannel:Null<String>;
+	final doorCoils:Null<{a:String, b:String}>;
+	final viseCoils:Null<{a:String, b:String}>;
+	final interfaceSensorIds:Null<{doorOpen:String, doorClosed:String, viseOpen:String, viseClamped:String, presence:String}>;
+	var loadPosition:Array<Float> = [];
+	var parkingProgram:Null<MotionProgram> = null;
+	var parkingStarted = false;
+	var parkingComplete = false;
+	var startRequested = false;
+	var pendingToolChange = false;
+	var lastInterfaceOutputs:Null<RobotInterfaceOutputs> = null;
 	var started = false;
 	/** Passes of the program completed since the session started. */
 	public var passes(default, null):Int = 0;
@@ -171,12 +196,15 @@ class CncProgramPlayer implements SessionMember {
 	var homingComplete:Bool = false;
 	/** The G-code line the machine is executing; 0 between lines. */
 	public var currentLine(default, null):Int = 0;
+	/** The interlock alarm currently published by the machine's robot interface. */
+	public var interfaceAlarm(default, null):RobotInterfaceAlarm = RobotInterfaceAlarm.None;
 	/** Speed of every move, as a fraction of the program's. */
 	public var speedOverride(default, null):Float = 1.0;
 	final source:String;
 	final recipe:MachiningRecipe;
 	/** Sensor selected from the assembled machine; null on routers without at-speed feedback. */
 	public final atSpeedSensorId:Null<String>;
+	final spindleVelocityJoint:Int;
 	final cellInput:Null<String->Null<EventValue>>;
 	/** The restart the operator asked for, until the machine can take it. */
 	var restartRequest:Null<{op:Int, distance:Float}> = null;
@@ -191,7 +219,7 @@ class CncProgramPlayer implements SessionMember {
 	 */
 	public function new(job:CncJob, robot:AssemblyRobot, simulation:Simulation,
 			project:ProjectDocumentSession, session:SimSession, ?cellInput:String->Null<EventValue>,
-			?check:PlanCheckOptions) {
+			?check:PlanCheckOptions, interfaceManaged:Bool = false) {
 		if (job.axes.length != 3) throw "A CNC job needs its X, Y and Z axes";
 		var definition = project.projectAssemblyDefinition, physical = project.projectPhysical;
 		if (definition == null || physical == null) throw "A CNC job needs the project's machine";
@@ -201,6 +229,9 @@ class CncProgramPlayer implements SessionMember {
 		this.cellInput = cellInput;
 		this.project = project;
 		this.loop = job.loop;
+		this.interfaceManaged = interfaceManaged;
+		robotInterface = interfaceManaged ? new RobotInterface() : null;
+		interfaceAlarmCodeChannel = interfaceManaged ? RobotInterfaceChannels.alarmCodeChannel(job.channelScope) : null;
 		this.source = job.source;
 		var placement = new AssemblyState(definition, state);
 		checkOptions = check == null ? new PlanCheckOptions() : check.copy();
@@ -256,8 +287,15 @@ class CncProgramPlayer implements SessionMember {
 		// A program runs from wherever the machine is, so each pass compiles it from there.
 		compileFrom = position -> {
 			var compiled = CncCompiler.compileDetailed(job.source, controller, position, machine.travel);
-			var errors = [for (diagnostic in compiled.diagnostics) if (diagnostic.severity == CncSeverity.Error) diagnostic.toString()];
-			if (errors.length > 0) throw 'The machining program: ${errors.join("; ")}';
+			var sourceLines = job.source.split("\n");
+			var errors = [for (diagnostic in compiled.diagnostics) if (diagnostic.severity == CncSeverity.Error) {
+				var message = diagnostic.toString();
+				if (diagnostic.span.line > 0 && diagnostic.span.line <= sourceLines.length)
+					message += ' [${sourceLines[diagnostic.span.line - 1]}]';
+				message;
+			}];
+			if (errors.length > 0) throw 'The machining program from [${position.x}, ${position.y}, ${position.z}] with G54 ${job.workOffset}: ${errors.join("; ")}';
+			loadPosition = finalMachinePosition(compiled.program);
 			var lowered = ToolpathMotion.lower(compiled.program, machine);
 			if (lowered.program == null)
 				throw 'The machining program: ${[for (diagnostic in lowered.diagnostics) diagnostic.message].join("; ")}';
@@ -266,22 +304,62 @@ class CncProgramPlayer implements SessionMember {
 			return compiled.program;
 		};
 		this.robot = robot;
+		if (interfaceManaged) {
+			if (job.controllerId == null || cellInput == null)
+				throw "A robot-tended CNC job needs controller ownership and cell signals";
+			var separator = job.controllerId.lastIndexOf("/");
+			var machineRoot = separator < 0 ? "" : job.controllerId.substr(0, separator);
+			function path(id:String):String return machineRoot.length == 0 ? id : machineRoot + "/" + id;
+			var door = pneumaticDriveFor(robot, path("door"));
+			var vise = pneumaticDriveFor(robot, path("mill/vise/jaw"));
+			var doorB = door.channelB, viseB = vise.channelB;
+			if (doorB == null || viseB == null)
+				throw "The door and vise need double-solenoid cylinder outputs";
+			doorCoils = {a:door.channelA, b:doorB};
+			viseCoils = {a:vise.channelA, b:viseB};
+			interfaceSensorIds = {doorOpen:path("door-open"), doorClosed:path("door-closed"),
+				viseOpen:path("vise-open"), viseClamped:path("vise-clamped"), presence:path("stock-present")};
+			for (id in [interfaceSensorIds.doorOpen, interfaceSensorIds.doorClosed,
+				interfaceSensorIds.viseOpen, interfaceSensorIds.viseClamped, interfaceSensorIds.presence])
+				if (!hasSensor(id)) throw 'Robot-tended CNC machine is missing field sensor "$id"';
+		} else {
+			doorCoils = null;
+			viseCoils = null;
+			interfaceSensorIds = null;
+		}
 		var spindlePart = robot.part("project:" + job.spindle);
-		var sensorId:Null<String> = null;
+	var sensorId:Null<String> = null;
+	var sensorJoint = -1;
 		for (sensor in robot.blueprint.sensors) if (sensor.kind == "at_speed" && sensor.joint >= 0 &&
 				robot.blueprint.joints[sensor.joint].childLink == spindlePart.linkIndex) {
 			if (sensorId != null) throw 'Spindle "${job.spindle}" has multiple readiness sensors';
 			sensorId = sensor.id;
+			sensorJoint = sensor.joint;
 		}
 		var processOwned = robot.blueprint.processJoints();
 		for (joint in robot.blueprint.joints) if (joint.childLink == spindlePart.linkIndex &&
 				processOwned[joint.joint] && sensorId == null)
 			throw 'Process spindle "${job.spindle}" needs its own readiness sensor';
 		atSpeedSensorId = sensorId;
+		spindleVelocityJoint = sensorJoint;
 		solver = binding.solver;
 		axisJoints = planning.indices;
 		// Compiling from the starting pose now reports a bad program before the simulation starts.
 		var compiled = compileFrom(new Point3(start[0], start[1], start[2]));
+		parkingComplete = !interfaceManaged;
+		if (interfaceManaged) {
+			var parkSource = 'G21 G90 G53 G0 X${machineMillimetres(loadPosition[0])} ' +
+				'Y${machineMillimetres(loadPosition[1])} Z${machineMillimetres(loadPosition[2])}\nM2';
+			var parked = CncCompiler.compileDetailed(parkSource, controller,
+				new Point3(start[0], start[1], start[2]), machine.travel);
+			var parkErrors = [for (diagnostic in parked.diagnostics) if (diagnostic.severity == CncSeverity.Error) diagnostic.toString()];
+			if (parkErrors.length > 0) throw 'Machine load-position move: ${parkErrors.join("; ")}';
+			var loweredPark = ToolpathMotion.lower(parked.program, machine);
+			if (loweredPark.program == null) throw "Machine load-position move did not lower";
+			var parkProgram = loweredPark.program;
+			if (parkProgram == null) throw "Machine load-position move did not lower";
+			parkingProgram = parkProgram;
+		}
 		for (op in compiled.ops) switch op {
 			case Move(kind, _, _, _, provenance), MachineMove(kind, _, _, _, provenance): kindByLine.set(provenance.line, kind);
 			case _:
@@ -351,6 +429,10 @@ class CncProgramPlayer implements SessionMember {
 					var number = Std.parseInt(channel.substr(channels.toolChangePrefix.length));
 					if (number == null || !toolsByNumber.exists(number)) throw 'The machining program loads unknown tool $channel';
 					if (number != loadedTool) {
+						if (interfaceManaged) {
+							pendingToolChange = true;
+						return EventValue.Digital(false);
+						}
 						loadedTool = number;
 						if (stock != null) stock.load(toolsByNumber.get(number));
 					}
@@ -430,13 +512,38 @@ class CncProgramPlayer implements SessionMember {
 				return;
 			}
 		}
+		if (interfaceManaged && !parkingComplete) {
+			var park = parkingProgram;
+			if (park == null) throw "Robot-tended CNC machine has no load-position program";
+			if (!parkingStarted) {
+				motion.run(park);
+				parkingStarted = true;
+			}
+			motion.update(session.fixedTimestep());
+			if (motion.failure != null) {
+				failure = 'Machine load-position move: ${motion.failure}';
+				return;
+			}
+			if (motion.completed) {
+				parkingComplete = true;
+				var positions = robot.robot.snapshot().positions;
+				var pose = solver.forward([for (index in axisJoints) positions.get(index)]);
+				compileFrom(new Point3(pose.x, pose.y, pose.z));
+				motion = newMotion();
+				if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
+			}
+			return;
+		}
 		var clock = Sys.time();
 		takeRestart();
-		if (started && motion.completed && !passCounted) {
+		var passFinished = started && motion.completed && !passCounted;
+		if (interfaceManaged) updateRobotInterface(passFinished);
+		if (passFinished) {
 			passes++;
 			passCounted = true;
 		}
-		if (!started || (loop && motion.completed && !motion.running && pendingContinuation == null)) {
+		if ((!started && (!interfaceManaged || startRequested)) ||
+				(!interfaceManaged && loop && motion.completed && !motion.running && pendingContinuation == null)) {
 			continuation = null;
 			if (started) {
 				// A program runs from wherever the machine is: the position the planner last
@@ -452,6 +559,8 @@ class CncProgramPlayer implements SessionMember {
 			motion.run(program);
 			started = true;
 			passCounted = false;
+			startRequested = false;
+			pendingToolChange = false;
 			runSeconds += Sys.time() - clock;
 			clock = Sys.time();
 		}
@@ -496,6 +605,139 @@ class CncProgramPlayer implements SessionMember {
 		}
 
 	}
+
+	function updateRobotInterface(passFinished:Bool):Void {
+		var logic = robotInterface;
+		var ids = interfaceSensorIds;
+		var door = doorCoils;
+		var vise = viseCoils;
+		if (logic == null || ids == null || door == null || vise == null) return;
+		var sensors = robot.robot.snapshot().sensors;
+		function readSensor(id:String):Bool {
+			for (index in 0...sensors.length) {
+				var frame = sensors.get(index);
+				if (frame.sensorId == id) return frame.values.length > 0 && frame.values.get(0) >= 0.5;
+			}
+			return false;
+		}
+		var input = new RobotInterfaceInput(
+			cellDigital(RobotInterfaceChannels.REQUEST_DOOR_OPEN),
+			cellDigital(RobotInterfaceChannels.REQUEST_DOOR_CLOSE),
+			cellDigital(RobotInterfaceChannels.REQUEST_CLAMP),
+			cellDigital(RobotInterfaceChannels.REQUEST_UNCLAMP),
+			cellDigital(RobotInterfaceChannels.CYCLE_START),
+			cellDigital(RobotInterfaceChannels.ROBOT_CLEAR),
+			cellDigital(RobotInterfaceChannels.FAULT_RESET),
+			readSensor(ids.doorOpen), readSensor(ids.doorClosed),
+			readSensor(ids.viseClamped), readSensor(ids.viseOpen), readSensor(ids.presence),
+			spindleStopped(), axesAtLoad(), passFinished, pendingToolChange);
+		var outputs = logic.update(input, session.fixedTimestep());
+		interfaceAlarm = outputs.alarm;
+		if (outputs.startCycle) startRequested = true;
+		if (outputs.holdCycle && motion.running) motion.hold();
+		writeDigital(RobotInterfaceChannels.CNC_READY, outputs.ready);
+		writeDigital(RobotInterfaceChannels.DOOR_OPEN, outputs.doorOpen);
+		writeDigital(RobotInterfaceChannels.DOOR_CLOSED, outputs.doorClosed);
+		writeDigital(RobotInterfaceChannels.CLAMPED, outputs.clamped);
+		writeDigital(RobotInterfaceChannels.UNCLAMPED, outputs.unclamped);
+		writeDigital(RobotInterfaceChannels.PART_PRESENT, outputs.partPresent);
+		writeDigital(RobotInterfaceChannels.IN_CYCLE, outputs.inCycle);
+		writeDigital(RobotInterfaceChannels.CYCLE_COMPLETE, outputs.cycleComplete);
+		writeDigital(RobotInterfaceChannels.ALARM, outputs.alarm != RobotInterfaceAlarm.None);
+		var alarmChannel = interfaceAlarmCodeChannel;
+		if (alarmChannel != null)
+			robot.runtime.writeOutput(alarmChannel, ProcessEventValue.Analog(outputs.alarm));
+		robot.runtime.writeDigitalOutput(door.a, outputs.doorCoilA);
+		robot.runtime.writeDigitalOutput(door.b, outputs.doorCoilB);
+		robot.runtime.writeDigitalOutput(vise.a, outputs.viseCoilA);
+		robot.runtime.writeDigitalOutput(vise.b, outputs.viseCoilB);
+		lastInterfaceOutputs = outputs;
+	}
+
+	function writeDigital(channel:String, value:Bool):Void {
+		var prior = lastInterfaceOutputs;
+		var unchanged = if (prior == null) false else switch channel {
+			case RobotInterfaceChannels.CNC_READY: prior.ready == value;
+			case RobotInterfaceChannels.DOOR_OPEN: prior.doorOpen == value;
+			case RobotInterfaceChannels.DOOR_CLOSED: prior.doorClosed == value;
+			case RobotInterfaceChannels.CLAMPED: prior.clamped == value;
+			case RobotInterfaceChannels.UNCLAMPED: prior.unclamped == value;
+			case RobotInterfaceChannels.PART_PRESENT: prior.partPresent == value;
+			case RobotInterfaceChannels.IN_CYCLE: prior.inCycle == value;
+			case RobotInterfaceChannels.CYCLE_COMPLETE: prior.cycleComplete == value;
+			case RobotInterfaceChannels.ALARM: (prior.alarm != RobotInterfaceAlarm.None) == value;
+			default: false;
+		};
+		if (!unchanged) robot.runtime.writeDigitalOutput(channel, value);
+	}
+
+	function cellDigital(channel:String):Bool {
+		var source = cellInput;
+		if (source == null) return false;
+		return switch source(channel) {
+			case Digital(value): value;
+			case _: false;
+		};
+	}
+
+	function spindleStopped():Bool {
+		var stoppedCommand = switch robot.runtime.channelValue(channels.spindleSpeed) {
+			case Analog(value): Math.abs(value) <= SPINDLE_STANDSTILL_RPM;
+			case _: false;
+		};
+		if (!stoppedCommand || spindleVelocityJoint < 0) return false;
+		var velocities = robot.robot.snapshot().velocities;
+		if (spindleVelocityJoint >= velocities.length) return false;
+		return Math.abs(velocities.get(spindleVelocityJoint)) <= SPINDLE_STANDSTILL_RPM * (2.0 * Math.PI / 60.0);
+	}
+
+	function axesAtLoad():Bool {
+		if (loadPosition.length != 3) return false;
+		var positions = robot.robot.snapshot().positions;
+		var machine = solver.forward([for (index in axisJoints) positions.get(index)]);
+		return Math.abs(machine.x - loadPosition[0]) <= 0.001 &&
+			Math.abs(machine.y - loadPosition[1]) <= 0.001 && Math.abs(machine.z - loadPosition[2]) <= 0.001;
+	}
+
+	function hasSensor(id:String):Bool {
+		for (candidate in robot.blueprint.sensors) if (candidate.id == id) return true;
+		return false;
+	}
+
+	function pneumaticDriveFor(robot:AssemblyRobot,
+			jointId:String):robotkit.runtime.RobotRuntimePneumaticDriveBlueprint {
+		for (drive in robot.blueprint.pneumaticDrives)
+			if (drive.joint >= 0 && drive.joint < robot.model.joints.length &&
+				robot.model.joints[drive.joint].id == jointId) return drive;
+		throw 'Robot-tended CNC machine is missing its pneumatic actuator on joint "$jointId"';
+	}
+
+	function finalMachinePosition(program:ToolpathProgram):Array<Float> {
+		var frame = ToolpathFrame.of(program), result:Array<Float> = null;
+		var lastWasMachineMove = false;
+		for (op in program.ops) {
+			frame.advance(op);
+			switch op {
+				case Move(_, geometry, _, _, _):
+					var point = GeometryTools.pointAt(geometry, GeometryTools.length(geometry));
+					var offset = frame.toMachine();
+					result = [point.x + offset[0], point.y + offset[1], point.z + offset[2]];
+					lastWasMachineMove = false;
+				case MachineMove(_, geometry, _, _, _):
+					var point = GeometryTools.pointAt(geometry, GeometryTools.length(geometry));
+					result = [point.x, point.y, point.z];
+					lastWasMachineMove = true;
+				case _:
+			}
+		}
+		if (result == null) throw "CNC program has no final machine position";
+		if (interfaceManaged && !lastWasMachineMove)
+			throw "Robot-tended CNC program must end with a G53 move to its load position";
+		return result;
+	}
+
+	static function machineMillimetres(metres:Float):String
+		return Std.string(Math.round(metres * 1000.0 * 1e6) / 1e6);
 
 	/** What the plan checks have found in the plans the machine has started: stall and accuracy findings and how near the drives came. */
 	public function planChecks():PlanCheckSummary return motion.checks;
@@ -592,6 +834,15 @@ class CncProgramPlayer implements SessionMember {
 		currentLine = 0;
 		loadedTool = initialTool;
 		started = false;
+		startRequested = false;
+		pendingToolChange = false;
+		lastInterfaceOutputs = null;
+		parkingStarted = false;
+		parkingComplete = !interfaceManaged;
+		if (interfaceManaged) {
+			robotInterface = new RobotInterface();
+			interfaceAlarm = RobotInterfaceAlarm.None;
+		}
 		failure = null;
 		passes = 0;
 		passCounted = false;

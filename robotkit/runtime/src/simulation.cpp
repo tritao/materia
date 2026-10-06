@@ -17,6 +17,19 @@ namespace {
 
 bool valid_pose(const double position[3], const double rotation[4]);
 
+bool valid_contact_surface(const double friction[3], uint32_t friction_dimensions,
+                           double contact_time_constant, double contact_damping_ratio,
+                           uint32_t contact_filter) {
+    if (friction_dimensions != 0 && friction_dimensions != 1 && friction_dimensions != 3 &&
+        friction_dimensions != 4 && friction_dimensions != 6)
+        return false;
+    for (uint32_t axis = 0; axis < 3; ++axis)
+        if (!std::isfinite(friction[axis]) || friction[axis] < 0.0) return false;
+    return std::isfinite(contact_time_constant) && contact_time_constant >= 0.0 &&
+        std::isfinite(contact_damping_ratio) && contact_damping_ratio >= 0.0 &&
+        contact_filter <= NKSIM_CONTACT_PAIRS_AND_ENVIRONMENT;
+}
+
 void require_sim(nksim_result result, const char *operation) {
     if (result != NKSIM_OK)
         throw std::runtime_error(operation);
@@ -30,7 +43,8 @@ void require_scene(nkscene_result result, const char *operation) {
 bool valid_link_shape(const rk_simulation_link_shape &shape, uint32_t link_count) {
     if (shape.link >= link_count || shape.type < RK_LINK_SHAPE_BOX ||
         shape.type > RK_LINK_SHAPE_CYLINDER || !valid_pose(shape.position, shape.rotation) ||
-        shape.contact_filter > NKSIM_CONTACT_PAIRS_AND_ENVIRONMENT)
+        !valid_contact_surface(shape.friction, shape.friction_dimensions,
+            shape.contact_time_constant, shape.contact_damping_ratio, shape.contact_filter))
         return false;
     const uint32_t sized = shape.type == RK_LINK_SHAPE_BOX ? 3
         : shape.type == RK_LINK_SHAPE_SPHERE ? 1 : 2;
@@ -501,6 +515,9 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             const auto &hull = robot_desc->link_hulls[index];
             if (hull.link >= blueprint.link_count || hull.vertex_count < 4 || hull.vertex_count > 64)
                 throw std::invalid_argument("invalid link hull");
+            if (!valid_contact_surface(hull.friction, hull.friction_dimensions,
+                    hull.contact_time_constant, hull.contact_damping_ratio, hull.contact_filter))
+                throw std::invalid_argument("invalid link hull contact surface");
             for (uint32_t coordinate = 0; coordinate < hull.vertex_count * 3; ++coordinate)
                 if (!std::isfinite(hull.vertices[coordinate]))
                     throw std::invalid_argument("link hull vertex is not finite");
@@ -569,6 +586,15 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 nksim_shape piece = 0;
                 require_sim(nksim_shape_create_convex(world, hull.vertices, hull.vertex_count * 3, &piece),
                             "nksim_shape_create_convex(link hull)");
+                nksim_surface surface{};
+                surface.struct_size = sizeof(surface);
+                std::copy_n(hull.friction, 3, surface.friction);
+                surface.friction_dimensions = hull.friction_dimensions;
+                surface.contact_time_constant = hull.contact_time_constant;
+                surface.contact_damping_ratio = hull.contact_damping_ratio;
+                surface.contact_filter = hull.contact_filter;
+                require_sim(nksim_shape_set_surface(world, piece, &surface),
+                            "nksim_shape_set_surface(link hull)");
                 link_shapes_.push_back(piece);
                 add_child(piece, origin, identity);
                 has_link_shape = true;

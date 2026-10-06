@@ -89,7 +89,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 30 /**< Serial deployment input wiring and device switch captures. */
+    RK_API_VERSION = 32 /**< Deployment wiring, drive references, brakes and collision surfaces. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -574,9 +574,16 @@ enum { RK_FAULT_ENDPOINT = 1, RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_L
     RK_FAULT_CLOCK_SYNC_LOST = 4, RK_FAULT_DUAL_DRIVE_SKEW = 5,
     RK_FAULT_QUEUE_REVISION_MISMATCH = 6,
     /** A velocity target outlived its command's expires_at_ns; the joint brakes to zero. */
-    RK_FAULT_COMMAND_EXPIRED = 7, RK_FAULT_LIMIT_SWITCH = 8,
-    RK_FAULT_PROCESS_CHANNEL_MISSING = 9, RK_FAULT_PROCESS_CHANNEL_TYPE = 10,
-    RK_FAULT_PROCESS_CHANNEL_VALUE = 11, RK_FAULT_BRAKE_RELEASE_TIMEOUT = 12,
+    RK_FAULT_COMMAND_EXPIRED = 7,
+    /** A drive failed to reach its geometry trip switch. */
+    RK_FAULT_LIMIT_SWITCH = 8,
+    /** A required process input is absent. */
+    RK_FAULT_PROCESS_CHANNEL_MISSING = 9,
+    /** A process input has the wrong value type. */
+    RK_FAULT_PROCESS_CHANNEL_TYPE = 10,
+    /** A process input carries an invalid value. */
+    RK_FAULT_PROCESS_CHANNEL_VALUE = 11,
+    RK_FAULT_BRAKE_RELEASE_TIMEOUT = 12,
     RK_FAULT_BRAKE_FEEDBACK = 13 };
 
 typedef uint32_t rk_session_state;
@@ -937,6 +944,15 @@ RK_API rk_result RK_CALL rk_robot_runtime_poll_events(
  */
 RK_API rk_result RK_CALL rk_robot_runtime_get_channel_value(
     rk_robot_runtime runtime, const char *channel RK_UTF8, rk_event_value *out_value);
+
+/**
+ * Applies a controller-owned digital or analog output between owner ticks. Its type must
+ * match the channel declaration. Once safety is not READY, only the declared safe value
+ * is accepted.
+ */
+RK_API rk_result RK_CALL rk_robot_runtime_write_output(
+    rk_robot_runtime runtime, const char *channel RK_UTF8,
+    const rk_event_value *value);
 
 /**
  * Copies the latest state into the caller-provided value.

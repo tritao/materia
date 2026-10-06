@@ -90,6 +90,8 @@ class NativeRuntimeEndpoint implements RuntimeEndpoint {
     return RobotKitRuntime.rk_robot_runtime_poll_events(nativeHandle(), batch);
   public function channelValue(channel:String, value:rk_event_value):Int
     return RobotKitRuntime.rk_robot_runtime_get_channel_value(nativeHandle(), channel, value);
+  public function writeOutput(channel:String, value:rk_event_value):Int
+    return RobotKitRuntime.rk_robot_runtime_write_output(nativeHandle(), channel, value);
   public function contacts():Array<RobotContact> return captureContacts == null ? [] : captureContacts();
   public function close():Void {
     if (closed) return;

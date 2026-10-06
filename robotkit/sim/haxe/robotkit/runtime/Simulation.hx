@@ -343,6 +343,13 @@ class Simulation {
           if (!Math.isFinite(vertices[coordinate])) throw "Simulation link hull has a non-finite vertex";
           native.set_vertices(coordinate, vertices[coordinate]);
         }
+        var surface = source.surface;
+        if (surface != null) {
+          for (axis in 0...3) native.set_friction(axis, surface.friction[axis]);
+          native.set_friction_dimensions(surface.frictionDimensions);
+          native.set_contact_time_constant(surface.contactTimeConstant);
+          native.set_contact_damping_ratio(surface.contactDampingRatio);
+        }
         robotDesc.set_link_hulls(index, native);
       }
     }
@@ -1049,6 +1056,7 @@ class Simulation {
 typedef SimulationLinkHull = {
   var link:Int;
   var vertices:Array<Float>;
+  @:optional var surface:robotkit.model.CollisionShape.ContactSurface;
 }
 
 typedef SimulationOmniDriveState = {

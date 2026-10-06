@@ -585,9 +585,12 @@ class DriveSystem {
 					if (lower == null || upper == null || !Math.isFinite(lower) || !Math.isFinite(upper) ||
 						lower > upper || hysteresis == null || !Math.isFinite(hysteresis) || hysteresis < 0)
 						throw 'Joint switch "${record.id}" has an invalid window or hysteresis';
-					if ((edge.limits.lower != null && lower < edge.limits.lower) ||
-						(edge.limits.upper != null && upper > edge.limits.upper))
-						throw 'Joint switch "${record.id}" lies outside joint travel';
+					// Switch heads can sense a member while it compresses a real end stop.
+					// `overtravel` is the mechanical room beyond the commanded joint limits.
+					var overtravel = edge.limits.overtravel == null ? 0.0 : edge.limits.overtravel;
+					if ((edge.limits.lower != null && lower < edge.limits.lower - overtravel) ||
+						(edge.limits.upper != null && upper > edge.limits.upper + overtravel))
+						throw 'Joint switch "${record.id}" lies outside mechanical travel including end-stop room';
 					result.push({id: record.id, kind: record.kind, joint: record.joint,
 						windowLower: lower, windowUpper: upper, hysteresis: hysteresis});
 				} else {

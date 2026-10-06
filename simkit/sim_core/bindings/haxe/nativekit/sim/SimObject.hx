@@ -28,6 +28,10 @@ class SimObject {
         SimWorld.check(NativeKitSim.nksim_session_teleport_object(session.nativeHandle(), handle,
             pose.toNative()), "object.teleport");
 
+    /** Places a free dynamic object on the next physics tick and clears its velocity. */
+    public function setPoseForNextTick(pose:SimPose):Void
+        session.setObjectPoseForNextTick(this, pose);
+
     /** Removes the object while stopped. */
     public function dispose():Void
         SimWorld.check(NativeKitSim.nksim_session_destroy_object(session.nativeHandle(), handle),

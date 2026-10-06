@@ -408,10 +408,18 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * One convex hull of a link built from several rigid parts, as XYZ vertices in
 	 * the link frame; 4..64 vertices.
 	 */
-	struct rk_simulation_link_hull @layout(1544, 8) {
+	struct rk_simulation_link_hull @layout(1592, 8) {
 		link: u32 @offset(0);
 		vertex_count: u32 @offset(4);
 		vertices: array<f64, 192> @offset(8);
+		/**
+		 * Contact surface for this physical part; zero fields keep the backend default.
+		 */
+		friction: array<f64, 3> @offset(1544);
+		contact_time_constant: f64 @offset(1568);
+		contact_damping_ratio: f64 @offset(1576);
+		friction_dimensions: u32 @offset(1584);
+		contact_filter: u32 @offset(1588);
 	}
 	/**
 	 * One primitive collision shape attached to a robot link, posed in the link frame.
@@ -521,7 +529,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
 	}
-	struct rk_simulation_robot_desc @layout(2537928, 8) {
+	struct rk_simulation_robot_desc @layout(2562504, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		flags: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -604,38 +612,38 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		/**
 		 * Appended v28 tail: physical cylinders are simulation models, not runtime targets.
 		 */
-		pneumatic_drive_count: u32 @offset(2470416);
-		pneumatic_drives: array<rk_simulation_pneumatic_drive, 512> @offset(2470424);
+		pneumatic_drive_count: u32 @offset(2494992);
+		pneumatic_drives: array<rk_simulation_pneumatic_drive, 512> @offset(2495000);
 		/**
 		 * Appended v29 tail: spindle speed is a typed analog process drive.
 		 */
-		velocity_drive_count: u32 @offset(2495000);
-		velocity_drives: array<rk_simulation_velocity_drive, 512> @offset(2495008);
+		velocity_drive_count: u32 @offset(2519576);
+		velocity_drives: array<rk_simulation_velocity_drive, 512> @offset(2519584);
 		/**
 		 * Optional board-defined peripheral profile; zero disables it.
 		 */
-		virtual_peripheral_kind: u32 @offset(2515488);
-		virtual_peripheral_parameter_count: u32 @offset(2515492);
-		virtual_external_sensor_mask: u32 @offset(2515496);
-		virtual_peripheral_parameters: array<f64, 16> @offset(2515504);
+		virtual_peripheral_kind: u32 @offset(2540064);
+		virtual_peripheral_parameter_count: u32 @offset(2540068);
+		virtual_external_sensor_mask: u32 @offset(2540072);
+		virtual_peripheral_parameters: array<f64, 16> @offset(2540080);
 		/**
 		 * Optional physical virtual-device switch wiring and step thresholds.
 		 */
-		virtual_device_input_count: u32 @offset(2515632);
-		virtual_device_input_actuator: array<u8, 64> @offset(2515636);
-		virtual_device_input_active_high: array<u8, 64> @offset(2515700);
-		virtual_device_input_active_above: array<u8, 64> @offset(2515764);
-		virtual_device_input_threshold_steps: array<i64, 64> @offset(2515832);
-		virtual_device_input_switch_ids: array<u8, 4096> @offset(2516344);
+		virtual_device_input_count: u32 @offset(2540208);
+		virtual_device_input_actuator: array<u8, 64> @offset(2540212);
+		virtual_device_input_active_high: array<u8, 64> @offset(2540276);
+		virtual_device_input_active_above: array<u8, 64> @offset(2540340);
+		virtual_device_input_threshold_steps: array<i64, 64> @offset(2540408);
+		virtual_device_input_switch_ids: array<u8, 4096> @offset(2540920);
 		/**
 		 * Optional original shaft feedback mappings; count zero keeps legacy mappings.
 		 */
-		virtual_device_feedback_count: u32 @offset(2520440);
-		virtual_device_feedback_joint: array<u8, 64> @offset(2520444);
-		virtual_device_feedback_ratio: array<f64, 64> @offset(2520512);
-		virtual_device_feedback_offset: array<f64, 64> @offset(2521024);
-		brake_count: u32 @offset(2521536);
-		brakes: array<rk_simulation_brake, 512> @offset(2521544);
+		virtual_device_feedback_count: u32 @offset(2545016);
+		virtual_device_feedback_joint: array<u8, 64> @offset(2545020);
+		virtual_device_feedback_ratio: array<f64, 64> @offset(2545088);
+		virtual_device_feedback_offset: array<f64, 64> @offset(2545600);
+		brake_count: u32 @offset(2546112);
+		brakes: array<rk_simulation_brake, 512> @offset(2546120);
 	}
 	/**
 	 * World-frame twist of one body: metres per second and radians per second.

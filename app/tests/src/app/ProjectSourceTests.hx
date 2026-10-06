@@ -11,6 +11,9 @@ import haxeon.ui.theme.Theme;
 import app.MateriaProjectRunner;
 import app.Main.ReferenceEditorApp;
 import app.ProjectDocumentSession;
+import BenchMill.BenchMill;
+import BenchMillPreview;
+import TendingControllers;
 import app.MatePickTool;
 import cadkit.modeling.AssemblyState;
 import app.ApplicationSimulation;
@@ -49,6 +52,9 @@ import motionkit.trajectory.PlanDiagnostic;
 import sys.FileSystem;
 import sys.io.File;
 import haxe.io.Bytes;
+import materia.project.SceneArtifact;
+import cnckit.controller.RobotInterfaceAlarm;
+import cnckit.controller.RobotInterfaceChannels;
 
 /** Save and reopen a generated project without persisting its mesh buffers. */
 @:access(app.MissionPlayer)
@@ -2382,12 +2388,12 @@ class ProjectSourceTests {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/machine-tending/materia.controllers.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     check(generated.controllers != null && generated.controllers.length == 2 &&
-      generated.signals != null && generated.signals.length == 2,
-      "tending cell exports two wired controllers and two signal links");
+      generated.signals != null && generated.signals.length == 16,
+      "tending cell exports two wired controllers and all robot-interface signals");
     var wires = generated.signals;
     if (wires == null) throw "Tending cell lost its signal wires";
     var robotSignals = [for (wire in wires) if (wire.from.controller == "robotController") wire];
-    check(robotSignals.length == 1, "the robot cabinet has one authored output signal");
+    check(robotSignals.length == 7, "the robot cabinet owns every robot request output");
     var first = robotSignals[0], output = false, published = false, now = 0.0;
     var bus = new CellSignals(wires, () -> now,
       (controller, channel) -> channel == first.name && output,
@@ -2541,6 +2547,275 @@ class ProjectSourceTests {
       check(Math.abs(target.snapshot().velocities.get(spindleIndex)) > 0.9 * spindleSpeed,
         "an emergency-stopped spindle coasts instead of applying full braking torque");
       Sys.println('tending controllers: ${ids.length} robots, ${[for (_ in joints.keys()) _].length} disjoint joints');
+    } catch (error:Dynamic) {
+      simulation.dispose(); session.dispose(); throw error;
+    }
+    simulation.dispose(); session.dispose();
+  }
+
+  /** Scripted robot outputs exercise the cabinet bus, interlocks, real valves and one CNC pass. */
+  static function checkTendingRobotInterface(root:String):Void {
+    var tendingCell = new TendingControllers();
+    var cell = SceneArtifact.decode(tendingCell.previewArtifact());
+    var cellAssembly = cell.assemblyDefinition, cellAssemblyState = cell.assemblyState;
+    if (cellAssembly == null || cellAssemblyState == null)
+      throw "Tending CNC preview has no assembly state";
+    var loadCell = new AssemblyState(cellAssembly, cellAssemblyState);
+    var stockOccurrence = [for (item in cellAssembly.occurrences) if (item.id == "mill/mill/stock") item];
+    if (stockOccurrence.length != 1) throw "Tending cell has no bearing-block stock occurrence";
+    for (index in 0...3) {
+      var axis = ["x", "y", "z"][index];
+      loadCell.setJoint('mill/mill/$axis', tendingCell.mill.loadPosition[index]);
+    }
+    loadCell.setJoint("mill/door", 0.0);
+    var stockPose = loadCell.worldPose("mill/mill/stock");
+    // Keep the scripted probe outside the machine's collision envelope until the door opens.
+    var blankStagePose = {x: stockPose.x - 2000, y: stockPose.y, z: stockPose.z,
+      qx: stockPose.qx, qy: stockPose.qy, qz: stockPose.qz, qw: stockPose.qw};
+    // A second occurrence of the stock geometry is the loose test blank. It starts away from
+    // the vise and is moved into the seat by the scripted test, as the operator/robot would.
+    cellAssembly.occurrences.push({id: "interface-test-blank",
+      definition: stockOccurrence[0].definition, initialPose: blankStagePose});
+    var cellState = new AssemblyState(cellAssembly, cellAssemblyState);
+    for (axis in ["x", "y", "z"]) {
+      var jointId = 'mill/mill/$axis';
+      var joint = [for (item in cellState.definition.joints) if (item.id == jointId) item];
+      var lower = joint.length == 1 ? joint[0].limits.lower : null;
+      var upper = joint.length == 1 ? joint[0].limits.upper : null;
+      if (lower == null || upper == null)
+        throw 'Tending cell has no bounded CNC axis "$jointId"';
+      cellState.setJoint(jointId, (lower + upper) / 2.0);
+    }
+    cellState.setJoint("mill/door", 0.0);
+    cell.assemblyState = cellState.record();
+    var enclosed = SceneArtifact.decode(BenchMillPreview.enclosed());
+    var job = enclosed.machining;
+    if (job == null) throw "Enclosed mill has no bearing-block job";
+    job.axes = [for (axis in job.axes) "mill/" + axis];
+    job.spindle = "mill/" + job.spindle;
+    if (job.stock != null) job.stock = "mill/" + job.stock;
+    if (job.toolPart != null) job.toolPart = "mill/" + job.toolPart;
+    job.channelScope = "mill/" + job.channelScope;
+    job.controllerId = "mill/cncController";
+    var targetId = job.target;
+    if (targetId == null) throw "Enclosed job has no target part";
+    var targetParts = [for (part in enclosed.parts) if (part.id == targetId) part];
+    if (targetParts.length != 1) throw "Enclosed job target geometry is missing";
+    cell.parts.push(targetParts[0]);
+    cell.machining = job;
+    var generated = MateriaProjectRunner.generatedFromArtifact(SceneArtifact.encode(cell));
+    if (generated.assemblyDefinition == null || generated.assemblyState == null)
+      throw "Generated tending CNC project has no assembly state";
+    var testBlank:Null<SceneObjectData> = null, seatedStock:Null<SceneObjectData> = null;
+    for (object in generated.objects) {
+      if (object.id == "project:interface-test-blank") testBlank = object;
+      if (object.id == "project:mill/mill/stock") seatedStock = object;
+    }
+    if (testBlank == null || seatedStock == null)
+      throw "Generated tending CNC project lost its scripted blank or vise stock";
+    testBlank.dynamicBody = true;
+    var generatedState = new cadkit.modeling.AssemblyState(generated.assemblyDefinition, generated.assemblyState);
+    var generatedSensors = generated.assemblyDefinition.sensors;
+    if (generatedSensors == null) throw "Generated tending cell lost its field sensors";
+    var stockSensor = [for (sensor in generatedSensors) if (sensor.id == "mill/stock-present") sensor];
+    var sensorOccurrence = stockSensor.length == 1 ? stockSensor[0].occurrence : null;
+    var sensorConnector = stockSensor.length == 1 ? stockSensor[0].connector : null;
+    if (sensorOccurrence == null || sensorConnector == null)
+      throw "Generated tending cell lost its vise presence-sensor connector";
+    var sensorPose = generatedState.worldConnector(sensorOccurrence, sensorConnector);
+    var stockInSensor = materia.assembly.AssemblyFrames.transformPoint(
+      materia.assembly.AssemblyFrames.inverse(sensorPose), seatedStock.x / generated.metresPerUnit,
+      seatedStock.y / generated.metresPerUnit, seatedStock.z / generated.metresPerUnit);
+    if (Math.abs(generatedState.joint("mill/mill/y") -
+        (cellState.joint("mill/mill/y"))) > 1e-9)
+      throw 'Generated tending CNC project changed Y from ${cellState.joint("mill/mill/y")} to ${generatedState.joint("mill/mill/y")}';
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/machine-tending/materia.controllers.project.json");
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    try {
+      check(simulation.rebuild(session.sensors, session.scene, session),
+        "tending CNC cell builds: " + simulation.error);
+      var player = simulation.cncPlayer();
+      var signals = simulation.cellSignals;
+      if (player == null || signals == null) throw "Tending CNC cell lost its interface runtime";
+      function signal(name:String):Bool {
+        var value = signals.input("robotController", name);
+        return value != null && switch value {case Digital(on): on; case _: false;};
+      }
+      function sensorImage():String {
+        var owner = simulation.world.robot("assembly:tending-controllers:mill/cncController");
+        if (owner == null) return "missing CNC runtime";
+        var snapshot = owner.snapshot();
+        var doorIndex = owner.description().joints.indexOf("mill/door");
+        var door = doorIndex < 0 ? "missing door joint" : 'doorQ=${snapshot.positions.get(doorIndex)}';
+        var jawIndex = owner.description().joints.indexOf("mill/mill/vise/jaw");
+        var jaw = jawIndex < 0 ? "missing vise jaw" : 'jawQ=${snapshot.positions.get(jawIndex)}';
+        var values:Array<String> = [];
+        for (frame in snapshot.sensors.toArray())
+          values.push(frame.sensorId + "=" + (frame.values.length == 0 ? "empty" : Std.string(frame.values.get(0))));
+        return '$door, $jaw; ${values.join(",")}';
+      }
+      function livePresenceFrame():Null<materia.assembly.AssemblyRecord.AssemblyFrame> {
+        var sensorRuntime = simulation.world.robot("assembly:tending-controllers:mill/cncController");
+        if (sensorRuntime == null) return null;
+        var presence:Null<robotkit.core.SensorFrame> = null;
+        for (sample in sensorRuntime.snapshot().sensors.toArray())
+          if (sample.sensorId == "mill/stock-present") presence = sample;
+        if (presence == null) return null;
+        var presentation = simulation.capturePresentationSnapshot();
+        var robotVisual = [for (robot in presentation.robots)
+          if (robot.id == "assembly:tending-controllers:mill/cncController") robot];
+        if (robotVisual.length != 1) return null;
+        var link = [for (item in robotVisual[0].links) if (item.id == presence.linkId) item];
+        if (link.length != 1) return null;
+        var mount:materia.assembly.AssemblyRecord.AssemblyFrame = {
+          x: presence.mountPosition.get(0), y: presence.mountPosition.get(1), z: presence.mountPosition.get(2),
+          qx: presence.mountRotation.get(0), qy: presence.mountRotation.get(1),
+          qz: presence.mountRotation.get(2), qw: presence.mountRotation.get(3)};
+        var actualSensor = AssemblyRobot.compose({position: link[0].position, rotation: link[0].rotation}, mount);
+        return {x: actualSensor.position[0], y: actualSensor.position[1], z: actualSensor.position[2],
+          qx: actualSensor.rotation[0], qy: actualSensor.rotation[1],
+          qz: actualSensor.rotation[2], qw: actualSensor.rotation[3]};
+      }
+      function looseBlankImage():String {
+        var object = simulation.environmentObject("project:interface-test-blank");
+        var active = simulation.activeSession();
+        if (object == null || active == null) return "missing loose blank";
+        var frame = active.capture();
+        var pose = frame.objectPose(object);
+        frame.dispose();
+        var liveSensor = "missing live sensor mount";
+        var sensorFrame = livePresenceFrame();
+        if (sensorFrame != null) {
+          var blankLocal = materia.assembly.AssemblyFrames.transformPoint(
+            materia.assembly.AssemblyFrames.inverse(sensorFrame), pose.x, pose.y, pose.z);
+          var presentation = simulation.capturePresentationSnapshot();
+          var stockVisual = [for (item in presentation.environment) if (item.id == "project:mill/mill/stock") item];
+          var stockImage = "missing";
+          if (stockVisual.length == 1) {
+            var stockPosition = stockVisual[0].position;
+            stockImage = '(${stockPosition[0]},${stockPosition[1]},${stockPosition[2]})';
+          }
+          liveSensor = 'live=(${sensorFrame.x},${sensorFrame.y},${sensorFrame.z}); ' +
+            'live-local=(${blankLocal.x},${blankLocal.y},${blankLocal.z}); stock=$stockImage';
+        }
+        return 'blank=(${pose.x},${pose.y},${pose.z}); ' +
+          'stock-sensor=(${sensorPose.x * generated.metresPerUnit},' +
+          '${sensorPose.y * generated.metresPerUnit},${sensorPose.z * generated.metresPerUnit}); ' +
+          'stock-local=(${stockInSensor.x},${stockInSensor.y},${stockInSensor.z}); $liveSensor';
+      }
+      function awaitSignal(name:String, expected:Bool, maxTicks:Int):Void {
+        for (_ in 0...maxTicks) {
+          simulation.step();
+          if (signal(name) == expected) return;
+          if (player.interfaceAlarm != RobotInterfaceAlarm.None) {
+            var spindleStopped = @:privateAccess player.spindleStopped();
+            var axesAtLoad = @:privateAccess player.axesAtLoad();
+            var runtime = (@:privateAccess player.robot).runtime;
+            var channels = @:privateAccess player.channels;
+            var commandedSpeed = switch runtime.channelValue(channels.spindleSpeed) {
+              case Analog(value): Std.string(value);
+              case _: "<none>";
+            };
+            var commandedDirection = switch runtime.channelValue(channels.spindleDirection) {
+              case Analog(value): Std.string(value);
+              case _: "<none>";
+            };
+            var diagnosticRobot = simulation.world.robot("assembly:tending-controllers:mill/cncController");
+            var spindleIndex = diagnosticRobot == null ? -1 :
+              diagnosticRobot.description().joints.indexOf("mill/mill/spindle-turn");
+            var actualSpindleVelocity = spindleIndex < 0 ? "<missing>" :
+              Std.string(diagnosticRobot.snapshot().velocities.get(spindleIndex));
+            throw 'Robot interface alarm ${player.interfaceAlarm} while waiting for $name=$expected ' +
+              '(ready=${signal(RobotInterfaceChannels.CNC_READY)}, doorClosed=${signal(RobotInterfaceChannels.DOOR_CLOSED)}, ' +
+              'doorOpen=${signal(RobotInterfaceChannels.DOOR_OPEN)}, clamped=${signal(RobotInterfaceChannels.CLAMPED)}, ' +
+              'unclamped=${signal(RobotInterfaceChannels.UNCLAMPED)}, partPresent=${signal(RobotInterfaceChannels.PART_PRESENT)}, ' +
+              'spindleStopped=$spindleStopped (v=$actualSpindleVelocity, command=$commandedSpeed, direction=$commandedDirection), ' +
+              'axesAtLoad=$axesAtLoad, ' +
+              'sensors=${sensorImage()})';
+          }
+          var failure = simulation.cncFailure();
+          if (failure != null) throw 'CNC failed while waiting for $name: $failure';
+        }
+        var detail = name == RobotInterfaceChannels.PART_PRESENT ? looseBlankImage() :
+          name == RobotInterfaceChannels.CYCLE_COMPLETE ? {
+            var lines = (@:privateAccess player.source).split("\n");
+            var line = player.currentLine > 0 && player.currentLine <= lines.length
+              ? StringTools.trim(lines[player.currentLine - 1]) : "<between lines>";
+            var progress = (@:privateAccess player.motion).progress();
+            var playerRobot = @:privateAccess player.robot;
+            var playerChannels = @:privateAccess player.channels;
+            var spindleCommand = switch playerRobot.runtime.channelValue(playerChannels.spindleSpeed) {
+              case Analog(value): Std.string(value);
+              case _: "<no analog command>";
+            };
+            var spindleDirection = switch playerRobot.runtime.channelValue(playerChannels.spindleDirection) {
+              case Analog(value): Std.string(value);
+              case _: "<no analog command>";
+            };
+            var spindleDrive = [for (drive in playerRobot.blueprint.velocityDrives)
+              if (drive.speedChannel == playerChannels.spindleSpeed)
+                'joint=${drive.joint}, scale=${drive.radiansPerSpeedUnit}, maxRate=${drive.maxRate}, maxEffort=${drive.maxEffort}'];
+            var owner = simulation.world.robot("assembly:tending-controllers:mill/cncController");
+            var state = owner == null ? null : owner.snapshot();
+            var joints = owner == null ? [] : owner.description().joints;
+            var motionState:Array<String> = [];
+            if (state != null) for (name in ["mill/mill/x", "mill/mill/y", "mill/mill/z",
+                "mill/mill/spindle-turn", "mill/mill/spindle-motor-turn"]) {
+              var joint = joints.indexOf(name);
+              if (joint >= 0) motionState.push('$name q=${state.positions.get(joint)}, ' +
+                'target=${state.setpointPositions.get(joint)}, v=${state.velocities.get(joint)}');
+            }
+            'line=${player.currentLine} "$line", progress=${progress.op}/${progress.pathDistance}, ' +
+              'passes=${player.passes}, CNC failure=${player.failure}, simulation failure=${simulation.cncFailure()}, ' +
+              'spindle-command-rpm=$spindleCommand, direction=$spindleDirection, drive=${spindleDrive.join("; ")}, ' +
+              'signals=${sensorImage()}, joints=${motionState.join("; ")}';
+          } : "";
+        throw 'Timed out waiting for $name=$expected at ${simulation.activeSession().simulationTime()} s $detail';
+      }
+      function request(name:String, response:String, maxTicks:Int):Void {
+        signals.writeSignal(name, true);
+        awaitSignal(response, true, maxTicks);
+        signals.writeSignal(name, false);
+        simulation.step();
+      }
+
+      // Readiness is delayed until the derived G53 load position has been reached.
+      awaitSignal(RobotInterfaceChannels.CNC_READY, true, 10000);
+      signals.writeSignal(RobotInterfaceChannels.ROBOT_CLEAR, true);
+      simulation.step();
+      request(RobotInterfaceChannels.REQUEST_DOOR_OPEN, RobotInterfaceChannels.DOOR_OPEN, 800);
+      var blankObject = simulation.environmentObject("project:interface-test-blank");
+      if (blankObject == null) throw "The scripted loose blank has no simulation body";
+      var presenceFrame = livePresenceFrame();
+      if (presenceFrame == null) throw "The vise presence sensor has no live simulation frame";
+      // Place the free physics blank at the geometry-derived vise seat. Its environmental contact
+      // with the moving jaw is what should stop the clamp at the preset blank width.
+      var blankCentre = materia.assembly.AssemblyFrames.transformPoint(presenceFrame,
+        BenchMill.STOCK_WIDTH * generated.metresPerUnit / 2,
+        BenchMill.STOCK_DEPTH * generated.metresPerUnit / 2,
+        BenchMill.STOCK_HEIGHT * generated.metresPerUnit / 2);
+      blankObject.setPoseForNextTick(new nativekit.sim.SimPose(blankCentre.x, blankCentre.y, blankCentre.z,
+        presenceFrame.qx, presenceFrame.qy, presenceFrame.qz, presenceFrame.qw));
+      awaitSignal(RobotInterfaceChannels.PART_PRESENT, true, 20);
+      request(RobotInterfaceChannels.REQUEST_UNCLAMP, RobotInterfaceChannels.UNCLAMPED, 800);
+      request(RobotInterfaceChannels.REQUEST_CLAMP, RobotInterfaceChannels.CLAMPED, 800);
+      if (!signal(RobotInterfaceChannels.CLAMPED)) throw 'Vise lost its clamped switch before door close (${sensorImage()}; ${looseBlankImage()})';
+      request(RobotInterfaceChannels.REQUEST_DOOR_CLOSE, RobotInterfaceChannels.DOOR_CLOSED, 800);
+      if (!signal(RobotInterfaceChannels.CLAMPED)) throw 'Vise lost its clamped switch during door close (${sensorImage()}; ${looseBlankImage()})';
+      if (!signal(RobotInterfaceChannels.PART_PRESENT))
+        throw 'The seated blank left the vise before machining (${sensorImage()}; ${looseBlankImage()})';
+      request(RobotInterfaceChannels.CYCLE_START, RobotInterfaceChannels.CYCLE_COMPLETE, 11000);
+      check(player.passes == 1, "the CNC controller runs one pass after cycle_start");
+      check(player.interfaceAlarm == RobotInterfaceAlarm.None,
+        "the scripted cycle completes without interlock alarms");
+      request(RobotInterfaceChannels.REQUEST_DOOR_OPEN, RobotInterfaceChannels.DOOR_OPEN, 800);
+      request(RobotInterfaceChannels.REQUEST_UNCLAMP, RobotInterfaceChannels.UNCLAMPED, 800);
+      check(simulation.activeSession().simulationTime() < 120,
+        "the scripted load/cut/unload sequence stays within two minutes");
+      Sys.println('tending robot interface: one physical CNC pass in ${simulation.activeSession().simulationTime()} s');
     } catch (error:Dynamic) {
       simulation.dispose(); session.dispose(); throw error;
     }
@@ -3329,6 +3604,26 @@ class ProjectSourceTests {
     if (!missingRejected) throw "Joint-motion policy must not fabricate a mechanical speed cap";
   }
 
+  /** The remaining full-suite checks, also available after a repaired track or gantry gate. */
+  static function checkAfterTrack(root:String):Void {
+    checkRobotWelder(root);
+    checkMates(root);
+    checkBenchMill(root);
+    checkEnclosedMillProject(root);
+    checkTendingControllers(root);
+    checkTendingRobotInterface(root);
+    checkVirtualRouterHoming(root);
+    checkCncRouter(root);
+    checkBeltRouter(root);
+    checkCoreXyPlotter(root);
+    checkMobileBase(root);
+    checkMobileMission(root);
+    checkMobileObstacle(root);
+    checkMissionOverlayEdge();
+    checkCncControls(root);
+    checkBackgroundLaunch(root);
+  }
+
   static function checks():Int {
     checkJointMotionPolicy();
     // Four joints and two segments distinguish per-joint stopping limits from
@@ -3489,6 +3784,7 @@ class ProjectSourceTests {
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mill") {
       checkBenchMill(root);
       checkEnclosedMillProject(root);
+      checkTendingRobotInterface(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "brake") {
@@ -3500,6 +3796,10 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cell") {
       checkTendingControllers(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "interface") {
+      checkTendingRobotInterface(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "identity") {

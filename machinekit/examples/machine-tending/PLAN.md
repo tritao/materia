@@ -117,6 +117,7 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 
 **MT-D5. Grip and clamp by contact.**
 - Jaw force plus friction holds the blank, in the fingers and in the vise. There is no `holdObjectOnLink` for the gripper or the vise.
+- The simulated pneumatic fixture and loose workpiece contacts use an assumed critically damped 1 ms response. Robot hulls receive it only on the parent and child links of pneumatic joints; this keeps the vise contact firm without hardening unrelated mill joints or stalling the spindle against a rigid blank.
 - Slip is measured, not assumed. A kinematic fallback is only added if measurements show MuJoCo cannot hold a clamped box under the mill's accelerations, and the plan is updated first.
 
 **MT-D6. Geometry decides.**
@@ -677,10 +678,16 @@ Done. What was built and decided:
   - the door opening during a cycle (switch lost) is a hold plus an alarm;
   - every request has a timeout and becomes an alarm.
 - `CncProgramPlayer` idles until cycle start, runs one pass, then raises cycle complete. The program ends with `G53` to the load position (MT-D6). `CamJob`/`CncWriter` gain an end position. Tool-change requests are alarms (MT-D8).
+- The physical spindle-stop interlock uses an assumed 5 rpm encoder deadband; the separate at-speed signal follows the commanded RPM with tolerance and hysteresis.
 - Tests:
   - pure tests: every interlock refusal and timeout;
   - a blocked door request times out when its physical open switch never arrives;
   - a scripted-signal sim test with no robot: open door, place the blank by script, clamp, close, start, wait for complete, open, unclamp. Volume as in MT2.
+- **Done. What was built and measured:**
+  - The two controller domains exchange typed digital signal images; the CNC controller owns the mill axes, field sensors, valve coils and one-pass job. Requests are edge-triggered, time out to named alarms, and the CNC program parks at its geometry-derived G53 load pose before reporting ready.
+  - MuJoCo completed the scripted door-open, loose-blank presence, unclamp, seated-blank clamp, door-close, one-pass cut, door-open and unclamp sequence in 59.09 simulated seconds, with no interlock alarm. The clamp held the real dynamic blank and used the physical 482.55 N vise cylinder; the door cylinder model reports 294.52 N.
+  - CNC-kit tests cover all four actuator timeouts and de-energize the valve coils after a timeout; all interlock refusal paths and the door-open-during-cycle hold are checked. `cnckit/tests` passed with 317 assertions.
+  - The same app run reproduced the current mill baseline: 52.55/53.22 s bare/enclosed, X/Y/Z peaks 0.048472/0.051497/0.060011 mm, 78 plans and zero rapid/collision contacts. The controlled `Part.fuseAll` comparison remains recorded above.
 
 **MT8. The parallel gripper, for real.**
 - Current suction handling keeps a held workpiece kinematic: its mass contributes
@@ -814,7 +821,7 @@ Done. What was built and decided:
 | MT5b follow-up | done: review fixes and complete closing gate | 4ff013c90; full history in [REVIEW_FIXES.md](REVIEW_FIXES.md) |
 | MT5b second review | done: verified and approved compiler pin recorded | 3c5eef1dd, 3ff303c2d; Haxeon 8be7ca0e; see [REVIEW_FIXES.md](REVIEW_FIXES.md) |
 | MT6 | done, second-review corrections verified | 4c9e6ebec, daf20e12d, 3c5eef1dd |
-| MT7 | planned | |
+| MT7 | done | implementation commit recorded below |
 | MT8 | planned | |
 | MT9 | planned | |
 | MT10 | planned | |

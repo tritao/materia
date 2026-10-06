@@ -327,9 +327,15 @@ class EnclosedMillChecks {
 		if (doorForce == null || viseForce == null || Math.abs(doorForce - 294.524311274) > 0.01 ||
 			Math.abs(viseForce - 482.54863159) > 0.01)
 			throw 'Enclosed cylinder models do not retain their newton ratings: $doorForce/$viseForce N';
+		var doorOvertravel = 0.0;
+		for (joint in processDefinition.joints) if (joint.id == "door") {
+			var compression = joint.limits.overtravel;
+			if (compression != null) doorOvertravel = compression;
+		}
 		var seenDoorClosed = false, seenDoorOpen = false, seenViseClamp = false, seenStock = false;
 		for (sensor in processDefinition.sensors) {
-			if (sensor.id == "door-closed" && sensor.kind == "joint_switch") seenDoorClosed = true;
+			if (sensor.id == "door-closed" && sensor.kind == "joint_switch" && sensor.windowLower != null)
+				seenDoorClosed = Math.abs(sensor.windowLower + doorOvertravel) < 1e-9;
 			if (sensor.id == "door-open" && sensor.kind == "joint_switch") seenDoorOpen = true;
 			if (sensor.id == "vise-clamped" && sensor.kind == "joint_switch" &&
 				sensor.windowLower != null && sensor.windowUpper != null) {

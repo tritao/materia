@@ -25,6 +25,7 @@ interface RuntimeEndpoint {
     degrees:NativeSpan<Int>, coefficients:NativeSpan<Float>, joints:NativeSpan<Int>, events:Array<rk_timed_event>):Int;
   public function pollEvents(batch:rk_event_record_batch):Int;
   public function channelValue(channel:String, value:rk_event_value):Int;
+  public function writeOutput(channel:String, value:rk_event_value):Int;
   public function contacts():Array<RobotContact>;
   public function close():Void;
 }

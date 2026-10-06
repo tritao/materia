@@ -7,6 +7,9 @@
   "sourceRoots": [
     "src",
     "tests/src",
+    "../machinekit/examples/bench-mill",
+    "../machinekit/examples/cnc-router",
+    "../machinekit/examples/machine-tending",
     "../processkit/tests/modbus"
   ],
   "dependencies": {

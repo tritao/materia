@@ -1,4 +1,5 @@
 import cadkit.modeling.AssemblyModel;
+import cadkit.modeling.AssemblyState;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.MachineAssembly;
 import machinekit.control.RobotController;
@@ -8,6 +9,7 @@ import machinekit.robotics.CobotClass;
 import materia.assembly.AssemblyFrames;
 import materia.project.SceneArtifact;
 import haxe.io.Bytes;
+import cnckit.controller.RobotInterfaceChannels;
 
 /** The two independently controlled machines of the tending cell, before interlock logic. */
 class TendingControllers extends MachineAssembly {
@@ -34,18 +36,39 @@ class TendingControllers extends MachineAssembly {
 			AssemblyFrames.translation(-1000, -1000, 0));
 		for (index in 0...6) connectPorts('robot-axis${index + 1}', "robotController", 'axis${index + 1}',
 			'arm/driver${index + 1}', "bus");
-		connectPorts("cnc.ready", "mill/cncController", "output1", "robotController", "input1");
-		connectPorts("robot.clear", "robotController", "output1", "mill/cncController", "input6");
+		connectPorts(RobotInterfaceChannels.CNC_READY, "mill/cncController", "output1", "robotController", "input1");
+		var cncNames = RobotInterfaceChannels.cncOutputs();
+		for (index in 1...cncNames.length)
+			connectPorts(cncNames[index], "mill/cncController", 'output${index + 1}', "robotController", 'input${index + 1}');
+		var robotNames = RobotInterfaceChannels.robotRequests();
+		for (index in 0...robotNames.length)
+			connectPorts(robotNames[index], "robotController", 'output${index + 1}', "mill/cncController", 'input${index + 6}');
 	}
 
-	public static function preview():Bytes return SceneArtifact.encode(AssemblyPreview.scene(new TendingControllers(), "tending-controllers"));
+	public static function preview():Bytes {
+		return new TendingControllers().previewArtifact();
+	}
+
+	/** Encode this cell instance so checks can use the geometry-derived load pose it owns. */
+	public function previewArtifact():Bytes {
+		var cell = this;
+		var scene = AssemblyPreview.scene(cell, "tending-controllers");
+		if (scene.assemblyDefinition == null || scene.assemblyState == null)
+			throw "Tending cell preview needs its assembled machine state";
+		var state = new AssemblyState(scene.assemblyDefinition, scene.assemblyState);
+		for (spec in cell.mill.mill.specs)
+			state.setJoint('mill/mill/${spec.id}', spec.initial);
+		scene.assemblyState = state.record();
+		return SceneArtifact.encode(scene);
+	}
 }
 
 class TendingControllerChecks {
 	public static function run():Void {
 		var scene = SceneArtifact.decode(TendingControllers.preview());
-		if (scene.controllers == null || scene.controllers.length != 2 || scene.signals == null || scene.signals.length != 2)
-			throw "Tending cell needs two controllers and two derived signal wires";
+		if (scene.controllers == null || scene.controllers.length != 2 || scene.signals == null ||
+			scene.signals.length != RobotInterfaceChannels.cncOutputs().length + RobotInterfaceChannels.robotRequests().length)
+			throw "Tending cell needs two controllers and every robot-interface signal wire";
 		var owners = new Map<String, String>();
 		for (control in scene.controllers) for (joint in control.joints) {
 			if (owners.exists(joint)) throw 'Joint "$joint" belongs to two controllers';
@@ -53,6 +76,10 @@ class TendingControllerChecks {
 		}
 		if (owners.get("mill/mill/x") != "mill/cncController" || owners.get("arm/j1") != "robotController")
 			throw "Cabinet wiring did not own the CNC and robot axes";
+		for (name in RobotInterfaceChannels.cncOutputs()) if (scene.signals.filter(wire -> wire.name == name).length != 1)
+			throw 'Cell wiring must publish CNC output "$name" exactly once';
+		for (name in RobotInterfaceChannels.robotRequests()) if (scene.signals.filter(wire -> wire.name == name).length != 1)
+			throw 'Cell wiring must publish robot request "$name" exactly once';
 		for (control in scene.controllers) if (control.id == "mill/cncController") {
 			for (sensor in ["mill/door-closed", "mill/door-open", "mill/vise-open", "mill/vise-clamped", "mill/stock-present"])
 				if (control.sensors.indexOf(sensor) < 0) throw 'Cabinet input wiring did not own sensor "$sensor"';

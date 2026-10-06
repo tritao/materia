@@ -9,16 +9,19 @@ class CellSignals implements SessionMember {
   final wires:Array<SceneArtifactCellSignal>;
   final readOutput:String->String->Bool;
   final publishInput:String->String->Bool->Int64->Int64->Void;
+  final writeOutput:Null<String->String->Bool->Void>;
   final simulationTime:Void->Float;
   var values = new Map<String, Bool>();
   var sequence = 0;
 
   public function new(wires:Array<SceneArtifactCellSignal>,
       simulationTime:Void->Float, readOutput:String->String->Bool,
-      publishInput:String->String->Bool->Int64->Int64->Void) {
+      publishInput:String->String->Bool->Int64->Int64->Void,
+      ?writeOutput:String->String->Bool->Void) {
     this.wires = wires.copy();
     this.simulationTime = simulationTime; this.readOutput = readOutput;
     this.publishInput = publishInput;
+    this.writeOutput = writeOutput;
     for (wire in wires) values.set(wire.name, false);
   }
 
@@ -31,6 +34,17 @@ class CellSignals implements SessionMember {
 
   public function inputFor(controller:String):String->Null<EventValue>
     return channel -> input(controller, channel);
+
+  /** Writes a declared digital wire at its source controller's process-output boundary. */
+  public function writeSignal(name:String, value:Bool):Void {
+    var writer = writeOutput;
+    if (writer == null) throw "This cell signal bus has no controller output writer";
+    for (wire in wires) if (wire.name == name) {
+      writer(wire.from.controller, wire.name, value);
+      return;
+    }
+    throw 'Unknown cell signal "$name"';
+  }
 
   public function feed():Void {
     sequence++;

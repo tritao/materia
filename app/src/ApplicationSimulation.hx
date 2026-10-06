@@ -191,6 +191,11 @@ class ApplicationSimulation {
             var target = candidateByController.get(controller);
             if (target == null) throw 'Signal target controller "$controller" has no runtime';
             target.runtime.publishSensorFrame(channel, [on ? 1.0 : 0.0], sequence, stamp, "cell.controller.tick");
+          },
+          (controller, channel, on) -> {
+            var source = candidateByController.get(controller);
+            if (source == null) throw 'Signal source controller "$controller" has no runtime';
+            source.runtime.writeDigitalOutput(channel, on);
           });
       }
       for (index in 0...models.length) {
@@ -213,10 +218,12 @@ class ApplicationSimulation {
           if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
             throw 'Robot "$id" is remote and read-only';
           var robotIndex = candidateRobots.length;
-          var job = session.cncJob;
-          var ownsJob = job != null && (control == null || job.controllerId == control.id);
-          var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
-            appliedRevision + 1, robotIndex, ownsJob ? CncProgramPlayer.processChannels(job) : null, virtualWelder, control, restContactGroup);
+			var job = session.cncJob;
+			var ownsJob = job != null && (control == null || job.controllerId == control.id);
+			var interfaceManaged = ownsJob && control != null && control.kind == "cnc" &&
+				session.controllers.length > 1;
+			var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
+				appliedRevision + 1, robotIndex, ownsJob ? CncProgramPlayer.processChannels(job, interfaceManaged) : null, virtualWelder, control, restContactGroup);
           candidateRobots.push(built.robot);
           candidateLinks.push([for (link in built.model.links) link.id]);
           candidateRobotModels.push(built.model);
@@ -232,8 +239,9 @@ class ApplicationSimulation {
             candidateAssembly = built;
             assemblyIndex = robotIndex;
           }
-          if (job != null && ownsJob) candidateCnc = new CncProgramPlayer(job, built, candidate, session,
-            createdSpace.session, candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id));
+		  if (job != null && ownsJob) candidateCnc = new CncProgramPlayer(job, built, candidate, session,
+		    createdSpace.session, candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id),
+		    null, interfaceManaged);
           var machine = session.machineMotion;
           if (machine != null) {
             var jointIds = [for (joint in built.model.joints) joint.id];
@@ -254,6 +262,14 @@ class ApplicationSimulation {
         [for (robot in candidateRobots) robot.id()], candidateRobotModels);
       var environmentRecords = scene.records();
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
+      var hasPneumaticActuator = candidateAssembly != null &&
+        candidateAssembly.blueprint.pneumaticDrives.length > 0;
+      if (!hasPneumaticActuator && session != null) for (control in session.controllers) {
+        var built = candidateByController.get(control.id);
+        if (built != null && built.blueprint.pneumaticDrives.length > 0) hasPneumaticActuator = true;
+      }
+      var pneumaticWorkpieceSurface = hasPneumaticActuator
+        ? SimulationContactSurfaces.environmentPart() : null;
       var assemblyOwned = new Map<String, Bool>();
       for (part in candidateAssemblyParts) assemblyOwned.set(part.id, true);
       for (object in environmentRecords) if (object.collisionEnabled && !assemblyOwned.exists(object.id)) {
@@ -290,7 +306,8 @@ class ApplicationSimulation {
           object.dynamicBody?MotionType.Dynamic:MotionType.Static,shape,
           new SimPose(centerX,centerY,centerZ,rotation[0],rotation[1],rotation[2],rotation[3]),
           object.dynamicBody?object.mass:0.0,
-          !object.dynamicBody && assembly != null && [for (part in assembly.occurrences) if (object.id == "project:" + part.id) part].length == 1 ? restContactGroup : null);
+          !object.dynamicBody && assembly != null && [for (part in assembly.occurrences) if (object.id == "project:" + part.id) part].length == 1 ? restContactGroup : null,
+          object.dynamicBody ? pneumaticWorkpieceSurface : null);
         candidateObjects.push({id:object.id,object:created});
         if (!object.dynamicBody) heldBoxes.push({id: object.id, x: centerX, y: centerY, z: centerZ,
           halfX: halfX, halfY: halfY, halfZ: halfZ,

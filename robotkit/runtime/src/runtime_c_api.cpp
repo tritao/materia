@@ -410,6 +410,13 @@ rk_result RK_CALL rk_robot_runtime_get_channel_value(
     return value ? value->channel_value(channel, *out_value) : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_robot_runtime_write_output(
+    rk_robot_runtime runtime, const char *channel, const rk_event_value *value) {
+    if (!channel || !value) return RK_ERROR_INVALID_ARGUMENT;
+    const auto resolved = robotkit::internal::resolve_runtime(runtime);
+    return resolved ? resolved->write_output(channel, *value) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_robot_runtime_snapshot(rk_robot_runtime runtime, rk_robot_state *out_state) {
     if (!out_state || out_state->struct_size < sizeof(*out_state))
         return RK_ERROR_INVALID_ARGUMENT;

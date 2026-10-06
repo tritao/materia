@@ -442,6 +442,10 @@ class MateriaProjectRunner {
       controllers: artifact.controllers, signals: artifact.signals};
   }
 
+  /** Decodes an in-memory generated artifact through the same path used by project loading. */
+  public static function generatedFromArtifact(snapshot:Bytes):GeneratedAssemblyScene
+    return previewRecords(snapshot);
+
   /**
    * The machining job the generator made with its machine, ready to run: meshes in metres in the
    * stock part's frame and the tool table as tools. Parts the tool may enter (the stock, and those

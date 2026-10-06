@@ -325,6 +325,34 @@ class RobotRuntime {
     return ProcessEventCodec.decode(value);
   }
 
+  /** Writes a declared digital or analog process output from controller logic. */
+  public function writeOutput(channel:String, value:ProcessEventValue):Void {
+    ensureLive();
+    var declaration:Null<ProcessChannelDeclaration> = null;
+    for (candidate in channels) if (candidate.id == channel) declaration = candidate;
+    if (declaration == null) throw 'runtime.writeOutput("$channel"): undeclared channel';
+    var compatible = switch declaration.safeValue {
+      case Digital(_): switch value {case Digital(_): true; case _: false;}
+      case Analog(_): switch value {case Analog(number): Math.isFinite(number); case _: false;}
+      case _: false;
+    };
+    if (!compatible) throw 'runtime.writeOutput("$channel"): output type does not match its declaration';
+    var native = new rk_event_value();
+    switch value {
+      case Digital(on):
+        native.set_kind(RobotKitRuntimeConstants.RK_EVENT_DIGITAL);
+        native.set_digital(on ? 1 : 0);
+      case Analog(number):
+        native.set_kind(RobotKitRuntimeConstants.RK_EVENT_ANALOG);
+        native.set_analog(number);
+      case Process(_, _): throw 'runtime.writeOutput("$channel"): process commands are plan events';
+    }
+    check(endpoint.writeOutput(channel, native), 'runtime.writeOutput("$channel")');
+  }
+
+  public function writeDigitalOutput(channel:String, value:Bool):Void
+    writeOutput(channel, ProcessEventValue.Digital(value));
+
   /** Submits all position targets in one native call. */
   public function submitPositions(positions:Array<Float>, sequence:Int,
       ?timestampNs:haxe.Int64):Void {

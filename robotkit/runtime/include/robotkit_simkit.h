@@ -85,6 +85,12 @@ typedef struct rk_simulation_link_hull {
     uint32_t link;
     uint32_t vertex_count;
     double vertices[64 * 3];
+    /** Contact surface for this physical part; zero fields keep the backend default. */
+    double friction[3];
+    double contact_time_constant;
+    double contact_damping_ratio;
+    uint32_t friction_dimensions;
+    uint32_t contact_filter;
 } rk_simulation_link_hull;
 
 /** One primitive collision shape attached to a robot link, posed in the link frame. */

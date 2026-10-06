@@ -56,6 +56,7 @@ class CncKitTests {
   }
 
   public static function main():Void {
+    RobotInterfaceTests.run();
     var machine = new CncTestRig("work", "x", "y", "z", 0.2);
     machine.controller.setWorkOffset(54, 0.1, 0.2, 0.0);
     machine.controller.setToolLength(2, 0.012);

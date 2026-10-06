@@ -176,7 +176,8 @@ class EnclosedBenchMill extends MachineAssembly {
 		connectPorts("vise-coil-b", "cncController", "valve4", "viseValve", "coilB");
 		addCylinder("door-cylinder", "door", "doorCylinder", "doorValve");
 		addCylinder("vise-cylinder", "mill/vise/jaw", "mill/vise/cylinder", "viseValve");
-		addSwitch("door-closed", "door", {lower: 0, upper: 5, velocity: null, effort: null}, 2);
+		addSwitch("door-closed", "door", {lower: -doorCylinder.endStopCompliance, upper: 5,
+			velocity: null, effort: null}, 2);
 		addSwitch("door-open", "door", {lower: doorStroke - 5, upper: doorStroke, velocity: null, effort: null}, 2);
 		addSwitch("vise-open", "mill/vise/jaw", {lower: 0, upper: 0.5, velocity: null, effort: null}, 0.25);
 		addSwitch("vise-clamped", "mill/vise/jaw", {lower: vise.grippedPosition - 0.5,

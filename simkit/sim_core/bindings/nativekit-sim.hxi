@@ -228,6 +228,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	extern fn nksim_session_reset(session: nksim_session) -> nksim_result;
 	/**
+	 * Writes physical body states for the next tick; each body must belong to this session.
+	 */
+	extern fn nksim_session_set_body_states(session: nksim_session, states: ptr<const<nksim_body_state>> @in_array("count"), count: u32) -> nksim_result;
+	/**
 	 * Starts a realtime owner loop that ticks at the fixed timestep.
 	 */
 	extern fn nksim_session_start(session: nksim_session) -> nksim_result;
@@ -512,7 +516,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		end_velocity: f64 @offset(72);
 		reference_duration: f64 @offset(80);
 	}
-	struct nksim_object_desc @layout(160, 8) {
+	struct nksim_object_desc @layout(208, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		/**
 		 * < NKSIM_MOTION_STATIC, _KINEMATIC, or _DYNAMIC.
@@ -536,7 +540,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		 * < Same mounted-contact policy as nksim_body_desc.
 		 */
 		rest_contact_group: u64 @offset(144);
-		reserved: array<u64, 1> @offset(152);
+		/**
+		 * < Contact surface of this environment object's shape.
+		 */
+		surface: nksim_surface @offset(152);
 	}
 	struct nksim_pose @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;

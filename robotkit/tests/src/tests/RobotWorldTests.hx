@@ -279,6 +279,7 @@ class RobotWorldTests {
     testSerialDeploymentVersions();
     testProcessChannelDeployment();
     testRuntimeProcessEvents();
+    testControllerProcessOutputs();
     testPneumaticProcessDrive();
     testDiscreteNativeSensors();
     testVirtualDeviceSimulation();
@@ -4855,6 +4856,36 @@ class RobotWorldTests {
     for (tick in 80...83) simulationHarness.step(Int64.ofInt(tick * 10000000));
     check(!on("tool.vacuum"), "an emergency stop takes even a keep-on-stop channel safe");
     simulationHarness.dispose();
+  }
+
+  static function testControllerProcessOutputs():Void {
+    var model = new RobotModel("controller-process-outputs");
+    var base = model.addLink(new Link("base"));
+    var tool = model.addLink(new Link("tool"));
+    model.addJoint(new Joint("axis", JointType.Revolute, base, tool));
+    var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
+    blueprint.channels.push(new ProcessChannelDeclaration("controller.ready",
+      ProcessEventValue.Digital(false)));
+    blueprint.channels.push(new ProcessChannelDeclaration("controller.alarm_code",
+      ProcessEventValue.Analog(0.0)));
+    var harness = new SimulationHarness();
+    var runtime = harness.simulation.addRobot(blueprint);
+    runtime.writeDigitalOutput("controller.ready", true);
+    runtime.writeOutput("controller.alarm_code", ProcessEventValue.Analog(7.0));
+    check(runtime.channelValue("controller.ready") == ProcessEventValue.Digital(true),
+      "controller logic writes a declared digital output while idle");
+    check(runtime.channelValue("controller.alarm_code") == ProcessEventValue.Analog(7.0),
+      "controller logic writes a declared analog output while idle");
+    check(runtime.pollEvents().events.length == 2,
+      "controller output writes enter the process event stream");
+    runtime.submitStop(1, true);
+    harness.step(Int64.ofInt(10000000));
+    throws(() -> runtime.writeDigitalOutput("controller.ready", true),
+      "an emergency-stopped runtime rejects an energized controller output");
+    runtime.writeDigitalOutput("controller.ready", false);
+    check(runtime.channelValue("controller.ready") == ProcessEventValue.Digital(false),
+      "a stopped runtime still accepts a safe digital output");
+    harness.dispose();
   }
 
   static function testPneumaticProcessDrive():Void {

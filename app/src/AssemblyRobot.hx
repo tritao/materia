@@ -12,6 +12,7 @@ import materia.project.MaterialLibrary;
 import robotkit.mobile.MobileBase;
 import robotkit.model.CollisionApproximation;
 import robotkit.model.RobotModel;
+import robotkit.model.Transmission;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -224,10 +225,34 @@ class AssemblyRobot {
       case _:
     }
     var linkHulls:Array<SimulationLinkHull> = [];
+    // CAD physical-part hulls retain their exact convex geometry. A pneumatic
+    // joint's connected links need an explicit contact response: the simulator's
+    // generic soft-contact default lets cylinder force push a workpiece through
+    // a jaw before its position switch trips. Keep that response local instead
+    // of stiffening every part in the machine.
+    var pneumaticContactLinks = new Map<Int, Bool>();
+    var hasPneumaticActuator = false;
+    for (actuator in converted.model.actuators)
+      if (actuator.drive != null && actuator.drive.pneumatic() != null) {
+        hasPneumaticActuator = true;
+        switch actuator.transmission {
+          case SimpleTransmission(jointId, _, _):
+            for (joint in converted.model.joints) if (joint.id == jointId) {
+              pneumaticContactLinks.set(converted.model.links.indexOf(joint.parent), true);
+              pneumaticContactLinks.set(converted.model.links.indexOf(joint.child), true);
+            }
+          case _:
+        }
+      }
+    var pneumaticContact = hasPneumaticActuator ? SimulationContactSurfaces.robotPart() : null;
     for (hull in converted.linkHulls) {
       var record = sceneParts.get("project:" + hull.part);
-      if (record != null && record.collisionEnabled && !rolling.exists(hull.link))
-        linkHulls.push({link: hull.link, vertices: hull.vertices});
+      if (record != null && record.collisionEnabled && !rolling.exists(hull.link)) {
+        var simulationHull:SimulationLinkHull = {link: hull.link, vertices: hull.vertices};
+        if (pneumaticContact != null && pneumaticContactLinks.exists(hull.link))
+          simulationHull.surface = pneumaticContact;
+        linkHulls.push(simulationHull);
+      }
     }
     if (converted.closureIds.length > 0 && !supportsClosures)
       throw "Assembly closures require MuJoCo equality constraints: " +

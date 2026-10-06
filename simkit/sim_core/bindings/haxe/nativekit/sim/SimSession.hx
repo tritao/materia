@@ -145,7 +145,8 @@ class SimSession {
         return status().get_fixed_timestep();
 
     public function createObject(motion:MotionType, shape:SimShape, pose:SimPose,
-            mass:Float = 0.0, ?restContactGroup:haxe.Int64):SimObject {
+            mass:Float = 0.0, ?restContactGroup:haxe.Int64,
+            ?surface:SimContactSurface):SimObject {
         ensureLive();
         var desc = new nksim_object_desc();
         desc.set_struct_size(nksim_object_desc.size());
@@ -154,6 +155,11 @@ class SimSession {
         desc.set_pose(pose.toNative());
         desc.set_mass(mass);
         if (restContactGroup != null) desc.set_rest_contact_group(restContactGroup);
+        var nativeSurface = new nksim_surface();
+        nativeSurface.set_struct_size(nksim_surface.size());
+        nativeSurface.set_contact_filter(NativeKitSimConstants.NKSIM_CONTACT_LAYERS);
+        if (surface != null) surface.writeNative(nativeSurface);
+        desc.set_surface(nativeSurface);
         var handle:nksim_object;
         if (shape.type == ShapeType.Convex) {
             var result = NativeKitSim.nksim_session_create_convex_object(owner.borrow(), desc, shape.convexVertices());
@@ -179,6 +185,37 @@ class SimSession {
         ensureLive();
         SimWorld.check(NativeKitSim.nksim_session_release_object(owner.borrow(), object.handle),
             "session.releaseObject");
+    }
+
+    /**
+     * Places a free dynamic object at the start of the next physics tick and clears its velocity.
+     * Unlike teleport(), this is safe while the session is hosted and does not change the reset pose.
+     */
+    @:allow(SimObject)
+    private function setObjectPoseForNextTick(object:SimObject, pose:SimPose):Void {
+        ensureLive();
+        if (object.session != this || object.motion != MotionType.Dynamic)
+            throw "Only this session's dynamic objects can be placed for the next tick";
+        // Releasing a free object reports INVALID_STATE; a held object stages its release before
+        // the body-state write, so both commands take effect in order on the next physics tick.
+        var releaseStatus = NativeKitSim.nksim_session_release_object(owner.borrow(), object.handle);
+        if (releaseStatus != NativeKitSimConstants.NKSIM_ERROR_INVALID_STATE)
+            SimWorld.check(releaseStatus, "session.releaseObjectForPlacement");
+        var found = NativeKitSim.nksim_session_get_object_body(owner.borrow(), object.handle);
+        SimWorld.check(found.status, "session.objectBody");
+        var state = new nksim_body_state();
+        state.set_struct_size(nksim_body_state.size());
+        state.set_body(found.out_body);
+        state.set_position(0, pose.x); state.set_position(1, pose.y); state.set_position(2, pose.z);
+        state.set_rotation(0, pose.qx); state.set_rotation(1, pose.qy);
+        state.set_rotation(2, pose.qz); state.set_rotation(3, pose.qw);
+        for (axis in 0...3) {
+            state.set_linear_velocity(axis, 0.0);
+            state.set_angular_velocity(axis, 0.0);
+        }
+        state.set_sleeping(0);
+        SimWorld.check(NativeKitSim.nksim_session_set_body_states(owner.borrow(), [state]),
+            "session.setObjectPoseForNextTick");
     }
 
     /** Zero means the object is free. */
