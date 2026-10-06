@@ -14,6 +14,7 @@ import robotkit.spatial.Vec3;
 class CartesianAnalyticIk implements AnalyticIk {
   public final group:KinematicGroup;
   final native:mk_analytic_cartesian_model;
+  final lifts:JointLifts;
 
   public function new(group:KinematicGroup) {
     if (group == null || group.workFrame != null)
@@ -21,6 +22,7 @@ class CartesianAnalyticIk implements AnalyticIk {
     this.group = group;
     var count = group.group.count();
     if (count < 3 || count > 5) throw "Cartesian analytic IK requires XYZ, XYZ+C or XYZ+C+A";
+    lifts = new JointLifts(group,[for (i in 0...count) i >= 3]);
     native = new mk_analytic_cartesian_model();
     native.set_struct_size(mk_analytic_cartesian_model.size());
     native.set_joint_count(count);
@@ -95,26 +97,8 @@ class CartesianAnalyticIk implements AnalyticIk {
     var answers:Array<AnalyticBranch> = [];
     for (i in 0...result.out_count) {
       var raw = result.out_solutions[i];
-      var lifted = [[for (joint in 0...jointCount()) raw.get_joints(joint)]];
-      for (joint in 0...jointCount()) {
-        var bounds = group.group.limitsOf(joint);
-        var next:Array<Array<Float>> = [];
-        for (q in lifted) {
-          if (joint < 3) {
-            if (q[joint] >= bounds.lower - 1e-9 && q[joint] <= bounds.upper + 1e-9) next.push(q);
-          } else {
-            var first = Math.ceil((bounds.lower - q[joint] - 1e-9) / (2 * Math.PI));
-            var last = Math.floor((bounds.upper - q[joint] + 1e-9) / (2 * Math.PI));
-            if (!Math.isFinite(first) || !Math.isFinite(last) || last - first > 64)
-              throw "Cartesian analytic wraps require a finite rotary planning range";
-            for (wrap in Std.int(first)...Std.int(last) + 1) {
-              var value = q.copy(); value[joint] += wrap * 2 * Math.PI; next.push(value);
-            }
-          }
-        }
-        lifted = next;
-      }
-      for (q in lifted) answers.push(new AnalyticBranch(q, raw.get_branch(), raw.get_singular() != 0));
+      for (lift in lifts.enumerate([for (joint in 0...jointCount()) raw.get_joints(joint)]))
+        answers.push(new AnalyticBranch(lift.q,raw.get_branch(),raw.get_singular() != 0));
     }
     return answers;
   }

@@ -19,10 +19,16 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * singular bits: 1 wrist, 2 elbow. Limits and periodic lifts belong to sampling.
 	 */
 	extern fn mk_analytic_ur_inverse(parameters: ptr<const<mk_ur_parameters>>, target: ptr<const<mk_opw_pose>>, singular_q6_seed: f64, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_enumerate_joint_lifts(request: ptr<const<mk_joint_lift_request>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_lifts: ptr<mk_joint_lift> @out_array("lift_capacity"), lift_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Converts Ruckig Community's offline phases to degree-3 native segments.
 	 */
 	extern fn mk_generate_state_to_state(request: ptr<const<mk_state_to_state_request>>, out_trajectory: ptr<mk_trajectory_handle> @out @owned, out_ruckig_result: ptr<i32> @out) -> mk_result;
+	/**
+	 * All legal lifts, in lexicographic wrap order; zero count means limits reject the branch.
+	 * Infinite planning ranges or a count/index overflow return INVALID_ARGUMENT.
+	 */
+	extern fn mk_joint_lift_count(request: ptr<const<mk_joint_lift_request>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * All eight slots are written, including invalid solutions.
 	 */
@@ -129,6 +135,21 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		failed_distance: f64 @offset(528);
 		cost: f64 @offset(536);
 		diagnostic: array<i8, 256> @offset(544);
+	}
+	struct mk_joint_lift @layout(776, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		joints: array<f64, 64> @offset(8);
+		wraps: array<i32, 64> @offset(520);
+	}
+	/**
+	 * Finite planning limits used for complete periodic-lift enumeration.
+	 */
+	struct mk_joint_lift_request @layout(1096, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		joint_count: u32 @offset(4);
+		lower: array<f64, 64> @offset(8);
+		upper: array<f64, 64> @offset(520);
+		periodic: array<u8, 64> @offset(1032);
 	}
 	/**
 	 * OPW's seven geometric parameters and manufacturer joint conventions.

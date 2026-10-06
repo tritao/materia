@@ -654,3 +654,18 @@ a tilted cone axis. Compiler-only build and focused C4 runtime pass (182,213
 assertions). This is the orientation part only: native external-axis Cartesian
 products, analytic branch/wrap filtering, and full candidate assembly remain
 outstanding. PP2 is not complete and production planning remains unchanged.
+
+PP2 native limit/lift preparation: added complete finite-range periodic joint
+lift counting and enumeration, with lexicographic wrap coordinates, nonperiodic
+limit filtering and locked-joint handling. Count/index overflow and infinite
+planning ranges fail explicitly rather than truncating candidates. Native
+coverage includes mixed joints, exact boundary lifts, rejected branches,
+insufficient output capacity, locked joints and 200 legal lifts beyond the
+old 64-turn restriction. All 12 native CTests and the four-platform ABI audit
+pass. Cartesian and UR adapters now use this native implementation through
+JointLifts instead of their Haxe wrap loops; compiler-only build and focused
+C4 runtime pass unchanged at 182,213 assertions. The Haxe wrapper retains wrap
+coordinates for the forthcoming candidate lattice. OPW's existing seeded
+unbounded-range policy has not been replaced here. Native external-axis cell
+products and combined analytic candidate assembly are still outstanding; PP2
+remains incomplete.

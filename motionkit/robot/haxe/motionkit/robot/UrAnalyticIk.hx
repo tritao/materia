@@ -16,6 +16,7 @@ import robotkit.spatial.Vec3;
 class UrAnalyticIk implements AnalyticIk {
   public final manipulator:KinematicGroup;
   final groupBackend:Null<UrGroupIk>;
+  final lifts:Null<JointLifts>;
   final native:mk_ur_parameters;
   final base:Transform3;
   final flangeTTcp:Transform3;
@@ -26,12 +27,14 @@ class UrAnalyticIk implements AnalyticIk {
     this.manipulator = manipulator;
     if (manipulator.workFrame != null || manipulator.external.indexOf(true) >= 0) {
       groupBackend = new UrGroupIk(manipulator,tolerance);
+      lifts = null;
       native = groupBackend.arm.native;
       base = groupBackend.arm.base;
       flangeTTcp = groupBackend.arm.flangeTTcp;
       return;
     }
     groupBackend = null;
+    lifts = new JointLifts(manipulator,[for (_ in 0...6) true]);
     if (manipulator.group.count() != 6) throw "UR analytic extraction requires six arm joints";
     var path = manipulator.pathJoints();
     var drivers = [for (j in path) if (j.type != JointType.Fixed) j];
@@ -125,17 +128,9 @@ class UrAnalyticIk implements AnalyticIk {
     if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'UR analytic inverse failed: ${result.status}';
     var answers:Array<AnalyticBranch> = [];
     for(i in 0...result.out_count) {
-      var raw=result.out_solutions[i],lifted=[[for(j in 0...6)raw.get_joints(j)]];
-      for(j in 0...6) {
-        var bounds=manipulator.group.limitsOf(j),next:Array<Array<Float>> = [];
-        for(q in lifted) {
-          var first=Math.ceil((bounds.lower-q[j]-1e-9)/(2*Math.PI)),last=Math.floor((bounds.upper-q[j]+1e-9)/(2*Math.PI));
-          if(!Math.isFinite(first)||!Math.isFinite(last)||last-first>64)throw "UR analytic wraps require a finite planning range";
-          for(wrap in Std.int(first)...Std.int(last)+1) {var copy=q.copy();copy[j]+=wrap*2*Math.PI;next.push(copy);}
-        }
-        lifted=next;
-      }
-      for(q in lifted)answers.push(new AnalyticBranch(q,raw.get_branch(),raw.get_singular()!=0));
+      var raw = result.out_solutions[i];
+      for (lift in lifts.enumerate([for (j in 0...6) raw.get_joints(j)]))
+        answers.push(new AnalyticBranch(lift.q,raw.get_branch(),raw.get_singular() != 0));
     }
     return answers;
   }

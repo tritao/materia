@@ -95,6 +95,21 @@ typedef struct mk_orientation_sample {
     uint32_t azimuth_index;
 } mk_orientation_sample;
 
+/** Finite planning limits used for complete periodic-lift enumeration. */
+typedef struct mk_joint_lift_request {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count;
+    double lower[MK_MAX_JOINTS];
+    double upper[MK_MAX_JOINTS];
+    uint8_t periodic[MK_MAX_JOINTS];
+} mk_joint_lift_request;
+
+typedef struct mk_joint_lift {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double joints[MK_MAX_JOINTS];
+    int32_t wraps[MK_MAX_JOINTS];
+} mk_joint_lift;
+
 /** Candidate sets for one Descartes ladder-graph selection call. */
 typedef struct mk_configuration_request {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -223,6 +238,13 @@ MK_API mk_result MK_CALL mk_orientation_lattice_count(const mk_orientation_latti
 MK_API mk_result MK_CALL mk_sample_orientations(const mk_orientation_lattice *lattice,
     const mk_opw_pose *target, mk_orientation_sample *out_samples MK_OUT_ARRAY(sample_capacity),
     uint32_t sample_capacity, uint32_t *out_count MK_OUT);
+/** All legal lifts, in lexicographic wrap order; zero count means limits reject the branch.
+ * Infinite planning ranges or a count/index overflow return INVALID_ARGUMENT. */
+MK_API mk_result MK_CALL mk_joint_lift_count(const mk_joint_lift_request *request,
+    const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count, uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_enumerate_joint_lifts(const mk_joint_lift_request *request,
+    const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    mk_joint_lift *out_lifts MK_OUT_ARRAY(lift_capacity), uint32_t lift_capacity, uint32_t *out_count MK_OUT);
 /** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */
 MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
