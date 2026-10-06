@@ -293,22 +293,44 @@ class KinematicsTests extends MotionKitTestSupport {
       var nativeBefore = group.numericSolveCount();
       var grid = [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,nativeSeed[0]-0.02,nativeSeed[0]+0.02,3)];
       if(withPositioner) grid.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(nativeSeed.length-1,nativeSeed[nativeSeed.length-1]-0.03,nativeSeed[nativeSeed.length-1]+0.03,3));
-      for(policy in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool]) {
-        var candidates = nativeSampler.sample(nativeTarget,nativeSeed,policy,grid,4,1,4);
+      var coneAxis = group.tcpPose(nativeSeed).transformVector(new Vec3(0,0,1)).toArray();
+      for(policy in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,
+          motionkit.path.OrientationPolicy.Cone(coneAxis,0.1)]) {
+        var activeGrid = switch policy {
+          case Cone(_, _): [for(joint in 0...nativeSeed.length)if(group.external[joint])
+            new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,nativeSeed[joint],nativeSeed[joint],1)];
+          default: grid;
+        };
+        var candidates = nativeSampler.sample(nativeTarget,nativeSeed,policy,activeGrid,4,1,4);
+        var repeated = nativeSampler.sample(nativeTarget,nativeSeed,policy,activeGrid,4,1,4);
+        check(candidates.length == repeated.length,"serial candidate counts are deterministic");
         check(candidates.length>0,"combined native serial sampler has candidates");
         var original = false;
-        for(candidate in candidates) {
+        for(index in 0...candidates.length) {
+          var candidate = candidates[index],again = repeated[index];
+          check(candidate.branch == again.branch && candidate.singular == again.singular && candidate.roll == again.roll &&
+            candidate.tilt == again.tilt && candidate.azimuth == again.azimuth,"serial branch and orientation coordinates are deterministic");
+          for(joint in 0...candidate.q.length) {
+            near(candidate.q[joint],again.q[joint],"serial candidate joints are deterministic",1e-12);
+            check(candidate.wraps[joint] == again.wraps[joint],"serial candidate wraps are deterministic");
+            var bound = group.group.limitsOf(joint);
+            check(candidate.q[joint] >= bound.lower-1e-9 && candidate.q[joint] <= bound.upper+1e-9,"combined serial lifts satisfy all compiled bounds");
+            if(group.external[joint])check(candidate.wraps[joint]==0,"external lattice coordinates are never independently lifted");
+          }
+          for(axis in 0...candidate.external.length) {
+            check(candidate.external[axis]==again.external[axis],"serial external coordinates are deterministic");
+            var range = activeGrid[axis];
+            var fraction = range.points == 1 ? 0.0 : candidate.external[axis]/(range.points-1);
+            near(candidate.q[range.joint],range.lower+(range.upper-range.lower)*fraction,"serial external coordinates match their values",1e-12);
+          }
           var same = true;
           for (joint in 0...nativeSeed.length) if (Math.abs(candidate.q[joint]-nativeSeed[joint])>1e-5) same = false;
           original = original || same;
           var actual=numeric.forward(candidate.q);
           near(motionkit.path.PoseMath.distance(actual,nativeTarget),0,"exported serial native candidate task position",1e-6);
           near(motionkit.robot.ToolFreedom.orientationError(actual,nativeTarget,policy),0,"exported serial native candidate orientation",1e-6);
-          near(candidate.q[0],nativeSeed[0]-0.02+0.02*candidate.external[0],"native candidate track coordinate",1e-12);
-          if(withPositioner)near(candidate.q[candidate.q.length-1],nativeSeed[nativeSeed.length-1]-0.03+0.03*candidate.external[1],
-            "native candidate positioner coordinate",1e-12);
         }
-        check(original,"combined native serial sampling retains the original centre-cell branch");
+        switch policy { case Cone(_, _): default: check(original,"combined native serial sampling retains the original centre-cell branch"); }
       }
       check(group.numericSolveCount()==nativeBefore,"combined serial native sampler uses no numeric IK");
       var ruleEnd = nativeSeed.copy();ruleEnd[0] += 0.005;
@@ -417,22 +439,44 @@ class KinematicsTests extends MotionKitTestSupport {
       var nativeBefore = group.numericSolveCount();
       var grid = [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,nativeSeed[0]-0.02,nativeSeed[0]+0.02,3)];
       if(withPositioner) grid.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(nativeSeed.length-1,nativeSeed[nativeSeed.length-1]-0.03,nativeSeed[nativeSeed.length-1]+0.03,3));
-      for(policy in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool]) {
-        var candidates = nativeSampler.sample(nativeTarget,nativeSeed,policy,grid,4,1,4);
+      var coneAxis = group.tcpPose(nativeSeed).transformVector(new Vec3(0,0,1)).toArray();
+      for(policy in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,
+          motionkit.path.OrientationPolicy.Cone(coneAxis,0.1)]) {
+        var activeGrid = switch policy {
+          case Cone(_, _): [for(joint in 0...nativeSeed.length)if(group.external[joint])
+            new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,nativeSeed[joint],nativeSeed[joint],1)];
+          default: grid;
+        };
+        var candidates = nativeSampler.sample(nativeTarget,nativeSeed,policy,activeGrid,4,1,4);
+        var repeated = nativeSampler.sample(nativeTarget,nativeSeed,policy,activeGrid,4,1,4);
+        check(candidates.length == repeated.length,"serial candidate counts are deterministic");
         check(candidates.length>0,"combined native serial sampler has candidates");
         var original = false;
-        for(candidate in candidates) {
+        for(index in 0...candidates.length) {
+          var candidate = candidates[index],again = repeated[index];
+          check(candidate.branch == again.branch && candidate.singular == again.singular && candidate.roll == again.roll &&
+            candidate.tilt == again.tilt && candidate.azimuth == again.azimuth,"serial branch and orientation coordinates are deterministic");
+          for(joint in 0...candidate.q.length) {
+            near(candidate.q[joint],again.q[joint],"serial candidate joints are deterministic",1e-12);
+            check(candidate.wraps[joint] == again.wraps[joint],"serial candidate wraps are deterministic");
+            var bound = group.group.limitsOf(joint);
+            check(candidate.q[joint] >= bound.lower-1e-9 && candidate.q[joint] <= bound.upper+1e-9,"combined serial lifts satisfy all compiled bounds");
+            if(group.external[joint])check(candidate.wraps[joint]==0,"external lattice coordinates are never independently lifted");
+          }
+          for(axis in 0...candidate.external.length) {
+            check(candidate.external[axis]==again.external[axis],"serial external coordinates are deterministic");
+            var range = activeGrid[axis];
+            var fraction = range.points == 1 ? 0.0 : candidate.external[axis]/(range.points-1);
+            near(candidate.q[range.joint],range.lower+(range.upper-range.lower)*fraction,"serial external coordinates match their values",1e-12);
+          }
           var same = true;
           for (joint in 0...nativeSeed.length) if (Math.abs(candidate.q[joint]-nativeSeed[joint])>1e-5) same = false;
           original = original || same;
           var actual=numeric.forward(candidate.q);
           near(motionkit.path.PoseMath.distance(actual,nativeTarget),0,"exported serial native candidate task position",1e-6);
           near(motionkit.robot.ToolFreedom.orientationError(actual,nativeTarget,policy),0,"exported serial native candidate orientation",1e-6);
-          near(candidate.q[0],nativeSeed[0]-0.02+0.02*candidate.external[0],"native candidate track coordinate",1e-12);
-          if(withPositioner)near(candidate.q[candidate.q.length-1],nativeSeed[nativeSeed.length-1]-0.03+0.03*candidate.external[1],
-            "native candidate positioner coordinate",1e-12);
         }
-        check(original,"combined native serial sampling retains the original centre-cell branch");
+        switch policy { case Cone(_, _): default: check(original,"combined native serial sampling retains the original centre-cell branch"); }
       }
       check(group.numericSolveCount()==nativeBefore,"combined serial native sampler uses no numeric IK");
       var ruleEnd = nativeSeed.copy();ruleEnd[0] += 0.005;

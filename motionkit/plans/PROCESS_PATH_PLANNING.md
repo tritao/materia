@@ -766,3 +766,14 @@ Compiler-only build and focused C4 runtime pass (265,425 assertions).
 Broader authored combined-sampler acceptance and serial cone/determinism checks
 remain outstanding; this builder is not wired into production selection yet.
 PP2 is not claimed complete, and PP3–PP11 remain to be implemented/verified.
+
+PP2 serial acceptance coverage is extended across fixed/free-spin/cone policies
+for UR and OPW with rotated tracks and optional positioners. Cone checks hold
+the known external cell while testing all returned task residuals. Repeat calls
+verify every returned joint, branch/singularity flag, wrap, external coordinate
+and orientation coordinate; every configuration respects compiled bounds and
+external coordinates are never independently lifted. Compiler-only build and
+focused C4 runtime pass (1,159,649 assertions). Authored Cobot and Cartesian
+example checks now include combined native sampling; their app compiler-only
+build passes, and the authored runtime job is running (results not yet claimed).
+PP2 acceptance is still pending that job and the appropriate phase gate.
