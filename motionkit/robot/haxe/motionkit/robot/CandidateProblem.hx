@@ -44,7 +44,8 @@ class CandidateProblem {
     }
   }
 
-  public function new(group:KinematicGroup,request:PathRequest,?options:CandidateSamplingOptions) {
+  public function new(group:KinematicGroup,request:PathRequest,?options:CandidateSamplingOptions,
+      boundedConstruction:Bool=false) {
     if(group==null || request==null || request.startQ.length!=group.group.count())
       throw "Candidate problem requires a group and complete path request";
     var settings=options==null ? new CandidateSamplingOptions() : options;
@@ -87,7 +88,19 @@ class CandidateProblem {
         if(ranges.length>0)throw "Standalone Cartesian candidate group has no external ranges";
         candidates=cart.sample(samplingTarget,request.startQ,samplingFreedom,settings.rollCount,settings.tiltRings,settings.azimuthCount);
       } else if(serial!=null) {
-        candidates=serial.sample(samplingTarget,request.startQ,samplingFreedom,ranges,settings.rollCount,settings.tiltRings,settings.azimuthCount);
+        var bounds:Null<{lower:Array<Float>,upper:Array<Float>}> = null;
+        var pinnedJump=index==0 && settings.pinStart && boundedConstruction ? [for(_ in request.startQ)1e-7] : null;
+        if(boundedConstruction && index>0 && samples[index-1].candidates.length>0){
+          var previous=samples[index-1].candidates;
+          var lower=previous[0].q.copy(),upper=lower.copy();
+          for(candidate in previous)for(j in 0...lower.length){
+            lower[j]=Math.min(lower[j],candidate.q[j]);upper[j]=Math.max(upper[j],candidate.q[j]);
+          }
+          for(j in 0...lower.length){lower[j]-=request.maxJump[j]+1e-12;upper[j]+=request.maxJump[j]+1e-12;}
+          bounds={lower:lower,upper:upper};
+        }
+        candidates=serial.sample(samplingTarget,request.startQ,samplingFreedom,ranges,
+          settings.rollCount,settings.tiltRings,settings.azimuthCount,pinnedJump,bounds);
       } else {
         candidates=[];
         // Unsupported geometry uses the explicitly diagnosed numeric fallback.

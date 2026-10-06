@@ -320,6 +320,14 @@ class KinematicsTests extends MotionKitTestSupport {
           return [for(joint in 0...q.length)if(group.external[joint])new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,q[joint],q[joint],1)];
         });
       var pathProblem = new motionkit.robot.CandidateProblem(group,pathRequest,options);
+      var boundedExternalProblem = new motionkit.robot.CandidateProblem(group,pathRequest,options,true);
+      check(boundedExternalProblem.samples[0].candidates.length == 1 &&
+        boundedExternalProblem.samples[1].candidates.length > 0,
+        "bounded serial construction preserves moving external rules");
+      var broadPinnedOptions = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1,1,1,true,grid);
+      var broadPinnedProblem = new motionkit.robot.CandidateProblem(group,pathRequest,broadPinnedOptions,true);
+      check(broadPinnedProblem.samples[0].candidates.length == 1,
+        "bounded pinned construction accepts an authored external grid wider than the joint window");
       check(pathProblem.samples[0].candidates.length == 1 && pathProblem.samples[1].candidates.length > 0,
         "per-sample external rules build a populated path ladder");
       for(candidate in pathProblem.samples[1].candidates)for(joint in 0...ruleEnd.length)if(group.external[joint])
@@ -468,6 +476,14 @@ class KinematicsTests extends MotionKitTestSupport {
           return [for(joint in 0...q.length)if(group.external[joint])new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,q[joint],q[joint],1)];
         });
       var pathProblem = new motionkit.robot.CandidateProblem(group,pathRequest,options);
+      var boundedExternalProblem = new motionkit.robot.CandidateProblem(group,pathRequest,options,true);
+      check(boundedExternalProblem.samples[0].candidates.length == 1 &&
+        boundedExternalProblem.samples[1].candidates.length > 0,
+        "bounded serial construction preserves moving external rules");
+      var broadPinnedOptions = new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1,1,1,true,grid);
+      var broadPinnedProblem = new motionkit.robot.CandidateProblem(group,pathRequest,broadPinnedOptions,true);
+      check(broadPinnedProblem.samples[0].candidates.length == 1,
+        "bounded pinned construction accepts an authored external grid wider than the joint window");
       check(pathProblem.samples[0].candidates.length == 1 && pathProblem.samples[1].candidates.length > 0,
         "per-sample external rules build a populated path ladder");
       for(candidate in pathProblem.samples[1].candidates)for(joint in 0...ruleEnd.length)if(group.external[joint])
@@ -651,6 +667,19 @@ class KinematicsTests extends MotionKitTestSupport {
     check(bounded.samples[1].candidates.length<unboundedCount,
       "forward jump bounds remove unreachable periodic lifts");
     var boundedRoute=motionkit.robot.StructuredLadder.search(bounded);
+    var constructedBounded=new motionkit.robot.CandidateProblem(fixture.arm,request,null,true);
+    for(i in 0...bounded.samples.length){
+      check(constructedBounded.samples[i].candidates.length==bounded.samples[i].candidates.length,
+        "bounded native construction matches exhaustive forward pruning");
+      for(candidate in bounded.samples[i].candidates){
+        var found=false;
+        for(actual in constructedBounded.samples[i].candidates){var same=candidate.branch==actual.branch;
+          for(j in 0...start.length)if(Math.abs(candidate.q[j]-actual.q[j])>1e-10)same=false;
+          if(same)found=true;
+        }
+        check(found,"bounded construction retains every feasible branch and periodic lift");
+      }
+    }
     check(boundedRoute.diagnostic==null,"bounded candidate problem retains a complete route");
     near(boundedRoute.cost,selected.cost,"forward bounds preserve the exact optimal route cost",1e-12);
     for(i in 0...selected.candidates.length)for(j in 0...start.length)

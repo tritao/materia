@@ -30,19 +30,35 @@ class SerialCandidateSampler {
     }
   }
   public function sample(target:Pose3,seed:Array<Float>,freedom:OrientationPolicy,ranges:Array<ExternalAxisRange>,
-      rollCount:Int=12,tiltRings:Int=3,azimuthCount:Int=8,?maxJump:Array<Float>):Array<LatticeCandidate> {
+      rollCount:Int=12,tiltRings:Int=3,azimuthCount:Int=8,?maxJump:Array<Float>,
+      ?jointBounds:{lower:Array<Float>,upper:Array<Float>}):Array<LatticeCandidate> {
     if(target==null)throw "Serial candidate sampling requires a target";
     var liftLimits=limits;
-    if(maxJump!=null){
-      if(seed==null || seed.length!=group.group.count() || maxJump.length!=seed.length)
+    if(maxJump!=null || jointBounds!=null){
+      if(seed==null || seed.length!=group.group.count() || maxJump!=null && maxJump.length!=seed.length ||
+          jointBounds!=null && (jointBounds.lower==null || jointBounds.upper==null ||
+            jointBounds.lower.length!=seed.length || jointBounds.upper.length!=seed.length))
         throw "Serial jump bounds must match complete joints";
       liftLimits=new mk_joint_lift_request();liftLimits.set_struct_size(mk_joint_lift_request.size());
       liftLimits.set_joint_count(seed.length);
       for(j in 0...seed.length){
-        if(!Math.isFinite(maxJump[j]) || maxJump[j]<=0)throw "Serial jump bounds must be finite and positive";
+        if(maxJump!=null && (!Math.isFinite(maxJump[j]) || maxJump[j]<=0))
+          throw "Serial jump bounds must be finite and positive";
         var bound=group.group.limitsOf(j);
-        liftLimits.set_lower(j,Math.max(bound.lower,seed[j]-maxJump[j]-1e-12));
-        liftLimits.set_upper(j,Math.min(bound.upper,seed[j]+maxJump[j]+1e-12));
+        var lower=bound.lower,upper=bound.upper;
+        if(maxJump!=null){lower=Math.max(lower,seed[j]-maxJump[j]-1e-12);upper=Math.min(upper,seed[j]+maxJump[j]+1e-12);}
+        if(jointBounds!=null){
+          if(!Math.isFinite(jointBounds.lower[j]) || !Math.isFinite(jointBounds.upper[j]) ||
+              jointBounds.lower[j]>jointBounds.upper[j])throw "Serial joint bounds must be finite ordered intervals";
+          lower=Math.max(lower,jointBounds.lower[j]);upper=Math.min(upper,jointBounds.upper[j]);
+        }
+        // External cells are authored by ExternalAxisGrid. Its full range
+        // must remain inside these native limits; forward pruning handles
+        // cell-to-cell jumps after sampling without reindexing the grid.
+        if(group.external[j]){lower=bound.lower;upper=bound.upper;}
+        if(lower>upper)return [];
+        liftLimits.set_lower(j,lower);
+        liftLimits.set_upper(j,upper);
         liftLimits.set_periodic(j,group.external[j] ? 0 : 1);
       }
     }

@@ -104,7 +104,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     }
     var profile=Sys.getEnv("PROCESS_PATH_PROFILE")=="1";
     var buildStarted=profile ? Sys.time() : 0.0;
-    var problem=new CandidateProblem(group,request,settings);
+    var problem=new CandidateProblem(group,request,settings,true);
     problem.pruneUnreachableBounds();
     var buildSeconds=profile ? Sys.time()-buildStarted : 0.0;
     var refinementSeconds=0.0,refinementAttempts=0;
