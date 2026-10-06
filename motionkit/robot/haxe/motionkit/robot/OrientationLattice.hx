@@ -7,10 +7,10 @@ import motionkit.path.OrientationPolicy;
 
 /** Native orientation cells, shared by geometric candidate families. */
 class OrientationLattice {
-  public static function sample(target:Pose3, freedom:OrientationPolicy, rollCount:Int = 12,
-      tiltRings:Int = 3, azimuthCount:Int = 8):Array<OrientationCell> {
-    if (target == null || rollCount <= 0 || tiltRings <= 0 || azimuthCount <= 0)
-      throw "Orientation lattice requires a target and positive resolutions";
+  public static function describe(freedom:OrientationPolicy,rollCount:Int = 12,
+      tiltRings:Int = 3,azimuthCount:Int = 8):mk_orientation_lattice {
+    if (rollCount <= 0 || tiltRings <= 0 || azimuthCount <= 0)
+      throw "Orientation lattice requires positive resolutions";
     var lattice = new mk_orientation_lattice(); lattice.set_struct_size(mk_orientation_lattice.size());
     lattice.set_roll_count(rollCount);lattice.set_tilt_rings(tiltRings);lattice.set_azimuth_count(azimuthCount);
     lattice.set_half_angle(0.0);
@@ -20,6 +20,13 @@ class OrientationLattice {
       case Cone(_,halfAngle): lattice.set_mode(2);lattice.set_half_angle(halfAngle);
       case Free: throw "Free orientation needs a full rotation lattice";
     }
+    return lattice;
+  }
+  public static function sample(target:Pose3, freedom:OrientationPolicy, rollCount:Int = 12,
+      tiltRings:Int = 3, azimuthCount:Int = 8):Array<OrientationCell> {
+    if (target == null || rollCount <= 0 || tiltRings <= 0 || azimuthCount <= 0)
+      throw "Orientation lattice requires a target and positive resolutions";
+    var lattice = describe(freedom,rollCount,tiltRings,azimuthCount);
     var count = MotionKitNative.mk_orientation_lattice_count(lattice);
     if (count.status != TrajectoryCoreConstants.MK_OK)
       throw 'Invalid orientation lattice: ${count.status}';

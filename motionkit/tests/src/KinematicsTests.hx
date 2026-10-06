@@ -472,10 +472,28 @@ class KinematicsTests extends MotionKitTestSupport {
       var group = new robotkit.manipulation.KinematicGroup(model, base.id, flange.id, null, tool);
       var analytic:motionkit.robot.AnalyticIk = new motionkit.robot.CartesianAnalyticIk(group);
       var numeric = new ManipulatorKinematics(group);
+      var sampler = new motionkit.robot.CartesianCandidateSampler(group);
+      var before = group.numericSolveCount();
       check(analytic.jointCount() == count, "Cartesian family keeps model DOF count");
       for (sample in 0...40) {
         var q = [for (joint in 0...count) 1.4 * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q);
+        var axis = group.tcpPose(q).transformVector(new Vec3(0,0,1)).toArray();
+        for (policy in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,
+            motionkit.path.OrientationPolicy.Cone(axis,0.1)]) {
+          var candidates = sampler.sample(target,q,policy,4,1,4), found = false;
+          for (candidate in candidates) {
+            var same = true;
+            for (joint in 0...count) if (Math.abs(candidate.q[joint]-q[joint]) > 1e-6) same = false;
+            found = found || same;
+            var actual = numeric.forward(candidate.q);
+            near(motionkit.path.PoseMath.distance(actual,target),0,"combined native Cartesian sampler task position",1e-7);
+            near(motionkit.robot.ToolFreedom.orientationError(actual,target,policy),0,"combined native Cartesian sampler freedom",1e-7);
+            check(candidate.wraps.length == count && candidate.external.length == 0,"native candidate retains wrap coordinates");
+          }
+          check(found,"combined native Cartesian sampler retains original legal configuration");
+        }
+        check(group.numericSolveCount() == before,"combined Cartesian sampling uses no numeric IK");
         near(motionkit.path.PoseMath.distance(analytic.forward(q), target), 0, "Cartesian model-derived FK", 1e-7);
         for (freedom in [motionkit.path.OrientationPolicy.Fixed, motionkit.path.OrientationPolicy.FreeAboutTool]) {
           var answers = analytic.branches(target, q, freedom), original = false;

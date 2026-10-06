@@ -715,3 +715,18 @@ application of a Cartesian TCP offset and periodic XYZ flags. Cartesian's native
 model already contains its full TCP; its separate tool transform must be
 identity. Haxe model-derived export and combined sampler invocation still need
 to be implemented. PP2 remains incomplete and production planning is unchanged.
+
+PP2 Haxe-to-native Cartesian candidate bridge is implemented. It exports the
+standalone Cartesian group's joint ordering and compiled limits, uses its
+FK-verified native screw/TCP descriptor, builds the orientation policy once,
+and calls combined native candidate counting/sampling without Haxe per-cell
+or per-orientation IK loops. Returned records retain branch/singularity flags
+and wrap/roll/tilt/azimuth coordinates. OrientationLattice.describe is shared
+with the orientation-only adapter. Integration tests cover 40 model vectors
+per XYZ / XYZ+C / XYZ+C+A family and fixed/free-spin/cone freedoms, with rotated
+bases, displaced joints and a pitched/displaced TCP. Original legal vectors
+are retained, all returned task residuals satisfy compiled FK / ToolFreedom,
+and numeric IK query counts remain unchanged. Compiler-only build and focused
+C4 runtime pass (190,110 assertions). Serial-arm space-screw export, combined
+external-cell Haxe integration, PathRequest problem building and production
+planner integration remain outstanding; PP2 is not complete.
