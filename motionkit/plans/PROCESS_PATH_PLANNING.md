@@ -69,6 +69,25 @@ Work already done stays where it fits; what doesn't is reworked in the step name
      - cobots with three parallel axes (UR; `CobotArm`).
    - `RobotArm` becomes the first; `CobotArm` already is the second.
    - The 35 mm offset was a by-product of stacking identical joint modules, not a design intent.
+7. **Plan within the drives, and check geometry once** (PP4, PP5, PP8; from the G17 diagnosis,
+   2026-10-06).
+   - **What went wrong.** The G17 refined track path peaks at 2.26 m/s² against 0.74 m/s² allowed.
+     TOPP-RA retries and then uniformly stretches the weld 1.39×: 378 s instead of about 227 s at
+     feed. The track travels 2.2 m instead of 2.6 m, so the arm absorbs the rest (margin 0.628 rad).
+     Planning is 88 s, of which 46.6 s is time-law generation with retries and 20.6 s is clearance on
+     the timed trajectory. The native search is about 1.1 s.
+   - **Fix 1: drive-aware refinement** (PP4).
+     - The refinement makes redundant coordinates feasible for their drives before timing.
+     - It never hands TOPP-RA a path whose track or positioner motion exceeds the drive at the
+       process's speed.
+   - **Fix 2: clearance once, on geometry** (PP5).
+     - The timed trajectory is a re-timing of the joint path that was already checked. It deviates
+       only by the lowering tolerance.
+     - Check the geometric path once, with the margin increased by a bound on how far that deviation
+       can move any link (collision plan's CL-D5 motion bounds).
+     - Drop the separate dense clearance pass on the timed trajectory.
+   - **Fix 3: the search wrapper** (state costs, packing, Haxe wrapper work) comes only after fixes 1
+     and 2.
 5. **Refinement is an interface** (PP4).
    - The spline smoothing plus exact re-solve is the first implementation behind a
      `PathRefinement`-style interface.
@@ -203,11 +222,13 @@ and OPW are built and tested, but no production code uses them.
 
   They are the cheap industrial default, and the full lattice is used when a rule fails.
 
-**PP-D5. Collision lazily, on the winning path.**
+**PP-D5. Collision lazily, on the winning path; geometry checked once.**
 - Search ignores collision.
 - The chosen path's samples and joint-space edges are checked. Colliding candidates or edges are
   removed and the search repeats, up to a bound.
-- One final check runs on the compiled trajectory.
+- The refined path is checked once, with a margin covering the lowering tolerance's worst link
+  displacement (revision 7). The timed trajectory is not checked again densely: its joint deviation
+  from the checked path is already bounded and validated by lowering.
 - **Rejected:** checking every candidate. Most are never on the winning path.
 
 **PP-D6. Native core, Haxe orchestration.**
@@ -234,6 +255,17 @@ candidate ordering and tie-breaks.
 - The structured ladder DP is the only graph search (Descartes removed).
 - `JointPathPlanner` is the only Cartesian-to-joint route in `ProgramCompiler`.
 - collisionkit is the only collision world once it lands.
+
+**PP-D12. Redundant coordinates respect their drives before timing** (revision 7).
+- A redundant coordinate x(s) (track, positioner, roll) moves at the process's planned path speed v(s).
+- So its drive's limits become path-shape bounds that refinement enforces:
+  - |x'(s)|·v ≤ v_max;
+  - |x''(s)|·v² + |x'(s)|·|dv/ds|·v ≤ a_max.
+
+  v_max and a_max come from the compiled model's drive-derived limits; the second bound is
+  conservative where v changes.
+- TOPP-RA then has no reason to stretch the process. A stretch or retry on a refined process path is a
+  defect to report, not a fallback.
 
 **PP-D11. Refinement behind an interface** (2026-10-06). Spline plus exact re-solve first; a
 constrained optimizer can replace it without touching search, timing or callers.
@@ -432,11 +464,32 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 - Output `JointPathSamples` for `ToppraPathTiming`.
 - The spline-and-re-solve is one implementation of a refinement interface (revision 5). Callers and
   timing depend only on the interface.
+- **Drive-aware refinement (revision 7, PP-D12).** Replace the plain spline with a small constrained
+  smoothing problem over the redundant coordinates along s:
+  - **Objective:**
+    - stay close to the ladder's route (it carries the global choices);
+    - penalize curvature;
+    - reward posture/limit margin (the same state costs the ladder uses).
+  - **Constraints:**
+    - PP-D12's velocity and acceleration bounds at the process's planned speed;
+    - joint limits of the re-solved arm, linearized around the route and re-checked after the exact
+      re-solve;
+    - the ladder's branch and configuration pins.
+  - **Solver:** a banded QP. proxsuite is already vendored; a hand-written banded solver is fine if
+    smaller. It's native, deterministic, and solved once per section, with at most a few
+    re-linearization rounds.
+  - **Seed and check, not a special case:** for a straight seam parallel to a track, the "track
+    follows the tool at a constant offset" rule (PP-D4) gives zero track acceleration and constant
+    arm posture. Use it as the QP's seed and as a sanity check.
 - **Tests:**
   - task-space error ≤ the compiler's path tolerance by construction;
   - no jumps;
   - derivatives match finite differences;
-  - TOPP-RA succeeds on the track weld without retries.
+  - TOPP-RA succeeds on the track weld **with no retries and no stretch**;
+  - the G17 refined track path stays within 0.74 m/s² at the weld feed;
+  - G17 track travel and arm posture margin meet PP8's gates (≥ 0.775421815 rad);
+  - an infeasible case (drive too weak for the feed) reports the binding coordinate and the feed it
+    could sustain, instead of stretching silently.
 
 **PP5. Lazy collision** (PP-D5).
 - After each search, check the route's samples and the joint-space interpolation between them through
@@ -445,9 +498,19 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 - Remove the failing candidates, or the failing edge for a sweep failure, and search again, up to N
   rounds.
 - Return the closest clearance on the final route.
+- **Clearance once, on geometry (revision 7):**
+  - check the refined joint path (samples plus swept edges) with the clearance margin increased by δ;
+  - δ is the largest distance any link point can move when each joint deviates by at most the
+    lowering tolerance: per joint, its tolerance × the farthest distance from that joint's axis to the
+    geometry it carries (the collision plan's CL-D5 motion bound, computed from the same hulls);
+  - lowering already validates the joint deviation, so the timed trajectory needs no second dense
+    clearance pass. Remove that pass from process compilation.
 - **Tests:**
   - an obstacle forcing a branch or roll change is avoided in a bounded number of rounds;
-  - an impossible case reports the blocking pair and sample.
+  - an impossible case reports the blocking pair and sample;
+  - δ is conservative: sampled timed trajectories never come closer than the plain margin, on G17 and
+    on the whole weldment;
+  - G17's compiled-trajectory clearance time (20.6 s) disappears from the planning profile.
 
 **PP6. Compiler integration.**
 - `ProgramCompiler` takes a `JointPathPlanner`, replacing the unused `configurationSelector` argument.
@@ -479,6 +542,15 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
   compile-and-verify.
 - `WeldingPlanRunner` compiles once. Reuse that compilation for the rate schedule instead of compiling
   again in `launch()`.
+- **Performance order (revision 7).** Measured on G17 with `PROCESS_PATH_PROFILE=1`, after PP1's
+  production EAIK adoption:
+  1. drive-aware refinement (PP4): removes the stretch, the TOPP-RA retries (most of the 46.6 s time
+     law) and the posture regression;
+  2. clearance once (PP5): removes the 20.6 s timed-trajectory pass;
+  3. only then the search wrapper (state costs 3.8 s, packing and wrapper work 7.3 s, native search
+     about 1.1 s per direction) and candidate construction (4.4 s).
+
+  Re-profile after each step and record the split here.
 - **Acceptance (on the PP0 benchmarks):**
   - G17 track weld under 15 s planning: 2600 mm, 5 mm leg, arm margin ≥ the PP0 value, no clearance
     violation, cycle time within 5 % of PP0 (**<=248.43 s**, from 236.6 s),
