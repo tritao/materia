@@ -6,25 +6,37 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	const MK_TIMING_BINDING_FEED_CAP = 3;
 	const MK_TIMING_BINDING_JOINT_ACCELERATION = 2;
 	const MK_TIMING_BINDING_JOINT_VELOCITY = 1;
-	extern fn mk_analytic_cartesian_forward(model: ptr<const<mk_analytic_cartesian_model>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_opw_pose> @out) -> mk_result;
+	extern fn mk_analytic_cartesian_forward(model: ptr<const<mk_analytic_cartesian_model>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_analytic_pose> @out) -> mk_result;
 	/**
 	 * All geometric branches, before limits/wrap enumeration by the sampler.
 	 * axis_only frees TCP spin; fixed orientation filters branches by full rotation.
 	 * The seed selects C at its explicit axis singularity.
 	 */
-	extern fn mk_analytic_cartesian_inverse(model: ptr<const<mk_analytic_cartesian_model>>, target: ptr<const<mk_opw_pose>>, axis_only: u32, singular_c_seed: f64, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
-	extern fn mk_analytic_ur_forward(parameters: ptr<const<mk_ur_parameters>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_opw_pose> @out) -> mk_result;
-	/**
-	 * Up to eight branches. Wrist-singular solutions preserve the supplied q6.
-	 * singular bits: 1 wrist, 2 elbow. Limits and periodic lifts belong to sampling.
-	 */
-	extern fn mk_analytic_ur_inverse(parameters: ptr<const<mk_ur_parameters>>, target: ptr<const<mk_opw_pose>>, singular_q6_seed: f64, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_analytic_cartesian_inverse(model: ptr<const<mk_analytic_cartesian_model>>, target: ptr<const<mk_analytic_pose>>, axis_only: u32, singular_c_seed: f64, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Cartesian free-spin/cone cells solve the tool-axis constraint. Repeated
 	 * geometric configurations retain their first lattice coordinates. The Cartesian
 	 * descriptor includes its TCP, so model.tool must be identity and XYZ nonperiodic.
 	 */
-	extern fn mk_cartesian_candidate_count(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_cartesian_candidate_count(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
+	/**
+	 * Compact sampling outputs are candidate-major, preserving full-record order.
+	 * Joint and wrap rows have joint_count entries. Coordinate rows contain external
+	 * cells followed by roll, tilt, azimuth, branch and singular bits. Lengths must
+	 * exactly match candidate_count times their respective row dimensions.
+	 */
+	extern fn mk_eaik_candidate_count(solver: mk_eaik_handle, configuration: ptr<const<mk_eaik_configuration>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
+	/**
+	 * Construct only known exact decompositions of a compiled 6R chain.
+	 */
+	extern fn mk_eaik_create(model: ptr<const<mk_eaik_model>>, out_solver: ptr<mk_eaik_handle> @out @owned) -> mk_result;
+	extern fn mk_eaik_destroy(solver: mk_eaik_handle) -> void;
+	extern fn mk_eaik_forward(solver: mk_eaik_handle, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_analytic_pose> @out) -> mk_result;
+	/**
+	 * Exact solutions only; least-squares approximations are rejected.
+	 */
+	extern fn mk_eaik_inverse(solver: mk_eaik_handle, target: ptr<const<mk_analytic_pose>>, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_eaik_inverse_labelled(solver: mk_eaik_handle, configuration: ptr<const<mk_eaik_configuration>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_enumerate_joint_lifts(request: ptr<const<mk_joint_lift_request>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_lifts: ptr<mk_joint_lift> @out_array("lift_capacity"), lift_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_external_lattice_count(lattice: ptr<const<mk_external_lattice>>, out_count: ptr<u32> @out) -> mk_result;
 	/**
@@ -36,12 +48,6 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * Infinite planning ranges or a count/index overflow return INVALID_ARGUMENT.
 	 */
 	extern fn mk_joint_lift_count(request: ptr<const<mk_joint_lift_request>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
-	extern fn mk_opw_candidate_count(parameters: ptr<const<mk_opw_parameters>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
-	/**
-	 * All eight slots are written, including invalid solutions.
-	 */
-	extern fn mk_opw_forward(parameters: ptr<const<mk_opw_parameters>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_opw_pose> @out) -> mk_result;
-	extern fn mk_opw_inverse(parameters: ptr<const<mk_opw_parameters>>, pose: ptr<const<mk_opw_pose>>, out_solutions: ptr<mk_opw_solution> @out_array("solution_count"), solution_count: u32) -> mk_result;
 	/**
 	 * Count first, then allocate exactly enough output. Invalid requests fail before writing.
 	 */
@@ -67,24 +73,16 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * One call replaces a bisection of mk_path_distance_to_time per sample.
 	 */
 	extern fn mk_path_times_to_distances(law: mk_time_law_handle, seconds: ptr<const<f64>> @in_array("count"), count: u32, out_distances: ptr<f64> @out_array("count")) -> mk_result;
-	extern fn mk_sample_cartesian_candidates(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
-	extern fn mk_sample_cartesian_candidates_compact(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_joints: ptr<f64> @out_array("joint_value_count"), out_wraps: ptr<i32> @out_array("joint_value_count"), joint_value_count: u32, out_coordinates: ptr<u32> @out_array("coordinate_count"), coordinate_count: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_sample_cartesian_candidates(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_sample_cartesian_candidates_compact(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_joints: ptr<f64> @out_array("joint_value_count"), out_wraps: ptr<i32> @out_array("joint_value_count"), joint_value_count: u32, out_coordinates: ptr<u32> @out_array("coordinate_count"), coordinate_count: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_sample_eaik_candidates(solver: mk_eaik_handle, configuration: ptr<const<mk_eaik_configuration>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_sample_eaik_candidates_compact(solver: mk_eaik_handle, configuration: ptr<const<mk_eaik_configuration>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_joints: ptr<f64> @out_array("joint_value_count"), out_wraps: ptr<i32> @out_array("joint_value_count"), joint_value_count: u32, out_coordinates: ptr<u32> @out_array("coordinate_count"), coordinate_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Axis endpoints are included; the last external coordinate varies fastest.
 	 * Non-external joints are copied from the seed. Zero external axes yields one cell.
 	 */
 	extern fn mk_sample_external_cells(lattice: ptr<const<mk_external_lattice>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_cells: ptr<mk_external_cell> @out_array("cell_capacity"), cell_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
-	extern fn mk_sample_opw_candidates(parameters: ptr<const<mk_opw_parameters>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
-	extern fn mk_sample_opw_candidates_compact(parameters: ptr<const<mk_opw_parameters>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_joints: ptr<f64> @out_array("joint_value_count"), out_wraps: ptr<i32> @out_array("joint_value_count"), joint_value_count: u32, out_coordinates: ptr<u32> @out_array("coordinate_count"), coordinate_count: u32, out_count: ptr<u32> @out) -> mk_result;
-	extern fn mk_sample_orientations(lattice: ptr<const<mk_orientation_lattice>>, target: ptr<const<mk_opw_pose>>, out_samples: ptr<mk_orientation_sample> @out_array("sample_capacity"), sample_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
-	extern fn mk_sample_ur_candidates(parameters: ptr<const<mk_ur_parameters>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
-	/**
-	 * Compact sampling outputs are candidate-major, preserving full-record order.
-	 * Joint and wrap rows have joint_count entries. Coordinate rows contain external
-	 * cells followed by roll, tilt, azimuth, branch and singular bits. Lengths must
-	 * exactly match candidate_count times their respective row dimensions.
-	 */
-	extern fn mk_sample_ur_candidates_compact(parameters: ptr<const<mk_ur_parameters>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_joints: ptr<f64> @out_array("joint_value_count"), out_wraps: ptr<i32> @out_array("joint_value_count"), joint_value_count: u32, out_coordinates: ptr<u32> @out_array("coordinate_count"), coordinate_count: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_sample_orientations(lattice: ptr<const<mk_orientation_lattice>>, target: ptr<const<mk_analytic_pose>>, out_samples: ptr<mk_orientation_sample> @out_array("sample_capacity"), sample_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * No candidate copies: samples address slices of the candidate array.
 	 * Costs are nonnegative; +infinity disables a candidate. Selected indices are
@@ -104,10 +102,6 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 */
 	extern fn mk_search_ladder_filtered(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_lattice_candidate>> @in_array("candidate_count"), state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, blocked_edges: ptr<const<mk_ladder_edge>> @in_array("blocked_edge_count"), blocked_edge_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result> @out) -> mk_result;
 	extern fn mk_select_configurations(request: ptr<const<mk_configuration_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_configuration_candidate>> @in_array("candidate_count"), candidate_count: u32, out_sequence: ptr<mk_configuration_solution> @out_array("sample_count")) -> mk_result;
-	/**
-	 * Samples OPW's eight IK branches natively before the same Descartes search.
-	 */
-	extern fn mk_select_opw_configurations(request: ptr<const<mk_configuration_request>>, parameters: ptr<const<mk_opw_parameters>>, samples: ptr<const<mk_opw_path_sample>> @in_array("sample_count"), sample_count: u32, start_joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_sequence: ptr<mk_configuration_solution> @out_array("sample_count")) -> mk_result;
 	extern fn mk_time_law_binding_count(law: mk_time_law_handle, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_time_law_create(stages: ptr<const<mk_time_stage>> @in_array("stage_count"), stage_count: u32, out_law: ptr<mk_time_law_handle> @out @owned) -> mk_result;
 	extern fn mk_time_law_destroy(law: mk_time_law_handle) -> void;
@@ -116,12 +110,6 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * Reachability-based TOPP-RA timing and its validated lowered trajectory.
 	 */
 	extern fn mk_time_path(path: mk_path_handle, max_velocity: ptr<const<f64>> @in_array("joint_count"), max_acceleration: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, speed_caps: ptr<const<f64>> @in_array("speed_cap_count"), speed_cap_count: u32, start_speed: f64, end_speed: f64, lowering_tolerance: f64, out_law: ptr<mk_time_law_handle> @out @owned, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
-	/**
-	 * Complete UR external-cell x orientation x branch x legal-lift sampling.
-	 * Target poses are in the work frame. Tool/base conventions match UR analytic FK.
-	 * External coordinates are held and are never independently lifted.
-	 */
-	extern fn mk_ur_candidate_count(parameters: ptr<const<mk_ur_parameters>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Cartesian chain represented by its zero-pose space screws and TCP pose.
 	 * The three translation axes are columns of translation_axes. Optional C/A
@@ -139,12 +127,23 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		home_position: array<f64, 3> @offset(176);
 		home_quaternion: array<f64, 4> @offset(200);
 	}
+	/**
+	 * Rigid target or FK pose shared by the analytic families.
+	 */
+	struct mk_analytic_pose @layout(64, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		position: array<f64, 3> @offset(8);
+		/**
+		 * < x, y, z, w.
+		 */
+		quaternion: array<f64, 4> @offset(32);
+	}
 	struct mk_analytic_solution @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		joints: array<f64, 6> @offset(8);
 		branch: u32 @offset(56);
 		/**
-		 * < Family-specific flags; Cartesian C axis or UR wrist/elbow.
+		 * < Family-specific flags; Cartesian C axis or EAIK wrist/elbow.
 		 */
 		singular: u32 @offset(60);
 	}
@@ -208,6 +207,37 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		rank_tolerance: f64 @offset(1192);
 		linear_tolerance: f64 @offset(1200);
 		angular_tolerance: f64 @offset(1208);
+	}
+	/**
+	 * Physical configuration reference extracted from the same compiled chain.
+	 */
+	struct mk_eaik_configuration @layout(216, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		spherical: u32 @offset(4);
+		reference: array<f64, 6> @offset(8);
+		signs: array<f64, 6> @offset(56);
+		base_position: array<f64, 3> @offset(104);
+		base_rotation: array<f64, 9> @offset(128);
+		shoulder_offset: f64 @offset(200);
+		elbow_offset: f64 @offset(208);
+	}
+	/**
+	 * Compiled 6R zero-pose axes H, link displacements P and terminal rotation.
+	 */
+	struct mk_eaik_model @layout(392, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		/**
+		 * < Six column vectors.
+		 */
+		axes: array<f64, 18> @offset(8);
+		/**
+		 * < Seven column vectors.
+		 */
+		displacements: array<f64, 21> @offset(152);
+		/**
+		 * < Column-major.
+		 */
+		terminal_rotation: array<f64, 9> @offset(320);
 	}
 	struct mk_external_cell @layout(776, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -305,44 +335,6 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		azimuth_index: u32 @offset(1040);
 		branch: u32 @offset(1044);
 		singular: u32 @offset(1048);
-	}
-	/**
-	 * OPW's seven geometric parameters and manufacturer joint conventions.
-	 */
-	struct mk_opw_parameters @layout(120, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		a1: f64 @offset(8);
-		a2: f64 @offset(16);
-		b: f64 @offset(24);
-		c1: f64 @offset(32);
-		c2: f64 @offset(40);
-		c3: f64 @offset(48);
-		c4: f64 @offset(56);
-		offsets: array<f64, 6> @offset(64);
-		sign_corrections: array<i8, 6> @offset(112);
-	}
-	struct mk_opw_path_sample @layout(72, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		distance: f64 @offset(8);
-		position: array<f64, 3> @offset(16);
-		/**
-		 * < OPW flange pose in the solver's local frame.
-		 */
-		quaternion: array<f64, 4> @offset(40);
-	}
-	struct mk_opw_pose @layout(64, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		position: array<f64, 3> @offset(8);
-		/**
-		 * < x, y, z, w.
-		 */
-		quaternion: array<f64, 4> @offset(32);
-	}
-	struct mk_opw_solution @layout(64, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		joints: array<f64, 6> @offset(8);
-		valid: u8 @offset(56);
-		singular: u8 @offset(57);
 	}
 	/**
 	 * Deterministic orientation lattice in the target TCP frame.
@@ -464,21 +456,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		joint: u32 @offset(12);
 		limit: f64 @offset(16);
 	}
-	/**
-	 * UR DH family: alpha = [pi/2, 0, 0, pi/2, -pi/2, 0].
-	 * Canonical DH q = sign_corrections[i] * model_q - offsets[i].
-	 */
-	struct mk_ur_parameters @layout(112, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		a2: f64 @offset(8);
-		a3: f64 @offset(16);
-		d1: f64 @offset(24);
-		d4: f64 @offset(32);
-		d5: f64 @offset(40);
-		d6: f64 @offset(48);
-		offsets: array<f64, 6> @offset(56);
-		sign_corrections: array<i8, 6> @offset(104);
-	}
+	handle mk_eaik_handle : u32 @destroy("mk_eaik_destroy");
 	handle mk_path_handle : u32 @destroy("mk_path_destroy");
 	handle mk_time_law_handle : u32 @destroy("mk_time_law_destroy");
 }

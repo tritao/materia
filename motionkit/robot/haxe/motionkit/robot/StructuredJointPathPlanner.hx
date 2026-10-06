@@ -80,8 +80,8 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     if (Std.isOfType(solver, ManipulatorKinematics)) {
       var adapter:ManipulatorKinematics = cast solver;
       workerGroup = adapter.manipulator;
-    } else if (Std.isOfType(solver, OpwKinematics)) {
-      var adapter:OpwKinematics = cast solver;
+    } else if (Std.isOfType(solver, EaikKinematics)) {
+      var adapter:EaikKinematics = cast solver;
       workerGroup = adapter.manipulator;
     } else throw "Structured planner worker requires compiled group kinematics";
     return new StructuredJointPathPlanner(workerGroup, sampling, coarse,

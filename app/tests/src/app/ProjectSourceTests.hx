@@ -1074,7 +1074,7 @@ class ProjectSourceTests {
         if (arm == null) throw "analytic cobot has no six-joint tool chain";
         var group = arm;
         var numeric = new motionkit.robot.ManipulatorKinematics(arm);
-        var analytic = new motionkit.robot.UrAnalyticIk(arm);
+        var analytic = new motionkit.robot.EaikAnalyticIk(arm);
         var sampler = new motionkit.robot.SerialCandidateSampler(group);
         var before = group.numericSolveCount();
         for (sample in 0...200) {
@@ -1135,7 +1135,7 @@ class ProjectSourceTests {
         at = frame.compose(robotkit.spatial.Transform3.fromArrays(joint.childFramePosition, joint.childFrameRotation).inverse());
       }
       Sys.println("Authored RobotArm joint geometry " + haxe.Json.stringify(geometry));
-      var analytic = new motionkit.robot.OpwKinematics(group.robot, arm);
+      var analytic = new motionkit.robot.EaikKinematics(arm);
       var tolerance = new motionkit.kinematics.IkTolerance(1e-6, 1e-6);
       for (sample in 0...100) {
         var q = [for (joint in 0...6) {

@@ -94,7 +94,7 @@ class WeldPlanningTests {
     check(rejected,"restart at the completed seam is refused");
     var fixture=arm(),solver=new ManipulatorKinematics(fixture.arm),before=fixture.arm.numericSolveCount();
     var backend=motionkit.robot.BranchIk.of(fixture.arm);
-    check(backend.family()=="UR6R","authored weld fixture has a model-derived analytic family");
+    check(backend.family()=="EAIK","authored weld fixture has a model-derived analytic family");
     var goals=backend.branches(problem.approach,[0.0,-1.5708,1.5708,-1.5708,-1.5708,0.0]);
     check(goals.length>0,"joined wire approach has an analytic start");
     var start=goals[0].q;

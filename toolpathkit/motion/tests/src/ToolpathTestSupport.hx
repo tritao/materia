@@ -24,7 +24,7 @@ import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
-import motionkit.robot.OpwKinematics;
+import motionkit.robot.EaikKinematics;
 import motionkit.robot.AxisKinematics;
 import toolpathkit.motion.ToolpathMotion;
 import toolpathkit.motion.ToolpathMotionBinding;

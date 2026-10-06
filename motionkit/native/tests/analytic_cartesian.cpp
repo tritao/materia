@@ -24,7 +24,7 @@ int main() {
         for (unsigned sample = 0; sample < 100; ++sample) {
             double q[6] = {};
             for (unsigned i = 0; i < n; ++i) q[i] = 1.4 * std::sin((sample + 1) * (i + 1) * 1.618);
-            mk_opw_pose target = {};
+            mk_analytic_pose target = {};
             assert(mk_analytic_cartesian_forward(&m, q, n, &target) == MK_OK);
             for (unsigned free = 0; free < 2; ++free) {
                 mk_analytic_solution answers[2] = {}; uint32_t count = 0;
@@ -36,7 +36,7 @@ int main() {
                     bool same = true;
                     for (unsigned i = 0; i < n; ++i) same &= std::abs(answers[j].joints[i] - q[i]) < 1e-7;
                     contains_original |= same;
-                    mk_opw_pose back = {};
+                    mk_analytic_pose back = {};
                     assert(mk_analytic_cartesian_forward(&m, answers[j].joints, n, &back) == MK_OK);
                     for (unsigned i = 0; i < 3; ++i) assert(std::abs(back.position[i] - target.position[i]) < 1e-8);
                 }
@@ -45,7 +45,7 @@ int main() {
         }
     }
     // Axial tool direction reports a singular C, and honors its seed for free spin.
-    double q[] = {0.1,0.2,0.3,0.7,-0.4}; mk_opw_pose target = {};
+    double q[] = {0.1,0.2,0.3,0.7,-0.4}; mk_analytic_pose target = {};
     assert(mk_analytic_cartesian_forward(&m, q, 5, &target) == MK_OK);
     mk_analytic_solution answers[2] = {}; uint32_t count = 0;
     assert(mk_analytic_cartesian_inverse(&m, &target, 1, 1.23, answers, 2, &count) == MK_OK);

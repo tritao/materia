@@ -17,8 +17,8 @@ bool valid_pose(const double *p,const double *q) {
 T pose(const double *p,const double *q) {
     T t=T::Identity();t.translation()=vector(p);t.linear()=Eigen::Quaterniond(q[3],q[0],q[1],q[2]).toRotationMatrix();return t;
 }
-mk_opw_pose record(const T &t) {
-    mk_opw_pose p={};p.struct_size=sizeof(p);Eigen::Quaterniond q(t.linear());
+mk_analytic_pose record(const T &t) {
+    mk_analytic_pose p={};p.struct_size=sizeof(p);Eigen::Quaterniond q(t.linear());
     for(unsigned i=0;i<3;++i)p.position[i]=t.translation()[i];
     p.quaternion[0]=q.x();p.quaternion[1]=q.y();p.quaternion[2]=q.z();p.quaternion[3]=q.w();return p;
 }
@@ -52,9 +52,10 @@ T frame(const mk_serial_cell_model &m,const double *q,unsigned scope) {
     return t*(scope==0 ? pose(m.base_position,m.base_quaternion) : pose(m.work_position,m.work_quaternion));
 }
 struct CompactOutput {double *joints;int32_t *wraps;uint32_t *coordinates;};
-mk_result run(const mk_ur_parameters *p,const mk_opw_parameters *opw,const mk_analytic_cartesian_model *cartesian,const mk_serial_cell_model *m,const mk_external_lattice *e,
-    const mk_orientation_lattice *o,const mk_joint_lift_request *limits,const mk_opw_pose *target,
-    const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t &count,CompactOutput *compact=nullptr) {
+mk_result run(const mk_analytic_cartesian_model *cartesian,const mk_serial_cell_model *m,const mk_external_lattice *e,
+    const mk_orientation_lattice *o,const mk_joint_lift_request *limits,const mk_analytic_pose *target,
+    const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t &count,CompactOutput *compact=nullptr,
+    mk_eaik_handle eaik={},const mk_eaik_configuration *labels=nullptr) {
     const uint32_t arm_count=cartesian ? cartesian->joint_count : 6;
     if(arm_count<3 || arm_count>6)return MK_ERROR_INVALID_ARGUMENT;
     if(!seed || !limits || limits->struct_size!=sizeof(*limits) || limits->joint_count!=n || !valid_model(m,e,n,arm_count))
@@ -71,9 +72,9 @@ mk_result run(const mk_ur_parameters *p,const mk_opw_parameters *opw,const mk_an
     status=mk_orientation_lattice_count(o,&no);if(status!=MK_OK)return status;
     status=mk_joint_lift_count(limits,seed,n,&unused);if(status!=MK_OK)return status;
     double arm_seed[6]={};for(unsigned i=0;i<arm_count;++i)arm_seed[i]=seed[m->arm_joint_indices[i]];
-    mk_opw_pose validation;
-    status=cartesian ? mk_analytic_cartesian_forward(cartesian,arm_seed,arm_count,&validation) :
-        p ? mk_analytic_ur_forward(p,arm_seed,6,&validation) : mk_opw_forward(opw,arm_seed,6,&validation);if(status!=MK_OK)return status;
+    mk_analytic_pose validation{};validation.struct_size=sizeof(validation);
+    status=eaik.id ? mk_eaik_forward(eaik,arm_seed,6,&validation) :
+        mk_analytic_cartesian_forward(cartesian,arm_seed,arm_count,&validation);if(status!=MK_OK)return status;
     for(unsigned i=0;i<m->external_count;++i) {
         const auto joint=m->external_joint_indices[i];
         if(e->lower[i]<limits->lower[joint]-1e-9 || e->upper[i]>limits->upper[joint]+1e-9)return MK_ERROR_INVALID_ARGUMENT;
@@ -90,36 +91,10 @@ mk_result run(const mk_ur_parameters *p,const mk_opw_parameters *opw,const mk_an
         const T base_inverse=frame(*m,cell.joints,0).inverse(),work=frame(*m,cell.joints,1);
         for(const auto &orientation:orientations) {
             const auto goal=record(base_inverse*work*pose(orientation.position,orientation.quaternion)*tool_inverse);
-            mk_analytic_solution branches[8];uint32_t nb;
-            if(cartesian) status=mk_analytic_cartesian_inverse(cartesian,&goal,o->mode==0 ? 0 : 1,
+            mk_analytic_solution branches[32];uint32_t nb;
+            if(eaik.id) status=mk_eaik_inverse_labelled(eaik,labels,&goal,arm_seed,6,branches,32,&nb);
+            else if(cartesian) status=mk_analytic_cartesian_inverse(cartesian,&goal,o->mode==0 ? 0 : 1,
                 arm_seed[3]+(o->mode==0 ? 0 : 6.28318530717958647692*orientation.roll_index/o->roll_count),branches,8,&nb);
-            else if(p) status=mk_analytic_ur_inverse(p,&goal,arm_seed[5],branches,8,&nb);
-            else {
-                mk_opw_solution slots[8];nb=0;status=mk_opw_inverse(opw,&goal,slots,8);
-                if(status==MK_OK)for(unsigned i=0;i<8;++i)if(slots[i].valid) {
-                    auto &branch=branches[nb++];branch={};branch.struct_size=sizeof(branch);branch.branch=i;branch.singular=slots[i].singular;
-                    for(unsigned j=0;j<6;++j)branch.joints[j]=slots[i].joints[j];
-                    const double wrist=branch.joints[4]*opw->sign_corrections[4]-opw->offsets[4];
-                    if(std::abs(std::sin(wrist))<1e-6) {
-                        // At either wrist pole, retain seeded q4 and recover the
-                        // coupled q6 directly from the target rotation. The raw
-                        // inverse representative is unstable at the pi pole.
-                        auto seeded=branch;
-                        seeded.joints[3]=arm_seed[3];
-                        seeded.joints[4]=((std::cos(wrist)>0 ? 0.0 : 3.14159265358979323846)+opw->offsets[4])*opw->sign_corrections[4];
-                        seeded.joints[5]=opw->offsets[5]*opw->sign_corrections[5];
-                        mk_opw_pose zero_spin;
-                        if(mk_opw_forward(opw,seeded.joints,6,&zero_spin)==MK_OK) {
-                            const Eigen::Matrix3d rotation=pose(zero_spin.position,zero_spin.quaternion).linear().transpose()*pose(goal.position,goal.quaternion).linear();
-                            seeded.joints[5]=(std::atan2(rotation(1,0),rotation(0,0))+opw->offsets[5])*opw->sign_corrections[5];
-                            mk_opw_pose checked;
-                            if(mk_opw_forward(opw,seeded.joints,6,&checked)==MK_OK &&
-                                (pose(checked.position,checked.quaternion).matrix()-pose(goal.position,goal.quaternion).matrix()).norm()<1e-8)
-                                branch=seeded;
-                        }
-                    }
-                }
-            }
             if(status!=MK_OK)return status;
             for(unsigned b=0;b<nb;++b) {
                 std::array<double,MK_MAX_JOINTS> q={};
@@ -170,96 +145,85 @@ mk_result run(const mk_ur_parameters *p,const mk_opw_parameters *opw,const mk_an
     count=uint32_t(total);return MK_OK;
 }
 }
-extern "C" mk_result MK_CALL mk_ur_candidate_count(const mk_ur_parameters *p,const mk_serial_cell_model *m,
-    const mk_external_lattice *e,const mk_orientation_lattice *o,const mk_joint_lift_request *limits,
-    const mk_opw_pose *target,const double *seed,uint32_t n,uint32_t *out_count) {
-    if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
-    try {uint32_t count;auto status=run(p,nullptr,nullptr,m,e,o,limits,target,seed,n,nullptr,count);if(status==MK_OK)*out_count=count;return status;}
-    catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
-}
-extern "C" mk_result MK_CALL mk_sample_ur_candidates(const mk_ur_parameters *p,const mk_serial_cell_model *m,
-    const mk_external_lattice *e,const mk_orientation_lattice *o,const mk_joint_lift_request *limits,
-    const mk_opw_pose *target,const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t capacity,uint32_t *out_count) {
-    if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
-    try {
-        uint32_t count;auto status=run(p,nullptr,nullptr,m,e,o,limits,target,seed,n,nullptr,count);if(status!=MK_OK)return status;
-        if(capacity<count || (count && !out))return MK_ERROR_INVALID_ARGUMENT;
-        if(count)status=run(p,nullptr,nullptr,m,e,o,limits,target,seed,n,out,count);
-        if(status==MK_OK)*out_count=count;return status;
-    }catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
-}
-extern "C" mk_result MK_CALL mk_opw_candidate_count(const mk_opw_parameters *p,const mk_serial_cell_model *m,
-    const mk_external_lattice *e,const mk_orientation_lattice *o,const mk_joint_lift_request *limits,
-    const mk_opw_pose *target,const double *seed,uint32_t n,uint32_t *out_count) {
-    if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
-    try {uint32_t count;auto status=run(nullptr,p,nullptr,m,e,o,limits,target,seed,n,nullptr,count);if(status==MK_OK)*out_count=count;return status;}
-    catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
-}
-extern "C" mk_result MK_CALL mk_sample_opw_candidates(const mk_opw_parameters *p,const mk_serial_cell_model *m,
-    const mk_external_lattice *e,const mk_orientation_lattice *o,const mk_joint_lift_request *limits,
-    const mk_opw_pose *target,const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t capacity,uint32_t *out_count) {
-    if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
-    try {
-        uint32_t count;auto status=run(nullptr,p,nullptr,m,e,o,limits,target,seed,n,nullptr,count);if(status!=MK_OK)return status;
-        if(capacity<count || (count && !out))return MK_ERROR_INVALID_ARGUMENT;
-        if(count)status=run(nullptr,p,nullptr,m,e,o,limits,target,seed,n,out,count);
-        if(status==MK_OK)*out_count=count;return status;
-    }catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
-}
 extern "C" mk_result MK_CALL mk_cartesian_candidate_count(const mk_analytic_cartesian_model *p,const mk_serial_cell_model *m,
     const mk_external_lattice *e,const mk_orientation_lattice *o,const mk_joint_lift_request *limits,
-    const mk_opw_pose *target,const double *seed,uint32_t n,uint32_t *out_count) {
+    const mk_analytic_pose *target,const double *seed,uint32_t n,uint32_t *out_count) {
     if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
-    try {uint32_t count;auto status=run(nullptr,nullptr,p,m,e,o,limits,target,seed,n,nullptr,count);if(status==MK_OK)*out_count=count;return status;}
+    try {uint32_t count;auto status=run(p,m,e,o,limits,target,seed,n,nullptr,count);if(status==MK_OK)*out_count=count;return status;}
     catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
 }
 extern "C" mk_result MK_CALL mk_sample_cartesian_candidates(const mk_analytic_cartesian_model *p,const mk_serial_cell_model *m,
     const mk_external_lattice *e,const mk_orientation_lattice *o,const mk_joint_lift_request *limits,
-    const mk_opw_pose *target,const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t capacity,uint32_t *out_count) {
+    const mk_analytic_pose *target,const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t capacity,uint32_t *out_count) {
     if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
     try {
-        uint32_t count;auto status=run(nullptr,nullptr,p,m,e,o,limits,target,seed,n,nullptr,count);if(status!=MK_OK)return status;
+        uint32_t count;auto status=run(p,m,e,o,limits,target,seed,n,nullptr,count);if(status!=MK_OK)return status;
         if(capacity<count || (count && !out))return MK_ERROR_INVALID_ARGUMENT;
-        if(count)status=run(nullptr,nullptr,p,m,e,o,limits,target,seed,n,out,count);
+        if(count)status=run(p,m,e,o,limits,target,seed,n,out,count);
         if(status==MK_OK)*out_count=count;return status;
     }catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
 }
 
 namespace {
-mk_result sample_compact(const mk_ur_parameters *ur,const mk_opw_parameters *opw,const mk_analytic_cartesian_model *cart,
+mk_result sample_compact(const mk_analytic_cartesian_model *cart,
     const mk_serial_cell_model *model,const mk_external_lattice *external,const mk_orientation_lattice *orientation,
-    const mk_joint_lift_request *limits,const mk_opw_pose *target,const double *seed,uint32_t n,
+    const mk_joint_lift_request *limits,const mk_analytic_pose *target,const double *seed,uint32_t n,
     double *joints,int32_t *wraps,uint32_t joint_value_count,uint32_t *coordinates,uint32_t coordinate_count,uint32_t *out_count) {
     if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
     try {
-        uint32_t count;auto status=run(ur,opw,cart,model,external,orientation,limits,target,seed,n,nullptr,count);
+        uint32_t count;auto status=run(cart,model,external,orientation,limits,target,seed,n,nullptr,count);
         if(status!=MK_OK)return status;
         if(uint64_t(count)*n!=joint_value_count || uint64_t(count)*(uint64_t(model->external_count)+5)!=coordinate_count ||
             (count && (!joints || !wraps || !coordinates)))return MK_ERROR_INVALID_ARGUMENT;
         CompactOutput output{joints,wraps,coordinates};
-        if(count)status=run(ur,opw,cart,model,external,orientation,limits,target,seed,n,nullptr,count,&output);
+        if(count)status=run(cart,model,external,orientation,limits,target,seed,n,nullptr,count,&output);
         if(status==MK_OK)*out_count=count;return status;
     }catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
 }
 }
-extern "C" mk_result MK_CALL mk_sample_ur_candidates_compact(const mk_ur_parameters *parameters,
-    const mk_serial_cell_model *model,const mk_external_lattice *external,const mk_orientation_lattice *orientation,
-    const mk_joint_lift_request *limits,const mk_opw_pose *target,const double *seed,uint32_t n,
-    double *joints,int32_t *wraps,uint32_t joint_value_count,uint32_t *coordinates,uint32_t coordinate_count,uint32_t *out_count) {
-    return sample_compact(parameters,nullptr,nullptr,
-        model,external,orientation,limits,target,seed,n,joints,wraps,joint_value_count,coordinates,coordinate_count,out_count);
-}
-extern "C" mk_result MK_CALL mk_sample_opw_candidates_compact(const mk_opw_parameters *parameters,
-    const mk_serial_cell_model *model,const mk_external_lattice *external,const mk_orientation_lattice *orientation,
-    const mk_joint_lift_request *limits,const mk_opw_pose *target,const double *seed,uint32_t n,
-    double *joints,int32_t *wraps,uint32_t joint_value_count,uint32_t *coordinates,uint32_t coordinate_count,uint32_t *out_count) {
-    return sample_compact(nullptr,parameters,nullptr,
-        model,external,orientation,limits,target,seed,n,joints,wraps,joint_value_count,coordinates,coordinate_count,out_count);
-}
 extern "C" mk_result MK_CALL mk_sample_cartesian_candidates_compact(const mk_analytic_cartesian_model *parameters,
     const mk_serial_cell_model *model,const mk_external_lattice *external,const mk_orientation_lattice *orientation,
-    const mk_joint_lift_request *limits,const mk_opw_pose *target,const double *seed,uint32_t n,
+    const mk_joint_lift_request *limits,const mk_analytic_pose *target,const double *seed,uint32_t n,
     double *joints,int32_t *wraps,uint32_t joint_value_count,uint32_t *coordinates,uint32_t coordinate_count,uint32_t *out_count) {
-    return sample_compact(nullptr,nullptr,parameters,
+    return sample_compact(parameters,
         model,external,orientation,limits,target,seed,n,joints,wraps,joint_value_count,coordinates,coordinate_count,out_count);
+}
+
+extern "C" mk_result MK_CALL mk_eaik_candidate_count(mk_eaik_handle solver,const mk_eaik_configuration *labels,
+    const mk_serial_cell_model *model,const mk_external_lattice *external,const mk_orientation_lattice *orientation,
+    const mk_joint_lift_request *limits,const mk_analytic_pose *target,const double *seed,uint32_t n,uint32_t *out_count) {
+    if(!out_count || !solver.id)return MK_ERROR_INVALID_ARGUMENT;
+    *out_count=0;
+    try {uint32_t count=0;const auto status=run(nullptr,model,external,orientation,limits,target,seed,n,nullptr,count,nullptr,solver,labels);if(status==MK_OK)*out_count=count;return status;}
+    catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
+    catch(...){return MK_ERROR_GENERATION;}
+}
+extern "C" mk_result MK_CALL mk_sample_eaik_candidates_compact(mk_eaik_handle solver,const mk_eaik_configuration *labels,
+    const mk_serial_cell_model *model,const mk_external_lattice *external,const mk_orientation_lattice *orientation,
+    const mk_joint_lift_request *limits,const mk_analytic_pose *target,const double *seed,uint32_t n,
+    double *joints,int32_t *wraps,uint32_t joint_value_count,uint32_t *coordinates,uint32_t coordinate_count,uint32_t *out_count) {
+    if(!out_count || !solver.id)return MK_ERROR_INVALID_ARGUMENT;
+    *out_count=0;
+    try {
+        uint32_t count=0;auto status=run(nullptr,model,external,orientation,limits,target,seed,n,nullptr,count,nullptr,solver,labels);
+        if(status!=MK_OK)return status;
+        if(uint64_t(count)*n!=joint_value_count || uint64_t(count)*(uint64_t(model->external_count)+5)!=coordinate_count ||
+            (count && (!joints || !wraps || !coordinates)))return MK_ERROR_INVALID_ARGUMENT;
+        CompactOutput output{joints,wraps,coordinates};
+        if(count)status=run(nullptr,model,external,orientation,limits,target,seed,n,nullptr,count,&output,solver,labels);
+        if(status==MK_OK)*out_count=count;return status;
+    }catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
+    catch(...){return MK_ERROR_GENERATION;}
+}
+
+extern "C" mk_result MK_CALL mk_sample_eaik_candidates(mk_eaik_handle solver,const mk_eaik_configuration *labels,const mk_serial_cell_model *m,
+    const mk_external_lattice *e,const mk_orientation_lattice *o,const mk_joint_lift_request *limits,
+    const mk_analytic_pose *target,const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t capacity,uint32_t *out_count) {
+    if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        uint32_t count;auto status=run(nullptr,m,e,o,limits,target,seed,n,nullptr,count,nullptr,solver,labels);if(status!=MK_OK)return status;
+        if(capacity<count || (count && !out))return MK_ERROR_INVALID_ARGUMENT;
+        if(count)status=run(nullptr,m,e,o,limits,target,seed,n,out,count,nullptr,solver,labels);
+        if(status==MK_OK)*out_count=count;return status;
+    }catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
 }

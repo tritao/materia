@@ -14,17 +14,12 @@ import robotkit.manipulation.KinematicGroup;
 class SerialCandidateSampler {
   final group:KinematicGroup;
   final model:SerialCellModel;
-  final ur:Null<UrAnalyticIk>;
-  final opw:Null<OpwKinematics>;
+  final eaik:EaikAnalyticIk;
   final limits:mk_joint_lift_request;
   public function new(group:KinematicGroup) {
     this.group=group;
-    var backend=BranchIk.of(group);
-    if(Std.isOfType(backend,UrAnalyticIk)) {
-      ur=cast backend;opw=null;model=new SerialCellModel(group,ur.nativeBase(),ur.nativeTool());
-    } else if(Std.isOfType(backend,OpwKinematics)) {
-      opw=cast backend;ur=null;model=new SerialCellModel(group,opw.nativeBase(),opw.nativeTool());
-    } else throw 'Serial native sampling requires UR or OPW geometry, got ${backend.family()}';
+    eaik=new EaikAnalyticIk(group);
+    model=new SerialCellModel(group,robotkit.spatial.Transform3.identity(),group.flangeTTcp);
     limits=new mk_joint_lift_request();limits.set_struct_size(mk_joint_lift_request.size());limits.set_joint_count(group.group.count());
     for(i in 0...group.group.count()) {
       var bound=group.group.limitsOf(i);
@@ -32,7 +27,7 @@ class SerialCandidateSampler {
     }
   }
   function labelled(candidates:Array<LatticeCandidate>):Array<LatticeCandidate> {
-    var family=ur==null ? "OPW" : "UR6R";
+    var family="EAIK";
     for(candidate in candidates)candidate.configuration=SixAxisConfiguration.of(family,candidate.branch,
       [for(index in model.armIndices)candidate.q[index]]);
     return candidates;
@@ -73,25 +68,15 @@ class SerialCandidateSampler {
     var external=ExternalAxisGrid.describe(group,seed,ranges);
     var orientation=OrientationLattice.describe(freedom,rollCount,tiltRings,azimuthCount);
     var centre=OrientationLattice.centre(target,freedom);
-    var pose=new mk_opw_pose();pose.set_struct_size(mk_opw_pose.size());
+    var pose=new mk_analytic_pose();pose.set_struct_size(mk_analytic_pose.size());
     var p=[centre.x,centre.y,centre.z],r=[centre.qx,centre.qy,centre.qz,centre.qw];
     for(i in 0...3)pose.set_position(i,p[i]);for(i in 0...4)pose.set_quaternion(i,r[i]);
-    if(ur!=null) {
-      var size=MotionKitNative.mk_ur_candidate_count(ur.nativeModel(),model.native,external,orientation,liftLimits,pose,seed);
-      if(size.status!=TrajectoryCoreConstants.MK_OK)throw 'Native UR candidate count failed: ${size.status}';
-      if(size.out_count==0)return [];
-      var lengths=CartesianCandidateSampler.compactLengths(size.out_count,seed.length,model.externalIndices.length);
-      var result=MotionKitNative.mk_sample_ur_candidates_compact(ur.nativeModel(),model.native,external,orientation,liftLimits,pose,seed,lengths.joints,lengths.coordinates);
-      if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native UR candidate sampling failed: ${result.status}';
-      return labelled(CartesianCandidateSampler.decodeCompact(result.out_joints,result.out_wraps,result.out_coordinates,
-        result.out_count,seed.length,model.externalIndices.length));
-    }
-    var size=MotionKitNative.mk_opw_candidate_count(opw.nativeModel(),model.native,external,orientation,liftLimits,pose,seed);
-    if(size.status!=TrajectoryCoreConstants.MK_OK)throw 'Native OPW candidate count failed: ${size.status}';
+    var size=MotionKitNative.mk_eaik_candidate_count(eaik.chain.solver,eaik.configuration.native,model.native,external,orientation,liftLimits,pose,seed);
+    if(size.status!=TrajectoryCoreConstants.MK_OK)throw 'Native EAIK candidate count failed: ${size.status}';
     if(size.out_count==0)return [];
     var lengths=CartesianCandidateSampler.compactLengths(size.out_count,seed.length,model.externalIndices.length);
-    var result=MotionKitNative.mk_sample_opw_candidates_compact(opw.nativeModel(),model.native,external,orientation,liftLimits,pose,seed,lengths.joints,lengths.coordinates);
-    if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native OPW candidate sampling failed: ${result.status}';
+    var result=MotionKitNative.mk_sample_eaik_candidates_compact(eaik.chain.solver,eaik.configuration.native,model.native,external,orientation,liftLimits,pose,seed,lengths.joints,lengths.coordinates);
+    if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native EAIK candidate sampling failed: ${result.status}';
     return labelled(CartesianCandidateSampler.decodeCompact(result.out_joints,result.out_wraps,result.out_coordinates,
         result.out_count,seed.length,model.externalIndices.length));
   }

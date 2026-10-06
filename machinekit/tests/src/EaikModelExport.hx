@@ -7,7 +7,6 @@ import robotkit.manipulation.Manipulator;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.model.JointType;
-import motionkit.robot.OpwKinematics;
 
 /** Export compiler-derived geometry and independent FK to the native spike. */
 class EaikModelExport {
@@ -44,13 +43,7 @@ class EaikModelExport {
     numbers(zero.rotation.toRotationMatrix());
     numbers([for(i in 0...6)arm.group.limitsOf(i).lower]);
     numbers([for(i in 0...6)arm.group.limitsOf(i).upper]);
-    lines.push(spherical ? "1" : "0");
-    if(spherical){
-      var solver=new OpwKinematics(model,arm),p=solver.parameters;
-      numbers([p.a1,p.a2,p.b,p.c1,p.c2,p.c3,p.c4]);
-      numbers(p.offsets);numbers([for(sign in p.signCorrections)sign*1.0]);
-      pose(solver.nativeBase());pose(solver.nativeTool());
-    }
+    lines.push("0"); // Production fixtures no longer embed a retired solver descriptor.
     lines.push("1005");
     for(sample in 0...1000){
       var q=[for(joint in 0...6){var bounds=arm.group.limitsOf(joint);

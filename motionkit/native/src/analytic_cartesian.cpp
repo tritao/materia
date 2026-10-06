@@ -47,7 +47,7 @@ T head(const mk_analytic_cartesian_model &m, const double *q) {
         t = t * rotation(vector(m.rotary_axes + 3 * i), vector(m.rotary_origins + 3 * i), q[3 + i]);
     return t * home(m);
 }
-void write_pose(const T &t, mk_opw_pose &p) {
+void write_pose(const T &t, mk_analytic_pose &p) {
     p = {}; p.struct_size = sizeof(p);
     Eigen::Quaterniond q(t.linear());
     for (unsigned i = 0; i < 3; ++i) p.position[i] = t.translation()[i];
@@ -59,7 +59,7 @@ double alignment(const V &a, const V &b, const V &axis) {
 }
 
 extern "C" mk_result MK_CALL mk_analytic_cartesian_forward(const mk_analytic_cartesian_model *m,
-    const double *q, uint32_t n, mk_opw_pose *out) {
+    const double *q, uint32_t n, mk_analytic_pose *out) {
     if (!valid(m) || !q || n != m->joint_count || !finite(q, n) || !out) return MK_ERROR_INVALID_ARGUMENT;
     T t = head(*m, q);
     t.translation() += translation_basis(*m) * vector(q);
@@ -68,7 +68,7 @@ extern "C" mk_result MK_CALL mk_analytic_cartesian_forward(const mk_analytic_car
 }
 
 extern "C" mk_result MK_CALL mk_analytic_cartesian_inverse(const mk_analytic_cartesian_model *m,
-    const mk_opw_pose *target, uint32_t axis_only, double seed, mk_analytic_solution *out,
+    const mk_analytic_pose *target, uint32_t axis_only, double seed, mk_analytic_solution *out,
     uint32_t capacity, uint32_t *count) {
     if (!valid(m) || !target || target->struct_size != sizeof(*target) || !out || capacity < 2 ||
         !count || axis_only > 1 || !std::isfinite(seed) || !finite(target->position, 3) ||

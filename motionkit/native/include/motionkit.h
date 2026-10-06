@@ -26,26 +26,35 @@ typedef struct mk_path_handle { uint32_t id; } mk_path_handle
 typedef struct mk_time_law_handle { uint32_t id; } mk_time_law_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_time_law_destroy);
 
-/** OPW's seven geometric parameters and manufacturer joint conventions. */
-typedef struct mk_opw_parameters {
+/** Compiled 6R zero-pose axes H, link displacements P and terminal rotation. */
+typedef struct mk_eaik_model {
     uint32_t struct_size MK_STRUCT_SIZE;
-    double a1, a2, b, c1, c2, c3, c4;
-    double offsets[6];
-    int8_t sign_corrections[6];
-} mk_opw_parameters;
+    double axes[18]; /**< Six column vectors. */
+    double displacements[21]; /**< Seven column vectors. */
+    double terminal_rotation[9]; /**< Column-major. */
+} mk_eaik_model;
+/** Physical configuration reference extracted from the same compiled chain. */
+typedef struct mk_eaik_configuration {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t spherical;
+    double reference[6];
+    double signs[6];
+    double base_position[3];
+    double base_rotation[9];
+    double shoulder_offset;
+    double elbow_offset;
+} mk_eaik_configuration;
+typedef struct mk_eaik_handle { uint32_t id; } mk_eaik_handle
+    MK_HANDLE MK_HANDLE_DESTROY(mk_eaik_destroy);
 
-typedef struct mk_opw_pose {
+/** Rigid target or FK pose shared by the analytic families. */
+
+typedef struct mk_analytic_pose {
     uint32_t struct_size MK_STRUCT_SIZE;
     double position[3];
     double quaternion[4]; /**< x, y, z, w. */
-} mk_opw_pose;
+} mk_analytic_pose;
 
-typedef struct mk_opw_solution {
-    uint32_t struct_size MK_STRUCT_SIZE;
-    double joints[6];
-    uint8_t valid;
-    uint8_t singular;
-} mk_opw_solution;
 
 /** Cartesian chain represented by its zero-pose space screws and TCP pose.
  * The three translation axes are columns of translation_axes. Optional C/A
@@ -64,17 +73,9 @@ typedef struct mk_analytic_solution {
     uint32_t struct_size MK_STRUCT_SIZE;
     double joints[6];
     uint32_t branch;
-    uint32_t singular; /**< Family-specific flags; Cartesian C axis or UR wrist/elbow. */
+    uint32_t singular; /**< Family-specific flags; Cartesian C axis or EAIK wrist/elbow. */
 } mk_analytic_solution;
 
-/** UR DH family: alpha = [pi/2, 0, 0, pi/2, -pi/2, 0].
- * Canonical DH q = sign_corrections[i] * model_q - offsets[i]. */
-typedef struct mk_ur_parameters {
-    uint32_t struct_size MK_STRUCT_SIZE;
-    double a2, a3, d1, d4, d5, d6;
-    double offsets[6];
-    int8_t sign_corrections[6];
-} mk_ur_parameters;
 
 /** Deterministic orientation lattice in the target TCP frame. */
 typedef struct mk_orientation_lattice {
@@ -241,12 +242,6 @@ typedef struct mk_configuration_sample {
     uint32_t candidate_count;
 } mk_configuration_sample;
 
-typedef struct mk_opw_path_sample {
-    uint32_t struct_size MK_STRUCT_SIZE;
-    double distance;
-    double position[3];
-    double quaternion[4]; /**< OPW flange pose in the solver's local frame. */
-} mk_opw_path_sample;
 
 typedef struct mk_configuration_candidate {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -319,35 +314,39 @@ typedef struct mk_state_to_state_request {
     double max_jerk[MK_MAX_JOINTS];
 } mk_state_to_state_request;
 
-/** All eight slots are written, including invalid solutions. */
-MK_API mk_result MK_CALL mk_opw_forward(const mk_opw_parameters *parameters,
+/** Construct only known exact decompositions of a compiled 6R chain. */
+MK_API mk_result MK_CALL mk_eaik_create(const mk_eaik_model *model,
+    mk_eaik_handle *out_solver MK_OUT MK_OWNED);
+MK_API void MK_CALL mk_eaik_destroy(mk_eaik_handle solver);
+MK_API mk_result MK_CALL mk_eaik_forward(mk_eaik_handle solver,
     const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count,
-    mk_opw_pose *out_pose MK_OUT);
-MK_API mk_result MK_CALL mk_opw_inverse(const mk_opw_parameters *parameters,
-    const mk_opw_pose *pose, mk_opw_solution *out_solutions MK_OUT_ARRAY(solution_count),
-    uint32_t solution_count);
+    mk_analytic_pose *out_pose MK_OUT);
+/** Exact solutions only; least-squares approximations are rejected. */
+MK_API mk_result MK_CALL mk_eaik_inverse(mk_eaik_handle solver,
+    const mk_analytic_pose *target,
+    mk_analytic_solution *out_solutions MK_OUT_ARRAY(solution_capacity),
+    uint32_t solution_capacity, uint32_t *out_count MK_OUT);
+
+MK_API mk_result MK_CALL mk_eaik_inverse_labelled(mk_eaik_handle solver,
+    const mk_eaik_configuration *configuration, const mk_analytic_pose *target,
+    const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    mk_analytic_solution *out_solutions MK_OUT_ARRAY(solution_capacity),
+    uint32_t solution_capacity, uint32_t *out_count MK_OUT);
+
 MK_API mk_result MK_CALL mk_analytic_cartesian_forward(const mk_analytic_cartesian_model *model,
-    const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count, mk_opw_pose *out_pose MK_OUT);
+    const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count, mk_analytic_pose *out_pose MK_OUT);
 /** All geometric branches, before limits/wrap enumeration by the sampler.
  * axis_only frees TCP spin; fixed orientation filters branches by full rotation.
  * The seed selects C at its explicit axis singularity. */
 MK_API mk_result MK_CALL mk_analytic_cartesian_inverse(const mk_analytic_cartesian_model *model,
-    const mk_opw_pose *target, uint32_t axis_only, double singular_c_seed,
-    mk_analytic_solution *out_solutions MK_OUT_ARRAY(solution_capacity), uint32_t solution_capacity,
-    uint32_t *out_count MK_OUT);
-MK_API mk_result MK_CALL mk_analytic_ur_forward(const mk_ur_parameters *parameters,
-    const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count, mk_opw_pose *out_pose MK_OUT);
-/** Up to eight branches. Wrist-singular solutions preserve the supplied q6.
- * singular bits: 1 wrist, 2 elbow. Limits and periodic lifts belong to sampling. */
-MK_API mk_result MK_CALL mk_analytic_ur_inverse(const mk_ur_parameters *parameters,
-    const mk_opw_pose *target, double singular_q6_seed,
+    const mk_analytic_pose *target, uint32_t axis_only, double singular_c_seed,
     mk_analytic_solution *out_solutions MK_OUT_ARRAY(solution_capacity), uint32_t solution_capacity,
     uint32_t *out_count MK_OUT);
 /** Count first, then allocate exactly enough output. Invalid requests fail before writing. */
 MK_API mk_result MK_CALL mk_orientation_lattice_count(const mk_orientation_lattice *lattice,
     uint32_t *out_count MK_OUT);
 MK_API mk_result MK_CALL mk_sample_orientations(const mk_orientation_lattice *lattice,
-    const mk_opw_pose *target, mk_orientation_sample *out_samples MK_OUT_ARRAY(sample_capacity),
+    const mk_analytic_pose *target, mk_orientation_sample *out_samples MK_OUT_ARRAY(sample_capacity),
     uint32_t sample_capacity, uint32_t *out_count MK_OUT);
 /** All legal lifts, in lexicographic wrap order; zero count means limits reject the branch.
  * Infinite planning ranges or a count/index overflow return INVALID_ARGUMENT. */
@@ -363,65 +362,48 @@ MK_API mk_result MK_CALL mk_external_lattice_count(const mk_external_lattice *la
 MK_API mk_result MK_CALL mk_sample_external_cells(const mk_external_lattice *lattice,
     const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_external_cell *out_cells MK_OUT_ARRAY(cell_capacity), uint32_t cell_capacity, uint32_t *out_count MK_OUT);
-/** Complete UR external-cell x orientation x branch x legal-lift sampling.
- * Target poses are in the work frame. Tool/base conventions match UR analytic FK.
- * External coordinates are held and are never independently lifted. */
-MK_API mk_result MK_CALL mk_ur_candidate_count(const mk_ur_parameters *parameters,
-    const mk_serial_cell_model *model, const mk_external_lattice *external,
-    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
-    uint32_t *out_count MK_OUT);
-MK_API mk_result MK_CALL mk_sample_ur_candidates(const mk_ur_parameters *parameters,
-    const mk_serial_cell_model *model, const mk_external_lattice *external,
-    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
-    mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
-    uint32_t *out_count MK_OUT);
-MK_API mk_result MK_CALL mk_opw_candidate_count(const mk_opw_parameters *parameters,
-    const mk_serial_cell_model *model, const mk_external_lattice *external,
-    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
-    uint32_t *out_count MK_OUT);
-MK_API mk_result MK_CALL mk_sample_opw_candidates(const mk_opw_parameters *parameters,
-    const mk_serial_cell_model *model, const mk_external_lattice *external,
-    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
-    mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
-    uint32_t *out_count MK_OUT);
 /** Cartesian free-spin/cone cells solve the tool-axis constraint. Repeated
  * geometric configurations retain their first lattice coordinates. The Cartesian
  * descriptor includes its TCP, so model.tool must be identity and XYZ nonperiodic. */
 MK_API mk_result MK_CALL mk_cartesian_candidate_count(const mk_analytic_cartesian_model *parameters,
     const mk_serial_cell_model *model, const mk_external_lattice *external,
     const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     uint32_t *out_count MK_OUT);
 MK_API mk_result MK_CALL mk_sample_cartesian_candidates(const mk_analytic_cartesian_model *parameters,
     const mk_serial_cell_model *model, const mk_external_lattice *external,
     const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
     uint32_t *out_count MK_OUT);
 /** Compact sampling outputs are candidate-major, preserving full-record order.
  * Joint and wrap rows have joint_count entries. Coordinate rows contain external
  * cells followed by roll, tilt, azimuth, branch and singular bits. Lengths must
  * exactly match candidate_count times their respective row dimensions. */
-MK_API mk_result MK_CALL mk_sample_ur_candidates_compact(const mk_ur_parameters *parameters,
+MK_API mk_result MK_CALL mk_eaik_candidate_count(mk_eaik_handle solver,
+    const mk_eaik_configuration *configuration,
     const mk_serial_cell_model *model, const mk_external_lattice *external,
     const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
-    double *out_joints MK_OUT_ARRAY(joint_value_count), int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
-    uint32_t *out_coordinates MK_OUT_ARRAY(coordinate_count), uint32_t coordinate_count, uint32_t *out_count MK_OUT);
-MK_API mk_result MK_CALL mk_sample_opw_candidates_compact(const mk_opw_parameters *parameters,
+    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_sample_eaik_candidates(mk_eaik_handle solver,
+    const mk_eaik_configuration *configuration,
     const mk_serial_cell_model *model, const mk_external_lattice *external,
     const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
+    uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_sample_eaik_candidates_compact(mk_eaik_handle solver,
+    const mk_eaik_configuration *configuration,
+    const mk_serial_cell_model *model, const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
+    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     double *out_joints MK_OUT_ARRAY(joint_value_count), int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
     uint32_t *out_coordinates MK_OUT_ARRAY(coordinate_count), uint32_t coordinate_count, uint32_t *out_count MK_OUT);
 MK_API mk_result MK_CALL mk_sample_cartesian_candidates_compact(const mk_analytic_cartesian_model *parameters,
     const mk_serial_cell_model *model, const mk_external_lattice *external,
     const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
-    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     double *out_joints MK_OUT_ARRAY(joint_value_count), int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
     uint32_t *out_coordinates MK_OUT_ARRAY(coordinate_count), uint32_t coordinate_count, uint32_t *out_count MK_OUT);
 /** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */
@@ -465,12 +447,6 @@ MK_API mk_result MK_CALL mk_search_ladder_compact_filtered(const mk_ladder_reque
 MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
     const mk_configuration_candidate *candidates MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
-    mk_configuration_solution *out_sequence MK_OUT_ARRAY(sample_count));
-/** Samples OPW's eight IK branches natively before the same Descartes search. */
-MK_API mk_result MK_CALL mk_select_opw_configurations(
-    const mk_configuration_request *request, const mk_opw_parameters *parameters,
-    const mk_opw_path_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
-    const double *start_joints MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_configuration_solution *out_sequence MK_OUT_ARRAY(sample_count));
 MK_API mk_result MK_CALL mk_path_create(const mk_path_sample *samples MK_IN_ARRAY(sample_count),
     uint32_t sample_count, mk_path_handle *out_path MK_OUT MK_OWNED);

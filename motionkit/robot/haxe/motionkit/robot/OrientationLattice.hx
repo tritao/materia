@@ -51,7 +51,7 @@ class OrientationLattice {
     var count = MotionKitNative.mk_orientation_lattice_count(lattice);
     if (count.status != TrajectoryCoreConstants.MK_OK)
       throw 'Invalid orientation lattice: ${count.status}';
-    var pose = new mk_opw_pose();pose.set_struct_size(mk_opw_pose.size());
+    var pose = new mk_analytic_pose();pose.set_struct_size(mk_analytic_pose.size());
     var centre = OrientationLattice.centre(target,freedom);
     var p = [centre.x,centre.y,centre.z],r = [centre.qx,centre.qy,centre.qz,centre.qw];
     for (i in 0...3) pose.set_position(i,p[i]);

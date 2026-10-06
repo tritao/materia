@@ -86,7 +86,7 @@ class CartesianAnalyticIk implements AnalyticIk {
       throw "Cartesian analytic IK needs a target and complete seed";
     var axisOnly = switch freedom { case null | Fixed | Interpolated: false; case FreeAboutTool: true;
       default: throw "Cartesian analytic IK does not enumerate this orientation freedom"; };
-    var pose = new mk_opw_pose(); pose.set_struct_size(mk_opw_pose.size());
+    var pose = new mk_analytic_pose(); pose.set_struct_size(mk_analytic_pose.size());
     var xyz = [target.x, target.y, target.z], quat = [target.qx, target.qy, target.qz, target.qw];
     for (i in 0...3) pose.set_position(i, xyz[i]);
     for (i in 0...4) pose.set_quaternion(i, quat[i]);

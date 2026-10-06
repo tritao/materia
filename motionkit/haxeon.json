@@ -29,8 +29,10 @@
         "native/include/motionkit.hpp",
         "native/src/generator.cpp",
         "native/src/path.cpp",
-        "native/src/opw.cpp",
-        "native/src/configuration.cpp"
+        "native/src/configuration.cpp",
+        "native/src/eaik.cpp",
+        "native/vendor/eaik/CPP/src",
+        "native/vendor/eaik/CPP/external/ik-geo/cpp/subproblems"
       ]
     }
   }

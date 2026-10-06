@@ -11,7 +11,7 @@ int main() {
         lattice.roll_count=12;lattice.tilt_rings=3;lattice.azimuth_count=8;lattice.half_angle=.4;
         uint32_t count=0;assert(mk_orientation_lattice_count(&lattice,&count)==MK_OK);
         assert(count==(mode==0?1u:mode==1?12u:300u));
-        mk_opw_pose target={};target.struct_size=sizeof(target);
+        mk_analytic_pose target={};target.struct_size=sizeof(target);
         const Eigen::Quaterniond rotation(Eigen::AngleAxisd(.23*placement,Eigen::Vector3d(1,2,3).normalized()));
         target.position[0]=.1*placement;target.position[1]=-.2;target.position[2]=.6;
         target.quaternion[0]=rotation.x();target.quaternion[1]=rotation.y();target.quaternion[2]=rotation.z();target.quaternion[3]=rotation.w();

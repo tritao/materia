@@ -29,7 +29,7 @@ import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.ManipulatorServo;
 import motionkit.robot.ServoSession;
 import motionkit.robot.ServoPlan.ServoPlanOptions;
-import motionkit.robot.OpwKinematics;
+import motionkit.robot.EaikKinematics;
 import motionkit.robot.AxisKinematics;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.StartTolerances;
@@ -261,7 +261,7 @@ class KinematicsTests extends MotionKitTestSupport {
     for (withPositioner in [false, true]) {
       var group = new robotkit.manipulation.KinematicGroup(model, root.id, flange.id,
         withPositioner ? workFrame.id : null, tcp, null, ["track"]);
-      var analytic = new OpwKinematics(model, group);
+      var analytic = new EaikKinematics(group);
       var numeric = new ManipulatorKinematics(group);
       var nativeSampler = new motionkit.robot.SerialCandidateSampler(group);
       check(analytic.jointCount() == (withPositioner ? 8 : 7), "OPW group preserves arm and external DOFs");
@@ -395,7 +395,7 @@ class KinematicsTests extends MotionKitTestSupport {
     for (withPositioner in [false, true]) {
       var group = new robotkit.manipulation.KinematicGroup(model, root.id, flange.id,
         withPositioner ? workFrame.id : null, tcp, null, ["track"]);
-      var analytic = new motionkit.robot.UrAnalyticIk(group);
+      var analytic = new motionkit.robot.EaikAnalyticIk(group);
       var numeric = new ManipulatorKinematics(group);
       var nativeSampler = new motionkit.robot.SerialCandidateSampler(group);
       check(analytic.jointCount() == (withPositioner ? 8 : 7), "UR group preserves arm and external DOFs");
@@ -613,10 +613,16 @@ class KinematicsTests extends MotionKitTestSupport {
     }catch(error:Dynamic){sevenTimed.releaseDistanceMap();sevenTimed.trajectory.dispose();throw error;}
     sevenTimed.releaseDistanceMap();sevenTimed.trajectory.dispose();
     var unsupportedFixture=buildContractArmFixture();
-    unsupportedFixture.arm.robot.joints[4].axis=[0.1,0.0,Math.sqrt(0.99)];
+    // A skew wrist alone remains a known EAIK three-parallel-axis family.
+    // Use a genuinely generic six-axis chain to exercise explicit fallback.
+    var axes=[[1.0,0,0],[0.0,1,0],[0.0,0,1],
+      [1.0/Math.sqrt(2),1.0/Math.sqrt(2),0],
+      [1.0/Math.sqrt(2),0,1.0/Math.sqrt(2)],
+      [0.0,1.0/Math.sqrt(2),1.0/Math.sqrt(2)]];
+    for(i in 0...6)unsupportedFixture.arm.robot.joints[i].axis=axes[i];
     var unsupported=new robotkit.manipulation.KinematicGroup(unsupportedFixture.arm.robot,
       unsupportedFixture.arm.rootLink,unsupportedFixture.arm.flangeFrame);
-    check(motionkit.robot.BranchIk.of(unsupported).family()=="numeric-fallback","skew wrist retains explicit numeric fallback");
+    check(motionkit.robot.BranchIk.of(unsupported).family()=="numeric-fallback","unknown EAIK decomposition retains explicit numeric fallback");
     var unsupportedSolver=new ManipulatorKinematics(unsupported),seed=[0.2,-0.8,0.6,-0.4,0.5,0.3],goal=seed.copy();goal[0]+=0.01;
     var line=new PoseLine(new PoseWaypoint(unsupportedSolver.forward(seed),1e-6,1e-6),
       new PoseWaypoint(unsupportedSolver.forward(goal),1e-6,1e-6),motionkit.path.OrientationPolicy.Interpolated,0.1,0.1);
@@ -666,7 +672,7 @@ class KinematicsTests extends MotionKitTestSupport {
       [for(_ in start)0.5],[for(_ in start)1.0],1);
     var before = fixture.arm.numericSolveCount();
     var problem = new motionkit.robot.CandidateProblem(fixture.arm,request);
-    check(problem.family == "UR6R" && problem.diagnostic == null,"path request selects the native UR family");
+    check(problem.family == "EAIK" && problem.diagnostic == null,"path request selects the native UR family");
     check(problem.samples.length == 2 && problem.samples[0].candidates.length == 1,"path problem pins the first complete configuration");
     check(problem.samples[1].candidates.length > request.maxCandidates,"native candidate problem retains all branches beyond the legacy cap");
     for(joint in 0...6)near(problem.samples[0].candidates[0].q[joint],start[joint],"pinned start stays exact",1e-12);
@@ -1879,19 +1885,18 @@ class KinematicsTests extends MotionKitTestSupport {
     }
   }
 
-  public function testOpwKinematics():Void {
+  public function testEaikKinematics():Void {
     var labels=["front/up/no-flip","front/down/no-flip","back/up/no-flip","back/down/no-flip",
       "front/up/flip","front/down/flip","back/up/flip","back/down/flip"];
     for(slot in 0...8){
-      var configuration=motionkit.kinematics.SixAxisConfiguration.of("OPW",slot,[0,0,0,0,0,0]);
+      var configuration=motionkit.kinematics.SixAxisConfiguration.of("EAIK",slot,[0,0,0,0,0,0]);
       check(configuration.label()==labels[slot]+" turns=[0,0,0,0,0,0]","OPW slots have explicit controller-style conventions");
     }
-    var counted=motionkit.kinematics.SixAxisConfiguration.of("OPW",0,[-2*Math.PI-0.1,-Math.PI,Math.PI,2*Math.PI+0.1,0,4*Math.PI+0.2]);
+    var counted=motionkit.kinematics.SixAxisConfiguration.of("EAIK",0,[-2*Math.PI-0.1,-Math.PI,Math.PI,2*Math.PI+0.1,0,4*Math.PI+0.2]);
     check(haxe.Json.stringify(counted.turns)=="[-1,0,1,1,0,2]","physical turn counts use the half-open principal interval");
     check(new motionkit.kinematics.SixAxisConfiguration("front","up","no-flip").accepts(counted),"geometric pins leave physical turns free");
     check(!new motionkit.kinematics.SixAxisConfiguration("front","up","no-flip",[0,0,0,0,0,0]).accepts(counted),"turn pins reject a different periodic lift");
-    var urConvention=motionkit.kinematics.SixAxisConfiguration.of("UR6R",4,[0,0,0,0,0,0]);
-    check(urConvention.shoulder=="back" && urConvention.wrist=="no-flip","UR shoulder and wrist bits differ from OPW");
+
 
     var model = new RobotModel("opw-abb-test");
     var links = [for (index in 0...7) model.addLink(new Link('opw-link-$index'))];
@@ -1913,17 +1918,14 @@ class KinematicsTests extends MotionKitTestSupport {
     flange.position = [0.0, 0.0, 0.085];
     var arm = new Manipulator(model, links[0].id, flange.id);
     var manipulator = arm;
-    var solver = new OpwKinematics(model, manipulator);
-    near(solver.parameters.a1, 0.1, "OPW extracts a1", 1e-9);
-    near(solver.parameters.a2, -0.135, "OPW extracts a2", 1e-9);
-    near(solver.parameters.c1, 0.615, "OPW extracts c1", 1e-9);
+    var solver = new EaikKinematics(manipulator);
     for (pole in [0.0, Math.PI]) {
       var seed = [0.2,-0.3,0.4,0.5,pole,0.7];
       var before = arm.numericSolveCount();
       var request = new PathRequest([0.0],[solver.forward(seed)],seed,new IkTolerance(1e-6,1e-6),
         [for (_ in seed)0.5],[for (_ in seed)1.0]);
       var problem = new motionkit.robot.CandidateProblem(arm,request);
-      check(problem.family == "OPW" && problem.samples[0].candidates.length == 1,
+      check(problem.family == "EAIK" && problem.samples[0].candidates.length == 1,
         "OPW wrist-pole path retains its pinned start");
       if (problem.samples[0].candidates.length == 1) {
         var candidate = problem.samples[0].candidates[0];
@@ -1935,7 +1937,7 @@ class KinematicsTests extends MotionKitTestSupport {
     // Through the interface: type tests work, and the solver runs its own (analytic) path search.
     {
       var general:KinematicsSolver = solver;
-      check(Std.isOfType(general, OpwKinematics) && !Std.isOfType(general, ManipulatorKinematics),
+      check(Std.isOfType(general, EaikKinematics) && !Std.isOfType(general, ManipulatorKinematics),
         "an OPW solver is recognised through the KinematicsSolver interface");
       var q0 = [0.2, -0.3, 0.4, 0.5, -0.6, 0.7];
       var path = general.solvePath(new PathRequest([0.0], [general.forward(q0)], q0, new IkTolerance(),
@@ -2011,19 +2013,7 @@ class KinematicsTests extends MotionKitTestSupport {
       tool.position = [0.0, 0.0, values[6]];
       var arm = new Manipulator(fixture, parts[0].id, tool.id);
       var robot = arm;
-      var analytic = new OpwKinematics(fixture, robot);
-      for (index in 0...7) {
-        var extracted = [analytic.parameters.a1, analytic.parameters.a2,
-          analytic.parameters.b, analytic.parameters.c1, analytic.parameters.c2,
-          analytic.parameters.c3, analytic.parameters.c4][index];
-        near(extracted, values[index], '$name OPW parameter $index', 1e-9);
-      }
-      for (index in 0...6) {
-        near(analytic.parameters.offsets[index], offsets[index],
-          '$name OPW offset $index', 1e-9);
-        check(analytic.parameters.signCorrections[index] == signs[index],
-          '$name OPW sign $index');
-      }
+      var analytic = new EaikKinematics(robot);
       var probe = [0.17, -0.24, 0.32, -0.41, 0.53, -0.68];
       var expected = new ManipulatorKinematics(robot).forward(probe);
       var actual = analytic.forward(probe);
@@ -2052,7 +2042,7 @@ class KinematicsTests extends MotionKitTestSupport {
       joint.parentFrameRotation = [rotation.x, rotation.y, rotation.z, rotation.w];
     }
     var placedArm = new Manipulator(model, links[0].id, flange.id);
-    var placed = new OpwKinematics(model, placedArm);
+    var placed = new EaikKinematics(placedArm);
     for (sample in 0...30) {
       var q = [for (joint in 0...6) 1.5 * Math.sin((sample + 1) * (joint + 1))];
       var target = new ManipulatorKinematics(placedArm).forward(q);
@@ -2065,7 +2055,7 @@ class KinematicsTests extends MotionKitTestSupport {
     model.joints[5].limits.lower = -4 * Math.PI;
     model.joints[5].limits.upper = 4 * Math.PI;
     var wrappedArm = new Manipulator(model, links[0].id, flange.id);
-    var wrappedAnalytic = new OpwKinematics(model, wrappedArm);
+    var wrappedAnalytic = new EaikKinematics(wrappedArm);
     var shared:motionkit.robot.AnalyticIk = wrappedAnalytic;
     var wrappedQ = [0.2, -0.3, 0.4, -0.5, 0.6, 3 * Math.PI + 0.2];
     var wrappedTarget = new ManipulatorKinematics(wrappedArm).forward(wrappedQ);
@@ -2144,12 +2134,12 @@ class KinematicsTests extends MotionKitTestSupport {
     check(unsupportedPin.indexOf("labelled six-axis")>=0,"unsupported kinematics reject a hard pin explicitly");
     check(foundOriginal, "OPW enumerates legal periodic lifts beyond the nearest plus/minus turn");
     var singularQ = wrappedQ.copy();
-    singularQ[4] = wrappedAnalytic.parameters.offsets[4] / wrappedAnalytic.parameters.signCorrections[4];
+    singularQ[4] = wrappedAnalytic.analytic.configuration.native.get_reference(4);
     var singularBranches = shared.branches(wrappedAnalytic.forward(singularQ), singularQ);
     check([for (branch in singularBranches) if (branch.singular) branch].length > 0,
       "OPW shared interface explicitly reports wrist singularity");
-    var ur = new motionkit.robot.UrAnalyticIk(bad.arm);
-    check(motionkit.robot.BranchIk.of(bad.arm).family() == "UR6R","model-derived family selection recognizes UR geometry");
+    var ur = new motionkit.robot.EaikAnalyticIk(bad.arm);
+    check(motionkit.robot.BranchIk.of(bad.arm).family() == "EAIK","model-derived family selection recognizes UR geometry");
     for (sample in 0...30) {
       var q = [for (joint in 0...6) 0.7 * Math.sin(sample * 0.37 + joint * 0.61)];
       var actual = bad.arm.tcpPose(q), predicted = ur.forward(q);
@@ -2173,7 +2163,7 @@ class KinematicsTests extends MotionKitTestSupport {
       joint.parentFrameRotation = Quat.fromAxisAngle(axis,0.17*(index+1)).toArray();
     }
     var placedUrArm = new Manipulator(placedUrFixture.model,"base","flange");
-    var placedUr = new motionkit.robot.UrAnalyticIk(placedUrArm);
+    var placedUr = new motionkit.robot.EaikAnalyticIk(placedUrArm);
     for (sample in 0...30) {
       var q = [for (joint in 0...6) 0.8*Math.sin(sample*0.39+joint*0.73)];
       var target = new ManipulatorKinematics(placedUrArm).forward(q);
@@ -2185,11 +2175,7 @@ class KinematicsTests extends MotionKitTestSupport {
       }
       check(found,"UR extraction recovers placed joint references");
     }
-    var diagnostic = "";
-    try new OpwKinematics(bad.model, bad.arm)
-    catch (error:Dynamic) diagnostic = Std.string(error);
-    check(diagnostic.indexOf("joint-3") >= 0,
-      "non-spherical UR5 wrist names its violating joint");
+    check(new EaikKinematics(bad.arm).family()=="EAIK", "Parallel-axis 6R uses the same production backend");
   }
 
   public function testManipulatorServo():Void {

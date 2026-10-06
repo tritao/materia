@@ -418,11 +418,11 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 **PP1. Analytic IK backends** (PP-D3; revised by PP1a).
 - A native `mk_analytic_*` family behind one Haxe interface. Given an arm sub-chain and a base pose, it
   returns all branches.
-- **OPW:** reuse `mk_opw_inverse`, extended to a sub-chain whose base comes from upstream joints.
-  `OpwKinematics` must accept a group that has external axes by solving only its arm part. Prove that
-  `machinekit` `RobotArm` is OPW-compatible with a round-trip test on the real model.
-- **UR-type 6R:** a closed form for three parallel axes with an offset wrist, up to 8 branches.
-  Parameters come from the model and are FK-verified. Test on `CobotArm`'s size classes.
+- **Supported 6R (accepted PP1a decision):** EAIK for compiled RobotArm spherical-wrist
+  and CobotArm parallel-axis chains. Derive axes, displacements and terminal flange rotation
+  from the compiled model, compose the current upstream base/work frame, and preserve geometric
+  configuration labels and physical turns. Test every authored size class and delete OPW/UR.
+  The 100,000-target production timing report is non-gating.
 - **Cartesian machines:** XYZ, XYZ+C and XYZ+C+A heads (G14). C and A follow from the tool axis
   direction, giving 2 branches for C+A, with the axis singularity handled explicitly.
 - **Fallback:** multi-seed numeric IK (seeds from neighbouring candidates and a fixed seed set), with a
@@ -614,8 +614,8 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 |------|-------|---------|
 | PP0 | in progress: harness and diagnostics; baseline completion pending | `0d43b32c0` (partial) |
 | PP0a | complete: industrial geometry/zero, configuration pins, all-size analytic/physical acceptance, all-user re-baselines and phase gate passed | see progress |
-| PP1a | spike accepted: compiled-model/singularity/browser gates pass; worst median R=1.27263; production adoption pending | see EAIK_SPIKE_RESULTS.md |
-| PP1 | in progress: industrial RobotArm resolved; EAIK accepted, production 6R adapter and OPW/UR deletion pending | see EAIK_SPIKE_RESULTS.md |
+| PP1a | complete: compiled-model/singularity/browser gates pass; historical worst median R=1.27263; production timing report non-gating | see EAIK_SPIKE_RESULTS.md |
+| PP1 | complete: production EAIK chain/base adapter, labels/turns, Cartesian backends and explicit numeric fallback; OPW/UR deleted; adoption gate passes | see EAIK_SPIKE_RESULTS.md |
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
 | PP3 | in progress: structured/coarse search and Descartes dispatch implemented; authored gate pending | `7cb639434`, `489f2c360`, `f8e88ad4d`, `09cb60fbb` |
 | PP4 | in progress: analytic/numeric refinement, cone rates and timing verified; transitions/authored gate pending | `4b9e750ff`, `0e5edbc06`, `39b6081c1` |
@@ -2554,3 +2554,82 @@ Detailed log: external scratch `process-path-g17-detailed-diagnostic.log`;
 compiler log: `process-path-g17-detailed-build.log`. The earlier, less detailed
 run (`process-path-g17-cycle-diagnostic.log`) measured 91.189 s overall planning
 and 71.958 s retained compilation, consistent with this split.
+
+
+### PP1 production EAIK adoption phase gate
+
+EAIK is now the sole supported 6R inverse backend. The adapter builds H/P and
+flange rotation from the compiled joint chain, composes the live upstream base
+and moving work frame, and enumerates legal physical turns. Native sampling
+uses geometric shoulder/elbow/wrist labels (bits 2/1/4), independently of
+EAIK's result order. Industrial label mapping was checked against the former
+solver on 3,000 targets before deleting OPW, its vendor, and handwritten UR.
+At spherical wrist poles, analytic seed-preserving wrist recovery precedes
+the exact 1e-9 m/rad FK filter; there is no numeric polish. Unsupported generic
+6R decompositions reject explicitly and use the already explicit numeric
+fallback where requested. This does not certify arbitrary future 6R chains.
+
+The adoption phase gate passes: native Release CTest **15/15**, canonical FFI
+audit on Linux/Windows/macOS x86-64/arm64, Emscripten exact-inverse and full/compact
+candidate sampling runtimes, seven compiled RobotArm/Cobot sizes (1,000 regular
+plus five wrist-singularity targets each), and MachineKit's full test-haxeon
+script. Compiler-only builds pass for app, MotionKit, ProcessKit and its
+planning module, RobotKit, CadBridge and Toolpath motion tests. Full runtime
+gates pass: MotionKit **1,223,400 assertions**, ProcessKit (including **511**
+weld-planning assertions), RobotKit, CadBridge (**173**) and Toolpath motion
+(**3,034**). The final two native validation/deduplication edits additionally
+pass rebuilt CTest, the full MachineKit script and both rebuilt Wasm runtimes.
+The earlier full MotionKit runtime predates those two native-only edits.
+
+The optional 100,000-target report uses GCC 13.3 Release, one thread pinned to
+CPU 16, the original fixed seed and 1,000 warmups; FK and target allocation
+are excluded. Other system work is not excluded, so it is an observation,
+not uncontended acceptance. Raw core / production exact-filter adapter
+median (p95), in microseconds: RobotArm900 **3.502 (3.788) / 13.145 (13.689)**;
+IRB2400 **3.397 (3.776) / 13.112 (13.615)**. These are unlabelled inverse calls,
+not end-to-end candidate construction or comparisons against retained OPW.
+The timing report does not gate adoption. Evidence: external scratch
+`process-path-pp1-production-*`; the exact-filter benchmark source and
+reproduction commands are in EAIK_SPIKE_RESULTS.md.
+
+
+### PP8 post-production-EAIK G17 profile (before PP-D12)
+
+The dedicated run exits zero with PROCESS_PATH_PROFILE=1 and no other owned
+checks running. General system contention is not excluded. Overall planning
+is **95.588453 s**, with **zero numeric IK solves**, 1,429 checked poses and
+the same selected 2.2 m track travel / **0.628358847 rad** arm margin. The
+mission cycle remains **383.4 s**; 2600 mm is deposited with 4.969494 mm mean
+leg, 0.125531 mm maximum seam error and no clearance violation. These are
+functional results; the original **15 s / 248.43 s / 0.775421815 rad** gates
+remain unmet. EAIK adoption does not resolve PP8's performance or posture.
+
+| Planning work | Seconds |
+|---|---:|
+| Candidate construction, both directions | 12.710 |
+| Search/checks, both directions (inclusive of packing/cost/native call) | 13.782 |
+| Refinement, both directions | 0.223 |
+| Retained program compilation | 68.854 |
+| Time-law generation inside compilation | 45.866 |
+| Compiled-trajectory clearance inside compilation | 20.144 |
+| Execution-plan creation inside compilation | 0.862 |
+| Task-space checks inside compilation | 1.357 |
+| Drive/load plan checks inside compilation | 0.470 |
+| Remaining compilation preparation/disposal | 0.154 |
+
+The residual 0.019 s outside these top-level categories includes runner
+preparation/reporting. Each direction again builds 977,992 candidates over
+1,424 samples. Native searches are 1.122 / 1.103 s; packing totals 0.381 s,
+state costs 3.798 s, and remaining inclusive search/check work 7.378 s.
+The latter is not a pure collision measurement.
+
+The initial weld law is again 246.994455 s with rail peak 2.261261 m/s²
+against 0.739547499 m/s² allowed. It repeats 20 smoothing retries followed
+by uniform stretch to **378.031832 s**; other execution sections total
+4.927457 s. The binding constraint and posture regression are unchanged.
+Candidate construction rose from the OPW observation's 4.437 s to 12.710 s;
+this comparison is observational, not uncontended solver acceptance.
+Per the required order, implement PP-D12 first, then inflated geometric
+clearance, and profile each before optimizing candidates or search wrappers.
+Logs/parsed records: external scratch `process-path-pp1-production-g17-profile.log`
+and `.json`.

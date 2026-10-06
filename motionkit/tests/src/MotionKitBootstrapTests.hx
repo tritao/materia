@@ -116,7 +116,7 @@ class MotionKitBootstrapTests {
     }
     if (Sys.getEnv("MOTIONKIT_C4_ONLY") == "1") {
       kinematicsTests.testAxisKinematics();
-      kinematicsTests.testOpwKinematics();
+      kinematicsTests.testEaikKinematics();
       kinematicsTests.testCartesianAnalyticIk();
       kinematicsTests.testExternalOpwIk();
       kinematicsTests.testExternalUrIk();
@@ -157,7 +157,7 @@ class MotionKitBootstrapTests {
       {name: "processTests.testMotionEventContracts", run: () -> processTests.testMotionEventContracts(), weight: 0.05},
       {name: "kinematicsTests.testKinematicsContract", run: () -> kinematicsTests.testKinematicsContract(), weight: 0.05},
       {name: "kinematicsTests.testSharedGroupAcrossThreads", run: () -> kinematicsTests.testSharedGroupAcrossThreads(), weight: 0.1},
-      {name: "kinematicsTests.testOpwKinematics", run: () -> kinematicsTests.testOpwKinematics(), weight: 0.05},
+      {name: "kinematicsTests.testEaikKinematics", run: () -> kinematicsTests.testEaikKinematics(), weight: 0.05},
       {name: "kinematicsTests.testCartesianAnalyticIk", run: () -> kinematicsTests.testCartesianAnalyticIk(), weight: 0.05},
       {name: "kinematicsTests.testExternalOpwIk", run: () -> kinematicsTests.testExternalOpwIk(), weight: 0.1},
       {name: "kinematicsTests.testExternalUrIk", run: () -> kinematicsTests.testExternalUrIk(), weight: 0.1},

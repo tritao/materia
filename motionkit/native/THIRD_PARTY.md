@@ -36,20 +36,6 @@ filter excludes qpOASES, GLPK, Python bindings, Pinocchio, torque and
 Cartesian constraints, and parametrizer implementations. Only the Seidel
 LP solver is constructed by MotionKit.
 
-## opw_kinematics
-
-- Upstream: <https://github.com/Jmeyer1292/opw_kinematics>.
-- Git submodule: `vendor/opw_kinematics`, tag `0.5.5` at
-  `8a32bda8197c50bd0d60dfe1d12ecb4c13111b72`.
-- License: Apache-2.0; full text at `vendor/opw_kinematics/LICENSE`.
-  This release does not ship a separate `NOTICE` file.
-- Dependency: Eigen 3, provided through `Eigen3::Eigen`.
-
-OPW is header-only. The wrapper includes `opw_kinematics.h` and
-`opw_utilities.h`; their audited transitive header set is
-`opw_parameters.h` and `opw_kinematics_impl.h`. MotionKit does not compile
-upstream tests, ROS packaging, or install targets.
-
 ## Descartes Light core
 
 - Upstream: <https://github.com/swri-robotics/descartes_light>.
@@ -69,7 +55,7 @@ header include when OpenMP is absent. The pinned core uses OpenMP pragmas but
 calls no `omp_*` functions.
 
 
-## EAIK C++ spike
+## EAIK production C++ core
 
 - Upstream: <https://github.com/OstermD/EAIK>.
 - Git submodule: `vendor/eaik` at
@@ -82,12 +68,13 @@ calls no `omp_*` functions.
 - Eigen: MotionKit's existing pinned Eigen, provided by `Eigen3::Eigen`.
   EAIK's separate Eigen submodule is neither initialized nor built.
 
-`MK_BUILD_EAIK_SPIKE=ON` enters only `CPP/src` and its IK-Geo C++
-subproblem dependency. Python bindings, wheels and upstream tests are excluded.
-The C++ source set includes EAIK/remodeling utilities, 1R–6R decompositions
-and IK-Geo subproblems. All three upstream targets use position-independent
-code. The local opt-in executable checks four OPW fixtures; it does not change
-the production backend choice. Compiled-model parity, browser compilation and single-thread speed acceptance
-passed (see `../plans/EAIK_SPIKE_RESULTS.md`). Production adoption remains
-pending. Emscripten targets enable C++ exception handling so unknown
-decompositions are rejected through the same checked error path as native.
+The production build enters only `CPP/src` and its IK-Geo C++ subproblem
+dependency. Python bindings, wheels and upstream tests are excluded. The C++
+source set includes EAIK/remodeling utilities, 1R–6R decompositions and IK-Geo
+subproblems. All three upstream targets use position-independent code.
+`MK_BUILD_EAIK_SPIKE=ON` builds the optional compiled-model parity executable
+and its non-gating 100,000-target timing report. The original OPW comparison
+and adoption decision are retained in `../plans/EAIK_SPIKE_RESULTS.md`; OPW's
+implementation/vendor and the handwritten UR inverse are removed.
+Emscripten targets enable C++ exception handling so unknown decompositions are
+rejected through the same checked error path as native.

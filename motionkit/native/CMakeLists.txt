@@ -91,53 +91,31 @@ else()
     set(MK_LIBRARY_TYPE STATIC)
 endif()
 
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/opw_kinematics/include/opw_kinematics/opw_kinematics.h")
-    message(FATAL_ERROR "Initialize motionkit/native/vendor/opw_kinematics submodule")
-endif()
-
-# Keep the pinned vendor pristine; apply the wrist-pole roundoff correction
-# to a private build copy of its headers.
-set(MK_OPW_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/opw-patched/include")
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/vendor/opw_kinematics/include/"
-    DESTINATION "${MK_OPW_INCLUDE}")
-set(MK_OPW_IMPL "${MK_OPW_INCLUDE}/opw_kinematics/opw_kinematics_impl.h")
-file(READ "${MK_OPW_IMPL}" MK_OPW_SOURCE)
-string(REPLACE "  T theta5_i = std::atan2" [=[  // Roundoff in the unit-axis dot product may exceed either wrist pole.
-  // Preserve NaNs from unreachable arm geometry while clamping finite cosines.
-  for (auto& cosine : m)
-    if (std::isfinite(cosine))
-      cosine = std::max(T(-1), std::min(T(1), cosine));
-
-  T theta5_i = std::atan2]=] MK_OPW_SOURCE "${MK_OPW_SOURCE}")
-file(WRITE "${MK_OPW_IMPL}" "${MK_OPW_SOURCE}")
-
-# Keep the spike opt-in until compiled-model parity, browser builds and the
-# prescribed single-thread timings decide which 6R backend to adopt.
+# The accepted pinned C++ core is also the production 6R backend.
+# Retain the evaluation executable as an optional, non-gating report.
 option(MK_BUILD_EAIK_SPIKE "Build the pinned EAIK C++ parity spike" OFF)
-if(MK_BUILD_EAIK_SPIKE)
-    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/eaik/CPP/external/ik-geo/cpp/subproblems/CMakeLists.txt")
-        message(FATAL_ERROR "Initialize EAIK and its CPP/external/ik-geo submodule")
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/eaik/CPP/external/ik-geo/cpp/subproblems/CMakeLists.txt")
+    message(FATAL_ERROR "Initialize EAIK and its CPP/external/ik-geo submodule")
+endif()
+add_subdirectory(vendor/eaik/CPP/src eaik EXCLUDE_FROM_ALL)
+foreach(MK_EAIK_TARGET EAIK EAIK_Kinematics SUBPROBLEMS)
+    target_link_libraries(${MK_EAIK_TARGET} Eigen3::Eigen)
+    set_target_properties(${MK_EAIK_TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    if(EMSCRIPTEN)
+        target_compile_options(${MK_EAIK_TARGET} PRIVATE -fexceptions)
     endif()
-    add_subdirectory(vendor/eaik/CPP/src eaik EXCLUDE_FROM_ALL)
-    foreach(MK_EAIK_TARGET EAIK EAIK_Kinematics SUBPROBLEMS)
-        target_link_libraries(${MK_EAIK_TARGET} Eigen3::Eigen)
-        set_target_properties(${MK_EAIK_TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-        if(EMSCRIPTEN)
-            target_compile_options(${MK_EAIK_TARGET} PRIVATE -fexceptions)
-        endif()
-    endforeach()
-    find_package(Threads REQUIRED)
-    target_link_libraries(EAIK Threads::Threads)
+endforeach()
+find_package(Threads REQUIRED)
+target_link_libraries(EAIK Threads::Threads)
+if(MK_BUILD_EAIK_SPIKE)
     add_executable(motionkit_eaik_spike tests/eaik_spike.cpp)
-    target_include_directories(motionkit_eaik_spike PRIVATE "${MK_OPW_INCLUDE}")
-    target_link_libraries(motionkit_eaik_spike PRIVATE EAIK)
+    target_link_libraries(motionkit_eaik_spike PRIVATE motionkit_core EAIK Eigen3::Eigen)
     if(EMSCRIPTEN)
         target_compile_options(motionkit_eaik_spike PRIVATE -fexceptions)
         target_link_options(motionkit_eaik_spike PRIVATE -fexceptions)
     endif()
-    if(BUILD_TESTING)
-        add_test(NAME motionkit_eaik_spike COMMAND motionkit_eaik_spike)
-    endif()
+    # Compiled-model parity needs the exported fixture file; run it explicitly.
+    # The standard native EAIK test supplies self-contained fixture coverage.
 endif()
 
 set(MK_DESCARTES_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/vendor/descartes_light/descartes_light/core/include")
@@ -161,14 +139,16 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/shims/no_openmp")
 endif()
 
-add_library(motionkit_core ${MK_LIBRARY_TYPE} src/generator.cpp src/path.cpp src/opw.cpp src/analytic_cartesian.cpp src/analytic_ur.cpp src/orientation_lattice.cpp src/joint_lifts.cpp src/external_lattice.cpp src/candidate_sampling.cpp src/configuration.cpp src/structured_ladder.cpp src/path_differential.cpp)
+add_library(motionkit_core ${MK_LIBRARY_TYPE} src/generator.cpp src/eaik.cpp src/path.cpp src/analytic_cartesian.cpp src/orientation_lattice.cpp src/joint_lifts.cpp src/external_lattice.cpp src/candidate_sampling.cpp src/configuration.cpp src/structured_ladder.cpp src/path_differential.cpp)
 target_compile_features(motionkit_core PUBLIC cxx_std_17)
-target_link_libraries(motionkit_core PUBLIC trajectory_core PRIVATE ruckig::ruckig toppra Eigen3::Eigen motionkit_descartes_core)
+target_link_libraries(motionkit_core PUBLIC trajectory_core PRIVATE EAIK ruckig::ruckig toppra Eigen3::Eigen motionkit_descartes_core)
 target_include_directories(motionkit_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
-target_include_directories(motionkit_core PRIVATE
-    ${MK_OPW_INCLUDE})
+if(EMSCRIPTEN)
+    target_compile_options(motionkit_core PRIVATE -fexceptions)
+    target_link_options(motionkit_core PUBLIC -fexceptions)
+endif()
 target_compile_definitions(motionkit_core PRIVATE MK_BUILDING_LIBRARY)
 if(NOT MK_BUILD_SHARED)
     target_compile_definitions(motionkit_core PUBLIC MK_STATIC)
@@ -204,19 +184,15 @@ if(BUILD_TESTING)
     add_executable(motionkit_path_tests tests/path.cpp)
     target_link_libraries(motionkit_path_tests PRIVATE motionkit_core)
     add_test(NAME motionkit_path COMMAND motionkit_path_tests)
-    add_executable(motionkit_opw_tests tests/opw.cpp)
-    target_link_libraries(motionkit_opw_tests PRIVATE motionkit_core)
-    add_test(NAME motionkit_opw COMMAND motionkit_opw_tests)
+    add_executable(motionkit_eaik_tests tests/eaik.cpp)
+    target_link_libraries(motionkit_eaik_tests PRIVATE motionkit_core Eigen3::Eigen)
+    add_test(NAME motionkit_eaik COMMAND motionkit_eaik_tests)
     add_executable(motionkit_configuration_tests tests/configuration.cpp)
     target_link_libraries(motionkit_configuration_tests PRIVATE motionkit_core)
     add_test(NAME motionkit_configuration COMMAND motionkit_configuration_tests)
     add_executable(motionkit_analytic_cartesian_tests tests/analytic_cartesian.cpp)
     target_link_libraries(motionkit_analytic_cartesian_tests PRIVATE motionkit_core)
     add_test(NAME motionkit_analytic_cartesian COMMAND motionkit_analytic_cartesian_tests)
-
-    add_executable(motionkit_analytic_ur_tests tests/analytic_ur.cpp)
-    target_link_libraries(motionkit_analytic_ur_tests PRIVATE motionkit_core)
-    add_test(NAME motionkit_analytic_ur COMMAND motionkit_analytic_ur_tests)
 
     add_executable(motionkit_orientation_lattice_tests tests/orientation_lattice.cpp)
     target_link_libraries(motionkit_orientation_lattice_tests PRIVATE motionkit_core Eigen3::Eigen)

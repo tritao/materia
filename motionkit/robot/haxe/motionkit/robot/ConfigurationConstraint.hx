@@ -12,9 +12,9 @@ class ConfigurationConstraint {
     if(configuration==null)throw "Configuration constraint requires a pin";
     if(Std.isOfType(solver,ManipulatorKinematics))
       backend=BranchIk.of(cast(solver,ManipulatorKinematics).manipulator);
-    else if(Std.isOfType(solver,OpwKinematics))backend=cast solver;
+    else if(Std.isOfType(solver,EaikKinematics))backend=cast solver;
     else throw "Configuration pin requires compiled labelled six-axis kinematics";
-    if(backend.family()!="OPW" && backend.family()!="UR6R")
+    if(backend.family()!="EAIK")
       throw "Configuration pin requires a labelled six-axis geometric backend";
     this.configuration=new SixAxisConfiguration(configuration.shoulder,configuration.elbow,configuration.wrist,configuration.turns);
   }

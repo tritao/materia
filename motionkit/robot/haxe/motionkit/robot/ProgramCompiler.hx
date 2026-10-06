@@ -209,8 +209,8 @@ class ProgramCompiler {
 
   static function defaultJointPathPlanner(solver:KinematicsSolver):Null<JointPathPlanner> {
     if (Std.isOfType(solver, AxisKinematics)) return new AxisJointPathPlanner(cast solver);
-    if (Std.isOfType(solver, OpwKinematics)) {
-      var opw:OpwKinematics = cast solver;
+    if (Std.isOfType(solver, EaikKinematics)) {
+      var opw:EaikKinematics = cast solver;
       // External axes require the process builder's explicit positioning rule.
       if (opw.manipulator.external.indexOf(true) < 0 && opw.manipulator.workFrame == null)
         return new StructuredJointPathPlanner(opw.manipulator);

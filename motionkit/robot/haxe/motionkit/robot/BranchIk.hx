@@ -10,10 +10,8 @@ class BranchIk {
     var reasons:Array<String> = [];
     try return new CartesianAnalyticIk(group)
     catch (error:Dynamic) reasons.push("Cartesian: " + Std.string(error));
-    try return new OpwKinematics(group.robot,group)
-    catch (error:Dynamic) reasons.push("OPW: " + Std.string(error));
-    try return new UrAnalyticIk(group)
-    catch (error:Dynamic) reasons.push("UR6R: " + Std.string(error));
+    try return new EaikAnalyticIk(group)
+    catch (error:Dynamic) reasons.push("EAIK: " + Std.string(error));
     return new NumericBranchIk(group,reasons.join("; "),tolerance);
   }
 }

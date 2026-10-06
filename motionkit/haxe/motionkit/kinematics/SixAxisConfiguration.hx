@@ -1,10 +1,8 @@
 package motionkit.kinematics;
 
-/** Controller-style geometric configuration and physical joint turn counts.
- * Conventions are explicit per backend, not inferred from a lifted joint sign.
- * OPW: slots 0/1 are front, 2/3 back; even slots are elbow up; slots 4..7 flip.
- * UR6R: native bits are shoulder, wrist, elbow (4,2,1 respectively).
- * These are generic conventions, not vendor-specific configuration codes.
+/** Geometric configuration and physical joint turn counts.
+ * EAIK's normalized geometric bits: shoulder 2, elbow 1, wrist 4.
+ * Labels are derived from compiled geometry, independently of solution order.
  */
 class SixAxisConfiguration {
   public final shoulder:String;
@@ -26,8 +24,7 @@ class SixAxisConfiguration {
       throw "Six-axis configuration requires a branch and six arm joints";
     var shoulderBit:Int,wristBit:Int;
     switch family {
-      case "OPW": shoulderBit=2;wristBit=4;
-      case "UR6R": shoulderBit=4;wristBit=2;
+      case "EAIK": shoulderBit=2;wristBit=4;
       default: throw 'No six-axis convention mapping for "$family"';
     }
     var turns:Array<Int> = [];

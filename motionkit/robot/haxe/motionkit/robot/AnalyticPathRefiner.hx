@@ -36,7 +36,7 @@ class AnalyticPathRefiner {
       throw "Analytic refinement requires a complete selected path with at least two samples";
     var isCartesian=problem.family=="XYZ" || problem.family=="XYZ+C" || problem.family=="XYZ+C+A";
     var isNumeric=problem.family=="numeric-fallback";
-    if(!isNumeric && !isCartesian && problem.family!="UR6R" && problem.family!="OPW")throw "Refinement requires a supported analytic family";
+    if(!isNumeric && !isCartesian && problem.family!="EAIK")throw "Refinement requires a supported analytic family";
     this.group=group;this.problem=problem;this.selection=selection;
     freeCentre=group.tcpPose(selection.candidates[0].q).rotation;
     sampler=isCartesian || isNumeric ? null : new SerialCandidateSampler(group);

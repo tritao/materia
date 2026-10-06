@@ -29,7 +29,7 @@ extern "C" mk_result MK_CALL mk_orientation_lattice_count(const mk_orientation_l
     return MK_OK;
 }
 extern "C" mk_result MK_CALL mk_sample_orientations(const mk_orientation_lattice *lattice,
-    const mk_opw_pose *target, mk_orientation_sample *out, uint32_t capacity, uint32_t *out_count) {
+    const mk_analytic_pose *target, mk_orientation_sample *out, uint32_t capacity, uint32_t *out_count) {
     uint32_t n;
     if (!out_count || !count(lattice,n) || !target || target->struct_size != sizeof(*target) || !out || capacity < n)
         return MK_ERROR_INVALID_ARGUMENT;
