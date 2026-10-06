@@ -49,6 +49,10 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	extern fn mk_path_create(samples: ptr<const<mk_path_sample>> @in_array("sample_count"), sample_count: u32, out_path: ptr<mk_path_handle> @out @owned) -> mk_result;
 	extern fn mk_path_destroy(path: mk_path_handle) -> void;
 	/**
+	 * Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected.
+	 */
+	extern fn mk_path_differential(request: ptr<const<mk_differential_request>>, jacobian: ptr<const<f64>> @in_array("jacobian_count"), jacobian_prime: ptr<const<f64>> @in_array("jacobian_count"), jacobian_count: u32, joint_count: u32, out_first: ptr<f64> @out_array("joint_count"), out_second: ptr<f64> @out_array("joint_count"), out_report: ptr<mk_differential_report> @out) -> mk_result;
+	/**
 	 * Returns seconds from the time-law epoch; exact at stage boundaries.
 	 */
 	extern fn mk_path_distance_to_time(law: mk_time_law_handle, s: f64, out_seconds: ptr<f64> @out) -> mk_result;
@@ -73,7 +77,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	extern fn mk_sample_orientations(lattice: ptr<const<mk_orientation_lattice>>, target: ptr<const<mk_opw_pose>>, out_samples: ptr<mk_orientation_sample> @out_array("sample_capacity"), sample_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_sample_ur_candidates(parameters: ptr<const<mk_ur_parameters>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_candidates: ptr<mk_lattice_candidate> @out_array("candidate_capacity"), candidate_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
-	 * Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected.
+	 * No candidate copies: samples address slices of the candidate array.
+	 * Costs are nonnegative; +infinity disables a candidate. Selected indices are
+	 * global candidate-array offsets. Failure details remain in out_result.
 	 */
 	extern fn mk_search_ladder(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_lattice_candidate>> @in_array("candidate_count"), state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result> @out) -> mk_result;
 	extern fn mk_select_configurations(request: ptr<const<mk_configuration_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_configuration_candidate>> @in_array("candidate_count"), candidate_count: u32, out_sequence: ptr<mk_configuration_solution> @out_array("sample_count")) -> mk_result;
@@ -158,6 +164,29 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		failed_distance: f64 @offset(528);
 		cost: f64 @offset(536);
 		diagnostic: array<i8, 256> @offset(544);
+	}
+	struct mk_differential_report @layout(32, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		rank: u32 @offset(4);
+		singular: u32 @offset(8);
+		velocity_error: f64 @offset(16);
+		acceleration_error: f64 @offset(24);
+	}
+	/**
+	 * Differential path solve: J q' = task_velocity and
+	 * J q'' = task_acceleration - J' q'. Known redundant rates are held exact.
+	 */
+	struct mk_differential_request @layout(1216, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		joint_count: u32 @offset(4);
+		known: array<u8, 64> @offset(8);
+		known_first: array<f64, 64> @offset(72);
+		known_second: array<f64, 64> @offset(584);
+		task_velocity: array<f64, 6> @offset(1096);
+		task_acceleration: array<f64, 6> @offset(1144);
+		rank_tolerance: f64 @offset(1192);
+		linear_tolerance: f64 @offset(1200);
+		angular_tolerance: f64 @offset(1208);
 	}
 	struct mk_external_cell @layout(776, 8) {
 		struct_size: u32 @offset(0) @struct_size;

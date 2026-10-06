@@ -380,10 +380,10 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | Step | State | Commits |
 |------|-------|---------|
 | PP0 | in progress: harness and diagnostics; baseline completion pending | `0d43b32c0` (partial) |
-| PP1 | in progress: Cartesian and external-axis OPW verified; UR and offset RobotArm pending | `0d43b32c0` (partial) |
-| PP2 | planned | — |
-| PP3 | planned | — |
-| PP4 | planned | — |
+| PP1 | in progress: Cartesian, OPW and authored Cobot UR verified; offset RobotArm unresolved | `0d43b32c0`, `bfec0fa28`, `8569a2a98` (partial) |
+| PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
+| PP3 | in progress: structured/coarse search and Descartes dispatch implemented; authored gate pending | `7cb639434`, `489f2c360`, `f8e88ad4d`, `09cb60fbb` |
+| PP4 | in progress: splines, serial refinement and differential solve; full path/timing integration pending | `1244858e1`, `01b20cbcc` |
 | PP5 | planned | — |
 | PP6 | planned | — |
 | PP7 | planned | — |
@@ -999,3 +999,21 @@ and no numeric IK calls. Compiler-only and focused runtime pass
 (1,144,570 assertions). Differential q-prime/q-double-prime, complete
 JointPathSamples/timing integration and authored acceptance are not done;
 this helper alone does not complete PP4.
+
+PP4 differential relation: native mk_path_differential solves J q-prime =
+task velocity with redundant rates prescribed, then J q-double-prime =
+task acceleration - J-prime q-prime with prescribed redundant curvature.
+Column-pivoted QR checks rank, and residual checks reject incompatible
+six-dimensional task derivatives. Rank loss is explicit. Native cases
+cover a six-axis arm plus moving external coordinate, exact known rates,
+Cartesian XYZ, all-known rates, task residuals and invalid inputs.
+Haxe PathDifferential uses the compiled TCP Jacobian and a centred
+directional difference for J-prime along the solved q-prime; q derivatives
+are obtained from the differential relation, not joint-position differences.
+AnalyticPathRefiner.derivatives supplies the external spline rates and
+checks that the configuration matches them. Independent UR FK differences
+recover the expected joint rate and zero curvature. All 16 native tests,
+four-platform ABI audit, compiler-only and focused runtime pass
+(1,144,582 assertions). Refined orientation task derivatives, full
+JointPathSamples/timing integration, broader moving-reference acceptance
+and the authored track gate remain outstanding; PP4 is not complete.

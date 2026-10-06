@@ -51,6 +51,16 @@ class AnalyticPathRefiner {
     if(index<0 || index>=external.length)throw "Unknown refinement external axis";
     return external[index].evaluate(distance);
   }
+  /** Task rates must describe the refined TCP pose, including its smoothed
+   * orientation. External redundancy rates come directly from the spline. */
+  public function derivatives(distance:Float,q:Array<Float>,taskVelocity:Array<Float>,taskAcceleration:Array<Float>):motionkit.robot.PathDifferential.JointDerivatives {
+    if(q==null || q.length!=group.group.count())throw "Refined derivatives require the complete configuration";
+    var known=[for(_ in q)false],first=[for(_ in q)0.0],second=[for(_ in q)0.0];
+    for(i in 0...external.length){var j=problem.externalJoints[i],state=external[i].evaluate(distance);
+      if(!Math.isFinite(q[j]) || Math.abs(q[j]-state.value)>1e-8)throw "Differential configuration differs from its redundancy spline";
+      known[j]=true;first[j]=state.first;second[j]=state.second;}
+    return PathDifferential.solve(group,q,taskVelocity,taskAcceleration,known,first,second);
+  }
   public function sample(distance:Float,target:Pose3,freedom:OrientationPolicy,?seed:Array<Float>):LatticeCandidate {
     if(target==null || freedom==null)throw "Refinement needs a target and task freedom";
     var q=seed==null ? selection.candidates[0].q.copy() : seed.copy();

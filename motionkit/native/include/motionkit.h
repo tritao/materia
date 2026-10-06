@@ -191,6 +191,28 @@ typedef struct mk_ladder_result {
     uint32_t backend; /**< 1 structured, 2 coarse corridor, 3 Descartes. */
 } mk_ladder_result;
 
+/** Differential path solve: J q' = task_velocity and
+ * J q'' = task_acceleration - J' q'. Known redundant rates are held exact. */
+typedef struct mk_differential_request {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count;
+    uint8_t known[MK_MAX_JOINTS];
+    double known_first[MK_MAX_JOINTS];
+    double known_second[MK_MAX_JOINTS];
+    double task_velocity[6];
+    double task_acceleration[6];
+    double rank_tolerance;
+    double linear_tolerance;
+    double angular_tolerance;
+} mk_differential_request;
+typedef struct mk_differential_report {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t rank;
+    uint32_t singular;
+    double velocity_error;
+    double acceleration_error;
+} mk_differential_report;
+
 /** Candidate sets for one Descartes ladder-graph selection call. */
 typedef struct mk_configuration_request {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -373,6 +395,13 @@ MK_API mk_result MK_CALL mk_sample_cartesian_candidates(const mk_analytic_cartes
     mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
     uint32_t *out_count MK_OUT);
 /** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */
+/** Jacobians are 6 x joint_count, row-major; J' is dJ/ds. */
+MK_API mk_result MK_CALL mk_path_differential(const mk_differential_request *request,
+    const double *jacobian MK_IN_ARRAY(jacobian_count),
+    const double *jacobian_prime MK_IN_ARRAY(jacobian_count), uint32_t jacobian_count,
+    uint32_t joint_count, double *out_first MK_OUT_ARRAY(joint_count),
+    double *out_second MK_OUT_ARRAY(joint_count), mk_differential_report *out_report MK_OUT);
+
 /** No candidate copies: samples address slices of the candidate array.
  * Costs are nonnegative; +infinity disables a candidate. Selected indices are
  * global candidate-array offsets. Failure details remain in out_result. */

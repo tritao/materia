@@ -594,6 +594,18 @@ class KinematicsTests extends MotionKitTestSupport {
       for(j in 0...q.length)near(refined.q[j],q[j],"fixed-orientation refinement retains the continuous joint lift",1e-6);
       previous=refined.q;
     }
+    var h=1e-4,at=start.copy(),minus=start.copy(),plus=start.copy();
+    at[0]+=0.015;minus[0]+=0.015-0.75*h;plus[0]+=0.015+0.75*h;
+    var pa=solver.forward(at),pm=solver.forward(minus),pp=solver.forward(plus);
+    var relative=new Quat(pp.qx,pp.qy,pp.qz,pp.qw).multiply(new Quat(pm.qx,pm.qy,pm.qz,pm.qw).conjugate());
+    var length=Math.sqrt(relative.x*relative.x+relative.y*relative.y+relative.z*relative.z);
+    var angularScale=2*Math.atan2(length,relative.w)/(2*h*length);
+    var taskFirst=[(pp.x-pm.x)/(2*h),(pp.y-pm.y)/(2*h),(pp.z-pm.z)/(2*h),
+      relative.x*angularScale,relative.y*angularScale,relative.z*angularScale];
+    var taskSecond=[(pp.x-2*pa.x+pm.x)/(h*h),(pp.y-2*pa.y+pm.y)/(h*h),(pp.z-2*pa.z+pm.z)/(h*h),0.0,0.0,0.0];
+    var derivatives=refiner.derivatives(0.02,at,taskFirst,taskSecond);
+    for(j in 0...at.length){near(derivatives.first[j],j==0?0.75:0,"differential rates match the independently sampled FK path",1e-5);
+      near(derivatives.second[j],0,"differential acceleration cancels Jacobian variation",1e-4);}
     var spinTargets=[for(p in request.poses){var rotation=new Quat(p.qx,p.qy,p.qz,p.qw).multiply(Quat.fromAxisAngle(new Vec3(0,0,1),0.17));
       new Pose3(p.x,p.y,p.z,rotation.x,rotation.y,rotation.z,rotation.w);}];
     var spinRequest=new PathRequest(request.distances,spinTargets,start,new IkTolerance(1e-6,1e-6),request.maxJump,request.velocity,1,

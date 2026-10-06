@@ -132,7 +132,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/shims/no_openmp")
 endif()
 
-add_library(motionkit_core ${MK_LIBRARY_TYPE} src/generator.cpp src/path.cpp src/opw.cpp src/analytic_cartesian.cpp src/analytic_ur.cpp src/orientation_lattice.cpp src/joint_lifts.cpp src/external_lattice.cpp src/candidate_sampling.cpp src/configuration.cpp src/structured_ladder.cpp)
+add_library(motionkit_core ${MK_LIBRARY_TYPE} src/generator.cpp src/path.cpp src/opw.cpp src/analytic_cartesian.cpp src/analytic_ur.cpp src/orientation_lattice.cpp src/joint_lifts.cpp src/external_lattice.cpp src/candidate_sampling.cpp src/configuration.cpp src/structured_ladder.cpp src/path_differential.cpp)
 target_compile_features(motionkit_core PUBLIC cxx_std_17)
 target_link_libraries(motionkit_core PUBLIC trajectory_core PRIVATE ruckig::ruckig toppra Eigen3::Eigen motionkit_descartes_core)
 target_include_directories(motionkit_core PUBLIC
@@ -151,6 +151,9 @@ set_target_properties(motionkit_core PROPERTIES
     SOVERSION 0)
 
 if(BUILD_TESTING)
+    add_executable(motionkit_path_differential_tests tests/path_differential.cpp)
+    target_link_libraries(motionkit_path_differential_tests PRIVATE motionkit_core)
+    add_test(NAME motionkit_path_differential COMMAND motionkit_path_differential_tests)
     add_executable(motionkit_structured_ladder_benchmark tools/benchmark-structured-ladder.cpp)
     target_include_directories(motionkit_structured_ladder_benchmark PRIVATE include "${CMAKE_CURRENT_SOURCE_DIR}/../../trajectorykit/native/include")
     target_compile_features(motionkit_structured_ladder_benchmark PRIVATE cxx_std_17)
