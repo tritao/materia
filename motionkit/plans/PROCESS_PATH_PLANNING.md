@@ -805,3 +805,13 @@ MotionKit and app compiler-only builds pass; focused C4 runtime passes
 job terminated. The MotionKit full phase-gate runtime is also running on the
 preceding compiled module; its result and the authored gantry result are still
 pending. PP2 is not claimed complete.
+
+PP2 authored acceptance now passes: all four Cobot classes complete 200 analytic
+round trips plus 60 combined native sets each; XYZ / XYZ+C pickers and XYZ+C+A
+welder each complete 200 analytic round trips plus 30 native sets. FK, task
+freedoms and compiled limits are checked on every returned candidate, with no
+numeric queries. The full MotionKit phase gate remains running. A further audit
+found OPW's singular inverse chooses a zero q4 representative, so a valid pinned
+start with nonzero q4 can be absent. A seeded q4/q6 coupling correction and
+zero/pi wrist tests with signed/offset conventions are staged, awaiting native
+validation after the running gate releases the shared library. PP2 remains open.

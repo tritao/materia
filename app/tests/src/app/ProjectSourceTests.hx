@@ -970,6 +970,25 @@ class ProjectSourceTests {
   }
 
   /** PP1: model extraction and all legal branches on the authored gantry examples. */
+  static function checkNativeCandidateSet(numeric:motionkit.robot.ManipulatorKinematics,target:motionkit.kinematics.Pose3,
+      q:Array<Float>,policy:motionkit.path.OrientationPolicy,candidates:Array<motionkit.robot.CartesianCandidateSampler.LatticeCandidate>):Void {
+    check(candidates.length>0,'authored native sampler returns candidates for $policy at q=$q');
+    var found=false;
+    for(candidate in candidates) {
+      var same=true;
+      for(joint in 0...q.length)if(Math.abs(candidate.q[joint]-q[joint])>1e-5)same=false;
+      found=found || same;
+      var actual=numeric.forward(candidate.q);
+      check(motionkit.path.PoseMath.distance(actual,target)<1e-6,"authored native candidate preserves mounted TCP position");
+      check(motionkit.robot.ToolFreedom.orientationError(actual,target,policy)<1e-6,"authored native candidate satisfies orientation freedom");
+      for(joint in 0...q.length) {
+        var bound=numeric.manipulator.group.limitsOf(joint);
+        check(candidate.q[joint]>=bound.lower-1e-9 && candidate.q[joint]<=bound.upper+1e-9,"authored native candidate respects compiled bounds");
+      }
+    }
+    switch policy {case Cone(_, _):default:check(found,"authored native candidate set retains original legal configuration");}
+  }
+
   static function checkCartesianAnalyticExamples(root:String):Void {
     for (fixture in [{example: "gantry-picker", file: "materia.project.json"},
         {example: "gantry-picker", file: "materia.yaw.project.json"},
@@ -994,6 +1013,7 @@ class ProjectSourceTests {
         var numeric:motionkit.robot.ManipulatorKinematics = cast motion.compiler.solver;
         var group = numeric.manipulator;
         var analytic:motionkit.robot.AnalyticIk = new motionkit.robot.CartesianAnalyticIk(group);
+        var sampler = new motionkit.robot.CartesianCandidateSampler(group);
         var before = group.numericSolveCount();
         for (sample in 0...100) {
           var q = [for (joint in 0...analytic.jointCount()) {
@@ -1002,6 +1022,13 @@ class ProjectSourceTests {
             bounds.lower + fraction * (bounds.upper - bounds.lower);
           }];
           var target = numeric.forward(q);
+          if(sample%10==0) {
+            var axis=group.tcpPose(q).transformVector(new robotkit.spatial.Vec3(0,0,1)).toArray();
+            for(policy in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,
+                motionkit.path.OrientationPolicy.Cone(axis,0.1)])
+              checkNativeCandidateSet(numeric,target,q,policy,sampler.sample(target,q,policy,4,1,4));
+          }
+
           for (freedom in [motionkit.path.OrientationPolicy.Fixed, motionkit.path.OrientationPolicy.FreeAboutTool]) {
             var original = false;
             for (answer in analytic.branches(target, q, freedom)) {
@@ -1018,7 +1045,7 @@ class ProjectSourceTests {
           }
         }
         check(group.numericSolveCount() == before, "Cartesian analytic branches use no numeric pose solves");
-        Sys.println('Authored ${fixture.example}/${fixture.file}: ${analytic.family()} 200 round trips passed');
+        Sys.println('Authored ${fixture.example}/${fixture.file}: ${analytic.family()} 200 round trips and 30 combined native sets passed');
       } catch (error:Dynamic) {
         simulation.dispose(); session.dispose(); throw error;
       }
@@ -1048,6 +1075,7 @@ class ProjectSourceTests {
         var group = arm;
         var numeric = new motionkit.robot.ManipulatorKinematics(arm);
         var analytic = new motionkit.robot.UrAnalyticIk(arm);
+        var sampler = new motionkit.robot.SerialCandidateSampler(group);
         var before = group.numericSolveCount();
         for (sample in 0...200) {
           var q = [for (joint in 0...6) {
@@ -1056,6 +1084,13 @@ class ProjectSourceTests {
             bounds.lower + fraction*(bounds.upper-bounds.lower);
           }];
           var target = numeric.forward(q), predicted = analytic.forward(q);
+          if(sample%10==0) {
+            var axis=group.tcpPose(q).transformVector(new robotkit.spatial.Vec3(0,0,1)).toArray();
+            for(policy in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool,
+                motionkit.path.OrientationPolicy.Cone(axis,0.1)])
+              checkNativeCandidateSet(numeric,target,q,policy,sampler.sample(target,q,policy,[],4,1,4));
+          }
+
           check(Math.sqrt(Math.pow(target.x-predicted.x,2)+Math.pow(target.y-predicted.y,2)+Math.pow(target.z-predicted.z,2)) < 1e-6,
             'authored Cobot $size analytic FK');
           var found = false;
@@ -1067,7 +1102,7 @@ class ProjectSourceTests {
           check(found,'authored Cobot $size original branch at sample $sample');
         }
         check(group.numericSolveCount() == before,"authored Cobot analytic checks use no numeric IK");
-        Sys.println('Authored Cobot $size: 200 analytic round trips passed');
+        Sys.println('Authored Cobot $size: 200 analytic round trips and 60 combined native sets passed');
       } catch (error:Dynamic) {
         simulation.dispose();session.dispose();throw error;
       }
