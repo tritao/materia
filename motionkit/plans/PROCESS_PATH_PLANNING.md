@@ -1300,3 +1300,17 @@ pass (1,148,930 assertions). This verifies a serial cone fixture, not all
 cone/path-policy joins or authored welding missions. Numeric/branch support,
 default migration, selector removal and full integration/performance gates
 remain outstanding; the overall plan remains active.
+
+PP4 numeric continuation: refinement now supports explicitly diagnosed
+numeric-fallback geometry as well as native analytic families. It fits the
+selected orientation/external profiles, continues from the previous
+physical configuration with one numeric neighbour seed, holds external
+coordinates and enforces the same limits/jumps/FK task checks. Numeric
+seed IDs are not treated as persistent geometric branches. The planner
+retains fallbackDiagnostic instead of rejecting every unsupported family.
+An unsupported skew-wrist 6R fixture completes selected-path refinement
+and preserves authored task positions. Compiler-only and focused runtime
+pass (1,148,937 assertions). This does not add redundancy profiles for more
+than six unknown internal DOFs; that differential case remains unsupported.
+Authored RobotArm acceptance/performance, branch segmentation, default
+migration and full integration gates remain outstanding.

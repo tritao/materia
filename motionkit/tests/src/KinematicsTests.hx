@@ -576,6 +576,22 @@ class KinematicsTests extends MotionKitTestSupport {
         check(Math.sqrt(distance) >= 1e-3,"numeric fallback deduplicates neighbour seeds");
       }
     }
+    var unsupportedFixture=buildContractArmFixture();
+    unsupportedFixture.arm.robot.joints[4].axis=[0.1,0.0,Math.sqrt(0.99)];
+    var unsupported=new robotkit.manipulation.KinematicGroup(unsupportedFixture.arm.robot,
+      unsupportedFixture.arm.rootLink,unsupportedFixture.arm.flangeFrame);
+    check(motionkit.robot.BranchIk.of(unsupported).family()=="numeric-fallback","skew wrist retains explicit numeric fallback");
+    var unsupportedSolver=new ManipulatorKinematics(unsupported),seed=[0.2,-0.8,0.6,-0.4,0.5,0.3],goal=seed.copy();goal[0]+=0.01;
+    var line=new PoseLine(new PoseWaypoint(unsupportedSolver.forward(seed),1e-6,1e-6),
+      new PoseWaypoint(unsupportedSolver.forward(goal),1e-6,1e-6),motionkit.path.OrientationPolicy.Interpolated,0.1,0.1);
+    var path=new motionkit.path.PosePath("task",[line]),distances=[for(i in 0...5)path.length()*i/4];
+    var numericRequest=new PathRequest(distances,[for(s in distances)path.poseAt(s)],seed,new IkTolerance(1e-6,1e-6),
+      [for(_ in seed)0.5],[for(_ in seed)1.0]);
+    var numericPlanner=new motionkit.robot.StructuredJointPathPlanner(unsupported);
+    var numericPath=numericPlanner.plan(path,numericRequest);
+    check(numericPlanner.fallbackDiagnostic!=null,"numeric path planner retains the unsupported-geometry diagnostic");
+    for(i in 0...distances.length)near(motionkit.path.PoseMath.distance(unsupportedSolver.forward(numericPath.q[i]),path.poseAt(distances[i])),0,
+      "numeric continuation refinement preserves authored geometry",1e-6);
     var cell = buildWorkcellFixture();
     var held = new motionkit.robot.NumericBranchIk(cell.group,"test external arm",new IkTolerance(1e-6,1e-6,30));
     var complete = [for (i in 0...cell.group.group.count()) 0.1*Math.sin(i+0.3)];

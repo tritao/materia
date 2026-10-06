@@ -18,6 +18,8 @@ class AnalyticPathRefiner {
   final selection:LadderSelection;
   final sampler:Null<SerialCandidateSampler>;
   final cartesian:Null<CartesianCandidateSampler>;
+  final numeric:Null<NumericBranchIk>;
+  public final diagnostic:Null<String>;
   final branch:Int;
   final external:Array<RedundancySpline>;
   final roll:RedundancySpline;
@@ -28,13 +30,16 @@ class AnalyticPathRefiner {
         problem.samples.length<2 || selection.candidates.length!=problem.samples.length)
       throw "Analytic refinement requires a complete selected path with at least two samples";
     var isCartesian=problem.family=="XYZ" || problem.family=="XYZ+C" || problem.family=="XYZ+C+A";
-    if(!isCartesian && problem.family!="UR6R" && problem.family!="OPW")throw "Refinement requires a supported analytic family";
+    var isNumeric=problem.family=="numeric-fallback";
+    if(!isNumeric && !isCartesian && problem.family!="UR6R" && problem.family!="OPW")throw "Refinement requires a supported analytic family";
     this.group=group;this.problem=problem;this.selection=selection;
-    sampler=isCartesian ? null : new SerialCandidateSampler(group);
+    sampler=isCartesian || isNumeric ? null : new SerialCandidateSampler(group);
+    numeric=isNumeric ? new NumericBranchIk(group,problem.diagnostic,problem.request.tolerance) : null;
+    diagnostic=problem.diagnostic;
     cartesian=isCartesian ? new CartesianCandidateSampler(group) : null;
     branch=selection.candidates[0].branch;
     var distances=[for(layer in problem.samples)layer.distance];
-    for(c in selection.candidates)if(c.branch!=branch)throw "Refinement must split the route at geometric branch transitions";
+    for(c in selection.candidates)if(!isNumeric && c.branch!=branch)throw "Refinement must split the route at geometric branch transitions";
     external=[for(j in problem.externalJoints)new RedundancySpline(distances,[for(c in selection.candidates)c.q[j]])];
     var rolls:Array<Float> = [],xs:Array<Float> = [],ys:Array<Float> = [];
     for(i in 0...selection.candidates.length){
@@ -118,9 +123,15 @@ class AnalyticPathRefiner {
     if(ToolFreedom.orientationError(refined,target,freedom)>problem.request.tolerance.orientation)
       throw 'Refined orientation exceeds task freedom at distance $distance';
     var best:Null<LatticeCandidate> = null,bestDistance=Math.POSITIVE_INFINITY;
-    var candidates=cartesian!=null ? cartesian.sample(refined,q,OrientationPolicy.Fixed,1,1,1)
+    var candidates:Array<LatticeCandidate>;
+    if(numeric!=null){
+      // Numeric IDs identify seeds rather than geometric branches. Continue
+      // the selected physical lift with one seed and the same jump guards.
+      candidates=[for(c in numeric.branchesFromNeighbours(refined,[q],q,OrientationPolicy.Fixed,false))
+        new LatticeCandidate(c.q,[for(_ in c.q)0],[for(_ in problem.externalJoints)0],0,0,0,c.branch,0,false)];
+    }else candidates=cartesian!=null ? cartesian.sample(refined,q,OrientationPolicy.Fixed,1,1,1)
       : sampler.sample(refined,q,OrientationPolicy.Fixed,ranges,1,1,1);
-    for(c in candidates)if(c.branch==branch){
+    for(c in candidates)if(numeric!=null || c.branch==branch){
       var d=0.0,legal=true;for(j in 0...q.length){d+=Math.abs(c.q[j]-q[j]);
         if(Math.abs(c.q[j]-previous[j])>problem.request.maxJump[j]+1e-12)legal=false;}
       if(legal && d<bestDistance){best=c;bestDistance=d;}}

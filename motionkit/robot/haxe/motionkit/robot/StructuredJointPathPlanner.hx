@@ -10,9 +10,10 @@ import robotkit.manipulation.KinematicGroup;
 import robotkit.manipulation.ArmClearance;
 
 /** Native ladder selection followed by analytic geometric refinement.
- * Unsupported-family fallback and edge exclusion remain separate stages. */
+ * Unsupported families use explicitly diagnosed numeric continuation. */
 class StructuredJointPathPlanner implements JointPathPlanner {
   public final group:KinematicGroup;
+  public var fallbackDiagnostic(default,null):Null<String> = null;
   final sampling:Null<CandidateSamplingOptions>;
   final coarse:Null<CoarseSearchOptions>;
   final clearance:Null<ArmClearance>;
@@ -46,7 +47,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
         throw 'Joint path request differs from authored geometry at sample $i';
     }
     var problem=new CandidateProblem(group,request,sampling);
-    if(problem.diagnostic!=null)throw 'Joint path family requires fallback: ${problem.diagnostic}';
+    fallbackDiagnostic=problem.diagnostic;
     var selected=clearance==null ? StructuredLadder.search(problem,null,0,null,coarse)
       : LazyCollisionLadder.select(problem,clearance,collisionRounds,contact,coarse);
     if(selected.diagnostic!=null)throw 'Joint path selection failed at distance ${selected.failedDistance}: ${selected.diagnostic}';
