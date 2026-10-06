@@ -90,8 +90,9 @@ typedef ArmJointSpec = {
 	var gearbox:Gearbox;
 }
 
-/** Six-axis serial arm on a pedestal with the caller's tool (a suction tool by default), in the classic shoulder/elbow/spherical-wrist layout.
+/** Six-axis serial arm on a pedestal with the caller's tool (a suction tool by default), in a shoulder/elbow layout with an offset wrist.
  *
+ * The j4 and j6 axis lines are separated by 35 mm along the j5 axis.
  * At zero on every joint the arm points straight up. Joints `j1`, `j4` and `j6` turn about the
  * vertical (j6 about the tool axis), while `j2`, `j3` and `j5` pitch about a horizontal axis.
  * Every housing belongs to the link before it, so each revolute mate joins a housing's rotor to

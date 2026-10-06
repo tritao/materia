@@ -1110,7 +1110,7 @@ class ProjectSourceTests {
     }
   }
 
-  static function checkRobotArmAnalytic(root:String):Void {
+  static function checkRobotArmAnalytic(root:String,offsetOnly:Bool=false):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var session = new ProjectDocumentSession(null, false);
@@ -1135,6 +1135,23 @@ class ProjectSourceTests {
         at = frame.compose(robotkit.spatial.Transform3.fromArrays(joint.childFramePosition, joint.childFrameRotation).inverse());
       }
       Sys.println("Authored RobotArm joint geometry " + haxe.Json.stringify(geometry));
+      if(offsetOnly){
+        var extracted=new motionkit.robot.OffsetWristGeometry(arm),before=arm.numericSolveCount();
+        check(Math.abs(Math.abs(extracted.offset)-0.035)<1e-6,"authored wrist offset is derived from axis lines");
+        for(sample in 0...100){
+          var q=[for(joint in 0...6){
+            var bounds=arm.group.limitsOf(joint);
+            var fraction=0.5+0.45*Math.sin((sample+1)*(joint+1)*1.61803398875);
+            bounds.lower+fraction*(bounds.upper-bounds.lower);
+          }];
+          var actual=extracted.forward(q),expected=numeric.forward(q);
+          check(motionkit.path.PoseMath.distance(actual,expected)<1e-6,"authored offset position matches compiled FK");
+          check(motionkit.path.PoseMath.angle(actual,expected)<1e-6,"authored offset orientation matches compiled FK");
+        }
+        check(arm.numericSolveCount()==before,"authored offset forward verification uses no inverse queries");
+        Sys.println("Authored RobotArm offset geometry: 100 forward comparisons passed");
+        simulation.dispose();session.dispose();return;
+      }
       var analytic = new motionkit.robot.OpwKinematics(group.robot, arm);
       var tolerance = new motionkit.kinematics.IkTolerance(1e-6, 1e-6);
       for (sample in 0...100) {
@@ -2895,6 +2912,10 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cobot-analytic") {
       checkCobotAnalytic(root);
+      return 0;
+    }
+    if(Sys.getEnv("PROJECT_SOURCE_ONLY")=="arm-offset-geometry"){
+      checkRobotArmAnalytic(root,true);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm-analytic") {
