@@ -13,6 +13,12 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * The seed selects C at its explicit axis singularity.
 	 */
 	extern fn mk_analytic_cartesian_inverse(model: ptr<const<mk_analytic_cartesian_model>>, target: ptr<const<mk_opw_pose>>, axis_only: u32, singular_c_seed: f64, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_analytic_ur_forward(parameters: ptr<const<mk_ur_parameters>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_opw_pose> @out) -> mk_result;
+	/**
+	 * Up to eight branches. Wrist-singular solutions preserve the supplied q6.
+	 * singular bits: 1 wrist, 2 elbow. Limits and periodic lifts belong to sampling.
+	 */
+	extern fn mk_analytic_ur_inverse(parameters: ptr<const<mk_ur_parameters>>, target: ptr<const<mk_opw_pose>>, singular_q6_seed: f64, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Converts Ruckig Community's offline phases to degree-3 native segments.
 	 */
@@ -216,6 +222,21 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		 */
 		joint: u32 @offset(12);
 		limit: f64 @offset(16);
+	}
+	/**
+	 * UR DH family: alpha = [pi/2, 0, 0, pi/2, -pi/2, 0].
+	 * Canonical DH q = sign_corrections[i] * model_q - offsets[i].
+	 */
+	struct mk_ur_parameters @layout(112, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		a2: f64 @offset(8);
+		a3: f64 @offset(16);
+		d1: f64 @offset(24);
+		d4: f64 @offset(32);
+		d5: f64 @offset(40);
+		d6: f64 @offset(48);
+		offsets: array<f64, 6> @offset(56);
+		sign_corrections: array<i8, 6> @offset(104);
 	}
 	handle mk_path_handle : u32 @destroy("mk_path_destroy");
 	handle mk_time_law_handle : u32 @destroy("mk_time_law_destroy");

@@ -67,6 +67,15 @@ typedef struct mk_analytic_solution {
     uint32_t singular; /**< C is undetermined at an axial tool direction. */
 } mk_analytic_solution;
 
+/** UR DH family: alpha = [pi/2, 0, 0, pi/2, -pi/2, 0].
+ * Canonical DH q = sign_corrections[i] * model_q - offsets[i]. */
+typedef struct mk_ur_parameters {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double a2, a3, d1, d4, d5, d6;
+    double offsets[6];
+    int8_t sign_corrections[6];
+} mk_ur_parameters;
+
 /** Candidate sets for one Descartes ladder-graph selection call. */
 typedef struct mk_configuration_request {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -179,6 +188,14 @@ MK_API mk_result MK_CALL mk_analytic_cartesian_forward(const mk_analytic_cartesi
  * The seed selects C at its explicit axis singularity. */
 MK_API mk_result MK_CALL mk_analytic_cartesian_inverse(const mk_analytic_cartesian_model *model,
     const mk_opw_pose *target, uint32_t axis_only, double singular_c_seed,
+    mk_analytic_solution *out_solutions MK_OUT_ARRAY(solution_capacity), uint32_t solution_capacity,
+    uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_analytic_ur_forward(const mk_ur_parameters *parameters,
+    const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count, mk_opw_pose *out_pose MK_OUT);
+/** Up to eight branches. Wrist-singular solutions preserve the supplied q6.
+ * singular bits: 1 wrist, 2 elbow. Limits and periodic lifts belong to sampling. */
+MK_API mk_result MK_CALL mk_analytic_ur_inverse(const mk_ur_parameters *parameters,
+    const mk_opw_pose *target, double singular_q6_seed,
     mk_analytic_solution *out_solutions MK_OUT_ARRAY(solution_capacity), uint32_t solution_capacity,
     uint32_t *out_count MK_OUT);
 /** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */

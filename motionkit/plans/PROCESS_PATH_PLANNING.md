@@ -574,3 +574,15 @@ suite now passes `310` assertions, including 30 inverse round trips after
 shifting the model's joint references and displacing each axis origin along
 its own axis. This verifies the new extraction conventions on a genuine OPW
 chain; it does not make the authored offset wrist OPW-compatible.
+
+PP1 native UR backend preparation: added parameterized standard-DH forward
+and closed-form inverse functions, preserving shoulder/wrist/elbow branch IDs
+and wrist/elbow singularity flags. The BSD-licensed ROS-Industrial inverse
+was adapted to receive inferred dimensions, offsets and signs; no robot-size
+table is used by the solver. A near-singular round trip exposed its original
+absolute tolerance snapping a valid wrist angle; the tolerance was tightened.
+Native tests now pass 1,600 round trips over four dimension fixtures, signed
+and shifted joint conventions, wrist singularities, unreachable targets and
+invalid parameters. All 10 native CTests pass, and the regenerated Haxeon ABI
+passes the four-platform audit. Model-derived UR extraction and Haxe adapter
+remain outstanding, so this is preparation rather than PP1 completion.
