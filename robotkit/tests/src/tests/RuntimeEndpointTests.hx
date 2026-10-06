@@ -80,7 +80,8 @@ private class TrackingEndpoint extends NativeRuntimeEndpoint {
   public var stops:Int = 0;
   public var closes:Int = 0;
   public var sequence:Int = 0;
-  public function new(owner:Ownedrk_robot_runtime) super(owner);
+  public function new(owner:Ownedrk_robot_runtime)
+    super(owner,new robotkit.time.SourceClock("robotkit.monotonic"));
   override public function start():Int { starts++; return super.start(); }
   override public function submit(command:rk_robot_command):Int {
     submits++;

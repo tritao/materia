@@ -996,7 +996,7 @@ Dependencies:
 | W6 | Done (2026-10-04) | RKD6 numeric feedback and virtual welder; checked retrofit profile; Modbus map/adapter with independent ProcessKit owner; unchanged seam and all six shutdown cases pass. Full welder, arm, mobile and MachineKit smoke gates pass; phase one lands on local main. |
 | P1 | Done (2026-10-05) | Mobile welding carrier, insulated storage and converter service graph; CAD fit/mass checks and both-backend carrier movement pass. |
 | P2 | Done (2026-10-05) | Minimum verified candidate cover: 2 stations / 10 seams; complete goTo/weld/stow mission passes both backends in 270.3 s; affected milestone gates pass. |
-| P3 | Open | Executed touch searches and correction under injected parking error. |
+| P3 | Done (2026-10-06) | Executed touch searches, corrected registration and checked live stow; both-backend mission and milestone gates pass. |
 | P4 | Open | Measured load integration, voltage sag/cutoff and pre-seam docking/charging. |
 | P5 | Open; required | Rendered-depth laser profiler and executed live seam correction. |
 
@@ -1606,3 +1606,1074 @@ P2 commit ledger before this final record:
 - `574d49ba97fa49250c1650de4a806dec13b0e14c` App: reacquire live arm starts between mission motion owners
 - `0e20c96730971d68e02d969280381216ac447a65` App: verify complete mobile welding missions on both backends
 - `619f2cf2734a048e37823d030fda4a197b6ed873` ProcessKit: record the observed-frame design for mobile weld registration
+
+### P3 rigid contact fit implementation (2026-10-05)
+
+`processkit.perception.ContactRegistration` fits nominal CAD planes to measured observer-frame
+contact points. The scaled six-dimensional normal system uses a symmetric pseudoinverse so
+partial fits update only observable directions. One face gives rank three, two faces rank five;
+only a converged rank-six fit inside residual, translation and rotation bounds authorizes welding.
+Partial estimates remain available to guide subsequent probes. No live work-body pose is an input.
+
+The focused contact-registration suite passes 109 assertions: full rigid-frame recovery,
+chassis-origin parking extremes (20 mm per axis and 2 degrees yaw), observer-frame equivariance,
+scaled plane equations, deficient/duplicate contacts, inconsistent observations, exceeded limits,
+iteration exhaustion and invalid inputs. This is numerical solver evidence only. Executed contact
+searches, CAD probe-region selection, saved mission integration and displaced-parking weld checks
+remain open; P3 has not passed its milestone gate. P4 and P5 remain required and open.
+
+### P3 bounded touch-search policy and servo adapter (2026-10-05)
+
+`ContactSearch` owns the arc-off contact-search policy: a measured TCP origin, inward direction,
+finite distance/time/corridor bounds, and an explicit calibrated sensing-threshold offset. Fresh
+noncontact feedback must arm a search before a new touch can finish it. Missing, stale, future,
+regressing or clock-mismatched observations, invalid frames, active arc/current and welder faults
+stop probing. Sensor skew is bounded on the joint clock rather than inferred from host receipt time.
+
+`ContactSearchRunner` connects this policy to an exclusively owned fresh MotionKit servo session.
+It reads measured joint positions for TCP FK and captures that point on touch before requesting
+braking. Completion waits until the servo reports rest. The caller must first execute a checked
+approach with arc and wire channels off; this adapter does not replace approach planning or CAD
+probe-region clearance checks. Existing MotionKit servo deadlines bound a stalled host's commands.
+
+The focused suite passes 20 search assertions plus the existing 109 registration assertions.
+The servo adapter compiles, but its executed native motion has not yet been exercised: the unit
+suite proves the search policy and constructor validation, not a mobile contact-search mission.
+CAD probe selection, safe approach/retreat, saved mission steps and observed-frame use remain open.
+
+P3's focused native-motion suite now passes 15 assertions on the deterministic backend. A
+prismatic probe executes the real ServoSession and native runtime against WeldArcModel contact
+feedback: calibrated contact is within 0.06 mm of a physical plane, the recorded point precedes
+braking, and stale feedback and a no-touch search both brake to rest without a registration point.
+This proves the adapter's executed motion boundary, not the multi-face mobile mission or MuJoCo.
+
+### P3 CAD probe patches and parking envelopes (2026-10-05)
+
+`machinekit.welding.WeldProbeGeometry` extracts polygonal planar B-rep faces in the nominal
+weldment reference frame. Face boundaries and holes determine sample regions; table and clamp
+faces can obstruct nominal approach rays without becoming registration targets. Containment of
+an entire rectangular uncertainty region checks boundary crossings as well as corners, so a hole
+inside a region cannot be missed. Unsupported curved geometry fails explicitly instead of being
+silently dropped from visibility. This initial implementation supports the example's polygonal
+solids; curved registration geometry remains unsupported.
+
+`WeldProbeParkingBounds` derives conservative face-plane intersection bounds from the nominal
+CAD chassis frame, per-axis translation limits and yaw about that chassis. Projected yaw extrema
+are analytic over the continuous angle interval, rather than a discrete corner-only sample. Ray
+normal projection and tangential rotation expand the region bounds. Planar parking error introduces
+no artificial vertical uncertainty on horizontal CAD faces. At a 1.7 m chassis lever arm, the
+20 mm/2 degree envelope can exceed 70 mm laterally, rejecting narrow first-contact patches.
+
+The focused CAD suite passes 3,101 assertions, including actual mobile-workpiece patches (468
+nominally exposed samples), hole/boundary rejection, fixture masking, world-placement invariance,
+unsupported geometry and dense displaced-ray checks of the continuous parking bounds. No native
+build or OCCT rebuild was needed. These are geometric candidates, not reach-approved probe moves.
+Multi-face selection, checked approach/refinement/retreat and mission observed-frame integration
+remain open. Probe order must follow observable uncertainty and feasible patch width rather than
+always assuming the top face is the first usable datum.
+
+P3's `WeldProbePatterns` now builds CAD-derived 3–2–1 stage candidates. Three contacts must be
+noncollinear; the second pair separates along the two planes' intersection to observe the remaining
+rotation; the final plane's normal must complete an independent basis. Pattern ordering favors
+geometric spread, while later arm planning must still prove each complete move. An uncertain
+approach prism conservatively masks every other face's projected bounds, including off-centre
+fixtures; yaw-induced search-ray tilt expands that prism. This can reject usable patches but must
+not accept a nominal centre ray whose uncertain contact could hit a neighbour.
+
+The CAD suite passes 3,167 assertions, including generated pattern observability and full rigid
+frame recovery from the selected six CAD constraints. Its later-stage tests deliberately use zero
+uncertainty to verify pattern geometry; they do not claim that runtime observations have reduced
+uncertainty. Actual posterior bounds and staged probe execution remain to be integrated.
+For planar parking error a broad vertical datum can be followed by an independent vertical datum,
+then a horizontal one: the second vertical face measures the unresolved horizontal displacement
+before a narrow top patch is approached. Choose feasible stages by current measured uncertainty,
+not by a fixed top-first order. Fine contact refinement is needed so detection-period error divided
+by the first-stage baseline does not amplify into unacceptable seam error far from those contacts.
+
+### P3 observed-rest correction (2026-10-05)
+
+The complete probe integration exposed an ownership boundary in `ContactSearchRunner`: a servo
+braking tick's `atRest` describes its commanded zeros, which are applied on the next native owner
+tick. Search completion now also requires observed joint velocities below 1e-5 and no active
+trajectory. Waiting for measured rest has a finite bound derived from observed speed and configured
+joint acceleration plus two seconds; a brake that does not settle fails instead of waiting forever.
+Detection-time contact capture remains unchanged. The focused native suite passes 31 assertions,
+including observed rest at every basic search handoff and the prepared refinement integration.
+
+### P3 complete single-probe execution (2026-10-05)
+
+`ProbeMotionPlanner` checks complete compiled approach and straight refinement/retreat trajectories,
+including short swept clearance edges. Approach IK candidates use bounded JointRoute detours; a
+blocked endpoint-to-endpoint sweep cannot become an accepted move merely because its goal is clear.
+Prismatic checks sample at 1 mm joint increments, revolute checks at 0.02 rad, and actual compiler
+end joints are retained. A measured per-joint deadline-brake prediction is also screened during
+searches. This is a predicted stopping reference from observed velocities and configured acceleration,
+not a proof of every possible Cartesian QP braking path or an independent safety controller.
+
+`ContactProbeRunner` executes an arc/wire-off checked approach, a coarse search, checked withdrawal,
+a fresh slow contact measurement and checked retreat. Servo and motion programs own the arm in
+separate phases. Observed rest alone does not release a sticky native velocity target: the runner
+submits a measured position hold, waits for its native owner tick, and reacquires the program start
+before retreat/refinement. This resolves the native -2 rejection at the first withdrawal without
+changing RobotRuntime or weakening the plan anchor contract. Fresh servo instances are disposed
+between searches. Failed probing clears its contact result and stops the robot with its existing
+channel-safe policy; a contact is only complete after retreat.
+
+The focused deterministic native suite passes 31 assertions. The full one-axis probe executes two
+separate touch episodes, refines a 20 mm-deep plane observation to within 6 micrometres, returns to
+its prepared air pose and leaves the joint at rest with arc and wire off throughout. Separate cases
+verify stale/no-touch stops, unreachable goals, intervening fixtures and predicted braking obstruction.
+This proves a complete single probe; CAD stage selection, measured posterior bounds, mobile scene
+steps and the noisy multi-face welding mission remain open. P3 has not passed its milestone gates.
+
+### P3 measured pose uncertainty (2026-10-05)
+
+`ContactPoseEnvelope` retains a bounded set of chassis pose errors consistent with measured plane
+contacts. Conservative interval rotation, translation contraction and same-plane contact differences
+reduce the set without treating unobserved degrees of freedom as zero. A finite subdivision/cell
+budget leaves wider feasible regions; reducing the cell cap merges them conservatively. Inconsistent
+contacts fail explicitly. Its provisional centre places subsequent probes but does not authorize
+welding: the final six-observable-component rigid fit remains required.
+
+Search-ray intersection bounds include the chassis yaw lever arm and remaining translation/rotation,
+with explicit metre units and calibrated contact error. Focused tests pass 51 envelope assertions,
+20 search assertions and 109 rigid-fit assertions. They cover parking extremes, partially observed
+interior poses, general six-component uncertainty, exact tolerance boundaries and budget exhaustion.
+CAD selection using these measured bounds and the executed mobile registration mission remain open.
+
+P3 CAD pattern selection now accepts a `WeldProbeUncertainty` region provider. The analytic parking
+prior implements this interface; observed bounds are supplied through an explicit provider without
+adding a ProcessKit dependency to MachineKit. Region extents/travel use CAD length units while tilt
+is dimensionless. The focused CAD test converts measured metre bounds explicitly and selects all
+three 3-2-1 stages using the surviving pose set, updating it after each stage rather than substituting
+zero uncertainty. For an interior displaced chassis pose, each selected search-ray intersection is
+inside its predicted region, and the six contacts produce an accepted rank-six fit. The CAD suite
+passes 3,177 assertions with 468 exposed samples. These observations are synthesized for the focused
+geometry test; execution on the mobile robot, saved registration steps and noisy mission gates are
+still required before P3 can land.
+
+### P3 measured registration execution sequence (2026-10-05)
+
+`ContactRegistrationSequence` owns the 3-2-1 measurement policy. A caller supplies checked CAD-derived
+probes on one nominal work plane per stage; the selector receives previous independent normals and
+the measured pose envelope. Each complete stage refines that envelope before selecting the next.
+Parallel planes, inconsistent observations and deficient final contact rank fail explicitly. Only an
+accepted six-component rigid fit publishes a result, with residual tolerance tied to calibrated
+contact error. A sequence is single-use so measurements cannot be carried across parking events.
+
+`ContactRegistrationRunner` drives the sequence through one `ContactProbeRunner`, accepting each
+measurement only after its checked retreat completes. Probe failure, selector failure and cancellation
+leave no published work frame. ProcessKit owns this execution policy; the selector boundary keeps
+CAD shape extraction and candidate/motion preparation outside the measured registration state.
+
+Focused tests pass 18 sequence assertions plus 51 envelope, 20 search and 109 rigid-fit assertions.
+The native contact-motion suite passes 34 assertions: its new wrapper case executes three full probes
+(six coarse/fine touch episodes), rejects an unavailable second independent plane, and leaves arc/wire
+off with observed joint rest. This one-axis case proves the execution/failure boundary, not successful
+six-component mobile registration. Saved mission integration, CAD-aware request preparation on the
+six-axis arm and both-backend injected-parking mission gates remain open. P4 and P5 remain required.
+
+### P3 saved contact job boundary (2026-10-05)
+
+SceneArtifact schema 17 adds `findWork` with the actual torch contact connector and a nominal CAD
+contact job. It stores the work reference occurrence, nominal assembly_T_work in metres, bounded
+chassis XYZ/RPY errors, calibrated observation error/contact offset, and polygonal target/fixture
+faces in the work frame. It stores no measured result or live body pose. Each face carries its
+occurrence/face identity, outward normal, plane centre and all contour edges, including holes.
+
+The strict decoder requires typed numeric/vector fields. Validation rejects missing occurrences,
+invalid frame quaternions, unsupported bounds, repeated face identities, non-unit normals,
+nonplanar/open boundaries and a target set without three independent normals. Probing must name
+the torch's connector, not another valid connector. Schema 16 is rejected; there is no migration.
+Tracked scene-envelope JSON examples have their own unchanged version 1; no tracked binary
+SceneArtifact fixtures were found to regenerate. Generated artifacts use the current schema.
+
+ProjectKit passes 18 new saved-contact assertions and 143 existing assertions. The new mission step
+is not yet emitted by the mobile generator or executed by MissionPlayer: those are the next P3
+integration changes, followed by actual noisy multi-face registration on both backends.
+
+MachineKit now exports probe patches to the saved contact face format with explicit CAD-to-metre
+conversion and reconstructs them without reopening CAD solids. The actual mobile cell's faces,
+fixture masks, holes and material samples survive this conversion. Its exported geometry passes
+saved-job validation, and the focused CAD suite passes 4,912 assertions with 468 exposed samples.
+This establishes the CAD data boundary; it does not prove arm reach, actual multi-face execution or
+the injected-parking welding mission. No native build or milestone-wide gate was run for this change.
+
+### P3 normal probe pose preparation (2026-10-05)
+
+`ProbePosePlanner` prepares a normal sensing corridor from a nominal root-frame CAD point, outward
+normal and conservative remaining normal travel. Wire +Z points inward. Sixteen rolls are tried,
+nearest the observed torch orientation first; each accepted prepared air pose has a complete checked
+approach through ProbeMotionPlanner. The air offset is normalTravel plus 3 mm, and the bounded search
+distance is twice normalTravel plus 3 mm, covering either sign of the unknown plane displacement.
+Continued IK is checked at 1 mm intervals over that entire corridor, rather than accepting a reachable
+nominal point while a possible displaced contact lies beyond the arm's reachable branch.
+
+Corridor kinematics do not turn a search into a nominal buffered contact move: before localization,
+that nominal move might penetrate the real plane. CAD patch/approach-region screening checks geometric
+exposure, and the executed search retains its measured collision/braking checks. This separation is
+necessary under parking error; checked approach and post-contact refinement/retreat remain unchanged.
+
+The focused native motion suite passes 43 assertions. New cases verify wire alignment, both signs of
+normal uncertainty and rejection specifically at an unreachable corridor despite reachable nominal
+contact/approach poses. On the existing six-axis arm fixture, three independent plane normals produce
+prepared wire orientations and checked approaches ending within 0.1 mm of their requests. This is
+six-axis preparation evidence, not an executed registration of the actual mobile CAD weldment. Saved
+mission emission/execution, actual mobile probe selection and both-backend parking-error gates remain
+open. No native build or milestone-wide app gate was run.
+
+### P3 mission integration draft (2026-10-05)
+
+The current uncommitted integration emits `findWork` after each mobile parking step and executes it
+through `FindWeldWork`/ContactRegistrationRunner. A measured root_T_work is scoped to that station;
+starting another goTo or resetting the mission clears it. Welds whose frame has a contact job require
+an accepted measurement and compose it with the same wheel estimate used by WeldSeam, cancelling
+that estimate when expressing the motion in the robot root. Registration's nominal input uses the
+wheel estimate and saved CAD assembly_T_work; live body poses are used only by clearance checks and
+test assertions, not by the registration fit or nominal prior.
+
+The saved-CAD-to-probe adapter is in an optional `machinekit-process` integration package under
+`machinekit/process`, in the `machinekit.welding` namespace. Adding ProcessKit to machinekit-robot
+would create a dependency cycle through CadBridge, so the core packages remain unchanged. ProcessKit
+owns measured sequence execution and probe motion; MachineKit supplies CAD patch selection and the
+adapter. The application wires those owners to its skill lifecycle and station frame scope.
+
+The application compiles (1,862 sources). A focused production-scene check is running: it injects a
+12/-9 mm chassis-frame translation and 0.025 rad yaw after parking, without resetting wheel odometry,
+then requires contact registration and the first weld on both backends. The first run failed before
+probing: geometrically selected broad patterns included blocked/unreachable approach endpoints.
+This draft is not a passing P3 milestone and is not landed on main.
+
+P3 candidate-screening repair: ProbePosePlanner now screens prepared approach configurations over
+its torch rolls and IK candidates, including endpoint clearance. WeldProbePatterns accepts an
+optional point predicate before selecting its broad contact pattern. A geometrically good but
+unreachable extreme no longer displaces all reachable interior points. This remains candidate
+screening: selected probes still require the complete checked approach and bounded corridor, and
+execution rechecks its actual measured start. Focused native tests pass 45 assertions; CAD tests
+pass 4,913 assertions. The mission adapter tries 9/17/33-point-per-axis lattices in order until a
+checked pattern succeeds, retaining finite search and avoiding the densest scan when unnecessary.
+The repaired focused mission check remains pending.
+
+P4 preparation audit while the P3 production preview runs: declared component mass is currently
+lost at the preview boundary. MachineComponent.massProperties returns declared vendor kg/COM and
+optional centroidal inertia in kg mm², but AssemblyPreview.scene exports Part.massProperties from
+the preview solid. MateriaProjectRunner then computes kg as volume*density*scale³, and CadBridge
+uses that same geometric mass unless its occurrence callback overrides it. The saved scene currently
+has geometric inertia moments, scaled by density*scale⁵, rather than explicit physical mass/inertia.
+P4 must repair this producer/data/consumer boundary before claiming measured motor-energy realism;
+changing pack ratings or multiplying loads afterward would hide the physical-model mismatch.
+No energy implementation or mass-format change has been made during this P3 execution check.
+
+The filtered focused run is live after production CAD generation; no pass/fail result is available
+at this point. Its source geometry artifact is cached beneath app/build/project-cache using the
+existing content/dependency/native-stamp fingerprint, keeping cache writes in this worktree. The
+next compiled focused check additionally requires twelve coarse/fine touch episodes, verifies that
+wheel localization did not receive the injected base jump, and measures frame error at the first
+weld's actual CAD seam endpoints rather than an arbitrary nearby point. Those added assertions have
+not yet been compiled/run; the current live process uses the preceding test binary.
+
+### P3 clock ownership stop (2026-10-05)
+
+The filtered focused run has terminated with exit 1. It now reaches the coarse contact search, then
+fails exactly: `step 1 (findWork): Coarse: contact search needs fresh welding feedback on the joint clock`.
+The scene generator completed and emitted 66 component records (2,877,017-byte artifact). No successful
+registration or weld is claimed; the enhanced contact-count/odometry/seam-endpoint assertions remain
+uncompiled and unrun.
+
+The concrete framework mismatch is RuntimeRobotAdapter.snapshot (robotkit/core/haxe/robotkit/runtime/
+RuntimeRobotAdapter.hx, source-clock argument): it labels all joint snapshots `unspecified`.
+VirtualWelderSupply publishes raw device-clock observations as `robotkit.device.<epoch>`.
+VirtualDeviceEndpoint::sensor_sample converts board timestamp ticks to nanoseconds at the device
+rate, retaining its device epoch; it does not map them into the joint observation clock. Equal numeric
+units do not establish a shared clock, and republishing at receipt time would hide sampling uncertainty.
+The existing strict ContactSearch condition is therefore correctly failing.
+
+A clean prerequisite is authoritative source-clock metadata from the runtime adapter/endpoint plus
+an explicit bounded device-to-joint mapping, using RobotKit's existing ClockMapping/ClockMappings
+contracts or an endpoint-owned equivalent. Its uncertainty must count against the permitted contact
+skew/position error; clock epochs, missing mappings and stale observations must fail. RobotRuntime.hx
+has not been edited, and the clock equality/freshness guard has not been weakened. This crosses the
+brief's RobotKit framework ownership boundary, so execution work stops here for an owner repair or
+explicitly authorized scope change. The mission adapter/application/generator draft remains uncommitted;
+main remains f4dc7456a65fb32dd2459d9a36d36dd8c80457a1. P3, P4 and P5 remain incomplete.
+
+### P3 authorized clock prerequisite (2026-10-05)
+
+The user authorized the framework repair across the earlier ownership boundary. RobotRuntime.hx
+and RobotArm.hx remain untouched. Inspection corrects the earlier diagnosis: RKD6 joint records,
+like its peripheral samples, retain board ticks converted to nanoseconds. They already share the
+same board oscillator; their source clock must not be called the host/simulation clock and does
+not need a fictitious device-to-joint calibration. Direct simulation joint records use physics time.
+
+RuntimeEndpoint now exposes its source-clock identity. Factories supply endpoint-owned identities
+with instance tokens and reset epochs; RuntimeRobotAdapter preserves that identity on joint and
+native sensor observations, while external frames retain their actual publisher's clock. SimKit
+notifies observers after a successful session reset so RobotKit can invalidate every endpoint epoch
+even when a later timestamp numerically repeats; individual robot resets invalidate that endpoint.
+This is a Haxe lifecycle change with no native ABI change or rebuild. Unexpected backward endpoint
+time also starts a distinct epoch; no mapping across it is inferred.
+
+SimulatedWelder publishes the completed physics observation's actual joint source timestamp and
+endpoint clock, rather than the separately monotonic step-observer integration time. The virtual
+supply retains raw board sample time and uses the same board clock identity as its joint records.
+For genuinely independent devices, ContactSearch and its execution wrappers accept explicit
+ClockMappings. The complete mapped uncertainty interval must precede measured FK and fit inside
+the existing age budget, retaining the speed*age contact-position bound. Unknown identities,
+missing/expired mappings, excessive uncertainty and a changed joint or sensor epoch fail probing.
+
+Final focused checks pass: 24 endpoint-clock assertions including a 70 ms device offset, 125 ppm
+drift, preserved external clocks and repeated-timestamp resets; a separate-process clock-identity
+check; 20 existing search assertions plus 10 mapping/epoch/invalid-time assertions; 50 native
+probe-motion assertions. The latter also prove that a repeated-timestamp reset aborts search,
+buffered probing and the entire registration sequence before points from different epochs can
+be combined. The final app source compiles 1,863 sources, using compiler-only builds and existing
+native libraries. No OCCT/native rebuild was performed.
+
+The production registration retry completed CAD generation (66 records, 2,877,017 bytes), passed
+the former clock prerequisite and reached the coarse servo search. It then terminated with exit 1:
+`step 1 (findWork): Coarse: Joint target must be finite`. The twelve-contact/seam checks did not run
+to completion; neither backend has a successful P3 registration result. The final epoch-guard
+additions were checked in the focused native suite and the app was recompiled after them.
+
+A separate diagnostic beneath ignored app/build/servo-diagnostic reproduces the framework error
+without CAD: one bounded prismatic DOF, velocity limit 0.1, absent maxAcceleration, requested TCP
+speed -0.005 m/s and dt 0.01. ManipulatorServo produces `velocity=NaN, fallback=true, status=-1`.
+The same call with acceleration override 1 produces `velocity=-0.004999989999781267`, finite,
+`fallback=false, status=0`. ManipulatorServo maps an absent acceleration to positive infinity;
+StepLimits.brakingSpeed then evaluates infinity times zero for a finite travel distance, and its
+NaN bounds propagate through the differential-IK fallback into the joint target. No MotionKit or
+KinematicsKit source was changed in this clock prerequisite. The user's outside-scope stop rule
+applies to this newly exposed framework defect; the clean next repair belongs to the acceleration
+limit contract and bounded differential IK, followed by resuming the P3 mission check.
+
+Clock repair commits are `bcfcd3e07f79869cb89a633a71e1f7898b92be7b` (RobotKit endpoint clocks
+and reset epochs) and `cfe73e334` (ProcessKit mapped-clock probing and simulation observations).
+The mission adapter/application/generator draft remains uncommitted. P3 is not a passing milestone,
+so no main fast-forward was attempted; main remains f4dc7456a65fb32dd2459d9a36d36dd8c80457a1.
+P3 full two-station and 20 mm/2-degree boundary validation, P4 energy/docking and P5 rendered-depth
+tracking remain required and open.
+
+### P3 authorized unlimited-acceleration repair (2026-10-05)
+
+The user authorized repairing the newly exposed kinematics prerequisite and resuming P3.
+Local main was merged before this work (already up to date at f4dc7456a65fb32dd2459d9a36d36dd8c80457a1).
+KinematicsKit owns differential-step travel and braking limits, so the repair is in StepLimits.
+The braking roots are now evaluated in their rationalized form: it is algebraically equivalent
+for finite positive acceleration, avoids cancellation at high acceleration, and has a finite
+travel-bound limit when acceleration is positive infinity. Absent acceleration, zero and positive
+infinity consistently mean unlimited acceleration; position, velocity and ramp turning-point
+bounds still apply. Invalid previous velocities fail before QP bounds can be produced. No motor
+rating or arbitrary acceleration cap was added to hide the numerical defect.
+
+Focused checks pass: 39 pure bounds assertions (including multiple numerical scales and interior
+ramp overshoot), 32 native differential-IK assertions (including the bounded fallback after QP
+failure), and the 50 native contact-probe motion assertions. Builds remain compiler-only with the
+existing native libraries. The production app rebuild passed (1,863 sources). The repair is
+committed as 00e80e2b43e8a0daaa0952069cdfce79fb724082, `KinematicsKit: keep unlimited acceleration
+steps finite`.
+
+The production registration retry then stopped before CAD generation with exit 1:
+`Could not compile Materia project entrypoint (exit 1)` and
+`/tmp/materia-project-3098987-1791196217.54144-804289383/preview.hl: No such file or directory`.
+The producer reports MateriaProjectModuleBuild.hx:75, its File.saveBytes call for the compiled
+module; the runner rethrows at MateriaProjectRunner.hx:222. The exact log is in ignored
+app/build/p3-limits-registration.log. The cause of the missing temporary output directory is
+not established. No compiler change, stale artifact bypass or production registration pass is
+claimed. This new tool/environment failure triggers the user's outside-scope stop rule.
+
+P3 remains incomplete, with production registration, full two-station coverage and boundary
+validation still open. Main remains f4dc7456a65fb32dd2459d9a36d36dd8c80457a1; no fast-forward was
+attempted. P4 energy/docking and required P5 rendered-depth tracking remain open.
+
+### P3 disk-space retry and lazy single-contact screening (2026-10-05)
+
+The user asked to continue and suggested low disk space as the temporary-output failure's cause.
+With 4.9 GB free, a retry using TMPDIR under app/build/project-tmp compiled and generated the
+expected production artifact (66 components, 2,877,017 bytes). This demonstrates that the tool
+failure no longer reproduces; it does not establish its original cause. No compiler/runtime or
+producer change was needed. All temporary files and the existing dependency-fingerprinted cache
+remain inside this worktree.
+
+The first uninstrumented registration run was stopped after approximately 25 minutes without a
+result. Test-only parking/contact progress messages were added and the app rebuilt successfully
+(1,863 sources). Its retry loaded the cached scene and executed ten touch episodes on the
+deterministic backend, from 27.05 through 52.48 simulated seconds, passing the former nonfinite
+servo prerequisite. It was stopped while still computing after approximately 20 minutes, to
+repair an identified avoidable candidate-screening cost. Neither interrupted run is a pass or
+a terminal registration failure; measured frame accuracy and bead acceptance remain unverified.
+
+For the one-contact stage, WeldProbePatterns formerly screened arm configurations for every
+geometrically admissible point, then selected the nearest reachable point to the face centre.
+It now screens nearest points in order and stops at the first reachable point on each face.
+Grid-order ties remain deterministic, rejected points fall through to the next nearest point,
+and an entirely unreachable face is rejected. The approach bound is derived from the selected
+point. Three- and two-contact broad-baseline selection, exposure/uncertainty checks and full
+checked motion preparation are unchanged. This avoids redundant IK/clearance work without
+reducing the candidate lattice, search bounds or physical proof requirements.
+
+The affected CAD probe suite passes 4,940 assertions and retains 468 exposed samples, including
+nearest-point preservation, one screening call per immediately reachable face, rejection
+fallback ordering and entirely unreachable faces. The production retry after this optimization
+is still required. P3 is incomplete and main has not been advanced.
+
+### P3 executed-phase diagnosis and probe wire model (2026-10-05)
+
+The subsequent retry reproduced the ten-touch sequence and was interrupted without a terminal
+registration result. A phase-instrumented app retry then established that all executed searches
+so far were the three probes on the first face, not two completed faces. Four touch episodes
+occurred during air approaches (two before the first coarse search and two before the third).
+The first face's final retreat began at 52.51 simulated seconds; computation then delayed the
+second-face selection/preparation. The single-contact screening optimization is valid focused
+work but did not address this observed delay. The diagnostic run was stopped to repair the
+confirmed air-contact omission and an identified envelope refinement inefficiency.
+
+ContactPoseEnvelope now bounds yaw sensitivity by point radius times the horizontal component
+of the observed plane normal. This follows d(Rz p)/d(yaw) = Z cross Rz p. A horizontal plane's
+residual is yaw-invariant, so splitting its unobserved yaw interval cannot improve a constraint.
+The previous all-axis radius bound could create 256 redundant cells. The full parking prior
+remains present in one cell for that case; no pose component is assumed known. Focused tests
+pass 67 envelope assertions (including all planar parking corners), 18 sequence assertions,
+109 fit assertions and the existing 20 search assertions. The affected CAD suite still passes
+4,940 assertions and 468 exposed samples. Commit: 4cae123ecb9b76e79f0cefcadc9b8d1f18435ec5.
+
+The rigid physics hull deliberately excludes consumed wire, but the unlit protruding wire is
+real geometry during contact probing. ProcessKit ProbeWireClearance derives a conservative
+circumscribed wire envelope from the supplied CAD diameter, stickout and link-local tip. It
+checks wire pairs against non-tool solids, including intervening air paths and predicted
+braking. The wire's own rigid tool skins are excluded from these additional pairs; ArmClearance
+continues to check the complete arm/nozzle with its original margins. Air wire clearance is
+3 mm. Near-contact sensing permits positive separation below that air margin but rejects
+touch/overlap of the wire envelope. No physical simulation collision body or saved schema was
+changed, and no nominal contact motion is used to locate the real plane.
+
+ProbeMotionPlanner and ProbePosePlanner include this optional, matching-arm wire check. The app
+supplies it only for registration, from the current saved torch facet; fixed welding planning
+keeps its original clearance. Scene collision-body extraction is shared so both checks use the
+same posed hulls. Native probe tests pass 57 assertions, including wire-only intervening
+collisions and braking, near-contact sensing and penetration rejection. Commits:
+db47f8a261504e6f287f493ab525e0d9186729db (wire checks) and
+f02af8e5180c83403736ac94d97b8339010c5fd8 (sweep input validation).
+
+The updated app compiles 1,864 sources. Its production retry is running with per-probe phase
+diagnostics; no production pass is claimed yet. All builds remain compiler-only using existing
+native libraries. Main remains f4dc7456a65fb32dd2459d9a36d36dd8c80457a1; P3, P4 and P5 remain open.
+
+### P3 parking-fault publication boundary (2026-10-05)
+
+The wire-aware production run removed the two first-probe approach contacts, but one contact
+remained during the third approach. Its diagnostic retry terminated with exit 1 at that contact:
+FK matched the physical tool point within 8.968100940422724e-16 m, while the frozen clearance
+world returned null. The measured joints were 0.6676030989851316, -0.21797454761040297,
+-0.9093220264586326, -1.3662865416110088, -0.7644976321991027, 2.464939730522297.
+The stricter test now rejects unexpected touch during any checked air approach instead of
+waiting for the final touch-count assertion. Log: ignored app/build/p3-air-diagnostic.log.
+
+A focused posture replay parks the production carrier, applies that joint configuration and
+compares the sensor/FK and hull queries without executing the expensive probe selector. It
+passes: sensor/FK error 8.955206467987463e-16 m, physical touch true, grounded distance
+-0.0008329146493810356 m, wire clearance correctly rejected against work/postRight. The matching
+point-to-hull distance is -0.0008329046672925777 m and the convex wire distance is zero. This
+rules out the hypothesized wire-query or sparse-sampling explanation for the remaining contact.
+Diagnostic geometry is saved only beneath ignored app/build/p3-wire-posture.json. Its focused
+PROJECT_SOURCE_ONLY filter is mobile-welder-wire-clearance.
+
+The fault-injection test violated placeRobotBase's documented next-tick semantics: it queued
+the jump, then started findWork before the plant published it. Planning captured clearance
+against the old root pose and execution used the jumped pose. The test now advances the plant
+and sensor observers once directly after injection, before feeding the mission. It does not
+reset wheel odometry, copy the physical root into the registration prior, or reset source-clock
+epochs. A consistent post-jump observation precedes planning, while the same stale wheel pose
+and injected parking uncertainty remain inputs to contact registration. No simulation/runtime
+source change was needed. The new full registration retry is pending.
+
+### P3 checked sensing branch and direct approach preference (2026-10-05)
+
+Preparation now retains its checked joint goal in the runtime contact request. Execution
+checks an air route to that same configuration, verifies the resulting TCP against both IK
+tolerances and rechecks continuation through the complete bounded sensing corridor before
+submitting movement. Manually supplied TCP requests receive the same executed-corridor check.
+This closes the previous mismatch where execution could select a different IK branch from
+the one proved during preparation. These requests are ephemeral; no saved format changed.
+
+Approach policy tries checked direct IK alternatives across the existing torch rolls before
+spending the bounded detour budget. Rolls retain their nearest-orientation order within each
+pass. If no direct approach has a reachable sensing corridor, the complete original detour
+search remains the fallback. Clearance sampling, wire guards and the 1,024-proposal detour
+budget are unchanged. This is a ProcessKit planning choice, not a runtime or CAD exception.
+
+The focused native probe suite passes 64 assertions, including retained joint goals, manual
+corridor rejection, mismatched-goal rejection before motion and obstructed direct approaches.
+The rejection tests publish the queued stop before retrying; otherwise the native owner is
+correctly unavailable for a new plan. Compiler-only builds use existing native libraries.
+The production P3 retry remains outstanding; main has not advanced.
+
+The branch-preserving production retry generated 66 records (2,877,017 bytes) and completed
+three coarse/fine pairs on its first face without air-approach touches. The last retreat
+started at 59.49 simulation seconds. It was deliberately interrupted with exit 143 while
+planning the second face; this is not a complete registration pass. Log:
+ignored app/build/p3-branch-registration.log. Commit for the tested branch policy:
+97ff470b267acd3edfc959aeb6c5901c0ce4e749.
+
+Two-contact CAD selection previously screened every eligible lattice point for IK before
+using only the extrema along the planes' intersection. It now screens those extrema lazily,
+rejecting unreachable points from the outside inward and preserving lattice-order ties.
+This retains the same broadest reachable pair and face score/order for a fixed predicate;
+interior points cannot change either extremum. The stage approach bound is derived from its
+two selected points. All geometric region and exposure checks remain in force, and three-
+contact breadth selection is unchanged. The focused CAD probe suite passes 4,975 assertions
+with 468 exposed samples, including unchanged extrema/order, unreachable-extreme fallback,
+all-unreachable rejection and two checks per face when both extrema are reachable. An initial
+call-count assertion incorrectly ignored geometrically narrow patches discarded after
+screening; that assertion was corrected. No production speedup or P3 pass is claimed yet.
+
+Three-contact selection now applies the same lazy ranking policy to the original four
+farthest-point sweeps and largest-area third point. It first finds the earliest reachable
+lattice point, then rejects unreachable points in each geometric rank order. Already
+rejected points cannot affect any later sweep. With a fixed feasibility predicate this
+produces the same choices as eager filtering; lattice-order ties remain deterministic.
+The approach bound is derived from the three selected points. Reachable patterns need six
+ranked checks per face rather than a complete lattice of IK checks. Focused CAD tests pass
+5,141 assertions and 468 exposed samples, including unchanged geometric scores, ordering
+and point choices with six reach checks per face. The two-contact-only production retry was
+interrupted (exit 143) during initial-face planning; no additional production pass is claimed.
+The next retry includes lazy screening for all three contact-pattern sizes.
+
+### P3 profiler diagnosis and demand-driven CAD faces (2026-10-05)
+
+The combined lazy-pattern retry again completed the first face with six touch episodes and no
+air-contact fault; it remained in later-stage computation and was interrupted with exit 143.
+A cached-artifact retry used HashLink's existing loopback diagnostics profiler, without edits
+to the compiler or runtime. The finalized capture reports 86.09% inclusive time in
+ProbePosePlanner.hasClearApproachConfiguration and 85.59% in numerical sampleCandidates;
+individual planning windows are entirely IK. Logs/capture remain under ignored app/build.
+The sampler attempts up to 384 seeds per pose and the unchanged welding IK tolerance permits
+300 iterations per solve. Thus unused-face screening is a measured cost, not a disk symptom.
+
+An analytic-IK prototype was removed without committing it. The numerical unit fixture is
+UR-style, and the production CAD arm also fails the existing OPW adapter with the exact error:
+"OPW joint robot/arm/j4 violates the parallel-base/spherical-wrist axis pattern". No solver,
+model, RobotArm or MotionKit change remains. The production posture replay still passes with
+sensor/FK error 8.955206467987463e-16 m and rejects physical wire contact. The app compiles
+1,864 sources; no complete registration pass is claimed.
+
+The CAD bridge now ranks geometric stages first and proves one candidate face at a time,
+accepting the first fully prepared stage. This replaces global ranking over every face's
+reachable pattern with geometric observability preference followed by checked feasibility.
+It avoids solving unused faces after an acceptable stage has been found. Failed faces and
+all existing lattice resolutions remain available; search budgets, sensing proofs and
+clearance checks are unchanged. WeldProbePatterns can restrict screening to one CAD face.
+The focused CAD suite passes 5,148 assertions and 468 exposed samples, including exclusion of
+unused faces and preservation of the selected geometric stage. Main remains unchanged and
+P3 production validation is pending.
+
+The demand-driven production retry generated the artifact and entered first-face motion
+within roughly 37 app CPU seconds, compared with minutes of eager unused-face screening.
+It completed six first-face touch episodes without air contact, then reached the second
+face's first coarse touch at 65.45 simulation seconds. The deterministic run terminated
+with exit 1: "Coarse: Contact probe predicted braking motion is obstructed". This is a
+concrete guarded-execution failure, not a pass or a disk error. Log:
+ignored app/build/p3-demand-registration.log. CAD bridge commit:
+2564c246d (compiled optional machinekit-process dependency and demand-driven stage selection).
+
+The braking inspector now preserves the named CAD pair or joint travel-bound violation.
+ContactProbeRunner includes that finding and observed joints/velocities in its rejection.
+Its guard remains unchanged; no unsafe search speed, contact clearance or deadline was
+relaxed. The focused native probe suite passes 65 assertions, including named wire/fixture
+findings. Production diagnosis must distinguish stopping-speed limits from a contact patch
+whose required sensing motion cannot clear another body before changing policy. Main and
+P3 completion status remain unchanged.
+
+The named-violation retry reproduced the seventh-touch failure: the conservative wire
+against work/beam reached zero separation during predicted deadline braking. Observed joints
+were 0.3258992621434045, 0.89290211905716, 1.1071958311472911, 2.361256812989156,
+-3.417395752561875, 2.5245429725158504; velocities were 0.00040074658884161794,
+-0.026254886297125357, -0.0693552988105068, 0.011303023065705617,
+0.030346696573941727, 0.03264635749882565. The deterministic retry terminated with exit 1.
+No clearance, sensing threshold or stop guard was weakened.
+
+ProbeMotionPlanner now derives a sensing-speed upper bound instead of assuming the requested
+coarse speed can always stop inside the calibrated touch stand-off. It walks the checked IK
+branch in existing 1 mm corridor steps and solves unit normal differential motion. A sum of
+CAD joint-to-joint lengths plus the distal wire extent bounds rotational lever arms; bounded
+distal prismatic strokes are included, and prismatic rates contribute directly. Independent
+joint deadline/braking travel therefore has a conservative path-length bound quadratic in
+TCP speed. The rationalized positive root caps the requested speed at each corridor sample.
+The reaction budget includes maximum sensor age and command keepalive (20 ms each); IK
+position tolerance and the circumscribed wire-box excess are reserved from calibration.
+A physical wire without a positive sufficient stand-off is rejected. Actual measured-joint
+braking collision checks remain in force, so this speed estimate cannot override them.
+
+The executed probe selects its speed before creating the fresh servo owner, for coarse and
+fine searches. Requested recipe speeds and saved formats are unchanged; only the new P3
+registration can take longer because the effective sensing speed respects stopping geometry.
+Fixed welding and arm mission paths do not use this policy. Focused native tests pass 74
+assertions: complete refined probing still succeeds, three six-axis sensing branches have
+positive bounded speeds, the prismatic deadline/brake travel fits its reserve, longer reaction
+reduces speed, larger calibration permits more speed, and absent/insufficient wire calibration
+fails. Production validation with derived speed remains pending.
+
+The calibrated-speed production retry completed the second face’s first coarse and fine
+touches (eight touch episodes total), then rejected the next approach with a blocked joint
+route endpoint. The preceding retreat preserved the measured contact rotation rather than
+the checked air configuration. Probe preparation now reserves IK position tolerance plus
+wire extent times angular tolerance beyond its minimum air offset. Retreat first withdraws
+linearly at the measured orientation, then restores the original checked joint goal through
+a collision-checked correction; its final endpoint must satisfy full air clearance. This
+keeps rotation away from contact and preserves the proved branch for the next probe. Named
+start/goal clearance failures replace the generic endpoint message. Focused native tests
+pass 92 assertions, including exact restoration of all six joints on three probe normals.
+Production registration remains pending; main has not been advanced.
+
+The restored-goal production retry completed ten touch episodes and passed the formerly
+blocked second-face approach. Final-face selection succeeded, then its coarse search began
+at 175.96 s with a calibrated speed of 0.00003682122177501335 m/s. The test reached its
+300 s watchdog while still sensing, with no runtime motion-guard failure. The registration
+test budget is now 1,200 s, matching the full mission test, to accommodate the physically
+bounded speed; runtime search deadlines, freshness and collision guards are unchanged.
+Ignored log: app/build/p3-retreat-registration.log. No registration pass is claimed.
+
+Production registration now passes on both backends with the measured work frame feeding
+the first weld. Deterministic: 12 touch episodes, 0.004839356540509003 mm maximum seam-frame
+error; MuJoCo: 12 episodes, 0.008527291404108734 mm error. Both satisfy the 0.1 mm requirement,
+retain at least 8 mm wheel-estimate error, keep arc off throughout contact registration, and
+produce the first weld without wrong leg or gaps. Deterministic final fine touch occurs at
+567.04 s, MuJoCo at 551.89 s. The extended integration-test budget is supported by executed
+calibrated sensing durations. App compilation passes 1,864 sources. Exit 0 log:
+ignored app/build/p3-registration-budget.log. Full two-station, parking-boundary and baseline
+validation still remain before P3 can pass or main can advance.
+
+The first full-mission trial was deliberately terminated after over 30 minutes of CPU-active
+execution without a completed backend result; exit 143 is not a validation pass or a motion
+failure. The candidate-screening loop still performed global numerical branch discovery for
+each roll before trying the next roll on the observed branch. Screening now tries all 16
+rolls from observed joints first, then preserves the same 12-candidate global searches for
+every roll as fallback. This changes discovery order, not Boolean eligibility, budgets or
+clearance authority. Native focused tests pass 92 assertions including reachable and
+unreachable normal screening. No production speedup is claimed yet. Full-mission retries
+will print station-step progress, and a separate registration entry point injects the
+20 mm per-axis/2-degree parking boundary without rerunning the smaller-error test.
+
+The observed-roll-first retry still remained at first-station findWork after 18 minutes of
+app CPU time and was deliberately terminated (not a pass). A five-minute HashLink capture
+with probe-phase logs then showed first-face probing complete at 206.56 simulation seconds
+and the delay in second-face selection. Across the whole capture, candidate screening is
+55.86% inclusive and numerical sampleCandidates 56.33%; individual selection windows are
+100% numerical IK. Capture/report: ignored app/build/p3-full-mission.hlpc and
+p3-full-mission-profile-report.txt. The diagnostic execution was stopped after capture.
+
+Stage selection now prefers reachable observed-branch patterns across all CAD faces and
+existing 9/17/33 lattices before globally discovering branches on any face. Geometric ranking
+remains within each pass; this is an explicit policy preference for continuation from measured
+configuration, not global optimality over every possible IK branch. If no checked observed-
+branch stage succeeds, all original global-discovery orientations, seed budgets and lattices
+remain available. A fresh immutable helper binding supplies each screening policy to avoid
+captured loop-state ambiguity. Both passes require full prepared trajectories and sensing
+corridors before accepting a stage. ProcessKit exposes observed-only configuration screening
+separately from the full discovery API; neither authorizes movement. Focused native tests
+pass 94 assertions, including observed-branch reachable/unreachable normal checks. Full
+mission production validation and measured speedup remain pending; main is unchanged.
+
+The observed-stage full-mission trial completed deterministic station-one registration at
+282.52 s, its five welds and checked stow, then drove and completed five probe pairs at
+station two (second-face retreat at 671.39 s). This proves the previously expensive
+second-face discovery now progresses through executed stages, but the complete mission
+is not passed: final-face selection remained expensive and the trial was stopped. The
+selection policy is refined to preserve 9/17/33 resolution priority: at each lattice size,
+try observed branches across faces, then full global discovery across faces, before moving
+to a finer lattice. Thus branch changes on the coarse lattice do not wait behind every
+fine-grid continuation attempt. Every global/fine fallback and its original budget remains.
+
+App tests now expose a separate 20 mm per-axis/2-degree registration boundary and log
+mission/probe phases. The full-mission watchdog sums the original 1,200 s allowance with
+the established 1,200 s per-registration allowance; runtime safety deadlines are unchanged.
+These test modes compile (1,864 sources); boundary and full-mission execution remain pending.
+The artifact producer completed 66 records / 2,877,017 bytes again, without the old missing
+preview.hl failure. Disk recovered to 6.3 GB free. Local main advanced independently to
+111384a5f4e06d1be1e6412e74b19c12f0718c90; merge only local main before final gates and adapt
+the registration bridge to its shared PlanningLimits APIs. No main sync is authorized by
+these partial results.
+
+### P3 latest-main build stop (2026-10-05)
+
+Merged local main 111384a5f4e06d1be1e6412e74b19c12f0718c90 as c116f20a4, then its
+follow-up 213d24ef9235f0e9bdb19e3345222e48bb2e74c9 (extracted platform/GPU package
+descriptors). Three conflicts preserve endpoint-owned source-clock observation/reset epochs
+alongside main’s endpoint snapshots, drive-coordinate calibration and simulation homing
+reset operations. Endpoint-only observations update the same clock owner as full snapshots.
+No RobotArm or RobotRuntime source edit was made for the merge. Existing submodule working
+checkouts were aligned to main’s recorded commits, fetching missing objects into this
+worktree’s clones; no recorded pins were edited and no shared checkout was modified.
+
+The compiler-only app check on these recorded Haxeon/NativeKit sources fails outside the
+welder code with the exact error:
+robotkit/transport/NativeTransport.hx:72:18: E1008: Function
+"nativekit.ffi.NativeKit.nk_transport_receive" expects 2 arguments, got 3.
+The compiler loads the tracked nativekit/bindings/haxe/nativekit.hxi; its data parameter
+is an input array whose size is projected away. NativeTransport still supplies buffer and
+capacity separately, and the unchanged call is present on current main. This is not a disk
+error or a missing local object. Log: ignored app/build/p3-latest-main-app-build.log.
+Per the user’s outside-scope stop rule, do not repair unrelated RobotKit transport here.
+
+P3 is not complete and mobile-welder has not advanced main. Latest focused native result
+(94 assertions) and the earlier two-backend injected-registration pass apply before this
+main merge; no latest-main runtime pass is claimed. Full-mission, 20 mm/2-degree executed
+boundary and final welder/arm/mobile/MachineKit gates remain pending. P4/P5 remain open.
+All production trials are stopped; no heavy check is left running.
+
+### Authorized transport repair and package-boundary stop (2026-10-05)
+
+The user authorized repairing the transport prerequisite. NativeTransport.receive now passes
+its allocated Bytes buffer to nk_transport_receive without a separate capacity argument: the
+tracked input-array FFI projection derives that count from the buffer. Buffer allocation,
+partial-result slicing and would-block/error handling are unchanged. No compatibility API
+or NativeKit pin change was introduced. git diff --check passes.
+
+The focused robotkit/tests/integration compiler-only build is blocked before compilation by:
+haxeon: Package "haxeon-gpu" path source does not exist:
+/home/joao/dev/materia-worktrees/mobile-welder/haxeon/packages/gpu
+Log: ignored app/build/p3-transport-integration-build.log. Main’s scenekit/uikit descriptors
+require this extracted package, but recorded Haxeon 99893ce3031fea2569ab076c52da87b5278719a8
+has no packages tree and no GPU package submodule. This is not an uninitialized dependency
+or disk failure. Resolving it requires the matching package sources/pin to land consistently
+on main; the user prohibits changing submodule pins here. Stop at this new outside-scope
+boundary. The transport runtime check and all remaining P3 checks are still pending; no
+new passing build or runtime result is claimed.
+
+### Authorized extracted-package repair (2026-10-05)
+
+The user authorized the narrow Haxeon pin exception after the missing-package stop.
+Haxeon now records be53817d9ab611072b95ecee49513e6fcb529e38, which supplies the
+platform/GPU extraction required by main. Direct first-party Haxe dependencies on
+NativeKit now use haxeon-platform; SceneKit/UIKit already own their haxeon-gpu
+dependencies. Native CMake providers remain unchanged. This gives each FFI interface
+one package owner, rather than filtering duplicate declarations or adding compatibility.
+
+Focused integration compilation passes (665 sources), its native build passes, and
+the outbound scheduler runtime passes latest-wins/fairness with exact received payloads.
+This validates the projected receive buffer repair. The complete app compiler-only
+build passes (1,936 sources, 29.3 s). MCAP and LZ4 were initialized at main's recorded
+pins for the native build; neither pin changed. Disk was checked before native builds;
+OCCT was not rebuilt. Logs are ignored app/build/p3-platform-*.log.
+
+P3 execution gates remain pending; these prerequisite passes do not complete P3 or
+authorize advancing main. P4/P5 remain open.
+
+### P3 demand-driven weld entry discovery (2026-10-05)
+
+The latest-main app native build passes after initializing main's seven recorded
+MuJoCo dependency pins. Its boundary trial spent over eleven minutes in the CAD
+producer and was deliberately stopped (exit 143), not counted as a test pass.
+A separate 60 s loopback-only live profile attributes 94% of samples to global
+IK candidate generation in station verification. That diagnostic producer was
+also stopped; no diagnostic process remains running.
+
+WeldPathPlanner now tries the current configuration's continuation through the
+entire existing air/chain/compiler acceptance path before generating broad IK
+candidates for that entry. Global discovery retains its twelve-goal limit and
+all other candidates, avoiding a duplicate of the already checked continuation.
+This deliberately prioritizes a proved current branch over the global candidates'
+travel-cost ordering; it does not weaken reach, continuity, clearance or compilation
+checks. The policy belongs in ProcessKit rather than a mobile-example shortcut.
+
+Focused WeldPlanningTests pass 54 assertions, including no global discovery for
+a proved continuation, alternate-branch fallback after compiler rejection,
+blocked-entry pruning, corner selection and collision refusal. Logs are ignored
+app/build/p3-lazy-weld-entry-*.log. Full mobile execution and fixed-welder gates
+remain required; no claim is made that path/time baselines are unchanged.
+
+### P3 latest-main boundary and observed preparation (2026-10-05)
+
+The 20 mm per-axis / 2-degree executed parking boundary passes on both rebuilt
+backends: exactly twelve touch episodes each, 0.007946892 mm deterministic and
+0.008690203 mm MuJoCo seam-frame error, with the first weld's bead checks passing.
+The CAD producer emits 66 records / 2,885,787 bytes on latest main. Its full
+verification remains expensive (about eighteen minutes); no producer speedup
+is claimed. Log: app/build/p3-lazy-entry-registration-boundary.log.
+
+The subsequent full-mission trial completed five probe pairs at station one
+(233.99999999993216 simulated seconds), then spent over eleven wall minutes
+in final-face selection. It was deliberately stopped (exit 143), not passed.
+Inspection found that ProbePosePlanner's supposedly observed preparation pass
+called directApproach, which eagerly sampled global IK candidates before using
+continuation. That defeated the tier's intended policy.
+
+ProbeMotionPlanner now exposes observedApproach: solve from observed joints,
+prove the complete joint edge and compile/check its motion. ProbePosePlanner
+tries this for every roll before its unchanged global/detour second pass. The
+misleading directApproach entry point is removed from its three callers. No
+KinematicsSolver contract expansion is needed for this repair; lazy global
+visitation can remain future work if execution evidence requires it. All
+existing global candidate, roll and route budgets remain unchanged.
+
+Latest-main focused native contact motion passes 95 assertions, including a
+counting solver proving zero global discovery for the observed preparation
+pass, blocked-fixture refusal, sensing corridor coverage and measured contact
+execution. Logs: app/build/p3-true-observed-probe-*.log. The earlier boundary
+pass predates this preparation repair; the full mission and final milestone
+gates remain open. Main has not advanced; P4/P5 are still required.
+
+### P3 explicit local refinement and sequential stages (2026-10-05)
+
+Focused clock observations pass 24 assertions on latest main. The corrected
+observed-approach full-mission trial regenerated the same 66-record / 2,885,787-byte
+artifact and executed five probe pairs at station one (223.97999999994127 s),
+then again spent substantial time selecting the final face. It was stopped
+(exit 143), not counted as a full-mission pass.
+
+A second tier leak remained: the observed CAD screen called full prepare, whose
+second pass could invoke global discovery. ProcessKit now has prepareObserved
+with no global fallback, and full prepare retains that fallback. Focused native
+contact motion passes 98 assertions, explicitly proving both failure behaviors.
+The app compiles 1,936 sources (28.9 s). No solver interface or search budget
+change is needed.
+
+With the local tier now bounded to observed continuation, CAD selection refines
+all original 9/17/33 local lattices before global discovery at those same sizes.
+This revises the earlier per-resolution priority: its motivation assumed the
+observed tier was cheap, but it was inadvertently executing global preparation.
+The new separation permits local refinement without paying for that discovery,
+and retains every original global/fine fallback.
+
+Multi-point stages are prepared sequentially from each preceding probe's checked
+approach configuration. Execution's checked retreat restores that configuration;
+proving every point from the initial stage posture could reject a valid sequence
+and did not represent its actual transitions. Execution still plans from measured
+joints and rechecks all clearance/corridor guards. Logs: ignored
+app/build/p3-tiered-*.log. Complete mission and final milestone gates remain open.
+
+
+The tiered full mission was stopped after five probe pairs at station one
+(179.64 simulated seconds); final-face selection had not advanced after over
+30 wall minutes. Its completed 5,494-sample live profile resolved every sample:
+57.37% was local clear-approach IK and 36.57% uncertainty-region evaluation.
+No global candidate sampling appeared in that capture.
+
+MotionKit's manipulator adapter now rejects poses outside a conservative reach
+bound derived from the authored fixed/revolute joint frames. The triangle
+inequality bounds the last pivot about the first pivot; the TCP offset and
+position/orientation tolerances enlarge it. Free tool spin retains the axial
+offset and allows the entire perpendicular offset. Unrestricted orientation
+uses the weaker TCP sphere. Prismatic chains and work-frame groups keep their
+existing behavior. All existing IK seeds, roll/lattice resolutions, clearance
+checks and route fallbacks remain available inside the bound. This belongs in
+the generic kinematics adapter, rather than a welding-specific reach heuristic.
+
+Focused reach tests pass 5,058 assertions (rotated parent/child frames, intervening
+fixed joints, tool offsets, dense FK samples, free spin, boundary/tolerance and
+unsupported-chain cases). Native contact motion passes 98 assertions. The app
+compiles with the change. These are unit/integration results, not a complete
+P3 mission pass; the full mission and final milestone gates remain pending.
+Logs: ignored app/build/p3-reach-*.log.
+
+
+Main advanced to 3bc5f73aa2b3f6185416ef4a8e25fdbefea72295 during these checks;
+merge 28ec1d1f4645c77a9939278c6c1a7f3251d7e710 brings it into this worktree.
+Clay was checked out at main's recorded revision, without authoring a pin change.
+The app's native build passes (four incremental UIKit steps), with prebuilt OCCT.
+
+The same completed mission profile justifies caching uncertainty regions within
+one synchronous CAD selection call. Keys include canonical face identity and
+all 24 IEEE coordinate bytes, so close points cannot share a rounded bound.
+The local cache is discarded before the next observation; no stale envelope is
+reused. Bounds are immutable and all geometry/clearance checks still execute.
+
+Coarse-to-fine selection now tries observed then global branches at each of the
+original 9/17/33 resolutions. The earlier local-all-resolutions priority assumed
+cheap observed screening; the 30-minute final-face trial and its local-IK profile
+contradict that assumption. Trying a coarse alternate branch before fine local
+refinement retains the complete search and can resolve a blocked observed branch
+sooner. Both changes are confined to the optional CAD/process bridge, so they do
+not invalidate the already running CAD producer. The app compiles 1,937 sources;
+full mission validation remains pending (app/build/p3-region-cache-app-build.log).
+
+
+The coarse selector progressed through five station-one probe pairs at 216.42
+simulated seconds, but final-face discovery was still running when stopped for
+the next repair. Its completed 5,990-sample profile had no unresolved frames or
+dropped records: 99.03% was global IK candidate sampling. This confirms that the
+remaining cost is branch discovery, rather than stale repeated region evaluation.
+Two obsolete ignored profiler captures were removed after retaining their text
+reports, reclaiming about 1.6 GB; the latest captures remain available.
+
+Contact probing physically requires an inward wire axis and a clear roll, rather
+than an independently prescribed spin. ProcessKit now solves FreeAboutTool first
+on the observed branch, then globally if needed. It checks the actual FK position
+and axis against the existing IK tolerances, proves the complete air motion and
+sensing corridor, and locks that actual pose/joint goal for execution. Local
+preparation uses a direct checked joint edge without global discovery or detours.
+The original 16 full-roll candidates and their global/route fallbacks remain.
+This makes task freedom explicit in its owning process layer, rather than
+weakening collision checks or changing numerical search budgets.
+
+Focused native contact motion passes 104 assertions. A five-axis fixture proves
+that contact-axis preparation works without independent tool spin, uses no global
+discovery locally, locks the actual pose, and retains its checked sensing corridor;
+a forced independent spin on that fixture is explicitly unreachable. The app
+compiles 1,937 sources (32.9 s). Full mission and final P3 gates remain pending;
+this ProcessKit change legitimately invalidates the CAD producer fingerprint.
+Logs: ignored app/build/p3-axis-*.log.
+
+
+The axis-first full trial completed five probe pairs at station one (203.35
+simulated seconds), but final-face selection continued. A 1,502-sample profile
+with no unresolved frames/dropped records attributed 17.18% to axis discovery
+and 81.56% to the retained full-pose DLS fallback. The trial was stopped for
+another geometric reach repair; it is not a mission pass.
+
+The original triangle-only pivot sphere loses cancellation of axial offsets.
+MotionKit now derives a tighter sphere from projected pivot-chain prefixes.
+The first pivot span's component along the first axis is a fixed centre shift.
+For each following prefix, components parallel to the second axis add signed,
+while perpendicular lengths bound their rotating sum. Every arbitrary carrier
+axis is covered by a rotation error allowance: Rodrigues' formula gives
+||R(u,t)-R(+/-b,t)|| <= 5 min(||u-b||,||u+b||) for unit axes at every angle;
+telescoping these errors over each span bounds the position deviation. Taking
+the smallest conservative prefix sphere preserves all configurations without
+requiring a parallel-axis pattern threshold or joint-limit approximation.
+Remaining spans, TCP offsets and task tolerances retain their existing bounds.
+
+Focused reach checks pass 17,059 assertions, including 6,000 six-axis FK samples
+with parallel/nonparallel axes and rotated child frames, and rejection of an
+impossible pose inside the former triangle-only sphere. Native probe motion
+passes 104 assertions; weld planning passes 54. The app compiles 1,937 sources
+(34.5 s). Complete mission validation remains pending; logs are ignored
+app/build/p3-projected-*.log.
+
+Operational recovery: removal of the mobile-base worktree invalidated borrowed
+Git object paths in this worktree's libwebsockets and sokol clones. They were
+repacked into their own object stores using read-only shared objects, and the
+alternates removed. Recorded pins remain 2491a1b101283cf7886d05033345b7e821825319
+and ab128b97b27d33b8cc7e19e0c98f850e08315569. Git status works again.
+Obsolete owned native-test build caches/intermediates were also removed as disk
+space fell; current app/integration libraries and verification reports are kept.
+
+### P3 budgeted IK seed coverage (2026-10-06)
+
+The six-axis candidate lattice has 729 combinations, while the existing
+candidate-discovery budget visits only the first 384. Lexicographic enumeration
+left the highest-index joints without one of their three coarse levels in that
+prefix. The near-limit fallback varies one joint at a time and cannot cover the
+missing combinations. MotionKit now applies a bijective ternary shear to the
+same lattice before visiting it. This preserves the seed set and every search
+budget while ensuring each joint sees all three levels in every initial block
+of three attempts; no arm-specific limits or policy are introduced.
+
+Focused seed coverage passes 13 assertions for three- and six-joint groups,
+including uniqueness, unchanged attempt counts, and all three levels per joint.
+Native contact motion passes 104 assertions, weld planning passes 54, and the
+app compiler passes 1,937 sources (27.3 s). These checks do not establish that
+the final registration face is reachable: the full two-station mission has not
+yet passed with this ordering. MachineKit smoke, the current displacement
+boundary, full mission, and milestone app checks remain open.
+
+### P3 checked retreat after physical probing (2026-10-06)
+
+With balanced IK seed coverage and the original sampler order, the 20 mm /
+2-degree boundary passed deterministic registration with twelve contact
+episodes, 0.012279905 mm seam-frame error, and the first weld's bead checks.
+MuJoCo reached the first fine-probe retreat, where the Cartesian withdrawal
+could not solve at 11.760731 mm (0.196619 mm position and 0.000280402 rad
+orientation residual). The short live profile attributed 76.56% inclusive time
+to damped-least-squares IK during contact candidate screening.
+
+A trial that ranked returned contact branches by joint travel then failed before
+probing with a bounded-route endpoint error; that ranking was removed. ProcessKit
+keeps the straight axial retreat as its preferred behavior. If IK cannot compile
+that line from the measured servo stop, it can use the previously checked air
+joint goal only when the complete joint trajectory passes the same contact-aware
+clearance sweep. The focused native contact-motion suite passes 106 assertions,
+including a forced Cartesian-solver failure and the checked joint-return path.
+The displacement boundary and full mission remain open with this fallback.
+
+### P3 finite joint-limit roundoff and boundary pass (2026-10-06)
+
+The latest-main 20 mm / 2-degree boundary first passed deterministic registration
+with twelve touch episodes and a 0.012279905 mm seam-frame error. MuJoCo
+completed its first six touches, then rejected a checked IK goal for `j5` at
+0.6084073464102079 rad against the authored upper limit of
+0.6084073464102069 rad: a 1e-15 rad representation overshoot. ProcessKit now
+canonicalizes IK goals only when their joint-limit overshoot is within a
+scale-relative 1e-12 roundoff tolerance. Materially invalid goals and observed
+starts remain rejected, with the joint and bound in the diagnostic.
+
+The contact-motion suite passes 109 assertions, including exact-limit
+canonicalization and rejection of out-of-range starts and goals. The app
+compiler passes 1,937 sources. The full injected parking boundary now passes on
+both backends: twelve contact episodes, 0.012279905 mm deterministic and
+0.002439543 mm MuJoCo seam-frame error, and first-weld bead checks on each.
+The regenerated 66-record / 2,884,840-byte preview is cached in the worktree.
+The full two-station mission and final P3 milestone gates remain open.
+
+### P3 fine-probe range correction (2026-10-06)
+
+The dynamic-stow two-station mission passed on the deterministic backend before
+this correction: 2 stations, 10 seams, 746.1 s, 5 mm legs, 40/40/40/40/40/40/
+180/180/40/40 mm beads and clear stow. The 20 mm / 2-degree boundary also
+passed on both backends in the preceding check. Neither result is yet a
+post-correction validation.
+
+The latest MuJoCo mission stopped at 170.03 s during the second probe's fine
+search. Its previous backoff sample showed the TCP 0.169 mm short of the
+checked backoff target. A fixed 0.125 mm local IK replay then reached 19 of 20
+samples, failing only at the 2.5 mm endpoint. The 2.5 mm request was
+`backoff + contactOffset`. ContactSearch already shifts the sensed threshold
+point by the calibrated offset to report the material point, and
+ProbeMotionPlanner already uses the same offset for the stopping reserve.
+Adding it again extended fine search 0.5 mm beyond the corrected material
+point. ContactProbeRunner now bounds fine search to `backoff`; the calibration
+remains in contact correction and braking policy, where each belongs.
+
+The focused native contact-motion suite passes 120 assertions, including a
+regression that checks the executed fine-search range, and the app compiler
+passes 1,938 sources. At this point in the work, the post-correction mission
+and displacement boundary were still pending; one mission retry was stopped
+before its trace when root free space fell to 11 MB. Their final results and
+the remaining P4/P5 scope are recorded in the closeout below.
+
+### P3 final gates and closeout (2026-10-06)
+
+The fine-probe correction is validated end to end. The 20 mm / 2-degree
+injected-parking boundary passes on the deterministic backend with twelve
+touch episodes and 0.012311799 mm seam-frame error, and on MuJoCo with twelve
+touch episodes and 0.002256648 mm error. Both execute the first weld. The
+two-station mission completes on both backends: 2 stations, 10 seams, 4 runs,
+40/40/40/40/40/40/180/180/40/40 mm beads and a live, clear stow. Deterministic
+simulation reports 746.2 s and 5.0 mm legs; MuJoCo reports 790.6 s, with nine
+5.0 mm legs and one 5.1 mm leg. Runtime registration returns to its measured
+starting posture before welding, and stow clearance is checked against the
+current workpiece and deposited metal.
+
+The final `PROJECT_SOURCE_ONLY=welder` gate passes on both backends. Its whole-
+weldment result is 10 seams / 4 runs in 114.4 s on the test backend and 114.5 s
+on MuJoCo, with 4.9–5.0 mm legs and no clearance violations. The single seam
+is 21.5 s, 5.0 mm leg, 180 mm bead and no gap; a mid-seam arc loss recovers
+once in 21.9 s; an unsupported seam fails with “the arc could not be held in 3
+restarts”; crater supply dropout needs no restart; the displaced workpiece
+keeps the tip on the seam and a 5.0 mm leg; the post-perimeter chain completes
+in 36.2 s with 4.9–5.0 mm legs and no restart. The 7 mm weave reaches 6.998 mm
+on both backends. The three-pass 10 mm weld reaches 10.00196 mm in MuJoCo and
+9.99913 mm on the test backend. `PROJECT_SOURCE_ONLY=arm` passes at 23.5 s;
+`PROJECT_SOURCE_ONLY=mobile` passes its driving, obstacle-replan and welding
+mission scenarios.
+
+Focused ProcessKit contact/stow checks pass 120 assertions and ProjectKit
+artifact checks pass 144 assertions. The Robot Welder example suite and
+MachineKit smoke both pass. The corrected mission and boundary executions,
+all three app source checks, and both MachineKit checks are recorded in the
+ignored `app/build/p3-*-final.log` reports.
+
+The measured single-seam and recovery times are 1.3 s and 0.3 s above the
+original 20.2 s / 21.6 s reference. The post-perimeter result is 16.3 s above
+the original 19.9 s reference. These are measured safe-path costs: the W4
+record already documents the clearance- and wrist-limit-driven increase for
+perimeter roll/entry, and P3's demand-driven entry discovery preserves complete
+clearance, continuity and compiler checks while prioritizing a proved current
+branch. The final gates retain those checks; no timing equivalence is claimed.
+The checked registration return and semantic live stow add the required
+transitions to the mobile mission.
+
+P3 is closed. P4 remains open for declared physical mass/inertia propagation,
+measured electrical load integration, voltage sag/cutoff and dock/charge/resume
+behavior. Required P5 remains open for rendered-depth laser profiling and
+executed live seam correction under displacement, noise and stale/missing
+observations.

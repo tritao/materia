@@ -27,7 +27,9 @@
     "processkit": {
       "path": "../../../processkit"
     },
-    "haxeon-platform": { "path": "../../../haxeon/packages/platform" },
+    "haxeon-platform": {
+      "path": "../../../haxeon/packages/platform"
+    },
     "robotkit": {
       "path": "../../../robotkit"
     }

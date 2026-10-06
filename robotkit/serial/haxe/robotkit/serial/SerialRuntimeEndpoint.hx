@@ -62,7 +62,8 @@ class SerialRuntimeEndpoint {
       blueprint.nativeValue(), devicePath, baud, device, maxTargetError,
       binding.stepTickHz, linkLossTimeoutNs, clockSyncBoundNs, haxe.Int64.ofInt(100000));
     RobotRuntime.check(result.status, "serialEndpoint.create");
-    return new NativeRuntimeEndpoint(result.out_runtime);
+    return new NativeRuntimeEndpoint(result.out_runtime,
+      new robotkit.time.SourceClock("robotkit.device." + controllerHex.toLowerCase()));
   }
 
   /** Create a runtime with its physical device switches published during observation. */

@@ -8,17 +8,16 @@ import robotkit.model.SwitchReading;
 class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
   final runtime:RobotRuntime;
   final readPositions:Void->Array<Float>;
-  final clockId:String;
   final readings:Array<SwitchReading> = [];
   final joints:Array<Int> = [];
   final drives:Array<SwitchDriveBinding> = [];
   final jointCount:Int;
   var sequence:Int64 = Int64.ofInt(0);
 
-  public function new(blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime, readPositions:Void->Array<Float>, clockId:String) {
-    if (blueprint == null || blueprint.identity == null || runtime == null || readPositions == null || clockId == null || clockId.length == 0)
+  public function new(blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime, readPositions:Void->Array<Float>) {
+    if (blueprint == null || blueprint.identity == null || runtime == null || readPositions == null)
       throw "Switch sensor adapter needs a model, runtime, actual-position reader and clock";
-    this.runtime = runtime; this.readPositions = readPositions; this.clockId = clockId;
+    this.runtime = runtime; this.readPositions = readPositions;
     jointCount = blueprint.jointCount;
     var indices = bindingIndices(blueprint);
     for (index in indices) joints.push(index);
@@ -77,7 +76,7 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
         drives[i].position(positions[joint]);
       runtime.publishSensorFrame(value.source.id,
         [active ? 1.0 : 0.0, edge == null ? 0.0 : 1.0, edge == null ? 0.0 : edge, value.closingEdges], sequence,
-        snapshot.sourceTimestampNs, clockId, null);
+        snapshot.sourceTimestampNs, runtime.endpoint.sourceClockId(), null);
     }
   }
 }

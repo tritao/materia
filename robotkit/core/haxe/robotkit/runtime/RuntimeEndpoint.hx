@@ -5,6 +5,8 @@ import runtime.memory.NativeSpan;
 /** Endpoint contract shared by cyclic and scheduled transports. Status codes are RK_*.
     Arrays/spans are borrowed only for a submit call; observations are copied out. */
 interface RuntimeEndpoint {
+  /** Identity of the endpoint's joint observation clock, including its current epoch. */
+  public function sourceClockId():String;
   public function start():Int;
   public function submit(command:rk_robot_command):Int;
   public function observe(snapshot:rk_robot_snapshot):Int;

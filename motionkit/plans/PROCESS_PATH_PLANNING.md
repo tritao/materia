@@ -3361,3 +3361,53 @@ forward direction has an unreachable sample at every density, costing
 about **39 s**. That repeated clearance is the immediate fix to pursue;
 more G17 tuning is not justified. Cycle/corner slowing/quality remain
 unchanged. Evidence: `process-path-revision8-saving2-gantry-profile.log`.
+
+
+### PP12 integration acceptance
+
+Revision-8 saving 2 commits as `906879343`. Local main `9918d76b1` is
+merged at this boundary (68 previously missing commits). The two content
+conflicts preserve both the configuration pin and mobile registration/stow
+behavior, including diagnostic failures. Imported probe code is being
+ported from numeric discovery to EAIK on supported arms; bounded sensor
+corridors retain their starting geometric configuration and physical jump
+checks. Unsupported chains keep their explicit inverse backend.
+
+The first integrated MotionKit/ToolpathKit runs expose an endpoint-clock
+mismatch: main's endpoint IDs include an owner and epoch, while gantry
+switch publishers used constant domain strings. Simulated/device trip
+switches now publish the actual endpoint clock ID; device capture history
+resets on a new epoch. Homing continues to reject incompatible/stale data.
+A stale test endpoint constructor also now supplies its owned clock.
+The added trip-switch regression verifies matching observation clocks and
+timestamps before reset, after shared-session reset and after robot reset;
+the clock-observation suite passes **36 assertions**.
+
+Integration acceptance passes on both mobile mission backends: **2 stations,
+10 seams and checked clear stow**, in **748.8 s** on the test backend and
+**793 s** on MuJoCo. These are integrated mission cycle times, including
+touch registration, not planning-speed measurements. Registration restores
+its starting posture. The physical wire-contact replay also passes with
+**5.33e-16 m** sensor/FK discrepancy and rejects the colliding posture.
+Every PP0a baseline selector exits zero: arm, cobot, mobile, track-arm,
+track-weld, gantry, gantry-yaw, gantry-welder and welder. G17 retains its
+**232.5 s** cycle and **0.778094423 rad** posture margin; gantry welding
+retains **171.3 s**, ten seams and existing corner slowing.
+
+All six compiler-only manifests and their runtime suites pass: app,
+MotionKit (**1,224,712 assertions**), ProcessKit, CadBridge (**173**),
+ToolpathKit Motion (**3,034**) and RobotKit (world **5,431**, excavator
+**37**). Imported contact-search-motion, contact-registration, contact-clock
+and weld-probe suites pass. The final boundary also passes the native app
+build, native MotionKit/TrajectoryKit **16/16** CTests, native RobotKit
+**17/17** CTests, and full MachineKit including its example builds.
+Evidence uses `process-path-revision8-main-*` and
+`process-path-revision8-merge-final-*` in external scratch.
+
+This integration leaves `gantries` ready to sync with local main; landing
+on main remains a separate action. The measured repeated gantry direction
+screening regression and PP3/PP9 close-outs remain follow-up work.
+
+The user confirms a quiet host is unavailable now. The five-run G17 result
+remains explicitly **non-quiet**; quiet-host timing acceptance stays open
+without blocking functional integration or further authorized work.

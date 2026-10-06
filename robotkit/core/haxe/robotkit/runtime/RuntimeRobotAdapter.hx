@@ -33,6 +33,7 @@ class RuntimeRobotAdapter implements Robot {
   var commandSequence:Int = 0;
   var observedSequence:Int64 = Int64.ofInt(-1);
   var observedReceipt:Int64 = Int64.ofInt(-1);
+  var observedClock:String = "";
   var currentSensors:Array<SensorFrame> = [];
   final eventRing = new RobotEventRing();
   final sensorStreams = new robotkit.streams.SensorStreams();
@@ -96,7 +97,7 @@ class RuntimeRobotAdapter implements Robot {
     return new RobotSnapshot(logicalId, value.sequence, value.sourceTimestampNs,
       value.q.toArray(), value.dq.toArray(), value.effort.toArray(), value.mode,
       value.faultCode, value.receivedTimestampNs, currentSensors,
-      runtime.sourceClockId, "robotkit.monotonic", value.safety,
+      runtime.endpoint.sourceClockId(), "robotkit.monotonic", value.safety,
       value.trajectoryQueueDepth, value.trajectoryActive,
       value.trajectoryTimeNs, value.trajectoryDurationNs,
       value.trajectoryTag, value.trajectoryTagTimeNs,
@@ -198,11 +199,23 @@ class RuntimeRobotAdapter implements Robot {
     // Externally published sensors (cameras, GNSS) update without a native
     // state change, so compare the sensor frames as well as the sequence.
     var sensors = RobotSensorFrames.fromRuntimeSnapshot(value);
-    if (value.sequence == observedSequence && value.receivedTimestampNs == observedReceipt &&
+    // Native slots are sampled by the endpoint on its joint clock. External frames retain
+    // their publisher's domain; an unspecified external clock must remain unresolved.
+    sensors = [for (frame in sensors)
+      if (frame.sourceClockId == "unspecified" &&
+          RobotRuntimeSensorBlueprint.isNativeKind(frame.kind))
+        new SensorFrame(frame.sensorId, frame.kind, frame.frameId, frame.sequence,
+          frame.sourceTimestampNs, frame.values.toArray(), frame.receivedTimestampNs,
+          frame.linkId, frame.mountPosition.toArray(), frame.mountRotation.toArray(),
+          runtime.endpoint.sourceClockId(), frame.receivedClockId, frame.image)
+      else frame];
+    var clock = runtime.endpoint.sourceClockId();
+    if (clock == observedClock && value.sequence == observedSequence && value.receivedTimestampNs == observedReceipt &&
         sameSensors(currentSensors, sensors))
       return;
     observedSequence = value.sequence;
     observedReceipt = value.receivedTimestampNs;
+    observedClock = clock;
     currentSensors = sensors;
     sensorStreams.publishFrames(sensors);
     var listener = changeListener;
@@ -214,6 +227,7 @@ class RuntimeRobotAdapter implements Robot {
     for (index in 0...left.length) {
       var a = left[index], b = right[index];
       if (a.sensorId != b.sensorId || a.sequence != b.sequence ||
+          a.sourceClockId != b.sourceClockId ||
           a.sourceTimestampNs != b.sourceTimestampNs ||
           a.receivedTimestampNs != b.receivedTimestampNs)
         return false;

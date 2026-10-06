@@ -10,13 +10,16 @@
     "../processkit/tests/modbus"
   ],
   "dependencies": {
+    "machinekit-process": {"path": "../machinekit/process"},
     "projectkit": {
       "path": "../projectkit"
     },
     "manufacturingkit": {
       "path": "../manufacturingkit"
     },
-    "haxeon-platform": { "path": "../haxeon/packages/platform" },
+    "haxeon-platform": {
+      "path": "../haxeon/packages/platform"
+    },
     "cadkit": {
       "path": "../cadkit"
     },

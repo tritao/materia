@@ -13,6 +13,7 @@ import materia.project.SceneArtifact.SceneArtifactPlace;
 import materia.project.SceneArtifact.SceneArtifactRobotTool;
 import materia.project.SceneArtifact.SceneArtifactTorchPose;
 import materia.project.SceneArtifact.SceneArtifactWeld;
+import materia.project.SceneContactRegistration.SceneContactWork;
 import motionkit.robot.HandlingPlanRunner;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.ManipulatorKinematics;
@@ -32,6 +33,7 @@ import motionkit.robot.StepperSlip;
 import robotkit.runtime.EncoderMonitor;
 import motionkit.robot.PlanningLimits;
 import processkit.WeldingPlanRunner;
+import processkit.WeldStowPlanner;
 import processkit.skill.WeldPlan;
 import processkit.skill.WeldSeam;
 import robotkit.spatial.Quat;
@@ -166,6 +168,8 @@ class MissionPlayer implements SessionMember {
   var welding:Null<WeldingPlanRunner>;
   final newWelding:Null<Void->WeldingPlanRunner>;
   final weldSensor:Null<String>;
+  final newRegistration:Null<SceneContactWork->processkit.ContactRegistrationRunner>;
+  var registeredWork = new Map<String, Transform3>();
   /** What welds are planned clear of, and where the arm's joints are among the robot's. */
   var clearance:Null<ArmClearance> = null;
   var clearanceJoints:Array<Int> = [];
@@ -177,6 +181,7 @@ class MissionPlayer implements SessionMember {
   final robotIndex:Int;
   final vacuumSensor:Null<String>;
   final simulation:Simulation;
+  final weldAcceleration:Float;
   final objects:Array<GripObject>;
   final project:ProjectDocumentSession;
   final assembly:Null<AssemblyDefinition>;
@@ -207,6 +212,7 @@ class MissionPlayer implements SessionMember {
     this.timestep = timestep;
     this.obstacles = standing(obstacles);
     this.simulation = simulation;
+    this.weldAcceleration = weldAcceleration;
     this.objects = objects;
     this.robotIndex = robotIndex;
     this.project = project;
@@ -257,7 +263,7 @@ class MissionPlayer implements SessionMember {
       wheels = new WheelOdometryLocalization(base, FRAME, robot.rootLink);
     }
     var handles = [for (step in mission.steps) if (step.kind == "pick" || step.kind == "place") step].length > 0;
-    var welds = [for (step in mission.steps) if (step.kind == "weld") step].length > 0;
+    var welds = [for (step in mission.steps) if (step.kind == "weld" || step.kind == "findWork") step].length > 0;
     if (handles && welds) throw "A mission picks and places, or it welds: the robot works with one tool on its arm";
     var suctions = [for (tool in project.robotTools) if (tool.kind == "suction") tool];
     var torches = [for (tool in project.robotTools) if (tool.kind == "torch") tool];
@@ -281,6 +287,7 @@ class MissionPlayer implements SessionMember {
       welding = null;
       newWelding = null;
       weldSensor = null;
+      newRegistration = null;
     } else {
       if (torches.length != 1) throw 'A mission that welds needs one torch, the robot has ${torches.length}';
       var tool = torches[0];
@@ -299,6 +306,32 @@ class MissionPlayer implements SessionMember {
           PlanningLimits.ofGroup(arm, new SteadyLoads(), weldAcceleration, null, state.modelRevision, state.calibrationRevision), 3, planned);
       };
       welding = newWelding();
+      newRegistration = (job) -> {
+        var odometry = wheels;
+        var observed = odometry == null ? null : odometry.state();
+        if (observed == null) throw "Contact registration requires an initialized wheel pose estimate";
+        var nominal = job.nominal;
+        var rootWork = Transform3.fromPose2(observed.pose).inverse().compose(new Transform3(
+          new Vec3(nominal.x, nominal.y, nominal.z), new Quat(nominal.qx, nominal.qy, nominal.qz, nominal.qw)));
+        var bodies = weldCollisionBodies(arm, tool.contact.occurrence, metal);
+        var planned = armClearance(arm, bodies);
+        var tip:AssemblyFrame = cast toolTip;
+        var wire = new processkit.ProbeWireClearance(arm, robot.model.links[toolLink].id,
+          new Transform3(new Vec3(tip.x, tip.y, tip.z), new Quat(tip.qx, tip.qy, tip.qz, tip.qw)),
+          torch.wireDiameterMm * 0.001, torch.stickoutMm * 0.001, bodies);
+        clearance = planned;
+        var planning = WeldingPlanRunner.planning(arm, weldAcceleration, planned);
+        var indices = arm.jointIndices();
+        var motion = new ManipulatorMotion(robot.robot, planning.compiler, (_) -> null, () -> robot.runtime.pollEvents(), indices);
+        var probes = new processkit.ProbeMotionPlanner(arm, planning.compiler, planned, wire);
+        var selection = new machinekit.welding.WeldContactSelection(job, probes, () -> {
+          var snapshot = robot.robot.snapshot();
+          return [for (index in indices) snapshot.positions.get(index)];
+        });
+        var probe = new processkit.ContactProbeRunner(motion, probes, channels, cast tool.sensor,
+          () -> new motionkit.robot.ServoSession(robot.robot, arm));
+        return new processkit.ContactRegistrationRunner(probe, selection.sequence(rootWork));
+      };
     }
     configureHoming();
   }
@@ -310,6 +343,10 @@ class MissionPlayer implements SessionMember {
    * are no obstacle (the weld metal).
    */
   function weldClearance(arm:Manipulator, torch:String, ignored:Array<String>):ArmClearance {
+    return armClearance(arm, weldCollisionBodies(arm, torch, ignored));
+  }
+
+  function weldCollisionBodies(arm:Manipulator, torch:String, ignored:Array<String>):Array<robotkit.manipulation.ArmClearance.ClearanceBodyData> {
     var links = robot.model.links;
     // The tool is everything the torch's assembly holds (the plate on the flange, the torch and its neck).
     var toolPrefix = torch.substr(0, torch.lastIndexOf("/") + 1);
@@ -339,6 +376,10 @@ class MissionPlayer implements SessionMember {
       }
       bodies.push({name: hull.name, link: links[0].id, vertices: vertices, tool: false});
     }
+    return bodies;
+  }
+
+  function armClearance(arm:Manipulator, bodies:Array<robotkit.manipulation.ArmClearance.ClearanceBodyData>):ArmClearance {
     var positions = robot.robot.snapshot().positions;
     var indices = [for (target in arm.toJointTargets([for (_ in 0...arm.dofCount()) 0.0])) target.joint];
     clearanceJoints = indices;
@@ -461,6 +502,7 @@ class MissionPlayer implements SessionMember {
   public function reset():Void {
     runner = new SkillRunner();
     jointMotions = new Map<String, ManipulatorMotion>();
+    registeredWork = new Map<String, Transform3>();
     stepIndex = 0;
     completed = 0;
     failure = null;
@@ -532,7 +574,10 @@ class MissionPlayer implements SessionMember {
     switch step.kind {
       case "moveJoints":
         return jointMove(step);
+      case "stow":
+        return stow();
       case "goTo":
+        registeredWork = new Map<String, Transform3>();
         var activeNavigator:Navigator = cast navigator;
         return new GoTo(activeNavigator, new NavigationGoal(floorPose(step), FRAME, POSITION_TOLERANCE, HEADING_TOLERANCE),
           observe);
@@ -550,6 +595,12 @@ class MissionPlayer implements SessionMember {
         return new processkit.skill.WeldPasses([for (pass in weld.passes)
           () -> weldPassSkill(weld, pass,configurationFor(step))],
           [for (pass in weld.passes) pass.interpassDwell]);
+      case "findWork":
+        var job:SceneContactWork = cast step.contactWork;
+        registeredWork.remove(job.frame);
+        var factory = newRegistration;
+        if (factory == null) throw "Contact mission has no registration runner";
+        return new processkit.skill.FindWeldWork(() -> factory(job), (frame) -> registeredWork.set(job.frame, frame));
       default:
         throw 'Mission step kind "${step.kind}" is not supported';
     }
@@ -614,18 +665,54 @@ class MissionPlayer implements SessionMember {
       MotionOp.MoveJ(MoveTarget.JointTarget(q), new MotionOptions(), Blend.ExactStop)],configurationFor(step)));
   }
 
+  /** Plan the mobile welding stow from measured joints against the live work and deposited bead geometry. */
+  function stow():Skill {
+    var torches = [for (tool in project.robotTools) if (tool.kind == "torch") tool];
+    if (torches.length != 1) throw 'A welding stow needs one torch, the robot has ${torches.length}';
+    var tool = torches[0];
+    var arm = toolArm(tool);
+    var metal = [for (step in mission.steps) if (step.kind == "weld") cast(step.weld, SceneArtifactWeld).metal];
+    var planned = weldClearance(arm, tool.contact.occurrence, metal);
+    clearance = planned;
+    var planning = WeldingPlanRunner.planning(arm, weldAcceleration, planned);
+    var indices = arm.jointIndices();
+    var observed = robot.robot.snapshot().positions;
+    var from = [for (index in indices) observed.get(index)];
+    // CadBridge bakes the assembly's authored home joints into the model; zero is its CAD ready posture.
+    var ready = [for (_ in indices) 0.0];
+    var program = WeldStowPlanner.plan(arm, planning.compiler, planned, from, ready);
+    var motion = new ManipulatorMotion(robot.robot, planning.compiler, (_) -> null,
+      () -> robot.runtime.pollEvents(), indices);
+    return new MotionProgramSkill(motion, program);
+  }
+
   /** Builds one weld pass using the shared welding runner. */
   function weldPassSkill(weld:SceneArtifactWeld, pass:materia.project.SceneArtifact.SceneArtifactWeldPass,?configuration:motionkit.kinematics.SixAxisConfiguration):Skill {
     var factory = newWelding;
     if (factory == null) throw "Weld mission has no welding runner";
     welding = factory();
     cast(welding,WeldingPlanRunner).configuration=configuration;
+    if (requiresRegistration(weld)) {
+      if (wheels == null) throw "Registered welding has no wheel pose estimate";
+      return new WeldSeam(cast welding, wheels, () -> weldPlan(weld, pass), cast weldSensor);
+    }
     return new WeldSeam(cast welding, localization, () -> weldPlan(weld, pass), cast weldSensor);
+  }
+
+  function requiresRegistration(weld:SceneArtifactWeld):Bool {
+    for (step in mission.steps) if (step.kind == "findWork" && step.contactWork != null && step.contactWork.frame == weld.frame) return true;
+    return false;
   }
 
   /** The world pose of a weld's reference member now, or the world's own when the weld names none. */
   function referenceFrame(weld:SceneArtifactWeld):Transform3 {
     if (weld.frame == null || weld.frame == "") return Transform3.identity();
+    if (requiresRegistration(weld)) {
+      var measured = registeredWork.get(weld.frame);
+      var estimate = wheels == null ? null : wheels.state();
+      if (measured == null || estimate == null) throw "Weld work has no accepted registration at this station";
+      return Transform3.fromPose2(estimate.pose).compose(measured);
+    }
     var live = assemblyParts.get("project:" + weld.frame).pose();
     return new Transform3(new Vec3(live.position[0], live.position[1], live.position[2]),
       new Quat(live.rotation[0], live.rotation[1], live.rotation[2], live.rotation[3]));

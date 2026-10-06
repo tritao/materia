@@ -1,0 +1,1 @@
+{"version":1,"package":{"name":"kinematicskit-step-limit-tests"},"entry":"StepLimitTests","sourceRoots":["."],"dependencies":{"kinematicskit":{"path":"../.."}},"target":"host","outputDir":"build"}

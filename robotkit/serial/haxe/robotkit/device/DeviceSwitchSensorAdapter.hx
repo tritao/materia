@@ -15,6 +15,7 @@ class DeviceSwitchSensorAdapter {
   final read:String->Null<DeviceInputReading>;
   final timestamps:Array<Null<Int64>> = [];
   final counts:Array<Int64> = [];
+  var sourceClock:Null<String> = null;
   var sequence:Int64 = Int64.ofInt(0);
 
   public function new(blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime, binding:DeviceBinding,
@@ -40,6 +41,11 @@ class DeviceSwitchSensorAdapter {
 
   /** Called after copying joint state; never advances the device clock. */
   public function poll(snapshot:robotkit.runtime.RobotSnapshot):Void {
+    var clock=runtime.endpoint.sourceClockId();
+    if(sourceClock!=clock){
+      for(index in 0...inputs.length){timestamps[index]=null;counts[index]=Int64.ofInt(0);}
+      sourceClock=clock;
+    }
     for (index in 0...inputs.length) {
       var input = inputs[index];
       var observed = read(input.wiring.switchId);
@@ -57,7 +63,7 @@ class DeviceSwitchSensorAdapter {
       sequence = Int64.add(sequence, Int64.ofInt(1));
       runtime.publishSensorFrame(input.wiring.switchId,
         [observed.active ? 1.0 : 0.0, count == 0 ? 0.0 : 1.0, edge, count], sequence,
-        observed.sourceTimestampNs, runtime.sourceClockId, null);
+        observed.sourceTimestampNs, clock, null);
       timestamps[index] = observed.sourceTimestampNs;
       counts[index] = observed.closingCount;
     }

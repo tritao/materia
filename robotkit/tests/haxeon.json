@@ -9,7 +9,9 @@
     "../../sensorkit/sensor_io/haxe"
   ],
   "dependencies": {
-    "haxeon-platform": { "path": "../../haxeon/packages/platform" },
+    "haxeon-platform": {
+      "path": "../../haxeon/packages/platform"
+    },
     "robotkit": {
       "path": ".."
     },

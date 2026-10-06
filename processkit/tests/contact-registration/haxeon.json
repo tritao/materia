@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "processkit-contact-registration-tests"},
+  "entry": "ContactRegistrationTests",
+  "sourceRoots": ["."],
+  "dependencies": {"processkit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

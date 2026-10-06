@@ -321,6 +321,7 @@ class ProjectKitTests {
     rejects(function() SceneArtifact.encode(data), "a second torch");
     data.robotTools = [{kind: "suction", contact: {occurrence: "plate", connector: "tcp"}, channel: "cup.enable", torch: welder()}];
     rejects(function() SceneArtifact.encode(data), "a suction tool with a welder");
+    ContactWorkTests.run(data, torch());
     weldMission(data, torch);
   }
 
@@ -356,6 +357,10 @@ class ProjectKitTests {
       weld.path[0].normals[1][1] == -1.0 && weld.legSize == 0.005 && weld.passes[0].process.wireSpeed == 8.0 && weld.passes[0].process.travelSpeed == 0.01 &&
       weld.passes[0].process.startDwell == 0.2 && weld.passes[0].process.craterDwell == 0.3 &&
       weld.passes[0].process.burnback == 0.1, "weld mission round trip including both dwells");
+    data.mission = {steps: [{kind: "weld", weld: seam()}, {kind: "stow"}]};
+    var stowBack = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    check(stowBack != null && stowBack.steps.length == 2 && stowBack.steps[1].kind == "stow",
+      "welding stow mission round trip");
     // A chained seam is one weld of several segments, each with its own faces.
     var chain = seam();
     chain.path = [line(), second()];

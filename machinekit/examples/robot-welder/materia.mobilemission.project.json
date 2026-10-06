@@ -11,7 +11,8 @@
     "mission": {
       "kind": "cad-preview",
       "module": "MobileWelderPreview",
-      "function": "plannedCell"
+      "function": "plannedCell",
+      "cache": {"inputs": ["MobileWeldStations.hx", "MobileWelderCell.hx", "MobileWelderPreview.hx"]}
     }
   }
 }

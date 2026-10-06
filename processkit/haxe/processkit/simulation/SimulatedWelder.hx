@@ -113,8 +113,11 @@ class SimulatedWelder implements SimulationStepObserver {
       tipDistance: work.distance(tip[0], tip[1], tip[2]),
       wireDistance: work.ray(tip[0], tip[1], tip[2], wire[0], wire[1], wire[2], WeldArcModel.STRIKE_REACH)
     });
-    runtime.publishSensorFrame(sensorId, WeldSensor.values(reading), Int64.ofInt(++sequence), sourceTimestampNs,
-      "robotkit.simulation");
+    // Geometry above comes from this completed physics tick. Observer time controls the
+    // process integration, but the observation timestamp belongs to the sampled physics clock.
+    var snapshot = runtime.snapshot();
+    runtime.publishSensorFrame(sensorId, WeldSensor.values(reading), Int64.ofInt(++sequence), snapshot.sourceTimestampNs,
+      runtime.endpoint.sourceClockId());
   }
 
   /** The session reset restored the robot's channels: forget the arc and any fault. */

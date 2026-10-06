@@ -40,6 +40,7 @@ class Simulation {
   final session:SimSession;
   /** Runs this simulation's step observers after each session tick. */
   final sessionObserverId:Int;
+  final sessionResetObserverId:Int;
   final fixedTimestepNs:Int64;
   var sourceTimeNs:Int64 = Int64.ofInt(0);
   var disposed:Bool = false;
@@ -53,6 +54,9 @@ class Simulation {
     check(attached.status, "simulation.createInSession");
     owner = attached.out_simulation;
     sessionObserverId = session.addStepObserver(afterStep);
+    sessionResetObserverId = session.addResetObserver(function() {
+      for (runtime in robots) SimulationEndpoints.beginEpoch(runtime.endpoint);
+    });
   }
 
   /** Attaches robots to a stopped session the caller owns, steps, and outlives. */
@@ -474,7 +478,7 @@ class Simulation {
     if (virtualDevice == null && blueprint.switches.length > 0) {
       var observedRuntime:RobotRuntime = runtime;
       var switches = new SimulatedSwitchSensorAdapter(blueprint, observedRuntime,
-        () -> observedRuntime.physicalPositions(), "robotkit.simulation");
+        () -> observedRuntime.physicalPositions());
       addStepObserver(switches);
       switchObservers.set(robots.length - 1, switches);
     }
@@ -604,6 +608,9 @@ class Simulation {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_reset_robot(owner.borrow(), robotIndex),
       "simulation.resetRobot");
+
+    SimulationEndpoints.beginEpoch(robots[robotIndex].endpoint);
+
     var offsets = powerUpOffsets.get(robotIndex);
     if (offsets != null) {
       var drives = powerUpSideDrives.get(robotIndex);
@@ -613,6 +620,7 @@ class Simulation {
     robots[robotIndex].afterNativeReset();
     var switches = switchObservers.get(robotIndex);
     if (switches != null) switches.reset();
+
   }
 
   /**
@@ -956,6 +964,7 @@ class Simulation {
   public function dispose():Void {
     if (disposed) return;
     session.removeStepObserver(sessionObserverId);
+    session.removeResetObserver(sessionResetObserverId);
     stepObservers.resize(0);
     switchObservers.clear();
     powerUpOffsets.clear();

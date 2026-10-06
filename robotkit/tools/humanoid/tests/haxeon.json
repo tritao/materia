@@ -9,7 +9,9 @@
     "../src"
   ],
   "dependencies": {
-    "haxeon-platform": { "path": "../../../../haxeon/packages/platform" },
+    "haxeon-platform": {
+      "path": "../../../../haxeon/packages/platform"
+    },
     "robotkit": {
       "path": "../../.."
     },

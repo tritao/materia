@@ -41,6 +41,7 @@ class MobileWeldStations {
   final ready:Array<Float>;
   final homeJoints:Array<Float>;
   final seams:Array<WeldSeam>;
+  final probeFaces:Array<materia.project.SceneContactRegistration.SceneContactFace>;
   final work:Transform3;
   final metal:String;
   final robotBodies:Array<ClearanceBodyData>;
@@ -81,6 +82,7 @@ class MobileWeldStations {
     ready = [for (_ in arm.group.jointIds) 0.0];
     var weldment = cell.weldment();
     seams = weldment.findIn(cell, cell.solvedPoses(state)).require();
+    probeFaces = machinekit.welding.WeldProbeGeometry.findIn(cell, weldment, cell.solvedPoses(state), ["table", "clamp"]).contactFaces(scene.metresPerUnit);
     work = transform(state.worldPose(weldment.reference), scene.metresPerUnit);
     metal = WeldMetal.carrierOf(cell, weldment);
     var prefix = contact.occurrence.substr(0, contact.occurrence.lastIndexOf("/") + 1);
@@ -233,15 +235,22 @@ class MobileWeldStations {
         }
       }
       result.push({kind: "goTo", pose: {x: station.pose.x, y: station.pose.y, yaw: station.pose.yaw}});
+      var tools:Array<materia.project.SceneArtifact.SceneArtifactRobotTool> = cast scene.robotTools;
+      result.push({kind: "findWork", at: tools[0].contact, contactWork: {
+        frame: cell.weldment().reference,
+        nominal: {x: work.translation.x, y: work.translation.y, z: work.translation.z,
+          qx: work.rotation.x, qy: work.rotation.y, qz: work.rotation.z, qw: work.rotation.w},
+        translation: [0.02, 0.02, 0.0], rotation: [0.0, 0.0, 2 * Math.PI / 180],
+        measurementError: 0.00001, contactOffset: processkit.tool.WeldArcModel.TOUCH_TOLERANCE, faces: probeFaces}});
       for (step in generated.steps) result.push(step);
       // Stow before base motion. Search in bounded joint space; every edge is compiler-checked.
       var lower = [for (joint in 0...arm.group.count()) arm.group.limitsOf(joint).lower];
       var upper = [for (joint in 0...arm.group.count()) arm.group.limitsOf(joint).upper];
       var stow = JointRoute.plan(q, ready, lower, upper, (from, to) -> airMove(station, from, to));
-      var tools:Array<materia.project.SceneArtifact.SceneArtifactRobotTool> = cast scene.robotTools;
-      for (waypoint in 1...stow.length) result.push({kind: "moveJoints", at: tools[0].contact,
-        joints: [for (joint in 0...arm.group.count())
-          {joint: arm.group.jointIds[joint], position: homeJoints[joint] + stow[waypoint][joint]}]});
+      if (stow.length < 2) throw "Mobile station has no checked ready-posture stow";
+      // The runtime replans this semantic stow from the measured post-weld arm
+      // pose and current cell geometry; these nominal edges only prove station feasibility.
+      result.push({kind: "stow", at: tools[0].contact});
     }
     Sys.println('Mobile weld mission: ${chosen.stations.length} stations, ${seams.length} CAD seams, ${chosen.travelCost} m route');
     return result;

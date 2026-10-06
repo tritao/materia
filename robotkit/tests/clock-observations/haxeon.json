@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "robotkit-clock-observation-tests"},
+  "entry": "ClockObservationTests",
+  "sourceRoots": ["."],
+  "dependencies": {"robotkit-sim": {"path": "../../sim"}},
+  "target": "host",
+  "outputDir": "build"
+}
