@@ -402,6 +402,28 @@ MK_API mk_result MK_CALL mk_sample_cartesian_candidates(const mk_analytic_cartes
     const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
     uint32_t *out_count MK_OUT);
+/** Compact sampling outputs are candidate-major, preserving full-record order.
+ * Joint and wrap rows have joint_count entries. Coordinate rows contain external
+ * cells followed by roll, tilt, azimuth, branch and singular bits. Lengths must
+ * exactly match candidate_count times their respective row dimensions. */
+MK_API mk_result MK_CALL mk_sample_ur_candidates_compact(const mk_ur_parameters *parameters,
+    const mk_serial_cell_model *model, const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
+    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    double *out_joints MK_OUT_ARRAY(joint_value_count), int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
+    uint32_t *out_coordinates MK_OUT_ARRAY(coordinate_count), uint32_t coordinate_count, uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_sample_opw_candidates_compact(const mk_opw_parameters *parameters,
+    const mk_serial_cell_model *model, const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
+    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    double *out_joints MK_OUT_ARRAY(joint_value_count), int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
+    uint32_t *out_coordinates MK_OUT_ARRAY(coordinate_count), uint32_t coordinate_count, uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_sample_cartesian_candidates_compact(const mk_analytic_cartesian_model *parameters,
+    const mk_serial_cell_model *model, const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
+    const mk_opw_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    double *out_joints MK_OUT_ARRAY(joint_value_count), int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
+    uint32_t *out_coordinates MK_OUT_ARRAY(coordinate_count), uint32_t coordinate_count, uint32_t *out_count MK_OUT);
 /** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */
 /** Jacobians are 6 x joint_count, row-major; J' is dJ/ds. */
 MK_API mk_result MK_CALL mk_path_differential(const mk_differential_request *request,

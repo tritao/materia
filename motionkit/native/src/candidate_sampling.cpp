@@ -51,9 +51,10 @@ T frame(const mk_serial_cell_model &m,const double *q,unsigned scope) {
     }
     return t*(scope==0 ? pose(m.base_position,m.base_quaternion) : pose(m.work_position,m.work_quaternion));
 }
+struct CompactOutput {double *joints;int32_t *wraps;uint32_t *coordinates;};
 mk_result run(const mk_ur_parameters *p,const mk_opw_parameters *opw,const mk_analytic_cartesian_model *cartesian,const mk_serial_cell_model *m,const mk_external_lattice *e,
     const mk_orientation_lattice *o,const mk_joint_lift_request *limits,const mk_opw_pose *target,
-    const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t &count) {
+    const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t &count,CompactOutput *compact=nullptr) {
     const uint32_t arm_count=cartesian ? cartesian->joint_count : 6;
     if(arm_count<3 || arm_count>6)return MK_ERROR_INVALID_ARGUMENT;
     if(!seed || !limits || limits->struct_size!=sizeof(*limits) || limits->joint_count!=n || !valid_model(m,e,n,arm_count))
@@ -141,15 +142,26 @@ mk_result run(const mk_ur_parameters *p,const mk_opw_parameters *opw,const mk_an
                 uint32_t nl;
                 status=mk_joint_lift_count(&held_limits,q.data(),n,&nl);if(status!=MK_OK)return status;
                 if(total+nl>std::numeric_limits<uint32_t>::max())return MK_ERROR_LIMIT;
-                if(out && nl) {
+                if((out || compact) && nl) {
                     std::vector<mk_joint_lift> lifts(nl);
                     status=mk_enumerate_joint_lifts(&held_limits,q.data(),n,lifts.data(),nl,&unused);if(status!=MK_OK)return status;
                     for(const auto &lift:lifts) {
-                        auto &candidate=out[total++];candidate={};candidate.struct_size=sizeof(candidate);
-                        for(unsigned i=0;i<n;++i){candidate.joints[i]=lift.joints[i];candidate.wraps[i]=lift.wraps[i];}
-                        for(unsigned i=0;i<m->external_count;++i)candidate.external_coordinates[i]=cell.coordinates[i];
-                        candidate.roll_index=orientation.roll_index;candidate.tilt_index=orientation.tilt_index;
-                        candidate.azimuth_index=orientation.azimuth_index;candidate.branch=branches[b].branch;candidate.singular=branches[b].singular;
+                        if(compact){
+                            const auto joint_offset=size_t(total)*n,cell_offset=size_t(total)*(m->external_count+5);
+                            for(unsigned i=0;i<n;++i){compact->joints[joint_offset+i]=lift.joints[i];compact->wraps[joint_offset+i]=lift.wraps[i];}
+                            auto cells=compact->coordinates+cell_offset;
+                            for(unsigned i=0;i<m->external_count;++i)cells[i]=cell.coordinates[i];
+                            cells[m->external_count]=orientation.roll_index;cells[m->external_count+1]=orientation.tilt_index;
+                            cells[m->external_count+2]=orientation.azimuth_index;cells[m->external_count+3]=branches[b].branch;
+                            cells[m->external_count+4]=branches[b].singular;
+                        }else{
+                            auto &candidate=out[total];candidate={};candidate.struct_size=sizeof(candidate);
+                            for(unsigned i=0;i<n;++i){candidate.joints[i]=lift.joints[i];candidate.wraps[i]=lift.wraps[i];}
+                            for(unsigned i=0;i<m->external_count;++i)candidate.external_coordinates[i]=cell.coordinates[i];
+                            candidate.roll_index=orientation.roll_index;candidate.tilt_index=orientation.tilt_index;
+                            candidate.azimuth_index=orientation.azimuth_index;candidate.branch=branches[b].branch;candidate.singular=branches[b].singular;
+                        }
+                        ++total;
                     }
                 } else total+=nl;
             }
@@ -211,4 +223,43 @@ extern "C" mk_result MK_CALL mk_sample_cartesian_candidates(const mk_analytic_ca
         if(count)status=run(nullptr,nullptr,p,m,e,o,limits,target,seed,n,out,count);
         if(status==MK_OK)*out_count=count;return status;
     }catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
+}
+
+namespace {
+mk_result sample_compact(const mk_ur_parameters *ur,const mk_opw_parameters *opw,const mk_analytic_cartesian_model *cart,
+    const mk_serial_cell_model *model,const mk_external_lattice *external,const mk_orientation_lattice *orientation,
+    const mk_joint_lift_request *limits,const mk_opw_pose *target,const double *seed,uint32_t n,
+    double *joints,int32_t *wraps,uint32_t joint_value_count,uint32_t *coordinates,uint32_t coordinate_count,uint32_t *out_count) {
+    if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        uint32_t count;auto status=run(ur,opw,cart,model,external,orientation,limits,target,seed,n,nullptr,count);
+        if(status!=MK_OK)return status;
+        if(uint64_t(count)*n!=joint_value_count || uint64_t(count)*(uint64_t(model->external_count)+5)!=coordinate_count ||
+            (count && (!joints || !wraps || !coordinates)))return MK_ERROR_INVALID_ARGUMENT;
+        CompactOutput output{joints,wraps,coordinates};
+        if(count)status=run(ur,opw,cart,model,external,orientation,limits,target,seed,n,nullptr,count,&output);
+        if(status==MK_OK)*out_count=count;return status;
+    }catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
+}
+}
+extern "C" mk_result MK_CALL mk_sample_ur_candidates_compact(const mk_ur_parameters *parameters,
+    const mk_serial_cell_model *model,const mk_external_lattice *external,const mk_orientation_lattice *orientation,
+    const mk_joint_lift_request *limits,const mk_opw_pose *target,const double *seed,uint32_t n,
+    double *joints,int32_t *wraps,uint32_t joint_value_count,uint32_t *coordinates,uint32_t coordinate_count,uint32_t *out_count) {
+    return sample_compact(parameters,nullptr,nullptr,
+        model,external,orientation,limits,target,seed,n,joints,wraps,joint_value_count,coordinates,coordinate_count,out_count);
+}
+extern "C" mk_result MK_CALL mk_sample_opw_candidates_compact(const mk_opw_parameters *parameters,
+    const mk_serial_cell_model *model,const mk_external_lattice *external,const mk_orientation_lattice *orientation,
+    const mk_joint_lift_request *limits,const mk_opw_pose *target,const double *seed,uint32_t n,
+    double *joints,int32_t *wraps,uint32_t joint_value_count,uint32_t *coordinates,uint32_t coordinate_count,uint32_t *out_count) {
+    return sample_compact(nullptr,parameters,nullptr,
+        model,external,orientation,limits,target,seed,n,joints,wraps,joint_value_count,coordinates,coordinate_count,out_count);
+}
+extern "C" mk_result MK_CALL mk_sample_cartesian_candidates_compact(const mk_analytic_cartesian_model *parameters,
+    const mk_serial_cell_model *model,const mk_external_lattice *external,const mk_orientation_lattice *orientation,
+    const mk_joint_lift_request *limits,const mk_opw_pose *target,const double *seed,uint32_t n,
+    double *joints,int32_t *wraps,uint32_t joint_value_count,uint32_t *coordinates,uint32_t coordinate_count,uint32_t *out_count) {
+    return sample_compact(nullptr,nullptr,parameters,
+        model,external,orientation,limits,target,seed,n,joints,wraps,joint_value_count,coordinates,coordinate_count,out_count);
 }

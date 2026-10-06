@@ -72,23 +72,19 @@ class SerialCandidateSampler {
       var size=MotionKitNative.mk_ur_candidate_count(ur.nativeModel(),model.native,external,orientation,liftLimits,pose,seed);
       if(size.status!=TrajectoryCoreConstants.MK_OK)throw 'Native UR candidate count failed: ${size.status}';
       if(size.out_count==0)return [];
-      var result=MotionKitNative.mk_sample_ur_candidates(ur.nativeModel(),model.native,external,orientation,liftLimits,pose,seed,size.out_count);
+      var lengths=CartesianCandidateSampler.compactLengths(size.out_count,seed.length,model.externalIndices.length);
+      var result=MotionKitNative.mk_sample_ur_candidates_compact(ur.nativeModel(),model.native,external,orientation,liftLimits,pose,seed,lengths.joints,lengths.coordinates);
       if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native UR candidate sampling failed: ${result.status}';
-      return decode(result.out_candidates,result.out_count);
+      return CartesianCandidateSampler.decodeCompact(result.out_joints,result.out_wraps,result.out_coordinates,
+        result.out_count,seed.length,model.externalIndices.length);
     }
     var size=MotionKitNative.mk_opw_candidate_count(opw.nativeModel(),model.native,external,orientation,liftLimits,pose,seed);
     if(size.status!=TrajectoryCoreConstants.MK_OK)throw 'Native OPW candidate count failed: ${size.status}';
     if(size.out_count==0)return [];
-    var result=MotionKitNative.mk_sample_opw_candidates(opw.nativeModel(),model.native,external,orientation,liftLimits,pose,seed,size.out_count);
+    var lengths=CartesianCandidateSampler.compactLengths(size.out_count,seed.length,model.externalIndices.length);
+    var result=MotionKitNative.mk_sample_opw_candidates_compact(opw.nativeModel(),model.native,external,orientation,liftLimits,pose,seed,lengths.joints,lengths.coordinates);
     if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native OPW candidate sampling failed: ${result.status}';
-    return decode(result.out_candidates,result.out_count);
+    return CartesianCandidateSampler.decodeCompact(result.out_joints,result.out_wraps,result.out_coordinates,
+        result.out_count,seed.length,model.externalIndices.length);
   }
-  function decode(records:Array<mk_lattice_candidate>,count:Int):Array<LatticeCandidate>
-    return [for(i in 0...count) {
-      var c=records[i];
-      new LatticeCandidate([for(j in 0...group.group.count())c.get_joints(j)],
-        [for(j in 0...group.group.count())c.get_wraps(j)],
-        [for(j in 0...model.externalIndices.length)c.get_external_coordinates(j)],
-        c.get_roll_index(),c.get_tilt_index(),c.get_azimuth_index(),c.get_branch(),c.get_singular());
-    }];
 }

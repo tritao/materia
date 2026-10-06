@@ -14,6 +14,16 @@ void store(const T &t,double *p,double *r) {
     Eigen::Quaterniond q(t.linear());for(unsigned i=0;i<3;++i)p[i]=t.translation()[i];
     r[0]=q.x();r[1]=q.y();r[2]=q.z();r[3]=q.w();
 }
+void check_compact(const std::vector<mk_lattice_candidate> &expected,unsigned n,unsigned external,
+    const std::vector<double> &joints,const std::vector<int32_t> &wraps,const std::vector<uint32_t> &cells) {
+    for(unsigned i=0;i<expected.size();++i){const auto &c=expected[i];
+        for(unsigned j=0;j<n;++j){assert(joints[i*n+j]==c.joints[j]);assert(wraps[i*n+j]==c.wraps[j]);}
+        auto row=cells.data()+i*(external+5);
+        for(unsigned j=0;j<external;++j)assert(row[j]==c.external_coordinates[j]);
+        assert(row[external]==c.roll_index && row[external+1]==c.tilt_index && row[external+2]==c.azimuth_index);
+        assert(row[external+3]==c.branch && row[external+4]==c.singular);
+    }
+}
 int main() {
     mk_ur_parameters p={};p.struct_size=sizeof(p);p.a2=-.425;p.a3=-.39225;p.d1=.089159;p.d4=.10915;p.d5=.09465;p.d6=.0823;
     for(auto &sign:p.sign_corrections)sign=1;
@@ -52,6 +62,17 @@ int main() {
         std::vector<mk_lattice_candidate> candidates(count),repeat(count);
         assert(sample(candidates.data(),count,&written)==MK_OK && written==count);
         assert(sample(repeat.data(),count,&written)==MK_OK);
+        std::vector<double> compact_joints(count*8);std::vector<int32_t> compact_wraps(count*8);
+        std::vector<uint32_t> compact_cells(count*7);
+        const auto compact_sample=[&](unsigned joint_values,unsigned cell_values){return family==0 ?
+            mk_sample_ur_candidates_compact(&p,&model,&external,&orientation,&limits,&target,seed,8,
+                compact_joints.data(),compact_wraps.data(),joint_values,compact_cells.data(),cell_values,&written) :
+            mk_sample_opw_candidates_compact(&opw,&model,&external,&orientation,&limits,&target,seed,8,
+                compact_joints.data(),compact_wraps.data(),joint_values,compact_cells.data(),cell_values,&written);};
+        assert(compact_sample(compact_joints.size(),compact_cells.size())==MK_OK && written==count);
+        check_compact(candidates,8,2,compact_joints,compact_wraps,compact_cells);
+        assert(compact_sample(compact_joints.size()-1,compact_cells.size())==MK_ERROR_INVALID_ARGUMENT);
+        assert(compact_sample(compact_joints.size(),compact_cells.size()-1)==MK_ERROR_INVALID_ARGUMENT);
         std::set<std::tuple<unsigned,unsigned,unsigned,unsigned,unsigned>> covered;
         for(unsigned i=0;i<count;++i) {
             const auto &c=candidates[i],&r=repeat[i];assert(c.branch<8);
@@ -109,6 +130,11 @@ int main() {
             if(mode==1)assert(count==(n==3?1u:n==4?4u:2u));
             std::vector<mk_lattice_candidate> candidates(count);
             assert(mk_sample_cartesian_candidates(&cart,&model,&external,&orientation,&limits,&target,seed,n,candidates.data(),count,&written)==MK_OK && written==count);
+            std::vector<double> compact_joints(count*n);std::vector<int32_t> compact_wraps(count*n);
+            std::vector<uint32_t> compact_cells(count*5);
+            assert(mk_sample_cartesian_candidates_compact(&cart,&model,&external,&orientation,&limits,&target,seed,n,
+                compact_joints.data(),compact_wraps.data(),compact_joints.size(),compact_cells.data(),compact_cells.size(),&written)==MK_OK && written==count);
+            check_compact(candidates,n,0,compact_joints,compact_wraps,compact_cells);
             bool original=false;
             const auto wanted=pose(target.position,target.quaternion);
             for(const auto &candidate:candidates) {

@@ -44,12 +44,27 @@ class CartesianCandidateSampler {
     var size=MotionKitNative.mk_cartesian_candidate_count(analytic.nativeModel(),model,external,orientation,limits,pose,seed);
     if (size.status!=TrajectoryCoreConstants.MK_OK)throw 'Native Cartesian candidate count failed: ${size.status}';
     if (size.out_count==0)return [];
-    var result=MotionKitNative.mk_sample_cartesian_candidates(analytic.nativeModel(),model,external,orientation,limits,pose,seed,size.out_count);
+    var lengths=compactLengths(size.out_count,seed.length,0);
+    var result=MotionKitNative.mk_sample_cartesian_candidates_compact(analytic.nativeModel(),model,external,orientation,limits,pose,seed,lengths.joints,lengths.coordinates);
     if (result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native Cartesian candidate sampling failed: ${result.status}';
-    return [for (i in 0...result.out_count) {
-      var c=result.out_candidates[i];
-      new LatticeCandidate([for (j in 0...seed.length)c.get_joints(j)],[for (j in 0...seed.length)c.get_wraps(j)],
-        [],c.get_roll_index(),c.get_tilt_index(),c.get_azimuth_index(),c.get_branch(),c.get_singular());
+    return decodeCompact(result.out_joints,result.out_wraps,result.out_coordinates,result.out_count,seed.length,0);
+  }
+  public static function compactLengths(count:Int,joints:Int,externals:Int):{joints:Int,coordinates:Int} {
+    if(count<0 || joints<1 || joints>64 || externals<0 || externals>joints ||
+        count>Std.int(268435456/Math.max(joints*8,(externals+5)*4)))
+      throw "Native candidate layer exceeds compact FFI array dimensions; streaming sampling is required";
+    return {joints:count*joints,coordinates:count*(externals+5)};
+  }
+  public static function decodeCompact(joints:Array<Float>,wraps:Array<Int>,coordinates:Array<Int>,
+      count:Int,jointCount:Int,externalCount:Int):Array<LatticeCandidate> {
+    return [for(i in 0...count){
+      var jointOffset=i*jointCount,cellOffset=i*(externalCount+5);
+      new LatticeCandidate([for(j in 0...jointCount)joints[jointOffset+j]],
+        [for(j in 0...jointCount)wraps[jointOffset+j]],
+        [for(j in 0...externalCount)coordinates[cellOffset+j]],
+        coordinates[cellOffset+externalCount],coordinates[cellOffset+externalCount+1],
+        coordinates[cellOffset+externalCount+2],coordinates[cellOffset+externalCount+3],
+        coordinates[cellOffset+externalCount+4]);
     }];
   }
 }
