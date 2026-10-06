@@ -1263,3 +1263,18 @@ Compiler-only and focused runtime pass (1,148,603 assertions). Default
 migration, unsupported families/cone centres/branch transitions, free-start
 entry handling, selector removal and full integration/performance gates
 remain outstanding; this serial fixture is not authored track acceptance.
+
+PP4 primitive angular rates: PoseMath.angularRates now differentiates the
+same shortest-hemisphere spherical/normalized-linear quaternion
+interpolation used by authored geometry. Spherical interpolation has a
+constant spatial angular rate; the small-angle normalized-linear case
+carries its nonconstant rate and exact angular acceleration. PoseLine and
+PoseArc combine these rates with analytic translation derivatives for all
+policies, removing their previous numerical pose differences. Independent
+quaternion-difference acceptance covers five small/large angles, a rotated
+initial frame and five interior distances. Existing structured UR compiler
+and Cartesian refinement tests pass. Compiler-only and focused runtime
+pass (1,148,753 assertions). Projected cone-centre derivatives, branch/
+numeric support, default migration and authored performance gates remain
+outstanding; authored quaternion rates do not yet supply projected cone
+centre rates.

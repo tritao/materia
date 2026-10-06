@@ -55,13 +55,10 @@ class PoseArc implements PosePrimitive {
   public function orientationPolicy():OrientationPolicy return policy;
   public function derivativesAt(distance:Float):PoseDerivatives {
     if(!Math.isFinite(distance) || distance<0 || distance>length())throw "Pose-arc distance outside segment";
-    return switch policy {
-      case Fixed:
-        var angle=distance/radius,sine=Math.sin(angle),cosine=Math.cos(angle);
-        new PoseDerivatives([for(i in 0...3)-sine*u[i]+cosine*v[i]],
-          [0.0,0.0,0.0],[for(i in 0...3)(-cosine*u[i]-sine*v[i])/radius],[0.0,0.0,0.0]);
-      default: PoseDerivatives.numeric(this,distance);
-    };
+    var angle=distance/radius,sine=Math.sin(angle),cosine=Math.cos(angle);
+    var angular=PoseMath.angularRates(start.pose,end.pose,distance/length(),policy,length());
+    return new PoseDerivatives([for(i in 0...3)-sine*u[i]+cosine*v[i]],angular.first,
+      [for(i in 0...3)(-cosine*u[i]-sine*v[i])/radius],angular.second);
   }
 
   public function waypointAt(distance:Float):PoseWaypoint {

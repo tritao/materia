@@ -781,6 +781,21 @@ class KinematicsTests extends MotionKitTestSupport {
   }
 
   public function testOrientationDifferential():Void {
+    for(angle in [0.01,0.06,0.1,1.2,3.0]) {
+      var initial=Quat.fromAxisAngle(new Vec3(1,0,0),0.7);
+      var finalRotation=Quat.fromAxisAngle(new Vec3(0,0,1),angle).multiply(initial);
+      var a=new PoseWaypoint(new Pose3(0,0,0,initial.x,initial.y,initial.z,initial.w),1e-6,1e-6);
+      var b=new PoseWaypoint(new Pose3(1,0,0,finalRotation.x,finalRotation.y,finalRotation.z,finalRotation.w),1e-6,1e-6);
+      var line=new PoseLine(a,b,motionkit.path.OrientationPolicy.Interpolated,0.1,0.1),h=1e-4;
+      for(distance in [0.1,0.3,0.5,0.7,0.9]) {
+        var rates=line.derivativesAt(distance),p=line.waypointAt(distance).pose;
+        var omega=poseRotationDelta(line.waypointAt(distance-h).pose,line.waypointAt(distance+h).pose,1/(2*h));
+        var before=poseRotationDelta(line.waypointAt(distance-2*h).pose,p,1/(2*h));
+        var after=poseRotationDelta(p,line.waypointAt(distance+2*h).pose,1/(2*h));
+        for(axis in 0...3){near(rates.angular[axis],omega[axis],"primitive angular velocity matches quaternion differences",1e-7);
+          near(rates.angularSecond[axis],(after[axis]-before[axis])/(2*h),"primitive angular acceleration matches quaternion differences",1e-6);}
+      }
+    }
     function rotationAt(s:Float):Quat {
       var x=0.3+0.2*s-0.03*s*s,y=-0.2+0.1*s+0.04*s*s,tilt=Math.sqrt(x*x+y*y);
       var swing=new Quat(-y*Math.sin(tilt/2)/tilt,x*Math.sin(tilt/2)/tilt,0,Math.cos(tilt/2));

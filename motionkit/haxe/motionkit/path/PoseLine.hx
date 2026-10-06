@@ -30,12 +30,10 @@ class PoseLine implements PosePrimitive {
   public function orientationPolicy():OrientationPolicy return policy;
   public function derivativesAt(distance:Float):PoseDerivatives {
     if(!Math.isFinite(distance) || distance<0 || distance>pathLength)throw "Pose-line distance outside segment";
-    return switch policy {
-      case Fixed: new PoseDerivatives([(end.pose.x-start.pose.x)/pathLength,
-        (end.pose.y-start.pose.y)/pathLength,(end.pose.z-start.pose.z)/pathLength],
-        [0.0,0.0,0.0],[0.0,0.0,0.0],[0.0,0.0,0.0]);
-      default: PoseDerivatives.numeric(this,distance);
-    };
+    var angular=PoseMath.angularRates(start.pose,end.pose,distance/pathLength,policy,pathLength);
+    return new PoseDerivatives([(end.pose.x-start.pose.x)/pathLength,
+      (end.pose.y-start.pose.y)/pathLength,(end.pose.z-start.pose.z)/pathLength],
+      angular.first,[0.0,0.0,0.0],angular.second);
   }
 
   public function waypointAt(distance:Float):PoseWaypoint {

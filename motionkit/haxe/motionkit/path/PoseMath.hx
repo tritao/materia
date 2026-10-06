@@ -21,6 +21,34 @@ class PoseMath {
       a.orientationTolerance + t * (b.orientationTolerance - a.orientationTolerance));
   }
 
+  /** Spatial angular derivatives of the exact interpolation used below. */
+  public static function angularRates(a:Pose3,b:Pose3,t:Float,policy:OrientationPolicy,
+      length:Float):{first:Array<Float>,second:Array<Float>} {
+    if(!Math.isFinite(t) || t<0 || t>1 || !Math.isFinite(length) || length<=0)
+      throw "Orientation derivatives require a valid interpolation distance";
+    switch policy {
+      case Fixed:return {first:[0.0,0.0,0.0],second:[0.0,0.0,0.0]};
+      case Cone(axis,halfAngle):
+        if(axis==null || axis.length!=3 || !Math.isFinite(halfAngle) || halfAngle<0)throw "Invalid orientation cone";
+      default:
+    }
+    var dot=a.qx*b.qx+a.qy*b.qy+a.qz*b.qz+a.qw*b.qw;
+    var sign=dot<0?-1.0:1.0;dot=Math.min(1.0,Math.abs(dot));
+    // Vector part of b * conjugate(a), in the path reference frame.
+    var axis=[sign*(-b.qw*a.qx+b.qx*a.qw-b.qy*a.qz+b.qz*a.qy),
+      sign*(-b.qw*a.qy+b.qx*a.qz+b.qy*a.qw-b.qz*a.qx),
+      sign*(-b.qw*a.qz-b.qx*a.qy+b.qy*a.qx+b.qz*a.qw)];
+    var sine=Math.sqrt(axis[0]*axis[0]+axis[1]*axis[1]+axis[2]*axis[2]);
+    if(sine==0)return {first:[0.0,0.0,0.0],second:[0.0,0.0,0.0]};
+    var rate=2*Math.atan2(sine,dot)/length,acceleration=0.0;
+    if(dot>=0.9995){
+      var x=1+t*(dot-1),y=t*sine,denominator=x*x+y*y;
+      rate=2*sine/(denominator*length);
+      acceleration=-4*sine*(x*(dot-1)+y*sine)/(denominator*denominator*length*length);
+    }
+    return {first:[for(value in axis)value*rate/sine],second:[for(value in axis)value*acceleration/sine]};
+  }
+
   static function quaternion(a:Pose3, b:Pose3, t:Float, policy:OrientationPolicy):Array<Float> {
     switch (policy) {
       case Fixed: return a.rotationArray();
