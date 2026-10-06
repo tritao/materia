@@ -108,6 +108,8 @@ class ArmClearance {
   public static inline var CONTACT_MARGIN:Float = 0.0005;
   /** Clearance required at named interfaces between mechanical parts, in metres. */
   public static inline var INTERFACE_MARGIN:Float = 0.001;
+  /** CAD mating surfaces can differ by a few micrometres after frame transforms. */
+  public static inline var INTERFACE_TOUCH_TOLERANCE:Float = 0.00001;
   /** Neighbouring links whose bodies are closer than this in the reference configuration touch by design, in metres. */
   public static inline var TOUCH:Float = 0.002;
   public final arm:KinematicGroup;
@@ -199,10 +201,11 @@ class ArmClearance {
       if (neighbours.exists(a.link + "\n" + b.link)) {
         var referenceGap = distance(a, a.placed(poses[a.linkIndex]), poses[a.linkIndex],
           b, b.placed(poses[b.linkIndex]), poses[b.linkIndex], TOUCH);
-        // An exactly mating interface is part of the joint's mechanical design.
-        // A named interface with a real gap still gets its tighter clearance below.
+        // A mating face may carry a few micrometres of transform-rounding gap.
+        // Named interfaces only waive their margin within that CAD tolerance;
+        // a designed, larger gap still gets the tighter clearance below.
         if ((interfaceMargin(a.name, b.name) == null && referenceGap < TOUCH) ||
-            (interfaceMargin(a.name, b.name) != null && referenceGap <= 1e-9)) continue;
+            (interfaceMargin(a.name, b.name) != null && referenceGap <= INTERFACE_TOUCH_TOLERANCE)) continue;
       }
       pairs.push([i, j]);
     }

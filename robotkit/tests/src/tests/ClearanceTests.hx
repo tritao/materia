@@ -235,6 +235,23 @@ class ClearanceTests {
       ]);
     check(mating.violation([0.0]) == null,
       "an exact zero-gap joint face remains a valid mechanical interface");
+    var roundedBodies = bodies.copy();
+    roundedBodies[1] = {name: "moving-bracket", link: moving.id,
+      vertices: box(0.000008, 0.1, -0.02, 0.02, -0.02, 0.02), tool: false};
+    var roundedMating = new ArmClearance(arm, roundedBodies, [0.0], ArmClearance.MARGIN,
+      ArmClearance.CONTACT_MARGIN, null, [
+        {first: "housing", second: "moving-bracket", margin: ArmClearance.INTERFACE_MARGIN}
+      ]);
+    check(roundedMating.violation([0.0]) == null,
+      "micrometre frame-rounding gaps remain a valid named mechanical interface");
+    roundedBodies[1] = {name: "moving-bracket", link: moving.id,
+      vertices: box(0.00002, 0.1, -0.02, 0.02, -0.02, 0.02), tool: false};
+    var separated = new ArmClearance(arm, roundedBodies, [0.0], ArmClearance.MARGIN,
+      ArmClearance.CONTACT_MARGIN, null, [
+        {first: "housing", second: "moving-bracket", margin: ArmClearance.INTERFACE_MARGIN}
+      ]).violation([0.0]);
+    check(separated != null && Math.abs(separated.required - ArmClearance.INTERFACE_MARGIN) < 1e-12,
+      "a gap beyond CAD tolerance keeps its named-interface clearance requirement");
   }
 
   static function testCrossingEdges():Void {
