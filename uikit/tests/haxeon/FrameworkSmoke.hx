@@ -5018,6 +5018,7 @@ class FrameworkSmoke {
 		var frame = new LayoutFrame(240, 80);
 		context.submit(new Text("lifetime baseline"), frame);
 		var before = context.buildContext.stateStore.diagnosticCounts();
+		var beforeKeys = context.buildContext.diagnosticKeyCounts();
 		for (index in 0...40) {
 			var content = new LayoutStyle(); content.height = LayoutAxis.fixed(500);
 			var label = new nativekit.ui.widgets.text.MiddleEllipsisText("label-" + index, "A long transient label");
@@ -5027,7 +5028,9 @@ class FrameworkSmoke {
 			context.submit(new Text("lifetime baseline"), frame);
 		}
 		var after = context.buildContext.stateStore.diagnosticCounts();
-		return after.values == before.values && after.resources == before.resources && after.paths == before.paths;
+		var afterKeys = context.buildContext.diagnosticKeyCounts();
+		return after.values == before.values && after.resources == before.resources && after.paths == before.paths &&
+			afterKeys.ids == beforeKeys.ids && afterKeys.paths == beforeKeys.paths;
 	}
 
 	static function selfUpdatingLifetimeValid(context:UiContext):Bool {
