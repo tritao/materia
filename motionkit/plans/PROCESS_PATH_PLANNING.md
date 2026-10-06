@@ -1033,3 +1033,22 @@ green. Compiler-only and focused runtime pass (1,144,735 assertions).
 Full JointPathSamples/timing integration, centre derivative providers for
 all geometric paths, broader family/moving-reference coverage, branch
 segmentation and authored acceptance remain outstanding.
+
+PP4 serial path/timing bridge: AnalyticPathRefiner.refinePath now produces
+JointPathSamples over the complete selected distance range from a typed
+RefinementTarget provider. It preserves the pinned initial configuration,
+re-solves the fixed analytic branch at each fine target, supplies
+differential q-prime/q-double-prime and carries incoming curvature
+separately at C1 geometric knots. Identical incoming/outgoing task
+curvature reuses the differential result. A UR circular TCP fixture
+provides independent exact task derivatives; all 21 refined samples
+match the analytic joint curve and derivatives. It succeeds in a single
+TOPP-RA call, reaches its full endpoint, and passes sampled velocity/
+acceleration checks plus native trajectory-extrema position/velocity/
+acceleration validation. A piecewise C1 fixture verifies outgoing zero
+and incoming 0.2 rad/path-unit-squared curvature at its central knot.
+Compiler-only and focused runtime pass (1,146,337 assertions). This is
+a serial fixture integration, not the authored track one-pass timing
+acceptance; Cartesian/numeric refinement, geometric centre derivative
+providers, moving-reference/OPW coverage and production integration remain
+outstanding, so PP4 and the overall plan remain incomplete.

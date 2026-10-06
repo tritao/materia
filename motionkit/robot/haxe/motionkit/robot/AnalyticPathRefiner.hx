@@ -76,6 +76,29 @@ class AnalyticPathRefiner {
     var motion=orientationMotion(distance,target,freedom,centreVelocity.slice(3),centreAcceleration.slice(3));
     return derivatives(distance,q,centreVelocity.slice(0,3).concat(motion.velocity),centreAcceleration.slice(0,3).concat(motion.acceleration));
   }
+  /** Produce the complete refined path for timing, preserving curvature on
+   * both sides of a geometric knot. The provider supplies exact task data. */
+  public function refinePath(distances:Array<Float>,task:Float->RefinementTarget):motionkit.planner.JointPathSamples {
+    if(distances==null || distances.length<2 || task==null ||
+        distances[0]!=problem.samples[0].distance || distances[distances.length-1]!=problem.samples[problem.samples.length-1].distance)
+      throw "Refined path must cover the complete selected path range";
+    for(i in 0...distances.length)if(!Math.isFinite(distances[i]) || i>0 && distances[i]<=distances[i-1])
+      throw "Refined path distances must increase finitely";
+    var positions:Array<Array<Float>> = [],first:Array<Array<Float>> = [],second:Array<Array<Float>> = [],before:Array<Array<Float>> = [];
+    var previous=selection.candidates[0].q.copy();
+    for(i in 0...distances.length){var distance=distances[i],target=task(distance);
+      if(target==null)throw 'Missing refinement task at distance $distance';
+      var candidate=sample(distance,target.pose,target.freedom,previous),q=candidate.q.copy();
+      if(i==0){var same=true;for(j in 0...q.length)if(Math.abs(q[j]-previous[j])>1e-7)same=false;
+        if(problem.pinnedStart && !same)throw "Refinement changed the pinned initial configuration";
+        if(same)q=previous.copy();}
+      var rates=refinedDerivatives(distance,q,target.pose,target.freedom,target.velocity,target.acceleration);
+      var sameCurvature=true;for(row in 0...6)if(target.acceleration[row]!=target.accelerationBefore[row])sameCurvature=false;
+      var incoming=sameCurvature ? rates : refinedDerivatives(distance,q,target.pose,target.freedom,target.velocity,target.accelerationBefore);
+      positions.push(q);first.push(rates.first);second.push(rates.second);before.push(incoming.second);previous=q;
+    }
+    return new motionkit.planner.JointPathSamples(distances,positions,first,second,before);
+  }
   public function sample(distance:Float,target:Pose3,freedom:OrientationPolicy,?seed:Array<Float>):LatticeCandidate {
     if(target==null || freedom==null)throw "Refinement needs a target and task freedom";
     var q=seed==null ? selection.candidates[0].q.copy() : seed.copy();
@@ -102,5 +125,22 @@ class AnalyticPathRefiner {
         ToolFreedom.orientationError(checked,target,freedom)>problem.request.tolerance.orientation)
       throw 'Refined analytic pose exceeds task tolerance at distance $distance';
     return best;
+  }
+}
+
+/** Centre rates are six-dimensional spatial derivatives: linear then angular. */
+class RefinementTarget {
+  public final pose:Pose3;
+  public final freedom:OrientationPolicy;
+  public final velocity:Array<Float>;
+  public final acceleration:Array<Float>;
+  public final accelerationBefore:Array<Float>;
+  public function new(pose:Pose3,freedom:OrientationPolicy,velocity:Array<Float>,acceleration:Array<Float>,?accelerationBefore:Array<Float>){
+    if(pose==null || freedom==null || velocity==null || acceleration==null || velocity.length!=6 || acceleration.length!=6 ||
+        accelerationBefore!=null && accelerationBefore.length!=6)throw "Refinement targets require a pose and spatial derivatives";
+    this.pose=pose;this.freedom=freedom;this.velocity=velocity.copy();this.acceleration=acceleration.copy();
+    this.accelerationBefore=accelerationBefore==null ? acceleration.copy() : accelerationBefore.copy();
+    for(values in [this.velocity,this.acceleration,this.accelerationBefore])for(value in values)
+      if(!Math.isFinite(value))throw "Refinement task derivatives must be finite";
   }
 }

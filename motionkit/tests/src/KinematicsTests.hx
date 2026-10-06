@@ -606,6 +606,48 @@ class KinematicsTests extends MotionKitTestSupport {
     var derivatives=refiner.refinedDerivatives(0.02,at,pa,motionkit.path.OrientationPolicy.Fixed,taskFirst,taskSecond);
     for(j in 0...at.length){near(derivatives.first[j],j==0?0.75:0,"differential rates match the independently sampled FK path",1e-5);
       near(derivatives.second[j],0,"differential acceleration cancels Jacobian variation",1e-4);}
+    var refinedPath=refiner.refinePath([for(i in 0...21)0.002*i],(distance)->{
+      var q=start.copy();q[0]+=0.75*distance;var p=solver.forward(q);
+      return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(p,motionkit.path.OrientationPolicy.Fixed,
+        [-0.75*p.y,0.75*p.x,0.0,0.0,0.0,0.75],[-0.5625*p.x,-0.5625*p.y,0.0,0.0,0.0,0.0]);
+    });
+    for(i in 0...refinedPath.s.length)for(j in 0...start.length){
+      near(refinedPath.q[i][j],start[j]+(j==0?0.75*refinedPath.s[i]:0),"refined joint path retains the exact analytic curve",1e-6);
+      near(refinedPath.qPrime[i][j],j==0?0.75:0,"refined joint path carries differential velocity",1e-6);
+      near(refinedPath.qDoublePrime[i][j],0,"refined joint path carries differential curvature",1e-5);
+    }
+    var timed=new ToppraPathTiming().time(refinedPath,new PathTimingLimits([for(_ in start)1.0],[for(_ in start)2.0]));
+    try {
+      var duration=timed.trajectory.durationSeconds();check(duration>0 && Math.isFinite(duration),"refined path succeeds in one TOPP-RA timing pass");
+      near(timed.distanceToTime(0.04),duration,"refined path end maps to timing end",1e-6);
+      for(i in 0...101){var state=timed.trajectory.evaluate(duration*i/100);
+        for(j in 0...start.length){check(Math.abs(state.velocities[j])<=1.00001,"timed refinement respects joint speed");
+          check(Math.abs(state.accelerations[j])<=2.00001,"timed refinement respects joint acceleration");}}
+      var exactLimits=new ValidationLimits(start.length,Int64.ofInt(0),Int64.ofInt(0));
+      for(j in 0...start.length){var bound=fixture.arm.group.limitsOf(j);exactLimits.position(j,bound.lower,bound.upper);
+        exactLimits.velocity(j,1.00001);exactLimits.acceleration(j,2.00001);}
+      check(!timed.trajectory.validate(exactLimits).hasFailure(),"native extrema validation proves refined trajectory bounds");
+      var finalState=timed.trajectory.evaluate(duration);
+      for(j in 0...start.length)near(finalState.positions[j],end[j],"timed refinement reaches the complete path endpoint",1e-6);
+    } catch(error:Dynamic){timed.releaseDistanceMap();timed.trajectory.dispose();throw error;}
+    timed.releaseDistanceMap();timed.trajectory.dispose();
+    function cornerQ(distance:Float):Array<Float> {
+      var q=start.copy();q[0]+=0.75*distance-0.1*0.02*0.02+(distance<0.02?0.1*(distance-0.02)*(distance-0.02):0);return q;
+    }
+    var cornerRequest=new PathRequest([0.0,0.02,0.04],[for(s in [0.0,0.02,0.04])solver.forward(cornerQ(s))],start,
+      new IkTolerance(1e-6,1e-6),request.maxJump,request.velocity);
+    var cornerProblem=new motionkit.robot.CandidateProblem(fixture.arm,cornerRequest);
+    var cornerRefiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,cornerProblem,motionkit.robot.StructuredLadder.search(cornerProblem));
+    var cornerPath=cornerRefiner.refinePath([for(i in 0...21)0.002*i],(distance)->{
+      var p=solver.forward(cornerQ(distance)),rate=0.75+(distance<0.02?0.2*(distance-0.02):0);
+      var outgoing=distance<0.02?0.2:0.0,incoming=distance<=0.02?0.2:0.0;
+      function acceleration(a:Float):Array<Float> return [-rate*rate*p.x-a*p.y,-rate*rate*p.y+a*p.x,0.0,0.0,0.0,a];
+      return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(p,motionkit.path.OrientationPolicy.Fixed,
+        [-rate*p.y,rate*p.x,0.0,0.0,0.0,rate],acceleration(outgoing),acceleration(incoming));
+    });
+    near(cornerPath.qDoublePrime[10][0],0,"refined path preserves outgoing curvature",1e-5);
+    near(cornerPath.qDoublePrimeBefore[10][0],0.2,"refined path preserves incoming curvature at a C1 knot",1e-5);
+    near(cornerPath.qPrime[10][0],0.75,"curvature break retains its continuous tangent",1e-6);
     var spinTargets=[for(p in request.poses){var rotation=new Quat(p.qx,p.qy,p.qz,p.qw).multiply(Quat.fromAxisAngle(new Vec3(0,0,1),0.17));
       new Pose3(p.x,p.y,p.z,rotation.x,rotation.y,rotation.z,rotation.w);}];
     var spinRequest=new PathRequest(request.distances,spinTargets,start,new IkTolerance(1e-6,1e-6),request.maxJump,request.velocity,1,
