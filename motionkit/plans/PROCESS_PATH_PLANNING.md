@@ -1079,3 +1079,14 @@ numeric-query checks prove no numeric pose IK is introduced. Compiler-only
 and focused runtime pass (1,147,730 assertions). Rotary Cartesian curvature
 acceptance, numeric fallback refinement, branch segmentation, geometric
 centre derivative providers and production/authored gates remain open.
+
+PP4 Cartesian rotary acceptance: XYZ+C and XYZ+C+A now also refine a
+nonuniform C-axis rotation with an offset tool and rotated base. An
+independent circle formula supplies exact TCP velocity and centripetal/
+tangential acceleration, with nonzero angular acceleration. Eleven fine
+samples preserve the selected joint curve, recover the changing C-axis
+rate and 0.4 curvature, and keep the translation axes stationary despite
+the moving TCP. Existing numeric-query counters still pass. Compiler-only
+and focused runtime pass (1,148,029 assertions). Numeric fallback refinement,
+branch segmentation, geometric centre derivative providers, production
+integration and authored timing/performance gates remain outstanding.

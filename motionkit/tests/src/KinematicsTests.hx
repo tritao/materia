@@ -879,6 +879,33 @@ class KinematicsTests extends MotionKitTestSupport {
         near(refined.qPrime[i][j],j==0?0.5:0,"Cartesian refinement solves task derivatives",1e-7);
         near(refined.qDoublePrime[i][j],0,"Cartesian straight refinement has zero curvature",1e-6);
       }
+      if(count>3) {
+        var opposite=markedQ.copy();opposite[3]+=Math.PI;
+        var oppositePose=new ManipulatorKinematics(marked).forward(opposite);
+        var centreX=(markedTarget.x+oppositePose.x)/2,centreY=(markedTarget.y+oppositePose.y)/2;
+        var rotaryEnd=markedQ.copy();rotaryEnd[3]+=0.5*0.04+0.2*0.04*0.04;
+        var rotaryRequest=new PathRequest([0.0,0.04],[markedTarget,new ManipulatorKinematics(marked).forward(rotaryEnd)],
+          markedQ,new IkTolerance(1e-6,1e-6),[for(_ in markedQ)0.5],[for(_ in markedQ)1.0]);
+        var rotaryProblem=new motionkit.robot.CandidateProblem(marked,rotaryRequest);
+        var rotaryRoute=motionkit.robot.StructuredLadder.search(rotaryProblem);
+        check(rotaryRoute.diagnostic==null,"Cartesian rotary refinement has a connected route");
+        var rotaryRefiner=new motionkit.robot.AnalyticPathRefiner(marked,rotaryProblem,rotaryRoute);
+        var rotaryPath=rotaryRefiner.refinePath([for(i in 0...11)0.004*i],distance -> {
+          var q=markedQ.copy();q[3]+=0.5*distance+0.2*distance*distance;
+          var p=new ManipulatorKinematics(marked).forward(q),rate=0.5+0.4*distance;
+          var x=p.x-centreX,y=p.y-centreY;
+          return new motionkit.robot.AnalyticPathRefiner.RefinementTarget(p,motionkit.path.OrientationPolicy.Fixed,
+            [-rate*y,rate*x,0.0,0.0,0.0,rate],
+            [-rate*rate*x-0.4*y,-rate*rate*y+0.4*x,0.0,0.0,0.0,0.4]);
+        });
+        for(i in 0...11)for(j in 0...count) {
+          var distance=rotaryPath.s[i];
+          near(rotaryPath.q[i][j],markedQ[j]+(j==3?0.5*distance+0.2*distance*distance:0),
+            "Cartesian rotary refinement preserves the offset-tool curve",1e-7);
+          near(rotaryPath.qPrime[i][j],j==3?0.5+0.4*distance:0,"Cartesian rotary differential velocity",1e-7);
+          near(rotaryPath.qDoublePrime[i][j],j==3?0.4:0,"Cartesian rotary differential curvature",1e-6);
+        }
+      }
       for (sample in 0...40) {
         var q = [for (joint in 0...count) 1.4 * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q);
