@@ -8,11 +8,11 @@ import app.EditorSceneTree;
 import app.SceneCodec;
 import cadkit.Shape;
 import nativekit.scene.Scene;
-import nativekit.ui.core.CommandContext;
-import nativekit.ui.properties.PropertyBinding;
-import nativekit.ui.properties.PropertyDescriptor;
-import nativekit.ui.properties.PropertyEditResult;
-import nativekit.ui.properties.PropertyValue;
+import haxeon.ui.core.CommandContext;
+import haxeon.ui.properties.PropertyBinding;
+import haxeon.ui.properties.PropertyDescriptor;
+import haxeon.ui.properties.PropertyEditResult;
+import haxeon.ui.properties.PropertyValue;
 
 class CadSceneSmoke {
   static function main():Int {

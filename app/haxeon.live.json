@@ -27,8 +27,8 @@
     "bimkit": {
       "path": "../bimkit"
     },
-    "uikit": {
-      "path": "../uikit"
+    "haxeon-ui": {
+      "path": "../haxeon/packages/ui"
     },
     "robotkit": {
       "path": "../robotkit"
@@ -90,7 +90,7 @@
         "native/CMakeLists.txt",
         "../haxeon/vendor/nativekit/CMakeLists.txt",
         "../haxeon/vendor/nativekit/modules/gpu/CMakeLists.txt",
-        "../uikit/CMakeLists.txt",
+        "../haxeon/packages/ui/CMakeLists.txt",
         "../scenekit/scene/CMakeLists.txt",
         "../scenekit/scene_render/CMakeLists.txt",
         "../simkit/sim_core/CMakeLists.txt",

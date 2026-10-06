@@ -1,5 +1,7 @@
 package tests;
 
+import haxeon.ui.ResolvedLayoutItem;
+
 import app.ApplicationSimulation;
 import app.ProjectDocumentSession;
 import app.ScriptOwnership;
@@ -10,9 +12,9 @@ import app.ScriptedSetup;
 import app.SetupScriptRegistry;
 import app.examples.TwoRobotSetupScript;
 import haxe.Json;
-import LayoutFrame;
-import FontCollection;
-import nativekit.ui.core.RenderNode;
+import haxeon.ui.LayoutFrame;
+import haxeon.ui.FontCollection;
+import haxeon.ui.core.RenderNode;
 import robotkit.world.RobotWorld;
 import robotkit.recording.McapRobotRecording;
 import robotkit.recording.McapRecordingReader;
@@ -283,9 +285,9 @@ class ScriptedSetupTests {
   static function inspectorInteraction(directory:String):Void {
     var workspacePath = directory + "/workspace.json";
     var fontPath:Null<String> = null;
-    for (candidate in ["uikit/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf",
-      "../../uikit/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../../uikit/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"])
+    for (candidate in ["haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf",
+      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
+      "../../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"])
       if (FileSystem.exists(candidate)) fontPath = candidate;
     check(fontPath != null, "scripted inspector test font is available");
     var fonts = FontCollection.create();

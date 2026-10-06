@@ -1,6 +1,8 @@
 package app;
 
-import nativekit.ui.host.DesktopUiHostContext;
+import haxeon.platform.NativeKitEventValue.NativeKitResource;
+
+import haxeon.ui.host.DesktopUiHostContext;
 import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitTypes;
 import haxeon.platform.NativeKitEventValue;

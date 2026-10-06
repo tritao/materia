@@ -16,7 +16,7 @@ start.
 | [`app/`](app/) | Reference editor shell and Component Lab host |
 | [`haxeon/`](haxeon/) | Haxe-compatible compiler, HashLink runtime, and project CLI |
 | [`haxeon/vendor/nativekit/`](haxeon/vendor/nativekit/) | Windows, surfaces, input, GPU, and native runtime services |
-| [`uikit/`](uikit/) | Retained UI layout, text, rendering, styles, and Haxe widgets |
+| [`haxeon/packages/ui/`](haxeon/packages/ui/) | Retained UI layout, text, rendering, styles, and Haxe widgets |
 | [`scenekit/`](scenekit/) | Retained scene data, rendering, picking, and interaction |
 | [`simkit/`](simkit/) | Deterministic simulation orchestration and physics integration |
 | [`sensorkit/`](sensorkit/) | Backend-independent sensor scheduling and measurement models |
@@ -132,7 +132,7 @@ and host integration details.
 
 Use the package README files for focused native build and test commands:
 
-- [NativeKit](haxeon/vendor/nativekit/README.md) and [UIKit](uikit/README.md) for platform and UI work;
+- [NativeKit](haxeon/vendor/nativekit/README.md) and [UIKit](haxeon/packages/ui/README.md) for platform and UI work;
 - [SceneKit](scenekit/README.md) and [SimKit](simkit/README.md) for scene and simulation work;
 - [CadKit](cadkit/README.md) for the headless CAD core;
 - [AnimKit](animkit/README.md) for glTF characters and skeletal animation;

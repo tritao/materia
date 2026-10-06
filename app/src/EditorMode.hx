@@ -1,7 +1,7 @@
 package app;
 
-import nativekit.ui.docking.DockNode;
-import nativekit.ui.icons.IconName;
+import haxeon.ui.docking.DockNode;
+import haxeon.ui.icons.IconName;
 
 /** Task-focused presets for the editor's dock layout and command surface. */
 class EditorMode {

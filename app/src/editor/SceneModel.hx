@@ -4,7 +4,7 @@ import app.EditorScene.EditorSceneObject;
 import app.SceneObjectData;
 import app.SceneCodec;
 import app.EditorScene;
-import nativekit.ui.editing.EditOperation;
+import haxeon.ui.editing.EditOperation;
 import app.editor.ObjectKindRegistry;
 
 typedef SceneRecordChange = {

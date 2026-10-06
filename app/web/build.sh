@@ -132,7 +132,7 @@ node "$app_dir/web/tools/check-imports.js" "$guest" "$build_dir/host/materia_web
 echo "== Site"
 cp "$build_dir/host/materia_web.js" "$build_dir/host/materia_web.wasm" "$guest" "$site_dir/"
 cp "$app_dir/web/index.html" "$app_dir/web/materia.js" "$haxeon_dir/stdlib/haxeon/wasm/haxeon-host.js" "$site_dir/"
-fonts="$materia_dir/uikit/vendor/skribidi/example/data"
+fonts="$materia_dir/haxeon/packages/ui/vendor/skribidi/example/data"
 cp "$fonts/IBMPlexSans-Regular.ttf" "$fonts/NotoEmoji-Regular.ttf" "$site_dir/assets/"
 echo "Built $site_dir"
 echo "Serve it with: python3 -m http.server --directory \"$site_dir\" 8080"

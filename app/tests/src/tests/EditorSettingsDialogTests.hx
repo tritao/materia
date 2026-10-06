@@ -2,16 +2,16 @@ package tests;
 
 import app.AppSettings;
 import app.Main.ReferenceEditorApp;
-import nativekit.ui.core.RenderNode;
-import nativekit.ui.core.UiEventKind;
-import nativekit.ui.core.UiKey;
-import nativekit.ui.core.UiModifier;
-import nativekit.ui.properties.PropertyValue;
-import nativekit.ui.theme.Theme;
-import FontCollection;
-import LayoutFrame;
-import nativekit.ui.widgets.settings.SettingsPanel;
-import nativekit.ui.widgets.settings.ShortcutsPanel;
+import haxeon.ui.core.RenderNode;
+import haxeon.ui.core.UiEventKind;
+import haxeon.ui.core.UiKey;
+import haxeon.ui.core.UiModifier;
+import haxeon.ui.properties.PropertyValue;
+import haxeon.ui.theme.Theme;
+import haxeon.ui.FontCollection;
+import haxeon.ui.LayoutFrame;
+import haxeon.ui.widgets.settings.SettingsPanel;
+import haxeon.ui.widgets.settings.ShortcutsPanel;
 import sys.FileSystem;
 
 /** The Editor Settings dialog: opening, editing, resetting and closing it in a laid-out editor. */
@@ -33,9 +33,9 @@ class EditorSettingsDialogTests {
     var settingsFile = DIRECTORY + "/settings.json";
     if (FileSystem.exists(settingsFile)) FileSystem.deleteFile(settingsFile);
     var fontPath:Null<String> = null;
-    for (candidate in ["uikit/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf",
-      "../../uikit/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../../uikit/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"])
+    for (candidate in ["haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf",
+      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
+      "../../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"])
       if (FileSystem.exists(candidate)) fontPath = candidate;
     check(fontPath != null, "a test font is available");
     var fonts = FontCollection.create();

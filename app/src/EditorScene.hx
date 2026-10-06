@@ -1,7 +1,9 @@
 package app;
 
-import nativekit.ui.widgets.controls.Select;
-import nativekit.ui.widgets.text.Text;
+import haxeon.ui.Path;
+
+import haxeon.ui.widgets.controls.Select;
+import haxeon.ui.widgets.text.Text;
 
 
 import nativekit.scene.Scene;
@@ -21,14 +23,14 @@ import nativekit.scene.Transaction;
 import nativekit.scene.SceneView;
 import nativekit.scene.SelectionSet;
 import nativekit.scene.Transform;
-import nativekit.ui.editing.EditorDocument;
-import nativekit.ui.editing.EditOperation;
-import nativekit.ui.core.CommandContext;
-import nativekit.ui.properties.PropertyDescriptor;
-import nativekit.ui.properties.PropertyDescriptorOptions;
-import nativekit.ui.properties.PropertyOption;
-import nativekit.ui.properties.PropertyType;
-import nativekit.ui.properties.PropertyValue;
+import haxeon.ui.editing.EditorDocument;
+import haxeon.ui.editing.EditOperation;
+import haxeon.ui.core.CommandContext;
+import haxeon.ui.properties.PropertyDescriptor;
+import haxeon.ui.properties.PropertyDescriptorOptions;
+import haxeon.ui.properties.PropertyOption;
+import haxeon.ui.properties.PropertyType;
+import haxeon.ui.properties.PropertyValue;
 import nativekit.scene.PickResult;
 import CadKit;
 import cadkit.Shape;

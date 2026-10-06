@@ -151,12 +151,12 @@ class WorkerDemoTests {
       if (after != nodeCount) throw 'Rebuild leaked character nodes: $nodeCount -> $after';
     }
     editor.scene.select("worker-demo");
-    var missingZoneField:Null<nativekit.ui.properties.PropertyDescriptor> = null;
+    var missingZoneField:Null<haxeon.ui.properties.PropertyDescriptor> = null;
     for (field in editor.scene.properties()) if (field.label == "Missing zone: missing-zone")
       missingZoneField = field;
     if (missingZoneField == null) throw "Inspector cannot remove a dangling zone";
-    switch new nativekit.ui.properties.PropertyBinding(missingZoneField, editor.scene.context())
-      .apply(nativekit.ui.properties.PropertyValue.Bool(false)) {
+    switch new haxeon.ui.properties.PropertyBinding(missingZoneField, editor.scene.context())
+      .apply(haxeon.ui.properties.PropertyValue.Bool(false)) {
       case Rejected(message): throw 'Removing dangling zone failed: $message';
       case Applied, Unchanged:
     }

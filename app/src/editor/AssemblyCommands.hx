@@ -3,7 +3,7 @@ package app.editor;
 import app.Main.ReferenceEditorApp;
 import app.MatePickTool;
 import materia.assembly.AssemblyDefinition.AssemblyMateKind;
-import nativekit.ui.core.Command;
+import haxeon.ui.core.Command;
 
 /** Assembly mate commands: each starts picking two faces for a mate of its kind in the perspective viewport. */
 @:access(app.Main.ReferenceEditorApp)

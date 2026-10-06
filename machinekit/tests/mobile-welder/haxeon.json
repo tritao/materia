@@ -19,6 +19,9 @@
     },
     "cadbridge": {
       "path": "../../../robotkit/cadbridge"
+    },
+    "processkit": {
+      "path": "../../../processkit"
     }
   },
   "target": "host",

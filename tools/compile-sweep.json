@@ -3,6 +3,6 @@
   "commands": [
     {"name": "simkit/sim_core bindings", "command": ["simkit/sim_core/tools/check-haxeon.sh"]},
     {"name": "simkit/sim_mujoco bindings", "command": ["simkit/sim_mujoco/tools/check-haxeon.sh"]},
-    {"name": "uikit showcase (script build)", "command": ["uikit/tools/showcase.sh", "--build-only"], "slow": true}
+    {"name": "uikit showcase (script build)", "command": ["haxeon/packages/ui/tools/showcase.sh", "--build-only"], "slow": true}
   ]
 }

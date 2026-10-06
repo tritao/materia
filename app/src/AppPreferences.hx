@@ -1,10 +1,12 @@
 package app;
 
+import haxeon.ui.Path;
+
 import haxe.Json;
 import haxe.io.Path as PreferencesPath;
-import nativekit.ui.properties.PropertyValue;
-import nativekit.ui.settings.SettingsJsonValue;
-import nativekit.ui.settings.SettingsStore;
+import haxeon.ui.properties.PropertyValue;
+import haxeon.ui.settings.SettingsJsonValue;
+import haxeon.ui.settings.SettingsStore;
 import sys.FileSystem;
 import sys.io.File;
 

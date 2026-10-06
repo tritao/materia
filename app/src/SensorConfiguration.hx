@@ -1,16 +1,16 @@
 package app;
 
-import nativekit.ui.widgets.text.Text;
+import haxeon.ui.widgets.text.Text;
 
 
-import nativekit.ui.core.CommandContext;
-import nativekit.ui.editing.EditorDocument;
-import nativekit.ui.editing.EditOperation;
-import nativekit.ui.properties.PropertyDescriptor;
-import nativekit.ui.properties.PropertyDescriptorOptions;
-import nativekit.ui.properties.PropertyOption;
-import nativekit.ui.properties.PropertyType;
-import nativekit.ui.properties.PropertyValue;
+import haxeon.ui.core.CommandContext;
+import haxeon.ui.editing.EditorDocument;
+import haxeon.ui.editing.EditOperation;
+import haxeon.ui.properties.PropertyDescriptor;
+import haxeon.ui.properties.PropertyDescriptorOptions;
+import haxeon.ui.properties.PropertyOption;
+import haxeon.ui.properties.PropertyType;
+import haxeon.ui.properties.PropertyValue;
 import robotkit.model.Frame;
 import robotkit.model.CollisionApproximation;
 import robotkit.model.Joint;

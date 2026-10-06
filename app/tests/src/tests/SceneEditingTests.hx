@@ -1,18 +1,18 @@
 package tests;
 
-import nativekit.ui.widgets.text.Text;
+import haxeon.ui.widgets.text.Text;
 
 
 import app.EditorScene;
 import app.EditorSceneTree;
-import nativekit.ui.properties.PropertyBinding;
-import nativekit.ui.properties.PropertyDescriptor;
-import nativekit.ui.properties.PropertyValue;
-import nativekit.ui.properties.PropertyEditResult;
+import haxeon.ui.properties.PropertyBinding;
+import haxeon.ui.properties.PropertyDescriptor;
+import haxeon.ui.properties.PropertyValue;
+import haxeon.ui.properties.PropertyEditResult;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import nativekit.scene.GeometryData;
-import LayoutFrame;
+import haxeon.ui.LayoutFrame;
 import haxeon.platform.NativeKitEvents;
 import app.ProjectDocumentSession;
 import app.SceneCodec;
@@ -22,8 +22,8 @@ import app.PerspectiveCamera;
 import app.EditorPerspectiveViewport;
 import app.PerspectiveSceneDrag;
 import app.Main.ReferenceEditorApp;
-import nativekit.ui.core.UiContext;
-import nativekit.ui.host.UiHostContext;
+import haxeon.ui.core.UiContext;
+import haxeon.ui.host.UiHostContext;
 import robotkit.world.RobotWorld;
 import robotkit.recording.McapRobotRecording;
 import robotkit.recording.McapRecordingReader;
@@ -61,15 +61,15 @@ class SceneEditingTests {
     var scene = new EditorScene([]);
     try {
       check(scene.createRectangle(), "finish test creates a rectangle");
-      var finish:Null<nativekit.ui.properties.PropertyDescriptor> = null;
-      var metallic:Null<nativekit.ui.properties.PropertyDescriptor> = null;
+      var finish:Null<haxeon.ui.properties.PropertyDescriptor> = null;
+      var metallic:Null<haxeon.ui.properties.PropertyDescriptor> = null;
       for (property in scene.properties()) {
         if (StringTools.endsWith(property.id, "finish")) finish = property;
         if (StringTools.endsWith(property.id, "metallic")) metallic = property;
       }
       check(finish != null && metallic != null, "finish properties are identified by id");
-      var finishProperty:nativekit.ui.properties.PropertyDescriptor = cast finish;
-      var metallicProperty:nativekit.ui.properties.PropertyDescriptor = cast metallic;
+      var finishProperty:haxeon.ui.properties.PropertyDescriptor = cast finish;
+      var metallicProperty:haxeon.ui.properties.PropertyDescriptor = cast metallic;
       var bronzeChoice = false;
       for (option in finishProperty.options) if (option.key == "bronze") bronzeChoice = true;
       check(bronzeChoice, "finish choices include the shared material library");
@@ -92,8 +92,8 @@ class SceneEditingTests {
 
   static function sensorRevisionSeparation():Void {
     var sensors = new SensorConfiguration();
-    var name:Null<nativekit.ui.properties.PropertyDescriptor> = null;
-    var rate:Null<nativekit.ui.properties.PropertyDescriptor> = null;
+    var name:Null<haxeon.ui.properties.PropertyDescriptor> = null;
+    var rate:Null<haxeon.ui.properties.PropertyDescriptor> = null;
     for (property in sensors.properties()) {
       if (StringTools.endsWith(property.id, ":name")) name = property;
       if (StringTools.endsWith(property.id, ":rate")) rate = property;
@@ -108,7 +108,7 @@ class SceneEditingTests {
       "sensor acquisition change requires simulation rebuild");
     sensors.dispose();
 
-    var shared = new nativekit.ui.editing.EditorDocument("shared");
+    var shared = new haxeon.ui.editing.EditorDocument("shared");
     var sharedSensors = new SensorConfiguration(null, shared);
     var sharedScene = new EditorScene([], shared);
     var sensorRevision = sharedSensors.revision();

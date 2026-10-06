@@ -1,11 +1,13 @@
 package app;
 
+import haxeon.ui.Path;
+
 import RobotKitRuntime;
-import FontCollection;
-import LayoutFrame;
-import nativekit.ui.core.RenderNode;
-import nativekit.ui.core.UiContext;
-import nativekit.ui.theme.Theme;
+import haxeon.ui.FontCollection;
+import haxeon.ui.LayoutFrame;
+import haxeon.ui.core.RenderNode;
+import haxeon.ui.core.UiContext;
+import haxeon.ui.theme.Theme;
 import app.MateriaProjectRunner;
 import app.Main.ReferenceEditorApp;
 import app.ProjectDocumentSession;
@@ -18,9 +20,9 @@ import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.AssemblyMateKind;
-import nativekit.ui.properties.PropertyBinding;
-import nativekit.ui.properties.PropertyValue;
-import nativekit.ui.properties.PropertyEditResult;
+import haxeon.ui.properties.PropertyBinding;
+import haxeon.ui.properties.PropertyValue;
+import haxeon.ui.properties.PropertyEditResult;
 import haxe.Json;
 import haxe.Int64;
 import robotkit.runtime.Simulation;
@@ -2526,7 +2528,7 @@ class ProjectSourceTests {
     check(StringTools.trim(lines[player.currentLine - 1]).length > 0, "the running line is a line of the program");
     // The CNC panel, laid out on its own and operated by pointer.
     var fonts = FontCollection.create();
-    fonts.add("uikit/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf");
+    fonts.add("haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf");
     var theme = Theme.dark();
     var ui = new UiContext(null, fonts, theme);
     var panel = new app.editor.CncPanel();

@@ -3,20 +3,20 @@ package app.editor;
 import app.ApplicationSimulation;
 import app.Main.ReferenceEditorApp;
 import app.ScriptOwnership;
-import Insets;
-import LayoutAxis;
-import LayoutStyle;
-import nativekit.ui.core.TextStyleOverride;
-import nativekit.ui.core.View;
-import nativekit.ui.icons.IconName;
-import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.controls.Button;
-import nativekit.ui.widgets.controls.ButtonVariant;
-import nativekit.ui.widgets.layout.Column;
-import nativekit.ui.widgets.layout.Row;
-import nativekit.ui.widgets.properties.PropertyInspector;
-import nativekit.ui.widgets.scroll.ScrollView;
-import nativekit.ui.widgets.text.Text;
+import haxeon.ui.Insets;
+import haxeon.ui.LayoutAxis;
+import haxeon.ui.LayoutStyle;
+import haxeon.ui.core.TextStyleOverride;
+import haxeon.ui.core.View;
+import haxeon.ui.icons.IconName;
+import haxeon.ui.widgets.KeyedView;
+import haxeon.ui.widgets.controls.Button;
+import haxeon.ui.widgets.controls.ButtonVariant;
+import haxeon.ui.widgets.layout.Column;
+import haxeon.ui.widgets.layout.Row;
+import haxeon.ui.widgets.properties.PropertyInspector;
+import haxeon.ui.widgets.scroll.ScrollView;
+import haxeon.ui.widgets.text.Text;
 
 /** Sensor dock panel and its script-owned controls. */
 @:access(app.Main.ReferenceEditorApp)

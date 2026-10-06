@@ -1,8 +1,10 @@
 package app.editor;
 
+import haxeon.ui.Path;
+
 import haxe.io.Path as SheetPath;
-import LayoutAxis;
-import LayoutStyle;
+import haxeon.ui.LayoutAxis;
+import haxeon.ui.LayoutStyle;
 import materia.project.MaterialLibrary;
 import materia.sheet.SheetCutPlan;
 import materia.sheet.SheetInventory;
@@ -10,26 +12,26 @@ import materia.sheet.SheetPartRequirement;
 import materia.sheet.SheetPlanExporter;
 import materia.sheet.SheetPlanValidation;
 import materia.sheet.SheetPlanValidator;
-import nativekit.ui.properties.PropertyDescriptor;
-import nativekit.ui.properties.PropertyDescriptorOptions;
-import nativekit.ui.properties.PropertyOption;
-import nativekit.ui.properties.PropertyType;
-import nativekit.ui.properties.PropertyValue;
-import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.controls.Button;
-import nativekit.ui.widgets.controls.Select;
-import nativekit.ui.widgets.controls.SelectOption;
-import nativekit.ui.widgets.layout.Column;
-import nativekit.ui.widgets.layout.Row;
-import nativekit.ui.widgets.properties.PropertyInspector;
-import nativekit.ui.widgets.scroll.ScrollView;
-import nativekit.ui.widgets.text.Text;
+import haxeon.ui.properties.PropertyDescriptor;
+import haxeon.ui.properties.PropertyDescriptorOptions;
+import haxeon.ui.properties.PropertyOption;
+import haxeon.ui.properties.PropertyType;
+import haxeon.ui.properties.PropertyValue;
+import haxeon.ui.widgets.KeyedView;
+import haxeon.ui.widgets.controls.Button;
+import haxeon.ui.widgets.controls.Select;
+import haxeon.ui.widgets.controls.SelectOption;
+import haxeon.ui.widgets.layout.Column;
+import haxeon.ui.widgets.layout.Row;
+import haxeon.ui.widgets.properties.PropertyInspector;
+import haxeon.ui.widgets.scroll.ScrollView;
+import haxeon.ui.widgets.text.Text;
 import sys.FileSystem;
 import sys.io.AtomicFile;
 
 /** Stock selection, manual plan editing, validation, exports, and cut confirmation in Materia. */
 @:access(app.Main.ReferenceEditorApp) class SheetWorkflowPanel {
-  public static function build(app:ReferenceEditorApp):Null < nativekit.ui.core.View > {
+  public static function build(app:ReferenceEditorApp):Null < haxeon.ui.core.View > {
     var projectReference = app.session.projectReference;
     if (projectReference == null) return null;
     var path = projectReference + ".sheet.json";

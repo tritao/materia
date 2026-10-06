@@ -17,7 +17,7 @@ inside one function, which moves what follows it along its line. Either one, not
 a difference in the output.
 
   tools/check-determinism.py
-  tools/check-determinism.py --edit shift --project app/tests/performance/haxeon.json --file uikit/haxe/nativekit/ui/core/BuildContext.hx
+  tools/check-determinism.py --edit shift --project app/tests/performance/haxeon.json --file haxeon/packages/ui/haxe/haxeon/ui/core/BuildContext.hx
 """
 import argparse
 import os
@@ -119,7 +119,7 @@ def check(project, target, edit, hldump, scratch):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project", type=Path, default=ROOT / "app/tests/performance/haxeon.json")
-    parser.add_argument("--file", type=Path, default=ROOT / "uikit/haxe/nativekit/ui/core/BuildContext.hx",
+    parser.add_argument("--file", type=Path, default=ROOT / "haxeon/packages/ui/haxe/haxeon/ui/core/BuildContext.hx",
                         help="the source file the edits are made to (restored afterwards)")
     parser.add_argument("--edit", choices=["shift", "literal", "all"], default="all")
     parser.add_argument("--hldump", type=Path, help="the hldump binary (default: $HLDUMP, or the one built in haxeon)")

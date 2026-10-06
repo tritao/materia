@@ -18,12 +18,12 @@ import cadkit.parametric.ParametricError;
 import cadkit.parametric.ReferenceState;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyReference;
-import nativekit.ui.properties.PropertyBinding;
-import nativekit.ui.properties.PropertyDescriptor;
-import nativekit.ui.properties.PropertyDescriptorOptions;
-import nativekit.ui.properties.PropertyEditResult;
-import nativekit.ui.properties.PropertyType;
-import nativekit.ui.properties.PropertyValue;
+import haxeon.ui.properties.PropertyBinding;
+import haxeon.ui.properties.PropertyDescriptor;
+import haxeon.ui.properties.PropertyDescriptorOptions;
+import haxeon.ui.properties.PropertyEditResult;
+import haxeon.ui.properties.PropertyType;
+import haxeon.ui.properties.PropertyValue;
 import sys.FileSystem;
 import sys.io.File;
 

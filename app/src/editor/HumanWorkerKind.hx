@@ -8,11 +8,11 @@ import app.SceneObjectData;
 import app.WorkerObjectData;
 import humankit.job.HumanJobSpec;
 import humankit.HumanBody;
-import nativekit.ui.properties.PropertyDescriptor;
-import nativekit.ui.properties.PropertyDescriptorOptions;
-import nativekit.ui.properties.PropertyOption;
-import nativekit.ui.properties.PropertyType;
-import nativekit.ui.properties.PropertyValue;
+import haxeon.ui.properties.PropertyDescriptor;
+import haxeon.ui.properties.PropertyDescriptorOptions;
+import haxeon.ui.properties.PropertyOption;
+import haxeon.ui.properties.PropertyType;
+import haxeon.ui.properties.PropertyValue;
 
 /** Scene object and inspector for an authored human worker. */
 @:access(app.EditorScene)

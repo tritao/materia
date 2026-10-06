@@ -1,10 +1,10 @@
 package tests;
 
 import app.EditorWorkspaceLayout;
-import nativekit.ui.docking.DockNode;
-import nativekit.ui.docking.DockSplitAxis;
-import nativekit.ui.docking.DockPanelDescriptor;
-import nativekit.ui.docking.DockWorkspaceModel;
+import haxeon.ui.docking.DockNode;
+import haxeon.ui.docking.DockSplitAxis;
+import haxeon.ui.docking.DockPanelDescriptor;
+import haxeon.ui.docking.DockWorkspaceModel;
 
 class EditorWorkspaceLayoutTests {
   public static function main():Int {

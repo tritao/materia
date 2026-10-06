@@ -1,7 +1,7 @@
 package app;
 
-import Color;
-import nativekit.ui.theme.Theme;
+import haxeon.ui.Color;
+import haxeon.ui.theme.Theme;
 
 /** Editor-specific surfaces and control colors shared by both theme variants. */
 class EditorAppearance {

@@ -1,10 +1,10 @@
 package tests;
 
 import app.WorkspaceSaveWorker;
-import nativekit.ui.docking.DockNode;
-import nativekit.ui.docking.DockWorkspacePersistence;
-import nativekit.ui.docking.DockWorkspaceSnapshot;
-import nativekit.ui.docking.DockWorkspaceSnapshotCodec;
+import haxeon.ui.docking.DockNode;
+import haxeon.ui.docking.DockWorkspacePersistence;
+import haxeon.ui.docking.DockWorkspaceSnapshot;
+import haxeon.ui.docking.DockWorkspaceSnapshotCodec;
 import sys.thread.Condition;
 
 class WorkspaceSaveWorkerTests {

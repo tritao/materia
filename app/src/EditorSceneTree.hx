@@ -1,18 +1,18 @@
 package app;
 
-import nativekit.ui.core.View;
-import nativekit.ui.widgets.text.Text;
-import nativekit.ui.widgets.text.MiddleEllipsisText;
-import nativekit.ui.widgets.overlays.Tooltip;
-import nativekit.ui.widgets.Icon;
-import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.layout.Row;
-import LayoutAlignmentY;
-import LayoutAxis;
-import LayoutStyle;
-import nativekit.ui.icons.IconName;
-import nativekit.ui.widgets.collections.TreeRootMetadata;
-import nativekit.ui.widgets.collections.TreeViewModel;
+import haxeon.ui.core.View;
+import haxeon.ui.widgets.text.Text;
+import haxeon.ui.widgets.text.MiddleEllipsisText;
+import haxeon.ui.widgets.overlays.Tooltip;
+import haxeon.ui.widgets.Icon;
+import haxeon.ui.widgets.KeyedView;
+import haxeon.ui.widgets.layout.Row;
+import haxeon.ui.LayoutAlignmentY;
+import haxeon.ui.LayoutAxis;
+import haxeon.ui.LayoutStyle;
+import haxeon.ui.icons.IconName;
+import haxeon.ui.widgets.collections.TreeRootMetadata;
+import haxeon.ui.widgets.collections.TreeViewModel;
 import materia.assembly.AssemblyBodies;
 import materia.assembly.AssemblyDefinition;
 

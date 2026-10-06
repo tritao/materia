@@ -1,8 +1,8 @@
 package app;
 
-import nativekit.ui.docking.DockWorkspacePersistence;
-import nativekit.ui.docking.DockWorkspaceSnapshot;
-import nativekit.ui.docking.DockWorkspaceSnapshotCodec;
+import haxeon.ui.docking.DockWorkspacePersistence;
+import haxeon.ui.docking.DockWorkspaceSnapshot;
+import haxeon.ui.docking.DockWorkspaceSnapshotCodec;
 #if !wasm
 import sys.thread.Condition;
 import sys.thread.Thread;
