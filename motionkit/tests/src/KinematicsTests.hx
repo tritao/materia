@@ -254,6 +254,69 @@ class KinematicsTests extends MotionKitTestSupport {
       "IK tolerance rejects a non-positive position tolerance");
   }
 
+  public function testExternalOpwIk():Void {
+    var model = new RobotModel("opw-track-positioner");
+    var root = model.addLink(new Link("cell")), carriage = model.addLink(new Link("carriage"));
+    var track = model.addJoint(new Joint("track", JointType.Prismatic, root, carriage));
+    track.axis = [0.8, 0.6, 0.0]; track.limits.lower = -1; track.limits.upper = 1;
+    var yaw = Quat.fromAxisAngle(new Vec3(0, 0, 1), 0.37);
+    track.parentFrameRotation = [yaw.x, yaw.y, yaw.z, yaw.w];
+    var positions = [[0.0, 0.0, 0.0], [0.1, 0.0, 0.615], [0.0, 0.0, 0.705],
+      [-0.135, 0.0, 0.755], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
+      [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    var parent = carriage;
+    for (index in 0...6) {
+      var child = model.addLink(new Link('arm-link-$index'));
+      var joint = model.addJoint(new Joint('arm-joint-$index', JointType.Revolute, parent, child));
+      joint.axis = axes[index]; joint.parentFramePosition = positions[index];
+      joint.limits.lower = -2 * Math.PI; joint.limits.upper = 2 * Math.PI;
+      parent = child;
+    }
+    var flange = model.addFrame(new Frame("arm-flange", parent)); flange.position = [0, 0, 0.085];
+    var work = model.addLink(new Link("positioner-work"));
+    var positioner = model.addJoint(new Joint("positioner", JointType.Revolute, root, work));
+    positioner.axis = [0, 0, 1]; positioner.parentFramePosition = [0.25, -0.3, 0.1];
+    positioner.limits.lower = -2 * Math.PI; positioner.limits.upper = 2 * Math.PI;
+    var workFrame = model.addFrame(new Frame("work-frame", work)); workFrame.position = [0.07, 0.02, 0.15];
+    var tcp = new Transform3(new Vec3(0.04, 0.02, 0.13), Quat.fromAxisAngle(new Vec3(0, 1, 0), 0.2));
+    for (withPositioner in [false, true]) {
+      var group = new robotkit.manipulation.KinematicGroup(model, root.id, flange.id,
+        withPositioner ? workFrame.id : null, tcp, null, ["track"]);
+      var analytic = new OpwKinematics(model, group);
+      var numeric = new ManipulatorKinematics(group);
+      check(analytic.jointCount() == (withPositioner ? 8 : 7), "OPW group preserves arm and external DOFs");
+      var before = group.numericSolveCount();
+      for (sample in 0...30) {
+        var q = [for (joint in 0...group.group.count()) (joint == 0 ? 0.8 : 1.4) * Math.sin((sample + 1) * (joint + 1) * 1.618)];
+        var target = numeric.forward(q), original = false;
+        near(motionkit.path.PoseMath.distance(analytic.forward(q), target), 0,
+          "External OPW analytic FK matches the compiled full-group model", 1e-6);
+        if (sample == 0) {
+          var solved = analytic.solvePose(target, q, new IkTolerance(1e-6, 1e-6));
+          check(solved != null, "External OPW KinematicsSolver interface returns a branch");
+          var answer:Array<Float> = cast solved;
+          for (joint in 0...q.length) near(answer[joint], q[joint],
+            "External OPW seeded solve selects the original complete configuration", 1e-5);
+        }
+        for (branch in analytic.branches(target, q)) {
+          var same = true;
+          for (joint in 0...q.length) {
+            same = same && Math.abs(branch.q[joint] - q[joint]) < 1e-5;
+            if (group.external[joint]) near(branch.q[joint], q[joint], "OPW holds the requested external lattice cell", 1e-12);
+          }
+          original = original || same;
+          var actual = numeric.forward(branch.q);
+          near(motionkit.path.PoseMath.distance(actual, target), 0, "External OPW preserves TCP position in its reference", 1e-6);
+          near(motionkit.robot.ToolFreedom.orientationError(actual, target, motionkit.path.OrientationPolicy.Fixed),
+            0, "External OPW preserves work-frame orientation", 1e-6);
+        }
+        check(original, "External OPW includes the original arm branch");
+      }
+      check(group.numericSolveCount() == before, "External OPW uses no numeric pose queries");
+    }
+  }
+
   public function testCartesianAnalyticIk():Void {
     for (count in 3...6) {
       var model = new RobotModel('analytic-cartesian-$count');

@@ -379,8 +379,8 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 
 | Step | State | Commits |
 |------|-------|---------|
-| PP0 | in progress: harness and diagnostics; gates and baselines pending | — |
-| PP1 | in progress: Cartesian verified, OPW extraction/interface verified; UR and external chains pending | — |
+| PP0 | in progress: harness and diagnostics; baseline completion pending | `0d43b32c0` (partial) |
+| PP1 | in progress: Cartesian and external-axis OPW verified; UR and offset RobotArm pending | `0d43b32c0` (partial) |
 | PP2 | planned | — |
 | PP3 | planned | — |
 | PP4 | planned | — |
@@ -479,9 +479,21 @@ position/orientation and using zero numeric pose queries. Evidence:
 `process-path-pp1-gantry-analytic.log`. OPW also implements the shared interface,
 retaining its native branch identities, singularity flags and legal periodic
 lifts, including lifts beyond one turn. The combined focused suite now passes
-`6659` assertions (`process-path-pp1-cartesian-haxe.log`). External-chain
-support, UR and numeric
-fallback diagnostics remain pending; PP1 is incomplete.
+`6659` assertions (`process-path-pp1-cartesian-haxe.log`).
+`OpwKinematics` now accepts a `KinematicGroup` with external axes, separating
+its six-joint arm at the first arm driver's parent link. `OpwGroupIk` derives
+the arm base in the current group reference (including a moving work frame),
+solves the arm analytically at the supplied external lattice values and
+restores the complete group configuration. Its FK composes the analytic arm
+pose with that base. The focused suite passes `103568` assertions, including
+rotated-track and track-plus-positioner round trips, complete seeded solves,
+legal branch recovery and zero numeric pose queries. Evidence:
+`process-path-pp1-external-opw.log`. External joints inside the arm chain are
+diagnosed as unsupported; no flattening into a fictitious six-axis model occurs.
+Production path compilation still uses its existing solver until PP6; the
+analytic external-cell API is ready for PP2 sampling. UR, the authored offset
+RobotArm decision and numeric fallback diagnostics remain pending; PP1 is
+incomplete.
 
 The pinned workspace gate passes all standalone suites; its one failure is the
 peer-dependent TCP integration launched without robotd. That integration has

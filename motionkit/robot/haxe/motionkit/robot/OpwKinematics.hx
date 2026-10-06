@@ -11,6 +11,7 @@ import motionkit.kinematics.PathRequest;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
 import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.KinematicGroup;
 import robotkit.model.Joint;
 import robotkit.model.Frame;
 import robotkit.model.JointType;
@@ -22,14 +23,15 @@ import robotkit.spatial.Vec3;
 /** Analytic 6R IK for a parallel-base, spherical-wrist RobotModel. */
 class OpwKinematics implements KinematicsSolver implements AnalyticIk {
   public final parameters:OpwParameters;
-  public final manipulator:Manipulator;
+  public final manipulator:KinematicGroup;
   public final geometryTolerance:Float;
   final base:Transform3;
   final flangeTTcp:Transform3;
   final native:mk_opw_parameters;
   final differential:ManipulatorKinematics;
+  final groupBackend:Null<OpwGroupIk>;
 
-  public function new(model:RobotModel, manipulator:Manipulator,
+  public function new(model:RobotModel, manipulator:KinematicGroup,
       ?geometryTolerance:Float = 1e-6) {
     if (model == null || manipulator == null) throw "OPW requires a model and manipulator";
     if (!Math.isFinite(geometryTolerance) || geometryTolerance <= 0.0)
@@ -37,6 +39,15 @@ class OpwKinematics implements KinematicsSolver implements AnalyticIk {
     this.manipulator = manipulator;
     this.geometryTolerance = geometryTolerance;
     differential = new ManipulatorKinematics(manipulator);
+    if (manipulator.external.indexOf(true) >= 0 || manipulator.workFrame != null) {
+      groupBackend = new OpwGroupIk(manipulator, geometryTolerance);
+      parameters = groupBackend.arm.parameters;
+      native = groupBackend.arm.native;
+      base = groupBackend.arm.base;
+      flangeTTcp = groupBackend.arm.flangeTTcp;
+      return;
+    }
+    groupBackend = null;
     var ordered = orderedJoints(model, manipulator);
     var current = Transform3.identity();
     var joints:Array<Joint> = [];
@@ -157,7 +168,7 @@ class OpwKinematics implements KinematicsSolver implements AnalyticIk {
     return {origins: origins, axes: axes};
   }
 
-  static function canonicalParameters(model:RobotModel, manipulator:Manipulator,
+  static function canonicalParameters(model:RobotModel, manipulator:KinematicGroup,
       joints:Array<Joint>, tolerance:Float):Null<OpwParameters> {
     var positions = [for (joint in joints) Vec3.fromArray(joint.parentFramePosition)];
     if (positions[0].norm() > tolerance ||
@@ -199,16 +210,18 @@ class OpwKinematics implements KinematicsSolver implements AnalyticIk {
   /** Nothing here changes once built, and the arm is safe to share. */
   public function fork():KinematicsSolver return this;
 
-  public function jointCount():Int return 6;
+  public function jointCount():Int return manipulator.group.count();
   public function family():String return "OPW";
 
   public function branches(target:Pose3, seed:Array<Float>, ?freedom:OrientationPolicy):Array<AnalyticBranch> {
+    if (groupBackend != null) return groupBackend.branches(target, seed, freedom);
     if (!ToolFreedom.isFull(freedom)) throw "OPW tool freedom must be sampled before analytic branch enumeration";
     if (seed == null || seed.length != 6) throw "OPW branch enumeration needs six seed joints";
     return branchCandidates(target, new IkTolerance(1e-6, 1e-6), seed);
   }
 
   public function forward(q:Array<Float>):Pose3 {
+    if (groupBackend != null) return groupBackend.forward(q);
     var result = forwardTransform(q);
     return new Pose3(result.translation.x, result.translation.y, result.translation.z,
       result.rotation.x, result.rotation.y, result.rotation.z, result.rotation.w);
@@ -216,6 +229,13 @@ class OpwKinematics implements KinematicsSolver implements AnalyticIk {
 
   public function solvePose(target:Pose3, seed:Array<Float>,
       tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>> {
+    if (groupBackend != null && ToolFreedom.isFull(freedom)) {
+      var options = groupBackend.branches(target, seed, freedom);
+      if (options.length == 0) return null;
+      options.sort((a, b) -> compareDistance(a.q, b.q, seed));
+      return options[0].q;
+    }
+    if (groupBackend != null) return differential.solvePose(target, seed, tolerance, freedom);
     if (!ToolFreedom.isFull(freedom)) return differential.solvePose(target, seed, tolerance, freedom);
     if (seed == null || seed.length != 6) throw "OPW pose solving needs six seed joints";
     var candidates = candidates(target, tolerance, seed);
@@ -226,6 +246,13 @@ class OpwKinematics implements KinematicsSolver implements AnalyticIk {
 
   public function sampleCandidates(target:Pose3, maxCount:Int,
       tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>> {
+    if (groupBackend != null) {
+      if (maxCount < 0) throw "OPW candidate count must be non-negative";
+      if (maxCount == 0) return [];
+      if (!ToolFreedom.isFull(freedom)) return differential.sampleCandidates(target, maxCount, tolerance, freedom);
+      var seed = [for (_ in 0...jointCount()) 0.0];
+      return [for (branch in groupBackend.branches(target, seed, freedom).slice(0, maxCount)) branch.q];
+    }
     if (!ToolFreedom.isFull(freedom)) return differential.sampleCandidates(target, maxCount, tolerance, freedom);
     if (maxCount < 0) throw "OPW candidate count must be non-negative";
     if (maxCount == 0) return [];
@@ -244,6 +271,7 @@ class OpwKinematics implements KinematicsSolver implements AnalyticIk {
    * call (`mk_select_opw_configurations`).
    */
   public function solvePath(request:PathRequest):Array<Null<Array<Float>>> {
+    if (groupBackend != null) return differential.solvePath(request);
     for (freedom in request.freedoms) if (!ToolFreedom.isFull(freedom)) return differential.solvePath(request);
     var lower:Array<Float> = [], upper:Array<Float> = [];
     for (joint in 0...jointCount()) {
@@ -266,6 +294,7 @@ class OpwKinematics implements KinematicsSolver implements AnalyticIk {
 
   /** Transform a requested TCP pose to the OPW flange frame for bulk IK. */
   public function nativePathSample(distance:Float, target:Pose3):mk_opw_path_sample {
+    if (groupBackend != null) throw "External OPW path samples require an explicit lattice-cell arm base";
     if (target == null || !Math.isFinite(distance))
       throw "OPW path sample needs a finite distance and pose";
     var local = localFlangePose(target);
@@ -359,7 +388,7 @@ class OpwKinematics implements KinematicsSolver implements AnalyticIk {
 
   static function compareDistance(a:Array<Float>, b:Array<Float>, seed:Array<Float>):Int {
     var da = 0.0, db = 0.0;
-    for (joint in 0...6) {
+    for (joint in 0...seed.length) {
       da += Math.pow(a[joint] - seed[joint], 2);
       db += Math.pow(b[joint] - seed[joint], 2);
     }
@@ -380,7 +409,7 @@ class OpwKinematics implements KinematicsSolver implements AnalyticIk {
       pose.get_quaternion(1), pose.get_quaternion(2), pose.get_quaternion(3)));
   }
 
-  static function orderedJoints(model:RobotModel, manipulator:Manipulator):Array<Joint>
+  static function orderedJoints(model:RobotModel, manipulator:KinematicGroup):Array<Joint>
     return manipulator.pathJoints();
 
 }
