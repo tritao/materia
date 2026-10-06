@@ -1896,3 +1896,7 @@ The algebraic research prototype now solves all four direct/reciprocal half-angl
 ### PP1 projected middle-axis special reconstruction
 
 The research inverse now reconstructs beta directly from its unsquared length equation when the middle-axis projection vanishes. Exact-rational q4=0/pi targets recover originals and each returns four FK-verified solutions (two special reconstructions), maximum errors 1.12e-16/6.67e-16. A constructed continuous-beta target verifies an explicit diagnostic rather than silent finite enumeration. Final experiment exits zero (`process-path-offset-degenerate-final.json`); prior boundary checks still pass. Parameterized continuum output, numerical certification/generic singular systems, native/model integration and all original gates remain unresolved.
+
+### PP1 deterministic algebraic reachable-target sweep
+
+Added shared exact-rational FK generation and `--check-random=N` to the research prototype. Actual combined 12-target/boundary experiment exits zero, recovers every original modulo turns, returns four to eight FK-verified solutions per random target, and preserves all finite boundary/degeneracy fixtures plus the continuum diagnostic. Maximum random FK error 2.51e-13, combined research runtime 32.803 s (`process-path-offset-random-final.json`, progress log of the same stem). Initial helper refactor exited one on an undefined local and was corrected before that passing run. This remains finite original-root evidence, not complete enumeration, native performance or authored/full-plan acceptance.

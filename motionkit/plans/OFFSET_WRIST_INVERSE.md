@@ -185,3 +185,23 @@ research experiment exits zero; evidence is
 `process-path-offset-degenerate-final.json`. These checks support the special
 reconstruction formula but do not implement parameterized continuum output or
 certify the elimination/back-substitution in other singular systems.
+
+## Deterministic reachable-target sweep
+
+`--check-random=12` generates exact-rational reachable targets from deterministic
+six-joint half-angle tangents (seed 712019, each numerator in [-9,9], denominator
+in [1,9]). FK generation is shared with the chart-boundary fixtures. The combined
+`--check-random=12 --check-boundaries` experiment exits zero: all twelve generating
+configurations recovered modulo turns, with four to eight solutions per target.
+All existing five finite boundary/projected-axis fixtures and the continuum
+diagnostic also pass. Maximum sweep FK error is 2.502442697505103e-13; combined
+elapsed time is 32.803 seconds. Evidence: `process-path-offset-random-final.json`
+and per-sample progress `process-path-offset-random-final.log`.
+
+The initial refactor experiment exited one because the extracted FK helper still
+referenced its former local `wrist` variable. It was corrected to `tangents[5]`
+before the successful combined run. The failure is not inverse-coverage evidence.
+This finite sweep does not prove all-root completeness; it verifies original-root
+recovery and checks every returned candidate against FK. Certified coupled-root
+back-substitution and continuum representation remain necessary before default
+family integration.

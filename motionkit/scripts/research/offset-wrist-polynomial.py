@@ -7,6 +7,7 @@ motionkit/plans/OFFSET_WRIST_INVERSE.md for reconstruction and degeneracies.
 import json
 import math
 import time
+import sys
 import sympy as s
 
 
@@ -133,7 +134,7 @@ def solve(rotation, position, dimensions):
     return {'solutions':solutions,'charts':charts}
 
 
-def boundary_checks(dimensions):
+def exact_target(tangents, dimensions):
     def trig(tangent):
         if tangent is None:
             return s.Integer(0),s.Integer(-1)
@@ -144,6 +145,21 @@ def boundary_checks(dimensions):
         if axis=='z':
             return s.Matrix([[cs,-sn,0],[sn,cs,0],[0,0,1]])
         return s.Matrix([[cs,0,sn],[0,1,0],[-sn,0,cs]])
+    matrices=[rotation(axis,t) for axis,t in zip('zyyzyz',tangents)]
+    R=s.eye(3)
+    for matrix in matrices:
+        R=R*matrix
+    s2,c2q=trig(tangents[1]);s3,c3q=trig(tangents[2])
+    sb,cb=s2*c3q+c2q*s3,c2q*c3q-s2*s3
+    a1,a2,b,c1,c2,c3,c4,d=dimensions
+    local=s.Matrix([a1+c2*s2+a2*cb+c3*sb,b,c1+c2*c2q-a2*sb+c3*cb])
+    sg,cg=trig(tangents[5])
+    position=matrices[0]*local+c4*R[:,2]+d*(R*s.Matrix([sg,cg,0]))
+    original=[math.pi if t is None else 2*math.atan(float(t)) for t in tangents]
+    return R,position,original
+
+
+def boundary_checks(dimensions):
     records=[]
     for base,wrist,middle_start in [(None,s.Rational(1,5),s.Rational(2,5)),
                                      (s.Rational(1,7),None,s.Rational(2,5)),
@@ -151,17 +167,7 @@ def boundary_checks(dimensions):
                                      (s.Rational(1,7),s.Rational(1,5),s.Integer(0)),
                                      (s.Rational(1,7),s.Rational(1,5),None)]:
         tangents=[base,s.Rational(1,3),s.Rational(-1,4),middle_start,s.Rational(1,2),wrist]
-        matrices=[rotation(axis,t) for axis,t in zip('zyyzyz',tangents)]
-        R=s.eye(3)
-        for matrix in matrices:
-            R=R*matrix
-        s2,c2q=trig(tangents[1]);s3,c3q=trig(tangents[2])
-        sb,cb=s2*c3q+c2q*s3,c2q*c3q-s2*s3
-        a1,a2,b,c1,c2,c3,c4,d=dimensions
-        local=s.Matrix([a1+c2*s2+a2*cb+c3*sb,b,c1+c2*c2q-a2*sb+c3*cb])
-        sg,cg=trig(wrist)
-        position=matrices[0]*local+c4*R[:,2]+d*(R*s.Matrix([sg,cg,0]))
-        original=[math.pi if t is None else 2*math.atan(float(t)) for t in tangents]
+        R,position,original=exact_target(tangents,dimensions)
         result=solve(R,position,dimensions)
         recovered=any(all(abs(math.atan2(math.sin(a-b),math.cos(a-b)))<1e-7
                           for a,b in zip(original,item['q'])) for item in result['solutions'])
@@ -183,6 +189,24 @@ def boundary_checks(dimensions):
     return records
 
 
+def random_checks(dimensions, count):
+    import random
+    rng=random.Random(712019)
+    records=[]
+    for sample in range(count):
+        tangents=[s.Rational(rng.randint(-9,9),rng.randint(1,9)) for _ in range(6)]
+        R,position,original=exact_target(tangents,dimensions)
+        result=solve(R,position,dimensions)
+        recovered=any(all(abs(math.atan2(math.sin(a-b),math.cos(a-b)))<1e-7
+                          for a,b in zip(original,item['q'])) for item in result['solutions'])
+        assert recovered, {'sample':sample,'tangents':list(map(str,tangents)),'result':result}
+        records.append({'sample':sample,'tangents':list(map(str,tangents)),
+                        'solutions':len(result['solutions']),'original_recovered':recovered,
+                        'max_fk_error':max(item['fk_error'] for item in result['solutions'])})
+        print('offset-polynomial sample',sample,'solutions',len(result['solutions']),flush=True,file=sys.stderr)
+    return records
+
+
 def main():
     rotation=s.Matrix([[s.Rational(2,15),-s.Rational(2,3),s.Rational(11,15)],
                        [s.Rational(14,15),s.Rational(1,3),s.Rational(2,15)],
@@ -192,9 +216,11 @@ def main():
     dimensions=list(map(s.Rational,['.17','-.09','.08','.4','.6','.5','.12','.035']))
     started=time.monotonic()
     result=solve(rotation,position,dimensions)
-    import sys
     if '--check-boundaries' in sys.argv:
         result['boundary_checks']=boundary_checks(dimensions)
+    for argument in sys.argv[1:]:
+        if argument.startswith('--check-random='):
+            result['random_checks']=random_checks(dimensions,int(argument.split('=',1)[1]))
     result['elapsed_seconds']=time.monotonic()-started
     print(json.dumps(result,indent=2))
 
