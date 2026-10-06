@@ -879,6 +879,19 @@ class KinematicsTests extends MotionKitTestSupport {
         near(refined.qPrime[i][j],j==0?0.5:0,"Cartesian refinement solves task derivatives",1e-7);
         near(refined.qDoublePrime[i][j],0,"Cartesian straight refinement has zero curvature",1e-6);
       }
+      var authoredLine=new PoseLine(new PoseWaypoint(markedTarget,1e-6,1e-6),new PoseWaypoint(delta,1e-6,1e-6),
+        motionkit.path.OrientationPolicy.Fixed,0.1,0.1);
+      var authoredPath=new motionkit.path.PosePath("task",[authoredLine]);
+      var authoredRequest=new PathRequest([0.0,authoredPath.length()],[markedTarget,delta],markedQ,
+        new IkTolerance(1e-6,1e-6),[for(_ in markedQ)0.5],[for(_ in markedQ)1.0]);
+      var authoredProblem=new motionkit.robot.CandidateProblem(marked,authoredRequest);
+      var authoredRefiner=new motionkit.robot.AnalyticPathRefiner(marked,authoredProblem,motionkit.robot.StructuredLadder.search(authoredProblem));
+      var provider=new motionkit.robot.PosePathRefinement(authoredPath);
+      var authoredSamples=authoredRefiner.refinePath([for(i in 0...11)authoredPath.length()*i/10],provider.at);
+      for(i in 0...11)for(j in 0...count) {
+        near(authoredSamples.q[i][j],markedQ[j]+(j==0?0.002*i:0),"authored pose path drives analytic refinement",1e-7);
+        near(authoredSamples.qPrime[i][j],j==0?1.0:0,"authored primitive supplies task rates",1e-6);
+      }
       if(count>3) {
         var opposite=markedQ.copy();opposite[3]+=Math.PI;
         var oppositePose=new ManipulatorKinematics(marked).forward(opposite);

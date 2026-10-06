@@ -1090,3 +1090,16 @@ the moving TCP. Existing numeric-query counters still pass. Compiler-only
 and focused runtime pass (1,148,029 assertions). Numeric fallback refinement,
 branch segmentation, geometric centre derivative providers, production
 integration and authored timing/performance gates remain outstanding.
+
+PP4 authored pose-path adapter: PosePathRefinement supplies RefinementTarget
+from PosePrimitive.derivativesAt in the group's task reference frame. At
+exact joins it selects outgoing task data and retains incoming curvature;
+velocity discontinuities require a stop/segment or blend rather than a
+single smooth differential solve. Fixed, interpolated and free-tool-spin
+centres use primitive rates. Cone projection and full-free centres are
+explicitly diagnosed until their centre derivatives are implemented.
+Authored PoseLine paths now pass through CandidateProblem, StructuredLadder,
+this provider and AnalyticPathRefiner to JointPathSamples for all three
+Cartesian families. Compiler-only and focused runtime pass (1,148,293
+assertions). Join/arc/weave acceptance, cone-centre derivatives, numeric
+refinement, branch segmentation and production/authored gates remain open.
