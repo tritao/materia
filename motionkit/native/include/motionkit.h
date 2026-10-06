@@ -129,7 +129,7 @@ typedef struct mk_external_cell {
 
 /** Space screws of external joints, in a common root frame at q=0.
  * Entries follow each chain's root-to-tip order. Scope 0 moves the arm base,
- * scope 1 moves the work frame. Kind 0 is prismatic, kind 1 is revolute. */
+ * scope 1 moves the work frame, scope 2 moves both. Kind 0 is prismatic, kind 1 is revolute. */
 typedef struct mk_serial_cell_model {
     uint32_t struct_size MK_STRUCT_SIZE;
     uint32_t joint_count;

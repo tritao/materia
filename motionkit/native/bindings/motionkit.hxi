@@ -21,7 +21,8 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	extern fn mk_analytic_ur_inverse(parameters: ptr<const<mk_ur_parameters>>, target: ptr<const<mk_opw_pose>>, singular_q6_seed: f64, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Cartesian free-spin/cone cells solve the tool-axis constraint. Repeated
-	 * geometric configurations retain their first lattice coordinates.
+	 * geometric configurations retain their first lattice coordinates. The Cartesian
+	 * descriptor includes its TCP, so model.tool must be identity and XYZ nonperiodic.
 	 */
 	extern fn mk_cartesian_candidate_count(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_opw_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_enumerate_joint_lifts(request: ptr<const<mk_joint_lift_request>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_lifts: ptr<mk_joint_lift> @out_array("lift_capacity"), lift_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
@@ -293,7 +294,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	/**
 	 * Space screws of external joints, in a common root frame at q=0.
 	 * Entries follow each chain's root-to-tip order. Scope 0 moves the arm base,
-	 * scope 1 moves the work frame. Kind 0 is prismatic, kind 1 is revolute.
+	 * scope 1 moves the work frame, scope 2 moves both. Kind 0 is prismatic, kind 1 is revolute.
 	 */
 	struct mk_serial_cell_model @layout(4048, 8) {
 		struct_size: u32 @offset(0) @struct_size;

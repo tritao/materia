@@ -33,7 +33,7 @@ bool valid_model(const mk_serial_cell_model *m,const mk_external_lattice *e,uint
     }
     for(unsigned i=0;i<m->external_count;++i) {
         auto j=m->external_joint_indices[i];
-        if(j>=n || seen[j] || j!=e->joint_indices[i] || m->external_scopes[i]>1 || m->external_kinds[i]>1)return false;
+        if(j>=n || seen[j] || j!=e->joint_indices[i] || m->external_scopes[i]>2 || m->external_kinds[i]>1)return false;
         seen[j]=true;
         for(unsigned k=0;k<3;++k)if(!std::isfinite(m->external_axes[3*i+k]) || !std::isfinite(m->external_origins[3*i+k]))return false;
         if(std::abs(vector(m->external_axes+3*i).norm()-1)>1e-8)return false;
@@ -42,7 +42,7 @@ bool valid_model(const mk_serial_cell_model *m,const mk_external_lattice *e,uint
 }
 T frame(const mk_serial_cell_model &m,const double *q,unsigned scope) {
     T t=T::Identity();
-    for(unsigned i=0;i<m.external_count;++i)if(m.external_scopes[i]==scope) {
+    for(unsigned i=0;i<m.external_count;++i)if(m.external_scopes[i]==scope || m.external_scopes[i]==2) {
         const V axis=vector(m.external_axes+3*i),origin=vector(m.external_origins+3*i);
         T step=T::Identity();const double value=q[m.external_joint_indices[i]];
         if(m.external_kinds[i]==0)step.translation()=axis*value;

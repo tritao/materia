@@ -211,6 +211,9 @@ class OpwKinematics implements KinematicsSolver implements AnalyticIk {
   public function fork():KinematicsSolver return this;
 
   public function jointCount():Int return manipulator.group.count();
+  public function nativeBase():Transform3 return base;
+  public function nativeTool():Transform3 return flangeTTcp;
+  public function nativeModel():mk_opw_parameters return native;
   public function family():String return "OPW";
 
   public function branches(target:Pose3, seed:Array<Float>, ?freedom:OrientationPolicy):Array<AnalyticBranch> {

@@ -285,8 +285,32 @@ class KinematicsTests extends MotionKitTestSupport {
         withPositioner ? workFrame.id : null, tcp, null, ["track"]);
       var analytic = new OpwKinematics(model, group);
       var numeric = new ManipulatorKinematics(group);
+      var nativeSampler = new motionkit.robot.SerialCandidateSampler(group);
       check(analytic.jointCount() == (withPositioner ? 8 : 7), "OPW group preserves arm and external DOFs");
       var before = group.numericSolveCount();
+      var nativeSeed = [for(i in 0...group.group.count()) 0.3*Math.sin(i+0.4)];
+      var nativeTarget = numeric.forward(nativeSeed);
+      var nativeBefore = group.numericSolveCount();
+      var grid = [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,nativeSeed[0]-0.02,nativeSeed[0]+0.02,3)];
+      if(withPositioner) grid.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(nativeSeed.length-1,nativeSeed[nativeSeed.length-1]-0.03,nativeSeed[nativeSeed.length-1]+0.03,3));
+      for(policy in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool]) {
+        var candidates = nativeSampler.sample(nativeTarget,nativeSeed,policy,grid,4,1,4);
+        check(candidates.length>0,"combined native serial sampler has candidates");
+        var original = false;
+        for(candidate in candidates) {
+          var same = true;
+          for (joint in 0...nativeSeed.length) if (Math.abs(candidate.q[joint]-nativeSeed[joint])>1e-5) same = false;
+          original = original || same;
+          var actual=numeric.forward(candidate.q);
+          near(motionkit.path.PoseMath.distance(actual,nativeTarget),0,"exported serial native candidate task position",1e-6);
+          near(motionkit.robot.ToolFreedom.orientationError(actual,nativeTarget,policy),0,"exported serial native candidate orientation",1e-6);
+          near(candidate.q[0],nativeSeed[0]-0.02+0.02*candidate.external[0],"native candidate track coordinate",1e-12);
+          if(withPositioner)near(candidate.q[candidate.q.length-1],nativeSeed[nativeSeed.length-1]-0.03+0.03*candidate.external[1],
+            "native candidate positioner coordinate",1e-12);
+        }
+        check(original,"combined native serial sampling retains the original centre-cell branch");
+      }
+      check(group.numericSolveCount()==nativeBefore,"combined serial native sampler uses no numeric IK");
       for (sample in 0...30) {
         var q = [for (joint in 0...group.group.count()) (joint == 0 ? 0.8 : 1.4) * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q), original = false;
@@ -348,6 +372,7 @@ class KinematicsTests extends MotionKitTestSupport {
         withPositioner ? workFrame.id : null, tcp, null, ["track"]);
       var analytic = new motionkit.robot.UrAnalyticIk(group);
       var numeric = new ManipulatorKinematics(group);
+      var nativeSampler = new motionkit.robot.SerialCandidateSampler(group);
       check(analytic.jointCount() == (withPositioner ? 8 : 7), "UR group preserves arm and external DOFs");
       var before = group.numericSolveCount();
       var seed = [for (i in 0...group.group.count()) 0.3*Math.sin(i+0.4)];
@@ -372,6 +397,29 @@ class KinematicsTests extends MotionKitTestSupport {
       var heldCells = motionkit.robot.ExternalAxisGrid.sample(group,seed,[]);
       check(heldCells.length == 1,"unspecified external axes become one-point rules");
       for (joint in 0...seed.length) near(heldCells[0].q[joint],seed[joint],"held external cell copies complete seed",1e-12);
+      var nativeSeed = [for(i in 0...group.group.count()) 0.3*Math.sin(i+0.4)];
+      var nativeTarget = numeric.forward(nativeSeed);
+      var nativeBefore = group.numericSolveCount();
+      var grid = [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,nativeSeed[0]-0.02,nativeSeed[0]+0.02,3)];
+      if(withPositioner) grid.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(nativeSeed.length-1,nativeSeed[nativeSeed.length-1]-0.03,nativeSeed[nativeSeed.length-1]+0.03,3));
+      for(policy in [motionkit.path.OrientationPolicy.Fixed,motionkit.path.OrientationPolicy.FreeAboutTool]) {
+        var candidates = nativeSampler.sample(nativeTarget,nativeSeed,policy,grid,4,1,4);
+        check(candidates.length>0,"combined native serial sampler has candidates");
+        var original = false;
+        for(candidate in candidates) {
+          var same = true;
+          for (joint in 0...nativeSeed.length) if (Math.abs(candidate.q[joint]-nativeSeed[joint])>1e-5) same = false;
+          original = original || same;
+          var actual=numeric.forward(candidate.q);
+          near(motionkit.path.PoseMath.distance(actual,nativeTarget),0,"exported serial native candidate task position",1e-6);
+          near(motionkit.robot.ToolFreedom.orientationError(actual,nativeTarget,policy),0,"exported serial native candidate orientation",1e-6);
+          near(candidate.q[0],nativeSeed[0]-0.02+0.02*candidate.external[0],"native candidate track coordinate",1e-12);
+          if(withPositioner)near(candidate.q[candidate.q.length-1],nativeSeed[nativeSeed.length-1]-0.03+0.03*candidate.external[1],
+            "native candidate positioner coordinate",1e-12);
+        }
+        check(original,"combined native serial sampling retains the original centre-cell branch");
+      }
+      check(group.numericSolveCount()==nativeBefore,"combined serial native sampler uses no numeric IK");
       for (sample in 0...30) {
         var q = [for (joint in 0...group.group.count()) (joint == 0 ? 0.8 : 1.4) * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q), original = false;

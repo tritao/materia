@@ -37,6 +37,8 @@ int main() {
     double seed[]={0,.2,-1.1,.8,-.5,.7,.3,0};
     mk_opw_parameters opw={};opw.struct_size=sizeof(opw);opw.a1=.1;opw.a2=-.135;opw.c1=.615;opw.c2=.705;opw.c3=.755;opw.c4=.085;
     for(auto &sign:opw.sign_corrections)sign=1;
+    for(unsigned shared=0;shared<2;++shared) {
+    model.external_scopes[0]=shared ? 2 : 0;
     for(unsigned family=0;family<2;++family) {
     const auto forward=[&](const double *q,mk_opw_pose *out){return family==0 ? mk_analytic_ur_forward(&p,q,6,out) : mk_opw_forward(&opw,q,6,out);};
     mk_opw_pose arm;assert(forward(seed+1,&arm)==MK_OK);
@@ -62,7 +64,9 @@ int main() {
             T moved_base=base;moved_base.translation()+=Eigen::Vector3d(.8,.6,0)*c.joints[0];
             T turn=T::Identity();turn.linear()=Eigen::AngleAxisd(c.joints[7],Eigen::Vector3d::UnitZ()).toRotationMatrix();
             const Eigen::Vector3d origin(.2,-.2,.1);turn.translation()=origin-turn.linear()*origin;
-            const T actual=(turn*work).inverse()*moved_base*pose(fk.position,fk.quaternion)*tool;
+            T moved_work=turn*work;
+            if(shared)moved_work.translation()+=Eigen::Vector3d(.8,.6,0)*c.joints[0];
+            const T actual=moved_work.inverse()*moved_base*pose(fk.position,fk.quaternion)*tool;
             assert((actual.translation()-goal.translation()).norm()<1e-7);
             const double dot=actual.linear().col(2).dot(goal.linear().col(2));
             const double tilt=acos(std::max(-1.0,std::min(1.0,dot)));
@@ -81,6 +85,7 @@ int main() {
     uint32_t written=99;assert(sample(nullptr,0,&written)==MK_OK && written==0);
     const auto original=model.arm_joint_indices[0];model.arm_joint_indices[0]=model.arm_joint_indices[1];
     assert(candidate_count(&count)==MK_ERROR_INVALID_ARGUMENT);model.arm_joint_indices[0]=original;
+    }
     }
     for(unsigned n=3;n<=5;++n) {
         mk_analytic_cartesian_model cart={};cart.struct_size=sizeof(cart);cart.joint_count=n;

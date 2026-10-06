@@ -100,6 +100,8 @@ class UrAnalyticIk implements AnalyticIk {
     }
     return {origins:origins,axes:axes};
   }
+  public function nativeBase():Transform3 return base;
+  public function nativeTool():Transform3 return flangeTTcp;
   public function family():String return "UR6R";
   public function jointCount():Int return manipulator.group.count();
   public function nativeModel():mk_ur_parameters return native;

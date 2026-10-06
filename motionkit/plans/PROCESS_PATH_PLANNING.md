@@ -730,3 +730,21 @@ and numeric IK query counts remain unchanged. Compiler-only build and focused
 C4 runtime pass (190,110 assertions). Serial-arm space-screw export, combined
 external-cell Haxe integration, PathRequest problem building and production
 planner integration remain outstanding; PP2 is not complete.
+
+PP2 serial Haxe-to-native export and invocation are now implemented. SerialCellModel
+walks the model's upstream and work-frame paths at q=0, exports their root-frame
+space screws, and composes the FK-verified analytic base/tool conventions with
+the group's reference frames. Shared external joints can move both base and
+work frame (scope 2), verified by independent native FK tests. SerialCandidateSampler
+uses model-derived limits and one combined native grid/orientation/branch/lift
+call; it performs no Haxe per-cell/per-orientation IK. ExternalAxisGrid.describe
+is shared with its cell-only wrapper. UR and OPW integration checks cover a
+rotated track alone and with a positioner, fixed/free-spin policies, pitched and
+displaced TCPs, original centre-cell branch retention, coordinate values and
+all returned task residuals. The first test grid was far from its target's
+external coordinates near full arm extension; it correctly returned no candidates.
+The centred grid includes a known reachable configuration. Compiler-only build,
+all 14 native CTests, four-platform ABI audit and focused C4 runtime pass
+(262,066 assertions). PathRequest problem building, cone integration across
+serial groups, authored combined-sampler acceptance and production migration
+remain outstanding; PP2 is not yet complete.

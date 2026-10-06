@@ -6,7 +6,7 @@ import robotkit.manipulation.KinematicGroup;
 
 /** Native external-cell product. Omitted axes are held at the sample's seed. */
 class ExternalAxisGrid {
-  public static function sample(group:KinematicGroup,seed:Array<Float>,ranges:Array<ExternalAxisRange>):Array<ExternalCell> {
+  public static function describe(group:KinematicGroup,seed:Array<Float>,ranges:Array<ExternalAxisRange>):mk_external_lattice {
     if (group == null || seed == null || seed.length != group.group.count() || ranges == null)
       throw "External grid requires a group, complete seed and ranges";
     var indices = [for (i in 0...group.group.count()) if (group.external[i]) i];
@@ -28,6 +28,11 @@ class ExternalAxisGrid {
       native.set_joint_indices(i,joint);native.set_point_counts(i,range == null ? 1 : range.points);
       native.set_lower(i,lower);native.set_upper(i,upper);
     }
+    return native;
+  }
+  public static function sample(group:KinematicGroup,seed:Array<Float>,ranges:Array<ExternalAxisRange>):Array<ExternalCell> {
+    var native = describe(group,seed,ranges);
+    var indices = [for (i in 0...group.group.count()) if (group.external[i]) i];
     var size = MotionKitNative.mk_external_lattice_count(native);
     if (size.status != TrajectoryCoreConstants.MK_OK) throw "Invalid external grid dimensions or product overflow";
     var result = MotionKitNative.mk_sample_external_cells(native,seed,size.out_count);
