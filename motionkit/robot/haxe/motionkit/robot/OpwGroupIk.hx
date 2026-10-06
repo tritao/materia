@@ -62,7 +62,7 @@ class OpwGroupIk implements AnalyticIk {
     for (branch in arm.branches(pose, armSeed, freedom)) {
       var q = seed.copy();
       for (index in 0...6) q[armIndices[index]] = branch.q[index];
-      answers.push(new AnalyticBranch(q, branch.branch, branch.singular));
+      answers.push(new AnalyticBranch(q, branch.branch, branch.singular,branch.singularityKnown,branch.configuration));
     }
     return answers;
   }

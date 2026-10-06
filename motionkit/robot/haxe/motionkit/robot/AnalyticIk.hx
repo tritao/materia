@@ -18,9 +18,10 @@ class AnalyticBranch {
   public final singular:Bool;
   /** Numeric fallback cannot classify geometric singularities. */
   public final singularityKnown:Bool;
+  public final configuration:Null<SixAxisConfiguration>;
 
-  public function new(q:Array<Float>, branch:Int, singular:Bool, singularityKnown:Bool = true) {
+  public function new(q:Array<Float>, branch:Int, singular:Bool, singularityKnown:Bool = true, ?configuration:SixAxisConfiguration) {
     this.q = q.copy(); this.branch = branch; this.singular = singular;
-    this.singularityKnown = singularityKnown;
+    this.singularityKnown = singularityKnown;this.configuration=configuration;
   }
 }

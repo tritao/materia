@@ -132,7 +132,7 @@ class UrAnalyticIk implements AnalyticIk {
     for(i in 0...result.out_count) {
       var raw = result.out_solutions[i];
       for (lift in lifts.enumerate([for (j in 0...6) raw.get_joints(j)]))
-        answers.push(new AnalyticBranch(lift.q,raw.get_branch(),raw.get_singular() != 0));
+        answers.push(new AnalyticBranch(lift.q,raw.get_branch(),raw.get_singular() != 0,true,SixAxisConfiguration.of("UR6R",raw.get_branch(),lift.q)));
     }
     return answers;
   }

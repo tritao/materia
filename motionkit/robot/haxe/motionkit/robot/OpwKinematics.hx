@@ -363,7 +363,7 @@ class OpwKinematics implements KinematicsSolver implements AnalyticIk {
           if (squared < tolerance.candidateSeparation * tolerance.candidateSeparation)
             duplicate = true;
         }
-        if (!duplicate) candidates.push(new AnalyticBranch(candidate, branch, solution.get_singular() != 0));
+        if (!duplicate) candidates.push(new AnalyticBranch(candidate, branch, solution.get_singular() != 0, true, SixAxisConfiguration.of("OPW",branch,candidate)));
       }
     }
     return candidates;

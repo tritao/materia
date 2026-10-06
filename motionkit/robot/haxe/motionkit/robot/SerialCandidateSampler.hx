@@ -29,6 +29,12 @@ class SerialCandidateSampler {
       limits.set_lower(i,bound.lower);limits.set_upper(i,bound.upper);limits.set_periodic(i,group.external[i] ? 0 : 1);
     }
   }
+  function labelled(candidates:Array<LatticeCandidate>):Array<LatticeCandidate> {
+    var family=ur==null ? "OPW" : "UR6R";
+    for(candidate in candidates)candidate.configuration=SixAxisConfiguration.of(family,candidate.branch,
+      [for(index in model.armIndices)candidate.q[index]]);
+    return candidates;
+  }
   public function sample(target:Pose3,seed:Array<Float>,freedom:OrientationPolicy,ranges:Array<ExternalAxisRange>,
       rollCount:Int=12,tiltRings:Int=3,azimuthCount:Int=8,?maxJump:Array<Float>,
       ?jointBounds:{lower:Array<Float>,upper:Array<Float>}):Array<LatticeCandidate> {
@@ -75,8 +81,8 @@ class SerialCandidateSampler {
       var lengths=CartesianCandidateSampler.compactLengths(size.out_count,seed.length,model.externalIndices.length);
       var result=MotionKitNative.mk_sample_ur_candidates_compact(ur.nativeModel(),model.native,external,orientation,liftLimits,pose,seed,lengths.joints,lengths.coordinates);
       if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native UR candidate sampling failed: ${result.status}';
-      return CartesianCandidateSampler.decodeCompact(result.out_joints,result.out_wraps,result.out_coordinates,
-        result.out_count,seed.length,model.externalIndices.length);
+      return labelled(CartesianCandidateSampler.decodeCompact(result.out_joints,result.out_wraps,result.out_coordinates,
+        result.out_count,seed.length,model.externalIndices.length));
     }
     var size=MotionKitNative.mk_opw_candidate_count(opw.nativeModel(),model.native,external,orientation,liftLimits,pose,seed);
     if(size.status!=TrajectoryCoreConstants.MK_OK)throw 'Native OPW candidate count failed: ${size.status}';
@@ -84,7 +90,7 @@ class SerialCandidateSampler {
     var lengths=CartesianCandidateSampler.compactLengths(size.out_count,seed.length,model.externalIndices.length);
     var result=MotionKitNative.mk_sample_opw_candidates_compact(opw.nativeModel(),model.native,external,orientation,liftLimits,pose,seed,lengths.joints,lengths.coordinates);
     if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native OPW candidate sampling failed: ${result.status}';
-    return CartesianCandidateSampler.decodeCompact(result.out_joints,result.out_wraps,result.out_coordinates,
-        result.out_count,seed.length,model.externalIndices.length);
+    return labelled(CartesianCandidateSampler.decodeCompact(result.out_joints,result.out_wraps,result.out_coordinates,
+        result.out_count,seed.length,model.externalIndices.length));
   }
 }

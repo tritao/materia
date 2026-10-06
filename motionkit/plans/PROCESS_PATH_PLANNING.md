@@ -2054,3 +2054,33 @@ This does not establish all-eight labelled inverse branches, class joint-limit
 interference/drive-load envelopes, every cell's reach, all-user re-baselines or a full
 phase gate. Configuration labels/turns and mission pinning remain next within PP0a,
 followed by its remaining geometry/mission/full-suite acceptance before PP1a.
+
+### PP0a shared configuration labels and candidate pins
+
+Added `SixAxisConfiguration`: generic shoulder front/back, elbow up/down, wrist
+flip/no-flip and six physical turn counts using principal interval [-pi,pi).
+OPW and UR native branch conventions are mapped explicitly in this shared class;
+these are not claimed as vendor configuration codes. Geometric-only pins leave
+turns free; pins with six turn counts select a physical lift. OPW/UR analytic
+results now carry labels, external-group adapters preserve the arm labels, and
+native serial sampler candidates derive them from their six internal coordinates.
+Cartesian/numeric fallback candidates remain explicitly unlabelled.
+
+`CandidateSamplingOptions.configuration` filters every candidate layer against
+the pin and rejects unsupported backend pinning. Exact-start candidates retain
+the selected label, and StructuredJointPathPlanner's start-option override preserves
+the pin. Profile construction diagnostics include its readable label.
+
+MotionKit compiler-only and final focused C4 runtime exit zero: 1,152,123 assertions
+(`process-path-config-labels-build-complete.log`, `process-path-config-labels-runtime-final.log`).
+New checks cover all eight OPW convention slots, physical turns at +/-pi and beyond
+one revolution, geometric/exact-turn pin semantics, the different UR bit mapping,
+labelled OPW lifts and actual native candidate layers retaining a chosen branch/lift.
+The initial new-file build hit the pinned parser's `>=` token at a generic assignment;
+spacing fixed it before successful builds. Existing Cartesian pinned-start fixtures
+still pass, without inventing a six-axis label.
+
+This implements IK/candidate labels and sampling pins, not yet authored program or
+mission pin fields, full refined-path pin enforcement or all-eight labelled authored
+RobotArm branch acceptance. Those remain PP0a work before class load/interference
+checks, all-user re-baselines and the full phase suite. PP1a has not started.

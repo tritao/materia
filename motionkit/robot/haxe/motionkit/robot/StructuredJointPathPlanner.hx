@@ -146,7 +146,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     if (pinStart != null) {
       var original = settings == null ? new CandidateSamplingOptions() : settings;
       settings = new CandidateSamplingOptions(original.rollCount,original.tiltRings,original.azimuthCount,
-        pinStart,original.externalRanges,original.externalRule);
+        pinStart,original.externalRanges,original.externalRule,original.configuration);
     }
     var profile=Sys.getEnv("PROCESS_PATH_PROFILE")=="1";
     var buildStarted=profile ? Sys.time() : 0.0;

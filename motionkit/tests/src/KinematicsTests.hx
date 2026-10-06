@@ -1842,6 +1842,19 @@ class KinematicsTests extends MotionKitTestSupport {
   }
 
   public function testOpwKinematics():Void {
+    var labels=["front/up/no-flip","front/down/no-flip","back/up/no-flip","back/down/no-flip",
+      "front/up/flip","front/down/flip","back/up/flip","back/down/flip"];
+    for(slot in 0...8){
+      var configuration=motionkit.robot.SixAxisConfiguration.of("OPW",slot,[0,0,0,0,0,0]);
+      check(configuration.label()==labels[slot]+" turns=[0,0,0,0,0,0]","OPW slots have explicit controller-style conventions");
+    }
+    var counted=motionkit.robot.SixAxisConfiguration.of("OPW",0,[-2*Math.PI-0.1,-Math.PI,Math.PI,2*Math.PI+0.1,0,4*Math.PI+0.2]);
+    check(haxe.Json.stringify(counted.turns)=="[-1,0,1,1,0,2]","physical turn counts use the half-open principal interval");
+    check(new motionkit.robot.SixAxisConfiguration("front","up","no-flip").accepts(counted),"geometric pins leave physical turns free");
+    check(!new motionkit.robot.SixAxisConfiguration("front","up","no-flip",[0,0,0,0,0,0]).accepts(counted),"turn pins reject a different periodic lift");
+    var urConvention=motionkit.robot.SixAxisConfiguration.of("UR6R",4,[0,0,0,0,0,0]);
+    check(urConvention.shoulder=="back" && urConvention.wrist=="no-flip","UR shoulder and wrist bits differ from OPW");
+
     var model = new RobotModel("opw-abb-test");
     var links = [for (index in 0...7) model.addLink(new Link('opw-link-$index'))];
     var positions = [[0.0, 0.0, 0.0], [0.1, 0.0, 0.615],
@@ -2019,11 +2032,23 @@ class KinematicsTests extends MotionKitTestSupport {
     var wrappedQ = [0.2, -0.3, 0.4, -0.5, 0.6, 3 * Math.PI + 0.2];
     var wrappedTarget = new ManipulatorKinematics(wrappedArm).forward(wrappedQ);
     var foundOriginal = false;
+    var originalConfiguration:Null<motionkit.robot.SixAxisConfiguration> = null;
     for (branch in shared.branches(wrappedTarget, wrappedQ)) {
       check(branch.branch >= 0 && branch.branch < 8, "OPW shared interface preserves native branch identity");
       var same = true;
       for (joint in 0...6) same = same && Math.abs(branch.q[joint] - wrappedQ[joint]) < 1e-5;
+      check(branch.configuration!=null,"OPW branches carry a six-axis label");
+      if(same)originalConfiguration=branch.configuration;
       foundOriginal = foundOriginal || same;
+    }
+    var pin:motionkit.robot.SixAxisConfiguration=cast originalConfiguration;
+    var pinRequest=new PathRequest([0.0,1.0],[wrappedTarget,wrappedTarget],wrappedQ,new IkTolerance(1e-6,1e-6),
+      [for(_ in wrappedQ)1.0],[for(_ in wrappedQ)1.0]);
+    var pinned=new motionkit.robot.CandidateProblem(wrappedArm,pinRequest,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1,1,1,true,null,null,pin));
+    for(layer in pinned.samples){
+      check(layer.candidates.length>0,"configuration-pinned ladder retains the authored branch");
+      for(candidate in layer.candidates)check(pin.accepts(candidate.configuration),"every pinned candidate preserves branch and turn labels");
     }
     check(foundOriginal, "OPW enumerates legal periodic lifts beyond the nearest plus/minus turn");
     var singularQ = wrappedQ.copy();

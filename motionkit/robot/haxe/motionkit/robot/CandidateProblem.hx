@@ -70,7 +70,8 @@ class CandidateProblem {
     var profile=Sys.getEnv("PROCESS_PATH_PROFILE")=="1",began=profile?Sys.time():0.0,lastReport=began;
     var queriesBefore=profile?group.numericSolveCount():0,totalCandidates=0;
     if(profile)Sys.println("PROCESS_PATH_BUILD_START "+haxe.Json.stringify({family:family,
-      diagnostic:diagnostic,samples:request.poses.length,externalAxes:externalJoints.length,pinnedStart:pinnedStart}));
+      diagnostic:diagnostic,samples:request.poses.length,externalAxes:externalJoints.length,pinnedStart:pinnedStart,
+      configuration:settings.configuration==null ? null : cast(settings.configuration,SixAxisConfiguration).label()}));
     samples=[];
     var initialPose=backend.forward(request.startQ);
     var neighbours=[request.startQ.copy()];
@@ -127,6 +128,12 @@ class CandidateProblem {
             candidates.push(new LatticeCandidate(branch.q,[for(_ in branch.q)0],cell.coordinates,
               orientation.roll,orientation.tilt,orientation.azimuth,branch.branch,0,false));
       }
+      var configurationPin=settings.configuration;
+      if(configurationPin!=null){
+        var pin:SixAxisConfiguration=cast configurationPin;
+        if(cart!=null || fallback!=null)throw "Configuration pin requires a labelled six-axis geometric backend";
+        candidates=[for(candidate in candidates)if(pin.accepts(candidate.configuration))candidate];
+      }
       if(index==0 && settings.pinStart) {
         var selected:Array<LatticeCandidate> = [];
         var initialCell:Null<motionkit.robot.OrientationLattice.OrientationCell> = null;
@@ -144,7 +151,7 @@ class CandidateProblem {
           if(same && selected.length==0)selected.push(new LatticeCandidate(request.startQ.copy(),candidate.wraps.copy(),
             candidate.external.copy(),initialCell==null ? candidate.roll : initialCell.roll,
             initialCell==null ? candidate.tilt : initialCell.tilt,
-            initialCell==null ? candidate.azimuth : initialCell.azimuth,candidate.branch,candidate.singular,candidate.singularityKnown));
+            initialCell==null ? candidate.azimuth : initialCell.azimuth,candidate.branch,candidate.singular,candidate.singularityKnown,candidate.configuration));
         }
         candidates=selected;
       }
@@ -171,11 +178,13 @@ class CandidateSamplingOptions {
   public final pinStart:Bool;
   public final externalRanges:Array<ExternalAxisRange>;
   public final externalRule:Null<(Int,Float,Pose3)->Array<ExternalAxisRange>>;
+  public final configuration:Null<SixAxisConfiguration>;
   public function new(rollCount:Int=12,tiltRings:Int=3,azimuthCount:Int=8,pinStart:Bool=true,
-      ?externalRanges:Array<ExternalAxisRange>,?externalRule:(Int,Float,Pose3)->Array<ExternalAxisRange>) {
+      ?externalRanges:Array<ExternalAxisRange>,?externalRule:(Int,Float,Pose3)->Array<ExternalAxisRange>,
+      ?configuration:SixAxisConfiguration) {
     if(rollCount<=0 || tiltRings<=0 || azimuthCount<=0)throw "Candidate lattice resolutions must be positive";
     this.rollCount=rollCount;this.tiltRings=tiltRings;this.azimuthCount=azimuthCount;this.pinStart=pinStart;
-    this.externalRanges=externalRanges==null ? [] : externalRanges.copy();this.externalRule=externalRule;
+    this.externalRanges=externalRanges==null ? [] : externalRanges.copy();this.externalRule=externalRule;this.configuration=configuration;
   }
 }
 class CandidateLayer {

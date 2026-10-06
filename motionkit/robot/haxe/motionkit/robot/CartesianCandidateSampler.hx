@@ -78,8 +78,9 @@ class LatticeCandidate {
   public final branch:Int;
   public final singular:Int;
   public final singularityKnown:Bool;
-  public function new(q:Array<Float>,wraps:Array<Int>,external:Array<Int>,roll:Int,tilt:Int,azimuth:Int,branch:Int,singular:Int,singularityKnown:Bool=true) {
+  public var configuration:Null<SixAxisConfiguration>;
+  public function new(q:Array<Float>,wraps:Array<Int>,external:Array<Int>,roll:Int,tilt:Int,azimuth:Int,branch:Int,singular:Int,singularityKnown:Bool=true,?configuration:SixAxisConfiguration) {
     this.q=q;this.wraps=wraps;this.external=external;this.roll=roll;this.tilt=tilt;this.azimuth=azimuth;
-    this.branch=branch;this.singular=singular;this.singularityKnown=singularityKnown;
+    this.branch=branch;this.singular=singular;this.singularityKnown=singularityKnown;this.configuration=configuration;
   }
 }
