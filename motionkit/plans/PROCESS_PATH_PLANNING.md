@@ -2027,3 +2027,30 @@ analytic round trips (`process-path-spherical-clevis-runtime.log`). This is the
 previously unmet authored OPW proof, not all eight labelled branch coverage,
 mechanical interference/BOM checks for all sizes, re-baselines or a full phase gate.
 Full suites remain required at PP0a close-out before the EAIK spike.
+
+### PP0a assumed industrial classes and horizontal forearm zero
+
+RobotArm now accepts `IndustrialArmClass` (Reach700/Reach900/Reach1300, default
+Reach900). `IndustrialArmReference` declares assumed source-link dimensions and
+assumed industrial angular limits, without supplying hand-written OPW parameters.
+The default class preserves the existing link lengths/reach needs. The elbow
+connector establishes upper-arm-vertical/forearm-horizontal (-Y) zero. All joints
+retain right-hand rotation about their declared physical axes (j2/j5 +X, j3 -X).
+The shifted elbow starting coordinate preserves the former physical ready pose.
+Fixtures have not been moved without measured reach evidence.
+
+App compiler-only and actual authored arm-analytic runtime exit zero; 100 OPW
+round trips still pass with the changed zero/limits
+(`process-path-industrial-zero-build.log`, `process-path-industrial-zero-runtime.log`).
+The example compiler and focused geometry runtime also exit zero: all three classes
+pass structural diagnostics, vertical upper arm/horizontal forearm, common wrist-axis
+intersection and six compiled actuator checks; default zero/ready FK and drive/mass
+checks pass (`process-path-industrial-classes-build-compiled.log`,
+`process-path-industrial-classes-runtime-final.log`). The first test build had a
+nullable actuator field compiler error; an initial runtime then read pre-export
+actuators. Both were corrected before the final passing run, not counted as green.
+
+This does not establish all-eight labelled inverse branches, class joint-limit
+interference/drive-load envelopes, every cell's reach, all-user re-baselines or a full
+phase gate. Configuration labels/turns and mission pinning remain next within PP0a,
+followed by its remaining geometry/mission/full-suite acceptance before PP1a.

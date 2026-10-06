@@ -34,7 +34,36 @@ class RobotArmChecks {
 			throw '$message: expected $expected, got $actual';
 	}
 
+	static function sizeClasses():Void {
+		for (cls in [machinekit.robotics.IndustrialArmClass.Reach700,
+			machinekit.robotics.IndustrialArmClass.Reach900, machinekit.robotics.IndustrialArmClass.Reach1300]) {
+			var arm = new RobotArm(false, null, cls);
+			arm.check().throwIfErrors();
+			var model = new AssemblyModel("mm");
+			arm.addTo(model, "");
+			var state = new AssemblyState(model.definition("industrial-arm"));
+			for (spec in arm.specs) state.setJoint(spec.id, 0);
+			state.forwardKinematics();
+			var upper = AssemblyFrames.transformVector(state.worldPose("upperArm"), 0, 0, 1);
+			var forearm = AssemblyFrames.transformVector(state.worldPose("forearm"), 0, 0, 1);
+			near(upper.z, 1, "industrial upper arm is vertical at zero");
+			near(forearm.y, -1, "industrial forearm is horizontal and forward at zero");
+			var centre = state.worldPose("hand");
+			for (index in 3...6) {
+				var frame = state.worldConnector('joint${index + 1}', index == 5 ? "tool" : "rotor");
+				var axis = AssemblyFrames.transformVector(frame, 0, 1, 0);
+				var dx = centre.x - frame.x, dy = centre.y - frame.y, dz = centre.z - frame.z;
+				var cx = dy * axis.z - dz * axis.y, cy = dz * axis.x - dx * axis.z, cz = dx * axis.y - dy * axis.x;
+				near(Math.sqrt(cx * cx + cy * cy + cz * cz), 0, "all wrist axes pass through the clevis centre", 1e-6);
+			}
+			var actuators:Array<materia.assembly.AssemblyDefinition.AssemblyActuator> = cast model.definition("industrial-arm").actuators;
+			if (actuators == null || actuators.length != 6) throw "Industrial class must retain all six drive actuators";
+			Sys.println('industrial arm ${arm.reference.designation}: zero and spherical axes passed');
+		}
+	}
+
 	public static function run():Void {
+		sizeClasses();
 		var scene = SceneArtifact.decode(RobotArmPreview.arm());
 		var definition = scene.assemblyDefinition;
 		if (scene.robotTools == null || scene.robotTools.length != 1 || scene.robotTools[0].sensor == null)
@@ -76,12 +105,14 @@ class RobotArmChecks {
 		straight.forwardKinematics();
 		var base = straight.worldPose("joint1");
 		near(base.z, RobotArm.PEDESTAL_HEIGHT + robot.flange.thickness, "arm base sits on the pedestal flange", 1e-3);
-		// At zero the current links point up; the clevis removes the old lateral wrist offset.
+		// Industrial zero: upper arm vertical, forearm and tool forward (-Y).
 		var tool = straight.worldPose("toolFlange");
 		near(tool.x, 0, "spherical tool flange x at the straight pose", 1e-3);
-		near(tool.y, 0, "tool flange y at the straight pose", 1e-3);
-		near(tool.z, 1299 + robot.toolFlange.thickness, "tool flange z at the straight pose", 1e-3);
-		near(AssemblyFrames.transformVector(tool, 0, 0, 1).z, 1, "tool axis points up when straight", 1e-6);
+		near(tool.y, -(robot.reference.forearm + robot.joints[3].length + robot.reference.wristBody +
+			robot.reference.hand + robot.joints[5].length + robot.toolFlange.thickness), "tool flange forward reach at zero", 1e-3);
+		near(tool.z, base.z + robot.joints[0].length + robot.reference.turret + robot.reference.upperArm,
+			"tool flange height at industrial zero", 1e-3);
+		near(AssemblyFrames.transformVector(tool, 0, 0, 1).y, -1, "tool axis points forward at industrial zero", 1e-6);
 
 		var ready = new AssemblyState(model.definition(RobotArmPreview.ASSEMBLY_ID));
 		for (spec in robot.specs) ready.setJoint(spec.id, spec.initial);

@@ -15,6 +15,8 @@ import machinekit.robotics.ArmJoint;
 import machinekit.robotics.GearedArmJoint;
 import machinekit.robotics.ArmLink;
 import machinekit.robotics.ArmWristFork;
+import machinekit.robotics.IndustrialArmClass;
+import machinekit.robotics.IndustrialArmReference;
 import machinekit.robotics.ArmLink.ArmAxis;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.Pedestal;
@@ -94,8 +96,9 @@ typedef ArmJointSpec = {
 /** Six-axis serial arm on a pedestal with the caller's tool (a suction tool by default), in a shoulder/elbow layout with a spherical wrist.
  *
  * The j5 clevis references the wrist centre, where the j4, j5 and j6 axes meet.
- * At zero on every joint the arm points straight up. Joints `j1`, `j4` and `j6` turn about the
- * vertical (j6 about the tool axis), while `j2`, `j3` and `j5` pitch about a horizontal axis.
+ * At zero the upper arm is vertical and the forearm points forward (-Y).
+ * Every joint uses right-hand rotation about its declared axis; j2/j5 point +X
+ * and j3 points -X. j4 and j6 turn about the forearm/tool direction.
  * Every housing belongs to the link before it, so each revolute mate joins a housing's rotor to
  * the next link's start.
  *
@@ -115,6 +118,8 @@ class RobotArm extends MachineAssembly {
 	public static inline var PLACE_X:Float = 150;
 	public static inline var WORK_Y:Float = -600;
 
+	public final cls:IndustrialArmClass;
+	public final reference:IndustrialArmReference.IndustrialArmReferenceRow;
 	public final flange = new RobotFlange(63);
 	public final pedestal:Pedestal;
 	public final toolFlange = new RobotFlange(31.5);
@@ -134,8 +139,10 @@ class RobotArm extends MachineAssembly {
 		return {id: id, lower: lower, upper: upper, initial: initial, servo: servo, gearbox: gearbox};
 	}
 
-	public function new(withCell:Bool = true, ?armTool:ArmTool) {
+	public function new(withCell:Bool = true, ?armTool:ArmTool, cls:IndustrialArmClass = Reach900) {
 		super();
+		this.cls = cls;
+		reference = IndustrialArmReference.of(cls);
 		if (armTool == null) armTool = new ArmSuctionTool();
 		pedestal = new Pedestal(flange, PEDESTAL_HEIGHT, 100);
 		var pi = Math.PI;
@@ -143,14 +150,13 @@ class RobotArm extends MachineAssembly {
 		// before they came from drives (2 to 4 rad/s), and the servo is the smallest generic one that carries the
 		// joint's torque: the shoulder and elbow 200 W, the wrist 50 W. j3 turns about -X, so a positive j3
 		// folds the forearm the opposite way from a positive j2.
-		specs = [
-			spec("j1", -2.9, 2.9, 0, "GENERIC-SERVO-200W", 250),
-			spec("j2", -1.9, 1.9, 0.4, "GENERIC-SERVO-200W", 250),
-			spec("j3", -2.4, 2.4, -1.4, "GENERIC-SERVO-200W", 220),
-			spec("j4", -3.1, 3.1, 0, "GENERIC-SERVO-50W", 175),
-			spec("j5", -2.1, 2.1, pi - 0.4 - 1.4, "GENERIC-SERVO-50W", 175),
-			spec("j6", -6.2, 6.2, 0, "GENERIC-SERVO-50W", 130)
-		];
+		// Limits are assumed industrial ranges in degrees. The elbow's connector
+		// sets the horizontal zero; its starting coordinate preserves the former
+		// physical ready pose so cell fixtures need not move without reach evidence.
+		var initial = [0.0, 0.4, pi / 2 - 1.4, 0.0, pi - 1.8, 0.0];
+		var ratios = [250.0, 250.0, 220.0, 175.0, 175.0, 130.0];
+		specs = [for (i in 0...6) spec('j${i + 1}', reference.lowerDegrees[i] * pi / 180,
+			reference.upperDegrees[i] * pi / 180, initial[i], i < 3 ? "GENERIC-SERVO-200W" : "GENERIC-SERVO-50W", ratios[i])];
 		function housing(index:Int, diameter:Float, length:Float, ?flange:RobotFlange):ArmJoint {
 			var source = specs[index].gearbox;
 			var gear = new Gearbox(source.ratio, source.efficiency, diameter * 0.6, length * 0.5, 8, true);
@@ -162,11 +168,11 @@ class RobotArm extends MachineAssembly {
 		var j4 = housing(3, 70, 60), j5 = housing(4, 60, 70), j6 = housing(5, 55, 40, toolFlange);
 		joints = [j1, j2, j3, j4, j5, j6];
 		links = [
-			new ArmLink(90, 90, 5, 100, PlusZ, PlusX, j2.length),
-			new ArmLink(320, 80, 5, 100, PlusX, MinusX, j3.length),
-			new ArmLink(260, 70, 4, 80, MinusX, PlusZ, j4.length),
-			new ArmLink(90, 60, 4, 70, PlusZ, PlusX, j5.length),
-			new ArmWristFork(60, j5.length)
+			new ArmLink(reference.turret, 90, 5, 100, PlusZ, PlusX, j2.length),
+			new ArmLink(reference.upperArm, 80, 5, 100, PlusX, MinusX, j3.length),
+			new ArmLink(reference.forearm, 70, 4, 80, MinusX, PlusZ, j4.length),
+			new ArmLink(reference.wristBody, 60, 4, 70, PlusZ, PlusX, j5.length),
+			new ArmWristFork(reference.hand, j5.length)
 		];
 		addComponent("pedestal", pedestal);
 		addComponent("baseFlange", flange);
@@ -179,7 +185,13 @@ class RobotArm extends MachineAssembly {
 		var linkNames = ["turret", "upperArm", "forearm", "wristBody", "hand"];
 		for (i in 0...5) {
 			addComponent(linkNames[i], links[i]);
-			revolute(specs[i], 'joint${i + 1}', "rotor", linkNames[i], "start");
+			var start = "start";
+			if (i == 2) {
+				start = "industrialStart";
+				addMemberConnector(linkNames[i], start, AssemblyFrames.compose(links[i].connector("start").frame,
+					AssemblyFrames.turnY(pi / 2)));
+			}
+			revolute(specs[i], 'joint${i + 1}', "rotor", linkNames[i], start);
 			addComponent('joint${i + 2}', joints[i + 1]);
 			addMate('${linkNames[i]}-joint${i + 2}', "fixed", linkNames[i], "end", 'joint${i + 2}', "stator");
 		}
