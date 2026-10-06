@@ -116,7 +116,7 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/shims/no_openmp")
 endif()
 
-add_library(motionkit_core ${MK_LIBRARY_TYPE} src/generator.cpp src/path.cpp src/opw.cpp src/configuration.cpp)
+add_library(motionkit_core ${MK_LIBRARY_TYPE} src/generator.cpp src/path.cpp src/opw.cpp src/analytic_cartesian.cpp src/configuration.cpp)
 target_compile_features(motionkit_core PUBLIC cxx_std_17)
 target_link_libraries(motionkit_core PUBLIC trajectory_core PRIVATE ruckig::ruckig toppra Eigen3::Eigen motionkit_descartes_core)
 target_include_directories(motionkit_core PUBLIC
@@ -154,6 +154,9 @@ if(BUILD_TESTING)
     add_executable(motionkit_configuration_tests tests/configuration.cpp)
     target_link_libraries(motionkit_configuration_tests PRIVATE motionkit_core)
     add_test(NAME motionkit_configuration COMMAND motionkit_configuration_tests)
+    add_executable(motionkit_analytic_cartesian_tests tests/analytic_cartesian.cpp)
+    target_link_libraries(motionkit_analytic_cartesian_tests PRIVATE motionkit_core)
+    add_test(NAME motionkit_analytic_cartesian COMMAND motionkit_analytic_cartesian_tests)
 
     # Every executable in this directory is a test; the library remains unaffected.
     get_property(motionkit_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)

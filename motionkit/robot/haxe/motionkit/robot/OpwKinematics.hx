@@ -1,6 +1,7 @@
 package motionkit.robot;
 
 import motionkit.path.OrientationPolicy;
+import motionkit.robot.AnalyticIk.AnalyticBranch;
 
 import TrajectoryCore;
 import MotionKitNative;
@@ -19,7 +20,7 @@ import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 
 /** Analytic 6R IK for a parallel-base, spherical-wrist RobotModel. */
-class OpwKinematics implements KinematicsSolver {
+class OpwKinematics implements KinematicsSolver implements AnalyticIk {
   public final parameters:OpwParameters;
   public final manipulator:Manipulator;
   public final geometryTolerance:Float;
@@ -62,6 +63,23 @@ class OpwKinematics implements KinematicsSolver {
       base = Transform3.identity();
       parameters = canonical;
     } else {
+    // Assembly models use the placed pose as q=0. Recover a canonical
+    // straight-arm reference from axis lines, without assembly zero metadata.
+    var reference = [for (_ in 0...6) 0.0];
+    var geometry = geometryAt(ordered, reference);
+    if (Math.abs(geometry.axes[3].dot(geometry.axes[2])) > geometryTolerance)
+      throw 'OPW joint ${joints[3].id} is not perpendicular to the elbow axis';
+    var targetZ = geometry.axes[0];
+    reference[1] = alignmentAngle(geometry.origins[2].sub(geometry.origins[1]), targetZ, geometry.axes[1]);
+    geometry = geometryAt(ordered, reference);
+    reference[2] = alignmentAngle(geometry.axes[3], targetZ, geometry.axes[2]);
+    geometry = geometryAt(ordered, reference);
+    reference[3] = alignmentAngle(geometry.axes[4], geometry.axes[1], geometry.axes[3]);
+    geometry = geometryAt(ordered, reference);
+    reference[4] = alignmentAngle(geometry.axes[5], targetZ, geometry.axes[4]);
+    geometry = geometryAt(ordered, reference);
+    origins = geometry.origins;
+    axes = geometry.axes;
     var z = axes[0];
     var y = axes[1];
     if (Math.abs(z.dot(y)) > geometryTolerance)
@@ -81,21 +99,24 @@ class OpwKinematics implements KinematicsSolver {
       signs.push(alignment < 0.0 ? -1 : 1);
     }
     var local = [for (origin in origins) base.inverse().transformPoint(origin)];
-    var p2 = local[1], p3 = local[2].sub(p2), p4 = local[3].sub(local[2]);
-    if (Math.abs(p3.x) > geometryTolerance || Math.abs(p3.y) > geometryTolerance)
+    var p2 = local[1], p3 = local[2].sub(p2);
+    if (Math.abs(p3.x) > geometryTolerance)
       throw 'OPW joint ${joints[2].id} is not on the upper-arm axis';
-    if (Math.abs(p4.y) > geometryTolerance)
-      throw 'OPW joint ${joints[3].id} has a lateral elbow offset';
-    for (index in 4...6)
-      if (local[index].sub(local[3]).norm() > geometryTolerance)
-        throw 'OPW joint ${joints[index].id} is not at the spherical wrist center';
+    // Axis origins need not coincide: housings can be displaced along
+    // their own axes. The three wrist axis lines must intersect instead.
+    var wrist = new Vec3(local[3].x, local[3].y, local[4].z);
+    if (Math.abs(local[4].x - wrist.x) > geometryTolerance ||
+        Math.abs(local[5].x - wrist.x) > geometryTolerance ||
+        Math.abs(local[5].y - wrist.y) > geometryTolerance)
+      throw 'OPW wrist axis lines ${joints[3].id}, ${joints[4].id}, ${joints[5].id} do not intersect';
+    var p4 = wrist.sub(local[2]);
     // c4 is the wrist-center-to-flange distance along the zero-pose tool Z.
     var tcpAtZero = base.inverse().compose(manipulator.tcpPose(zero));
-    var flangeAtZero = base.inverse().compose(manipulator.forwardKinematics(zero));
-    var c4 = flangeAtZero.translation.sub(local[3]).dot(zeroAxis());
+    var flangeAtZero = base.inverse().compose(manipulator.forwardKinematics(reference));
+    var c4 = flangeAtZero.translation.sub(wrist).dot(zeroAxis());
     if (c4 < -geometryTolerance) throw 'OPW flange lies behind wrist joint ${joints[5].id}';
-    parameters = new OpwParameters(p2.x, p4.x, p2.y, p2.z, p3.z, p4.z,
-      Math.max(0.0, c4), [for (_ in 0...6) 0.0], signs);
+    parameters = new OpwParameters(p2.x, p4.x, wrist.y, p2.z, p3.z, p4.z,
+      Math.max(0.0, c4), [for (index in 0...6) reference[index] * signs[index]], signs);
     }
     native = parameters.toNative();
     var tcpAtZero = base.inverse().compose(manipulator.tcpPose(zero));
@@ -112,6 +133,29 @@ class OpwKinematics implements KinematicsSolver {
   }
 
   static function zeroAxis():Vec3 return new Vec3(0.0, 0.0, 1.0);
+
+  static function alignmentAngle(from:Vec3, to:Vec3, axis:Vec3):Float {
+    var a = from.sub(axis.scale(from.dot(axis)));
+    var b = to.sub(axis.scale(to.dot(axis)));
+    if (a.norm() < 1e-12 || b.norm() < 1e-12) throw "OPW canonical reference is degenerate";
+    return Math.atan2(axis.dot(a.cross(b)), a.dot(b));
+  }
+
+  static function geometryAt(path:Array<Joint>, q:Array<Float>):{origins:Array<Vec3>, axes:Array<Vec3>} {
+    var origins:Array<Vec3> = [], axes:Array<Vec3> = [];
+    var at = Transform3.identity(), index = 0;
+    for (joint in path) {
+      var frame = at.compose(Transform3.fromArrays(joint.parentFramePosition, joint.parentFrameRotation));
+      if (joint.type != JointType.Fixed) {
+        var axis = Vec3.fromArray(joint.axis).normalized();
+        origins.push(frame.translation);
+        axes.push(frame.transformVector(axis).normalized());
+        frame = frame.compose(new Transform3(new Vec3(0, 0, 0), Quat.fromAxisAngle(axis, q[index++])));
+      }
+      at = frame.compose(Transform3.fromArrays(joint.childFramePosition, joint.childFrameRotation).inverse());
+    }
+    return {origins: origins, axes: axes};
+  }
 
   static function canonicalParameters(model:RobotModel, manipulator:Manipulator,
       joints:Array<Joint>, tolerance:Float):Null<OpwParameters> {
@@ -156,6 +200,13 @@ class OpwKinematics implements KinematicsSolver {
   public function fork():KinematicsSolver return this;
 
   public function jointCount():Int return 6;
+  public function family():String return "OPW";
+
+  public function branches(target:Pose3, seed:Array<Float>, ?freedom:OrientationPolicy):Array<AnalyticBranch> {
+    if (!ToolFreedom.isFull(freedom)) throw "OPW tool freedom must be sampled before analytic branch enumeration";
+    if (seed == null || seed.length != 6) throw "OPW branch enumeration needs six seed joints";
+    return branchCandidates(target, new IkTolerance(1e-6, 1e-6), seed);
+  }
 
   public function forward(q:Array<Float>):Pose3 {
     var result = forwardTransform(q);
@@ -235,7 +286,11 @@ class OpwKinematics implements KinematicsSolver {
   }
 
   function candidates(target:Pose3, tolerance:IkTolerance,
-      seed:Null<Array<Float>>):Array<Array<Float>> {
+      seed:Null<Array<Float>>):Array<Array<Float>>
+    return [for (candidate in branchCandidates(target, tolerance, seed)) candidate.q];
+
+  function branchCandidates(target:Pose3, tolerance:IkTolerance,
+      seed:Null<Array<Float>>):Array<AnalyticBranch> {
     if (target == null || tolerance == null) throw "OPW candidate sampling needs pose and tolerance";
     var requested = new Transform3(new Vec3(target.x, target.y, target.z),
       new Quat(target.qx, target.qy, target.qz, target.qw));
@@ -248,17 +303,33 @@ class OpwKinematics implements KinematicsSolver {
     var result = MotionKitNative.mk_opw_inverse(native, nativePose, 8);
     if (result.status != TrajectoryCoreConstants.MK_OK)
       throw 'OPW inverse failed with MotionKit error ${result.status}';
-    var candidates:Array<Array<Float>> = [];
+    var candidates:Array<AnalyticBranch> = [];
+    var slot = 0;
     for (solution in result.out_solutions) {
+      var branch = slot++;
       if (solution.get_valid() == 0) continue;
       var raw = [for (joint in 0...6) solution.get_joints(joint)];
       var wrapped:Array<Array<Float>> = [raw];
       for (joint in 0...6) {
         var next:Array<Array<Float>> = [];
-        for (candidate in wrapped) for (shift in [-1, 0, 1]) {
-          var variant = candidate.copy();
-          variant[joint] += shift * 2.0 * Math.PI;
-          if (withinJoint(joint, variant[joint])) next.push(variant);
+        var bounds = manipulator.group.limitsOf(joint);
+        for (candidate in wrapped) {
+          var first = -1, last = 1;
+          if (bounds.lower < bounds.upper) {
+            var lo = Math.ceil((bounds.lower - candidate[joint] - 1e-9) / (2 * Math.PI));
+            var hi = Math.floor((bounds.upper - candidate[joint] + 1e-9) / (2 * Math.PI));
+            if (!Math.isFinite(lo) || !Math.isFinite(hi) || hi - lo > 64)
+              throw "OPW periodic lifts require a finite rotary planning range";
+            first = Std.int(lo); last = Std.int(hi);
+          } else if (seed != null) {
+            var nearest = Math.round((seed[joint] - candidate[joint]) / (2 * Math.PI));
+            first += nearest; last += nearest;
+          }
+          for (shift in first...last + 1) {
+            var variant = candidate.copy();
+            variant[joint] += shift * 2.0 * Math.PI;
+            if (withinJoint(joint, variant[joint])) next.push(variant);
+          }
         }
         wrapped = next;
       }
@@ -270,11 +341,11 @@ class OpwKinematics implements KinematicsSolver {
         var duplicate = false;
         for (existing in candidates) {
           var squared = 0.0;
-          for (joint in 0...6) squared += Math.pow(existing[joint] - candidate[joint], 2);
+          for (joint in 0...6) squared += Math.pow(existing.q[joint] - candidate[joint], 2);
           if (squared < tolerance.candidateSeparation * tolerance.candidateSeparation)
             duplicate = true;
         }
-        if (!duplicate) candidates.push(candidate);
+        if (!duplicate) candidates.push(new AnalyticBranch(candidate, branch, solution.get_singular() != 0));
       }
     }
     return candidates;

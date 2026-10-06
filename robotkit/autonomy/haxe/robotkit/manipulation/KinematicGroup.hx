@@ -339,6 +339,9 @@ class KinematicGroup {
     return gradient;
   }
 
+  /** Diagnostic count for this thread (or explicit context), without sharing mutable counters between planners. */
+  public function numericSolveCount(?data:KinematicGroupData):Int return dataFor(data).numericSolves;
+
   /**
    * Inverse kinematics: joint values that put the tool centre point (or the
    * flange, `options.atFlange`) at `target`, in the reference frame, or with
@@ -355,6 +358,7 @@ class KinematicGroup {
     if (o.swivel != null && swivel == null) throw "Solving at a swivel angle needs an arm swivel";
     if (o.swivel != null && !Math.isFinite(o.swivel)) throw "Swivel angle must be finite";
     var d = dataFor(data);
+    d.numericSolves++;
     if (o.rootPose != null) return solveWithBase(target, start, o, d);
     var state = d.state;
     for (i in 0...n) state.q[dofs[i]] = start[i];

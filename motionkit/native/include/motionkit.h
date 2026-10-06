@@ -47,6 +47,26 @@ typedef struct mk_opw_solution {
     uint8_t singular;
 } mk_opw_solution;
 
+/** Cartesian chain represented by its zero-pose space screws and TCP pose.
+ * The three translation axes are columns of translation_axes. Optional C/A
+ * axes and origins are in the same reference frame, in chain order. */
+typedef struct mk_analytic_cartesian_model {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count; /**< 3 (XYZ), 4 (XYZ+C), or 5 (XYZ+C+A). */
+    double translation_axes[9];
+    double rotary_axes[6];
+    double rotary_origins[6];
+    double home_position[3];
+    double home_quaternion[4];
+} mk_analytic_cartesian_model;
+
+typedef struct mk_analytic_solution {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double joints[6];
+    uint32_t branch;
+    uint32_t singular; /**< C is undetermined at an axial tool direction. */
+} mk_analytic_solution;
+
 /** Candidate sets for one Descartes ladder-graph selection call. */
 typedef struct mk_configuration_request {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -152,6 +172,15 @@ MK_API mk_result MK_CALL mk_opw_forward(const mk_opw_parameters *parameters,
 MK_API mk_result MK_CALL mk_opw_inverse(const mk_opw_parameters *parameters,
     const mk_opw_pose *pose, mk_opw_solution *out_solutions MK_OUT_ARRAY(solution_count),
     uint32_t solution_count);
+MK_API mk_result MK_CALL mk_analytic_cartesian_forward(const mk_analytic_cartesian_model *model,
+    const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count, mk_opw_pose *out_pose MK_OUT);
+/** All geometric branches, before limits/wrap enumeration by the sampler.
+ * axis_only frees TCP spin; fixed orientation filters branches by full rotation.
+ * The seed selects C at its explicit axis singularity. */
+MK_API mk_result MK_CALL mk_analytic_cartesian_inverse(const mk_analytic_cartesian_model *model,
+    const mk_opw_pose *target, uint32_t axis_only, double singular_c_seed,
+    mk_analytic_solution *out_solutions MK_OUT_ARRAY(solution_capacity), uint32_t solution_capacity,
+    uint32_t *out_count MK_OUT);
 /** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */
 MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,

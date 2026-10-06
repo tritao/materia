@@ -969,6 +969,114 @@ class ProjectSourceTests {
     } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
   }
 
+  /** PP1: model extraction and all legal branches on the authored gantry examples. */
+  static function checkCartesianAnalyticExamples(root:String):Void {
+    for (fixture in [{example: "gantry-picker", file: "materia.project.json"},
+        {example: "gantry-picker", file: "materia.yaw.project.json"},
+        {example: "gantry-welder", file: "materia.project.json"}]) {
+      var manifest = FileSystem.fullPath(root + "/machinekit/examples/" + fixture.example + "/" + fixture.file);
+      var generated = MateriaProjectRunner.loadProject(manifest);
+      var session = new ProjectDocumentSession(null, false);
+      session.openGeneratedProject(generated, manifest);
+      var simulation = new ApplicationSimulation(new RobotWorld());
+      try {
+        check(simulation.rebuild(session.sensors, session.scene, session), "analytic gantry model builds: " + simulation.error);
+        var mission = simulation.missionPlayer();
+        if (mission == null) throw "analytic gantry has no mission group";
+        var motion:motionkit.robot.ManipulatorMotion;
+        if (fixture.example == "gantry-welder") {
+          var welding:processkit.WeldingPlanRunner = cast mission.welding;
+          motion = welding.motion;
+        } else {
+          var handling:motionkit.robot.HandlingPlanRunner = cast mission.handling;
+          motion = handling.motion;
+        }
+        var numeric:motionkit.robot.ManipulatorKinematics = cast motion.compiler.solver;
+        var group = numeric.manipulator;
+        var analytic:motionkit.robot.AnalyticIk = new motionkit.robot.CartesianAnalyticIk(group);
+        var before = group.numericSolveCount();
+        for (sample in 0...100) {
+          var q = [for (joint in 0...analytic.jointCount()) {
+            var bounds = group.group.limitsOf(joint);
+            var fraction = 0.5 + 0.45 * Math.sin((sample + 1) * (joint + 1) * 1.61803398875);
+            bounds.lower + fraction * (bounds.upper - bounds.lower);
+          }];
+          var target = numeric.forward(q);
+          for (freedom in [motionkit.path.OrientationPolicy.Fixed, motionkit.path.OrientationPolicy.FreeAboutTool]) {
+            var original = false;
+            for (answer in analytic.branches(target, q, freedom)) {
+              var same = true;
+              for (joint in 0...q.length) same = same && Math.abs(answer.q[joint] - q[joint]) < 1e-6;
+              original = original || same;
+              var actual = numeric.forward(answer.q);
+              check(motionkit.path.PoseMath.distance(actual, target) < 1e-6,
+                "authored gantry branch preserves the mounted TCP position");
+              check(motionkit.robot.ToolFreedom.orientationError(actual, target, freedom) < 1e-6,
+                "authored gantry branch preserves the permitted tool orientation");
+            }
+            check(original, "authored gantry analytic branches contain the original configuration");
+          }
+        }
+        check(group.numericSolveCount() == before, "Cartesian analytic branches use no numeric pose solves");
+        Sys.println('Authored ${fixture.example}/${fixture.file}: ${analytic.family()} 200 round trips passed');
+      } catch (error:Dynamic) {
+        simulation.dispose(); session.dispose(); throw error;
+      }
+      simulation.dispose(); session.dispose();
+    }
+  }
+
+  /** PP1: analytic round trips on the authored MachineKit arm, including its mounted tool. */
+  static function checkRobotArmAnalytic(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    try {
+      check(simulation.rebuild(session.sensors, session.scene, session), "analytic arm model builds: " + simulation.error);
+      var mission = simulation.missionPlayer();
+      if (mission == null || mission.handling == null) throw "analytic arm fixture has no handling group";
+      var handling:motionkit.robot.HandlingPlanRunner = cast mission.handling;
+      var numeric:motionkit.robot.ManipulatorKinematics = cast handling.motion.compiler.solver;
+      var group = numeric.manipulator;
+      var arm = new robotkit.manipulation.Manipulator(group.robot, group.rootLink, group.flangeFrame,
+        group.flangeTTcp, group.model, null, group.profile);
+      var at = robotkit.spatial.Transform3.identity();
+      var geometry:Array<Dynamic> = [];
+      for (joint in arm.pathJoints()) {
+        var frame = at.compose(robotkit.spatial.Transform3.fromArrays(joint.parentFramePosition, joint.parentFrameRotation));
+        if (joint.type != robotkit.model.JointType.Fixed)
+          geometry.push({id: joint.id, origin: frame.translation.toArray(),
+            axis: frame.transformVector(robotkit.spatial.Vec3.fromArray(joint.axis)).toArray()});
+        at = frame.compose(robotkit.spatial.Transform3.fromArrays(joint.childFramePosition, joint.childFrameRotation).inverse());
+      }
+      Sys.println("Authored RobotArm joint geometry " + haxe.Json.stringify(geometry));
+      var analytic = new motionkit.robot.OpwKinematics(group.robot, arm);
+      var tolerance = new motionkit.kinematics.IkTolerance(1e-6, 1e-6);
+      for (sample in 0...100) {
+        var q = [for (joint in 0...6) {
+          var bounds = arm.group.limitsOf(joint);
+          var fraction = 0.5 + 0.45 * Math.sin((sample + 1) * (joint + 1) * 1.61803398875);
+          bounds.lower + fraction * (bounds.upper - bounds.lower);
+        }];
+        var target = numeric.forward(q);
+        var solved = analytic.solvePose(target, q, tolerance);
+        if (solved == null) throw 'authored RobotArm has no analytic branch at sample $sample';
+        var answer:Array<Float> = cast solved;
+        for (joint in 0...6) check(Math.abs(answer[joint] - q[joint]) < 1e-5,
+          'authored RobotArm analytic branch contains original joint $joint at sample $sample');
+        var predicted = analytic.forward(q);
+        check(Math.sqrt(Math.pow(predicted.x - target.x, 2) + Math.pow(predicted.y - target.y, 2) +
+          Math.pow(predicted.z - target.z, 2)) < 1e-6, "authored RobotArm analytic FK matches model FK");
+      }
+      Sys.println("Authored MachineKit RobotArm: 100 analytic round trips passed");
+    } catch (error:Dynamic) {
+      simulation.dispose(); session.dispose(); throw error;
+    }
+    simulation.dispose(); session.dispose();
+  }
+
   static function checkRobotArm(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
@@ -1008,6 +1116,7 @@ class ProjectSourceTests {
       definition.occurrences.length, "robot arm publishes a pose for every part, tool and free workpiece included");
     var startWork = pose("project:workpiece").position.copy();
     var lift = 0.0, lastDone = 0, log:Array<String> = [];
+    var previousPlanningSeconds = 0.0, previousIkSolves = 0;
     while (mission.completed < steps.length && simulation.activeSession().simulationTime() < 120) {
       simulation.step();
       var failure = mission.failure;
@@ -1017,6 +1126,15 @@ class ProjectSourceTests {
       lift = Math.max(lift, pose("project:workpiece").position[2] - startWork[2]);
       if (mission.completed == lastDone) continue;
       var step = steps[lastDone];
+      if (Sys.getEnv("PROCESS_PATH_BENCHMARK") == "1") {
+        var handling:motionkit.robot.HandlingPlanRunner = cast mission.handling;
+        var metrics = handling.motion.planningMetrics();
+        Sys.println("PROCESS_PATH_RUN " + haxe.Json.stringify({example: "handling", backend: ApplicationSimulation.MUJOCO,
+          run: mission.completed, planningSeconds: metrics.seconds - previousPlanningSeconds,
+          numericIkSolves: metrics.numericIkSolves - previousIkSolves}));
+        previousPlanningSeconds = metrics.seconds;
+        previousIkSolves = metrics.numericIkSolves;
+      }
       if (step.kind == "pick") {
         check(held.join(",") == "project:workpiece", 'step $lastDone picks the workpiece up');
       } else {
@@ -1036,6 +1154,9 @@ class ProjectSourceTests {
     }
     check(mission.completed >= steps.length, 'the arm runs its whole round in two minutes, finished ${mission.completed} steps');
     check(lift > 0.05, 'the workpiece is lifted off its pad (rose at most $lift m)');
+    if (Sys.getEnv("PROCESS_PATH_BENCHMARK") == "1")
+      Sys.println("PROCESS_PATH_QUALITY " + haxe.Json.stringify({example: "handling", backend: ApplicationSimulation.MUJOCO,
+        completed: mission.completed, cycleSeconds: simulation.activeSession().simulationTime(), liftMetres: lift}));
     // A reset puts the workpiece back and starts the mission over.
     check(simulation.reset(), "the arm simulation resets");
     check(simulation.heldObjectIds().length == 0, "a reset holds nothing");
@@ -1296,6 +1417,13 @@ class ProjectSourceTests {
         restarts += mission.weldRestarts();
         done = mission.completed;
         Sys.println('welder ($label): run $done planned in ' + mission.planReport());
+        if (Sys.getEnv("PROCESS_PATH_BENCHMARK") == "1") {
+          var planning:processkit.WeldingPlanRunner = cast mission.welding;
+          var chosen:processkit.WeldPathPlanner.PlannedWeld = cast planning.lastPlan();
+          Sys.println("PROCESS_PATH_RUN " + haxe.Json.stringify({example: example, backend: backend,
+            run: done, planningSeconds: planning.planningSeconds, checkedPoses: chosen.checked,
+            numericIkSolves: planning.planningIkSolves}));
+        }
         finished.push(Math.round(simulation.activeSession().simulationTime() * 10) / 10);
       }
       var step = mission.weldingStep();
@@ -1380,6 +1508,15 @@ class ProjectSourceTests {
     }
     Sys.println('welder ($label): whole weldment, ${steps.length} runs and $seams seams, cycle ${time} s (runs done at ${finished.join(", ")} s), ' +
       'tip within ${Math.round(strayed * 10000) / 10} mm of the seams, legs ${legs.join("/")} mm, bead lengths ${lengths.join("/")} mm, no clearance violation');
+    if (Sys.getEnv("PROCESS_PATH_BENCHMARK") == "1")
+      Sys.println("PROCESS_PATH_QUALITY " + haxe.Json.stringify({example: example, backend: backend,
+        runs: done, seams: seams, cycleSeconds: time, clearanceViolation: violation,
+        trackTravelMetres: example == "track-arm" ? Math.abs(trackLast - (trackStart == null ? 0.0 : trackStart)) : null,
+        armMarginRadians: example == "track-arm" ? armMargin : null,
+        maxArmStepRadians: example == "track-arm" ? armJump : null,
+        seamErrorMetres: strayed, wireErrorRadians: wireError,
+        legsMillimetres: [for (entry in beads.beads) entry.bead.meanLeg(0.3, 0.7) * 1000],
+        lengthsMillimetres: [for (entry in beads.beads) entry.bead.extent() * 1000]}));
     simulation.clear();
     cell.session.dispose();
   }
@@ -2671,6 +2808,14 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry") {
       checkGantryPicker(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm-analytic") {
+      checkRobotArmAnalytic(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-analytic") {
+      checkCartesianAnalyticExamples(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {

@@ -166,6 +166,21 @@ class KinematicsTests extends MotionKitTestSupport {
     var own = arm.newData();
     var withOwn = arm.tcpPose(configurations[5], own).translation;
     near(withOwn.x, expected[5].x, "a caller's own data evaluates the same", 1e-12);
+    check(arm.numericSolveCount() == 0 && arm.numericSolveCount(own) == 0,
+      "forward queries do not count as numeric IK");
+    arm.solve(arm.tcpPose(configurations[5], own), configurations[5], null, own);
+    check(arm.numericSolveCount(own) == 1 && arm.numericSolveCount() == 0,
+      "numeric IK diagnostics stay with their caller-owned context");
+    var countDone = new sys.thread.Lock();
+    var workerCount = [0];
+    sys.thread.Thread.create(function() {
+      arm.solve(arm.tcpPose(configurations[5]), configurations[5]);
+      workerCount[0] = arm.numericSolveCount();
+      countDone.release();
+    });
+    countDone.wait();
+    check(workerCount[0] == 1 && arm.numericSolveCount() == 0,
+      "numeric IK diagnostics stay isolated between planning threads");
   }
 
   public function testKinematicsContract():Void {
@@ -237,6 +252,59 @@ class KinematicsTests extends MotionKitTestSupport {
       "MotionKit twist rejects non-finite components");
     throws(function() new IkTolerance(0.0, 1e-3),
       "IK tolerance rejects a non-positive position tolerance");
+  }
+
+  public function testCartesianAnalyticIk():Void {
+    for (count in 3...6) {
+      var model = new RobotModel('analytic-cartesian-$count');
+      var base = model.addLink(new Link("cartesian-base")), parent = base;
+      for (index in 0...count) {
+        var child = model.addLink(new Link('cartesian-link-$index'));
+        var joint = model.addJoint(new Joint('cartesian-joint-$index',
+          index < 3 ? JointType.Prismatic : JointType.Revolute, parent, child));
+        joint.axis = index < 3 ? [for (axis in 0...3) axis == index ? 1.0 : 0.0]
+          : index == 3 ? [0.0, 0.0, 1.0] : [0.0, 1.0, 0.0];
+        if (index == 0) {
+          var yaw = Quat.fromAxisAngle(new Vec3(0, 0, 1), 0.37);
+          joint.parentFrameRotation = [yaw.x, yaw.y, yaw.z, yaw.w];
+        }
+        joint.parentFramePosition = [0.03 * index, -0.02 * index, 0.04 * index];
+        joint.limits.lower = index < 3 ? -2 : -2 * Math.PI;
+        joint.limits.upper = index < 3 ? 2 : 2 * Math.PI;
+        parent = child;
+      }
+      var flange = model.addFrame(new Frame("cartesian-flange", parent));
+      flange.position = [0.04, 0.02, 0.07];
+      var tool = new Transform3(new Vec3(0.08, -0.03, 0.14), Quat.fromAxisAngle(new Vec3(0, 1, 0), 0.4));
+      var group = new robotkit.manipulation.KinematicGroup(model, base.id, flange.id, null, tool);
+      var analytic:motionkit.robot.AnalyticIk = new motionkit.robot.CartesianAnalyticIk(group);
+      var numeric = new ManipulatorKinematics(group);
+      check(analytic.jointCount() == count, "Cartesian family keeps model DOF count");
+      for (sample in 0...40) {
+        var q = [for (joint in 0...count) 1.4 * Math.sin((sample + 1) * (joint + 1) * 1.618)];
+        var target = numeric.forward(q);
+        near(motionkit.path.PoseMath.distance(analytic.forward(q), target), 0, "Cartesian model-derived FK", 1e-7);
+        for (freedom in [motionkit.path.OrientationPolicy.Fixed, motionkit.path.OrientationPolicy.FreeAboutTool]) {
+          var answers = analytic.branches(target, q, freedom), original = false;
+          check(answers.length > 0, "Cartesian analytic inverse returns a legal branch");
+          for (answer in answers) {
+            var same = true;
+            for (joint in 0...count) {
+              same = same && Math.abs(answer.q[joint] - q[joint]) < 1e-6;
+              var bounds = group.group.limitsOf(joint);
+              check(answer.q[joint] >= bounds.lower - 1e-9 && answer.q[joint] <= bounds.upper + 1e-9,
+                "Every Cartesian periodic lift respects compiled limits");
+            }
+            original = original || same;
+            var actual = numeric.forward(answer.q);
+            near(motionkit.path.PoseMath.distance(actual, target), 0, "Cartesian branch preserves TCP position", 1e-7);
+            near(motionkit.robot.ToolFreedom.orientationError(actual, target, freedom), 0,
+              "Cartesian branch preserves permitted orientation", 1e-7);
+          }
+          check(original, "Cartesian analytic branches contain original model configuration");
+        }
+      }
+    }
   }
 
   public function testOpwKinematics():Void {
@@ -355,7 +423,49 @@ class KinematicsTests extends MotionKitTestSupport {
       [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0], [1, 1, 1, 1, 1, 1]);
     published("Stäubli TX40", [0.0, 0.0, 0.035, 0.32, 0.225, 0.225, 0.065],
       [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0], [1, 1, 1, 1, 1, 1]);
+    // Equivalent joint frames with displaced axis origins and a placed q=0:
+    // extraction must use axis lines rather than a particular frame convention.
+    var placedOffsets = [0.2, 0.4, -0.7, 0.3, 0.6, -0.2];
+    for (index in 0...6) {
+      var joint = model.joints[index];
+      var axis = Vec3.fromArray(joint.axis);
+      var shift = axis.scale(0.013);
+      joint.parentFramePosition = Vec3.fromArray(joint.parentFramePosition).add(shift).toArray();
+      joint.childFramePosition = shift.toArray();
+      var rotation = Quat.fromAxisAngle(axis, placedOffsets[index]);
+      joint.parentFrameRotation = [rotation.x, rotation.y, rotation.z, rotation.w];
+    }
+    var placedArm = new Manipulator(model, links[0].id, flange.id);
+    var placed = new OpwKinematics(model, placedArm);
+    for (sample in 0...30) {
+      var q = [for (joint in 0...6) 1.5 * Math.sin((sample + 1) * (joint + 1))];
+      var target = new ManipulatorKinematics(placedArm).forward(q);
+      var solved = placed.solvePose(target, q, new IkTolerance(1e-6, 1e-6));
+      check(solved != null, "placed OPW frame convention has an inverse branch");
+      var answer:Array<Float> = cast solved;
+      for (joint in 0...6) near(answer[joint], q[joint], "placed OPW retains original branch", 1e-5);
+    }
     var bad = buildContractArmFixture();
+    model.joints[5].limits.lower = -4 * Math.PI;
+    model.joints[5].limits.upper = 4 * Math.PI;
+    var wrappedArm = new Manipulator(model, links[0].id, flange.id);
+    var wrappedAnalytic = new OpwKinematics(model, wrappedArm);
+    var shared:motionkit.robot.AnalyticIk = wrappedAnalytic;
+    var wrappedQ = [0.2, -0.3, 0.4, -0.5, 0.6, 3 * Math.PI + 0.2];
+    var wrappedTarget = new ManipulatorKinematics(wrappedArm).forward(wrappedQ);
+    var foundOriginal = false;
+    for (branch in shared.branches(wrappedTarget, wrappedQ)) {
+      check(branch.branch >= 0 && branch.branch < 8, "OPW shared interface preserves native branch identity");
+      var same = true;
+      for (joint in 0...6) same = same && Math.abs(branch.q[joint] - wrappedQ[joint]) < 1e-5;
+      foundOriginal = foundOriginal || same;
+    }
+    check(foundOriginal, "OPW enumerates legal periodic lifts beyond the nearest plus/minus turn");
+    var singularQ = wrappedQ.copy();
+    singularQ[4] = wrappedAnalytic.parameters.offsets[4] / wrappedAnalytic.parameters.signCorrections[4];
+    var singularBranches = shared.branches(wrappedAnalytic.forward(singularQ), singularQ);
+    check([for (branch in singularBranches) if (branch.singular) branch].length > 0,
+      "OPW shared interface explicitly reports wrist singularity");
     var diagnostic = "";
     try new OpwKinematics(bad.model, bad.arm)
     catch (error:Dynamic) diagnostic = Std.string(error);

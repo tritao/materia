@@ -44,6 +44,15 @@ class ManipulatorMotion {
   var barrierElapsed:Float = 0.0;
   var pendingProgram:Null<MotionProgram>;
   var programCompleted:Bool = false;
+  var releasedPlanningSeconds:Float = 0.0;
+  var releasedNumericIkSolves:Int = 0;
+
+  /** Cumulative compilation work across programs; excludes worker lookahead waits. */
+  public function planningMetrics():{seconds:Float, numericIkSolves:Int} {
+    var current = planner == null ? {seconds: 0.0, numericIkSolves: 0} : planner.planningMetrics();
+    return {seconds: releasedPlanningSeconds + current.seconds,
+      numericIkSolves: releasedNumericIkSolves + current.numericIkSolves};
+  }
   var planStarted:Bool = false;
   /** Past any plan's end, to bring a finished plan's slip to its total. */
   static inline final plansEnd = 1e12;
@@ -312,6 +321,9 @@ class ManipulatorMotion {
     var planning = planner;
     if (planning != null) {
       nextPlanId = planning.nextPlanId;
+      var metrics = planning.planningMetrics();
+      releasedPlanningSeconds += metrics.seconds;
+      releasedNumericIkSolves += metrics.numericIkSolves;
       planning.dispose();
       planner = null;
     }

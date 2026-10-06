@@ -207,6 +207,10 @@ class RobotWorldTests {
       ClearanceTests.run();
       return;
     }
+    if (Sys.getEnv("ROBOTKIT_ONLY") == "wall-finishing") {
+      Sys.println('Wall finishing passed (${WallFinishingScenarioTests.run()} assertions)');
+      return;
+    }
     // ROBOTKIT_ONLY=construction runs just the construction skills (they plan arm motions through MotionKit).
     if (Sys.getEnv("ROBOTKIT_ONLY") == "construction") {
       Sys.println('RobotKit construction skills passed (${ConstructionSkillTests.run()} assertions)');

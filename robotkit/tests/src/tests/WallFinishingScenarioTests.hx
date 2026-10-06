@@ -319,6 +319,23 @@ class WallFinishingScenarioTests {
 
       // Execute the complete patch as validated plans. Process records, not
       // host step indices, drive the simulated sprayer.
+      if (Sys.getEnv("PROCESS_PATH_BENCHMARK") == "1") {
+        // runPatch starts a lookahead worker; its return time only measures startup.
+        // Measure a complete synchronous compilation of the identical patch instead.
+        var planningStarted = Sys.time();
+        var solvesBefore = planRunner.manipulator.numericSolveCount();
+        var benchmarkProgram = planRunner.programForPatch(patch, baseTWork, seed);
+        var benchmarkInitial = [for (index in planRunner.motion.jointIndices)
+          robot.snapshot().setpointPositions.get(index)];
+        var compiled = planRunner.motion.compiler.compile(benchmarkProgram, benchmarkInitial, Int64.ofInt(300000));
+        var cycle = 0.0;
+        for (block in compiled.blocks) for (planned in block.plans) cycle += planned.durationSeconds;
+        Sys.println("PROCESS_PATH_RUN " + haxe.Json.stringify({example: "wall-finishing", backend: backend,
+          planningSeconds: Sys.time() - planningStarted,
+          cycleSeconds: cycle,
+          numericIkSolves: planRunner.manipulator.numericSolveCount() - solvesBefore}));
+        compiled.dispose();
+      }
       planRunner.runPatch(patch, baseTWork, seed);
       var planStartSnapshot = robot.snapshot();
       check(planRunner.running(), 'Patch plan starts (${planRunner.failure()}, safety=${planStartSnapshot.safety}, active=${planStartSnapshot.trajectoryActive}, queue=${planStartSnapshot.trajectoryQueueDepth})');
@@ -413,6 +430,10 @@ class WallFinishingScenarioTests {
       'trackingMax=$maxPositionTrackingError trackingRms=$rms ' +
       'registrationTranslation=${registration.translationCorrection} ' +
       'registrationRotation=${registration.rotationCorrectionRadians}';
+    if (Sys.getEnv("PROCESS_PATH_BENCHMARK") == "1")
+      Sys.println("PROCESS_PATH_QUALITY " + haxe.Json.stringify({example: "wall-finishing", backend: backend,
+        coverage: coverageFraction, exclusionCoverage: exclusionCoverageFraction,
+        trackingMaxMetres: maxPositionTrackingError, trackingRmsMetres: rms}));
     if (backend == 0) {
       lastDefaultBackendReport = report;
       Sys.println('M9 default-backend scenario: $report');

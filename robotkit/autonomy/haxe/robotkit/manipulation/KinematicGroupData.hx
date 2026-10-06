@@ -15,6 +15,8 @@ class KinematicGroupData {
   public final state:KinematicState;
   public final snapshot:KinematicSnapshot;
   public final workspace:SolverWorkspace;
+  /** Numeric pose queries evaluated in this caller-owned or thread-local context. */
+  public var numericSolves:Int = 0;
   /** Measures the swivel of a redundant arm (it keeps scratch of its own); null without one. */
   public final swivelProbe:Null<SwivelTask>;
 

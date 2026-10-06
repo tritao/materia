@@ -109,6 +109,7 @@ class MotionKitBootstrapTests {
     }
     if (Sys.getEnv("MOTIONKIT_C4_ONLY") == "1") {
       kinematicsTests.testOpwKinematics();
+      kinematicsTests.testCartesianAnalyticIk();
       Sys.println('C4 focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
@@ -142,6 +143,7 @@ class MotionKitBootstrapTests {
       {name: "kinematicsTests.testKinematicsContract", run: () -> kinematicsTests.testKinematicsContract(), weight: 0.05},
       {name: "kinematicsTests.testSharedGroupAcrossThreads", run: () -> kinematicsTests.testSharedGroupAcrossThreads(), weight: 0.1},
       {name: "kinematicsTests.testOpwKinematics", run: () -> kinematicsTests.testOpwKinematics(), weight: 0.05},
+      {name: "kinematicsTests.testCartesianAnalyticIk", run: () -> kinematicsTests.testCartesianAnalyticIk(), weight: 0.05},
       {name: "programTests.testMotionProgramContracts", run: () -> programTests.testMotionProgramContracts(), weight: 0.05},
       {name: "programTests.testProgramCompiler", run: () -> programTests.testProgramCompiler(), weight: 0.1},
       {name: "programTests.testRedundantArmPaths", run: () -> programTests.testRedundantArmPaths(), weight: 0.3},

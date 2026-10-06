@@ -130,6 +130,8 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   var planned:Null<PlannedWeld> = null;
   /** How long the last weld took to plan, in seconds, and what the plan is (for reports). */
   public var planningSeconds(default, null):Float = 0.0;
+  /** Numeric pose queries used by the complete geometric and compiled-motion check. */
+  public var planningIkSolves(default, null):Int = 0;
   public function lastPlan():Null<PlannedWeld> return planned;
 
   /** The weld's complete motion, validated without arc outputs or robot submission. Exact stops match the process program. */
@@ -245,8 +247,11 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     // Plan first: the rolls of the torch, how it comes in and leaves, reach and clearance all along. A weld that cannot be
     // done fails here, with the reasons.
     var began = Sys.time();
+    var group = cast(motion.compiler.solver, ManipulatorKinematics).manipulator;
+    var solvesBefore = group.numericSolveCount();
     var planned = planner.plan(requested, startPositions());
     planningSeconds = Sys.time() - began;
+    planningIkSolves = group.numericSolveCount() - solvesBefore;
     this.planned = planned;
     var plan = planned.plan;
     this.plan = plan;

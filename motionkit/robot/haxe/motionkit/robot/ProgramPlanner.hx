@@ -49,6 +49,16 @@ class ProgramPlanner {
   var speedScale:Float;
   var cancelled:Bool = false;
   var stopped:Bool = false;
+  var planningSeconds:Float = 0.0;
+  var numericIkSolves:Int = 0;
+
+  /** Worker CPU-phase wall time, excluding lookahead waits, and numeric pose queries. */
+  public function planningMetrics():{seconds:Float, numericIkSolves:Int} {
+    condition.acquire();
+    var result = {seconds: planningSeconds, numericIkSolves: numericIkSolves};
+    condition.release();
+    return result;
+  }
 
   /** Starts planning; an invalid program or start position throws here, on the caller's thread. */
   public function new(compiler:ProgramCompiler, program:MotionProgram, initialQ:Array<Float>,
@@ -168,7 +178,19 @@ class ProgramPlanner {
         var cancel = cancelled;
         compilation.speedScale = speedScale;
         condition.release();
-        if (cancel || !compilation.step()) break;
+        if (cancel) break;
+        var numeric:Null<ManipulatorKinematics> = Std.isOfType(compilation.compiler.solver, ManipulatorKinematics)
+          ? cast compilation.compiler.solver : null;
+        var before = numeric == null ? 0 : numeric.manipulator.numericSolveCount();
+        var began = Sys.time();
+        var more = compilation.step();
+        var elapsed = Sys.time() - began;
+        var solves = numeric == null ? 0 : numeric.manipulator.numericSolveCount() - before;
+        condition.acquire();
+        planningSeconds += elapsed;
+        numericIkSolves += solves;
+        condition.release();
+        if (!more) break;
       }
     } catch (error:Dynamic) {
       deliver(Failed(Std.string(error)));

@@ -379,8 +379,8 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 
 | Step | State | Commits |
 |------|-------|---------|
-| PP0 | planned | — |
-| PP1 | planned | — |
+| PP0 | in progress: harness and diagnostics; gates and baselines pending | — |
+| PP1 | in progress: Cartesian verified, OPW extraction/interface verified; UR and external chains pending | — |
 | PP2 | planned | — |
 | PP3 | planned | — |
 | PP4 | planned | — |
@@ -391,3 +391,174 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP9 | planned | — |
 | PP10 | planned | — |
 | PP11 | planned | — |
+
+### PP0 setup (2026-10-06)
+
+- `gantries` includes local main `5e4bca72b`; Haxeon is at its pinned
+  `80d00f541f1f480e8187614303936c8aba2a5670`. Its native runtime was rebuilt
+  in `haxeon/out/cmake/pp0-release`; dependencies were initialized from the
+  main checkout's stores. G18 remains skipped.
+- App, MotionKit tests and RobotKit tests compile with the pinned compiler.
+  MotionKit's runtime suite passes `71403` assertions, including numeric-query
+  counter isolation. Combined workspace/peer and native CTest evidence is
+  recorded below; baseline completion remains pending.
+  The first workspace gate found uninitialized root dependencies (proxsuite,
+  MCAP/LZ4 and MuJoCo's vendored dependencies); their pinned commits have now
+  been initialized from the main checkout's stores. This attempt is not a
+  passing gate; it must be rerun after its current actions finish.
+- `motionkit/scripts/benchmark-process-paths.py` saves raw logs and structured
+  run/quality records for the five baseline cases. Numeric pose-query counters
+  are isolated per thread or caller-owned kinematics context; their isolation
+  test is included in the MotionKit suite.
+- Handling metrics count worker compilation steps under the worker's condition
+  lock, excluding lookahead waits; `ManipulatorMotion` retains cumulative
+  metrics across completed programs. The focused handling check emits per-step
+  deltas and pick/place quality. The app compiles with this instrumentation;
+  its runtime benchmark remains pending.
+- Surface planning uses a complete synchronous compilation of the same patch
+  for measurement, since runtime lookahead startup does not measure full
+  compilation. An initial startup-only measurement was discarded.
+- Baseline results are not yet established; no speedup is claimed.
+
+| Baseline case | Run | Planning seconds | Numeric pose queries | Motion cycle seconds |
+|---|---:|---:|---:|---:|
+| Wall finishing, default backend | 1 | 0.906981 | 310 | 86.624458 |
+| Wall finishing, default backend | 2 | 1.007403 | 312 | 85.395973 |
+| Wall finishing, default backend | 3 | 1.005243 | 310 | 85.397328 |
+| G17 track weld, MuJoCo | 1 | 161.044064 | 634552 | 236.6 |
+| Arm handling, MuJoCo | 1 | 0.199098 | 61 | — |
+| Arm handling, MuJoCo | 2 | 0.189073 | 51 | — |
+| Arm handling, MuJoCo | 3 | 0.277194 | 53 | — |
+| Arm handling, MuJoCo | 4 | 0.277770 | 59 | — |
+
+Handling completed four pick/place steps in `23.460000000000868 s`, with a
+`0.14152727976814344 m` lift. Placement and reset assertions passed. Each run
+reports complete worker compilation time excluding lookahead waits; individual
+motion-cycle times are not yet emitted. Evidence:
+`/home/joao/dev/materia-cache/claude-scratch/process-path-baseline-missions/handling.log`.
+
+Track-weld baseline: `224878` checked poses, `2.5999986904836363 m` track travel,
+`0.7754218150152417 rad` arm margin, maximum joint step
+`0.00001774160193779295 rad`, full `2600 mm` bead with `4.998146645480292 mm`
+leg, maximum seam error `0.000022282434410538006 m`, wire error
+`2.980232238769532e-8 rad`, no clearance violation. This refreshed-toolchain
+baseline replaces the historical 306 s value for speedup comparisons; the
+absolute under-15-second requirement remains. Evidence:
+`/home/joao/dev/materia-cache/claude-scratch/process-path-baseline/`.
+
+Wall-finishing quality: coverage `0.9959946595460614`, excluded-region coverage
+`0`, maximum tracking error `7.777754145844614e-16 m`, RMS tracking error
+`2.516468919819489e-16 m`. The focused check passed 71 assertions. These
+planning measurements include program construction and full compilation;
+motion-cycle numbers sum trajectory durations (excluding dwell barriers).
+The current surface checker does not expose a checked-pose or clearance-distance
+count; these are still missing from the PP0 harness. Raw JSON/log evidence is in
+`/home/joao/dev/materia-cache/claude-scratch/process-path-baseline-surface-complete/`.
+
+### PP1 preparation
+
+The first native Cartesian backend is implemented as
+`mk_analytic_cartesian_forward/inverse`: model-derived zero-pose space axes,
+origins and TCP pose describe XYZ, XYZ+C and XYZ+C+A. Free-spin C+A returns
+both geometric branches; fixed orientation filters them. Axial C singularities
+are explicitly flagged, preserving the supplied seed when spin is free.
+The native test exercises 600 round trips with a rotated translation basis,
+displaced rotary origins and a pitched home TCP, plus singular/invalid-model
+cases. Release checks remain enabled. MotionKit/TrajectoryKit native CTest
+passes all `9` tests; the portable ABI audit passes Linux, Windows and both
+macOS targets, and bindings are regenerated. The Haxe `CartesianAnalyticIk`
+adapter now extracts the descriptor from `KinematicGroup`, verifies it against
+compiled FK, and enumerates all rotary lifts within finite compiled limits.
+Unsupported freedoms and unbounded wrap ranges are diagnosed explicitly. Its
+shared `AnalyticIk` interface preserves branch identity and singularity flags.
+Haxe model round trips for all three families (rotated base, displaced frames
+and mounted tool) pass in the focused C4 suite. Actual picker/welder gantry
+round trips under `PROJECT_SOURCE_ONLY=gantry-analytic` pass: `200` each for
+XYZ picker, XYZ+C yaw picker and XYZ+C+A welder, all preserving mounted TCP
+position/orientation and using zero numeric pose queries. Evidence:
+`process-path-pp1-gantry-analytic.log`. OPW also implements the shared interface,
+retaining its native branch identities, singularity flags and legal periodic
+lifts, including lifts beyond one turn. The combined focused suite now passes
+`6659` assertions (`process-path-pp1-cartesian-haxe.log`). External-chain
+support, UR and numeric
+fallback diagnostics remain pending; PP1 is incomplete.
+
+The pinned workspace gate passes all standalone suites; its one failure is the
+peer-dependent TCP integration launched without robotd. That integration has
+now passed separately with the documented robotd fixture (camera, multi-joint,
+test authorization), including SkillRunner GoTo and MissionExecutor. Evidence:
+`process-path-pp0-peer-runtime.log`. This is combined suite evidence, rather
+than a claim that the unassisted workspace command exits zero. RobotKit's
+native runtime was rebuilt with `ROBOTD_BUILD_TESTS=ON`; all `19` native CTest
+cases pass, including wire, serial PTY, virtual-device, inference and SimKit
+checks. Evidence: `process-path-pp0-runtime-ctest.log`. The normal build option
+disables runtime tests, so the earlier two-trajectory-test pass was insufficient
+and is superseded by this full pass. PP0 baseline completion remains pending.
+
+PP0's robot-welder MuJoCo whole-weldment measurement is available; the focused
+welder check is still running its other cases/backends.
+
+| Robot-welder MuJoCo run | Planning seconds | Checked poses | Numeric pose queries |
+|---:|---:|---:|---:|
+| 1 | 223.917895 | 428451 | 476366 |
+| 2 | 17.033878 | 7892 | 9801 |
+| 3 | 3.428612 | 4636 | 905 |
+| 4 | 49.322336 | 5571 | 27818 |
+
+Quality: all 10 seams in four runs, cycle `114.4 s`, no clearance violation,
+maximum seam error `0.00028911608356520056 m`, wire error `0 rad`.
+Legs (mm): `4.9921112577618745, 4.988490679606122, 4.9699010788607945,
+4.921193060062008, 4.973832402680148, 4.940971967400651, 4.92748327327362,
+4.961859324866635, 4.9973399334701885, 5.001373493520714`.
+Lengths (mm): `40, 39.99999999999998, 40, 39.99999999999998, 40, 40, 40, 40, 180, 180`.
+Raw evidence: `process-path-baseline-missions/welder.log` in the scratch directory.
+
+| Robot-welder test-backend run | Planning seconds | Checked poses | Numeric pose queries |
+|---:|---:|---:|---:|
+| 1 | 161.057081 | 428451 | 476366 |
+| 2 | 17.499276 | 7892 | 9801 |
+| 3 | 3.326203 | 4636 | 905 |
+| 4 | 47.265934 | 5571 | 27818 |
+
+Test-backend quality: all 10 seams, cycle `114.4 s`, no clearance violation,
+maximum seam error `0.0002891857583632866 m`, wire error `0 rad`.
+Legs (mm): `4.970854314068294, 5.0150636878779045, 4.961363053145066,
+4.921848223437177, 4.995847873437931, 4.938814463483445, 4.930586331039058,
+4.942692233198144, 4.997339933470188, 4.9973399334701885`.
+Lengths match the MuJoCo run. The focused welder check's additional regression
+cases are still running; the process exit and gantry-welder baseline remain
+pending.
+
+`PROJECT_SOURCE_ONLY=arm-analytic` checks 100 deterministic joint vectors
+within the authored MachineKit arm's limits, using the actual generated
+RobotModel and mounted suction tool. It checks OPW/model FK agreement and that
+analytic inverse solutions contain the original configuration. The test is
+implemented in the app project-source checks and compiles. Its first runtime
+check fails during model extraction: `OPW joint j4 violates the
+parallel-base/spherical-wrist axis pattern`. The existing fixture extractor
+therefore does not yet support the authored arm. Parameter extraction must
+handle its actual joint frames and reference pose and then pass the round-trip
+proof; do not assume its compatibility from the spherical-wrist description.
+Evidence: `/home/joao/dev/materia-cache/claude-scratch/process-path-pp1-arm-analytic.log`.
+The assembly bridge embeds the initial placement in each parent joint frame
+and shifts robot limits to that reference; extraction must handle this without
+hard-coded initial angles.
+OPW external-chain support, UR and Cartesian backends remain
+unimplemented; this preparation does not satisfy PP1.
+
+Extraction is being extended to recover a canonical straight-arm reference
+from the model's axis lines and to test wrist-axis intersection rather than
+coincidence of the selected axis origins. This uses no assembly-specific
+initial angles. The code compiles; authored-arm and existing OPW runtime
+checks are pending. Its authored-arm runtime check now reaches wrist-axis
+intersection and rejects the geometry: the `j4` and `j6` axis lines are
+separated by `35 mm` along the `j5` direction. The authored wrist is therefore
+offset, despite its spherical-wrist description, and cannot satisfy an OPW
+round-trip proof unchanged. The user has been asked to choose between keeping
+the geometry and adding its analytic family, or redesigning it as spherical.
+Neither decision is assumed yet. Existing OPW fixture diagnostics have also
+been restored for the UR arm's perpendicular-axis violation. The focused C4
+suite now passes `310` assertions, including 30 inverse round trips after
+shifting the model's joint references and displacing each axis origin along
+its own axis. This verifies the new extraction conventions on a genuine OPW
+chain; it does not make the authored offset wrist OPW-compatible.

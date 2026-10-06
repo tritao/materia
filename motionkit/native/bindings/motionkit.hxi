@@ -6,6 +6,13 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	const MK_TIMING_BINDING_FEED_CAP = 3;
 	const MK_TIMING_BINDING_JOINT_ACCELERATION = 2;
 	const MK_TIMING_BINDING_JOINT_VELOCITY = 1;
+	extern fn mk_analytic_cartesian_forward(model: ptr<const<mk_analytic_cartesian_model>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_opw_pose> @out) -> mk_result;
+	/**
+	 * All geometric branches, before limits/wrap enumeration by the sampler.
+	 * axis_only frees TCP spin; fixed orientation filters branches by full rotation.
+	 * The seed selects C at its explicit axis singularity.
+	 */
+	extern fn mk_analytic_cartesian_inverse(model: ptr<const<mk_analytic_cartesian_model>>, target: ptr<const<mk_opw_pose>>, axis_only: u32, singular_c_seed: f64, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Converts Ruckig Community's offline phases to degree-3 native segments.
 	 */
@@ -48,6 +55,32 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * Reachability-based TOPP-RA timing and its validated lowered trajectory.
 	 */
 	extern fn mk_time_path(path: mk_path_handle, max_velocity: ptr<const<f64>> @in_array("joint_count"), max_acceleration: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, speed_caps: ptr<const<f64>> @in_array("speed_cap_count"), speed_cap_count: u32, start_speed: f64, end_speed: f64, lowering_tolerance: f64, out_law: ptr<mk_time_law_handle> @out @owned, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	/**
+	 * Cartesian chain represented by its zero-pose space screws and TCP pose.
+	 * The three translation axes are columns of translation_axes. Optional C/A
+	 * axes and origins are in the same reference frame, in chain order.
+	 */
+	struct mk_analytic_cartesian_model @layout(232, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		/**
+		 * < 3 (XYZ), 4 (XYZ+C), or 5 (XYZ+C+A).
+		 */
+		joint_count: u32 @offset(4);
+		translation_axes: array<f64, 9> @offset(8);
+		rotary_axes: array<f64, 6> @offset(80);
+		rotary_origins: array<f64, 6> @offset(128);
+		home_position: array<f64, 3> @offset(176);
+		home_quaternion: array<f64, 4> @offset(200);
+	}
+	struct mk_analytic_solution @layout(64, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		joints: array<f64, 6> @offset(8);
+		branch: u32 @offset(56);
+		/**
+		 * < C is undetermined at an axial tool direction.
+		 */
+		singular: u32 @offset(60);
+	}
 	struct mk_configuration_candidate @layout(520, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		joints: array<f64, 64> @offset(8);
