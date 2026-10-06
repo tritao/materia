@@ -150,6 +150,27 @@ function main():Void { BenchMillChecks.run(); EnclosedMillChecks.run(); }
 class EnclosedMillChecks {
 	public static function run():Void {
 		var cell = new EnclosedBenchMill(), state = cell.state();
+		var deck = BenchMillChecks.posed(cell, state, "standDeck");
+		var tray = BenchMillChecks.posed(cell, state, "chipTray");
+		var db = deck.shape.bounds(), tb = tray.shape.bounds();
+		if (Math.abs(db.get_min().get_x() - tb.get_min().get_x()) > 1e-5 ||
+			Math.abs(db.get_max().get_x() - tb.get_max().get_x()) > 1e-5 ||
+			Math.abs(db.get_min().get_y() - tb.get_min().get_y()) > 1e-5 ||
+			Math.abs(db.get_max().get_y() - tb.get_max().get_y()) > 1e-5 ||
+			Math.abs(db.get_max().get_z() - tb.get_min().get_z()) > 1e-5)
+			throw "Stand deck must support the complete chip tray at its underside";
+		deck.close(); tray.close();
+		for (id in cell.standIds) if (StringTools.startsWith(id, "standLeg")) {
+			var leg = BenchMillChecks.posed(cell, state, id), bounds = leg.shape.bounds();
+			if (Math.abs(bounds.get_min().get_z()) > 1e-5 ||
+				Math.abs(bounds.get_max().get_z() - (cell.standHeight - 8)) > 1e-5)
+				throw "Stand legs must reach from the floor to the deck";
+			var expected = (80 * 80 - 72 * 72) * (cell.standHeight - 8);
+			if (Math.abs(leg.volume() - expected) > 0.01)
+				throw "Stand leg mass must come from hollow structural stock";
+			leg.close();
+		}
+		if (cell.standIds.length != 15) throw "Stand needs a deck, four legs, eight rails and two rear braces";
 		// The X guide preserves the leaf's Y interval, so this separating plane
 		// proves panel clearance for the entire continuous stroke.
 		var guide = [for (joint in state.definition.joints) if (joint.id == "door") joint][0];

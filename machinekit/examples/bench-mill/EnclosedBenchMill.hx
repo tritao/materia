@@ -10,6 +10,9 @@ import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
+import machinekit.structural.RectTube;
+import machinekit.structural.ProfileMember;
+import cadkit.modeling.Vector;
 
 typedef MillBounds = {var low:Array<Float>; var high:Array<Float>;}
 
@@ -28,6 +31,7 @@ class EnclosedBenchMill extends MachineAssembly {
 	public final floorOffset:Float;
 	public final panelIds:Array<String> = [];
 	public final doorIds:Array<String> = [];
+	public final standIds:Array<String> = [];
 	final poses = new Map<String, AssemblyFrame>();
 
 	public function new() {
@@ -54,10 +58,35 @@ class EnclosedBenchMill extends MachineAssembly {
 			AssemblyFrames.translation(0, 0, floorOffset)));
 		addMemberConnector("mill/base", "standSeat", AssemblyFrames.identity());
 		addMate("mill-on-stand", "fixed", "chipTray", "millSeat", "mill/base", "standSeat");
-		// The stand deck and four legs are convex fabricated blocks.
-		panel("standDeck", mill.base.width, mill.base.depth, 5, 0, 0, standHeight - 5, false);
-		for (x in [-1, 1]) for (y in [-1, 1]) panel('standLeg${x + 1}${y + 1}', 30, 30, standHeight - 5,
-			x * (mill.base.width / 2 - 30), y * (mill.base.depth / 2 - 30), 0, false);
+		// Support the entire enclosure footprint with hollow steel stock and a full deck.
+		var deckThickness = 8.0, legSize = 80.0, railSize = 60.0;
+		var deckBottom = standHeight - deckThickness;
+		panel("standDeck", width, depth, deckThickness, centreX, centreY, deckBottom, false);
+		standIds.push("standDeck");
+		var x0 = left + legSize / 2, x1 = right - legSize / 2;
+		var y0 = front + legSize / 2, y1 = back - legSize / 2;
+		for (xi in 0...2) for (yi in 0...2) {
+			var x = xi == 0 ? x0 : x1, y = yi == 0 ? y0 : y1;
+			standMember('standLeg$xi$yi', new RectTube(legSize, legSize, 4),
+				new Vector(x, y, 0), new Vector(x, y, deckBottom));
+		}
+		for (level in 0...2) {
+			var z = level == 0 ? 180.0 : deckBottom - railSize / 2;
+			for (side in 0...2) {
+				var x = side == 0 ? x0 : x1, y = side == 0 ? y0 : y1;
+				standMember('standRailX$level$side', new RectTube(railSize, railSize, 3),
+					new Vector(x0 + legSize / 2, y, z), new Vector(x1 - legSize / 2, y, z));
+				standMember('standRailY$level$side', new RectTube(railSize, railSize, 3),
+					new Vector(x, y0 + legSize / 2, z), new Vector(x, y1 - legSize / 2, z));
+			}
+		}
+		// Rear diagonals resist racking while leaving the front clear for access.
+		for (side in 0...2) {
+			var startX = side == 0 ? x0 : x1, endX = side == 0 ? x1 : x0;
+			var braceY = y1 + (side == 0 ? -21 : 21);
+			standMember('standBrace$side', new RectTube(40, 40, 3),
+				new Vector(startX, braceY, 220), new Vector(endX, braceY, deckBottom - railSize));
+		}
 		panel("enclosureLeft", panelThickness, depth, top - bottom, left - panelThickness / 2, centreY, bottom);
 		panel("enclosureRight", panelThickness, depth, top - bottom, right + panelThickness / 2, centreY, bottom);
 		panel("enclosureBack", width, panelThickness, top - bottom, centreX, back + panelThickness / 2, bottom);
@@ -144,6 +173,15 @@ class EnclosedBenchMill extends MachineAssembly {
 		if (id == "chipTray") { addComponent(id, part, pose); poses.set(id, pose); }
 		else fixed(id, part, pose, "chipTray");
 		if (enclosure) panelIds.push(id);
+	}
+	function standMember(id:String, profile:RectTube, start:Vector, end:Vector):Void {
+		var delta = end.subtract(start), length = delta.length(), axis = delta.normalized();
+		var reference = Math.abs(axis.z) < 0.9 ? Vector.Z() : Vector.Y();
+		var x = reference.cross(axis).normalized(), y = axis.cross(x);
+		var pose = AssemblyFrames.fromRotationMatrix(start.x, start.y, start.z,
+			[x.x, y.x, axis.x, x.y, y.y, axis.y, x.z, y.z, axis.z]);
+		fixed(id, new ProfileMember(profile, length), pose, "chipTray");
+		standIds.push(id);
 	}
 	function doorPanel(id:String, w:Float, d:Float, h:Float, x:Float, y:Float, z:Float, material:String = "steel"):Void {
 		fixed(id, new MillPanel(w, d, h, material), AssemblyFrames.translation(x, y, z), "doorSlider");
