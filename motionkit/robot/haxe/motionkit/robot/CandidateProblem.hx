@@ -67,6 +67,10 @@ class CandidateProblem {
     diagnostic=fallback==null ? null : fallback.diagnostic;
     var cart:Null<CartesianCandidateSampler> = Std.isOfType(backend,CartesianAnalyticIk) ? new CartesianCandidateSampler(group) : null;
     var serial:Null<SerialCandidateSampler> = cart==null && fallback==null ? new SerialCandidateSampler(group) : null;
+    var profile=Sys.getEnv("PROCESS_PATH_PROFILE")=="1",began=profile?Sys.time():0.0,lastReport=began;
+    var queriesBefore=profile?group.numericSolveCount():0,totalCandidates=0;
+    if(profile)Sys.println("PROCESS_PATH_BUILD_START "+haxe.Json.stringify({family:family,
+      diagnostic:diagnostic,samples:request.poses.length,externalAxes:externalJoints.length,pinnedStart:pinnedStart}));
     samples=[];
     var initialPose=backend.forward(request.startQ);
     var neighbours=[request.startQ.copy()];
@@ -140,6 +144,16 @@ class CandidateProblem {
         candidates=selected;
       }
       samples.push(new CandidateLayer(request.distances[index],target,freedom,candidates));
+      if(profile){
+        totalCandidates+=candidates.length;
+        var now=Sys.time();
+        if(now-lastReport>=1.0 || index==request.poses.length-1){
+          Sys.println("PROCESS_PATH_BUILD_PROGRESS "+haxe.Json.stringify({family:family,
+            completedSamples:index+1,samples:request.poses.length,candidates:totalCandidates,
+            numericIkSolves:group.numericSolveCount()-queriesBefore,seconds:now-began}));
+          lastReport=now;
+        }
+      }
       neighbours=[for(candidate in candidates)candidate.q.copy()];
       if(neighbours.length==0)neighbours=[request.startQ.copy()];
     }
