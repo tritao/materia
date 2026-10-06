@@ -1311,8 +1311,9 @@ class KinematicsTests extends MotionKitTestSupport {
     var compiler = new ProgramCompiler(solver, limits, "work",
       [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],
       [for (_ in 0...6) 20.0], StartTolerances.uniform(6, 0.02, 0.02, 0.02),
-      null, 0.01, 0.5, 0.005, 0.02, null,
-      new motionkit.robot.StructuredJointPathPlanner(manipulator));
+      null, 0.01, 0.5, 0.005, 0.02);
+    check(Std.isOfType(compiler.jointPathPlanner, motionkit.robot.StructuredJointPathPlanner),
+      "standalone OPW compiler selects the structured planner by default");
     var program = new MotionProgram([MotionOp.MoveL(solver.forward(next),
       "work", 0.1, Blend.ExactStop)]);
     var compiled = compiler.compile(program, q, Int64.ofInt(901));

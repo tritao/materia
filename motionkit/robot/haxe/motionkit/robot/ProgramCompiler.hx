@@ -184,7 +184,18 @@ class ProgramCompiler {
     this.orientationTolerance = orientationTolerance;
     this.ikTolerance = ikTolerance == null ? new IkTolerance() : ikTolerance;
     this.jointPathPlanner = jointPathPlanner != null ? jointPathPlanner :
-      Std.isOfType(solver, AxisKinematics) ? new AxisJointPathPlanner(cast solver) : null;
+      defaultJointPathPlanner(solver);
+  }
+
+  static function defaultJointPathPlanner(solver:KinematicsSolver):Null<JointPathPlanner> {
+    if (Std.isOfType(solver, AxisKinematics)) return new AxisJointPathPlanner(cast solver);
+    if (Std.isOfType(solver, OpwKinematics)) {
+      var opw:OpwKinematics = cast solver;
+      // External axes require the process builder's explicit positioning rule.
+      if (opw.manipulator.external.indexOf(true) < 0 && opw.manipulator.workFrame == null)
+        return new StructuredJointPathPlanner(opw.manipulator);
+    }
+    return null;
   }
 
   /**

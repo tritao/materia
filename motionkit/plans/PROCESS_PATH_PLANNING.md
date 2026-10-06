@@ -1393,3 +1393,9 @@ Compiler-only validation passes. The focused C4 runtime passes 1,148,990 asserti
 `StructuredJointPathPlanner` now accepts a per-sample candidate state cost and retains it when rebinding a worker solver. Both direct search and lazy sample/edge/refined collision retries use that cost; disabled candidates still receive infinite cost. This fixes the prior composition gap where lazy clearance replaced all process preferences with zero. Process builders must supply pure, worker-safe callbacks.
 
 Compiler-only validation passes. The focused C4 runtime passes 1,148,993 assertions, including a preferred alternative route with a clear world and a collision retry that excludes that alternative while continuing to avoid the penalized initial route. Serial-arm default migration and construction of authored process preferences remain outstanding; this supplies the common cost plumbing, not their completion.
+
+### PP6 standalone OPW compiler default
+
+Standalone OPW compilers now select `StructuredJointPathPlanner` without an explicit constructor argument, so `lowerPath` sends the selected/refined joint derivatives directly to timing. The existing OPW MoveL acceptance now exercises that default and its worker compilation. Explicit planners take precedence; OPW groups with external axes or a moving work frame still require authored positioning rules and remain pending. Full-free serial orientation sampling remains unsupported and diagnosed.
+
+Compiler-only validation passes; the focused C4 runtime passes 1,148,994 assertions. This verifies the standalone OPW default and existing axis/UR/numeric structured coverage, not the complete PP6 phase gate or process-runner migration.
