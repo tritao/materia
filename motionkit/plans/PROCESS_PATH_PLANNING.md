@@ -864,3 +864,14 @@ Exact branch bounding boxes now skip impossible cross-branch searches, and
 single-cell orientation coordinates skip redundant neighbour probes. The
 small random-reference test still passes; a 21-layer optimized probe took
 0.183113 s and tested 1,367,600 edges. The <1 s requirement is not achieved.
+
+PP3 streaming scale evidence: structured DP now accepts a layer provider
+whose two-slot cache keeps only the current/prior candidate layers. Validation
+runs as each layer is consumed. One hundred random problems produce identical
+routes, costs, failure indices and edge counts with stored versus streamed
+layers, in addition to brute-force agreement. The complete synthetic
+1301 x 7700 probe now finishes with ~60 MB peak RSS rather than >10 GB.
+Initial streaming timing was 13.305743 s; hashing/comparing only active
+lattice coordinates reduced it to 5.741541 s (88,894,000 tested edges),
+including streamed candidate generation. The one-second acceptance target
+remains unmet, and this synthetic probe is not authored-track coverage.

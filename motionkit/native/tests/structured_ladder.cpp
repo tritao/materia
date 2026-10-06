@@ -5,6 +5,16 @@
 #include <cassert>
 #include <random>
 using namespace motionkit;
+struct CachedLayers {
+    const std::vector<LadderLayer> &source;
+    mutable std::array<LadderLayer,2> cache;
+    mutable std::array<unsigned,2> index{{UINT32_MAX,UINT32_MAX}};
+    size_t size()const{return source.size();}
+    bool empty()const{return source.empty();}
+    const LadderLayer &operator[](unsigned layer)const{
+        unsigned slot=layer%2;if(index[slot]!=layer){cache[slot]=source[layer];index[slot]=layer;}return cache[slot];
+    }
+};
 int main(){
     LadderSettings s;s.joints=4;s.externals=1;s.rolls=4;s.roll_weight=.07;
     for(unsigned j=0;j<4;++j){s.jump[j]=.5;s.weight[j]=1+j;s.velocity[j]=1;}
@@ -16,6 +26,10 @@ int main(){
             for(unsigned j=0;j<4;++j)c.joints[j]=q(random);layers[l].push_back(c);states[l].push_back(.01*i);
         }
         auto result=structured_ladder(layers,s,states);
+        CachedLayers streamed{layers};auto streamed_result=structured_ladder(streamed,s,states);
+        assert(streamed_result.failed==result.failed && streamed_result.route==result.route);
+        assert(streamed_result.cost==result.cost && streamed_result.tested_edges==result.tested_edges);
+
         std::vector<double> old;
         unsigned failed=UINT32_MAX;
         for(unsigned l=0;l<4;++l){std::vector<double> next(16,INFINITY);

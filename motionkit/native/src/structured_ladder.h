@@ -25,17 +25,17 @@ struct LadderResult {
 };
 using LadderLayer=std::vector<mk_lattice_candidate>;
 struct LatticeKey {
-    unsigned branch;
+    unsigned branch, dimensions=0;
     std::array<unsigned,MK_MAX_JOINTS+3> cell{};
-    bool operator==(const LatticeKey &b) const {return branch==b.branch && cell==b.cell;}
+    bool operator==(const LatticeKey &b) const {return branch==b.branch && dimensions==b.dimensions && std::equal(cell.begin(),cell.begin()+dimensions,b.cell.begin());}
 };
 struct LatticeHash {
     size_t operator()(const LatticeKey &a) const {
-        size_t h=a.branch;for(auto v:a.cell)h=(h^v)*1099511628211ull;return h;
+        size_t h=a.branch;for(unsigned i=0;i<a.dimensions;++i)h=(h^a.cell[i])*1099511628211ull;return h;
     }
 };
 inline LatticeKey lattice_key(const mk_lattice_candidate &c,unsigned external) {
-    LatticeKey key{};key.branch=c.branch;
+    LatticeKey key{};key.branch=c.branch;key.dimensions=external+3;
     for(unsigned i=0;i<external;++i)key.cell[i]=c.external_coordinates[i];
     key.cell[external]=c.roll_index;key.cell[external+1]=c.tilt_index;key.cell[external+2]=c.azimuth_index;
     return key;
@@ -50,10 +50,12 @@ struct JointHash {
     }
 };
 /** Exact dynamic programming over the structured graph, retaining only two
- * cost layers. State costs are supplied by the caller (margin/posture/roll).
+ * cost layers. A layer provider must retain current and previous layers while
+ * they are referenced (a two-slot cache is sufficient). State costs are supplied by the caller (margin/posture/roll).
  * Coordinate keys deliberately omit wrap numbers: FK representatives can cross
  * a wrap seam between samples; physical joint jumps decide connectivity. */
-inline LadderResult structured_ladder(const std::vector<LadderLayer> &layers,
+template<class Layers>
+inline LadderResult structured_ladder(const Layers &layers,
         const LadderSettings &s,const std::vector<std::vector<double>> &state_cost={}) {
     if(s.joints==0 || s.joints>MK_MAX_JOINTS || s.externals>MK_MAX_JOINTS ||
         s.rolls==0 || s.tilts==0 || s.azimuths==0 ||
@@ -65,19 +67,6 @@ inline LadderResult structured_ladder(const std::vector<LadderLayer> &layers,
             throw std::invalid_argument("Ladder requires finite joints, positive jumps/speeds and nonnegative weights");
     if(!state_cost.empty() && state_cost.size()!=layers.size())
         throw std::invalid_argument("Ladder state-cost layer count mismatch");
-    for(unsigned l=0;l<layers.size();++l){
-        if(!state_cost.empty() && state_cost[l].size()!=layers[l].size())
-            throw std::invalid_argument("Ladder state-cost candidate count mismatch");
-        for(unsigned i=0;i<layers[l].size();++i){const auto &c=layers[l][i];
-            if(c.roll_index>=s.rolls || c.tilt_index>=s.tilts || c.azimuth_index>=s.azimuths)
-                throw std::invalid_argument("Ladder orientation coordinate out of range");
-            for(unsigned j=0;j<s.joints;++j)
-                if(!std::isfinite(c.joints[j]) || std::abs(c.joints[j]/s.jump[j])>0x1p60)
-                    throw std::invalid_argument("Ladder joint cannot be represented in the spatial hash");
-            if(!state_cost.empty() && (std::isnan(state_cost[l][i]) || state_cost[l][i]<0))
-                throw std::invalid_argument("Ladder state costs must be nonnegative");
-        }
-    }
     LadderResult out;
     if(layers.empty())return out;
     std::vector<std::vector<unsigned>> predecessor(layers.size());
@@ -91,6 +80,17 @@ inline LadderResult structured_ladder(const std::vector<LadderLayer> &layers,
     };
     for(unsigned layer=0;layer<layers.size();++layer){
         const auto &current=layers[layer];
+        if(!state_cost.empty() && state_cost[layer].size()!=current.size())
+            throw std::invalid_argument("Ladder state-cost candidate count mismatch");
+        for(unsigned i=0;i<current.size();++i){const auto &c=current[i];
+            if(c.roll_index>=s.rolls || c.tilt_index>=s.tilts || c.azimuth_index>=s.azimuths)
+                throw std::invalid_argument("Ladder orientation coordinate out of range");
+            for(unsigned j=0;j<s.joints;++j)
+                if(!std::isfinite(c.joints[j]) || std::abs(c.joints[j]/s.jump[j])>0x1p60)
+                    throw std::invalid_argument("Ladder joint cannot be represented in the spatial hash");
+            if(!state_cost.empty() && (std::isnan(state_cost[layer][i]) || state_cost[layer][i]<0))
+                throw std::invalid_argument("Ladder state costs must be nonnegative");
+        }
         if(current.empty()){out.failed=layer;out.no_candidates=true;return out;}
         std::vector<double> costs(current.size(),std::numeric_limits<double>::infinity());
         predecessor[layer].assign(current.size(),UINT32_MAX);
