@@ -80,11 +80,7 @@ class SceneFileDialogs {
       complete(path, null);
       return;
     }
-    var resource = new Resource();
-    resource.set_struct_size(Resource.size());
-    resource.set_flags(ResourceFlags.Readable);
-    resource.set_uri(item.uri);
-    if (item.displayName != null) resource.set_display_name(item.displayName);
+    var resource = new haxeon.platform.resource.Resource(item.uri, null, item.displayName).nativeValue();
     var id = NativeKit.nk_resource_load_async_checked(resource);
     request = id;
     host.events.requests.track(id, function(event) {

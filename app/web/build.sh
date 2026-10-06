@@ -67,7 +67,8 @@ compiler="$build_dir/haxeon-compiler.hl"
 if [[ ! -f "$compiler" ]] || [[ -n $(find "$haxeon_dir/src" -name '*.hx' -newer "$compiler" -print -quit) ]]; then
 	"$haxeon_dir/.tools/haxe/haxe" --cwd "$haxeon_dir" -cp src -hl "$compiler" -main compiler.tools.HaxeonCompiler
 fi
-mapfile -t guest_arguments < <(python3 "$app_dir/web/tools/guest-arguments.py" "$app_dir/haxeon.json" "$build_dir/hxi")
+python3 "$app_dir/web/tools/guest-arguments.py" "$app_dir/haxeon.json" "$build_dir/hxi" > "$build_dir/guest-arguments.txt"
+mapfile -t guest_arguments < "$build_dir/guest-arguments.txt"
 # The page's own services (materia.js), which only the browser guest imports.
 guest_arguments+=("--ffi-interface=$app_dir/web/MateriaWebFiles.hxi")
 (cd "$haxeon_dir" && LD_LIBRARY_PATH="$haxeon_dir/out:$haxeon_dir/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \

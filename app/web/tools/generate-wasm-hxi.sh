@@ -7,6 +7,7 @@ mkdir -p "$1"
 output_dir=$(cd "$1" && pwd)
 generators=(
 	"haxeon/packages/platform/tools/audit-haxeon-abi.sh:nativekit.hxi:--output="
+	"haxeon/packages/platform/tools/update-haxeon-net-hxi.sh:nativekit-net.hxi:--output="
 	"haxeon/packages/gpu/tools/check-hxi.sh:nativekit-gpu.hxi"
 	"haxeon/packages/ui/tools/check-hxi.sh:nativekit-ui.hxi"
 	"scenekit/scene/tools/check-hxi.sh:nativekit-scene.hxi"
@@ -20,6 +21,9 @@ generators=(
 	"visionkit/native/tools/check-hxi.sh:visionkit.hxi"
 	"animkit/native/tools/check-hxi.sh:animkit.hxi"
 	"stockkit/core/tools/check-hxi.sh:stockkit.hxi"
+	"trajectorykit/native/tools/check-hxi.sh:trajectory-core.hxi"
+	"kinematicskit/native/tools/check-hxi.sh:kinematicskit.hxi"
+	"motionkit/native/tools/check-hxi.sh:motionkit.hxi"
 )
 "$materia_dir/tools/web/generate-wasm-hxi.sh" "$output_dir" "${generators[@]}"
 

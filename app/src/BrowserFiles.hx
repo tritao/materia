@@ -2,6 +2,7 @@ package app;
 
 #if wasm
 import haxe.io.Bytes;
+import haxeon.platform.resource.Resource;
 import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitTypes;
 import runtime.MemoryFileSystem;
@@ -84,10 +85,7 @@ class BrowserFiles implements MemoryFileSystemObserver {
     var uri = links.get(path);
     if (uri == null) return;
     if (StringTools.startsWith(uri, "nativekit-download://")) links.remove(path);
-    var resource = new Resource();
-    resource.set_struct_size(Resource.size());
-    resource.set_flags(ResourceFlags.Writable);
-    resource.set_uri(uri);
+    var resource = new Resource(uri, null, null, ResourceFlags.Writable).nativeValue();
     var opened = NativeKit.nk_resource_open(resource,
       ResourceOpenFlags.Write | ResourceOpenFlags.Create | ResourceOpenFlags.Truncate);
     if (opened.status != Result.Ok) {
