@@ -27,6 +27,7 @@ class AnalyticPathRefiner {
   final roll:RedundancySpline;
   final swingX:RedundancySpline;
   final swingY:RedundancySpline;
+  final freeCentre:Quat;
   public function new(group:KinematicGroup,problem:CandidateProblem,selection:LadderSelection) {
     if(group==null || problem==null || selection==null || selection.diagnostic!=null ||
         problem.samples.length<2 || selection.candidates.length!=problem.samples.length)
@@ -35,6 +36,7 @@ class AnalyticPathRefiner {
     var isNumeric=problem.family=="numeric-fallback";
     if(!isNumeric && !isCartesian && problem.family!="UR6R" && problem.family!="OPW")throw "Refinement requires a supported analytic family";
     this.group=group;this.problem=problem;this.selection=selection;
+    freeCentre=group.tcpPose(selection.candidates[0].q).rotation;
     sampler=isCartesian || isNumeric ? null : new SerialCandidateSampler(group);
     numeric=isNumeric ? new NumericBranchIk(group,problem.diagnostic,problem.request.tolerance) : null;
     diagnostic=problem.diagnostic;
@@ -70,12 +72,12 @@ class AnalyticPathRefiner {
       // would turn numerical pose error into artificial spline curvature.
       if(ToolFreedom.isFull(layer.freedom)){rolls.push(0);xs.push(0);ys.push(0);continue;}
       var centre=OrientationLattice.centre(layer.target,layer.freedom);
-      var reference=new Quat(centre.qx,centre.qy,centre.qz,centre.qw);
+      var reference=switch layer.freedom {case Free:freeCentre;default:new Quat(centre.qx,centre.qy,centre.qz,centre.qw);};
       var relative=reference.conjugate().multiply(actual.rotation),length=Math.sqrt(relative.z*relative.z+relative.w*relative.w);
       if(length<1e-10)throw "Refinement roll is undefined at an antipodal tool axis";
       var spin=2*Math.atan2(relative.z,relative.w),twist=Quat.fromAxisAngle(new Vec3(0,0,1),spin);
       var swing=relative.multiply(twist.conjugate()),axis=swing.rotate(new Vec3(0,0,1));
-      var tilt=Math.acos(Math.max(-1,Math.min(1,axis.z))),azimuth=Math.atan2(axis.y,axis.x);
+      var tilt=Math.atan2(Math.sqrt(axis.x*axis.x+axis.y*axis.y),axis.z),azimuth=Math.atan2(axis.y,axis.x);
       rolls.push(spin);xs.push(tilt*Math.cos(azimuth));ys.push(tilt*Math.sin(azimuth));
     }
     roll=new RedundancySpline(distances,rolls,2*Math.PI);
@@ -98,6 +100,14 @@ class AnalyticPathRefiner {
   public function orientationMotion(distance:Float,target:Pose3,freedom:OrientationPolicy,
       centreOmega:Array<Float>,centreAlpha:Array<Float>):motionkit.robot.OrientationDifferential.OrientationMotion {
     var centre=OrientationLattice.centre(target,freedom);
+    switch freedom {
+      case Free:
+        // Authored rotation is unconstrained. Its movement must not inject
+        // angular rates or put the selected start at an artificial pole.
+        return OrientationDifferential.refine(freeCentre,[0.0,0.0,0.0],[0.0,0.0,0.0],
+          swingX.evaluate(distance),swingY.evaluate(distance),roll.evaluate(distance));
+      default:
+    }
     return OrientationDifferential.refine(new Quat(centre.qx,centre.qy,centre.qz,centre.qw),centreOmega,centreAlpha,
       swingX.evaluate(distance),swingY.evaluate(distance),roll.evaluate(distance));
   }

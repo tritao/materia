@@ -661,6 +661,18 @@ class KinematicsTests extends MotionKitTestSupport {
     var selected=motionkit.robot.StructuredLadder.search(problem);
     check(selected.diagnostic==null && selected.candidates.length==2,"Haxe structured ladder selects a complete native route");
     var selectedAgain=motionkit.robot.StructuredLadder.search(problem);
+    var shiftedSpinTargets=[for(p in request.poses){
+      var rotation=new Quat(p.qx,p.qy,p.qz,p.qw).multiply(Quat.fromAxisAngle(new Vec3(0,0,1),Math.PI));
+      new Pose3(p.x,p.y,p.z,rotation.x,rotation.y,rotation.z,rotation.w);
+    }];
+    var shiftedSpinProblem=new motionkit.robot.CandidateProblem(fixture.arm,new PathRequest(request.distances,
+      shiftedSpinTargets,start,request.tolerance,request.maxJump,request.velocity,32,
+      [OrientationPolicy.FreeAboutTool,OrientationPolicy.FreeAboutTool]),
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,2,4),true);
+    check(shiftedSpinProblem.samples[0].candidates[0].roll==2,
+      "pinned free-spin metadata describes its actual orientation in the authored lattice");
+    check(motionkit.robot.StructuredLadder.search(shiftedSpinProblem).diagnostic==null,
+      "a shifted authored spin cannot disconnect a reachable pinned continuation");
     var freeOrientationPath=new PosePath("task",[new PoseLine(
       new PoseWaypoint(request.poses[0],1e-6,1e-6),new PoseWaypoint(request.poses[1],1e-6,1e-6),
       OrientationPolicy.Free,0.1,0.1)]);
@@ -688,6 +700,41 @@ class KinematicsTests extends MotionKitTestSupport {
         "compiled full-free path preserves the pinned configuration",1e-12);
     } catch(error:Dynamic){freeCompiled.dispose();throw error;}
     freeCompiled.dispose();
+    var flippedFreeWaypoints=[for(p in request.poses){
+      var rotation=new Quat(p.qx,p.qy,p.qz,p.qw).multiply(Quat.fromAxisAngle(new Vec3(1,0,0),Math.PI));
+      new PoseWaypoint(new Pose3(p.x,p.y,p.z,rotation.x,rotation.y,rotation.z,rotation.w),1e-6,1e-6);
+    }];
+    var flippedFreePath=new PosePath("task",[new PoseLine(flippedFreeWaypoints[0],flippedFreeWaypoints[1],
+      OrientationPolicy.Free,0.1,0.1)]);
+    var flippedFreeRequest=new PathRequest(freeOrientationDistances,
+      [for(s in freeOrientationDistances)flippedFreePath.poseAt(s)],start,request.tolerance,
+      request.maxJump,request.velocity,32,[for(_ in freeOrientationDistances)OrientationPolicy.Free]);
+    var flippedFreeProblem=new motionkit.robot.CandidateProblem(fixture.arm,flippedFreeRequest,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,2,4),true);
+    var flippedRefiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,flippedFreeProblem,
+      motionkit.robot.StructuredLadder.search(flippedFreeProblem));
+    var flippedCurve=flippedRefiner.refinePath(freeOrientationDistances,new motionkit.robot.PosePathRefinement(flippedFreePath).at);
+    for(i in 0...flippedCurve.q.length)
+      near(motionkit.path.PoseMath.distance(solver.forward(flippedCurve.q[i]),flippedFreeRequest.poses[i]),0,
+        "antipodal authored free orientation does not invalidate the selected path",1e-6);
+    for(i in 0...flippedCurve.q.length)for(j in 0...start.length)
+      near(flippedCurve.q[i][j],freeOrientationCurve.q[i][j],
+        "unconstrained authored rotations do not shift the free candidate lattice",1e-10);
+    var freeMotion=flippedRefiner.orientationMotion(freeOrientationDistances[1],flippedFreeRequest.poses[1],
+      OrientationPolicy.Free,[0.0,0.0,0.0],[0.0,0.0,0.0]);
+    var authoredMotion=flippedRefiner.orientationMotion(freeOrientationDistances[1],flippedFreeRequest.poses[1],
+      OrientationPolicy.Free,[1.0,2.0,3.0],[4.0,5.0,6.0]);
+    for(axis in 0...3){
+      near(authoredMotion.velocity[axis],freeMotion.velocity[axis],"free angular velocity comes from the selected lift",1e-12);
+      near(authoredMotion.acceleration[axis],freeMotion.acceleration[axis],"free angular acceleration comes from the selected lift",1e-12);
+    }
+    var flippedCompiled=freeCompiler.compile(new MotionProgram([
+      MotionOp.FollowPath(flippedFreePath,"task",0.1,[])]),start,Int64.ofInt(820));
+    try {
+      check(flippedCompiled.blocks[0].plans.length>0,
+        "antipodal authored free orientation passes final native and task-space checks");
+    } catch(error:Dynamic){flippedCompiled.dispose();throw error;}
+    flippedCompiled.dispose();
     var bounded=new motionkit.robot.CandidateProblem(fixture.arm,request);
     var unboundedCount=bounded.samples[1].candidates.length;
     bounded.pruneUnreachableBounds();
@@ -1439,6 +1486,22 @@ class KinematicsTests extends MotionKitTestSupport {
         near(authoredSamples.qPrime[i][j],j==0?1.0:0,"authored primitive supplies task rates",1e-6);
       }
       var plannerSolver=new ManipulatorKinematics(marked);
+      var ignoredRotation=Quat.fromAxisAngle(new Vec3(1,2,3).normalized(),0.73);
+      function freeWaypoint(p:Pose3):PoseWaypoint return new PoseWaypoint(new Pose3(p.x,p.y,p.z,
+        ignoredRotation.x,ignoredRotation.y,ignoredRotation.z,ignoredRotation.w),1e-6,1e-6);
+      var freeCartesianPath=new PosePath("task",[new PoseLine(freeWaypoint(authoredPath.poseAt(0)),
+        freeWaypoint(authoredPath.poseAt(authoredPath.length())),OrientationPolicy.Free,0.1,0.1)]);
+      var freeCartesianDistances=[0.0,freeCartesianPath.length()];
+      var freeCartesianCurve=planner.plan(freeCartesianPath,new PathRequest(freeCartesianDistances,
+        [for(s in freeCartesianDistances)freeCartesianPath.poseAt(s)],markedQ,new IkTolerance(1e-6,1e-6),
+        [for(_ in markedQ)0.5],[for(_ in markedQ)1.0],32,[OrientationPolicy.Free,OrientationPolicy.Free]));
+      for(i in 0...2){
+        near(motionkit.path.PoseMath.distance(plannerSolver.forward(freeCartesianCurve.q[i]),
+          freeCartesianPath.poseAt(freeCartesianDistances[i])),0,
+          "Cartesian full-free travel ignores unreachable authored rotation",1e-6);
+        for(j in 3...count)near(freeCartesianCurve.q[i][j],markedQ[j],
+          "Cartesian free travel retains the nearest seeded rotary configuration",1e-6);
+      }
       var plannerLimits=new ValidationLimits(count,Int64.ofInt(1),Int64.ofInt(0));
       var plannerCompiler=new ProgramCompiler(plannerSolver,plannerLimits,"task",
         [for(_ in markedQ)1.0],[for(_ in markedQ)2.0],[for(_ in markedQ)20.0],

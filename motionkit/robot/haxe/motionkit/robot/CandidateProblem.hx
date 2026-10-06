@@ -68,6 +68,7 @@ class CandidateProblem {
     var cart:Null<CartesianCandidateSampler> = Std.isOfType(backend,CartesianAnalyticIk) ? new CartesianCandidateSampler(group) : null;
     var serial:Null<SerialCandidateSampler> = cart==null && fallback==null ? new SerialCandidateSampler(group) : null;
     samples=[];
+    var initialPose=backend.forward(request.startQ);
     var neighbours=[request.startQ.copy()];
     for(index in 0...request.poses.length) {
       var target=request.poses[index],freedom=request.freedoms[index];
@@ -75,8 +76,17 @@ class CandidateProblem {
       var ranges=rule==null ? settings.externalRanges : rule(index,request.distances[index],target);
       if(ranges==null)throw "External rule must return ranges for every sample";
       var samplingTarget=target,samplingFreedom=freedom;
+      switch freedom {
+        case Free:
+          // Keep the unconstrained rotation lattice in one frame throughout
+          // the path. Authored rotations remain available for state costs.
+          samplingTarget=new Pose3(target.x,target.y,target.z,
+            initialPose.qx,initialPose.qy,initialPose.qz,initialPose.qw);
+        default:
+      }
+      var gridTarget=samplingTarget;
       if(index==0 && settings.pinStart) {
-        samplingTarget=backend.forward(request.startQ);
+        samplingTarget=initialPose;
         if(PoseMath.distance(samplingTarget,target)>request.tolerance.position ||
             ToolFreedom.orientationError(samplingTarget,target,freedom)>request.tolerance.orientation)
           throw "Pinned start does not satisfy the first task sample";
@@ -110,12 +120,22 @@ class CandidateProblem {
       }
       if(index==0 && settings.pinStart) {
         var selected:Array<LatticeCandidate> = [];
+        var initialCell:Null<motionkit.robot.OrientationLattice.OrientationCell> = null;
+        if(fallback==null && !ToolFreedom.isFull(freedom)){
+          var nearest=Math.POSITIVE_INFINITY;
+          for(cell in OrientationLattice.sample(gridTarget,freedom,settings.rollCount,settings.tiltRings,settings.azimuthCount)){
+            var angle=PoseMath.angle(samplingTarget,cell.pose);
+            if(angle<nearest-1e-12){nearest=angle;initialCell=cell;}
+          }
+        }
         for(candidate in candidates) {
           var same=true;
           for(joint in 0...request.startQ.length)
             if(Math.abs(candidate.q[joint]-request.startQ[joint])>1e-7)same=false;
           if(same && selected.length==0)selected.push(new LatticeCandidate(request.startQ.copy(),candidate.wraps.copy(),
-            candidate.external.copy(),candidate.roll,candidate.tilt,candidate.azimuth,candidate.branch,candidate.singular,candidate.singularityKnown));
+            candidate.external.copy(),initialCell==null ? candidate.roll : initialCell.roll,
+            initialCell==null ? candidate.tilt : initialCell.tilt,
+            initialCell==null ? candidate.azimuth : initialCell.azimuth,candidate.branch,candidate.singular,candidate.singularityKnown));
         }
         candidates=selected;
       }
