@@ -603,7 +603,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var taskFirst=[(pp.x-pm.x)/(2*h),(pp.y-pm.y)/(2*h),(pp.z-pm.z)/(2*h),
       relative.x*angularScale,relative.y*angularScale,relative.z*angularScale];
     var taskSecond=[(pp.x-2*pa.x+pm.x)/(h*h),(pp.y-2*pa.y+pm.y)/(h*h),(pp.z-2*pa.z+pm.z)/(h*h),0.0,0.0,0.0];
-    var derivatives=refiner.derivatives(0.02,at,taskFirst,taskSecond);
+    var derivatives=refiner.refinedDerivatives(0.02,at,pa,motionkit.path.OrientationPolicy.Fixed,taskFirst,taskSecond);
     for(j in 0...at.length){near(derivatives.first[j],j==0?0.75:0,"differential rates match the independently sampled FK path",1e-5);
       near(derivatives.second[j],0,"differential acceleration cancels Jacobian variation",1e-4);}
     var spinTargets=[for(p in request.poses){var rotation=new Quat(p.qx,p.qy,p.qz,p.qw).multiply(Quat.fromAxisAngle(new Vec3(0,0,1),0.17));
@@ -645,6 +645,38 @@ class KinematicsTests extends MotionKitTestSupport {
       "Haxe native ladder distinguishes an empty candidate layer");
 
 
+  }
+
+  public function testOrientationDifferential():Void {
+    function rotationAt(s:Float):Quat {
+      var x=0.3+0.2*s-0.03*s*s,y=-0.2+0.1*s+0.04*s*s,tilt=Math.sqrt(x*x+y*y);
+      var swing=new Quat(-y*Math.sin(tilt/2)/tilt,x*Math.sin(tilt/2)/tilt,0,Math.cos(tilt/2));
+      return Quat.fromAxisAngle(new Vec3(0,0,1),0.2+0.4*s+0.05*s*s).multiply(swing)
+        .multiply(Quat.fromAxisAngle(new Vec3(0,0,1),0.7-0.3*s+0.06*s*s));
+    }
+    function finiteOmega(s:Float):Array<Float> {
+      var h=1e-5,relative=rotationAt(s+h).multiply(rotationAt(s-h).conjugate());
+      var length=Math.sqrt(relative.x*relative.x+relative.y*relative.y+relative.z*relative.z);
+      var factor=2*Math.atan2(length,relative.w)/(2*h*length);
+      return [relative.x*factor,relative.y*factor,relative.z*factor];
+    }
+    for(i in 0...21){var s=i/20.0,centre=Quat.fromAxisAngle(new Vec3(0,0,1),0.2+0.4*s+0.05*s*s);
+      var motion=motionkit.robot.OrientationDifferential.refine(centre,[0.0,0.0,0.4+0.1*s],[0.0,0.0,0.1],
+        new motionkit.robot.RedundancySpline.SplineSample(0.3+0.2*s-0.03*s*s,0.2-0.06*s,-0.06),
+        new motionkit.robot.RedundancySpline.SplineSample(-0.2+0.1*s+0.04*s*s,0.1+0.08*s,0.08),
+        new motionkit.robot.RedundancySpline.SplineSample(0.7-0.3*s+0.06*s*s,-0.3+0.12*s,0.12));
+      var expected=rotationAt(s),actual=motion.rotation;
+      near(Math.abs(actual.x*expected.x+actual.y*expected.y+actual.z*expected.z+actual.w*expected.w),1,
+        "orientation jet reproduces direct quaternion composition",1e-10);
+      var omega=finiteOmega(s),h=1e-4,before=finiteOmega(s-h),after=finiteOmega(s+h);
+      for(axis in 0...3){near(motion.velocity[axis],omega[axis],"analytic angular velocity matches quaternion differences",1e-7);
+        near(motion.acceleration[axis],(after[axis]-before[axis])/(2*h),"analytic angular acceleration matches quaternion differences",1e-5);}
+    }
+    var zero=motionkit.robot.OrientationDifferential.refine(Quat.identity(),[0.0,0.0,0.0],[0.0,0.0,0.0],
+      new motionkit.robot.RedundancySpline.SplineSample(0,0.2,0.1),new motionkit.robot.RedundancySpline.SplineSample(0,0.3,-0.2),
+      new motionkit.robot.RedundancySpline.SplineSample(0,0.4,0.5));
+    for(axis in 0...3){near(zero.velocity[axis],[-0.3,0.2,0.4][axis],"zero swing has finite exact angular rates",1e-12);
+      near(zero.acceleration[axis],[0.28,0.22,0.5][axis],"zero swing includes swing-roll acceleration coupling",1e-12);}
   }
 
   public function testRedundancySpline():Void {

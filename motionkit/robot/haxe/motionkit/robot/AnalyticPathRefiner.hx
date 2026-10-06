@@ -61,6 +61,21 @@ class AnalyticPathRefiner {
       known[j]=true;first[j]=state.first;second[j]=state.second;}
     return PathDifferential.solve(group,q,taskVelocity,taskAcceleration,known,first,second);
   }
+  public function orientationMotion(distance:Float,target:Pose3,freedom:OrientationPolicy,
+      centreOmega:Array<Float>,centreAlpha:Array<Float>):motionkit.robot.OrientationDifferential.OrientationMotion {
+    var centre=OrientationLattice.centre(target,freedom);
+    return OrientationDifferential.refine(new Quat(centre.qx,centre.qy,centre.qz,centre.qw),centreOmega,centreAlpha,
+      swingX.evaluate(distance),swingY.evaluate(distance),roll.evaluate(distance));
+  }
+  /** The supplied six-dimensional rates describe OrientationLattice.centre,
+   * including any changing cone axis. Spline swing/roll rates are added here. */
+  public function refinedDerivatives(distance:Float,q:Array<Float>,target:Pose3,freedom:OrientationPolicy,
+      centreVelocity:Array<Float>,centreAcceleration:Array<Float>):motionkit.robot.PathDifferential.JointDerivatives {
+    if(centreVelocity==null || centreAcceleration==null || centreVelocity.length!=6 || centreAcceleration.length!=6)
+      throw "Refined task derivatives need six-dimensional centre rates";
+    var motion=orientationMotion(distance,target,freedom,centreVelocity.slice(3),centreAcceleration.slice(3));
+    return derivatives(distance,q,centreVelocity.slice(0,3).concat(motion.velocity),centreAcceleration.slice(0,3).concat(motion.acceleration));
+  }
   public function sample(distance:Float,target:Pose3,freedom:OrientationPolicy,?seed:Array<Float>):LatticeCandidate {
     if(target==null || freedom==null)throw "Refinement needs a target and task freedom";
     var q=seed==null ? selection.candidates[0].q.copy() : seed.copy();
@@ -71,12 +86,7 @@ class AnalyticPathRefiner {
       var limits=group.group.limitsOf(j);
       if(value<limits.lower || value>limits.upper)throw 'Refined external axis exceeds limits at distance $distance';
       q[j]=value;ranges.push(new ExternalAxisRange(j,value,value,1));}
-    var centre=OrientationLattice.centre(target,freedom),rotation=new Quat(centre.qx,centre.qy,centre.qz,centre.qw);
-    var x=swingX.evaluate(distance).value,y=swingY.evaluate(distance).value;
-    var tilt=Math.sqrt(x*x+y*y),azimuth=Math.atan2(y,x);
-    rotation=rotation.multiply(Quat.fromAxisAngle(new Vec3(0,0,1),azimuth))
-      .multiply(Quat.fromAxisAngle(new Vec3(0,1,0),tilt))
-      .multiply(Quat.fromAxisAngle(new Vec3(0,0,1),-azimuth+roll.evaluate(distance).value));
+    var rotation=orientationMotion(distance,target,freedom,[0.0,0.0,0.0],[0.0,0.0,0.0]).rotation;
     var refined=new Pose3(target.x,target.y,target.z,rotation.x,rotation.y,rotation.z,rotation.w);
     if(ToolFreedom.orientationError(refined,target,freedom)>problem.request.tolerance.orientation)
       throw 'Refined orientation exceeds task freedom at distance $distance';

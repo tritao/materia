@@ -1017,3 +1017,19 @@ four-platform ABI audit, compiler-only and focused runtime pass
 (1,144,582 assertions). Refined orientation task derivatives, full
 JointPathSamples/timing integration, broader moving-reference acceptance
 and the authored track gate remain outstanding; PP4 is not complete.
+
+PP4 refined orientation derivatives: OrientationDifferential composes a
+moving centre quaternion, spline swing vector and periodic roll with
+second-order scalar jets. It returns analytic spatial angular velocity and
+acceleration, including centre/swing/roll coupling. A squared-tilt power
+series avoids the polar singularity at zero swing. AnalyticPathRefiner uses
+this same composition for poses and refinedDerivatives adds these angular
+rates before the Jacobian differential solve. Centre rates must describe
+OrientationLattice.centre, including any changing cone axis. Independent
+quaternion differences over 21 nonlinear cases check angular velocity and
+acceleration, while a zero-swing case checks exact coupling and finite
+rates. Existing fixed/free-spin refinement and differential tests remain
+green. Compiler-only and focused runtime pass (1,144,735 assertions).
+Full JointPathSamples/timing integration, centre derivative providers for
+all geometric paths, broader family/moving-reference coverage, branch
+segmentation and authored acceptance remain outstanding.
