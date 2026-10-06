@@ -778,7 +778,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var serialCompiler=new ProgramCompiler(solver,serialLimits,"task",
       [for(_ in start)1.0],[for(_ in start)2.0],[for(_ in start)20.0],
       StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,
-      null,null,null,null,null,0.01,new motionkit.robot.StructuredJointPathPlanner(fixture.arm));
+      null,new motionkit.robot.StructuredJointPathPlanner(fixture.arm));
     var serialProgram=new MotionProgram([MotionOp.MoveL(solver.forward(end),"task",0.1,Blend.ExactStop)]);
     var serialCompiled=serialCompiler.compile(serialProgram,start,Int64.ofInt(920));
     check(serialCompiled.blocks[0].plans.length==1,"UR MoveL compiles through structured selection and differential refinement");
@@ -796,7 +796,7 @@ class KinematicsTests extends MotionKitTestSupport {
     var coneCompiler=new ProgramCompiler(solver,serialLimits,"task",
       [for(_ in start)1.0],[for(_ in start)2.0],[for(_ in start)20.0],
       StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,
-      null,null,null,null,null,0.01,new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
+      null,new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
         new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,1,4)));
     var coneCompiled=coneCompiler.compile(new MotionProgram([MotionOp.FollowPath(authoredCone,"task",0.1,[])]),
       start,Int64.ofInt(922));
@@ -1159,7 +1159,7 @@ class KinematicsTests extends MotionKitTestSupport {
       var plannerCompiler=new ProgramCompiler(plannerSolver,plannerLimits,"task",
         [for(_ in markedQ)1.0],[for(_ in markedQ)2.0],[for(_ in markedQ)20.0],
         StartTolerances.uniform(count,0.02,0.02,0.02),null,0.01,0.5,0.005,0.02,
-        null,null,null,null,null,0.01,new motionkit.robot.StructuredJointPathPlanner(marked));
+        null,new motionkit.robot.StructuredJointPathPlanner(marked));
       var plannerProgram=new MotionProgram([MotionOp.MoveL(delta,"task",0.1,Blend.ExactStop)]);
       var compiledPlanner=plannerCompiler.compile(plannerProgram,markedQ,Int64.ofInt(910));
       check(compiledPlanner.blocks[0].plans.length==1,"compiler consumes structured timing-ready joint path");
@@ -1312,13 +1312,22 @@ class KinematicsTests extends MotionKitTestSupport {
     var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0));
     var compiler = new ProgramCompiler(solver, limits, "work",
       [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],
-      [for (_ in 0...6) 20.0], StartTolerances.uniform(6, 0.02, 0.02, 0.02));
+      [for (_ in 0...6) 20.0], StartTolerances.uniform(6, 0.02, 0.02, 0.02),
+      null, 0.01, 0.5, 0.005, 0.02, null,
+      new motionkit.robot.StructuredJointPathPlanner(manipulator));
     var program = new MotionProgram([MotionOp.MoveL(solver.forward(next),
       "work", 0.1, Blend.ExactStop)]);
     var compiled = compiler.compile(program, q, Int64.ofInt(901));
     check(compiled.blocks[0].plans.length == 1,
       "OPW arm path compiles through the shared ProgramCompiler");
     compiled.dispose();
+    var workerCompiler = compiler.forWorker();
+    check(workerCompiler.jointPathPlanner != compiler.jointPathPlanner,
+      "OPW worker receives its own structured planner");
+    var workerPlan = workerCompiler.compile(program, q, Int64.ofInt(902));
+    check(workerPlan.blocks[0].plans.length == 1,
+      "OPW worker compiles through structured path refinement");
+    workerPlan.dispose();
     function published(name:String, values:Array<Float>, offsets:Array<Float>,
         signs:Array<Int>):Void {
       var fixture = new RobotModel(name);

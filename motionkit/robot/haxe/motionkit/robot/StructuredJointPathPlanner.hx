@@ -26,10 +26,16 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     this.clearance=clearance;this.collisionRounds=collisionRounds;this.contact=contact;
   }
   public function withSolver(solver:motionkit.kinematics.KinematicsSolver):JointPathPlanner {
-    if(!Std.isOfType(solver,ManipulatorKinematics))throw "Structured planner worker requires compiled group kinematics";
-    var adapter:ManipulatorKinematics=cast solver;
-    return new StructuredJointPathPlanner(adapter.manipulator,sampling,coarse,
-      clearance==null ? null : clearance.withGroup(adapter.manipulator),collisionRounds,contact);
+    var workerGroup:KinematicGroup;
+    if (Std.isOfType(solver, ManipulatorKinematics)) {
+      var adapter:ManipulatorKinematics = cast solver;
+      workerGroup = adapter.manipulator;
+    } else if (Std.isOfType(solver, OpwKinematics)) {
+      var adapter:OpwKinematics = cast solver;
+      workerGroup = adapter.manipulator;
+    } else throw "Structured planner worker requires compiled group kinematics";
+    return new StructuredJointPathPlanner(workerGroup, sampling, coarse,
+      clearance == null ? null : clearance.withGroup(workerGroup), collisionRounds, contact);
   }
   static function sameFreedom(a:motionkit.path.OrientationPolicy,b:motionkit.path.OrientationPolicy):Bool {
     return switch a {

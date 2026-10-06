@@ -384,8 +384,8 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
 | PP3 | in progress: structured/coarse search and Descartes dispatch implemented; authored gate pending | `7cb639434`, `489f2c360`, `f8e88ad4d`, `09cb60fbb` |
 | PP4 | in progress: analytic/numeric refinement, cone rates and timing verified; transitions/authored gate pending | `4b9e750ff`, `0e5edbc06`, `39b6081c1` |
-| PP5 | in progress: lazy sample/edge/refined retries and physical obstacle acceptance; full gate running | `e1435022f`, `e5336893f`, `bfd03d585` |
-| PP6 | in progress: optional compiler/worker integration verified; default migration and selector removal pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
+| PP5 | in progress: lazy sample/edge/refined retries and physical obstacle acceptance; traced full gate passed, normal gate pending | `e1435022f`, `e5336893f`, `bfd03d585` |
+| PP6 | in progress: compiler planner argument and OPW worker isolation verified; default migration and legacy class removal pending | `46f29f74f`, `4edacf8af`, `fc0efe042` |
 | PP7 | planned | — |
 | PP8 | planned | — |
 | PP9 | planned | — |
@@ -1361,3 +1361,15 @@ focused-test environment switches. It has passed new refinement/collision
 coverage, existing compiler tests, redundant-arm paths and coordinated
 external axes; the asynchronous ProgramPlanner group is still running.
 No full-suite pass or PP5 completion is recorded until it terminates.
+
+### PP5 phase gate: runtime evidence and output buffering
+
+- Native CTest passed all 16 tests. A full MotionKit runtime run under GDB completed normally with 1,220,252 assertions, covering the refined collision retries and existing program, timing, runtime and homing groups. The run included temporary diagnostic waits/tracing; those experiments have been removed.
+- Redirected HashLink stdout is fully buffered unless `HL_STDOUT_FLUSH=1` is set (`haxeon/vendor/hashlink/src/std/sys.c`). Earlier runs were mistakenly classified as stalled from their last printed group and explicitly terminated. Their sampled stacks showed continuing simulation work; they are unpassed, interrupted runs, not evidence of a planner or GC deadlock.
+- Logged runtime gates now set `HL_STDOUT_FLUSH=1`. A normal full gate of the restored production/test code remains to be recorded before PP5 close-out.
+
+### PP6 compiler argument and worker ownership
+
+`ProgramCompiler` now takes `JointPathPlanner` in the former configuration-selector argument; the extra trailing planner argument and compiler selector branch are gone. Structured compiler callers use that argument directly. `forWorker()` always creates a compiler with its own planner and planning assumptions, including when an immutable OPW solver returns itself from `fork()`. Structured planner rebinding accepts both compiled manipulator and OPW adapters.
+
+Compiler-only validation passes. The focused C4 runtime passes 1,148,969 assertions, including direct and worker OPW, UR and Cartesian compilation. Default process-runner migration and deletion of the legacy `PathConfigurationSelector` class (still used by OPW's transport-level `solvePath()` and its tests) remain pending. This is not PP6 close-out.
