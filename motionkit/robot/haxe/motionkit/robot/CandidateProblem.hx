@@ -117,15 +117,20 @@ class CandidateProblem {
           settings.rollCount,settings.tiltRings,settings.azimuthCount,pinnedJump,bounds);
       } else {
         candidates=[];
-        // Unsupported geometry uses the explicitly diagnosed numeric fallback.
-        for(cell in ExternalAxisGrid.sample(group,request.startQ,ranges))
-          for(branch in fallback.branchesFromNeighbours(samplingTarget,neighbours,cell.q,samplingFreedom))
-            candidates.push(new LatticeCandidate(branch.q,[for(_ in branch.q)0],cell.coordinates,0,0,0,branch.branch,0,false));
+        // Reduced tasks use the same explicit orientation lattice as analytic
+        // families. A reduced numeric solve per neighbour would invent new free
+        // spins at every layer instead of sampling that declared finite lattice.
+        var orientations=OrientationLattice.sample(samplingTarget,samplingFreedom,
+          settings.rollCount,settings.tiltRings,settings.azimuthCount);
+        for(cell in ExternalAxisGrid.sample(group,request.startQ,ranges))for(orientation in orientations)
+          for(branch in fallback.branchesFromNeighbours(orientation.pose,neighbours,cell.q,OrientationPolicy.Fixed))
+            candidates.push(new LatticeCandidate(branch.q,[for(_ in branch.q)0],cell.coordinates,
+              orientation.roll,orientation.tilt,orientation.azimuth,branch.branch,0,false));
       }
       if(index==0 && settings.pinStart) {
         var selected:Array<LatticeCandidate> = [];
         var initialCell:Null<motionkit.robot.OrientationLattice.OrientationCell> = null;
-        if(fallback==null && !ToolFreedom.isFull(freedom)){
+        if(!ToolFreedom.isFull(freedom)){
           var nearest=Math.POSITIVE_INFINITY;
           for(cell in OrientationLattice.sample(gridTarget,freedom,settings.rollCount,settings.tiltRings,settings.azimuthCount)){
             var angle=PoseMath.angle(samplingTarget,cell.pose);

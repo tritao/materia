@@ -628,6 +628,20 @@ class KinematicsTests extends MotionKitTestSupport {
     check(numericPlanner.fallbackDiagnostic!=null,"numeric path planner retains the unsupported-geometry diagnostic");
     for(i in 0...distances.length)near(motionkit.path.PoseMath.distance(unsupportedSolver.forward(numericPath.q[i]),path.poseAt(distances[i])),0,
       "numeric continuation refinement preserves authored geometry",1e-6);
+    var freeNumeric=new PathRequest([0.0,0.02],[unsupportedSolver.forward(seed),unsupportedSolver.forward(goal)],seed,
+      new IkTolerance(1e-6,1e-6,60),[for(_ in seed)0.5],[for(_ in seed)1.0],48,
+      [motionkit.path.OrientationPolicy.FreeAboutTool,motionkit.path.OrientationPolicy.FreeAboutTool]);
+    var finiteNumeric=new motionkit.robot.CandidateProblem(unsupported,freeNumeric,
+      new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,3,8,false));
+    for(layer in finiteNumeric.samples){
+      check(layer.candidates.length>0,"numeric reduced task retains reachable lattice states");
+      var cells=motionkit.robot.OrientationLattice.sample(layer.target,layer.freedom,4,3,8);
+      for(candidate in layer.candidates){
+        check(candidate.roll>=0 && candidate.roll<4,"numeric states retain explicit roll cell coordinates");
+        near(motionkit.path.PoseMath.angle(unsupportedSolver.forward(candidate.q),cells[candidate.roll].pose),0,
+          "numeric fallback solves the declared orientation cell",2e-6);
+      }
+    }
     var cell = buildWorkcellFixture();
     var held = new motionkit.robot.NumericBranchIk(cell.group,"test external arm",new IkTolerance(1e-6,1e-6,30));
     var complete = [for (i in 0...cell.group.group.count()) 0.1*Math.sin(i+0.3)];
