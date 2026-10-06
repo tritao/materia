@@ -1014,7 +1014,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM11 | blocked: MT6 (two controllers and `CellSignals`) and MT7 (`RobotInterface` state-machine pattern) are not on local main 3bc5f73aa | |
 | SM12 | blocked: SM11 is blocked, and the Phase-C gate requires MT6 (`CellSignals`), MT7 (`RobotInterface`), MT8 (full jaw assembly and `gripper` tool kind), and MT10 mission steps on local main 3bc5f73aa; verify weld-equality updates when unblocked | |
 | SM13 | blocked: waits for SM11 and SM12; MT8 full gripper/tool-kind support and MT10 `signal`/`waitFor`/`moveVia` mission steps are not on local main 3bc5f73aa; MT3 `CobotArm` is present, while MT6/MT7 remain prerequisites through SM11 | |
-| SM14 | planned | |
+| SM14 | blocked: requires the SM13 one-bend cell; SM13 waits for SM11/SM12 and MT8/MT10, while SM11 waits for MT6/MT7 on local main 3bc5f73aa | |
 | SM15 | planned | |
 | SM16 | planned | |
 | SM17 | later | |
