@@ -1027,6 +1027,54 @@ class ProjectSourceTests {
   }
 
   /** PP1: analytic round trips on the authored MachineKit arm, including its mounted tool. */
+  static function checkCobotAnalytic(root:String):Void {
+    for (size in [500,850,900,1300]) {
+      var filename = size == 850 ? "materia.project.json" : 'materia.reach$size.project.json';
+      var manifest = FileSystem.fullPath(root + "/machinekit/examples/cobot-arm/" + filename);
+      var generated = MateriaProjectRunner.loadProject(manifest);
+      var session = new ProjectDocumentSession(null,false);
+      session.openGeneratedProject(generated,manifest);
+      var simulation = new ApplicationSimulation(new RobotWorld());
+      try {
+        check(simulation.rebuild(session.sensors,session.scene,session),"analytic cobot builds: " + simulation.error);
+        var mission = simulation.missionPlayer();
+        if (mission == null) throw "analytic cobot has no mission";
+        var arm:Null<robotkit.manipulation.Manipulator> = null;
+        for (frame in mission.robot.missionFrames) {
+          var candidate = new robotkit.manipulation.Manipulator(mission.robot.model,mission.robot.model.links[0].id,frame.id);
+          if (candidate.group.count() == 6) { arm = candidate; break; }
+        }
+        if (arm == null) throw "analytic cobot has no six-joint tool chain";
+        var group = arm;
+        var numeric = new motionkit.robot.ManipulatorKinematics(arm);
+        var analytic = new motionkit.robot.UrAnalyticIk(arm);
+        var before = group.numericSolveCount();
+        for (sample in 0...200) {
+          var q = [for (joint in 0...6) {
+            var bounds = arm.group.limitsOf(joint);
+            var fraction = 0.5 + 0.45*Math.sin((sample+1)*(joint+1)*1.61803398875);
+            bounds.lower + fraction*(bounds.upper-bounds.lower);
+          }];
+          var target = numeric.forward(q), predicted = analytic.forward(q);
+          check(Math.sqrt(Math.pow(target.x-predicted.x,2)+Math.pow(target.y-predicted.y,2)+Math.pow(target.z-predicted.z,2)) < 1e-6,
+            'authored Cobot $size analytic FK');
+          var found = false;
+          for (branch in analytic.branches(target,q)) {
+            var same = true;
+            for (joint in 0...6) if (Math.abs(branch.q[joint]-q[joint]) > 1e-5) same = false;
+            found = found || same;
+          }
+          check(found,'authored Cobot $size original branch at sample $sample');
+        }
+        check(group.numericSolveCount() == before,"authored Cobot analytic checks use no numeric IK");
+        Sys.println('Authored Cobot $size: 200 analytic round trips passed');
+      } catch (error:Dynamic) {
+        simulation.dispose();session.dispose();throw error;
+      }
+      simulation.dispose();session.dispose();
+    }
+  }
+
   static function checkRobotArmAnalytic(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
@@ -2808,6 +2856,10 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry") {
       checkGantryPicker(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cobot-analytic") {
+      checkCobotAnalytic(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm-analytic") {

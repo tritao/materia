@@ -618,3 +618,12 @@ passes. Focused C4 runtime passes 180,868 assertions. Authored Cobot validation
 is still underway; its examples declare moveJoints missions at the flange,
 so the fixture must use missionFrames rather than toolFrames or a handling
 runner.
+
+PP1 authored Cobot acceptance now passes: Reach500, Reach850, Reach900 and
+Reach1300 each complete 200 analytic FK/inverse round trips over legal joint
+vectors with the original lifted configuration among the returned branches.
+Their simulation models are built from the actual example projects, using the
+mission flange connector; extraction reads model frames/axes, not CobotReference
+size tables. Each check observes zero numeric pose queries. App compiler-only
+build and authored runtime exit successfully; log
+`process-path-pp1-cobot-runtime.log` is retained in external scratch.
