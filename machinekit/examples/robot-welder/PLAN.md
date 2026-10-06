@@ -996,7 +996,7 @@ Dependencies:
 | W6 | Done (2026-10-04) | RKD6 numeric feedback and virtual welder; checked retrofit profile; Modbus map/adapter with independent ProcessKit owner; unchanged seam and all six shutdown cases pass. Full welder, arm, mobile and MachineKit smoke gates pass; phase one lands on local main. |
 | P1 | Done (2026-10-05) | Mobile welding carrier, insulated storage and converter service graph; CAD fit/mass checks and both-backend carrier movement pass. |
 | P2 | Done (2026-10-05) | Minimum verified candidate cover: 2 stations / 10 seams; complete goTo/weld/stow mission passes both backends in 270.3 s; affected milestone gates pass. |
-| P3 | Open | Executed touch searches and correction under injected parking error. |
+| P3 | Done (2026-10-06) | Executed touch searches, corrected registration and checked live stow; both-backend mission and milestone gates pass. |
 | P4 | Open | Measured load integration, voltage sag/cutoff and pre-seam docking/charging. |
 | P5 | Open; required | Rendered-depth laser profiler and executed live seam correction. |
 
@@ -2603,3 +2603,77 @@ both backends: twelve contact episodes, 0.012279905 mm deterministic and
 0.002439543 mm MuJoCo seam-frame error, and first-weld bead checks on each.
 The regenerated 66-record / 2,884,840-byte preview is cached in the worktree.
 The full two-station mission and final P3 milestone gates remain open.
+
+### P3 fine-probe range correction (2026-10-06)
+
+The dynamic-stow two-station mission passed on the deterministic backend before
+this correction: 2 stations, 10 seams, 746.1 s, 5 mm legs, 40/40/40/40/40/40/
+180/180/40/40 mm beads and clear stow. The 20 mm / 2-degree boundary also
+passed on both backends in the preceding check. Neither result is yet a
+post-correction validation.
+
+The latest MuJoCo mission stopped at 170.03 s during the second probe's fine
+search. Its previous backoff sample showed the TCP 0.169 mm short of the
+checked backoff target. A fixed 0.125 mm local IK replay then reached 19 of 20
+samples, failing only at the 2.5 mm endpoint. The 2.5 mm request was
+`backoff + contactOffset`. ContactSearch already shifts the sensed threshold
+point by the calibrated offset to report the material point, and
+ProbeMotionPlanner already uses the same offset for the stopping reserve.
+Adding it again extended fine search 0.5 mm beyond the corrected material
+point. ContactProbeRunner now bounds fine search to `backoff`; the calibration
+remains in contact correction and braking policy, where each belongs.
+
+The focused native contact-motion suite passes 120 assertions, including a
+regression that checks the executed fine-search range, and the app compiler
+passes 1,938 sources. At this point in the work, the post-correction mission
+and displacement boundary were still pending; one mission retry was stopped
+before its trace when root free space fell to 11 MB. Their final results and
+the remaining P4/P5 scope are recorded in the closeout below.
+
+### P3 final gates and closeout (2026-10-06)
+
+The fine-probe correction is validated end to end. The 20 mm / 2-degree
+injected-parking boundary passes on the deterministic backend with twelve
+touch episodes and 0.012311799 mm seam-frame error, and on MuJoCo with twelve
+touch episodes and 0.002256648 mm error. Both execute the first weld. The
+two-station mission completes on both backends: 2 stations, 10 seams, 4 runs,
+40/40/40/40/40/40/180/180/40/40 mm beads and a live, clear stow. Deterministic
+simulation reports 746.2 s and 5.0 mm legs; MuJoCo reports 790.6 s, with nine
+5.0 mm legs and one 5.1 mm leg. Runtime registration returns to its measured
+starting posture before welding, and stow clearance is checked against the
+current workpiece and deposited metal.
+
+The final `PROJECT_SOURCE_ONLY=welder` gate passes on both backends. Its whole-
+weldment result is 10 seams / 4 runs in 114.4 s on the test backend and 114.5 s
+on MuJoCo, with 4.9–5.0 mm legs and no clearance violations. The single seam
+is 21.5 s, 5.0 mm leg, 180 mm bead and no gap; a mid-seam arc loss recovers
+once in 21.9 s; an unsupported seam fails with “the arc could not be held in 3
+restarts”; crater supply dropout needs no restart; the displaced workpiece
+keeps the tip on the seam and a 5.0 mm leg; the post-perimeter chain completes
+in 36.2 s with 4.9–5.0 mm legs and no restart. The 7 mm weave reaches 6.998 mm
+on both backends. The three-pass 10 mm weld reaches 10.00196 mm in MuJoCo and
+9.99913 mm on the test backend. `PROJECT_SOURCE_ONLY=arm` passes at 23.5 s;
+`PROJECT_SOURCE_ONLY=mobile` passes its driving, obstacle-replan and welding
+mission scenarios.
+
+Focused ProcessKit contact/stow checks pass 120 assertions and ProjectKit
+artifact checks pass 144 assertions. The Robot Welder example suite and
+MachineKit smoke both pass. The corrected mission and boundary executions,
+all three app source checks, and both MachineKit checks are recorded in the
+ignored `app/build/p3-*-final.log` reports.
+
+The measured single-seam and recovery times are 1.3 s and 0.3 s above the
+original 20.2 s / 21.6 s reference. The post-perimeter result is 16.3 s above
+the original 19.9 s reference. These are measured safe-path costs: the W4
+record already documents the clearance- and wrist-limit-driven increase for
+perimeter roll/entry, and P3's demand-driven entry discovery preserves complete
+clearance, continuity and compiler checks while prioritizing a proved current
+branch. The final gates retain those checks; no timing equivalence is claimed.
+The checked registration return and semantic live stow add the required
+transitions to the mobile mission.
+
+P3 is closed. P4 remains open for declared physical mass/inertia propagation,
+measured electrical load integration, voltage sag/cutoff and dock/charge/resume
+behavior. Required P5 remains open for rendered-depth laser profiling and
+executed live seam correction under displacement, noise and stale/missing
+observations.
