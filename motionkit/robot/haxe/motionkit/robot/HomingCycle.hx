@@ -220,7 +220,7 @@ class HomingCycle {
     var axis = axes[index], side = axis.switches[0].side;
     switch next {
       case Seek: driver.velocity(axis.joint, side * axis.seekSpeed, axis.acceleration);
-      case Backoff: driver.velocity(axis.joint, -side * axis.seekSpeed, axis.acceleration);
+      case Backoff: driver.velocity(axis.joint, -side * axis.backoffSpeed, axis.acceleration);
       case Approach:
         approachEdges = [for (contact in axis.switches) signalFor(contact.id, observation).closingEdges];
         driver.velocity(axis.joint, side * axis.latchSpeed, axis.acceleration);

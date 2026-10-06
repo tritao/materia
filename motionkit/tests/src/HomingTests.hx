@@ -19,9 +19,19 @@ class HomingTests {
     driver.next(0.002, false, false, 1, 0); cycle.update(0.01);
     driver.next(0.002, false, false, 1, 0); cycle.update(0.01);
     check(cycle.status() == "Approach", "Home must release and stop before slow approach");
+    check(driver.speeds.length == 3 && driver.speeds[1] < driver.speeds[0] && driver.speeds[2] < driver.speeds[1],
+      "Cycle uses separate search, clearance-limited backoff and precision approach speeds");
     driver.events = [];
   }
   public static function run():Void {
+    // Fast switch release must not create a long precision-speed return.
+    var contact = new JointSwitch("home", "z", "frame", "home", -1, -0.001, 0.0002, 0.00002, 1);
+    var axis = new HomingAxis("z", 0, [contact], 1.0, 2.0, 0.0, 0.5, 0.01, 0.0, 0.02);
+    check(axis.backoffSpeed < axis.seekSpeed, "Short switch release needs its own speed bound");
+    check(axis.backoffSpeed * axis.backoffSpeed / (2 * axis.acceleration) <= axis.releaseDistance * 0.25 + 1e-12,
+      "Backoff braking overrun stays within a quarter of release clearance");
+    check(axis.backoffSpeed * axis.timestep <= axis.releaseDistance * 0.25 + 1e-12,
+      "Backoff observes switch release before traversing the clearance");
     var delayed = new DelayedHomingFixture(), delayedCycle = delayed.cycle();
     approach(delayed, delayedCycle);
     delayed.delayHolds = true;
@@ -78,6 +88,7 @@ class HomingTests {
 
 class HomingFixture implements HomingDriver implements HomingSideControl {
   public var events:Array<String> = [];
+  public var speeds:Array<Float> = [];
   public var failStop:Bool = false;
   public var calibrationReady:Bool = true;
   public var leaderCaptureSeen:Float = 0.0;
@@ -103,7 +114,9 @@ class HomingFixture implements HomingDriver implements HomingSideControl {
       new HomingSwitchObservation("left", left, sequence, time, "fixture", leftEdges > 0 ? -0.001 : null, leftEdges),
       new HomingSwitchObservation("right", right, sequence, time, "fixture", rightEdges > 0 ? -0.002 : null, rightEdges)], time, "fixture", calibrationReady);
   }
-  public function velocity(joint:Int, velocity:Float, acceleration:Float):Void events.push("velocity");
+  public function velocity(joint:Int, velocity:Float, acceleration:Float):Void {
+    speeds.push(Math.abs(velocity)); events.push("velocity");
+  }
   public function stop(joint:Int, acceleration:Float):Void { events.push("stop"); if (failStop) throw "stop failed"; }
   public function latch(id:String, position:Float, leaderCounterPosition:Null<Float>):Void {
     events.push("latch:" + id);

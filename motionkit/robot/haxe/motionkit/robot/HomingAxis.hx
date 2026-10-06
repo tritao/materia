@@ -10,6 +10,7 @@ class HomingAxis {
   public final acceleration:Float;
   public final seekSpeed:Float;
   public final latchSpeed:Float;
+  public final backoffSpeed:Float;
   public final releaseDistance:Float;
   public final maximumTravel:Float;
   public final home:Float;
@@ -46,9 +47,17 @@ class HomingAxis {
     seekSpeed = Math.min(velocity * 0.25, Math.sqrt(2 * acceleration * margin) * 0.5);
     latchSpeed = Math.min(seekSpeed * 0.1, precision / timestep * 0.25);
     releaseDistance = Math.max(release, latchSpeed * timestep * 4);
+    // Backoff only needs to clear the switch. Using seek speed here creates a
+    // long braking overrun that must then be retraced at precision latch speed.
+    // Bound stopping distance to a quarter of the release distance, and allow
+    // at least four observation intervals over that distance.
+    backoffSpeed = Math.min(seekSpeed, Math.min(
+      Math.sqrt(2 * acceleration * releaseDistance) * 0.5,
+      releaseDistance / (4 * timestep)));
     maximumTravel = upper - lower + 2 * overtravel;
     if (!Math.isFinite(maximumTravel) || !Math.isFinite(seekSpeed) || seekSpeed <= 0 ||
-        !Math.isFinite(latchSpeed) || latchSpeed <= 0) throw "Homing derived travel/speeds must be finite and positive";
+        !Math.isFinite(latchSpeed) || latchSpeed <= 0 ||
+        !Math.isFinite(backoffSpeed) || backoffSpeed <= 0) throw "Homing derived travel/speeds must be finite and positive";
     positionTolerance = precision;
   }
 }

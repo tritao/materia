@@ -851,6 +851,7 @@ class ProjectSourceTests {
       check(mission.statusLabel() == "Waiting for home switches", "picker explains its startup wait");
       if (paced) simulation.start();
       var lastReport = Sys.time();
+      var homingPhases = new Map<String, Float>();
       var lastDone = 0, placed = 0, ticks = 0;
       var bytes = 0.0, measuredTicks = 0;
       var previousPlan:Null<motionkit.trajectory.ExecutionPlan> = null;
@@ -866,6 +867,11 @@ class ProjectSourceTests {
         }
       }
       while (!mission.finished && simulation.activeSession().simulationTime() < 600) {
+        var homeView = @:privateAccess mission.homing;
+        if (homeView != null && homeView.homingStatus() != "Complete") {
+          var key = homeView.homingAxis() + ":" + homeView.homingStatus();
+          homingPhases.set(key, (homingPhases.exists(key) ? homingPhases.get(key) : 0.0) + simulation.timestep);
+        }
         var before = hl.Gc.totalAllocated();
         var priorPlan = motion.executor.plan;
         if (paced) {
@@ -976,9 +982,14 @@ class ProjectSourceTests {
         ", time=" + simulation.activeSession().simulationTime() + ", motion=" + motion.sessionState() +
         ", q=" + mission.robot.runtime.snapshot().q.toArray().join(","));
       check(mission.statusLabel() == "Mission complete", "picker reports mission completion");
+      check(mission.homingSeconds > 0 && mission.homingSeconds < 25,
+        "picker homes within its 25 s simulation budget without long backoff overruns: " + mission.homingSeconds);
       check(planned > 0 && motion.checks.plans > 0, "picker executes physically checked plans");
       check(motion.checks.count(PlanDiagnosticKind.StepperStall) == 0, "picker drive checks report no stall");
       check(measuredTicks > 0 && bytes / measuredTicks < 200000, "picker allocates below its assumed 200 KB execution-tick budget");
+      var phaseNames = [for (key in homingPhases.keys()) key];
+      phaseNames.sort(Reflect.compare);
+      for (key in phaseNames) Sys.println("picker homing " + key + ": " + homingPhases.get(key) + " s");
       Sys.println((yaw ? "gantry C-head yaw picker mission: " : "gantry picker mission: ") + simulation.activeSession().simulationTime() + " s, six cartons; homing " + mission.homingSeconds + " s; " +
         Math.round(bytes / measuredTicks) + " bytes per execution tick; " + planned + " plans, no stalls");
       simulation.clear(); session.dispose();
