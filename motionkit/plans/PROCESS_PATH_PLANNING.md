@@ -1252,3 +1252,14 @@ This is opt-in integration: default planner construction, fallback/cone/
 branch support, approach/retreat/k-best behavior, selector removal and the
 full phase-boundary integration suites remain outstanding. PP6 and the
 full plan are not complete.
+
+PP6 serial compiler acceptance: the UR fixture now compiles an interpolated
+MoveL through StructuredJointPathPlanner, differential refinement, shared
+timing and task/trajectory validation, both directly and in a forked
+worker. The root compiled group records no numeric pose IK calls. The
+compiler validates returned joint/sample counts, exact requested distance
+alignment and pinned initial configuration before accepting planner output.
+Compiler-only and focused runtime pass (1,148,603 assertions). Default
+migration, unsupported families/cone centres/branch transitions, free-start
+entry handling, selector removal and full integration/performance gates
+remain outstanding; this serial fixture is not authored track acceptance.

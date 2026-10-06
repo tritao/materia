@@ -707,6 +707,21 @@ class KinematicsTests extends MotionKitTestSupport {
       for(j in 0...start.length)near(finalState.positions[j],end[j],"timed refinement reaches the complete path endpoint",1e-6);
     } catch(error:Dynamic){timed.releaseDistanceMap();timed.trajectory.dispose();throw error;}
     timed.releaseDistanceMap();timed.trajectory.dispose();
+    var nativeCompileBefore=fixture.arm.numericSolveCount();
+    var serialLimits=new ValidationLimits(start.length,Int64.ofInt(1),Int64.ofInt(0));
+    var serialCompiler=new ProgramCompiler(solver,serialLimits,"task",
+      [for(_ in start)1.0],[for(_ in start)2.0],[for(_ in start)20.0],
+      StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,
+      null,null,null,null,null,0.01,new motionkit.robot.StructuredJointPathPlanner(fixture.arm));
+    var serialProgram=new MotionProgram([MotionOp.MoveL(solver.forward(end),"task",0.1,Blend.ExactStop)]);
+    var serialCompiled=serialCompiler.compile(serialProgram,start,Int64.ofInt(920));
+    check(serialCompiled.blocks[0].plans.length==1,"UR MoveL compiles through structured selection and differential refinement");
+    serialCompiled.dispose();
+    check(fixture.arm.numericSolveCount()==nativeCompileBefore,"structured UR compilation uses no numeric pose IK");
+    var serialWorker=serialCompiler.forWorker();
+    var serialWorkerPlan=serialWorker.compile(serialProgram,start,Int64.ofInt(921));
+    check(serialWorkerPlan.blocks[0].plans.length==1,"UR worker compiles through independent structured planning");
+    serialWorkerPlan.dispose();
     function cornerQ(distance:Float):Array<Float> {
       var q=start.copy();q[0]+=0.75*distance-0.1*0.02*0.02+(distance<0.02?0.1*(distance-0.02)*(distance-0.02):0);return q;
     }

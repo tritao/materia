@@ -540,6 +540,12 @@ class ProgramCompiler {
     var refined:Null<JointPathSamples> = null;
     if(jointPathPlanner!=null){
       refined=jointPathPlanner.plan(path,new PathRequest(distances,pathPoses,startQ,ikTolerance,perJointMaxJump,maxVelocity,48,freedoms));
+      if(refined==null || refined.jointCount!=startQ.length || refined.s.length!=distances.length)
+        throw 'Motion program op $index joint planner returned incompatible samples';
+      for(sample in 0...distances.length)if(refined.s[sample]!=distances[sample])
+        throw 'Motion program op $index joint planner changed path distance at sample $sample';
+      for(joint in 0...startQ.length)if(Math.abs(refined.q[0][joint]-startQ[joint])>1e-7)
+        throw 'Motion program op $index joint planner changed the pinned start';
       for(q in refined.q)selected.push(q);
     } else if (configurationSelector != null && fullOrientation)
       for (q in configurationSelector.selectPoses(distances, pathPoses, startQ, ikTolerance)) selected.push(q);
