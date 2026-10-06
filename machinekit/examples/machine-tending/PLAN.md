@@ -840,7 +840,7 @@ Done. What was built and decided:
 | MT5b second review | done: verified and approved compiler pin recorded | 3c5eef1dd, 3ff303c2d; Haxeon 8be7ca0e; see [REVIEW_FIXES.md](REVIEW_FIXES.md) |
 | MT6 | done, second-review corrections verified | 4c9e6ebec, daf20e12d, 3c5eef1dd |
 | MT7 | done | 1780b60fa |
-| MT8 | planned | |
+| MT8 | done | 371070b1d |
 | MT9 | planned | |
 | MT10 | planned | |
 | MT11 | planned | |
