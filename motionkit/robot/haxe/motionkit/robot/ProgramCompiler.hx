@@ -1018,16 +1018,7 @@ class ProgramCompiler {
     var start = 0.0;
     for (k in 0...path.primitives.length) {
       var primitive = path.primitives[k], length = primitive.length();
-      var curvature = 0.0;
-      for (at in [0.0, 0.5 * length, length]) {
-        var second = primitive.derivativesAt(at);
-        curvature = Math.max(curvature, Math.sqrt(
-          second.linearSecond[0] * second.linearSecond[0] +
-          second.linearSecond[1] * second.linearSecond[1] +
-          second.linearSecond[2] * second.linearSecond[2]));
-      }
-      var pieces = Std.int(Math.max(1, Math.max(Math.ceil(length / cartesianResolution),
-        Math.ceil(length * curvature / 0.25))));
+      var pieces = motionkit.path.PoseSampling.pieces(primitive,cartesianResolution);
       for (piece in 1...(pieces + 1)) {
         var last = piece == pieces;
         // Exactly the end: `length * pieces / pieces` can round one ulp past it.

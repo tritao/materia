@@ -91,13 +91,13 @@ class AnalyticPathRefiner {
   }
   /** Task rates must describe the refined TCP pose, including its smoothed
    * orientation. External redundancy rates come directly from the spline. */
-  public function derivatives(distance:Float,q:Array<Float>,taskVelocity:Array<Float>,taskAcceleration:Array<Float>):motionkit.robot.PathDifferential.JointDerivatives {
+  public function derivatives(distance:Float,q:Array<Float>,taskVelocity:Array<Float>,taskAcceleration:Array<Float>,freeToolAxis:Bool=false):motionkit.robot.PathDifferential.JointDerivatives {
     if(q==null || q.length!=group.group.count())throw "Refined derivatives require the complete configuration";
     var known=[for(_ in q)false],first=[for(_ in q)0.0],second=[for(_ in q)0.0];
     for(i in 0...external.length){var j=prescribedJoints[i],state=external[i].evaluate(distance);
       if(!Math.isFinite(q[j]) || Math.abs(q[j]-state.value)>1e-8)throw "Differential configuration differs from its redundancy spline";
       known[j]=true;first[j]=state.first;second[j]=state.second;}
-    return PathDifferential.solve(group,q,taskVelocity,taskAcceleration,known,first,second);
+    return PathDifferential.solve(group,q,taskVelocity,taskAcceleration,known,first,second,1e-6,freeToolAxis);
   }
   public function orientationMotion(distance:Float,target:Pose3,freedom:OrientationPolicy,
       centreOmega:Array<Float>,centreAlpha:Array<Float>):motionkit.robot.OrientationDifferential.OrientationMotion {
@@ -120,7 +120,8 @@ class AnalyticPathRefiner {
     if(centreVelocity==null || centreAcceleration==null || centreVelocity.length!=6 || centreAcceleration.length!=6)
       throw "Refined task derivatives need six-dimensional centre rates";
     var motion=orientationMotion(distance,target,freedom,centreVelocity.slice(3),centreAcceleration.slice(3));
-    return derivatives(distance,q,centreVelocity.slice(0,3).concat(motion.velocity),centreAcceleration.slice(0,3).concat(motion.acceleration));
+    return derivatives(distance,q,centreVelocity.slice(0,3).concat(motion.velocity),centreAcceleration.slice(0,3).concat(motion.acceleration),
+      problem.family=="XYZ+C+A" && !ToolFreedom.isFull(freedom));
   }
   /** Produce the complete refined path for timing, preserving curvature on
    * both sides of a geometric knot. The provider supplies exact task data. */

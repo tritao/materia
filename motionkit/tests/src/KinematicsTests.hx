@@ -1201,7 +1201,45 @@ class KinematicsTests extends MotionKitTestSupport {
 
   }
 
+  function testCartesianAxisDifferential():Void {
+    var model=new RobotModel("axis-task-differential"),base=model.addLink(new Link("base")),parent=base;
+    for(j in 0...5){
+      var child=model.addLink(new Link('axis-link-$j'));
+      var joint=model.addJoint(new Joint('axis-joint-$j',j<3?JointType.Prismatic:JointType.Revolute,parent,child));
+      joint.axis=j<3?[for(k in 0...3)k==j?1.0:0.0]:j==3?[0.0,0,1]:[1.0,0,0];
+      joint.limits.lower=-4;joint.limits.upper=4;parent=child;
+    }
+    var tip=model.addFrame(new Frame("tip",parent));tip.position=[0.03,0.02,0.15];
+    var group=new robotkit.manipulation.KinematicGroup(model,base.id,tip.id),solver=new ManipulatorKinematics(group);
+    function joints(t:Float):Array<Float> return [0.1+0.2*t+0.03*t*t,-0.2+0.1*t-0.04*t*t,
+      0.3-0.1*t+0.02*t*t,0.4+0.5*t+0.06*t*t,0.8-0.3*t+0.05*t*t];
+    function target(t:Float):Pose3 {
+      var physical=solver.forward(joints(t));
+      var rotation=new Quat(physical.qx,physical.qy,physical.qz,physical.qw)
+        .multiply(Quat.fromAxisAngle(new Vec3(0,0,1),0.7+1.2*t+0.4*t*t));
+      return new Pose3(physical.x,physical.y,physical.z,rotation.x,rotation.y,rotation.z,rotation.w);
+    }
+    for(t in [0.0,0.3,0.7,1.0]){
+      var h=1e-4,minus=target(t-h),centre=target(t),plus=target(t+h);
+      var omega=poseRotationDelta(minus,plus,1/(2*h));
+      var before=poseRotationDelta(target(t-2*h),centre,1/(2*h));
+      var after=poseRotationDelta(centre,target(t+2*h),1/(2*h));
+      var velocity=[(plus.x-minus.x)/(2*h),(plus.y-minus.y)/(2*h),(plus.z-minus.z)/(2*h)].concat(omega);
+      var acceleration=[(plus.x-2*centre.x+minus.x)/(h*h),(plus.y-2*centre.y+minus.y)/(h*h),
+        (plus.z-2*centre.z+minus.z)/(h*h)].concat([for(i in 0...3)(after[i]-before[i])/(2*h)]);
+      var rates=motionkit.robot.PathDifferential.solve(group,joints(t),velocity,acceleration,
+        [false,false,false,false,false],[0.0,0,0,0,0],[0.0,0,0,0,0],1e-6,true);
+      var expectedFirst=[0.2+0.06*t,0.1-0.08*t,-0.1+0.04*t,0.5+0.12*t,-0.3+0.1*t];
+      var expectedSecond=[0.06,-0.08,0.04,0.12,0.1];
+      for(j in 0...5){
+        near(rates.first[j],expectedFirst[j],"CA reduced velocity ignores uncommanded tool spin",1e-6);
+        near(rates.second[j],expectedSecond[j],"CA reduced acceleration matches independent joint polynomial",1e-5);
+      }
+    }
+  }
+
   public function testOrientationDifferential():Void {
+    testCartesianAxisDifferential();
     for(angle in [0.01,0.06,0.1,1.2,3.0]) {
       var initial=Quat.fromAxisAngle(new Vec3(1,0,0),0.7);
       var finalRotation=Quat.fromAxisAngle(new Vec3(0,0,1),angle).multiply(initial);

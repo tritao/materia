@@ -30,8 +30,8 @@ class WeldingCell extends MachineAssembly {
 	/** The table is the arm's own work table, as tall as its cell's. */
 	public static inline var TABLE_TOP:Float = RobotArm.TABLE_TOP;
 	/** The table stands in front of the arm (-Y), and the weldment sits on its centre line, in the arm's reach. */
-	public static inline var TABLE_CENTRE_Y:Float = -600;
-	public static inline var WORK_Y:Float = -480;
+	public static inline var TABLE_CENTRE_Y:Float = -570;
+	public static inline var WORK_Y:Float = -450;
 	/** The workpiece's origin, the plate's centre, on the table. The plate and the tube frame beside it are both in the arm's reach. */
 	public static inline var WORK_X:Float = -155;
 	static inline var FIXTURE_SIZE:Float = 20;

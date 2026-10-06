@@ -2231,3 +2231,56 @@ with zero numeric IK calls, but its fourth run cannot select a complete route.
 It is not an accepted complete re-baseline; bounded candidate construction and
 physical reach/limits remain under investigation. All-user re-baselines and
 the PP0a phase gate remain open; PP1a has not started.
+
+
+### PP0a production weld routes, shared grids and coordinated rail re-baselines
+
+Recentered the fixed welding table and workpiece 30 mm towards the industrial
+arm. The previous far-side seam approached poses outside physical reach, even
+with diagnostic joint limits widened. Native diagnostics were removed; physical
+travel and clearance margins remain enforced.
+
+Checked welds prefer a geometric air entry/retreat along the CAD seam's declared
+open side (twice the recipe's approach distance), with direct geometry as the
+fallback. Both travel directions still use the shared structured selection and
+retained compilation. Missing open-side metadata cannot invent an air route.
+Selection also checks final joints with the air margin. This fixes entry sweeps
+through the upright between individually valid weld runs.
+
+Cartesian gantry axes are solved by their analytic head, not enumerated as
+serial-arm external axes. C/A reduced-task differential refinement now projects
+onto the hard tool axis and accounts for physical uncommanded spin in angular
+acceleration. Independent finite-difference poses with extra varying tool spin
+recover all five joint polynomial derivatives. XYZ/XYZ+C and full-task
+refinement keep their previous equations. PoseSampling owns the common spatial
+and curvature grid density for selection and execution; a woven retained curve
+now compiles on exactly the grid selected for it.
+
+The track coordinated-path check explicitly supplies the rail's complete finite
+range, retaining the station-holding default of the handling runner. Its elbow
+assertion uses the industrial zero. All six station steps and the 2.6 m
+coordinated path pass (0.126 mm error, 0.645 rad posture margin, 0.00412 rad maximum
+joint step).
+
+App, MotionKit and ProcessKit compiler-only builds pass. Focused C4 passes
+1,152,175 assertions; ProcessKit passes 66 welder, 508 planning and 20 rate
+schedule assertions. The fixed whole weldment completes all ten seams on both
+backends in 103.5 s, with zero numeric IK calls and no clearance violation
+(MuJoCo maximum seam error 0.031 mm). Its broader selector subsequently exposed
+the woven grid mismatch; the corrected quality selector exits zero for woven
+7 mm and three-pass 10 mm welds on both backends (6.998 mm and 9.999–10.002 mm
+legs). A fresh complete selector run remains required at the phase boundary.
+The arm-free gantry control exits zero: all ten seams, 178.1 s cycle, zero
+numeric IK calls, no clearance violation, 0.125 mm maximum seam error.
+
+Track/G17 exits zero: 2600 mm seam, 2.2 m rail travel, 0.628 rad posture margin,
+0.00372 rad maximum joint step, 383.4 s cycle, 4.969 mm leg, no clearance violation
+and 0.126 mm maximum seam error. Its planning is still 88.204 s for 1429 poses,
+with zero numeric IK calls. This is functional acceptance, **not** the required
+under-15-second planning result. Timing runs overlapped other checks and are not
+isolated performance measurements.
+
+Re-baseline reason: **industrial spherical-wrist RobotArm**. Accepted control,
+quality and track logs live in external scratch with the
+`process-path-industrial-baseline-*` prefix. Mobile users, a fresh complete fixed
+welder selector, and the complete PP0a phase gate remain open. PP1a has not started.

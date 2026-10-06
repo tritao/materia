@@ -251,11 +251,19 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var problem=new WeldPathProblem(requested,wrist,[for(_ in requested.segments)WeldCorner.AROUND],FRAME,APPROACH_SPEED);
     var best:Null<processkit.WeldPathProblem.WeldPathSelection> = null;
     var reasons:Array<String> = [];
-    for(alternative in [problem,problem.reversed()]){
-      try {
-        var selected=selectProblem(alternative,start);
-        if(best==null || selected.cost<cast(best,processkit.WeldPathProblem.WeldPathSelection).cost)best=selected;
-      }catch(error:Dynamic){reasons.push(Std.string(error));}
+    // A checked cell needs an air departure before another run can cross the
+    // work. The same geometry owns entry and retreat; both directions use DP.
+    var airDistance=2*requested.parameters.approach;
+    var alternatives=clearance==null ? [0.0] : [airDistance,0.0];
+    for(clearanceDistance in alternatives){
+      for(direction in [problem,problem.reversed()]){
+        try {
+          var alternative=clearanceDistance==0 ? direction : direction.withAirClearance(clearanceDistance);
+          var selected=selectProblem(alternative,start);
+          if(best==null || selected.cost<cast(best,processkit.WeldPathProblem.WeldPathSelection).cost)best=selected;
+        }catch(error:Dynamic){reasons.push(Std.string(error));}
+      }
+      if(best!=null)break;
     }
     if(best==null)throw 'Cannot select either weld travel direction: ${reasons.join("; ")}';
     var chosen=cast(best,processkit.WeldPathProblem.WeldPathSelection);
@@ -292,7 +300,10 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     // Omitted ranges hold axes at the seed. Welds with a work positioner or
     // rail must search its physical range rather than freezing it there.
     var ranges:Array<motionkit.robot.ExternalAxisGrid.ExternalAxisRange> = [];
-    for(joint in 0...group.group.count())if(group.external[joint]){
+    // A Cartesian head solves all its axes directly; its linear axes are not
+    // external coordinates to enumerate around a serial-arm solution.
+    var cartesian=Std.isOfType(motionkit.robot.BranchIk.of(group),motionkit.robot.CartesianAnalyticIk);
+    for(joint in 0...group.group.count())if(!cartesian && group.external[joint]){
       var limits=group.group.limitsOf(joint);
       if(!Math.isFinite(limits.lower) || !Math.isFinite(limits.upper))
         throw "Weld external-axis selection requires finite planning bounds";
@@ -308,7 +319,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
           clearance,entry,false,0.01,q->problem.contact(solver.forward(q)));
         entry.dispose();return violation;
       }catch(error:Dynamic){entry.dispose();throw error;}
-    },null,null,null,0,solver);
+    },clearance==null ? null : q -> clearance.violation(q,false),null,null,0,solver);
   }
 
   function prepareWeld(prepared:WeldPlan,path:PosePath,exitPose:Pose3):Void {

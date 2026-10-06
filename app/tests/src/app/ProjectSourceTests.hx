@@ -1339,6 +1339,16 @@ class ProjectSourceTests {
     kinematics.preferredPosture = entry;
     check(kinematics.manipulator.external[0] && kinematics.manipulator.swivel == null,
       "coordinated planning derives the track without inventing a swivel");
+    // Coordinated travel explicitly searches the rail. The handling runner's
+    // default holds station axes while it picks and places at each station.
+    var rail=kinematics.manipulator.group.limitsOf(0);
+    var cells=Std.int(Math.ceil((rail.upper-rail.lower)/(motion.compiler.perJointMaxJump[0]*0.5)))+1;
+    var sampling=new motionkit.robot.CandidateProblem.CandidateSamplingOptions(8,3,8,true,
+      [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,rail.lower,rail.upper,cells)]);
+    var coordinated=motion.compiler.withJointPathPlanner(new motionkit.robot.StructuredJointPathPlanner(
+      kinematics.manipulator,sampling,null,null,8,false,null,null,null,0,kinematics));
+    motion=new motionkit.robot.ManipulatorMotion(motion.robot,coordinated,_ -> null,
+      () -> ({events:[],overflow:false}),motion.jointIndices);
     motion.run(new motionkit.program.MotionProgram([
       motionkit.program.MotionOp.FollowPath(path, motionkit.robot.HandlingPlanRunner.FRAME, 0.08, [])]));
     var worst = 0.0, margin = Math.POSITIVE_INFINITY, jump = 0.0, previous = entry.copy(), last = entry.copy();
@@ -1355,7 +1365,7 @@ class ProjectSourceTests {
         margin = Math.min(margin, Math.min(last[index] - bound.lower, bound.upper - last[index]));
         jump = Math.max(jump, Math.abs(last[index] - previous[index]));
       }
-      check(-1.4 + last[3] < -0.2, "coordinated path retains its elbow branch");
+      check(Math.PI/2 - 1.4 + last[3] < Math.PI/2 - 0.2, "coordinated path retains its elbow branch");
       check(Math.abs(last[6] - entry[6]) < 1.0, "coordinated path retains its wrist winding");
       previous = last.copy();
     }

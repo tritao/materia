@@ -32,6 +32,8 @@ class WeldPlanningTests {
     testCornerTurn();
     testJoinedPathProblem();
     testProblemTravelAlternatives();
+    testAirEntryGeometry();
+    testRetainedWeaveGrid();
     testRotaryWristSelection();
     testRollAvoidsTheWall();
     testEntryBranchReachesTheWholeWeld();
@@ -358,6 +360,59 @@ class WeldPlanningTests {
       if(motionkit.path.PoseMath.angle(original.seam.poseAt(distance),alternative.seam.poseAt(distance))>1e-4)changed=true;}
     check(changed,"corner alternatives are distinct geometric problems before IK or timing");
     near(alternative.seam.length(),original.seam.length(),1e-12,"corner alternatives preserve deposited length");
+  }
+
+  static function testRetainedWeaveGrid():Void {
+    var model=new RobotModel("woven-retained-grid"),base=model.addLink(new Link("base")),parent=base;
+    for(j in 0...3){var child=model.addLink(new Link('weave-link-$j'));
+      var joint=model.addJoint(new Joint('weave-joint-$j',JointType.Prismatic,parent,child));
+      joint.axis=[for(k in 0...3)k==j?1.0:0.0];joint.limits.lower=-1;joint.limits.upper=1;parent=child;}
+    var tip=model.addFrame(new Frame("tip",parent)),group=new Manipulator(model,base.id,tip.id);
+    var parameters:WeldParameters={wireSpeed:8.0,voltage:24.0,travelSpeed:0.01,approach:0.04,
+      startDwell:0.15,craterDwell:0.15,burnback:0.1,
+      weave:new motionkit.path.WeaveProfile(motionkit.path.WeavePattern.Sine,0.002,50.0,0.01)};
+    var requested=new WeldPlan([new processkit.skill.WeldPlan.WeldSegment(
+      new Transform3(new Vec3(0.1,0.2,0.3),Quat.identity()),
+      new Transform3(new Vec3(0.28,0.2,0.3),Quat.identity()),"weave",new Vec3(0,0,1))],parameters);
+    var problem=new processkit.WeldPathProblem(requested,WRIST,[WeldCorner.AROUND],"weld-task");
+    var solver=new ManipulatorKinematics(group),start=[problem.approach.x,problem.approach.y,problem.approach.z];
+    var compiler=new motionkit.robot.ProgramCompiler(solver,
+      new motionkit.trajectory.ValidationLimits(3,haxe.Int64.ofInt(1),haxe.Int64.ofInt(0)),"weld-task",
+      [1.0,1,1],[2.0,2,2],[20.0,20,20],motionkit.robot.StartTolerances.uniform(3,0.01,0.01,0.01),
+      null,0.002,0.2,0.001,0.02,new IkTolerance(1e-6,1e-6));
+    var request=problem.request(start,compiler.ikTolerance,compiler.perJointMaxJump,compiler.maxVelocity);
+    check(request.distances.length>150,"woven selection samples curvature beyond the spatial step");
+    var curves=problem.select(group,request,new motionkit.robot.CandidateProblem.CandidateSamplingOptions(1,1,1,true));
+    var program=new processkit.WeldPathProgram(problem,curves,{arc:"arc",wireSpeed:"wire",voltage:"voltage"});
+    var compiled=program.compile(compiler,group,start,haxe.Int64.ofInt(990));
+    for(section in 0...program.sectionOps.length){
+      var found=false;
+      for(block in compiled.blocks)for(i in 0...block.opIndices.length)if(block.opIndices[i]==program.sectionOps[section]){
+        found=true;near(block.pathLengths[i],problem.sections[section].length(),1e-12,
+          "woven execution retains the selected section extent");
+      }
+      check(found,"woven retained geometry compiles every selected section");
+    }
+    check(group.numericSolveCount()==0,"woven selection and retained compilation remain analytic");
+    compiled.dispose();
+  }
+
+  static function testAirEntryGeometry():Void {
+    var base=seam(),segment=base.segments[0];
+    var requested=new WeldPlan([new processkit.skill.WeldPlan.WeldSegment(segment.start,segment.stop,"air seam",new Vec3(0,0,1))],PARAMETERS);
+    var direct=new processkit.WeldPathProblem(requested,WRIST,[WeldCorner.AROUND],"weld-task");
+    var air=direct.withAirClearance(0.12);
+    near(air.approach.z-direct.approach.z,0.12,1e-12,"air entry uses declared open side");
+    near(air.retreat.z-direct.retreat.z,0.12,1e-12,"air retreat clears the same work");
+    near(air.seam.length(),direct.seam.length(),1e-12,"air alternative preserves deposited seam");
+    near(air.path.length()-direct.path.length(),0.24,1e-12,"air route includes both extra legs");
+    near(air.reversed().approach.z,air.retreat.z,1e-12,"opposite travel preserves the physical air route");
+    near(air.recovery(0.05).approach.z,air.approach.z,1e-12,"recovery retains air clearance");
+    check(!air.contact(air.approach) && !air.contact(air.retreat),"air route retains air collision margin");
+    var rejected=false;
+    try new processkit.WeldPathProblem(base,WRIST,[WeldCorner.AROUND],"weld-task").withAirClearance(0.12)
+      catch(error:Dynamic)rejected=Std.string(error).indexOf("open side")>=0;
+    check(rejected,"air entry cannot invent a missing material open side");
   }
 
   static function testRotaryWristSelection():Void {
