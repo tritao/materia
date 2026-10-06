@@ -1412,6 +1412,49 @@ class KinematicsTests extends MotionKitTestSupport {
       [rollSolver.forward(policyFrom),rollSolver.forward(policyTo)],policyFrom,new IkTolerance(1e-6,1e-6),
       [1.0,1.0,1.0,1.0],[1.0,1.0,1.0,1.0],32,[OrientationPolicy.Fixed,OrientationPolicy.Fixed])),
       "whole-route planning requires sampled timing stops");
+    var reselections=[0];
+    var reuseChecks=new motionkit.robot.StructuredJointPathPlanner(rollGroup,null,null,marginWorld,8,false,
+      (_,candidate)->{reselections[0]++;return 0.0;},null,null,0,null,p->Math.abs(p.y)<0.035);
+    var retained=new motionkit.robot.SelectedJointPathPlanner(rollSolver,reuseChecks,mixedSections,joinedCurves);
+    var retainedRequest=new PathRequest(joinedCurves[0].s,
+      [for(distance in joinedCurves[0].s)mixedSections[0].poseAt(distance)],joinedCurves[0].q[0],
+      new IkTolerance(1e-6,1e-6),[1.0,1.0,1.0,1.0],[1.0,1.0,1.0,1.0],32,
+      [for(_ in joinedCurves[0].s)OrientationPolicy.Fixed]);
+    var retainedCurve=retained.plan(mixedSections[0],retainedRequest,true);
+    near(retainedCurve.q[1][1],joinedCurves[0].q[1][1],"retained execution uses selected physical joints",0);
+    retainedCurve.q[1][1]+=0.01;
+    near(retained.plan(mixedSections[0],retainedRequest,true).q[1][1],joinedCurves[0].q[1][1],
+      "returned curve mutation cannot change retained selection",0);
+    throws(function() retained.plan(mixedSections[0],retainedRequest,false),
+      "retained execution cannot request a new free start");
+    var changedStart=retainedRequest.startQ.copy();changedStart[0]+=0.01;
+    throws(function() retained.plan(mixedSections[0],new PathRequest(retainedRequest.distances,retainedRequest.poses,
+      changedStart,retainedRequest.tolerance,retainedRequest.maxJump,retainedRequest.velocity,32,retainedRequest.freedoms)),
+      "retained selection rejects a changed execution start");
+    var changedGrid=retainedRequest.distances.copy();changedGrid[1]+=0.001;
+    throws(function() retained.plan(mixedSections[0],new PathRequest(changedGrid,retainedRequest.poses,
+      retainedRequest.startQ,retainedRequest.tolerance,retainedRequest.maxJump,retainedRequest.velocity,32,retainedRequest.freedoms)),
+      "retained selection rejects a changed sampling grid");
+    var retainedCompiler=new ProgramCompiler(rollSolver,new ValidationLimits(4,Int64.ofInt(1),Int64.ofInt(0)),"task",
+      [1.0,1.0,1.0,1.0],[2.0,2.0,2.0,2.0],[20.0,20.0,20.0,20.0],
+      StartTolerances.uniform(4,0.01,0.01,0.01),null,0.02,1.0,1e-4,1e-4,null,retained);
+    var retainedProgram=new MotionProgram([for(path in mixedSections)MotionOp.FollowPath(path,"task",0.1,[])]);
+    for(worker in [false,true]){
+      var execution=(worker?retainedCompiler.forWorker():retainedCompiler).compile(retainedProgram,policyFrom,Int64.ofInt(939));
+      try {
+        var selectedPlans=[for(block in execution.blocks)for(plan in block.plans)plan];
+        check(selectedPlans.length==2,"selected process sections compile into separately stopped paths");
+        for(section in 0...2){var trajectory=selectedPlans[section];
+          var from=trajectory.evaluate(0),to=trajectory.evaluate(trajectory.durationSeconds);
+          for(j in 0...4){near(from.positions[j],joinedCurves[section].q[0][j],"execution retains selected section start",1e-8);
+            near(to.positions[j],joinedCurves[section].q[2][j],"execution retains selected section end",1e-8);
+            near(from.velocities[j],0,"retained section starts stopped",1e-7);
+            near(to.velocities[j],0,"retained section ends stopped",1e-7);}
+        }
+      }catch(error:Dynamic){execution.dispose();throw error;}
+      execution.dispose();
+    }
+    check(reselections[0]==0,"main and worker execution reuse curves without candidate reselection");
     var farthestSample=[-1];
     var cornerPlanner=new motionkit.robot.StructuredJointPathPlanner(rollGroup,null,null,null,8,false,
       (sample,candidate)->{farthestSample[0]=Std.int(Math.max(farthestSample[0],sample));return 0.0;});
