@@ -87,7 +87,7 @@ template<class Layers> LadderResult coarse_ladder(const Layers &source,const Lad
             for(auto index:corridor.mapping[i%2])prices.push_back(state_cost[i][index]);fine_costs.push_back(std::move(prices));}
         auto fine=structured_ladder(corridor,settings,fine_costs);tested+=fine.tested_edges;
         if(fine.failed==UINT32_MAX){for(unsigned i=0;i<fine.route.size();++i)fine.route[i]=corridor.all_mapping[i][fine.route[i]];
-            fine.tested_edges=tested;return fine;}
+            fine.tested_edges=tested;fine.backend=2;return fine;}
         if(radius>UINT32_MAX/2)break;radius*=2;
     }
     auto complete=structured_ladder(source,settings,state_cost);complete.tested_edges+=tested;return complete;

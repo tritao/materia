@@ -188,6 +188,7 @@ typedef struct mk_ladder_result {
     double failed_distance;
     double cost;
     uint64_t tested_edges;
+    uint32_t backend; /**< 1 structured, 2 coarse corridor, 3 Descartes. */
 } mk_ladder_result;
 
 /** Candidate sets for one Descartes ladder-graph selection call. */

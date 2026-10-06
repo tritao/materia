@@ -926,3 +926,18 @@ selection agrees with full search. Compiler-only and focused runtime pass
 (1,143,581 assertions), all 15 native CTest cases pass, and the portable
 four-platform ABI audit passes. Descartes small-ladder dispatch, authored
 large-path acceptance and production migration remain outstanding.
+
+PP3 bounded Descartes dispatch: the shared native entry point uses
+LadderGraphSolver for ladders with at most 32 candidates per layer and
+one million potential edges; large ladders retain indexed DP, and explicit
+coarse settings select the corridor solver. The Descartes adapter preserves
+structured neighbour/branch-change connectivity, exact joint jumps,
+weighted travel, roll costs, per-state costs and free-start travel. A
+structured reference supplies validation/failure diagnostics for these
+small problems and provides fallback if Descartes cannot produce a route.
+The result reports the actual backend (structured/corridor/Descartes), and
+native tests explicitly prove Descartes executes and agrees with the
+brute-force cost on reachable random small ladders; disconnected cases
+agree on their first failure. All 15 native tests, four-platform ABI audit,
+compiler-only and focused Haxe runtime (1,143,581 assertions) pass.
+Authored large-track acceptance and the PP3 phase gate remain outstanding.

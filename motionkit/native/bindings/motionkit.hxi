@@ -218,7 +218,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		corridor_radius: u32 @offset(2088);
 		corridor_widenings: u32 @offset(2092);
 	}
-	struct mk_ladder_result @layout(40, 8) {
+	struct mk_ladder_result @layout(48, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		/**
 		 * < UINT32_MAX on success.
@@ -231,6 +231,10 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		failed_distance: f64 @offset(16);
 		cost: f64 @offset(24);
 		tested_edges: u64 @offset(32);
+		/**
+		 * < 1 structured, 2 coarse corridor, 3 Descartes.
+		 */
+		backend: u32 @offset(40);
 	}
 	struct mk_lattice_candidate @layout(1056, 8) {
 		struct_size: u32 @offset(0) @struct_size;

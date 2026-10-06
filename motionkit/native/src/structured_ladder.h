@@ -17,6 +17,7 @@ struct LadderSettings {
     double roll_weight=0;
 };
 struct LadderResult {
+    unsigned backend=1;
     std::vector<unsigned> route;
     double cost=std::numeric_limits<double>::infinity();
     unsigned failed=UINT32_MAX;
