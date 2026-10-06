@@ -539,7 +539,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | Step | State | Commits |
 |------|-------|---------|
 | PP0 | in progress: harness and diagnostics; baseline completion pending | `0d43b32c0` (partial) |
-| PP0a | planned (revision 2026-10-06): industrial spherical-wrist RobotArm, delete offset-wrist work | — |
+| PP0a | in progress: offset prototypes deleted; spherical clevis passes authored OPW extraction; proportions/zero/configurations/re-baselines pending | see progress |
 | PP1a | planned (revision 2026-10-06): EAIK spike | — |
 | PP1 | in progress: Cartesian, OPW and authored Cobot UR verified; offset RobotArm unresolved | `0d43b32c0`, `bfec0fa28`, `8569a2a98` (partial) |
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
@@ -2008,3 +2008,22 @@ selector or diagnostic references outside this historical removal list/revision.
 configuration labels and every RobotArm user re-baseline still need PP0a work.
 The first PP0a commit removes these artifacts; subsequent work follows PP0a then
 PP1a's EAIK parity/speed/Emscripten decision before the revised downstream plan.
+
+### PP0a spherical wrist clevis
+
+Added registered `ArmWristFork`: its pitch input references the rotor face at half
+the j5 module length while its hand output lies on the wrist-centre axis. The
+physical clevis spans the pitch housing and supports j6 without inheriting the
+old 35 mm lateral displacement. RobotArm replaces its hand tube with this clevis;
+existing servo modules, gearboxes, drivers and flange remain the source parts.
+Updated the straight-pose x expectation from 35 mm to zero. This increment retains
+the existing straight-up zero pose and dimensions; PP0a's industrial zero,
+size classes, labels and user re-baselines are not yet implemented.
+
+App compiler-only exits zero (`process-path-spherical-clevis-build.log`). Actual
+`PROJECT_SOURCE_ONLY=arm-analytic` runtime exits zero after generating and decoding
+the authored 38-component arm; OPW extracts the compiled model and passes 100
+analytic round trips (`process-path-spherical-clevis-runtime.log`). This is the
+previously unmet authored OPW proof, not all eight labelled branch coverage,
+mechanical interference/BOM checks for all sizes, re-baselines or a full phase gate.
+Full suites remain required at PP0a close-out before the EAIK spike.

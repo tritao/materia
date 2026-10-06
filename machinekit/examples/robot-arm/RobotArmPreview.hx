@@ -76,9 +76,9 @@ class RobotArmChecks {
 		straight.forwardKinematics();
 		var base = straight.worldPose("joint1");
 		near(base.z, RobotArm.PEDESTAL_HEIGHT + robot.flange.thickness, "arm base sits on the pedestal flange", 1e-3);
-		// At zero the arm points straight up: shoulder offset 45, elbow back to the axis, wrist offset 35.
+		// At zero the current links point up; the clevis removes the old lateral wrist offset.
 		var tool = straight.worldPose("toolFlange");
-		near(tool.x, 35, "tool flange x at the straight pose", 1e-3);
+		near(tool.x, 0, "spherical tool flange x at the straight pose", 1e-3);
 		near(tool.y, 0, "tool flange y at the straight pose", 1e-3);
 		near(tool.z, 1299 + robot.toolFlange.thickness, "tool flange z at the straight pose", 1e-3);
 		near(AssemblyFrames.transformVector(tool, 0, 0, 1).z, 1, "tool axis points up when straight", 1e-6);

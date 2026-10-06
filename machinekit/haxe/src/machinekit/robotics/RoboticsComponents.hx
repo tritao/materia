@@ -13,6 +13,7 @@ class RoboticsComponents {
 		registry.register(FrameBar.recipeType());
 		registry.register(ArmJoint.recipeType());
 		registry.register(ArmLink.recipeType());
+		registry.register(ArmWristFork.recipeType());
 		registry.register(ParallelGripper.recipeType());
 		registry.register(ToolChangerMaster.recipeType());
 		registry.register(ToolChangerTool.recipeType());

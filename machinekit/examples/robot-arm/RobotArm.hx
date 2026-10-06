@@ -14,6 +14,7 @@ import machinekit.motion.ServoMotor;
 import machinekit.robotics.ArmJoint;
 import machinekit.robotics.GearedArmJoint;
 import machinekit.robotics.ArmLink;
+import machinekit.robotics.ArmWristFork;
 import machinekit.robotics.ArmLink.ArmAxis;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.Pedestal;
@@ -90,9 +91,9 @@ typedef ArmJointSpec = {
 	var gearbox:Gearbox;
 }
 
-/** Six-axis serial arm on a pedestal with the caller's tool (a suction tool by default), in a shoulder/elbow layout with an offset wrist.
+/** Six-axis serial arm on a pedestal with the caller's tool (a suction tool by default), in a shoulder/elbow layout with a spherical wrist.
  *
- * The j4 and j6 axis lines are separated by 35 mm along the j5 axis.
+ * The j5 clevis references the wrist centre, where the j4, j5 and j6 axes meet.
  * At zero on every joint the arm points straight up. Joints `j1`, `j4` and `j6` turn about the
  * vertical (j6 about the tool axis), while `j2`, `j3` and `j5` pitch about a horizontal axis.
  * Every housing belongs to the link before it, so each revolute mate joins a housing's rotor to
@@ -119,7 +120,7 @@ class RobotArm extends MachineAssembly {
 	public final toolFlange = new RobotFlange(31.5);
 	public final tool:EndEffector;
 	public final joints:Array<ArmJoint>;
-	public final links:Array<ArmLink>;
+	public final links:Array<MachineComponent>;
 	public final specs:Array<ArmJointSpec>;
 	/**
 	 * Efficiency of every joint's gearbox. Assumption: 0.85, about a strain-wave (harmonic) gearhead's
@@ -165,7 +166,7 @@ class RobotArm extends MachineAssembly {
 			new ArmLink(320, 80, 5, 100, PlusX, MinusX, j3.length),
 			new ArmLink(260, 70, 4, 80, MinusX, PlusZ, j4.length),
 			new ArmLink(90, 60, 4, 70, PlusZ, PlusX, j5.length),
-			new ArmLink(60, 50, 4, 60, PlusX, PlusZ, j6.length)
+			new ArmWristFork(60, j5.length)
 		];
 		addComponent("pedestal", pedestal);
 		addComponent("baseFlange", flange);
