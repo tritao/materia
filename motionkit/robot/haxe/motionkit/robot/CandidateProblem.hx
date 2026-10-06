@@ -22,7 +22,6 @@ class CandidateProblem {
       throw "Candidate problem requires a group and complete path request";
     var settings=options==null ? new CandidateSamplingOptions() : options;
     this.request=request;this.pinnedStart=settings.pinStart;
-    externalJoints=[for(i in 0...group.group.count())if(group.external[i])i];
     for(i in 0...request.distances.length) {
       if(!Math.isFinite(request.distances[i]) || request.distances[i]<0 ||
           (i>0 && request.distances[i]<=request.distances[i-1]) || request.poses[i]==null)
@@ -34,6 +33,7 @@ class CandidateProblem {
         throw "Candidate path requires finite joints and positive jump/speed limits";
     var backend=BranchIk.of(group,request.tolerance);
     family=backend.family();
+    externalJoints=Std.isOfType(backend,CartesianAnalyticIk) ? [] : [for(i in 0...group.group.count())if(group.external[i])i];
     var fallback:Null<NumericBranchIk> = Std.isOfType(backend,NumericBranchIk) ? cast backend : null;
     diagnostic=fallback==null ? null : fallback.diagnostic;
     var cart:Null<CartesianCandidateSampler> = Std.isOfType(backend,CartesianAnalyticIk) ? new CartesianCandidateSampler(group) : null;

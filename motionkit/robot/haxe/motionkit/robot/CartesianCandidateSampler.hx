@@ -17,7 +17,8 @@ class CartesianCandidateSampler {
   public function new(group:KinematicGroup) {
     this.group=group;
     analytic=new CartesianAnalyticIk(group);
-    if (group.external.indexOf(true)>=0) throw "Cartesian candidate export requires a standalone Cartesian group";
+    // The verified Cartesian descriptor includes every joint, including
+    // leading axes marked external by the group classification.
     var count=group.group.count();
     model=new mk_serial_cell_model();model.set_struct_size(mk_serial_cell_model.size());
     model.set_joint_count(count);model.set_arm_joint_count(count);model.set_external_count(0);

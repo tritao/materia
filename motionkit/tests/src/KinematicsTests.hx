@@ -644,6 +644,20 @@ class KinematicsTests extends MotionKitTestSupport {
       var sampler = new motionkit.robot.CartesianCandidateSampler(group);
       var before = group.numericSolveCount();
       check(analytic.jointCount() == count, "Cartesian family keeps model DOF count");
+      var marked = new robotkit.manipulation.KinematicGroup(model,base.id,flange.id,null,tool,null,["cartesian-joint-0"]);
+      check(marked.external[0],"Cartesian regression fixture marks a leading axis external");
+      var markedQ = [for(i in 0...count)0.2*Math.sin(i+0.3)];
+      var markedTarget = new ManipulatorKinematics(marked).forward(markedQ);
+      var markedSampler = new motionkit.robot.CartesianCandidateSampler(marked);
+      var markedCandidates = markedSampler.sample(markedTarget,markedQ,motionkit.path.OrientationPolicy.Fixed);
+      check(markedCandidates.length>0,"complete Cartesian chain exports despite external markers");
+      for(candidate in markedCandidates)near(motionkit.path.PoseMath.distance(new ManipulatorKinematics(marked).forward(candidate.q),markedTarget),0,
+        "marked Cartesian native candidates satisfy compiled FK",1e-7);
+      var markedRequest = new PathRequest([0.0],[markedTarget],markedQ,new IkTolerance(1e-6,1e-6),
+        [for(_ in markedQ)0.5],[for(_ in markedQ)1.0]);
+      var markedProblem = new motionkit.robot.CandidateProblem(marked,markedRequest);
+      check(markedProblem.externalJoints.length==0 && markedProblem.samples[0].candidates.length==1,
+        "Cartesian task axes are solved geometrically rather than sampled independently");
       for (sample in 0...40) {
         var q = [for (joint in 0...count) 1.4 * Math.sin((sample + 1) * (joint + 1) * 1.618)];
         var target = numeric.forward(q);

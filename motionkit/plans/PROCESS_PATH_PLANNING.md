@@ -790,3 +790,18 @@ spin retention and exact/near-antipodal alignment, and existing candidate/FK
 coverage passes. MotionKit and authored-app compiler-only builds pass; focused
 C4 runtime passes 1,143,524 assertions. The authored Cobot/gantry job has been
 restarted after the earlier job terminated, and its acceptance remains pending.
+
+PP2 authored Cobot checks now pass all four size classes: 200 analytic round
+trips and 60 combined native candidate sets each, covering fixed/free-spin/cone
+constraints, mounted TCP FK and compiled bounds. The gantry XYZ case also
+passed, but the yaw variant exposed a wrapper rejection when KinematicGroup
+marks axes inside the complete Cartesian chain as external. The verified
+Cartesian descriptor already contains these task axes, so the sampler now
+solves them geometrically; CandidateProblem does not classify them as separate
+redundant lattice axes. Regression fixtures explicitly mark a leading axis
+external across all three Cartesian families and verify FK and pinned layers.
+MotionKit and app compiler-only builds pass; focused C4 runtime passes
+1,143,540 assertions. Gantry authored checks are rerunning after the previous
+job terminated. The MotionKit full phase-gate runtime is also running on the
+preceding compiled module; its result and the authored gantry result are still
+pending. PP2 is not claimed complete.
