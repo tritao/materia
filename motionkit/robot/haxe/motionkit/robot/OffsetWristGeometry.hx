@@ -94,11 +94,19 @@ class OffsetWristGeometry {
    * canonical final-wrist angle. Zero residual is the consistency condition;
    * these probes are not full inverse enumeration or legal periodic lifts. */
   public function inverseSlice(target:Pose3,cell:Array<Float>,theta:Float):Array<OffsetWristProbe> {
-    if(target==null || cell==null || cell.length!=group.group.count() || !Math.isFinite(theta))
-      throw "Offset wrist slice requires a target, complete cell and finite angle";
+    if(!Math.isFinite(theta))throw "Offset wrist slice angle must be finite";
+    return sliceLocal(localTarget(target,cell),cell,theta);
+  }
+
+  function localTarget(target:Pose3,cell:Array<Float>):Transform3 {
+    if(target==null || cell==null || cell.length!=group.group.count())
+      throw "Offset wrist slice requires a target and complete cell";
     for(value in cell)if(!Math.isFinite(value))throw "Offset wrist cell must be finite";
     var requested=new Transform3(new Vec3(target.x,target.y,target.z),new Quat(target.qx,target.qy,target.qz,target.qw));
-    var local=base.inverse().compose(group.linkPoses(cell,[armRoot])[0].inverse()).compose(requested).compose(tool.inverse());
+    return base.inverse().compose(group.linkPoses(cell,[armRoot])[0].inverse()).compose(requested).compose(tool.inverse());
+  }
+
+  function sliceLocal(local:Transform3,cell:Array<Float>,theta:Float):Array<OffsetWristProbe> {
     var middle=local.rotation.multiply(Quat.fromAxisAngle(new Vec3(0,0,1),-theta)).rotate(new Vec3(0,1,0));
     var p=local.translation.sub(middle.scale(offset)),r=local.rotation;
     var pose=new MotionKitNative.mk_opw_pose();pose.set_struct_size(MotionKitNative.mk_opw_pose.size());
@@ -124,6 +132,16 @@ class OffsetWristGeometry {
    * must not be registered as a complete production inverse family. */
   public function simpleRoots(target:Pose3,cell:Array<Float>,intervals:Int=128):Array<OffsetWristProbe> {
     if(intervals<4)throw "Offset wrist root scan requires at least four intervals";
+    var local=localTarget(target,cell);
+    var cache=new Map<String,Array<{angle:Float,probes:Array<OffsetWristProbe>}>>();
+    function probesAt(angle:Float):Array<OffsetWristProbe> {
+      // Strings select buckets only; exact double equality controls reuse.
+      var key=Std.string(angle),bucket=cache.get(key);
+      if(bucket!=null)for(entry in bucket)if(entry.angle==angle)return entry.probes;
+      var probes=sliceLocal(local,cell,angle);
+      if(bucket==null){bucket=[];cache.set(key,bucket);}
+      bucket.push({angle:angle,probes:probes});return probes;
+    }
     var roots:Array<OffsetWristProbe> = [];
     function branchAt(probes:Array<OffsetWristProbe>,branch:Int):Null<OffsetWristProbe>{
       for(probe in probes)if(probe.branch==branch)return probe;
@@ -142,13 +160,13 @@ class OffsetWristGeometry {
     }
     function refineInterval(a:Float,b:Float,left:OffsetWristProbe,right:OffsetWristProbe,depth:Int):Void {
       if(Math.abs(left.residual-right.residual)>=Math.PI || depth>20)return;
-      var mid=(a+b)*0.5,value=branchAt(inverseSlice(target,cell,mid),right.branch);
+      var mid=(a+b)*0.5,value=branchAt(probesAt(mid),right.branch);
       if(value==null)return;
       var probe=cast(value,OffsetWristProbe);retain(probe);
       if(left.residual*right.residual<0){
         var lo=a,hi=b,fa=left.residual;
         for(_ in 0...48){
-          var x=(lo+hi)*0.5,v=branchAt(inverseSlice(target,cell,x),right.branch);
+          var x=(lo+hi)*0.5,v=branchAt(probesAt(x),right.branch);
           if(v==null)break;
           var p=cast(v,OffsetWristProbe);
           if(Math.abs(p.residual)<1e-10){retain(p);break;}
@@ -171,16 +189,16 @@ class OffsetWristGeometry {
     function refineBoundary(a:Float,b:Float,left:Null<OffsetWristProbe>,right:Null<OffsetWristProbe>,branch:Int,depth:Int):Void {
       if(depth>32)return;
       if(left!=null && right!=null){refineInterval(a,b,cast(left,OffsetWristProbe),cast(right,OffsetWristProbe),0);return;}
-      var mid=(a+b)*0.5,value=branchAt(inverseSlice(target,cell,mid),branch);
+      var mid=(a+b)*0.5,value=branchAt(probesAt(mid),branch);
       if(value==null && left==null && right==null)return;
       if(value!=null)retain(cast(value,OffsetWristProbe));
       refineBoundary(a,mid,left,value,branch,depth+1);
       refineBoundary(mid,b,value,right,branch,depth+1);
     }
-    var lower=-Math.PI,previous=inverseSlice(target,cell,lower);
+    var lower=-Math.PI,previous=probesAt(lower);
     for(probe in previous)retain(probe);
     for(i in 1...intervals+1){
-      var upper=-Math.PI+2*Math.PI*i/intervals,current=inverseSlice(target,cell,upper);
+      var upper=-Math.PI+2*Math.PI*i/intervals,current=probesAt(upper);
       for(probe in current)retain(probe);
       for(branch in 0...8)
         refineBoundary(lower,upper,branchAt(previous,branch),branchAt(current,branch),branch,0);
