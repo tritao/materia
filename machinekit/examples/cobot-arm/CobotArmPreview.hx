@@ -58,9 +58,9 @@ class CobotArmChecks {
 				near(actual.z, expected.z, "DH flange Z");
 				var a = AssemblyFrames.toRotationMatrix(actual), b = AssemblyFrames.toRotationMatrix(expected);
 				for (i in 0...9) near(a[i], b[i], "DH flange orientation", 1e-8);
+				checkOverlap(arm, state);
 			}
 			for (i in 0...6) state.setJoint('j${i + 1}', 0);
-			checkOverlap(arm, state);
 			var zero = state.worldPose("toolFlange");
 			for (i in 0...6) for (limit in [-2 * Math.PI, 2 * Math.PI]) {
 				state.setJoint('j${i + 1}', limit);
@@ -78,7 +78,7 @@ class CobotArmChecks {
 				"DH-zero shoulder reference distance");
 			var torques = arm.holdingTorques(state, arm.reference.payload);
 			for (i in 0...6) if (Math.abs(torques[i]) > arm.modules[i].outputRatedTorque)
-				throw "Cobot rated payload exceeds a joint holding torque";
+				throw '${arm.reference.designation} joint ${i + 1} needs ${Math.abs(torques[i])} N m, exceeds ${arm.modules[i].outputRatedTorque} N m rated torque';
 			var mass = arm.armMass();
 			if (!(mass > 0) || !Math.isFinite(mass))
 				throw '${arm.reference.designation} assembled mass must be finite and positive';
@@ -105,6 +105,8 @@ class CobotArmChecks {
 			var pose = state.worldPose(entry.id);
 			var x = AssemblyFrames.transformVector(pose, 1, 0, 0), z = AssemblyFrames.transformVector(pose, 0, 0, 1);
 			var local = entry.component.geometry();
+			if (!local.valid() || local.solidCount() != 1)
+				throw '${arm.reference.designation}: ${entry.id} must be one valid solid';
 			parts.push(local.placed(new Location(new Plane(new Vector(pose.x, pose.y, pose.z),
 				new Vector(x.x, x.y, x.z), new Vector(z.x, z.y, z.z)))));
 			local.close(); ids.push(entry.id);

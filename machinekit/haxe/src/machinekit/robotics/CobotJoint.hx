@@ -5,6 +5,10 @@ import machinekit.motion.ServoMotor;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentRecipeSupport;
+import cadkit.modeling.Part;
+import machinekit.component.ComponentDetail;
+import machinekit.component.Solids;
+import CadKit;
 
 /** An assumed strain-wave cobot module: housing, gearhead and
  * an integrated servo. The geometric pocket removes the installed gearhead's
@@ -44,6 +48,19 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 		outputPeakTorque = 2 * outputRatedTorque;
 		gearbox = new Gearbox(RATIO, EFFICIENCY, pocketDiameter - 1, pocketLength - 1 - inputPilotDepth, 8, true);
 		gearbox.setMaterial(size == 2 ? "aluminium 6061" : "steel");
+	}
+
+	/** Round the outside of the housing while retaining the drive pocket and both mating planes. */
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var body = Part.cylinderSpan(diameter / 2, 0, length);
+		var edges = body.edges().curve(CadKit.CurveKind.Circle);
+		var rounded:Part;
+		try rounded = body.fillet(edges, 2) catch (error:Dynamic) {
+			edges.close(); body.close(); throw error;
+		}
+		edges.close(); body.close();
+		return Solids.cut(Solids.named(rounded, "body"),
+			[Solids.named(Part.cylinderSpan(pocketDiameter / 2, -1, pocketLength), "pocket")]);
 	}
 
 	/** Explicit physical drive gains select CSP interpolation, including on an
