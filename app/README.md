@@ -101,7 +101,10 @@ compiles the program with CncKit and streams it to the machine through MotionKit
   (Design, Paused, or Running) sits beside them. Play and Step
   build or rebuild pending configuration first; the Sensors panel buttons call the same commands.
 - A Start tab opens beside the 3D view on a plain launch, with new-file shortcuts, recent files,
-  and the bundled examples listed in `editor/ExampleCatalog`. `--snapshot --example=ID[,ID...]`
+  and the bundled examples listed in `editor/ExampleCatalog`. Examples have task category filters
+  and search across their titles and variant descriptions. Related welding, cobot and mill examples
+  share a card; open its detail view to choose a variant, then **Open example**. Back preserves
+  the search and category. The three most recent existing files stay above the catalogue. `--snapshot --example=ID[,ID...]`
   opens the same examples headlessly, in order, for checks (`--example-settle=SECONDS` lets a
   running simulation step between them). Project examples build on a worker thread: the Start page shows a spinner, the current
   phase and elapsed time with a Cancel button, the rest of the editor stays responsive, and later

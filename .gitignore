@@ -27,6 +27,7 @@
 /simkit/.cache/
 
 /app/tests/build/
+/app/tests/start-page/build/
 /build/
 /robotkit/tools/humanoid/tests/build/
 

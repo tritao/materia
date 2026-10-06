@@ -634,6 +634,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   // The worker-thread build behind startLoading, when the example is a project.
   var startJob:Null<ProjectLoadJob> = null;
   var startFailure:Null<String> = null;
+  final startExamples = new app.editor.ExampleBrowser();
   // The Start page was opened only to show a launch project's progress, so it closes once that opens.
   var closeStartAfterOpen:Bool = false;
   var lastRecordedPath:Null<String> = null;

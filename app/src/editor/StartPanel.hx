@@ -1,6 +1,8 @@
 package app.editor;
 
 import haxeon.ui.Path;
+import app.editor.ExampleBrowser.ExampleFamily;
+import haxeon.ui.widgets.controls.SearchField;
 
 import app.Main.ReferenceEditorApp;
 import app.editor.ExampleCatalog.ExampleEntry;
@@ -55,6 +57,7 @@ class StartPanel {
     var recentCards:Array<KeyedView> = [];
     for (path in app.preferences.recent) {
       if (!FileSystem.exists(path)) continue;
+      if (recentCards.length >= 3) break;
       var target = path;
       recentCards.push(new KeyedView("recent:" + path, card(app, StartPath.withoutDirectory(path),
         IconName.NewFile, [shorten(StartPath.directory(path), 34)], null, function() {
@@ -66,16 +69,72 @@ class StartPanel {
       : cardRow("start-recent", recentCards)));
 
     rows.push(new KeyedView("examples-heading", app.sectionHeading("EXAMPLES")));
-    var exampleCards:Array<KeyedView> = [];
-    for (entry in ExampleCatalog.available()) {
-      var chosen = entry;
-      exampleCards.push(new KeyedView("example:" + entry.id, card(app, entry.title,
-        exampleIcon(entry), entry.description, entry.tag, function() app.requestExample(chosen))));
+    var browser = app.startExamples;
+    var available = ExampleCatalog.available();
+    if (browser.selectedFamily == null) {
+      rows.push(new KeyedView("search", new SearchField("start-example-search", browser.query, function(value) {
+        browser.search(value);
+        app.invalidateView();
+      }, null, "Search examples and variants...")));
+      var filters:Array<KeyedView> = [];
+      for (category in ExampleBrowser.categories) {
+        var chosenCategory = category;
+        var button = new Button(category, null, function() {
+          browser.selectCategory(chosenCategory);
+          app.invalidateView();
+        }, "start-category:" + category);
+        button.variant = browser.category == category ? ButtonVariant.Primary : ButtonVariant.Secondary;
+        button.selected = browser.category == category;
+        filters.push(new KeyedView(category, button));
+      }
+      rows.push(new KeyedView("categories", cardRow("start-categories", filters)));
+      var families = browser.filtered(available);
+      rows.push(new KeyedView("count", new Text(families.length + (families.length == 1 ? " example" : " examples"),
+        null, tokens.textSecondary, TextStyleOverride.text(12.0))));
+      var exampleCards:Array<KeyedView> = [];
+      for (family in families) {
+        var chosen = family;
+        var first = family.examples[0];
+        var view = card(app, family.title, exampleIcon(first), first.description,
+          family.examples.length > 1 ? family.examples.length + " variants" : exampleBadge(first), function() {
+            browser.selectedFamily = chosen.id;
+            app.invalidateView();
+          });
+        // Preview illustrations are vector artwork, so they stay crisp at any display scale.
+        exampleCards.push(new KeyedView("example:" + family.id, familyCard(app, family, view)));
+      }
+      if (exampleCards.length == 0) {
+        rows.push(new KeyedView("empty", new Text(available.length == 0
+          ? "No bundled examples were found next to this build."
+          : "No examples match. Try another search or category.", null, tokens.textSecondary, TextStyleOverride.text(12.0))));
+        if (available.length > 0) rows.push(new KeyedView("clear", new Button("Clear filters", null, function() {
+          browser.search("");
+          browser.selectCategory("All");
+          app.invalidateView();
+        }, "start-clear-filters")));
+      } else rows.push(new KeyedView("examples", cardRow("start-examples", exampleCards)));
+    } else {
+      rows.push(new KeyedView("back", new Button("Back to examples", null, function() {
+        browser.selectedFamily = null;
+        app.invalidateView();
+      }, "start-examples-back")));
+      for (family in ExampleBrowser.families(available)) if (family.id == browser.selectedFamily) {
+        rows.push(new KeyedView("family-title", new Text(family.title, null, tokens.text, TextStyleOverride.text(18.0))));
+        rows.push(new KeyedView("family-category", new Text(family.category, null, tokens.textSecondary, TextStyleOverride.text(12.0))));
+        var variants:Array<KeyedView> = [];
+        for (entry in family.examples) {
+          var chosenEntry = entry;
+          var button = new Button("Open example", null, function() app.requestExample(chosenEntry), "start-open-example:" + entry.id);
+          button.variant = ButtonVariant.Primary;
+          button.enabled = app.startLoading == null && !app.documents.blocked();
+          var variantRows = [new KeyedView("title", new Text(ExampleBrowser.variantTitle(entry), null, tokens.text, TextStyleOverride.text(15.0)))];
+          variantRows = variantRows.concat(description(app, entry.id, entry.description, exampleBadge(entry)));
+          variantRows.push(new KeyedView("open", button));
+          variants.push(new KeyedView(entry.id, new Column("start-variant:" + entry.id, variantRows, cardStyle(app))));
+        }
+        rows.push(new KeyedView("variants", cardRow("start-variants", variants)));
+      }
     }
-    rows.push(new KeyedView("examples", exampleCards.length == 0
-      ? new Text("No bundled examples were found next to this build.", null, tokens.textSecondary,
-        TextStyleOverride.text(12.0))
-      : cardRow("start-examples", exampleCards)));
 
     rows.push(new KeyedView("startup", new Checkbox("start-show-at-startup",
       "Show this page at startup", app.preferences.showStartPage, function(value) {
@@ -87,6 +146,17 @@ class StartPanel {
     var scrollStyle = ReferenceEditorApp.fillStyle();
     scrollStyle.background = tokens.surface;
     return new ScrollView("start-scroll", content, scrollStyle);
+  }
+
+  static function exampleBadge(entry:ExampleEntry):String return entry.tag;
+
+  static function familyCard(app:ReferenceEditorApp, family:ExampleFamily, details:View):View {
+    var style = cardStyle(app);
+    style.padding = new Insets(0.0, 0.0, 0.0, 0.0);
+    return new Column("family:" + family.id, [
+      new KeyedView("preview", StartExamplePreview.build(family, app.appearance.theme.tokens.accent, app.appearance.theme.tokens.surfaceRaised)),
+      new KeyedView("details", details)
+    ], style);
   }
 
   /** Spinner, current phase and elapsed time for a running build, with a Cancel button. */
