@@ -586,3 +586,24 @@ and shifted joint conventions, wrist singularities, unreachable targets and
 invalid parameters. All 10 native CTests pass, and the regenerated Haxeon ABI
 passes the four-platform audit. Model-derived UR extraction and Haxe adapter
 remain outstanding, so this is preparation rather than PP1 completion.
+
+PP0 mission baseline harness has finished: handling, robot welder and gantry
+welder all exited successfully. Gantry MuJoCo planning runs took
+3.429471970, 23.115318775, 20.144918919 and 49.658793926 seconds
+(total 96.348503590), checking 5,192 / 5,798 / 10,033 / 12,186 poses
+and making 522 / 13,829 / 514 / 14,253 numeric IK queries. The ten-seam
+weldment cycle was 182.3 seconds, with no clearance violation; bead legs were
+4.995715197–5.015761457 mm. Full records are retained in
+`process-path-baseline-missions/results.json` under the external scratch
+folder. Surface checked-pose/clearance-distance diagnostics are still missing
+from the PP0 harness, so PP0 is not yet claimed complete.
+
+PP1 UR Haxe adapter now derives canonical joint references, axis signs and DH
+geometry from the standalone arm model, absorbs fixed base/tool placement,
+and verifies extraction against compiled FK. It enumerates native branches
+and legal rotary lifts through the shared AnalyticIk interface. The existing
+UR-like contract fixture passes 30 forward/inverse round trips; a second
+30-round-trip fixture verifies shifted joint references. Compiler-only build
+and focused C4 runtime pass (103,688 assertions). Actual authored Cobot models,
+external axes, equivalent displaced axis origins and wider geometric coverage
+remain to be verified; PP1 is still incomplete.

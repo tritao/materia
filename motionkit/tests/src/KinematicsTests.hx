@@ -529,6 +529,39 @@ class KinematicsTests extends MotionKitTestSupport {
     var singularBranches = shared.branches(wrappedAnalytic.forward(singularQ), singularQ);
     check([for (branch in singularBranches) if (branch.singular) branch].length > 0,
       "OPW shared interface explicitly reports wrist singularity");
+    var ur = new motionkit.robot.UrAnalyticIk(bad.arm);
+    for (sample in 0...30) {
+      var q = [for (joint in 0...6) 0.7 * Math.sin(sample * 0.37 + joint * 0.61)];
+      var actual = bad.arm.tcpPose(q), predicted = ur.forward(q);
+      near(actual.translation.sub(new Vec3(predicted.x,predicted.y,predicted.z)).norm(),0.0,"UR model-derived FK",1e-6);
+      var candidates = ur.branches(predicted,q);
+      check(candidates.length > 0,"UR model-derived inverse branches");
+      var found = false;
+      for (candidate in candidates) {
+        var same = true;
+        for (joint in 0...6) if (Math.abs(candidate.q[joint]-q[joint]) > 1e-5) same = false;
+        found = found || same;
+      }
+      check(found,"UR inverse contains the original legal lift");
+    }
+    var placedUrFixture = buildContractArmFixture();
+    for (index in 0...6) {
+      var joint = placedUrFixture.model.joints[index];
+      joint.parentFrameRotation = Quat.fromAxisAngle(Vec3.fromArray(joint.axis),0.17*(index+1)).toArray();
+    }
+    var placedUrArm = new Manipulator(placedUrFixture.model,"base","flange");
+    var placedUr = new motionkit.robot.UrAnalyticIk(placedUrArm);
+    for (sample in 0...30) {
+      var q = [for (joint in 0...6) 0.8*Math.sin(sample*0.39+joint*0.73)];
+      var target = new ManipulatorKinematics(placedUrArm).forward(q);
+      var found = false;
+      for (candidate in placedUr.branches(target,q)) {
+        var same = true;
+        for (joint in 0...6) if (Math.abs(candidate.q[joint]-q[joint]) > 1e-5) same = false;
+        found = found || same;
+      }
+      check(found,"UR extraction recovers placed joint references");
+    }
     var diagnostic = "";
     try new OpwKinematics(bad.model, bad.arm)
     catch (error:Dynamic) diagnostic = Std.string(error);
