@@ -1314,3 +1314,16 @@ pass (1,148,937 assertions). This does not add redundancy profiles for more
 than six unknown internal DOFs; that differential case remains unsupported.
 Authored RobotArm acceptance/performance, branch segmentation, default
 migration and full integration gates remain outstanding.
+
+PP4 internal numeric redundancy: numeric refinement with more than six
+internal DOFs now selects six independent task-Jacobian columns and fits
+selected-route splines to the remaining internal coordinates. Numeric
+continuation holds those coordinates together with external axes; the
+differential solve receives their prescribed rates and curvature, leaving
+six unknown task coordinates. The same chart must remain regular at all
+selected knots; chart transitions/rank loss are diagnosed. A seven-axis
+fixture now produces complete differential JointPathSamples and preserves
+its authored pose-path geometry. Compiler-only and focused runtime pass
+(1,148,943 assertions). Chart-transition segmentation, authored-model and
+broader derivative/timing acceptance, default migration and final gates
+remain open; this is not proof of all redundant arm geometries.

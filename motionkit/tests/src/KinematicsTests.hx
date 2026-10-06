@@ -576,6 +576,18 @@ class KinematicsTests extends MotionKitTestSupport {
         check(Math.sqrt(distance) >= 1e-3,"numeric fallback deduplicates neighbour seeds");
       }
     }
+    var sevenStart=[0.2,-0.8,0.6,-0.4,0.5,0.3,-0.2],sevenEnd=sevenStart.copy();sevenEnd[0]+=0.01;
+    var sevenSolver=new ManipulatorKinematics(fixture.arm);
+    var sevenLine=new PoseLine(new PoseWaypoint(sevenSolver.forward(sevenStart),1e-6,1e-6),
+      new PoseWaypoint(sevenSolver.forward(sevenEnd),1e-6,1e-6),motionkit.path.OrientationPolicy.Interpolated,0.1,0.1);
+    var sevenPath=new motionkit.path.PosePath("task",[sevenLine]),sevenDistances=[for(i in 0...5)sevenPath.length()*i/4];
+    var sevenRequest=new PathRequest(sevenDistances,[for(s in sevenDistances)sevenPath.poseAt(s)],sevenStart,
+      new IkTolerance(1e-6,1e-6),[for(_ in sevenStart)0.5],[for(_ in sevenStart)1.0]);
+    var sevenPlanner=new motionkit.robot.StructuredJointPathPlanner(fixture.arm);
+    var sevenSamples=sevenPlanner.plan(sevenPath,sevenRequest);
+    check(sevenSamples.jointCount==7,"numeric refinement prescribes internal redundancy for a seven-axis arm");
+    for(i in 0...sevenDistances.length)near(motionkit.path.PoseMath.distance(sevenSolver.forward(sevenSamples.q[i]),sevenPath.poseAt(sevenDistances[i])),0,
+      "seven-axis differential refinement preserves authored task geometry",1e-6);
     var unsupportedFixture=buildContractArmFixture();
     unsupportedFixture.arm.robot.joints[4].axis=[0.1,0.0,Math.sqrt(0.99)];
     var unsupported=new robotkit.manipulation.KinematicGroup(unsupportedFixture.arm.robot,

@@ -22,6 +22,8 @@ class AnalyticPathRefiner {
   public final diagnostic:Null<String>;
   final branch:Int;
   final external:Array<RedundancySpline>;
+  final prescribedJoints:Array<Int>;
+  final internalJoints:Array<Int>;
   final roll:RedundancySpline;
   final swingX:RedundancySpline;
   final swingY:RedundancySpline;
@@ -40,7 +42,27 @@ class AnalyticPathRefiner {
     branch=selection.candidates[0].branch;
     var distances=[for(layer in problem.samples)layer.distance];
     for(c in selection.candidates)if(!isNumeric && c.branch!=branch)throw "Refinement must split the route at geometric branch transitions";
-    external=[for(j in problem.externalJoints)new RedundancySpline(distances,[for(c in selection.candidates)c.q[j]])];
+    internalJoints=[];
+    if(isNumeric){
+      var arm=[for(j in 0...group.group.count())if(!group.external[j])j];
+      if(arm.length>6){
+        var independent:Array<Int> = [],jacobian=group.tcpJacobian(selection.candidates[0].q);
+        for(j in arm){var trial=independent.concat([j]);
+          var columns=[for(row in 0...6)for(column in trial)jacobian[row*group.group.count()+column]];
+          if(kinematicskit.LinearAlgebra.rank(columns,6,trial.length,1e-10)>independent.length)independent.push(j);
+          if(independent.length==6)break;
+        }
+        if(independent.length!=6)throw "Numeric refinement needs a regular six-dimensional task chart";
+        for(j in arm)if(independent.indexOf(j)<0)internalJoints.push(j);
+        for(c in selection.candidates){var matrix=group.tcpJacobian(c.q);
+          var columns=[for(row in 0...6)for(j in independent)matrix[row*group.group.count()+j]];
+          if(kinematicskit.LinearAlgebra.rank(columns,6,6,1e-10)!=6)
+            throw "Numeric refinement must split at an internal redundancy chart transition";
+        }
+      }
+    }
+    prescribedJoints=problem.externalJoints.concat(internalJoints);
+    external=[for(j in prescribedJoints)new RedundancySpline(distances,[for(c in selection.candidates)c.q[j]])];
     var rolls:Array<Float> = [],xs:Array<Float> = [],ys:Array<Float> = [];
     for(i in 0...selection.candidates.length){
       var actual=group.tcpPose(selection.candidates[i].q),layer=problem.samples[i];
@@ -65,7 +87,7 @@ class AnalyticPathRefiner {
   public function derivatives(distance:Float,q:Array<Float>,taskVelocity:Array<Float>,taskAcceleration:Array<Float>):motionkit.robot.PathDifferential.JointDerivatives {
     if(q==null || q.length!=group.group.count())throw "Refined derivatives require the complete configuration";
     var known=[for(_ in q)false],first=[for(_ in q)0.0],second=[for(_ in q)0.0];
-    for(i in 0...external.length){var j=problem.externalJoints[i],state=external[i].evaluate(distance);
+    for(i in 0...external.length){var j=prescribedJoints[i],state=external[i].evaluate(distance);
       if(!Math.isFinite(q[j]) || Math.abs(q[j]-state.value)>1e-8)throw "Differential configuration differs from its redundancy spline";
       known[j]=true;first[j]=state.first;second[j]=state.second;}
     return PathDifferential.solve(group,q,taskVelocity,taskAcceleration,known,first,second);
@@ -114,10 +136,10 @@ class AnalyticPathRefiner {
     if(q.length!=group.group.count())throw "Refinement seed must contain the complete group";
     var previous=q.copy();
     var ranges:Array<ExternalAxisRange> = [];
-    for(i in 0...external.length){var j=problem.externalJoints[i],value=external[i].evaluate(distance).value;
+    for(i in 0...external.length){var j=prescribedJoints[i],value=external[i].evaluate(distance).value;
       var limits=group.group.limitsOf(j);
       if(value<limits.lower || value>limits.upper)throw 'Refined external axis exceeds limits at distance $distance';
-      q[j]=value;ranges.push(new ExternalAxisRange(j,value,value,1));}
+      q[j]=value;if(group.external[j])ranges.push(new ExternalAxisRange(j,value,value,1));}
     var rotation=orientationMotion(distance,target,freedom,[0.0,0.0,0.0],[0.0,0.0,0.0]).rotation;
     var refined=new Pose3(target.x,target.y,target.z,rotation.x,rotation.y,rotation.z,rotation.w);
     if(ToolFreedom.orientationError(refined,target,freedom)>problem.request.tolerance.orientation)
@@ -127,7 +149,7 @@ class AnalyticPathRefiner {
     if(numeric!=null){
       // Numeric IDs identify seeds rather than geometric branches. Continue
       // the selected physical lift with one seed and the same jump guards.
-      candidates=[for(c in numeric.branchesFromNeighbours(refined,[q],q,OrientationPolicy.Fixed,false))
+      candidates=[for(c in numeric.branchesFromNeighbours(refined,[q],q,OrientationPolicy.Fixed,false,internalJoints))
         new LatticeCandidate(c.q,[for(_ in c.q)0],[for(_ in problem.externalJoints)0],0,0,0,c.branch,0,false)];
     }else candidates=cartesian!=null ? cartesian.sample(refined,q,OrientationPolicy.Fixed,1,1,1)
       : sampler.sample(refined,q,OrientationPolicy.Fixed,ranges,1,1,1);

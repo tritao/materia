@@ -48,10 +48,14 @@ class NumericBranchIk implements AnalyticIk {
 
   /** Neighbour seeds precede the deterministic fixed set; external coordinates stay held. */
   public function branchesFromNeighbours(target:Pose3, neighbours:Array<Array<Float>>, cell:Array<Float>,
-      ?freedom:OrientationPolicy,includeFixedSeeds:Bool=true):Array<AnalyticBranch> {
+      ?freedom:OrientationPolicy,includeFixedSeeds:Bool=true,?heldJoints:Array<Int>):Array<AnalyticBranch> {
     if (target == null || cell == null || cell.length != jointCount() || neighbours == null)
       throw "Numeric fallback requires a target, neighbours and complete lattice cell";
     var held = [for (i in 0...jointCount()) if (group.external[i]) i];
+    if(heldJoints!=null)for(j in heldJoints){
+      if(j<0 || j>=jointCount())throw "Numeric held joint lies outside the group";
+      if(held.indexOf(j)<0)held.push(j);
+    }
     for (i in 0...jointCount()) {
       if (!Math.isFinite(cell[i])) throw "Numeric fallback seed must be finite";
       if (group.external[i]) {
