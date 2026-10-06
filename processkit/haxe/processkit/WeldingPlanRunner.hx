@@ -318,14 +318,14 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   static function selectProblem(compiler:ProgramCompiler,clearance:Null<ArmClearance>,problem:WeldPathProblem,
       start:Array<Float>,configuration:Null<motionkit.kinematics.SixAxisConfiguration>):processkit.WeldPathProblem.WeldPathSelection {
     var solver=cast(compiler.solver,ManipulatorKinematics),group=solver.manipulator;
+    var cartesian=Std.isOfType(motionkit.robot.BranchIk.of(group),motionkit.robot.CartesianAnalyticIk);
     var request=problem.request(start,compiler.ikTolerance,
-      compiler.perJointMaxJump,compiler.maxVelocity,WeldPathPlanner.STEP,compiler.maxAcceleration);
+      compiler.perJointMaxJump,compiler.maxVelocity,WeldPathPlanner.STEP,compiler.maxAcceleration,!cartesian);
     // Omitted ranges hold axes at the seed. Welds with a work positioner or
     // rail must search its physical range rather than freezing it there.
     var ranges:Array<motionkit.robot.ExternalAxisGrid.ExternalAxisRange> = [];
     // A Cartesian head solves all its axes directly; its linear axes are not
     // external coordinates to enumerate around a serial-arm solution.
-    var cartesian=Std.isOfType(motionkit.robot.BranchIk.of(group),motionkit.robot.CartesianAnalyticIk);
     for(joint in 0...group.group.count())if(!cartesian && group.external[joint]){
       var limits=group.group.limitsOf(joint);
       if(!Math.isFinite(limits.lower) || !Math.isFinite(limits.upper))

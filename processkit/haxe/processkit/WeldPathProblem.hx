@@ -196,21 +196,22 @@ class WeldPathProblem {
 
   /** One global sample grid, retaining every primitive boundary and timing stop. */
   public function request(start:Array<Float>,tolerance:IkTolerance,jump:Array<Float>,velocity:Array<Float>,
-      resolution:Float=WeldPathPlanner.STEP,?acceleration:Array<Float>):PathRequest {
+      resolution:Float=WeldPathPlanner.STEP,?acceleration:Array<Float>,fixedProcessFeed:Bool=true):PathRequest {
     if(!Math.isFinite(resolution) || resolution<=0)throw "Weld sample resolution must be finite and positive";
-    var distances:Array<Float> = [],poses:Array<Pose3> = [],freedoms:Array<OrientationPolicy> = [],feeds:Array<Float> = [];
+    var distances:Array<Float> = [],poses:Array<Pose3> = [],freedoms:Array<OrientationPolicy> = [],feeds:Array<Float> = [],fixedFeeds:Array<Bool> = [];
     var offset=0.0;
     for(sectionIndex in 0...sections.length){
       var section=sections[sectionIndex],local=0.0;
       for(primitive in section.primitives){
         // The outgoing primitive owns the common geometric knot.
-        if(distances.length>0){distances.pop();poses.pop();freedoms.pop();feeds.pop();}
+        if(distances.length>0){distances.pop();poses.pop();freedoms.pop();feeds.pop();fixedFeeds.pop();}
         var length=primitive.length(),pieces=motionkit.path.PoseSampling.pieces(primitive,resolution);
         for(piece in 0...pieces+1){
           var at=piece==pieces?length:length*piece/pieces;
           distances.push(offset+local+at);poses.push(primitive.waypointAt(at).pose);
           freedoms.push(primitive.orientationPolicy());
           feeds.push(Math.min(primitive.speedLimit(),phases[sectionIndex]==Weld?plan.parameters.travelSpeed:primitive.speedLimit()));
+          fixedFeeds.push(fixedProcessFeed && phases[sectionIndex]==Weld);
         }
         local+=length;
       }
@@ -218,7 +219,7 @@ class WeldPathProblem {
       offset+=section.length();
     }
     return new PathRequest(distances,poses,start,tolerance,jump,velocity,48,freedoms,
-      acceleration==null?null:new motionkit.kinematics.PathDriveLimits(acceleration,feeds));
+      acceleration==null?null:new motionkit.kinematics.PathDriveLimits(acceleration,feeds,null,fixedFeeds));
   }
 
   static function pose(frame:Transform3):Pose3

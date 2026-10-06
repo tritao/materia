@@ -82,6 +82,10 @@ int main(){
     auto impossible_edge=structured_ladder(edge_layers,edge_settings,{},
         [](unsigned layer,unsigned,unsigned){return layer!=1;});
     assert(impossible_edge.failed==1 && !impossible_edge.no_candidates);
+    // Exercise the large-external fallback with an actual transition.
+    auto wide=edge_settings;wide.externals=6;
+    auto wide_route=structured_ladder(edge_layers,wide,{},exclude);
+    assert(wide_route.route==edge_route.route && wide_route.cost==edge_route.cost);
     std::mt19937 random(177);std::uniform_real_distribution<double> q(-1,1);
     for(unsigned trial=0;trial<100;++trial){
         std::vector<LadderLayer> layers(4);std::vector<std::vector<double>> states(4);
@@ -90,6 +94,9 @@ int main(){
             for(unsigned j=0;j<4;++j)c.joints[j]=q(random)*(trial<50?.2:1.0);layers[l].push_back(c);states[l].push_back(.01*i);
         }
         auto result=structured_ladder(layers,s,states);
+        auto full_key=structured_ladder_with_key<MK_MAX_JOINTS+3>(layers,s,states);
+        assert(full_key.route==result.route && full_key.cost==result.cost && full_key.failed==result.failed);
+        assert(full_key.tested_edges==result.tested_edges);
         auto compact=compact_layers(layers,s);
         auto compact_result=structured_ladder(compact,s,states);
         assert(compact_result.route==result.route && compact_result.cost==result.cost);

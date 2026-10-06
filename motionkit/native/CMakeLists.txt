@@ -181,6 +181,11 @@ if(BUILD_TESTING)
     target_include_directories(motionkit_structured_ladder_tests PRIVATE include "${CMAKE_CURRENT_SOURCE_DIR}/../../trajectorykit/native/include")
     target_compile_features(motionkit_structured_ladder_tests PRIVATE cxx_std_17)
     target_link_libraries(motionkit_structured_ladder_tests PRIVATE motionkit_core)
+    if(EMSCRIPTEN)
+        # The kernel is instantiated in this test translation unit; its
+        # invalid-input fixtures must catch the same exceptions as the core.
+        target_compile_options(motionkit_structured_ladder_tests PRIVATE -fexceptions)
+    endif()
     add_test(NAME motionkit_structured_ladder COMMAND motionkit_structured_ladder_tests)
     add_executable(motionkit_trajectory_tests tests/trajectory.cpp)
     target_link_libraries(motionkit_trajectory_tests PRIVATE motionkit_core)

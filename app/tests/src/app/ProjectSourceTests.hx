@@ -2919,6 +2919,11 @@ class ProjectSourceTests {
       checkRobotArm(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-whole") {
+      checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "MuJoCo");
+      checkWholeWeldment(root, ApplicationSimulation.DETERMINISTIC, "test backend");
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder") {
       checkRobotWelder(root);
       return 0;

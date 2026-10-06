@@ -246,13 +246,16 @@ class ArmClearance {
     return [for(body in bodies)bounds.point(body.link,originRadius(body.corners))];
   }
 
+  public function motionEnvelope(lower:Array<Float>,upper:Array<Float>):ClearanceMotionEnvelope
+    return new ClearanceMotionEnvelope(arm,lower,upper,[for(body in bodies)body.link],[for(body in bodies)body.corners]);
+
   public function tcpDisplacementBound(q:Array<Float>,errors:Array<Float>):Float
     return new ClearanceMotionBounds(arm,q,errors).tcp();
 
   /** Acceptance audit of the analytical bound using these exact hull corners.
    * Both placements are brought to the fixed group root before comparison. */
-  public function auditDisplacement(q:Array<Float>,perturbed:Array<Float>,errors:Array<Float>):Float {
-    var bounds=displacementBounds(q,errors),a=arm.linkPoses(q,links),b=arm.linkPoses(perturbed,links),
+  public function auditDisplacement(q:Array<Float>,perturbed:Array<Float>,errors:Array<Float>,?envelope:ClearanceMotionEnvelope):Float {
+    var bounds=envelope==null ? displacementBounds(q,errors) : envelope.bounds(errors),a=arm.linkPoses(q,links),b=arm.linkPoses(perturbed,links),
       rootA=arm.workPose(q),rootB=arm.workPose(perturbed),ratio=0.0;
     for(i in 0...bodies.length){var body=bodies[i],pa=body.placed(rootA.compose(a[body.linkIndex])),pb=body.placed(rootB.compose(b[body.linkIndex]));
       for(k in 0...Std.int(pa.length/3)){var dx=pa[3*k]-pb[3*k],dy=pa[3*k+1]-pb[3*k+1],dz=pa[3*k+2]-pb[3*k+2],
@@ -261,7 +264,7 @@ class ArmClearance {
         if(bounds[i]>0)ratio=Math.max(ratio,moved/bounds[i]);
       }
     }
-    var moved=arm.tcpPose(q).translation.sub(arm.tcpPose(perturbed).translation).norm(),tcp=tcpDisplacementBound(q,errors);
+    var moved=arm.tcpPose(q).translation.sub(arm.tcpPose(perturbed).translation).norm(),tcp=envelope==null ? tcpDisplacementBound(q,errors) : envelope.tcp(errors);
     if(moved>tcp+1e-10)throw 'TCP displacement exceeds contact neighborhood bound: $moved > $tcp';
     return ratio;
   }
@@ -299,11 +302,13 @@ class ArmClearance {
    * selects the margin independently at every sampled configuration.
    */
   public function sweep(from:Array<Float>, to:Array<Float>, ?contact:Bool = false, ?maxJointStep:Float = 0.02, ?wanted:Float,
-      ?contactAt:Array<Float>->Bool):Null<ClearanceViolation> {
+      ?contactAt:Array<Float>->Bool,endpointsChecked:Bool=false):Null<ClearanceViolation> {
     if (from == null || to == null || from.length != to.length || !(maxJointStep > 0.0)) throw "A clearance sweep needs matching joint values and a positive step";
     var steps = 1;
     for (joint in 0...from.length) steps = Std.int(Math.max(steps, Math.ceil(Math.abs(to[joint] - from[joint]) / maxJointStep)));
-    for (step in 0...steps + 1) {
+    // Reuse endpoint checks only when the caller has just checked both under
+    // the same world and contact policy; every interior sample is retained.
+    for (step in (endpointsChecked ? 1 : 0)...(endpointsChecked ? steps : steps+1)) {
       var t = step / steps;
       var q = [for (joint in 0...from.length) from[joint] + (to[joint] - from[joint]) * t];
       var found = violation(q, contactAt == null ? contact : contactAt(q), wanted);

@@ -213,10 +213,12 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     }
     var world=clearance;
     var preferences = preferenceSource == null ? null : new JointPathPreferences(preferenceSource);
+    var preferenceCost:(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float=
+      preferences==null ? (sample,candidate)->0.0 : preferences.forProblem(group,problem);
     var cost = preferences == null ? stateCost :
       (sample:Int,candidate:motionkit.robot.CartesianCandidateSampler.LatticeCandidate) ->
         (stateCost == null ? 0.0 : stateCost(sample,candidate)) +
-          preferences.cost(group,request.poses[sample],candidate.q);
+          preferenceCost(sample,candidate);
     if (exitCheck != null && retreat != null) {
       var destination:Array<Float> = retreat.copy();
       var precedingCost = cost;
@@ -227,16 +229,24 @@ class StructuredJointPathPlanner implements JointPathPlanner {
         return value;
       };
     }
+    var continuousClearance=contactPose==null || contactGuard!=null;
+    // The continuous certificate rejects the actual refined path and feeds
+    // its failed span back to lazy edge blocking. Checking the discarded
+    // sampled ladder path first duplicates work and can reject a safe fit.
+    var candidateCheck:Array<Float>->Null<ArmClearance.ClearanceViolation> =
+      continuousClearance ? q->null : q->world.violation(q,contactAt(q));
+    var candidateSweep:Null<(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>> =
+      continuousClearance ? null : (from,to)->world.sweep(from,to,contact,0.02,null,contactAt,true);
     var searchStarted=profile ? Sys.time() : 0.0;
     var selected=world==null ? StructuredLadder.search(problem,weights,rollWeight,cost,coarse)
-      : LazyCollisionLadder.selectWithChecks(problem,q -> world.violation(q,contactAt(q)),collisionRounds,
-        (from,to) -> world.sweep(from,to,contact,0.02,null,contactPose == null ? null : contactAt),coarse,route -> {
+      : LazyCollisionLadder.selectWithChecks(problem,candidateCheck,collisionRounds,
+        candidateSweep,coarse,route -> {
           var refinementStarted=profile ? Sys.time() : 0.0;
           var curves=refine(route);
           if(profile){refinementSeconds+=Sys.time()-refinementStarted;refinementAttempts++;}
           for(section in 0...curves.length){
             var curve=curves[section],base=request.distances.indexOf(offsets[section]);
-            if(contactPose==null || contactGuard!=null){
+            if(continuousClearance){
               var proofBegan=Sys.time(),proof=new JointCurveClearance(world,curve,1e-6,contact,contactPose,contactGuard);
               if(!proof.check())return new motionkit.robot.LazyCollisionLadder.RefinedCollision(base+proof.failedSpan+1,true,cast proof.failure);
               curve.clearanceProof=proof;

@@ -27,9 +27,7 @@ class SerialCandidateSampler {
     }
   }
   function labelled(candidates:Array<LatticeCandidate>):Array<LatticeCandidate> {
-    var family="EAIK";
-    for(candidate in candidates)candidate.configuration=SixAxisConfiguration.of(family,candidate.branch,
-      [for(index in model.armIndices)candidate.q[index]]);
+    for(candidate in candidates)candidate.labelArm(model.armIndices);
     return candidates;
   }
   public function sample(target:Pose3,seed:Array<Float>,freedom:OrientationPolicy,ranges:Array<ExternalAxisRange>,
@@ -71,13 +69,9 @@ class SerialCandidateSampler {
     var pose=new mk_analytic_pose();pose.set_struct_size(mk_analytic_pose.size());
     var p=[centre.x,centre.y,centre.z],r=[centre.qx,centre.qy,centre.qz,centre.qw];
     for(i in 0...3)pose.set_position(i,p[i]);for(i in 0...4)pose.set_quaternion(i,r[i]);
-    var size=MotionKitNative.mk_eaik_candidate_count(eaik.chain.solver,eaik.configuration.native,model.native,external,orientation,liftLimits,pose,seed);
-    if(size.status!=TrajectoryCoreConstants.MK_OK)throw 'Native EAIK candidate count failed: ${size.status}';
-    if(size.out_count==0)return [];
-    var lengths=CartesianCandidateSampler.compactLengths(size.out_count,seed.length,model.externalIndices.length);
-    var result=MotionKitNative.mk_sample_eaik_candidates_compact(eaik.chain.solver,eaik.configuration.native,model.native,external,orientation,liftLimits,pose,seed,lengths.joints,lengths.coordinates);
-    if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native EAIK candidate sampling failed: ${result.status}';
-    return labelled(CartesianCandidateSampler.decodeCompact(result.out_joints,result.out_wraps,result.out_coordinates,
-        result.out_count,seed.length,model.externalIndices.length));
+    var result=MotionKitNative.mk_create_eaik_candidate_batch(eaik.chain.solver,eaik.configuration.native,
+      model.native,external,orientation,liftLimits,pose,seed);
+    if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native EAIK candidate generation failed: ${result.status}';
+    return labelled(NativeCandidateBatch.decode(result.out_batch,result.out_count,seed.length,model.externalIndices.length));
   }
 }

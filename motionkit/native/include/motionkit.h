@@ -47,6 +47,10 @@ typedef struct mk_eaik_configuration {
 typedef struct mk_eaik_handle { uint32_t id; } mk_eaik_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_eaik_destroy);
 
+/** Immutable compact candidate layer, generated once and then copied out. */
+typedef struct mk_candidate_batch_handle { uint32_t id; } mk_candidate_batch_handle
+    MK_HANDLE MK_HANDLE_DESTROY(mk_candidate_batch_destroy);
+
 /** Rigid target or FK pose shared by the analytic families. */
 
 typedef struct mk_analytic_pose {
@@ -426,6 +430,26 @@ MK_API mk_result MK_CALL mk_sample_cartesian_candidates(const mk_analytic_cartes
  * Joint and wrap rows have joint_count entries. Coordinate rows contain external
  * cells followed by roll, tilt, azimuth, branch and singular bits. Lengths must
  * exactly match candidate_count times their respective row dimensions. */
+/** Generate all legal cells/branches/lifts once; no truncation or pruning. */
+MK_API mk_result MK_CALL mk_create_eaik_candidate_batch(mk_eaik_handle solver,
+    const mk_eaik_configuration *configuration, const mk_serial_cell_model *model,
+    const mk_external_lattice *external, const mk_orientation_lattice *orientation,
+    const mk_joint_lift_request *limits, const mk_analytic_pose *target,
+    const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    mk_candidate_batch_handle *out_batch MK_OUT MK_OWNED, uint32_t *out_count MK_OUT);
+MK_API mk_result MK_CALL mk_create_cartesian_candidate_batch(const mk_analytic_cartesian_model *parameters,
+    const mk_serial_cell_model *model, const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation, const mk_joint_lift_request *limits,
+    const mk_analytic_pose *target, const double *seed MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    mk_candidate_batch_handle *out_batch MK_OUT MK_OWNED, uint32_t *out_count MK_OUT);
+MK_API void MK_CALL mk_candidate_batch_destroy(mk_candidate_batch_handle batch);
+/** Exact compact dimensions are required. The read is reusable and thread-safe. */
+MK_API mk_result MK_CALL mk_read_candidate_batch(mk_candidate_batch_handle batch,
+    double *out_joints MK_OUT_ARRAY(joint_value_count),
+    int32_t *out_wraps MK_OUT_ARRAY(joint_value_count), uint32_t joint_value_count,
+    uint32_t *out_coordinates MK_OUT_ARRAY(coordinate_count), uint32_t coordinate_count,
+    uint32_t *out_count MK_OUT);
+
 MK_API mk_result MK_CALL mk_eaik_candidate_count(mk_eaik_handle solver,
     const mk_eaik_configuration *configuration,
     const mk_serial_cell_model *model, const mk_external_lattice *external,

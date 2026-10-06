@@ -35,16 +35,15 @@ class CandidateProblem {
         lower[joint]=Math.min(lower[joint],candidate.q[joint]);
         upper[joint]=Math.max(upper[joint],candidate.q[joint]);
       }
-      var retained:Array<LatticeCandidate> = [];
-      for(candidate in samples[index].candidates){
+      var layer=samples[index].candidates,retained=0;
+      for(candidate in layer){
         var legal=true;
         for(joint in 0...lower.length)
           if(candidate.q[joint]<lower[joint]-request.maxJump[joint]-1e-12 ||
               candidate.q[joint]>upper[joint]+request.maxJump[joint]+1e-12)legal=false;
-        if(legal)retained.push(candidate);
+        if(legal)layer[retained++]=candidate;
       }
-      var layer=samples[index].candidates;
-      layer.resize(0);for(candidate in retained)layer.push(candidate);
+      layer.resize(retained);
     }
   }
 
@@ -171,8 +170,12 @@ class CandidateProblem {
           lastReport=now;
         }
       }
-      neighbours=[for(candidate in candidates)candidate.q.copy()];
-      if(neighbours.length==0)neighbours=[request.startQ.copy()];
+      // Only the explicit numerical fallback consumes predecessor seeds.
+      // Analytic sampling uses its declared complete native lattice instead.
+      if(fallback!=null){
+        neighbours=[for(candidate in candidates)candidate.q.copy()];
+        if(neighbours.length==0)neighbours=[request.startQ.copy()];
+      }
     }
   }
 }

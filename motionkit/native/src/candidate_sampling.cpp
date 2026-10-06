@@ -1,10 +1,15 @@
 #include "motionkit.h"
+#include "joint_lift_ranges.h"
 #include <Eigen/Geometry>
 #include <array>
 #include <vector>
 #include <cmath>
 #include <limits>
 #include <new>
+#include <memory>
+#include <mutex>
+#include <unordered_map>
+#include <cstring>
 namespace {
 using T=Eigen::Isometry3d;
 using V=Eigen::Vector3d;
@@ -51,7 +56,16 @@ T frame(const mk_serial_cell_model &m,const double *q,unsigned scope) {
     }
     return t*(scope==0 ? pose(m.base_position,m.base_quaternion) : pose(m.work_position,m.work_quaternion));
 }
-struct CompactOutput {double *joints;int32_t *wraps;uint32_t *coordinates;};
+struct CandidateBatch {
+    uint32_t joint_count=0,external_count=0,count=0;
+    std::vector<double> joints;
+    std::vector<int32_t> wraps;
+    std::vector<uint32_t> coordinates;
+};
+std::mutex batch_mutex;
+uint32_t next_batch_id=1;
+std::unordered_map<uint32_t,std::shared_ptr<const CandidateBatch>> batches;
+struct CompactOutput {double *joints;int32_t *wraps;uint32_t *coordinates;CandidateBatch *batch=nullptr;};
 mk_result run(const mk_analytic_cartesian_model *cartesian,const mk_serial_cell_model *m,const mk_external_lattice *e,
     const mk_orientation_lattice *o,const mk_joint_lift_request *limits,const mk_analytic_pose *target,
     const double *seed,uint32_t n,mk_lattice_candidate *out,uint32_t &count,CompactOutput *compact=nullptr,
@@ -117,11 +131,34 @@ mk_result run(const mk_analytic_cartesian_model *cartesian,const mk_serial_cell_
                 uint32_t nl;
                 status=mk_joint_lift_count(&held_limits,q.data(),n,&nl);if(status!=MK_OK)return status;
                 if(total+nl>std::numeric_limits<uint32_t>::max())return MK_ERROR_LIMIT;
-                if((out || compact) && nl) {
+                if(compact && compact->batch &&
+                    (total+nl)*(uint64_t(n)*12+(uint64_t(m->external_count)+5)*4)>268435456)return MK_ERROR_LIMIT;
+                if(compact && compact->batch && nl){
+                    // Enumerate into compact storage directly, using the same
+                    // lift ranges and lexicographic mixed-radix ordering.
+                    std::array<motionkit_lifts::Range,MK_MAX_JOINTS> ranges;
+                    uint32_t verified;
+                    if(!motionkit_lifts::ranges(&held_limits,q.data(),n,ranges,verified) || verified!=nl)return MK_ERROR_GENERATION;
+                    auto &batch=*compact->batch;
+                    for(uint32_t index=0;index<nl;++index){
+                        uint64_t code=index;
+                        const auto offset=batch.joints.size();batch.joints.resize(offset+n);batch.wraps.resize(offset+n);
+                        for(uint32_t j=n;j>0;--j){const auto i=j-1;
+                            const auto width=uint64_t(int64_t(ranges[i].last)-ranges[i].first)+1;
+                            const auto wrap=int32_t(int64_t(ranges[i].first)+int64_t(code%width));code/=width;
+                            batch.joints[offset+i]=q[i]+motionkit_lifts::tau*wrap;batch.wraps[offset+i]=wrap;
+                        }
+                        for(unsigned i=0;i<m->external_count;++i)batch.coordinates.push_back(cell.coordinates[i]);
+                        batch.coordinates.insert(batch.coordinates.end(),{orientation.roll_index,orientation.tilt_index,
+                            orientation.azimuth_index,branches[b].branch,branches[b].singular});
+                    }
+                    total+=nl;
+                }else if((out || compact) && nl) {
                     std::vector<mk_joint_lift> lifts(nl);
                     status=mk_enumerate_joint_lifts(&held_limits,q.data(),n,lifts.data(),nl,&unused);if(status!=MK_OK)return status;
                     for(const auto &lift:lifts) {
                         if(compact){
+
                             const auto joint_offset=size_t(total)*n,cell_offset=size_t(total)*(m->external_count+5);
                             for(unsigned i=0;i<n;++i){compact->joints[joint_offset+i]=lift.joints[i];compact->wraps[joint_offset+i]=lift.wraps[i];}
                             auto cells=compact->coordinates+cell_offset;
@@ -226,4 +263,62 @@ extern "C" mk_result MK_CALL mk_sample_eaik_candidates(mk_eaik_handle solver,con
         if(count)status=run(nullptr,m,e,o,limits,target,seed,n,out,count,nullptr,solver,labels);
         if(status==MK_OK)*out_count=count;return status;
     }catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
+}
+
+namespace {
+mk_result create_batch(const mk_analytic_cartesian_model *cartesian,mk_eaik_handle eaik,
+    const mk_eaik_configuration *labels,const mk_serial_cell_model *model,const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation,const mk_joint_lift_request *limits,const mk_analytic_pose *target,
+    const double *seed,uint32_t n,mk_candidate_batch_handle *out,uint32_t *count) {
+    if(!out || !count)return MK_ERROR_INVALID_ARGUMENT;
+    out->id=0;*count=0;
+    if(!cartesian && !eaik.id)return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        auto batch=std::make_shared<CandidateBatch>();
+        CompactOutput output{nullptr,nullptr,nullptr,batch.get()};
+        uint32_t generated=0;
+        const auto status=run(cartesian,model,external,orientation,limits,target,seed,n,nullptr,generated,&output,eaik,labels);
+        if(status!=MK_OK)return status;
+        batch->joint_count=n;batch->external_count=model->external_count;batch->count=generated;
+        std::lock_guard lock(batch_mutex);
+        if(next_batch_id==0)return MK_ERROR_LIMIT;
+        const auto id=next_batch_id++;
+        batches.emplace(id,std::move(batch));out->id=id;*count=generated;
+        return MK_OK;
+    }catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
+     catch(...){return MK_ERROR_GENERATION;}
+}
+}
+extern "C" mk_result MK_CALL mk_create_eaik_candidate_batch(mk_eaik_handle solver,
+    const mk_eaik_configuration *labels,const mk_serial_cell_model *model,const mk_external_lattice *external,
+    const mk_orientation_lattice *orientation,const mk_joint_lift_request *limits,const mk_analytic_pose *target,
+    const double *seed,uint32_t n,mk_candidate_batch_handle *out,uint32_t *count) {
+    return create_batch(nullptr,solver,labels,model,external,orientation,limits,target,seed,n,out,count);
+}
+extern "C" mk_result MK_CALL mk_create_cartesian_candidate_batch(const mk_analytic_cartesian_model *parameters,
+    const mk_serial_cell_model *model,const mk_external_lattice *external,const mk_orientation_lattice *orientation,
+    const mk_joint_lift_request *limits,const mk_analytic_pose *target,const double *seed,uint32_t n,
+    mk_candidate_batch_handle *out,uint32_t *count) {
+    return create_batch(parameters,{},nullptr,model,external,orientation,limits,target,seed,n,out,count);
+}
+extern "C" void MK_CALL mk_candidate_batch_destroy(mk_candidate_batch_handle handle) {
+    std::lock_guard lock(batch_mutex);batches.erase(handle.id);
+}
+extern "C" mk_result MK_CALL mk_read_candidate_batch(mk_candidate_batch_handle handle,
+    double *joints,int32_t *wraps,uint32_t joint_count,uint32_t *coordinates,uint32_t coordinate_count,uint32_t *out_count) {
+    if(!out_count)return MK_ERROR_INVALID_ARGUMENT;
+    *out_count=0;
+    std::shared_ptr<const CandidateBatch> batch;
+    {std::lock_guard lock(batch_mutex);const auto found=batches.find(handle.id);
+        if(found==batches.end())return MK_ERROR_INVALID_HANDLE;
+        batch=found->second;
+    }
+    if(batch->joints.size()!=joint_count || batch->coordinates.size()!=coordinate_count ||
+        (batch->count && (!joints || !wraps || !coordinates)))return MK_ERROR_INVALID_ARGUMENT;
+    if(batch->count){
+        std::memcpy(joints,batch->joints.data(),batch->joints.size()*sizeof(double));
+        std::memcpy(wraps,batch->wraps.data(),batch->wraps.size()*sizeof(int32_t));
+        std::memcpy(coordinates,batch->coordinates.data(),batch->coordinates.size()*sizeof(uint32_t));
+    }
+    *out_count=batch->count;return MK_OK;
 }

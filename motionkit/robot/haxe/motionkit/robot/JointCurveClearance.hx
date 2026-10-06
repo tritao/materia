@@ -16,6 +16,8 @@ class JointCurveClearance implements JointPathClearanceProof {
   final guard:Null<(Pose3,Float)->Bool>;
   final tolerance:Float;
   final snapshot:JointPathSamples;
+  final envelope:robotkit.manipulation.ClearanceMotionEnvelope;
+  final loweringDelta:Array<Float>;
   var checked:Bool = false;
   public var queries(default,null):Int = 0;
   public var maximumDelta(default,null):Float = 0.0;
@@ -28,6 +30,14 @@ class JointCurveClearance implements JointPathClearanceProof {
     if(policy!=null && guard==null)throw "Contact permission requires a conservative neighborhood guard";
     this.world=world;this.tolerance=tolerance;this.contact=contact;this.policy=policy;this.guard=guard;
     snapshot=new JointPathSamples(path.s,path.q,path.qPrime,path.qDoublePrime,path.qDoublePrimeBefore);
+    var lower=path.q[0].copy(),upper=lower.copy();
+    for(span in 0...snapshot.s.length-1){
+      var controls=JointPathPolynomial.bernstein(JointPathPolynomial.coefficients(snapshot,span));
+      for(j in 0...lower.length)for(v in controls[j]){lower[j]=Math.min(lower[j],v);upper[j]=Math.max(upper[j],v);}
+    }
+    for(j in 0...lower.length){lower[j]-=1.01*tolerance;upper[j]+=1.01*tolerance;}
+    envelope=world.motionEnvelope(lower,upper);
+    loweringDelta=envelope.bounds([for(_ in lower)1.01*tolerance]);
   }
   public function samePolicy(world:ArmClearance,contact:Bool,policy:Null<Pose3->Bool>,guard:Null<(Pose3,Float)->Bool>):Bool
     return this.world==world && this.contact==contact &&
@@ -71,7 +81,7 @@ class JointCurveClearance implements JointPathClearanceProof {
       var actual=trajectory.evaluate(trajectory.durationSeconds()*i/(distances.length-1)).positions;
       for(j in 0...q.length){var error=Math.abs(q[j]-actual[j]);worstError=Math.max(worstError,error);
         if(error>1.01*tolerance+1e-10)throw 'Lowered joint $j exceeds certified error: $error > ${1.01*tolerance}';}
-      worstRatio=Math.max(worstRatio,world.auditDisplacement(q,actual,[for(_ in q)1.01*tolerance]));samples++;
+      worstRatio=Math.max(worstRatio,world.auditDisplacement(q,actual,[for(_ in q)1.01*tolerance],envelope));samples++;
     }
     Sys.println("PROCESS_PATH_CLEARANCE_AUDIT "+haxe.Json.stringify({samples:samples,maximumJointError:worstError,
       maximumHullBoundRatio:worstRatio,loweringTolerance:tolerance}));
@@ -80,26 +90,19 @@ class JointCurveClearance implements JointPathClearanceProof {
     var predicate:(Pose3,Float)->Bool=cast guard;
     var halves=JointPathPolynomial.split(control),q=[for(row in halves[0])row[5]];
     var errors=[for(j in 0...q.length){var e=0.0;for(v in control[j])e=Math.max(e,Math.abs(v-q[j]));e+1.01*tolerance;}];
-    var delta=world.displacementBounds(q,errors);
+    var delta=envelope.bounds(errors);
     var contactHere=contact;
     if(policy!=null){var tcp=world.arm.tcpPose(q);contactHere=predicate(new Pose3(tcp.translation.x,tcp.translation.y,tcp.translation.z,
-      tcp.rotation.x,tcp.rotation.y,tcp.rotation.z,tcp.rotation.w),world.tcpDisplacementBound(q,errors));}
+      tcp.rotation.x,tcp.rotation.y,tcp.rotation.z,tcp.rotation.w),envelope.tcp(errors));}
     queries++;
     var found=world.violation(q,contactHere,null,delta);
     if(found==null){
-      var lowering=world.displacementBounds(q,[for(_ in q)1.01*tolerance]);
-      for(v in lowering)maximumDelta=Math.max(maximumDelta,v);
+      for(v in loweringDelta)maximumDelta=Math.max(maximumDelta,v);
       return true;
     }
     if(depth>=20){failure=found;return false;}
-    // A failing midpoint under the lowering margin cannot be certified by
-    // further subdivision. Contact uses the same shrunken neighborhood.
-    var baseErrors=[for(_ in q)1.01*tolerance],baseContact=contact;
-    if(policy!=null){var tcp=world.arm.tcpPose(q);baseContact=predicate(new Pose3(tcp.translation.x,tcp.translation.y,tcp.translation.z,
-      tcp.rotation.x,tcp.rotation.y,tcp.rotation.z,tcp.rotation.w),world.tcpDisplacementBound(q,baseErrors));}
-    queries++;
-    var actual=world.violation(q,baseContact,null,world.displacementBounds(q,baseErrors));
-    if(actual!=null){failure=actual;return false;}
+    // Subdivision alone proves or rejects the piece. An extra midpoint
+    // query under only the lowering margin cannot certify its neighborhood.
     return piece(halves[0],depth+1) && piece(halves[1],depth+1);
   }
 }

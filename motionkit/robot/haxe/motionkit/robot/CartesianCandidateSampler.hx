@@ -43,13 +43,9 @@ class CartesianCandidateSampler {
     var pose=new mk_analytic_pose();pose.set_struct_size(mk_analytic_pose.size());
     var p=[centre.x,centre.y,centre.z],r=[centre.qx,centre.qy,centre.qz,centre.qw];
     for (i in 0...3)pose.set_position(i,p[i]);for (i in 0...4)pose.set_quaternion(i,r[i]);
-    var size=MotionKitNative.mk_cartesian_candidate_count(analytic.nativeModel(),model,external,orientation,limits,pose,seed);
-    if (size.status!=TrajectoryCoreConstants.MK_OK)throw 'Native Cartesian candidate count failed: ${size.status}';
-    if (size.out_count==0)return [];
-    var lengths=compactLengths(size.out_count,seed.length,0);
-    var result=MotionKitNative.mk_sample_cartesian_candidates_compact(analytic.nativeModel(),model,external,orientation,limits,pose,seed,lengths.joints,lengths.coordinates);
-    if (result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native Cartesian candidate sampling failed: ${result.status}';
-    return decodeCompact(result.out_joints,result.out_wraps,result.out_coordinates,result.out_count,seed.length,0);
+    var result=MotionKitNative.mk_create_cartesian_candidate_batch(analytic.nativeModel(),model,external,orientation,limits,pose,seed);
+    if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native Cartesian candidate generation failed: ${result.status}';
+    return NativeCandidateBatch.decode(result.out_batch,result.out_count,seed.length,0);
   }
   public static function compactLengths(count:Int,joints:Int,externals:Int):{joints:Int,coordinates:Int} {
     if(count<0 || joints<1 || joints>64 || externals<0 || externals>joints ||
@@ -80,7 +76,20 @@ class LatticeCandidate {
   public final branch:Int;
   public final singular:Int;
   public final singularityKnown:Bool;
-  public var configuration:Null<SixAxisConfiguration>;
+  var labelledConfiguration:Null<SixAxisConfiguration>;
+  var armIndices:Null<Array<Int>>;
+  public var configuration(get,set):Null<SixAxisConfiguration>;
+  function get_configuration():Null<SixAxisConfiguration> {
+    if(labelledConfiguration==null && armIndices!=null)
+      labelledConfiguration=SixAxisConfiguration.of("EAIK",branch,[for(index in armIndices)q[index]]);
+    return labelledConfiguration;
+  }
+  function set_configuration(value:Null<SixAxisConfiguration>):Null<SixAxisConfiguration> {
+    armIndices=null;labelledConfiguration=value;return value;
+  }
+  /** Preserve native branch/joint evidence; materialize display labels and
+   * turn arrays only when a pin, selected route or caller requests them. */
+  public function labelArm(indices:Array<Int>):Void armIndices=indices;
   public function new(q:Array<Float>,wraps:Array<Int>,external:Array<Int>,roll:Int,tilt:Int,azimuth:Int,branch:Int,singular:Int,singularityKnown:Bool=true,?configuration:SixAxisConfiguration) {
     this.q=q;this.wraps=wraps;this.external=external;this.roll=roll;this.tilt=tilt;this.azimuth=azimuth;
     this.branch=branch;this.singular=singular;this.singularityKnown=singularityKnown;this.configuration=configuration;

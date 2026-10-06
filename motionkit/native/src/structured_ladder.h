@@ -26,19 +26,21 @@ struct LadderResult {
     uint64_t tested_edges=0;
 };
 using LadderLayer=std::vector<mk_lattice_candidate>;
-struct LatticeKey {
+template<unsigned Capacity>
+struct BasicLatticeKey {
     unsigned branch, dimensions=0;
-    std::array<unsigned,MK_MAX_JOINTS+3> cell{};
-    bool operator==(const LatticeKey &b) const {return branch==b.branch && dimensions==b.dimensions && std::equal(cell.begin(),cell.begin()+dimensions,b.cell.begin());}
+    std::array<unsigned,Capacity> cell{};
+    bool operator==(const BasicLatticeKey &b) const {return branch==b.branch && dimensions==b.dimensions && std::equal(cell.begin(),cell.begin()+dimensions,b.cell.begin());}
 };
-struct LatticeHash {
-    size_t operator()(const LatticeKey &a) const {
+template<unsigned Capacity>
+struct BasicLatticeHash {
+    size_t operator()(const BasicLatticeKey<Capacity> &a) const {
         size_t h=a.branch;for(unsigned i=0;i<a.dimensions;++i)h=(h^a.cell[i])*1099511628211ull;return h;
     }
 };
-template<class Candidate>
-inline LatticeKey lattice_key(const Candidate &c,unsigned external) {
-    LatticeKey key{};key.branch=c.branch;key.dimensions=external+3;
+template<unsigned Capacity,class Candidate>
+inline BasicLatticeKey<Capacity> lattice_key(const Candidate &c,unsigned external) {
+    BasicLatticeKey<Capacity> key{};key.branch=c.branch;key.dimensions=external+3;
     for(unsigned i=0;i<external;++i)key.cell[i]=c.external_coordinates[i];
     key.cell[external]=c.roll_index;key.cell[external+1]=c.tilt_index;key.cell[external+2]=c.azimuth_index;
     return key;
@@ -75,11 +77,12 @@ inline void validate_ladder_candidate(const Candidate &c,const LadderSettings &s
  * they are referenced (a two-slot cache is sufficient). State costs are supplied by the caller (margin/posture/roll).
  * Coordinate keys deliberately omit wrap numbers: FK representatives can cross
  * a wrap seam between samples; physical joint jumps decide connectivity. */
-template<class Layers>
-inline LadderResult structured_ladder(const Layers &layers,
+template<unsigned Capacity,class Layers>
+inline LadderResult structured_ladder_with_key(const Layers &layers,
         const LadderSettings &s,const std::vector<std::vector<double>> &state_cost={},
         const std::function<bool(unsigned,unsigned,unsigned)> &edge_allowed={}) {
     validate_ladder_settings(s);
+    if(s.externals+3>Capacity)throw std::invalid_argument("Ladder key capacity is too small");
     if(!state_cost.empty() && state_cost.size()!=layers.size())
         throw std::invalid_argument("Ladder state-cost layer count mismatch");
     LadderResult out;
@@ -113,8 +116,12 @@ inline LadderResult structured_ladder(const Layers &layers,
             }
         }else{
             const auto &prior=layers[layer-1];
-            std::unordered_map<LatticeKey,std::vector<unsigned>,LatticeHash> lattice;
-            std::unordered_map<JointKey,std::vector<unsigned>,JointHash> joints;
+            std::unordered_map<BasicLatticeKey<Capacity>,unsigned,BasicLatticeHash<Capacity>> lattice;
+            std::unordered_map<JointKey,unsigned,JointHash> joints;
+            lattice.reserve(prior.size());joints.reserve(prior.size());
+            // One link per candidate replaces separate vector allocations in
+            // every bucket. Explicit predecessor-index tie breaks are retained.
+            std::vector<unsigned> lattice_next(prior.size(),UINT32_MAX),joint_next(prior.size(),UINT32_MAX);
             // Hash the three most discriminating joint coordinates. The other
             // coordinates are checked exactly; 27 buckets contain every nearby
             // cross-branch state regardless of the number of joints.
@@ -128,7 +135,10 @@ inline LadderResult structured_ladder(const Layers &layers,
             auto joint_key=[&](const auto &c){JointKey k;
                 for(unsigned d=0;d<nd;++d)k.cell[d]=static_cast<int64_t>(std::floor(c.joints[dimensions[d]]/(s.jump[dimensions[d]]+1e-12)));return k;};
             for(unsigned i=0;i<prior.size();++i)if(std::isfinite(previous[i])){
-                lattice[lattice_key(prior[i],s.externals)].push_back(i);joints[joint_key(prior[i])].push_back(i);
+                auto cell=lattice.emplace(lattice_key<Capacity>(prior[i],s.externals),i);
+                if(!cell.second){lattice_next[i]=cell.first->second;cell.first->second=i;}
+                auto joint=joints.emplace(joint_key(prior[i]),i);
+                if(!joint.second){joint_next[i]=joint.first->second;joint.first->second=i;}
             }
             struct Bounds {std::array<double,MK_MAX_JOINTS> lo,hi;};
             auto bounds=[&](const auto &cells){std::unordered_map<unsigned,Bounds> result;
@@ -151,9 +161,9 @@ inline LadderResult structured_ladder(const Layers &layers,
                     if(s.rolls>1)rd=std::min(rd,s.rolls-rd);
                     cost+=s.roll_weight*rd;
                     if(cost<costs[i] || (cost==costs[i] && p<predecessor[layer][i])){costs[i]=cost;predecessor[layer][i]=p;}};
-                auto key=lattice_key(c,s.externals);
+                auto key=lattice_key<Capacity>(c,s.externals);
                 auto visit=[&](auto &&self,unsigned dimension)->void{
-                    if(dimension==s.externals+3){auto found=lattice.find(key);if(found!=lattice.end())for(auto p:found->second)consider(p);return;}
+                    if(dimension==s.externals+3){auto found=lattice.find(key);if(found!=lattice.end())for(unsigned p=found->second;p!=UINT32_MAX;p=lattice_next[p])consider(p);return;}
                     if(dimension>=s.externals){unsigned count=dimension==s.externals?s.rolls:dimension==s.externals+1?s.tilts:s.azimuths;
                         if(count==1){self(self,dimension+1);return;}}
                     unsigned original=key.cell[dimension];
@@ -167,7 +177,7 @@ inline LadderResult structured_ladder(const Layers &layers,
                 };visit(visit,0);
                 auto hash=joint_key(c);
                 auto flips=[&](auto &&self,unsigned d)->void{
-                    if(d==nd){auto found=joints.find(hash);if(found!=joints.end())for(auto p:found->second)if(prior[p].branch!=c.branch)consider(p);return;}
+                    if(d==nd){auto found=joints.find(hash);if(found!=joints.end())for(unsigned p=found->second;p!=UINT32_MAX;p=joint_next[p])if(prior[p].branch!=c.branch)consider(p);return;}
                     auto original=hash.cell[d];for(int delta=-1;delta<=1;++delta){hash.cell[d]=original+delta;self(self,d+1);}hash.cell[d]=original;
                 };if(can_flip[c.branch])flips(flips,0);
             }
@@ -180,5 +190,17 @@ inline LadderResult structured_ladder(const Layers &layers,
     for(unsigned layer=layers.size();layer-->0;){out.route[layer]=best;if(layer)best=predecessor[layer][best];}
     return out;
 }
+/** Keep hash keys proportional to the common small coordinate lattice. The
+ * full capacity fallback preserves support for every public external count. */
+template<class Layers>
+inline LadderResult structured_ladder(const Layers &layers,const LadderSettings &s,
+        const std::vector<std::vector<double>> &state_cost={},
+        const std::function<bool(unsigned,unsigned,unsigned)> &edge_allowed={}) {
+    if(s.externals==0)return structured_ladder_with_key<3>(layers,s,state_cost,edge_allowed);
+    if(s.externals==1)return structured_ladder_with_key<4>(layers,s,state_cost,edge_allowed);
+    if(s.externals<=5)return structured_ladder_with_key<8>(layers,s,state_cost,edge_allowed);
+    return structured_ladder_with_key<MK_MAX_JOINTS+3>(layers,s,state_cost,edge_allowed);
+}
+
 }
 #endif

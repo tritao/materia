@@ -22,11 +22,20 @@ class JointPathPreferences {
   }
 
   public function cost(group:KinematicGroup,target:Pose3,q:Array<Float>):Float {
+    return postureCost(q)+orientationCost(group,target,q);
+  }
+
+  function postureCost(q:Array<Float>):Float {
     var value = 0.0;
     if (posture != null) for (joint in 0...q.length) {
       var delta = q[joint]-posture[joint];
       value += delta*delta;
     }
+    return value;
+  }
+
+  function orientationCost(group:KinematicGroup,target:Pose3,q:Array<Float>):Float {
+    var value=0.0;
     var desired = orientation == null && preferTarget ? target : orientation;
     if (desired != null) {
       var fk = group.tcpPose(q);
@@ -37,4 +46,23 @@ class JointPathPreferences {
     }
     return value;
   }
+  /** Exact analytic branches and physical turns share one task orientation
+   * per lattice cell (their native FK witnesses are within 1e-9). Posture and
+   * caller costs still use every physical joint vector independently. */
+  public function forProblem(group:KinematicGroup,problem:CandidateProblem):
+      (Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float {
+    var analytic=problem.family=="EAIK" || problem.family=="XYZ" ||
+      problem.family=="XYZ+C" || problem.family=="XYZ+C+A";
+    var cells=1.0*problem.rollCount*problem.tiltCount*problem.azimuthCount;
+    if(!analytic || cells>2147483647.0)
+      return (sample,candidate)->cost(group,problem.request.poses[sample],candidate.q);
+    var cache=[for(_ in problem.samples)new Map<Int,Float>()];
+    return (sample,candidate)->{
+      var key=candidate.roll+problem.rollCount*(candidate.azimuth+problem.azimuthCount*candidate.tilt);
+      var angle=cache[sample].get(key);
+      if(angle==null){angle=orientationCost(group,problem.request.poses[sample],candidate.q);cache[sample].set(key,angle);}
+      return postureCost(candidate.q)+angle;
+    };
+  }
+
 }

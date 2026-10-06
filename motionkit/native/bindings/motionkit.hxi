@@ -13,18 +13,21 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * The seed selects C at its explicit axis singularity.
 	 */
 	extern fn mk_analytic_cartesian_inverse(model: ptr<const<mk_analytic_cartesian_model>>, target: ptr<const<mk_analytic_pose>>, axis_only: u32, singular_c_seed: f64, out_solutions: ptr<mk_analytic_solution> @out_array("solution_capacity"), solution_capacity: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_candidate_batch_destroy(batch: mk_candidate_batch_handle) -> void;
 	/**
 	 * Cartesian free-spin/cone cells solve the tool-axis constraint. Repeated
 	 * geometric configurations retain their first lattice coordinates. The Cartesian
 	 * descriptor includes its TCP, so model.tool must be identity and XYZ nonperiodic.
 	 */
 	extern fn mk_cartesian_candidate_count(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
+	extern fn mk_create_cartesian_candidate_batch(parameters: ptr<const<mk_analytic_cartesian_model>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_batch: ptr<mk_candidate_batch_handle> @out @owned, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Compact sampling outputs are candidate-major, preserving full-record order.
 	 * Joint and wrap rows have joint_count entries. Coordinate rows contain external
 	 * cells followed by roll, tilt, azimuth, branch and singular bits. Lengths must
 	 * exactly match candidate_count times their respective row dimensions.
 	 */
+	extern fn mk_create_eaik_candidate_batch(solver: mk_eaik_handle, configuration: ptr<const<mk_eaik_configuration>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_batch: ptr<mk_candidate_batch_handle> @out @owned, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_eaik_candidate_count(solver: mk_eaik_handle, configuration: ptr<const<mk_eaik_configuration>>, model: ptr<const<mk_serial_cell_model>>, external: ptr<const<mk_external_lattice>>, orientation: ptr<const<mk_orientation_lattice>>, limits: ptr<const<mk_joint_lift_request>>, target: ptr<const<mk_analytic_pose>>, seed: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Construct only known exact decompositions of a compiled 6R chain.
@@ -73,6 +76,10 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * One call replaces a bisection of mk_path_distance_to_time per sample.
 	 */
 	extern fn mk_path_times_to_distances(law: mk_time_law_handle, seconds: ptr<const<f64>> @in_array("count"), count: u32, out_distances: ptr<f64> @out_array("count")) -> mk_result;
+	/**
+	 * Exact compact dimensions are required. The read is reusable and thread-safe.
+	 */
+	extern fn mk_read_candidate_batch(batch: mk_candidate_batch_handle, out_joints: ptr<f64> @out_array("joint_value_count"), out_wraps: ptr<i32> @out_array("joint_value_count"), joint_value_count: u32, out_coordinates: ptr<u32> @out_array("coordinate_count"), coordinate_count: u32, out_count: ptr<u32> @out) -> mk_result;
 	/**
 	 * Deterministic sparse banded C2 cubic smoothing QP. Every span is bounded
 	 * using its Bernstein control polygons, including between authored knots.
@@ -523,6 +530,10 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		limit: f64 @offset(24);
 		sustainable_scale: f64 @offset(32);
 	}
+	/**
+	 * Immutable compact candidate layer, generated once and then copied out.
+	 */
+	handle mk_candidate_batch_handle : u32 @destroy("mk_candidate_batch_destroy");
 	handle mk_eaik_handle : u32 @destroy("mk_eaik_destroy");
 	handle mk_path_handle : u32 @destroy("mk_path_destroy");
 	handle mk_time_law_handle : u32 @destroy("mk_time_law_destroy");

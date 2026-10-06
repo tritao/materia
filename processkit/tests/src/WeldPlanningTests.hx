@@ -99,6 +99,19 @@ class WeldPlanningTests {
     check(goals.length>0,"joined wire approach has an analytic start");
     var start=goals[0].q;
     var request=problem.request(start,new IkTolerance(1e-6,1e-6),[for(_ in start)0.2],[for(_ in start)3.0]);
+    var drivenRequest=problem.request(start,new IkTolerance(1e-6,1e-6),[for(_ in start)0.2],
+      [for(_ in start)3.0],WeldPathPlanner.STEP,[for(_ in start)2.0]);
+    var drivenLimits:motionkit.kinematics.PathDriveLimits=cast drivenRequest.drives;
+    check(!drivenLimits.fixedFeed[0],"approach speed is an air cap rather than a prescribed process feed");
+    for(i in 0...drivenRequest.distances.length){
+      var s=drivenRequest.distances[i];
+      if(Math.abs(s-problem.seamOffset)<1e-12)check(drivenLimits.fixedFeed[i],"outgoing weld span requires its prescribed process feed");
+      if(Math.abs(s-problem.seamEnd)<1e-12)check(!drivenLimits.fixedFeed[i],"outgoing burnback owns the weld-end feed mask");
+    }
+    var variableFeedRequest=problem.request(start,new IkTolerance(1e-6,1e-6),[for(_ in start)0.2],
+      [for(_ in start)3.0],WeldPathPlanner.STEP,[for(_ in start)2.0],false);
+    var variableFeedLimits:motionkit.kinematics.PathDriveLimits=cast variableFeedRequest.drives;
+    for(fixed in variableFeedLimits.fixedFeed)check(!fixed,"Cartesian corner policy leaves every feed as a drive-limited cap");
     for(boundary in [problem.seamOffset,problem.seamEnd,problem.burnbackEnd]){
       var retained=false;for(distance in request.distances)if(Math.abs(distance-boundary)<1e-12)retained=true;
       check(retained,"global selection grid retains each engagement stop");

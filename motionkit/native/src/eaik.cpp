@@ -9,10 +9,18 @@
 #include <vector>
 
 namespace {
+struct Solver final : EAIK::Robot {
+    const Eigen::Matrix<double,3,6> axes,rotation_axes;
+    const Eigen::Matrix<double,3,7> displacements;
+    const Eigen::Matrix3d terminal;
+    Solver(const Eigen::Matrix<double,3,6> &h,const Eigen::Matrix<double,3,7> &p,const Eigen::Matrix3d &r)
+        : EAIK::Robot(Eigen::MatrixXd(h),Eigen::MatrixXd(p),r),axes(h),
+          rotation_axes(h.colwise().normalized()),displacements(p),terminal(r) {}
+};
 std::mutex solver_mutex;
 uint32_t next_id=1;
-std::unordered_map<uint32_t,std::shared_ptr<const EAIK::Robot>> solvers;
-std::shared_ptr<const EAIK::Robot> find(mk_eaik_handle handle) {
+std::unordered_map<uint32_t,std::shared_ptr<const Solver>> solvers;
+std::shared_ptr<const Solver> find(mk_eaik_handle handle) {
     std::lock_guard lock(solver_mutex);
     const auto it=solvers.find(handle.id);
     return it==solvers.end() ? nullptr : it->second;
@@ -43,7 +51,7 @@ mk_result MK_CALL mk_eaik_create(const mk_eaik_model *m,mk_eaik_handle *out) {
         return MK_ERROR_INVALID_ARGUMENT;
     for(int j=0;j<6;++j) if(std::abs(h.col(j).norm()-1)>1e-8) return MK_ERROR_INVALID_ARGUMENT;
     try {
-        auto robot=std::make_shared<EAIK::Robot>(Eigen::MatrixXd(h),Eigen::MatrixXd(p),Eigen::Matrix3d(r));
+        auto robot=std::make_shared<Solver>(h,p,r);
         if(!robot->has_known_decomposition()) return MK_ERROR_UNSUPPORTED;
         std::lock_guard lock(solver_mutex);
         if(next_id==0) return MK_ERROR_GENERATION;
@@ -123,7 +131,7 @@ mk_result MK_CALL mk_eaik_inverse_labelled(mk_eaik_handle handle,const mk_eaik_c
     const Eigen::Matrix3d base=Eigen::Map<const Eigen::Matrix3d>(c->base_rotation);
     const Eigen::Vector3d base_p=Eigen::Map<const Eigen::Vector3d>(c->base_position);
     if(!base.allFinite() || !base_p.allFinite() || (base.transpose()*base-Eigen::Matrix3d::Identity()).norm()>1e-8 || std::abs(base.determinant()-1)>1e-8 || !std::isfinite(c->shoulder_offset) || !std::isfinite(c->elbow_offset))return MK_ERROR_INVALID_ARGUMENT;
-    const auto h=robot->get_original_H(),p=robot->get_original_P();
+    const auto &h=robot->axes;const auto &p=robot->displacements;
     std::vector<mk_analytic_solution> exact;
     for(auto answer:candidates) {
         double t[6];
@@ -134,7 +142,7 @@ mk_result MK_CALL mk_eaik_inverse_labelled(mk_eaik_handle handle,const mk_eaik_c
         for(unsigned j=0;j<6;++j){
             axes[j]=rotation*h.col(j);origins[j]=origin;
             if(j==(c->spherical ? 4u : 5u))wrist=origin;
-            rotation=rotation*Eigen::AngleAxisd(answer.joints[j],h.col(j)).toRotationMatrix();
+            rotation=rotation*Eigen::AngleAxisd(answer.joints[j],robot->rotation_axes.col(j)).toRotationMatrix();
             origin+=rotation*p.col(j+1);
         }
         if(c->spherical)wrist=origins[3]+axes[3]*(origins[4]-origins[3]).dot(axes[3]);
@@ -143,6 +151,7 @@ mk_result MK_CALL mk_eaik_inverse_labelled(mk_eaik_handle handle,const mk_eaik_c
             std::sin(t[0]-std::atan2(wrist.x(),-wrist.y()))>=0;
         const bool up=std::sin(t[2]+c->elbow_offset)>=0,flip=std::sin(t[4])<0;
         answer.branch=(front ? 0u : 2u)+(up ? 0u : 1u)+(flip ? 4u : 0u);
+        bool repaired=false;
         if(c->spherical && axes[3].cross(axes[5]).norm()<1e-6) {
             std::vector<double> seeded(answer.joints,answer.joints+6);seeded[3]=seed[3];
             seeded[4]=c->reference[4]+(std::cos(t[4])>=0 ? 0.0 : std::acos(-1.0))*c->signs[4];seeded[5]=0;
@@ -155,11 +164,16 @@ mk_result MK_CALL mk_eaik_inverse_labelled(mk_eaik_handle handle,const mk_eaik_c
             const auto checked=robot->fwdkin(seeded),goal=pose(*target);
             if((checked.block<3,1>(0,3)-goal.block<3,1>(0,3)).norm()<1e-9 &&
                 Eigen::AngleAxisd(checked.block<3,3>(0,0).transpose()*goal.block<3,3>(0,0)).angle()<1e-9)
-                std::copy(seeded.begin(),seeded.end(),answer.joints);
+                {std::copy(seeded.begin(),seeded.end(),answer.joints);repaired=true;}
         }
         answer.singular=(axes[3].cross(axes[5]).norm()<1e-7 ? 1u : 0u) |
             (std::abs(std::sin(t[2]+c->elbow_offset))<1e-7 ? 2u : 0u);
-        const auto fk=robot->fwdkin(std::vector<double>(answer.joints,answer.joints+6));
+        // The label chain walk is the original EAIK FK with the same
+        // normalized axes and terminal rotation. Reuse its witness unless
+        // spherical-pole repair has changed the physical joint vector.
+        Eigen::Matrix4d fk=Eigen::Matrix4d::Identity();
+        if(repaired)fk=robot->fwdkin(std::vector<double>(answer.joints,answer.joints+6));
+        else {fk.block<3,3>(0,0)=rotation*robot->terminal;fk.block<3,1>(0,3)=origin;}
         if((fk.block<3,1>(0,3)-goal.block<3,1>(0,3)).norm()>1e-9 ||
             Eigen::AngleAxisd(fk.block<3,3>(0,0).transpose()*goal.block<3,3>(0,0)).angle()>1e-9)continue;
         bool duplicate=false;

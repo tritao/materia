@@ -685,6 +685,10 @@ class KinematicsTests extends MotionKitTestSupport {
         for(joint in 0...6)near(candidate.q[joint],again.q[joint],"candidate problem joints are deterministic",1e-12);
       }
     }
+    for(layer in problem.samples)for(candidate in layer.candidates){
+      var expectedLabel=motionkit.kinematics.SixAxisConfiguration.of("EAIK",candidate.branch,candidate.q);
+      check(expectedLabel.accepts(candidate.configuration),"deferred labels preserve native branches and physical turns");
+    }
     check(fixture.arm.numericSolveCount() == before,"native PathRequest candidate construction makes no numeric IK calls");
     var selected=motionkit.robot.StructuredLadder.search(problem);
     check(selected.diagnostic==null && selected.candidates.length==2,"Haxe structured ladder selects a complete native route");
@@ -699,6 +703,18 @@ class KinematicsTests extends MotionKitTestSupport {
       new motionkit.robot.CandidateProblem.CandidateSamplingOptions(4,2,4),true);
     check(shiftedSpinProblem.samples[0].candidates[0].roll==2,
       "pinned free-spin metadata describes its actual orientation in the authored lattice");
+    solver.preferredPosture=start.copy();solver.preferTargetOrientation=true;
+    var cellPreferences=new motionkit.robot.JointPathPreferences(solver);
+    var cachedCost=cellPreferences.forProblem(fixture.arm,shiftedSpinProblem);
+    for(sample in 0...shiftedSpinProblem.samples.length)for(candidate in shiftedSpinProblem.samples[sample].candidates)
+      near(cachedCost(sample,candidate),cellPreferences.cost(fixture.arm,shiftedSpinProblem.request.poses[sample],candidate.q),
+        "analytic cell preference matches per-state FK across branches and turns",1e-8);
+    var referenceCost=motionkit.robot.StructuredLadder.search(shiftedSpinProblem,null,0,
+      (sample,candidate)->cellPreferences.cost(fixture.arm,shiftedSpinProblem.request.poses[sample],candidate.q));
+    var cachedSelection=motionkit.robot.StructuredLadder.search(shiftedSpinProblem,null,0,cachedCost);
+    check(referenceCost.diagnostic==cachedSelection.diagnostic,"orientation cell cache preserves reachability");
+    near(referenceCost.cost,cachedSelection.cost,"orientation cell cache preserves route cost",1e-8);
+    solver.preferredPosture=null;solver.preferTargetOrientation=false;
     check(motionkit.robot.StructuredLadder.search(shiftedSpinProblem).diagnostic==null,
       "a shifted authored spin cannot disconnect a reachable pinned continuation");
     var freeOrientationPath=new PosePath("task",[new PoseLine(
@@ -1458,6 +1474,10 @@ class KinematicsTests extends MotionKitTestSupport {
     check(marginWorld.violation(rollStart,false)!=null && marginWorld.violation(rollStart,true)==null,
       "contact policy fixture distinguishes air from contact clearance");
     var policyFrom=[0.0,-0.04,0.0,0.0],policyTo=[0.0,0.04,0.0,0.0];
+    check(marginWorld.violation(policyFrom,false)==null && marginWorld.violation(policyTo,false)==null,
+      "interior sweep fixture has two checked clear endpoints");
+    check(marginWorld.sweep(policyFrom,policyTo,false,0.005,null,null,true)!=null,
+      "reusing clear endpoints retains every colliding interior sample");
     check(marginWorld.sweep(policyFrom,policyTo,false)!=null,
       "air-only sweep rejects close approach at its interior");
     check(marginWorld.sweep(policyFrom,policyTo,false,0.005,null,q->Math.abs(q[1])<0.035)==null,
@@ -1739,11 +1759,28 @@ class KinematicsTests extends MotionKitTestSupport {
     var coupledGroup=new robotkit.manipulation.KinematicGroup(coupledModel,root.id,flange.id,work.id);
     var coupledWorld=new robotkit.manipulation.ArmClearance(coupledGroup,[
       {name:"coupled-tool",link:followerLink.id,vertices:cube(0.4),tool:true}],[0,0]);
+    var cachedEnvelope=coupledWorld.motionEnvelope([-2.01,-1.51],[2.01,1.51]);
     for(i in 0...100){var q=[Math.sin(i*0.31)*2,Math.cos(i*0.17)*1.5],errors=[0.002,0.001],
       perturbed=[q[0]+errors[0]*(i%2==0?1:-1),q[1]+errors[1]*(i%3==0?1:-1)];
+      check(coupledWorld.auditDisplacement(q,perturbed,errors,cachedEnvelope)<=1+1e-8,
+        "fixed envelope bounds exact hull and moving-work TCP displacement");
       check(coupledWorld.auditDisplacement(q,perturbed,errors)<=1+1e-8,
         "rotary, prismatic and multi-source follower hull motion stays inside CL-D5 bound");
     }
+    var screwModel=new RobotModel("axial-screw-bound"),screwRoot=screwModel.addLink(new Link("screw-root")),
+      carriage=screwModel.addLink(new Link("carriage")),shaft=screwModel.addLink(new Link("shaft"));
+    var shaftSlide=screwModel.addJoint(new Joint("slide",JointType.Prismatic,screwRoot,carriage));shaftSlide.axis=[1,0,0];
+    var shaftSpin=screwModel.addJoint(new Joint("spin",JointType.Continuous,screwRoot,shaft));shaftSpin.axis=[0,0,1];
+    screwModel.addCoupling(new JointCoupling("screw-gain",shaftSlide.id,shaftSpin.id,2000,0));
+    var screwFlange=screwModel.addFrame(new Frame("flange",carriage));
+    var screwGroup=new robotkit.manipulation.KinematicGroup(screwModel,screwRoot.id,screwFlange.id),shaftCorners:Array<Float> = [];
+    for(x in [-0.004,0.004])for(y in [-0.004,0.004])for(z in [-1.0,1.0]){shaftCorners.push(x);shaftCorners.push(y);shaftCorners.push(z);}
+    var screwWorld=new robotkit.manipulation.ArmClearance(screwGroup,[{name:"long-shaft",link:shaft.id,vertices:shaftCorners,tool:false}],[0.0]);
+    var shaftEnvelope=screwWorld.motionEnvelope([-0.1],[0.1]);
+    check(shaftEnvelope.bounds([1e-6])[0]<0.000012,"axial shaft length does not inflate its rotational lever arm");
+    for(i in 0...50)check(screwWorld.auditDisplacement([0.09*Math.sin(i)],
+      [0.09*Math.sin(i)+(i%2==0?1:-1)*1e-6],[1e-6],shaftEnvelope)<=1+1e-8,
+      "perpendicular shaft bound covers exact coupled hull movement");
     var emptyWorld=new robotkit.manipulation.ArmClearance(clearanceGroup,[],[0.0]);
     check(emptyWorld.closest([0.0])==null,"empty clearance world has no closest pair");
     function waypoint(x:Float,y:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x,y,0),1e-6,1e-6);
@@ -1792,6 +1829,26 @@ class KinematicsTests extends MotionKitTestSupport {
       var analytic:motionkit.robot.AnalyticIk = new motionkit.robot.CartesianAnalyticIk(group);
       var numeric = new ManipulatorKinematics(group);
       var sampler = new motionkit.robot.CartesianCandidateSampler(group);
+      if(count==3){
+        var start=[0.0,0.0,0.0],end=[0.02,0.0,0.0],from=numeric.forward(start),to=numeric.forward(end);
+        var airPath=new PosePath("task",[new PoseLine(new PoseWaypoint(from,1e-6,1e-6),
+          new PoseWaypoint(to,1e-6,1e-6),OrientationPolicy.Fixed,0.08,0.08)]);
+        var speed=[0.01,1.0,1.0],acceleration=[1.0,1.0,1.0],mask=[false,false];
+        var cap=new motionkit.kinematics.PathDriveLimits(acceleration,[0.08,0.08],null,mask);mask[0]=true;
+        check(!cap.fixedFeed[0],"air feed mask is copied into the path request");
+        var airRequest=new PathRequest([0.0,airPath.length()],[from,to],start,new IkTolerance(1e-6,1e-6),
+          [1.0,1.0,1.0],speed,32,[OrientationPolicy.Fixed,OrientationPolicy.Fixed],cap);
+        var planner=new motionkit.robot.StructuredJointPathPlanner(group),curve=planner.plan(airPath,airRequest);
+        var timed=new ToppraPathTiming().time(curve,new PathTimingLimits(speed,acceleration,[0.08]));
+        check(timed.trajectory.durationSeconds()>=2.0,"air time law slows below its cap to obey actual joint speed");
+        for(i in 0...21)check(Math.abs(timed.trajectory.evaluate(timed.trajectory.durationSeconds()*i/20).velocities[0])<=0.010001,
+          "air slowdown retains the original physical velocity limit");
+        timed.releaseDistanceMap();timed.trajectory.dispose();
+        var fixedRequest=new PathRequest([0.0,airPath.length()],[from,to],start,new IkTolerance(1e-6,1e-6),
+          [1.0,1.0,1.0],speed,32,[OrientationPolicy.Fixed,OrientationPolicy.Fixed],
+          new motionkit.kinematics.PathDriveLimits(acceleration,[0.08,0.08]));
+        throws(function() planner.plan(airPath,fixedRequest),"a fixed process feed remains infeasible under the same physical limits");
+      }
       var before = group.numericSolveCount();
       check(analytic.jointCount() == count, "Cartesian family keeps model DOF count");
       var marked = new robotkit.manipulation.KinematicGroup(model,base.id,flange.id,null,tool,null,["cartesian-joint-0"]);

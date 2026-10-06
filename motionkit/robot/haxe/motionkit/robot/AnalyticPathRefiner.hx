@@ -98,7 +98,12 @@ class AnalyticPathRefiner {
     var orientationCount=orientation?(tilt?3:1):0;
     var d=prescribedJoints.length+orientationCount;
     if(d==0){
-      for(i in 0...n){var task=tasks[i],q=selection.candidates[i].q;
+      for(i in 0...n){
+        // A unique Cartesian curve cannot reshape its air motion. Its air
+        // cap is enforced by physical timing, which may slow that motion.
+        // The prescribed weld feed must still be feasible geometrically.
+        if(!drives.fixedFeed[i])continue;
+        var task=tasks[i],q=selection.candidates[i].q;
         var rates=refinedDerivatives(distances[i],q,task.pose,task.freedom,task.velocity,task.acceleration),feed=drives.feed[i];
         for(j in 0...q.length){var v=Math.abs(rates.first[j])*feed;
           var a=Math.abs(rates.second[j])*feed*feed+Math.abs(rates.first[j])*drives.feedGradient[i]*feed;

@@ -25,6 +25,20 @@ void check_compact(const std::vector<mk_lattice_candidate> &expected,unsigned n,
         assert(row[external+3]==c.branch && row[external+4]==c.singular);
     }
 }
+void check_batch(mk_candidate_batch_handle batch,const std::vector<mk_lattice_candidate> &expected,unsigned n,unsigned external) {
+    assert(batch.id!=0);
+    std::vector<double> joints(expected.size()*n);std::vector<int32_t> wraps(expected.size()*n);
+    std::vector<uint32_t> cells(expected.size()*(external+5));uint32_t written=UINT32_MAX;
+    for(int repeat=0;repeat<2;++repeat){
+        assert(mk_read_candidate_batch(batch,joints.data(),wraps.data(),static_cast<uint32_t>(joints.size()),
+            cells.data(),static_cast<uint32_t>(cells.size()),&written)==MK_OK && written==expected.size());
+        check_compact(expected,n,external,joints,wraps,cells);
+    }
+    assert(mk_read_candidate_batch(batch,joints.data(),wraps.data(),static_cast<uint32_t>(joints.size()-1),
+        cells.data(),static_cast<uint32_t>(cells.size()),&written)==MK_ERROR_INVALID_ARGUMENT && written==0);
+    mk_candidate_batch_destroy(batch);mk_candidate_batch_destroy(batch);
+    assert(mk_read_candidate_batch(batch,nullptr,nullptr,0,nullptr,0,&written)==MK_ERROR_INVALID_HANDLE && written==0);
+}
 int main() {
     mk_serial_cell_model model={};model.struct_size=sizeof(model);model.joint_count=8;model.external_count=2;model.arm_joint_count=6;
     for(unsigned i=0;i<6;++i)model.arm_joint_indices[i]=i+1;
@@ -69,6 +83,10 @@ int main() {
                 compact_joints.data(),compact_wraps.data(),joint_values,compact_cells.data(),cell_values,&written);};
         assert(compact_sample(compact_joints.size(),compact_cells.size())==MK_OK && written==count);
         check_compact(candidates,8,2,compact_joints,compact_wraps,compact_cells);
+        mk_candidate_batch_handle batch{};uint32_t batch_count=0;
+        assert(mk_create_eaik_candidate_batch(solver,&labels,&model,&external,&orientation,&limits,&target,seed,8,
+            &batch,&batch_count)==MK_OK && batch_count==count);
+        check_batch(batch,candidates,8,2);
         assert(compact_sample(compact_joints.size()-1,compact_cells.size())==MK_ERROR_INVALID_ARGUMENT);
         assert(compact_sample(compact_joints.size(),compact_cells.size()-1)==MK_ERROR_INVALID_ARGUMENT);
         std::set<std::tuple<unsigned,unsigned,unsigned,unsigned,unsigned>> covered;
@@ -104,6 +122,12 @@ int main() {
     uint32_t written=99;assert(sample(nullptr,0,&written)==MK_OK && written==0);
     const auto original=model.arm_joint_indices[0];model.arm_joint_indices[0]=model.arm_joint_indices[1];
     assert(candidate_count(&count)==MK_ERROR_INVALID_ARGUMENT);model.arm_joint_indices[0]=original;
+    auto unreachable=target;unreachable.position[0]+=1000;
+    mk_candidate_batch_handle empty{};uint32_t empty_count=999;
+    assert(mk_create_eaik_candidate_batch(solver,&labels,&model,&external,&orientation,&limits,&unreachable,seed,8,
+        &empty,&empty_count)==MK_OK && empty_count==0 && empty.id!=0);
+    assert(mk_read_candidate_batch(empty,nullptr,nullptr,0,nullptr,0,&empty_count)==MK_OK && empty_count==0);
+    mk_candidate_batch_destroy(empty);
     mk_eaik_destroy(solver);
     }
     }
@@ -134,6 +158,10 @@ int main() {
             assert(mk_sample_cartesian_candidates_compact(&cart,&model,&external,&orientation,&limits,&target,seed,n,
                 compact_joints.data(),compact_wraps.data(),compact_joints.size(),compact_cells.data(),compact_cells.size(),&written)==MK_OK && written==count);
             check_compact(candidates,n,0,compact_joints,compact_wraps,compact_cells);
+            mk_candidate_batch_handle batch{};uint32_t batch_count=0;
+            assert(mk_create_cartesian_candidate_batch(&cart,&model,&external,&orientation,&limits,&target,seed,n,
+                &batch,&batch_count)==MK_OK && batch_count==count);
+            check_batch(batch,candidates,n,0);
             bool original=false;
             const auto wanted=pose(target.position,target.quaternion);
             for(const auto &candidate:candidates) {
