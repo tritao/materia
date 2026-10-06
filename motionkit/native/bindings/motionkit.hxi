@@ -82,6 +82,10 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * global candidate-array offsets. Failure details remain in out_result.
 	 */
 	extern fn mk_search_ladder(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_lattice_candidate>> @in_array("candidate_count"), state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result> @out) -> mk_result;
+	/**
+	 * Same search with collision-excluded transitions; endpoint states remain available.
+	 */
+	extern fn mk_search_ladder_filtered(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_lattice_candidate>> @in_array("candidate_count"), state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, blocked_edges: ptr<const<mk_ladder_edge>> @in_array("blocked_edge_count"), blocked_edge_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result> @out) -> mk_result;
 	extern fn mk_select_configurations(request: ptr<const<mk_configuration_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_configuration_candidate>> @in_array("candidate_count"), candidate_count: u32, out_sequence: ptr<mk_configuration_solution> @out_array("sample_count")) -> mk_result;
 	/**
 	 * Samples OPW's eight IK branches natively before the same Descartes search.
@@ -222,6 +226,15 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		lower: array<f64, 64> @offset(8);
 		upper: array<f64, 64> @offset(520);
 		periodic: array<u8, 64> @offset(1032);
+	}
+	/**
+	 * A blocked transition into sample, using local candidate indices.
+	 */
+	struct mk_ladder_edge @layout(16, 4) {
+		struct_size: u32 @offset(0) @struct_size;
+		sample: u32 @offset(4);
+		from_candidate: u32 @offset(8);
+		to_candidate: u32 @offset(12);
 	}
 	/**
 	 * Structured ladder costs and lattice dimensions. External axes use their

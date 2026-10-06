@@ -1,6 +1,8 @@
 #include "coarse_ladder.h"
 #include <new>
 #include <memory>
+#include <set>
+#include <tuple>
 #include <descartes_light/solvers/ladder_graph/ladder_graph_solver.h>
 #include <console_bridge/console.h>
 namespace {
@@ -37,10 +39,13 @@ public:
 };
 class SmallEdge final:public descartes_light::EdgeEvaluatorD {
     CandidateSlice prior,current;const motionkit::LadderSettings &settings;uint64_t &tested;
+    unsigned layer;const std::function<bool(unsigned,unsigned,unsigned)> &allowed;
 public:
-    SmallEdge(CandidateSlice prior,CandidateSlice current,const motionkit::LadderSettings &settings,uint64_t &tested)
-        :prior(prior),current(current),settings(settings),tested(tested){}
+    SmallEdge(CandidateSlice prior,CandidateSlice current,const motionkit::LadderSettings &settings,uint64_t &tested,
+        unsigned layer,const std::function<bool(unsigned,unsigned,unsigned)> &allowed)
+        :prior(prior),current(current),settings(settings),tested(tested),layer(layer),allowed(allowed){}
     std::pair<bool,double> evaluate(const State &a,const State &b)const override{
+        if(allowed && !allowed(layer,static_cast<unsigned>(a.values[0]),static_cast<unsigned>(b.values[0])))return {false,0};
         ++tested;const auto &from=prior[static_cast<unsigned>(a.values[0])],&to=current[static_cast<unsigned>(b.values[0])];
         auto distance=[](unsigned a,unsigned b,unsigned period){unsigned d=a>b?a-b:b-a;return period>1?std::min(d,period-d):d;};
         unsigned roll=distance(from.roll_index,to.roll_index,settings.rolls);
@@ -56,17 +61,17 @@ public:
 };
 // A bounded all-pairs graph uses Descartes; large ladders retain indexed DP.
 motionkit::LadderResult small_ladder(const Slices &layers,const motionkit::LadderSettings &settings,
-        const std::vector<std::vector<double>> &costs) {
+        const std::vector<std::vector<double>> &costs,const std::function<bool(unsigned,unsigned,unsigned)> &allowed) {
     // Validate with the same shared contract, including singleton handling.
     // The structured reference also supplies authoritative failure diagnostics.
-    auto reference=motionkit::structured_ladder(layers,settings,costs);
+    auto reference=motionkit::structured_ladder(layers,settings,costs,allowed);
     if(reference.failed!=UINT32_MAX || layers.size()==1)return reference;
     uint64_t tested=0;
     std::string log;console_bridge::ScopedDiagnosticSink sink(log);
     std::vector<descartes_light::WaypointSamplerD::ConstPtr> samplers;
     std::vector<descartes_light::EdgeEvaluatorD::ConstPtr> edges;
     for(unsigned i=0;i<layers.size();++i){samplers.push_back(std::make_shared<SmallSampler>(layers[i],costs[i].data(),settings,i==0));
-        if(i)edges.push_back(std::make_shared<SmallEdge>(layers[i-1],layers[i],settings,tested));}
+        if(i)edges.push_back(std::make_shared<SmallEdge>(layers[i-1],layers[i],settings,tested,i,allowed));}
     try {
     descartes_light::LadderGraphSolverD solver(1);
     if(!solver.build(samplers,edges,{}))return reference;
@@ -78,13 +83,15 @@ motionkit::LadderResult small_ladder(const Slices &layers,const motionkit::Ladde
 }
 
 }
-extern "C" mk_result MK_CALL mk_search_ladder(const mk_ladder_request *request,
+extern "C" mk_result MK_CALL mk_search_ladder_filtered(const mk_ladder_request *request,
     const mk_configuration_sample *samples,uint32_t sample_count,
     const mk_lattice_candidate *candidates,const double *state_costs,uint32_t candidate_count,
+    const mk_ladder_edge *blocked_edges,uint32_t blocked_edge_count,
     uint32_t *out_indices,mk_ladder_result *out_result) {
     if(!request || request->struct_size!=sizeof(*request) || !samples || !sample_count ||
         (candidate_count && (!candidates || !state_costs)) || !out_indices || !out_result)
         return MK_ERROR_INVALID_ARGUMENT;
+    if(blocked_edge_count && !blocked_edges)return MK_ERROR_INVALID_ARGUMENT;
     *out_result={};out_result->struct_size=sizeof(*out_result);out_result->failed_sample=UINT32_MAX;
     for(unsigned i=0;i<sample_count;++i){out_indices[i]=UINT32_MAX;
         const auto &s=samples[i];
@@ -101,7 +108,16 @@ extern "C" mk_result MK_CALL mk_search_ladder(const mk_ladder_request *request,
             return MK_ERROR_INVALID_ARGUMENT;
         for(unsigned j=0;j<request->joint_count;++j)if(!std::isfinite(c.joints[j]))return MK_ERROR_INVALID_ARGUMENT;
     }
+    for(unsigned i=0;i<blocked_edge_count;++i){const auto &e=blocked_edges[i];
+        if(e.struct_size!=sizeof(e) || !e.sample || e.sample>=sample_count ||
+            e.from_candidate>=samples[e.sample-1].candidate_count || e.to_candidate>=samples[e.sample].candidate_count)
+            return MK_ERROR_INVALID_ARGUMENT;
+    }
     try {
+        std::set<std::tuple<unsigned,unsigned,unsigned>> excluded;
+        for(unsigned i=0;i<blocked_edge_count;++i){const auto &e=blocked_edges[i];excluded.emplace(e.sample,e.from_candidate,e.to_candidate);}
+        std::function<bool(unsigned,unsigned,unsigned)> allowed;
+        if(!excluded.empty())allowed=[&](unsigned layer,unsigned from,unsigned to){return !excluded.count({layer,from,to});};
         motionkit::LadderSettings settings;settings.joints=request->joint_count;settings.externals=request->external_count;
         settings.rolls=request->roll_count;settings.tilts=request->tilt_count;settings.azimuths=request->azimuth_count;
         settings.roll_weight=request->roll_weight;
@@ -117,7 +133,7 @@ extern "C" mk_result MK_CALL mk_search_ladder(const mk_ladder_request *request,
         small=small && pairs<=1000000;
         auto result=request->coarse_sample_stride ? motionkit::coarse_ladder(slices,settings,
             motionkit::CoarseLadderSettings{request->coarse_sample_stride,request->coarse_lattice_stride,
-                request->corridor_radius,request->corridor_widenings},costs) : small ? small_ladder(slices,settings,costs) : motionkit::structured_ladder(slices,settings,costs);
+                request->corridor_radius,request->corridor_widenings},costs,allowed) : small ? small_ladder(slices,settings,costs,allowed) : motionkit::structured_ladder(slices,settings,costs,allowed);
         out_result->failed_sample=result.failed;out_result->cost=result.cost;out_result->tested_edges=result.tested_edges;out_result->backend=result.backend;
         if(result.failed!=UINT32_MAX){out_result->failed_distance=samples[result.failed].distance;
             out_result->failure_kind=result.no_candidates?1:2;return MK_ERROR_GENERATION;}
@@ -125,4 +141,12 @@ extern "C" mk_result MK_CALL mk_search_ladder(const mk_ladder_request *request,
         return MK_OK;
     }catch(const std::invalid_argument &){return MK_ERROR_INVALID_ARGUMENT;}
     catch(const std::bad_alloc &){return MK_ERROR_OUT_OF_MEMORY;}
+}
+
+extern "C" mk_result MK_CALL mk_search_ladder(const mk_ladder_request *request,
+    const mk_configuration_sample *samples,uint32_t sample_count,
+    const mk_lattice_candidate *candidates,const double *state_costs,uint32_t candidate_count,
+    uint32_t *out_indices,mk_ladder_result *out_result) {
+    return mk_search_ladder_filtered(request,samples,sample_count,candidates,state_costs,candidate_count,
+        nullptr,0,out_indices,out_result);
 }

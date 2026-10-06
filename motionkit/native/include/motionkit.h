@@ -181,6 +181,14 @@ typedef struct mk_ladder_request {
     uint32_t corridor_widenings;
 } mk_ladder_request;
 
+/** A blocked transition into sample, using local candidate indices. */
+typedef struct mk_ladder_edge {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t sample;
+    uint32_t from_candidate;
+    uint32_t to_candidate;
+} mk_ladder_edge;
+
 typedef struct mk_ladder_result {
     uint32_t struct_size MK_STRUCT_SIZE;
     uint32_t failed_sample; /**< UINT32_MAX on success. */
@@ -409,6 +417,14 @@ MK_API mk_result MK_CALL mk_search_ladder(const mk_ladder_request *request,
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
     const mk_lattice_candidate *candidates MK_IN_ARRAY(candidate_count),
     const double *state_costs MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
+    uint32_t *out_indices MK_OUT_ARRAY(sample_count), mk_ladder_result *out_result MK_OUT);
+
+/** Same search with collision-excluded transitions; endpoint states remain available. */
+MK_API mk_result MK_CALL mk_search_ladder_filtered(const mk_ladder_request *request,
+    const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
+    const mk_lattice_candidate *candidates MK_IN_ARRAY(candidate_count),
+    const double *state_costs MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
+    const mk_ladder_edge *blocked_edges MK_IN_ARRAY(blocked_edge_count), uint32_t blocked_edge_count,
     uint32_t *out_indices MK_OUT_ARRAY(sample_count), mk_ladder_result *out_result MK_OUT);
 
 MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,

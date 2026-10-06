@@ -86,6 +86,21 @@ int main(){
         auto status=mk_search_ladder(&request,samples,4,flat.data(),prices.data(),flat.size(),indices,&report);
         assert(status==(failed==UINT32_MAX?MK_OK:MK_ERROR_GENERATION));assert(report.failed_sample==failed);
         if(status==MK_OK){assert(report.backend==3);assert(std::abs(report.cost-result.cost)<1e-10);}
+        if(status==MK_OK){
+            mk_ladder_edge blocked{sizeof(mk_ladder_edge),1,indices[0]-samples[0].first_candidate,indices[1]-samples[1].first_candidate};
+            auto allowed=[&](unsigned layer,unsigned from,unsigned to){return !(layer==blocked.sample && from==blocked.from_candidate && to==blocked.to_candidate);};
+            auto expected=structured_ladder(layers,s,states,allowed);
+            for(unsigned coarse_stride:{0u,2u}){
+                request.coarse_sample_stride=coarse_stride;request.coarse_lattice_stride=1;request.corridor_radius=10;request.corridor_widenings=0;
+                auto filtered=mk_search_ladder_filtered(&request,samples,4,flat.data(),prices.data(),flat.size(),&blocked,1,indices,&report);
+                assert(filtered==(expected.failed==UINT32_MAX?MK_OK:MK_ERROR_GENERATION));
+                assert(report.failed_sample==expected.failed);
+                if(filtered==MK_OK){assert(report.backend==(coarse_stride?2u:3u));assert(std::abs(report.cost-expected.cost)<1e-10);
+                    assert(indices[0]-samples[0].first_candidate!=blocked.from_candidate || indices[1]-samples[1].first_candidate!=blocked.to_candidate);}
+            }
+            blocked.sample=0;
+            assert(mk_search_ladder_filtered(&request,samples,4,flat.data(),prices.data(),flat.size(),&blocked,1,indices,&report)==MK_ERROR_INVALID_ARGUMENT);
+        }
         assert(result.failed==failed);
         if(failed==UINT32_MAX)assert(std::abs(result.cost-*std::min_element(old.begin(),old.end()))<1e-10);
     }

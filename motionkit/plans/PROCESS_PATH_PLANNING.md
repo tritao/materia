@@ -1176,3 +1176,16 @@ removes decoys, changes local indices and still returns the exact allowed
 route/cost with the corridor backend. Native rebuild and focused
 structured-ladder CTest pass. Public ABI/Haxe records, Descartes handling,
 lazy sweep retry, closest clearance and physical acceptance remain open.
+
+PP5 public native exclusions: mk_search_ladder_filtered accepts validated
+mk_ladder_edge records (destination sample and local source/destination
+candidate indices). The original entry point delegates with no exclusions.
+A deduplicated transition set reaches structured DP, mapped coarse search
+and Descartes edge evaluators; the structured reference used for Descartes
+failure/fallback respects the same set. Random native problems exclude a
+selected edge and compare filtered Descartes and full-corridor coarse
+status, failure sample and optimal cost with the structured reference;
+invalid sample-zero exclusions are rejected. Native rebuild, focused
+structured CTest and four-platform ABI audit pass; bindings regenerated.
+Haxe blocked-edge wiring, lazy sweep re-search, closest clearance and
+physical obstacle acceptance remain outstanding.
