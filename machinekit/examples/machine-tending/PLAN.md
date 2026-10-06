@@ -821,7 +821,7 @@ Done. What was built and decided:
 | MT5b follow-up | done: review fixes and complete closing gate | 4ff013c90; full history in [REVIEW_FIXES.md](REVIEW_FIXES.md) |
 | MT5b second review | done: verified and approved compiler pin recorded | 3c5eef1dd, 3ff303c2d; Haxeon 8be7ca0e; see [REVIEW_FIXES.md](REVIEW_FIXES.md) |
 | MT6 | done, second-review corrections verified | 4c9e6ebec, daf20e12d, 3c5eef1dd |
-| MT7 | done | implementation commit recorded below |
+| MT7 | done | 1780b60fa |
 | MT8 | planned | |
 | MT9 | planned | |
 | MT10 | planned | |
