@@ -720,6 +720,16 @@ class KinematicsTests extends MotionKitTestSupport {
     var collisionRoute=motionkit.robot.LazyCollisionLadder.selectWithChecks(problem,q -> {collisionChecks++;return null;});
     near(collisionRoute.cost,selected.cost,"clear route retains native ladder cost",1e-12);
     check(collisionChecks==problem.samples.length,"lazy collision checks only selected samples");
+    var unreachableExitProblem=new motionkit.robot.CandidateProblem(fixture.arm,request);
+    unreachableExitProblem.samples[1].candidates.resize(0);
+    var unreachableChecks=0;
+    var unreachableExit=motionkit.robot.LazyCollisionLadder.selectWithChecks(unreachableExitProblem,
+      q -> {unreachableChecks++;return null;},8,
+      null,null,null,null,null,
+      q -> {unreachableChecks++;return null;});
+    check(unreachableExit.diagnostic!=null && unreachableExit.failedSample==1 &&
+      unreachableExit.candidates.length==0 && unreachableChecks==0,
+      "an unreachable route retains its ladder diagnostic when an exit check is configured");
     throws(function() motionkit.robot.LazyCollisionLadder.selectWithChecks(problem,q ->
       ({a:"arm",b:"fixture",distance:0.0,required:0.01})),"impossible pinned start reports collision blockage");
     throws(function() motionkit.robot.LazyCollisionLadder.selectWithChecks(problem,q -> null,8,

@@ -42,21 +42,7 @@ class LazyCollisionLadder {
           stateCost == null ? 0.0 : stateCost(sample,candidate),coarse,edges);
       if(route.diagnostic!=null){
         if(last!=null)throw 'Collision blocks sample $lastSample (${last.a}, ${last.b}): ${route.diagnostic}';
-        if (exitCheck != null) {
-        var sample = route.candidates.length - 1;
-        var chosen = route.candidates[sample];
-        var exit = exitCheck(chosen.q);
-        if (exit != null) {
-          for (candidate in problem.samples[sample].candidates) {
-            var same = true;
-            for (joint in 0...chosen.q.length)
-              if (Math.abs(candidate.q[joint] - chosen.q[joint]) > 1e-7) same = false;
-            if (same) blocked[sample].set(candidate,true);
-          }
-          last=exit;lastSample=sample;continue;
-        }
-      }
-      return route;
+        return route;
       }
       if (entrySweep != null) {
         var entry = entrySweep(problem.request.startQ,route.candidates[0].q);

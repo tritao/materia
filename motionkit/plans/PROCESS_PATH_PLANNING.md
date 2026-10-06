@@ -1499,3 +1499,15 @@ External scratch `process-path-bounded-construction-surface/results.json` retain
 MotionKit, ProcessKit and app compiler-only builds pass. C4 passes 1,149,300 assertions (`process-path-final-rate-c4.log`), including native event clocks from direct and worker compilers. `PROCESSKIT_ONLY=planning` passes welder-process (56), weld-planning (53) and rate-schedule (20) assertions (`process-path-final-rate-processkit-v2.log`). Rate tests cover recovery spanning section boundaries, internal transition rejection and final-endpoint roundoff. These are focused checks; authored runner execution and full phase gates remain pending.
 
 PP8 remains incomplete: `WeldPathPlanner` still has its roll/entry/corner loops and candidate compile-and-verify, and its accepted candidate compilation is not yet retained for execution. This increment removes the distinct rate-scheduling duplicate in `launch()`, not those earlier compilations. Track/weldment speed, clearance, cycle and deposited-leg acceptance still require the completed migration and clean-revision benchmarks.
+
+### Final-clock scheduling: authored gantry-welder acceptance
+
+The authored gantry-welder MuJoCo mission passes at clean revision 1a0e9dc1c, with four runs and all ten seams welded. Cycle time is 182.2 s versus PP0's 182.3 s. Every deposited length and leg-size record matches PP0 exactly (legs 4.995715–5.015761 mm); wire error remains 0.007218779 rad and seam error is 0.00012491246 m. No clearance violation is reported. Records are retained in external scratch `process-path-final-rate-gantry-welder/results.json` and its mission log.
+
+Per-run planning is 3.344234, 23.282064, 19.673083 and 48.681022 s (94.980403 s total), versus PP0's 96.348504 s total. These numbers measure the still-legacy planner's search/verification and do not establish the required 10x weldment improvement. The removed rate precompile occurs afterward. This acceptance verifies actual execution/deposition with final-clock feed scheduling, not completion of the weld problem-builder migration.
+
+### Empty-route exit diagnostics
+
+Tracing safe retreat selection exposed a duplicated exit-check block inside the failed-search branch of `LazyCollisionLadder`: an unreachable ladder with a configured exit check attempted to dereference an endpoint of its empty route. Failed search now immediately returns its native diagnostic (or the existing preceding-collision report). Exit checks still run on successfully selected/refined routes. A regression verifies the failed sample and empty route, and that neither sample nor exit clearance is evaluated without a route.
+
+MotionKit compiler-only validation passes, and C4 passes 1,149,301 assertions (`process-path-empty-exit-c4.log`). The authored gantry-welder result above belongs to the preceding clean revision; its module does not include this independent diagnostic fix. Full phase gates and the remaining PP8 migration remain outstanding.
