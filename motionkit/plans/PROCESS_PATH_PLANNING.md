@@ -1103,3 +1103,14 @@ this provider and AnalyticPathRefiner to JointPathSamples for all three
 Cartesian families. Compiler-only and focused runtime pass (1,148,293
 assertions). Join/arc/weave acceptance, cone-centre derivatives, numeric
 refinement, branch segmentation and production/authored gates remain open.
+
+PP4 primitive joins and fixed-orientation geometry: acceptance now checks
+an exact tangent line/arc join, outgoing arc curvature, incoming zero line
+curvature, rejection of an unblended corner and invalid path distances.
+PoseLine and PoseArc supply direct analytic translation derivatives for
+Fixed policy (including 3D arc tangent and curvature); rotating policies
+retain their existing derivative implementation. This removes numerical
+geometry differences in the common fixed-orientation process case.
+Compiler-only and focused runtime pass (1,148,298 assertions). Cone-centre
+rates, broader rotating/weave paths, numeric refinement, branch segmentation
+and production/authored gates remain open.

@@ -819,6 +819,19 @@ class KinematicsTests extends MotionKitTestSupport {
   }
 
   public function testCartesianAnalyticIk():Void {
+    function waypoint(x:Float,y:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x,y,0),1e-6,1e-6);
+    var line=new PoseLine(waypoint(-1,0),waypoint(0,0),motionkit.path.OrientationPolicy.Fixed,0.1,0.1);
+    var arc=new motionkit.path.PoseArc(waypoint(0,0),waypoint(Math.sqrt(0.5),1-Math.sqrt(0.5)),
+      waypoint(1,1),motionkit.path.OrientationPolicy.Fixed,0.1);
+    var joined=new motionkit.robot.PosePathRefinement(new motionkit.path.PosePath("task",[line,arc]));
+    var knot=joined.at(line.length());
+    near(knot.velocity[0],1,"line/arc refinement retains the shared tangent",1e-6);
+    near(knot.acceleration[1],1,"line/arc refinement selects outgoing curvature",1e-4);
+    near(knot.accelerationBefore[1],0,"line/arc refinement retains incoming line curvature",1e-6);
+    var corner=new PoseLine(waypoint(0,0),waypoint(0,1),motionkit.path.OrientationPolicy.Fixed,0.1,0.1);
+    var discontinuous=new motionkit.robot.PosePathRefinement(new motionkit.path.PosePath("task",[line,corner]));
+    throws(function() discontinuous.at(line.length()),"refinement rejects an unblended task-velocity corner");
+    throws(function() joined.at(-0.01),"refinement rejects distance before the authored path");
     for (count in 3...6) {
       var model = new RobotModel('analytic-cartesian-$count');
       var base = model.addLink(new Link("cartesian-base")), parent = base;
