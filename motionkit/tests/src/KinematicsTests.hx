@@ -2010,6 +2010,18 @@ class KinematicsTests extends MotionKitTestSupport {
       var answer:Array<Float> = cast solved;
       for (joint in 0...6) near(answer[joint], q[joint], "placed OPW retains original branch", 1e-5);
     }
+    var originalWristPosition=model.joints[5].parentFramePosition[1];
+    model.joints[5].parentFramePosition[1]+=0.035;
+    var offsetArm=new Manipulator(model,links[0].id,flange.id);
+    var offsetGeometry=new motionkit.robot.OffsetWristGeometry(offsetArm);
+    near(Math.abs(offsetGeometry.offset),0.035,"offset wrist extracts physical middle-axis displacement",1e-9);
+    for(sample in 0...40){
+      var q=[for(j in 0...6)1.5*Math.sin((sample+1)*(j+1))];
+      var expected=new ManipulatorKinematics(offsetArm).forward(q),actual=offsetGeometry.forward(q);
+      near(motionkit.path.PoseMath.distance(actual,expected),0,"offset wrist position agrees with compiled model",1e-6);
+      near(motionkit.path.PoseMath.angle(actual,expected),0,"offset wrist rotation agrees with compiled model",1e-6);
+    }
+    model.joints[5].parentFramePosition[1]=originalWristPosition;
     var bad = buildContractArmFixture();
     model.joints[5].limits.lower = -4 * Math.PI;
     model.joints[5].limits.upper = 4 * Math.PI;
