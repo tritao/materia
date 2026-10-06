@@ -2584,3 +2584,22 @@ joint goal only when the complete joint trajectory passes the same contact-aware
 clearance sweep. The focused native contact-motion suite passes 106 assertions,
 including a forced Cartesian-solver failure and the checked joint-return path.
 The displacement boundary and full mission remain open with this fallback.
+
+### P3 finite joint-limit roundoff and boundary pass (2026-10-06)
+
+The latest-main 20 mm / 2-degree boundary first passed deterministic registration
+with twelve touch episodes and a 0.012279905 mm seam-frame error. MuJoCo
+completed its first six touches, then rejected a checked IK goal for `j5` at
+0.6084073464102079 rad against the authored upper limit of
+0.6084073464102069 rad: a 1e-15 rad representation overshoot. ProcessKit now
+canonicalizes IK goals only when their joint-limit overshoot is within a
+scale-relative 1e-12 roundoff tolerance. Materially invalid goals and observed
+starts remain rejected, with the joint and bound in the diagnostic.
+
+The contact-motion suite passes 109 assertions, including exact-limit
+canonicalization and rejection of out-of-range starts and goals. The app
+compiler passes 1,937 sources. The full injected parking boundary now passes on
+both backends: twelve contact episodes, 0.012279905 mm deterministic and
+0.002439543 mm MuJoCo seam-frame error, and first-weld bead checks on each.
+The regenerated 66-record / 2,884,840-byte preview is cached in the worktree.
+The full two-station mission and final P3 milestone gates remain open.

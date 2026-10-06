@@ -101,6 +101,45 @@ class ProbeMotionPlanner {
     } catch (_:Dynamic) return false;
   }
 
+  function boundsProblem(q:Array<Float>, label:String):Null<String> {
+    if (q == null) return '$label joint configuration is missing';
+    if (q.length != arm.group.count()) return '$label joint configuration has ${q.length} values; expected ${arm.group.count()}';
+    for (joint in 0...q.length) {
+      var limits = arm.group.limitsOf(joint);
+      var name = arm.robot.joints[arm.jointIndices()[joint]].id;
+      if (!Math.isFinite(limits.lower) || !Math.isFinite(limits.upper) || !(limits.upper > limits.lower))
+        return '$label joint $name has no finite route bounds [${limits.lower}, ${limits.upper}]';
+      if (!Math.isFinite(q[joint]) || q[joint] < limits.lower || q[joint] > limits.upper)
+        return '$label joint $name=${q[joint]} is outside [${limits.lower}, ${limits.upper}]';
+    }
+    return null;
+  }
+
+  /** Canonicalize representation-sized IK overshoots at a finite joint limit. */
+  function boundedGoal(q:Array<Float>):Array<Float> {
+    if (q == null || q.length != arm.group.count())
+      throw 'IK goal has ${q == null ? 0 : q.length} joints; expected ${arm.group.count()}';
+    var result = q.copy();
+    for (joint in 0...result.length) {
+      var limits = arm.group.limitsOf(joint);
+      var name = arm.robot.joints[arm.jointIndices()[joint]].id;
+      if (!Math.isFinite(limits.lower) || !Math.isFinite(limits.upper) || !(limits.upper > limits.lower))
+        throw 'IK goal joint $name has no finite route bounds [${limits.lower}, ${limits.upper}]';
+      if (!Math.isFinite(result[joint])) throw 'IK goal joint $name=${result[joint]} is not finite';
+      var roundoff = 1e-12 * Math.max(1.0, Math.max(Math.abs(limits.lower), Math.abs(limits.upper)));
+      if (result[joint] < limits.lower) {
+        if (limits.lower - result[joint] > roundoff)
+          throw 'IK goal joint $name=${result[joint]} is outside [${limits.lower}, ${limits.upper}]';
+        result[joint] = limits.lower;
+      } else if (result[joint] > limits.upper) {
+        if (result[joint] - limits.upper > roundoff)
+          throw 'IK goal joint $name=${result[joint]} is outside [${limits.lower}, ${limits.upper}]';
+        result[joint] = limits.upper;
+      }
+    }
+    return result;
+  }
+
   /** Bounded joint-space detours reach the requested prepared search pose on a proved IK branch. */
   public function approach(target:Transform3, start:Array<Float>, proposals:Int = 1024):CheckedProbeMove {
     if (target == null || start == null || start.length != arm.group.count() || proposals < 1)
@@ -150,14 +189,17 @@ class ProbeMotionPlanner {
   function approachCandidates(goals:Array<Array<Float>>, start:Array<Float>, proposals:Int):CheckedProbeMove {
     var lower = [for (i in 0...arm.group.count()) arm.group.limitsOf(i).lower];
     var upper = [for (i in 0...arm.group.count()) arm.group.limitsOf(i).upper];
+    var startProblem = boundsProblem(start, "start");
+    if (startProblem != null) throw 'Probe approach $startProblem';
     var initialHit = violation(start);
     if (initialHit != null) throw 'Probe approach start is blocked: ${initialHit.a} against ${initialHit.b}, clearance ${initialHit.distance} m (required ${initialHit.required} m)';
     var reasons:Array<String> = [];
     for (goal in goals) {
       try {
-        var goalHit = violation(goal);
+        var bounded = boundedGoal(goal);
+        var goalHit = violation(bounded);
         if (goalHit != null) throw 'Probe approach goal is blocked: ${goalHit.a} against ${goalHit.b}, clearance ${goalHit.distance} m (required ${goalHit.required} m)';
-        var route = JointRoute.plan(start, goal, lower, upper, edge, proposals);
+        var route = JointRoute.plan(start, bounded, lower, upper, edge, proposals);
         var ops:Array<MotionOp> = [for (i in 1...route.length)
           MotionOp.MoveJ(MoveTarget.JointTarget(route[i]), new MotionOptions(), Blend.ExactStop)];
         var program = new MotionProgram(ops);

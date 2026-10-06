@@ -100,6 +100,17 @@ class ContactSearchMotionTests {
       var forbidden = false;
       try probePlanner.approach(new Transform3(new Vec3(0, 0, 0.2), Quat.identity()), [0.0], 32) catch (_:Dynamic) forbidden = true;
       check(forbidden, "Probe approach rejects a target outside the mechanical travel");
+      var badStart = false;
+      try probePlanner.approachJoints([0.01], [0.11]) catch (error:Dynamic)
+        badStart = Std.string(error).indexOf("start joint probe=0.11") >= 0;
+      check(badStart, "Probe approach identifies an observed start outside its finite joint bounds");
+      var badGoal = false;
+      try probePlanner.approachJoints([0.11], [0.0]) catch (error:Dynamic)
+        badGoal = Std.string(error).indexOf("IK goal joint probe=0.11") >= 0;
+      check(badGoal, "Probe approach identifies a discovered IK goal outside its finite joint bounds");
+      var roundoffGoal = probePlanner.approachJoints([0.1000000000000005], [0.0]);
+      check(Math.abs(roundoffGoal.endJoints[0] - 0.1) < 1e-12,
+        "Probe approach clamps representation-sized IK overshoot to the exact joint limit");
       function cube(z:Float):Array<Float> return [for (x in [-0.001, 0.001]) for (y in [-0.001, 0.001])
         for (height in [z - 0.001, z + 0.001]) for (value in [x, y, height]) value];
       var blocked = new ArmClearance(arm, [
