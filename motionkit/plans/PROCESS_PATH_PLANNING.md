@@ -875,3 +875,15 @@ Initial streaming timing was 13.305743 s; hashing/comparing only active
 lattice coordinates reduced it to 5.741541 s (88,894,000 tested edges),
 including streamed candidate generation. The one-second acceptance target
 remains unmet, and this synthetic probe is not authored-track coverage.
+
+PP3 native interface: mk_search_ladder reads candidate slices without copying
+the candidate ladder and returns global selected indices, cost, edge counts,
+first failed sample/distance and empty-layer versus no-edge diagnostics.
+Requests carry compiled jump/speed limits, process weights, free-start
+configuration and lattice dimensions; nonnegative per-candidate costs
+(including +infinity for disabled states) carry margin/posture preferences.
+Native API regressions cover successful selection, failed edges, empty
+layers, invalid slices and invalid limits. All 15 native CTest cases pass,
+and the regenerated portable ABI passes Linux/Windows/macOS x86_64/arm64
+audit. Haxe bridging, small-problem Descartes dispatch, coarse-to-fine and
+the subsecond large-path gate remain outstanding.

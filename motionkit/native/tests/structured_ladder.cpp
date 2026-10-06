@@ -72,4 +72,25 @@ int main(){
     layers[1][0].roll_index=s.rolls;invalid(s);
     layers[1][0].roll_index=0;layers[1][0].joints[0]=INFINITY;invalid(s);
 
+    mk_ladder_request request{};request.struct_size=sizeof(request);request.joint_count=1;
+    request.roll_count=request.tilt_count=request.azimuth_count=1;
+    request.max_jump[0]=.2;request.velocity[0]=request.weights[0]=1;
+    mk_configuration_sample samples[2]{};
+    for(unsigned i=0;i<2;++i){samples[i].struct_size=sizeof(samples[i]);samples[i].distance=.1*i;samples[i].first_candidate=i;samples[i].candidate_count=1;}
+    mk_lattice_candidate cells[2]{};
+    for(auto &c:cells)c.struct_size=sizeof(c);
+    cells[1].joints[0]=.1;double costs[]={0,.03};unsigned selected[2];mk_ladder_result report;
+    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_OK);
+    assert(selected[0]==0 && selected[1]==1 && std::abs(report.cost-.13)<1e-12 && report.failed_sample==UINT32_MAX);
+    cells[1].joints[0]=1;
+    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_GENERATION);
+    assert(report.failed_sample==1 && report.failure_kind==2 && report.failed_distance==.1 && selected[0]==UINT32_MAX);
+    samples[1].candidate_count=0;
+    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_GENERATION);
+    assert(report.failed_sample==1 && report.failure_kind==1);
+    samples[1].candidate_count=2;
+    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_INVALID_ARGUMENT);
+    samples[1].candidate_count=1;request.max_jump[0]=0;
+    assert(mk_search_ladder(&request,samples,2,cells,costs,2,selected,&report)==MK_ERROR_INVALID_ARGUMENT);
+
 }

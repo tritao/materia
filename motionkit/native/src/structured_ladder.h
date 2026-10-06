@@ -120,7 +120,7 @@ inline LadderResult structured_ladder(const Layers &layers,
                 lattice[lattice_key(prior[i],s.externals)].push_back(i);joints[joint_key(prior[i])].push_back(i);
             }
             struct Bounds {std::array<double,MK_MAX_JOINTS> lo,hi;};
-            auto bounds=[&](const LadderLayer &cells){std::unordered_map<unsigned,Bounds> result;
+            auto bounds=[&](const auto &cells){std::unordered_map<unsigned,Bounds> result;
                 for(const auto &c:cells){auto found=result.find(c.branch);
                     if(found==result.end()){Bounds b;for(unsigned j=0;j<s.joints;++j)b.lo[j]=b.hi[j]=c.joints[j];result.emplace(c.branch,b);}
                     else for(unsigned j=0;j<s.joints;++j){found->second.lo[j]=std::min(found->second.lo[j],c.joints[j]);found->second.hi[j]=std::max(found->second.hi[j],c.joints[j]);}}

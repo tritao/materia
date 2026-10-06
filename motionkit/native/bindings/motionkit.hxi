@@ -75,6 +75,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	/**
 	 * Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected.
 	 */
+	extern fn mk_search_ladder(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_lattice_candidate>> @in_array("candidate_count"), state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result>) -> mk_result;
 	extern fn mk_select_configurations(request: ptr<const<mk_configuration_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_configuration_candidate>> @in_array("candidate_count"), candidate_count: u32, out_sequence: ptr<mk_configuration_solution> @out_array("sample_count")) -> mk_result;
 	/**
 	 * Samples OPW's eight IK branches natively before the same Descartes search.
@@ -192,6 +193,37 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		lower: array<f64, 64> @offset(8);
 		upper: array<f64, 64> @offset(520);
 		periodic: array<u8, 64> @offset(1032);
+	}
+	/**
+	 * Structured ladder costs and lattice dimensions. External axes use their
+	 * process weights in weights[]; speeds normalize travel costs.
+	 */
+	struct mk_ladder_request @layout(2080, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		joint_count: u32 @offset(4);
+		external_count: u32 @offset(8);
+		roll_count: u32 @offset(12);
+		tilt_count: u32 @offset(16);
+		azimuth_count: u32 @offset(20);
+		max_jump: array<f64, 64> @offset(24);
+		weights: array<f64, 64> @offset(536);
+		velocity: array<f64, 64> @offset(1048);
+		start_joints: array<f64, 64> @offset(1560);
+		roll_weight: f64 @offset(2072);
+	}
+	struct mk_ladder_result @layout(40, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		/**
+		 * < UINT32_MAX on success.
+		 */
+		failed_sample: u32 @offset(4);
+		/**
+		 * < 0 success, 1 empty candidates, 2 no legal edges.
+		 */
+		failure_kind: u32 @offset(8);
+		failed_distance: f64 @offset(16);
+		cost: f64 @offset(24);
+		tested_edges: u64 @offset(32);
 	}
 	struct mk_lattice_candidate @layout(1056, 8) {
 		struct_size: u32 @offset(0) @struct_size;

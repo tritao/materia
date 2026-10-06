@@ -161,6 +161,31 @@ typedef struct mk_lattice_candidate {
     uint32_t singular;
 } mk_lattice_candidate;
 
+/** Structured ladder costs and lattice dimensions. External axes use their
+ * process weights in weights[]; speeds normalize travel costs. */
+typedef struct mk_ladder_request {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count;
+    uint32_t external_count;
+    uint32_t roll_count;
+    uint32_t tilt_count;
+    uint32_t azimuth_count;
+    double max_jump[MK_MAX_JOINTS];
+    double weights[MK_MAX_JOINTS];
+    double velocity[MK_MAX_JOINTS];
+    double start_joints[MK_MAX_JOINTS];
+    double roll_weight;
+} mk_ladder_request;
+
+typedef struct mk_ladder_result {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t failed_sample; /**< UINT32_MAX on success. */
+    uint32_t failure_kind; /**< 0 success, 1 empty candidates, 2 no legal edges. */
+    double failed_distance;
+    double cost;
+    uint64_t tested_edges;
+} mk_ladder_result;
+
 /** Candidate sets for one Descartes ladder-graph selection call. */
 typedef struct mk_configuration_request {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -343,6 +368,15 @@ MK_API mk_result MK_CALL mk_sample_cartesian_candidates(const mk_analytic_cartes
     mk_lattice_candidate *out_candidates MK_OUT_ARRAY(candidate_capacity), uint32_t candidate_capacity,
     uint32_t *out_count MK_OUT);
 /** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */
+/** No candidate copies: samples address slices of the candidate array.
+ * Costs are nonnegative; +infinity disables a candidate. Selected indices are
+ * global candidate-array offsets. Failure details remain in out_result. */
+MK_API mk_result MK_CALL mk_search_ladder(const mk_ladder_request *request,
+    const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
+    const mk_lattice_candidate *candidates MK_IN_ARRAY(candidate_count),
+    const double *state_costs MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
+    uint32_t *out_indices MK_OUT_ARRAY(sample_count), mk_ladder_result *out_result);
+
 MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,
     const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
     const mk_configuration_candidate *candidates MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
