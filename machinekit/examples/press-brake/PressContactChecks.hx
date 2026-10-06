@@ -12,6 +12,7 @@ import cadkit.sheetmetal.process.AirBending;
 import cadkit.sheetmetal.process.ProcessBendRule;
 import machinekit.pressbrake.ToolContactPrism;
 import machinekit.pressbrake.ToolHorn;
+import machinekit.pressbrake.ToolHornEnd;
 import machinekit.pressbrake.ToolProfiles;
 import machinekit.pressbrake.ToolSegment;
 import machinekit.pressbrake.ToolingCatalogue;
@@ -76,9 +77,11 @@ class PressContactChecks {
 
 		for (profile in ToolProfiles.catalogueProfiles()) nativeVolume(new ToolSegment(profile,100));
 		for (punch in ToolingCatalogue.punches()) {
-			nativeVolume(new ToolSegment(Punch(punch),100,new ToolHorn(Left,20,25)));
-			nativeVolume(new ToolSegment(Punch(punch),100,new ToolHorn(Right,20,25)));
+			nativeVolume(new ToolSegment(Punch(punch),100,new ToolHorn(ToolHornEnd.Left,20,25)));
+			nativeVolume(new ToolSegment(Punch(punch),100,new ToolHorn(ToolHornEnd.Right,20,25)));
 		}
+		for (end in [ToolHornEnd.Left,ToolHornEnd.Right])
+			nativeVolume(new ToolSegment(Punch(ToolingCatalogue.straight()),50,new ToolHorn(end,25,1)));
 		var punch = ToolingCatalogue.straight(), flat = rect(-1,-1,2,1);
 		check(!query.overlap(punch.contactSection(),flat),"Exact punch nose merely touches flat stock");
 		check(query.overlap(polygon(punch.collisionSection(0.01).points()),flat),"Fixture independently exposes false conservative nose penetration");

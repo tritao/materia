@@ -17,6 +17,7 @@ class ToolProfiles {
 		var result:Array<ToolProfile> = [];
 		for (punch in ToolingCatalogue.punches()) result.push(Punch(punch));
 		for (die in ToolingCatalogue.dies()) result.push(SingleV(die));
+		result.push(SingleV(ToolingCatalogue.raisedV12()));
 		var block = ToolingCatalogue.fourV();
 		for (face in 0...4) result.push(FourV(block, face));
 		return result;

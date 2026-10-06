@@ -13,6 +13,10 @@ class ToolingCatalogue {
 	public static function fourV():MultiVDieProfile return new MultiVDieProfile("reference-four-v-8-12-16-22", 60,
 		[for (opening in [8, 12, 16, 22]) new DieGroove(opening, 88 * Math.PI / 180, 1)]);
 
+	/** Taller reference block provides clearance below downward folded flanges. */
+	public static function raisedV12():DieProfile return new DieProfile("reference-v12-raised-88-r1",
+		new DieGroove(12, 88 * Math.PI / 180, 1), 40, 50);
+
 	public static function straight():PunchProfile return tapered("reference-straight-88-r06", Straight, 88 * Math.PI / 180, 100);
 
 	public static function acute():PunchProfile return tapered("reference-acute-30-r06", Acute, Math.PI / 6, 100);

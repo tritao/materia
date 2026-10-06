@@ -15,10 +15,13 @@ import cadkit.sheetmetal.process.ProcessBendRule;
 import machinekit.pressbrake.planning.BackgaugeStroke;
 import machinekit.pressbrake.planning.BendOrientation;
 import machinekit.pressbrake.planning.BendSetup;
+import machinekit.pressbrake.planning.BendTimeModel;
 import machinekit.pressbrake.planning.ConvexPrism;
 import machinekit.pressbrake.planning.GaugeEdge;
 import machinekit.pressbrake.planning.GeometricGripCheck;
 import machinekit.pressbrake.planning.GripCheck;
+import machinekit.pressbrake.planning.GripCandidateResult.GripAccepted;
+import machinekit.pressbrake.planning.GripCandidateResult.GripRejected;
 import machinekit.pressbrake.planning.GripperBox;
 import machinekit.pressbrake.planning.PressGeometry;
 import machinekit.pressbrake.planning.PressWallPrismQuery;
@@ -67,6 +70,23 @@ class GripChecks {
 		checker.check(sheet,setup,grip,withdrawal); checks++;
 		var underside = new SheetGrip(root.id,new Point2(10,50),false);
 		checker.check(sheet,setup,underside,withdrawal); checks++;
+		var unsupportedGrip = new SheetGrip(root.id,new Point2(1,50),true);
+		var outcomes = geometric.checkCandidates(sheet,setup,[grip,unsupportedGrip,underside],withdrawal);
+		check(outcomes.length == 3,"Batched grip clearance returns one typed result per authored candidate");
+		switch outcomes[0] {
+			case GripAccepted(value): check(BendTimeModel.sameGrip(value,grip),"Batched clearance retains the first accepted grip");
+			case GripRejected(_,failure): throw failure;
+		}
+		switch outcomes[1] {
+			case GripRejected(value,failure):
+				check(BendTimeModel.sameGrip(value,unsupportedGrip) && failure.code == "press.grip-support",
+					"Batched clearance retains each unsupported candidate and its diagnosis");
+			case GripAccepted(_): throw "Batched clearance cannot accept an unsupported grip";
+		}
+		switch outcomes[2] {
+			case GripAccepted(value): check(BendTimeModel.sameGrip(value,underside),"Batched clearance preserves candidate order");
+			case GripRejected(_,failure): throw failure;
+		}
 		for (pose in setup.stroke()) {
 			var frame = underside.frame(sheet,pose), expected = pose.wall(root.id).plane.toWorld(new Vector(10,50,-stock.thickness));
 			check(frame.plane.origin.subtract(expected).length() < 1e-8

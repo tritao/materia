@@ -16,7 +16,10 @@ class PressContactQuery {
 			case SheetBend(id):
 				for (contact in tool.prisms()) {
 					var material = PressBendSection.of(sheet.bend(id), pose.evaluation.bend(id), pose.placement, contact.start, contact.end);
-					if (material == null) return null;
+					if (material == null) {
+						if (PressBendToolSeparation.clear(pose.evaluation.bend(id),pose.placement,contact)) continue;
+						return null;
+					}
 					for (section in material) if (sections.overlap(section, contact.section)) return true;
 				}
 				return false;

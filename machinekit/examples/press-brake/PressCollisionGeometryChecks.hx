@@ -10,6 +10,7 @@ import cadkit.sheetmetal.WallOutline;
 import cadkit.sheetmetal.process.AirBending;
 import cadkit.sheetmetal.process.ProcessBendRule;
 import machinekit.pressbrake.ToolHorn;
+import machinekit.pressbrake.ToolHornEnd;
 import machinekit.pressbrake.ToolLayout;
 import machinekit.pressbrake.ToolRow;
 import machinekit.pressbrake.ToolSegment;
@@ -68,7 +69,7 @@ class PressCollisionGeometryChecks {
 		checks = 0;
 		var punch = ToolingCatalogue.straight(), die = ToolingCatalogue.dies()[1];
 		var station = new ToolStation("split", new ToolRow([new ToolSegment(Punch(punch),100),
-			new ToolSegment(Punch(punch),50,new ToolHorn(Left,10,25))],[20]),
+			new ToolSegment(Punch(punch),50,new ToolHorn(ToolHornEnd.Left,10,25))],[20]),
 			new ToolRow([new ToolSegment(SingleV(die),100),new ToolSegment(SingleV(die),50)],[30]),700);
 		var other = new ToolStation("neck",new ToolRow([new ToolSegment(Punch(ToolingCatalogue.gooseneck()),100)],[]),
 			new ToolRow([new ToolSegment(SingleV(die),100)],[]),1100);
