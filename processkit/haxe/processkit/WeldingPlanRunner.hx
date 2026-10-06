@@ -279,7 +279,19 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     var solver=cast(motion.compiler.solver,ManipulatorKinematics),group=solver.manipulator;
     var request=problem.request(start,motion.compiler.ikTolerance,
       motion.compiler.perJointMaxJump,motion.compiler.maxVelocity);
-    return problem.select(group,request,null,clearance,(from,to)->{
+    // Omitted ranges hold axes at the seed. Welds with a work positioner or
+    // rail must search its physical range rather than freezing it there.
+    var ranges:Array<motionkit.robot.ExternalAxisGrid.ExternalAxisRange> = [];
+    for(joint in 0...group.group.count())if(group.external[joint]){
+      var limits=group.group.limitsOf(joint);
+      if(!Math.isFinite(limits.lower) || !Math.isFinite(limits.upper))
+        throw "Weld external-axis selection requires finite planning bounds";
+      var span=limits.upper-limits.lower;
+      var points=span==0 ? 1 : Std.int(Math.ceil(span/(request.maxJump[joint]*0.5)))+1;
+      ranges.push(new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(joint,limits.lower,limits.upper,points));
+    }
+    var sampling=new motionkit.robot.CandidateProblem.CandidateSamplingOptions(8,3,8,false,ranges);
+    return problem.select(group,request,sampling,clearance,(from,to)->{
       var entry=motion.compiler.generateEntry(from,to);
       try {
         var violation=clearance==null ? null : motionkit.robot.TrajectoryClearance.violation(
