@@ -607,3 +607,14 @@ UR-like contract fixture passes 30 forward/inverse round trips; a second
 and focused C4 runtime pass (103,688 assertions). Actual authored Cobot models,
 external axes, equivalent displaced axis origins and wider geometric coverage
 remain to be verified; PP1 is still incomplete.
+
+PP1 UR external-chain support is now implemented: arm branches are evaluated
+at the upstream/workpiece coordinates supplied in the complete seed, then
+restored into the group's joint vector. Rotated-track and track-plus-positioner
+fixtures pass 30 round trips each, including all returned branch TCP/orientation
+checks and exact preservation of external coordinates. The standalone shifted
+reference fixture also displaces each joint origin along its own axis and
+passes. Focused C4 runtime passes 180,868 assertions. Authored Cobot validation
+is still underway; its examples declare moveJoints missions at the flange,
+so the fixture must use missionFrames rather than toolFrames or a handling
+runner.

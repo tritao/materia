@@ -5,7 +5,7 @@ import TrajectoryCore;
 import motionkit.kinematics.Pose3;
 import motionkit.path.OrientationPolicy;
 import motionkit.robot.AnalyticIk.AnalyticBranch;
-import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.KinematicGroup;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.spatial.Transform3;
@@ -14,21 +14,31 @@ import robotkit.spatial.Vec3;
 
 /** UR parallel-axis 6R geometry extracted from model joint axes and frames. */
 class UrAnalyticIk implements AnalyticIk {
-  public final manipulator:Manipulator;
+  public final manipulator:KinematicGroup;
+  final groupBackend:Null<UrGroupIk>;
   final native:mk_ur_parameters;
   final base:Transform3;
   final flangeTTcp:Transform3;
 
-  public function new(manipulator:Manipulator, tolerance:Float = 1e-6) {
-    if (manipulator == null || manipulator.group.count() != 6 || manipulator.workFrame != null || manipulator.external.indexOf(true) >= 0)
-      throw "UR analytic extraction requires a standalone six-joint arm";
+  public function new(manipulator:KinematicGroup, tolerance:Float = 1e-6) {
+    if (manipulator == null || !Math.isFinite(tolerance) || tolerance <= 0)
+      throw "UR analytic extraction requires a group and positive finite tolerance";
     this.manipulator = manipulator;
+    if (manipulator.workFrame != null || manipulator.external.indexOf(true) >= 0) {
+      groupBackend = new UrGroupIk(manipulator,tolerance);
+      native = groupBackend.arm.native;
+      base = groupBackend.arm.base;
+      flangeTTcp = groupBackend.arm.flangeTTcp;
+      return;
+    }
+    groupBackend = null;
+    if (manipulator.group.count() != 6) throw "UR analytic extraction requires six arm joints";
     var path = manipulator.pathJoints();
     var drivers = [for (j in path) if (j.type != JointType.Fixed) j];
+    if (drivers.length != 6) throw "UR analytic extraction requires six revolute joints";
     for (i in 0...drivers.length)
       if ((drivers[i].type != JointType.Revolute && drivers[i].type != JointType.Continuous) || drivers[i].id != manipulator.group.jointIds[i])
         throw "UR analytic extraction requires independent revolute joints in chain order";
-    if (drivers.length != 6) throw "UR analytic extraction requires six revolute joints";
     var reference = [for (_ in 0...6) 0.0];
     var geometry = geometryAt(path, reference);
     var z = geometry.axes[0], y = geometry.axes[1].scale(-1);
@@ -88,7 +98,7 @@ class UrAnalyticIk implements AnalyticIk {
     return {origins:origins,axes:axes};
   }
   public function family():String return "UR6R";
-  public function jointCount():Int return 6;
+  public function jointCount():Int return manipulator.group.count();
   public function nativeModel():mk_ur_parameters return native;
   function nativeForward(q:Array<Float>):Transform3 {
     var result=MotionKitNative.mk_analytic_ur_forward(native,q);
@@ -98,10 +108,13 @@ class UrAnalyticIk implements AnalyticIk {
   }
   function forwardTransform(q:Array<Float>):Transform3 return base.compose(nativeForward(q)).compose(flangeTTcp);
   public function forward(q:Array<Float>):Pose3 {
+    if (q == null || q.length != jointCount()) throw "UR analytic FK requires complete joints";
+    if (groupBackend != null) return groupBackend.forward(q);
     var t=forwardTransform(q),p=t.translation,r=t.rotation;
     return new Pose3(p.x,p.y,p.z,r.x,r.y,r.z,r.w);
   }
   public function branches(target:Pose3,seed:Array<Float>,?freedom:OrientationPolicy):Array<AnalyticBranch> {
+    if (groupBackend != null) return groupBackend.branches(target,seed,freedom);
     if(seed==null || seed.length!=6 || target==null) throw "UR analytic IK requires a complete seed and target";
     switch freedom {case null | Fixed | Interpolated: case _: throw "UR analytic IK requires a fixed orientation sample";}
     var t=base.inverse().compose(new Transform3(new Vec3(target.x,target.y,target.z),new Quat(target.qx,target.qy,target.qz,target.qw))).compose(flangeTTcp.inverse());
