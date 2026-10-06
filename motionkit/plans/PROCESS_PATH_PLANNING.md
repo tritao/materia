@@ -37,8 +37,9 @@ Work already done stays where it fits; what doesn't is reworked in the step name
      prototype it) is replaced by EAIK if the spike shows EAIK solves `RobotArm` as authored.
    - Cartesian machines and their C/C+A heads keep our own small closed form: they have prismatic
      joints, and EAIK targets revolute chains.
-   - `RobotArm`'s 35 mm wrist offset (documented as a spherical wrist) is a geometry decision for the
-     user. EAIK handles either answer. Do not change the arm's geometry without that decision.
+   - `RobotArm`'s 35 mm wrist offset: **decided by the user (2026-10-06): `RobotArm` becomes a standard
+     industrial spherical-wrist arm** (PP0a). OPW solves it exactly. EAIK's spike targets
+     `CobotArm` (UR-type) and generality, not `RobotArm`.
 2. **One collision world: collisionkit** (PP-D5, PP-D6, PP5, PP10).
    - The coal collision plan (`kinematicskit/plans/COLLISION.md`, CL0–CL8; CL1 done on branch
      `collision`) owns collision: a native world posed from body poses (CL2 collisionkit, CL3 cell
@@ -59,6 +60,13 @@ Work already done stays where it fits; what doesn't is reworked in the step name
      `JointPathPlanner`. A short move is a ladder with one candidate per sample.
    - Point-by-point path IK, `RedundancyResolver` and its parameterizations are deleted (PP9), with
      no parallel code path kept for "other" cases.
+6. **`RobotArm` follows industry geometry and conventions** (PP0a, decided 2026-10-06).
+   - Industry has two dominant 6R families:
+     - industrial arms with a spherical wrist (ABB, KUKA, Fanuc, Yaskawa, all arc-welding robots;
+       OPW);
+     - cobots with three parallel axes (UR; `CobotArm`).
+   - `RobotArm` becomes the first; `CobotArm` already is the second.
+   - The 35 mm offset was a by-product of stacking identical joint modules, not a design intent.
 5. **Refinement is an interface** (PP4).
    - The spline smoothing plus exact re-solve is the first implementation behind a
      `PathRefinement`-style interface.
@@ -295,20 +303,59 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 - Record every number in this plan's Progress section. They are the targets PP8–PP9 must beat,
   with weld quality unchanged.
 
+**PP0a. Industrial `RobotArm`** (revision 6). Do this before PP1a.
+- **Stop and delete the offset-wrist work:**
+  - `motionkit/native/src/offset_wrist_polynomial.h` and `scripts/research/offset-wrist-polynomial.py`;
+  - the offset geometry/inverse prototypes, interval and certificate code, and their tests and app
+    selectors.
+  - Revert or remove them in one commit that lists what went. Keep nothing "for later": EAIK covers
+    non-spherical wrists if ever needed.
+- **Spherical wrist.** Redesign the wrist links so the j4, j5 and j6 axes meet at one point:
+  - the j5 housing becomes a fork/clevis around the wrist centre;
+  - j6 is coaxial with j4 at j5 = 0, ending in the tool flange.
+  - Keep the joint-module parts (servo, gearbox, X8 drives), and change how the wrist links carry
+    them.
+  - Hollow-wrist routing for a torch cable is welcome, but not required.
+- **Proportions as size classes,** like `CobotArm`. The OPW-shaped parameters (shoulder offset a1,
+  elbow offset a2, upper arm c2, forearm c3, wrist-to-flange c4) resemble a known ~0.9 m reach
+  industrial arm (IRB 1200 / KR 6 R900 class). Generic names; values marked assumed.
+  - The default class keeps the welders' and track arm's reach needs. Check every cell that uses
+    `RobotArm` still reaches its work, and move fixtures only where reach requires it.
+- **Standard zero pose and directions:**
+  - at zero, the upper arm is vertical and the forearm horizontal (ABB/Fanuc convention);
+  - right-hand joint directions;
+  - datasheet-like limits, marked assumed.
+- **Named configurations.**
+  - Label every IK solution the way controllers do: shoulder front/back, elbow up/down, wrist
+    flip/no-flip, plus turn counts per joint (compare ABB `cfx`, Fanuc "N U T").
+  - Programs and missions can pin a configuration.
+  - Ladder candidates (PP2/PP3) and diagnostics carry the label.
+  - Implemented once in MotionKit for every 6R family, using each family's convention mapping.
+- **Tests:**
+  - `OpwKinematics` extracts `RobotArm`'s parameters from the compiled model (no hand-written
+    values);
+  - FK round trips contain all 8 labelled solutions;
+  - configuration labels match OPW branches;
+  - MachineKit checks (FK, interference at joint limits, drives, BOM) pass for each size class.
+- **Re-baseline.** Re-run the robot-arm mission, robot welder, gantry welder (unchanged arm-free
+  control), track arm/G17 weld, and every other `RobotArm` user (about 13 construction sites).
+  Record new baselines with the reason "industrial spherical-wrist RobotArm". These replace PP0's arm
+  numbers as the targets for PP8.
+
 **PP1a. EAIK spike** (revision 1). Decide EAIK before more IK work.
 - Vendor `OstermD/EAIK` as a pinned submodule (BSD-3-Clause; record it in `THIRD_PARTY.md`). Build only
   its C++ core (`CPP/src`, CMake) into MotionKit native, using MotionKit's Eigen.
 - Feed it H/P vectors from the `RobotModel` arm sub-chain (with the base pose from external joints).
 - **Checks:**
   - every OPW-tested arm (IRB2400, KR6, R2000, TX40): EAIK's solutions contain OPW's, FK round trip;
-  - `RobotArm` as authored (35 mm offset wrist): all solutions, FK round trip;
+  - `RobotArm` after PP0a: EAIK agrees with OPW;
   - `CobotArm` size classes: same;
   - cost per solve (closed-form vs 1-D search cases) against the ladder's budget;
   - an Emscripten build compiles;
   - determinism, and behaviour at singularities.
 - **Outcome recorded here.**
-  - Pass: EAIK is the 6R backend; continue PP1 on it, delete the offset-wrist research code and the
-    UR closed form.
+  - Pass: EAIK is the 6R backend for arms other than OPW's family; continue PP1 on it, and delete
+    the UR closed form.
   - Fail: record why, and keep per-family solvers only for what EAIK can't do.
 
 **PP1. Analytic IK backends** (PP-D3; revised by PP1a).
@@ -438,12 +485,12 @@ joint path q(s), q'(s), q''(s)  ──► TOPP-RA once ──► final checks (l
 ## Order
 
 ```
-PP0 → PP1a → PP1 → PP2 → PP3 → PP4 → PP5 → PP6 → PP7 → PP8 → PP9 → PP11
+PP0 → PP0a → PP1a → PP1 → PP2 → PP3 → PP4 → PP5 → PP6 → PP7 → PP8 → PP9 → PP11
                                    (collision plan CL2–CL4 on main) → PP10
 ```
 
-PP1a comes first: the IK backend decides how the welders' `RobotArm` is solved, and with it the
-track-weld benchmark.
+PP0a comes first: it settles the welders' arm, and with it the IK backend and the track-weld
+baseline. PP1a then settles EAIK for the cobot family and other arms.
 
 ## Later
 
@@ -467,6 +514,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | Step | State | Commits |
 |------|-------|---------|
 | PP0 | in progress: harness and diagnostics; baseline completion pending | `0d43b32c0` (partial) |
+| PP0a | planned (revision 2026-10-06): industrial spherical-wrist RobotArm, delete offset-wrist work | — |
 | PP1a | planned (revision 2026-10-06): EAIK spike | — |
 | PP1 | in progress: Cartesian, OPW and authored Cobot UR verified; offset RobotArm unresolved | `0d43b32c0`, `bfec0fa28`, `8569a2a98` (partial) |
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
