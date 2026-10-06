@@ -249,9 +249,10 @@ class MobileWeldStations {
       var lower = [for (joint in 0...arm.group.count()) arm.group.limitsOf(joint).lower];
       var upper = [for (joint in 0...arm.group.count()) arm.group.limitsOf(joint).upper];
       var stow = JointRoute.plan(q, ready, lower, upper, (from, to) -> airMove(station, from, to));
-      for (waypoint in 1...stow.length) result.push({kind: "moveJoints", at: tools[0].contact,
-        joints: [for (joint in 0...arm.group.count())
-          {joint: arm.group.jointIds[joint], position: homeJoints[joint] + stow[waypoint][joint]}]});
+      if (stow.length < 2) throw "Mobile station has no checked ready-posture stow";
+      // The runtime replans this semantic stow from the measured post-weld arm
+      // pose and current cell geometry; these nominal edges only prove station feasibility.
+      result.push({kind: "stow", at: tools[0].contact});
     }
     Sys.println('Mobile weld mission: ${chosen.stations.length} stations, ${seams.length} CAD seams, ${chosen.travelCost} m route');
     return result;
