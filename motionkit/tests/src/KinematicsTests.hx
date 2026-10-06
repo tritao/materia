@@ -646,6 +646,19 @@ class KinematicsTests extends MotionKitTestSupport {
     throws(function() motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q ->
       q==blockedEndpoint ? {a:"wrist",b:"obstacle",distance:0.0,required:0.01} : null,1),
       "collision retry budget is enforced before accepting an unchecked alternate");
+    var sweepChecks=0;
+    var sweepRoute=motionkit.robot.LazyCollisionLadder.selectWithChecks(rerouteProblem,q -> null,2,
+      (from,to) -> {sweepChecks++;return to==blockedEndpoint ? {a:"tool",b:"post",distance:0.0,required:0.01} : null;});
+    check(sweepRoute.candidates[1].q!=blockedEndpoint && sweepChecks==2,
+      "lazy sweep exclusions reroute the blocked transition in two rounds");
+    var blockedEdge=new motionkit.robot.StructuredLadder.BlockedLadderEdge(1,
+      rerouteProblem.samples[0].candidates.indexOf(initialRoute.candidates[0]),
+      rerouteProblem.samples[1].candidates.indexOf(initialRoute.candidates[1]));
+    var filteredRoute=motionkit.robot.StructuredLadder.search(rerouteProblem,null,0,null,null,[blockedEdge]);
+    check(filteredRoute.diagnostic==null && filteredRoute.candidates[1].q!=blockedEndpoint,
+      "Haxe edge records reach filtered native search");
+    throws(function() motionkit.robot.StructuredLadder.search(rerouteProblem,null,0,null,null,
+      [new motionkit.robot.StructuredLadder.BlockedLadderEdge(0,0,0)]),"Haxe rejects a nonadjacent blocked edge");
     var originalRoute=motionkit.robot.StructuredLadder.search(rerouteProblem);
     check(originalRoute.candidates[1].q==blockedEndpoint,"lazy collision filtering leaves the source candidate problem unchanged");
     var refiner=new motionkit.robot.AnalyticPathRefiner(fixture.arm,problem,selected);

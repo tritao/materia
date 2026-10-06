@@ -7,7 +7,7 @@ import motionkit.robot.CartesianCandidateSampler.LatticeCandidate;
 /** Native structured selection over all candidates retained by CandidateProblem. */
 class StructuredLadder {
   public static function search(problem:CandidateProblem,?weights:Array<Float>,rollWeight:Float=0,
-      ?stateCost:(Int,LatticeCandidate)->Float,?coarse:CoarseSearchOptions):LadderSelection {
+      ?stateCost:(Int,LatticeCandidate)->Float,?coarse:CoarseSearchOptions,?blockedEdges:Array<BlockedLadderEdge>):LadderSelection {
     if(problem==null || problem.samples.length==0)throw "Ladder search requires candidate layers";
     var path=problem.request,n=path.startQ.length;
     if(weights!=null && weights.length!=n)throw "Ladder weight count must match joints";
@@ -35,7 +35,15 @@ class StructuredLadder {
         candidates.push(record);originals.push(c);costs.push(stateCost==null ? 0.0 : stateCost(i,c));
       }
     }
-    var result=MotionKitNative.mk_search_ladder(request,samples,candidates,costs);
+    var exclusions:Array<mk_ladder_edge> = [];
+    if(blockedEdges!=null)for(edge in blockedEdges){
+      if(edge==null || edge.sample<1 || edge.sample>=problem.samples.length || edge.from<0 || edge.to<0 ||
+          edge.from>=problem.samples[edge.sample-1].candidates.length || edge.to>=problem.samples[edge.sample].candidates.length)
+        throw "Blocked ladder edge must address adjacent candidate layers";
+      var record=new mk_ladder_edge();record.set_struct_size(mk_ladder_edge.size());
+      record.set_sample(edge.sample);record.set_from_candidate(edge.from);record.set_to_candidate(edge.to);exclusions.push(record);
+    }
+    var result=MotionKitNative.mk_search_ladder_filtered(request,samples,candidates,costs,exclusions);
     if(result.status==TrajectoryCoreConstants.MK_ERROR_GENERATION){var report=result.out_result;
       return new LadderSelection([],report.get_cost(),report.get_failed_sample(),report.get_failed_distance(),
         report.get_failure_kind()==1 ? "no candidates (unreachable or joint limits)" : "no legal edges (jump or disabled states)");}
@@ -65,4 +73,12 @@ class CoarseSearchOptions {
     if(sampleStride<1 || latticeStride<1 || radius<1 || widenings<0 || widenings>16)throw "Invalid coarse ladder resolution";
     this.sampleStride=sampleStride;this.latticeStride=latticeStride;this.radius=radius;this.widenings=widenings;
   }
+}
+
+/** Candidate indices are local to adjacent source layers. */
+class BlockedLadderEdge {
+  public final sample:Int;
+  public final from:Int;
+  public final to:Int;
+  public function new(sample:Int,from:Int,to:Int){this.sample=sample;this.from=from;this.to=to;}
 }

@@ -1189,3 +1189,16 @@ invalid sample-zero exclusions are rejected. Native rebuild, focused
 structured CTest and four-platform ABI audit pass; bindings regenerated.
 Haxe blocked-edge wiring, lazy sweep re-search, closest clearance and
 physical obstacle acceptance remain outstanding.
+
+PP5 Haxe sweep retry: StructuredLadder accepts validated BlockedLadderEdge
+records and calls the filtered native API. LazyCollisionLadder records
+failed swept transitions using original layer-local candidate indices,
+then searches again within the same round budget while preserving both
+endpoint states. Selected-pose filtering and edge filtering coexist.
+Injected-checker acceptance verifies a blocked sweep selects an alternate
+route in exactly two rounds, native exclusions reach Haxe, invalid sample-
+zero records are rejected, and fully blocked/budget cases still fail.
+Compiler-only and focused runtime pass (1,148,574 assertions). Physical
+obstacle branch/roll acceptance, closest-clearance reporting, refined
+collision re-search and production/compiler migration remain outstanding;
+PP5 and the full plan remain incomplete.
