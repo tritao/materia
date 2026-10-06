@@ -49,6 +49,7 @@ class ProgramPlanner {
   var speedScale:Float;
   var cancelled:Bool = false;
   var stopped:Bool = false;
+  var fixedPlans:Bool = false;
   var planningSeconds:Float = 0.0;
   var numericIkSolves:Int = 0;
 
@@ -62,12 +63,35 @@ class ProgramPlanner {
 
   /** Starts planning; an invalid program or start position throws here, on the caller's thread. */
   public function new(compiler:ProgramCompiler, program:MotionProgram, initialQ:Array<Float>,
-      firstPlanId:Int64, firstOp:Int, speedScale:Float, lookaheadSeconds:Float) {
+      firstPlanId:Int64, firstOp:Int, speedScale:Float, lookaheadSeconds:Float,?compiled:CompiledProgram) {
     if (!Math.isFinite(lookaheadSeconds) || lookaheadSeconds <= 0.0)
       throw "Planning lookahead must be finite and positive";
     this.lookaheadSeconds = lookaheadSeconds;
     this.speedScale = speedScale;
     nextPlanId = firstPlanId;
+    if(compiled!=null){
+      for(block in compiled.blocks)if(!block.complete || block.plans.length!=block.opIndices.length ||
+          block.plans.length!=block.pathLengths.length || block.plans.length!=block.pathDistances.length ||
+          block.plans.length!=block.pathTimes.length)throw "Compiled blocks must have complete aligned metadata";
+      var expected=firstPlanId;
+      for(block in compiled.blocks)for(plan in block.plans){
+        if(plan==null || Int64.compare(plan.planId,expected)<0)throw "Compiled plan ids must be increasing and unused";
+        expected=Int64.add(plan.planId,Int64.ofInt(1));
+      }
+      var owned=compiled.takeBlocks();
+      try {
+        for(block in owned){
+          for(i in 0...block.plans.length){var plan=block.plans[i];
+            blocks.plan(plan,block.opIndices[i],block.pathLengths[i],block.pathDistances[i],block.pathTimes[i]);
+            nextPlanId=Int64.add(plan.planId,Int64.ofInt(1));
+          }
+          if(block.barrier!=null)blocks.barrier(block.barrier);
+        }
+        for(note in compiled.notes)blocks.note(note);
+        blocks.finish(nextPlanId);fixedPlans=true;stopped=true;
+      }catch(error:Dynamic){for(block in owned)for(plan in block.plans)plan.dispose();throw error;}
+      return;
+    }
     // The worker plans on kinematics of its own: the caller keeps evaluating the arm meanwhile.
     var compilation = compiler.forWorker().begin(program, initialQ, firstPlanId, firstOp, speedScale,
       new WorkerSink(this));
@@ -76,6 +100,12 @@ class ProgramPlanner {
     live.push(this);
     registry.release();
     Thread.create(function() self.work(compilation));
+  }
+
+  /** Adopt checked plans without another compilation or a worker thread. */
+  public static function fromCompiled(compiled:CompiledProgram,firstPlanId:Int64):ProgramPlanner {
+    if(compiled==null)throw "A compiled program is required";
+    return new ProgramPlanner(null,null,[],firstPlanId,0,1.0,1.0,compiled);
   }
 
   /** How many planners have a worker that has not stopped yet. */
@@ -138,6 +168,7 @@ class ProgramPlanner {
   public function setSpeedScale(scale:Float):Void {
     if (!Math.isFinite(scale) || scale <= 0.0)
       throw "Program speed scale must be finite and positive";
+    if(fixedPlans && scale!=speedScale)throw "Compiled motion has a fixed clock; speed changes require recompilation";
     condition.acquire();
     speedScale = scale;
     condition.release();

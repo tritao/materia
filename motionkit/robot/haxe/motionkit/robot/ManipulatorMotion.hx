@@ -121,6 +121,27 @@ class ManipulatorMotion {
     } catch (error:Dynamic) { fail(Std.string(error), false); }
   }
 
+  /** Submit checked plans once; ownership passes to this motion after validation.
+   * Their clock and process events are retained without another compiler pass. */
+  public function runCompiled(compiled:CompiledProgram):Void {
+    session.requireReady();
+    if(compiled==null)throw "A compiled manipulator program is required";
+    if(session.isStopping() || running)throw "Compiled motion requires an idle ready session";
+    if(speedOverride!=1.0)throw "Compiled motion has a fixed clock; reset the speed override before submission";
+    var expected=nextPlanId;
+    for(block in compiled.blocks)for(plan in block.plans){
+      if(plan.jointCount!=jointIndices.length || Int64.compare(plan.planId,expected)<0)
+        throw "Compiled motion joint count or plan ids do not match this executor";
+      expected=Int64.add(plan.planId,Int64.ofInt(1));
+    }
+    release();programCompleted=false;failure=null;events=[];
+    blockIndex=0;planIndex=0;barrierElapsed=0.0;planStarted=false;startedPlans=0;
+    try {
+      planner=ProgramPlanner.fromCompiled(compiled,nextPlanId);
+      session.begin();advance(0.0);
+    }catch(error:Dynamic){fail(Std.string(error),false);}
+  }
+
   public function update(dtSeconds:Float):Void {
     if (!running) return;
     if (!Math.isFinite(dtSeconds) || dtSeconds <= 0.0)
@@ -166,9 +187,9 @@ class ManipulatorMotion {
   public function setSpeedOverride(scale:Float):Void {
     if (!Math.isFinite(scale) || scale < 0.05 || scale > 2.0)
       throw "Speed override must be between 0.05 and 2";
-    speedOverride = scale;
     var planning = planner;
     if (planning != null) planning.setSpeedScale(scale);
+    speedOverride = scale;
   }
 
   public function hold():Void if (running) executor.hold();

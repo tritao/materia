@@ -766,6 +766,64 @@ class ProgramTests extends MotionKitTestSupport {
     waiting.dispose();
   }
 
+  public function testCompiledManipulatorMotion():Void {
+    var fixture=buildContractArmFixture();
+    for(joint in fixture.model.joints)joint.limits.maxAcceleration=4.0;
+    var harness=new SimulationHarness(0.01);
+    var blueprint=RobotRuntimeCompiler.compile(fixture.model,new robotkit.profile.RobotProfile());
+    blueprint.channels.push(new ProcessChannelDeclaration("compiled.enabled",ProcessEventValue.Digital(false)));
+    var runtime=harness.simulation.addRobot(blueprint);
+    var robot=new SimulatedRobot("compiled-arm",runtime,fixture.model.name,
+      [for(link in fixture.model.links)link.name],[for(joint in fixture.model.joints)joint.name]);
+    var solver=new ManipulatorKinematics(fixture.arm,1e-8);
+    var compiler=new ProgramCompiler(solver,new ValidationLimits(6,Int64.ofInt(1),Int64.ofInt(0)),"work",
+      [for(_ in 0...6)2.0],[for(_ in 0...6)4.0],[for(_ in 0...6)20.0],
+      StartTolerances.uniform(6,0.02,0.02,0.02));
+    var ready=false,motion=new ManipulatorMotion(robot,compiler,_->EventValue.Digital(ready),()->runtime.pollEvents());
+    var origin=[for(_ in 0...6)0.0],goal=origin.copy();goal[0]=0.02;
+    var program=new MotionProgram([
+      MotionOp.MoveJ(MoveTarget.JointTarget(goal),new MotionOptions(),Blend.ExactStop),
+      MotionOp.SetOutput("compiled.enabled",EventValue.Digital(true)),
+      MotionOp.WaitInput("ready",InputPredicate.Equals(EventValue.Digital(true)),3.0),
+      MotionOp.Dwell(0.1),
+      MotionOp.MoveJ(MoveTarget.JointTarget(origin),new MotionOptions(),Blend.ExactStop),
+      MotionOp.SetOutput("compiled.enabled",EventValue.Digital(false))
+    ]);
+    var compiled=compiler.compile(program,origin,Int64.ofInt(700));
+    var workers=ProgramPlanner.active();
+    motion.setSpeedOverride(0.5);
+    throws(()->motion.runCompiled(compiled),"compiled submission rejects a different execution speed override");
+    motion.setSpeedOverride(1.0);motion.runCompiled(compiled);
+    compiled.dispose(); // Ownership moved; this must not destroy queued plans.
+    throws(()->ProgramPlanner.fromCompiled(compiled,Int64.ofInt(700)),"compiled plan ownership transfers only once");
+    check(ProgramPlanner.active()==workers,"precompiled submission starts no planning worker");
+    throws(()->motion.setSpeedOverride(0.5),"running compiled plans retain their validated process clock");
+    near(motion.speedOverride,1.0,"rejected compiled override does not change motion state",0);
+    var tick=0;
+    for(i in 0...400){
+      if(i==100)ready=true;
+      motion.update(0.01);harness.step(Int64.ofInt(++tick));
+      if(motion.completed || motion.failure!=null)break;
+    }
+    check(motion.completed && motion.failure==null,'precompiled motion completes through wait/dwell barriers: ${motion.failure}');
+    near(robot.snapshot().positions.get(0),0.0,"precompiled program reaches its selected endpoint",1e-4);
+    var fired=motion.firedEvents();
+    check(Lambda.exists(fired,event->event.channel=="compiled.enabled" && switch event.value {
+      case ProcessEventValue.Digital(true):true;default:false;
+    }),"precompiled runtime retains engagement on events");
+    check(Lambda.exists(fired,event->event.channel=="compiled.enabled" && switch event.value {
+      case ProcessEventValue.Digital(false):true;default:false;
+    }),"precompiled runtime retains engagement off events");
+    var metrics=motion.planningMetrics();
+    check(metrics.seconds==0 && metrics.numericIkSolves==0,"precompiled execution performs no additional compilation");
+    var stale=compiler.compile(program,origin,Int64.ofInt(700));
+    throws(()->motion.runCompiled(stale),"precompiled execution rejects previously used plan ids");stale.dispose();
+    motion.run(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal),new MotionOptions(),Blend.ExactStop)]));
+    for(_ in 0...300){motion.update(0.01);harness.step(Int64.ofInt(++tick));if(motion.completed || motion.failure!=null)break;}
+    check(motion.completed && motion.failure==null,"normal worker planning continues with unused ids after compiled execution");
+    harness.dispose();
+  }
+
   public function testManipulatorMotion():Void {
     var fixture = buildContractArmFixture();
     for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;

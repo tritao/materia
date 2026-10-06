@@ -106,6 +106,14 @@ class MotionKitBootstrapTests {
       Sys.println('Redundancy focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    if(Sys.getEnv("MOTIONKIT_COMPILED_ONLY")=="1") {
+      programTests.testCompiledManipulatorMotion();
+      programTests.testProgramPlanner();
+      programTests.testManipulatorMotion();
+      motionkit.robot.ProgramPlanner.shutdown();
+      Sys.println('Compiled motion focused tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_C4_ONLY") == "1") {
       kinematicsTests.testAxisKinematics();
       kinematicsTests.testOpwKinematics();
@@ -168,6 +176,7 @@ class MotionKitBootstrapTests {
       {name: "kinematicsTests.testManipulatorServo", run: () -> kinematicsTests.testManipulatorServo(), weight: 0.05},
       {name: "kinematicsTests.testServoSession", run: () -> kinematicsTests.testServoSession(), weight: 0.1},
       {name: "kinematicsTests.testServoPlans", run: () -> kinematicsTests.testServoPlans(), weight: 3.7},
+      {name: "programTests.testCompiledManipulatorMotion", run: () -> programTests.testCompiledManipulatorMotion(), weight: 0.1},
       {name: "programTests.testManipulatorMotion", run: () -> programTests.testManipulatorMotion(), weight: 0.05},
       {name: "programTests.testManipulatorSessionTransitions", run: () -> programTests.testManipulatorSessionTransitions(), weight: 0.05},
       {name: "programTests.testProcessRunVirtualArmRecovery", run: () -> programTests.testProcessRunVirtualArmRecovery(), weight: 0.1},
