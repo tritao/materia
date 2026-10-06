@@ -150,6 +150,14 @@ class WeldPlanningTests {
       [for(_ in measured)3.0],[for(_ in measured)2.0],[for(_ in measured)20.0],
       motionkit.robot.StartTolerances.uniform(6,0.01,0.01,0.01),null,0.002,0.2,
       0.001,0.02,new IkTolerance(1e-6,1e-6));
+    var recoveryProblem=problem.recovery(0.037);
+    var recoveryRequest=recoveryProblem.request(measured,compiler.ikTolerance,compiler.perJointMaxJump,compiler.maxVelocity);
+    var recoveryCurves=recoveryProblem.select(fixture.arm,recoveryRequest,null,world);
+    var recoveryProgram=new processkit.WeldPathProgram(recoveryProblem,recoveryCurves,
+      {arc:"arc",wireSpeed:"wire",voltage:"voltage"});
+    var recoveryCompiled=recoveryProgram.compile(compiler,fixture.arm,measured,haxe.Int64.ofInt(701),world);
+    recoveryCompiled.dispose();
+    check(fixture.arm.numericSolveCount()==before,"sliced recovery selection and retained compilation use analytic kinematics");
     var selectedProgram=new processkit.WeldPathProgram(problem,freeCurves,{arc:"arc",wireSpeed:"wire",voltage:"voltage"});
     var compiled=selectedProgram.compile(compiler,fixture.arm,measured,haxe.Int64.ofInt(801),world);
     try {

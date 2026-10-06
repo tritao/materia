@@ -83,12 +83,17 @@ class SelectedJointPathPlanner implements JointPathPlanner {
     throw "No retained selected curve matches the execution task, grid and start";
   }
   static function geometryOf(path:PosePath):String
-    return haxe.Json.stringify({frame:path.frameId,primitives:[for(primitive in path.primitives){
-      type:Std.isOfType(primitive,motionkit.path.PoseLine)?"line":
-        Std.isOfType(primitive,motionkit.path.PoseArc)?"arc":
-        Std.isOfType(primitive,motionkit.path.PoseWeave)?"weave":
-        throw "Selected curve reuse requires a known pose primitive",data:primitive
-    }]});
+    return haxe.Json.stringify({frame:path.frameId,primitives:[for(primitive in path.primitives)geometryPrimitive(primitive)]});
+  static function geometryPrimitive(primitive:motionkit.path.PosePrimitive):Dynamic {
+    if(Std.isOfType(primitive,motionkit.path.PoseSlice)){
+      var slice=cast(primitive,motionkit.path.PoseSlice);
+      return {type:"slice",from:slice.from,to:slice.to,source:geometryPrimitive(slice.source)};
+    }
+    return {type:Std.isOfType(primitive,motionkit.path.PoseLine)?"line":
+      Std.isOfType(primitive,motionkit.path.PoseArc)?"arc":
+      Std.isOfType(primitive,motionkit.path.PoseWeave)?"weave":
+      throw "Selected curve reuse requires a known pose primitive",data:primitive};
+  }
   static function snapshot(task:RefinementTarget):RefinementTarget {
     var freedom=switch task.freedom {case Cone(axis,angle):motionkit.path.OrientationPolicy.Cone(axis.copy(),angle);default:task.freedom;};
     return new RefinementTarget(task.pose,freedom,task.velocity,task.acceleration,task.accelerationBefore);
