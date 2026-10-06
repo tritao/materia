@@ -33,6 +33,7 @@ import motionkit.robot.StepperSlip;
 import robotkit.runtime.EncoderMonitor;
 import motionkit.robot.PlanningLimits;
 import processkit.WeldingPlanRunner;
+import processkit.WeldStowPlanner;
 import processkit.skill.WeldPlan;
 import processkit.skill.WeldSeam;
 import robotkit.spatial.Quat;
@@ -180,6 +181,7 @@ class MissionPlayer implements SessionMember {
   final robotIndex:Int;
   final vacuumSensor:Null<String>;
   final simulation:Simulation;
+  final weldAcceleration:Float;
   final objects:Array<GripObject>;
   final project:ProjectDocumentSession;
   final assembly:Null<AssemblyDefinition>;
@@ -210,6 +212,7 @@ class MissionPlayer implements SessionMember {
     this.timestep = timestep;
     this.obstacles = standing(obstacles);
     this.simulation = simulation;
+    this.weldAcceleration = weldAcceleration;
     this.objects = objects;
     this.robotIndex = robotIndex;
     this.project = project;
@@ -564,6 +567,8 @@ class MissionPlayer implements SessionMember {
     switch step.kind {
       case "moveJoints":
         return jointMove(step);
+      case "stow":
+        return stow();
       case "goTo":
         registeredWork = new Map<String, Transform3>();
         var activeNavigator:Navigator = cast navigator;
@@ -649,6 +654,27 @@ class MissionPlayer implements SessionMember {
     }
     return new MotionProgramSkill(motion, new MotionProgram([
       MotionOp.MoveJ(MoveTarget.JointTarget(q), new MotionOptions(), Blend.ExactStop)]));
+  }
+
+  /** Plan the mobile welding stow from measured joints against the live work and deposited bead geometry. */
+  function stow():Skill {
+    var torches = [for (tool in project.robotTools) if (tool.kind == "torch") tool];
+    if (torches.length != 1) throw 'A welding stow needs one torch, the robot has ${torches.length}';
+    var tool = torches[0];
+    var arm = toolArm(tool);
+    var metal = [for (step in mission.steps) if (step.kind == "weld") cast(step.weld, SceneArtifactWeld).metal];
+    var planned = weldClearance(arm, tool.contact.occurrence, metal);
+    clearance = planned;
+    var planning = WeldingPlanRunner.planning(arm, weldAcceleration, planned);
+    var indices = arm.jointIndices();
+    var observed = robot.robot.snapshot().positions;
+    var from = [for (index in indices) observed.get(index)];
+    // CadBridge bakes the assembly's authored home joints into the model; zero is its CAD ready posture.
+    var ready = [for (_ in indices) 0.0];
+    var program = WeldStowPlanner.plan(arm, planning.compiler, planned, from, ready);
+    var motion = new ManipulatorMotion(robot.robot, planning.compiler, (_) -> null,
+      () -> robot.runtime.pollEvents(), indices);
+    return new MotionProgramSkill(motion, program);
   }
 
   /** Builds one weld pass using the shared welding runner. */

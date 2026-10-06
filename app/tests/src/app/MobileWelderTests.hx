@@ -242,7 +242,7 @@ class MobileWelderTests {
   }
 
   /** Execute the generated station mission, including driving and every checked stow transition. */
-  public static function runMission(root:String):Void {
+  public static function runMission(root:String, ?onlyBackend:Int):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.mobilemission.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
@@ -261,7 +261,9 @@ class MobileWelderTests {
     var seamCount = 0;
     for (_ in expected.keys()) seamCount++;
     if (stations == 0 || seamCount != 10) throw 'Mobile mission has $stations stations and $seamCount seams';
-    for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
+    var backends:Array<Int> = onlyBackend == null ?
+      [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO] : [cast onlyBackend];
+    for (backend in backends) {
       var session = new ProjectDocumentSession(null, false);
       session.openGeneratedProject(generated, manifest);
       var simulation = new ApplicationSimulation(new RobotWorld());
@@ -276,13 +278,27 @@ class MobileWelderTests {
         var tick = 0, stowing = -1, reportedStep = -1;
         var reportedProbe = "";
         var worst = 0.0;
+        var arm = mission.toolArm(session.robotTools[0]);
+        var armJoints = arm.jointIndices();
+        var registrationStart:Null<Array<Float>> = null;
         var stowClearance:Null<robotkit.manipulation.ArmClearance> = null;
         while (!mission.finished && simulation.activeSession().simulationTime() < limit) {
           simulation.step(); tick++;
           if (mission.stepIndex != reportedStep) {
+            var previousStep = reportedStep;
             reportedStep = mission.stepIndex;
             var kind = reportedStep < authored.steps.length ? authored.steps[reportedStep].kind : "done";
             Sys.println('mobile welding ($backend): step $reportedStep $kind at ${simulation.activeSession().simulationTime()} s');
+            if (kind == "findWork")
+              registrationStart = [for (joint in armJoints) mission.robot.robot.snapshot().positions.get(joint)];
+            else if (kind == "weld" && previousStep >= 0 && authored.steps[previousStep].kind == "findWork") {
+              var start:Array<Float> = cast registrationStart;
+              var positions = mission.robot.robot.snapshot().positions;
+              for (index in 0...armJoints.length) if (Math.abs(positions.get(armJoints[index]) - start[index]) > 0.005)
+                throw 'Contact registration changed the planned starting posture at joint ${armJoints[index]}';
+              registrationStart = null;
+              Sys.println('mobile welding ($backend): contact registration restored its starting posture');
+            }
           }
           if (mission.stepIndex < authored.steps.length && authored.steps[mission.stepIndex].kind == "findWork") {
             var finding:processkit.skill.FindWeldWork = cast mission.runner.activeSkill();
@@ -316,7 +332,7 @@ class MobileWelderTests {
             }
           }
           var index = mission.completed;
-          if (index < authored.steps.length && authored.steps[index].kind == "moveJoints") {
+          if (index < authored.steps.length && authored.steps[index].kind == "stow") {
             if (stowing != index) {
               stowing = index;
               var tool = session.robotTools[0];
@@ -327,8 +343,9 @@ class MobileWelderTests {
             if (tick % 5 == 0) {
               var clear:robotkit.manipulation.ArmClearance = cast stowClearance;
               var positions = mission.robot.robot.snapshot().positions;
-              var hit = clear.violation([for (joint in mission.clearanceJoints) positions.get(joint)]);
-              if (hit != null) throw 'Mobile stow clearance: ${hit.a}/${hit.b}';
+              var q = [for (joint in mission.clearanceJoints) positions.get(joint)];
+              var hit = clear.violation(q);
+              if (hit != null) throw 'Mobile stow clearance: ${hit.a}/${hit.b}, ${hit.distance} m < ${hit.required} m; joints=${q.join(",")}; time=${simulation.activeSession().simulationTime()} s';
             }
           }
           if (index < authored.steps.length && authored.steps[index].kind != "weld" && welder.reading().arc)

@@ -2646,6 +2646,10 @@ class ProjectSourceTests {
       MobileWelderTests.runMission(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-mission-mujoco") {
+      MobileWelderTests.runMission(root, ApplicationSimulation.MUJOCO);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-joint-handoff") {
       MobileWelderTests.runJointHandoff(root);
       return 0;
