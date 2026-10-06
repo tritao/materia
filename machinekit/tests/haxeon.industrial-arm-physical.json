@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-industrial-arm-physical-tests"
+  },
+  "entry": "RobotArmPhysicalTests",
+  "sourceRoots": [
+    "src",
+    "../examples",
+    "../examples/robot-arm",
+    "../examples/cnc-router",
+    "../examples/mobile-base",
+    "../examples/robot-welder",
+    "../examples/corexy",
+    "../examples/bench-mill",
+    "../examples/cobot-arm",
+    "../examples/machine-tending",
+    "mobile-welder/src",
+    "../examples/gantry-picker",
+    "../examples/track-arm"
+  ],
+  "dependencies": {
+    "processkit": {
+      "path": "../../processkit"
+    },
+    "projectkit": {
+      "path": "../../projectkit"
+    },
+    "manufacturingkit": {
+      "path": "../../manufacturingkit"
+    },
+    "cadkit": {
+      "path": "../../cadkit"
+    },
+    "machinekit": {
+      "path": ".."
+    },
+    "machinekit-robot": {
+      "path": "../robot"
+    },
+    "machinekit-picking-station-example": {
+      "path": "../examples/picking-station"
+    },
+    "robotkit": {
+      "path": "../../robotkit"
+    },
+    "cadbridge": {
+      "path": "../../robotkit/cadbridge"
+    },
+    "toolpathkit": {
+      "path": "../../toolpathkit"
+    },
+    "camkit": {
+      "path": "../../camkit"
+    },
+    "cnckit": {
+      "path": "../../cnckit"
+    },
+    "motionkit-robot": {
+      "path": "../../motionkit/robot"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

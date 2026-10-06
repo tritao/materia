@@ -539,7 +539,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | Step | State | Commits |
 |------|-------|---------|
 | PP0 | in progress: harness and diagnostics; baseline completion pending | `0d43b32c0` (partial) |
-| PP0a | in progress: industrial geometry/zero, IK labels and program/mission pins implemented; all-size branch acceptance passed; limit/load checks, re-baselines and phase gate pending | see progress |
+| PP0a | in progress: industrial geometry/zero, IK labels and program/mission pins implemented; all-size branch acceptance passed; physical limit/load/BOM acceptance passed; re-baselines and phase gate pending | see progress |
 | PP1a | planned (revision 2026-10-06): EAIK spike | — |
 | PP1 | in progress: Cartesian, OPW and authored Cobot UR verified; offset RobotArm unresolved | `0d43b32c0`, `bfec0fa28`, `8569a2a98` (partial) |
 | PP2 | in progress: native family samplers and Haxe problem construction implemented; close-out pending | `601fff4ba`, `8569a2a98`, `e28f1092e` |
@@ -2172,3 +2172,42 @@ MachineKitSmoke registers this acceptance check for the full phase suite.
 Physical interference at limits, all-class drive/load/BOM acceptance, all-user
 mission re-baselines and the complete PP0a phase gate remain pending. PP1a has
 not started; this focused run does not replace the phase gate.
+
+### PP0a all-size physical acceptance and travel limits
+
+RobotArmPhysicalTests now checks every size's BOM quantities, complete mass and
+inertia rollup, six servo/gearbox drives, derived speed and peak torque caps, and
+absolute mechanical limits after compilation. It builds the same saved scene and
+clearance hulls as the app. Ready, industrial zero, every joint endpoint and
+one-axis travel from ready (sample spacing <=0.05 rad) keep the existing welding
+3 mm air margin. This samples those excursions, not every combination of joints;
+actual planned routes still require their clearance checks.
+
+The original assumed travel was physically unsafe. Exact CAD intersections
+confirmed pedestal/forearm overlap at the shoulder upper stop, pedestal/tool
+interference at the elbow lower stop, and a small-size wrist-body/j6 overlap.
+A 5-degree clearance scan established the connected clear interval around ready.
+Use class-specific assumed shoulder upper/elbow lower/wrist pitch limits:
+Reach700 90/-35/+/-115 degrees; Reach900 125/-45/+/-120;
+Reach1300 135/-55/+/-125. Other joint limits, geometry and drive recipes are retained.
+
+Rotary gravity is not accounted for by DriveLoads' sliding-axis steady-force
+helper, so this acceptance separately differentiates compiled link gravitational
+potential to check continuous static holding torque. Across the clear samples,
+shoulder demand is 24.07/33.01/57.60 Nm against 135.28 Nm continuous. All six
+joints pass their continuous rating; these are static sampled loads, not dynamic
+trajectory or thermal acceptance. Total authored masses are 44.16/44.65/45.83 kg,
+with 29 aggregated BOM lines and no unaccounted mass/inertia.
+
+Final focused physical compiler/runtime passed:
+`process-path-arm-physical-build-final-limits.log`,
+`process-path-arm-physical-runtime-final.log` (739/759/769 sampled poses).
+Analytic acceptance was rebuilt and rerun after the limits changed:
+`process-path-arm-analytic-build-final-limits.log`,
+`process-path-arm-analytic-runtime-final-limits.log`; 1,000 targets per class,
+all-eight simultaneous branch targets 338/269/261, and all 24 configuration pins
+still pass. Initial probe logs intentionally exposed the unsafe old limits; an
+initial test compile needed a typed actuator array before successful builds.
+The physical acceptance is registered in MachineKitSmoke for the phase gate.
+
+All-user re-baselines and the complete PP0a gate remain open; PP1a has not started.
