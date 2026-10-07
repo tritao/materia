@@ -815,10 +815,20 @@ class ProjectSourceTests {
   }
 
   /** Runs the actual Cartesian picker mission and measures its placement and drive budget. */
-  static function checkGantryPicker(root:String, yaw:Bool = false, paced:Bool = false):Void {
+  static function checkGantryPicker(root:String, yaw:Bool = false, paced:Bool = false, startup:Null<String> = null):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/gantry-picker/" + (yaw ? "materia.yaw.project.json" : "materia.project.json"));
     var generated = MateriaProjectRunner.loadProject(manifest);
     var definition:AssemblyDefinition = cast generated.assemblyDefinition;
+    if (startup == "far") {
+      // A displaced authored pose retains known counter coordinates. Unknown-origin
+      // cold starts outside the runtime search window are checked separately below.
+      var displaced = new AssemblyState(definition, generated.assemblyState);
+      displaced.setJoint("x", 300); displaced.setJoint("y", 200);
+      generated.assemblyState = displaced.record();
+    } else if (startup == "unreferenced") {
+      if (generated.mission == null) throw "Picker startup test needs a mission";
+      generated.mission.powerUpOffsets = [{joint: "x", offset: 0.3}, {joint: "y", offset: 0.2}];
+    }
     var placement = new AssemblyState(definition, generated.assemblyState);
     var session = new ProjectDocumentSession(null, false);
     var simulation = new ApplicationSimulation(new RobotWorld());
@@ -831,6 +841,15 @@ class ProjectSourceTests {
       var motion = mission.handling.motion;
       var model = mission.robot.model;
       check(motion.compiler.solver.jointCount() == (yaw ? 4 : 3), "picker plans XYZ and its selected C head");
+      var restoredModel = robotkit.model.RobotModelCodec.decode(robotkit.model.RobotModelCodec.encode(model));
+      for (contact in model.switches) if (contact.role == "home") {
+        var restored = [for (candidate in restoredModel.switches) if (candidate.id == contact.id) candidate][0];
+        check(restored.homeAfter.join("/") == contact.homeAfter.join("/"), "RobotModel codec preserves home dependencies");
+        var name = contact.joint.split("/").pop();
+        if (name == "x" || name == "y")
+          check(contact.homeAfter.length == 1 && contact.homeAfter[0].split("/").pop() == "z",
+            "picker retains machine-authored Z clearance dependencies through serialization and runtime compilation");
+      }
       for (index in 0...motion.jointIndices.length) {
         var joint = model.joints[motion.jointIndices[index]];
         var coupled = model.coupledLimits(joint.id, new SteadyLoads());
@@ -889,6 +908,13 @@ class ProjectSourceTests {
         ticks++;
         if (mission.failure != null) {
           var failed = mission.robot.runtime.snapshot();
+          if (startup == "unreferenced") {
+            check(mission.failure.indexOf("search reached its travel boundary without a switch") >= 0,
+              "Unknown-origin startup outside the coordinate search window faults safely");
+            simulation.clear(); session.dispose();
+            Sys.println("picker unreferenced startup: bounded search refusal passed");
+            return;
+          }
           throw 'gantry picker mission: ${mission.failure}; time=${simulation.activeSession().simulationTime()} names=${mission.robot.robot.description().joints} offsets=${[for (joint in 0...failed.q.length) mission.robot.runtime.referenceOffset(joint)]} q=${failed.q.toArray()} setpoint=${mission.robot.robot.snapshot().setpointPositions.toArray()}';
         }
         var plan = motion.executor.plan;
@@ -982,8 +1008,8 @@ class ProjectSourceTests {
         ", time=" + simulation.activeSession().simulationTime() + ", motion=" + motion.sessionState() +
         ", q=" + mission.robot.runtime.snapshot().q.toArray().join(","));
       check(mission.statusLabel() == "Mission complete", "picker reports mission completion");
-      check(mission.homingSeconds > 0 && mission.homingSeconds < 25,
-        "picker homes within its 25 s simulation budget without long backoff overruns: " + mission.homingSeconds);
+      check(mission.homingSeconds > 0 && mission.homingSeconds < (startup == "far" ? 100 : 15),
+        "picker homes within its startup simulation budget without long backoff overruns: " + mission.homingSeconds);
       check(planned > 0 && motion.checks.plans > 0, "picker executes physically checked plans");
       check(motion.checks.count(PlanDiagnosticKind.StepperStall) == 0, "picker drive checks report no stall");
       check(measuredTicks > 0 && bytes / measuredTicks < 200000, "picker allocates below its assumed 200 KB execution-tick budget");
@@ -2940,6 +2966,11 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-yaw") {
       checkGantryPicker(root, true);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-starts") {
+      checkGantryPicker(root, false, false, "far");
+      checkGantryPicker(root, false, false, "unreferenced");
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-realtime") {

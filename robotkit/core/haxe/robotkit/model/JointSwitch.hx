@@ -15,9 +15,10 @@ class JointSwitch {
   public final seed:Int;
   /** Optional motor follower sensed by this physical side, rather than the shared leader. */
   public final driveJoint:Null<JointId>;
+  public final homeAfter:Array<String>;
 
   public function new(id:String, joint:JointId, frameId:FrameId, role:String, side:Int,
-      trip:Float, hysteresis:Float, repeatability:Float, seed:Int = 1, ?driveJoint:JointId) {
+      trip:Float, hysteresis:Float, repeatability:Float, seed:Int = 1, ?driveJoint:JointId, ?homeAfter:Array<String>) {
     if (id == null || StringTools.trim(id).length == 0 ||
         joint == null || StringTools.trim(joint).length == 0 ||
         frameId == null || StringTools.trim(frameId).length == 0)
@@ -28,6 +29,13 @@ class JointSwitch {
         !Math.isFinite(repeatability) || repeatability < 0)
       throw "Switch trip and non-negative hysteresis/repeatability must be finite";
     if (driveJoint != null && StringTools.trim(driveJoint).length == 0) throw "Switch drive joint is empty";
+    this.homeAfter = homeAfter == null ? [] : homeAfter.copy();
+    var seen = new Map<String, Bool>();
+    for (id in this.homeAfter) {
+      if (role != "home" || id == null || StringTools.trim(id).length == 0 || id == joint || seen.exists(id))
+        throw "Home dependencies must name distinct other coordinates";
+      seen.set(id, true);
+    }
     this.driveJoint = driveJoint;
     this.id = id; this.joint = joint; this.frameId = frameId; this.role = role;
     this.side = side; this.trip = trip; this.hysteresis = hysteresis;

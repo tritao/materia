@@ -127,10 +127,20 @@ class MotionSystem {
         var physical = blueprint.runtime.joints[joint];
         if (physical.maxRate == null || physical.maxAcceleration == null)
           throw 'Homing axis "${axis.id}" needs physical drive limits';
+        var ownerSeconds = Int64.compare(blueprint.runtime.ownerPeriodNs, Int64.ofInt(0)) > 0 ?
+          Int64.toFloat(blueprint.runtime.ownerPeriodNs) / 1e9 : fixedTimestepSeconds;
+        var leadSeconds = Int64.compare(blueprint.runtime.commitLeadNs, Int64.ofInt(0)) > 0 ?
+          Int64.toFloat(blueprint.runtime.commitLeadNs) / 1e9 : 2 * ownerSeconds;
+        var response = blueprint.homingLatencySeconds == null ? leadSeconds + fixedTimestepSeconds : blueprint.homingLatencySeconds;
+        if (!Math.isFinite(response) || response < leadSeconds + fixedTimestepSeconds)
+          throw "Homing latency must include command admission and one fresh observation";
+        var racking = blueprint.model.joints[joint].limits.rackingTolerance;
         homingAxes.push(new HomingAxis(axis.id, joint, homes, physical.maxRate,
           physical.maxAcceleration, physical.lowerLimit, physical.upperLimit,
           physical.overtravel, axis.jointOffset(0) + axis.jointScale(0) * axis.homePosition,
-          fixedTimestepSeconds));
+          fixedTimestepSeconds, new HomingDynamics(physical.maxAcceleration,
+            physical.maxAcceleration / fixedTimestepSeconds, response, fixedTimestepSeconds),
+          homes.length > 1 && racking > 0 ? racking : null));
       }
     }
     for (contact in blueprint.runtime.switches) if (contact.role == "home") {

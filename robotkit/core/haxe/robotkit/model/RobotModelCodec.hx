@@ -241,6 +241,7 @@ class RobotModelCodec {
       side: contact.side, trip: contact.trip, hysteresis: contact.hysteresis,
       repeatability: contact.repeatability, seed: contact.seed};
       if (contact.driveJoint != null) encoded.driveJoint = contact.driveJoint;
+      if (contact.homeAfter.length > 0) encoded.homeAfter = contact.homeAfter;
       encoded;
     }];
     if (model.elasticNetworks.length == 0) Reflect.deleteField(document, "elasticNetworks");
@@ -432,7 +433,11 @@ class RobotModelCodec {
         var contact = new JointSwitch(text(record, "id"), text(record, "joint"), text(record, "frame"),
           text(record, "role"), Std.int(side), number(record, "trip"), number(record, "hysteresis"),
           number(record, "repeatability"), Std.int(seed),
-          Reflect.hasField(record, "driveJoint") ? text(record, "driveJoint") : null);
+          Reflect.hasField(record, "driveJoint") ? text(record, "driveJoint") : null,
+          Reflect.hasField(record, "homeAfter") ? [for (id in array(record, "homeAfter")) {
+            if (!Std.isOfType(id, String)) throw "Home dependency must be a coordinate ID";
+            cast(id, String);
+          }] : null);
         if (switchIds.exists(contact.id)) throw 'Duplicate robot switch ${contact.id}';
         switchIds.set(contact.id, true);
         if (!joints.exists(contact.joint) || !frames.exists(contact.frameId) ||

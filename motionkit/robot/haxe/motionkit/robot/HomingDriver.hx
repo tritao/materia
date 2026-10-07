@@ -7,6 +7,8 @@ interface HomingDriver {
   function observe(joint:Int):HomingObservation;
   function velocity(joint:Int, velocity:Float, acceleration:Float):Void;
   function stop(joint:Int, acceleration:Float):Void;
+  /** Finite rest-to-rest move; completion is observed through calibrationReady. */
+  function moveTo(joint:Int, position:Float, velocity:Float, acceleration:Float):Void;
   /** Establish the runtime zero and reset encoder/slip monitors at the captured latch. */
   function latch(switchId:String, counterPosition:Float, leaderCounterPosition:Null<Float>):Void;
   function returnHome(joint:Int, position:Float, velocity:Float, acceleration:Float):Void;
@@ -21,8 +23,10 @@ class HomingSwitchObservation {
   public final timestampNs:Int64;
   public final clockId:String;
   public final closingEdges:Null<Int>;
+  /** True only when the source promises hardware/endpoint crossing capture. */
+  public final capturesEdges:Bool;
   public function new(id:String, active:Bool, sequence:Int64, timestampNs:Int64,
-      clockId:String, edgePosition:Null<Float> = null, closingEdges:Null<Int> = null) {
+      clockId:String, edgePosition:Null<Float> = null, closingEdges:Null<Int> = null, capturesEdges:Bool = false) {
     if (id == null || id.length == 0 || (edgePosition != null && !Math.isFinite(edgePosition)))
       throw "Home signal requires an ID and finite edge coordinate";
     if (sequence == null || timestampNs == null || Int64.compare(sequence, Int64.ofInt(0)) <= 0 ||
@@ -30,6 +34,9 @@ class HomingSwitchObservation {
         (closingEdges != null && closingEdges < 0) ||
         (edgePosition != null && (closingEdges == null || closingEdges == 0)))
       throw "Home signal requires source freshness and captured-edge identity";
+    if (capturesEdges ? closingEdges == null : edgePosition != null || closingEdges != null)
+      throw "Switch capture payload disagrees with its capability";
+    this.capturesEdges = capturesEdges;
     this.id = id; this.active = active; this.edgePosition = edgePosition;
     this.sequence = sequence; this.timestampNs = timestampNs; this.clockId = clockId;
     this.closingEdges = closingEdges;

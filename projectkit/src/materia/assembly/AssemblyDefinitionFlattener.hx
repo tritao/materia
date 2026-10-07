@@ -174,7 +174,8 @@ class AssemblyDefinitionFlattener {
 		trigger: map(contact.trigger), triggerConnector: contact.triggerConnector, role: contact.role,
 		side: contact.side, trip: contact.trip, hysteresis: contact.hysteresis,
 		repeatability: contact.repeatability, seed: contact.seed,
-		driveJoint: contact.driveJoint == null ? null : map(contact.driveJoint)
+		driveJoint: contact.driveJoint == null ? null : map(contact.driveJoint),
+		homeAfter: contact.homeAfter == null ? null : [for (id in contact.homeAfter) map(id)]
 	};
 
 	/** Keep every coordinate and motion-source reference in a network's namespace. */
@@ -304,7 +305,8 @@ class AssemblyDefinitionFlattener {
 					part: part.occurrence, connector: part.connector, trigger: trigger.occurrence,
 					triggerConnector: trigger.connector, role: contact.role, side: contact.side,
 					trip: contact.trip, hysteresis: contact.hysteresis, repeatability: contact.repeatability, seed: contact.seed,
-					driveJoint: contact.driveJoint == null ? null : scoped(prefix, contact.driveJoint)});
+					driveJoint: contact.driveJoint == null ? null : scoped(prefix, contact.driveJoint),
+					homeAfter: contact.homeAfter == null ? null : [for (id in contact.homeAfter) scoped(prefix, id)]});
 			}
 		}
 		if (mates != null) for (mate in mates) {

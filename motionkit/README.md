@@ -123,3 +123,31 @@ Run the focused native-backed test with:
 ```sh
 ./haxeon/scripts/haxeon run --project motionkit/tests/haxeon.json
 ```
+
+### Sensor homing
+
+Physical home switches carry `homeAfter` prerequisite joint IDs. MachineKit authors these with
+`assembly.homeAfter("x", ["z"])` after registering all switches. Assembly flattening scopes the
+references with the owning machine; saved assemblies and RobotModel artifacts retain them.
+Missing prerequisites, dependency cycles and disagreeing switches on one coordinate are rejected.
+The shared robot queue executes the validated order serially; axis names do not imply clearance.
+
+Homing searches for a switch, stops through the runtime owner, and plans a finite backoff to
+release it. The approach starts only after the endpoint is at rest, all contacts are open and
+release clearance is confirmed. It never substitutes a captured search edge for the final approach.
+Captured-edge sources identify their capability even before the first crossing. Such sources
+must supply a fresh crossing position and counter; digital-only sources use a speed derived from
+switch repeatability and observation period. Capability changes and missing captures fault.
+
+`HomingDynamics` includes command/observation latency, acceleration and the planner's jerk limit
+when bounding switch approach speed. Runtime command admission and the owner period establish the
+default latency; `MotionSystemBlueprint.homingLatencySeconds` can state a longer measured response
+budget. Jerk defaults to acceleration divided by the owner period as a planning policy, rather
+than a claimed hardware specification. Finite plans use the same acceleration and jerk limits.
+Captured approaches reserve physical end-stop room, and independent motor holds additionally
+require an authored racking tolerance. Stop, hold and calibration acknowledgements remain barriers.
+
+Homing retains the runtime's finite coordinate search window. A cold start whose unknown counter
+origin places the switch outside that window faults at the boundary; it does not expand travel
+blindly. Full-stroke homing from arbitrary unknown origins requires a matching runtime/device
+search-window contract. Displaced authored poses with known coordinates remain supported.

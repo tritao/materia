@@ -174,6 +174,8 @@ class Gantry extends AxisBuilder {
 		if (spec.dualY) buildSwitches(axes[1], "YRight", "frameRight", "beamFootRight", 0, 1, alongY);
 		buildSwitches(axes[0], "X", "beam", "xCarriage", 1, -1, alongX);
 		buildSwitches(axes[2], "Z", "zColumn", "zCarriage", 0, -1, [0.0, 0, -1]);
+		homeAfter("x", ["z"]);
+		homeAfter("y", ["z"]);
 	}
 
 	/** Side-mounted steel trigger and switches carried by the actual guide's fixed structure. */

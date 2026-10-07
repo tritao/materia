@@ -59,7 +59,7 @@ class RuntimeHomingObserver {
       // A digital-only source has no edge identity; it uses sampled-position budgets.
       var count:Null<Int> = frame.values.length == 4 ? reading.closingEdges : null;
       signals.push(new HomingSwitchObservation(contact.id, reading.active,
-        frame.sequence, frame.sourceTimestampNs, frame.sourceClockId, translatedEdge, count));
+        frame.sequence, frame.sourceTimestampNs, frame.sourceClockId, translatedEdge, count, reading.capturesEdges));
     }
     var ready = snapshot.sessionState == RobotKitRuntimeConstants.RK_SESSION_IDLE &&
       snapshot.trajectoryQueueDepth == 0 && !snapshot.trajectoryActive;

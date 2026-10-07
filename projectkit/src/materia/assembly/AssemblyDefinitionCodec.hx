@@ -281,6 +281,31 @@ class AssemblyDefinitionCodec {
 				throw 'Assembly has an invalid switch "${contact.id}"';
 			switchIds.set(contact.id, true);
 		}
+		var homeDependencies = new Map<String, Array<String>>();
+		for (contact in switches) {
+			var dependencies = contact.homeAfter == null ? [] : contact.homeAfter;
+			if (contact.role != "home" && dependencies.length > 0) throw "Only home switches may declare homing dependencies";
+			if (contact.role != "home") continue;
+			var seenDependencies = new Map<String, Bool>();
+			for (id in dependencies) {
+				if (!validText(id) || id == contact.joint || seenDependencies.exists(id)) throw "Invalid home dependency";
+				seenDependencies.set(id, true);
+			}
+			var sorted = dependencies.copy(); sorted.sort(Reflect.compare);
+			if (homeDependencies.exists(contact.joint) && homeDependencies.get(contact.joint).join("\n") != sorted.join("\n"))
+				throw "Home switches on one coordinate must agree on dependencies";
+			homeDependencies.set(contact.joint, sorted);
+		}
+		var homeVisiting = new Map<String, Bool>(), homeVisited = new Map<String, Bool>();
+		function visitHome(id:String):Void {
+			if (!homeDependencies.exists(id)) throw 'Home dependency "$id" has no home switch';
+			if (homeVisiting.exists(id)) throw "Homing dependencies contain a cycle";
+			if (homeVisited.exists(id)) return;
+			homeVisiting.set(id, true);
+			for (dependency in homeDependencies.get(id)) visitHome(dependency);
+			homeVisiting.remove(id); homeVisited.set(id, true);
+		}
+		for (id in homeDependencies.keys()) visitHome(id);
 		var encoders = definition.encoders == null ? [] : definition.encoders;
 		if (encoders.length > 4000) throw "Assembly has too many encoders";
 		var encoderIds = new Map<String, Bool>();

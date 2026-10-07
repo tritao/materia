@@ -85,6 +85,9 @@ class RuntimeHomingDriver implements HomingDriver {
     afterLatch();
   }
 
+  public function moveTo(joint:Int, position:Float, velocity:Float, acceleration:Float):Void
+    move(requireAxis(joint), position, velocity, acceleration);
+
   public function returnHome(joint:Int, position:Float, velocity:Float, acceleration:Float):Void
     move(requireAxis(joint), position, velocity, acceleration);
 
@@ -95,14 +98,16 @@ class RuntimeHomingDriver implements HomingDriver {
   }
 
   function move(axis:HomingAxis, position:Float, velocity:Float, acceleration:Float):Void {
+    if (!Math.isFinite(position) || !Math.isFinite(velocity) || velocity <= 0 ||
+        !Math.isFinite(acceleration) || acceleration <= 0) throw "Homing plan requires a finite target and positive motion limits";
     var snapshot = robot.snapshot();
     // Homing polls once per owner period. Keep acceleration ramps observable
     // for two periods, including the slow latch pass, rather than producing
     // sub-period segments that a serial device cannot qualify or stream.
-    var boundedAcceleration = Math.min(acceleration, velocity / (2 * axis.timestep));
+    var boundedAcceleration = Math.min(acceleration, axis.dynamics.planAcceleration(velocity));
     // Native plans anchor on held commanded coordinates, including measured following error.
     var trajectory = planner.plan(snapshot.setpointPositions.toArray(),
-      {targets: [new AxisTarget(axis.id, position - mappings.get(axis.joint).jointOffset(0))], options: new MotionOptions(velocity, boundedAcceleration)}).trajectory;
+      {targets: [new AxisTarget(axis.id, position - mappings.get(axis.joint).jointOffset(0))], options: new MotionOptions(velocity, boundedAcceleration, axis.dynamics.planJerk(velocity))}).trajectory;
     try {
       var stream = new TrajectoryStream(robot);
       var segments = trajectory.segments();

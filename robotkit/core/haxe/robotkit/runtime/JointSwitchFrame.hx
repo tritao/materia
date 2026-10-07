@@ -9,11 +9,13 @@ class JointSwitchFrame {
   public final active:Bool;
   public final closingEdgePosition:Null<Float>;
   public final closingEdges:Int;
+  public final capturesEdges:Bool;
 
   public function new(frame:SensorFrame) {
     if (frame == null || frame.kind != "trip_switch" || !valid(frame.values.toArray()))
       throw "Invalid joint switch frame";
     this.frame = frame;
+    capturesEdges = frame.values.length == 4;
     active = frame.values.get(0) == 1.0;
     closingEdgePosition = frame.values.length == 4 && frame.values.get(1) == 1.0 ? frame.values.get(2) : null;
     closingEdges = frame.values.length == 4 ? Std.int(frame.values.get(3)) : 0;

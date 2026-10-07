@@ -669,6 +669,8 @@ class CncRouter extends AxisBuilder {
 			[6.0, 12.0, 6.0], [1.0, 0, 0], -1, (belts ? "pulleyX-turn" : "screwX-turn"));
 		buildHome(specs[2], "Z", "xPlate", "zPlate", [xc + 75.0, zBlockFace, zPlateBottom + 35.0],
 			[40.0, 6.0, 6.0], [0.0, 0, 1], 1, foldedZ ? "motorZ-turn" : "screwZ-turn");
+		homeAfter("x", ["z"]);
+		homeAfter("y", ["z"]);
 		exposeConnector("nose", "spindle", "nose");
 		exposeConnector("toolTip", "tool", "tip");
 	}

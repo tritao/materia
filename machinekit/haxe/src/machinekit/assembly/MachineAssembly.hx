@@ -517,6 +517,21 @@ class MachineAssembly {
 		changed();
 	}
 
+	/** Declare clearance prerequisites after all physical home switches have been registered. */
+	public function homeAfter(joint:String, prerequisites:Array<String>):Void {
+		if (prerequisites == null) throw "Home prerequisites cannot be null";
+		var homes = [for (contact in drives.switches) if (contact.role == "home") contact];
+		var found = false, seen = new Map<String, Bool>();
+		for (id in prerequisites) {
+			if (id == joint || seen.exists(id) || [for (contact in homes) if (contact.joint == id) contact].length == 0)
+				throw "Home prerequisites must name distinct other switched coordinates";
+			seen.set(id, true);
+		}
+		for (contact in homes) if (contact.joint == joint) { contact.homeAfter = prerequisites.copy(); found = true; }
+		if (!found) throw 'Home coordinate "$joint" has no physical switches';
+		changed();
+	}
+
 	/** A reed or limit switch with an inclusive coordinate window and release hysteresis. */
 	public function addSwitch(id:String, joint:String, window:AssemblyJointLimits, hysteresis:Float = 0):Void {
 		if (window == null || window.lower == null || window.upper == null)

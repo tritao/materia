@@ -64,7 +64,7 @@ class RobotRuntimeCompiler {
 
     for (contact in robot.switches) result.switches.push(new robotkit.model.JointSwitch(
       contact.id, contact.joint, contact.frameId, contact.role, contact.side, contact.trip,
-      contact.hysteresis, contact.repeatability, contact.seed, contact.driveJoint));
+      contact.hysteresis, contact.repeatability, contact.seed, contact.driveJoint, contact.homeAfter));
     result.floatingBase = robot.floatingBase;
     result.collisionApproximation = switch (robot.collisionApproximation) {
       case CollisionApproximation.None: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;

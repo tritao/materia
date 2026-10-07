@@ -76,6 +76,31 @@ class ProjectKitTests {
     rejects(function() AssemblyDefinitionCodec.encode(model), "inverted joint limits");
   }
 
+  static function homingDependencies():Void {
+    var model = definition();
+    model.joints[0].type = AssemblyJointType.Prismatic;
+    model.occurrences.push({id: "tool", definition: "body", initialPose: AssemblyFrames.identity()});
+    model.joints.push({id: "slide", type: AssemblyJointType.Prismatic, role: AssemblyJointRole.Tree,
+      parent: "arm", parentConnector: "pin", child: "tool", childConnector: "pin", axis: {x: 1.0, y: 0.0, z: 0.0},
+      limits: {lower: -1.0, upper: 1.0, velocity: null, effort: null}, defaultValue: 0.0});
+    model.switches = [
+      {id: "homeLift", joint: "hinge", part: "base", connector: "pin", trigger: "arm", triggerConnector: "pin",
+        role: "home", side: -1, trip: -0.1, hysteresis: 0.01, repeatability: 0.001, seed: 1},
+      {id: "homeSlide", joint: "slide", part: "arm", connector: "pin", trigger: "tool", triggerConnector: "pin",
+        role: "home", side: -1, trip: -0.1, hysteresis: 0.01, repeatability: 0.001, seed: 1, homeAfter: ["hinge"]}];
+    var restored = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(model));
+    check(restored.switches[1].homeAfter[0] == "hinge", "home dependency survives assembly serialization");
+    var scoped = materia.assembly.AssemblyDefinitionFlattener.copySwitch(restored.switches[1], id -> "cell/" + id);
+    check(scoped.joint == "cell/slide" && scoped.homeAfter[0] == "cell/hinge", "included machines scope home dependencies with their joints");
+    model.switches[0].homeAfter = ["slide"];
+    rejects(() -> AssemblyDefinitionCodec.encode(model), "cyclic home dependencies are invalid design data");
+    model.switches[0].homeAfter = ["missing"];
+    rejects(() -> AssemblyDefinitionCodec.encode(model), "home prerequisites must have physical home switches");
+    model.switches[0].homeAfter = new Array<String>();
+    model.switches[1].homeAfter = ["hinge", "hinge"];
+    rejects(() -> AssemblyDefinitionCodec.encode(model), "duplicate home prerequisites are invalid");
+  }
+
   static function frames():Void {
     var turn = AssemblyFrames.axisMotion(AssemblyJointType.Revolute,
       {x: 0, y: 0, z: 1}, Math.PI / 2);
@@ -538,7 +563,8 @@ class ProjectKitTests {
     near(LengthUnit.metresPerUnit("in"), 0.0254, "inches");
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");
     rejects(function() LengthUnit.metresPerUnit("feet"), "unsupported unit");
-    assembly(); frames(); scene(); machining(); mobileBase(); torchTool(); bodies();
+    assembly();
+    homingDependencies(); frames(); scene(); machining(); mobileBase(); torchTool(); bodies();
     check(MaterialLibrary.require("steel-c45").physical.density == 7850, "steel density");
     check(MaterialLibrary.fromSpec("steel C45") == "steel-c45", "material lookup");
     rejects(function() MaterialLibrary.require("unknown"), "unknown material");

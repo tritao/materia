@@ -15,6 +15,8 @@ class MotionSystemBlueprint {
   public final fixedTimestepSeconds:Float;
   /** Smooth replacement lead in owner periods; defaults to two. */
   public var replacementMarginOwnerPeriods:Int = 2;
+  /** Optional measured upper bound for homing command/observation response, in seconds. */
+  public var homingLatencySeconds:Null<Float> = null;
   /** Owner period used for replacement lead; defaults to fixedTimestepSeconds. */
   public var replacementOwnerPeriodSeconds:Float;
 

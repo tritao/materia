@@ -419,6 +419,8 @@ class MachineAssemblyCodec {
 		for (sensor in machine.sensors) target.addSensorRecord(sensor);
 		for (contact in machine.switches) target.addTripSwitch(contact.id, contact.joint, contact.part,
 			{instanceId: contact.trigger, connectorName: contact.triggerConnector}, contact.side, contact.role, contact.seed, contact.driveJoint);
+		for (contact in machine.switches) if (contact.homeAfter != null && contact.homeAfter.length > 0)
+			target.homeAfter(contact.joint, contact.homeAfter);
 		// Encoders after the motors they read, whose actuators they point at.
 		for (encoder in machine.encoders) target.addEncoderRecord(encoder);
 		for (entry in machine.connectorExposures) target.exposeConnector(entry.name, entry.instanceId, entry.connectorName);

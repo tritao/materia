@@ -11,6 +11,9 @@ class HomingAxis {
   public final seekSpeed:Float;
   public final latchSpeed:Float;
   public final backoffSpeed:Float;
+  public final capturedApproachSpeed:Float;
+  public final dynamics:HomingDynamics;
+  public final releaseSearchDistance:Float;
   public final releaseDistance:Float;
   public final maximumTravel:Float;
   public final home:Float;
@@ -20,7 +23,7 @@ class HomingAxis {
   public final upperTravel:Float;
 
   public function new(id:String, joint:Int, switches:Array<JointSwitch>, velocity:Float,
-      acceleration:Float, lower:Float, upper:Float, overtravel:Float, home:Float, timestep:Float) {
+      acceleration:Float, lower:Float, upper:Float, overtravel:Float, home:Float, timestep:Float, ?dynamics:HomingDynamics, ?maximumCaptureOverrun:Float) {
     if (id == null || id.length == 0 || joint < 0 || switches == null || switches.length == 0)
       throw "Homing axis requires an ID, joint and physical home switches";
     for (value in [velocity, acceleration, overtravel, timestep])
@@ -44,20 +47,30 @@ class HomingAxis {
     }
     if (!(margin > 0)) throw "Home switch leaves no braking distance before the end stop";
     if (!Math.isFinite(precision)) precision = 1e-6;
-    seekSpeed = Math.min(velocity * 0.25, Math.sqrt(2 * acceleration * margin) * 0.5);
-    latchSpeed = Math.min(seekSpeed * 0.1, precision / timestep * 0.25);
-    releaseDistance = Math.max(release, latchSpeed * timestep * 4);
-    // Backoff only needs to clear the switch. Using seek speed here creates a
-    // long braking overrun that must then be retraced at precision latch speed.
-    // Bound stopping distance to a quarter of the release distance, and allow
-    // at least four observation intervals over that distance.
-    backoffSpeed = Math.min(seekSpeed, Math.min(
-      Math.sqrt(2 * acceleration * releaseDistance) * 0.5,
-      releaseDistance / (4 * timestep)));
+    // Two owner periods for command admission and one for a fresh switch observation.
+    // The jerk limit is an explicit planning policy until a drive supplies a tighter limit.
+    this.dynamics = dynamics == null ? new HomingDynamics(acceleration, acceleration / timestep, 3 * timestep, timestep) : dynamics;
+    if (this.dynamics.acceleration > acceleration || this.dynamics.timestep != timestep)
+      throw "Homing dynamics must respect the physical drive and owner period";
+    seekSpeed = this.dynamics.speedForRoom(margin, velocity);
+    latchSpeed = Math.min(seekSpeed, precision / timestep * 0.25);
+    releaseDistance = Math.max(release, precision * 4);
+    // Finite backoff plans decelerate at their endpoint; they need no release-triggered stop.
+    backoffSpeed = seekSpeed;
+    // One coordinate may use the available end-stop room. Independent side holds
+    // additionally need an authored racking budget; otherwise retain sampled speed.
+    if (maximumCaptureOverrun != null && (!Math.isFinite(maximumCaptureOverrun) || maximumCaptureOverrun <= 0))
+      throw "Captured-edge overrun budget must be finite and positive";
+    var captureRoom = maximumCaptureOverrun == null ? margin : Math.min(margin, maximumCaptureOverrun - 2 * precision);
+    capturedApproachSpeed = switches.length > 1 && maximumCaptureOverrun == null ? latchSpeed :
+      captureRoom > 0 ? this.dynamics.speedForRoom(captureRoom, seekSpeed) : latchSpeed;
+    // A sampled closing observation may already be past the switch by one owner interval.
+    releaseSearchDistance = releaseDistance + release + seekSpeed * timestep;
     maximumTravel = upper - lower + 2 * overtravel;
     if (!Math.isFinite(maximumTravel) || !Math.isFinite(seekSpeed) || seekSpeed <= 0 ||
         !Math.isFinite(latchSpeed) || latchSpeed <= 0 ||
-        !Math.isFinite(backoffSpeed) || backoffSpeed <= 0) throw "Homing derived travel/speeds must be finite and positive";
+        !Math.isFinite(backoffSpeed) || backoffSpeed <= 0 ||
+        !Math.isFinite(capturedApproachSpeed) || capturedApproachSpeed <= 0) throw "Homing derived travel/speeds must be finite and positive";
     positionTolerance = precision;
   }
 }

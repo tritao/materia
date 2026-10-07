@@ -270,6 +270,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(11) var repeatability:Float;
 	@:id(12) var seed:Int;
 	@:id(13) @:optional var driveJoint:String;
+	/** Home coordinates that must finish before this switch's coordinate can move. */
+	@:id(14) @:optional var homeAfter:Array<String>;
 }
 
 /** A connector exported from a member of an assembly definition. */

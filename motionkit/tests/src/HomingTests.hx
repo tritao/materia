@@ -15,23 +15,72 @@ class HomingTests {
     cycle.start();
     driver.next(-0.001, true, false, 1, 0); cycle.update(0.01);
     driver.next(-0.001, true, false, 1, 0); cycle.update(0.01);
-    driver.next(0.0, false, false, 1, 0); cycle.update(0.01);
-    driver.next(0.002, false, false, 1, 0); cycle.update(0.01);
-    driver.next(0.002, false, false, 1, 0); cycle.update(0.01);
+    for (_ in 0...6) {
+      if (cycle.status() != "Backoff") break;
+      driver.next(driver.moves[driver.moves.length - 1], false, false, 1, 0); cycle.update(0.01);
+    }
     check(cycle.status() == "Approach", "Home must release and stop before slow approach");
-    check(driver.speeds.length == 3 && driver.speeds[1] < driver.speeds[0] && driver.speeds[2] < driver.speeds[1],
-      "Cycle uses separate search, clearance-limited backoff and precision approach speeds");
+    check(driver.moves.length > 0 && driver.speeds.length == 2 && driver.speeds[1] <= driver.speeds[0],
+      "Cycle uses finite backoff plans between search and capture-aware approach");
     driver.events = [];
   }
   public static function run():Void {
     // Fast switch release must not create a long precision-speed return.
     var contact = new JointSwitch("home", "z", "frame", "home", -1, -0.001, 0.0002, 0.00002, 1);
     var axis = new HomingAxis("z", 0, [contact], 1.0, 2.0, 0.0, 0.5, 0.01, 0.0, 0.02);
-    check(axis.backoffSpeed < axis.seekSpeed, "Short switch release needs its own speed bound");
-    check(axis.backoffSpeed * axis.backoffSpeed / (2 * axis.acceleration) <= axis.releaseDistance * 0.25 + 1e-12,
-      "Backoff braking overrun stays within a quarter of release clearance");
-    check(axis.backoffSpeed * axis.timestep <= axis.releaseDistance * 0.25 + 1e-12,
-      "Backoff observes switch release before traversing the clearance");
+    check(axis.dynamics.stoppingDistance(axis.seekSpeed) <= 0.009 + 1e-12,
+      "Search speed accounts for latency, acceleration and jerk before the end stop");
+    check(axis.capturedApproachSpeed > axis.latchSpeed,
+      "Captured edges permit a faster approach than sampled positions");
+    var slow = new motionkit.robot.HomingDynamics(2.0, 20.0, 0.1, 0.02);
+    check(slow.speedForRoom(0.001, 1.0) < axis.dynamics.speedForRoom(0.001, 1.0),
+      "A longer response and tighter jerk limit reduce safe switch approach speed");
+    function home(id:String, after:Array<String>):HomingAxis {
+      return new HomingAxis("axis-" + id, id == "lift" ? 0 : id == "rail" ? 1 : 2,
+        [new JointSwitch("switch-" + id, id, "frame", "home", -1, -0.001, 0.0002, 0.00002, 1, null, after)],
+        0.1, 1.0, 0.0, 0.5, 0.01, 0.0, 0.01);
+    }
+    var ordered = motionkit.robot.HomingSequence.order([home("rail", ["lift"]), home("lift", [])]);
+    check(ordered[0].id == "axis-lift", "Authored dependencies determine order without XYZ naming");
+    for (invalid in [[home("rail", ["missing"])], [home("rail", ["lift"]), home("lift", ["rail"])]]) {
+      var rejected = false;
+      try motionkit.robot.HomingSequence.order(invalid) catch (_:Dynamic) rejected = true;
+      check(rejected, "Homing rejects missing prerequisites and dependency cycles");
+    }
+    var active = new HomingFixture(); active.next(-0.001, true, true, 1, 1);
+    active.cycle().start();
+    check(active.moves.length == 1 && active.speeds.length == 0,
+      "An already-active switch starts with a finite release plan");
+    var sampled = new HomingFixture(); sampled.captured = false;
+    var sampledCycle = sampled.cycle(); approach(sampled, sampledCycle);
+    check(sampled.speeds[1] <= 0.00001 / 0.01 * 0.25 + 1e-12,
+      "Digital-only switches retain their sampled-position precision budget");
+    sampled.next(-0.002, true, true, 2, 1); sampledCycle.update(0.01);
+    check(sampledCycle.status() == "StopAfterLatch", "Sampled switches still latch from a fresh observed position");
+    var omitted = new HomingFixture(), omittedCycle = omitted.cycle(); approach(omitted, omittedCycle);
+    omitted.omitCapture = true; omitted.next(-0.002, true, true, 2, 1);
+    var rejectedCapture = false;
+    try omittedCycle.update(0.01) catch (_:Dynamic) rejectedCapture = true;
+    check(rejectedCapture && omittedCycle.status() == "Fault", "A captured-edge source cannot silently fall back to sampled positions");
+    var missing = new HomingFixture(), missingCycle = missing.cycle(); missingCycle.start();
+    missing.next(-0.01, false, false, 0, 0, true);
+    var missingRejected = false;
+    try missingCycle.update(0.01) catch (_:Dynamic) missingRejected = true;
+    check(missingRejected && missingCycle.status() == "Fault", "A search ending without a switch faults instead of waiting forever");
+    var stuck = new HomingFixture(); stuck.next(-0.001, true, true, 1, 1);
+    var stuckCycle = stuck.cycle(); stuckCycle.start();
+    for (_ in 0...2000) {
+      if (!stuckCycle.isActive()) break;
+      stuck.next(stuck.moves[stuck.moves.length - 1], true, true, 1, 1);
+      try stuckCycle.update(0.01) catch (_:Dynamic) {}
+    }
+    check(stuckCycle.status() == "Fault" && stuck.events.indexOf("end") >= 0,
+      "A switch stuck active faults at bounded release travel and closes the squaring scope");
+    var changed = new HomingFixture(), changedCycle = changed.cycle(); approach(changed, changedCycle);
+    changed.captured = false; changed.next(-0.001, true, false, 2, 0);
+    var changedRejected = false;
+    try changedCycle.update(0.01) catch (_:Dynamic) changedRejected = true;
+    check(changedRejected && changedCycle.status() == "Fault", "Capture capabilities cannot change during homing");
     var delayed = new DelayedHomingFixture(), delayedCycle = delayed.cycle();
     approach(delayed, delayedCycle);
     delayed.delayHolds = true;
@@ -89,6 +138,10 @@ class HomingTests {
 class HomingFixture implements HomingDriver implements HomingSideControl {
   public var events:Array<String> = [];
   public var speeds:Array<Float> = [];
+  public var moves:Array<Float> = [];
+  public var captured:Bool = true;
+  public var omitCapture:Bool = false;
+  var moving:Bool = false;
   public var failStop:Bool = false;
   public var calibrationReady:Bool = true;
   public var leaderCaptureSeen:Float = 0.0;
@@ -104,20 +157,24 @@ class HomingFixture implements HomingDriver implements HomingSideControl {
       new JointSwitch("right", "y", "rightFrame", "home", -1, -0.001, 0.0002, 0.00001, 2, "rightMotor")];
     return new HomingCycle(this, [new HomingAxis("y", 0, contacts, 0.1, 1.0, 0.0, 0.1, 0.01, 0.0, 0.01)], this);
   }
-  public function next(position:Float, left:Bool, right:Bool, leftEdges:Int, rightEdges:Int):Void {
+  public function next(position:Float, left:Bool, right:Bool, leftEdges:Int, rightEdges:Int, rest:Bool = false):Void {
+    if (rest) moving = false;
     tick++; this.position = position; this.left = left; this.right = right;
     this.leftEdges = leftEdges; this.rightEdges = rightEdges;
   }
   public function observe(joint:Int):HomingObservation {
     var sequence = Int64.ofInt(tick), time = Int64.ofInt(tick * 10000000);
     return new HomingObservation(position, 0.0, [
-      new HomingSwitchObservation("left", left, sequence, time, "fixture", leftEdges > 0 ? -0.001 : null, leftEdges),
-      new HomingSwitchObservation("right", right, sequence, time, "fixture", rightEdges > 0 ? -0.002 : null, rightEdges)], time, "fixture", calibrationReady);
+      new HomingSwitchObservation("left", left, sequence, time, "fixture", captured && !omitCapture && leftEdges > 0 ? -0.001 : null, captured ? leftEdges : null, captured),
+      new HomingSwitchObservation("right", right, sequence, time, "fixture", captured && !omitCapture && rightEdges > 0 ? -0.002 : null, captured ? rightEdges : null, captured)], time, "fixture", calibrationReady && !moving);
   }
   public function velocity(joint:Int, velocity:Float, acceleration:Float):Void {
-    speeds.push(Math.abs(velocity)); events.push("velocity");
+    moving = true; speeds.push(Math.abs(velocity)); events.push("velocity");
   }
-  public function stop(joint:Int, acceleration:Float):Void { events.push("stop"); if (failStop) throw "stop failed"; }
+  public function moveTo(joint:Int, position:Float, velocity:Float, acceleration:Float):Void {
+    moves.push(position); events.push("move");
+  }
+  public function stop(joint:Int, acceleration:Float):Void { moving = false; events.push("stop"); if (failStop) throw "stop failed"; }
   public function latch(id:String, position:Float, leaderCounterPosition:Null<Float>):Void {
     events.push("latch:" + id);
     if (id == "left" && leaderCounterPosition != null) leaderCaptureSeen = leaderCounterPosition;
