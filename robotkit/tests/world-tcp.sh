@@ -104,7 +104,10 @@ elif [[ "${ROBOTKIT_TEST_BULK:-0}" == "1" ]]; then
     exit 1
   fi
 else
-  "$repo_dir/haxeon/scripts/haxeon" run --project "$client_project" -- \
+  # The workspace entry may already be running main.hl while it owns this
+  # fixture. Compile the actual client separately instead of replacing it.
+  "$repo_dir/haxeon/scripts/haxeon" run --project "$client_project" \
+    --output ../build/integration/host/tcp-client.hl -- \
     --port="$port" $client_mode
 fi
 if [[ "${ROBOTKIT_TEST_AUTHENTICATION:-0}" != "1" && "${ROBOTKIT_TEST_SESSIONS:-0}" != "1" && "${ROBOTKIT_TEST_LOCAL_OWNER:-0}" != "1" \

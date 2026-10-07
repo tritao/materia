@@ -3,6 +3,13 @@ package tests;
 class IntegrationMain {
   public static function main():Void {
     var arguments = Sys.args();
+    // Workspace tests invoke the entry without arguments. The TCP client
+    // needs the managed robotd fixture; world-tcp.sh calls back with --port
+    // and --camera-fixture so that invocation runs the client directly.
+    if (arguments.length == 0) {
+      runFixture();
+      return;
+    }
     var port = parsePort(arguments);
     var host = parseHost(arguments);
     if (arguments.indexOf("--outbound-scheduler") >= 0) OutboundSchedulerIntegration.run(port);
@@ -19,6 +26,23 @@ class IntegrationMain {
     else if (arguments.indexOf("--restart-check") >= 0)
       WorldTcpIntegration.runRestartCheck(host, port);
     else WorldTcpIntegration.run(host, port, arguments.indexOf("--camera-fixture") >= 0);
+  }
+
+  static function runFixture():Void {
+    var directory = sys.FileSystem.fullPath(Sys.getCwd());
+    while (true) {
+      var script = haxe.io.Path.join([directory, "robotkit", "tests", "world-tcp.sh"]);
+      if (sys.FileSystem.exists(script)) {
+        Sys.println("RobotKit TCP integration: starting the managed robotd fixture");
+        var status = Sys.command("bash", [script]);
+        if (status != 0) Sys.exit(status);
+        return;
+      }
+      var parent = haxe.io.Path.directory(directory);
+      if (parent == directory || parent.length == 0)
+        throw "Cannot locate robotkit/tests/world-tcp.sh; run the integration suite inside the repository";
+      directory = parent;
+    }
   }
 
   static function parseHost(arguments:Array<String>):String {

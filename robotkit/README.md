@@ -508,6 +508,10 @@ cross-check.
 
 `robotkit/tests/world-tcp.sh` exercises the same `HoldJointBehavior` against a
 local `SimulatedRobot` and a TCP-connected `RemoteRobot` hosted by `robotd`.
+The integration entry without arguments starts this managed fixture too, so
+`haxeon workspace test --only robotkit-integration` starts and cleans up its
+own server. This network test always runs rather than reusing a cached pass.
+Explicit client arguments such as `--port=17942` use an already running peer.
 An atomic position/velocity/effort batch is checked before three successive
 behavior targets test command counts, unchanged-snapshot suppression, settled
 joint positions, and encoder/IMU/LiDAR identities, mounts, and values. The
