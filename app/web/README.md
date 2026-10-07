@@ -109,3 +109,11 @@ and so does editing primitive objects. The following do not work yet:
 - **Threads:** project loads and workspace saves run on the UI thread, and the
   simulation steps on it each frame. RobotKit's self-driven runtimes and
   recordings, and its serial and simulated-board devices, are not built.
+
+### Canvas layout
+
+The page owns the editor canvas layout through CSS. NativeKit observes its size
+and updates the framebuffer and UI layout without replacing the viewport sizing
+with inline pixel dimensions. Container-based embeddings can use ordinary CSS
+width and height too. Set `data-nativekit-sizing="native"` on the canvas only
+when NativeKit's window/surface sizing APIs should control its displayed size.
