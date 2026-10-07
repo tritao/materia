@@ -364,4 +364,4 @@ Rebase and mill attribution follow-up (2026-10-06):
 
 Haxeon source-root and typing correction (2026-10-06):
 
-- The branch pins Haxeon `ccfd1dd6`, which fixes source-root typing and nullable array refinements. Materia commit `65ec9349e` integrates that pin and declares package-scoped and unscoped example roots explicitly; application sources use the repaired compiler without a local typing workaround.
+- The branch pins Haxeon `ccfd1dd6`, which fixes source-root typing and nullable array refinements. Materia commit `5c51b08c7` integrates that pin and declares package-scoped and unscoped example roots explicitly; application sources use the repaired compiler without a local typing workaround.
