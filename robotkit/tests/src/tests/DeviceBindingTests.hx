@@ -40,10 +40,10 @@ class DeviceBindingTests {
     check(channel.jointIndex == 0 && channel.directionSetupTicks == 2, "the channel follows the independent carriage leader");
     near(channel.maxRate, 20000.0 / channel.stepsPerUnit, "the step tick caps the actuator's rate below its own 100 rad/s");
     near(model.actuators[0].requireRate(), 100.0, "binding leaves the model alone");
-    near(binding.model.actuators[0].requireRate(), channel.maxRate, "the tightened model carries the cap");
+    check(binding.model.actuators[0].requireRate() <= channel.maxRate, "the tightened model respects the device rate");
     var leadRatio = Math.PI * 1000.0;
-    near(binding.model.coupledLimits("axis").requireVelocity(), channel.maxRate / leadRatio,
-      "planning limits see the device's real ceiling through the screw");
+    near(binding.model.coupledLimits("axis").requireVelocity(), binding.model.actuators[0].requireRate() / leadRatio,
+      "planning limits see the device's achievable ceiling through the screw");
     near(model.coupledLimits("axis").requireVelocity(), 100.0 / leadRatio, "an unbound model keeps the actuator's own limit");
 
     var mixed = axisModel();
@@ -61,6 +61,16 @@ class DeviceBindingTests {
     // A slower actuator keeps its own rate; no authored rate takes the ceiling.
     var slow = DeviceBinding.bind(axisModel(10.0), layout, 20000);
     near(slow.channels[0].maxRate, 10.0, "an actuator slower than the step tick keeps its rate");
+    // 10 rad/s requests a non-integral pulse interval. A continuous ceiling
+    // would leave physical counters chasing the plan after its nominal stop.
+    var wire = Bytes.alloc(8);
+    wire.setFloat(0, slow.channels[0].maxRate);
+    wire.setFloat(4, slow.channels[0].stepsPerUnit);
+    var stepInterval = Math.ceil(20000 / (wire.getFloat(0) * wire.getFloat(4)));
+    check(slow.model.actuators[0].requireRate() < slow.channels[0].maxRate,
+      "integer pulse spacing tightens a non-integral rate ceiling");
+    near(slow.model.actuators[0].requireRate(), 20000 / (stepInterval * wire.getFloat(4)),
+      "planner speed matches the pulse generator's deployed f32 settings");
     var unlimited = DeviceBinding.bind(axisModel(null), layout, 20000);
     near(unlimited.channels[0].maxRate, 20000.0 / channel.stepsPerUnit, "an unlimited actuator takes the step tick's ceiling");
     near(channel.feedbackRatio, -1.0, "physical shaft feedback retains the direct reversed transmission");

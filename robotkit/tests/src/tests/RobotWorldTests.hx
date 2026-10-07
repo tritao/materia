@@ -203,6 +203,10 @@ class RobotWorldTests {
       Sys.println("Current RobotKit fixtures regenerated");
       return;
     }
+    if (Sys.getEnv("ROBOTKIT_ONLY") == "device-binding") {
+      Sys.println('Device binding passed (${DeviceBindingTests.run()} assertions)');
+      return;
+    }
     if (Sys.getEnv("ROBOTKIT_ONLY") == "clearance") {
       ClearanceTests.run();
       return;

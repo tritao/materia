@@ -161,8 +161,21 @@ CompiledDevicePlan6 compile_device_segments6(
         }
         expected_ns += source.duration_ns;
         const auto host_start = host_plan_start_ns + source.time_from_start_ns;
-        const auto start_ticks = device_ticks(host_start);
-        const auto end_ticks = device_ticks(host_plan_start_ns + expected_ns);
+        // Keep segments contiguous and never shorten their physical duration when
+        // rounding the clock mapping. Compression can push a plan authored at
+        // its velocity/acceleration ceiling above the deployment limits.
+        const auto start_ticks = result.segments.empty() ? base_ticks :
+            result.segments.back().header.t0_ticks + result.segments.back().header.duration_ticks;
+        const auto mapped_start = device_ticks(host_start);
+        const auto mapped_end = device_ticks(host_plan_start_ns + expected_ns);
+        if (mapped_end <= mapped_start) return reject("device tick mapping collapsed segment");
+        const auto mapped_duration = mapped_end - mapped_start;
+        const long double minimum_ticks = std::ceil(
+            static_cast<long double>(source.duration_ns) * device_tick_hz / 1'000'000'000.0L);
+        if (minimum_ticks > UINT64_MAX) return reject("device duration overflow");
+        const auto safe_duration = std::max(mapped_duration, static_cast<std::uint64_t>(minimum_ticks));
+        if (safe_duration > UINT64_MAX - start_ticks) return reject("device time overflow");
+        const auto end_ticks = start_ticks + safe_duration;
         if (end_ticks <= start_ticks || start_ticks < base_ticks)
             return reject("device tick mapping collapsed segment");
         const auto duration_ticks = end_ticks - start_ticks;
@@ -171,6 +184,8 @@ CompiledDevicePlan6 compile_device_segments6(
         const auto host_duration_seconds = static_cast<double>(source.duration_ns) / 1e9;
         const auto scale = host_duration_seconds / device_duration_seconds;
         DeviceSegment6 wire;
+        wire.host_time_from_start_ns = source.time_from_start_ns;
+        wire.host_duration_ns = source.duration_ns;
         wire.header = {0, plan_id, start_ticks, duration_ticks,
                        static_cast<std::uint8_t>(source.degree),
                        static_cast<std::uint8_t>(actuator_count),

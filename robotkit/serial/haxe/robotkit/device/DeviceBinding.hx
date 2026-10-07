@@ -138,7 +138,15 @@ class DeviceBinding {
       if (capped != null) {
         if ((stepTickHz < driverRate) &&
             (motorRate == null || rate < motorRate)) capped.speedLimiter = "controller tick";
-        capped.maxRate = rate;
+        // The pulse generator enforces an integer number of controller ticks
+        // between steps. Plan at that achievable ceiling, using the same f32
+        // deployment values, rather than allowing the motor to lag a faster
+        // continuous-rate trajectory and keep moving after its nominal stop.
+        var wire = haxe.io.Bytes.alloc(8);
+        wire.setFloat(0, rate); wire.setFloat(4, stepsPerUnit);
+        var wireRate = wire.getFloat(0), wireSteps = wire.getFloat(4);
+        var interval = Math.max(1, Math.ceil(stepTickHz / (wireRate * wireSteps)));
+        capped.maxRate = Math.min(rate, stepTickHz / (interval * wireSteps));
       }
     }
     for (actuator in robot.actuators)

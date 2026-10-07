@@ -202,20 +202,15 @@ private:
     std::deque<DeviceSegment6> pending_;
     std::vector<DeviceSegment6> sent_;
     std::size_t next_commit_ = 0;
-    /**
-      How one submitted chunk's path time maps to device ticks: through the
-      clock mapping it was compiled with, shifted to meet the queued path. A
-      boundary or commit inside it maps to exactly the ticks its segments
-      carry, however the clock estimate has moved since.
-    **/
+    // Per-segment timing preserves conservative device duration rounding in
+    // progress, captures, commits, events, and replacement boundaries.
     struct ChunkTiming {
         std::uint64_t host_path_start_ns;
         std::uint64_t device_start_ticks;
-        std::uint64_t host_epoch_ns;
-        ClockMap6 clock;
-        std::int64_t shift_ticks;
+        std::uint64_t host_duration_ns;
+        std::uint64_t device_duration_ticks;
     };
-    std::vector<ChunkTiming> chunk_timings_;
+    std::deque<ChunkTiming> chunk_timings_;
     /** Events sent and not yet passed, to resend when a replacement reopens their stretch. */
     std::vector<device_wire6::Event6> sent_events_;
     /** Device ticks of the queued path at `path_ns`, or 0 when no chunk covers it. */

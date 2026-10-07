@@ -496,7 +496,6 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
     const bool append = plan.replace_after_plan_id == 0 && anchor_ticks != 0;
     const auto replace_ticks = anchor_ticks != 0 ? anchor_ticks :
         clock_.map_host_ns(host_epoch_ns_ + base_time_ns);
-    const auto compile_clock = clock_.snapshot();
     if (plan.replace_after_plan_id && replace_ticks < committed_until_ticks_)
         return RK_ERROR_INVALID_STATE;
     // The device begins a revision only at a segment boundary. A replacement inside a
@@ -559,7 +558,12 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
             source.value.kind != blueprint.channels[channel].kind) return RK_ERROR_INVALID_ARGUMENT;
         device_wire6::Event6 event{};
         event.plan_id = plan.plan_id;
-        event.path_ticks = clock_.map_host_ns(host_epoch_ns_ + base_time_ns + source.time_ns);
+        const auto timing = std::find_if(compiled.segments.rbegin(), compiled.segments.rend(),
+            [&](const auto &segment) { return source.time_ns >= segment.host_time_from_start_ns; });
+        if (timing == compiled.segments.rend()) return RK_ERROR_INVALID_ARGUMENT;
+        event.path_ticks = timing->header.t0_ticks + static_cast<std::uint64_t>(std::llround(
+            static_cast<long double>(source.time_ns - timing->host_time_from_start_ns) *
+            timing->header.duration_ticks / timing->host_duration_ns));
         event.channel = static_cast<std::uint8_t>(channel);
         event.kind = static_cast<std::uint8_t>(source.value.kind);
         event.hold_policy = static_cast<std::uint8_t>(source.hold_policy);
@@ -683,10 +687,9 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
     if (plan.replace_after_plan_id)
         while (!chunk_timings_.empty() && chunk_timings_.back().host_path_start_ns >= base_time_ns)
             chunk_timings_.pop_back();
-    const auto mapped_start = compile_clock.map(host_epoch_ns_ + base_time_ns);
-    chunk_timings_.push_back({base_time_ns, compiled.segments.front().header.t0_ticks,
-        host_epoch_ns_, compile_clock, anchor_ticks == 0 ? 0 :
-            static_cast<std::int64_t>(anchor_ticks) - static_cast<std::int64_t>(mapped_start)});
+    for (const auto &segment : compiled.segments)
+        chunk_timings_.push_back({base_time_ns + segment.host_time_from_start_ns,
+            segment.header.t0_ticks, segment.host_duration_ns, segment.header.duration_ticks});
     if (plan.replace_after_plan_id) {
         while (!plan_tags_.empty() && plan_tags_.back().start_ticks >= replace_ticks)
             plan_tags_.pop_back();
@@ -846,7 +849,7 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                     sent_events_.end());
                 while (chunk_timings_.size() > 1 &&
                        chunk_timings_[1].device_start_ticks <= status_.path_clock_ticks)
-                    chunk_timings_.erase(chunk_timings_.begin());
+                    chunk_timings_.pop_front();
                 while (plan_tags_.size() > 1 &&
                        plan_tags_[1].start_ticks <= state_header_.path_clock_ticks)
                     plan_tags_.erase(plan_tags_.begin());
@@ -1062,9 +1065,9 @@ rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state
 std::uint64_t Rkd6Endpoint::path_time_ns(std::uint64_t device_ticks) const noexcept {
     for (auto it = chunk_timings_.rbegin(); it != chunk_timings_.rend(); ++it) {
         if (device_ticks >= it->device_start_ticks) {
-            const auto host = it->clock.host_ns(static_cast<std::uint64_t>(
-                static_cast<std::int64_t>(device_ticks) - it->shift_ticks)) -
-                static_cast<long double>(it->host_epoch_ns);
+            const auto host = static_cast<long double>(it->host_path_start_ns) +
+                static_cast<long double>(device_ticks - it->device_start_ticks) *
+                it->host_duration_ns / it->device_duration_ticks;
             if (host <= static_cast<long double>(it->host_path_start_ns))
                 return it->host_path_start_ns;
             if (host >= static_cast<long double>(UINT64_MAX)) return UINT64_MAX;
@@ -1077,9 +1080,11 @@ std::uint64_t Rkd6Endpoint::path_time_ns(std::uint64_t device_ticks) const noexc
 std::uint64_t Rkd6Endpoint::device_ticks_at(std::uint64_t path_ns) const noexcept {
     for (auto it = chunk_timings_.rbegin(); it != chunk_timings_.rend(); ++it)
         if (path_ns >= it->host_path_start_ns) {
-            if (it->host_epoch_ns > UINT64_MAX - path_ns) return 0;
-            return static_cast<std::uint64_t>(static_cast<std::int64_t>(
-                it->clock.map(it->host_epoch_ns + path_ns)) + it->shift_ticks);
+            const auto ticks = static_cast<long double>(it->device_start_ticks) +
+                static_cast<long double>(path_ns - it->host_path_start_ns) *
+                it->device_duration_ticks / it->host_duration_ns;
+            if (ticks >= static_cast<long double>(UINT64_MAX)) return 0;
+            return static_cast<std::uint64_t>(std::llround(ticks));
         }
     return 0;
 }

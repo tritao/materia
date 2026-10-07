@@ -29,6 +29,25 @@ int main() {
     assert(accepted.ok && accepted.segments.size() == 1);
     assert(accepted.segments[0].header.t0_ticks == 1'050'000);
     assert(accepted.segments[0].header.duration_ticks == 1'000'000);
+    // A non-integral duration must round up, including continuations, so a
+    // trajectory at the speed ceiling cannot be accelerated by tick rounding.
+    auto ceiling_blueprint = blueprint;
+    ceiling_blueprint.joints[0].max_velocity = 0.025;
+    auto ceiling_segment = segment;
+    ceiling_segment.duration_ns = 20'000'400;
+    ceiling_segment.coefficients[0].value[1] = 0.025;
+    auto continuation = ceiling_segment;
+    continuation.time_from_start_ns = ceiling_segment.duration_ns;
+    continuation.coefficients[0].value[0] = 0.025 * ceiling_segment.duration_ns / 1e9;
+    const robotkit::TrajectorySegment ceiling_segments[] = {ceiling_segment, continuation};
+    auto ceiling_plan = robotkit::compile_device_segments6(
+        ceiling_segments, 8, false, 1'000'000'000ULL,
+        clock, ceiling_blueprint, 1'000'000, 40'000, 5, 1e-6);
+    assert(ceiling_plan.ok && ceiling_plan.segments.size() == 2);
+    assert(ceiling_plan.segments[0].header.duration_ticks == 20'001);
+    assert(ceiling_plan.segments[1].header.t0_ticks ==
+        ceiling_plan.segments[0].header.t0_ticks + ceiling_plan.segments[0].header.duration_ticks);
+    assert(ceiling_plan.segments[1].coefficients[0].c1 <= 0.025);
     auto minimal_line = robotkit::compile_device_segments6(
         std::span(&segment, 1), 7, true, 1'000'000'000ULL,
         clock, blueprint, 1'000'000, 40'000, 1, 1e-6);

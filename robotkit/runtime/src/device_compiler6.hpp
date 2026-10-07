@@ -37,6 +37,8 @@ struct DeviceInput6 {
 };
 
 struct DeviceSegment6 {
+    std::uint64_t host_time_from_start_ns = 0;
+    std::uint64_t host_duration_ns = 0;
     device_wire6::Segment6Header header{};
     std::vector<device_wire6::Segment6Coefficients> coefficients;
 };
@@ -50,9 +52,9 @@ struct CompiledDevicePlan6 {
 
 /**
   Compiles host segments starting at `host_plan_start_ns` into device segments.
-  Each boundary maps to device ticks through `clock`; a nonzero `anchor_ticks`
-  starts the plan on that tick instead, keeping the clock's rate, so a
-  continuation meets the queued path exactly.
+  Clock mapping schedules the start; durations round conservatively without
+  compressing physical motion. A nonzero `anchor_ticks` starts the plan on
+  that tick so a continuation meets the queued path exactly.
   Homing alone may use the blueprint's declared overtravel past soft limits;
   derivative and actuator step-rate limits still apply.
 **/
