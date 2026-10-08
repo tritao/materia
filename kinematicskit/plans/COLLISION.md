@@ -219,11 +219,35 @@ assembling a SimKit session is the closest thing to a cell-wide one.
   - Every body and object keeps a stable id across changes, so rules and
     reports survive them.
 - **CL-D7 — Free-space planning is our own RRT-Connect, with OMPL as the
-  reference.**
-  - OMPL is not vendored: it needs Boost (serialization, filesystem,
-    program_options). RRT-Connect with shortcutting is small enough to own
-    and test. It is pure Haxe over `CollisionWorld`, so it runs wherever a
-    backend does.
+  reference.** (Revised 2026-10-09.)
+  - **Why not an existing planner.**
+
+    | Option | Why not now |
+    | --- | --- |
+    | OMPL | It needs Boost, which we kept out with coal. Its RRT-Connect alone is a few hundred lines; its value is its other planners and its benchmark set, which we do not need yet. |
+    | VAMP | It needs robot-specific code generated ahead of time, with robots made of spheres. That does not fit cells that change at runtime or CAD meshes in coal. |
+    | MoveIt, Tesseract, MPLib | They bring ROS or FCL + OMPL + Pinocchio, which duplicates what we have. |
+    | cuRobo | NVIDIA licence and CUDA. |
+
+  - **Why Haxe, and where native code goes.** Reach is not the reason: a
+    planner needs a collision backend, and that is native everywhere
+    (CL-D2), the browser included. Haxe is for integration: the kit's
+    models, redundancy parameterizations, MotionKit timing and phase
+    synchronization, and the existing suites. The cost that dominates
+    RRT-Connect is collision checking, which is native. So the hot path
+    stays native:
+    - edges and configuration lists are checked in batched native calls,
+      with CL-D5's bisection done natively (CL2 adds the call). That
+      avoids one FFI call, and one array copy, per configuration;
+    - tree nodes are stored flat in preallocated arrays, not one array
+      per configuration;
+    - nearest-neighbour search becomes a k-d tree once trees grow (a
+      linear scan scales badly).
+  - **Measured, not assumed.** Our planner is benchmarked against OMPL's
+    RRT-Connect on the same scenes, with the same validity checker
+    (out of tree). If the Haxe tree code is a meaningful share of
+    planning time, nearest-neighbour search (or the whole loop) moves to
+    C++, with that measurement as the reason.
   - MotionKit gets a `MotionPlanner` interface. Its first implementation is
     bidirectional RRT-Connect in joint space, followed by shortcutting.
   - Edges are checked with CL-D5's bound, with a small slack over `ds`.
@@ -236,7 +260,8 @@ assembling a SimKit session is the closest thing to a cell-wide one.
     time, path length, success rate) is the comparison.
   - Asymptotically optimal or constrained planning (OMPL's RRT*, BIT* or
     constrained state spaces) can come in later as an optional native
-    backend behind the same interface, if needed.
+    backend behind the same interface, if needed. Recheck OMPL's Boost
+    requirements then: they were not verified for its current release.
 - **CL-D8 — "Exact" means exact for the declared geometry.**
   - The report lists what the geometry approximates, in its assumptions:
     - the tessellation deflection of CAD meshes (tessellated curved faces
@@ -272,8 +297,9 @@ assembling a SimKit session is the closest thing to a cell-wide one.
 
 Each step is its own commit with all suites green.
 
-- **CL0 — This plan.** Done (dd9408ca6); revised after CL1.
-- **CL1 — Native collision world in the kit.** Done (335ef1b98), see the
+- **CL0 — This plan.** Done (9ca6aed52); revised after CL1 and on
+  2026-10-09.
+- **CL1 — Native collision world in the kit.** Done (311788aa9), see the
   progress log. CL2 moves it out of the kit.
 - **CL2 — collisionkit.**
   - New package:
@@ -294,6 +320,10 @@ Each step is its own commit with all suites green.
   - Inflation for primitives and convex sets.
   - Results name the bodies as well as the objects. A query over chosen
     pairs lets CL-D5 bisect one pair without recomputing the rest.
+  - Batched checks for CL6 and CL7 (CL-D7): one call takes many pose sets
+    (a configuration list, or a segment's two ends with their motion
+    bounds) and returns the first failure, with CL-D5's bisection done
+    natively.
   - Height updates below the field's minimum are refused.
   - In kinematicskit (pure Haxe): rigid, adjacent and closure pairs of a
     `KinematicModel`, with reasons.
@@ -331,7 +361,19 @@ Each step is its own commit with all suites green.
   - Tests:
     - one world with a robot, a CAD mechanism and terrain;
     - a fixture through the robot at its reference, reported as a layout
-      error.
+      error;
+    - a cross-check: at sampled configurations, every MuJoCo contact is
+      also a collision in the coal world (meshes aside, which MuJoCo
+      treats as hulls).
+  - Convex decomposition (V-HACD or CoACD, in cadbridge) for non-convex
+    solids: links, tools, parts and fixtures become sets of convex pieces
+    instead of one hull or a surface mesh (CL-D8). The pieces feed both
+    coal and SimKit's MuJoCo backend.
+  - One collision description for the cell, consumed by both the coal
+    world and the SimKit session: shapes per body, and the allowed pairs
+    with their reasons. MuJoCo gets the exclusions as excludes instead of
+    recomputing them (`add_self_collision_excludes`), so the planner and
+    the simulation cannot drift apart.
   - Out of scope here: loading URDF `<mesh>` files. They stay references
     until a mesh importer exists.
 - **CL4 — Validation.**
@@ -389,8 +431,10 @@ Each step is its own commit with all suites green.
   - The search only prunes; CL4 stays the guarantee.
 - **CL7 — Free-space planning (CL-D7).**
   - The `MotionPlanner` interface in MotionKit.
-  - RRT-Connect with shortcutting in pure Haxe, over a `CollisionWorld`,
-    with its own seeded random generator.
+  - RRT-Connect with shortcutting in Haxe, over a `CollisionWorld`, with
+    its own seeded random generator. Edges go through CL2's batched
+    checks; nodes are stored flat; nearest-neighbour search is a k-d tree
+    once trees grow (CL-D7).
   - Phase synchronization in MotionKit's generator, so a planned edge is a
     straight line in joint space.
   - `ProgramCompiler` plans a joint move that asks for it (a planned
@@ -401,7 +445,10 @@ Each step is its own commit with all suites green.
     - determinism from a seed;
     - the timed path following the checked edges;
     - a planned move through validation.
-  - An OMPL benchmark scene is noted for an out-of-tree comparison.
+  - An out-of-tree benchmark against OMPL's RRT-Connect on the same
+    scenes and checker: planning time, path length, success rate, and the
+    share of time outside collision checks (CL-D7 decides from it whether
+    any planner code moves to C++).
 - **CL8 — Collision in the editor and the browser** (any time after CL3).
   - The desktop editor links collisionkit's native library and shows
     colliding and near pairs while a cell is laid out or a robot jogged.
@@ -506,3 +553,33 @@ collisionkit):
 - **Build.** coal is linked into `kinematicskit_core`, so every native kit
   build compiles it once (about a minute). The library has no new dynamic
   dependencies, and its dependency records list no Boost or assimp header.
+
+### Rebase onto main and planner revision (2026-10-09)
+
+- **The branch is rebased onto main `1decbfc20`**, 956 commits on from
+  where it started. CL0 and CL1 kept their content. Their commits are now
+  9ca6aed52 and 311788aa9.
+  - `motionkit/plans/README.md` keeps main's process-path row next to the
+    collision rows.
+  - `kinematicskit.hxi` is regenerated from the merged header.
+  - CL1's C++ test packs main's model format 2 (joint terms), in
+    ec135609a.
+- **Main's process-path plan already depends on this one.** PP10 adopts
+  collisionkit once CL2–CL4 are on main, and `ArmClearance` serves its
+  clearance interface until then.
+- **CL1 stays off main until CL2.** Landing it alone would make every
+  native kit build on main compile coal, for a design CL2 replaces.
+- **CL-D7 revised:** the planner is Haxe for integration, not for reach.
+  Collision is native everywhere it is wanted. The hot path is native
+  (batched checks, added to CL2), and the OMPL benchmark decides whether
+  any planner code moves to C++.
+- **CL3 gains** convex decomposition and one collision description shared
+  with SimKit's MuJoCo backend, with a cross-check test.
+- **Checks after the rebase:**
+  - the standalone C++ tests pass;
+  - the native kit suite passes (713 assertions);
+  - MotionKit passes (1224712 assertions), and so does RobotKit (5433):
+    both now compile coal through `kinematicskit-native`.
+  - The pure kit suite fails "DLS allocates nothing per iteration
+    (-40.8 bytes)". A clean export of `origin/main` fails identically, so
+    this is main's, not this branch's.
