@@ -95,6 +95,30 @@ joints makes it fall.
   outright that the trained weights are covered. Keep a `NOTICE` beside the
   files naming the source repository, the pinned commit, the licence and that
   ambiguity.
+- **HU-D11 — H7 picks the controller's model by what the controller needs
+  (2026-10-01).** The controller never reads the simulation (HU-D4, Lane D
+  LD-D1), but its model of the robot can come from either library:
+  - **A whole-body QP** (inverse dynamics on ProxQP from the mass matrix,
+    bias forces, contact and centre-of-mass Jacobians) takes them from a
+    MuJoCo model of its own: a separate instance with the controller's
+    parameters, never the simulator's state. MuJoCo is already vendored;
+    mink (IK) and MuJoCo MPC use it the same way.
+  - **TSID or gradient-based predictive control** (Crocoddyl, Aligator)
+    needs exact derivatives of the dynamics, so it uses Pinocchio.
+    - Pinocchio is built without collision support
+      (`BUILD_WITH_COLLISION_SUPPORT` off): collision questions go to
+      collisionkit (`kinematicskit/plans/COLLISION.md`).
+    - Its build requires Boost filesystem and serialization, the objection
+      that kept OMPL out. Before vendoring, check what can be cut, as the
+      coal fork did.
+
+  Either way the model compiles from `RobotModel` (as the MJCF export does),
+  and tests check its mass matrix and bias forces against the simulator's.
+  The tests must account for:
+  - the terms MuJoCo adds: armature, joint damping, passive forces;
+  - the floating-base conventions. MuJoCo's quaternion is w,x,y,z and
+    Pinocchio's x,y,z,w. MuJoCo's free-joint linear velocity is in the world
+    frame, Pinocchio's in the body frame.
 
 ---
 
@@ -226,18 +250,24 @@ the editor, each also on an MCAP channel.
 ## H7 — Model-based control (after H4)
 
 Do:
-- Pinocchio binding for floating-base kinematics and dynamics that do not come
-  from the simulator (Lane D rule).
+- Pick the controller's model by HU-D11: a MuJoCo model of the controller's
+  own for a whole-body QP, Pinocchio for TSID or gradient-based predictive
+  control. Floating-base kinematics and dynamics never come from the
+  simulator (Lane D rule).
 - Extend the Lane D QP with a floating base, contact constraints and a
   centre-of-mass task.
-- Inverse dynamics with TSID (stack-of-tasks, on Pinocchio) and ProxQP, the
-  QP solver kinematicskit's K3 also uses (`kinematicskit/plans/KINEMATICS.md`
-  KK-D13/KK-D14). Build the Pinocchio model directly from `RobotModel` (as
-  the MJCF export does), not through URDF files. TSID and Pinocchio are
-  native dependencies of RobotKit's runtime: before vendoring, confirm
-  licences, pinned versions and the dependency set (Pinocchio has optional
-  Boost-based parts) and log the decision. Keep task definitions aligned
-  with kinematicskit's (SE3 ~ `FrameTask`, posture ~ `PostureTask`).
+- Inverse dynamics on ProxQP, the QP solver kinematicskit's K3 also uses
+  (`kinematicskit/plans/KINEMATICS.md` KK-D13/KK-D14), through TSID
+  (stack-of-tasks) if HU-D11 picks Pinocchio.
+- Build the controller's model directly from `RobotModel` (as the MJCF
+  export does), not through URDF files, and check it against the
+  simulator's (HU-D11).
+- Pinocchio and TSID would be native dependencies of RobotKit's runtime.
+  Before vendoring them, confirm the licences, pinned versions and the
+  dependency set (Pinocchio's build requires Boost filesystem and
+  serialization), and log the decision.
+- Keep task definitions aligned with kinematicskit's (SE3 ~ `FrameTask`,
+  posture ~ `PostureTask`).
 
 First target: the policy balances the legs while the whole-body controller
 tracks a hand target.

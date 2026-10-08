@@ -120,16 +120,19 @@ out to be wrong.
   and that its dense solver builds without optional extras; if it does not,
   stop and log, with DAQP (small C dense active-set solver) as the fallback
   to evaluate.
-- **KK-D14 — Dynamics stays out; TSID + Pinocchio own it (H7).** TSID
-  (stack-of-tasks) solves torques, accelerations and contact forces per
-  control tick on Pinocchio's rigid-body dynamics; that is humanoid H7 in
-  RobotKit's native runtime, not this kit. The kit keeps its task vocabulary
-  close to TSID's (`FrameTask` ~ SE3 equality task, `PostureTask` ~ joint
-  posture task) so a goal authored once can drive a kinematic solve or TSID.
-  Once Pinocchio is in the build, its FK and Jacobians become a test oracle
-  for the kit. Pinocchio does not replace the kit: the kit must run in Haxe
-  without native code (editor, CAD design mode) and handles CAD closures and
-  couplings.
+- **KK-D14 — Dynamics stays out; humanoid H7 owns it.**
+  - Torques, accelerations and contact forces per control tick are solved in
+    RobotKit's native runtime (H7), not in this kit.
+  - They are computed either on Pinocchio with TSID or on a MuJoCo model of
+    the controller's own, depending on what the controller needs
+    (`robotkit/plans/HUMANOID.md` HU-D11, revised 2026-10-01).
+  - The kit keeps its task vocabulary close to TSID's (`FrameTask` ~ SE3
+    equality task, `PostureTask` ~ joint posture task), so a goal authored
+    once can drive a kinematic solve or a whole-body controller.
+  - MuJoCo, already in the build through SimKit, becomes the test oracle for
+    the kit's FK and Jacobians. Pinocchio is not brought in for that.
+  - Neither replaces the kit: the kit must run in Haxe without native code
+    (editor, CAD design mode), and it handles CAD closures and couplings.
 - **KK-D20 — coal for collision and distance (2026-10-01).** Signed
   distance with closest points (what distance constraints need), triangle
   meshes, height fields and octrees, scenes that change at runtime, and
@@ -139,13 +142,16 @@ out to be wrong.
   compiled simulator model per scene, which does not fit non-convex,
   changing construction scenes. FCL is coal's predecessor. Vendored from
   our fork `tritao/coal` (branch `materia`): the core only, Eigen only, no
-  Boost or assimp (see `native/THIRD_PARTY.md`). It lives behind the
-  kinematicskit-native C ABI like ProxQP, so it is native-only; the browser
-  build does not get collision checks unless coal is compiled to
-  WebAssembly. The plan built on it is `COLLISION.md`.
-- **KK-D9 — Out of scope:** collision geometry sources and collision
-  validation (MotionKit); the collision world itself moved into the kit
-  (`COLLISION.md` CL-D1, 2026-10-01), time parameterization and trajectories (MotionKit), dynamics,
+  Boost or assimp (see `native/THIRD_PARTY.md`). It is native-only. CL1
+  linked it into kinematicskit-native; it moves to its own package,
+  collisionkit (`COLLISION.md` CL-D1, CL2), which the browser build gets
+  by compiling it into its Emscripten host (CL-D2). The plan built on it
+  is `COLLISION.md`.
+- **KK-D9 — Out of scope:** collision geometry sources, the collision
+  world (collisionkit) and collision validation (MotionKit). The kit keeps
+  the rigid, adjacent and closure pairs, the motion bounds for path checks
+  and the avoidance task (`COLLISION.md` CL-D1, revised 2026-10-01). Also
+  out: time parameterization and trajectories (MotionKit), dynamics,
   character IK (`animkit`/`humankit`), and the OPW analytic solver (stays a
   specialist `KinematicsSolver` in MotionKit).
 
@@ -371,9 +377,9 @@ robot-arm CAD/robot FK agreement check; every former façade caller passes.
 
 Do: optional root-pose variables in the problem (planar 3-DOF for a mobile
 base, 6-DOF for a floating base), so a mobile manipulator can solve base +
-arm together. H7's whole-body control (contacts, centre of mass, Pinocchio
-dynamics) stays in `HUMANOID.md`; this item only makes sure the kit does not
-block it.
+arm together. H7's whole-body control (contacts, centre of mass, dynamics
+from the model HU-D11 picks) stays in `HUMANOID.md`; this item only makes
+sure the kit does not block it.
 
 ## E1 — Editor IK gizmo (separate track, after K2)
 
