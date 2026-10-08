@@ -141,9 +141,9 @@ assembling a SimKit session is the closest thing to a cell-wide one.
        overlap there is a layout error, and it is reported.
   - Declared allow or check rules from the cell override the defaults.
   - Process contact is allowed per window, never globally (CL-D9).
-  - Later, SimKit takes its exclusions from the same rules instead of
-    computing its own, so simulation and checking agree on which pairs may
-    touch.
+  - SimKit takes its exclusions from the same rules instead of computing
+    its own (CL3b), so simulation and checking agree on which pairs may
+    touch; it may exclude more, never fewer (CL-D10).
 - **CL-D4 — Two distances per pair class.**
   - The **safety margin** `ds`: clearance below it is a violation in
     validation.
@@ -293,6 +293,41 @@ assembling a SimKit session is the closest thing to a cell-wide one.
   - MotionKit validation (CL4) consumes the declarations. Without them,
     every contact is a collision.
 
+- **CL-D10 — RobotKit's contact settings are simulation-only, except
+  contact pairs.** (Decided 2026-10-09.)
+  - `ShapeContact` (`Layers`, `PairsOnly`, `PairsAndEnvironment`) and the
+    blueprint's `selfCollision` tune simulated contact for stability and
+    cost. Clearance ignores them: a `PairsOnly` finger pad is still
+    checked against a fixture. The report records that a
+    simulation-only setting was ignored.
+  - A `ContactPair` says two shapes are meant to touch (fingers closing
+    on each other). It becomes an allow rule on that object pair, with
+    the reason "declared contact". Checking it would always fail.
+  - Intended contact with the environment (a grasp, a foot on the floor,
+    a torch on its seam) is not a simulation setting: it is a CL-D9
+    window, declared with the program.
+  - Rules flow one way, from these rules to MuJoCo as excludes. The
+    simulation may switch off more contacts than the rules allow, never
+    fewer.
+- **CL-D11 — Convex decomposition is V-HACD 4, with enclosure checked by
+  us.** (Decided 2026-10-09.)
+  - Non-convex solids (links, tools, parts, fixtures) become sets of
+    convex pieces (CL-D8), instead of one hull or a surface mesh.
+  - V-HACD 4.0: BSD-3, one header, no libraries. It is archived upstream
+    (its README points to CoACD), so it is vendored as a `tritao` fork,
+    like coal, and fixed there if needed.
+  - CoACD is rejected for now. Its pieces are better, but its build pulls
+    in Boost, OpenVDB, zlib and spdlog: Boost is what coal was trimmed to
+    avoid, and OpenVDB would weigh on the browser build. Using it later
+    means trimming it as coal was.
+  - Neither library promises that the pieces enclose the input. After
+    decomposition we measure how far the tessellated mesh sticks out of
+    the pieces' union, and inflate the pieces by that distance (coal's
+    inflation radius), so the union encloses it. The inflation and the
+    tessellation deflection go into the report's assumptions (CL-D8).
+  - Decomposition runs when a CAD part changes, not at planning time.
+    The pieces are cached with the part.
+
 ## Steps
 
 Each step is its own commit with all suites green.
@@ -337,7 +372,9 @@ Each step is its own commit with all suites green.
     - overlap at reference leaving the environment checked;
     - inflation against an exact distance;
     - refused heights.
-- **CL3 — Geometry from the cell.**
+- **CL3 — Geometry from the cell**, in two commits. CL3a can run
+  unattended; CL3b reaches into SimKit and is done with review.
+- **CL3a — Robot, tool and environment geometry; decomposition.**
   - RobotKit builds a robot's bodies, groups and shapes from a
     `RobotModel`:
     - link primitives;
@@ -348,10 +385,9 @@ Each step is its own commit with all suites green.
   - Default rules come from the kit's pairs and from overlap at reference.
     Each robot's reference configuration is named (its home if the model
     has one, else zero) and recorded.
-  - RobotKit's contact policy (`ShapeContact`, contact pairs) is mapped to
-    rules, and the mapping recorded. Proposal: the policy governs
-    simulated contact only, and clearance checks every shape unless a
-    rule allows the pair.
+  - RobotKit's contact settings are mapped per CL-D10: `ShapeContact` and
+    `selfCollision` are ignored and recorded, and each `ContactPair` becomes
+    an allow rule with the reason "declared contact".
   - Environment:
     - scene boxes;
     - CAD parts and fixtures at `AssemblyState.worldPose`, as hulls
@@ -362,21 +398,37 @@ Each step is its own commit with all suites green.
     - one world with a robot, a CAD mechanism and terrain;
     - a fixture through the robot at its reference, reported as a layout
       error;
-    - a cross-check: at sampled configurations, every MuJoCo contact is
-      also a collision in the coal world (meshes aside, which MuJoCo
-      treats as hulls).
-  - Convex decomposition (V-HACD or CoACD, in cadbridge) for non-convex
-    solids: links, tools, parts and fixtures become sets of convex pieces
-    instead of one hull or a surface mesh (CL-D8). The pieces feed both
-    coal and SimKit's MuJoCo backend.
-  - One collision description for the cell, consumed by both the coal
-    world and the SimKit session: shapes per body, and the allowed pairs
-    with their reasons. MuJoCo gets the exclusions as excludes instead of
-    recomputing them (`add_self_collision_excludes`), so the planner and
-    the simulation cannot drift apart.
+    - the CL-D10 mapping: a `PairsOnly` shape still checked, a contact
+      pair allowed with its reason;
+    - a decomposed non-convex part whose pieces enclose its tessellation
+      after inflation, with the inflation recorded.
+  - Convex decomposition (CL-D11): V-HACD 4 vendored from a `tritao` fork
+    into cadbridge's native code (or CadKit's, wherever the tessellation
+    is), the enclosure measurement and inflation, and the pieces cached
+    with the part. Creating the fork publishes a repository, so it needs
+    the user's go-ahead.
   - Out of scope here: loading URDF `<mesh>` files. They stay references
     until a mesh importer exists.
+- **CL3b — One collision description shared with SimKit.**
+  - The cell's description (shapes per body, allowed pairs with their
+    reasons) is consumed by both the coal world and the SimKit session.
+  - MuJoCo gets the exclusions as excludes instead of recomputing them
+    (`add_self_collision_excludes`), so the planner and the simulation
+    cannot drift apart (CL-D10: the simulation may exclude more, never
+    fewer).
+  - The decomposed pieces feed MuJoCo too.
+  - Test, a cross-check: at sampled configurations, every MuJoCo contact
+    is also a collision in the coal world (meshes aside, which MuJoCo
+    treats as hulls).
 - **CL4 — Validation.**
+  - **First, reconcile with main's clearance code** (written up in this
+    plan, no code). Main's process-path work added `TrajectoryClearance`,
+    `JointCurveClearance` and `LazyCollisionLadder` (motionkit-robot),
+    `JointPathClearanceProof` (motionkit planner) and `ArmClearance`
+    (robotkit autonomy), and its PP10 adopts collisionkit after CL2–CL4.
+    Decide what CL4 and CL6 reuse, replace or drop, and whether
+    `JointPathClearanceProof` already is CL-D5's proof. CL4 and CL6
+    below were written before that code existed.
   - Add `MK_CHECK_COLLISION` to `mk_validation_report`, with
     `mk_report_set_collision` and `ValidationReport.setCollision`.
   - A check's single `joint` slot cannot name a pair, so the report gains
@@ -422,7 +474,10 @@ Each step is its own commit with all suites green.
     - the servo stopping short of an obstacle and sliding along it;
     - a pair against another robot;
     - recovery from inside `ds`.
-- **CL6 — The path search avoids collisions.**
+- **CL6 — The path search avoids collisions.** Rewrite after the
+  reconciliation in CL4: main's process paths now use a ladder search
+  (`StructuredLadder`, `LazyCollisionLadder`), and main's PP plan calls
+  CL6 and its PP5 the same job.
   - `RedundancyResolver` and `PathConfigurationSelector` drop candidates
     that collide (solids per CL-D8).
   - Their edges are checked with CL-D5.
@@ -583,3 +638,15 @@ collisionkit):
   - The pure kit suite fails "DLS allocates nothing per iteration
     (-40.8 bytes)". A clean export of `origin/main` fails identically, so
     this is main's, not this branch's.
+
+### Decisions on CL3 (2026-10-09)
+
+- CL-D10: RobotKit's contact settings are simulation-only; contact pairs
+  become allow rules with their reason.
+- CL-D11: convex decomposition is V-HACD 4 from a `tritao` fork, with
+  enclosure measured and fixed by inflation; CoACD is rejected because
+  its build needs Boost and OpenVDB (checked in its CMakeLists).
+- CL3 splits into CL3a (geometry, mapping, decomposition) and CL3b (the
+  description shared with SimKit).
+- CL4 and CL6 start with a reconciliation against main's clearance code,
+  which arrived with the rebase.
