@@ -9,7 +9,7 @@ Revised on 2026-10-01, after CL1: the world moves out of the kit into its
 own package, and three errors are fixed (see the revision log). The plan
 moves to `collisionkit/plans/` with CL2.
 
-## Where things stand (2026-10-01)
+## Where things stand (2026-10-01, main's clearance code 2026-10-09)
 
 - **coal** is a submodule at `kinematicskit/native/vendor/coal`.
   - CL1 linked it into `kinematicskit_core`, so every package that builds
@@ -75,8 +75,38 @@ moves to `collisionkit/plans/` with CL2.
   (`lower ≤ Δ ≤ upper`). `PrioritizedSolver` keeps an active set of pinned
   DOFs.
 
-CL1's world is the only collision world. `ApplicationSimulation`
-assembling a SimKit session is the closest thing to a cell-wide one.
+`ApplicationSimulation` assembling a SimKit session is the closest thing
+to a cell-wide collision model.
+
+**Main's clearance code** (arrived with the 2026-10-09 rebase, from the
+process-path plan, `motionkit/plans/PROCESS_PATH_PLANNING.md`):
+- `ArmClearance` (robotkit autonomy): convex hulls per link, from the
+  simulation hulls, assembly parts and deposited weld hulls
+  (`MissionPlayer`). Pure-Haxe GJK (`ConvexDistance`) over all pairs, with
+  a sphere and box broad phase. Neighbour links touching at a reference are
+  excluded; tool contact has its own margin. Queries:
+  - `violation(q, contact, wanted, displacements)`: the first pair closer
+    than the margin plus each body's inflation;
+  - `closest`;
+  - `sweep`: sampled along a straight joint line.
+- `ClearanceMotionBounds` and `ClearanceMotionEnvelope`: CL-D5's motion
+  bound on the compiled kinematic forest, with couplings, prismatic
+  joints and moving work frames.
+- `JointCurveClearance`, implementing `JointPathClearanceProof`: a
+  conservative proof on refined quintic paths. Per span, a query at the
+  midpoint with the margin raised by the envelope's bound, then bisection
+  to depth 20.
+- `LazyCollisionLadder` and `StructuredLadder`: the ladder search that
+  prunes colliding candidates and edges and retries (PP-D5). This is CL6
+  for process paths.
+- `TrajectoryClearance`: sampled checks (10 ms, 0.02 rad) for timed
+  trajectories without a certificate: joint moves, and generated entry,
+  exit and hold moves.
+- No clearance entry in the validation report (now in trajectorykit,
+  `trajectory_core.h`); failures throw. Main added `MK_CHECK_METHOD_BOUND`
+  for task-space certificates.
+- PP10 plans to implement the clearance seams on collisionkit once CL2–CL4
+  are on main, and to delete `ArmClearance` from process planning.
 
 ## Decisions
 
@@ -163,8 +193,13 @@ assembling a SimKit session is the closest thing to a cell-wide one.
     largest `di` and apply each class's margins to the results.
   - The cell overrides the defaults. The report records the margins it
     used.
-- **CL-D5 — Path checks are conservative, not just sampled.** Between two
-  checked configurations, no point on a body moves further than a bound
+- **CL-D5 — Path checks are conservative, not just sampled.**
+  (Implementation revised 2026-10-09: main's `ClearanceMotionEnvelope`
+  and `JointCurveClearance` are this decision's implementation; see
+  CL-D12. They use one midpoint query per span with the margin raised by
+  `Ba + Bb`, an equally sound form of the two-endpoint bound below. No
+  second proof is built. Certificates are reported with main's
+  `MK_CHECK_METHOD_BOUND`.) Between two checked configurations, no point on a body moves further than a bound
   `B`, the sum of:
   - for each joint between the root and the body, `R_j · T_j`:
     - `T_j` is the joint's total travel over the segment, not the
@@ -255,7 +290,7 @@ assembling a SimKit session is the closest thing to a cell-wide one.
     rest-to-rest move with Ruckig's phase synchronization, which is a
     straight line in joint space. MotionKit's generator accepts only time
     synchronization today; CL7 adds phase. Blending through waypoints
-    comes later, and validation (CL4) re-checks whatever is timed.
+    comes later, and validation (CL4b) re-checks whatever is timed.
   - OMPL's planners are the reference, and its benchmark set (planning
     time, path length, success rate) is the comparison.
   - Asymptotically optimal or constrained planning (OMPL's RRT*, BIT* or
@@ -290,7 +325,7 @@ assembling a SimKit session is the closest thing to a cell-wide one.
     - fingers closing on a part;
     - a part leaving or reaching its fixture;
     - a bucket in the soil.
-  - MotionKit validation (CL4) consumes the declarations. Without them,
+  - MotionKit validation (CL4b) consumes the declarations. Without them,
     every contact is a collision.
 
 - **CL-D10 — RobotKit's contact settings are simulation-only, except
@@ -313,9 +348,11 @@ assembling a SimKit session is the closest thing to a cell-wide one.
   us.** (Decided 2026-10-09.)
   - Non-convex solids (links, tools, parts, fixtures) become sets of
     convex pieces (CL-D8), instead of one hull or a surface mesh.
-  - V-HACD 4.0: BSD-3, one header, no libraries. It is archived upstream
-    (its README points to CoACD), so it is vendored as a `tritao` fork,
-    like coal, and fixed there if needed.
+  - V-HACD 4: BSD-3, one header, no libraries. It is archived upstream
+    (its README points to CoACD), which only means frozen. It is a plain
+    submodule of upstream `kmammou/v-hacd` at tag `v4.1.0`, as the repo
+    keeps every dependency it does not change. A `tritao` fork comes only
+    if a fix is needed, and creating one needs the user's go-ahead.
   - CoACD is rejected for now. Its pieces are better, but its build pulls
     in Boost, OpenVDB, zlib and spdlog: Boost is what coal was trimmed to
     avoid, and OpenVDB would weigh on the browser build. Using it later
@@ -327,6 +364,24 @@ assembling a SimKit session is the closest thing to a cell-wide one.
     tessellation deflection go into the report's assumptions (CL-D8).
   - Decomposition runs when a CAD part changes, not at planning time.
     The pieces are cached with the part.
+
+- **CL-D12 — Main's clearance design stays; collisionkit replaces its
+  geometry engine.** (Decided 2026-10-09.)
+  - Main's process-path work already has the proof
+    (`JointCurveClearance`), the motion bound (`ClearanceMotionEnvelope`)
+    and the collision-aware ladder (`LazyCollisionLadder`). What it lacks
+    is the geometry: `ArmClearance` is convex hulls only, Haxe GJK over
+    every pair, without primitives, meshes, height fields or pair rules.
+  - An interface is extracted from what `ArmClearance` exposes: violations
+    with per-body inflation, the closest pair, straight-line joint sweeps,
+    the motion envelope, the tool pose. `ClearanceViolation` moves out of
+    robotkit to sit with it. `ArmClearance` and a collisionkit adapter both
+    implement it.
+  - Allowed: extracting interfaces, moving types, adding adapters and new
+    code paths, all without changing behaviour. Not allowed: changing the
+    proof, the margins or the ladder, or deleting `ArmClearance`. Switching
+    process planning over and deleting `ArmClearance` is main's PP10, and
+    is decided with the process-path work.
 
 ## Steps
 
@@ -355,10 +410,14 @@ Each step is its own commit with all suites green.
   - Inflation for primitives and convex sets.
   - Results name the bodies as well as the objects. A query over chosen
     pairs lets CL-D5 bisect one pair without recomputing the rest.
-  - Batched checks for CL6 and CL7 (CL-D7): one call takes many pose sets
-    (a configuration list, or a segment's two ends with their motion
-    bounds) and returns the first failure, with CL-D5's bisection done
-    natively.
+  - Violation queries as main's proof uses them (CL-D12): the first pair
+    closer than its margin plus each body's inflation (`required + δa +
+    δb`), and the closest pair with names.
+  - Batched checks (CL-D7, CL-D12): one call takes many pose sets, each
+    with its per-body inflation, and returns the first failure.
+    `JointCurveClearance` makes thousands of queries per path (about 3,900
+    per direction on G17), so one FFI call each would cost more than the
+    geometry.
   - Height updates below the field's minimum are refused.
   - In kinematicskit (pure Haxe): rigid, adjacent and closure pairs of a
     `KinematicModel`, with reasons.
@@ -402,11 +461,13 @@ Each step is its own commit with all suites green.
       pair allowed with its reason;
     - a decomposed non-convex part whose pieces enclose its tessellation
       after inflation, with the inflation recorded.
-  - Convex decomposition (CL-D11): V-HACD 4 vendored from a `tritao` fork
-    into cadbridge's native code (or CadKit's, wherever the tessellation
-    is), the enclosure measurement and inflation, and the pieces cached
-    with the part. Creating the fork publishes a repository, so it needs
-    the user's go-ahead.
+  - Convex decomposition (CL-D11): V-HACD 4 as an upstream submodule at
+    `v4.1.0`, built into cadbridge's native code (or CadKit's, wherever
+    the tessellation is), with the enclosure measurement and inflation,
+    and the pieces cached with the part.
+  - The geometry also covers what `ArmClearance` gets today (simulation
+    hulls, assembly parts, deposited weld hulls, via `MissionPlayer`), so
+    CL4a can compare the two worlds on the same scenes.
   - Out of scope here: loading URDF `<mesh>` files. They stay references
     until a mesh importer exists.
 - **CL3b — One collision description shared with SimKit.**
@@ -420,34 +481,46 @@ Each step is its own commit with all suites green.
   - Test, a cross-check: at sampled configurations, every MuJoCo contact
     is also a collision in the coal world (meshes aside, which MuJoCo
     treats as hulls).
-- **CL4 — Validation.**
-  - **First, reconcile with main's clearance code** (written up in this
-    plan, no code). Main's process-path work added `TrajectoryClearance`,
-    `JointCurveClearance` and `LazyCollisionLadder` (motionkit-robot),
-    `JointPathClearanceProof` (motionkit planner) and `ArmClearance`
-    (robotkit autonomy), and its PP10 adopts collisionkit after CL2–CL4.
-    Decide what CL4 and CL6 reuse, replace or drop, and whether
-    `JointPathClearanceProof` already is CL-D5's proof. CL4 and CL6
-    below were written before that code existed.
-  - Add `MK_CHECK_COLLISION` to `mk_validation_report`, with
-    `mk_report_set_collision` and `ValidationReport.setCollision`.
+- **CL4a — The clearance interface and the collisionkit adapter**
+  (CL-D12).
+  - Extract the interface from `ArmClearance`'s queries and move
+    `ClearanceViolation` beside it. `StructuredJointPathPlanner`,
+    `JointCurveClearance`, `LazyCollisionLadder`'s callbacks and the
+    processkit runners take the interface instead of `ArmClearance`.
+    Behaviour does not change.
+  - A collisionkit adapter implements it from CL3a's cell geometry and
+    CL2's batched, inflated queries. `ClearanceMotionEnvelope` gets its
+    reach from the same geometry.
+  - Parity tests on main's weld and rail scenes (G17 included): the two
+    implementations agree on violations within the solver tolerance, and
+    `JointCurveClearance` certifies the same paths with either. Every
+    disagreement is explained in the log (geometry, hull versus
+    primitive, tolerance).
+  - Not here: switching process planning to the adapter, or deleting
+    `ArmClearance` (main's PP10).
+- **CL4b — Clearance in the validation report; conservative joint moves.**
+  - Add `MK_CHECK_COLLISION` to `mk_validation_report` (trajectorykit,
+    `trajectory_core.h`), with its setter and `ValidationReport`'s.
   - A check's single `joint` slot cannot name a pair, so the report gains
     the pair (object ids and names) and the segment. `MK_CHECK_COUNT`
     grows, so the report's layout changes: it is versioned by
     `struct_size`, and the bindings are regenerated.
-  - After `checkTaskSpace`, `ProgramCompiler.finish` checks the timed path
-    with CL-D5:
-    - CL-D9's declarations replay in time order;
-    - each pair class has its margins (CL-D4);
-    - contact windows apply.
-  - On failure the report gives the time, the pair, the clearance and the
-    margin, and compilation throws as it does for task space.
-  - Exact or sampled as CL-D5 says; the approximations go into the
-    assumptions (CL-D8).
-  - Without a world, the check stays `UNCHECKED`.
+  - `ProgramCompiler` records what it already proves: a certificate from
+    `JointCurveClearance` as `MK_CHECK_METHOD_BOUND`, a
+    `TrajectoryClearance` pass as sampled, the closest pair and margin
+    either way. Failures still throw, and are recorded first.
+  - Joint moves and generated entry, exit and hold moves get the same
+    proof on their straight joint lines (`ClearanceMotionEnvelope` with
+    bisection), recorded as a bound when it closes. Where it does not
+    close but the sampled check passes, the report says sampled and names
+    the segment; it does not throw, so existing programs behave as before.
+  - Contact windows and attachments (CL-D9) replay in time order; pair
+    classes keep their margins (CL-D4).
+  - Without a clearance world, the check stays `UNCHECKED`.
   - Tests:
-    - a passing and a failing cell;
-    - an overshoot between samples caught;
+    - a passing and a failing cell, recorded in the report;
+    - a joint move whose sampled check misses a contact between samples,
+      caught by the bound;
     - bisection at its depth limit reported as sampled;
     - a grasp and a place replayed;
     - a torch window with its approach margin.
@@ -474,16 +547,14 @@ Each step is its own commit with all suites green.
     - the servo stopping short of an obstacle and sliding along it;
     - a pair against another robot;
     - recovery from inside `ds`.
-- **CL6 — The path search avoids collisions.** Rewrite after the
-  reconciliation in CL4: main's process paths now use a ladder search
-  (`StructuredLadder`, `LazyCollisionLadder`), and main's PP plan calls
-  CL6 and its PP5 the same job.
-  - `RedundancyResolver` and `PathConfigurationSelector` drop candidates
-    that collide (solids per CL-D8).
-  - Their edges are checked with CL-D5.
-  - An optional clearance cost lets the search prefer room over minimal
+- **CL6 — The path search avoids collisions.** Mostly done on main for
+  process paths: `LazyCollisionLadder` prunes colliding candidates and
+  edges and retries (PP-D5), and reaches collisionkit through CL4a's
+  interface. `PathConfigurationSelector` is deleted, and PP9 deletes the
+  `RedundancyResolver` fallback. What remains, later and with the
+  process-path work:
+  - an optional clearance cost, so the search prefers room over minimal
     motion.
-  - The search only prunes; CL4 stays the guarantee.
 - **CL7 — Free-space planning (CL-D7).**
   - The `MotionPlanner` interface in MotionKit.
   - RRT-Connect with shortcutting in Haxe, over a `CollisionWorld`, with
@@ -493,7 +564,9 @@ Each step is its own commit with all suites green.
   - Phase synchronization in MotionKit's generator, so a planned edge is a
     straight line in joint space.
   - `ProgramCompiler` plans a joint move that asks for it (a planned
-    MoveJ), times each edge rest to rest, and validates the result (CL4).
+    MoveJ), times each edge rest to rest, and validates the result (CL4b).
+  - Main's PP7 already reserves a use: a blocked process entry with no
+    clear k-best start goes through the planner.
   - Tests:
     - narrow passages;
     - start or goal in collision (named, not planned);
@@ -501,13 +574,57 @@ Each step is its own commit with all suites green.
     - the timed path following the checked edges;
     - a planned move through validation.
   - An out-of-tree benchmark against OMPL's RRT-Connect on the same
-    scenes and checker: planning time, path length, success rate, and the
+    scenes and checker. OMPL builds from source into a scratch prefix
+    against the system's Boost (1.83's development packages are
+    installed); nothing of it enters the repo. Time-boxed: if OMPL does not
+    build within about an hour, the log says so and the benchmark waits.
+    It records planning time, path length, success rate, and the
     share of time outside collision checks (CL-D7 decides from it whether
     any planner code moves to C++).
 - **CL8 — Collision in the editor and the browser** (any time after CL3).
   - The desktop editor links collisionkit's native library and shows
     colliding and near pairs while a cell is laid out or a robot jogged.
   - The browser build compiles the library into its Emscripten host.
+
+## Order and gates (2026-10-09)
+
+Working order:
+1. CL2;
+2. merge onto local `main` (no push);
+3. CL3a;
+4. CL4a;
+5. CL4b;
+6. CL5;
+7. CL3b;
+8. CL7, with its OMPL benchmark last.
+
+CL6's remainder, main's PP10 and CL8 wait for review.
+
+Gates, for work without review:
+- **Each step is one commit, with its suites green:**
+  - the standalone C++ tests;
+  - the native and pure kit;
+  - collisionkit's own suites, from CL2 on;
+  - MotionKit;
+  - RobotKit;
+  - processkit's weld planning, from CL4a on.
+- **No existing test assertion or expected value changes.** A step that
+  would change one stops, and the log explains why; nothing is
+  rebaselined. Without a clearance world every new check reports
+  unchecked, which is what keeps this possible: only new tests carry
+  worlds.
+- **Known failure on main:** the pure kit's "DLS allocates nothing per
+  iteration (-40.8 bytes)" fails identically on a clean `origin/main`. It
+  is recorded, not fixed here.
+- **Stop and write up, instead of deciding alone, on any of:**
+  - a new dependency beyond those this plan names (V-HACD, and OMPL
+    out of tree);
+  - creating a fork;
+  - changes to main's process-path logic beyond CL-D12's allowance;
+  - deleting `ArmClearance`.
+- **No pushes.** OCCT is never rebuilt: set
+  `MATERIA_CACHE_DIR=/home/joao/dev/materia-cache`. The shared checkout is
+  touched only to move local `main`.
 
 ## Out of scope
 
@@ -650,3 +767,29 @@ collisionkit):
   description shared with SimKit).
 - CL4 and CL6 start with a reconciliation against main's clearance code,
   which arrived with the rebase.
+
+### Reconciliation with main's clearance code (2026-10-09)
+
+- **Main already has CL-D5 and most of CL6 for process paths:**
+  - `ClearanceMotionEnvelope` and `JointCurveClearance` give the bound and
+    the proof;
+  - `LazyCollisionLadder` gives the pruning.
+
+  What main lacks is the geometry engine, and that is what collisionkit
+  provides. CL-D12 records the rule: main's design stays, and collisionkit
+  replaces `ArmClearance`'s geometry behind an extracted interface.
+- **Step changes:**
+  - CL2 gains inflated, batched violation queries.
+  - CL4 splits:
+    - CL4a, the interface and adapter, with parity tests;
+    - CL4b, the report entry, and conservative checks for joint moves and
+      generated moves.
+
+    A conservative check that does not close never throws where the
+    sampled one passes.
+  - CL6 shrinks to an optional clearance cost.
+  - CL7 notes PP7's entry hook.
+- **V-HACD** is an upstream submodule at `v4.1.0`, not a fork (CL-D11).
+- **The OMPL benchmark** builds OMPL out of tree against the system Boost.
+- **"Order and gates"** records the working order and the rules for
+  unattended work.
