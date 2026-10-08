@@ -35,14 +35,16 @@ std::vector<double> at(double x, double y, double z) { return {x, y, z, 0, 0, 0,
  * -> fixed at x = 1 -> tool (body 3).
  */
 kk_model_handle make_arm() {
-    std::vector<int32_t> ints = {1, 4, 3, 2, 0,
+    // Packed format 2, no joint terms: every joint follows its own DOF.
+    std::vector<int32_t> ints = {2, 4, 3, 2, 0, 0,
                                  -1, 0, 1, 2,
                                  0, 1, 2, 3,
                                  1, 0, 1, 0, -1,
                                  1, 1, 2, 1, -1,
                                  0, 2, 3, -1, -1,
                                  0, 1, 2,
-                                 0, 1, 2};
+                                 0, 1, 2,
+                                 0, 0, 0, 0};
     std::vector<double> reals;
     for (int body = 0; body < 4; ++body) reals.insert(reals.end(), kIdentity, kIdentity + 7);
     const double joint_x[3] = {0.0, 1.0, 1.0};
@@ -52,6 +54,7 @@ kk_model_handle make_arm() {
         reals.insert(reals.end(), kIdentity, kIdentity + 7);
         reals.insert(reals.end(), {0.0, 0.0, 1.0, 1.0, 0.0, 1.0});
     }
+    reals.insert(reals.end(), {0.0, 0.0, 0.0}); // joint constants
     kk_model_handle model{0};
     const kk_result created = kk_model_create(ints.data(), uint32_t(ints.size()), reals.data(),
                                               uint32_t(reals.size()), &model);
