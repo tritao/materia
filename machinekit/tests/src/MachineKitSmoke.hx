@@ -8,6 +8,7 @@ import cadkit.modeling.Vector;
 import cadkit.InertiaTensor;
 import RobotArmPreview.RobotArmChecks;
 import CncRouterPreview.CncRouterChecks;
+import CoreXyPrinterPreview.CoreXyPrinterChecks;
 import MobileBasePreview.MobileBaseChecks;
 import RobotWelderPreview.RobotWelderChecks;
 import CoreXyPlotterPreview.CoreXyPlotterChecks;
@@ -2601,6 +2602,8 @@ class MachineKitSmoke {
 			{name: "RobotWelderChecks.run", run: RobotWelderChecks.run, weight: 11.3},
 			{name: "CoreXyPlotterChecks.run", run: CoreXyPlotterChecks.run, weight: 2.7},
 			{name: "CoreXyDriveTests.run", run: CoreXyDriveTests.run, weight: 0.5},
+			{name: "PrintingPartTests.run", run: PrintingPartTests.run, weight: 0.3},
+			{name: "CoreXyPrinterChecks.run", run: CoreXyPrinterChecks.run, weight: 4},
 			{name: "assemblyPreviewSharing", run: assemblyPreviewSharing, weight: 0.05},
 			{name: "RecipeContractTests.run", run: RecipeContractTests.run, weight: 7.1},
 			{name: "MotorDriverTests.run", run: MotorDriverTests.run, weight: 0.05},

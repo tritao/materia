@@ -16,10 +16,22 @@ typedef AxisPlanRequest = {
 class AxisPlanner {
   final axes:Array<MotionAxis>;
   final fixedTimestepSeconds:Float;
+  final derived:Array<DerivedJoint>;
 
-  public function new(axes:Array<MotionAxis>, fixedTimestepSeconds:Float) {
+  /** `derived` are the joints that follow several axes (see `MotionAxisCouplings.derived`); the planner projects them. */
+  public function new(axes:Array<MotionAxis>, fixedTimestepSeconds:Float, ?derived:Array<DerivedJoint>) {
     this.axes = axes.copy();
     this.fixedTimestepSeconds = fixedTimestepSeconds;
+    this.derived = derived == null ? [] : derived.copy();
+  }
+
+  /** Sets each derived joint to the sum of its terms: positions take the term offsets, deltas do not. */
+  function projectDerived(values:Array<Float>, position:Bool):Void {
+    for (joint in derived) {
+      var sum = 0.0;
+      for (term in joint.terms) sum += term.ratio * values[term.leader] + (position ? term.offset : 0.0);
+      values[joint.joint] = sum;
+    }
   }
 
   function axis(id:String):Null<MotionAxis> {
@@ -144,6 +156,7 @@ class AxisPlanner {
         throw 'Axis "${axisValue.id}" needs positive velocity, acceleration and jerk limits';
       maxVelocity.push(speed); maxAcceleration.push(accel); maxJerk.push(jerk);
     }
+    for (joint in derived) mapped[joint.joint] = true;
     for (joint in 0...start.length)
       if (!mapped[joint] && (Math.abs(target[joint] - start[joint]) > 1e-12 ||
           Math.abs(velocity[joint]) > 1e-12 || Math.abs(acceleration[joint]) > 1e-12))
@@ -161,6 +174,7 @@ class AxisPlanner {
           if (power == 0) axes[index].writeLogicalPosition(values, segment.coefficients[index][power]);
           else axes[index].writeLogicalDelta(values, segment.coefficients[index][power]);
         }
+        projectDerived(values, power == 0);
         for (joint in 0...start.length) coefficients[joint].push(values[joint]);
       }
       physical.push({timeFromStartNs: segment.timeFromStartNs, durationNs: segment.durationNs,
@@ -173,6 +187,11 @@ class AxisPlanner {
       var mappedCaps = [for (_ in start) 0.0];
       axes[index].writeLogicalDelta(mappedCaps, maxAcceleration[index]);
       for (joint in 0...start.length) if (axes[index].containsJoint(joint)) caps[joint] = Math.abs(mappedCaps[joint]);
+    }
+    for (joint in derived) {
+      var sum = 0.0;
+      for (term in joint.terms) sum += Math.abs(term.ratio) * caps[term.leader];
+      caps[joint.joint] = sum;
     }
     result.controlAcceleration = caps;
     return result;

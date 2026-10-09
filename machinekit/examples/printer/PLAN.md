@@ -589,6 +589,46 @@ Done. What was built and decided (AM3 comes before AM6 in the run order):
   `app/src/editor/ExampleCatalog.hx`, and a `PROJECT_SOURCE_ONLY=printer` check that the
   MuJoCo backend builds it and homes it.
 
+Done. What was built and decided:
+- **Parts** (`machinekit.printing`: `Thermistor`, `HeaterCartridge`, `Nozzle`, `Hotend`, `HeatedBed`, `Fan`,
+  `Extruder`, registered in `MachineKitComponents`): typed and catalogue-backed, their values marked assumed
+  where no datasheet is cited, every primitive named (`Solids.named`) for the naming audit. Catalogue rows
+  added: pancake stepper `17HS08-1004S`, rails `MGN12H` and `MGN9C`. The Beta thermistor gives 24861.65 ohm at
+  60 C and 6975.2 ohm at 100 C (`PrintingPartTests`).
+- **Assembly** `machinekit/examples/printer/CoreXyPrinter`: 20x20 frame, MGN12C Y rails, 40x20 crossbar with an
+  MGN12H carriage, GT2 belts A and B, two NEMA 17 on the rear posts, the toolhead (nozzle, hotend, cartridge,
+  thermistor, hotend fan, blower, extruder with its pancake motor and an 18:54 module-0.5 gear pair, joint `e`,
+  geared to the motor shaft by `GearMesh`), the bed on three Tr8x2 (4 starts) screws and two MGN9C rails, a
+  home switch per axis, drivers and the supply. 53 definitions, 100 occurrences, 53 BOM lines, 17 kg. Axes: x
+  and y 0..220 mm, z 0..220 mm; machine zero (-110, -110).
+- **Decisions.**
+  - Z homes with the bed lowered (the upper end of the joint), not at the nozzle. `DriveSystem.resolveSwitch`
+    wants a home trip strictly beyond the soft limit and collinear with the joint, so a probe at the nozzle
+    (which trips inside the travel) cannot be a home switch. An inductive sensor on a pillar from the base
+    plate senses a flag under the bed's carrier; X and Y then home with the bed away from the nozzle
+    (`homeAfter("x", ["z"])`, `homeAfter("y", ["z"])`). A second inductive probe beside the nozzle is kept for
+    levelling and has no switch yet.
+  - The CoreXY coupling helper moved from the plotter into `AxisBuilder.turnCoreXyPulley`; the plotter and
+    the printer both use it.
+  - A joint that follows several axes (a belt motor's pulley, the idlers of both belts) belongs to no axis.
+    `MotionAxisCouplings.derived` lists such joints (`DerivedJoint`: terms of `ratio * leader + offset`) and
+    `AxisPlanner` projects them from the axes' trajectories, so `MotionSystem` and `RuntimeHomingDriver` plan
+    homing, jogs and axis moves on a CoreXY machine. Before, `expand` threw "A multi-axis follower requires
+    coordinated polynomial planning" as soon as a home switch existed. Followers of joints no axis drives
+    (the extruder's gear train) stay where they are; a follower that mixes driven and undriven leaders still
+    throws. Test: `CoreXyTests.testDerivedPulleysFollowBothAxes` (six derived joints, each the sum of its belt
+    terms to 1e-9 along a plan).
+- **Checks.** `CoreXyPrinterChecks` in the MachineKit smoke (occurrences, joints, couplings, switches, forward
+  kinematics of the nozzle, rail ranges, clearances, belt clamp, gear distance), `PrintingPartTests`, the full
+  MachineKit smoke. In the app, `PROJECT_SOURCE_ONLY=printer` builds the assembly into the shared MuJoCo
+  simulation and homes it (z first, then x and y) in 8.75 s on the deterministic backend. Planning limits from
+  the motors: x 250 mm/s 30.03 m/s^2, y 250 mm/s 15.59 m/s^2, z 100 mm/s 22.87 m/s^2. A Start-page entry
+  ("3D printing" category) opens the project.
+- **Left for AM8.** Homing on MuJoCo with gravity: the bed (a follower of nothing the simulation actuates) falls
+  freely, because the screw turns do not hold it. The virtual device cannot home CoreXY switches yet: a device
+  input names one actuator whose channel joint is the switch's joint, and a CoreXY switch joint is driven by
+  two motors.
+
 **AM7. Heaters (AM-D6).**
 - Device: the `heater` module (PID, Beta thermistor, runaway watchdog, safe state) with Rust
   unit tests for every fault path, plus a virtual thermal plant in `device_virtual`.
@@ -696,7 +736,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM3 | done | see the commits below |
 | AM4 | planned | |
 | AM5 | planned | |
-| AM6 | planned | |
+| AM6 | done | see the commit below |
 | AM7 | planned | |
 | AM8 | planned | |
 | AM9 | planned | |

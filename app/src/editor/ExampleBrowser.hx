@@ -11,7 +11,7 @@ typedef ExampleFamily = {
 
 /** Start-page navigation state and searchable groups; opening still uses the original catalogue entries. */
 class ExampleBrowser {
-  public static final categories = ["All", "Robotics & handling", "Welding", "Machining", "CAD & design", "People & simulation"];
+  public static final categories = ["All", "Robotics & handling", "Welding", "Machining", "3D printing", "CAD & design", "People & simulation"];
   public var query:String = "";
   public var category:String = "All";
 
@@ -79,6 +79,7 @@ class ExampleBrowser {
     case "robot-welder", "robot-welder-seam", "robot-welder-post", "robot-welder-weave", "robot-welder-multipass",
       "mobile-robot-welder", "mobile-welding-mission", "gantry-welder", "track-welder": "Welding";
     case "bench-mill", "enclosed-bench-mill", "cnc-router", "press-brake": "Machining";
+    case "printer": "3D printing";
     case "motor-shaft-bearings", "cad-modeling": "CAD & design";
     case "two-robot", "worker-rack-to-table", "worker-gallery": "People & simulation";
     case "picking-station", "robot-arm", "cobot-reach500", "cobot-reach850", "cobot-reach900", "cobot-reach1300", "gantry-picker", "overhead-arm", "mobile-base", "tending-controllers", "machine-tending": "Robotics & handling";

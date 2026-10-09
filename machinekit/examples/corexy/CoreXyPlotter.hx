@@ -170,7 +170,7 @@ class CoreXyPlotter extends AxisBuilder {
 						AssemblyFrames.translation(wrap.x, wrap.y, BASE_TOP), "base");
 				}
 				hang(id, beltPulley(), pose, parent);
-				turnCoreXyPulley(id, parent, 'belt$letter', belt, wrap, true);
+				turnCoreXyPulley(id, parent, 'belt$letter', belt, wrap, true, w == 3);
 			}
 		}
 
@@ -196,7 +196,7 @@ class CoreXyPlotter extends AxisBuilder {
 				attach(pin, new PlotterPin(motor.variant.shaftDiameter, pinLength - (bracketBase + 6 - BASE_TOP), "Idler pin"),
 					AssemblyFrames.translation(wrap.x, wrap.y, bracketBase + 6), wrap.x < 0 ? "bracketLeft" : "bracketRight");
 				hang(id, beltPulley(), AssemblyFrames.translation(wrap.x, wrap.y, level), pin);
-				turnCoreXyPulley(id, pin, 'belt$letter', belts[b], wrap, false);
+				turnCoreXyPulley(id, pin, 'belt$letter', belts[b], wrap, false, false);
 			}
 		}
 
@@ -243,20 +243,4 @@ class CoreXyPlotter extends AxisBuilder {
 	/** A GT2 pulley of the plotter's size, bored for the motor shaft. */
 	function beltPulley():TimingPulley
 		return new TimingPulley(GT2, TEETH, motor.variant.shaftDiameter, BELT_WIDTH);
-
-	/** CoreXY strand geometry determines each leader's signed contribution. */
-	function turnCoreXyPulley(id:String, parent:String, beltId:String, belt:TimingBelt, wrap:BeltWrap, onFrame:Bool):Void {
-		var strands = belt.strands();
-		var signs = [sign(strands[0].dx)];
-		if (onFrame) signs.push(sign(strands[1].dy));
-		var axes = ["x", "y"];
-		var motions:Array<machinekit.assembly.AxisBuilder.BeltAxisMotion> = [];
-		for (index in 0...signs.length) if (signs[index] != 0)
-			motions.push({id: '$id-${axes[index]}', leader: axes[index], initial: 0.0,
-				rotation: wrap.side * signs[index], idler: id != "pulleyA" && id != "pulleyB"});
-		turnWithBelt(id, parent, [0.0, 0, 1], beltId, motions, 0.0);
-	}
-
-	static function sign(value:Float):Int return value > 1e-9 ? 1 : value < -1e-9 ? -1 : 0;
-
 }

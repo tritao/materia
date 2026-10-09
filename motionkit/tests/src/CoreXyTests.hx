@@ -291,6 +291,49 @@ class CoreXyTests extends MotionKitTestSupport {
    * Both motors serve both axes, so the plan check adds what each axis asks of a motor: along a diagonal one
    * motor stands almost still, and the other carries both axes' force.
    */
+  /**
+   * A motor's pulley follows both axes, so no axis owns it: it is a derived joint, and the axis planner (the one jogging
+   * and homing use) projects it from the axes' trajectories instead of refusing the machine.
+   */
+  public function testDerivedPulleysFollowBothAxes():Void {
+    var scene = SceneArtifact.decode(CoreXyPlotterPreview.plotter());
+    var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),
+      scene.assemblyState).model;
+    model.materializeLimits(true);
+    var runtime = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile(), 1);
+    var names = [for (joint in model.joints) joint.id];
+    var blueprints = [for (id in ["x", "y"]) new motionkit.axis.MotionAxisBlueprint(id, [id], -0.05, 0.05, 0.5, 5.0, 0.0)];
+    var expanded = motionkit.robot.MotionAxisCouplings.expand(blueprints, runtime, names);
+    var derived = motionkit.robot.MotionAxisCouplings.derived(expanded, runtime, names);
+    var ids = [for (joint in derived) names[joint.joint]];
+    ids.sort(Reflect.compare);
+    check(ids.join(",") == "idlerAFront-turn,idlerARear-turn,idlerBFront-turn,idlerBRear-turn,pulleyA-turn,pulleyB-turn",
+      'the motor pulleys and the idlers that turn with both belts follow both axes, got $ids');
+    for (joint in derived) check(joint.terms.length == 2, "each follows two axes");
+    var owned = [for (axis in expanded) for (id in axis.jointIds) id];
+    check(owned.indexOf("pulleyA-turn") < 0 && owned.indexOf("idlerAStart-turn") >= 0,
+      "a gantry idler belongs to the one axis it follows, a motor pulley to none");
+
+    var axes = [for (axis in expanded) new motionkit.axis.MotionAxis(axis, names)];
+    var planner = new motionkit.robot.AxisPlanner(axes, 0.01, derived);
+    var trajectory = planner.plan([for (_ in names) 0.0], {targets: [new motionkit.AxisTarget("x", 0.03), new motionkit.AxisTarget("y", -0.02)],
+      options: null}).trajectory;
+    var worst = 0.0, moved = 0.0;
+    var steps = 40;
+    for (step in 0...steps + 1) {
+      var state = trajectory.evaluate(trajectory.durationSeconds() * step / steps);
+      for (joint in derived) {
+        var wanted = 0.0;
+        for (term in joint.terms) wanted += term.ratio * state.positions[term.leader] + term.offset;
+        worst = Math.max(worst, Math.abs(state.positions[joint.joint] - wanted));
+        moved = Math.max(moved, Math.abs(state.positions[joint.joint]));
+      }
+    }
+    check(moved > 0.1, 'the motor pulleys turn with the move: $moved rad');
+    check(worst < 1e-9, 'each pulley is the sum of its belts\' terms along the whole plan: $worst');
+    trajectory.dispose();
+  }
+
   public function testPlanCheckAddsTheAxesOnASharedMotor():Void {
     var scene = SceneArtifact.decode(CoreXyPlotterPreview.plotter());
     var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),

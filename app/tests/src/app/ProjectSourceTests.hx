@@ -415,6 +415,80 @@ class ProjectSourceTests {
    * axis is bound by both motors, and the shared simulation (MuJoCo, with fixed tendons for the sums) builds,
    * steps and keeps the machine at rest.
    */
+  /**
+   * The CoreXY printer: its motors follow two axes each (belts), its bed follows z through three screws, its extruder
+   * through a gear pair; the shared simulation (MuJoCo) builds it, and it homes on its switches in the order the
+   * assembly states: the bed down first, then X and Y.
+   */
+  static function checkPrinter(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var definition = session.projectAssemblyDefinition, physical = session.projectPhysical;
+    if (definition == null || physical == null) throw "the printer has no assembly to build a robot from";
+    var model = AssemblySimulationBridge.toRobotModel(definition, physical, session.projectAssemblyState).model;
+    check(model.actuators.length == 6, 'the printer has six steppers, got ${model.actuators.length}');
+    var leaders = new Map<String, Int>();
+    for (coupling in model.couplings) leaders.set(coupling.follower, (leaders.exists(coupling.follower) ? leaders.get(coupling.follower) : 0) + 1);
+    check(leaders.get("pulleyA-turn") == 2 && leaders.get("pulleyB-turn") == 2 && leaders.get("idlerAStart-turn") == 1,
+      "each belt motor's pulley follows two axes, a gantry idler one");
+    var homes = [for (contact in model.switches) if (contact.role == "home") contact.joint];
+    homes.sort(Reflect.compare);
+    check(homes.join(",") == "x,y,z", 'the printer has home switches on x, y and z, got $homes');
+    var compiled = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
+    check(compiled.couplings.length == model.couplings.length, "the runtime blueprint carries every coupling");
+    // The controller's 40 kHz step tick, as the router's.
+    var planning = DeviceBinding.planningModel(model, 40000);
+    var xLimits = planning.coupledLimits("x"), yLimits = planning.coupledLimits("y"), zLimits = planning.coupledLimits("z");
+    check(xLimits.requireAcceleration() > yLimits.requireAcceleration() && yLimits.requireAcceleration() > 5,
+      'the carriage accelerates harder than the gantry it rides: ${xLimits.requireAcceleration()} against ${yLimits.requireAcceleration()}');
+    Sys.println('printer: axes x ${Math.round(xLimits.requireVelocity() * 1e4) / 10} mm/s ${Math.round(xLimits.requireAcceleration() * 100) / 100} m/s², ' +
+      'y ${Math.round(yLimits.requireVelocity() * 1e4) / 10} mm/s ${Math.round(yLimits.requireAcceleration() * 100) / 100} m/s², ' +
+      'z ${Math.round(zLimits.requireVelocity() * 1e4) / 10} mm/s ${Math.round(zLimits.requireAcceleration() * 100) / 100} m/s²');
+    var world = new RobotWorld();
+    var simulation = new ApplicationSimulation(world);
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session), "the printer builds in the shared simulation: " + simulation.error);
+    simulation.step();
+
+    // Homing on the deterministic simulation (MuJoCo joins in AM8): every axis finds its switch and is referenced, the bed first.
+    var axes = [for (joint in planning.joints) if (joint.type == JointType.Prismatic) {
+      var limits = planning.coupledLimits(joint.id, new SteadyLoads());
+      new motionkit.axis.MotionAxisBlueprint(joint.id, [joint.id], joint.limits.lower, joint.limits.upper,
+        limits.requireVelocity(), limits.requireAcceleration(), joint.id == "z" ? joint.limits.upper : joint.limits.lower);
+    }];
+    var blueprint = motionkit.robot.MotionSystemBlueprint.fromRobotModel(planning, axes);
+    var harness = new SimulationHarness(0.01, 1, SimulationSpace.DETERMINISTIC);
+    try {
+      var runtime = harness.simulation.addRobot(blueprint.runtime);
+      var robot = new robotkit.simulation.SimulatedRobot("printer", runtime, planning.name,
+        [for (link in planning.links) link.name], [for (joint in planning.joints) joint.name]);
+      var motion = new motionkit.robot.MotionSystem(robot, blueprint);
+      motion.configureRuntimeHoming(runtime, () -> {}, harness.simulation.homingSides(0));
+      harness.step(Int64.ofInt(1));
+      motion.home();
+      var ticks = 0, firstReferenced = "";
+      while (motion.homingStatus() != "Complete" && ticks++ < 60000) {
+        harness.step(Int64.ofInt(ticks + 1));
+        motion.update(0.01);
+        if (firstReferenced == "") for (index in 0...planning.joints.length)
+          if (planning.joints[index].type == JointType.Prismatic && runtime.isReferenced(index)) firstReferenced = planning.joints[index].id;
+      }
+      check(motion.homingStatus() == "Complete", "The printer homes: " + motion.homingStatus());
+      check(firstReferenced == "z", 'the bed is the first axis referenced, got "$firstReferenced"');
+      var snapshot = runtime.snapshot();
+      for (index in 0...planning.joints.length) if (planning.joints[index].type == JointType.Prismatic) {
+        check(runtime.isReferenced(index), 'printer axis ${planning.joints[index].id} is referenced');
+        var home = planning.joints[index].id == "z" ? planning.joints[index].limits.upper : planning.joints[index].limits.lower;
+        check(Math.abs(snapshot.q.get(index) - home) < 0.0002, 'printer axis ${planning.joints[index].id} returns to its reference, ' +
+          'at ${snapshot.q.get(index)} against ${home}');
+      }
+      Sys.println('printer: homed in ${ticks * 0.01} s');
+      harness.dispose();
+    } catch (error:Dynamic) { harness.dispose(); throw error; }
+  }
+
   static function checkCoreXyPlotter(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/corexy/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
@@ -5142,6 +5216,10 @@ class ProjectSourceTests {
       checkMissionOverlayEdge();
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer") {
+      checkPrinter(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "corexy") {
       checkCoreXyPlotter(root);
       return 0;
@@ -5302,6 +5380,7 @@ class ProjectSourceTests {
       checkCncRouter(root);
       checkBeltRouter(root);
       checkCoreXyPlotter(root);
+      checkPrinter(root);
       checkMobileBase(root);
       checkMobileMission(root);
       checkMobileObstacle(root);
@@ -5673,6 +5752,7 @@ class ProjectSourceTests {
     checkCncRouter(root);
     checkBeltRouter(root);
     checkCoreXyPlotter(root);
+    checkPrinter(root);
     checkMobileBase(root);
     checkMobileMission(root);
     checkMobileObstacle(root);

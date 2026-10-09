@@ -41,6 +41,7 @@ class MotionSystem {
   function get_planChecks():PlanCheckSummary return stream.planChecks;
   public final axes:Array<MotionAxis>;
   final axisPlanner:AxisPlanner;
+  final derivedJoints:Array<DerivedJoint>;
   final homingAxes:Array<HomingAxis> = [];
   var homingDriver:Null<HomingDriver> = null;
   var homingSides:Null<robotkit.runtime.HomingSideControl> = null;
@@ -110,6 +111,7 @@ class MotionSystem {
     for (contact in blueprint.runtime.switches) if (contact.role == "home") hasHomes = true;
     var resolvedAxes = hasHomes
       ? MotionAxisCouplings.expand(blueprint.axes, blueprint.runtime, description.joints) : blueprint.axes;
+    derivedJoints = hasHomes ? MotionAxisCouplings.derived(resolvedAxes, blueprint.runtime, description.joints) : [];
     for (axisBlueprint in resolvedAxes) {
       var axis = new MotionAxis(axisBlueprint, description.joints);
       if (axisIds.exists(axis.id)) throw 'Duplicate motion axis "${axis.id}"';
@@ -148,7 +150,7 @@ class MotionSystem {
       for (home in homingAxes) for (signal in home.switches) if (signal.id == contact.id) mapped = true;
       if (!mapped) throw 'Home switch "${contact.id}" has no independent motion axis';
     }
-    axisPlanner = new AxisPlanner(this.axes, fixedTimestepSeconds);
+    axisPlanner = new AxisPlanner(this.axes, fixedTimestepSeconds, derivedJoints);
     pathPlanner = new PathPlanner(this.axes, fixedTimestepSeconds,
       modelRevision, calibrationRevision);
   }
@@ -484,7 +486,7 @@ class MotionSystem {
     }
     refreshRevision();
     refreshHomeRevision = refreshRevision;
-    homingDriver = new RuntimeHomingDriver(robot, runtime, homingAxes, axes, afterLatch, scopedStop);
+    homingDriver = new RuntimeHomingDriver(robot, runtime, homingAxes, axes, afterLatch, scopedStop, derivedJoints);
     homingSides = sides;
   }
 

@@ -5,6 +5,40 @@ import robotkit.runtime.RobotRuntimeBlueprint;
 
 /** Expand independent task axes through the compiled physical coupling graph. */
 class MotionAxisCouplings {
+  /**
+   * The joints that follow more than one axis and so belong to none, in an order where each follows only axis joints
+   * or earlier entries. `axes` are the expanded axes.
+   */
+  public static function derived(axes:Array<MotionAxisBlueprint>, runtime:RobotRuntimeBlueprint,
+      jointNames:Array<String>):Array<DerivedJoint> {
+    var owned = [for (_ in jointNames) false];
+    for (axis in axes) for (id in axis.jointIds) owned[jointNames.indexOf(id)] = true;
+    var result:Array<DerivedJoint> = [];
+    var placed = owned.copy();
+    var remaining = [for (joint in 0...runtime.jointCount) if (!owned[joint]) joint];
+    var progress = true;
+    while (remaining.length > 0 && progress) {
+      progress = false;
+      for (joint in remaining.copy()) {
+        var terms = [for (term in runtime.couplings) if (term.follower == joint) {leader: term.leader, ratio: term.ratio, offset: term.offset}];
+        if (terms.length == 0) { remaining.remove(joint); progress = true; continue; }
+        var ready = true;
+        for (term in terms) if (!placed[term.leader]) ready = false;
+        if (!ready) continue;
+        result.push({joint: joint, terms: terms});
+        placed[joint] = true;
+        remaining.remove(joint);
+        progress = true;
+      }
+    }
+    // What is left follows joints no axis drives (an extruder's gear train, say): it stays where it is, unless it
+    // mixes those with driven joints, which needs coordinated planning.
+    for (joint in remaining)
+      for (term in runtime.couplings) if (term.follower == joint && placed[term.leader])
+        throw "A partially mapped follower requires coordinated polynomial planning";
+    return result;
+  }
+
   public static function expand(axes:Array<MotionAxisBlueprint>, runtime:RobotRuntimeBlueprint,
       jointNames:Array<String>):Array<MotionAxisBlueprint> {
     if (axes == null || runtime == null || jointNames == null || jointNames.length != runtime.jointCount)
@@ -27,17 +61,17 @@ class MotionAxisCouplings {
     for (_ in 0...runtime.jointCount) {
       var changed = false;
       for (joint in 0...runtime.jointCount) {
-        var hasTerms = false, ready = true, owner = -1, ratio = 0.0, zero = 0.0;
+        var hasTerms = false, ready = true, multiple = false, owner = -1, ratio = 0.0, zero = 0.0;
         for (term in runtime.couplings) if (term.follower == joint) {
           hasTerms = true;
           if (owners[term.leader] < 0) { ready = false; continue; }
-          if (owner >= 0 && owner != owners[term.leader])
-            throw "A multi-axis follower requires coordinated polynomial planning";
+          // A follower of several axes belongs to none: see `derived`.
+          if (owner >= 0 && owner != owners[term.leader]) { multiple = true; continue; }
           owner = owners[term.leader];
           ratio += term.ratio * scales[term.leader];
           zero += term.ratio * offsets[term.leader] + term.offset;
         }
-        if (!hasTerms || !ready) continue;
+        if (!hasTerms || !ready || multiple) continue;
         if (!Math.isFinite(ratio) || ratio == 0.0 || !Math.isFinite(zero))
           throw "Coupled axis mapping has an invalid scale or zero";
         if (owners[joint] >= 0) {
@@ -52,9 +86,6 @@ class MotionAxisCouplings {
       }
       if (!changed) break;
     }
-    for (term in runtime.couplings)
-      if (owners[term.leader] >= 0 && owners[term.follower] < 0)
-        throw "A partially mapped follower requires coordinated polynomial planning";
     return [for (i in 0...axes.length) new MotionAxisBlueprint(axes[i].id, ids[i],
       axes[i].lowerLimit, axes[i].upperLimit, axes[i].maxVelocity, axes[i].maxAcceleration,
       axes[i].homePosition, ratios[i], zeros[i])];

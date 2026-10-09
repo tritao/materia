@@ -14,6 +14,7 @@ class MachineKitComponents {
 		machinekit.pneumatic.PneumaticComponents.register(registry);
 		machinekit.milling.MillingComponents.register(registry);
 		machinekit.pressbrake.PressBrakeComponents.register(registry);
+		machinekit.printing.PrintingComponents.register(registry);
 		machinekit.assembly.AssemblyComponents.register(registry);
 		machinekit.control.ControlComponents.register(registry);
 		registry.register(machinekit.structural.RectTubeMember.recipeType());

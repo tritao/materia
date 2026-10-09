@@ -36,13 +36,28 @@ class LinearRailSystem {
 			railWidth: 15, railHeight: 15, blockWidth: 34, blockHeight: 28, blockLength: 61.4,
 			blockHolePitchB: 26, blockHolePitchC: 26, blockMountScrew: "M4x10", railHolePitch: 60, railEndMargin: 20,
 			railMountScrew: "M4x16", staticLoadCapacity: 10000
+		}, {
+			// The long carriage of the MGN12 rail: same rail, a longer block for stiffness. Assumed envelope;
+			// static capacity scaled from the assumed MGN12C value by the H/C block ratio (about 1.5).
+			designation: "MGN12H", family: "HIWIN",
+			railWidth: 12, railHeight: 8, blockWidth: 27, blockHeight: 13, blockLength: 45.4,
+			blockHolePitchB: 20, blockHolePitchC: 15, blockMountScrew: "M3x8", railHolePitch: 25, railEndMargin: 10,
+			railMountScrew: "M3x8", staticLoadCapacity: 3900
+		}, {
+			// The miniature MGN9 rail and its short carriage. Assumed envelope; static capacity scaled from
+			// the assumed MGN12C value (about 0.55 of it).
+			designation: "MGN9C", family: "HIWIN",
+			railWidth: 9, railHeight: 6.5, blockWidth: 20, blockHeight: 10, blockLength: 28.9,
+			blockHolePitchB: 10, blockHolePitchC: 15, blockMountScrew: "M3x8", railHolePitch: 20, railEndMargin: 7.5,
+			railMountScrew: "M3x6", staticLoadCapacity: 1400
 		}];
 
 	/** HIWIN MGN/MGW linear guideway dimensions used by the MGN12C profile row. */
 	public static function catalog():Catalog<LinearRailProfileSpec> {
 		if (table == null)
-			table = new Catalog("linear rail profile", spec -> spec.designation, rows(), spec -> spec.designation == "HGR15" ? ({
-				source: "Assumed HGR15/HGH15CA reference envelope and 10 kN static block capacity; not vendor verified",
+			table = new Catalog("linear rail profile", spec -> spec.designation, rows(), spec -> spec.designation == "HGR15" || spec.designation == "MGN12H" || spec.designation == "MGN9C" ? ({
+				source: spec.designation == "HGR15" ? "Assumed HGR15/HGH15CA reference envelope and 10 kN static block capacity; not vendor verified"
+					: "Assumed " + spec.designation + " reference envelope and static block capacity; not vendor verified",
 				standard: null, standardEdition: null, dimensionKind: Nominal, conformance: GenericApproximation,
 				verifiedFields: []
 			}) : ({

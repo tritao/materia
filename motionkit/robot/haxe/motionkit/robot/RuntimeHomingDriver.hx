@@ -27,7 +27,7 @@ class RuntimeHomingDriver implements HomingDriver {
 
   /** afterLatch resets the caller-owned encoder and stepper-slip monitors. */
   public function new(robot:Robot, runtime:RobotRuntime, homes:Array<HomingAxis>,
-      motionAxes:Array<MotionAxis>, afterLatch:Void -> Void, ?deviceStop:Void -> Bool) {
+      motionAxes:Array<MotionAxis>, afterLatch:Void -> Void, ?deviceStop:Void -> Bool, ?derived:Array<DerivedJoint>) {
     if (robot == null || runtime == null || homes == null || homes.length == 0 ||
         motionAxes == null || afterLatch == null) throw "Homing driver requires runtime, axes and latch monitor reset";
     this.robot = robot; this.runtime = runtime; this.afterLatch = afterLatch;
@@ -59,7 +59,7 @@ class RuntimeHomingDriver implements HomingDriver {
       for (axis in expanded) if (axis.jointIndices[0] == home.joint) matched = true;
       if (!matched) throw "Homing driver has no physical motion mapping";
     }
-    planner = new AxisPlanner(expanded, timestep);
+    planner = new AxisPlanner(expanded, timestep, derived);
     // Runtime positions are already logical; captured edges stay endpoint coordinates.
     observer = new RuntimeHomingObserver(robot, homes, (joint, position) -> position,
       (joint, edge) -> edge);

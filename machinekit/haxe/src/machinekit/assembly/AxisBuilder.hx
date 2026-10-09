@@ -9,6 +9,7 @@ import machinekit.motion.NemaStepper;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.ScrewSupport;
 import machinekit.transmission.TimingBelt;
+import machinekit.transmission.TimingBelt.BeltWrap;
 import machinekit.transmission.TimingPulley;
 import machinekit.transmission.Rack;
 import machinekit.transmission.SpurGear;
@@ -182,6 +183,28 @@ class AxisBuilder extends MachineAssembly {
 		addMateOnAxis('$id-turn', "continuous", parent, 'to-$id', id, 'attach-$id',
 			{x: about[0], y: about[1], z: about[2]}, defaultAngle == null ? angle : defaultAngle);
 	}
+
+	/**
+	 * A pulley on a CoreXY belt. Its signed contribution from each leader comes from the belt's strand geometry
+	 * (`TimingBelt.strands()`) and the side of the belt it wraps (`BeltWrap.side`): the gantry strand, which the
+	 * carriage clamps, moves with `x`, and the strand between the frame pulleys moves with `y`. A pulley on the
+	 * gantry sees only the carriage moving, so follows `x` alone; a pulley on the frame follows both. `driving` is
+	 * the motor's own pulley, which carries torque; every other pulley is an idler.
+	 */
+	public function turnCoreXyPulley(id:String, parent:String, beltId:String, belt:TimingBelt, wrap:BeltWrap,
+			onFrame:Bool, driving:Bool, ?initialX:Float = 0.0, ?initialY:Float = 0.0):Void {
+		var strands = belt.strands();
+		var signs = [coreXySign(strands[0].dx)];
+		if (onFrame) signs.push(coreXySign(strands[1].dy));
+		var axes = ["x", "y"], initials = [initialX, initialY];
+		var motions:Array<BeltAxisMotion> = [];
+		for (index in 0...signs.length) if (signs[index] != 0)
+			motions.push({id: '$id-${axes[index]}', leader: axes[index], initial: initials[index],
+				rotation: wrap.side * signs[index], idler: !driving});
+		turnWithBelt(id, parent, [0.0, 0, 1], beltId, motions, null);
+	}
+
+	static function coreXySign(value:Float):Int return value > 1e-9 ? 1 : value < -1e-9 ? -1 : 0;
 
 	/** Build the belt, driving pulley, idler and motor relationship from their actual parts. */
 	public function twoPulleyAxis(layout:TwoPulleyAxis):Void {

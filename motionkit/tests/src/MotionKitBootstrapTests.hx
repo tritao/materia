@@ -105,6 +105,7 @@ class MotionKitBootstrapTests {
       new CoreXyTests().testMotorSpaceTiming();
       new CoreXyTests().testBeltDisplay();
       new CoreXyTests().testPlotterDrawsASquare();
+      new CoreXyTests().testDerivedPulleysFollowBothAxes();
       new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor();
       Sys.println('CoreXY tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
@@ -166,6 +167,7 @@ class MotionKitBootstrapTests {
       {name: "PlanCheckTests.testCompilerRunsPlanCheck", run: () -> new PlanCheckTests().testCompilerRunsPlanCheck(), weight: 0.1},
       {name: "CoreXyTests.testTwoBeltCompliance", run: () -> new CoreXyTests().testTwoBeltCompliance(), weight: 0.05},
       {name: "CoreXyTests.testPlotterDrawsASquare", run: () -> new CoreXyTests().testPlotterDrawsASquare(), weight: 0.5},
+      {name: "CoreXyTests.testDerivedPulleysFollowBothAxes", run: () -> new CoreXyTests().testDerivedPulleysFollowBothAxes(), weight: 0.1},
       {name: "CoreXyTests.testPlanCheckAddsTheAxesOnASharedMotor", run: () -> new CoreXyTests().testPlanCheckAddsTheAxesOnASharedMotor(), weight: 0.5},
       {name: "processTests.testPoseProcessPath", run: () -> processTests.testPoseProcessPath(), weight: 0.05},
       {name: "processTests.testMotionEventContracts", run: () -> processTests.testMotionEventContracts(), weight: 0.05},

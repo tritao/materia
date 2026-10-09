@@ -61,7 +61,12 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 				{designation: "34HS31-5504S", frame: 34, bodyFace: 86.0, bodyLength: 80.0,
 					shaftDiameter: 14.0, shaftLength: 35.0, pilotHeight: 1.6,
 					mountScrew: "M6", tappedMount: false, mountHoleDepth: 8.0},
+				// The 20 mm "pancake" 17, as used on extruders. Rated values are assumptions (below).
+				{designation: "17HS08-1004S", frame: 17, bodyFace: 42.0, bodyLength: 20.0,
+					shaftDiameter: 5.0, shaftLength: 24.0, pilotHeight: 2.0,
+					mountScrew: "M3", tappedMount: true, mountHoleDepth: 4.5},
 			], spec -> ({source: switch (spec.designation) {
+				case "17HS08-1004S": "https://www.omc-stepperonline.com/nema-17-bipolar-1-8deg-13ncm-18-4oz-in-1a-4-2v-42x42x20mm-4-wires-17hs08-1004s";
 				case "17HS19-1684S1": "https://www.omc-stepperonline.com/nema-17-bipolar-1-8deg-45ncm-64oz-in-1-68a-2-8v-42x42x48mm-4-wires-17hs19-1684s1";
 				case "23HS22-2804S": "https://www.omc-stepperonline.com/nema-23-bipolar-1-8deg-1-26nm-178-4oz-in-2-8a-2-5v-57x57x56mm-4-wires-23hs22-2804s";
 				default: "https://www.omc-stepperonline.com/nema-34-cnc-stepper-motor-4-5nm-637-25oz-in-5-5a-86x86x80mm-key-way-shaft-34hs31-5504s";
@@ -84,6 +89,8 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 					rotorInertia: 3.0e-5, stepAngle: 1.8},
 				{designation: "34HS31-5504S", holdingTorque: 4.5, ratedCurrent: 5.5, phaseInductance: 3.2e-3,
 					rotorInertia: 1.4e-4, stepAngle: 1.8},
+				{designation: "17HS08-1004S", holdingTorque: 0.13, ratedCurrent: 1.0, phaseInductance: 3.5e-3,
+					rotorInertia: 2.0e-6, stepAngle: 1.8},
 			], spec -> ({source: variantCatalog().metadata(spec.designation).source, standard: null,
 				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
 				verifiedFields: ["holdingTorque", "ratedCurrent", "stepAngle"]}));
