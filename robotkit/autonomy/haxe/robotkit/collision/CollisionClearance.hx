@@ -7,8 +7,7 @@ import collisionkit.CollisionPairStatus;
 import collisionkit.CollisionPose;
 import collisionkit.CollisionViolation;
 import collisionkit.CollisionWorld;
-import robotkit.manipulation.ArmClearance;
-import robotkit.manipulation.ArmClearance.ClearanceBodyData;
+import robotkit.manipulation.ClearanceBodyData;
 import robotkit.manipulation.ClearanceChange;
 import robotkit.manipulation.ClearanceScene;
 import robotkit.manipulation.ClearanceMotionBounds;
@@ -22,18 +21,21 @@ import robotkit.tool.ConvexDistance;
 import robotkit.tool.ConvexSolid;
 
 /**
- * `ArmClearance`'s queries on a collisionkit world (COLLISION.md CL-D12,
- * CL4a). The bodies, margins and checked pairs are `ArmClearance`'s, decided
- * the same way (same link, neighbouring or drive-coupled links touching at
- * the reference, fixed pairs); only the geometry engine differs: each hull
- * is a convex object on its own collisionkit body, posed at its link, and
- * queries go to the world, with a violation's per-body displacement as the
- * world's per-body inflation and sweeps as batched pose sets.
+ * Whether an arm, with its tool, is clear of its surroundings at joint
+ * values and along a motion, on a collisionkit world (COLLISION.md CL-D12,
+ * CL4a; PP10 retired the Haxe GJK `ArmClearance` it replaced, with equal
+ * answers on the weld, rail and G17 cells).
+ *
+ * Every body is a convex hull on a link (the hulls the simulation collides
+ * with), as a convex object on its own collisionkit body posed at its link.
+ * A body is *moving* when its link is carried by one of the arm's joints,
+ * *fixed* otherwise. Bodies on one link, both fixed, or on neighbouring or
+ * drive-coupled links touching (within `TOUCH`) at the reference are never
+ * checked: they touch by design. Queries ask the world in batches.
  *
  * Groups carry the margins: moving bodies, moving tool bodies, fixed bodies
  * and fixed tool bodies; with `contact`, a tool group against a fixed group
- * keeps `contactMargin`. Distances are reported as `ArmClearance` does: zero
- * when bodies touch or overlap.
+ * keeps `contactMargin`. Distances are zero when bodies touch or overlap.
  *
  * As a `ClearanceScene` it replays a program's changes (CL-D9): a hull can
  * be attached to a link where it is (a grasp) and detached to the arm's root
@@ -42,6 +44,12 @@ import robotkit.tool.ConvexSolid;
  * own, so the margins stay per group pair.
  */
 class CollisionClearance implements ClearanceWorld implements ClearanceScene {
+  /** The distance bodies must keep, in metres. */
+  public static inline var MARGIN:Float = 0.005;
+  /** The distance a tool body must keep from fixed bodies where it works, in metres. */
+  public static inline var CONTACT_MARGIN:Float = 0.0005;
+  /** Neighbouring links whose bodies are closer than this in the reference configuration touch by design, in metres. */
+  public static inline var TOUCH:Float = 0.002;
   static inline var MOVING = 0;
   static inline var MOVING_TOOL = 1;
   static inline var FIXED = 2;
@@ -70,9 +78,9 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   /** Open windows: their two hulls and margin (null: contact allowed). */
   final windows:Array<{a:Int, b:Int, margin:Null<Float>}> = [];
 
-  /** As `ArmClearance`'s constructor, with `makeWorld` giving an empty world (and another per `withGroup`). */
+  /** The arm's bodies (`data`) and the configuration whose touching neighbours are allowed (`reference`); `makeWorld` gives an empty world (and another per `withGroup`). */
   public function new(arm:KinematicGroup, data:Array<ClearanceBodyData>, reference:Array<Float>, makeWorld:Void->CollisionWorld,
-      ?margin:Float = ArmClearance.MARGIN, ?contactMargin:Float = ArmClearance.CONTACT_MARGIN) {
+      ?margin:Float = MARGIN, ?contactMargin:Float = CONTACT_MARGIN) {
     if (arm == null || data == null || reference == null || makeWorld == null)
       throw "Collision clearance needs an arm, its bodies, a reference configuration and a world";
     if (!(margin >= 0.0) || !(contactMargin >= 0.0) || contactMargin > margin)
@@ -210,7 +218,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
     return roleOf(i);
   }
 
-  /** `ArmClearance`'s pair rules: one link, both fixed, or neighbours touching at the reference are not checked. */
+  /** The pair rules: one link, both fixed, or neighbours touching at the reference are not checked. */
   function declarePairs():Void {
     var neighbours = new Map<String, Bool>();
     for (joint in arm.robot.joints) if (joint != null && joint.parent != null && joint.child != null) {
@@ -296,7 +304,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
       }
       return null;
     }
-    if (samples.length == 0) return null;
+    if (samples.length == 0 || checkedPairs == 0) return null;
     // Every sample's poses in one batched call.
     var sets:Array<Float> = [];
     for (q in samples) {
@@ -399,7 +407,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   }
 
   static function touching(a:Array<Float>, b:Array<Float>):Bool
-    return ConvexDistance.between(a, b, ArmClearance.TOUCH) < ArmClearance.TOUCH;
+    return ConvexDistance.between(a, b, TOUCH) < TOUCH;
 
   static function placed(points:Array<Float>, pose:Transform3):Array<Float> {
     var out:Array<Float> = [];

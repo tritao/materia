@@ -6,7 +6,7 @@ import motionkit.path.PosePath;
 import motionkit.path.PoseMath;
 import motionkit.planner.JointPathSamples;
 import motionkit.robot.AnalyticPathRefiner.RefinementTarget;
-import robotkit.manipulation.ArmClearance;
+import robotkit.collision.CollisionClearance;
 import robotkit.manipulation.ClearanceViolation;
 
 /** Reuse globally selected geometry for execution timing. No inverse solving or

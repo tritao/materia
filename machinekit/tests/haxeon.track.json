@@ -18,6 +18,7 @@
     "../examples/gantry-picker"
   ],
   "dependencies": {
+    "collisionkit-native": {"path": "../../collisionkit/native"},
     "projectkit": {
       "path": "../../projectkit"
     },

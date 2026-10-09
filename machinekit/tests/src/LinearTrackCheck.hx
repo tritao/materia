@@ -7,7 +7,7 @@ import cadkit.modeling.AssemblyModel;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
 import robotkit.manipulation.Manipulator;
-import robotkit.manipulation.ArmClearance;
+import robotkit.collision.CollisionClearance;
 import materia.project.SceneArtifact;
 
 class LinearTrackCheck {
@@ -60,9 +60,9 @@ class LinearTrackCheck {
 		for (index in 1...7) check(!manipulator.external[index], "six arm joints retain arm ownership");
 		check(manipulator.swivel == null, "six-axis arm on a track has no fabricated swivel");
 		var reference = [for (_ in 0...7) 0.0];
-		var clearance = new ArmClearance(manipulator, [for (hull in converted.linkHulls)
+		var clearance = new robotkit.collision.CollisionClearance(manipulator, [for (hull in converted.linkHulls)
 			{name: hull.part, link: model.links[hull.link].id, vertices: hull.vertices,
-				tool: StringTools.startsWith(hull.part, "arm/tool/")}], reference, 0.003);
+				tool: StringTools.startsWith(hull.part, "arm/tool/")}], reference, () -> new collisionkit.native.NativeCollisionWorld(), 0.003);
 		for (coordinate in [manipulator.group.limitsOf(0).lower, manipulator.group.limitsOf(0).upper]) {
 			var q = reference.copy(); q[0] = coordinate;
 			var hit = clearance.violation(q);

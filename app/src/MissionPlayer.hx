@@ -38,7 +38,7 @@ import processkit.skill.WeldPlan;
 import processkit.skill.WeldSeam;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
-import robotkit.manipulation.ArmClearance;
+import robotkit.collision.CollisionClearance;
 import robotkit.manipulation.ClearanceViolation;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
@@ -171,7 +171,7 @@ class MissionPlayer implements SessionMember {
   final newRegistration:Null<SceneContactWork->processkit.ContactRegistrationRunner>;
   var registeredWork = new Map<String, Transform3>();
   /** What welds are planned clear of, and where the arm's joints are among the robot's. */
-  var clearance:Null<ArmClearance> = null;
+  var clearance:Null<CollisionClearance> = null;
   var clearanceJoints:Array<Int> = [];
   /** Runtime weld metal in world coordinates, read before each pass is planned. */
   public var depositedWeldHulls:Void -> Array<{name:String, vertices:Array<Float>}> = () -> [];
@@ -342,11 +342,11 @@ class MissionPlayer implements SessionMember {
    * and 0.5 mm between tool and work at the seam; the arm's installed gearheads have 4.5 mm designed clearance to the next tube. `ignored` are occurrences that
    * are no obstacle (the weld metal).
    */
-  function weldClearance(arm:Manipulator, torch:String, ignored:Array<String>):ArmClearance {
+  function weldClearance(arm:Manipulator, torch:String, ignored:Array<String>):CollisionClearance {
     return armClearance(arm, weldCollisionBodies(arm, torch, ignored));
   }
 
-  function weldCollisionBodies(arm:Manipulator, torch:String, ignored:Array<String>):Array<robotkit.manipulation.ArmClearance.ClearanceBodyData> {
+  function weldCollisionBodies(arm:Manipulator, torch:String, ignored:Array<String>):Array<robotkit.manipulation.ClearanceBodyData> {
     var links = robot.model.links;
     // The tool is everything the torch's assembly holds (the plate on the flange, the torch and its neck).
     var toolPrefix = torch.substr(0, torch.lastIndexOf("/") + 1);
@@ -379,11 +379,11 @@ class MissionPlayer implements SessionMember {
     return bodies;
   }
 
-  function armClearance(arm:Manipulator, bodies:Array<robotkit.manipulation.ArmClearance.ClearanceBodyData>):ArmClearance {
+  function armClearance(arm:Manipulator, bodies:Array<robotkit.manipulation.ClearanceBodyData>):CollisionClearance {
     var positions = robot.robot.snapshot().positions;
     var indices = [for (target in arm.toJointTargets([for (_ in 0...arm.dofCount()) 0.0])) target.joint];
     clearanceJoints = indices;
-    return new ArmClearance(arm, bodies, [for (index in indices) positions.get(index)], processkit.WeldPathPlanner.AIR_MARGIN);
+    return new robotkit.collision.CollisionClearance(arm, bodies, [for (index in indices) positions.get(index)], () -> new collisionkit.native.NativeCollisionWorld(), processkit.WeldPathPlanner.AIR_MARGIN);
   }
 
   /**

@@ -8,6 +8,7 @@
     "src"
   ],
   "dependencies": {
+    "collisionkit-native": {"path": "../collisionkit/native"},
     "machinekit-process": {"path": "../machinekit/process"},
     "projectkit": {
       "path": "../projectkit"

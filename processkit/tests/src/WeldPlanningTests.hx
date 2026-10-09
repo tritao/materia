@@ -3,7 +3,7 @@ import motionkit.robot.ManipulatorKinematics;
 import processkit.WeldCorner;
 import processkit.WeldCorner.WristLimits;
 import processkit.WeldPathPlanner;
-import robotkit.manipulation.ArmClearance;
+import robotkit.collision.CollisionClearance;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
 import robotkit.model.Joint;
@@ -552,7 +552,7 @@ class WeldPlanningTests {
    * The cell: the torch is a bar behind the wire tip (along -Z of the tool frame) with a neck sticking out to the tool's
    * +X; a table below the seam; and, when `wall` is given, a wall as a fixed body beside the seam's end.
    */
-  static function cell(wallX:Null<Float>):{planner:WeldPathPlanner, clearance:ArmClearance, start:Array<Float>} {
+  static function cell(wallX:Null<Float>):{planner:WeldPathPlanner, clearance:CollisionClearance, start:Array<Float>} {
     var made = arm();
     var d6 = 0.0823;
     var bodies = [
@@ -562,7 +562,7 @@ class WeldPlanningTests {
     ];
     if (wallX != null) bodies.push({name: "wall", link: "base_link", vertices: box(wallX, wallX + 0.05, 0.05, 0.35, 0.0, 0.5), tool: false});
     var start = [0.0, -1.5708, 1.5708, -1.5708, -1.5708, 0.0];
-    var clearance = new ArmClearance(made.arm, bodies, start);
+    var clearance = new robotkit.collision.CollisionClearance(made.arm, bodies, start, () -> new collisionkit.native.NativeCollisionWorld());
     var solver = new ManipulatorKinematics(made.arm, 1e-8);
     solver.preferTargetOrientation = true;
     var planner = new WeldPathPlanner(solver, new IkTolerance(2e-4, 1e-3, 300, 0.03), [for (_ in 0...6) 3.0], WRIST, clearance);
@@ -760,9 +760,20 @@ private class EntryTrajectorySolver extends ContinuousBranchFixture {
     return new motionkit.kinematics.Pose3(0.35, 0.2, 0.19, 0, 0, 0, 1);
 }
 
-private class EntryTrajectoryClearance extends ArmClearance {
+private class EntryTrajectoryClearance extends CollisionClearance {
   public function new(group:robotkit.manipulation.KinematicGroup)
-    super(group, [], [for (_ in group.jointIds()) 0.0]);
+    super(group, [], [for (_ in group.jointIds()) 0.0], () -> new collisionkit.native.NativeCollisionWorld());
   override public function violation(q:Array<Float>, contact:Bool = false, ?wanted:Float):Null<robotkit.manipulation.ClearanceViolation>
     return q[0] > 2.0 ? {a: "torch", b: "upright", distance: 0.002, required: 0.003} : null;
+  // The world's batched sweep never calls `violation`; sample it here instead.
+  override public function sweep(from:Array<Float>, to:Array<Float>, ?contactFlag:Bool, ?step:Float, ?wanted:Float,
+      ?contactAt:Array<Float>->Bool, ?endpoints:Bool):Null<robotkit.manipulation.ClearanceViolation> {
+    var maxJointStep:Float = step == null ? 0.02 : step, steps = 1;
+    for (joint in 0...from.length) steps = Std.int(Math.max(steps, Math.ceil(Math.abs(to[joint] - from[joint]) / maxJointStep)));
+    for (k in (endpoints == true ? 1 : 0)...(endpoints == true ? steps : steps + 1)) {
+      var found = violation([for (joint in 0...from.length) from[joint] + (to[joint] - from[joint]) * k / steps]);
+      if (found != null) return found;
+    }
+    return null;
+  }
 }

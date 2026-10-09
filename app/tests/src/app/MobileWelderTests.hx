@@ -281,7 +281,7 @@ class MobileWelderTests {
         var arm = mission.toolArm(session.robotTools[0]);
         var armJoints = arm.jointIndices();
         var registrationStart:Null<Array<Float>> = null;
-        var stowClearance:Null<robotkit.manipulation.ArmClearance> = null;
+        var stowClearance:Null<robotkit.collision.CollisionClearance> = null;
         while (!mission.finished && simulation.activeSession().simulationTime() < limit) {
           simulation.step(); tick++;
           if (mission.stepIndex != reportedStep) {
@@ -345,7 +345,7 @@ class MobileWelderTests {
                   materia.project.SceneArtifact.SceneArtifactWeld).metal]);
             }
             if (tick % 5 == 0) {
-              var clear:robotkit.manipulation.ArmClearance = cast stowClearance;
+              var clear:robotkit.collision.CollisionClearance = cast stowClearance;
               var positions = mission.robot.robot.snapshot().positions;
               var q = [for (joint in mission.clearanceJoints) positions.get(joint)];
               var hit = clear.violation(q);

@@ -9,6 +9,7 @@
     "../../sensorkit/sensor_io/haxe"
   ],
   "dependencies": {
+    "collisionkit-native": {"path": "../../collisionkit/native"},
     "haxeon-platform": {
       "path": "../../haxeon/packages/platform"
     },

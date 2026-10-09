@@ -1370,3 +1370,56 @@ Done as planned, with these choices:
   session has in the shared checkout (`app/src/MissionPlayer.hx`,
   `robotkit/sim/haxe/robotkit/runtime/Simulation.hx`, both also changed
   here), so the branch `collision` holds CL3a to CL7 until that is sorted.
+
+### PP10: process planning on collisionkit (2026-10-09)
+
+- **Local `main` and the pushes.** Local `main` was fast-forwarded to CL7
+  (f3da28dea) once the other session's two files were set aside and
+  restored; the coal fork (`tritao/coal` `materia`, 7b57ae92) and then the
+  parent (`tritao/materia` `main`, f3da28dea) were pushed with the user's
+  permission. The upstream coal PR still waits for the user.
+- **`ArmClearance` is deleted.** Every user builds
+  `robotkit.collision.CollisionClearance` with a `NativeCollisionWorld`
+  factory: the app's mission player, the robot-welder and machine-tending
+  examples, MachineKit's track and physical checks, and the RobotKit,
+  MotionKit and ProcessKit tests. `ClearanceBodyData` has its own module in
+  `robotkit.manipulation`; `MARGIN`, `CONTACT_MARGIN` and `TOUCH` live on
+  `CollisionClearance`. Projects that construct the world depend on
+  `collisionkit-native`, and the web host links `collisionkit_core`.
+- **The parity suite is retired** with the class it compared against. Its
+  last run (above) was exact on the weld cell, rail and G17 scenes.
+- **Two behaviours changed with the switch:**
+  - A clearance with no checked pairs returns from `sweep` at once (the
+    native batch refuses a world without bodies).
+  - `sweep` asks the world in one batch, so it no longer calls `violation`
+    per sample. One test fake (`EntryTrajectoryClearance` in
+    `WeldPlanningTests`) overrode only `violation`, so it now samples its own
+    sweep. No assertion changed.
+- **Benchmarks** (PP8's runner, same host, back to back; not quiet-host
+  timing). Every quality record is identical to the `ArmClearance` build of
+  f3da28dea:
+
+| Case (one run each) | `ArmClearance` at f3da28dea | collisionkit | Quality |
+|---|---:|---:|---|
+| G17 track weld, MuJoCo | 9.177 s | 7.475 s | identical: 232.5 s cycle, 0.778094423 rad margin, 4.998 mm leg |
+| Robot welder, MuJoCo, runs 1–4 | 1.578 / 1.910 / 4.645 / 9.400 s | 0.720 / 0.735 / 1.413 / 2.072 s | identical: ten seams, 99.9 s |
+| Robot welder, test backend, runs 1–4 | 1.699 / 1.776 / 4.596 / 9.318 s | 0.774 / 0.620 / 1.555 / 2.146 s | identical: ten seams, 99.9 s |
+| Gantry welder, MuJoCo, runs 1–4 | 27.799 / 104.381 / 89.996 / 261.273 s | 4.094 / 14.529 / 11.330 / 33.406 s | identical: ten seams, 159.8 s |
+
+  G17's continuous geometry certificate takes 0.168 s over six sections
+  (`PROCESS_PATH_GEOMETRY_CLEARANCE`). The gantry welder's 159.8 s cycle
+  (171.3 s in the PP8 log) is the same on both builds, so it moved before
+  this step.
+- **Suites:** RobotKit (5433), cell (30), clearance validation (23), planner
+  (12), MuJoCo cross-check (59), weld planning (609), processkit's full
+  suite, contact-search motion (120), MotionKit (1224712), MachineKit's
+  track and physical checks, the robot-welder, machine-tending, track-arm
+  and gantry-welder examples, the app's mobile welder and mobile mission
+  (both backends, 10 seams, clear stow), and the web build (433 guest
+  imports bound).
+- **Failing before and after (same message on f3da28dea):** MachineKit's
+  main suite stops at `CoreXyDriveTests` ("the step rate is each motor's
+  ceiling: expected 78.54, got 39.27"), and the app suite stops at the
+  worker document tests ("Could not open source file"). Both stop their
+  suites early, so the checks after them did not run in either build.
+

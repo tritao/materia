@@ -91,7 +91,8 @@ node - "$guest" "$exports" <<'NODE'
 const fs = require("fs");
 const [guestPath, exportsPath] = process.argv.slice(2);
 const linked = new Set(["nativekit", "nativekit_gpu", "nativekit_ui", "nativekit_scene", "nativekit_scene_render",
-  "nativekit_sim_core", "nativekit_sim_mujoco", "robotkit_runtime", "animkit_core", "stockkit_core"]);
+  "nativekit_sim_core", "nativekit_sim_mujoco", "robotkit_runtime", "animkit_core", "stockkit_core",
+  "collisionkit_core"]);
 // CadKit links only with a browser build of OCCT (MATERIA_WEB_OCCT_DIR); otherwise it stays unavailable.
 if (process.env.MATERIA_WEB_OCCT_DIR) linked.add("cadkit-core");
 const module = new WebAssembly.Module(fs.readFileSync(guestPath));

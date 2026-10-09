@@ -11,8 +11,8 @@ import motionkit.robot.StructuredJointPathPlanner;
 import motionkit.robot.TrajectoryClearanceProof.ClearanceEvent;
 import motionkit.trajectory.ValidationReport;
 import robotkit.collision.CollisionClearance;
-import robotkit.manipulation.ArmClearance;
-import robotkit.manipulation.ArmClearance.ClearanceBodyData;
+import robotkit.collision.CollisionClearance;
+import robotkit.manipulation.ClearanceBodyData;
 import robotkit.manipulation.ClearanceChange;
 import robotkit.manipulation.ClearanceWorld;
 import robotkit.manipulation.Manipulator;
@@ -81,7 +81,7 @@ class ClearanceValidationTests {
   }
 
   static function testPassingAndFailingCells():Void {
-    var world = new ArmClearance(arm, [torch(), neck(), table()], START);
+    var world = new robotkit.collision.CollisionClearance(arm, [torch(), neck(), table()], START, () -> new collisionkit.native.NativeCollisionWorld());
     var target = shifted(START, [0.4, 0.1, 0.0, 0.0, 0.0, 0.2]);
     var compiled = compiler(world).compile(moves([target]), START, Int64.ofInt(1));
     var report = reports(compiled)[0];
@@ -157,7 +157,7 @@ class ClearanceValidationTests {
     for (x in [radius - 0.05, radius + 0.05]) for (y in [-0.00025, 0.00025]) for (z in [centre.z - 0.05, centre.z + 0.05]) {
       plate.push(c * x - s * y); plate.push(s * x + c * y); plate.push(z);
     }
-    var world = new ArmClearance(arm, [bead, {name: "plate", link: "base_link", vertices: plate, tool: false}], from, 0.0002, 0.0002);
+    var world = new robotkit.collision.CollisionClearance(arm, [bead, {name: "plate", link: "base_link", vertices: plate, tool: false}], from, () -> new collisionkit.native.NativeCollisionWorld(), 0.0002, 0.0002);
     check(world.violation(from) == null && world.violation(to) == null, "both ends are clear");
     var message = throwsWith(() -> compiler(world).compile(moves([to]), from, Int64.ofInt(1)).dispose());
     check(message.indexOf("trajectory clearance bound (bead, plate)") >= 0,
@@ -167,7 +167,7 @@ class ClearanceValidationTests {
 
   /** With no bisection the bound cannot close, and the report says sampled over the open interval. */
   static function testDepthLimitIsSampled():Void {
-    var world = new ArmClearance(arm, [torch(), neck(), table()], START);
+    var world = new robotkit.collision.CollisionClearance(arm, [torch(), neck(), table()], START, () -> new collisionkit.native.NativeCollisionWorld());
     var shallow = compiler(world);
     shallow.clearanceDepthLimit = 0;
     var compiled = shallow.compile(moves([shifted(START, [0.4, 0.1, 0.0, 0.0, 0.0, 0.2])]), START, Int64.ofInt(1));

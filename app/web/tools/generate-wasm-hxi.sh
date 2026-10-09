@@ -24,6 +24,7 @@ generators=(
 	"trajectorykit/native/tools/check-hxi.sh:trajectory-core.hxi"
 	"kinematicskit/native/tools/check-hxi.sh:kinematicskit.hxi"
 	"motionkit/native/tools/check-hxi.sh:motionkit.hxi"
+	"collisionkit/native/tools/check-hxi.sh:collisionkit.hxi"
 )
 "$materia_dir/tools/web/generate-wasm-hxi.sh" "$output_dir" "${generators[@]}"
 

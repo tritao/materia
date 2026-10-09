@@ -3,7 +3,7 @@
   "package": { "name": "machinekit-rotary-head-tests" },
   "entry": "RotaryHeadCheck",
   "sourceRoots": ["src"],
-  "dependencies": { "machinekit": { "path": ".." } },
+  "dependencies": { "collisionkit-native": {"path": "../../collisionkit/native"}, "machinekit": { "path": ".." } },
   "target": "host",
   "outputDir": "build/rotary-head"
 }

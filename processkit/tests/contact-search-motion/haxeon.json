@@ -3,7 +3,7 @@
   "package": {"name": "processkit-contact-search-motion-tests"},
   "entry": "ContactSearchMotionTests",
   "sourceRoots": [".", "../src"],
-  "dependencies": {"processkit": {"path": "../.."}},
+  "dependencies": { "collisionkit-native": {"path": "../../../collisionkit/native"},"processkit": {"path": "../.."}},
   "target": "host",
   "outputDir": "build"
 }

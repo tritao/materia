@@ -10,7 +10,7 @@ import cadbridge.AssemblySimulationBridge;
 import robotkit.model.Frame;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.IkOptions;
-import robotkit.manipulation.ArmClearance;
+import robotkit.collision.CollisionClearance;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
@@ -77,9 +77,9 @@ class TendingReach {
 			var tcp = AssemblyFrames.compose(carrier.offset, AssemblyFrames.translation(0, 0, tool.length / 1000));
 			frame.position = [tcp.x, tcp.y, tcp.z]; frame.rotation = [tcp.qx, tcp.qy, tcp.qz, tcp.qw];
 			var arm = new Manipulator(converted.model, converted.model.links[0].id, frame.id);
-			var clearance = new ArmClearance(arm, [for (hull in converted.linkHulls)
+			var clearance = new robotkit.collision.CollisionClearance(arm, [for (hull in converted.linkHulls)
 				{name: hull.part, link: converted.model.links[hull.link].id, vertices: hull.vertices,
-					tool: StringTools.startsWith(hull.part, "tool/")}], source.ready(), 0, 0);
+					tool: StringTools.startsWith(hull.part, "tool/")}], source.ready(), () -> new collisionkit.native.NativeCollisionWorld(), 0, 0);
 			var standOff = tool.length + source.baseFlange.flangeDiameter + tool.depth + 20;
 			var baseX = source.reference.d[3], baseY = cell.opening.y - standOff;
 			var pitchX = tool.width + tool.openingTravel + 10;
@@ -88,8 +88,8 @@ class TendingReach {
 			// The doorway must pass the wrist as well as the tool. Keep its roll module
 			// below the header; the vise approach can rise after it is inside.
 			var wristPackage = tool.length + source.toolFlange.thickness + source.reference.d[5] + source.modules[5].length;
-			var viaZ = Math.min(grasp.z + approach, cell.opening.z + cell.openingHeight - wristPackage - ArmClearance.MARGIN * 1000);
-			if (viaZ <= cell.opening.z + ArmClearance.MARGIN * 1000) throw "Wrist and tool do not fit through the doorway";
+			var viaZ = Math.min(grasp.z + approach, cell.opening.z + cell.openingHeight - wristPackage - CollisionClearance.MARGIN * 1000);
+			if (viaZ <= cell.opening.z + CollisionClearance.MARGIN * 1000) throw "Wrist and tool do not fit through the doorway";
 			var allNames = names.copy(), allPoints = [points[0],
 				[grasp.x, cell.opening.y - tool.depth, viaZ], [grasp.x, cell.opening.y + tool.depth, viaZ]];
 			for (side in [-1, 1]) for (row in 0...2) for (column in 0...3) {
@@ -115,7 +115,7 @@ class TendingReach {
 					solved.push(q); seed = q.copy();
 				}
 				if (valid) {
-					var bodies:Array<robotkit.manipulation.ArmClearance.ClearanceBodyData> = [for (hull in converted.linkHulls)
+					var bodies:Array<robotkit.manipulation.ClearanceBodyData> = [for (hull in converted.linkHulls)
 						{name: hull.part, link: converted.model.links[hull.link].id, vertices: hull.vertices,
 							tool: StringTools.startsWith(hull.part, "tool/")}];
 					for (body in environment) {
@@ -126,7 +126,7 @@ class TendingReach {
 						}
 						bodies.push({name: "machine:" + body.name, link: converted.model.links[0].id, vertices: vertices, tool: false});
 					}
-					var full = new ArmClearance(arm, bodies, source.ready());
+					var full = new robotkit.collision.CollisionClearance(arm, bodies, source.ready(), () -> new collisionkit.native.NativeCollisionWorld());
 					for (i in 0...solved.length) {
 						var hit = full.violation(solved[i], i == 0);
 						if (hit == null) continue;

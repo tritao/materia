@@ -10,7 +10,7 @@ import kinematicskit.KinematicModel;
 import kinematicskit.KinematicState;
 import kinematicskit.Transform;
 import robotkit.kinematics.RobotKinematics;
-import robotkit.manipulation.ArmClearance.ClearanceBodyData;
+import robotkit.manipulation.ClearanceBodyData;
 import robotkit.model.CollisionShape;
 import robotkit.model.RobotModel;
 import robotkit.spatial.Transform3;
@@ -194,7 +194,7 @@ class RobotCollision {
   }
 
   /**
-   * The hulls `ArmClearance` checks (`ClearanceBodyData`: simulation hulls,
+   * The hulls `CollisionClearance` checks (`ClearanceBodyData`: simulation hulls,
    * assembly parts and deposited weld beads carried on links), as objects on
    * the robot's link bodies, so both worlds see the same scene (CL4a).
    * Tool hulls go on the tool body, which must exist when any is given.

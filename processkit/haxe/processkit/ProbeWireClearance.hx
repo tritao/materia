@@ -1,7 +1,7 @@
 package processkit;
 
 import robotkit.manipulation.Manipulator;
-import robotkit.manipulation.ArmClearance.ClearanceBodyData;
+import robotkit.manipulation.ClearanceBodyData;
 import robotkit.manipulation.ClearanceViolation;
 import robotkit.model.LinkId;
 import robotkit.spatial.Transform3;
@@ -58,7 +58,7 @@ class ProbeWireClearance {
     centre = tip.transformPoint(new Vec3(0, 0, -stickout / 2));
     radius = Math.sqrt(2 * half * half + stickout * stickout / 4);
     for (body in bodies) {
-      // Tool skins are the wire's own rigid assembly; their clearance remains checked by ArmClearance.
+      // Tool skins are the wire's own rigid assembly; their clearance remains checked by CollisionClearance.
       if (body.tool || body.link == link) continue;
       var index = links.indexOf(body.link);
       if (index < 0) { index = links.length; links.push(body.link); }

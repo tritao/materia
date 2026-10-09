@@ -4,7 +4,7 @@ import motionkit.trajectory.Trajectory;
 import robotkit.manipulation.ClearanceWorld;
 import robotkit.manipulation.ClearanceViolation;
 
-/** Sweep the generated joint curve, retaining ArmClearance's sampled sweep contract. */
+/** Sweep the generated joint curve, retaining CollisionClearance's sampled sweep contract. */
 class TrajectoryClearance {
   public static function violation(world:ClearanceWorld,trajectory:Trajectory,contact:Bool=false,
       stepSeconds:Float=0.01,?contactAt:Array<Float>->Bool):Null<ClearanceViolation> {

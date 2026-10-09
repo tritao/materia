@@ -17,6 +17,7 @@
 		"../robot-arm"
 	],
 	"dependencies": {
+		"collisionkit-native": {"path": "../../../collisionkit/native"},
 		"projectkit": {
 			"path": "../../../projectkit"
 		},

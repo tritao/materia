@@ -22,7 +22,7 @@ import motionkit.program.MoveTarget;
 import motionkit.robot.CollisionPlannerSpace;
 import motionkit.robot.StructuredJointPathPlanner;
 import robotkit.collision.CollisionClearance;
-import robotkit.manipulation.ArmClearance.ClearanceBodyData;
+import robotkit.manipulation.ClearanceBodyData;
 import robotkit.manipulation.Manipulator;
 
 /**
@@ -262,7 +262,7 @@ class PlannerTests {
     // Bound the search to a neighbourhood of the move.
     var planner = new RrtConnect(new BoundedSpace(space, [for (j in 0...6) Math.min(START[j], goal[j]) - 0.8],
       [for (j in 0...6) Math.max(START[j], goal[j]) + 0.8]), 2);
-    // Validation: the adapter on the same hulls, with ArmClearance's margins.
+    // Validation: the adapter on the same hulls, with CollisionClearance's margins.
     var clearance = new CollisionClearance(arm, [torch, table, post], START, () -> new NativeCollisionWorld());
     check(clearance.sweep(START, goal) != null, "the direct turn sweeps the torch through the post");
     var compiler = processkit.WeldingPlanRunner.planning(arm, 2.0).compiler.withJointPathPlanner(

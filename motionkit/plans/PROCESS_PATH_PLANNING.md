@@ -712,7 +712,7 @@ Submodules come from the main checkout's stores, not from other worktrees (which
 | PP7 | complete: generated entry/retreat selection, retries and emission; full MotionKit/native gate passed | `92b8c69ee`, `093e65a46`, `e41bdfffa`; retreat gate below |
 | PP8 | in progress: robot weldment tenfold targets met against PP0; G17 five-run median 14.387 s on non-quiet host; both revision-8 savings and boundary gate pass; gantry speed regression, quiet acceptance and migration remain open | per-step profiles below |
 | PP9 | in progress: handling and surface use the structured planner and authored missions pass; toolpaths/deletions/remaining mission gate pending | runner migrations below |
-| PP10 | planned | — |
+| PP10 | complete: `ArmClearance` deleted; process planning runs on collisionkit with identical quality and faster planning | PP10 evidence below |
 | PP11 | planned | — |
 
 ### PP0 setup (2026-10-06)
@@ -3411,3 +3411,27 @@ screening regression and PP3/PP9 close-outs remain follow-up work.
 The user confirms a quiet host is unavailable now. The five-run G17 result
 remains explicitly **non-quiet**; quiet-host timing acceptance stays open
 without blocking functional integration or further authorized work.
+
+
+### PP10 adopt collisionkit (2026-10-09)
+
+`robotkit.collision.CollisionClearance` (collision plan CL4a, on a
+`NativeCollisionWorld`) is now the only clearance world; `ArmClearance` and
+its parity suite are deleted. The steps, behaviour changes and suites are in
+`collisionkit/plans/COLLISION.md` ("PP10: process planning on
+collisionkit"). The PP8 benchmarks, same host, back to back, one run each
+(not quiet-host timing), against the `ArmClearance` build of `f3da28dea`:
+
+| Case (one run each) | `ArmClearance` at f3da28dea | collisionkit | Quality |
+|---|---:|---:|---|
+| G17 track weld, MuJoCo | 9.177 s | 7.475 s | identical: 232.5 s cycle, 0.778094423 rad margin, 4.998 mm leg |
+| Robot welder, MuJoCo, runs 1–4 | 1.578 / 1.910 / 4.645 / 9.400 s | 0.720 / 0.735 / 1.413 / 2.072 s | identical: ten seams, 99.9 s |
+| Robot welder, test backend, runs 1–4 | 1.699 / 1.776 / 4.596 / 9.318 s | 0.774 / 0.620 / 1.555 / 2.146 s | identical: ten seams, 99.9 s |
+| Gantry welder, MuJoCo, runs 1–4 | 27.799 / 104.381 / 89.996 / 261.273 s | 4.094 / 14.529 / 11.330 / 33.406 s | identical: ten seams, 159.8 s |
+
+Every quality record is identical. G17's geometry certificate takes 0.168 s
+(`PROCESS_PATH_GEOMETRY_CLEARANCE`, six sections). Handling (23.42 s cycle,
+four steps) passes on collisionkit; it was not rerun on the baseline. With
+`PROCESS_PATH_PROFILE=1` the runner can fail to parse a record when two
+threads print at once (seen on the welder); the runs above are without it.
+

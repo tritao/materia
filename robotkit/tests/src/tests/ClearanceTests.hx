@@ -3,7 +3,7 @@ package tests;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 
-import robotkit.manipulation.ArmClearance;
+import robotkit.collision.CollisionClearance;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
 import robotkit.model.Joint;
@@ -14,7 +14,7 @@ import robotkit.tool.ConvexDistance;
 import robotkit.tool.ConvexSolid;
 
 /**
- * `ArmClearance` on a planar two-link arm in a cell with a post and a table: clear poses, a pose that hits the post, a
+ * `CollisionClearance` on a planar two-link arm in a cell with a post and a table: clear poses, a pose that hits the post, a
  * motion whose end poses are clear but whose path is not, the margin, the tool's contact margin, bodies that touch by
  * design, and hulls whose edges cross with no corner of either inside the other.
  */
@@ -47,11 +47,11 @@ class ClearanceTests {
     model.addCoupling(new robotkit.model.JointCoupling("thread", slide.id, screw.id, 100, 0));
     var tip = model.addFrame(new Frame("tip", carriage));
     var group = new Manipulator(model, base.id, tip.id);
-    var clearance = new ArmClearance(group, [
+    var clearance = new robotkit.collision.CollisionClearance(group, [
       {name: "nut", link: carriage.id, vertices: box(-0.02, 0.02, -0.04, 0.04, -0.04, 0.04), tool: false},
       {name: "screw", link: shaft.id, vertices: box(-0.1, 0.5, -0.006, 0.006, -0.006, 0.006), tool: false},
       {name: "work", link: base.id, vertices: box(0.28, 0.32, 0.025, 0.04, -0.025, 0.025), tool: false}
-    ], [0.0]);
+    ], [0.0], () -> new collisionkit.native.NativeCollisionWorld());
     check(clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
       "a driven nut's designed engagement stays clear at rest and through travel");
     var hit = clearance.violation([0.3]);
@@ -72,12 +72,12 @@ class ClearanceTests {
     model.addCoupling(new robotkit.model.JointCoupling("rack", slide.id, shaft.id, -50, 0));
     var tip = model.addFrame(new Frame("tip", carriage));
     var group = new Manipulator(model, base.id, tip.id);
-    var clearance = new ArmClearance(group, [
+    var clearance = new robotkit.collision.CollisionClearance(group, [
       {name: "carriage", link: carriage.id, vertices: box(-0.02, 0.02, -0.04, 0.04, 0.08, 0.1), tool: false},
       {name: "pinion", link: pinion.id, vertices: box(-0.03, 0.03, -0.01, 0.01, -0.03, 0.03), tool: false},
       {name: "rack", link: base.id, vertices: box(-0.1, 0.6, -0.01, 0.01, -0.02, 0), tool: false},
       {name: "work", link: base.id, vertices: box(0.28, 0.32, -0.02, 0.02, 0.01, 0.04), tool: false}
-    ], [0.0]);
+    ], [0.0], () -> new collisionkit.native.NativeCollisionWorld());
     check(clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
       "a moving pinion retains its designed engagement with the fixed rack");
     var hit = clearance.violation([0.3]);
@@ -100,7 +100,7 @@ class ClearanceTests {
    * A 2R arm in the XY plane, links 0.3 m long (bars of 5 cm), with `fixed` bodies on the base link. The second link is
    * the tool.
    */
-  static function rig(fixed:Array<{name:String, vertices:Array<Float>}>, ?linkWidth:Float = 0.025, ?reference:Array<Float>):{arm:Manipulator, clearance:ArmClearance} {
+  static function rig(fixed:Array<{name:String, vertices:Array<Float>}>, ?linkWidth:Float = 0.025, ?reference:Array<Float>):{arm:Manipulator, clearance:CollisionClearance} {
     var model = new RobotModel("clearance-arm");
     var base = model.addLink(new Link("base"));
     var link1 = model.addLink(new Link("link1"));
@@ -118,7 +118,7 @@ class ClearanceTests {
       {name: "forearm", link: link2.id, vertices: box(0.0, 0.3, -linkWidth, linkWidth, -linkWidth, linkWidth), tool: true}
     ];
     for (body in fixed) bodies.push({name: body.name, link: base.id, vertices: body.vertices, tool: false});
-    return {arm: arm, clearance: new ArmClearance(arm, bodies, reference == null ? [0.0, 0.0] : reference)};
+    return {arm: arm, clearance: new robotkit.collision.CollisionClearance(arm, bodies, reference == null ? [0.0, 0.0] : reference, () -> new collisionkit.native.NativeCollisionWorld())};
   }
 
   static function testPosesAndPath():Void {
@@ -144,7 +144,7 @@ class ClearanceTests {
     var table = {name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.003)};
     var cell = rig([table]);
     var tight = cell.clearance.violation([0.0, 0.0]);
-    check(tight != null && tight.distance > 0.0 && tight.distance < ArmClearance.MARGIN, "3 mm above the table is a violation of the margin, not a collision");
+    check(tight != null && tight.distance > 0.0 && tight.distance < CollisionClearance.MARGIN, "3 mm above the table is a violation of the margin, not a collision");
     check(tight != null && Math.abs(tight.distance - 0.003) < 0.0005, 'its distance is 3 mm, got ${tight == null ? -1 : tight.distance * 1000} mm');
     // The tool in the contact zone may come as close as the contact margin: 3 mm is clear for the forearm but not the upper arm.
     var contact = cell.clearance.violation([0.0, 0.0], true);
@@ -154,9 +154,9 @@ class ClearanceTests {
     var roomy = rig([{name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.02)}]);
     check(roomy.clearance.violation([0.0, 0.0]) == null, "20 mm above the table is clear");
     // With a margin wider than the gap the violation reports the distance between the faces.
-    var strict = new ArmClearance(cell.arm, [
+    var strict = new robotkit.collision.CollisionClearance(cell.arm, [
       {name: "forearm", link: "link2", vertices: box(0.0, 0.3, -0.025, 0.025, -0.025, 0.025), tool: true},
-      {name: "table", link: "base", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.0123), tool: false}], [0.0, 0.0], 0.05, 0.05);
+      {name: "table", link: "base", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.0123), tool: false}], [0.0, 0.0], () -> new collisionkit.native.NativeCollisionWorld(), 0.05, 0.05);
     var found = strict.violation([0.0, 0.0]);
     check(found != null && Math.abs(found.distance - 0.0123) < 1e-6, 'the distance between parallel faces is measured, got ${found == null ? -1 : found.distance}');
   }
@@ -201,10 +201,10 @@ class ClearanceTests {
       var flange = model.addFrame(new Frame("flange", moving));
       var group = new Manipulator(model, base.id, flange.id);
       var tool = box(0.3, 0.6, -0.025, 0.025, -0.025, 0.025);
-      var clearance = new ArmClearance(group, [
+      var clearance = new robotkit.collision.CollisionClearance(group, [
         {name: "tool", link: moving.id, vertices: tool, tool: true},
         {name: "obstacle", link: obstacle.id, vertices: vertices, tool: false}
-      ], [0.0]);
+      ], [0.0], () -> new collisionkit.native.NativeCollisionWorld());
       for (sample in 0...61) {
         var q = [-Math.PI + sample * Math.PI / 30];
         var poses = group.linkPoses(q, [moving.id, obstacle.id]);
@@ -217,7 +217,7 @@ class ClearanceTests {
           return result;
         }
         for (contact in [false, true]) {
-          var margin = contact ? ArmClearance.CONTACT_MARGIN : ArmClearance.MARGIN;
+          var margin = contact ? CollisionClearance.CONTACT_MARGIN : CollisionClearance.MARGIN;
           var exact = ConvexDistance.between(placed(tool, poses[0]), placed(vertices, poses[1]), margin);
           check((clearance.violation(q, contact) != null) == (exact < margin),
             "bounds preserve exact rotated hull clearance and contact margins");

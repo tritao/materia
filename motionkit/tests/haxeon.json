@@ -9,6 +9,7 @@
     "../../machinekit/examples/corexy"
   ],
   "dependencies": {
+    "collisionkit-native": {"path": "../../collisionkit/native"},
     "cadbridge": {
       "path": "../../robotkit/cadbridge"
     },

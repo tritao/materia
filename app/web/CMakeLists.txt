@@ -74,6 +74,11 @@ add_subdirectory("${MATERIA_SOURCE_ROOT}/animkit/native" animkit)
 set(SK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 add_subdirectory("${MATERIA_SOURCE_ROOT}/stockkit/core" stockkit)
 
+# CollisionKit: the collision world on coal and convex decomposition (V-HACD, single-threaded here), which
+# process planning's clearance checks use (collisionkit/plans/COLLISION.md CL-D2, CL8).
+set(CK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+add_subdirectory("${MATERIA_SOURCE_ROOT}/collisionkit/native" collisionkit)
+
 # CadKit, when given an Emscripten install of the pinned OCCT source (static, built with -fwasm-exceptions like
 # everything here). Without one CadKit stays unavailable and the guest's calls throw haxeon.wasm.HostError.
 set(MATERIA_WEB_OCCT_DIR "" CACHE PATH "Prefix of an Emscripten install of CadKit's pinned OCCT")
@@ -105,7 +110,7 @@ add_executable(materia_web
 target_include_directories(materia_web PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(materia_web PRIVATE
     NativeKit::nativekit NativeKit::gpu NativeKit::ui NativeKit::scene NativeKit::scene_render
-    NativeKit::sim_core NativeKit::sim_mujoco RobotKit::runtime animkit_core stockkit::core
+    NativeKit::sim_core NativeKit::sim_mujoco RobotKit::runtime animkit_core stockkit::core collisionkit::core
     NativeKit::wasm_host_allocator)
 if(MATERIA_WEB_OCCT_DIR)
     target_link_libraries(materia_web PRIVATE cadkit::core)

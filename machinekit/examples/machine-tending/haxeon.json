@@ -17,6 +17,7 @@
 		"../cnc-router"
 	],
 	"dependencies": {
+		"collisionkit-native": {"path": "../../../collisionkit/native"},
 		"projectkit": {
 			"path": "../../../projectkit"
 		},

@@ -6,8 +6,8 @@ import robotkit.manipulation.ClearanceViolation;
  * What process planning asks of a clearance world (COLLISION.md CL-D12):
  * margin violations with per-body inflation, the closest pair, sampled
  * straight joint sweeps, and the motion bounds of its bodies, for an arm at
- * joint values. `ArmClearance` (convex hulls, Haxe GJK) implements it, and
- * so does `robotkit.collision.CollisionClearance` on a collisionkit world.
+ * joint values. `robotkit.collision.CollisionClearance` implements it on a
+ * collisionkit world.
  *
  * Margins: a pair must keep `margin` (or a smaller `wanted`); with
  * `contact`, a tool body need keep only `contactMargin` from fixed bodies.

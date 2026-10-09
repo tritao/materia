@@ -50,7 +50,7 @@ class CellCollisionTests {
     testFixtureThroughTheRobotIsALayoutError();
     testSimulationContactSettings();
     testDecomposedPartEnclosesItsTessellation();
-    testArmClearanceBodies();
+    testClearanceBodies();
     Sys.println('Cell collision tests passed ($assertions assertions)');
   }
 
@@ -252,8 +252,8 @@ class CellCollisionTests {
     b.close();
   }
 
-  /** The hulls ArmClearance is given (link hulls, a tool hull, parts and welds on the base link) land on the same bodies. */
-  static function testArmClearanceBodies():Void {
+  /** The hulls CollisionClearance is given (link hulls, a tool hull, parts and welds on the base link) land on the same bodies. */
+  static function testClearanceBodies():Void {
     var description = new CollisionDescription();
     var robot = RobotCollision.describe(description, arm(), armOptions("arm"));
     var objects = RobotCollision.describeClearanceBodies(description, robot, [
