@@ -1635,3 +1635,24 @@ Done as planned, with these choices:
   suites), and so do the project-source collision checks.
 - **CL8 is done:** CL8a–d.
 
+### Follow-up: the app's simulation takes its exclusions from the description (2026-10-09)
+
+- CL3b made SimKit take a robot's excluded link pairs from the collision
+  description, but only on RobotKit's path. The app's `AssemblyRobot.add`
+  still let SimKit decide, and SimKit excludes any pair whose bounding
+  spheres overlap at rest.
+- Now it describes the robot with its link hulls (the same pieces as
+  everywhere since CL8a) at its starting configuration, and passes
+  `RobotCollision.simulationExcludes` to `addRobotAtPose`. The simulation,
+  the planner and the editor's collision view therefore agree on which link
+  pairs are checked.
+- On the generated arm the simulation now leaves out exactly the six jointed
+  neighbours and checks every other pair, the pedestal against the forearm
+  included (`checkSimulationCollision` asserts the list).
+- **Suites:**
+  - the full project-source run passes, with the arm, cobot, gantry picker,
+    gantry, track and robot welder missions;
+  - the PP8 runner's G17, gantry welder and robot welder (both backends)
+    quality records are identical to before;
+  - the app suite (15 suites).
+

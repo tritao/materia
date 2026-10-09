@@ -183,6 +183,30 @@ class AssemblyRobot {
    * robots. Throws when the project lacks the data to simulate a part, or when
    * closures are needed and `supportsClosures` is false.
    */
+  /**
+   * The link pairs the simulation leaves out, from the same collision description the planner and the
+   * editor use (COLLISION.md CL3b): adjacent and rigidly joined links, and links whose hulls overlap in
+   * the robot's starting configuration (its joints start at zero, the loaded state). SimKit's own rule
+   * (bounding spheres overlapping at rest) would leave out more and check fewer real contacts.
+   */
+  static function simulationExcludes(model:RobotModel, hulls:Array<SimulationLinkHull>):Array<Int> {
+    var description = new collisionkit.CollisionDescription();
+    var options = new robotkit.collision.RobotCollision.RobotCollisionOptions("robot");
+    options.hulls = [for (index in 0...hulls.length)
+      new robotkit.collision.RobotCollision.RobotLinkHull(hulls[index].link, 'hull$index', hulls[index].vertices)];
+    var robot = robotkit.collision.RobotCollision.describe(description, model, options);
+    var world = new collisionkit.native.NativeCollisionWorld();
+    try {
+      var build = description.build(world);
+      var excludes = robotkit.collision.RobotCollision.simulationExcludes(description, build, robot);
+      world.dispose();
+      return excludes;
+    } catch (error:Dynamic) {
+      world.dispose();
+      throw error;
+    }
+  }
+
   public static function add(candidate:Simulation, scene:EditorScene, session:ProjectDocumentSession,
       assembly:AssemblyDefinition, supportsClosures:Bool, revision:Int, robotIndex:Int,
       ?channels:Array<ProcessChannelDeclaration>, virtualWelder:Bool = false):AssemblyRobot {
@@ -364,7 +388,7 @@ class AssemblyRobot {
     // Like a machine whose servos are on, its joints hold their designed pose until something commands
     // them, such as an arm while its base drives.
     var runtime = candidate.addRobotAtPose(blueprint, position, rotation, device, null, null, closures, null, null, null, null,
-      linkHulls, true);
+      linkHulls, true, simulationExcludes(converted.model, linkHulls));
     var authored:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset>> = session.cncJob != null ? session.cncJob.powerUpOffsets :
       session.mission == null ? null : session.mission.powerUpOffsets;
     var sideOffsets:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>> = session.cncJob != null ? session.cncJob.powerUpSideOffsets :

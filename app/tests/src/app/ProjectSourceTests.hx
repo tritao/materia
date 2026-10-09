@@ -54,6 +54,7 @@ import haxe.io.Bytes;
 @:access(motionkit.robot.ManipulatorMotion)
 @:access(motionkit.robot.PlanExecutor)
 @:access(processkit.WeldingPlanRunner)
+@:access(app.AssemblyRobot)
 class ProjectSourceTests {
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
@@ -2921,6 +2922,14 @@ class ProjectSourceTests {
     check(simulation.rebuild(editor.session.sensors, editor.scene, editor.session), "the arm simulates: " + simulation.error);
     var mission = simulation.missionPlayer();
     if (mission == null) throw "the arm has no mission";
+    var robot:AssemblyRobot = mission.robot;
+    var excludes = AssemblyRobot.simulationExcludes(robot.model, [for (hull in robot.hulls) {link: hull.link, vertices: hull.vertices}]);
+    var links = [for (link in robot.model.links) link.id];
+    // The simulation leaves out what the collision description allows (CL3b in the app): only the six
+    // jointed neighbours; the pedestal and the forearm, say, are checked, as the planner checks them.
+    var excluded = [for (i in 0...Std.int(excludes.length / 2)) links[excludes[2 * i]] + "-" + links[excludes[2 * i + 1]]];
+    check(excluded.join(" ") == "assembly-root-turret turret-upperArm upperArm-forearm forearm-wristBody wristBody-hand hand-toolFlange",
+      'the arm simulation excludes only its jointed neighbours (${excluded.join(" ")})');
     var deepest = new Map<String, Float>();
     while (mission.completed < 2 && simulation.activeSession().simulationTime() < 60) {
       simulation.step();
