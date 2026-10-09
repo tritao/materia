@@ -323,6 +323,54 @@ All are built in code, so tests need no files.
   `T`).
 - The baseline suite results are recorded in the session prompt.
 
+**AM0b. Make main green.** Done. Seven failures were already on main 1decbfc20; each was diagnosed
+before it was fixed, and none was fixed by loosening a check.
+- **Step rate halved (MachineKit smoke and workspace, app screw and belt routers).** Not a code
+  intent: 8c9e1d026 plans at the integer pulse interval of the f32 rate and steps per unit the
+  device receives. A rate exactly at the step tick's ceiling can round below one tick per step in
+  f32, so the interval came out as two and the CoreXY plotter and both routers were planned at half
+  speed. The device derives the same interval from the same f32 values, so it would have run at
+  half speed too. `PulseRate` (in `DeviceBinding.hx`) now derives, once, the rate a planner may
+  use and the rate to deploy: a ratio within f32 rounding of an integer is that integer, and a
+  deployed rate is nudged to the nearest f32 that gives the planned interval. 2fbea0683.
+- **`testVirtualCncProgram` ("exceeds claimed limits: position on joint 0 at 0 s").** Caused by
+  efd8c5c16 (confirmed by reverting it): homed axes return to their home coordinate, which defaults
+  to the lower travel limit. A stepper cannot rest exactly on a limit; the pulse generator floors
+  its target, so the device rested one or two steps (12.5 um) below zero, within the homing
+  precision but outside the claimed bound, and four layers refused the first plan. A joint outside a
+  claimed position bound by no more than the plan's start tolerance now begins there, with its
+  bound reaching the start and no further, in each place that checks a plan against joint
+  limits: `ExecutionPlan.create`, `ProgramCompiler`'s path check, the runtime's appended-path
+  validation and the RKD6 device compiler. Rejected: returning homed axes a precision inside the
+  limits (path planners start at the home coordinate and expect to find the axis there; motionkit's
+  `PlannerTests` fail). ae6e95ec5.
+- **`DLS allocates nothing per iteration (-40.8 bytes)`.** A measurement artefact: HashLink bills
+  allocation in blocks, so a run is now and then charged a 2 KB refill. Every run allocated 752
+  bytes whatever its length. The test takes the cheapest of six runs per length. cd29b1993.
+- **processkit and robotkit-core tests ("libnativekit_scene.so" / "libnativekit.so" not found).**
+  Neither test project built the NativeKit libraries it loads. processkit's declares the native
+  build of the motionkit tests; the robotkit-core consumer builds NativeKit beside the runtime.
+  dfa6e2940.
+- **Editor tests ("Worker document tests failed: ... Could not open source file").**
+  `StartPageTests` moved the process to the repository root and never came back, so the worker
+  tests' `fixtures/worker-legacy.materia` resolved against the root. It restores the working
+  directory now. 2611087d9.
+
+Gate `am-suite.sh am0b` (full, 2395 s): every project passes. One workspace action, `toolpathkit`,
+was blocked because this session edited its sources while the suite ran; it passes alone (97
+assertions) on the committed tree. Assertion counts: RobotKit world 5439 (was 5433), terrain 3524,
+MotionKit 1,224,712, CadBridge 173, CncKit 317, CamKit 12311, ProjectKit 152, ToolpathKit 97, KinematicsKit
+325 + native 695, automationkit 86, manufacturingkit 54. Every number listed as not to move is
+unchanged. The two routers now have numbers (the new baseline for every later step):
+- **Screw router:** axes y 22.3 mm/s 5.21 m/s^2, x 25 mm/s 5.37, z 25 mm/s 5.65; plate milled in
+  232.2 s of machining (homing 38 s, total 270.2 s), 9902.1 of 9996.5 mm^3 removed, leftover 140.3
+  mm^3, gouge 63.9 mm^3; 128 plans, 0 flagged, 0 stalls, worst deviation 0.05 mm.
+- **Belt router:** axes y and x 500 mm/s 12.29 and 14.1 m/s^2; plate milled in 215.2 s (homing
+  26.2 s, total 241.4 s), same removal; 128 plans, 56 flagged, 62 over the 0.1 mm tolerance, 0
+  stalls, worst deviation 1.76 mm on y (assumed belt drag).
+  (The "last known good" values, 220.2 s and 201.6 s, predate the controller step-rate ceilings.)
+- **CoreXY plotter:** axes to 649.6 mm/s, 71.549 m/s^2 (as before).
+
 **AM1. Printer ops in the IR.**
 - Add the AM-D2 ops to `ToolpathOp`, with validation:
   - area, width and height positive and consistent (`area ≤ width·height`);
@@ -545,6 +593,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | Step | State | Commits |
 |---|---|---|
 | AM0 | done: worktree and baseline | |
+| AM0b | done: main green, router baselines recorded | 2fbea0683, ae6e95ec5, cd29b1993, dfa6e2940, 2611087d9 |
 | AM1 | planned | |
 | AM2 | planned | |
 | AM3 | planned | |
