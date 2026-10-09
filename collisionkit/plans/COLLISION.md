@@ -541,6 +541,7 @@ Each step is its own commit with all suites green.
   - Not here: switching process planning to the adapter, or deleting
     `ArmClearance` (main's PP10).
 - **CL4b — Clearance in the validation report; conservative joint moves.**
+  Done, see the progress log.
   - Add `MK_CHECK_COLLISION` to `mk_validation_report` (trajectorykit,
     `trajectory_core.h`), with its setter and `ValidationReport`'s.
   - A check's single `joint` slot cannot name a pair, so the report gains
@@ -1114,3 +1115,79 @@ Done as planned, with these choices:
   app compiles. The weld planning and parity suites need SimKit's
   libraries on `LD_LIBRARY_PATH` (`robotkit/tests/build/host/native/
   robotkit-world-tests`), as their projects declare no native build.
+
+### CL4b — Clearance in the validation report; conservative joint moves (2026-10-09)
+
+- **The report** (`trajectory_core.h`) gains a planner-owned
+  `collision` check and a `collision_pair` (object ids, names, the
+  segment), with `mk_report_set_collision`; `mk_validate` leaves it
+  unchecked. `ValidationReport` exposes `collision`, `collisionPair` and
+  `setCollision`, `hasFailure` counts it, and `ValidationGuarantees` has a
+  `collision` guarantee. The bindings are regenerated.
+- **Not as `checks[MK_CHECK_COLLISION]`.** The plan had `MK_CHECK_COUNT`
+  grow. `motionkit/native/tests/generator.cpp` asserts that `mk_validate`
+  decides every entry of `checks` except task space, and a planner-owned
+  collision entry there would stay unchecked and fail it; changing that
+  assertion is against the gates. So the check sits beside `checks`, in the
+  same report: its layout still changes and is versioned by `struct_size`
+  as planned. Any binary built against the old header must be rebuilt (the
+  weld planning suite first failed with "runtime.submitPlan failed with
+  RobotKit status -10" until RobotKit's natives were rebuilt).
+- **Object ids** are UINT32_MAX: `ClearanceWorld` names bodies only (its
+  violations are `ArmClearance`'s, by name).
+- **`ProgramCompiler.finish`** records, after the plan is created:
+  - a refined process path certified by `JointCurveClearance`: a bound,
+    with the closest pair over 8 times along the motion;
+  - any other motion (a joint move, a generated entry, exit or hold):
+    `TrajectoryClearanceProof`. Over a time interval of half-length h, joint
+    j moves at most `v_j·h` from the midpoint, where `v_j` bounds its speed
+    from the motion's own polynomials (Σ k|c_k|d^(k-1) per segment); the
+    world's displacement bounds turn that into per-body inflation, and the
+    interval is clear when the midpoint is, inflated; otherwise it is
+    bisected, to `clearanceDepthLimit` (16). Every midpoint is also checked
+    as it is. A bound that closes is recorded as a bound; one that does not
+    is recorded as sampled (the sampled check passed), naming the first
+    open interval, and does not throw; a real violation it finds between
+    samples is recorded and throws.
+  - The sampled checks that already throw (`TrajectoryClearance`, the
+    refined-curve proof) still throw before a plan, and so a report,
+    exists; their messages name the pair.
+- **Contact policy:** with a per-configuration contact policy the bound
+  uses the planner's neighbourhood guard (as `JointCurveClearance` does);
+  without one it uses the stricter margins.
+- **Changes (CL-D9):** `ClearanceChange` (attach, detach, open and close a
+  window) and `ClearanceScene` in robotkit; `ClearanceEvent` (op, time,
+  change) and `ProgramCompiler.clearanceEvents` in MotionKit. The proof
+  replays an op's events in time order through the world, never bisecting
+  across one; the scene resets when a program starts and carries across
+  ops. `CollisionClearance` is a scene: attaching moves a hull onto a link
+  where it is (rigid with that link's hulls), detaching onto the arm's
+  root, and a window gives its pair two groups of their own, with the
+  window's margin between them, or allows the pair (process contact) when
+  the margin is null. An op with events skips the sampled check, which
+  cannot replay them; the proof checks every midpoint as it is instead.
+  `ArmClearance` cannot replay changes, and events with it are refused.
+- **Tests** (`motionkit/tests/clearance-validation`, 20 assertions, on
+  main's weld arm):
+  - a clear joint move recorded as a bound with its closest pair
+    (neck/table 0.552 m against 0.005 m), unchecked without a world, and a
+    move into the table refused naming the pair;
+  - a 1 mm bead on the outstretched arm (0.90 m out) swept across a 0.5 mm
+    plate placed in the widest gap of the sampled check's own samples
+    (0.0132 rad apart): the sampled check passes and the bound finds the
+    contact at 0.754 s;
+  - with the depth limit at 0, the same clear move is recorded as sampled
+    over its open interval;
+  - a part grasped at the torch tip (overlapping it), carried and placed,
+    with the torch leaving it through a contact window: refused without
+    the events, clear with them;
+  - a torch ending 2 mm from its seam: refused under the 5 mm margin,
+    clear inside a window with a 1 mm approach margin (recorded as a bound,
+    1.98 mm against 1 mm).
+- **Suites:** collisionkit standalone C++ 3 of 3; MotionKit standalone
+  C++ 16 of 16 (the generator assertion untouched); collisionkit native
+  passed (350); cell tests passed (30); native kit passed (695); pure kit
+  only main's known DLS failure; RobotKit passed (5433); weld planning
+  passed (609, weld pass path 19, the shared welding motion factory);
+  processkit's full suite passed; parity passed (4184); clearance
+  validation passed (20); MotionKit passed (1224712).

@@ -382,6 +382,42 @@ mk_result MK_CALL mk_report_set_task_space(mk_validation_report *report,
     return MK_OK;
 }
 
+mk_result MK_CALL mk_report_set_collision(mk_validation_report *report,
+    uint32_t status, uint32_t method, double distance, double required, double time_seconds,
+    double segment_start, double segment_end, uint64_t resolution_ns, uint32_t object_a, uint32_t object_b,
+    const uint8_t *name_a, uint32_t name_a_length, const uint8_t *name_b, uint32_t name_b_length) {
+    if (report == nullptr || report->struct_size < sizeof(mk_validation_report) ||
+        (status != MK_CHECK_PASSED && status != MK_CHECK_FAILED) ||
+        (method != MK_CHECK_METHOD_BOUND && method != MK_CHECK_METHOD_SAMPLED) ||
+        !std::isfinite(distance) || !std::isfinite(required) || required < 0.0 ||
+        !std::isfinite(time_seconds) || time_seconds < 0.0 || !std::isfinite(segment_start) ||
+        !std::isfinite(segment_end) || segment_start < 0.0 || segment_end < segment_start ||
+        (method == MK_CHECK_METHOD_SAMPLED) != (resolution_ns != 0) ||
+        (name_a_length && name_a == nullptr) || (name_b_length && name_b == nullptr))
+        return MK_ERROR_INVALID_ARGUMENT;
+    mk_validation_check check{};
+    check.status = status;
+    check.joint = UINT32_MAX;
+    check.method = method;
+    check.value = distance;
+    check.time_seconds = time_seconds;
+    check.limit = required;
+    check.margin = distance - required;
+    check.resolution_ns = resolution_ns;
+    report->collision = check;
+    mk_collision_pair pair{};
+    pair.object_a = object_a;
+    pair.object_b = object_b;
+    pair.segment_start = segment_start;
+    pair.segment_end = segment_end;
+    const uint32_t a = std::min<uint32_t>(name_a_length, MK_ASSUMPTION_LENGTH - 1);
+    const uint32_t b = std::min<uint32_t>(name_b_length, MK_ASSUMPTION_LENGTH - 1);
+    for (uint32_t i = 0; i < a; ++i) pair.name_a[i] = char(name_a[i]);
+    for (uint32_t i = 0; i < b; ++i) pair.name_b[i] = char(name_b[i]);
+    report->collision_pair = pair;
+    return MK_OK;
+}
+
 mk_result MK_CALL mk_report_set_task_space_bound(mk_validation_report *report,
     double upper_bound, double tolerance) {
     if (report == nullptr || report->struct_size < sizeof(mk_validation_report) ||

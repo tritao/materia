@@ -130,6 +130,20 @@ class StructuredJointPathPlanner implements JointPathPlanner {
       spans:path.s.length-1,queries:proof.queries,loweringTolerance:tolerance,maximumBodyDelta:proof.maximumDelta}));
     return true;
   }
+  public function proveMotion(trajectory:motionkit.trajectory.Trajectory, velocity:Array<Float>, events:Array<ClearanceEvent>,
+      depthLimit:Int):Null<TrajectoryClearanceProof> {
+    var world = clearance;
+    if (world == null) return null;
+    var guard = contactGuard;
+    var neighbourhood:Null<(Array<Float>, Float)->Bool> = guard == null ? null : (q:Array<Float>, reach:Float) -> {
+      var fk = group.tcpPose(q);
+      return guard(new motionkit.kinematics.Pose3(fk.translation.x, fk.translation.y, fk.translation.z,
+        fk.rotation.x, fk.rotation.y, fk.rotation.z, fk.rotation.w), reach);
+    };
+    return TrajectoryClearanceProof.run(world, trajectory, velocity, contact, contactPose == null ? null : contactAt,
+      neighbourhood, events, depthLimit);
+  }
+  public function clearanceWorld():Null<ClearanceWorld> return clearance;
   public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<ClearanceViolation>
     return clearance == null ? null : TrajectoryClearance.violation(clearance,trajectory,contact,0.01,contactPose == null ? null : contactAt);
   public function plan(path:PosePath,request:PathRequest,?pinStart:Bool,

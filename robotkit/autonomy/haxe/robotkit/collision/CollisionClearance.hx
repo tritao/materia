@@ -9,6 +9,8 @@ import collisionkit.CollisionViolation;
 import collisionkit.CollisionWorld;
 import robotkit.manipulation.ArmClearance;
 import robotkit.manipulation.ArmClearance.ClearanceBodyData;
+import robotkit.manipulation.ClearanceChange;
+import robotkit.manipulation.ClearanceScene;
 import robotkit.manipulation.ClearanceMotionBounds;
 import robotkit.manipulation.ClearanceMotionEnvelope;
 import robotkit.manipulation.ClearanceViolation;
@@ -32,8 +34,14 @@ import robotkit.tool.ConvexSolid;
  * and fixed tool bodies; with `contact`, a tool group against a fixed group
  * keeps `contactMargin`. Distances are reported as `ArmClearance` does: zero
  * when bodies touch or overlap.
+ *
+ * As a `ClearanceScene` it replays a program's changes (CL-D9): a hull can
+ * be attached to a link where it is (a grasp) and detached to the arm's root
+ * (a place), and a pair can get a margin of its own or be allowed to touch
+ * while a contact window is open. Each window pair gets two groups of its
+ * own, so the margins stay per group pair.
  */
-class CollisionClearance implements ClearanceWorld {
+class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   static inline var MOVING = 0;
   static inline var MOVING_TOOL = 1;
   static inline var FIXED = 2;
@@ -42,7 +50,7 @@ class CollisionClearance implements ClearanceWorld {
   public final arm:KinematicGroup;
   public final margin:Float;
   public final contactMargin:Float;
-  public final world:CollisionWorld;
+  public var world(default, null):CollisionWorld;
   final makeWorld:Void->CollisionWorld;
   final data:Array<ClearanceBodyData>;
   final reference:Array<Float>;
@@ -57,6 +65,10 @@ class CollisionClearance implements ClearanceWorld {
   final objects:Array<Int> = [];
   var checkedPairs = 0;
   final poses:Array<Float> = [];
+  /** The rule each checked-or-not pair was built with ("i\nj" -> reason, absent when checked). */
+  final baseRules = new Map<String, CollisionPairStatus>();
+  /** Open windows: their two hulls and margin (null: contact allowed). */
+  final windows:Array<{a:Int, b:Int, margin:Null<Float>}> = [];
 
   /** As `ArmClearance`'s constructor, with `makeWorld` giving an empty world (and another per `withGroup`). */
   public function new(arm:KinematicGroup, data:Array<ClearanceBodyData>, reference:Array<Float>, makeWorld:Void->CollisionWorld,
@@ -71,7 +83,25 @@ class CollisionClearance implements ClearanceWorld {
     this.makeWorld = makeWorld;
     this.margin = margin;
     this.contactMargin = contactMargin;
+    build();
+  }
+
+  /** The world as described by `data`, with no change applied. */
+  function build():Void {
     world = makeWorld();
+    names.resize(0);
+    bodyLinks.resize(0);
+    links.resize(0);
+    corners.resize(0);
+    moving.resize(0);
+    tool.resize(0);
+    linkOf.resize(0);
+    bodies.resize(0);
+    objects.resize(0);
+    poses.resize(0);
+    windows.resize(0);
+    baseRules.clear();
+    checkedPairs = 0;
     var movingLinks = new Map<LinkId, Bool>();
     for (body in data) {
       if (body.vertices == null || body.vertices.length < 12) throw 'Clearance body "${body.name}" needs a hull';
@@ -88,13 +118,96 @@ class CollisionClearance implements ClearanceWorld {
       corners.push(new ConvexSolid(body.vertices).cornerPoints());
       moving.push(isMoving);
       tool.push(body.tool);
-      var id = world.addBody(isMoving ? (body.tool ? MOVING_TOOL : MOVING) : (body.tool ? FIXED_TOOL : FIXED));
+      var id = world.addBody(roleOf(bodies.length));
       if (!isMoving) world.setBodyStatic(id, true);
       bodies.push(id);
       objects.push(world.add(id, CollisionPose.identity(), CollisionGeometry.Convex(corners[corners.length - 1])));
     }
     for (_ in 0...7 * bodies.length) poses.push(0.0);
     declarePairs();
+  }
+
+  public function reset():Void {
+    world.dispose();
+    build();
+  }
+
+  public function apply(change:ClearanceChange, q:Array<Float>):Void {
+    switch change {
+      case Attach(body, link):
+        move(hull(body), link, q);
+      case Detach(body):
+        move(hull(body), arm.rootLink, q);
+      case OpenWindow(a, b, margin):
+        var i = hull(a), j = hull(b);
+        for (window in windows) if (window.a == i || window.b == i || window.a == j || window.b == j)
+          throw 'Clearance window $a / $b overlaps an open window';
+        if (margin != null && !(margin >= 0.0)) throw 'Clearance window $a / $b needs a nonnegative margin';
+        windows.push({a: i, b: j, margin: margin});
+        regroup();
+        if (margin == null) world.setBodyRule(bodies[i], bodies[j], CollisionPairRule.Allow, CollisionPairStatus.ProcessContact);
+      case CloseWindow(a, b):
+        var i = hull(a), j = hull(b);
+        var found = -1;
+        for (k in 0...windows.length) if ((windows[k].a == i && windows[k].b == j) || (windows[k].a == j && windows[k].b == i)) found = k;
+        if (found < 0) throw 'No clearance window is open for $a / $b';
+        windows.splice(found, 1);
+        restoreRule(i, j);
+        regroup();
+    }
+  }
+
+  function hull(name:String):Int {
+    var index = names.indexOf(name);
+    if (index < 0) throw 'Clearance world has no body "$name"';
+    return index;
+  }
+
+  /** Moves hull `i` onto `link` where it is at `q`. */
+  function move(i:Int, link:LinkId, q:Array<Float>):Void {
+    var target = links.indexOf(link);
+    if (target < 0) {
+      target = links.length;
+      links.push(link);
+    }
+    var at = arm.linkPoses(q, links);
+    var inCell = placed(corners[i], at[linkOf[i]]);
+    corners[i] = placed(inCell, at[target].inverse());
+    bodyLinks[i] = link;
+    linkOf[i] = target;
+    moving[i] = arm.moves(link);
+    world.remove(objects[i]);
+    objects[i] = world.add(bodies[i], CollisionPose.identity(), CollisionGeometry.Convex(corners[i]));
+    world.setBodyStatic(bodies[i], !moving[i]);
+    // A moved hull is rigid with the hulls on its new link and checked against everything else.
+    for (j in 0...bodies.length) if (j != i) {
+      var rule = bodyLinks[j] == link ? CollisionPairStatus.Rigid : null;
+      var key = i < j ? '$i\n$j' : '$j\n$i';
+      if (rule == null) baseRules.remove(key) else baseRules.set(key, rule);
+      restoreRule(i, j);
+    }
+    regroup();
+  }
+
+  function restoreRule(i:Int, j:Int):Void {
+    var base = baseRules.get(i < j ? '$i\n$j' : '$j\n$i');
+    if (base == null) world.setBodyRule(bodies[i], bodies[j], CollisionPairRule.Default, CollisionPairStatus.Checked);
+    else world.setBodyRule(bodies[i], bodies[j], CollisionPairRule.Allow, base);
+  }
+
+  /** Every hull's group: its role, or its window's own. */
+  function regroup():Void {
+    for (i in 0...bodies.length) world.setBodyGroup(bodies[i], groupOf(i));
+  }
+
+  function roleOf(i:Int):Int return moving[i] ? (tool[i] ? MOVING_TOOL : MOVING) : (tool[i] ? FIXED_TOOL : FIXED);
+
+  function groupOf(i:Int):Int {
+    for (k in 0...windows.length) {
+      if (windows[k].a == i) return 4 + 2 * k;
+      if (windows[k].b == i) return 5 + 2 * k;
+    }
+    return roleOf(i);
   }
 
   /** `ArmClearance`'s pair rules: one link, both fixed, or neighbours touching at the reference are not checked. */
@@ -123,11 +236,13 @@ class CollisionClearance implements ClearanceWorld {
       if (!moving[i] && !moving[j]) continue;
       if (bodyLinks[i] == bodyLinks[j]) {
         world.setBodyRule(bodies[i], bodies[j], CollisionPairRule.Allow, CollisionPairStatus.Rigid);
+        baseRules.set('$i\n$j', CollisionPairStatus.Rigid);
         continue;
       }
       if (neighbours.exists(bodyLinks[i] + "\n" + bodyLinks[j])
           && touching(placed(corners[i], linkPoses[linkOf[i]]), placed(corners[j], linkPoses[linkOf[j]]))) {
         world.setBodyRule(bodies[i], bodies[j], CollisionPairRule.Allow, CollisionPairStatus.Adjacent);
+        baseRules.set('$i\n$j', CollisionPairStatus.Adjacent);
         continue;
       }
       checkedPairs++;
@@ -242,8 +357,23 @@ class CollisionClearance implements ClearanceWorld {
 
   function margins(contact:Bool, wanted:Null<Float>):CollisionMargins {
     var m = wanted == null ? margin : Math.min(margin, wanted);
-    var table = new CollisionMargins(4, m);
-    if (contact) for (t in [MOVING_TOOL, FIXED_TOOL]) for (f in [FIXED, FIXED_TOOL]) table.set(t, f, contactMargin);
+    var groups = 4 + 2 * windows.length;
+    var roles = [for (g in 0...4) g];
+    for (window in windows) {
+      roles.push(roleOf(window.a));
+      roles.push(roleOf(window.b));
+    }
+    var table = new CollisionMargins(groups, m);
+    if (contact) for (g in 0...groups) for (h in 0...groups) {
+      var toolG = roles[g] == MOVING_TOOL || roles[g] == FIXED_TOOL, toolH = roles[h] == MOVING_TOOL || roles[h] == FIXED_TOOL;
+      var fixedG = roles[g] == FIXED || roles[g] == FIXED_TOOL, fixedH = roles[h] == FIXED || roles[h] == FIXED_TOOL;
+      if ((toolG && fixedH) || (toolH && fixedG)) table.set(g, h, contactMargin);
+    }
+    for (k in 0...windows.length) {
+      var window = windows[k];
+      // An allowed pair is not checked; its groups keep the default for others.
+      if (window.margin != null) table.set(4 + 2 * k, 5 + 2 * k, window.margin);
+    }
     return table;
   }
 

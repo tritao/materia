@@ -49,6 +49,10 @@ class SelectedJointPathPlanner implements JointPathPlanner {
     return checking.checkPathClearance(path,tolerance);
   public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<ClearanceViolation>
     return checking.checkMotion(trajectory);
+  public function proveMotion(trajectory:motionkit.trajectory.Trajectory, velocity:Array<Float>, events:Array<ClearanceEvent>,
+      depthLimit:Int):Null<TrajectoryClearanceProof>
+    return checking.proveMotion(trajectory, velocity, events, depthLimit);
+  public function clearanceWorld():Null<robotkit.manipulation.ClearanceWorld> return checking.clearanceWorld();
   public function plan(path:PosePath,request:PathRequest,?pinStart:Bool,
       ?entryCheck:(Array<Float>,Array<Float>)->Null<ClearanceViolation>,
       ?exitCheck:Array<Float>->Null<ClearanceViolation>):JointPathSamples {

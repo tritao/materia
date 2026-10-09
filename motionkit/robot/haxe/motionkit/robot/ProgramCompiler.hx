@@ -1,6 +1,7 @@
 package motionkit.robot;
 
 import haxe.Int64;
+import TrajectoryCore;
 import motionkit.kinematics.Twist6;
 import motionkit.path.PosePrimitive;
 import motionkit.path.PoseDerivatives;
@@ -89,6 +90,15 @@ class ProgramCompiler {
   /** Process sections reject a time-law retry or stretch after refinement. */
   public var requireFeasiblePath:Null<Int->Bool> = null;
 
+  /**
+   * Changes to the cell during the program, per op (grasps, places, contact windows; COLLISION.md
+   * CL-D9). Validation replays them in time order through the planner's clearance world, which must
+   * then be a `ClearanceScene`.
+   */
+  public var clearanceEvents:Array<ClearanceEvent> = [];
+  /** How deep the conservative clearance check of a joint or generated move bisects (CL4b). */
+  public var clearanceDepthLimit:Int = 16;
+
   /** Preserve compiler limits/checks while timing an already selected route. */
   public function withJointPathPlanner(planner:JointPathPlanner):ProgramCompiler {
     if(planner==null)throw "A replacement joint path planner is required";
@@ -99,6 +109,7 @@ class ProgramCompiler {
     result.planCheck=planCheck==null?null:planCheck.fork();
     result.configurationConstraint=configurationConstraint;
     result.motorSpace=motorSpace;result.pathEventSchedule=pathEventSchedule;result.requireFeasiblePath=requireFeasiblePath;
+    result.clearanceEvents=clearanceEvents.copy();result.clearanceDepthLimit=clearanceDepthLimit;
     return result;
   }
 
@@ -122,6 +133,8 @@ class ProgramCompiler {
       new ConfigurationConstraint(forked,configurationConstraint.configuration);
     worker.motorSpace = motorSpace;
     worker.pathEventSchedule = pathEventSchedule;
+    worker.clearanceEvents = clearanceEvents.copy();
+    worker.clearanceDepthLimit = clearanceDepthLimit;
     return worker;
   }
 
@@ -254,6 +267,7 @@ class ProgramCompiler {
     if(program==null || initialQ==null || initialQ.length!=solver.jointCount())
       throw "Program compiler needs a program and complete start position";
     for(value in initialQ)if(!Math.isFinite(value))throw "Non-finite program start position";
+    resetClearanceScene();
     var compiler=this;
     if(program.configuration!=null){
       var pin:motionkit.kinematics.SixAxisConfiguration=cast program.configuration;
@@ -616,7 +630,9 @@ class ProgramCompiler {
         if(Std.isOfType(curve.clearanceProof,JointCurveClearance)){var proof:JointCurveClearance=cast curve.clearanceProof;
           proof.auditTrajectory(curve,pending.trajectory,pending.taskSampleDistances);}
       }
-      if (jointPathPlanner != null && (!pending.geometryClearance || Sys.getEnv("PROCESS_PATH_VERIFY_CLEARANCE")=="1")) {
+      // With changes to the cell in this op, the conservative check below replays them instead.
+      if (jointPathPlanner != null && (!pending.geometryClearance || Sys.getEnv("PROCESS_PATH_VERIFY_CLEARANCE")=="1") &&
+          !hasClearanceEvents(pending.opIndex)) {
         var failure = jointPathPlanner.checkMotion(projected == null ? pending.trajectory : projected);
         if (failure != null)
           throw 'compiled trajectory clearance (${failure.a}, ${failure.b}): ${failure.distance} < ${failure.required}';
@@ -651,6 +667,8 @@ class ProgramCompiler {
         queries:taskProof==null?0:taskProof.queries,positionBound:taskProof==null?null:taskProof.positionBound,
         orientationBound:taskProof==null?null:taskProof.orientationBound}));
       mark("taskSpaceCheck");
+      recordClearance(completedPlan, pending, projected == null ? pending.trajectory : projected);
+      mark("clearanceReport");
       var check = planCheck;
       if (check != null && check.checks()) {
         var result = check.check(completedPlan, pending.opIndex, pending.feed);
@@ -669,6 +687,92 @@ class ProgramCompiler {
       if (projected != null) projected.dispose();
       throw 'Motion program op ${pending.opIndex}: $error';
     }
+  }
+
+  function hasClearanceEvents(op:Int):Bool {
+    for (event in clearanceEvents) if (event.op == op) return true;
+    return false;
+  }
+
+  function resetClearanceScene():Void {
+    if (clearanceEvents.length == 0 || jointPathPlanner == null) return;
+    var world = jointPathPlanner.clearanceWorld();
+    if (world != null && Std.isOfType(world, robotkit.manipulation.ClearanceScene)) {
+      var scene:robotkit.manipulation.ClearanceScene = cast world;
+      scene.reset();
+    }
+  }
+
+  /**
+   * Records the clearance check in the plan's report (COLLISION.md CL4b). A refined process path
+   * certified by `JointCurveClearance` is a bound. Any other motion (a joint move, a generated
+   * entry, exit or hold) gets `TrajectoryClearanceProof`: a bound when it closes every interval,
+   * else sampled (the sampled check above passed) with the first open interval named; a real
+   * violation it finds between samples is recorded and throws. Without a clearance world the check
+   * stays unchecked.
+   */
+  function recordClearance(plan:ExecutionPlan, pending:PendingMotion, motion:Trajectory):Void {
+    var planner = jointPathPlanner;
+    if (planner == null) return;
+    var world = planner.clearanceWorld();
+    if (world == null) return;
+    var duration = motion.durationSeconds();
+    if (pending.geometryClearance) {
+      var closest:Null<robotkit.manipulation.ClearanceViolation> = null, when = 0.0;
+      for (i in 0...8) {
+        var t = duration * (i + 0.5) / 8, q = motion.evaluate(t).positions;
+        var found = world.closest(q, false);
+        if (found != null && (closest == null || found.distance < (cast closest : robotkit.manipulation.ClearanceViolation).distance)) {
+          closest = found;
+          when = t;
+        }
+      }
+      setClearance(plan, TrajectoryCoreConstants.MK_CHECK_PASSED, TrajectoryCoreConstants.MK_CHECK_METHOD_BOUND, closest, when,
+        0.0, duration);
+      return;
+    }
+    var events = [for (event in clearanceEvents) if (event.op == pending.opIndex) event];
+    var proof = planner.proveMotion(motion, velocityBounds(motion), events, clearanceDepthLimit);
+    if (proof == null) return;
+    var failure = proof.failure;
+    if (failure != null) {
+      setClearance(plan, TrajectoryCoreConstants.MK_CHECK_FAILED, TrajectoryCoreConstants.MK_CHECK_METHOD_BOUND, failure,
+        proof.failureTime, proof.failureTime, proof.failureTime);
+      throw 'trajectory clearance bound (${failure.a}, ${failure.b}): ${failure.distance} < ${failure.required} at ${proof.failureTime} s';
+    }
+    if (proof.closed)
+      setClearance(plan, TrajectoryCoreConstants.MK_CHECK_PASSED, TrajectoryCoreConstants.MK_CHECK_METHOD_BOUND, proof.closest,
+        proof.closestTime, 0.0, duration);
+    else
+      setClearance(plan, TrajectoryCoreConstants.MK_CHECK_PASSED, TrajectoryCoreConstants.MK_CHECK_METHOD_SAMPLED, proof.closest,
+        proof.closestTime, proof.openStart, proof.openEnd, Int64.ofInt(10000000));
+  }
+
+  static function setClearance(plan:ExecutionPlan, status:Int, method:Int, pair:Null<robotkit.manipulation.ClearanceViolation>,
+      time:Float, start:Float, end:Float, ?resolutionNs:Int64):Void {
+    var resolution = resolutionNs == null ? Int64.ofInt(0) : resolutionNs;
+    if (pair == null) plan.report.setCollision(status, method, 0.0, 0.0, time, start, end, resolution, "", "");
+    else plan.report.setCollision(status, method, pair.distance, pair.required, time, start, end, resolution, pair.a, pair.b);
+  }
+
+  /**
+   * Each joint's largest speed over the motion, bounded from its polynomials: on a segment of
+   * duration d, |p'(t)| <= sum over k of k |c_k| d^(k-1).
+   */
+  static function velocityBounds(motion:Trajectory):Array<Float> {
+    var bounds:Array<Float> = [];
+    for (segment in motion.segments()) {
+      var d = Int64.toFloat(segment.durationNs) / 1e9;
+      for (joint in 0...segment.coefficients.length) {
+        var c = segment.coefficients[joint], speed = 0.0, power = 1.0;
+        for (k in 1...c.length) {
+          speed += k * Math.abs(c[k]) * power;
+          power *= d;
+        }
+        if (joint >= bounds.length) bounds.push(speed) else bounds[joint] = Math.max(bounds[joint], speed);
+      }
+    }
+    return bounds;
   }
 
   /** Keep the follower polynomial exact after independent Hermite lowering. */

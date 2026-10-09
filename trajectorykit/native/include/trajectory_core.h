@@ -164,6 +164,21 @@ typedef struct mk_assumption {
     char text[MK_ASSUMPTION_LENGTH];
 } mk_assumption;
 
+/**
+ * The pair a clearance check names (COLLISION.md CL4b): the closest pair when
+ * it passed, the offending pair when it failed, or the first segment a
+ * conservative check could not close when it is sampled. Object ids are
+ * UINT32_MAX when the clearance world names bodies only.
+ */
+typedef struct mk_collision_pair {
+    uint32_t object_a;
+    uint32_t object_b;
+    double segment_start; /**< Seconds from the trajectory epoch; equal to segment_end for one instant. */
+    double segment_end;
+    char name_a[MK_ASSUMPTION_LENGTH];
+    char name_b[MK_ASSUMPTION_LENGTH];
+} mk_collision_pair;
+
 typedef struct mk_validation_report {
     uint32_t struct_size MK_STRUCT_SIZE;
     uint32_t assumption_count;
@@ -173,6 +188,16 @@ typedef struct mk_validation_report {
     mk_validation_check checks[MK_CHECK_COUNT];
     mk_assumption assumptions[MK_MAX_ASSUMPTIONS];
     uint64_t executor_time_resolution_ns; /**< Effective validation time resolution. */
+    /**
+     * Clearance against the cell (planner-owned, like task space; UNCHECKED
+     * without a clearance world). value is the distance, limit the
+     * clearance required, margin their difference; BOUND when a continuous
+     * motion bound closed every segment, SAMPLED otherwise. It is kept out
+     * of `checks` because mk_validate decides every check there except
+     * task space.
+     */
+    mk_validation_check collision;
+    mk_collision_pair collision_pair;
 } mk_validation_report;
 
 typedef struct mk_start_state {
@@ -276,6 +301,19 @@ TC_API mk_result MK_CALL mk_report_set_task_space(mk_validation_report *report,
  * peak time/resolution is claimed. The planner owns the geometric proof. */
 TC_API mk_result MK_CALL mk_report_set_task_space_bound(mk_validation_report *report,
     double upper_bound, double tolerance);
+/**
+ * Records the planner's clearance check: status (MK_CHECK_PASSED or
+ * MK_CHECK_FAILED), method (MK_CHECK_METHOD_BOUND or SAMPLED), the
+ * distance and required clearance, the time of the named pair (seconds), the
+ * segment (equal ends for an instant), the sampling resolution (zero for a
+ * bound), object ids (UINT32_MAX when unknown) and names (UTF-8, truncated to
+ * MK_ASSUMPTION_LENGTH - 1 bytes).
+ */
+TC_API mk_result MK_CALL mk_report_set_collision(mk_validation_report *report,
+    uint32_t status, uint32_t method, double distance, double required, double time_seconds,
+    double segment_start, double segment_end, uint64_t resolution_ns, uint32_t object_a, uint32_t object_b,
+    const uint8_t *name_a MK_IN_ARRAY(name_a_length), uint32_t name_a_length,
+    const uint8_t *name_b MK_IN_ARRAY(name_b_length), uint32_t name_b_length);
 /** Deep-copies the trajectory and refuses any failed validation check. */
 TC_API mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory,
     const mk_plan_spec *spec, const mk_limits *limits,
