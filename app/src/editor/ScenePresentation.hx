@@ -33,6 +33,9 @@ class ScenePresentation {
   public var renderNeedsRefresh:Bool = false;
   public var selectionMaterial:Material;
   public var hoverMaterial:Material;
+  /** Objects in collision, and objects nearer than the near distance (COLLISION.md CL8b). */
+  public var collidingMaterial:Material;
+  public var nearMaterial:Material;
   public final faceHoverNodes:Map<String, NodeId> = new Map();
   public final faceHoverGeometries:Map<String, Geometry> = new Map();
   public final faceHoverIndexes:Map<String, Int> = new Map();
@@ -155,8 +158,25 @@ class ScenePresentation {
   }
 
   public function configureRenderView(owner:EditorScene, view:SceneView, viewProjection:Transform,
-      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1):SceneView {
+      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1,
+      ?collisions:Array<app.SceneCollision.SceneCollisionPair>):SceneView {
     view.setViewProjection(viewProjection);
+    if (collisions != null) {
+      // Red for objects in a colliding pair, amber for objects only near; the selection and the hovered
+      // object keep their own highlight.
+      var colliding = new Map<String, Bool>();
+      for (pair in collisions) {
+        if (pair.colliding()) { colliding.set(pair.a, true); colliding.set(pair.b, true); }
+        else {
+          if (!colliding.exists(pair.a)) colliding.set(pair.a, false);
+          if (!colliding.exists(pair.b)) colliding.set(pair.b, false);
+        }
+      }
+      for (id in colliding.keys()) if (id != owner.selectedId && id != hoveredId) {
+        var runtime = bridge.runtime(id);
+        if (runtime != null) view.setMaterial(runtime.node, colliding.get(id) == true ? collidingMaterial : nearMaterial);
+      }
+    }
     var selected = owner.object(owner.selectedId);
     var selection = new SelectionSet();
     if (selected != null) {

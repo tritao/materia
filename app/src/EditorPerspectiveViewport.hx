@@ -32,6 +32,9 @@ import haxeon.ui.semantics.Semantics;
 
 /** Interactive SceneKit GPU viewport composited into the editor UI. */
 class EditorPerspectiveViewport implements View {
+  /** The closest pairs drawn in the viewport; the toolbar counts all of them. */
+  static inline var MAX_DRAWN_COLLISIONS:Int = 16;
+
   public final key:String;
   final scene:EditorScene;
   final host:UiHostContext;
@@ -44,6 +47,10 @@ class EditorPerspectiveViewport implements View {
   var renderedCameraRevision:Int = -1;
   var renderedLightingRevision:Int = -1;
   var renderedHoverRevision:Int = -1;
+  /** The scene's colliding and near pairs (COLLISION.md CL8b), drawn while editing. */
+  var collisionPairs:Array<SceneCollision.SceneCollisionPair> = [];
+  var collisionRevision:Int = 0;
+  var renderedCollisionRevision:Int = -1;
   var lightingRevision:Int = 0;
   var lightingPreset:Int = 0;
   var renderCount:Int = 0;
@@ -133,7 +140,7 @@ class EditorPerspectiveViewport implements View {
   public function presentationKey():String
     return scene.visualRevision + ":" + camera.revision + ":" + lightingRevision + ":" + sketchDragRevision + ":" +
       assemblyDragRevision + ":" + matePickRevision + ":" +
-      hoverRevision + ":orbit:" + orbiting() + ":" + gridVisible + ":" + gridStep + ":" + sampleCountRequested;
+      hoverRevision + ":orbit:" + orbiting() + ":" + gridVisible + ":" + gridStep + ":" + sampleCountRequested + ":" + collisionRevision;
 
   public function setLightingPreset(preset:Int):Void {
     if (preset < 0 || preset > 2 || preset == lightingPreset) return;
@@ -152,7 +159,8 @@ class EditorPerspectiveViewport implements View {
         sketchDragRevision + ":" + assemblyDragRevision + ":hover:" + hoverRevision + ":" + camera.revision +
         ":orbit:" + orbiting() +
         ":light:" + lightingRevision + ":aa:" + sampleCountRequested + ":" +
-        renderedWidth + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep);
+        renderedWidth + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep +
+        ":collisions:" + collisionRevision);
       installNavigation(node);
       return node;
     });
@@ -168,11 +176,13 @@ class EditorPerspectiveViewport implements View {
         renderedLightingRevision != lightingRevision ||
         renderedSampleCount != sampleCountRequested ||
         renderedHoverRevision != hoverRevision ||
+        renderedCollisionRevision != collisionRevision ||
         width != renderedWidth || height != renderedHeight)) {
       var started = Sys.time();
       fitCameraClipRange();
       var view = scene.configureRenderView(new SceneView(), camera.viewProjection(width / height),
-        simulationActive ? simulationPoses : null, hoveredObjectId, hoveredFaceIndex);
+        simulationActive ? simulationPoses : null, hoveredObjectId, hoveredFaceIndex,
+        simulationActive ? null : collisionPairs);
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
       if (gridVisible && gridStep > 0.0) {
         var scale = Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360.0);
@@ -215,6 +225,7 @@ class EditorPerspectiveViewport implements View {
       renderedLightingRevision = lightingRevision;
       renderedSampleCount = sampleCountRequested;
       renderedHoverRevision = hoverRevision;
+      renderedCollisionRevision = collisionRevision;
       renderedWidth = width;
       renderedHeight = height;
       lastRenderSeconds = Sys.time() - started;
@@ -229,6 +240,7 @@ class EditorPerspectiveViewport implements View {
     if (surface != null) canvas.drawSurface(surface, new Rect(0, 0, geometry.width, geometry.height));
     paintSensors(canvas,geometry.width,geometry.height);
     if(simulationActive)missionOverlay.paint(canvas,camera,geometry.width,geometry.height);
+    if (!simulationActive) paintCollisions(canvas, geometry.width, geometry.height);
     paintAssemblyDrag(canvas, geometry.width, geometry.height);
     paintSketchDraft(canvas, geometry.width, geometry.height);
     paintOrbitPivot(canvas, geometry.width, geometry.height);
@@ -357,6 +369,32 @@ class EditorPerspectiveViewport implements View {
   /** What the running mission shows on the floor: its route, costmap, sensed obstacles and odometry; null shows none. */
   /** Whether sensor rays (and, through `setMissionOverlay`, the mission's overlays) are drawn. */
   public function setSimulationOverlays(visible:Bool):Void overlaysVisible = visible;
+
+  /** The pairs to tint and draw; an unchanged query result keeps the rendered image. */
+  public function setCollisions(pairs:Array<SceneCollision.SceneCollisionPair>):Void {
+    if (pairs == collisionPairs) return;
+    collisionPairs = pairs;
+    collisionRevision++;
+  }
+
+  public function collisionPairCount():Int return collisionPairs.length;
+
+  /** The closest pairs' closest points, joined: red where they collide, amber where they are only near. */
+  function paintCollisions(canvas:Canvas, width:Float, height:Float):Void {
+    for (index in 0...Std.int(Math.min(MAX_DRAWN_COLLISIONS, collisionPairs.length))) {
+      var pair = collisionPairs[index], a = pair.pointA, b = pair.pointB;
+      var color = pair.colliding() ? Color.rgba(0.95, 0.2, 0.18, 0.95) : Color.rgba(1.0, 0.66, 0.18, 0.95);
+      for (point in [a, b]) {
+        var at = camera.project(point[0], point[1], point[2], width, height);
+        if (at != null) canvas.fillRect(new Rect(at.x - 3, at.y - 3, 6, 6), color);
+      }
+      var segment = camera.projectSegment(a[0], a[1], a[2], b[0], b[1], b[2], width, height);
+      if (segment == null) continue;
+      var path = new PathBuilder();
+      path.moveTo(segment[0].x, segment[0].y).lineTo(segment[1].x, segment[1].y);
+      canvas.strokeTransient(path.build(), color, 2.0);
+    }
+  }
   public function setMissionOverlay(overlay:Null<MissionOverlay>):Void missionOverlay.set(overlay);
   public function editingEnabled():Bool return !simulationActive;
 

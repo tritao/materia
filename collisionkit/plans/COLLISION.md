@@ -1540,3 +1540,35 @@ Done as planned, with these choices:
   clear stow); the PP8 runner's gantry and robot welders, whose quality
   records are identical to PP10's.
 
+### CL8b: showing it (2026-10-09)
+
+- While editing, the viewport tints objects in a colliding pair red and
+  objects only near amber. These are `SceneView.setMaterial` overrides in
+  each render view, nothing persistent; the selected and hovered objects
+  keep their own highlight.
+- It joins the closest points of the 16 closest pairs, with marks at both
+  ends.
+- The viewport toolbar says what was found, for example
+  "1 collision, 1 near · Hand / Pedestal 31 mm deep".
+  - **Change from the plan:** the distance is on that line, not beside each
+    drawn line, because the viewport has no text drawing (`Canvas.drawText`
+    needs a `TextLayout`, which no overlay uses yet).
+- **Settings:** `editors/3d/collision/show` (on by default) and
+  `editors/3d/collision/near_mm` (10 mm) are in the Editor Settings dialog.
+  `scene.toggle-collisions` is in the viewport options menu.
+- While a simulation runs nothing is shown (CL8c).
+- **Cost:** the viewport repaints only when the query result changes. On the
+  generated arm (38 objects), a drag step's joint edit plus query takes about
+  0.7–0.9 ms after main's allocation work (rebased onto 1b952cd54). Before
+  that work it was 37 ms for the edit and about 3 ms more for the query.
+- **Tests (`SceneCollisionTests`):**
+  - the tints: all four objects in a colliding pair and a near pair, the
+    selected one left out, none without pairs;
+  - the toolbar line;
+  - the viewport's repaint key changes with new pairs and not with the same
+    result;
+  - in a headless editor: the setting off shows nothing, the command turns it
+    back on, and a 0 mm near distance shows only collisions.
+- **Suites:** the app suite; the project-source `scene-collision` check; the
+  web build (438 guest imports bound).
+

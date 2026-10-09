@@ -611,6 +611,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final logLengths:Array<Int> = [];
   var gridVisible:Bool;
   var simulationOverlaysVisible:Bool = true;
+  /** COLLISION.md CL8b: the scene's collision world, its settings, and the toolbar's summary of what it found. */
+  var collisionsVisible:Bool = true;
+  var collisionNearMillimetres:Float = 10.0;
+  var sceneCollision:Null<SceneCollision> = null;
+  var collisionSummary:Null<String> = null;
   var gridSnapEnabled:Bool;
   var gridSpacing:Float;
   /** The viewport's lighting preset number, from the saved setting. */
@@ -933,6 +938,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast"]);
       optionIds = optionIds.concat([
         "scene.antialiasing-off", "scene.antialiasing-2x", "scene.antialiasing-4x"]);
+      optionIds.push("scene.toggle-collisions");
       var options = new CommandMenu("viewport-options-menu", optionIds,
         viewportOptionsX, viewportOptionsY, commands, ui.commandContext,
         function() { viewportOptionsVisible = false; invalidateView(); },
@@ -1174,6 +1180,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function dispose():Void {
     missionController.cancel();
     if (projectUiExtension != null) projectUiExtension.dispose();
+    if (sceneCollision != null) sceneCollision.dispose();
+    sceneCollision = null;
     var saveError = workspaceSaves.close();
     if (saveError != null) log("Workspace save failed: " + saveError);
     simulation.dispose();
@@ -1615,7 +1623,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
         // perspectivePanel() pushes grid and simulation settings into the viewport, so a hit may only skip it when
         // none of its inputs changed: this key includes the current simulation presentation.
         function() return perspectiveRevisionKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible +
-          ":viewportPresentation=" + (perspectiveViewport == null ? "" : perspectiveViewport.presentationKey())),
+          ":viewportPresentation=" + (perspectiveViewport == null ? "" : perspectiveViewport.presentationKey()) +
+          ":collisions=" + collisionsVisible + "/" + collisionNearMillimetres),
       new DockPanelContent("inspector", function(_) return inspectorPanel(), null,
         function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
           ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive() +
@@ -1690,6 +1699,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var store = preferences.store;
     gridVisible = store.getBool(AppSettings.GRID_VISIBLE);
     simulationOverlaysVisible = store.getBool(AppSettings.SIMULATION_OVERLAYS);
+    collisionsVisible = store.getBool(AppSettings.COLLISIONS_VISIBLE);
+    collisionNearMillimetres = store.getFloat(AppSettings.COLLISION_NEAR);
     gridSnapEnabled = store.getBool(AppSettings.GRID_SNAP);
     gridSpacing = store.getFloat(AppSettings.GRID_SPACING);
     lightingPreset = Std.int(Math.max(0, AppSettings.LIGHTING_PRESETS.indexOf(store.getString(AppSettings.LIGHTING))));
@@ -1822,6 +1833,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (dragMessage != null)
       controls.push(new KeyedView("assembly-drag-status", new Text(dragMessage, null,
         appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
+    else if (collisionSummary != null)
+      controls.push(new KeyedView("collision-status", new Text(collisionSummary, null,
+        appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
     var barStyle = new LayoutStyle();
     barStyle.width = LayoutAxis.grow();
     barStyle.height = LayoutAxis.fixed(38.0);
@@ -1896,6 +1910,28 @@ class ReferenceEditorApp implements DesktopUiApplication {
       ? new Rect(event.x, event.y, 0.0, 0.0) : node.resolved.clippedViewportBounds();
   }
 
+  /**
+   * The scene's colliding and near pairs while editing (COLLISION.md CL8b), and the toolbar's summary;
+   * none while a simulation runs or the setting is off. The world answers once per scene revision.
+   */
+  function editingCollisions():Array<SceneCollision.SceneCollisionPair> {
+    collisionSummary = null;
+    if (!collisionsVisible || simulation.isActive()) return [];
+    var collision = sceneCollision;
+    if (collision == null) sceneCollision = collision = new SceneCollision(() -> new collisionkit.native.NativeCollisionWorld());
+    var pairs:Array<SceneCollision.SceneCollisionPair>;
+    try pairs = collision.query(scene, session, collisionNearMillimetres / 1000.0)
+    catch (error:Dynamic) {
+      collisionSummary = "Collisions unavailable: " + Std.string(error);
+      return [];
+    }
+    collisionSummary = SceneCollision.summary(pairs, function(id) {
+      var item = scene.object(id);
+      return item == null ? id : item.label;
+    });
+    return pairs;
+  }
+
   function perspectivePanel(availableWidth:Float = 0.0):View {
     if (perspectiveViewport != null) {
       perspectiveViewport.setPlacementOptions(gridSnapEnabled, gridSpacing, gridVisible);
@@ -1904,6 +1940,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         frame == null ? 0 : frame.revision,frame == null ? [] : frame.robots);
       var mission = simulation.missionPlayer();
       perspectiveViewport.setSimulationOverlays(simulationOverlaysVisible);
+      perspectiveViewport.setCollisions(editingCollisions());
       perspectiveViewport.setMissionOverlay(mission == null || !simulation.isActive() || !simulationOverlaysVisible ? null : mission.overlay());
     }
     return perspectiveViewport == null

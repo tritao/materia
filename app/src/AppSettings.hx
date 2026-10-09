@@ -23,6 +23,10 @@ class AppSettings {
 
   /** Whether a running simulation draws its robots' sensor rays and mission overlays (route, costmap, odometry). */
   public static inline var SIMULATION_OVERLAYS:String = "editors/3d/simulation/show_overlays";
+  /** Whether the viewport tints and joins objects that collide or come near while editing (COLLISION.md CL8b). */
+  public static inline var COLLISIONS_VISIBLE:String = "editors/3d/collision/show";
+  /** How close two objects count as near, in millimetres. */
+  public static inline var COLLISION_NEAR:String = "editors/3d/collision/near_mm";
 
   public static final LIGHTING_PRESETS:Array<String> = haxeon.editor.ViewportLook.PresetNames;
 
@@ -61,6 +65,18 @@ class AppSettings {
     overlays.label = "Show Simulation Overlays";
     overlays.tooltip = "Draw lidar rays, and a mission's route, costmap, sensed obstacles and odometry, while a simulation runs.";
     registry.define(SIMULATION_OVERLAYS, PropertyType.Bool, PropertyValue.Bool(true), overlays);
+    var collisions = new SettingOptions();
+    collisions.label = "Show Collisions";
+    collisions.tooltip = "While editing, tint objects that collide red and objects nearer than the near distance amber, and join their closest points.";
+    registry.define(COLLISIONS_VISIBLE, PropertyType.Bool, PropertyValue.Bool(true), collisions);
+    var near = new SettingOptions();
+    near.label = "Near Distance";
+    near.tooltip = "Objects closer than this are shown as near.";
+    near.minimum = 0.0;
+    near.maximum = 1000.0;
+    near.step = 1.0;
+    near.unit = "mm";
+    registry.define(COLLISION_NEAR, PropertyType.Float, PropertyValue.Float(10.0), near);
     var snap = new SettingOptions();
     snap.tooltip = "Round dragged and placed objects to the grid spacing.";
     registry.define(GRID_SNAP, PropertyType.Bool, PropertyValue.Bool(false), snap);

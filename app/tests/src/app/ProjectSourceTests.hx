@@ -2874,6 +2874,16 @@ class ProjectSourceTests {
     editor.session.setAssemblyJointCoordinate("j3", 0.0);
     check(colliding().length == 0, "back at zero, nothing collides");
     check(collision.builds == 1, 'jogging only re-poses the world (${collision.builds} builds)');
+    // What a drag costs per frame: one joint edit and one query.
+    var started = Sys.time();
+    for (step in 0...50) {
+      editor.session.setAssemblyJointCoordinate("j1", step * 0.01);
+      collision.query(editor.scene, editor.session, 0.01);
+    }
+    var queryStarted = Sys.time();
+    for (step in 0...50) editor.session.setAssemblyJointCoordinate("j1", step * 0.01);
+    var editSeconds = (Sys.time() - queryStarted) / 50, totalSeconds = (queryStarted - started) / 50;
+    Sys.println('SCENE_COLLISION_COST ${editor.scene.items().length} objects: edit+query ${Math.round(totalSeconds * 1e5) / 100} ms, edit alone ${Math.round(editSeconds * 1e5) / 100} ms');
     Sys.println("Scene collision on the generated arm passed");
     collision.dispose();
     editor.dispose();

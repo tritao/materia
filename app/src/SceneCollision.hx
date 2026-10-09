@@ -84,6 +84,22 @@ class SceneCollision {
     return queried;
   }
 
+  /**
+   * The toolbar's line for `pairs`: how many collide and how many are near, and the closest pair by
+   * name with its depth or gap in millimetres; null when there are none.
+   */
+  public static function summary(pairs:Array<SceneCollisionPair>, name:String->String):Null<String> {
+    if (pairs.length == 0) return null;
+    var colliding = [for (pair in pairs) if (pair.colliding()) pair].length, near = pairs.length - colliding;
+    var counts:Array<String> = [];
+    if (colliding > 0) counts.push(colliding + (colliding == 1 ? " collision" : " collisions"));
+    if (near > 0) counts.push(near + " near");
+    var closest = pairs[0];
+    var millimetres = Math.round(Math.abs(closest.distance) * 10000.0) / 10.0;
+    return counts.join(", ") + " · " + name(closest.a) + " / " + name(closest.b) + " " + millimetres +
+      (closest.colliding() ? " mm deep" : " mm apart");
+  }
+
   public function dispose():Void {
     if (world != null) world.dispose();
     world = null;
