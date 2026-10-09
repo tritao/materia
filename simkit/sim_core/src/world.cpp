@@ -800,6 +800,26 @@ nksim_result World::create_contact_pair(const nksim_contact_pair_desc &desc) {
     return backend->contact_pair_create(pair);
 }
 
+nksim_result World::set_exclusions(const nksim_body *handles, uint32_t body_count, const uint32_t *pairs,
+                                   uint32_t pair_count) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if ((body_count && !handles) || (pair_count && !pairs) || pair_count % 2 != 0) return NKSIM_ERROR_INVALID_ARGUMENT;
+    std::vector<std::uint64_t> backend_bodies;
+    for (uint32_t index = 0; index < body_count; ++index) {
+        const auto *body = bodies.get(handles[index]);
+        if (!body) return NKSIM_ERROR_INVALID_HANDLE;
+        backend_bodies.push_back(body->backend_body);
+    }
+    std::vector<std::pair<std::uint64_t, std::uint64_t>> excluded;
+    for (uint32_t index = 0; index < pair_count; index += 2) {
+        if (pairs[index] >= body_count || pairs[index + 1] >= body_count || pairs[index] == pairs[index + 1])
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        const auto a = backend_bodies[pairs[index]], b = backend_bodies[pairs[index + 1]];
+        excluded.emplace_back(std::min(a, b), std::max(a, b));
+    }
+    return backend->exclusions_set(backend_bodies, excluded);
+}
+
 nksim_result World::destroy_shape(nksim_shape shape) {
     if (!owns_thread())
         return NKSIM_ERROR_WRONG_THREAD;

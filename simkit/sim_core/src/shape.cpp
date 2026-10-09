@@ -77,6 +77,13 @@ nksim_result NKSIM_CALL nksim_contact_pair_create(nksim_world world,
     return value ? value->create_contact_pair(*desc) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
+nksim_result NKSIM_CALL nksim_world_set_exclusions(nksim_world world, const nksim_body *bodies,
+                                                   uint32_t body_count, const uint32_t *pairs,
+                                                   uint32_t pair_count) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->set_exclusions(bodies, body_count, pairs, pair_count) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
 nksim_result NKSIM_CALL nksim_shape_create_sphere(nksim_world world, double radius,
                                                   nksim_shape *out_shape) {
     if (!out_shape || !std::isfinite(radius) || radius <= 0.0)

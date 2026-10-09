@@ -212,6 +212,65 @@ class RobotCollision {
     }];
   }
 
+  /**
+   * The robot's link pairs the simulation should exclude (COLLISION.md CL3b,
+   * CL-D10): link index pairs (two per pair) between which some object pair
+   * is allowed in the built world (or that carry no objects), the tool
+   * counting as its flange link. Passed to `Simulation.addRobotAtPose
+   * (linkExcludes)`, the simulation excludes these pairs instead of computing
+   * its own. Excludes are per link, rules per object: a link pair with one
+   * allowed object pair is excluded whole, so the simulation may exclude
+   * more than the clearance world, never fewer (CL-D10).
+   */
+  public static function simulationExcludes(description:CollisionDescription, build:collisionkit.CollisionBuild,
+      robot:RobotCollisionBodies):Array<Int> {
+    var links = robot.model.bodyCount();
+    var objectsOf = [for (_ in 0...links) new Array<Int>()];
+    for (index in 0...description.objects.length) {
+      var link = linkOf(robot, description.objects[index].body);
+      if (link >= 0) objectsOf[link].push(build.objects[index]);
+    }
+    var pairs:Array<Int> = [];
+    for (a in 0...links) for (b in a + 1...links) {
+      var allowed = objectsOf[a].length == 0 || objectsOf[b].length == 0;
+      for (x in objectsOf[a]) for (y in objectsOf[b]) if (!allowed && build.world.pairStatus(x, y) != CollisionPairStatus.Checked)
+        allowed = true;
+      if (allowed) {
+        pairs.push(a);
+        pairs.push(b);
+      }
+    }
+    return pairs;
+  }
+
+  /** The robot link (model body) of a described body, a follower (the tool) counting as the link it follows, or -1. */
+  static function linkOf(robot:RobotCollisionBodies, body:Int):Int {
+    var link = robot.bodies.bodies.indexOf(body);
+    if (link >= 0) return link;
+    var follower = robot.bodies.followers.indexOf(body);
+    return follower >= 0 ? robot.bodies.followed[follower] : -1;
+  }
+
+  /**
+   * Every convex object on the robot's links in `description` (link hulls,
+   * CAD hulls, decomposed pieces; the tool's hulls are given to the
+   * simulation as its tool shape instead), for `Simulation.addRobotAtPose
+   * (linkHulls)`. Their inflation is not carried: MuJoCo has no swept-sphere
+   * radius, so the simulation's pieces are the uninflated ones.
+   */
+  public static function simulationHulls(description:CollisionDescription, robot:RobotCollisionBodies):Array<RobotLinkHull> {
+    var hulls:Array<RobotLinkHull> = [];
+    for (object in description.objects) {
+      var link = robot.bodies.bodies.indexOf(object.body);
+      if (link < 0) continue;
+      switch object.geometry {
+        case Convex(points): hulls.push(new RobotLinkHull(link, object.name, points));
+        case _:
+      }
+    }
+    return hulls;
+  }
+
   static function zeroWithinLimits(model:KinematicModel):Array<Float>
     return [for (dof in 0...model.dofCount()) Math.min(Math.max(0.0, model.dofLower[dof]), model.dofUpper[dof])];
 

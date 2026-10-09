@@ -19,8 +19,16 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	const RK_LINK_SHAPE_SPHERE = 2;
 	const RK_MAX_CONTACT_PAIRS = 128;
+	const RK_MAX_LINK_EXCLUDES = 4096;
 	const RK_MAX_LINK_HULLS = 512;
 	const RK_MAX_LINK_SHAPES = 256;
+	/**
+	 * The robot's links exclude exactly link_excludes from colliding with
+	 * each other, instead of SimKit's own rule (parent and child, or
+	 * overlapping at rest): a collision description's allowed pairs, so the
+	 * simulation and clearance checks agree (collisionkit COLLISION.md CL3b).
+	 */
+	const RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES = 2;
 	/**
 	 * Joints hold the robot's designed pose from the start, as servos enabled at power-on do, until
 	 * a command targets them; a reset holds them there again. Coupled followers follow their leader.
@@ -511,7 +519,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
 	}
-	struct rk_simulation_robot_desc @layout(2521536, 8) {
+	struct rk_simulation_robot_desc @layout(2554312, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		flags: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -620,6 +628,11 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		virtual_device_feedback_joint: array<u8, 64> @offset(2520444);
 		virtual_device_feedback_ratio: array<f64, 64> @offset(2520512);
 		virtual_device_feedback_offset: array<f64, 64> @offset(2521024);
+		/**
+		 * Appended tail: link index pairs that never collide, used with RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES.
+		 */
+		link_exclude_count: u32 @offset(2521536);
+		link_excludes: array<u32, 8192> @offset(2521540);
 	}
 	/**
 	 * World-frame twist of one body: metres per second and radians per second.

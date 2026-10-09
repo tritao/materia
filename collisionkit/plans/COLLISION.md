@@ -512,7 +512,8 @@ Each step is its own commit with all suites green.
     CL4a can compare the two worlds on the same scenes.
   - Out of scope here: loading URDF `<mesh>` files. They stay references
     until a mesh importer exists.
-- **CL3b — One collision description shared with SimKit.**
+- **CL3b — One collision description shared with SimKit.** Done, see the
+  progress log.
   - The cell's description (shapes per body, allowed pairs with their
     reasons) is consumed by both the coal world and the SimKit session.
   - MuJoCo gets the exclusions as excludes instead of recomputing them
@@ -1235,3 +1236,49 @@ Done as planned, with these choices:
   passed (5433); weld planning passed (609); processkit's full suite
   passed; parity passed (4184); clearance validation passed (23);
   MotionKit passed (1224712).
+
+### CL3b — One collision description shared with SimKit (2026-10-09)
+
+- **SimKit:** `nksim_world_set_exclusions` declares exactly which pairs of
+  an articulation's bodies never collide; the MuJoCo backend then skips its
+  own rule (parent and child, or overlapping at rest) for pairs within the
+  declared set, and keeps it for every other pair. It is C-only (behind
+  `NKSIM_HAXEON_IMPORT`, as SimKit's other C-only calls): handle arrays do
+  not cross haxeon's FFI, and RobotKit's runtime is the caller. The
+  committed SimKit bindings were already behind main's header in unrelated
+  places; they are left as they are.
+- **RobotKit:** `rk_simulation_robot_desc` gains an appended tail
+  (`link_exclude_count`, `link_excludes`, up to 4096 pairs) and the flag
+  `RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES`; the runtime passes them to SimKit
+  for the robot's link bodies. `Simulation.addRobotAtPose` takes
+  `linkExcludes` (link index pairs). Without it nothing changes.
+- **From the description:** `RobotCollision.simulationExcludes(description,
+  build, robot)` gives the link pairs to exclude: those with some object
+  pair allowed in the built world (or carrying no objects), the tool
+  counting as its flange link. Excludes are per link and rules per object,
+  so a link pair with one allowed object pair is excluded whole: the
+  simulation may exclude more, never fewer (CL-D10).
+  `RobotCollision.simulationHulls` gives the description's convex objects
+  on links (link hulls, CAD hulls, decomposed pieces) as the simulation's
+  link hulls, without inflation (MuJoCo has no swept-sphere radius).
+- **Test** (`robotkit/tests/collision-mujoco`, MuJoCo backend, 59
+  assertions): an arm with link boxes and a hull, and two environment
+  boxes, in one description. Folded back, the forearm reaches over the
+  base: SimKit's own rule excludes that pair (its bounding-radius test
+  calls them overlapping at rest), while the description checks it; with
+  the shared excludes MuJoCo reports the contact, and coal does too. Over
+  60 sampled configurations (a fresh simulation each, one step), every one
+  of 52 MuJoCo contacts is a coal collision.
+- **Worktree setup:** the MuJoCo native build (`robotd/native-mujoco`)
+  needs haxeon's nested NativeKit submodules `libwebsockets` and `sokol`;
+  they were cloned from the main checkout.
+- **Not here:** RobotKit's other simulation paths (the app's
+  `AssemblyRobot`, `MissionPlayer`) do not yet build a description; they
+  keep SimKit's own rule until they do.
+- **Suites:** collisionkit standalone C++ 3 of 3; MotionKit standalone C++
+  16 of 16; collisionkit native passed (364); cell tests passed (30); native
+  kit passed (695); pure kit only main's known DLS failure; RobotKit passed
+  (5433); weld planning passed (609); processkit's full suite passed;
+  parity passed (4184); clearance validation passed (23); the new MuJoCo
+  cross-check passed (59); CadBridge's MuJoCo cup and vacuum test passed
+  (the backend changed under it); MotionKit passed (1224712).
