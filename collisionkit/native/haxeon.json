@@ -18,10 +18,13 @@
 				"CMakeLists.txt",
 				"include/collisionkit.h",
 				"src/api.cpp",
+				"src/decompose.cpp",
+				"src/decompose.hpp",
 				"src/world.cpp",
 				"src/world.hpp",
 				"src/handles.hpp",
-				"vendor/coal/materia/CMakeLists.txt"
+				"vendor/coal/materia/CMakeLists.txt",
+				"vendor/v-hacd/include/VHACD.h"
 			]
 		}
 	},

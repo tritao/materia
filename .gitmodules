@@ -73,3 +73,6 @@
 [submodule "motionkit/native/vendor/eaik"]
 	path = motionkit/native/vendor/eaik
 	url = https://github.com/OstermD/EAIK.git
+[submodule "collisionkit/native/vendor/v-hacd"]
+	path = collisionkit/native/vendor/v-hacd
+	url = https://github.com/kmammou/v-hacd.git

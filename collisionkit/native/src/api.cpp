@@ -1,4 +1,5 @@
 #include "collisionkit.h"
+#include "decompose.hpp"
 #include "handles.hpp"
 #include "world.hpp"
 
@@ -17,6 +18,7 @@ using ck::World;
 namespace {
 
 ck::Handles<World> worlds;
+ck::Handles<ck::Decomposition> decompositions;
 
 bool finite(const double *values, uint32_t count) {
     for (uint32_t i = 0; i < count; ++i)
@@ -528,4 +530,64 @@ CK_API ck_result CK_CALL ck_violation_batch(ck_world_handle handle, const double
         }
         return CK_OK;
     });
+}
+
+CK_API ck_result CK_CALL ck_decompose(const double *vertices, uint32_t vertex_count, const int32_t *indices,
+                                      uint32_t index_count, uint32_t max_pieces, uint32_t resolution,
+                                      uint32_t max_piece_vertices, double sample_spacing,
+                                      ck_decomposition_handle *out_decomposition) {
+    if (!out_decomposition) return CK_ERROR_INVALID_ARGUMENT;
+    out_decomposition->id = 0;
+    if (!vertices || !indices || vertex_count < 12 || vertex_count % 3 != 0 || index_count < 12 ||
+        index_count % 3 != 0 || !finite(vertices, vertex_count) || max_pieces == 0 || resolution < 1000 ||
+        max_piece_vertices < 4 || max_piece_vertices > 64 || !std::isfinite(sample_spacing) || sample_spacing < 0.0)
+        return CK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t i = 0; i < index_count; ++i)
+        if (indices[i] < 0 || uint32_t(indices[i]) >= vertex_count / 3) return CK_ERROR_INVALID_ARGUMENT;
+    try {
+        auto result = std::make_unique<ck::Decomposition>();
+        ck::DecomposeOptions options;
+        options.max_pieces = max_pieces;
+        options.resolution = resolution;
+        options.max_piece_vertices = max_piece_vertices;
+        options.sample_spacing = sample_spacing;
+        if (!ck::decompose(vertices, vertex_count, indices, index_count, options, *result)) return CK_ERROR_INTERNAL;
+        const uint32_t handle = decompositions.store(std::move(result));
+        if (!handle) return CK_ERROR_OUT_OF_MEMORY;
+        out_decomposition->id = handle;
+        return CK_OK;
+    } catch (const std::bad_alloc &) {
+        return CK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return CK_ERROR_INTERNAL;
+    }
+}
+
+CK_API void CK_CALL ck_decomposition_destroy(ck_decomposition_handle decomposition) {
+    decompositions.release(decomposition.id);
+}
+
+CK_API ck_result CK_CALL ck_decomposition_info(ck_decomposition_handle handle, uint32_t *out_pieces,
+                                               double *out_values, uint32_t value_capacity) {
+    if (!out_pieces || !out_values || value_capacity < 3) return CK_ERROR_INVALID_ARGUMENT;
+    const ck::Decomposition *decomposition = decompositions.find(handle.id);
+    if (!decomposition) return CK_ERROR_INVALID_HANDLE;
+    *out_pieces = uint32_t(decomposition->pieces.size());
+    out_values[0] = decomposition->measured;
+    out_values[1] = decomposition->spacing;
+    out_values[2] = decomposition->inflation;
+    return CK_OK;
+}
+
+CK_API ck_result CK_CALL ck_decomposition_piece(ck_decomposition_handle handle, uint32_t piece, double *out_points,
+                                                uint32_t point_capacity, uint32_t *out_count) {
+    if (!out_count || (point_capacity && !out_points)) return CK_ERROR_INVALID_ARGUMENT;
+    *out_count = 0;
+    const ck::Decomposition *decomposition = decompositions.find(handle.id);
+    if (!decomposition) return CK_ERROR_INVALID_HANDLE;
+    if (piece >= decomposition->pieces.size()) return CK_ERROR_INVALID_ARGUMENT;
+    const std::vector<double> &points = decomposition->pieces[piece];
+    *out_count = uint32_t(points.size());
+    std::copy(points.begin(), points.begin() + std::min<size_t>(points.size(), point_capacity), out_points);
+    return CK_OK;
 }

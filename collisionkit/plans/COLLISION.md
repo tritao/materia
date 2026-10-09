@@ -474,7 +474,8 @@ Each step is its own commit with all suites green.
     when the user says so.
 - **CL3 — Geometry from the cell**, in two commits. CL3a can run
   unattended; CL3b reaches into SimKit and is done with review.
-- **CL3a — Robot, tool and environment geometry; decomposition.**
+- **CL3a — Robot, tool and environment geometry; decomposition.** Done,
+  see the progress log.
   - RobotKit builds a robot's bodies, groups and shapes from a
     `RobotModel`:
     - link primitives;
@@ -953,3 +954,82 @@ Done as planned, with these choices:
 - **Suites:** standalone C++ 2 of 2; collisionkit native passed (350
   assertions); native kit passed (695); pure kit only main's known DLS
   failure; MotionKit passed (1224712); RobotKit passed (5433).
+
+### Merge onto local main (2026-10-09)
+
+Local `main` was fast-forwarded to CL2b (5ef09380b) in the shared checkout,
+without recursing into submodules; nothing was pushed. The shared checkout
+keeps an untracked `kinematicskit/native/vendor/coal` directory from
+before the move, and its `collisionkit/native/vendor/coal` is not checked
+out (the pinned coal commit is local to this worktree).
+
+### CL3a — Geometry from the cell (2026-10-09)
+
+Done as planned, with these choices:
+- **A description first.** `collisionkit.CollisionDescription` holds the
+  cell as data: bodies (group, fixed, pose), objects (geometry, inflation,
+  what they approximate), body and object rules with reasons,
+  articulations with their reference, and the assumptions (CL-D8). Its
+  `build(world)` adds everything, marks each articulation's overlaps at
+  its reference, and returns the ids and the layout errors (pairs
+  colliding at the reference between an articulation and anything
+  outside it). CL3b feeds the same description to SimKit.
+- **Models.** `collisionkit.kinematics.ModelBodies` puts a
+  `KinematicModel` in a description: one body per model body, the kit's
+  rigid, adjacent and closure pairs as rules, bodies rigid to a root fixed
+  when the model is bolted down, posed at the reference; followers (a
+  tool in its own group) take their body's rules. `place` and `poses`
+  pose them from a state; `state(q)` keeps the cell placement. This gives
+  collisionkit's pure half a dependency on the pure kit (kinematicskit
+  still does not depend on collisionkit).
+- **RobotKit** (`robotkit.collision.RobotCollision`, robotkit-autonomy):
+  link primitives, link hulls (simulation or CAD-sourced), the tool on a
+  follower body in the tool group (box, cylinder, or hulls inflated by
+  their padding), contact pairs as "declared contact" rules, and
+  `ShapeContact`, the self-collision opt-out and mesh references recorded
+  as ignored (CL-D10). RobotModel has no home configuration, so the
+  reference is the caller's or zero within limits, and its name is
+  recorded. `describeClearanceBodies` adds `ArmClearance`'s inputs
+  (`ClearanceBodyData`: link hulls, tool hulls, parts and weld beads on
+  links) to the same bodies, for CL4a.
+- **CAD** (`cadbridge.CadCollision`): mechanisms through
+  `AssemblySimulationBridge.toRobotModel` and the robot builder, with the
+  CAD link hulls; parts and fixtures at their world pose as an enclosing
+  hull, a surface mesh, or decomposed.
+- **Terrain** (`processkit.collision.HeightMapCollision`): a `HeightMap`
+  becomes a height field (rows flipped to coal's layout, centred on the
+  map) down to a floor below the deepest dig; `heights` gives updates.
+- **Scene boxes:** `CollisionDescription.addFixed`; the app's scene records
+  are not wired here (that is the editor's, CL8).
+- **Decomposition** is in collisionkit's native library, not cadbridge or
+  CadKit: cadbridge has no native code, CadKit's would tie it to OCCT, and
+  a mesh is all it needs. `ck_decompose` runs V-HACD 4 (submodule at
+  v4.1.0, synchronous) and measures enclosure: exact point-to-polytope
+  distances at samples over every triangle no farther apart than a spacing
+  (0.5 % of the bounding diagonal by default); `inflation = measured +
+  spacing`, since the distance to the union is 1-Lipschitz. The pure
+  `ConvexDecomposer` interface keeps cadbridge off the native library;
+  `NativeConvexDecomposer` implements it. `CadDecompositionCache` keeps
+  the pieces per part, keyed by the tessellation's contents.
+- **Tests:**
+  - `collisionkit/native/tests/cpp/decomposition.cpp` (CTest): an
+    L-shaped prism splits into 4 pieces; inflated by 12.8 mm, every one of
+    random surface samples lies inside them (checked through the world's
+    distances); a box is one piece; arguments.
+  - `robotkit/cadbridge/tests/collision` (new, 30 assertions): one world
+    with a robot (primitives, a hull, finger pads, a box tool), a CAD
+    slider posed from its own model and terrain from a height map, with
+    distances following both models and a dig; a fixture through the
+    forearm reported as a layout error and still checked; the CL-D10
+    mapping (a `PairsOnly` pad checked against a fixture, the contact pair
+    allowed as declared contact, the settings and the self-collision
+    opt-out recorded); a fused L-shaped CAD bracket decomposed into 5
+    pieces inflated by 1.0 mm (measured 0.29 mm, spacing 0.71 mm) that
+    enclose its tessellation, decomposed once through the cache; and
+    `ArmClearance`'s inputs landing on the right bodies.
+- **Not here:** URDF `<mesh>` loading (references are recorded); the
+  tessellation deflection is recorded, not added to the inflation.
+- **Suites:** standalone C++ 3 of 3 (`ck_coal_smoke`, `ck_collision_world`,
+  `ck_decomposition`); collisionkit native passed (350); cell tests passed
+  (30); native kit passed (695); pure kit only main's known DLS failure;
+  MotionKit passed (1224712); RobotKit passed (5433).

@@ -41,3 +41,23 @@ Boost check (`grep -rn boost include src` outside mesh_loader, serialization
 and python), update the version macros in `materia/include/coal/config.hh`,
 bump the submodule and this file, and rerun the standalone C++ tests and
 `native/tests`.
+
+## V-HACD 4 (convex decomposition)
+
+- Source: upstream https://github.com/kmammou/v-hacd, pinned submodule at
+  `vendor/v-hacd`, tag v4.1.0 (commit 22ec20a7). No fork (COLLISION.md
+  CL-D11); upstream is archived, which only means frozen.
+- Licence: BSD 3-Clause, Copyright (c) 2011 Khaled Mamou
+  (`vendor/v-hacd/LICENSE`).
+- Use: the single header `include/VHACD.h`, compiled once in
+  `src/decompose.cpp` (`ENABLE_VHACD_IMPLEMENTATION`), synchronously
+  (`m_asyncACD` off). It needs only the C++ standard library and threads
+  (`Threads::Threads`). The `app/` and `doc/` directories are not used.
+- Enclosure: V-HACD does not promise that its pieces enclose the input;
+  `src/decompose.cpp` measures how far the mesh sticks out of the pieces'
+  union (exact point-to-polytope distances at samples no farther apart
+  than a spacing) and reports the inflation that encloses it.
+
+Updating: bump the submodule to a new tag, update this file, and rerun the
+standalone C++ tests (`ck_decomposition`) and the cell tests
+(`robotkit/cadbridge/tests/collision`).

@@ -25,13 +25,22 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/coal/materia/CMakeLists.txt")
 endif()
 add_subdirectory(vendor/coal/materia coal EXCLUDE_FROM_ALL)
 
+# V-HACD 4 (convex decomposition; see THIRD_PARTY.md) is a single header,
+# compiled once in src/decompose.cpp.
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/v-hacd/include/VHACD.h")
+    message(FATAL_ERROR "Initialize collisionkit/native/vendor/v-hacd submodule")
+endif()
+find_package(Threads REQUIRED)
+
 add_library(collisionkit_core ${CK_LIBRARY_TYPE}
     src/api.cpp
+    src/decompose.cpp
     src/world.cpp
 )
 target_compile_features(collisionkit_core PUBLIC c_std_11 PRIVATE cxx_std_17)
 target_include_directories(collisionkit_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(collisionkit_core PRIVATE Eigen3::Eigen coal::core)
+target_link_libraries(collisionkit_core PRIVATE Eigen3::Eigen coal::core Threads::Threads)
+target_include_directories(collisionkit_core SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vendor/v-hacd/include)
 set_target_properties(collisionkit_core PROPERTIES
     C_VISIBILITY_PRESET hidden
     CXX_VISIBILITY_PRESET hidden
@@ -57,4 +66,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND BUILD_TESTING)
     add_executable(ck_collision_world tests/cpp/collision_world.cpp)
     target_link_libraries(ck_collision_world PRIVATE collisionkit_core)
     add_test(NAME ck_collision_world COMMAND ck_collision_world)
+    add_executable(ck_decomposition tests/cpp/decomposition.cpp)
+    target_link_libraries(ck_decomposition PRIVATE collisionkit_core)
+    add_test(NAME ck_decomposition COMMAND ck_decomposition)
 endif()

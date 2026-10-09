@@ -28,6 +28,9 @@
     },
     "bimkit": {
       "path": "../../bimkit"
+    },
+    "collisionkit": {
+      "path": "../../collisionkit"
     }
   },
   "target": "host"

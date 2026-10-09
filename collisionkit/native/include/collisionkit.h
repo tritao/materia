@@ -327,6 +327,36 @@ CK_API ck_result CK_CALL ck_violation_batch(ck_world_handle world,
     double *out_result CK_OUT_ARRAY(result_capacity), uint32_t result_capacity,
     int32_t *out_set CK_OUT);
 
+/*
+ * Convex decomposition (CL-D11): V-HACD 4 splits a triangle mesh into convex
+ * pieces, then the world measures how far points sampled over every
+ * triangle (no point of the mesh farther than the sample spacing from a
+ * sample) lie outside the pieces' union. Inflating every piece by
+ * `measured + spacing` makes the union enclose the mesh.
+ */
+typedef struct ck_decomposition_handle { uint32_t id; } ck_decomposition_handle
+    CK_HANDLE CK_HANDLE_DESTROY(ck_decomposition_destroy);
+
+/**
+ * Decomposes a mesh (`vertices` x, y, z each, `indices` three per triangle)
+ * into at most `max_pieces` pieces of at most `max_piece_vertices` (4..64)
+ * vertices, voxelized at `resolution` voxels. `sample_spacing` is the
+ * enclosure samples' spacing (0: 0.5 % of the mesh's bounding diagonal).
+ */
+CK_API ck_result CK_CALL ck_decompose(const double *vertices CK_IN_ARRAY(vertex_count), uint32_t vertex_count,
+    const int32_t *indices CK_IN_ARRAY(index_count), uint32_t index_count,
+    uint32_t max_pieces, uint32_t resolution, uint32_t max_piece_vertices, double sample_spacing,
+    ck_decomposition_handle *out_decomposition CK_OUT CK_OWNED);
+CK_API void CK_CALL ck_decomposition_destroy(ck_decomposition_handle decomposition);
+
+/** The number of pieces; `out_values` gets the measured outside distance, the sample spacing and the inflation. */
+CK_API ck_result CK_CALL ck_decomposition_info(ck_decomposition_handle decomposition, uint32_t *out_pieces CK_OUT,
+    double *out_values CK_OUT_ARRAY(value_capacity), uint32_t value_capacity);
+
+/** One piece's vertices (x, y, z each) into `out_points`; `out_count` is how many doubles it has. */
+CK_API ck_result CK_CALL ck_decomposition_piece(ck_decomposition_handle decomposition, uint32_t piece,
+    double *out_points CK_OUT_ARRAY(point_capacity), uint32_t point_capacity, uint32_t *out_count CK_OUT);
+
 #ifdef __cplusplus
 }
 #endif

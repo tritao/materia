@@ -140,6 +140,22 @@ interface CollisionKitNative @target("portable-abi64") @library("collisionkit_co
 	 */
 	extern fn ck_closest(world: ck_world_handle, margins: ptr<const<f64>> @in_array("margin_count"), margin_count: u32, out_pair: ptr<i32> @out_array("pair_capacity"), pair_capacity: u32, out_result: ptr<f64> @out_array("result_capacity"), result_capacity: u32, out_found: ptr<i32> @out) -> ck_result;
 	/**
+	 * Decomposes a mesh (`vertices` x, y, z each, `indices` three per triangle)
+	 * into at most `max_pieces` pieces of at most `max_piece_vertices` (4..64)
+	 * vertices, voxelized at `resolution` voxels. `sample_spacing` is the
+	 * enclosure samples' spacing (0: 0.5 % of the mesh's bounding diagonal).
+	 */
+	extern fn ck_decompose(vertices: ptr<const<f64>> @in_array("vertex_count"), vertex_count: u32, indices: ptr<const<i32>> @in_array("index_count"), index_count: u32, max_pieces: u32, resolution: u32, max_piece_vertices: u32, sample_spacing: f64, out_decomposition: ptr<ck_decomposition_handle> @out @owned) -> ck_result;
+	extern fn ck_decomposition_destroy(decomposition: ck_decomposition_handle) -> void;
+	/**
+	 * The number of pieces; `out_values` gets the measured outside distance, the sample spacing and the inflation.
+	 */
+	extern fn ck_decomposition_info(decomposition: ck_decomposition_handle, out_pieces: ptr<u32> @out, out_values: ptr<f64> @out_array("value_capacity"), value_capacity: u32) -> ck_result;
+	/**
+	 * One piece's vertices (x, y, z each) into `out_points`; `out_count` is how many doubles it has.
+	 */
+	extern fn ck_decomposition_piece(decomposition: ck_decomposition_handle, piece: u32, out_points: ptr<f64> @out_array("point_capacity"), point_capacity: u32, out_count: ptr<u32> @out) -> ck_result;
+	/**
 	 * Checked pairs closer than `query_distance`, closest first: four ints per
 	 * pair in `out_pairs` and ten doubles per pair in `out_results`. The shorter
 	 * of the two arrays bounds how many pairs are written; `out_count` is the
@@ -213,6 +229,7 @@ interface CollisionKitNative @target("portable-abi64") @library("collisionkit_co
 	 */
 	extern fn ck_world_create(out_world: ptr<ck_world_handle> @out @owned) -> ck_result;
 	extern fn ck_world_destroy(world: ck_world_handle) -> void;
+	handle ck_decomposition_handle : u32 @destroy("ck_decomposition_destroy");
 	type ck_result = i32;
 	handle ck_world_handle : u32 @destroy("ck_world_destroy");
 }

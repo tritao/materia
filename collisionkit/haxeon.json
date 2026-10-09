@@ -3,5 +3,8 @@
 	"package": { "name": "collisionkit" },
 	"sourceRoots": ["haxe"],
 	"scopeSourceRoots": false,
+	"dependencies": {
+		"kinematicskit": { "path": "../kinematicskit" }
+	},
 	"target": "host"
 }

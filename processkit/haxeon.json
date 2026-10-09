@@ -7,7 +7,8 @@
     "projectkit": { "path": "../projectkit" },
     "motionkit": { "path": "../motionkit" },
     "motionkit-robot": { "path": "../motionkit/robot" },
-    "robotkit": { "path": "../robotkit" }
+    "robotkit": { "path": "../robotkit" },
+    "collisionkit": { "path": "../collisionkit" }
   },
   "target": "host"
 }
