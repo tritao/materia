@@ -6,9 +6,11 @@ Moved here from `kinematicskit/native/vendor/coal` with COLLISION.md CL2.
 
 - Source: our fork https://github.com/tritao/coal, branch `materia`, pinned
   submodule at `vendor/coal`. Based on upstream coal-library/coal tag v3.0.4
-  (commit f0fecd0a); the branch adds two commits: f92f288b (the Materia
-  build) and 85cb6397 (height-field distance, COLLISION.md CL-D13; meant
-  for upstream, not yet pushed or proposed).
+  (commit f0fecd0a); the branch adds three commits: f92f288b (the Materia
+  build), 85cb6397 (height-field distance, COLLISION.md CL-D13) and
+  7b57ae92 (large convex sets without neighbours used the hill-climbing
+  support and crashed). The last two are meant for upstream, and are not
+  yet pushed or proposed.
 - Licence: BSD 3-Clause (upstream `vendor/coal/LICENSE`; coal descends from
   FCL and hpp-fcl).
 - Use: the collision and distance core (shapes, GJK/EPA, bounding-volume

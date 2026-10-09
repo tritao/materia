@@ -11,8 +11,8 @@ interface JointPathPlanner {
   function allowsFreeStart():Bool;
   function retreatTarget():Null<Array<Float>>;
   function checkPathClearance(path:JointPathSamples,tolerance:Float):Bool;
-  function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<robotkit.manipulation.ArmClearance.ClearanceViolation>;
+  function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<robotkit.manipulation.ClearanceViolation>;
   function plan(path:PosePath,request:PathRequest,?pinStart:Bool,
-    ?entryCheck:(Array<Float>,Array<Float>)->Null<robotkit.manipulation.ArmClearance.ClearanceViolation>,
-    ?exitCheck:Array<Float>->Null<robotkit.manipulation.ArmClearance.ClearanceViolation>):JointPathSamples;
+    ?entryCheck:(Array<Float>,Array<Float>)->Null<robotkit.manipulation.ClearanceViolation>,
+    ?exitCheck:Array<Float>->Null<robotkit.manipulation.ClearanceViolation>):JointPathSamples;
 }

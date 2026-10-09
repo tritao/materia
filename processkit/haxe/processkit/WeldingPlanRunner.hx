@@ -22,7 +22,8 @@ import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.PlanningLimits;
 import processkit.WelderProcessDevice.WelderChannels;
-import robotkit.manipulation.ArmClearance;
+import robotkit.manipulation.ClearanceViolation;
+import robotkit.manipulation.ClearanceWorld;
 import robotkit.manipulation.KinematicGroup;
 import processkit.skill.WeldPlan;
 import robotkit.spatial.Transform3;
@@ -60,8 +61,8 @@ class WeldPlanning {
   public final compiler:ProgramCompiler;
   public final wrist:WristLimits;
   public final planner:WeldPathPlanner;
-  final clearance:Null<ArmClearance>;
-  public function new(compiler:ProgramCompiler, wrist:WristLimits, planner:WeldPathPlanner,?clearance:ArmClearance) {
+  final clearance:Null<ClearanceWorld>;
+  public function new(compiler:ProgramCompiler, wrist:WristLimits, planner:WeldPathPlanner,?clearance:ClearanceWorld) {
     this.clearance=clearance;
     this.compiler = compiler;
     this.planner = planner;
@@ -126,7 +127,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   public var current(default, null):Null<ProcessRun> = null;
 
   final wrist:WristLimits;
-  final clearance:Null<ArmClearance>;
+  final clearance:Null<ClearanceWorld>;
   var selectedProblem:Null<WeldPathProblem> = null;
   var selectedProgram:Null<WeldPathProgram> = null;
   var selectedCompilation:Null<motionkit.robot.CompiledProgram> = null;
@@ -166,11 +167,11 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   }
 
   /** The same complete-motion planner used by execution, without a robot or channel owner. */
-  public static function planning(manipulator:KinematicGroup, maxAcceleration:Float, ?clearance:ArmClearance):WeldPlanning {
+  public static function planning(manipulator:KinematicGroup, maxAcceleration:Float, ?clearance:ClearanceWorld):WeldPlanning {
     return planningWithLimits(manipulator, PlanningLimits.ofGroup(manipulator, new robotkit.model.SteadyLoads(), maxAcceleration), clearance);
   }
 
-  static function planningWithLimits(manipulator:KinematicGroup, planning:PlanningLimits, ?clearance:ArmClearance):WeldPlanning {
+  static function planningWithLimits(manipulator:KinematicGroup, planning:PlanningLimits, ?clearance:ClearanceWorld):WeldPlanning {
     var count = manipulator.group.count();
     planning.requireGroup(manipulator);
     var limits = planning.validation();
@@ -203,7 +204,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
    */
   public static function create(robot:Robot, manipulator:KinematicGroup,
       eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channels:WelderChannels, limits:PlanningLimits,
-      ?maxRestarts:Int = 3, ?clearance:ArmClearance):WeldingPlanRunner {
+      ?maxRestarts:Int = 3, ?clearance:ClearanceWorld):WeldingPlanRunner {
     var checked = planningWithLimits(manipulator, limits, clearance);
     var count = manipulator.group.count();
     var compiler = checked.compiler;
@@ -239,7 +240,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   /** Over an existing motion, whose input wait reads the established arc from `latest`. */
   function new(motion:ManipulatorMotion, channels:WelderChannels, latest:LatestReading, maxRestarts:Int,
-      wrist:WristLimits,?clearance:ArmClearance) {
+      wrist:WristLimits,?clearance:ClearanceWorld) {
     if (motion == null || channels == null || latest == null || maxRestarts < 0 || wrist == null)
       throw "WeldingPlanRunner needs motion, the torch's channels, a restart limit of zero or more, the wrist's limits";
     this.wrist = wrist;this.clearance=clearance;
@@ -267,7 +268,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
   }
 
   /** Shared geometry and air policy for runtime and offline cell verification. */
-  public static function selectWeld(compiler:ProgramCompiler,wrist:WristLimits,clearance:Null<ArmClearance>,
+  public static function selectWeld(compiler:ProgramCompiler,wrist:WristLimits,clearance:Null<ClearanceWorld>,
       requested:WeldPlan,start:Array<Float>,?configuration:motionkit.kinematics.SixAxisConfiguration):processkit.WeldPathProblem.WeldPathSelection {
     var problem=new WeldPathProblem(requested,wrist,[for(_ in requested.segments)WeldCorner.AROUND],FRAME,APPROACH_SPEED);
     var best:Null<processkit.WeldPathProblem.WeldPathSelection> = null;
@@ -349,7 +350,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
 
   /** A sparse geometric ladder ranks directions without refinement or timing.
    * Fine selection still owns entry, drive and continuous-clearance acceptance. */
-  static function coarseCost(compiler:ProgramCompiler,clearance:Null<ArmClearance>,problem:WeldPathProblem,start:Array<Float>,
+  static function coarseCost(compiler:ProgramCompiler,clearance:Null<ClearanceWorld>,problem:WeldPathProblem,start:Array<Float>,
       configuration:Null<motionkit.kinematics.SixAxisConfiguration>,resolution:Float):Float {
     var began=Sys.time(),group=cast(compiler.solver,ManipulatorKinematics).manipulator;
     var inputs=selectionInputs(compiler,problem,start,configuration,resolution);
@@ -408,7 +409,7 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
     return {request:request,sampling:sampling};
   }
 
-  static function selectProblem(compiler:ProgramCompiler,clearance:Null<ArmClearance>,problem:WeldPathProblem,
+  static function selectProblem(compiler:ProgramCompiler,clearance:Null<ClearanceWorld>,problem:WeldPathProblem,
       start:Array<Float>,configuration:Null<motionkit.kinematics.SixAxisConfiguration>):processkit.WeldPathProblem.WeldPathSelection {
     var solver=cast(compiler.solver,ManipulatorKinematics),group=solver.manipulator;
     var inputs=selectionInputs(compiler,problem,start,configuration,WeldPathPlanner.STEP);
@@ -418,8 +419,8 @@ class WeldingPlanRunner implements processkit.skill.WeldRunner {
       clearance==null ? null : q->clearance.violation(q,false),null,null,0,solver);
   }
 
-  static function entryFailure(compiler:ProgramCompiler,clearance:Null<ArmClearance>,problem:WeldPathProblem,
-      from:Array<Float>,to:Array<Float>):Null<ArmClearance.ClearanceViolation> {
+  static function entryFailure(compiler:ProgramCompiler,clearance:Null<ClearanceWorld>,problem:WeldPathProblem,
+      from:Array<Float>,to:Array<Float>):Null<ClearanceViolation> {
     var entry=compiler.generateEntry(from,to);
     try {
       var violation=clearance==null ? null : motionkit.robot.TrajectoryClearance.violation(

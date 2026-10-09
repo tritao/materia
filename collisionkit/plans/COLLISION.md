@@ -524,7 +524,7 @@ Each step is its own commit with all suites green.
     is also a collision in the coal world (meshes aside, which MuJoCo
     treats as hulls).
 - **CL4a — The clearance interface and the collisionkit adapter**
-  (CL-D12).
+  (CL-D12). Done, see the progress log.
   - Extract the interface from `ArmClearance`'s queries and move
     `ClearanceViolation` beside it. `StructuredJointPathPlanner`,
     `JointCurveClearance`, `LazyCollisionLadder`'s callbacks and the
@@ -1033,3 +1033,84 @@ Done as planned, with these choices:
   `ck_decomposition`); collisionkit native passed (350); cell tests passed
   (30); native kit passed (695); pure kit only main's known DLS failure;
   MotionKit passed (1224712); RobotKit passed (5433).
+
+### CL4a — The clearance interface and the collisionkit adapter (2026-10-09)
+
+- **Interface:** `robotkit.manipulation.ClearanceWorld`, extracted from what
+  callers use of `ArmClearance`: `violation` (with per-body displacement),
+  `closest`, `sweep`, `closestSweep`, `motionEnvelope`,
+  `displacementBounds`, `tcpDisplacementBound`, `auditDisplacement`,
+  `withGroup`, `pairCount`, `bodyCount`, `movingNames`, and `group()` for
+  the arm. haxeon interfaces take no fields and no default values, so the
+  arm is a method (`JointCurveClearance` reads `world.group()` instead of
+  `world.arm`), the interface's optional arguments carry no defaults, and
+  `ArmClearance.withGroup` returns the interface.
+- **`ClearanceViolation`** moved out of `ArmClearance`'s module into its
+  own, beside the interface, in robotkit-autonomy. Not out of robotkit:
+  the interface needs `KinematicGroup` and `ClearanceMotionEnvelope`, which
+  are robotkit's, and `ArmClearance` must implement it without robotkit
+  depending on MotionKit.
+- **Callers take the interface:** `StructuredJointPathPlanner`,
+  `JointCurveClearance`, `LazyCollisionLadder`, `TrajectoryClearance`, the
+  path planner interfaces, and processkit's weld and probe planners and
+  runners. Types only; nothing else changed in them. Constructors stay
+  `ArmClearance` (app, examples, tests), and process planning is not
+  switched over (PP10).
+- **Adapter:** `robotkit.collision.CollisionClearance` takes
+  `ArmClearance`'s inputs and a world factory. It decides the checked
+  pairs exactly as `ArmClearance` does (one link; both fixed; neighbouring
+  or drive-coupled links touching within 2 mm at the reference, with the
+  same `ConvexDistance` test), so the parity tests compare engines, not
+  rules. Each hull is a convex object on its own collisionkit body, since
+  the proof inflates per hull; the four groups (moving, moving tool,
+  fixed, fixed tool) carry the margins, with `contactMargin` between tool
+  and fixed groups under `contact`. Displacements are the world's per-body
+  inflation, sweeps without a per-sample contact policy are one batched
+  call, and the motion envelope uses the same hull corners. It uses
+  `ArmClearance`'s body data rather than CL3a's description: the
+  description puts a link's hulls on one body, and the proof inflates each
+  hull by its own bound. `RobotCollision.describeClearanceBodies` maps the
+  same data onto a cell description for later use.
+- **coal fix (fork, local commit 7b57ae92):** the rail and G17 scenes have
+  hulls of up to 64 points. coal's GJK dispatch picked its hill-climbing
+  support for convex sets over 32 points even without a neighbour graph,
+  and crashed on our point-only hulls (CL1–CL3 tests used at most 8
+  points). Its generic support function already checked for neighbours;
+  the GJK and contact-patch dispatch now do too, with a coal test
+  (`test/convex_without_neighbors.cpp`: crashes without the fix, 5 of 5
+  with it) and a 60-point convex in collisionkit's C++ test. A fork fix
+  per CL-D13, upstreamable, not pushed.
+- **Parity** (`machinekit/tests/clearance-parity`, 4184 assertions):
+  - main's weld cell, open and with the wall: 301 configurations, 1244
+    violation queries each (plain, contact, and inflated by the
+    displacement bounds), the closest pairs within 1.9e-7 m, 40 sweeps and
+    40 straight-path `JointCurveClearance` proofs (23 and 18 certified)
+    identical; the weld planner with the adapter plans the same weld
+    ("along the wire", roll 0, 96 poses; beside the wall "along the wire
+    from twice as far", roll pi/4, 1802 poses);
+  - the rail (3 m linear track with the arm) and the G17 track welder
+    (arm, torch, 2.6 m weldment and table): 201 configurations each, the
+    closest pairs within 1.1e-11 m, sweeps and 40 proofs each (39 and 23
+    certified) identical;
+  - no disagreement at all, so none needed explaining; the suite would
+    accept and print boundary cases (a distance within 1e-6 m of its
+    required clearance) and fail on any other.
+  - Not run: the full G17 track-weld plan with the adapter (a 15 s to
+    300 s benchmark of main's process-path work). Its scene, sweeps and
+    proofs are covered above; the whole plan waits for PP10's switch-over.
+- **Defaults through the interface:** haxeon fills a default argument at
+  the call site from the static type, and interfaces cannot declare
+  defaults. The first MotionKit run failed ("A clearance sweep needs
+  matching joint values and a positive step"): a sweep called through
+  `ClearanceWorld` passed null for the 0.02 step. `ArmClearance` and the
+  adapter now take those arguments as optional and apply the same
+  defaults in the body (contact false, step 0.02, endpoints unchecked), so
+  every caller gets what it got before.
+- **Suites:** standalone C++ 3 of 3; collisionkit native passed (350);
+  cell tests passed (30); native kit passed (695); pure kit only main's
+  known DLS failure; weld planning passed (609, weld pass path 19, the
+  shared welding motion factory); parity passed (4184); MotionKit passed
+  (1224712); RobotKit passed (5433); processkit's full suite passed; the
+  app compiles. The weld planning and parity suites need SimKit's
+  libraries on `LD_LIBRARY_PATH` (`robotkit/tests/build/host/native/
+  robotkit-world-tests`), as their projects declare no native build.

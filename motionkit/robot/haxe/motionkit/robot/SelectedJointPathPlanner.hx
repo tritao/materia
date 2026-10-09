@@ -7,6 +7,7 @@ import motionkit.path.PoseMath;
 import motionkit.planner.JointPathSamples;
 import motionkit.robot.AnalyticPathRefiner.RefinementTarget;
 import robotkit.manipulation.ArmClearance;
+import robotkit.manipulation.ClearanceViolation;
 
 /** Reuse globally selected geometry for execution timing. No inverse solving or
  * fallback selection: a different task, grid or start must be selected again.
@@ -46,11 +47,11 @@ class SelectedJointPathPlanner implements JointPathPlanner {
   public function retreatTarget():Null<Array<Float>> return null;
   public function checkPathClearance(path:JointPathSamples,tolerance:Float):Bool
     return checking.checkPathClearance(path,tolerance);
-  public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<ArmClearance.ClearanceViolation>
+  public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<ClearanceViolation>
     return checking.checkMotion(trajectory);
   public function plan(path:PosePath,request:PathRequest,?pinStart:Bool,
-      ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>,
-      ?exitCheck:Array<Float>->Null<ArmClearance.ClearanceViolation>):JointPathSamples {
+      ?entryCheck:(Array<Float>,Array<Float>)->Null<ClearanceViolation>,
+      ?exitCheck:Array<Float>->Null<ClearanceViolation>):JointPathSamples {
     if(path==null || request==null || pinStart==false)
       throw "Selected curve reuse requires its pinned execution start";
     for(j in 0...request.startQ.length)if(!Math.isFinite(request.startQ[j]) ||

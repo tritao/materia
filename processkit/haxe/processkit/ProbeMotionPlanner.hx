@@ -11,8 +11,8 @@ import motionkit.program.MoveTarget;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.CompiledProgram;
 import robotkit.manipulation.Manipulator;
-import robotkit.manipulation.ArmClearance;
-import robotkit.manipulation.ArmClearance.ClearanceViolation;
+import robotkit.manipulation.ClearanceWorld;
+import robotkit.manipulation.ClearanceViolation;
 import robotkit.manipulation.JointRoute;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
@@ -34,14 +34,14 @@ class ProbeMotionPlanner {
   static inline final MIN_CORRIDOR_STEP = 0.000125;
   public final arm:Manipulator;
   public final compiler:ProgramCompiler;
-  public final clearance:Null<ArmClearance>;
+  public final clearance:Null<ClearanceWorld>;
   public final wireClearance:Null<ProbeWireClearance>;
   public final airPoseReserve:Float;
   public final inverse:motionkit.kinematics.KinematicsSolver;
   final interval:Float;
   final jointStep:Float;
 
-  public function new(arm:Manipulator, compiler:ProgramCompiler, ?clearance:ArmClearance, ?wireClearance:ProbeWireClearance) {
+  public function new(arm:Manipulator, compiler:ProgramCompiler, ?clearance:ClearanceWorld, ?wireClearance:ProbeWireClearance) {
     if (arm == null || compiler == null || compiler.solver.jointCount() != arm.group.count() ||
         wireClearance != null && wireClearance.arm != arm)
       throw "Probe motion planning needs matching arm kinematics and compiler";

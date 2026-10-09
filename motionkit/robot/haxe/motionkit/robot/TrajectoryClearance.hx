@@ -1,12 +1,12 @@
 package motionkit.robot;
 
 import motionkit.trajectory.Trajectory;
-import robotkit.manipulation.ArmClearance;
-import robotkit.manipulation.ArmClearance.ClearanceViolation;
+import robotkit.manipulation.ClearanceWorld;
+import robotkit.manipulation.ClearanceViolation;
 
 /** Sweep the generated joint curve, retaining ArmClearance's sampled sweep contract. */
 class TrajectoryClearance {
-  public static function violation(world:ArmClearance,trajectory:Trajectory,contact:Bool=false,
+  public static function violation(world:ClearanceWorld,trajectory:Trajectory,contact:Bool=false,
       stepSeconds:Float=0.01,?contactAt:Array<Float>->Bool):Null<ClearanceViolation> {
     if (world == null || trajectory == null || !Math.isFinite(stepSeconds) || stepSeconds <= 0.0)
       throw "Trajectory clearance requires a world, motion and positive sample step";

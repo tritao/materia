@@ -455,6 +455,30 @@ int main() {
                "a removed object has no status");
     }
 
+    // A convex given by more points than coal's large-convex threshold (32), as CAD hulls are (up to 64): coal
+    // must scan them rather than climb a neighbour graph it does not have (fixed in our fork, CL-D13).
+    {
+        std::vector<double> ball;
+        const int n = 60;
+        for (int i = 0; i < n; ++i) {
+            const double z = 1.0 - 2.0 * (i + 0.5) / n, r = std::sqrt(1.0 - z * z), a = 2.399963 * i;
+            ball.insert(ball.end(), {0.1 * r * std::cos(a), 0.1 * r * std::sin(a), 0.1 * z});
+        }
+        double top = -1;
+        for (int i = 0; i < n; ++i) top = std::max(top, ball[3 * i + 2]);
+        uint32_t big = 0;
+        const auto big_at = at(0, 0, 3);
+        expect(ck_add_convex(world, -1, big_at.data(), 7, ball.data(), uint32_t(ball.size()), &big) == CK_OK,
+               "a 60-point convex");
+        const auto plate_at = at(0, 0, 3.5);
+        const uint32_t plate = shape(world, -1, plate_at, CK_SHAPE_BOX, {1, 1, 0.1});
+        const int32_t pair[2] = {int32_t(big), int32_t(plate)};
+        double row[10];
+        expect(ck_pair_distances(world, pair, 2, row, 10) == CK_OK, "distance to the 60-point convex");
+        near(row[0], 0.4 - top, 1e-9, "the 60-point convex's top below the plate");
+        expect(ck_remove(world, big) == CK_OK && ck_remove(world, plate) == CK_OK, "removed");
+    }
+
     // Arguments and handles.
     {
         uint32_t id = 0;

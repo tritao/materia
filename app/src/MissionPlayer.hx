@@ -39,7 +39,7 @@ import processkit.skill.WeldSeam;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.manipulation.ArmClearance;
-import robotkit.manipulation.ArmClearance.ClearanceViolation;
+import robotkit.manipulation.ClearanceViolation;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
 import robotkit.model.SteadyLoads;

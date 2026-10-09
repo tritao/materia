@@ -1,5 +1,7 @@
 package robotkit.manipulation;
 
+import robotkit.manipulation.ClearanceViolation;
+
 import robotkit.model.LinkId;
 import robotkit.spatial.Transform3;
 import robotkit.tool.ConvexDistance;
@@ -12,14 +14,6 @@ typedef ClearanceBodyData = {
   var vertices:Array<Float>;
   /** Part of the tool: it may come closer to the work than the arm may, within the contact zone (see `ArmClearance.violation`). */
   var tool:Bool;
-}
-
-/** Two bodies closer than they may be. `distance` is zero when they touch or overlap. */
-typedef ClearanceViolation = {
-  var a:String;
-  var b:String;
-  var distance:Float;
-  var required:Float;
 }
 
 private class ClearanceBody {
@@ -92,7 +86,7 @@ private class ClearanceBody {
  * so: the wire tip is working a seam) need only keep `contactMargin`, since the nozzle sits a few
  * millimetres from the faces it welds. The wire itself is no body (it is millimetres of metal that is consumed).
  */
-class ArmClearance {
+class ArmClearance implements ClearanceWorld {
   /** The distance bodies must keep, in metres. */
   public static inline var MARGIN:Float = 0.005;
   /** The distance a tool body must keep from fixed bodies where it works, in metres. */
@@ -170,10 +164,12 @@ class ArmClearance {
 
   /** How many pairs of bodies are checked. */
   /** Same collision geometry on a worker's independent compiled group. */
-  public function withGroup(group:KinematicGroup):ArmClearance {
+  public function withGroup(group:KinematicGroup):ClearanceWorld {
     return new ArmClearance(group,[for(body in bodies){name:body.name,link:body.link,
       vertices:body.corners.copy(),tool:body.tool}],reference,margin,contactMargin);
   }
+
+  public function group():KinematicGroup return arm;
 
   public function pairCount():Int return pairs.length;
 
@@ -187,7 +183,9 @@ class ArmClearance {
    * The first pair closer than it may be with the arm at `q`, or null. With `contact` the tool's bodies may come as close to
    * the fixed bodies as `contactMargin`. `wanted`, when given, is a smaller margin than the default for the others.
    */
-  public function violation(q:Array<Float>, contact:Bool = false, ?wanted:Float, ?displacements:Array<Float>):Null<ClearanceViolation> {
+  public function violation(q:Array<Float>, ?contactFlag:Bool, ?wanted:Float, ?displacements:Array<Float>):Null<ClearanceViolation> {
+    // Defaults are applied here: through `ClearanceWorld` an omitted argument arrives as null.
+    var contact = contactFlag == true;
     if(displacements!=null && displacements.length!=bodies.length)throw "Clearance displacement count differs from bodies";
     if(displacements!=null)for(value in displacements)if(!Math.isFinite(value) || value<0)throw "Clearance displacements must be finite and nonnegative";
     var poses = arm.linkPoses(q, links);
@@ -279,7 +277,8 @@ class ArmClearance {
   /** Closest checked pair, including clear pairs, or null for an empty world.
    * Uses full hull queries; at the GJK iteration limit the distance remains
    * a conservative lower bound, as in ConvexDistance.between. */
-  public function closest(q:Array<Float>,contact:Bool=false,?wanted:Float):Null<ClearanceViolation> {
+  public function closest(q:Array<Float>,?contactFlag:Bool,?wanted:Float):Null<ClearanceViolation> {
+    var contact = contactFlag == true;
     var poses=arm.linkPoses(q,links);
     var placed:Array<Null<Array<Float>>> = [for(_ in bodies)null];
     function corners(index:Int):Array<Float> {
@@ -301,8 +300,10 @@ class ArmClearance {
    * `maxJointStep` radians between samples, or null. `contactAt`, when supplied,
    * selects the margin independently at every sampled configuration.
    */
-  public function sweep(from:Array<Float>, to:Array<Float>, ?contact:Bool = false, ?maxJointStep:Float = 0.02, ?wanted:Float,
-      ?contactAt:Array<Float>->Bool,endpointsChecked:Bool=false):Null<ClearanceViolation> {
+  public function sweep(from:Array<Float>, to:Array<Float>, ?contactFlag:Bool, ?step:Float, ?wanted:Float,
+      ?contactAt:Array<Float>->Bool,?endpoints:Bool):Null<ClearanceViolation> {
+    // Defaults are applied here: through `ClearanceWorld` an omitted argument arrives as null.
+    var contact = contactFlag == true, maxJointStep:Float = step == null ? 0.02 : step, endpointsChecked = endpoints == true;
     if (from == null || to == null || from.length != to.length || !(maxJointStep > 0.0)) throw "A clearance sweep needs matching joint values and a positive step";
     var steps = 1;
     for (joint in 0...from.length) steps = Std.int(Math.max(steps, Math.ceil(Math.abs(to[joint] - from[joint]) / maxJointStep)));
@@ -320,8 +321,9 @@ class ArmClearance {
 
   /** Minimum hull clearance over the same sampled straight joint sweep as
    * sweep(). This is a sampled result, not a continuous collision bound. */
-  public function closestSweep(from:Array<Float>,to:Array<Float>,contact:Bool=false,
-      maxJointStep:Float=0.02,?wanted:Float):Null<ClearanceViolation> {
+  public function closestSweep(from:Array<Float>,to:Array<Float>,?contactFlag:Bool,
+      ?step:Float,?wanted:Float):Null<ClearanceViolation> {
+    var contact = contactFlag == true, maxJointStep:Float = step == null ? 0.02 : step;
     if(from==null || to==null || from.length!=to.length || !Math.isFinite(maxJointStep) || maxJointStep<=0)
       throw "A closest-clearance sweep needs matching joints and a finite positive step";
     var steps=1;

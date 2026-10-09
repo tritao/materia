@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-clearance-parity"
+  },
+  "entry": "ClearanceParityTests",
+  "sourceRoots": [
+    "src",
+    "../../examples",
+    "../../examples/robot-arm",
+    "../../examples/track-arm",
+    "../../examples/robot-welder",
+    "../../../processkit/tests/src"
+  ],
+  "dependencies": {
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "manufacturingkit": {
+      "path": "../../../manufacturingkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../.."
+    },
+    "machinekit-robot": {
+      "path": "../../robot"
+    },
+    "machinekit-picking-station-example": {
+      "path": "../../examples/picking-station"
+    },
+    "robotkit": {
+      "path": "../../../robotkit"
+    },
+    "cadbridge": {
+      "path": "../../../robotkit/cadbridge"
+    },
+    "toolpathkit": {
+      "path": "../../../toolpathkit"
+    },
+    "camkit": {
+      "path": "../../../camkit"
+    },
+    "cnckit": {
+      "path": "../../../cnckit"
+    },
+    "processkit": {
+      "path": "../../../processkit"
+    },
+    "motionkit-robot": {
+      "path": "../../../motionkit/robot"
+    },
+    "collisionkit-native": {
+      "path": "../../../collisionkit/native"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

@@ -763,6 +763,6 @@ private class EntryTrajectorySolver extends ContinuousBranchFixture {
 private class EntryTrajectoryClearance extends ArmClearance {
   public function new(group:robotkit.manipulation.KinematicGroup)
     super(group, [], [for (_ in group.jointIds()) 0.0]);
-  override public function violation(q:Array<Float>, contact:Bool = false, ?wanted:Float):Null<robotkit.manipulation.ArmClearance.ClearanceViolation>
+  override public function violation(q:Array<Float>, contact:Bool = false, ?wanted:Float):Null<robotkit.manipulation.ClearanceViolation>
     return q[0] > 2.0 ? {a: "torch", b: "upright", distance: 0.002, required: 0.003} : null;
 }

@@ -4,13 +4,13 @@ import motionkit.robot.StructuredLadder.LadderSelection;
 import motionkit.robot.StructuredLadder.BlockedLadderEdge;
 import motionkit.robot.StructuredLadder.CoarseSearchOptions;
 import motionkit.robot.CartesianCandidateSampler.LatticeCandidate;
-import robotkit.manipulation.ArmClearance;
-import robotkit.manipulation.ArmClearance.ClearanceViolation;
+import robotkit.manipulation.ClearanceWorld;
+import robotkit.manipulation.ClearanceViolation;
 
 /** Check only winning routes and disable colliding sample candidates.
  * Failed sweeps exclude transitions; final sweeps report sampled clearance. */
 class LazyCollisionLadder {
-  public static function select(problem:CandidateProblem,clearance:ArmClearance,rounds:Int=8,
+  public static function select(problem:CandidateProblem,clearance:ClearanceWorld,rounds:Int=8,
       contact:Bool=false,?coarse:CoarseSearchOptions):LadderSelection {
     if(clearance==null)throw "Lazy collision selection requires a clearance world";
     var selected=selectWithChecks(problem,q -> clearance.violation(q,contact),rounds,

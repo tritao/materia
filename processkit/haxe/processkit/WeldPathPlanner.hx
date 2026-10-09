@@ -5,7 +5,7 @@ import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.robot.CompiledProgram;
 import motionkit.trajectory.PlanDiagnostic.PlanCheckResult;
-import robotkit.manipulation.ArmClearance;
+import robotkit.manipulation.ClearanceWorld;
 import processkit.skill.WeldPlan;
 import processkit.skill.WeldPlan.WeldSegment;
 import robotkit.spatial.Quat;
@@ -125,7 +125,7 @@ class WeldPathPlanner {
   final tolerance:IkTolerance;
   final velocity:Array<Float>;
   final wrist:WristLimits;
-  final clearance:Null<ArmClearance>;
+  final clearance:Null<ClearanceWorld>;
   final maxJointJump:Array<Float>;
   final compileMotion:Null<(PlannedWeld, Array<Float>) -> CompiledProgram>;
   var checked:Int = 0;
@@ -143,7 +143,7 @@ class WeldPathPlanner {
    * where it stands); `wrist` limits the corner turns (`WeldCorner`); `clearance` is null for a cell without hulls.
    * `maxJointJump` is the compiler's continuity bound; `compileMotion` returns validated plans without robot submission.
    */
-  public function new(solver:KinematicsSolver, tolerance:IkTolerance, velocity:Array<Float>, wrist:WristLimits, ?clearance:ArmClearance,
+  public function new(solver:KinematicsSolver, tolerance:IkTolerance, velocity:Array<Float>, wrist:WristLimits, ?clearance:ClearanceWorld,
       ?maxJointJump:Array<Float>, ?compileMotion:(PlannedWeld, Array<Float>) -> CompiledProgram) {
     if (solver == null || tolerance == null || velocity == null || wrist == null) throw "A weld planner needs a solver, tolerances, joint speeds and the wrist's limits";
     this.solver = solver;
@@ -515,10 +515,10 @@ class WeldPathPlanner {
   static function styleName(style:Int):String
     return style == WeldCorner.AROUND ? "around the corner" : style == WeldCorner.ARC ? "along the wire's arc" : "by rotation";
 
-  static function describeHit(hit:robotkit.manipulation.ArmClearance.ClearanceViolation):String
+  static function describeHit(hit:robotkit.manipulation.ClearanceViolation):String
     return '${hit.a} is ${Math.round(hit.distance * 10000) / 10} mm from ${hit.b} (needs ${Math.round(hit.required * 10000) / 10} mm)';
 
-  static function describe(hit:robotkit.manipulation.ArmClearance.ClearanceViolation, pose:Pose3):String
+  static function describe(hit:robotkit.manipulation.ClearanceViolation, pose:Pose3):String
     return describeHit(hit) + ' with the tip at ' + where(pose);
 
   static function where(pose:Pose3):String

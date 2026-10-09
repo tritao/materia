@@ -7,7 +7,8 @@ import motionkit.planner.JointPathSamples;
 import motionkit.robot.CandidateProblem.CandidateSamplingOptions;
 import motionkit.robot.StructuredLadder.CoarseSearchOptions;
 import robotkit.manipulation.KinematicGroup;
-import robotkit.manipulation.ArmClearance;
+import robotkit.manipulation.ClearanceViolation;
+import robotkit.manipulation.ClearanceWorld;
 
 /** Native ladder selection followed by analytic geometric refinement.
  * Unsupported families use explicitly diagnosed numeric continuation.
@@ -20,7 +21,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
   public var fallbackDiagnostic(default,null):Null<String> = null;
   final sampling:Null<CandidateSamplingOptions>;
   final coarse:Null<CoarseSearchOptions>;
-  final clearance:Null<ArmClearance>;
+  final clearance:Null<ClearanceWorld>;
   final collisionRounds:Int;
   final contact:Bool;
   final contactPose:Null<motionkit.kinematics.Pose3->Bool>;
@@ -32,7 +33,7 @@ class StructuredJointPathPlanner implements JointPathPlanner {
   final preferenceSource:Null<ManipulatorKinematics>;
   final stateCost:Null<(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float>;
   public function new(group:KinematicGroup,?sampling:CandidateSamplingOptions,?coarse:CoarseSearchOptions,
-      ?clearance:ArmClearance,collisionRounds:Int=8,contact:Bool=false,
+      ?clearance:ClearanceWorld,collisionRounds:Int=8,contact:Bool=false,
       ?stateCost:(Int,motionkit.robot.CartesianCandidateSampler.LatticeCandidate)->Float,
       ?retreat:Array<Float>,?weights:Array<Float>,rollWeight:Float=0,?preferenceSource:ManipulatorKinematics,?contactPose:motionkit.kinematics.Pose3->Bool,?contactGuard:(motionkit.kinematics.Pose3,Float)->Bool) {
     if(group==null || collisionRounds<1)throw "Joint path planner requires a compiled group and positive collision round budget";
@@ -122,25 +123,25 @@ class StructuredJointPathPlanner implements JointPathPlanner {
       if(proof.samePolicy(clearance,contact,contactPose,contactGuard) && proof.covers(path,tolerance))return true;
     }
     var proof=new JointCurveClearance(clearance,path,tolerance,contact,contactPose,contactGuard),began=Sys.time();
-    if(!proof.check()){var failure:ArmClearance.ClearanceViolation=cast proof.failure;
+    if(!proof.check()){var failure:ClearanceViolation=cast proof.failure;
       throw 'refined curve clearance (${failure.a}, ${failure.b}): ${failure.distance} < ${failure.required} at span ${proof.failedSpan}';}
     path.clearanceProof=proof;
     if(Sys.getEnv("PROCESS_PATH_PROFILE")=="1")Sys.println("PROCESS_PATH_GEOMETRY_CLEARANCE "+haxe.Json.stringify({seconds:Sys.time()-began,
       spans:path.s.length-1,queries:proof.queries,loweringTolerance:tolerance,maximumBodyDelta:proof.maximumDelta}));
     return true;
   }
-  public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<ArmClearance.ClearanceViolation>
+  public function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<ClearanceViolation>
     return clearance == null ? null : TrajectoryClearance.violation(clearance,trajectory,contact,0.01,contactPose == null ? null : contactAt);
   public function plan(path:PosePath,request:PathRequest,?pinStart:Bool,
-      ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>,
-      ?exitCheck:Array<Float>->Null<ArmClearance.ClearanceViolation>):JointPathSamples {
+      ?entryCheck:(Array<Float>,Array<Float>)->Null<ClearanceViolation>,
+      ?exitCheck:Array<Float>->Null<ClearanceViolation>):JointPathSamples {
     return planSections([path],request,pinStart,entryCheck,exitCheck)[0];
   }
 
   /** One ladder over all timing sections; stop derivatives remain per section. */
   public function planSections(paths:Array<PosePath>,request:PathRequest,?pinStart:Bool,
-      ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>,
-      ?exitCheck:Array<Float>->Null<ArmClearance.ClearanceViolation>):Array<JointPathSamples> {
+      ?entryCheck:(Array<Float>,Array<Float>)->Null<ClearanceViolation>,
+      ?exitCheck:Array<Float>->Null<ClearanceViolation>):Array<JointPathSamples> {
     selectionCost=null;
     if(paths==null || paths.length==0 || request==null || request.distances.length<2 || request.distances[0]!=0)
       throw "Joint path sections require a complete sampled request";
@@ -233,9 +234,9 @@ class StructuredJointPathPlanner implements JointPathPlanner {
     // The continuous certificate rejects the actual refined path and feeds
     // its failed span back to lazy edge blocking. Checking the discarded
     // sampled ladder path first duplicates work and can reject a safe fit.
-    var candidateCheck:Array<Float>->Null<ArmClearance.ClearanceViolation> =
+    var candidateCheck:Array<Float>->Null<ClearanceViolation> =
       continuousClearance ? q->null : q->world.violation(q,contactAt(q));
-    var candidateSweep:Null<(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>> =
+    var candidateSweep:Null<(Array<Float>,Array<Float>)->Null<ClearanceViolation>> =
       continuousClearance ? null : (from,to)->world.sweep(from,to,contact,0.02,null,contactAt,true);
     var searchStarted=profile ? Sys.time() : 0.0;
     var selected=world==null ? StructuredLadder.search(problem,weights,rollWeight,cost,coarse)

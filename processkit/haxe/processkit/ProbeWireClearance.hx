@@ -2,7 +2,7 @@ package processkit;
 
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.ArmClearance.ClearanceBodyData;
-import robotkit.manipulation.ArmClearance.ClearanceViolation;
+import robotkit.manipulation.ClearanceViolation;
 import robotkit.model.LinkId;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;

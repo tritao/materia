@@ -4,13 +4,14 @@ import motionkit.planner.JointPathSamples;
 import motionkit.planner.JointPathPolynomial;
 import motionkit.planner.JointPathClearanceProof;
 import motionkit.kinematics.Pose3;
-import robotkit.manipulation.ArmClearance;
+import robotkit.manipulation.ClearanceViolation;
+import robotkit.manipulation.ClearanceWorld;
 
 /** Continuous quintic-path certificate, with hull displacement reserved for
  * native lowering. Bernstein subdivision bounds every configuration between
  * samples; it never treats a sampled chord sweep as a continuous proof. */
 class JointCurveClearance implements JointPathClearanceProof {
-  public final world:ArmClearance;
+  public final world:ClearanceWorld;
   public final contact:Bool;
   public final policy:Null<Pose3->Bool>;
   final guard:Null<(Pose3,Float)->Bool>;
@@ -22,8 +23,8 @@ class JointCurveClearance implements JointPathClearanceProof {
   public var queries(default,null):Int = 0;
   public var maximumDelta(default,null):Float = 0.0;
   public var failedSpan(default,null):Int = -1;
-  public var failure(default,null):Null<ArmClearance.ClearanceViolation> = null;
-  public function new(world:ArmClearance,path:JointPathSamples,tolerance:Float,contact:Bool,
+  public var failure(default,null):Null<ClearanceViolation> = null;
+  public function new(world:ClearanceWorld,path:JointPathSamples,tolerance:Float,contact:Bool,
       ?policy:Pose3->Bool,?guard:(Pose3,Float)->Bool) {
     if(world==null || path==null || !Math.isFinite(tolerance) || tolerance<=0)
       throw "Curve clearance requires a world and finite positive lowering tolerance";
@@ -39,7 +40,7 @@ class JointCurveClearance implements JointPathClearanceProof {
     envelope=world.motionEnvelope(lower,upper);
     loweringDelta=envelope.bounds([for(_ in lower)1.01*tolerance]);
   }
-  public function samePolicy(world:ArmClearance,contact:Bool,policy:Null<Pose3->Bool>,guard:Null<(Pose3,Float)->Bool>):Bool
+  public function samePolicy(world:ClearanceWorld,contact:Bool,policy:Null<Pose3->Bool>,guard:Null<(Pose3,Float)->Bool>):Bool
     return this.world==world && this.contact==contact &&
       (this.policy==null ? policy==null : policy!=null && Reflect.compareMethods(this.policy,policy)) &&
       (this.guard==null ? guard==null : guard!=null && Reflect.compareMethods(this.guard,guard));
@@ -92,7 +93,7 @@ class JointCurveClearance implements JointPathClearanceProof {
     var errors=[for(j in 0...q.length){var e=0.0;for(v in control[j])e=Math.max(e,Math.abs(v-q[j]));e+1.01*tolerance;}];
     var delta=envelope.bounds(errors);
     var contactHere=contact;
-    if(policy!=null){var tcp=world.arm.tcpPose(q);contactHere=predicate(new Pose3(tcp.translation.x,tcp.translation.y,tcp.translation.z,
+    if(policy!=null){var tcp=world.group().tcpPose(q);contactHere=predicate(new Pose3(tcp.translation.x,tcp.translation.y,tcp.translation.z,
       tcp.rotation.x,tcp.rotation.y,tcp.rotation.z,tcp.rotation.w),envelope.tcp(errors));}
     queries++;
     var found=world.violation(q,contactHere,null,delta);
