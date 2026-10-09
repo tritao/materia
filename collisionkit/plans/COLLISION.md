@@ -625,10 +625,82 @@ Each step is its own commit with all suites green.
     It records planning time, path length, success rate, and the
     share of time outside collision checks (CL-D7 decides from it whether
     any planner code moves to C++).
-- **CL8 — Collision in the editor and the browser** (any time after CL3).
+- **CL8 — Collision in the editor and the browser** (any time after CL3;
+  steps written 2026-10-09, after PP10).
   - The desktop editor links collisionkit's native library and shows
     colliding and near pairs while a cell is laid out or a robot jogged.
-  - The browser build compiles the library into its Emscripten host.
+  - The browser build compiles the library into its Emscripten host
+    (linked since PP10).
+  - **What the editor has to show it with** (survey 2026-10-09):
+    - Scene objects (`EditorSceneObject`) are posed at their geometry
+      centre, in metres, Z-up. Only boxes exist as collision proxies (the
+      record's extents; `CadCollisionBounds` for CAD parts).
+    - A generated project's parts are `project:<occurrence>` scene objects.
+      Their hulls are in CAD units in the part frame
+      (`AssemblyPhysicalPart.collisionHull`, or a component's multi-piece
+      `collisionHulls`). `AssemblySimulationBridge.toRobotModel` prefers the
+      multi-piece hulls, but `SimulationAssemblyParts` uses the single hull.
+    - Outside simulation there is no robot joint state. The editor's "jog" is
+      the project assembly: an inspector joint edit or an IK drag. Both
+      reach the scene through `EditorScene.setAssemblyOccurrenceTransforms`.
+      A drag preview publishes on every pointer move.
+    - While a simulation runs, robot links are posed by `Simulation.linkPose`
+      with `AssemblyRobot` hulls (MissionPlayer's clearance already uses
+      them).
+  - **CL-D14 — one editor collision world, rebuilt rarely, posed often.**
+    - `SceneCollision` (app) describes the scene in one `CollisionDescription`:
+      - every assembly occurrence is a body with its hull pieces;
+      - each assembly is an articulation with the loaded state as its
+        reference, so parts that touch by design are allowed, with that
+        reason;
+      - rigidly joined occurrences, and parent/child across a joint, follow
+        CL-D3's rigid and adjacent rules;
+      - every other `collisionEnabled` object is a movable body with its box
+        (CAD parts with their collision bounds).
+    - The world is rebuilt only when the collision content changes
+      (objects added or removed, a shape or the collision flag changed;
+      `SceneModel.physicsRecordsChanged` is the existing test). A pose
+      change only re-poses bodies and queries again.
+    - The query runs at most once per scene revision, when the overlay is on
+      and the view asks: `colliding(0)` and `distances(near)`. The near
+      distance is a setting, 10 mm by default.
+    - One function gives an occurrence's collision pieces (multi-piece hulls
+      when the component has them, else its hull). The editor and
+      `SimulationAssemblyParts` both use it, which ends the disagreement
+      above.
+  - **CL8a — the editor's collision world.**
+    - `SceneCollision`, the occurrence-pieces function, and
+      `SimulationAssemblyParts` moved onto it.
+    - Headless tests:
+      - two overlapping boxes collide; moving one 5 mm apart makes the pair
+        near; 50 mm apart, clear;
+      - a project's parts at load report nothing (touching by design is
+        allowed);
+      - a joint edit that drives a link into the base reports that pair;
+      - a pose-only change does not rebuild the world.
+  - **CL8b — show it.**
+    - Colliding objects are drawn with a red material override, near ones
+      amber (`SceneView.setMaterial`, per view, nothing persistent).
+    - A 2D overlay draws each pair's closest points and a line between
+      them, with the distance, for the closest pairs (at most 16).
+    - The viewport toolbar shows the count ("2 collisions, 1 near").
+    - A setting `editors/3d/collision/show` (Editor Settings dialog), the
+      near distance `editors/3d/collision/near_mm`, and a command
+      `scene.toggle-collisions` in the viewport options menu.
+    - Tests check the material overrides, the overlay key and the count
+      headlessly (`SceneEditingTests` already builds a `SceneView` and a
+      viewport without a GPU).
+  - **CL8c — while simulating.**
+    - Robot links (`AssemblyRobot` hulls at `Simulation.linkPose`) and the
+      parts the simulation moves join the same world. Pairs show as in
+      CL8b, as clearance next to MuJoCo's own contacts.
+    - A test drives a simulated arm into a box and sees the pair.
+  - **CL8d — the browser.**
+    - The web build runs CL8a's tests' scene in its smoke test (`app/web/test.sh`),
+      and a downloadable example shows its pairs.
+    - Generated projects can't be compiled in the browser (no external
+      commands), and CAD-shape hulls need the OCCT browser build; both are
+      recorded as the browser's limits, not worked around.
 
 ## Order and gates (2026-10-09)
 
