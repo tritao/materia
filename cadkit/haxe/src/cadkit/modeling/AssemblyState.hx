@@ -30,40 +30,46 @@ typedef AssemblyClosureResidual = {
 /** Mutable configuration and derived world poses for an immutable assembly definition. */
 class AssemblyState {
 	public final definition:AssemblyDefinition;
+	public final model:CompiledAssembly;
 	final coordinates:Map<String, Float> = [];
 	final rootPoses:Map<String, AssemblyFrame> = [];
-	final occurrences:Map<String, AssemblyComponentOccurrence> = [];
-	final components:Map<String, AssemblyComponentDefinition> = [];
-	final joints:Map<String, KinematicJoint> = [];
+	final occurrences:Map<String, AssemblyComponentOccurrence>;
+	final components:Map<String, AssemblyComponentDefinition>;
+	final joints:Map<String, KinematicJoint>;
 	final poses:Map<String, AssemblyFrame> = [];
 	final kinematics:AssemblyKinematics;
 	final kinematicState:KinematicState;
 	final snapshot:KinematicSnapshot;
 	var dirty:Bool = true;
 
-	public function new(definition:AssemblyDefinition, ?state:AssemblyStateRecord) {
-		AssemblyDefinitionCodec.validate(definition);
+	/** Existing callers retain snapshot ownership. Reuse a published model through fromModel. */
+	public function new(definition:AssemblyDefinition, ?state:AssemblyStateRecord, ?sharedModel:CompiledAssembly) {
+		if (sharedModel != null && sharedModel.definition != definition) throw "Assembly model does not match its definition";
 		if (state != null) state = AssemblyDefinitionFlattener.flattenState(definition, state);
-		definition = AssemblyDefinitionFlattener.flatten(definition);
-		this.definition = definition;
-		for (component in definition.definitions) components.set(component.id, component);
-		for (occurrence in definition.occurrences) occurrences.set(occurrence.id, occurrence);
-		for (joint in definition.joints) {
-			joints.set(joint.id, joint);
-			if (joint.role == AssemblyJointRole.Tree) {
-				if (AssemblyDefinitionCodec.hasCoordinate(joint.type))
-					coordinates.set(joint.id, joint.defaultValue);
-			}
-		}
-		kinematics = AssemblyKinematics.compile(definition);
+		model = sharedModel == null ? CompiledAssembly.snapshot(definition) : sharedModel;
+		this.definition = model.definition;
+		occurrences = model.occurrences;
+		components = model.components;
+		joints = model.joints;
+		for (joint in this.definition.joints)
+			if (joint.role == AssemblyJointRole.Tree && AssemblyDefinitionCodec.hasCoordinate(joint.type))
+				coordinates.set(joint.id, joint.defaultValue);
+		kinematics = model.kinematics;
 		kinematicState = new KinematicState(kinematics.model);
 		snapshot = new KinematicSnapshot(kinematics.model);
 		if (state != null) {
-			AssemblyDefinitionCodec.validateState(definition, state);
+			AssemblyDefinitionCodec.validateState(this.definition, state);
 			for (coordinate in state.jointCoordinates) coordinates.set(coordinate.joint, coordinate.value);
-			for (root in state.rootPoses) rootPoses.set(root.occurrence, root.pose);
+			for (root in state.rootPoses) rootPoses.set(root.occurrence, copyFrame(root.pose));
 		}
 	}
+
+	/** Shares immutable topology and compiled kinematics; owns all mutable configuration and evaluated poses. */
+	public static function fromModel(model:CompiledAssembly, ?state:AssemblyStateRecord):AssemblyState
+		return new AssemblyState(model.definition, state, model);
+
+	static function copyFrame(pose:AssemblyFrame):AssemblyFrame
+		return {x: pose.x, y: pose.y, z: pose.z, qx: pose.qx, qy: pose.qy, qz: pose.qz, qw: pose.qw};
 
 	var orderedTargets:Array<String>;
 
@@ -137,7 +143,7 @@ class AssemblyState {
 		if (!AssemblyDefinitionCodec.rootOccurrences(definition).exists(id))
 			throw 'Occurrence "$id" is not a kinematic root';
 		AssemblyCodec.validateFrame(pose);
-		rootPoses.set(id, pose);
+		rootPoses.set(id, copyFrame(pose));
 		dirty = true;
 	}
 
@@ -303,7 +309,7 @@ class AssemblyState {
 		}
 		var roots:Array<AssemblyRootPose> = [];
 		for (occurrence in definition.occurrences) if (rootPoses.exists(occurrence.id))
-			roots.push({occurrence: occurrence.id, pose: rootPoses.get(occurrence.id)});
+			roots.push({occurrence: occurrence.id, pose: copyFrame(rootPoses.get(occurrence.id))});
 		var result:AssemblyStateRecord = {schemaVersion: AssemblyDefinitionCodec.VERSION,
 			definition: definition.id, jointCoordinates: values, rootPoses: roots};
 		AssemblyDefinitionCodec.validateState(definition, result);
