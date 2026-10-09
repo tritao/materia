@@ -162,14 +162,19 @@ class ProjectDocumentSession {
 
   public function open(file:String):Void {
     var absolute = checkedPath(file);
-    var text = File.getContent(absolute);
+    var text:String;
+    try text = File.getContent(absolute) catch (error:Dynamic)
+      throw 'Could not read scene "$absolute": ${Std.string(error)}';
     openContent(absolute, text);
   }
 
   /** Open a bundled example as an untitled document so Save requests a new path. */
   public function openExample(file:String):Void {
     var absolute = checkedPath(file);
-    openContent(absolute, File.getContent(absolute));
+    var text:String;
+    try text = File.getContent(absolute) catch (error:Dynamic)
+      throw 'Could not read scene example "$absolute": ${Std.string(error)}';
+    openContent(absolute, text);
     path = null;
   }
 

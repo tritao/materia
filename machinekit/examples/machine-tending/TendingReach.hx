@@ -8,6 +8,7 @@ import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import machinekit.assembly.MachineAssembly;
 import machinekit.pneumatic.AirSupply;
+import machinekit.control.DigitalSensor;
 import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.AssemblySimulationBridge;
 import cadkit.modeling.Part;
@@ -36,7 +37,7 @@ typedef TendingReachResult = {
 	var handlingApproachMm:Float;
 	/** Joint pose that parks the arm facing away from the mill during CNC cutting. */
 	var parkPose:Array<Float>;
-	/** TCP height over a tray slot derived from the complete gripper envelope and blank. */
+	/** TCP height over a tray slot that clears the seated blank before transit. */
 	var trayClearanceMm:Float;
 	/** Reach-certified joint poses, each keyed by its station and actual gripper TCP. */
 	var poses:Array<TendingReachPose>;
@@ -59,15 +60,24 @@ typedef TendingReachPose = {
 }
 typedef TendingReachRequest = {var name:String; var tool:String; var point:Array<Float>; var toolOffset:Transform3;}
 typedef TendingTraySlot = {var name:String; var frame:AssemblyFrame;}
-typedef TendingTrayLayout = {var id:String; var frame:AssemblyFrame; var slots:Array<TendingTraySlot>;}
+typedef TendingTrayLayout = {
+	var id:String;
+	var frame:AssemblyFrame;
+	var slots:Array<TendingTraySlot>;
+	var width:Float;
+	var depth:Float;
+}
 
 /** Static reach, with each physical gripper TCP at the vise, tray slots and both sides of the
  * doorway. Mill and blank geometry decide the poses; each gripper supplies its own envelope.
+ * MotionKit certifies the actual timed joint paths when it admits the generated moveVia plans.
  */
 class TendingReach {
 	/** A pocket's free pitch accounts for the opposing tool envelopes and both clearance sides. */
 	public static inline var TRAY_SLOT_CLEARANCE_MM:Float =
 		2 * DualArmGripperTool.INTER_GRIPPER_CLEARANCE_MM + 2 * ArmClearance.MARGIN * 1000;
+	/** Assumed placement allowance beyond the general collision margin for fixed sensor heads. */
+	public static inline var PRESENCE_HEAD_MOUNT_ALLOWANCE_MM:Float = 1.0;
 	/** Assumed 6 x 40 mm replaceable pads leave handling clearance around the 60 mm stock face. */
 	public static function tendingTool():DualArmGripperTool
 		return new DualArmGripperTool(32, BenchMill.STOCK_WIDTH, 60, 16, false,
@@ -77,9 +87,29 @@ class TendingReach {
 	public static function trayPitchX():Float return BenchMill.STOCK_WIDTH + TRAY_SLOT_CLEARANCE_MM;
 	public static function trayPitchY():Float return BenchMill.STOCK_DEPTH + TRAY_SLOT_CLEARANCE_MM;
 
+	/** Keep the sensor outside the blank edge with the global margin and its mount allowance. */
+	public static function presenceHeadOffsetX():Float {
+		return -(BenchMill.STOCK_WIDTH / 2 + DigitalSensor.BODY_WIDTH / 2 + ArmClearance.MARGIN * 1000 +
+			PRESENCE_HEAD_MOUNT_ALLOWANCE_MM);
+	}
+
+	/** Place the sensor beyond the gripper housing depth, toward the outside edge of its tray row. */
+	public static function presenceHeadOffsetY():Float {
+		var spec = tendingTool().spec;
+		var gripperHalfDepth = Math.max(spec.bodyDepth, spec.fingerDepth) / 2;
+		return gripperHalfDepth + DigitalSensor.BODY_DEPTH / 2 + ArmClearance.MARGIN * 1000;
+	}
+
+	/** `slot` is in its tray frame; the sensor sits outward from either row. */
+	public static function presenceHeadFrame(slot:AssemblyFrame):AssemblyFrame {
+		var outwardY = slot.y < 0 ? -presenceHeadOffsetY() : presenceHeadOffsetY();
+		return AssemblyFrames.compose(slot, AssemblyFrames.translation(presenceHeadOffsetX(), outwardY, 10));
+	}
+
 	public static function run():Void {
-		var result = study(new EnclosedBenchMill());
-		if (result.cls != Reach850 || result.riser != 550 || result.poses.length != 80 ||
+		var cell = new EnclosedBenchMill();
+		var result = study(cell);
+		if (result.cls != Reach850 || result.riser != 550 || result.poses.length != 86 ||
 			result.jointMargin < 0.1 || result.wristSine < 0.2)
 			throw 'Tending reach changed class, riser, pose coverage or margins: ' +
 				'${result.cls}/${result.riser}/${result.poses.length}, joint=${result.jointMargin}, wrist=${result.wristSine}';
@@ -90,10 +120,23 @@ class TendingReach {
 			Math.abs(infeed.slots[1].frame.x - infeed.slots[0].frame.x - trayPitchX()) > 1e-9 ||
 			Math.abs(infeed.slots[3].frame.y - infeed.slots[0].frame.y - trayPitchY()) > 1e-9)
 			throw "Reach poses do not use the occupied tray pitch derived from stock and the two gripper envelopes";
+		for (tray in result.trays) for (slot in tray.slots) {
+			var slotLocal = AssemblyFrames.compose(AssemblyFrames.inverse(tray.frame), slot.frame);
+			var local = presenceHeadFrame(slotLocal);
+			if (local.y * slotLocal.y <= 0)
+				throw 'Presence head for ${tray.id}/${slot.name} is not on the outside of its tray row';
+			if (local.x - DigitalSensor.BODY_WIDTH / 2 < -tray.width / 2 - 1e-9 ||
+				local.x + DigitalSensor.BODY_WIDTH / 2 > tray.width / 2 + 1e-9 ||
+				local.y - DigitalSensor.BODY_DEPTH / 2 < -tray.depth / 2 - 1e-9 ||
+				local.y + DigitalSensor.BODY_DEPTH / 2 > tray.depth / 2 + 1e-9)
+				throw 'Presence head for ${tray.id}/${slot.name} extends beyond the cell-fixed tray frame';
+		}
 		var toolPoseDelta = 0.0;
 		for (joint in 0...viseA.length) toolPoseDelta = Math.max(toolPoseDelta, Math.abs(viseA[joint] - viseB[joint]));
 		if (toolPoseDelta < 0.01) throw "The reach study did not account for the second gripper's TCP offset";
+		var baseStandOff = cell.opening.y - result.armPlacement.y;
 		trace('Tending reach: ${result.cls}, ${result.riser} mm riser, ${result.poses.length} poses, ' +
+			'${baseStandOff} mm base stand-off, ' +
 			'${result.jointMargin * 100}% joint margin, wrist |sin(q5)| ${result.wristSine}');
 	}
 
@@ -152,6 +195,16 @@ class TendingReach {
 		var graspLocal:AssemblyFrame = {x: grasp.contact.x, y: grasp.contact.y, z: grasp.contact.z,
 			qx: grasp.toolRotation.x, qy: grasp.toolRotation.y, qz: grasp.toolRotation.z, qw: grasp.toolRotation.w};
 		var graspWorld = AssemblyFrames.compose(blank, graspLocal);
+		// The TCP is the gripper's fingertip plane. Measure the carried stock's
+		// actual lower extent from that plane; adding tool length and stock height
+		// would count the overlapping finger engagement twice.
+		var graspInverse = AssemblyFrames.inverse(graspLocal);
+		var payloadBottom = Math.POSITIVE_INFINITY;
+		for (i in 0...Std.int(stockHull.length / 3)) {
+			var point = AssemblyFrames.transformPoint(graspInverse, stockHull[i * 3], stockHull[i * 3 + 1], stockHull[i * 3 + 2]);
+			payloadBottom = Math.min(payloadBottom, point.z);
+		}
+		if (!Math.isFinite(payloadBottom)) throw "Reach grasp has no carried-stock collision points";
 		// Lift the stock above both the tray seat lands and the vise jaws. The jaw
 		// top is 20 mm above the vise datum blank's underside, so jaw clearance can
 		// govern even when the tray seat is the lower obstacle.
@@ -160,11 +213,12 @@ class TendingReach {
 		var movingJaw = state.worldPose("mill/vise/movingJaw");
 		var viseJawClearance = movingJaw.z + vise.movingJaw.height - blank.z + 2 * ArmClearance.MARGIN * 1000;
 		var approach = Math.max(PartTray.SEAT_Z + 2 * ArmClearance.MARGIN * 1000, viseJawClearance);
-		var trayClearanceMm = toolDepth + BenchMill.STOCK_HEIGHT + 2 * ArmClearance.MARGIN * 1000;
+		// The TCP is at the inserted finger tips on the blank's far face. Raise it
+		// by the handling approach plus blank height and clearance so the fingers
+		// clear the seated part before transit; the body extends behind the TCP.
+		var trayClearanceMm = approach + BenchMill.STOCK_HEIGHT + 2 * ArmClearance.MARGIN * 1000;
 		var viseNormal = AssemblyFrames.transformVector(blank, grasp.approachAxis.x,
 			grasp.approachAxis.y, grasp.approachAxis.z);
-		var names = ["vise", "vise-approach", "outside door", "inside door"];
-
 		var environment = [for (occurrence in flat.occurrences) if (occurrence.id != "mill/stock") {
 			var physical = [for (part in millPhysical.parts) if (part.id == occurrence.definition) part][0];
 			var pose = state.worldPose(occurrence.id), vertices:Array<Float> = [];
@@ -200,7 +254,8 @@ class TendingReach {
 			var frame = AssemblyFrames.translation(centre, trayY, traySeatZ - trayAssembly.seat(0, 0).z);
 			var slots:Array<TendingTraySlot> = [for (slot in trayAssembly.seatFrames())
 				{name: slot.name, frame: AssemblyFrames.compose(frame, slot.frame)}];
-			trayLayouts.push({id: id, frame: frame, slots: slots});
+			trayLayouts.push({id: id, frame: frame, slots: slots,
+				width: trayAssembly.width, depth: trayAssembly.depth});
 			for (piece in trayAssembly.collisionPieces()) {
 				var pieceFrame = AssemblyFrames.compose(frame, piece.frame);
 				var vertices:Array<Float> = [];
@@ -210,6 +265,21 @@ class TendingReach {
 					vertices.push(point.x / 1000); vertices.push(point.y / 1000); vertices.push(point.z / 1000);
 				}
 				environment.push({name: '$id/${piece.id}', vertices: vertices});
+			}
+			// Presence heads are fixed to the tray edge, outside the open finger sweep.
+			// Include their real box hulls so the static reach study and runtime planner
+			// evaluate the same sensor hardware.
+			for (slot in slots) {
+				var slotLocal = AssemblyFrames.compose(AssemblyFrames.inverse(frame), slot.frame);
+				var sensorFrame = AssemblyFrames.compose(frame, presenceHeadFrame(slotLocal));
+				var vertices:Array<Float> = [];
+				for (x in [-DigitalSensor.BODY_WIDTH / 2, DigitalSensor.BODY_WIDTH / 2])
+					for (y in [-DigitalSensor.BODY_DEPTH / 2, DigitalSensor.BODY_DEPTH / 2])
+						for (z in [0.0, DigitalSensor.BODY_HEIGHT]) {
+							var point = AssemblyFrames.transformPoint(sensorFrame, x, y, z);
+							vertices.push(point.x / 1000); vertices.push(point.y / 1000); vertices.push(point.z / 1000);
+						}
+				environment.push({name: '$id/${slot.name}-present', vertices: vertices});
 			}
 		}
 		var tableTop = traySeatZ - PartTray.SEAT_Z;
@@ -285,30 +355,58 @@ class TendingReach {
 					tool: StringTools.startsWith(hull.part, toolPrefix)}], source.ready(),
 				ArmClearance.MARGIN, ArmClearance.CONTACT_MARGIN, null, interfaces);
 			var toolStandOff = toolLength + source.baseFlange.flangeDiameter + toolDepth + 20;
+			// The static tool envelope includes its assumed hose clearance. Keep the
+			// runtime's full obstacle margin beyond that envelope at the door plane.
+			var doorStandOff = toolDepth + ArmClearance.MARGIN * 1000;
 			var classBaseY = cell.opening.y - toolStandOff;
-			// The doorway must pass the wrist as well as the tool. Keep its roll module
-			// below the header; the vise approach can rise after it is inside.
+			// Keep the exterior holding pose at the checked lift height. The doorway
+			// pass uses the lowest pose allowed by the upper wrist-package clearance;
+			// stock and tool below the TCP are checked from their physical hulls.
 			var wristPackage = toolLength + source.toolFlange.thickness + source.reference.d[5] + source.modules[5].length;
-			var viaZ = Math.min(graspWorld.z + approach, cell.opening.z + cell.openingHeight - wristPackage - ArmClearance.MARGIN * 1000);
-			if (viaZ <= cell.opening.z + ArmClearance.MARGIN * 1000) throw "Wrist and tool do not fit through the doorway";
-			var baseTargets:Array<{name:String, point:Array<Float>}> = [
-				{name: "vise", point: [graspWorld.x, graspWorld.y, graspWorld.z]},
-				{name: "vise-approach", point: [graspWorld.x + viseNormal.x * approach,
-					graspWorld.y + viseNormal.y * approach, graspWorld.z + viseNormal.z * approach]},
-				{name: "outside door", point: [graspWorld.x, cell.opening.y - toolDepth, viaZ]},
-				{name: "inside door", point: [graspWorld.x, cell.opening.y + toolDepth, viaZ]}];
+			var portalTopZ = cell.opening.z + cell.openingHeight - wristPackage - ArmClearance.MARGIN * 1000;
+			var stagingZ = Math.min(graspWorld.z + approach, portalTopZ);
+			var payloadFloorZ = graspWorld.z + payloadBottom;
+			var floorClearance = ArmClearance.MARGIN * 1000;
+			var portalFloorZ = cell.opening.z + floorClearance - payloadBottom;
+			if (portalFloorZ >= portalTopZ)
+				throw 'The carried stock and wrist package do not fit the doorway height ' +
+					'(lower=$portalFloorZ, upper=$portalTopZ)';
+			// Balance the physical stock clearance below the TCP and wrist-package
+			// clearance above it. This gives the articulated links room at both the
+			// sill and header while the arm crosses the opening plane.
+			var doorwayZ = Math.min(stagingZ, (portalFloorZ + portalTopZ) / 2);
+			if (stagingZ + payloadBottom < cell.opening.z + floorClearance ||
+				doorwayZ + payloadBottom < cell.opening.z + floorClearance)
+				throw 'The wrist, gripper and carried blank do not fit through the doorway ' +
+					'(opening=${cell.opening.z}, stockBottom=$payloadFloorZ, staging=$stagingZ, ' +
+					'portal=$doorwayZ, floorClearance=$floorClearance, portalTop=$portalTopZ)';
+			var firstTrayTargets:Array<{name:String, point:Array<Float>}> = [];
+			var remainingTrayTargets:Array<{name:String, point:Array<Float>}> = [];
 			for (tray in trayLayouts) for (slot in tray.slots) {
 				var name = tray.id == "infeedTray" ? StringTools.replace(slot.name, "slot-", "infeed-")
 					: StringTools.replace(slot.name, "slot-", "outfeed-");
 				var graspedSlot = AssemblyFrames.compose(slot.frame, graspLocal);
 				var normal = AssemblyFrames.transformVector(slot.frame, grasp.approachAxis.x,
 					grasp.approachAxis.y, grasp.approachAxis.z);
-				baseTargets.push({name: name + "-clearance", point: [graspedSlot.x + normal.x * trayClearanceMm,
+				var targets = tray.id == "infeedTray" && slot.name == "slot-0-0" ? firstTrayTargets : remainingTrayTargets;
+				targets.push({name: name + "-clearance", point: [graspedSlot.x + normal.x * trayClearanceMm,
 					graspedSlot.y + normal.y * trayClearanceMm, graspedSlot.z + normal.z * trayClearanceMm]});
-				baseTargets.push({name: name + "-approach", point: [graspedSlot.x + normal.x * approach,
+				targets.push({name: name + "-approach", point: [graspedSlot.x + normal.x * approach,
 					graspedSlot.y + normal.y * approach, graspedSlot.z + normal.z * approach]});
-				baseTargets.push({name: name, point: [graspedSlot.x, graspedSlot.y, graspedSlot.z]});
+				targets.push({name: name, point: [graspedSlot.x, graspedSlot.y, graspedSlot.z]});
 			}
+			// The shared door and vise solutions follow the first real mission route
+			// so IK chooses their branch from the infeed grasp, not from the vise.
+			var baseTargets = firstTrayTargets.concat([
+				{name: "outside staging", point: [graspWorld.x, cell.opening.y - toolStandOff, stagingZ]},
+				{name: "outside door", point: [graspWorld.x, cell.opening.y - doorStandOff, doorwayZ]},
+				{name: "doorway center", point: [graspWorld.x, cell.opening.y, doorwayZ]},
+				{name: "inside doorway", point: [graspWorld.x, cell.opening.y + doorStandOff / 2, doorwayZ]},
+				{name: "inside door", point: [graspWorld.x, cell.opening.y + doorStandOff, doorwayZ]},
+				{name: "vise-approach", point: [graspWorld.x + viseNormal.x * approach,
+					graspWorld.y + viseNormal.y * approach, graspWorld.z + viseNormal.z * approach]},
+				{name: "vise", point: [graspWorld.x, graspWorld.y, graspWorld.z]}
+			]).concat(remainingTrayTargets);
 			var options = new IkOptions(0.00001, 0.0001, 250, 0.001).reaching();
 			var mountedTools = new AssemblyState(reachAssembly.definition());
 			var tcpA = mountedTools.worldConnector("arm/tool/gripperA/body", "tcp");
@@ -321,21 +419,30 @@ class TendingReach {
 				for (entry in baseTargets) requests.push({name: entry.name, tool: tool, point: entry.point, toolOffset: offset});
 			}
 			var baseShift = source.baseFlange.flangeDiameter / 2 + ArmClearance.MARGIN * 1000;
-			// Search the geometry-derived base stand-off at half-radius increments,
-			// checking the selected 550 mm riser before adjacent 50 mm fabrication sizes.
-			var baseOffsets = [0.0, baseShift * 0.5, baseShift, baseShift * 1.5, 2 * baseShift];
+			var maxBaseOffset = 2 * baseShift;
+			var fallbackBaseOffsets = [0.0, -baseShift * 0.5, baseShift * 0.5, -baseShift,
+				baseShift, -baseShift * 1.5, baseShift * 1.5, -maxBaseOffset, maxBaseOffset];
+			// Keep the geometry-derived search bounded. Full polynomial sweeps are
+			// certified once the mission planner has produced the actual joint plans.
+			var baseOffsets550 = fallbackBaseOffsets.copy();
 			var riserHeights = [550.0];
 			for (step in 1...25) {
 				var lower = 550 - step * 50, upper = 550 + step * 50;
 				if (lower >= 0) riserHeights.push(lower);
 				if (upper <= 1200) riserHeights.push(upper);
 			}
-			for (baseOffset in baseOffsets) {
-			for (height in riserHeights) {
+			var candidates:Array<{height:Float, baseOffset:Float}> = [];
+			for (baseOffset in baseOffsets550) candidates.push({height: 550, baseOffset: baseOffset});
+			for (height in riserHeights) if (height != 550) for (baseOffset in fallbackBaseOffsets)
+				candidates.push({height: height, baseOffset: baseOffset});
+			for (candidate in candidates) {
+				var height = candidate.height, baseOffset = candidate.baseOffset;
 				var armPlacement = AssemblyFrames.compose(AssemblyFrames.translation(source.reference.d[3], classBaseY + baseOffset, height),
 					AssemblyFrames.fromRotationMatrix(0, 0, 0, [0.0, 1, 0, -1, 0, 0, 0, 0, 1]));
 				var baseFlange = mountedBaseFlange(source, armPlacement);
-				var inverse = transform(baseFlange).inverse();
+				// AssemblySimulationBridge's root link is the arm assembly origin;
+				// the base-flange part is offset within it and is checked separately.
+				var inverse = transform(armPlacement).inverse();
 				var solved:Array<Array<Float>> = [], targets:Array<AssemblyFrame> = [], yawsSolved:Array<Float> = [], seed = source.ready();
 				var margin = 1.0, wrist = 1.0, valid = true;
 				var failedAt:Null<String> = null, failedReason:Null<String> = null;
@@ -345,6 +452,10 @@ class TendingReach {
 					var selected:Null<Array<Float>> = null, selectedTarget:Null<AssemblyFrame> = null;
 					var selectedYaw = 0.0;
 					var selectionFailure = "no tool roll candidate";
+					var ingressStart:Null<Array<Float>> = null;
+					if (request.name == "outside door" && pointIndex > 0 &&
+						requests[pointIndex - 1].tool == request.tool &&
+						requests[pointIndex - 1].name == "outside staging") ingressStart = solved[pointIndex - 1];
 					var yaws = request.name == "vise"
 						? [0.0, Math.PI] : [0.0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
 					for (yaw in yaws) {
@@ -360,6 +471,14 @@ class TendingReach {
 						}
 						var selfHit = clearance.violation(solution.q);
 						if (selfHit != null) { selectionFailure = 'self ${selfHit.a}/${selfHit.b}'; continue; }
+						if (ingressStart != null) {
+							var midpointHit = clearance.violation(
+								[for (joint in 0...solution.q.length) (ingressStart[joint] + solution.q[joint]) * 0.5]);
+							if (midpointHit != null) {
+								selectionFailure = 'staging ingress midpoint ${midpointHit.a}/${midpointHit.b}';
+								continue;
+							}
+						}
 						selected = solution.q; selectedTarget = pose; selectedYaw = yaw; break;
 					}
 					// Numeric IK can converge on a self-colliding branch even when another
@@ -377,7 +496,11 @@ class TendingReach {
 								for (wristSeed in [-Math.PI / 2, Math.PI / 2]) {
 									var attempt = arm.solve(target,
 										[pan, -Math.PI / 2, elbow, -elbow, wristSeed, 0.0], options);
-									if (attempt.converged && withinMargins(arm, attempt.q) && clearance.violation(attempt.q) == null) {
+									var midpointHit:Null<ArmClearance.ClearanceViolation> = null;
+									if (ingressStart != null && attempt.converged) midpointHit = clearance.violation(
+										[for (joint in 0...attempt.q.length) (ingressStart[joint] + attempt.q[joint]) * 0.5]);
+									if (attempt.converged && withinMargins(arm, attempt.q) && clearance.violation(attempt.q) == null &&
+										midpointHit == null) {
 										selected = attempt.q; selectedTarget = pose; selectedYaw = yaw; break;
 									}
 								}
@@ -387,7 +510,8 @@ class TendingReach {
 					if (selected == null || selectedTarget == null) {
 						valid = false; failedAt = request.name + "@" + request.tool; failedReason = selectionFailure; break;
 					}
-					solved.push(selected); targets.push(selectedTarget); yawsSolved.push(selectedYaw); seed = selected.copy();
+					solved.push(selected); targets.push(selectedTarget); yawsSolved.push(selectedYaw);
+					seed = selected.copy();
 				}
 				if (valid) {
 					var bodies:Array<robotkit.manipulation.ArmClearance.ClearanceBodyData> = [for (hull in converted.linkHulls)
@@ -419,16 +543,27 @@ class TendingReach {
 						var request = requests[i];
 						var activeToolPrefix = request.tool == DualArmGripperTool.TOOL_CHANNEL_A
 							? "arm/tool/gripperA/" : "arm/tool/gripperB/";
-						var activeToolBodies = [for (body in bodies) {name: body.name, link: body.link,
+						// Keep the idle gripper in the scene collision check. Only the selected
+						// fingers and jaw are allowed the reduced margin at the workpiece.
+						var pointBodies = [for (body in bodies) {name: body.name, link: body.link,
 							vertices: body.vertices, tool: StringTools.startsWith(body.name, activeToolPrefix)}];
 						var selectedStock = trayStock(request.name);
 						var contactBodies = viseContactBodies.copy();
 						if (selectedStock != null) contactBodies.push("machine:" + selectedStock);
-						var pointClearance = new ArmClearance(arm, activeToolBodies, parkPose,
+						var pointClearance = new ArmClearance(arm, pointBodies, parkPose,
 							ArmClearance.MARGIN, ArmClearance.CONTACT_MARGIN, contactBodies, interfaces);
 						var contact = request.name == "vise" || selectedStock != null;
 						var hit = pointClearance.violation(solved[i], contact);
-						if (hit == null) continue;
+						// The route proof belongs to MotionKit at admission time. During
+						// reach selection, avoid a branch whose staging-to-door joint
+						// midpoint already collides; the complete timed path is still
+						// certified on the generated moveVia.
+						var routeStart:Null<Array<Float>> = null;
+						if (request.name == "outside door" && i > 0 && requests[i - 1].tool == request.tool &&
+							requests[i - 1].name == "outside staging") routeStart = solved[i - 1];
+						var routeMidpointHit = routeStart == null ? null : pointClearance.violation(
+							[for (joint in 0...solved[i].length) (routeStart[joint] + solved[i][joint]) * 0.5], contact);
+						if (hit == null && routeMidpointHit == null) continue;
 						var point = request.point;
 						var alternative:Null<Array<Float>> = null;
 						var alternativeTarget:Null<AssemblyFrame> = null;
@@ -450,9 +585,17 @@ class TendingReach {
 									if (alternative != null) break;
 									for (wristSeed in [-Math.PI / 2, Math.PI / 2]) {
 										var attempt = arm.solve(target, [pan, -Math.PI / 2, elbow, -elbow, wristSeed, 0.0], options);
-									if (attempt.converged && withinMargins(arm, attempt.q) && clearance.violation(attempt.q) == null &&
-										pointClearance.violation(attempt.q, contact) == null) {
-										alternative = attempt.q; alternativeTarget = pose; alternativeYaw = yaw; break;
+										var midpointHit:Null<ArmClearance.ClearanceViolation> = null;
+										if (routeStart != null && attempt.converged)
+											midpointHit = pointClearance.violation(
+												[for (joint in 0...attempt.q.length) (routeStart[joint] + attempt.q[joint]) * 0.5], contact);
+										if (attempt.converged && withinMargins(arm, attempt.q) &&
+											clearance.violation(attempt.q) == null &&
+											pointClearance.violation(attempt.q, contact) == null && midpointHit == null) {
+											alternative = attempt.q;
+											alternativeTarget = pose;
+											alternativeYaw = yaw;
+											break;
 										}
 									}
 								}
@@ -463,7 +606,9 @@ class TendingReach {
 							yawsSolved[i] = alternativeYaw;
 						} else {
 							failedAt = request.name + "@" + request.tool;
-							failedReason = 'clearance ${hit.a}/${hit.b} (${hit.distance} m)';
+							failedReason = hit != null ? 'clearance ${hit.a}/${hit.b} (${hit.distance} m)'
+								: routeMidpointHit == null ? "no collision-free IK branch for the checked route midpoint"
+									: 'route midpoint ${routeMidpointHit.a}/${routeMidpointHit.b} (${routeMidpointHit.distance} m)';
 							valid = false; break;
 						}
 					}
@@ -495,13 +640,13 @@ class TendingReach {
 					if (height == 550) riserFailures.push(failure);
 				}
 			}
-			}
 			if (firstClassFailure != null && lastClassFailure != null)
 				failures.push('$cls first ${firstClassFailure}, 550 mm candidates [${riserFailures.join("; ")}], last ${lastClassFailure}');
 		}
 		throw 'Neither tending arm class reaches every required pose with the joint and wrist margins' +
 			(failures.length == 0 ? "" : '; candidates: ${failures.join("; ")}');
 	}
+
 	static function jointMargin(arm:Manipulator, q:Array<Float>):Float {
 		var margin = 1.0;
 		for (i in 0...6) {
@@ -510,6 +655,7 @@ class TendingReach {
 		}
 		return margin;
 	}
+
 	static function withinMargins(arm:Manipulator, q:Array<Float>):Bool
 		return jointMargin(arm, q) >= 0.1 && Math.abs(Math.sin(q[4])) >= 0.2;
 	static function graspFrame(point:Array<Float>, grasp:AssemblyFrame, yaw:Float):AssemblyFrame {

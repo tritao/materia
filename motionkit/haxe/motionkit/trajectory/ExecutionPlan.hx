@@ -5,6 +5,7 @@ import haxe.Int64;
 import motionkit.event.TimedEvent;
 import motionkit.event.EventValue;
 import motionkit.event.HoldPolicy;
+import motionkit.trajectory.PlanDiagnostic.PlanCheckResult;
 import runtime.memory.NativeSpan;
 import runtime.memory.NativeSpanOwner;
 

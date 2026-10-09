@@ -1,6 +1,7 @@
 import haxe.io.Bytes;
 import materia.project.SceneArtifact;
 import cnckit.controller.RobotInterfaceChannels;
+import cnckit.controller.RobotInterface;
 import machinekit.robotics.DualArmGripperTool;
 
 /** The playable four-part machine-tending project. */
@@ -29,6 +30,8 @@ class TendingMissionChecks {
 		}
 		var via = [for (step in mission.steps) if (step.kind == "moveVia") step];
 		var requests = [for (step in mission.steps) if (step.kind == "signal") step];
+		if (via.length == 0 || via[0].poses == null || via[0].poses.length != 2)
+			throw "The first tray approach needs both the geometry-derived clearance and approach poses";
 		function signalCount(name:String, value:Bool):Int {
 			var count = 0;
 			for (step in requests) if (step.signal != null && step.signal.name == name && step.signal.value == value) count++;
@@ -42,6 +45,11 @@ class TendingMissionChecks {
 			signalCount(RobotInterfaceChannels.REQUEST_UNCLAMP, true) != 4 ||
 			signalCount(RobotInterfaceChannels.CYCLE_START, true) != 4)
 			throw "Each tending cycle needs door, clamp, unclamp and CNC start outputs";
+		for (step in mission.steps) if (step.kind == "waitFor" && step.waitFor != null &&
+			StringTools.startsWith(step.waitFor.name, "cnc.") &&
+			step.waitFor.name != RobotInterfaceChannels.CYCLE_COMPLETE &&
+			step.waitFor.timeout <= RobotInterface.DEFAULT_REQUEST_TIMEOUT_SECONDS)
+			throw 'Mission wait for ${step.waitFor.name} must leave a signal round trip after the PLC timeout';
 		var expectedPickParts = ["infeed/blank-0-0", "infeed/blank-0-1", "infeed/blank-0-0",
 			"infeed/blank-0-2", "infeed/blank-0-1", "infeed/blank-1-0", "infeed/blank-0-2", "infeed/blank-1-0"];
 		var expectedPickTools = [DualArmGripperTool.TOOL_CHANNEL_A, DualArmGripperTool.TOOL_CHANNEL_B,

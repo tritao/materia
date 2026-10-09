@@ -19,6 +19,10 @@ class RobotInterfaceChannels {
   public static inline final CYCLE_COMPLETE = "cnc.cycle_complete";
   public static inline final ALARM = "cnc.alarm";
 
+  /** Four discrete outputs carry the current RobotInterfaceAlarm value to the cell PLC. */
+  public static function alarmCodeBits():Array<String> return [
+    "cnc.alarm_code.bit0", "cnc.alarm_code.bit1", "cnc.alarm_code.bit2", "cnc.alarm_code.bit3"];
+
   public static function alarmCodeChannel(scope:String):String
     return scope == null || scope.length == 0 ? "cnc.alarm_code" : scope + "/cnc.alarm_code";
 
@@ -27,5 +31,5 @@ class RobotInterfaceChannels {
     ROBOT_CLEAR, FAULT_RESET];
   public static function cncOutputs():Array<String> return [CNC_READY, DOOR_OPEN,
     DOOR_CLOSED, CLAMPED, UNCLAMPED, PART_PRESENT, IN_CYCLE,
-    CYCLE_COMPLETE, ALARM];
+    CYCLE_COMPLETE, ALARM].concat(alarmCodeBits());
 }

@@ -52,6 +52,11 @@ class LinearTrackCheck {
 		var converted = AssemblySimulationBridge.toRobotModel(cast scene.assemblyDefinition,
 			AssemblyPhysicalPartView.fromSceneArtifact(scene), scene.assemblyState);
 		var model = converted.model;
+		var rackMotorInterface = converted.jointInterfaces.filter(pair ->
+			(pair.first == "rackSupport" && pair.second == "motorPlate") ||
+			(pair.first == "motorPlate" && pair.second == "rackSupport"));
+		check(rackMotorInterface.length == 1,
+			"nested rack and motor mounts are clearance candidates across the track joint");
 		check(model.validate().length == 0, "physical model validates");
 		var toolFrames = [for (frame in model.frames) if (frame.name == "arm/toolFlange robot flange") frame];
 		check(toolFrames.length == 1, "arm tool flange is a physical ownership frame");

@@ -95,17 +95,21 @@ class ParallelGripperBody extends MachineComponent {
 		var reliefZ = guideZ - clearance;
 		var innerHalf = spec.openJawCentre() - spec.jawTravel() - spec.jawWidth / 2 - clearance;
 		if (reliefZ <= 0 || innerHalf <= 0) throw "Gripper housing needs room for its swept jaw reliefs";
-		var body = Part.box(spec.bodyWidth, spec.bodyDepth, spec.bodyLength);
+		var body = Solids.named(Part.box(spec.bodyWidth, spec.bodyDepth, spec.bodyLength), "housing");
 		var notchHeight = spec.bodyLength - reliefZ + clearance;
 		var notchDepth = spec.bodyDepth + 2 * clearance;
 		var leftMin = -spec.openJawCentre() - spec.jawWidth / 2 - clearance;
 		var leftMax = -spec.openJawCentre() + spec.jawTravel() + spec.jawWidth / 2 + clearance;
 		var rightMin = -leftMax, rightMax = -leftMin;
-		return machinekit.component.Solids.cut(body, [
-			Part.box(leftMax - leftMin, notchDepth, notchHeight).translated(
-				new Vector((leftMin + leftMax) / 2, 0, reliefZ)),
-			Part.box(rightMax - rightMin, notchDepth, notchHeight).translated(
-				new Vector((rightMin + rightMax) / 2, 0, reliefZ))
-		]);
+		// Give each boolean operand its design role before cutting. The housing's
+		// broad faces split around the two reliefs; unique feature tags keep those
+		// resulting names strong instead of relying on boolean input ordinals.
+		return Solids.building([
+			body,
+			Solids.named(Part.box(leftMax - leftMin, notchDepth, notchHeight).translated(
+				new Vector((leftMin + leftMax) / 2, 0, reliefZ)), "left-jaw-relief"),
+			Solids.named(Part.box(rightMax - rightMin, notchDepth, notchHeight).translated(
+				new Vector((rightMin + rightMax) / 2, 0, reliefZ)), "right-jaw-relief")
+		], parts -> Solids.cut(parts[0], [parts[1], parts[2]]));
 	}
 }

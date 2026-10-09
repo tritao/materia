@@ -2,6 +2,8 @@ package cnckit.controller;
 
 /** Pure, one-cycle PLC state machine for a robot-tended CNC enclosure and vise. */
 class RobotInterface {
+  /** Internal PLC timeout; the robot mission waits one extra signal round trip before its own deadline. */
+  public static inline final DEFAULT_REQUEST_TIMEOUT_SECONDS = 5.0;
   static inline final IDLE = 0;
   static inline final OPENING_DOOR = 1;
   static inline final CLOSING_DOOR = 2;
@@ -17,7 +19,7 @@ class RobotInterface {
   var previous:Null<RobotInterfaceInput> = null;
   var holdRequested:Bool = false;
 
-  public function new(requestTimeoutSeconds:Float = 5.0) {
+  public function new(requestTimeoutSeconds:Float = DEFAULT_REQUEST_TIMEOUT_SECONDS) {
     if (!(requestTimeoutSeconds > 0.0) || !Math.isFinite(requestTimeoutSeconds))
       throw "Robot interface timeout must be finite and positive";
     this.requestTimeoutSeconds = requestTimeoutSeconds;
@@ -68,7 +70,10 @@ class RobotInterface {
     if (alarmCode == RobotInterfaceAlarm.None && state == IDLE && !activeCycle) {
       if (openEdge) {
         if (input.doorOpen) {}
-        else if (!input.spindleStopped || !input.axesAtLoad || !input.doorClosed)
+        // Opening is safe from any partially open position once the spindle is
+        // stopped and the axes are parked; requiring the closed switch here
+        // would prevent recovery after a door jam just beyond that switch.
+        else if (!input.spindleStopped || !input.axesAtLoad)
           fail(DoorOpenInterlock, false);
         else begin(OPENING_DOOR);
       } else if (closeEdge) {

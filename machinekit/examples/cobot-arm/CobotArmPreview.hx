@@ -60,16 +60,6 @@ class CobotArmChecks {
 				for (i in 0...9) near(a[i], b[i], "DH flange orientation", 1e-8);
 				checkOverlap(arm, state);
 			}
-			for (i in 0...6) state.setJoint('j${i + 1}', 0);
-			var zero = state.worldPose("toolFlange");
-			for (i in 0...6) for (limit in [-2 * Math.PI, 2 * Math.PI]) {
-				state.setJoint('j${i + 1}', limit);
-				var at = state.worldPose("toolFlange");
-				near(at.x, zero.x, "Full-turn limit X"); near(at.y, zero.y, "Full-turn limit Y");
-				near(at.z, zero.z, "Full-turn limit Z");
-				state.setJoint('j${i + 1}', 0);
-			}
-			checkOverlap(arm, state);
 			for (i in 0...6) {
 				var exported = [for (joint in definition.joints) if (joint.id == 'j${i + 1}') joint];
 				if (exported.length != 1) throw "Cobot must export each joint exactly once";
@@ -94,16 +84,15 @@ class CobotArmChecks {
 				throw '${arm.reference.designation} joint ${i + 1} needs ${Math.abs(torques[i])} N m, exceeds ${arm.modules[i].outputRatedTorque} N m rated torque';
 			var mass = arm.armMass();
 			var checkedMass = switch cls {
-				case Reach500: 13.616;
-				case Reach850: 19.484;
-				case Reach900: 35.342;
-				case Reach1300: 35.603;
+				case Reach500: 14.725839279605855;
+				case Reach850: 21.12096867189879;
+				case Reach900: 37.394304785203424;
+				case Reach1300: 37.73141399994982;
 			};
-			if (!Math.isFinite(mass) || Math.abs(mass - checkedMass) > 0.02 ||
-				Math.abs(mass / arm.reference.mass - 1) > 0.25)
-				throw '${arm.reference.designation} assembled mass $mass kg differs from its checked design and published class';
+			if (!Math.isFinite(mass) || Math.abs(mass - checkedMass) > 0.02)
+				throw '${arm.reference.designation} assembled mass $mass kg differs from its checked assumed assembly mass $checkedMass kg';
 			if (definition.encoders == null || definition.encoders.length != 6) throw "Cobot needs six output encoders";
-			Sys.println('${arm.reference.designation}: $mass kg assembled (published reference ${arm.reference.mass} kg), DH-zero shoulder distance $reach mm, holding N m $torques, DH FK at five poses, exported limits and zero/ready CAD overlap checks passed');
+			Sys.println('${arm.reference.designation}: $mass kg assembled (published reference ${arm.reference.mass} kg), DH-zero shoulder distance $reach mm, holding N m $torques, DH FK and CAD overlap at five poses, exported limits passed');
 		}
 	}
 

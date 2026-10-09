@@ -30,6 +30,7 @@ class MotionKitBootstrapTests {
     }
     if (Sys.getEnv("MOTIONKIT_CLEARANCE_ONLY") == "1") {
       kinematicsTests.testJointPlanClearanceChecksInteriorExcursion();
+      kinematicsTests.testJointPlanClearancePartitionsIndependentAxisRanges();
       Sys.println('Joint plan clearance tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
@@ -176,6 +177,7 @@ class MotionKitBootstrapTests {
       {name: "kinematicsTests.testRedundancySpline", run: () -> kinematicsTests.testRedundancySpline(), weight: 0.05},
       {name: "kinematicsTests.testOrientationDifferential", run: () -> kinematicsTests.testOrientationDifferential(), weight: 0.05},
       {name: "kinematicsTests.testJointPlanClearanceChecksInteriorExcursion", run: () -> kinematicsTests.testJointPlanClearanceChecksInteriorExcursion(), weight: 1.0},
+      {name: "kinematicsTests.testJointPlanClearancePartitionsIndependentAxisRanges", run: () -> kinematicsTests.testJointPlanClearancePartitionsIndependentAxisRanges(), weight: 1.0},
       {name: "programTests.testMotionProgramContracts", run: () -> programTests.testMotionProgramContracts(), weight: 0.05},
       {name: "programTests.testProgramCompiler", run: () -> programTests.testProgramCompiler(), weight: 0.1},
       {name: "programTests.testRedundantArmPaths", run: () -> programTests.testRedundantArmPaths(), weight: 0.3},

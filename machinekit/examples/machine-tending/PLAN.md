@@ -352,9 +352,10 @@ Done. What was built and decided:
   - FK of the flange at zero and at four poses equals the DH table within 0.01 mm;
   - shoulder-to-flange distance at DH zero equals the distance derived from the verified DH offsets;
     the published nominal reach remains class metadata, rather than changing DH lengths to fit it;
-  - assembled mass finite and positive, reported beside the maker's complete-arm reference;
-    changes in assumed gearbox mass are recorded rather than hidden by a tolerance;
-  - no self-overlap at zero or at the joint limits taken one joint at a time;
+  - assembled mass matches its checked generic design value within 0.02 kg and is reported beside
+    the maker's complete-arm reference; assumed gearbox changes are recorded explicitly;
+  - no self-overlap at zero, ready, and three additional nontrivial DH poses; revolute ±2π
+    endpoints are not counted separately because they are the same physical configuration as zero;
   - assembly-derived gravity moments hold the rated payload at the horizontally stretched DH-zero
     pose without exceeding rated torque on any joint. X6 steady loads currently model sliding
     gravity only, so its rotary plan check cannot establish this static holding claim.
@@ -380,6 +381,11 @@ Done. What was built and decided:
   mass and gravity loads, especially for Reach500; its assumptions are not vendor internals.
   The updated rated-payload shoulder moments are 31.436, 95.026, 252.330 and 314.138 N m.
   The MachineKit smoke passes with these model-derived values; no reference row was rewritten.
+- The rebased link-envelope and transmission integration now derives assembly masses of 14.72584,
+  21.12097, 37.39430 and 37.73141 kg. `CobotArmChecks` asserts each checked assembly mass within
+  0.02 kg and reports the maker's reference separately; it no longer accepts any positive mass
+  under a broad percentage tolerance. These are values of the assumed generic module internals,
+  not corrections to the published 11.2/20.6/33.1/33.5 kg complete-arm references.
 - The proposed 1% equality between catalogue reach and a fully stretched DH flange distance
   does not follow from the verified offsets. Keep the source geometry and check its explicit
   shoulder reference distance instead; do not rescale a2/a3 to force the catalogue label.
@@ -446,6 +452,9 @@ Done. What was built and decided:
   tool length and wrist-module geometry. Numeric IK checks alternate elbow/wrist branches
   when its first solution hits a panel; the first outfeed solution otherwise crossed the
   right front frame. No clearance or joint-margin threshold was relaxed.
+- At the retracted Z limit, the enclosure check intersects the actual head casting with the
+  top frame and every closed-door panel. It verifies physical solid clearance instead of
+  comparing the opening edge with the same reference pose used to place it.
 - `ArmClearance` rejects distant pairs with bounding spheres, then uses
   `ConvexDistance.between` with the required margin so a separating plane can
   end the hull search early. Its three RobotKit cutoff checks now exercise
@@ -696,6 +705,8 @@ Done. What was built and decided:
   - the door opening during a cycle (switch lost) is a hold plus an alarm;
   - every request has a timeout and becomes an alarm.
 - `CncProgramPlayer` idles until cycle start, runs one pass, then raises cycle complete. The program ends with `G53` to the load position (MT-D6). `CamJob`/`CncWriter` gain an end position. Tool-change requests are alarms (MT-D8).
+- The CNC's alarm code crosses the controller boundary with four discrete output bits beside `cnc.alarm`; the robot mission decodes those bits to its stable operator alarm instead of collapsing every PLC fault into one generic code. The analog alarm-code channel remains CNC-local diagnostics.
+- CNC-signal waits use the PLC's 5 s request timeout plus one second for its alarm and one-tick wire image. Tray-presence waits retain their independent 5 s deadline.
 - The physical spindle-stop interlock uses an assumed 5 rpm encoder deadband; the separate at-speed signal follows the commanded RPM with tolerance and hysteresis.
 - Tests:
   - pure tests: every interlock refusal and timeout;
@@ -705,7 +716,7 @@ Done. What was built and decided:
   - The two controller domains exchange typed digital signal images; the CNC controller owns the mill axes, field sensors, valve coils and one-pass job. Requests are edge-triggered, time out to named alarms, and the CNC program parks at its geometry-derived G53 load pose before reporting ready.
   - MuJoCo completed the scripted door-open, loose-blank presence, unclamp, seated-blank clamp, door-close, one-pass cut, door-open and unclamp sequence in 59.09 simulated seconds, with no interlock alarm. The clamp held the real dynamic blank and used the physical 482.55 N vise cylinder; the door cylinder model reports 294.52 N.
   - CNC-kit tests cover all four actuator timeouts and de-energize the valve coils after a timeout; all interlock refusal paths and the door-open-during-cycle hold are checked. `cnckit/tests` passed with 317 assertions.
-  - The same app run reproduced the current mill baseline: 52.55/53.22 s bare/enclosed, X/Y/Z peaks 0.048472/0.051497/0.060011 mm, 78 plans and zero rapid/collision contacts. The controlled `Part.fuseAll` comparison remains recorded above.
+  - That app run recorded a mill baseline of 52.55/53.22 s bare/enclosed, X/Y/Z peaks 0.048472/0.051497/0.060011 mm, 78 plans and zero rapid/collision contacts. The later controlled `Part.fuseAll` comparison and the post-rebase recheck are recorded below.
 
 **MT8. The parallel gripper, for real.**
 - Current suction handling keeps a held workpiece kinematic: its mass contributes
@@ -738,6 +749,8 @@ Done. What was built and measured:
   SceneArtifact v19. Open, gripped and closed-empty switches use derived jaw-travel windows.
 - The housing CAD solid and collision hull leave derived reliefs for the full jaw-carriage sweep;
   the reach study exposed that a solid housing box falsely collided with the moving jaws.
+- Boolean inputs now receive semantic `housing`, `left-jaw-relief` and `right-jaw-relief` names
+  before subtraction, so split faces retain strong topological names instead of weak input ordinals.
 - The tending cell uses 50 mm flat fingers derived from the 50 mm housing depth. MuJoCo completed
   50 physical pick/carry/place round trips with a free dynamic blank: **0.373 mm** peak slip from
   the TCP, **0.208 mm** pickup seating, and **51.99 N m** peak arm-joint effort. The empty grasp
@@ -788,7 +801,7 @@ Done. What was built and measured:
   8. come out and place in the outfeed slot.
 - The grasp approach distance is saved on each pick/place step and comes from the tray-seat height plus two collision margins. The selected tool roll is saved independently from part heading and compensated between grasp and placement. The same approach value drives reach checking and the physical handling planner; the former generic 120 mm handling default does not describe this cell.
 - On unload, the mission requests and confirms unclamp while the blank is still supported on the vise parallels, then picks and retracts it. The handling skill includes its retract, so waiting for unclamp first avoids pulling the part against the clamp.
-- Vise, doorway and tray targets come from their assembled geometry and the shared reach result. Each `moveVia` is admitted against the arm, tool and cell hulls by `ArmPlanClearance`; the mission asserts `robot.clear` only after reaching an outside-door waypoint and drops it before entering.
+- Vise, doorway and tray targets come from their assembled geometry and the shared reach result. Exterior staging stays at the checked lift height. The transit height balances the stock collision hull's lower extent against the wrist-package clearance at the header; checked poses at the doorway plane and halfway through its inner stand-off split the crossing into short, exact-stop segments. The reach study checks waypoint configurations and searches the geometry-derived base stand-off offsets on both sides of nominal. `ArmPlanClearance` certifies the actual generated joint polynomials against the arm, tool and cell hulls before each `moveVia` is admitted; one reach-study interpolation cannot stand in for those planned curves. With the door closed, the mission asserts `robot.clear` at the exterior staging pose; it approaches the doorway only after the door-open switch arrives, then drops `robot.clear` before entering.
 - Acceptance (`ProjectSourceTests.checkMachineTending`, MuJoCo):
   - 4 parts unattended, 4 finished parts in the outfeed;
   - all four selected outfeed pockets report their physical presence switches;
@@ -804,17 +817,19 @@ Done. What was built and measured:
   - part dropped in transit (jaw switch leaves the gripped band);
   - clamp with no part (presence false);
   - door jam (switch timeout);
-  - cycle alarm (a tool-change request, or a stall from the X6 plan check);
+  - cycle alarm (a premature cycle-start interlock; the CNC-kit also verifies the tool-change hold path);
   - e-stop.
 - After `robot.fault_reset` and the cause removed, the mission resumes at the step that failed. Parts already finished stay finished.
 - Tests: one scenario per fault.
 
-Recovery policy: mission failures carry stable application alarm codes. A failed wait may point to the asserted output request that owns it; retry repeats that request, pulses `robot.fault_reset` for one controller image, and keeps the completed-step count and physical object state. Emergency stop uses RobotKit's safety-stop and explicit reset path before mission retry. A carried workpiece is monitored through via-motion and a lost jaw signal latches the mission as `PartDropped`.
+Recovery policy: mission failures carry stable application alarm codes. The CNC PLC's discrete alarm-code outputs preserve the typed cause across the one-tick controller boundary. A failed wait may point to the asserted output request that owns it; retry repeats that request and holds `robot.fault_reset` high until one full cell-signal image has sampled it, then lowers it on the next controller feed. Recovery waits for the robot's controlled stop to reach `READY` before writing outputs and keeps the completed-step count and physical object state. Emergency stop uses RobotKit's safety-stop and explicit reset path before mission retry. A carried workpiece is monitored through via-motion and a lost jaw signal latches the mission as `PartDropped`.
+- `DoorJam` is reserved for a physical door timeout or a door switch lost during the cut; refused interlocks remain `CncAlarm`. `ClampWithoutPart` requires the physical presence input to be false, while a clamp/unclamp stroke timeout with stock present is `ViseFailure`.
 
 **MT12. Throughput.**
 - Pre-staging: while the mill cuts, the arm picks the next blank and waits outside the door.
 - A dual gripper (`DualArmGripperTool`) mounts two independently valved physical grippers at 90° on one plate. Each has its own cylinder, channels, sensor and contact frame.
 - The reach study derives the fixed TCP transform between the two grippers, solves the cell poses for each actual TCP, and checks both tool envelopes against the machine, doorway, fixed tray/table hulls and all six blanks in the initial infeed layout. The generated `moveVia` steps use the checked poses for the gripper that handles the next part. Each mission plan also checks live blank and carried-object poses as inventory changes.
+- A carried blank stays in the live collision set and follows its confirmed gripper carrier in planning FK. Its named holder and gripper hulls, plus the four source-tray seat pads while lifting that blank, use explicit zero-margin contact interfaces: the hulls cannot penetrate, but do not need 5 mm separation from designed contact surfaces. Door, other tray members and the machine retain the 5 mm obstacle margin.
 - Tray pitch is derived from stock size, the assumed inter-gripper envelope clearance and the general collision margin on both sides; the same cell-derived pitch builds the reach geometry and the assembled trays.
 - While cutting, the free gripper collects the next blank and stages it outside. After `cnc.ready`, one door opening unloads the finished blank and loads the staged blank; the two physical grippers retain their separate parts during the exchange.
 - The CNC dock panel measures spindle utilization from its encoder only during active CNC-cycle intervals, preserving the last completed measurement during idle time. The app acceptance check compares it with an independent encoder sample over the same signal window. The four-cycle acceptance records each interval and the overall mission time.
@@ -990,12 +1005,12 @@ Second-review closing work (validated):
 - Joint plans require conservative continuous hull-motion certificates instead of fixed angular samples. Guide blocks carry transverse loads and residual moments while the screw carries axial force at its assembled line of action.
 - MT6 validates sensor and program ownership, retains single-cabinet identities and animates each controller's belts independently. Shared mounted geometry has an explicit transient contact group; unrelated robots and loose objects retain contact. Environment CAD uses the existing bounded hull generator.
 - Presence sensing tests every supported loose-object shape against its volume. CNC process scope is explicit in SceneArtifact v18; MT8 adds saved gripper limits as v19, with migrated producers and no old-format reader. Unpowered spindles coast; asymmetric belt tests distinguish coordinate direction from power direction.
-- The sequential `review-final` gate and its focused retries cover the completed implementation. Compiler corrections, regression evidence, final measurements and commits are recorded in [REVIEW_FIXES.md](REVIEW_FIXES.md). MT7 and later remain paused.
+- The sequential `review-final` gate and its focused retries covered the completed implementation at that checkpoint. Compiler corrections, regression evidence, final measurements and commits are recorded in [REVIEW_FIXES.md](REVIEW_FIXES.md). MT7 and later had not started yet.
 
 Done. What was built and decided (second-review validation):
 
 - The sequential kit gate passed every kit except the initial MachineKit compile, which exposed a compiler defect. The repaired compiler's MachineKit retry passed. Project-source coverage completed with focused retries after two invalid new fixtures were corrected; the full editor AppTests suite, thirteen native suites, supplemental RobotKit tool/process/weld/clearance suites and HXI binding integration all passed. Long welder searches were not repeated.
-- The mill retains a 10 ms controller tick and drive-derived 0.25 ms physics interval. X/Y/Z rapids remain 15.095544/25/21.521827 m/min, with 0.085940/0.051497/0.060011 mm peak tracking. Bare/enclosed bearing-block cycles are 52.58/53.23 s (+one tick after changing the installed brake's stator decomposition and carried mass), 78 plans and 55 existing torque diagnostics. Door opening/closing remains 1.50/1.79 s; the seated-blank clamp remains 0.08 s at 482.548632 N. Powered e-stop Z sag falls from 0.665314 to 0.000376 mm because servo holding persists until fresh engaged feedback; settled drift is 0.000020016 mm over 0.5 s.
+- At the pre-balanced-fusion closing-brake checkpoint, the mill retained a 10 ms controller tick and drive-derived 0.25 ms physics interval. X/Y/Z rapids were 15.095544/25/21.521827 m/min, with 0.085940/0.051497/0.060011 mm peak tracking. Bare/enclosed bearing-block cycles were 52.58/53.23 s, 78 plans and 55 existing torque diagnostics. Door opening/closing was 1.50/1.79 s; the seated-blank clamp was 0.08 s at 482.548632 N. Powered e-stop Z sag fell from 0.665314 to 0.000376 mm because servo holding persists until fresh engaged feedback; settled drift was 0.000020016 mm over 0.5 s. These are the sequential-fusion comparison values, not the later balanced-fusion result.
 - Correct screw/guide reactions produce bare X/Y/Z guide utilizations 0.156532/0.383137/0.825162 and enclosed 0.216948/0.446731/0.825162. Capacity and cutting load remain assumed reference envelopes. The enclosure now has 156 parts after reducing the brake stator from 48 to 26 convex pieces. Reach stays Reach850 on a 600 mm riser, fifteen cell poses and 16.239926% minimum joint margin.
 - Screw/belt router baselines remain 232.2/215.2 s, 128 plans and 0.05/1.76 mm worst deviation. CoreXY remains 649.6 mm/s and 71.549 m/s²; arm pick/place remains 5.8/12/17.2/23.5 s; welder remains 20.6/21.1 s seam runs, 29.8 s post and 106.5 s whole weldment on both backends. All cobot classes remain 2.06 s. Reach850 peak changes 0.005987→0.006131 mrad because upstream `574d49ba9` reacquires the live arm start between mission owners: disabling that reset reproduces the old peak exactly. The other three peaks remain 0.004640/0.011236/0.016598 mrad.
 - The rebased upstream world-aligned floor grid (`75c98a563`) changes mobile mission completion 61→56.4 s and obstacle round 65→60 s. Restoring the old grid origin reproduces both prior timings exactly; restoring box lidar envelopes does not. The 400 mm straight move and 0.5 rad turn remain unchanged. Every diagnostic source change was restored.
@@ -1011,4 +1026,4 @@ Current-main integration checkpoint (2026-10-05):
 - Closing coverage passes through the initial sequential gate and focused repairs/retries, including full rebuilt editor AppTests. CadBridge is now 181 assertions after a regression for flange export across controller domains; foreign occurrences do not require links in the selected controller's model. Original failed gate logs are retained; no uninterrupted monolithic success is claimed.
 - The controlled mill comparison isolated main's balanced-tree `Part.fuseAll` change (`4b52eb740`): `MillCasting.geometry` builds its base/column/saddle unions through this shared method. With balanced fusion, the measured bare/enclosed cycles were 52.55/53.22 s and bare X/Y/Z peaks were 0.048472/0.051497/0.060011 mm. Overriding only `Part.fuseAll` to restore sequential fusion reproduced 52.58/53.23 s and 0.085940/0.051497/0.060011 mm. The +0.03/+0.01 s and +0.037468 mm X-tracking deltas belong to that geometry-fusion change; the brake stator/mass and braced stand were present in both sides of the controlled comparison. The post-merge `PROJECT_SOURCE_ONLY=mill` rerun reconfirmed the balanced-fusion measurements: bare/enclosed cycles 52.55/53.22 s, bare X/Y/Z peaks 0.048472/0.051497/0.060011 mm, and no rapid or holder contacts. The enclosure bracing introduces no measured baseline shift at this resolution.
 - Main's physical router homing adds 104.8/57.8 s to unchanged screw/belt machining cycles of 232.2/215.2 s. Screw removal/leftover/gouge now measures 9899.8/105.7/27 mm³ with the calibrated homing path; upstream G13 explicitly changes the sensor mount and the recess voxel-volume tolerance. Worst screw/belt tracking remains 0.05/1.76 mm. CoreXY and mobile reproduce their recorded values. The post weld now measures 36.2 s; weave and multipass checks pass on both backends.
-- MT7 remains paused; no Materia main update or push has occurred. Other sessions have advanced main beyond this fixed validated snapshot, so a later fast-forward also requires integrating that newer work.
+- At this integration checkpoint, no Materia main update or push had occurred; the branch later incorporated main through `a490c9dd2`. MT7–MT12 work and final validation are recorded below.

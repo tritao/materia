@@ -156,6 +156,86 @@ class KinematicsTests extends MotionKitTestSupport {
     plan.dispose(); trajectory.dispose();
   }
 
+  /** Joint axes may reach their targets at different phases within one synchronized move. */
+  public function testJointPlanClearancePartitionsIndependentAxisRanges():Void {
+    var model = new robotkit.model.RobotModel("synchronized joint clearance");
+    var base = model.addLink(new robotkit.model.Link("base"));
+    var xLink = model.addLink(new robotkit.model.Link("x-carriage"));
+    var yLink = model.addLink(new robotkit.model.Link("y-carriage"));
+    var x = model.addJoint(new robotkit.model.Joint("x", robotkit.model.JointType.Prismatic, base, xLink));
+    x.axis = [1, 0, 0];
+    var y = model.addJoint(new robotkit.model.Joint("y", robotkit.model.JointType.Prismatic, xLink, yLink));
+    y.axis = [0, 1, 0];
+    var frame = model.addFrame(new robotkit.model.Frame("tool-frame", yLink));
+    var arm = new Manipulator(model, base.id, frame.id);
+    function box(cx:Float, cy:Float):Array<Float> {
+      var vertices:Array<Float> = [];
+      for (corner in 0...8) {
+        vertices.push(cx + ((corner & 1) == 0 ? -0.01 : 0.01));
+        vertices.push(cy + ((corner & 2) == 0 ? -0.01 : 0.01));
+        vertices.push((corner & 4) == 0 ? -0.01 : 0.01);
+      }
+      return vertices;
+    }
+    var profiles:Array<{velocity:Array<Float>, acceleration:Array<Float>, jerk:Array<Float>}> = [
+      {velocity: [0.2, 1.0], acceleration: [1.0, 0.2], jerk: [10.0, 0.2]},
+      {velocity: [1.0, 0.2], acceleration: [0.2, 1.0], jerk: [0.2, 10.0]},
+      {velocity: [0.2, 2.0], acceleration: [10.0, 0.2], jerk: [0.2, 10.0]},
+      {velocity: [2.0, 0.2], acceleration: [0.2, 10.0], jerk: [10.0, 0.2]},
+      {velocity: [0.5, 2.0], acceleration: [5.0, 0.2], jerk: [0.2, 20.0]},
+      {velocity: [2.0, 0.5], acceleration: [0.2, 5.0], jerk: [20.0, 0.2]}
+    ];
+    var selected:Null<{velocity:Array<Float>, acceleration:Array<Float>, jerk:Array<Float>, point:Array<Float>}> = null;
+    var greatestOffDiagonal = 0.0;
+    for (profile in profiles) {
+      var trajectory = motionkit.trajectory.Trajectory.generateStateToState([0.0, 0.0], [0.0, 0.0],
+        [0.0, 0.0], [1.0, 1.0], profile.velocity, profile.acceleration, profile.jerk);
+      for (sample in 1...100) {
+        var sampleTime:Float = trajectory.durationSeconds() * (sample / 100.0);
+        var point = trajectory.evaluate(sampleTime).positions;
+        var offDiagonal = Math.abs(point[0] - point[1]);
+        if (offDiagonal > greatestOffDiagonal) {
+          greatestOffDiagonal = offDiagonal;
+          selected = {velocity: profile.velocity, acceleration: profile.acceleration,
+            jerk: profile.jerk, point: point.copy()};
+        }
+      }
+      trajectory.dispose();
+    }
+    check(selected != null && greatestOffDiagonal > 0.1,
+      'different synchronized axis profiles make a trajectory leave the straight joint-space chord by a safe distance');
+    var profile = selected;
+    if (profile == null) throw "Synchronized trajectory fixture did not leave its joint-space chord";
+    var clearance = new robotkit.manipulation.ArmClearance(arm, [
+      {name: "moving tool", link: yLink.id, vertices: box(0, 0), tool: false},
+      {name: "off-diagonal obstacle", link: base.id, vertices: box(profile.point[0], profile.point[1]), tool: false}
+    ], [0.0, 0.0]);
+    check(clearance.violation([0.0, 0.0]) == null && clearance.violation([1.0, 1.0]) == null &&
+      clearance.certifySegment([0.0, 0.0], [1.0, 1.0]) == null,
+      "the endpoints and straight joint-space chord clear the trajectory-only obstacle");
+    var validator = new motionkit.robot.ArmPlanClearance(clearance);
+    var original = motionkit.trajectory.Trajectory.generateStateToState([0.0, 0.0], [0.0, 0.0],
+      [0.0, 0.0], [1.0, 1.0], profile.velocity, profile.acceleration, profile.jerk);
+    var originalRejected = false;
+    try validator.checkTrajectory(original) catch (error:Dynamic)
+      originalRejected = Std.string(error).indexOf("off-diagonal obstacle") >= 0;
+    check(originalRejected, "polynomial clearance catches the synchronized path that leaves its chord");
+    original.dispose();
+    var targets = validator.partitionJointSegment([0.0, 0.0], [1.0, 1.0],
+      profile.velocity, profile.acceleration, profile.jerk);
+    check(targets.length > 1 && targets[targets.length - 1][0] == 1.0 && targets[targets.length - 1][1] == 1.0,
+      "the rejected synchronized move is refined into exact-stop joint waypoints");
+    var from = [0.0, 0.0];
+    for (to in targets) {
+      var trajectory = motionkit.trajectory.Trajectory.generateStateToState(from, [0.0, 0.0],
+        [0.0, 0.0], to, profile.velocity, profile.acceleration, profile.jerk);
+      validator.checkTrajectory(trajectory);
+      trajectory.dispose();
+      from = to;
+    }
+    check(true, "every refined rest-to-rest trajectory satisfies the exact polynomial clearance validator");
+  }
+
   /** A two-metre lever crosses a thin edge between the old 0.02-rad samples. */
   public function testJointPlanClearanceCertifiesThinEdgeIntervals():Void {
     var model = new robotkit.model.RobotModel("long lever clearance");
@@ -193,30 +273,6 @@ class KinematicsTests extends MotionKitTestSupport {
     check(rejected, "continuous interval admission catches an edge missed by angular samples");
     plan.dispose(); trajectory.dispose();
   }
-
-
-  public function testPathConfigurationSelector():Void {
-    var selector = new PathConfigurationSelector(new PlanarSolver(),
-      [for (_ in 0...6) -20.0], [for (_ in 0...6) 20.0],
-      [for (_ in 0...6) 2.0], [for (_ in 0...6) 1.0]);
-    var candidate = (x:Float) -> [x, 0.0, 0.0, 0.0, 0.0, 0.0];
-    var chosen = selector.select([0.0, 0.5, 1.0], [
-      [candidate(0.0), candidate(10.0)],
-      [candidate(1.0), candidate(9.0)], [candidate(10.0)]]);
-    near(chosen[0][0], 10.0, "Descartes avoids an unreachable nearest branch");
-    near(chosen[1][0], 9.0, "Descartes keeps the continuous branch");
-    var narrow = new PathConfigurationSelector(new PlanarSolver(),
-      [for (_ in 0...6) -20.0], [for (_ in 0...6) 20.0],
-      [for (_ in 0...6) 0.5], [for (_ in 0...6) 1.0]);
-    var message = "";
-    try narrow.select([0.0, 0.5, 1.0], [
-      [candidate(0.0), candidate(10.0)],
-      [candidate(1.0), candidate(9.0)], [candidate(10.0)]])
-    catch (error:Dynamic) message = Std.string(error);
-    check(message.indexOf("0.500000") >= 0,
-      "Descartes reports the first disconnected sample distance");
-  }
-
   /** One group serves several threads at once: each evaluates in data of its own. */
   public function testSharedGroupAcrossThreads():Void {
     var arm = buildContractArmFixture().arm;
@@ -517,6 +573,23 @@ class KinematicsTests extends MotionKitTestSupport {
       var heldCells = motionkit.robot.ExternalAxisGrid.sample(group,seed,[]);
       check(heldCells.length == 1,"unspecified external axes become one-point rules");
       for (joint in 0...seed.length) near(heldCells[0].q[joint],seed[joint],"held external cell copies complete seed",1e-12);
+      var trackLower = group.group.limitsOf(0).lower;
+      var trackUpper = group.group.limitsOf(0).upper;
+      var roundedSeed = seed.copy(); roundedSeed[0] = trackUpper + 3e-11;
+      var roundedHeld = motionkit.robot.ExternalAxisGrid.sample(group,roundedSeed,[]);
+      near(roundedHeld[0].q[0],trackUpper,"sub-nanometre external seed residual snaps to the mechanical stop",1e-12);
+      var roundedLowSeed = seed.copy(); roundedLowSeed[0] = trackLower - 3e-11;
+      var roundedLow = motionkit.robot.ExternalAxisGrid.sample(group,roundedLowSeed,[]);
+      near(roundedLow[0].q[0],trackLower,"sub-nanometre external seed residual snaps at the lower stop",1e-12);
+      var roundedRange = motionkit.robot.ExternalAxisGrid.sample(group,seed,
+        [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,trackUpper+3e-11,trackUpper+3e-11,1)]);
+      near(roundedRange[0].q[0],trackUpper,"external grid endpoints normalize representational stop noise",1e-12);
+      var realOvertravelRejected = false;
+      try {
+        var invalidGrid = motionkit.robot.ExternalAxisGrid.sample(group,seed,
+          [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,trackUpper+1e-5,trackUpper+1e-5,1)]);
+      } catch (_:Dynamic) { realOvertravelRejected = true; }
+      check(realOvertravelRejected,"external grid rejects travel beyond floating-point boundary tolerance");
       var nativeSeed = [for(i in 0...group.group.count()) 0.3*Math.sin(i+0.4)];
       var nativeTarget = numeric.forward(nativeSeed);
       var nativeBefore = group.numericSolveCount();

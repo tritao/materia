@@ -55,6 +55,12 @@ class RobotInterfaceTests {
       "door opening is refused while the spindle is running");
 
     fsm = new RobotInterface();
+    output = fsm.update(input(true, false, false, false, false, false,
+      false, false, true, false, true, true, true), 0.01);
+    check(output.alarm == RobotInterfaceAlarm.None && output.doorCoilA,
+      "a safe open request continues a door from a partially open position");
+
+    fsm = new RobotInterface();
     output = fsm.update(input(false, false, true, false, false, false,
       true, false, false, false, false), 0.01);
     check(output.alarm == RobotInterfaceAlarm.ClampInterlock,

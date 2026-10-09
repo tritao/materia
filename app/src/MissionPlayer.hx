@@ -28,10 +28,10 @@ import motionkit.program.MotionOp;
 import motionkit.program.MoveTarget;
 import motionkit.program.Blend;
 import motionkit.kinematics.Pose3;
-import motionkit.robot.JointMotionPolicy;
 import motionkit.MotionOptions;
 import motionkit.robot.MotionSystem;
 import motionkit.robot.MotionSystemBlueprint;
+import motionkit.robot.JointMotionPolicy;
 import motionkit.axis.MotionAxisBlueprint;
 import motionkit.robot.StepperSlip;
 import robotkit.runtime.EncoderMonitor;
@@ -79,9 +79,16 @@ import robotkit.skill.SkillRunner;
 import robotkit.skill.SkillStatus;
 import robotkit.skill.SkillResult;
 import robotkit.core.RobotSnapshot;
+import cnckit.controller.RobotInterfaceAlarm;
+import cnckit.controller.RobotInterfaceChannels;
 
 /** A box held where it stands: centre, half extents and heading, in metres and radians. */
 typedef FloorObstacle = robotkit.navigation.FloorMap.FloorBox;
+
+private typedef InterfaceAlarmRead = {
+  var valid:Bool;
+  var code:RobotInterfaceAlarm;
+}
 
 /**
  * What a view of the running mission draws, all in the map frame and metres: the route being followed,
@@ -537,6 +544,11 @@ class MissionPlayer implements SessionMember {
     var links = robot.model.links;
     var bodies = [for (hull in robot.hulls) if (ignored.indexOf(hull.part) < 0)
       {name: hull.part, link: links[hull.link].id, vertices: hull.vertices, tool: toolPrefix != null && StringTools.startsWith(hull.part, toolPrefix)}];
+    var carriedLinks = new Map<String, Int>();
+    for (channel in carryingTools.keys()) if (carryingTools.get(channel) == true) {
+      var held = heldParts.get(channel), kinematics = toolKinematics.get(channel);
+      if (held != null && kinematics != null) carriedLinks.set(held.occurrence, kinematics.link);
+    }
     var base = simulation.linkPose(robotIndex, 0);
     var baseInverse = new Transform3(new Vec3(base.position[0], base.position[1], base.position[2]),
       new Quat(base.rotation[0], base.rotation[1], base.rotation[2], base.rotation[3])).inverse();
@@ -544,9 +556,15 @@ class MissionPlayer implements SessionMember {
       var part = assemblyParts.get(entry.id);
       if (part.vertices.length == 0) continue;
       var live = part.pose();
-      var carrier = simulation.objectCarrier(entry.object), attached = -1;
-      for (index in 0...links.length)
-        if (simulation.linkBody(robotIndex, index) == carrier) {attached = index; break;}
+      // Free CAD objects do not have a physical parent link. During planning,
+      // a confirmed grasp supplies that rigid relationship so the payload hull
+      // follows the actual gripper carrier in the arm's forward kinematics.
+      var attached = -1, carried = carriedLinks.get(entry.id.substr(8));
+      if (carried != null) attached = carried else {
+        var carrier = simulation.objectCarrier(entry.object);
+        for (index in 0...links.length)
+          if (simulation.linkBody(robotIndex, index) == carrier) {attached = index; break;}
+      }
       var inverse = baseInverse;
       if (attached >= 0) {
         var body = simulation.linkPose(robotIndex, attached);
@@ -728,9 +746,17 @@ class MissionPlayer implements SessionMember {
       return;
     }
     var readCellInput = cellInput;
-    if (readCellInput != null) switch readCellInput(cnckit.controller.RobotInterfaceChannels.ALARM) {
+    if (readCellInput != null) switch readCellInput(RobotInterfaceChannels.ALARM) {
       case Digital(true):
-        failMission("CNC controller alarm", MissionAlarmCode.CncAlarm);
+        var alarm = readInterfaceAlarm(readCellInput);
+        var partPresent = switch readCellInput(RobotInterfaceChannels.PART_PRESENT) {
+          case Digital(value): value;
+          case _: false;
+        };
+        var alarmName = alarm.valid ? Std.string(alarm.code) : "with an invalid code";
+        var missionAlarm = alarm.valid ? MissionAlarmClassifier.fromInterfaceAlarm(alarm.code, partPresent)
+          : MissionAlarmCode.CncAlarm;
+        failMission('CNC controller alarm $alarmName', missionAlarm);
         return;
       case _:
     }
@@ -776,14 +802,38 @@ class MissionPlayer implements SessionMember {
     trackWheels(snapshot);
     switch runner.status() {
       case Running:
-      case _:
-        if (runner.start(skillFor(mission.steps[stepIndex])) != Running) {
+        case _:
+        var activeStep = mission.steps[stepIndex];
+        var skill:Skill;
+        try {
+          skill = skillFor(activeStep);
+        } catch (error:Dynamic) {
+          var message = Std.string(error);
+          failMission('step $stepIndex (${activeStep.kind}) could not be planned: $message',
+            alarmForFailure(activeStep, message));
+          return;
+        }
+        if (runner.start(skill) != Running) {
           settle();
           return;
         }
     }
     runner.update(snapshot, timestep);
     settle();
+  }
+
+  /** Read the four discrete CNC alarm-code outputs as one validated PLC alarm value. */
+  function readInterfaceAlarm(read:String->Null<EventValue>):InterfaceAlarmRead {
+    var code = 0;
+    var bits = RobotInterfaceChannels.alarmCodeBits();
+    for (index in 0...bits.length) switch read(bits[index]) {
+      case Digital(on): if (on) code |= 1 << index;
+      case _: return {valid: false, code: RobotInterfaceAlarm.None};
+    }
+    if (code < RobotInterfaceAlarm.ConflictingRequests || code > RobotInterfaceAlarm.ToolChangeRequired)
+      return {valid: false, code: RobotInterfaceAlarm.None};
+    var alarm:RobotInterfaceAlarm = code;
+    return {valid: true, code: alarm};
   }
 
   /** The step that was running stops through the robot's runtime, which still answers until the session resets. */
@@ -854,11 +904,8 @@ class MissionPlayer implements SessionMember {
     return active == null ? 0 : active.restarts();
   }
 
-  public function present():Void {
-    if (!recoveryPulsePending) return;
-    recoveryPulsePending = false;
-    try writeMissionOutput(cnckit.controller.RobotInterfaceChannels.FAULT_RESET, false) catch (_:Dynamic) {}
-  }
+  /** Controller pulses are timed in feed(), never on render-frame presentation. */
+  public function present():Void {}
 
   function failMission(message:String, code:MissionAlarmCode):Void {
     if (failure != null) return;
@@ -930,11 +977,18 @@ class MissionPlayer implements SessionMember {
       case Digital(value): activeAlarm = value;
       case _:
     }
+    // CellSignals samples cabinet outputs before this member runs. Keep reset high
+    // until the following controller image has carried it to the CNC cabinet.
+    if (recoveryPulsePending) {
+      recoveryPulsePending = false;
+      try writeMissionOutput(cnckit.controller.RobotInterfaceChannels.FAULT_RESET, false) catch (_:Dynamic) {}
+    }
     var state = robot.runtime.snapshot();
     var safetyStopped = state.safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT ||
       state.safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP ||
       state.endpoint == RobotKitRuntimeConstants.RK_ENDPOINT_FAULT;
-    if (recoveryOutputPending && !safetyStopped) {
+    var safetyReady = !safetyStopped && state.safety == RobotKitRuntimeConstants.RK_SAFETY_READY;
+    if (recoveryOutputPending && safetyReady) {
       try writeMissionOutput(cnckit.controller.RobotInterfaceChannels.FAULT_RESET, true) catch (error:Dynamic) {
         recoveryPending = false;
         recoveryOutputPending = false;
@@ -947,7 +1001,7 @@ class MissionPlayer implements SessionMember {
       recoveryPulsePending = true;
       return;
     }
-    if (!activeAlarm && !safetyStopped && !recoveryPulsePending) {
+    if (!activeAlarm && safetyReady && !recoveryPulsePending) {
       failure = null;
       alarmCode = null;
       failedStepIndex = -1;
@@ -1126,10 +1180,23 @@ class MissionPlayer implements SessionMember {
     var context = jointMotionContext(at);
     var q = startingJointPositions(context.motion, context.indices);
     var ops:Array<MotionOp> = [];
-    for (waypoint in waypoints) {
+    var validator = planValidator(context.arm);
+    for (waypointIndex in 0...waypoints.length) {
+      var waypoint = waypoints[waypointIndex];
       if (waypoint.joints != null) {
-        setJointTargets(q, waypoint.joints, context);
-        ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(q.copy()), new MotionOptions(), Blend.ExactStop));
+        var goal = q.copy();
+        setJointTargets(goal, waypoint.joints, context);
+        var compiler = context.motion.compiler;
+        var targets:Array<Array<Float>>;
+        try {
+          targets = validator.partitionJointSegment(q, goal, compiler.maxVelocity,
+            compiler.maxAcceleration, compiler.maxJerk);
+        } catch (error:Dynamic) {
+          throw 'Via waypoint $waypointIndex failed clearance planning: ${Std.string(error)}';
+        }
+        for (target in targets)
+          ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(target), new MotionOptions(), Blend.ExactStop));
+        q = goal;
       } else {
         var pose = waypoint.pose;
         if (pose == null) throw "Via waypoint has no target";
@@ -1137,7 +1204,7 @@ class MissionPlayer implements SessionMember {
           new MotionOptions(), Blend.ExactStop));
       }
     }
-    context.motion.compiler.planValidator = planValidator(context.arm);
+    context.motion.compiler.planValidator = validator;
     return new MotionProgramSkill(context.motion, new MotionProgram(ops));
   }
 
@@ -1179,7 +1246,10 @@ class MissionPlayer implements SessionMember {
   function startingJointPositions(motion:ManipulatorMotion, indices:Array<Int>):Array<Float> {
     var q = motion.commandedPositions();
     if (q == null) {
-      var positions = robot.robot.snapshot().positions;
+      // MotionProgramSkill compiles its first move from commanded setpoints.
+      // The clearance partition must use that same start state; measured
+      // positions can lag by a small tracking error and describe a different path.
+      var positions = robot.robot.snapshot().setpointPositions;
       q = [for (index in indices) positions.get(index)];
     }
     return q;
@@ -1197,7 +1267,25 @@ class MissionPlayer implements SessionMember {
         var authored = [for (item in assembly.joints) if (item.id == target.joint) item];
         if (authored.length != 1) throw 'No mechanical joint "${target.joint}"';
         var scale = Std.string(authored[0].type) == "prismatic" ? metres : 1.0;
-        q[i] = target.position - placement.joint(target.joint) * scale;
+        var requested = target.position - placement.joint(target.joint) * scale;
+        var limits = context.arm.group.limitsOf(i);
+        if (limits.lower < limits.upper) {
+          // Converting an authored absolute coordinate through its assembly
+          // offset can put an exact stop target one ULP outside the model range.
+          // Snap only that floating-point residue; reject any real overtravel.
+          var tolerance = 1e-12 * Math.max(1.0,
+            Math.max(Math.abs(limits.lower), Math.abs(limits.upper)));
+          if (requested < limits.lower) {
+            if (limits.lower - requested > tolerance)
+              throw 'Joint "${target.joint}" target $requested is below its limit ${limits.lower}';
+            requested = limits.lower;
+          } else if (requested > limits.upper) {
+            if (requested - limits.upper > tolerance)
+              throw 'Joint "${target.joint}" target $requested is above its limit ${limits.upper}';
+            requested = limits.upper;
+          }
+        }
+        q[i] = requested;
         found = true;
       }
       if (!found) throw 'Joint "${target.joint}" is outside the selected mission chain';
@@ -1208,6 +1296,35 @@ class MissionPlayer implements SessionMember {
     var interfaces:Array<robotkit.manipulation.ArmClearance.ClearanceInterfaceData> = [
       for (pair in robot.jointInterfaces) {first: pair.first, second: pair.second, margin: ArmClearance.INTERFACE_MARGIN}
     ];
+    for (channel in carryingTools.keys()) if (carryingTools.get(channel) == true) {
+      var held = heldParts.get(channel), tool = handlingTools.get(channel);
+      if (held == null || tool == null) continue;
+      var occurrence = held.occurrence;
+      // A blank leaves its four tray pads while the gripper carries it. Treat
+      // those designed support contacts like other mechanical interfaces: the
+      // hulls must not penetrate, but they need not retain the air-clearance
+      // margin while the blank is being lifted out of its seat.
+      var infeedPrefix = "infeed/blank-";
+      if (StringTools.startsWith(occurrence, infeedPrefix)) {
+        var slot = occurrence.substr(infeedPrefix.length).split("-");
+        if (slot.length == 2) {
+          var row = Std.parseInt(slot[0]), column = Std.parseInt(slot[1]);
+          if (row != null && column != null) for (sideX in [-1, 1]) for (sideY in [-1, 1])
+            interfaces.push({first: occurrence,
+              second: 'infeedTray/seat-r$row-c$column-x$sideX-y$sideY', margin: 0.0});
+        }
+      }
+      var toolPart = tool.contact.occurrence;
+      var prefix = toolPart.substr(0, toolPart.lastIndexOf("/") + 1);
+      var contacted = new Map<String, Bool>();
+      // A carried blank remains a collision body against the cell, but its designed
+      // contact with this gripper is a named interface rather than a self-collision.
+      for (hull in robot.hulls) if ((hull.part == toolPart || StringTools.startsWith(hull.part, prefix)) &&
+          !contacted.exists(hull.part)) {
+        contacted.set(hull.part, true);
+        interfaces.push({first: hull.part, second: occurrence, margin: 0.0});
+      }
+    }
     return new ArmPlanClearance(cellClearance(arm, null, [], ArmClearance.MARGIN, interfaces));
   }
 

@@ -23,7 +23,16 @@ typedef ClearanceViolation = {
   var required:Float;
 }
 
-/** A named pair of part hulls with a derived mechanical interface clearance. */
+private typedef ClearancePair = {
+  var first:Int;
+  var second:Int;
+  var interfaceMargin:Null<Float>;
+}
+
+/** A named pair of part hulls with a mechanical interface clearance. A zero
+    margin allows swept intervals to end at contact; an ambiguous stationary
+    zero-distance interval fails closed because GJK cannot distinguish touch
+    from overlap. Positive margins apply only to close reference interfaces. */
 typedef ClearanceInterfaceData = {
 	var first:String;
 	var second:String;
@@ -110,6 +119,8 @@ class ArmClearance {
   public static inline var INTERFACE_MARGIN:Float = 0.001;
   /** CAD mating surfaces can differ by a few micrometres after frame transforms. */
   public static inline var INTERFACE_TOUCH_TOLERANCE:Float = 0.00001;
+  /** Numerical tolerance for conservative zero-margin interval contact, in metres. */
+  public static inline var ZERO_MARGIN_INTERVAL_TOLERANCE:Float = 1e-9;
   /** Neighbouring links whose bodies are closer than this in the reference configuration touch by design, in metres. */
   public static inline var TOUCH:Float = 0.002;
   public final arm:KinematicGroup;
@@ -118,14 +129,13 @@ class ArmClearance {
   /** Null keeps the traditional contact policy; otherwise only named fixed bodies get it. */
   final contactBodies:Null<Map<String, Bool>>;
   final allowedContactBodyNames:Null<Array<String>>;
-  final interfaceMargins:Map<String, Float> = new Map();
   final interfaceDefinitions:Array<ClearanceInterfaceData> = [];
 
   final reference:Array<Float>;
   final bodies:Array<ClearanceBody> = [];
   final links:Array<LinkId> = [];
-  /** The pairs checked, as indices into `bodies`. */
-  final pairs:Array<Array<Int>> = [];
+  /** The checked body pairs and their resolved reference interface policy. */
+  final pairs:Array<ClearancePair> = [];
 
   /**
    * `reference` is a configuration the arm stands in and nothing is meant to collide: neighbouring links whose bodies
@@ -147,13 +157,14 @@ class ArmClearance {
       permitted = names;
     }
     contactBodies = permitted;
+    var declaredInterfaces = new Map<String, Float>();
     if (interfaces != null) for (entry in interfaces) {
       if (entry == null || entry.first == null || entry.second == null || entry.first == entry.second ||
           !Math.isFinite(entry.margin) || entry.margin < 0.0 || entry.margin > margin)
         throw "Clearance interfaces need distinct part names and a finite margin within the global margin";
       var key = interfaceKey(entry.first, entry.second);
-      if (interfaceMargins.exists(key)) throw 'Clearance interface "${entry.first}/${entry.second}" is duplicated';
-      interfaceMargins.set(key, entry.margin);
+      if (declaredInterfaces.exists(key)) throw 'Clearance interface "${entry.first}/${entry.second}" is duplicated';
+      declaredInterfaces.set(key, entry.margin);
       interfaceDefinitions.push({first: entry.first, second: entry.second, margin: entry.margin});
     }
     var movingLinks = new Map<LinkId, Bool>();
@@ -198,16 +209,26 @@ class ArmClearance {
       var a = bodies[i], b = bodies[j];
       if (!a.moving && !b.moving) continue;
       if (a.link == b.link) continue;
-      if (neighbours.exists(a.link + "\n" + b.link)) {
+      var key = interfaceKey(a.name, b.name);
+      var namedInterface = declaredInterfaces.get(key);
+      var resolvedInterface:Null<Float> = null;
+      var jointNeighbour = neighbours.exists(a.link + "\n" + b.link);
+      if (jointNeighbour || namedInterface != null) {
         var referenceGap = distance(a, a.placed(poses[a.linkIndex]), poses[a.linkIndex],
-          b, b.placed(poses[b.linkIndex]), poses[b.linkIndex], TOUCH);
-        // A mating face may carry a few micrometres of transform-rounding gap.
+          b, b.placed(poses[b.linkIndex]), poses[b.linkIndex], namedInterface == null ? TOUCH : margin);
+        // A zero-margin interface explicitly permits contact throughout the
+        // plan (for example, a carried workpiece against its gripper). Positive
+        // mechanical fits get their smaller margin only while they are close at
+        // the planning reference; a distant pair remains an ordinary obstacle.
+        if (namedInterface != null && (namedInterface == 0.0 || referenceGap < margin))
+          resolvedInterface = namedInterface;
+        // A joint mating face may carry a few micrometres of transform-rounding gap.
         // Named interfaces only waive their margin within that CAD tolerance;
-        // a designed, larger gap still gets the tighter clearance below.
-        if ((interfaceMargin(a.name, b.name) == null && referenceGap < TOUCH) ||
-            (interfaceMargin(a.name, b.name) != null && referenceGap <= INTERFACE_TOUCH_TOLERANCE)) continue;
+        // A close named pair with a real design gap keeps the interface margin.
+        if ((namedInterface == null && jointNeighbour && referenceGap < TOUCH) ||
+            (namedInterface != null && jointNeighbour && referenceGap <= INTERFACE_TOUCH_TOLERANCE)) continue;
       }
-      pairs.push([i, j]);
+      pairs.push({first: i, second: j, interfaceMargin: resolvedInterface});
     }
   }
 
@@ -230,9 +251,6 @@ class ArmClearance {
     var allowed = contactBodies;
     return allowed == null || allowed.exists(name);
   }
-
-  function interfaceMargin(first:String, second:String):Null<Float>
-    return interfaceMargins.get(interfaceKey(first, second));
 
   static function interfaceKey(first:String, second:String):String
     return Reflect.compare(first, second) <= 0 ? first + "\n" + second : second + "\n" + first;
@@ -294,11 +312,18 @@ class ArmClearance {
     var poses = arm.linkPoses(q, links);
     var placed = [for (body in bodies) body.placed(poses[body.linkIndex])];
     for (pair in pairs) {
-      var a = bodies[pair[0]], b = bodies[pair[1]];
-      var jointInterface = interfaceMargin(a.name, b.name);
-      var required = (jointInterface == null ? margin : jointInterface) + movement[pair[0]] + movement[pair[1]];
-      if (distance(a, placed[pair[0]], poses[a.linkIndex], b, placed[pair[1]], poses[b.linkIndex], required) <= required)
-        return false;
+      var a = bodies[pair.first], b = bodies[pair.second];
+      var jointInterface = pair.interfaceMargin;
+      var required = (jointInterface == null ? margin : jointInterface) + movement[pair.first] + movement[pair.second];
+      var lowerBound = distance(a, placed[pair.first], poses[a.linkIndex],
+        b, placed[pair.second], poses[b.linkIndex], required);
+      if (jointInterface == 0.0) {
+        // GJK reports both contact and overlap as zero. With nonzero motion,
+        // the distance lower bound must cover the complete relative travel;
+        // with no motion, zero is ambiguous and cannot certify the interface.
+        if (lowerBound + ZERO_MARGIN_INTERVAL_TOLERANCE < required ||
+            required == 0.0 && lowerBound == 0.0) return false;
+      } else if (lowerBound <= required) return false;
     }
     return true;
   }
@@ -339,27 +364,27 @@ class ArmClearance {
       return made;
     }
     for (pair in pairs) {
-      var a = bodies[pair[0]], b = bodies[pair[1]];
+      var a = bodies[pair.first], b = bodies[pair.second];
       var workingFace = (a.tool && !b.moving && canContact(b.name)) ||
         (b.tool && !a.moving && canContact(a.name));
       var requested = wanted == null ? margin : Math.min(margin, wanted);
-      var jointInterface = interfaceMargin(a.name, b.name);
+      var jointInterface = pair.interfaceMargin;
       if (jointInterface != null) requested = Math.min(requested, jointInterface);
       var required = contact && workingFace ? contactMargin : requested;
-      if(displacements!=null)required+=displacements[pair[0]]+displacements[pair[1]];
+      if(displacements!=null)required+=displacements[pair.first]+displacements[pair.second];
       // Whole bodies clear by more than the margin: bounding spheres.
-      var gap = centres[pair[0]].sub(centres[pair[1]]).norm() - a.radius - b.radius;
+      var gap = centres[pair.first].sub(centres[pair.second]).norm() - a.radius - b.radius;
       if (gap > required) continue;
       // Long rails and tables have large spheres. Their world bounds give
       // another conservative lower bound before the exact hull query.
-      var boxA = box(pair[0]), boxB = box(pair[1]);
+      var boxA = box(pair.first), boxB = box(pair.second);
       var gap2 = 0.0;
       for (axis in 0...3) {
         var separation = Math.max(0.0, Math.max(boxA[axis] - boxB[axis + 3], boxB[axis] - boxA[axis + 3]));
         gap2 += separation * separation;
       }
       if (gap2 > required * required) continue;
-      var apart = ConvexDistance.between(corners(pair[0]), corners(pair[1]), required);
+      var apart = ConvexDistance.between(corners(pair.first), corners(pair.second), required);
       if (apart < required) return {a: a.name, b: b.name, distance: apart, required: required};
     }
     return null;
@@ -415,10 +440,10 @@ class ArmClearance {
       var made=bodies[index].placed(poses[bodies[index].linkIndex]);placed[index]=made;return made;
     }
     var best:Null<ClearanceViolation> = null;
-    for(pair in pairs){var a=bodies[pair[0]],b=bodies[pair[1]];
+    for(pair in pairs){var a=bodies[pair.first],b=bodies[pair.second];
       var required=contact && (a.tool && !b.moving || b.tool && !a.moving) ? contactMargin
         : (wanted==null ? margin : Math.min(margin,wanted));
-      var apart=ConvexDistance.between(corners(pair[0]),corners(pair[1]),Math.POSITIVE_INFINITY);
+      var apart=ConvexDistance.between(corners(pair.first),corners(pair.second),Math.POSITIVE_INFINITY);
       if(best==null || apart<best.distance)best={a:a.name,b:b.name,distance:apart,required:required};
     }
     return best;
@@ -441,6 +466,42 @@ class ArmClearance {
       var q = [for (joint in 0...from.length) from[joint] + (to[joint] - from[joint]) * t];
       var found = violation(q, contactAt == null ? contact : contactAt(q), wanted);
       if (found != null) return found;
+    }
+    return null;
+  }
+
+  /** Certify the complete straight joint-coordinate segment, subdividing until
+   * the analytical hull-displacement bounds prove each interval clear. Unlike
+   * `sweep`, this does not rely on a fixed sample spacing. */
+  public function certifySegment(from:Array<Float>, to:Array<Float>, contact:Bool = false):Null<ClearanceViolation> {
+    if (from == null || to == null || from.length != to.length || from.length != arm.dofCount())
+      throw "Clearance segment needs matching group coordinates";
+    var delta:Array<Float> = [];
+    for (joint in 0...from.length) {
+      if (!Math.isFinite(from[joint]) || !Math.isFinite(to[joint]))
+        throw "Clearance segment coordinates must be finite";
+      delta.push(to[joint] - from[joint]);
+    }
+    var endpointHit = violation(from, contact);
+    if (endpointHit != null) return endpointHit;
+    endpointHit = violation(to, contact);
+    if (endpointHit != null) return endpointHit;
+    var pending = [{start: 0.0, end: 1.0}], checked = 0;
+    while (pending.length > 0) {
+      if (++checked > 100000) throw "Clearance segment certification budget exceeded; split the motion";
+      var interval = pending.pop();
+      if (interval == null) throw "Clearance segment interval stack is empty";
+      var middle = interval.start + (interval.end - interval.start) / 2;
+      var q = [for (joint in 0...from.length) from[joint] + delta[joint] * middle];
+      var hit = violation(q, contact);
+      if (hit != null) return hit;
+      var radius = (interval.end - interval.start) / 2;
+      var excursions = [for (joint in 0...from.length) Math.abs(delta[joint]) * radius];
+      if (intervalClear(q, excursions)) continue;
+      if (middle == interval.start || middle == interval.end)
+        throw "Clearance segment cannot certify the required margin";
+      pending.push({start: middle, end: interval.end});
+      pending.push({start: interval.start, end: middle});
     }
     return null;
   }

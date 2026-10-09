@@ -53,7 +53,7 @@ typedef AssemblyLinkHull = {
   var vertices:Array<Float>;
 }
 
-/** Two occurrence hulls that meet as a designed mechanical joint interface. */
+/** Candidate occurrence hulls on opposite sides of a mechanical joint. */
 typedef AssemblyJointInterface = {
 	var first:String;
 	var second:String;
@@ -618,8 +618,9 @@ class AssemblySimulationBridge {
       closureIds: closures, closures: closureGeometry};
   }
 
-/** Parts at rotary or pneumatic joints and their directly mounted accessories,
- * derived from the kinematic tree. Unrelated parts sharing a root link are not interfaces. */
+/** Candidate part pairs across a mechanical joint, derived from the kinematic tree.
+ * `ArmClearance` activates the smaller interface margin only for pairs within the
+ * ordinary clearance at its planning reference. */
   public static function jointInterfaces(definition:AssemblyDefinition, model:RobotModel,
       hulls:Array<AssemblyLinkHull>):Array<AssemblyJointInterface> {
     var available = new Map<String, AssemblyLinkHull>();
@@ -668,6 +669,26 @@ class AssemblySimulationBridge {
         for (parentAccessory in parentAccessories) for (childAccessory in childAccessories)
           add(parentAccessory, childAccessory);
       }
+    }
+    // Fixed mounts can be nested several levels below either joint endpoint
+    // (a rack support and a motor plate around an external track, for example).
+    // Include every physical pair on the two adjacent rigid links as a candidate;
+    // ArmClearance keeps the global obstacle margin for parts that are not close
+    // interfaces at its reference pose.
+    var hullsByLink = new Map<Int, Array<AssemblyLinkHull>>();
+    for (hull in hulls) {
+      var linkHulls = hullsByLink.get(hull.link);
+      if (linkHulls == null) {
+        linkHulls = [];
+        hullsByLink.set(hull.link, linkHulls);
+      }
+      linkHulls.push(hull);
+    }
+    for (joint in model.joints) {
+      var parent = model.links.indexOf(joint.parent), child = model.links.indexOf(joint.child);
+      var parentParts = hullsByLink.get(parent), childParts = hullsByLink.get(child);
+      if (parentParts == null || childParts == null) continue;
+      for (first in parentParts) for (second in childParts) add(first.part, second.part);
     }
     return result;
   }

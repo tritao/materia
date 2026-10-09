@@ -22,6 +22,8 @@ class GantryWelder extends machinekit.gantry.Gantry {
 	/** The workpiece's origin, the plate's centre, on the table. The plate and the tube frame beside it are both inside the XYZ workspace. */
 	public static inline var WORK_X:Float = 450;
 	static inline var FIXTURE_SIZE:Float = 20;
+	/** Assumed race-root diameter for this generic 16 mm, 10 mm-lead ball screw, mm. */
+	static inline var SCREW_RACE_ROOT_DIAMETER:Float = 13;
 	/** The work clamp's seat on the plate's top, in the plate's frame: a back corner, clear of the seams. */
 	public static inline var CLAMP_X:Float = -60;
 	public static inline var CLAMP_Y:Float = 62;
@@ -38,7 +40,8 @@ class GantryWelder extends machinekit.gantry.Gantry {
 		// The 10 mm ball-screw lead and 48 V drivers supply that carriage
 		// speed while the wire stays above the welder's stable feed range.
 		var screw = machinekit.gantry.GantrySpec.GantryDrive.Screw(new machinekit.motion.LeadScrewThread(
-			machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.Ball, 16, 10));
+			machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.Ball, 16, 10, 1,
+			machinekit.motion.LeadScrewThread.LeadScrewHand.RightHand, SCREW_RACE_ROOT_DIAMETER));
 		super(new machinekit.gantry.GantrySpec(1200, 1000, 600, screw, screw, screw, true,
 			"MGN12C", 23, "HFS5-4040", "HFS5-4040", false, machinekit.gantry.GantrySpec.GantryHead.CA,
 			0.5, machinekit.motion.ServoMotor.LOW_VOLTAGE_BUS, 16, 200, 100, 500, 250));

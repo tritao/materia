@@ -35,6 +35,9 @@
 		"robotkit": {
 			"path": "../../../robotkit"
 		},
+		"motionkit-robot": {
+			"path": "../../../motionkit/robot"
+		},
 		"cadbridge": {
 			"path": "../../../robotkit/cadbridge"
 		},

@@ -34,20 +34,21 @@ class SerialCandidateSampler {
       rollCount:Int=12,tiltRings:Int=3,azimuthCount:Int=8,?maxJump:Array<Float>,
       ?jointBounds:{lower:Array<Float>,upper:Array<Float>}):Array<LatticeCandidate> {
     if(target==null)throw "Serial candidate sampling requires a target";
+    var planningSeed = ExternalAxisGrid.normalizeSeed(group, seed);
     var liftLimits=limits;
     if(maxJump!=null || jointBounds!=null){
-      if(seed==null || seed.length!=group.group.count() || maxJump!=null && maxJump.length!=seed.length ||
+      if(maxJump!=null && maxJump.length!=planningSeed.length ||
           jointBounds!=null && (jointBounds.lower==null || jointBounds.upper==null ||
-            jointBounds.lower.length!=seed.length || jointBounds.upper.length!=seed.length))
+            jointBounds.lower.length!=planningSeed.length || jointBounds.upper.length!=planningSeed.length))
         throw "Serial jump bounds must match complete joints";
       liftLimits=new mk_joint_lift_request();liftLimits.set_struct_size(mk_joint_lift_request.size());
-      liftLimits.set_joint_count(seed.length);
-      for(j in 0...seed.length){
+      liftLimits.set_joint_count(planningSeed.length);
+      for(j in 0...planningSeed.length){
         if(maxJump!=null && (!Math.isFinite(maxJump[j]) || maxJump[j]<=0))
           throw "Serial jump bounds must be finite and positive";
         var bound=group.group.limitsOf(j);
         var lower=bound.lower,upper=bound.upper;
-        if(maxJump!=null){lower=Math.max(lower,seed[j]-maxJump[j]-1e-12);upper=Math.min(upper,seed[j]+maxJump[j]+1e-12);}
+        if(maxJump!=null){lower=Math.max(lower,planningSeed[j]-maxJump[j]-1e-12);upper=Math.min(upper,planningSeed[j]+maxJump[j]+1e-12);}
         if(jointBounds!=null){
           if(!Math.isFinite(jointBounds.lower[j]) || !Math.isFinite(jointBounds.upper[j]) ||
               jointBounds.lower[j]>jointBounds.upper[j])throw "Serial joint bounds must be finite ordered intervals";
@@ -63,15 +64,15 @@ class SerialCandidateSampler {
         liftLimits.set_periodic(j,group.external[j] ? 0 : 1);
       }
     }
-    var external=ExternalAxisGrid.describe(group,seed,ranges);
+    var external=ExternalAxisGrid.describe(group,planningSeed,ranges);
     var orientation=OrientationLattice.describe(freedom,rollCount,tiltRings,azimuthCount);
     var centre=OrientationLattice.centre(target,freedom);
     var pose=new mk_analytic_pose();pose.set_struct_size(mk_analytic_pose.size());
     var p=[centre.x,centre.y,centre.z],r=[centre.qx,centre.qy,centre.qz,centre.qw];
     for(i in 0...3)pose.set_position(i,p[i]);for(i in 0...4)pose.set_quaternion(i,r[i]);
     var result=MotionKitNative.mk_create_eaik_candidate_batch(eaik.chain.solver,eaik.configuration.native,
-      model.native,external,orientation,liftLimits,pose,seed);
+      model.native,external,orientation,liftLimits,pose,planningSeed);
     if(result.status!=TrajectoryCoreConstants.MK_OK)throw 'Native EAIK candidate generation failed: ${result.status}';
-    return labelled(NativeCandidateBatch.decode(result.out_batch,result.out_count,seed.length,model.externalIndices.length));
+    return labelled(NativeCandidateBatch.decode(result.out_batch,result.out_count,planningSeed.length,model.externalIndices.length));
   }
 }

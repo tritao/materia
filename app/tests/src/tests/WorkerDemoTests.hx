@@ -2,6 +2,7 @@ package tests;
 
 import app.Main.ReferenceEditorApp;
 import humankit.sim.HumanWorkerSignals;
+import sys.FileSystem;
 
 /** Runs the saved worker document in the application's shared SimKit session. */
 class WorkerDemoTests {
@@ -187,7 +188,11 @@ class WorkerDemoTests {
   static function legacyHumansRefused():Void {
     var editor = new ReferenceEditorApp();
     var refused:Null<String> = null;
-    try editor.session.open("fixtures/worker-legacy.materia") catch (error:Dynamic) refused = Std.string(error);
+    var fixturePath:Null<String> = null;
+    for (candidate in ["fixtures/worker-legacy.materia", "app/tests/fixtures/worker-legacy.materia"])
+      if (fixturePath == null && FileSystem.exists(candidate)) fixturePath = FileSystem.fullPath(candidate);
+    if (fixturePath == null) throw 'Worker refusal fixture is missing from the test working directory "${Sys.getCwd()}"';
+    try editor.session.open(fixturePath) catch (error:Dynamic) refused = Std.string(error);
     if (refused == null) throw "A scene with the retired humans section opened";
     if (refused.indexOf("humans") < 0 || refused.indexOf("no longer supported") < 0)
       throw 'The refusal does not say why: $refused';

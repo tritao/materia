@@ -365,9 +365,13 @@ class ProcessTests extends MotionKitTestSupport {
 
     homeGantryFixture(blueprint, runtime, simulationHarness, robot, machine);
     var home = robot.snapshot();
-    near(home.positions.get(0), 0.0, "XYZ gantry homes X");
-    near(home.positions.get(1), 0.0, "XYZ gantry homes Y");
-    near(home.positions.get(2), 0.0, "XYZ gantry homes Z");
+    var homePositions = home.positions.toArray();
+    for (axisBlueprint in blueprint.axes) {
+      var axis = machine.axis(axisBlueprint.id);
+      if (axis == null) throw 'XYZ gantry has no logical axis "${axisBlueprint.id}"';
+      near(axis.logicalPosition(homePositions), axisBlueprint.homePosition,
+        'XYZ gantry homes ${axisBlueprint.id} at its authored reference');
+    }
     throws(function() machine.moveAxes([new AxisTarget("x", 0.081)]),
       "XYZ gantry rejects an out-of-range axis target");
 

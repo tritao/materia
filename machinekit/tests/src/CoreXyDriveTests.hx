@@ -82,10 +82,20 @@ class CoreXyDriveTests {
 		// A controller's step rate caps the motors, and through them both axes: 16 microsteps at 40 kHz is 78.5 rad/s.
 		var binding = DeviceBinding.bind(model, DeviceLayout.forActuators(model), 40000);
 		if (binding.channels.length != 2) throw "the plotter's two motors take two channels";
-		var ceiling = 40000.0 / (200.0 * 16.0 / (2 * Math.PI));
-		near(binding.model.actuators[0].requireRate(), ceiling, "the step rate is each motor's ceiling", 1e-6);
-		near(binding.model.coupledLimits("x").requireVelocity(), ceiling * radius / 2, "and the axes' (250 mm/s)", 1e-9);
-		near(binding.model.coupledLimits("x").requireVelocity(), 0.25, "250 mm/s", 1e-4);
+		var pulseCeiling = 40000.0 / (200.0 * 16.0 / (2 * Math.PI));
+		near(binding.channels[0].maxRate, pulseCeiling, "the channel exposes the continuous pulse ceiling", 1e-6);
+		// The deployed pulse generator receives f32 settings, promotes them to f64,
+		// then rounds the required spacing up to an integer number of controller ticks.
+		var wire = haxe.io.Bytes.alloc(8);
+		wire.setFloat(0, binding.channels[0].maxRate);
+		wire.setFloat(4, binding.channels[0].stepsPerUnit);
+		var interval = Math.max(1, Math.ceil(binding.stepTickHz /
+			(wire.getFloat(0) * wire.getFloat(4))));
+		var achievableCeiling = binding.stepTickHz / (interval * wire.getFloat(4));
+		near(binding.model.actuators[0].requireRate(), achievableCeiling,
+			"the planner respects the quantized step interval", 1e-6);
+		near(binding.model.coupledLimits("x").requireVelocity(), achievableCeiling * radius / 2,
+			"the quantized motor ceiling limits both axes", 1e-9);
 		Sys.println('corexy plotter drives: motors ${Math.round(rate * 10) / 10} rad/s, axes to ${Math.round(x.requireVelocity() * 1e4) / 10} mm/s, ' +
 			'${Math.round(x.requireAcceleration() * 10) / 10} (x) and ${Math.round(y.requireAcceleration() * 10) / 10} (y) m/s²');
 	}

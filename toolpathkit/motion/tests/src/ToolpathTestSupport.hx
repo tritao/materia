@@ -183,6 +183,14 @@ class ToolpathTestSupport extends MotionKitTestSupport {
         homing.update(0.01);
       }
       check(homing.homingStatus() == "Complete", "CNC device establishes switch references");
+      var homed = robot.snapshot().positions.toArray();
+      for (axis in blueprint.axes) {
+        var index = -1;
+        for (jointIndex in 0...blueprint.model.joints.length)
+          if (blueprint.model.joints[jointIndex].id == axis.id) index = jointIndex;
+        check(index >= 0 && homed[index] >= axis.lowerLimit && homed[index] <= axis.upperLimit,
+          'CNC home on ${axis.id} stays within its soft travel: ${index < 0 ? "missing axis" : homed[index]}');
+      }
     } else homeGantryFixture(blueprint, runtime, simulationHarness, robot);
     var cnc = new MotionCncRig("work", "x", "y", "z", 0.01,
       null, 0.001);
@@ -195,7 +203,9 @@ class ToolpathTestSupport extends MotionKitTestSupport {
         EventValue.Digital(true) : null,
       function() return runtime.pollEvents());
     motion.run(program);
-    check(motion.running, 'CNC program starts: ${motion.failure}');
+    var afterHome = robot.snapshot();
+    check(motion.running, 'CNC program starts: ${motion.failure}; observed=${afterHome.positions.toArray()}, ' +
+      'setpoints=${afterHome.setpointPositions.toArray()}');
     var trace:Array<Float> = [];
     var holdIssued = false, holdTicks = 0, linkCut = false;
     for (tick in 0...3000) {

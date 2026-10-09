@@ -59,12 +59,38 @@ class MachineKitRobotCompiler {
           joints.push(coupling.follower);
       }
       var limits = model.coupledLimits(axis.id);
+      var lower = axis.lower * MILLIMETRES_TO_METRES;
+      var upper = axis.upper * MILLIMETRES_TO_METRES;
       axes.push(new MotionAxisBlueprint(axis.id, joints,
-        axis.lower * MILLIMETRES_TO_METRES, axis.upper * MILLIMETRES_TO_METRES,
+        lower, upper,
         Math.min(maxVelocity, limits.requireVelocity()),
-        Math.min(maxAcceleration, limits.requireAcceleration())));
+        Math.min(maxAcceleration, limits.requireAcceleration()),
+        homingDatum(model, axis.id, lower, upper)));
     }
     return MotionSystemBlueprint.fromRobotModel(model, axes);
+  }
+
+  /** Put a switch-referenced stepper home inside the soft limit by its stated uncertainty. */
+  static function homingDatum(model:RobotModel, axisId:String, lower:Float, upper:Float):Float {
+    var home = lower, jointIndex = -1;
+    for (index in 0...model.joints.length) if (model.joints[index].id == axisId) jointIndex = index;
+    if (jointIndex < 0) throw 'Gantry axis "$axisId" has no compiled joint';
+    var repeatability = 0.0;
+    for (contact in model.switches) if (contact.role == "home" && contact.joint == axisId)
+      repeatability = Math.max(repeatability, contact.repeatability);
+    var resolution = 0.0;
+    for (actuator in model.actuators) {
+      var mapping = robotkit.device.DeviceTransmission.of(model, actuator);
+      if (!mapping.singleLeader || mapping.jointIndex != jointIndex || actuator.microsteps == null ||
+          actuator.microsteps <= 0 || actuator.fullStepsPerRevolution <= 0.0) continue;
+      resolution = Math.max(resolution, 2 * Math.PI /
+        (actuator.fullStepsPerRevolution * actuator.microsteps * Math.abs(mapping.ratio)));
+    }
+    if (repeatability == 0.0 && resolution == 0.0) return home;
+    var inset = repeatability + resolution;
+    if (!Math.isFinite(inset) || inset <= 0.0 || inset >= upper - lower)
+      throw 'Gantry axis "$axisId" has no room for its switch and drive home uncertainty';
+    return lower + inset;
   }
 
   /** Physical mass/inertia and saved actuator metadata enter one bridge invocation. */

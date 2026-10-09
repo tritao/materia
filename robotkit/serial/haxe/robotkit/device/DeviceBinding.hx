@@ -145,6 +145,8 @@ class DeviceBinding {
         var wire = haxe.io.Bytes.alloc(8);
         wire.setFloat(0, rate); wire.setFloat(4, stepsPerUnit);
         var wireRate = wire.getFloat(0), wireSteps = wire.getFloat(4);
+        // RKD6 decodes both serialized f32 settings to f64 before choosing its
+        // integer interval. Match that deployed arithmetic when bounding plans.
         var interval = Math.max(1, Math.ceil(stepTickHz / (wireRate * wireSteps)));
         capped.maxRate = Math.min(rate, stepTickHz / (interval * wireSteps));
       }

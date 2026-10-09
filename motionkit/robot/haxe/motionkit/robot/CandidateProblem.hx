@@ -51,6 +51,7 @@ class CandidateProblem {
       boundedConstruction:Bool=false) {
     if(group==null || request==null || request.startQ.length!=group.group.count())
       throw "Candidate problem requires a group and complete path request";
+    var planningStart = ExternalAxisGrid.normalizeSeed(group, request.startQ);
     var settings=options==null ? new CandidateSamplingOptions() : options;
     this.request=request;this.pinnedStart=settings.pinStart;
     this.configuration=settings.configuration;
@@ -77,8 +78,8 @@ class CandidateProblem {
       diagnostic:diagnostic,samples:request.poses.length,externalAxes:externalJoints.length,pinnedStart:pinnedStart,
       configuration:settings.configuration==null ? null : cast(settings.configuration,SixAxisConfiguration).label()}));
     samples=[];
-    var initialPose=backend.forward(request.startQ);
-    var neighbours=[request.startQ.copy()];
+    var initialPose=backend.forward(planningStart);
+    var neighbours=[planningStart.copy()];
     for(index in 0...request.poses.length) {
       var target=request.poses[index],freedom=request.freedoms[index];
       var rule = settings.externalRule;
@@ -105,10 +106,10 @@ class CandidateProblem {
       var candidates:Array<LatticeCandidate>;
       if(cart!=null) {
         if(ranges.length>0)throw "Standalone Cartesian candidate group has no external ranges";
-        candidates=cart.sample(samplingTarget,request.startQ,samplingFreedom,settings.rollCount,settings.tiltRings,settings.azimuthCount);
+        candidates=cart.sample(samplingTarget,planningStart,samplingFreedom,settings.rollCount,settings.tiltRings,settings.azimuthCount);
       } else if(serial!=null) {
         var bounds:Null<{lower:Array<Float>,upper:Array<Float>}> = null;
-        var pinnedJump=index==0 && settings.pinStart && boundedConstruction ? [for(_ in request.startQ)1e-7] : null;
+        var pinnedJump=index==0 && settings.pinStart && boundedConstruction ? [for(_ in planningStart)1e-7] : null;
         if(boundedConstruction && index>0 && samples[index-1].candidates.length>0){
           var previous=samples[index-1].candidates;
           var lower=previous[0].q.copy(),upper=lower.copy();
@@ -118,7 +119,7 @@ class CandidateProblem {
           for(j in 0...lower.length){lower[j]-=request.maxJump[j]+1e-12;upper[j]+=request.maxJump[j]+1e-12;}
           bounds={lower:lower,upper:upper};
         }
-        candidates=serial.sample(samplingTarget,request.startQ,samplingFreedom,ranges,
+        candidates=serial.sample(samplingTarget,planningStart,samplingFreedom,ranges,
           settings.rollCount,settings.tiltRings,settings.azimuthCount,pinnedJump,bounds);
       } else {
         candidates=[];
@@ -127,7 +128,7 @@ class CandidateProblem {
         // spins at every layer instead of sampling that declared finite lattice.
         var orientations=OrientationLattice.sample(samplingTarget,samplingFreedom,
           settings.rollCount,settings.tiltRings,settings.azimuthCount);
-        for(cell in ExternalAxisGrid.sample(group,request.startQ,ranges))for(orientation in orientations)
+        for(cell in ExternalAxisGrid.sample(group,planningStart,ranges))for(orientation in orientations)
           for(branch in fallback.branchesFromNeighbours(orientation.pose,neighbours,cell.q,OrientationPolicy.Fixed))
             candidates.push(new LatticeCandidate(branch.q,[for(_ in branch.q)0],cell.coordinates,
               orientation.roll,orientation.tilt,orientation.azimuth,branch.branch,0,false));
@@ -150,9 +151,9 @@ class CandidateProblem {
         }
         for(candidate in candidates) {
           var same=true;
-          for(joint in 0...request.startQ.length)
-            if(Math.abs(candidate.q[joint]-request.startQ[joint])>1e-7)same=false;
-          if(same && selected.length==0)selected.push(new LatticeCandidate(request.startQ.copy(),candidate.wraps.copy(),
+          for(joint in 0...planningStart.length)
+            if(Math.abs(candidate.q[joint]-planningStart[joint])>1e-7)same=false;
+          if(same && selected.length==0)selected.push(new LatticeCandidate(planningStart.copy(),candidate.wraps.copy(),
             candidate.external.copy(),initialCell==null ? candidate.roll : initialCell.roll,
             initialCell==null ? candidate.tilt : initialCell.tilt,
             initialCell==null ? candidate.azimuth : initialCell.azimuth,candidate.branch,candidate.singular,candidate.singularityKnown,candidate.configuration));
@@ -174,7 +175,7 @@ class CandidateProblem {
       // Analytic sampling uses its declared complete native lattice instead.
       if(fallback!=null){
         neighbours=[for(candidate in candidates)candidate.q.copy()];
-        if(neighbours.length==0)neighbours=[request.startQ.copy()];
+        if(neighbours.length==0)neighbours=[planningStart.copy()];
       }
     }
   }

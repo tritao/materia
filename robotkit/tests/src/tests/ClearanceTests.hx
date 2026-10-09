@@ -138,6 +138,10 @@ class ClearanceTests {
     check(cell.clearance.violation([1.4, 0.0]) == null, "the arm swung well past the post is clear");
     check(cell.clearance.sweep([0.0, 0.0], [1.4, 0.0]) != null, "the arm swinging round through the post is found along the way");
     check(cell.clearance.sweep([0.0, 0.0], [-1.4, 0.0]) == null, "the same swing away from the post is clear");
+    check(cell.clearance.certifySegment([0.0, 0.0], [1.4, 0.0]) != null,
+      "a continuous joint-segment certificate rejects the path through the post");
+    check(cell.clearance.certifySegment([0.0, 0.0], [-1.4, 0.0]) == null,
+      "a continuous joint-segment certificate accepts the clear swing");
     check(cell.clearance.pairCount() > 0 && cell.clearance.bodyCount() == 3, "the arm's bodies are checked against the post");
   }
 
@@ -252,6 +256,49 @@ class ClearanceTests {
       ]).violation([0.0]);
     check(separated != null && Math.abs(separated.required - ArmClearance.INTERFACE_MARGIN) < 1e-12,
       "a gap beyond CAD tolerance keeps its named-interface clearance requirement");
+
+    var slideModel = new RobotModel("joint-interface-reference-gap");
+    var fixed = slideModel.addLink(new Link("fixed"));
+    var slider = slideModel.addLink(new Link("slider"));
+    var slide = slideModel.addJoint(new Joint("slide", JointType.Prismatic, fixed, slider));
+    slide.axis = [1.0, 0.0, 0.0];
+    var slideTip = slideModel.addFrame(new Frame("tip", slider));
+    var slideArm = new Manipulator(slideModel, fixed.id, slideTip.id);
+    var interfacePair = [{first: "rail", second: "mount", margin: ArmClearance.INTERFACE_MARGIN}];
+    var closePair = new ArmClearance(slideArm, [
+      {name: "rail", link: fixed.id, vertices: box(-0.02, 0.0, -0.02, 0.02, -0.02, 0.02), tool: false},
+      {name: "mount", link: slider.id, vertices: box(0.004, 0.02, -0.02, 0.02, -0.02, 0.02), tool: false}
+    ], [0.0], ArmClearance.MARGIN, ArmClearance.CONTACT_MARGIN, null, interfacePair);
+    check(closePair.violation([0.0]) == null,
+      "a named 4 mm mechanical fit is admitted against its 1 mm interface clearance");
+    var closeHit = closePair.violation([-0.0035]);
+    check(closeHit != null && Math.abs(closeHit.distance - 0.0005) < 1e-6 &&
+      Math.abs(closeHit.required - ArmClearance.INTERFACE_MARGIN) < 1e-12,
+      "a close mechanical interface remains checked against its smaller margin during motion");
+    var distantPair = new ArmClearance(slideArm, [
+      {name: "rail", link: fixed.id, vertices: box(-0.02, 0.0, -0.02, 0.02, -0.02, 0.02), tool: false},
+      {name: "mount", link: slider.id, vertices: box(0.006, 0.02, -0.02, 0.02, -0.02, 0.02), tool: false}
+    ], [0.0], ArmClearance.MARGIN, ArmClearance.CONTACT_MARGIN, null, interfacePair);
+    check(distantPair.violation([0.0]) == null,
+      "a named pair beyond the global margin is clear at its reference");
+    var distantHit = distantPair.violation([-0.0055]);
+    check(distantHit != null && Math.abs(distantHit.distance - 0.0005) < 1e-6 &&
+      Math.abs(distantHit.required - ArmClearance.MARGIN) < 1e-12,
+      "a distant pair that approaches later retains the full obstacle margin");
+    var carriedContact = new ArmClearance(slideArm, [
+      {name: "rail", link: fixed.id, vertices: box(-0.02, 0.0, -0.02, 0.02, -0.02, 0.02), tool: false},
+      {name: "carried-part", link: slider.id, vertices: box(0.006, 0.02, -0.02, 0.02, -0.02, 0.02), tool: true}
+    ], [0.0], ArmClearance.MARGIN, ArmClearance.CONTACT_MARGIN, null, [
+      {first: "rail", second: "carried-part", margin: 0.0}
+    ]);
+    check(carriedContact.violation([-0.006]) == null,
+      "an explicit zero-margin carried-contact pair can meet after starting outside the ordinary clearance margin");
+    check(carriedContact.intervalClear([-0.003], [0.003]),
+      "a zero-margin interval certifies motion ending at contact within its numeric tolerance");
+    check(!carriedContact.intervalClear([-0.0065], [0.0005]),
+      "a zero-margin swept interval fails closed when the carried hull penetrates its support");
+    check(!carriedContact.intervalClear([-0.006], [0.0]),
+      "a stationary zero-distance pair is not certified when GJK cannot distinguish touch from overlap");
   }
 
   static function testCrossingEdges():Void {

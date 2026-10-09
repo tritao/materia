@@ -82,7 +82,7 @@ class ExampleBrowser {
     case "bench-mill", "enclosed-bench-mill", "cnc-router": "Machining";
     case "motor-shaft-bearings", "cad-modeling": "CAD & design";
     case "two-robot", "worker-rack-to-table", "worker-gallery": "People & simulation";
-    case "picking-station", "robot-arm", "cobot-reach500", "cobot-reach850", "cobot-reach900", "cobot-reach1300", "gantry-picker", "mobile-base": "Robotics & handling";
+    case "picking-station", "robot-arm", "cobot-reach500", "cobot-reach850", "cobot-reach900", "cobot-reach1300", "gantry-picker", "mobile-base", "tending-controllers", "machine-tending": "Robotics & handling";
     default: throw 'Example "$id" needs a Start-page category';
   };
 

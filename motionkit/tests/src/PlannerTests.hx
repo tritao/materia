@@ -506,6 +506,12 @@ class PlannerTests extends MotionKitTestSupport {
 
   public function testToleranceBlend():Void {
     var tolerance = 0.0005;
+    var blueprint = gantryBlueprint();
+    function home(id:String):Float {
+      for (axis in blueprint.axes) if (axis.id == id) return axis.homePosition;
+      throw 'Gantry blueprint has no "$id" axis';
+    }
+    var origin = new PathPoint(home("x"), home("y"), home("z"));
     for (degrees in [10, 45, 90, 135, 150]) {
       var angle = degrees * Math.PI / 180.0;
       var corner = new PathPoint(0.1, 0.0);
@@ -572,8 +578,13 @@ class PlannerTests extends MotionKitTestSupport {
       .path.primitives.length == 3, "arc-to-line corner receives a blend");
     check(CornerBlender.blend(arcToArc, 0.0004, Math.PI * 5.0 / 6.0)
       .path.primitives.length == 3, "arc-to-arc corner receives a blend");
+    var mixedAtHome = new GeometricPath([
+      new LineSegment(origin, new PathPoint(origin.x + 0.05, origin.y, origin.z)),
+      new ArcSegment(new PathPoint(origin.x + 0.07, origin.y, origin.z),
+        0.02, Math.PI, -Math.PI * 0.5)
+    ]);
     var mixedRig = gantryRig(true);
-    var mixedTimed = mixedRig.machine.movePath(mixedCorner,
+    var mixedTimed = mixedRig.machine.movePath(mixedAtHome,
       PathPlanningOptions.blend(0.0005), new MotionOptions(0.08, 0.4));
     var mixedReport = mixedRig.machine.lastPathValidationReport;
     if (mixedReport == null) throw "Mixed blend did not record validation";
@@ -582,13 +593,14 @@ class PlannerTests extends MotionKitTestSupport {
         TrajectoryCoreConstants.MK_CHECK_PASSED,
       "mixed blend times and validates through the runtime plan");
     runMotion(mixedRig.machine, mixedRig.harness);
-    near(mixedRig.robot.snapshot().positions.get(0), 0.07,
+    near(mixedRig.robot.snapshot().positions.get(0), origin.x + 0.07,
       "mixed blend executes to its X endpoint", 1e-5);
-    near(mixedRig.robot.snapshot().positions.get(1), 0.02,
+    near(mixedRig.robot.snapshot().positions.get(1), origin.y + 0.02,
       "mixed blend executes to its Y endpoint", 1e-5);
     mixedRig.harness.dispose();
-    var path = GeometricPath.lines([new PathPoint(0.0, 0.0),
-      new PathPoint(0.05, 0.0), new PathPoint(0.05, 0.05)]);
+    var east = new PathPoint(origin.x + 0.05, origin.y, origin.z);
+    var northeast = new PathPoint(origin.x + 0.05, origin.y + 0.05, origin.z);
+    var path = GeometricPath.lines([origin, east, northeast]);
     var exactRig = gantryRig(true);
     var exact = exactRig.machine.movePath(path, PathPlanningOptions.exactStopMode(),
       new MotionOptions(0.08, 0.4));
@@ -609,11 +621,12 @@ class PlannerTests extends MotionKitTestSupport {
     for (index in 0...501) {
       var state = blended.evaluate(blended.durationSeconds() * index / 500.0);
       var x = state.positions[0], y = state.positions[1];
-      var deviation = Math.min(segmentDistance(x, y, 0.0, 0.0, 0.05, 0.0),
-        segmentDistance(x, y, 0.05, 0.0, 0.05, 0.05));
+      var deviation = Math.min(segmentDistance(x, y, origin.x, origin.y, east.x, east.y),
+        segmentDistance(x, y, east.x, east.y, northeast.x, northeast.y));
       check(deviation <= 0.0005 + 1e-5,
         "0.5 mm fillet stays within its authored path tolerance");
-      var cornerDistance = Math.sqrt((x - 0.05) * (x - 0.05) + y * y);
+      var cornerDistance = Math.sqrt((x - east.x) * (x - east.x) +
+        (y - east.y) * (y - east.y));
       if (cornerDistance < closestCorner) {
         closestCorner = cornerDistance;
         cornerSpeed = Math.sqrt(state.velocities[0] * state.velocities[0] +
@@ -628,17 +641,17 @@ class PlannerTests extends MotionKitTestSupport {
       Math.abs(taskCheck.limit - 0.0005) < 1e-12,
       "blend validation checks the authored 0.5 mm tolerance");
     runMotion(blendedRig.machine, blendedRig.harness);
-    near(blendedRig.robot.snapshot().positions.get(0), 0.05,
+    near(blendedRig.robot.snapshot().positions.get(0), northeast.x,
       "blended path executes to its X endpoint", 1e-5);
-    near(blendedRig.robot.snapshot().positions.get(1), 0.05,
+    near(blendedRig.robot.snapshot().positions.get(1), northeast.y,
       "blended path executes to its Y endpoint", 1e-5);
     exactRig.harness.dispose();
     blendedRig.harness.dispose();
 
-    var reverse = GeometricPath.lines([new PathPoint(0.0, 0.0),
-      new PathPoint(0.05, 0.0),
-      new PathPoint(0.05 + 0.05 * Math.cos(Math.PI * 170.0 / 180.0),
-        0.05 * Math.sin(Math.PI * 170.0 / 180.0))]);
+    var reverseCorner = new PathPoint(origin.x + 0.05, origin.y, origin.z);
+    var reverse = GeometricPath.lines([origin, reverseCorner,
+      new PathPoint(origin.x + 0.05 + 0.05 * Math.cos(Math.PI * 170.0 / 180.0),
+        origin.y + 0.05 * Math.sin(Math.PI * 170.0 / 180.0), origin.z)]);
     var reverseRig = gantryRig(true);
     var fallback = reverseRig.machine.movePath(reverse, PathPlanningOptions.blend(0.0005),
       new MotionOptions(0.08, 0.4));
@@ -648,8 +661,8 @@ class PlannerTests extends MotionKitTestSupport {
     var stoppedAtCorner = false;
     for (segment in fallback.segments()) {
       var state = fallback.evaluate(Int64.toFloat(segment.timeFromStartNs) * 1e-9);
-      if (Math.abs(state.positions[0] - 0.05) < 1e-8 &&
-          Math.abs(state.positions[1]) < 1e-8 &&
+      if (Math.abs(state.positions[0] - reverseCorner.x) < 1e-8 &&
+          Math.abs(state.positions[1] - reverseCorner.y) < 1e-8 &&
           Math.abs(state.velocities[0]) < 1e-7 && Math.abs(state.velocities[1]) < 1e-7)
         stoppedAtCorner = true;
     }
@@ -660,10 +673,18 @@ class PlannerTests extends MotionKitTestSupport {
   public function testCircularSegments():Void {
     var cases = [CircularPlane.XY, CircularPlane.XZ, CircularPlane.YZ];
     for (plane in cases) {
+      var rig = gantryRig(true);
+      var measured = rig.robot.snapshot().positions.toArray();
+      var xAxis = rig.machine.axis("x"), yAxis = rig.machine.axis("y"), zAxis = rig.machine.axis("z");
+      if (xAxis == null) throw "Homed gantry has no X axis";
+      if (yAxis == null) throw "Homed gantry has no Y axis";
+      if (zAxis == null) throw "Homed gantry has no Z axis";
+      var origin = new PathPoint(xAxis.logicalPosition(measured), yAxis.logicalPosition(measured),
+        zAxis.logicalPosition(measured));
       var center = switch plane {
-        case XY: new PathPoint(0.02, 0.0, 0.0);
-        case XZ: new PathPoint(0.02, 0.0, 0.0);
-        case YZ: new PathPoint(0.0, 0.02, 0.0);
+        case XY: new PathPoint(origin.x + 0.02, origin.y, origin.z);
+        case XZ: new PathPoint(origin.x + 0.02, origin.y, origin.z);
+        case YZ: new PathPoint(origin.x, origin.y + 0.02, origin.z);
       };
       var circular = new CircularSegment(center, 0.02, Math.PI,
         -Math.PI * 0.5, plane, 0.01);
@@ -675,7 +696,6 @@ class PlannerTests extends MotionKitTestSupport {
       var midpoint = circular.pointAt(circular.length() * 0.5);
       near(circular.distanceTo(midpoint), 0.0, 'helical $plane distance', 1e-9);
       var authored = new GeometricPath([circular]);
-      var rig = gantryRig(true);
       var timed = rig.machine.movePath(authored,
         PathPlanningOptions.exactStopMode(), new MotionOptions(0.04, 0.4));
       check(timed.durationSeconds() > 0.0,

@@ -50,13 +50,13 @@ class TendingControllers extends MachineAssembly {
 			infeedBlanks.addComponent('blank-${slot.name.substr(5)}',
 				new TendingBlank(BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH, BenchMill.STOCK_HEIGHT), local);
 			infeedBlanks.addComponent(slot.name + "-present", new DigitalSensor("presence"),
-				AssemblyFrames.compose(local, AssemblyFrames.translation(-BenchMill.STOCK_WIDTH * 0.5 - 10, 0, 10)));
+				TendingReach.presenceHeadFrame(local));
 		}
 		var outfeedSensors = new MachineAssembly();
 		for (slot in outfeed.slots) {
 			var local = AssemblyFrames.compose(AssemblyFrames.inverse(outfeed.frame), slot.frame);
 			outfeedSensors.addComponent(slot.name + "-present", new DigitalSensor("presence"),
-				AssemblyFrames.compose(local, AssemblyFrames.translation(-BenchMill.STOCK_WIDTH * 0.5 - 10, 0, 10)));
+				TendingReach.presenceHeadFrame(local));
 		}
 		arm = new CobotArm(reach.cls, TendingReach.tendingTool());
 		include("mill", mill);
@@ -213,7 +213,7 @@ class TendingControllerChecks {
 				cell.reach.parkPose[index]) > 1e-9)
 				throw "Tending cell start state differs from the arm's checked mill-clear park pose";
 		var layout = cell.reach;
-		if (layout.cls != Reach850 || layout.riser != 550 || layout.poses.length != 56 ||
+		if (layout.cls != Reach850 || layout.riser != 550 || layout.poses.length != 86 ||
 			layout.jointMargin < 0.1 || layout.wristSine < 0.2 || cell.arm.cls != layout.cls)
 			throw 'Tending cell must use the asserted reach result: ' +
 				'${layout.cls}/${layout.riser}/${layout.poses.length}, joint=${layout.jointMargin}, wrist=${layout.wristSine}';

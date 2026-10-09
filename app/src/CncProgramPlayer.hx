@@ -109,6 +109,7 @@ class CncProgramPlayer implements SessionMember {
 	static inline final STOCK_SPACING = 0.0005;
 	/** Assumed encoder deadband: the cell treats the spindle as stopped below 5 rpm. */
 	static inline final SPINDLE_STANDSTILL_RPM = 5.0;
+	static final INTERFACE_ALARM_CODE_BITS = RobotInterfaceChannels.alarmCodeBits();
 
 	/** Spindle and coolant channels a CNC program's events need on the machine's runtime. */
 	public static function channelsFor(job:CncJob):ToolpathChannels {
@@ -688,6 +689,13 @@ class CncProgramPlayer implements SessionMember {
 		writeDigital(RobotInterfaceChannels.IN_CYCLE, outputs.inCycle);
 		writeDigital(RobotInterfaceChannels.CYCLE_COMPLETE, outputs.cycleComplete);
 		writeDigital(RobotInterfaceChannels.ALARM, outputs.alarm != RobotInterfaceAlarm.None);
+		var alarmCode:Int = outputs.alarm;
+		var previousAlarmCode:Int = lastInterfaceOutputs == null ? -1 : lastInterfaceOutputs.alarm;
+		for (index in 0...INTERFACE_ALARM_CODE_BITS.length) {
+			var mask = 1 << index;
+			if (previousAlarmCode < 0 || (previousAlarmCode & mask) != (alarmCode & mask))
+				robot.runtime.writeDigitalOutput(INTERFACE_ALARM_CODE_BITS[index], (alarmCode & mask) != 0);
+		}
 		var alarmChannel = interfaceAlarmCodeChannel;
 		if (alarmChannel != null)
 			robot.runtime.writeOutput(alarmChannel, ProcessEventValue.Analog(outputs.alarm));

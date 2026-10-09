@@ -438,16 +438,24 @@ class SessionTests extends MotionKitTestSupport {
       [for (joint in squareBlueprint.model.joints) joint.name]);
     var squareMachine = MotionSystem.fromBlueprint(squareRobot, squareBlueprint);
     homeGantryFixture(squareBlueprint, squareRuntime, squareSimulationHarness, squareRobot, squareMachine);
+    var squareHome = squareRobot.snapshot().positions.toArray();
+    var squareX = squareMachine.axis("x"), squareY = squareMachine.axis("y"),
+      squareZ = squareMachine.axis("z");
+    if (squareX == null) throw "Square-hold gantry has no X axis";
+    if (squareY == null) throw "Square-hold gantry has no Y axis";
+    if (squareZ == null) throw "Square-hold gantry has no Z axis";
+    var origin = new PathPoint(squareX.logicalPosition(squareHome),
+      squareY.logicalPosition(squareHome), squareZ.logicalPosition(squareHome));
+    var east = new PathPoint(origin.x + 0.02, origin.y, origin.z);
+    var northeast = new PathPoint(origin.x + 0.02, origin.y + 0.02, origin.z);
+    var north = new PathPoint(origin.x, origin.y + 0.02, origin.z);
     var squarePath = squareMachine.movePath(GeometricPath.lines([
-      new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.02, 0.0, 0.0),
-      new PathPoint(0.02, 0.02, 0.0), new PathPoint(0.0, 0.02, 0.0),
-      new PathPoint(0.0, 0.0, 0.0)
+      origin, east, northeast, north, origin
     ]), PathPlanningOptions.exactStopMode(), new MotionOptions(0.04, 0.2));
     var cornerStops = 0;
     for (segment in squarePath.segments()) {
       var state = squarePath.evaluate(Int64.toFloat(segment.timeFromStartNs) * 1e-9);
-      for (corner in [new PathPoint(0.02, 0.0), new PathPoint(0.02, 0.02),
-          new PathPoint(0.0, 0.02)])
+      for (corner in [east, northeast, north])
         if (Math.abs(state.positions[0] - corner.x) < 1e-8 &&
             Math.abs(state.positions[1] - corner.y) < 1e-8 &&
             Math.abs(state.velocities[0]) < 1e-7 && Math.abs(state.velocities[1]) < 1e-7)
@@ -499,7 +507,7 @@ class SessionTests extends MotionKitTestSupport {
       tick++;
       var position = squareRobot.snapshot().positions;
       if (previousX > 0.0001 && position.get(0) > 0.0001) {
-        check(Math.abs(position.get(1) - 0.02) < 0.001,
+        check(Math.abs(position.get(1) - north.y) < 0.001,
           "square resume stays on the third path leg");
         check(position.get(0) <= previousX + 1e-5,
           "square resume does not jump backwards along the third leg");
@@ -507,9 +515,9 @@ class SessionTests extends MotionKitTestSupport {
       previousX = position.get(0);
       if (tick > 5000) throw "square path did not complete after resume";
     }
-    near(squareRobot.snapshot().positions.get(0), 0.0,
+    near(squareRobot.snapshot().positions.get(0), origin.x,
       "square path resumes to its final X endpoint", 1e-5);
-    near(squareRobot.snapshot().positions.get(1), 0.0,
+    near(squareRobot.snapshot().positions.get(1), origin.y,
       "square path resumes to its final Y endpoint", 1e-5);
     squareSimulationHarness.dispose();
   }
@@ -796,6 +804,7 @@ class SessionTests extends MotionKitTestSupport {
       [for (joint in blueprint.model.joints) joint.name]));
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
     homeGantryFixture(blueprint, runtime, simulationHarness, robot, machine);
+    var homeX = robot.snapshot().positions.get(0);
     var originalJog = planned(machine.jog("x", 0.04, 2.5));
     var positions:Array<Float> = [];
     var tick = 0;
@@ -823,7 +832,7 @@ class SessionTests extends MotionKitTestSupport {
     }
     check(peakSecondDifference(positions) <= 0.4 * 1.05,
       'original jog stays within the limit (peak ${peakSecondDifference(positions)})');
-    near(positions[positions.length - 1], 0.1,
+    near(positions[positions.length - 1], homeX + 0.1,
       "rejected replacement leaves the original jog to complete", 1e-5);
     simulationHarness.dispose();
   }
@@ -834,29 +843,41 @@ class SessionTests extends MotionKitTestSupport {
    */
   public function testPathHoldsStayOnPathWithinLimits():Void {
     var limit = 0.4;
+    var blueprint = gantryBlueprint();
+    function home(id:String):Float {
+      for (axis in blueprint.axes) if (axis.id == id) return axis.homePosition;
+      throw 'Gantry blueprint has no "$id" axis';
+    }
+    var origin = new PathPoint(home("x"), home("y"), home("z"));
     // A line, a quarter arc tangent to it, and a line tangent to the arc.
     function arcPath():GeometricPath
       return new GeometricPath([
-        new LineSegment(new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.05, 0.0, 0.0)),
-        new ArcSegment(new PathPoint(0.05, 0.03, 0.0), 0.03, -Math.PI * 0.5, Math.PI * 0.5),
-        new LineSegment(new PathPoint(0.08, 0.03, 0.0), new PathPoint(0.08, 0.06, 0.0))
+        new LineSegment(origin, new PathPoint(origin.x + 0.05, origin.y, origin.z)),
+        new ArcSegment(new PathPoint(origin.x + 0.05, origin.y + 0.03, origin.z),
+          0.03, -Math.PI * 0.5, Math.PI * 0.5),
+        new LineSegment(new PathPoint(origin.x + 0.08, origin.y + 0.03, origin.z),
+          new PathPoint(origin.x + 0.08, origin.y + 0.05, origin.z))
       ]);
     function arcDistance(x:Float, y:Float):Float {
-      var angle = Math.atan2(y - 0.03, x - 0.05);
-      var radial = Math.sqrt((x - 0.05) * (x - 0.05) + (y - 0.03) * (y - 0.03));
+      var angle = Math.atan2(y - origin.y - 0.03, x - origin.x - 0.05);
+      var radial = Math.sqrt((x - origin.x - 0.05) * (x - origin.x - 0.05) +
+        (y - origin.y - 0.03) * (y - origin.y - 0.03));
       var onArc = angle >= -Math.PI * 0.5 && angle <= 0.0 ? Math.abs(radial - 0.03) : 1.0;
-      return Math.min(onArc, Math.min(segmentDistance(x, y, 0.0, 0.0, 0.05, 0.0),
-        segmentDistance(x, y, 0.08, 0.03, 0.08, 0.06)));
+      return Math.min(onArc, Math.min(segmentDistance(x, y, origin.x, origin.y,
+        origin.x + 0.05, origin.y), segmentDistance(x, y, origin.x + 0.08,
+        origin.y + 0.03, origin.x + 0.08, origin.y + 0.05)));
     }
     function cornerDistance(x:Float, y:Float):Float
-      return Math.min(segmentDistance(x, y, 0.0, 0.0, 0.05, 0.0),
-        segmentDistance(x, y, 0.05, 0.0, 0.05, 0.05));
+      return Math.min(segmentDistance(x, y, origin.x, origin.y,
+        origin.x + 0.05, origin.y), segmentDistance(x, y, origin.x + 0.05,
+        origin.y, origin.x + 0.05, origin.y + 0.05));
     var cases:Array<{label:String, begin:MotionSystem -> Void, distance:(Float, Float) -> Float}> = [
       {label: "arc path", distance: arcDistance, begin: machine -> machine.movePath(arcPath(),
         PathPlanningOptions.exactStopMode(), new MotionOptions(0.05, limit))},
       {label: "exact-stop corner", distance: cornerDistance, begin: machine -> machine.movePath(
-        GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.05, 0.0, 0.0),
-          new PathPoint(0.05, 0.05, 0.0)]), PathPlanningOptions.exactStopMode(),
+        GeometricPath.lines([origin, new PathPoint(origin.x + 0.05, origin.y, origin.z),
+          new PathPoint(origin.x + 0.05, origin.y + 0.05, origin.z)]),
+        PathPlanningOptions.exactStopMode(),
         new MotionOptions(0.05, limit))}
     ];
     for (queueSupport in [true]) {

@@ -295,10 +295,18 @@ class EnclosedMillChecks {
 		if (openLeft <= cell.opening.x + cell.openingWidth / 2)
 			throw "Open door does not clear the opening";
 		state.setJoint("mill/z", cell.mill.specs[2].upper);
+		state.setJoint("door", 0);
 		var head = BenchMillChecks.posed(cell, state, "mill/head");
-		var headBottom = head.shape.bounds().get_min().get_z();
+		for (obstructionId in ["frontTop", "doorLeft", "doorRight", "doorBottom", "doorTop", "doorWindow"]) {
+			var obstruction = BenchMillChecks.posed(cell, state, obstructionId);
+			var overlap = head.intersect(obstruction), volume = overlap.volume();
+			overlap.close(); obstruction.close();
+			if (volume > 1e-3) {
+				head.close();
+				throw 'Retracted head casting intersects closed doorway body $obstructionId by $volume mm³';
+			}
+		}
 		head.close();
-		if (headBottom < cell.opening.z + cell.openingHeight) throw "Retracted head casting crosses the doorway";
 		var vise = cell.mill.vise;
 		if (vise == null) throw "Enclosed mill has no vise";
 		var cabinet = BenchMillChecks.posed(cell, state, "cabinetBottom");

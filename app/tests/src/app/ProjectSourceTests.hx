@@ -88,14 +88,27 @@ class ProjectSourceTests {
     check(timeoutAlarm(RobotInterfaceChannels.DOOR_OPEN) == MissionAlarmCode.DoorJam &&
       timeoutAlarm(RobotInterfaceChannels.DOOR_CLOSED) == MissionAlarmCode.DoorJam,
       "door switch timeouts map to the stable door-jam alarm");
-    check(timeoutAlarm(RobotInterfaceChannels.CLAMPED) == MissionAlarmCode.ClampWithoutPart &&
+    check(timeoutAlarm(RobotInterfaceChannels.CLAMPED) == MissionAlarmCode.ViseFailure &&
       timeoutAlarm(RobotInterfaceChannels.PART_PRESENT) == MissionAlarmCode.ClampWithoutPart,
-      "vise and presence timeouts map to the stable clamp-without-part alarm");
+      "vise-actuator and stock-presence timeouts map to distinct stable alarms");
     check(timeoutAlarm(RobotInterfaceChannels.CNC_READY) == MissionAlarmCode.CncAlarm &&
       timeoutAlarm(RobotInterfaceChannels.IN_CYCLE) == MissionAlarmCode.CncAlarm &&
       timeoutAlarm(RobotInterfaceChannels.CYCLE_COMPLETE) == MissionAlarmCode.CncAlarm &&
       timeoutAlarm(RobotInterfaceChannels.ALARM) == MissionAlarmCode.CncAlarm,
       "cycle and CNC alarm timeouts map to the stable CNC alarm");
+    check(MissionAlarmClassifier.fromInterfaceAlarm(RobotInterfaceAlarm.DoorOpenTimeout, true) == MissionAlarmCode.DoorJam &&
+      MissionAlarmClassifier.fromInterfaceAlarm(RobotInterfaceAlarm.DoorCloseTimeout, true) == MissionAlarmCode.DoorJam &&
+      MissionAlarmClassifier.fromInterfaceAlarm(RobotInterfaceAlarm.DoorOpenedDuringCycle, true) == MissionAlarmCode.DoorJam,
+      "physical door interlock alarm codes map to the stable door-jam alarm");
+    check(MissionAlarmClassifier.fromInterfaceAlarm(RobotInterfaceAlarm.ClampInterlock, false) == MissionAlarmCode.ClampWithoutPart &&
+      MissionAlarmClassifier.fromInterfaceAlarm(RobotInterfaceAlarm.ClampTimeout, false) == MissionAlarmCode.ClampWithoutPart &&
+      MissionAlarmClassifier.fromInterfaceAlarm(RobotInterfaceAlarm.ClampTimeout, true) == MissionAlarmCode.ViseFailure &&
+      MissionAlarmClassifier.fromInterfaceAlarm(RobotInterfaceAlarm.UnclampTimeout, true) == MissionAlarmCode.ViseFailure,
+      "physical vise alarm codes distinguish missing stock from actuator faults");
+    check(MissionAlarmClassifier.fromInterfaceAlarm(RobotInterfaceAlarm.CycleInterlock, false) == MissionAlarmCode.CncAlarm &&
+      MissionAlarmClassifier.fromInterfaceAlarm(RobotInterfaceAlarm.DoorOpenInterlock, false) == MissionAlarmCode.CncAlarm &&
+      MissionAlarmClassifier.fromInterfaceAlarm(RobotInterfaceAlarm.ToolChangeRequired, false) == MissionAlarmCode.CncAlarm,
+      "cycle and tool-change alarms map to the stable CNC alarm");
   }
 
   static function singleHandlingChannel(mission:MissionPlayer):String {
@@ -2438,7 +2451,8 @@ class ProjectSourceTests {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/machine-tending/materia.controllers.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     check(generated.controllers != null && generated.controllers.length == 2 &&
-      generated.signals != null && generated.signals.length == 16,
+      generated.signals != null && generated.signals.length == RobotInterfaceChannels.cncOutputs().length +
+        RobotInterfaceChannels.robotRequests().length,
       "tending cell exports two wired controllers and all robot-interface signals");
     var wires = generated.signals;
     if (wires == null) throw "Tending cell lost its signal wires";
@@ -2463,6 +2477,23 @@ class ProjectSourceTests {
     var nextTick = bus.input(first.to.controller, first.name);
     check(nextTick != null && switch nextTick {case Digital(on): on; case _: false;} && published,
       "the wired digital output reaches the next controller tick and its sensor");
+    var alarmBit = RobotInterfaceChannels.alarmCodeBits()[0];
+    var alarmWire = [for (wire in wires) if (wire.name == alarmBit) wire];
+    check(alarmWire.length == 1, "the CNC alarm code has a declared cell output");
+    var alarmOutput = false;
+    var alarmBus = new CellSignals(wires, () -> now,
+      (controller, channel) -> channel == alarmBit && alarmOutput,
+      (_controller, _channel, _on, _sequence, _stamp) -> {});
+    alarmBus.feed();
+    alarmOutput = true;
+    var alarmSameTick = alarmBus.input(alarmWire[0].to.controller, alarmBit);
+    check(alarmSameTick != null && switch alarmSameTick {case Digital(on): !on; case _: false;},
+      "the PLC alarm code remains behind the same controller tick boundary");
+    now += 0.01;
+    alarmBus.feed();
+    var alarmNextTick = alarmBus.input(alarmWire[0].to.controller, alarmBit);
+    check(alarmNextTick != null && switch alarmNextTick {case Digital(on): on; case _: false;},
+      "the declared alarm-code wire publishes its digital input on the next signal image");
     var writtenController:Null<String> = null, writtenName:Null<String> = null, writtenValue = false;
     var writerBus = new CellSignals(wires, () -> now, (_controller, _channel) -> false,
       (_controller, _channel, _on, _sequence, _stamp) -> {},
@@ -2504,45 +2535,59 @@ class ProjectSourceTests {
       if (arm == null) throw "Tending cell has no robot controller runtime";
       var armAdapter:robotkit.runtime.RuntimeRobotAdapter = cast arm;
       var armRuntime = @:privateAccess armAdapter.runtime;
-      var jawIndex = arm.description().joints.indexOf("arm/tool/gripper/jaw-left-slide");
-      if (jawIndex < 0) throw "Tending arm has no physical gripper jaw joint";
-      var jawStart = armRuntime.snapshot().q.get(jawIndex);
-      var logicalGripper = "arm/tool/gripper/body.close";
-      armRuntime.writeDigitalOutput(logicalGripper, true);
       function sensed(snapshot:robotkit.runtime.RobotSnapshot, id:String):Float {
         for (frame in snapshot.sensors.toArray()) if (frame.sensorId == id && frame.values.length > 0)
           return frame.values.get(0);
         return -1.0;
       }
-      var closedEmpty = false, closeCoilOff = false;
-      for (_ in 0...100) {
-        simulation.step();
-        var snapshot = armRuntime.snapshot();
-        closedEmpty = snapshot.q.get(jawIndex) > jawStart + 0.01 &&
-          sensed(snapshot, "arm/tool/gripper/jaw-closed-empty") > 0.5;
-        closeCoilOff = switch armRuntime.channelValue("arm/tool/valve/coilA") {
-          case Digital(on): !on;
-          case _: false;
-        };
-        if (closedEmpty && closeCoilOff) break;
+      var grippers:Array<{name:String, channel:String, jawIndex:Int, sensor:String, valve:String}> = [
+        {name: "A", channel: DualArmGripperTool.TOOL_CHANNEL_A,
+          jawIndex: arm.description().joints.indexOf("arm/tool/gripperA/jaw-left-slide"),
+          sensor: "arm/tool/gripperA/", valve: "arm/tool/valveA/"},
+        {name: "B", channel: DualArmGripperTool.TOOL_CHANNEL_B,
+          jawIndex: arm.description().joints.indexOf("arm/tool/gripperB/jaw-left-slide"),
+          sensor: "arm/tool/gripperB/", valve: "arm/tool/valveB/"}
+      ];
+      for (gripper in grippers) if (gripper.jawIndex < 0)
+        throw 'Tending arm has no physical gripper ${gripper.name} jaw joint';
+      var initialJawPositions = [for (gripper in grippers) armRuntime.snapshot().q.get(gripper.jawIndex)];
+      for (index in 0...grippers.length) {
+        var gripper = grippers[index], other = grippers[1 - index];
+        var jawStart = initialJawPositions[index], otherStart = initialJawPositions[1 - index];
+        armRuntime.writeDigitalOutput(gripper.channel, true);
+        var closedEmpty = false, closeCoilOff = false, otherStayedOpen = false;
+        for (_ in 0...100) {
+          simulation.step();
+          var snapshot = armRuntime.snapshot();
+          closedEmpty = snapshot.q.get(gripper.jawIndex) > jawStart + 0.01 &&
+            sensed(snapshot, gripper.sensor + "jaw-closed-empty") > 0.5;
+          closeCoilOff = switch armRuntime.channelValue(gripper.valve + "coilA") {
+            case Digital(on): !on;
+            case _: false;
+          };
+          otherStayedOpen = Math.abs(snapshot.q.get(other.jawIndex) - otherStart) < 0.001;
+          if (closedEmpty && closeCoilOff && otherStayedOpen) break;
+        }
+        check(closedEmpty, 'gripper ${gripper.name} closes its real jaws to the closed-empty switch');
+        check(closeCoilOff, 'gripper ${gripper.name} close coil de-energizes after its pulse');
+        check(otherStayedOpen, 'gripper ${gripper.name} command leaves the other physical gripper open');
+
+        armRuntime.writeDigitalOutput(gripper.channel, false);
+        var reopened = false, openCoilOff = false;
+        for (_ in 0...100) {
+          simulation.step();
+          var snapshot = armRuntime.snapshot();
+          reopened = snapshot.q.get(gripper.jawIndex) < jawStart + 0.001 &&
+            sensed(snapshot, gripper.sensor + "jaw-open") > 0.5;
+          openCoilOff = switch armRuntime.channelValue(gripper.valve + "coilB") {
+            case Digital(on): !on;
+            case _: false;
+          };
+          if (reopened && openCoilOff) break;
+        }
+        check(reopened, 'gripper ${gripper.name} open command returns its jaws to the reed switch');
+        check(openCoilOff, 'gripper ${gripper.name} open coil de-energizes after its pulse');
       }
-      check(closedEmpty, "the logical gripper command closes the real jaws to the empty-vise switch");
-      check(closeCoilOff, "the double-solenoid gripper coil de-energizes after its pulse");
-      armRuntime.writeDigitalOutput(logicalGripper, false);
-      var reopened = false, openCoilOff = false;
-      for (_ in 0...100) {
-        simulation.step();
-        var snapshot = armRuntime.snapshot();
-        reopened = snapshot.q.get(jawIndex) < jawStart + 0.001 &&
-          sensed(snapshot, "arm/tool/gripper/jaw-open") > 0.5;
-        openCoilOff = switch armRuntime.channelValue("arm/tool/valve/coilB") {
-          case Digital(on): !on;
-          case _: false;
-        };
-        if (reopened && openCoilOff) break;
-      }
-      check(reopened, "the open command returns the real jaws to their reed switch");
-      check(openCoilOff, "the open-valve coil also de-energizes after its pulse");
       check(simulation.environmentObject("project:floorMarker") != null &&
         simulation.environmentObject("project:mill/mill/base") == null &&
         simulation.environmentObject("project:arm/baseFlange") == null,
@@ -3252,7 +3297,7 @@ class ProjectSourceTests {
   }
 
   /** Four real blank-to-outfeed cycles through the saved robot mission and wired CNC interface. */
-  static function checkMachineTending(root:String):Void {
+  static function checkMachineTending(root:String, routeOnly:Bool = false):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/machine-tending/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var savedMission = generated.mission;
@@ -3279,7 +3324,36 @@ class ProjectSourceTests {
       var originalBlank = new nativekit.sim.SimPose(blankPose[0].position[0], blankPose[0].position[1],
         blankPose[0].position[2], blankPose[0].rotation[0], blankPose[0].rotation[1],
         blankPose[0].rotation[2], blankPose[0].rotation[3]);
-      blank.teleport(new nativekit.sim.SimPose(3.0, 3.0, 3.0));
+      if (routeOnly) {
+        var clampCommand = -1;
+        for (index in 0...mission.mission.steps.length) {
+          var step = mission.mission.steps[index];
+          if (step.kind == "signal" && step.signal != null &&
+              step.signal.name == RobotInterfaceChannels.REQUEST_CLAMP && step.signal.value) {
+            clampCommand = index;
+            break;
+          }
+        }
+        if (clampCommand < 0) throw "Tending route has no seated-clamp command";
+        var routeTicks = 0;
+        while (mission.stepIndex < clampCommand && mission.failure == null && routeTicks < 5000) {
+          simulation.step(); routeTicks++;
+        }
+        var signals = simulation.cellSignals;
+        var doorOpen = false;
+        if (signals != null) doorOpen = switch signals.input("robotController", RobotInterfaceChannels.DOOR_OPEN) {
+          case Digital(value): value;
+          case _: false;
+        };
+        check(mission.stepIndex == clampCommand && mission.failure == null && doorOpen,
+          'the robot stages outside with the door closed, enters after the open switch, and reaches the vise ' +
+            '(failure=${mission.failure}, step=${mission.stepIndex}/$clampCommand, ticks=$routeTicks/5000, ' +
+            'doorOpen=$doorOpen, runner=${mission.runner.status()})');
+        Sys.println('tending startup route: vise reached at ${simulation.activeSession().simulationTime()} s');
+        simulation.dispose(); session.dispose();
+        return;
+      }
+      blank.setPoseForNextTick(new nativekit.sim.SimPose(3.0, 3.0, 3.0));
       check(simulation.emergencyStopRobot(mission.robotId()),
         "the tending cell accepts a targeted emergency stop for its robot");
       for (_ in 0...5) {
@@ -3328,15 +3402,20 @@ class ProjectSourceTests {
       }
       if (firstPick < 0) throw "Tending mission has no first infeed pick to fault-inject";
       var approachTicks = 0;
-      while (mission.stepIndex < firstPick && mission.failure == null && approachTicks < 2000) {
+      var approachTimeout = mission.stepIndex >= 0 && mission.stepIndex < mission.mission.steps.length
+        ? mission.mission.steps[mission.stepIndex].timeoutSeconds : null;
+      var approachLimit = approachTimeout == null ? 2000 : Std.int(approachTimeout / 0.01) + 1;
+      while (mission.stepIndex < firstPick && mission.failure == null && approachTicks < approachLimit) {
         simulation.step(); approachTicks++;
       }
       check(mission.stepIndex == firstPick && mission.failure == null,
-        "the mission confirms infeed presence and reaches its first pick after empty-slot recovery");
+        'the mission confirms infeed presence and reaches its first pick after empty-slot recovery ' +
+          '(failure=${mission.failure}, step=${mission.stepIndex}, completed=${mission.completed}, ' +
+          'ticks=$approachTicks/$approachLimit, runner=${mission.runner.status()})');
       var firstPickStep = mission.mission.steps[firstPick];
       var originalPickTimeout = firstPickStep.timeoutSeconds;
       firstPickStep.timeoutSeconds = 0.25;
-      blank.teleport(new nativekit.sim.SimPose(3.0, 3.0, 3.0));
+      blank.setPoseForNextTick(new nativekit.sim.SimPose(3.0, 3.0, 3.0));
       for (_ in 0...100) {
         if (mission.failure != null) break;
         simulation.step();
@@ -3348,17 +3427,34 @@ class ProjectSourceTests {
       check(simulation.retryMission(),
         "restoring the missing workpiece makes the failed pick recoverable without clearing other controllers");
       var retryTicks = 0;
-      while (mission.stepIndex <= firstPick && mission.failure == null && retryTicks < 2000) {
+      var retryLimit = originalPickTimeout == null ? 2000 : Std.int(originalPickTimeout / 0.01) + 1;
+      while ((mission.failure != null || mission.stepIndex <= firstPick) && retryTicks < retryLimit) {
         simulation.step(); retryTicks++;
       }
       check(mission.failure == null && mission.stepIndex > firstPick,
-        "the restored blank is physically grasped after retrying the failed pick");
+        'the restored blank is physically grasped after retrying the failed pick ' +
+          '(failure=${mission.failure}, step=${mission.stepIndex}, completed=${mission.completed}, ' +
+          'ticks=$retryTicks/$retryLimit, runner=${mission.runner.status()})');
       var carriedVisuals = simulation.capturePresentationSnapshot().environment;
       var carriedPose = [for (entry in carriedVisuals) if (entry.id == "project:infeed/blank-0-0") entry];
       if (carriedPose.length != 1) throw "The first blank disappeared before the part-drop fault check";
       var beforeDrop = new nativekit.sim.SimPose(carriedPose[0].position[0], carriedPose[0].position[1],
         carriedPose[0].position[2], carriedPose[0].rotation[0], carriedPose[0].rotation[1],
         carriedPose[0].rotation[2], carriedPose[0].rotation[3]);
+      var gripperOccurrence = "arm/" + DualArmGripperTool.GRIPPER_A_BODY;
+      var gripperPart = mission.robot.part("project:" + gripperOccurrence);
+      var gripperFrame = mission.robot.toolFrames.get(gripperOccurrence);
+      if (gripperFrame == null) throw "The first gripper has no TCP for part-drop recovery";
+      var recoveredPhysics = simulation.simulation;
+      if (recoveredPhysics == null) throw "Part-drop recovery has no physical simulation";
+      function gripperTcpPose():robotkit.spatial.Transform3 {
+        var link = recoveredPhysics.linkPose(gripperPart.robotIndex, gripperPart.linkIndex);
+        return robotkit.spatial.Transform3.fromArrays(link.position, link.rotation).compose(
+          robotkit.spatial.Transform3.fromArrays(gripperFrame.position, gripperFrame.rotation));
+      }
+      var blankBeforeDrop = robotkit.spatial.Transform3.fromArrays(
+        [beforeDrop.x, beforeDrop.y, beforeDrop.z], [beforeDrop.qx, beforeDrop.qy, beforeDrop.qz, beforeDrop.qw]);
+      var gripperToBlank = gripperTcpPose().inverse().compose(blankBeforeDrop);
       mission.robot.runtime.writeDigitalOutput(DualArmGripperTool.TOOL_CHANNEL_A, false);
       for (_ in 0...150) {
         if (mission.failure != null) break;
@@ -3368,7 +3464,19 @@ class ProjectSourceTests {
         "a physical jaw opening while carrying latches the stable part-dropped alarm");
       check(Std.string(mission.runner.status()) != "Running",
         "a mission fault cancels the active arm plan instead of leaving motion running");
-      blank.setPoseForNextTick(beforeDrop);
+      var stopTicks = 0;
+      while (mission.robot.runtime.snapshot().safety != RobotKitRuntimeConstants.RK_SAFETY_READY &&
+          stopTicks < 1000) {
+        simulation.step(); stopTicks++;
+      }
+      check(mission.robot.runtime.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_READY,
+        'the arm completes its controlled stop before the operator closes the gripper (ticks=$stopTicks)');
+      // A stopped arm has moved during its controlled stop. Reseat the operator-
+      // recovered blank at the current TCP using its measured grasp transform.
+      var restoredBlank = gripperTcpPose().compose(gripperToBlank);
+      blank.setPoseForNextTick(new nativekit.sim.SimPose(restoredBlank.translation.x,
+        restoredBlank.translation.y, restoredBlank.translation.z, restoredBlank.rotation.x,
+        restoredBlank.rotation.y, restoredBlank.rotation.z, restoredBlank.rotation.w));
       mission.robot.runtime.writeDigitalOutput(DualArmGripperTool.TOOL_CHANNEL_A, true);
       var gripRestored = false;
       for (_ in 0...150) {
@@ -3386,6 +3494,166 @@ class ProjectSourceTests {
       }
       check(mission.failure == null && mission.stepIndex > firstPick,
         "part-drop recovery preserves the held part and resumes the interrupted carry step");
+      function cellSignal(name:String):Bool {
+        var bus = simulation.cellSignals;
+        if (bus == null) return false;
+        return switch bus.input("robotController", name) {
+          case Digital(value): value;
+          case _: false;
+        };
+      }
+      function cncRequest(name:String):Bool {
+        var bus = simulation.cellSignals;
+        if (bus == null) return false;
+        return switch bus.input("mill/cncController", name) {
+          case Digital(value): value;
+          case _: false;
+        };
+      }
+      var doorCommand = -1, doorWait = -1;
+      for (index in 0...mission.mission.steps.length) {
+        var step = mission.mission.steps[index];
+        if (step.kind == "signal" && step.signal != null &&
+            step.signal.name == RobotInterfaceChannels.REQUEST_DOOR_OPEN && step.signal.value && doorCommand < 0)
+          doorCommand = index;
+        if (step.kind == "waitFor" && step.waitFor != null &&
+            step.waitFor.name == RobotInterfaceChannels.DOOR_OPEN && doorWait < 0)
+          doorWait = index;
+      }
+      if (doorCommand < 0 || doorWait < 0) throw "Tending mission has no door-open handshake to fault-inject";
+      var doorApproachTicks = 0;
+      while (mission.stepIndex < doorCommand && mission.failure == null && doorApproachTicks < 3000) {
+        simulation.step(); doorApproachTicks++;
+      }
+      check(mission.stepIndex == doorCommand && mission.failure == null,
+        'the first door-open command is ready for a blocked-switch fault ' +
+          '(failure=${mission.failure}, step=${mission.stepIndex}/$doorCommand, completed=${mission.completed}, ' +
+          'ticks=$doorApproachTicks/3000, runner=${mission.runner.status()})');
+      var cncRobotIndex = -1;
+      var robotIds = simulation.simulatedRobotIds();
+      for (index in 0...robotIds.length)
+        if (StringTools.endsWith(robotIds[index], ":mill/cncController")) cncRobotIndex = index;
+      var doorJoint = cnc.robot.robot.description().joints.indexOf("mill/door");
+      if (cncRobotIndex < 0 || doorJoint < 0)
+        throw "Tending cell has no CNC door joint to hold against the open request";
+      var physics = simulation.simulation;
+      if (physics == null) throw "Tending door fault has no physical simulation to jam";
+      var doorPart = cnc.robot.part("project:mill/doorRight");
+      var doorFrame = AssemblyRobot.partPose(physics, doorPart);
+      var doorCenterOffset = AssemblyRobot.rotate(doorFrame.rotation, doorPart.center);
+      var stopHalf:Array<Float> = [0.003, 0.006, 0.025];
+      var stopOffset = AssemblyRobot.rotate(doorFrame.rotation,
+        [0.0125 + stopHalf[0] + 0.0002, 0.0, 0.0]);
+      var stopCenter = [for (axis in 0...3)
+        doorFrame.position[axis] + doorCenterOffset[axis] + stopOffset[axis]];
+      var jammedSession = simulation.activeSession();
+      if (jammedSession == null) throw "Tending door fault lost its simulation session";
+      jammedSession.stop();
+      // A fixed stop sits 0.2 mm beyond the closed door's right edge. The powered
+      // cylinder must meet real contact and fail to reach the open limit switch.
+      var doorStop = jammedSession.createObject(nativekit.sim.MotionType.Static,
+        nativekit.sim.SimShape.box(stopHalf[0], stopHalf[1], stopHalf[2]),
+        new nativekit.sim.SimPose(stopCenter[0], stopCenter[1], stopCenter[2], doorFrame.rotation[0],
+          doorFrame.rotation[1], doorFrame.rotation[2], doorFrame.rotation[3]));
+      for (_ in 0...800) {
+        if (mission.failure != null) break;
+        simulation.step();
+      }
+      check(mission.failure != null && mission.alarmCode == MissionAlarmCode.DoorJam,
+        "a door that cannot reach its physical switch raises the stable door-jam alarm");
+      jammedSession.stop();
+      doorStop.dispose();
+      var beforeDoorRetry = mission.completed;
+      check(simulation.retryMission(), "removing the door jam makes its timed-out request recoverable");
+      simulation.step();
+      simulation.step();
+      check(cncRequest(RobotInterfaceChannels.FAULT_RESET),
+        "the CNC receives one complete sampled image with the mission fault-reset pulse high");
+      simulation.step();
+      check(!cncRequest(RobotInterfaceChannels.FAULT_RESET),
+        "the mission lowers fault reset after that controller image, independent of render frames");
+      var doorRetryTicks = 0;
+      while ((mission.failure != null || mission.stepIndex <= doorWait) && doorRetryTicks < 1000) {
+        simulation.step(); doorRetryTicks++;
+      }
+      check(mission.failure == null && mission.stepIndex > doorWait && mission.completed > beforeDoorRetry &&
+        cellSignal(RobotInterfaceChannels.DOOR_OPEN),
+        'door-jam recovery resets the PLC, opens the door and resumes its failed wait ' +
+          '(failure=${mission.failure}, alarm=${mission.alarmCode}, step=${mission.stepIndex}/$doorWait, ' +
+          'completed=${mission.completed}/$beforeDoorRetry, open=${cellSignal(RobotInterfaceChannels.DOOR_OPEN)}, ' +
+          'request=${cncRequest(RobotInterfaceChannels.REQUEST_DOOR_OPEN)}, ' +
+          'faultReset=${cncRequest(RobotInterfaceChannels.FAULT_RESET)}, cncAlarm=${cnc.interfaceAlarm}, ' +
+          'door=${cnc.robot.robot.snapshot().positions.get(doorJoint)}, ' +
+          'runner=${mission.runner.status()}, ticks=$doorRetryTicks/1000)');
+      check(cellSignal(RobotInterfaceChannels.DOOR_OPEN) && mission.failure == null,
+        "the first physical door request reaches its open switch before injected cycle interlock");
+      // Request a cycle with the door open. This exercises the CNC alarm-code outputs and
+      // robot-side classification through the same one-tick cell wiring as a physical PLC.
+      mission.robot.runtime.writeDigitalOutput(RobotInterfaceChannels.CYCLE_START, true);
+      simulation.step();
+      mission.robot.runtime.writeDigitalOutput(RobotInterfaceChannels.CYCLE_START, false);
+      for (_ in 0...5) {
+        if (mission.failure != null) break;
+        simulation.step();
+      }
+      check(mission.failure != null && mission.alarmCode == MissionAlarmCode.CncAlarm,
+        "a physical cycle interlock arrives as a coded CNC alarm at the robot mission");
+      var beforeCycleRetry = mission.completed;
+      check(simulation.retryMission(), "clearing the invalid cycle request makes the failed step recoverable");
+      for (_ in 0...20) {
+        simulation.step();
+        if (mission.failure == null) break;
+      }
+      check(mission.failure == null && mission.completed == beforeCycleRetry,
+        "cycle-interlock recovery clears the PLC alarm and resumes the same mission step");
+
+      var clampCommand = -1, clampWait = -1;
+      for (index in 0...mission.mission.steps.length) {
+        var step = mission.mission.steps[index];
+        if (step.kind == "signal" && step.signal != null &&
+            step.signal.name == RobotInterfaceChannels.REQUEST_CLAMP && step.signal.value && clampCommand < 0)
+          clampCommand = index;
+        if (step.kind == "waitFor" && step.waitFor != null &&
+            step.waitFor.name == RobotInterfaceChannels.CLAMPED) {clampWait = index; break;}
+      }
+      if (clampCommand < 0 || clampWait < 0) throw "Tending mission has no clamp handshake to fault-inject";
+      var clampTicks = 0;
+      while (mission.stepIndex < clampCommand && mission.failure == null && clampTicks < 3000) {
+        simulation.step(); clampTicks++;
+      }
+      check(mission.stepIndex == clampCommand && mission.failure == null,
+        'the physical blank reaches the first seated-clamp command ' +
+          '(failure=${mission.failure}, alarm=${mission.alarmCode}, step=${mission.stepIndex}/$clampCommand, ' +
+          'completed=${mission.completed}, cncAlarm=${cnc.interfaceAlarm}, ' +
+          'doorOpen=${cellSignal(RobotInterfaceChannels.DOOR_OPEN)}, ' +
+          'doorClosed=${cellSignal(RobotInterfaceChannels.DOOR_CLOSED)}, ' +
+          'clear=${cncRequest(RobotInterfaceChannels.ROBOT_CLEAR)}, ' +
+          'requestCycle=${cncRequest(RobotInterfaceChannels.CYCLE_START)}, ' +
+          'runner=${mission.runner.status()}, ticks=$clampTicks/3000)');
+      var seatedImages = [for (entry in simulation.capturePresentationSnapshot().environment)
+        if (entry.id == "project:infeed/blank-0-0") entry];
+      if (seatedImages.length != 1) throw "The first blank has no physical vise pose for clamp recovery";
+      var seatedPose = new nativekit.sim.SimPose(seatedImages[0].position[0], seatedImages[0].position[1],
+        seatedImages[0].position[2], seatedImages[0].rotation[0], seatedImages[0].rotation[1],
+        seatedImages[0].rotation[2], seatedImages[0].rotation[3]);
+      blank.setPoseForNextTick(new nativekit.sim.SimPose(3.0, 3.0, 3.0));
+      for (_ in 0...30) {
+        if (mission.failure != null) break;
+        simulation.step();
+      }
+      check(mission.failure != null && mission.alarmCode == MissionAlarmCode.ClampWithoutPart,
+        "a physical clamp request without a sensed blank raises the stable clamp alarm");
+      blank.setPoseForNextTick(seatedPose);
+      var beforeClampRetry = mission.completed;
+      check(simulation.retryMission(), "reseating the missing blank makes the clamp alarm recoverable");
+      var clampRetryTicks = 0;
+      while ((mission.failure != null || mission.stepIndex <= clampWait) && clampRetryTicks < 500) {
+        simulation.step(); clampRetryTicks++;
+      }
+      check(mission.failure == null && mission.stepIndex > clampWait && mission.completed > beforeClampRetry,
+        "clamp-alarm recovery reseats the same blank, clamps it and resumes the mission");
+      // Start at the first seated-and-clamped blank; exclude earlier recovery fault injections.
+      var productionStart = simulation.activeSession().simulationTime();
       var ticks = 0, spindleTicks = 0, observedStocks = 0, maxSimultaneousHeld = 0;
       var lastCycleStart = 0.0, lastCycleTime = 0.0, wasCycleActive = false;
       var cycleTimes:Array<Float> = [];
@@ -3443,7 +3711,7 @@ class ProjectSourceTests {
         'the dual grippers carry the staged raw blank and finished blank together during exchange, max $maxSimultaneousHeld');
       check(cycleTimes.length == 4 && lastCycleTime > 0 && ticks > 0 && spindleTicks > 0,
         'the tending run reports all four CNC cycle intervals and spindle time');
-      var elapsed = simulation.activeSession().simulationTime();
+      var productionSeconds = simulation.activeSession().simulationTime() - productionStart;
       var spindleUse = spindleTicks / ticks;
       check(cnc.spindleUtilization >= 0.75,
         'dual-gripper tending keeps measured spindle utilization at or above 75%, got ${cnc.spindleUtilization * 100}%');
@@ -3453,10 +3721,18 @@ class ProjectSourceTests {
       for (_ in 0...20) simulation.step();
       check(Math.abs(cnc.spindleUtilization - measuredUse) < 1e-12,
         "spindle utilization holds its completed-cycle measurement while the cell is idle");
-      Sys.println('tending mission: ${cnc.completedStocks.length} blanks, ${elapsed} s elapsed, ' +
+      Sys.println('tending production: ${cnc.completedStocks.length} blanks, first clamp to fourth outfeed ' +
+        '${productionSeconds} s, ' +
         'spindle active ${Math.round(cnc.spindleUtilization * 1000) / 10}%, cycle intervals ${cycleTimes.join(", ")} s');
     } catch (error:Dynamic) {
-      simulation.dispose(); session.dispose(); throw error;
+      var cleanupError:Null<String> = null;
+      try simulation.dispose() catch (disposeError:Dynamic) cleanupError = Std.string(disposeError);
+      try session.dispose() catch (disposeError:Dynamic) {
+        var sessionError = Std.string(disposeError);
+        cleanupError = cleanupError == null ? sessionError : cleanupError + "; " + sessionError;
+      }
+      if (cleanupError != null) throw '$error (cleanup also failed: $cleanupError)';
+      throw error;
     }
     simulation.dispose(); session.dispose();
   }
@@ -3689,12 +3965,19 @@ class ProjectSourceTests {
     var controller = job == null ? null : job.controller;
     if (controller == null) throw "the router names the controller its steppers are wired to";
     // Each axis is as fast as the slowest of: a 24 V NEMA 23 at half its holding torque (twice the
-    // 68.6 rad/s where its winding's reactance takes the supply), what the controller's step tick can
-    // generate at its microstepping (40 kHz over 3200 steps a turn: 78.5 rad/s), and the screw's
-    // critical speed, all through the axis's ratio to the motor.
+    // 68.6 rad/s where its winding's reactance takes the supply), the deployed controller's
+    // integer-tick pulse ceiling, and the screw's critical speed, all through the axis's ratio to
+    // the motor.
     var motorSpeed = 2 * 24 / (50 * 2.5e-3 * 2.8);
     var binding = routerDeviceBinding(model, controller.stepTickHz);
-    var stepSpeed = controller.stepTickHz / binding.channels[0].stepsPerUnit;
+    var channel = binding.channels[0];
+    var wire = haxe.io.Bytes.alloc(8);
+    wire.setFloat(0, channel.maxRate);
+    wire.setFloat(4, channel.stepsPerUnit);
+    var interval = Math.max(1, Math.ceil(binding.stepTickHz /
+      (wire.getFloat(0) * wire.getFloat(4))));
+    var stepSpeed = Math.min(channel.maxRate,
+      binding.stepTickHz / (interval * wire.getFloat(4)));
     var wired = binding.model;
     var steady = new SteadyLoads();
     var derived:Array<String> = [], free:Array<String> = [];
@@ -4247,15 +4530,8 @@ class ProjectSourceTests {
     if (!missingRejected) throw "Joint-motion policy must not fabricate a mechanical speed cap";
   }
 
-  /** The remaining full-suite checks, also available after a repaired track or gantry gate. */
-  static function checkAfterTrack(root:String):Void {
-    checkRobotWelder(root);
-    checkMates(root);
-    checkBenchMill(root);
-    checkEnclosedMillProject(root);
-    checkTendingControllers(root);
-    checkTendingRobotInterface(root);
-    checkMachineTending(root);
+  /** Checks after the physical tending mission, also available as a resumed app phase. */
+  static function checkAfterMachineTending(root:String):Void {
     checkVirtualRouterHoming(root);
     checkCncRouter(root);
     checkBeltRouter(root);
@@ -4266,6 +4542,23 @@ class ProjectSourceTests {
     checkMissionOverlayEdge();
     checkCncControls(root);
     checkBackgroundLaunch(root);
+  }
+
+  /** Checks after the controller-cell build, also available as a resumed app phase. */
+  static function checkAfterTendingControllers(root:String):Void {
+    checkTendingRobotInterface(root);
+    checkMachineTending(root);
+    checkAfterMachineTending(root);
+  }
+
+  /** The remaining full-suite checks, also available after a repaired track or gantry gate. */
+  static function checkAfterTrack(root:String):Void {
+    checkRobotWelder(root);
+    checkMates(root);
+    checkBenchMill(root);
+    checkEnclosedMillProject(root);
+    checkTendingControllers(root);
+    checkAfterTendingControllers(root);
   }
 
   static function checks():Int {
@@ -4414,6 +4707,14 @@ class ProjectSourceTests {
       checkAfterTrack(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "after-cell") {
+      checkAfterTendingControllers(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "after-tending") {
+      checkAfterMachineTending(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder") {
       checkRobotWelder(root);
       return 0;
@@ -4456,6 +4757,10 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending") {
       checkMachineTending(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-route") {
+      checkMachineTending(root, true);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "identity") {
