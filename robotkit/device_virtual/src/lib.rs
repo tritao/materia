@@ -68,7 +68,7 @@ impl VirtualDevice {
         }
         Some(Self {
             steps: StepGenerator::new(steps_per_unit, [0; ACTUATORS],
-                [0.0; ACTUATORS], tick_hz)?,
+                [1; ACTUATORS])?,
             board: VirtualBoard::new_with_actuator_count(
                 tick_hz, offset_ticks, drift_ppm, steps_per_unit, count),
             core: None,
@@ -198,15 +198,15 @@ impl VirtualDevice {
                         *limit = begin.actuator_max_acceleration[i];
                     }
                     let mut steps_per_unit = [1.0; ACTUATORS];
-                    let mut max_rate = [0.0; ACTUATORS];
+                    let mut min_step_ticks = [1; ACTUATORS];
                     let mut setup = [0; ACTUATORS];
                     for i in 0..begin.actuator_count as usize {
                         steps_per_unit[i] = begin.steps_per_unit[i] as f64;
-                        max_rate[i] = begin.max_rate[i] as f64;
+                        min_step_ticks[i] = begin.min_step_ticks[i] as u64;
                         setup[i] = begin.direction_setup_ticks[i] as u64;
                     }
                     let Some(mut generator) = StepGenerator::new(
-                        steps_per_unit, setup, max_rate, self.board.tick_hz()) else {
+                        steps_per_unit, setup, min_step_ticks) else {
                         return false;
                     };
                     for i in 0..begin.actuator_count as usize {
@@ -903,7 +903,7 @@ mod tests {
             step_tick_hz: 40_000,
             max_acceleration: 10.0,
             actuator_max_acceleration: [10.0; 64],
-            steps_per_unit: [1_000.0; 64], max_rate: [0.0; 64],
+            steps_per_unit: [1_000.0; 64], min_step_ticks: [1; 64],
             direction_setup_ticks: [0; 64], actuator_joint: [0; 64],
             actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64],
             link_loss_timeout_ns: 2_000_000_000,
@@ -981,7 +981,7 @@ mod tests {
             step_tick_hz: 40_000,
             max_acceleration: 10.0,
             actuator_max_acceleration: [10.0; 64],
-            steps_per_unit: [1_000.0; 64], max_rate: [0.0; 64],
+            steps_per_unit: [1_000.0; 64], min_step_ticks: [1; 64],
             direction_setup_ticks: [0; 64], actuator_joint: [0; 64],
             actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64],
             link_loss_timeout_ns: 2_000_000_000,

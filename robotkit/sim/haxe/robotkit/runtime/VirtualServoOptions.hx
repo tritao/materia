@@ -35,8 +35,12 @@ class VirtualServoOptions {
               encoderCountsPerUnit = encoder.countsPerUnit / Math.abs(ratio);
           }
           if (encoderCountsPerUnit <= 0.0) throw 'Virtual servo "${actuator.id}" needs its authored encoder';
-          var countsPerUnit = Math.min(encoderCountsPerUnit, tickHz / rate);
-          options.actuators.push(new VirtualActuatorOptions(actuator.id, index, ratio, offset, countsPerUnit, rate));
+          // At most one count per tick at peak speed: either the grid is coarsened to exactly that (one
+          // tick), or the encoder is coarser and its counts at peak speed set the ticks.
+          var coarsened = tickHz / rate < encoderCountsPerUnit;
+          var countsPerUnit = coarsened ? tickHz / rate : encoderCountsPerUnit;
+          var ticks = coarsened ? 1 : StepTicks.forLimit(rate * encoderCountsPerUnit, tickHz);
+          options.actuators.push(new VirtualActuatorOptions(actuator.id, index, ratio, offset, countsPerUnit, ticks));
           options.targetError = Math.max(options.targetError, 1.0 / (countsPerUnit * Math.abs(ratio)));
       }
     }

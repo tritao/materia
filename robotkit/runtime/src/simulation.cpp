@@ -349,7 +349,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                     actuator.feedback_offset = robot_desc->virtual_device_feedback_offset[i];
                 }
                 actuator.steps_per_unit = robot_desc->virtual_device_actuator_steps_per_unit[i];
-                actuator.max_rate = robot_desc->virtual_device_actuator_max_rate[i];
+                actuator.min_step_ticks = robot_desc->virtual_device_actuator_min_step_ticks[i];
                 actuator.direction_setup_ticks =
                     robot_desc->virtual_device_actuator_direction_setup_ticks[i];
                 actuator.dual_drive_skew_bound = robot_desc->virtual_device_actuator_skew_bound[i];

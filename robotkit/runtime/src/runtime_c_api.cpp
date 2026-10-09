@@ -114,7 +114,7 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
             actuator.feedback_offset = device->feedback_offset[i];
         }
         actuator.steps_per_unit = device->actuator_steps_per_unit[i];
-        actuator.max_rate = device->actuator_max_rate[i];
+        actuator.min_step_ticks = device->actuator_min_step_ticks[i];
         actuator.direction_setup_ticks = device->actuator_direction_setup_ticks[i];
         actuator.dual_drive_skew_bound = device->actuator_skew_bound[i];
         const auto *id = device->actuator_ids + i * 64;

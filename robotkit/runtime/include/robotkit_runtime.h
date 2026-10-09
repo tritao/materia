@@ -747,7 +747,7 @@ typedef struct rk_serial_device_desc {
     double actuator_ratio[RK_MAX_SERIAL_JOINTS];
     double actuator_offset[RK_MAX_SERIAL_JOINTS];
     double actuator_steps_per_unit[RK_MAX_SERIAL_JOINTS];
-    double actuator_max_rate[RK_MAX_SERIAL_JOINTS]; /**< Zero means no rate limit. */
+    uint32_t actuator_min_step_ticks[RK_MAX_SERIAL_JOINTS]; /**< Least whole step-tick periods between steps, at least one. */
     uint16_t actuator_direction_setup_ticks[RK_MAX_SERIAL_JOINTS];
     double actuator_skew_bound[RK_MAX_SERIAL_JOINTS];
     uint8_t actuator_ids[RK_MAX_SERIAL_JOINTS * 64]; /**< 64 NUL-terminated ASCII IDs, 64 bytes each. */

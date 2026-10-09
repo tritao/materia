@@ -88,7 +88,7 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
         for (a, &limit) in head.actuator_max_acceleration[..head.actuator_count as usize].iter().enumerate() {
             if !limit.is_finite() || limit <= 0.0 || limit > head.max_acceleration ||
                !head.steps_per_unit[a].is_finite() || head.steps_per_unit[a] <= 0.0 ||
-               !head.max_rate[a].is_finite() || head.max_rate[a] < 0.0 ||
+               head.min_step_ticks[a] == 0 ||
                head.actuator_joint[a] >= MAX_ACTUATORS ||
                !head.actuator_ratio[a].is_finite() || head.actuator_ratio[a] == 0.0 ||
                !head.dual_drive_skew_bound[a].is_finite() || head.dual_drive_skew_bound[a] < 0.0 {

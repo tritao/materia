@@ -7,7 +7,7 @@ fn edge_capture_survives_later_motion_and_counts_repeated_closures() {
     assert!(board.configure_switch(3, VirtualSwitch {
         actuator: 1, threshold_steps: 2, active_above: true, active_high: false,
     }));
-    let mut steps = StepGenerator::new([1000.0; 2], [0; 2], [0.0; 2], 1000).unwrap();
+    let mut steps = StepGenerator::new([1000.0; 2], [0; 2], [1; 2]).unwrap();
     assert!(steps.bind_input(&board, 3, InputBinding { actuator: 1, active_high: false }, 2));
     assert!(!steps.bind_input(&board, 64, InputBinding { actuator: 0, active_high: true }, 2));
     assert!(!steps.bind_input(&board, 4, InputBinding { actuator: 2, active_high: true }, 2));
@@ -46,7 +46,7 @@ fn edge_capture_survives_later_motion_and_counts_repeated_closures() {
 fn initially_closed_input_does_not_create_a_capture() {
     let mut board = VirtualBoard::<1, 1>::new(1000, 0, 0, [1000.0]);
     assert!(board.set_input(0, true));
-    let mut steps = StepGenerator::new([1000.0], [0], [0.0], 1000).unwrap();
+    let mut steps = StepGenerator::new([1000.0], [0], [1]).unwrap();
     assert!(steps.bind_input(&board, 0, InputBinding { actuator: 0, active_high: true }, 1));
     steps.tick(&mut board, [0.0]).unwrap();
     let observed = steps.input_observation(0).unwrap();

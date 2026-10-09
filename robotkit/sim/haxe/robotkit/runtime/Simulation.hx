@@ -201,7 +201,7 @@ class Simulation {
           robotDesc.set_virtual_device_feedback_ratio(i, actuator.feedbackRatio);
           robotDesc.set_virtual_device_feedback_offset(i, actuator.feedbackOffset);
           robotDesc.set_virtual_device_actuator_steps_per_unit(i, actuator.stepsPerUnit);
-          robotDesc.set_virtual_device_actuator_max_rate(i, actuator.maxRate);
+          robotDesc.set_virtual_device_actuator_min_step_ticks(i, actuator.minStepTicks);
           robotDesc.set_virtual_device_actuator_direction_setup_ticks(i,
             actuator.directionSetupTicks);
           robotDesc.set_virtual_device_actuator_skew_bound(i, actuator.skewBound);

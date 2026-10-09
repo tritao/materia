@@ -8,7 +8,7 @@
 
 namespace robotkit::device_wire6 {
 
-inline constexpr std::uint8_t PROTOCOL_VERSION = 13;
+inline constexpr std::uint8_t PROTOCOL_VERSION = 14;
 inline constexpr std::uint8_t MAX_ACTUATORS = 64;
 
 enum class MessageType6 : std::uint8_t {
@@ -47,7 +47,7 @@ struct SessionBegin6 {
     float max_acceleration{};
     std::array<float, 64> actuator_max_acceleration{};
     std::array<float, 64> steps_per_unit{};
-    std::array<float, 64> max_rate{};
+    std::array<std::uint32_t, 64> min_step_ticks{};
     std::array<std::uint16_t, 64> direction_setup_ticks{};
     std::array<std::uint8_t, 64> actuator_joint{};
     std::array<float, 64> actuator_ratio{};
@@ -113,11 +113,11 @@ inline bool encode(const SessionBegin6 &value, std::span<std::uint8_t> out) {
         out[offset++] = static_cast<std::uint8_t>(bits_steps_per_unit >> 24);
     }
     for (std::size_t i = 0; i < 64; ++i) {
-        const std::uint32_t bits_max_rate = std::bit_cast<std::uint32_t>(value.max_rate[i]);
-        out[offset++] = static_cast<std::uint8_t>(bits_max_rate >> 0);
-        out[offset++] = static_cast<std::uint8_t>(bits_max_rate >> 8);
-        out[offset++] = static_cast<std::uint8_t>(bits_max_rate >> 16);
-        out[offset++] = static_cast<std::uint8_t>(bits_max_rate >> 24);
+        const std::uint32_t bits_min_step_ticks = static_cast<std::uint32_t>(value.min_step_ticks[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_min_step_ticks >> 0);
+        out[offset++] = static_cast<std::uint8_t>(bits_min_step_ticks >> 8);
+        out[offset++] = static_cast<std::uint8_t>(bits_min_step_ticks >> 16);
+        out[offset++] = static_cast<std::uint8_t>(bits_min_step_ticks >> 24);
     }
     for (std::size_t i = 0; i < 64; ++i) {
         const std::uint16_t bits_direction_setup_ticks = static_cast<std::uint16_t>(value.direction_setup_ticks[i]);
@@ -261,12 +261,12 @@ inline bool decode(std::span<const std::uint8_t> input, SessionBegin6 &value) {
         value.steps_per_unit[i] = std::bit_cast<float>(bits_steps_per_unit);
     }
     for (std::size_t i = 0; i < 64; ++i) {
-        std::uint32_t bits_max_rate = 0;
-        bits_max_rate |= static_cast<std::uint32_t>(input[offset++]) << 0;
-        bits_max_rate |= static_cast<std::uint32_t>(input[offset++]) << 8;
-        bits_max_rate |= static_cast<std::uint32_t>(input[offset++]) << 16;
-        bits_max_rate |= static_cast<std::uint32_t>(input[offset++]) << 24;
-        value.max_rate[i] = std::bit_cast<float>(bits_max_rate);
+        std::uint32_t bits_min_step_ticks = 0;
+        bits_min_step_ticks |= static_cast<std::uint32_t>(input[offset++]) << 0;
+        bits_min_step_ticks |= static_cast<std::uint32_t>(input[offset++]) << 8;
+        bits_min_step_ticks |= static_cast<std::uint32_t>(input[offset++]) << 16;
+        bits_min_step_ticks |= static_cast<std::uint32_t>(input[offset++]) << 24;
+        value.min_step_ticks[i] = bits_min_step_ticks;
     }
     for (std::size_t i = 0; i < 64; ++i) {
         std::uint16_t bits_direction_setup_ticks = 0;

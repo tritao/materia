@@ -17,7 +17,8 @@ struct DeviceActuator6 {
     double ratio = 1.0;
     double offset = 0.0;
     double steps_per_unit = 1'000.0;
-    double max_rate = 0.0; // zero means the actuator has no authored rate limit
+    // The least whole step-tick periods between two steps, chosen by the host's device binding.
+    std::uint32_t min_step_ticks = 1;
     std::uint16_t direction_setup_ticks = 0;
     double dual_drive_skew_bound = 0.0;
     std::string id;

@@ -5,6 +5,7 @@ import robotkit.model.RobotModel;
 import robotkit.model.RobotModelCodec;
 import robotkit.model.Transmission;
 import robotkit.runtime.VirtualActuatorOptions;
+import robotkit.runtime.StepTicks;
 
 /** One RKD6 channel as the device sees it: a stepper actuator's transmission into a joint, in steps. */
 class BoundChannel {
@@ -17,6 +18,8 @@ class BoundChannel {
   public final stepsPerUnit:Float;
   /** Actuator units per second the step tick can generate, or less when the actuator is slower. */
   public final maxRate:Float;
+  /** The least whole step-tick periods between steps, which the device enforces (`StepTicks`). */
+  public final minStepTicks:Int;
   public final directionSetupTicks:Int;
   public final skewBound:Float;
   /** Original physical shaft mapping, before collapsing its leader coupling. */
@@ -25,7 +28,7 @@ class BoundChannel {
   public final feedbackOffset:Float;
 
   public function new(channel:Int, actuatorId:String, jointIndex:Int, ratio:Float, offset:Float,
-      stepsPerUnit:Float, maxRate:Float, directionSetupTicks:Int, skewBound:Float,
+      stepsPerUnit:Float, maxRate:Float, minStepTicks:Int, directionSetupTicks:Int, skewBound:Float,
       feedbackJointIndex:Int, feedbackRatio:Float, feedbackOffset:Float) {
     this.channel = channel;
     this.actuatorId = actuatorId;
@@ -34,6 +37,7 @@ class BoundChannel {
     this.offset = offset;
     this.stepsPerUnit = stepsPerUnit;
     this.maxRate = maxRate;
+    this.minStepTicks = minStepTicks;
     this.directionSetupTicks = directionSetupTicks;
     this.skewBound = skewBound;
     this.feedbackJointIndex = feedbackJointIndex;
@@ -59,9 +63,6 @@ class BoundInput {
  * is an error.
  */
 class DeviceBinding {
-  /** Relative error of a rate times steps per unit carried as two f32 values, with margin; the device step generator uses the same. */
-  static inline var RATE_ROUNDING:Float = 1e-6;
-
   public final channels:Array<BoundChannel>;
   public final inputs:Array<BoundInput>;
   /**
@@ -125,6 +126,10 @@ class DeviceBinding {
       var ceiling = pulseRate / stepsPerUnit;
       var motorRate = actuator.planningRate();
       var rate = motorRate == null ? ceiling : Math.min(motorRate, ceiling);
+      // The device steps at most once per `ticks` (an integer chosen here, from the driver's ceiling and the
+      // motor's speed in deployed steps), so planning uses the rate those ticks reach, never more.
+      var ticks = StepTicks.forLimit(motorRate == null ? driverRate
+        : Math.min(driverRate, motorRate * StepTicks.deployed(stepsPerUnit)), stepTickHz);
       var feedbackJoint = -1, feedbackRatio = 0.0, feedbackOffset = 0.0;
       switch actuator.transmission {
         case SimpleTransmission(shaft, directRatio, directOffset):
@@ -135,23 +140,15 @@ class DeviceBinding {
       if (feedbackJoint < 0 || !Math.isFinite(feedbackRatio) || feedbackRatio == 0 || !Math.isFinite(feedbackOffset))
         throw "Device actuator has no valid physical feedback mapping";
       bound.push(new BoundChannel(position, name, jointIndex, ratio * channel.direction, offset,
-        stepsPerUnit, rate, channel.directionSetupTicks, channel.skewBound,
+        stepsPerUnit, rate, ticks, channel.directionSetupTicks, channel.skewBound,
         feedbackJoint, feedbackRatio, feedbackOffset));
       var capped = find(tightened, name);
       if (capped != null) {
         if ((stepTickHz < driverRate) &&
             (motorRate == null || rate < motorRate)) capped.speedLimiter = "controller tick";
-        // The pulse generator enforces an integer number of controller ticks
-        // between steps. Plan at that achievable ceiling, using the same f32
-        // deployment values, rather than allowing the motor to lag a faster
+        // Plan at the rate the device's whole ticks reach rather than letting the motor lag a faster
         // continuous-rate trajectory and keep moving after its nominal stop.
-        var wire = haxe.io.Bytes.alloc(8);
-        wire.setFloat(0, rate); wire.setFloat(4, stepsPerUnit);
-        var wireRate = wire.getFloat(0), wireSteps = wire.getFloat(4);
-        var ticks = stepTickHz / (wireRate * wireSteps), whole = Math.floor(ticks);
-        // As the device rounds: a remainder within the f32 values' rounding adds no tick (RATE_ROUNDING).
-        var interval = Math.max(1, ticks - whole > ticks * RATE_ROUNDING ? whole + 1 : whole);
-        capped.maxRate = Math.min(rate, stepTickHz / (interval * wireSteps));
+        capped.maxRate = Math.min(rate, StepTicks.rate(ticks, stepsPerUnit, stepTickHz));
       }
     }
     for (actuator in robot.actuators)
@@ -220,7 +217,7 @@ class DeviceBinding {
   /** The channels as an in-process virtual device's actuators. */
   public function virtualActuators():Array<VirtualActuatorOptions>
     return [for (channel in channels) new VirtualActuatorOptions(channel.actuatorId,
-      channel.jointIndex, channel.ratio, channel.offset, channel.stepsPerUnit, channel.maxRate,
+      channel.jointIndex, channel.ratio, channel.offset, channel.stepsPerUnit, channel.minStepTicks,
       channel.directionSetupTicks, channel.skewBound, channel.feedbackJointIndex,
       channel.feedbackRatio, channel.feedbackOffset)];
 

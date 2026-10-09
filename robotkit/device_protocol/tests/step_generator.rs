@@ -4,7 +4,7 @@ use robotkit_device_protocol::{Board, Output, SkewGroup, StepFault, StepGenerato
 #[test]
 fn captured_integer_counter_does_not_retract_after_f32_conversion() {
     let mut board = VirtualBoard::<1, 1>::new(1_000_000, 0, 0, [1000.0]);
-    let mut generator = StepGenerator::new([1000.0], [0], [0.0], 1_000_000).unwrap();
+    let mut generator = StepGenerator::new([1000.0], [0], [1]).unwrap();
     for _ in 0..166 { board.step_pulse(0, true); }
     board.advance_host_ns(1_000_000);
     let held = generator.counter_position(&board, 0).unwrap() as f32;
@@ -18,47 +18,28 @@ fn captured_integer_counter_does_not_retract_after_f32_conversion() {
 
 #[test]
 fn crossing_setup_and_rate_limit() {
+    // A 40 kHz step tick on a 1 MHz board: one call every 25 board ticks. Direction setup is 50
+    // board ticks; at most one step every 10 step ticks (250 board ticks).
     let mut board = VirtualBoard::<1, 1>::new(1_000_000, 0, 0, [400.0]);
-    let mut generator = StepGenerator::new([400.0], [50], [10.0], 1_000_000).unwrap();
-    board.advance_host_ns(1_000_000);
-    generator.tick(&mut board, [0.01]).unwrap();
-    assert_eq!(board.step_count(0), 0);
-    board.advance_host_ns(1_040_000);
-    generator.tick(&mut board, [0.01]).unwrap();
-    assert_eq!(board.step_count(0), 0);
-    board.advance_host_ns(1_050_000);
-    generator.tick(&mut board, [0.01]).unwrap();
-    assert_eq!(board.step_count(0), 1);
-    board.advance_host_ns(1_100_000);
-    generator.tick(&mut board, [0.01]).unwrap();
-    assert_eq!(board.step_count(0), 1);
-    board.advance_host_ns(1_300_000);
-    generator.tick(&mut board, [0.01]).unwrap();
-    assert_eq!(board.step_count(0), 2);
+    let mut generator = StepGenerator::new([400.0], [50], [10]).unwrap();
+    let mut step_at = |micros: u64, board: &mut VirtualBoard<1, 1>| {
+        board.advance_host_ns(micros * 1_000);
+        generator.tick(board, [0.01]).unwrap();
+        board.step_count(0)
+    };
+    assert_eq!(step_at(1_000, &mut board), 0);
+    assert_eq!(step_at(1_025, &mut board), 0);
+    assert_eq!(step_at(1_050, &mut board), 1);
+    for micros in (1_075..1_300).step_by(25) { assert_eq!(step_at(micros, &mut board), 1); }
+    assert_eq!(step_at(1_300, &mut board), 2);
     let steps: Vec<_> = board.records().iter().filter(|r| matches!(r.output, Output::Step(..))).collect();
     assert!(steps[1].ticks - steps[0].ticks >= 250);
 }
 
 #[test]
-fn rate_at_the_tick_ceiling_steps_every_tick() {
-    // 16 microsteps of a 1.8° motor at 40 kHz: the ceiling is 78.54 rad/s. As f32 wire values the
-    // rate times steps per unit lands just under 40 kHz, which must not round up to two ticks a step.
-    let steps = (200.0 * 16.0 / (2.0 * core::f64::consts::PI)) as f32 as f64;
-    let rate = (40_000.0 / (200.0 * 16.0 / (2.0 * core::f64::consts::PI))) as f32 as f64;
-    assert!(rate * steps < 40_000.0);
-    let mut board = VirtualBoard::<1, 1>::new(40_000, 0, 0, [steps]);
-    let mut generator = StepGenerator::new([steps], [0], [rate], 40_000).unwrap();
-    for tick in 1..=10u64 {
-        board.advance_host_ns(tick * 25_000);
-        generator.tick(&mut board, [1.0]).unwrap();
-    }
-    assert_eq!(board.step_count(0), 10);
-}
-
-#[test]
 fn feedback_skew_latches_fault() {
     let mut board = VirtualBoard::<2, 1>::new(1_000_000, 0, 0, [400.0, 400.0]);
-    let mut generator = StepGenerator::new([400.0; 2], [0; 2], [0.0; 2], 1_000_000).unwrap();
+    let mut generator = StepGenerator::new([400.0; 2], [0; 2], [1; 2]).unwrap();
     assert!(generator.set_skew_group(SkewGroup { first: 0, second: 1,
         first_ratio: 1.0, second_ratio: 1.0, bound: 0.001 }));
     board.advance_host_ns(1_000_000);
@@ -70,7 +51,7 @@ fn feedback_skew_latches_fault() {
 #[test]
 fn lead_screw_crosses_400_steps_per_mm() {
     let mut board = VirtualBoard::<1, 1>::new(1_000_000, 0, 0, [400_000.0]);
-    let mut generator = StepGenerator::new([400_000.0], [0], [0.01], 1_000_000).unwrap();
+    let mut generator = StepGenerator::new([400_000.0], [0], [10]).unwrap();
     for tick in 1..=4_000 {
         let host_ns = tick * 25_000;
         board.advance_host_ns(host_ns);
@@ -84,7 +65,7 @@ fn lead_screw_crosses_400_steps_per_mm() {
 #[test]
 fn homing_side_hold_preserves_alignment_and_requires_homing_purpose() {
     let mut board = VirtualBoard::<3, 1>::new(1000, 0, 0, [1000.0; 3]);
-    let mut generator = StepGenerator::new([1000.0; 3], [0; 3], [0.0; 3], 1000).unwrap();
+    let mut generator = StepGenerator::new([1000.0; 3], [0; 3], [1; 3]).unwrap();
     assert!(generator.set_skew_group(SkewGroup {
         first: 0, second: 1, first_ratio: 1.0, second_ratio: 1.0, bound: 0.001,
     }));
@@ -112,7 +93,7 @@ fn homing_side_hold_preserves_alignment_and_requires_homing_purpose() {
 #[test]
 fn independent_counter_rebase_is_atomic_and_preserves_physical_steps() {
     let mut board = VirtualBoard::<2, 1>::new(1000, 0, 0, [1000.0; 2]);
-    let mut generator = StepGenerator::new([1000.0; 2], [0; 2], [0.0; 2], 1000).unwrap();
+    let mut generator = StepGenerator::new([1000.0; 2], [0; 2], [1; 2]).unwrap();
     assert!(generator.set_skew_group(SkewGroup {
         first: 0, second: 1, first_ratio: 1.0, second_ratio: 1.0, bound: 0.001,
     }));
@@ -141,7 +122,7 @@ fn independent_counter_rebase_is_atomic_and_preserves_physical_steps() {
 #[test]
 fn stopped_pair_queue_handoff_preserves_steps_and_uses_the_shared_leader() {
     let mut board = VirtualBoard::<2, 1>::new(1000, 0, 0, [1000.0; 2]);
-    let mut generator = StepGenerator::new([1000.0; 2], [0; 2], [0.0; 2], 1000).unwrap();
+    let mut generator = StepGenerator::new([1000.0; 2], [0; 2], [1; 2]).unwrap();
     assert!(generator.set_skew_group(SkewGroup {
         first: 0, second: 1, first_ratio: 1.0, second_ratio: 1.0, bound: 0.01,
     }));

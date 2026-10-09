@@ -52,7 +52,7 @@ CompiledDevicePlan6 compile_device_segments6(
         if (actuator.joint >= blueprint.joint_count || !std::isfinite(actuator.ratio) ||
             actuator.ratio == 0 || !std::isfinite(actuator.offset) ||
             !std::isfinite(actuator.steps_per_unit) || actuator.steps_per_unit <= 0 ||
-            !std::isfinite(actuator.max_rate) || actuator.max_rate < 0)
+            actuator.min_step_ticks == 0)
             return failure("invalid actuator layout");
     const auto original_segments = segments;
     std::vector<robotkit::TrajectorySegment> lowered;
@@ -257,9 +257,9 @@ CompiledDevicePlan6 compile_device_segments6(
                         power *= host_tau;
                     }
                     const auto actuator_rate = std::abs(velocity * ratio);
-                    if ((layout[actuator].max_rate > 0 &&
-                         actuator_rate > layout[actuator].max_rate + 1e-6) ||
-                        actuator_rate * layout[actuator].steps_per_unit > step_tick_hz + 1e-6)
+                    // The device steps at most once per `min_step_ticks`, counting with its f32 steps per unit.
+                    const auto steps = static_cast<double>(static_cast<float>(layout[actuator].steps_per_unit));
+                    if (actuator_rate * steps * layout[actuator].min_step_ticks > step_tick_hz + 1e-6)
                         return reject("actuator step-rate limit exceeded");
                 }
             }

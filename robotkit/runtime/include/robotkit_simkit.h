@@ -203,7 +203,7 @@ typedef struct rk_simulation_robot_desc {
     double virtual_device_actuator_ratio[64];
     double virtual_device_actuator_offset[64];
     double virtual_device_actuator_steps_per_unit[64];
-    double virtual_device_actuator_max_rate[64];
+    uint32_t virtual_device_actuator_min_step_ticks[64]; /**< Least whole step-tick periods between steps, at least one. */
     uint16_t virtual_device_actuator_direction_setup_ticks[64];
     double virtual_device_actuator_skew_bound[64];
     uint8_t virtual_device_actuator_ids[4096]; /**< 64 NUL-terminated ASCII IDs, 64 bytes each. */

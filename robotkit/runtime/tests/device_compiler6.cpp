@@ -86,8 +86,8 @@ int main() {
     segment.degree = 1;
     segment.coefficients[0].value[0] = 0.01;
     segment.coefficients[0].value[1] = 0.002;
-    robotkit::DeviceActuator6 first{0, 2.0, 0.005, 400'000.0, 0.01};
-    robotkit::DeviceActuator6 second{0, 4.0, 0.005, 400'000.0, 0.02};
+    robotkit::DeviceActuator6 first{0, 2.0, 0.005, 400'000.0};
+    robotkit::DeviceActuator6 second{0, 4.0, 0.005, 400'000.0};
     const robotkit::DeviceActuator6 layout[] = {first, second};
     auto transmitted = robotkit::compile_device_segments6(
         std::span(&segment, 1), 8, true, 1'000'000'000ULL,
@@ -96,7 +96,7 @@ int main() {
     assert(std::abs(transmitted.segments[0].coefficients[0].c0 - 0.01f) < 1e-7);
     assert(std::abs(transmitted.segments[0].coefficients[1].c0 - 0.02f) < 1e-7);
     assert(std::abs(transmitted.segments[0].coefficients[1].c1 - 0.008f) < 1e-7);
-    second.max_rate = 0.001;
+    second.min_step_ticks = 1'000;
     const robotkit::DeviceActuator6 slow[] = {first, second};
     auto rate_rejected = robotkit::compile_device_segments6(
         std::span(&segment, 1), 8, true, 1'000'000'000ULL,

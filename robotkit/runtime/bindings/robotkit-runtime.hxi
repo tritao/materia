@@ -1238,7 +1238,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * board it is for. Joint, ratio and offset relate a channel to a blueprint joint:
 	 * actuator = ratio * (joint - offset), in the actuator's unit (a stepper's rotor radians).
 	 */
-	struct rk_serial_device_desc @layout(12192, 8) {
+	struct rk_serial_device_desc @layout(11936, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -1256,38 +1256,38 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		actuator_offset: array<f64, 64> @offset(600);
 		actuator_steps_per_unit: array<f64, 64> @offset(1112);
 		/**
-		 * < Zero means no rate limit.
+		 * < Least whole step-tick periods between steps, at least one.
 		 */
-		actuator_max_rate: array<f64, 64> @offset(1624);
-		actuator_direction_setup_ticks: array<u16, 64> @offset(2136);
-		actuator_skew_bound: array<f64, 64> @offset(2264);
+		actuator_min_step_ticks: array<u32, 64> @offset(1624);
+		actuator_direction_setup_ticks: array<u16, 64> @offset(1880);
+		actuator_skew_bound: array<f64, 64> @offset(2008);
 		/**
 		 * < 64 NUL-terminated ASCII IDs, 64 bytes each.
 		 */
-		actuator_ids: array<u8, 4096> @offset(2776);
+		actuator_ids: array<u8, 4096> @offset(2520);
 		/**
 		 * < Wired switch inputs, zero to 64.
 		 */
-		input_count: u32 @offset(6872);
+		input_count: u32 @offset(6616);
 		/**
 		 * < Captured physical actuator channel per input.
 		 */
-		input_actuator: array<u8, 64> @offset(6876);
+		input_actuator: array<u8, 64> @offset(6620);
 		/**
 		 * < Electrical polarity: zero or one.
 		 */
-		input_active_high: array<u8, 64> @offset(6940);
+		input_active_high: array<u8, 64> @offset(6684);
 		/**
 		 * < NUL-terminated model switch IDs.
 		 */
-		input_switch_ids: array<u8, 4096> @offset(7004);
+		input_switch_ids: array<u8, 4096> @offset(6748);
 		/**
 		 * Optional original shaft feedback mappings; count zero keeps legacy mappings.
 		 */
-		feedback_count: u32 @offset(11100);
-		feedback_joint: array<u8, 64> @offset(11104);
-		feedback_ratio: array<f64, 64> @offset(11168);
-		feedback_offset: array<f64, 64> @offset(11680);
+		feedback_count: u32 @offset(10844);
+		feedback_joint: array<u8, 64> @offset(10848);
+		feedback_ratio: array<f64, 64> @offset(10912);
+		feedback_offset: array<f64, 64> @offset(11424);
 	}
 	struct rk_timed_event @layout(136, 8) {
 		/**
