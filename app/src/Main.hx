@@ -1911,16 +1911,20 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   /**
-   * The scene's colliding and near pairs while editing (COLLISION.md CL8b), and the toolbar's summary;
-   * none while a simulation runs or the setting is off. The world answers once per scene revision.
+   * The scene's colliding and near pairs (COLLISION.md CL8b), and the toolbar's summary; none when
+   * the setting is off. While a simulation runs, bodies follow its presentation (CL8c) and resting
+   * contact is tolerated. The world answers once per scene revision or presented frame.
    */
   function editingCollisions():Array<SceneCollision.SceneCollisionPair> {
     collisionSummary = null;
-    if (!collisionsVisible || simulation.isActive()) return [];
+    if (!collisionsVisible) return [];
     var collision = sceneCollision;
     if (collision == null) sceneCollision = collision = new SceneCollision(() -> new collisionkit.native.NativeCollisionWorld());
     var pairs:Array<SceneCollision.SceneCollisionPair>;
-    try pairs = collision.query(scene, session, collisionNearMillimetres / 1000.0)
+    var frame = simulation.isActive() ? framePresentation : null;
+    try pairs = frame == null ? collision.query(scene, session, collisionNearMillimetres / 1000.0)
+      : collision.query(scene, session, collisionNearMillimetres / 1000.0, SceneCollision.SIMULATION_CONTACT,
+        frame.environment, frame.revision)
     catch (error:Dynamic) {
       collisionSummary = "Collisions unavailable: " + Std.string(error);
       return [];

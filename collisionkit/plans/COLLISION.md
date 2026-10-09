@@ -1572,3 +1572,37 @@ Done as planned, with these choices:
 - **Suites:** the app suite; the project-source `scene-collision` check; the
   web build (438 guest imports bound).
 
+### CL8c: while simulating (2026-10-09)
+
+- The same world follows a running simulation. Bodies take the
+  presentation's geometry-centred poses by scene id: free objects, and
+  every assembly part on its link. `query` re-poses once per presented frame
+  and never rebuilds. The viewport tints and draws pairs while simulating
+  too.
+- **Contact tolerance.** A pair collides only when it overlaps by more than
+  a contact tolerance; within it the pair is touching and shown like a near
+  pair.
+  - Editing uses 0.1 mm, so a box laid flush on another is not a collision
+    (in CL8b, distance 0 still counted as colliding).
+  - Simulating uses 5 mm. Under MuJoCo the arm's workpiece rests 2.04 mm into
+    the table and the suction cup grips it 0.95 mm deep; the box put into
+    the pedestal below is 50 mm deep.
+- The plan's robot links need no separate source: an assembly robot's links
+  are its occurrences, posed by the presentation, with the same pieces the
+  simulation collides (CL8a's `collisionPieces`). Robots configured outside
+  a project (`SensorConfiguration` models) are not drawn as scene geometry
+  and are not included.
+- **Tests:**
+  - `checkSimulationCollision` (project-source, with `scene-collision`):
+    - a 100 mm box put into the generated arm's pedestal collides while
+      editing and through the whole simulation;
+    - the pick and place hits nothing else in 5 mm tolerance at every step;
+    - the suction cup reaches the workpiece and only touches it, which shows
+      the bodies follow the simulation;
+    - one build for 1146 steps.
+  - `SceneCollisionTests`: flush boxes touch without colliding.
+- **Suites:** the app suite; the project-source `scene-collision` checks.
+  The app suite ran with main's own two failures worked around locally and
+  reverted: `SceneEditingTests` doesn't compile and the child-process
+  SIGTERM test fails, both from main's newest commits.
+

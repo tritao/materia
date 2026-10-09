@@ -2889,6 +2889,63 @@ class ProjectSourceTests {
     editor.dispose();
   }
 
+  /**
+   * Collisions while the generated arm simulates (COLLISION.md CL8c): the world follows the
+   * simulation's poses, a box put into the pedestal collides there too, and the pick-and-place
+   * mission runs without the arm hitting anything.
+   */
+  static function checkSimulationCollision(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
+    var editor = new ReferenceEditorApp();
+    editor.openProjectInBackground(manifest);
+    var deadline = Sys.time() + 600.0;
+    while (editor.openingProject() && Sys.time() < deadline) {
+      editor.tick();
+      Sys.sleep(0.01);
+    }
+    var found = editor.scene.object("project:pedestal");
+    if (found == null) throw "the arm has no pedestal";
+    var pedestal:app.EditorScene.EditorSceneObject = found;
+    check(editor.scene.createRectangle(), "a box is added beside the arm");
+    var box = editor.scene.selectedId;
+    editor.scene.setDimensions(box, 0.1, 0.1, 0.1);
+    editor.scene.setPosition(box, 0, pedestal.x);
+    editor.scene.setPosition(box, 1, pedestal.y);
+    var collision = new app.SceneCollision(() -> new collisionkit.native.NativeCollisionWorld());
+    function colliding(pairs:Array<app.SceneCollision.SceneCollisionPair>):Array<String>
+      return [for (pair in pairs) if (pair.colliding()) pair.a + "/" + pair.b + " " + Math.round(pair.distance * 1e4) / 10 + " mm"];
+    var editing = colliding(collision.query(editor.scene, editor.session, 0.01));
+    check(editing.length == 1 && StringTools.startsWith(editing[0], "project:pedestal/" + box), 'the box is in the pedestal ($editing)');
+    var simulation = editor.simulation;
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(editor.session.sensors, editor.scene, editor.session), "the arm simulates: " + simulation.error);
+    var mission = simulation.missionPlayer();
+    if (mission == null) throw "the arm has no mission";
+    var deepest = new Map<String, Float>();
+    while (mission.completed < 2 && simulation.activeSession().simulationTime() < 60) {
+      simulation.step();
+      var frame = simulation.capturePresentationSnapshot();
+      var pairs = collision.query(editor.scene, editor.session, 0.01, app.SceneCollision.SIMULATION_CONTACT,
+        frame.environment, frame.revision);
+      var crashed = [for (entry in colliding(pairs)) if (!StringTools.startsWith(entry, "project:pedestal/" + box)) entry];
+      check(crashed.length == 0, 'the pick and place hits nothing ($crashed)');
+      check(colliding(pairs).length == 1, "the box stays in the pedestal while simulating");
+      for (pair in pairs) if (pair.distance < 0) {
+        var key = pair.a + "/" + pair.b, known = deepest.get(key);
+        if (known == null || pair.distance < known) deepest.set(key, pair.distance);
+      }
+    }
+    check(mission.completed >= 2, "the arm picks and places");
+    var gripped = deepest.get("project:tool/cup/project:workpiece");
+    check(gripped != null && gripped > -app.SceneCollision.SIMULATION_CONTACT,
+      "the bodies follow the simulation: the suction cup reaches the workpiece and only touches it");
+    check(collision.builds == 1, 'simulating only re-poses the world (${collision.builds} builds)');
+    Sys.println("Scene collision while simulating the arm passed");
+    collision.dispose();
+    simulation.dispose();
+    editor.dispose();
+  }
+
   static function checkBackgroundLaunch(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var editor = new ReferenceEditorApp();
@@ -3047,6 +3104,7 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "scene-collision") {
       checkSceneCollision(root);
+      checkSimulationCollision(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {

@@ -56,6 +56,13 @@ class SceneCollisionTests {
       'boxes 5 mm apart are near (${pairs.length} pairs)');
     check(Math.abs(pairs[0].pointB[0] - pairs[0].pointA[0] - 0.005) < 1e-6, "the closest points span the gap");
 
+    // Face to face, as a box laid on another: touching, shown as near, not colliding.
+    scene.setPosition("b", 0, 0.1);
+    pairs = collision.query(scene, null, 0.01);
+    check(pairs.length == 1 && !pairs[0].colliding() && Math.abs(pairs[0].distance) < 1e-6,
+      'flush boxes touch without colliding (${pairs.length} pairs)');
+    check(collision.query(scene, null, 0.01, 0.0).length == 1, "a zero contact tolerance still finds the pair");
+
     // 50 mm apart: clear.
     scene.setPosition("b", 0, 0.15);
     check(collision.query(scene, null, 0.01).length == 0, "boxes 50 mm apart are clear");

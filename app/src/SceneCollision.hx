@@ -13,7 +13,7 @@ import materia.assembly.AssemblyBodies;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinitionFlattener;
 
-/** Two scene objects closer than the near distance: overlapping when `distance` is zero or less. */
+/** Two scene objects closer than the near distance, colliding when they overlap by more than the contact tolerance. */
 class SceneCollisionPair {
   /** Scene object ids, in a stable order. */
   public final a:String;
@@ -23,16 +23,19 @@ class SceneCollisionPair {
   /** The closest points, in world metres (on `a`, then on `b`). */
   public final pointA:Array<Float>;
   public final pointB:Array<Float>;
+  final overlapping:Bool;
 
-  public function new(a:String, b:String, distance:Float, pointA:Array<Float>, pointB:Array<Float>) {
+  public function new(a:String, b:String, distance:Float, pointA:Array<Float>, pointB:Array<Float>, overlapping:Bool) {
     this.a = a;
     this.b = b;
     this.distance = distance;
     this.pointA = pointA;
     this.pointB = pointB;
+    this.overlapping = overlapping;
   }
 
-  public function colliding():Bool return distance <= 0;
+  /** Overlapping by more than the contact tolerance; resting or flush objects are only touching. */
+  public function colliding():Bool return overlapping;
 }
 
 /**
@@ -49,6 +52,14 @@ class SceneCollisionPair {
  * into each other shows.
  */
 class SceneCollision {
+  /** Objects laid flush (a box on a table) touch rather than collide: 0.1 mm while editing. */
+  public static inline var EDITING_CONTACT:Float = 1e-4;
+  /**
+   * Physics lets resting bodies sink in a little: 5 mm while simulating. The generated arm's
+   * workpiece rests 2.04 mm into the table under MuJoCo and its suction cup grips 0.95 mm in.
+   */
+  public static inline var SIMULATION_CONTACT:Float = 5e-3;
+
   /** How many times the world was built; a pose-only change must not add one. */
   public var builds(default, null):Int = 0;
 
@@ -59,7 +70,7 @@ class SceneCollision {
   /** The scene object behind each described body, and how to pose that body. */
   var bodyObjects:Array<String> = [];
   var bodyCentres:Array<Null<Array<Float>>> = [];
-  var queriedRevision = -1;
+  var queriedRevision = "";
   var queriedNear = -1.0;
   var queried:Array<SceneCollisionPair> = [];
 
@@ -70,16 +81,22 @@ class SceneCollision {
   }
 
   /**
-   * The pairs closer than `near` metres at the scene's current poses, closest first, one per pair of
-   * scene objects. `project` supplies the assembly of a generated project, when one is open.
+   * The pairs closer than `near` metres, closest first, one per pair of scene objects; a pair
+   * overlapping by more than `contact` metres collides. Bodies are where the scene has them or, while
+   * a simulation runs, where `poses` (its presentation's geometry-centred poses, by scene id, at
+   * `posesRevision`) puts them. `project` supplies the assembly of a generated project, when one is open.
    */
-  public function query(scene:EditorScene, project:Null<ProjectDocumentSession>, near:Float):Array<SceneCollisionPair> {
+  public function query(scene:EditorScene, project:Null<ProjectDocumentSession>, near:Float,
+      contact:Float = EDITING_CONTACT, ?poses:Array<ApplicationSimulation.SimulationPoseVisual>,
+      posesRevision:Int = 0):Array<SceneCollisionPair> {
     if (!Math.isFinite(near) || near < 0) throw "The near distance must be finite and nonnegative";
-    if (scene.revision == queriedRevision && near == queriedNear) return queried;
+    if (!Math.isFinite(contact) || contact < 0) throw "The contact tolerance must be finite and nonnegative";
+    var revision = scene.revision + ":" + contact + (poses == null ? "" : ":sim" + posesRevision);
+    if (revision == queriedRevision && near == queriedNear) return queried;
     var key = keyOf(scene, project);
     if (key != contentKey) rebuild(scene, project, key);
-    queried = pairs(scene, near);
-    queriedRevision = scene.revision;
+    queried = pairs(scene, near, contact, poses);
+    queriedRevision = revision;
     queriedNear = near;
     return queried;
   }
@@ -105,7 +122,7 @@ class SceneCollision {
     world = null;
     build = null;
     contentKey = null;
-    queriedRevision = -1;
+    queriedRevision = "";
   }
 
   /** What the world is built from; poses are left out on purpose. */
@@ -209,15 +226,20 @@ class SceneCollision {
   }
 
   /** The pairs within `near`, with every body posed where the scene has its object now. */
-  function pairs(scene:EditorScene, near:Float):Array<SceneCollisionPair> {
+  function pairs(scene:EditorScene, near:Float, contact:Float,
+      poses:Null<Array<ApplicationSimulation.SimulationPoseVisual>>):Array<SceneCollisionPair> {
     var current = world, built = build;
     if (current == null || built == null || bodyObjects.length == 0) return [];
     var items = new Map<String, EditorSceneObject>();
     for (item in scene.items()) items.set(item.id, item);
+    var simulated = new Map<String, ApplicationSimulation.SimulationPoseVisual>();
+    if (poses != null) for (pose in poses) simulated.set(pose.id, pose);
     for (index in 0...bodyObjects.length) {
       var item = items.get(bodyObjects[index]);
       if (item == null) throw 'Scene object "${bodyObjects[index]}" vanished without a rebuild';
-      current.setBodyPose(built.bodies[index], posed(item, bodyCentres[index]));
+      var live = simulated.get(item.id);
+      current.setBodyPose(built.bodies[index], live == null ? posed(item, bodyCentres[index])
+        : placed(live.position, live.rotation, bodyCentres[index]));
     }
     var closest = new Map<String, SceneCollisionPair>();
     for (found in current.distances(near)) {
@@ -226,8 +248,9 @@ class SceneCollision {
       var key = swap ? b + "\n" + a : a + "\n" + b;
       var known = closest.get(key);
       if (known != null && known.distance <= found.distance) continue;
-      closest.set(key, swap ? new SceneCollisionPair(b, a, found.distance, found.pointB, found.pointA)
-        : new SceneCollisionPair(a, b, found.distance, found.pointA, found.pointB));
+      var overlapping = found.distance < -contact;
+      closest.set(key, swap ? new SceneCollisionPair(b, a, found.distance, found.pointB, found.pointA, overlapping)
+        : new SceneCollisionPair(a, b, found.distance, found.pointA, found.pointB, overlapping));
     }
     var result = [for (pair in closest) pair];
     result.sort((x, y) -> x.distance < y.distance ? -1 : x.distance > y.distance ? 1 : Reflect.compare(x.a + x.b, y.a + y.b));
@@ -238,11 +261,15 @@ class SceneCollision {
    * The body's world pose: an object's centre and rotation, or, for an assembly occurrence, its
    * part frame (the centre less the preview centre, rotated).
    */
-  static function posed(item:EditorSceneObject, centre:Null<Array<Float>>):CollisionPose {
-    var r = item.rotation == null ? [0.0, 0.0, 0.0, 1.0] : item.rotation;
-    if (centre == null) return new CollisionPose(item.x, item.y, item.z, r[0], r[1], r[2], r[3]);
-    var offset = ApplicationSimulation.rotateOffset(centre[0], centre[1], centre[2], item.rotation);
-    return new CollisionPose(item.x - offset[0], item.y - offset[1], item.z - offset[2], r[0], r[1], r[2], r[3]);
+  static function posed(item:EditorSceneObject, centre:Null<Array<Float>>):CollisionPose
+    return placed([item.x, item.y, item.z], item.rotation, centre);
+
+  /** A geometry-centred pose as the body's pose (less the preview centre, for an assembly occurrence). */
+  static function placed(position:Array<Float>, rotation:Null<Array<Float>>, centre:Null<Array<Float>>):CollisionPose {
+    var r = rotation == null ? [0.0, 0.0, 0.0, 1.0] : rotation;
+    if (centre == null) return new CollisionPose(position[0], position[1], position[2], r[0], r[1], r[2], r[3]);
+    var offset = ApplicationSimulation.rotateOffset(centre[0], centre[1], centre[2], rotation);
+    return new CollisionPose(position[0] - offset[0], position[1] - offset[1], position[2] - offset[2], r[0], r[1], r[2], r[3]);
   }
 
   /** The object's box, as the simulation builds it: its extents, or a CAD part's collision bounds. */

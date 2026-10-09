@@ -47,7 +47,7 @@ class EditorPerspectiveViewport implements View {
   var renderedCameraRevision:Int = -1;
   var renderedLightingRevision:Int = -1;
   var renderedHoverRevision:Int = -1;
-  /** The scene's colliding and near pairs (COLLISION.md CL8b), drawn while editing. */
+  /** The scene's colliding and near pairs (COLLISION.md CL8b, CL8c), drawn while editing and simulating. */
   var collisionPairs:Array<SceneCollision.SceneCollisionPair> = [];
   var collisionRevision:Int = 0;
   var renderedCollisionRevision:Int = -1;
@@ -182,7 +182,7 @@ class EditorPerspectiveViewport implements View {
       fitCameraClipRange();
       var view = scene.configureRenderView(new SceneView(), camera.viewProjection(width / height),
         simulationActive ? simulationPoses : null, hoveredObjectId, hoveredFaceIndex,
-        simulationActive ? null : collisionPairs);
+        collisionPairs);
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
       if (gridVisible && gridStep > 0.0) {
         var scale = Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360.0);
@@ -240,7 +240,7 @@ class EditorPerspectiveViewport implements View {
     if (surface != null) canvas.drawSurface(surface, new Rect(0, 0, geometry.width, geometry.height));
     paintSensors(canvas,geometry.width,geometry.height);
     if(simulationActive)missionOverlay.paint(canvas,camera,geometry.width,geometry.height);
-    if (!simulationActive) paintCollisions(canvas, geometry.width, geometry.height);
+    paintCollisions(canvas, geometry.width, geometry.height);
     paintAssemblyDrag(canvas, geometry.width, geometry.height);
     paintSketchDraft(canvas, geometry.width, geometry.height);
     paintOrbitPivot(canvas, geometry.width, geometry.height);
