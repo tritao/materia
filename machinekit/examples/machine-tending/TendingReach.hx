@@ -1,3 +1,4 @@
+import collisionkit.native.NativeCollisionWorld;
 import machinekit.robotics.CobotArm;
 import machinekit.robotics.CobotClass;
 import machinekit.assembly.AssemblyPreview;
@@ -77,9 +78,9 @@ class TendingReach {
 			var tcp = AssemblyFrames.compose(carrier.offset, AssemblyFrames.translation(0, 0, tool.length / 1000));
 			frame.position = [tcp.x, tcp.y, tcp.z]; frame.rotation = [tcp.qx, tcp.qy, tcp.qz, tcp.qw];
 			var arm = new Manipulator(converted.model, converted.model.links[0].id, frame.id);
-			var clearance = new robotkit.collision.CollisionClearance(arm, [for (hull in converted.linkHulls)
+			var clearance = new CollisionClearance(arm, [for (hull in converted.linkHulls)
 				{name: hull.part, link: converted.model.links[hull.link].id, vertices: hull.vertices,
-					tool: StringTools.startsWith(hull.part, "tool/")}], source.ready(), () -> new collisionkit.native.NativeCollisionWorld(), 0, 0);
+					tool: StringTools.startsWith(hull.part, "tool/")}], source.ready(), () -> new NativeCollisionWorld(), 0, 0);
 			var standOff = tool.length + source.baseFlange.flangeDiameter + tool.depth + 20;
 			var baseX = source.reference.d[3], baseY = cell.opening.y - standOff;
 			var pitchX = tool.width + tool.openingTravel + 10;
@@ -126,7 +127,7 @@ class TendingReach {
 						}
 						bodies.push({name: "machine:" + body.name, link: converted.model.links[0].id, vertices: vertices, tool: false});
 					}
-					var full = new robotkit.collision.CollisionClearance(arm, bodies, source.ready(), () -> new collisionkit.native.NativeCollisionWorld());
+					var full = new CollisionClearance(arm, bodies, source.ready(), () -> new NativeCollisionWorld());
 					for (i in 0...solved.length) {
 						var hit = full.violation(solved[i], i == 0);
 						if (hit == null) continue;

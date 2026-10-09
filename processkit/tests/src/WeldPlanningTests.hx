@@ -1,3 +1,4 @@
+import collisionkit.native.NativeCollisionWorld;
 import motionkit.kinematics.IkTolerance;
 import motionkit.robot.ManipulatorKinematics;
 import processkit.WeldCorner;
@@ -562,7 +563,7 @@ class WeldPlanningTests {
     ];
     if (wallX != null) bodies.push({name: "wall", link: "base_link", vertices: box(wallX, wallX + 0.05, 0.05, 0.35, 0.0, 0.5), tool: false});
     var start = [0.0, -1.5708, 1.5708, -1.5708, -1.5708, 0.0];
-    var clearance = new robotkit.collision.CollisionClearance(made.arm, bodies, start, () -> new collisionkit.native.NativeCollisionWorld());
+    var clearance = new CollisionClearance(made.arm, bodies, start, () -> new NativeCollisionWorld());
     var solver = new ManipulatorKinematics(made.arm, 1e-8);
     solver.preferTargetOrientation = true;
     var planner = new WeldPathPlanner(solver, new IkTolerance(2e-4, 1e-3, 300, 0.03), [for (_ in 0...6) 3.0], WRIST, clearance);
@@ -760,20 +761,49 @@ private class EntryTrajectorySolver extends ContinuousBranchFixture {
     return new motionkit.kinematics.Pose3(0.35, 0.2, 0.19, 0, 0, 0, 1);
 }
 
-private class EntryTrajectoryClearance extends CollisionClearance {
-  public function new(group:robotkit.manipulation.KinematicGroup)
-    super(group, [], [for (_ in group.jointIds()) 0.0], () -> new collisionkit.native.NativeCollisionWorld());
-  override public function violation(q:Array<Float>, contact:Bool = false, ?wanted:Float):Null<robotkit.manipulation.ClearanceViolation>
+/**
+ * A clearance world with one obstacle: the torch is too close to an upright wherever joint 0 exceeds 2 rad.
+ * Process planning asks it for poses and sampled sweeps only; anything else fails the test loudly.
+ */
+private class EntryTrajectoryClearance implements robotkit.manipulation.ClearanceWorld {
+  final arm:robotkit.manipulation.KinematicGroup;
+
+  public function new(arm:robotkit.manipulation.KinematicGroup) this.arm = arm;
+
+  public function group():robotkit.manipulation.KinematicGroup return arm;
+
+  public function violation(q:Array<Float>, ?contact:Bool, ?wanted:Float,
+      ?displacements:Array<Float>):Null<robotkit.manipulation.ClearanceViolation>
     return q[0] > 2.0 ? {a: "torch", b: "upright", distance: 0.002, required: 0.003} : null;
-  // The world's batched sweep never calls `violation`; sample it here instead.
-  override public function sweep(from:Array<Float>, to:Array<Float>, ?contactFlag:Bool, ?step:Float, ?wanted:Float,
-      ?contactAt:Array<Float>->Bool, ?endpoints:Bool):Null<robotkit.manipulation.ClearanceViolation> {
-    var maxJointStep:Float = step == null ? 0.02 : step, steps = 1;
-    for (joint in 0...from.length) steps = Std.int(Math.max(steps, Math.ceil(Math.abs(to[joint] - from[joint]) / maxJointStep)));
-    for (k in (endpoints == true ? 1 : 0)...(endpoints == true ? steps : steps + 1)) {
+
+  public function sweep(from:Array<Float>, to:Array<Float>, ?contact:Bool, ?maxJointStep:Float, ?wanted:Float,
+      ?contactAt:Array<Float>->Bool, ?endpointsChecked:Bool):Null<robotkit.manipulation.ClearanceViolation> {
+    var step:Float = maxJointStep == null ? 0.02 : maxJointStep, steps = 1, inner = endpointsChecked == true;
+    for (joint in 0...from.length) steps = Std.int(Math.max(steps, Math.ceil(Math.abs(to[joint] - from[joint]) / step)));
+    for (k in (inner ? 1 : 0)...(inner ? steps : steps + 1)) {
       var found = violation([for (joint in 0...from.length) from[joint] + (to[joint] - from[joint]) * k / steps]);
       if (found != null) return found;
     }
     return null;
   }
+
+  public function closest(q:Array<Float>, ?contact:Bool, ?wanted:Float):Null<robotkit.manipulation.ClearanceViolation>
+    return unused("closest");
+  public function closestSweep(from:Array<Float>, to:Array<Float>, ?contact:Bool, ?maxJointStep:Float,
+      ?wanted:Float):Null<robotkit.manipulation.ClearanceViolation>
+    return unused("closestSweep");
+  public function motionEnvelope(lower:Array<Float>, upper:Array<Float>):robotkit.manipulation.ClearanceMotionEnvelope
+    return unused("motionEnvelope");
+  public function displacementBounds(q:Array<Float>, errors:Array<Float>):Array<Float> return unused("displacementBounds");
+  public function tcpDisplacementBound(q:Array<Float>, errors:Array<Float>):Float return unused("tcpDisplacementBound");
+  public function auditDisplacement(q:Array<Float>, perturbed:Array<Float>, errors:Array<Float>,
+      ?envelope:robotkit.manipulation.ClearanceMotionEnvelope):Float
+    return unused("auditDisplacement");
+  public function withGroup(group:robotkit.manipulation.KinematicGroup):robotkit.manipulation.ClearanceWorld
+    return new EntryTrajectoryClearance(group);
+  public function pairCount():Int return 1;
+  public function bodyCount():Int return 2;
+  public function movingNames():Array<String> return ["torch"];
+
+  static function unused<T>(query:String):T throw 'The entry-trajectory fixture does not answer $query';
 }

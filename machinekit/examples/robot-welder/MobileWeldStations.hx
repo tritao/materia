@@ -1,3 +1,4 @@
+import collisionkit.native.NativeCollisionWorld;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
 import cadkit.modeling.AssemblyState;
@@ -143,7 +144,7 @@ class MobileWeldStations {
       }
       bodies.push({name: body.name, link: arm.baseLink, vertices: vertices, tool: false});
     }
-    var clearance = new robotkit.collision.CollisionClearance(arm, bodies, ready, () -> new collisionkit.native.NativeCollisionWorld(), processkit.WeldPathPlanner.AIR_MARGIN);
+    var clearance = new CollisionClearance(arm, bodies, ready, () -> new NativeCollisionWorld(), processkit.WeldPathPlanner.AIR_MARGIN);
     clearances.set(station.id, clearance);
     var made = WeldingPlanRunner.planning(arm, 2.0, clearance);
     planning.set(station.id, made);

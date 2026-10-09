@@ -1,3 +1,4 @@
+import collisionkit.native.NativeCollisionWorld;
 import machinekit.robotics.IndustrialArmClass;
 import machinekit.assembly.AssemblyPreview;
 import cadbridge.AssemblyPhysicalPartView;
@@ -26,8 +27,8 @@ class RobotArmPhysicalTests {
     var model=converted.model,flange=[for(frame in model.frames)if(frame.name=="toolFlange robot flange")frame][0];
     var arm=new Manipulator(model,model.links[0].id,flange.id);
     var home=[for(_ in 0...6)0.0];
-    var clearance=new robotkit.collision.CollisionClearance(arm,[for(hull in converted.linkHulls){name:hull.part,link:model.links[hull.link].id,
-      vertices:hull.vertices,tool:StringTools.startsWith(hull.part,"tool/")}],home, () -> new collisionkit.native.NativeCollisionWorld(),processkit.WeldPathPlanner.AIR_MARGIN);
+    var clearance=new CollisionClearance(arm,[for(hull in converted.linkHulls){name:hull.part,link:model.links[hull.link].id,
+      vertices:hull.vertices,tool:StringTools.startsWith(hull.part,"tool/")}],home, () -> new NativeCollisionWorld(),processkit.WeldPathPlanner.AIR_MARGIN);
     var continuous:Array<Float> = [];
     for(index in 0...6){
       var id=arm.jointIds()[index];

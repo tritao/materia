@@ -1,5 +1,6 @@
 package app;
 
+import collisionkit.native.NativeCollisionWorld;
 import app.SimulatedTools.GripObject;
 import cadkit.modeling.AssemblyState;
 import haxe.Int64;
@@ -383,7 +384,7 @@ class MissionPlayer implements SessionMember {
     var positions = robot.robot.snapshot().positions;
     var indices = [for (target in arm.toJointTargets([for (_ in 0...arm.dofCount()) 0.0])) target.joint];
     clearanceJoints = indices;
-    return new robotkit.collision.CollisionClearance(arm, bodies, [for (index in indices) positions.get(index)], () -> new collisionkit.native.NativeCollisionWorld(), processkit.WeldPathPlanner.AIR_MARGIN);
+    return new CollisionClearance(arm, bodies, [for (index in indices) positions.get(index)], () -> new NativeCollisionWorld(), processkit.WeldPathPlanner.AIR_MARGIN);
   }
 
   /**

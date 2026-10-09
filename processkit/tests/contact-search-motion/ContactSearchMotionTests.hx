@@ -1,3 +1,4 @@
+import collisionkit.native.NativeCollisionWorld;
 import haxe.Int64;
 import processkit.ContactSearchRunner;
 import processkit.ProbeMotionPlanner;
@@ -115,9 +116,9 @@ class ContactSearchMotionTests {
         "Probe approach clamps representation-sized IK overshoot to the exact joint limit");
       function cube(z:Float):Array<Float> return [for (x in [-0.001, 0.001]) for (y in [-0.001, 0.001])
         for (height in [z - 0.001, z + 0.001]) for (value in [x, y, height]) value];
-      var blocked = new robotkit.collision.CollisionClearance(arm, [
+      var blocked = new CollisionClearance(arm, [
         {name: "tool", link: tool.id, vertices: cube(0), tool: true},
-        {name: "fixture", link: base.id, vertices: cube(0.015), tool: false}], [0.0], () -> new collisionkit.native.NativeCollisionWorld(), 0.003);
+        {name: "fixture", link: base.id, vertices: cube(0.015), tool: false}], [0.0], () -> new NativeCollisionWorld(), 0.003);
       var wire = new processkit.ProbeWireClearance(arm, tool.id, Transform3.identity(), 0.001, 0.015,
         [{name: "fixture", link: base.id, vertices: cube(0.015), tool: false}]);
       var wireGuarded = new ProbeMotionPlanner(arm, planning.compiler, null, wire);
@@ -356,7 +357,7 @@ class ContactSearchMotionTests {
       servo.dispose(); harness.dispose(); return;
     }
     var planning = WeldingPlanRunner.planning(fixture.arm, 1.0);
-    var clear = new robotkit.collision.CollisionClearance(fixture.arm, [], [0.0], () -> new collisionkit.native.NativeCollisionWorld());
+    var clear = new CollisionClearance(fixture.arm, [], [0.0], () -> new NativeCollisionWorld());
     var stow = WeldStowPlanner.plan(fixture.arm, planning.compiler, clear, [0.03], [0.0]);
     check(stow.ops.length == 1 && switch stow.ops[0] {
       case motionkit.program.MotionOp.MoveJ(motionkit.program.MoveTarget.JointTarget(goal), _, _): Math.abs(goal[0]) < 1e-12;
