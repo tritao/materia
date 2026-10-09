@@ -27,6 +27,13 @@
 #include <BRepOffsetAPI_MakeOffset.hxx>
 #include <BRepOffsetAPI_MakeThickSolid.hxx>
 #include <BRepProj_Projection.hxx>
+#include <BRepClass_FaceClassifier.hxx>
+#include <BRepTools_WireExplorer.hxx>
+#include <ShapeFix_Face.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <TopoDS_Face.hxx>
+#include <gp_Pln.hxx>
+#include <gp_Circ.hxx>
 #include <BRep_Builder.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GeomAPI_Interpolate.hxx>
@@ -4128,6 +4135,206 @@ extern "C" CADKIT_API cad_result cad_project(cad_shape curve, cad_shape target, 
         BRepProj_Projection projection(source, model_shape(target), model_direction(direction));
         require_model(projection.IsDone(), "projection did not intersect target");
         return projection.Shape();
+    });
+}
+
+// ---- Planar regions, for slicing ---------------------------------------------------------------
+
+namespace {
+TopoDS_Compound planar_compound(const std::vector<TopoDS_Face>& faces) {
+    TopoDS_Compound compound;
+    BRep_Builder builder;
+    builder.MakeCompound(compound);
+    for (const auto& face : faces) builder.Add(compound, face);
+    return compound;
+}
+
+std::vector<TopoDS_Face> planar_faces(const TopoDS_Shape& shape) {
+    std::vector<TopoDS_Face> faces;
+    for (TopExp_Explorer explorer(shape, TopAbs_FACE); explorer.More(); explorer.Next())
+        faces.push_back(TopoDS::Face(explorer.Current()));
+    return faces;
+}
+
+gp_Pln plane_of(const TopoDS_Face& face) {
+    BRepAdaptor_Surface surface(face);
+    require_model(surface.GetType() == GeomAbs_Plane, "slicing regions must be planar");
+    return surface.Plane();
+}
+
+// Faces from closed wires in one plane: nesting decides which are islands (even depth) and which are holes.
+std::vector<TopoDS_Face> faces_from_wires(const std::vector<TopoDS_Wire>& wires, const gp_Pln& plane) {
+    const auto count = wires.size();
+    std::vector<TopoDS_Face> bounded(count);
+    std::vector<double> areas(count);
+    std::vector<gp_Pnt> probes(count);
+    for (std::size_t i = 0; i < count; ++i) {
+        BRepBuilderAPI_MakeFace maker(plane, wires[i], true);
+        require_model(maker.IsDone(), "an offset wire does not bound a face");
+        bounded[i] = maker.Face();
+        GProp_GProps properties;
+        BRepGProp::SurfaceProperties(bounded[i], properties);
+        areas[i] = std::abs(properties.Mass());
+        TopExp_Explorer vertex(wires[i], TopAbs_VERTEX);
+        require_model(vertex.More(), "an offset wire has no vertices");
+        probes[i] = BRep_Tool::Pnt(TopoDS::Vertex(vertex.Current()));
+    }
+    std::vector<int> depth(count, 0), parent(count, -1);
+    for (std::size_t i = 0; i < count; ++i) {
+        for (std::size_t j = 0; j < count; ++j) {
+            if (i == j || areas[j] <= areas[i]) continue;
+            BRepClass_FaceClassifier classifier(bounded[j], probes[i], 1e-7);
+            if (classifier.State() != TopAbs_IN) continue;
+            depth[i] += 1;
+            if (parent[i] < 0 || areas[j] < areas[static_cast<std::size_t>(parent[i])]) parent[i] = static_cast<int>(j);
+        }
+    }
+    std::vector<TopoDS_Face> result;
+    for (std::size_t i = 0; i < count; ++i) {
+        if (depth[i] % 2 != 0) continue;
+        BRepBuilderAPI_MakeFace maker(plane, wires[i], true);
+        for (std::size_t k = 0; k < count; ++k)
+            if (depth[k] % 2 != 0 && parent[k] == static_cast<int>(i)) maker.Add(wires[k]);
+        ShapeFix_Face fixer(maker.Face());
+        fixer.FixOrientation();
+        fixer.Perform();
+        result.push_back(fixer.Face());
+    }
+    return result;
+}
+
+// An empty region is a compound without faces, which the usual validity check of a result does not accept.
+template<class F> cad_result planar_output(cad_shape* output, F action) {
+    if (output) *output = 0;
+    return model_guard([&]() {
+        require_model(output != nullptr, "out_faces must not be null");
+        return insert_shape(action(), output, nullptr);
+    });
+}
+
+TopoDS_Shape planar_boolean(cad_shape first, cad_shape second, int operation) {
+    auto a = model_shape(first), b = model_shape(second);
+    TopoDS_Shape result;
+    if (operation == 0) { BRepAlgoAPI_Cut op(a, b); require_model(op.IsDone(), "planar cut failed"); result = op.Shape(); }
+    else if (operation == 1) { BRepAlgoAPI_Common op(a, b); require_model(op.IsDone(), "planar common failed"); result = op.Shape(); }
+    else { BRepAlgoAPI_Fuse op(a, b); require_model(op.IsDone(), "planar fuse failed"); result = op.Shape(); }
+    auto faces = planar_faces(result);
+    if (faces.empty()) return planar_compound(faces);
+    ShapeUpgrade_UnifySameDomain unify(planar_compound(faces), true, true, false);
+    unify.Build();
+    return planar_compound(planar_faces(unify.Shape()));
+}
+}  // namespace
+
+extern "C" CADKIT_API cad_result cad_shape_section(cad_shape solid, cad_vec3 origin, cad_vec3 normal, cad_shape* output) {
+    return planar_output(output, [&]() -> TopoDS_Shape {
+        auto source = model_shape(solid);
+        gp_Pln plane(model_point(origin), model_direction(normal));
+        Bnd_Box box;
+        BRepBndLib::Add(source, box);
+        require_model(!box.IsVoid(), "cannot section an empty shape");
+        const double extent = 2.0 * std::sqrt(box.SquareExtent()) + 1.0;
+        BRepBuilderAPI_MakeFace cutter(plane, -extent, extent, -extent, extent);
+        require_model(cutter.IsDone(), "section plane could not be built");
+        BRepAlgoAPI_Common common(source, cutter.Face());
+        require_model(common.IsDone(), "section failed");
+        return planar_compound(planar_faces(common.Shape()));
+    });
+}
+
+extern "C" CADKIT_API cad_result cad_planar_offset(cad_shape faces, double distance, cad_shape* output) {
+    return planar_output(output, [&]() -> TopoDS_Shape {
+        require_model(std::isfinite(distance), "offset must be finite");
+        auto source = planar_faces(model_shape(faces));
+        std::vector<TopoDS_Face> result;
+        for (const auto& face : source) {
+            if (std::abs(distance) < 1e-9) { result.push_back(face); continue; }
+            const auto plane = plane_of(face);
+            // OCCT offsets towards the side the face's own orientation names, so a reversed face flips.
+            const double signed_distance = face.Orientation() == TopAbs_REVERSED ? -distance : distance;
+            std::vector<TopoDS_Wire> wires;
+            try {
+                BRepOffsetAPI_MakeOffset offset(face, GeomAbs_Arc);
+                offset.Perform(signed_distance);
+                if (!offset.IsDone() || offset.Shape().IsNull()) continue;
+                for (TopExp_Explorer explorer(offset.Shape(), TopAbs_WIRE); explorer.More(); explorer.Next())
+                    wires.push_back(TopoDS::Wire(explorer.Current()));
+            } catch (const Standard_Failure&) {
+                continue; // the region collapsed
+            }
+            if (wires.empty()) continue;
+            for (const auto& produced : faces_from_wires(wires, plane)) result.push_back(produced);
+        }
+        return planar_compound(result);
+    });
+}
+
+extern "C" CADKIT_API cad_result cad_planar_cut(cad_shape first, cad_shape second, cad_shape* output) {
+    return planar_output(output, [&]() { return planar_boolean(first, second, 0); });
+}
+extern "C" CADKIT_API cad_result cad_planar_common(cad_shape first, cad_shape second, cad_shape* output) {
+    return planar_output(output, [&]() { return planar_boolean(first, second, 1); });
+}
+extern "C" CADKIT_API cad_result cad_planar_fuse(cad_shape first, cad_shape second, cad_shape* output) {
+    return planar_output(output, [&]() { return planar_boolean(first, second, 2); });
+}
+
+extern "C" CADKIT_API cad_result cad_planar_copy_boundary_bytes(
+    cad_shape faces, double chord_tolerance, std::uint8_t* output, std::uint32_t* byte_capacity) {
+    return model_guard([&]() {
+        require_model(byte_capacity != nullptr, "byte_capacity must not be null");
+        require_model(std::isfinite(chord_tolerance) && chord_tolerance > 0.0, "chord tolerance must be positive");
+        auto source = planar_faces(model_shape(faces));
+        std::vector<double> records;
+        double face_index = 0.0;
+        for (const auto& face : source) {
+            const auto plane = plane_of(face);
+            require_model(std::abs(std::abs(plane.Axis().Direction().Z()) - 1.0) < 1e-9, "boundaries are read from horizontal planes");
+            const auto outer = BRepTools::OuterWire(face);
+            double wire_index = 0.0;
+            for (TopExp_Explorer wires(face, TopAbs_WIRE); wires.More(); wires.Next()) {
+                const auto wire = TopoDS::Wire(wires.Current());
+                const double is_outer = wire.IsSame(outer) ? 1.0 : 0.0;
+                auto line = [&](const gp_Pnt& a, const gp_Pnt& b) {
+                    records.insert(records.end(), {face_index, wire_index, is_outer, 0.0, a.X(), a.Y(), a.Z(), b.X(), b.Y(), 0.0, 0.0, 0.0, 0.0, 0.0});
+                };
+                for (BRepTools_WireExplorer explorer(wire, face); explorer.More(); explorer.Next()) {
+                    const auto edge = explorer.Current();
+                    BRepAdaptor_Curve curve(edge);
+                    const bool reversed = edge.Orientation() == TopAbs_REVERSED;
+                    const double first = curve.FirstParameter(), last = curve.LastParameter();
+                    const gp_Pnt begin = curve.Value(reversed ? last : first), finish = curve.Value(reversed ? first : last);
+                    if (curve.GetType() == GeomAbs_Line) {
+                        line(begin, finish);
+                    } else if (curve.GetType() == GeomAbs_Circle) {
+                        const gp_Circ circle = curve.Circle();
+                        const gp_Pnt centre = circle.Location();
+                        double sweep = (last - first) * (circle.Axis().Direction().Z() > 0.0 ? 1.0 : -1.0);
+                        if (reversed) sweep = -sweep;
+                        const double start = std::atan2(begin.Y() - centre.Y(), begin.X() - centre.X());
+                        records.insert(records.end(), {face_index, wire_index, is_outer, 1.0, begin.X(), begin.Y(), begin.Z(),
+                            finish.X(), finish.Y(), centre.X(), centre.Y(), circle.Radius(), start, sweep});
+                    } else {
+                        GCPnts_QuasiUniformDeflection sampler(curve, chord_tolerance);
+                        require_model(sampler.IsDone(), "a boundary curve could not be sampled");
+                        std::vector<gp_Pnt> points;
+                        for (int i = 1; i <= sampler.NbPoints(); ++i) points.push_back(sampler.Value(i));
+                        if (reversed) std::reverse(points.begin(), points.end());
+                        for (std::size_t i = 1; i < points.size(); ++i) line(points[i - 1], points[i]);
+                    }
+                }
+                wire_index += 1.0;
+            }
+            face_index += 1.0;
+        }
+        require_model(records.size() <= std::numeric_limits<std::uint32_t>::max() / sizeof(double), "boundary exceeds 32-bit range");
+        const auto required = static_cast<std::uint32_t>(records.size() * sizeof(double));
+        const auto capacity = *byte_capacity;
+        *byte_capacity = required;
+        if (capacity < required || (required != 0 && output == nullptr))
+            return fail(CAD_ERROR_BUFFER_TOO_SMALL, "boundary output buffer is too small");
+        if (required != 0) std::memcpy(output, records.data(), required);
+        return CAD_OK;
     });
 }
 

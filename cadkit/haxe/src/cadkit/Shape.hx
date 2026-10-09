@@ -421,6 +421,33 @@ class Shape {
 		return new Operation(CadKit.commonOperationChecked(native.borrow(), other.native.borrow()));
 	}
 
+	/** The planar faces of this solid on the plane through `origin` with `normal`, holes kept; an empty region when it misses. */
+	public function section(origin:CadKit.Vec3, normal:CadKit.Vec3):Shape {
+		return new Shape(CadKit.shapeSectionChecked(native.borrow(), origin, normal));
+	}
+
+	/** Every face of this planar region grown by `distance` in its plane (negative shrinks it); a face may vanish or split. */
+	public function planarOffset(distance:Float):Shape {
+		return new Shape(CadKit.planarOffsetChecked(native.borrow(), distance));
+	}
+
+	public function planarCut(other:Shape):Shape {
+		return new Shape(CadKit.planarCutChecked(native.borrow(), other.native.borrow()));
+	}
+
+	public function planarCommon(other:Shape):Shape {
+		return new Shape(CadKit.planarCommonChecked(native.borrow(), other.native.borrow()));
+	}
+
+	public function planarFuse(other:Shape):Shape {
+		return new Shape(CadKit.planarFuseChecked(native.borrow(), other.native.borrow()));
+	}
+
+	/** Exact boundary segments of a horizontal planar region: see `cad_planar_copy_boundary_bytes` (14 doubles per segment). */
+	public function planarBoundary(chordTolerance:Float):haxe.io.Bytes {
+		return CadKit.planarCopyBoundaryBytesChecked(native.borrow(), chordTolerance);
+	}
+
 	public function close():Bool {
 		meshCache.resize(0);
 		return native.close();

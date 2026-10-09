@@ -33,6 +33,7 @@ target_link_libraries(cadkit-core
         TKDESTEP
         TKFillet
         TKOffset
+        TKShHealing
         TKMesh
         TKPrim
         TKTopAlgo

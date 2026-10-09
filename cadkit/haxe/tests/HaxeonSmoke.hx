@@ -58,6 +58,7 @@ class HaxeonSmoke {
 	}
 
 	static function main():Int {
+		PlanarRegionSmoke.run();
 		AssemblyModelSmoke.run();
 		AssemblyNestingSmoke.run();
 		AssemblyDocumentsSmoke.run();

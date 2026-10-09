@@ -239,6 +239,34 @@ CADKIT_API cad_result cad_shell_operation(cad_shape solid,
 CADKIT_API cad_result cad_project(cad_shape curve, cad_shape target, cad_vec3 direction,
     cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
+/* Planar regions, for slicing. A region is a planar face or a compound of them, with holes and islands.
+ * An empty result is a valid compound without faces. */
+
+/* The part of `solid` on the plane through `origin` with `normal`: the planar faces inside the solid, holes kept.
+ * Choose a plane that does not coincide with one of the solid's faces. */
+CADKIT_API cad_result cad_shape_section(cad_shape solid, cad_vec3 origin, cad_vec3 normal,
+    cad_shape* out_faces CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+/* Every face of `faces` grown by `distance` in its plane (negative shrinks it, so holes grow). Rounded convex
+ * corners when growing. A face that vanishes is dropped, a face that pinches off becomes several. */
+CADKIT_API cad_result cad_planar_offset(cad_shape faces, double distance,
+    cad_shape* out_faces CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+/* Booleans between coplanar regions; coplanar faces that meet are merged. */
+CADKIT_API cad_result cad_planar_cut(cad_shape first, cad_shape second,
+    cad_shape* out_faces CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_planar_common(cad_shape first, cad_shape second,
+    cad_shape* out_faces CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_planar_fuse(cad_shape first, cad_shape second,
+    cad_shape* out_faces CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+/* The boundaries of the faces of a region lying in a horizontal plane (normal along z), exact: lines and circular
+ * arcs stay lines and arcs, other curves are cut into lines within `chord_tolerance`. 14 doubles per segment, in
+ * the order of the wire:
+ *   face index, wire index within the face, 1 for the outer wire else 0, 0 line or 1 arc,
+ *   x0, y0, z, x1, y1, centre x, centre y, radius, start angle, sweep (signed, about +z; 0 for a line).
+ * Wires run as the B-rep has them, not necessarily counter-clockwise: the reader orients them. */
+CADKIT_API cad_result cad_planar_copy_boundary_bytes(cad_shape faces, double chord_tolerance,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
 CADKIT_API cad_result cad_box(
     double width,
     double depth,

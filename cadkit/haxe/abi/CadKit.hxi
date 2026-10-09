@@ -99,7 +99,12 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_operation_history_source_at(operation: cad_operation, relation: cad_history_relation, index: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_operation_history_target_at(operation: cad_operation, relation: cad_history_relation, index: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_operation_result_shape(operation: cad_operation, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_planar_common(first: cad_shape, second: cad_shape, out_faces: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_planar_copy_boundary_bytes(faces: cad_shape, chord_tolerance: f64, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> cad_result;
+	extern fn cad_planar_cut(first: cad_shape, second: cad_shape, out_faces: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_planar_face(outer: cad_shape, holes: ptr<const<cad_shape_ref>> @in_array("hole_count"), hole_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_planar_fuse(first: cad_shape, second: cad_shape, out_faces: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_planar_offset(faces: cad_shape, distance: f64, out_faces: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_polyline(points: ptr<const<cad_vec3>> @in_array("point_count"), point_count: u32, closed: u8, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_project(curve: cad_shape, target: cad_shape, direction: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_resource_counts_get(out_counts: ptr<cad_resource_counts> @out) -> cad_result;
@@ -134,6 +139,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_shape_revolve_operation(profile: cad_shape, axis_origin: cad_vec3, axis_direction: cad_vec3, angle: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_rotate(shape: cad_shape, axis: cad_vec3, angle: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_rotate_operation(shape: cad_shape, axis: cad_vec3, angle: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
+	extern fn cad_shape_section(solid: cad_shape, origin: cad_vec3, normal: cad_vec3, out_faces: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_seed_names(shape: cad_shape, kind: cad_shape_kind, names: utf8, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_stamp_names(shape: cad_shape, tag: utf8, inputs: ptr<const<cad_shape_ref>> @in_array("input_count"), input_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_subshape_at(shape: cad_shape, kind: cad_shape_kind, index: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
