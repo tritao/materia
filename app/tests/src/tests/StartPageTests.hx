@@ -15,11 +15,15 @@ class StartPageTests {
   }
 
   public static function main():Int {
+    // `run` works from the repository root; the suites after it expect the directory they started in.
+    var started = Sys.getCwd();
     try {
       run();
+      Sys.setCwd(started);
       Sys.println("Start-page categories, variant search and navigation passed");
       return 0;
     } catch (error:Dynamic) {
+      Sys.setCwd(started);
       Sys.println('Start-page tests failed: $error');
       return 1;
     }
