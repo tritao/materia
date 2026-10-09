@@ -386,6 +386,30 @@ unchanged. The two routers now have numbers (the new baseline for every later st
 - A `ToolpathProgram` query: total deposited volume, per-layer volume and per-object volume.
 - Tests: validation, pass-through, volume queries.
 
+Done. What was built and decided:
+- `ToolpathOp` gained `Deposit(area, width, height)`, `DepositOff`, `FilamentMove(length, speed)`,
+  `Heat(heater, celsius, wait)`, `Fan(fan, duty)` and the markers `Layer(index, z)`, `Feature(kind)` and
+  `PrintObject(name, start)`, as AM-D2 says. `Move` is unchanged, so no consumer that destructures it
+  changed. `PrintFeature` is the marker vocabulary (`ExternalPerimeter`, `Perimeter`, `Infill`,
+  `SolidInfill`, `TopSolidInfill`, `Skirt`, `Travel`, `Other(name)` for a slicer's own label).
+- Validation lives in `PrinterOps.validate`, run by the `ToolpathProgram` constructor with the op's
+  index in the message: area, width and height positive and finite with `area <= width * height`; a
+  nonzero `FilamentMove` length at a positive finite speed; non-empty heater, fan and object names;
+  finite non-negative temperatures; fan duty in [0, 1]; a non-negative layer index.
+- `ArcFitting`, `ToolpathFrame`, `TravelEnvelope`, `Setup` and `stockkit.CutMoves` already fell
+  through unknown ops, and pass the new ones through in place (tested). `CncWriter` refuses a program
+  holding any printer op before writing, naming its line ("LinuxCNC has no extruder, heater or
+  fan"); `CncCompensator` and the app's `StockSimulationSession` list the new ops where they were
+  exhaustive. `ToolpathLowering` ignores the markers and refuses the rest ("printing operations need
+  a printer binding"), so a printer program cannot be half-run on a CNC machine; AM8 lowers them.
+- `ToolpathProgram.depositedVolume()`, `layerVolumes()` and `objectVolumes()`: bead area times
+  length of each `Cut` move (`Cut` only: `Rapid`, `Link` and `Retract` never deposit) under the
+  `Deposit` in force, attributed to the current `Layer` (index -1 before the first marker) and
+  `PrintObject`.
+- Tests: ToolpathKit 97 -> 141 assertions (`PrinterOpCoverage`: validation, pass-through, volumes);
+  CncKit 317 -> 325 (writer refusal); toolpathkit/motion (lowering refusal and markers). Quick suite
+  `am1`: every project passes; the app project-source build compiles.
+
 **AM2. Printer G-code dialect and writer.**
 - `CncDialect` gains `Printer` (Marlin/Klipper/RepRap family). The lexer keeps comments as
   data in this dialect, so `;LAYER_CHANGE`, `;TYPE:`, `;LAYER:` and `M117` text are not errors.
@@ -594,7 +618,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 |---|---|---|
 | AM0 | done: worktree and baseline | |
 | AM0b | done: main green, router baselines recorded | 2fbea0683, ae6e95ec5, cd29b1993, dfa6e2940, 2611087d9 |
-| AM1 | planned | |
+| AM1 | done | see the commit below |
 | AM2 | planned | |
 | AM3 | planned | |
 | AM4 | planned | |

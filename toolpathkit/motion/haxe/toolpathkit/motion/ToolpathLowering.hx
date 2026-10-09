@@ -101,6 +101,10 @@ class ToolpathLowering {
         flush(); drainQueued(); add(MotionOp.WaitInput(machine.channels.operatorResume,
           InputPredicate.Equals(EventValue.Digital(true)), null), span);
       case End(_): flush(); drainQueued();
+      case Layer(_, _, _), Feature(_, _), PrintObject(_, _, _):
+        // Markers for preview, restart and cancel-object: they take no motion.
+      case Deposit(_, _, _, span), DepositOff(span), FilamentMove(_, _, span), Heat(_, _, _, span), Fan(_, _, span):
+        throw 'toolpath line ${span.line}: printing operations need a printer binding';
     }
     flush(); drainQueued();
     var program = motionOps.length == 0 ? null : new MotionProgram(motionOps);

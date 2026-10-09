@@ -139,7 +139,7 @@ class ToolpathKitTests {
         if (!(first < 0.0 && next > 0.0)) throw "an S-curve turns one way, then the other";
       case _: throw 'an S-curve becomes two arcs, got ${curve.length} operations';
     }
-    var coverage = ToolpathCoreCoverage.run();
+    var coverage = ToolpathCoreCoverage.run() + PrinterOpCoverage.run();
     Sys.println('ToolpathKit tests passed (${22 + coverage} assertions)');
   }
 }

@@ -194,7 +194,9 @@ class StockSimulationSession {
       case SetSetup(_, provenance), Move(_, _, _, _, provenance), MachineMove(_, _, _, _, provenance),
           Dwell(_, provenance), Spindle(_, _, provenance), Coolant(_, _, provenance),
           ToolChange(_, provenance), ToolLengthOffset(_, _, provenance), OptionalStop(provenance),
-          ProgramStop(provenance), End(provenance): provenance;
+          ProgramStop(provenance), End(provenance), Deposit(_, _, _, provenance), DepositOff(provenance),
+          FilamentMove(_, _, provenance), Heat(_, _, _, provenance), Fan(_, _, provenance),
+          Layer(_, _, provenance), Feature(_, provenance), PrintObject(_, _, provenance): provenance;
     };
 
   function operationColour(move:CutMove):Int

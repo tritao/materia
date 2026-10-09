@@ -15,6 +15,10 @@ class CncWriter {
     if (program == null || controller == null)
       throw "G-code export needs a program and controller";
     var ops = program.ops;
+    var printing = toolpathkit.path.PrinterOps.first(ops);
+    if (printing != null)
+      throw 'CNC export line ${toolpathkit.path.PrinterOps.provenance(printing).line}: LinuxCNC has no extruder, heater or fan; '
+        + 'write printing operations with the printer writer';
     var activeSetup = program.setups[0];
     // Each setup is validated alone, so it starts with the tool state in effect.
     var activeTool:Null<ToolpathOp> = null, activeLength:Null<ToolpathOp> = null;
@@ -129,6 +133,9 @@ class CncWriter {
           if (mist) lines.push("M7");
           if (flood) lines.push("M8");
         }
+      case Deposit(_, _, _, _), DepositOff(_), FilamentMove(_, _, _), Heat(_, _, _, _), Fan(_, _, _),
+          Layer(_, _, _), Feature(_, _), PrintObject(_, _, _):
+        throw "printing operations were refused above";
       }
       index++;
     }

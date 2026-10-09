@@ -30,4 +30,32 @@ enum ToolpathOp {
   OptionalStop(span:Provenance);
   ProgramStop(span:Provenance);
   End(span:Provenance);
+
+  // Printing. Extrusion is a process quantity along the path, not an axis: the program stores the
+  // bead laid per distance, which is machine independent. The filament diameter belongs to the
+  // material and the extruder, so G-code import and export convert `E` with it.
+
+  /**
+    Modal: every following `Cut` move lays a bead of this cross-section until the next `Deposit` or
+    `DepositOff`. `area` is in m², and `width` by `height` is the bead's footprint, which its
+    rounded cross-section cannot exceed. `Rapid`, `Link` and `Retract` moves never deposit.
+  **/
+  Deposit(area:Float, width:Float, height:Float, provenance:Provenance);
+  /** Ends deposition: following `Cut` moves lay nothing. */
+  DepositOff(provenance:Provenance);
+  /**
+    An extruder-only move, in metres of filament at `speed` metres of filament per second.
+    Positive primes, negative retracts. It is how retraction, unretraction and purge are written.
+  **/
+  FilamentMove(length:Float, speed:Float, provenance:Provenance);
+  /** Sets a heater, such as `hotend` or `bed`, to `celsius`; with `wait`, later moves wait until it is there. */
+  Heat(heater:String, celsius:Float, wait:Bool, provenance:Provenance);
+  /** Sets a fan to a duty from 0 to 1. */
+  Fan(fan:String, duty:Float, provenance:Provenance);
+  /** Marker: the layer `index` (from 0) printed at height `z`. Lowering ignores it. */
+  Layer(index:Int, z:Float, provenance:Provenance);
+  /** Marker: the moves up to the next marker are of this kind. Lowering ignores it. */
+  Feature(kind:PrintFeature, provenance:Provenance);
+  /** Marker: the part named `name` starts (or, with `start` false, ends). Lowering ignores it. */
+  PrintObject(name:String, start:Bool, provenance:Provenance);
 }

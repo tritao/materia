@@ -715,6 +715,18 @@ class CncKitTests {
       machine.toolLibrary, [setup]), machine.controller)
     catch (error:Dynamic) rejected = Std.string(error).indexOf("disagrees") >= 0;
     check(rejected, "writer rejects a mismatched H tool length");
+    // LinuxCNC has no extruder, heater or fan: any printing operation is refused with its line.
+    var printing:Array<ToolpathOp> = [ToolpathOp.Heat("hotend", 210, true, p), ToolpathOp.Deposit(8e-8, 4.5e-4, 2e-4, p),
+      ToolpathOp.FilamentMove(-0.001, 0.03, p), ToolpathOp.Fan("part", 1.0, p), ToolpathOp.Layer(0, 2e-4, p),
+      ToolpathOp.Feature(toolpathkit.path.PrintFeature.Infill, p), ToolpathOp.PrintObject("a", true, p),
+      ToolpathOp.DepositOff(p)];
+    for (op in printing) {
+      var message = "";
+      try CncWriter.write(new ToolpathProgram([op], machine.toolLibrary, [setup]), machine.controller)
+      catch (error:Dynamic) message = Std.string(error);
+      check(message.indexOf("no extruder, heater or fan") >= 0 && message.indexOf("line " + p.line) >= 0,
+        "writer refuses a printing operation: " + message);
+    }
   }
 
   static function fixture(name:String, machine:CncTestRig):Void {

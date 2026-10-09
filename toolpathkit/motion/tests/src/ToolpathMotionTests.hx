@@ -65,6 +65,19 @@ class ToolpathMotionTests {
     }
     if (!rejected) throw "machine travel was not checked";
     machine.setTravel(null);
+    // Printing waits for a printer binding; its markers take no motion.
+    var markers = ToolpathMotion.lower(pathProgram([ToolpathOp.Layer(0, 0.0002, origin),
+      ToolpathOp.Feature(Perimeter, origin), ToolpathOp.PrintObject("a", true, origin),
+      ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)), 0.01, 0, origin)]), machine);
+    if (markers.program == null || markers.diagnostics.length != 0) throw "printing markers must not change lowering";
+    for (printing in [ToolpathOp.Deposit(8e-8, 4.5e-4, 2e-4, origin), ToolpathOp.DepositOff(origin),
+        ToolpathOp.FilamentMove(-0.001, 0.03, origin), ToolpathOp.Heat("hotend", 210, true, origin),
+        ToolpathOp.Fan("part", 1.0, origin)]) {
+      rejected = false;
+      try ToolpathMotion.lower(pathProgram([printing]), machine)
+      catch (error:Dynamic) rejected = Std.string(error).indexOf("need a printer binding") >= 0;
+      if (!rejected) throw "printing operations must be refused until a printer binding lowers them";
+    }
     var probeOps = [ToolpathOp.Move(Cut,
       PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
       0.01, 0.0, origin)];

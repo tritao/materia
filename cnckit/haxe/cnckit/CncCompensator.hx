@@ -342,6 +342,8 @@ class CncCompensator {
     case Dwell(_, span), Spindle(_, _, span), Coolant(_, _, span),
         ToolChange(_, span), ToolLengthOffset(_, _, span), OptionalStop(span),
         ProgramStop(span), End(span): span;
+    case Deposit(_, _, _, span), DepositOff(span), FilamentMove(_, _, span), Heat(_, _, _, span),
+        Fan(_, _, span), Layer(_, _, span), Feature(_, span), PrintObject(_, _, span): span;
   };
   static function replaceGeometry(op:ToolpathOp, geometry:PathGeometry):ToolpathOp
     return switch op {
