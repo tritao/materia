@@ -1,6 +1,7 @@
 package app;
 
 import haxe.Int64;
+import materia.assembly.AssemblyFrames;
 import humankit.sim.HumanWorker;
 import humankit.sim.HumanWorkerSignals;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -9,8 +10,8 @@ import robotkit.runtime.SimulationSpace;
 import robotkit.runtime.SimulationPresentationSnapshot;
 import robotkit.core.Robot;
 import robotkit.world.RobotWorld;
-import robotkit.simulation.SimulatedRobot;
 import robotkit.world.WorldSnapshot;
+import robotkit.simulation.SimulatedRobot;
 import robotkit.core.SensorFrame;
 import nativekit.sim.MotionType;
 import nativekit.sim.SimObject;
@@ -26,6 +27,14 @@ typedef SimulationRobotVisual={
   var links:Array<SimulationPoseVisual>;
 }
 typedef SimulationPoseVisual={var id:String;var position:Array<Float>;var rotation:Array<Float>;}
+
+/** Geometry-centred part frame, prepared once for the active simulation configuration. */
+private typedef AssemblyVisual = {
+  var id:String;
+  var robotIndex:Int;
+  var linkIndex:Int;
+  var offset:materia.assembly.AssemblyRecord.AssemblyFrame;
+}
 
 /**
  * Owns the one shared editable-scene simulation attached to the application
@@ -69,7 +78,7 @@ class ApplicationSimulation {
   var workforce:Null<HumanWorkforce> = null;
   /** Everything that follows the session's lifecycle, in the order it is fed. */
   var members:Array<SessionMember> = [];
-  var assemblyParts:Array<AssemblyPart> = [];
+  var assemblyParts:Array<AssemblyVisual> = [];
   var running:Bool = false;
   /** Wall-clock stamp of the previous pump, or negative when pacing restarts. */
   var pumpStamp:Float = -1.0;
@@ -143,7 +152,7 @@ class ApplicationSimulation {
     var candidateRobotModels:Array<robotkit.model.RobotModel> = [];
     var candidateObjects:Array<{id:String,object:SimObject}> = [];
     var candidateWorkforce:Null<HumanWorkforce> = null;
-    var candidateAssemblyParts:Array<AssemblyPart> = [];
+    var candidateAssemblyParts:Array<AssemblyVisual> = [];
     var candidateWarnings:Array<String> = [];
     var candidateCnc:Null<CncProgramPlayer> = null;
     var candidateBelts:Null<BeltVisuals> = null;
@@ -192,7 +201,7 @@ class ApplicationSimulation {
         candidateRobots.push(built.robot);
         candidateLinks.push([for (link in built.model.links) link.id]);
         candidateRobotModels.push(built.model);
-        for (part in built.parts) candidateAssemblyParts.push(part);
+        for (part in built.parts) candidateAssemblyParts.push(prepareAssemblyVisual(part));
         for (warning in built.warnings) candidateWarnings.push(warning);
         candidateMobile = built.mobile;
         candidateAssembly = built;
@@ -362,6 +371,12 @@ class ApplicationSimulation {
       z + qw * tz + qx * ty - qy * tx];
   }
 
+  static function prepareAssemblyVisual(part:AssemblyPart):AssemblyVisual {
+    return {id:part.id, robotIndex:part.robotIndex, linkIndex:part.linkIndex,
+      offset:AssemblyFrames.compose(part.offset,
+        AssemblyFrames.translation(part.center[0], part.center[1], part.center[2]))};
+  }
+
   /** Advances the simulation one tick. Read what it produced with `snapshot()`. */
   public function step(?timestampNs:Int64):Void {
     var active = space;
@@ -481,14 +496,31 @@ class ApplicationSimulation {
     return null;
   }
   public function simulatedRobotIds():Array<String> return simulatedIds.copy();
-  /** Captures physics poses once, then combines the matching frame's world publications. */
+  /** Captures physics poses once, then combines them with the matching sensor streams. */
   public function capturePresentationSnapshot():ApplicationPresentationSnapshot {
-    if (beltVisuals != null) beltVisuals.present();
     var active = space, robotsInSession = simulation;
     var frame = active == null ? null : active.session.capture();
     var physics = frame == null || robotsInSession == null ? null : robotsInSession.presentFrame(frame);
-    var publication:WorldSnapshot;
-    try publication = world.snapshot() catch (error:Dynamic) {
+    if (beltVisuals != null) try beltVisuals.present(physics) catch (error:Dynamic) {
+      if (physics != null) physics.dispose();
+      if (frame != null) frame.dispose();
+      throw error;
+    }
+    var robotSensorFrames:Array<Null<Array<SensorFrame>>> = [];
+    for (_ in 0...simulatedIds.length) robotSensorFrames.push(null);
+    try {
+      // Poll every attached robot as before, but avoid constructing a WorldSnapshot that this
+      // presentation never reads. Streams already observe the runtime snapshot and return the
+      // immutable frames needed by the viewport.
+      world.pump();
+      for (robot in world.robots()) {
+        var id = robot.id();
+        var frames = robot.streams().latestFrames();
+        var index = simulatedIds.indexOf(id);
+        if (index >= 0) robotSensorFrames[index] = frames;
+      }
+      world.pump();
+    } catch (error:Dynamic) {
       if (physics != null) physics.dispose();
       if (frame != null) frame.dispose();
       throw error;
@@ -496,9 +528,9 @@ class ApplicationSimulation {
     var robots:Array<SimulationRobotVisual> = [];
     for (index in 0...simulatedIds.length) {
       var id = simulatedIds[index];
-      var robot = publication.robot(id);
+      var sensorFrames = robotSensorFrames[index];
       robots.push({id:id,position:[0.0,0.0,0.0],rotation:[0.0,0.0,0.0,1.0],
-        sensors:world.robot(id)==null?[]:world.robot(id).streams().latestFrames(),links:[for (linkId in simulatedLinks[index])
+        sensors:sensorFrames == null ? [] : sensorFrames,links:[for (linkId in simulatedLinks[index])
           {id:linkId,position:[0.0,0.0,0.0],rotation:[0.0,0.0,0.0,1.0]}]});
     }
     if (physics != null) for (pose in physics.poses) switch pose.kind {
@@ -525,15 +557,12 @@ class ApplicationSimulation {
       frame.dispose();
     }
     if (presentAssemblyPhysics) for (part in assemblyParts) {
-      // The part's frame on its body's link, then its geometry's centre in that frame.
+      // The fixed geometry-centred frame is already expressed on the body's link.
       var link = robots[part.robotIndex].links[part.linkIndex];
-      var pose = AssemblyRobot.compose({position: link.position, rotation: link.rotation}, part.offset);
-      var offset = rotateOffset(part.center[0], part.center[1], part.center[2], pose.rotation);
-      orderedEnvironment.push({id:part.id,
-        position:[pose.position[0] + offset[0], pose.position[1] + offset[1],
-          pose.position[2] + offset[2]], rotation:pose.rotation});
+      var pose = AssemblyRobot.composeComponents(link.position, link.rotation, part.offset);
+      orderedEnvironment.push({id:part.id, position:pose.position, rotation:pose.rotation});
     }
-    return new ApplicationPresentationSnapshot(publication, physics, robots, orderedEnvironment,
+    return new ApplicationPresentationSnapshot(physics, robots, orderedEnvironment,
       presentationEpoch);
   }
 

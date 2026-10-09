@@ -61,16 +61,21 @@ class BeltStrand {
 
 /** A point on the belt's pitch line in its plane, and the direction the belt travels through it. */
 class BeltPoint {
-	public final x:Float;
-	public final y:Float;
-	public final dx:Float;
-	public final dy:Float;
+	public var x(default, null):Float;
+	public var y(default, null):Float;
+	public var dx(default, null):Float;
+	public var dy(default, null):Float;
 
 	public function new(x:Float, y:Float, dx:Float, dy:Float) {
 		this.x = x;
 		this.y = y;
 		this.dx = dx;
 		this.dy = dy;
+	}
+	@:allow(machinekit.transmission.TimingBelt)
+	inline function assign(x:Float, y:Float, dx:Float, dy:Float):BeltPoint {
+		this.x = x; this.y = y; this.dx = dx; this.dy = dy;
+		return this;
 	}
 }
 
@@ -399,26 +404,28 @@ class TimingBelt extends MachineComponent {
 
 	/**
 	 * The pitch line at `distance` along the belt, from where strand 0 leaves its wrap, wrapping
-	 * round at the belt's length.
+	 * round at the belt's length. Without `target`, returns an independent snapshot.
+	 * Display mesh builders may pass their own target to reuse its storage.
 	 */
-	public function pointAt(distance:Float):BeltPoint {
+	public function pointAt(distance:Float, ?target:BeltPoint):BeltPoint {
+		if (target == null) target = new BeltPoint(0.0, 0.0, 0.0, 0.0);
 		var rest = distance - length * Math.floor(distance / length);
 		for (i in 0...strandList.length) {
 			var run = strandList[i];
 			if (rest <= run.length)
-				return new BeltPoint(run.startX + run.dx * rest, run.startY + run.dy * rest, run.dx, run.dy);
+				return target.assign(run.startX + run.dx * rest, run.startY + run.dy * rest, run.dx, run.dy);
 			rest -= run.length;
 			var k = (i + 1) % loop.length, wrap = loop[k];
 			var arc = wrap.radius * sweeps[k];
 			if (rest <= arc) {
 				var angle = arrivals[k] + wrap.side * rest / wrap.radius;
-				return new BeltPoint(wrap.x + wrap.radius * Math.cos(angle), wrap.y + wrap.radius * Math.sin(angle),
+				return target.assign(wrap.x + wrap.radius * Math.cos(angle), wrap.y + wrap.radius * Math.sin(angle),
 					-wrap.side * Math.sin(angle), wrap.side * Math.cos(angle));
 			}
 			rest -= arc;
 		}
 		var last = strandList[strandList.length - 1];
-		return new BeltPoint(last.endX, last.endY, last.dx, last.dy);
+		return target.assign(last.endX, last.endY, last.dx, last.dy);
 	}
 
 	override public function hasGeometry():Bool return true;

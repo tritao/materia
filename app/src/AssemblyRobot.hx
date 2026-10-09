@@ -88,15 +88,40 @@ class AssemblyRobot {
 
   /** `pose` followed by `offset`: positions in metres, rotations as xyzw quaternions. */
   public static function compose(pose:{position:Array<Float>, rotation:Array<Float>},
+      offset:materia.assembly.AssemblyRecord.AssemblyFrame):{position:Array<Float>, rotation:Array<Float>}
+    return composeComponents(pose.position, pose.rotation, offset);
+
+  /** Compose directly from pose components without allocating a temporary pose wrapper. */
+  public static function composeComponents(position:Array<Float>, rotation:Array<Float>,
       offset:materia.assembly.AssemblyRecord.AssemblyFrame):{position:Array<Float>, rotation:Array<Float>} {
-    var q = pose.rotation;
-    var moved = rotate(q, [offset.x, offset.y, offset.z]);
-    var o = [offset.qx, offset.qy, offset.qz, offset.qw];
-    return {position: [for (axis in 0...3) pose.position[axis] + moved[axis]],
-      rotation: [q[3] * o[0] + q[0] * o[3] + q[1] * o[2] - q[2] * o[1],
-        q[3] * o[1] - q[0] * o[2] + q[1] * o[3] + q[2] * o[0],
-        q[3] * o[2] + q[0] * o[1] - q[1] * o[0] + q[2] * o[3],
-        q[3] * o[3] - q[0] * o[0] - q[1] * o[1] - q[2] * o[2]]};
+    var q = rotation;
+    var x = q[0], y = q[1], z = q[2], w = q[3];
+    var tx = 2 * (y * offset.z - z * offset.y);
+    var ty = 2 * (z * offset.x - x * offset.z);
+    var tz = 2 * (x * offset.y - y * offset.x);
+    return {position: [position[0] + (offset.x + w * tx + y * tz - z * ty),
+        position[1] + (offset.y + w * ty + z * tx - x * tz),
+        position[2] + (offset.z + w * tz + x * ty - y * tx)],
+      rotation: [w * offset.qx + x * offset.qw + y * offset.qz - z * offset.qy,
+        w * offset.qy - x * offset.qz + y * offset.qw + z * offset.qx,
+        w * offset.qz + x * offset.qy - y * offset.qx + z * offset.qw,
+        w * offset.qw - x * offset.qx - y * offset.qy - z * offset.qz]};
+  }
+
+  /** Compose a link pose and part offset into reusable frame storage. */
+  public static function composeComponentsInto(position:Array<Float>, rotation:Array<Float>,
+      offset:materia.assembly.AssemblyRecord.AssemblyFrame, target:AssemblyFrame):Void {
+    var x = rotation[0], y = rotation[1], z = rotation[2], w = rotation[3];
+    var tx = 2 * (y * offset.z - z * offset.y);
+    var ty = 2 * (z * offset.x - x * offset.z);
+    var tz = 2 * (x * offset.y - y * offset.x);
+    target.x = position[0] + offset.x + w * tx + y * tz - z * ty;
+    target.y = position[1] + offset.y + w * ty + z * tx - x * tz;
+    target.z = position[2] + offset.z + w * tz + x * ty - y * tx;
+    target.qx = w * offset.qx + x * offset.qw + y * offset.qz - z * offset.qy;
+    target.qy = w * offset.qy - x * offset.qz + y * offset.qw + z * offset.qx;
+    target.qz = w * offset.qz + x * offset.qy - y * offset.qx + z * offset.qw;
+    target.qw = w * offset.qw - x * offset.qx - y * offset.qy - z * offset.qz;
   }
 
   /** `v` turned by the xyzw quaternion `q`. */

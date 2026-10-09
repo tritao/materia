@@ -21,6 +21,7 @@ class RuntimeGeometryTests {
     var data = new GeometryData();
     data.addStream(1, 2, positions, 3, 12);
     data.setIndexBuffer(indices, 3);
+    data.setBounds(offset, 0, 0, offset + 0.01, 0.01, 0);
     return data;
   }
 
@@ -33,6 +34,28 @@ class RuntimeGeometryTests {
       check(scene.createRectangle(), "runtime geometry test creates an object");
       var id = scene.selectedId;
       var authored = scene.runtimeFor(id).geometry;
+      check(scene.createRectangle(), "batch runtime geometry test creates a second object");
+      var second = scene.selectedId, secondAuthored = scene.runtimeFor(second).geometry;
+      var revision = scene.revision, visualRevision = scene.visualRevision, environmentRevision = scene.environmentRevision;
+      scene.setRuntimeGeometries([id => triangle(0.04), second => triangle(0.08)]);
+      check(scene.revision == revision && scene.environmentRevision == environmentRevision &&
+        scene.visualRevision == visualRevision + 1,
+        "related runtime meshes publish one visual revision without invalidating document or physics caches");
+      check(scene.runtimeFor(id).geometry != authored && scene.runtimeFor(second).geometry != secondAuthored,
+        "a batch gives each object independent runtime geometry");
+      var firstBounds = scene.info(id).bounds(), secondBounds = scene.info(second).bounds();
+      check(firstBounds.valid && secondBounds.valid && Math.abs(firstBounds.maxX - firstBounds.minX - 0.01) < 1e-6 &&
+        Math.abs(secondBounds.maxX - secondBounds.minX - 0.01) < 1e-6,
+        "the batch snapshot contains both updated meshes");
+      revision = scene.revision; visualRevision = scene.visualRevision;
+      scene.setRuntimeGeometries([id => triangle(0.12), second => triangle(0.16)]);
+      check(scene.revision == revision && scene.visualRevision == visualRevision + 1 &&
+        scene.info(id).bounds().minX > firstBounds.maxX,
+        "subsequent batched updates refresh the retained geometry and bounds");
+      scene.clearRuntimeGeometry(id); scene.clearRuntimeGeometry(second);
+      check(scene.runtimeFor(id).geometry == authored && scene.runtimeFor(second).geometry == secondAuthored,
+        "both batched meshes restore their authored geometry");
+      scene.select(id);
       scene.setRuntimeGeometryParts(id, 2, [0 => triangle(0), 1 => triangle(0.02)]);
       var parts = scene.runtimePartNodes(id);
       check(parts.length == 2 && live(scene, parts[0]) && live(scene, parts[1]),
@@ -43,6 +66,8 @@ class RuntimeGeometryTests {
       check(scene.runtimePartNodes(id).join(",") == parts.join(","), "an update replaces a part's geometry in place");
 
       scene.clearRuntimeGeometry(id);
+      check(scene.revision == revision && scene.environmentRevision == environmentRevision,
+        "runtime part updates and restoration keep document and physics revisions stable");
       check(scene.runtimePartNodes(id).length == 0 && !live(scene, parts[0]) && !live(scene, parts[1]),
         "clearing removes the part nodes");
       check(scene.runtimeFor(id).geometry == authored && scene.bridge.idForNode(parts[0]) == null,

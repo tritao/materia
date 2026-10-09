@@ -97,20 +97,38 @@ class AssemblyFrames {
 	}
 
 	public static function inverse(frame:AssemblyFrame):AssemblyFrame {
-		var reverse:AssemblyFrame = {x: 0, y: 0, z: 0, qx: -frame.qx, qy: -frame.qy,
-			qz: -frame.qz, qw: frame.qw};
-		var point = transformPoint(reverse, -frame.x, -frame.y, -frame.z);
-		reverse.x = point.x; reverse.y = point.y; reverse.z = point.z;
-		return reverse;
+		var result:AssemblyFrame = {x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: frame.qw};
+		inverseInto(frame, result);
+		return result;
+	}
+
+	/** Writes the rigid inverse into caller-owned storage. */
+	public static function inverseInto(frame:AssemblyFrame, target:AssemblyFrame):Void {
+		var x = -frame.x, y = -frame.y, z = -frame.z;
+		target.qx = -frame.qx; target.qy = -frame.qy; target.qz = -frame.qz; target.qw = frame.qw;
+		var tx = 2 * (target.qy * z - target.qz * y);
+		var ty = 2 * (target.qz * x - target.qx * z);
+		var tz = 2 * (target.qx * y - target.qy * x);
+		target.x = x + target.qw * tx + target.qy * tz - target.qz * ty;
+		target.y = y + target.qw * ty + target.qz * tx - target.qx * tz;
+		target.z = z + target.qw * tz + target.qx * ty - target.qy * tx;
 	}
 
 	public static function transformPoint(frame:AssemblyFrame, x:Float, y:Float, z:Float):{x:Float, y:Float, z:Float} {
+		var result = {x: 0.0, y: 0.0, z: 0.0};
+		transformPointInto(frame, x, y, z, result);
+		return result;
+	}
+
+	/** Writes a transformed point into caller-owned storage. */
+	public static function transformPointInto(frame:AssemblyFrame, x:Float, y:Float, z:Float,
+			target:{x:Float, y:Float, z:Float}):Void {
 		var tx = 2 * (frame.qy * z - frame.qz * y);
 		var ty = 2 * (frame.qz * x - frame.qx * z);
 		var tz = 2 * (frame.qx * y - frame.qy * x);
-		return {x: x + frame.qw * tx + frame.qy * tz - frame.qz * ty + frame.x,
-			y: y + frame.qw * ty + frame.qz * tx - frame.qx * tz + frame.y,
-			z: z + frame.qw * tz + frame.qx * ty - frame.qy * tx + frame.z};
+		target.x = x + frame.qw * tx + frame.qy * tz - frame.qz * ty + frame.x;
+		target.y = y + frame.qw * ty + frame.qz * tx - frame.qx * tz + frame.y;
+		target.z = z + frame.qw * tz + frame.qx * ty - frame.qy * tx + frame.z;
 	}
 
 	public static function transformVector(frame:AssemblyFrame, x:Float, y:Float, z:Float):{x:Float, y:Float, z:Float} {
