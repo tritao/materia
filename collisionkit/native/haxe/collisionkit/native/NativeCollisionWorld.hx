@@ -217,6 +217,16 @@ class NativeCollisionWorld implements CollisionWorld {
     return result.out_set < 0 ? null : violationOf(result.out_pair, result.out_result, result.out_set);
   }
 
+  public function violations(poses:Array<Float>, margins:CollisionMargins, ?inflation:Array<Float>):Array<Bool> {
+    requireLive();
+    var sets = bodies == 0 ? 0 : Std.int(poses.length / (7 * bodies));
+    var result = CollisionKitNative.ck_violation_sets(owner.borrow(), poses, inflation == null ? none : inflation,
+      margins.flat(), sets);
+    check(result.status, "violation_sets");
+    var flags = result.out_flags;
+    return [for (s in 0...sets) flags[s] != 0];
+  }
+
   public function dispose():Void {
     if (disposed) return;
     disposed = true;

@@ -16,7 +16,8 @@ namespace {
 bool valid_request(const mk_state_to_state_request &request) {
     if (request.struct_size < sizeof(request) || request.joint_count == 0 ||
         request.joint_count > MK_MAX_JOINTS ||
-        request.synchronization != MK_SYNCHRONIZATION_TIME ||
+        (request.synchronization != MK_SYNCHRONIZATION_TIME &&
+         request.synchronization != MK_SYNCHRONIZATION_PHASE) ||
         (request.control_mode != MK_CONTROL_POSITION &&
          request.control_mode != MK_CONTROL_VELOCITY_STOP))
         return false;
@@ -64,7 +65,8 @@ mk_result generate(const mk_state_to_state_request &request, Trajectory &traject
     }
     const auto dofs = request.joint_count;
     ruckig::InputParameter<ruckig::DynamicDOFs> input(dofs);
-    input.synchronization = ruckig::Synchronization::Time;
+    input.synchronization = request.synchronization == MK_SYNCHRONIZATION_PHASE ?
+        ruckig::Synchronization::Phase : ruckig::Synchronization::Time;
     input.control_interface = request.control_mode == MK_CONTROL_VELOCITY_STOP ?
         ruckig::ControlInterface::Velocity : ruckig::ControlInterface::Position;
     for (uint32_t joint = 0; joint < dofs; ++joint) {

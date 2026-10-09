@@ -98,6 +98,8 @@ class ProgramCompiler {
   public var clearanceEvents:Array<ClearanceEvent> = [];
   /** How deep the conservative clearance check of a joint or generated move bisects (CL4b). */
   public var clearanceDepthLimit:Int = 16;
+  /** Plans the path of a joint move whose options ask for it (`MotionOptions.planned`; COLLISION.md CL7). */
+  public var motionPlanner:Null<motionkit.planner.MotionPlanner> = null;
 
   /** Preserve compiler limits/checks while timing an already selected route. */
   public function withJointPathPlanner(planner:JointPathPlanner):ProgramCompiler {
@@ -110,6 +112,7 @@ class ProgramCompiler {
     result.configurationConstraint=configurationConstraint;
     result.motorSpace=motorSpace;result.pathEventSchedule=pathEventSchedule;result.requireFeasiblePath=requireFeasiblePath;
     result.clearanceEvents=clearanceEvents.copy();result.clearanceDepthLimit=clearanceDepthLimit;
+    result.motionPlanner=motionPlanner;
     return result;
   }
 
@@ -135,6 +138,7 @@ class ProgramCompiler {
     worker.pathEventSchedule = pathEventSchedule;
     worker.clearanceEvents = clearanceEvents.copy();
     worker.clearanceDepthLimit = clearanceDepthLimit;
+    worker.motionPlanner = motionPlanner;
     return worker;
   }
 
@@ -341,7 +345,8 @@ class ProgramCompiler {
           var acceleration = effective(maxAcceleration, options.maxAcceleration);
           var jerk = effective(maxJerk, options.maxJerk);
           var motors = motorSpace;
-          var generated = motors == null ? Trajectory.generateStateToState(q, zeros(), zeros(), goal,
+          var generated = options.planned ? plannedMove(q, goal, velocity, acceleration, jerk, index)
+            : motors == null ? Trajectory.generateStateToState(q, zeros(), zeros(), goal,
             velocity, acceleration, jerk) : motors.move(q, goal, velocity, acceleration, jerk);
           var pending = new PendingMotion(index, q, goal, generated, [], null, null);
           c.pending = pending;
@@ -687,6 +692,36 @@ class ProgramCompiler {
       if (projected != null) projected.dispose();
       throw 'Motion program op ${pending.opIndex}: $error';
     }
+  }
+
+  /**
+   * A planned joint move (COLLISION.md CL7): the motion planner's waypoints,
+   * each edge timed rest to rest with phase synchronization, so the timed path
+   * runs along the straight edges that were checked. Validation (CL4b) then
+   * checks the whole motion again.
+   */
+  function plannedMove(from:Array<Float>, to:Array<Float>, velocity:Array<Float>, acceleration:Array<Float>,
+      jerk:Array<Float>, index:Int):Trajectory {
+    var planner = motionPlanner;
+    if (planner == null) throw 'Motion program op $index asks for a planned move, but the compiler has no motion planner';
+    if (motorSpace != null) throw 'Motion program op $index: planned moves in motor space are not supported';
+    var plan = planner.plan(from, to);
+    var path = plan.waypoints;
+    if (path == null) throw 'Motion program op $index has no planned path: ${plan.failure}';
+    var segments:Array<{timeFromStartNs:Int64, durationNs:Int64, coefficients:Array<Array<Float>>}> = [];
+    var offset = Int64.ofInt(0);
+    for (k in 1...path.length) {
+      var edge = Trajectory.generateStateToState(path[k - 1], zeros(), zeros(), path[k], velocity, acceleration, jerk, true);
+      var last = Int64.ofInt(0);
+      for (segment in edge.segments()) {
+        segments.push({timeFromStartNs: segment.timeFromStartNs + offset, durationNs: segment.durationNs,
+          coefficients: segment.coefficients});
+        last = segment.timeFromStartNs + segment.durationNs;
+      }
+      offset = offset + last;
+      edge.dispose();
+    }
+    return Trajectory.fromSegments(segments);
   }
 
   function hasClearanceEvents(op:Int):Bool {

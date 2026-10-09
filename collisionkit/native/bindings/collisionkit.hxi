@@ -225,6 +225,13 @@ interface CollisionKitNative @target("portable-abi64") @library("collisionkit_co
 	 */
 	extern fn ck_violation_batch(world: ck_world_handle, poses: ptr<const<f64>> @in_array("pose_count"), pose_count: u32, inflation: ptr<const<f64>> @in_array("inflation_count"), inflation_count: u32, margins: ptr<const<f64>> @in_array("margin_count"), margin_count: u32, out_pair: ptr<i32> @out_array("pair_capacity"), pair_capacity: u32, out_result: ptr<f64> @out_array("result_capacity"), result_capacity: u32, out_set: ptr<i32> @out) -> ck_result;
 	/**
+	 * As `ck_violation_batch`, but checks every set: `out_flags` (one per set)
+	 * is 1 where the set has a violation, 0 where it is clear. For a planner's
+	 * edge checks, which need every failing set of a batch (CL-D7). The world is
+	 * left posed at the last set.
+	 */
+	extern fn ck_violation_sets(world: ck_world_handle, poses: ptr<const<f64>> @in_array("pose_count"), pose_count: u32, inflation: ptr<const<f64>> @in_array("inflation_count"), inflation_count: u32, margins: ptr<const<f64>> @in_array("margin_count"), margin_count: u32, out_flags: ptr<i32> @out_array("flag_capacity"), flag_capacity: u32) -> ck_result;
+	/**
 	 * An empty world: no bodies, no objects.
 	 */
 	extern fn ck_world_create(out_world: ptr<ck_world_handle> @out @owned) -> ck_result;

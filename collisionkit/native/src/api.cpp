@@ -591,3 +591,37 @@ CK_API ck_result CK_CALL ck_decomposition_piece(ck_decomposition_handle handle, 
     std::copy(points.begin(), points.begin() + std::min<size_t>(points.size(), point_capacity), out_points);
     return CK_OK;
 }
+
+CK_API ck_result CK_CALL ck_violation_sets(ck_world_handle handle, const double *poses, uint32_t pose_count,
+                                           const double *inflation, uint32_t inflation_count, const double *margins,
+                                           uint32_t margin_count, int32_t *out_flags, uint32_t flag_capacity) {
+    return with_world(handle, [&](World &world) -> ck_result {
+        const uint32_t bodies = world.body_count();
+        ck::Margins table;
+        if (!read_margins(world, margins, margin_count, table) || bodies == 0 || (pose_count && !poses) ||
+            pose_count % (7 * bodies) != 0)
+            return CK_ERROR_INVALID_ARGUMENT;
+        const uint32_t sets = pose_count / (7 * bodies);
+        if (flag_capacity != sets || (sets && !out_flags) ||
+            (inflation_count && (!inflation || inflation_count != sets * bodies)))
+            return CK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t s = 0; s < sets; ++s)
+            if (inflation_count && !read_inflation(inflation + size_t(s) * bodies, bodies, bodies))
+                return CK_ERROR_INVALID_ARGUMENT;
+        double pose[7];
+        for (uint32_t i = 0; i < pose_count; i += 7)
+            if (!read_pose(poses + i, pose)) return CK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t s = 0; s < sets; ++s) {
+            for (uint32_t body = 0; body < bodies; ++body) {
+                read_pose(poses + 7 * (size_t(s) * bodies + body), pose);
+                world.set_body_pose(body, pose);
+            }
+            bool found = false;
+            ck::PairResult pair;
+            if (!world.violation(table, inflation_count ? inflation + size_t(s) * bodies : nullptr, found, pair))
+                return CK_ERROR_UNSUPPORTED;
+            out_flags[s] = found ? 1 : 0;
+        }
+        return CK_OK;
+    });
+}

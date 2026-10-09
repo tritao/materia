@@ -2,6 +2,7 @@
 interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @depends("TrajectoryCore") {
 	const MK_CONTROL_POSITION = 0;
 	const MK_CONTROL_VELOCITY_STOP = 1;
+	const MK_SYNCHRONIZATION_PHASE = 1;
 	const MK_SYNCHRONIZATION_TIME = 0;
 	const MK_TIMING_BINDING_FEED_CAP = 3;
 	const MK_TIMING_BINDING_JOINT_ACCELERATION = 2;
@@ -476,7 +477,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		struct_size: u32 @offset(0) @struct_size;
 		joint_count: u32 @offset(4);
 		/**
-		 * < Only MK_SYNCHRONIZATION_TIME is supported.
+		 * < MK_SYNCHRONIZATION_TIME or MK_SYNCHRONIZATION_PHASE.
 		 */
 		synchronization: u32 @offset(8);
 		/**

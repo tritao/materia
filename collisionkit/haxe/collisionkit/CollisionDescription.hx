@@ -61,6 +61,34 @@ class CollisionDescription {
     return articulations.length - 1;
   }
 
+  /**
+   * The radius of a body's objects about its frame: no point of them is
+   * farther from the body's origin (inflation included). Motion bounds use
+   * it (CL-D5). Height fields and half-spaces have no finite radius.
+   */
+  public function bodyRadius(body:Int):Float {
+    var radius = 0.0;
+    for (object in objects) if (object.body == body) {
+      var o = object.offset;
+      var centre = Math.sqrt(o.x * o.x + o.y * o.y + o.z * o.z);
+      // Rotations keep distances from the offset's origin, so local extents add to the offset's length.
+      var extent = switch object.geometry {
+        case Box(x, y, z): Math.sqrt(x * x + y * y + z * z);
+        case Sphere(r): r;
+        case Capsule(r, h): r + h;
+        case Cylinder(r, h): Math.sqrt(r * r + h * h);
+        case Convex(points) | Mesh(points, _):
+          var far = 0.0;
+          for (i in 0...Std.int(points.length / 3))
+            far = Math.max(far, Math.sqrt(points[3 * i] * points[3 * i] + points[3 * i + 1] * points[3 * i + 1] + points[3 * i + 2] * points[3 * i + 2]));
+          far;
+        case HalfSpace(_, _, _, _) | HeightField(_, _, _, _, _): Math.POSITIVE_INFINITY;
+      }
+      radius = Math.max(radius, centre + extent + object.inflation);
+    }
+    return radius;
+  }
+
   /** Records an assumption once. */
   public function note(text:String):Void {
     if (assumptions.indexOf(text) < 0) assumptions.push(text);

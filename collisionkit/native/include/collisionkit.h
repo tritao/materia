@@ -327,6 +327,18 @@ CK_API ck_result CK_CALL ck_violation_batch(ck_world_handle world,
     double *out_result CK_OUT_ARRAY(result_capacity), uint32_t result_capacity,
     int32_t *out_set CK_OUT);
 
+/**
+ * As `ck_violation_batch`, but checks every set: `out_flags` (one per set)
+ * is 1 where the set has a violation, 0 where it is clear. For a planner's
+ * edge checks, which need every failing set of a batch (CL-D7). The world is
+ * left posed at the last set.
+ */
+CK_API ck_result CK_CALL ck_violation_sets(ck_world_handle world,
+    const double *poses CK_IN_ARRAY(pose_count), uint32_t pose_count,
+    const double *inflation CK_IN_ARRAY(inflation_count), uint32_t inflation_count,
+    const double *margins CK_IN_ARRAY(margin_count), uint32_t margin_count,
+    int32_t *out_flags CK_OUT_ARRAY(flag_capacity), uint32_t flag_capacity);
+
 /*
  * Convex decomposition (CL-D11): V-HACD 4 splits a triangle mesh into convex
  * pieces, then the world measures how far points sampled over every

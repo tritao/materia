@@ -599,7 +599,7 @@ Each step is its own commit with all suites green.
   process-path work:
   - an optional clearance cost, so the search prefers room over minimal
     motion.
-- **CL7 — Free-space planning (CL-D7).**
+- **CL7 — Free-space planning (CL-D7).** Done, see the progress log.
   - The `MotionPlanner` interface in MotionKit.
   - RRT-Connect with shortcutting in Haxe, over a `CollisionWorld`, with
     its own seeded random generator. Edges go through CL2's batched
@@ -1282,3 +1282,86 @@ Done as planned, with these choices:
   parity passed (4184); clearance validation passed (23); the new MuJoCo
   cross-check passed (59); CadBridge's MuJoCo cup and vacuum test passed
   (the backend changed under it); MotionKit passed (1224712).
+
+### CL7 — Free-space planning (2026-10-09)
+
+- **Interfaces** (MotionKit, `motionkit.planner`): `MotionPlanner`
+  (`plan(start, goal)`), `MotionPlan` (waypoints or the failure, with
+  iterations, nodes, edge checks, time in checks and in all),
+  `PlannerSpace` (bounds, `invalid(q)` naming what collides, and batched
+  `edgesClear`).
+- **RRT-Connect** (`RrtConnect`, pure Haxe): seeded (xorshift), extend by at
+  most `step`, connect by checking all of a connection's straight steps in
+  one batch and keeping the clear prefix, then shortcutting in batches of
+  eight. Trees store nodes flat (`PlannerTree`: one coordinate array, one
+  parent array) and find neighbours with a k-d tree rebuilt as the tree
+  doubles past 64 nodes, plus a scan of the nodes added since.
+- **The space** (`motionkit.robot.CollisionPlannerSpace`): a model's
+  bodies in a collision description. An edge is clear when its midpoint is
+  clear with each body inflated by its bound over half the edge's per-joint
+  travel; otherwise it is halved to `depthLimit` (14), every level for every
+  pending edge in one native call (`ck_violation_sets`, new: a flag per pose
+  set), plus one for the midpoints as they are. The bound is
+  `kinematicskit.MotionReach`: per body and DOF, the offsets from each
+  joint to the body (every joint on the way, with a prismatic joint's
+  largest travel) and the revolute joints' share of the body's radius
+  (`CollisionDescription.bodyRadius`), configuration-independent. It is
+  looser than main's `ClearanceMotionEnvelope` over a joint box, but needs
+  only the kit's model, which is what the OMPL benchmark's checker shares.
+- **Phase synchronization:** `MK_SYNCHRONIZATION_PHASE` in MotionKit's
+  generator (Ruckig's phase synchronization), and
+  `Trajectory.generateStateToState(phase)`: a rest-to-rest edge is a
+  straight line in joint space.
+- **Planned joint moves:** `MotionOptions.planned` and
+  `ProgramCompiler.motionPlanner`. A planned MoveJ is the planner's
+  waypoints, each edge timed rest to rest with phase synchronization and
+  joined into the op's one motion, which validation (CL4b) then checks
+  again. Not in motor space yet. PP7's blocked process entry can use the
+  same planner; that wiring is with the process-path work.
+- **Tests** (`motionkit/tests/planner`, 12 assertions):
+  - a 10 cm ball on x and y slides through a 16 cm gap in a wall (the
+    straight way is blocked): found, every edge rechecked clear, crossing
+    in the gap (5 waypoints, 60 iterations, 3.3 ms, 98 % in checks);
+  - a start or goal inside the wall is named ("start in collision:
+    ball / wall-high ..."), not planned;
+  - the same seed plans the same path, another seed another;
+  - main's weld arm turning 1.2 rad past a post its torch would sweep
+    through (the direct sweep collides): a planned MoveJ of 3 edges whose
+    timed path stays on the planned edges (within 1e-6 rad at 200 times) and
+    passes validation as a bound.
+- **OMPL benchmark** (out of tree, nothing of it in the repo): OMPL 1.7.0
+  built from source into a scratch prefix against the system Boost 1.83 in
+  1 m 43 s. A C++ harness rebuilds each scene `PlannerTests` exports (with
+  `PLANNER_BENCH_DIR`): the same packed kit model (native FK), collisionkit
+  world, margins and edge check (the same `MotionReach` bisection over
+  batched calls), so OMPL's RRT-Connect (same range) uses our checker;
+  OMPL's partial shortcutting runs afterwards with as many rounds. 20 runs
+  per scene, medians:
+
+  | Scene | Planner | Success | Time | Path length | Edge checks | In checks |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | maze (2 DOF, narrow gap) | ours | 20/20 | 2.92 ms | 2.082 | 368 | 96.2 % |
+  | maze | OMPL | 20/20 | 1.24 ms | 1.985 (raw 2.761) | 147 | 27.6 % |
+  | weld arm and post (6 DOF) | ours | 20/20 | 4.66 ms | 1.483 | 108 | 99.2 % |
+  | weld arm and post | OMPL | 20/20 | 2.20 ms | 1.371 (raw 2.012) | 61 | 61.0 % |
+
+  **CL-D7's decision from it:** our planner spends 1–4 % of its time
+  outside collision checks, so its Haxe tree code is not a meaningful share,
+  and none of it moves to C++. OMPL is about twice as fast on these scenes
+  because it checks fewer edges (it connects one step at a time and stops
+  at the first blocked step, where we check a whole connection in one
+  batch) and each check costs less (FK in C++; ours runs the kit's FK in
+  Haxe and copies pose arrays across the FFI, about 7.6 µs an edge against
+  2.3 µs). If planning time matters, those are the two places: checking a
+  connection's steps lazily, and native FK in the check (or a native
+  `PlannerSpace`). Path lengths are within 8 %.
+- **Suites:** collisionkit standalone C++ 3 of 3; MotionKit standalone C++
+  16 of 16; collisionkit native passed (364); cell tests passed (30); native
+  kit passed (695); pure kit only main's known DLS failure; RobotKit passed
+  (5433); weld planning passed (609); processkit's full suite passed;
+  parity passed (4184); clearance validation passed (23); planner passed
+  (12); the MuJoCo cross-check passed (59); MotionKit passed (1224712).
+- **The order's eight steps are done** (CL2, the merge, CL3a, CL4a, CL4b,
+  CL5, CL3b, CL7). CL6's remainder, main's PP10 and CL8 wait for review, as
+  "Order and gates" says. Nothing is pushed; the coal fork's commits
+  (85cb6397, 7b57ae92) are local.
