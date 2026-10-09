@@ -54,9 +54,27 @@ class PrinterOpCoverage {
   public static function run():Int {
     assertions = 0;
     validation();
+    coldExtrusion();
     passThrough();
     volumes();
     return assertions;
+  }
+
+  /** The static cold-extrusion check: filament and beads only after a waited heat to the minimum. */
+  static function coldExtrusion():Void {
+    function heat(celsius:Float, wait:Bool):ToolpathOp return ToolpathOp.Heat("hotend", celsius, wait, span);
+    var deposit = ToolpathOp.Deposit(8.0e-8, 4.5e-4, 2.0e-4, span);
+    var prime = ToolpathOp.FilamentMove(0.0015, 0.005, span);
+    var retract = ToolpathOp.FilamentMove(-0.0008, 0.035, span);
+    check(PrinterOps.coldExtrusion([heat(210.0, true), prime, deposit, line(0.0, 0.01)], 170.0).length == 0, "after a waited heat it is safe");
+    check(PrinterOps.coldExtrusion([retract, heat(210.0, true)], 170.0).length == 0, "pulling filament back needs no heat");
+    var early = PrinterOps.coldExtrusion([prime, heat(210.0, true)], 170.0);
+    check(early.length == 1 && early[0].message.indexOf("filament is pushed") >= 0, "priming before the heat is found");
+    check(PrinterOps.coldExtrusion([heat(210.0, false), deposit, line(0.0, 0.01)], 170.0).length == 1, "a heat that is not waited for does not make it safe");
+    check(PrinterOps.coldExtrusion([heat(150.0, true), deposit, line(0.0, 0.01)], 170.0).length == 1, "waiting for less than the minimum does not either");
+    check(PrinterOps.coldExtrusion([heat(210.0, true), heat(0.0, false), prime], 170.0).length == 1, "turning the heater off makes it cold again");
+    check(PrinterOps.coldExtrusion([ToolpathOp.Heat("bed", 60.0, true, span), deposit, line(0.0, 0.01)], 170.0).length == 1, "the bed is not the hotend");
+    check(PrinterOps.coldExtrusion([deposit, ToolpathOp.DepositOff(span), line(0.0, 0.01)], 170.0).length == 0, "moves with no bead need no heat");
   }
 
   static function validation():Void {

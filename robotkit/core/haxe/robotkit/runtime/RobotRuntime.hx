@@ -739,6 +739,9 @@ class RobotRuntime {
       case "tool_weld":
         if (image != null || !validExternalWeldFrame(values))
           throw 'Weld sensor "$sensorId" publication requires arc, current, voltage, touch, fault and power values';
+      case "tool_heater":
+        if (image != null || !robotkit.tool.HeaterSensor.valid(values))
+          throw 'Heater sensor "$sensorId" publication requires temperature, target, duty, at-target and fault values';
       case _:
     }
     var frame = new SensorFrame(mounted.id, mounted.kind, mounted.frameId, sequence,

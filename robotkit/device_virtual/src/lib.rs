@@ -7,6 +7,7 @@ use robotkit_device_protocol::{
     StepGenerator, StopReason, VirtualBoard, VirtualSwitch,
 };
 use std::collections::VecDeque;
+pub mod heaters;
 pub mod welder;
 #[cfg(test)]
 mod retrofit_tests;
@@ -43,6 +44,8 @@ pub struct VirtualDevice {
     received_bytes: u64,
     welder: Option<welder::VirtualWelder>,
     weld_sequence: u64,
+    heaters: heaters::VirtualHeaters,
+    heater_sequence: [u64; 8],
 }
 
 impl VirtualDevice {
@@ -93,6 +96,8 @@ impl VirtualDevice {
             received_bytes: 0,
             welder: None,
             weld_sequence: 0,
+            heaters: heaters::VirtualHeaters::default(),
+            heater_sequence: [0; 8],
         })
     }
 
@@ -110,6 +115,63 @@ impl VirtualDevice {
     }
 
     pub fn weld_values(&self) -> Option<[f32; 6]> { self.welder.as_ref().map(|w| w.values()) }
+
+    /// The heaters of peripheral profile 2, configured before opening the session.
+    pub fn configure_heaters(&mut self, parameters: &[f64]) -> bool {
+        if self.core.is_some() { return false; }
+        match heaters::from_parameters(parameters) {
+            Some(heaters) => { self.heaters = heaters; true }
+            None => false,
+        }
+    }
+
+    /// An experiment's hand on the plant: see `heaters::input`.
+    pub fn set_heater_input(&mut self, input: u32, value: f64) -> bool { self.heaters.set_input(input, value) }
+
+    /// Heater `index`'s sensor frame: temperature, target, duty, at target, fault.
+    pub fn heater_values(&self, index: usize) -> Option<[f32; 5]> { self.heaters.heaters.get(index).map(|h| h.values()) }
+
+    /// The block's true temperature, which a fallen thermistor does not read.
+    pub fn heater_block_celsius(&self, index: usize) -> Option<f32> { self.heaters.heaters.get(index).map(|h| h.block_celsius()) }
+
+    fn valid_heater_channels(&self, begin: &SessionBegin6) -> bool {
+        self.heaters.heaters.iter().all(|h| {
+            let target = h.wiring.target_channel;
+            // The target keeps its value through a commanded stop (a pause does not cool the hotend) and is zero
+            // when the outputs are made safe: a fault or an emergency stop switches the heater off.
+            let fan_ok = h.wiring.fan_channel.map_or(true, |f| f < begin.channel_count as usize && begin.channel_kind[f] == 2
+                && begin.safe_analog[f] == 0.0);
+            target < begin.channel_count as usize && begin.channel_kind[target] == 2 && begin.safe_analog[target] == 0.0
+                && begin.channel_stop_policy[target] == 1 && fan_ok
+                && h.wiring.extruder_actuator.map_or(true, |a| a < begin.actuator_count as usize)
+        })
+    }
+
+    fn update_heaters(&mut self, dt: f64) {
+        if self.heaters.heaters.is_empty() { return; }
+        let mut faulted = false;
+        for heater in self.heaters.heaters.iter_mut() {
+            let target = self.board.analog(heater.wiring.target_channel).unwrap_or(0.0);
+            let fan = heater.wiring.fan_channel.and_then(|c| self.board.analog(c)).unwrap_or(0.0);
+            let steps = heater.wiring.extruder_actuator.map(|a| self.board.step_count(a));
+            heater.tick(dt, target, fan, steps);
+            faulted |= heater.faulted();
+        }
+        if faulted {
+            if let Some(core) = self.core.as_mut() {
+                if core.stop_reason().is_none() { core.stop(StopReason::ProcessFault); }
+                self.events.as_mut().unwrap().stop(&mut self.board, StopReason::ProcessFault);
+                self.events.as_ref().unwrap().apply_safe(&mut self.board, StopReason::ProcessFault);
+                self.final_safe_applied = true;
+            }
+        }
+    }
+
+    /// Everything a process peripheral does between steps.
+    fn update_peripherals(&mut self, dt: f64) {
+        self.update_welder(dt);
+        self.update_heaters(dt);
+    }
 
     fn valid_weld_channels(&self, begin: &SessionBegin6) -> bool {
         let Some(welder) = self.welder.as_ref() else { return true; };
@@ -183,6 +245,7 @@ impl VirtualDevice {
                     profile: self.profile,
                 };
                 if self.valid_weld_channels(&begin)
+                    && self.valid_heater_channels(&begin)
                     && controller_matches(&begin.expected_controller, &self.controller)
                     && begin.actuator_count > 0
                     && begin.actuator_count as usize <= self.count
@@ -243,6 +306,8 @@ impl VirtualDevice {
                     core.initialize_clock(self.board.now_ticks());
                     if let Some(welder) = self.welder.as_mut() { welder.reset(); }
                     self.weld_sequence = 0;
+                    for heater in self.heaters.heaters.iter_mut() { heater.reset(); }
+                    self.heater_sequence = [0; 8];
                     self.steps = generator;
                     self.actuator_joint = begin.actuator_joint;
                     self.actuator_ratio = begin.actuator_ratio;
@@ -452,14 +517,14 @@ impl VirtualDevice {
                 if let Some(reason) = self.core.as_ref().unwrap().stop_reason() {
                     self.events.as_mut().unwrap().stop(&mut self.board, reason);
                 }
-                self.update_welder(0.0);
+                self.update_peripherals(0.0);
                 true
             }
             11 => {
                 self.steps.end_homing_pair(); self.homing_scope = None; self.homing_stop = false;
                 self.core.as_mut().unwrap().stop(StopReason::Stop);
                 self.events.as_mut().unwrap().stop(&mut self.board, StopReason::Stop);
-                self.update_welder(0.0);
+                self.update_peripherals(0.0);
                 true
             }
             12 => {
@@ -467,7 +532,7 @@ impl VirtualDevice {
                 self.core.as_mut().unwrap().emergency_stop(&mut self.board);
                 self.events.as_mut().unwrap().stop(&mut self.board, StopReason::EmergencyStop);
                 self.final_safe_applied = true;
-                self.update_welder(0.0);
+                self.update_peripherals(0.0);
                 true
             }
             13 => false,
@@ -511,9 +576,9 @@ impl VirtualDevice {
                     core.stop(StopReason::DualDriveSkew);
                 }
             }
-            self.update_welder(step_ns as f64 / 1_000_000_000.0);
+            self.update_peripherals(step_ns as f64 / 1_000_000_000.0);
         }
-        self.update_welder(0.0);
+        self.update_peripherals(0.0);
         if host_ns.saturating_sub(self.last_publish_ns) >= 10_000_000 {
             self.publish_state();
             self.last_publish_ns = host_ns;
@@ -605,6 +670,20 @@ impl VirtualDevice {
             }
             self.emit(17, &body);
         }
+        for index in 0..self.heaters.heaters.len() {
+            let heater = &self.heaters.heaters[index];
+            self.heater_sequence[index] += 1;
+            let header = Sensor6Header { session: self.session, timestamp_ticks: self.board.now_ticks(),
+                sequence: self.heater_sequence[index], slot: heater.wiring.sensor_slot, value_count: 5 };
+            let values = heater.values();
+            let mut body = [0; Sensor6Header::SIZE + 5 * Sensor6Value::SIZE];
+            header.encode(&mut body[..Sensor6Header::SIZE]).unwrap();
+            for (i, value) in values.iter().enumerate() {
+                let start = Sensor6Header::SIZE + i * Sensor6Value::SIZE;
+                Sensor6Value { value: *value }.encode(&mut body[start..start + Sensor6Value::SIZE]).unwrap();
+            }
+            self.emit(17, &body);
+        }
     }
 
     pub fn take_frame(&mut self) -> Option<Vec<u8>> { self.outbox.pop_front() }
@@ -649,7 +728,12 @@ pub unsafe extern "C" fn rkd_virtual_create(
 pub unsafe extern "C" fn rkd_virtual_configure_peripheral(
     device: *mut VirtualDevice, kind: u32, parameters: *const f64, count: usize,
 ) -> i32 {
-    if parameters.is_null() || kind != 1 || count != 7 { return 0; }
+    if parameters.is_null() { return 0; }
+    if kind == 2 {
+        let Some(device) = device.as_mut() else { return 0; };
+        return device.configure_heaters(std::slice::from_raw_parts(parameters, count)) as i32;
+    }
+    if kind != 1 || count != 7 { return 0; }
     let p = std::slice::from_raw_parts(parameters, count);
     if p.iter().any(|v| !v.is_finite()) || p[..4].iter().any(|v| *v < 0.0 || v.fract() != 0.0)
         || p[0] >= 8.0 || p[1..4].iter().any(|v| *v >= 32.0) { return 0; }
@@ -660,6 +744,9 @@ pub unsafe extern "C" fn rkd_virtual_configure_peripheral(
 pub unsafe extern "C" fn rkd_virtual_set_peripheral_input(
     device: *mut VirtualDevice, input: u32, value: f64,
 ) -> i32 {
+    let Some(device) = device.as_mut() else { return 0; };
+    // A device with heaters takes their inputs (`heaters::input`); otherwise input 0 grounds the welding workpiece.
+    if !device.heaters.heaters.is_empty() { return device.set_heater_input(input, value) as i32; }
     if input != 0 || (value != 0.0 && value != 1.0) { return 0; }
     rkd_virtual_set_welder_grounded(device, value as u8)
 }
@@ -1231,4 +1318,132 @@ mod tests {
         }
     }
 
+
+    // ---- heaters ----------------------------------------------------------------------------------------
+
+    fn heater_config() -> robotkit_device_protocol::heater::HeaterConfig {
+        robotkit_device_protocol::heater::HeaterConfig { r0_ohm: 100_000.0, t0_c: 25.0, beta: 3950.0, pullup_ohm: 4_700.0,
+            v_ref: 3.3, kp: 0.08, ki: 0.004, kd: 0.5, max_duty: 1.0, max_temperature_c: 275.0, min_extrude_c: 170.0,
+            band_c: 3.0, pid_range_c: 10.0, gain_window_s: 20.0, gain_min_c: 2.0, hysteresis_c: 15.0, hysteresis_window_s: 10.0 }
+    }
+    fn heater_parameters() -> Vec<f64> {
+        let hotend = heaters::parameters(heaters::Wiring { sensor_slot: 0, target_channel: 0, fan_channel: Some(1),
+            extruder_actuator: None }, &heater_config(),
+            &heaters::Plant { capacity: 10.0, power: 40.0, loss: 0.06, fan_loss: 0.05, ambient: 22.0 });
+        let bed_config = robotkit_device_protocol::heater::HeaterConfig { kp: 0.2, ki: 0.0008, kd: 2.0, min_extrude_c: 0.0,
+            max_temperature_c: 120.0, gain_window_s: 120.0, hysteresis_c: 10.0, hysteresis_window_s: 20.0, ..heater_config() };
+        let bed = heaters::parameters(heaters::Wiring { sensor_slot: 1, target_channel: 2, fan_channel: None,
+            extruder_actuator: None }, &bed_config,
+            &heaters::Plant { capacity: 500.0, power: 250.0, loss: 0.7, fan_loss: 0.0, ambient: 22.0 });
+        let mut all = vec![2.0]; all.extend(hotend); all.extend(bed); all
+    }
+    /// A device holding 210 C on the hotend and 60 C on the bed for `seconds`, with the part fan at `fan`.
+    // Boxed: a device is large, and a test thread's stack (2 MiB) does not hold it beside a stop's frames in a debug build.
+    fn heating_device(keep_targets: bool, fan: f32, seconds: u64) -> Option<Box<VirtualDevice>> {
+        let mut d = Box::new(VirtualDevice::new(1_000_000, 40_000, 0, 0, 1, [1_000.0; ACTUATORS], [7; 16], 1).unwrap());
+        assert!(d.configure_heaters(&heater_parameters()));
+        let mut begin = begin_for([7; 16]);
+        begin.channel_count = 3; begin.channel_kind[0] = 2; begin.channel_kind[1] = 2; begin.channel_kind[2] = 2;
+        for (i, name) in [b"heater.hotend.target".as_slice(), b"fan.part".as_slice(), b"heater.bed.target".as_slice()].iter().enumerate() {
+            begin.channel_id[i * 48..i * 48 + name.len()].copy_from_slice(name);
+        }
+        if keep_targets { begin.channel_stop_policy[0] = 1; begin.channel_stop_policy[2] = 1; }
+        begin.link_loss_timeout_ns = 1_000_000_000_000;
+        if ack_to(&mut d, &begin).0.status != 1 { return None; }
+        let duration_ticks = seconds * 1_000_000;
+        let queue = QueueBegin6 { queue_revision: 1, replace_after_ticks: 0,
+            expected_position: [0.0; 64], expected_velocity: [0.0; 64], actuator_count: 1 };
+        let mut q = [0; QueueBegin6::SIZE]; queue.encode(&mut q).unwrap();
+        assert!(send::<QueueBegin6>(&mut d, 5, &q));
+        let header = Segment6Header { queue_revision: 1, plan_id: 1, t0_ticks: 0,
+            duration_ticks, degree: 0, actuator_count: 1, ends_at_rest: 1, purpose: 0 };
+        let row = Segment6Coefficients { actuator: 0, c0: 0.0, c1: 0.0, c2: 0.0, c3: 0.0, c4: 0.0, c5: 0.0 };
+        let mut segment = vec![0; Segment6Header::SIZE + Segment6Coefficients::SIZE];
+        header.encode(&mut segment[..Segment6Header::SIZE]).unwrap();
+        row.encode(&mut segment[Segment6Header::SIZE..]).unwrap();
+        assert!(send::<Segment6Header>(&mut d, 6, &segment));
+        for (channel, analog) in [(0, 210.0), (2, 60.0), (1, fan)] {
+            let event = Event6 { queue_revision: 1, plan_id: 1, path_ticks: 0, channel, kind: 2, hold_policy: 1,
+                digital: 0, analog, argument: 0.0, command: [0; 48] };
+            let mut body = [0; Event6::SIZE]; event.encode(&mut body).unwrap();
+            assert!(send::<Event6>(&mut d, 16, &body));
+        }
+        let mut body = [0; Commit6::SIZE];
+        Commit6 { through_ticks: duration_ticks }.encode(&mut body).unwrap();
+        assert!(send::<Commit6>(&mut d, 7, &body));
+        Some(d)
+    }
+
+    #[test]
+    fn heaters_need_their_target_channels_to_keep_their_value_through_a_stop() {
+        assert!(heating_device(false, 0.0, 10).is_none(), "a target that is dropped by a pause cools the hotend");
+        assert!(heating_device(true, 0.0, 10).is_some());
+    }
+
+    #[test]
+    fn the_device_heats_both_blocks_to_target_and_publishes_them_in_sensor_frames() {
+        let mut d = heating_device(true, 0.0, 200).unwrap();
+        let (mut hotend_at, mut bed_at) = (None, None);
+        let mut frames = 0;
+        for second in 1..=150u64 {
+            assert!(d.advance(second * 1_000_000_000));
+            let hotend = d.heater_values(0).unwrap(); let bed = d.heater_values(1).unwrap();
+            if hotend_at.is_none() && hotend[3] == 1.0 { hotend_at = Some(second); }
+            if bed_at.is_none() && bed[3] == 1.0 { bed_at = Some(second); }
+            while let Some(frame) = d.take_frame() {
+                let (kind, body) = decode_frame6(&frame).unwrap();
+                if kind == 17 {
+                    let header = Sensor6Header::decode(&body[..Sensor6Header::SIZE]).unwrap();
+                    assert!(header.slot < 2 && header.value_count == 5 && header.sequence > 0);
+                    frames += 1;
+                }
+            }
+        }
+        eprintln!("device: hotend at 210 C after {hotend_at:?} s, bed at 60 C after {bed_at:?} s");
+        let (hotend_at, bed_at) = (hotend_at.unwrap(), bed_at.unwrap());
+        assert!((55..=90).contains(&hotend_at) && (60..=120).contains(&bed_at));
+        assert!(frames > 300);
+        let hotend = d.heater_values(0).unwrap();
+        assert!((hotend[0] - 210.0).abs() < 2.0 && hotend[1] == 210.0 && hotend[4] == 0.0);
+        assert_eq!(d.core.as_ref().unwrap().stop_reason(), None);
+    }
+
+    #[test]
+    fn a_stop_keeps_the_temperature_and_an_emergency_stop_lets_it_go() {
+        for (kind, kept) in [(11u8, true), (12, false)] {
+            let mut d = heating_device(true, 0.0, 200).unwrap();
+            assert!(d.advance(100_000_000_000));
+            assert!(send::<SessionBegin6>(&mut d, kind, &[]));
+            assert!(d.advance(101_000_000_000));
+            assert_eq!(d.board.analog(0) == Some(210.0), kept, "stop {kind}");
+            assert_eq!(d.heater_values(0).unwrap()[1] == 210.0, kept);
+            assert!(d.advance(130_000_000_000));
+            let hotend = d.heater_values(0).unwrap();
+            if kept { assert!(hotend[0] > 205.0, "{hotend:?}"); } else { assert_eq!(hotend[2], 0.0); assert!(hotend[0] < 205.0); }
+        }
+    }
+
+    #[test]
+    fn a_heater_fault_stops_the_device_and_switches_every_target_off() {
+        let mut d = heating_device(true, 0.0, 200).unwrap();
+        assert!(d.advance(70_000_000_000));
+        assert!(d.set_heater_input(heaters::input::COUNT * 0 + heaters::input::SENSOR_OPEN, 1.0));
+        assert!(d.advance(70_200_000_000));
+        assert_eq!(d.heater_values(0).unwrap()[4], robotkit_device_protocol::heater::fault::SENSOR_OPEN as f32);
+        assert_eq!(d.core.as_ref().unwrap().stop_reason(), Some(StopReason::ProcessFault));
+        assert_eq!(d.board.analog(0), Some(0.0)); assert_eq!(d.board.analog(2), Some(0.0));
+        assert_eq!(d.heater_values(0).unwrap()[2], 0.0);
+        // The bed, with no fault of its own, was told to cool.
+        assert!(d.advance(71_000_000_000));
+        assert_eq!(d.heater_values(1).unwrap()[2], 0.0);
+    }
+
+    #[test]
+    fn a_dead_element_is_found_by_the_watchdog_on_the_device() {
+        let mut d = heating_device(true, 0.0, 200).unwrap();
+        assert!(d.set_heater_input(heaters::input::ELEMENT, 0.0));
+        assert!(d.advance(30_000_000_000));
+        assert_eq!(d.heater_values(0).unwrap()[4], robotkit_device_protocol::heater::fault::NOT_HEATING as f32);
+        assert_eq!(d.core.as_ref().unwrap().stop_reason(), Some(StopReason::ProcessFault));
+    }
 }

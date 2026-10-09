@@ -9,3 +9,8 @@ Run `cargo test --manifest-path robotkit/device_protocol/Cargo.toml --features s
 and `robotkit/device_protocol/tools/check-mcu-build.sh`. The latter compiles
 the core and the Nucleo minimal-profile stub for `thumbv7em-none-eabihf`.
 The desktop virtual device and PTY binaries are in `robotkit/device_virtual`.
+
+The heater controller (`boards/heater.rs`) is part of the core: a PWM duty out and a thermistor ADC in
+with PID, a runaway watchdog and a latched fault. The virtual device (`device_virtual/src/heaters.rs`) runs it
+against a thermal plant; the Nucleo image type-checks it against a gate and ADC pins
+(`boards/nucleo-g474re/src/heater_profile.rs`, placeholder pins).

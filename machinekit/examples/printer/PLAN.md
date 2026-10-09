@@ -758,6 +758,46 @@ Done. What was built and decided:
   - runaway on a disconnected heater, a fallen-off thermistor and a fan blast;
   - the cold-extrusion static check and device fault.
 
+Done. What was built and decided:
+- **Controller** (`robotkit/device_protocol/boards/heater.rs`, `no_std`, shared by the board and the virtual device):
+  a PWM duty out and a thermistor ADC in (Beta model: 100k NTC 3950 under a 4.7k pull-up on 3.3 V, so the
+  controller reads 0.1 degree per LSB of a 12-bit ADC at 210 C); PID with derivative on the filtered measurement
+  (2 s), integral held outside a 10 C range and anti-windup; and a watchdog that latches a fault and switches the
+  output off until a session resets it: sensor open or short (within 1 % of a rail), over-temperature, not heating
+  (a window without a 2 C gain while heating up; 20 s for the hotend, 120 s for the bed), left the band (below the
+  target by more than the hysteresis for a window after reaching it), cold extrusion (the extruder actuator steps
+  forward below the material's minimum), and a command or configuration that is not a number. The same module
+  type-checks on the Nucleo target (`heater_profile.rs`, placeholder pins; `check-mcu-build.sh` passes).
+- **Virtual device** (`robotkit/device_virtual/src/heaters.rs`): peripheral profile 2 runs the controller against a
+  lumped plant `C dT/dt = P duty - (h + h_fan fan)(T - T_amb)` with a 12-bit ADC; one or two heaters, each with a
+  sensor slot (a `tool_heater` frame of five values: temperature, target, duty, at target, fault), a target channel,
+  an optional fan channel and an optional extruder actuator. A fault stops the robot (`ProcessFault`) and takes every
+  target channel to its safe value. The session is refused unless every target channel is analog, safe at zero and
+  keeps its value through a commanded stop (a pause does not cool the hotend; a fault or an emergency stop does).
+  An experiment reaches the plant through `rkd_virtual_set_peripheral_input`: element connected, thermistor on its
+  block, a draught (W/K), wire open, wire shorted. The peripheral parameter list grew from 16 to 64 doubles
+  (`robotkit_simkit.h`, the HXI regenerated). No RKD6 wire revision: the target is an analog channel event and the
+  report a `SENSOR6` slot.
+- **Host.** `robotkit.tool.HeaterSensor` (the frame and its fault messages), `HeaterChannels` (target and fan
+  declarations: zero when safe, kept through a commanded stop), the `tool_heater` external sensor kind (the runtime
+  validates its frames), and `robotkit.runtime.VirtualHeaters` (configures the device from `HeaterSetup`s, publishes
+  its reports to the sensors, reaches the plant). The `Heat(wait)` barrier and the print-side channels
+  (`MachiningRun.continuationFrom` and `safeShutdown` counterparts) are lowered in AM8 with the printer binding;
+  `heater.<name>.at_temperature` is the frame's fourth value. The static cold-extrusion check is
+  `PrinterOps.coldExtrusion(ops, minimum)`: filament pushed or a bead laid before a waited `Heat` of the hotend to
+  the minimum (and after one that turns it down) is a finding with its source.
+- **Numbers** (assumed plants: hotend 10 J/K, 40 W, 0.06 W/K, +0.05 W/K with the part fan; bed 500 J/K, 250 W,
+  0.7 W/K; room 22 C), through the whole stack (Haxe test over the virtual device): the hotend is at 210 C
+  (within 3 C) after 65.1 s with a peak of 210.8 C; the bed is at 60 C after 84.2 s. Holding 210 C the block
+  stays within 210.01 to 210.72 C (quantized ADC), and with the part fan at full duty within 208.2 to 210.0 C.
+  The unquantized controller alone (`device_protocol` tests): hotend 63.9 s, bed 77.2 s, ripple under 0.1 C.
+- **Tests.** `device_protocol/tests/heater.rs` (7: thermistor round trip, heat-up and hold of a hotend and a bed,
+  every fault turns the output off and stays until reset, leaving the band, cold extrusion, bad commands),
+  `device_virtual` (10 new: plant times, ripple, dead element, fallen thermistor, draught, open and short wire, cold
+  extrusion, parameter lists, session channel rules, both blocks on the device with sensor frames, pause versus
+  emergency stop, fault stops the robot and clears every target), `HeaterDeviceTests` (RobotKit world 5439 -> 5469
+  assertions), `PrinterOpCoverage.coldExtrusion` (ToolpathKit 141 -> 149).
+
 **AM8. Extruder joint and the first simulated print (AM-D3).**
 - Lowering: printer binding (axes plus extruder joint, filament diameter, maximum flow, pressure
   advance K and smoothing).
@@ -849,7 +889,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM4 | done | see the commit below |
 | AM5 | done: gate passed | see the commit below |
 | AM6 | done | see the commit below |
-| AM7 | planned | |
+| AM7 | done | see the commit below |
 | AM8 | planned | |
 | AM9 | planned | |
 | AM10 | planned | |

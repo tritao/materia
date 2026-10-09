@@ -558,7 +558,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
 	}
-	struct rk_simulation_robot_desc @layout(3881472, 8) {
+	struct rk_simulation_robot_desc @layout(3881856, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		flags: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -653,36 +653,36 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		virtual_peripheral_kind: u32 @offset(3799248);
 		virtual_peripheral_parameter_count: u32 @offset(3799252);
 		virtual_external_sensor_mask: u32 @offset(3799256);
-		virtual_peripheral_parameters: array<f64, 16> @offset(3799264);
+		virtual_peripheral_parameters: array<f64, 64> @offset(3799264);
 		/**
 		 * Optional physical virtual-device switch wiring and step thresholds.
 		 */
-		virtual_device_input_count: u32 @offset(3799392);
-		virtual_device_input_actuator: array<u8, 64> @offset(3799396);
-		virtual_device_input_active_high: array<u8, 64> @offset(3799460);
-		virtual_device_input_active_above: array<u8, 64> @offset(3799524);
-		virtual_device_input_threshold_steps: array<i64, 64> @offset(3799592);
-		virtual_device_input_switch_ids: array<u8, 4096> @offset(3800104);
+		virtual_device_input_count: u32 @offset(3799776);
+		virtual_device_input_actuator: array<u8, 64> @offset(3799780);
+		virtual_device_input_active_high: array<u8, 64> @offset(3799844);
+		virtual_device_input_active_above: array<u8, 64> @offset(3799908);
+		virtual_device_input_threshold_steps: array<i64, 64> @offset(3799976);
+		virtual_device_input_switch_ids: array<u8, 4096> @offset(3800488);
 		/**
 		 * Optional original shaft feedback mappings; count zero keeps legacy mappings.
 		 */
-		virtual_device_feedback_count: u32 @offset(3804200);
-		virtual_device_feedback_joint: array<u8, 64> @offset(3804204);
-		virtual_device_feedback_ratio: array<f64, 64> @offset(3804272);
-		virtual_device_feedback_offset: array<f64, 64> @offset(3804784);
-		brake_count: u32 @offset(3805296);
-		brakes: array<rk_simulation_brake, 512> @offset(3805304);
+		virtual_device_feedback_count: u32 @offset(3804584);
+		virtual_device_feedback_joint: array<u8, 64> @offset(3804588);
+		virtual_device_feedback_ratio: array<f64, 64> @offset(3804656);
+		virtual_device_feedback_offset: array<f64, 64> @offset(3805168);
+		brake_count: u32 @offset(3805680);
+		brakes: array<rk_simulation_brake, 512> @offset(3805688);
 		/**
 		 * Appended tail: link index pairs that never collide, used with RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES.
 		 */
-		link_exclude_count: u32 @offset(3821688);
-		link_excludes: array<u32, 8192> @offset(3821692);
+		link_exclude_count: u32 @offset(3822072);
+		link_excludes: array<u32, 8192> @offset(3822076);
 		/**
 		 * General tool shapes, in flange coordinates; supersedes convex-only pieces.
 		 */
-		tool_shape_count: u32 @offset(3854460);
-		tool_shapes: array<rk_simulation_link_shape, 16> @offset(3854464);
-		tool_shape_gap: array<f64, 16> @offset(3881344);
+		tool_shape_count: u32 @offset(3854844);
+		tool_shapes: array<rk_simulation_link_shape, 16> @offset(3854848);
+		tool_shape_gap: array<f64, 16> @offset(3881728);
 	}
 	/**
 	 * World-frame twist of one body: metres per second and radians per second.

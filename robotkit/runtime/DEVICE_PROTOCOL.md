@@ -39,7 +39,11 @@ device acquisition ticks, a nonzero sequence, the compiled sensor slot (0–7), 
 value count (1–360). Exactly that many `Sensor6Value` records follow; each is a
 finite `f32`. The host assigns semantic IDs to these deployment slots. A welding
 slot carries the six values specified by ProcessKit's `WeldContract`; the device
-transport does not interpret welding units or fault codes. Sequence zero means
+transport does not interpret welding units or fault codes. A heater slot carries five
+values (`robotkit.tool.HeaterSensor`): temperature in degrees Celsius, the target the board holds,
+duty, at target, and a fault code; the host sets a target on the heater's analog channel and the
+board's controller (`device_protocol/boards/heater.rs`: PID, a runaway watchdog, a safe state) does
+the rest, so a host that stalls does not leave a heater on. No wire revision is needed. Sequence zero means
 absent in host snapshots, and duplicate or older samples must not replace newer
 ones. Revision 12 is rejected rather than migrated. The current schema lock and
 shared Rust/C++ frame vectors were regenerated for revision 13.

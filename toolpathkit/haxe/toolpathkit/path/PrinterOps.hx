@@ -53,4 +53,29 @@ class PrinterOps {
       case _:
     }
   }
+
+  /**
+    Where a program lays a bead or pushes filament before `heater` has been waited up to `minimumCelsius`, the
+    material's minimum extrusion temperature: a `Heat` that waits for at least that, with no later `Heat` below it,
+    is what makes extruding safe. The device faults a cold extrusion too; this finds it before the print starts.
+    Each finding is the source of the offending operation and says what it did.
+  **/
+  public static function coldExtrusion(ops:Array<ToolpathOp>, minimumCelsius:Float, ?heater:String = "hotend"):Array<{provenance:Provenance, message:String}> {
+    var findings:Array<{provenance:Provenance, message:String}> = [];
+    var hot = false, depositing = false;
+    for (op in ops) switch op {
+      case Heat(name, celsius, wait, _) if (name == heater):
+        // Waiting for the minimum makes it hot; turning it down (or only asking, without waiting) does not keep it so.
+        if (celsius < minimumCelsius) hot = false;
+        else if (wait) hot = true;
+      case Deposit(_, _, _, _): depositing = true;
+      case DepositOff(_): depositing = false;
+      case FilamentMove(length, _, span) if (length > 0.0 && !hot):
+        findings.push({provenance: span, message: 'filament is pushed before $heater has been waited up to ${minimumCelsius} C'});
+      case Move(Cut, _, _, _, span) if (depositing && !hot):
+        findings.push({provenance: span, message: 'a bead is laid before $heater has been waited up to ${minimumCelsius} C'});
+      case _:
+    }
+    return findings;
+  }
 }

@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+mod heater_profile;
 mod welder_profile;
 
 use cortex_m::peripheral::DWT;

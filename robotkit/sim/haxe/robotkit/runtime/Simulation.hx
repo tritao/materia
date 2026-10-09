@@ -146,7 +146,7 @@ class Simulation {
             (virtualDevice.stepsPerUnit.length != 0 &&
              virtualDevice.stepsPerUnit.length != blueprint.jointCount))
           throw "Simulation virtual device configuration is invalid";
-        if (virtualDevice.peripheralParameters.length > 16) throw "Too many virtual peripheral parameters";
+        if (virtualDevice.peripheralParameters.length > 64) throw "Too many virtual peripheral parameters";
         var externalMask = 0;
         for (slot in virtualDevice.externalSensorSlots) {
           if (slot < 0 || slot >= 8) throw "Virtual external sensor slot is out of range";

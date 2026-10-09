@@ -408,7 +408,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         config.clock_bound_ns = robot_desc->virtual_device_clock_bound_ns;
         config.link_loss_timeout_ns = robot_desc->virtual_device_link_loss_timeout_ns;
         {
-            if (robot_desc->virtual_peripheral_parameter_count > 16) return RK_ERROR_INVALID_ARGUMENT;
+            if (robot_desc->virtual_peripheral_parameter_count > 64) return RK_ERROR_INVALID_ARGUMENT;
             config.peripheral_kind = robot_desc->virtual_peripheral_kind;
             config.external_sensor_mask = robot_desc->virtual_external_sensor_mask;
             config.peripheral_parameters.assign(robot_desc->virtual_peripheral_parameters,
