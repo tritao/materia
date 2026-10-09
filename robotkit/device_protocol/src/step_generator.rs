@@ -31,6 +31,9 @@ pub struct StepGenerator<const A: usize> {
     squaring_bound: [Option<f64>; A],
 }
 
+/// Relative error of a rate times steps per unit carried as two f32 values (24-bit mantissas), with margin.
+pub const RATE_ROUNDING: f64 = 1e-6;
+
 impl<const A: usize> StepGenerator<A> {
     pub fn new(steps_per_unit: [f64; A], setup_ticks: [u64; A],
         max_rate: [f64; A], tick_hz: u64) -> Option<Self> {
@@ -42,8 +45,10 @@ impl<const A: usize> StepGenerator<A> {
             if max_rate[a] > 0.0 {
                 let interval = tick_hz as f64 / (max_rate[a] * steps_per_unit[a]);
                 if !interval.is_finite() || interval > u64::MAX as f64 { return None; }
-                min_interval_ticks[a] = (interval as u64) +
-                    u64::from(interval > interval as u64 as f64);
+                // Round up to whole ticks, except for a remainder within the f32 wire values'
+                // rounding: a rate set at the tick ceiling must not lose half its speed to it.
+                let whole = interval as u64;
+                min_interval_ticks[a] = whole + u64::from(interval - whole as f64 > interval * RATE_ROUNDING || whole == 0);
             }
         }
         Some(Self { inputs: InputCapture::new(), homing_pair: None, held: [None; A],

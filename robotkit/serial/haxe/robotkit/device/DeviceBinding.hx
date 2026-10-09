@@ -59,6 +59,9 @@ class BoundInput {
  * is an error.
  */
 class DeviceBinding {
+  /** Relative error of a rate times steps per unit carried as two f32 values, with margin; the device step generator uses the same. */
+  static inline var RATE_ROUNDING:Float = 1e-6;
+
   public final channels:Array<BoundChannel>;
   public final inputs:Array<BoundInput>;
   /**
@@ -145,7 +148,9 @@ class DeviceBinding {
         var wire = haxe.io.Bytes.alloc(8);
         wire.setFloat(0, rate); wire.setFloat(4, stepsPerUnit);
         var wireRate = wire.getFloat(0), wireSteps = wire.getFloat(4);
-        var interval = Math.max(1, Math.ceil(stepTickHz / (wireRate * wireSteps)));
+        var ticks = stepTickHz / (wireRate * wireSteps), whole = Math.floor(ticks);
+        // As the device rounds: a remainder within the f32 values' rounding adds no tick (RATE_ROUNDING).
+        var interval = Math.max(1, ticks - whole > ticks * RATE_ROUNDING ? whole + 1 : whole);
         capped.maxRate = Math.min(rate, stepTickHz / (interval * wireSteps));
       }
     }

@@ -40,6 +40,22 @@ fn crossing_setup_and_rate_limit() {
 }
 
 #[test]
+fn rate_at_the_tick_ceiling_steps_every_tick() {
+    // 16 microsteps of a 1.8° motor at 40 kHz: the ceiling is 78.54 rad/s. As f32 wire values the
+    // rate times steps per unit lands just under 40 kHz, which must not round up to two ticks a step.
+    let steps = (200.0 * 16.0 / (2.0 * core::f64::consts::PI)) as f32 as f64;
+    let rate = (40_000.0 / (200.0 * 16.0 / (2.0 * core::f64::consts::PI))) as f32 as f64;
+    assert!(rate * steps < 40_000.0);
+    let mut board = VirtualBoard::<1, 1>::new(40_000, 0, 0, [steps]);
+    let mut generator = StepGenerator::new([steps], [0], [rate], 40_000).unwrap();
+    for tick in 1..=10u64 {
+        board.advance_host_ns(tick * 25_000);
+        generator.tick(&mut board, [1.0]).unwrap();
+    }
+    assert_eq!(board.step_count(0), 10);
+}
+
+#[test]
 fn feedback_skew_latches_fault() {
     let mut board = VirtualBoard::<2, 1>::new(1_000_000, 0, 0, [400.0, 400.0]);
     let mut generator = StepGenerator::new([400.0; 2], [0; 2], [0.0; 2], 1_000_000).unwrap();
