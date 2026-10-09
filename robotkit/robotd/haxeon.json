@@ -22,6 +22,7 @@
     "cmake": {
       "source": "native",
       "target": "robotd_native",
+      "libraries": ["nativekit", "nativekit_scene", "nativekit_sim_core", "trajectory_core", "robotkit_runtime", "robotkit_inference"],
       "inputs": [
         "native/CMakeLists.txt",
         "../CMakeLists.txt",

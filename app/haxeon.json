@@ -87,6 +87,7 @@
     "cmake": {
       "source": "native",
       "target": "haxeon_app_native",
+      "libraries": ["nativekit", "nativekit_gpu", "nativekit_ui", "nativekit_scene", "nativekit_scene_render", "nativekit_sim_core", "trajectory_core", "motionkit_core", "robotkit_runtime", "animkit_core"],
       "inputs": [
         "native/CMakeLists.txt",
         "../haxeon/vendor/nativekit/CMakeLists.txt",

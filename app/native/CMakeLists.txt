@@ -85,10 +85,7 @@ foreach(target_name IN LISTS MATERIA_RUNTIME_TARGETS)
         ARCHIVE_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}")
 endforeach()
 
-# Haxeon's coarse CMake artifact is a build stamp.  The runtime libraries
-# loaded by the generated FFI calls are the libnativekit*.so files above.
+# Haxeon tracks the runtime libraries declared in app/haxeon.json.
 add_custom_target(haxeon_app_native
     DEPENDS ${MATERIA_RUNTIME_TARGETS}
-    COMMAND "${CMAKE_COMMAND}" -E touch "${HAXEON_NATIVE_OUTPUT_DIR}/app.hdll"
-    BYPRODUCTS "${HAXEON_NATIVE_OUTPUT_DIR}/app.hdll"
     COMMENT "Building NativeKit, GPU, and UIKit native dependencies")

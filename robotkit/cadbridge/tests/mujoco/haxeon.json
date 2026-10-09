@@ -14,6 +14,7 @@
     "cmake": {
       "source": "../../../robotd/native-mujoco",
       "target": "robotd_native",
+      "libraries": ["nativekit", "nativekit_scene", "nativekit_sim_core", "trajectory_core", "robotkit_runtime", "robotkit_inference", "nativekit_sim_mujoco", "robotkit_policy"],
       "inputs": [
         "../../../runtime/include/robotkit_runtime.h",
         "../../../runtime/include/robotkit_simkit.h",

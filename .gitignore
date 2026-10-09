@@ -40,3 +40,7 @@
 /robotkit/core/tests/build/
 
 /processkit/tests/modbus/build/
+/app/tests/*/build/
+/app/web/examples/build/
+/projectkit/tests/*/build/
+__pycache__/
