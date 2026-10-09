@@ -199,6 +199,7 @@ class MotionKitBootstrapTests {
       {name: "plannerTests.testSimplePathTimingContract", run: () -> plannerTests.testSimplePathTimingContract(), weight: 0.05},
       {name: "plannerTests.testNativePathLowering", run: () -> plannerTests.testNativePathLowering(), weight: 0.05},
       {name: "plannerTests.testToppraPathTiming", run: () -> plannerTests.testToppraPathTiming(), weight: 0.05},
+      {name: "plannerTests.testLongPathQueries", run: () -> plannerTests.testLongPathQueries(), weight: 0.2},
       {name: "plannerTests.testGeometricPathPrimitives", run: () -> plannerTests.testGeometricPathPrimitives(), weight: 0.05},
       {name: "plannerTests.testNativeTrajectoryRoundTrip", run: () -> plannerTests.testNativeTrajectoryRoundTrip(), weight: 0.05},
       {name: "plannerTests.testNativeValidationAndPlan", run: () -> plannerTests.testNativeValidationAndPlan(), weight: 0.05},

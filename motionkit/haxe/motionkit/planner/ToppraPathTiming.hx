@@ -23,10 +23,10 @@ class ToppraPathTiming implements PathTimingBackend {
       var timed = nativePath.time(limits, loweringTolerance);
       var law = timed.law;
       try {
-        var bindings = law.bindingConstraints();
         var result = new TimedPath(timed.trajectory, function(distance:Float):Float
-          return law.distanceToTime(distance), bindings, function():Void law.dispose(),
-          function(seconds:Array<Float>):Array<Float> return law.timesToDistances(seconds));
+          return law.distanceToTime(distance), [], function():Void law.dispose(),
+          function(seconds:Array<Float>):Array<Float> return law.timesToDistances(seconds),
+          function():Array<motionkit.planner.BindingConstraint> return law.bindingConstraints());
         nativePath.dispose();
         return result;
       } catch (error:Dynamic) {

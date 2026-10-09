@@ -9,6 +9,15 @@ class CornerBlender {
   **/
   public static inline final GEOMETRY_SHARE = 0.8;
 
+  /**
+    The tightest arc a corner may be rounded to, metres, unless its tolerance asks for tighter. A corner between
+    very short moves can only be rounded within its tolerance by an arc of a few micrometres, which no machine
+    follows and which the timing cannot resolve (accelerations along it exceed the limits by half again); such a
+    corner is stopped at instead, as its speed would be next to nothing either way. A corner whose own tolerance
+    needs a tighter arc (a few micrometres of tolerance round a right angle at about twice that radius) keeps it.
+  **/
+  public static inline final MIN_RADIUS = 5e-5;
+
   public static function blend(path:GeometricPath, tolerance:Float,
       maxTurnAngleRadians:Float):BlendedGeometry {
     if (path == null || !Math.isFinite(tolerance) || tolerance < 0.0)
@@ -85,6 +94,11 @@ class CornerBlender {
             // Distance to a set is 1-Lipschitz. This half-sample travel
             // allowance bounds deviation between the checked points.
             if (worst + candidate.length() / 512.0 <= tolerance) {
+              // Cutting less only tightens the blend, so a blend too tight to follow ends the search.
+              var tightest = 0.0;
+              for (sample in 0...65)
+                tightest = Math.max(tightest, Math.abs(candidate.curvatureAt(candidate.length() * sample / 64.0)));
+              if (tightest > 1.0 / Math.min(MIN_RADIUS, 1.2 * tolerance)) break;
               accepted = candidate;
               break;
             }
@@ -143,7 +157,13 @@ class CornerBlender {
         diagnosticCorners.push(i + 1);
         continue;
       }
+      var wanted = radius;
       radius = cut / halfTangent;
+      if (radius < Math.min(MIN_RADIUS, 0.5 * wanted)) {
+        diagnostics.push('corner ${i + 1}: exact stop (blend radius below the minimum)');
+        diagnosticCorners.push(i + 1);
+        continue;
+      }
       endCuts[i] = cut;
       startCuts[i + 1] = cut;
       var start = new PathPoint(first.end.x - incoming[0] * cut,

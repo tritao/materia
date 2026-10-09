@@ -81,29 +81,41 @@ class PrinterAxes {
   }
 }
 
-/** Delivers plans to a `ProgramBlocks`, noting when each arrived. */
+typedef BenchmarkResult = {
+  var failure:Null<String>;
+  var planned:Float;
+  var reference:Float;
+  var wall:Float;
+  /** Seconds of motion planned per second of planning, over the whole print and over its worst 10 s. */
+  var overall:Float;
+  var worstWindow:Float;
+  var sections:Int;
+}
+
+/** Notes when each plan arrived and how long it runs, then releases it; barriers and notes go to a `ProgramBlocks`. */
 class TimedSink implements ProgramSink {
   public final blocks:ProgramBlocks = new ProgramBlocks();
-  /** Seconds of planning spent on each plan, and the seconds that plan takes to run. */
+  /** Seconds of processor time (not wall time: other work on the machine does not count) planning spent on each plan, and the seconds that plan takes to run. */
   public final wall:Array<Float> = [];
   public final run:Array<Float> = [];
-  var last:Float = Sys.time();
+  var last:Float = Sys.cpuTime();
   final trace:Bool = Sys.getEnv("PRINTING_BENCHMARK_TRACE") != null;
   /** The largest garbage-collected heap seen as plans arrived, bytes. */
   public var peakHeap:Float = 0.0;
 
   public function new() {}
 
-  public function reset():Void last = Sys.time();
+  public function reset():Void last = Sys.cpuTime();
 
   public function plan(plan:ExecutionPlan, opIndex:Int, length:Float, distances:Array<Float>, times:Array<Float>):Void {
-    var now = Sys.time();
+    var now = Sys.cpuTime();
     wall.push(now - last);
     if (trace) Sys.println('TRACE plan ${run.length} op $opIndex: ${Math.round(plan.durationSeconds * 1000)} ms of motion, path ${Math.round(length * 1e5) / 100} mm, planned in ${Math.round((now - last) * 1000)} ms');
     last = now;
     run.push(plan.durationSeconds);
     peakHeap = Math.max(peakHeap, hl.Gc.heapBytes());
-    blocks.plan(plan, opIndex, length, distances, times);
+    // A plan is measured and let go, as an executor does once it has run it: a long print's plans do not fit in memory together.
+    plan.dispose();
   }
 
   public function barrier(barrier:ProgramBarrier):Void blocks.barrier(barrier);
@@ -117,7 +129,8 @@ class TimedSink implements ProgramSink {
  * the worst 10 s of print time), peak memory, exact stops by reason and timing sections, next to the lower bound of a
  * look-ahead planner with Marlin's junction deviation at the same accelerations.
  *
- * `PRINTING_BENCHMARK_ONLY` names one load: `gear`, `cube` or `gcode` (a tower through G-code and back).
+ * Run with no arguments it is the gate. `PRINTING_BENCHMARK_ONLY` names a load instead: `gear`, `cube`, `gcode` (a tower
+ * through G-code and back) or `all`.
  */
 class PrintingBenchmark {
   /** The process's peak resident memory in megabytes (the kernel's high-water mark), or -1. */
@@ -138,7 +151,8 @@ class PrintingBenchmark {
       new toolpathkit.path.Point3(PrinterAxes.ORIGIN_X, PrinterAxes.ORIGIN_Y, PrinterAxes.ORIGIN_Z))]);
   }
 
-  static function report(name:String, machine:PrinterAxes, program:ToolpathProgram, sliceSeconds:Float):Void {
+  /** What a load came to: the numbers `report` prints. */
+  static function report(name:String, machine:PrinterAxes, program:ToolpathProgram, sliceSeconds:Float):BenchmarkResult {
     var moves = motionOnly(program);
     var moveCount = moves.ops.length;
     var estimate = PrintTimeEstimate.estimate(moves, machine.speed, machine.acceleration);
@@ -150,14 +164,14 @@ class PrintingBenchmark {
     if (motion == null) throw '$name has no motion';
     var sink = new TimedSink();
     var heapBefore = hl.Gc.heapBytes(), allocatedBefore = hl.Gc.totalAllocated();
-    var compileBegan = Sys.time();
+    var compileBegan = Sys.cpuTime();
     sink.reset();
     var failure:Null<String> = null;
     var compilation = machine.binding.compiler.begin(motion, machine.start, Int64.ofInt(1), 0, 1.0, sink);
     try {
       while (compilation.step()) {}
     } catch (error:Dynamic) { failure = Std.string(error); compilation.dispose(); }
-    var compileSeconds = Sys.time() - compileBegan;
+    var compileSeconds = Sys.cpuTime() - compileBegan;
     var planned = 0.0;
     for (seconds in sink.run) planned += seconds;
     // The worst stretch of 10 s of print time: the plans in it, and what they cost to plan.
@@ -185,15 +199,50 @@ class PrintingBenchmark {
     if (failure != null) Sys.println('  PLANNING FAILED after ${sink.run.length} plans (${Math.round(planned * 10) / 10} s planned): $failure');
     Sys.println('  planned: ${Math.round(planned * 10) / 10} s in ${sink.run.length} timing sections (plans); estimate lower bound ${Math.round(estimate.seconds * 10) / 10} s, ' +
       'planned is ${Math.round((planned / estimate.seconds - 1.0) * 1000) / 10} % above it');
-    Sys.println('  planning: ${Math.round(compileSeconds * 100) / 100} s wall, ${Math.round(planned / compileSeconds * 100) / 100}x real time overall' +
+    Sys.println('  planning: ${Math.round(compileSeconds * 100) / 100} s of processor time, ${Math.round(planned / compileSeconds * 100) / 100}x real time overall' +
       (worstRatio < Math.POSITIVE_INFINITY ? ', worst 10 s window ${Math.round(worstRatio * 100) / 100}x (from print time ${Math.round(worstAt * 10) / 10} s)' : ', print shorter than 10 s'));
     Sys.println('  exact stops by reason: ${stops.length == 0 ? "none" : stops.join(", ")}; $notes planner notes');
     Sys.println('  memory: managed heap peak ${Math.round(sink.peakHeap / 1048576)} MB (${Math.round(heapBefore / 1048576)} MB before planning), ' +
       '${Math.round((hl.Gc.totalAllocated() - allocatedBefore) / 1048576)} MB allocated while planning');
     sink.blocks.dispose();
+    return {failure: failure, planned: planned, reference: estimate.seconds, wall: compileSeconds,
+      overall: planned / Math.max(compileSeconds, 1e-9), worstWindow: worstRatio, sections: sink.run.length};
+  }
+
+  /**
+   * AM5's gate on a thin gear (module 1.5, 40 teeth, 1.2 mm: six layers, 61 mm across, involute teeth that slice to
+   * short segments): planning at least twice as fast as the print over the whole job and over its worst 10 s, a planned
+   * time no more than 15 % above the look-ahead reference, and no planning failure (the compiler rejects any plan that
+   * breaks a limit or strays from the path's tolerance).
+   */
+  static function gate(machine:PrinterAxes, settings:SlicerSettings, profile:PrinterProfile):Void {
+    var part = new SpurGear(1.5, 40, 1.2).geometry();
+    var sliced = Slicer.slice(part, settings, profile, "gear");
+    part.close();
+    var result = report("gate gear (module 1.5, 40 teeth, 1.2 mm)", machine, sliced.program, sliced.report.seconds);
+    var failures:Array<String> = [];
+    if (result.failure != null) failures.push("planning failed: " + result.failure);
+    if (result.overall < 2.0) failures.push('planning is ${result.overall}x real time overall, below 2x');
+    if (result.worstWindow < 2.0) failures.push('planning is ${result.worstWindow}x real time over its worst 10 s, below 2x');
+    if (result.planned > 1.15 * result.reference) failures.push('planned ${result.planned} s is more than 15 % above the reference ${result.reference} s');
+    Sys.println(failures.length == 0 ? "PRINTING GATE PASSED" : "PRINTING GATE FAILED: " + failures.join("; "));
+    if (failures.length > 0) Sys.exit(1);
   }
 
   public static function main():Void {
+    // `PRINTING_BENCHMARK_GC=f` sets the fraction of the heap that may be allocated between collections.
+    var threshold = Sys.getEnv("PRINTING_BENCHMARK_GC");
+    if (threshold != null) hl.Gc.setMarkThreshold(Std.parseFloat(threshold));
+    var census = Sys.getEnv("PRINTING_BENCHMARK_CENSUS");
+    if (census != null) hl.Gc.censusStart(4096);
+    mainLoads();
+    if (census != null) {
+      hl.Gc.censusStop();
+      hl.Gc.censusDump(cast haxe.io.Bytes.ofString(census + "/census.json").getData());
+    }
+  }
+
+  static function mainLoads():Void {
     var only = Sys.getEnv("PRINTING_BENCHMARK_ONLY");
     var machine = new PrinterAxes();
     for (axis in machine.blueprint.axes) Sys.println('  axis ${axis.id}: ${axis.lowerLimit} .. ${axis.upperLimit}');
@@ -202,6 +251,11 @@ class PrintingBenchmark {
       'z ${Math.round(machine.speed[2] * 1e4) / 10} mm/s ${Math.round(machine.acceleration[2] * 100) / 100} m/s2');
     var settings = new SlicerSettings();
     var profile = PrinterProfile.bed220();
+    // Without a named load the run is the gate, which the suites run; the loads are for measuring.
+    if (only == null && Sys.getEnv("PRINTING_BENCHMARK_GCODE") == null || only == "gate") {
+      gate(machine, settings, profile);
+      return;
+    }
     var dump = Sys.getEnv("PRINTING_BENCHMARK_DUMP");
     function sliceNamed(name:String, part:cadkit.modeling.Part):camkit.additive.Slicer.SliceResult {
       var sliced = Slicer.slice(part, settings, profile, name);
@@ -219,15 +273,15 @@ class PrintingBenchmark {
       report(file, machine, read.program, Sys.time() - began);
       return;
     }
-    if (only == null || only == "gear") {
+    if (only == "all" || only == "gear") {
       var sliced = sliceNamed("gear", new SpurGear(1.5, 40, 8).geometry());
       report("gear (module 1.5, 40 teeth, 8 mm)", machine, sliced.program, sliced.report.seconds);
     }
-    if (only == null || only == "cube") {
+    if (only == "all" || only == "cube") {
       var sliced = sliceNamed("cube", TestParts.calibrationCube());
       report("calibration cube", machine, sliced.program, sliced.report.seconds);
     }
-    if (only == null || only == "gcode") {
+    if (only == "all" || only == "gcode") {
       var sliced = sliceNamed("tower", TestParts.testTower());
       var controller = new CncController(Printer);
       var text = PrinterWriter.write(sliced.program, controller, PrinterFlavour.Klipper);

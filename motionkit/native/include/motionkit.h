@@ -566,6 +566,16 @@ MK_API mk_result MK_CALL mk_time_path(mk_path_handle path,
     mk_timing_report *out_report MK_OUT,
     mk_time_law_handle *out_law MK_OUT MK_OWNED,
     mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+/**
+ * A copy of `trajectory` whose coupled joints are exactly the sum of their terms: for each term in order,
+ * follower += ratio * leader (every degree), plus offset in the constant term. A follower's terms must come
+ * together and after the terms of any joint they lead, as the compiled coupling graph orders them; the
+ * followers' own coefficients are replaced, not added to.
+ */
+MK_API mk_result MK_CALL mk_project_couplings(mk_trajectory_handle trajectory,
+    const uint32_t *followers MK_IN_ARRAY(term_count), const uint32_t *leaders MK_IN_ARRAY(term_count),
+    const double *ratios MK_IN_ARRAY(term_count), const double *offsets MK_IN_ARRAY(term_count),
+    uint32_t term_count, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
 MK_API mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,
     uint32_t *out_count MK_OUT);
 MK_API mk_result MK_CALL mk_time_law_get_binding(mk_time_law_handle law,

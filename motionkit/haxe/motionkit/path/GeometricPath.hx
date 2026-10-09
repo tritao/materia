@@ -7,6 +7,9 @@ class GeometricPath implements MotionPath {
   public final primitives:Array<PathPrimitive>;
   public final totalLength:Float;
   final cumulativeLengths:Array<Float>;
+  /** Primitives by the grid cell their bounding box touches, built on the first distance query. */
+  var grid:Null<Map<Int, Array<Int>>> = null;
+  static inline final CELL:Float = 0.001;
 
   public function new(primitives:Array<PathPrimitive>) {
     if (primitives == null || primitives.length == 0)
@@ -47,5 +50,110 @@ class GeometricPath implements MotionPath {
       previous = end;
     }
     return primitives[primitives.length - 1].pointAt(primitives[primitives.length - 1].length());
+  }
+
+  /**
+    How far `point` is from the nearest point of the path. A grid of the primitives' bounding boxes bounds the
+    search to the cells near the point, so a query costs about the same however long the path is.
+  **/
+  public function distanceTo(point:PathPoint):Float {
+    if (grid == null) buildGrid();
+    var cells = grid;
+    var ix = Math.floor(point.x / CELL), iy = Math.floor(point.y / CELL), iz = Math.floor(point.z / CELL);
+    // How far the point is from the faces of its own cell: after `ring` rings the visited block reaches that
+    // much plus `ring` cells beyond the point in every direction.
+    var fx = point.x / CELL - ix, fy = point.y / CELL - iy, fz = point.z / CELL - iz;
+    var inner = Math.min(Math.min(Math.min(fx, 1.0 - fx), Math.min(fy, 1.0 - fy)), Math.min(fz, 1.0 - fz)) * CELL;
+    var best = Math.POSITIVE_INFINITY;
+    // Primitives already measured by this query (one reaching several cells is measured once); the path itself
+    // stays unchanged by a query, so threads may share it.
+    var seen:Array<Int> = [];
+    for (ring in 0...9) {
+      for (dx in -ring...(ring + 1)) for (dy in -ring...(ring + 1)) for (dz in -ring...(ring + 1)) {
+        if (Math.max(Math.abs(dx), Math.max(Math.abs(dy), Math.abs(dz))) != ring) continue;
+        var found = cells.get(cellKey(ix + dx, iy + dy, iz + dz));
+        if (found == null) continue;
+        for (index in found) if (seen.indexOf(index) < 0) {
+          seen.push(index);
+          best = Math.min(best, distanceToPrimitive(primitives[index], point));
+        }
+      }
+      // Everything the visited block reaches has been seen; nothing unvisited is nearer than that.
+      if (best <= ring * CELL + inner) return best;
+    }
+    // Far from the path (or in a cell the grid hashed away): look at every primitive.
+    best = Math.POSITIVE_INFINITY;
+    for (primitive in primitives) best = Math.min(best, distanceToPrimitive(primitive, point));
+    return best;
+  }
+
+  static function cellKey(x:Int, y:Int, z:Int):Int
+    return x * 73856093 + y * 19349663 + z * 83492791;
+
+  function buildGrid():Void {
+    var cells = new Map<Int, Array<Int>>();
+    for (index in 0...primitives.length) {
+      var primitive = primitives[index], length = primitive.length();
+      // Sample the primitive finely enough that no point is further than one step from a sample.
+      var pieces = Std.int(Math.max(1, Math.min(4096, Math.ceil(length / (CELL * 0.5)))));
+      var step = length / pieces;
+      var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+      var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+      for (piece in 0...(pieces + 1)) {
+        var at = primitive.pointAt(piece == pieces ? length : length * piece / pieces);
+        lo[0] = Math.min(lo[0], at.x); hi[0] = Math.max(hi[0], at.x);
+        lo[1] = Math.min(lo[1], at.y); hi[1] = Math.max(hi[1], at.y);
+        lo[2] = Math.min(lo[2], at.z); hi[2] = Math.max(hi[2], at.z);
+      }
+      // A step of arc can bulge past its chord's box by less than the step.
+      var pad = Math.max(step, 1e-9);
+      var x0 = Math.floor((lo[0] - pad) / CELL), x1 = Math.floor((hi[0] + pad) / CELL);
+      var y0 = Math.floor((lo[1] - pad) / CELL), y1 = Math.floor((hi[1] + pad) / CELL);
+      var z0 = Math.floor((lo[2] - pad) / CELL), z1 = Math.floor((hi[2] + pad) / CELL);
+      if ((x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1) > 1e6) throw "Geometric path primitive is too large to index";
+      for (x in Std.int(x0)...Std.int(x1 + 1)) for (y in Std.int(y0)...Std.int(y1 + 1)) for (z in Std.int(z0)...Std.int(z1 + 1)) {
+        var key = cellKey(x, y, z);
+        var list = cells.get(key);
+        if (list == null) { list = []; cells.set(key, list); }
+        list.push(index);
+      }
+    }
+    grid = cells;
+  }
+
+  static function distanceToPrimitive(primitive:PathPrimitive, point:PathPoint):Float {
+    if (Std.isOfType(primitive, LineSegment)) {
+      var line:LineSegment = cast primitive;
+      return segmentDistance(point, line.start, line.end);
+    }
+    if (Std.isOfType(primitive, ArcSegment)) {
+      var arc:ArcSegment = cast primitive;
+      var angle = Math.atan2(point.y - arc.center.y, point.x - arc.center.x);
+      var delta = angle - arc.startAngle;
+      if (arc.sweepAngle >= 0.0) {
+        while (delta < 0.0) delta += 2.0 * Math.PI;
+      } else {
+        while (delta > 0.0) delta -= 2.0 * Math.PI;
+      }
+      // Beyond the swept angle the nearest point is whichever end is nearer.
+      var inside = arc.sweepAngle >= 0.0 ? delta <= arc.sweepAngle : delta >= arc.sweepAngle;
+      if (!inside) return Math.min(point.distanceTo(arc.start), point.distanceTo(arc.end));
+      var at = arc.pointAt(arc.length() * (arc.sweepAngle == 0.0 ? 0.0 : delta / arc.sweepAngle));
+      return Math.sqrt((point.x - at.x) * (point.x - at.x) + (point.y - at.y) * (point.y - at.y) + (point.z - at.z) * (point.z - at.z));
+    }
+    if (Std.isOfType(primitive, CircularSegment)) {
+      var circular:CircularSegment = cast primitive;
+      return circular.distanceTo(point);
+    }
+    throw "Unsupported authored path primitive";
+  }
+
+  static function segmentDistance(point:PathPoint, start:PathPoint, end:PathPoint):Float {
+    var dx = end.x - start.x, dy = end.y - start.y, dz = end.z - start.z;
+    var lengthSquared = dx * dx + dy * dy + dz * dz;
+    var fraction = lengthSquared <= 0.0 ? 0.0 : Math.max(0.0, Math.min(1.0,
+      ((point.x - start.x) * dx + (point.y - start.y) * dy + (point.z - start.z) * dz) / lengthSquared));
+    var x = point.x - start.x - fraction * dx, y = point.y - start.y - fraction * dy, z = point.z - start.z - fraction * dz;
+    return Math.sqrt(x * x + y * y + z * z);
   }
 }

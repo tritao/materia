@@ -221,6 +221,66 @@ class PlannerTests extends MotionKitTestSupport {
       "path timing requires positive joint velocity limits");
   }
 
+  /**
+    Queries along a long path cost what a short one does: distance to a path through its grid, the primitive at a
+    distance by bisection, and a smooth path longer than a section is cut (and rests) at a primitive boundary.
+  **/
+  public function testLongPathQueries():Void {
+    var seed = 20241009;
+    function random():Float {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 2147483648.0;
+    }
+    var primitives:Array<motionkit.path.PathPrimitive> = [];
+    var previous = new PathPoint(0.0, 0.0, 0.0);
+    for (_ in 0...300) {
+      var next = new PathPoint(random() * 0.05, random() * 0.05, random() * 0.002);
+      primitives.push(new LineSegment(previous, next));
+      previous = next;
+    }
+    var arc = new ArcSegment(new PathPoint(0.06, 0.025, 0.001), 0.01, 0.0, Math.PI);
+    primitives.push(arc);
+    var path = new GeometricPath(primitives);
+    function brute(point:PathPoint):Float {
+      var best = Math.POSITIVE_INFINITY;
+      for (primitive in primitives) {
+        if (Std.isOfType(primitive, LineSegment)) {
+          var line:LineSegment = cast primitive;
+          var dx = line.end.x - line.start.x, dy = line.end.y - line.start.y, dz = line.end.z - line.start.z;
+          var length2 = dx * dx + dy * dy + dz * dz;
+          var t = length2 <= 0.0 ? 0.0 : Math.max(0.0, Math.min(1.0, ((point.x - line.start.x) * dx + (point.y - line.start.y) * dy + (point.z - line.start.z) * dz) / length2));
+          best = Math.min(best, point.distanceTo(new PathPoint(line.start.x + t * dx, line.start.y + t * dy, line.start.z + t * dz)));
+        } else for (step in 0...4001)
+          best = Math.min(best, point.distanceTo(primitive.pointAt(primitive.length() * step / 4000)));
+      }
+      return best;
+    }
+    var worst = 0.0;
+    for (_ in 0...300) {
+      var point = new PathPoint(random() * 0.09 - 0.01, random() * 0.07 - 0.01, random() * 0.006 - 0.002);
+      worst = Math.max(worst, Math.abs(path.distanceTo(point) - brute(point)));
+    }
+    var far = new PathPoint(1.0, 1.0, 1.0);
+    worst = Math.max(worst, Math.abs(path.distanceTo(far) - brute(far)));
+    check(worst < 2e-6, 'the grid finds the nearest point of a long path like a scan of every primitive does: $worst');
+
+    var feed = 0.05;
+    function waypoint(x:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x, 0.0, 0.0), 1e-6, 1e-3);
+    var lines:Array<motionkit.path.PosePrimitive> = [for (i in 0...(2 * ProgramCompiler.MAX_SECTION_PRIMITIVES + 10))
+      new PoseLine(waypoint(i * 0.001), waypoint((i + 1) * 0.001), OrientationPolicy.Fixed, 0.1, feed)];
+    var pose = new PosePath("work", lines);
+    check(pose.indexAt(0.0) == 0 && pose.indexAt(0.001) == 0 && pose.indexAfter(0.001) == 1 && pose.indexAt(0.0015) == 1,
+      "a distance on a boundary belongs to the primitive that ends there, or the one that starts there");
+    check(pose.indexAt(pose.length()) == lines.length - 1 && pose.indexAfter(pose.length()) == lines.length - 1,
+      "the end of the path is in its last primitive");
+    near(pose.startOf(2500), 2.5, "primitives start where the ones before them end", 1e-9);
+    near(pose.waypointAt(2.5004).pose.x, 2.5004, "a pose along a long path", 1e-9);
+    var sections = ProgramCompiler.timingSections(pose);
+    check(sections.length == 3 && sections[0].path.primitives.length == ProgramCompiler.MAX_SECTION_PRIMITIVES &&
+      sections[2].path.primitives.length == 10, 'a straight path of ${lines.length} primitives is cut into sections of at most ${ProgramCompiler.MAX_SECTION_PRIMITIVES}');
+    near(sections[1].offset, ProgramCompiler.MAX_SECTION_PRIMITIVES * 0.001, "each section knows where it starts", 1e-9);
+  }
+
   public function testGeometricPathPrimitives():Void {
     var path = GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0),
       new PathPoint(0.1, 0.0, 0.0), new PathPoint(0.1, 0.1, 0.0)]);

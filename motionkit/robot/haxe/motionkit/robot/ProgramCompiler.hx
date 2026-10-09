@@ -65,6 +65,11 @@ class ProgramCompiler {
   public final maxJointJump:Float;
   public final perJointMaxJump:Array<Float>;
   final couplingIndices:Array<{leader:Int, follower:Int, ratio:Float, offset:Float}>;
+  /** The coupling terms grouped by follower, each follower after the joints it follows (`projectionOrder`). */
+  final projectionFollowers:Array<Int> = [];
+  final projectionLeaders:Array<Int> = [];
+  final projectionRatios:Array<Float> = [];
+  final projectionOffsets:Array<Float> = [];
   /** The coupled joints, each after the coupled joints among its leaders: a follower is the sum of its terms. */
   final projectionOrder:Array<Int>;
   public final positionTolerance:Float;
@@ -222,6 +227,10 @@ class ProgramCompiler {
       var remaining = [for (_ in 0...count) 0];
       for (term in couplingIndices) remaining[term.follower]++;
       for (term in couplingIndices) if (--remaining[term.follower] == 0) projectionOrder.push(term.follower);
+      for (follower in projectionOrder) for (term in couplingIndices) if (term.follower == follower) {
+        projectionFollowers.push(follower); projectionLeaders.push(term.leader);
+        projectionRatios.push(term.ratio); projectionOffsets.push(term.offset);
+      }
     }
     this.jointIds = jointIds == null ? null : jointIds.copy();
     this.couplings = couplings == null ? null : couplings.copy();
@@ -563,7 +572,27 @@ class ProgramCompiler {
       if (event.distance >= section.offset && (last || event.distance < end))
         new PathEvent(event.distance - section.offset, event.channel, event.value,
           event.leadSeconds, event.holdPolicy)], c.currentIndex,null,0.0,curve,section.offset,last);
-    } catch (error:Dynamic) { releaseTransitions(); throw error; }
+    } catch (error:Dynamic) {
+      releaseTransitions();
+      // Timing can fail where several limits meet along a long, tight path; the same path in two halves,
+      // each from rest to rest, has fewer places to meet. Cut it at the middle primitive and plan the halves.
+      var primitives = section.path.primitives;
+      if (curve != null || primitives.length < 2 || Std.string(error).indexOf("path.time failed") < 0) throw error;
+      var middle = primitives.length >> 1;
+      var first = new PosePath(section.path.frameId, primitives.slice(0, middle));
+      var second = new PosePath(section.path.frameId, primitives.slice(middle));
+      var authored = section.path.authoredGeometry;
+      if (authored != null) {
+        first.withAuthoredGeometry(authored, section.path.blendTolerance);
+        second.withAuthoredGeometry(authored, section.path.blendTolerance);
+      }
+      c.sections.splice(k, 1);
+      c.sections.insert(k, {path: second, offset: section.offset + first.length()});
+      c.sections.insert(k, {path: first, offset: section.offset});
+      c.sectionIndex = k;
+      c.sink.note('Motion program op ${c.currentIndex} timing failed over ${primitives.length} primitives: planned in two halves');
+      return;
+    }
     try {
       var moved = false;
       for (joint in 0...c.q.length) if (Math.abs(pathStart[joint]-c.q[joint]) > 1e-7) moved = true;
@@ -804,18 +833,8 @@ class ProgramCompiler {
   }
 
   /** Keep the follower polynomial exact after independent Hermite lowering. */
-  function projectCouplings(source:Trajectory):Trajectory {
-    var segments = source.segments();
-    for (segment in segments) for (follower in projectionOrder)
-      for (degree in 0...segment.coefficients[follower].length) {
-        var sum = 0.0;
-        for (coupling in couplingIndices) if (coupling.follower == follower)
-          sum += coupling.ratio * segment.coefficients[coupling.leader][degree] +
-            (degree == 0 ? coupling.offset : 0.0);
-        segment.coefficients[follower][degree] = sum;
-      }
-    return Trajectory.fromSegments(segments);
-  }
+  function projectCouplings(source:Trajectory):Trajectory
+    return source.projectCouplings(projectionFollowers, projectionLeaders, projectionRatios, projectionOffsets);
 
   function resolveTarget(target:MoveTarget, start:Array<Float>, index:Int):Array<Float> {
     return switch target {
@@ -1010,7 +1029,10 @@ class ProgramCompiler {
         Std.int(Math.max(distances.length * 2 - 1, Math.ceil(path.length() / (blendTolerance / 8.0)) + 1));
       var checkDistances = [for (sample in 0...checkSamples) path.length() * sample / (checkSamples - 1)];
       var checkTimes = [for (distance in checkDistances) timed.distanceToTime(distance)];
-      var timeSteps = Std.int(Math.max(1,
+      // Axis machines map a path to joints exactly, so the executed position can differ from the path's only by
+      // the lowering tolerance, which the lowering itself bounds: the clock need not be sampled every millisecond
+      // (a long print has millions), the path's own samples above are checked.
+      var timeSteps = Std.isOfType(solver, AxisKinematics) ? 1 : Std.int(Math.max(1,
         Math.ceil(timed.trajectory.durationSeconds() / 0.001)));
       var taskSampleDistances:Array<Float> = [];
       if (timed.hasDirectInverse()) {
@@ -1119,37 +1141,8 @@ class ProgramCompiler {
     return Math.sqrt(x * x + y * y + z * z);
   }
 
-  static function distanceToGeometry(point:Pose3, geometry:GeometricPath):Float {
-    var best = Math.POSITIVE_INFINITY;
-    for (primitive in geometry.primitives) {
-      var candidate = if (Std.isOfType(primitive, LineSegment)) {
-        var line:LineSegment = cast primitive;
-        pointToSegmentDistance(point.x, point.y, point.z,
-          line.start.x, line.start.y, line.start.z, line.end.x, line.end.y, line.end.z);
-      } else if (Std.isOfType(primitive, ArcSegment)) {
-        var arc:ArcSegment = cast primitive;
-        var angle = Math.atan2(point.y - arc.center.y,
-          point.x - arc.center.x);
-        var delta = angle - arc.startAngle;
-        if (arc.sweepAngle >= 0.0) {
-          while (delta < 0.0) delta += 2.0 * Math.PI;
-        } else {
-          while (delta > 0.0) delta -= 2.0 * Math.PI;
-        }
-        var fraction = arc.sweepAngle == 0.0 ? 0.0 :
-          Math.max(0.0, Math.min(1.0, delta / arc.sweepAngle));
-        var at = arc.pointAt(arc.length() * fraction);
-        Math.sqrt((point.x - at.x) * (point.x - at.x) +
-          (point.y - at.y) * (point.y - at.y) +
-          (point.z - at.z) * (point.z - at.z));
-      } else if (Std.isOfType(primitive, motionkit.path.CircularSegment)) {
-        var circular:motionkit.path.CircularSegment = cast primitive;
-        circular.distanceTo(new motionkit.path.PathPoint(point.x, point.y, point.z));
-      } else throw "Unsupported authored path primitive";
-      best = Math.min(best, candidate);
-    }
-    return best;
-  }
+  static function distanceToGeometry(point:Pose3, geometry:GeometricPath):Float
+    return geometry.distanceTo(new motionkit.path.PathPoint(point.x, point.y, point.z));
 
   function requireFrame(requested:String, index:Int):Void {
     if (requested != frameId)
@@ -1180,6 +1173,9 @@ class ProgramCompiler {
     `path` split at its sharp corners, where one primitive's end tangent is
     not the next one's start tangent, with each section's distance along it.
   **/
+  /** Most primitives one timed section holds; a longer smooth path is cut (and rests) at the next primitive boundary. */
+  public static inline final MAX_SECTION_PRIMITIVES = 4000;
+
   /** Split authored task-velocity discontinuities into independently timed stops. */
   public static function timingSections(path:PosePath):Array<{path:PosePath, offset:Float}> {
     var sections:Array<{path:PosePath, offset:Float}> = [];
@@ -1195,7 +1191,8 @@ class ProgramCompiler {
         for (axis in 0...3) turn = Math.max(turn, Math.max(
           Math.abs(arriving.linear[axis] - leaving.linear[axis]),
           Math.abs(beforeAngular[axis] - leavingAngular[axis])));
-        if (turn > 1e-6) {
+        // A smooth path longer than a section may be rests there too: the plan stays bounded in samples and memory.
+        if (turn > 1e-6 || k - start >= MAX_SECTION_PRIMITIVES) {
           sections.push({path: new PosePath(path.frameId, path.primitives.slice(start, k)), offset: sectionOffset});
           start = k;
           sectionOffset = offset;
@@ -1283,14 +1280,8 @@ class ProgramCompiler {
     return [for (joint in 0...q.length) (ahead[joint] - behind[joint]) / (2.0 * step)];
   }
 
-  static function primitiveSpeedAt(path:PosePath, distance:Float):Float {
-    var start = 0.0;
-    for (primitive in path.primitives) {
-      start += primitive.length();
-      if (distance <= start) return primitive.speedLimit();
-    }
-    return path.primitives[path.primitives.length-1].speedLimit();
-  }
+  static function primitiveSpeedAt(path:PosePath, distance:Float):Float
+    return path.primitives[path.indexAt(distance)].speedLimit();
   static function orientationError(actual:Pose3, desired:Pose3,
       policy:OrientationPolicy):Float {
     return ToolFreedom.orientationError(actual, desired, policy);

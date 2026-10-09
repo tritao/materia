@@ -5,7 +5,10 @@ import motionkit.trajectory.Trajectory;
 /** Lowered trajectory plus its exact path-distance timing contract. */
 class TimedPath {
   public final trajectory:Trajectory;
-  public final bindingConstraints:Array<BindingConstraint>;
+  /** Which limit bound each stage of the time law; read lazily, and only while the time law is still held. */
+  public var bindingConstraints(get, never):Array<BindingConstraint>;
+  var bindings:Null<Array<BindingConstraint>>;
+  final bindingSupplier:Null<Void -> Array<BindingConstraint>>;
   final distanceToTimeMap:Float -> Float;
   final releaseMap:Null<Void -> Void>;
   final timesToDistancesMap:Null<Array<Float> -> Array<Float>>;
@@ -17,14 +20,25 @@ class TimedPath {
    */
   public function new(trajectory:Trajectory, distanceToTimeMap:Float -> Float,
       bindingConstraints:Array<BindingConstraint>, ?releaseMap:Void -> Void,
-      ?timesToDistancesMap:Array<Float> -> Array<Float>) {
+      ?timesToDistancesMap:Array<Float> -> Array<Float>, ?lazyBindings:Void -> Array<BindingConstraint>) {
     this.timesToDistancesMap = timesToDistancesMap;
     if (trajectory == null || distanceToTimeMap == null || bindingConstraints == null)
       throw "Timed path needs a trajectory, distance map, and constraint report";
     this.trajectory = trajectory;
     this.distanceToTimeMap = distanceToTimeMap;
-    this.bindingConstraints = bindingConstraints.copy();
+    bindings = lazyBindings == null ? bindingConstraints.copy() : null;
+    bindingSupplier = lazyBindings;
     this.releaseMap = releaseMap;
+  }
+
+  function get_bindingConstraints():Array<BindingConstraint> {
+    if (bindings == null) {
+      if (mapReleased) throw "Timed path bindings must be read before its distance map is released";
+      var supplier = bindingSupplier;
+      if (supplier == null) throw "Timed path has no binding constraints";
+      bindings = supplier();
+    }
+    return bindings;
   }
 
   public function distanceToTime(distance:Float):Float {

@@ -137,15 +137,14 @@ class ToolpathLowering {
 
   function flush():Void {
     if (pending.length == 0) return;
-    // A blend between moves of different speeds would take one move's speed,
-    // so only corners between moves of one speed are rounded.
+    // Moves of different speeds join in one rounded path: the path keeps each move's speed, and the arc
+    // that rounds a corner between them goes at the slower of the two.
     var corners = [for (i in 0...(pending.length - 1))
-      pendingSpeeds[i] != pendingSpeeds[i + 1] ? 0.0 :
-        Math.min(pendingTolerances[i], pendingTolerances[i + 1]) * CornerBlender.GEOMETRY_SHARE];
+      Math.min(pendingTolerances[i], pendingTolerances[i + 1]) * CornerBlender.GEOMETRY_SHARE];
     var rounded = false;
     for (corner in corners) if (corner > 0.0) rounded = true;
     for (i in 0...corners.length) if (corners[i] == 0.0 && turns(pending[i], pending[i + 1]))
-      count(pendingSpeeds[i] != pendingSpeeds[i + 1] ? "speed change" : "no blend tolerance");
+      count("no blend tolerance");
     if (rounded) {
       var authored = new GeometricPath(pending);
       var blended = CornerBlender.blendPerCorner(authored, corners,
@@ -157,10 +156,15 @@ class ToolpathLowering {
         diagnostics.push(new ToolpathDiagnostic( "CNC_EXACT_STOP",
           pendingSpans[index], blended.diagnostics[warning]));
         var text = blended.diagnostics[warning], open = text.indexOf("exact stop (");
-        count(open < 0 ? text : text.substring(open + 12, text.lastIndexOf(")")));
+        // The angle in "turn angle 2.6 exceeds blend limit" is not part of the reason.
+        count(~/ [0-9][0-9.eE+-]* /g.replace(open < 0 ? text : text.substring(open + 12, text.lastIndexOf(")")), " "));
       }
-      emitPath(blended.path.primitives, spans, [for (index in blended.sourcePrimitiveIndices)
-        pendingSpeeds[index]], authored, pendingBlend, blended.sourcePrimitiveIndices);
+      var indices = blended.sourcePrimitiveIndices;
+      // A blend arc is listed just before the move it leads into, under that move's index.
+      var speeds = [for (k in 0...indices.length)
+        k + 1 < indices.length && indices[k + 1] == indices[k] ?
+          Math.min(pendingSpeeds[indices[k] - 1], pendingSpeeds[indices[k]]) : pendingSpeeds[indices[k]]];
+      emitPath(blended.path.primitives, spans, speeds, authored, pendingBlend, indices);
     } else
       emitPath(pending, pendingSpans, pendingSpeeds, null, 0.0, [for (index in 0...pending.length) index]);
     pending = []; pendingSpans = []; pendingTolerances = []; pendingSpeeds = [];

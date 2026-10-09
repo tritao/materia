@@ -159,6 +159,21 @@ class Trajectory implements TimedJointTrajectory {
     return result;
   }
 
+  /**
+    A copy whose coupled joints are exactly the sum of their terms (`follower = ratio * leader + offset`, summed
+    over its terms): `followers`, `leaders`, `ratios` and `offsets` list the terms grouped by follower, each
+    follower after the joints it follows. Done in native memory: a long trajectory has millions of coefficients.
+  **/
+  public function projectCouplings(followers:Array<Int>, leaders:Array<Int>, ratios:Array<Float>,
+      offsets:Array<Float>):Trajectory {
+    ensureLive();
+    if (followers.length != leaders.length || followers.length != ratios.length || followers.length != offsets.length)
+      throw "Coupling terms must list a follower, leader, ratio and offset each";
+    var created = MotionKitNative.mk_project_couplings(owner.borrow(), followers, leaders, ratios, offsets);
+    check(created.status, "trajectory.projectCouplings");
+    return new Trajectory(created.out_trajectory);
+  }
+
   public function evaluate(timeSeconds:Float):TrajectoryState {
     ensureLive();
     var state = TrajectoryStateBuffer.acquire();

@@ -615,6 +615,65 @@ Done. What was built and decided (AM3 comes before AM6 in the run order):
   counterbore open, layer heights monotonic, deterministic output, G-code round trip within 0.1 %.
   CamKit 12311 -> 12442 assertions.
 
+Done. What was built and decided:
+- **Where the time went** (profiled with `perf` and the allocation census, in the order they were found):
+  1. The task-space check measured each sample against the whole op's authored geometry (a scan of every primitive,
+     62 000 for the gear): `GeometricPath.distanceTo` now uses a grid of the primitives' boxes, and `PosePath`
+     finds the primitive at a distance by bisection (`indexAt`, `indexAfter`, `startOf`) instead of scanning.
+  2. `AxisKinematics.solveDifferential` gave derived joints (a CoreXY motor's pulley follows both axes) a rate of
+     zero while their positions moved, so the pulleys' joint paths were inconsistent, TOPP-RA did not see their
+     real accelerations, and the lowered trajectory broke the limits by 3 % to 60 %. Each break started a
+     smoothing retry (up to 24 whole re-lowerings); one section took 12 minutes. The rates are now the sum of the
+     leaders'.
+  3. `mk_path_lower` searched every sample for each of its 170 000 stages and every stage for each sample
+     (quadratic): both are bisections now, and a stage whose joint is affine in the path (a straight move)
+     skips the residual search, as does any stage whose coefficient sum is within the tolerance.
+  4. `ProgramCompiler.projectCouplings` copied every segment of the trajectory into Haxe arrays and back
+     (millions of boxed floats, and the collector marking them again and again): `mk_project_couplings` does it
+     in native memory.
+  5. The clock was sampled every millisecond for the task-space check; on an axis machine the executed position
+     can only differ from the path's by the lowering tolerance, which the lowering bounds, so a section's own
+     samples are checked and the clock at its ends. Timing bindings are read only when asked for.
+- **Cornering.** Moves of different speeds join in one rounded path (the corner arc goes at the slower of the two),
+  which removed the exact stop at every change of feature: the cube went from 4040 stops to 12, each of which
+  costs milliseconds at 12 to 24 m/s^2. Not rounded: turns above 150 degrees, non-planar corners (one per layer
+  change: a planar quintic cannot follow a z climb, and a stop costs a few milliseconds), and, new, corners whose
+  rounding arc would be tighter than 50 micrometres (`CornerBlender.MIN_RADIUS`; a tolerance that itself asks for a tighter arc keeps it): between moves of a few tens
+  of micrometres such a corner can only be rounded within tolerance by an arc of 8 to 15 micrometres, along which
+  no machine moves, and whose accelerations the time law could not hold (TOPP-RA broke the limits by half again
+  and retried 20 times). The tower's plan time fell from 410 s to 47 s with the rule, and its planned time from
+  10.3 % above the reference to 1 %.
+- **Windows.** A smooth path longer than `ProgramCompiler.MAX_SECTION_PRIMITIVES` (4000) is cut, and rests, at a
+  primitive boundary: the memory and the sample budget of a plan stay bounded, and a rest every few hundred
+  millimetres of path costs a few milliseconds. The plan's "windows with boundary speeds" is not done: with the
+  stops this cheap and every layer change a stop anyway, carrying a speed across windows would add a feasibility
+  fallback for no measurable time. Timing that still fails (`path.time failed`) is retried in two halves, each
+  from rest to rest, down to a single primitive.
+- **TOPP-RA.** The stock forward pass gave up ("forward pass" failure, seen on every load sliced from exact
+  geometry) where the speed it had reached was the greatest the controllable set allows, a vertex where two
+  constraints meet and rounding leaves no acceleration. The submodule is not ours to patch, so motionkit
+  subclasses `TOPPRA` and retries the stage with the speed lowered by 1e-9, 1e-7, 1e-5, 1e-3 (relative); the lowered
+  trajectory is still validated against the caller's limits.
+- Gate (`machinekit/examples/printer/benchmark`, run with no arguments; in the workspace as `printing-gate`) on a thin
+  gear (module 1.5, 40 teeth, 1.2 mm: 6 layers, 11 797 moves): planning at least 2x faster than the print over the whole
+  job and its worst 10 s, planned time within 15 % of the reference, no failure. **Passed**: 1047.9 s planned,
+  0.3 % above the reference; 94.1 s of processor time, 11.1x real time overall and 3.19x over the worst 10 s.
+- **Numbers after AM5** (processor time, so other work on the machine does not count):
+
+| Load | Planned | Reference | Planning | Real time (all / worst 10 s) | Sections | Before |
+|---|---|---|---|---|---|---|
+| Gear, whole (61 933 moves) | 2357.9 s | 2354.8 s (+0.1 %) | 350.1 s | 6.73x / 2.90x | 1004 | did not finish in 3000 s; sliced, failed in TOPP-RA |
+| Calibration cube | 872.4 s | 867.6 s (+0.6 %) | 60.1 s | 14.52x / 9.66x | 1576 | 929.1 s (+7.1 %), 1.04x / 0.75x, 4042 sections |
+| Test tower through G-code | 474.2 s | 469.6 s (+1 %) | 46.9 s | 10.12x / 1.87x | 1549 | 506.7 s (+7.9 %), 0.99x / 0.67x, 4271 sections |
+
+  The tower's worst window is just under 2x: arcs are the dearest paths to lower (each joint is curved, so every
+  stage is fitted and checked), and its 1324 corners stopped at for being below the minimum radius come from
+  micro-segments in its G-code (the sliced chamfer and boss); the slicer should not emit them.
+  Managed heap peaks 323 MB (gear), 198 MB, 213 MB.
+- Tests: `ToolpathMotionTests.printerLowering` (rounding across speeds, the arc's speed, stops by reason),
+  `PlannerTests.testLongPathQueries` (grid distance against a scan, bisection at boundaries, sections of a long
+  path), `CoreXyTests.testDerivedPulleysFollowBothAxes` (pulleys are the sums of their terms along a plan).
+
 **AM6. The CoreXY printer.**
 - `machinekit.printing` parts, plus catalogue rows (AM-D8), with unit tests: masses, connector
   frames, heater power, thermistor curve, extruder rotation per mm of filament.
@@ -774,7 +833,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM2 | done | see the commit below |
 | AM3 | done | see the commits below |
 | AM4 | done | see the commit below |
-| AM5 | planned | |
+| AM5 | done: gate passed | see the commit below |
 | AM6 | done | see the commit below |
 | AM7 | planned | |
 | AM8 | planned | |

@@ -15,12 +15,7 @@ class PosePathRefinement {
   }
   public function at(distance:Float):RefinementTarget {
     if(!Math.isFinite(distance) || distance<0 || distance>path.length())throw "Refinement distance outside pose path";
-    var start=0.0,index=0,local=distance;
-    for(i in 0...path.primitives.length){
-      var end=start+path.primitives[i].length();
-      if(distance<end || i==path.primitives.length-1){index=i;local=distance-start;break;}
-      start=end;
-    }
+    var index=path.indexAfter(distance),local=distance-path.startOf(index);
     var primitive=path.primitives[index],policy=primitive.orientationPolicy();
     // The globally checked endpoint can subtract to slightly more than the
     // final primitive's length after accumulated floating-point additions.

@@ -137,6 +137,12 @@ class AxisKinematics implements KinematicsSolver {
     x.writeLogicalDelta(result, twist.linearX);
     y.writeLogicalDelta(result, twist.linearY);
     z.writeLogicalDelta(result, twist.linearZ);
+    // A derived joint moves with what it follows; a rate has no offset.
+    for (_ in derived) for (index in derived) {
+      var sum = 0.0;
+      for (term in terms[index]) sum += term.ratio * result[term.leader];
+      result[index] = sum;
+    }
     return result;
   }
 

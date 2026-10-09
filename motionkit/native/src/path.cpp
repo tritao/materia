@@ -99,7 +99,11 @@ bool inverse_time(const std::vector<mk_time_stage> &stages, double s, double &se
         seconds = static_cast<double>(last.start_ns + last.duration_ns) * 1e-9;
         return true;
     }
-    for (const auto &stage : stages) {
+    // Stages are contiguous and ordered, so the ones that end before `s` are skipped by bisection.
+    const auto first = std::partition_point(stages.begin(), stages.end(),
+        [s, epsilon](const mk_time_stage &stage) { return s > end_s(stage) + epsilon; });
+    for (auto at = first; at != stages.end(); ++at) {
+        const auto &stage = *at;
         if (std::abs(s - stage.start_s) <= epsilon) {
             seconds = static_cast<double>(stage.start_ns) * 1e-9;
             return true;
@@ -263,20 +267,31 @@ bool append_interval(const std::vector<mk_path_sample> &path,
     segment.joint_count = a.joint_count;
     double worst = 0.0;
     for (uint32_t joint = 0; joint < a.joint_count; ++joint) {
-        const auto left = path_state(a, b, joint, s0);
-        const auto right = path_state(a, b, joint, s1);
-        Poly fit = hermite(left.position, left.first * v0 * duration,
-            (left.second * v0 * v0 + left.first * stage.acceleration) * duration * duration,
-            right.position, right.first * v1 * duration,
-            (right.second * v1 * v1 + right.first * stage.acceleration) * duration * duration);
         const Poly authored = path_poly(a, b, joint);
-        if (std::abs(authored[2]) < 1e-12 && std::abs(authored[3]) < 1e-12 &&
-            std::abs(authored[4]) < 1e-12 && std::abs(authored[5]) < 1e-12)
-            fit = compose(authored, normalized_s);
+        Poly fit;
+        // A joint that is affine in s over the span (a straight move of a Cartesian machine) is
+        // composed with the time law exactly: nothing is approximated, so there is no residual to bound.
+        const bool exact = std::abs(authored[2]) < 1e-12 && std::abs(authored[3]) < 1e-12 &&
+            std::abs(authored[4]) < 1e-12 && std::abs(authored[5]) < 1e-12;
+        if (exact) fit = compose(authored, normalized_s);
+        else {
+            const auto left = path_state(a, b, joint, s0);
+            const auto right = path_state(a, b, joint, s1);
+            fit = hermite(left.position, left.first * v0 * duration,
+                (left.second * v0 * v0 + left.first * stage.acceleration) * duration * duration,
+                right.position, right.first * v1 * duration,
+                (right.second * v1 * v1 + right.first * stage.acceleration) * duration * duration);
+        }
         for (size_t i = 0; i < fit.size(); ++i)
             segment.coefficients[joint].value[i] = fit[i] / std::pow(duration, static_cast<int>(i));
-        Poly residual = compose(path_poly(a, b, joint), normalized_s);
+        if (exact) continue;
+        Poly residual = compose(authored, normalized_s);
         for (size_t i = 0; i < fit.size(); ++i) residual[i] -= fit[i];
+        // On [0,1] a polynomial stays within the sum of its coefficients' magnitudes: when that is within the
+        // tolerance there is no need to isolate its extrema (nearly every stage of a fine path).
+        double bound = 0.0;
+        for (double coefficient : residual) bound += std::abs(coefficient);
+        if (bound <= tolerance) { worst = std::max(worst, bound); continue; }
         worst = std::max(worst, std::abs(eval(residual, 0.5)));
         for (double root : roots(derivative(residual)))
             worst = std::max(worst, std::abs(eval(residual, root)));
@@ -312,6 +327,46 @@ protected:
 private:
     std::vector<double> knots_;
     std::vector<double> caps_;
+};
+
+// TOPP-RA whose forward pass tolerates the vertex a controllable set ends in. The speed the previous stage
+// reached can be the greatest the controllable set allows, where two constraints meet; rounding then leaves
+// the next stage no acceleration to choose and the stock pass gives up ("forward pass" failure, seen on the
+// tight rounded corners of printed outlines). Here the stage retries with the speed lowered by the least
+// relative amount that restores one. Stage accelerations are derived from the speeds afterwards, and the
+// lowered trajectory is validated against the caller's limits.
+class Toppra final : public toppra::algorithm::TOPPRA {
+public:
+    using toppra::algorithm::TOPPRA::TOPPRA;
+
+protected:
+    toppra::ReturnCode computeForwardPass(toppra::value_type vel_start) override {
+        toppra::Vector g_upper{2}, solution{2};
+        toppra::Matrix H;
+        auto deltas = m_solver->deltas();
+        toppra::Bound x, x_next;
+        m_data.parametrization(0) = vel_start;
+        for (std::size_t i = 0; i + 1 < static_cast<std::size_t>(m_data.parametrization.size()); i++) {
+            g_upper << -2 * deltas(i), -1;
+            x.setConstant(m_data.parametrization(i));
+            x_next = m_data.controllable_sets.row(i + 1);
+            bool solved = m_solver->solveStagewiseOptim(i, H, g_upper, x, x_next, solution);
+            for (const double shrink : {1e-9, 1e-7, 1e-5, 1e-3}) {
+                if (solved) break;
+                x.setConstant(m_data.parametrization(i) * (1.0 - shrink));
+                solved = m_solver->solveStagewiseOptim(i, H, g_upper, x, x_next, solution);
+                if (solved) m_data.parametrization(i) = x(0);
+            }
+            if (!solved) {
+                m_errorStream << "Forward pass failed at idx " << i << '\n';
+                return toppra::ReturnCode::ERR_FAIL_FORWARD_PASS;
+            }
+            m_data.parametrization(i + 1) = std::min(m_data.controllable_sets(i + 1, 1),
+                std::max(m_data.controllable_sets(i + 1, 0),
+                    m_data.parametrization(i) + 2 * deltas(i) * solution(0)));
+        }
+        return toppra::ReturnCode::OK;
+    }
 };
 
 bool valid_timing_request(const std::vector<mk_path_sample> &path,
@@ -556,8 +611,11 @@ mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
         for (const auto &stage : stages) {
             std::vector<int64_t> knots{stage.start_ns,
                 stage.start_ns + stage.duration_ns};
-            for (const auto &sample : samples) {
-                if (sample.s <= stage.start_s || sample.s >= end_s(stage)) continue;
+            const double stage_end = end_s(stage);
+            for (auto at = std::upper_bound(samples.begin(), samples.end(), stage.start_s,
+                     [](double value, const mk_path_sample &sample) { return value < sample.s; });
+                 at != samples.end() && at->s < stage_end; ++at) {
+                const auto &sample = *at;
                 double seconds = 0.0;
                 if (!inverse_time(stages, sample.s, seconds)) {
                     mk_trajectory_destroy(trajectory);
@@ -648,10 +706,16 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         // path. Reserve room for those peaks; final validation still uses the
         // caller's exact acceleration limit.
         const double interpolation_margin = nonlinear ? 0.8 : 1.0;
-        toppra::Vector lower_velocity(dof), upper_velocity(dof);
-        toppra::Vector lower_acceleration(dof), upper_acceleration(dof);
+        toppra::Vector grid(static_cast<Eigen::Index>(1 + 32 * (samples.size() - 1)));
+        for (size_t span = 0; span + 1 < samples.size(); ++span)
+            for (int step = 0; step < 32; ++step)
+                grid[static_cast<Eigen::Index>(span * 32 + step)] = samples[span].s +
+                    (samples[span + 1].s - samples[span].s) * step / 32.0;
+        grid[grid.size() - 1] = samples.back().s;
         const double moving_boundary_margin = (start_speed > 0.0 || end_speed > 0.0)
             ? 0.98 : 1.0;
+        toppra::Vector lower_velocity(dof), upper_velocity(dof);
+        toppra::Vector lower_acceleration(dof), upper_acceleration(dof);
         for (uint32_t j = 0; j < joint_count; ++j) {
             lower_velocity[j] = -max_velocity[j] * coordinate_scale[j] * moving_boundary_margin;
             upper_velocity[j] = max_velocity[j] * coordinate_scale[j] * moving_boundary_margin;
@@ -670,21 +734,15 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
                 lower_acceleration, upper_acceleration)};
         for (auto &constraint : constraints)
             constraint->discretizationType(toppra::DiscretizationType::Collocation);
-        toppra::algorithm::TOPPRA algorithm(constraints, geometric);
-        algorithm.solver(std::make_shared<toppra::solver::Seidel>());
-        toppra::Vector grid(static_cast<Eigen::Index>(1 + 32 * (samples.size() - 1)));
-        for (size_t span = 0; span + 1 < samples.size(); ++span)
-            for (int step = 0; step < 32; ++step)
-                grid[static_cast<Eigen::Index>(span * 32 + step)] = samples[span].s +
-                    (samples[span + 1].s - samples[span].s) * step / 32.0;
-        grid[grid.size() - 1] = samples.back().s;
-        algorithm.setGridpoints(grid);
-        algorithm.setInitialXBounds(toppra::Bound{0.0, 1e16});
+        auto algorithm = std::make_unique<Toppra>(constraints, geometric);
+        algorithm->solver(std::make_shared<toppra::solver::Seidel>());
+        algorithm->setGridpoints(grid);
+        algorithm->setInitialXBounds(toppra::Bound{0.0, 1e16});
         // TOPP-RA's forward pass stores its first parameter as squared path
         // speed, while the public endpoint contract uses path speed.
-        if (algorithm.computePathParametrization(start_speed * start_speed, end_speed) !=
+        if (algorithm->computePathParametrization(start_speed * start_speed, end_speed) !=
             toppra::ReturnCode::OK) return MK_ERROR_GENERATION;
-        const auto &data = algorithm.getParameterizationData();
+        const auto &data = algorithm->getParameterizationData();
         std::vector<mk_time_stage> stages;
         std::vector<mk_timing_binding> bindings;
         stages.reserve(static_cast<size_t>(grid.size() - 1));
@@ -809,6 +867,52 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         return MK_OK;
     } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
     catch (...) { return MK_ERROR_GENERATION; }
+}
+
+mk_result MK_CALL mk_project_couplings(mk_trajectory_handle trajectory,
+                                       const uint32_t *followers, const uint32_t *leaders,
+                                       const double *ratios, const double *offsets,
+                                       uint32_t term_count, mk_trajectory_handle *out_trajectory) {
+    if (!out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
+    out_trajectory->id = 0;
+    if (term_count && (!followers || !leaders || !ratios || !offsets)) return MK_ERROR_INVALID_ARGUMENT;
+    uint32_t joints = 0, segments = 0;
+    auto status = mk_trajectory_joint_count(trajectory, &joints);
+    if (status != MK_OK) return status;
+    status = mk_trajectory_segment_count(trajectory, &segments);
+    if (status != MK_OK) return status;
+    for (uint32_t term = 0; term < term_count; ++term)
+        if (followers[term] >= joints || leaders[term] >= joints || !std::isfinite(ratios[term]) ||
+            !std::isfinite(offsets[term])) return MK_ERROR_INVALID_ARGUMENT;
+    mk_trajectory_handle projected{};
+    status = mk_trajectory_create(joints, &projected);
+    if (status != MK_OK) return status;
+    try {
+        auto segment = std::make_unique<mk_segment>();
+        for (uint32_t index = 0; index < segments; ++index) {
+            *segment = mk_segment{};
+            segment->struct_size = sizeof(mk_segment);
+            status = mk_trajectory_get_segment(trajectory, index, segment.get());
+            if (status != MK_OK) { mk_trajectory_destroy(projected); return status; }
+            // Followers start from nothing; terms are in dependency order, so a leader that is itself a
+            // follower is complete before it is used.
+            for (uint32_t term = 0; term < term_count; ++term) {
+                auto &target = segment->coefficients[followers[term]];
+                if (term == 0 || followers[term] != followers[term - 1])
+                    for (int degree = 0; degree <= MK_MAX_DEGREE; ++degree) target.value[degree] = 0.0;
+            }
+            for (uint32_t term = 0; term < term_count; ++term) {
+                auto &target = segment->coefficients[followers[term]];
+                const auto &source = segment->coefficients[leaders[term]];
+                for (int degree = 0; degree <= static_cast<int>(segment->degree); ++degree)
+                    target.value[degree] += ratios[term] * source.value[degree] + (degree == 0 ? offsets[term] : 0.0);
+            }
+            status = mk_trajectory_append_segment(projected, segment.get());
+            if (status != MK_OK) { mk_trajectory_destroy(projected); return status; }
+        }
+    } catch (const std::bad_alloc &) { mk_trajectory_destroy(projected); return MK_ERROR_OUT_OF_MEMORY; }
+    *out_trajectory = projected;
+    return MK_OK;
 }
 
 mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,

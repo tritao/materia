@@ -26,6 +26,49 @@ class ToolpathMotionTests {
     return new ToolpathProgram(ops, new ToolLibrary(),
       [new Setup("1", new Point3(0, 0, 0))]);
 
+  /**
+    A printer's travels run at their feed and round their corners; moves of different speeds join in one rounded path
+    whose corner arc goes at the slower of the two; the corners it still stops at are counted by reason.
+  **/
+  static function printerLowering(origin:Provenance):Void {
+    function line(from:Array<Float>, to:Array<Float>, kind:MoveKind, speed:Float, tolerance:Float):ToolpathOp
+      return ToolpathOp.Move(kind, PathGeometry.Line(new Point3(from[0], from[1], 0), new Point3(to[0], to[1], 0)), speed, tolerance, origin);
+    function primitives(result:toolpathkit.motion.ToolpathLoweringResult):Array<motionkit.path.PosePrimitive> {
+      var found:Array<motionkit.path.PosePrimitive> = [];
+      var lowered = result.program;
+      if (lowered == null) throw "nothing lowered";
+      for (op in lowered.ops) switch op {
+        case MotionOp.FollowPath(path, _, _, _): for (primitive in path.primitives) found.push(primitive);
+        case _:
+      }
+      return found;
+    }
+    var printer = new MachineBinding("work", "x", "y", "z", 0.25, new toolpathkit.motion.ToolpathChannels(""));
+    printer.setRapidsAtFeed(true);
+    // A cut at 40 mm/s, a corner of 90 degrees, a travel at 150 mm/s: one path of line, arc, line.
+    var rounded = ToolpathMotion.lower(pathProgram([line([0, 0], [0.02, 0], Cut, 0.04, 0.0001),
+      line([0.02, 0], [0.02, 0.02], Rapid, 0.15, 0.0001)]), printer);
+    var pieces = primitives(rounded);
+    if (pieces.length != 3) throw 'a corner between moves of two speeds is rounded, got ${pieces.length} pieces';
+    if (Math.abs(pieces[0].speedLimit() - 0.04) > 1e-12 || Math.abs(pieces[2].speedLimit() - 0.15) > 1e-12)
+      throw "each move keeps its own speed";
+    if (Math.abs(pieces[1].speedLimit() - 0.04) > 1e-12) throw "the corner arc goes at the slower of the two moves";
+    for (_ in rounded.stops) throw "a rounded corner is not a stop";
+    // Without the flag a travel is a rapid: the machine's rapid speed, and an exact stop.
+    var mill = ToolpathMotion.lower(pathProgram([line([0, 0], [0.02, 0], Cut, 0.04, 0.0001),
+      line([0.02, 0], [0.02, 0.02], Rapid, 0.15, 0.0001)]), new MachineBinding("work", "x", "y", "z", 0.25, new toolpathkit.motion.ToolpathChannels("")));
+    var millPieces = primitives(mill);
+    if (millPieces.length != 2 || Math.abs(millPieces[1].speedLimit() - 0.25) > 1e-12 || mill.stops.get("no blend tolerance") != 1)
+      throw "a rapid keeps the machine's rapid speed and stops at its corner";
+    // A turn of 160 degrees is above the blend limit; a zero tolerance blends nothing.
+    var turn = 160.0 * Math.PI / 180.0;
+    var sharp = ToolpathMotion.lower(pathProgram([line([0, 0], [0.02, 0], Cut, 0.04, 0.0001),
+      line([0.02, 0], [0.02 + 0.02 * Math.cos(turn), 0.02 * Math.sin(turn)], Cut, 0.04, 0.0001),
+      line([0.02 + 0.02 * Math.cos(turn), 0.02 * Math.sin(turn)], [0.0, 0.05], Cut, 0.04, 0.0)]), printer);
+    if (sharp.stops.get("turn angle exceeds blend limit") != 1 || sharp.stops.get("no blend tolerance") != 1)
+      throw 'stops are counted by reason without the angle in it, got ${[for (reason in sharp.stops.keys()) reason + " " + sharp.stops.get(reason)]}';
+  }
+
   static function main():Void {
     if (Sys.getEnv("TOOLPATH_VIRTUAL_CNC_ONLY") == "1") {
       new ToolpathProcessTests().testVirtualCncProgram();
@@ -186,6 +229,7 @@ class ToolpathMotionTests {
         case _: throw "Spindle readiness escaped its machine scope";
       }
     }
+    printerLowering(origin);
     Sys.println("ToolpathKit Motion tests passed (18 assertions)");
     Sys.println('Toolpath accuracy tests passed (${ToolpathAccuracyTests.run()} assertions)');
     MachiningRunTests.run();
