@@ -18,7 +18,10 @@ class SceneViewCommands {
     app.commands.register(new Command("scene.frame-selected", "Frame selected", function() {
       if (app.perspectiveViewport != null) app.perspectiveViewport.frameSelected();
       app.log("Framed " + app.scene.selectedId);
-    }, null, function() return !app.documents.blocked() && app.scene.items().length > 0));
+    }, new Shortcut(UiKey.F), function() return !app.documents.blocked() && app.scene.items().length > 0));
+    app.commands.register(new Command("scene.fit-all", "Fit all", function() {
+      if (app.perspectiveViewport != null) app.perspectiveViewport.fitAll();
+    }, new Shortcut(UiKey.Home), function() return !app.documents.blocked() && app.perspectiveViewport != null));
     app.commands.register(new Command("scene.reset-perspective", "Reset perspective view", function() {
       if (app.perspectiveViewport != null) app.perspectiveViewport.resetView();
       app.log("Perspective view reset");

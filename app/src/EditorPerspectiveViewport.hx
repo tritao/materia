@@ -23,12 +23,13 @@ import haxeon.ui.core.RenderNode;
 import haxeon.ui.core.UiEvent;
 import haxeon.ui.core.UiEventKind;
 import haxeon.ui.core.UiKey;
+import haxeon.ui.core.UiModifier;
 import haxeon.ui.core.View;
 import haxeon.ui.host.UiHostContext;
 import haxeon.ui.semantics.AccessibilityRole;
 import haxeon.ui.semantics.Semantics;
 
-/** Fixed-camera SceneKit GPU render composited into the editor UI. */
+/** Interactive SceneKit GPU viewport composited into the editor UI. */
 class EditorPerspectiveViewport implements View {
   public final key:String;
   final scene:EditorScene;
@@ -50,6 +51,8 @@ class EditorPerspectiveViewport implements View {
   final camera:PerspectiveCamera = new PerspectiveCamera();
   var navigationPointer:Null<Int> = null;
   var navigationMode:Int = 0;
+  final flyKeys:Map<Int, Bool> = new Map();
+  var flyFast:Bool = false;
   var sketchDragRevision:Int = 0;
   var pointerX:Float = 0.0;
   var pointerY:Float = 0.0;
@@ -81,9 +84,23 @@ class EditorPerspectiveViewport implements View {
   var renderedSampleCount:Int = 0;
   var runtimeRevision:Int=0;
   var simulationPoses:Array<SimulationPoseVisual> = [];
+  // Resolve each displayed pose once per simulation presentation, shared by clipping and framing.
+  var simulationPoseById:Map<String, SimulationPoseVisual> = new Map();
+  var simulationTransforms:Map<String, Transform> = new Map();
+  final simulationTransformScratch:Array<Transform> = [];
+  var simulationTransformCount:Int = 0;
+  final clipBoundsScratch:Array<Array<Float>> = [];
+  final clipBounds:Array<Array<Float>> = [];
+  final linkMarkerPath = new PathBuilder();
+  final sensorMarkerPath = new PathBuilder();
+  final sensorRayPath = new PathBuilder();
   var robotVisuals:Array<SimulationRobotVisual> = [];
   final missionOverlay = new MissionOverlayView();
   var overlaysVisible:Bool = true;
+
+  static final LINK_MARKER_COLOR = Color.rgba(0.2, 0.85, 0.55, 0.9);
+  static final SENSOR_MARKER_COLOR = Color.rgba(1.0, 0.75, 0.2, 0.95);
+  static final SENSOR_RAY_COLOR = Color.rgba(0.25, 0.8, 1.0, 0.22);
 
   public function new(key:String, scene:EditorScene, host:UiHostContext, ?style:LayoutStyle) {
     this.key = key;
@@ -115,7 +132,7 @@ class EditorPerspectiveViewport implements View {
   public function presentationKey():String
     return scene.visualRevision + ":" + camera.revision + ":" + lightingRevision + ":" + sketchDragRevision + ":" +
       assemblyDragRevision + ":" + matePickRevision + ":" +
-      hoverRevision + ":" + gridVisible + ":" + gridStep + ":" + sampleCountRequested;
+      hoverRevision + ":orbit:" + orbiting() + ":" + gridVisible + ":" + gridStep + ":" + sampleCountRequested;
 
   public function setLightingPreset(preset:Int):Void {
     if (preset < 0 || preset > 2 || preset == lightingPreset) return;
@@ -132,6 +149,7 @@ class EditorPerspectiveViewport implements View {
         "Scene perspective GPU view");
       node.onPaint(paint, "perspective:" + scene.visualRevision + ":" + runtimeRevision + ":" +
         sketchDragRevision + ":" + assemblyDragRevision + ":hover:" + hoverRevision + ":" + camera.revision +
+        ":orbit:" + orbiting() +
         ":light:" + lightingRevision + ":aa:" + sampleCountRequested + ":" +
         renderedWidth + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep);
       installNavigation(node);
@@ -228,6 +246,56 @@ class EditorPerspectiveViewport implements View {
     if(simulationActive)missionOverlay.paint(canvas,camera,geometry.width,geometry.height);
     paintAssemblyDrag(canvas, geometry.width, geometry.height);
     paintSketchDraft(canvas, geometry.width, geometry.height);
+    paintOrbitPivot(canvas, geometry.width, geometry.height);
+  }
+
+  function flying():Bool return navigationPointer != null && navigationMode == 8;
+
+  /** Advance held-key motion once per host frame, independently of key repeat. */
+  public function advanceNavigation(deltaSeconds:Float):Void {
+    if (!flying()) return;
+    var forward = flyAxis(UiKey.W, UiKey.S);
+    var right = flyAxis(UiKey.D, UiKey.A);
+    var up = flyAxis(69, 81); // E / Q
+    if (forward == 0 && right == 0 && up == 0) return;
+    var speed = Math.max(0.1, camera.distance * 0.5) * (flyFast ? 4.0 : 1.0);
+    camera.fly(forward, right, up, speed * Math.max(0.0, Math.min(0.1, deltaSeconds)));
+    host.requestFrame();
+  }
+
+  function flyAxis(positive:Int, negative:Int):Int
+    return (flyKeys.exists(positive) ? 1 : 0) - (flyKeys.exists(negative) ? 1 : 0);
+
+  function clearFlyKeys():Void {
+    flyKeys.clear();
+    flyFast = false;
+  }
+
+  function flyKey(event:UiEvent, down:Bool):Bool {
+    if (!flying()) return false;
+    var key = event.key;
+    flyFast = (event.modifiers & UiModifier.Shift) != 0;
+    if (key == 340 || key == 344) flyFast = down; // Left / right Shift
+    var movement = key == UiKey.W || key == UiKey.A || key == UiKey.S || key == UiKey.D || key == 81 || key == 69;
+    if (!movement && key != 340 && key != 344) return false;
+    if (movement) {
+      if (down) flyKeys.set(key, true); else flyKeys.remove(key);
+    }
+    host.requestFrame();
+    event.preventDefault(); event.stopPropagation();
+    return true;
+  }
+
+  function orbiting():Bool return navigationPointer != null && navigationMode == 1;
+
+  /** Screen-sized ring at the actual camera target, drawn above scene geometry. */
+  function paintOrbitPivot(canvas:Canvas, width:Float, height:Float):Void {
+    if (!orbiting()) return;
+    var point = camera.project(camera.targetX, camera.targetY, camera.targetZ, width, height);
+    if (point == null) return;
+    var path = new PathBuilder().roundRect(point.x - 6, point.y - 6, 12, 12, 6);
+    canvas.strokeTransient(path.build(), Color.rgba(0.05, 0.06, 0.08, 0.85), 3.5);
+    canvas.strokeTransient(path.build(), Color.rgba(1.0, 1.0, 1.0, 0.95), 1.5);
   }
 
   public function diagnosticState():Dynamic return {
@@ -250,10 +318,15 @@ class EditorPerspectiveViewport implements View {
       var bounds=transformedBounds(transform,selected.width,selected.height,selected.depth);
       camera.frame((bounds[0]+bounds[3])/2,(bounds[1]+bounds[4])/2,(bounds[2]+bounds[5])/2,
         bounds[3]-bounds[0],bounds[4]-bounds[1],bounds[5]-bounds[2],aspect());
+      host.requestFrame();
       return;
     }
+    fitAll();
+  }
+
+  public function fitAll():Void {
     var items = scene.items();
-    if (items.length == 0) { camera.reset(); return; }
+    if (items.length == 0) { resetView(); return; }
     var minX = 1000000000.0, minY = 1000000000.0, minZ = 1000000000.0;
     var maxX = -1000000000.0, maxY = -1000000000.0, maxZ = -1000000000.0;
     for (item in items) {
@@ -263,14 +336,21 @@ class EditorPerspectiveViewport implements View {
       minX=Math.min(minX,bounds[0]);minY=Math.min(minY,bounds[1]);minZ=Math.min(minZ,bounds[2]);
       maxX=Math.max(maxX,bounds[3]);maxY=Math.max(maxY,bounds[4]);maxZ=Math.max(maxZ,bounds[5]);
     }
-    if (minX == 1000000000.0) { camera.reset(); return; }
+    if (minX == 1000000000.0) { resetView(); return; }
     camera.frame((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2,
       maxX - minX, maxY - minY, maxZ - minZ, aspect());
+    host.requestFrame();
   }
 
-  public function resetView():Void camera.reset();
+  public function resetView():Void {
+    camera.reset();
+    host.requestFrame();
+  }
 
-  public function setViewAngle(yaw:Float, pitch:Float):Void camera.setAngle(yaw, pitch);
+  public function setViewAngle(yaw:Float, pitch:Float):Void {
+    camera.setAngle(yaw, pitch);
+    host.requestFrame();
+  }
   public function viewAngleLabel():String return camera.angleLabel();
 
   public function setPlacementOptions(snap:Bool, step:Float, ?visible:Bool = true):Void {
@@ -282,6 +362,11 @@ class EditorPerspectiveViewport implements View {
   public function setSimulationState(active:Bool,poses:Array<SimulationPoseVisual>,revision:Int,
       ?robots:Array<SimulationRobotVisual>):Void {
     simulationActive=active;simulationPoses=poses==null?[]:poses.copy();runtimeRevision=revision;
+    simulationPoseById.clear();
+    simulationTransforms.clear();
+    simulationTransformCount = 0;
+    if (active) for (pose in simulationPoses)
+      if (!simulationPoseById.exists(pose.id)) simulationPoseById.set(pose.id, pose);
     robotVisuals=robots==null?[]:robots.copy();
   }
   /** What the running mission shows on the floor: its route, costmap, sensed obstacles and odometry; null shows none. */
@@ -407,7 +492,10 @@ class EditorPerspectiveViewport implements View {
 
   function releaseNavigation():Null<PerspectivePointer> {
     var pointer = navigationPointer;
+    var wasOrbiting = orbiting();
     navigationPointer = null; navigationMode = 0;
+    clearFlyKeys();
+    if (wasOrbiting) host.requestFrame();
     return pointer == null ? null : new PerspectivePointer(pointer, pointerX, pointerY);
   }
 
@@ -478,40 +566,60 @@ class EditorPerspectiveViewport implements View {
       ray.directionX,ray.directionY,ray.directionZ);
   }
 
-  static function transformedBounds(transform:Transform,width:Float,height:Float,depth:Float):Array<Float>{
-    var result=[1e300,1e300,1e300,-1e300,-1e300,-1e300];
-    for(x in [-width/2,width/2])for(y in [-height/2,height/2])for(z in [-depth/2,depth/2]){
-      var local=[x,y,z];for(row in 0...3){var value=transform.element(12+row);
-        for(column in 0...3)value+=transform.element(column*4+row)*local[column];
-        result[row]=Math.min(result[row],value);result[row+3]=Math.max(result[row+3],value);}}
+  static function transformedBounds(transform:Transform,width:Float,height:Float,depth:Float,
+      ?target:Array<Float>):Array<Float>{
+    // An affine transform maps a centred box to a box whose half extents are |M| * h.
+    // This is the same bound as transforming eight corners, without their temporary arrays.
+    var x = transform.element(12), y = transform.element(13), z = transform.element(14);
+    var hx = Math.abs(width) / 2, hy = Math.abs(height) / 2, hz = Math.abs(depth) / 2;
+    var ex = Math.abs(transform.element(0)) * hx + Math.abs(transform.element(4)) * hy + Math.abs(transform.element(8)) * hz;
+    var ey = Math.abs(transform.element(1)) * hx + Math.abs(transform.element(5)) * hy + Math.abs(transform.element(9)) * hz;
+    var ez = Math.abs(transform.element(2)) * hx + Math.abs(transform.element(6)) * hy + Math.abs(transform.element(10)) * hz;
+    var result = target == null ? [0.0, 0.0, 0.0, 0.0, 0.0, 0.0] : target;
+    result[0] = x - ex; result[1] = y - ey; result[2] = z - ez;
+    result[3] = x + ex; result[4] = y + ey; result[5] = z + ez;
     return result;
   }
 
   function fitCameraClipRange():Void {
-    var bounds:Array<Array<Float>> = [];
+    clipBounds.resize(0);
     for (item in scene.items()) {
       if (!item.visible) continue;
       if (simulationActive) {
-        bounds.push(transformedBounds(displayTransform(item), item.width, item.height, item.depth));
+        var index = clipBounds.length;
+        if (index == clipBoundsScratch.length) clipBoundsScratch.push([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        clipBounds.push(transformedBounds(displayTransform(item), item.width, item.height, item.depth,
+          clipBoundsScratch[index]));
       } else {
         var world = scene.info(item.id).bounds();
         if (world.valid)
-          bounds.push([world.minX, world.minY, world.minZ,
+          clipBounds.push([world.minX, world.minY, world.minZ,
             world.maxX, world.maxY, world.maxZ]);
       }
     }
-    camera.fitClipRange(bounds);
+    camera.fitClipRange(clipBounds);
   }
 
   function displayTransform(item:EditorSceneObject):Transform {
-    if (simulationActive) for (pose in simulationPoses) if (pose.id == item.id)
-      return poseTransform(pose.position,pose.rotation);
+    if (simulationActive) {
+      var cached = simulationTransforms.get(item.id);
+      if (cached != null) return cached;
+      var pose = simulationPoseById.get(item.id);
+      if (pose != null) {
+        if (simulationTransformCount == simulationTransformScratch.length)
+          simulationTransformScratch.push(Transform.identity());
+        var transform = poseTransform(pose.position, pose.rotation,
+          simulationTransformScratch[simulationTransformCount++]);
+        simulationTransforms.set(item.id, transform);
+        return transform;
+      }
+    }
     return Transform.identity().translated(item.x,item.y,item.z);
   }
 
-  static function poseTransform(position:Array<Float>,rotation:Array<Float>):Transform {
+  static function poseTransform(position:Array<Float>,rotation:Array<Float>, ?target:Transform):Transform {
     var x=rotation[0],y=rotation[1],z=rotation[2],w=rotation[3];
-    return Transform.identity()
+    return (target == null ? Transform.identity() : target)
       .set(0,1-2*(y*y+z*z)).set(1,2*(x*y+z*w)).set(2,2*(x*z-y*w))
       .set(4,2*(x*y-z*w)).set(5,1-2*(x*x+z*z)).set(6,2*(y*z+x*w))
       .set(8,2*(x*z+y*w)).set(9,2*(y*z-x*w)).set(10,1-2*(x*x+y*y))
@@ -519,6 +627,7 @@ class EditorPerspectiveViewport implements View {
   }
 
   public function dispose():Void {
+    clearFlyKeys();
     if (surface != null) surface.dispose();
     surface = null;
     if (renderer != null) renderer.dispose();
@@ -577,31 +686,75 @@ class EditorPerspectiveViewport implements View {
     return true;
   }
 
-  function paintSensors(canvas:Canvas,width:Float,height:Float):Void {
-    if(!simulationActive)return;
-    for(robot in robotVisuals){
-      for(link in robot.links){var point=camera.project(link.position[0],link.position[1],link.position[2],width,height);
-        if(point!=null)canvas.fillRect(new Rect(point.x-4,point.y-4,8,8),Color.rgba(0.2,0.85,0.55,0.9));}
-      for(sensor in robot.sensors){
-      var linkPosition=robot.position,linkRotation=robot.rotation;
-      for(link in robot.links)if(link.id==sensor.linkId){linkPosition=link.position;linkRotation=link.rotation;break;}
-      var offset=rotateVector(linkRotation,sensor.mountPosition.toArray());
-      var origin=[linkPosition[0]+offset[0],linkPosition[1]+offset[1],linkPosition[2]+offset[2]];
-      var mount=camera.project(origin[0],origin[1],origin[2],width,height);if(mount==null)continue;
-      canvas.fillRect(new Rect(mount.x-3,mount.y-3,6,6),Color.rgba(1.0,0.75,0.2,0.95));
-      if(sensor.kind!="lidar"||sensor.values.length==0)continue;
-      var rotation=multiplyQuaternion(linkRotation,sensor.mountRotation.toArray()),path=new PathBuilder();
-      var values=sensor.values.toArray(),visibleRays=0;
-      for(index in 0...values.length){var angle=index*6.283185307179586/values.length;
-        var direction=rotateVector(rotation,[Math.cos(angle),Math.sin(angle),0.0]);
-        var hit=camera.project(origin[0]+direction[0]*values[index],origin[1]+direction[1]*values[index],
-          origin[2]+direction[2]*values[index],width,height);
-        if(hit!=null&&(hit.x!=mount.x||hit.y!=mount.y)){path.moveTo(mount.x,mount.y).lineTo(hit.x,hit.y);visibleRays++;}}
-      // Every ray can project to nothing (behind the camera, clipped, or a range that is not finite yet) or have
-      // no length (a zero range before the first scan); stroking such a path would hand the renderer nothing.
-      if(visibleRays>0&&overlaysVisible)canvas.strokeTransient(path.build(),Color.rgba(0.25,0.8,1.0,0.22),1.0);
+  function paintSensors(canvas:Canvas, width:Float, height:Float):Void {
+    if (!simulationActive) return;
+    var projection = camera.viewProjection(width / Math.max(1.0, height));
+    for (robot in robotVisuals) {
+      linkMarkerPath.clear();
+      sensorMarkerPath.clear();
+      sensorRayPath.clear();
+      var hasLinkMarkers = false, hasSensorMarkers = false, visibleRays = 0;
+      for (link in robot.links) {
+        var point = camera.projectWithMatrix(projection, link.position[0], link.position[1],
+          link.position[2], width, height);
+        if (point != null) {
+          appendMarker(linkMarkerPath, point.x, point.y, 4.0);
+          hasLinkMarkers = true;
+        }
+      }
+      for (sensor in robot.sensors) {
+        var linkPosition = robot.position, linkRotation = robot.rotation;
+        for (link in robot.links) if (link.id == sensor.linkId) {
+          linkPosition = link.position;
+          linkRotation = link.rotation;
+          break;
+        }
+        var mountPosition = sensor.mountPosition;
+        var mx = mountPosition.get(0), my = mountPosition.get(1), mz = mountPosition.get(2);
+        var qx = linkRotation[0], qy = linkRotation[1], qz = linkRotation[2], qw = linkRotation[3];
+        var tx = 2 * (qy * mz - qz * my), ty = 2 * (qz * mx - qx * mz), tz = 2 * (qx * my - qy * mx);
+        var originX = linkPosition[0] + mx + qw * tx + qy * tz - qz * ty;
+        var originY = linkPosition[1] + my + qw * ty + qz * tx - qx * tz;
+        var originZ = linkPosition[2] + mz + qw * tz + qx * ty - qy * tx;
+        var mount = camera.projectWithMatrix(projection, originX, originY, originZ, width, height);
+        if (mount == null) continue;
+        appendMarker(sensorMarkerPath, mount.x, mount.y, 3.0);
+        hasSensorMarkers = true;
+        if (!overlaysVisible || sensor.kind != "lidar" || sensor.values.length == 0) continue;
+
+        var mountRotation = sensor.mountRotation;
+        var rx = qw * mountRotation.get(0) + qx * mountRotation.get(3) + qy * mountRotation.get(2) - qz * mountRotation.get(1);
+        var ry = qw * mountRotation.get(1) - qx * mountRotation.get(2) + qy * mountRotation.get(3) + qz * mountRotation.get(0);
+        var rz = qw * mountRotation.get(2) + qx * mountRotation.get(1) - qy * mountRotation.get(0) + qz * mountRotation.get(3);
+        var rw = qw * mountRotation.get(3) - qx * mountRotation.get(0) - qy * mountRotation.get(1) - qz * mountRotation.get(2);
+        var values = sensor.values;
+        for (index in 0...values.length) {
+          var angle = index * 6.283185307179586 / values.length;
+          var vx = Math.cos(angle), vy = Math.sin(angle);
+          var dx = -2 * rz * vy, dy = 2 * rz * vx, dz = 2 * (rx * vy - ry * vx);
+          var directionX = vx + rw * dx + ry * dz - rz * dy;
+          var directionY = vy + rw * dy + rz * dx - rx * dz;
+          var directionZ = rw * dz + rx * dy - ry * dx;
+          var distance = values.get(index);
+          var hit = camera.projectWithMatrix(projection,
+            originX + directionX * distance, originY + directionY * distance,
+            originZ + directionZ * distance, width, height);
+          if (hit != null && (hit.x != mount.x || hit.y != mount.y)) {
+            sensorRayPath.moveTo(mount.x, mount.y).lineTo(hit.x, hit.y);
+            visibleRays++;
+          }
+        }
+        // Every ray can project to nothing or have no length before the first scan.
+      }
+      if (hasLinkMarkers) canvas.fillTransient(linkMarkerPath.build(), LINK_MARKER_COLOR);
+      if (hasSensorMarkers) canvas.fillTransient(sensorMarkerPath.build(), SENSOR_MARKER_COLOR);
+      if (visibleRays > 0) canvas.strokeTransient(sensorRayPath.build(), SENSOR_RAY_COLOR, 1.0);
     }
-    }
+  }
+
+  static inline function appendMarker(path:PathBuilder,x:Float,y:Float,halfSize:Float):Void {
+    path.moveTo(x-halfSize,y-halfSize).lineTo(x+halfSize,y-halfSize)
+      .lineTo(x+halfSize,y+halfSize).lineTo(x-halfSize,y+halfSize).close();
   }
 
   function paintSketchDraft(canvas:Canvas, width:Float, height:Float):Void {
@@ -728,14 +881,6 @@ class EditorPerspectiveViewport implements View {
     return camera.project(world.x, world.y, world.z, width, height);
   }
 
-  static function rotateVector(q:Array<Float>,v:Array<Float>):Array<Float>{
-    var x=q[0],y=q[1],z=q[2],w=q[3],tx=2*(y*v[2]-z*v[1]),ty=2*(z*v[0]-x*v[2]),tz=2*(x*v[1]-y*v[0]);
-    return [v[0]+w*tx+y*tz-z*ty,v[1]+w*ty+z*tx-x*tz,v[2]+w*tz+x*ty-y*tx];
-  }
-  static function multiplyQuaternion(a:Array<Float>,b:Array<Float>):Array<Float>return[
-    a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],
-    a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];
-
   function ensureRenderer():Void {
     if (renderer != null || host.gpuRendererId == 0) return;
     renderer = SceneRenderer.createBorrowedId(host.gpuRendererId);
@@ -746,7 +891,29 @@ class EditorPerspectiveViewport implements View {
 
   function installNavigation(node:RenderNode):Void {
     node.on(UiEventKind.PointerDown, function(event:UiEvent) {
+      if (navigationPointer != null) return;
+      if (event.button == 1) {
+        clearFlyKeys();
+        flyFast = (event.modifiers & UiModifier.Shift) != 0;
+        navigationPointer = event.pointerId;
+        navigationMode = 8;
+        pointerX = pointerStartX = event.x; pointerY = pointerStartY = event.y;
+        pointerMoved = false;
+        clearHover();
+        event.capturePointer(); event.preventDefault(); event.stopPropagation();
+        return;
+      }
       if (event.button != 0 && event.button != 2) return;
+      var navigate = event.button == 2 || (event.button == 0 && (event.modifiers & UiModifier.Alt) != 0);
+      if (navigate) {
+        navigationPointer = event.pointerId;
+        navigationMode = (event.modifiers & UiModifier.Shift) != 0 ? 2 : 1;
+        pointerX = pointerStartX = event.x; pointerY = pointerStartY = event.y;
+        pointerMoved = false;
+        if (orbiting()) host.requestFrame();
+        event.capturePointer(); event.preventDefault(); event.stopPropagation();
+        return;
+      }
       updateHover(event.localX, event.localY);
       if (event.button == 0 && matePick != null) {
         pickMateFace(hoveredObjectId, hoveredFaceIndex);
@@ -778,7 +945,7 @@ class EditorPerspectiveViewport implements View {
         return;
       }
       navigationPointer = event.pointerId;
-      navigationMode = event.button == 0 ? 1 : 2;
+      navigationMode = 7; // Selection without camera movement.
       if (event.button == 0) {
         var hit = pick(event.localX, event.localY);
         if (hit != "scene"&&editingEnabled()) {
@@ -805,6 +972,10 @@ class EditorPerspectiveViewport implements View {
         pointerMoved = true;
       var sketchDrag = sketchRectangleDrag;
       if (navigationMode == 1) camera.orbit(deltaX, deltaY);
+      else if (navigationMode == 8) {
+        flyFast = (event.modifiers & UiModifier.Shift) != 0;
+        camera.look(deltaX, deltaY);
+      }
       else if (navigationMode == 2) camera.pan(deltaX, deltaY, Math.max(1, renderedHeight));
       else if (objectDrag != null) objectDrag.update(camera, event.localX, event.localY,
         Math.max(1, renderedWidth), Math.max(1, renderedHeight));
@@ -826,7 +997,8 @@ class EditorPerspectiveViewport implements View {
           }
         }
       }
-      if (navigationMode != 4) updateHover(event.localX, event.localY);
+      if (navigationMode == 1 || navigationMode == 2 || navigationMode == 8) host.requestFrame();
+      if (navigationMode != 4 && navigationMode != 8) updateHover(event.localX, event.localY);
       event.preventDefault(); event.stopPropagation();
     });
     node.on(UiEventKind.HoverEnter, function(event:UiEvent) {
@@ -837,6 +1009,7 @@ class EditorPerspectiveViewport implements View {
     });
     var finish = function(event:UiEvent) {
       if (navigationPointer == null || event.pointerId != navigationPointer) return;
+      var wasOrbiting = orbiting();
       var sketchDrag = sketchRectangleDrag;
       if (navigationMode == 3 && objectDrag != null) {
         if (event.kind == UiEventKind.PointerUp) objectDrag.commit(); else objectDrag.cancel();
@@ -859,9 +1032,11 @@ class EditorPerspectiveViewport implements View {
         }
         sketchRectangleDrag = null;
         sketchDragRevision++;
-      } else if (event.kind == UiEventKind.PointerUp && navigationMode == 1 && !pointerMoved)
+      } else if (event.kind == UiEventKind.PointerUp && navigationMode == 7 && !pointerMoved)
         selectAt(event.localX,event.localY);
       navigationPointer = null; navigationMode = 0;
+      clearFlyKeys();
+      if (wasOrbiting) host.requestFrame();
       if (event.kind == UiEventKind.PointerUp) updateHover(event.localX, event.localY);
       else clearHover();
       event.releasePointer(); event.preventDefault(); event.stopPropagation();
@@ -869,10 +1044,30 @@ class EditorPerspectiveViewport implements View {
     node.on(UiEventKind.PointerUp, finish);
     node.on(UiEventKind.PointerCancel, finish);
     node.on(UiEventKind.Scroll, function(event:UiEvent) {
-      camera.zoom(event.deltaY);
+      if (navigationPointer != null) { event.preventDefault(); event.stopPropagation(); return; }
+      var ray = camera.screenRay(event.localX, event.localY, Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+      var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
+        simulationActive ? simulationPoses : null);
+      var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
+        ray.directionX, ray.directionY, ray.directionZ);
+      var anchor = hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z)
+        ? [hit.x, hit.y, hit.z]
+        : camera.cursorAnchor(event.localX, event.localY, Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+      camera.zoomAt(event.deltaY, anchor[0], anchor[1], anchor[2]);
+      host.requestFrame();
       event.preventDefault(); event.stopPropagation();
     });
+    node.on(UiEventKind.KeyUp, function(event:UiEvent) { flyKey(event, false); });
+    node.on(UiEventKind.KeyRepeat, function(event:UiEvent) { flyKey(event, true); });
+    node.on(UiEventKind.Blur, function(_) { clearFlyKeys(); });
+    node.on(UiEventKind.FocusLost, function(_) { clearFlyKeys(); });
     node.on(UiEventKind.KeyDown, function(event:UiEvent) {
+      if (flying() && event.key == UiKey.Escape) {
+        clearFlyKeys();
+        event.cancelPointerCapture(); event.preventDefault(); event.stopPropagation();
+        return;
+      }
+      if (flyKey(event, true)) return;
       if (event.key == UiKey.Escape && sketchRectangleDrag != null) {
         sketchRectangleDrag = null;
         sketchDragRevision++;

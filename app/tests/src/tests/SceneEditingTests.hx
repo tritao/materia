@@ -23,6 +23,9 @@ import app.EditorPerspectiveViewport;
 import app.PerspectiveSceneDrag;
 import app.Main.ReferenceEditorApp;
 import haxeon.ui.core.UiContext;
+import haxeon.ui.core.UiKey;
+import haxeon.ui.core.UiEventKind;
+import haxeon.ui.core.UiModifier;
 import haxeon.ui.host.UiHostContext;
 import robotkit.world.RobotWorld;
 import robotkit.recording.McapRobotRecording;
@@ -50,7 +53,9 @@ import materia.project.Appearance.Appearances;
 import materia.project.MaterialLibrary;
 
 @:access(app.EditorPerspectiveViewport)
+@:access(app.ApplicationSimulation)
 @:access(app.Main.ReferenceEditorApp)
+@:access(haxeon.ui.core.RenderNode)
 class SceneEditingTests {
   static function property(properties:Array<PropertyDescriptor>, key:String):PropertyDescriptor {
     for (candidate in properties)
@@ -188,10 +193,35 @@ class SceneEditingTests {
     camera.orbit(20, -10);
     check(camera.revision > initialRevision && camera.pitch > -1.49 && camera.pitch < 1.49,
       "perspective orbit changes bounded camera state");
+    var flyCamera = new PerspectiveCamera();
+    var flyEye = flyCamera.eyePosition();
+    flyCamera.look(40, -20);
+    var lookedEye = flyCamera.eyePosition();
+    for (axis in 0...3) near(lookedEye[axis], flyEye[axis], "fly mouse-look keeps the flyEye fixed");
+    var forward = flyCamera.viewDirection();
+    flyCamera.fly(1, 0, 0, 2);
+    var movedEye = flyCamera.eyePosition();
+    for (axis in 0...3) near(movedEye[axis], flyEye[axis] - forward[axis] * 2,
+      "fly forward moves in the look direction");
+    var start = flyCamera.eyePosition();
+    flyCamera.fly(1, 1, 0, 2);
+    var diagonal = flyCamera.eyePosition();
+    var dx = diagonal[0] - start[0], dy = diagonal[1] - start[1], dz = diagonal[2] - start[2];
+    near(Math.sqrt(dx * dx + dy * dy + dz * dz), 2, "diagonal fly speed is normalized");
     var targetX = camera.targetX, targetY = camera.targetY;
     camera.pan(30, -15, 600);
     check(camera.targetX != targetX || camera.targetY != targetY,
       "perspective pan moves the orbit target");
+    // A fixed world point follows the pointer on both screen axes, at different angles.
+    for (angle in [0.0, 0.8, -0.8]) {
+      var panCamera = new PerspectiveCamera();
+      panCamera.setAngle(angle, angle);
+      var anchor = panCamera.cursorAnchor(400, 300, 800, 600);
+      panCamera.pan(30, -15, 600);
+      var moved = panCamera.project(anchor[0], anchor[1], anchor[2], 800, 600);
+      check(moved != null && Math.abs(moved.x - 430) < 0.01 && Math.abs(moved.y - 285) < 0.01,
+        "panning moves scene content with the pointer on both axes");
+    }
     camera.zoom(-120);
     check(camera.distance < initialDistance, "perspective wheel zoom moves closer");
     camera.frame(2.0, -3.0, 0.0, 4.0, 2.0, 0.1, 16.0 / 9.0);
@@ -201,11 +231,41 @@ class SceneEditingTests {
     var wideDistance = camera.distance;
     camera.frame(2.0, -3.0, 0.0, 4.0, 2.0, 0.1, 0.5);
     check(camera.distance > wideDistance, "perspective framing adapts to a narrow resize");
+    // Cursor anchoring must hold at off-center pixels and at the zoom clamp.
+    for (delta in [-120.0, 240.0, -100000.0]) {
+      var anchor = camera.cursorAnchor(170, 440, 800, 600);
+      camera.zoomAt(delta, anchor[0], anchor[1], anchor[2]);
+      var point = camera.project(anchor[0], anchor[1], anchor[2], 800, 600);
+      check(point != null, "zoom anchor remains in front of camera");
+      if (point != null) {
+        check(Math.abs(point.x - 170) < 0.1, "cursor zoom preserves horizontal anchor");
+        check(Math.abs(point.y - 440) < 0.1, "cursor zoom preserves vertical anchor");
+      }
+    }
+    camera.frame(2.0, -3.0, 0.0, 4.0, 2.0, 0.1, 0.5);
+    for (ix in 0...2) for (iy in 0...2) for (iz in 0...2) {
+      var corner = camera.project(2 + (ix - 0.5) * 4, -3 + (iy - 0.5) * 2,
+        (iz - 0.5) * 0.1, 300, 600);
+      check(corner != null && corner.x >= 0 && corner.x <= 300 && corner.y >= 0 && corner.y <= 600,
+        "framing fits every corner in a portrait viewport");
+    }
     var matrix = camera.viewProjection(16.0 / 9.0);
     for (index in 0...16) {
       var value = matrix.element(index);
       check(value == value && value - value == 0.0, "perspective matrix remains finite");
     }
+    var source = [2.0, -3.0, 0.0, 1.0], clip:Array<Float> = [];
+    for (row in 0...4) {
+      var value = 0.0;
+      for (column in 0...4) value += matrix.element(column * 4 + row) * source[column];
+      clip.push(value);
+    }
+    var projected = camera.projectWithMatrix(matrix, source[0], source[1], source[2], 1600, 900);
+    check(projected != null && nearValue(projected.x, (clip[0]/clip[3]*0.5+0.5)*1600) &&
+      nearValue(projected.y, (0.5-clip[1]/clip[3]*0.5)*900) && nearValue(projected.depth, clip[2]/clip[3]),
+      "shared projection agrees with homogeneous matrix multiplication");
+    check(camera.projectWithMatrix(nativekit.scene.Transform.identity().set(15,-1),0,0,0,800,600)==null,
+      "shared projection rejects points behind the camera");
     camera.reset();
     camera.fitClipRange([[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]]);
     check(camera.clipNear > camera.distance * 0.5 && camera.clipFar < camera.distance * 2.0,
@@ -367,6 +427,45 @@ class SceneEditingTests {
     restored.dispose(); scene.dispose();
   }
 
+  static function assemblyPoseComposition():Void {
+    for (index in 0...32) {
+      var angle = index * 0.137, sine = Math.sin(angle / 2);
+      var pose = {position:[1.5, -2.0, 0.25],
+        rotation:[2*sine/3, -sine/3, 2*sine/3, Math.cos(angle/2)]};
+      var offset:materia.assembly.AssemblyRecord.AssemblyFrame = {
+        x:0.25*index, y:-0.5, z:0.75, qx:Math.sin(angle), qy:0.0, qz:0.0, qw:Math.cos(angle)};
+      var composed = app.AssemblyRobot.compose(pose, offset);
+      var moved = app.AssemblyRobot.rotate(pose.rotation, [offset.x, offset.y, offset.z]);
+      var probe = [0.75, -0.25, 1.0];
+      var expected = app.AssemblyRobot.rotate(pose.rotation,
+        app.AssemblyRobot.rotate([offset.qx, offset.qy, offset.qz, offset.qw], probe));
+      var actual = app.AssemblyRobot.rotate(composed.rotation, probe);
+      for (axis in 0...3) {
+        near(composed.position[axis], pose.position[axis]+moved[axis], "composed part position");
+        near(actual[axis], expected[axis], "composed part rotation follows parent then offset");
+      }
+      var center = [0.3, -0.7, 0.2 * index];
+      var visual = ApplicationSimulation.prepareAssemblyVisual({id:"part", robotIndex:2, linkIndex:3,
+        offset:offset, center:center});
+      var centred = app.AssemblyRobot.composeComponents(pose.position, pose.rotation, visual.offset);
+      var rotatedCenter = ApplicationSimulation.rotateOffset(center[0], center[1], center[2], composed.rotation);
+      for (axis in 0...3) {
+        near(centred.position[axis], composed.position[axis] + rotatedCenter[axis],
+          "prepared visual frame matches world-space geometry centre");
+        near(centred.rotation[axis], composed.rotation[axis], "prepared visual frame preserves rotation");
+      }
+      near(centred.rotation[3], composed.rotation[3], "prepared visual frame preserves quaternion W");
+      check(visual.id == "part" && visual.robotIndex == 2 && visual.linkIndex == 3 &&
+        offset.x == 0.25 * index && center[0] == 0.3,
+        "preparing visual metadata preserves identity and authored inputs");
+      var next = app.AssemblyRobot.compose(pose, offset);
+      composed.position[0] = 999;
+      composed.rotation[0] = 999;
+      check(next.position[0] != 999 && next.rotation[0] != 999 && pose.position[0] == 1.5,
+        "composed poses retain independent output and preserve their inputs");
+    }
+  }
+
   static function simulationViewportSemantics():Void {
     var scene = new EditorScene();
     scene.select("tower");
@@ -389,6 +488,15 @@ class SceneEditingTests {
     check(scene.pickRayWithView(perspectiveView,ray.originX,ray.originY,ray.originZ,
       ray.directionX,ray.directionY,ray.directionZ)=="tower",
       "perspective picking follows rotated simulation geometry and stable document IDs");
+    var movedPose:{id:String,position:Array<Float>,rotation:Array<Float>} = {
+      id:"tower", position:[30.0,20.0,15.0], rotation:[0.0,0.0,0.0,1.0]};
+    var nextView = scene.configureRenderView(new SceneView(),perspective.viewProjection(4.0/3.0),[movedPose]);
+    check(scene.pickRayWithView(nextView,ray.originX,ray.originY,ray.originZ,
+      ray.directionX,ray.directionY,ray.directionZ)=="scene",
+      "next presentation uses the updated simulation pose");
+    check(scene.pickRayWithView(perspectiveView,ray.originX,ray.originY,ray.originZ,
+      ray.directionX,ray.directionY,ray.directionZ)=="tower",
+      "reusing pose scratch transforms preserves previously built views");
     scene.setVisible("tower",false);
     check(scene.pickRayWithView(perspectiveView,ray.originX,ray.originY,ray.originZ,
       ray.directionX,ray.directionY,ray.directionZ)=="scene",
@@ -1038,6 +1146,187 @@ class SceneEditingTests {
     scene.dispose();
   }
 
+  static function viewportPaintNode(root:haxeon.ui.core.RenderNode):haxeon.ui.core.RenderNode {
+    var found:Null<haxeon.ui.core.RenderNode> = null;
+    root.walk(function(node) {
+      var key = node.retainedPaintKey();
+      if (key != null && key.indexOf("handler:perspective:") >= 0) found = node;
+    });
+    if (found == null) throw "Docked viewport paint node is missing";
+    return found;
+  }
+
+  static function styledNode(root:haxeon.ui.core.RenderNode, key:String):haxeon.ui.core.RenderNode {
+    var found:Null<haxeon.ui.core.RenderNode> = null;
+    root.walk(function(node) { if (node.styleKey == key) found = node; });
+    if (found == null) throw "Missing styled node: " + key;
+    return found;
+  }
+
+  static function chromeRetention(app:ReferenceEditorApp, frame:LayoutFrame):Void {
+    // Force full submissions, as a live simulation does, rather than testing the outer submit cache.
+    function submit():haxeon.ui.core.RenderNode return app.ui.submit(app.view(), frame);
+    app.scene.createRectangle();
+    check(app.simulation.rebuild(app.sensors, app.scene, app.session),
+      "chrome test builds a shared simulation: " + app.simulation.error);
+    var root = submit();
+    var top = styledNode(root, "editor-toolbar"), status = styledNode(root, "editor-status-bar");
+    app.simulation.step();
+    root = submit();
+    check(styledNode(root, "editor-toolbar") == top && styledNode(root, "editor-status-bar") == status,
+      "new simulation poses retain unchanged top and status render subtrees");
+
+    app.simulation.start();
+    root = submit();
+    check(styledNode(root, "editor-toolbar") != top && styledNode(root, "editor-status-bar") != status,
+      "starting simulation refreshes transport and status");
+    check(!styledNode(root, "toolbar-sim-step").enabled && styledNode(root, "toolbar-sim-pause").enabled,
+      "running transport shows Pause and disables Step");
+    top = styledNode(root, "editor-toolbar"); status = styledNode(root, "editor-status-bar");
+    root = submit();
+    check(styledNode(root, "editor-toolbar") == top && styledNode(root, "editor-status-bar") == status,
+      "unchanged running state retains both chrome subtrees");
+    app.simulation.stop();
+    root = submit();
+    check(styledNode(root, "toolbar-sim-step").enabled && styledNode(root, "toolbar-sim-play").enabled,
+      "pausing refreshes transport availability without a registry refresh");
+
+    top = styledNode(root, "editor-toolbar"); status = styledNode(root, "editor-status-bar");
+    app.simulation.setTimestep(app.simulation.timestep * 2.0);
+    root = submit();
+    check(styledNode(root, "editor-toolbar") != top && styledNode(root, "editor-status-bar") != status,
+      "pending simulation configuration refreshes both state labels");
+    status = styledNode(root, "editor-status-bar");
+    app.simulation.error = "Chrome test failure";
+    root = submit();
+    check(styledNode(root, "editor-status-bar") != status,
+      "simulation errors refresh status text and color");
+    app.simulation.error = null;
+
+    // A document confirmation must also block commands inside retained chrome.
+    app.documents.requestNew();
+    root = submit();
+    check(app.documents.blocked() && !styledNode(root, "toolbar-save").enabled,
+      "document confirmation refreshes retained command enabled states");
+    app.documents.resolve("cancel");
+    root = submit();
+    check(styledNode(root, "toolbar-save").enabled, "dismissing confirmation restores command availability");
+    app.simulation.clear();
+  }
+
+  static function dockedNavigationInput():Void {
+    var fonts = haxeon.ui.FontCollection.create();
+    var font:Null<String> = null;
+    for (candidate in ["haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
+      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"])
+      if (FileSystem.exists(candidate)) font = candidate;
+    check(font != null, "navigation test font exists");
+    fonts.add(cast font);
+    var directory = "build/navigation-input-test-" + Std.string(Std.int(Sys.time()));
+    FileSystem.createDirectory(directory);
+    var app = new ReferenceEditorApp(fonts, directory + "/workspace.json");
+    var requests = 0;
+    var host = new UiHostContext(fonts, new NativeKitEvents(), function() {}, function() requests++);
+    var viewport = new EditorPerspectiveViewport("scene-perspective", app.scene, host);
+    app.perspectiveViewport = viewport;
+    app.workspace.activate("perspective");
+    var frame = new LayoutFrame(1400, 900);
+    try {
+      var node = viewportPaintNode(app.submit(frame));
+      var bounds = node.globalBounds();
+      viewport.renderedWidth = Std.int(bounds.width);
+      viewport.renderedHeight = Std.int(bounds.height);
+      var x = bounds.x + bounds.width * 0.6, y = bounds.y + bounds.height * 0.6;
+      var before = node.retainedPaintKey(), distance = viewport.camera.distance;
+      // Warm both the editor submission cache and the dock pane cache.
+      app.submit(frame);
+      app.ui.scroll(x, y, 0, -120);
+      check(viewport.camera.distance < distance, "docked wheel input changes camera distance");
+      node = viewportPaintNode(app.submit(frame));
+      check(node.retainedPaintKey() != before, "docked wheel zoom rebuilds retained paint instructions");
+      before = node.retainedPaintKey();
+      var yaw = viewport.camera.yaw;
+      app.ui.pointerDown(x, y, 2);
+      check(viewport.orbiting(), "orbit pivot is visible on press before movement");
+      var orbitPressKey = viewportPaintNode(app.submit(frame)).retainedPaintKey();
+      check(orbitPressKey != before, "orbit press invalidates docked paint for pivot ring");
+      app.ui.pointerMove(x + 30, y + 10);
+      app.ui.pointerUp(x + 30, y + 10, 2);
+      check(!viewport.orbiting(), "orbit pivot hides on release");
+      check(viewport.camera.yaw != yaw, "docked middle drag orbits");
+      check(viewportPaintNode(app.submit(frame)).retainedPaintKey() != before,
+        "docked orbit rebuilds retained paint instructions");
+      before = viewportPaintNode(app.submit(frame)).retainedPaintKey();
+      app.ui.pointerDown(x, y, 2);
+      check(viewportPaintNode(app.submit(frame)).retainedPaintKey() != before,
+        "stationary orbit press shows pivot ring through dock cache");
+      app.ui.pointerUp(x, y, 2);
+      check(viewportPaintNode(app.submit(frame)).retainedPaintKey() == before,
+        "stationary orbit release removes pivot ring through dock cache");
+      var target = viewport.camera.targetX;
+      app.ui.pointerDown(x, y, 0, haxeon.ui.core.UiModifier.Alt | haxeon.ui.core.UiModifier.Shift);
+      check(!viewport.orbiting(), "panning does not show the orbit pivot");
+      app.ui.pointerMove(x + 25, y, haxeon.ui.core.UiModifier.Alt | haxeon.ui.core.UiModifier.Shift);
+      app.ui.pointerUp(x + 25, y, 0, haxeon.ui.core.UiModifier.Alt | haxeon.ui.core.UiModifier.Shift);
+      check(viewport.camera.targetX != target, "docked Alt+Shift drag pans");
+      check(viewportPaintNode(app.submit(frame)).retainedPaintKey() != before,
+        "docked pan rebuilds retained paint instructions");
+      // Hold RMB: look around the eye, then advance WASD through real app submissions.
+      var eye = viewport.camera.eyePosition();
+      app.ui.pointerDown(x, y, 1);
+      check(viewport.flying() && !viewport.orbiting(), "right mouse enters fly without orbit marker");
+      app.ui.pointerMove(x + 35, y + 20);
+      var lookedEye = viewport.camera.eyePosition();
+      for (axis in 0...3) near(lookedEye[axis], eye[axis], "RMB look preserves eye position");
+      app.ui.key(UiEventKind.KeyDown, UiKey.W);
+      var backward = viewport.camera.viewDirection();
+      var speed = Math.max(0.1, viewport.camera.distance * 0.5);
+      before = viewportPaintNode(app.submit(frame)).retainedPaintKey();
+      frame.deltaSeconds = 0.02;
+      app.submit(frame);
+      var moved = viewport.camera.eyePosition();
+      for (axis in 0...3) near(moved[axis], eye[axis] - backward[axis] * speed * 0.02,
+        "held W advances camera once per host frame");
+      check(viewportPaintNode(app.submit(new LayoutFrame(1400, 900))).retainedPaintKey() != before,
+        "fly movement invalidates docked paint");
+      app.ui.key(UiEventKind.KeyDown, 340, UiModifier.Shift);
+      app.submit(frame);
+      var fast = viewport.camera.eyePosition();
+      for (axis in 0...3) near(fast[axis], moved[axis] - backward[axis] * speed * 0.02 * 4,
+        "Shift boosts flight speed");
+      app.ui.key(UiEventKind.KeyUp, UiKey.W, UiModifier.Shift);
+      var stoppedRevision = viewport.camera.revision;
+      app.submit(frame);
+      check(viewport.camera.revision == stoppedRevision, "key release stops continuous flight");
+      app.ui.key(UiEventKind.KeyDown, UiKey.D);
+      app.ui.pointerUp(x + 35, y + 20, 1);
+      stoppedRevision = viewport.camera.revision;
+      app.submit(frame);
+      check(!viewport.flying() && viewport.camera.revision == stoppedRevision,
+        "RMB release clears held movement keys");
+      app.ui.pointerDown(x, y, 1);
+      app.submit(frame);
+      check(viewport.camera.revision == stoppedRevision, "new flight starts without stale keys");
+      app.ui.key(UiEventKind.KeyDown, UiKey.W);
+      app.ui.key(UiEventKind.KeyDown, UiKey.Escape);
+      app.submit(frame);
+      check(!viewport.flying() && viewport.camera.revision == stoppedRevision,
+        "Escape cancels flight and capture");
+      app.ui.pointerDown(x, y, 1);
+      app.ui.key(UiEventKind.KeyDown, UiKey.W);
+      app.ui.windowFocusLost();
+      app.submit(frame);
+      check(!viewport.flying() && viewport.camera.revision == stoppedRevision,
+        "window focus loss cancels flight and held movement");
+
+      chromeRetention(app, frame);
+
+    } catch (error:Dynamic) {
+      app.dispose(); fonts.dispose(); throw error;
+    }
+    app.dispose(); fonts.dispose();
+  }
+
   static function perspectiveHoverInput():Void {
     var scene = new EditorScene();
     var frameRequests = 0;
@@ -1047,9 +1336,39 @@ class SceneEditingTests {
     var viewport = new EditorPerspectiveViewport("hover-test", scene, host);
     var ui = new UiContext();
     try {
+      var rotatedBox = nativekit.scene.Transform.identity()
+        .set(0, 0).set(1, 2).set(4, -3).set(5, 0).translated(1, 2, 3);
+      var rotatedBounds = EditorPerspectiveViewport.transformedBounds(rotatedBox, 4, 6, 8);
+      check(nearValue(rotatedBounds[0], -8) && nearValue(rotatedBounds[3], 10) &&
+        nearValue(rotatedBounds[1], -2) && nearValue(rotatedBounds[4], 6) &&
+        nearValue(rotatedBounds[2], -1) && nearValue(rotatedBounds[5], 7),
+        "clip bounds preserve rotated and scaled box extents");
+      var box:app.EditorScene.EditorSceneObject = scene.object("box");
+      if (box == null) throw "missing box fixture";
+      viewport.setSimulationState(true, [{id: "box", position: [1.0, 2.0, 3.0],
+        rotation: [0.0, 0.0, 0.0, 1.0]}], 1);
+      var firstTransform = viewport.displayTransform(box);
+      var firstBounds = EditorPerspectiveViewport.transformedBounds(firstTransform, 0, 0, 0);
+      check(nearValue(firstBounds[0], 1.0) && nearValue(firstBounds[1], 2.0),
+        "display transform resolves a simulation pose by object id");
+      check(viewport.displayTransform(box) == firstTransform,
+        "clipping and framing reuse a pose transform within one presentation");
+      viewport.setSimulationState(true, [{id: "box", position: [4.0, 5.0, 6.0],
+        rotation: [0.0, 0.0, 0.0, 1.0]}], 1);
+      check(viewport.displayTransform(box) == firstTransform,
+        "successive presentations reuse viewport scratch transforms");
+      var nextBounds = EditorPerspectiveViewport.transformedBounds(viewport.displayTransform(box), 0, 0, 0, firstBounds);
+      check(nextBounds == firstBounds, "clip bounds reuse caller storage");
+      check(nearValue(nextBounds[0], 4.0),
+        "new pose input invalidates transforms even when the supplied revision is unchanged");
+      viewport.setSimulationState(false, null, 2);
+      var authoredBounds = EditorPerspectiveViewport.transformedBounds(viewport.displayTransform(box), 0, 0, 0);
+      check(nearValue(authoredBounds[0], box.x),
+        "stopping simulation restores the authored display transform");
       viewport.renderedWidth = 800;
       viewport.renderedHeight = 600;
       viewport.frameSelected();
+      frameRequests = 0;
       var beforeKey = viewport.presentationKey();
       ui.submit(viewport, new LayoutFrame(800.0, 600.0));
 
@@ -1201,7 +1520,32 @@ class SceneEditingTests {
     scene.dispose();
   }
 
+  static function packedPoseEditing():Void {
+    var scene = nativekit.scene.Scene.create();
+    var transaction = scene.beginTransaction();
+    var first = transaction.createNode(), second = transaction.createNode();
+    transaction.commit();
+    var view = new SceneView();
+    view.replacePoses([first], [Transform.identity()]);
+    check(view.poseOverrideCount() == 1, "packed pose publication records its count");
+    view.setPose(first, Transform.identity().translated(2, 3, 4));
+    check(view.poseOverrideCount() == 1, "editing a packed pose replaces the existing node");
+    view.setPose(second, Transform.identity());
+    check(view.poseOverrideCount() == 2, "editing a packed pose list can add another node");
+    view.replacePoses([second], [Transform.identity()]);
+    check(view.poseOverrideCount() == 1, "bulk replacement discards incremental poses");
+    var rejected = false;
+    try view.replacePoses([first, second], [Transform.identity()]) catch (error:Dynamic) rejected = true;
+    check(rejected && view.poseOverrideCount() == 1, "invalid bulk replacement preserves existing poses");
+    view.clearPoses();
+    check(view.poseOverrideCount() == 0, "clearing removes packed poses");
+    view.setPose(first, Transform.identity());
+    check(view.poseOverrideCount() == 1, "incremental editing works after clearing packed poses");
+    scene.dispose();
+  }
+
   static function main():Int {
+    packedPoseEditing();
     var emptyApp = new ReferenceEditorApp();
     check(emptyApp.scene.items().length == 0, "default launch starts with an empty scene");
     var commandRevision = emptyApp.commands.revision;
@@ -1215,6 +1559,7 @@ class SceneEditingTests {
     revisionSeparation();
     appearanceArtifactRoundTrip();
     componentFinishReset();
+    dockedNavigationInput();
     perspectiveHoverInput();
     cadFaceHoverPresentation();
     cadPreviewFaceHoverPresentation();
@@ -1289,6 +1634,7 @@ class SceneEditingTests {
       assemblyOccurrenceDragging();
       semanticActionHooks();
       cadPlateMesh();
+      assemblyPoseComposition();
       simulationViewportSemantics();
       sensorConfiguration();
       sensorWorkflow();
