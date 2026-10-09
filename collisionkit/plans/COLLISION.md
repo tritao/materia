@@ -7,15 +7,15 @@ Lane C (OMPL listed as out of scope). This is that plan.
 
 Revised on 2026-10-01, after CL1: the world moves out of the kit into its
 own package, and three errors are fixed (see the revision log). The plan
-moves to `collisionkit/plans/` with CL2.
+moved from `kinematicskit/plans/` to `collisionkit/plans/` with CL2.
 
 ## Where things stand (2026-10-01, main's clearance code 2026-10-09)
 
-- **coal** is a submodule at `kinematicskit/native/vendor/coal`.
-  - CL1 linked it into `kinematicskit_core`, so every package that builds
-    kinematicskit-native compiles it (about a minute): `motionkit-robot`
-    and its users, such as processkit, toolpathkit's motion package, the
-    RobotKit suites and the robot-arm example.
+- **coal** is a submodule at `collisionkit/native/vendor/coal` (since CL2;
+  it was at `kinematicskit/native/vendor/coal`).
+  - CL1 linked it into `kinematicskit_core`, so every package that built
+    kinematicskit-native compiled it. Since CL2 only collisionkit-native
+    does.
   - The build has primitives, convex sets, BVH meshes, height fields and
     the broadphase managers. It has no octrees, no mesh-file loading and
     no qhull. Hulls come as point sets from CadKit's pure-Haxe
@@ -391,7 +391,7 @@ Each step is its own commit with all suites green.
   2026-10-09.
 - **CL1 — Native collision world in the kit.** Done (311788aa9), see the
   progress log. CL2 moves it out of the kit.
-- **CL2 — collisionkit.**
+- **CL2 — collisionkit.** Done, see the progress log.
   - New package:
     - a pure half: `CollisionWorld`, its types and the rule types;
     - a native half: its C ABI, `NativeCollisionWorld`, and coal, moved
@@ -793,3 +793,81 @@ collisionkit):
 - **The OMPL benchmark** builds OMPL out of tree against the system Boost.
 - **"Order and gates"** records the working order and the rules for
   unattended work.
+
+### CL2 — collisionkit (2026-10-09)
+
+Done as planned, with these choices:
+- **Package.** `collisionkit/`:
+  - pure half (`collisionkit`): `CollisionWorld`, `CollisionGeometry`,
+    `CollisionPose`, `CollisionPair`, `CollisionDistance`,
+    `CollisionViolation`, `CollisionMargins`, `CollisionPairStatus`,
+    `CollisionPairRule`; no dependencies;
+  - native half (`collisionkit-native`): the C ABI `ck_*` in
+    `native/include/collisionkit.h`, `NativeCollisionWorld`, coal moved
+    to `native/vendor/coal` with its notes (`native/THIRD_PARTY.md`). The
+    submodule keeps its old name in `.gitmodules`; only its path moved.
+  - kinematicskit-native is back to main's: no coal, no collision code, no
+    `KK_ERROR_UNSUPPORTED`. Main's standalone coal smoke test moved with
+    coal.
+- **Bodies.** The world's own, numbered from 0, never removed; body -1 is
+  the world. Each has a group (CL-D4's pair classes) and can be marked
+  static. `ck_set_body_poses` poses a run of bodies from seven doubles
+  each. The world keeps no model and no FK.
+- **Statuses,** in precedence order: an object rule; a body rule (an allow
+  rule records its reason: rigid, adjacent, closure, declared, process
+  contact, declared contact); static (both bodies static); rigid (one
+  body); overlapping at reference; checked. Unsupported pairs still make
+  queries fail.
+- **Overlap at reference** takes the bodies of one articulation and marks
+  only pairs with both bodies in it, replacing earlier marks among them.
+  Re-attaching an object drops its marks.
+- **Inflation** (`ck_set_inflation`) is coal's swept-sphere radius on
+  primitives and convex sets; meshes and height fields refuse it
+  (`CK_ERROR_UNSUPPORTED`). Distances to inflated shapes are exact to
+  1e-9 in the tests (sphere against box, convex block and capsule).
+- **Violation queries** (CL-D12): margins come with each query as a square
+  table over body groups (row ≤ column read), plus an optional inflation
+  per body, so `required = margin(ga, gb) + δa + δb`. `ck_violation`
+  returns the first checked pair in id order (signed distance and
+  required); `ck_closest` the closest checked pair;
+  `ck_violation_batch` checks many pose sets (every body's pose per set,
+  with per-set inflation) in one call and returns the first failing set.
+- **Results name bodies:** pair rows are four ints (objects a and b,
+  bodies a and b). `ck_pair_distances` measures chosen pairs whatever
+  their status, each in the order given.
+- **Heights** below a field's minimum are refused, at creation and on
+  update (coal would clamp them).
+- **Kit pairs:** `kinematicskit.KinematicBodyPairs.of(model)` gives every
+  rigid, adjacent and closure body pair with its relation
+  (`BodyPairRelation`); `rigidGroups` the fixed-joint groups. The caller
+  maps them to body rules.
+- **Tests:**
+  - `native/tests/cpp/collision_world.cpp` (standalone, CTest; CL1's carried
+    over, posed by hand-computed arm poses): rules with reasons, static
+    bodies, a held part following the tool's rules, overlap at reference
+    within the arm with the environment overlap still reported, inflation,
+    violations with group margins and inflation, the closest pair, batched
+    sets, chosen pairs, refused heights, arguments.
+  - `native/tests` (Haxe, with the pure kit as a test dependency): kit body
+    pairs and their rules; distances following the kit snapshot to 1e-9 on
+    random trees (CL1's); statuses, grasping, terrain (CL1's, posed from
+    the snapshot); two models in one world; inflation against exact
+    distances; violations and batches from a snapshot sweep; refused
+    heights.
+  - CL1's Haxe test marked terrain overlapping the arm at reference as
+    allowed; under CL-D3 it is a layout error, so the carried-over test now
+    expects it to stay checked. That test was CL1's own (never on main).
+- **The pure kit suite** is unchanged. A body-pair test placed in it,
+  anywhere before the allocation test, moved main's known allocation
+  failure from DLS (-40.8 bytes) to LM (+40.96 bytes): the measurement
+  depends on heap state. So the kit's pairs are tested in collisionkit's
+  suite instead, and the pure kit keeps failing exactly as main does.
+- **Suites:**
+  - standalone C++ (CTest, `collisionkit/native`): 2 of 2 pass
+    (`ck_coal_smoke`, `ck_collision_world`);
+  - collisionkit native: passed (350 assertions);
+  - native kit: passed (695 assertions: main's, CL1's 18 moved out);
+  - pure kit: only main's known "DLS allocates nothing per iteration
+    (-40.8 bytes)";
+  - MotionKit: passed (1224712 assertions), no longer compiling coal;
+  - RobotKit: passed (5433 assertions).

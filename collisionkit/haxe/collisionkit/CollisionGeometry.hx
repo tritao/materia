@@ -1,9 +1,10 @@
-package kinematicskit;
+package collisionkit;
 
 /**
  * A collision shape, in its body's frame after the offset it is added with
- * (COLLISION.md CL-D1). Lengths are in the model's unit; axial shapes run
- * along local z.
+ * (COLLISION.md CL-D1). Lengths are in the caller's unit; axial shapes run
+ * along local z. Primitives and convex sets can be inflated
+ * (`CollisionWorld.setInflation`); meshes are surfaces (CL-D8).
  */
 enum CollisionGeometry {
   Box(halfX:Float, halfY:Float, halfZ:Float);
@@ -20,7 +21,7 @@ enum CollisionGeometry {
   /**
    * A grid of `rows` x (heights.length / rows) heights, row-major, centred on
    * the offset over xSize by ySize; columns run along +x, rows along -y. A
-   * solid down to `minHeight`.
+   * solid down to `minHeight`; no height may be below it (CL-D6).
    */
   HeightField(xSize:Float, ySize:Float, heights:Array<Float>, rows:Int, minHeight:Float);
 }

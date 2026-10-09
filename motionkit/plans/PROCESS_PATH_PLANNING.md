@@ -44,7 +44,7 @@ Work already done stays where it fits; what doesn't is reworked in the step name
      industrial spherical-wrist arm** (PP0a). OPW solves it exactly. EAIK's spike targets
      `CobotArm` (UR-type) and generality, not `RobotArm`.
 2. **One collision world: collisionkit** (PP-D5, PP-D6, PP5, PP10).
-   - The coal collision plan (`kinematicskit/plans/COLLISION.md`, CL0–CL8; CL1 done on branch
+   - The coal collision plan (`collisionkit/plans/COLLISION.md`, CL0–CL8; CL1 done on branch
      `collision`) owns collision: a native world posed from body poses (CL2 collisionkit, CL3 cell
      geometry, CL4 plan validation), avoidance rows (CL5), collision-aware path search (CL6) and
      RRT-Connect (CL7).

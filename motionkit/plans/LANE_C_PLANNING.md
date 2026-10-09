@@ -343,7 +343,7 @@ Tests (a scenario test in the motion or CNC test project):
 
 - Jerk-limited path timing and rolling contour lookahead;
 - OMPL free-space planning and collision checking (and so Descartes' BGL
-  lazy solvers): now `kinematicskit/plans/COLLISION.md`, with our own
+  lazy solvers): now `collisionkit/plans/COLLISION.md`, with our own
   RRT-Connect and OMPL as the reference (CL-D7);
 - `G18`/`G19`, cutter compensation (`G41`/`G42`), canned cycles, probing, CAM;
 - external controllers (LinuxCNC, grblHAL backends);

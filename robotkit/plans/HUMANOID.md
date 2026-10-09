@@ -107,7 +107,7 @@ joints makes it fall.
     needs exact derivatives of the dynamics, so it uses Pinocchio.
     - Pinocchio is built without collision support
       (`BUILD_WITH_COLLISION_SUPPORT` off): collision questions go to
-      collisionkit (`kinematicskit/plans/COLLISION.md`).
+      collisionkit (`collisionkit/plans/COLLISION.md`).
     - Its build requires Boost filesystem and serialization, the objection
       that kept OMPL out. Before vendoring, check what can be cut, as the
       coal fork did.

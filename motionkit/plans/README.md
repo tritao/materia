@@ -9,7 +9,7 @@
 | `LANE_C_PLANNING.md` | Native path trajectories and TOPP-RA timing, corner blending, OPW IK, configuration selection, CncKit, virtual CNC end to end. |
 | `LANE_D_REDUNDANCY_SERVO.md` | Mink-shaped QP differential IK (ProxQP), 7-axis redundancy, live Cartesian servoing through the execution session, coordinated external axes: done (D1–D3, D5, D6). Its collision-avoidance limits (D4) are CL5 of the collision plan. |
 | `PROCESS_PATH_PLANNING.md` | Process paths (welds, surface passes, arm toolpaths, arm + track) planned as one ladder graph over analytic IK branches, external-axis and free-roll lattices; lazy collision; timed once. Replaces the numeric beam search and the weld planner's generate-and-test. |
-| `../../kinematicskit/plans/COLLISION.md` | Collision world on coal, path validation, avoidance rows, collision-aware path search, and free-space planning (RRT-Connect, with OMPL as the reference). |
+| `../../collisionkit/plans/COLLISION.md` | Collision world on coal, path validation, avoidance rows, collision-aware path search, and free-space planning (RRT-Connect, with OMPL as the reference). |
 
 **Order:** §P0, merged to `main`, then Lanes A, B and C in parallel, each in
 its own worktree.

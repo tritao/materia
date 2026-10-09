@@ -38,12 +38,6 @@ class NativeKinematics {
     return result.out_jacobian;
   }
 
-  /** The live native handle, for other native objects built on this model (e.g. a collision world). */
-  public function handle():kk_model_handle {
-    requireLive();
-    return owner.borrow();
-  }
-
   public function dispose():Void {
     if (disposed) return;
     disposed = true;

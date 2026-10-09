@@ -1,0 +1,12 @@
+{
+	"version": 1,
+	"package": { "name": "collisionkit-native-tests" },
+	"entry": "NativeCollisionTests",
+	"sourceRoots": ["src"],
+	"dependencies": {
+		"collisionkit-native": { "path": ".." },
+		"kinematicskit": { "path": "../../../kinematicskit" }
+	},
+	"target": "host",
+	"outputDir": "build"
+}

@@ -99,7 +99,7 @@ MuJoCo) is the design reference. It is **not** a runtime dependency.
 
 - Lane C: C4 (`KinematicsSolver` + OPW); C5 (configuration selection), for
   D3.
-- Collision checking (`kinematicskit/plans/COLLISION.md`), for D4: it is
+- Collision checking (`collisionkit/plans/COLLISION.md`), for D4: it is
   that plan's CL5.
 - Lane A: the virtual device, for realistic servo-latency tests in D5.
 - Pinocchio (optional, later): only if humanoid H7 picks TSID or

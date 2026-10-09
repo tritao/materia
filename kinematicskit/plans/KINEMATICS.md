@@ -142,15 +142,18 @@ out to be wrong.
   compiled simulator model per scene, which does not fit non-convex,
   changing construction scenes. FCL is coal's predecessor. Vendored from
   our fork `tritao/coal` (branch `materia`): the core only, Eigen only, no
-  Boost or assimp (see `native/THIRD_PARTY.md`). It is native-only. CL1
-  linked it into kinematicskit-native; it moves to its own package,
-  collisionkit (`COLLISION.md` CL-D1, CL2), which the browser build gets
-  by compiling it into its Emscripten host (CL-D2). The plan built on it
-  is `COLLISION.md`.
+  Boost or assimp. It is native-only. CL1 linked it into
+  kinematicskit-native; CL2 moved it to its own package, collisionkit
+  (`collisionkit/plans/COLLISION.md` CL-D1; vendored at
+  `collisionkit/native/vendor/coal`, see its `THIRD_PARTY.md`), which the
+  browser build gets by compiling it into its Emscripten host (CL-D2). The
+  kit keeps no collision code beyond `KinematicBodyPairs` (rigid, adjacent
+  and closure pairs).
 - **KK-D9 — Out of scope:** collision geometry sources, the collision
   world (collisionkit) and collision validation (MotionKit). The kit keeps
   the rigid, adjacent and closure pairs, the motion bounds for path checks
-  and the avoidance task (`COLLISION.md` CL-D1, revised 2026-10-01). Also
+  and the avoidance task (`collisionkit/plans/COLLISION.md` CL-D1, revised
+  2026-10-01). Also
   out: time parameterization and trajectories (MotionKit), dynamics,
   character IK (`animkit`/`humankit`), and the OPW analytic solver (stays a
   specialist `KinematicsSolver` in MotionKit).
