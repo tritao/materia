@@ -1365,3 +1365,8 @@ Done as planned, with these choices:
   CL5, CL3b, CL7). CL6's remainder, main's PP10 and CL8 wait for review, as
   "Order and gates" says. Nothing is pushed; the coal fork's commits
   (85cb6397, 7b57ae92) are local.
+- **Local `main`** stays at CL2b (5ef09380b), where the order merged it.
+  Fast-forwarding it to CL7 would overwrite uncommitted edits another
+  session has in the shared checkout (`app/src/MissionPlayer.hx`,
+  `robotkit/sim/haxe/robotkit/runtime/Simulation.hx`, both also changed
+  here), so the branch `collision` holds CL3a to CL7 until that is sorted.
