@@ -683,7 +683,7 @@ Done. What was built and decided:
   `CADKIT_BUILD_ROOT` pointed at it. Every run since AM3 must use this worktree's `cadkit/build/debug`; the script
   now defaults to it. Earlier runs since AM3 were not tested against the wrong library: the quick suite does not
   run the CadKit suite, and the projects that slice (the machinekit smoke, the printing gate) build and load their
-  own `libcadkit-core` (their logs say `Build CMake target cadkit-core`), as the slicing in them proves.
+  own `libcadkit-core` (their logs say `Build CMake target cadkit-core`), as the slicing in them proves. The full run after the fixes (`am5b`, 2587 s) passed: every workspace project, KinematicsKit, CadKit, the MachineKit smoke, the app's project-source suite (physical router, bench-mill and plotter numbers unchanged; per-tick allocation down about 15 %, the belt router's slowest update from 1582 ms to 209 ms) and the editor tests.
 - Tests: `ToolpathMotionTests.printerLowering` (rounding across speeds, the arc's speed, stops by reason),
   `PlannerTests.testLongPathQueries` (grid distance against a scan, bisection at boundaries, sections of a long
   path), `CoreXyTests.testDerivedPulleysFollowBothAxes` (pulleys are the sums of their terms along a plan).
