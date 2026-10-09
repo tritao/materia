@@ -24,7 +24,7 @@ class AppSettings {
   /** Whether a running simulation draws its robots' sensor rays and mission overlays (route, costmap, odometry). */
   public static inline var SIMULATION_OVERLAYS:String = "editors/3d/simulation/show_overlays";
 
-  public static final LIGHTING_PRESETS:Array<String> = ["studio", "soft", "contrast"];
+  public static final LIGHTING_PRESETS:Array<String> = haxeon.editor.ViewportLook.PresetNames;
 
   /** A registry holding every setting the editor defines. */
   public static function registry():SettingsRegistry {

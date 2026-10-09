@@ -2,5 +2,5 @@ package app.editor;
 
 /** Shared viewport grid defaults. */
 class EditorGrid {
-  public static inline var STEP:Float = 0.2;
+  public static inline var STEP:Float = haxeon.editor.ViewportLook.GridStep;
 }

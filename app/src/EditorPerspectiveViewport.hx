@@ -1,5 +1,6 @@
 package app;
 
+import haxeon.editor.ViewportLook;
 import haxeon.platform.GraphicsImageRef;
 import haxeon.ui.Canvas;
 import app.MissionPlayer.MissionOverlay;
@@ -181,31 +182,15 @@ class EditorPerspectiveViewport implements View {
       }
       var directions:Array<Float> = [];
       // Coin directions point from each light into the scene; the shader needs the reverse.
-      var intensities = switch (lightingPreset) {
-        case 1: [0.65, 0.45, 0.25];
-        case 2: [0.95, 0.20, 0.65];
-        default: [0.76, 0.34, 0.50];
-      };
-      var coinDirections = [[0.6841049, -0.12062616, -0.7193398],
-        [-0.6403416, 0.7631294, 0.087155744],
-        [-0.7544065, -0.63302225, -0.17364818]];
+      var intensities = ViewportLook.intensities(lightingPreset);
+      var coinDirections = ViewportLook.lightDirections();
       for (index in 0...3) {
         var light = coinDirections[index];
         var direction = camera.studioDirection(-light[0], -light[1], -light[2]);
         directions.push(direction[0]); directions.push(direction[1]);
         directions.push(direction[2]); directions.push(intensities[index]);
       }
-      var sky = switch (lightingPreset) {
-        case 1: [0.25, 0.26, 0.27];
-        case 2: [0.18, 0.19, 0.20];
-        default: [0.22, 0.23, 0.24];
-      };
-      var ground = switch (lightingPreset) {
-        case 1: [0.22, 0.22, 0.23];
-        case 2: [0.08, 0.08, 0.09];
-        default: [0.16, 0.16, 0.17];
-      };
-      view.setStudioLighting(directions, sky, ground);
+      view.setStudioLighting(directions, ViewportLook.sky(lightingPreset), ViewportLook.ground(lightingPreset));
       // Keep the scene image transparent so the UI gradient shows through
       // wherever the renderer has no geometry.
       if (sampleCountApplied != sampleCountRequested) {

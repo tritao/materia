@@ -20,7 +20,7 @@ import sys.io.File;
 class AppPreferences {
   public static inline var MAX_RECENT:Int = 10;
   /** Samples per pixel for the 3D viewport's edges on a GPU that supports it. */
-  public static inline var DEFAULT_ANTIALIASING:Int = 4;
+  public static inline var DEFAULT_ANTIALIASING:Int = haxeon.editor.ViewportLook.SampleCount;
   static inline var RECENT_STATE:String = "recent";
 
   public final store:SettingsStore;
