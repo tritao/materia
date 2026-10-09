@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "artifact-decoding-benchmark"},
+  "entry": "ArtifactDecodingBenchmark",
+  "sourceRoots": ["."],
+  "dependencies": {"projectkit": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

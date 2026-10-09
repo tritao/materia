@@ -69,6 +69,21 @@ typedef SceneArtifactData = {
 	@:optional var robotSensors:Array<SceneArtifactRobotSensor>;
   /** Moving belts and an optional axis program supplied by the machine's generator. */
   @:optional var machineMotion:SceneArtifactMachineMotion;
+  /** Project-owned runtime settings resolved by an artifact publisher, independent of source files. */
+  @:optional var project:SceneArtifactProject;
+
+}
+
+typedef SceneArtifactProject = {
+  @:optional var job:String;
+  var dynamicParts:Array<String>;
+  var motions:Array<SceneArtifactProjectMotion>;
+}
+
+typedef SceneArtifactProjectMotion = {
+  var joint:String;
+  var loop:Bool;
+  var keys:Array<{time:Float, position:Float}>;
 }
 
 typedef SceneArtifactMachineMotion = {
@@ -403,7 +418,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 17;
+	public static inline var VERSION:Int = 18;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -435,10 +450,12 @@ class SceneArtifact {
 		if (robotTools.length > 100000) throw "Scene artifact robot tools are too large";
 		var robotSensors = data.robotSensors == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.robotSensors));
 		if (robotSensors.length > 100000) throw "Scene artifact robot sensors are too large";
+    var project = data.project == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.project));
+    if (project.length > 2000000) throw "Scene artifact project settings are too large";
     var machineMotion = data.machineMotion == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.machineMotion));
     if (machineMotion.length > 1000000) throw "Scene artifact machine motion is too large";
 		var length = 36 + unitText.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
-			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4 + robotSensors.length + 4 + machineMotion.length + 4;
+			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4 + robotSensors.length + 4 + machineMotion.length + 4 + project.length + 4;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -536,14 +553,72 @@ class SceneArtifact {
 		result.blit(offset, robotSensors, 0, robotSensors.length); offset += robotSensors.length;
     offset = putInt(result, offset, machineMotion.length);
     result.blit(offset, machineMotion, 0, machineMotion.length); offset += machineMotion.length;
+    offset = putInt(result, offset, project.length);
+    result.blit(offset, project, 0, project.length); offset += project.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
 
+  /** Decode the portable project settings without retaining dynamic JSON object graphs. */
+  public static function decodeProject(raw:Dynamic):SceneArtifactProject {
+    var parts:Dynamic = Reflect.field(raw, "dynamicParts"), motions:Dynamic = Reflect.field(raw, "motions");
+    var job:Dynamic = Reflect.field(raw, "job");
+    if (!Std.isOfType(parts, Array) || !Std.isOfType(motions, Array) ||
+        (job != null && (!Std.isOfType(job, String) || job.length == 0 || job.length > 500)))
+      throw "Invalid artifact project settings";
+    var dynamicParts:Array<String> = [];
+    for (id in (cast parts:Array<Dynamic>)) {
+      if (!Std.isOfType(id, String)) throw "Invalid project dynamic part";
+      dynamicParts.push(id);
+    }
+    var tracks:Array<SceneArtifactProjectMotion> = [];
+    for (motion in (cast motions:Array<Dynamic>)) {
+      var joint:Dynamic = Reflect.field(motion, "joint"), loop:Dynamic = Reflect.field(motion, "loop");
+      if (!Std.isOfType(joint, String) || !Std.isOfType(loop, Bool) || !Std.isOfType(Reflect.field(motion, "keys"), Array))
+        throw "Invalid project motion";
+      var keys:Array<{time:Float, position:Float}> = [];
+      for (key in (cast Reflect.field(motion, "keys"):Array<Dynamic>)) {
+        var time:Dynamic = Reflect.field(key, "time"), position:Dynamic = Reflect.field(key, "position");
+        for (value in [time, position])
+          if (!Std.isOfType(value, Int) && !Std.isOfType(value, Float)) throw "Invalid project motion key";
+        keys.push({time: time, position: position});
+      }
+      tracks.push({joint: joint, loop: loop, keys: keys});
+    }
+    return {job: job, dynamicParts: dynamicParts, motions: tracks};
+  }
+
+  static function validateProject(project:SceneArtifactProject, data:SceneArtifactData):Void {
+    decodeProject(project);
+    if (project.dynamicParts.length > 1000 || project.motions.length > 64) throw "Too many project settings";
+    var definition = data.assemblyDefinition == null ? null : AssemblyDefinitionFlattener.flattenView(data.assemblyDefinition);
+    var occurrences = definition == null ? [for (part in data.parts) part.id] : [for (item in definition.occurrences) item.id];
+    var joints = definition == null ? [] : [for (item in definition.joints) item.id];
+    var seen = new Map<String, Bool>();
+    for (id in project.dynamicParts) {
+      if (occurrences.indexOf(id) < 0 || seen.exists(id)) throw "Invalid project dynamic part";
+      seen.set(id, true);
+    }
+    seen = new Map();
+    for (motion in project.motions) {
+      if (joints.indexOf(motion.joint) < 0 || seen.exists(motion.joint) || motion.keys.length < 2 || motion.keys.length > 10000)
+        throw "Invalid project joint motion";
+      seen.set(motion.joint, true);
+      var previous = -1.0;
+      for (key in motion.keys) {
+        if (!Math.isFinite(key.time) || !Math.isFinite(key.position) || key.time < 0 || key.time <= previous ||
+            (previous < 0 && key.time != 0)) throw "Invalid project motion key";
+        previous = key.time;
+      }
+      if (motion.loop && Math.abs(motion.keys[0].position - motion.keys[motion.keys.length - 1].position) > 1e-9)
+        throw "Project motion loop must return to its starting position";
+    }
+  }
+
   static function validateMachineMotion(motion:SceneArtifactMachineMotion, data:SceneArtifactData):Void {
     if (data.assemblyDefinition == null || motion.belts == null || motion.belts.length > 128)
       throw "Machine motion needs an assembly and a bounded belt list";
-    var definition = AssemblyDefinitionFlattener.flatten(cast data.assemblyDefinition);
+    var definition = AssemblyDefinitionFlattener.flattenView(cast data.assemblyDefinition);
     var occurrences = [for (value in definition.occurrences) value.id];
     var joints = [for (value in definition.joints) value.id];
     for (belt in motion.belts) {
@@ -590,6 +665,13 @@ class SceneArtifact {
 		return new SceneArtifactReader(source).read();
 	}
 
+	/** Decode while borrowing mesh buffers from source. Keep source immutable while using the result.
+	 * Views retain the source buffer; decode() still returns independent mesh buffers. */
+	public static function decodeView(source:Bytes):SceneArtifactData {
+		if (source == null || source.length > MAX_BYTES) throw "Scene artifact is missing or too large";
+		return new SceneArtifactReader(source, true).read();
+	}
+
 	static function validateHeader(data:SceneArtifactData):Void {
 		if (data == null || !finite(data.metresPerUnit) || data.metresPerUnit <= 0.0 ||
 			data.parts == null || data.parts.length == 0 || data.parts.length > 1000)
@@ -608,12 +690,13 @@ class SceneArtifact {
 		var assemblyDefinition = data.assemblyDefinition;
 		if (assemblyDefinition != null) {
 			AssemblyDefinitionCodec.validate(assemblyDefinition);
-			assemblyDefinition = AssemblyDefinitionFlattener.flatten(assemblyDefinition);
+			assemblyDefinition = AssemblyDefinitionFlattener.flattenView(assemblyDefinition);
 			for (definition in assemblyDefinition.definitions) if (!ids.exists(definition.id))
 				throw 'Assembly component definition "${definition.id}" has no geometry part';
 			if (data.assemblyState != null)
 				AssemblyDefinitionCodec.validateState(assemblyDefinition, data.assemblyState);
 		}
+    if (data.project != null) validateProject(data.project, data);
 		if (data.machining != null && data.mission != null)
 			throw "Scene artifact cannot combine machining and a mission";
 		if (data.machining != null) validateMachining(data.machining, ids, data.assemblyDefinition);
@@ -628,7 +711,7 @@ class SceneArtifact {
 		function fail(detail:String):Void throw 'Scene artifact robot tool $detail';
 		var definition = data.assemblyDefinition;
 		if (definition == null) fail("needs the robot's assembly definition");
-		var flat = AssemblyDefinitionFlattener.flatten(cast definition);
+		var flat = AssemblyDefinitionFlattener.flattenView(cast definition);
 		var channels = new Map<String, Bool>();
 		var torches = 0;
 		for (tool in tools) {
@@ -688,7 +771,7 @@ class SceneArtifact {
 		function fail(detail:String):Void throw 'Scene artifact robot sensor $detail';
 		var definition = data.assemblyDefinition;
 		if (definition == null) fail("needs the robot's assembly definition");
-		var flat = AssemblyDefinitionFlattener.flatten(cast definition);
+		var flat = AssemblyDefinitionFlattener.flattenView(cast definition);
 		var ids = new Map<String, Bool>();
 		for (sensor in sensors) {
 			if (sensor == null || sensor.kind != "lidar") fail('kind "${sensor == null ? null : sensor.kind}" is unknown');
@@ -813,7 +896,7 @@ class SceneArtifact {
 		validatePowerUpSideOffsets(mission.powerUpSideOffsets, data.assemblyDefinition);
 		if (mission.steps == null || mission.steps.length == 0) fail("has no steps");
 		var definition = data.assemblyDefinition;
-		var flat = definition == null ? null : AssemblyDefinitionFlattener.flatten(definition);
+		var flat = definition == null ? null : AssemblyDefinitionFlattener.flattenView(definition);
 		/** Whether `place` names an existing connector of an existing occurrence. */
 		function exists(place:Null<SceneArtifactPlace>):Bool {
 			if (place == null || flat == null) return false;
@@ -1073,7 +1156,7 @@ class SceneArtifact {
 			definition:Null<AssemblyDefinition>):Void {
 		if (offsets == null) return;
 		if (definition == null || offsets.length > 512) throw "Power-up sides require a bounded machine layout";
-		var flat = AssemblyDefinitionFlattener.flatten(definition), seen = new Map<String, Bool>();
+		var flat = AssemblyDefinitionFlattener.flattenView(definition), seen = new Map<String, Bool>();
 		for (entry in offsets) {
 			if (entry == null || entry.homeSwitch == null || !finite(entry.offset)) throw "Invalid power-up side offset";
 			var drive:Null<String> = null;
@@ -1091,7 +1174,7 @@ class SceneArtifact {
 			definition:Null<AssemblyDefinition>):Void {
 		if (offsets == null) return;
 		if (definition == null || offsets.length > 512) throw "Power-up offsets require a bounded machine layout";
-		var flat = AssemblyDefinitionFlattener.flatten(definition), seen = new Map<String, Bool>();
+		var flat = AssemblyDefinitionFlattener.flattenView(definition), seen = new Map<String, Bool>();
 		for (entry in offsets) {
 			if (entry == null || entry.joint == null || seen.exists(entry.joint) || !finite(entry.offset))
 				throw "Power-up offsets require distinct joints and finite SI displacements";
@@ -1169,7 +1252,7 @@ class SceneArtifact {
 	static function validateMobileBase(base:SceneArtifactMobileBase, definition:Null<AssemblyDefinition>):Void {
 		function fail(detail:String):Void throw 'Scene artifact mobile base $detail';
 		if (definition == null) fail("needs the robot's assembly definition");
-		var flat = AssemblyDefinitionFlattener.flatten(definition);
+		var flat = AssemblyDefinitionFlattener.flattenView(definition);
 		var prefix = base.robot == null ? "" : base.robot + "/";
 		if (base.robot != null && [for (item in flat.occurrences) if (StringTools.startsWith(item.id, prefix)) item].length == 0)
 			fail('robot "${base.robot}" has no occurrences');
@@ -1392,13 +1475,17 @@ class SceneArtifact {
 private class SceneArtifactReader {
 	final source:Bytes;
 	var offset:Int = 0;
-	public function new(source:Bytes) this.source = source;
+	final borrowStreams:Bool;
+	public function new(source:Bytes, borrowStreams:Bool = false) {
+		this.source = source;
+		this.borrowStreams = borrowStreams;
+	}
 
 	public function read():SceneArtifactData {
 		for (expected in [77, 84, 82, 71]) if (readByte() != expected)
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
-		if (version != SceneArtifact.VERSION)
+		if (version != SceneArtifact.VERSION && version != 17)
 			throw 'schema v$version is unsupported; expected v${SceneArtifact.VERSION}';
 		var metresPerUnit = readDouble();
 		var lengthUnit = readText();
@@ -1424,9 +1511,9 @@ private class SceneArtifactReader {
 				indexCount % 3 != 0 || indexCount / 3 > 4000000 || rangeCount < 0 || rangeCount > 100000 ||
 				edgeByteCount < 0 || edgeByteCount % 48 != 0 || edgeByteCount > SceneArtifact.MAX_BYTES)
 				throw 'Scene artifact part "$id" has invalid mesh counts';
-		var vertices = readBytes(vertexCount * 24), normals = readBytes(vertexCount * 24),
-				indices = readBytes(indexCount * 4), edgeSegments = readBytes(edgeByteCount);
-			var edgeIds = readBytes(Std.int(edgeByteCount / 48) * 4);
+		var vertices = readStream(vertexCount * 24), normals = readStream(vertexCount * 24),
+				indices = readStream(indexCount * 4), edgeSegments = readStream(edgeByteCount);
+			var edgeIds = readStream(Std.int(edgeByteCount / 48) * 4);
 			var faceRanges:Array<SceneArtifactFaceRange> = [];
 			for (_ in 0...rangeCount)
 				faceRanges.push({faceIndex: readInt(), firstIndex: readInt(), indexCount: readInt()});
@@ -1446,26 +1533,26 @@ private class SceneArtifactReader {
 		if (definitionLength < 0 || definitionLength > 2000000)
 			throw "Scene artifact assembly definition is too large";
 		if (definitionLength > 0)
-			assemblyDefinition = AssemblyDefinitionCodec.decode(readBytes(definitionLength).getString(0, definitionLength));
+			assemblyDefinition = AssemblyDefinitionCodec.decode(readString(definitionLength));
 		var stateLength = readInt();
 		if (stateLength < 0 || stateLength > 2000000)
 			throw "Scene artifact assembly state is too large";
 		if (stateLength > 0) {
 			if (assemblyDefinition == null) throw "Scene artifact assembly state has no definition";
 			assemblyState = AssemblyDefinitionCodec.decodeState(assemblyDefinition,
-				readBytes(stateLength).getString(0, stateLength));
+				readString(stateLength));
 		}
 		var recipeDocument:Null<String> = null;
 		var documentLength = readInt();
 		if (documentLength < 0 || documentLength > 2000000)
 			throw "Scene artifact recipe document is too large";
-		if (documentLength > 0) recipeDocument = readBytes(documentLength).getString(0, documentLength);
+		if (documentLength > 0) recipeDocument = readString(documentLength);
 		var recipeDiagnostics:Null<Array<String>> = null;
 		var diagnosticsLength = readInt();
 		if (diagnosticsLength < 0 || diagnosticsLength > 2000000)
 			throw "Scene artifact recipe diagnostics are too large";
 		if (diagnosticsLength > 0) {
-			var decoded:Dynamic = haxe.Json.parse(readBytes(diagnosticsLength).getString(0, diagnosticsLength));
+			var decoded:Dynamic = haxe.Json.parse(readString(diagnosticsLength));
 			if (!Std.isOfType(decoded, Array)) throw "Scene artifact recipe diagnostics are invalid";
 			for (entry in (cast decoded:Array<Dynamic>))
 				if (!Std.isOfType(entry, String)) throw "Scene artifact recipe diagnostics are invalid";
@@ -1475,39 +1562,45 @@ private class SceneArtifactReader {
 		var machiningLength = readInt();
 		if (machiningLength < 0 || machiningLength > 8000000) throw "Scene artifact machining job is too large";
 		if (machiningLength > 0) {
-			machining = @:privateAccess SceneArtifact.decodeMachining(haxe.Json.parse(readBytes(machiningLength).getString(0, machiningLength)));
+			machining = @:privateAccess SceneArtifact.decodeMachining(haxe.Json.parse(readString(machiningLength)));
 		}
 		var mobileBase:Null<SceneArtifactMobileBase> = null;
 		var mobileLength = readInt();
 		if (mobileLength < 0 || mobileLength > 100000) throw "Scene artifact mobile base is too large";
 		if (mobileLength > 0)
-			mobileBase = @:privateAccess SceneArtifact.decodeMobileBase(haxe.Json.parse(readBytes(mobileLength).getString(0, mobileLength)));
+			mobileBase = @:privateAccess SceneArtifact.decodeMobileBase(haxe.Json.parse(readString(mobileLength)));
 		var mission:Null<SceneArtifactMission> = null;
 		var missionLength = readInt();
 		if (missionLength < 0 || missionLength > 1000000) throw "Scene artifact mission is too large";
 		if (missionLength > 0)
-			mission = @:privateAccess SceneArtifact.decodeMission(haxe.Json.parse(readBytes(missionLength).getString(0, missionLength)));
+			mission = @:privateAccess SceneArtifact.decodeMission(haxe.Json.parse(readString(missionLength)));
 		var robotTools:Null<Array<SceneArtifactRobotTool>> = null;
 		var toolsLength = readInt();
 		if (toolsLength < 0 || toolsLength > 100000) throw "Scene artifact robot tools are too large";
 		if (toolsLength > 0)
-			robotTools = @:privateAccess SceneArtifact.decodeRobotTools(haxe.Json.parse(readBytes(toolsLength).getString(0, toolsLength)));
+			robotTools = @:privateAccess SceneArtifact.decodeRobotTools(haxe.Json.parse(readString(toolsLength)));
 		var robotSensors:Null<Array<SceneArtifactRobotSensor>> = null;
 		var sensorsLength = readInt();
 		if (sensorsLength < 0 || sensorsLength > 100000) throw "Scene artifact robot sensors are too large";
 		if (sensorsLength > 0)
-			robotSensors = @:privateAccess SceneArtifact.decodeRobotSensors(haxe.Json.parse(readBytes(sensorsLength).getString(0, sensorsLength)));
+			robotSensors = @:privateAccess SceneArtifact.decodeRobotSensors(haxe.Json.parse(readString(sensorsLength)));
     var machineMotion:Null<SceneArtifactMachineMotion> = null;
     var machineLength = readInt();
     if (machineLength < 0 || machineLength > 1000000) throw "Scene artifact machine motion is too large";
     if (machineLength > 0)
-      machineMotion = @:privateAccess SceneArtifact.decodeMachineMotion(haxe.Json.parse(readBytes(machineLength).getString(0, machineLength)));
+      machineMotion = @:privateAccess SceneArtifact.decodeMachineMotion(haxe.Json.parse(readString(machineLength)));
+    var project:Null<SceneArtifactProject> = null;
+    if (version >= 18) {
+      var projectLength = readInt();
+      if (projectLength < 0 || projectLength > 2000000) throw "Scene artifact project settings are too large";
+      if (projectLength > 0) project = @:privateAccess SceneArtifact.decodeProject(haxe.Json.parse(readString(projectLength)));
+    }
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts,
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
 			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase, mission: mission,
-			robotTools: robotTools, robotSensors: robotSensors, machineMotion: machineMotion};
+			robotTools: robotTools, robotSensors: robotSensors, machineMotion: machineMotion, project: project};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}
@@ -1516,13 +1609,13 @@ private class SceneArtifactReader {
 	function readOpaqueText(limit:Int, what:String):String {
 		var length = readInt();
 		if (length < 0 || length > limit) throw 'Scene artifact $what are too large';
-		return length == 0 ? "" : readBytes(length).getString(0, length);
+		return length == 0 ? "" : readString(length);
 	}
 
 	function readText():String {
 		var length = readInt();
 		if (length <= 0 || length > 4096) throw "Scene artifact has an invalid part ID or name";
-		var value = readBytes(length).getString(0, length);
+		var value = readString(length);
 		if (StringTools.trim(value).length == 0) throw "Scene artifact has an empty part ID or name";
 		return value;
 	}
@@ -1531,17 +1624,40 @@ private class SceneArtifactReader {
 		if (offset >= source.length) throw "Scene artifact ended unexpectedly";
 		return source.get(offset++);
 	}
+	inline function require(length:Int):Void {
+		if (length < 0 || length > source.length - offset)
+			throw "Scene artifact has an invalid buffer length";
+	}
 	function readInt():Int {
-		var a = readByte(), b = readByte(), c = readByte(), d = readByte();
-		return a | (b << 8) | (c << 16) | (d << 24);
+		require(4);
+		var value = source.getInt32(offset);
+		offset += 4;
+		return value;
 	}
 	function readDouble():Float {
-		var value = readBytes(8);
-		return value.getDouble(0);
+		require(8);
+		var value = source.getDouble(offset);
+		offset += 8;
+		return value;
 	}
 	function readFloat():Float {
-		var value = readBytes(4);
-		return value.getFloat(0);
+		require(4);
+		var value = source.getFloat(offset);
+		offset += 4;
+		return value;
+	}
+	function readString(length:Int):String {
+		require(length);
+		var value = source.getString(offset, length);
+		offset += length;
+		return value;
+	}
+	function readStream(length:Int):Bytes {
+		if (!borrowStreams) return readBytes(length);
+		require(length);
+		var value = Bytes.view(source, offset, length);
+		offset += length;
+		return value;
 	}
 	function readBytes(length:Int):Bytes {
 		if (length < 0 || length > source.length - offset)

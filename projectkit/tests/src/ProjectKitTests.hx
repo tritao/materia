@@ -130,6 +130,32 @@ class ProjectKitTests {
         indices: indices, faceRanges: [], faceDescriptors: "[{\"index\":0}]"}], recipeDocument: "cube", recipeDiagnostics: ["ok"]};
     var encoded = SceneArtifact.encode(data);
     check(encoded.getInt32(4) == SceneArtifact.VERSION, "current scene version");
+    var legacy = Bytes.alloc(encoded.length - 4);
+    legacy.blit(0, encoded, 0, legacy.length);
+    legacy.setInt32(4, 17);
+    check(SceneArtifact.decodeView(legacy).project == null, "v17 artifacts remain readable without project settings");
+    data.project = {job: "fixture", dynamicParts: ["part"], motions: []};
+    var bundled = SceneArtifact.decode(SceneArtifact.encode(data));
+    check(bundled.project != null && bundled.project.job == "fixture" && bundled.project.dynamicParts[0] == "part",
+      "published project job and dynamic parts round trip");
+    data.project.dynamicParts = ["missing"];
+    rejects(function() SceneArtifact.encode(data), "project settings reject unknown dynamic parts");
+    data.project = null;
+    var moving = SceneArtifact.decode(encoded);
+    moving.parts[0].id = "body";
+    moving.assemblyDefinition = definition();
+    var publishedMotion:materia.project.SceneArtifact.SceneArtifactProject = {dynamicParts: ["arm"], motions: [{joint: "hinge", loop: true,
+      keys: [{time: 0.0, position: 0.0}, {time: 1.0, position: 0.25}, {time: 2.0, position: 0.0}]}]};
+    moving.project = publishedMotion;
+    var moved = SceneArtifact.decode(SceneArtifact.encode(moving));
+    var movedProject:materia.project.SceneArtifact.SceneArtifactProject = cast moved.project;
+    check(movedProject.motions[0].joint == "hinge" && movedProject.motions[0].keys[1].position == 0.25,
+      "published joint motion round trips");
+    publishedMotion.motions[0].joint = "missing";
+    rejects(function() SceneArtifact.encode(moving), "project settings reject unknown joints");
+    publishedMotion.motions[0].joint = "hinge";
+    publishedMotion.motions[0].keys[2].position = 0.3;
+    rejects(function() SceneArtifact.encode(moving), "project settings reject discontinuous loops");
     var restored = SceneArtifact.decode(encoded);
     check(restored.parts[0].id == "part", "scene part round trip");
     var appearance = restored.parts[0].appearance;
@@ -148,6 +174,51 @@ class ProjectKitTests {
     invalidScale.blit(0, encoded, 0, encoded.length);
     invalidScale.setDouble(8, -1);
     rejects(function() SceneArtifact.decode(invalidScale), "invalid scene unit scale");
+    var borrowed = SceneArtifact.decodeView(encoded);
+    check(borrowed.parts[0].vertices.getDouble(24) == restored.parts[0].vertices.getDouble(24),
+      "borrowed mesh matches copied decoding");
+    check(borrowed.recipeDocument == restored.recipeDocument &&
+      borrowed.parts[0].faceDescriptors == restored.parts[0].faceDescriptors, "borrowed metadata round trip");
+    borrowed.parts[0].vertices.setDouble(24, 2);
+    check(SceneArtifact.decode(encoded).parts[0].vertices.getDouble(24) == 2,
+      "borrowed meshes retain and share source storage");
+    check(restored.parts[0].vertices.getDouble(24) == 1, "ordinary decoding owns independent mesh buffers");
+    borrowed.parts[0].vertices.setDouble(24, Math.NaN);
+    rejects(() -> SceneArtifact.decodeView(encoded), "borrowed decoder rejects nonfinite vertices");
+    borrowed.parts[0].vertices.setDouble(24, 1);
+    borrowed.parts[0].indices.setInt32(0, -1);
+    rejects(() -> SceneArtifact.decodeView(encoded), "borrowed decoder rejects invalid indices");
+    borrowed.parts[0].indices.setInt32(0, 0);
+    for (length in [0, 3, 7, 15, encoded.length - 1]) {
+      var short = Bytes.view(encoded, 0, length);
+      rejects(() -> SceneArtifact.decode(short), "copied decoder rejects truncation");
+      rejects(() -> SceneArtifact.decodeView(short), "borrowed decoder rejects truncation");
+    }
+    var original = definition();
+    var beforeValidation = AssemblyDefinitionCodec.encode(original);
+    AssemblyDefinitionCodec.validate(original);
+    AssemblyDefinitionCodec.validateState(original, {schemaVersion: AssemblyDefinitionCodec.VERSION,
+      definition: original.id, jointCoordinates: [], rootPoses: []});
+    check(AssemblyDefinitionCodec.encode(original) == beforeValidation, "validation leaves its input unchanged");
+    check(materia.assembly.AssemblyDefinitionFlattener.flattenView(original) == original,
+      "flat read-only view borrows the definition");
+    var independent = materia.assembly.AssemblyDefinitionFlattener.flatten(original);
+    independent.id = "edited";
+    check(original.id == "fixture", "flatten still returns an independent editable copy");
+    var nested:AssemblyDefinition = {
+      schemaVersion: AssemblyDefinitionCodec.VERSION, id: "nested", lengthUnit: "mm",
+      definitions: [], joints: [],
+      occurrences: [{id: "cell", definition: "unit", assembly: "unit", initialPose: AssemblyFrames.identity()}],
+      assemblies: [{id: "unit", definitions: original.definitions,
+        occurrences: original.occurrences, joints: original.joints}]
+    };
+    var nestedBefore = AssemblyDefinitionCodec.encode(nested);
+    var expanded = materia.assembly.AssemblyDefinitionFlattener.flattenView(nested);
+    check(expanded != nested && expanded.occurrences[0].id == "cell/base", "nested views still expand members");
+    check(AssemblyDefinitionCodec.encode(nested) == nestedBefore, "nested view leaves its source unchanged");
+    nested.assemblies[0].joints[0].parent = "missing";
+    rejects(() -> AssemblyDefinitionCodec.validate(nested), "nested views still reject missing joint members");
+
     data.parts.push(data.parts[0]);
     rejects(function() SceneArtifact.encode(data), "duplicate scene part ID");
     data.parts.pop(); data.parts[0].indices.setInt32(0, 99);
