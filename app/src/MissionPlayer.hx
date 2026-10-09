@@ -89,6 +89,14 @@ typedef MissionOverlay = {
   var guard:MotionGuardState;
 }
 
+typedef MissionProgress = {
+  var phase:String;
+  var stepIndex:Int;
+  var completedInLoop:Int;
+  var loop:Int;
+  var failure:Null<String>;
+}
+
 /**
  * The project's mission, run by its assembly robot when the simulation runs: each step becomes a
  * RobotKit skill, advanced one tick at a time by a `SkillRunner`, and the next starts when it
@@ -474,7 +482,15 @@ class MissionPlayer implements SessionMember {
       };
       return label + " · " + phase;
     }
-    return "Step " + (completed + 1) + " / " + mission.steps.length + " · " + mission.steps[stepIndex].kind;
+    return "Step " + (stepIndex + 1) + " / " + mission.steps.length + " · " + mission.steps[stepIndex].kind;
+  }
+
+  /** Structured presentation state; startup is separate from the first authored step. */
+  public function progress():MissionProgress {
+    var phase = failure != null ? "failed" : finished ? "complete" :
+      !homingComplete && homing != null ? "startup" : "executing";
+    return {phase:phase, stepIndex:stepIndex, completedInLoop:finished ? mission.steps.length : stepIndex,
+      loop:mission.loop == true ? Std.int(completed / mission.steps.length) + 1 : 1, failure:failure};
   }
 
   public function feed():Void {

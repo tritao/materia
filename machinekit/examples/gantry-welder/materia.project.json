@@ -11,7 +11,8 @@
 		"cell": {
 			"kind": "cad-preview",
 			"module": "GantryWelderPreview",
-			"function": "cell"
+			"function": "cell",
+			"cache": {"inputs": []}
 		}
 	}
 }

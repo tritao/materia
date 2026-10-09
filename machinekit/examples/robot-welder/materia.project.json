@@ -3,12 +3,68 @@
 	"version": 1,
 	"name": "Robot welder",
 	"defaultEntrypoint": "cell",
-	"build": { "system": "haxeon", "manifest": "haxeon.json" },
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.json"
+	},
 	"entrypoints": {
 		"cell": {
 			"kind": "cad-preview",
 			"module": "RobotWelderPreview",
 			"function": "cell"
+		},
+		"single-seam": {
+			"kind": "cad-preview",
+			"module": "RobotWelderPreview",
+			"function": "seamCell"
+		},
+		"tube-post": {
+			"kind": "cad-preview",
+			"module": "RobotWelderPreview",
+			"function": "postCell"
+		},
+		"woven-seam": {
+			"kind": "cad-preview",
+			"module": "RobotWelderPreview",
+			"function": "wovenCell"
+		},
+		"multipass": {
+			"kind": "cad-preview",
+			"module": "RobotWelderPreview",
+			"function": "multipassCell"
 		}
-	}
+	},
+	"defaultJob": "complete",
+	"jobs": [
+		{
+			"id": "complete",
+			"label": "Complete weldment",
+			"summary": "All declared weldment seams",
+			"entrypoint": "cell"
+		},
+		{
+			"id": "single-seam",
+			"label": "Single seam",
+			"summary": "Plate T-joint \u00b7 straight seam",
+			"entrypoint": "single-seam"
+		},
+		{
+			"id": "tube-post",
+			"label": "Tube post",
+			"summary": "First post \u00b7 perimeter weld",
+			"entrypoint": "tube-post"
+		},
+		{
+			"id": "woven-seam",
+			"label": "Woven seam \u00b7 7 mm",
+			"summary": "Plate T-joint \u00b7 7 mm fillet",
+			"entrypoint": "woven-seam"
+		},
+		{
+			"id": "multipass",
+			"label": "Three-pass seam \u00b7 10 mm",
+			"summary": "Plate T-joint \u00b7 10 mm fillet",
+			"entrypoint": "multipass"
+		}
+	]
 }

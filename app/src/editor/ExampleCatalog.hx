@@ -1,8 +1,12 @@
 package app.editor;
 
 import app.MateriaProjectRunner;
-import app.MateriaProjectRunner.GeneratedAssemblyScene;
-import app.ProjectLoadJob;
+import app.GeneratedAssemblyScene;
+import app.ExampleLoadJob;
+#if wasm
+import app.BrowserExamples;
+#end
+import app.ProjectSourceLoader;
 import app.Main.ReferenceEditorApp;
 import app.SetupScriptRegistry;
 import haxe.Json;
@@ -28,9 +32,10 @@ typedef ExampleEntry = {
   final description:Array<String>;
   final tag:String;
   final kind:ExampleKind;
+  @:optional final jobId:String;
 }
 
-/** Bundled demos offered on the Start page. Entries whose files are missing are not listed. */
+/** One catalog for desktop files and browser resources published by the examples build. */
 @:access(app.Main.ReferenceEditorApp)
 class ExampleCatalog {
   public static final entries:Array<ExampleEntry> = [
@@ -85,23 +90,23 @@ class ExampleCatalog {
     {id: "robot-welder", title: "Robot welder",
       description: ["A generated MIG welding cell: arm,", "torch, power source and a weldment"],
       tag: "Editable project",
-      kind: Project("machinekit/examples/robot-welder/materia.project.json")},
+      jobId: "complete", kind: Project("machinekit/examples/robot-welder/materia.project.json")},
     {id: "robot-welder-seam", title: "Robot welder: one seam",
       description: ["A focused MIG welding mission", "along a plate T-joint"],
       tag: "Editable project",
-      kind: Project("machinekit/examples/robot-welder/materia.seam.project.json")},
+      jobId: "single-seam", kind: Project("machinekit/examples/robot-welder/materia.project.json")},
     {id: "robot-welder-post", title: "Robot welder: tube post",
       description: ["Weld four sides of a tube post", "as one continuous path"],
       tag: "Editable project",
-      kind: Project("machinekit/examples/robot-welder/materia.post.project.json")},
+      jobId: "tube-post", kind: Project("machinekit/examples/robot-welder/materia.project.json")},
     {id: "robot-welder-weave", title: "Robot welder: woven seam",
       description: ["A 7 mm seam deposited", "with a weaving torch path"],
       tag: "Editable project",
-      kind: Project("machinekit/examples/robot-welder/materia.weave.project.json")},
+      jobId: "woven-seam", kind: Project("machinekit/examples/robot-welder/materia.project.json")},
     {id: "robot-welder-multipass", title: "Robot welder: three passes",
       description: ["A 10 mm seam built up", "over three welding passes"],
       tag: "Editable project",
-      kind: Project("machinekit/examples/robot-welder/materia.multipass.project.json")},
+      jobId: "multipass", kind: Project("machinekit/examples/robot-welder/materia.project.json")},
     {id: "mobile-robot-welder", title: "Mobile robot welder",
       description: ["A mobile welding cell", "with an arm and torch"],
       tag: "Editable project",
@@ -147,6 +152,7 @@ class ExampleCatalog {
 
   /** The manifest's own name, or its folder name when the manifest cannot be read yet. */
   static function projectTitle(projectPath:String):String {
+    if (ProjectSourceLoader.isPrebuilt(projectPath)) return Path.withoutDirectory(projectPath);
     try {
       var name:Dynamic = Reflect.field(Json.parse(File.getContent(projectPath)), "name");
       if (Std.isOfType(name, String) && StringTools.trim(name).length > 0) return name;
@@ -164,12 +170,18 @@ class ExampleCatalog {
     return null;
   }
 
-  static function isAvailable(entry:ExampleEntry):Bool return switch (entry.kind) {
+  static function isAvailable(entry:ExampleEntry):Bool {
+    #if wasm
+    return BrowserExamples.has(entry.id);
+    #else
+    return switch (entry.kind) {
     case Project(path): FileSystem.exists(path);
     case Script(reference): SetupScriptRegistry.references().indexOf(reference) >= 0;
     case WorkerRackToTable: workerAssetExists("app/examples/worker-rack-to-table.materia");
     case WorkerGallery: workerAssetExists("app/examples/worker-gallery.materia");
-  };
+    };
+    #end
+  }
 
   static function workerAssetExists(document:String):Bool {
     try {
@@ -180,13 +192,16 @@ class ExampleCatalog {
   }
 
   /**
-   * Starts opening an example. A project builds on a worker thread, so its job is returned and the caller
-   * applies the result with finish() once the job is done; every other kind opens immediately and returns null.
+   * Starts opening an example. Projects prepare asynchronously; browser examples acquire missing resources
+   * first. The caller applies a completed job with finish(). Native local demos open immediately.
    */
-  public static function begin(app:ReferenceEditorApp, entry:ExampleEntry):Null<ProjectLoadJob> {
+  public static function begin(app:ReferenceEditorApp, entry:ExampleEntry):Null<ExampleLoadJob> {
+    #if wasm
+    if (BrowserExamples.has(entry.id)) return new ExampleLoadJob(entry);
+    #end
     switch (entry.kind) {
-      case Project(path):
-        return new ProjectLoadJob(path);
+      case Project(_):
+        return new ExampleLoadJob(entry);
       default:
         open(app, entry);
         return null;
@@ -194,11 +209,15 @@ class ExampleCatalog {
   }
 
   /** Replaces the current document with a built project example. */
-  public static function finish(app:ReferenceEditorApp, entry:ExampleEntry, generated:GeneratedAssemblyScene):Void {
+  public static function finish(app:ReferenceEditorApp, entry:ExampleEntry, generated:Null<GeneratedAssemblyScene>):Void {
     var path = switch (entry.kind) {
       case Project(projectPath): projectPath;
-      default: throw "Only project examples finish from a build";
+      default: open(app, entry); return;
     };
+    #if wasm
+    if (BrowserExamples.has(entry.id)) path = BrowserExamples.source(entry.id);
+    #end
+    if (generated == null) throw "Project loading produced no scene";
     app.session.openGeneratedProject(generated, path);
     app.documentChanged();
     showModel(app);
@@ -209,7 +228,7 @@ class ExampleCatalog {
   public static function open(app:ReferenceEditorApp, entry:ExampleEntry):Void {
     switch (entry.kind) {
       case Project(path):
-        finish(app, entry, MateriaProjectRunner.loadProject(path));
+        finish(app, entry, ProjectSourceLoader.load(path, null, null, entry.jobId));
         return;
       case Script(reference):
         var scripted = app.session.openScript(reference);

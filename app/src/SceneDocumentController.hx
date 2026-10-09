@@ -17,6 +17,8 @@ class SceneDocumentController {
   public var error(default, null):Null<String> = null;
   /** Set by the host while something outside the controller, such as a background project load, owns the document. */
   public var busy:Null<Void->Bool> = null;
+  /** Hosted artifact opening can report progress before replacing the current document. */
+  public var openArtifact:Null<String->Void> = null;
 
   public function new(session:ProjectDocumentSession,
       choosePath:Bool->Null<String>->(Null<String>->Null<String>->Void)->Void, changed:Void->Void,
@@ -53,9 +55,19 @@ class SceneDocumentController {
 
   function openAccepted(path:String):Void {
     try {
+      if (ProjectSourceLoader.isPrebuilt(path)) {
+        if (openArtifact != null) openArtifact(path); else session.open(path);
+        changed();
+        return;
+      }
       var root:Dynamic = Json.parse(File.getContent(path));
       var project = SceneCodec.decodeProjectRoot(root);
       var script = project == null ? SceneCodec.decodeScriptRoot(root) : null;
+      if (project != null && ProjectSourceLoader.isPrebuilt(Reflect.field(project, "reference"))) {
+        session.open(path);
+        changed();
+        return;
+      }
       if (project != null || script != null) {
         trustedOpen = path;
         trustReference = project != null ? Reflect.field(project, "reference") :

@@ -22,7 +22,7 @@ class StartPageTests {
     try {
       run();
       Sys.setCwd(started);
-      Sys.println("Start-page categories, variant search and navigation passed");
+      Sys.println("Start-page grouping, direct access and responsive layout passed");
       return 0;
     } catch (error:Dynamic) {
       Sys.setCwd(started);
@@ -49,14 +49,13 @@ class StartPageTests {
     browser.search("  WOVEN seam  ");
     var matches = browser.filtered(all);
     check(matches.length == 1 && matches[0].id == "robot-welding", "search finds variants regardless of case");
-    check(matches[0].examples.length == 5, "search preserves the family's five variants");
+    check(matches[0].examples.length == 1 && matches[0].examples[0].id == "robot-welder-weave",
+      "search exposes only the matching runnable variant");
     browser.selectCategory("Machining");
     check(browser.filtered(all).length == 0, "search and category compose");
     browser.search("");
     check(browser.filtered(all).length == 2, "bench mill variants share a card");
-    browser.selectedFamily = "bench-mills";
     browser.selectCategory("All");
-    check(browser.selectedFamily == null, "category navigation leaves a family detail");
 
     // A partial installation still groups only the variants that are actually available.
     var variant = ExampleCatalog.find("robot-welder-weave");
@@ -79,26 +78,42 @@ class StartPageTests {
     check(startRoot != null && find(startRoot, "search-field") != null, "search is present");
     click(editor, frame, "start-category:Welding");
     check(editor.startExamples.category == "Welding", "category button updates navigation");
-    check(find(editor.submit(frame), "card-button:Robot welding") != null, "family card is present");
-    var preview:RenderNode = cast find(editor.submit(frame), "start-preview:robot-welding");
+    root = editor.submit(frame);
+    check(find(root, "family:robot-welding") != null, "family heading is present");
+    var preview:RenderNode = cast find(root, "start-preview:robot-welding");
     check(preview != null && preview.resolved != null && preview.resolved.width > 0 && preview.resolved.height > 0,
       "preview illustrations have paintable dimensions");
-    click(editor, frame, "card-button:Robot welding");
-    root = editor.submit(frame);
     for (id in ["robot-welder", "robot-welder-seam", "robot-welder-post", "robot-welder-weave", "robot-welder-multipass"])
-      check(find(root, "start-open-example:" + id) != null, "detail offers " + id);
-    click(editor, frame, "start-examples-back");
-    check(editor.startExamples.selectedFamily == null && editor.startExamples.category == "Welding", "Back preserves category");
+      check(find(root, "start-open-example:" + id) != null, "family exposes " + id + " directly");
+    check(find(root, "start-examples-back") == null, "examples have no drill-down navigation");
+    editor.startExamples.search("Complete weldment");
+    editor.invalidateView();
+    click(editor, frame, "start-open-example:robot-welder");
+    check(editor.startLoading != null && editor.startLoading.id == "robot-welder", "one card click starts the chosen example");
+    editor.cancelExampleLoad();
     editor.startExamples.search("nothing matches 12345");
     editor.invalidateView();
     check(find(editor.submit(frame), "start-clear-filters") != null, "empty search offers recovery");
     click(editor, frame, "start-clear-filters");
     check(editor.startExamples.query == "" && editor.startExamples.category == "All", "clear restores all families");
-    var narrow = editor.submit(new LayoutFrame(1024, 768));
-    check(find(narrow, "start-category:Welding") != null && find(narrow, "start-category:People & simulation") != null,
-      "all categories remain available in a narrower window");
+    for (width in [1024, 800]) {
+      var narrow = editor.submit(new LayoutFrame(width, 768));
+      check(find(narrow, "start-category:Welding") != null && find(narrow, "start-category:People & simulation") != null,
+        "all categories remain available in a narrower window");
+      var content:RenderNode = cast find(narrow, "start-content");
+      check(content != null && content.resolved != null, "start content has bounds");
+      checkCardBounds(narrow, content.globalBounds().x + content.globalBounds().width);
+    }
     editor.dispose();
     fonts.dispose();
+  }
+
+  static function checkCardBounds(node:RenderNode, right:Float):Void {
+    if (StringTools.startsWith(node.styleKey == null ? "" : node.styleKey, "start-open-example:")) {
+      check(node.resolved != null && node.globalBounds().x + node.globalBounds().width <= right + 1.0,
+        "example fits the pane: " + node.styleKey);
+    }
+    for (child in node.children) checkCardBounds(child, right);
   }
 
   static function find(node:RenderNode, key:String):Null<RenderNode> {

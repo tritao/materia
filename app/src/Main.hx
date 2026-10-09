@@ -189,7 +189,7 @@ class Main {
         new ReferenceEditorApp(null, null, null, null, null, null, null, null, true) :
         new ReferenceEditorApp();
       if (projectPath.length > 0) {
-        var generated = MateriaProjectRunner.loadProject(projectPath);
+        var generated = ProjectSourceLoader.load(projectPath);
         editor.session.openGeneratedProject(generated, projectPath);
       }
       // Opens bundled examples in order, exactly as the Start page does, for headless checks.
@@ -311,6 +311,7 @@ class Main {
     // `--frame=ID` frames the camera on that scene object once the project is open, leaving nothing selected.
     var frameId:Null<String> = null;
     for (arg in args) if (arg.indexOf("--frame=") == 0) frameId = arg.substr(8);
+    host.onFrameRendered = function() { if (activeEditor != null) activeEditor.projectFrameRendered(); };
     host.captureReady = function() {
       var ready = activeEditor == null || !activeEditor.openingProject();
       if (ready && playOnOpen && activeEditor != null) {
@@ -599,6 +600,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var sceneGeneration:Int = 0;
   var treeModel:EditorSceneTree;
   final telemetry:TelemetryPanel;
+  final missionPanel = new app.editor.MissionPanel();
+  public var missionController(default, null):MissionController;
   final cncPanel = new app.editor.CncPanel();
   static inline var MAX_LOG_LINES:Int = 1000;
   final logLines:Array<String>;
@@ -630,9 +633,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public var antialiasing(default, null):Int = AppPreferences.DEFAULT_ANTIALIASING;
   // Start page example that is queued to open; it runs a few frames later so "Opening..." is visible first.
   var startLoading:Null<ExampleEntry> = null;
+  var projectOpenStartedAt:Float = 0.0;
+  var projectFrameControl:Null<ProjectLoadControl> = null;
   var startLoadDelay:Int = 0;
   // The worker-thread build behind startLoading, when the example is a project.
-  var startJob:Null<ProjectLoadJob> = null;
+  var startJob:Null<ExampleLoadJob> = null;
   var startFailure:Null<String> = null;
   var reportedMissionFailure:Null<String> = null;
   final startExamples = new app.editor.ExampleBrowser();
@@ -742,7 +747,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if(projectPath!=null){
       if(hostContext!=null) deferredProject=projectPath;
       else {
-        var generated=MateriaProjectRunner.loadProject(projectPath);
+        var generated=ProjectSourceLoader.load(projectPath);
         session.openGeneratedProject(generated, projectPath);
       }
     }
@@ -753,8 +758,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (chooser == null) complete(null, "File dialogs require the desktop host");
       else chooser.choose(save, path, complete);
     }, documentChanged, commitActiveDrag, cancelActiveDrag);
-    documents.busy = function() return startLoading != null;
+    missionController = new MissionController(session, simulation, documents.requestRun, invalidateView,
+      function() { documentChanged(); commands.execute("scene.fit-all"); },
+      function() return documents.blocked(),
+      function(id) { scene.selectTreeKey("project:" + id); invalidateView(); });
+    documents.busy = function() return startLoading != null || missionController.isLoading();
+    documents.openArtifact = openProjectInBackground;
     if (hostContext != null) hostContext.onCloseRequested = function(close) {
+      missionController.cancel();
       // A running build must not keep the window from closing: cancel it and let the normal prompt run.
       if (startJob != null) {
         startJob.control.cancel();
@@ -777,7 +788,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     telemetry = new TelemetryPanel(demo);
     logLines = [];
     for (line in demo ? ["Demo scene ready", "Select a box; edit position or visibility",
-        "Middle-drag to pan; scroll to zoom"] : ["Scene ready", "Use Add to create an object"])
+        "Middle-drag to orbit; Shift+middle to pan; right-drag + WASD to fly; scroll to zoom"] : ["Scene ready", "Use Add to create an object"])
       log(line);
     readViewSettings();
     paletteVisible = false;
@@ -857,16 +868,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
     shellStyle.background = appearance.canvas;
     var shell = new AppShell("reference-editor-shell", new Stack("overlay-host", layers),
       new RetainedView("editor-top-bar", function(_) return topBar(),
-        function() return chromeRevisionKey()),
+        function() return topBarRevisionKey()),
       null, null, shellStyle, null,
       new RetainedView("editor-status-bar", function(_) return statusBar(),
-        function() return chromeRevisionKey()));
+        function() return statusBarRevisionKey()));
     var windowLayers:Array<StackChild> = [new StackChild("shell", shell, 0.0, 0.0, 0,
       LayoutAxis.grow(), LayoutAxis.grow())];
     if (toolbarMenuVisible && documentDialog == null) {
       var toolbarMenu = new CommandMenu("editor-more-menu", [
         "editor.save-as", "scene.export-step", "editor.undo", "editor.redo",
-        "scene.frame-selected", "scene.reset-perspective",
+        "scene.frame-selected", "scene.fit-all", "scene.reset-perspective",
         "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast",
         "scene.toggle-grid", "scene.toggle-simulation-overlays", "editor.toggle-dark-theme", "start.show", "editor.command-palette", "editor.settings",
         "workspace.reset"
@@ -970,6 +981,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Convenience entry point for a NativeKit host's layout phase. */
   public function submit(frame:LayoutFrame):RenderNode {
+    if (perspectiveViewport != null) perspectiveViewport.advanceNavigation(frame.deltaSeconds);
     var selectionKey = scene.treeSelectionKey();
     if (selectionKey != lastRecordedSelection) {
       lastRecordedSelection = selectionKey;
@@ -986,13 +998,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     // Keep live simulation, component stories, and externally populated worlds
     // on the normal path because their presentation can change independently
     // of the UI revision counters.
-    if (componentLab != null || simulation.isActive() || externalWorldHasRobots)
+    if (componentLab != null || startLoading != null || simulation.isActive() || externalWorldHasRobots)
       return ui.submit(view(), frame);
     return ui.submitCached(function() return view(), frame, editorSubmitKey());
   }
 
   /** Advance the character preview, then CAD preview refinement after a rendered frame. */
   public function tick():Void {
+    missionController.tick();
     var queued = startLoading;
     if (queued != null) {
       var job = startJob;
@@ -1005,7 +1018,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
           startLoading = null;
           if (job.wasCancelled()) log("Cancelled opening " + queued.title);
           else try {
+            job.control.phase("Installing the scene");
             ExampleCatalog.finish(this, queued, job.take());
+            job.control.phase("Rendering the first project frame");
+            projectFrameControl = job.control;
             if (closeStartAfterOpen) workspace.close("start");
           } catch (failure:Dynamic) {
             startFailure = "Could not open " + queued.title + ": " + Std.string(failure);
@@ -1058,10 +1074,23 @@ class ReferenceEditorApp implements DesktopUiApplication {
    * caller returns at once and the window keeps painting; `tick()` opens the result.
    */
   public function openProjectInBackground(path:String):Void {
+    projectOpenStartedAt = Sys.time();
+    projectFrameControl = null;
     startLoading = ExampleCatalog.launchEntry(path);
     startLoadDelay = 3;
     closeStartAfterOpen = workspace.get("start") != null && !workspace.isOpen("start");
     showStartPage();
+  }
+
+  /** CPU render completion; this measures frame submission, not monitor scan-out. */
+  public function projectFrameRendered():Void {
+    var control = projectFrameControl;
+    if (control == null) return;
+    projectFrameControl = null;
+    Sys.println("project-open-profile " + haxe.Json.stringify({
+      openToFirstFrameMilliseconds: (Sys.time() - projectOpenStartedAt) * 1000.0,
+      loading: control.profile()
+    }));
   }
 
   /** Opens the Start page beside the 3D view. */
@@ -1075,6 +1104,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function requestExample(entry:ExampleEntry):Void {
     startFailure = null;
     documents.requestRun(function() {
+      projectOpenStartedAt = Sys.time();
+      projectFrameControl = null;
       startLoading = entry;
       startLoadDelay = 3;
       invalidateView();
@@ -1141,6 +1172,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function context():UiContext return ui;
 
   public function dispose():Void {
+    missionController.cancel();
     if (projectUiExtension != null) projectUiExtension.dispose();
     var saveError = workspaceSaves.close();
     if (saveError != null) log("Workspace save failed: " + saveError);
@@ -1415,9 +1447,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var active = simulation.isActive();
     var mission = simulation.missionPlayer();
     var missionFailed = mission != null && mission.failure != null;
-    var text = missionFailed || (simulation.isRunning() && mission != null)
-      ? mission.statusLabel() : simulation.isRunning() ? "Running" : active ? "Paused" : "Design";
-    if (active && simulation.pending(sensors, scene)) text += " · rebuild pending";
+    var text = simulationStateLabel();
     var dotColor = missionFailed ? tokens.danger : simulation.isRunning() ? tokens.success : active ? tokens.warning : tokens.textSecondary;
     var chip = new LayoutStyle();
     chip.direction = LayoutDirection.LeftToRight;
@@ -1437,7 +1467,44 @@ class ReferenceEditorApp implements DesktopUiApplication {
     ], chip);
   }
 
-  function chromeRevisionKey():String {
+  function simulationStateLabel():String {
+    var mission = simulation.missionPlayer();
+    var text = mission != null && (mission.failure != null || simulation.isRunning())
+      ? mission.statusLabel() : simulation.isRunning() ? "Running" : simulation.isActive() ? "Paused" : "Design";
+    return simulation.isActive() && simulation.pending(sensors, scene) ? text + " · rebuild pending" : text;
+  }
+
+  static final topBarCommands:Array<String> = ["editor.new", "editor.open", "editor.save",
+    "editor.undo", "editor.redo", "editor.mode.design", "editor.mode.simulate",
+    "sim.play", "sim.pause", "sim.step", "sim.reset", "sim.stop", "scene.frame-selected"];
+
+  /** Command predicates can change without a registry refresh (for example after selection). */
+  function topBarCommandState():Int {
+    var result = 0;
+    for (id in topBarCommands) {
+      var command = commands.get(id);
+      result = (result << 2) | (command != null && command.isEnabled(ui.commandContext) ? 1 : 0) |
+        (command != null && command.isChecked(ui.commandContext) ? 2 : 0);
+    }
+    return result;
+  }
+
+  function topBarRevisionKey():String {
+    var mission = simulation.missionPlayer();
+    return "document=" + session.label() + ":commands=" + commands.revision + ":state=" + topBarCommandState() +
+      ":active=" + simulation.isActive() + ":running=" + simulation.isRunning() +
+      ":failed=" + (mission != null && mission.failure != null) + ":chip=" + simulationStateLabel() +
+      ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible;
+  }
+
+  function statusBarRevisionKey():String {
+    return "left=" + statusSelectionLabel() + ":right=" + statusRuntimeLabel() +
+      ":grid=" + gridSpacing + ":snap=" + gridSnapEnabled + ":mates=" + Std.string(session.assemblyMateStatus()) +
+      ":mateProblem=" + (session.assemblyMateProblem != null) + ":error=" + (simulation.error != null);
+  }
+
+  // The viewport also consumes simulation poses, so its dependencies include presentation revisions.
+  function perspectiveRevisionKey():String {
     var presentationRevision = framePresentation == null ? -1 : framePresentation.revision;
     return "generation=" + sceneGeneration + ":scene=" + scene.revision +
       ":selection=" + scene.selectionRevision + ":simulation=" + simulation.appliedRevision +
@@ -1460,24 +1527,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     style.padding = new Insets(10.0, 3.0, 10.0, 3.0);
     style.background = appearance.toolbar;
 
-    var selected = scene.object(scene.selectedId);
-    var left = simulation.error != null ? "Simulation error: " + simulation.error :
-      selected == null ? "Ready" : selected.label + " selected";
-    var mission = simulation.missionPlayer();
-    if (mission != null && simulation.isActive() && (simulation.isRunning() || mission.failure != null))
-      left = mission.statusLabel(true);
-    var staleCount = session.staleEdits().length;
-    if (staleCount > 0) left = staleCount + " stale project edit" + (staleCount == 1 ? "" : "s");
-    var mode = simulation.isRunning() ? "Running" : simulation.isActive() ? "Paused" : "Design";
-    if (simulation.isActive() && simulation.pending(sensors, scene)) mode += " · Rebuild pending";
-    var worldLabel = switch (world.status()) {
-      case RobotStatus.Disconnected: "World Offline";
-      case RobotStatus.Connecting: "World Connecting";
-      case RobotStatus.Ready: "World Ready";
-      case RobotStatus.Fault: "World Fault";
-    };
-    var right = mode + (viewportWidth >= 700.0 ? " · " + simulation.userBackendName() : "") +
-      " · " + worldLabel;
+    var left = statusSelectionLabel();
+    var right = statusRuntimeLabel();
     var items:Array<KeyedView> = [
       new KeyedView("selection", new Text(shortenLabel(left, viewportWidth < 700.0 ? 20 : 48),
         null, simulation.error == null ? appearance.theme.tokens.textSecondary :
@@ -1497,6 +1548,31 @@ class ReferenceEditorApp implements DesktopUiApplication {
     items.push(new KeyedView("runtime", new Text(right, null,
       appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
     return new Row("editor-status-bar", items, style);
+  }
+
+  function statusSelectionLabel():String {
+    var selected = scene.object(scene.selectedId);
+    var left = simulation.error != null ? "Simulation error: " + simulation.error :
+      selected == null ? "Ready" : selected.label + " selected";
+    var mission = simulation.missionPlayer();
+    if (mission != null && simulation.isActive() && (simulation.isRunning() || mission.failure != null))
+      left = mission.statusLabel(true);
+    var staleCount = session.staleEdits().length;
+    if (staleCount > 0) left = staleCount + " stale project edit" + (staleCount == 1 ? "" : "s");
+    return left;
+  }
+
+  function statusRuntimeLabel():String {
+    var mode = simulation.isRunning() ? "Running" : simulation.isActive() ? "Paused" : "Design";
+    if (simulation.isActive() && simulation.pending(sensors, scene)) mode += " · Rebuild pending";
+    var worldLabel = switch (world.status()) {
+      case RobotStatus.Disconnected: "World Offline";
+      case RobotStatus.Connecting: "World Connecting";
+      case RobotStatus.Ready: "World Ready";
+      case RobotStatus.Fault: "World Fault";
+    };
+    return mode + (viewportWidth >= 700.0 ? " · " + simulation.userBackendName() : "") +
+      " · " + worldLabel;
   }
 
   function toolbarAction(key:String, commandId:String, label:String, icon:IconName,
@@ -1523,10 +1599,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("sensors", "Sensors", false, true, IconName.Radar));
     result.register(new DockPanelDescriptor("console", "Console", true, true, IconName.Terminal));
     result.register(new DockPanelDescriptor("telemetry", "Telemetry", true, true, IconName.Activity));
+    result.register(new DockPanelDescriptor("mission", "Mission", true, true, IconName.Activity));
     result.register(new DockPanelDescriptor("cnc", "CNC", true, true, IconName.Terminal));
 
     workspacePanelContents = [
-      new DockPanelContent("start", function(_) return StartPanel.build(this)),
+      new DockPanelContent("start", function(_) return StartPanel.build(this),
+        function(_, width) return StartPanel.build(this, width)),
       new DockPanelContent("hierarchy", function(_) return hierarchyPanel(), null,
         function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
           ":filter=" + hierarchySearch + ":expansion=" + hierarchyExpansionRevision +
@@ -1535,8 +1613,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new DockPanelContent("perspective", function(_) return perspectivePanel(),
         function(_, width) return perspectivePanel(width),
         // perspectivePanel() pushes grid and simulation settings into the viewport, so a hit may only skip it when
-        // none of its inputs changed: the chrome key covers grid, snap, simulation, presentation and size.
-        function() return chromeRevisionKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible),
+        // none of its inputs changed: this key includes the current simulation presentation.
+        function() return perspectiveRevisionKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible +
+          ":viewportPresentation=" + (perspectiveViewport == null ? "" : perspectiveViewport.presentationKey())),
       new DockPanelContent("inspector", function(_) return inspectorPanel(), null,
         function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
           ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive() +
@@ -1551,6 +1630,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ":dark=" + appearance.dark),
       new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation, appearance.theme.tokens.surface,
         appearance.theme.tokens.textSecondary, simulation)),
+      new DockPanelContent("mission", function(_) return missionPanel.build(missionController, appearance.theme.tokens)),
       new DockPanelContent("cnc", function(_) return cncPanel.build(simulation, appearance.theme.tokens))
     ];
 
@@ -1722,6 +1802,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     };
     var controls:Array<KeyedView> = [new KeyedView("frame",
       viewportToolbarAction("viewport-frame", "scene.frame-selected", "Frame", IconName.Inspect, compact))];
+    controls.push(new KeyedView("fit-all",
+      viewportToolbarAction("viewport-fit-all", "scene.fit-all", "Fit", IconName.Inspect, compact)));
     if (!tiny) controls.push(new KeyedView("reset",
       viewportToolbarAction("viewport-reset", "scene.reset-perspective", "Reset", IconName.Cube, compact)));
     var groupDivider = new Spacer("viewport-toolbar-group-divider", LayoutAxis.fixed(1.0),
@@ -1770,11 +1852,20 @@ class ReferenceEditorApp implements DesktopUiApplication {
       }
       invalidateView();
     };
-    var canvas:View = new Stack("perspective-canvas-overlay", [
-      new StackChild("scene", content, 0.0, 0.0, 0,
-        LayoutAxis.grow(), LayoutAxis.grow()),
+    var layers = [
+      new StackChild("scene", content, 0.0, 0.0, 0, LayoutAxis.grow(), LayoutAxis.grow()),
       new StackChild("view-angle", viewAngle, 10.0, 10.0, 1)
-    ]);
+    ];
+    var missionState = missionController.snapshot();
+    if (missionState.mission != null || missionState.jobs.length > 0) {
+      var overlayWidth = Math.max(120.0, Math.min(300.0, (availableWidth > 0 ? availableWidth : 400.0) - 20.0));
+      layers.push(new StackChild("mission-controls",
+        app.editor.MissionJobView.build(missionController, appearance.theme.tokens, "viewport-mission", function() {
+          workspace.open("mission", workspace.isOpen("sensors") ? "sensors" : "inspector");
+          workspace.activate("mission"); invalidateView();
+        }), 10.0, 54.0, 2, LayoutAxis.fixed(overlayWidth), LayoutAxis.fit(), false));
+    }
+    var canvas:View = new Stack("perspective-canvas-overlay", layers);
     return new Column("perspective-with-toolbar", [
       new KeyedView("toolbar", toolbar),
       new KeyedView("divider", divider),
@@ -2124,9 +2215,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     modeSnapshots.set(mode.id, layoutSnapshot());
     mode = next;
     // The mode's default layout backs "Reset workspace" while it is active.
-    workspace.setDefaultLayout(next.layout());
+    workspace.setDefaultLayout(next == EditorMode.Simulate
+      ? EditorWorkspaceLayout.simulateLayout(session.mission != null) : next.layout());
     var saved = modeSnapshots.get(next.id);
     if (saved != null) workspace.restorePersisted(saved);
+    if (next == EditorMode.Simulate && session.mission != null) {
+      if (!workspace.isOpen("mission")) workspace.open("mission", "sensors");
+      workspace.activate("mission");
+    }
     log(next.label + " mode");
     commands.refresh();
     invalidateView();

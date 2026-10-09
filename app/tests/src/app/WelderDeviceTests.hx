@@ -1,7 +1,7 @@
 package app;
 
 import sys.FileSystem;
-import app.MateriaProjectRunner.GeneratedAssemblyScene;
+import app.GeneratedAssemblyScene;
 import robotkit.world.RobotWorld;
 import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitTypes;

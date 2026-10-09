@@ -19,7 +19,8 @@
 		"yawPicker": {
 			"kind": "cad-preview",
 			"module": "GantryPickerPreview",
-			"function": "yawPicker"
+			"function": "yawPicker",
+			"cache": {"inputs": []}
 		}
 	}
 }

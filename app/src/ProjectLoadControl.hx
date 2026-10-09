@@ -15,17 +15,37 @@ class ProjectLoadControl {
 
   final mutex:Mutex = new Mutex();
   var phaseText:String = "Starting";
+  final startedAt:Float = Sys.time();
+  var phaseStartedAt:Float = Sys.time();
+  var measurements:Array<{name:String, milliseconds:Float}> = [];
+  var timings:Array<{phase:String, milliseconds:Float}> = [];
   var cancelRequested:Bool = false;
-  #if !wasm
-  var running:Null<Process> = null;
-  #end
+  var running:Null<Void->Void> = null;
 
   public function new() {}
 
   public function phase(text:String):Void {
     mutex.acquire();
+    var now = Sys.time();
+    timings.push({phase: phaseText, milliseconds: (now - phaseStartedAt) * 1000.0});
+    phaseStartedAt = now;
     phaseText = text;
     mutex.release();
+  }
+
+  public function measure(name:String, seconds:Float):Void {
+    mutex.acquire();
+    measurements.push({name: name, milliseconds: seconds * 1000.0});
+    mutex.release();
+  }
+
+  public function profile():Dynamic {
+    mutex.acquire();
+    var values = timings.copy();
+    values.push({phase: phaseText, milliseconds: (Sys.time() - phaseStartedAt) * 1000.0});
+    var work = measurements.copy();
+    mutex.release();
+    return {measurements: work, totalMilliseconds: (Sys.time() - startedAt) * 1000.0, phases: values};
   }
 
   public function currentPhase():String {
@@ -46,27 +66,22 @@ class ProjectLoadControl {
   public function cancel():Void {
     mutex.acquire();
     cancelRequested = true;
-    #if !wasm
     var process = running;
-    #end
     mutex.release();
-    #if !wasm
-    if (process != null) try process.kill() catch (_:Dynamic) {}
-    #end
+    if (process != null) try process() catch (_:Dynamic) {}
   }
 
   public function throwIfCancelled():Void {
     if (isCancelled()) throw CANCELLED;
   }
 
-  #if !wasm
-  /** Called by the worker around each child process so cancel() can reach it. */
-  public function attach(process:Process):Void {
+  /** Installs the execution adapter's cancellation action. Invoked outside the mutex. */
+  public function attachCancellation(action:Void->Void):Void {
     mutex.acquire();
-    running = process;
+    running = action;
     var stop = cancelRequested;
     mutex.release();
-    if (stop) try process.kill() catch (_:Dynamic) {}
+    if (stop) try action() catch (_:Dynamic) {}
   }
 
   public function detach():Void {
@@ -74,5 +89,24 @@ class ProjectLoadControl {
     running = null;
     mutex.release();
   }
+
+  #if !wasm
+  /** Called by the worker around each child process so cancel() can reach it. */
+  public function attach(process:Process):Void {
+    mutex.acquire();
+    running = function() process.kill();
+    var stop = cancelRequested;
+    mutex.release();
+    if (stop) try process.kill() catch (_:Dynamic) {}
+  }
+
+  public function attachChild(process:sys.io.ChildProcess):Void {
+    mutex.acquire();
+    running = function() process.cancel();
+    var stop = cancelRequested;
+    mutex.release();
+    if (stop) try process.cancel() catch (_:Dynamic) {}
+  }
+
   #end
 }

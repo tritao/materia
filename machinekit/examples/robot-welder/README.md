@@ -48,3 +48,12 @@ restart peak-leg check, for focused recovery work.
 Open it from the editor's Start page, or check it alone with
 `haxeon/scripts/haxeon run --project machinekit/examples/robot-welder/haxeon.json`
 (CadKit's native libraries on `LD_LIBRARY_PATH`).
+
+## Jobs in Materia
+
+`materia.project.json` exposes five presets of the shared stationary cell: Complete
+weldment, Single seam, Tube post, Woven seam (7 mm), and Three-pass seam (10 mm).
+The Start cards open this project with a job selected. Use the job selector in the
+viewport or Mission panel to change it before simulation; stop simulation before
+switching. The selection is retained when saving a Materia document. The older
+individual manifests remain usable for existing scripts and saved references.

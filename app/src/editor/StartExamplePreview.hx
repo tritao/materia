@@ -4,7 +4,6 @@ import app.editor.ExampleBrowser.ExampleFamily;
 import haxeon.ui.Color;
 import haxeon.ui.LayoutAxis;
 import haxeon.ui.LayoutStyle;
-import haxeon.ui.Rect;
 import haxeon.ui.PathBuilder;
 import haxeon.ui.LineCap;
 import haxeon.ui.LineJoin;
@@ -13,12 +12,11 @@ import haxeon.ui.core.View;
 
 /** Lightweight category illustrations; no model compilation or image loading on the Start page. */
 class StartExamplePreview {
-  public static function build(family:ExampleFamily, ink:Color, background:Color):View {
+  public static function build(family:ExampleFamily, ink:Color, width:Float = 250.0):View {
     var style = new LayoutStyle();
-    style.width = LayoutAxis.fixed(250.0);
+    style.width = LayoutAxis.fixed(width);
     style.height = LayoutAxis.fixed(88.0);
     return new CanvasView("start-preview:" + family.id, function(canvas, geometry) {
-      canvas.fillRectIfPositive(new Rect(0, 0, geometry.width, geometry.height), background);
       var path = new PathBuilder();
       switch family.category {
         case "Welding", "Robotics & handling":

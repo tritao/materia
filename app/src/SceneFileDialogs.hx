@@ -88,7 +88,10 @@ class SceneFileDialogs {
       switch (event) {
         case Raw(kind, _, _, result, _, _, data) if (kind == EventKind.ResourceDataComplete):
           if (result != Result.Ok) { complete(null, "Could not read the chosen file: " + Std.string(result)); return; }
-          try BrowserFiles.store(path, data)
+          try {
+            if (ProjectSourceLoader.isPrebuilt(path)) path = BrowserFiles.storeArtifact(item.displayName, data);
+            else BrowserFiles.store(path, data);
+          }
           catch (failure:Dynamic) { complete(null, Std.string(failure)); return; }
           complete(path, null);
         default: complete(null, "Unexpected file read response");

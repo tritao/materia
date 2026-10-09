@@ -130,6 +130,8 @@ class SceneCodec {
     if (Reflect.field(root, "script") != null) throw "A scene cannot have both script and project owners";
     if (numberField(value, "version") != 1) throw "Unsupported generated project record version";
     var reference = stringField(value, "reference");
+    var jobId = optionalText(value, "jobId");
+    if (jobId != null && (jobId.length == 0 || jobId.length > 500)) throw "Invalid project job ID";
     var assemblyState = optionalText(value, "assemblyState");
     if (assemblyState != null && assemblyState.length > 2000000)
       throw "Generated project assembly state is too large";
@@ -192,6 +194,7 @@ class SceneCodec {
     var record:ProjectSceneRecord = {version: 1, reference: reference, overrides: overrideRecords,
       removed: removedIds, instances: instanceRecords, assemblyState: assemblyState,
       assemblyDependentJoints: assemblyDependentJoints};
+    if (jobId != null) record.jobId = jobId;
     if (assemblyMates != null) record.assemblyMates = assemblyMates;
     return record;
   }

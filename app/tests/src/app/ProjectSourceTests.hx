@@ -1671,7 +1671,7 @@ class ProjectSourceTests {
     checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "gantry MuJoCo", "gantry-welder");
 
   /** A welder cell open in the simulation on MuJoCo, from one of the example's manifests. */
-  static function openWelder(root:String, manifestName:String, ?adjust:app.MateriaProjectRunner.GeneratedAssemblyScene -> Void,
+  static function openWelder(root:String, manifestName:String, ?adjust:app.GeneratedAssemblyScene -> Void,
       ?backend:Int, example:String = "robot-welder"):{session:ProjectDocumentSession, simulation:ApplicationSimulation, mission:MissionPlayer, welder:processkit.simulation.SimulatedWelder,
       beads:WeldBeads} {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/" + example + "/" + manifestName);
@@ -2704,7 +2704,7 @@ class ProjectSourceTests {
    * revolute joint from the plate; the pin keeps its place and turns on the joint; the joint and its coordinate
    * survive a save and reopen; undo brings the mates back.
    */
-  static function checkMateJoint(manifest:String, generated:MateriaProjectRunner.GeneratedAssemblyScene):Void {
+  static function checkMateJoint(manifest:String, generated:GeneratedAssemblyScene):Void {
     var descriptors = generated.faceDescriptorsByDefinition;
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot,
@@ -2753,7 +2753,7 @@ class ProjectSourceTests {
    * are refused without losing the first pick; the second face on another part adds the mate. The mate then
    * shows on the part's inspector, and clearing it removes the mate (undoably).
    */
-  static function checkMatePick(manifest:String, generated:MateriaProjectRunner.GeneratedAssemblyScene):Void {
+  static function checkMatePick(manifest:String, generated:GeneratedAssemblyScene):Void {
     var descriptors = generated.faceDescriptorsByDefinition;
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot,

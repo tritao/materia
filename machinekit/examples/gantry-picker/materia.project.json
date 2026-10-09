@@ -19,7 +19,8 @@
 		"picker": {
 			"kind": "cad-preview",
 			"module": "GantryPickerPreview",
-			"function": "picker"
+			"function": "picker",
+			"cache": {"inputs": []}
 		}
 	}
 }

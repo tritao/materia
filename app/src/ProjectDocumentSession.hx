@@ -5,7 +5,7 @@ import haxeon.ui.Path;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 import app.CncProgramPlayer.CncJob;
-import app.MateriaProjectRunner.GeneratedAssemblyScene;
+import app.GeneratedAssemblyScene;
 import materia.project.SceneArtifact.SceneArtifactMission;
 import materia.project.SceneArtifact.SceneArtifactMobileBase;
 import materia.project.SceneArtifact.SceneArtifactRobotSensor;
@@ -70,6 +70,7 @@ class ProjectDocumentSession {
   public var generation(default, null):Int = 0;
   public var scriptOwnership(default,null):Null<ScriptOwnership> = null;
   public var projectReference(default,null):Null<String> = null;
+  public var projectJob(default,null):Null<String> = null;
   public var projectAssemblyDefinition(default,null):Null<AssemblyDefinition> = null;
   public var projectAssemblyState(default,null):Null<AssemblyStateRecord> = null;
   public var projectPhysical(default,null):Null<AssemblyPhysicalData> = null;
@@ -149,6 +150,10 @@ class ProjectDocumentSession {
 
   public function open(file:String):Void {
     var absolute = checkedPath(file);
+    if (ProjectSourceLoader.isPrebuilt(absolute)) {
+      openGeneratedProject(ProjectSourceLoader.load(absolute), absolute);
+      return;
+    }
     var text = File.getContent(absolute);
     openContent(absolute, text);
   }
@@ -239,13 +244,15 @@ class ProjectDocumentSession {
   }
 
   /** Open everything a project's generator made, retaining its source manifest. */
-  public function openGeneratedProject(generated:GeneratedAssemblyScene, manifestPath:String):Void
+  public function openGeneratedProject(generated:GeneratedAssemblyScene, manifestPath:String):Void {
     openGeneratedScene(generated.objects, manifestPath,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions,
       generated.faceDescriptorsByDefinition, generated.cncJob, generated.mobileBase, generated.mission, generated.robotTools,
-      generated.robotSensors, generated.machineMotion);
+      generated.robotSensors, generated.machineMotion, generated.assemblyModel);
+    projectJob = generated.projectJob;
+  }
 
   /** Open generated geometry while retaining its source manifest. */
   public function openGeneratedScene(data:Array<SceneObjectData>, ?manifestPath:String,
@@ -255,7 +262,8 @@ class ProjectDocumentSession {
       ?physical:AssemblyPhysicalData, ?recipeText:String, ?motions:Array<RobotMotionTrack>,
       ?faceDescriptors:Map<String, String>, ?cnc:CncJob,
       ?mobile:SceneArtifactMobileBase, ?work:SceneArtifactMission, ?tools:Array<SceneArtifactRobotTool>,
-      ?sensors:Array<SceneArtifactRobotSensor>, ?machine:materia.project.SceneArtifact.SceneArtifactMachineMotion):Void {
+      ?sensors:Array<SceneArtifactRobotSensor>, ?machine:materia.project.SceneArtifact.SceneArtifactMachineMotion,
+      ?model:cadkit.modeling.CompiledAssembly):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -275,7 +283,8 @@ class ProjectDocumentSession {
     }
     var runtime:Null<AssemblyState> = null;
     try {
-      runtime = assemblyDefinition == null ? null : new AssemblyState(assemblyDefinition, assemblyState);
+      runtime = assemblyDefinition == null ? null : model != null && model.definition == assemblyDefinition
+        ? AssemblyState.fromModel(model, assemblyState) : new AssemblyState(assemblyDefinition, assemblyState);
       configureAssembly(next, assemblyDefinition);
     } catch (error:Dynamic) {
       next.dispose();
@@ -308,16 +317,16 @@ class ProjectDocumentSession {
     reference = FileSystem.fullPath(reference);
     var savedRecipe:Null<String> = Reflect.field(root, "recipeDocument");
     var diagnostics:Array<String> = [];
-    var projectRequirement = MateriaProjectRunner.executionRequirement(reference);
-    var generated = MateriaProjectRunner.loadProject(reference,
-      projectRequirement.reconcilesSavedRecipe ? savedRecipe : null);
+    var projectRequirement = ProjectSourceLoader.executionRequirement(reference, project.jobId);
+    var generated = ProjectSourceLoader.load(reference,
+      projectRequirement.reconcilesSavedRecipe ? savedRecipe : null, null, project.jobId);
     if (projectRequirement.reconcilesSavedRecipe) {
       if (generated.recipeDiagnostics != null)
         for (diagnostic in generated.recipeDiagnostics) diagnostics.push(diagnostic);
-    } else if (savedRecipe != null && generated.recipeDocument != null) {
+    } else if (!ProjectSourceLoader.isPrebuilt(reference) && savedRecipe != null && generated.recipeDocument != null) {
       var reconciled = reconcileRecipe(generated.recipeDocument, savedRecipe, diagnostics);
       if (reconciled.changed)
-        generated = MateriaProjectRunner.loadProject(reference, reconciled.text);
+        generated = ProjectSourceLoader.load(reference, reconciled.text, null, project.jobId);
       else
         generated.recipeDocument = reconciled.text;
     }
@@ -357,7 +366,8 @@ class ProjectDocumentSession {
     var runtime:Null<AssemblyState> = null;
     try {
       runtime = generated.assemblyDefinition == null ? null :
-        new AssemblyState(generated.assemblyDefinition, stateRecord);
+        generated.assemblyModel != null && generated.assemblyModel.definition == generated.assemblyDefinition
+        ? AssemblyState.fromModel(generated.assemblyModel, stateRecord) : new AssemblyState(generated.assemblyDefinition, stateRecord);
       configureAssembly(next, generated.assemblyDefinition);
     } catch (error:Dynamic) {
       if (next != null) next.dispose();
@@ -380,6 +390,7 @@ class ProjectDocumentSession {
     cncJob = generated.cncJob;
     mobileBase = generated.mobileBase;
     mission = generated.mission;
+    projectJob = generated.projectJob;
     robotTools = generated.robotTools == null ? [] : generated.robotTools.copy();
     robotSensors = generated.robotSensors == null ? [] : generated.robotSensors.copy();
     machineMotion = generated.machineMotion;
@@ -837,7 +848,8 @@ class ProjectDocumentSession {
       value:Float):AssemblyStateRecord {
     var definition = projectAssemblyDefinition;
     if (definition == null) throw "Assembly definition is unavailable";
-    var candidate = new AssemblyState(definition, stateRecord);
+    var candidate = assemblyRuntime != null && assemblyRuntime.model.definition == definition
+      ? AssemblyState.fromModel(assemblyRuntime.model, stateRecord) : new AssemblyState(definition, stateRecord);
     candidate.setJoint(jointId, value);
     return evaluateAssemblyConfigurationState(candidate, assemblyDependentJointIds());
   }
@@ -870,7 +882,8 @@ class ProjectDocumentSession {
     var centers = assemblyLocalCentersByDefinition;
     if (definition == null || centers == null)
       throw "Assembly placement data is unavailable";
-    var candidate = new AssemblyState(definition, stateRecord);
+    var candidate = assemblyRuntime != null && assemblyRuntime.model.definition == definition
+      ? AssemblyState.fromModel(assemblyRuntime.model, stateRecord) : new AssemblyState(definition, stateRecord);
     var transforms:Array<{id:String, x:Float, y:Float, z:Float, rotation:Array<Float>}> = [];
     for (occurrence in definition.occurrences) {
       var center = centers.get(occurrence.definition);
@@ -971,6 +984,7 @@ class ProjectDocumentSession {
     sensors = nextSensors;
     scriptOwnership=nextOwnership;
     projectReference = null;
+    projectJob = null;
     recipeDocument = null;
     projectBaseline = null;
     staleProjectEdits = [];
@@ -1037,7 +1051,7 @@ class ProjectDocumentSession {
     var recipe = recipeDocument, reference = projectReference;
     if (recipe == null || reference == null) throw "This project has no editable recipe document";
     var saved = projectSaveData(path == null ? reference + ".materia" : path);
-    var generated = MateriaProjectRunner.loadProject(reference, DocumentCodec.encode(recipe));
+    var generated = ProjectSourceLoader.load(reference, DocumentCodec.encode(recipe), null, projectJob);
     var generatedDefinition = generated.assemblyDefinition;
     var overlaid = overlayDefinition(generatedDefinition, assemblyMates, generated.faceDescriptorsByDefinition);
     generated.assemblyDefinition = overlaid.definition;
@@ -1051,7 +1065,9 @@ class ProjectDocumentSession {
     scene.refreshGenerated(data, generated.geometryBySnapshot);
     projectBaseline = generated.objects;
     installAssemblyRuntime(generated.assemblyDefinition,
-      generated.assemblyDefinition == null ? null : new AssemblyState(generated.assemblyDefinition, stateRecord),
+      generated.assemblyDefinition == null ? null : generated.assemblyModel != null
+        && generated.assemblyModel.definition == generated.assemblyDefinition
+        ? AssemblyState.fromModel(generated.assemblyModel, stateRecord) : new AssemblyState(generated.assemblyDefinition, stateRecord),
       generated.localCentersByDefinition, generated.metresPerUnit, saved.record.assemblyDependentJoints,
       generated.faceDescriptorsByDefinition, overlaid.overlay, generatedDefinition, overlaid.problem);
   }
@@ -1102,6 +1118,7 @@ class ProjectDocumentSession {
       : AssemblyDefinitionCodec.encodeState(projectAssemblyDefinition, assemblyRuntime.record());
     var record:ProjectSceneRecord = {version: 1, reference: relativeReference(destination, reference),
       overrides: overrides, removed: removed, instances: instances,
+      jobId: projectJob,
       assemblyState: savedAssemblyState,
       assemblyDependentJoints: savedDependentJoints()};
     if (!assemblyMates.isEmpty()) record.assemblyMates = assemblyMates.encode();
