@@ -16,6 +16,12 @@ class AxisKinematics implements KinematicsSolver {
   public final y:MotionAxis;
   public final z:MotionAxis;
   final home:Array<Float>;
+  /**
+    The joints no axis owns that follow other joints (a CoreXY motor's pulley follows both axes): each is the sum
+    of its couplings' terms, placed after the joints it follows.
+  **/
+  final derived:Array<Int> = [];
+  final terms:Array<Array<{leader:Int, ratio:Float, offset:Float}>> = [];
 
   public function new(blueprint:MotionSystemBlueprint,
       ?xAxisId:String = "x", ?yAxisId:String = "y", ?zAxisId:String = "z") {
@@ -34,6 +40,13 @@ class AxisKinematics implements KinematicsSolver {
         throw 'Axis kinematics maps joint $joint to more than one coordinate';
       used.set(joint, true);
     }
+    var ids = [for (joint in blueprint.model.joints) joint.id];
+    for (_ in ids) terms.push([]);
+    for (coupling in blueprint.model.couplings) {
+      var leader = ids.indexOf(coupling.leader), follower = ids.indexOf(coupling.follower);
+      if (leader >= 0 && follower >= 0) terms[follower].push({leader: leader, ratio: coupling.ratio, offset: coupling.offset});
+    }
+    for (index in 0...ids.length) if (terms[index].length > 0 && !used.exists(index)) derived.push(index);
     home = [for (_ in names) 0.0];
     x.writeLogicalPosition(home, x.homePosition);
     y.writeLogicalPosition(home, y.homePosition);
@@ -67,6 +80,12 @@ class AxisKinematics implements KinematicsSolver {
       if (bounds.lower < bounds.upper &&
           (result[index] < bounds.lower - tolerance.position ||
            result[index] > bounds.upper + tolerance.position)) return null;
+    }
+    // Joints no axis owns follow their leaders; repeated passes put each after what it follows.
+    for (_ in derived) for (index in derived) {
+      var sum = 0.0;
+      for (term in terms[index]) sum += term.ratio * result[term.leader] + term.offset;
+      result[index] = sum;
     }
     // A follower is the sum of its couplings' terms.
     var sums = new Map<String, Float>();

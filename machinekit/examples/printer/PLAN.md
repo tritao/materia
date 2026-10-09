@@ -523,6 +523,45 @@ Done. What was built and decided:
   junction deviation 0.013 mm at the same acceleration and speeds.
 - Record all numbers in this plan. They are the "before" of AM5.
 
+Done. What was built and decided (the "before" of AM5):
+- **Benchmark** `machinekit/examples/printer/benchmark` (a project of its own, `haxeon run --project=machinekit/examples/printer/benchmark/haxeon.json`):
+  slices the load (or reads G-code), strips everything but the moves, lowers it with the printer's work origin and
+  `rapidsAtFeed`, and plans it with `ProgramCompiler` on the printer's x, y and z (no plan check, no
+  simulation). `PRINTING_BENCHMARK_ONLY=gear|cube|gcode` picks a load, `PRINTING_BENCHMARK_DUMP=dir` writes the
+  sliced G-code, `PRINTING_BENCHMARK_GCODE=file` plans a G-code file instead of slicing, `PRINTING_BENCHMARK_LAYERS=n`
+  keeps the first n layers, `PRINTING_BENCHMARK_TRACE=1` prints every plan. The reference estimator
+  (`PrintTimeEstimate`) is a look-ahead planner with Marlin's junction deviation (0.013 mm) at the printer axes'
+  limits; it is a lower bound.
+- Machine: the printer's planning model (`DeviceBinding.planningModel`, 40 kHz step tick), axes x and y 250 mm/s
+  with 24.09 and 12.56 m/s^2, z 100 mm/s with 18.1 m/s^2, from the scene artifact. (The app test, which takes
+  its physical parts from a project session, finds 30.03, 15.59 and 22.87 m/s^2: the masses differ, the cause is
+  not chased.) Joint coordinates are relative to the assembly's initial pose, so the work origin is
+  (-0.11, -0.11, -0.01) m.
+- Lowering and kinematics changes the benchmark needed, all independent of printing ops: `MachineBinding.rapidsAtFeed`
+  (travels run at their own feed and round corners), `ToolpathLoweringResult.stops` (exact stops by reason),
+  `ToolpathMotionBinding` gives joints that follow several axes (CoreXY pulleys) limits that are the sum of their
+  leaders' and takes `heldJoints` (the extruder and its motor hold still), `AxisKinematics` places such joints from
+  their couplings.
+- **Numbers before AM5** (debug CadKit, shared machine):
+
+| Load | Moves | Planned | Reference | Planning | Real time (all / worst 10 s) | Sections |
+|---|---|---|---|---|---|---|
+| Calibration cube (100 layers) | 4841 | 929.1 s | 867.6 s (+7.1 %) | 889.8 s | 1.04x / 0.75x | 4042 (4040 stops at a speed change, 1 with no tolerance) |
+| Test tower through G-code (60 layers) | 4617 | 506.7 s | 469.6 s (+7.9 %) | 511.6 s | 0.99x / 0.67x | 4271 (4269 speed changes, 1 non-planar line) |
+| Gear, layer 1 only (G-code of the sliced gear) | 2135 | 366 s | 357.6 s (+2.3 %) | 436.0 s | 0.84x / 0.12x | 554 |
+| Gear, whole (module 1.5, 40 teeth, 8 mm; 61933 moves, 81453 segments, sliced in 45 s) | 61933 | not finished | | more than 3000 s | | |
+
+  Managed heap peaks: 493 MB (cube; 48 GB allocated while planning), 503 MB (tower), 332 MB (gear layer 1).
+- **Where the time goes.** Planned time is within 8 % of the reference even with thousands of exact stops: the axes
+  are agile (12 to 24 m/s^2) against print speeds of 30 to 150 mm/s, so a stop costs a few milliseconds. The cost is
+  planning: about 220 ms for each plan of the cube, and it is quadratic in the length of a smooth section. The gear's
+  perimeter loops (about 400 mm of path, 1000 spans) take 162 to 171 s each for 20 s of motion, while 14 ms plans
+  take 10 ms. Per-sample work that scans every primitive of the authored geometry is the cause to confirm:
+  `distanceToGeometry` in the task-space check scans the whole op's authored path for each of the 1 ms samples, and
+  `primitiveSpeedAt` and `PosePathRefinement.at` search linearly too. The sliced gear also failed in TOPP-RA
+  (`path.time failed with MotionKit error -6`, the fourth plan) where the same program read back from G-code
+  (rounded to a micrometre) did not.
+
 **AM5. Cornering and windowed timing (AM-D4).**
 - `CornerBlender`: blend short lines (blend length limited to a share of each neighbour),
   non-planar lines, and line–arc and arc–arc corners. Exact stop only above the turn limit.
@@ -734,7 +773,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM1 | done | see the commit below |
 | AM2 | done | see the commit below |
 | AM3 | done | see the commits below |
-| AM4 | planned | |
+| AM4 | done | see the commit below |
 | AM5 | planned | |
 | AM6 | done | see the commit below |
 | AM7 | planned | |

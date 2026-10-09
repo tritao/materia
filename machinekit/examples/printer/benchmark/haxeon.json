@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "package": {
+    "name": "printing-benchmark"
+  },
+  "entry": "PrintingBenchmark",
+  "sourceRoots": [
+    "src",
+    ".."
+  ],
+  "dependencies": {
+    "toolpathkit-motion": {
+      "path": "../../../../toolpathkit/motion"
+    },
+    "cnckit": {
+      "path": "../../../../cnckit"
+    },
+    "camkit": {
+      "path": "../../../../camkit"
+    },
+    "cadkit": {
+      "path": "../../../../cadkit"
+    },
+    "cadbridge": {
+      "path": "../../../../robotkit/cadbridge"
+    },
+    "machinekit": {
+      "path": "../../.."
+    },
+    "projectkit": {
+      "path": "../../../../projectkit"
+    },
+    "processkit": {
+      "path": "../../../../processkit"
+    },
+    "haxeon-platform": {
+      "path": "../../../../haxeon/packages/platform"
+    },
+    "robotkit": {
+      "path": "../../../../robotkit"
+    },
+    "motionkit-robot": {
+      "path": "../../../../motionkit/robot"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

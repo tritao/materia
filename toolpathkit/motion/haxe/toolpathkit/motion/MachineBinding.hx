@@ -14,6 +14,12 @@ class MachineBinding {
   public final orientationTolerance:Float;
   public final maxBlendTurnAngleRadians:Float;
   public var travel(default, null):Null<TravelEnvelope> = null;
+  /**
+    Whether `Rapid`, `Link` and `Retract` moves run at their own feed (bounded by `rapidSpeed`) and round
+    their corners within their tolerance, as a printer's travels do, instead of at `rapidSpeed` with
+    exact stops, as a mill's rapids do.
+  **/
+  public var rapidsAtFeed(default, null):Bool = false;
 
   public function new(frameId:String, xAxisId:String, yAxisId:String,
       zAxisId:String, rapidSpeed:Float, channels:ToolpathChannels,
@@ -41,4 +47,6 @@ class MachineBinding {
   }
 
   public function setTravel(value:Null<TravelEnvelope>):Void travel = value;
+
+  public function setRapidsAtFeed(value:Bool):Void rapidsAtFeed = value;
 }

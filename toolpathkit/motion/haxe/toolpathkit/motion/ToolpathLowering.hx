@@ -44,6 +44,7 @@ class ToolpathLowering {
   var queuedEvents:Array<PendingOutputEvent> = [];
   var pendingBlend:Float = 0.0;
   var spindleOn:Bool = false;
+  var stops:Map<String, Int> = new Map();
 
   public function new(machine:MachineBinding) {
     this.machine = machine;
@@ -56,14 +57,16 @@ class ToolpathLowering {
     pending = []; pendingSpans = []; pendingTolerances = []; pendingSpeeds = [];
     pendingEvents = []; queuedEvents = []; spindleOn = false;
     pendingBlend = 0.0;
+    stops = new Map();
     for (op in ops) switch op {
       case SetSetup(_, _):
         flush();
       case MachineMove(_, _, _, _, _):
         throw "machine moves must be projected before lowering";
-      case Move(Rapid, geometry, _, _, span), Move(Link, geometry, _, _, span),
-          Move(Retract, geometry, _, _, span):
-        addMove(primitive(geometry), machine.rapidSpeed, 0.0, span);
+      case Move(Rapid, geometry, speed, blend, span), Move(Link, geometry, speed, blend, span),
+          Move(Retract, geometry, speed, blend, span):
+        if (machine.rapidsAtFeed) addMove(primitive(geometry), Math.min(speed, machine.rapidSpeed), blend, span);
+        else addMove(primitive(geometry), machine.rapidSpeed, 0.0, span);
       case Move(_, geometry, speed, blend, span):
         addMove(primitive(geometry), speed, blend, span);
       case Dwell(seconds, span):
@@ -108,7 +111,7 @@ class ToolpathLowering {
     }
     flush(); drainQueued();
     var program = motionOps.length == 0 ? null : new MotionProgram(motionOps);
-    return new ToolpathLoweringResult(program, sourceMap, diagnostics.copy());
+    return new ToolpathLoweringResult(program, sourceMap, diagnostics.copy(), stops);
   }
 
   /**
@@ -141,6 +144,8 @@ class ToolpathLowering {
         Math.min(pendingTolerances[i], pendingTolerances[i + 1]) * CornerBlender.GEOMETRY_SHARE];
     var rounded = false;
     for (corner in corners) if (corner > 0.0) rounded = true;
+    for (i in 0...corners.length) if (corners[i] == 0.0 && turns(pending[i], pending[i + 1]))
+      count(pendingSpeeds[i] != pendingSpeeds[i + 1] ? "speed change" : "no blend tolerance");
     if (rounded) {
       var authored = new GeometricPath(pending);
       var blended = CornerBlender.blendPerCorner(authored, corners,
@@ -151,6 +156,8 @@ class ToolpathLowering {
         var index = blended.diagnosticCorners[warning];
         diagnostics.push(new ToolpathDiagnostic( "CNC_EXACT_STOP",
           pendingSpans[index], blended.diagnostics[warning]));
+        var text = blended.diagnostics[warning], open = text.indexOf("exact stop (");
+        count(open < 0 ? text : text.substring(open + 12, text.lastIndexOf(")")));
       }
       emitPath(blended.path.primitives, spans, [for (index in blended.sourcePrimitiveIndices)
         pendingSpeeds[index]], authored, pendingBlend, blended.sourcePrimitiveIndices);
@@ -159,6 +166,16 @@ class ToolpathLowering {
     pending = []; pendingSpans = []; pendingTolerances = []; pendingSpeeds = [];
     pendingEvents = [];
     pendingBlend = 0.0;
+  }
+
+  function count(reason:String):Void stops.set(reason, (stops.exists(reason) ? stops.get(reason) : 0) + 1);
+
+  /** Whether the path changes direction where `before` ends and `after` begins. */
+  static function turns(before:PathPrimitive, after:PathPrimitive):Bool {
+    var incoming = before.tangentAt(before.length()), outgoing = after.tangentAt(0.0);
+    var change = 0.0;
+    for (axis in 0...3) change = Math.max(change, Math.abs(incoming[axis] - outgoing[axis]));
+    return change > 1e-6;
   }
 
   function emitPath(geometry:Array<PathPrimitive>, spans:Array<Provenance>,

@@ -18,8 +18,12 @@ class ToolpathMotionBinding {
   public final solver:AxisKinematics;
   public final compiler:ProgramCompiler;
 
+  /**
+    `heldJoints` are joints the XYZ axes do not move and this binding does not plan (a printer's extruder
+    and the motor that turns it): they hold their position.
+  **/
   public function new(machine:MachineBinding, blueprint:MotionSystemBlueprint,
-      ?modelRevision:Int64, ?calibrationRevision:Int64) {
+      ?modelRevision:Int64, ?calibrationRevision:Int64, ?heldJoints:Array<String>) {
     if (machine == null || blueprint == null)
       throw "CNC binding needs a machine and motion-system blueprint";
     this.machine = machine;
@@ -77,9 +81,28 @@ class ToolpathMotionBinding {
         jump[joint] = Math.max(0.1, 0.1 * scale);
       }
     }
+    // A joint that follows several axes (a CoreXY motor's pulley) belongs to none: it moves at most as
+    // fast as its terms add up to, which the coupled trajectory keeps exactly.
+    var ids = [for (joint in blueprint.model.joints) joint.id];
+    for (_ in 0...count) for (joint in 0...count) if (velocity[joint] <= 0.0) {
+      var terms = [for (coupling in blueprint.model.couplings) if (coupling.follower == ids[joint]) coupling];
+      if (terms.length == 0) continue;
+      var ready = true;
+      for (term in terms) if (velocity[ids.indexOf(term.leader)] <= 0.0) ready = false;
+      if (!ready) continue;
+      velocity[joint] = 0.0; acceleration[joint] = 0.0; jerk[joint] = 0.0; jump[joint] = 0.0;
+      for (term in terms) {
+        var leader = ids.indexOf(term.leader), scale = Math.abs(term.ratio);
+        velocity[joint] += scale * velocity[leader];
+        acceleration[joint] += scale * acceleration[leader];
+        jerk[joint] += scale * jerk[leader];
+        jump[joint] += scale * jump[leader];
+      }
+    }
     for (joint in 0...count) {
       if (velocity[joint] <= 0.0 || acceleration[joint] <= 0.0) {
-        if (blueprint.model.joints[joint].type != robotkit.model.JointType.Fixed)
+        if (blueprint.model.joints[joint].type != robotkit.model.JointType.Fixed &&
+            (heldJoints == null || heldJoints.indexOf(blueprint.model.joints[joint].id) < 0))
           throw 'CNC joint $joint is not bound to an XYZ axis';
         // Assembly root and mounting joints remain stationary, but native
         // trajectory validation still needs finite positive limit arrays.

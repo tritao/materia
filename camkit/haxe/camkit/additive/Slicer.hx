@@ -1,6 +1,8 @@
 package camkit.additive;
 
 import cadkit.PlanarRegion;
+import camkit.CamContour;
+import camkit.CamPocketPlanner;
 import cadkit.PlanarRegion.PlanarLoop;
 import cadkit.PlanarRegion.PlanarSegment;
 import cadkit.Geometry;
