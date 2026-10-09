@@ -1,5 +1,7 @@
 package app;
 
+import app.editor.ExampleCatalog;
+
 import haxeon.ui.FontFamily;
 import app.Main.ReferenceEditorApp;
 import haxe.CallStack;
@@ -36,9 +38,14 @@ class MainWeb {
       #if wasm
       // Files from earlier sessions first: the editor reads its settings and workspace while it starts.
       BrowserFiles.start();
+      BrowserExamples.configure();
+      var identity = MateriaWebFiles.materia_build_identity();
+      if (identity.status != 0) throw "Browser build identity is unavailable";
+      PreparedSceneCaches.configureBrowser(identity.data.toString());
       #end
       var options = new BrowserUiHostOptions();
       options.title = "Materia";
+      options.onFrameRendered = function() { if (editor != null) editor.projectFrameRendered(); };
       options.width = width;
       options.height = height;
       options.fonts = [
@@ -81,6 +88,25 @@ class MainWeb {
     }
   }
 
+  /** Opens host-supplied artifact bytes through the ordinary dirty-document and progress workflow. */
+  @:expose public static function openArtifact():Int {
+    #if wasm
+    var app = editor;
+    if (app == null || app.documents.blocked()) return 1;
+    try {
+      var name = MateriaWebFiles.materia_artifact_name();
+      var content = MateriaWebFiles.materia_artifact_content();
+      if (name.status != 0 || content.status != 0 || content.data.length > 150000000) return 2;
+      if (!ProjectSourceLoader.isPrebuilt(name.data.toString())) return 3;
+      var path = BrowserFiles.storeArtifact(name.data.toString(), content.data);
+      app.documents.requestOpenPath(path);
+      return 0;
+    } catch (error:Dynamic) { record(error); return 4; }
+    #else
+    return 1;
+    #end
+  }
+
   /** Commands whose availability the browser tests check. */
   static final REPORTED_COMMANDS = ["editor.new", "editor.undo", "editor.redo", "scene.create", "scene.delete", "sim.play", "sim.step",
     "sim.stop", "sim.reset"];
@@ -109,9 +135,15 @@ class MainWeb {
       #end
       Sys.println("materia-report " + haxe.Json.stringify({
         mode: app.mode.id,
+        examples: [for (entry in ExampleCatalog.available()) entry.id],
+        exampleFailure: @:privateAccess app.startFailure,
+        projectJob: app.session.projectJob,
+        robotMotionCount: app.session.robotMotions.length,
+        dynamicParts: [for (record in app.scene.records()) if (record.dynamicBody == true) record.id],
         simulationRunning: app.simulation.isRunning(),
         simulationActive: app.simulation.isActive(),
         simulationError: app.simulation.error,
+        mission: app.simulation.missionPlayer() == null ? null : app.simulation.missionPlayer().progress(),
         objects: [for (record in app.scene.records()) {id: record.id, label: record.label, type: record.type, x: record.x, y: record.y}],
         selected: app.scene.selectedId,
         commands: [for (id in REPORTED_COMMANDS) {id: id, enabled: commandEnabled(app, id)}],

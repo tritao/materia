@@ -52,19 +52,18 @@ add_subdirectory("${MATERIA_SOURCE_ROOT}/simkit/sim_core" sim_core)
 add_subdirectory("${MATERIA_SOURCE_ROOT}/simkit/sim_mujoco" sim_mujoco)
 
 # RobotKit's runtime and its SimKit simulation, without the serial and simulated-board devices (no ports or cargo
-# here). It brings MotionKit.
-# MotionKit needs Eigen, which is header-only: Emscripten's find_package searches only its sysroot, so take the
-# host's copy.
-find_path(MATERIA_WEB_EIGEN3_DIR Eigen3Config.cmake
-    PATHS /usr/share/eigen3/cmake /usr/lib/cmake/eigen3 /usr/local/share/eigen3/cmake /opt/homebrew/share/eigen3/cmake
-    NO_CMAKE_FIND_ROOT_PATH)
-if(MATERIA_WEB_EIGEN3_DIR)
-    set(Eigen3_DIR "${MATERIA_WEB_EIGEN3_DIR}" CACHE PATH "" FORCE)
-endif()
+# here). Its trajectory core is shared with MotionKit.
 set(RK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(RK_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(RK_BUILD_SIMKIT ON CACHE BOOL "" FORCE)
 add_subdirectory("${MATERIA_SOURCE_ROOT}/robotkit" robotkit)
+
+# Mission planning runs the same native motion and kinematics kernels as desktop.
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(MK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+add_subdirectory("${MATERIA_SOURCE_ROOT}/motionkit/native" motionkit)
+set(KK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+add_subdirectory("${MATERIA_SOURCE_ROOT}/kinematicskit/native" kinematicskit)
 
 # AnimKit (ozz-animation, glTF import) and StockKit (stock removal). StockKit's worker pool runs every job on the
 # calling thread in a build without threads.
@@ -110,7 +109,7 @@ add_executable(materia_web
 target_include_directories(materia_web PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(materia_web PRIVATE
     NativeKit::nativekit NativeKit::gpu NativeKit::ui NativeKit::scene NativeKit::scene_render
-    NativeKit::sim_core NativeKit::sim_mujoco RobotKit::runtime animkit_core stockkit::core collisionkit::core
+    NativeKit::sim_core NativeKit::sim_mujoco RobotKit::runtime motionkit_core kinematicskit_core animkit_core stockkit::core collisionkit::core
     NativeKit::wasm_host_allocator)
 if(MATERIA_WEB_OCCT_DIR)
     target_link_libraries(materia_web PRIVATE cadkit::core)
@@ -120,7 +119,7 @@ target_link_options(materia_web PRIVATE
     "-sALLOW_MEMORY_GROWTH=0"
     "-sEXPORTED_FUNCTIONS=@${MATERIA_WEB_EXPORTS_FILE}"
     # The page adds the guest's native callbacks to the function table.
-    "-sEXPORTED_RUNTIME_METHODS=addFunction,removeFunction"
+    "-sEXPORTED_RUNTIME_METHODS=addFunction,removeFunction,FS"
     "-sALLOW_TABLE_GROWTH=1"
     "-sNO_EXIT_RUNTIME=1"
     "-fwasm-exceptions"

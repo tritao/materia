@@ -28,6 +28,11 @@ temp_dir=$(mktemp -d)
 cleanup() {
 	kill "${browser_pid:-}" "${http_pid:-}" 2>/dev/null || true
 	wait 2>/dev/null || true
+	# Chrome helpers can finish writing their profile just after the browser exits.
+	for cleanup_attempt in 1 2 3 4 5; do
+		if rm -rf -- "${temp_dir:?}" 2>/dev/null; then return; fi
+		sleep 0.1
+	done
 	rm -rf -- "${temp_dir:?}"
 }
 trap cleanup EXIT
@@ -44,5 +49,14 @@ driver="$app_dir/web/tools/smoke.py"
 if [[ "${1:-}" == "--tour" ]]; then
 	driver="$app_dir/web/tools/tour.py"
 	shift
+fi
+if [[ "${1:-}" == "--examples" ]]; then
+	driver="$app_dir/web/tools/examples.py"
+fi
+if [[ "${1:-}" == "--missions" ]]; then
+	driver="$app_dir/web/tools/missions.py"
+fi
+if [[ "${1:-}" == "--artifact" ]]; then
+	driver="$app_dir/web/tools/artifact.py"
 fi
 python3 "$driver" --debug-port "$debug_port" --page-url "$page_url" "$@"

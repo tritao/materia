@@ -82,7 +82,7 @@ headless Chrome with software WebGL, a frame while hovering the 3D view took
 3.1 ms on wasm-gc and 25 ms on wasm32; download size (about 5.5 MB gzipped)
 and startup (under half a second to the first frame) were about the same.
 
-`build.sh` does four things:
+`build.sh` generates the downloadable example catalog, then builds the editor:
 
 1. Generates wasm32 FFI interfaces for every kit into `app/build/web/hxi`, by
    running each kit's own `check-hxi.sh` with the wasm32 targets. They describe
@@ -94,21 +94,68 @@ and startup (under half a second to the first frame) were about the same.
 4. Runs `tools/check-imports.js`, which lists every guest import whose Wasm
    type differs from the host function it binds to.
 
+## Examples and local storage
+
+The Start page uses the desktop's `ExampleCatalog`: all 25 examples, including job
+variants and worker scenes. Startup downloads only `examples/catalog.json` (about
+11 KB). Selecting a card downloads its missing artifact or saved document and
+animation assets, with progress, cancellation and retry. Files are checked against
+the catalog's byte count and SHA-256 before installation. Project artifacts include
+selected jobs, dynamic parts and joint motion tracks, preserving desktop behavior.
+
+The native publisher compiles project sources at build time. It writes immutable,
+content-addressed files under `examples/objects/`; the complete current catalog is
+about 74 MB, which is hosted but never fetched as one bundle. Run the publisher
+separately to reuse an existing bundle:
+
+```sh
+./app/web/build-examples.sh /tmp/materia-examples
+MATERIA_WEB_EXAMPLES_DIR=/tmp/materia-examples ./app/web/build.sh
+```
+
+Set `window.MATERIA_EXAMPLES_URL` before `materia.js` to serve the index and its
+relative objects from another location; cross-origin hosting needs CORS. Publish
+the index together with all objects it references.
+
+Verified raw files and derived preparation persist in OPFS when available. Opening
+an example again, including after reload, reuses those files without downloading
+model data. This does not make the editor shell itself available offline. Browser
+storage can be evicted; missing or damaged files are acquired again. Animation
+assets are also restored into the native host filesystem.
+
+Cold project preparation runs in a dedicated Web Worker. Cached preparation and
+final scene installation use the shared project loader on the UI thread. Desktop
+loads retain native generation and the filesystem caches. Browser source compilation
+still needs native child processes; downloading published artifacts avoids that
+requirement. Schema 18 artifacts retain compatibility with schema 17 inputs.
+
+Run the real Start page acquisition checks with `./app/web/test.sh --examples`.
+They cover catalog parity, no eager model downloads, cancel/failure/retry, persistent
+reuse with network requests blocked, selected job variants, native animation assets
+and compiled setup examples. Run against both guest targets.
+
 ## What works and what does not yet
 
-The editor shell, docking, inspector, console and the 3D viewport all work,
-and so does editing primitive objects. The following do not work yet:
+The editor shell, docking, inspector, console, 3D viewport, primitive editing,
+published examples and standalone prebuilt projects work. Files are mirrored to
+OPFS when the browser supports it. The native host includes AnimKit and StockKit;
+CadKit requires OCCT (see [CadKit and OCCT](#cadkit-and-occt)). Unavailable native
+imports throw `haxeon.wasm.HostError`; `window.materia.unavailable` lists them.
 
-- **Kits with no browser build:** AnimKit, StockKit, and CadKit unless built
-  with OCCT (see [CadKit and OCCT](#cadkit-and-occt)). The page gives their
-  imports stubs that throw `haxeon.wasm.HostError`, which the editor catches
-  and logs; `window.materia.unavailable` lists them.
-- **Opening projects:** this compiles and runs child processes, which the browser
-  cannot start.
-- **Files:** they live in an in-memory filesystem for the session.
-- **Threads:** project loads and workspace saves run on the UI thread, and the
-  simulation steps on it each frame. RobotKit's self-driven runtimes and
-  recordings, and its serial and simulated-board devices, are not built.
+Simulation steps and workspace saves run on the UI thread. RobotKit's self-driven
+runtimes and recordings, and its serial and simulated-board devices, are not built.
+
+Robot missions link MotionKit, KinematicsKit and TrajectoryKit into the browser
+host, using the host's exception model. The browser import check rejects missing
+native functions except the optional CadKit backend, so scene-only smoke tests
+cannot conceal an unlinked planning kernel. Run `./app/web/test.sh --missions` to
+open the Six-axis robot arm, exercise pause/resume and complete a pick/place cycle.
+Published binary artifacts bypass source-only project UI extension discovery.
+
+MotionKit uses its incremental program compiler on both platforms: desktop
+schedules it on a native worker; single-threaded browser builds advance it on
+demand with bounded lookahead. Browser planning does not wait on thread
+conditions. Individual planning steps still run on the UI thread.
 
 ### Canvas layout
 

@@ -43,6 +43,14 @@ if [[ ! -x "$haxeon_dir/.tools/hashlink/hl" ]]; then
 	exit 1
 fi
 mkdir -p "$build_dir" "$site_dir/assets"
+echo "== Downloadable examples"
+if [[ -n "${MATERIA_WEB_EXAMPLES_DIR:-}" ]]; then
+  [[ -f "$MATERIA_WEB_EXAMPLES_DIR/catalog.json" ]] || { echo "Missing examples catalog" >&2; exit 1; }
+  mkdir -p "$site_dir/examples"
+  cp -a "$MATERIA_WEB_EXAMPLES_DIR/." "$site_dir/examples/"
+else
+  "$app_dir/web/build-examples.sh" "$site_dir/examples"
+fi
 
 echo "== wasm32 FFI interfaces"
 "$app_dir/web/tools/generate-wasm-hxi.sh" "$build_dir/hxi"
@@ -68,7 +76,10 @@ if [[ ! -f "$compiler" ]] || [[ -n $(find "$haxeon_dir/src" -name '*.hx' -newer 
 	"$haxeon_dir/.tools/haxe/haxe" --cwd "$haxeon_dir" -cp src -hl "$compiler" -main compiler.tools.HaxeonCompiler
 fi
 python3 "$app_dir/web/tools/guest-arguments.py" "$app_dir/haxeon.json" "$build_dir/hxi" > "$build_dir/guest-arguments.txt"
-mapfile -t guest_arguments < "$build_dir/guest-arguments.txt"
+guest_arguments=()
+while IFS= read -r argument; do
+  [[ "$argument" == "$app_dir/src/PreparationWorkerMain.hx" ]] || guest_arguments+=("$argument")
+done < "$build_dir/guest-arguments.txt"
 # The page's own services (materia.js), which only the browser guest imports.
 guest_arguments+=("--ffi-interface=$app_dir/web/MateriaWebFiles.hxi")
 (cd "$haxeon_dir" && LD_LIBRARY_PATH="$haxeon_dir/out:$haxeon_dir/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
@@ -83,6 +94,22 @@ if [[ ! -f "$guest" || "$guest" -ot "$contract" ]]; then
 	exit 1
 fi
 
+echo "== Preparation worker guest"
+# Resolve only the portable entry and its dependencies; never root the editor's exposed entry points.
+worker_arguments=()
+for argument in "${guest_arguments[@]}"; do
+  [[ "$argument" == --* && "$argument" != "--ffi-interface=$app_dir/web/MateriaPreparation.hxi" && "$argument" != "--ffi-interface=$app_dir/web/MateriaWebFiles.hxi" ]] && worker_arguments+=("$argument")
+done
+worker_guest="$build_dir/materia_preparation.wasm"
+(cd "$haxeon_dir" && LD_LIBRARY_PATH="$haxeon_dir/out:$haxeon_dir/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  HAXEON_WASM_LEGACY_EXCEPTIONS=1 \
+  "$haxeon_dir/.tools/hashlink/hl" "$compiler" --target="$guest_target" --output="$worker_guest" \
+  --entry=app.PreparationWorkerMain --wasm-import-memory \
+  "${worker_arguments[@]}" --ffi-interface="$app_dir/web/MateriaPreparation.hxi" \
+  "$app_dir/src/PreparationWorkerMain.hx") > "$build_dir/worker-compile.log" 2>&1
+[[ -f "$worker_guest" ]] || { tail -20 "$build_dir/worker-compile.log" >&2; exit 1; }
+node "$app_dir/web/tools/check-preparation-imports.js" "$worker_guest"
+
 echo "== Emscripten host"
 # Export the guest's imports from the libraries the host links; haxeon-host.js
 # gives the guest's remaining imports stubs that throw when called.
@@ -91,7 +118,7 @@ node - "$guest" "$exports" <<'NODE'
 const fs = require("fs");
 const [guestPath, exportsPath] = process.argv.slice(2);
 const linked = new Set(["nativekit", "nativekit_gpu", "nativekit_ui", "nativekit_scene", "nativekit_scene_render",
-  "nativekit_sim_core", "nativekit_sim_mujoco", "robotkit_runtime", "animkit_core", "stockkit_core",
+  "nativekit_sim_core", "nativekit_sim_mujoco", "robotkit_runtime", "animkit_core", "stockkit_core", "motionkit_core", "trajectory_core", "kinematicskit_core",
   "collisionkit_core"]);
 // CadKit links only with a browser build of OCCT (MATERIA_WEB_OCCT_DIR); otherwise it stays unavailable.
 if (process.env.MATERIA_WEB_OCCT_DIR) linked.add("cadkit-core");
@@ -132,8 +159,9 @@ cmake --build "$build_dir/host" --target materia_web
 node "$app_dir/web/tools/check-imports.js" "$guest" "$build_dir/host/materia_web.wasm" "$build_dir/host/materia_web.js"
 
 echo "== Site"
-cp "$build_dir/host/materia_web.js" "$build_dir/host/materia_web.wasm" "$guest" "$site_dir/"
-cp "$app_dir/web/index.html" "$app_dir/web/materia.js" "$haxeon_dir/stdlib/haxeon/wasm/haxeon-host.js" "$site_dir/"
+cp "$build_dir/host/materia_web.js" "$build_dir/host/materia_web.wasm" "$guest" "$guest.build-id" "$site_dir/"
+cp "$worker_guest" "$worker_guest.build-id" "$app_dir/web/preparation-worker.js" "$site_dir/"
+cp "$app_dir/web/index.html" "$app_dir/web/materia.js" "$app_dir/web/examples.js" "$haxeon_dir/stdlib/haxeon/wasm/haxeon-host.js" "$site_dir/"
 fonts="$materia_dir/haxeon/packages/ui/vendor/skribidi/example/data"
 cp "$fonts/IBMPlexSans-Regular.ttf" "$fonts/NotoEmoji-Regular.ttf" "$site_dir/assets/"
 echo "Built $site_dir"

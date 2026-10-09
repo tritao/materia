@@ -29,4 +29,19 @@ interface MateriaWebFiles @target("portable-abi32") @library("materia_web_files"
 	 * Moves a file or a directory tree.
 	 */
 	extern fn materia_files_renamed(path: utf8, new_path: utf8) -> void;
+	extern fn materia_build_identity(data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
+	extern fn materia_artifact_name(data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
+	extern fn materia_artifact_content(data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
+  extern fn materia_worker_start(content: ptr<const<u8>> @in_array("length"), length: u32) -> i32;
+  extern fn materia_worker_status(id: i32) -> i32;
+  extern fn materia_worker_phase(id: i32, data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
+  extern fn materia_worker_result(id: i32, data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
+  extern fn materia_worker_cancel(id: i32) -> void;
+  extern fn materia_examples_catalog(data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
+  extern fn materia_example_start(id: utf8, paths: utf8) -> i32;
+  extern fn materia_example_status(id: i32) -> i32;
+  extern fn materia_example_phase(id: i32, data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
+  extern fn materia_example_error(id: i32, data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
+  extern fn materia_example_content(id: i32, index: u32, data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
+  extern fn materia_example_cancel(id: i32) -> void;
 }

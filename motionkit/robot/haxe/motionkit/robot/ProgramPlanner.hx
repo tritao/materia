@@ -19,7 +19,8 @@ private enum PlannedStep {
 /**
   Plans a program on a worker thread, `lookaheadSeconds` of motion ahead of the
   plans that have started executing, and hands each step to the frame thread,
-  which `poll`s them into `blocks`. The worker owns the compilation; the frame
+  which `poll`s them into `blocks`. A single-threaded Wasm host advances the same
+  compilation cooperatively on demand, retaining bounded lookahead. The worker owns the compilation; the frame
   thread owns `blocks` and every plan in it, so neither touches the other's
   objects. A speed scale set while planning applies to motion not yet planned.
 
@@ -52,6 +53,9 @@ class ProgramPlanner {
   var fixedPlans:Bool = false;
   var planningSeconds:Float = 0.0;
   var numericIkSolves:Int = 0;
+  #if wasm
+  var cooperative:Null<ProgramCompilation>;
+  #end
 
   /** Worker CPU-phase wall time, excluding lookahead waits, and numeric pose queries. */
   public function planningMetrics():{seconds:Float, numericIkSolves:Int} {
@@ -99,7 +103,11 @@ class ProgramPlanner {
     registry.acquire();
     live.push(this);
     registry.release();
+    #if wasm
+    cooperative = compilation;
+    #else
     Thread.create(function() self.work(compilation));
+    #end
   }
 
   /** Adopt checked plans without another compilation or a worker thread. */
@@ -133,6 +141,9 @@ class ProgramPlanner {
 
   /** Moves what the worker has planned since the last poll into `blocks`; true if anything came. */
   public function poll():Bool {
+    #if wasm
+    advanceCooperative(false);
+    #end
     condition.acquire();
     var steps = outbox;
     outbox = [];
@@ -143,10 +154,15 @@ class ProgramPlanner {
 
   /** Waits until the worker delivers more or stops, then polls. */
   public function waitForMore():Void {
+    #if wasm
+    while (outbox.length == 0 && !stopped) advanceCooperative(true);
+    poll();
+    #else
     condition.acquire();
     while (outbox.length == 0 && !stopped) condition.wait();
     condition.release();
     poll();
+    #end
   }
 
   /** Whether the worker has stopped: the program is planned, planning failed, or it was cancelled. */
@@ -184,6 +200,10 @@ class ProgramPlanner {
     condition.release();
     disposeSteps(steps);
     blocks.dispose();
+    #if wasm
+    var compilation = cooperative;
+    if (compilation != null) finishCompilation(compilation);
+    #end
   }
 
   function apply(step:PlannedStep):Void {
@@ -207,25 +227,21 @@ class ProgramPlanner {
         condition.acquire();
         while (!cancelled && secondsAhead() >= lookaheadSeconds) condition.wait();
         var cancel = cancelled;
-        compilation.speedScale = speedScale;
         condition.release();
         if (cancel) break;
-        var numeric:Null<ManipulatorKinematics> = Std.isOfType(compilation.compiler.solver, ManipulatorKinematics)
-          ? cast compilation.compiler.solver : null;
-        var before = numeric == null ? 0 : numeric.manipulator.numericSolveCount();
-        var began = Sys.time();
-        var more = compilation.step();
-        var elapsed = Sys.time() - began;
-        var solves = numeric == null ? 0 : numeric.manipulator.numericSolveCount() - before;
-        condition.acquire();
-        planningSeconds += elapsed;
-        numericIkSolves += solves;
-        condition.release();
+        var more = advanceCompilation(compilation);
         if (!more) break;
       }
     } catch (error:Dynamic) {
       deliver(Failed(Std.string(error)));
     }
+    finishCompilation(compilation);
+  }
+
+  function finishCompilation(compilation:ProgramCompilation):Void {
+    #if wasm
+    cooperative = null;
+    #end
     compilation.dispose();
     condition.acquire();
     stopped = true;
@@ -235,6 +251,41 @@ class ProgramPlanner {
     live.remove(this);
     registry.release();
   }
+
+  /** Both schedulers advance the same compilation and account for the same planning work. */
+  function advanceCompilation(compilation:ProgramCompilation):Bool {
+    condition.acquire();
+    compilation.speedScale = speedScale;
+    condition.release();
+    var numeric:Null<ManipulatorKinematics> = Std.isOfType(compilation.compiler.solver, ManipulatorKinematics)
+      ? cast compilation.compiler.solver : null;
+    var before = numeric == null ? 0 : numeric.manipulator.numericSolveCount();
+    var began = Sys.time();
+    var more = compilation.step();
+    var elapsed = Sys.time() - began;
+    var solves = numeric == null ? 0 : numeric.manipulator.numericSolveCount() - before;
+    condition.acquire();
+    planningSeconds += elapsed;
+    numericIkSolves += solves;
+    condition.release();
+    return more;
+  }
+
+  #if wasm
+  /** A single-threaded host yields between compiler steps instead of blocking on a condition. */
+  function advanceCooperative(required:Bool):Void {
+    var compilation = cooperative;
+    if (compilation == null) return;
+    if (cancelled) { finishCompilation(compilation); return; }
+    if (!required && secondsAhead() >= lookaheadSeconds) return;
+    try {
+      if (!advanceCompilation(compilation)) finishCompilation(compilation);
+    } catch (error:Dynamic) {
+      deliver(Failed(Std.string(error)));
+      finishCompilation(compilation);
+    }
+  }
+  #end
 
   /** Seconds of planned motion after the started plans; call under `condition`. */
   function secondsAhead():Float {
