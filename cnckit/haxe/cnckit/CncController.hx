@@ -9,12 +9,16 @@ class CncController {
   final offsets:Map<Int, Array<Float>> = new Map();
   final homes:Map<Int, Array<Float>> = new Map();
   public final toolLibrary:ToolLibrary;
+  /** Filament and firmware-retract settings; present exactly for the printer dialect. */
+  public final printer:Null<PrinterSettings>;
   final hTools:Map<Int, Int> = new Map();
   final dTools:Map<Int, Int> = new Map();
 
   public function new(?dialect:CncDialect = LinuxCnc,
-      ?toolLibrary:ToolLibrary) {
+      ?toolLibrary:ToolLibrary, ?printer:PrinterSettings) {
+    if (dialect == LinuxCnc && printer != null) throw "only a printer controller has printer settings";
     this.dialect = dialect;
+    this.printer = dialect == Printer ? (printer == null ? new PrinterSettings() : printer) : null;
     this.toolLibrary = toolLibrary == null ? new ToolLibrary() : toolLibrary;
     for (code in 54...60) offsets.set(code, [0.0, 0.0, 0.0]);
     homes.set(28, [0.0, 0.0, 0.0]);
@@ -33,6 +37,7 @@ class CncController {
       throw 'CNC controller cannot map setup $id to G54-G59';
     return switch dialect {
       case LinuxCnc: number + 53;
+      case Printer: throw "a printer controller has no work offsets";
     };
   }
 

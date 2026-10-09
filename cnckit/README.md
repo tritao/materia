@@ -23,6 +23,24 @@ var result = CncCompiler.compileDetailed(source, controller, start,
 var lowered = ToolpathMotion.lower(result.program, binding);
 ```
 
+## Printer G-code
+
+`CncDialect.Printer` reads and writes the Marlin, Klipper and RepRap family.
+A printer `CncController` carries `PrinterSettings`: the filament diameter, which turns `E`
+into the bead laid along the path, and the firmware retract for `G10`/`G11`.
+
+- `CncCompiler.compileDetailed(source, controller)` with a printer controller returns the printing
+  operations of ToolpathKit: `E` becomes `Deposit` (a new one when the extrusion per distance
+  changes by more than `ratioTolerance`, 0.5 %), `FilamentMove` (E-only moves, retracts) and
+  `Move`s; `M104`/`M109`/`M140`/`M190`/`M141`/`M191` become `Heat`, `M106`/`M107` `Fan`; `M220`/`M221`
+  are folded into the moves they scale. Slicer comments become `Layer`, `Feature` and `PrintObject`
+  markers (PrusaSlicer, OrcaSlicer, Cura, `EXCLUDE_OBJECT_*`, `M486`). `G28` only sets
+  `CncCompileResult.homes`: homing is the player's job. `G92` sets the extruder position only.
+  Motion limits, stored settings and macros are reported once as `CNC_PRINTER_IGNORED` warnings.
+- `PrinterWriter.write(program, controller, flavour)` writes the same operations as Klipper or
+  Marlin G-code in millimetres with relative extrusion; reading the file back gives the same
+  deposited volume (within the controller's tolerance) and geometry (within 1 um).
+
 Run CncKit tests with:
 
 ```sh

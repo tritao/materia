@@ -436,6 +436,41 @@ Done. What was built and decided:
   - hand-written snippets in the style of PrusaSlicer, Cura and Orca parse;
   - LinuxCNC behaviour is unchanged (CncKit assertion count only grows).
 
+Done. What was built and decided:
+- `CncDialect.Printer`. A printer `CncController` carries `PrinterSettings` (filament diameter, the
+  firmware retract for `G10`/`G11`, the ratio tolerance, the corner tolerance given to deposited
+  moves, whether the controller draws arcs); a LinuxCNC controller has none. `CncCompiler` hands a
+  printer controller to `PrinterInterpreter`; the LinuxCNC interpreter is untouched.
+- `CncLexer.parse(source, Printer)` keeps comments as data (`CncComment`), reads string words
+  (`A"name"`), ignores line numbers and checksums, takes the rest of `M117`/`M118` as a message and
+  reads Klipper extended commands (`NAME KEY=value ...`).
+- `PrinterInterpreter`: `E` is delta-converted (`M82`/`M83`, `G92 E`) and becomes
+  `Deposit(area, width, height)` with `area = dE * filamentArea / distance` (the arc length for
+  `G2`/`G3`), restarting when the ratio moves by more than 0.5 %; the bead is a layer tall and as wide
+  as a stadium of that area, so area <= width * height always holds. E-only moves and `G10`/`G11` are
+  `FilamentMove`s; a retract while moving becomes a `FilamentMove` plus a travel, with a warning.
+  `M104`/`M109`/`M140`/`M190`/`M141`/`M191` become `Heat`, `M106`/`M107` `Fan` (fan 0 is `part`,
+  fan n is `fan<n>`), `M220`/`M221` scale the speed and the extrusion of the moves after them, `G4`
+  a `Dwell`, `M0`/`M1`/`M2` stops. `G28` only sets `CncCompileResult.homes`. Motion limits,
+  stored settings and macros are `CNC_PRINTER_IGNORED` warnings, once each; unknown codes and
+  `G92` on an axis are errors on their line and the rest still compiles.
+- Markers: `;LAYER_CHANGE` + `;Z:`/`;HEIGHT:` (Prusa, Orca), `;LAYER:` (Cura, the height is the first
+  move's Z), `;TYPE:`/`; FEATURE:` (all three slicers' names), `;MESH:`, `; printing object`,
+  `EXCLUDE_OBJECT_START/END` and `M486`. `TEMPERATURE_WAIT` after `SET_HEATER_TEMPERATURE` is the
+  wait of that `Heat`.
+- Rapid travel carries its speed: a G0/G1 without extrusion is `Move(Rapid, ..., speed)`, so the
+  slicer's travel speed survives. A CNC `Rapid` has speed 0 and keeps the machine's rapid speed.
+  AM8's lowering uses the speed when it is positive.
+- `PrinterWriter` (Klipper and Marlin flavours) writes `G21 G90 M83 G28`, the moves with
+  `E = area * length / filamentArea`, `Layer`/`Feature` as Prusa-style comments, `EXCLUDE_OBJECT_DEFINE`
+  up front and `_START`/`_END` (Klipper) or `M486` (Marlin), `SET_HEATER_TEMPERATURE` and
+  `SET_FAN_SPEED` for generic parts (Klipper only). Controllers without arcs get chords no more than
+  2 um off the arc.
+- Tests: CncKit 325 -> 432 assertions (`PrinterGcodeTests`): PrusaSlicer, Cura and Orca snippets;
+  M220/M221, E-only, G10/G11, wipe, G92, G20; refusals; IR -> G-code -> IR keeps deposited volume
+  within 0.1 %, per-layer and per-object volumes, geometry within 1 um, markers, temperatures and
+  fans in order; writing what was read is a fixed point. LinuxCNC fixtures are unchanged.
+
 **AM3. Slicer v1.**
 - CadKit native (AM-D5): section, planar face offset, planar face booleans. Also Haxe wrappers
   and HXI regeneration through `cadkit/scripts/generate-haxeon-hxi`.
@@ -619,7 +654,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM0 | done: worktree and baseline | |
 | AM0b | done: main green, router baselines recorded | 2fbea0683, ae6e95ec5, cd29b1993, dfa6e2940, 2611087d9 |
 | AM1 | done | see the commit below |
-| AM2 | planned | |
+| AM2 | done | see the commit below |
 | AM3 | planned | |
 | AM4 | planned | |
 | AM5 | planned | |

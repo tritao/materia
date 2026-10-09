@@ -597,6 +597,7 @@ class CncKitTests {
       "travel error identifies the G-code line");
     rejects(travelMachine, "G21 F600 G3 X10 Y0 I5 J0", "Y travel");
     writerRoundTrip();
+    assertions += PrinterGcodeTests.run();
     Sys.println('CncKit tests passed ($assertions assertions)');
   }
 

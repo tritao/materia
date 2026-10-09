@@ -3,6 +3,7 @@ package cnckit;
 import cnckit.CncDiagnostic.CncSeverity;
 import cnckit.interp.CncInterpreter;
 import cnckit.parse.CncLexer;
+import cnckit.printer.PrinterInterpreter;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.GeometryOffset;
@@ -20,6 +21,7 @@ class CncCompiler {
     var initial = start == null ? new Point3(0.0, 0.0, 0.0) : start;
     if (!Math.isFinite(initial.x) || !Math.isFinite(initial.y) ||
         !Math.isFinite(initial.z)) throw "CNC start needs finite XYZ";
+    if (controller.dialect == Printer) return compilePrinter(source, controller, initial, travel);
     var setups = [setupFor(controller, "1")];
     if (source == null) {
       var error = new CncDiagnostic(Error, "CNC_NULL_SOURCE",
@@ -74,6 +76,33 @@ class CncCompiler {
     });
     return new CncCompileResult(new ToolpathProgram(ops, controller.toolLibrary,
       setups), diagnostics);
+  }
+
+  /** Printer G-code: one setup at the machine origin, markers and comments kept. */
+  static function compilePrinter(source:String, controller:CncController, start:Point3,
+      travel:Null<TravelEnvelope>):CncCompileResult {
+    var setups = [new Setup("1", new Point3(0.0, 0.0, 0.0))];
+    if (source == null) {
+      var error = new CncDiagnostic(Error, "CNC_NULL_SOURCE",
+        new Provenance(1, 1, 0), "CNC source must not be null");
+      return new CncCompileResult(new ToolpathProgram([], controller.toolLibrary, setups), [error]);
+    }
+    var parsed = CncLexer.parse(source, Printer);
+    var interpreter = new PrinterInterpreter(controller, start);
+    var ops = interpreter.interpret(parsed.blocks);
+    var diagnostics = parsed.diagnostics.concat(interpreter.diagnostics);
+    var program = new ToolpathProgram(ops, controller.toolLibrary, setups);
+    if (travel != null)
+      for (violation in travel.check(program))
+        diagnostics.push(new CncDiagnostic(Error, "CNC_TRAVEL", violation.provenance, violation.message()));
+    if (ops.length == 0 && diagnostics.length == 0)
+      diagnostics.push(new CncDiagnostic(Error, "CNC_EMPTY",
+        new Provenance(1, 1, 0), "G-code contains no executable motion or barrier"));
+    diagnostics.sort(function(a, b) {
+      if (a.span.line != b.span.line) return a.span.line - b.span.line;
+      return a.span.column - b.span.column;
+    });
+    return new CncCompileResult(program, diagnostics, interpreter.homes);
   }
 
   static function setupFor(controller:CncController, id:String):Setup {

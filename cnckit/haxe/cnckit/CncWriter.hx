@@ -142,14 +142,14 @@ class CncWriter {
     return lines.join("\n") + "\n";
   }
 
-  static function xyz(point:Point3):String
+  public static function xyz(point:Point3):String
     return 'X${millimetres(point.x)} Y${millimetres(point.y)} Z${millimetres(point.z)}';
 
-  static function millimetres(metres:Float):String
+  public static function millimetres(metres:Float):String
     return number(metres * 1000.0);
 
   /** Six decimal places in millimetres avoid exponent syntax in G-code. */
-  static function number(value:Float):String {
+  public static function number(value:Float):String {
     if (!Math.isFinite(value)) throw "CNC G-code cannot export non-finite values";
     var sign = value < 0.0 ? "-" : "";
     var magnitude = Math.abs(value);

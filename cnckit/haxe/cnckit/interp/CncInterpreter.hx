@@ -555,7 +555,7 @@ class CncInterpreter {
     state.position = target.copy();
   }
 
-  static function radiusCenter(start:Point3, end:Point3, radius:Float,
+  public static function radiusCenter(start:Point3, end:Point3, radius:Float,
       mode:Int, plane:Int, line:Int, column:Int):Point3 {
     var a = coordinates(start, plane), b = coordinates(end, plane);
     var dx = b[0] - a[0], dy = b[1] - a[1];
@@ -578,7 +578,7 @@ class CncInterpreter {
       (firstSweep >= secondSweep ? first : second);
   }
 
-  static function arcSweep(start:Point3, end:Point3,
+  public static function arcSweep(start:Point3, end:Point3,
       center:Point3, mode:Int, plane:Int):Float {
     var a = coordinates(start, plane), b = coordinates(end, plane);
     var c = coordinates(center, plane);
@@ -590,19 +590,19 @@ class CncInterpreter {
     return sweep;
   }
 
-  static function centerFromOffsets(start:Point3, plane:Int,
+  public static function centerFromOffsets(start:Point3, plane:Int,
       first:Float, second:Float):Point3 {
     var origin = coordinates(start, plane);
     return fromCoordinates(origin[0] + first, origin[1] + second,
       origin[2], plane);
   }
 
-  static function coordinates(point:Point3, plane:Int):Array<Float>
+  public static function coordinates(point:Point3, plane:Int):Array<Float>
     return plane == 17 ? [point.x, point.y, point.z] :
       plane == 18 ? [point.x, point.z, point.y] :
       [point.y, point.z, point.x];
 
-  static function fromCoordinates(u:Float, v:Float, axial:Float,
+  public static function fromCoordinates(u:Float, v:Float, axial:Float,
       plane:Int):Point3
     return plane == 17 ? new Point3(u, v, axial) :
       plane == 18 ? new Point3(u, axial, v) :
