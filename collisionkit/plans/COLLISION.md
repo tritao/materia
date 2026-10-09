@@ -383,6 +383,36 @@ process-path plan, `motionkit/plans/PROCESS_PATH_PLANNING.md`):
     process planning over and deleting `ArmClearance` is main's PP10, and
     is decided with the process-path work.
 
+- **CL-D13 — Fix coal in our fork when it limits us; upstream the fix.**
+  (Decided 2026-10-09.)
+  - Gaps go into our `tritao/coal` fork (branch `materia`), not into
+    workarounds in collisionkit. Patches stay small and upstreamable to
+    `coal-library/coal`, so the fork's diff stays small.
+  - Add: height-field distance queries. coal's
+    `HeightFieldShapeDistancer` still throws "not implemented" (checked on
+    upstream `devel`; v3.0.4 is the latest release). It is implemented in
+    coal: the height field's BV tree is traversed with distance lower
+    bounds, cells are compared as coal's own prisms
+    (`buildConvexTriangles`, already used for collision), and the signed
+    distance, closest points and normal come back through coal's normal
+    distance API. Height field against mesh goes through the same prisms
+    (prism against mesh already works).
+  - Later, only if V-HACD decomposition proves too coarse for some part: an
+    opt-in "closed mesh" mode. With no intersection, a winding-number inside
+    test makes the distance negative, so a shape wholly inside a closed CAD
+    mesh no longer reads as clear (CL-D8).
+  - Not added to coal:
+    - a hull builder: V-HACD's pieces carry their triangles, and coal's
+      `Convex<Triangle>` constructor builds neighbours from them; CadKit's
+      point-only hulls (at most 64 points) are fine with the linear scan;
+    - mesh inflation: per-body inflation is extra margin per pair
+      (`required + δa + δb`), as main's proof does it;
+    - motion bounds or continuous collision: `ClearanceMotionEnvelope`
+      owns that;
+    - batching, pair rules or broadphase changes: those live in
+      collisionkit;
+    - height field against height field: it stays `Unsupported`.
+
 ## Steps
 
 Each step is its own commit with all suites green.
@@ -431,6 +461,15 @@ Each step is its own commit with all suites green.
     - overlap at reference leaving the environment checked;
     - inflation against an exact distance;
     - refused heights.
+- **CL2b — coal: height-field distance (CL-D13).**
+  - Implemented in the fork, with coal's own tests for a box, sphere,
+    capsule, convex and mesh against a height field, including penetration
+    and the closest points.
+  - collisionkit's world then uses coal's height-field distance directly:
+    the cell-prism workaround (`field_distance`) is deleted, and its tests
+    keep passing unchanged.
+  - An upstream PR to `coal-library/coal` comes later, not in this run,
+    when the user says so.
 - **CL3 — Geometry from the cell**, in two commits. CL3a can run
   unattended; CL3b reaches into SimKit and is done with review.
 - **CL3a — Robot, tool and environment geometry; decomposition.**
@@ -590,13 +629,14 @@ Each step is its own commit with all suites green.
 
 Working order:
 1. CL2;
-2. merge onto local `main` (no push);
-3. CL3a;
-4. CL4a;
-5. CL4b;
-6. CL5;
-7. CL3b;
-8. CL7, with its OMPL benchmark last.
+2. CL2b;
+3. merge onto local `main` (no push);
+4. CL3a;
+5. CL4a;
+6. CL4b;
+7. CL5;
+8. CL3b;
+9. CL7, with its OMPL benchmark last.
 
 CL6's remainder, main's PP10 and CL8 wait for review.
 
@@ -622,7 +662,11 @@ Gates, for work without review:
   - creating a fork;
   - changes to main's process-path logic beyond CL-D12's allowance;
   - deleting `ArmClearance`.
-- **No pushes.** OCCT is never rebuilt: set
+- **No pushes,** the coal fork included: its commits stay local. The
+  parent's submodule pin may point at a local, unpushed coal commit
+  overnight; pushing the fork and opening the upstream PR wait for the
+  user, like every other push.
+- OCCT is never rebuilt: set
   `MATERIA_CACHE_DIR=/home/joao/dev/materia-cache`. The shared checkout is
   touched only to move local `main`.
 
