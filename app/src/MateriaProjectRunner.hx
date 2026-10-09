@@ -465,7 +465,10 @@ class MateriaProjectRunner {
     if (status != 0) {
       var details = StringTools.trim(stderr.getBytes().toString() + "\n" + output);
       if (details.length > 6000) details = details.substr(details.length - 6000);
-      throw description + " (exit " + status + "):\n" + details;
+      // ChildProcess reports a signal as 128 + signal, like a shell.
+      var exit = status > 128 && status < 192 ? processExitDescription(0x40000000 | (status - 128)) : 'exit $status';
+      var message = description + " (" + exit + ")";
+      throw details.length == 0 ? message : message + ":\n" + details;
     }
     return output;
   }

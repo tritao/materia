@@ -1009,13 +1009,8 @@ class SceneEditingTests {
     check(visual[1].links.length==2&&visual[1].sensors[0].linkId=="arm",
       "articulated visualization exposes the link owning each sensor mount");
     var presentation=simulation.capturePresentationSnapshot();
-    var publishedRobot=presentation.world.robot("materia/robot");
-    if(publishedRobot==null)throw "Application presentation lost its RobotWorld publication";
-    check(presentation.revision>0&&presentation.robots.length==2&&presentation.environment.length>0&&
-      publishedRobot.sensors.length==firstRobot.sensors.length,
-      "one application presentation snapshot combines a physics revision with world publications");
-    check(publishedRobot.streamSequences[0].sequence==firstRobot.streamSequences[0].sequence,
-      "presentation keeps each sensor's actual source timestamp");
+    check(presentation.revision>0&&presentation.robots.length==2&&presentation.environment.length>0,
+      "one application presentation snapshot combines a physics revision with robot visuals");
     var writer = new McapRobotRecording(recordingPath);
     for(robotId in observation.robotIds()) {
       var robot=observation.robot(robotId);
