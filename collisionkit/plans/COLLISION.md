@@ -1417,9 +1417,15 @@ Done as planned, with these choices:
   and gantry-welder examples, the app's mobile welder and mobile mission
   (both backends, 10 seams, clear stow), and the web build (433 guest
   imports bound).
-- **Failing before and after (same message on f3da28dea):** MachineKit's
-  main suite stops at `CoreXyDriveTests` ("the step rate is each motor's
-  ceiling: expected 78.54, got 39.27"), and the app suite stops at the
-  worker document tests ("Could not open source file"). Both stop their
-  suites early, so the checks after them did not run in either build.
+- **Two older failures, fixed after PP10.** Both failed the same way on
+  f3da28dea and stopped their suites early:
+  - MachineKit's `CoreXyDriveTests` ("the step rate is each motor's
+    ceiling"): the device rounded a step interval of 1.0000000029 ticks,
+    f32 noise at the 40 kHz ceiling, up to two ticks, and the planning cap
+    mirrors it (10824b00b);
+  - the app suite's worker document tests ("Could not open source file"):
+    the Start-page tests left the working directory at the repository root
+    (57dddf9ba).
+  With them fixed, MachineKit's suite ("MachineKit smoke passed") and the
+  whole app suite pass with PP10.
 
