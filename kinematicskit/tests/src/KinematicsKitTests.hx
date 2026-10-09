@@ -756,16 +756,26 @@ class KinematicsKitTests {
     check(perIteration == 0.0, 'LM allocates nothing per iteration ($perIteration bytes)');
   }
 
-  /** Bytes allocated by a 60-iteration run beyond a 10-iteration run, per extra iteration. */
+  /**
+   * Bytes allocated by a 60-iteration run beyond a 10-iteration run, per extra iteration. HashLink
+   * accounts allocation in blocks, so now and then a run is charged a refill (about 2 KB) that has
+   * nothing to do with it; the fewest bytes any of several runs allocates is its real cost.
+   */
   static function bytesPerIteration(run:Int->Int):Float {
     run(10); run(60); // warm up (JIT, lazily sized buffers)
-    var before = hl.Gc.totalAllocated();
-    var shortIterations = run(10);
-    var middle = hl.Gc.totalAllocated();
-    var longIterations = run(60);
-    var after = hl.Gc.totalAllocated();
+    var shortest = Math.POSITIVE_INFINITY, longest = Math.POSITIVE_INFINITY;
+    var shortIterations = 0, longIterations = 0;
+    for (_ in 0...6) {
+      var before = hl.Gc.totalAllocated();
+      shortIterations = run(10);
+      var middle = hl.Gc.totalAllocated();
+      longIterations = run(60);
+      var after = hl.Gc.totalAllocated();
+      shortest = Math.min(shortest, middle - before);
+      longest = Math.min(longest, after - middle);
+    }
     if (longIterations <= shortIterations) throw 'fixture did not run longer ($shortIterations vs $longIterations)';
-    return ((after - middle) - (middle - before)) / (longIterations - shortIterations);
+    return (longest - shortest) / (longIterations - shortIterations);
   }
 
   /** A 7-axis arm with alternating Z/Y axes: spherical shoulder at 0.34, elbow 0.4 above, spherical wrist 0.4 above. */
