@@ -7,6 +7,7 @@ import haxe.Int64;
 import nativekit.ffi.NativeKit;
 import robotkit.streams.CameraImage;
 import robotkit.core.SensorFrame;
+import robotkit.core.RobotStatus;
 import robotkit.execution.ExecutionPlanSubmission;
 import robotkit.execution.FiredProcessEvent;
 import robotkit.execution.ProcessEventCodec;
@@ -514,7 +515,8 @@ class RobotRuntime {
     try {
       snapshotScratch.set_struct_size(rk_robot_snapshot.size());
       check(endpoint.observeEndpoint(snapshotScratch), "runtime.physicalPositions");
-      var positions = RobotSnapshot.fromNative(snapshotScratch, sensorLayout).q.toArray();
+      var positions = [for (index in 0...snapshotScratch.get_joint_count())
+        snapshotScratch.get_position(index)];
       scratchMutex.release();
       return positions;
     } catch (error:Dynamic) {
@@ -523,11 +525,94 @@ class RobotRuntime {
     }
   }
 
+  /** Copies actual endpoint coordinates into caller-owned storage for per-tick observers. */
+  public function copyPhysicalPositionsInto(target:Array<Float>):Void {
+    ensureLive();
+    if (target == null) throw "Physical-position target is required";
+    scratchMutex.acquire();
+    try {
+      snapshotScratch.set_struct_size(rk_robot_snapshot.size());
+      check(endpoint.observeEndpoint(snapshotScratch), "runtime.physicalPositions");
+      var count = snapshotScratch.get_joint_count();
+      if (target.length != count)
+        throw 'Physical-position target has ${target.length} entries; runtime has $count';
+      for (index in 0...count) target[index] = snapshotScratch.get_position(index);
+    } catch (error:Dynamic) {
+      scratchMutex.release();
+      throw error;
+    }
+    scratchMutex.release();
+  }
+
   /** Install a device sensor source before exposing the runtime to consumers. */
   public function installSensorPoller(poll:RobotSnapshot->Void):Void {
     ensureLive();
     if (poll == null || sensorPoller != null) throw "Runtime device sensor source is already installed or missing";
     sensorPoller = poll;
+  }
+
+  /** Reads connection/safety status without materializing joint or sensor snapshots. */
+  public function status():RobotStatus {
+    ensureLive();
+    scratchMutex.acquire();
+    var result:RobotStatus;
+    try {
+      snapshotScratch.set_struct_size(rk_robot_snapshot.size());
+      check(endpoint.observe(snapshotScratch), "runtime.status");
+      result = snapshotScratch.get_endpoint() == RobotKitRuntimeConstants.RK_ENDPOINT_FAULT ||
+        snapshotScratch.get_safety() == RobotKitRuntimeConstants.RK_SAFETY_FAULT ? Fault : Ready;
+    } catch (error:Dynamic) {
+      scratchMutex.release();
+      throw error;
+    }
+    scratchMutex.release();
+    return result;
+  }
+
+  /** Joint counter sample for observers that do not consume sensor or execution state. */
+  public function jointObservation():RuntimeJointObservation {
+    ensureLive();
+    scratchMutex.acquire();
+    var result:RuntimeJointObservation;
+    try {
+      snapshotScratch.set_struct_size(rk_robot_snapshot.size());
+      check(endpoint.observe(snapshotScratch), "runtime.jointObservation");
+      result = new RuntimeJointObservation(
+        [for (index in 0...snapshotScratch.get_joint_count()) snapshotScratch.get_position(index)],
+        snapshotScratch.get_source_timestamp_ns());
+    } catch (error:Dynamic) {
+      scratchMutex.release();
+      throw error;
+    }
+    scratchMutex.release();
+    return result;
+  }
+
+  /** Copies joint counters into caller-owned storage and returns their source timestamp. */
+  public function copyJointObservationInto(target:Array<Float>):Int64 {
+    ensureLive();
+    if (target == null) throw "Joint-observation target is required";
+    scratchMutex.acquire();
+    var sourceTimestampNs:Int64;
+    try {
+      snapshotScratch.set_struct_size(rk_robot_snapshot.size());
+      check(endpoint.observe(snapshotScratch), "runtime.jointObservation");
+      var count = snapshotScratch.get_joint_count();
+      if (target.length != count)
+        throw 'Joint-observation target has ${target.length} entries; runtime has $count';
+      for (index in 0...count) target[index] = snapshotScratch.get_position(index);
+      sourceTimestampNs = snapshotScratch.get_source_timestamp_ns();
+    } catch (error:Dynamic) {
+      scratchMutex.release();
+      throw error;
+    }
+    scratchMutex.release();
+    return sourceTimestampNs;
+  }
+
+  /** Copies the latest joint positions into caller-owned storage without building an observation snapshot. */
+  public function copyJointPositionsInto(target:Array<Float>):Void {
+    copyJointObservationInto(target);
   }
 
   /** Reads the latest published native state without advancing time. */
@@ -539,7 +624,7 @@ class RobotRuntime {
       snapshotScratch.set_struct_size(rk_robot_snapshot.size());
       check(endpoint.observe(snapshotScratch),
         "runtime.snapshot");
-      native = RobotSnapshot.fromNative(snapshotScratch, sensorLayout);
+      native = RobotSnapshot.fromNative(snapshotScratch, sensorLayout, endpoint.sourceClockId());
     } catch (error:Dynamic) {
       scratchMutex.release();
       throw error;
@@ -625,8 +710,8 @@ class RobotRuntime {
     }
     var frame = new SensorFrame(mounted.id, mounted.kind, mounted.frameId, sequence,
       sourceTimestampNs, values, NativeKit.nk_time_now_ns(), mounted.linkId,
-      mounted.position.toArray(), mounted.rotation.toArray(), sourceClockId,
-      "robotkit.monotonic", image);
+      null, null, sourceClockId,
+      "robotkit.monotonic", image, mounted.mount);
     externalMutex.acquire();
     var previous = externalFrames.get(sensorId);
     if (previous != null && Int64.compare(sequence, previous.sequence) <= 0) {
@@ -712,4 +797,14 @@ private class SegmentValues {
   }
 
 
+}
+
+/** Owned joint coordinates and their source time from one endpoint observation. */
+class RuntimeJointObservation {
+  public final positions:Array<Float>;
+  public final sourceTimestampNs:Int64;
+  public function new(positions:Array<Float>, sourceTimestampNs:Int64) {
+    this.positions = positions;
+    this.sourceTimestampNs = sourceTimestampNs;
+  }
 }

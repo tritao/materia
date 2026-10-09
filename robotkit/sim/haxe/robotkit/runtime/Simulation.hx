@@ -493,7 +493,7 @@ class Simulation {
     if (virtualDevice == null && blueprint.switches.length > 0) {
       var observedRuntime:RobotRuntime = runtime;
       var switches = new SimulatedSwitchSensorAdapter(blueprint, observedRuntime,
-        () -> observedRuntime.physicalPositions());
+        positions -> observedRuntime.copyPhysicalPositionsInto(positions));
       addStepObserver(switches);
       switchObservers.set(robots.length - 1, switches);
     }

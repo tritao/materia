@@ -10,6 +10,7 @@ class RobotRuntimeSensorBlueprint {
   public final frameId:String;
   public final linkId:String;
   public final link:Int;
+  public final mount:robotkit.core.SensorMount;
   public final position:ImmutableFloatArray;
   public final rotation:ImmutableFloatArray;
   public final updateRate:Float;
@@ -30,8 +31,9 @@ class RobotRuntimeSensorBlueprint {
       startAngleRadians:Float = 0.0, fieldOfViewRadians:Float = Math.PI * 2.0,
       joint:Int = -1, windowLower:Float = 0.0, windowUpper:Float = 0.0, hysteresis:Float = 0.0) {
     this.id = id; this.kind = kind; this.frameId = frameId; this.linkId = linkId; this.link = link;
-    this.position = new ImmutableFloatArray(position);
-    this.rotation = new ImmutableFloatArray(rotation);
+    mount = new robotkit.core.SensorMount(position, rotation);
+    this.position = mount.position;
+    this.rotation = mount.rotation;
     this.updateRate = updateRate; this.rayCount = rayCount; this.maxRange = maxRange;
     this.startAngleRadians = startAngleRadians; this.fieldOfViewRadians = fieldOfViewRadians;
     this.noiseStddev = noiseStddev; this.noiseSeed = noiseSeed;

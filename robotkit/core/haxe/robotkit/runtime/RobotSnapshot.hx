@@ -87,7 +87,8 @@ class RobotSnapshot {
 
   /** Converts the native ABI value while leaving the semantic robot ID unset. */
   @:allow(RobotRuntime)
-  static function fromNative(value:rk_robot_snapshot, layout:Array<RobotRuntimeSensorBlueprint>):RobotSnapshot {
+  static function fromNative(value:rk_robot_snapshot, layout:Array<RobotRuntimeSensorBlueprint>,
+      sourceClockId:String):RobotSnapshot {
     var positions:Array<Float> = [];
     var velocities:Array<Float> = [];
     var efforts:Array<Float> = [];
@@ -109,7 +110,7 @@ class RobotSnapshot {
       frames.push(new SensorFrame(config.id, config.kind, config.frameId,
         sample.get_sequence(), sample.get_source_timestamp_ns(),
         [for (j in 0...sample.get_value_count()) value.get_sensor_values(sample.get_value_offset() + j)], sample.get_received_timestamp_ns(),
-        config.linkId, config.position.toArray(), config.rotation.toArray()));
+        config.linkId, null, null, sourceClockId, "robotkit.monotonic", null, config.mount));
     }
     // Standalone endpoints may only report joint state; expose configured
     // encoders from that actual state, never synthesize other sensor kinds.
@@ -117,7 +118,7 @@ class RobotSnapshot {
       for (config in layout) if (config.kind == "joint_encoder")
         frames.push(new SensorFrame(config.id, config.kind, config.frameId,
           value.get_sequence(), value.get_source_timestamp_ns(), positions, value.get_received_timestamp_ns(),
-          config.linkId, config.position.toArray(), config.rotation.toArray()));
+          config.linkId, null, null, sourceClockId, "robotkit.monotonic", null, config.mount));
     return new RobotSnapshot(Int64.ofInt(0), value.get_sequence(), value.get_source_timestamp_ns(),
       value.get_mode(), value.get_safety(), value.get_endpoint(), value.get_fault_code(),
       positions, velocities, efforts, value.get_received_timestamp_ns(), frames,
