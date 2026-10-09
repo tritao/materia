@@ -143,6 +143,7 @@ class MainWeb {
         simulationRunning: app.simulation.isRunning(),
         simulationActive: app.simulation.isActive(),
         simulationError: app.simulation.error,
+        collisions: app.collisionSummary,
         mission: app.simulation.missionPlayer() == null ? null : app.simulation.missionPlayer().progress(),
         objects: [for (record in app.scene.records()) {id: record.id, label: record.label, type: record.type, x: record.x, y: record.y}],
         selected: app.scene.selectedId,

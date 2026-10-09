@@ -615,7 +615,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var collisionsVisible:Bool = true;
   var collisionNearMillimetres:Float = 10.0;
   var sceneCollision:Null<SceneCollision> = null;
-  var collisionSummary:Null<String> = null;
+  public var collisionSummary(default, null):Null<String> = null;
   var gridSnapEnabled:Bool;
   var gridSpacing:Float;
   /** The viewport's lighting preset number, from the saved setting. */

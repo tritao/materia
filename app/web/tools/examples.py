@@ -12,7 +12,7 @@ def main():
     parser.add_argument('--debug-port', type=int, required=True)
     parser.add_argument('--page-url', required=True)
     parser.add_argument('--examples', action='store_true')
-    parser.add_argument('--timeout', type=float, default=240)
+    parser.add_argument('--timeout', type=float, default=360)
     options = parser.parse_args()
     page = Page(WebSocket(wait_for_page(options.debug_port, options.page_url, 30)['webSocketDebuggerUrl']))
     page.socket.socket.settimeout(options.timeout)
@@ -59,6 +59,7 @@ def main():
         scroll(-10000)
         category, example = {
             'Gantry picker': ('Robotics & handling', 'gantry-picker'),
+            'Robot arm': ('Robotics & handling', 'robot-arm'),
             'woven seam': ('Welding', 'robot-welder-weave'),
             'Worker gallery': ('People & simulation', 'worker-gallery'),
             'Two robots with sensors': ('People & simulation', 'two-robot')
@@ -157,6 +158,20 @@ def main():
     assert editor.report()['projectJob'] == 'woven-seam', 'Published welding variant lost its selected job'
 
     print('job variant', flush=True)
+    # COLLISION.md CL8d: a downloaded example's assembly in the browser's collision world. As designed the
+    # arm collides with nothing; its workpiece rests 2 mm over the table, the one near pair.
+    browse('Robot arm')
+    page.evaluate('delete materia.projectOpenProfile; 0')
+    editor.click(key='start-open-example:robot-arm')
+    while not any(item['id'] == 'project:pedestal' for item in editor.report()['objects']):
+        if time.monotonic() >= deadline: raise RuntimeError('Robot arm did not open')
+        time.sleep(.05)
+    editor.click(role='tab', label='3D')
+    editor.settle()
+    collisions = editor.report()['collisions']
+    assert collisions is not None and collisions.startswith('1 near') and '2 mm apart' in collisions, \
+        'Robot arm collisions in the browser: %s' % collisions
+    print('arm collisions: %s' % collisions, flush=True)
     print('compiled setup', flush=True)
     before_script = page.evaluate('materia.examples().requests.length')
     browse('Two robots with sensors')

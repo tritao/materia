@@ -1606,3 +1606,32 @@ Done as planned, with these choices:
   reverted: `SceneEditingTests` doesn't compile and the child-process
   SIGTERM test fails, both from main's newest commits.
 
+### CL8d: the browser (2026-10-09)
+
+- The browser editor runs the same collision world. `collisionkit_core` has
+  been linked into the Emscripten host since PP10, and the web build binds
+  all 453 guest imports.
+- The page's report (`window.materia.inspect()`) carries the toolbar's
+  collision line.
+- **`app/web/test.sh --tour`:** in the 3D view a new rectangle lands on the
+  scene's first one, and the page reports "1 collision · Rectangle /
+  Rectangle 100 mm deep". The tour's simulation step still passes with
+  collisions shown.
+- **`app/web/test.sh --examples`:** the downloadable robot-arm example opens
+  from the Start page and its 3D view reports "1 near · TABLE-800x500x250 /
+  WORKPIECE-60x60x50 2 mm apart", the desktop's answer for the arm as
+  designed. The extra download needs more time, so the driver's default
+  budget goes from 240 s to 360 s; the whole check passes with 600 s.
+  - One run without the new step died at startup with the page not
+    responding. These headless-Chrome checks are sensitive to host load.
+- **Limits, recorded and not worked around:**
+  - The browser can't compile generated projects (no external commands),
+    only open the published `.mtrg` examples.
+  - CAD parts need the OCCT browser build for their CadKit shapes. Without
+    it, scene CAD parts are unavailable altogether, so they don't reach the
+    collision world either.
+- After rebasing onto main 76d7923db (which fixed both of the failures CL8c
+  worked around, in 2dede0d8d), the whole app suite passes as is (15
+  suites), and so do the project-source collision checks.
+- **CL8 is done:** CL8a–d.
+
