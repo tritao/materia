@@ -63,8 +63,8 @@ class SimulatedTools implements SessionMember {
 		var parts = new SimulationAssemblyParts(simulation, robot, objects, project);
 		for (id in welding.groundedWork) {
 			var body = parts.get("project:" + id);
-			if (body.vertices.length < 12) throw 'Grounded work "$id" has no CAD collision hull';
-			work.add(new ConvexSolid(body.vertices), body.pose);
+			if (body.pieces.length == 0) throw 'Grounded work "$id" has no CAD collision hull';
+			for (piece in body.pieces) work.add(new ConvexSolid(piece), body.pose);
 		}
 		return new SimulatedWelder(simulation, robot.runtime, robotIndex, part.linkIndex, [tip.x, tip.y, tip.z], wire, work, tool.channel,
 			welding.wireSpeedChannel, welding.voltageChannel, sensor,

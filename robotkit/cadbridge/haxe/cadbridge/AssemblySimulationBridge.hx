@@ -88,6 +88,24 @@ typedef AssemblyPhysicalData = {
 /** Converts an assembly's tree joints and physical parts to a RobotKit model. */
 class AssemblySimulationBridge {
   /**
+   * An occurrence's convex collision pieces, in CAD units in its component's frame: the component's
+   * authored pieces when it has them, else the part's measured hull, else none. Everything that
+   * collides an assembly's parts (simulation, clearance, the editor) takes them from here.
+   */
+  public static function collisionPieces(occurrence:String, component:AssemblyDefinition.AssemblyComponentDefinition,
+      part:Null<AssemblyPhysicalPart>):Array<Array<Float>> {
+    var pieces = component.collisionHulls != null ? component.collisionHulls
+      : part != null && part.collisionHull != null ? [part.collisionHull] : [];
+    for (hull in pieces) {
+      if (hull.length < 12 || hull.length > 64 * 3 || hull.length % 3 != 0)
+        throw 'Assembly occurrence "$occurrence" has an invalid collision hull';
+      for (value in hull) if (!Math.isFinite(value))
+        throw 'Assembly occurrence "$occurrence" has a non-finite collision hull';
+    }
+    return pieces;
+  }
+
+  /**
    * End-stop room past a joint's limits when its assembly states no overtravel: 1 mm for a slide,
    * 1 degree for a rotary joint. A joint parked on its limit reads noise either side of it, and a
    * runtime that faulted exactly at the limit would stop the robot before any command.
@@ -226,16 +244,10 @@ class AssemblySimulationBridge {
         masses[index].push({mass: mass, center: [center.x * scale, center.y * scale, center.z * scale],
           inertia: rotated(part.inertia, offset, part.density * Math.pow(scale, 5) * mass / baseMass)});
         var component = [for (entry in definition.definitions) if (entry.id == occurrence.definition) entry][0];
-        var hulls = component.collisionHulls == null ?
-          (part.collisionHull == null ? [] : [part.collisionHull]) : component.collisionHulls;
-        for (hull in hulls) {
-          if (hull.length < 12 || hull.length > 64 * 3 || hull.length % 3 != 0)
-            throw 'Assembly occurrence "$id" has an invalid collision hull';
+        for (hull in collisionPieces(id, component, part)) {
           var vertices:Array<Float> = [];
           for (vertex in 0...Std.int(hull.length / 3)) {
             var x = hull[vertex * 3], y = hull[vertex * 3 + 1], z = hull[vertex * 3 + 2];
-            if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z))
-              throw 'Assembly occurrence "$id" has a non-finite collision hull';
             var point = AssemblyFrames.transformPoint(offset, x, y, z);
             vertices.push(point.x * scale);
             vertices.push(point.y * scale);

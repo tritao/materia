@@ -438,7 +438,7 @@ class MobileWelderTests {
           materia.project.SceneArtifact.SceneArtifactMission).steps[0].weld;
         var frame = mission.assemblyParts.get("project:" + step.frame);
         var host = mission.assemblyParts.get("project:" + step.metal);
-        if (frame.vertices.length < 12 || host.id != "project:work/weldMetal") throw "External weld lost CAD physical geometry";
+        if (frame.pieces.length == 0 || host.id != "project:work/weldMetal") throw "External weld lost CAD physical geometry";
         var before = frame.pose();
         var designed = new cadkit.modeling.AssemblyState(cast generated.assemblyDefinition, generated.assemblyState).worldPose(cast step.frame);
         for (axis in 0...3) if (Math.abs(before.position[axis] - [designed.x, designed.y, designed.z][axis] * 0.001) > 1e-6)

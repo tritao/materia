@@ -1501,3 +1501,42 @@ Done as planned, with these choices:
   With them fixed, MachineKit's suite ("MachineKit smoke passed") and the
   whole app suite pass with PP10.
 
+### CL8a: the editor's collision world (2026-10-09)
+
+- `app.SceneCollision` (CL-D14) describes the open scene in one
+  collisionkit world:
+  - a generated project's occurrences, with their pieces;
+  - CL-D3's rigid and adjacent rules from `AssemblyBodies`;
+  - the assembly as an articulation referenced at its as-designed state
+    (default joint values);
+  - every other collision-enabled object as a movable box, built as the
+    simulation builds it (a CAD part's collision bounds).
+- It rebuilds only when what collides changes (ids, kinds, extents, CAD
+  bounds, the collision flag, the project). A move or a joint edit
+  re-poses the bodies. `query(scene, project, near)` answers once per scene
+  revision: one pair per two scene objects, closest first, with the closest
+  points.
+- `AssemblySimulationBridge.collisionPieces` is the one source of an
+  occurrence's pieces: the component's authored hulls, else the measured
+  hull. `toRobotModel`, `SimulationAssemblyParts` (now `pieces`, not
+  `vertices`), the mission clearance (one body per piece), grounded weld
+  work and the editor all use it, so the simulation and the robot model no
+  longer disagree.
+- **Tests:**
+  - `SceneCollisionTests` (app suite): overlapping boxes collide 20 mm deep;
+    5 mm apart they are near, with the closest points spanning the gap; 50 mm
+    apart they are clear; moving never rebuilds; turning collision off on
+    one rebuilds once.
+  - `checkSceneCollision` (project-source, `arm` and the default run) on the
+    robot-arm example:
+    - nothing collides as designed, and the one near pair is the workpiece
+      2 mm over the table;
+    - j2 1.5 / j3 -0.78 puts the hand into the pedestal;
+    - j2 2.18 / j3 2.5 puts the suction cup into the table;
+    - back at zero, nothing collides;
+    - one build for all of it.
+- **Suites:** the app suite; CadBridge (173); project-source `arm`,
+  `scene-collision` and `mobile-welder-mission` (both backends, 10 seams,
+  clear stow); the PP8 runner's gantry and robot welders, whose quality
+  records are identical to PP10's.
+

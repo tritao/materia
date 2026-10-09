@@ -358,16 +358,19 @@ class MissionPlayer implements SessionMember {
       new Quat(base.rotation[0], base.rotation[1], base.rotation[2], base.rotation[3])).inverse();
     for (entry in objects) if (StringTools.startsWith(entry.id, "project:") && ignored.indexOf(entry.id.substr(8)) < 0) {
       var part = assemblyParts.get(entry.id);
-      if (part.vertices.length == 0) continue;
+      if (part.pieces.length == 0) continue;
       var live = part.pose();
       var pose = baseInverse.compose(new Transform3(new Vec3(live.position[0], live.position[1], live.position[2]),
         new Quat(live.rotation[0], live.rotation[1], live.rotation[2], live.rotation[3])));
-      var vertices:Array<Float> = [];
-      for (index in 0...Std.int(part.vertices.length / 3)) {
-        var point = pose.transformPoint(new Vec3(part.vertices[index * 3], part.vertices[index * 3 + 1], part.vertices[index * 3 + 2]));
-        vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
+      for (index in 0...part.pieces.length) {
+        var piece = part.pieces[index], vertices:Array<Float> = [];
+        for (vertex in 0...Std.int(piece.length / 3)) {
+          var point = pose.transformPoint(new Vec3(piece[vertex * 3], piece[vertex * 3 + 1], piece[vertex * 3 + 2]));
+          vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
+        }
+        var name = entry.id.substr(8);
+        bodies.push({name: part.pieces.length == 1 ? name : '$name#$index', link: links[0].id, vertices: vertices, tool: false});
       }
-      bodies.push({name: entry.id.substr(8), link: links[0].id, vertices: vertices, tool: false});
     }
     for (hull in depositedWeldHulls()) {
       var vertices:Array<Float> = [];

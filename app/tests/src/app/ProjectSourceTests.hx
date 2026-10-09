@@ -2837,6 +2837,48 @@ class ProjectSourceTests {
       '$label: pin at ${pose.x}, ${pose.y}, ${pose.z}');
   }
 
+  /**
+   * The editor's collision world on a generated arm (COLLISION.md CL8a): nothing collides as
+   * designed, a joint edit that folds the arm into itself reports the pair, and jogging only
+   * re-poses the world.
+   */
+  static function checkSceneCollision(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
+    var editor = new ReferenceEditorApp();
+    editor.openProjectInBackground(manifest);
+    var deadline = Sys.time() + 600.0;
+    while (editor.openingProject() && Sys.time() < deadline) {
+      editor.tick();
+      Sys.sleep(0.01);
+    }
+    check(editor.session.projectAssemblyDefinition != null, "the arm project opens");
+    var collision = new app.SceneCollision(() -> new collisionkit.native.NativeCollisionWorld());
+    function colliding():Array<String>
+      return [for (pair in collision.query(editor.scene, editor.session, 0.01)) if (pair.colliding()) pair.a + "/" + pair.b];
+    var loaded = collision.query(editor.scene, editor.session, 0.01);
+    check([for (pair in loaded) if (pair.colliding()) pair].length == 0,
+      "nothing collides as designed: parts that touch by design are allowed");
+    check(loaded.length == 1 && loaded[0].a == "project:table" && loaded[0].b == "project:workpiece" &&
+      Math.abs(loaded[0].distance - 0.002) < 1e-6, "the workpiece sits 2 mm over the table, a near pair");
+    // Shoulder forward, elbow back: the wrist folds into the pedestal.
+    editor.session.setAssemblyJointCoordinate("j2", 1.5);
+    editor.session.setAssemblyJointCoordinate("j3", -0.78);
+    var folded = colliding();
+    check(folded.indexOf("project:hand/project:pedestal") >= 0, 'the hand hits the pedestal ($folded)');
+    // Shoulder down, elbow up: the suction tool goes into the table.
+    editor.session.setAssemblyJointCoordinate("j2", 2.18);
+    editor.session.setAssemblyJointCoordinate("j3", 2.5);
+    var reached = colliding();
+    check(reached.indexOf("project:table/project:tool/cup") >= 0, 'the cup hits the table ($reached)');
+    editor.session.setAssemblyJointCoordinate("j2", 0.0);
+    editor.session.setAssemblyJointCoordinate("j3", 0.0);
+    check(colliding().length == 0, "back at zero, nothing collides");
+    check(collision.builds == 1, 'jogging only re-poses the world (${collision.builds} builds)');
+    Sys.println("Scene collision on the generated arm passed");
+    collision.dispose();
+    editor.dispose();
+  }
+
   static function checkBackgroundLaunch(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var editor = new ReferenceEditorApp();
@@ -2993,8 +3035,13 @@ class ProjectSourceTests {
       checkCartesianAnalyticExamples(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "scene-collision") {
+      checkSceneCollision(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {
       checkRobotArm(root);
+      checkSceneCollision(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-whole") {
@@ -3361,6 +3408,7 @@ class ProjectSourceTests {
     session.dispose();
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
     checkRobotArm(root);
+    checkSceneCollision(root);
     checkCobotArms(root);
     checkGantryPicker(root);
     checkGantryPicker(root, true);
