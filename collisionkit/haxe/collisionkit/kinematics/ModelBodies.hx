@@ -6,7 +6,10 @@ import collisionkit.CollisionPairRule;
 import collisionkit.CollisionPairStatus;
 import collisionkit.CollisionPose;
 import collisionkit.CollisionWorld;
+import collisionkit.CollisionDistance;
+import kinematicskit.AvoidancePair;
 import kinematicskit.BodyPairRelation;
+import kinematicskit.Vector3;
 import kinematicskit.KinematicBodyPairs;
 import kinematicskit.KinematicModel;
 import kinematicskit.KinematicSnapshot;
@@ -123,6 +126,33 @@ class ModelBodies {
     for (body in 0...bodies.length) snapshot.bodyPoseInto(body, out, 7 * body);
     for (i in 0...followers.length) snapshot.bodyPoseInto(followed[i], out, 7 * (bodies.length + i));
     return out;
+  }
+
+  /**
+   * Avoidance pairs for this model (COLLISION.md CL5) from a built world's
+   * distances: each pair with a body of this model, as model bodies (a side
+   * outside it, or a follower such as the tool, maps to its model body or
+   * -1), with the pair's safety margin and influence distance.
+   */
+  public function avoidancePairs(build:CollisionBuild, found:Array<CollisionDistance>, safety:Float,
+      influence:Float):Array<AvoidancePair> {
+    function modelBody(worldBody:Int):Int {
+      var described = build.bodyOf(worldBody);
+      if (described < 0) return -1;
+      var direct = bodies.indexOf(described);
+      if (direct >= 0) return direct;
+      var follower = followers.indexOf(described);
+      return follower >= 0 ? followed[follower] : -1;
+    }
+    var pairs:Array<AvoidancePair> = [];
+    for (d in found) {
+      var a = modelBody(d.bodyA), b = modelBody(d.bodyB);
+      if (a < 0 && b < 0) continue;
+      pairs.push(new AvoidancePair(a, b, new Vector3(d.pointA[0], d.pointA[1], d.pointA[2]),
+        new Vector3(d.pointB[0], d.pointB[1], d.pointB[2]), new Vector3(d.normal[0], d.normal[1], d.normal[2]), d.distance,
+        safety, influence));
+    }
+    return pairs;
   }
 
   function poseDescription():Void {

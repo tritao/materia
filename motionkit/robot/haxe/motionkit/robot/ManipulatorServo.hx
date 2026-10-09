@@ -1,5 +1,6 @@
 package motionkit.robot;
 
+import kinematicskit.AvoidancePair;
 import kinematicskit.FrameVelocityTask;
 import kinematicskit.KinematicProblem;
 import kinematicskit.SolverWorkspace;
@@ -20,13 +21,19 @@ class ServoStep {
   public final iterations:Int;
   /** Arm DOF indices whose step sits on a position or velocity bound. */
   public final limited:Array<Int>;
+  /** Avoidance pairs that bounded the step, and those whose rows had to be relaxed (COLLISION.md CL5). */
+  public final avoided:Array<AvoidancePair>;
+  public final relaxed:Array<AvoidancePair>;
 
-  public function new(velocity:Array<Float>, fallback:Bool, qpStatus:Int, iterations:Int, limited:Array<Int>) {
+  public function new(velocity:Array<Float>, fallback:Bool, qpStatus:Int, iterations:Int, limited:Array<Int>,
+      ?avoided:Array<AvoidancePair>, ?relaxed:Array<AvoidancePair>) {
     this.velocity = velocity;
     this.fallback = fallback;
     this.qpStatus = qpStatus;
     this.iterations = iterations;
     this.limited = limited;
+    this.avoided = avoided == null ? [] : avoided;
+    this.relaxed = relaxed == null ? [] : relaxed;
   }
 }
 
@@ -46,6 +53,12 @@ class ServoStep {
  * (a ramped step is a streamed plan chunk). If the QP does not solve, the
  * damped step clamped into the same bounds is used, and the answer says so.
  *
+ * With `avoidance` set, each tick asks it for the pairs near the arm at `q`
+ * (bodies of the group's model; another robot or the environment is -1) and
+ * adds their velocity-damper rows (`kinematicskit.AvoidanceRows`, closing at
+ * most `avoidanceSpeed`): the servo stops short of obstacles and slides
+ * along them instead of finding out afterwards (COLLISION.md CL5).
+ *
  * Keep one per arm and reuse it: the QP warm-starts from the previous tick.
  */
 class ManipulatorServo {
@@ -55,6 +68,10 @@ class ManipulatorServo {
   final problem:KinematicProblem;
   final task:FrameVelocityTask;
   final workspace = new SolverWorkspace();
+  /** The pairs near the arm at a state of the group's model (COLLISION.md CL5), or null for none. */
+  public var avoidance:Null<kinematicskit.KinematicState->Array<AvoidancePair>> = null;
+  /** The speed avoidance rows let a pair close at, far from its safety margin. */
+  public var avoidanceSpeed:Float = 0.1;
 
   public function new(manipulator:KinematicGroup, ?damping:Float = 1e-3) {
     if (manipulator == null) throw "Servo requires a manipulator";
@@ -89,9 +106,13 @@ class ManipulatorServo {
         }];
     }
     task.setTwist(twist.toArray(), dt);
-    var solved = DifferentialIk.step(problem, manipulator.stateOf(q), dt, qp, limits, 1.0, damping, workspace,
-      maxIterations);
-    return new ServoStep(solved.velocity, solved.fallback, solved.status, solved.iterations, solved.limited);
+    var state = manipulator.stateOf(q);
+    var provider = avoidance;
+    var pairs = provider == null ? null : provider(state);
+    var solved = DifferentialIk.step(problem, state, dt, qp, limits, 1.0, damping, workspace, maxIterations, pairs,
+      avoidanceSpeed);
+    return new ServoStep(solved.velocity, solved.fallback, solved.status, solved.iterations, solved.limited,
+      solved.avoided, solved.relaxed);
   }
 
   public function dispose():Void qp.dispose();

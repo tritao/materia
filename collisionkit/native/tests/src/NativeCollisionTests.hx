@@ -7,7 +7,16 @@ import collisionkit.CollisionPairStatus;
 import collisionkit.CollisionPose;
 import collisionkit.CollisionWorld;
 import collisionkit.native.NativeCollisionWorld;
+import collisionkit.CollisionBuild;
+import collisionkit.kinematics.ModelBodies;
+import kinematicskit.AvoidancePair;
 import kinematicskit.BodyPairRelation;
+import kinematicskit.FrameOrientation;
+import kinematicskit.FrameTask;
+import kinematicskit.KinematicProblem;
+import kinematicskit.StepLimits;
+import kinematicskit.native.DifferentialIk;
+import kinematicskit.native.NativeQpStep;
 import kinematicskit.ClosureKind;
 import kinematicskit.JointKind;
 import kinematicskit.KinematicBodyPairs;
@@ -35,6 +44,10 @@ class NativeCollisionTests {
     testInflationAgainstExactDistances();
     testViolationsAndBatches();
     testRefusedHeights();
+    testServoStopsShortAndSlides();
+    testAvoidsAnotherRobot();
+    testRecoversFromInsideTheMargin();
+    testRelaxesRowsThatCannotHold();
     Sys.println('CollisionKit native tests passed ($assertions assertions)');
   }
 
@@ -308,6 +321,161 @@ class NativeCollisionTests {
     world.setHeights(field, [0, -1, 0, 0]);
     rejects(() -> world.setHeights(field, [0, -1.5, 0, 0]), "a dig below the minimum is refused, not clamped");
     world.dispose();
+  }
+
+
+  /** A two-link arm with a flange frame at the forearm's tip. */
+  static function flangeArm(?root:Transform):KinematicModel {
+    var builder = new KinematicModelBuilder();
+    var base = builder.addBody("base"), upper = builder.addBody("upper"), fore = builder.addBody("fore");
+    if (root != null) builder.setRootPose(base, root);
+    var z = new Vector3(0, 0, 1);
+    builder.addJoint("shoulder", JointKind.Revolute, base, upper, Transform.identity(), Transform.identity(), z, -3, 3);
+    builder.addJoint("elbow", JointKind.Revolute, upper, fore, Transform.translation(1, 0, 0), Transform.identity(), z, -3, 3);
+    builder.addFrame("flange", fore, Transform.translation(1, 0, 0));
+    return builder.build();
+  }
+
+  /**
+   * Servoes `model` toward `target` (flange position) for `steps` ticks of
+   * 10 ms with avoidance rows from `world` (ds 10 mm, di 100 mm, xi 0.5 m/s):
+   * returns the smallest distance seen on the moving arm's pairs, and leaves
+   * `state` where it ends.
+   */
+  static function servo(model:KinematicModel, bodies:ModelBodies, build:CollisionBuild, state:KinematicState,
+      target:Vector3, steps:Int, avoid:Bool):Float {
+    var task = FrameTask.atFrame(model, model.frameIndex("flange"), Transform.translation(target.x, target.y, target.z),
+      1e-6, 1e-6, null, 7, FrameOrientation.Free);
+    var problem = new KinematicProblem(model).add(task);
+    var qp = new NativeQpStep(problem.layout().width);
+    var limits = StepLimits.ofVelocity([1.0, 1.0]);
+    var closest = Math.POSITIVE_INFINITY;
+    for (_ in 0...steps) {
+      bodies.place(build, state);
+      var near = build.world.distances(0.1);
+      for (d in near) closest = Math.min(closest, d.distance);
+      var pairs = avoid ? bodies.avoidancePairs(build, near, 0.01, 0.1) : null;
+      var step = DifferentialIk.step(problem, state, 0.01, qp, limits, 0.2, 1e-3, null, 1000, pairs, 0.5);
+      for (column in 0...problem.layout().width) state.q[problem.layout().dofs[column]] += step.velocity[column] * 0.01;
+    }
+    bodies.place(build, state);
+    for (d in build.world.distances(0.1)) closest = Math.min(closest, d.distance);
+    qp.dispose();
+    return closest;
+  }
+
+  static function flangePoint(model:KinematicModel, state:KinematicState):Transform {
+    var snapshot = new KinematicSnapshot(model);
+    snapshot.evaluate(state);
+    return snapshot.framePose(model.frameIndex("flange"));
+  }
+
+  /** CL5: reaching for a point behind a wall, the arm stops short of it at the margin and slides along it. */
+  static function testServoStopsShortAndSlides():Void {
+    var model = flangeArm();
+    for (avoid in [false, true]) {
+      var description = new collisionkit.CollisionDescription();
+      var reference = new KinematicState(model, [1.2, -1.6]);
+      var bodies = ModelBodies.describe(description, model, "arm", 0, reference, "start", true);
+      description.addObject("tip", bodies.bodies[2], CollisionPose.translation(1, 0, 0), CollisionGeometry.Sphere(0.05));
+      bodies.declare();
+      // A wall whose face is the plane x = 1.5.
+      description.addFixed("wall", CollisionPose.translation(1.6, 0, 0), CollisionGeometry.Box(0.1, 2, 2), 1);
+      var world = new NativeCollisionWorld();
+      var build = description.build(world);
+      check(build.layoutErrors.length == 0, "the arm starts clear of the wall");
+      var state = reference.copy();
+      var closest = servo(model, bodies, build, state, new Vector3(1.7, 0.5, 0), 400, avoid);
+      var tip = flangePoint(model, state);
+      if (!avoid) check(closest < 0, 'without avoidance the tip goes into the wall ($closest)');
+      else {
+        check(closest >= 0.01 - 1e-3, 'with avoidance it stops short at the 10 mm margin ($closest)');
+        check(Math.abs(tip.x - (1.5 - 0.05 - 0.01)) < 5e-3, 'at the wall (${tip.x})');
+        check(Math.abs(tip.y - 0.5) < 0.02, 'having slid along it to the target height (${tip.y})');
+      }
+      world.dispose();
+    }
+  }
+
+  /** CL5: the other side of a pair is another robot (no Jacobian in this solve); the arm still stops short of it. */
+  static function testAvoidsAnotherRobot():Void {
+    var model = flangeArm(), other = flangeArm(Transform.translation(2.0, 1.2, 0).compose(Transform.axisAngle(0, 0, 1, Math.PI)));
+    var description = new collisionkit.CollisionDescription();
+    var bodies = ModelBodies.describe(description, model, "arm", 0, new KinematicState(model, [0.0, 0.0]), "start", true);
+    description.addObject("tip", bodies.bodies[2], CollisionPose.translation(1, 0, 0), CollisionGeometry.Sphere(0.05));
+    bodies.declare();
+    var otherBodies = ModelBodies.describe(description, other, "other", 2, new KinematicState(other, [0.0, 0.0]), "start", true);
+    for (body in 1...3) description.addObject('other$body', otherBodies.bodies[body], CollisionPose.translation(0.5, 0, 0),
+      CollisionGeometry.Capsule(0.05, 0.5));
+    otherBodies.declare();
+    var world = new NativeCollisionWorld();
+    var build = description.build(world);
+    check(build.layoutErrors.length == 0, "the two arms start clear");
+    var state = new KinematicState(model, [0.0, 0.0]);
+    // Reach for a point on the other robot's upper arm.
+    var closest = servo(model, bodies, build, state, new Vector3(1.5, 1.2, 0), 400, true);
+    check(closest >= 0.01 - 1e-3, 'the arm stops short of the other robot ($closest)');
+    var pairs = bodies.avoidancePairs(build, world.distances(0.1), 0.01, 0.1);
+    check(pairs.length > 0 && pairs.filter(p -> p.bodyB == -1 || p.bodyA == -1).length == pairs.length,
+      "the other robot's side has no Jacobian in this solve");
+    world.dispose();
+  }
+
+  /** CL5: starting inside the margin, the rows demand separation and the arm backs out. */
+  static function testRecoversFromInsideTheMargin():Void {
+    var model = flangeArm();
+    var description = new collisionkit.CollisionDescription();
+    // Bent, so the tip can move along the wall's normal (stretched out it could not).
+    var reference = new KinematicState(model, [0.5, -1.0]);
+    var bodies = ModelBodies.describe(description, model, "arm", 0, reference, "start", true);
+    description.addObject("tip", bodies.bodies[2], CollisionPose.translation(1, 0, 0), CollisionGeometry.Sphere(0.05));
+    bodies.declare();
+    // The wall's face is 4 mm beyond the tip sphere.
+    var tipX = flangePoint(model, reference).x;
+    description.addFixed("wall", CollisionPose.translation(tipX + 0.05 + 0.004 + 0.1, 0, 0), CollisionGeometry.Box(0.1, 2, 2), 1);
+    var world = new NativeCollisionWorld();
+    var build = description.build(world);
+    var state = reference.copy();
+    bodies.place(build, state);
+    var start = world.distances(0.1)[0].distance;
+    check(Math.abs(start - 0.004) < 1e-9, 'it starts 4 mm from the wall ($start)');
+    // Holding its place (the target is where it is) it still backs out to the margin.
+    var task = FrameTask.atFrame(model, model.frameIndex("flange"), flangePoint(model, state), 1e-6, 1e-6, null, 7, FrameOrientation.Free);
+    var problem = new KinematicProblem(model).add(task);
+    var qp = new NativeQpStep(2);
+    var distances = [start];
+    for (_ in 0...300) {
+      bodies.place(build, state);
+      var pairs = bodies.avoidancePairs(build, world.distances(0.1), 0.01, 0.1);
+      var step = DifferentialIk.step(problem, state, 0.01, qp, StepLimits.ofVelocity([1.0, 1.0]), 0.2, 1e-3, null, 1000, pairs, 0.5);
+      for (column in 0...2) state.q[problem.layout().dofs[column]] += step.velocity[column] * 0.01;
+      bodies.place(build, state);
+      distances.push(world.distances(0.1)[0].distance);
+    }
+    qp.dispose();
+    var rising = true;
+    for (i in 1...distances.length) if (distances[i] < distances[i - 1] - 1e-9 && distances[i - 1] < 0.01 - 1e-4) rising = false;
+    var last = distances[distances.length - 1];
+    check(rising && last >= 0.01 - 1e-3, 'the distance rises back to the margin (${distances[1]}, ..., $last)');
+    world.dispose();
+  }
+
+  /** CL5: rows the step limits cannot honour are relaxed, and the step says which. */
+  static function testRelaxesRowsThatCannotHold():Void {
+    var model = flangeArm();
+    var state = new KinematicState(model, [0.5, -1.0]);
+    var task = FrameTask.atFrame(model, model.frameIndex("flange"), flangePoint(model, state), 1e-6, 1e-6, null, 7, FrameOrientation.Free);
+    var problem = new KinematicProblem(model).add(task);
+    var qp = new NativeQpStep(2);
+    // Inside the margin, but no joint may move at all.
+    var pair = new AvoidancePair(2, -1, new Vector3(2.05, 0, 0), new Vector3(2.054, 0, 0), new Vector3(1, 0, 0), 0.004, 0.01, 0.1);
+    var step = DifferentialIk.step(problem, state, 0.01, qp, StepLimits.ofVelocity([0.0, 0.0]), 0.2, 1e-3, null, 1000, [pair], 0.5);
+    check(step.avoided.length == 1 && step.relaxed.length == 1 && step.relaxed[0] == pair, "the row that cannot hold is relaxed and named");
+    check(Math.abs(step.velocity[0]) < 1e-9 && Math.abs(step.velocity[1]) < 1e-9, "and the limits still hold exactly");
+    // With room to move, it holds as given.
+    var free = DifferentialIk.step(problem, state, 0.01, qp, StepLimits.ofVelocity([1.0, 1.0]), 0.2, 1e-3, null, 1000, [pair], 0.5);
+    check(free.relaxed.length == 0 && !free.fallback, "a row that can hold is not relaxed");
+    qp.dispose();
   }
 
   /** Registers a model's bodies (in its order) in `group`, with the kit's pairs as rules; returns the first body. */

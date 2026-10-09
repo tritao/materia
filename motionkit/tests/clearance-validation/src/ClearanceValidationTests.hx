@@ -39,6 +39,7 @@ class ClearanceValidationTests {
     testDepthLimitIsSampled();
     testGraspAndPlace();
     testTorchWindow();
+    testServoStopsAboveTheTable();
     Sys.println('Clearance validation tests passed ($assertions assertions)');
   }
 
@@ -226,6 +227,40 @@ class ClearanceValidationTests {
     check(report.collision.status == TrajectoryCoreConstants.MK_CHECK_PASSED, "inside the window the approach margin holds");
     Sys.println('CL4B torch window: ${report.collisionPair.nameA}/${report.collisionPair.nameB} ${report.collision.value} m (needs ${report.collision.limit}), method ${report.collision.method}');
     compiled.dispose();
+  }
+
+  /** CL5: jogging the torch down and sideways, the servo stops it at the margin above the table and slides along. */
+  static function testServoStopsAboveTheTable():Void {
+    var description = new collisionkit.CollisionDescription();
+    var model = arm.model;
+    var bodies = collisionkit.kinematics.ModelBodies.describe(description, model, "ur", 0, arm.stateOf(START), "start", true);
+    var wrist = bodies.bodies[model.bodyIndex("wrist_3_link")];
+    description.addObject("torch", wrist, collisionkit.CollisionPose.identity(), collisionkit.CollisionGeometry.Convex(torch().vertices));
+    bodies.declare();
+    description.addFixed("table", collisionkit.CollisionPose.identity(), collisionkit.CollisionGeometry.Convex(table().vertices), 1);
+    var world = new NativeCollisionWorld();
+    var build = description.build(world);
+    check(build.layoutErrors.length == 0, "the arm starts clear of the table");
+    var servo = new motionkit.robot.ManipulatorServo(arm);
+    servo.avoidanceSpeed = 0.2;
+    servo.avoidance = state -> {
+      bodies.place(build, state);
+      return bodies.avoidancePairs(build, world.distances(0.05), 0.005, 0.05);
+    };
+    var q = START.copy(), closest = Math.POSITIVE_INFINITY, slid = 0.0, start = arm.tcpPose(q).translation, held = 0;
+    for (_ in 0...1500) {
+      var step = servo.step(q, new motionkit.kinematics.Twist6(0.05, 0.0, -0.2, 0, 0, 0), 0.01);
+      if (step.avoided.length > 0) held++;
+      for (j in 0...6) q[j] += step.velocity[j] * 0.01;
+      bodies.place(build, arm.stateOf(q));
+      for (d in world.distances(0.05)) closest = Math.min(closest, d.distance);
+    }
+    slid = arm.tcpPose(q).translation.x - start.x;
+    check(held > 0 && closest >= 0.005 - 1e-3, 'the servo stops short of the table (closest ${closest} m)');
+    check(slid > 0.2, 'and slides along it (${slid} m)');
+    Sys.println('CL5 servo: closest ${closest} m above the table after sliding ${slid} m');
+    servo.dispose();
+    world.dispose();
   }
 
   static function check(value:Bool, message:String):Void {

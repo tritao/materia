@@ -121,8 +121,12 @@ KK_API kk_result KK_CALL kk_qp_solve(kk_qp_handle handle, const double *jacobian
         if (std::isnan(lower[i]) || std::isnan(upper[i]) || lower[i] == INFINITY || upper[i] == -INFINITY)
             return KK_ERROR_INVALID_ARGUMENT;
     try {
-        const auto outcome = step->solve(jacobian, row_count, residual, lower, upper, damping, tolerance,
-                                         max_iterations, out_step);
+        const uint32_t m = uint32_t(step->row_lower.size());
+        const auto outcome = m == 0
+            ? step->solve(jacobian, row_count, residual, lower, upper, damping, tolerance, max_iterations, out_step)
+            : step->solve_rows(jacobian, row_count, residual, lower, upper, step->constraint.data(), m,
+                               step->row_lower.data(), step->row_upper.data(), damping, tolerance, max_iterations,
+                               out_step, step->relaxed.data());
         *out_status = outcome.status;
         *out_iterations = outcome.iterations;
         return KK_OK;
@@ -131,4 +135,36 @@ KK_API kk_result KK_CALL kk_qp_solve(kk_qp_handle handle, const double *jacobian
     } catch (...) {
         return KK_ERROR_SOLVER;
     }
+}
+
+KK_API kk_result KK_CALL kk_qp_set_rows(kk_qp_handle handle, const double *constraint, uint32_t constraint_count,
+                                        const double *row_lower, uint32_t constraint_row_count,
+                                        const double *row_upper, uint32_t row_upper_count) {
+    kk::QpStep *step = steps.find(handle.id);
+    if (!step) return KK_ERROR_INVALID_HANDLE;
+    const uint32_t m = constraint_row_count;
+    if (row_upper_count != m || uint64_t(constraint_count) != uint64_t(m) * step->width() ||
+        (m && (!constraint || !row_lower || !row_upper)) || !finite(constraint, constraint_count))
+        return KK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t i = 0; i < m; ++i)
+        if (std::isnan(row_lower[i]) || std::isnan(row_upper[i]) || row_lower[i] == INFINITY ||
+            row_upper[i] == -INFINITY || row_lower[i] > row_upper[i])
+            return KK_ERROR_INVALID_ARGUMENT;
+    try {
+        step->constraint.assign(constraint, constraint + constraint_count);
+        step->row_lower.assign(row_lower, row_lower + m);
+        step->row_upper.assign(row_upper, row_upper + m);
+        step->relaxed.assign(m, 0);
+        return KK_OK;
+    } catch (const std::bad_alloc &) {
+        return KK_ERROR_OUT_OF_MEMORY;
+    }
+}
+
+KK_API kk_result KK_CALL kk_qp_relaxed(kk_qp_handle handle, int32_t *out_relaxed, uint32_t relaxed_count) {
+    kk::QpStep *step = steps.find(handle.id);
+    if (!step) return KK_ERROR_INVALID_HANDLE;
+    if (relaxed_count != step->relaxed.size() || (relaxed_count && !out_relaxed)) return KK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t i = 0; i < relaxed_count; ++i) out_relaxed[i] = step->relaxed[i];
+    return KK_OK;
 }

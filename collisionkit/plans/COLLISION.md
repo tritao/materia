@@ -567,7 +567,7 @@ Each step is its own commit with all suites green.
     - bisection at its depth limit reported as sampled;
     - a grasp and a place replayed;
     - a torch window with its approach margin.
-- **CL5 — Avoidance (Lane D D4).**
+- **CL5 — Avoidance (Lane D D4).** Done, see the progress log.
   - The kit's avoidance task takes pairs within `di`. CL1's normal `n`
     points from `a` toward `b`, so the distance changes at
     `n·(J_b − J_a)·q̇`. Each pair gives the velocity-damper row
@@ -1191,3 +1191,47 @@ Done as planned, with these choices:
   passed (609, weld pass path 19, the shared welding motion factory);
   processkit's full suite passed; parity passed (4184); clearance
   validation passed (20); MotionKit passed (1224712).
+
+### CL5 — Avoidance (2026-10-09)
+
+- **Kit** (pure): `AvoidancePair` (bodies of the solved model or -1, closest
+  points, normal from a to b, distance, ds, di) and `AvoidanceRows`: each
+  pair within di gives `n·(J_b − J_a)·Δ ≥ −ξ·(d − ds)/(di − ds)·dt` from
+  the snapshot's point Jacobians at the closest points over the layout's
+  DOF columns. A moving root's columns get no row entries yet.
+- **Native QP:** `kk_qp_set_rows` keeps general rows on the QP handle and
+  `kk_qp_solve` honours them (none set: unchanged); `kk_qp_relaxed` reads
+  which rows needed relaxing. haxeon's FFI takes at most 16 arguments per
+  C call, which ruled out one solve call carrying the rows. With rows, the
+  QP first solves them hard (ProxQP inequality rows); if rows and limits
+  admit no step, every row gets a slack s ≥ 0 penalized at 10^6 times the
+  Hessian's largest diagonal, and the rows whose slack is in use are
+  reported (mink relaxes its collision rows similarly).
+- **`DifferentialIk.step`** takes `avoidance` pairs and `xi`, and its step
+  reports the pairs that gave rows and those relaxed; if the QP fails with
+  rows the step is zero, never an unchecked damped step.
+- **`ManipulatorServo`** gains an `avoidance` provider (pairs at the state
+  of the group's model) and `avoidanceSpeed`, and its step reports avoided
+  and relaxed pairs.
+- **From the world:** `ModelBodies.avoidancePairs` turns a built world's
+  distances into pairs for that model (followers such as the tool map to
+  their model body; other articulations and the environment are -1).
+- `PrioritizedSolver` collision rows stay for later, as planned.
+- **Tests:**
+  - collisionkit native (14 new assertions, 364 in all): a two-link arm
+    reaching behind a wall goes 99 mm into it without rows and stops at
+    the 10 mm margin with them; an arm reaching for another robot's arm
+    stops short of it (that side has no Jacobian); starting 4 mm from a
+    wall, holding its place, the arm backs out to the margin (a bent pose:
+    stretched out the tip cannot move along the wall's normal); rows that
+    zero velocity limits cannot honour are relaxed and named while the
+    limits hold exactly, and rows that can hold are not;
+  - clearance validation (3 new assertions): `ManipulatorServo` jogging
+    main's weld arm down and sideways stops the torch 5.005 mm above the
+    table (margin 5 mm) and slides 0.75 m along it.
+- **Suites:** collisionkit standalone C++ 3 of 3; MotionKit standalone C++
+  16 of 16; collisionkit native passed (364); cell tests passed (30); native
+  kit passed (695); pure kit only main's known DLS failure; RobotKit
+  passed (5433); weld planning passed (609); processkit's full suite
+  passed; parity passed (4184); clearance validation passed (23);
+  MotionKit passed (1224712).
