@@ -46,12 +46,13 @@ void print_stats(const char *name, const nkscene::GpuExecutionStats &stats,
                  const nkscene::RenderUpdate &update, double milliseconds) {
     std::printf(
         "%-10s %8.3f ms  plan(rebuild=%d instances=%zu) "
-        "gpu(rebuilds=%zu geometry=%zu/%zu materials=%zu/%zu buffers=%zu records=%zu draws=%zu)\n",
+        "gpu(rebuilds=%zu geometry=%zu/%zu materials=%zu/%zu buffers=%zu records=%zu uploads=%zu draws=%zu)\n",
         name, milliseconds, update.plan_rebuilt, update.patched_instances,
         stats.full_rebuilds,
         stats.geometry_resources_created, stats.geometry_resources_updated,
         stats.material_resources_created, stats.material_resources_updated,
-        stats.instance_buffers_created, stats.instance_records_updated, stats.draw_calls);
+        stats.instance_buffers_created, stats.instance_records_updated,
+        stats.instance_buffer_updates, stats.draw_calls);
 }
 
 } // namespace
@@ -233,6 +234,7 @@ int main() {
         assert(stats.material_resources_updated == 0);
         assert(stats.instance_buffers_created == 0);
         assert(stats.instance_records_updated == 100);
+        assert(stats.instance_buffer_updates == materials.size());
         assert(stats.commands == leaf_count);
         assert(stats.draw_calls == materials.size());
         print_stats("move 100", stats, update, move_hundred_time.count());

@@ -398,6 +398,8 @@ struct GpuExecutionStats {
     std::size_t material_resources_updated = 0;
     std::size_t instance_buffers_created = 0;
     std::size_t instance_records_updated = 0;
+    /** Upload calls for changed instance records, coalesced by batch. */
+    std::size_t instance_buffer_updates = 0;
     std::size_t commands = 0;
     std::size_t draw_calls = 0;
     /** Number of complete executor reconciliations performed by this call. */

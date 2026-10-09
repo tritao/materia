@@ -184,6 +184,7 @@ struct GeometryVertexStream {
 struct GeometryPayload {
     /** Positions are object-local and use a tightly packed float3 layout. */
     std::vector<GeometryVertex> vertices;
+    /** Attribute streams; C API ingestion stores positions only in `vertices`. */
     std::vector<GeometryVertexStream> streams;
     struct StrokeSegment {
         std::array<float, 3> start{};
@@ -245,6 +246,21 @@ struct GeometryResource {
         auto next = std::make_shared<SubelementTable>(*subelements);
         subelements = next;
         return *next;
+    }
+
+    void replace_data(GeometryPayload next_payload, Bounds next_bounds,
+                      SubelementTable next_subelements) {
+        // C API geometry submissions replace the complete payload. Keep old
+        // published snapshots intact without cloning their large buffers.
+        auto next_payload_snapshot =
+            std::make_shared<GeometryPayload>(std::move(next_payload));
+        auto next_subelements_snapshot =
+            std::make_shared<SubelementTable>(std::move(next_subelements));
+        ++revision;
+        mark_resource_mutation(mutation_state, id);
+        payload = std::move(next_payload_snapshot);
+        bounds = next_bounds;
+        subelements = std::move(next_subelements_snapshot);
     }
 };
 

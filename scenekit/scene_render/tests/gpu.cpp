@@ -180,6 +180,28 @@ int main() {
         }
         assert(found_color);
 
+        // Padded float streams must produce the same image as tightly packed attributes.
+        auto padded_normal = normal_stream;
+        padded_normal.stride = 20;
+        padded_normal.data.assign(52, std::byte{0x7f});
+        for (std::size_t index = 0; index < 3; ++index)
+            std::memcpy(padded_normal.data.data() + index * 20,
+                        normals.data() + index * 3, 12);
+        geometry_resource.edit_payload().streams = {padded_normal, texcoord_stream};
+        scene->publish();
+        std::vector<std::uint8_t> padded_pixels;
+        assert(executor.capture_rgba8(plan, scene->snapshot(), options.width, options.height,
+                   {0.0f, 0.0f, 0.0f, 1.0f}, padded_pixels) == NKGPU_OK);
+        assert(padded_pixels == color_pixels);
+        // A truncated last attribute must fail before any upload, and a corrected revision retries.
+        padded_normal.data.pop_back();
+        geometry_resource.edit_payload().streams = {padded_normal, texcoord_stream};
+        scene->publish();
+        assert(executor.execute(plan, scene->snapshot()).result == NKGPU_ERROR_INVALID_ARGUMENT);
+        geometry_resource.edit_payload().streams = {normal_stream, texcoord_stream};
+        scene->publish();
+        assert(executor.execute(plan, scene->snapshot()).result == NKGPU_OK);
+
         // View lighting changes the image without changing scene resources or picking.
         nkscene::SceneView studio_view = view;
         studio_view.studio_lighting.enabled = true;
@@ -494,6 +516,24 @@ int main() {
         assert(stats.commands_patched == 1);
         assert(stats.commands == 2);
 
+        // Both visible instances share one batch and must use a single persistent upload.
+        Transaction move_pair(scene);
+        nkscene::LocalTransform pair_transform;
+        pair_transform.matrix[12] = 0.1f;
+        move_pair.add_transform(node, pair_transform);
+        pair_transform.matrix[12] = -0.1f;
+        move_pair.add_transform(second_node, pair_transform);
+        assert(scene->commit(move_pair, changes) == NKS_OK);
+        move_pair.close();
+        const auto pair_snapshot = scene->snapshot();
+        nkscene::update(plan, pair_snapshot, changes, view);
+        stats = executor.execute(plan, pair_snapshot);
+        assert(stats.result == NKGPU_OK);
+        assert(stats.instance_records_updated == 2);
+        assert(stats.instance_buffer_updates == 1);
+        stats = executor.execute(plan, pair_snapshot);
+        assert(stats.instance_records_updated == 0 && stats.instance_buffer_updates == 0);
+
         const auto alternate_material = scene->reserve_material_id();
         scene->material_store().create(alternate_material);
         Transaction change_instance_material(scene);
@@ -583,11 +623,39 @@ int main() {
         assert(stats.geometry_resources_updated == 0);
         assert(stats.draw_calls == 1);
 
+        // A fresh plan reconciles all resources, including unchanged meshes.
+        // Their prepared surface/picking buffers must survive this cache hit.
+        const auto unchanged_snapshot = scene->snapshot();
+        auto recompiled_plan = nkscene::compile(unchanged_snapshot, view);
+        stats = executor.execute(recompiled_plan, unchanged_snapshot);
+        assert(stats.result == NKGPU_OK);
+        assert(stats.full_rebuilds == 1);
+        assert(stats.geometry_resources_created == 0);
+        assert(stats.geometry_resources_updated == 0);
+        assert(stats.draw_calls == 1);
+        std::vector<std::uint8_t> cached_pixels;
+        assert(executor.capture_rgba8(recompiled_plan, unchanged_snapshot,
+                                     options.width, options.height,
+                                     {0.0f, 0.0f, 0.0f, 1.0f}, cached_pixels) == NKGPU_OK);
+        assert(cached_pixels.size() == options.width * options.height * 4);
+        nkscene::PickResult cached_pick;
+        assert(executor.pick_pixel(recompiled_plan, unchanged_snapshot,
+                                   options.width, options.height, 80, options.height / 2,
+                                   &cached_pick) == NKGPU_OK);
+        assert(cached_pick.node == node);
+        assert(cached_pick.source == nkscene::EntityId{42});
+        assert(cached_pick.subelement.value == 42);
+        // Restore the original plan before checking its bounded delta history.
+        stats = executor.execute(plan, unchanged_snapshot);
+        assert(stats.result == NKGPU_OK);
+
         for (std::size_t iteration = 0; iteration < 70; ++iteration) {
             nkscene::LocalTransform lagged_transform;
             lagged_transform.matrix[12] = 0.25f + static_cast<float>(iteration) * 0.01f;
             Transaction lagged_move(scene);
             lagged_move.add_transform(node, lagged_transform);
+            lagged_transform.matrix[12] = -lagged_transform.matrix[12];
+            lagged_move.add_transform(second_node, lagged_transform);
             assert(scene->commit(lagged_move, changes) == NKS_OK);
             lagged_move.close();
             const auto lagged_update = nkscene::update(plan, scene->snapshot(), changes, view);
@@ -596,7 +664,8 @@ int main() {
         stats = executor.execute(plan, scene->snapshot());
         assert(stats.result == NKGPU_OK);
         assert(stats.full_rebuilds == 1);
-        assert(stats.instance_records_updated == 1);
+        assert(stats.instance_records_updated == 2);
+        assert(stats.instance_buffer_updates == 1);
         assert(stats.draw_calls == 1);
     }
 
@@ -648,6 +717,34 @@ int main() {
                                   80, options.height / 2, &visible) == NKGPU_OK);
         assert(visible.node == node);
         assert(visible.subelement.value == 7);
+
+        // An existing pick buffer must refresh after display-only geometry updates.
+        auto &moving_geometry = scene->geometry_store().create(geometry);
+        const auto original_vertices = moving_geometry.payload->vertices;
+        moving_geometry.edit_payload().indices = {0, 0, 0};
+        scene->publish();
+        assert(executor.execute(plan, scene->snapshot()).result == NKGPU_OK);
+        std::vector<std::uint8_t> degenerate_pixels;
+        assert(executor.capture_rgba8(plan, scene->snapshot(), options.width, options.height,
+                                     {0.0f, 0.0f, 0.0f, 1.0f}, degenerate_pixels) == NKGPU_OK);
+        const auto center_pixel = (options.height / 2 * options.width + 80) * 4;
+        assert(degenerate_pixels[center_pixel] == 0 && degenerate_pixels[center_pixel + 1] == 0 &&
+               degenerate_pixels[center_pixel + 2] == 0);
+        moving_geometry.edit_payload().indices = {0, 1, 2};
+        for (auto &vertex : moving_geometry.edit_payload().vertices)
+            vertex.position[0] += 3.0f;
+        scene->publish();
+        assert(executor.execute(plan, scene->snapshot()).result == NKGPU_OK);
+        assert(executor.pick_pixel(plan, scene->snapshot(), options.width, options.height,
+                                  80, options.height / 2, &visible) == NKGPU_OK);
+        assert(!visible.node.valid());
+        moving_geometry.edit_payload().vertices = original_vertices;
+        moving_geometry.edit_payload().indices.clear();
+        scene->publish();
+        assert(executor.execute(plan, scene->snapshot()).result == NKGPU_OK);
+        assert(executor.pick_pixel(plan, scene->snapshot(), options.width, options.height,
+                                  80, options.height / 2, &visible) == NKGPU_OK);
+        assert(visible.node == node);
     }
 
     {

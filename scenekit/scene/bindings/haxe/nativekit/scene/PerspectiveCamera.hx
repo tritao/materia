@@ -62,6 +62,30 @@ class PerspectiveCamera {
     revision++;
   }
 
+  /** Mouse-look turns around the eye rather than orbiting the target. */
+  public function look(deltaX:Float, deltaY:Float):Void {
+    var eye = eyePosition();
+    orbit(deltaX, deltaY);
+    var backward = viewDirection();
+    targetX = eye[0] - backward[0] * distance;
+    targetY = eye[1] - backward[1] * distance;
+    targetZ = eye[2] - backward[2] * distance;
+  }
+
+  /** Translate in view-forward/right and world-up directions, with normalized diagonal speed. */
+  public function fly(forward:Float, right:Float, up:Float, amount:Float):Void {
+    var backward = viewDirection();
+    var x = -backward[0] * forward - Math.sin(yaw) * right;
+    var y = -backward[1] * forward + Math.cos(yaw) * right;
+    var z = -backward[2] * forward + up;
+    var length = Math.sqrt(x * x + y * y + z * z);
+    if (length < 0.000001 || amount <= 0.0) return;
+    targetX += x / length * amount;
+    targetY += y / length * amount;
+    targetZ += z / length * amount;
+    revision++;
+  }
+
   /** Set a standard camera angle without changing the current focus or zoom. */
   public function setAngle(nextYaw:Float, nextPitch:Float):Void {
     yaw = nextYaw;
@@ -86,9 +110,10 @@ class PerspectiveCamera {
     var upX = rightY * forwardZ;
     var upY = -rightX * forwardZ;
     var upZ = rightX * forwardY - rightY * forwardX;
-    targetX -= (rightX * deltaX + upX * deltaY) * scale;
-    targetY -= (rightY * deltaX + upY * deltaY) * scale;
-    targetZ -= upZ * deltaY * scale;
+    // Screen Y grows downward: dragging down moves the camera target toward world up.
+    targetX -= (rightX * deltaX - upX * deltaY) * scale;
+    targetY -= (rightY * deltaX - upY * deltaY) * scale;
+    targetZ += upZ * deltaY * scale;
     revision++;
   }
 
@@ -98,13 +123,42 @@ class PerspectiveCamera {
     revision++;
   }
 
+  /** Zoom around a world anchor, keeping its projected position fixed. */
+  public function zoomAt(deltaY:Float, x:Float, y:Float, z:Float):Void {
+    var previous = distance;
+    zoom(deltaY);
+    var shift = 1.0 - distance / previous;
+    targetX += (x - targetX) * shift;
+    targetY += (y - targetY) * shift;
+    targetZ += (z - targetZ) * shift;
+  }
+
+  /** Cursor anchor on the plane through the orbit target, parallel to the screen. */
+  public function cursorAnchor(x:Float, y:Float, width:Float, height:Float):Array<Float> {
+    var ray = screenRay(x, y, width, height), normal = viewDirection();
+    var t = ((targetX - ray.originX) * normal[0] + (targetY - ray.originY) * normal[1] +
+      (targetZ - ray.originZ) * normal[2]) /
+      (ray.directionX * normal[0] + ray.directionY * normal[1] + ray.directionZ * normal[2]);
+    return [ray.originX + ray.directionX * t, ray.originY + ray.directionY * t,
+      ray.originZ + ray.directionZ * t];
+  }
+
   public function frame(centerX:Float, centerY:Float, centerZ:Float,
       width:Float, height:Float, depth:Float, aspect:Float):Void {
     targetX = centerX; targetY = centerY; targetZ = centerZ;
-    var vertical = Math.max(height, depth);
-    var horizontal = Math.max(width, depth) / Math.max(0.01, aspect);
-    var diameter = Math.max(0.1, Math.max(vertical, horizontal));
-    distance = clamp((diameter * 0.65) / Math.tan(FOV_Y * Math.PI / 360.0), 0.05, 1000000.0);
+    // Fit every corner against both side planes, including its depth from the target.
+    var backward = viewDirection();
+    var right = [-Math.sin(yaw), Math.cos(yaw), 0.0];
+    var up = cross(backward, right);
+    var tanY = Math.tan(FOV_Y * Math.PI / 360.0);
+    var tanX = tanY * Math.max(0.01, aspect);
+    var required = 0.05;
+    for (ix in 0...2) for (iy in 0...2) for (iz in 0...2) {
+      var corner = [(ix - 0.5) * width, (iy - 0.5) * height, (iz - 0.5) * depth];
+      required = Math.max(required, dot(corner, backward) +
+        Math.max(Math.abs(dot(corner, right)) / tanX, Math.abs(dot(corner, up)) / tanY));
+    }
+    distance = clamp(required * 1.15, 0.05, 1000000.0);
     resetClipRange();
     revision++;
   }
@@ -165,11 +219,18 @@ class PerspectiveCamera {
       direction[0], direction[1], direction[2]);
   }
 
-  public function project(x:Float,y:Float,z:Float,width:Float,height:Float):Null<PerspectiveScreenPoint>{
-    var matrix=viewProjection(width/Math.max(1.0,height)),source=[x,y,z,1.0],clip:Array<Float> = [];
-    for(row in 0...4){var value=0.0;for(column in 0...4)value+=matrix.element(column*4+row)*source[column];clip.push(value);}
-    if(clip[3]<=0.000001)return null;
-    return screenPoint(clip, width, height);
+  public function project(x:Float,y:Float,z:Float,width:Float,height:Float):Null<PerspectiveScreenPoint>
+    return projectWithMatrix(viewProjection(width/Math.max(1.0,height)),x,y,z,width,height);
+
+  /** Projects a point using the same immutable matrix as the other points in this paint. */
+  public function projectWithMatrix(matrix:Transform,x:Float,y:Float,z:Float,
+      width:Float,height:Float):Null<PerspectiveScreenPoint> {
+    var w=matrix.element(3)*x+matrix.element(7)*y+matrix.element(11)*z+matrix.element(15);
+    if(w<=0.000001)return null;
+    var cx=matrix.element(0)*x+matrix.element(4)*y+matrix.element(8)*z+matrix.element(12);
+    var cy=matrix.element(1)*x+matrix.element(5)*y+matrix.element(9)*z+matrix.element(13);
+    var cz=matrix.element(2)*x+matrix.element(6)*y+matrix.element(10)*z+matrix.element(14);
+    return new PerspectiveScreenPoint((cx/w*0.5+0.5)*width,(0.5-cy/w*0.5)*height,cz/w);
   }
 
   /** Projects the visible part of a world-space line after clipping it to the camera frustum. */

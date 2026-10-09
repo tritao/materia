@@ -37,6 +37,9 @@ class ScenePresentation {
   public final faceHoverGeometries:Map<String, Geometry> = new Map();
   public final faceHoverIndexes:Map<String, Int> = new Map();
 
+  // Scratch transforms are copied into each SceneView, never published by reference.
+  final poseTransformScratch:Array<Transform> = [];
+
   public function new() bridge = new SceneBridge();
 
   public function queueRenderChanges(changes:ChangeSet):Void {
@@ -182,11 +185,13 @@ class ScenePresentation {
     if (poses != null) {
       var poseNodes:Array<NodeId> = [];
       var poseTransforms:Array<Transform> = [];
+      var poseIndex = 0;
       for (pose in poses) {
         var runtime = bridge.runtime(pose.id);
         if (runtime != null) {
           poseNodes.push(runtime.node);
-          poseTransforms.push(EditorScene.poseTransform(pose.position, pose.rotation));
+          if (poseIndex == poseTransformScratch.length) poseTransformScratch.push(Transform.identity());
+          poseTransforms.push(EditorScene.poseTransform(pose.position, pose.rotation, poseTransformScratch[poseIndex++]));
           // The face overlay is a child of its object with an identity transform, but a pose
           // override moves only its own node, so the overlay needs the object's pose as well.
           if (faceHoverShown && pose.id == hoveredId) {
