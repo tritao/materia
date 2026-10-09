@@ -178,9 +178,10 @@ class RobotModel {
         inertia += efficiencies[index] * turningInertia(follower) * scales[index] * scales[index];
       limits.maxAcceleration = tighten(limits.maxAcceleration, force / inertia);
     }
-    // A turning joint with no acceleration of its own (a filament drive gear behind its motor) accelerates as its
-    // motor's torque, through the gears, turns what it carries and what follows it.
-    if (driven && joint[0].type != JointType.Prismatic && limits.maxAcceleration == null) {
+    // A turning joint with no acceleration of its own whose motor is behind a gear train (a filament drive gear: its
+    // motor is a follower of it) accelerates as the motor's torque, through the gears, turns what it carries and what
+    // follows it. A joint its motor turns directly keeps the limits its model gives it.
+    if (driven && joint[0].type != JointType.Prismatic && limits.maxAcceleration == null && reached.length > 1) {
       var inertia = turningInertia(joint[0]);
       for (index in 1...reached.length) for (follower in joints) if (follower.id == reached[index])
         inertia += efficiencies[index] * turningInertia(follower) * scales[index] * scales[index];

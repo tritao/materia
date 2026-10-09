@@ -108,6 +108,8 @@ class ProjectDocumentSession {
   public var machineMotion(default, null):Null<materia.project.SceneArtifact.SceneArtifactMachineMotion> = null;
   public var controllers(default, null):Array<materia.project.SceneArtifact.SceneArtifactCellController> = [];
   public var signals(default, null):Array<materia.project.SceneArtifact.SceneArtifactCellSignal> = [];
+  /** The project's print job, run on its printer in the simulation. */
+  public var printJob(default, null):Null<materia.project.SceneArtifact.SceneArtifactPrinting> = null;
   var assemblyRuntime:Null<AssemblyState> = null;
   /** Mates authored over the generated assembly, and the face connectors they name (see `ProjectAssemblyMates`). */
   public var assemblyMates(default, null):ProjectAssemblyMates = ProjectAssemblyMates.empty();
@@ -266,7 +268,8 @@ class ProjectDocumentSession {
       generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions,
       generated.faceDescriptorsByDefinition, generated.cncJob, generated.mobileBase, generated.mission, generated.robotTools,
-      generated.robotSensors, generated.machineMotion, generated.assemblyModel, generated.controllers, generated.signals);
+      generated.robotSensors, generated.machineMotion, generated.assemblyModel, generated.controllers, generated.signals,
+      generated.printJob);
     projectJob = generated.projectJob;
   }
 
@@ -281,7 +284,8 @@ class ProjectDocumentSession {
       ?sensors:Array<SceneArtifactRobotSensor>, ?machine:materia.project.SceneArtifact.SceneArtifactMachineMotion,
       ?model:cadkit.modeling.CompiledAssembly,
       ?cellControllers:Array<materia.project.SceneArtifact.SceneArtifactCellController>,
-      ?cellSignals:Array<materia.project.SceneArtifact.SceneArtifactCellSignal>):Void {
+      ?cellSignals:Array<materia.project.SceneArtifact.SceneArtifactCellSignal>,
+      ?print:materia.project.SceneArtifact.SceneArtifactPrinting):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -324,6 +328,7 @@ class ProjectDocumentSession {
     machineMotion = machine;
     controllers = cellControllers == null ? [] : cellControllers.copy();
     signals = cellSignals == null ? [] : cellSignals.copy();
+    printJob = print;
     if (reference != null) {
       projectReference = reference;
       projectBaseline = data;
@@ -415,6 +420,7 @@ class ProjectDocumentSession {
     machineMotion = generated.machineMotion;
     controllers = generated.controllers == null ? [] : generated.controllers.copy();
     signals = generated.signals == null ? [] : generated.signals.copy();
+    printJob = generated.printJob;
   }
 
   function configureAssembly(target:EditorScene, definition:Null<AssemblyDefinition>):Void {
@@ -1021,6 +1027,7 @@ class ProjectDocumentSession {
     machineMotion = null;
     controllers = [];
     signals = [];
+    printJob = null;
     assemblyRuntime = null;
     assemblyLocalCentersByDefinition = null;
     assemblyMetresPerUnit = 1.0;

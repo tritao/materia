@@ -487,6 +487,107 @@ class ProjectSourceTests {
       Sys.println('printer: homed in ${ticks * 0.01} s');
       harness.dispose();
     } catch (error:Dynamic) { harness.dispose(); throw error; }
+    printSmallTab(session, simulation, world, model);
+    simulation.dispose();
+    session.dispose();
+  }
+
+  /** The filament a printer program feeds, millimetres: the sum of its extrusion words (relative extrusion). */
+  static function programFilament(source:String):Float {
+    var total = 0.0;
+    for (line in source.split("\n")) {
+      var words = line.split(";")[0].split(" ");
+      if (words.length == 0 || ["G0", "G1", "G2", "G3"].indexOf(words[0]) < 0) continue;
+      for (word in words) if (word.length > 1 && word.charAt(0) == "E") total += Std.parseFloat(word.substr(1));
+    }
+    return total;
+  }
+
+  static function median(values:Array<Float>):Float {
+    var sorted = values.copy();
+    sorted.sort(Reflect.compare);
+    return sorted.length == 0 ? Math.NaN : sorted[sorted.length >> 1];
+  }
+
+  /**
+   * The printer prints the small tab the project ships, on the shared MuJoCo simulation through the virtual device that
+   * runs its heaters: the hotend and bed heat up and the program waits for them, the print finishes with no stall, fault
+   * or failure, the extruder feeds the filament the program asks for, and slowing the print down keeps the filament
+   * per millimetre of path.
+   */
+  static function printSmallTab(session:ProjectDocumentSession, simulation:ApplicationSimulation, world:RobotWorld, model:RobotModel):Void {
+    var player = simulation.printPlayer(), job = session.printJob;
+    if (player == null || job == null) throw "the printer has no print player";
+    function joint(id:String):Int {
+      for (index in 0...model.joints.length) if (model.joints[index].id == id) return index;
+      throw 'the printer has no joint $id';
+    }
+    var x = joint("x"), y = joint("y"), z = joint("z"), e = joint("e");
+    var dt = simulation.timestep, every = 5;
+    function robot():robotkit.core.RobotSnapshot return world.snapshot().robots()[0];
+    var first = robot();
+    var e0 = first.positions.get(e);
+    var hotendAt = -1.0, bedAt = -1.0, ticks = 0, limit = Math.round(1500.0 / dt);
+    var ratios = {slow: new Array<Float>(), fast: new Array<Float>()};
+    var last = first, lastE = e0, slowed = false, restored = false, detail = "";
+    var wall = Sys.time();
+    while (player.passes == 0 && player.failure == null && ticks++ < limit) {
+      simulation.step();
+      if (ticks % every != 0) continue;
+      var seen = robot();
+      var now = ticks * dt;
+      var hotend = player.heaterReading("hotend"), bed = player.heaterReading("bed");
+      if (hotendAt < 0 && hotend != null && hotend.atTarget) hotendAt = now;
+      if (bedAt < 0 && bed != null && bed.atTarget) bedAt = now;
+      // From the third layer to the fifth the print runs at half speed: the filament per millimetre of path must not change.
+      if (detail == "" && player.layer == 2) detail = player.statusDetail();
+      if (!slowed && player.layer >= 3) { player.setSpeedOverride(0.5); slowed = true; }
+      if (slowed && !restored && player.layer >= 5) { player.setSpeedOverride(1.0); restored = true; }
+      var path = Math.sqrt(Math.pow(seen.positions.get(x) - last.positions.get(x), 2) + Math.pow(seen.positions.get(y) - last.positions.get(y), 2) +
+        Math.pow(seen.positions.get(z) - last.positions.get(z), 2));
+      var fed = (seen.positions.get(e) - lastE) * job.gearRadius;
+      // Cruising on a bead: the nozzle runs at least 4 mm/s and the extruder feeds.
+      if (path / (every * dt) > 0.004 && fed > 0.0 && player.layer >= 2)
+        (slowed && !restored ? ratios.slow : (restored ? ratios.fast : ratios.fast)).push(fed / path);
+      last = seen; lastE = seen.positions.get(e);
+    }
+    var wallSeconds = Sys.time() - wall;
+    check(player.failure == null, "the printer prints its tab: " + player.failure);
+    check(player.passes == 1, 'the print finishes in ${ticks * dt} s (limit ${limit * dt} s)');
+    check(hotendAt > 0 && bedAt > 0, "both heaters reached their targets before the print");
+    var end = robot();
+    var fedMillimetres = (end.positions.get(e) - e0) * job.gearRadius * 1000.0;
+    var asked = programFilament(job.source);
+    check(Math.abs(fedMillimetres - asked) <= 0.01 * asked, 'the extruder feeds ${fedMillimetres} mm of filament, the program asks for ${asked} mm');
+    check(ratios.slow.length > 10 && ratios.fast.length > 10, 'cruise samples at both speeds (${ratios.slow.length}, ${ratios.fast.length})');
+    var slow = median(ratios.slow), fast = median(ratios.fast);
+    check(Math.abs(slow - fast) <= 0.02 * fast, 'half speed feeds ${slow * 1000.0} mm of filament per metre of path, full speed ${fast * 1000.0}');
+    // The panel shows the print: its layer and temperatures in the status, and the controls a CNC program has.
+    check(detail.indexOf('layer 2/${player.layerCount}') >= 0 && detail.indexOf("hotend 2") >= 0 && detail.indexOf("bed 6") >= 0,
+      'the print status names the layer and the temperatures: $detail');
+    var fonts = FontCollection.create();
+    fonts.add("haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf");
+    var theme = Theme.dark();
+    var ui = new UiContext(null, fonts, theme);
+    function find(node:RenderNode, key:String):Null<RenderNode> {
+      if (node.styleKey == key) return node;
+      for (child in node.children) {
+        var found = find(child, key);
+        if (found != null) return found;
+      }
+      return null;
+    }
+    var shown = ui.submit(new app.editor.CncPanel().build(simulation, theme.tokens), new LayoutFrame(480.0, 720.0));
+    check(find(shown, "cnc-hold") != null && find(shown, "cnc-speed") != null, "the panel offers hold and a speed override for a print");
+    var checks = player.planChecks();
+    check(checks.count(PlanDiagnosticKind.StepperStall) == 0, 'no plan of the print stalls a stepper (${checks.count(PlanDiagnosticKind.StepperStall)} findings)');
+    check(end.safety == 0 && end.faultCode == 0, "the print ends with the runtime ready and no fault");
+    Sys.println('printer: SmallTab printed in ${Math.round(ticks * dt * 10) / 10} s (heat-up: hotend ${Math.round(hotendAt * 10) / 10} s, bed ${Math.round(bedAt * 10) / 10} s), ' +
+      '${player.layerCount} layers, filament ${Math.round(fedMillimetres * 100) / 100} of ${Math.round(asked * 100) / 100} mm, ' +
+      'filament per metre of path ${Math.round(fast * 1e5) / 100} mm at full speed and ${Math.round(slow * 1e5) / 100} mm at half; ' +
+      'plan checks: ${checks.plans} plans, ${checks.flagged} flagged, worst torque ${Math.round(checks.worstTorqueRatio * 100)} % (${checks.worstMotor}), ' +
+      'worst deviation ${Math.round(checks.worstDeviation * 1e6)} um (${checks.worstAxis}); ' +
+      'motion cost ${Math.round(player.motionSeconds * 10) / 10} s of ${Math.round(wallSeconds * 10) / 10} s wall, slowest tick ${Math.round(player.slowestUpdate * 1000)} ms');
   }
 
   static function checkCoreXyPlotter(root:String):Void {

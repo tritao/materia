@@ -303,15 +303,20 @@ class TrajectoryStream {
     if (!jerkUnchecked && first > 0)
       aTol = arrays.robotTolerances(plan.copyAccelerationTolerances(), tolerance);
     if (chunk.degrees.get(0) > 1) {
-      var precedingAcceleration = first == 0 ? zero : arrays.robotValues(
-        plan.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations, zero, false);
+      var preceding = plan.evaluate(Math.max(0.0, startSeconds - 1e-9));
+      var precedingAcceleration = first == 0 ? zero : arrays.robotValues(preceding.accelerations, zero, false);
+      // The runtime compares with the previous segment's end, which the instant a nanosecond before stands for: they
+      // differ by the jerk over that nanosecond, which a quintic with a large jerk makes more than the fixed slack.
+      var precedingJerk = first == 0 ? zero : arrays.robotValues(preceding.jerks, zero, false);
+      var startJerk = first == 0 ? zero : arrays.robotValues(state.jerks, zero, false);
       for (joint in 0...fixedPositions.length) {
         var polynomialAcceleration = 2.0 * chunk.coefficient(0, joint, 2);
+        var clock = 1e-9 * (Math.abs(precedingJerk[joint]) + Math.abs(startJerk[joint]));
         if (jerkUnchecked || first == 0) {
           aTol[joint] = Math.max(aTol[joint],
-            Math.abs(polynomialAcceleration - startAcceleration[joint]) + 1e-5 * scale[joint]);
+            Math.abs(polynomialAcceleration - startAcceleration[joint]) + 1e-5 * scale[joint] + clock);
           aTol[joint] = Math.max(aTol[joint],
-            Math.abs(polynomialAcceleration - precedingAcceleration[joint]) + 1e-5 * scale[joint]);
+            Math.abs(polynomialAcceleration - precedingAcceleration[joint]) + 1e-5 * scale[joint] + clock);
         }
         startAcceleration[joint] = polynomialAcceleration;
       }

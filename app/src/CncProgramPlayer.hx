@@ -102,7 +102,7 @@ typedef CncJob = {
  * machine's axes and streamed to the robot runtime as trajectory segments by MotionKit, before each
  * simulation tick. A looping job starts again once the program completes.
  */
-class CncProgramPlayer implements SessionMember {
+class CncProgramPlayer extends ToolpathPlayer {
 	/** Stock geometry goes to the scene at most this often, in simulated seconds. */
 	static inline final STOCK_REFRESH = 0.05;
 	/** Ray spacing of the simulated stock, in metres. */
@@ -129,20 +129,10 @@ class CncProgramPlayer implements SessionMember {
 		return result;
 	}
 
-	final session:SimSession;
 	final project:ProjectDocumentSession;
 	final job:CncJob;
 	final simulation:Simulation;
 	final assemblyParts:SimulationAssemblyParts;
-	final compileFrom:Point3->ToolpathProgram;
-	final robot:AssemblyRobot;
-	/** Machine coordinates from the axis joints' positions, and those joints' indices on the robot. */
-	final solver:AxisKinematics;
-	final axisJoints:Array<Int>;
-	/** Peak observed following error per machine axis, metres, aligned with the drive interval end. */
-	public final axisTrackingPeak:Array<Float> = [];
-	var program:MotionProgram;
-	var sourceMap:ToolpathSourceMap;
 	final kindByLine = new Map<Int, MoveKind>();
 	final stockSources:Map<String, {part:SimulationAssemblyPart, source:CncJobStock}> = new Map();
 	var stockObject:Null<String>;
@@ -170,9 +160,6 @@ class CncProgramPlayer implements SessionMember {
 	/** Wall-clock seconds spent cutting and meshing the stock, for profiling. */
 	public var cuttingSeconds(default, null):Float = 0.0;
 	public var meshingSeconds(default, null):Float = 0.0;
-	public var motionSeconds(default, null):Float = 0.0;
-	public var runSeconds(default, null):Float = 0.0;
-	public var slowestUpdate(default, null):Float = 0.0;
 	/** Fraction of active CNC-cycle time with the spindle turning. */
 	public var spindleUtilization(default, null):Float = 0.0;
 	var spindleIntervalSeconds:Float = 0.0;
@@ -180,9 +167,6 @@ class CncProgramPlayer implements SessionMember {
 	var commandedKind:MoveKind = MoveKind.Rapid;
 	var commandedOp = -1;
 	var commandedProvenance = new Provenance(0, 0, 0);
-	final newMotion:Void->ManipulatorMotion;
-	var motion:ManipulatorMotion;
-	final loop:Bool;
 	final interfaceManaged:Bool;
 	var robotInterface:Null<RobotInterface>;
 	final interfaceAlarmCodeChannel:Null<String>;
@@ -196,39 +180,8 @@ class CncProgramPlayer implements SessionMember {
 	var startRequested = false;
 	var pendingToolChange = false;
 	var lastInterfaceOutputs:Null<RobotInterfaceOutputs> = null;
-	var started = false;
-	/** Passes of the program completed since the session started. */
-	public var passes(default, null):Int = 0;
-	var passCounted = false;
-	/** Why the program stopped, when it failed. */
-	public var failure(default, null):Null<String> = null;
-	/** What the plan check assumes and allows, as the player was given it. */
-	public final checkOptions:PlanCheckOptions;
-	/**
-	 * Steps the machine's steppers lose where the plan check finds them over their pull-out curve: the
-	 * simulated axis falls behind its command and keeps the error until the session resets. Plans the
-	 * check passes lose nothing.
-	 */
-	public final slip:StepperSlip;
-	/**
-	 * What the machine's encoders read against the commanded positions: a motor-side encoder names the steps a
-	 * stepper lost, a load-side one reports the path error. Monitoring only; it has nothing to read when the
-	 * machine has no encoders.
-	 */
-	public final encoders:EncoderMonitor;
-	/** Physical homing time, excluded from machining planning/execution timings. */
-	public var homingSeconds(default, null):Float = 0.0;
-	final newHoming:Void -> Null<MotionSystem>;
-	var homing:Null<MotionSystem> = null;
-	var homingStarted:Bool = false;
-	var homingComplete:Bool = false;
-	/** The G-code line the machine is executing; 0 between lines. */
-	public var currentLine(default, null):Int = 0;
 	/** The interlock alarm currently published by the machine's robot interface. */
 	public var interfaceAlarm(default, null):RobotInterfaceAlarm = RobotInterfaceAlarm.None;
-	/** Speed of every move, as a fraction of the program's. */
-	public var speedOverride(default, null):Float = 1.0;
-	final source:String;
 	final recipe:MachiningRecipe;
 	/** Sensor selected from the assembled machine; null on routers without at-speed feedback. */
 	public final atSpeedSensorId:Null<String>;
@@ -249,24 +202,21 @@ class CncProgramPlayer implements SessionMember {
 			project:ProjectDocumentSession, session:SimSession, assemblyParts:SimulationAssemblyParts,
 			?cellInput:String->Null<EventValue>,
 			?check:PlanCheckOptions, interfaceManaged:Bool = false) {
+		super(robot, session, job.source, job.loop, check);
 		if (job.axes.length != 3) throw "A CNC job needs its X, Y and Z axes";
 		var definition = project.projectAssemblyDefinition, physical = project.projectPhysical;
 		if (definition == null || physical == null) throw "A CNC job needs the project's machine";
 		var metresPerUnit = physical.metresPerUnit, state = project.projectAssemblyState;
 		channels = channelsFor(job);
 		this.job = job;
-		this.session = session;
 		this.simulation = simulation;
 		this.assemblyParts = assemblyParts;
 		this.cellInput = cellInput;
 		this.project = project;
-		this.loop = job.loop;
 		this.interfaceManaged = interfaceManaged;
 		robotInterface = interfaceManaged ? new RobotInterface() : null;
 		interfaceAlarmCodeChannel = interfaceManaged ? RobotInterfaceChannels.alarmCodeChannel(job.channelScope) : null;
-		this.source = job.source;
 		var placement = new AssemblyState(definition, state);
-		checkOptions = check == null ? new PlanCheckOptions() : check.copy();
 		var steady = checkOptions.steady;
 		// Apply the controller pulse ceiling to stepper planning.
 		var machineModel = robot.model;
@@ -335,7 +285,6 @@ class CncProgramPlayer implements SessionMember {
 			sourceMap = lowered.sourceMap;
 			return compiled.program;
 		};
-		this.robot = robot;
 		if (interfaceManaged) {
 			if (job.controllerId == null || cellInput == null)
 				throw "A robot-tended CNC job needs controller ownership and cell signals";
@@ -478,22 +427,6 @@ class CncProgramPlayer implements SessionMember {
 	}
 
 	/**
-	 * A successfully completed move plans its successor from the exact terminal setpoint. Use that
-	 * same machine pose when compiling the next CNC program; measured feedback can differ by a few
-	 * micrometres while still satisfying the motion completion tolerance.
-	 */
-	function machinePositionAtMotionEnd():Point3 {
-		var joints = motion.commandedPositions();
-		if (joints == null) {
-			var actual = robot.robot.snapshot().positions;
-			joints = [for (index in axisJoints) actual.get(index)];
-		}
-		var pose = solver.forward(joints);
-		return new Point3(pose.x, pose.y, pose.z);
-	}
-
-
-	/**
 	 * Geometry of a tool in the spindle for part `toolPart`'s scene object: the tool's profile hung its
 	 * length below the gauge line, in the part's frame shifted to its preview centre, in metres.
 	 */
@@ -516,139 +449,92 @@ class CncProgramPlayer implements SessionMember {
 		});
 	}
 
-	public function feed():Void {
-		if (failure != null) return;
-		var homeView = homing;
-		if (!homingComplete && homeView != null) {
-			try {
-				if (!homingStarted) {
-					// feed runs before physics; wait for the first actual switch observations.
-					var seen = robot.robot.snapshot(), available = new Map<String, Bool>();
-					for (frame in seen.sensors.toArray()) available.set(frame.sensorId, true);
-					for (contact in robot.blueprint.switches)
-						if (contact.role == "home" && !available.exists(contact.id)) return;
-					homeView.home();
-					homingStarted = true;
-					return;
-				}
-				homingSeconds += session.fixedTimestep();
-				homeView.update(session.fixedTimestep());
-				if (homeView.homingStatus() != "Complete") return;
-				homingComplete = true;
-				// Latching changed the calibration revision used by every machining plan.
-				motion = newMotion();
-				if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
-				var positions = robot.robot.snapshot().positions;
-				var pose = solver.forward([for (index in axisJoints) positions.get(index)]);
-				compileFrom(new Point3(pose.x, pose.y, pose.z));
-			} catch (error:Dynamic) {
-				failure = 'Machine homing: $error';
-				return;
-			}
-		}
-		if (interfaceManaged && !parkingComplete) {
-			var park = parkingProgram;
-			if (park == null) throw "Robot-tended CNC machine has no load-position program";
-			if (!parkingStarted) {
-				motion.run(park);
-				parkingStarted = true;
-			}
-			motion.update(session.fixedTimestep());
-			if (motion.failure != null) {
-				failure = 'Machine load-position move: ${motion.failure}';
-				return;
-			}
-			if (motion.completed) {
-				parkingComplete = true;
-				compileFrom(machinePositionAtMotionEnd());
-				motion = newMotion();
-				if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
-			}
-			return;
-		}
-		var clock = Sys.time();
-		takeRestart();
-		var passFinished = started && motion.completed && !passCounted;
-		if (interfaceManaged) updateRobotInterface(passFinished);
-		if (passFinished) {
-			passes++;
-			passCounted = true;
-		}
-		var newCycle = !started && (!interfaceManaged || startRequested);
-		var requestedNextCycle = interfaceManaged && started && startRequested &&
-			motion.completed && !motion.running && passCounted;
-		if (newCycle || requestedNextCycle ||
-				(!interfaceManaged && loop && motion.completed && !motion.running && pendingContinuation == null)) {
-			if (job.stocks.length > 0) {
-				if (interfaceManaged) activateStock(stockAtPresenceInput());
-				else if (activeStock == null) activateStock(job.stocks[0]);
-			}
-			continuation = null;
-			if (started) {
-				// A program runs from wherever the machine is: the position the planner last
-				// commanded, or where the robot stands when there is none.
-				compileFrom(machinePositionAtMotionEnd());
-			}
-			motion.run(program);
-			started = true;
-			passCounted = false;
-			startRequested = false;
-			pendingToolChange = false;
-			runSeconds += Sys.time() - clock;
-			clock = Sys.time();
+	/** A tended machine first moves to its load position, where the robot can reach the vise. */
+	override function prepare():Bool {
+		if (!interfaceManaged || parkingComplete) return true;
+		var park = parkingProgram;
+		if (park == null) throw "Robot-tended CNC machine has no load-position program";
+		if (!parkingStarted) {
+			motion.run(park);
+			parkingStarted = true;
 		}
 		motion.update(session.fixedTimestep());
+		if (motion.failure != null) {
+			fail('Machine load-position move: ${motion.failure}');
+			return false;
+		}
+		if (motion.completed) {
+			parkingComplete = true;
+			compileFrom(machinePositionAtMotionEnd());
+			motion = newMotion();
+			if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
+		}
+		return false;
+	}
+
+	override function beforeStep():Void takeRestart();
+
+	override function exchangeSignals(passFinished:Bool):Void {
+		if (interfaceManaged) updateRobotInterface(passFinished);
+	}
+
+	/** A tended machine starts a pass when the cell asks for one; a looping one waits for an operator's restart to take. */
+	override function startsPass():Bool {
+		if (interfaceManaged)
+			return startRequested && (!started || (motion.completed && !motion.running && passCounted));
+		return super.startsPass() && (!started || pendingContinuation == null);
+	}
+
+	override function beginPass():Void {
+		if (job.stocks.length > 0) {
+			if (interfaceManaged) activateStock(stockAtPresenceInput());
+			else if (activeStock == null) activateStock(job.stocks[0]);
+		}
+		continuation = null;
+		startRequested = false;
+		pendingToolChange = false;
+	}
+
+	/** A restart aborts the program on purpose; that is not a failure. */
+	override function stoppedOnPurpose():Bool return pendingContinuation != null || restartRequest != null;
+
+	override function originalAt(op:Int, distance:Float):{op:Int, distance:Float}
+		return continuation == null ? {op: op, distance: distance} : continuation.originalAt(op, distance);
+
+	override function afterStep(at:{op:Int, distance:Float}, provenance:Null<Provenance>, passFinished:Bool):Void {
 		if (encoders.readings.length > 0) {
-			var seen = robot.robot.snapshot();
 			var spindleWindow = if (interfaceManaged)
 				lastInterfaceOutputs != null && lastInterfaceOutputs.inCycle
 			else started && motion.running;
 			if (spindleWindow) {
+				var velocities = robot.robot.snapshot().velocities;
 				var elapsed = session.fixedTimestep();
 				spindleIntervalSeconds += elapsed;
-				if (spindleVelocityJoint >= 0 && spindleVelocityJoint < seen.velocities.length &&
-					Math.abs(seen.velocities.get(spindleVelocityJoint)) > SPINDLE_STANDSTILL_RPM * (2.0 * Math.PI / 60.0))
+				if (spindleVelocityJoint >= 0 && spindleVelocityJoint < velocities.length &&
+					Math.abs(velocities.get(spindleVelocityJoint)) > SPINDLE_STANDSTILL_RPM * (2.0 * Math.PI / 60.0))
 					spindleTurningSeconds += elapsed;
 				spindleUtilization = spindleTurningSeconds / spindleIntervalSeconds;
 			}
-			encoders.observe(seen.positions.toArray(), seen.setpointPositions.toArray(), session.simulationTime());
-			for (axis in 0...axisJoints.length) {
-				var joint = axisJoints[axis];
-				axisTrackingPeak[axis] = Math.max(axisTrackingPeak[axis],
-					Math.abs(seen.positions.get(joint) - seen.setpointPositions.get(joint)));
-			}
 		}
-		var spent = Sys.time() - clock;
-		motionSeconds += spent;
-		slowestUpdate = Math.max(slowestUpdate, spent);
-		// A restart aborts the program on purpose; that is not a failure.
-		if (motion.failure != null && pendingContinuation == null && restartRequest == null) failure = motion.failure;
-		var progress = motion.progress();
-		var at = continuation == null ? {op: progress.op, distance: progress.pathDistance} :
-			continuation.originalAt(progress.op, progress.pathDistance);
-		var provenance = at.op < 0 ? null : sourceMap.provenanceAt(at.op, at.distance);
-		currentLine = provenance == null ? 0 : provenance.line;
 		var cutting = activeStock;
-		if (cutting != null) {
-			clock = Sys.time();
-			var kind = provenance == null ? null : kindByLine.get(provenance.line);
-			var now = kind == null ? MoveKind.Rapid : kind;
-			var nowProvenance = provenance == null ? new Provenance(0, 0, 0) : provenance;
-			// The tool moved on the last tick under the move commanded before it, so the segment it
-			// just cut belongs to that move; the move under way now labels the next segment. A tick
-			// that runs from a rapid into a cutting move cut under the cutting move: the rapid's part
-			// of it is at most one tick, and a rapid that does enter the stock cuts on the ticks after.
-			if (commandedKind == MoveKind.Rapid && now != MoveKind.Rapid)
-				cutting.follow(now, at.op, nowProvenance);
-			else
-				cutting.follow(commandedKind, commandedOp, commandedProvenance);
-			commandedKind = now;
-			commandedOp = at.op;
-			commandedProvenance = nowProvenance;
-			cuttingSeconds += Sys.time() - clock;
-			if (interfaceManaged && passFinished) finishActiveStock();
-		}
-
+		if (cutting == null) return;
+		var clock = Sys.time();
+		var kind = provenance == null ? null : kindByLine.get(provenance.line);
+		var now = kind == null ? MoveKind.Rapid : kind;
+		var nowProvenance = provenance == null ? new Provenance(0, 0, 0) : provenance;
+		// The tool moved on the last tick under the move commanded before it, so the segment it
+		// just cut belongs to that move; the move under way now labels the next segment. A tick
+		// that runs from a rapid into a cutting move cut under the cutting move: the rapid's part
+		// of it is at most one tick, and a rapid that does enter the stock cuts on the ticks after.
+		if (commandedKind == MoveKind.Rapid && now != MoveKind.Rapid)
+			cutting.follow(now, at.op, nowProvenance);
+		else
+			cutting.follow(commandedKind, commandedOp, commandedProvenance);
+		commandedKind = now;
+		commandedOp = at.op;
+		commandedProvenance = nowProvenance;
+		cuttingSeconds += Sys.time() - clock;
+		if (interfaceManaged && passFinished) finishActiveStock();
 	}
 
 	function updateRobotInterface(passFinished:Bool):Void {
@@ -867,42 +753,20 @@ class CncProgramPlayer implements SessionMember {
 	static function machineMillimetres(metres:Float):String
 		return Std.string(Math.round(metres * 1000.0 * 1e6) / 1e6);
 
-	/** What the plan checks have found in the plans the machine has started: stall and accuracy findings and how near the drives came. */
-	public function planChecks():PlanCheckSummary return motion.checks;
+	override public function canRestart():Bool return true;
 
-	/** A finding in words, with the G-code line of its op when the program knows it. */
-	public function describe(diagnostic:motionkit.trajectory.PlanDiagnostic):String {
-		var line = 0;
-		if (diagnostic.opIndex >= 0 && sourceMap != null) {
-			var found = sourceMap.provenanceAt(diagnostic.opIndex, Math.max(0.0, diagnostic.pathDistance));
-			if (found != null) line = found.line;
-		}
-		return diagnostic.describe(line);
-	}
+	override public function title():String return "CNC PROGRAM";
 
-	/** The program's G-code, one entry per line. */
-	public function sourceLines():Array<String> return source.split("\n");
-
-	/** Whether the machine is stopped by a feed hold. */
-	public function held():Bool return motion.sessionState() == SessionState.Held;
-
-	/** Brings the machine to a controlled stop on its path. */
-	public function hold():Void motion.hold();
-
-	public function resume():Void motion.resume();
-
-	/** Sets the speed of every move, from 5% to 200% of the program's; it takes effect from motion not yet planned, about a second ahead. */
-	public function setSpeedOverride(scale:Float):Void {
-		motion.setSpeedOverride(scale);
-		speedOverride = scale;
-	}
+	override public function statusDetail():String
+		return ' · tool $loadedTool' +
+			(spindleUtilization > 0.0 ? ' · spindle ${Math.round(spindleUtilization * 1000) / 10}%' : "");
 
 	/**
 	 * Restarts the program at G-code line `line`, or the first line after it that moves: the machine
 	 * stops, climbs clear of the work, loads that line's tool, starts the spindle as the program had it
 	 * and carries on from there. Returns false when no later line moves.
 	 */
-	public function restartFromLine(line:Int):Bool {
+	override public function restartFromLine(line:Int):Bool {
 		var best:Null<toolpathkit.motion.ToolpathSourceMap.ToolpathSourceMapEntry> = null;
 		for (entry in sourceMap.entries) {
 			var at = entry.provenance.line;
@@ -913,7 +777,7 @@ class CncProgramPlayer implements SessionMember {
 		}
 		if (best == null) return false;
 		restartRequest = {op: best.opIndex, distance: best.startDistance};
-		failure = null;
+		clearFailure();
 		return true;
 	}
 
@@ -943,25 +807,11 @@ class CncProgramPlayer implements SessionMember {
 	}
 
 	/** The session is back at its start, and the robot with it: run the program again on fresh stock. */
-	public function beforeReset():Void {
-		if (homing != null && homing.isMoving()) homing.abort();
-	}
-
-	public function reset():Void {
-		slip.reset();
-		encoders.reset([for (_ in robot.model.joints) 0.0]);
-		motion = newMotion();
-		homing = newHoming();
-		homingStarted = false;
-		homingComplete = homing == null;
-		homingSeconds = 0.0;
-		if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
+	override function resetJob():Void {
 		restartRequest = null;
 		pendingContinuation = null;
 		continuation = null;
-		currentLine = 0;
 		loadedTool = initialTool;
-		started = false;
 		startRequested = false;
 		pendingToolChange = false;
 		lastInterfaceOutputs = null;
@@ -971,12 +821,9 @@ class CncProgramPlayer implements SessionMember {
 			robotInterface = new RobotInterface();
 			interfaceAlarm = RobotInterfaceAlarm.None;
 		}
-		failure = null;
-		passes = 0;
 		spindleUtilization = 0.0;
 		spindleIntervalSeconds = 0.0;
 		spindleTurningSeconds = 0.0;
-		passCounted = false;
 		for (cut in allStocks) cut.dispose();
 		allStocks.splice(0, allStocks.length);
 		for (occurrence in job.stocks) project.scene.clearRuntimeGeometry("project:" + occurrence);
@@ -993,7 +840,7 @@ class CncProgramPlayer implements SessionMember {
 	 * Shows the tool in the spindle, and the stock as cut so far: a few times a second the stock is
 	 * re-contoured on its own thread, where it changed, and the chunks it rebuilt are shown when ready.
 	 */
-	public function present():Void {
+	override public function present():Void {
 		var shape = toolShape, toolId = toolObject;
 		if (shape != null && toolId != null && shownTool != loadedTool) {
 			var tool = toolsByNumber.get(loadedTool);

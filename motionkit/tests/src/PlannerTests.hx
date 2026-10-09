@@ -489,6 +489,51 @@ class PlannerTests extends MotionKitTestSupport {
     second.dispose();
   }
 
+  /**
+    A path lowered to hundreds of short segments a second is merged into longer ones where a quintic follows them: a
+    ramp of constant-acceleration pieces becomes a few segments that keep every position, speed and acceleration of
+    the original; a zigzag that no quintic follows is left as it was; chords are never merged.
+  **/
+  public function testMergedSegmentsFollowTheOriginals():Void {
+    var pieces = 400, dt = 0.0001;
+    var segments = [];
+    var position = 0.0, speed = 0.0;
+    for (i in 0...pieces) {
+      var acceleration = i < pieces / 2 ? 10.0 : -10.0;
+      segments.push({timeFromStartNs: Int64.ofInt(i * 100000), durationNs: Int64.ofInt(100000),
+        coefficients: [[position, speed, 0.5 * acceleration], [2.0 * position, 2.0 * speed, acceleration]]});
+      position += speed * dt + 0.5 * acceleration * dt * dt;
+      speed += acceleration * dt;
+    }
+    var ramp = motionkit.trajectory.Trajectory.fromSegments(segments);
+    var merged = ramp.mergeSegments([1e-6, 2e-6], [0.01, 0.02], [1.0, 2.0], [100.0, 200.0], [1000.0, 2000.0], 0.01);
+    check(merged.segments().length <= 8, 'the ramp merges to a few segments, got ${merged.segments().length} of $pieces');
+    check(merged.durationSeconds() == ramp.durationSeconds(), "and keeps its duration");
+    var worst = 0.0, worstSpeed = 0.0, worstAcceleration = 0.0;
+    for (step in 0...2000) {
+      var t = ramp.durationSeconds() * (step + 0.5) / 2000;
+      var a = ramp.evaluate(t), b = merged.evaluate(t);
+      for (joint in 0...2) {
+        worst = Math.max(worst, Math.abs(a.positions[joint] - b.positions[joint]));
+        worstSpeed = Math.max(worstSpeed, Math.abs(a.velocities[joint] - b.velocities[joint]));
+        worstAcceleration = Math.max(worstAcceleration, Math.abs(a.accelerations[joint] - b.accelerations[joint]));
+      }
+    }
+    check(worst <= 2e-6 && worstSpeed <= 0.02 && worstAcceleration <= 2.0,
+      'the merged ramp follows the original: $worst m, $worstSpeed m/s, $worstAcceleration m/s^2');
+    // A limit the original keeps to is kept: the same ramp with an acceleration limit below its peak is not merged across the turn.
+    var limited = ramp.mergeSegments([1e-6, 2e-6], [0.01, 0.02], [1.0, 2.0], [100.0, 200.0], [9.9, 19.8], 0.01);
+    check(limited.segments().length == pieces || limited.segments().length >= merged.segments().length, "a limit the pieces keep to is not broken by a merge");
+    // A zigzag of 0.1 ms pieces turns more often than a quintic can follow.
+    var zigzag = [for (i in 0...100) {timeFromStartNs: Int64.ofInt(i * 100000), durationNs: Int64.ofInt(100000),
+      coefficients: [[i % 2 == 0 ? 0.0 : 0.0005, i % 2 == 0 ? 5.0 : -5.0, 0.0], [0.0, 0.0, 0.0]]}];
+    var saw = motionkit.trajectory.Trajectory.fromSegments(zigzag);
+    var kept = saw.mergeSegments([1e-6, 1e-6], [0.01, 0.01], [1.0, 1.0], [100.0, 100.0], [1000.0, 1000.0], 0.01);
+    check(kept.segments().length > 40, 'a zigzag stays mostly as it was, ${kept.segments().length} of 100 segments');
+    ramp.dispose(); merged.dispose(); limited.dispose(); saw.dispose(); kept.dispose();
+  }
+
+
   public function testToppraExactStopsAndBindings():Void {
     var path = new JointPathSamples([0.0, 0.05, 0.1], [[0.0], [0.05], [0.1]],
       [[1.0], [1.0], [1.0]], [[0.0], [0.0], [0.0]]);

@@ -153,7 +153,12 @@ class ToolpathMotionBinding {
       null, null, jump,
       [for (joint in blueprint.model.joints) joint.id], blueprint.model.couplings,
       blueprint.fixedTimestepSeconds);
-    if (printer != null) { compiler.pressureAdvance = printer.pressureAdvance; compiler.pressureAdvanceWindow = printer.pressureAdvanceWindow; }
+    if (printer != null) {
+      compiler.pressureAdvance = printer.pressureAdvance; compiler.pressureAdvanceWindow = printer.pressureAdvanceWindow;
+      // A sliced curve lowers to thousands of segments a second, more than the robot's queue or a device's link takes:
+      // runs of them are merged into one quintic each where it follows them closely (an owner period at most).
+      compiler.mergeSegmentsSeconds = 0.01;
+    }
   }
 
   public function compile(program:ToolpathProgram, initialJoints:Array<Float>,

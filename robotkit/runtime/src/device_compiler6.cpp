@@ -30,16 +30,110 @@ CompiledDevicePlan6 failure(const char *message) {
     return result;
 }
 
+struct Motion { double position, velocity, acceleration; };
+
+/** Position, velocity and acceleration of one joint's polynomial `tau` seconds into its segment. */
+Motion motion_at(const robotkit::SegmentCoefficients &c, std::uint32_t degree, double tau) {
+    double p = 0.0, v = 0.0, a = 0.0;
+    for (int k = static_cast<int>(degree); k >= 0; --k) p = p * tau + c.value[k];
+    for (int k = static_cast<int>(degree) - 1; k >= 0; --k) v = v * tau + (k + 1.0) * c.value[k + 1];
+    for (int k = static_cast<int>(degree) - 2; k >= 0; --k) a = a * tau + (k + 2.0) * (k + 1.0) * c.value[k + 2];
+    return {p, v, a};
+}
+
+/**
+  The segments `first` to `last` as one quintic through the first one's starting state and the last one's final state
+  (position, velocity, acceleration of every joint). The caller checks it against the originals.
+**/
+robotkit::TrajectorySegment through_run(std::span<const robotkit::TrajectorySegment> source, std::size_t first,
+                                        std::size_t last) {
+    robotkit::TrajectorySegment merged{};
+    merged.time_from_start_ns = source[first].time_from_start_ns;
+    merged.duration_ns = source[last].time_from_start_ns + source[last].duration_ns - merged.time_from_start_ns;
+    merged.degree = 5;
+    merged.joint_count = source[first].joint_count;
+    const double T = static_cast<double>(merged.duration_ns) * 1e-9;
+    const double end = static_cast<double>(source[last].duration_ns) * 1e-9;
+    for (std::uint32_t joint = 0; joint < merged.joint_count; ++joint) {
+        const auto from = motion_at(source[first].coefficients[joint], source[first].degree, 0.0);
+        const auto to = motion_at(source[last].coefficients[joint], source[last].degree, end);
+        const double V0 = from.velocity * T, A0 = from.acceleration * T * T;
+        const double V1 = to.velocity * T, A1 = to.acceleration * T * T;
+        const double D = to.position - from.position - V0 - 0.5 * A0, E = V1 - V0 - A0, F = A1 - A0;
+        const double normalized[6] = {from.position, V0, 0.5 * A0, 10.0 * D - 4.0 * E + 0.5 * F,
+            -15.0 * D + 7.0 * E - F, 6.0 * D - 3.0 * E + 0.5 * F};
+        double scale = 1.0;
+        for (int k = 0; k < 6; ++k) { merged.coefficients[joint].value[k] = normalized[k] / scale; scale *= T; }
+    }
+    return merged;
+}
+
+/** The accuracy a merged run of segments must keep on every motor: a tenth of a step of position, a percent of the step rate in speed. */
+constexpr double MERGE_POSITION_STEPS = 0.1;
+constexpr double MERGE_SPEED_FRACTION = 0.01;
+/**
+  Only segments shorter than this are merged, and a merged segment is no longer than the next: a link refills a
+  segment in a fraction of a millisecond, so longer segments are no problem and are sent as planned.
+**/
+constexpr std::uint64_t MERGE_BELOW_NS = 2'000'000ULL;
+constexpr std::uint64_t MERGE_UP_TO_NS = 4'000'000ULL;
+
+/**
+  Whether the quintic `merged` follows the originals it replaces: at the originals' joins and across the run, every
+  motor's position stays within a tenth of a step of the original and its speed within a percent of the step rate.
+**/
+bool follows(const robotkit::TrajectorySegment &merged, std::span<const robotkit::TrajectorySegment> source,
+             std::size_t first, std::size_t last, std::span<const robotkit::DeviceActuator6> layout,
+             std::uint64_t step_tick_hz, const rk_robot_runtime_blueprint &blueprint) {
+    // A run that ends at a joint's travel limit (a printer's Z on its endstop side) may not round past it between
+    // the originals' joins: the device's deployment check holds every joint to its limits.
+    const double merged_seconds = static_cast<double>(merged.duration_ns) * 1e-9;
+    for (int step = 0; step <= 64; ++step)
+        for (std::uint32_t joint = 0; joint < merged.joint_count; ++joint) {
+            const auto at = motion_at(merged.coefficients[joint], merged.degree, merged_seconds * step / 64.0);
+            if (at.position < blueprint.joints[joint].lower_limit || at.position > blueprint.joints[joint].upper_limit)
+                return false;
+        }
+    std::vector<std::uint64_t> times;
+    const std::size_t runs = last - first + 1;
+    // The joins, thinned to at most 24, and 16 even steps across the run.
+    const std::size_t stride = std::max<std::size_t>(1, runs / 24);
+    for (std::size_t i = first; i <= last; i += stride) times.push_back(source[i].time_from_start_ns);
+    for (int step = 1; step <= 16; ++step)
+        times.push_back(merged.time_from_start_ns + merged.duration_ns * step / 16);
+    for (const auto absolute : times) {
+        // The original covering this instant.
+        std::size_t index = first;
+        while (index < last && absolute >= source[index + 1].time_from_start_ns) ++index;
+        const auto &original = source[index];
+        const double tau = std::min<double>(static_cast<double>(absolute - original.time_from_start_ns) * 1e-9,
+            static_cast<double>(original.duration_ns) * 1e-9);
+        const double mine = static_cast<double>(absolute - merged.time_from_start_ns) * 1e-9;
+        for (const auto &actuator : layout) {
+            const auto &o = original.coefficients[actuator.joint];
+            const auto &m = merged.coefficients[actuator.joint];
+            const auto want = motion_at(o, original.degree, tau), have = motion_at(m, merged.degree, mine);
+            const double gain = std::abs(actuator.ratio) * actuator.steps_per_unit;
+            if (std::abs(have.position - want.position) * gain > MERGE_POSITION_STEPS ||
+                std::abs(have.velocity - want.velocity) * gain > MERGE_SPEED_FRACTION * static_cast<double>(step_tick_hz))
+                return false;
+        }
+    }
+    return true;
+}
+
 } // namespace
 
-CompiledDevicePlan6 compile_device_segments6(
+namespace {
+
+CompiledDevicePlan6 compile_once(
     std::span<const robotkit::TrajectorySegment> segments, std::uint64_t plan_id,
     bool ends_at_rest, std::uint64_t host_plan_start_ns,
     const ClockEstimator6 &clock, const rk_robot_runtime_blueprint &blueprint,
     std::uint64_t device_tick_hz, std::uint64_t step_tick_hz,
     std::uint8_t max_degree, double target_error,
     std::span<const DeviceActuator6> layout, std::uint64_t anchor_ticks, bool homing,
-    const double *start_tolerance) {
+    const double *start_tolerance, bool merge) {
     if (!clock.may_commit()) return failure("clock_sync_lost");
     if (segments.empty() || plan_id == 0 || blueprint.joint_count == 0 ||
         blueprint.joint_count > device_wire6::MAX_ACTUATORS ||
@@ -97,6 +191,54 @@ CompiledDevicePlan6 compile_device_segments6(
         }
         segments = lowered;
     }
+    // A sliced curve plans to hundreds of short segments a second, more than a serial link can refill. Runs of them
+    // become one quintic when it follows them to a tenth of a step (see `follows`): the longest run, no longer than
+    // MERGE_UP_TO_NS, that does, found by doubling and then bisecting.
+    std::vector<robotkit::TrajectorySegment> merged;
+    std::vector<bool> is_merged;
+    if (merge && max_degree == 5 && !layout.empty() && segments.size() > 1) {
+        const std::uint64_t longest = MERGE_UP_TO_NS;
+        for (const auto &segment : segments)
+            if (segment.joint_count != blueprint.joint_count || segment.degree > 5) { merge = false; break; }
+        if (merge) {
+            merged.reserve(segments.size() / 4 + 1);
+            for (std::size_t first = 0; first < segments.size();) {
+                // The last segment (counted from `first`) that still fits an owner period.
+                std::size_t limit = first;
+                // Only a segment too short for the link starts a run.
+                while (segments[first].duration_ns < MERGE_BELOW_NS && limit + 1 < segments.size() && segments[limit + 1].time_from_start_ns +
+                        segments[limit + 1].duration_ns - segments[first].time_from_start_ns <= longest) ++limit;
+                std::size_t best = first;
+                robotkit::TrajectorySegment best_segment = segments[first];
+                auto accepts = [&](std::size_t last) {
+                    auto candidate = through_run(segments, first, last);
+                    if (!follows(candidate, segments, first, last, layout, step_tick_hz, blueprint)) return false;
+                    best = last; best_segment = candidate;
+                    return true;
+                };
+                std::size_t step = 1, failed = limit + 1;
+                while (best + step <= limit) {
+                    if (accepts(best + step)) step *= 2; else { failed = best + step; break; }
+                }
+                // Between the last run that worked and the first that did not.
+                while (failed > best + 1) {
+                    const auto middle = best + (failed - best) / 2;
+                    if (middle == best) break;
+                    if (accepts(middle)) continue;
+                    failed = middle;
+                }
+                merged.push_back(best_segment);
+                is_merged.push_back(best > first);
+                first = best + 1;
+            }
+            segments = merged;
+        }
+    }
+    if (is_merged.empty()) is_merged.assign(segments.size(), false);
+    // The segments in force, by start time, for finding the original that covers an instant.
+    std::vector<std::uint64_t> original_starts;
+    original_starts.reserve(original_segments.size());
+    for (const auto &segment : original_segments) original_starts.push_back(segment.time_from_start_ns);
     const auto resolution_ns = (1'000'000'000ULL + step_tick_hz - 1) / step_tick_hz;
     // A continuation starts on the device tick where the queued path ends. Mapping its
     // start afresh would move it whenever a time sync refined the clock in between.
@@ -153,9 +295,11 @@ CompiledDevicePlan6 compile_device_segments6(
                         expected += coupling.ratio * source.coefficients[coupling.leader].value[degree] +
                             (degree == 0 ? coupling.offset : 0.0);
                 }
+                // A merged segment's follower is the same combination of its leaders to rounding, which a high power's
+                // coefficient (the position over a power of the duration) magnifies past the check's absolute bound.
                 if (!std::isfinite(expected) ||
                     !std::isfinite(source.coefficients[follower].value[degree]) ||
-                    std::abs(source.coefficients[follower].value[degree] - expected) > 1e-6)
+                    (!is_merged[i] && std::abs(source.coefficients[follower].value[degree] - expected) > 1e-6))
                     return reject("coupled follower trajectory mismatch");
                 source.coefficients[follower].value[degree] = expected;
             }
@@ -237,19 +381,27 @@ CompiledDevicePlan6 compile_device_segments6(
             const auto host_elapsed_ns = std::min<std::uint64_t>(source.duration_ns, sample * resolution_ns);
             const auto device_elapsed_seconds = static_cast<double>(host_elapsed_ns) / 1e9 / scale;
             const auto host_tau = static_cast<double>(host_elapsed_ns) / 1e9;
+            // The original covering this instant (the one before a join, so that the end of a segment is its own).
+            const auto absolute_ns = source.time_from_start_ns + host_elapsed_ns;
+            const auto covering = std::upper_bound(original_starts.begin(), original_starts.end(), absolute_ns);
+            const std::size_t original = covering == original_starts.begin() ? 0 :
+                static_cast<std::size_t>(covering - original_starts.begin()) - 1;
+            const auto &reference = original_segments[original];
+            const auto reference_tau = std::min(static_cast<double>(absolute_ns - reference.time_from_start_ns) / 1e9,
+                static_cast<double>(reference.duration_ns) / 1e9);
             for (std::size_t actuator = 0; actuator < actuator_count; ++actuator) {
                 const auto joint = layout.empty() ? actuator : layout[actuator].joint;
                 const auto ratio = layout.empty() ? 1.0 : layout[actuator].ratio;
                 const auto offset = layout.empty() ? 0.0 : layout[actuator].offset;
                 const auto actual = static_cast<double>(evaluate_f32(wire.coefficients[actuator],
                     wire.header.degree, static_cast<float>(device_elapsed_seconds)));
-                const auto &reference = max_degree == 1 ? original_segments[original_index[i]] : source;
-                const auto reference_tau = host_tau +
-                    (max_degree == 1 ? static_cast<double>(original_offset[i]) / 1e9 : 0.0);
                 const auto exact = evaluate_f64(reference.coefficients[joint], reference.degree, reference_tau);
                 const auto error = std::abs(actual / ratio + offset - exact);
                 result.worst_position_error = std::max(result.worst_position_error, error);
-                if (error > target_error) return reject("converted trajectory exceeds target_error");
+                // A merged segment keeps to a tenth of a step of the originals on top of the conversion's own error.
+                const auto allowed = target_error + (is_merged[i] ?
+                    MERGE_POSITION_STEPS / (std::abs(ratio) * (layout.empty() ? 1.0 : layout[actuator].steps_per_unit)) : 0.0);
+                if (error > allowed) return reject("converted trajectory exceeds target_error");
                 if (!layout.empty()) {
                     double velocity = 0.0;
                     double power = 1.0;
@@ -310,6 +462,24 @@ CompiledDevicePlan6 compile_device_segments6(
         }
     result.ok = true;
     return result;
+}
+
+} // namespace
+
+CompiledDevicePlan6 compile_device_segments6(
+    std::span<const robotkit::TrajectorySegment> segments, std::uint64_t plan_id,
+    bool ends_at_rest, std::uint64_t host_plan_start_ns,
+    const ClockEstimator6 &clock, const rk_robot_runtime_blueprint &blueprint,
+    std::uint64_t device_tick_hz, std::uint64_t step_tick_hz,
+    std::uint8_t max_degree, double target_error,
+    std::span<const DeviceActuator6> layout, std::uint64_t anchor_ticks, bool homing,
+    const double *start_tolerance) {
+    // Merged segments are the first try; a plan they would take past a deployment limit goes as it came.
+    auto merged = compile_once(segments, plan_id, ends_at_rest, host_plan_start_ns, clock, blueprint, device_tick_hz,
+        step_tick_hz, max_degree, target_error, layout, anchor_ticks, homing, start_tolerance, true);
+    if (merged.ok) return merged;
+    return compile_once(segments, plan_id, ends_at_rest, host_plan_start_ns, clock, blueprint, device_tick_hz,
+        step_tick_hz, max_degree, target_error, layout, anchor_ticks, homing, start_tolerance, false);
 }
 
 } // namespace robotkit

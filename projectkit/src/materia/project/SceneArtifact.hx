@@ -82,6 +82,8 @@ typedef SceneArtifactData = {
 	@:optional var signals:Array<SceneArtifactCellSignal>;
   /** Project-owned runtime settings resolved by an artifact publisher, independent of source files. */
   @:optional var project:SceneArtifactProject;
+	/** A print job the generator made for its own printer; see SceneArtifactPrinting. */
+	@:optional var printing:SceneArtifactPrinting;
 }
 
 typedef SceneArtifactCellController = {
@@ -590,6 +592,75 @@ typedef SceneArtifactTool = {
 	var profile:Array<Array<Float>>;
 }
 
+
+/**
+ * A print job the generator made for its own printer (since version 30). Lengths are metres, whatever the scene's unit.
+ *
+ * `source` is the program as the printer's G-code (Klipper flavour: relative extrusion, `M104`/`M109`/`M140`/`M190`,
+ * `M106`/`M107`), in machine coordinates: the positions of the three `axes`, prismatic joints whose values are
+ * machine X, Y and Z (the bed's Z grows as the bed goes down, so the nozzle rises relative to it). The machine starts
+ * where the assembly's initial pose puts it, referenced: a leading `G28` is not run, because the virtual device has
+ * no switch inputs for a CoreXY yet. The `extruder` is the joint of the filament drive gear: it turns
+ * `1 / gearRadius` radians per metre of filament, and the hotend melts at most `maxFlow` cubic metres a second.
+ * `pressureAdvance` seconds (0 is off) is how far the extruder runs ahead of the flow it feeds, averaged over
+ * `pressureAdvanceWindow` seconds; `rampLength` is how far along the path its rate ramps. `controller` is the
+ * controller the steppers are wired to, as in a machining job.
+ *
+ * Each heater (the hotend, the bed) is run by the controller: the host sets its target on the analog channel
+ * `target`, the board's PID and watchdog do the rest, and its report is the `tool_heater` sensor `sensor`, in the
+ * board's slot `slot`, mounted on the occurrence `mount`. The numbers are the controller's tuning and the part's
+ * assumed thermal plant. A heater's `fan` is the analog channel (duty 0 to 1) of the part fan that blows on it;
+ * `feedsExtruder` says that pushing filament while it is below `minExtrusionTemperature` is a fault.
+ */
+typedef SceneArtifactPrinting = {
+	var source:String;
+	var axes:Array<String>;
+	var extruder:String;
+	var filamentDiameter:Float;
+	var gearRadius:Float;
+	var maxFlow:Float;
+	var pressureAdvance:Float;
+	var pressureAdvanceWindow:Float;
+	var rampLength:Float;
+	var heaters:Array<SceneArtifactHeater>;
+	var controller:SceneArtifactController;
+	/** The material's minimum extrusion temperature, degrees Celsius: the static check and the controller refuse to extrude colder. */
+	var minExtrusionTemperature:Float;
+}
+
+/** One heater of a print job; see SceneArtifactPrinting. */
+typedef SceneArtifactHeater = {
+	var name:String;
+	var sensor:String;
+	var slot:Int;
+	var mount:String;
+	var target:String;
+	@:optional var fan:String;
+	/** The heater feeds the extruder: pushing filament while it is cold is a fault. */
+	var feedsExtruder:Bool;
+	var r0Ohm:Float;
+	var t0Celsius:Float;
+	var beta:Float;
+	var pullupOhm:Float;
+	var vRef:Float;
+	var kp:Float;
+	var ki:Float;
+	var kd:Float;
+	var maxDuty:Float;
+	var maxTemperature:Float;
+	var bandCelsius:Float;
+	var pidRangeCelsius:Float;
+	var gainWindowSeconds:Float;
+	var gainMinCelsius:Float;
+	var hysteresisCelsius:Float;
+	var hysteresisWindowSeconds:Float;
+	var heatCapacity:Float;
+	var power:Float;
+	var loss:Float;
+	var fanLoss:Float;
+	var ambient:Float;
+}
+
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
 	public static inline var VERSION:Int = 30;
@@ -633,9 +704,12 @@ class SceneArtifact {
 		var controllers = data.controllers == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.controllers));
 		var signals = data.signals == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.signals));
 		if (controllers.length > 100000 || signals.length > 100000) throw "Scene artifact cell wiring is too large";
+		var printing = data.printing == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.printing));
+		if (printing.length > 40000000) throw "Scene artifact print job is too large";
 		var length = 36 + unitText.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
 			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4 + robotSensors.length + 4 + machineMotion.length + 4
-			+ controllers.length + 4 + signals.length + 4 + project.length + 4;
+			+ controllers.length + 4 + signals.length + 4 + project.length + 4
+			+ printing.length + 4;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -753,6 +827,8 @@ class SceneArtifact {
 		result.blit(offset, signals, 0, signals.length); offset += signals.length;
     offset = putInt(result, offset, project.length);
     result.blit(offset, project, 0, project.length); offset += project.length;
+		offset = putInt(result, offset, printing.length);
+		result.blit(offset, printing, 0, printing.length); offset += printing.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
@@ -1000,6 +1076,9 @@ class SceneArtifact {
 			(data.machining.controllerId == null || data.mission.controllerId == null ||
 			 data.machining.controllerId == data.mission.controllerId))
 			throw "Scene artifact CNC job and mission need distinct controller owners";
+		if (data.printing != null && (data.machining != null || data.mission != null))
+			throw "Scene artifact cannot combine a print job with machining or a mission";
+		if (data.printing != null) validatePrinting(data.printing, data);
 		if (data.machining != null) validateMachining(data.machining, ids, data.assemblyDefinition);
 		if (data.mobileBase != null) validateMobileBase(data.mobileBase, data.assemblyDefinition);
 		if (data.robotTools != null) validateRobotTools(data.robotTools, data);
@@ -1101,6 +1180,9 @@ class SceneArtifact {
 			for (axis in axes) if (owners.get(axis) != owners.get(axes[0]))
 				throw 'Scene artifact axis program crosses controllers at "$axis"';
 		}
+		var printing = data.printing;
+		if (printing != null) for (axis in printing.axes) if (owners.get(axis) != owners.get(printing.extruder))
+			throw 'Scene artifact print axis "$axis" and the extruder belong to different controllers';
 		if (data.mission != null && (data.mission.controllerId == null ||
 			[for (c in controllers) if (c.id == data.mission.controllerId && c.kind == "robot") c].length != 1))
 			throw "Scene artifact mission needs its robot controller";
@@ -1282,6 +1364,91 @@ class SceneArtifact {
 		}];
 	}
 
+
+
+	/** A print job from its JSON section, typed field by field. */
+	static function decodePrinting(decoded:Dynamic):SceneArtifactPrinting {
+		function fail():Dynamic throw "Scene artifact print job is invalid";
+		function array(value:Dynamic):Array<Dynamic> return Std.isOfType(value, Array) ? cast value : fail();
+		function number(value:Dynamic):Float return Std.isOfType(value, Float) || Std.isOfType(value, Int) ? (value:Float) : fail();
+		function field(value:Dynamic, name:String):Float return number(Reflect.field(value, name));
+		function text(value:Dynamic, name:String):String {
+			var item:Dynamic = Reflect.field(value, name);
+			return Std.isOfType(item, String) ? item : fail();
+		}
+		function flag(value:Dynamic, name:String):Bool {
+			var item:Dynamic = Reflect.field(value, name);
+			return Std.isOfType(item, Bool) ? item : fail();
+		}
+		function integer(value:Dynamic, name:String):Int {
+			var result = field(value, name);
+			return result == Math.floor(result) ? Std.int(result) : fail();
+		}
+		var controller:Dynamic = Reflect.field(decoded, "controller");
+		if (controller == null) fail();
+		var job:SceneArtifactPrinting = {source: text(decoded, "source"),
+			axes: [for (axis in array(Reflect.field(decoded, "axes"))) Std.isOfType(axis, String) ? (axis:String) : fail()],
+			extruder: text(decoded, "extruder"),
+			filamentDiameter: field(decoded, "filamentDiameter"), gearRadius: field(decoded, "gearRadius"),
+			maxFlow: field(decoded, "maxFlow"), pressureAdvance: field(decoded, "pressureAdvance"),
+			pressureAdvanceWindow: field(decoded, "pressureAdvanceWindow"), rampLength: field(decoded, "rampLength"),
+			minExtrusionTemperature: field(decoded, "minExtrusionTemperature"),
+			heaters: [for (raw in array(Reflect.field(decoded, "heaters"))) {
+				var heater:SceneArtifactHeater = {name: text(raw, "name"), sensor: text(raw, "sensor"), slot: integer(raw, "slot"),
+					mount: text(raw, "mount"), target: text(raw, "target"), feedsExtruder: flag(raw, "feedsExtruder"),
+					r0Ohm: field(raw, "r0Ohm"), t0Celsius: field(raw, "t0Celsius"), beta: field(raw, "beta"),
+					pullupOhm: field(raw, "pullupOhm"), vRef: field(raw, "vRef"), kp: field(raw, "kp"), ki: field(raw, "ki"),
+					kd: field(raw, "kd"), maxDuty: field(raw, "maxDuty"), maxTemperature: field(raw, "maxTemperature"),
+					bandCelsius: field(raw, "bandCelsius"), pidRangeCelsius: field(raw, "pidRangeCelsius"),
+					gainWindowSeconds: field(raw, "gainWindowSeconds"), gainMinCelsius: field(raw, "gainMinCelsius"),
+					hysteresisCelsius: field(raw, "hysteresisCelsius"), hysteresisWindowSeconds: field(raw, "hysteresisWindowSeconds"),
+					heatCapacity: field(raw, "heatCapacity"), power: field(raw, "power"), loss: field(raw, "loss"),
+					fanLoss: field(raw, "fanLoss"), ambient: field(raw, "ambient")};
+				var fan:Dynamic = Reflect.field(raw, "fan");
+				if (fan != null) heater.fan = Std.isOfType(fan, String) ? fan : fail();
+				heater;
+			}],
+			controller: {stepTickHz: integer(controller, "stepTickHz")}};
+		return job;
+	}
+
+	static function validatePrinting(job:SceneArtifactPrinting, data:SceneArtifactData):Void {
+		function fail(detail:String):Void throw 'Scene artifact print job $detail';
+		if (data.assemblyDefinition == null) fail("needs the printer's assembly definition");
+		var definition = AssemblyDefinitionFlattener.flattenView(cast data.assemblyDefinition);
+		var joints = new Map<String, String>();
+		for (joint in definition.joints) joints.set(joint.id, Std.string(joint.type));
+		var occurrences = [for (item in definition.occurrences) item.id];
+		if (job.source == null || job.source.length == 0) fail("has no program");
+		if (job.axes == null || job.axes.length != 3) fail("needs three axes");
+		for (index in 0...3) {
+			var axis = job.axes[index];
+			if (!joints.exists(axis) || joints.get(axis) != "prismatic" || job.axes.indexOf(axis) != index)
+				fail('axis "$axis" is not a distinct prismatic joint');
+		}
+		if (!joints.exists(job.extruder) || job.axes.indexOf(job.extruder) >= 0) fail('extruder "${job.extruder}" is not a joint of its own');
+		for (value in [job.filamentDiameter, job.gearRadius, job.maxFlow, job.rampLength, job.pressureAdvanceWindow])
+			if (!finite(value) || value <= 0.0) fail("has a filament, gear, flow, ramp or window size that is not positive");
+		if (!finite(job.pressureAdvance) || job.pressureAdvance < 0.0 || job.pressureAdvance > 1.0) fail("has a pressure advance outside 0 to 1 s");
+		if (!finite(job.minExtrusionTemperature) || job.minExtrusionTemperature < 0.0) fail("has a minimum extrusion temperature below 0");
+		if (job.controller == null || job.controller.stepTickHz <= 0) fail("needs a controller step rate");
+		if (job.heaters == null || job.heaters.length == 0 || job.heaters.length > 2) fail("needs one or two heaters");
+		var slots = new Map<Int, Bool>(), channels = new Map<String, Bool>();
+		for (heater in job.heaters) {
+			if (heater.slot < 0 || heater.slot > 7 || slots.exists(heater.slot)) fail('heater "${heater.name}" has a bad or repeated sensor slot');
+			slots.set(heater.slot, true);
+			if (occurrences.indexOf(heater.mount) < 0) fail('heater "${heater.name}" is mounted on no occurrence');
+			for (channel in [heater.target, heater.fan]) if (channel != null) {
+				if (channel.length == 0 || channels.exists(channel)) fail('channel "$channel" is empty or repeated');
+				channels.set(channel, true);
+			}
+			for (value in [heater.r0Ohm, heater.t0Celsius, heater.beta, heater.pullupOhm, heater.vRef, heater.kp, heater.ki, heater.kd,
+					heater.maxDuty, heater.maxTemperature, heater.bandCelsius, heater.pidRangeCelsius, heater.gainWindowSeconds,
+					heater.gainMinCelsius, heater.hysteresisCelsius, heater.hysteresisWindowSeconds, heater.heatCapacity, heater.power,
+					heater.loss, heater.fanLoss, heater.ambient])
+				if (!finite(value)) fail('heater "${heater.name}" has a value that is not a number');
+		}
+	}
 
 	/** Robot tools from their JSON section, typed field by field. */
 	static function decodeRobotTools(decoded:Dynamic):Array<SceneArtifactRobotTool> {
@@ -2329,13 +2496,18 @@ private class SceneArtifactReader {
 		var projectLength = readInt();
 		if (projectLength < 0 || projectLength > 2000000) throw "Scene artifact project settings are too large";
 		if (projectLength > 0) project = @:privateAccess SceneArtifact.decodeProject(haxe.Json.parse(readString(projectLength)));
+		var printing:Null<SceneArtifactPrinting> = null;
+		var printingLength = readInt();
+		if (printingLength < 0 || printingLength > 40000000) throw "Scene artifact print job is too large";
+		if (printingLength > 0) printing = @:privateAccess SceneArtifact.decodePrinting(haxe.Json.parse(readString(printingLength)));
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts,
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
 			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase, mission: mission,
 			robotTools: robotTools, robotSensors: robotSensors, machineMotion: machineMotion,
-			controllers: controllers, signals: signals, project: project};
+			controllers: controllers, signals: signals, project: project,
+			printing: printing};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}

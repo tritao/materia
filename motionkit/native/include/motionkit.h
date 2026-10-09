@@ -577,6 +577,20 @@ MK_API mk_result MK_CALL mk_project_couplings(mk_trajectory_handle trajectory,
     const double *ratios MK_IN_ARRAY(term_count), const double *offsets MK_IN_ARRAY(term_count),
     uint32_t term_count, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
 /**
+ * A copy of `trajectory` with runs of its segments replaced by one quintic each, so a path lowered to hundreds of short
+ * segments a second does not fill a robot's queue or a device's link. A run is merged when the quintic through its
+ * start state and end state stays within the per-joint tolerances of the segments it replaces, in position, velocity and
+ * acceleration, at their joins and across the run, takes no joint past its velocity or acceleration limit where the
+ * segments it replaces keep to it, and is no longer than `max_duration_seconds`. Segments of degree 1 (chords) are
+ * never merged. Runs are found longest first by doubling and then bisecting.
+ */
+MK_API mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const double *position_tolerance,
+                                           const double *velocity_tolerance, const double *acceleration_tolerance,
+                                           const double *velocity_limit, const double *acceleration_limit,
+                                           uint32_t joint_count, double max_duration_seconds,
+                                           mk_trajectory_handle *out_trajectory);
+
+/**
  * A copy of `trajectory` in which `joint` runs `lead_seconds` ahead of itself, the lead taken on its velocity averaged
  * over `window_seconds`: position + lead * (position(t + w/2) - position(t - w/2)) / w. It is the pressure-advance
  * correction of an extruder: the filament is pushed ahead of the flow it will feed, and the window keeps a trajectory

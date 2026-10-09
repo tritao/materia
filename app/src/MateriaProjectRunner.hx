@@ -533,7 +533,7 @@ class MateriaProjectRunner {
       recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics,
       robotMotions: generated.robotMotions, cncJob: generated.cncJob,
       mobileBase: generated.mobileBase, mission: generated.mission, robotTools: generated.robotTools,
-      robotSensors: generated.robotSensors, machineMotion: generated.machineMotion};
+      robotSensors: generated.robotSensors, machineMotion: generated.machineMotion, printJob: generated.printJob};
   }
 
   static function projectToolsDirectory():String {

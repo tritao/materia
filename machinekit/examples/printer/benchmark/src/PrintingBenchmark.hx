@@ -329,6 +329,19 @@ class PrintingBenchmark {
     check(offsets >= 2 && driven >= 3, 'retractions are extruder moves and beads drive the extruder: $offsets moves, $driven driven paths');
     var compiled = machine.binding.compiler.compile(motion, machine.start, Int64.ofInt(1));
     var extruder = machine.printer.extruderIndex, taken = 0.0;
+    var shortest = 1e9, under = 0, total = 0, seconds = 0.0, plans = 0;
+    var all:Array<Float> = [];
+    for (block in compiled.blocks) for (plan in block.plans) {
+      var durations = plan.segmentDurations();
+      plans++;
+      for (i in 0...durations.length()) {
+        var ms = Int64.toInt(durations.get(i)) / 1e6;
+        total++; shortest = Math.min(shortest, ms); seconds += ms / 1000; all.push(ms);
+        if (ms < 1.0) under++;
+      }
+    }
+    all.sort(Reflect.compare);
+    Sys.println('segments: $total in $plans plans over ${seconds} s, shortest ${shortest} ms, median ${all[all.length >> 1]} ms, 90th ${all[Std.int(all.length * 0.9)]} ms, $under under 1 ms');
     for (block in compiled.blocks) for (plan in block.plans) {
       taken += plan.evaluate(plan.durationSeconds).positions[extruder] - plan.evaluate(0.0).positions[extruder];
     }

@@ -142,7 +142,7 @@ class ProjectArtifactLoader {
       recipeDocument: artifact.recipeDocument, recipeDiagnostics: artifact.recipeDiagnostics,
       cncJob: machiningJob(artifact, records, scale), mobileBase: artifact.mobileBase, mission: artifact.mission,
       robotTools: artifact.robotTools, robotSensors: artifact.robotSensors, machineMotion: artifact.machineMotion,
-      controllers: artifact.controllers, signals: artifact.signals};
+      controllers: artifact.controllers, signals: artifact.signals, printJob: artifact.printing};
   }
 
   /**

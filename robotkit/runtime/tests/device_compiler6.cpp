@@ -1,6 +1,7 @@
 #include "device_compiler6.hpp"
 #include <cassert>
 #include <cmath>
+#include <vector>
 
 int main() {
     robotkit::ClockEstimator6 clock(1'000'000, 500'000);
@@ -201,4 +202,51 @@ int main() {
         1'000'000'000ULL, clock, blueprint, 1'000'000, 40'000, 5, 1e-7);
     assert(!too_precise.ok);
 
+    // A sliced curve plans to hundreds of segments a second, more than a serial link can refill: runs of them that one
+    // quintic follows to a tenth of a step go as one. A ramp of 400 pieces of 0.1 ms (constant acceleration, exact in a
+    // quadratic each) becomes a few segments no longer than 4 ms, the same motion to the step.
+    blueprint.joint_count = 1;
+    blueprint.owner_period_ns = 10'000'000;
+    blueprint.joints[0].max_velocity = 1.0;
+    blueprint.joints[0].max_acceleration = 100.0;
+    robotkit::DeviceActuator6 motor{0, 1.0, 0.0, 10'000.0, 0.5};
+    const robotkit::DeviceActuator6 motors[] = {motor};
+    std::vector<robotkit::TrajectorySegment> ramp(400);
+    double position = 0.0, speed = 0.0;
+    for (std::size_t i = 0; i < ramp.size(); ++i) {
+        // Accelerate at 10 m/s^2 for the first half, brake for the second.
+        const double acceleration = i < 200 ? 10.0 : -10.0, dt = 1e-4;
+        ramp[i].time_from_start_ns = i * 100'000ULL; ramp[i].duration_ns = 100'000; ramp[i].degree = 2; ramp[i].joint_count = 1;
+        ramp[i].coefficients[0].value[0] = position;
+        ramp[i].coefficients[0].value[1] = speed;
+        ramp[i].coefficients[0].value[2] = 0.5 * acceleration;
+        position += speed * dt + 0.5 * acceleration * dt * dt;
+        speed += acceleration * dt;
+    }
+    auto many = robotkit::compile_device_segments6(ramp, 12, true, 1'000'000'000ULL, clock, blueprint, 1'000'000, 40'000,
+        5, 1e-5, motors);
+    assert(many.ok);
+    assert(many.segments.size() <= 14);
+    std::uint64_t covered = 0;
+    for (const auto &piece : many.segments) {
+        assert(piece.host_duration_ns <= 4'000'000);
+        assert(piece.host_time_from_start_ns == covered);
+        covered += piece.host_duration_ns;
+    }
+    assert(covered == 40'000'000);
+    assert(many.segments.back().header.ends_at_rest);
+    // The pieces meet where the motion does: the last one ends where the ramp does (position 0.4 m... 2 x 0.5 x 10 x 0.02^2).
+    const auto &last = many.segments.back();
+    const double tau = static_cast<double>(last.header.duration_ticks) / 1e6;
+    const double end = last.coefficients[0].c0 + last.coefficients[0].c1 * tau + last.coefficients[0].c2 * tau * tau +
+        last.coefficients[0].c3 * tau * tau * tau + last.coefficients[0].c4 * std::pow(tau, 4) + last.coefficients[0].c5 * std::pow(tau, 5);
+    assert(std::abs(end - position) < 1e-6);
+    // A path that turns inside a piece is not merged across the turn: a speed reversal every 0.1 ms.
+    for (std::size_t i = 0; i < ramp.size(); ++i) {
+        ramp[i].degree = 1; ramp[i].coefficients[0].value[0] = (i % 2 == 0 ? 0.0 : 0.0005);
+        ramp[i].coefficients[0].value[1] = (i % 2 == 0 ? 5.0 : -5.0); ramp[i].coefficients[0].value[2] = 0.0;
+    }
+    auto zigzag = robotkit::compile_device_segments6(ramp, 13, true, 1'000'000'000ULL, clock, blueprint, 1'000'000, 40'000,
+        5, 1e-5, motors);
+    assert(!zigzag.ok || zigzag.segments.size() == ramp.size());
 }

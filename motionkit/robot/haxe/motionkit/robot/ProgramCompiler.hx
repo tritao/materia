@@ -88,6 +88,15 @@ class ProgramCompiler {
   public var planCheck:Null<PlanCheck> = null;
   /** Linear motor sums for machines whose axis velocities use the single-axis envelope. */
   public var motorSpace:Null<MotorSpaceConstraints> = null;
+  /**
+    When positive, runs of a lowered path's segments are merged into one quintic each, up to this long, where the
+    quintic follows them to a few microseconds of motion (`MERGE_TIMING`) in position, a percent of the speed limit
+    and a tenth of the acceleration limit. A printer's curves lower to thousands of segments a second, which would
+    fill the robot's queue and a device's link; the default of zero leaves a path as it was lowered.
+  **/
+  public var mergeSegmentsSeconds:Float = 0.0;
+  /** The position error a merged segment may have, as seconds of motion at the joint's speed limit. */
+  public static inline var MERGE_TIMING:Float = 10e-6;
   /** Seconds a path's distance-driven joint (an extruder) runs ahead of the flow it feeds; 0 is off. */
   public var pressureAdvance:Float = 0.0;
   /** The window, seconds, over which the driven joint's velocity is averaged for the advance. */
@@ -121,7 +130,7 @@ class ProgramCompiler {
     result.planningAssumptions=planningAssumptions.copy();
     result.planCheck=planCheck==null?null:planCheck.fork();
     result.configurationConstraint=configurationConstraint;
-    result.motorSpace=motorSpace;result.pathEventSchedule=pathEventSchedule;result.requireFeasiblePath=requireFeasiblePath;
+    result.motorSpace=motorSpace;result.mergeSegmentsSeconds=mergeSegmentsSeconds;result.pathEventSchedule=pathEventSchedule;result.requireFeasiblePath=requireFeasiblePath;
     result.clearanceEvents=clearanceEvents.copy();result.clearanceDepthLimit=clearanceDepthLimit;
     result.motionPlanner=motionPlanner;
     result.angularResolution=angularResolution;
@@ -147,6 +156,7 @@ class ProgramCompiler {
     worker.configurationConstraint = configurationConstraint == null ? null :
       new ConfigurationConstraint(forked,configurationConstraint.configuration);
     worker.motorSpace = motorSpace;
+    worker.mergeSegmentsSeconds = mergeSegmentsSeconds;
     worker.pathEventSchedule = pathEventSchedule;
     worker.clearanceEvents = clearanceEvents.copy();
     worker.clearanceDepthLimit = clearanceDepthLimit;
@@ -668,6 +678,7 @@ class ProgramCompiler {
     };
     var plan:Null<ExecutionPlan> = null;
     var projected:Null<Trajectory> = null;
+    var merged:Null<Trajectory> = null;
     try {
       var motors = motorSpace;
       if (motors != null) motors.validate(pending.trajectory);
@@ -679,6 +690,17 @@ class ProgramCompiler {
       if (couplingIndices.length > 0) projected = projectCouplings(timed);
       else if (advanced != null) { projected = advanced; advanced = null; }
       if (advanced != null) advanced.dispose();
+      if (mergeSegmentsSeconds > 0.0 && pending.path != null) {
+        var count = maxVelocity.length;
+        var runs = (projected == null ? pending.trajectory : projected).mergeSegments(
+          [for (joint in 0...count) MERGE_TIMING * maxVelocity[joint]],
+          [for (joint in 0...count) 0.01 * maxVelocity[joint]],
+          [for (joint in 0...count) 0.1 * maxAcceleration[joint]],
+          [for (joint in 0...count) 0.98 * maxVelocity[joint]],
+          [for (joint in 0...count) 0.98 * maxAcceleration[joint]], mergeSegmentsSeconds);
+        // The followers are again exactly the sum of their terms, in the merged coefficients.
+        if (couplingIndices.length > 0) { merged = projectCouplings(runs); runs.dispose(); } else merged = runs;
+      }
       mark("motorValidationAndCouplings");
       if(pending.geometryCurve!=null && pending.geometryClearance && Sys.getEnv("PROCESS_PATH_VERIFY_CLEARANCE")=="1"){
         var curve:JointPathSamples=cast pending.geometryCurve;
@@ -696,10 +718,21 @@ class ProgramCompiler {
       if(configurationConstraint!=null)configurationConstraint.checkTrajectory(
         projected == null ? pending.trajectory : projected,controllerPeriodSeconds);
       mark("configurationCheck");
-      var completedPlan:ExecutionPlan = ExecutionPlan.create(projected == null ? pending.trajectory : projected,
-        pending.path == null ? limits : limits.withoutJerk(), id, pending.startQ,
-        zeros(), zeros(), startTolerances.position, startTolerances.velocity,
-        startTolerances.acceleration, pending.events);
+      var planLimits = pending.path == null ? limits : limits.withoutJerk();
+      var completedPlan:ExecutionPlan;
+      // A merged path follows what it replaces closely but not exactly: should it break a limit anyway, the path
+      // goes as it was lowered.
+      try {
+        if (merged == null) throw "not merged";
+        completedPlan = ExecutionPlan.create(merged, planLimits, id, pending.startQ, zeros(), zeros(),
+          startTolerances.position, startTolerances.velocity, startTolerances.acceleration, pending.events);
+      } catch (error:Dynamic) {
+        if (merged != null) { merged.dispose(); merged = null; }
+        completedPlan = ExecutionPlan.create(projected == null ? pending.trajectory : projected,
+          planLimits, id, pending.startQ,
+          zeros(), zeros(), startTolerances.position, startTolerances.velocity,
+          startTolerances.acceleration, pending.events);
+      }
       plan=completedPlan;
       mark("executionPlanCreation");
       var taskProof:Null<JointCurveTask> = null;
@@ -736,10 +769,12 @@ class ProgramCompiler {
       if (profiling) Sys.println("PROCESS_PATH_COMPILE_CHECKS " + haxe.Json.stringify({op:pending.opIndex, stages:profileRows}));
       pending.trajectory.dispose();
       if (projected != null) projected.dispose();
+      if (merged != null) merged.dispose();
       return completedPlan;
     } catch (error:Dynamic) {
       if (plan != null) plan.dispose();
       if (projected != null) projected.dispose();
+      if (merged != null) merged.dispose();
       throw 'Motion program op ${pending.opIndex}: $error';
     }
   }

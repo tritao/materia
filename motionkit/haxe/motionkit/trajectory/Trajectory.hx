@@ -175,6 +175,25 @@ class Trajectory implements TimedJointTrajectory {
   }
 
   /**
+    A copy in which runs of segments are one quintic each where that quintic stays within the per-joint tolerances of
+    what it replaces (see `mk_merge_segments`): a path lowered to hundreds of short segments a second becomes a few
+    hundred, which fit a robot's queue and a device's link. Joints that follow others are to be projected again after.
+  **/
+  public function mergeSegments(positionTolerance:Array<Float>, velocityTolerance:Array<Float>,
+      accelerationTolerance:Array<Float>, velocityLimit:Array<Float>, accelerationLimit:Array<Float>,
+      maxSeconds:Float):Trajectory {
+    ensureLive();
+    var count = positionTolerance.length;
+    if (velocityTolerance.length != count || accelerationTolerance.length != count || velocityLimit.length != count ||
+        accelerationLimit.length != count)
+      throw "Merging segments needs a position, velocity and acceleration tolerance and limit for each joint";
+    var created = MotionKitNative.mk_merge_segments(owner.borrow(), positionTolerance, velocityTolerance,
+      accelerationTolerance, velocityLimit, accelerationLimit, maxSeconds);
+    check(created.status, "trajectory.mergeSegments");
+    return new Trajectory(created.out_trajectory);
+  }
+
+  /**
     A copy in which joint `joint` runs `leadSeconds` ahead of itself, the lead taken on its velocity averaged over
     `windowSeconds`: an extruder's pressure advance. The joints that follow it are to be projected again afterwards.
   **/

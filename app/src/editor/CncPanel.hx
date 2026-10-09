@@ -38,22 +38,22 @@ class CncPanel {
     style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
     style.childGap = 8.0;
     style.background = tokens.surface;
-    var player = simulation.cncPlayer();
-    var heading = new KeyedView("heading", new Text("CNC PROGRAM", null, tokens.textSecondary, TextStyleOverride.text(11.0, 0.8)));
+    var player = simulation.toolpathPlayer();
+    var heading = new KeyedView("heading", new Text(player == null ? "CNC PROGRAM" : player.title(), null, tokens.textSecondary,
+      TextStyleOverride.text(11.0, 0.8)));
     if (player == null)
       return new Column("cnc-panel", [heading, new KeyedView("empty",
-        new Text("Play a project with a machining job to run its program here."))], style);
+        new Text("Play a project with a machining or print job to run its program here."))], style);
     model.show(player.sourceLines(), player.currentLine, tokens.selectionField);
     // Follow the running line, keeping a few lines of context above it.
     if (player.currentLine > 0 && player.currentLine != followedLine) {
       followedLine = player.currentLine;
       scroll.jumpTo(scroll.offsetX, Math.max(0.0, (player.currentLine - 4) * ROW_HEIGHT));
     }
-    var held = player.held(), failure = simulation.cncFailure();
+    var held = player.held(), failure = player.failure;
     var status = failure != null ? 'Stopped: $failure' :
       (held ? "Held" : "Running") + (player.currentLine > 0 ? ' · line ${player.currentLine}' : "") +
-      ' · tool ${player.loadedTool} · speed ${Math.round(player.speedOverride * 100)}%' +
-      (player.spindleUtilization > 0.0 ? ' · spindle ${Math.round(player.spindleUtilization * 1000) / 10}%' : "");
+      player.statusDetail() + ' · speed ${Math.round(player.speedOverride * 100)}%';
     var hold = new Button("Hold", null, () -> player.hold(), "cnc-hold");
     hold.enabled = !held && failure == null;
     var resume = new Button("Resume", null, () -> player.resume(), "cnc-resume");
@@ -62,7 +62,7 @@ class CncPanel {
       () -> {
         if (selectedLine > 0) player.restartFromLine(selectedLine);
       }, "cnc-restart");
-    restart.enabled = selectedLine > 0;
+    restart.enabled = selectedLine > 0 && player.canRestart();
     var buttonsStyle = new LayoutStyle();
     buttonsStyle.width = LayoutAxis.grow();
     buttonsStyle.childGap = 6.0;

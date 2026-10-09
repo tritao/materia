@@ -574,9 +574,8 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         std::memcpy(event.command.data(), source.value.command, RK_PROCESS_COMMAND_BYTES);
         wire_events.push_back(event);
     }
-    const auto first_host_duration = ack_.profile == 2
-        ? std::min<std::uint64_t>(owner_period_ns_, plan.segments.segments[0].duration_ns)
-        : plan.segments.segments[0].duration_ns;
+    // The first device segment may cover several of the plan's (merged), or be a piece of one (the minimal profile).
+    const auto first_host_duration = compiled.segments.front().host_duration_ns;
     const auto path_rate = static_cast<double>(compiled.segments.front().header.duration_ticks) /
         static_cast<double>(first_host_duration);
     if (!std::isfinite(path_rate) || path_rate <= 0) return RK_ERROR_LIMIT;

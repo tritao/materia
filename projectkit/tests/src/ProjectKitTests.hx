@@ -898,6 +898,77 @@ class ProjectKitTests {
   }
 
 
+  /** A print job travels with its printer: its axes, extruder and heaters name only what the assembly has. */
+  static function printing():Void {
+    var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
+    vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
+    var corners = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+    for (i in 0...corners.length) indices.setInt32(i * 4, corners[i]);
+    function part(id:String):materia.project.SceneArtifact.SceneArtifactPart
+      return {id: id, name: id, red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12,
+        vertices: vertices, normals: normals, indices: indices, faceRanges: []};
+    var frame = AssemblyFrames.identity();
+    function joint(id:String, type:AssemblyJointType, parent:String, child:String):materia.assembly.AssemblyDefinition.KinematicJoint
+      return {id: id, type: type, role: AssemblyJointRole.Tree, parent: parent, parentConnector: "pin", child: child,
+        childConnector: "pin", axis: {x: 0.0, y: 0.0, z: 1.0},
+        limits: {lower: -1.0, upper: 1.0, velocity: null, effort: null}, defaultValue: 0.0};
+    var printer:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "printer", lengthUnit: "mm",
+      definitions: [{id: "body", connectors: [{name: "pin", frame: frame}]}],
+      occurrences: [for (id in ["bed", "gantry", "carriage", "block", "gear", "sensor", "bedSensor"]) {id: id, definition: "body", initialPose: frame}],
+      joints: [joint("y", AssemblyJointType.Prismatic, "bed", "gantry"), joint("x", AssemblyJointType.Prismatic, "gantry", "carriage"),
+        joint("z", AssemblyJointType.Prismatic, "carriage", "block"), joint("e", AssemblyJointType.Continuous, "block", "gear")]};
+    function heater(name:String, slot:Int, mount:String, ?fan:String):materia.project.SceneArtifact.SceneArtifactHeater {
+      var made:materia.project.SceneArtifact.SceneArtifactHeater = {name: name, sensor: name, slot: slot, mount: mount,
+        target: 'heater.$name.target', feedsExtruder: name == "hotend", r0Ohm: 100000.0, t0Celsius: 25.0, beta: 3950.0,
+        pullupOhm: 4700.0, vRef: 3.3, kp: 0.06, ki: 0.004, kd: 0.0, maxDuty: 1.0, maxTemperature: 275.0, bandCelsius: 3.0,
+        pidRangeCelsius: 10.0, gainWindowSeconds: 28.0, gainMinCelsius: 2.0, hysteresisCelsius: 15.0, hysteresisWindowSeconds: 10.0,
+        heatCapacity: 13.5, power: 40.0, loss: 0.12, fanLoss: 0.05, ambient: 22.0};
+      if (fan != null) made.fan = fan;
+      return made;
+    }
+    var job:materia.project.SceneArtifact.SceneArtifactPrinting = {source: "G21\nG90\nM83\nG1 X10 Y10 E0.5 F1200\n",
+      axes: ["x", "y", "z"], extruder: "e", filamentDiameter: 1.75e-3, gearRadius: 3.65e-3, maxFlow: 15e-9,
+      pressureAdvance: 0.04, pressureAdvanceWindow: 0.04, rampLength: 0.0005, minExtrusionTemperature: 170.0,
+      heaters: [heater("hotend", 0, "sensor", "fan.part"), heater("bed", 1, "bedSensor")], controller: {stepTickHz: 40000}};
+    var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
+      parts: [part("body")], assemblyDefinition: printer, printing: job};
+    var restored = SceneArtifact.decode(SceneArtifact.encode(data)).printing;
+    if (restored == null) throw "print job round trip lost the job";
+    check(restored.source == job.source && restored.axes.join(",") == "x,y,z" && restored.extruder == "e" &&
+      restored.filamentDiameter == 1.75e-3 && restored.gearRadius == 3.65e-3 && restored.maxFlow == 15e-9 &&
+      restored.pressureAdvance == 0.04 && restored.minExtrusionTemperature == 170.0 && restored.controller.stepTickHz == 40000,
+      "print job round trip");
+    check(restored.heaters.length == 2 && restored.heaters[0].fan == "fan.part" && restored.heaters[1].fan == null &&
+      restored.heaters[0].feedsExtruder && !restored.heaters[1].feedsExtruder && restored.heaters[1].slot == 1 &&
+      restored.heaters[0].heatCapacity == 13.5 && restored.heaters[0].mount == "sensor", "print job heaters round trip");
+    // The job's own rules.
+    job.axes = ["x", "y", "e"];
+    rejects(function() SceneArtifact.encode(data), "a print axis that does not slide");
+    job.axes = ["x", "x", "z"];
+    rejects(function() SceneArtifact.encode(data), "a repeated print axis");
+    job.axes = ["x", "y", "z"]; job.extruder = "x";
+    rejects(function() SceneArtifact.encode(data), "an extruder that is an axis");
+    job.extruder = "e"; job.heaters[1] = heater("bed", 0, "bedSensor");
+    rejects(function() SceneArtifact.encode(data), "two heaters on one sensor slot");
+    job.heaters[1] = heater("bed", 1, "nowhere");
+    rejects(function() SceneArtifact.encode(data), "a heater mounted on no occurrence");
+    job.heaters[1] = heater("bed", 1, "bedSensor", "fan.part");
+    rejects(function() SceneArtifact.encode(data), "two heaters sharing a channel");
+    job.heaters[1] = heater("bed", 1, "bedSensor"); job.heaters[0].kp = Math.NaN;
+    rejects(function() SceneArtifact.encode(data), "a heater with a tuning that is not a number");
+    job.heaters[0].kp = 0.06; job.gearRadius = 0.0;
+    rejects(function() SceneArtifact.encode(data), "an extruder gear with no radius");
+    job.gearRadius = 3.65e-3; job.pressureAdvance = 2.0;
+    rejects(function() SceneArtifact.encode(data), "a pressure advance of seconds");
+    job.pressureAdvance = 0.04; job.heaters = [];
+    rejects(function() SceneArtifact.encode(data), "a print job with no heaters");
+    job.heaters = [heater("hotend", 0, "sensor", "fan.part")];
+    data.machining = {program: "M2\n", axes: ["x", "y", "z"], spindle: "gear", channelScope: "", workOffset: [0.0, 0.0, 0.0], tools: [], stocks: [], controller: {stepTickHz: 40000}};
+    rejects(function() SceneArtifact.encode(data), "machining and printing together");
+    data.machining = null; data.assemblyDefinition = null;
+    rejects(function() SceneArtifact.encode(data), "a print job without its printer");
+  }
+
   static function bodies():Void {
     var frame = AssemblyFrames.identity();
     function joint(id:String, type:AssemblyJointType, parent:String, child:String,
@@ -945,7 +1016,7 @@ class ProjectKitTests {
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");
     rejects(function() LengthUnit.metresPerUnit("feet"), "unsupported unit");
     assembly(); hydraulic();
-    homingDependencies(); frames(); scene(); machineMetadata(); machining(); mobileBase(); torchTool(); bodies();
+    homingDependencies(); frames(); scene(); machineMetadata(); machining(); printing(); mobileBase(); torchTool(); bodies();
     check(MaterialLibrary.require("steel-c45").physical.density == 7850, "steel density");
     check(MaterialLibrary.fromSpec("steel C45") == "steel-c45", "material lookup");
     rejects(function() MaterialLibrary.require("unknown"), "unknown material");

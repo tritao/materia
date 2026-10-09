@@ -63,11 +63,15 @@ class AssemblyRobot {
   public final toolFrames:Map<String, robotkit.model.Frame>;
   /** Connector frames used as endpoints of planned mission chains. */
   public final missionFrames:Map<String, robotkit.model.Frame>;
+  /** The heaters of a printer's virtual device, or null when the assembly has none. */
+  public final heaters:Null<robotkit.runtime.VirtualHeaters>;
 
   function new(robot:SimulatedRobot, runtime:RobotRuntime, model:RobotModel, blueprint:RobotRuntimeBlueprint,
       parts:Array<AssemblyPart>, shapes:Array<RobotRuntimeLinkShape>,
       jointInterfaces:Array<cadbridge.AssemblySimulationBridge.AssemblyJointInterface>, warnings:Array<String>,
-      mobile:Null<MobileBase>, toolFrames:Map<String, robotkit.model.Frame>, missionFrames:Map<String, robotkit.model.Frame>) {
+      mobile:Null<MobileBase>, toolFrames:Map<String, robotkit.model.Frame>, missionFrames:Map<String, robotkit.model.Frame>,
+      heaters:Null<robotkit.runtime.VirtualHeaters>) {
+    this.heaters = heaters;
     this.robot = robot;
     this.runtime = runtime;
     this.model = model;
@@ -407,6 +411,19 @@ class AssemblyRobot {
         sensor.frame = mount;
       }
     }
+    // A print job's heaters report on sensors of their own, mounted on the parts that carry the thermistors. In a cell
+    // of several controllers, the job runs on the one whose robot drives the extruder.
+    var printJob = session.printJob;
+    if (printJob != null && control != null && [for (joint in converted.model.joints) if (joint.id == printJob.extruder) joint].length == 0)
+      printJob = null;
+    if (printJob != null) for (heater in printJob.heaters) {
+      var carrier = converted.partLinks.get(heater.mount);
+      if (carrier == null) throw 'Heater "${heater.name}" is mounted on "${heater.mount}", which is not part of the printer';
+      var sensor = converted.model.addSensor(new robotkit.model.Sensor(heater.sensor, robotkit.tool.HeaterSensor.KIND, 0.0, heater.sensor));
+      var mount = converted.model.addFrame(new robotkit.model.Frame(heater.sensor + " mount", converted.model.links[carrier.link]));
+      mount.position = [carrier.offset.x, carrier.offset.y, carrier.offset.z];
+      sensor.frame = mount;
+    }
     // A frame on a link at a connector of the part riding it, in the link's frame and metres.
     function mountFrame(name:String, at:SceneArtifactPlace):robotkit.model.Frame {
       var carrier = converted.partLinks.get(at.occurrence);
@@ -446,8 +463,21 @@ class AssemblyRobot {
     }
     var machine = session.machineMotion;
     var device:Null<robotkit.runtime.VirtualDeviceOptions> = null;
+    var extruderChannel = -1;
     if (virtualWelder) device = robotkit.runtime.VirtualServoOptions.fromModel(converted.model);
-    else if (machine != null && machine.virtualDevice == true) {
+    else if (printJob != null) {
+      // The printer's heaters run on the device. Its board has no switch inputs for a CoreXY (a switch joint driven by
+      // two motors), so the machine is referenced where its initial pose has it, and its home switches are not wired.
+      converted.model.switches.resize(0);
+      var binding = robotkit.device.DeviceBinding.bind(converted.model,
+        robotkit.device.DeviceLayout.forActuators(converted.model), printJob.controller.stepTickHz);
+      converted.model = binding.model;
+      device = new robotkit.runtime.VirtualDeviceOptions();
+      device.actuators = binding.virtualActuators();
+      device.baud = PrintProgramPlayer.LINK_BAUD;
+      for (channel in binding.channels) if (converted.model.joints[channel.jointIndex].id == printJob.extruder) extruderChannel = channel.channel;
+      if (extruderChannel < 0) throw 'The printer\'s extruder joint "${printJob.extruder}" has no motor on the device';
+    } else if (machine != null && machine.virtualDevice == true) {
       var binding = robotkit.device.DeviceBinding.bind(converted.model,
         robotkit.device.DeviceLayout.forActuators(converted.model), 40000);
       converted.model = binding.model;
@@ -484,6 +514,12 @@ class AssemblyRobot {
         ? new processkit.tool.WeldChannels(tool.channel, welder.wireSpeedChannel, welder.voltageChannel)
         : tool.kind == "gripper" ? new robotkit.tool.GripperChannels(tool.channel)
         : new robotkit.tool.SuctionChannels(tool.channel));
+    }
+    var heaterSetups:Array<robotkit.runtime.VirtualHeaters.HeaterSetup> = [];
+    if (printJob != null && device != null) {
+      heaterSetups = PrintProgramPlayer.heaterSetups(printJob, extruderChannel);
+      for (heater in printJob.heaters) blueprint.addTool(new robotkit.tool.HeaterChannels(heater.target, heater.fan));
+      robotkit.runtime.VirtualHeaters.configure(device, blueprint, heaterSetups);
     }
     if (virtualWelder) {
       var torches = [for (tool in session.robotTools) if (tool.torch != null) tool];
@@ -548,8 +584,9 @@ class AssemblyRobot {
       parts.push({id: "project:" + occurrence.id, robotIndex: robotIndex, linkIndex: placed.link,
         offset: placed.offset, center: [for (coordinate in center) coordinate * physical.metresPerUnit]});
     }
+    var heaters = printJob == null ? null : new robotkit.runtime.VirtualHeaters(candidate, runtime, robotIndex, heaterSetups);
     return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, cadbridge.AssemblySimulationBridge.shapes(converted.model),
       converted.jointInterfaces, warnings, mobile,
-      toolFrames, missionFrames);
+      toolFrames, missionFrames, heaters);
   }
 }

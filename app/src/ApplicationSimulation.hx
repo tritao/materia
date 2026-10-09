@@ -76,6 +76,7 @@ class ApplicationSimulation {
   /** The battery model of a CAD mobile power system, when present. */
   var power:Null<SimulatedMobilePower> = null;
   var cnc:Null<CncProgramPlayer> = null;
+  var print:Null<PrintProgramPlayer> = null;
   var beltVisuals:Array<BeltVisuals> = [];
   var machineProgram:Null<MachineProgramPlayer> = null;
   var digitalProgram:Null<MachineDigitalProgramPlayer> = null;
@@ -149,6 +150,7 @@ class ApplicationSimulation {
     if (tools != null) members.push(tools);
     if (power != null) members.push(power);
     if (cnc != null) members.push(cnc);
+    if (print != null) members.push(print);
     if (machineProgram != null) members.push(machineProgram);
     if (digitalProgram != null) members.push(digitalProgram);
     if (pressBrake != null) members.push(pressBrake);
@@ -173,6 +175,7 @@ class ApplicationSimulation {
     var candidateAssemblyParts:Array<AssemblyVisual> = [];
     var candidateWarnings:Array<String> = [];
     var candidateCnc:Null<CncProgramPlayer> = null;
+    var candidatePrint:Null<PrintProgramPlayer> = null;
     var pendingCnc:Null<{job:CncJob, robot:AssemblyRobot,
       input:Null<String->Null<EventValue>>, interfaceManaged:Bool}> = null;
     var candidateBelts:Array<BeltVisuals> = [];
@@ -288,6 +291,13 @@ class ApplicationSimulation {
 		      input: candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id),
 		      interfaceManaged: interfaceManaged};
 		  }
+          // A bad print program fails the rebuild here, before anything live changes.
+          var printJob = session.printJob;
+          if (printJob != null && built.heaters != null) {
+            if (ownsJob) throw "A controller cannot run a CNC job and a print job together";
+            if (candidatePrint != null) throw "A project simulation can run only one print job";
+            candidatePrint = new PrintProgramPlayer(printJob, built, candidate, session, createdSpace.session);
+          }
           var machine = session.machineMotion;
           if (machine != null) {
             var jointIds = [for (joint in built.model.joints) joint.id];
@@ -513,6 +523,7 @@ class ApplicationSimulation {
       if (pressBrake != null) pressBrake.beforeReset();
       pressBrake = candidatePress;
       cnc = candidateCnc;
+      print = candidatePrint;
       mobile = candidateMobile;
       mission = candidateMission;
       cellSignals = candidateSignals;
@@ -644,9 +655,15 @@ class ApplicationSimulation {
 
   /** Why the project's CNC program stopped, or null while it runs or when there is none. */
   public function cncFailure():Null<String> return cnc == null ? null : cnc.failure;
+  /** Why the project's print stopped, or null while it runs or when there is none. */
+  public function printFailure():Null<String> return print == null ? null : print.failure;
 
   /** The project's CNC program player, or null when the project has no CNC job. */
   public function cncPlayer():Null<CncProgramPlayer> return cnc;
+  /** The project's print job player, or null when the project has none. */
+  public function printPlayer():Null<PrintProgramPlayer> return print;
+  /** The player of the project's G-code job, whatever the machine: CNC or print. */
+  public function toolpathPlayer():Null<ToolpathPlayer> return cnc != null ? cnc : print;
   public function programPlayer():Null<MachineProgramPlayer> return machineProgram;
   static function hasPneumaticCylinder(blueprint:robotkit.runtime.RobotRuntimeBlueprint):Bool {
     for (drive in blueprint.cylinderDrives)
@@ -835,7 +852,7 @@ class ApplicationSimulation {
     digitalProgram = null;
     if (pressBrake != null) pressBrake.beforeReset();
     pressBrake = null;
-    cnc = null; mobile = null; mission = null; beads = null; cellSignals = null; refreshMembers();
+    cnc = null; print = null; mobile = null; mission = null; beads = null; cellSignals = null; refreshMembers();
     // A mission's programs are planned on worker threads that finish the plan they are on after they are cancelled; the
     // world they plan for goes now, so wait for them (see ProgramPlanner).
     motionkit.robot.ProgramPlanner.shutdown();

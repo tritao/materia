@@ -38,4 +38,6 @@ typedef GeneratedAssemblyScene = {
   @:optional var controllers:Array<materia.project.SceneArtifact.SceneArtifactCellController>;
   /** Digital wires between cabinet terminals. */
   @:optional var signals:Array<materia.project.SceneArtifact.SceneArtifactCellSignal>;
+  /** The print job the project's generator made for its printer, if any. */
+  @:optional var printJob:materia.project.SceneArtifact.SceneArtifactPrinting;
 }

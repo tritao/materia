@@ -1,10 +1,19 @@
 import cadkit.modeling.AssemblyModel;
+import camkit.additive.Slicer;
+import camkit.additive.SlicerSettings;
+import camkit.additive.TestParts;
+import cnckit.CncController;
+import cnckit.printer.PrinterFlavour;
+import cnckit.printer.PrinterWriter;
 import cadkit.modeling.AssemblyState;
 import haxe.io.Bytes;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.PosedParts;
 import machinekit.motion.LinearRail;
 import machinekit.motion.NemaStepper;
+import machinekit.printing.HeaterCartridge;
+import machinekit.printing.Thermistor;
+import machinekit.printing.Thermistor.ThermistorSpec;
 import machinekit.transmission.TimingBelt;
 import machinekit.transmission.TimingBelt.BeltWrap;
 import materia.assembly.AssemblyFrames;
@@ -14,10 +23,74 @@ import materia.project.SceneArtifact;
 class CoreXyPrinterPreview {
 	public static inline var ASSEMBLY_ID:String = "corexy-printer";
 
-	/** Geometry, joints and initial pose of the printer (parts with equal designations share geometry). */
+	/**
+	 * Geometry, joints and initial pose of the printer (parts with equal designations share geometry), and the job it
+	 * prints: the slicer's small tab.
+	 */
 	public static function printer():Bytes {
-		var scene = AssemblyPreview.scene(new CoreXyPrinter(), ASSEMBLY_ID);
+		var printer = new CoreXyPrinter();
+		var scene = AssemblyPreview.scene(printer, ASSEMBLY_ID);
+		scene.printing = CoreXyPrinterJob.smallTab(printer);
 		return SceneArtifact.encode(scene);
+	}
+}
+
+/**
+ * The print job of the printer example (see SceneArtifactPrinting): the slicer's program as Klipper G-code, and the
+ * printer's own numbers for the extruder, the hotend and the bed, taken from the parts that are in it.
+ */
+class CoreXyPrinterJob {
+	/** The step rate of the controller the steppers are wired to, as the router's. */
+	public static inline var STEP_TICK_HZ:Int = 40000;
+	/** Pressure advance of a direct-drive extruder, seconds. */
+	public static inline var PRESSURE_ADVANCE:Float = 0.04;
+	/** The room, degrees Celsius. */
+	public static inline var AMBIENT:Float = 22.0;
+
+	/** The slicer's `SmallTab` (10 x 10 x 1.2 mm, six layers) with its default settings. */
+	public static function smallTab(printer:CoreXyPrinter):SceneArtifactPrinting {
+		var sliced = Slicer.slice(TestParts.smallTab(), new SlicerSettings());
+		return job(printer, PrinterWriter.write(sliced.program, new CncController(Printer), Klipper));
+	}
+
+	/** `source` (printer G-code in machine coordinates) as a job on this printer. */
+	public static function job(printer:CoreXyPrinter, source:String):SceneArtifactPrinting {
+		var hotend = printer.hotend.spec, cartridge = new HeaterCartridge();
+		var thermistor = new Thermistor();
+		var hotendHeater = heater("hotend", "thermistor", 0, "fan.part", true, thermistor.spec,
+			hotend.heatCapacity, cartridge.power(cartridge.spec.volts), hotend.lossCoefficient, hotend.fanLossCoefficient,
+			Math.min(hotend.maxTemperature, Math.min(cartridge.spec.maxTemperature, thermistor.spec.maxTemperature)) - 10.0);
+		var bed = printer.bed.spec;
+		var bedHeater = heater("bed", "bedThermistor", 1, null, false, thermistor.spec,
+			bed.heatCapacity, bed.watts, bed.lossCoefficient, 0.0, bed.maxTemperature);
+		return {source: source, axes: ["x", "y", "z"], extruder: "e",
+			filamentDiameter: hotend.filamentDiameter * 1e-3, gearRadius: printer.extruder.spec.hobDiameter * 0.5e-3,
+			maxFlow: hotend.maxVolumetricFlow * 1e-9, pressureAdvance: PRESSURE_ADVANCE, pressureAdvanceWindow: 0.04, rampLength: 0.0005,
+			minExtrusionTemperature: hotend.minExtrusionTemperature, heaters: [hotendHeater, bedHeater],
+			controller: {stepTickHz: STEP_TICK_HZ}};
+	}
+
+	/**
+	 * A heater on the controller whose plant is a block of `capacity` J/K, heated by `power` W at full duty and losing
+	 * `loss` W/K to the room (`fanLoss` more with the part fan on): a first-order lag of time constant
+	 * `tau = capacity / loss`. The PI closes the loop in a twentieth of `tau` (`kp = capacity / (power tau / 20)`) with
+	 * an integral time of an eighth of it, so the integral has made up the duty the block needs to hold its target
+	 * (`loss (target - room) / power`) before the watchdog's window is over; there is no derivative, as the plant has no
+	 * dead time to lead. The output is at full power outside the PID range and let down gently inside it. The watchdog
+	 * expects 2 degrees of gain in a quarter of `tau` while heating (never less than 20 s).
+	 */
+	static function heater(name:String, mount:String, slot:Int, fan:Null<String>, feedsExtruder:Bool, sensor:ThermistorSpec,
+			capacity:Float, power:Float, loss:Float, fanLoss:Float, maxTemperature:Float):SceneArtifactHeater {
+		var timeConstant = capacity / loss;
+		var lambda = timeConstant / 20.0;
+		var heater:SceneArtifactHeater = {name: name, sensor: name, slot: slot, mount: mount, target: 'heater.$name.target',
+			feedsExtruder: feedsExtruder, r0Ohm: sensor.ohmsAt25, t0Celsius: 25.0, beta: sensor.beta, pullupOhm: 4700.0, vRef: 3.3,
+			kp: capacity / (power * lambda), ki: capacity / (power * lambda) / (timeConstant / 8.0), kd: 0.0, maxDuty: 1.0, maxTemperature: maxTemperature,
+			bandCelsius: 3.0, pidRangeCelsius: 10.0, gainWindowSeconds: Math.max(20.0, timeConstant / 4.0), gainMinCelsius: 2.0,
+			hysteresisCelsius: 15.0, hysteresisWindowSeconds: 10.0, heatCapacity: capacity, power: power, loss: loss,
+			fanLoss: fanLoss, ambient: AMBIENT};
+		if (fan != null) heater.fan = fan;
+		return heater;
 	}
 }
 

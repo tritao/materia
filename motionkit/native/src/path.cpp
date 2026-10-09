@@ -986,6 +986,155 @@ mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joi
     return MK_OK;
 }
 
+namespace {
+
+struct Kin { double position, velocity, acceleration; };
+
+Kin kin_of(const mk_joint_coefficients &c, uint32_t degree, double tau) {
+    double p = 0.0, v = 0.0, a = 0.0;
+    for (int k = static_cast<int>(degree); k >= 0; --k) p = p * tau + c.value[k];
+    for (int k = static_cast<int>(degree) - 1; k >= 0; --k) v = v * tau + (k + 1.0) * c.value[k + 1];
+    for (int k = static_cast<int>(degree) - 2; k >= 0; --k) a = a * tau + (k + 2.0) * (k + 1.0) * c.value[k + 2];
+    return {p, v, a};
+}
+
+} // namespace
+
+mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const double *position_tolerance,
+                                    const double *velocity_tolerance, const double *acceleration_tolerance,
+                                    const double *velocity_limit, const double *acceleration_limit,
+                                    uint32_t joint_count, double max_duration_seconds,
+                                    mk_trajectory_handle *out_trajectory) {
+    if (!out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
+    out_trajectory->id = 0;
+    if (!position_tolerance || !velocity_tolerance || !acceleration_tolerance || !velocity_limit || !acceleration_limit ||
+        joint_count == 0 ||
+        !std::isfinite(max_duration_seconds) || max_duration_seconds <= 0.0)
+        return MK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t j = 0; j < joint_count; ++j)
+        if (!(position_tolerance[j] > 0.0) || !(velocity_tolerance[j] > 0.0) || !(acceleration_tolerance[j] > 0.0) ||
+            !(velocity_limit[j] > 0.0) || !(acceleration_limit[j] > 0.0))
+            return MK_ERROR_INVALID_ARGUMENT;
+    uint32_t joints = 0, count = 0;
+    auto status = mk_trajectory_joint_count(trajectory, &joints);
+    if (status != MK_OK) return status;
+    if (joints != joint_count) return MK_ERROR_INVALID_ARGUMENT;
+    status = mk_trajectory_segment_count(trajectory, &count);
+    if (status != MK_OK) return status;
+    const int64_t longest = static_cast<int64_t>(std::llround(max_duration_seconds * 1e9));
+    mk_trajectory_handle merged{};
+    status = mk_trajectory_create(joints, &merged);
+    if (status != MK_OK) return status;
+    try {
+        std::vector<int64_t> start(count), duration(count);
+        std::vector<uint8_t> smooth(count);
+        auto first_segment = std::make_unique<mk_segment>(), last_segment = std::make_unique<mk_segment>();
+        auto candidate = std::make_unique<mk_segment>(), best_segment = std::make_unique<mk_segment>();
+        for (uint32_t i = 0; i < count; ++i) {
+            *first_segment = mk_segment{};
+            first_segment->struct_size = sizeof(mk_segment);
+            status = mk_trajectory_get_segment(trajectory, i, first_segment.get());
+            if (status != MK_OK) { mk_trajectory_destroy(merged); return status; }
+            start[i] = first_segment->t0_ns;
+            duration[i] = first_segment->duration_ns;
+            // A chord (degree 1) knows no acceleration to match: it is never merged.
+            smooth[i] = first_segment->degree >= 2 ? 1 : 0;
+        }
+        // The quintic through the first segment's start state and the last one's end state.
+        auto through = [&](uint32_t last) {
+            const double T = static_cast<double>(start[last] + duration[last] - first_segment->t0_ns) * 1e-9;
+            const double end = static_cast<double>(duration[last]) * 1e-9;
+            *candidate = *first_segment;
+            candidate->t0_ns = first_segment->t0_ns;
+            candidate->duration_ns = start[last] + duration[last] - first_segment->t0_ns;
+            candidate->degree = 5;
+            for (uint32_t joint = 0; joint < joints; ++joint) {
+                const auto from = kin_of(first_segment->coefficients[joint], first_segment->degree, 0.0);
+                const auto to = kin_of(last_segment->coefficients[joint], last_segment->degree, end);
+                const double V0 = from.velocity * T, A0 = from.acceleration * T * T;
+                const double V1 = to.velocity * T, A1 = to.acceleration * T * T;
+                const double D = to.position - from.position - V0 - 0.5 * A0, E = V1 - V0 - A0, F = A1 - A0;
+                const double normalized[6] = {from.position, V0, 0.5 * A0, 10.0 * D - 4.0 * E + 0.5 * F,
+                    -15.0 * D + 7.0 * E - F, 6.0 * D - 3.0 * E + 0.5 * F};
+                double scale = 1.0;
+                for (int k = 0; k < 6; ++k) { candidate->coefficients[joint].value[k] = normalized[k] / scale; scale *= T; }
+            }
+        };
+        mk_trajectory_state state{};
+        state.struct_size = sizeof(state);
+        // Whether the quintic follows the segments it replaces at their joins and at fifteen even steps across.
+        auto follows = [&](uint32_t first, uint32_t last) -> mk_result {
+            std::vector<int64_t> times;
+            const uint32_t stride = std::max<uint32_t>(1, (last - first + 1) / 24);
+            for (uint32_t i = first; i <= last; i += stride) times.push_back(start[i]);
+            for (int step = 1; step < 16; ++step)
+                times.push_back(candidate->t0_ns + candidate->duration_ns * step / 16);
+            for (const auto time : times) {
+                const auto result = mk_trajectory_evaluate(trajectory, time, &state);
+                if (result != MK_OK) return result;
+                const double tau = static_cast<double>(time - candidate->t0_ns) * 1e-9;
+                for (uint32_t joint = 0; joint < joints; ++joint) {
+                    const auto mine = kin_of(candidate->coefficients[joint], 5, tau);
+                    if (std::abs(mine.position - state.position[joint]) > position_tolerance[joint] ||
+                        std::abs(mine.velocity - state.velocity[joint]) > velocity_tolerance[joint] ||
+                        std::abs(mine.acceleration - state.acceleration[joint]) > acceleration_tolerance[joint])
+                        return MK_ERROR_GENERATION;
+                    // A merged run does not take a joint past a limit that the segments it replaces keep to.
+                    if ((std::abs(mine.velocity) > velocity_limit[joint] && std::abs(state.velocity[joint]) <= velocity_limit[joint]) ||
+                        (std::abs(mine.acceleration) > acceleration_limit[joint] &&
+                         std::abs(state.acceleration[joint]) <= acceleration_limit[joint]))
+                        return MK_ERROR_GENERATION;
+                }
+            }
+            return MK_OK;
+        };
+        for (uint32_t first = 0; first < count;) {
+            *first_segment = mk_segment{};
+            first_segment->struct_size = sizeof(mk_segment);
+            status = mk_trajectory_get_segment(trajectory, first, first_segment.get());
+            if (status != MK_OK) { mk_trajectory_destroy(merged); return status; }
+            *best_segment = *first_segment;
+            uint32_t best = first, limit = first;
+            if (smooth[first])
+                while (limit + 1 < count && smooth[limit + 1] &&
+                       start[limit + 1] + duration[limit + 1] - start[first] <= longest) ++limit;
+            auto accepts = [&](uint32_t last) -> mk_result {
+                *last_segment = mk_segment{};
+                last_segment->struct_size = sizeof(mk_segment);
+                auto result = mk_trajectory_get_segment(trajectory, last, last_segment.get());
+                if (result != MK_OK) return result;
+                through(last);
+                result = follows(first, last);
+                if (result != MK_OK) return result;
+                best = last;
+                *best_segment = *candidate;
+                return MK_OK;
+            };
+            // The longest run that works, found by doubling and then bisecting.
+            uint32_t step = 1, failed = limit + 1;
+            while (best + step <= limit) {
+                const auto result = accepts(best + step);
+                if (result == MK_OK) step *= 2;
+                else if (result == MK_ERROR_GENERATION) { failed = best + step; break; }
+                else { mk_trajectory_destroy(merged); return result; }
+            }
+            while (failed > best + 1) {
+                const uint32_t middle = best + (failed - best) / 2;
+                if (middle == best) break;
+                const auto result = accepts(middle);
+                if (result == MK_OK) continue;
+                if (result != MK_ERROR_GENERATION) { mk_trajectory_destroy(merged); return result; }
+                failed = middle;
+            }
+            status = mk_trajectory_append_segment(merged, best_segment.get());
+            if (status != MK_OK) { mk_trajectory_destroy(merged); return status; }
+            first = best + 1;
+        }
+    } catch (const std::bad_alloc &) { mk_trajectory_destroy(merged); return MK_ERROR_OUT_OF_MEMORY; }
+    *out_trajectory = merged;
+    return MK_OK;
+}
+
 mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,
                                              uint32_t *out_count) {
     if (!out_count) return MK_ERROR_INVALID_ARGUMENT;

@@ -8,6 +8,15 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	const MK_TIMING_BINDING_JOINT_ACCELERATION = 2;
 	const MK_TIMING_BINDING_JOINT_VELOCITY = 1;
 	/**
+	 * A copy of `trajectory` with runs of its segments replaced by one quintic each, so a path lowered to hundreds of short
+	 * segments a second does not fill a robot's queue or a device's link. A run is merged when the quintic through its
+	 * start state and end state stays within the per-joint tolerances of the segments it replaces, in position, velocity and
+	 * acceleration, at their joins and across the run, takes no joint past its velocity or acceleration limit where the
+	 * segments it replaces keep to it, and is no longer than `max_duration_seconds`. Segments of degree 1 (chords) are
+	 * never merged. Runs are found longest first by doubling and then bisecting.
+	 */
+	extern fn mk_merge_segments(trajectory: mk_trajectory_handle, position_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_tolerance: ptr<const<f64>> @in_array("joint_count"), acceleration_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_limit: ptr<const<f64>> @in_array("joint_count"), acceleration_limit: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, max_duration_seconds: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	/**
 	 * A copy of `trajectory` in which `joint` runs `lead_seconds` ahead of itself, the lead taken on its velocity averaged
 	 * over `window_seconds`: position + lead * (position(t + w/2) - position(t - w/2)) / w. It is the pressure-advance
 	 * correction of an extruder: the filament is pushed ahead of the flow it will feed, and the window keeps a trajectory

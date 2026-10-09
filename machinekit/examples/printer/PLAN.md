@@ -834,6 +834,82 @@ Done. What was built and decided:
     program's; a speed override keeps volume per distance within 2 %.
   - Print: print time, heat-up, planning ratio and plan-check results.
 
+Done. What was built and decided:
+- **Lowering and kit level** (the first commit of AM8): the extruder is a joint driven by path distance
+  (`DistanceDrive`, ramps that conserve the nominal feed), `FilamentMove` is a joint offset, flow caps, pressure advance
+  as a windowed polynomial transform (`mk_advance_joint`), `PrinterBinding` (see the commit).
+- **`SceneArtifact.printing`** (version 28, 27 rejected): the program as Klipper G-code in machine coordinates, the three
+  axes, the extruder joint, filament diameter, gear radius, melt rate, pressure advance and its window, the ramp
+  length, the minimum extrusion temperature, the controller's step rate, and the heaters (sensor slot, mount, channels,
+  PID and watchdog numbers and the thermal plant). Exclusive with machining and a mission. The "slicer request" variant
+  is not offered: the generator slices when it generates (`CoreXyPrinterJob.smallTab`), so the artifact carries the
+  program that was sliced, and a later slicer UI writes the same section. There is no work offset: printer G-code
+  is in machine coordinates (the bed's front left corner is the machine's zero), as `CncCompiler` reads it.
+- **Generator** (`CoreXyPrinterPreview.printer()`): slices `SmallTab` with the default settings and takes the numbers of
+  the extruder (hob 7.3 mm, 1.75 mm filament, 15 mm^3/s), the hotend (13.5 J/K, 0.12 W/K, +0.05 W/K with the fan,
+  cartridge 40 W, thermistor 100k beta 3950) and the bed (640 J/K, 300 W, 1.4 W/K) from the parts. The PID is derived
+  from each plant, not typed: the loop closes in a twentieth of the plant's time constant (`kp = C / (P tau / 20)`),
+  the integral time is an eighth of it, there is no derivative, and the watchdog expects 2 degrees in a quarter of the
+  time constant. (A first tuning with an integral time equal to the time constant left the hotend creeping the last
+  degrees until the watchdog called it runaway; the test caught it.)
+- **App.** `ToolpathPlayer` (new) holds what a CNC and a print player share: compile from where the machine is, homing
+  when it has switches, streaming plans to the robot, looping, speed override, feed hold, plan checks, stepper slip
+  and encoders; `CncProgramPlayer` now extends it (restart, stock and tools stay in it) and `PrintProgramPlayer` is the
+  second user. The print player plans over the whole machine (axes, belts, screws and the extruder, with the plan
+  check on all of it), reads the heaters' reports before each step, answers `heater.<name>.at_temperature` waits from
+  the `tool_heater` sensor, stops the print on a heater fault with the controller's message, and tracks the layer from
+  the G-code's layer markers. `AssemblyRobot.add` gives a project with a print job a virtual device, the heaters'
+  sensors and channels and `VirtualHeaters`. The CNC panel serves both (title, status line, restart only where the
+  player can restart).
+- **The virtual device and a CoreXY.** The device cannot read a CoreXY's home switches (a switch joint driven by two
+  motors; AM6 left this open), so a print job's model drops its switch inputs and the machine is referenced. A virtual
+  device counts steps from zero, and the assembly's actuators count from the joints' zero: the machine powers up at
+  its origin, all three axes at their lower limit (nozzle at the bed's front left corner, touching it), so the player
+  compiles from where the robot stands once the device has taken over (it waits 0.15 s for the clock sync, as the
+  machine program does), not from the assembly's initial pose. Starting exactly on the limits works because of the
+  start-at-limit rule (AM5b item 1 is about that rule).
+- **The segment density problem, measured and fixed.** The first print stopped in the device's link qualification and
+  then in the robot's queue: `SmallTab` plans to 163,392 polynomial segments over 56 s of motion (median 33 us, 140,323
+  under 1 ms, 3,000 a second), because TOPP-RA's 32 stages per path sample span lower to one segment each and the
+  extruder's ramp stations and the corner arcs make many tiny spans. The robot's queue holds 4,096 knots and the stream
+  keeps 2 s ahead; the endpoint refuses a link that cannot refill 128 segments in time. Two merges, both exact to a
+  fraction of a step: `mk_merge_segments` (MotionKit native, opt-in per compiler: `mergeSegmentsSeconds`, set to an
+  owner period by the printer binding) replaces runs of lowered segments by one quintic through the run's end states
+  where it stays within 10 microseconds of motion at the joint's speed limit, 1 % of its speed and 10 % of its
+  acceleration of the pieces, never past a limit the pieces keep to, found by doubling and bisecting; a plan whose merged
+  form breaks a limit anyway is built from the unmerged path. `SmallTab`: 163,392 -> 25,580 segments (457 a second);
+  the gate's planning also gets faster (the gear: 10.37x -> 13.36x real time overall, worst 10 s window 3.11x ->
+  4.12x, planned time unchanged, 0.3 % above the reference). `compile_device_segments6` merges again for the device's
+  link: a segment under 2 ms starts a run of up to 4 ms that one quintic follows to a tenth of a step and a percent of
+  the step rate of the originals (else the plan goes as it came, as does any plan the merge would take past a
+  deployment limit). Segments of 2 ms or more are sent as planned: a first setting that merged up to an owner period
+  everywhere also changed the gantry weldment, whose arc then could not be held. The 18,900 segments under 1 ms that
+  remain are corner arcs (AM5b item 8). The link is the board's native USB (12 Mbit/s): at the welder's 3 Mbaud the
+  qualification still refused the bursts of tiny segments at the arcs.
+- **A change of mine that broke the gantry weldment, found by the full suite.** The extruder gear needs an acceleration
+  from its motor's torque, and `RobotModel.coupledLimits` now gives a turning joint with no acceleration of its own
+  one; that also gave one to every directly driven revolute joint of the arms, which changed the gantry welder's
+  plans (the arc could not be held in three restarts). The rule now applies only to a joint whose motor is behind
+  a gear train (the motor is a follower of the joint), as the extruder's is; the weldment passes again (159.8 s
+  cycle, tip within 0.2 mm of the seams, legs of 5 mm).
+- **Fixes the print found.** The chunk-boundary acceleration tolerance (`TrajectoryStream.programSubmission`) allowed
+  the jump between chunks plus 1e-5, and a quintic with a large jerk differs between the previous segment's end and
+  the instant a nanosecond before by more than that: it now adds the jerk over that nanosecond. The motor-space check
+  (AM5 commit f91cb56cc) and a regression test for the diagonals came out of the review of CoreXY limits.
+- **The print (MuJoCo, virtual device, 100 Hz).** `SmallTab`, six layers: 169.8 s from power-up to the end, of which
+  the hotend reaches 210 C (within 3 C) at 103.6 s and the bed 60 C at 90.5 s (the program waits for both), then 66 s of
+  printing. No stall, no heater fault, no failure; the extruder feeds 56.08 mm of filament against the program's
+  56.08 mm (0.0 %); with the speed halved from layer 3 to 4 the filament per metre of path is 33.98 mm against 33.89 mm
+  at full speed (0.3 %, limit 2 %). The plan check ran on 39 plans: no stepper stall, worst torque 45 % of the
+  pull-out curve (a Z screw motor), 30 plans carry accuracy findings, worst deviation 329 micrometres on y (the belt
+  stretching under acceleration: that is what the check is for, recorded not hidden). Planning cost 54 s of processor
+  time for the 66 s of motion; the slowest tick 13.8 s, the first plan's synchronous compile: an interactive app would
+  hold still that long at the start of a print (AM5b item 9).
+- **Tests.** `PlannerTests.testMergedSegmentsFollowTheOriginals` (a ramp of 400 pieces to a few, the zigzag kept, limits
+  kept), the C++ `robotkit_device_compiler6` test (400 pieces to at most 8, durations and ends kept), `ProjectKitTests.printing`
+  (round trip and twelve rejections), `ProjectSourceTests.checkPrinter` (the print above with its assertions, and the
+  panel), the printing gate's `motorChecks`. The CNC refactor is covered by the existing router and mill checks.
+
 **AM9. Deposition and checks (AM-D7).**
 - `sk_stock_add` and empty-stock creation, with C tests.
 - App `PrintingStock` (the `MachiningStock` counterpart) deposits from the actual tip and
@@ -892,6 +968,12 @@ left in the motion path.
    the device's f32 arithmetic).
 7. Decide whether the printer's axes take the motors' full rate with motor-space rows (see the AM5 notes on CoreXY motor
    limits), against the cube's print time.
+8. The corner arcs still lower to tens of thousands of sub-millisecond segments (`SmallTab`: 18,900 of 25,580 under
+   1 ms after merging): an adaptive TOPP-RA grid by span length and curvature (the fixed 32 per span is calibrated with
+   the 0.8 margin; see the RobotKit Paint path that failed when it was coarsened), or arcs that are not made smaller
+   than the machine can follow (item 4).
+9. The first plan of a print compiles synchronously inside a tick (13.8 s for `SmallTab` in the app): plan it on the
+   planner thread, as a mission's programs are, and start the print when the first plan is ready.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
@@ -927,7 +1009,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM5 | done: gate passed | see the commit below |
 | AM6 | done | see the commit below |
 | AM7 | done | see the commit below |
-| AM8 | planned | |
+| AM8 | done | see the commits below |
 | AM9 | planned | |
 | AM10 | planned | |
 | AM11 | planned | |
