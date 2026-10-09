@@ -15,7 +15,11 @@ class CamContour {
   public final z:Float;
   public final signedArea:Float;
 
-  public function new(vertices:Array<Point3>) {
+  /**
+    `validated` skips the self-intersection check, which costs the square of the vertex count: for
+    contours that come from a valid B-rep face, where a boundary cannot cross itself.
+  **/
+  public function new(vertices:Array<Point3>, ?validated:Bool = false) {
     if (vertices == null) throw "CAM contour needs vertices";
     var values = vertices.copy();
     if (values.length > 1 && values[0].distanceTo(values[values.length - 1]) < 1e-9)
@@ -36,7 +40,7 @@ class CamContour {
     }
     signedArea = area * 0.5;
     if (Math.abs(signedArea) < 1e-14) throw "CAM contour has zero area";
-    for (i in 0...values.length) for (j in (i + 2)...values.length) {
+    if (!validated) for (i in 0...values.length) for (j in (i + 2)...values.length) {
       if ((j + 1) % values.length == i) continue;
       if (intersects(values[i], values[(i + 1) % values.length],
           values[j], values[(j + 1) % values.length]))

@@ -36,7 +36,7 @@ class PlanarRegionSmoke {
 		near(Math.abs(inner.segments[0].sweep), 2.0 * Math.PI, "a full circle", 1e-9);
 		near(outer.signedArea(), 400.0, "the outer loop runs counter-clockwise", 1e-9);
 		near(inner.signedArea(), -Math.PI * 9.0, "the hole runs clockwise", 1e-9);
-		near(outer.z, 7.5, "loops are at the section height", 1e-9);
+		near(outer.z, 0.0, "sections are brought down to z = 0", 1e-9);
 		near(outer.length(), 80.0, "the square's perimeter", 1e-9);
 		// Each loop closes up.
 		for (loop in loops) for (index in 0...loop.segments.length) {

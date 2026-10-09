@@ -33,6 +33,10 @@ class CamKitTests {
       '$message: expected $expected, got $actual');
 
   public static function main():Void {
+    if (Sys.getEnv("CAM_ONLY") == "additive") {
+      Sys.println('Additive slicer tests passed (${AdditiveSlicerTests.run()} assertions)');
+      return;
+    }
     var placement:materia.sheet.SheetPartPlacement = {
       id: "gantry-bracket", requirementId: "bracket", x: 10.0, y: 10.0,
       width: 20.0, height: 10.0, rotation: 0, regionId: "sheet-a"
@@ -233,6 +237,7 @@ class CamKitTests {
     CamMeasuredToolFixture.run(check);
     CamArcFixture.run(check);
     CamSetupFixture.run(check);
+    assertions += AdditiveSlicerTests.run();
     Sys.println('CamKit tests passed ($assertions assertions)');
   }
 

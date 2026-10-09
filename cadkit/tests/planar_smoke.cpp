@@ -45,6 +45,26 @@ int main() {
     check(faces(section) == 1);
     near(area(section), 400.0 - M_PI * 9.0, 1e-6);
 
+    // The same section far from the origin, where a plane through the origin is nowhere near the part.
+    cad_shape far = 0, farSection = 0;
+    ok(cad_shape_translate(part, {110, 110, 0}, &far)); keep(far);
+    ok(cad_shape_section(far, {0, 0, 7.5}, {0, 0, 1}, &farSection)); keep(farSection);
+    check(faces(farSection) == 1);
+    near(area(farSection), 400.0 - M_PI * 9.0, 1e-6);
+
+    // Sections of a prism at two heights, brought to one plane, are the same region made twice: their booleans must see it.
+    cad_shape higher = 0, lower = 0, same = 0, rest = 0, together = 0;
+    ok(cad_shape_section(part, {0, 0, 12.5}, {0, 0, 1}, &higher)); keep(higher);
+    check(higher != section);
+    ok(cad_shape_translate(higher, {0, 0, -5}, &lower)); keep(lower); // into the plane of the first
+    ok(cad_planar_common(section, lower, &same)); keep(same);
+    near(area(same), area(section), 1e-6);
+    ok(cad_planar_cut(section, lower, &rest)); keep(rest);
+    check(faces(rest) == 0);
+    ok(cad_planar_fuse(section, lower, &together)); keep(together);
+    near(area(together), area(section), 1e-6);
+    check(faces(together) == 1);
+
     cad_shape above = 0;
     ok(cad_shape_section(part, {0, 0, 25}, {0, 0, 1}, &above)); keep(above);
     check(faces(above) == 0);
@@ -98,6 +118,28 @@ int main() {
     ok(cad_planar_fuse(band, inset, &fused)); keep(fused);
     near(area(fused), area(section), 1e-6);
     check(faces(fused) == 1);
+    // Whichever way a face was made to look, offsets go the same way.
+    for (cad_shape region : {common, fused}) {
+        cad_shape grown2 = 0, shrunk2 = 0;
+        ok(cad_planar_offset(region, 0.1, &grown2)); keep(grown2);
+        ok(cad_planar_offset(region, -0.1, &shrunk2)); keep(shrunk2);
+        check(area(grown2) > area(region) && area(shrunk2) < area(region));
+    }
+    // Concentric and parallel boundaries have no well-defined medial axis: a ring and a band offset all the same.
+    cad_shape rod = 0, bore = 0, tube = 0, ring = 0, ringIn = 0, ringOut = 0;
+    ok(cad_cylinder(5, 10, &rod)); keep(rod);
+    ok(cad_cylinder(2, 30, &bore)); keep(bore);
+    cad_shape low = 0; ok(cad_shape_translate(bore, {0, 0, -10}, &low)); keep(low);
+    ok(cad_cut(rod, low, &tube)); keep(tube);
+    ok(cad_shape_section(tube, {0, 0, 5}, {0, 0, 1}, &ring)); keep(ring);
+    near(area(ring), M_PI * (25.0 - 4.0), 1e-6);
+    ok(cad_planar_offset(ring, -0.8, &ringIn)); keep(ringIn);
+    near(area(ringIn), M_PI * (4.2 * 4.2 - 2.8 * 2.8), 1e-6);
+    ok(cad_planar_offset(ring, 0.5, &ringOut)); keep(ringOut);
+    near(area(ringOut), M_PI * (5.5 * 5.5 - 1.5 * 1.5), 1e-6);
+    cad_shape bandIn = 0;
+    ok(cad_planar_offset(band, -0.1, &bandIn)); keep(bandIn);
+    check(area(bandIn) < area(band));
     cad_shape nothing = 0;
     ok(cad_planar_common(inset, gone, &nothing)); keep(nothing);
     check(faces(nothing) == 0);

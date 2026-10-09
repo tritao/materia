@@ -78,6 +78,25 @@ var controller = new CncController(LinuxCnc, program.tools);
 var linuxCnc = CncWriter.write(program, controller, machineBinding.travel);
 ```
 
+## Additive: slicing
+
+`camkit.additive.Slicer.slice(part, settings, profile, name)` turns a CadKit `Part` (millimetres) into a
+`ToolpathProgram` of printing operations (metres) and a `SliceReport`. It slices the B-rep: each layer is
+`PlanarRegion.section` of the solid at the layer's middle height, perimeters are offsets of it
+(`(k + 1/2)` bead widths in, from the outside in), the infill region starts where the last perimeter's
+share ends, top and bottom skins are what the `topLayers` above and `bottomLayers` below do not cover
+(booleans between layer regions), and infill is `CamPocketPlanner.fill` scanlines (rectilinear, alternating
+45 and 135 degrees on a lattice shared by all layers). Boundaries are read back exactly, so a circle is an
+`Arc` operation with no polygonization and no arc fitting. A bead is a rectangle with semicircular sides:
+`SlicerSettings.beadArea(height)`, and beads that fill a layer are `beadSpacing(height)` apart, so a solid
+layer deposits exactly its volume. Travels retract when they are longer than `retractMinTravel` and leave the
+part.
+
+`PrinterProfile` holds the bed centre, the purge line and the home position; its start sequence heats the
+bed and hotend and waits, travels to the purge line and primes, and its end sequence retracts, switches the
+heaters and the fan off and parks. The skirt belongs to no object, so cancelling the part leaves it.
+`TestParts` builds the calibration cube, the test tower and the small tab in code.
+
 The test project creates its own rectangular, rounded and holed plate fixtures,
 plus a generated clamp keep-out.
 It checks CAD curve sampling, pocket coverage, cutter offsets, depth steps,

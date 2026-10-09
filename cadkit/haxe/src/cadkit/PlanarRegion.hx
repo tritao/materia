@@ -95,9 +95,21 @@ class PlanarRegion {
 		this.shape = shape;
 	}
 
-	/** The region of `solid` on the plane z = `height` (the solid's own units). */
-	public static function section(solid:Shape, height:Float):PlanarRegion
-		return new PlanarRegion(solid.section(Geometry.vec3(0.0, 0.0, height), Geometry.vec3(0.0, 0.0, 1.0)));
+	/**
+	 * The region of `solid` on the plane z = `height` (the solid's own units), moved down to z = 0 so that
+	 * the sections of every layer lie in one plane and can be combined with booleans.
+	 */
+	public static function section(solid:Shape, height:Float):PlanarRegion {
+		var cut = solid.section(Geometry.vec3(0.0, 0.0, height), Geometry.vec3(0.0, 0.0, 1.0));
+		try {
+			var level = cut.translate(Geometry.vec3(0.0, 0.0, -height));
+			cut.close();
+			return new PlanarRegion(level);
+		} catch (error:Dynamic) {
+			cut.close();
+			throw error;
+		}
+	}
 
 	public function faceCount():Int return shape.subshapeCount(CadKit.ShapeKind.Face);
 

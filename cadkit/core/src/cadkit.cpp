@@ -4149,10 +4149,22 @@ TopoDS_Compound planar_compound(const std::vector<TopoDS_Face>& faces) {
     return compound;
 }
 
+// OCCT booleans treat a face as one side of a thin sheet: two faces on the same plane that look opposite
+// ways have nothing in common. A region's faces all look along the plane normal's dominant axis, upwards.
+TopoDS_Face looking_up(const TopoDS_Face& face) {
+    BRepAdaptor_Surface surface(face);
+    if (surface.GetType() != GeomAbs_Plane) return face;
+    gp_Dir normal = surface.Plane().Axis().Direction();
+    if (face.Orientation() == TopAbs_REVERSED) normal.Reverse();
+    const double x = normal.X(), y = normal.Y(), z = normal.Z();
+    const double dominant = std::abs(z) >= std::abs(x) && std::abs(z) >= std::abs(y) ? z : (std::abs(y) >= std::abs(x) ? y : x);
+    return dominant < 0.0 ? TopoDS::Face(face.Reversed()) : face;
+}
+
 std::vector<TopoDS_Face> planar_faces(const TopoDS_Shape& shape) {
     std::vector<TopoDS_Face> faces;
     for (TopExp_Explorer explorer(shape, TopAbs_FACE); explorer.More(); explorer.Next())
-        faces.push_back(TopoDS::Face(explorer.Current()));
+        faces.push_back(looking_up(TopoDS::Face(explorer.Current())));
     return faces;
 }
 
@@ -4198,7 +4210,7 @@ std::vector<TopoDS_Face> faces_from_wires(const std::vector<TopoDS_Wire>& wires,
         ShapeFix_Face fixer(maker.Face());
         fixer.FixOrientation();
         fixer.Perform();
-        result.push_back(fixer.Face());
+        result.push_back(looking_up(fixer.Face()));
     }
     return result;
 }
@@ -4212,17 +4224,76 @@ template<class F> cad_result planar_output(cad_shape* output, F action) {
     });
 }
 
-TopoDS_Shape planar_boolean(cad_shape first, cad_shape second, int operation) {
-    auto a = model_shape(first), b = model_shape(second);
+// Faces a, b (regions in one plane): 0 cut, 1 common, 2 fuse.
+TopoDS_Shape planar_boolean_shapes(const TopoDS_Shape& first, const TopoDS_Shape& second, int operation) {
+    const auto a = planar_compound(planar_faces(first)), b = planar_compound(planar_faces(second));
     TopoDS_Shape result;
-    if (operation == 0) { BRepAlgoAPI_Cut op(a, b); require_model(op.IsDone(), "planar cut failed"); result = op.Shape(); }
-    else if (operation == 1) { BRepAlgoAPI_Common op(a, b); require_model(op.IsDone(), "planar common failed"); result = op.Shape(); }
-    else { BRepAlgoAPI_Fuse op(a, b); require_model(op.IsDone(), "planar fuse failed"); result = op.Shape(); }
+    // Sections of one prism are the same region made twice, equal to within the tolerance of the shapes
+    // they were cut from, so the boolean is told to take that tolerance for coincidence.
+    auto run = [&](auto& op) {
+        NCollection_List<TopoDS_Shape> arguments, tools;
+        arguments.Append(a);
+        tools.Append(b);
+        op.SetArguments(arguments);
+        op.SetTools(tools);
+        op.SetFuzzyValue(1e-6);
+        op.SetNonDestructive(true);
+        op.Build();
+        require_model(op.IsDone() && !op.HasErrors(), "planar boolean failed");
+        return op.Shape();
+    };
+    if (operation == 0) { BRepAlgoAPI_Cut op; result = run(op); }
+    else if (operation == 1) { BRepAlgoAPI_Common op; result = run(op); }
+    else { BRepAlgoAPI_Fuse op; result = run(op); }
     auto faces = planar_faces(result);
     if (faces.empty()) return planar_compound(faces);
     ShapeUpgrade_UnifySameDomain unify(planar_compound(faces), true, true, false);
     unify.Build();
     return planar_compound(planar_faces(unify.Shape()));
+}
+
+TopoDS_Shape planar_boolean(cad_shape first, cad_shape second, int operation) {
+    return planar_boolean_shapes(model_shape(first), model_shape(second), operation);
+}
+
+// One face with a single wire offset on its own. MakeOffset works from the medial axis of everything it is
+// given, which degenerates (and crashes OCCT) when two boundaries of a face are concentric or parallel, so
+// a face is never offset with its holes: see `offset_face`.
+std::vector<TopoDS_Face> offset_simple(const TopoDS_Face& face, const gp_Pln& plane, double signed_distance) {
+    std::vector<TopoDS_Wire> wires;
+    try {
+        BRepOffsetAPI_MakeOffset offset(face, GeomAbs_Arc);
+        offset.Perform(signed_distance);
+        if (!offset.IsDone() || offset.Shape().IsNull()) return {};
+        for (TopExp_Explorer explorer(offset.Shape(), TopAbs_WIRE); explorer.More(); explorer.Next())
+            wires.push_back(TopoDS::Wire(explorer.Current()));
+    } catch (const Standard_Failure&) {
+        return {}; // the region collapsed
+    }
+    if (wires.empty()) return {};
+    return faces_from_wires(wires, plane);
+}
+
+// A face grown by `distance` (negative shrinks). Its outer boundary and each hole are offset separately, the
+// outer region one way and every hole region the other, and the holes are cut out of the outer result.
+std::vector<TopoDS_Face> offset_face(const TopoDS_Face& face, double distance) {
+    const auto plane = plane_of(face);
+    const auto outer = BRepTools::OuterWire(face);
+    auto region = [&](const TopoDS_Wire& wire) {
+        BRepBuilderAPI_MakeFace maker(plane, wire, true);
+        require_model(maker.IsDone(), "a boundary does not bound a face");
+        return looking_up(maker.Face());
+    };
+    auto grown = offset_simple(region(outer), plane, distance);
+    if (grown.empty()) return {};
+    std::vector<TopoDS_Face> holes;
+    for (TopExp_Explorer wires(face, TopAbs_WIRE); wires.More(); wires.Next()) {
+        const auto wire = TopoDS::Wire(wires.Current());
+        if (wire.IsSame(outer)) continue;
+        for (const auto& piece : offset_simple(region(wire), plane, -distance)) holes.push_back(piece);
+    }
+    if (holes.empty()) return grown;
+    return planar_faces(planar_boolean_shapes(planar_compound(grown), planar_compound(holes), 0));
 }
 }  // namespace
 
@@ -4233,8 +4304,18 @@ extern "C" CADKIT_API cad_result cad_shape_section(cad_shape solid, cad_vec3 ori
         Bnd_Box box;
         BRepBndLib::Add(source, box);
         require_model(!box.IsVoid(), "cannot section an empty shape");
-        const double extent = 2.0 * std::sqrt(box.SquareExtent()) + 1.0;
-        BRepBuilderAPI_MakeFace cutter(plane, -extent, extent, -extent, extent);
+        // The cutter spans the shape's bounds as seen in the plane.
+        double low_u = 1e300, high_u = -1e300, low_v = 1e300, high_v = -1e300;
+        const gp_Pnt lower = box.CornerMin(), upper = box.CornerMax();
+        for (int corner = 0; corner < 8; ++corner) {
+            const gp_Pnt point((corner & 1) ? upper.X() : lower.X(), (corner & 2) ? upper.Y() : lower.Y(), (corner & 4) ? upper.Z() : lower.Z());
+            const gp_Vec offset(plane.Location(), point);
+            const double u = offset.Dot(gp_Vec(plane.Position().XDirection())), v = offset.Dot(gp_Vec(plane.Position().YDirection()));
+            low_u = std::min(low_u, u); high_u = std::max(high_u, u);
+            low_v = std::min(low_v, v); high_v = std::max(high_v, v);
+        }
+        const double margin = 1.0;
+        BRepBuilderAPI_MakeFace cutter(plane, low_u - margin, high_u + margin, low_v - margin, high_v + margin);
         require_model(cutter.IsDone(), "section plane could not be built");
         BRepAlgoAPI_Common common(source, cutter.Face());
         require_model(common.IsDone(), "section failed");
@@ -4249,21 +4330,7 @@ extern "C" CADKIT_API cad_result cad_planar_offset(cad_shape faces, double dista
         std::vector<TopoDS_Face> result;
         for (const auto& face : source) {
             if (std::abs(distance) < 1e-9) { result.push_back(face); continue; }
-            const auto plane = plane_of(face);
-            // OCCT offsets towards the side the face's own orientation names, so a reversed face flips.
-            const double signed_distance = face.Orientation() == TopAbs_REVERSED ? -distance : distance;
-            std::vector<TopoDS_Wire> wires;
-            try {
-                BRepOffsetAPI_MakeOffset offset(face, GeomAbs_Arc);
-                offset.Perform(signed_distance);
-                if (!offset.IsDone() || offset.Shape().IsNull()) continue;
-                for (TopExp_Explorer explorer(offset.Shape(), TopAbs_WIRE); explorer.More(); explorer.Next())
-                    wires.push_back(TopoDS::Wire(explorer.Current()));
-            } catch (const Standard_Failure&) {
-                continue; // the region collapsed
-            }
-            if (wires.empty()) continue;
-            for (const auto& produced : faces_from_wires(wires, plane)) result.push_back(produced);
+            for (const auto& produced : offset_face(face, distance)) result.push_back(produced);
         }
         return planar_compound(result);
     });

@@ -538,6 +538,44 @@ Done. What was built and decided:
   numbers and the cause, and continue. The user decides whether our stack stays a printing
   target.
 
+Done. What was built and decided (AM3 comes before AM6 in the run order):
+- **CadKit native** (`cadkit.h`): `cad_shape_section` (the solid in common with a big plane face, so
+  holes and islands come out as OCCT builds them), `cad_planar_offset`, `cad_planar_cut/common/fuse` and
+  `cad_planar_copy_boundary_bytes` (every boundary in one call: lines and circular arcs exact, other curves
+  cut into lines within a tolerance). HXI regenerated; `cadkit.Shape` and the new `cadkit.PlanarRegion`
+  (loops oriented outer counter-clockwise, holes clockwise) wrap them. `TKShHealing` is linked.
+  CadKit was built into the worktree's `cadkit/build/debug` with the prebuilt OCCT; tested natively
+  (`planar_smoke`) and through Haxe (`PlanarRegionSmoke`).
+- Findings that shaped the native code:
+  - OCCT booleans treat a face as one side of a sheet, so two coplanar faces looking opposite ways have
+    nothing in common: every region face is turned to look along its plane's dominant axis (`looking_up`).
+  - Sections at different heights lie in different planes. `PlanarRegion.section` moves its result to z = 0 so
+    layers combine with booleans, and the boolean is run with a 1e-6 fuzzy value because two sections of one
+    prism are equal only to within the tolerance of the shapes they were cut from.
+  - `BRepOffsetAPI_MakeOffset` on a face with concentric or parallel boundaries (a ring, a band) crashes OCCT
+    inside the medial-axis code (SIGSEGV, not an exception). `cad_planar_offset` therefore never offsets a face
+    with its holes: the outer boundary is offset one way, each hole the other, and the holes are cut out.
+    Faces whose single boundary has concentric parts of its own (a C-shaped ring) remain at risk.
+- **Slicer** (`camkit.additive`: `Slicer`, `SlicerSettings`, `PrinterProfile`, `TestParts`): as in the step, with
+  these decisions. Perimeters are exact lines and arcs from the offsets, so the plan's "arc fitting within 5 um"
+  is not needed. The bead is a stadium (rectangle with semicircular sides) of the layer height and the line
+  width, solid infill and perimeters are `lineWidth - height * (1 - pi/4)` apart (the spacing at which beads
+  fill a layer exactly), and sparse infill is `lineWidth / density`. The infill core starts at
+  `lineWidth/2 + (P - 1) * spacing + spacing/2` from the boundary. The solid region is the core less what
+  the layers above and below all cover; layers without a full window are fully solid. Scanlines lie on a
+  global lattice, so infill stacks from layer to layer. Travels retract when longer than 2 mm and leaving the
+  part (even-odd test along the travel on the layer's section). The skirt is printed before the
+  `PrintObject` marker, outside the object. `CamContour` gained a `validated` flag that skips its
+  quadratic self-intersection check (a B-rep boundary cannot cross itself) and `CamPocketPlanner.fill` gives
+  edge-to-edge scanlines.
+- Numbers (debug CadKit, prebuilt release OCCT): SmallTab 6 layers in 19 ms, 467 operations, 120.0 mm^3 in the
+  object (CAD 120). CalibrationCube (100 layers) 0.59 s solid: 7409 of 7435 mm^3 (-0.35 %); at 15 % infill
+  0.84 s, 2791 mm^3. TestTower (60 layers) 0.32 s solid: 3196 of 3202 mm^3 (-0.2 %); at 15 % infill 0.46 s,
+  51 retractions, 5029 lines of G-code. Checks: volume within 3 %, no bead outside the footprint plus half a
+  width, the hole's wall a half bead from the nearest bead on every layer (the cube) and the tower's
+  counterbore open, layer heights monotonic, deterministic output, G-code round trip within 0.1 %.
+  CamKit 12311 -> 12442 assertions.
+
 **AM6. The CoreXY printer.**
 - `machinekit.printing` parts, plus catalogue rows (AM-D8), with unit tests: masses, connector
   frames, heater power, thermistor curve, extruder rotation per mm of filament.
@@ -655,7 +693,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM0b | done: main green, router baselines recorded | 2fbea0683, ae6e95ec5, cd29b1993, dfa6e2940, 2611087d9 |
 | AM1 | done | see the commit below |
 | AM2 | done | see the commit below |
-| AM3 | planned | |
+| AM3 | done | see the commits below |
 | AM4 | planned | |
 | AM5 | planned | |
 | AM6 | planned | |

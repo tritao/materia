@@ -56,6 +56,35 @@ class CamPocketPlanner {
     return passes;
   }
 
+  /**
+    Horizontal passes across a face, one on every line `y = k * spacing` of a lattice through the origin
+    that crosses it: the face's own interior, with no cutter eroding the edges. Because the lattice does
+    not depend on the face, passes of neighbouring layers line up. The islands are holes.
+  **/
+  public static function fill(contour:CamContour, spacing:Float, ?islands:Array<CamContour>):Array<CamPocketPass> {
+    if (!(spacing > 0.0) || !Math.isFinite(spacing)) throw "CAM fill needs a positive spacing";
+    var minY = Math.POSITIVE_INFINITY, maxY = Math.NEGATIVE_INFINITY;
+    for (point in contour.vertices) {
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
+    }
+    var first = Math.ceil((minY + 1e-9) / spacing), last = Math.floor((maxY - 1e-9) / spacing);
+    if (last - first > 100000) throw "CAM fill exceeds 100000 rows";
+    var passes:Array<CamPocketPass> = [];
+    var row = first;
+    while (row <= last) {
+      var y = row * spacing;
+      var intervals = interiorIntervals(contour, y);
+      if (islands != null)
+        for (island in islands)
+          for (blocked in interiorIntervals(island, y)) intervals = subtract(intervals, blocked);
+      for (interval in intervals)
+        if (interval.right - interval.left > 1e-8) passes.push({y: y, left: interval.left, right: interval.right});
+      row += 1;
+    }
+    return passes;
+  }
+
   static function interiorIntervals(contour:CamContour, row:Float)
       :Array<{left:Float, right:Float}> {
     var vertices = contour.vertices, crossings:Array<Float> = [];
