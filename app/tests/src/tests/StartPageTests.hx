@@ -15,8 +15,10 @@ class StartPageTests {
   }
 
   public static function main():Int {
-    // `run` works from the repository root; the suites after it expect the directory they started in.
+    // The editor finds its example projects from where it is launched, the repository root
+    // (ExampleCatalog, ProjectLoadJob). Run from there, and leave the directory as found.
     var started = Sys.getCwd();
+    Sys.setCwd(TestPaths.repository());
     try {
       run();
       Sys.setCwd(started);
@@ -30,14 +32,6 @@ class StartPageTests {
   }
 
   static function run():Void {
-    var rootPath = Sys.getCwd();
-    while (!FileSystem.exists(rootPath + "/app/src/Main.hx")) {
-      while (StringTools.endsWith(rootPath, "/")) rootPath = rootPath.substr(0, rootPath.length - 1);
-      var parent = haxe.io.Path.directory(rootPath);
-      check(parent != rootPath && parent.length > 0, "repository root exists");
-      rootPath = parent;
-    }
-    Sys.setCwd(rootPath);
     var all = ExampleCatalog.entries;
     var groups = ExampleBrowser.families(all);
     var seen:Map<String, Bool> = new Map();
@@ -71,16 +65,12 @@ class StartPageTests {
     check(partial.length == 1 && partial[0].title == "Robot welding" && partial[0].examples.length == 1,
       "a family works even when its primary example is absent");
 
-    var directory = "build/start-page-test";
+    var directory = TestPaths.of("build/start-page-test");
     FileSystem.createDirectory(directory);
     var fonts = FontCollection.create();
-    var font:Null<String> = null;
-    for (candidate in ["haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"])
-      if (FileSystem.exists(candidate)) font = candidate;
-    check(font != null, "test font exists");
-    fonts.add(cast font);
+    var font = TestPaths.font();
+    check(FileSystem.exists(font), "test font exists");
+    fonts.add(font);
     var editor = new ReferenceEditorApp(fonts, directory + "/workspace.json");
     editor.commands.execute("start.show");
     var frame = new LayoutFrame(1600, 1000);

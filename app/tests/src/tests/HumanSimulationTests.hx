@@ -26,13 +26,10 @@ class HumanSimulationTests {
     var directory = "build/human-simulation-test";
     if (!FileSystem.exists(directory)) FileSystem.createDirectory(directory);
     var fonts = FontCollection.create();
-    fonts.add(requirePath(["haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf",
-      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"]));
+    fonts.add(requirePath(TestPaths.font()));
     var editor = new ReferenceEditorApp(fonts, directory + "/workspace.json", null, null, null,
       TwoRobotSetupScript.REFERENCE);
-    editor.enableCharacterPreview(requirePath(["animkit/assets/quaternius/worker.glb",
-      "../../animkit/assets/quaternius/worker.glb", "../animkit/assets/quaternius/worker.glb"]));
+    editor.enableCharacterPreview(requirePath(TestPaths.of("animkit/assets/quaternius/worker.glb")));
     editor.tick();
     check(editor.simulation.pending(editor.sensors, editor.scene), "a new person requires a rebuild");
     check(editor.simulation.rebuild(editor.sensors, editor.scene, editor.session),
@@ -62,8 +59,8 @@ class HumanSimulationTests {
   static function torsoDistance(session:SimSession):Float
     return session.raycast(new SimPose(2.5, -3.0, 1.0), 0.0, 1.0, 0.0, 10.0);
 
-  static function requirePath(candidates:Array<String>):String {
-    for (candidate in candidates) if (FileSystem.exists(candidate)) return candidate;
-    throw "Missing test file: " + candidates[0];
+  static function requirePath(path:String):String {
+    if (!FileSystem.exists(path)) throw "Missing test file: " + path;
+    return path;
   }
 }

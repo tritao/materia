@@ -284,12 +284,8 @@ class ScriptedSetupTests {
 
   static function inspectorInteraction(directory:String):Void {
     var workspacePath = directory + "/workspace.json";
-    var fontPath:Null<String> = null;
-    for (candidate in ["haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf",
-      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"])
-      if (FileSystem.exists(candidate)) fontPath = candidate;
-    check(fontPath != null, "scripted inspector test font is available");
+    var fontPath = TestPaths.font();
+    check(FileSystem.exists(fontPath), "scripted inspector test font is available");
     var fonts = FontCollection.create();
     fonts.add(cast fontPath);
     var editor = new ReferenceEditorApp(fonts, workspacePath, null, null, null,
