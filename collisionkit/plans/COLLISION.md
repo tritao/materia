@@ -21,7 +21,8 @@ moved from `kinematicskit/plans/` to `collisionkit/plans/` with CL2.
     no qhull. Hulls come as point sets from CadKit's pure-Haxe
     `ConvexHullVertices`.
   - Found in CL1 and since:
-    - no distance queries on height fields;
+    - no distance queries on height fields (implemented in our fork in
+      CL2b, CL-D13);
     - meshes are surfaces: a shape wholly inside one is not in contact;
     - `HeightField::updateHeights` clamps heights at the field's minimum;
     - no conservative advancement (FCL has it, coal does not);
@@ -461,7 +462,8 @@ Each step is its own commit with all suites green.
     - overlap at reference leaving the environment checked;
     - inflation against an exact distance;
     - refused heights.
-- **CL2b — coal: height-field distance (CL-D13).**
+- **CL2b — coal: height-field distance (CL-D13).** Done, see the progress
+  log.
   - Implemented in the fork, with coal's own tests for a box, sphere,
     capsule, convex and mesh against a height field, including penetration
     and the closest points.
@@ -915,3 +917,39 @@ Done as planned, with these choices:
     (-40.8 bytes)";
   - MotionKit: passed (1224712 assertions), no longer compiling coal;
   - RobotKit: passed (5433 assertions).
+
+### CL2b — coal: height-field distance (2026-10-09)
+
+- **In our coal fork** (branch `materia`, local commit 85cb6397, not
+  pushed; the upstream PR waits for the user):
+  - `HeightFieldShapeDistancer` is implemented. The height field's BV tree
+    is traversed with lower bounds from each subtree's cell bounds against
+    the shape's bounds, both in the field's frame (coal's old traversal
+    node ignored the field's transform). Leaves are the two prisms of
+    `buildConvexTriangles`, so distances are signed, with closest points
+    and the normal from the field toward the shape. With signed distances
+    asked for, overlapping bounds give no lower bound, so every cell they
+    cover is compared.
+  - A mesh against a height field (every mesh BV type, both argument
+    orders) goes through the same prisms, convex against mesh.
+  - Bounds use AABBs computed from the shape (`computeBV<AABB>`), which
+    accept a swept-sphere radius; coal's generic OBBRSS fitting throws on
+    one.
+  - Tests: `test/hfield_distance.cpp`, registered in coal's
+    `test/CMakeLists.txt`; built standalone here (Boost.Test header-only,
+    against `coal_core`): 4 cases, 210 of 210 assertions pass. A box,
+    sphere, capsule, convex and mesh against flat and sloped fields under
+    an arbitrary placement, clear and penetrating, both argument orders,
+    closest points on the field's surface, a swept-sphere radius,
+    agreement with collision, and a shape beside the field.
+- **collisionkit** uses coal's distance for every height-field pair; the
+  cell-prism code (`field_distance`) is deleted. A height-field pair is
+  checked by distance (coal has no height-field collision against a mesh),
+  so support is decided by coal's distance table. CL2's tests pass
+  unchanged.
+- **Pin:** the parent pins coal at the local 85cb6397. A clone without this
+  worktree's submodule objects cannot check it out until the fork is
+  pushed.
+- **Suites:** standalone C++ 2 of 2; collisionkit native passed (350
+  assertions); native kit passed (695); pure kit only main's known DLS
+  failure; MotionKit passed (1224712); RobotKit passed (5433).

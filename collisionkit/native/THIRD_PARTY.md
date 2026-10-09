@@ -6,7 +6,9 @@ Moved here from `kinematicskit/native/vendor/coal` with COLLISION.md CL2.
 
 - Source: our fork https://github.com/tritao/coal, branch `materia`, pinned
   submodule at `vendor/coal`. Based on upstream coal-library/coal tag v3.0.4
-  (commit f0fecd0a); the branch adds one commit (f92f288b).
+  (commit f0fecd0a); the branch adds two commits: f92f288b (the Materia
+  build) and 85cb6397 (height-field distance, COLLISION.md CL-D13; meant
+  for upstream, not yet pushed or proposed).
 - Licence: BSD 3-Clause (upstream `vendor/coal/LICENSE`; coal descends from
   FCL and hpp-fcl).
 - Use: the collision and distance core (shapes, GJK/EPA, bounding-volume
@@ -25,9 +27,9 @@ Moved here from `kinematicskit/native/vendor/coal` with COLLISION.md CL2.
   collisionkit-native compile it (about 70 sources, a minute on a first
   build). The submodule is initialized non-recursively: its nested `cmake`
   submodule is not used.
-- Gaps worked around in `src/world.cpp`: coal answers no distance queries
-  on height fields, so the world compares a field's cells as convex prisms;
-  without qhull, convex shapes are built from points alone (`PointConvex`,
+- Gaps: upstream coal answers no distance queries on height fields; our
+  branch implements them (85cb6397, with `test/hfield_distance.cpp`).
+  Worked around in `src/world.cpp`: without qhull, convex shapes are built from points alone (`PointConvex`,
   no neighbour lists, so support queries scan every point); coal clamps
   heights at a field's minimum, so the world refuses heights below it.
 - Checked: a standalone build of `native/` runs `tests/cpp/coal_smoke.cpp`

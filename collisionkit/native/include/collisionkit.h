@@ -194,10 +194,10 @@ CK_API ck_result CK_CALL ck_add_mesh(ck_world_handle world, int32_t body,
  * +x from -x_size/2; rows run along -y from +y_size/2 (coal's layout). The
  * solid reaches down to `min_height`; heights below it are refused (coal
  * would clamp them, CL-D6), so terrain sets it below the deepest dig.
- * coal answers no distance queries on height fields, so the world compares
- * each cell near the other object as two triangular prisms (split as coal
- * splits them for collision) and takes the closest: a penetration depth is
- * then measured within one cell. Two height fields cannot be compared.
+ * Distances come from coal (our fork, CL-D13), which compares each cell as
+ * the two triangular prisms it splits it into for collision: a penetration
+ * depth is measured within one cell. A height field is checked against
+ * meshes too. Two height fields cannot be compared.
  */
 CK_API ck_result CK_CALL ck_add_height_field(ck_world_handle world, int32_t body,
     const double *offset CK_IN_ARRAY(offset_count), uint32_t offset_count,

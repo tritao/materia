@@ -95,10 +95,10 @@ interface CollisionKitNative @target("portable-abi64") @library("collisionkit_co
 	 * +x from -x_size/2; rows run along -y from +y_size/2 (coal's layout). The
 	 * solid reaches down to `min_height`; heights below it are refused (coal
 	 * would clamp them, CL-D6), so terrain sets it below the deepest dig.
-	 * coal answers no distance queries on height fields, so the world compares
-	 * each cell near the other object as two triangular prisms (split as coal
-	 * splits them for collision) and takes the closest: a penetration depth is
-	 * then measured within one cell. Two height fields cannot be compared.
+	 * Distances come from coal (our fork, CL-D13), which compares each cell as
+	 * the two triangular prisms it splits it into for collision: a penetration
+	 * depth is measured within one cell. A height field is checked against
+	 * meshes too. Two height fields cannot be compared.
 	 */
 	extern fn ck_add_height_field(world: ck_world_handle, body: i32, offset: ptr<const<f64>> @in_array("offset_count"), offset_count: u32, x_size: f64, y_size: f64, heights: ptr<const<f64>> @in_array("height_count"), height_count: u32, rows: u32, min_height: f64, out_object: ptr<u32> @out) -> ck_result;
 	/**

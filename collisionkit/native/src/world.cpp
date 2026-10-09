@@ -173,83 +173,17 @@ int32_t World::status(uint32_t a, uint32_t b) const {
 }
 
 bool World::supported(const Object &first, const Object &second) {
-    if (first.height_field && second.height_field) return false;
-    // A height field is compared through convex cells.
-    static const PointConvex cell(std::make_shared<std::vector<coal::Vec3s>>(std::vector<coal::Vec3s>{
-        coal::Vec3s(0, 0, 0), coal::Vec3s(1, 0, 0), coal::Vec3s(0, 1, 0), coal::Vec3s(0, 0, 1)}));
-    const coal::CollisionGeometry *a = first.height_field ? &cell : first.object->collisionGeometryPtr();
-    const coal::CollisionGeometry *b = second.height_field ? &cell : second.object->collisionGeometryPtr();
+    const coal::CollisionGeometry *a = first.object->collisionGeometryPtr();
+    const coal::CollisionGeometry *b = second.object->collisionGeometryPtr();
     try {
-        coal::ComputeCollision collide(a, b);
+        // A height-field pair is checked through its distance alone (coal has no height-field collision against a
+        // mesh); two height fields cannot be compared.
+        if (!first.height_field && !second.height_field) coal::ComputeCollision collide(a, b);
         coal::ComputeDistance distance(a, b);
     } catch (const std::invalid_argument &) {
         return false;
     }
     return true;
-}
-
-double World::field_distance(const coal::CollisionObject &field_object, const coal::CollisionObject &other,
-                             double query, bool field_first, PairResult *out, double stop_at) {
-    const auto &field = static_cast<const coal::HeightField<coal::OBBRSS> &>(*field_object.collisionGeometryPtr());
-    const coal::MatrixXs &heights = field.getHeights();
-    const coal::VecXs &xs = field.getXGrid(), &ys = field.getYGrid();
-    const double floor = field.getMinHeight();
-    const coal::Transform3s &placed = field_object.getTransform();
-    // The other object's bounds in the field's frame, grown by the query distance.
-    const coal::AABB &box = other.getAABB();
-    coal::Vec3s low = coal::Vec3s::Constant(INFINITY), high = coal::Vec3s::Constant(-INFINITY);
-    bool bounded = box.min_.allFinite() && box.max_.allFinite() && std::isfinite(query);
-    if (bounded) {
-        for (int corner = 0; corner < 8; ++corner) {
-            const coal::Vec3s point(corner & 1 ? box.max_[0] : box.min_[0], corner & 2 ? box.max_[1] : box.min_[1],
-                                    corner & 4 ? box.max_[2] : box.min_[2]);
-            const coal::Vec3s local = placed.inverseTransform(point);
-            low = low.cwiseMin(local);
-            high = high.cwiseMax(local);
-        }
-        const double grow = std::max(query, 0.0);
-        low.array() -= grow;
-        high.array() += grow;
-    }
-    double best = INFINITY;
-    coal::DistanceRequest request(true, true);
-    for (Eigen::Index row = 0; row + 1 < heights.rows(); ++row) {
-        // Rows run along -y.
-        if (bounded && (ys[row] < low[1] || ys[row + 1] > high[1])) continue;
-        for (Eigen::Index col = 0; col + 1 < heights.cols(); ++col) {
-            if (bounded && (xs[col + 1] < low[0] || xs[col] > high[0])) continue;
-            const double h00 = heights(row, col), h01 = heights(row, col + 1), h10 = heights(row + 1, col),
-                         h11 = heights(row + 1, col + 1);
-            if (bounded && (std::max({h00, h01, h10, h11}) < low[2] || floor > high[2])) continue;
-            const double x0 = xs[col], x1 = xs[col + 1], y0 = ys[row], y1 = ys[row + 1];
-            // The cell's two prisms, split as coal splits them for collision.
-            const coal::Vec3s halves[2][3] = {
-                {coal::Vec3s(x0, y0, h00), coal::Vec3s(x0, y1, h10), coal::Vec3s(x1, y0, h01)},
-                {coal::Vec3s(x1, y1, h11), coal::Vec3s(x0, y1, h10), coal::Vec3s(x1, y0, h01)}};
-            for (const auto &top : halves) {
-                auto corners = std::make_shared<std::vector<coal::Vec3s>>();
-                for (const coal::Vec3s &p : top) corners->emplace_back(p[0], p[1], floor);
-                for (const coal::Vec3s &p : top) corners->push_back(p);
-                PointConvex prism(std::move(corners));
-                coal::DistanceResult result;
-                const double distance = coal::distance(&prism, placed, other.collisionGeometryPtr(),
-                                                       other.getTransform(), request, result);
-                if (!(distance < best)) continue;
-                best = distance;
-                if (out) {
-                    const int f = field_first ? 0 : 1, o = 1 - f;
-                    const double sign = field_first ? 1.0 : -1.0;
-                    for (int k = 0; k < 3; ++k) {
-                        (f == 0 ? out->point_a : out->point_b)[k] = result.nearest_points[0][k];
-                        (o == 0 ? out->point_a : out->point_b)[k] = result.nearest_points[1][k];
-                        out->normal[k] = sign * result.normal[k];
-                    }
-                }
-                if (best <= stop_at) return best;
-            }
-        }
-    }
-    return best;
 }
 
 void World::pose(Object &object) {
@@ -270,10 +204,10 @@ bool World::make_pair(uint32_t a, uint32_t b, Pair &pair) {
     pair.second = second.object.get();
     pair.field = first.height_field ? 1 : second.height_field ? 2 : 0;
     if (!supported(first, second)) return false;
-    if (pair.field) return true;
     try {
-        pair.collide = std::make_unique<coal::ComputeCollision>(pair.first->collisionGeometryPtr(),
-                                                                pair.second->collisionGeometryPtr());
+        if (!pair.field)
+            pair.collide = std::make_unique<coal::ComputeCollision>(pair.first->collisionGeometryPtr(),
+                                                                    pair.second->collisionGeometryPtr());
         pair.distance = std::make_unique<coal::ComputeDistance>(pair.first->collisionGeometryPtr(),
                                                                 pair.second->collisionGeometryPtr());
     } catch (const std::invalid_argument &) {
@@ -301,24 +235,23 @@ void World::rebuild_pairs() {
 }
 
 bool World::collides(Pair &pair, double margin, coal::CollisionRequest &request) {
-    if (pair.field == 1) return field_distance(*pair.first, *pair.second, margin, true, nullptr, margin) <= margin;
-    if (pair.field == 2) return field_distance(*pair.second, *pair.first, margin, false, nullptr, margin) <= margin;
+    if (pair.field) {
+        coal::DistanceRequest distance_request(false, true);
+        coal::DistanceResult result;
+        return (*pair.distance)(pair.first->getTransform(), pair.second->getTransform(), distance_request, result) <=
+               margin;
+    }
     request.security_margin = margin;
     coal::CollisionResult result;
     (*pair.collide)(pair.first->getTransform(), pair.second->getTransform(), request, result);
     return result.isCollision();
 }
 
-void World::measure(Pair &pair, double query, PairResult &out) {
+void World::measure(Pair &pair, PairResult &out) {
     out.a = pair.a;
     out.b = pair.b;
     out.body_a = pair.body_a;
     out.body_b = pair.body_b;
-    if (pair.field) {
-        out.distance = pair.field == 1 ? field_distance(*pair.first, *pair.second, query, true, &out, -INFINITY)
-                                       : field_distance(*pair.second, *pair.first, query, false, &out, -INFINITY);
-        return;
-    }
     coal::DistanceRequest request(true, true);
     coal::DistanceResult result;
     out.distance = (*pair.distance)(pair.first->getTransform(), pair.second->getTransform(), request, result);
@@ -379,7 +312,7 @@ bool World::distances(double query, std::vector<PairResult> &out) {
         // Boxes never report penetration: a negative query still needs every overlapping pair.
         if (pair.first->getAABB().distance(pair.second->getAABB()) > std::max(query, 0.0)) continue;
         PairResult found;
-        measure(pair, query, found);
+        measure(pair, found);
         if (found.distance < query) out.push_back(found);
     }
     std::stable_sort(out.begin(), out.end(),
@@ -390,7 +323,7 @@ bool World::distances(double query, std::vector<PairResult> &out) {
 bool World::pair_distance(uint32_t a, uint32_t b, PairResult &out) {
     Pair pair;
     if (!make_pair(a, b, pair)) return false;
-    measure(pair, INFINITY, out);
+    measure(pair, out);
     return true;
 }
 
@@ -407,7 +340,7 @@ bool World::violation(const Margins &margins, const double *inflation, bool &fou
         }
         if (box_gap(*pair.first, *pair.second) > required) continue;
         if (!collides(pair, required, request)) continue;
-        measure(pair, required, out);
+        measure(pair, out);
         out.required = required;
         found = true;
         return true;
@@ -423,7 +356,7 @@ bool World::closest(const Margins &margins, bool &found, PairResult &out) {
     for (Pair &pair : pairs_) {
         if (found && box_gap(*pair.first, *pair.second) >= best) continue;
         PairResult candidate;
-        measure(pair, best, candidate);
+        measure(pair, candidate);
         if (found && !(candidate.distance < best)) continue;
         candidate.required = margins.between(group_of(pair.body_a), group_of(pair.body_b));
         out = candidate;

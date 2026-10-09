@@ -101,7 +101,7 @@ private:
         uint32_t a, b;
         int32_t body_a, body_b;
         coal::CollisionObject *first, *second;
-        /** coal's own queries; null for a height-field pair, which goes through its cells instead. */
+        /** coal's own queries; no collision query for a height-field pair, which is checked by distance. */
         std::unique_ptr<coal::ComputeCollision> collide;
         std::unique_ptr<coal::ComputeDistance> distance;
         /** 1 when `first` is a height field, 2 when `second` is, else 0. */
@@ -122,17 +122,9 @@ private:
     /** True when the pair is closer than `margin` (touching counts at 0); `request` carries the margin for coal. */
     static bool collides(Pair &pair, double margin, coal::CollisionRequest &request);
     /** The pair's signed distance with closest points into `out` (ids and bodies included). */
-    static void measure(Pair &pair, double query, PairResult &out);
+    static void measure(Pair &pair, PairResult &out);
     /** False when coal cannot compare the two objects' shapes (directly, or through height-field cells). */
     static bool supported(const Object &first, const Object &second);
-    /**
-     * Signed distance between a height field and another object, through the
-     * field's cells within `query` of it (see `collisionkit.h`); `out` gets the
-     * closest points with the field as `field_first` says. Infinite when no
-     * cell is that close. With `stop_at`, stops once a cell is at or below it.
-     */
-    static double field_distance(const coal::CollisionObject &field, const coal::CollisionObject &other, double query,
-                                 bool field_first, PairResult *out, double stop_at);
 
     std::vector<Body> bodies_;
     std::map<uint32_t, Object> objects_;
