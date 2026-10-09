@@ -81,12 +81,7 @@ class AxisKinematics implements KinematicsSolver {
           (result[index] < bounds.lower - tolerance.position ||
            result[index] > bounds.upper + tolerance.position)) return null;
     }
-    // Joints no axis owns follow their leaders; repeated passes put each after what it follows.
-    for (_ in derived) for (index in derived) {
-      var sum = 0.0;
-      for (term in terms[index]) sum += term.ratio * result[term.leader] + term.offset;
-      result[index] = sum;
-    }
+    completeDerived(result, true);
     // A follower is the sum of its couplings' terms.
     var sums = new Map<String, Float>();
     for (coupling in blueprint.model.couplings) {
@@ -137,13 +132,21 @@ class AxisKinematics implements KinematicsSolver {
     x.writeLogicalDelta(result, twist.linearX);
     y.writeLogicalDelta(result, twist.linearY);
     z.writeLogicalDelta(result, twist.linearZ);
-    // A derived joint moves with what it follows; a rate has no offset.
+    completeDerived(result, false);
+    return result;
+  }
+
+  /**
+    Sets every joint no axis owns that follows others to the sum of its terms: positions with the terms' offsets, rates
+    (`positions` false) without. Repeated passes put each after what it follows. A driven joint (an extruder) is set
+    first, and its followers (the motor behind its gears) come out here.
+  **/
+  public function completeDerived(q:Array<Float>, positions:Bool):Void {
     for (_ in derived) for (index in derived) {
       var sum = 0.0;
-      for (term in terms[index]) sum += term.ratio * result[term.leader];
-      result[index] = sum;
+      for (term in terms[index]) sum += term.ratio * q[term.leader] + (positions ? term.offset : 0.0);
+      q[index] = sum;
     }
-    return result;
   }
 
   function requireJoints(q:Array<Float>):Void {

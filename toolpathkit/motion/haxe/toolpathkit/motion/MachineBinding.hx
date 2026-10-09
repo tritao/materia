@@ -20,6 +20,8 @@ class MachineBinding {
     exact stops, as a mill's rapids do.
   **/
   public var rapidsAtFeed(default, null):Bool = false;
+  /** The extruder and heaters, when the machine prints. */
+  public var printer(default, null):Null<PrinterBinding> = null;
 
   public function new(frameId:String, xAxisId:String, yAxisId:String,
       zAxisId:String, rapidSpeed:Float, channels:ToolpathChannels,
@@ -49,4 +51,6 @@ class MachineBinding {
   public function setTravel(value:Null<TravelEnvelope>):Void travel = value;
 
   public function setRapidsAtFeed(value:Bool):Void rapidsAtFeed = value;
+
+  public function setPrinter(value:Null<PrinterBinding>):Void printer = value;
 }

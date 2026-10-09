@@ -69,6 +69,64 @@ class ToolpathMotionTests {
       throw 'stops are counted by reason without the angle in it, got ${[for (reason in sharp.stops.keys()) reason + " " + sharp.stops.get(reason)]}';
   }
 
+  /**
+    A printer binding lowers the printing operations: beads drive the extruder along their path (what is laid is what
+    is fed, a corner included), the melt rate caps a bead's speed, a retraction is an extruder-only move, a heater
+    that is waited for is a barrier, and a heater or fan that is not is an event on the path.
+  **/
+  static function extruderLowering(origin:Provenance):Void {
+    var machine = new MachineBinding("work", "x", "y", "z", 0.25, new toolpathkit.motion.ToolpathChannels(""));
+    machine.setRapidsAtFeed(true);
+    var printer = new toolpathkit.motion.PrinterBinding("e", 0.00175, 0.00365, 1.0e-8);
+    printer.bind(3);
+    machine.setPrinter(printer);
+    var area = 8.0e-8;
+    function line(from:Array<Float>, to:Array<Float>, kind:MoveKind, speed:Float):ToolpathOp
+      return ToolpathOp.Move(kind, PathGeometry.Line(new Point3(from[0], from[1], 0), new Point3(to[0], to[1], 0)), speed, 0.0001, origin);
+    var result = ToolpathMotion.lower(pathProgram([
+      ToolpathOp.Heat("bed", 60.0, true, origin),
+      ToolpathOp.Heat("hotend", 200.0, false, origin),
+      ToolpathOp.Fan("part", 0.5, origin),
+      ToolpathOp.Deposit(area, 4.5e-4, 2.0e-4, origin),
+      line([0, 0], [0.02, 0], Cut, 0.2),
+      line([0.02, 0], [0.02, 0.02], Cut, 0.2),
+      ToolpathOp.DepositOff(origin),
+      line([0.02, 0.02], [0.0, 0.02], Rapid, 0.15),
+      ToolpathOp.FilamentMove(-0.001, 0.03, origin)]), machine);
+    var motion = result.program;
+    if (motion == null) throw "a print lowers to a program";
+    var kinds:Array<String> = [];
+    var drive:Null<motionkit.path.DistanceDrive> = null, capped = 0.0, eventChannels:Array<String> = [];
+    for (op in motion.ops) switch op {
+      case SetOutput(channel, _): kinds.push("set " + channel);
+      case WaitInput(channel, _, _): kinds.push("wait " + channel);
+      case MoveJ(JointOffset(joint, delta), options, _):
+        kinds.push("offset");
+        if (joint != 3 || Math.abs(delta - (-0.001 / 0.00365)) > 1e-9 || Math.abs(options.maxVelocity - 0.03 / 0.00365) > 1e-9)
+          throw "a retraction turns the extruder by the filament over the gear radius, at the speed asked";
+      case FollowPath(path, _, _, events):
+        kinds.push("path");
+        drive = path.drive;
+        for (primitive in path.primitives) if (primitive.speedLimit() < 0.14) capped = primitive.speedLimit();
+        for (event in events) eventChannels.push(event.channel);
+      case _:
+    }
+    if (kinds.join(",") != "set heater.bed.target,wait heater.bed.at_temperature,path,offset" && kinds.join(",") != "set heater.bed.target,wait heater.bed.at_temperature,path,set heater.hotend.target,offset")
+      throw 'the print lowers to a barrier for the bed, a path and a retraction, got ${kinds.join(",")}';
+    if (drive == null || drive.joint != 3) throw "the beads drive the extruder joint";
+    // 0.04 m of bead; the 90 degree corner is rounded and the arc feeds what the trimmed ends would have.
+    var expected = 0.04 * area / printer.filamentArea() / 0.00365;
+    if (Math.abs(drive.total() - expected) > 1e-9 * expected) throw 'the extruder is fed what the beads lay: ${drive.total()} against $expected';
+    if (Math.abs(capped - 1.0e-8 / area) > 1e-12) throw 'the melt rate caps a bead at ${1.0e-8 / area} m/s, got $capped';
+    if (eventChannels.indexOf("heater.hotend.target") < 0 && eventChannels.indexOf("fan.part") < 0)
+      throw "a heater not waited for and a fan are events on the path";
+    // Without a printer binding the printing operations are refused.
+    var refused = false;
+    try ToolpathMotion.lower(pathProgram([ToolpathOp.Heat("bed", 60.0, true, origin)]), new MachineBinding("work", "x", "y", "z", 0.25, new toolpathkit.motion.ToolpathChannels("")))
+    catch (_:Dynamic) refused = true;
+    if (!refused) throw "a mill has no heaters";
+  }
+
   static function main():Void {
     if (Sys.getEnv("TOOLPATH_VIRTUAL_CNC_ONLY") == "1") {
       new ToolpathProcessTests().testVirtualCncProgram();
@@ -230,6 +288,7 @@ class ToolpathMotionTests {
       }
     }
     printerLowering(origin);
+    extruderLowering(origin);
     Sys.println("ToolpathKit Motion tests passed (18 assertions)");
     Sys.println('Toolpath accuracy tests passed (${ToolpathAccuracyTests.run()} assertions)');
     MachiningRunTests.run();

@@ -81,6 +81,26 @@ class ToolpathMotionBinding {
         jump[joint] = Math.max(0.1, 0.1 * scale);
       }
     }
+    // The extruder: a joint the XYZ axes do not move, driven by distance along the path. Its limits are the
+    // drive's (its motor through the gears); the melt-rate limit is applied to the speed of the moves that feed it.
+    var printer = machine.printer;
+    if (printer != null) {
+      var extruder = -1;
+      for (joint in 0...count) if (blueprint.model.joints[joint].id == printer.extruderJoint) extruder = joint;
+      if (extruder < 0) throw 'Printer extruder joint "${printer.extruderJoint}" is not in the machine';
+      // A planning model of the axes alone holds the drive's limits on the joint; the full machine derives them.
+      var own = blueprint.model.joints[extruder].limits;
+      var drive = own.velocity != null && own.maxAcceleration != null ? own :
+        blueprint.model.coupledLimits(printer.extruderJoint, new robotkit.model.SteadyLoads());
+      // Pressure advance adds `lead` times the extruder's acceleration to its speed and `lead` times its jerk to its
+      // acceleration: the plan leaves room for both.
+      var room = printer.pressureAdvance > 0.0;
+      velocity[extruder] = drive.requireVelocity() * (room ? 0.8 : 1.0);
+      acceleration[extruder] = drive.requireAcceleration() * (room ? 0.6 : 1.0);
+      jerk[extruder] = acceleration[extruder] * 25.0;
+      jump[extruder] = 0.1;
+      printer.bind(extruder);
+    }
     // A joint that follows several axes (a CoreXY motor's pulley) belongs to none: it moves at most as
     // fast as its terms add up to, which the coupled trajectory keeps exactly.
     var ids = [for (joint in blueprint.model.joints) joint.id];
@@ -127,6 +147,7 @@ class ToolpathMotionBinding {
       null, null, jump,
       [for (joint in blueprint.model.joints) joint.id], blueprint.model.couplings,
       blueprint.fixedTimestepSeconds);
+    if (printer != null) { compiler.pressureAdvance = printer.pressureAdvance; compiler.pressureAdvanceWindow = printer.pressureAdvanceWindow; }
   }
 
   public function compile(program:ToolpathProgram, initialJoints:Array<Float>,

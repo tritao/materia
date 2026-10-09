@@ -576,6 +576,16 @@ MK_API mk_result MK_CALL mk_project_couplings(mk_trajectory_handle trajectory,
     const uint32_t *followers MK_IN_ARRAY(term_count), const uint32_t *leaders MK_IN_ARRAY(term_count),
     const double *ratios MK_IN_ARRAY(term_count), const double *offsets MK_IN_ARRAY(term_count),
     uint32_t term_count, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+/**
+ * A copy of `trajectory` in which `joint` runs `lead_seconds` ahead of itself, the lead taken on its velocity averaged
+ * over `window_seconds`: position + lead * (position(t + w/2) - position(t - w/2)) / w. It is the pressure-advance
+ * correction of an extruder: the filament is pushed ahead of the flow it will feed, and the window keeps a trajectory
+ * whose acceleration steps from asking for more than the drive has. The joint is held at rest beyond the ends of the
+ * trajectory. Each segment of the joint becomes a cubic through the corrected position and velocity at its ends, so the
+ * result is continuous in both. The caller follows with `mk_project_couplings` for the joints that follow `joint`.
+ */
+MK_API mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joint, double lead_seconds,
+    double window_seconds, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
 MK_API mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,
     uint32_t *out_count MK_OUT);
 MK_API mk_result MK_CALL mk_time_law_get_binding(mk_time_law_handle law,

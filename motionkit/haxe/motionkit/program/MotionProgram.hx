@@ -78,6 +78,10 @@ class MotionProgram {
         else if (!allFinite(joints))
           'Motion program op $index joint target must be finite';
         else null;
+      case JointOffset(joint, delta):
+        if (joint < 0 || !Math.isFinite(delta) || delta == 0.0)
+          'Motion program op $index joint offset needs a joint and a nonzero finite distance';
+        else null;
       case PoseTarget(pose, frameId, configurationHint):
         if (pose == null) 'Motion program op $index needs a target pose';
         else if (!hasId(frameId)) 'Motion program op $index pose target needs a frame ID';

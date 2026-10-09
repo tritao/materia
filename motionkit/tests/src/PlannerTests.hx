@@ -281,6 +281,47 @@ class PlannerTests extends MotionKitTestSupport {
     near(sections[1].offset, ProgramCompiler.MAX_SECTION_PRIMITIVES * 0.001, "each section knows where it starts", 1e-9);
   }
 
+  /**
+    A distance-driven joint (an extruder): continuous rate with ramps, the nominal feed conserved exactly over every
+    run, joint position the integral of the rate, slices that start and end at rest.
+  **/
+  public function testDistanceDrive():Void {
+    var drive = new motionkit.path.DistanceDrive(7, [{start: 0.01, end: 0.05, rate: 2.0}, {start: 0.05, end: 0.08, rate: 3.0}, {start: 0.09, end: 0.095, rate: 1.0}], 0.1, 0.002);
+    near(drive.total(), 2.0 * 0.04 + 3.0 * 0.03 + 1.0 * 0.005, "the position change is the nominal feed, whatever the ramps", 1e-12);
+    near(drive.offsetAt(0.1), drive.total(), "the offset at the end is the total", 1e-12);
+    near(drive.offsetAt(0.01), 0.0, "nothing is fed before the first run", 1e-15);
+    near(drive.rateAt(0.0), 0.0, "the plan starts at rest", 1e-15);
+    near(drive.rateAt(0.1), 0.0, "and ends at rest", 1e-15);
+    near(drive.rateAt(0.01), 0.0, "a run begins at rest", 1e-15);
+    near(drive.rateAt(0.01 + 0.002), 3.0, "its start-up overshoots by half the rate over one ramp", 1e-12);
+    near(drive.rateAt(0.01 + 0.004), 2.0, "and settles to the rate over two", 1e-12);
+    // The rate is continuous: no step anywhere, so the joint's velocity needs no jump.
+    var previous = drive.rateAt(0.0), worstStep = 0.0, integral = 0.0, spacing = 1e-6;
+    for (i in 1...100001) {
+      var at = i * spacing, rate = drive.rateAt(at);
+      worstStep = Math.max(worstStep, Math.abs(rate - previous));
+      integral += 0.5 * (rate + previous) * spacing;
+      previous = rate;
+    }
+    check(worstStep < 3.0 * spacing / 0.001 * 1.01, 'the rate changes smoothly: $worstStep');
+    near(integral, drive.total(), "the rate integrates to the position change", 1e-6);
+    // A joint's second derivative is the rate's slope, with the corners' two sides apart.
+    check(Math.abs(drive.curvatureAt(0.01 + 0.002, true) - drive.curvatureAt(0.01 + 0.002, false)) > 100.0,
+      "the rate's slope jumps at a ramp's corner, and the two sides say so");
+    var stations = drive.stations();
+    check(stations.length > 10 && stations[0] == 0.0 && stations[stations.length - 1] == 0.1, "the path is sampled at the ramp corners");
+    // A cut path: each piece starts and ends at rest and keeps its own share of the feed.
+    var left = drive.slice(0.0, 0.03), right = drive.slice(0.03, 0.1);
+    if (left == null || right == null) throw "a cut of the drive lost a piece";
+    near(left.total() + right.total(), drive.total(), "the pieces of a cut path feed what the whole did", 1e-12);
+    near(left.rateAt(left.pathLength), 0.0, "the first piece ends at rest", 1e-15);
+    near(right.rateAt(0.0), 0.0, "the second begins at rest", 1e-15);
+    check(drive.slice(0.095, 0.1) == null, "a stretch that feeds nothing has no drive");
+    // A run too short for its ramps gets shorter ramps and feeds the same.
+    var short = new motionkit.path.DistanceDrive(0, [{start: 0.0, end: 0.001, rate: 5.0}], 0.001, 0.002);
+    near(short.total(), 0.005, "a short run feeds its nominal amount", 1e-12);
+  }
+
   public function testGeometricPathPrimitives():Void {
     var path = GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0),
       new PathPoint(0.1, 0.0, 0.0), new PathPoint(0.1, 0.1, 0.0)]);

@@ -88,6 +88,10 @@ class ProgramCompiler {
   public var planCheck:Null<PlanCheck> = null;
   /** Linear motor sums for machines whose axis velocities use the single-axis envelope. */
   public var motorSpace:Null<MotorSpaceConstraints> = null;
+  /** Seconds a path's distance-driven joint (an extruder) runs ahead of the flow it feeds; 0 is off. */
+  public var pressureAdvance:Float = 0.0;
+  /** The window, seconds, over which the driven joint's velocity is averaged for the advance. */
+  public var pressureAdvanceWindow:Float = 0.04;
   /** Pure, worker-safe event scheduling on the actual timed path section.
    * Distances/events use whole-operation coordinates; times are section-local. */
   public var pathEventSchedule:Null<(Int,Float,Bool,Array<Float>,Array<Float>,Array<PathEvent>)->Array<PathEvent>> = null;
@@ -357,6 +361,18 @@ class ProgramCompiler {
           var velocity = effective(maxVelocity, options.maxVelocity);
           var acceleration = effective(maxAcceleration, options.maxAcceleration);
           var jerk = effective(maxJerk, options.maxJerk);
+          // The limits of a joint offset are its driven joint's: what moves with it is held in proportion.
+          switch target {
+            case JointOffset(driven, delta):
+              for (joint in 0...goal.length) {
+                var share = Math.abs(goal[joint] - q[joint]) / Math.abs(delta);
+                if (share <= 0.0) continue;
+                if (options.maxVelocity > 0.0) velocity[joint] = Math.min(maxVelocity[joint], options.maxVelocity * share);
+                if (options.maxAcceleration > 0.0) acceleration[joint] = Math.min(maxAcceleration[joint], options.maxAcceleration * share);
+                if (options.maxJerk > 0.0) jerk[joint] = Math.min(maxJerk[joint], options.maxJerk * share);
+              }
+            case _:
+          }
           var motors = motorSpace;
           var generated = options.planned ? plannedMove(q, goal, velocity, acceleration, jerk, index)
             : motors == null ? Trajectory.generateStateToState(q, zeros(), zeros(), goal,
@@ -579,13 +595,7 @@ class ProgramCompiler {
       var primitives = section.path.primitives;
       if (curve != null || primitives.length < 2 || Std.string(error).indexOf("path.time failed") < 0) throw error;
       var middle = primitives.length >> 1;
-      var first = new PosePath(section.path.frameId, primitives.slice(0, middle));
-      var second = new PosePath(section.path.frameId, primitives.slice(middle));
-      var authored = section.path.authoredGeometry;
-      if (authored != null) {
-        first.withAuthoredGeometry(authored, section.path.blendTolerance);
-        second.withAuthoredGeometry(authored, section.path.blendTolerance);
-      }
+      var first = section.path.sub(0, middle), second = section.path.sub(middle, primitives.length);
       c.sections.splice(k, 1);
       c.sections.insert(k, {path: second, offset: section.offset + first.length()});
       c.sections.insert(k, {path: first, offset: section.offset});
@@ -661,7 +671,14 @@ class ProgramCompiler {
     try {
       var motors = motorSpace;
       if (motors != null) motors.validate(pending.trajectory);
-      if (couplingIndices.length > 0) projected = projectCouplings(pending.trajectory);
+      // Pressure advance runs the driven joint ahead of itself, and what follows it follows.
+      var advanced:Null<Trajectory> = null;
+      var drive = pending.path == null ? null : pending.path.drive;
+      if (pressureAdvance > 0.0 && drive != null) advanced = pending.trajectory.advanceJoint(drive.joint, pressureAdvance, pressureAdvanceWindow);
+      var timed = advanced == null ? pending.trajectory : advanced;
+      if (couplingIndices.length > 0) projected = projectCouplings(timed);
+      else if (advanced != null) { projected = advanced; advanced = null; }
+      if (advanced != null) advanced.dispose();
       mark("motorValidationAndCouplings");
       if(pending.geometryCurve!=null && pending.geometryClearance && Sys.getEnv("PROCESS_PATH_VERIFY_CLEARANCE")=="1"){
         var curve:JointPathSamples=cast pending.geometryCurve;
@@ -836,12 +853,31 @@ class ProgramCompiler {
   function projectCouplings(source:Trajectory):Trajectory
     return source.projectCouplings(projectionFollowers, projectionLeaders, projectionRatios, projectionOffsets);
 
+  /** Sets every coupled joint to the sum of its terms, in dependency order. */
+  function completeCoupled(q:Array<Float>):Void {
+    var at = 0;
+    while (at < projectionFollowers.length) {
+      var follower = projectionFollowers[at], sum = 0.0;
+      while (at < projectionFollowers.length && projectionFollowers[at] == follower) {
+        sum += projectionRatios[at] * q[projectionLeaders[at]] + projectionOffsets[at];
+        at++;
+      }
+      q[follower] = sum;
+    }
+  }
+
   function resolveTarget(target:MoveTarget, start:Array<Float>, index:Int):Array<Float> {
     return switch target {
       case JointTarget(joints):
         if (joints.length != solver.jointCount())
           throw 'Motion program op $index joint count mismatch';
         joints.copy();
+      case JointOffset(joint, delta):
+        if (joint >= start.length) throw 'Motion program op $index joint offset names a joint the machine does not have';
+        var moved = start.copy();
+        moved[joint] += delta;
+        completeCoupled(moved);
+        moved;
       case PoseTarget(pose, requestedFrame, _):
         requireFrame(requestedFrame, index);
         var candidates:Array<Array<Float>>;
@@ -1193,14 +1229,14 @@ class ProgramCompiler {
           Math.abs(beforeAngular[axis] - leavingAngular[axis])));
         // A smooth path longer than a section may be rests there too: the plan stays bounded in samples and memory.
         if (turn > 1e-6 || k - start >= MAX_SECTION_PRIMITIVES) {
-          sections.push({path: new PosePath(path.frameId, path.primitives.slice(start, k)), offset: sectionOffset});
+          sections.push({path: path.sub(start, k), offset: sectionOffset});
           start = k;
           sectionOffset = offset;
         }
       }
       offset += primitive.length();
     }
-    sections.push({path: new PosePath(path.frameId, path.primitives.slice(start)), offset: sectionOffset});
+    sections.push({path: path.sub(start, path.primitives.length), offset: sectionOffset});
     if (sections.length == 1) return [{path: path, offset: 0.0}];
     var authored = path.authoredGeometry;
     if (authored != null) for (section in sections)
@@ -1218,13 +1254,24 @@ class ProgramCompiler {
     var first = path.primitives[0];
     var samples:Array<PathSample> = [{distance: 0.0, primitive: first, local: 0.0, arriving: null}];
     var start = 0.0;
+    // A distance-driven joint changes its rate's slope at its stations: they are sampled too.
+    var stations = path.drive == null ? [] : path.drive.stations();
+    var stationAt = 0;
     for (k in 0...path.primitives.length) {
       var primitive = path.primitives[k], length = primitive.length();
       var pieces = motionkit.path.PoseSampling.pieces(primitive,cartesianResolution,angularResolution);
-      for (piece in 1...(pieces + 1)) {
-        var last = piece == pieces;
-        // Exactly the end: `length * pieces / pieces` can round one ulp past it.
-        var local = last ? length : length * piece / pieces;
+      var locals = [for (piece in 1...pieces) length * piece / pieces];
+      while (stationAt < stations.length && stations[stationAt] <= start + 1e-12) stationAt++;
+      var extra = stationAt;
+      while (extra < stations.length && stations[extra] < start + length - 1e-12) { locals.push(stations[extra] - start); extra++; }
+      if (extra > stationAt) locals.sort(Reflect.compare);
+      // Exactly the end: `length * pieces / pieces` can round one ulp past it.
+      locals.push(length);
+      var previous = 0.0;
+      for (index in 0...locals.length) {
+        var local = locals[index], last = index == locals.length - 1;
+        if (!last && local - previous <= 1e-12) continue;
+        previous = local;
         var next = last && k + 1 < path.primitives.length ? path.primitives[k + 1] : null;
         samples.push(next == null ?
           {distance: start + local, primitive: primitive, local: local, arriving: null} :

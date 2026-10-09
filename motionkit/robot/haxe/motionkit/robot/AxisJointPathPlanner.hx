@@ -44,6 +44,12 @@ class AxisJointPathPlanner implements JointPathPlanner {
           ToolFreedom.orientationError(task.pose, request.poses[i], task.freedom) > request.tolerance.orientation)
         throw 'Axis path request differs from authored geometry or freedom at sample $i';
       var q = i == 0 ? request.startQ.copy() : solver.solvePose(task.pose, previous, request.tolerance, task.freedom);
+      // A distance-driven joint (an extruder) turns with the path, not the pose; what follows it follows.
+      var drive = path.drive;
+      if (drive != null && q != null) {
+        q[drive.joint] = request.startQ[drive.joint] + drive.offsetAt(request.distances[i]);
+        solver.completeDerived(q, true);
+      }
       if (q == null || PoseMath.distance(solver.forward(q), task.pose) > request.tolerance.position ||
           ToolFreedom.orientationError(solver.forward(q), task.pose, task.freedom) > request.tolerance.orientation ||
           solver.solvePose(task.pose, q, request.tolerance, task.freedom) == null)
@@ -58,14 +64,21 @@ class AxisJointPathPlanner implements JointPathPlanner {
       }
       for (joint in 0...q.length) if (Math.abs(q[joint] - previous[joint]) > request.maxJump[joint])
         throw 'Axis path exceeds joint $joint jump at sample $i, distance ${request.distances[i]}';
-      function map(values:Array<Float>):Array<Float> {
+      function map(values:Array<Float>, rate:Float):Array<Float> {
         var mapped = solver.solveDifferential(q, new Twist6(values[0], values[1], values[2],
           values[3], values[4], values[5]), null, task.freedom);
         if (mapped == null) throw 'Axis path derivatives are unreachable at sample $i';
+        if (drive != null) {
+          mapped[drive.joint] = rate;
+          solver.completeDerived(mapped, false);
+        }
         return mapped;
       }
-      positions.push(q); first.push(map(task.velocity));
-      second.push(map(task.acceleration)); before.push(map(task.accelerationBefore));
+      var distance = request.distances[i];
+      // A joint driven by distance has rate `d` per metre, and its rate's own slope is its second derivative.
+      positions.push(q); first.push(map(task.velocity, drive == null ? 0.0 : drive.rateAt(distance)));
+      second.push(map(task.acceleration, drive == null ? 0.0 : drive.curvatureAt(distance, true)));
+      before.push(map(task.accelerationBefore, drive == null ? 0.0 : drive.curvatureAt(distance, false)));
       previous = q;
     }
     return new JointPathSamples(request.distances, positions, first, second, before);

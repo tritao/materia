@@ -174,6 +174,17 @@ class Trajectory implements TimedJointTrajectory {
     return new Trajectory(created.out_trajectory);
   }
 
+  /**
+    A copy in which joint `joint` runs `leadSeconds` ahead of itself, the lead taken on its velocity averaged over
+    `windowSeconds`: an extruder's pressure advance. The joints that follow it are to be projected again afterwards.
+  **/
+  public function advanceJoint(joint:Int, leadSeconds:Float, windowSeconds:Float):Trajectory {
+    ensureLive();
+    var created = MotionKitNative.mk_advance_joint(owner.borrow(), joint, leadSeconds, windowSeconds);
+    check(created.status, "trajectory.advanceJoint");
+    return new Trajectory(created.out_trajectory);
+  }
+
   public function evaluate(timeSeconds:Float):TrajectoryState {
     ensureLive();
     var state = TrajectoryStateBuffer.acquire();

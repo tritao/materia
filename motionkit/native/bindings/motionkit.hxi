@@ -7,6 +7,15 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	const MK_TIMING_BINDING_FEED_CAP = 3;
 	const MK_TIMING_BINDING_JOINT_ACCELERATION = 2;
 	const MK_TIMING_BINDING_JOINT_VELOCITY = 1;
+	/**
+	 * A copy of `trajectory` in which `joint` runs `lead_seconds` ahead of itself, the lead taken on its velocity averaged
+	 * over `window_seconds`: position + lead * (position(t + w/2) - position(t - w/2)) / w. It is the pressure-advance
+	 * correction of an extruder: the filament is pushed ahead of the flow it will feed, and the window keeps a trajectory
+	 * whose acceleration steps from asking for more than the drive has. The joint is held at rest beyond the ends of the
+	 * trajectory. Each segment of the joint becomes a cubic through the corrected position and velocity at its ends, so the
+	 * result is continuous in both. The caller follows with `mk_project_couplings` for the joints that follow `joint`.
+	 */
+	extern fn mk_advance_joint(trajectory: mk_trajectory_handle, joint: u32, lead_seconds: f64, window_seconds: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	extern fn mk_analytic_cartesian_forward(model: ptr<const<mk_analytic_cartesian_model>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_analytic_pose> @out) -> mk_result;
 	/**
 	 * All geometric branches, before limits/wrap enumeration by the sampler.

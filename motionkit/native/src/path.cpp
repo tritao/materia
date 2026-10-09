@@ -915,6 +915,77 @@ mk_result MK_CALL mk_project_couplings(mk_trajectory_handle trajectory,
     return MK_OK;
 }
 
+mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joint, double lead_seconds,
+                                   double window_seconds, mk_trajectory_handle *out_trajectory) {
+    if (!out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
+    out_trajectory->id = 0;
+    if (!std::isfinite(lead_seconds) || lead_seconds < 0.0 || !std::isfinite(window_seconds) || window_seconds <= 0.0)
+        return MK_ERROR_INVALID_ARGUMENT;
+    uint32_t joints = 0, segments = 0;
+    int64_t duration_ns = 0;
+    auto status = mk_trajectory_joint_count(trajectory, &joints);
+    if (status != MK_OK) return status;
+    if (joint >= joints) return MK_ERROR_INVALID_ARGUMENT;
+    status = mk_trajectory_segment_count(trajectory, &segments);
+    if (status != MK_OK) return status;
+    status = mk_trajectory_duration_ns(trajectory, &duration_ns);
+    if (status != MK_OK) return status;
+    const int64_t half_ns = std::max<int64_t>(1, static_cast<int64_t>(std::llround(window_seconds * 0.5e9)));
+    const double window = static_cast<double>(2 * half_ns) * 1e-9;
+    // The joint's position and velocity at `t`, the trajectory held at rest beyond either end.
+    auto state_at = [&](int64_t t, double &position, double &velocity) -> mk_result {
+        mk_trajectory_state state{};
+        state.struct_size = sizeof(state);
+        const int64_t clamped = std::clamp<int64_t>(t, 0, duration_ns);
+        const auto result = mk_trajectory_evaluate(trajectory, clamped, &state);
+        if (result != MK_OK) return result;
+        position = state.position[joint];
+        velocity = (t < 0 || t > duration_ns) ? 0.0 : state.velocity[joint];
+        return MK_OK;
+    };
+    // The corrected position and velocity at `t`.
+    auto corrected = [&](int64_t t, double &position, double &velocity) -> mk_result {
+        double p = 0, v = 0, pa = 0, va = 0, pb = 0, vb = 0;
+        auto result = state_at(t, p, v);
+        if (result == MK_OK) result = state_at(t + half_ns, pa, va);
+        if (result == MK_OK) result = state_at(t - half_ns, pb, vb);
+        if (result != MK_OK) return result;
+        position = p + lead_seconds * (pa - pb) / window;
+        velocity = v + lead_seconds * (va - vb) / window;
+        return MK_OK;
+    };
+    mk_trajectory_handle advanced{};
+    status = mk_trajectory_create(joints, &advanced);
+    if (status != MK_OK) return status;
+    try {
+        auto segment = std::make_unique<mk_segment>();
+        double position_a = 0, velocity_a = 0;
+        for (uint32_t index = 0; index < segments; ++index) {
+            *segment = mk_segment{};
+            segment->struct_size = sizeof(mk_segment);
+            status = mk_trajectory_get_segment(trajectory, index, segment.get());
+            if (status == MK_OK && index == 0) status = corrected(segment->t0_ns, position_a, velocity_a);
+            double position_b = 0, velocity_b = 0;
+            if (status == MK_OK) status = corrected(segment->t0_ns + segment->duration_ns, position_b, velocity_b);
+            if (status != MK_OK) { mk_trajectory_destroy(advanced); return status; }
+            const double h = static_cast<double>(segment->duration_ns) * 1e-9;
+            const double delta = position_b - position_a;
+            auto &c = segment->coefficients[joint].value;
+            for (auto &value : c) value = 0.0;
+            c[0] = position_a;
+            c[1] = velocity_a;
+            c[2] = 3.0 * delta / (h * h) - (2.0 * velocity_a + velocity_b) / h;
+            c[3] = -2.0 * delta / (h * h * h) + (velocity_a + velocity_b) / (h * h);
+            if (segment->degree < 3) segment->degree = 3;
+            status = mk_trajectory_append_segment(advanced, segment.get());
+            if (status != MK_OK) { mk_trajectory_destroy(advanced); return status; }
+            position_a = position_b; velocity_a = velocity_b;
+        }
+    } catch (const std::bad_alloc &) { mk_trajectory_destroy(advanced); return MK_ERROR_OUT_OF_MEMORY; }
+    *out_trajectory = advanced;
+    return MK_OK;
+}
+
 mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,
                                              uint32_t *out_count) {
     if (!out_count) return MK_ERROR_INVALID_ARGUMENT;

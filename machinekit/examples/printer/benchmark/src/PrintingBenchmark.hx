@@ -22,6 +22,7 @@ import robotkit.device.DeviceBinding;
 import robotkit.model.JointType;
 import robotkit.model.SteadyLoads;
 import toolpathkit.motion.MachineBinding;
+import toolpathkit.motion.PrinterBinding;
 import toolpathkit.motion.ToolpathMotion;
 import toolpathkit.motion.ToolpathMotionBinding;
 import toolpathkit.path.ToolpathOp;
@@ -41,8 +42,9 @@ class PrinterAxes {
   public final speed:Array<Float> = [];
   public final acceleration:Array<Float> = [];
   public final start:Array<Float>;
+  public final printer:PrinterBinding;
 
-  public function new() {
+  public function new(?pressureAdvance:Float = 0.0) {
     var scene = SceneArtifact.decode(CoreXyPrinterPreview.printer());
     var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),
       scene.assemblyState).model;
@@ -59,7 +61,12 @@ class PrinterAxes {
     blueprint = MotionSystemBlueprint.fromRobotModel(planning, axes);
     var machine = new MachineBinding("work", "x", "y", "z", 0.25, new toolpathkit.motion.ToolpathChannels(""), 1e-4);
     machine.setRapidsAtFeed(true);
-    binding = new ToolpathMotionBinding(machine, blueprint, null, null, ["e", "motorE-turn"]);
+    // The extruder: a hobbed gear of the printer's own extruder part, feeding the hotend's filament.
+    var printed = new CoreXyPrinter();
+    printer = new PrinterBinding("e", printed.hotend.spec.filamentDiameter * 1e-3, printed.extruder.spec.hobDiameter * 0.5e-3,
+      printed.hotend.spec.maxVolumetricFlow * 1e-9, 0.0005, pressureAdvance);
+    machine.setPrinter(printer);
+    binding = new ToolpathMotionBinding(machine, blueprint);
     // Where homing leaves the nozzle (the slicer's profile), with every coupled joint where its leaders put it.
     var ids = [for (joint in planning.joints) joint.id];
     var q = [for (_ in ids) 0.0];
@@ -216,6 +223,9 @@ class PrintingBenchmark {
    * breaks a limit or strays from the path's tolerance).
    */
   static function gate(machine:PrinterAxes, settings:SlicerSettings, profile:PrinterProfile):Void {
+    extruderChecks(machine, settings, profile);
+    // Pressure advance runs the extruder 40 ms ahead of the flow: the same filament in the end, and every plan still within its limits.
+    extruderChecks(new PrinterAxes(0.04), settings, profile);
     var part = new SpurGear(1.5, 40, 1.2).geometry();
     var sliced = Slicer.slice(part, settings, profile, "gear");
     part.close();
@@ -227,6 +237,47 @@ class PrintingBenchmark {
     if (result.planned > 1.15 * result.reference) failures.push('planned ${result.planned} s is more than 15 % above the reference ${result.reference} s');
     Sys.println(failures.length == 0 ? "PRINTING GATE PASSED" : "PRINTING GATE FAILED: " + failures.join("; "));
     if (failures.length > 0) Sys.exit(1);
+  }
+
+  /**
+   * A whole sliced job through lowering and the compiler with the extruder joint: the heater barriers lower to a
+   * target and a wait, the retractions to extruder-only moves, and the filament the extruder joint takes over the whole
+   * plan is what the program lays (its beads and its retractions) to within 0.2 %.
+   */
+  static function extruderChecks(machine:PrinterAxes, settings:SlicerSettings, profile:PrinterProfile):Void {
+    var part = TestParts.smallTab();
+    var sliced = Slicer.slice(part, settings, profile, "tab");
+    part.close();
+    var program = new ToolpathProgram(sliced.program.ops, sliced.program.tools, [new toolpathkit.setup.Setup("1",
+      new toolpathkit.path.Point3(PrinterAxes.ORIGIN_X, PrinterAxes.ORIGIN_Y, PrinterAxes.ORIGIN_Z))]);
+    var lowered = ToolpathMotion.lower(program, machine.binding.machine);
+    var motion = lowered.program;
+    if (motion == null) throw "the tab lowers to nothing";
+    var targets = 0, waits = 0, offsets = 0, driven = 0;
+    for (op in motion.ops) switch op {
+      case SetOutput(channel, _) if (StringTools.startsWith(channel, "heater.")): targets++;
+      case WaitInput(channel, _, _) if (channel == "heater.hotend.at_temperature" || channel == "heater.bed.at_temperature"): waits++;
+      case MoveJ(JointOffset(_, _), _, _): offsets++;
+      case FollowPath(path, _, _, _) if (path.drive != null): driven++;
+      case _:
+    }
+    check(targets >= 2 && waits == 2, 'the job heats the bed and the hotend and waits for both: $targets targets, $waits waits');
+    check(offsets >= 2 && driven >= 3, 'retractions are extruder moves and beads drive the extruder: $offsets moves, $driven driven paths');
+    var compiled = machine.binding.compiler.compile(motion, machine.start, Int64.ofInt(1));
+    var extruder = machine.printer.extruderIndex, taken = 0.0;
+    for (block in compiled.blocks) for (plan in block.plans) {
+      taken += plan.evaluate(plan.durationSeconds).positions[extruder] - plan.evaluate(0.0).positions[extruder];
+    }
+    var filament = sliced.program.depositedVolume() / machine.printer.filamentArea();
+    for (op in sliced.program.ops) switch op { case FilamentMove(length, _, _): filament += length; case _: }
+    var expected = machine.printer.radians(filament);
+    Sys.println('extruder: the joint turns ${Math.round(taken * 1000) / 1000} rad for ${Math.round(expected * 1000) / 1000} rad of filament (${Math.round((taken / expected - 1) * 1e5) / 1e3} %)');
+    check(Math.abs(taken / expected - 1.0) < 0.002, 'the extruder takes what the program lays: $taken against $expected rad');
+    compiled.dispose();
+  }
+
+  static function check(ok:Bool, message:String):Void {
+    if (!ok) throw message;
   }
 
   public static function main():Void {

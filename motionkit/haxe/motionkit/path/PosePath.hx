@@ -12,6 +12,8 @@ class PosePath implements MotionPath {
   /** Original geometry for paths that replace corners with tolerance blends. */
   public var authoredGeometry(default, null):Null<GeometricPath> = null;
   public var blendTolerance(default, null):Float = 0.0;
+  /** A joint driven by distance along the path (an extruder), if any. */
+  public var drive(default, null):Null<DistanceDrive> = null;
   final totalLength:Float;
   /** Where each primitive ends along the path, summed in order. */
   final ends:Array<Float> = [];
@@ -50,6 +52,28 @@ class PosePath implements MotionPath {
     blendTolerance = tolerance;
     return this;
   }
+  public function withDrive(value:DistanceDrive):PosePath {
+    if (value == null || Math.abs(value.pathLength - totalLength) > 1e-9 * Math.max(1.0, totalLength))
+      throw "A path drive must span its path";
+    drive = value;
+    return this;
+  }
+
+  /** The primitives from `first` up to (not including) `last` as a path of their own, with the geometry and drive that belong to them. */
+  public function sub(first:Int, last:Int):PosePath {
+    if (first < 0 || last > primitives.length || first >= last) throw "Path slice is out of range";
+    var result = new PosePath(frameId, primitives.slice(first, last));
+    if (authoredGeometry != null) result.withAuthoredGeometry(authoredGeometry, blendTolerance);
+    if (drive != null) {
+      var from = startOf(first), to = ends[last - 1];
+      var driven = drive.slice(from, to);
+      // The slice spans the pieces' lengths as summed from zero; keep the path's own.
+      if (driven != null) result.drive = Math.abs(driven.pathLength - result.length()) <= 1e-9 ? driven :
+        new DistanceDrive(driven.joint, driven.intervals, result.length(), driven.ramp);
+    }
+    return result;
+  }
+
   public function poseAt(distance:Float):Pose3 return waypointAt(distance).pose;
 
   /** The first primitive that ends at or after `distance` (the last one past the end), by bisection. */
