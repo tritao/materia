@@ -101,8 +101,12 @@ class ToolpathMotionBinding {
       jump[extruder] = 0.1;
       printer.bind(extruder);
     }
-    // A joint that follows several axes (a CoreXY motor's pulley) belongs to none: it moves at most as
-    // fast as its terms add up to, which the coupled trajectory keeps exactly.
+    // A joint that follows several axes (a CoreXY motor's pulley) belongs to none, and the plan times it as a column of
+    // its own. It moves at most as fast as its terms add up to when the axes run at their limits, and no faster than its
+    // own drive allows: the motor's rate bounds the axes through it (on a CoreXY a diagonal turns one motor at the sum of
+    // what both axes ask, which is why the axes' limits are shares of the motors', see `RobotModel.coupledLimits`).
+    // Its acceleration is the sum alone: the drive's torque limit is the plan check's, since a pulley's own inertia says
+    // nothing of the carriage its belt moves.
     var ids = [for (joint in blueprint.model.joints) joint.id];
     for (_ in 0...count) for (joint in 0...count) if (velocity[joint] <= 0.0) {
       var terms = [for (coupling in blueprint.model.couplings) if (coupling.follower == ids[joint]) coupling];
@@ -118,6 +122,8 @@ class ToolpathMotionBinding {
         jerk[joint] += scale * jerk[leader];
         jump[joint] += scale * jump[leader];
       }
+      var own = blueprint.model.coupledLimits(ids[joint], null, true).velocity;
+      if (own != null && own > 0.0) velocity[joint] = Math.min(velocity[joint], own);
     }
     for (joint in 0...count) {
       if (velocity[joint] <= 0.0 || acceleration[joint] <= 0.0) {

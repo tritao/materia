@@ -67,12 +67,21 @@ class PrinterAxes {
       printed.hotend.spec.maxVolumetricFlow * 1e-9, 0.0005, pressureAdvance);
     machine.setPrinter(printer);
     binding = new ToolpathMotionBinding(machine, blueprint);
-    // Where homing leaves the nozzle (the slicer's profile), with every coupled joint where its leaders put it.
-    var ids = [for (joint in planning.joints) joint.id];
+    // Where homing leaves the nozzle (the slicer's profile).
+    ids = [for (joint in planning.joints) joint.id];
+    this.planning = planning;
+    start = stateAt(0.0, 0.0, 0.01);
+  }
+
+  final planning:robotkit.model.RobotModel;
+  var ids:Array<String> = [];
+
+  /** Every joint's value with the nozzle at (x, y, z) of the bed's frame, each coupled joint where its leaders put it. */
+  public function stateAt(x:Float, y:Float, z:Float):Array<Float> {
     var q = [for (_ in ids) 0.0];
-    q[ids.indexOf("x")] = ORIGIN_X;
-    q[ids.indexOf("y")] = ORIGIN_Y;
-    q[ids.indexOf("z")] = 0.0;
+    q[ids.indexOf("x")] = ORIGIN_X + x;
+    q[ids.indexOf("y")] = ORIGIN_Y + y;
+    q[ids.indexOf("z")] = ORIGIN_Z + z;
     var known = [for (id in ids) id == "x" || id == "y" || id == "z"];
     for (_ in 0...ids.length) for (follower in 0...ids.length) if (!known[follower]) {
       var sum = 0.0, any = false, ready = true;
@@ -84,7 +93,7 @@ class PrinterAxes {
       }
       if (any && ready) { q[follower] = sum; known[follower] = true; }
     }
-    start = q;
+    return q;
   }
 }
 
@@ -223,6 +232,7 @@ class PrintingBenchmark {
    * breaks a limit or strays from the path's tolerance).
    */
   static function gate(machine:PrinterAxes, settings:SlicerSettings, profile:PrinterProfile):Void {
+    motorChecks(machine);
     extruderChecks(machine, settings, profile);
     // Pressure advance runs the extruder 40 ms ahead of the flow: the same filament in the end, and every plan still within its limits.
     extruderChecks(new PrinterAxes(0.04), settings, profile);
@@ -237,6 +247,60 @@ class PrintingBenchmark {
     if (result.planned > 1.15 * result.reference) failures.push('planned ${result.planned} s is more than 15 % above the reference ${result.reference} s');
     Sys.println(failures.length == 0 ? "PRINTING GATE PASSED" : "PRINTING GATE FAILED: " + failures.join("; "));
     if (failures.length > 0) Sys.exit(1);
+  }
+
+  /**
+   * On a CoreXY machine both motors serve both axes, so a diagonal asks one of them for the sum of what the axes ask
+   * (the slicer's infill runs at 45 and 135 degrees). Fast moves along x, y and both diagonals are planned with the
+   * drives' plan check on, and sampled every millisecond: no motor turns faster than its own rate allows, none is asked
+   * for more torque than it gives, and the axes' own limits are kept.
+   */
+  static function motorChecks(machine:PrinterAxes):Void {
+    var model = machine.blueprint.model;
+    var ids = [for (joint in model.joints) joint.id];
+    var options = new motionkit.robot.PlanCheck.PlanCheckOptions();
+    machine.binding.compiler.planCheck = new motionkit.robot.PlanCheck(model, ids, options);
+    var motors = ["pulleyA-turn", "pulleyB-turn"];
+    var rates = [for (id in motors) model.coupledLimits(id, null, true).requireVelocity()];
+    var origin = new toolpathkit.path.Point3(PrinterAxes.ORIGIN_X, PrinterAxes.ORIGIN_Y, PrinterAxes.ORIGIN_Z);
+    var report:Array<String> = [];
+    var seconds = new Map<String, Float>();
+    for (move in [{name: "x", dx: 1.0, dy: 0.0}, {name: "y", dx: 0.0, dy: 1.0}, {name: "45", dx: 1.0, dy: 1.0}, {name: "135", dx: -1.0, dy: 1.0}]) {
+      var length = Math.sqrt(move.dx * move.dx + move.dy * move.dy);
+      var from = new toolpathkit.path.Point3(0.11 - 0.05 * move.dx / length, 0.11 - 0.05 * move.dy / length, 0.01);
+      var to = new toolpathkit.path.Point3(0.11 + 0.05 * move.dx / length, 0.11 + 0.05 * move.dy / length, 0.01);
+      var program = new ToolpathProgram([ToolpathOp.Move(Cut, toolpathkit.path.PathGeometry.Line(from, to), 1.0, 0.0001,
+        new toolpathkit.path.Provenance(1, 1, 0))], new toolpathkit.tool.ToolLibrary(), [new toolpathkit.setup.Setup("1", origin)]);
+      var lowered = ToolpathMotion.lower(program, machine.binding.machine);
+      var motion = lowered.program;
+      if (motion == null) throw "the diagonal move lowers to nothing";
+      // From where the previous move left the machine: at the start of this one.
+      var start = machine.stateAt(from.x, from.y, 0.01);
+      var compiled = machine.binding.compiler.compile(motion, start, Int64.ofInt(1));
+      var peak = [0.0, 0.0], worstTorque = 0.0, findings = 0, duration = 0.0;
+      for (block in compiled.blocks) for (plan in block.plans) {
+        duration += plan.durationSeconds;
+        var steps = Math.ceil(plan.durationSeconds / 0.001);
+        for (step in 0...steps + 1) {
+          var state = plan.evaluate(Math.min(plan.durationSeconds, step * 0.001));
+          for (i in 0...2) peak[i] = Math.max(peak[i], Math.abs(state.velocities[ids.indexOf(motors[i])]));
+        }
+        var checked = plan.checked;
+        if (checked != null) {
+          worstTorque = Math.max(worstTorque, checked.worstTorqueRatio);
+          for (finding in checked.diagnostics) if (finding.kind != motionkit.trajectory.PlanDiagnostic.PlanDiagnosticKind.Accuracy) {
+            findings++;
+            report.push('${move.name}: ${finding.describe(0)}');
+          }
+        }
+      }
+      for (i in 0...2) check(peak[i] <= rates[i] * 1.001, '${move.name}: ${motors[i]} turns ${peak[i]} rad/s, its limit is ${rates[i]}');
+      check(findings == 0, '${move.name}: the plan check finds ${report.join("; ")}');
+      seconds.set(move.name, duration);
+      Sys.println('motors: ${move.name} move ${Math.round(duration * 1000)} ms, motors at most ${Math.round(peak[0])} and ${Math.round(peak[1])} rad/s of ${Math.round(rates[0])}, worst torque ${Math.round(worstTorque * 100)} %');
+      compiled.dispose();
+    }
+    machine.binding.compiler.planCheck = null;
   }
 
   /**

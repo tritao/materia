@@ -684,6 +684,23 @@ Done. What was built and decided:
   now defaults to it. Earlier runs since AM3 were not tested against the wrong library: the quick suite does not
   run the CadKit suite, and the projects that slice (the machinekit smoke, the printing gate) build and load their
   own `libcadkit-core` (their logs say `Build CMake target cadkit-core`), as the slicing in them proves. The full run after the fixes (`am5b`, 2587 s) passed: every workspace project, KinematicsKit, CadKit, the MachineKit smoke, the app's project-source suite (physical router, bench-mill and plotter numbers unchanged; per-tick allocation down about 15 %, the belt router's slowest update from 1582 ms to 209 ms) and the editor tests.
+- **CoreXY motor limits (coordinator review after the gate fix).** The review asked whether derived joints (a CoreXY
+  motor's pulley) are limited by the sum of their leaders' limits instead of by their motors, so that a diagonal (the
+  slicer's 45 and 135 degree infill) could drive one motor past its rate. Measured first, by `motorChecks` in the
+  printing gate: a 100 mm move along x, along y and along both diagonals, planned with the drives' plan check on and
+  sampled every millisecond. The sum is not looser than the motor: the axes' limits are shares of the motors'
+  (`RobotModel.coupledLimits` divides a motor's rate by the sum of the couplings that use it, and its force by the
+  coupling's share), so both axes at their limits turn a motor at exactly its rate. Diagonals turn the busy motor at
+  78 of 79 rad/s (the other stands still), x and y moves turn both at 39 (half: the cost of a share is that a pure
+  axis move uses half of what the motors give), the worst torque is 40 % of the pull-out curve, and the plan check
+  finds nothing. So no plan exceeded a motor's rate or torque; the change is that `ToolpathMotionBinding` bounds a
+  derived joint by its own drive's rate when the model has one (`min` with the sum), so the motor's limit is the
+  constraint and the sum only the most the axes can ask. The acceleration stays the sum (a pulley's own inertia says
+  nothing of the carriage it moves; the drive's torque is the plan check's job and it passes). Not done: axes at the
+  motors' full rate (`coupledLimits(..., motorSpaceVelocity = true)` with `MotorSpaceConstraints` rows, as the
+  plotter's machine program does) would make pure axis moves up to twice as fast. The printer plans derived joints as
+  columns of the timed path, which carry the motor rows already, so the rows would be duplicates; whether to take the
+  speed is a decision for the cube's print time (AM5b).
 - Tests: `ToolpathMotionTests.printerLowering` (rounding across speeds, the arc's speed, stops by reason),
   `PlannerTests.testLongPathQueries` (grid distance against a scan, bisection at boundaries, sections of a long
   path), `CoreXyTests.testDerivedPulleysFollowBothAxes` (pulleys are the sums of their terms along a plan).
@@ -855,6 +872,26 @@ Done. What was built and decided:
   MuJoCo a belt spring.
 - Test: a step move on the printer; the residual vibration at the modelled resonance drops by
   at least 5× with the shaper, and the cube's print time grows by less than 5 %.
+
+**AM5b. Motion cleanup (after AM12).** Planned work, not for the AM run. Each item removes a workaround that AM3 to AM8
+left in the motion path.
+1. The start-at-limit tolerance (`ae6e95ec5`) is duplicated in four places (`ValidationLimits.admittingStart`,
+   `ProgramCompiler.checkJointPosition`, `runtime.cpp validate_appended_path`, `device_compiler6.cpp`) with a magic
+   `1e-6` fallback: move the rule into trajectorykit's shared validator (`trajectory_core`) once, and settle where a
+   homed axis should rest (a home coordinate exactly on the travel limit is the root cause).
+2. TOPP-RA's forward-pass failure: replace the lowered-speed retry subclass and the string-matched "path.time failed"
+   halving with a real fix of TOPP-RA's forward-pass numerics (a fork and an upstream pull request). Forking is
+   outward-facing and needs the user's approval: pending approval.
+3. Replace the `MAX_SECTION_PRIMITIVES` forced rests with timing windows that carry boundary speeds (AM-D4's original
+   design).
+4. Derive `CornerBlender.MIN_RADIUS` from the machine (an arc whose v^2 / r exceeds the acceleration cannot be followed)
+   or from the binding, instead of a global 50 micrometre constant, and stop the slicer emitting micro-segments.
+5. Replace `Std.isOfType(solver, AxisKinematics)` (which skips the clock-sampled task-space check) with a capability
+   the solver declares (exact, affine kinematics).
+6. RKD6: send the step interval as an integer tick count so host and device cannot disagree (`PulseRate` now mirrors
+   the device's f32 arithmetic).
+7. Decide whether the printer's axes take the motors' full rate with motor-space rows (see the AM5 notes on CoreXY motor
+   limits), against the cube's print time.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
