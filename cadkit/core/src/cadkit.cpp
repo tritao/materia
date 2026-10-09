@@ -4257,8 +4257,10 @@ TopoDS_Shape planar_boolean(cad_shape first, cad_shape second, int operation) {
 }
 
 // One face with a single wire offset on its own. MakeOffset works from the medial axis of everything it is
-// given, which degenerates (and crashes OCCT) when two boundaries of a face are concentric or parallel, so
-// a face is never offset with its holes: see `offset_face`.
+// given, which crashes OCCT when two SEPARATE loops are concentric circles or arcs (eccentricity below about
+// 1e-7, inward offsets, both joins): MAT2d_MiniPath::MinimumL1L2 skips the Extrema_ExtCC2d results when
+// IsParallel(). https://github.com/Open-Cascade-SAS/OCCT/issues/1606. A face with a single wire never reaches
+// that code, and rectangular frames do not crash, so a face is never offset with its holes: see `offset_face`.
 std::vector<TopoDS_Face> offset_simple(const TopoDS_Face& face, const gp_Pln& plane, double signed_distance) {
     std::vector<TopoDS_Wire> wires;
     try {

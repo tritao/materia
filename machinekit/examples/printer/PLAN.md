@@ -591,10 +591,13 @@ Done. What was built and decided (AM3 comes before AM6 in the run order):
   - Sections at different heights lie in different planes. `PlanarRegion.section` moves its result to z = 0 so
     layers combine with booleans, and the boolean is run with a 1e-6 fuzzy value because two sections of one
     prism are equal only to within the tolerance of the shapes they were cut from.
-  - `BRepOffsetAPI_MakeOffset` on a face with concentric or parallel boundaries (a ring, a band) crashes OCCT
-    inside the medial-axis code (SIGSEGV, not an exception). `cad_planar_offset` therefore never offsets a face
-    with its holes: the outer boundary is offset one way, each hole the other, and the holes are cut out.
-    Faces whose single boundary has concentric parts of its own (a C-shaped ring) remain at risk.
+  - `BRepOffsetAPI_MakeOffset` on a face with two separate loops that are concentric circles or arcs (a ring)
+    crashes OCCT (SIGSEGV, not an exception): `MAT2d_MiniPath::MinimumL1L2` skips the `Extrema_ExtCC2d` results
+    when `IsParallel()`, which two loops of eccentricity below about 1e-7 reach with inward offsets and both
+    joins. Filed upstream as https://github.com/Open-Cascade-SAS/OCCT/issues/1606. Rectangular frames do not
+    crash. `cad_planar_offset` therefore never offsets a face with its holes: the outer boundary is offset one
+    way, each hole the other, and the holes are cut out. A face with a single wire never reaches that code,
+    so the workaround avoids the crash completely.
 - **Slicer** (`camkit.additive`: `Slicer`, `SlicerSettings`, `PrinterProfile`, `TestParts`): as in the step, with
   these decisions. Perimeters are exact lines and arcs from the offsets, so the plan's "arc fitting within 5 um"
   is not needed. The bead is a stadium (rectangle with semicircular sides) of the layer height and the line
@@ -670,6 +673,17 @@ Done. What was built and decided:
   stage is fitted and checked), and its 1324 corners stopped at for being below the minimum radius come from
   micro-segments in its G-code (the sliced chamfer and boss); the slicer should not emit them.
   Managed heap peaks 323 MB (gear), 198 MB, 213 MB.
+- **The first full run of the gate failed, and was fixed before AM7 went on.** (1) CamKit's "a blended pocket stops
+  at fewer corners" came out 90 against 90: the test asks for a 10 micrometre blend tolerance, which rounds a right
+  angle with an arc of about 19 micrometres, and the new minimum radius of 50 micrometres stopped at those corners.
+  The code was wrong, not the test: a corner whose own tolerance needs a tighter arc than the minimum keeps it
+  (`min(MIN_RADIUS, 0.5 * the radius the tolerance asks for)`); the minimum exists to stop corners squeezed by tiny
+  neighbours, not to override what was asked. (2) The CadKit suite loaded the shared `topological-naming` CadKit
+  build, which lacks the AM3 natives (`undefined symbol: cad_shape_section`): the suite script's default
+  `CADKIT_BUILD_ROOT` pointed at it. Every run since AM3 must use this worktree's `cadkit/build/debug`; the script
+  now defaults to it. Earlier runs since AM3 were not tested against the wrong library: the quick suite does not
+  run the CadKit suite, and the projects that slice (the machinekit smoke, the printing gate) build and load their
+  own `libcadkit-core` (their logs say `Build CMake target cadkit-core`), as the slicing in them proves.
 - Tests: `ToolpathMotionTests.printerLowering` (rounding across speeds, the arc's speed, stops by reason),
   `PlannerTests.testLongPathQueries` (grid distance against a scan, bisection at boundaries, sections of a long
   path), `CoreXyTests.testDerivedPulleysFollowBothAxes` (pulleys are the sums of their terms along a plan).
