@@ -236,19 +236,32 @@ void evaluate_knot(const RobotRuntime::RuntimeTrajectoryPoint &knot, uint64_t ti
   `queued`, which was valid when queued. The checks are per segment and per
   junction, so the new segments and the queued segment they join are all
   that need checking: an append costs its own length, not the queue's.
+
+  `start_tolerance`, when given, is the submitted plan's per-joint start position tolerance.
+  A joint resting just outside a position limit by no more than that (a stepper homed onto its
+  limit comes to rest a step or two past it) may begin there: its bound reaches the first
+  position of the validated path and no further.
 **/
 rk_result validate_appended_path(
     const std::deque<RobotRuntime::RuntimeTrajectoryPoint> &queued,
     const std::vector<RobotRuntime::RuntimeTrajectoryPoint> &added,
-    const rk_robot_runtime_blueprint &blueprint, bool homing = false) {
+    const rk_robot_runtime_blueprint &blueprint, bool homing = false,
+    const double *start_tolerance = nullptr) {
     mk_trajectory_handle handle{};
     if (mk_trajectory_create(blueprint.joint_count, &handle) != MK_OK)
         return RK_ERROR_OUT_OF_MEMORY;
     uint32_t segments = 0;
+    double first_position[RK_MAX_TRAJECTORY_JOINTS]{};
     auto append = [&](const RobotRuntime::RuntimeTrajectoryPoint &knot) {
         if (!knot.has_segment) return true;
         const auto native = knot.segment.native();
         if (mk_trajectory_append_segment(handle, &native) != MK_OK) return false;
+        if (segments == 0) {
+            mk_trajectory_state first{};
+            motionkit::evaluate_segment(native, 0.0, first);
+            std::copy_n(first.position, std::min<uint32_t>(first.joint_count, RK_MAX_TRAJECTORY_JOINTS),
+                first_position);
+        }
         ++segments;
         return true;
     };
@@ -285,6 +298,15 @@ rk_result validate_appended_path(
         const double travel = homing && has_overtravel ? blueprint.joint_overtravel[joint] : 0.0;
         limits.position_lower[joint] = source.lower_limit - travel;
         limits.position_upper[joint] = source.upper_limit + travel;
+        if (start_tolerance != nullptr && limits.position_claimed[joint]) {
+            const double slack = start_tolerance[joint] > 0.0 ? start_tolerance[joint] : 1e-6;
+            if (first_position[joint] < limits.position_lower[joint] &&
+                first_position[joint] >= limits.position_lower[joint] - slack)
+                limits.position_lower[joint] = first_position[joint];
+            if (first_position[joint] > limits.position_upper[joint] &&
+                first_position[joint] <= limits.position_upper[joint] + slack)
+                limits.position_upper[joint] = first_position[joint];
+        }
         if (!std::isfinite(limits.position_lower[joint]) ||
             !std::isfinite(limits.position_upper[joint])) {
             mk_trajectory_destroy(handle);
@@ -1017,7 +1039,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         if (knots_after_append(kept, added) > RK_MAX_TRAJECTORY_QUEUE_POINTS)
             return RK_ERROR_QUEUE_FULL;
         const auto checked = validate_appended_path(kept, added, blueprint_,
-            (plan.flags & RK_PLAN_HOMING) != 0);
+            (plan.flags & RK_PLAN_HOMING) != 0, plan.position_tolerance);
         if (checked != RK_OK) return checked;
         if (endpoint_->executes_trajectory_queue()) {
             const auto owner_now = externally_driven_ ? last_owner_timestamp_ns_ : monotonic_now_ns();

@@ -69,16 +69,40 @@ class ValidationLimits {
   public function nativeValue():mk_limits return native;
 
   /** Preserve machine claims while leaving path-timed jerk unclaimed. */
-  public function withoutJerk():ValidationLimits {
+  public function withoutJerk():ValidationLimits return copy(false, null, null);
+
+  /**
+   * The same claims for a plan that starts at `positions`. A joint resting just outside a claimed
+   * position bound, within its start tolerance (a stepper homed onto a limit comes to rest a step
+   * or two past it), may begin there, so its bound reaches the start position and no further.
+   */
+  public function admittingStart(positions:Array<Float>, tolerances:Array<Float>):ValidationLimits {
+    var outside = false;
+    for (joint in 0...jointCount)
+      if (native.get_position_claimed(joint) != 0 &&
+          (positions[joint] < native.get_position_lower(joint) || positions[joint] > native.get_position_upper(joint)))
+        outside = true;
+    return outside ? copy(true, positions, tolerances) : this;
+  }
+
+  function copy(keepJerk:Bool, startPositions:Null<Array<Float>>, startTolerances:Null<Array<Float>>):ValidationLimits {
     var result = new ValidationLimits(jointCount, modelRevision, calibrationRevision);
     for (joint in 0...jointCount) {
-      if (native.get_position_claimed(joint) != 0)
-        result.position(joint, native.get_position_lower(joint),
-          native.get_position_upper(joint));
+      if (native.get_position_claimed(joint) != 0) {
+        var lower = native.get_position_lower(joint), upper = native.get_position_upper(joint);
+        if (startPositions != null) {
+          var start = startPositions[joint], tolerance = startTolerances[joint];
+          if (start < lower && start >= lower - tolerance) lower = start;
+          if (start > upper && start <= upper + tolerance) upper = start;
+        }
+        result.position(joint, lower, upper);
+      }
       if ((native.get_derivative_claimed(joint) & 1) != 0)
         result.velocity(joint, native.get_max_velocity(joint));
       if ((native.get_derivative_claimed(joint) & 2) != 0)
         result.acceleration(joint, native.get_max_acceleration(joint));
+      if (keepJerk && (native.get_derivative_claimed(joint) & 4) != 0)
+        result.jerk(joint, native.get_max_jerk(joint));
     }
     for (order in 0...3)
       result.continuity(order, native.get_max_continuity_jump(order));

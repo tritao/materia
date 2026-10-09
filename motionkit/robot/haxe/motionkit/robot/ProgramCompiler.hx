@@ -929,7 +929,7 @@ class ProgramCompiler {
       var solved = selected[sample];
       if (solved == null || solved.length != startQ.length)
         throw 'Motion program op $index unreachable pose at path distance $distance${solverFailure()}';
-      checkJointPosition(solved, index, distance);
+      checkJointPosition(solved, index, distance, startQ);
       if (sample > 0) {
         for (joint in 0...startQ.length)
           if (Math.abs(solved[joint] - previous[joint]) > perJointMaxJump[joint])
@@ -1155,15 +1155,25 @@ class ProgramCompiler {
     if (requested != frameId)
       throw 'Motion program op $index frame "$requested" does not match "$frameId"';
   }
+  /**
+    A joint may sit at its `start` position even just outside its bound, within the start tolerance
+    (a stepper homed onto a limit comes to rest a step or two past it): see ValidationLimits.admittingStart.
+  **/
   function checkJointPosition(q:Array<Float>, index:Int,
-      distance:Null<Float>):Void {
+      distance:Null<Float>, ?start:Array<Float>):Void {
     var nativeLimits = limits.nativeValue();
     for (joint in 0...q.length)
-      if (nativeLimits.get_position_claimed(joint) != 0 &&
-          (q[joint] < nativeLimits.get_position_lower(joint) - 1e-9 ||
-           q[joint] > nativeLimits.get_position_upper(joint) + 1e-9)) {
-        var location = distance == null ? "" : ' at path distance $distance';
-        throw 'Motion program op $index joint limit $joint$location';
+      if (nativeLimits.get_position_claimed(joint) != 0) {
+        var lower = nativeLimits.get_position_lower(joint), upper = nativeLimits.get_position_upper(joint);
+        if (start != null) {
+          var tolerance = startTolerances.position[joint];
+          if (start[joint] < lower && start[joint] >= lower - tolerance) lower = start[joint];
+          if (start[joint] > upper && start[joint] <= upper + tolerance) upper = start[joint];
+        }
+        if (q[joint] < lower - 1e-9 || q[joint] > upper + 1e-9) {
+          var location = distance == null ? "" : ' at path distance $distance';
+          throw 'Motion program op $index joint limit $joint$location';
+        }
       }
   }
   /**

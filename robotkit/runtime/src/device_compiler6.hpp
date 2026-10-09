@@ -58,6 +58,9 @@ struct CompiledDevicePlan6 {
   that tick so a continuation meets the queued path exactly.
   Homing alone may use the blueprint's declared overtravel past soft limits;
   derivative and actuator step-rate limits still apply.
+  `start_tolerance`, when given, is the plan's per-joint start position tolerance: a joint resting
+  just outside a position limit by no more than that (a stepper homed onto its limit comes to
+  rest a step or two past it) may begin there, its bound reaching the first position and no further.
 **/
 CompiledDevicePlan6 compile_device_segments6(
     std::span<const robotkit::TrajectorySegment> segments, std::uint64_t plan_id,
@@ -66,6 +69,7 @@ CompiledDevicePlan6 compile_device_segments6(
     std::uint64_t device_tick_hz, std::uint64_t step_tick_hz,
     std::uint8_t max_degree, double target_error,
     std::span<const DeviceActuator6> layout = {},
-    std::uint64_t anchor_ticks = 0, bool homing = false);
+    std::uint64_t anchor_ticks = 0, bool homing = false,
+    const double *start_tolerance = nullptr);
 
 } // namespace robotkit

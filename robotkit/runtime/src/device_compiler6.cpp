@@ -38,7 +38,8 @@ CompiledDevicePlan6 compile_device_segments6(
     const ClockEstimator6 &clock, const rk_robot_runtime_blueprint &blueprint,
     std::uint64_t device_tick_hz, std::uint64_t step_tick_hz,
     std::uint8_t max_degree, double target_error,
-    std::span<const DeviceActuator6> layout, std::uint64_t anchor_ticks, bool homing) {
+    std::span<const DeviceActuator6> layout, std::uint64_t anchor_ticks, bool homing,
+    const double *start_tolerance) {
     if (!clock.may_commit()) return failure("clock_sync_lost");
     if (segments.empty() || plan_id == 0 || blueprint.joint_count == 0 ||
         blueprint.joint_count > device_wire6::MAX_ACTUATORS ||
@@ -281,6 +282,14 @@ CompiledDevicePlan6 compile_device_segments6(
         const auto travel = homing && has_overtravel ? blueprint.joint_overtravel[joint] : 0.0;
         limits.position_lower[joint] = source.lower_limit - travel;
         limits.position_upper[joint] = source.upper_limit + travel;
+        if (start_tolerance != nullptr) {
+            const double first = original_segments[0].coefficients[joint].value[0];
+            const double slack = start_tolerance[joint] > 0.0 ? start_tolerance[joint] : 1e-6;
+            if (first < limits.position_lower[joint] && first >= limits.position_lower[joint] - slack)
+                limits.position_lower[joint] = first;
+            if (first > limits.position_upper[joint] && first <= limits.position_upper[joint] + slack)
+                limits.position_upper[joint] = first;
+        }
         limits.max_velocity[joint] = source.max_velocity;
         limits.max_acceleration[joint] = source.max_acceleration;
         limits.derivative_claimed[joint] = ((source.limit_flags & RK_LIMIT_VELOCITY) ? 1u : 0u) |

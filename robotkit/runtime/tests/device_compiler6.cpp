@@ -78,6 +78,25 @@ int main() {
         clock, blueprint, 1'000'000, 40'000, 5, 1e-6, {}, 0, true);
     assert(!beyond_stop.ok);
     blueprint.joint_overtravel[0] = 0.0;
+    // A stepper homed onto its limit rests just beyond it: a plan may start there within its start
+    // tolerance, with the bound reaching the start and no further.
+    auto resting = segment;
+    resting.coefficients[0].value[0] = 10.002;
+    resting.coefficients[0].value[1] = 0.0;
+    auto strict = robotkit::compile_device_segments6(
+        std::span(&resting, 1), 9, true, 1'000'000'000ULL,
+        clock, blueprint, 1'000'000, 40'000, 5, 1e-6);
+    assert(!strict.ok);
+    const double start_tolerance[robotkit::device_wire6::MAX_ACTUATORS] = {0.005};
+    auto admitted = robotkit::compile_device_segments6(
+        std::span(&resting, 1), 9, true, 1'000'000'000ULL,
+        clock, blueprint, 1'000'000, 40'000, 5, 1e-6, {}, 0, false, start_tolerance);
+    assert(admitted.ok);
+    resting.coefficients[0].value[0] = 10.02;
+    auto too_far = robotkit::compile_device_segments6(
+        std::span(&resting, 1), 9, true, 1'000'000'000ULL,
+        clock, blueprint, 1'000'000, 40'000, 5, 1e-6, {}, 0, false, start_tolerance);
+    assert(!too_far.ok);
     segment.degree = 6;
     auto degree = robotkit::compile_device_segments6(
         std::span(&segment, 1), 7, true, 1'000'000'000ULL,
