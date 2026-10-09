@@ -28,6 +28,7 @@ import motionkit.program.MotionOp;
 import motionkit.program.MoveTarget;
 import motionkit.program.Blend;
 import motionkit.kinematics.Pose3;
+import motionkit.robot.JointMotionPolicy;
 import motionkit.MotionOptions;
 import motionkit.robot.MotionSystem;
 import motionkit.robot.MotionSystemBlueprint;

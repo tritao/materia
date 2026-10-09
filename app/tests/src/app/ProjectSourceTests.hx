@@ -26,6 +26,7 @@ import cadkit.modeling.AssemblyState;
 import materia.assembly.AssemblyFrames;
 import app.ApplicationSimulation;
 import robotkit.world.RobotWorld;
+import motionkit.robot.JointMotionPolicy;
 import robotkit.core.Robot;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
