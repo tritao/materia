@@ -64,6 +64,14 @@ class ContactPoseEnvelope {
   }
 
   function get_cells():Int return boxes.length;
+
+  /** Independent planning branch with the same conservative pose set. */
+  public function fork():ContactPoseEnvelope {
+    var result = new ContactPoseEnvelope(nominalWork, new Vec3(), new Vec3(), measurementError);
+    result.boxes = [for (box in boxes) {lo: box.lo.copy(), hi: box.hi.copy()}];
+    return result;
+  }
+
   static function dot(vector:Array<Span>, axis:Vec3):Span return vector[0].scale(axis.x).add(vector[1].scale(axis.y)).add(vector[2].scale(axis.z));
 
   /** Z-Y-X rotation of a constant vector, with conservative interval products. */

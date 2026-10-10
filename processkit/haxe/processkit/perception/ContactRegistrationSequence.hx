@@ -10,12 +10,19 @@ class ContactRegistrationStage {
   public final normal:Vec3;
   public final offset:Float;
   public final probes:Array<ContactProbeRequest>;
-  public function new(normal:Vec3, offset:Float, probes:Array<ContactProbeRequest>) {
+  /** Checked entry posture for this stage; null uses the saved registration start. */
+  public var entryJoints(get, never):Null<Array<Float>>;
+  final checkpoint:Null<Array<Float>>;
+  public function new(normal:Vec3, offset:Float, probes:Array<ContactProbeRequest>, entryJoints:Null<Array<Float>> = null) {
     if (normal == null || !Math.isFinite(normal.norm()) || normal.norm() < 1e-12 || !Math.isFinite(offset) || probes == null || probes.length == 0)
       throw "Contact registration stage needs a plane and prepared probes";
     for (probe in probes) if (probe == null) throw "Contact registration stage has a missing probe";
+    if (entryJoints != null) for (joint in entryJoints)
+      if (!Math.isFinite(joint)) throw "Contact registration entry has a non-finite joint";
     this.normal = normal.normalized(); this.offset = offset / normal.norm(); this.probes = probes.copy();
+    checkpoint = entryJoints == null ? null : entryJoints.copy();
   }
+  function get_entryJoints():Null<Array<Float>> return checkpoint == null ? null : checkpoint.copy();
 }
 
 /** Measured 3-2-1 registration policy; selection receives only CAD/observed uncertainty, never physical work poses. */
@@ -28,6 +35,10 @@ class ContactRegistrationSequence {
   var stage:Null<ContactRegistrationStage> = null;
   var index = 0;
   var started = false;
+  public var stageTransitionPending(default, null) = false;
+
+  /** The selected CAD plane and its checked probes, while the sequence works on that plane. */
+  public function activeStage():Null<ContactRegistrationStage> return stage;
 
   public function new(envelope:ContactPoseEnvelope,
       select:Int->Array<Vec3>->ContactPoseEnvelope->ContactRegistrationStage) {
@@ -49,8 +60,15 @@ class ContactRegistrationSequence {
     if (normals.length == 1 && normals[0].cross(selected.normal).norm() < 1e-3 ||
         normals.length == 2 && Math.abs(normals[0].cross(normals[1]).dot(selected.normal)) < 1e-3)
       throw "Contact registration stages need independent plane normals";
-    stage = selected; index = 0;
+    stage = selected; index = 0; stageTransitionPending = false;
     return selected.probes[0];
+  }
+
+  /** Select the next plane from completed measurements; the runner then follows its checked entry. */
+  public function selectNextStage():ContactProbeRequest {
+    if (!started || !stageTransitionPending || result != null)
+      throw "Contact registration has no pending plane transition";
+    return selectStage();
   }
 
   /** Called only after an executed probe has completed its checked retreat. */
@@ -63,7 +81,12 @@ class ContactRegistrationSequence {
     if (index < active.probes.length) return active.probes[index];
     envelope.refine(contacts);
     normals.push(active.normal);
-    if (normals.length < 3) return selectStage();
+    stage = null;
+    index = 0;
+    if (normals.length < 3) {
+      stageTransitionPending = true;
+      return null;
+    }
     var fitted = ContactRegistration.fit(contacts, envelope.nominalWork, envelope.measurementError);
     fitted.require();
     result = fitted;

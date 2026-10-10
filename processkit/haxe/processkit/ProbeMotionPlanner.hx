@@ -110,44 +110,33 @@ class ProbeMotionPlanner {
     } catch (_:Dynamic) return false;
   }
 
-  function boundsProblem(q:Array<Float>, label:String):Null<String> {
-    if (q == null) return '$label joint configuration is missing';
-    if (q.length != arm.group.count()) return '$label joint configuration has ${q.length} values; expected ${arm.group.count()}';
-    for (joint in 0...q.length) {
-      var limits = arm.group.limitsOf(joint);
-      var name = arm.robot.joints[arm.jointIndices()[joint]].id;
-      if (!Math.isFinite(limits.lower) || !Math.isFinite(limits.upper) || !(limits.upper > limits.lower))
-        return '$label joint $name has no finite route bounds [${limits.lower}, ${limits.upper}]';
-      if (!Math.isFinite(q[joint]) || q[joint] < limits.lower || q[joint] > limits.upper)
-        return '$label joint $name=${q[joint]} is outside [${limits.lower}, ${limits.upper}]';
-    }
-    return null;
-  }
-
-  /** Canonicalize representation-sized IK overshoots at a finite joint limit. */
-  function boundedGoal(q:Array<Float>):Array<Float> {
-    if (q == null || q.length != arm.group.count())
-      throw 'IK goal has ${q == null ? 0 : q.length} joints; expected ${arm.group.count()}';
+  /** Canonicalize only representation-sized joint-limit overshoots, for observed starts and IK goals. */
+  function boundedConfiguration(q:Array<Float>, label:String):Array<Float> {
+    if (q == null) throw '$label joint configuration is missing';
+    if (q.length != arm.group.count())
+      throw '$label joint configuration has ${q.length} values; expected ${arm.group.count()}';
     var result = q.copy();
     for (joint in 0...result.length) {
       var limits = arm.group.limitsOf(joint);
       var name = arm.robot.joints[arm.jointIndices()[joint]].id;
       if (!Math.isFinite(limits.lower) || !Math.isFinite(limits.upper) || !(limits.upper > limits.lower))
-        throw 'IK goal joint $name has no finite route bounds [${limits.lower}, ${limits.upper}]';
-      if (!Math.isFinite(result[joint])) throw 'IK goal joint $name=${result[joint]} is not finite';
+        throw '$label joint $name has no finite route bounds [${limits.lower}, ${limits.upper}]';
+      if (!Math.isFinite(result[joint])) throw '$label joint $name=${result[joint]} is not finite';
       var roundoff = 1e-12 * Math.max(1.0, Math.max(Math.abs(limits.lower), Math.abs(limits.upper)));
       if (result[joint] < limits.lower) {
         if (limits.lower - result[joint] > roundoff)
-          throw 'IK goal joint $name=${result[joint]} is outside [${limits.lower}, ${limits.upper}]';
+          throw '$label joint $name=${result[joint]} is outside [${limits.lower}, ${limits.upper}]';
         result[joint] = limits.lower;
       } else if (result[joint] > limits.upper) {
         if (result[joint] - limits.upper > roundoff)
-          throw 'IK goal joint $name=${result[joint]} is outside [${limits.lower}, ${limits.upper}]';
+          throw '$label joint $name=${result[joint]} is outside [${limits.lower}, ${limits.upper}]';
         result[joint] = limits.upper;
       }
     }
     return result;
   }
+
+  function boundedGoal(q:Array<Float>):Array<Float> return boundedConfiguration(q, "IK goal");
 
   /** Bounded joint-space detours reach the requested prepared search pose on a proved IK branch. */
   public function approach(target:Transform3, start:Array<Float>, proposals:Int = 1024):CheckedProbeMove {
@@ -169,9 +158,16 @@ class ProbeMotionPlanner {
   public function observedApproachJoints(goal:Array<Float>, start:Array<Float>):CheckedProbeMove {
     if (goal == null || start == null || goal.length != arm.group.count() || start.length != goal.length)
       throw "Observed probe joint approach needs matching configurations";
-    if (!edge(start, goal)) throw "Probe approach has no checked observed IK configuration";
-    var program = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
-    return new CheckedProbeMove(program, inspect(program, start, false));
+    var boundedStart:Array<Float>;
+    try boundedStart = boundedConfiguration(start, "start")
+    catch (error:Dynamic) throw 'Probe approach $error';
+    var bounded = boundedGoal(goal);
+    var program = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(bounded), new MotionOptions(), Blend.ExactStop)]);
+    var hit = sweep(boundedStart, bounded, false);
+    if (hit != null)
+      throw 'Probe approach has no checked observed IK configuration: ${hit.a} against ${hit.b}, clearance ${hit.distance} m (required ${hit.required} m)';
+    try return new CheckedProbeMove(program, inspect(program, boundedStart, false))
+    catch (error:Dynamic) throw 'Probe approach has no checked observed IK configuration: ${Std.string(error)}';
   }
 
   function goalsFor(target:Transform3, start:Array<Float>):Array<Array<Float>> {
@@ -198,9 +194,10 @@ class ProbeMotionPlanner {
   function approachCandidates(goals:Array<Array<Float>>, start:Array<Float>, proposals:Int):CheckedProbeMove {
     var lower = [for (i in 0...arm.group.count()) arm.group.limitsOf(i).lower];
     var upper = [for (i in 0...arm.group.count()) arm.group.limitsOf(i).upper];
-    var startProblem = boundsProblem(start, "start");
-    if (startProblem != null) throw 'Probe approach $startProblem';
-    var initialHit = violation(start);
+    var boundedStart:Array<Float>;
+    try boundedStart = boundedConfiguration(start, "start")
+    catch (error:Dynamic) throw 'Probe approach $error';
+    var initialHit = violation(boundedStart);
     if (initialHit != null) throw 'Probe approach start is blocked: ${initialHit.a} against ${initialHit.b}, clearance ${initialHit.distance} m (required ${initialHit.required} m)';
     var reasons:Array<String> = [];
     for (goal in goals) {
@@ -208,11 +205,28 @@ class ProbeMotionPlanner {
         var bounded = boundedGoal(goal);
         var goalHit = violation(bounded);
         if (goalHit != null) throw 'Probe approach goal is blocked: ${goalHit.a} against ${goalHit.b}, clearance ${goalHit.distance} m (required ${goalHit.required} m)';
-        var route = JointRoute.plan(start, bounded, lower, upper, edge, proposals);
+        // Most touch probes have a clear exact-stop joint path. Prove that path
+        // once before searching detours, and keep the full corridor/clearance
+        // inspection as the acceptance check.
+        var direct = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(bounded), new MotionOptions(), Blend.ExactStop)]);
+        var directFailed = false;
+        try return new CheckedProbeMove(direct, inspect(direct, boundedStart, false))
+        catch (_:Dynamic) directFailed = true;
+        var directStart = boundedStart.copy();
+        var directGoal = bounded.copy();
+        var skipDirectEdge = directFailed;
+        function sameConfiguration(a:Array<Float>, b:Array<Float>):Bool {
+          if (a.length != b.length) return false;
+          for (index in 0...a.length) if (Math.abs(a[index] - b[index]) > 1e-12) return false;
+          return true;
+        }
+        var route = JointRoute.plan(directStart, directGoal, lower, upper, (from, to) ->
+          skipDirectEdge && sameConfiguration(from, directStart) && sameConfiguration(to, directGoal)
+            ? false : edge(from, to), proposals);
         var ops:Array<MotionOp> = [for (i in 1...route.length)
           MotionOp.MoveJ(MoveTarget.JointTarget(route[i]), new MotionOptions(), Blend.ExactStop)];
         var program = new MotionProgram(ops);
-        var end = inspect(program, start, false);
+        var end = inspect(program, boundedStart, false);
         return new CheckedProbeMove(program, end);
       } catch (error:Dynamic) reasons.push(Std.string(error));
     }
@@ -225,6 +239,25 @@ class ProbeMotionPlanner {
     if (start == null || start.length != arm.group.count() || direction == null || Math.abs(direction.norm() - 1) > 1e-8 ||
         !Math.isFinite(distance) || !(distance > 0)) throw "Probe corridor needs observed joints, a unit direction and finite distance";
     return continuationCorridor(start, direction, distance) != null;
+  }
+
+  /** Prove the arm and unconsumed wire stay clear along a checked sensing ray to its contact plane. */
+  public function sensingCorridorViolation(start:Array<Float>, direction:Vec3, distance:Float):Null<ClearanceViolation> {
+    if (start == null || start.length != arm.group.count() || direction == null || Math.abs(direction.norm() - 1) > 1e-8 ||
+        !Math.isFinite(distance) || !(distance > 0))
+      throw "Probe sensing clearance needs observed joints, a unit direction and finite travel";
+    var samples = continuationCorridor(start, direction, distance);
+    if (samples == null) throw "Probe sensing clearance leaves the executed IK branch";
+    var previous = samples[0];
+    var initial = violation(previous, true);
+    if (initial != null) return initial;
+    for (index in 1...samples.length) {
+      var next = samples[index];
+      var hit = sweep(previous, next, true);
+      if (hit != null) return hit;
+      previous = next;
+    }
+    return null;
   }
 
   /** Continue locally along a bounded Cartesian ray, refining only where the current IK branch needs it. */
@@ -353,8 +386,15 @@ class ProbeMotionPlanner {
       accelerations.push(acceleration);
       horizon = Math.max(horizon, keepaliveSeconds + Math.abs(velocity[joint]) / acceleration);
     }
-    var samples = Std.int(Math.max(1.0, Math.ceil(horizon / interval)));
-    var last = start.copy();
+    var maximumRate = 0.0;
+    for (rate in velocity) maximumRate = Math.max(maximumRate, Math.abs(rate));
+    // The braking path is monotone in each joint. Pick time samples so no
+    // observed joint can travel farther than the clearance sweep's spatial
+    // step, including when a measured rate exceeds its nominal limit. Testing
+    // each sample once is equivalent to sweeping every adjacent pair, whose
+    // only samples would be those same endpoints.
+    var samplePeriod = maximumRate > 0 ? Math.min(interval, jointStep / maximumRate) : interval;
+    var samples = Std.int(Math.max(1.0, Math.ceil(horizon / samplePeriod)));
     for (sample in 0...samples + 1) {
       var time = horizon * sample / samples;
       var hold = Math.min(time, keepaliveSeconds);
@@ -371,9 +411,8 @@ class ProbeMotionPlanner {
             distance: Math.min(end - limits.lower, limits.upper - end), required: 0.0};
         q.push(end);
       }
-      var hit = sweep(last, q, true);
+      var hit = violation(q, true);
       if (hit != null) return hit;
-      last = q;
     }
     return null;
   }

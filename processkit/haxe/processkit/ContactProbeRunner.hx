@@ -13,7 +13,7 @@ import robotkit.core.JointTarget;
 import robotkit.core.RobotCommand;
 import haxe.Int64;
 
-private enum ProbePhase { Idle; Approaching; Coarse; Backoff; Fine; HandoffBackoff; HandoffRetreat; Retreat; Done; Failed; }
+private enum ProbePhase { Idle; Approaching; HandoffCoarse; Coarse; Backoff; HandoffFine; Fine; HandoffBackoff; HandoffRetreat; Retreat; Done; Failed; }
 
 /** A prepared nominal search pose and bounded arc-off sensing parameters, in metres and seconds. */
 class ContactProbeRequest {
@@ -37,11 +37,30 @@ class ContactProbeRequest {
     this.coarseSpeed = coarseSpeed; this.fineSpeed = fineSpeed; this.backoff = backoff; this.contactOffset = contactOffset;
     this.approachJoints = approachJoints == null ? null : approachJoints.copy();
   }
+
+  /** Static clearance ends before the earliest possible calibrated touch; sensing owns the uncertain interval. */
+  public function precontactDistance(nominalTravel:Float, normalTravel:Float):Float {
+    if (!Math.isFinite(nominalTravel) || nominalTravel <= 0 || nominalTravel > distance + 1e-8 ||
+        !Math.isFinite(normalTravel) || normalTravel < 0)
+      throw "Probe pre-contact clearance needs a nominal plane inside its search and finite uncertainty";
+    var travel = nominalTravel - normalTravel - contactOffset;
+    if (!(travel > 0)) throw "Probe approach has no guaranteed pre-contact clearance interval";
+    return travel;
+  }
+
+  /** Bound sampling and feedback skew; a fine pass only needs to clear the coarse observation bound. */
+  public function withPrecision(error:Float, maxAgeSeconds:Float):ContactProbeRequest {
+    if (!Math.isFinite(error) || !(error > 0) || !Math.isFinite(maxAgeSeconds) || !(maxAgeSeconds > 0))
+      throw "Contact probe precision needs a positive error and feedback age bound";
+    var speed = Math.min(fineSpeed, error / (2 * maxAgeSeconds));
+    var retreat = Math.min(backoff, contactOffset + 2 * coarseSpeed * maxAgeSeconds + 2 * error);
+    return new ContactProbeRequest(approach, direction, distance, coarseSpeed, speed, retreat, contactOffset, approachJoints);
+  }
 }
 
 /** One exclusive owner alternates checked motion programs with contact servo searches. */
 class ContactProbeRunner {
-  static inline var SEARCH_AGE_SECONDS:Float = 0.02;
+  public static inline var SEARCH_AGE_SECONDS:Float = 0.02;
   public final motion:ManipulatorMotion;
   public final planner:ProbeMotionPlanner;
   public final channels:WelderChannels;
@@ -122,6 +141,15 @@ class ContactProbeRunner {
     search = null;
   }
 
+  /** Hold the measured pose and wait for a fresh source sample before transferring motion ownership. */
+  function holdAndHandoff(next:ProbePhase):Void {
+    var snapshot = motion.robot.snapshot();
+    motion.robot.submit(RobotCommand.JointTargets([for (index in motion.jointIndices)
+      JointTarget.position(index, snapshot.positions.get(index))], null));
+    handoffAt = snapshot.sourceTimestampNs;
+    phase = next;
+  }
+
   public function update(dt:Float):Void {
     if (!running()) return;
     if (!Math.isFinite(dt) || !(dt > 0)) throw "Contact probe update needs a positive finite duration";
@@ -134,13 +162,29 @@ class ContactProbeRunner {
           if (motion.failure != null) throw motion.failure;
           if (motion.completed) {
             switch phase {
-              case Approaching:
-                beginSearch(requested.coarseSpeed, requested.distance); phase = Coarse;
-              case Backoff:
-                beginSearch(requested.fineSpeed, requested.backoff); phase = Fine;
+              case Approaching: holdAndHandoff(HandoffCoarse);
+              case Backoff: holdAndHandoff(HandoffFine);
               case Retreat: phase = Done;
               case _:
             }
+          }
+        case HandoffCoarse | HandoffFine:
+          var snapshot = motion.robot.snapshot();
+          if (snapshot.sourceTimestampNs <= handoffAt) return;
+          if (snapshot.sourceTimestampNs - handoffAt > Int64.fromFloat(2e9))
+            throw 'Contact probe position hold did not settle before ${phase == HandoffCoarse ? "coarse" : "fine"} sensing';
+          var indices = motion.jointIndices;
+          var joints = [for (index in indices) snapshot.positions.get(index)];
+          var velocity = [for (index in indices) snapshot.velocities.get(index)];
+          for (speed in velocity) if (Math.abs(speed) > 1e-5) return;
+          if (planner.stoppingViolation(joints, velocity, SEARCH_AGE_SECONDS) != null) return;
+          motion.reset();
+          if (phase == HandoffCoarse) {
+            beginSearch(requested.coarseSpeed, requested.distance);
+            phase = Coarse;
+          } else {
+            beginSearch(requested.fineSpeed, requested.backoff);
+            phase = Fine;
           }
         case Coarse | Fine:
           var active:ContactSearchRunner = cast search;
@@ -157,12 +201,8 @@ class ContactProbeRunner {
             var measured:Vec3 = cast active.search.contact;
             releaseSearch();
             pendingContact = measured;
-            var snapshot = motion.robot.snapshot();
             // A stopped velocity target still owns the native joint. Change to a position hold and await its owner tick.
-            motion.robot.submit(RobotCommand.JointTargets([for (index in motion.jointIndices)
-              JointTarget.position(index, snapshot.positions.get(index))], null));
-            handoffAt = snapshot.sourceTimestampNs;
-            phase = phase == Coarse ? HandoffBackoff : HandoffRetreat;
+            holdAndHandoff(phase == Coarse ? HandoffBackoff : HandoffRetreat);
           }
         case HandoffBackoff | HandoffRetreat:
           var snapshot = motion.robot.snapshot();
