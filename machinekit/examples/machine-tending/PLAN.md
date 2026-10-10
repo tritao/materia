@@ -975,9 +975,9 @@ Done. What was built and decided:
 | MT6 | done, baseline attribution rechecked after integration | 4c9e6ebec, daf20e12d, 3c5eef1dd, 6240e8b5c |
 | MT7 | done | 1780b60fa |
 | MT8 | done | 371070b1d |
-| MT9 | done; sequential closing gate passed | ac42c8866 |
-| MT10 | done; CollisionKit integration closing gate passed | a5c6bb9da, f2e04aff3, 9b5bfb299 |
-| MT11 | done; physical production, recovery and integration gates passed | a65789a38, 81f5563f7 |
+| MT9 | done; sequential closing gate passed | ac42c8866, 3dd21bd25 |
+| MT10 | done; CollisionKit integration closing gate passed | a5c6bb9da, f2e04aff3, 9b5bfb299, 3dd21bd25 |
+| MT11 | done; physical production, recovery and integration gates passed | a65789a38, 81f5563f7, 3dd21bd25 |
 | MT12 | planned | |
 | MT12b | planned | |
 | MT13 | planned | |
@@ -1068,3 +1068,5 @@ CollisionKit integration closing measurements (main `249ebcea2`, validated):
 - Closing sequential coverage passes through `mt-suite-cl7-mt11-final.txt`, `mt-suite-cl7-mt11-close.txt` and `mt-suite-cl7-mt11-routers.txt` in `/home/joao/dev/materia-cache/claude-scratch/`. The initial run and first follow-up report failures from the corrected test/dependency omissions; their successful phases plus focused repaired phases cover the full gate. This is not an uninterrupted monolithic green run. RobotKit world 5461, MotionKit 1224709, ToolpathKit 3020, CadBridge 178, CncKit 317, StockKit 100673, CamKit 12311, ProjectKit 192, ProcessKit 23 plus 19 weld-path assertions pass. HumanKit/AnimKit, five HXI audits, CadKit, MachineKit smoke, app builds, full editor AppTests, native collision 3/3, native motion 16/16, CollisionKit 364, clearance validation 23, CadBridge collision 30, MuJoCo collision 59 and CadBridge MuJoCo all pass. App coverage includes real loose-blank clamping, 37.92 s startup seating, controller wiring and physical CNC interface, all recovery injections, all four production parts, physical router homing and the complete remaining router/mobile/control/background phase.
 - Screw/belt machining stays **232.2/215.2 s**, **128 plans**, screw **0.05 mm** worst deviation; belt changes **1.76 to 1.75 mm**, with 56 flagged and 62 over-tolerance plans. Fresh exported mass/inertia and deployed integer pulse periods give homing **38.0/26.2 s** (preceding checkpoint 104.8/57.8 s), and both cuts report **9902.1 mm³ removed, 140.3 mm³ leftover, 63.9 mm³ gouge**. These shared-model diagnostics are recorded rather than pinned by the retired f32 pulse-period calculation. The homing and volume deltas are a combined refreshed-model comparison; no isolated causal measurement is claimed. CoreXY remains **649.6 mm/s / 71.549 m/s²**. Both mobile backends still travel 400 mm in 1 s and turn 0.5 rad; the mobile mission ends at **57.3 s** (preceding 57.6 s) and obstacle round at **61 s** (preceding 59 s). Main changes physical mass/inertia and wheel-odometry uncertainty/reanchoring; these timings are likewise a combined-merge comparison.
 - The Haxeon pin `835cf2c0` contains both requested ancestors `ccfd1dd6` and `0d14ccbd`; merged compiler fixes are described under MT11 above. Materia main has not been updated, and nothing has been pushed. Stop here for review; **MT12–MT13 remain planned after landing**.
+
+- Closing merge **`3dd21bd25`** records the validated implementation and main `249ebcea2` as its second parent. JointMotionPolicy remains its separate **`9b5bfb299`** commit; the Haxeon merge/re-pin is recorded in **`6b843d326`** and subsequent compiler-fix integration **`81f5563f7`**. No required implementation or verification remains before review.
