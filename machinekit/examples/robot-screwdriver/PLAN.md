@@ -391,6 +391,11 @@ initial full run passed every stage except an editor picking test whose identity
 camera culled the posed object; the corrected focused tests pass 855 checks.
 ProjectKit adds eight checks (180 to 188).
 
+The full SD2 gate (`sd-suite-sd2.txt`) passes on `4b3102ff8`, including all
+855 cosmetic-thread checks. The initial failed run is retained as
+`sd-suite-sd2-initial.txt`; its picking test camera was corrected, and every
+stage passed in the complete rerun.
+
 SD2 artifact sizes grow by four bytes per part plus the typed thread packet. The
 38 project-source readings grew by 8–2290 bytes; representative cached artifacts
 exactly equal their v18 bytes after removing the new packets and normalizing the
@@ -409,7 +414,7 @@ The local workaround uses typed arrays or `resize(0)`; haxeon is unchanged.
 | --- | --- | --- |
 | SD0 | done | `70f8b600b`, `bd112de5a` |
 | SD1 | done | `27067cf7e`, `44f907ab0` |
-| SD2 | validating full gate | |
+| SD2 | done | `4b3102ff8` |
 | SD3 | open | |
 | SD4 | open — waits for machine tending on local main | |
 | SD5 | open — waits for machine tending on local main | |
