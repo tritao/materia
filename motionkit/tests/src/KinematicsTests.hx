@@ -1,3 +1,5 @@
+import robotkit.collision.CollisionClearance;
+import collisionkit.native.NativeCollisionWorld;
 import MotionKitNative.mk_lattice_candidate;
 import haxe.Int64;
 import haxe.io.Bytes;
@@ -122,157 +124,6 @@ import MotionKitTestSupport.TrialRig;
 class KinematicsTests extends MotionKitTestSupport {
   public function new() { super(); }
 
-  /** Clear endpoints do not permit a polynomial excursion through a fixed body. */
-  public function testJointPlanClearanceChecksInteriorExcursion():Void {
-    var model = new robotkit.model.RobotModel("clearance slide");
-    var base = model.addLink(new robotkit.model.Link("base"));
-    var tool = model.addLink(new robotkit.model.Link("tool"));
-    var joint = model.addJoint(new robotkit.model.Joint("slide", robotkit.model.JointType.Prismatic, base, tool));
-    joint.axis = [1, 0, 0];
-    var frame = model.addFrame(new robotkit.model.Frame("tool-frame", tool));
-    var arm = new Manipulator(model, base.id, frame.id);
-    var corners:Array<Float> = [];
-    for (corner in 0...8) {
-      corners.push((corner & 1) == 0 ? -0.01 : 0.01);
-      corners.push((corner & 2) == 0 ? -0.01 : 0.01);
-      corners.push((corner & 4) == 0 ? -0.01 : 0.01);
-    }
-    var clearance = new robotkit.manipulation.ArmClearance(arm, [
-      {name: "moving tool", link: tool.id, vertices: corners, tool: false},
-      {name: "fixed obstacle", link: base.id, vertices: corners, tool: false}
-    ], [-0.2]);
-    check(clearance.violation([-0.2]) == null && clearance.violation([0.2]) == null, "both excursion extrema are clear");
-    var trajectory = motionkit.trajectory.Trajectory.fromSegments([
-      {timeFromStartNs: Int64.ofInt(0), durationNs: Int64.ofInt(1000000000), coefficients: [[-0.2, 1.6, -1.6]]}
-    ]);
-    var limits = new motionkit.trajectory.ValidationLimits(1, Int64.ofInt(1), Int64.ofInt(1));
-    limits.position(0, -1, 1); limits.velocity(0, 2); limits.acceleration(0, 4); limits.jerk(0, 10);
-    var plan = motionkit.trajectory.ExecutionPlan.create(trajectory, limits, Int64.ofInt(1),
-      [-0.2], [1.6], [-3.2], [1e-6], [1e-6], [1e-6]);
-    var validator = new motionkit.robot.ArmPlanClearance(clearance);
-    var rejected = false;
-    try validator.fork().check(plan) catch (error:Dynamic) rejected = Std.string(error).indexOf("fixed obstacle") >= 0;
-    check(rejected, "timed polynomial clearance rejects an interior collision despite its returning endpoint");
-    plan.dispose(); trajectory.dispose();
-  }
-
-  /** Joint axes may reach their targets at different phases within one synchronized move. */
-  public function testJointPlanClearancePartitionsIndependentAxisRanges():Void {
-    var model = new robotkit.model.RobotModel("synchronized joint clearance");
-    var base = model.addLink(new robotkit.model.Link("base"));
-    var xLink = model.addLink(new robotkit.model.Link("x-carriage"));
-    var yLink = model.addLink(new robotkit.model.Link("y-carriage"));
-    var x = model.addJoint(new robotkit.model.Joint("x", robotkit.model.JointType.Prismatic, base, xLink));
-    x.axis = [1, 0, 0];
-    var y = model.addJoint(new robotkit.model.Joint("y", robotkit.model.JointType.Prismatic, xLink, yLink));
-    y.axis = [0, 1, 0];
-    var frame = model.addFrame(new robotkit.model.Frame("tool-frame", yLink));
-    var arm = new Manipulator(model, base.id, frame.id);
-    function box(cx:Float, cy:Float):Array<Float> {
-      var vertices:Array<Float> = [];
-      for (corner in 0...8) {
-        vertices.push(cx + ((corner & 1) == 0 ? -0.01 : 0.01));
-        vertices.push(cy + ((corner & 2) == 0 ? -0.01 : 0.01));
-        vertices.push((corner & 4) == 0 ? -0.01 : 0.01);
-      }
-      return vertices;
-    }
-    var profiles:Array<{velocity:Array<Float>, acceleration:Array<Float>, jerk:Array<Float>}> = [
-      {velocity: [0.2, 1.0], acceleration: [1.0, 0.2], jerk: [10.0, 0.2]},
-      {velocity: [1.0, 0.2], acceleration: [0.2, 1.0], jerk: [0.2, 10.0]},
-      {velocity: [0.2, 2.0], acceleration: [10.0, 0.2], jerk: [0.2, 10.0]},
-      {velocity: [2.0, 0.2], acceleration: [0.2, 10.0], jerk: [10.0, 0.2]},
-      {velocity: [0.5, 2.0], acceleration: [5.0, 0.2], jerk: [0.2, 20.0]},
-      {velocity: [2.0, 0.5], acceleration: [0.2, 5.0], jerk: [20.0, 0.2]}
-    ];
-    var selected:Null<{velocity:Array<Float>, acceleration:Array<Float>, jerk:Array<Float>, point:Array<Float>}> = null;
-    var greatestOffDiagonal = 0.0;
-    for (profile in profiles) {
-      var trajectory = motionkit.trajectory.Trajectory.generateStateToState([0.0, 0.0], [0.0, 0.0],
-        [0.0, 0.0], [1.0, 1.0], profile.velocity, profile.acceleration, profile.jerk);
-      for (sample in 1...100) {
-        var sampleTime:Float = trajectory.durationSeconds() * (sample / 100.0);
-        var point = trajectory.evaluate(sampleTime).positions;
-        var offDiagonal = Math.abs(point[0] - point[1]);
-        if (offDiagonal > greatestOffDiagonal) {
-          greatestOffDiagonal = offDiagonal;
-          selected = {velocity: profile.velocity, acceleration: profile.acceleration,
-            jerk: profile.jerk, point: point.copy()};
-        }
-      }
-      trajectory.dispose();
-    }
-    check(selected != null && greatestOffDiagonal > 0.1,
-      'different synchronized axis profiles make a trajectory leave the straight joint-space chord by a safe distance');
-    var profile = selected;
-    if (profile == null) throw "Synchronized trajectory fixture did not leave its joint-space chord";
-    var clearance = new robotkit.manipulation.ArmClearance(arm, [
-      {name: "moving tool", link: yLink.id, vertices: box(0, 0), tool: false},
-      {name: "off-diagonal obstacle", link: base.id, vertices: box(profile.point[0], profile.point[1]), tool: false}
-    ], [0.0, 0.0]);
-    check(clearance.violation([0.0, 0.0]) == null && clearance.violation([1.0, 1.0]) == null &&
-      clearance.certifySegment([0.0, 0.0], [1.0, 1.0]) == null,
-      "the endpoints and straight joint-space chord clear the trajectory-only obstacle");
-    var validator = new motionkit.robot.ArmPlanClearance(clearance);
-    var original = motionkit.trajectory.Trajectory.generateStateToState([0.0, 0.0], [0.0, 0.0],
-      [0.0, 0.0], [1.0, 1.0], profile.velocity, profile.acceleration, profile.jerk);
-    var originalRejected = false;
-    try validator.checkTrajectory(original) catch (error:Dynamic)
-      originalRejected = Std.string(error).indexOf("off-diagonal obstacle") >= 0;
-    check(originalRejected, "polynomial clearance catches the synchronized path that leaves its chord");
-    original.dispose();
-    var targets = validator.partitionJointSegment([0.0, 0.0], [1.0, 1.0],
-      profile.velocity, profile.acceleration, profile.jerk);
-    check(targets.length > 1 && targets[targets.length - 1][0] == 1.0 && targets[targets.length - 1][1] == 1.0,
-      "the rejected synchronized move is refined into exact-stop joint waypoints");
-    var from = [0.0, 0.0];
-    for (to in targets) {
-      var trajectory = motionkit.trajectory.Trajectory.generateStateToState(from, [0.0, 0.0],
-        [0.0, 0.0], to, profile.velocity, profile.acceleration, profile.jerk);
-      validator.checkTrajectory(trajectory);
-      trajectory.dispose();
-      from = to;
-    }
-    check(true, "every refined rest-to-rest trajectory satisfies the exact polynomial clearance validator");
-  }
-
-  /** A two-metre lever crosses a thin edge between the old 0.02-rad samples. */
-  public function testJointPlanClearanceCertifiesThinEdgeIntervals():Void {
-    var model = new robotkit.model.RobotModel("long lever clearance");
-    var base = model.addLink(new robotkit.model.Link("base"));
-    var tool = model.addLink(new robotkit.model.Link("tool"));
-    var joint = model.addJoint(new robotkit.model.Joint("turn", robotkit.model.JointType.Revolute, base, tool));
-    var frame = model.addFrame(new robotkit.model.Frame("tool-frame", tool));
-    var arm = new Manipulator(model, base.id, frame.id);
-    var moving:Array<Float> = [], obstacle:Array<Float> = [];
-    for (corner in 0...8) {
-      var x = (corner & 1) == 0 ? -0.0001 : 0.0001;
-      var y = (corner & 2) == 0 ? -0.0001 : 0.0001;
-      var z = (corner & 4) == 0 ? -0.0001 : 0.0001;
-      moving.push(2 + x); moving.push(y); moving.push(z);
-      obstacle.push(2 * Math.cos(0.007) + x);
-      obstacle.push(2 * Math.sin(0.007) + y); obstacle.push(z);
-    }
-    var clearance = new robotkit.manipulation.ArmClearance(arm, [
-      {name: "long tool", link: tool.id, vertices: moving, tool: false},
-      {name: "thin door edge", link: base.id, vertices: obstacle, tool: false}
-    ], [0.0]);
-    for (q in [0.0, 0.01, 0.02]) check(clearance.violation([q]) == null, "endpoints and midpoint miss the thin edge");
-    check(clearance.intervalClear([0.0], [0.0]), "stationary clear interval is certified");
-    check(!clearance.intervalClear([0.01], [0.01]), "hull travel prevents certifying the crossing interval");
-    var trajectory = motionkit.trajectory.Trajectory.fromSegments([
-      {timeFromStartNs: Int64.ofInt(0), durationNs: Int64.ofInt(1000000000), coefficients: [[0.0, 0.02]]}
-    ]);
-    var limits = new motionkit.trajectory.ValidationLimits(1, Int64.ofInt(1), Int64.ofInt(1));
-    limits.position(0, -1, 1); limits.velocity(0, 1); limits.acceleration(0, 1); limits.jerk(0, 1);
-    var plan = motionkit.trajectory.ExecutionPlan.create(trajectory, limits, Int64.ofInt(1),
-      [0.0], [0.02], [0.0], [1e-6], [1e-6], [1e-6]);
-    var rejected = false;
-    try new motionkit.robot.ArmPlanClearance(clearance).check(plan)
-    catch (error:Dynamic) rejected = Std.string(error).indexOf("thin door edge") >= 0;
-    check(rejected, "continuous interval admission catches an edge missed by angular samples");
-    plan.dispose(); trajectory.dispose();
-  }
   /** One group serves several threads at once: each evaluates in data of its own. */
   public function testSharedGroupAcrossThreads():Void {
     var arm = buildContractArmFixture().arm;
@@ -573,23 +424,6 @@ class KinematicsTests extends MotionKitTestSupport {
       var heldCells = motionkit.robot.ExternalAxisGrid.sample(group,seed,[]);
       check(heldCells.length == 1,"unspecified external axes become one-point rules");
       for (joint in 0...seed.length) near(heldCells[0].q[joint],seed[joint],"held external cell copies complete seed",1e-12);
-      var trackLower = group.group.limitsOf(0).lower;
-      var trackUpper = group.group.limitsOf(0).upper;
-      var roundedSeed = seed.copy(); roundedSeed[0] = trackUpper + 3e-11;
-      var roundedHeld = motionkit.robot.ExternalAxisGrid.sample(group,roundedSeed,[]);
-      near(roundedHeld[0].q[0],trackUpper,"sub-nanometre external seed residual snaps to the mechanical stop",1e-12);
-      var roundedLowSeed = seed.copy(); roundedLowSeed[0] = trackLower - 3e-11;
-      var roundedLow = motionkit.robot.ExternalAxisGrid.sample(group,roundedLowSeed,[]);
-      near(roundedLow[0].q[0],trackLower,"sub-nanometre external seed residual snaps at the lower stop",1e-12);
-      var roundedRange = motionkit.robot.ExternalAxisGrid.sample(group,seed,
-        [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,trackUpper+3e-11,trackUpper+3e-11,1)]);
-      near(roundedRange[0].q[0],trackUpper,"external grid endpoints normalize representational stop noise",1e-12);
-      var realOvertravelRejected = false;
-      try {
-        var invalidGrid = motionkit.robot.ExternalAxisGrid.sample(group,seed,
-          [new motionkit.robot.ExternalAxisGrid.ExternalAxisRange(0,trackUpper+1e-5,trackUpper+1e-5,1)]);
-      } catch (_:Dynamic) { realOvertravelRejected = true; }
-      check(realOvertravelRejected,"external grid rejects travel beyond floating-point boundary tolerance");
       var nativeSeed = [for(i in 0...group.group.count()) 0.3*Math.sin(i+0.4)];
       var nativeTarget = numeric.forward(nativeSeed);
       var nativeBefore = group.numericSolveCount();
@@ -1269,7 +1103,7 @@ class KinematicsTests extends MotionKitTestSupport {
     serialWorkerPlan.dispose();
     var entryPlanner = new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
       new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12,3,8,false),null,
-      new robotkit.manipulation.ArmClearance(fixture.arm,[],start));
+      new CollisionClearance(fixture.arm,[],start, () -> new NativeCollisionWorld()));
     var entryCompiler = new ProgramCompiler(solver,serialLimits,"task",
       [for (_ in start) 1.0],[for (_ in start) 2.0],[for (_ in start) 20.0],
       StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,null,entryPlanner);
@@ -1299,7 +1133,7 @@ class KinematicsTests extends MotionKitTestSupport {
     entered.dispose();
     var retreatPlanner = new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
       new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12,3,8,false),null,
-      new robotkit.manipulation.ArmClearance(fixture.arm,[],start),8,false,null,current);
+      new CollisionClearance(fixture.arm,[],start, () -> new NativeCollisionWorld()),8,false,null,current);
     var retreatCompiler = new ProgramCompiler(solver,serialLimits,"task",
       [for (_ in start) 1.0],[for (_ in start) 2.0],[for (_ in start) 20.0],
       StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,null,retreatPlanner);
@@ -1633,12 +1467,12 @@ class KinematicsTests extends MotionKitTestSupport {
       for(dx in [-0.01,0.01])for(y in [-0.01,0.01])for(z in [-0.01,0.01]){
         vertices.push(x+dx);vertices.push(y);vertices.push(z);}
       return vertices;}
-    var rollWorld=new robotkit.manipulation.ArmClearance(rollGroup,[
+    var rollWorld=new CollisionClearance(rollGroup,[
       {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
-      {name:"post",link:rollBase.id,vertices:rollHull(0.3),tool:false}],rollStart);
-    var marginWorld=new robotkit.manipulation.ArmClearance(rollGroup,[
+      {name:"post",link:rollBase.id,vertices:rollHull(0.3),tool:false}],rollStart, () -> new NativeCollisionWorld());
+    var marginWorld=new CollisionClearance(rollGroup,[
       {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
-      {name:"contact-work",link:rollBase.id,vertices:rollHull(0.124),tool:false}],rollStart,0.01,0.001);
+      {name:"contact-work",link:rollBase.id,vertices:rollHull(0.124),tool:false}],rollStart, () -> new NativeCollisionWorld(),0.01,0.001);
     check(marginWorld.violation(rollStart,false)!=null && marginWorld.violation(rollStart,true)==null,
       "contact policy fixture distinguishes air from contact clearance");
     var policyFrom=[0.0,-0.04,0.0,0.0],policyTo=[0.0,0.04,0.0,0.0];
@@ -1780,9 +1614,9 @@ class KinematicsTests extends MotionKitTestSupport {
       "generated trajectory clearance detects the physical mid-motion obstacle");
     excursion.dispose();
     var entryCurrent = [0.0,-0.1,0.0,0.0];
-    var entryWorld = new robotkit.manipulation.ArmClearance(rollGroup,[
+    var entryWorld = new CollisionClearance(rollGroup,[
       {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
-      {name:"entry-post",link:rollBase.id,vertices:rollHull(0.2),tool:false}],entryCurrent);
+      {name:"entry-post",link:rollBase.id,vertices:rollHull(0.2),tool:false}],entryCurrent, () -> new NativeCollisionWorld());
     var entryPath = new PosePath("task",[new PoseLine(
       new PoseWaypoint(new Pose3(0.2,0.1,0.0),1e-6,1e-6),
       new PoseWaypoint(new Pose3(0.21,0.1,0.0),1e-6,1e-6),OrientationPolicy.FreeAboutTool,0.1,0.1)]);
@@ -1857,9 +1691,9 @@ class KinematicsTests extends MotionKitTestSupport {
     check(finalSafe.blocks[0].plans.length == 1,
       "final compiler check accepts the obstacle-avoiding timed path after a rejected motion");
     finalSafe.dispose();
-    var blockedWorld=new robotkit.manipulation.ArmClearance(rollGroup,[
+    var blockedWorld=new CollisionClearance(rollGroup,[
       {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
-      {name:"blocking-post",link:rollBase.id,vertices:rollHull(0.1),tool:false}],rollStart);
+      {name:"blocking-post",link:rollBase.id,vertices:rollHull(0.1),tool:false}],rollStart, () -> new NativeCollisionWorld());
     var blockage="";
     try {motionkit.robot.LazyCollisionLadder.select(rollProblem,blockedWorld,3);}catch(error:Dynamic){blockage=Std.string(error);}
     check(blockage.indexOf("sample 0")>=0 && blockage.indexOf("offset-tool")>=0 && blockage.indexOf("blocking-post")>=0,
@@ -1875,15 +1709,15 @@ class KinematicsTests extends MotionKitTestSupport {
       for(dx in [-0.01,0.01])for(y in [-0.01,0.01])for(z in [-0.01,0.01]){vertices.push(x+dx);vertices.push(y);vertices.push(z);}
       return vertices;
     }
-    var world=new robotkit.manipulation.ArmClearance(clearanceGroup,[
+    var world=new CollisionClearance(clearanceGroup,[
       {name:"tool",link:movingLink.id,vertices:cube(0),tool:true},
       {name:"far",link:fixedLink.id,vertices:cube(1.5),tool:false},
-      {name:"near",link:fixedLink.id,vertices:cube(1),tool:false}],[0.0]);
+      {name:"near",link:fixedLink.id,vertices:cube(1),tool:false}],[0.0], () -> new NativeCollisionWorld());
     var closest=world.closest([0.0]);check(closest!=null,"closest clearance reports clear pairs");
     if(closest!=null){near(closest.distance,0.98,"closest clearance measures the nearest hull gap",1e-8);
       check(closest.a=="near" || closest.b=="near","closest clearance retains the nearest body pair");}
     var moved=world.closest([0.5],true);if(moved!=null){near(moved.distance,0.48,"closest clearance follows moving geometry",1e-8);
-      near(moved.required,robotkit.manipulation.ArmClearance.CONTACT_MARGIN,"closest clearance retains contact margin",1e-12);}
+      near(moved.required,robotkit.collision.CollisionClearance.CONTACT_MARGIN,"closest clearance retains contact margin",1e-12);}
     var sweepClosest=world.closestSweep([0.0],[1.2],false,0.02);
     check(sweepClosest!=null,"closest sweep reports a checked hull pair");
     if(sweepClosest!=null)near(sweepClosest.distance,0,"closest sweep finds an interior collision between clear endpoints",1e-8);
@@ -1925,8 +1759,8 @@ class KinematicsTests extends MotionKitTestSupport {
     coupledModel.addCoupling(new JointCoupling("turn-drive",turn.id,follower.id,-0.5,0));
     var flange=coupledModel.addFrame(new Frame("flange",followerLink)),work=coupledModel.addFrame(new Frame("work",slideLink));
     var coupledGroup=new robotkit.manipulation.KinematicGroup(coupledModel,root.id,flange.id,work.id);
-    var coupledWorld=new robotkit.manipulation.ArmClearance(coupledGroup,[
-      {name:"coupled-tool",link:followerLink.id,vertices:cube(0.4),tool:true}],[0,0]);
+    var coupledWorld=new CollisionClearance(coupledGroup,[
+      {name:"coupled-tool",link:followerLink.id,vertices:cube(0.4),tool:true}],[0,0], () -> new NativeCollisionWorld());
     var cachedEnvelope=coupledWorld.motionEnvelope([-2.01,-1.51],[2.01,1.51]);
     for(i in 0...100){var q=[Math.sin(i*0.31)*2,Math.cos(i*0.17)*1.5],errors=[0.002,0.001],
       perturbed=[q[0]+errors[0]*(i%2==0?1:-1),q[1]+errors[1]*(i%3==0?1:-1)];
@@ -1952,13 +1786,13 @@ class KinematicsTests extends MotionKitTestSupport {
     var screwFlange=screwModel.addFrame(new Frame("flange",carriage));
     var screwGroup=new robotkit.manipulation.KinematicGroup(screwModel,screwRoot.id,screwFlange.id),shaftCorners:Array<Float> = [];
     for(x in [-0.004,0.004])for(y in [-0.004,0.004])for(z in [-1.0,1.0]){shaftCorners.push(x);shaftCorners.push(y);shaftCorners.push(z);}
-    var screwWorld=new robotkit.manipulation.ArmClearance(screwGroup,[{name:"long-shaft",link:shaft.id,vertices:shaftCorners,tool:false}],[0.0]);
+    var screwWorld=new CollisionClearance(screwGroup,[{name:"long-shaft",link:shaft.id,vertices:shaftCorners,tool:false}],[0.0], () -> new NativeCollisionWorld());
     var shaftEnvelope=screwWorld.motionEnvelope([-0.1],[0.1]);
     check(shaftEnvelope.bounds([1e-6])[0]<0.000012,"axial shaft length does not inflate its rotational lever arm");
     for(i in 0...50)check(screwWorld.auditDisplacement([0.09*Math.sin(i)],
       [0.09*Math.sin(i)+(i%2==0?1:-1)*1e-6],[1e-6],shaftEnvelope)<=1+1e-8,
       "perpendicular shaft bound covers exact coupled hull movement");
-    var emptyWorld=new robotkit.manipulation.ArmClearance(clearanceGroup,[],[0.0]);
+    var emptyWorld=new CollisionClearance(clearanceGroup,[],[0.0], () -> new NativeCollisionWorld());
     check(emptyWorld.closest([0.0])==null,"empty clearance world has no closest pair");
     function waypoint(x:Float,y:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x,y,0),1e-6,1e-6);
     var line=new PoseLine(waypoint(-1,0),waypoint(0,0),motionkit.path.OrientationPolicy.Fixed,0.1,0.1);

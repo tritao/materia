@@ -49,9 +49,8 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 - Inputs are sensor frames (`publishSensorFrame`).
 
 **Collision**
-- `robotkit.manipulation.ArmClearance` (welder branch d7d3d0f14): distances from the arm and tool hulls to the cell's hulls, and straight joint-space sweeps.
-- `kinematicskit` `CollisionWorld` on coal (branch `collision`, CL1).
-- There is no collision-aware planner yet (CL6).
+- Main's CL0–CL7 provide `collisionkit.CollisionDescription`, `robotkit.collision.RobotCollision`, the CAD adapter `cadbridge.CadCollision`, and `motionkit.robot.CollisionPlannerSpace` over the coal-backed `CollisionWorld`.
+- `robotkit.collision.CollisionClearance` remains the runtime clearance query for named grasp/contact windows. The branch's duplicate `ArmClearance` and `ArmPlanClearance` implementations are removed; generated joint paths use MotionKit's conservative planner.
 
 **MachineKit parts**
 - Rails: `LinearRailSystem` (MGN catalogue).
@@ -137,8 +136,8 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 - An automatic tool changer is a later step.
 
 **MT-D9. Collision.**
-- Until CL6, approaches are derived via-poses.
-- Every segment is swept with `ArmClearance` against the cell hulls, with the door at its open pose, when the mission is generated. A failure rejects the mission.
+- Main's `CollisionDescription` and `CadCollision`/`RobotCollision` adapters describe the world and articulated hulls. MotionKit's `CollisionPlannerSpace` conservatively checks generated joint-space edges against that description; a blocked path is replanned or rejected.
+- Until the cell-level MT12b builder is integrated, MachineTending supplies the assembled cell hulls to the shared collision API and derives approaches from via-poses. The door is open for paths inside the cell.
 - "Robot clear" is computed from the arm and tool hulls against the machine's zone box, not taught.
 
 **MT-D10. Concave things are several convex parts.**
@@ -172,13 +171,17 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 - The camera finds parts; it never feeds an interlock. It never enters the machine (chips and coolant): the vise keeps its air-gauge presence sensor and the gripper its jaw switches.
 - **Rejected:** a fixed mast camera. It wins only when the cell needs observation while the arm is busy, which this cell does not.
 
-**MT-D13. Cell collision geometry is one description; `ArmClearance` is its current engine.**
-- One builder produces the cell's collision description:
+**MT-D13. One cell description uses the shared CollisionKit and MotionKit APIs.**
+- Main now supplies the shared low-level collision description and adapters:
+  - `collisionkit.CollisionDescription` stores bodies, articulated models, stable object ids and pair rules;
+  - `RobotCollision` describes RobotKit mechanisms, and `cadbridge.CadCollision` adapts CAD parts and mechanism hulls;
+  - `CollisionPlannerSpace` provides conservative motion-planning checks, while `CollisionClearance` supports runtime scene changes and named contact windows.
+- MT12b adds one MachineTending-level builder on those shared APIs:
   - bodies: hull, owner (a robot's link, or world) and a stable id;
   - pair rules: margin per pair, allowed contacts and process interfaces, each with its reason.
-- The static reach study, the app's mission clearance and the welder stations all consume it. Today they each assemble their own bodies and margins, and a mismatch between such builders looks like the track welder's 4.0 mm rejection.
-- Clearance queries go only through `ArmClearance` and `ArmPlanClearance`. No new checker, and no direct `ConvexDistance` calls.
-- The collision plan (collisionkit on coal, CL2–CL4) takes this same description and replaces the engine. A shared corpus of cases with expected answers proves the two engines agree.
+- The static reach study, app mission planner and welder stations consume that cell description. They must not build another collision engine or a second CAD/robot adapter.
+- Clearance queries use the shared `CollisionClearance` and `CollisionPlannerSpace` APIs. Do not restore `ArmClearance`/`ArmPlanClearance` or call `ConvexDistance` directly from cell logic.
+- CL0–CL7 are now in main, including the coal native backend and its test corpus. MT12b tests the MachineTending cell-description adapter against those shared APIs; it does not compare duplicate engines.
 - **Known limitation:** planning uses a snapshot of the other robot's and the loose objects' poses taken when a skill starts. It is safe here because the interlocks keep the mill still while the arm is inside. The collision plan's pose-driven world removes it.
 
 ## The machine (starting numbers, fixed in MT1–MT4)
@@ -192,8 +195,8 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 | Screws | Ball screws SFU1605 (Ø16, lead 5, preloaded), BK12 fixed end and BF12 support end |
 | Axis drives | X/Y 400 W and Z 750 W assumed servos, direct coupling (R2). The physical Z brake remains open in the review-fix R3 group. |
 | Spindle | ER20 cartridge, max 10 000 rpm, 1.1 kW motor, HTD-5M belt 1:1. The spindle is a continuous joint driven by `spindle.speed`. |
-| Enclosure | Steel panels on a chip tray, front frame around a 450 × 400 mm opening, sliding door with a polycarbonate window |
-| Door | Door on a guide rail, moved by a pneumatic cylinder (Ø25, stroke 460). Door-closed safety switch plus a reed switch at each end of the cylinder. |
+| Enclosure | Steel panels on a chip tray, front frame around a 600 × 500 mm opening, sliding door with a polycarbonate window |
+| Door | Door on a guide rail, moved by a pneumatic cylinder (Ø25, stroke 610). Door-closed safety switch plus a reed switch at each end of the cylinder. |
 | Vise | 100 mm pneumatic vise. The moving jaw is preset by its screw for the blank, then a 6 mm air stroke clamps. Reeds sense clamped and open; an air-gauge sensor at the datum senses part present. |
 | Stand | 750 mm. The controller cabinet sits on the side. |
 | Air | FRL unit, then a manifold with 5/2 valves (door, vise; gripper on the arm) |
@@ -430,8 +433,8 @@ Done. What was built and decided:
   polycarbonate density 1200 kg/m³. The default bare-mill project keeps running; a separate
   enclosed Start-page project previews the mechanics until MT5 supplies clamping force.
 - The mill's swept part bounds are [-585, -455, 0]..[445, 275, 900] mm. They determine panel
-  positions on the 750 mm stand and 2 mm tray. The 450 × 400 mm opening spans Z 878..1278 mm,
-  with its top 10 mm below the retracted head. The door travels 460 mm; an invariant Y
+  positions on the 750 mm stand and 2 mm tray. The 600 × 500 mm opening spans Z 888..1388 mm,
+  with its sill 400 mm below the retracted head. The door travels 610 mm; an invariant Y
   separating plane proves clearance over its complete X stroke, with CAD samples as a second
   check. Every panel/window hull stays within 5% error.
 - The preset vise has 43 mm open jaw separation for the 40 mm blank (1.5 mm per side), a 6 mm
@@ -455,10 +458,10 @@ Done. What was built and decided:
 - At the retracted Z limit, the enclosure check intersects the actual head casting with the
   top frame and every closed-door panel. It verifies physical solid clearance instead of
   comparing the opening edge with the same reference pose used to place it.
-- `ArmClearance` rejects distant pairs with bounding spheres, then uses
-  `ConvexDistance.between` with the required margin so a separating plane can
-  end the hull search early. Its three RobotKit cutoff checks now exercise
-  that production path; the unused point-to-solid shortcut was removed.
+- The original branch's Haxe convex-distance cutoff and `ArmClearance` engine
+  were superseded by main's CollisionKit native world. Collision coverage now
+  runs through `collisionkit.CollisionWorld`; RobotKit retains its runtime
+  adapter for clearance windows rather than a second distance implementation.
 - A diagnostic enclosed MuJoCo cut exposed the unactuated jaw drifting during table
   acceleration (fault at 35.86 s). MT4 therefore exports and verifies the seated job but
   leaves its physical cycle for MT5, instead of adding an artificial jaw lock or motor.
@@ -784,7 +787,7 @@ Done. What was built and measured:
 **MT10. The tending cell and its mission.**
 - `TendingControllers` assembles the empty-vise `EnclosedBenchMill(false)` under `mill/`, the selected `CobotArm` with `DualArmGripperTool` on the shared `TendingCellRiser`, six free infeed blanks, pocketed trays and their table, both controller cabinets, air service and wiring. `TendingCell` saves the generated mission with that cell.
 - `machine-tending/materia.project.json`, plus a Start-page entry.
-- SceneArtifact v25 stores signal, wait, via-motion, timeout, metric handling approach, fault-retry command references, per-step handling-tool selection and a tool-roll field separate from part heading; CNC jobs and missions may coexist only under distinct controller owners. The scene producer and fixtures use the current format directly.
+- SceneArtifact v26 stores signal, wait, via-motion, timeout, metric handling approach, fault-retry command references, per-step handling-tool selection and a tool-roll field separate from part heading; CNC jobs and missions may coexist only under distinct controller owners. Main's current artifact format is used directly by the scene producer and fixtures.
 - Mission steps:
   - `signal{name, value}`;
   - `waitFor{name, value, timeout}`;
@@ -801,7 +804,7 @@ Done. What was built and measured:
   8. come out and place in the outfeed slot.
 - The grasp approach distance is saved on each pick/place step and comes from the tray-seat height plus two collision margins. The selected tool roll is saved independently from part heading and compensated between grasp and placement. The same approach value drives reach checking and the physical handling planner; the former generic 120 mm handling default does not describe this cell.
 - On unload, the mission requests and confirms unclamp while the blank is still supported on the vise parallels, then picks and retracts it. The handling skill includes its retract, so waiting for unclamp first avoids pulling the part against the clamp.
-- Vise, doorway and tray targets come from their assembled geometry and the shared reach result. Exterior staging stays at the checked lift height. The transit height balances the stock collision hull's lower extent against the wrist-package clearance at the header; checked poses at the doorway plane and halfway through its inner stand-off split the crossing into short, exact-stop segments. The reach study checks waypoint configurations and searches the geometry-derived base stand-off offsets on both sides of nominal. `ArmPlanClearance` certifies the actual generated joint polynomials against the arm, tool and cell hulls before each `moveVia` is admitted; one reach-study interpolation cannot stand in for those planned curves. With the door closed, the mission asserts `robot.clear` at the exterior staging pose; it approaches the doorway only after the door-open switch arrives, then drops `robot.clear` before entering.
+- Vise, doorway and tray targets come from their assembled geometry and the shared reach result. Exterior staging stays at the checked lift height. The transit height balances the stock collision hull's lower extent against the wrist-package clearance at the header; checked poses at the doorway plane and halfway through its inner stand-off split the crossing into short, exact-stop segments. The reach study checks waypoint configurations; MotionKit's `CollisionPlannerSpace` conservatively certifies each generated joint-space edge against the CollisionKit description before a move is admitted. With the door closed, the mission asserts `robot.clear` at the exterior staging pose; it approaches the doorway only after the door-open switch arrives, then drops `robot.clear` before entering.
 - Acceptance (`ProjectSourceTests.checkMachineTending`, MuJoCo):
   - 4 parts unattended, 4 finished parts in the outfeed;
   - all four selected outfeed pockets report their physical presence switches;
@@ -809,6 +812,14 @@ Done. What was built and measured:
   - 0 collisions and 0 interlock alarms;
   - cycle time and spindle use reported;
   - the welder, router and arm tests are unchanged.
+
+**Implementation checkpoint. What was built and decided:**
+- The closing MT11 mission handles one blank at a time, completing its outfeed placement before the next infeed pick. Earlier code and assertions prematurely required MT12's two-part exchange and ≥75% throughput; those are deferred until after landing. The existing two-gripper hardware and both checked TCP pose sets remain available for MT12. The fault replay exposed an inactive finished-part collision during that premature exchange; MT12 must certify the two-payload contact and transit scenarios before enabling pre-staging.
+- The saved cell has two independent controller owners and a 137-step, four-blank mission. Its live startup route reaches the seated-clamp request at **74.31 s**, after confirming the physical door-open switch.
+- The assembled tool and occupied-tray study chooses **Reach1300 / 550 mm**, **92 poses**, **391 mm** base stand-off, **12.181859%** minimum joint margin and `|sin(q5)| ≈ 1`.
+- Main's CL7 planner owns `moveVia` collision admission. Its description uses the robot adapter's structural pair rules, and phase-synchronized rest-to-rest timing stays on the certified joint-space edges. The older process-clearance post-check is removed from this joint-move path; process handling and welding retain main's process-clearance APIs.
+- Independent cell hulls have their own fixed collision bodies outside the arm articulation, so reference-overlap allowances cannot hide an obstacle intersecting the initial pose. Confirmed payloads remain on their carrier links. Each move rebuilds this description from live door, inventory and payload poses, while reusing its controller and derived limits. The independent-obstacle and carried-object rejection checks pass with their original assertions.
+- The full production and fault-recovery closing gate remains pending. MT12's pre-staging, two-payload exchange and throughput acceptance, and MT13's vision work stay after review and landing.
 
 **MT11. Faults and recovery.**
 - Injected faults, each ending in the safe state with a named mission failure and an alarm code:
@@ -825,7 +836,22 @@ Done. What was built and measured:
 Recovery policy: mission failures carry stable application alarm codes. The CNC PLC's discrete alarm-code outputs preserve the typed cause across the one-tick controller boundary. A failed wait may point to the asserted output request that owns it; retry repeats that request and holds `robot.fault_reset` high until one full cell-signal image has sampled it, then lowers it on the next controller feed. Recovery waits for the robot's controlled stop to reach `READY` before writing outputs and keeps the completed-step count and physical object state. Emergency stop uses RobotKit's safety-stop and explicit reset path before mission retry. A carried workpiece is monitored through via-motion and a lost jaw signal latches the mission as `PartDropped`.
 - `DoorJam` is reserved for a physical door timeout or a door switch lost during the cut; refused interlocks remain `CncAlarm`. `ClampWithoutPart` requires the physical presence input to be false, while a clamp/unclamp stroke timeout with stock present is `ViseFailure`.
 
+**Implementation checkpoint. What was built and decided:**
+- Stable mission alarm codes distinguish emergency stop, empty tray, missed grasp, dropped part, physical door jam, missing-part clamp, vise stroke failure and refused CNC interlocks. The missed-grasp fixture removes the blank only after the real close coil output fires, then checks failed grasp confirmation; it no longer moves the target before planning or forces a 0.25 s generic timeout. Genuine planning failures remain `MotionFailure`. Physical-gripper picks first request opening and wait their existing 0.4 s valve/stroke settling dwell; step-specific approach distances preserve this tool policy. The retry checks actual jaw-open feedback before the new grasp. Physical-gripper handling supplies a typed IK tolerance of 0.1 mm / 0.1 mrad; the generic suction defaults remain unchanged. The old 2 mm / 5 mrad planning tolerance was looser than the machining stock-axis requirement. Tightening IK alone did not resolve the physical seating error; the machining check correctly continued to refuse the tilted blank. The machining alignment check remains strict and reports its observed stock-local axis. Startup also requests and confirms vise unclamping while the arm remains outside the enclosure; the initial double-solenoid latch is closed, so skipping this handshake perched the first blank on the jaw tops. Later unloads share the same retryable unclamp helper. Recovery reasserts confirmed carried-gripper requests once the controller is ready, while safety-cleared logical outputs do not move a double-solenoid valve on their own.
+- Retry preserves the completed-step count and physical inventory, waits for the controlled stop, and repeats the owning request only after a full controller image has sampled fault reset.
+- Recovery confirms carried grippers before resuming and refreshes their measured payload transforms. In the dropped-part fixture the operator supports the reseated blank until both fingers contact it and jaw velocity settles, then removes support for a 50 ms grasp confirmation. The earlier fixture accepted the travel switch before closure; the blank fell nearly 8 mm before the next carry and eventually slipped out. No kinematic hold is used during the resumed carry.
+- Placement resolves the station's live CAD frame across both controller owners, rather than its authored zero pose. CNC parking moves the vise before loading; a stock-presence assertion now checks the physical sensing volume before the missing-part injection. The shared part resolver owns frame and geometry-centre conversion for robot parts and free bodies. Physical held-object reporting includes both-jaw contacts for parallel grippers, not only suction attachments.
+- The vise exposes separate `datum`, `seat` and `load` connectors. G54 uses the stock corner; `seat` locates the centred stock origin after clamping and installs the mill's initial stock. `load` releases the blank above the parallels and in the centre of the open jaw gap, both offsets derived from the preset clearance (1.5 mm). The reach study covers loading and seated unloading separately (96 poses). A free blank in the isolated contact fixture stays flat under the actual cylinder, whereas direct robot insertion against the fixed jaw left the stock tilted. Placement refreshes the currently observed grasp transform once before planning, then freezes it for that handling step; a contact grip can slip during transit. Using the machining corner for placement had shifted the blank 30 mm in each horizontal direction.
+- Approach and contact IK share a tool roll, checked independently against the exported runtime model for all eight placements. The former endpoint-only study could choose headings 90 degrees apart. The enclosed vise mount moves 20 mm along X, derived from head width, vise width, travel and clearance; loading parks the complete vise beside the retracted head. The route crosses the doorway centre, then approaches the off-centre vise inside. Main's CL7 conservative edge checker and RRT planner certify the selected doorway transitions with the payload hull; the final route is checked again after all IK pairs are selected. MotionKit's shared `ManipulatorPlannerSpace` adapter fixes inactive DOFs for both this study and the live mission, replacing the app-local duplicate. A blocked direct joint segment may use a conservatively checked detour. The insertion lift is 50 mm: jaw clearance, two 5 mm margins and the stock hull's 20 mm axial span. The side pads have no axial locating stop, so the span reserves clearance for a valid grasp at any depth on the side face, so a measured grasp offset does not consume the collision margin. The chosen Reach1300/550 mm mounting shifts -238 mm in X and -300 mm in Y from the nominal location, for 691 mm front stand-off. The earlier **16.13 s** startup checkpoint reached the pre-clamp command only; it did not prove seating. The strengthened gate waits for real clamp confirmation after the startup unclamp handshake. The bare mill mount is unchanged; the enclosed cycle must be remeasured.
+- CAD hulls remain available independently of the editor collision flag. Machining stock uses a separate simulation contact policy; the former resolver returned no hulls and clearance then treated a held blank as a root-fixed bounding box. The physical replay exposed a false 35 mm blank-to-upper-arm collision. The stock now follows its gripper carrier using its actual convex geometry, and the route regression checks that relationship immediately after a confirmed pick.
+- Haxeon `9366f24e` fixes proven-null instance, static and record field reads: they produce typed nulls in their declared nullable storage instead of a cast to `TNull`/IR `Void`. TestMain, a real HashLink fixture and official-Haxe parity pass; the pin follows the requested `ccfd1dd6`/main merge. The reduced class-field guard originally failed with `Unsupported cast from Bytes to Void`; no application workaround remains.
+- Haxeon `835cf2c0` preserves final-field refinement stability across continuing branch joins. A valid constructor guard followed by an unrelated method call had rejected `vise.seat` as nullable. Guard, if, switch and loop regressions pass in TestMain and real HashLink/official-Haxe parity; mutable-field invalidation remains checked. The compiler is fixed directly, with no CAD-code workaround.
+- Reset and scene retirement drain each joint motion's own planning workers before disposing its collision world. Cancellation alone is asynchronous; a retained crash showed `ck_violation_sets` running concurrently with `ck_world_destroy`. Typed cached planner ownership replaces runtime casts, and a scoped-shutdown regression verifies that unrelated planning continues.
+- The isolated pneumatic fixture derives its reversal and completion windows from cylinder stroke and flow. MT10's 600 mm opening requires a 610 mm stroke; the older fixed 1.6 s reversal stopped it before opening. Measured opening/closing is **1.99/2.37 s**, while the seated-blank clamp remains **0.08 s / 482.548632 N**. Nominal and resumed startup use the same bounded 120 s route budget. The former 16.13 s and 74.31 s checkpoints stopped before clamp confirmation; the closing test now requires actual seating and clamping.
+- The dedicated app test injects every listed fault before continuing the four-blank production mission. Its closing run, plus the editor document refusal check, remains pending in the integration gate.
+
 **MT12. Throughput.**
+- Before enabling pre-staging, certify both carried-payload envelopes at insertion as well as transit, including the inactive gripper against the retracted head and seated workpiece. The premature prototype lost the finished gripper's part during the first exchange under main's collision model; MT11 now uses the sequential mission above.
 - Pre-staging: while the mill cuts, the arm picks the next blank and waits outside the door.
 - A dual gripper (`DualArmGripperTool`) mounts two independently valved physical grippers at 90° on one plate. Each has its own cylinder, channels, sensor and contact frame.
 - The reach study derives the fixed TCP transform between the two grippers, solves the cell poses for each actual TCP, and checks both tool envelopes against the machine, doorway, fixed tray/table hulls and all six blanks in the initial infeed layout. The generated `moveVia` steps use the checked poses for the gripper that handles the next part. Each mission plan also checks live blank and carried-object poses as inventory changes.
@@ -836,15 +862,15 @@ Recovery policy: mission failures carry stable application alarm codes. The CNC 
 - Target: spindle use ≥ 75 % for the bearing-block job, with numbers recorded here.
 
 **MT12b. One cell collision description.**
-- **`CellCollisionScene`.** A typed description (bodies, owners, stable ids, pair rules with reasons) with one builder from the cell assembly, its controllers and the scene's loose objects.
-  - It lives where both MachineKit's `TendingReach` and the app's `MissionPlayer` can depend on it: cadbridge or RobotKit, next to the bridge's hulls.
+- **`CellCollisionScene`.** A cell-level builder over main's `CollisionDescription`, `CadCollision` and `RobotCollision`. It collects the cell assembly, controller-owned mechanisms and loose objects once, with owners, stable ids and pair rules with reasons.
+  - Keep it beside the CAD bridge so `TendingReach`, `MissionPlayer` and `MobileWeldStations` can consume the same result.
   - Door, vise and other robot poses are inputs, never baked in.
-- **Pair rules are data.** Vise jaws and gripper pads may touch the blank at the contact margin; welder interfaces keep their margin; everything else gets the default 5 mm. They live in the description, not in branches at each call site.
+- **Pair rules are data.** Vise jaws and gripper pads use the work-contact allowance; welder interfaces keep their own margin; other pairs use the general 5 mm margin. Use CollisionKit's pair-rule and group-margin APIs rather than call-site branches or a new distance engine.
 - **Migration, clean break:**
-  - `TendingReach`, `MissionPlayer.cellClearance` and `MobileWeldStations` build their `ArmClearance` from the description;
+  - `TendingReach` and `MissionPlayer` use the shared description for static checks and conservative planning; `MobileWeldStations` consumes the same description through the RobotKit clearance adapter;
   - the per-site body gathering and contact lists are deleted;
   - a single construction site remains.
-- **Collision corpus.** Data fixtures, each with geometry, poses, rules and the expected verdict and distance, run in the RobotKit suite against `ArmClearance`:
+- **Collision corpus.** Data fixtures with geometry, poses, rules and expected verdicts/distances run against CollisionKit's native `CollisionWorld` and CAD/robot adapters:
   - the thin door edge (clear at both ends and the midpoint, unsafe inside);
   - gripper B against the neighbouring tray blank;
   - the vise contact allowance;
@@ -852,7 +878,7 @@ Recovery policy: mission failures carry stable application alarm codes. The CNC 
   - the track welder's 4.0 mm case;
   - a cross-robot pair (arm against mill door).
 
-  The coal backend must later pass the same fixtures.
+  Main's coal backend is the checked implementation; do not reintroduce a parallel backend for these fixtures.
 - **Acceptance:**
   - reach study result unchanged (class, riser, margin);
   - every mission clearance verdict in the tending, cobot and welder project-source cases unchanged, or explained;
@@ -947,9 +973,9 @@ Done. What was built and decided:
 | MT6 | done, baseline attribution rechecked after integration | 4c9e6ebec, daf20e12d, 3c5eef1dd, 6240e8b5c |
 | MT7 | done | 1780b60fa |
 | MT8 | done | 371070b1d |
-| MT9 | implemented; focused checks passed, full closing gate pending | 7bd3b9fa8 |
-| MT10 | planned | |
-| MT11 | planned | |
+| MT9 | implemented; focused checks passed, full closing gate pending | ac42c8866 |
+| MT10 | implemented; collisionkit integration closing gate pending | a5c6bb9da, f2e04aff3, 9b5bfb299 |
+| MT11 | implemented; full fault-recovery closing gate pending | a65789a38 |
 | MT12 | planned | |
 | MT12b | planned | |
 | MT13 | planned | |

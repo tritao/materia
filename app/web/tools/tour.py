@@ -191,6 +191,16 @@ def tour(editor):
     editor.click(role="tab", label="3D")
     check(editor.report()["state"]["perspective"] is not None, "the 3D view is open")
 
+    print("collisions")
+    # A new rectangle lands where the scene's first one stands, so the two overlap. CollisionKit runs in the page
+    # (collisionkit_core is linked into the host); the 3D view's toolbar says what it found.
+    editor.click(role="button", label="Add")
+    editor.click(role="menuitem", label="Add rectangle")
+    editor.settle()
+    found = editor.report()["collisions"]
+    check(found is not None and not found.startswith("Collisions unavailable"), f"the browser checks collisions: {found}")
+    check("collision" in found, f"the overlapping objects collide: {found}")
+
     print("simulation")
     # SimKit, MuJoCo and RobotKit run in the page, single-threaded: the editor steps the session each frame.
     editor.click(role="button", label="Play")

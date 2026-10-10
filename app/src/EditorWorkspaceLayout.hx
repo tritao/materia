@@ -26,11 +26,12 @@ class EditorWorkspaceLayout {
   }
 
   /** Simulation focus: a wide viewport with telemetry below and runtime controls (sensors, CNC) beside it. */
-  public static function simulateLayout():DockNode {
+  public static function simulateLayout(hasMission:Bool = false):DockNode {
     var main = DockNode.Split(DockSplitAxis.Vertical, 0.68,
       DockNode.Panel("perspective"),
       DockNode.Tabs(["console", "telemetry"], "console"));
     return DockNode.Split(DockSplitAxis.Horizontal, 0.74, main,
-      DockNode.Tabs(["sensors", "cnc", "inspector", "hierarchy"], "sensors"));
+      DockNode.Tabs(hasMission ? ["mission", "sensors", "cnc", "inspector", "hierarchy"] :
+        ["sensors", "cnc", "inspector", "hierarchy"], hasMission ? "mission" : "sensors"));
   }
 }

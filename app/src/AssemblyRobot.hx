@@ -95,15 +95,40 @@ class AssemblyRobot {
 
   /** `pose` followed by `offset`: positions in metres, rotations as xyzw quaternions. */
   public static function compose(pose:{position:Array<Float>, rotation:Array<Float>},
+      offset:materia.assembly.AssemblyRecord.AssemblyFrame):{position:Array<Float>, rotation:Array<Float>}
+    return composeComponents(pose.position, pose.rotation, offset);
+
+  /** Compose directly from pose components without allocating a temporary pose wrapper. */
+  public static function composeComponents(position:Array<Float>, rotation:Array<Float>,
       offset:materia.assembly.AssemblyRecord.AssemblyFrame):{position:Array<Float>, rotation:Array<Float>} {
-    var q = pose.rotation;
-    var moved = rotate(q, [offset.x, offset.y, offset.z]);
-    var o = [offset.qx, offset.qy, offset.qz, offset.qw];
-    return {position: [for (axis in 0...3) pose.position[axis] + moved[axis]],
-      rotation: [q[3] * o[0] + q[0] * o[3] + q[1] * o[2] - q[2] * o[1],
-        q[3] * o[1] - q[0] * o[2] + q[1] * o[3] + q[2] * o[0],
-        q[3] * o[2] + q[0] * o[1] - q[1] * o[0] + q[2] * o[3],
-        q[3] * o[3] - q[0] * o[0] - q[1] * o[1] - q[2] * o[2]]};
+    var q = rotation;
+    var x = q[0], y = q[1], z = q[2], w = q[3];
+    var tx = 2 * (y * offset.z - z * offset.y);
+    var ty = 2 * (z * offset.x - x * offset.z);
+    var tz = 2 * (x * offset.y - y * offset.x);
+    return {position: [position[0] + (offset.x + w * tx + y * tz - z * ty),
+        position[1] + (offset.y + w * ty + z * tx - x * tz),
+        position[2] + (offset.z + w * tz + x * ty - y * tx)],
+      rotation: [w * offset.qx + x * offset.qw + y * offset.qz - z * offset.qy,
+        w * offset.qy - x * offset.qz + y * offset.qw + z * offset.qx,
+        w * offset.qz + x * offset.qy - y * offset.qx + z * offset.qw,
+        w * offset.qw - x * offset.qx - y * offset.qy - z * offset.qz]};
+  }
+
+  /** Compose a link pose and part offset into reusable frame storage. */
+  public static function composeComponentsInto(position:Array<Float>, rotation:Array<Float>,
+      offset:materia.assembly.AssemblyRecord.AssemblyFrame, target:AssemblyFrame):Void {
+    var x = rotation[0], y = rotation[1], z = rotation[2], w = rotation[3];
+    var tx = 2 * (y * offset.z - z * offset.y);
+    var ty = 2 * (z * offset.x - x * offset.z);
+    var tz = 2 * (x * offset.y - y * offset.x);
+    target.x = position[0] + offset.x + w * tx + y * tz - z * ty;
+    target.y = position[1] + offset.y + w * ty + z * tx - x * tz;
+    target.z = position[2] + offset.z + w * tz + x * ty - y * tx;
+    target.qx = w * offset.qx + x * offset.qw + y * offset.qz - z * offset.qy;
+    target.qy = w * offset.qy - x * offset.qz + y * offset.qw + z * offset.qx;
+    target.qz = w * offset.qz + x * offset.qy - y * offset.qx + z * offset.qw;
+    target.qw = w * offset.qw - x * offset.qx - y * offset.qy - z * offset.qz;
   }
 
   /** `v` turned by the xyzw quaternion `q`. */
@@ -166,6 +191,30 @@ class AssemblyRobot {
    * robots. Throws when the project lacks the data to simulate a part, or when
    * closures are needed and `supportsClosures` is false.
    */
+  /**
+   * The link pairs the simulation leaves out, from the same collision description the planner and the
+   * editor use (COLLISION.md CL3b): adjacent and rigidly joined links, and links whose hulls overlap in
+   * the robot's starting configuration (its joints start at zero, the loaded state). SimKit's own rule
+   * (bounding spheres overlapping at rest) would leave out more and check fewer real contacts.
+   */
+  static function simulationExcludes(model:RobotModel, hulls:Array<SimulationLinkHull>):Array<Int> {
+    var description = new collisionkit.CollisionDescription();
+    var options = new robotkit.collision.RobotCollision.RobotCollisionOptions("robot");
+    options.hulls = [for (index in 0...hulls.length)
+      new robotkit.collision.RobotCollision.RobotLinkHull(hulls[index].link, 'hull$index', hulls[index].vertices)];
+    var robot = robotkit.collision.RobotCollision.describe(description, model, options);
+    var world = new collisionkit.native.NativeCollisionWorld();
+    try {
+      var build = description.build(world);
+      var excludes = robotkit.collision.RobotCollision.simulationExcludes(description, build, robot);
+      world.dispose();
+      return excludes;
+    } catch (error:Dynamic) {
+      world.dispose();
+      throw error;
+    }
+  }
+
   public static function add(candidate:Simulation, scene:EditorScene, session:ProjectDocumentSession,
       assembly:AssemblyDefinition, supportsClosures:Bool, revision:Int, robotIndex:Int,
       ?channels:Array<ProcessChannelDeclaration>, virtualWelder:Bool = false, ?control:SceneArtifactCellController,
@@ -427,7 +476,7 @@ class AssemblyRobot {
     // Like a machine whose servos are on, its joints hold their designed pose until something commands
     // them, such as an arm while its base drives.
     var runtime = candidate.addRobotAtPose(blueprint, position, rotation, device, null, null, closures, null, null, null, null,
-      linkHulls, true, restContactGroup);
+      linkHulls, true, simulationExcludes(converted.model, linkHulls), restContactGroup);
     var authored:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset>> = session.cncJob != null ? session.cncJob.powerUpOffsets :
       session.mission == null ? null : session.mission.powerUpOffsets;
     var sideOffsets:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>> = session.cncJob != null ? session.cncJob.powerUpSideOffsets :

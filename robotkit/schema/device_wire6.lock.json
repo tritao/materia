@@ -6,7 +6,7 @@
     },
     "PROTOCOL_VERSION": {
       "type": "u8",
-      "value": 13
+      "value": 14
     }
   },
   "enums": {
@@ -639,8 +639,8 @@
         },
         {
           "length": 64,
-          "name": "max_rate",
-          "type": "f32"
+          "name": "min_step_ticks",
+          "type": "u32"
         },
         {
           "length": 64,

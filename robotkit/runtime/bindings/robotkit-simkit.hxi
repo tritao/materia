@@ -19,8 +19,16 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	const RK_LINK_SHAPE_SPHERE = 2;
 	const RK_MAX_CONTACT_PAIRS = 128;
+	const RK_MAX_LINK_EXCLUDES = 4096;
 	const RK_MAX_LINK_HULLS = 512;
 	const RK_MAX_LINK_SHAPES = 256;
+	/**
+	 * The robot's links exclude exactly link_excludes from colliding with
+	 * each other, instead of SimKit's own rule (parent and child, or
+	 * overlapping at rest): a collision description's allowed pairs, so the
+	 * simulation and clearance checks agree (collisionkit COLLISION.md CL3b).
+	 */
+	const RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES = 2;
 	/**
 	 * Joints hold the robot's designed pose from the start, as servos enabled at power-on do, until
 	 * a command targets them; a reset holds them there again. Coupled followers follow their leader.
@@ -529,7 +537,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
 	}
-	struct rk_simulation_robot_desc @layout(2562504, 8) {
+	struct rk_simulation_robot_desc @layout(2595024, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		flags: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -559,91 +567,99 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		virtual_device_actuator_ratio: array<f64, 64> @offset(784);
 		virtual_device_actuator_offset: array<f64, 64> @offset(1296);
 		virtual_device_actuator_steps_per_unit: array<f64, 64> @offset(1808);
-		virtual_device_actuator_max_rate: array<f64, 64> @offset(2320);
-		virtual_device_actuator_direction_setup_ticks: array<u16, 64> @offset(2832);
-		virtual_device_actuator_skew_bound: array<f64, 64> @offset(2960);
+		/**
+		 * < Least whole step-tick periods between steps, at least one.
+		 */
+		virtual_device_actuator_min_step_ticks: array<u32, 64> @offset(2320);
+		virtual_device_actuator_direction_setup_ticks: array<u16, 64> @offset(2576);
+		virtual_device_actuator_skew_bound: array<f64, 64> @offset(2704);
 		/**
 		 * < 64 NUL-terminated ASCII IDs, 64 bytes each.
 		 */
-		virtual_device_actuator_ids: array<u8, 4096> @offset(3472);
+		virtual_device_actuator_ids: array<u8, 4096> @offset(3216);
 		/**
 		 * Optional origin-centred link boxes; zero extents preserve legacy shape policy.
 		 */
-		collision_half_extents: array<f64, 3072> @offset(7568);
+		collision_half_extents: array<f64, 3072> @offset(7312);
 		/**
 		 * Optional physical-part convex hulls; 4..64 local XYZ vertices per link.
 		 */
-		collision_hull_count: array<u32, 1024> @offset(32144);
-		collision_hull_vertices: array<f64, 196608> @offset(36240);
-		closure_count: u32 @offset(1609104);
-		closures: array<rk_simulation_closure_desc, 64> @offset(1609112);
+		collision_hull_count: array<u32, 1024> @offset(31888);
+		collision_hull_vertices: array<f64, 196608> @offset(35984);
+		closure_count: u32 @offset(1608848);
+		closures: array<rk_simulation_closure_desc, 64> @offset(1608856);
 		/**
 		 * < 1 full, 2 minimal; zero defaults to full.
 		 */
-		virtual_device_profile: u32 @offset(1613208);
+		virtual_device_profile: u32 @offset(1612952);
 		/**
 		 * Optional tool collision geoms, expressed in the flange link frame.
 		 */
-		tool_link_index: u32 @offset(1613212);
-		tool_piece_count: u32 @offset(1613216);
-		tool_piece_vertex_count: array<u32, 16> @offset(1613220);
-		tool_piece_vertices: array<f64, 3072> @offset(1613288);
-		tool_margin: f64 @offset(1637864);
-		tool_gap: f64 @offset(1637872);
+		tool_link_index: u32 @offset(1612956);
+		tool_piece_count: u32 @offset(1612960);
+		tool_piece_vertex_count: array<u32, 16> @offset(1612964);
+		tool_piece_vertices: array<f64, 3072> @offset(1613032);
+		tool_margin: f64 @offset(1637608);
+		tool_gap: f64 @offset(1637616);
 		/**
 		 * Optional primitive collision shapes. A link that has any collides
 		 * through them together with its hull or box above, if given, and its
 		 * tool pieces; otherwise the link keeps the legacy shape policy.
 		 */
-		link_shape_count: u32 @offset(1637880);
-		link_shapes: array<rk_simulation_link_shape, 256> @offset(1637888);
+		link_shape_count: u32 @offset(1637624);
+		link_shapes: array<rk_simulation_link_shape, 256> @offset(1637632);
 		/**
 		 * Optional explicit contacts between link shapes.
 		 */
-		contact_pair_count: u32 @offset(1672704);
-		contact_pairs: array<rk_simulation_contact_pair, 128> @offset(1672712);
+		contact_pair_count: u32 @offset(1672448);
+		contact_pairs: array<rk_simulation_contact_pair, 128> @offset(1672456);
 		/**
 		 * Optional convex hulls of links built from several rigid parts, one per
 		 * part. A link collides through a compound of its hull or box above, these
 		 * hulls, its primitives and its tool pieces.
 		 */
-		link_hull_count: u32 @offset(1679880);
-		link_hulls: array<rk_simulation_link_hull, 512> @offset(1679888);
+		link_hull_count: u32 @offset(1679624);
+		link_hulls: array<rk_simulation_link_hull, 512> @offset(1679632);
 		/**
 		 * Appended v28 tail: physical cylinders are simulation models, not runtime targets.
 		 */
-		pneumatic_drive_count: u32 @offset(2494992);
-		pneumatic_drives: array<rk_simulation_pneumatic_drive, 512> @offset(2495000);
+		pneumatic_drive_count: u32 @offset(2494736);
+		pneumatic_drives: array<rk_simulation_pneumatic_drive, 512> @offset(2494744);
 		/**
 		 * Appended v29 tail: spindle speed is a typed analog process drive.
 		 */
-		velocity_drive_count: u32 @offset(2519576);
-		velocity_drives: array<rk_simulation_velocity_drive, 512> @offset(2519584);
+		velocity_drive_count: u32 @offset(2519320);
+		velocity_drives: array<rk_simulation_velocity_drive, 512> @offset(2519328);
 		/**
 		 * Optional board-defined peripheral profile; zero disables it.
 		 */
-		virtual_peripheral_kind: u32 @offset(2540064);
-		virtual_peripheral_parameter_count: u32 @offset(2540068);
-		virtual_external_sensor_mask: u32 @offset(2540072);
-		virtual_peripheral_parameters: array<f64, 16> @offset(2540080);
+		virtual_peripheral_kind: u32 @offset(2539808);
+		virtual_peripheral_parameter_count: u32 @offset(2539812);
+		virtual_external_sensor_mask: u32 @offset(2539816);
+		virtual_peripheral_parameters: array<f64, 16> @offset(2539824);
 		/**
 		 * Optional physical virtual-device switch wiring and step thresholds.
 		 */
-		virtual_device_input_count: u32 @offset(2540208);
-		virtual_device_input_actuator: array<u8, 64> @offset(2540212);
-		virtual_device_input_active_high: array<u8, 64> @offset(2540276);
-		virtual_device_input_active_above: array<u8, 64> @offset(2540340);
-		virtual_device_input_threshold_steps: array<i64, 64> @offset(2540408);
-		virtual_device_input_switch_ids: array<u8, 4096> @offset(2540920);
+		virtual_device_input_count: u32 @offset(2539952);
+		virtual_device_input_actuator: array<u8, 64> @offset(2539956);
+		virtual_device_input_active_high: array<u8, 64> @offset(2540020);
+		virtual_device_input_active_above: array<u8, 64> @offset(2540084);
+		virtual_device_input_threshold_steps: array<i64, 64> @offset(2540152);
+		virtual_device_input_switch_ids: array<u8, 4096> @offset(2540664);
 		/**
 		 * Optional original shaft feedback mappings; count zero keeps legacy mappings.
 		 */
-		virtual_device_feedback_count: u32 @offset(2545016);
-		virtual_device_feedback_joint: array<u8, 64> @offset(2545020);
-		virtual_device_feedback_ratio: array<f64, 64> @offset(2545088);
-		virtual_device_feedback_offset: array<f64, 64> @offset(2545600);
-		brake_count: u32 @offset(2546112);
-		brakes: array<rk_simulation_brake, 512> @offset(2546120);
+		virtual_device_feedback_count: u32 @offset(2544760);
+		virtual_device_feedback_joint: array<u8, 64> @offset(2544764);
+		virtual_device_feedback_ratio: array<f64, 64> @offset(2544832);
+		virtual_device_feedback_offset: array<f64, 64> @offset(2545344);
+		brake_count: u32 @offset(2545856);
+		brakes: array<rk_simulation_brake, 512> @offset(2545864);
+		/**
+		 * Appended tail: link index pairs that never collide, used with RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES.
+		 */
+		link_exclude_count: u32 @offset(2562248);
+		link_excludes: array<u32, 8192> @offset(2562252);
 	}
 	/**
 	 * World-frame twist of one body: metres per second and radians per second.

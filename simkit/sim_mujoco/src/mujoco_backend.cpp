@@ -788,6 +788,21 @@ public:
         return topology_update ? NKSIM_OK : rebuild();
     }
 
+    nksim_result exclusions_set(const std::vector<std::uint64_t> &set,
+                                const std::vector<std::pair<std::uint64_t, std::uint64_t>> &pairs) override {
+        for (const auto body : set)
+            if (bodies.find(body) == bodies.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        // Replace what was declared for these bodies.
+        for (auto it = explicit_excludes.begin(); it != explicit_excludes.end();)
+            it = std::find(set.begin(), set.end(), it->first) != set.end() ||
+                         std::find(set.begin(), set.end(), it->second) != set.end()
+                     ? explicit_excludes.erase(it)
+                     : std::next(it);
+        for (const auto body : set) explicit_bodies[body] = set.front();
+        explicit_excludes.insert(pairs.begin(), pairs.end());
+        return topology_update ? NKSIM_OK : rebuild();
+    }
+
     nksim_result set_joint_targets(const nksim::BackendJointTarget *targets,
                                    std::uint32_t count) override {
         if (count != 0 && !targets)
@@ -1625,8 +1640,15 @@ private:
                 const bool same_articulation = is_same_articulation(first, second);
                 const bool same_mount = body_a.desc.rest_contact_group != 0 &&
                     body_a.desc.rest_contact_group == body_b.desc.rest_contact_group;
-                const bool real_exclude = (same_articulation && is_parent_child(first, second)) ||
-                    ((same_articulation || same_mount) && geometries_overlap_at_rest(body_a, body_b));
+                // A pair in one declared set is excluded exactly as declared (nksim_world_set_exclusions).
+                const auto set_a = explicit_bodies.find(first), set_b = explicit_bodies.find(second);
+                const bool declared = set_a != explicit_bodies.end() && set_b != explicit_bodies.end() &&
+                    set_a->second == set_b->second;
+                const bool real_exclude = declared
+                    ? explicit_excludes.count({std::min(first, second), std::max(first, second)}) != 0
+                    : (same_articulation &&
+                       (is_parent_child(first, second) || geometries_overlap_at_rest(body_a, body_b))) ||
+                      (same_mount && !same_articulation && geometries_overlap_at_rest(body_a, body_b));
                 if (real_exclude) real_excludes.emplace(std::min(first, second), std::max(first, second));
                 if (!real_exclude) continue;
                 auto *exclude = mjs_addExclude(spec);
@@ -2310,6 +2332,9 @@ private:
     std::vector<nksim::BackendJointCoupling> saved_couplings;
     std::vector<nksim::BackendClosure> saved_closures;
     std::vector<nksim::BackendContactPair> contact_pairs;
+    /** Declared exclusion sets: each body's set (its first body), and the excluded pairs. */
+    std::map<std::uint64_t, std::uint64_t> explicit_bodies;
+    std::set<std::pair<std::uint64_t, std::uint64_t>> explicit_excludes;
     std::vector<nksim::BackendContactPair> saved_contact_pairs;
     std::set<std::pair<std::uint64_t, std::uint64_t>> saved_manual_excludes;
     std::uint64_t next_body = 1;

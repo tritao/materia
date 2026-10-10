@@ -44,6 +44,20 @@ interface KinematicsKitNative @target("portable-abi64") @library("kinematicskit_
 	extern fn kk_qp_create(width: u32, out_qp: ptr<kk_qp_handle> @out @owned) -> kk_result;
 	extern fn kk_qp_destroy(qp: kk_qp_handle) -> void;
 	/**
+	 * After a solve with rows: 1 for each row (in order) whose relaxation was needed, else 0.
+	 */
+	extern fn kk_qp_relaxed(qp: kk_qp_handle, out_relaxed: ptr<i32> @out_array("relaxed_count"), relaxed_count: u32) -> kk_result;
+	/**
+	 * Sets general rows  row_lower <= C*D <= row_upper  for this QP's following
+	 * solves (`constraint` is `constraint_row_count` x width, row-major; infinite
+	 * bounds mean unbounded), e.g. collision-avoidance rows; zero rows clear them.
+	 * With rows set, `kk_qp_solve` honours them, and when they and the bounds
+	 * admit no step it relaxes every row by a slack penalized far above the task
+	 * (as mink relaxes its collision rows); `kk_qp_relaxed` then says which rows
+	 * needed it, and `out_status` is the relaxed solve's.
+	 */
+	extern fn kk_qp_set_rows(qp: kk_qp_handle, constraint: ptr<const<f64>> @in_array("constraint_count"), constraint_count: u32, row_lower: ptr<const<f64>> @in_array("constraint_row_count"), constraint_row_count: u32, row_upper: ptr<const<f64>> @in_array("row_upper_count"), row_upper_count: u32) -> kk_result;
+	/**
 	 * Solves  minimize 1/2 |J*D - e|^2 + 1/2 lambda^2|D|^2  subject to  lower <= D <= upper
 	 * for D (`step_count` = width). `jacobian` is `row_count` x width,
 	 * row-major; `residual` has `row_count` entries. Infinite bounds mean

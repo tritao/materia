@@ -24,6 +24,15 @@ class EditorWorkspaceLayoutTests {
     };
     if (layoutValid != 0) return 1;
 
+    for (hasMission in [false, true]) {
+      switch (EditorWorkspaceLayout.simulateLayout(hasMission)) {
+        case DockNode.Split(DockSplitAxis.Horizontal, _, _, DockNode.Tabs(tabs, active)):
+          if (hasMission && (tabs[0] != "mission" || active != "mission")) return 1;
+          if (!hasMission && (tabs.indexOf("mission") >= 0 || active != "sensors")) return 1;
+        default: return 1;
+      }
+    }
+
     for (active in ["viewport", "perspective"]) {
       var workspace = new DockWorkspaceModel();
       for (id in ["viewport", "perspective", "inspector"])

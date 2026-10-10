@@ -83,8 +83,15 @@ class ProjectSourceTests {
   static function checkTendingAlarmClassification():Void {
     function timeoutAlarm(channel:String):MissionAlarmCode {
       var step:SceneArtifactMissionStep = {kind: "waitFor", waitFor: {name: channel, value: true, timeout: 0.1}};
-      return MissionAlarmClassifier.classify(step, "controller input timed out", false, false);
+      return MissionAlarmClassifier.classify(step, "controller input timed out", false);
     }
+    var pick:SceneArtifactMissionStep = {kind: "pick"};
+    var place:SceneArtifactMissionStep = {kind: "place"};
+    check(MissionAlarmClassifier.classify(pick, "Joint path selection failed", false) == MissionAlarmCode.MotionFailure &&
+      MissionAlarmClassifier.classify(place, "Joint path selection failed", false) == MissionAlarmCode.MotionFailure,
+      "planning failures are motion alarms even during a pick or a loaded carry");
+    check(MissionAlarmClassifier.classify(pick, "the tool did not confirm a grasp", false) == MissionAlarmCode.MissedGrasp,
+      "unconfirmed grasp feedback retains the missed-grasp alarm");
     check(timeoutAlarm(RobotInterfaceChannels.DOOR_OPEN) == MissionAlarmCode.DoorJam &&
       timeoutAlarm(RobotInterfaceChannels.DOOR_CLOSED) == MissionAlarmCode.DoorJam,
       "door switch timeouts map to the stable door-jam alarm");
@@ -1823,7 +1830,7 @@ class ProjectSourceTests {
     checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "gantry MuJoCo", "gantry-welder");
 
   /** A welder cell open in the simulation on MuJoCo, from one of the example's manifests. */
-  static function openWelder(root:String, manifestName:String, ?adjust:app.MateriaProjectRunner.GeneratedAssemblyScene -> Void,
+  static function openWelder(root:String, manifestName:String, ?adjust:app.GeneratedAssemblyScene -> Void,
       ?backend:Int, example:String = "robot-welder"):{session:ProjectDocumentSession, simulation:ApplicationSimulation, mission:MissionPlayer, welder:processkit.simulation.SimulatedWelder,
       beads:WeldBeads} {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/" + example + "/" + manifestName);
@@ -2281,7 +2288,7 @@ class ProjectSourceTests {
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
       generated.recipeDocument, generated.robotMotions, null, generated.cncJob,
       generated.mobileBase, generated.mission, generated.robotTools, generated.robotSensors,
-      generated.machineMotion, generated.controllers, generated.signals);
+      generated.machineMotion, generated.assemblyModel, generated.controllers, generated.signals);
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     try {
       check(simulation.rebuild(session.sensors, session.scene, session), "mill builds: " + simulation.error);
@@ -2376,7 +2383,7 @@ class ProjectSourceTests {
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
       generated.recipeDocument, generated.robotMotions, null, generated.cncJob,
       generated.mobileBase, generated.mission, generated.robotTools, generated.robotSensors,
-      generated.machineMotion, generated.controllers, generated.signals);
+      generated.machineMotion, generated.assemblyModel, generated.controllers, generated.signals);
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     try {
       check(simulation.rebuild(session.sensors, session.scene, session),
@@ -2407,7 +2414,7 @@ class ProjectSourceTests {
     checkSingleCabinetMotion(generated, manifest);
   }
 
-  static function checkSingleCabinetMotion(generated:MateriaProjectRunner.GeneratedAssemblyScene, manifest:String):Void {
+  static function checkSingleCabinetMotion(generated:GeneratedAssemblyScene, manifest:String):Void {
     var definition = requiredAssemblyDefinition(generated.assemblyDefinition);
     var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
     check(generated.controllers != null && generated.controllers.length == 1,
@@ -2533,8 +2540,10 @@ class ProjectSourceTests {
       check(simulation.simulatedRobotIds().length == 2, "both robots advance one shared MuJoCo world");
       var arm = simulation.world.robot("assembly:tending-controllers:robotController");
       if (arm == null) throw "Tending cell has no robot controller runtime";
-      var armAdapter:robotkit.runtime.RuntimeRobotAdapter = cast arm;
-      var armRuntime = @:privateAccess armAdapter.runtime;
+      var physical = @:privateAccess simulation.simulation;
+      if (physical == null) throw "Tending cell has no physical simulation";
+      var runtimes = @:privateAccess physical.robots;
+      var armRuntime = runtimes[ids.indexOf(arm.id())];
       function sensed(snapshot:robotkit.runtime.RobotSnapshot, id:String):Float {
         for (frame in snapshot.sensors.toArray()) if (frame.sensorId == id && frame.values.length > 0)
           return frame.values.get(0);
@@ -2605,7 +2614,8 @@ class ProjectSourceTests {
       var source = simulation.world.robot("assembly:tending-controllers:" + first.from.controller);
       var signals = simulation.cellSignals;
       if (source == null || signals == null) throw "Tending signal has no source runtime or bus";
-      var pose = source.snapshot().positions.toArray();
+      // Plans anchor to commanded state; servo tracking samples are observations.
+      var pose = source.snapshot().setpointPositions.toArray();
       var zero = [for (_ in pose) 0.0];
       var hold = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000),
         [for (position in pose) [position, 0.0]]);
@@ -2642,47 +2652,15 @@ class ProjectSourceTests {
       check(simulation.cncPlayer() == null, "the controller-only cell has no CNC job player");
       simulation.capturePresentationSnapshot();
       var beltUpdates = simulation.beltDisplayUpdates();
-      var millPose = target.snapshot().setpointPositions.toArray();
-      // Passive coordinates are measured physics states. Author the held plan
-      // from its leaders so its coefficients obey the mechanical couplings.
-      var couplings = target.description().couplings;
-      for (axis in ["x", "y", "z"]) {
-        var slide = target.description().joints.indexOf("mill/mill/" + axis);
-        var motor = target.description().joints.indexOf("mill/mill/screw" + axis.toUpperCase() + "-turn");
-        var terms = [for (term in couplings) if (term.leader == slide && term.follower == motor) term];
-        check(terms.length == 1, "the held spindle plan has one screw relation for " + axis);
-        var term = terms[0];
-        millPose[slide] = (millPose[motor] - term.offset) / term.ratio;
-      }
-      for (_ in 0...couplings.length) {
-        var sums = new Map<Int, Float>();
-        for (term in couplings) {
-          var previous = sums.get(term.follower);
-          sums.set(term.follower, (previous == null ? 0.0 : previous) +
-            term.ratio * millPose[term.leader] + term.offset);
-        }
-        for (follower in sums.keys()) millPose[follower] = sums.get(follower);
-      }
-      var millState = target.snapshot();
-      check(millState.safety == RobotKitRuntimeConstants.RK_SAFETY_READY,
-        'mill spindle plan requires a ready controller: safety ${millState.safety}, fault ${millState.faultCode}');
-      for (i in 0...millPose.length)
-        check(Math.abs(millPose[i] - millState.setpointPositions.get(i)) <= 1e-6,
-          'held mill plan agrees with ${target.description().joints[i]} anchor: ${millPose[i]} versus ${millState.setpointPositions.get(i)}');
-      var millZero = [for (_ in millPose) 0.0];
-      var millHold = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000),
-        [for (position in millPose) [position, 0.0]]);
       var spindleChannels = new toolpathkit.motion.ToolpathChannels("mill/mill");
       for (name in [spindleChannels.spindleDirection, spindleChannels.spindleSpeed])
         check([for (channel in target.description().channels) if (channel.id == name) channel].length == 1,
           "the mill controller owns spindle output " + name);
-      target.submit(robotkit.core.RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(
-        Int64.ofInt(1802), Int64.ofInt(simulation.appliedRevision), Int64.ofInt(0),
-        RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
-          RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS, millPose, millZero, millZero, [millHold],
-        null, null, null, null, null, true, [
-          new ProcessTimedEvent(Int64.ofInt(0), spindleChannels.spindleDirection, ProcessEventValue.Analog(1.0)),
-          new ProcessTimedEvent(Int64.ofInt(0), spindleChannels.spindleSpeed, ProcessEventValue.Analog(1000.0))])));
+      // Spindle speed is a cabinet process output, independently owned from
+      // joint motion. Exercise it without inventing a full-axis hold plan.
+      var spindleRuntime = runtimes[ids.indexOf(target.id())];
+      spindleRuntime.writeOutput(spindleChannels.spindleDirection, ProcessEventValue.Analog(1.0));
+      spindleRuntime.writeOutput(spindleChannels.spindleSpeed, ProcessEventValue.Analog(1000.0));
       var spindleIndex = target.description().joints.indexOf("mill/mill/spindle-motor-turn");
       if (spindleIndex < 0) throw "Cell has no spindle motor joint";
       var spindleStart = target.snapshot().positions.get(spindleIndex);
@@ -2721,7 +2699,7 @@ class ProjectSourceTests {
       {kind: "pick", at: {occurrence: "arm/workpiece", connector: "top"}},
       {kind: "place", at: {occurrence: "arm/padPick", connector: "top"}}
     ]};
-    var generated = MateriaProjectRunner.generatedFromArtifact(SceneArtifact.encode(artifact));
+    var generated = new ProjectArtifactLoader().load(SceneArtifact.encode(artifact));
     var blanks = [for (object in generated.objects) if (object.id == "project:arm/workpiece") object];
     if (blanks.length != 1) throw "Physical-gripper fixture needs one generated blank";
     blanks[0].dynamicBody = true;
@@ -3004,7 +2982,7 @@ class ProjectSourceTests {
     if (cellTargets.length == 0) cell.parts.push(targetParts[0]);
     else if (cellTargets.length != 1) throw "Generated tending project has duplicate machining target geometry";
     cell.machining = job;
-    var generated = MateriaProjectRunner.generatedFromArtifact(SceneArtifact.encode(cell));
+    var generated = new ProjectArtifactLoader().load(SceneArtifact.encode(cell));
     if (generated.assemblyDefinition == null || generated.assemblyState == null)
       throw "Generated tending CNC project has no assembly state";
     var testBlank:Null<SceneObjectData> = null;
@@ -3296,6 +3274,68 @@ class ProjectSourceTests {
     simulation.dispose(); session.dispose();
   }
 
+  /** A confirmed grasp carries every CAD piece even when stock has a separate cutter contact policy. */
+  static function checkTendingPayloadCarriers(mission:MissionPlayer):Int {
+    var checked = 0;
+    for (channel in mission.carryingTools.keys()) if (mission.carryingTools.get(channel) == true) {
+      var held = mission.heldParts.get(channel), kinematics = mission.toolKinematics.get(channel);
+      if (held == null || kinematics == null) throw "The loaded route lost its grasp carrier";
+      var tool = mission.handlingTools.get(channel);
+      if (tool == null) throw "The loaded route lost its handling tool";
+      var bodies = mission.cellCollisionBodies(mission.toolArm(tool), null, []);
+      var payload = [for (body in bodies) if (body.name == held.occurrence ||
+        StringTools.startsWith(body.name, held.occurrence + "#")) body];
+      check(payload.length > 0, "Confirmed machining stock has CAD clearance geometry");
+      for (piece in payload) check(piece.link == mission.robot.model.links[kinematics.link].id,
+        "Machining stock uses its CAD hull on the gripper carrier despite its editor collision flag");
+      checked++;
+    }
+    return checked;
+  }
+
+  /** Exported joint approaches must keep the same heading as the following insertion. */
+  static function checkTendingHandlingOrientations(mission:MissionPlayer):Void {
+    var placement = mission.placement;
+    if (placement == null) throw "Tending reach needs its authored joint coordinates";
+    var steps = mission.mission.steps;
+    for (index in 0...steps.length) {
+      var step = steps[index];
+      if (step.kind != "place") continue;
+      var channel = step.tool, at = step.at, yaw = step.toolYaw;
+      if (channel == null || at == null || yaw == null || index == 0)
+        throw "Tending placement needs a selected tool, seat and approach";
+      var previous = steps[index - 1], poses = previous.poses;
+      if (previous.kind != "moveVia" || poses == null || poses.length == 0)
+        throw "Tending placement needs its reach-certified joint approach";
+      var targets = poses[poses.length - 1].joints;
+      if (targets == null) throw "Tending approach lost its mechanical joint targets";
+      var tool = mission.handlingTools.get(channel);
+      if (tool == null) throw "Tending placement selects an unknown tool";
+      var group = mission.toolArm(tool);
+      var q:Array<Float> = [for (_ in 0...group.group.count()) 0.0];
+      var indices = [for (target in group.toJointTargets(q)) target.joint];
+      for (joint in 0...indices.length) {
+        var name = mission.robot.model.joints[indices[joint]].name;
+        var matches = [for (target in targets) if (target.joint == name) target];
+        if (matches.length != 1) throw 'Tending approach has no unique target for "$name"';
+        q[joint] = matches[0].position - placement.joint(name);
+      }
+      var picks = [for (pick in steps) if (pick.kind == "pick" && pick.tool == channel) pick];
+      if (picks.length == 0) throw "Tending placement has no preceding grasp";
+      var pickAt = picks[0].at;
+      if (pickAt == null) throw "Tending grasp lost its part frame";
+      var grasp = mission.findGrasp(pickAt, channel);
+      var rotation = MissionPlayer.yawRotation(yaw).multiply(
+        mission.placementRotation(at.occurrence).multiply(grasp.toolRotation));
+      var pose = new motionkit.robot.ManipulatorKinematics(group, 1e-8).forward(q);
+      var desired = new motionkit.kinematics.Pose3(pose.x, pose.y, pose.z,
+        rotation.x, rotation.y, rotation.z, rotation.w);
+      var error = motionkit.path.PoseMath.angle(pose, desired);
+      check(error <= 0.0002,
+        'Tending placement $index approach disagrees with its insertion heading by $error rad');
+    }
+  }
+
   /** Four real blank-to-outfeed cycles through the saved robot mission and wired CNC interface. */
   static function checkMachineTending(root:String, routeOnly:Bool = false):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/machine-tending/materia.project.json");
@@ -3315,6 +3355,50 @@ class ProjectSourceTests {
         "the playable tending cell builds: " + simulation.error);
       var mission = simulation.missionPlayer(), cnc = simulation.cncPlayer();
       if (mission == null || cnc == null) throw "Playable tending project lost its mission or CNC player";
+      checkTendingHandlingOrientations(mission);
+      if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-reach") {
+        simulation.clear(); return;
+      }
+      if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-vise") {
+        var nativeSession = simulation.activeSession();
+        var freeBlank = simulation.environmentObject("project:infeed/blank-0-0");
+        var station:Null<materia.project.SceneArtifact.SceneArtifactPlace> = null;
+        for (step in mission.mission.steps) if (station == null && step.kind == "place") station = step.at;
+        if (nativeSession == null || freeBlank == null || station == null) throw "Vise seating fixture is incomplete";
+        var drives = [for (drive in cnc.robot.blueprint.pneumaticDrives)
+          if (cnc.robot.model.joints[drive.joint].id == "mill/mill/vise/jaw") drive];
+        if (drives.length != 1) throw "Vise seating fixture needs one real cylinder";
+        var drive = drives[0], retract = drive.channelB;
+        if (retract == null) throw "Vise seating fixture needs two valve coils";
+        cnc.robot.runtime.writeDigitalOutput(drive.channelA, false);
+        cnc.robot.runtime.writeDigitalOutput(retract, true);
+        for (_ in 0...100) nativeSession.step();
+        var openJaw = cnc.robot.runtime.snapshot().q.get(drive.joint);
+        var seat = mission.liveConnectorFrame(station);
+        var blankPart = mission.assemblyParts.get("project:infeed/blank-0-0");
+        var center = blankPart.center;
+        var at = AssemblyFrames.transformPoint(seat, center[0], center[1], center[2]);
+        freeBlank.setPoseForNextTick(new nativekit.sim.SimPose(at.x, at.y, at.z + 0.001,
+          seat.qx, seat.qy, seat.qz, seat.qw));
+        for (_ in 0...100) nativeSession.step();
+        var before = mission.partFrame("infeed/blank-0-0");
+        cnc.robot.runtime.writeDigitalOutput(retract, false);
+        cnc.robot.runtime.writeDigitalOutput(drive.channelA, true);
+        for (_ in 0...100) nativeSession.step();
+        var after = mission.partFrame("infeed/blank-0-0");
+        var jawTravel = cnc.robot.runtime.snapshot().q.get(drive.joint) - openJaw;
+        var normal = new robotkit.spatial.Quat(after.qx, after.qy, after.qz, after.qw)
+          .conjugate().rotate(new robotkit.spatial.Vec3(0, 0, 1));
+        Sys.println('vise contact seating: before=${[before.x,before.y,before.z,before.qx,before.qy,before.qz,before.qw]} ' +
+          'after=${[after.x,after.y,after.z,after.qx,after.qy,after.qz,after.qw]} normal=${normal.toArray()}');
+        check(normal.z >= 1 - 1e-6, "The real pneumatic vise keeps a seated free blank aligned for machining");
+        check(jawTravel > 0.0025 && jawTravel < 0.0035,
+          'The real clamp closes onto the preset blank rather than an empty stroke ($jawTravel m)');
+        simulation.dispose(); session.dispose(); return;
+      }
+      // Startup includes confirmed door and vise opening, insertion and clamping; use one bounded route
+      // budget for nominal startup and for resuming after injected faults.
+      var routeTickBudget = Std.int(Math.ceil(120.0 / simulation.timestep));
       checkTendingAlarmClassification();
       var blank = simulation.environmentObject("project:infeed/blank-0-0");
       if (blank == null) throw "Tending cell has no free first infeed blank";
@@ -3335,9 +3419,18 @@ class ProjectSourceTests {
           }
         }
         if (clampCommand < 0) throw "Tending route has no seated-clamp command";
-        var routeTicks = 0;
-        while (mission.stepIndex < clampCommand && mission.failure == null && routeTicks < 5000) {
+        var clampConfirmed = -1;
+        for (index in clampCommand...mission.mission.steps.length) {
+          var step = mission.mission.steps[index];
+          if (step.kind == "waitFor" && step.waitFor != null && step.waitFor.name == RobotInterfaceChannels.CLAMPED) {
+            clampConfirmed = index; break;
+          }
+        }
+        if (clampConfirmed < 0) throw "Tending route has no physical clamp confirmation";
+        var routeTicks = 0, checkedPayloadCarrier = false;
+        while (mission.stepIndex <= clampConfirmed && mission.failure == null && routeTicks < routeTickBudget) {
           simulation.step(); routeTicks++;
+          if (!checkedPayloadCarrier && checkTendingPayloadCarriers(mission) > 0) checkedPayloadCarrier = true;
         }
         var signals = simulation.cellSignals;
         var doorOpen = false;
@@ -3345,11 +3438,22 @@ class ProjectSourceTests {
           case Digital(value): value;
           case _: false;
         };
-        check(mission.stepIndex == clampCommand && mission.failure == null && doorOpen,
-          'the robot stages outside with the door closed, enters after the open switch, and reaches the vise ' +
-            '(failure=${mission.failure}, step=${mission.stepIndex}/$clampCommand, ticks=$routeTicks/5000, ' +
+        var clamped = signals != null && switch signals.input("robotController", RobotInterfaceChannels.CLAMPED) {
+          case Digital(value): value;
+          case _: false;
+        };
+        check(mission.stepIndex > clampConfirmed && mission.failure == null && doorOpen && clamped,
+          'the robot stages outside, enters after confirmed opening, seats the blank and confirms physical clamping ' +
+            '(failure=${mission.failure}, step=${mission.stepIndex}/$clampCommand, ticks=$routeTicks/$routeTickBudget, ' +
+            'time=${simulation.activeSession().simulationTime()} s, ' +
             'doorOpen=$doorOpen, runner=${mission.runner.status()})');
-        Sys.println('tending startup route: vise reached at ${simulation.activeSession().simulationTime()} s');
+        check(checkedPayloadCarrier, "The startup route checks its confirmed payload carrier before placement");
+        var placed = mission.partFrame("infeed/blank-0-0");
+        var stockAxis = new robotkit.spatial.Quat(placed.qx, placed.qy, placed.qz, placed.qw)
+          .conjugate().rotate(new robotkit.spatial.Vec3(0, 0, 1));
+        check(stockAxis.z >= 1 - 1e-6,
+          'The robot seats and clamps its blank within the machining alignment bound (${stockAxis.toArray()})');
+        Sys.println('tending startup route: blank seated and clamped at ${simulation.activeSession().simulationTime()} s');
         simulation.dispose(); session.dispose();
         return;
       }
@@ -3414,27 +3518,42 @@ class ProjectSourceTests {
           'ticks=$approachTicks/$approachLimit, runner=${mission.runner.status()})');
       var firstPickStep = mission.mission.steps[firstPick];
       var originalPickTimeout = firstPickStep.timeoutSeconds;
-      firstPickStep.timeoutSeconds = 0.25;
+      var retryLimit = originalPickTimeout == null ? 2000 : Std.int(originalPickTimeout / simulation.timestep) + 1;
+      var closeTicks = 0, closeRequested = false;
+      while (mission.failure == null && !closeRequested && closeTicks < retryLimit) {
+        simulation.step(); closeTicks++;
+        closeRequested = switch mission.robot.runtime.channelValue(DualArmGripperTool.TOOL_CHANNEL_A) {
+          case Digital(value): value;
+          case _: throw "The first gripper coil is not a digital output";
+        };
+      }
+      check(closeRequested && mission.stepIndex == firstPick && mission.failure == null,
+        'the missing-grasp injection waits for the real close command after planning ' +
+          '(failure=${mission.failure}, ticks=$closeTicks/$retryLimit)');
       blank.setPoseForNextTick(new nativekit.sim.SimPose(3.0, 3.0, 3.0));
-      for (_ in 0...100) {
+      for (_ in 0...retryLimit) {
         if (mission.failure != null) break;
         simulation.step();
       }
       check(mission.failure != null && mission.alarmCode == MissionAlarmCode.MissedGrasp,
-        "a blank lost after its presence check faults the pick with the stable missed-grasp alarm");
-      firstPickStep.timeoutSeconds = originalPickTimeout;
+        'a blank lost at physical closure faults the pick with the stable missed-grasp alarm ' +
+          '(failure=${mission.failure}, alarm=${mission.alarmCode})');
       blank.setPoseForNextTick(originalBlank);
       check(simulation.retryMission(),
         "restoring the missing workpiece makes the failed pick recoverable without clearing other controllers");
-      var retryTicks = 0;
-      var retryLimit = originalPickTimeout == null ? 2000 : Std.int(originalPickTimeout / 0.01) + 1;
+      var retryTicks = 0, retryOpened = false;
       while ((mission.failure != null || mission.stepIndex <= firstPick) && retryTicks < retryLimit) {
         simulation.step(); retryTicks++;
+        for (frame in mission.robot.runtime.snapshot().sensors.toArray())
+          if (frame.sensorId == "arm/tool/gripperA/jaw-open" && frame.values.length > 0 && frame.values.get(0) >= 0.5)
+            retryOpened = true;
+        if (mission.failure != null && !mission.recoveryPending) break;
       }
       check(mission.failure == null && mission.stepIndex > firstPick,
         'the restored blank is physically grasped after retrying the failed pick ' +
           '(failure=${mission.failure}, step=${mission.stepIndex}, completed=${mission.completed}, ' +
           'ticks=$retryTicks/$retryLimit, runner=${mission.runner.status()})');
+      check(retryOpened, "Retry opens the empty latched gripper before its new physical grasp");
       var carriedVisuals = simulation.capturePresentationSnapshot().environment;
       var carriedPose = [for (entry in carriedVisuals) if (entry.id == "project:infeed/blank-0-0") entry];
       if (carriedPose.length != 1) throw "The first blank disappeared before the part-drop fault check";
@@ -3462,6 +3581,8 @@ class ProjectSourceTests {
       }
       check(mission.failure != null && mission.alarmCode == MissionAlarmCode.PartDropped,
         "a physical jaw opening while carrying latches the stable part-dropped alarm");
+      check(simulation.heldObjectIds().indexOf("project:infeed/blank-0-0") < 0,
+        "open jaws do not report the dropped blank as physically held");
       check(Std.string(mission.runner.status()) != "Running",
         "a mission fault cancels the active arm plan instead of leaving motion running");
       var stopTicks = 0;
@@ -3479,14 +3600,41 @@ class ProjectSourceTests {
         restoredBlank.rotation.y, restoredBlank.rotation.z, restoredBlank.rotation.w));
       mission.robot.runtime.writeDigitalOutput(DualArmGripperTool.TOOL_CHANNEL_A, true);
       var gripRestored = false;
+      var settledGripSeconds = 0.0;
+      var recoveredJaw = -1;
+      for (index in 0...mission.robot.model.joints.length)
+        if (mission.robot.model.joints[index].id == "arm/tool/gripperA/jaw-left-slide") recoveredJaw = index;
+      if (recoveredJaw < 0) throw "Part-drop recovery has no physical jaw joint";
+      var recoveredFingers = [mission.robot.part("project:arm/tool/gripperA/fingerLeft").linkIndex,
+        mission.robot.part("project:arm/tool/gripperA/fingerRight").linkIndex];
       for (_ in 0...150) {
+        // The operator supports the recovered blank while closing the jaws.
+        // Entering the width switch's band alone does not establish a grasp.
+        if (settledGripSeconds == 0.0) blank.setPoseForNextTick(new nativekit.sim.SimPose(
+          restoredBlank.translation.x, restoredBlank.translation.y, restoredBlank.translation.z,
+          restoredBlank.rotation.x, restoredBlank.rotation.y, restoredBlank.rotation.z, restoredBlank.rotation.w));
         simulation.step();
-        for (frame in mission.robot.runtime.snapshot().sensors.toArray())
+        var recoverySnapshot = mission.robot.runtime.snapshot();
+        var widthConfirmed = false;
+        for (frame in recoverySnapshot.sensors.toArray())
           if (frame.sensorId == "arm/tool/gripperA/gripped" && frame.values.length > 0 && frame.values.get(0) >= 0.5)
-            gripRestored = true;
+            widthConfirmed = true;
+        var fingerContact = [false, false];
+        for (contact in recoveredPhysics.robotContacts(mission.robot.runtime)) {
+          var finger = recoveredFingers.indexOf(contact.linkIndex);
+          if (contact.active && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
+              contact.otherObject == blank.handle.rawValue() && finger >= 0) fingerContact[finger] = true;
+        }
+        if (widthConfirmed && fingerContact[0] && fingerContact[1] &&
+            Math.abs(recoverySnapshot.dq.get(recoveredJaw)) < 0.005)
+          settledGripSeconds += simulation.timestep;
+        else settledGripSeconds = 0.0;
+        gripRestored = settledGripSeconds >= 0.05;
         if (gripRestored) break;
       }
-      check(gripRestored, "restoring the blank to the physical jaws closes the gripper switch");
+      check(gripRestored, "the recovered blank is supported by both settled physical jaws after operator support ends");
+      check(simulation.heldObjectIds().indexOf("project:infeed/blank-0-0") >= 0,
+        "both jaw contacts report the recovered dynamic blank as physically held");
       check(simulation.retryMission(), "the recovered jaw and blank allow the failed carry to resume");
       for (_ in 0...8) {
         simulation.step();
@@ -3522,13 +3670,13 @@ class ProjectSourceTests {
       }
       if (doorCommand < 0 || doorWait < 0) throw "Tending mission has no door-open handshake to fault-inject";
       var doorApproachTicks = 0;
-      while (mission.stepIndex < doorCommand && mission.failure == null && doorApproachTicks < 3000) {
+      while (mission.stepIndex < doorCommand && mission.failure == null && doorApproachTicks < routeTickBudget) {
         simulation.step(); doorApproachTicks++;
       }
       check(mission.stepIndex == doorCommand && mission.failure == null,
         'the first door-open command is ready for a blocked-switch fault ' +
           '(failure=${mission.failure}, step=${mission.stepIndex}/$doorCommand, completed=${mission.completed}, ' +
-          'ticks=$doorApproachTicks/3000, runner=${mission.runner.status()})');
+          'ticks=$doorApproachTicks/$routeTickBudget, runner=${mission.runner.status()})');
       var cncRobotIndex = -1;
       var robotIds = simulation.simulatedRobotIds();
       for (index in 0...robotIds.length)
@@ -3618,8 +3766,25 @@ class ProjectSourceTests {
       }
       if (clampCommand < 0 || clampWait < 0) throw "Tending mission has no clamp handshake to fault-inject";
       var clampTicks = 0;
-      while (mission.stepIndex < clampCommand && mission.failure == null && clampTicks < 3000) {
+      while (mission.stepIndex < clampCommand && mission.failure == null && clampTicks < routeTickBudget) {
         simulation.step(); clampTicks++;
+      }
+      var placementDiagnostic = "";
+      var failedStep = mission.mission.steps[mission.stepIndex];
+      if (mission.failure != null && failedStep.kind == "place") {
+        var destination = failedStep.at;
+        if (destination == null) throw "Failed placement has no destination";
+        var channel = mission.handlingToolChannel(failedStep);
+        var liveSeat = mission.liveConnectorFrame(destination);
+        var authored = mission.placement.worldPose(destination.occurrence);
+        var goal = mission.placeContact(destination, failedStep.yaw, channel);
+        var tcp = mission.toolContact(channel);
+        var relativeRotation = mission.heldToolRotations.get(channel);
+        var rotationImage:Array<Float> = relativeRotation == null ? [] : relativeRotation.toArray();
+        placementDiagnostic = 'seat=${[liveSeat.x, liveSeat.y, liveSeat.z]}, ' +
+          'authored=${[authored.x, authored.y, authored.z]}, goal=${goal.toArray()}, tcp=${tcp.toArray()}, ' +
+          'graspRotation=$rotationImage, ' +
+          'q=${mission.robot.runtime.snapshot().q.toArray()}';
       }
       check(mission.stepIndex == clampCommand && mission.failure == null,
         'the physical blank reaches the first seated-clamp command ' +
@@ -3629,7 +3794,9 @@ class ProjectSourceTests {
           'doorClosed=${cellSignal(RobotInterfaceChannels.DOOR_CLOSED)}, ' +
           'clear=${cncRequest(RobotInterfaceChannels.ROBOT_CLEAR)}, ' +
           'requestCycle=${cncRequest(RobotInterfaceChannels.CYCLE_START)}, ' +
-          'runner=${mission.runner.status()}, ticks=$clampTicks/3000)');
+          'runner=${mission.runner.status()}, ticks=$clampTicks/$routeTickBudget, $placementDiagnostic)');
+      check(cellSignal(RobotInterfaceChannels.PART_PRESENT),
+        "the placed blank reaches the live vise's physical presence volume before fault removal");
       var seatedImages = [for (entry in simulation.capturePresentationSnapshot().environment)
         if (entry.id == "project:infeed/blank-0-0") entry];
       if (seatedImages.length != 1) throw "The first blank has no physical vise pose for clamp recovery";
@@ -3650,8 +3817,19 @@ class ProjectSourceTests {
       while ((mission.failure != null || mission.stepIndex <= clampWait) && clampRetryTicks < 500) {
         simulation.step(); clampRetryTicks++;
       }
+      var retrySeat = mission.partFrame("infeed/blank-0-0");
+      var seatPlace = mission.mission.steps[clampCommand - 1].at;
+      if (seatPlace == null) throw "Clamp recovery has no preceding placement station";
+      var retryVise = mission.liveConnectorFrame(seatPlace);
       check(mission.failure == null && mission.stepIndex > clampWait && mission.completed > beforeClampRetry,
-        "clamp-alarm recovery reseats the same blank, clamps it and resumes the mission");
+        'clamp-alarm recovery reseats the same blank, clamps it and resumes the mission ' +
+          '(failure=${mission.failure}, alarm=${mission.alarmCode}, step=${mission.stepIndex}/$clampWait, ' +
+          'completed=${mission.completed}/$beforeClampRetry, present=${cellSignal(RobotInterfaceChannels.PART_PRESENT)}, ' +
+          'clamped=${cellSignal(RobotInterfaceChannels.CLAMPED)}, open=${cellSignal(RobotInterfaceChannels.UNCLAMPED)}, ' +
+          'request=${cncRequest(RobotInterfaceChannels.REQUEST_CLAMP)}, cncAlarm=${cnc.interfaceAlarm}, ' +
+          'q=${cnc.robot.runtime.snapshot().q.toArray()}, ticks=$clampRetryTicks/500, ' +
+          'blank=${[retrySeat.x,retrySeat.y,retrySeat.z,retrySeat.qx,retrySeat.qy,retrySeat.qz,retrySeat.qw]}, ' +
+          'seat=${[retryVise.x,retryVise.y,retryVise.z]}, original=${[seatedPose.x,seatedPose.y,seatedPose.z]})');
       // Start at the first seated-and-clamped blank; exclude earlier recovery fault injections.
       var productionStart = simulation.activeSession().simulationTime();
       var ticks = 0, spindleTicks = 0, observedStocks = 0, maxSimultaneousHeld = 0;
@@ -3659,7 +3837,8 @@ class ProjectSourceTests {
       var cycleTimes:Array<Float> = [];
       var expectedRemoval = expectedBearingBlockRemoval();
       while (!mission.finished && simulation.activeSession().simulationTime() < 800) {
-        simulation.step();
+        try simulation.step() catch (error:Dynamic)
+          throw 'Tending production step ${mission.stepIndex}/${mission.mission.steps.length}: $error';
         var heldNow = simulation.heldObjectIds().length;
         if (heldNow > maxSimultaneousHeld) maxSimultaneousHeld = heldNow;
         var signalBus = simulation.cellSignals;
@@ -3707,14 +3886,12 @@ class ProjectSourceTests {
           outfeedCount++;
       check(outfeedCount == 4,
         'four finished blanks occupy their sensed outfeed seats, got $outfeedCount');
-      check(maxSimultaneousHeld == 2,
-        'the dual grippers carry the staged raw blank and finished blank together during exchange, max $maxSimultaneousHeld');
+      check(maxSimultaneousHeld == 1,
+        'the sequential MT10–MT11 mission carries one workpiece at a time, max $maxSimultaneousHeld');
       check(cycleTimes.length == 4 && lastCycleTime > 0 && ticks > 0 && spindleTicks > 0,
         'the tending run reports all four CNC cycle intervals and spindle time');
       var productionSeconds = simulation.activeSession().simulationTime() - productionStart;
       var spindleUse = spindleTicks / ticks;
-      check(cnc.spindleUtilization >= 0.75,
-        'dual-gripper tending keeps measured spindle utilization at or above 75%, got ${cnc.spindleUtilization * 100}%');
       check(Math.abs(cnc.spindleUtilization - spindleUse) < 0.05,
         'CNC-panel spindle utilization agrees with encoder sampling, got ${cnc.spindleUtilization * 100}% vs ${spindleUse * 100}%');
       var measuredUse = cnc.spindleUtilization;
@@ -3752,6 +3929,9 @@ class ProjectSourceTests {
     var doorChannelB = doorDrive.channelB;
     if (doorChannelB == null) throw "Enclosed mill door needs a second valve coil";
     var fixture = new RobotModel("enclosed mill pneumatic stroke");
+    // This pressure/flow fixture has no collision geometry. Default fallback
+    // boxes would put its independent door and vise sliders inside each other.
+    fixture.collisionApproximation = robotkit.model.CollisionApproximation.None;
     var base = fixture.addLink(new Link("base"));
     var doorLink = fixture.addLink(new Link("door"));
     var viseLink = fixture.addLink(new Link("vise jaw"));
@@ -3797,16 +3977,23 @@ class ProjectSourceTests {
     fixtureSwitch.hysteresis = clampSwitch[0].hysteresis;
     fixture.addSensor(fixtureSwitch);
     var blueprint = RobotRuntimeCompiler.compile(fixture, new robotkit.profile.RobotProfile());
+    var expectedDoorSeconds = doorDrive.stroke * 0.98 / doorDrive.ratedSpeed;
+    var expectedDoorCloseSeconds = expectedDoorSeconds *
+      doorDrive.extensionForce() / doorDrive.retractionForce();
+    // MT10 widened the door. Derive both coil windows from this cylinder's
+    // stroke and flow instead of reversing the older door at a fixed 1.6 s.
+    var reverseTick = Std.int(Math.ceil(1.15 * doorDrive.stroke / doorDrive.ratedSpeed / 0.01)) + 2;
+    var finalTick = reverseTick + Std.int(Math.ceil(1.15 * expectedDoorCloseSeconds / 0.01)) + 10;
     var physical = new SimulationHarness(0.01, physicsSubsteps, SimulationSpace.MUJOCO);
     try {
       var runtime = physical.simulation.addRobot(blueprint);
-      var stroke = new TrajectorySegment(Int64.ofInt(0), Int64.parseString("3500000000"),
+      var stroke = new TrajectorySegment(Int64.ofInt(0), Int64.fromFloat(finalTick * 10000000.0),
         [[0.0, 0.0], [0.0, 0.0]]);
       var events = [
         new ProcessTimedEvent(Int64.ofInt(10000000), doorDrive.channelA, ProcessEventValue.Digital(true)),
         new ProcessTimedEvent(Int64.ofInt(10000000), viseDrive.channelA, ProcessEventValue.Digital(true)),
-        new ProcessTimedEvent(Int64.ofInt(1600000000), doorDrive.channelA, ProcessEventValue.Digital(false)),
-        new ProcessTimedEvent(Int64.ofInt(1600000000), doorChannelB, ProcessEventValue.Digital(true))
+        new ProcessTimedEvent(Int64.fromFloat(reverseTick * 10000000.0), doorDrive.channelA, ProcessEventValue.Digital(false)),
+        new ProcessTimedEvent(Int64.fromFloat(reverseTick * 10000000.0), doorChannelB, ProcessEventValue.Digital(true))
       ];
       runtime.submitPlan(new ExecutionPlanSubmission(Int64.ofInt(1202), Int64.ofInt(blueprint.revision),
         Int64.ofInt(blueprint.calibrationRevision), RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
@@ -3816,7 +4003,8 @@ class ProjectSourceTests {
       var viseClampStart = -1, viseClampReached = -1;
       var viseClampEffort = 0.0;
       var lastDoorPosition = 0.0;
-      for (tick in 1...351) {
+      var peakDoorPosition = 0.0, peakDoorEffort = 0.0;
+      for (tick in 1...finalTick + 1) {
         physical.step(Int64.fromFloat(tick * 10000000.0));
         var snapshot = runtime.snapshot();
         if (snapshot.safety != RobotKitRuntimeConstants.RK_SAFETY_READY &&
@@ -3825,6 +4013,8 @@ class ProjectSourceTests {
         var doorPosition = snapshot.q.get(0) * doorDrive.extendSign;
         var visePosition = snapshot.q.get(1) * viseDrive.extendSign;
         lastDoorPosition = doorPosition;
+        peakDoorPosition = Math.max(peakDoorPosition, doorPosition);
+        peakDoorEffort = Math.max(peakDoorEffort, Math.abs(snapshot.effort.get(0)));
         var doorA = switch runtime.channelValue(doorDrive.channelA) {case Digital(value): value; case _: false;};
         var doorB = switch runtime.channelValue(doorChannelB) {case Digital(value): value; case _: false;};
         var viseA = switch runtime.channelValue(viseDrive.channelA) {case Digital(value): value; case _: false;};
@@ -3843,13 +4033,10 @@ class ProjectSourceTests {
       var doorOpenSeconds = (doorOpenReached - doorOpenStart) * 0.01;
       var doorCloseSeconds = (doorCloseReached - doorCloseStart) * 0.01;
       var viseClampSeconds = (viseClampReached - viseClampStart) * 0.01;
-      var expectedDoorSeconds = doorDrive.stroke * 0.98 / doorDrive.ratedSpeed;
-      var expectedDoorCloseSeconds = expectedDoorSeconds *
-        doorDrive.extensionForce() / doorDrive.retractionForce();
       var expectedViseSeconds = gripTravel * 0.98 / viseDrive.ratedSpeed;
       check(doorOpenStart > 0 && doorOpenReached > doorOpenStart &&
         Math.abs(doorOpenSeconds / expectedDoorSeconds - 1.0) <= 0.1,
-        'MuJoCo door extension takes stroke / rated speed within 10%, measured $doorOpenSeconds s; start=$doorOpenStart reached=$doorOpenReached position=$lastDoorPosition sign=${doorDrive.extendSign} drives=${blueprint.pneumaticDrives.length}, trajectory=${runtime.snapshot().trajectoryTimeNs}, active=${runtime.snapshot().trajectoryActive}, safety=${runtime.snapshot().safety}');
+        'MuJoCo door extension takes stroke / rated speed within 10%, measured $doorOpenSeconds s; start=$doorOpenStart reached=$doorOpenReached position=$lastDoorPosition peak=$peakDoorPosition effort=$peakDoorEffort stroke=${doorDrive.stroke} speed=${doorDrive.ratedSpeed} sign=${doorDrive.extendSign} drives=${blueprint.pneumaticDrives.length}, trajectory=${runtime.snapshot().trajectoryTimeNs}, active=${runtime.snapshot().trajectoryActive}, safety=${runtime.snapshot().safety}');
       check(doorCloseStart > 0 && doorCloseReached > doorCloseStart &&
         Math.abs(doorCloseSeconds / expectedDoorCloseSeconds - 1.0) <= 0.1,
         'MuJoCo door retraction takes stroke / rated speed within 10%, measured $doorCloseSeconds s');
@@ -4331,7 +4518,7 @@ class ProjectSourceTests {
    * revolute joint from the plate; the pin keeps its place and turns on the joint; the joint and its coordinate
    * survive a save and reopen; undo brings the mates back.
    */
-  static function checkMateJoint(manifest:String, generated:MateriaProjectRunner.GeneratedAssemblyScene):Void {
+  static function checkMateJoint(manifest:String, generated:app.GeneratedAssemblyScene):Void {
     var descriptors = generated.faceDescriptorsByDefinition;
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot,
@@ -4380,7 +4567,7 @@ class ProjectSourceTests {
    * are refused without losing the first pick; the second face on another part adds the mate. The mate then
    * shows on the part's inspector, and clearing it removes the mate (undoably).
    */
-  static function checkMatePick(manifest:String, generated:MateriaProjectRunner.GeneratedAssemblyScene):Void {
+  static function checkMatePick(manifest:String, generated:app.GeneratedAssemblyScene):Void {
     var descriptors = generated.faceDescriptorsByDefinition;
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot,
@@ -4707,6 +4894,12 @@ class ProjectSourceTests {
       checkAfterTrack(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "after-mill") {
+      checkEnclosedMillProject(root);
+      checkTendingControllers(root);
+      checkAfterTendingControllers(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "after-cell") {
       checkAfterTendingControllers(root);
       return 0;
@@ -4755,7 +4948,7 @@ class ProjectSourceTests {
       checkTendingRobotInterface(root);
       return 0;
     }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending") {
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending" || Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-reach" || Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-vise") {
       checkMachineTending(root);
       return 0;
     }

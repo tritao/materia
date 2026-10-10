@@ -187,15 +187,16 @@ class WorkerDemoTests {
   /** A scene that keeps its people in the retired sensors section is refused, not silently emptied. */
   static function legacyHumansRefused():Void {
     var editor = new ReferenceEditorApp();
+    var fixture = TestPaths.of("app/tests/fixtures/worker-legacy.materia");
+    if (!FileSystem.exists(fixture))
+      throw 'Cannot test legacy worker refusal: fixture "$fixture" does not exist (cwd=${Sys.getCwd()})';
+    try sys.io.File.getContent(fixture) catch (error:Dynamic)
+      throw 'Cannot read legacy worker refusal fixture "$fixture": ${Std.string(error)}';
     var refused:Null<String> = null;
-    var fixturePath:Null<String> = null;
-    for (candidate in ["fixtures/worker-legacy.materia", "app/tests/fixtures/worker-legacy.materia"])
-      if (fixturePath == null && FileSystem.exists(candidate)) fixturePath = FileSystem.fullPath(candidate);
-    if (fixturePath == null) throw 'Worker refusal fixture is missing from the test working directory "${Sys.getCwd()}"';
-    try editor.session.open(fixturePath) catch (error:Dynamic) refused = Std.string(error);
+    try editor.session.open(fixture) catch (error:Dynamic) refused = Std.string(error);
     if (refused == null) throw "A scene with the retired humans section opened";
     if (refused.indexOf("humans") < 0 || refused.indexOf("no longer supported") < 0)
-      throw 'The refusal does not say why: $refused';
+      throw 'Opening legacy worker fixture "$fixture" did not explain the retired humans section: $refused';
     if ([for (item in editor.scene.records()) if (item.type == "human-worker") item].length != 0)
       throw "A refused scene left workers behind";
     editor.dispose();

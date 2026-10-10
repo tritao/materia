@@ -23,6 +23,10 @@ class PneumaticVise extends MachineAssembly {
 	public final endStop:MillPanel;
 	public final cylinder:PneumaticCylinder;
 	public final datum:AssemblyFrame;
+	/** Origin of the preset blank: centred in X/Y, with its bottom on the parallels. */
+	public final seat:AssemblyFrame;
+	/** Release the blank above the parallels, centred in the fully open jaw gap. */
+	public final load:AssemblyFrame;
 	public final openGap:Float;
 	/** Jaw travel at first contact with the preset blank, measured from fully open. */
 	public var grippedPosition(get, never):Float;
@@ -72,6 +76,12 @@ class PneumaticVise extends MachineAssembly {
 			fixedPose.y + fixedJaw.depth / 2, parallelPose.z + parallels.height);
 		addMemberConnector("body", "datum", datum);
 		exposeConnector("datum", "body", "datum");
+		seat = AssemblyFrames.compose(datum, AssemblyFrames.translation(blankLength / 2, blankWidth / 2, 0));
+		addMemberConnector("body", "seat", seat);
+		exposeConnector("seat", "body", "seat");
+		load = AssemblyFrames.compose(seat, AssemblyFrames.translation(0, clearance, clearance));
+		addMemberConnector("body", "load", load);
+		exposeConnector("load", "body", "load");
 		exposeConnector("mount", "body", "mount");
 	}
 

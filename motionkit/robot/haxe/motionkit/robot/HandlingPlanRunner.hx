@@ -43,11 +43,13 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
   public final contactSpeed:Float;
   public final dwell:Float;
   public final pressDepth:Float;
+  /** Open a physical gripper and allow its valve/stroke dwell before approaching a new part. */
+  public final openBeforePick:Bool;
 
   public static function create(robot:Robot, manipulator:KinematicGroup,
       eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}, channel:String,
       planning:PlanningLimits, ?approachHeight:Float = DEFAULT_APPROACH_HEIGHT, ?travelSpeed:Float = 0.3, ?contactSpeed:Float = 0.08,
-      ?dwell:Float = 0.4, ?pressDepth:Float = 0.003):HandlingPlanRunner {
+      ?dwell:Float = 0.4, ?pressDepth:Float = 0.003, openBeforePick:Bool = false, ?ikTolerance:IkTolerance):HandlingPlanRunner {
     var count = manipulator.group.count();
     planning.requireGroup(manipulator);
     var limits = planning.validation();
@@ -69,17 +71,17 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     var compiler = new ProgramCompiler(solver, limits, FRAME,
       planning.velocity, planning.acceleration, planning.jerk,
       planning.startTolerances(0.005),
-      null, 0.0075, 0.2, 0.002, 0.02, new IkTolerance(2e-3, 5e-3, 300, 0.03),pathPlanner);
+      null, 0.0075, 0.2, 0.002, 0.02, ikTolerance == null ? new IkTolerance(2e-3, 5e-3, 300, 0.03) : ikTolerance,pathPlanner);
     compiler.planningAssumptions = planning.assumptions.copy();
     compiler.planCheck = planning.check();
     var motion = new ManipulatorMotion(robot, compiler, function(_) return null, eventSource, indices);
     // Arm joint values are relative to the robot's starting pose.
     return new HandlingPlanRunner(motion, channel, home, solver.forward(home), approachHeight, travelSpeed,
-      contactSpeed, dwell, pressDepth);
+      contactSpeed, dwell, pressDepth, openBeforePick);
   }
 
   public function new(motion:ManipulatorMotion, channel:String, home:Array<Float>, homePose:Pose3,
-      approachHeight:Float, travelSpeed:Float, contactSpeed:Float, dwell:Float, pressDepth:Float) {
+      approachHeight:Float, travelSpeed:Float, contactSpeed:Float, dwell:Float, pressDepth:Float, openBeforePick:Bool = false) {
     if (motion == null || channel == null || channel.length == 0 || home == null || homePose == null ||
         !(approachHeight > 0) || !(travelSpeed > 0) || !(contactSpeed > 0) || !(dwell >= 0) || !(pressDepth >= 0))
       throw "HandlingPlanRunner needs motion, a channel, a home pose and positive speeds";
@@ -92,6 +94,7 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     this.contactSpeed = contactSpeed;
     this.dwell = dwell;
     this.pressDepth = pressDepth;
+    this.openBeforePick = openBeforePick;
   }
 
   public function run(contact:Vec3, hold:Bool, ?orientation:Quat, ?approach:Vec3):Void
@@ -107,17 +110,28 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     var atPoint = contact.sub(lift.scale(hold ? pressDepth : 0.0));
     var above = new Pose3(abovePoint.x, abovePoint.y, abovePoint.z, q.x, q.y, q.z, q.w);
     var at = new Pose3(atPoint.x, atPoint.y, atPoint.z, q.x, q.y, q.z, q.w);
-    var ops = [
+    var ops:Array<MotionOp> = [];
+    if (hold && openBeforePick) {
+      ops.push(MotionOp.SetOutput(channel, EventValue.Digital(false)));
+      ops.push(MotionOp.Dwell(dwell));
+    }
+    ops = ops.concat([
       MotionOp.MoveL(above, FRAME, travelSpeed, Blend.ExactStop,
         orientation == null ? policy : OrientationPolicy.Interpolated),
       MotionOp.MoveL(at, FRAME, contactSpeed, Blend.ExactStop, policy),
       MotionOp.SetOutput(channel, EventValue.Digital(hold)),
       MotionOp.Dwell(dwell),
       MotionOp.MoveL(above, FRAME, contactSpeed, Blend.ExactStop, policy)
-    ];
+    ]);
     if (orientation == null)
       ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(home), new MotionOptions(), Blend.ExactStop));
     return new MotionProgram(ops, configuration);
+  }
+
+  /** Derive a step's approach while retaining the tool's actuation policy. */
+  public function withApproachDistance(distance:Float):HandlingPlanRunner {
+    return new HandlingPlanRunner(motion, channel, home, homePose, distance, travelSpeed,
+      contactSpeed, dwell, pressDepth, openBeforePick);
   }
 
   public function update(dtSeconds:Float):Void motion.update(dtSeconds);

@@ -8,13 +8,16 @@ class SimContactSurface {
     public final frictionDimensions:Int;
     public final contactTimeConstant:Float;
     public final contactDampingRatio:Float;
+    public final contactFilter:SimContactFilter;
 
     public function new(?friction:Array<Float>, frictionDimensions:Int = 0,
-            contactTimeConstant:Float = 0.0, contactDampingRatio:Float = 0.0) {
+            contactTimeConstant:Float = 0.0, contactDampingRatio:Float = 0.0,
+            contactFilter:SimContactFilter = SimContactFilter.Layers) {
         this.friction = friction == null ? [0.0, 0.0, 0.0] : friction.copy();
         this.frictionDimensions = frictionDimensions;
         this.contactTimeConstant = contactTimeConstant;
         this.contactDampingRatio = contactDampingRatio;
+        this.contactFilter = contactFilter;
         var error = validate();
         if (error != null) throw error;
     }
@@ -25,7 +28,7 @@ class SimContactSurface {
         target.set_friction_dimensions(frictionDimensions);
         target.set_contact_time_constant(contactTimeConstant);
         target.set_contact_damping_ratio(contactDampingRatio);
-        target.set_contact_filter(NativeKitSimConstants.NKSIM_CONTACT_LAYERS);
+        target.set_contact_filter(contactFilter);
     }
 
     function validate():Null<String> {
@@ -35,6 +38,8 @@ class SimContactSurface {
         if (frictionDimensions != 0 && frictionDimensions != 1 && frictionDimensions != 3 &&
                 frictionDimensions != 4 && frictionDimensions != 6)
             return "friction dimensions must be 0, 1, 3, 4 or 6";
+        if (contactFilter < SimContactFilter.Layers || contactFilter > SimContactFilter.PairsAndEnvironment)
+            return "contact filter is not supported";
         if (!Math.isFinite(contactTimeConstant) || contactTimeConstant < 0.0 ||
                 !Math.isFinite(contactDampingRatio) || contactDampingRatio < 0.0)
             return "contact time constant and damping ratio must be finite and non-negative";

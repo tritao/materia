@@ -17,7 +17,8 @@ class SimulationContactSurfaces {
       PNEUMATIC_FIXTURE_TIME_CONSTANT, 1.0);
   }
 
-  public static function environmentPart():nativekit.sim.SimContactSurface
+  public static function environmentPart(
+      filter:nativekit.sim.SimContactFilter = nativekit.sim.SimContactFilter.Layers):nativekit.sim.SimContactSurface
     return new nativekit.sim.SimContactSurface(null, 0,
-      PNEUMATIC_FIXTURE_TIME_CONSTANT, 1.0);
+      PNEUMATIC_FIXTURE_TIME_CONSTANT, 1.0, filter);
 }

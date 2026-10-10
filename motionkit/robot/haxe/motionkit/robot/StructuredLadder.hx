@@ -164,8 +164,8 @@ class LadderSelection {
   public final failedSample:Int;
   public final failedDistance:Float;
   public final diagnostic:Null<String>;
-  public final closestClearance:Null<robotkit.manipulation.ArmClearance.ClearanceViolation>;
-  public function new(candidates:Array<LatticeCandidate>,cost:Float,failedSample:Int=-1,failedDistance:Float=0,?diagnostic:String,?closestClearance:robotkit.manipulation.ArmClearance.ClearanceViolation){
+  public final closestClearance:Null<robotkit.manipulation.ClearanceViolation>;
+  public function new(candidates:Array<LatticeCandidate>,cost:Float,failedSample:Int=-1,failedDistance:Float=0,?diagnostic:String,?closestClearance:robotkit.manipulation.ClearanceViolation){
     this.candidates=candidates;this.cost=cost;this.failedSample=failedSample;this.failedDistance=failedDistance;this.diagnostic=diagnostic;this.closestClearance=closestClearance;
   }
   public function joints():Array<Array<Float>> return [for(candidate in candidates)candidate.q.copy()];

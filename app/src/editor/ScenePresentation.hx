@@ -33,9 +33,15 @@ class ScenePresentation {
   public var renderNeedsRefresh:Bool = false;
   public var selectionMaterial:Material;
   public var hoverMaterial:Material;
+  /** Objects in collision, and objects nearer than the near distance (COLLISION.md CL8b). */
+  public var collidingMaterial:Material;
+  public var nearMaterial:Material;
   public final faceHoverNodes:Map<String, NodeId> = new Map();
   public final faceHoverGeometries:Map<String, Geometry> = new Map();
   public final faceHoverIndexes:Map<String, Int> = new Map();
+
+  // Scratch transforms are copied into each SceneView, never published by reference.
+  final poseTransformScratch:Array<Transform> = [];
 
   public function new() bridge = new SceneBridge();
 
@@ -152,8 +158,25 @@ class ScenePresentation {
   }
 
   public function configureRenderView(owner:EditorScene, view:SceneView, viewProjection:Transform,
-      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1):SceneView {
+      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1,
+      ?collisions:Array<app.SceneCollision.SceneCollisionPair>):SceneView {
     view.setViewProjection(viewProjection);
+    if (collisions != null) {
+      // Red for objects in a colliding pair, amber for objects only near; the selection and the hovered
+      // object keep their own highlight.
+      var colliding = new Map<String, Bool>();
+      for (pair in collisions) {
+        if (pair.colliding()) { colliding.set(pair.a, true); colliding.set(pair.b, true); }
+        else {
+          if (!colliding.exists(pair.a)) colliding.set(pair.a, false);
+          if (!colliding.exists(pair.b)) colliding.set(pair.b, false);
+        }
+      }
+      for (id in colliding.keys()) if (id != owner.selectedId && id != hoveredId) {
+        var runtime = bridge.runtime(id);
+        if (runtime != null) view.setMaterial(runtime.node, colliding.get(id) == true ? collidingMaterial : nearMaterial);
+      }
+    }
     var selected = owner.object(owner.selectedId);
     var selection = new SelectionSet();
     if (selected != null) {
@@ -182,11 +205,13 @@ class ScenePresentation {
     if (poses != null) {
       var poseNodes:Array<NodeId> = [];
       var poseTransforms:Array<Transform> = [];
+      var poseIndex = 0;
       for (pose in poses) {
         var runtime = bridge.runtime(pose.id);
         if (runtime != null) {
           poseNodes.push(runtime.node);
-          poseTransforms.push(EditorScene.poseTransform(pose.position, pose.rotation));
+          if (poseIndex == poseTransformScratch.length) poseTransformScratch.push(Transform.identity());
+          poseTransforms.push(EditorScene.poseTransform(pose.position, pose.rotation, poseTransformScratch[poseIndex++]));
           // The face overlay is a child of its object with an identity transform, but a pose
           // override moves only its own node, so the overlay needs the object's pose as well.
           if (faceHoverShown && pose.id == hoveredId) {

@@ -32,8 +32,16 @@ class BrowserFiles implements MemoryFileSystemObserver {
 
   /** Keeps a picked file's content at `path`. */
   public static function store(path:String, content:Bytes):Void {
-    MemoryFileSystem.createDirectory(DIRECTORY, true);
+    MemoryFileSystem.createDirectory(haxe.io.Path.directory(path), true);
     MemoryFileSystem.saveBytes(path, content);
+  }
+
+  /** Immutable, content-addressed imports keep cancelling a replacement from overwriting the old source. */
+  public static function storeArtifact(name:String, content:Bytes):String {
+    var file = haxe.io.Path.withoutDirectory(pathFor(name));
+    var path = DIRECTORY + "/artifacts/" + PreparedProjectCache.hex(haxe.crypto.Sha256.make(content)) + "/" + file;
+    if (!MemoryFileSystem.exists(path)) store(path, content);
+    return path;
   }
 
   /** Sends later writes to `path` to the chooser's save target `uri` as well. */

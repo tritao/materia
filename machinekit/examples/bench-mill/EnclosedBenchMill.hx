@@ -25,9 +25,10 @@ class EnclosedBenchMill extends MachineAssembly {
 	public final standHeight:Float = 750;
 	public final trayThickness:Float = 2;
 	public final panelThickness:Float = 2;
-	public final openingWidth:Float = 450;
-	public final openingHeight:Float = 400;
-	public final doorStroke:Float = 460;
+	public final openingWidth:Float = 600;
+	public final openingHeight:Float = 500;
+	public final openingSillBelowRetractedHead:Float = 400;
+	public final doorStroke:Float;
 	public final envelope:MillBounds;
 	public final opening:AssemblyFrame;
 	public final loadPosition:Array<Float>;
@@ -39,6 +40,7 @@ class EnclosedBenchMill extends MachineAssembly {
 
 	public function new(includesWorkpiece:Bool = true) {
 		super();
+		doorStroke = openingWidth + 10;
 		this.includesWorkpiece = includesWorkpiece;
 		mill = new BenchMill(true, includesWorkpiece);
 		floorOffset = standHeight + trayThickness;
@@ -53,7 +55,10 @@ class EnclosedBenchMill extends MachineAssembly {
 		var retracted = new AssemblyState(coreModel.definition("mill-door-head"));
 		retracted.setJoint("z", mill.specs[2].upper);
 		var headBottom = retracted.worldPose("head").z;
-		opening = AssemblyFrames.translation(0, front, floorOffset + headBottom - 10 - openingHeight);
+		// Keep the sill at its established load-access height and raise the header
+		// to clear the cobot's upper-arm envelope at the enclosure plane.
+		opening = AssemblyFrames.translation(0, front,
+			floorOffset + headBottom - openingSillBelowRetractedHead);
 		var width = right - left, depth = back - front;
 		var centreX = (left + right) / 2, centreY = (front + back) / 2;
 		panel("chipTray", width, depth, trayThickness, centreX, centreY, standHeight);
@@ -233,23 +238,43 @@ class EnclosedBenchMill extends MachineAssembly {
 		return new AssemblyState(model.definition("enclosed-bench-mill"));
 	}
 
-	/** Project the doorway onto the two table travels; retract Z to its geometric upper limit. */
+	/** Bring the vise to the doorway beside the retracted head, within the real table travels. */
 	function nearestLoadPosition():Array<Float> {
 		var state = state();
 		for (spec in mill.specs) state.setJoint("mill/" + spec.id, 0);
-		var zero = state.worldConnector("mill/vise/body", "datum");
-		var result:Array<Float> = [];
-		for (spec in mill.specs) {
-			if (spec.id == "z") { result.push(spec.upper); continue; }
-			state.setJoint("mill/" + spec.id, 1);
-			var shifted = state.worldConnector("mill/vise/body", "datum");
-			state.setJoint("mill/" + spec.id, 0);
-			var dx = shifted.x - zero.x, dy = shifted.y - zero.y, dz = shifted.z - zero.z;
-			var value = ((opening.x - zero.x) * dx + (opening.y - zero.y) * dy + (opening.z - zero.z) * dz) /
-				(dx * dx + dy * dy + dz * dz);
-			result.push(Math.max(spec.lower, Math.min(spec.upper, value)));
+		var zero = state.worldConnector("mill/vise/body", "seat");
+		var vise = mill.vise;
+		if (vise == null) throw "Loading needs a preset vise";
+		var clearance = robotkit.collision.CollisionClearance.MARGIN * 1000;
+		var head = state.worldPose("mill/head");
+		var separation = mill.head.width / 2 + vise.body.width / 2 + clearance;
+		var targetXs = Math.abs(opening.x - head.x) >= separation ? [opening.x]
+			: [head.x - separation, head.x + separation];
+		var best:Null<Array<Float>> = null, bestDistance = Math.POSITIVE_INFINITY;
+		var trials:Array<String> = [];
+		for (targetX in targetXs) {
+			for (spec in mill.specs) state.setJoint("mill/" + spec.id, 0);
+			var result:Array<Float> = [];
+			for (spec in mill.specs) {
+				if (spec.id == "z") { result.push(spec.upper); continue; }
+				state.setJoint("mill/" + spec.id, 1);
+				var shifted = state.worldConnector("mill/vise/body", "seat");
+				state.setJoint("mill/" + spec.id, 0);
+				var dx = shifted.x - zero.x, dy = shifted.y - zero.y, dz = shifted.z - zero.z;
+				var value = ((targetX - zero.x) * dx + (opening.y - zero.y) * dy + (opening.z - zero.z) * dz) /
+					(dx * dx + dy * dy + dz * dz);
+				result.push(Math.max(spec.lower, Math.min(spec.upper, value)));
+			}
+			for (index in 0...mill.specs.length) state.setJoint("mill/" + mill.specs[index].id, result[index]);
+			var seat = state.worldConnector("mill/vise/body", "seat");
+			trials.push('target=$targetX seat=${seat.x}/${seat.y} axes=$result');
+			if (Math.abs(seat.x - head.x) < separation - 1e-6 ||
+				Math.abs(seat.x - opening.x) + vise.body.width / 2 + clearance > openingWidth / 2) continue;
+			var distance = Math.pow(seat.x - opening.x, 2) + Math.pow(seat.y - opening.y, 2);
+			if (distance < bestDistance) { best = result; bestDistance = distance; }
 		}
-		return result;
+		if (best == null) throw 'The table cannot load the vise beside the head through the doorway: zero=${zero.x}/${zero.y}, head=${head.x}, separation=$separation, opening=${opening.x}/$openingWidth; ${trials.join("; ")}';
+		return best;
 	}
 
 	/** Local geometry is read once; FK supplies its bounds at every travel corner. */

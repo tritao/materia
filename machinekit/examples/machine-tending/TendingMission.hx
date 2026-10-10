@@ -12,7 +12,9 @@ class TendingMission {
 	static inline var CNC_SIGNAL_TIMEOUT:Float = RobotInterface.DEFAULT_REQUEST_TIMEOUT_SECONDS + 1.0;
 	static inline var PRESENCE_TIMEOUT:Float = 5.0;
 	static inline var CYCLE_TIMEOUT:Float = 180.0;
-	static inline var MOTION_TIMEOUT:Float = 60.0;
+	// Main CollisionKit's conservative joint-space path through the door and vise
+	// is bounded by this per-step simulation-time budget, including planning and settling.
+	static inline var MOTION_TIMEOUT:Float = 90.0;
 
 	/** Generate complete cycles for distinct tray slot indices in row-major order. */
 	public static function generate(cell:TendingControllers, slots:Array<Int>):Array<SceneArtifactMissionStep> {
@@ -43,10 +45,13 @@ class TendingMission {
 		}
 		function moveTray(station:String, tool:String):Void
 			move([station + "-clearance", station + "-approach"], tool);
-		function moveToVise(tool:String):Void
-			move(["outside door", "doorway center", "inside doorway", "inside door", "vise-approach"], tool);
-		function moveFromVise(tool:String):Void
-			move(["vise-approach", "inside door", "inside doorway", "doorway center", "outside door", "outside staging"], tool);
+		function moveToVise(tool:String, station:String = "vise"):Void
+			move(TendingReach.viseTransitStations(station).slice(1), tool);
+		function moveFromVise(tool:String, station:String = "vise"):Void {
+			var path = TendingReach.viseTransitStations(station);
+			path.reverse();
+			move(path, tool);
+		}
 		function pick(occurrence:String, station:String, tool:String):Void result.push({kind: "pick",
 			at: {occurrence: occurrence, connector: "grasp"}, tool: tool,
 			timeoutSeconds: MOTION_TIMEOUT, approachDistance: cell.reach.handlingApproachMm / 1000,
@@ -69,6 +74,11 @@ class TendingMission {
 			wait(RobotInterfaceChannels.DOOR_CLOSED, true, CNC_SIGNAL_TIMEOUT, request);
 			signal(RobotInterfaceChannels.REQUEST_DOOR_CLOSE, false);
 		}
+		function unclampPart():Void {
+			var request = signal(RobotInterfaceChannels.REQUEST_UNCLAMP, true);
+			wait(RobotInterfaceChannels.UNCLAMPED, true, CNC_SIGNAL_TIMEOUT, request);
+			signal(RobotInterfaceChannels.REQUEST_UNCLAMP, false);
+		}
 		function clampPart():Void {
 			var request = signal(RobotInterfaceChannels.REQUEST_CLAMP, true);
 			wait(RobotInterfaceChannels.CLAMPED, true, CNC_SIGNAL_TIMEOUT, request);
@@ -84,72 +94,39 @@ class TendingMission {
 		var toolA = DualArmGripperTool.TOOL_CHANNEL_A;
 		var toolB = DualArmGripperTool.TOOL_CHANNEL_B;
 		function toolFor(cycle:Int):String return cycle % 2 == 0 ? toolA : toolB;
-		function otherTool(tool:String):String return tool == toolA ? toolB : toolA;
-
-		// Load the first blank, then cycle with the next blank staged outside the
-		// door. While each following cut runs, clear the prior finish and prepare
-		// the next blank on the same free gripper.
-		var firstSlot = slots[0], firstTool = toolFor(0);
-		waitInfeed(firstSlot);
-		moveTray('infeed-${rowOf(firstSlot)}-${columnOf(firstSlot)}', firstTool);
-		pick(blankOf(firstSlot), 'infeed-${rowOf(firstSlot)}-${columnOf(firstSlot)}', firstTool);
-		// Stay at the fully exterior staging pose while the door is closed. The
-		// robot only approaches the aperture after the CNC controller opens it.
-		move(['infeed-${rowOf(firstSlot)}-${columnOf(firstSlot)}-clearance', "outside staging"], firstTool);
-		signal(RobotInterfaceChannels.ROBOT_CLEAR, true);
-		openDoor();
-		signal(RobotInterfaceChannels.ROBOT_CLEAR, false);
-		moveToVise(firstTool);
-		place(cell.viseDatumPlace(), "vise", firstTool);
-		clampPart();
-		moveFromVise(firstTool);
-		signal(RobotInterfaceChannels.ROBOT_CLEAR, true);
-		closeDoor();
-		var cycleStartIndices:Array<Int> = [startCycle()];
-
+		// MT10–MT11 handles one blank at a time. Pre-staging and a two-part
+		// exchange are MT12 throughput work, after this cell's recovery gate.
 		for (cycle in 0...slots.length) {
-			var currentTool = toolFor(cycle), stagingTool = otherTool(currentTool);
-			if (cycle > 0) {
-				var finishedSlot = slots[cycle - 1];
-				moveTray('outfeed-${rowOf(finishedSlot)}-${columnOf(finishedSlot)}', stagingTool);
-				place(cell.outfeedPlace(rowOf(finishedSlot), columnOf(finishedSlot)),
-					'outfeed-${rowOf(finishedSlot)}-${columnOf(finishedSlot)}', stagingTool);
-			}
-			if (cycle + 1 < slots.length) {
-				var nextSlot = slots[cycle + 1];
-				waitInfeed(nextSlot);
-				moveTray('infeed-${rowOf(nextSlot)}-${columnOf(nextSlot)}', stagingTool);
-				pick(blankOf(nextSlot), 'infeed-${rowOf(nextSlot)}-${columnOf(nextSlot)}', stagingTool);
-				move(['infeed-${rowOf(nextSlot)}-${columnOf(nextSlot)}-clearance', "outside staging"], stagingTool);
-				signal(RobotInterfaceChannels.ROBOT_CLEAR, true);
-			}
-			var startIndex = cycleStartIndices[cycle];
-			wait(RobotInterfaceChannels.CYCLE_COMPLETE, true, CYCLE_TIMEOUT, startIndex);
+			var slot = slots[cycle], tool = toolFor(cycle);
+			var station = 'infeed-${rowOf(slot)}-${columnOf(slot)}';
+			waitInfeed(slot);
+			moveTray(station, tool);
+			pick(blankOf(slot), station, tool);
+			move([station + "-clearance", "outside staging"], tool);
+			signal(RobotInterfaceChannels.ROBOT_CLEAR, true);
+			openDoor();
+			unclampPart();
+			signal(RobotInterfaceChannels.ROBOT_CLEAR, false);
+			moveToVise(tool, "vise-load");
+			place(cell.viseLoadPlace(), "vise-load", tool);
+			clampPart();
+			moveFromVise(tool, "vise-load");
+			signal(RobotInterfaceChannels.ROBOT_CLEAR, true);
+			closeDoor();
+			var cycleRequest = startCycle();
+			wait(RobotInterfaceChannels.CYCLE_COMPLETE, true, CYCLE_TIMEOUT, cycleRequest);
 			wait(RobotInterfaceChannels.CNC_READY, true, CNC_SIGNAL_TIMEOUT);
 			openDoor();
 			signal(RobotInterfaceChannels.ROBOT_CLEAR, false);
-			moveToVise(currentTool);
-			signal(RobotInterfaceChannels.REQUEST_UNCLAMP, true);
-			wait(RobotInterfaceChannels.UNCLAMPED, true, CNC_SIGNAL_TIMEOUT);
-			signal(RobotInterfaceChannels.REQUEST_UNCLAMP, false);
-			var finishedBlank = blankOf(slots[cycle]);
-			pick(finishedBlank, "vise", currentTool);
-			if (cycle + 1 < slots.length) {
-				move(["vise-approach"], stagingTool);
-				place(cell.viseDatumPlace(), "vise", stagingTool);
-				clampPart();
-				moveFromVise(stagingTool);
-				signal(RobotInterfaceChannels.ROBOT_CLEAR, true);
-				closeDoor();
-				cycleStartIndices.push(startCycle());
-			} else {
-				moveFromVise(currentTool);
-				signal(RobotInterfaceChannels.ROBOT_CLEAR, true);
-				closeDoor();
-				moveTray('outfeed-${rowOf(slots[cycle])}-${columnOf(slots[cycle])}', currentTool);
-				place(cell.outfeedPlace(rowOf(slots[cycle]), columnOf(slots[cycle])),
-					'outfeed-${rowOf(slots[cycle])}-${columnOf(slots[cycle])}', currentTool);
-			}
+			moveToVise(tool);
+			unclampPart();
+			pick(blankOf(slot), "vise", tool);
+			moveFromVise(tool);
+			signal(RobotInterfaceChannels.ROBOT_CLEAR, true);
+			closeDoor();
+			var outfeedStation = 'outfeed-${rowOf(slot)}-${columnOf(slot)}';
+			moveTray(outfeedStation, tool);
+			place(cell.outfeedPlace(rowOf(slot), columnOf(slot)), outfeedStation, tool);
 		}
 		return result;
 	}

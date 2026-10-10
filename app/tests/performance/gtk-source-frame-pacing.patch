@@ -1,0 +1,94 @@
+--- a/gdk/gdkframeclockidle.c
++++ b/gdk/gdkframeclockidle.c
+@@ -23,6 +23,8 @@
+  */
+ 
+ #include "config.h"
++#define PACING_TAG "clock"
++#include "pacing-debug.h"
+ 
+ #include "gdkinternals.h"
+ #include "gdkframeclockprivate.h"
+@@ -319,6 +321,7 @@
+       if (!priv->in_paint_idle &&
+ 	  priv->paint_idle_id == 0 && RUN_PAINT_IDLE (priv))
+         {
++          pacing_trace("schedule", clock_idle, min_interval, priv->min_next_frame_time, caused_by_thaw);
+           priv->paint_is_thaw = caused_by_thaw;
+           priv->paint_idle_id = gdk_threads_add_timeout_full (GDK_PRIORITY_REDRAW,
+                                                               min_interval,
+@@ -402,6 +405,7 @@
+   gboolean skip_to_resume_events;
+   GdkFrameTimings *timings = NULL;
+ 
++  pacing_trace("paint", clock, priv->freeze_count, priv->min_next_frame_time, priv->phase);
+   priv->paint_idle_id = 0;
+   priv->in_paint_idle = TRUE;
+   priv->min_next_frame_time = 0;
+@@ -739,6 +743,7 @@
+     }
+ #endif
+ 
++  pacing_trace("freeze", clock, priv->freeze_count, priv->phase, 0);
+   priv->freeze_count++;
+   maybe_stop_idle (clock_idle);
+ }
+@@ -751,6 +756,7 @@
+ 
+   g_return_if_fail (priv->freeze_count > 0);
+ 
++  pacing_trace("thaw", clock, priv->freeze_count, priv->phase, 0);
+   priv->freeze_count--;
+   if (priv->freeze_count == 0)
+     {
+--- a/gdk/x11/gdkwindow-x11.c
++++ b/gdk/x11/gdkwindow-x11.c
+@@ -24,6 +24,8 @@
+  */
+ 
+ #include "config.h"
++#define PACING_TAG "window"
++#include "../pacing-debug.h"
+ 
+ #include "gdkwindow-x11.h"
+ 
+@@ -448,6 +450,7 @@
+           impl->toplevel->frame_pending = TRUE;
+           _gdk_frame_clock_freeze (gdk_window_get_frame_clock (window));
+           timings->cookie = impl->toplevel->current_counter_value;
++          pacing_trace("end-frame", clock, timings->cookie, timings->frame_time, timings->slept_before);
+         }
+     }
+ 
+--- a/gdk/x11/gdkdisplay-x11.c
++++ b/gdk/x11/gdkdisplay-x11.c
+@@ -21,6 +21,8 @@
+  */
+ 
+ #include "config.h"
++#define PACING_TAG "display"
++#include "../pacing-debug.h"
+ 
+ #include "gdkasync.h"
+ #include "gdkdisplay.h"
+@@ -1376,6 +1378,7 @@
+           GdkFrameClock *clock = gdk_window_get_frame_clock (win);
+           GdkFrameTimings *timings = find_frame_timings (clock, serial);
+ 
++          pacing_trace("ack", clock, serial, frame_drawn_time, window_impl->toplevel->frame_pending);
+           if (timings)
+             timings->drawn_time = frame_drawn_time;
+ 
+--- /dev/null
++++ b/gdk/pacing-debug.h
+@@ -0,0 +1,10 @@
++#include <stdio.h>
++#include <glib.h>
++static void pacing_trace(const char *event, const void *clock, gint64 a, gint64 b, gint64 c)
++{
++ static FILE *f; static int checked;
++ if (!checked) { const char *base=g_getenv("NK_GTK_TRACE"); checked=1;
++  if(base) { char *path=g_strdup_printf("%s-%s.csv",base,PACING_TAG); f=fopen(path,"w"); g_free(path); if(f)setvbuf(f,NULL,_IOFBF,1024*1024); }
++ }
++ if(f)fprintf(f,"%" G_GINT64_FORMAT ",%s,%p,%" G_GINT64_FORMAT ",%" G_GINT64_FORMAT ",%" G_GINT64_FORMAT "\n",g_get_monotonic_time(),event,clock,a,b,c);
++}

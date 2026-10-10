@@ -15,6 +15,7 @@
     "cmake": {
       "source": "../../animkit/tests/native",
       "target": "animkit_tests_native",
+      "libraries": ["nativekit", "nativekit_gpu", "nativekit_scene", "nativekit_scene_render", "animkit_core"],
       "inputs": [
         "../../animkit/tests/native/CMakeLists.txt",
         "../../animkit/native/CMakeLists.txt",

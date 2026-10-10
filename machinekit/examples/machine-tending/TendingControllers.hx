@@ -24,8 +24,10 @@ class TendingControllers extends MachineAssembly {
 	public final outfeedTray:PartTray;
 	public final cellTable:TendingCellTable;
 
-	public function viseDatumPlace():SceneArtifact.SceneArtifactPlace
-		return {occurrence: "mill/mill/vise/body", connector: "datum"};
+	public function viseSeatPlace():SceneArtifact.SceneArtifactPlace
+		return {occurrence: "mill/mill/vise/body", connector: "seat"};
+	public function viseLoadPlace():SceneArtifact.SceneArtifactPlace
+		return {occurrence: "mill/mill/vise/body", connector: "load"};
 
 	public function outfeedPlace(row:Int, column:Int):SceneArtifact.SceneArtifactPlace {
 		var target = outfeedTray.placeTarget(row, column);
@@ -213,7 +215,7 @@ class TendingControllerChecks {
 				cell.reach.parkPose[index]) > 1e-9)
 				throw "Tending cell start state differs from the arm's checked mill-clear park pose";
 		var layout = cell.reach;
-		if (layout.cls != Reach850 || layout.riser != 550 || layout.poses.length != 86 ||
+		if (layout.cls != Reach1300 || layout.riser != 550 || layout.poses.length != 92 ||
 			layout.jointMargin < 0.1 || layout.wristSine < 0.2 || cell.arm.cls != layout.cls)
 			throw 'Tending cell must use the asserted reach result: ' +
 				'${layout.cls}/${layout.riser}/${layout.poses.length}, joint=${layout.jointMargin}, wrist=${layout.wristSine}';

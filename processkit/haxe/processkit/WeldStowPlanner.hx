@@ -7,7 +7,7 @@ import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
 import motionkit.robot.ProgramCompiler;
-import robotkit.manipulation.ArmClearance;
+import robotkit.manipulation.ClearanceWorld;
 import robotkit.manipulation.JointRoute;
 import robotkit.manipulation.Manipulator;
 
@@ -17,7 +17,7 @@ class WeldStowPlanner {
    * Plan a stow from the observed joint state to the zero-relative CAD ready posture.
    * The caller supplies clearance built from the current cell poses, including deposited beads.
    */
-  public static function plan(arm:Manipulator, compiler:ProgramCompiler, clearance:ArmClearance,
+  public static function plan(arm:Manipulator, compiler:ProgramCompiler, clearance:ClearanceWorld,
       from:Array<Float>, to:Array<Float>):MotionProgram {
     if (arm == null || compiler == null || clearance == null || from == null || to == null ||
         compiler.solver.jointCount() != arm.group.count() || from.length != arm.group.count() || to.length != from.length)

@@ -41,14 +41,6 @@ class DeviceBindingTests {
     near(channel.maxRate, 20000.0 / channel.stepsPerUnit, "the step tick caps the actuator's rate below its own 100 rad/s");
     near(model.actuators[0].requireRate(), 100.0, "binding leaves the model alone");
     check(binding.model.actuators[0].requireRate() <= channel.maxRate, "the tightened model respects the device rate");
-    var deployedWire = Bytes.alloc(8);
-    deployedWire.setFloat(0, channel.maxRate);
-    deployedWire.setFloat(4, channel.stepsPerUnit);
-    var deployedInterval = Math.max(1, Math.ceil(20000 /
-      (deployedWire.getFloat(0) * deployedWire.getFloat(4))));
-    near(binding.model.actuators[0].requireRate(),
-      20000 / (deployedInterval * deployedWire.getFloat(4)),
-      "the planning ceiling matches RKD6's integer pulse interval");
     var leadRatio = Math.PI * 1000.0;
     near(binding.model.coupledLimits("axis").requireVelocity(), binding.model.actuators[0].requireRate() / leadRatio,
       "planning limits see the device's achievable ceiling through the screw");

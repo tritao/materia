@@ -14,7 +14,8 @@ import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.CandidateProblem.CandidateSamplingOptions;
 import motionkit.planner.JointPathSamples;
 import robotkit.manipulation.KinematicGroup;
-import robotkit.manipulation.ArmClearance;
+import robotkit.manipulation.ClearanceViolation;
+import robotkit.manipulation.ClearanceWorld;
 import processkit.WeldCorner.WristLimits;
 import processkit.skill.WeldPlan;
 import robotkit.spatial.Transform3;
@@ -154,9 +155,9 @@ class WeldPathProblem {
    * leaves the approach start free; external lattice/rules and motion weights
    * remain explicit inputs from the cell/process. No candidate is timed. */
   public function select(group:KinematicGroup,request:PathRequest,?sampling:CandidateSamplingOptions,
-      ?clearance:ArmClearance,
-      ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>,
-      ?exitCheck:Array<Float>->Null<ArmClearance.ClearanceViolation>,
+      ?clearance:ClearanceWorld,
+      ?entryCheck:(Array<Float>,Array<Float>)->Null<ClearanceViolation>,
+      ?exitCheck:Array<Float>->Null<ClearanceViolation>,
       ?retreatJoints:Array<Float>,?weights:Array<Float>,rollWeight:Float=0,
       ?preferences:ManipulatorKinematics):Array<JointPathSamples> {
     return selectWithCost(group,request,sampling,clearance,entryCheck,exitCheck,
@@ -164,9 +165,9 @@ class WeldPathProblem {
   }
 
   public function selectWithCost(group:KinematicGroup,request:PathRequest,?sampling:CandidateSamplingOptions,
-      ?clearance:ArmClearance,
-      ?entryCheck:(Array<Float>,Array<Float>)->Null<ArmClearance.ClearanceViolation>,
-      ?exitCheck:Array<Float>->Null<ArmClearance.ClearanceViolation>,
+      ?clearance:ClearanceWorld,
+      ?entryCheck:(Array<Float>,Array<Float>)->Null<ClearanceViolation>,
+      ?exitCheck:Array<Float>->Null<ClearanceViolation>,
       ?retreatJoints:Array<Float>,?weights:Array<Float>,rollWeight:Float=0,
       ?preferences:ManipulatorKinematics):WeldPathSelection {
     var options=sampling==null ? new CandidateSamplingOptions(8,3,8,false) : sampling;

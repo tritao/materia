@@ -24,8 +24,12 @@ class SimulatedTools implements SessionMember {
 	public final grippers:Array<SimulatedPneumaticGripper> = [];
 	public final welders:Array<SimulatedWelder> = [];
 	final objects:Array<GripObject>;
+	final simulation:Simulation;
 
-	public function new(objects:Array<GripObject>) this.objects = objects;
+	public function new(objects:Array<GripObject>, simulation:Simulation) {
+		this.objects = objects;
+		this.simulation = simulation;
+	}
 
 	public function add(tool:SimulatedSuctionTool):SimulatedSuctionTool {
 		tools.push(tool);
@@ -67,11 +71,11 @@ class SimulatedTools implements SessionMember {
 			qx: contact.qx, qy: contact.qy, qz: contact.qz, qw: contact.qw});
 		var wire = AssemblyRobot.rotate([tip.qx, tip.qy, tip.qz, tip.qw], [0.0, 0.0, 1.0]);
 		var work = new GroundedWork();
-		var parts = new SimulationAssemblyParts(simulation, robot, objects, project);
+        var parts = new SimulationAssemblyParts(simulation, [robot], objects, project);
 		for (id in welding.groundedWork) {
 			var body = parts.get("project:" + id);
-			if (body.vertices.length < 12) throw 'Grounded work "$id" has no CAD collision hull';
-			work.add(new ConvexSolid(body.vertices), body.pose);
+			if (body.pieces.length == 0) throw 'Grounded work "$id" has no CAD collision hull';
+			for (piece in body.pieces) work.add(new ConvexSolid(piece), body.pose);
 		}
 		return new SimulatedWelder(simulation, robot.runtime, robotIndex, part.linkIndex, [tip.x, tip.y, tip.z], wire, work, tool.channel,
 			welding.wireSpeedChannel, welding.voltageChannel, sensor,
@@ -85,6 +89,18 @@ class SimulatedTools implements SessionMember {
 		for (tool in tools) {
 			var held = tool.held;
 			if (held != null) for (entry in objects) if (entry.object == held) result.push(entry.id);
+		}
+		var runtimes:Array<robotkit.runtime.RobotRuntime> = [];
+		var images:Array<Array<robotkit.runtime.RobotContact>> = [];
+		for (gripper in grippers) {
+			var image = runtimes.indexOf(gripper.runtime);
+			if (image < 0) {
+				image = runtimes.length;
+				runtimes.push(gripper.runtime);
+				images.push(simulation.robotContacts(gripper.runtime));
+			}
+			for (handle in gripper.grippedObjects(images[image])) for (entry in objects)
+				if (entry.object.handle.rawValue() == handle && result.indexOf(entry.id) < 0) result.push(entry.id);
 		}
 		return result;
 	}

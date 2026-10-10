@@ -37,6 +37,7 @@ class ManipulatorMotion {
   /** Seconds of planned motion kept ahead of the machine. */
   public static inline final LOOKAHEAD_SECONDS = 1.0;
   var planner:Null<ProgramPlanner>;
+  var retiringPlanners:Array<ProgramPlanner> = [];
   /** Plans of the running program started so far. */
   var startedPlans:Int = 0;
   var blockIndex:Int = 0;
@@ -214,6 +215,20 @@ class ManipulatorMotion {
       lastCommandedQ = null;
     }
   }
+  /** Cancels this motion's planning and waits before its native planning resources are destroyed.
+      Other motions and their workers are unaffected. Returns the workers still running at timeout. */
+  public function shutdownPlanning(timeoutSeconds:Float = 30.0):Int {
+    if (!Math.isFinite(timeoutSeconds) || timeoutSeconds < 0.0)
+      throw "Planning shutdown timeout must be finite and nonnegative";
+    abort();
+    release();
+    var polls = Std.int(Math.ceil(timeoutSeconds / 0.005));
+    while (true) {
+      retiringPlanners = [for (worker in retiringPlanners) if (!worker.isStopped()) worker];
+      if (retiringPlanners.length == 0 || polls-- <= 0) return retiringPlanners.length;
+      Sys.sleep(0.005);
+    }
+  }
   public function firedEvents():Array<FiredProcessEvent> {
     collectEvents();
     return events.copy();
@@ -354,6 +369,8 @@ class ManipulatorMotion {
       releasedPlanningSeconds += metrics.seconds;
       releasedNumericIkSolves += metrics.numericIkSolves;
       planning.dispose();
+      retiringPlanners = [for (worker in retiringPlanners) if (!worker.isStopped()) worker];
+      if (!planning.isStopped()) retiringPlanners.push(planning);
       planner = null;
     }
   }

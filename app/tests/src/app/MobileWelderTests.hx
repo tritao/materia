@@ -284,7 +284,7 @@ class MobileWelderTests {
         var arm = mission.toolArm(session.robotTools[0]);
         var armJoints = arm.jointIndices();
         var registrationStart:Null<Array<Float>> = null;
-        var stowClearance:Null<robotkit.manipulation.ArmClearance> = null;
+        var stowClearance:Null<robotkit.collision.CollisionClearance> = null;
         while (!mission.finished && simulation.activeSession().simulationTime() < limit) {
           simulation.step(); tick++;
           if (mission.stepIndex != reportedStep) {
@@ -348,7 +348,7 @@ class MobileWelderTests {
                   materia.project.SceneArtifact.SceneArtifactWeld).metal]);
             }
             if (tick % 5 == 0) {
-              var clear:robotkit.manipulation.ArmClearance = cast stowClearance;
+              var clear:robotkit.collision.CollisionClearance = cast stowClearance;
               var positions = mission.robot.robot.snapshot().positions;
               var q = [for (joint in mission.clearanceJoints) positions.get(joint)];
               var hit = clear.violation(q);
@@ -441,7 +441,7 @@ class MobileWelderTests {
           materia.project.SceneArtifact.SceneArtifactMission).steps[0].weld;
         var frame = mission.assemblyParts.get("project:" + step.frame);
         var host = mission.assemblyParts.get("project:" + step.metal);
-        if (frame.vertices.length < 12 || host.id != "project:work/weldMetal") throw "External weld lost CAD physical geometry";
+        if (frame.pieces.length == 0 || host.id != "project:work/weldMetal") throw "External weld lost CAD physical geometry";
         var before = frame.pose();
         var designed = new cadkit.modeling.AssemblyState(cast generated.assemblyDefinition, generated.assemblyState).worldPose(cast step.frame);
         for (axis in 0...3) if (Math.abs(before.position[axis] - [designed.x, designed.y, designed.z][axis] * 0.001) > 1e-6)

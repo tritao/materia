@@ -192,3 +192,13 @@ builder exposes `constrainedSketch()`. See
 `examples/modeling/ConstrainedMountingPlate.hx` for one centered, filleted plate
 whose width, height, edge clearance, hole radius, and thickness survive
 recompute, undo/redo, and JSON reload.
+
+
+`CompiledAssembly` publishes flattened assembly topology and an `AssemblyKinematics`
+model for reuse by `AssemblyState.fromModel`. Its definition, nested records, arrays
+and compiled kinematics are read-only after publication. `snapshot(definition)`
+protects caller-owned editable data; `takeOwnership(definition)` transfers exclusive
+ownership and avoids copying already-flat data. New authored topology requires a new
+compiled assembly. States share that topology while owning joint coordinates, root
+pose overrides and evaluation buffers independently. `new AssemblyState(definition)`
+continues to snapshot editable input for compatibility.

@@ -27,14 +27,20 @@ class DualArmGripperTool implements ArmTool {
 	public final spec:ParallelGripperSpec;
 	/** Half-spacing of opposing stations on the adapter's tool bolt circle. */
 	public final mountOffsetMm:Float;
+	/** Actual thickness of the flange adapter plate, including the assumed wrist stand-off. */
+	public final adapterThicknessMm:Float;
 	/** Conservative projected envelopes including the cylinder and routed air lines, in mm. */
 	public final envelopeWidthMm:Float;
 	public final envelopeDepthMm:Float;
 
 	public function new(size:Int = 32, expectedPartWidth:Float = 60, fingerLength:Float = 60,
-			openingTravel:Float = 16, supportStep:Bool = false, ?fingerDepth:Float, ?fingerWidth:Float) {
+			openingTravel:Float = 16, supportStep:Bool = false, ?fingerDepth:Float, ?fingerWidth:Float,
+			?adapterThicknessMm:Float) {
 		spec = new ParallelGripperSpec(size, expectedPartWidth, fingerLength, openingTravel,
 			supportStep, fingerDepth, fingerWidth);
+		this.adapterThicknessMm = adapterThicknessMm == null ? 12.0 : adapterThicknessMm;
+		if (!Math.isFinite(this.adapterThicknessMm) || this.adapterThicknessMm <= 0)
+			throw "Dual gripper adapter thickness must be finite and positive";
 		var valve = new SolenoidValve(true, false);
 		var inwardReach = Math.max(spec.openJawCentre() + spec.jawWidth / 2,
 			Math.max(spec.bodyWidth / 2, spec.valveSeatX() + valve.bodyWidth / 2));
@@ -65,7 +71,7 @@ class DualArmGripperTool implements ArmTool {
 	public function build(flange:RobotFlange):EndEffector {
 		var result = new EndEffector();
 		// The opposing tool-bolt holes are also the two gripper mount stations.
-		var plate = new EndEffectorPlate(flange, 12, 2 * mountOffsetMm, 4);
+		var plate = new EndEffectorPlate(flange, adapterThicknessMm, 2 * mountOffsetMm, 4);
 		result.addComponent("plate", plate);
 		var seatA = plate.connector("toolBolt3").frame;
 		var seatB = AssemblyFrames.compose(plate.connector("toolBolt1").frame,

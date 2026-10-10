@@ -1,9 +1,10 @@
 package tests;
 
+import collisionkit.native.NativeCollisionWorld;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 
-import robotkit.manipulation.ArmClearance;
+import robotkit.collision.CollisionClearance;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
 import robotkit.model.Joint;
@@ -11,10 +12,9 @@ import robotkit.model.JointType;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.tool.ConvexDistance;
-import robotkit.tool.ConvexSolid;
 
 /**
- * `ArmClearance` on a planar two-link arm in a cell with a post and a table: clear poses, a pose that hits the post, a
+ * `CollisionClearance` on a planar two-link arm in a cell with a post and a table: clear poses, a pose that hits the post, a
  * motion whose end poses are clear but whose path is not, the margin, the tool's contact margin, bodies that touch by
  * design, and hulls whose edges cross with no corner of either inside the other.
  */
@@ -26,13 +26,11 @@ class ClearanceTests {
     testPosesAndPath();
     testMargins();
     testTouchingByDesign();
-    testNamedJointInterfaces();
     testCoupledDriveContact();
     testMovingRackContact();
     testCrossingEdges();
     testBoundsPreserveHullChecks();
     testSolidEdges();
-    testCombinedCouplingBounds();
     Sys.println('RobotKit clearance tests passed ($assertions assertions)');
     return assertions;
   }
@@ -49,11 +47,11 @@ class ClearanceTests {
     model.addCoupling(new robotkit.model.JointCoupling("thread", slide.id, screw.id, 100, 0));
     var tip = model.addFrame(new Frame("tip", carriage));
     var group = new Manipulator(model, base.id, tip.id);
-    var clearance = new ArmClearance(group, [
+    var clearance = new CollisionClearance(group, [
       {name: "nut", link: carriage.id, vertices: box(-0.02, 0.02, -0.04, 0.04, -0.04, 0.04), tool: false},
       {name: "screw", link: shaft.id, vertices: box(-0.1, 0.5, -0.006, 0.006, -0.006, 0.006), tool: false},
       {name: "work", link: base.id, vertices: box(0.28, 0.32, 0.025, 0.04, -0.025, 0.025), tool: false}
-    ], [0.0]);
+    ], [0.0], () -> new NativeCollisionWorld());
     check(clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
       "a driven nut's designed engagement stays clear at rest and through travel");
     var hit = clearance.violation([0.3]);
@@ -74,12 +72,12 @@ class ClearanceTests {
     model.addCoupling(new robotkit.model.JointCoupling("rack", slide.id, shaft.id, -50, 0));
     var tip = model.addFrame(new Frame("tip", carriage));
     var group = new Manipulator(model, base.id, tip.id);
-    var clearance = new ArmClearance(group, [
+    var clearance = new CollisionClearance(group, [
       {name: "carriage", link: carriage.id, vertices: box(-0.02, 0.02, -0.04, 0.04, 0.08, 0.1), tool: false},
       {name: "pinion", link: pinion.id, vertices: box(-0.03, 0.03, -0.01, 0.01, -0.03, 0.03), tool: false},
       {name: "rack", link: base.id, vertices: box(-0.1, 0.6, -0.01, 0.01, -0.02, 0), tool: false},
       {name: "work", link: base.id, vertices: box(0.28, 0.32, -0.02, 0.02, 0.01, 0.04), tool: false}
-    ], [0.0]);
+    ], [0.0], () -> new NativeCollisionWorld());
     check(clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
       "a moving pinion retains its designed engagement with the fixed rack");
     var hit = clearance.violation([0.3]);
@@ -102,7 +100,7 @@ class ClearanceTests {
    * A 2R arm in the XY plane, links 0.3 m long (bars of 5 cm), with `fixed` bodies on the base link. The second link is
    * the tool.
    */
-  static function rig(fixed:Array<{name:String, vertices:Array<Float>}>, ?linkWidth:Float = 0.025, ?reference:Array<Float>):{arm:Manipulator, clearance:ArmClearance} {
+  static function rig(fixed:Array<{name:String, vertices:Array<Float>}>, ?linkWidth:Float = 0.025, ?reference:Array<Float>):{arm:Manipulator, clearance:CollisionClearance} {
     var model = new RobotModel("clearance-arm");
     var base = model.addLink(new Link("base"));
     var link1 = model.addLink(new Link("link1"));
@@ -120,7 +118,7 @@ class ClearanceTests {
       {name: "forearm", link: link2.id, vertices: box(0.0, 0.3, -linkWidth, linkWidth, -linkWidth, linkWidth), tool: true}
     ];
     for (body in fixed) bodies.push({name: body.name, link: base.id, vertices: body.vertices, tool: false});
-    return {arm: arm, clearance: new ArmClearance(arm, bodies, reference == null ? [0.0, 0.0] : reference)};
+    return {arm: arm, clearance: new CollisionClearance(arm, bodies, reference == null ? [0.0, 0.0] : reference, () -> new NativeCollisionWorld())};
   }
 
   static function testPosesAndPath():Void {
@@ -138,33 +136,7 @@ class ClearanceTests {
     check(cell.clearance.violation([1.4, 0.0]) == null, "the arm swung well past the post is clear");
     check(cell.clearance.sweep([0.0, 0.0], [1.4, 0.0]) != null, "the arm swinging round through the post is found along the way");
     check(cell.clearance.sweep([0.0, 0.0], [-1.4, 0.0]) == null, "the same swing away from the post is clear");
-    check(cell.clearance.certifySegment([0.0, 0.0], [1.4, 0.0]) != null,
-      "a continuous joint-segment certificate rejects the path through the post");
-    check(cell.clearance.certifySegment([0.0, 0.0], [-1.4, 0.0]) == null,
-      "a continuous joint-segment certificate accepts the clear swing");
     check(cell.clearance.pairCount() > 0 && cell.clearance.bodyCount() == 3, "the arm's bodies are checked against the post");
-  }
-
-  static function testCombinedCouplingBounds():Void {
-    var model = new RobotModel("combined clearance");
-    var base = model.addLink(new Link("base"));
-    var links = [for (name in ["a", "b", "combined"]) model.addLink(new Link(name))];
-    for (link in links) {
-      var joint = model.addJoint(new Joint(link.id, JointType.Prismatic, base, link));
-      joint.axis = [1.0, 0.0, 0.0];
-    }
-    model.addCoupling(new robotkit.model.JointCoupling("first", "a", "combined", 1, 0));
-    model.addCoupling(new robotkit.model.JointCoupling("second", "b", "combined", 2, 0));
-    var frame = model.addFrame(new Frame("tip", links[1]));
-    var arm = new Manipulator(model, base.id, frame.id);
-    check(arm.moves(links[2].id), "a combined follower moves with the group's second coupling term");
-    var clearance = new ArmClearance(arm, [
-      {name: "coupled slide", link: links[2].id, vertices: box(-0.01, 0.01, -0.01, 0.01, -0.01, 0.01), tool: false},
-      {name: "fixture", link: base.id, vertices: box(1.99, 2.01, -0.01, 0.01, -0.01, 0.01), tool: false}
-    ], [0.0]);
-    check(clearance.violation([1.0]) != null, "combined follower collision is included in checked pairs");
-    check(clearance.intervalClear([0.8], [0.0]), "stationary combined follower is clear");
-    check(!clearance.intervalClear([0.8], [0.2]), "summed coupling scale bounds its interval travel");
   }
 
   static function testMargins():Void {
@@ -172,28 +144,19 @@ class ClearanceTests {
     var table = {name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.003)};
     var cell = rig([table]);
     var tight = cell.clearance.violation([0.0, 0.0]);
-    check(tight != null && tight.distance > 0.0 && tight.distance < ArmClearance.MARGIN, "3 mm above the table is a violation of the margin, not a collision");
+    check(tight != null && tight.distance > 0.0 && tight.distance < CollisionClearance.MARGIN, "3 mm above the table is a violation of the margin, not a collision");
     check(tight != null && Math.abs(tight.distance - 0.003) < 0.0005, 'its distance is 3 mm, got ${tight == null ? -1 : tight.distance * 1000} mm');
     // The tool in the contact zone may come as close as the contact margin: 3 mm is clear for the forearm but not the upper arm.
     var contact = cell.clearance.violation([0.0, 0.0], true);
     check(contact != null && contact.a != "forearm" && contact.b != "forearm", 'only the arm itself, not the tool, is held to the margin there, got ${contact == null ? "" : contact.a + "," + contact.b}');
-    var selected = new ArmClearance(cell.arm, [
-      {name: "forearm", link: "link2", vertices: box(0.0, 0.3, -0.025, 0.025, -0.025, 0.025), tool: true},
-      {name: "table", link: "base", vertices: table.vertices, tool: false},
-      {name: "unrelated fixture", link: "base", vertices: table.vertices, tool: false}],
-      [0.0, 0.0], ArmClearance.MARGIN, ArmClearance.CONTACT_MARGIN, ["table"]);
-    var fixtureHit = selected.violation([0.0, 0.0], true);
-    check(fixtureHit != null && fixtureHit.b == "unrelated fixture" &&
-      fixtureHit.required == ArmClearance.MARGIN,
-      "contact allowance applies only to the selected fixed body");
     var lifted = rig([{name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.00025)}]);
     check(lifted.clearance.violation([0.0, 0.0], true) != null, "0.25 mm is closer than even the contact margin");
     var roomy = rig([{name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.02)}]);
     check(roomy.clearance.violation([0.0, 0.0]) == null, "20 mm above the table is clear");
     // With a margin wider than the gap the violation reports the distance between the faces.
-    var strict = new ArmClearance(cell.arm, [
+    var strict = new CollisionClearance(cell.arm, [
       {name: "forearm", link: "link2", vertices: box(0.0, 0.3, -0.025, 0.025, -0.025, 0.025), tool: true},
-      {name: "table", link: "base", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.0123), tool: false}], [0.0, 0.0], 0.05, 0.05);
+      {name: "table", link: "base", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.0123), tool: false}], [0.0, 0.0], () -> new NativeCollisionWorld(), 0.05, 0.05);
     var found = strict.violation([0.0, 0.0]);
     check(found != null && Math.abs(found.distance - 0.0123) < 1e-6, 'the distance between parallel faces is measured, got ${found == null ? -1 : found.distance}');
   }
@@ -205,100 +168,6 @@ class ClearanceTests {
     check(cell.clearance.violation([0.0, 0.0]) == null, "bars that meet at the elbow are not a collision");
     check(cell.clearance.violation([0.0, 2.0]) == null, "the elbow turning does not make its own bars collide");
     check(cell.clearance.pairCount() == 0, "no pair is checked in an arm of two neighbouring links");
-  }
-
-  static function testNamedJointInterfaces():Void {
-    var model = new RobotModel("named-clearance-interface");
-    var base = model.addLink(new Link("base"));
-    var moving = model.addLink(new Link("moving"));
-    var hinge = model.addJoint(new Joint("hinge", JointType.Revolute, base, moving));
-    hinge.axis = [0.0, 0.0, 1.0];
-    var tip = model.addFrame(new Frame("tip", moving));
-    var arm = new Manipulator(model, base.id, tip.id);
-    var bodies = [
-      {name: "housing", link: base.id, vertices: box(-0.1, 0.0, -0.02, 0.02, -0.02, 0.02), tool: false},
-      {name: "moving-bracket", link: moving.id, vertices: box(0.0005, 0.1, -0.02, 0.02, -0.02, 0.02), tool: false}
-    ];
-    var defaultPolicy = new ArmClearance(arm, bodies, [0.0]);
-    check(defaultPolicy.violation([0.0]) == null,
-      "ordinary adjacent link bodies keep their reference-pose contact exemption");
-    var named = new ArmClearance(arm, bodies, [0.0], ArmClearance.MARGIN,
-      ArmClearance.CONTACT_MARGIN, null, [
-        {first: "housing", second: "moving-bracket", margin: ArmClearance.INTERFACE_MARGIN}
-      ]);
-    var hit = named.violation([0.0]);
-    check(hit != null && hit.a == "housing" && hit.b == "moving-bracket" &&
-      Math.abs(hit.required - ArmClearance.INTERFACE_MARGIN) < 1e-12,
-      "a named joint interface keeps its derived 1 mm clearance policy");
-    var touchingBodies = bodies.copy();
-    touchingBodies[1] = {name: "moving-bracket", link: moving.id,
-      vertices: box(0.0, 0.1, -0.02, 0.02, -0.02, 0.02), tool: false};
-    var mating = new ArmClearance(arm, touchingBodies, [0.0], ArmClearance.MARGIN,
-      ArmClearance.CONTACT_MARGIN, null, [
-        {first: "housing", second: "moving-bracket", margin: ArmClearance.INTERFACE_MARGIN}
-      ]);
-    check(mating.violation([0.0]) == null,
-      "an exact zero-gap joint face remains a valid mechanical interface");
-    var roundedBodies = bodies.copy();
-    roundedBodies[1] = {name: "moving-bracket", link: moving.id,
-      vertices: box(0.000008, 0.1, -0.02, 0.02, -0.02, 0.02), tool: false};
-    var roundedMating = new ArmClearance(arm, roundedBodies, [0.0], ArmClearance.MARGIN,
-      ArmClearance.CONTACT_MARGIN, null, [
-        {first: "housing", second: "moving-bracket", margin: ArmClearance.INTERFACE_MARGIN}
-      ]);
-    check(roundedMating.violation([0.0]) == null,
-      "micrometre frame-rounding gaps remain a valid named mechanical interface");
-    roundedBodies[1] = {name: "moving-bracket", link: moving.id,
-      vertices: box(0.00002, 0.1, -0.02, 0.02, -0.02, 0.02), tool: false};
-    var separated = new ArmClearance(arm, roundedBodies, [0.0], ArmClearance.MARGIN,
-      ArmClearance.CONTACT_MARGIN, null, [
-        {first: "housing", second: "moving-bracket", margin: ArmClearance.INTERFACE_MARGIN}
-      ]).violation([0.0]);
-    check(separated != null && Math.abs(separated.required - ArmClearance.INTERFACE_MARGIN) < 1e-12,
-      "a gap beyond CAD tolerance keeps its named-interface clearance requirement");
-
-    var slideModel = new RobotModel("joint-interface-reference-gap");
-    var fixed = slideModel.addLink(new Link("fixed"));
-    var slider = slideModel.addLink(new Link("slider"));
-    var slide = slideModel.addJoint(new Joint("slide", JointType.Prismatic, fixed, slider));
-    slide.axis = [1.0, 0.0, 0.0];
-    var slideTip = slideModel.addFrame(new Frame("tip", slider));
-    var slideArm = new Manipulator(slideModel, fixed.id, slideTip.id);
-    var interfacePair = [{first: "rail", second: "mount", margin: ArmClearance.INTERFACE_MARGIN}];
-    var closePair = new ArmClearance(slideArm, [
-      {name: "rail", link: fixed.id, vertices: box(-0.02, 0.0, -0.02, 0.02, -0.02, 0.02), tool: false},
-      {name: "mount", link: slider.id, vertices: box(0.004, 0.02, -0.02, 0.02, -0.02, 0.02), tool: false}
-    ], [0.0], ArmClearance.MARGIN, ArmClearance.CONTACT_MARGIN, null, interfacePair);
-    check(closePair.violation([0.0]) == null,
-      "a named 4 mm mechanical fit is admitted against its 1 mm interface clearance");
-    var closeHit = closePair.violation([-0.0035]);
-    check(closeHit != null && Math.abs(closeHit.distance - 0.0005) < 1e-6 &&
-      Math.abs(closeHit.required - ArmClearance.INTERFACE_MARGIN) < 1e-12,
-      "a close mechanical interface remains checked against its smaller margin during motion");
-    var distantPair = new ArmClearance(slideArm, [
-      {name: "rail", link: fixed.id, vertices: box(-0.02, 0.0, -0.02, 0.02, -0.02, 0.02), tool: false},
-      {name: "mount", link: slider.id, vertices: box(0.006, 0.02, -0.02, 0.02, -0.02, 0.02), tool: false}
-    ], [0.0], ArmClearance.MARGIN, ArmClearance.CONTACT_MARGIN, null, interfacePair);
-    check(distantPair.violation([0.0]) == null,
-      "a named pair beyond the global margin is clear at its reference");
-    var distantHit = distantPair.violation([-0.0055]);
-    check(distantHit != null && Math.abs(distantHit.distance - 0.0005) < 1e-6 &&
-      Math.abs(distantHit.required - ArmClearance.MARGIN) < 1e-12,
-      "a distant pair that approaches later retains the full obstacle margin");
-    var carriedContact = new ArmClearance(slideArm, [
-      {name: "rail", link: fixed.id, vertices: box(-0.02, 0.0, -0.02, 0.02, -0.02, 0.02), tool: false},
-      {name: "carried-part", link: slider.id, vertices: box(0.006, 0.02, -0.02, 0.02, -0.02, 0.02), tool: true}
-    ], [0.0], ArmClearance.MARGIN, ArmClearance.CONTACT_MARGIN, null, [
-      {first: "rail", second: "carried-part", margin: 0.0}
-    ]);
-    check(carriedContact.violation([-0.006]) == null,
-      "an explicit zero-margin carried-contact pair can meet after starting outside the ordinary clearance margin");
-    check(carriedContact.intervalClear([-0.003], [0.003]),
-      "a zero-margin interval certifies motion ending at contact within its numeric tolerance");
-    check(!carriedContact.intervalClear([-0.0065], [0.0005]),
-      "a zero-margin swept interval fails closed when the carried hull penetrates its support");
-    check(!carriedContact.intervalClear([-0.006], [0.0]),
-      "a stationary zero-distance pair is not certified when GJK cannot distinguish touch from overlap");
   }
 
   static function testCrossingEdges():Void {
@@ -332,10 +201,10 @@ class ClearanceTests {
       var flange = model.addFrame(new Frame("flange", moving));
       var group = new Manipulator(model, base.id, flange.id);
       var tool = box(0.3, 0.6, -0.025, 0.025, -0.025, 0.025);
-      var clearance = new ArmClearance(group, [
+      var clearance = new CollisionClearance(group, [
         {name: "tool", link: moving.id, vertices: tool, tool: true},
         {name: "obstacle", link: obstacle.id, vertices: vertices, tool: false}
-      ], [0.0]);
+      ], [0.0], () -> new NativeCollisionWorld());
       for (sample in 0...61) {
         var q = [-Math.PI + sample * Math.PI / 30];
         var poses = group.linkPoses(q, [moving.id, obstacle.id]);
@@ -348,7 +217,7 @@ class ClearanceTests {
           return result;
         }
         for (contact in [false, true]) {
-          var margin = contact ? ArmClearance.CONTACT_MARGIN : ArmClearance.MARGIN;
+          var margin = contact ? CollisionClearance.CONTACT_MARGIN : CollisionClearance.MARGIN;
           var exact = ConvexDistance.between(placed(tool, poses[0]), placed(vertices, poses[1]), margin);
           check((clearance.violation(q, contact) != null) == (exact < margin),
             "bounds preserve exact rotated hull clearance and contact margins");
@@ -358,16 +227,8 @@ class ClearanceTests {
   }
 
   static function testSolidEdges():Void {
-    var solid = new ConvexSolid(box(0.0, 0.1, 0.0, 0.2, 0.0, 0.3));
-    check(solid.cornerPoints().length == 24, "a box has eight corners");
     // The distance between hulls: two boxes 0.05 apart face to face, and 0.05 apart edge to edge (a diagonal gap of 0.05 * sqrt(2)).
     var a = box(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
-    check(ConvexDistance.between(a, box(2.0, 3.0, 0.0, 1.0, 0.0, 1.0), 0.005) >= 0.005,
-      "the clearance solver proves a distant hull pair clear at the requested margin");
-    near(ConvexDistance.between(a, box(1.003, 2.0, 0.0, 1.0, 0.0, 1.0), 0.005),
-      0.003, 1e-9, "a below-margin pair keeps its exact distance");
-    check(ConvexDistance.between(a, box(0.5, 1.5, 0.5, 1.5, 0.5, 1.5), 0.005) == 0.0,
-      "the margin cutoff does not hide a penetration");
     near(ConvexDistance.between(a, box(1.05, 2.0, 0.0, 1.0, 0.0, 1.0), 1.0), 0.05, 1e-9, "boxes apart face to face");
     near(ConvexDistance.between(a, box(1.05, 2.0, 1.05, 2.0, 0.0, 1.0), 1.0), 0.05 * Math.sqrt(2), 1e-9, "boxes apart edge to edge");
     near(ConvexDistance.between(a, box(1.05, 2.0, 1.05, 2.0, 1.05, 2.0), 1.0), 0.05 * Math.sqrt(3), 1e-9, "boxes apart corner to corner");

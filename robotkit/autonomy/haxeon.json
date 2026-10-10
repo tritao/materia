@@ -22,6 +22,9 @@
     },
     "visionkit": {
       "path": "../../visionkit"
+    },
+    "collisionkit": {
+      "path": "../../collisionkit"
     }
   },
   "target": "host"

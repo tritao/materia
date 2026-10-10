@@ -971,6 +971,16 @@ class ProgramTests extends MotionKitTestSupport {
       pathSimulationHarness.step(Int64.ofInt(pathTick++));
     }
     pathMotion.abort();
+    var independent = new ProgramPlanner(compiler, new MotionProgram([
+      MotionOp.MoveJ(MoveTarget.JointTarget(destination), new MotionOptions(), Blend.ExactStop),
+      MotionOp.MoveJ(MoveTarget.JointTarget(origin), new MotionOptions(), Blend.ExactStop)
+    ]), origin, Int64.ofInt(900), 0, 1.0, 1e-6);
+    independent.waitForMore();
+    check(pathMotion.shutdownPlanning() == 0,
+      "scoped shutdown joins the motion's already-aborted planning workers");
+    check(!independent.isStopped(), "scoped shutdown leaves another motion's planner running");
+    independent.dispose();
+    check(ProgramPlanner.shutdown() == 0, "the independent worker is drained before fixture teardown");
     pathSimulationHarness.step(Int64.ofInt(pathTick++));
     check(Lambda.exists(pathMotion.firedEvents(), function(event) return switch event.value {
       case ProcessEventValue.Digital(enabled): !enabled;

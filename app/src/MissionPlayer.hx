@@ -1,5 +1,16 @@
 package app;
 
+import collisionkit.native.NativeCollisionWorld;
+import collisionkit.CollisionDescription;
+import collisionkit.CollisionGeometry;
+import collisionkit.CollisionMargins;
+import robotkit.collision.RobotCollision;
+import robotkit.collision.RobotCollision.RobotCollisionOptions;
+import motionkit.robot.CollisionPlannerSpace;
+import motionkit.robot.ManipulatorPlannerSpace;
+import motionkit.planner.MotionPlanner;
+import motionkit.planner.PlannerSpace;
+import motionkit.planner.RrtConnect;
 import app.SimulatedTools.GripObject;
 import cadkit.modeling.AssemblyState;
 import haxe.Int64;
@@ -16,6 +27,7 @@ import materia.project.SceneArtifact.SceneArtifactMissionWaypoint;
 import materia.project.SceneArtifact.SceneArtifactWeld;
 import materia.project.SceneContactRegistration.SceneContactWork;
 import motionkit.robot.HandlingPlanRunner;
+import motionkit.kinematics.IkTolerance;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.ProgramCompiler;
@@ -42,9 +54,8 @@ import processkit.skill.WeldPlan;
 import processkit.skill.WeldSeam;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
-import robotkit.manipulation.ArmClearance;
-import motionkit.robot.ArmPlanClearance;
-import robotkit.manipulation.ArmClearance.ClearanceViolation;
+import robotkit.collision.CollisionClearance;
+import robotkit.manipulation.ClearanceViolation;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.Grasp;
 import robotkit.manipulation.Grasp.GraspFrame;
@@ -221,7 +232,20 @@ private typedef JointMotionContext = {
   var indices:Array<Int>;
 }
 
+private typedef CachedJointMotion = {
+  var motion:ManipulatorMotion;
+  var space:Null<ManipulatorPlannerSpace>;
+}
+
 private typedef HandlingToolKinematics = {var link:Int; var tip:AssemblyFrame;}
+
+typedef MissionProgress = {
+  var phase:String;
+  var stepIndex:Int;
+  var completedInLoop:Int;
+  var loop:Int;
+  var failure:Null<String>;
+}
 
 /**
  * The project's mission, run by its assembly robot when the simulation runs: each step becomes a
@@ -297,7 +321,7 @@ class MissionPlayer implements SessionMember {
   var homingSlip:Null<StepperSlip> = null;
   final cellRobots:Array<AssemblyRobot>;
   var runner = new SkillRunner();
-  var jointMotions = new Map<String, ManipulatorMotion>();
+  var jointMotions = new Map<String, CachedJointMotion>();
   /** Handling tool definitions, planning contexts and physical contacts, keyed by their logical channel. */
   final handlingTools:Map<String, SceneArtifactRobotTool> = new Map();
   final gripperTools:Map<String, SceneArtifactRobotTool> = new Map();
@@ -311,7 +335,7 @@ class MissionPlayer implements SessionMember {
   final newRegistration:Null<SceneContactWork->processkit.ContactRegistrationRunner>;
   var registeredWork = new Map<String, Transform3>();
   /** What welds are planned clear of, and where the arm's joints are among the robot's. */
-  var clearance:Null<ArmClearance> = null;
+  var clearance:Null<CollisionClearance> = null;
   var clearanceJoints:Array<Int> = [];
   /** Runtime weld metal in world coordinates, read before each pass is planned. */
   public var depositedWeldHulls:Void -> Array<{name:String, vertices:Array<Float>}> = () -> [];
@@ -362,6 +386,7 @@ class MissionPlayer implements SessionMember {
     this.mission = mission;
     this.robot = robot;
     this.cellRobots = cellRobots.copy();
+    if (this.cellRobots.indexOf(robot) < 0) this.cellRobots.push(robot);
     this.timestep = timestep;
     this.cellInput = cellInput;
     this.cellOutput = cellOutput;
@@ -372,7 +397,7 @@ class MissionPlayer implements SessionMember {
     this.objects = objects;
     this.robotIndex = robotIndex;
     this.project = project;
-    assemblyParts = new SimulationAssemblyParts(simulation, robot, objects, project);
+    assemblyParts = new SimulationAssemblyParts(simulation, this.cellRobots, objects, project);
     var physical = project.projectPhysical;
     metres = physical == null ? 1.0 : physical.metresPerUnit;
     var definition = project.projectAssemblyDefinition;
@@ -452,7 +477,8 @@ class MissionPlayer implements SessionMember {
             selectedTool.channel,
             PlanningLimits.ofGroup(selectedArm, new SteadyLoads(), ARM_ACCELERATION, null,
               state.modelRevision, state.calibrationRevision),
-            HandlingPlanRunner.DEFAULT_APPROACH_HEIGHT, 0.3, 0.08, 0.4, isGripper ? 0.0 : 0.003);
+            HandlingPlanRunner.DEFAULT_APPROACH_HEIGHT, 0.3, 0.08, 0.4, isGripper ? 0.0 : 0.003, isGripper,
+            isGripper ? new IkTolerance(0.0001, 0.0001, 300, 0.03) : null);
         };
         handlingTools.set(selectedTool.channel, selectedTool);
         if (isGripper) gripperTools.set(selectedTool.channel, selectedTool);
@@ -528,19 +554,17 @@ class MissionPlayer implements SessionMember {
    * and 0.5 mm between tool and work at the seam; the arm's installed gearheads have 4.5 mm designed clearance to the next tube. `ignored` are occurrences that
    * are no obstacle (the weld metal).
    */
-  function weldClearance(arm:Manipulator, torch:String, ignored:Array<String>):ArmClearance
-    return cellClearance(arm, torch.substr(0, torch.lastIndexOf("/") + 1), ignored, processkit.WeldPathPlanner.AIR_MARGIN);
-
-  function weldCollisionBodies(arm:Manipulator, torch:String, ignored:Array<String>):Array<robotkit.manipulation.ArmClearance.ClearanceBodyData>
-    return cellCollisionBodies(arm, torch.substr(0, torch.lastIndexOf("/") + 1), ignored);
-
-  /** Fixed cell geometry and other controllers' bodies at the start of planning. */
-  function cellClearance(arm:Manipulator, toolPrefix:Null<String>, ignored:Array<String>, margin:Float,
-      ?interfaces:Array<robotkit.manipulation.ArmClearance.ClearanceInterfaceData>):ArmClearance {
-    return armClearanceAtMargin(arm, cellCollisionBodies(arm, toolPrefix, ignored), margin, interfaces);
+  function weldClearance(arm:Manipulator, torch:String, ignored:Array<String>):CollisionClearance {
+    return armClearance(arm, weldCollisionBodies(arm, torch, ignored));
   }
 
-  function cellCollisionBodies(arm:Manipulator, toolPrefix:Null<String>, ignored:Array<String>):Array<robotkit.manipulation.ArmClearance.ClearanceBodyData> {
+  function weldCollisionBodies(arm:Manipulator, torch:String, ignored:Array<String>):Array<robotkit.manipulation.ClearanceBodyData> {
+    var toolPrefix = torch.substr(0, torch.lastIndexOf("/") + 1);
+    return cellCollisionBodies(arm, toolPrefix, ignored);
+  }
+
+  /** The simulation's articulated hulls plus its current cell geometry, all in this robot's root frame. */
+  function cellCollisionBodies(arm:Manipulator, toolPrefix:Null<String>, ignored:Array<String>):Array<robotkit.manipulation.ClearanceBodyData> {
     var links = robot.model.links;
     var bodies = [for (hull in robot.hulls) if (ignored.indexOf(hull.part) < 0)
       {name: hull.part, link: links[hull.link].id, vertices: hull.vertices, tool: toolPrefix != null && StringTools.startsWith(hull.part, toolPrefix)}];
@@ -554,7 +578,7 @@ class MissionPlayer implements SessionMember {
       new Quat(base.rotation[0], base.rotation[1], base.rotation[2], base.rotation[3])).inverse();
     for (entry in objects) if (StringTools.startsWith(entry.id, "project:") && ignored.indexOf(entry.id.substr(8)) < 0) {
       var part = assemblyParts.get(entry.id);
-      if (part.vertices.length == 0) continue;
+      if (part.pieces.length == 0) continue;
       var live = part.pose();
       // Free CAD objects do not have a physical parent link. During planning,
       // a confirmed grasp supplies that rigid relationship so the payload hull
@@ -573,13 +597,16 @@ class MissionPlayer implements SessionMember {
       }
       var pose = inverse.compose(new Transform3(new Vec3(live.position[0], live.position[1], live.position[2]),
         new Quat(live.rotation[0], live.rotation[1], live.rotation[2], live.rotation[3])));
-      var vertices:Array<Float> = [];
-      for (index in 0...Std.int(part.vertices.length / 3)) {
-        var point = pose.transformPoint(new Vec3(part.vertices[index * 3], part.vertices[index * 3 + 1], part.vertices[index * 3 + 2]));
-        vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
+      for (index in 0...part.pieces.length) {
+        var piece = part.pieces[index], vertices:Array<Float> = [];
+        for (vertex in 0...Std.int(piece.length / 3)) {
+          var point = pose.transformPoint(new Vec3(piece[vertex * 3], piece[vertex * 3 + 1], piece[vertex * 3 + 2]));
+          vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
+        }
+        var name = entry.id.substr(8);
+        bodies.push({name: part.pieces.length == 1 ? name : '$name#$index',
+          link: links[attached >= 0 ? attached : 0].id, vertices: vertices, tool: attached >= 0});
       }
-      bodies.push({name: entry.id.substr(8), link: links[attached >= 0 ? attached : 0].id,
-        vertices: vertices, tool: attached >= 0});
     }
     var included = new Map<String, Bool>();
     for (body in bodies) included.set(body.name, true);
@@ -635,18 +662,12 @@ class MissionPlayer implements SessionMember {
     return bodies;
   }
 
-  function armClearance(arm:Manipulator, bodies:Array<robotkit.manipulation.ArmClearance.ClearanceBodyData>):ArmClearance {
-    return armClearanceAtMargin(arm, bodies, processkit.WeldPathPlanner.AIR_MARGIN);
-  }
-
-  function armClearanceAtMargin(arm:Manipulator,
-      bodies:Array<robotkit.manipulation.ArmClearance.ClearanceBodyData>, margin:Float,
-      ?interfaces:Array<robotkit.manipulation.ArmClearance.ClearanceInterfaceData>):ArmClearance {
+  function armClearance(arm:Manipulator, bodies:Array<robotkit.manipulation.ClearanceBodyData>, ?reference:Array<Float>):CollisionClearance {
     var positions = robot.robot.snapshot().positions;
     var indices = [for (target in arm.toJointTargets([for (_ in 0...arm.dofCount()) 0.0])) target.joint];
     clearanceJoints = indices;
-    return new ArmClearance(arm, bodies, [for (index in indices) positions.get(index)], margin,
-      ArmClearance.CONTACT_MARGIN, null, interfaces);
+    var q = reference == null ? [for (index in indices) positions.get(index)] : reference;
+    return new CollisionClearance(arm, bodies, q, () -> new NativeCollisionWorld(), processkit.WeldPathPlanner.AIR_MARGIN);
   }
 
   /**
@@ -729,7 +750,15 @@ class MissionPlayer implements SessionMember {
       };
       return label + " · " + phase;
     }
-    return "Step " + (completed + 1) + " / " + mission.steps.length + " · " + mission.steps[stepIndex].kind;
+    return "Step " + (stepIndex + 1) + " / " + mission.steps.length + " · " + mission.steps[stepIndex].kind;
+  }
+
+  /** Structured presentation state; startup is separate from the first authored step. */
+  public function progress():MissionProgress {
+    var phase = failure != null ? "failed" : finished ? "complete" :
+      !homingComplete && homing != null ? "startup" : "executing";
+    return {phase:phase, stepIndex:stepIndex, completedInLoop:finished ? mission.steps.length : stepIndex,
+      loop:mission.loop == true ? Std.int(completed / mission.steps.length) + 1 : 1, failure:failure};
   }
 
   public function feed():Void {
@@ -841,13 +870,14 @@ class MissionPlayer implements SessionMember {
     runner.cancel();
     deenergizeMissionOutputs();
     if (homing != null && homing.isMoving()) homing.abort();
+    clearJointMotions();
   }
 
   /** Back to the first step; the next tick starts it from wherever the reset put the robot. */
   public function reset():Void {
     deenergizeMissionOutputs();
     runner = new SkillRunner();
-    jointMotions = new Map<String, ManipulatorMotion>();
+    clearJointMotions();
     registeredWork = new Map<String, Transform3>();
     stepIndex = 0;
     completed = 0;
@@ -927,7 +957,7 @@ class MissionPlayer implements SessionMember {
     var emergencyStopped = state.safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT ||
         state.safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP ||
         state.endpoint == RobotKitRuntimeConstants.RK_ENDPOINT_FAULT;
-    return MissionAlarmClassifier.classify(step, message, emergencyStopped, hasCarriedPart());
+    return MissionAlarmClassifier.classify(step, message, emergencyStopped);
   }
 
   function toolSensorActive(snapshot:RobotSnapshot, tool:SceneArtifactRobotTool):Bool {
@@ -938,11 +968,6 @@ class MissionPlayer implements SessionMember {
       var frame = snapshot.sensors.get(index);
       if (frame.sensorId == sensor) return frame.values.length > 0 && frame.values.get(0) >= threshold;
     }
-    return false;
-  }
-
-  function hasCarriedPart():Bool {
-    for (channel in carryingTools.keys()) if (carryingTools.get(channel) == true) return true;
     return false;
   }
 
@@ -988,6 +1013,9 @@ class MissionPlayer implements SessionMember {
       state.safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP ||
       state.endpoint == RobotKitRuntimeConstants.RK_ENDPOINT_FAULT;
     var safetyReady = !safetyStopped && state.safety == RobotKitRuntimeConstants.RK_SAFETY_READY;
+    if (safetyReady) for (channel in carryingTools.keys())
+      if (carryingTools.get(channel) == true && gripperTools.exists(channel))
+        robot.runtime.writeDigitalOutput(channel, true);
     if (recoveryOutputPending && safetyReady) {
       try writeMissionOutput(cnckit.controller.RobotInterfaceChannels.FAULT_RESET, true) catch (error:Dynamic) {
         recoveryPending = false;
@@ -1002,22 +1030,36 @@ class MissionPlayer implements SessionMember {
       return;
     }
     if (!activeAlarm && safetyReady && !recoveryPulsePending) {
-      failure = null;
-      alarmCode = null;
-      failedStepIndex = -1;
-      stepIndex = recoveryStep;
-      recoveryStep = -1;
-      recoveryPending = false;
-      recoveryOutputPending = false;
-      runner = new SkillRunner();
-      jointMotions = new Map<String, ManipulatorMotion>();
-      return;
+      // An operator may have reseated a dropped part. Keep its identity but
+      // derive the placement and payload frame from the confirmed live grasp.
+      var graspsConfirmed = true;
+      var observed = robot.robot.snapshot();
+      for (channel in carryingTools.keys()) if (carryingTools.get(channel) == true && gripperTools.exists(channel)) {
+        var tool = handlingTools.get(channel);
+        if (tool == null || !toolSensorActive(observed, tool)) graspsConfirmed = false;
+      }
+      if (graspsConfirmed) {
+        for (channel in carryingTools.keys())
+          if (carryingTools.get(channel) == true && gripperTools.exists(channel)) captureHeldGripperTransform(channel);
+        failure = null;
+        alarmCode = null;
+        failedStepIndex = -1;
+        stepIndex = recoveryStep;
+        recoveryStep = -1;
+        recoveryPending = false;
+        recoveryOutputPending = false;
+        runner = new SkillRunner();
+        clearJointMotions();
+        return;
+      }
     }
     if (recoveryElapsed >= 5.0) {
       recoveryPending = false;
       recoveryOutputPending = false;
       recoveryStep = -1;
-      failure = "Fault reset did not clear the machine alarm; remove the cause and retry";
+      failure = activeAlarm ? "Fault reset did not clear the machine alarm; remove the cause and retry"
+        : !safetyReady ? "The robot did not become ready for recovery; correct its safety state and retry"
+        : "A carried gripper has no confirmed grasp; reseat the part and retry";
       alarmCode = MissionAlarmCode.RecoveryTimeout;
     }
   }
@@ -1050,7 +1092,7 @@ class MissionPlayer implements SessionMember {
           if (make != null) handlingRunners.set(channel, make());
         }
       } else {
-        jointMotions = new Map<String, ManipulatorMotion>();
+        clearJointMotions();
       }
       completed++;
       if (stepIndex + 1 < mission.steps.length || mission.loop == true)
@@ -1063,6 +1105,18 @@ class MissionPlayer implements SessionMember {
       var code = alarmForFailure(mission.steps[stepIndex], message);
       failMission('step $stepIndex (${mission.steps[stepIndex].kind}): $message', code);
     case _:
+  }
+
+  /** Disposes the native collision worlds owned by cached joint-motion planners. */
+  function clearJointMotions():Void {
+    for (name in jointMotions.keys()) {
+      var cached = jointMotions.get(name);
+      if (cached == null) continue;
+      if (cached.motion.shutdownPlanning() != 0)
+        throw 'Joint-motion planner "$name" did not stop before collision-world teardown';
+      if (cached.space != null) cached.space.dispose();
+    }
+    jointMotions = new Map<String, CachedJointMotion>();
   }
 
   function configurationFor(step:SceneArtifactMissionStep):Null<motionkit.kinematics.SixAxisConfiguration> {
@@ -1109,6 +1163,9 @@ class MissionPlayer implements SessionMember {
         if (at == null) throw "Place needs a mission frame";
         var channel = handlingToolChannel(step), tool = handlingTools.get(channel);
         if (tool == null) throw 'Place selects unknown handling tool "$channel"';
+        // A contact grip can slip during transit. Placement uses the currently
+        // observed part-to-tool transform, frozen for this handling program.
+        if (gripperTools.exists(channel)) captureHeldGripperTransform(channel);
         var placeRunner = handlingRunner(step, channel);
         placeRunner.configuration = configurationFor(step);
         return withTimeout(step, HandlePart.place(placeRunner, localization,
@@ -1155,9 +1212,7 @@ class MissionPlayer implements SessionMember {
     var active = handlingRunners.get(channel);
     if (active == null) throw 'Handling tool "$channel" has no arm runner';
     var approachDistance = step.approachDistance;
-    return approachDistance == null ? active : new HandlingPlanRunner(active.motion, active.channel,
-      active.home, active.homePose, approachDistance, active.travelSpeed, active.contactSpeed,
-      active.dwell, active.pressDepth);
+    return approachDistance == null ? active : active.withApproachDistance(approachDistance);
   }
 
   /** Plans absolute mechanical coordinates on the chain ending at the named connector. */
@@ -1167,9 +1222,8 @@ class MissionPlayer implements SessionMember {
     var context = jointMotionContext(at);
     var q = startingJointPositions(context.motion, context.indices);
     setJointTargets(q, step.joints, context);
-    context.motion.compiler.planValidator = planValidator(context.arm);
     return new MotionProgramSkill(context.motion, new MotionProgram([
-      MotionOp.MoveJ(MoveTarget.JointTarget(q), new MotionOptions(), Blend.ExactStop)]));
+      MotionOp.MoveJ(MoveTarget.JointTarget(q), new MotionOptions(0, 0, 0, true), Blend.ExactStop)]));
   }
 
   /** A sequence of exact-stop Cartesian or joint points certified as timed arm motion. */
@@ -1180,22 +1234,12 @@ class MissionPlayer implements SessionMember {
     var context = jointMotionContext(at);
     var q = startingJointPositions(context.motion, context.indices);
     var ops:Array<MotionOp> = [];
-    var validator = planValidator(context.arm);
     for (waypointIndex in 0...waypoints.length) {
       var waypoint = waypoints[waypointIndex];
       if (waypoint.joints != null) {
         var goal = q.copy();
         setJointTargets(goal, waypoint.joints, context);
-        var compiler = context.motion.compiler;
-        var targets:Array<Array<Float>>;
-        try {
-          targets = validator.partitionJointSegment(q, goal, compiler.maxVelocity,
-            compiler.maxAcceleration, compiler.maxJerk);
-        } catch (error:Dynamic) {
-          throw 'Via waypoint $waypointIndex failed clearance planning: ${Std.string(error)}';
-        }
-        for (target in targets)
-          ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(target), new MotionOptions(), Blend.ExactStop));
+        ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(0, 0, 0, true), Blend.ExactStop));
         q = goal;
       } else {
         var pose = waypoint.pose;
@@ -1204,7 +1248,6 @@ class MissionPlayer implements SessionMember {
           new MotionOptions(), Blend.ExactStop));
       }
     }
-    context.motion.compiler.planValidator = validator;
     return new MotionProgramSkill(context.motion, new MotionProgram(ops));
   }
 
@@ -1215,7 +1258,8 @@ class MissionPlayer implements SessionMember {
     var arm = new Manipulator(robot.model, robot.model.links[0].id, frame.id);
     var count = arm.group.count();
     var indices = [for (target in arm.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
-    var motion = jointMotions.get(name);
+    var cached = jointMotions.get(name);
+    var motion = cached == null ? null : cached.motion;
     if (motion == null) {
       var limits = new ValidationLimits(count, Int64.ofInt(1), Int64.ofInt(0));
       var velocities:Array<Float> = [];
@@ -1232,14 +1276,30 @@ class MissionPlayer implements SessionMember {
         limits.acceleration(i, rates.acceleration);
         limits.jerk(i, rates.jerk);
       }
+      // moveVia compiles planned MoveJ operations. The CL7 collisionkit motion
+      // planner certifies each joint-space edge and the timed rest-to-rest
+      // trajectory follows those same edges; do not re-check it with the
+      // process-clearance world, whose adjacent-link policy is different.
       var compiler = new ProgramCompiler(new ManipulatorKinematics(arm, 1e-8), limits, FRAME,
         velocities, accelerations, jerks,
         StartTolerances.uniform(count, 0.005, 0.02, 0.2));
       motion = new ManipulatorMotion(robot.robot, compiler,
         channel -> cellInput == null ? null : cellInput(channel), () -> robot.runtime.pollEvents(), indices);
-      jointMotions.set(name, motion);
+      cached = {motion: motion, space: null};
+      jointMotions.set(name, cached);
     }
+    if (cached == null) throw "Joint-motion cache was not created";
+    if (motion.shutdownPlanning() != 0)
+      throw 'Joint-motion planner "$name" did not stop before replacing its collision world';
+    if (cached.space != null) cached.space.dispose();
+    cached.space = null;
     motion.reset();
+    var reference = startingJointPositions(motion, indices);
+    // The controller and its limits are reusable; the door, loose inventory
+    // and confirmed payload attachments belong to this move's live scene.
+    var planned = missionMotionPlanner(arm, reference, cellCollisionBodies(arm, null, []));
+    cached.space = planned.space;
+    motion.compiler.motionPlanner = planned.planner;
     return {motion: motion, arm: arm, indices: indices};
   }
 
@@ -1292,40 +1352,34 @@ class MissionPlayer implements SessionMember {
     }
   }
 
-  function planValidator(arm:Manipulator):ArmPlanClearance {
-    var interfaces:Array<robotkit.manipulation.ArmClearance.ClearanceInterfaceData> = [
-      for (pair in robot.jointInterfaces) {first: pair.first, second: pair.second, margin: ArmClearance.INTERFACE_MARGIN}
-    ];
-    for (channel in carryingTools.keys()) if (carryingTools.get(channel) == true) {
-      var held = heldParts.get(channel), tool = handlingTools.get(channel);
-      if (held == null || tool == null) continue;
-      var occurrence = held.occurrence;
-      // A blank leaves its four tray pads while the gripper carries it. Treat
-      // those designed support contacts like other mechanical interfaces: the
-      // hulls must not penetrate, but they need not retain the air-clearance
-      // margin while the blank is being lifted out of its seat.
-      var infeedPrefix = "infeed/blank-";
-      if (StringTools.startsWith(occurrence, infeedPrefix)) {
-        var slot = occurrence.substr(infeedPrefix.length).split("-");
-        if (slot.length == 2) {
-          var row = Std.parseInt(slot[0]), column = Std.parseInt(slot[1]);
-          if (row != null && column != null) for (sideX in [-1, 1]) for (sideY in [-1, 1])
-            interfaces.push({first: occurrence,
-              second: 'infeedTray/seat-r$row-c$column-x$sideX-y$sideY', margin: 0.0});
-        }
-      }
-      var toolPart = tool.contact.occurrence;
-      var prefix = toolPart.substr(0, toolPart.lastIndexOf("/") + 1);
-      var contacted = new Map<String, Bool>();
-      // A carried blank remains a collision body against the cell, but its designed
-      // contact with this gripper is a named interface rather than a self-collision.
-      for (hull in robot.hulls) if ((hull.part == toolPart || StringTools.startsWith(hull.part, prefix)) &&
-          !contacted.exists(hull.part)) {
-        contacted.set(hull.part, true);
-        interfaces.push({first: hull.part, second: occurrence, margin: 0.0});
-      }
+  function missionMotionPlanner(arm:Manipulator, reference:Array<Float>,
+      data:Array<robotkit.manipulation.ClearanceBodyData>):{planner:MotionPlanner, space:ManipulatorPlannerSpace} {
+    var description = new CollisionDescription();
+    var options = new RobotCollisionOptions("mission-arm");
+    options.reference = arm.stateOf(reference).q;
+    options.referenceName = "mission start";
+    var bodies = RobotCollision.describe(description, arm.robot, options);
+    var owned = new Map<String, Bool>();
+    for (hull in robot.hulls) owned.set(hull.part, true);
+    // Cell geometry is expressed in the base frame but is not part of the
+    // robot's articulation. Otherwise reference-overlap rules would permit an
+    // independent obstacle just because it intersects the initial arm pose.
+    var basePose = description.bodies[bodies.linkBody(robot.model.links[0].id)].pose;
+    var geometry:Array<robotkit.manipulation.ClearanceBodyData> = [];
+    for (body in data) {
+      if (owned.exists(body.name) || body.tool)
+        geometry.push({name: body.name, link: body.link, vertices: body.vertices, tool: false});
+      else
+        description.addFixed(body.name, basePose, CollisionGeometry.Convex(body.vertices), options.linkGroup, 0.0, "cell hull");
     }
-    return new ArmPlanClearance(cellClearance(arm, null, [], ArmClearance.MARGIN, interfaces));
+    RobotCollision.describeClearanceBodies(description, bodies, geometry);
+    var world = new NativeCollisionWorld();
+    var build = description.build(world);
+    var collisionSpace = new CollisionPlannerSpace(description, build, bodies.bodies,
+      CollisionMargins.uniform(CollisionClearance.MARGIN));
+    var space = new ManipulatorPlannerSpace(collisionSpace, arm, reference);
+    var planner = new RrtConnect(space, 17);
+    return {planner: planner, space: space};
   }
 
   function writeMissionOutput(name:String, value:Bool):Void {
@@ -1503,19 +1557,19 @@ class MissionPlayer implements SessionMember {
   function placeContact(at:SceneArtifactPlace, ?yaw:Float, channel:String):Vec3 {
     var held = heldParts.get(channel);
     if (held == null) throw "Nothing was picked to place";
-    var seat = AssemblyFrames.compose(staticPose(at.occurrence), connectorFrame(at));
+    var seat = liveConnectorFrame(at);
     if (gripperTools.exists(channel)) {
       var offset = heldToolOffsets.get(channel);
       if (offset == null) throw "The gripper has no measured tool-to-part transform";
       var rotation = placementRotation(at.occurrence, yaw);
       var shifted = rotation.rotate(offset);
-      return new Vec3(seat.x * metres + shifted.x, seat.y * metres + shifted.y, seat.z * metres + shifted.z);
+      return new Vec3(seat.x + shifted.x, seat.y + shifted.y, seat.z + shifted.z);
     }
     var origin = partFrame(held.occurrence);
     var tool = toolContact(channel);
     var offset = new Vec3(tool.x - origin.x, tool.y - origin.y, tool.z - origin.z);
     if (yaw != null) offset = yawRotation(yaw - frameYaw(origin)).rotate(offset);
-    return new Vec3(seat.x * metres + offset.x, seat.y * metres + offset.y, seat.z * metres + offset.z);
+    return new Vec3(seat.x + offset.x, seat.y + offset.y, seat.z + offset.z);
   }
 
   static function frameYaw(frame:AssemblyFrame):Float {
@@ -1575,7 +1629,7 @@ class MissionPlayer implements SessionMember {
         var at = step.at;
         if (at == null) throw "Pick needs a mission frame";
         var target = yaw == null ? worldHome
-          : yawRotation(yaw - frameYaw(staticPose(at.occurrence))).multiply(worldHome);
+          : yawRotation(yaw - frameYaw(partFrame(at.occurrence))).multiply(worldHome);
         if (toolYaw == null) {
           heldToolYaws.remove(channel);
           return target;
@@ -1673,7 +1727,7 @@ class MissionPlayer implements SessionMember {
   }
 
   function placementRotation(occurrence:String, ?yaw:Float):Quat {
-    var pose = staticPose(occurrence);
+    var pose = partFrame(occurrence);
     var result = frameRotation(pose);
     return yaw == null ? result : yawRotation(yaw - frameYaw(pose)).multiply(result);
   }
@@ -1693,22 +1747,19 @@ class MissionPlayer implements SessionMember {
     return new Vec3(point.x, point.y, point.z);
   }
 
-  /** The live frame of a free part's own origin, in metres: its simulated pose less its geometry's centre. */
+  /** A CAD occurrence's live origin in metres, resolved across controller owners and free bodies. */
   function partFrame(occurrence:String):AssemblyFrame {
-    var entry = [for (item in objects) if (item.id == "project:" + occurrence) item];
-    if (entry.length != 1) throw 'Part "$occurrence" is not a free object of the simulation';
-    var pose = simulation.objectPose(entry[0].object);
-    var centre = project.assemblyPreviewCenter(definitionOf(occurrence));
-    if (centre == null) throw 'Part "$occurrence" has no preview centre';
-    var at:AssemblyFrame = {x: pose.x, y: pose.y, z: pose.z, qx: pose.qx, qy: pose.qy, qz: pose.qz, qw: pose.qw};
-    return AssemblyFrames.compose(at, AssemblyFrames.translation(-centre[0] * metres, -centre[1] * metres, -centre[2] * metres));
+    var pose = assemblyParts.get("project:" + occurrence).pose();
+    return {x: pose.position[0], y: pose.position[1], z: pose.position[2],
+      qx: pose.rotation[0], qy: pose.rotation[1], qz: pose.rotation[2], qw: pose.rotation[3]};
   }
 
-  /** A held part's frame in the assembly as designed, in CAD units. */
-  function staticPose(occurrence:String):AssemblyFrame {
-    var state = placement;
-    if (state == null) throw "The mission has no assembly to place on";
-    return state.worldPose(occurrence);
+  /** The named station follows its actual carrier; only connector translations need CAD-unit conversion. */
+  function liveConnectorFrame(at:SceneArtifactPlace):AssemblyFrame {
+    var connector = connectorFrame(at);
+    return AssemblyFrames.compose(partFrame(at.occurrence), {x: connector.x * metres,
+      y: connector.y * metres, z: connector.z * metres,
+      qx: connector.qx, qy: connector.qy, qz: connector.qz, qw: connector.qw});
   }
 
   /** The connector named by `at`, in its occurrence's frame and CAD units. */

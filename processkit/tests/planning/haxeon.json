@@ -3,7 +3,7 @@
   "package": {"name": "processkit-weld-planning-tests"},
   "entry": "WeldPlanningMain",
   "sourceRoots": [".", "../src"],
-  "dependencies": {"processkit": {"path": "../.."}},
+  "dependencies": {"processkit": {"path": "../.."}, "collisionkit-native": {"path": "../../../collisionkit/native"}},
   "target": "host",
   "outputDir": "build"
 }

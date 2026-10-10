@@ -1,0 +1,32 @@
+{
+	"version": 1,
+	"package": { "name": "collisionkit-native" },
+	"sourceRoots": ["haxe"],
+	"scopeSourceRoots": false,
+	"dependencies": {
+		"collisionkit": { "path": ".." }
+	},
+	"ffi": {
+		"interfaces": ["bindings/collisionkit.hxi"]
+	},
+	"native": {
+		"cmake": {
+			"source": ".",
+			"target": "collisionkit_core",
+			"library": "collisionkit_core",
+			"inputs": [
+				"CMakeLists.txt",
+				"include/collisionkit.h",
+				"src/api.cpp",
+				"src/decompose.cpp",
+				"src/decompose.hpp",
+				"src/world.cpp",
+				"src/world.hpp",
+				"src/handles.hpp",
+				"vendor/coal/materia/CMakeLists.txt",
+				"vendor/v-hacd/include/VHACD.h"
+			]
+		}
+	},
+	"target": "host"
+}

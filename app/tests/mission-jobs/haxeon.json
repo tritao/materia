@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "entry": "tests.MissionJobsTests",
+  "sourceRoots": ["../src"],
+  "scopeSourceRoots": false,
+  "dependencies": {"app": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

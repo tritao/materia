@@ -20,6 +20,7 @@
     "../examples/track-arm"
   ],
   "dependencies": {
+    "collisionkit-native": {"path": "../../collisionkit/native"},
     "processkit": {
       "path": "../../processkit"
     },

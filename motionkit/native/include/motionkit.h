@@ -344,14 +344,20 @@ typedef struct mk_timing_binding {
     double limit;
 } mk_timing_binding;
 
-enum { MK_SYNCHRONIZATION_TIME = 0 };
+/**
+ * TIME: every joint takes the same duration. PHASE: every joint also follows
+ * one profile scaled to its distance, so a rest-to-rest move is a straight
+ * line in joint space (a planned edge, COLLISION.md CL-D7); Ruckig falls back
+ * to time synchronization where phase is impossible.
+ */
+enum { MK_SYNCHRONIZATION_TIME = 0, MK_SYNCHRONIZATION_PHASE = 1 };
 enum { MK_CONTROL_POSITION = 0, MK_CONTROL_VELOCITY_STOP = 1 };
 
 /** Offline Ruckig request. Velocity-stop ignores target position and velocity limits. */
 typedef struct mk_state_to_state_request {
     uint32_t struct_size MK_STRUCT_SIZE;
     uint32_t joint_count;
-    uint32_t synchronization; /**< Only MK_SYNCHRONIZATION_TIME is supported. */
+    uint32_t synchronization; /**< MK_SYNCHRONIZATION_TIME or MK_SYNCHRONIZATION_PHASE. */
     uint32_t control_mode; /**< Position target or velocity-control stop. */
     double current_position[MK_MAX_JOINTS];
     double current_velocity[MK_MAX_JOINTS];

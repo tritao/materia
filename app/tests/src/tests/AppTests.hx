@@ -7,6 +7,7 @@ class AppTests {
 	static function main():Int {
 		ProjectProcessTests.run();
     if (StartPageTests.main() != 0) return 1;
+    if (MissionJobsTests.main() != 0) return 1;
 		if (AppPreferencesTests.main() != 0) return 1;
 		if (EditorSettingsDialogTests.main() != 0) return 1;
 		if (SceneAtomicityTests.main() != 0) return 1;
@@ -20,6 +21,7 @@ class AppTests {
     if (StockSimulationTests.main() != 0) return 1;
     if (RuntimeGeometryTests.main() != 0) return 1;
     if (WorkerObjectTests.main() != 0) return 1;
+    if (SceneCollisionTests.main() != 0) return 1;
     ScriptedSetupTests.run();
     if (HumanSimulationTests.main() != 0) return 1;
     if (WorkerDemoTests.main() != 0) return 1;

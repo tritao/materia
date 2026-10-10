@@ -151,6 +151,24 @@ KK_API kk_result KK_CALL kk_qp_solve(kk_qp_handle qp,
     double *out_step KK_OUT_ARRAY(step_count), uint32_t step_count,
     int32_t *out_status KK_OUT, uint32_t *out_iterations KK_OUT);
 
+/**
+ * Sets general rows  row_lower <= C*D <= row_upper  for this QP's following
+ * solves (`constraint` is `constraint_row_count` x width, row-major; infinite
+ * bounds mean unbounded), e.g. collision-avoidance rows; zero rows clear them.
+ * With rows set, `kk_qp_solve` honours them, and when they and the bounds
+ * admit no step it relaxes every row by a slack penalized far above the task
+ * (as mink relaxes its collision rows); `kk_qp_relaxed` then says which rows
+ * needed it, and `out_status` is the relaxed solve's.
+ */
+KK_API kk_result KK_CALL kk_qp_set_rows(kk_qp_handle qp,
+    const double *constraint KK_IN_ARRAY(constraint_count), uint32_t constraint_count,
+    const double *row_lower KK_IN_ARRAY(constraint_row_count), uint32_t constraint_row_count,
+    const double *row_upper KK_IN_ARRAY(row_upper_count), uint32_t row_upper_count);
+
+/** After a solve with rows: 1 for each row (in order) whose relaxation was needed, else 0. */
+KK_API kk_result KK_CALL kk_qp_relaxed(kk_qp_handle qp,
+    int32_t *out_relaxed KK_OUT_ARRAY(relaxed_count), uint32_t relaxed_count);
+
 #ifdef __cplusplus
 }
 #endif

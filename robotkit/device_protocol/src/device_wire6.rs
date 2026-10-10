@@ -3,7 +3,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error { ShortBuffer, WrongLength }
 
-pub const PROTOCOL_VERSION: u8 = 13;
+pub const PROTOCOL_VERSION: u8 = 14;
 pub const MAX_ACTUATORS: u8 = 64;
 
 #[repr(u8)]
@@ -43,7 +43,7 @@ pub struct SessionBegin6 {
     pub max_acceleration: f32,
     pub actuator_max_acceleration: [f32; 64],
     pub steps_per_unit: [f32; 64],
-    pub max_rate: [f32; 64],
+    pub min_step_ticks: [u32; 64],
     pub direction_setup_ticks: [u16; 64],
     pub actuator_joint: [u8; 64],
     pub actuator_ratio: [f32; 64],
@@ -92,7 +92,7 @@ impl SessionBegin6 {
             out[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
             offset += 4;
         }
-        for value in self.max_rate {
+        for value in self.min_step_ticks {
             out[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
             offset += 4;
         }
@@ -203,11 +203,11 @@ impl SessionBegin6 {
             *item = f32::from_le_bytes(bytes);
             offset += 4;
         }
-        let mut max_rate = [0 as f32; 64];
-        for item in &mut max_rate {
+        let mut min_step_ticks = [0 as u32; 64];
+        for item in &mut min_step_ticks {
             let mut bytes = [0u8; 4];
             bytes.copy_from_slice(&input[offset..offset + 4]);
-            *item = f32::from_le_bytes(bytes);
+            *item = u32::from_le_bytes(bytes);
             offset += 4;
         }
         let mut direction_setup_ticks = [0 as u16; 64];
@@ -311,7 +311,7 @@ impl SessionBegin6 {
         let input_active_high = u64::from_le_bytes(bytes);
         offset += 8;
         let _ = offset;
-        Ok(Self { session, protocol_version, expected_controller, actuator_count, max_degree, step_tick_hz, max_acceleration, actuator_max_acceleration, steps_per_unit, max_rate, direction_setup_ticks, actuator_joint, actuator_ratio, dual_drive_skew_bound, link_loss_timeout_ns, channel_count, channel_id, channel_kind, safe_digital, safe_analog, safe_argument, safe_command, channel_stop_policy, input_count, input_actuator, input_active_high })
+        Ok(Self { session, protocol_version, expected_controller, actuator_count, max_degree, step_tick_hz, max_acceleration, actuator_max_acceleration, steps_per_unit, min_step_ticks, direction_setup_ticks, actuator_joint, actuator_ratio, dual_drive_skew_bound, link_loss_timeout_ns, channel_count, channel_id, channel_kind, safe_digital, safe_analog, safe_argument, safe_command, channel_stop_policy, input_count, input_actuator, input_active_high })
     }
 }
 

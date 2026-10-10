@@ -95,7 +95,7 @@ class MachiningStock {
 		}
 		var axis = spindleAxis();
 		if (axis[2] < 1 - 1e-6)
-			throw "The machining spindle must point along the stock's +Z";
+			throw 'The machining spindle must point along the stock\'s +Z (observed stock-local axis $axis)';
 	}
 
 	/** Puts `next` in the spindle. The tip jumps with the tool's length, so cutting starts afresh. */

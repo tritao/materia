@@ -156,13 +156,7 @@ class MachineKitRecipeProjectTests {
 	}
 
 	public static function main():Int {
-		var root = FileSystem.fullPath(Sys.getCwd());
-		while (!FileSystem.exists(root + "/machinekit/examples/materia.project.json")) {
-			var parent = haxe.io.Path.directory(root);
-			if (parent == root || parent.length == 0) throw "Could not locate Materia repository";
-			root = parent;
-		}
-		var manifest = root + "/machinekit/examples/materia.project.json";
+		var manifest = tests.TestPaths.of("machinekit/examples/materia.project.json");
 		var generated = MateriaProjectRunner.loadProject(manifest);
 		check(generated.recipeDocument != null, "generated preview carries a recipe document");
 		reconciliationRegressions(cast generated.recipeDocument);

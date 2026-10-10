@@ -177,8 +177,17 @@ enum {
      * Joints hold the robot's designed pose from the start, as servos enabled at power-on do, until
      * a command targets them; a reset holds them there again. Coupled followers follow their leader.
      */
-    RK_SIMULATION_ROBOT_HOLD_AT_REST = 1
+    RK_SIMULATION_ROBOT_HOLD_AT_REST = 1,
+    /**
+     * The robot's links exclude exactly link_excludes from colliding with
+     * each other, instead of SimKit's own rule (parent and child, or
+     * overlapping at rest): a collision description's allowed pairs, so the
+     * simulation and clearance checks agree (collisionkit COLLISION.md CL3b).
+     */
+    RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES = 2
 };
+
+enum { RK_MAX_LINK_EXCLUDES = 4096 };
 
 typedef struct rk_simulation_robot_desc {
     uint32_t struct_size RK_STRUCT_SIZE;
@@ -209,7 +218,7 @@ typedef struct rk_simulation_robot_desc {
     double virtual_device_actuator_ratio[64];
     double virtual_device_actuator_offset[64];
     double virtual_device_actuator_steps_per_unit[64];
-    double virtual_device_actuator_max_rate[64];
+    uint32_t virtual_device_actuator_min_step_ticks[64]; /**< Least whole step-tick periods between steps, at least one. */
     uint16_t virtual_device_actuator_direction_setup_ticks[64];
     double virtual_device_actuator_skew_bound[64];
     uint8_t virtual_device_actuator_ids[4096]; /**< 64 NUL-terminated ASCII IDs, 64 bytes each. */
@@ -270,6 +279,9 @@ typedef struct rk_simulation_robot_desc {
     double virtual_device_feedback_offset[64];
     uint32_t brake_count;
     rk_simulation_brake brakes[RK_MAX_JOINTS];
+    /** Appended tail: link index pairs that never collide, used with RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES. */
+    uint32_t link_exclude_count;
+    uint32_t link_excludes[RK_MAX_LINK_EXCLUDES * 2];
 } rk_simulation_robot_desc;
 
 /** Latest numeric device observation, independent of the authored sensor layout. */

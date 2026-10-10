@@ -84,18 +84,15 @@ class CoreXyDriveTests {
 		if (binding.channels.length != 2) throw "the plotter's two motors take two channels";
 		var pulseCeiling = 40000.0 / (200.0 * 16.0 / (2 * Math.PI));
 		near(binding.channels[0].maxRate, pulseCeiling, "the channel exposes the continuous pulse ceiling", 1e-6);
-		// The deployed pulse generator receives f32 settings, promotes them to f64,
-		// then rounds the required spacing up to an integer number of controller ticks.
-		var wire = haxe.io.Bytes.alloc(8);
-		wire.setFloat(0, binding.channels[0].maxRate);
-		wire.setFloat(4, binding.channels[0].stepsPerUnit);
-		var interval = Math.max(1, Math.ceil(binding.stepTickHz /
-			(wire.getFloat(0) * wire.getFloat(4))));
-		var achievableCeiling = binding.stepTickHz / (interval * wire.getFloat(4));
-		near(binding.model.actuators[0].requireRate(), achievableCeiling,
-			"the planner respects the quantized step interval", 1e-6);
-		near(binding.model.coupledLimits("x").requireVelocity(), achievableCeiling * radius / 2,
-			"the quantized motor ceiling limits both axes", 1e-9);
+		// The binding chooses the deployed tick spacing directly from pulse limits.
+		// Turning rounded channel rates back into ticks would incorrectly halve
+		// this full-frequency channel at the f32 boundary.
+		if (binding.channels[0].minStepTicks != 1 || binding.channels[1].minStepTicks != 1)
+			throw "The 40 kHz controller ceiling must retain one tick per step";
+		near(binding.model.actuators[0].requireRate(), pulseCeiling,
+			"the planner retains the full controller pulse ceiling", 1e-6);
+		near(binding.model.coupledLimits("x").requireVelocity(), pulseCeiling * radius / 2,
+			"the controller pulse ceiling limits both axes", 1e-9);
 		Sys.println('corexy plotter drives: motors ${Math.round(rate * 10) / 10} rad/s, axes to ${Math.round(x.requireVelocity() * 1e4) / 10} mm/s, ' +
 			'${Math.round(x.requireAcceleration() * 10) / 10} (x) and ${Math.round(y.requireAcceleration() * 10) / 10} (y) m/s²');
 	}

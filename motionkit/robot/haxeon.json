@@ -25,6 +25,9 @@
     },
     "robotkit-policy": {
       "path": "../../robotkit/policy"
+    },
+    "collisionkit": {
+      "path": "../../collisionkit"
     }
   },
   "target": "host"

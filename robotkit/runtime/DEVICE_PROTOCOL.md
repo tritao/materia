@@ -43,6 +43,15 @@ transport does not interpret welding units or fault codes. Sequence zero means
 absent in host snapshots, and duplicate or older samples must not replace newer
 ones. Revision 12 is rejected rather than migrated. The current schema lock and
 shared Rust/C++ frame vectors were regenerated for revision 13.
+
+Wire revision 14 replaces `SESSION_BEGIN6`'s `max_rate` (`f32[64]`, a rate the
+device turned into ticks) with `min_step_ticks` (`u32[64]`): each active
+actuator's least whole number of step-tick periods between steps, at least one.
+The host's device binding chooses it once from the driver's step-rate ceiling
+and the motor's speed (`robotkit.runtime.StepTicks`), and plans at the rate it
+reaches; the device only enforces it. As a rate, the tick ceiling could round
+under itself in f32 and cost a whole tick, halving the motor's speed. Revision
+13 is rejected rather than migrated.
 Protocol version 8 also carries steps per actuator unit, actuator rate limits,
 direction setup ticks, source joint indices, transmission ratios and dual-drive
 skew bounds, all derived by the host from the model and the deployment's

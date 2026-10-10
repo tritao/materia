@@ -5,7 +5,7 @@ import haxeon.ui.Path;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 import app.CncProgramPlayer.CncJob;
-import app.MateriaProjectRunner.GeneratedAssemblyScene;
+import app.GeneratedAssemblyScene;
 import materia.project.SceneArtifact.SceneArtifactMission;
 import materia.project.SceneArtifact.SceneArtifactMobileBase;
 import materia.project.SceneArtifact.SceneArtifactRobotSensor;
@@ -71,6 +71,8 @@ class ProjectDocumentSession {
   public var generation(default, null):Int = 0;
   public var scriptOwnership(default,null):Null<ScriptOwnership> = null;
   public var projectReference(default,null):Null<String> = null;
+  /** Selected entrypoint in the source project's job list, when it defines one. */
+  public var projectJob(default,null):Null<String> = null;
   public var projectAssemblyDefinition(default,null):Null<AssemblyDefinition> = null;
   public var projectAssemblyState(default,null):Null<AssemblyStateRecord> = null;
   public var projectPhysical(default,null):Null<AssemblyPhysicalData> = null;
@@ -257,13 +259,15 @@ class ProjectDocumentSession {
   }
 
   /** Open everything a project's generator made, retaining its source manifest. */
-  public function openGeneratedProject(generated:GeneratedAssemblyScene, manifestPath:String):Void
+  public function openGeneratedProject(generated:GeneratedAssemblyScene, manifestPath:String):Void {
     openGeneratedScene(generated.objects, manifestPath,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions,
       generated.faceDescriptorsByDefinition, generated.cncJob, generated.mobileBase, generated.mission, generated.robotTools,
-      generated.robotSensors, generated.machineMotion, generated.controllers, generated.signals);
+      generated.robotSensors, generated.machineMotion, generated.assemblyModel, generated.controllers, generated.signals);
+    projectJob = generated.projectJob;
+  }
 
   /** Open generated geometry while retaining its source manifest. */
   public function openGeneratedScene(data:Array<SceneObjectData>, ?manifestPath:String,
@@ -274,6 +278,7 @@ class ProjectDocumentSession {
       ?faceDescriptors:Map<String, String>, ?cnc:CncJob,
       ?mobile:SceneArtifactMobileBase, ?work:SceneArtifactMission, ?tools:Array<SceneArtifactRobotTool>,
       ?sensors:Array<SceneArtifactRobotSensor>, ?machine:materia.project.SceneArtifact.SceneArtifactMachineMotion,
+      ?model:cadkit.modeling.CompiledAssembly,
       ?cellControllers:Array<materia.project.SceneArtifact.SceneArtifactCellController>,
       ?cellSignals:Array<materia.project.SceneArtifact.SceneArtifactCellSignal>):Void {
     if (data == null || data.length == 0)
@@ -295,7 +300,8 @@ class ProjectDocumentSession {
     }
     var runtime:Null<AssemblyState> = null;
     try {
-      runtime = assemblyDefinition == null ? null : new AssemblyState(assemblyDefinition, assemblyState);
+      runtime = assemblyDefinition == null ? null : model != null && model.definition == assemblyDefinition
+        ? AssemblyState.fromModel(model, assemblyState) : new AssemblyState(assemblyDefinition, assemblyState);
       configureAssembly(next, assemblyDefinition);
     } catch (error:Dynamic) {
       next.dispose();
@@ -330,16 +336,16 @@ class ProjectDocumentSession {
     reference = FileSystem.fullPath(reference);
     var savedRecipe:Null<String> = Reflect.field(root, "recipeDocument");
     var diagnostics:Array<String> = [];
-    var projectRequirement = MateriaProjectRunner.executionRequirement(reference);
-    var generated = MateriaProjectRunner.loadProject(reference,
-      projectRequirement.reconcilesSavedRecipe ? savedRecipe : null);
+    var projectRequirement = ProjectSourceLoader.executionRequirement(reference, project.jobId);
+    var generated = ProjectSourceLoader.load(reference,
+      projectRequirement.reconcilesSavedRecipe ? savedRecipe : null, null, project.jobId);
     if (projectRequirement.reconcilesSavedRecipe) {
       if (generated.recipeDiagnostics != null)
         for (diagnostic in generated.recipeDiagnostics) diagnostics.push(diagnostic);
-    } else if (savedRecipe != null && generated.recipeDocument != null) {
+    } else if (!ProjectSourceLoader.isPrebuilt(reference) && savedRecipe != null && generated.recipeDocument != null) {
       var reconciled = reconcileRecipe(generated.recipeDocument, savedRecipe, diagnostics);
       if (reconciled.changed)
-        generated = MateriaProjectRunner.loadProject(reference, reconciled.text);
+        generated = ProjectSourceLoader.load(reference, reconciled.text, null, project.jobId);
       else
         generated.recipeDocument = reconciled.text;
     }
@@ -392,6 +398,7 @@ class ProjectDocumentSession {
     recipeDocument = nextRecipe;
     projectReference = reference;
     projectBaseline = baseline;
+    projectJob = generated.projectJob;
     staleProjectEdits = diagnostics;
     staleProjectRecord = diagnostics.length == 0 ? null : project;
     installAssemblyRuntime(generated.assemblyDefinition, runtime,
@@ -995,6 +1002,7 @@ class ProjectDocumentSession {
     sensors = nextSensors;
     scriptOwnership=nextOwnership;
     projectReference = null;
+    projectJob = null;
     recipeDocument = null;
     projectBaseline = null;
     staleProjectEdits = [];
@@ -1130,6 +1138,7 @@ class ProjectDocumentSession {
       overrides: overrides, removed: removed, instances: instances,
       assemblyState: savedAssemblyState,
       assemblyDependentJoints: savedDependentJoints()};
+    if (projectJob != null) record.jobId = projectJob;
     if (!assemblyMates.isEmpty()) record.assemblyMates = assemblyMates.encode();
     return {record: record, authored: authored};
   }

@@ -39,10 +39,10 @@ class TendingMissionChecks {
 		}
 		if (picks.length != 8 || places.length != 8 || cuts.length != 4 || via.length < 12 || requests.length == 0)
 			throw 'Tending mission must unroll four pick/place/cut cycles; got ${picks.length}/${places.length}/${cuts.length}/${via.length}';
-		if (signalCount(RobotInterfaceChannels.REQUEST_DOOR_OPEN, true) != 5 ||
-			signalCount(RobotInterfaceChannels.REQUEST_DOOR_CLOSE, true) != 5 ||
+		if (signalCount(RobotInterfaceChannels.REQUEST_DOOR_OPEN, true) != 8 ||
+			signalCount(RobotInterfaceChannels.REQUEST_DOOR_CLOSE, true) != 8 ||
 			signalCount(RobotInterfaceChannels.REQUEST_CLAMP, true) != 4 ||
-			signalCount(RobotInterfaceChannels.REQUEST_UNCLAMP, true) != 4 ||
+			signalCount(RobotInterfaceChannels.REQUEST_UNCLAMP, true) != 8 ||
 			signalCount(RobotInterfaceChannels.CYCLE_START, true) != 4)
 			throw "Each tending cycle needs door, clamp, unclamp and CNC start outputs";
 		for (step in mission.steps) if (step.kind == "waitFor" && step.waitFor != null &&
@@ -50,31 +50,23 @@ class TendingMissionChecks {
 			step.waitFor.name != RobotInterfaceChannels.CYCLE_COMPLETE &&
 			step.waitFor.timeout <= RobotInterface.DEFAULT_REQUEST_TIMEOUT_SECONDS)
 			throw 'Mission wait for ${step.waitFor.name} must leave a signal round trip after the PLC timeout';
-		var expectedPickParts = ["infeed/blank-0-0", "infeed/blank-0-1", "infeed/blank-0-0",
-			"infeed/blank-0-2", "infeed/blank-0-1", "infeed/blank-1-0", "infeed/blank-0-2", "infeed/blank-1-0"];
-		var expectedPickTools = [DualArmGripperTool.TOOL_CHANNEL_A, DualArmGripperTool.TOOL_CHANNEL_B,
-			DualArmGripperTool.TOOL_CHANNEL_A, DualArmGripperTool.TOOL_CHANNEL_A,
-			DualArmGripperTool.TOOL_CHANNEL_B, DualArmGripperTool.TOOL_CHANNEL_B,
-			DualArmGripperTool.TOOL_CHANNEL_A, DualArmGripperTool.TOOL_CHANNEL_B];
-		for (index in 0...picks.length) {
-			var pick = picks[index], at = pick.at;
-			if (at == null || at.occurrence != expectedPickParts[index] || at.connector != "grasp" ||
-				pick.tool != expectedPickTools[index] || pick.yaw != null || pick.toolYaw == null || !Math.isFinite(pick.toolYaw))
-				throw 'Tending pick $index does not use the staged blank and alternating gripper';
-		}
-		var expectedPlaceParts = ["mill/mill/vise/body", "mill/mill/vise/body", "outfeedTray/seat-r0-c0-x-1-y-1",
-			"mill/mill/vise/body", "outfeedTray/seat-r0-c1-x-1-y-1", "mill/mill/vise/body",
-			"outfeedTray/seat-r0-c2-x-1-y-1", "outfeedTray/seat-r1-c0-x-1-y-1"];
-		var expectedPlaceTools = [DualArmGripperTool.TOOL_CHANNEL_A, DualArmGripperTool.TOOL_CHANNEL_B,
-			DualArmGripperTool.TOOL_CHANNEL_A, DualArmGripperTool.TOOL_CHANNEL_A,
-			DualArmGripperTool.TOOL_CHANNEL_B, DualArmGripperTool.TOOL_CHANNEL_B,
-			DualArmGripperTool.TOOL_CHANNEL_A, DualArmGripperTool.TOOL_CHANNEL_B];
-		for (index in 0...places.length) {
-			var place = places[index], at = place.at;
-			var connector = StringTools.startsWith(expectedPlaceParts[index], "mill/") ? "datum" : "seat";
-			if (at == null || at.occurrence != expectedPlaceParts[index] || at.connector != connector ||
-				place.tool != expectedPlaceTools[index] || place.yaw != null || place.toolYaw == null || !Math.isFinite(place.toolYaw))
-				throw 'Tending place $index does not transfer finished and staged blanks on their assigned grippers';
+		var selectedSlots = ["0-0", "0-1", "0-2", "1-0"];
+		var outfeedSeats = ["seat-r0-c0-x-1-y-1", "seat-r0-c1-x-1-y-1",
+			"seat-r0-c2-x-1-y-1", "seat-r1-c0-x-1-y-1"];
+		for (cycle in 0...selectedSlots.length) {
+			var tool = cycle % 2 == 0 ? DualArmGripperTool.TOOL_CHANNEL_A : DualArmGripperTool.TOOL_CHANNEL_B;
+			for (phase in 0...2) {
+				var index = cycle * 2 + phase;
+				var pick = picks[index], pickAt = pick.at;
+				if (pickAt == null || pickAt.occurrence != "infeed/blank-" + selectedSlots[cycle] ||
+					pickAt.connector != "grasp" || pick.tool != tool || pick.yaw != null || pick.toolYaw == null || !Math.isFinite(pick.toolYaw))
+					throw 'Tending pick $index does not load and unload its assigned blank';
+				var place = places[index], placeAt = place.at;
+				var destination = phase == 0 ? "mill/mill/vise/body" : "outfeedTray/" + outfeedSeats[cycle];
+				if (placeAt == null || placeAt.occurrence != destination || placeAt.connector != (phase == 0 ? "load" : "seat") ||
+					place.tool != tool || place.yaw != null || place.toolYaw == null || !Math.isFinite(place.toolYaw))
+					throw 'Tending place $index does not seat its assigned blank';
+			}
 		}
 		var viaA = 0, viaB = 0;
 		for (step in via) {
@@ -131,26 +123,16 @@ class TendingMissionChecks {
 		}
 		if (cycleStarts.length != 4) throw "Every unattended cut needs one CNC start edge";
 		for (cycle in 0...4) {
-			if (cycle < 3) {
-				var staged = -1;
-				for (index in 0...mission.steps.length) {
-					var step = mission.steps[index];
-					if (staged < 0 && step.kind == "pick" && step.at != null &&
-						step.at.occurrence == expectedPickParts[cycle * 2 + 1]) staged = index;
-				}
-				if (staged <= cycleStarts[cycle] || staged >= completedCycles[cycle])
-					throw 'Cycle $cycle must stage the next blank after starting and before the current cut completes';
+			var unloaded = -1, nextPick = -1;
+			for (index in completedCycles[cycle]...mission.steps.length) {
+				var step = mission.steps[index], at = step.at;
+				if (unloaded < 0 && step.kind == "place" && at != null &&
+					at.occurrence == "outfeedTray/" + outfeedSeats[cycle]) unloaded = index;
+				if (cycle < 3 && nextPick < 0 && step.kind == "pick" && at != null &&
+					at.occurrence == "infeed/blank-" + selectedSlots[cycle + 1]) nextPick = index;
 			}
-			if (cycle > 0) {
-				var unloaded = -1;
-				for (index in 0...mission.steps.length) {
-					var step = mission.steps[index];
-					if (step.kind == "place" && step.at != null &&
-						step.at.occurrence == expectedPlaceParts[cycle * 2]) unloaded = index;
-				}
-				if (unloaded <= cycleStarts[cycle] || unloaded >= completedCycles[cycle])
-					throw 'Cycle $cycle must unload its prior finish while the mill cuts';
-			}
+			if (unloaded <= completedCycles[cycle] || (cycle < 3 && nextPick <= unloaded))
+				throw 'Cycle $cycle must place its finish in outfeed before picking the next blank';
 		}
 		for (cycle in 0...completedCycles.length) {
 			var complete = completedCycles[cycle];

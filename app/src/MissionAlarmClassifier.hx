@@ -27,7 +27,7 @@ class MissionAlarmClassifier {
 	};
 
 	public static function classify(step:SceneArtifactMissionStep, message:String,
-		emergencyStopped:Bool, carryingPart:Bool):MissionAlarmCode {
+		emergencyStopped:Bool):MissionAlarmCode {
 		if (emergencyStopped) return MissionAlarmCode.EmergencyStop;
 		if (step.kind == "waitFor" && step.waitFor != null) {
 			var name = step.waitFor.name;
@@ -45,9 +45,8 @@ class MissionAlarmClassifier {
 				default:
 			}
 		}
-		if (step.kind == "pick" || message.indexOf("did not confirm a grasp") >= 0)
+		if (message.indexOf("did not confirm a grasp") >= 0)
 			return MissionAlarmCode.MissedGrasp;
-		if (carryingPart) return MissionAlarmCode.PartDropped;
 		return MissionAlarmCode.MotionFailure;
 	}
 }
