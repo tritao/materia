@@ -116,8 +116,8 @@ class WeldPathPlanner {
   /** The welding cell's margin for arm and air motions, in metres. */
   public static inline var AIR_MARGIN:Float = 0.003;
   static inline var AIR_STEP:Float = 0.02;
-  /** How many goals of the joint move to the entry are tried. */
-  static inline var GOALS:Int = 12;
+  /** How many distinct IK branches are useful before sweeping each around the wrist. */
+  static inline var GOALS:Int = 4;
   /** The rolls about the wire tried for a segment, in radians: a quarter turns, and the eighths between. */
   public static final ROLLS:Array<Float> = [0.0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, 3 * Math.PI / 4, -3 * Math.PI / 4, Math.PI];
 
