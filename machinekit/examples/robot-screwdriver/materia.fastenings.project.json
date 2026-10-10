@@ -1,0 +1,21 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Fastenings: flange bearing and NEMA mount",
+	"defaultEntrypoint": "flange",
+	"build": {"system": "haxeon", "manifest": "haxeon.fastening.json"},
+	"entrypoints": {
+		"flange": {
+			"kind": "cad-preview",
+			"module": "FasteningPreview",
+			"function": "flange",
+			"cache": {"inputs": ["FasteningPreview.hx"]}
+		},
+		"motor": {
+			"kind": "cad-preview",
+			"module": "FasteningPreview",
+			"function": "motor",
+			"cache": {"inputs": ["FasteningPreview.hx"]}
+		}
+	}
+}

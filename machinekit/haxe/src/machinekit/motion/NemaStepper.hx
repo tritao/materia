@@ -9,6 +9,8 @@ import machinekit.component.Dimension;
 import materia.project.MaterialLibrary;
 
 import cadkit.modeling.Part;
+import cadkit.threads.Threads;
+import cadkit.threads.ThreadedFace.ThreadStart;
 import cadkit.modeling.Vector;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
@@ -280,8 +282,15 @@ class NemaStepper extends MachineComponent implements MotorDrive {
 				var bolt = 1;
 				for (point in boltPattern()) {
 					// Bolt holes are named like the `bolt<k>` connectors: the pattern always has the same four.
-					var tool = Solids.named(Part.cylinderSpan(holeDiameter / 2, -variant.mountHoleDepth, 0.1, point.x, point.y),
-						"bolt" + bolt++);
+					var blank = Part.cylinderSpan(holeDiameter / 2, -variant.mountHoleDepth, 0.1, point.x, point.y);
+					tracked.push(blank);
+					var tool = blank;
+					if (variant.tappedMount) {
+						tool = new Part(Threads.attach(blank.shape, "cyl.side", screw.thread.mating(), AxisMaximum,
+							variant.mountHoleDepth, 0.1));
+						blank.close(); tracked.push(tool);
+					}
+					tool = Solids.named(tool, "bolt" + bolt++);
 					tracked.push(tool);
 					tools.push(tool);
 				}

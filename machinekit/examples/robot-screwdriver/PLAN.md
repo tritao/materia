@@ -88,6 +88,24 @@ simulation and hardware, and a mission step drives it.
   Interior boundaries draw stroke rings, including a partly threaded shank's
   transition to its plain segment. Ball races omit the flank overlay.
 
+- **SD3 — Connections are rebuilt from current CAD.** Fixed head seats select
+  the screw and clamped occurrence. Clearance faces are queried geometrically;
+  internal threads still resolve only by their strong topological names. Face
+  intervals give engagement, and solid queries give the actual tip and blind
+  floor. Intervening plain bores or solids produce diagnostics, rather than a
+  connection to a farther threaded part. Names combine occurrence paths and face
+  names with length prefixes; no axis, length or fastening cache is saved.
+- **SD3 — Qualified joint limits are authored, never inferred from torque.**
+  `FastenedAssembly.join` supplies optional minimum engagement and an angle
+  window in radians from snug. The angle window stays absent until the engineer
+  supplies qualified limits: a published torque/preload table cannot derive it.
+  These are code-authored workpiece policies, like `Weldment.join`, not a new
+  saved machine or scene format. Unknown threaded materials require an explicit
+  minimum. The existing NEMA design's 1.3 d minimum and 0.5 mm tip clearance
+  move into `NemaMountPlate`, without changing its geometry or screw size.
+  Standard nut height may likewise be an explicit joint minimum; the conservative
+  steel default remains 1 d.
+
 ## What exists
 
 - Fasteners in `machinekit.standard`: `SocketHeadCapScrew` (ISO 4762),
@@ -223,6 +241,8 @@ Here:
   member and its tapped hole (or a nut), engagement length, `ThreadSpec`,
   tightening spec (torque, angle window), and a name made from the face names,
   so it survives edits like a weld seam.
+  Published torque/preload guidance accompanies the connection; the angle window
+  is optional qualified input, since CAD and those tables cannot supply it.
 - `Fastenings.find(assembly)` derives fastenings from the existing seat mates
   and the threads: the screw's axis runs through a clearance hole in the seated
   part and into a coaxial threaded face of the next part. It reports instead of
@@ -230,12 +250,23 @@ Here:
   hand), engagement under the minimum (default 1 d in steel, 1.5 d in
   aluminium), clearance hole smaller than the major diameter, screw too long
   for a blind hole.
-- `FastenedAssembly` resolves them, like `Weldment.join`.
+  It also checks starts/profile, plain shank entering the thread, ambiguous
+  head seats or next threads, and intervening plain bores or solid parts.
+  Conical named threads use their actual circular boundaries and axis-frame
+  bounds. A nut's through bore permits the tip to extend past its far end.
+- `FastenedAssembly` resolves them afresh, with `join` for optional joint-specific
+  engagement and qualified angle limits, like `Weldment.join`.
 - Workpiece: `FlangeBearingAssembly` on a plate with tapped holes, then a NEMA
   motor on `NemaMountPlate` (four M3).
+  `materia.fastenings.project.json` exposes both CAD previews, with no equipment
+  or start-page change. The canonical NEMA plate is extracted from
+  `MotorShaftBearings`; tapped motor mount faces gain attributes without changing
+  their tap-drill solids or names.
 - Checks: the flange assembly gives four fastenings with the right engagement;
   shortening a screw reports under-engagement; moving the plate's holes off the
   flange's bolt circle reports no threaded face.
+  Also cover reversed head-seat orientation, rotated included workpieces,
+  conical blind bores, through nuts, explicit limits, and blocking next parts.
 
 **SD4. Screwdriving equipment and the cell.**
 - MachineKit `machinekit.screwdriving`:
@@ -414,8 +445,8 @@ The local workaround uses typed arrays or `resize(0)`; haxeon is unchanged.
 | --- | --- | --- |
 | SD0 | done | `70f8b600b`, `bd112de5a` |
 | SD1 | done | `27067cf7e`, `44f907ab0` |
-| SD2 | done | `4b3102ff8` |
-| SD3 | open | |
+| SD2 | done | `4b3102ff8`, `e3c91be3f` |
+| SD3 | implemented — gate pending | |
 | SD4 | open — waits for machine tending on local main | |
 | SD5 | open — waits for machine tending on local main | |
 | SD6 | open — waits for machine tending on local main | |

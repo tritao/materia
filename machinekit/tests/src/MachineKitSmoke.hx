@@ -2560,6 +2560,7 @@ class MachineKitSmoke {
 			{name: "TendingCell.TendingMissionChecks.run", run: () -> TendingCell.TendingMissionChecks.run(), weight: 1.0},
 			{name: "FastenerThreadTests.run", run: FastenerThreadTests.run, weight: 0.05},
 			{name: "FastenerDataTests.run", run: FastenerDataTests.run, weight: 0.05},
+			{name: "FasteningTests.run", run: FasteningTests.run, weight: 0.05},
 			{name: "AxisBuilderChecks.run", run: () -> AxisBuilderChecks.run(), weight: 1.0},
 			{name: "AssemblyIntegrityTests.run", run: () -> AssemblyIntegrityTests.run(), weight: 1.0},
 			{name: "GantryChecks.run", run: () -> GantryChecks.run(), weight: 1.0},
