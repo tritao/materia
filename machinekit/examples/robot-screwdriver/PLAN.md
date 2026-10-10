@@ -435,6 +435,23 @@ varies (for example, CNC tick timings 0.23 to 0.22 ms and belt tick timings 0.28
 to 0.29 ms); these measure elapsed execution time under shared machine load, not
 simulated motion.
 
+SD3 quick gate (`sd-suite-sd3.txt`) passes on `7348ea75d`, including 74
+fastening checks and the final `MachineKit smoke passed`. The two CAD workpiece
+previews also pass (`sd3-preview.log`). Earlier gate attempts are retained as
+`sd-suite-sd3-initial.txt` and `sd-suite-sd3-material.txt`; their test setup was
+corrected to unwrap nullable angle limits and use a registered bronze material.
+All 112 existing engineering and acceptance result lines match SD2 exactly;
+only elapsed test timings vary.
+
+The existing motor/shaft/bearing project was rebuilt in the desktop editor.
+Its artifact grows from 711108 to 712703 bytes (+1595), entirely the motor's
+four internal thread packets. After removing packets and canonicalizing the
+freshly generated document/definition/element IDs (preserving their references),
+all geometry, material, face-name and assembly bytes match SD2 exactly.
+`sd3-artifact-check.log` records the comparison; the capture is in
+`build/sd3-motor-capture/`. No mechanical dimensions, densities, screw lengths
+or engineering results changed in SD3.
+
 SD2 compiler finding: `StatementTyper.typeFieldAssignment`
 (`haxeon/src/compiler/types/typing/StatementTyper.hx:498`) types the RHS without
 its field's expected type before resolving that type. Nested field assignments
@@ -446,7 +463,7 @@ The local workaround uses typed arrays or `resize(0)`; haxeon is unchanged.
 | SD0 | done | `70f8b600b`, `bd112de5a` |
 | SD1 | done | `27067cf7e`, `44f907ab0` |
 | SD2 | done | `4b3102ff8`, `e3c91be3f` |
-| SD3 | implemented — gate pending | |
+| SD3 | done | `7348ea75d` |
 | SD4 | open — waits for machine tending on local main | |
 | SD5 | open — waits for machine tending on local main | |
 | SD6 | open — waits for machine tending on local main | |
