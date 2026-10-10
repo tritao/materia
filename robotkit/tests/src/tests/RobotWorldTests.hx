@@ -1619,6 +1619,20 @@ class RobotWorldTests {
     check(localization.state() != null, "localization retains its latest immutable state");
     localization.reset();
     equal(localization.state(), null, "localization reset clears its published state");
+    var rebaseSnapshot = observation(3, 300, 4.5, 4.5, "boot-B");
+    var rebaseObservation = new LocalizationState(Int64.ofInt(3), new Pose2(2.0, -1.0, 0.25),
+      "odom", "base", new PoseCovariance2(0.04, 0.01, 0.002, 0.09, 0.003, 0.01),
+      Good, Int64.ofInt(300), Int64.ofInt(310), "map-clock", "host-clock");
+    var rebased = localization.rebase(rebaseObservation, rebaseSnapshot);
+    check(Math.abs(rebased.pose.x - 2.0) < 1e-9 && Math.abs(rebased.pose.y + 1.0) < 1e-9 &&
+      Math.abs(rebased.pose.yaw - 0.25) < 1e-9 && rebased.covariance.xx == 0.04 &&
+      rebased.covariance.xy == 0.01 && rebased.covariance.xYaw == 0.002 &&
+      rebased.covariance.yy == 0.09 && rebased.covariance.yYaw == 0.003 &&
+      rebased.covariance.yawYaw == 0.01,
+      "wheel localization rebase seeds pose and preserves full localization covariance");
+    throws(function() localization.rebase(rebaseObservation,
+      observation(4, 400, 4.5, 4.5, "boot-B")),
+      "wheel localization rebase rejects an observation from another snapshot");
     throws(function() new PoseCovariance2(-1.0),
       "pose covariance rejects negative variances");
 
