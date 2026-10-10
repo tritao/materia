@@ -356,7 +356,7 @@ specified above; no existing mechanical dimensions or material densities changed
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done | `70f8b600b`, `bd112de5a` |
-| SD1 | open | |
+| SD1 | done | `27067cf7e` |
 | SD2 | open | |
 | SD3 | open | |
 | SD4 | open — waits for machine tending on local main | |
