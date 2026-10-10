@@ -583,6 +583,27 @@ class ProgramTests extends MotionKitTestSupport {
       "MoveJ resolves a reachable 6R pose through candidate IK");
     poseMove.dispose();
 
+    var seededPoseSolver = new SeededPoseProbeSolver();
+    var seededPoseCompiler = new ProgramCompiler(seededPoseSolver, limits, "work", velocity,
+      acceleration, jerk, StartTolerances.uniform(6, 0.02, 0.02, 0.02));
+    var poseTarget = new Pose3(0.25);
+    var seededPoseMove = seededPoseCompiler.compile(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.PoseTarget(poseTarget, "work", null), new MotionOptions(), Blend.ExactStop)]),
+      start, Int64.ofInt(302));
+    check(seededPoseSolver.solveCalls == 1 && seededPoseSolver.sampleCalls == 0,
+      "a pose move uses the current posture's IK branch before multistart sampling");
+    seededPoseMove.dispose();
+
+    var fallbackPoseSolver = new SeededPoseProbeSolver(true);
+    var fallbackPoseCompiler = new ProgramCompiler(fallbackPoseSolver, limits, "work", velocity,
+      acceleration, jerk, StartTolerances.uniform(6, 0.02, 0.02, 0.02));
+    var fallbackPoseMove = fallbackPoseCompiler.compile(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.PoseTarget(poseTarget, "work", null), new MotionOptions(), Blend.ExactStop)]),
+      start, Int64.ofInt(303));
+    check(fallbackPoseSolver.solveCalls == 1 && fallbackPoseSolver.sampleCalls == 1,
+      "an unreachable seeded pose move falls back to the alternate IK branches");
+    fallbackPoseMove.dispose();
+
     var branchSolver = new WristBranchSolver();
     var branchCompiler = new ProgramCompiler(branchSolver, limits, "work", velocity,
       acceleration, jerk, StartTolerances.uniform(6, 0.02, 0.02, 0.02), null, 0.05, 0.5);
@@ -1292,4 +1313,27 @@ class ProgramTests extends MotionKitTestSupport {
       "motion program construction rejects invalid structure");
   }
 
+}
+
+private class SeededPoseProbeSolver extends WristBranchSolver {
+  public final rejectSeed:Bool;
+  public var solveCalls:Int = 0;
+  public var sampleCalls:Int = 0;
+
+  public function new(?rejectSeed:Bool = false) {
+    super();
+    this.rejectSeed = rejectSeed;
+  }
+
+  override public function solvePose(target:Pose3, seed:Array<Float>, tolerance:IkTolerance,
+      ?freedom:OrientationPolicy):Null<Array<Float>> {
+    solveCalls++;
+    return rejectSeed ? null : super.solvePose(target, seed, tolerance, freedom);
+  }
+
+  override public function sampleCandidates(target:Pose3, maxCount:Int,
+      tolerance:IkTolerance, ?freedom:OrientationPolicy):Array<Array<Float>> {
+    sampleCalls++;
+    return [super.solvePose(target, [for (_ in 0...6) 0.0], tolerance, freedom)];
+  }
 }

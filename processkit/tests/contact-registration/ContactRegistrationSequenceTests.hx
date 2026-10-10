@@ -15,6 +15,13 @@ class ContactRegistrationSequenceTests {
     var points = [new Vec3(-0.1, -0.1, 0), new Vec3(0.1, -0.1, 0), new Vec3(0.1, 0.1, 0),
       new Vec3(-0.1, 0.02, 0.05), new Vec3(0.1, 0.02, 0.05), new Vec3(0.04, -0.04, 0.05)];
     var planeNormals = [new Vec3(0, 0, 1), new Vec3(0, 1, 0), new Vec3(1, 0, 0)];
+    var checkpoint = [0.03, -0.2];
+    var checkpointStage = new ContactRegistrationStage(planeNormals[0], 0, [request(new Vec3())], checkpoint);
+    checkpoint[0] = 0.04;
+    var exposedCheckpoint:Array<Float> = cast checkpointStage.entryJoints;
+    exposedCheckpoint[0] = 0.05;
+    check(checkpointStage.entryJoints != null && checkpointStage.entryJoints[0] == 0.03,
+      "A selected stage protects its checked transition target from caller mutation");
     var nominal = new Transform3(new Vec3(1.7, -0.2, 0.6), Quat.fromRollPitchYaw(0, 0, 0.7));
     var error = new Transform3(new Vec3(0.012, -0.009, 0), Quat.fromRollPitchYaw(0, 0, 0.025));
     var actual = error.inverse().compose(nominal);
@@ -33,9 +40,28 @@ class ContactRegistrationSequenceTests {
         [for (i in start...start + count) request(points[i])]);
     });
     var pending:Null<ContactProbeRequest> = sequence.start();
+    var active = sequence.activeStage();
+    check(active != null && active.probes.length == 3,
+      "The sequence exposes the selected checked stage for CAD preflight and execution reporting");
     for (i in 0...points.length) {
       check(pending != null && sequence.result == null, "Every contact remains pending without publishing a work frame");
       pending = sequence.observe(actual.transformPoint(points[i]));
+      if (i == 2) {
+        check(pending == null && sequence.stageTransitionPending && sequence.activeStage() == null,
+          "A completed plane pauses for its checked return before selecting the next plane");
+        pending = sequence.selectNextStage();
+        active = sequence.activeStage();
+        check(active != null && active.probes.length == 2,
+          "The next stage is selected after the first-plane transition");
+      }
+      if (i == 4) {
+        check(pending == null && sequence.stageTransitionPending && sequence.activeStage() == null,
+          "The second plane also pauses for its checked return");
+        pending = sequence.selectNextStage();
+        active = sequence.activeStage();
+        check(active != null && active.probes.length == 1,
+          "The final stage is selected after the second-plane transition");
+      }
     }
     check(pending == null && sequence.result != null, "The sixth completed contact terminates the sequence");
     var fitted:processkit.perception.ContactRegistration.ContactRegistrationResult = cast sequence.result;
@@ -48,16 +74,22 @@ class ContactRegistrationSequenceTests {
     var invalid = new ContactRegistrationSequence(new ContactPoseEnvelope(Transform3.identity(),
       new Vec3(0.02, 0.02, 0.02), new Vec3(), 0.00001), (count, _, _) ->
         new ContactRegistrationStage(new Vec3(0, 0, 1), 0, [for (_ in 0...count) request(new Vec3())]));
-    invalid.start(); invalid.observe(new Vec3()); invalid.observe(new Vec3());
+    invalid.start(); invalid.observe(new Vec3()); invalid.observe(new Vec3()); invalid.observe(new Vec3());
     rejected = false;
-    try invalid.observe(new Vec3()) catch (_:Dynamic) rejected = true;
+    try invalid.selectNextStage() catch (_:Dynamic) rejected = true;
     check(rejected && invalid.result == null, "Parallel later-stage planes fail without authorizing welding");
     var deficient = new ContactRegistrationSequence(new ContactPoseEnvelope(Transform3.identity(),
       new Vec3(0.02, 0.02, 0.02), new Vec3(0.01, 0.01, 0.01), 0.00001), (count, _, _) ->
         new ContactRegistrationStage(planeNormals[3 - count], 0, [for (_ in 0...count) request(new Vec3())]));
     deficient.start();
     rejected = false;
-    try for (_ in 0...6) deficient.observe(new Vec3()) catch (_:Dynamic) rejected = true;
+    try {
+      for (_ in 0...3) deficient.observe(new Vec3());
+      deficient.selectNextStage();
+      for (_ in 0...2) deficient.observe(new Vec3());
+      deficient.selectNextStage();
+      for (_ in 0...1) deficient.observe(new Vec3());
+    } catch (_:Dynamic) rejected = true;
     check(rejected && deficient.result == null, "Independent planes alone cannot authorize a rank-deficient contact pattern");
     var inconsistent = new ContactRegistrationSequence(new ContactPoseEnvelope(Transform3.identity(),
       new Vec3(0.001, 0.001, 0.001), new Vec3(), 0.00001), (count, _, _) ->

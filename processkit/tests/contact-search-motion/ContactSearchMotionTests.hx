@@ -72,6 +72,15 @@ class ContactSearchMotionTests {
         Math.abs(preparedProbe.distance - 0.043 - probePlanner.airPoseReserve) < 1e-9, "Prepared search covers both signs of uncertainty and the IK air-clearance reserve in metres");
       check(preparedProbe.approachJoints != null, "Preparation retains the checked sensing configuration");
       check(solver.discoveries == 0, "Observed-branch preparation proves the sensing corridor without global IK discovery");
+      var minimumZ = -0.02 - (0.02 + 0.003 + probePlanner.airPoseReserve);
+      var liftedMotion = new StandoffObstacleProbePlanner(arm, source, minimumZ);
+      check(liftedMotion.violation([minimumZ]) != null, "The test fixture blocks the minimum probe standoff");
+      var lifted = new processkit.ProbePosePlanner(liftedMotion).prepareObserved(new Vec3(0, 0, -0.02),
+        new Vec3(0, 0, -1), 0.02, [0.0], WeldArcModel.TOUCH_TOLERANCE, 0.003, 1);
+      check(Math.abs(lifted.approach.translation.z - (minimumZ - 0.005)) < 1e-9,
+        'A blocked minimum standoff selects the next checked clearance height: got ${lifted.approach.translation.z}, expected ${minimumZ - 0.005}');
+      check(Math.abs(lifted.approach.translation.z + lifted.distance) < 1e-9,
+        "Lifting the probe start preserves the far edge of its CAD uncertainty interval");
       var local = screening.prepareObserved(new Vec3(0, 0, -0.02), new Vec3(0, 0, -1),
         0.02, [0.0], WeldArcModel.TOUCH_TOLERANCE, 0.003, 1);
       check(local.approachJoints != null && solver.discoveries == 0, "Observed-only preparation returns a checked sensing goal");
@@ -114,11 +123,36 @@ class ContactSearchMotionTests {
       var roundoffGoal = probePlanner.approachJoints([0.1000000000000005], [0.0]);
       check(Math.abs(roundoffGoal.endJoints[0] - 0.1) < 1e-12,
         "Probe approach clamps representation-sized IK overshoot to the exact joint limit");
+      var roundoffStart = probePlanner.approachJoints([0.08], [0.1000000000000005]);
+      check(Math.abs(roundoffStart.endJoints[0] - 0.08) < 1e-12,
+        "Probe approach clamps representation-sized observed-start overshoot to the exact joint limit");
       function cube(z:Float):Array<Float> return [for (x in [-0.001, 0.001]) for (y in [-0.001, 0.001])
         for (height in [z - 0.001, z + 0.001]) for (value in [x, y, height]) value];
-      var blocked = new CollisionClearance(arm, [
+      var probeContact = new CollisionClearance(arm, [
         {name: "tool", link: tool.id, vertices: cube(0), tool: true},
-        {name: "fixture", link: base.id, vertices: cube(0.015), tool: false}], [0.0], () -> new NativeCollisionWorld(), 0.003);
+        {name: "fixture", link: base.id, vertices: cube(0.014612), tool: false}], [0.0], () -> new NativeCollisionWorld(), 0.003,
+        CollisionClearance.CONTACT_MARGIN);
+      var blocked = probeContact;
+      var checkedProbe = new ProbeMotionPlanner(arm, planning.compiler, probeContact);
+      var brakingHit = checkedProbe.stoppingViolation([0.012], [0.005], 0.02);
+      var clearCorridor = checkedProbe.sensingCorridorViolation([0.0], new Vec3(0, 0, 1), 0.012);
+      var blockedCorridor = checkedProbe.sensingCorridorViolation([0.0], new Vec3(0, 0, 1), 0.0122);
+      check(brakingHit != null && brakingHit.a == "tool" && brakingHit.b == "fixture" &&
+          Math.abs(brakingHit.required - CollisionClearance.CONTACT_MARGIN) < 1e-12,
+        "Probe braking retains the standard tool-body contact clearance");
+      check(clearCorridor == null && blockedCorridor != null && blockedCorridor.a == "tool" &&
+          blockedCorridor.b == "fixture" && Math.abs(blockedCorridor.required - CollisionClearance.CONTACT_MARGIN) < 1e-12,
+        "A probe candidate proves its swept sensing corridor at the standard contact clearance");
+      var uncertainProbe = new processkit.ContactProbeRunner.ContactProbeRequest(Transform3.identity(),
+        new Vec3(0, 0, 1), 0.032, 0.01, 0.0005, 0.002, 0.0005);
+      var precontact = uncertainProbe.precontactDistance(0.022, 0.01);
+      check(Math.abs(precontact - 0.0115) < 1e-12 &&
+        checkedProbe.sensingCorridorViolation([0.0], new Vec3(0, 0, 1), precontact) == null &&
+        checkedProbe.sensingCorridorViolation([0.0], new Vec3(0, 0, 1), 0.022) != null,
+        "A surface inside contact uncertainty does not invalidate the guaranteed pre-contact corridor");
+      var noAir = false;
+      try uncertainProbe.precontactDistance(0.01, 0.01) catch (_:Dynamic) noAir = true;
+      check(noAir, "A probe with no clearance before possible touch cannot be prepared");
       var wire = new processkit.ProbeWireClearance(arm, tool.id, Transform3.identity(), 0.001, 0.015,
         [{name: "fixture", link: base.id, vertices: cube(0.015), tool: false}]);
       var wireGuarded = new ProbeMotionPlanner(arm, planning.compiler, null, wire);
@@ -161,8 +195,8 @@ class ContactSearchMotionTests {
       check(wireGuarded.violation([0.012]) != null, "Air clearance includes the wire beyond the nozzle");
       check(wireGuarded.violation([0.0135], true) == null, "Calibrated near-contact sensing permits the wire to approach without penetration");
       check(wireGuarded.violation([0.0145], true) != null, "Touch sensing cannot authorize wire penetration");
-      var brakingHit = wireGuarded.stoppingViolation([0.011], [0.1], 0.02);
-      check(brakingHit != null && brakingHit.a == "contact sensing wire" && brakingHit.b == "fixture",
+      var wireBrakingHit = wireGuarded.stoppingViolation([0.011], [0.1], 0.02);
+      check(wireBrakingHit != null && wireBrakingHit.a == "contact sensing wire" && wireBrakingHit.b == "fixture",
         "A rejected deadline brake retains the obstructing CAD bodies");
       check(!wireGuarded.stoppingClear([0.011], [0.1], 0.02), "Predicted braking also guards the unconsumed wire");
       forbidden = false;
@@ -238,7 +272,7 @@ class ContactSearchMotionTests {
     check(Math.abs(robot.snapshot().velocities.get(0)) < 1e-6, "The native joint is at rest after probing");
     servo.dispose(); harness.dispose();
   }
-  static function completeProbe(registration:Bool = false):Void {
+  static function completeProbe(registration:Bool = false, precision:Bool = false):Void {
     var fixture = axis(true);
     var model = fixture.model, arm = fixture.arm;
     var blueprint = RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
@@ -256,6 +290,7 @@ class ContactSearchMotionTests {
     var prepared = new Transform3(new Vec3(0, 0, 0.01), arm.tcpPose([0.0]).rotation);
     var requested = new ContactProbeRequest(prepared, new Vec3(0, 0, -1), 0.04, 0.005, 0.0005, 0.002,
       WeldArcModel.TOUCH_TOLERANCE);
+    if (precision) requested = requested.withPrecision(0.000001, ContactProbeRunner.SEARCH_AGE_SECONDS);
     var registrationRunner = new processkit.ContactRegistrationRunner(probe,
       new processkit.perception.ContactRegistrationSequence(
         new processkit.perception.ContactPoseEnvelope(Transform3.identity(), new Vec3(0, 0, 0.001), new Vec3(), 0.00001),
@@ -310,6 +345,8 @@ class ContactSearchMotionTests {
     check(fineRangeChecked, "Fine contact refinement executes with its bounded material distance");
     var point:Vec3 = cast probe.contact;
     check(point != null && Math.abs(point.z + 0.02) < 0.000006, "Fine probing improves the calibrated observation to within 6 micrometres");
+    if (precision) check(Math.abs(point.z + 0.02) <= 0.000001,
+      "A precision-limited native probe meets its micrometre contact budget after a shortened coarse backoff");
     check(touchEpisodes == 2, "The executed probe withdraws and measures a fresh second contact");
     check(safe, "Arc and wire remain off throughout approach, sensing, refinement and retreat");
     check(Math.abs(robot.snapshot().positions.get(0) - 0.01) < 0.0001, "Completed probing returns to the prepared air pose");
@@ -391,7 +428,7 @@ class ContactSearchMotionTests {
   public static function main():Void {
     fiveAxisPreparation();
     checkedJointRetreatFallback();
-    run(false, false); run(true, false); run(false, true); completeProbe(); completeProbe(true);
+    run(false, false); run(true, false); run(false, true); completeProbe(); completeProbe(true); completeProbe(false, true);
     registrationReturnsToStart(); sixAxisPreparation(); resetEpochs();
     Sys.println('Contact search native motion: $checks assertions passed');
   }
@@ -411,14 +448,17 @@ class ContactSearchMotionTests {
     var points = [new Vec3(-0.1, -0.1, 0), new Vec3(0.1, -0.1, 0), new Vec3(0.1, 0.1, 0),
       new Vec3(-0.1, 0.02, 0.05), new Vec3(0.1, 0.02, 0.05), new Vec3(0.04, -0.04, 0.05)];
     var normals = [new Vec3(0, 0, 1), new Vec3(0, 1, 0), new Vec3(1, 0, 0)];
+    var selectionStarts:Array<Float> = [];
     var sequence = new processkit.perception.ContactRegistrationSequence(
       new processkit.perception.ContactPoseEnvelope(Transform3.identity(), new Vec3(0.1, 0.1, 0.1),
         new Vec3(0.1, 0.1, 0.1), 0.00001), (count, _, _) -> {
+          selectionStarts.push(robot.snapshot().positions.get(0));
           var first = count == 3 ? 0 : count == 2 ? 3 : 5;
           var normal = normals[3 - count];
           return new processkit.perception.ContactRegistrationSequence.ContactRegistrationStage(normal,
             normal.dot(points[first]), [for (index in first...first + count)
-              new ContactProbeRequest(new Transform3(points[index], Quat.identity()), new Vec3(0, 0, -1), 0.1)]);
+              new ContactProbeRequest(new Transform3(points[index], Quat.identity()), new Vec3(0, 0, -1), 0.1)],
+            count == 2 ? [0.03] : null);
         });
     var registration = new ContactRegistrationRunner(probe, sequence);
     var initial = robot.snapshot().positions.get(0);
@@ -431,6 +471,12 @@ class ContactSearchMotionTests {
     check(registration.completed() && registration.failure == null && registration.workFrame != null,
       'Accepted registration completes only after returning to its start: ${registration.failure}');
     check(probe.requests == 6, "Registration executes all 3–2–1 contacts before restoring the arm");
+    check(selectionStarts.length == 3 && Math.abs(selectionStarts[0]) < 1e-9 &&
+      Math.abs(selectionStarts[1] - 0.03) < 0.005 && Math.abs(selectionStarts[2] - 0.03) < 0.005,
+      "Each next plane is selected from completed measurements before moving to its selected entry");
+    check(probe.starts.length == 6 && Math.abs(probe.starts[0]) < 0.005 &&
+      Math.abs(probe.starts[3] - 0.03) < 0.005 && Math.abs(probe.starts[5]) < 0.005,
+      "Probes begin only after their checked stage entry, including return to the saved start");
     check(Math.abs(robot.snapshot().positions.get(0) - initial) < 0.005 &&
       Math.abs(robot.snapshot().velocities.get(0)) < 1e-5,
       "Accepted contact registration restores the measured starting posture at rest");
@@ -520,6 +566,25 @@ private class ObservedProbeSolver extends motionkit.robot.ManipulatorKinematics 
   }
 }
 
+private class StandoffObstacleProbePlanner extends ProbeMotionPlanner {
+  final blockedZ:Float;
+  public function new(arm:Manipulator, compiler:motionkit.robot.ProgramCompiler, blockedZ:Float) {
+    super(arm, compiler);
+    this.blockedZ = blockedZ;
+  }
+  override public function violation(q:Array<Float>, contact:Bool = false):Null<robotkit.manipulation.ClearanceViolation> {
+    return q.length == 1 && Math.abs(q[0] - blockedZ) < 0.00015
+      ? {a: "probe", b: "fixture", distance: 0.0, required: 0.003} : null;
+  }
+  override public function observedApproachJoints(goal:Array<Float>, start:Array<Float>):processkit.ProbeMotionPlanner.CheckedProbeMove {
+    if (violation(goal) != null) throw "Probe approach goal is blocked by the fixture";
+    var move = motionkit.program.MotionOp.MoveJ(motionkit.program.MoveTarget.JointTarget(goal),
+      new motionkit.MotionOptions(), motionkit.program.Blend.ExactStop);
+    return new processkit.ProbeMotionPlanner.CheckedProbeMove(new motionkit.program.MotionProgram([move]), goal);
+  }
+  override public function corridorReachable(start:Array<Float>, direction:Vec3, distance:Float):Bool return true;
+}
+
 private class RetreatProbeSolver extends motionkit.robot.ManipulatorKinematics {
   public function new(arm:Manipulator) {
     super(arm);
@@ -552,6 +617,7 @@ private class StepLimitedProbeSolver extends motionkit.robot.ManipulatorKinemati
 
 private class RegistrationReturnProbe extends ContactProbeRunner {
   public var requests(default, null):Int = 0;
+  public final starts:Array<Float> = [];
   var fakeRunning = false;
   var fakeCompleted = false;
   var measured:Null<Vec3> = null;
@@ -563,6 +629,7 @@ private class RegistrationReturnProbe extends ContactProbeRunner {
 
   override public function start(request:ContactProbeRequest):Void {
     if (fakeRunning) throw "Fake registration probe is already running";
+    starts.push(motion.robot.snapshot().positions.get(0));
     requests++;
     measured = request.approach.translation;
     Reflect.setField(this, "contact", null);

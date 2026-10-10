@@ -15,7 +15,10 @@ class WheelOdometryLocalization implements Localization {
 
   final odometry:DifferentialOdometry;
   var varianceX:Float = 0.0;
+  var covarianceXY:Float = 0.0;
+  var covarianceXYaw:Float = 0.0;
   var varianceY:Float = 0.0;
+  var covarianceYYaw:Float = 0.0;
   var varianceYaw:Float = 0.0;
   var currentState:Null<LocalizationState> = null;
 
@@ -44,7 +47,8 @@ class WheelOdometryLocalization implements Localization {
     varianceYaw += yawVariancePerRadian * Math.abs(odometry.lastHeadingChange);
     currentState = new LocalizationState(snapshot.sourceSequence, pose,
       referenceFrame, bodyFrame,
-      new PoseCovariance2(varianceX, 0.0, 0.0, varianceY, 0.0, varianceYaw),
+      new PoseCovariance2(varianceX, covarianceXY, covarianceXYaw,
+        varianceY, covarianceYYaw, varianceYaw),
       LocalizationQuality.Degraded, snapshot.sourceTimestampNs,
       snapshot.receivedTimestampNs, snapshot.sourceClockId, snapshot.receivedClockId);
     return currentState;
@@ -52,10 +56,34 @@ class WheelOdometryLocalization implements Localization {
 
   public function state():Null<LocalizationState> return currentState;
 
+  /** Re-anchors wheel integration from a same-tick localization observation, retaining its uncertainty. */
+  public function rebase(observation:LocalizationState, snapshot:RobotSnapshot):LocalizationState {
+    if (observation == null || snapshot == null)
+      throw "Wheel odometry rebase requires a localization observation and robot snapshot";
+    if (observation.referenceFrame != referenceFrame || observation.bodyFrame != bodyFrame)
+      throw "Wheel odometry rebase localization frames do not match its configured frames";
+    if (observation.sequence != snapshot.sourceSequence)
+      throw "Wheel odometry rebase requires a localization observation from the same snapshot";
+    if (switch observation.quality { case Invalid: true; case _: false; })
+      throw "Wheel odometry cannot rebase from an invalid localization observation";
+
+    odometry.reset(observation.pose);
+    varianceX = observation.covariance.xx;
+    covarianceXY = observation.covariance.xy;
+    covarianceXYaw = observation.covariance.xYaw;
+    varianceY = observation.covariance.yy;
+    covarianceYYaw = observation.covariance.yYaw;
+    varianceYaw = observation.covariance.yawYaw;
+    return update(snapshot);
+  }
+
   public function reset(?pose:Pose2):Void {
     odometry.reset(pose);
     varianceX = 0.0;
+    covarianceXY = 0.0;
+    covarianceXYaw = 0.0;
     varianceY = 0.0;
+    covarianceYYaw = 0.0;
     varianceYaw = 0.0;
     currentState = null;
   }

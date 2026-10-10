@@ -76,6 +76,18 @@ class WeldStationTests {
     for (count in fullCalls) check(count == 1, "Full coverage checks are cached across selection retries");
     for (index in 0...proven.stations.length) for (name in proven.seams[index])
       check(fullCalls.exists(proven.stations[index].id + ":" + name), "Every assigned seam has a full-motion proof");
+    var sequenceChecks = 0;
+    var scheduled = WeldStationPlanner.verified(["a", "b"],
+      [new WeldStationCandidate("bad-sequence", new Pose2(1, 0)),
+        new WeldStationCandidate("good-sequence", new Pose2(2, 0))], new Pose2(),
+      (_, _) -> null, (_, _) -> null, distance, (plan) -> {
+        sequenceChecks++;
+        return plan.stations[0].id == "bad-sequence"
+          ? new processkit.WeldStationPlanner.WeldStationPlanFailure("bad-sequence", ["a"], "ordered group cannot be executed")
+          : null;
+      });
+    check(sequenceChecks == 2 && scheduled.stations.length == 1 && scheduled.stations[0].id == "good-sequence",
+      "A whole-group motion failure removes its assigned edge and retries another complete cover");
     rejects(() -> {
       WeldStationPlanner.verified(["a"], candidates, new Pose2(), (_, _) -> null,
         (_, _) -> "all entries collide", distance);
@@ -113,7 +125,32 @@ class WeldStationTests {
         Math.abs(Pose2.wrapAngle(expected.yaw - moved[index].pose.yaw)) < 1e-9,
         "A displaced CAD work frame displaces its stations without authored world coordinates");
     }
+    var independent = WeldStationCandidates.aroundWithHeadings(endpoints, work, mount, 0.45, 0.65, 3, 12, 4);
+    check(independent.length == 144, "Independent position and base-heading grids enumerate every proposal");
+    var ids = new Map<String, Bool>();
+    for (index in 0...independent.length) {
+      var candidate = independent[index];
+      var arm = candidate.pose.compose(new Pose2(mount.x, mount.y)).relativeTo(work);
+      var site = Std.int(index / 4), radial = site % 3, heading = index % 4;
+      var standoff = 0.45 + 0.1 * radial;
+      check(Math.abs(Math.sqrt(arm.x * arm.x + arm.y * arm.y) - standoff) < 1e-9,
+        "Independent headings preserve the CAD-derived arm-mount position");
+      check(Math.abs(Pose2.wrapAngle(arm.yaw - 2 * Math.PI * heading / 4)) < 1e-9,
+        "Base heading samples vary independently of the polar position");
+      check(!ids.exists(candidate.id), "Independent station proposals have unique ids");
+      ids.set(candidate.id, true);
+    }
+    var independentMoved = WeldStationCandidates.aroundWithHeadings(endpoints, shift.compose(work), mount,
+      0.45, 0.65, 3, 12, 4);
+    for (index in 0...independent.length) {
+      var expected = shift.compose(independent[index].pose);
+      check(Math.abs(expected.x - independentMoved[index].pose.x) < 1e-9 &&
+        Math.abs(expected.y - independentMoved[index].pose.y) < 1e-9 &&
+        Math.abs(Pose2.wrapAngle(expected.yaw - independentMoved[index].pose.yaw)) < 1e-9,
+        "Independent heading proposals transform with the live CAD work frame");
+    }
     rejects(() -> { WeldStationCandidates.around([], work, mount, 0.4, 0.6); }, "seam endpoints");
     rejects(() -> { WeldStationCandidates.around(endpoints, work, mount, 0.6, 0.4); }, "standoffs");
+    rejects(() -> { WeldStationCandidates.aroundWithHeadings(endpoints, work, mount, 0.4, 0.6, 3, 12, 0); }, "at least one heading");
   }
 }

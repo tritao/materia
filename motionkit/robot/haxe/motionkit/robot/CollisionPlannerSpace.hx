@@ -59,10 +59,15 @@ class CollisionPlannerSpace implements PlannerSpace {
   public function upper():Array<Float> return bodyUpper.copy();
 
   public function invalid(q:Array<Float>):Null<String> {
-    bodies.place(build, bodies.state(q));
-    var found = build.world.violation(margins);
+    var found = violation(q);
     if (found == null) return null;
     return '${name(found.a)} / ${name(found.b)} (${found.distance} m, needs ${found.required} m)';
+  }
+
+  /** Structured diagnostics for callers that need the actual contact pair. */
+  public function violation(q:Array<Float>):Null<collisionkit.CollisionViolation> {
+    bodies.place(build, bodies.state(q));
+    return build.world.violation(margins);
   }
 
   function name(worldObject:Int):String {

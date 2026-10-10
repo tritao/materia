@@ -997,7 +997,7 @@ Dependencies:
 | P1 | Done (2026-10-05) | Mobile welding carrier, insulated storage and converter service graph; CAD fit/mass checks and both-backend carrier movement pass. |
 | P2 | Done (2026-10-05) | Minimum verified candidate cover: 2 stations / 10 seams; complete goTo/weld/stow mission passes both backends in 270.3 s; affected milestone gates pass. |
 | P3 | Done (2026-10-06) | Executed touch searches, corrected registration and checked live stow; both-backend mission and milestone gates pass. |
-| P4 | Open | Measured load integration, voltage sag/cutoff and pre-seam docking/charging. |
+| P4 | Done (2026-10-10) | CAD battery/dock profiles; measured load and sag integration; complete full-pack and dock/charge/resume missions on both backends; executed voltage cutoff, parking precision and affected milestone checks pass. |
 | P5 | Open; required | Rendered-depth laser profiler and executed live seam correction. |
 
 
@@ -2677,3 +2677,623 @@ measured electrical load integration, voltage sag/cutoff and dock/charge/resume
 behavior. Required P5 remains open for rendered-depth laser profiling and
 executed live seam correction under displacement, noise and stale/missing
 observations.
+
+### P4 full-pack mission regression investigation (2026-10-07)
+
+The current uncommitted P4 work fails the full-pack MuJoCo mission at the second
+station's final contact-registration stage, with no charging trip. It reaches
+that station, completes the 3-contact and 2-contact planes, then cannot prepare
+an independent 1-contact plane. The reported blocked configurations include
+the table and the neighboring right post. This does not invalidate the earlier
+P3 closeout result; the P4 branch changes the mobile cell and power model, and
+the cause has not yet been isolated.
+
+A temporary second-station-only runner reproduced the five contacts, then spent
+over two wall minutes in final-plane selection without progress and was stopped.
+A diagnostic 30-degree heading shift made the first coarse probe take over 250
+simulated seconds and was also stopped; it did not establish a usable alternate
+station. Both temporary runner hooks were removed. The useful next repair is to
+include complete registration access in CAD station-candidate verification,
+then retain runtime checks against the measured pose. This keeps station
+selection in the CAD/ProcessKit planning boundary instead of adding a fixed
+parking pose or weakening probe clearance. The focused failure report remains
+in ignored `app/build/p3-mission-mujoco-lift-10mm.log`.
+
+### P4 station coverage retry (2026-10-07)
+
+The station integration now performs a bounded exact look-ahead for the final
+one-contact probe before preferring a two-contact registration stage. The
+look-ahead checks the selected approach and sensing corridor; an exact first
+stage remains as fallback, and the complete station preflight still decides
+whether the candidate is usable. The focused project compiles 1,306 sources.
+
+The runtime station check still finds no complete cover. `station:9:2` and
+`station:9:3` complete all six nominal 3–2–1 contacts, prove the checked return
+to ready, and select several seam paths, but the planner still has no station
+for `work/basePlate:box.+z|work/upright:box.-y`. Candidates `station:2:4`,
+`station:3:2`, `station:3:3`, `station:3:4` and `station:10:4` reach the fifth
+contact but cannot prepare the final independent probe on
+`work/postLeft:side(seg.1)@0`. Other candidates fail earlier in registration;
+the two successful stations cannot substitute for the missing seam access.
+
+The bounded exact look-ahead therefore has not repaired P4. The next repair is
+to improve CAD-derived station pose proposals or registration-stage planning
+so the complete contact sequence and all seam paths are checked together.
+Keep the approach-clearance checks intact. The P4 load, voltage-cutoff and
+dock/charge/resume gates remain unrun until a complete mission is feasible.
+
+### P4 station pose and ordered-schedule repair (2026-10-07)
+
+The failed pose grid tied chassis yaw to the radial direction of the mounted
+arm. `WeldStationCandidates.aroundWithHeadings` now keeps CAD-derived arm-mount
+locations and samples chassis headings independently. Each pose is still only
+a proposal: the floor map, full registration, seam motion, ordered mission and
+stow checks decide whether it is usable. The finite grid remains a practical
+search, not a claim of a continuous optimum.
+
+The station policy now accepts an optional whole-plan verification callback.
+After individual coverage edges pass, MachineKit checks the exact generated
+run order from the ready joints and the checked return before accepting the
+cover. If a run or stow fails, the assigned seam edges are rejected and the
+minimum-cover search retries. This closes the gap where individually reachable
+seams produced an unreachable ordered mission.
+
+The focused ProcessKit station suite passes 727 checks. The CAD station
+integration passes with two stations, all ten unique seams, six-contact
+registration and checked stow at each station; the route is 8.780004 m. The
+first station covers the `work/upright:box.+y` plate seam, and the second covers
+the `work/upright:box.-y` seam. P4's full-pack, voltage-cutoff and derated
+dock/charge/resume simulation gates are now the next checks.
+
+### P4 live registration reach correction (2026-10-07)
+
+The first MuJoCo full-pack run reaches station one and completes five nominal
+3-2-1 probes, but runtime cannot prepare the final one-contact plane after
+applying the measured contacts. CAD preflight still proves the nominal pose;
+the runtime pose uses the measured work-frame estimate. The failure preserves
+the 3 mm air-clearance rule and shows the endpoint reach screen is insufficient
+to choose the final contact by itself.
+
+The bounded one-contact lattice already provides up to eight spread samples per
+CAD face. Selection now fully checks every endpoint-screened sample instead of
+only the two points closest to the face centre. This keeps the same finite
+candidate set and clearance margins, but the full-pack rerun failed at the same
+final plane and simulation time; the broader spread did not repair this station.
+
+The deterministic backend reproduces the same final-stage failure. A focused
+diagnostic shows five measured contacts, two independent planes, a fitted pose
+shift of 0.11 mm / 0.02 mm / 0 mm and a final arm posture identical to the
+preflight posture within floating-point error. The exact prepared approaches
+miss the 3 mm air minimum by up to about 0.13 mm after live contact refinement.
+Changing the base parking tolerance from 10 mm / 1 degree to 2 mm / 0.2 degrees
+did not fix it, so the original half-envelope tolerance is retained.
+
+The first conservative retry used a 3.5 mm patch boundary and 3.5 mm probe
+standoff. It preserved the 3 mm body-clearance and 0.5 mm contact-zone rules,
+but runtime could not prepare the first 3-contact plane at station one. The
+patch boundary is restored to 3 mm; the probe start keeps a 0.2 mm reserve
+above the standard 3 mm standoff. The bounded patch search still checks the
+full eight-point spread after endpoint screening. The energy mission remains
+the focused validation; voltage cutoff, derated charging and P5 remain open.
+
+### P4 dock-return work-frame repair (2026-10-07)
+
+The derated MuJoCo run reaches the CAD charger, delivers 634.4 Wh on its first
+trip, returns, and resumes welding. Later seams cause additional top-ups. After
+four dock trips and 691.8 Wh delivered cumulatively, a post-dock re-registration
+fails while selecting its final one-contact plane. A read-only debugger trace
+places the cost in repeated candidate approach and clearance checks; the
+failure is not in charging or dock alignment.
+
+The workpiece is clamped and stationary for a charging excursion. Keep each
+authored station's executed contact measurement in the map frame, anchored by
+the current valid map-localization observation. On dock return, require a fresh
+map observation with uncertainty inside the saved contact envelope, rebase
+wheel odometry from it, and resume with the retained map work frame. A later
+authored station still clears the prior frame and performs new contact probes.
+This avoids treating dock alignment as localization and avoids re-probing a
+stationary fixture after every charge. The map-frame change and focused
+displaced-workpiece check are pending validation; P4 remains open.
+
+### P4 registration stage checkpoint repair (2026-10-07)
+
+Each selected registration plane now owns an optional, defensively copied arm
+checkpoint for choosing the next plane. Runtime look-ahead tries the checked
+terminal posture first, then the saved registration start, and proves the next
+exact plane from that target. Each later plane is selected again after its new
+contacts arrive, avoiding a duplicate nominal prediction of downstream IK
+search. The registration runner follows the selected transition through the
+probe planner; station preflight applies the same checkpoint contract. A
+missing checkpoint retains the conservative return to the saved start. Probe
+clearances and CAD-derived contact candidates are unchanged.
+
+The first two displaced-workpiece app runs did not finish. The first reached
+the nested look-ahead after project generation and runtime setup but was
+stopped before it returned. The second removed that nesting but spent over ten
+minutes in exact next-stage route planning. Prediction now checks eight roll
+branches, while the selected live stage still checks all sixteen. This limits
+only pre-contact prediction; it does not authorize motion or relax the executed
+path and corridor checks.
+
+The focused ProcessKit registration sequence passes 109 assertions and the
+native probe-motion suite passes 127. The CAD station integration proves two
+stations, all ten unique seams, full six-contact registration and checked
+stow; its route is 8.915212 m. The app compiler passes all 2,002 sources. Both
+displaced-workpiece runtime checks were stopped before returning a result: the
+first after about 25 minutes and the second after about 30 minutes. The second
+spent about 14.5 minutes in generated-project compilation and over ten minutes
+in exact next-stage trajectory checks. The eight-roll prediction bound still
+needs runtime validation. The registration app gate is unresolved. P4 energy,
+voltage-cutoff and dock/charge/resume validation remain open.
+
+### P4 loaded voltage-cutoff regression (2026-10-10)
+
+The focused power suite now distinguishes stored-energy exhaustion from a
+voltage-sag cutoff. A 30%-charged test pack still holds more than 20 Wh when a
+5 kW demand pushes its terminal voltage below the CAD cutoff and disables its
+supply. Removing that unsupported demand restores open-circuit voltage without
+adding charge. All 25 power checks and the existing voltage-resolution checks
+pass. This verifies the pack model; the executed welding cutoff and complete
+charge/resume app gates remain required. The registration app check is running
+with the eight-roll prediction bound and has not returned a result.
+
+### P5 implementation boundaries (2026-10-10)
+
+Use SensorKit's existing rendered metric-depth path to produce a calibrated
+laser-sheet cross-section. SensorKit owns the profile geometry, validity and
+capture/delivery timestamps; its output is an observation, without a CAD seam
+coordinate. Declare the profiler's mounting frame and calibration with the
+torch assembly. Keep SceneKit's camera axes (+X forward, +Z up) explicit at the
+adapter boundary rather than silently treating them as optical +Z-forward axes.
+
+ProcessKit owns seam extraction from the measured profile, correspondence to
+the CAD weld, pre-weld alignment and bounded transverse tracking correction.
+CAD provides the intended seam and face directions, while rendered samples
+provide the measured intersection. Reject insufficient or ambiguous profiles;
+retain observation freshness and frame checks through execution. Missing or
+stale samples must lead to a controlled arc-off stop rather than continued
+welding against an unobserved correction.
+
+Execute tracking through MotionKit's existing servo lane with one arm motion
+owner. Feed the intended weld motion and measured correction to that owner;
+do not run an independent correction stream alongside a queued weld trajectory.
+The welding process remains in ProcessKit, and RobotKit's device protocol stays
+generic. Validate rendered profile geometry separately, then pre-weld alignment
+and injected displacement during a live weld, including stale/missing samples.
+These are implementation decisions, not completed P5 features; P4 gates still
+precede P5 implementation and milestone validation.
+
+### P4 uncertainty-aware pre-contact clearance (2026-10-10)
+
+The static sensing-ray witness previously ran to ten micrometres before the
+nominal CAD plane. An actual surface may lie closer anywhere inside the saved
+normal uncertainty, so that witness could reject a valid touch search by
+checking through its potential contact interval. A prepared probe now derives
+its pre-contact distance from nominal plane travel minus normal uncertainty
+and calibrated touch offset. Static swept clearance covers that guaranteed
+interval. Full search kinematic reachability remains checked, and every live
+sensing tick still proves its deadline/braking path against observed geometry
+at the existing contact margins. A missing positive pre-contact interval is
+rejected.
+
+The native probe-motion regression places an obstruction inside the contact
+uncertainty: the guaranteed pre-contact corridor is clear while the path to
+the nominal plane is blocked. All 129 assertions pass. Checkpoint selection
+also fails immediately once its existing continuation budget is exhausted;
+previously it kept preparing candidates that could no longer obtain a
+checkpoint. Its limits and acceptance rules are unchanged.
+
+The eight-roll app attempt completed CAD generation but remained in exact
+next-stage route planning. It was stopped without a result after finding the
+range defect; it is not a passing registration gate. The rebuilt app compiles
+all 2,002 sources. Its displaced-workpiece retry with these repairs is running
+and recorded in `app/build/p4-registration-precontact.log`; runtime validation
+is pending. P4 and P5 remain open.
+
+### P4 executed voltage-cutoff gate (2026-10-10)
+
+`PROJECT_SOURCE_ONLY=mobile-welder-voltage-cutoff` reuses the executed
+displaced-parking registration and first-weld setup on both backends. After
+the first established arc, the test injects a pack-state fault with positive
+stored energy and open-circuit voltage halfway between the CAD empty voltage
+and cutoff. It requires all twelve registration touch episodes, disabled
+pack/welder supply, zero arc and welding power, and the process runner's
+three-restart failure. The scenario is bounded to sixty simulated seconds
+after fault injection. Normal registration and complete-mission gates still
+require correct, gap-free beads.
+
+The updated app compiles all 2,002 sources. This new gate has not run yet;
+the repaired normal registration retry remains live in CAD generation and
+heavy app checks will run serially. No executed-cutoff result is claimed.
+
+### P4 measured stage entries replace nominal look-ahead (2026-10-10)
+
+The pre-contact-range retry returned a deterministic-backend failure after
+executing the first plane's three contacts, with six coarse/fine touch
+episodes. Selection prepared two-contact candidates but rejected them after
+eight checkpoint trials because their nominal final-plane prediction failed.
+The captured diagnostic reports nozzle/base-plate clearance below the 3 mm air
+minimum. MuJoCo was not reached. The log is
+`app/build/p4-registration-precontact.log`.
+
+A nominal rollout before the next contacts arrive cannot establish that
+plane's real measured pose. Remove that prerequisite and select every next
+stage from the completed contacts and current arm posture. If no full checked
+stage is available there, prove a transition to the saved registration start
+and prepare the stage from that fallback. Each stage owns a defensively copied
+entry posture; the runner selects it after measurement, follows its checked
+entry, and only then starts its probes. CAD preflight uses the same contract
+with nominal observations. It still verifies all six contacts and the final
+return, while execution still publishes the work frame only after the full fit
+and a checked return to the saved start.
+
+This supersedes the pre-measurement checkpoint prediction and eight-roll
+experiment above. All actual probe preparation uses sixteen roll branches;
+there are no nominal future-stage approval gates or checkpoint-trial caps.
+The bounded CAD lattice and actual path, clearance, kinematic and braking
+checks remain. The focused sequence/envelope/fitting suite passes, including
+24 sequence assertions and 109 fitting assertions. The native probe-motion
+suite passes 130 assertions, including selection at the measured endpoint
+followed by the chosen entry before probing. The app compiles all 2,002 sources.
+Its adaptive-entry registration retry is running, with line-buffered output in
+`app/build/p4-registration-adaptive-entry.log`. Runtime validation is pending.
+P4 and required P5 remain open.
+
+### P4 registration chain-distance oracle (2026-10-10)
+
+The adaptive-entry retry executes all six deterministic-backend contact probes
+and all twelve coarse/fine touch episodes. Its accepted frame passes the
+0.1 mm seam-frame bound, and the first weld completes. The test then reports
+a 40.002788 mm tip error because it takes the maximum distance to every
+segment of the first weld. The current station schedule starts with a chain,
+so a tip on one segment is naturally far from another segment.
+
+The oracle now takes the nearest segment distance at each arc tick, then the
+maximum of those distances over execution, matching the complete-mission
+check. The 1.5 mm tip tolerance and bead checks are unchanged. App rebuild
+and the focused both-backend registration rerun are pending; the prior run
+is a failed test, not a passing registration gate.
+
+The corrected both-backend check passes using the cached 67-component
+artifact. Deterministic simulation executes twelve touch episodes with
+0.024992379 mm seam-frame error and 0.024975265 mm worst tip error; MuJoCo
+executes twelve episodes with 0.068839169 mm and 0.068794507 mm respectively.
+Both complete the first weld and pass its leg/gap checks. Results are in
+`app/build/p4-registration-chain-distance.log`. The 20 mm/2-degree boundary
+regression is running; complete energy, cutoff and charge/resume gates remain
+pending. P4 and required P5 remain open.
+
+### P4 parking-boundary accuracy investigation (2026-10-10)
+
+The 20 mm/2-degree boundary check completes twelve touch episodes on both
+backends. The MuJoCo frame misses the real seam by 0.112878084 mm, exceeding
+the unchanged 0.1 mm limit (`app/build/p4-registration-boundary.log`). This
+is a failed gate. Add test-only per-plane contact residual diagnostics to
+distinguish sensing bias from amplification by the selected contact geometry
+before changing the measurement policy. The executed voltage-cutoff gate is
+running separately; no result is claimed yet.
+
+The executed voltage-cutoff gate subsequently passes on both backends
+(`app/build/p4-voltage-cutoff.log`, exit 0). Each completes twelve touch
+episodes before the established-arc pack fault. Both report 40.938289660 V
+with 1,712.328767 Wh remaining, disabled supply, zero arc/power, and the
+expected three-restart process failure. The boundary accuracy gate remains
+open; its focused MuJoCo filter avoids rerunning the passing deterministic
+case while investigating per-plane contact errors.
+
+The test-only diagnostic rerun reproduces the MuJoCo boundary failure
+exactly (`app/build/p4-boundary-diagnostic.log`, exit 1). The first plane's
+three residuals are -4.854201, -4.274431 and -1.532131 micrometres, on a
+triangle approximately 11 mm long and 4.5 mm high. The other three residuals
+are -4.173022, -4.535181 and -2.165163 micrometres. Thus individual contacts
+satisfy the saved 10-micrometre measurement envelope, while the narrow
+triangle can amplify their differences into a frame error above 0.1 mm at
+the seam. Investigate geometry-dependent sensing precision and fit
+conditioning; do not loosen the seam tolerance or bypass the six-contact
+rank-six acceptance gate. No production accuracy repair is implemented yet.
+
+### P4 geometry-dependent probe precision (2026-10-10)
+
+ProcessKit now allocates fine-contact precision over the selected 3-2-1
+pattern and the complete CAD work extent. Triangle barycentric leverage and
+its gradient account for displacement and tilt away from the sampled plane;
+pair spacing and plane independence account for the remaining components.
+Each stage gets one third of a 0.1 mm work-point error budget. The allocation
+caps the motion-dependent observation error at the saved contact envelope;
+it does not replace that envelope or the full rank-six fit.
+
+The CAD bridge supplies target-member contour vertices and the selected probe
+points. ContactProbeRequest caps fine speed against both sampling and
+feedback-age uncertainty. It also bounds the fine entry backoff from the
+coarse speed and feedback age, avoiding long slow searches over the former
+fixed 2 mm backoff. Preparation, independent plane checks, six contacts,
+clock checks, braking/clearance checks, and final checked return are retained.
+No saved-format change or old-format compatibility is introduced.
+
+The focused registration suite passes its existing 20 search, 67 envelope,
+24 sequence and 109 fitting assertions, plus 517 precision assertions. The
+new checks exercise all 64 signs of bounded contact errors through the
+independent rigid fit over eight work-extent corners. The native motion suite
+passes 141 assertions, including an executed precision-limited probe within
+1 micrometre after the shortened backoff. App build and both-backend parking
+boundary validation remain pending. P4 and P5 remain open.
+
+The app subsequently compiles all 2,003 sources
+(`app/build/p4-registration-precision-compile.log`). The both-backend boundary
+check is live in CAD regeneration
+(`app/build/p4-registration-precision-boundary.log`). Its confirmed child is
+working inside probe approach/arm-clearance checks; no runtime boundary
+result is claimed yet. Other heavy gates remain queued serially.
+
+### P4 complete-pack measurement gate (2026-10-10)
+
+The full-mission project-source filter now runs both supported backends,
+rather than only MuJoCo. During execution its test integrates the exposed
+bus load, welding AC power and positive arm/drive mechanical power. For the
+full pack, stored-energy loss must equal the bus demand plus the observed
+current's internal-resistance losses within 0.002 Wh. This balance follows
+energy conservation and does not duplicate the battery's current solver.
+Both full and derated missions must report positive welding/bus energy and
+remaining stored energy, in addition to their existing bead, clearance and
+dock/resume checks. Per-backend energy totals will be printed for review.
+
+The updated app compiles all 2,003 sources
+(`app/build/p4-mission-energy-balance-compile.log`). Runtime full/derated gates
+are queued after the live boundary check, not yet passing evidence.
+
+### P5 rendered-depth access and capture frames (2026-10-10)
+
+Inspection confirms that SensorKit's native SceneCameraAdapter already
+captures metric depth, but SceneKit's exported C/Haxe renderer currently
+offers RGBA capture rather than depth capture. Expose generic depth capture
+at SceneKit's rendering boundary instead of deriving distances from CAD seam
+coordinates or coupling SensorKit to private SceneKit snapshot internals.
+Keep depth unprojection, laser-sheet calibration and stamped profile data
+in SensorKit; ProcessKit consumes profiles to estimate the seam.
+
+Capture-time arm poses must accompany or be retained for profile alignment;
+using the latest arm pose for an older profile introduces a motion-dependent
+frame error even when the sample is fresh. Keep camera-forward +X and image
+up +Z explicit, and convert the editor's CAD units to metric sensor units at
+the adapter boundary. These are design choices for the still-unimplemented
+P5 work, not a rendered-profile or tracking gate result.
+
+### P4 parking-boundary precision gate passes (2026-10-10)
+
+The geometry-dependent precision repair passes the unchanged 20 mm/2-degree
+boundary check on both backends
+(`app/build/p4-registration-precision-boundary.log`, exit 0). Both execute
+twelve coarse/fine touch episodes and complete the first weld with correct
+leg size and no gaps. Deterministic seam-frame error is 0.001627361 mm and
+worst tip error 0.001627359 mm; MuJoCo errors are 0.002509396 mm and
+0.020083007 mm. The original 0.1 mm frame and 1.5 mm tip bounds are retained.
+
+Registration finishes at 356.89 simulated seconds on the deterministic
+backend and 302.58 on MuJoCo. The increased duration is intentional: the
+narrow triangle requires slower fine sensing to avoid amplified sampling
+error. Broad stages use their less demanding geometry-derived budgets.
+The complete both-backend full-pack mission, including energy conservation,
+is now running (`app/build/p4-full-pack-mission.log`). Dock/charge/resume and
+remaining affected milestone checks are still pending. P4 and P5 stay open.
+
+The full-pack mission passes on the deterministic backend: two stations,
+ten seams, 1,003.9 simulated seconds, 4.9–5.0 mm legs, complete bead extents,
+no gaps, checked stow and zero charging trips. Bus demand is 166.462091275 Wh
+and internal-resistance loss 7.145366345 Wh; the final 24,826.392542380 Wh
+matches their sum against the initial 25,000 Wh pack within the gate's
+0.002 Wh tolerance. Welding AC contributes 120.739818710 Wh. The ideal test
+backend reports zero joint efforts, hence zero measured arm/drive mechanical
+energy; the MuJoCo run is still live and will exercise its actuator-effort
+feedback. Results are in `app/build/p4-full-pack-mission.log`; the overall
+both-backend gate is not yet claimed complete.
+
+The full-pack gate subsequently completes on both backends (exit 0).
+MuJoCo finishes the two-station, ten-seam mission in 911.7 simulated seconds,
+with 4.9–5.0 mm legs, complete extents, no gaps, checked stow and zero charging
+trips. Its bus demand is 163.578848702 Wh and resistance loss 7.145214849 Wh,
+leaving 24,829.275936450 Wh. Welding AC contributes 120.760337865 Wh; measured
+positive arm and drive mechanical work are 0.222787192 Wh and 0.000594441 Wh.
+The energy balance passes the same 0.002 Wh bound. These are actuator-effort
+measurements from the current simulator; the mobile pose plant remains its
+existing ideal kinematic drive rather than a new traction model.
+
+Local main has advanced to `0f574ed490335e15e08f0b238e147e256a329a60`, with
+changes to planning, simulation/collisions and app presentation. Integrate
+only main, preserving this draft with a unique tagged stash and restoring by
+SHA, before the remaining dock/charge/resume and affected milestone checks.
+P4 has not been committed or synchronized; P5 remains required and open.
+
+### P4 latest-main integration (2026-10-10)
+
+Merged local main `0f574ed490335e15e08f0b238e147e256a329a60` as
+`1878168c11887b11356939c56fb0cef7b57f93ce`. Restored the P4 draft by its
+saved stash SHA and resolved its three conflicts by retaining measured
+registration stage entries and probe precision while adopting main's
+CollisionClearance and NativeCollisionWorld boundary. Preserve the new
+project-settings payload in scene schema 20, but reject all other versions;
+replace main's schema-17 compatibility assertion with a rejection check.
+
+The merged app compiler-only build passes (2,079 sources). ProjectKit passes
+185 assertions, including the current project-settings round trip and old
+schema rejection (`app/build/p4-main-projectkit.log`). The local compiler and
+HashLink runtime were aligned to the already-recorded main revisions, without
+changing pins. The native app integration build and remaining executed P4
+gates are pending; pre-merge execution results are not merged-main evidence.
+
+The native app integration build also passes
+(`app/build/p4-main-native-build.log`, exit 0). Focused contact registration
+passes 20 search, 67 envelope, 24 sequence, 517 precision and 109 fitting
+assertions; native contact-search motion passes 141 assertions under the new
+CollisionClearance backend. ProjectKit's validated schema/profile change is
+committed separately as `4c795c3fd824c82987c7e390a2969f0f328b0330`.
+The merged-main derated MuJoCo mission is executing; it has completed its
+first station and five dock/charge/return cycles, but that intermediate state
+is not a complete mission gate. Local main remains unchanged.
+
+The complete merged-main derated MuJoCo gate passes
+(`app/build/p4-main-dock-resume-mujoco.log`, exit 0): two stations, ten seams,
+3,191.1 simulated seconds, 4.9–5.0 mm legs, complete 40/180 mm bead extents,
+no gaps and checked stow. It performs seven dock/charge/return cycles,
+charging 798.231311451 Wh over 1,080.98 seconds. Fresh registration succeeds
+at both stations and welding resumes after each charging excursion. Executed
+bus demand is 243.511185536 Wh, resistance loss 28.952430337 Wh, welding AC
+120.720073458 Wh, arm mechanical work 0.214407627 Wh and drive mechanical
+work 0.006879061 Wh; stored energy ends at 1,033.312217460 Wh. The test's
+reduced-capacity 1,800 Wh pack starts at 25% charge. Its deterministic peer
+and the remaining milestone checks are still pending.
+
+The deterministic derated peer also passes
+(`app/build/p4-main-dock-resume-deterministic.log`, exit 0): two stations,
+ten seams, 3,313.5 simulated seconds, seven charging trips, 802.044435336 Wh
+charged over 1,086.15 seconds, 4.9–5.0 mm legs, complete bead lengths, no gaps
+and checked stow. Bus demand is 247.480660555 Wh, resistance loss
+29.051145760 Wh, welding AC 120.720748062 Wh and final stored energy
+1,033.336943684 Wh. The ideal backend again supplies zero arm/drive effort.
+Both backend gates now prove docking, aligned charging, return handoffs,
+fresh second-station registration and whole-weldment completion on merged
+main. Remaining affected focused suites and full-pack/cutoff/app milestone
+checks still precede P4 synchronization and required P5 implementation.
+
+Remaining merged-main kit checks completed: MachineKit power 25 checks,
+MotionKit bootstrap 1,224,714 assertions plus candidate seeds 23, RobotKit
+world 5,449, ProcessKit stations 727, CAD probes 5,415 over 468 exposed
+samples, and ProcessKit weld planning 609/welder 66 (with its rate, weave,
+pass and bead checks also passing). Logs are the `p4-main-*` files under
+`app/build`. Their validated changes are committed in separate kit commits;
+main has not been updated.
+
+The milestone MachineKit smoke initially failed compilation because its
+manifest did not declare machinekit-process while importing the mobile
+welder example. Add that existing dependency; the dedicated CAD station
+suite also needs main's explicit collisionkit-native dependency. The smoke
+retry is running; neither the smoke nor remaining app gates is yet claimed
+complete.
+
+The corrected MachineKit milestone smoke passes
+(`app/build/p4-main-machinekit-smoke.log`, exit 0), including the declared-mass
+router acceleration baseline and fixed/mobile welder checks. Its slower
+portion was OCCT face-intersection tolerance calculation, confirmed with a
+single stack sample; it advanced and was not restarted. The smoke dependency
+fix is committed as `3f8385233`; the router physical-model test correction is
+`8a6eca8b3`. The dedicated CAD station check is running next, followed by the
+remaining app gates. This is still an incomplete P4 closeout.
+
+Dedicated CAD station verification passes
+(`app/build/p4-main-cad-stations.log`, exit 0): two stations, ten unique CAD
+seams, an 8.915212309579 m directed route and checked registration returns.
+The CAD schedule/power integration is committed as `1766e95a4`.
+
+The nested NativeKit checkout was then aligned to the revision already
+recorded by main's Haxeon (`ad6541dda093c1402b86004a429a9f70c8c354d1`);
+no gitlink pin was changed. Its delta covers platform event handling,
+transport and GPU uploads rather than the tested contact/station algorithms
+or physics models. The pinned native app rebuild passes
+(`app/build/p4-main-pinned-native-build.log`, exit 0). The final full-pack app
+gate is running against those pinned libraries. Previous numerical gates
+remain recorded separately rather than relabelled as results of this rebuild.
+
+The final pinned-library full-pack gate passes on both backends
+(`app/build/p4-main-full-pack.log`, exit 0): two stations, ten seams, complete
+40/180 mm bead extents, 4.9–5.0 mm legs, no gaps, checked stow and no docking.
+The deterministic run retains its pre-merge 1,003.9 s duration and energy
+totals: 166.462091275 Wh bus plus 7.145366345 Wh resistance, leaving
+24,826.392542380 Wh. MuJoCo retains 911.7 s, with 163.579001229 Wh bus plus
+7.145235949 Wh resistance, leaving 24,829.275762823 Wh. Its welding AC energy
+is 120.760478403 Wh; measured positive arm/drive work is 0.222787034 Wh and
+0.000594441 Wh. Both independent stored-loss balances meet 0.002 Wh.
+
+The map-anchored registration repair is committed separately as `b1eda90e9`;
+it accepts a fresh valid map pose with bounded covariance, retains the clamped
+work frame while the base moves, and transforms the weld through the same
+map localization. The app's measured power/charging feature and executed
+regression checks remain separate pending commits. Voltage-cutoff and the
+required welder/arm/mobile milestone app checks remain pending.
+
+The final pinned-library voltage-cutoff gate passes on both backends
+(`app/build/p4-main-voltage-cutoff.log`, exit 0). The fault leaves
+1,712.328767123 Wh stored at 40.938289660 V; supply and arc are off,
+and the expected three-restart failure is observed.
+
+Draft review found that the ordinary parking-registration injection had
+been reduced from 12/-9 mm and 0.025 rad to 6/-7 mm and 0.75 degrees.
+The ordinary regression now restores the original displacement. The
+voltage-fault fixture retains its separate smaller displacement; the
+20/-20 mm, two-degree boundary fixture remains unchanged. The app
+compiler passes after this test-only repair; the restored ordinary
+registration gate is running and no result is claimed yet.
+
+The restored ordinary parking-registration gate passes on both backends
+(`app/build/p4-main-restored-registration.log`, exit 0). Both execute twelve
+touch episodes and pass the first weld. Deterministic seam-frame/tip errors
+are 0.000886206/0.000886204 mm; MuJoCo errors are
+0.000922916/0.026848437 mm. This verifies the original 12/-9 mm,
+0.025 rad displacement rather than the reduced draft fixture. Redundant
+app contact-margin forwarding was removed: the collision planner already
+defaults to the same 0.5 mm margin. Final compilation and the merged-main
+20/-20 mm, two-degree boundary check follow serially.
+
+The merged-main parking-boundary gate passes on both backends
+(`app/build/p4-main-boundary-registration.log`, exit 0), after the final
+compiler-only build passes all 2,079 sources. Both execute twelve touch
+episodes and pass the first weld. Deterministic seam-frame/tip errors are
+0.001627361/0.001627359 mm; MuJoCo errors are
+0.002509396/0.020083007 mm. These retain the previous precision-gate
+results under the merged collision backend.
+
+The measured mobile power and internal dock/charge/return transfer feature
+is committed as `b1f0339953431e520757b319e7f37a22b10d0878`; executed
+power and registration regression checks are committed separately as
+`f2aecdc53`. The required full welder app check is running, followed by
+arm and mobile checks because shared app code changed. Local main has not
+been advanced; P4 remains open until those checks pass.
+
+The required `PROJECT_SOURCE_ONLY=welder` gate passes, exit 0
+(`app/build/p4-main-welder.log`). Both backends weld all ten fixed-cell
+seams in four runs, 99.9 s, with complete 40/180 mm beads, 4.9–5.0 mm
+legs and no clearance violation. Single 180 mm seams remain 21.5 s,
+5.0 mm mean leg, 4.8–5.1 mm range, no restart/gap. Arc-loss recovery
+passes with one restart, 3 mm overlap, 5.0 mm mean leg and no gap in
+24.9 s. The air seam fails with the required three-restart reason; crater
+dropout completes in 21.5 s without restart; the 12.3 mm displaced
+workpiece remains within the 0.1 mm tip bound. The four-side post completes
+in 27.7 s with 4.9–5.0 mm legs. Woven 7 mm legs are 6.998213 mm;
+three-pass 10 mm legs are 10.001961 mm (MuJoCo) and 9.999189 mm
+(deterministic), with the requested strike counts and whole beads.
+
+The motion-dependent cycle times differ from the P3 gate: whole-cell
+99.9 s, recovery 24.9 s and post 27.7 s. The merged planner plus P4
+local-first Cartesian target resolution select different joint paths for
+air entry/departure and recovery from the observed stopped state. This
+can change travel time even when the process recipe is unchanged; the
+single-seam travel, dwell duration, deposited dimensions and gap checks
+remain verified. Exact attribution between the merged planner and local
+seed changes has not been isolated; do not describe these cycles as
+unchanged baselines. The arm and mobile shared-app gates remain pending.
+
+### P4 milestone closeout (2026-10-10)
+
+The remaining shared app gates pass: `PROJECT_SOURCE_ONLY=arm`
+(`app/build/p4-main-arm.log`, exit 0) finishes its mission at 23.4 s,
+within the approximately 23.5 s baseline, and passes generated scene
+collision checks. `PROJECT_SOURCE_ONLY=mobile`
+(`app/build/p4-main-mobile.log`, exit 0) verifies both-backend 400 mm
+translation and 0.5 rad rotation, a 57.3 s MuJoCo handling mission, and
+obstacle stop/replan/resume with 418 mm minimum gap, one replan and
+61 s completion. The overlay edge check also passes.
+
+P4 is complete: the probe pre-contact margin and geometry-dependent
+measurement precision are proved; map-frame registration survives
+docking; full-pack, voltage-cutoff and dock/charge/resume gates pass on
+both backends; the focused kit checks, MachineKit smoke and required
+welder/arm/mobile app checks pass. The full pack performs no charge trips;
+the derated fixture performs seven successful transfers and completes
+all ten seams with no gaps. Main sync uses an old-value-guarded update
+after this closeout commit. No submodule pins or remote refs change.
+
+P5 remains wholly required and unimplemented. Next: merge local main
+before P5, expose generic rendered depth at SceneKit's C/Haxe boundary,
+then implement SensorKit calibrated/stamped laser profiles, ProcessKit
+measured seam alignment and bounded live correction, and single-owner
+MotionKit servo execution. Prove real rendered-depth geometry,
+pre-weld alignment, displacement during welding, and controlled
+arc-off stops for stale, missing, noisy or ambiguous observations.

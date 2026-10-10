@@ -111,6 +111,16 @@ class WeldTests {
     for (i in 0...9) for (j in 0...9) for (z in [0.0, 1.0]) many = many.concat([i * 0.1, j * 0.1, z]);
     var big = new ConvexSolid(many);
     check(big.distance(0.4, 0.4, 2.0) > 0.99 && big.distance(0.4, 0.4, 0.5) < 0, "a large hull is its bounding box");
+    var round:Array<Float> = [];
+    for (i in 0...64) for (z in [-1.0, 1.0]) {
+      var angle = i * 2 * Math.PI / 64;
+      round.push(Math.cos(angle)); round.push(Math.sin(angle)); round.push(z);
+    }
+    var boxed = new ConvexSolid(round).cornerPoints();
+    check(boxed.length == 24, "a boxed round cloud supplies all eight box corners");
+    for (i in 0...8) check(Math.abs(Math.abs(boxed[3 * i]) - 1) < 1e-9 &&
+      Math.abs(Math.abs(boxed[3 * i + 1]) - 1) < 1e-9 && Math.abs(Math.abs(boxed[3 * i + 2]) - 1) < 1e-9,
+      "box corners are constructed from bounds, even when absent from the input cloud");
     var flat = false;
     try new ConvexSolid([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0]) catch (_:Dynamic) flat = true;
     check(flat, "a flat set of vertices is no solid");

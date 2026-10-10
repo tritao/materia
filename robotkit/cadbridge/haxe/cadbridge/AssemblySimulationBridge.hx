@@ -82,6 +82,12 @@ typedef AssemblyPhysicalPart = {
   var centerOfMass:Array<Float>;
   var inertia:Array<Float>;
   var density:Float;
+  /** Resolved part mass in kg; absent only for geometry-only callers. */
+  @:optional var physicalMassKg:Float;
+  /** Centroidal inertia in kg m², row-major, when the CAD producer resolved it. */
+  @:optional var physicalInertiaKgM2:Array<Float>;
+  /** Declared component mass must survive later material edits. */
+  @:optional var physicalMassDeclared:Bool;
   /** Bounded convex support hull, flattened XYZ triples in CAD units. */
   @:optional var collisionHull:Array<Float>;
   @:optional var collisionWarning:String;
@@ -255,12 +261,16 @@ class AssemblySimulationBridge {
         if (part == null) throw 'Assembly occurrence "$id" has no physical part';
         if (!Math.isFinite(part.volume) || part.volume <= 0 || !Math.isFinite(part.density) ||
             part.density <= 0 || part.centerOfMass == null || part.centerOfMass.length != 3 ||
-            part.inertia == null || part.inertia.length != 9)
+            part.inertia == null || part.inertia.length != 9 ||
+            part.physicalMassKg != null && (!Math.isFinite(part.physicalMassKg) || part.physicalMassKg <= 0) ||
+            part.physicalInertiaKgM2 != null && part.physicalInertiaKgM2.length != 9)
           throw 'Assembly occurrence "$id" has invalid mass properties';
         for (coordinate in part.centerOfMass) if (!Math.isFinite(coordinate))
           throw 'Assembly occurrence "$id" has a non-finite centre of mass';
         for (component in part.inertia) if (!Math.isFinite(component))
           throw 'Assembly occurrence "$id" has a non-finite inertia';
+        if (part.physicalInertiaKgM2 != null) for (component in part.physicalInertiaKgM2)
+          if (!Math.isFinite(component)) throw 'Assembly occurrence "$id" has a non-finite physical inertia';
         // The part's frame in its link's frame; fixed joints keep it constant.
         var offset = AssemblyFrames.compose(toLink, placement.worldPose(id));
         offsets.set(id, offset);
@@ -271,10 +281,15 @@ class AssemblySimulationBridge {
           part.centerOfMass[2]);
         var baseMass = part.volume * part.density * scale * scale * scale;
         var chosen = massOf == null ? null : massOf(id);
-        var mass = chosen == null ? baseMass : chosen;
+        var resolvedMass = part.physicalMassKg;
+        var mass = chosen == null ? (resolvedMass == null ? baseMass : resolvedMass) : chosen;
         if (!Math.isFinite(mass) || mass <= 0) throw 'Assembly occurrence "$id" has an invalid mass';
+        var inertia = part.physicalInertiaKgM2;
+        var tensor:Array<Float> = inertia == null
+          ? rotated(part.inertia, offset, part.density * Math.pow(scale, 5) * mass / baseMass)
+          : rotated(inertia, offset, mass / (resolvedMass == null ? mass : resolvedMass));
         masses[index].push({mass: mass, center: [center.x * scale, center.y * scale, center.z * scale],
-          inertia: rotated(part.inertia, offset, part.density * Math.pow(scale, 5) * mass / baseMass)});
+          inertia: tensor});
         var component = [for (entry in definition.definitions) if (entry.id == occurrence.definition) entry][0];
         for (hull in collisionPieces(id, component, part)) {
           var vertices:Array<Float> = [];

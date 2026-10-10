@@ -11,10 +11,16 @@ import MobileBase.MobileBaseLayout;
 /** The same torch arm on a payload platform, with its welding services carried onboard. */
 class MobileWeldingRobot extends MobileBase {
   public static inline var EQUIPMENT_GAP:Float = 40;
+  /** Fixed load for the onboard controller, safety system and network switches. */
+  public static inline var COMPUTER_LOAD_WATTS:Float = 120;
+  /** Explicit motor and driver efficiency assumptions used to convert measured joint work to DC draw. */
+  public static inline var ARM_DRIVE_EFFICIENCY:Float = 0.72;
+  public static inline var DRIVE_MOTOR_EFFICIENCY:Float = 0.68;
   public final source:WeldingPowerSource;
   public final inverter:Inverter;
   public final cylinder:GasCylinder;
   public final feeder:WireFeeder;
+  public final armSupply:IsolatedDcConverter;
   public final computerSupply:IsolatedDcConverter;
 
   public function new(?pack:BatteryPack, ?powerSource:WeldingPowerSource, ?powerInverter:Inverter) {
@@ -25,10 +31,12 @@ class MobileWeldingRobot extends MobileBase {
       throw "The mobile welding pack must match the inverter and supply four branches";
     var weldingArm = new RobotArm(false, new ArmWeldingTool());
     // The isolated 48 V branch supports the low-voltage arm windings and regeneration.
-    weldingArm.replaceComponent("powerSupply", new IsolatedDcConverter(storage.nominalVolts, 48, 75, 6, 120, 60, 30, 0.95, 2, 2500));
+    var armConversion = new IsolatedDcConverter(storage.nominalVolts, 48, 75, 6, 120, 60, 30, 0.95, 2, 2500);
+    weldingArm.replaceComponent("powerSupply", armConversion);
     super(weldingArm, storage.nominalVolts, payloadLayout(storage, supply, conversion));
     source = supply;
     inverter = conversion;
+    armSupply = armConversion;
     cylinder = new GasCylinder();
     feeder = new WireFeeder(150, 240, 180);
     computerSupply = new IsolatedDcConverter(storage.nominalVolts, 24, 10, 1);

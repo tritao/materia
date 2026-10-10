@@ -171,18 +171,43 @@ class WeldProbeTests {
     var geometricTriples = WeldProbePatterns.stages(work, 3, [], reduced, 3, 9);
     check(lazyTriples.length == geometricTriples.length && lazyTriples.length > 0,
       "Lazy breadth selection retains every geometric three-contact stage");
-    for (tested in tripleChecks) check(tested == 6, "Reachable broad patterns need only six ranked checks per face");
+    for (tested in tripleChecks) check(tested >= 3 && tested <= 6,
+      "Reachable broad patterns screen at most six unique ranked points per face");
     for (index in 0...lazyTriples.length) {
       check(lazyTriples[index].face.name() == geometricTriples[index].face.name() &&
         lazyTriples[index].score == geometricTriples[index].score, "Lazy breadth selection preserves stage scores and order");
       for (point in 0...3) check(lazyTriples[index].points[point].subtract(geometricTriples[index].points[point]).length() < 1e-10,
         "Lazy breadth selection preserves each farthest-point choice");
     }
+    var screenedPoints = new Map<String, Bool>();
+    var repeatedScreenings = [0];
+    var rejectedTriples = WeldProbePatterns.stages(work, 3, [], reduced, 3, 9, (face, point, _) -> {
+      var key = face.name() + ":" + point.x + ":" + point.y + ":" + point.z;
+      if (screenedPoints.exists(key)) repeatedScreenings[0]++;
+      screenedPoints.set(key, true);
+      return false;
+    });
+    check(rejectedTriples.length == 0 && screenedPoints.size() > 0 && repeatedScreenings[0] == 0,
+      "Rejected lattice points are screened only once during farthest-point selection");
+    var mixedScreenings = new Map<String, Bool>();
+    var mixedScreeningCount = [0];
+    var mixedTriples = WeldProbePatterns.stages(work, 3, [], reduced, 3, 9, (face, point, _) -> {
+      var key = face.name() + ":" + point.x + ":" + point.y + ":" + point.z;
+      var reachable = mixedScreeningCount[0]++ % 3 != 0;
+      mixedScreenings.set(key, reachable);
+      return reachable;
+    });
+    check(mixedTriples.length > 0, "Mixed reachability still yields a checked three-contact stage");
+    for (stage in mixedTriples) for (point in stage.points) {
+      var key = stage.face.name() + ":" + point.x + ":" + point.y + ":" + point.z;
+      check(mixedScreenings.exists(key) && mixedScreenings.get(key) == true,
+        "Three-contact stages contain only points whose own reachability check passed");
+    }
     var oneFaceChecks = [0];
     var oneFace = WeldProbePatterns.stages(work, 3, [], reduced, 3, 9,
       (face, _, _) -> { oneFaceChecks[0]++; check(face == geometricTriples[0].face,
         "Single-face screening never solves unused faces"); return true; }, geometricTriples[0].face);
-    check(oneFace.length == 1 && oneFace[0].score == geometricTriples[0].score && oneFaceChecks[0] == 6,
+    check(oneFace.length == 1 && oneFace[0].score == geometricTriples[0].score && oneFaceChecks[0] >= 3 && oneFaceChecks[0] <= 6,
       "Demand-driven screening preserves the selected geometric stage");
     var pairChecks = new Map<String, Int>();
     var directPairs = WeldProbePatterns.stages(work, 2, [firstNormal], reduced, 3, 9,
@@ -192,8 +217,16 @@ class WeldProbeTests {
       });
     var unfilteredPairs = WeldProbePatterns.stages(work, 2, [firstNormal], reduced, 3, 9);
     check(directPairs.length > 0, "Reachable extrema yield second-plane stages");
-    for (tested in pairChecks) check(tested == 2,
-      "Two-contact selection screens only its reachable extrema, even for a geometrically narrow patch");
+    for (tested in pairChecks) check(tested >= 2 && tested <= 4,
+      "Two-contact selection screens only a bounded set of reachable extrema");
+    var pairsPerFace = new Map<String, Int>();
+    for (pair in directPairs) {
+      var prior = pairsPerFace.get(pair.face.name());
+      pairsPerFace.set(pair.face.name(), prior == null ? 1 : prior + 1);
+    }
+    var hasAlternative = false;
+    for (count in pairsPerFace) if (count > 1 && count <= 4) hasAlternative = true;
+    check(hasAlternative, "A face retains bounded alternate two-contact patterns after its widest pair");
     for (index in 0...directPairs.length) {
       check(directPairs[index].face.name() == unfilteredPairs[index].face.name() &&
         directPairs[index].score == unfilteredPairs[index].score &&
@@ -207,8 +240,8 @@ class WeldProbeTests {
         if (rejectedExtrema.exists(face.name())) return true;
         rejectedExtrema.set(face.name(), true); return false;
       });
-    check(alternativePairs.length == directPairs.length,
-      "An unreachable extreme still permits a broad reachable pair");
+    check(alternativePairs.length > 0 && alternativePairs.length <= directPairs.length,
+      "An unreachable extreme still permits a bounded alternate reachable pair");
     check(WeldProbePatterns.stages(work, 2, [firstNormal], reduced, 3, 9, (_, _, _) -> false).length == 0,
       "An entirely unreachable second plane is rejected");
     var thirdStages = WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced);
@@ -217,12 +250,15 @@ class WeldProbeTests {
     var nearestStages = WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced, 3, 9,
       (_, _, _) -> { screenings[0]++; return true; });
     var unscreenedStages = WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced, 3, 9);
-    check(screenings[0] == nearestStages.length && nearestStages.length > 0,
-      "Single-contact selection checks only the nearest candidate when it is reachable");
-    for (index in 0...nearestStages.length)
-      check(nearestStages[index].face.name() == unscreenedStages[index].face.name() &&
-        nearestStages[index].points[0].subtract(unscreenedStages[index].points[0]).length() < 1e-10,
-        "Lazy screening retains the nearest-point choice and face ordering");
+    check(screenings[0] == nearestStages.length && nearestStages.length >= unscreenedStages.length &&
+      nearestStages.length <= unscreenedStages.length * 8,
+      "Single-contact selection screens a bounded spread on every eligible face");
+    for (stage in unscreenedStages) {
+      var nearest = false;
+      for (candidate in nearestStages) if (candidate.face == stage.face &&
+        candidate.points[0].subtract(stage.points[0]).length() < 1e-10) nearest = true;
+      check(nearest, "Bounded single-contact screening retains the geometric nearest point");
+    }
     var previousDistance = new Map<String, Float>();
     var afterRejection = WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced, 3, 9,
       (face, point, _) -> {
@@ -230,13 +266,17 @@ class WeldProbeTests {
         var prior = previousDistance.get(face.name());
         previousDistance.set(face.name(), square);
         if (prior == null) return false;
-        check(square >= prior, "An unreachable nearest point is followed by the next closest candidate");
+        check(square >= prior, "Single-contact screen samples move outward across the face");
         return true;
       });
     check(afterRejection.length == nearestStages.length,
-      "Rejecting the nearest point still permits the next reachable single-contact candidate");
-    check(WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced, 3, 9,
-      (_, _, _) -> false).length == 0, "An entirely unreachable third plane is rejected");
+      "Bounded single-contact alternatives remain available after screen misses");
+    var missed = [0];
+    var screenMisses = WeldProbePatterns.stages(work, 1, [firstNormal, secondStages[0].face.normal], reduced, 3, 9,
+      (_, _, _) -> { missed[0]++; return false; });
+    check(screenMisses.length > 0 && missed[0] == screenMisses.length &&
+      screenMisses.length <= unscreenedStages.length * 8,
+      "Screen misses retain only a bounded set of CAD candidates for full checked planning");
     for (stage in thirdStages) check(Math.abs(firstNormal.cross(secondStages[0].face.normal).dot(stage.face.normal)) > 1e-3,
       "Third-plane normals observe the remaining translation");
     var actual = new Transform3(new Vec3(0.02, -0.02, 0), Quat.fromRollPitchYaw(0, 0, 2 * Math.PI / 180));

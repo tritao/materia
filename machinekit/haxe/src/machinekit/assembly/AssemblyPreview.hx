@@ -3,6 +3,8 @@ package machinekit.assembly;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
+import machinekit.component.MassProperties;
+import machinekit.component.MassProperties.MassSource;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.project.MaterialLibrary;
@@ -27,13 +29,23 @@ class AssemblyPreview {
 		var definitionByDesignation = new Map<String, String>();
 		for (entry in assembly.components()) {
 			var collision = machinekit.component.CollisionHullFacet.of(entry.component);
-			var designationKey = entry.component.designation + (collision == null ? "" : haxe.Json.stringify(collision.hulls));
+			var mass = entry.component.massProperties();
+			var inertia = mass.inertia;
+			var inertiaKey:Null<Array<Float>> = inertia == null ? null :
+				[inertia.xx, inertia.xy, inertia.xz, inertia.yy, inertia.yz, inertia.zz];
+			var declared = switch mass.source { case Declared: true; case Computed(_): false; };
+			var massKey = haxe.Json.stringify({mass: mass.mass,
+				centre: [mass.centreOfMass.x, mass.centreOfMass.y, mass.centreOfMass.z],
+				inertia: inertiaKey, declared: declared});
+			var designationKey = entry.component.designation + "|" + entry.component.materialId + "|" + massKey +
+				(collision == null ? "" : haxe.Json.stringify(collision.hulls));
 			var definitionId = definitionByDesignation.get(designationKey);
 			if (definitionId == null) {
 				definitionId = entry.id;
 				definitionByDesignation.set(designationKey, definitionId);
-        var rendered = part(definitionId, entry.component.designation,
-          entry.component.geometry(ComponentDetail.Preview), entry.component.materialId);
+				var rendered = part(definitionId, entry.component.designation,
+					entry.component.geometry(ComponentDetail.Preview), entry.component.materialId, null,
+					mass);
         if (Std.isOfType(entry.component, machinekit.transmission.TimingBelt)) {
           var belt:machinekit.transmission.TimingBelt = cast entry.component;
           var moving = [for (value in machineMotion.belts) if (value.occurrence == entry.id) value];
@@ -139,18 +151,35 @@ class AssemblyPreview {
 	 * deviates from the solid by a small fraction of its size, or by at most `deflection` (in the part's
 	 * units) when given, for a mesh that is measured against rather than only looked at.
 	 */
-	public static function part(id:String, name:String, part:Part, materialId:String, ?deflection:Float):SceneArtifactPart {
+	public static function part(id:String, name:String, part:Part, materialId:String,
+			?deflection:Float, ?massProperties:MassProperties):SceneArtifactPart {
 		var material = MaterialLibrary.require(materialId);
 		var color = material.visual.baseColor;
 		try {
 			var physical = part.massProperties();
 			var mesh = deflection == null ? part.shape.tessellateRelative() : part.shape.tessellate(deflection);
+			var mass = massProperties == null ? physical.volume * 1e-9 * material.physical.density : massProperties.mass;
+			var centre = massProperties == null ? physical.centerOfMass : massProperties.centreOfMass;
+			// A declared mass without its own tensor uses the CAD shape's distribution, scaled to
+			// that mass. Explicit component inertia is already in kg mm².
+			var tensor = massProperties == null || massProperties.inertia == null
+				? physical.inertia.scaled(mass / physical.volume * Math.pow(LengthUnit.metresPerUnit("mm"), 2))
+				: massProperties.inertia.scaled(Math.pow(LengthUnit.metresPerUnit("mm"), 2));
 			var result:SceneArtifactPart = {
 				id: id, name: name, red: color[0], green: color[1], blue: color[2],
 				appearance: MaterialLibrary.appearance(materialId), materialId: materialId,
 				vertexCount: mesh.vertexCount, indexCount: mesh.indexCount,
 				volume: physical.volume,
-				centerOfMass: [physical.centerOfMass.x, physical.centerOfMass.y, physical.centerOfMass.z],
+				centerOfMass: [centre.x, centre.y, centre.z], inertia: [physical.inertia.xx, physical.inertia.xy,
+					physical.inertia.xz, physical.inertia.xy, physical.inertia.yy, physical.inertia.yz,
+					physical.inertia.xz, physical.inertia.yz, physical.inertia.zz],
+				physicalMassKg: mass,
+				physicalMassDeclared: massProperties != null && switch massProperties.source {
+					case Declared: true;
+					case Computed(_): false;
+				},
+				physicalInertiaKgM2: [tensor.xx, tensor.xy, tensor.xz, tensor.xy, tensor.yy, tensor.yz,
+					tensor.xz, tensor.yz, tensor.zz],
 				vertices: mesh.vertices, normals: mesh.normals, indices: mesh.indices,
 				edgeSegments: mesh.edgeSegments, edgeIds: mesh.edgeIds,
 				faceDescriptors: cadkit.parametric.GeometricConnectors.describeFaces(part.shape),

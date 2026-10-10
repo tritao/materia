@@ -34,7 +34,7 @@ class PneumaticVise extends MachineAssembly {
 
 	public function new(blankWidth:Float = 40, blankLength:Float = 60, clearance:Float = 1.5) {
 		super();
-		if (!(blankWidth > stroke) || !(blankLength > 0 && blankLength < jawWidth) ||
+		if (!(blankWidth > stroke) || !(blankLength > 2 * clearance && blankLength < jawWidth) ||
 			!(clearance > 0 && 2 * clearance < stroke)) throw "Vise preset needs room for the blank and air stroke";
 		this.blankWidth = blankWidth; this.blankLength = blankLength; this.clearance = clearance;
 		openGap = blankWidth + 2 * clearance;
@@ -42,8 +42,12 @@ class PneumaticVise extends MachineAssembly {
 		body = new MillPanel(jawWidth, Math.max(100, openGap + 45), 25);
 		fixedJaw = new MillPanel(jawWidth, 15, 30);
 		movingJaw = new MillPanel(jawWidth, 15, 30);
-		parallels = new MillPanel(blankLength, 5, 10);
-		endStop = new MillPanel(6, blankWidth, 15);
+		// Leave the same preset clearance at both end faces for closing fingers.
+		parallels = new MillPanel(blankLength - 2 * clearance, 5, 10);
+		// A corner locator leaves the centre of the end face accessible to
+		// replaceable gripper fingers. Its 6 mm square contact is assumed.
+		var stopWidth = 6.0;
+		endStop = new MillPanel(stopWidth, stopWidth, 15);
 		addComponent("body", body);
 		var fixedPose = AssemblyFrames.translation(0, -blankWidth / 2 - fixedJaw.depth / 2, body.height);
 		fixed("fixedJaw", fixedJaw, fixedPose);
@@ -70,7 +74,8 @@ class PneumaticVise extends MachineAssembly {
 		var parallelPose = AssemblyFrames.translation(0, -(blankWidth / 2 - 1.5 * parallels.depth), body.height);
 		fixed("parallel0", parallels, parallelPose);
 		fixed("parallel1", parallels, AssemblyFrames.translation(0, -parallelPose.y, parallelPose.z));
-		var stopPose = AssemblyFrames.translation(-blankLength / 2 - endStop.width / 2, 0, body.height);
+		var stopPose = AssemblyFrames.translation(-blankLength / 2 - endStop.width / 2,
+			-(blankWidth - endStop.depth) / 2, body.height);
 		fixed("endStop", endStop, stopPose);
 		datum = AssemblyFrames.translation(stopPose.x + endStop.width / 2,
 			fixedPose.y + fixedJaw.depth / 2, parallelPose.z + parallels.height);

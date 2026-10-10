@@ -25,6 +25,21 @@ class WeldStationPlan {
   }
 }
 
+/** A complete scheduled station group failed after its individual seam checks passed. */
+class WeldStationPlanFailure {
+  public final stationId:String;
+  public final seams:Array<String>;
+  public final reason:String;
+  public function new(stationId:String, seams:Array<String>, reason:String) {
+    if (stationId == null || stationId.length == 0 || seams == null || seams.length == 0 ||
+        reason == null || reason.length == 0)
+      throw "A station-plan failure needs a station, assigned seams and a reason";
+    this.stationId = stationId;
+    this.seams = seams.copy();
+    this.reason = reason;
+  }
+}
+
 /**
  * Exact minimum station cover over a finite candidate set, then minimum directed route cost.
  * Access must check the complete weld motion at its torch angles, including entry and exit.
@@ -42,9 +57,10 @@ class WeldStationPlanner {
   public static function verified(required:Array<String>, candidates:Array<WeldStationCandidate>, start:Pose2,
       screen:(WeldStationCandidate, String) -> Null<String>,
       verify:(WeldStationCandidate, String) -> Null<String>,
-      route:(Pose2, Pose2) -> Null<Float>):WeldStationPlan {
+      route:(Pose2, Pose2) -> Null<Float>,
+      ?verifyPlan:WeldStationPlan -> Null<WeldStationPlanFailure>):WeldStationPlan {
     if (screen == null || verify == null) throw "Verified station planning requires a screen and full motion check";
-    return new StationVerification(screen, verify).solve(required, candidates, start, route);
+    return new StationVerification(screen, verify, verifyPlan).solve(required, candidates, start, route);
   }
 
   public static function plan(required:Array<String>, candidates:Array<WeldStationCandidate>, start:Pose2,
@@ -70,12 +86,16 @@ class WeldStationPlanner {
 private class StationVerification {
   final screen:(WeldStationCandidate, String) -> Null<String>;
   final verify:(WeldStationCandidate, String) -> Null<String>;
+  final verifyPlan:Null<WeldStationPlan -> Null<WeldStationPlanFailure>>;
   final screened:Map<String, Map<String, Null<String>>> = new Map();
   final verified:Map<String, Map<String, Null<String>>> = new Map();
 
-  public function new(screen:(WeldStationCandidate, String) -> Null<String>, verify:(WeldStationCandidate, String) -> Null<String>) {
+  public function new(screen:(WeldStationCandidate, String) -> Null<String>,
+      verify:(WeldStationCandidate, String) -> Null<String>,
+      verifyPlan:Null<WeldStationPlan -> Null<WeldStationPlanFailure>>) {
     this.screen = screen;
     this.verify = verify;
+    this.verifyPlan = verifyPlan;
   }
 
   function results(table:Map<String, Map<String, Null<String>>>, id:String):Map<String, Null<String>> {
@@ -107,7 +127,26 @@ private class StationVerification {
           if (full.get(seam) != null) complete = false;
         }
       }
-      if (complete) return plan;
+      if (complete) {
+        if (verifyPlan == null) return plan;
+        var failure = verifyPlan(plan);
+        if (failure == null) return plan;
+        var stationIndex = -1;
+        for (index in 0...plan.stations.length)
+          if (plan.stations[index].id == failure.stationId) stationIndex = index;
+        if (stationIndex < 0) throw "Station-plan verification rejected a station outside the proposed plan";
+        var full = results(verified, failure.stationId);
+        var rejected = 0;
+        for (seam in failure.seams) {
+          if (plan.seams[stationIndex].indexOf(seam) < 0)
+            throw 'Station-plan verification rejected unassigned seam "$seam"';
+          if (full.get(seam) == null) {
+            full.set(seam, failure.reason);
+            rejected++;
+          }
+        }
+        if (rejected == 0) throw "Station-plan verification must reject at least one currently valid assigned seam";
+      }
     }
   }
 }
@@ -159,7 +198,7 @@ private class StationSearch {
 
   public function solve():WeldStationPlan {
     for (size in 1...candidates.length + 1) {
-      subsets([], 0, size);
+      subsets(size);
       if (best.length > 0) {
         var assigned = new Map<String, Bool>();
         var groups:Array<Array<String>> = [];
@@ -177,24 +216,74 @@ private class StationSearch {
     throw "Welding stations cover the seams but no navigation route visits a complete cover";
   }
 
-  function subsets(selected:Array<Int>, next:Int, remaining:Int):Void {
-    if (candidates.length - next < remaining) return;
-    // Reject a branch as soon as its remaining candidates cannot cover an outstanding seam.
-    for (seam in 0...required.length) {
-      var possible = false;
-      for (index in selected) if (covers[index][seam]) possible = true;
-      if (remaining > 0) for (index in next...candidates.length) if (covers[index][seam]) possible = true;
-      if (!possible) return;
+  function subsets(size:Int):Void {
+    var visited = new Map<String, Bool>();
+
+    function search(selected:Array<Int>):Void {
+      var keyParts = selected.copy();
+      keyParts.sort((a, b) -> a - b);
+      var key = keyParts.join(",");
+      if (visited.exists(key)) return;
+      visited.set(key, true);
+
+      var complete = true;
+      var uncovered = 0;
+      var maximumGain = 0;
+      var pivot:Array<Int> = null;
+      var pivotCount = candidates.length + 1;
+      for (seam in 0...required.length) {
+        var alreadyCovered = false;
+        for (index in selected) if (covers[index][seam]) { alreadyCovered = true; break; }
+        if (alreadyCovered) continue;
+        complete = false;
+        uncovered++;
+        var options:Array<Int> = [];
+        for (index in 0...candidates.length) {
+          if (selected.indexOf(index) < 0 && covers[index][seam]) options.push(index);
+        }
+        if (options.length == 0) return;
+        if (options.length < pivotCount) { pivot = options; pivotCount = options.length; }
+      }
+
+      if (selected.length == size) {
+        if (complete) visit(selected, [], 0);
+        return;
+      }
+      if (candidates.length - selected.length < size - selected.length) return;
+
+      if (complete) {
+        // A routeable minimum cover can need a redundant station when smaller covers are
+        // disconnected. Enumerate the fillers only after all seam coverage is established.
+        for (index in 0...candidates.length) if (selected.indexOf(index) < 0) {
+          var extended = selected.copy();
+          extended.push(index);
+          search(extended);
+        }
+        return;
+      }
+
+      for (index in 0...candidates.length) if (selected.indexOf(index) < 0) {
+        var gain = 0;
+        for (seam in 0...required.length) {
+          var covered = false;
+          for (chosen in selected) if (covers[chosen][seam]) { covered = true; break; }
+          if (!covered && covers[index][seam]) gain++;
+        }
+        maximumGain = Std.int(Math.max(maximumGain, gain));
+      }
+      if (maximumGain == 0 || selected.length + Std.int(Math.ceil(uncovered / maximumGain)) > size) return;
+
+      // Cover the seam with the fewest remaining choices first. The visited set removes
+      // duplicate subsets reached through overlapping seam coverage.
+      if (pivot == null) return;
+      for (index in pivot) {
+        var extended = selected.copy();
+        extended.push(index);
+        search(extended);
+      }
     }
-    if (remaining == 0) {
-      visit(selected, [], 0);
-      return;
-    }
-    for (index in next...candidates.length) {
-      var extended = selected.copy();
-      extended.push(index);
-      subsets(extended, index + 1, remaining - 1);
-    }
+
+    search([]);
   }
 
   function visit(remaining:Array<Int>, order:Array<Int>, cost:Float):Void {

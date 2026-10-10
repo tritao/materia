@@ -17,6 +17,9 @@
 		"../cnc-router"
 	],
 	"dependencies": {
+		"robotkit-autonomy": {
+			"path": "../../../robotkit/autonomy"
+		},
 		"projectkit": {
 			"path": "../../../projectkit"
 		},

@@ -27,8 +27,10 @@ class ConvexSolid {
     for (value in vertices) if (!Math.isFinite(value)) throw "A convex solid needs finite vertices";
     var count = Std.int(vertices.length / 3);
     if (count > EXACT_LIMIT) addBox(vertices, count);
-    else addHull(vertices, count);
-    collectCorners(vertices, count);
+    else {
+      addHull(vertices, count);
+      collectCorners(vertices, count);
+    }
     if (offsets.length < 4) throw "A convex solid needs vertices that are not flat";
   }
 
@@ -98,6 +100,10 @@ class ConvexSolid {
       normal[axis] = 1.0;
       addPlane(normal[0], normal[1], normal[2], high[axis]);
       addPlane(-normal[0], -normal[1], -normal[2], -low[axis]);
+    }
+    // The box corners generally are not among the original cloud's vertices.
+    for (x in [low[0], high[0]]) for (y in [low[1], high[1]]) for (z in [low[2], high[2]]) {
+      corners.push(x); corners.push(y); corners.push(z);
     }
   }
 

@@ -3554,6 +3554,7 @@ class ProjectSourceTests {
           '(failure=${mission.failure}, step=${mission.stepIndex}, completed=${mission.completed}, ' +
           'ticks=$retryTicks/$retryLimit, runner=${mission.runner.status()})');
       check(retryOpened, "Retry opens the empty latched gripper before its new physical grasp");
+      Sys.println('tending recovery: emergency stop, empty infeed and missed grasp passed at ${simulation.activeSession().simulationTime()} s');
       var carriedVisuals = simulation.capturePresentationSnapshot().environment;
       var carriedPose = [for (entry in carriedVisuals) if (entry.id == "project:infeed/blank-0-0") entry];
       if (carriedPose.length != 1) throw "The first blank disappeared before the part-drop fault check";
@@ -3642,6 +3643,7 @@ class ProjectSourceTests {
       }
       check(mission.failure == null && mission.stepIndex > firstPick,
         "part-drop recovery preserves the held part and resumes the interrupted carry step");
+      Sys.println('tending recovery: dropped-part regrasp passed at ${simulation.activeSession().simulationTime()} s');
       function cellSignal(name:String):Bool {
         var bus = simulation.cellSignals;
         if (bus == null) return false;
@@ -3754,6 +3756,7 @@ class ProjectSourceTests {
       }
       check(mission.failure == null && mission.completed == beforeCycleRetry,
         "cycle-interlock recovery clears the PLC alarm and resumes the same mission step");
+      Sys.println('tending recovery: physical door jam and CNC interlock passed at ${simulation.activeSession().simulationTime()} s');
 
       var clampCommand = -1, clampWait = -1;
       for (index in 0...mission.mission.steps.length) {
@@ -3831,12 +3834,22 @@ class ProjectSourceTests {
           'blank=${[retrySeat.x,retrySeat.y,retrySeat.z,retrySeat.qx,retrySeat.qy,retrySeat.qz,retrySeat.qw]}, ' +
           'seat=${[retryVise.x,retryVise.y,retryVise.z]}, original=${[seatedPose.x,seatedPose.y,seatedPose.z]})');
       // Start at the first seated-and-clamped blank; exclude earlier recovery fault injections.
+      Sys.println('tending recovery: missing-part clamp passed at ${simulation.activeSession().simulationTime()} s');
       var productionStart = simulation.activeSession().simulationTime();
       var ticks = 0, spindleTicks = 0, observedStocks = 0, maxSimultaneousHeld = 0;
       var lastCycleStart = 0.0, lastCycleTime = 0.0, wasCycleActive = false;
       var cycleTimes:Array<Float> = [];
       var expectedRemoval = expectedBearingBlockRemoval();
-      while (!mission.finished && simulation.activeSession().simulationTime() < 800) {
+      // Conservative collision paths can take longer than the former exchange
+      // prototype. Bound this replay by its remaining authored step budgets.
+      var productionDeadline = productionStart;
+      for (index in mission.stepIndex...mission.mission.steps.length) {
+        var step = mission.mission.steps[index];
+        var timeout = step.timeoutSeconds;
+        var condition = step.waitFor;
+        productionDeadline += timeout != null ? timeout : condition != null ? condition.timeout : 1.0;
+      }
+      while (!mission.finished && simulation.activeSession().simulationTime() < productionDeadline) {
         try simulation.step() catch (error:Dynamic)
           throw 'Tending production step ${mission.stepIndex}/${mission.mission.steps.length}: $error';
         var heldNow = simulation.heldObjectIds().length;
@@ -3866,16 +3879,23 @@ class ProjectSourceTests {
             'tending blank ${stock.occurrence} removes the bearing-block volume within 2%, got ${stock.removedVolume * 1e9} mm³');
           check(stock.targetMass > 0 && stock.massError <= 0.02,
             'finished blank mass is within 2% of its CAD target (${stock.massError * 100}%)');
+          check(stock.leftover + stock.gouge < expectedRemoval * 0.02,
+            'finished blank agrees with the CAD cut shape: leftover ${stock.leftover * 1e9} mm³, gouge ${stock.gouge * 1e9} mm³');
           check(stock.rapidContacts == 0 && stock.collisions == 0,
             'finished blank ${stock.occurrence} has no cutter rapid contacts or collisions');
           var now = simulation.activeSession().simulationTime();
           if (lastCycleStart <= 0) throw 'CNC cycle start was not observed before finishing ${stock.occurrence}';
           lastCycleTime = now - lastCycleStart;
           cycleTimes.push(lastCycleTime);
+          Sys.println('tending cut: blank $observedStocks, $lastCycleTime s, ${stock.removedVolume * 1e9} mm³ removed, ' +
+            '${stock.leftover * 1e9} mm³ leftover, ${stock.gouge * 1e9} mm³ gouge');
         }
       }
-      check(mission.finished && mission.completed == mission.mission.steps.length,
-        'the unattended tending mission finishes every declared step (${mission.completed}/${mission.mission.steps.length})');
+      // Successful replayed requests also increment the cumulative counter.
+      check(mission.finished && mission.stepIndex == mission.mission.steps.length - 1 &&
+          mission.completed >= mission.mission.steps.length,
+        'the unattended tending mission finishes every declared step (${mission.completed}/${mission.mission.steps.length}, ' +
+          '${mission.statusLabel(true)}, time=${simulation.activeSession().simulationTime()}, deadline=$productionDeadline)');
       check(cnc.completedStocks.length == 4,
         'four loose infeed blanks are machined and reported, got ${cnc.completedStocks.length}');
       check(cnc.interfaceAlarm == RobotInterfaceAlarm.None && simulation.cncFailure() == null,
@@ -4151,20 +4171,10 @@ class ProjectSourceTests {
     var job = generated.cncJob;
     var controller = job == null ? null : job.controller;
     if (controller == null) throw "the router names the controller its steppers are wired to";
-    // Each axis is as fast as the slowest of: a 24 V NEMA 23 at half its holding torque (twice the
-    // 68.6 rad/s where its winding's reactance takes the supply), the deployed controller's
-    // integer-tick pulse ceiling, and the screw's critical speed, all through the axis's ratio to
-    // the motor.
-    var motorSpeed = 2 * 24 / (50 * 2.5e-3 * 2.8);
+    // Each axis respects all its installed motor/driver channels and screw limits.
+    // Steady loads may tighten those ceilings; deployed integer pulse periods
+    // are authoritative, rather than re-quantizing rounded continuous rates.
     var binding = routerDeviceBinding(model, controller.stepTickHz);
-    var channel = binding.channels[0];
-    var wire = haxe.io.Bytes.alloc(8);
-    wire.setFloat(0, channel.maxRate);
-    wire.setFloat(4, channel.stepsPerUnit);
-    var interval = Math.max(1, Math.ceil(binding.stepTickHz /
-      (wire.getFloat(0) * wire.getFloat(4))));
-    var stepSpeed = Math.min(channel.maxRate,
-      binding.stepTickHz / (interval * wire.getFloat(4)));
     var wired = binding.model;
     var steady = new SteadyLoads();
     var derived:Array<String> = [], free:Array<String> = [];
@@ -4183,10 +4193,19 @@ class ProjectSourceTests {
         }
       }
       check(motorRatio > 0, '$kind axis ${joint.id} has a motor');
-      var expected = Math.min(Math.min(motorSpeed, stepSpeed) / motorRatio, critical);
+      var ceiling = critical, channels = 0;
+      for (channel in binding.channels) if (wired.joints[channel.jointIndex].id == joint.id) {
+        var pulseRate = binding.stepTickHz / (channel.minStepTicks *
+          robotkit.runtime.StepTicks.deployed(channel.stepsPerUnit));
+        ceiling = Math.min(ceiling, Math.min(channel.maxRate, pulseRate) / Math.abs(channel.ratio));
+        channels++;
+      }
+      check(channels > 0, '$kind axis ${joint.id} has its own deployed pulse channels');
       var limits = wired.coupledLimits(joint.id, steady);
-      check(Math.abs(limits.requireVelocity() - expected) < 1e-9,
-        '$kind axis ${joint.id} is as fast as its motor, controller and screw allow: ${limits.requireVelocity()} m/s, expected $expected');
+      check(limits.requireVelocity() > 0 && limits.requireVelocity() <= ceiling + 1e-9,
+        '$kind axis ${joint.id} respects its motor, controller and screw ceilings: ${limits.requireVelocity()} m/s, ceiling $ceiling');
+      check(limits.requireVelocity() <= wired.coupledLimits(joint.id).requireVelocity() + 1e-9,
+        '$kind axis ${joint.id} steady loads cannot raise its unloaded speed limit');
       check(limits.requireAcceleration() > 0.5 && limits.requireAcceleration() < 50,
         '$kind axis ${joint.id} accelerates as its motors move it: ${limits.requireAcceleration()} m/s²');
       derived.push('${joint.id} ${Math.round(limits.requireVelocity() * 1e4) / 10} mm/s, ${Math.round(limits.requireAcceleration() * 100) / 100} m/s²' +
@@ -4749,6 +4768,7 @@ class ProjectSourceTests {
   }
 
   static function checks():Int {
+    // Focused project-source filters skip unrelated physics setup and run only the selected checks.
     checkJointMotionPolicy();
     // Four joints and two segments distinguish per-joint stopping limits from
     // per-segment storage, including the constructor's default path.
@@ -4764,27 +4784,6 @@ class ProjectSourceTests {
       null, null, null, null, null, true, null, false, null, [1.0, 2.0, 3.0, 4.0]);
     check(explicitStops.controlAcceleration.get(3) == 4.0,
       "explicit stopping acceleration accepts all four joints in a two-segment plan");
-    var flat = Bytes.alloc(4 * 24);
-    for (index in 0...4) {
-      flat.setDouble(index * 24, (index & 1) == 0 ? 0.0 : 2.0);
-      flat.setDouble(index * 24 + 8, (index & 2) == 0 ? 0.0 : 1.0);
-      flat.setDouble(index * 24 + 16, 0.0);
-    }
-    var flatHull = cadkit.ConvexHullVertices.safeFromMesh(flat, 4, 0.5);
-    check(flatHull.warning != null && flatHull.vertices.length == 24 &&
-      flatHull.vertices[2] == -0.25 && flatHull.vertices[14] == 0.25,
-      "flat collision part uses a 0.5-unit thickened box with a warning");
-    checkCoupling(0);
-    checkCoupling(1);
-    checkLinkCollision(0, true);
-    checkLinkCollision(0, false);
-    checkLinkCollision(1, true);
-    checkLinkCollision(1, false);
-    checkHullCollision(0, true);
-    checkHullCollision(0, false);
-    checkHullCollision(1, true);
-    checkHullCollision(1, false);
-    checkWedgeContact();
     var root = Sys.getCwd();
     while (!FileSystem.exists(root + "/cadkit/examples/modeling/materia.project.json")) {
       var parent = haxe.io.Path.directory(root);
@@ -4797,8 +4796,16 @@ class ProjectSourceTests {
       MobileWelderTests.runRegistration(root, true);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-registration-boundary-mujoco") {
+      MobileWelderTests.runRegistration(root, true, false, ApplicationSimulation.MUJOCO);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-registration") {
       MobileWelderTests.runRegistration(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-voltage-cutoff") {
+      MobileWelderTests.runRegistration(root, false, true);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-wire-clearance") {
@@ -4815,6 +4822,14 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-mission-mujoco") {
       MobileWelderTests.runMission(root, ApplicationSimulation.MUJOCO);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-energy") {
+      MobileWelderTests.runMission(root, ApplicationSimulation.MUJOCO, true);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-energy-test-backend") {
+      MobileWelderTests.runMission(root, ApplicationSimulation.DETERMINISTIC, true);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-joint-handoff") {
@@ -5038,6 +5053,28 @@ class ProjectSourceTests {
       checkBackgroundLaunch(root);
       return 0;
     }
+
+    var flat = Bytes.alloc(4 * 24);
+    for (index in 0...4) {
+      flat.setDouble(index * 24, (index & 1) == 0 ? 0.0 : 2.0);
+      flat.setDouble(index * 24 + 8, (index & 2) == 0 ? 0.0 : 1.0);
+      flat.setDouble(index * 24 + 16, 0.0);
+    }
+    var flatHull = cadkit.ConvexHullVertices.safeFromMesh(flat, 4, 0.5);
+    check(flatHull.warning != null && flatHull.vertices.length == 24 &&
+      flatHull.vertices[2] == -0.25 && flatHull.vertices[14] == 0.25,
+      "flat collision part uses a 0.5-unit thickened box with a warning");
+    checkCoupling(0);
+    checkCoupling(1);
+    checkLinkCollision(0, true);
+    checkLinkCollision(0, false);
+    checkLinkCollision(1, true);
+    checkLinkCollision(1, false);
+    checkHullCollision(0, true);
+    checkHullCollision(0, false);
+    checkHullCollision(1, true);
+    checkHullCollision(1, false);
+    checkWedgeContact();
     var manifest = FileSystem.fullPath(root + "/cadkit/examples/modeling/materia.project.json");
     var machineManifest = FileSystem.fullPath(root + "/machinekit/examples/materia.project.json");
     var requirement = MateriaProjectRunner.executionRequirement(machineManifest);

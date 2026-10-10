@@ -19,7 +19,10 @@ class AssemblyPhysicalPartView {
       var hull = ConvexHullVertices.fromMesh(part.vertices, part.vertexCount);
       parts.push({id: part.id, materialId: part.materialId, volume: cast part.volume,
         centerOfMass: part.centerOfMass.copy(), inertia: part.inertia.copy(),
-        density: cast part.materialDensity, collisionHull: hull});
+        density: cast part.materialDensity, physicalMassKg: part.physicalMassKg,
+        physicalMassDeclared: part.physicalMassDeclared,
+        physicalInertiaKgM2: part.physicalInertiaKgM2 == null ? null : part.physicalInertiaKgM2.copy(),
+        collisionHull: hull});
     }
     return {metresPerUnit: scene.metresPerUnit, parts: parts};
   }

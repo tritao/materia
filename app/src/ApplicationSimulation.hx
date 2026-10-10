@@ -73,6 +73,8 @@ class ApplicationSimulation {
   var motions:Null<RobotMotionPlayer> = null;
   /** The simulated tools on the session's robots. */
   var tools:Null<SimulatedTools> = null;
+  /** The battery model of a CAD mobile power system, when present. */
+  var power:Null<SimulatedMobilePower> = null;
   var cnc:Null<CncProgramPlayer> = null;
   var beltVisuals:Array<BeltVisuals> = [];
   var machineProgram:Null<MachineProgramPlayer> = null;
@@ -143,6 +145,7 @@ class ApplicationSimulation {
     if (cellSignals != null) members.push(cellSignals);
     if (motions != null) members.push(motions);
     if (tools != null) members.push(tools);
+    if (power != null) members.push(power);
     if (cnc != null) members.push(cnc);
     if (machineProgram != null) members.push(machineProgram);
     if (mission != null) members.push(mission);
@@ -171,6 +174,7 @@ class ApplicationSimulation {
     var candidateBelts:Array<BeltVisuals> = [];
     var candidateProgram:Null<MachineProgramPlayer> = null;
     var candidateMobile:Null<robotkit.mobile.MobileBase> = null;
+    var candidatePower:Null<SimulatedMobilePower> = null;
     var candidateMission:Null<MissionPlayer> = null;
     var candidateSignals:Null<CellSignals> = null;
     var candidateBeads:Null<WeldBeads> = null;
@@ -407,14 +411,20 @@ class ApplicationSimulation {
       var work = session == null ? null : session.mission;
       if (work != null) {
         if (candidateAssembly == null) throw "A mission needs the project's assembly";
+        var welds = [for (step in work.steps) if (step.kind == "weld") step].length > 0;
+        var mobileProfile = session == null ? null : session.mobileBase;
+        if (welds && mobileProfile != null && mobileProfile.energy != null) {
+          if (candidateTools.welders.length != 1) throw "A powered mobile welding mission needs one simulated welder";
+          candidatePower = new SimulatedMobilePower(mobileProfile.energy, mobileProfile, candidateAssembly,
+            candidate, assemblyIndex, timestep, candidateTools.welders[0]);
+        }
         candidateMission = new MissionPlayer(work, candidateAssembly, candidate, assemblyIndex, timestep, heldBoxes,
           candidateTools.objectsByScene(), session, [for (id in candidateByController.keys()) candidateByController.get(id)],
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId),
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.outputFor(work.controllerId), null,
           virtualWelder ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
-            : MissionPlayer.ARM_ACCELERATION);
+            : MissionPlayer.ARM_ACCELERATION, candidatePower);
         // A mission that welds lays the weld metal as the welder deposits it.
-        var welds = [for (step in work.steps) if (step.kind == "weld") step].length > 0;
         if (welds) {
           var active:ProjectDocumentSession = cast session;
           var torch = [for (tool in active.robotTools) if (tool.kind == "torch") tool][0].torch;
@@ -462,6 +472,7 @@ class ApplicationSimulation {
       motions = resolvedMotions.length == 0 ? null :
         new RobotMotionPlayer(world, createdSpace.session, resolvedMotions);
       tools = candidateTools;
+      power = candidatePower;
       workforce = candidateWorkforce;
       if (cnc != null) cnc.dispose();
       for (visual in beltVisuals) visual.reset();
@@ -772,7 +783,7 @@ class ApplicationSimulation {
       retired.dispose();
       retired.scene.setWorkerVisualsVisible(true);
     }
-    workforce = null; motions = null; tools = null;
+    workforce = null; motions = null; tools = null; power = null;
     if (cnc != null) cnc.dispose();
     if (beads != null) beads.dispose();
     for (visual in beltVisuals) visual.reset();

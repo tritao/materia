@@ -42,6 +42,7 @@ class ManipulatorPlannerSpace implements PlannerSpace {
   public function lower():Array<Float> return [for (i in 0...dofs.length) arm.group.limitsOf(i).lower];
   public function upper():Array<Float> return [for (i in 0...dofs.length) arm.group.limitsOf(i).upper];
   public function invalid(q:Array<Float>):Null<String> return inner.invalid(full(q));
+  public function violation(q:Array<Float>):Null<collisionkit.CollisionViolation> return inner.violation(full(q));
 
   public function edgesClear(edges:Array<Float>, count:Int):Array<Bool> {
     var n = dimension(), mapped:Array<Float> = [];

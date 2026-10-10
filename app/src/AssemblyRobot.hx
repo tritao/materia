@@ -242,7 +242,7 @@ class AssemblyRobot {
         throw 'Assembly part "${occurrence.definition}" has no convex collision hull';
       var baseMass = part.volume * part.density * Math.pow(physical.metresPerUnit, 3);
       var chosenMass = record.mass;
-      if (record.materialId != null && record.materialId != part.materialId &&
+      if (part.physicalMassDeclared != true && record.materialId != null && record.materialId != part.materialId &&
           Math.abs(record.mass - baseMass) <= 1e-9 * Math.max(1.0, baseMass)) {
         var density:Null<Float> = null;
         for (material in session.customMaterials)

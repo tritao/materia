@@ -12,6 +12,35 @@ import robotkit.spatial.Vec3;
  * These are proposals only; navigation, reach and swept clearance decide their coverage.
  */
 class WeldStationCandidates {
+  /**
+   * Propose a polar grid of arm-mount positions with an independent base-heading grid.
+   * The original `around` form remains useful when the base should face the work centre.
+   */
+  public static function aroundWithHeadings(points:Array<Vec3>, map_T_work:Pose2, chassis_T_arm:Vec3,
+      minimumStandoff:Float, maximumStandoff:Float, radialSteps:Int = 3,
+      positionSectors:Int = 12, headingSamples:Int = 4):Array<WeldStationCandidate> {
+    if (headingSamples < 1) throw "Station heading grid needs at least one heading";
+    var sites = around(points, map_T_work, chassis_T_arm, minimumStandoff, maximumStandoff,
+      radialSteps, positionSectors);
+    var result:Array<WeldStationCandidate> = [];
+    for (siteIndex in 0...sites.length) {
+      var site = sites[siteIndex];
+      var armMap = site.pose.compose(new Pose2(chassis_T_arm.x, chassis_T_arm.y));
+      var armWork = armMap.relativeTo(map_T_work);
+      var position = Std.int(siteIndex / radialSteps);
+      var radial = siteIndex % radialSteps;
+      for (heading in 0...headingSamples) {
+        var yaw = 2 * Math.PI * heading / headingSamples;
+        var c = Math.cos(yaw), s = Math.sin(yaw);
+        var baseX = armWork.x - (c * chassis_T_arm.x - s * chassis_T_arm.y);
+        var baseY = armWork.y - (s * chassis_T_arm.x + c * chassis_T_arm.y);
+        result.push(new WeldStationCandidate('station:$position:$radial:$heading',
+          map_T_work.compose(new Pose2(baseX, baseY, yaw))));
+      }
+    }
+    return result;
+  }
+
   public static function around(points:Array<Vec3>, map_T_work:Pose2, chassis_T_arm:Vec3,
       minimumStandoff:Float, maximumStandoff:Float, radialSteps:Int = 3, headings:Int = 12):Array<WeldStationCandidate> {
     if (points == null || points.length == 0 || map_T_work == null || chassis_T_arm == null)
