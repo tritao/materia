@@ -327,7 +327,7 @@ pins. All native CadKit configurations use the prebuilt OCCT cache.
 
 | Step | State | Commits |
 | --- | --- | --- |
-| SD0 | open | |
+| SD0 | done | `70f8b600b` |
 | SD1 | open | |
 | SD2 | open | |
 | SD3 | open | |
