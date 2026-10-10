@@ -225,7 +225,6 @@ class MachineAssemblyDocuments {
 				typeId = id;
 				for (entry in saved) values.set(entry.name, MachineAssemblyCodec.componentValue(entry.value));
 		}
-		values.setToken("material", member.material);
 		var type = MachineKitComponents.defaultRegistry().byId(typeId);
 		var key = type.key(values);
 		var definition = cache.get(key);
@@ -258,7 +257,7 @@ class MachineAssemblyDocuments {
 	static function memberRecord(element:InstanceElement, local:String):MemberRecord {
 		var component = MachineKitRecipes.component(element);
 		if (component.componentType() == null) throw 'Saved member "$local" has no recipe';
-		return {occurrence: local, material: component.materialSpec(), source: MachineAssemblyCodec.memberSource(component)};
+		return {occurrence: local, source: MachineAssemblyCodec.memberSource(component)};
 	}
 
 	/** The document's assembly as data, with members and port connections read from the document. */

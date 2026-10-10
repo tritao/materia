@@ -87,7 +87,7 @@ class RecipeContractTests {
 			}
 
 			var baseline = type.create();
-			var materialOptions = MaterialLibrary.specs();
+			var materialOptions = type.materialEditable ? MaterialLibrary.specs() : [];
 			for (parameter in type.parameters()) if (parameter.name == "material")
 				materialOptions = switch parameter.type {
 					case Choice(options): options;

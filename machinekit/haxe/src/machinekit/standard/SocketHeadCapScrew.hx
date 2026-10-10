@@ -6,7 +6,9 @@ import machinekit.component.ComponentValue.*;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.ToolSpec;
 import machinekit.component.Dimension;
-import materia.project.MaterialLibrary;
+import cadkit.threads.ThreadSpec;
+import machinekit.standard.PropertyClass.PropertyClasses;
+import machinekit.standard.FastenerTightening.TighteningTableRow;
 
 import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
@@ -23,11 +25,14 @@ import machinekit.component.Solids;
  * Connectors: `head` at the bearing face and `tip` at z=-length, both with +Y along +Z.
  * Hole tools share the convention: the seat surface is z=0 and material lies at z<0.
  */
-class SocketHeadCapScrew extends MachineComponent {
+class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
 	static var table:Null<Catalog<MetricScrewSpec>>;
 
 	public final spec:MetricScrewSpec;
 	public final length:Float;
+	public final propertyClass:PropertyClass;
+	public final drive:ScrewDrive;
+	public final thread:ThreadSpec;
 	public var diameter(get, never):Float;
 	public var pitch(get, never):Float;
 	/** Threaded length measured from the tip. */
@@ -73,22 +78,25 @@ class SocketHeadCapScrew extends MachineComponent {
 		return table;
 	}
 
-	public static function metric(size:String, length:Float, material:String = "steel 12.9"):SocketHeadCapScrew
-		return new SocketHeadCapScrew(catalog().get(size), length, material);
+	public static function metric(size:String, length:Float, propertyClass:PropertyClass = Steel129):SocketHeadCapScrew
+		return new SocketHeadCapScrew(catalog().get(size), length, propertyClass);
 
 	public static function custom(spec:MetricScrewSpec, length:Float,
-			material:String = "steel 12.9"):SocketHeadCapScrew
-		return new SocketHeadCapScrew(spec, length, material, true);
+			propertyClass:PropertyClass = Steel129):SocketHeadCapScrew
+		return new SocketHeadCapScrew(spec, length, propertyClass, true);
 
-	private function new(spec:MetricScrewSpec, length:Float, material:String = "steel 12.9",
+	private function new(spec:MetricScrewSpec, length:Float, propertyClass:PropertyClass = Steel129,
 			codeOnly:Bool = false) {
 		if (!(length > 0) || !Math.isFinite(length)) throw 'Screw ${spec.size} needs a positive length';
+		if (propertyClass == null) throw 'Screw ${spec.size} needs a property class';
 		if (!(spec.diameter > 0) || !(spec.headDiameter > spec.diameter) || !(spec.headHeight > spec.socketDepth)
+			|| !(spec.socketSize > 0) || !(spec.socketDepth > 0) || !(spec.threadLength > 0)
 			|| !(spec.tapDrill < spec.diameter) || !(spec.clearanceFine > spec.diameter)
 			|| !(spec.counterboreDiameter > spec.headDiameter) || !(spec.counterboreDepth > spec.headHeight))
 			throw 'Screw ${spec.size} has inconsistent dimensions';
 		var name = '${spec.size}x${Dimension.format(length)}';
-		var materialSuffix = material == "steel 12.9" ? "" : '-${StringTools.replace(material, " ", "-")}';
+		var material = PropertyClasses.material(propertyClass);
+		var materialSuffix = propertyClass == Steel129 ? "" : '-' + PropertyClasses.token(propertyClass);
 		var designation = 'ISO4762-$name$materialSuffix';
 		var customName = '${spec.size}-D${Dimension.format(spec.diameter)}-P${Dimension.format(spec.pitch)}' +
 			'-HD${Dimension.format(spec.headDiameter)}x${Dimension.format(spec.headHeight)}-S${Dimension.format(spec.socketSize)}x${Dimension.format(spec.socketDepth)}' +
@@ -100,11 +108,27 @@ class SocketHeadCapScrew extends MachineComponent {
 			'Socket head cap screw $name$materialSuffix', material, codeOnly);
 		this.spec = spec;
 		this.length = length;
+		this.propertyClass = propertyClass;
+		drive = HexSocket(spec.socketSize);
+		thread = FastenerThreads.metric(spec.diameter, spec.pitch);
 		addConnector("head", Face, Solids.axial(0, 0, 0));
 		addConnector("tip", Face, Solids.axial(0, 0, -length));
 	}
 
 	override public function hasGeometry():Bool return true;
+
+	public function screwDrive():ScrewDrive return drive;
+	public function threadSpec():ThreadSpec return thread;
+	public function fastenerClass():PropertyClass return propertyClass;
+	public function shankLength():Float return length;
+	public function threadedLength():Float return threadLength;
+	public function tightening():TighteningTableRow return FastenerTightening.forThread(thread, propertyClass);
+
+	override public function setMaterial(spec:String):Void {
+		if (spec != PropertyClasses.material(propertyClass))
+			throw 'Fastener $designation material is determined by property class ${PropertyClasses.token(propertyClass)}';
+		super.setMaterial(spec);
+	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var head = Solids.named(Part.cylinderSpan(spec.headDiameter / 2, 0, spec.headHeight), "head");
@@ -180,9 +204,9 @@ class SocketHeadCapScrew extends MachineComponent {
 		if (recipeTypeCache == null)
 			recipeTypeCache = new ComponentType("machinekit.standard.socket-head-cap-screw",
 			[ComponentRecipeSupport.catalog("size", SocketHeadCapScrew.catalog(), "M5"), ComponentRecipeSupport.length("length", 20),
-				ComponentRecipeSupport.choice("material", fastenerMaterials(), "steel 12.9")],
-			v -> SocketHeadCapScrew.metric(v.token("size"), v.number("length"), v.token("material")),
-			true, true);
+				ComponentRecipeSupport.choice("propertyClass", PropertyClasses.tokens(), "12.9")],
+			v -> SocketHeadCapScrew.metric(v.token("size"), v.number("length"), PropertyClasses.parse(v.token("propertyClass"))),
+			true, true, null, false);
 		return recipeTypeCache;
 	}
 
@@ -191,11 +215,7 @@ class SocketHeadCapScrew extends MachineComponent {
 	override public function values():ComponentValues {
 		return new ComponentValues().set("size", Token(this.spec.size))
 				.set("length", Number(this.length))
-				.set("material", Token(materialSpec()));
-	}
-
-	static function fastenerMaterials():Array<String> {
-		return ["steel", "steel C45", "steel 8", "steel 8.8", "steel 12.9", "aluminium 6061"];
+				.set("propertyClass", Token(PropertyClasses.token(propertyClass)));
 	}
 
 }

@@ -1,6 +1,7 @@
 package machinekit.motion;
 
 import machinekit.component.Dimension;
+import cadkit.threads.ThreadSpec;
 
 /** Semantic lead-screw thread. Dimensions are nominal millimetres; this does not validate
  * that a diameter/pitch combination is listed in a particular edition of a thread standard.
@@ -62,6 +63,18 @@ class LeadScrewThread {
 	 */
 	public function signedLead():Float
 		return hand == RightHand ? -lead : lead;
+
+	/** The common face-thread value retains this family's profile and positive lead. */
+	public function threadSpec(internal:Bool = false):ThreadSpec {
+		var profile = switch family {
+			case MetricTrapezoidal: cadkit.threads.ThreadSpec.ThreadProfile.Trapezoidal;
+			case Acme: cadkit.threads.ThreadSpec.ThreadProfile.Acme;
+			case Ball: cadkit.threads.ThreadSpec.ThreadProfile.Ball;
+		};
+		return new ThreadSpec(designation, screwDiameter, pitch, starts,
+			hand == RightHand ? cadkit.threads.ThreadSpec.ThreadHand.RightHand : cadkit.threads.ThreadSpec.ThreadHand.LeftHand,
+			internal, "nominal", profile);
+	}
 
 	/**
 	 * Share of the motor's work that reaches the nut when the screw drives it: tan λ / tan(λ + φ'),

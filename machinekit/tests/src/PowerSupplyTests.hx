@@ -62,7 +62,7 @@ class PowerSupplyTests {
 		near(rate(rebuilt), nominal, "A saved powered machine resolves its service graph again");
 		var edited:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(powered.describe()));
 		edited.machine.members = [for (member in edited.machine.members) member.occurrence != "supply" ? member :
-			{occurrence: member.occurrence, material: member.material, source: switch member.source {
+			{occurrence: member.occurrence, source: switch member.source {
 				case Typed(id, values): Typed(id, [for (entry in values) entry.name != "voltage" ? entry :
 					{name: "voltage", value: SavedValue.Number(48)}]);
 				case other: other;

@@ -503,7 +503,7 @@ class MachineAssemblyDescriptionTests {
 			throw "The lead screw drive names its screw";
 		var edited:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(description));
 		edited.machine.members = [for (member in edited.machine.members) (member.occurrence != "screw" && member.occurrence != "nut") ? member :
-			{occurrence: member.occurrence, material: member.material, source: switch member.source {
+			{occurrence: member.occurrence, source: switch member.source {
 				case Typed(id, values): Typed(id, [for (value in values) value.name != "pitch" ? value :
 					{name: "pitch", value: SavedValue.Number(4)}]);
 				case other: other;
@@ -666,7 +666,7 @@ class MachineAssemblyDescriptionTests {
 		function changed(memberId:String, field:String, value:SavedValue):MachineAssembly {
 			var description:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(assembly.describe()));
 			description.machine.members = [for (member in description.machine.members) member.occurrence != memberId ? member :
-				{occurrence: member.occurrence, material: member.material, source: switch member.source {
+				{occurrence: member.occurrence, source: switch member.source {
 					case Typed(id, values): Typed(id, [for (entry in values) entry.name != field ? entry : {name: field, value: value}]);
 					case other: other;
 				}}];
@@ -826,7 +826,7 @@ class MachineAssemblyDescriptionTests {
 		function driverChanged(current:Float, voltage:Float, microsteps:Int):MachineAssembly {
 			var description:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(assembly.describe()));
 			description.machine.members = [for (member in description.machine.members) member.occurrence != "driver" ? member :
-				{occurrence: member.occurrence, material: member.material, source: switch member.source {
+				{occurrence: member.occurrence, source: switch member.source {
 					case Typed(id, values): Typed(id, [for (entry in values) {name: entry.name, value: switch entry.name {
 						case "current": SavedValue.Number(current);
 						case "voltage": SavedValue.Number(voltage);
@@ -971,13 +971,13 @@ class MachineAssemblyDescriptionTests {
 		// Rebuilt with the NEMA 17 in the motor's place, the actuator follows the motor.
 		var description:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(assembly.describe()));
 		description.machine.members = [for (member in description.machine.members) member.occurrence != "motor" ? member :
-			{occurrence: member.occurrence, material: member.material, source: switch member.source {
+			{occurrence: member.occurrence, source: switch member.source {
 				case Typed(id, values): Typed(id, [for (value in values) value.name != "model" ? value :
 					{name: "model", value: SavedValue.Token("17HS19-1684S1")}]);
 				case other: other;
 			}}];
 		description.machine.members = [for (member in description.machine.members) member.occurrence != "driver" ? member :
-			{occurrence: member.occurrence, material: member.material, source: switch member.source {
+			{occurrence: member.occurrence, source: switch member.source {
 				case Typed(id, values): Typed(id, [for (entry in values) entry.name != "current" ? entry :
 					{name: "current", value: SavedValue.Number(1.68)}]);
 				case other: other;

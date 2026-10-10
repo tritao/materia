@@ -44,7 +44,8 @@ class MachineComponent {
 	}
 
 	public final designation:String;
-	public var materialId:String;
+	/** Physical material changes go through setMaterial, so mechanically typed parts can enforce their class. */
+	public var materialId(default, null):String;
 	/** True when this component was built from explicit, non-catalog specifications. */
 	public final codeOnly:Bool;
 	public var bom(get, never):BomItem;

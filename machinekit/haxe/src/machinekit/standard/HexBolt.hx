@@ -6,7 +6,9 @@ import machinekit.component.ComponentValue.*;
 import machinekit.component.ComponentRecipeSupport;
 import machinekit.component.ToolSpec;
 import machinekit.component.Dimension;
-import materia.project.MaterialLibrary;
+import cadkit.threads.ThreadSpec;
+import machinekit.standard.PropertyClass.PropertyClasses;
+import machinekit.standard.FastenerTightening.TighteningTableRow;
 
 import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
@@ -23,11 +25,14 @@ import machinekit.component.Solids;
  * `SocketHeadCapScrew`. Connectors: `head` at the bearing face and `tip` at z=-length, both
  * with +Y along +Z. Envelope approximates the head as its across-corners cylinder.
  */
-class HexBolt extends MachineComponent {
+class HexBolt extends MachineComponent implements ScrewFastener {
 	static var table:Null<Catalog<HexBoltSpec>>;
 
 	public final spec:HexBoltSpec;
 	public final length:Float;
+	public final propertyClass:PropertyClass;
+	public final drive:ScrewDrive;
+	public final thread:ThreadSpec;
 	public var diameter(get, never):Float;
 	public var pitch(get, never):Float;
 	/** Threaded length measured from the tip; ISO 4017 bolts are threaded over their full length. */
@@ -65,31 +70,49 @@ class HexBolt extends MachineComponent {
 		return table;
 	}
 
-	public static function metric(size:String, length:Float):HexBolt
-		return new HexBolt(catalog().get(size), length);
+	public static function metric(size:String, length:Float, propertyClass:PropertyClass = Steel88):HexBolt
+		return new HexBolt(catalog().get(size), length, propertyClass);
 
-	public static function custom(spec:HexBoltSpec, length:Float):HexBolt
-		return new HexBolt(spec, length, true);
+	public static function custom(spec:HexBoltSpec, length:Float, propertyClass:PropertyClass = Steel88):HexBolt
+		return new HexBolt(spec, length, propertyClass, true);
 
-	private function new(spec:HexBoltSpec, length:Float, codeOnly:Bool = false) {
+	private function new(spec:HexBoltSpec, length:Float, propertyClass:PropertyClass = Steel88, codeOnly:Bool = false) {
 		if (!(length > 0) || !Math.isFinite(length)) throw 'Bolt ${spec.size} needs a positive length';
+		if (propertyClass == null) throw 'Bolt ${spec.size} needs a property class';
 		if (!(spec.diameter > 0) || !(spec.acrossFlats > spec.diameter) || !(spec.headHeight > 0)
 			|| !(spec.tapDrill < spec.diameter) || !(spec.clearanceFine > spec.diameter))
 			throw 'Bolt ${spec.size} has inconsistent dimensions';
 		var name = '${spec.size}x${Dimension.format(length)}';
-		var designation = 'ISO4017-$name';
+		var classSuffix = propertyClass == Steel88 ? "" : '-' + PropertyClasses.token(propertyClass);
+		var designation = 'ISO4017-$name$classSuffix';
 		var customName = '${spec.size}-D${Dimension.format(spec.diameter)}-P${Dimension.format(spec.pitch)}-AF${Dimension.format(spec.acrossFlats)}' +
 			'-H${Dimension.format(spec.headHeight)}-TD${Dimension.format(spec.tapDrill)}' +
 			'-C${Dimension.format(spec.clearanceFine)}x${Dimension.format(spec.clearanceMedium)}x${Dimension.format(spec.clearanceCoarse)}' +
-			'-L${Dimension.format(length)}';
-		super(codeOnly ? customDesignation(customName) : designation, 'Hex bolt $name', "steel 8.8", codeOnly);
+			'-L${Dimension.format(length)}-PC${PropertyClasses.token(propertyClass)}';
+		super(codeOnly ? customDesignation(customName) : designation, 'Hex bolt $name$classSuffix', PropertyClasses.material(propertyClass), codeOnly);
 		this.spec = spec;
 		this.length = length;
+		this.propertyClass = propertyClass;
+		drive = HexHead(spec.acrossFlats);
+		thread = FastenerThreads.metric(spec.diameter, spec.pitch);
 		addConnector("head", Face, Solids.axial(0, 0, 0));
 		addConnector("tip", Face, Solids.axial(0, 0, -length));
 	}
 
 	override public function hasGeometry():Bool return true;
+
+	public function screwDrive():ScrewDrive return drive;
+	public function threadSpec():ThreadSpec return thread;
+	public function fastenerClass():PropertyClass return propertyClass;
+	public function shankLength():Float return length;
+	public function threadedLength():Float return threadLength;
+	public function tightening():TighteningTableRow return FastenerTightening.forThread(thread, propertyClass);
+
+	override public function setMaterial(spec:String):Void {
+		if (spec != PropertyClasses.material(propertyClass))
+			throw 'Fastener $designation material is determined by property class ${PropertyClasses.token(propertyClass)}';
+		super.setMaterial(spec);
+	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var shank = Part.cylinderSpan(diameter / 2, -length, 0);
@@ -155,9 +178,10 @@ class HexBolt extends MachineComponent {
 	public static function recipeType():ComponentType {
 		if (recipeTypeCache == null)
 			recipeTypeCache = new ComponentType("machinekit.standard.hex-bolt",
-			[ComponentRecipeSupport.catalog("size", HexBolt.catalog(), "M5"), ComponentRecipeSupport.length("length", 20)],
-			v -> HexBolt.metric(v.token("size"), v.number("length")),
-			true);
+			[ComponentRecipeSupport.catalog("size", HexBolt.catalog(), "M5"), ComponentRecipeSupport.length("length", 20),
+				ComponentRecipeSupport.choice("propertyClass", PropertyClasses.tokens(), "8.8")],
+			v -> HexBolt.metric(v.token("size"), v.number("length"), PropertyClasses.parse(v.token("propertyClass"))),
+			true, true, null, false);
 		return recipeTypeCache;
 	}
 
@@ -165,7 +189,7 @@ class HexBolt extends MachineComponent {
 
 	override public function values():ComponentValues {
 		return new ComponentValues().set("size", Token(this.spec.size))
-				.set("length", Number(this.length)).setToken("material", materialSpec());
+				.set("length", Number(this.length)).setToken("propertyClass", PropertyClasses.token(propertyClass));
 	}
 
 }

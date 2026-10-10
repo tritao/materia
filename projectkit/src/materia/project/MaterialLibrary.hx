@@ -19,6 +19,8 @@ class MaterialLibrary {
     material("steel-c45", "C45 steel", [0.62, 0.64, 0.67], 0.8, 0.34, 7850, "steel C45"),
     material("steel-8", "Class 8 steel", [0.62, 0.64, 0.67], 0.8, 0.34, 7850, "steel 8"),
     material("steel-8-8", "Class 8.8 steel", [0.62, 0.64, 0.67], 0.8, 0.34, 7850, "steel 8.8"),
+    material("steel-10-9", "Class 10.9 steel", [0.62, 0.64, 0.67], 0.8, 0.34, 7850, "steel 10.9"),
+    material("stainless-a2-70", "A2-70 stainless steel", [0.62, 0.64, 0.67], 0.8, 0.34, 7900, "stainless A2-70"),
     material("steel-12-9", "Class 12.9 steel", [0.18, 0.19, 0.20], 0.55, 0.52, 7850, "steel 12.9"),
     material("black-oxide", "Black oxide steel", [0.18, 0.19, 0.20], 0.55, 0.52, 7850, "steel 12.9"),
     material("bearing-steel", "Bearing steel", [0.58, 0.61, 0.64], 0.78, 0.30, 7810, "bearing steel"),

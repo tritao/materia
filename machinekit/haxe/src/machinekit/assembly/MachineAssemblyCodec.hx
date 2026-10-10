@@ -229,7 +229,7 @@ class MachineAssemblyCodec {
 
 	static function levelRecord(assembly:MachineAssembly):MachineLevelRecord {
 		var members:Array<MemberRecord> = [for (member in assembly.mechanical.members) {
-			occurrence: member.id, source: memberSource(member.component), material: member.component.materialSpec()}];
+			occurrence: member.id, source: memberSource(member.component)}];
 		members.sort((a, b) -> Reflect.compare(a.occurrence, b.occurrence));
 		var connections = [for (entry in assembly.services.connections) {id: entry.id, fromInstance: entry.fromInstance,
 			fromPort: entry.fromPort, toInstance: entry.toInstance, toPort: entry.toPort}];
@@ -308,7 +308,6 @@ class MachineAssemblyCodec {
 				for (entry in saved) values.set(entry.name, componentValue(entry.value));
 				registry.byId(typeId).create(values);
 		};
-		component.setMaterial(member.material);
 		return component;
 	}
 

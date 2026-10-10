@@ -31,6 +31,29 @@ simulation and hardware, and a mission step drives it.
   SD2, which takes FreeCAD's thread texture as its reference and avoids its
   bugs).
 
+### Implementation decisions
+
+- **SD0 — Property class owns the fastener's mechanical material.** Screws and
+  bolts offer 8.8, 10.9, 12.9 and A2-70 as typed classes; their recipes store
+  `propertyClass` and derive material, rather than accepting a second,
+  contradictory material input. Other component recipes retain their material
+  input. The machine member record drops its duplicate material field: recipes
+  already supply material, including overrides on other components. Defaults
+  remain 12.9 for cap screws and 8.8 for hex bolts.
+- **SD0 — Published table values retain their limits.** The tightening catalog
+  records Optimas's [steel table](https://optimas.com/technical-resources/pre-load-and-tightening-torques-of-metric-thread-steel-fasteners/)
+  at friction 0.125 and [A2-70 table](https://international.optimas.com/technical-resources/stainless-steel-fasteners-pre-load-and-tightening-torques/)
+  at friction 0.1, with torque in Nm and preload in N. These are published
+  maximum assembly guidance values, not a validated joint process program.
+  Only the catalog's M3–M20 coarse sizes are included; unsupported fine pitches,
+  hands, starts and custom dimensions report a missing row instead of
+  interpolation. Fine thread designations still derive from custom screw specs.
+- **SD0 — Thread data belongs in CadKit.** MachineKit fasteners and lead screws
+  share `cadkit.threads.ThreadSpec`; metric, trapezoidal, Acme and ball-race
+  profiles retain their distinct meaning. Ball races have no cosmetic flank
+  profile. A function-only `ScrewFastener` interface shares driven-fastener
+  facts without haxeon's class-to-typedef structural assignment.
+
 ## What exists
 
 - Fasteners in `machinekit.standard`: `SocketHeadCapScrew` (ISO 4762),
@@ -76,7 +99,8 @@ client, and any thread rendering.
   size, so the bit is chosen from the screw. SHCS: hex socket of `socketSize`;
   hex bolt: hex head of `acrossFlats`.
 - `PropertyClass` (8.8, 10.9, 12.9, A2-70, …) on screws and bolts, replacing the
-  free-text `material` default.
+  free-text `material` default. Class determines material; recipes have no second
+  material input. Defaults stay 12.9 for cap screws and 8.8 for hex bolts.
 - A tightening table: assembly torque and preload per size and property class
   at a stated friction coefficient, with its source recorded like the existing
   catalog sources. No numbers are invented: they come from a cited table.
@@ -86,6 +110,11 @@ client, and any thread rendering.
   (trapezoidal), so lead screws join the same scheme.
 - Checks: every catalog screw has a drive, a thread spec and a torque for its
   default class; `LeadScrewThread`'s lead equals `ThreadSpec` pitch × starts.
+  Class survives recipe and saved-assembly round trips; contradictory material
+  overrides and unsupported tightening rows are reported.
+  Recipe changes advance the machine format from v13 to v14 and the CadKit
+  document from v11 to v12; the two empty BIM examples are regenerated with the
+  current encoder. Existing geometry, default materials and mass stay unchanged.
 
 **SD1. Threads on faces.**
 A thread is attached to a named cylindrical (or conical) face, never found again
@@ -288,14 +317,22 @@ Dependencies:
 
 ## Progress
 
+Validation uses the supplied suite, copied to `build/sd-suite-local.sh` to create
+the root `build/` directory and include the app's CollisionKit, KinematicsKit,
+MotionKit and TrajectoryKit library directories at runtime. The initial full
+baseline exposed those environment omissions; its successful build stages were
+retained while the runtime stages were retried with the complete path. NativeKit's
+empty mandatory libwebsockets and sokol checkouts were populated at their recorded
+pins. All native CadKit configurations use the prebuilt OCCT cache.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | open | |
 | SD1 | open | |
 | SD2 | open | |
 | SD3 | open | |
-| SD4 | open | |
-| SD5 | open | |
-| SD6 | open | |
-| SD7 | open | |
-| SD8 | open | |
+| SD4 | open — waits for machine tending on local main | |
+| SD5 | open — waits for machine tending on local main | |
+| SD6 | open — waits for machine tending on local main | |
+| SD7 | open — waits for machine tending on local main | |
+| SD8 | open — waits for machine tending on local main | |

@@ -26,7 +26,6 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 @:wire typedef MemberRecord = {
 	@:id(1) var occurrence:String;
 	@:id(2) var source:MemberSource;
-	@:id(3) var material:String;
 }
 
 @:wire typedef PortConnectionRecord = {

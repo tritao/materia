@@ -6,6 +6,8 @@ import materia.project.MaterialLibrary;
 /** Stable recipe for one kind of single part. */
 class ComponentType {
 	public final id:String;
+	/** False when a typed mechanical input already determines the material. */
+	public final materialEditable:Bool;
 	final inputs:Array<ComponentParameter>;
 	final build:ComponentValues->MachineComponent;
 	final keepDesignation:Bool;
@@ -21,10 +23,11 @@ class ComponentType {
 
 	public function new(id:String, inputs:Array<ComponentParameter>, build:ComponentValues->MachineComponent,
 			keepDesignation:Bool = false, materialInDesignation:Bool = false,
-			?bomExcludedInputs:Array<String>) {
+			?bomExcludedInputs:Array<String>, materialEditable:Bool = true) {
 		if (id == null || id.length == 0 || inputs == null || build == null)
 			throw "Incomplete component type";
 		this.id = id;
+		this.materialEditable = materialEditable;
 		this.keepDesignation = keepDesignation;
 		this.materialInDesignation = materialInDesignation;
 		this.bomExcludedInputs = bomExcludedInputs == null ? [] : bomExcludedInputs.copy();
@@ -39,9 +42,10 @@ class ComponentType {
 		var defaultComponent = sourceBuild(baseline);
 		defaultMaterial = defaultComponent.materialSpec();
 		this.inputs = inputs.copy();
-		if (!seen.exists("material"))
+		if (!materialEditable && seen.exists("material")) throw 'Derived material on "$id" cannot also be an input';
+		if (materialEditable && !seen.exists("material"))
 			this.inputs.push(new ComponentParameter("material", Choice(MaterialLibrary.specs()), Token(defaultMaterial)));
-		else {
+		else if (materialEditable) {
 			var declared = switch this.inputs[seenIndex(this.inputs, "material")].defaultValue {
 				case Token(spec): spec;
 				default: "";
@@ -50,7 +54,7 @@ class ComponentType {
 		}
 		this.build = values -> {
 			var component = sourceBuild(values);
-			component.setMaterial(values.token("material"));
+			if (materialEditable) component.setMaterial(values.token("material"));
 			return component;
 		};
 	}

@@ -516,11 +516,11 @@ class MachineKitSmoke {
 		check(scalarType.key(null).indexOf("scalar:1:3") >= 0,
 			"scalar keys round above the signed 32-bit integer range");
 		var screwRecipe = MachineKitComponents.defaultRegistry().byId("machinekit.standard.socket-head-cap-screw");
-		var steelScrew = screwRecipe.create(new ComponentValues().setToken("material", "steel C45"));
-		check(steelScrew.bom.material == "steel C45", "non-default screw material reaches the BOM");
-		check(steelScrew.designation == "ISO4762-M5x20-steel-C45" &&
+		var steelScrew = screwRecipe.create(new ComponentValues().setToken("propertyClass", "8.8"));
+		check(steelScrew.bom.material == "steel 8.8", "non-default screw class supplies the BOM material");
+		check(steelScrew.designation == "ISO4762-M5x20-8.8" &&
 			steelScrew.bom.partNumber != screwRecipe.create().bom.partNumber,
-			"non-default screw material has its own designation and BOM identity");
+			"non-default screw class has its own designation and BOM identity");
 		var customBearing = DeepGrooveBearing.custom({designation: "608", bore: 8, outside: 22, width: 7, chamfer: 0.3}, false);
 		check(customBearing.componentType() == null && StringTools.startsWith(customBearing.designation, "CUSTOM-608-D8x22x7-C0.3") &&
 			customBearing.bom.partNumber == customBearing.designation && customBearing.bom.typeId == null,
@@ -2558,6 +2558,7 @@ class MachineKitSmoke {
 		}
 		var everything = Shards.run([
 			{name: "TendingCell.TendingMissionChecks.run", run: () -> TendingCell.TendingMissionChecks.run(), weight: 1.0},
+			{name: "FastenerDataTests.run", run: FastenerDataTests.run, weight: 0.05},
 			{name: "AxisBuilderChecks.run", run: () -> AxisBuilderChecks.run(), weight: 1.0},
 			{name: "AssemblyIntegrityTests.run", run: () -> AssemblyIntegrityTests.run(), weight: 1.0},
 			{name: "GantryChecks.run", run: () -> GantryChecks.run(), weight: 1.0},

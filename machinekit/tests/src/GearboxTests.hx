@@ -45,7 +45,7 @@ class GearboxTests {
 			"Assumed gearbox ratings reach the actuator");
 		var edited:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(machine.describe()));
 		edited.machine.members = [for (member in edited.machine.members) member.occurrence != "gearbox" ? member :
-			{occurrence: member.occurrence, material: member.material, source: switch member.source {
+			{occurrence: member.occurrence, source: switch member.source {
 				case Typed(id, values): Typed(id, [for (entry in values) switch entry.name {
 					case "ratio": {name: entry.name, value: SavedValue.Number(20)};
 					case "efficiency": {name: entry.name, value: SavedValue.Number(0.8)};
