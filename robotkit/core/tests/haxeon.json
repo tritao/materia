@@ -15,12 +15,13 @@
   "native": {
     "cmake": {
       "source": "native",
-      "target": "robotkit_runtime",
+      "target": "robotkit_core_consumer_native",
       "library": "robotkit_runtime",
       "inputs": [
         "../../CMakeLists.txt",
         "../../runtime/CMakeLists.txt",
         "../../runtime/include/robotkit_runtime.h",
+        "../../../haxeon/vendor/nativekit/CMakeLists.txt",
         "native/CMakeLists.txt"
       ]
     }
