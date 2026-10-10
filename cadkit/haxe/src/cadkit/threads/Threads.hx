@@ -2,6 +2,7 @@ package cadkit.threads;
 
 import CadKit;
 import cadkit.ElementNames;
+import materia.project.ThreadRenderData;
 import cadkit.Shape;
 import cadkit.modeling.Model;
 import cadkit.modeling.Location;
@@ -18,14 +19,18 @@ class ResolvedThread {
 	public final length:Float;
 	public final radius:Float;
 	public final partial:Bool;
+	public final ringAtStart:Bool;
+	public final ringAtEnd:Bool;
 
-	public function new(attribute:ThreadedFace, faceIndex:Int, frame:Plane, length:Float, radius:Float, partial:Bool) {
+	public function new(attribute:ThreadedFace, faceIndex:Int, frame:Plane, length:Float, radius:Float, ringAtStart:Bool, ringAtEnd:Bool) {
 		this.attribute = attribute;
 		this.faceIndex = faceIndex;
 		this.frame = frame;
 		this.length = length;
 		this.radius = radius;
-		this.partial = partial;
+		this.ringAtStart = ringAtStart;
+		this.ringAtEnd = ringAtEnd;
+		partial = ringAtStart || ringAtEnd;
 	}
 }
 
@@ -106,6 +111,17 @@ class Threads {
 		}
 	}
 
+	/** Portable display data is derived on every mesh rebuild, alongside its face ranges. */
+	public static function renderData(shape:Shape):Array<ThreadRenderData> {
+		return [for (thread in ofShape(shape)) {
+			faceName: thread.attribute.faceName, faceIndex: thread.faceIndex, spec: thread.attribute.spec.data(),
+			origin: [thread.frame.origin.x, thread.frame.origin.y, thread.frame.origin.z],
+			xDirection: [thread.frame.xDirection.x, thread.frame.xDirection.y, thread.frame.xDirection.z],
+			direction: [thread.frame.normal.x, thread.frame.normal.y, thread.frame.normal.z],
+			length: thread.length, ringAtStart: thread.ringAtStart, ringAtEnd: thread.ringAtEnd
+		}];
+	}
+
 	public static function of(part:Model):Array<ResolvedThread> return ofShape(part.shape);
 
 	public static function ofShape(shape:Shape):Array<ResolvedThread> {
@@ -125,7 +141,8 @@ class Threads {
 					var origin = Vector.fromNative(axis.get_origin()).add(direction.scale(start));
 					var frame = new Plane(origin, Vector.fromNative(axis.get_reference()), direction.scale(attribute.direction));
 					result.push(new ResolvedThread(attribute, index, frame, maximum - minimum, axis.get_radius(),
-						minimum > span.minimum + 1e-7 || maximum < span.maximum - 1e-7));
+						attribute.direction == 1 ? minimum > span.minimum + 1e-7 : maximum < span.maximum - 1e-7,
+						attribute.direction == 1 ? maximum < span.maximum - 1e-7 : minimum > span.minimum + 1e-7));
 				}
 				face.close();
 			} catch (error:Dynamic) {

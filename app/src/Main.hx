@@ -625,6 +625,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final consoleDocument:TextDocument = new TextDocument("");
   final logLengths:Array<Int> = [];
   var gridVisible:Bool;
+  var cosmeticThreadsVisible:Bool = true;
   var simulationOverlaysVisible:Bool = true;
   /** COLLISION.md CL8b: the scene's collision world, its settings, and the toolbar's summary of what it found. */
   var collisionsVisible:Bool = true;
@@ -956,6 +957,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       optionIds = optionIds.concat([
         "scene.antialiasing-off", "scene.antialiasing-2x", "scene.antialiasing-4x"]);
       optionIds.push("scene.toggle-collisions");
+      optionIds.push("scene.toggle-cosmetic-threads");
       var options = new CommandMenu("viewport-options-menu", optionIds,
         viewportOptionsX, viewportOptionsY, commands, ui.commandContext,
         function() { viewportOptionsVisible = false; invalidateView(); },
@@ -1787,13 +1789,17 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function readViewSettings():Void {
     var store = preferences.store;
     gridVisible = store.getBool(AppSettings.GRID_VISIBLE);
+    cosmeticThreadsVisible = store.getBool(AppSettings.COSMETIC_THREADS);
     simulationOverlaysVisible = store.getBool(AppSettings.SIMULATION_OVERLAYS);
     collisionsVisible = store.getBool(AppSettings.COLLISIONS_VISIBLE);
     collisionNearMillimetres = store.getFloat(AppSettings.COLLISION_NEAR);
     gridSnapEnabled = store.getBool(AppSettings.GRID_SNAP);
     gridSpacing = store.getFloat(AppSettings.GRID_SPACING);
     lightingPreset = Std.int(Math.max(0, AppSettings.LIGHTING_PRESETS.indexOf(store.getString(AppSettings.LIGHTING))));
-    if (perspectiveViewport != null) perspectiveViewport.setLightingPreset(lightingPreset);
+    if (perspectiveViewport != null) {
+      perspectiveViewport.setLightingPreset(lightingPreset);
+      perspectiveViewport.setCosmeticThreads(cosmeticThreadsVisible);
+    }
     if (commands != null) commands.refresh();
     invalidateView();
   }
@@ -2033,6 +2039,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         frame == null ? 0 : frame.revision,frame == null ? [] : frame.robots);
       var mission = simulation.missionPlayer();
       perspectiveViewport.setSimulationOverlays(simulationOverlaysVisible);
+      perspectiveViewport.setCosmeticThreads(cosmeticThreadsVisible);
       perspectiveViewport.setCollisions(editingCollisions());
       perspectiveViewport.setMissionOverlay(mission == null || !simulation.isActive() || !simulationOverlaysVisible ? null : mission.overlay());
     }

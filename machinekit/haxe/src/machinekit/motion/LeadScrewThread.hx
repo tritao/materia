@@ -67,12 +67,12 @@ class LeadScrewThread {
 	/** The common face-thread value retains this family's profile and positive lead. */
 	public function threadSpec(internal:Bool = false):ThreadSpec {
 		var profile = switch family {
-			case MetricTrapezoidal: cadkit.threads.ThreadSpec.ThreadProfile.Trapezoidal;
-			case Acme: cadkit.threads.ThreadSpec.ThreadProfile.Acme;
-			case Ball: cadkit.threads.ThreadSpec.ThreadProfile.Ball;
+			case MetricTrapezoidal: materia.project.ThreadSpecData.ThreadProfile.Trapezoidal;
+			case Acme: materia.project.ThreadSpecData.ThreadProfile.Acme;
+			case Ball: materia.project.ThreadSpecData.ThreadProfile.Ball;
 		};
 		return new ThreadSpec(designation, screwDiameter, pitch, starts,
-			hand == RightHand ? cadkit.threads.ThreadSpec.ThreadHand.RightHand : cadkit.threads.ThreadSpec.ThreadHand.LeftHand,
+			hand == RightHand ? materia.project.ThreadSpecData.ThreadHand.RightHand : materia.project.ThreadSpecData.ThreadHand.LeftHand,
 			internal, "nominal", profile);
 	}
 

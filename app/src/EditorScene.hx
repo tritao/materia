@@ -1754,8 +1754,8 @@ class EditorScene {
 
   public function configureRenderView(view:SceneView, viewProjection:Transform,
       ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1,
-      ?collisions:Array<SceneCollision.SceneCollisionPair>):SceneView
-    return presentation.configureRenderView(this, view, viewProjection, poses, hoveredId, hoveredFaceIndex, collisions);
+      ?collisions:Array<SceneCollision.SceneCollisionPair>, cosmeticThreads:Bool = true):SceneView
+    return presentation.configureRenderView(this, view, viewProjection, poses, hoveredId, hoveredFaceIndex, collisions, cosmeticThreads);
 
   public function selectRayWithView(view:SceneView, originX:Float, originY:Float, originZ:Float,
       directionX:Float, directionY:Float, directionZ:Float,
@@ -3025,6 +3025,7 @@ class EditorScene {
   public function dispose():Void {
     if (disposed) return;
     disposed = true;
+    presentation.threads.dispose(this);
     for (visual in workerVisuals) visual.dispose(scene, false);
     workerVisuals.clear();
     for (session in stockSimulations) session.dispose();

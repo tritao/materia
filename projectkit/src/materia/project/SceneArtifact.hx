@@ -2,6 +2,8 @@ package materia.project;
 
 import haxe.io.Bytes;
 import haxeon.wire.JsonWire;
+import materia.project.ThreadRenderData;
+import materia.project.ThreadRenderData.ThreadRenderDataValues;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyDefinitionCodec;
@@ -51,6 +53,8 @@ typedef SceneArtifactPart = {
 		without the B-rep author mates on faces.
 	*/
 	@:optional var faceDescriptors:String;
+	/** Named semantic intervals derived beside this exact tessellation. */
+	@:optional var threads:Array<ThreadRenderData>;
 }
 
 typedef SceneArtifactData = {
@@ -693,7 +697,7 @@ class SceneArtifact {
 		var unitText = Bytes.ofString(unit);
 		var names:Array<{id:Bytes, name:Bytes, finish:Bytes, materialId:Bytes, materialSpec:Bytes,
 			density:Float, volume:Float, center:Array<Float>, inertia:Array<Float>, physicalMass:Float,
-			physicalMassDeclared:Bool, physicalInertia:Array<Float>, faces:Bytes}> = [];
+			physicalMassDeclared:Bool, physicalInertia:Array<Float>, faces:Bytes, threads:Bytes}> = [];
 		var assemblyDefinition = data.assemblyDefinition == null ? Bytes.alloc(0)
 			: Bytes.ofString(AssemblyDefinitionCodec.encode(data.assemblyDefinition));
 		var assemblyState = data.assemblyState == null ? Bytes.alloc(0)
@@ -750,8 +754,9 @@ class SceneArtifact {
 				: part.physicalInertiaKgM2.copy();
 			var faceDescriptors = part.faceDescriptors;
 			var faces = faceDescriptors == null ? Bytes.alloc(0) : Bytes.ofString(faceDescriptors);
+			var threads = part.threads == null || part.threads.length == 0 ? Bytes.alloc(0) : Bytes.ofString(JsonWire.encode(part.threads));
 			names.push({id: id, name: name, finish: finish, materialId: materialId,
-				materialSpec: materialSpec, density: density, faces: faces,
+				materialSpec: materialSpec, density: density, faces: faces, threads: threads,
 				volume: volume,
 				center: part.centerOfMass == null ? meshProperties.centerOfMass : part.centerOfMass,
 				inertia: part.inertia == null ? meshProperties.inertia : part.inertia,
@@ -761,7 +766,7 @@ class SceneArtifact {
 			length += 249 + finish.length + materialId.length + materialSpec.length + id.length + name.length + part.vertices.length + part.normals.length
 				+ part.indices.length + (part.edgeSegments == null ? 0 : part.edgeSegments.length)
 				+ (part.edgeIds == null ? 0 : part.edgeIds.length)
-				+ part.faceRanges.length * 12 + 4 + faces.length;
+				+ part.faceRanges.length * 12 + 4 + faces.length + 4 + threads.length;
 			if (length > MAX_BYTES) throw "Scene artifact exceeds the 150 MB limit";
 		}
 		var result = Bytes.alloc(length), offset = 0;
@@ -818,6 +823,8 @@ class SceneArtifact {
 			}
 			offset = putInt(result, offset, text.faces.length);
 			result.blit(offset, text.faces, 0, text.faces.length); offset += text.faces.length;
+			offset = putInt(result, offset, text.threads.length);
+			result.blit(offset, text.threads, 0, text.threads.length); offset += text.threads.length;
 		}
 		offset = putInt(result, offset, assemblyDefinition.length);
 		result.blit(offset, assemblyDefinition, 0, assemblyDefinition.length); offset += assemblyDefinition.length;
@@ -2364,6 +2371,16 @@ class SceneArtifact {
 			!finite(appearance.metallic) || appearance.metallic < 0 || appearance.metallic > 1 ||
 			!finite(appearance.roughness) || appearance.roughness < 0 || appearance.roughness > 1))
 			throw 'Scene artifact part "${part.id}" has an invalid appearance';
+		if (part.threads != null) {
+			if (part.threads.length > MAX_FACE_RANGES) throw 'Part ${part.id} has too many threads';
+			for (thread in part.threads) {
+				ThreadRenderDataValues.validate(thread);
+				var found = false;
+				for (range in part.faceRanges) if (range.faceIndex == thread.faceIndex) found = true;
+				if (!found) throw 'Thread ${part.id}/${thread.faceName} has no tessellated face range';
+			}
+		}
+
 		for (range in part.faceRanges)
 			if (range.faceIndex < 0 || range.firstIndex < 0 || range.indexCount < 0 ||
 				range.firstIndex % 3 != 0 || range.indexCount % 3 != 0 ||
@@ -2441,7 +2458,9 @@ private class SceneArtifactReader {
 			for (_ in 0...rangeCount)
 				faceRanges.push({faceIndex: readInt(), firstIndex: readInt(), indexCount: readInt()});
 			var faceDescriptors = readOpaqueText(16000000, 'part "$id" face descriptors');
-			var part:SceneArtifactPart = {id: id, name: name, red: red, green: green, blue: blue,
+			var threadText = readOpaqueText(16000000, 'part "$id" threads');
+			var threads:Array<ThreadRenderData> = threadText.length == 0 ? [] : JsonWire.decode(threadText);
+			var part:SceneArtifactPart = {threads: threads, id: id, name: name, red: red, green: green, blue: blue,
 				appearance: appearance, materialId: materialId, materialDensity: density, materialSpec: materialSpec,
 				volume: volume, centerOfMass: center, inertia: inertia,
 				physicalMassKg: physicalMassKg, physicalMassDeclared: physicalMassDeclared == 1,

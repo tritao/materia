@@ -16,6 +16,7 @@ class AppSettings {
   public static inline var COLOR_SCHEME:String = "interface/theme/color_scheme";
   /** One of LIGHTING_PRESETS; its index is the viewport's preset number. */
   public static inline var LIGHTING:String = "editors/3d/lighting";
+  public static inline var COSMETIC_THREADS:String = "editors/3d/show_cosmetic_threads";
   public static inline var GRID_VISIBLE:String = "editors/3d/grid/show_grid";
   public static inline var GRID_SNAP:String = "editors/3d/grid/snap_to_grid";
   /** Metres between grid lines, and the snapping step. */
@@ -75,6 +76,10 @@ class AppSettings {
     registry.define(PRINTER_CONFIG, PropertyType.Text, PropertyValue.Text(""), config);
 
     registry.define(GRID_VISIBLE, PropertyType.Bool, PropertyValue.Bool(true));
+    var threads = new SettingOptions();
+    threads.label = "Show Cosmetic Threads";
+    threads.tooltip = "Draw the nominal threads on named bore and shank faces.";
+    registry.define(COSMETIC_THREADS, PropertyType.Bool, PropertyValue.Bool(true), threads);
     var overlays = new SettingOptions();
     overlays.label = "Show Simulation Overlays";
     overlays.tooltip = "Draw lidar rays, and a mission's route, costmap, sensed obstacles and odometry, while a simulation runs.";

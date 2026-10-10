@@ -49,7 +49,7 @@ import haxe.Json;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
 import cadkit.threads.ThreadSpec;
-import cadkit.threads.ThreadSpecData;
+import materia.project.ThreadSpecData;
 import haxeon.wire.JsonWire;
 import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.CylinderFeature;

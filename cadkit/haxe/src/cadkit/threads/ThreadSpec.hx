@@ -1,20 +1,9 @@
 package cadkit.threads;
 
-/** Hand of a thread, independent of the face's orientation. */
-@:wire
-enum ThreadHand {
-	@:id(1) RightHand;
-	@:id(2) LeftHand;
-}
-
-/** Nominal thread profile; ball races have no cosmetic flank profile. */
-@:wire
-enum ThreadProfile {
-	@:id(1) Metric;
-	@:id(2) Trapezoidal;
-	@:id(3) Acme;
-	@:id(4) Ball;
-}
+import materia.project.ThreadSpecData;
+import materia.project.ThreadSpecData.ThreadSpecDataValues;
+import materia.project.ThreadSpecData.ThreadHand;
+import materia.project.ThreadSpecData.ThreadProfile;
 
 /** Immutable nominal thread dimensions in millimetres; no helical B-rep is made. */
 class ThreadSpec {
@@ -31,13 +20,9 @@ class ThreadSpec {
 	public function new(designation:String, majorDiameter:Float, pitch:Float, starts:Int = 1,
 			hand:ThreadHand = RightHand, internal:Bool = false, toleranceClass:Null<String> = null,
 			profile:ThreadProfile = Metric) {
-		if (designation == null || StringTools.trim(designation) == "") throw "Thread needs a designation";
-		if (!Math.isFinite(majorDiameter) || majorDiameter <= 0) throw "Thread needs a positive major diameter";
-		if (!Math.isFinite(pitch) || pitch <= 0) throw "Thread needs a positive pitch";
-		if (starts < 1 || !Math.isFinite(pitch * starts)) throw "Thread needs a finite lead and at least one start";
 		var tolerance = toleranceClass == null ? (profile == Metric ? (internal ? "6H" : "6g") : "nominal") : toleranceClass;
-		if (hand == null || profile == null || StringTools.trim(tolerance) == "")
-			throw "Thread needs a hand, profile and tolerance class";
+		ThreadSpecDataValues.validate({designation: designation, majorDiameter: majorDiameter, pitch: pitch,
+			starts: starts, hand: hand, internal: internal, toleranceClass: tolerance, profile: profile});
 		this.designation = designation;
 		this.majorDiameter = majorDiameter;
 		this.pitch = pitch;

@@ -2,6 +2,7 @@ package tests;
 
 import app.AppPreferences;
 import app.AppSettings;
+import haxeon.ui.properties.PropertyValue;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -34,6 +35,9 @@ class AppPreferencesTests {
       "anti-aliasing defaults to four samples");
     check(first.showStartPage, "the Start page shows by default");
     check(first.recent.length == 0, "no recent files at first");
+    check(first.store.getBool(AppSettings.COSMETIC_THREADS), "cosmetic threads are shown by default");
+    first.store.set(AppSettings.COSMETIC_THREADS, PropertyValue.Bool(false));
+    check(!new AppPreferences(file).store.getBool(AppSettings.COSMETIC_THREADS), "thread visibility survives a restart");
 
     first.setAntialiasing(2);
     check(first.antialiasing == 2, "the choice takes effect");

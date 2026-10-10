@@ -62,6 +62,7 @@ class SceneReconciler {
     var previousFaceShape=owner.selectedCadFace;
     var previousFaceX=owner.selectedCadFaceX,previousFaceY=owner.selectedCadFaceY;
     var retained:Map<String, Bool> = new Map();
+    var retiredThreadIds:Array<String> = [];
     try {
       for (record in data) {
         var item = existingById.get(record.id);
@@ -201,6 +202,11 @@ class SceneReconciler {
           prepared.transaction.destroyNode(part);
           prepared.nodeEntries.remove(SceneBridge.nodeKey(part));
         }
+        for (node in owner.presentation.threads.nodesFor(item.id)) {
+          prepared.transaction.destroyNode(node);
+          prepared.nodeEntries.remove(SceneBridge.nodeKey(node));
+        }
+        retiredThreadIds.push(item.id);
         prepared.transaction.destroyNode(runtime.node);
         prepared.bridgeEntries.remove(item.id);
         prepared.nodeEntries.remove(SceneBridge.nodeKey(runtime.node));
@@ -227,6 +233,7 @@ class SceneReconciler {
       owner.faceHoverGeometries.remove(id);
       if (geometry != null) geometry.dispose();
     }
+    for (id in retiredThreadIds) owner.presentation.threads.release(owner, id);
     owner.objects = prepared.objects;
     owner.cadSessions = prepared.cadSessions;
     owner.pruneStockSimulations();

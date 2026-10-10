@@ -3,6 +3,9 @@ package nativekit.scene;
 import NativeKitScene;
 import haxe.io.Bytes;
 
+/** Borrowed vertex stream; callers must keep its bytes immutable. */
+typedef GeometryStream = {var bytes:Bytes; var format:Int; var count:Int; var stride:Int;}
+
 /** Owns the backing arrays used to describe one geometry resource. */
 class GeometryData {
 	public static inline var EDGE_SUBELEMENT_TAG:Int = 0x40000000;
@@ -141,6 +144,19 @@ class GeometryData {
 
 	public function triangleCount():Int
 		return Std.int((packedIndices == null ? indexValues.length : packedIndexCount) / 3);
+
+	/** Read a stream without copying it, for overlays on the same tessellation. */
+	public function stream(semantic:Int):Null<GeometryStream> {
+		for (index in 0...streamSemantics.length) if (streamSemantics[index] == semantic)
+			return {bytes: streamData[index], format: streamFormats[index], count: streamCounts[index], stride: streamStrides[index]};
+		return null;
+	}
+
+	public function indexAt(index:Int):Int {
+		var count = packedIndices == null ? indexValues.length : packedIndexCount;
+		if (index < 0 || index >= count) throw "Geometry index is out of range";
+		return packedIndices == null ? indexValues[index] : packedIndices.getInt32(index * 4);
+	}
 
 	/**
 	 * Builds a renderable geometry containing only one subelement's triangles.

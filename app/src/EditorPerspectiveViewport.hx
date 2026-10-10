@@ -32,6 +32,7 @@ import haxeon.ui.semantics.Semantics;
 
 /** Interactive SceneKit GPU viewport composited into the editor UI. */
 class EditorPerspectiveViewport implements View {
+  var cosmeticThreadsVisible:Bool = true;
   /** The closest pairs drawn in the viewport; the toolbar counts all of them. */
   static inline var MAX_DRAWN_COLLISIONS:Int = 16;
 
@@ -110,6 +111,13 @@ class EditorPerspectiveViewport implements View {
   static final SENSOR_MARKER_COLOR = Color.rgba(1.0, 0.75, 0.2, 0.95);
   static final SENSOR_RAY_COLOR = Color.rgba(0.25, 0.8, 1.0, 0.22);
 
+  public function setCosmeticThreads(visible:Bool):Void {
+    if (visible == cosmeticThreadsVisible) return;
+    cosmeticThreadsVisible = visible;
+    runtimeRevision++;
+    host.requestFrame();
+  }
+
   public function new(key:String, scene:EditorScene, host:UiHostContext, ?style:LayoutStyle) {
     this.key = key;
     this.scene = scene;
@@ -182,7 +190,7 @@ class EditorPerspectiveViewport implements View {
       fitCameraClipRange();
       var view = scene.configureRenderView(new SceneView(), camera.viewProjection(width / height),
         simulationActive ? simulationPoses : null, hoveredObjectId, hoveredFaceIndex,
-        collisionPairs);
+        collisionPairs, cosmeticThreadsVisible);
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
       if (gridVisible && gridStep > 0.0) {
         var scale = Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360.0);
@@ -471,7 +479,7 @@ class EditorPerspectiveViewport implements View {
   function beginAssemblyDrag(localX:Float, localY:Float):Bool {
     fitCameraClipRange();
     var ray = camera.screenRay(localX, localY, Math.max(1, renderedWidth), Math.max(1, renderedHeight));
-    var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()), null);
+    var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()), null, null, -1, null, cosmeticThreadsVisible);
     var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
       ray.directionX, ray.directionY, ray.directionZ);
     if (hit.id == "scene" || !Math.isFinite(hit.x) || !Math.isFinite(hit.y) || !Math.isFinite(hit.z)) return false;
@@ -527,7 +535,7 @@ class EditorPerspectiveViewport implements View {
     fitCameraClipRange();
     var ray=camera.screenRay(localX,localY,Math.max(1,renderedWidth),Math.max(1,renderedHeight));
     var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),
-      simulationActive?simulationPoses:null);
+      simulationActive?simulationPoses:null, null, -1, null, cosmeticThreadsVisible);
     return scene.pickRayWithView(view,ray.originX,ray.originY,ray.originZ,
       ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
   }
@@ -543,7 +551,7 @@ class EditorPerspectiveViewport implements View {
     // A running simulation poses the scene, so hover must test the posed geometry, as picking does.
     var hit = simulationActive
       ? scene.hoverHitRayWithView(scene.configureRenderView(new SceneView(),
-          camera.viewProjection(aspect()), simulationPoses),
+          camera.viewProjection(aspect()), simulationPoses, null, -1, null, cosmeticThreadsVisible),
           ray.originX, ray.originY, ray.originZ, ray.directionX, ray.directionY, ray.directionZ)
       : scene.hoverHitRay(ray.originX, ray.originY, ray.originZ,
           ray.directionX, ray.directionY, ray.directionZ);
@@ -578,7 +586,7 @@ class EditorPerspectiveViewport implements View {
     if(!editingEnabled()){var id=pick(localX,localY);scene.select(id);return id;}
     fitCameraClipRange();
     var ray=camera.screenRay(localX,localY,Math.max(1,renderedWidth),Math.max(1,renderedHeight));
-    var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),null);
+    var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),null, null, -1, null, cosmeticThreadsVisible);
     return scene.selectRayWithView(view,ray.originX,ray.originY,ray.originZ,
       ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
   }
@@ -1107,7 +1115,7 @@ class EditorPerspectiveViewport implements View {
       if (navigationPointer != null) { event.preventDefault(); event.stopPropagation(); return; }
       var ray = camera.screenRay(event.localX, event.localY, Math.max(1, renderedWidth), Math.max(1, renderedHeight));
       var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()),
-        simulationActive ? simulationPoses : null);
+        simulationActive ? simulationPoses : null, null, -1, null, cosmeticThreadsVisible);
       var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
         ray.directionX, ray.directionY, ray.directionZ);
       var anchor = hit.id != "scene" && Math.isFinite(hit.x) && Math.isFinite(hit.y) && Math.isFinite(hit.z)

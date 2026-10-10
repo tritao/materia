@@ -2,6 +2,7 @@ package machinekit.assembly;
 
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Part;
+import cadkit.threads.Threads;
 import machinekit.component.ComponentDetail;
 import machinekit.component.MassProperties;
 import machinekit.component.MassProperties.MassSource;
@@ -86,6 +87,7 @@ class AssemblyPreview {
     part.vertexCount = Std.int(mesh.positions.length / 3); part.indexCount = mesh.indices.length;
     part.vertices = vertices; part.normals = normals; part.indices = indices;
     part.faceRanges = []; part.faceDescriptors = null; part.edgeSegments = null; part.edgeIds = null;
+    part.threads = new Array<materia.project.ThreadRenderData>();
   }
 
 	static function movingBelts(assembly:MachineAssembly):materia.project.SceneArtifact.SceneArtifactMachineMotion {
@@ -190,6 +192,7 @@ class AssemblyPreview {
 				vertices: mesh.vertices, normals: mesh.normals, indices: mesh.indices,
 				edgeSegments: mesh.edgeSegments, edgeIds: mesh.edgeIds,
 				faceDescriptors: cadkit.parametric.GeometricConnectors.describeFaces(part.shape),
+				threads: Threads.renderData(part.shape),
 				faceRanges: [for (range in mesh.faceRanges) {
 					faceIndex: range.faceIndex, firstIndex: range.firstIndex, indexCount: range.indexCount
 				}]

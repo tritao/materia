@@ -488,3 +488,8 @@ from the current named faces. Frame +Z proceeds into a tapped bore or toward a
 screw tip. The physical face clips both ends of the manufacturing interval.
 `HoleFeature.tapped` saves its internal spec, tap drill and independently editable
 thread depth; saved frames are never caches. Recessed tapped holes are rejected.
+
+`Threads.renderData(shape)` derives portable display packets alongside the mesh.
+ProjectKit owns their wire types and nominal enums; frame and length use the
+part's unit and nominal spec dimensions stay in millimetres. The editor clips the
+base face triangles at these intervals and supplies analytic thread textures.

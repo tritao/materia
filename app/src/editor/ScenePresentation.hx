@@ -23,6 +23,7 @@ import nativekit.scene.ChangeSet;
 /** SceneKit resources, renderer changes, and hover presentation state. */
 @:access(app.EditorScene)
 class ScenePresentation {
+  public final threads:CosmeticThreadPresentation = new CosmeticThreadPresentation();
   public var bridge:SceneBridge;
   public var snapshot:SceneSnapshot;
   public var spatial:SpatialIndex;
@@ -160,7 +161,9 @@ class ScenePresentation {
 
   public function configureRenderView(owner:EditorScene, view:SceneView, viewProjection:Transform,
       ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1,
-      ?collisions:Array<app.SceneCollision.SceneCollisionPair>):SceneView {
+      ?collisions:Array<app.SceneCollision.SceneCollisionPair>, cosmeticThreads:Bool = true):SceneView {
+    if (cosmeticThreads) threads.ensure(owner);
+    var threadHighlights:Map<String, Material> = [];
     view.setViewProjection(viewProjection);
     if (collisions != null) {
       // Red for objects in a colliding pair, amber for objects only near; the selection and the hovered
@@ -175,7 +178,10 @@ class ScenePresentation {
       }
       for (id in colliding.keys()) if (id != owner.selectedId && id != hoveredId) {
         var runtime = bridge.runtime(id);
-        if (runtime != null) view.setMaterial(runtime.node, colliding.get(id) == true ? collidingMaterial : nearMaterial);
+        if (runtime != null) {
+          var highlight = colliding.get(id) == true ? collidingMaterial : nearMaterial;
+          view.setMaterial(runtime.node, highlight); threadHighlights.set(id, highlight);
+        }
       }
     }
     var selected = owner.object(owner.selectedId);
@@ -186,6 +192,7 @@ class ScenePresentation {
       else for (node in workerVisual.character.model.primitiveNodes) selection.add(node);
     }
     view.applySelection(selection, selectionMaterial);
+    if (selected != null) threadHighlights.set(selected.id, selectionMaterial);
     var faceHoverNode = hoveredId == null || hoveredFaceIndex == null || hoveredFaceIndex < 0
       ? null : faceHoverNodes.get(hoveredId);
     var faceHoverShown = faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex;
@@ -203,6 +210,8 @@ class ScenePresentation {
       else
         view.applyHover(hovered == null ? null : owner.runtimeFor(hovered.id).node, hoverMaterial);
     }
+    if (hoveredId != null && hoveredId != owner.selectedId && !faceHoverShown) threadHighlights.set(hoveredId, hoverMaterial);
+    threads.show(owner, view, cosmeticThreads, threadHighlights);
     if (poses != null) {
       var poseNodes:Array<NodeId> = [];
       var poseTransforms:Array<Transform> = [];
@@ -225,6 +234,7 @@ class ScenePresentation {
             for (axis in 0...4) previous[axis + 3] = pose.rotation[axis];
           }
           poseTransforms.push(transform);
+          for (node in threads.nodesFor(pose.id)) { poseNodes.push(node); poseTransforms.push(transform); }
           // The face overlay is a child of its object with an identity transform, but a pose
           // override moves only its own node, so the overlay needs the object's pose as well.
           if (faceHoverShown && pose.id == hoveredId) {

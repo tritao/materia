@@ -1,0 +1,15 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Cosmetic threads: tapped plate and M6 screw",
+	"defaultEntrypoint": "viewport",
+	"build": {"system": "haxeon", "manifest": "haxeon.json"},
+	"entrypoints": {
+		"viewport": {
+			"kind": "cad-preview",
+			"module": "ThreadPreview",
+			"function": "preview",
+			"cache": {"inputs": ["ThreadPreview.hx"]}
+		}
+	}
+}

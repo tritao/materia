@@ -264,6 +264,35 @@ class ProjectKitTests {
     check(oldRefusal.indexOf("schema v17 is unsupported") >= 0 &&
       oldRefusal.indexOf('expected v${SceneArtifact.VERSION}') >= 0,
       "clean scene format break explains that v17 needs migration");
+    legacy.setInt32(4, 18);
+    rejects(function() SceneArtifact.decodeView(legacy), "version 18 is rejected");
+    var thread:materia.project.ThreadRenderData = {faceName: "bore:cyl.side", faceIndex: 7,
+      spec: {designation: "M6", majorDiameter: 6, pitch: 1, starts: 2,
+        hand: materia.project.ThreadSpecData.ThreadHand.LeftHand, internal: true,
+        toleranceClass: "6H", profile: materia.project.ThreadSpecData.ThreadProfile.Metric},
+      origin: [4, 5, 6], xDirection: [1, 0, 0], direction: [0, 0, -1], length: 20,
+      ringAtStart: false, ringAtEnd: true};
+    data.parts[0].faceRanges = [{faceIndex: 7, firstIndex: 0, indexCount: 12}];
+    data.parts[0].threads = [thread];
+    var threaded = SceneArtifact.decodeView(SceneArtifact.encode(data)).parts[0].threads;
+    check(threaded != null && threaded.length == 1 && threaded[0].faceName == thread.faceName
+      && threaded[0].faceIndex == 7 && threaded[0].length == 20 && threaded[0].origin[2] == 6
+      && threaded[0].direction[2] == -1 && threaded[0].ringAtEnd && !threaded[0].ringAtStart,
+      "named thread interval and frame round trip");
+    check(threaded[0].spec.starts == 2 && threaded[0].spec.pitch == 1 && threaded[0].spec.hand == thread.spec.hand,
+      "nominal thread facts round trip without a kernel");
+    thread.faceIndex = 8;
+    rejects(function() SceneArtifact.encode(data), "thread must reference a base face range");
+    thread.faceIndex = 7; thread.direction = [1, 0, 0];
+    rejects(function() SceneArtifact.encode(data), "thread frame must have perpendicular axes");
+    thread.direction = [0, 0, -1]; thread.origin[0] = Math.NaN;
+    rejects(function() SceneArtifact.encode(data), "thread frame must be finite");
+    thread.origin[0] = 4; thread.length = 0;
+    rejects(function() SceneArtifact.encode(data), "thread display interval must be positive");
+    thread.length = 20; thread.spec.pitch = 0;
+    rejects(function() SceneArtifact.encode(data), "nominal thread pitch must be positive");
+    thread.spec.pitch = 1;
+    data.parts[0].threads = new Array<materia.project.ThreadRenderData>(); data.parts[0].faceRanges.resize(0);
     data.project = {job: "fixture", dynamicParts: ["part"], motions: []};
     var bundled = SceneArtifact.decode(SceneArtifact.encode(data));
     check(bundled.project != null && bundled.project.job == "fixture" && bundled.project.dynamicParts[0] == "part",

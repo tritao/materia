@@ -99,8 +99,8 @@ class FastenerDataTests {
 			var lead = new LeadScrewThread(family, 12, 2, 4, hand);
 			var spec = lead.threadSpec();
 			near(spec.pitch * spec.starts, lead.lead, "shared lead");
-			check(spec.hand == (hand == RightHand ? cadkit.threads.ThreadSpec.ThreadHand.RightHand
-				: cadkit.threads.ThreadSpec.ThreadHand.LeftHand), "shared hand");
+			check(spec.hand == (hand == RightHand ? materia.project.ThreadSpecData.ThreadHand.RightHand
+				: materia.project.ThreadSpecData.ThreadHand.LeftHand), "shared hand");
 			check(spec.internal == false, "lead screw is external");
 		}
 		trace('Fastener data: $assertions assertions passed');

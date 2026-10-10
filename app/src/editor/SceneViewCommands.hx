@@ -26,6 +26,9 @@ class SceneViewCommands {
       if (app.perspectiveViewport != null) app.perspectiveViewport.resetView();
       app.log("Perspective view reset");
     }, null, function() return !app.documents.blocked() && app.perspectiveViewport != null));
+    app.commands.register(new Command("scene.toggle-cosmetic-threads", "Cosmetic Threads", function() {
+      app.preferences.store.set(AppSettings.COSMETIC_THREADS, PropertyValue.Bool(!app.cosmeticThreadsVisible));
+    }, null, null, function() return app.cosmeticThreadsVisible));
     registerLightingPreset(app, "scene.lighting-studio", "Lighting: Studio", 0);
     registerLightingPreset(app, "scene.lighting-soft", "Lighting: Soft", 1);
     registerLightingPreset(app, "scene.lighting-contrast", "Lighting: Contrast", 2);
