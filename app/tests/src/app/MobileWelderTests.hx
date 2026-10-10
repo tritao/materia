@@ -14,6 +14,7 @@ import robotkit.skill.SkillStatus;
 @:access(processkit.perception.ContactRegistrationSequence)
 @:access(processkit.ProbeWireClearance)
 @:access(processkit.simulation.SimulatedWelder)
+@:access(machinekit.power.BatterySimulator)
 class MobileWelderTests {
   /** Replay the observed air-contact posture without running the expensive probe selector. */
   public static function runWireClearance(root:String):Void {
@@ -92,13 +93,16 @@ class MobileWelderTests {
     simulation.clear(); session.dispose();
   }
   /** Contacts must recover a parked work frame while wheel odometry retains its pre-jump estimate. */
-  public static function runRegistration(root:String, boundary:Bool = false):Void {
+  public static function runRegistration(root:String, boundary:Bool = false, voltageCutoff:Bool = false, ?onlyBackend:Int):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.mobilemission.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
     if (authored.steps[1].kind != "findWork") throw "Mobile mission lacks contact registration after parking";
+    var job:materia.project.SceneContactRegistration.SceneContactWork = cast authored.steps[1].contactWork;
     generated.mission = {steps: authored.steps.slice(0, 3)};
-    for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
+    var backends:Array<Int> = onlyBackend == null ?
+      [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO] : [cast onlyBackend];
+    for (backend in backends) {
       var session = new ProjectDocumentSession(null, false);
       session.openGeneratedProject(generated, manifest);
       var simulation = new ApplicationSimulation(new RobotWorld()); simulation.setBackend(backend);
@@ -107,17 +111,22 @@ class MobileWelderTests {
         var mission:MissionPlayer = cast simulation.missionPlayer();
         var physics:robotkit.runtime.Simulation = cast simulation.simulation;
         var injected = false;
+        var cutoffInjected = false, cutoffAt = 0.0;
         var touchEpisodes = 0, touching = false;
         var probeProgress = "";
+        var worstTipError = 0.0;
         var welder:processkit.simulation.SimulatedWelder = cast simulation.welder();
         // Calibrated stopping can make near-singular probe branches slower than the requested recipe.
-        while (!mission.finished && simulation.activeSession().simulationTime() < 1200) {
+        while (!mission.finished && simulation.activeSession().simulationTime() < 1200 &&
+            (!cutoffInjected || simulation.activeSession().simulationTime() < cutoffAt + 60)) {
           if (mission.stepIndex == 1 && !injected) {
             var base = physics.linkPose(mission.robotIndex, 0);
             var old = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(base.position[0], base.position[1], base.position[2]),
               robotkit.spatial.Quat.fromArray(base.rotation));
-            var error = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(boundary ? 0.020 : 0.012, boundary ? -0.020 : -0.009, 0),
-              robotkit.spatial.Quat.fromRollPitchYaw(0, 0, boundary ? 2 * Math.PI / 180 : 0.025));
+            var error = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(boundary ? 0.020 : voltageCutoff ? 0.006 : 0.012,
+              boundary ? -0.020 : voltageCutoff ? -0.007 : -0.009, 0),
+              robotkit.spatial.Quat.fromRollPitchYaw(0, 0,
+                boundary ? 2 * Math.PI / 180 : voltageCutoff ? 0.75 * Math.PI / 180 : 0.025));
             var shifted = old.compose(error);
             physics.placeRobotBase(mission.robotIndex, shifted.translation.toArray(), shifted.rotation.toArray());
             // placeRobotBase applies on the next owner tick. Publish the displaced plant before planning its clearance world.
@@ -126,7 +135,39 @@ class MobileWelderTests {
             Sys.println('mobile contact registration ($backend): injected ${boundary ? "20 mm/2 degree boundary" : "parking error"}');
           }
           simulation.step();
-          if (mission.failure != null) throw 'Mobile contact registration ($backend) failed: ${mission.failure}';
+          var failure = mission.failure;
+          if (failure != null) {
+            if (voltageCutoff && cutoffInjected && failure.indexOf("the arc could not be held in 3 restarts") >= 0) break;
+            throw 'Mobile contact registration ($backend) failed: $failure';
+          }
+          var weldStep = mission.weldingStep();
+          if (weldStep >= 0 && welder.reading().arc) {
+            if (voltageCutoff && !cutoffInjected) {
+              var power = simulation.power;
+              if (power == null) throw "Voltage-cutoff scenario has no CAD pack model";
+              // Inject a pack-state fault after strike. Its open-circuit voltage lies
+              // halfway between the CAD empty voltage and cutoff, with energy still stored.
+              power.battery.chargeFraction = 0.5 * (power.profile.cutoffVoltage - power.profile.emptyVoltage) /
+                (power.profile.fullVoltage - power.profile.emptyVoltage);
+              cutoffInjected = true;
+              cutoffAt = simulation.activeSession().simulationTime();
+            }
+            var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast authored.steps[weldStep].weld;
+            var live = mission.assemblyParts.get("project:" + job.frame).pose();
+            var work = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(live.position),
+              robotkit.spatial.Quat.fromArray(live.rotation));
+            var tip = mission.toolContact();
+            var nearest = Math.POSITIVE_INFINITY;
+            for (segment in weld.path) {
+              var a = work.transformPoint(robotkit.spatial.Vec3.fromArray(segment.start.position));
+              var b = work.transformPoint(robotkit.spatial.Vec3.fromArray(segment.stop.position));
+              var edge = b.sub(a), relative = tip.sub(a);
+              var square = edge.dot(edge);
+              var along = square <= 1e-18 ? 0.0 : Math.max(0.0, Math.min(1.0, relative.dot(edge) / square));
+              nearest = Math.min(nearest, tip.sub(a.add(edge.scale(along))).norm());
+            }
+            worstTipError = Math.max(worstTipError, nearest);
+          }
           if (mission.stepIndex == 1) {
             var finding:processkit.skill.FindWeldWork = cast mission.runner.activeSkill();
             var registration = finding == null ? null : finding.runner;
@@ -138,6 +179,17 @@ class MobileWelderTests {
                 var search = registration.probe.search;
                 var speed = search == null ? "" : ' at ${search.search.speed} m/s';
                 Sys.println('mobile contact registration ($backend): probe $progress at ${simulation.activeSession().simulationTime()} s$speed');
+                if (boundary && registration.probe.contact != null && sequence.activeStage() != null) {
+                  var stage:processkit.perception.ContactRegistrationSequence.ContactRegistrationStage = cast sequence.activeStage();
+                  var body = physics.linkPose(mission.robotIndex, 0);
+                  var observedRoot = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(body.position),
+                    robotkit.spatial.Quat.fromArray(body.rotation));
+                  var live = mission.assemblyParts.get("project:" + job.frame).pose();
+                  var actualWork = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(live.position),
+                    robotkit.spatial.Quat.fromArray(live.rotation));
+                  var point = actualWork.inverse().transformPoint(observedRoot.transformPoint(cast registration.probe.contact));
+                  Sys.println('mobile boundary contact: ${point.toArray().join(",")}; plane residual ${stage.normal.dot(point) - stage.offset} m');
+                }
               }
             }
             var reading = welder.reading();
@@ -160,14 +212,28 @@ class MobileWelderTests {
             touching = reading.touch;
           }
         }
-        var job:materia.project.SceneContactRegistration.SceneContactWork = cast authored.steps[1].contactWork;
-        var measured = mission.registeredWork.get(job.frame);
-        if (!injected || !mission.finished || measured == null) throw "Mobile contact registration did not complete";
+        if (voltageCutoff) {
+          var power = simulation.power;
+          var state = power == null ? null : power.batteryState();
+          var failure = mission.failure;
+          if (!cutoffInjected || touchEpisodes != 12 || power == null || state == null ||
+              failure == null || failure.indexOf("the arc could not be held in 3 restarts") < 0 ||
+              state.voltageVolts >= power.profile.cutoffVoltage || state.remainingEnergyWattHours == null ||
+              state.remainingEnergyWattHours <= 0 || power.battery.supplyAvailable || welder.supplyReady ||
+              welder.reading().arc || welder.reading().powerW > 0)
+            throw 'Mobile voltage cutoff ($backend) did not shut down the established arc and report its restart failure';
+          Sys.println('mobile voltage cutoff ($backend): ${state.voltageVolts} V, ' +
+            '${state.remainingEnergyWattHours} Wh remaining; arc off, restart failure observed');
+          simulation.clear(); session.dispose();
+          continue;
+        }
+        var measuredWorld = mission.registeredWorkWorld.get(job.frame);
+        if (!injected || !mission.finished || measuredWorld == null) throw "Mobile contact registration did not complete";
         var base = physics.linkPose(mission.robotIndex, 0);
         var root = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(base.position), robotkit.spatial.Quat.fromArray(base.rotation));
         var live = mission.assemblyParts.get("project:" + job.frame).pose();
-        var actual = root.inverse().compose(new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(live.position),
-          robotkit.spatial.Quat.fromArray(live.rotation)));
+        var actualWorld = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(live.position),
+          robotkit.spatial.Quat.fromArray(live.rotation));
         var estimated = cast(mission.wheels, robotkit.localization.WheelOdometryLocalization).state();
         if (estimated == null || Math.sqrt(Math.pow(estimated.pose.x - root.translation.x, 2) +
           Math.pow(estimated.pose.y - root.translation.y, 2)) < 0.008)
@@ -177,13 +243,15 @@ class MobileWelderTests {
         var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast authored.steps[2].weld;
         for (segment in weld.path) for (pose in [segment.start, segment.stop]) {
           var point = robotkit.spatial.Vec3.fromArray(pose.position);
-          error = Math.max(error, measured.transformPoint(point).sub(actual.transformPoint(point)).norm());
+          error = Math.max(error, measuredWorld.transformPoint(point).sub(actualWorld.transformPoint(point)).norm());
         }
         if (error > 0.0001) throw 'Mobile measured work frame misses the real seam by $error m';
+        if (worstTipError > 0.0015) throw 'Registered weld tip misses the real seam by $worstTipError m';
         var beads:WeldBeads = cast simulation.weldBeads();
         for (entry in beads.beads) if (Math.abs(entry.bead.meanLeg(0.3, 0.7) - entry.weld.legSize) > 0.0005 || entry.bead.gaps() > 0)
           throw "Registered mobile weld has a wrong leg or gap";
-        Sys.println('mobile contact registration ($backend): $touchEpisodes touch episodes, ${error * 1000} mm seam-frame error; first weld passes');
+        Sys.println('mobile contact registration ($backend): $touchEpisodes touch episodes, ' +
+          '${error * 1000} mm seam-frame error, ${worstTipError * 1000} mm tip error; first weld passes');
       } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
       simulation.clear(); session.dispose();
     }
@@ -250,9 +318,16 @@ class MobileWelderTests {
   }
 
   /** Execute the generated station mission, including driving and every checked stow transition. */
-  public static function runMission(root:String, ?onlyBackend:Int):Void {
+  public static function runMission(root:String, ?onlyBackend:Int, deratedPack:Bool = false):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.mobilemission.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
+    if (deratedPack) {
+      // Keep the CAD enclosure and ratings intact while injecting a reduced usable-capacity test pack.
+      var mobile:materia.project.SceneArtifact.SceneArtifactMobileBase = cast generated.mobileBase;
+      var energy:materia.project.SceneArtifact.SceneArtifactMobileEnergy = cast mobile.energy;
+      energy.capacityWh = 1800.0;
+      energy.initialChargeFraction = 0.25;
+    }
     var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
     var expected = new Map<String, Bool>();
     var stations = 0;
@@ -280,11 +355,26 @@ class MobileWelderTests {
         if (!simulation.rebuild(session.sensors, session.scene, session)) throw simulation.error;
         var mission = simulation.missionPlayer(), beads = simulation.weldBeads(), welder = simulation.welder();
         if (mission == null || beads == null || welder == null) throw "Mobile welding mission is incomplete";
+        var power:SimulatedMobilePower = cast simulation.power;
+        if (power == null) throw "Mobile welding mission has no CAD pack integration";
+        var initialBattery:robotkit.power.BatteryState = cast power.batteryState();
+        if (initialBattery == null) throw "Mobile pack did not report its initial state";
+        var initialEnergy = initialBattery.remainingEnergyWattHours;
+        if (initialEnergy == null) throw "Mobile pack did not report stored energy";
+        var busEnergy = 0.0, resistiveEnergy = 0.0, weldEnergy = 0.0;
+        var armEnergy = 0.0, driveEnergy = 0.0;
         // Preserve the original mission allowance and the validated per-registration test allowance.
+        // Authored stations each execute contact registration. Charging excursions get
+        // their own bounded travel/charge allowance below and retain the clamped work frame.
         var registrations = [for (step in authored.steps) if (step.kind == "findWork") step].length;
         var limit = simulation.activeSession().simulationTime() + 1200 * (1 + registrations);
-        var tick = 0, stowing = -1, reportedStep = -1;
+        var tick = 0, stowing = -1, reportedStep = -1, reportedDockTrips = 0;
+        var stepStartedAt = simulation.activeSession().simulationTime(), stepDockTrips = 0;
         var reportedProbe = "";
+        var registrationDebug = "";
+        var lastFinding:Null<processkit.skill.FindWeldWork> = null;
+        var reportedEnergyPhase = "", reportedChargeMinute = -1;
+        var reportedEnergyProgressAt = stepStartedAt;
         var worst = 0.0;
         var arm = mission.toolArm(session.robotTools[0]);
         var armJoints = arm.jointIndices();
@@ -292,14 +382,74 @@ class MobileWelderTests {
         var stowClearance:Null<robotkit.collision.CollisionClearance> = null;
         while (!mission.finished && simulation.activeSession().simulationTime() < limit) {
           simulation.step(); tick++;
+          var battery:robotkit.power.BatteryState = cast power.batteryState();
+          if (battery == null || !Math.isFinite(battery.voltageVolts) || !Math.isFinite(battery.currentAmps) ||
+              !Math.isFinite(power.packLoadWatts) || power.packLoadWatts < 0)
+            throw "Executed mobile power integration has invalid measurements";
+          var hours = simulation.timestep / 3600.0;
+          busEnergy += power.packLoadWatts * hours;
+          resistiveEnergy += battery.currentAmps * battery.currentAmps * power.profile.internalResistanceOhms * hours;
+          weldEnergy += power.weldAcWatts * hours;
+          armEnergy += power.armMechanicalWatts * hours;
+          driveEnergy += power.driveMechanicalWatts * hours;
+          if (mission.energyDockTrips > reportedDockTrips) {
+            var newTrips = mission.energyDockTrips - reportedDockTrips;
+            reportedDockTrips = mission.energyDockTrips;
+            limit += 1200 * newTrips;
+            Sys.println('mobile welding ($backend): energy dock trip $reportedDockTrips; mission allowance extended to $limit s');
+          }
+          var energyPhase = mission.energyTransferPhase();
+          var chargeMinute = Std.int(mission.energyChargeSeconds / 60);
+          if (energyPhase == "to-dock" && reportedEnergyPhase != "to-dock") {
+            var positions = mission.robot.robot.snapshot().positions;
+            for (joint in armJoints) if (Math.abs(positions.get(joint)) > 0.01)
+              throw 'Energy dock trip ${mission.energyDockTrips} left the torch outside its ready posture';
+            Sys.println('mobile welding ($backend): torch stowed at the checked ready posture before dock travel');
+          }
+          if (energyPhase != "idle" && (energyPhase != reportedEnergyPhase ||
+              (energyPhase == "charging" && chargeMinute != reportedChargeMinute))) {
+            reportedEnergyPhase = energyPhase;
+            reportedChargeMinute = chargeMinute;
+            Sys.println('mobile welding ($backend): energy phase $energyPhase at ${simulation.activeSession().simulationTime()} s; ' +
+              '${mission.energyChargedWattHours} Wh charged in ${mission.energyChargeSeconds} s');
+          }
+          var energyProgressAt = simulation.activeSession().simulationTime();
+          if (energyPhase != "idle" && energyProgressAt - reportedEnergyProgressAt >= 60) {
+            reportedEnergyProgressAt = energyProgressAt;
+            var state = mission.localization.state();
+            var pose = state == null ? "unknown" :
+              '(${Math.round(state.pose.x * 1000) / 1000},${Math.round(state.pose.y * 1000) / 1000},${Math.round(state.pose.yaw * 1000) / 1000})';
+            Sys.println('mobile welding ($backend): energy progress $energyPhase at ${energyProgressAt} s; ' +
+              'nav=${mission.navigating()} replans=${mission.replans()} map=$pose, ' +
+              '${mission.energyChargedWattHours} Wh charged in ${mission.energyChargeSeconds} s');
+          }
           if (mission.stepIndex != reportedStep) {
             var previousStep = reportedStep;
             reportedStep = mission.stepIndex;
+            stepStartedAt = simulation.activeSession().simulationTime();
+            stepDockTrips = mission.energyDockTrips;
             var kind = reportedStep < authored.steps.length ? authored.steps[reportedStep].kind : "done";
             Sys.println('mobile welding ($backend): step $reportedStep $kind at ${simulation.activeSession().simulationTime()} s');
-            if (kind == "findWork")
+            if (kind == "findWork") {
               registrationStart = [for (joint in armJoints) mission.robot.robot.snapshot().positions.get(joint)];
-            else if (kind == "weld" && previousStep >= 0 && authored.steps[previousStep].kind == "findWork") {
+              if (previousStep >= 0 && authored.steps[previousStep].kind == "goTo") {
+                var job:materia.project.SceneContactRegistration.SceneContactWork =
+                  cast authored.steps[reportedStep].contactWork;
+                var target = MissionPlayer.floorPose(authored.steps[previousStep]);
+                var localized = mission.localization.state();
+                if (localized == null) throw 'Station ${reportedStep} has no measured pose after goTo';
+                var positionError = Math.sqrt(Math.pow(localized.pose.x - target.x, 2) +
+                  Math.pow(localized.pose.y - target.y, 2));
+                var headingError = Math.abs(Math.atan2(Math.sin(localized.pose.yaw - target.yaw),
+                  Math.cos(localized.pose.yaw - target.yaw)));
+                var positionLimit = Math.min(job.translation[0], job.translation[1]) * 0.5 + 1e-6;
+                var headingLimit = job.rotation[2] * 0.5 + 1e-6;
+                if (positionError > positionLimit || headingError > headingLimit)
+                  throw 'Station ${reportedStep} parked ${positionError} m / ${headingError} rad from its contact-work envelope ' +
+                    '(${positionLimit} m / ${headingLimit} rad)';
+                Sys.println('mobile welding ($backend): station ${reportedStep} parked within ${positionError} m / ${headingError} rad');
+              }
+            } else if (kind == "weld" && previousStep >= 0 && authored.steps[previousStep].kind == "findWork") {
               var start:Array<Float> = cast registrationStart;
               var positions = mission.robot.robot.snapshot().positions;
               for (index in 0...armJoints.length) if (Math.abs(positions.get(armJoints[index]) - start[index]) > 0.005)
@@ -310,6 +460,7 @@ class MobileWelderTests {
           }
           if (mission.stepIndex < authored.steps.length && authored.steps[mission.stepIndex].kind == "findWork") {
             var finding:processkit.skill.FindWeldWork = cast mission.runner.activeSkill();
+            if (finding != null) lastFinding = finding;
             if (finding != null && finding.runner != null) {
               var active = finding.runner;
               var progress = '${mission.stepIndex}: ${active.sequence.normals.length + 1}/${active.sequence.index + 1} ${active.probe.phase}';
@@ -320,12 +471,54 @@ class MobileWelderTests {
             }
           }
           if (mission.failure != null) {
+            var state = mission.localization.state();
             var overlay = mission.overlay();
-            var step = authored.steps[mission.completed];
-            throw 'Mobile weld ($backend) failed at ${simulation.activeSession().simulationTime()} s: ${mission.failure}; goal=${haxe.Json.stringify(step.pose)}, odometry=${haxe.Json.stringify(overlay == null ? null : overlay.odometry)}';
+            var failedStep = mission.stepIndex < authored.steps.length ? authored.steps[mission.stepIndex] : null;
+            var goalText = failedStep == null ? "none" : failedStep.kind == "findWork"
+              ? "findWork contact registration" : haxe.Json.stringify(failedStep);
+            if (failedStep != null && failedStep.kind == "findWork" && lastFinding != null && lastFinding.runner != null) {
+              var sequence = lastFinding.runner.sequence;
+              var delta = sequence.envelope.nominalWork.inverse().compose(sequence.envelope.estimate());
+              var shift = delta.translation, rotation = delta.rotation;
+              var joints = [for (joint in armJoints) mission.robot.robot.snapshot().positions.get(joint)];
+              var tcp = arm.tcpPose(joints).translation;
+              registrationDebug = ' registration=${sequence.contacts.length} contacts/${sequence.normals.length} planes, ' +
+                'envelope=${sequence.envelope.cells} cells, nominal shift=(${shift.x},${shift.y},${shift.z}), ' +
+                'rotation=(${rotation.x},${rotation.y},${rotation.z},${rotation.w}), tcp=(${tcp.x},${tcp.y},${tcp.z})';
+              var stage = sequence.activeStage();
+              if (stage != null) {
+                var last = stage.probes[stage.probes.length - 1].approachJoints;
+                if (last != null) {
+                  var error = [for (index in 0...armJoints.length)
+                    mission.robot.robot.snapshot().positions.get(armJoints[index]) - last[index]];
+                  registrationDebug += ' last-probe joint error=(${error.join(",")})';
+                }
+              }
+            }
+            var pose = state == null ? "unknown" :
+              '(${state.pose.x}, ${state.pose.y}, ${state.pose.yaw})';
+            var odometryPose = overlay == null ? null : overlay.odometry;
+            var odometry = odometryPose == null ? "unknown" :
+              '(${odometryPose.x}, ${odometryPose.y}, ${odometryPose.yaw})';
+            var route = overlay == null ? "[]" :
+              '[${[for (point in overlay.route) '(${point.x},${point.y})'].join(", ")}]';
+            throw 'Mobile weld ($backend) failed at ${simulation.activeSession().simulationTime()} s: ${mission.failure}; ' +
+              'pose=$pose odom=$odometry goal=$goalText$registrationDebug nav=${mission.navigating()} ' +
+              'replans=${mission.replans()} route=$route';
+          }
+          if (deratedPack) {
+            var elapsedInStep = simulation.activeSession().simulationTime() - stepStartedAt;
+            var stepAllowance = 1200 * (1 + mission.energyDockTrips - stepDockTrips);
+            if (elapsedInStep > stepAllowance) {
+              var reading = welder.reading();
+              throw 'Mobile mission step ${mission.stepIndex} made no progress for $elapsedInStep/$stepAllowance s: ' +
+                'energy=${mission.energyTransferPhase()}, nav=${mission.navigating()}, weldStep=${mission.weldingStep()}, ' +
+                'arc=${reading.arc}, weldPower=${reading.powerW} W, trips=${mission.energyDockTrips}, ' +
+                'charged=${mission.energyChargedWattHours} Wh, charging=${mission.energyChargeSeconds} s';
+            }
           }
           var weldStep = mission.weldingStep();
-          if (weldStep >= 0) {
+          if (weldStep >= 0 && welder.reading().arc) {
             var tip = beads.toFrame(weldStep, welder.tip());
             var nearest = Math.POSITIVE_INFINITY;
             for (bead in beads.beadOf(weldStep).beads) {
@@ -337,7 +530,7 @@ class MobileWelderTests {
               for (axis in 0...3) squared += Math.pow(tip[axis] - point[axis], 2);
               nearest = Math.min(nearest, Math.sqrt(squared));
             }
-            if (welder.reading().arc) worst = Math.max(worst, nearest);
+            worst = Math.max(worst, nearest);
             if (tick % 5 == 0) {
               var hit = mission.clearanceViolation(nearest <= processkit.WeldPathPlanner.CONTACT_ZONE);
               if (hit != null) throw 'Mobile weld clearance: ${hit.a}/${hit.b}';
@@ -363,7 +556,32 @@ class MobileWelderTests {
           if (index < authored.steps.length && authored.steps[index].kind != "weld" && welder.reading().arc)
             throw "Mobile mission moves between welds with the arc established";
         }
-        if (!mission.finished || worst > 0.0015) throw 'Mobile weld incomplete or off seam ($worst m)';
+        if (!mission.finished || worst > 0.0015) {
+          var now = simulation.activeSession().simulationTime();
+          throw 'Mobile weld incomplete or off seam ($worst m): finished=${mission.finished}, ' +
+            'step=${mission.stepIndex}/${authored.steps.length}, completed=${mission.completed}, time=$now/$limit s, ' +
+            'phase=${mission.energyTransferPhase()}, nav=${mission.navigating()}, weldStep=${mission.weldingStep()}, ' +
+            'dockTrips=${mission.energyDockTrips}, charged=${mission.energyChargedWattHours} Wh, ' +
+            'charging=${mission.energyChargeSeconds} s';
+        }
+        if (deratedPack) {
+          if (mission.energyDockTrips == 0 || mission.energyChargedWattHours <= 0 || mission.energyChargeSeconds <= 0)
+            throw 'Derated mobile pack did not dock, charge and resume: ${mission.energyDockTrips} trips, ' +
+              '${mission.energyChargedWattHours} Wh, ${mission.energyChargeSeconds} s';
+        } else if (mission.energyDockTrips != 0 || mission.energyChargedWattHours != 0) {
+          throw 'Full mobile pack made an unnecessary charging trip: ${mission.energyDockTrips} trips, ' +
+            '${mission.energyChargedWattHours} Wh';
+        }
+        var finalBattery:robotkit.power.BatteryState = cast power.batteryState();
+        if (finalBattery == null) throw "Mobile pack did not report its final state";
+        var finalEnergy = finalBattery.remainingEnergyWattHours;
+        if (finalEnergy == null || !(weldEnergy > 0) || !(busEnergy > weldEnergy) || finalEnergy <= 0)
+          throw "Complete mobile weld did not integrate its powered work into stored pack energy";
+        if (!deratedPack && Math.abs((initialEnergy - finalEnergy) - busEnergy - resistiveEnergy) > 0.002)
+          throw 'Full pack energy balance differs from executed bus and resistance losses: ' +
+            '${initialEnergy - finalEnergy} Wh stored loss, $busEnergy Wh bus, $resistiveEnergy Wh resistance';
+        Sys.println('mobile power ($backend): $busEnergy Wh bus, $resistiveEnergy Wh resistance, ' +
+          '$weldEnergy Wh welding AC, $armEnergy Wh arm and $driveEnergy Wh drive mechanical; $finalEnergy Wh remaining');
         var lengths:Array<String> = [], legs:Array<String> = [];
         for (entry in beads.beads) {
           var bead = entry.bead, leg = bead.meanLeg(0.3, 0.7);
@@ -372,7 +590,7 @@ class MobileWelderTests {
           legs.push(Std.string(Math.round(leg * 10000) / 10));
           lengths.push(Std.string(Math.round(bead.extent() * 10000) / 10));
         }
-        Sys.println('mobile welding ($backend): $stations stations, $seamCount seams, ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s; legs ${legs.join("/")} mm, lengths ${lengths.join("/")} mm, clear stow');
+        Sys.println('mobile welding ($backend): $stations stations, $seamCount seams, ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s; legs ${legs.join("/")} mm, lengths ${lengths.join("/")} mm, clear stow; energy ${mission.energyDockTrips} dock trips, ${Math.round(mission.energyChargedWattHours * 10) / 10} Wh in ${Math.round(mission.energyChargeSeconds * 10) / 10} s');
       } catch (error:Dynamic) {
         simulation.clear(); session.dispose(); throw error;
       }

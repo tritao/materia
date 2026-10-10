@@ -2998,27 +2998,7 @@ class ProjectSourceTests {
   }
 
   static function checks():Int {
-    var flat = Bytes.alloc(4 * 24);
-    for (index in 0...4) {
-      flat.setDouble(index * 24, (index & 1) == 0 ? 0.0 : 2.0);
-      flat.setDouble(index * 24 + 8, (index & 2) == 0 ? 0.0 : 1.0);
-      flat.setDouble(index * 24 + 16, 0.0);
-    }
-    var flatHull = cadkit.ConvexHullVertices.safeFromMesh(flat, 4, 0.5);
-    check(flatHull.warning != null && flatHull.vertices.length == 24 &&
-      flatHull.vertices[2] == -0.25 && flatHull.vertices[14] == 0.25,
-      "flat collision part uses a 0.5-unit thickened box with a warning");
-    checkCoupling(0);
-    checkCoupling(1);
-    checkLinkCollision(0, true);
-    checkLinkCollision(0, false);
-    checkLinkCollision(1, true);
-    checkLinkCollision(1, false);
-    checkHullCollision(0, true);
-    checkHullCollision(0, false);
-    checkHullCollision(1, true);
-    checkHullCollision(1, false);
-    checkWedgeContact();
+    // Focused project-source filters skip unrelated physics setup and run only the selected checks.
     var root = Sys.getCwd();
     while (!FileSystem.exists(root + "/cadkit/examples/modeling/materia.project.json")) {
       var parent = haxe.io.Path.directory(root);
@@ -3031,8 +3011,16 @@ class ProjectSourceTests {
       MobileWelderTests.runRegistration(root, true);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-registration-boundary-mujoco") {
+      MobileWelderTests.runRegistration(root, true, false, ApplicationSimulation.MUJOCO);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-registration") {
       MobileWelderTests.runRegistration(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-voltage-cutoff") {
+      MobileWelderTests.runRegistration(root, false, true);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-wire-clearance") {
@@ -3049,6 +3037,14 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-mission-mujoco") {
       MobileWelderTests.runMission(root, ApplicationSimulation.MUJOCO);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-energy") {
+      MobileWelderTests.runMission(root, ApplicationSimulation.MUJOCO, true);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-energy-test-backend") {
+      MobileWelderTests.runMission(root, ApplicationSimulation.DETERMINISTIC, true);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-joint-handoff") {
@@ -3212,6 +3208,28 @@ class ProjectSourceTests {
       checkBackgroundLaunch(root);
       return 0;
     }
+
+    var flat = Bytes.alloc(4 * 24);
+    for (index in 0...4) {
+      flat.setDouble(index * 24, (index & 1) == 0 ? 0.0 : 2.0);
+      flat.setDouble(index * 24 + 8, (index & 2) == 0 ? 0.0 : 1.0);
+      flat.setDouble(index * 24 + 16, 0.0);
+    }
+    var flatHull = cadkit.ConvexHullVertices.safeFromMesh(flat, 4, 0.5);
+    check(flatHull.warning != null && flatHull.vertices.length == 24 &&
+      flatHull.vertices[2] == -0.25 && flatHull.vertices[14] == 0.25,
+      "flat collision part uses a 0.5-unit thickened box with a warning");
+    checkCoupling(0);
+    checkCoupling(1);
+    checkLinkCollision(0, true);
+    checkLinkCollision(0, false);
+    checkLinkCollision(1, true);
+    checkLinkCollision(1, false);
+    checkHullCollision(0, true);
+    checkHullCollision(0, false);
+    checkHullCollision(1, true);
+    checkHullCollision(1, false);
+    checkWedgeContact();
     var manifest = FileSystem.fullPath(root + "/cadkit/examples/modeling/materia.project.json");
     var machineManifest = FileSystem.fullPath(root + "/machinekit/examples/materia.project.json");
     var requirement = MateriaProjectRunner.executionRequirement(machineManifest);
