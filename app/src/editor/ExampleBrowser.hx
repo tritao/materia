@@ -14,18 +14,15 @@ class ExampleBrowser {
   public static final categories = ["All", "Robotics & handling", "Welding", "Machining", "CAD & design", "People & simulation"];
   public var query:String = "";
   public var category:String = "All";
-  public var selectedFamily:Null<String> = null;
 
   public function new() {}
 
   public function selectCategory(value:String):Void {
     category = value;
-    selectedFamily = null;
   }
 
   public function search(value:String):Void {
     query = value;
-    selectedFamily = null;
   }
 
   public static function families(entries:Array<ExampleEntry>):Array<ExampleFamily> {
@@ -46,18 +43,20 @@ class ExampleBrowser {
 
   public function filtered(entries:Array<ExampleEntry>):Array<ExampleFamily> {
     var words = [for (word in StringTools.trim(query).toLowerCase().split(" ")) if (word.length > 0) word];
-    return [for (family in families(entries)) if ((category == "All" || family.category == category) && matches(family, words)) family];
+    var result:Array<ExampleFamily> = [];
+    for (family in families(entries)) {
+      if (category != "All" && family.category != category) continue;
+      var matching = [for (entry in family.examples) if (matches(family, entry, words)) entry];
+      if (matching.length > 0) result.push({id:family.id, title:family.title, category:family.category, examples:matching});
+    }
+    return result;
   }
 
-  static function matches(family:ExampleFamily, words:Array<String>):Bool {
-    // Match a variant as a whole, so unrelated words from separate variants do not produce a false result.
-    for (entry in family.examples) {
-      var text = (family.title + " " + family.category + " " + entry.title + " " + entry.description.join(" ")).toLowerCase();
-      var match = true;
-      for (word in words) if (text.indexOf(word) < 0) match = false;
-      if (match) return true;
-    }
-    return false;
+  static function matches(family:ExampleFamily, entry:ExampleEntry, words:Array<String>):Bool {
+    var text = (family.title + " " + family.category + " " + entry.title + " " + variantTitle(entry) + " " +
+      entry.description.join(" ")).toLowerCase();
+    for (word in words) if (text.indexOf(word) < 0) return false;
+    return true;
   }
 
   public static function familyId(id:String):String return switch id {

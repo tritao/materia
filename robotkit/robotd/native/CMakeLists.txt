@@ -51,6 +51,4 @@ endif()
 add_custom_target(robotd_native
     DEPENDS trajectory_core robotkit_runtime ${ROBOTD_POLICY_TARGET}
         ${ROBOTD_VISIONKIT_TARGET} ${ROBOTD_INFERENCE_TARGET}
-    COMMAND "${CMAKE_COMMAND}" -E touch "${HAXEON_NATIVE_OUTPUT_DIR}/robotd.hdll"
-    BYPRODUCTS "${HAXEON_NATIVE_OUTPUT_DIR}/robotd.hdll"
     COMMENT "Building RobotKit native dependencies for robotd")

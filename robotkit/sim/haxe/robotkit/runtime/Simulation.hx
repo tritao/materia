@@ -104,11 +104,11 @@ class Simulation {
       ?linkCollisionHulls:Array<Null<Array<Float>>>,
       ?closures:Array<SimulationClosure>, ?tool:ToolCollisionShape,
       ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float, ?linkHulls:Array<SimulationLinkHull>,
-      holdAtRest:Bool = false):RobotRuntime {
+      holdAtRest:Bool = false, ?linkExcludes:Array<Int>):RobotRuntime {
     if (position == null || position.length != 3 || rotation == null || rotation.length != 4)
       throw "Simulation.addRobotAtPose requires a three-component position and four-component rotation";
     return addRobotWithPose(blueprint, makePose(position, rotation), virtualDevice, linkCollisionBoxes,
-      linkCollisionHulls, closures, tool, toolLink, toolMargin, toolGap, linkHulls, holdAtRest);
+      linkCollisionHulls, closures, tool, toolLink, toolMargin, toolGap, linkHulls, holdAtRest, linkExcludes);
   }
 
   function addRobotWithPose(blueprint:RobotRuntimeBlueprint,
@@ -118,7 +118,7 @@ class Simulation {
       ?linkCollisionHulls:Array<Null<Array<Float>>>,
       ?closures:Array<SimulationClosure>, ?tool:ToolCollisionShape,
       ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float, ?linkHulls:Array<SimulationLinkHull>,
-      holdAtRest:Bool = false):RobotRuntime {
+      holdAtRest:Bool = false, ?linkExcludes:Array<Int>):RobotRuntime {
     ensureLive();
     if (blueprint == null) throw "Simulation requires a robot blueprint";
     if (virtualDevice == null && blueprint.switches.length > 0)
@@ -201,7 +201,7 @@ class Simulation {
           robotDesc.set_virtual_device_feedback_ratio(i, actuator.feedbackRatio);
           robotDesc.set_virtual_device_feedback_offset(i, actuator.feedbackOffset);
           robotDesc.set_virtual_device_actuator_steps_per_unit(i, actuator.stepsPerUnit);
-          robotDesc.set_virtual_device_actuator_max_rate(i, actuator.maxRate);
+          robotDesc.set_virtual_device_actuator_min_step_ticks(i, actuator.minStepTicks);
           robotDesc.set_virtual_device_actuator_direction_setup_ticks(i,
             actuator.directionSetupTicks);
           robotDesc.set_virtual_device_actuator_skew_bound(i, actuator.skewBound);
@@ -462,6 +462,21 @@ class Simulation {
       var desc = requireRobotDescription(robotDesc);
       desc.set_flags(desc.get_flags() | RobotKitSimKitConstants.RK_SIMULATION_ROBOT_HOLD_AT_REST);
     }
+    // The links exclude exactly these pairs (link indices, two per pair) from each other: a collision
+    // description's allowed pairs (collisionkit COLLISION.md CL3b).
+    if (linkExcludes != null) {
+      if (linkExcludes.length % 2 != 0 || linkExcludes.length > 2 * RobotKitSimKitConstants.RK_MAX_LINK_EXCLUDES)
+        throw 'Simulation link excludes are pairs, at most ${RobotKitSimKitConstants.RK_MAX_LINK_EXCLUDES}';
+      if (robotDesc == null) {
+        robotDesc = new rk_simulation_robot_desc();
+        robotDesc.set_struct_size(rk_simulation_robot_desc.size());
+      }
+      var desc = requireRobotDescription(robotDesc);
+      for (link in linkExcludes) if (link < 0 || link >= blueprint.linkCount) throw "Simulation link exclude names an unknown link";
+      desc.set_link_exclude_count(Std.int(linkExcludes.length / 2));
+      for (index in 0...linkExcludes.length) desc.set_link_excludes(index, linkExcludes[index]);
+      desc.set_flags(desc.get_flags() | RobotKitSimKitConstants.RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES);
+    }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");
     var runtime:RobotRuntime = null;
@@ -478,7 +493,7 @@ class Simulation {
     if (virtualDevice == null && blueprint.switches.length > 0) {
       var observedRuntime:RobotRuntime = runtime;
       var switches = new SimulatedSwitchSensorAdapter(blueprint, observedRuntime,
-        () -> observedRuntime.physicalPositions());
+        positions -> observedRuntime.copyPhysicalPositionsInto(positions));
       addStepObserver(switches);
       switchObservers.set(robots.length - 1, switches);
     }

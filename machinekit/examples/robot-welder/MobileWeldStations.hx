@@ -1,3 +1,4 @@
+import collisionkit.native.NativeCollisionWorld;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
 import cadkit.modeling.AssemblyState;
@@ -20,9 +21,9 @@ import processkit.WeldingPlanRunner;
 import processkit.WeldingPlanRunner.WeldPlanning;
 import processkit.WeldScenePlan;
 import robotkit.manipulation.Manipulator;
-import robotkit.manipulation.ArmClearance;
+import robotkit.collision.CollisionClearance;
 import robotkit.manipulation.JointRoute;
-import robotkit.manipulation.ArmClearance.ClearanceBodyData;
+import robotkit.manipulation.ClearanceBodyData;
 import robotkit.model.Frame;
 import robotkit.mobile.Pose2;
 import robotkit.navigation.FloorMap;
@@ -48,7 +49,7 @@ class MobileWeldStations {
   final external:Array<{name:String, vertices:Array<Float>}> = [];
   final boxes:Array<FloorBox> = [];
   final planning:Map<String, WeldPlanning> = new Map();
-  final clearances:Map<String, ArmClearance> = new Map();
+  final clearances:Map<String, CollisionClearance> = new Map();
   final candidates:Array<WeldStationCandidate>;
   final navigation:AStarPlanner;
   final start:Pose2;
@@ -143,7 +144,7 @@ class MobileWeldStations {
       }
       bodies.push({name: body.name, link: arm.baseLink, vertices: vertices, tool: false});
     }
-    var clearance = new ArmClearance(arm, bodies, ready, processkit.WeldPathPlanner.AIR_MARGIN);
+    var clearance = new CollisionClearance(arm, bodies, ready, () -> new NativeCollisionWorld(), processkit.WeldPathPlanner.AIR_MARGIN);
     clearances.set(station.id, clearance);
     var made = WeldingPlanRunner.planning(arm, 2.0, clearance);
     planning.set(station.id, made);
@@ -184,7 +185,7 @@ class MobileWeldStations {
 
   /** Validate the same exact-stop joint motion emitted to the application, including its time law. */
   function airMove(station:WeldStationCandidate, from:Array<Float>, to:Array<Float>):Bool {
-    var clearance:ArmClearance = cast clearances.get(station.id);
+    var clearance:CollisionClearance = cast clearances.get(station.id);
     if (clearance.sweep(from, to) != null) return false;
     var moving = false;
     for (i in 0...from.length) if (Math.abs(from[i] - to[i]) > 1e-12) moving = true;

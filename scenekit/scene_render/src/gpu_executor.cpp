@@ -1,5 +1,6 @@
 #include "nativekit_scene_render.hpp"
 #include "scene_shader_sources.hpp"
+#include "capture_profiler.hpp"
 
 #include <algorithm>
 #include <array>
@@ -8,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <cstdlib>
 #include <limits>
 #include <thread>
 #include <unordered_map>
@@ -199,10 +201,56 @@ bool decode_vertex_stream(const GeometryVertexStream &stream, std::size_t index,
 bool pack_geometry_vertices(const GeometryResource &resource, std::vector<SceneVertex> &out) {
     out.resize(resource.payload->vertices.size());
     for (std::size_t index = 0; index < out.size(); ++index)
-        out[index].position = resource.payload->vertices[index].position;
+        out[index] = SceneVertex{resource.payload->vertices[index].position};
     for (const auto &stream : resource.payload->streams) {
         if (stream.count != out.size())
             return false;
+        if (out.empty()) continue;
+        // Matching float streams can scatter directly into the interleaved GPU record.
+        // Resolve the layout and validate its complete byte range once, not per vertex.
+        std::size_t destination = 0, bytes = 0;
+        switch (stream.semantic) {
+        case VertexSemantic::Position:
+            if (stream.format == VertexFormat::Float32x3) {
+                destination = offsetof(SceneVertex, position); bytes = sizeof(float) * 3;
+            }
+            break;
+        case VertexSemantic::Normal:
+            if (stream.format == VertexFormat::Float32x3) {
+                destination = offsetof(SceneVertex, normal); bytes = sizeof(float) * 3;
+            }
+            break;
+        case VertexSemantic::Texcoord0:
+            if (stream.format == VertexFormat::Float32x2) {
+                destination = offsetof(SceneVertex, texcoord); bytes = sizeof(float) * 2;
+            }
+            break;
+        case VertexSemantic::Color0:
+            if (stream.format == VertexFormat::Float32x4) {
+                destination = offsetof(SceneVertex, color); bytes = sizeof(float) * 4;
+            }
+            break;
+        default: break;
+        }
+        if (bytes) {
+            const auto stride = stream.stride ? stream.stride : bytes;
+            if (stride < bytes ||
+                (stream.count - 1) > (std::numeric_limits<std::size_t>::max() - bytes) / stride ||
+                (stream.count - 1) * stride + bytes > stream.data.size())
+                return false;
+            const auto *source = reinterpret_cast<const std::uint8_t *>(stream.data.data());
+            auto *target = reinterpret_cast<std::uint8_t *>(out.data()) + destination;
+            const auto copy = [&]<std::size_t Size>() {
+                for (std::size_t index = 0; index < out.size(); ++index)
+                    std::memcpy(target + index * sizeof(SceneVertex), source + index * stride, Size);
+            };
+            switch (bytes) {
+            case 8: copy.template operator()<8>(); break;
+            case 12: copy.template operator()<12>(); break;
+            case 16: copy.template operator()<16>(); break;
+            }
+            continue;
+        }
         for (std::size_t index = 0; index < out.size(); ++index) {
             std::array<float, 4> value{};
             if (!decode_vertex_stream(stream, index, value))
@@ -327,9 +375,11 @@ struct NativeKitGpuExecutor::State {
     struct GeometryGpu {
         nkgpu_buffer buffer{};
         nkgpu_buffer index_buffer{};
+        std::shared_ptr<const GeometryPayload> index_payload;
         nkgpu_buffer pick_buffer{};
         nkgpu_buffer stroke_buffer{};
         std::uint64_t revision = 0;
+        std::uint64_t pick_revision = 0;
         std::uint32_t byte_size = 0;
         std::uint32_t index_byte_size = 0;
         std::uint32_t vertex_count = 0;
@@ -356,6 +406,7 @@ struct NativeKitGpuExecutor::State {
         BatchKey key;
         nkgpu_buffer buffer{};
         std::vector<NodeId> instances;
+        std::vector<InstanceData> records;
         std::vector<std::uint64_t> transform_revisions;
         std::vector<std::uint32_t> pick_ids;
     };
@@ -429,6 +480,20 @@ struct NativeKitGpuExecutor::State {
     bool plan_initialized = false;
     nkgpu_result last_result = NKGPU_OK;
 
+    struct InstanceUpdate {
+        std::size_t batch, instance;
+        std::uint64_t revision;
+    };
+    std::vector<InstanceUpdate> instance_updates;
+    std::vector<SceneVertex> geometry_vertices;
+    std::unique_ptr<render_internal::CaptureProfiler> capture_profiler;
+
+    State() {
+        if (const auto *path = std::getenv("NK_SCENE_GPU_TIMINGS"); path && *path) {
+            capture_profiler = std::make_unique<render_internal::CaptureProfiler>(path);
+            if (!capture_profiler->enabled()) capture_profiler.reset();
+        }
+    }
     ~State() { release_gpu(); }
 
     void destroy_pass_pipelines(PassPipelines &set) noexcept {
@@ -441,6 +506,7 @@ struct NativeKitGpuExecutor::State {
     }
 
     void release_gpu() noexcept {
+        if (capture_profiler) capture_profiler->release();
         for (auto &[id, resource] : geometry_resources) {
             (void)id;
             if (renderer.id && resource.buffer.id)
@@ -1552,6 +1618,7 @@ bool create_instance_buffer(StateT &state, const DesiredBatch &desired,
     const auto result = nkgpu_buffer_create_desc(state.renderer, &descriptor, &target.buffer);
     if (result != NKGPU_OK)
         return set_failure(state, stats, result);
+    target.records = std::move(data);
     target.key = desired.key;
     target.instances = desired.instances;
     target.transform_revisions = desired.transform_revisions;
@@ -1562,13 +1629,19 @@ bool create_instance_buffer(StateT &state, const DesiredBatch &desired,
 
 template <class StateT>
 bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecutionStats &stats) {
+    const bool profile_sample = state.capture_profiler && state.capture_profiler->active();
+    const auto packing_started = profile_sample ? std::chrono::steady_clock::now()
+                                               : std::chrono::steady_clock::time_point{};
     const auto vertex_count = resource.payload->vertices.size();
     const auto index_count = resource.payload->indices.size();
     if (!valid_geometry_payload(resource))
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
-    std::vector<SceneVertex> packed_vertices;
+    auto &packed_vertices = state.geometry_vertices;
     if (!pack_geometry_vertices(resource, packed_vertices))
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
+
+    if (profile_sample)
+        state.capture_profiler->packingElapsed(std::chrono::steady_clock::now() - packing_started);
 
     auto [found, inserted] = state.geometry_resources.try_emplace(resource.id);
     auto &cached = found->second;
@@ -1578,14 +1651,6 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
     if (pick_vertex_count > std::numeric_limits<std::uint32_t>::max() / sizeof(PickVertex) ||
         pick_vertex_count / 3 > 0x00ffffffu)
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
-    std::vector<PickVertex> pick_vertices;
-    pick_vertices.reserve(pick_vertex_count);
-    for (std::size_t index = 0; index < pick_vertex_count; ++index) {
-        const auto source = index_count ? resource.payload->indices[index] : index;
-        pick_vertices.push_back({packed_vertices[source].position,
-                                 static_cast<float>(index / 3 + 1)});
-    }
-    const auto pick_byte_size = pick_vertices.size() * sizeof(PickVertex);
     if (resource.payload->stroke_segments.size() >
         std::numeric_limits<std::uint32_t>::max() / (6 * sizeof(StrokeVertex)))
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
@@ -1631,7 +1696,10 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
             return set_failure(state, stats, result);
     }
 
-    if (cached.index_buffer.id) {
+    // Retain immutable source data rather than copying a second index array.
+    const bool indices_changed = !cached.index_payload ||
+                                 cached.index_payload->indices != resource.payload->indices;
+    if (indices_changed && cached.index_buffer.id) {
         if (cached.index_byte_size == index_byte_size && index_byte_size != 0) {
             const auto result = nkgpu_buffer_update(
                 state.renderer, cached.index_buffer, 0,
@@ -1656,34 +1724,6 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
         descriptor.dynamic_update = 1;
         const auto result =
             nkgpu_buffer_create_desc(state.renderer, &descriptor, &cached.index_buffer);
-        if (result != NKGPU_OK)
-            return set_failure(state, stats, result);
-    }
-    if (cached.pick_buffer.id) {
-        if (cached.pick_vertex_count * sizeof(PickVertex) == pick_byte_size &&
-            pick_byte_size != 0) {
-            const auto result = nkgpu_buffer_update(
-                state.renderer, cached.pick_buffer, 0,
-                reinterpret_cast<const std::uint8_t *>(pick_vertices.data()),
-                static_cast<std::uint32_t>(pick_byte_size));
-            if (result != NKGPU_OK)
-                return set_failure(state, stats, result);
-        } else {
-            (void)nkgpu_buffer_destroy(state.renderer, cached.pick_buffer);
-            cached.pick_buffer = {};
-            cached.pick_vertex_count = 0;
-        }
-    }
-    if (pick_byte_size != 0 && !cached.pick_buffer.id) {
-        nkgpu_buffer_desc descriptor{};
-        descriptor.struct_size = sizeof(descriptor);
-        descriptor.size = static_cast<std::uint32_t>(pick_byte_size);
-        descriptor.usage = NKGPU_BUFFER_VERTEX;
-        descriptor.data = reinterpret_cast<const std::uint8_t *>(pick_vertices.data());
-        descriptor.data_size = descriptor.size;
-        descriptor.dynamic_update = 1;
-        const auto result = nkgpu_buffer_create_desc(state.renderer, &descriptor,
-                                                     &cached.pick_buffer);
         if (result != NKGPU_OK)
             return set_failure(state, stats, result);
     }
@@ -1715,18 +1755,71 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
         if (result != NKGPU_OK)
             return set_failure(state, stats, result);
     }
+    cached.index_payload = resource.payload;
     cached.revision = resource.revision;
     cached.byte_size = static_cast<std::uint32_t>(byte_size);
     cached.index_byte_size = static_cast<std::uint32_t>(index_byte_size);
     cached.vertex_count = static_cast<std::uint32_t>(vertex_count);
     cached.index_count = static_cast<std::uint32_t>(index_count);
-    cached.pick_vertex_count = static_cast<std::uint32_t>(pick_vertex_count);
     cached.stroke_vertex_count = static_cast<std::uint32_t>(stroke_vertices.size());
     cached.indexed = !resource.payload->indices.empty();
     if (inserted)
         ++stats.geometry_resources_created;
     else if (revision_changed)
         ++stats.geometry_resources_updated;
+    return true;
+}
+
+// Picking data is expanded per triangle and is only needed for a pick/depth pass.
+// Keep the last buffer until that pass, then refresh it from the current snapshot.
+template <class StateT>
+bool ensure_pick_geometry(StateT &state, const GeometryResource &resource,
+                          GpuExecutionStats &stats) {
+    auto &cached = state.geometry_resources.at(resource.id);
+    if (cached.pick_revision == resource.revision) return true;
+    const auto index_count = resource.payload->indices.size();
+    const auto pick_vertex_count = index_count ? index_count : resource.payload->vertices.size();
+    std::vector<SceneVertex> packed_vertices;
+    if (!pack_geometry_vertices(resource, packed_vertices))
+        return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
+    std::vector<PickVertex> pick_vertices;
+    pick_vertices.reserve(pick_vertex_count);
+    for (std::size_t index = 0; index < pick_vertex_count; ++index) {
+        const auto source = index_count ? resource.payload->indices[index] : index;
+        pick_vertices.push_back({packed_vertices[source].position,
+                                 static_cast<float>(index / 3 + 1)});
+    }
+    const auto pick_byte_size = pick_vertices.size() * sizeof(PickVertex);
+    if (cached.pick_buffer.id) {
+        if (cached.pick_vertex_count * sizeof(PickVertex) == pick_byte_size &&
+            pick_byte_size != 0) {
+            const auto result = nkgpu_buffer_update(
+                state.renderer, cached.pick_buffer, 0,
+                reinterpret_cast<const std::uint8_t *>(pick_vertices.data()),
+                static_cast<std::uint32_t>(pick_byte_size));
+            if (result != NKGPU_OK)
+                return set_failure(state, stats, result);
+        } else {
+            (void)nkgpu_buffer_destroy(state.renderer, cached.pick_buffer);
+            cached.pick_buffer = {};
+            cached.pick_vertex_count = 0;
+        }
+    }
+    if (pick_byte_size != 0 && !cached.pick_buffer.id) {
+        nkgpu_buffer_desc descriptor{};
+        descriptor.struct_size = sizeof(descriptor);
+        descriptor.size = static_cast<std::uint32_t>(pick_byte_size);
+        descriptor.usage = NKGPU_BUFFER_VERTEX;
+        descriptor.data = reinterpret_cast<const std::uint8_t *>(pick_vertices.data());
+        descriptor.data_size = descriptor.size;
+        descriptor.dynamic_update = 1;
+        const auto result = nkgpu_buffer_create_desc(state.renderer, &descriptor,
+                                                     &cached.pick_buffer);
+        if (result != NKGPU_OK)
+            return set_failure(state, stats, result);
+    }
+    cached.pick_vertex_count = static_cast<std::uint32_t>(pick_vertex_count);
+    cached.pick_revision = resource.revision;
     return true;
 }
 
@@ -1986,18 +2079,26 @@ bool update_batch(StateT &state, const DesiredBatch &desired, std::size_t batch_
         remove_batch(state, batch_index);
         return install_batch(state, desired, stats);
     }
+    std::size_t first = have.records.size(), last = 0, changed = 0;
     for (std::size_t instance = 0; instance < desired.transform_revisions.size(); ++instance) {
         if (desired.transform_revisions[instance] == have.transform_revisions[instance])
             continue;
-        const InstanceData data{desired.transforms[instance],
-                                encode_pick_id(desired.pick_ids[instance])};
+        have.records[instance] = {desired.transforms[instance],
+                                  encode_pick_id(desired.pick_ids[instance])};
+        first = std::min(first, instance);
+        last = instance;
+        ++changed;
+    }
+    if (changed) {
         const auto result = nkgpu_buffer_update(
-            state.renderer, have.buffer, static_cast<std::uint32_t>(instance * instance_stride),
-            reinterpret_cast<const std::uint8_t *>(&data), instance_stride);
+            state.renderer, have.buffer, static_cast<std::uint32_t>(first * instance_stride),
+            reinterpret_cast<const std::uint8_t *>(have.records.data() + first),
+            static_cast<std::uint32_t>((last - first + 1) * instance_stride));
         if (result != NKGPU_OK)
             return set_failure(state, stats, result);
-        have.transform_revisions[instance] = desired.transform_revisions[instance];
-        ++stats.instance_records_updated;
+        have.transform_revisions = desired.transform_revisions;
+        stats.instance_records_updated += changed;
+        ++stats.instance_buffer_updates;
     }
     return true;
 }
@@ -2084,12 +2185,24 @@ bool synchronize_batches(StateT &state, const RenderPlan &plan, GpuExecutionStat
 template <class StateT>
 bool prepare_geometry_resource(StateT &state, const GeometryResource &resource,
                                GpuExecutionStats &stats) {
+    // Snapshot resources are immutable within a revision. Reconciliation may
+    // visit every mesh, but unchanged meshes need neither validation nor
+    // repacking of their surface, picking and stroke buffers.
+    const auto found = state.geometry_resources.find(resource.id);
+    if (found != state.geometry_resources.end() && found->second.revision == resource.revision)
+        return true;
+    if (state.renderer.id) {
+        const bool profile_sample = state.capture_profiler && state.capture_profiler->active();
+        const auto started = profile_sample ? std::chrono::steady_clock::now()
+                                            : std::chrono::steady_clock::time_point{};
+        const auto result = ensure_geometry(state, resource, stats);
+        if (profile_sample)
+            state.capture_profiler->geometryElapsed(std::chrono::steady_clock::now() - started);
+        return result;
+    }
     if (!valid_geometry_payload(resource))
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
-    if (state.renderer.id)
-        return ensure_geometry(state, resource, stats);
 
-    const auto found = state.geometry_resources.find(resource.id);
     if (found == state.geometry_resources.end()) {
         typename StateT::GeometryGpu cached;
         cached.revision = resource.revision;
@@ -2165,6 +2278,9 @@ bool patch_instance_records(StateT &state, const RenderPlan &plan,
                             std::span<const NodeId> nodes, GpuExecutionStats &stats) {
     if (!state.renderer.id)
         return true;
+    auto &updates = state.instance_updates;
+    updates.clear();
+    updates.reserve(nodes.size());
     std::unordered_set<NodeId> seen;
     seen.reserve(nodes.size());
     for (const auto node : nodes) {
@@ -2189,14 +2305,32 @@ bool patch_instance_records(StateT &state, const RenderPlan &plan,
         const auto &transform = plan.transforms()[item.transformIndex];
         if (transform.revision == batch.transform_revisions[instance])
             continue;
-        const InstanceData data{transform.transform.matrix, encode_pick_id(item.pickId)};
+        batch.records[instance] = {transform.transform.matrix, encode_pick_id(item.pickId)};
+        updates.push_back({found->second.batch, instance, transform.revision});
+    }
+    std::sort(updates.begin(), updates.end(), [](const auto &a, const auto &b) {
+        return a.batch < b.batch || (a.batch == b.batch && a.instance < b.instance);
+    });
+    for (std::size_t begin = 0; begin < updates.size();) {
+        std::size_t end = begin + 1;
+        while (end < updates.size() && updates[end].batch == updates[begin].batch)
+            ++end;
+        auto &batch = state.batches[updates[begin].batch];
+        const auto first = updates[begin].instance;
+        const auto last = updates[end - 1].instance;
+        // Include unchanged records between dirty instances: NativeKit updates a persistent
+        // buffer once per frame, so separate partial writes would recreate the GPU buffer.
         const auto result = nkgpu_buffer_update(
-            state.renderer, batch.buffer, static_cast<std::uint32_t>(instance * instance_stride),
-            reinterpret_cast<const std::uint8_t *>(&data), instance_stride);
+            state.renderer, batch.buffer, static_cast<std::uint32_t>(first * instance_stride),
+            reinterpret_cast<const std::uint8_t *>(batch.records.data() + first),
+            static_cast<std::uint32_t>((last - first + 1) * instance_stride));
         if (result != NKGPU_OK)
             return set_failure(state, stats, result);
-        batch.transform_revisions[instance] = transform.revision;
-        ++stats.instance_records_updated;
+        for (auto at = begin; at < end; ++at)
+            batch.transform_revisions[updates[at].instance] = updates[at].revision;
+        stats.instance_records_updated += end - begin;
+        ++stats.instance_buffer_updates;
+        begin = end;
     }
     return true;
 }
@@ -2269,11 +2403,14 @@ bool prepare_resources(StateT &state, const RenderPlan &plan, const SceneSnapsho
  * is returned.
  */
 template <class StateT>
-nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, std::uint32_t width,
-                              std::uint32_t height, GpuExecutionStats &stats) {
+nkgpu_result render_pick_pass(StateT &state, const RenderPlan &plan, const SceneSnapshot &snapshot,
+                              std::uint32_t width, std::uint32_t height, GpuExecutionStats &stats) {
     if (!ensure_pick_targets(state, width, height, stats))
         return state.last_result;
     for (const auto &batch : state.batches) {
+        const auto *resource = snapshot.find_geometry(batch.key.geometry);
+        if (resource && state.geometry_resources.contains(resource->id) &&
+            !ensure_pick_geometry(state, *resource, stats)) return state.last_result;
         const auto geometry = state.geometry_resources.find(batch.key.geometry);
         if (geometry == state.geometry_resources.end() || !geometry->second.pick_buffer.id)
             continue;
@@ -2738,9 +2875,13 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     state_->viewport_width = width;
     state_->viewport_height = height;
 
+    auto *profiler = state_->capture_profiler.get();
+    render_internal::CaptureProfiler::Sample timing;
+    if (profiler) timing = profiler->start(state_->renderer);
     GpuExecutionStats stats;
     if (!synchronize(plan, snapshot, stats))
         return state_->last_result;
+    if (profiler) profiler->synchronized(timing);
     const auto samples = resolve_samples(*state_);
     sync_msaa_pipelines(*state_, samples);
     if (!ensure_capture_targets(*state_, width, height, samples, stats))
@@ -2755,6 +2896,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     if (!ensure_surface_pipelines(*state_, snapshot, samples, stats))
         return state_->last_result;
 
+    if (profiler) profiler->prepared(timing);
     auto result = nkgpu_frame_begin(state_->renderer);
     if (result != NKGPU_OK) {
         state_->last_result = result;
@@ -2762,6 +2904,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     }
     bool pass_active = false;
     auto fail_frame = [&](nkgpu_result failure) {
+        if (profiler) profiler->abort(timing);
         if (pass_active)
             (void)nkgpu_end_pass(state_->renderer);
         (void)nkgpu_end_frame(state_->renderer);
@@ -2789,6 +2932,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     if (result != NKGPU_OK)
         return fail_frame(result);
     pass_active = true;
+    if (profiler) profiler->begin(timing);
 
     if ((result = nkgpu_apply_viewport(state_->renderer, 0, 0, static_cast<std::int32_t>(width),
                                        static_cast<std::int32_t>(height))) != NKGPU_OK)
@@ -2815,8 +2959,10 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         return fail_frame(result);
     if (!draw_stroke_batches(*state_, plan, snapshot, samples, stats))
         return fail_frame(stats.result);
+    if (profiler) profiler->end(timing);
     if ((result = nkgpu_end_pass(state_->renderer)) != NKGPU_OK) {
         pass_active = false;
+        if (profiler) profiler->abort(timing);
         (void)nkgpu_end_frame(state_->renderer);
         state_->last_result = result;
         return result;
@@ -2872,16 +3018,20 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
 
         if ((result = nkgpu_end_pass(state_->renderer)) != NKGPU_OK) {
             pass_active = false;
+            if (profiler) profiler->abort(timing);
             (void)nkgpu_end_frame(state_->renderer);
             state_->last_result = result;
             return result;
         }
         pass_active = false;
     }
+    if (profiler) profiler->end(timing);
     if ((result = nkgpu_end_frame(state_->renderer)) != NKGPU_OK) {
+        if (profiler) profiler->abort(timing);
         state_->last_result = result;
         return result;
     }
+    if (profiler) profiler->finish(timing);
 
     if (out_image) {
         result = nkgpu_image_get_graphics_image(
@@ -2948,7 +3098,7 @@ nkgpu_result NativeKitGpuExecutor::capture_depth(const RenderPlan &plan,
     GpuExecutionStats stats;
     if (!synchronize(plan, snapshot, stats))
         return state_->last_result;
-    auto result = render_pick_pass(*state_, plan, width, height, stats);
+    auto result = render_pick_pass(*state_, plan, snapshot, width, height, stats);
     if (result != NKGPU_OK)
         return result;
 
@@ -2985,7 +3135,7 @@ nkgpu_result NativeKitGpuExecutor::capture_pick_ids(const RenderPlan &plan,
         state_->last_result = NKGPU_ERROR_INVALID_ARGUMENT;
         return state_->last_result;
     }
-    auto result = render_pick_pass(*state_, plan, width, height, stats);
+    auto result = render_pick_pass(*state_, plan, snapshot, width, height, stats);
     if (result != NKGPU_OK)
         return result;
 
@@ -3183,7 +3333,7 @@ nkgpu_result NativeKitGpuExecutor::begin_pick_pixel(const RenderPlan &plan,
     GpuExecutionStats stats;
     if (!synchronize(plan, snapshot, stats))
         return state_->last_result;
-    auto result = render_pick_pass(*state_, plan, width, height, stats);
+    auto result = render_pick_pass(*state_, plan, snapshot, width, height, stats);
     if (result != NKGPU_OK)
         return result;
 

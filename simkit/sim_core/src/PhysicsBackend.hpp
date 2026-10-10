@@ -161,6 +161,11 @@ public:
     virtual nksim_result closure_create(const BackendClosure &closure) = 0;
     /** Backends without explicit pairs keep their own contact rules. */
     virtual nksim_result contact_pair_create(const BackendContactPair &) { return NKSIM_OK; }
+    /** Exactly these pairs of `bodies` never collide with each other (see nksim_world_set_exclusions). */
+    virtual nksim_result exclusions_set(const std::vector<std::uint64_t> &,
+                                        const std::vector<std::pair<std::uint64_t, std::uint64_t>> &) {
+        return NKSIM_OK;
+    }
     virtual nksim_result set_joint_targets(const BackendJointTarget *targets,
                                            std::uint32_t count) = 0;
 

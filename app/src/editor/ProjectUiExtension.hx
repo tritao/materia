@@ -3,6 +3,7 @@ package app.editor;
 import haxeon.ui.Path;
 
 import app.MateriaProjectRunner;
+import app.ProjectSourceLoader;
 import app.Main.ReferenceEditorApp;
 import haxe.Json;
 import haxe.io.Path as UiPath;
@@ -29,6 +30,8 @@ class ProjectUiExtension {
 	var lastSelection:String = "";
 
 	public static function open(projectPath:String, ?initialAction:String):Null<ProjectUiExtension> {
+		// Published artifacts contain geometry and runtime settings, not executable UI declarations.
+		if (ProjectSourceLoader.isPrebuilt(projectPath)) return null;
 		var absolute = FileSystem.fullPath(projectPath);
 		var root:Dynamic = Json.parse(File.getContent(absolute));
 		var declaration:Dynamic = Reflect.field(root, "uiExtension");

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "package": {
+    "name": "insets-escape-tests"
+  },
+  "entry": "InsetsEscapeTests",
+  "sourceRoots": [
+    "."
+  ],
+  "dependencies": {
+    "app": {
+      "path": "../.."
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

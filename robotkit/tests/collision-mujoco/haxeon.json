@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "package": {
+    "name": "robotkit-collision-mujoco-tests"
+  },
+  "entry": "CollisionMuJoCoTests",
+  "sourceRoots": [
+    "src"
+  ],
+  "dependencies": {
+    "haxeon-platform": {
+      "path": "../../../haxeon/packages/platform"
+    },
+    "robotkit": {
+      "path": "../.."
+    },
+    "collisionkit-native": {
+      "path": "../../../collisionkit/native"
+    }
+  },
+  "native": {
+    "cmake": {
+      "source": "../../robotd/native-mujoco",
+      "target": "robotd_native",
+      "inputs": [
+        "../../runtime/include/robotkit_runtime.h",
+        "../../runtime/include/robotkit_simkit.h",
+        "../../../simkit/CMakeLists.txt",
+        "../../../cadkit/CMakeLists.txt",
+        "../../inference/CMakeLists.txt",
+        "../../inference/src/inference.cpp",
+        "../../inference/include/robotkit_inference.h",
+        "../../policy/CMakeLists.txt",
+        "../../policy/src/policy.cpp",
+        "../../policy/include/robotkit_policy.h"
+      ]
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

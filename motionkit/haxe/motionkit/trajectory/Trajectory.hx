@@ -96,11 +96,15 @@ class Trajectory {
     return new Trajectory(created.out_trajectory);
   }
 
-  /** Offline, jerk-limited synchronized state-to-state motion. */
+  /**
+   * Offline, jerk-limited synchronized state-to-state motion. With `phase`,
+   * every joint follows one profile scaled to its distance, so a move from
+   * rest to rest is a straight line in joint space (a planned edge).
+   */
   public static function generateStateToState(currentPosition:Array<Float>,
       currentVelocity:Array<Float>, currentAcceleration:Array<Float>, targetPosition:Array<Float>,
       maximumVelocity:Array<Float>, maximumAcceleration:Array<Float>,
-      maximumJerk:Array<Float>):Trajectory {
+      maximumJerk:Array<Float>, ?phase:Bool = false):Trajectory {
     if (currentPosition == null || currentPosition.length < 1 ||
         currentPosition.length > TrajectoryCoreConstants.MK_MAX_JOINTS)
       throw "Invalid generated trajectory joint count";
@@ -112,7 +116,8 @@ class Trajectory {
     var request = new mk_state_to_state_request();
     request.set_struct_size(mk_state_to_state_request.size());
     request.set_joint_count(count);
-    request.set_synchronization(MotionKitNativeConstants.MK_SYNCHRONIZATION_TIME);
+    request.set_synchronization(phase == true ? MotionKitNativeConstants.MK_SYNCHRONIZATION_PHASE
+      : MotionKitNativeConstants.MK_SYNCHRONIZATION_TIME);
     request.set_control_mode(MotionKitNativeConstants.MK_CONTROL_POSITION);
     for (joint in 0...count) {
       request.set_current_position(joint, currentPosition[joint]);

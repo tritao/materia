@@ -301,6 +301,10 @@ class EditorScene {
       scene.setMaterialData(selectionMaterial, MaterialData.opaque(1.0, 0.88, 0.35).setRoughness(0.7));
       hoverMaterial = scene.createMaterial();
       scene.setMaterialData(hoverMaterial, MaterialData.opaque(0.45, 0.78, 1.0).setRoughness(0.55));
+      presentation.collidingMaterial = scene.createMaterial();
+      scene.setMaterialData(presentation.collidingMaterial, MaterialData.opaque(0.92, 0.22, 0.2).setRoughness(0.6));
+      presentation.nearMaterial = scene.createMaterial();
+      scene.setMaterialData(presentation.nearMaterial, MaterialData.opaque(1.0, 0.66, 0.18).setRoughness(0.6));
       profileLoadEnd("finalMaterial", phaseStarted);
       phaseStarted = profileLoadStart();
       snapshot = scene.snapshot();
@@ -1631,8 +1635,9 @@ class EditorScene {
   }
 
   public function configureRenderView(view:SceneView, viewProjection:Transform,
-      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1):SceneView
-    return presentation.configureRenderView(this, view, viewProjection, poses, hoveredId, hoveredFaceIndex);
+      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1,
+      ?collisions:Array<SceneCollision.SceneCollisionPair>):SceneView
+    return presentation.configureRenderView(this, view, viewProjection, poses, hoveredId, hoveredFaceIndex, collisions);
 
   public function selectRayWithView(view:SceneView, originX:Float, originY:Float, originZ:Float,
       directionX:Float, directionY:Float, directionZ:Float,
@@ -1656,11 +1661,11 @@ class EditorScene {
           directionX, directionY, directionZ));
   }
 
-  static function poseTransform(position:Array<Float>, rotation:Array<Float>):Transform {
+  static function poseTransform(position:Array<Float>, rotation:Array<Float>, ?target:Transform):Transform {
     if (position == null || position.length != 3 || rotation == null || rotation.length != 4)
       throw "Invalid presentation pose";
     var x=rotation[0],y=rotation[1],z=rotation[2],w=rotation[3];
-    return Transform.identity()
+    return (target == null ? Transform.identity() : target)
       .set(0,1-2*(y*y+z*z)).set(1,2*(x*y+z*w)).set(2,2*(x*z-y*w))
       .set(4,2*(x*y-z*w)).set(5,1-2*(x*x+z*z)).set(6,2*(y*z+x*w))
       .set(8,2*(x*z+y*w)).set(9,2*(y*z-x*w)).set(10,1-2*(x*x+y*y))
@@ -2222,8 +2227,8 @@ class EditorScene {
    * character. Document and environment revisions stay unchanged, so UI caches
    * and simulation remain valid while the viewport re-renders.
    */
-  public function publishRuntimeNodes(nodes:Array<NodeId>):Void {
-    requireRenderRefresh();
+  public function publishRuntimeNodes(nodes:Array<NodeId>, ?changes:Null<ChangeSet>):Void {
+    if (changes == null) requireRenderRefresh(); else queueRenderChanges(changes);
     markVisualChanged();
     rebuildPresentation(nodes);
   }
@@ -2603,11 +2608,28 @@ class EditorScene {
     generated parts can share theirs; later calls update it in place.
   **/
   public function setRuntimeGeometry(id:String, data:GeometryData):Void {
+    updateRuntimeGeometry(id, data);
+  }
+
+  /** Publishes related display geometry updates with one snapshot and spatial-index refresh. */
+  public function setRuntimeGeometries(changed:Map<String, GeometryData>):Void {
+    var updated:Array<NodeId> = [];
+    try {
+      for (id => data in changed) updateRuntimeGeometry(id, data, updated);
+    } catch (error:Dynamic) {
+      // Keep derived caches consistent with any geometry already accepted by SceneKit.
+      if (updated.length > 0) publishRuntimeNodes(updated);
+      throw error;
+    }
+    if (updated.length > 0) publishRuntimeNodes(updated);
+  }
+
+  function updateRuntimeGeometry(id:String, data:GeometryData, ?updated:Array<NodeId>):Void {
     var runtime = runtimeFor(id);
     var owned = ownedRuntimeGeometry.get(id);
     if (owned != null && owned == runtime.geometry) {
       scene.setGeometryData(owned, data);
-      publish([runtime.node], false);
+      if (updated == null) publishRuntimeNodes([runtime.node]); else updated.push(runtime.node);
       return;
     }
     var geometry:Null<Geometry> = null;
@@ -2626,7 +2648,11 @@ class EditorScene {
     if (!runtimeOriginalGeometry.exists(id)) runtimeOriginalGeometry.set(id, runtime.geometry);
     bridge.attach(id, runtime.node, geometry, runtime.material);
     ownedRuntimeGeometry.set(id, geometry);
-    publish([runtime.node], false, changes);
+    if (updated == null) publishRuntimeNodes([runtime.node], changes);
+    else {
+      if (changes != null) changes.dispose();
+      updated.push(runtime.node);
+    }
   }
 
   /** Gives object `id` its own geometry back, ending `setRuntimeGeometry` and `setRuntimeGeometryParts`. */
@@ -2651,7 +2677,7 @@ class EditorScene {
     ownedRuntimeGeometry.remove(id);
     runtimeOriginalGeometry.remove(id);
     runtimeParts.remove(id);
-    publish([runtime.node], false, changes);
+    publishRuntimeNodes([runtime.node], changes);
   }
 
   /** The part nodes of object `id`'s runtime geometry, which go with it when it is removed. */
@@ -2757,7 +2783,7 @@ class EditorScene {
       bridge.mapNode(part.node, id);
       updated.push(part.node);
     }
-    publish(updated, false, changes);
+    publishRuntimeNodes(updated, changes);
   }
 
   function releaseRuntimeParts(id:String):Void {

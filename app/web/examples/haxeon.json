@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "materia-web-examples"},
+  "entry": "WebExampleExport",
+  "sourceRoots": ["."],
+  "dependencies": {"app": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

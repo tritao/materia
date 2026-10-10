@@ -15,7 +15,7 @@ import motionkit.robot.ProgramCompiler;
 import motionkit.robot.SelectedJointPathPlanner;
 import motionkit.robot.StructuredJointPathPlanner;
 import robotkit.manipulation.KinematicGroup;
-import robotkit.manipulation.ArmClearance;
+import robotkit.manipulation.ClearanceWorld;
 import processkit.WelderProcessDevice.WelderChannels;
 import processkit.WeldPathProblem.WeldPathPhase;
 
@@ -124,7 +124,7 @@ class WeldPathProgram {
   /** One compiler pass, including generated entry, drive/task/clearance checks
    * and rates derived from the final timed deposition sections. */
   public function compile(compiler:ProgramCompiler,group:KinematicGroup,start:Array<Float>,planId:Int64,
-      ?clearance:ArmClearance,?configuration:motionkit.kinematics.SixAxisConfiguration):CompiledProgram {
+      ?clearance:ClearanceWorld,?configuration:motionkit.kinematics.SixAxisConfiguration):CompiledProgram {
     var checking=new StructuredJointPathPlanner(group,null,null,clearance,8,false,
       null,null,null,0,null,problem.contact,problem.contactNeighborhood);
     var selected=new SelectedJointPathPlanner(compiler.solver,checking,problem.sections,curves);

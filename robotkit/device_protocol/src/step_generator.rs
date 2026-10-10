@@ -22,9 +22,13 @@ pub struct StepGenerator<const A: usize> {
     nominal_steps: [f64; A],
     steps_per_unit: [f64; A],
     setup_ticks: [u64; A],
-    min_interval_ticks: [u64; A],
+    /// Least step ticks between two steps of each actuator.
+    min_step_ticks: [u64; A],
     direction: [Option<bool>; A],
     direction_since: [u64; A],
+    /// Step ticks so far: one per `tick` call.
+    step_tick: u64,
+    /// The step tick of each actuator's last step.
     last_step: [Option<u64>; A],
     skew: [Option<SkewGroup>; A],
     skew_count: usize,
@@ -32,22 +36,16 @@ pub struct StepGenerator<const A: usize> {
 }
 
 impl<const A: usize> StepGenerator<A> {
+    /// `min_step_ticks` is each actuator's least whole number of step ticks between steps, as the
+    /// host chose it (at least one); the device enforces it and never derives it from a rate. Each
+    /// `tick` call is one step tick; `setup_ticks` are board clock ticks.
     pub fn new(steps_per_unit: [f64; A], setup_ticks: [u64; A],
-        max_rate: [f64; A], tick_hz: u64) -> Option<Self> {
-        if A == 0 || A > 64 || tick_hz == 0 ||
+        min_step_ticks: [u64; A]) -> Option<Self> {
+        if A == 0 || A > 64 ||
             steps_per_unit.iter().any(|v| !v.is_finite() || *v <= 0.0) ||
-            max_rate.iter().any(|v| !v.is_finite() || *v < 0.0) { return None; }
-        let mut min_interval_ticks = [0; A];
-        for a in 0..A {
-            if max_rate[a] > 0.0 {
-                let interval = tick_hz as f64 / (max_rate[a] * steps_per_unit[a]);
-                if !interval.is_finite() || interval > u64::MAX as f64 { return None; }
-                min_interval_ticks[a] = (interval as u64) +
-                    u64::from(interval > interval as u64 as f64);
-            }
-        }
+            min_step_ticks.iter().any(|v| *v == 0) { return None; }
         Some(Self { inputs: InputCapture::new(), homing_pair: None, held: [None; A],
-            alignment_steps: [0.0; A], counter_origin_steps: [0.0; A], nominal_steps: [0.0; A], steps_per_unit, setup_ticks, min_interval_ticks,
+            alignment_steps: [0.0; A], counter_origin_steps: [0.0; A], nominal_steps: [0.0; A], steps_per_unit, setup_ticks, min_step_ticks, step_tick: 0,
             direction: [None; A], direction_since: [0; A], last_step: [None; A],
             skew: [None; A], skew_count: 0, squaring_bound: [None; A] })
     }
@@ -209,6 +207,7 @@ impl<const A: usize> StepGenerator<A> {
         }
         if !self.inputs.sample(board, None) { self.end_homing_pair(); return Err(StepFault::InputCounterOverflow); }
         let now = board.now_ticks();
+        self.step_tick += 1;
         for a in 0..count {
             self.nominal_steps[a] = targets[a] as f64 * self.steps_per_unit[a];
             if let Some(physical) = self.held[a] {
@@ -234,11 +233,11 @@ impl<const A: usize> StepGenerator<A> {
             }
             if now.saturating_sub(self.direction_since[a]) < self.setup_ticks[a] { continue; }
             if let Some(last) = self.last_step[a] {
-                if now.saturating_sub(last) < self.min_interval_ticks[a] { continue; }
+                if self.step_tick - last < self.min_step_ticks[a] { continue; }
             }
             board.step_pulse(a, forward);
             if !self.inputs.sample(board, Some(a)) { self.end_homing_pair(); return Err(StepFault::InputCounterOverflow); }
-            self.last_step[a] = Some(now);
+            self.last_step[a] = Some(self.step_tick);
         }
         for (i, configured) in self.skew[..self.skew_count].iter().enumerate() {
             let Some(group) = configured else { continue; };

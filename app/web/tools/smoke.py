@@ -14,6 +14,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../haxeon/vendor/nativekit/tools"))
+from canvas_sizing_smoke import check_canvas_sizing
 from web_smoke import WebSocket, wait_for_page  # noqa: E402
 
 
@@ -67,6 +68,8 @@ def main():
 
     target = wait_for_page(options.debug_port, options.page_url, 30)
     page = Page(WebSocket(target["webSocketDebuggerUrl"]))
+    # Guest compilation can keep the renderer busy during initial startup.
+    page.socket.socket.settimeout(min(30.0, options.timeout))
     page.command("Runtime.enable")
     page.command("Page.enable")
     deadline = time.monotonic() + options.timeout
@@ -77,6 +80,8 @@ def main():
         if state.get("state") in ("failed", "stopped") or state.get("frames", 0) >= options.frames:
             break
         time.sleep(0.25)
+    if state.get("state") == "running":
+        check_canvas_sizing(page)
     for click in options.click if state.get("state") == "running" else []:
         x, y = (float(value) for value in click.split(","))
         for kind in ("mouseMoved", "mousePressed", "mouseReleased"):

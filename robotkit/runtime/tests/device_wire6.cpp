@@ -33,6 +33,7 @@ int main(int argc, char **argv) {
     begin.actuator_max_acceleration[0] = 2.0f;
     begin.actuator_max_acceleration[1] = 4.0f;
     begin.steps_per_unit[0] = begin.steps_per_unit[1] = 400.0f;
+    begin.min_step_ticks[0] = begin.min_step_ticks[1] = 1;
     begin.actuator_ratio[0] = begin.actuator_ratio[1] = 1.0f;
     begin.link_loss_timeout_ns = 500'000'000;
     std::vector<std::uint8_t> session(begin.SIZE);

@@ -349,7 +349,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                     actuator.feedback_offset = robot_desc->virtual_device_feedback_offset[i];
                 }
                 actuator.steps_per_unit = robot_desc->virtual_device_actuator_steps_per_unit[i];
-                actuator.max_rate = robot_desc->virtual_device_actuator_max_rate[i];
+                actuator.min_step_ticks = robot_desc->virtual_device_actuator_min_step_ticks[i];
                 actuator.direction_setup_ticks =
                     robot_desc->virtual_device_actuator_direction_setup_ticks[i];
                 actuator.dual_drive_skew_bound = robot_desc->virtual_device_actuator_skew_bound[i];
@@ -835,6 +835,23 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 for (const auto joint : {blueprint.couplings[index].leader, blueprint.couplings[index].follower})
                     if (driven[find(joint)] && binding->servo_[joint].stiffness <= 0.0)
                         binding->passive_[joint] = 1;
+        }
+        if (robot_desc && (robot_desc->flags & RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES)) {
+            if (robot_desc->struct_size < offsetof(rk_simulation_robot_desc, link_excludes) +
+                    sizeof(robot_desc->link_excludes) ||
+                robot_desc->link_exclude_count > RK_MAX_LINK_EXCLUDES)
+                throw std::invalid_argument("explicit link excludes need the descriptor's exclude tail");
+            std::vector<uint32_t> pairs;
+            for (uint32_t index = 0; index < robot_desc->link_exclude_count; ++index) {
+                const auto a = robot_desc->link_excludes[2 * index], b = robot_desc->link_excludes[2 * index + 1];
+                if (a >= blueprint.link_count || b >= blueprint.link_count || a == b)
+                    throw std::invalid_argument("invalid link exclude");
+                pairs.push_back(a);
+                pairs.push_back(b);
+            }
+            require_sim(nksim_world_set_exclusions(world, binding->bodies_.data(), blueprint.link_count,
+                                                   pairs.data(), uint32_t(pairs.size())),
+                        "nksim_world_set_exclusions");
         }
         const auto topology_result = nksim_world_end_topology_update(world);
         topology_update = false;

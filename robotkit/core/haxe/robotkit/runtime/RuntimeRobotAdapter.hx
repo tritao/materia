@@ -82,9 +82,7 @@ class RuntimeRobotAdapter implements Robot {
 
   public function status():RobotStatus {
     if (closed) return Disconnected;
-    var value = runtime.snapshot();
-    return value.endpoint == RobotKitRuntimeConstants.RK_ENDPOINT_FAULT ||
-      value.safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT ? Fault : Ready;
+    return runtime.status();
   }
 
   public function description():RobotDescription return robotDescription;

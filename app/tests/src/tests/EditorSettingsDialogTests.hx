@@ -32,12 +32,8 @@ class EditorSettingsDialogTests {
     if (!FileSystem.exists(DIRECTORY)) FileSystem.createDirectory(DIRECTORY);
     var settingsFile = DIRECTORY + "/settings.json";
     if (FileSystem.exists(settingsFile)) FileSystem.deleteFile(settingsFile);
-    var fontPath:Null<String> = null;
-    for (candidate in ["haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf",
-      "../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
-      "../../../haxeon/packages/ui/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"])
-      if (FileSystem.exists(candidate)) fontPath = candidate;
-    check(fontPath != null, "a test font is available");
+    var fontPath = TestPaths.font();
+    check(FileSystem.exists(fontPath), "a test font is available");
     var fonts = FontCollection.create();
     fonts.add(cast fontPath);
     var editor = new ReferenceEditorApp(fonts, DIRECTORY + "/workspace.json");

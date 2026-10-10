@@ -1,5 +1,5 @@
 import build.Target;
-import haxe.crypto.Sha256;
+import build.execution.ContentDigest;
 import haxe.io.Path;
 import project.PackageResolver;
 import project.PathSourceAcquirer;
@@ -8,6 +8,7 @@ import sys.io.File;
 
 /** Fingerprint the declared inputs of a deterministic CAD preview entrypoint. */
 class MateriaProjectFingerprint {
+	static var generatedSources:String;
 	static function main():Void {
 		var args = Sys.args();
 		if (args.length < 5)
@@ -15,11 +16,16 @@ class MateriaProjectFingerprint {
 		var manifest = FileSystem.fullPath(args[0]);
 		var project = new PackageResolver(new PathSourceAcquirer()).resolve(manifest, null, false, Target.parse("host"));
 		var home = FileSystem.fullPath(args[4]);
+		var cache = Sys.getEnv("XDG_CACHE_HOME");
+		if (cache == null || cache.length == 0) cache = Path.join([Sys.getEnv("HOME"), ".cache"]);
+		generatedSources = Path.normalize(Path.join([FileSystem.fullPath(cache), "materia", "project-sources"]));
 		var paths = new Map<String, Bool>();
 		add(paths, manifest);
 		for (item in project.packages.packages) {
 			add(paths, Path.join([item.root, PackageResolver.MANIFEST_NAME]));
 			for (root in item.sourceRoots) addHaxeSources(paths, root);
+			for (path in item.sources)
+				if (!StringTools.startsWith(Path.normalize(FileSystem.fullPath(path)), generatedSources + "/")) add(paths, path);
 			for (path in item.ffiInterfaces) add(paths, path);
 			for (path in item.ffiProjections) add(paths, path);
 			for (imported in item.ffiImports) {
@@ -35,12 +41,15 @@ class MateriaProjectFingerprint {
 		var ordered = [for (path in paths.keys()) path];
 		ordered.sort(Reflect.compare);
 		var fields = new StringBuf();
-		field(fields, "materia-generated-artifact-v1");
+		field(fields, "materia-generated-artifact-v2");
+		// These options affect generated code even when source bytes are unchanged.
+		for (name in ["HAXEON_INLINE", "HAXEON_LOADSTORE", "HAXEON_STRENGTH"])
+			field(fields, name + ":" + (Sys.getEnv(name) == "0" ? "off" : "on"));
 		field(fields, args[1]);
 		field(fields, args[2]);
 		for (path in ordered) {
 			field(fields, path);
-			field(fields, Sha256.make(File.getBytes(path)).toHex());
+			field(fields, ContentDigest.make(File.getBytes(path)).toHex());
 		}
 		// Native code and tool binaries are not Haxe sources. Their build stamps
 		// invalidate generated geometry without reading large shared libraries.
@@ -55,11 +64,13 @@ class MateriaProjectFingerprint {
 		for (path in binaries) {
 			if (!FileSystem.exists(path)) continue;
 			var stat = FileSystem.stat(path);
+			// Empty files contain no executable native code.
+			if (stat.size == 0) continue;
 			field(fields, path);
 			field(fields, Std.string(stat.size));
 			field(fields, Std.string(stat.mtime.getTime()));
 		}
-		Sys.println(Sha256.encode(fields.toString()));
+		Sys.println(ContentDigest.make(haxe.io.Bytes.ofString(fields.toString())).toHex());
 	}
 
 	static function add(paths:Map<String, Bool>, path:String):Void {
@@ -70,6 +81,8 @@ class MateriaProjectFingerprint {
 	}
 
 	static function addHaxeSources(paths:Map<String, Bool>, root:String):Void {
+		// A caller may put XDG_CACHE_HOME inside a broad source root. Generated wrappers are outputs.
+		if (Path.normalize(FileSystem.fullPath(root)) == generatedSources) return;
 		if (!FileSystem.exists(root) || !FileSystem.isDirectory(root))
 			throw 'Haxeon source directory is missing: $root';
 		for (name in FileSystem.readDirectory(root)) {

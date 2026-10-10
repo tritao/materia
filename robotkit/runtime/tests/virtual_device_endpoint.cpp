@@ -129,8 +129,8 @@ void dual_drive_layout() {
     VirtualDeviceConfig6 config;
     config.controller.fill(7);
     config.clock_bound_ns = 5'000'000;
-    config.actuators = {{0, 1.0, 0.0, 400'000.0, 0.02, 2, 4e-6},
-                        {0, 2.0, 0.0, 400'000.0, 0.04, 2, 4e-6}};
+    config.actuators = {{0, 1.0, 0.0, 400'000.0, 5, 2, 4e-6},
+                        {0, 2.0, 0.0, 400'000.0, 3, 2, 4e-6}};
     config.actuators[0].id = "gantry.left";
     config.actuators[1].id = "gantry.right";
     auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
@@ -219,9 +219,9 @@ void router_leader_skew() {
     VirtualDeviceConfig6 config;
     config.controller.fill(7);
     config.clock_bound_ns = 5'000'000;
-    config.actuators = {{0, -ratio, 0, steps_per_radian, 78, 2, 0.0005},
-                        {0, ratio, 0, steps_per_radian, 78, 2, 0.0005},
-                        {1, ratio, 0, steps_per_radian, 78, 2, 0}};
+    config.actuators = {{0, -ratio, 0, steps_per_radian, 2, 2, 0.0005},
+                        {0, ratio, 0, steps_per_radian, 2, 2, 0.0005},
+                        {1, ratio, 0, steps_per_radian, 2, 2, 0}};
     config.actuators[0].id = "gantry.left";
     config.actuators[1].id = "gantry.right";
     config.actuators[2].id = "gantry.x";
@@ -311,8 +311,8 @@ void motor_feedback_reconstructs_leaders() {
     blueprint.couplings[4] = {2, 4, 0.5, 0.01};
     VirtualDeviceConfig6 config;
     config.clock_bound_ns = 5'000'000;
-    config.actuators = {{2, 1.0, 0.02, 100'000.0, 0.1},
-                        {3, 1.0, -0.03, 100'000.0, 0.1}};
+    config.actuators = {{2, 1.0, 0.02, 100'000.0, 4},
+                        {3, 1.0, -0.03, 100'000.0, 4}};
     config.actuators[0].id = "motor.a";
     config.actuators[1].id = "motor.b";
     auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
@@ -373,8 +373,8 @@ void lead_screw_carriage_coupling() {
     VirtualDeviceConfig6 config;
     config.controller.fill(9);
     config.clock_bound_ns = 5'000'000;
-    config.actuators = {{0, 1.0, 0.0, 3'200.0, 1.0},
-                        {1, 1.0, 0.001, 400'000.0, 0.01}};
+    config.actuators = {{0, 1.0, 0.0, 3'200.0, 13},
+                        {1, 1.0, 0.001, 400'000.0, 10}};
     config.actuators[0].id = "screw";
     config.actuators[1].id = "carriage";
     auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
@@ -864,7 +864,7 @@ void runtime_boot_anchor_uses_device_counter_origin() {
     VirtualDeviceConfig6 config;
     config.controller.fill(12);
     config.clock_bound_ns = 5'000'000;
-    config.actuators = {{0, 2.0, 1.0, 1'000.0, 40'000.0}};
+    config.actuators = {{0, 2.0, 1.0, 1'000.0, 1}};
     config.actuators[0].id = "offset-motor";
     auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
     assert(endpoint);

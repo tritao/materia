@@ -14,6 +14,7 @@
 		"../examples/corexy"
 	],
 	"dependencies": {
+		"collisionkit-native": {"path": "../../collisionkit/native"},
 		"projectkit": {
 			"path": "../../projectkit"
 		},

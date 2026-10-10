@@ -1,0 +1,7 @@
+// Byte-only boundary for the isolated browser preparation guest.
+interface MateriaPreparation @target("portable-abi32") @library("materia_preparation") {
+  extern fn materia_prepare_input(data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
+  extern fn materia_prepare_phase(text: utf8) -> void;
+  extern fn materia_prepare_complete(content: ptr<const<u8>> @in_array("length"), length: u32) -> void;
+  extern fn materia_prepare_error(text: utf8) -> void;
+}

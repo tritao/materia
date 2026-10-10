@@ -1,5 +1,6 @@
 package app;
 
+import collisionkit.native.NativeCollisionWorld;
 import app.SimulatedTools.GripObject;
 import cadkit.modeling.AssemblyState;
 import haxe.Int64;
@@ -38,8 +39,8 @@ import processkit.skill.WeldPlan;
 import processkit.skill.WeldSeam;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
-import robotkit.manipulation.ArmClearance;
-import robotkit.manipulation.ArmClearance.ClearanceViolation;
+import robotkit.collision.CollisionClearance;
+import robotkit.manipulation.ClearanceViolation;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
 import robotkit.model.SteadyLoads;
@@ -86,6 +87,14 @@ typedef MissionOverlay = {
   var odometry:Null<Pose2>;
   var outline:Array<Pose2>;
   var guard:MotionGuardState;
+}
+
+typedef MissionProgress = {
+  var phase:String;
+  var stepIndex:Int;
+  var completedInLoop:Int;
+  var loop:Int;
+  var failure:Null<String>;
 }
 
 /**
@@ -171,7 +180,7 @@ class MissionPlayer implements SessionMember {
   final newRegistration:Null<SceneContactWork->processkit.ContactRegistrationRunner>;
   var registeredWork = new Map<String, Transform3>();
   /** What welds are planned clear of, and where the arm's joints are among the robot's. */
-  var clearance:Null<ArmClearance> = null;
+  var clearance:Null<CollisionClearance> = null;
   var clearanceJoints:Array<Int> = [];
   /** Runtime weld metal in world coordinates, read before each pass is planned. */
   public var depositedWeldHulls:Void -> Array<{name:String, vertices:Array<Float>}> = () -> [];
@@ -342,11 +351,11 @@ class MissionPlayer implements SessionMember {
    * and 0.5 mm between tool and work at the seam; the arm's installed gearheads have 4.5 mm designed clearance to the next tube. `ignored` are occurrences that
    * are no obstacle (the weld metal).
    */
-  function weldClearance(arm:Manipulator, torch:String, ignored:Array<String>):ArmClearance {
+  function weldClearance(arm:Manipulator, torch:String, ignored:Array<String>):CollisionClearance {
     return armClearance(arm, weldCollisionBodies(arm, torch, ignored));
   }
 
-  function weldCollisionBodies(arm:Manipulator, torch:String, ignored:Array<String>):Array<robotkit.manipulation.ArmClearance.ClearanceBodyData> {
+  function weldCollisionBodies(arm:Manipulator, torch:String, ignored:Array<String>):Array<robotkit.manipulation.ClearanceBodyData> {
     var links = robot.model.links;
     // The tool is everything the torch's assembly holds (the plate on the flange, the torch and its neck).
     var toolPrefix = torch.substr(0, torch.lastIndexOf("/") + 1);
@@ -357,16 +366,19 @@ class MissionPlayer implements SessionMember {
       new Quat(base.rotation[0], base.rotation[1], base.rotation[2], base.rotation[3])).inverse();
     for (entry in objects) if (StringTools.startsWith(entry.id, "project:") && ignored.indexOf(entry.id.substr(8)) < 0) {
       var part = assemblyParts.get(entry.id);
-      if (part.vertices.length == 0) continue;
+      if (part.pieces.length == 0) continue;
       var live = part.pose();
       var pose = baseInverse.compose(new Transform3(new Vec3(live.position[0], live.position[1], live.position[2]),
         new Quat(live.rotation[0], live.rotation[1], live.rotation[2], live.rotation[3])));
-      var vertices:Array<Float> = [];
-      for (index in 0...Std.int(part.vertices.length / 3)) {
-        var point = pose.transformPoint(new Vec3(part.vertices[index * 3], part.vertices[index * 3 + 1], part.vertices[index * 3 + 2]));
-        vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
+      for (index in 0...part.pieces.length) {
+        var piece = part.pieces[index], vertices:Array<Float> = [];
+        for (vertex in 0...Std.int(piece.length / 3)) {
+          var point = pose.transformPoint(new Vec3(piece[vertex * 3], piece[vertex * 3 + 1], piece[vertex * 3 + 2]));
+          vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
+        }
+        var name = entry.id.substr(8);
+        bodies.push({name: part.pieces.length == 1 ? name : '$name#$index', link: links[0].id, vertices: vertices, tool: false});
       }
-      bodies.push({name: entry.id.substr(8), link: links[0].id, vertices: vertices, tool: false});
     }
     for (hull in depositedWeldHulls()) {
       var vertices:Array<Float> = [];
@@ -379,11 +391,11 @@ class MissionPlayer implements SessionMember {
     return bodies;
   }
 
-  function armClearance(arm:Manipulator, bodies:Array<robotkit.manipulation.ArmClearance.ClearanceBodyData>):ArmClearance {
+  function armClearance(arm:Manipulator, bodies:Array<robotkit.manipulation.ClearanceBodyData>):CollisionClearance {
     var positions = robot.robot.snapshot().positions;
     var indices = [for (target in arm.toJointTargets([for (_ in 0...arm.dofCount()) 0.0])) target.joint];
     clearanceJoints = indices;
-    return new ArmClearance(arm, bodies, [for (index in indices) positions.get(index)], processkit.WeldPathPlanner.AIR_MARGIN);
+    return new CollisionClearance(arm, bodies, [for (index in indices) positions.get(index)], () -> new NativeCollisionWorld(), processkit.WeldPathPlanner.AIR_MARGIN);
   }
 
   /**
@@ -470,7 +482,15 @@ class MissionPlayer implements SessionMember {
       };
       return label + " · " + phase;
     }
-    return "Step " + (completed + 1) + " / " + mission.steps.length + " · " + mission.steps[stepIndex].kind;
+    return "Step " + (stepIndex + 1) + " / " + mission.steps.length + " · " + mission.steps[stepIndex].kind;
+  }
+
+  /** Structured presentation state; startup is separate from the first authored step. */
+  public function progress():MissionProgress {
+    var phase = failure != null ? "failed" : finished ? "complete" :
+      !homingComplete && homing != null ? "startup" : "executing";
+    return {phase:phase, stepIndex:stepIndex, completedInLoop:finished ? mission.steps.length : stepIndex,
+      loop:mission.loop == true ? Std.int(completed / mission.steps.length) + 1 : 1, failure:failure};
   }
 
   public function feed():Void {

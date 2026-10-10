@@ -153,13 +153,13 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
             !std::isfinite(mapping.ratio) ||
             mapping.ratio == 0 || !std::isfinite(mapping.offset) ||
             !std::isfinite(mapping.steps_per_unit) || mapping.steps_per_unit <= 0 ||
-            !std::isfinite(mapping.max_rate) || mapping.max_rate < 0 ||
+            mapping.min_step_ticks == 0 ||
             !std::isfinite(mapping.dual_drive_skew_bound) || mapping.dual_drive_skew_bound < 0)
             return {};
         begin.actuator_max_acceleration[i] = static_cast<float>(
             std::abs(mapping.ratio) * blueprint.joints[mapping.joint].max_acceleration);
         begin.steps_per_unit[i] = static_cast<float>(mapping.steps_per_unit);
-        begin.max_rate[i] = static_cast<float>(mapping.max_rate);
+        begin.min_step_ticks[i] = mapping.min_step_ticks;
         begin.direction_setup_ticks[i] = mapping.direction_setup_ticks;
         begin.actuator_joint[i] = mapping.joint;
         begin.actuator_ratio[i] = static_cast<float>(mapping.ratio);
@@ -393,6 +393,7 @@ rk_result Rkd6Endpoint::identify(std::unique_ptr<Rkd6Transport> transport,
     begin.max_acceleration = 1.0f;
     begin.actuator_max_acceleration[0] = 1.0f;
     begin.steps_per_unit[0] = 1.0f;
+    begin.min_step_ticks[0] = 1;
     begin.actuator_ratio[0] = 1.0f;
     begin.link_loss_timeout_ns = 1;
     std::vector<std::uint8_t> payload(begin.SIZE), frame, reply;

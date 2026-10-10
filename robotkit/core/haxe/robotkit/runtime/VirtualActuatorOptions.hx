@@ -7,7 +7,8 @@ class VirtualActuatorOptions {
   public final ratio:Float;
   public final offset:Float;
   public final stepsPerUnit:Float;
-  public final maxRate:Float;
+  /** The least whole step-tick periods between steps (`StepTicks`). */
+  public final minStepTicks:Int;
   public final directionSetupTicks:Int;
   public final skewBound:Float;
   public final feedbackJointIndex:Int;
@@ -15,13 +16,13 @@ class VirtualActuatorOptions {
   public final feedbackOffset:Float;
 
   public function new(id:String, jointIndex:Int, ratio:Float, offset:Float,
-      stepsPerUnit:Float, maxRate:Float = 0.0, directionSetupTicks:Int = 0,
+      stepsPerUnit:Float, minStepTicks:Int = 1, directionSetupTicks:Int = 0,
       skewBound:Float = 0.0, feedbackJointIndex:Int = -1,
       feedbackRatio:Float = 1.0, feedbackOffset:Float = 0.0) {
     if (id == null || id.length == 0 || id.length > 63 ||
         jointIndex < 0 || jointIndex >= 64 || !Math.isFinite(ratio) || ratio == 0.0 ||
         !Math.isFinite(offset) || !Math.isFinite(stepsPerUnit) || stepsPerUnit <= 0.0 ||
-        !Math.isFinite(maxRate) || maxRate < 0.0 || directionSetupTicks < 0 ||
+        minStepTicks < 1 || directionSetupTicks < 0 ||
         directionSetupTicks > 65535 || !Math.isFinite(skewBound) || skewBound < 0.0)
       throw "Invalid virtual actuator configuration";
     for (i in 0...id.length)
@@ -32,7 +33,7 @@ class VirtualActuatorOptions {
     this.ratio = ratio;
     this.offset = offset;
     this.stepsPerUnit = stepsPerUnit;
-    this.maxRate = maxRate;
+    this.minStepTicks = minStepTicks;
     this.directionSetupTicks = directionSetupTicks;
     this.skewBound = skewBound;
     if (feedbackJointIndex < -1 || feedbackJointIndex >= 64 || !Math.isFinite(feedbackRatio) ||

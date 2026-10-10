@@ -16,6 +16,7 @@ class SceneView {
 	var sourceMaterialOverrides:Array<nkscene_render_source_material_override> = [];
 	var clipPlanes:Array<nkscene_render_clip_plane> = [];
 	var poseOverrides:Array<nkscene_render_pose_override> = [];
+	var packedPoses:nkscene_render_pose_overrideBuffer = null;
 
 	public function new() {
 		value = new nkscene_render_view();
@@ -166,6 +167,12 @@ class SceneView {
 
 	/** Adds or replaces a runtime world-space pose without changing the scene snapshot. */
 	public function setPose(node:NodeId, transform:Transform):SceneView {
+		// Materialize only for the incremental editing API, never for bulk publication.
+		if (packedPoses != null) {
+			poseOverrides = [];
+			for (index in 0...packedPoses.length) poseOverrides.push(packedPoses.copy(index));
+			packedPoses = null;
+		}
 		for (override in poseOverrides) {
 			if (override.get_node().get_value() == node.stableValue()) {
 				override.set_world_transform(transform.nativeValue());
@@ -186,20 +193,20 @@ class SceneView {
 	/** Replaces all world-space poses with one native publication. */
 	public function replacePoses(nodes:Array<NodeId>, transforms:Array<Transform>):SceneView {
 		if (nodes.length != transforms.length) throw "Pose node/transform count mismatch";
-		var replacements:Array<nkscene_render_pose_override> = [];
+		// Each view owns its publication; another view cannot overwrite this storage.
+		var replacements = new nkscene_render_pose_overrideBuffer(nodes.length);
 		for (index in 0...nodes.length) {
-			var override = new nkscene_render_pose_override();
-			override.set_node(nodes[index].nativeValue());
-			override.set_world_transform(transforms[index].nativeValue());
-			replacements.push(override);
+			replacements.set_node(index, nodes[index].nativeValue());
+			replacements.set_world_transform(index, transforms[index].nativeValue());
 		}
-		poseOverrides = replacements;
-		value.set_pose_overrides(poseOverrides);
-		value.set_pose_override_count(poseOverrides.length);
+		value.set_pose_overrides_packed(replacements);
+		packedPoses = replacements;
+		poseOverrides.resize(0);
 		return this;
 	}
 
 	public function clearPoses():SceneView {
+		packedPoses = null;
 		poseOverrides.resize(0);
 		value.set_pose_overrides(poseOverrides);
 		value.set_pose_override_count(0);
@@ -390,7 +397,7 @@ class SceneView {
 		return hoverOverrides.copy();
 
 	public function poseOverrideCount():Int
-		return poseOverrides.length;
+		return packedPoses == null ? poseOverrides.length : packedPoses.length;
 
 	public function visibilityOverrideCount():Int
 		return visibilityOverrides.length;

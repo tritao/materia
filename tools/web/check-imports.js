@@ -113,7 +113,7 @@ const [guestPath, hostPath, hostScript] = process.argv.slice(2);
 const guest = readModule(guestPath), host = readModule(hostPath);
 // Emscripten minifies export names; its JS binds Module["_name"] = wasmExports["xy"].
 const hostNames = new Map();
-for (const match of fs.readFileSync(hostScript, "utf8").matchAll(/Module\["_(\w+)"\]\s*=\s*wasmExports\["(\w+)"\]/g))
+for (const match of fs.readFileSync(hostScript, "utf8").matchAll(/Module\["_(\w+)"\]\s*=\s*wasmExports\["([\w$]+)"\]/g))
   hostNames.set(match[1], match[2]);
 const mismatches = [];
 for (const entry of guest.imports) {

@@ -765,7 +765,7 @@ class CadPlateWorkflowTests {
 
   static function stepImportWorkflow():Void {
     var session = new ProjectDocumentSession();
-    var root = Sys.getCwd() + "/../build-cad";
+    var root = TestPaths.of("app/build-cad");
     if (!FileSystem.exists(root)) FileSystem.createDirectory(root);
     var sourceFile = root + "/generic-import.step";
     var sceneFile = root + "/generic-import.scene";
@@ -861,7 +861,7 @@ class CadPlateWorkflowTests {
 
   static function run():Void {
     var session = new ProjectDocumentSession();
-    var root = Sys.getCwd() + "/../build-cad";
+    var root = TestPaths.of("app/build-cad");
     if (!FileSystem.exists(root)) FileSystem.createDirectory(root);
     var sceneFile = root + "/plate-workflow.scene";
     var stepFile = root + "/plate-workflow.step";
@@ -945,7 +945,7 @@ class CadPlateWorkflowTests {
 
   static function faceHoleWorkflow():Void {
     var session = new ProjectDocumentSession();
-    var root = Sys.getCwd() + "/../build-cad";
+    var root = TestPaths.of("app/build-cad");
     if (!FileSystem.exists(root)) FileSystem.createDirectory(root);
     var sceneFile = root + "/face-hole-workflow.scene";
     try {
@@ -1003,7 +1003,7 @@ class CadPlateWorkflowTests {
 
   static function bracketWorkflow():Void {
     var session=new ProjectDocumentSession();
-    var root=Sys.getCwd()+"/../build-cad";
+    var root=TestPaths.of("app/build-cad");
     if(!FileSystem.exists(root))FileSystem.createDirectory(root);
     var sceneFile=root+"/bracket-workflow.scene";
     try {

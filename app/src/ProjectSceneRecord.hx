@@ -4,6 +4,7 @@ package app;
 typedef ProjectSceneRecord = {
   var version:Int;
   var reference:String;
+  @:optional var jobId:String;
   var overrides:Array<ProjectFieldOverride>;
   var removed:Array<String>;
   var instances:Array<ProjectSceneInstance>;

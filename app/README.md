@@ -23,6 +23,37 @@ tracks selection. Edit Name, Position X/Y (metres), Width, Height, Colour
 Hidden objects remain selectable in the hierarchy. Click empty viewport space
 or the Scene root to clear object selection.
 
+## Mission monitor
+
+In Simulate, projects with an authored mission open the Mission sidebar tab. It shows
+startup, step progress, loop count, completion, and failures, including progress while
+paused. Select a step to inspect its target part and connector. The list follows the
+current step until you scroll away; **Follow current step** resumes following. Use the
+shared Play/Pause, Step, Reset, and Stop controls to run the simulation. Mission steps
+are read-only here.
+
+Projects can declare named jobs in their source manifest. A job selects an entrypoint,
+so its geometry, process settings and mission are loaded together. The viewport card
+and Mission panel share a job selector; **Show steps** opens the panel. Switching is
+available before simulation starts, and locked while running or paused. Jobs build
+in the background with Cancel; a failed or cancelled build leaves the current scene
+intact. Saved `.materia` documents retain the selected job ID.
+
+The stationary Robot welding cards are presets of one project with five jobs:
+`complete`, `single-seam`, `tube-post`, `woven-seam`, and `multipass`. Existing projects
+without job metadata keep their default entrypoint. Source manifests declare jobs as:
+
+```json
+"defaultJob": "single-seam",
+"jobs": [{"id": "single-seam", "label": "Single seam",
+          "summary": "Plate T-joint", "entrypoint": "seam"}]
+```
+
+Each job's `entrypoint` names an existing entry in `entrypoints`. Job IDs are unique;
+`defaultJob` must name one. Source job selection is unavailable for prebuilt `.mtrg`
+artifacts, which contain an already generated scene.
+
+
 ## Workers in scene documents
 
 Use **Add → People → Worker** to place a worker in the scene. Select it to
@@ -87,7 +118,7 @@ compiles the program with CncKit and streams it to the machine through MotionKit
 - The Perspective tab renders extruded SceneKit geometry through the GPU.
   Visibility, object colours, depth, and the yellow selection highlight stay
   synchronized with the inspector.
-- Left-drag empty space orbits, middle-drag pans, and the wheel zooms. Frame selected
+- Middle-drag or Alt+left-drag orbits; add Shift to pan. The wheel zooms toward the cursor. Frame selected
   fits the full 3D bounds and Reset view restores the default camera.
 - Perspective clicks use a camera ray against the boxes' 3D bounds. Left-dragging a
   selected box moves it on its current Z plane with snapping and one undo step.
@@ -103,8 +134,9 @@ compiles the program with CncKit and streams it to the machine through MotionKit
 - A Start tab opens beside the 3D view on a plain launch, with new-file shortcuts, recent files,
   and the bundled examples listed in `editor/ExampleCatalog`. Examples have task category filters
   and search across their titles and variant descriptions. Related welding, cobot and mill examples
-  share a card; open its detail view to choose a variant, then **Open example**. Back preserves
-  the search and category. The three most recent existing files stay above the catalogue. `--snapshot --example=ID[,ID...]`
+  appear under family headings on the same page. Every variant has its own card: click anywhere
+  on it to open the example directly. Search shows only matching variants, and card rows adapt to
+  the dock pane width. The three most recent existing files stay above the catalogue. `--snapshot --example=ID[,ID...]`
   opens the same examples headlessly, in order, for checks (`--example-settle=SECONDS` lets a
   running simulation step between them). Project examples build on a worker thread: the Start page shows a spinner, the current
   phase and elapsed time with a Cancel button, the rest of the editor stays responsive, and later
@@ -126,6 +158,112 @@ compiles the program with CncKit and streams it to the machine through MotionKit
   Cancelling a chooser or a failed save keeps the current document open.
 - Docking preferences remain separate and save automatically. The command
   palette also exposes Save workspace.
+
+Project loading runs the build and fingerprint tools as cached HashLink executables.
+The generator uses Haxeon's reusable compiler session, and its compiled code is reused
+across opens and editable recipe changes. Deterministic entrypoints opt into geometry
+caching with `"cache": {"inputs": [...]}`; list every external file that affects their
+output. The Gantry picker, yaw picker, and welder enable this cache. Source contents,
+manifests, compiler options, declared inputs, and tool/native library metadata invalidate
+cached artifacts. Recipe edits always execute the generator with the new document.
+Caches live below `${XDG_CACHE_HOME:-$HOME/.cache}/materia`, in `project-tools` and
+`generated-artifacts`; stable generated entrypoints live in `project-sources`.
+Compiler workers use Haxeon's existing idle timeout and resident limits. Cancelling an
+open closes its helper connection, cancels that compiler transaction, and preserves the
+previous published bytecode. Unsupported hosts and `HAXEON_COMPILER_SERVER=0` use the
+one-shot driver.
+
+Desktop opens emit a `project-open-profile` JSON line after the first successful frame
+render. It reports Open-to-frame time, fingerprinting, compilation, generation, artifact
+decoding, geometry/physics preparation, scene installation, and first rendering. Physics
+preparation is also measured within the geometry phase. The frame endpoint is CPU render
+completion, not monitor scan-out. Capture a real desktop open with:
+`./app/run-built.sh --project=/absolute/path/materia.project.json --capture-dir=/tmp/materia-open --frames=3`.
+The first compiler/tool bootstrap is included when those caches are empty.
+
+Hashing uses Haxeon's shared C SHA-256 kernel on native and both browser Wasm
+backends. The standard-Haxe project helpers call the same kernel through
+`build.execution.ContentDigest`; cache identity still hashes the complete content.
+
+Artifact decoding borrows mesh streams from the immutable snapshot through
+`SceneArtifact.decodeView`. Read-only assembly validation uses `flattenView`,
+avoiding JSON round-trip copies of already-flat definitions. Editable callers
+retain the independent-copy `decode` and `flatten` APIs. Native and browser decoder
+measurements are documented in [the decoding benchmark](../projectkit/tests/decoding/README.md).
+
+Derived preparation is cached separately in `materia/prepared-scenes`. Each `.mtrp`
+entry contains packed vertex streams, original bounds, mass properties, and collision
+hulls. Bounds and physics values are stored as binary float64, preserving exact values.
+Its identity includes the source artifact SHA-256, format/preparation settings, and
+the compiled application build identity. The compiler emits the identity beside the
+module as `.build-id`; loading never scans application source files.
+Native geometry handles and editable state are
+created anew for every open. Entries have a checksum, bounded decoding, and atomic
+publication; missing, stale, or corrupt entries are regenerated from the artifact.
+Preparation caching also applies to editable generators without caching their execution:
+new artifact bytes select a different entry. Removing `prepared-scenes` is safe.
+Bump `PreparedProjectCache.VERSION` when changing its format or preparation conventions.
+
+Native and browser opening share `ProjectArtifactLoader`: it accepts `.mtrg` bytes
+and an optional `PreparedSceneStore`, decodes the artifact, obtains portable prepared
+data, and creates fresh runtime geometry. `ProjectScenePreparation` owns the shared
+geometry/physics calculations. `ProjectSourceLoader` selects an explicit prebuilt
+`.mtrg` source or the native project generator; compilation and manifest policy remain
+outside materialization. The document installs a completed result after loading succeeds.
+A saved project can reference a prebuilt artifact without executing source code.
+
+Assembly loading publishes a `cadkit.modeling.CompiledAssembly`: immutable topology,
+lookup tables and compiled kinematics. The artifact loader transfers its freshly
+decoded definition into that model; scene installation and configuration edits reuse
+it through `AssemblyState.fromModel`. Each state owns its joint values, root poses
+and evaluated pose buffers. Authored topology changes create a new model. Existing
+`new AssemblyState(editableDefinition)` callers keep independent snapshot semantics.
+The shared definition's nested records and arrays must remain read-only, matching
+`kinematicskit.KinematicModel`'s ownership contract.
+
+
+In the browser, use File > Open, drop a `.mtrg` onto the viewport, or call
+`await window.materia.openArtifact(file)` with a File, Blob, ArrayBuffer or Uint8Array.
+The imported artifact is retained under `/files/artifacts/<content hash>/<name>`;
+prepared data lives under `/cache/materia/prepared-scenes`. The virtual filesystem
+mirrors both to the origin private file system (OPFS), so a reload can reuse them.
+Unavailable storage still permits loading. Cache entries are disposable; corrupt
+entries are rebuilt, and a different application build selects a new cache key.
+Native cache policy instead uses the user's filesystem cache directory.
+
+Browser opening consumes prebuilt artifacts; source compilation and recipe
+regeneration still require the native toolchain. Artifact metadata is retained,
+but manifest-only supplements cannot be inferred from artifact bytes.
+
+Browser artifact opens reuse validated cached data on the editor thread. Cache
+misses run artifact decoding and geometry/physics preparation in a reusable
+dedicated Web Worker. Its small Wasm guest has private memory and no
+native-library, rendering, or storage imports. A versioned job protocol transfers
+binary buffers; `PreparedSceneCodec` is shared by worker results and disk caches.
+The page owns persistence, and the editor validates completed data before creating
+runtime geometry and installing the scene. Cancellation terminates busy work and
+preserves the previous scene; the next request recreates the worker. Successful
+jobs reuse it. The cache identity includes both editor and preparation builds.
+No pthreads or shared Wasm memory are required. Transfers between JavaScript
+contexts move ownership, while staging between the editor and worker Wasm memories
+still requires copies. This removes the long preparation pause from the UI; final
+materialization and installation remain on the editor thread.
+Browser profiles end at CPU render completion, as native profiles do.
+
+Check both browser backends by building with `MATERIA_WEB_TARGET=wasm-gc` or
+`MATERIA_WEB_TARGET=wasm32`, then running
+`app/web/test.sh --artifact /path/to/fixture.mtrg`. This checks actual rendering,
+warm-cache reuse, File > Open, OPFS persistence after reload, corrupt-cache repair,
+and failed replacement preserving the current scene. Measurements and native fixture
+instructions are in [the project loading checks](tests/project-loading/README.md).
+
+The application and robotd CMake aggregates declare their required libraries with
+`native.cmake.libraries`; build completion is checked against those real files,
+without synthetic `.hdll` markers.
+
+Run the loading/cache integration checks with
+`./haxeon/scripts/haxeon run --project=app/tests/project-loading/haxeon.json`.
+Add `-- --gantry` to compare first and repeat loads of all three Gantry variants.
 
 `EditorScene` provides the scene API and UIKit `EditorDocument` history.
 `editor/SceneModel` owns authored records and structural changes;
@@ -341,7 +479,11 @@ partial layout.
 Perspective diagnostics report render dimensions, GPU composition mode, CPU
 transfer bytes, and render latency in `app-state.json`. SceneKit renders into a
 shared GPU image that UIKit composites directly, without an RGBA readback. The
-interactive camera uses left-drag orbit, middle-drag pan, and wheel zoom.
+interactive camera uses middle-drag orbit, Shift+middle-drag pan, and cursor-centered wheel zoom.
+Alt+left-drag (with Shift for pan) is available without a middle button. Left input selects and edits.
+Hold the right mouse button for mouse-look and WASD flight; Q/E move down/up and Shift increases speed.
+Release the right button or press Escape to stop flying. Movement also stops when the window loses focus.
+Press F to frame the selection and set its center as the orbit pivot; Home or the Fit button fits all visible objects.
 Frame selected will fit the selected rectangle (or the whole scene when selection
 is empty), while Reset view restores the documented default camera.
 
@@ -470,3 +612,10 @@ worker at table height (the rack-to-table demo as it was); the library character
 a shelf at 0.35 m; using the left hand and turning right round to a table behind it; and using both hands for a long part and then pressing a panel. The file is written
 by `app/tools/make-worker-gallery.py` (`--check` says whether it is up to date); `--snapshot --worker-demo=gallery --worker-demo-step=N` runs it headless and prints each
 worker's result and the tick it finished at, and `WorkerGalleryTests` holds all six to finishing with the part on its table.
+
+Browser Start pages use the same example catalog as desktop. Only a small index
+loads at startup; selecting an example acquires hash-verified prebuilt project or
+scene files and required animation assets. Downloads support cancellation and retry,
+and OPFS retains both source artifacts and prepared scenes for later opens. The
+native build publishes the downloadable files; see [browser examples](web/README.md#examples-and-local-storage)
+for hosting, bundle reuse and checks.

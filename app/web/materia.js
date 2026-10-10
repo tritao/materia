@@ -17,6 +17,8 @@ const report = window.materia = {state: "loading", frames: 0, error: null, unava
   inspect: () => guest ? guest["app.MainWeb.report"]() : -1};
 let hostMemory = null;
 let guest = null;
+let buildIdentity = "";
+let pendingArtifact = null;
 
 function fail(message) {
   report.state = "failed";
@@ -113,6 +115,11 @@ const files = (() => {
     memoryBytes().set(value.subarray(0, size), pointer);
     view.setUint32(sizePointer, size, true);
   };
+  const installAsset = (path, data) => {
+    if (!path.startsWith("/animkit/assets/")) return;
+    Module.FS.mkdirTree(path.slice(0, path.lastIndexOf("/")));
+    Module.FS.writeFile(path, data);
+  };
   async function load() {
     if (!navigator.storage?.getDirectory) return;
     const walk = async (handle, prefix) => {
@@ -125,7 +132,9 @@ const files = (() => {
           restored.push({path, directory: true});
           await walk(child, path);
         } else {
-          restored.push({path, directory: false, bytes: new Uint8Array(await (await child.getFile()).arrayBuffer())});
+          const bytes = new Uint8Array(await (await child.getFile()).arrayBuffer());
+          installAsset(path, bytes);
+          restored.push({path, directory: false, bytes});
         }
       }
     };
@@ -138,6 +147,17 @@ const files = (() => {
     report.restoredFiles = restored.filter(entry => !entry.directory).length;
   }
   const imports = {
+    _materia_build_identity: (pointer, sizePointer) => {
+      answer(encoder.encode(buildIdentity), pointer, sizePointer); return 0;
+    },
+    _materia_artifact_name: (pointer, sizePointer) => {
+      if (!pendingArtifact) return -1;
+      answer(encoder.encode(pendingArtifact.name), pointer, sizePointer); return 0;
+    },
+    _materia_artifact_content: (pointer, sizePointer) => {
+      if (!pendingArtifact) return -1;
+      answer(pendingArtifact.bytes, pointer, sizePointer); return 0;
+    },
     _materia_files_restore_count: () => restored.length,
     _materia_files_restore_path: (index, pointer, sizePointer) => {
       const entry = restored[index];
@@ -158,6 +178,7 @@ const files = (() => {
     },
     _materia_files_file_written: (pointer, content, length) => {
       const path = names(cString(pointer)), data = memoryBytes().slice(content, content + length);
+      installAsset("/" + path.join("/"), data);
       enqueue("save /" + path.join("/"), async () => write(await directory(path.slice(0, -1), true), path.at(-1), data));
     },
     _materia_files_removed: pointer => {
@@ -188,10 +209,90 @@ const files = (() => {
 })();
 report.filesSettled = () => files.settled();
 
+// One reusable isolated preparation worker. Only this page owns persistence and runtime handles.
+const preparation = (() => {
+  let worker = null, nextId = 1, active = null, last = null;
+  const answer = (bytes, pointer, sizePointer) => {
+    const view = new DataView(hostMemory.buffer);
+    if (!pointer) { view.setUint32(sizePointer, bytes.length, true); return; }
+    const size = Math.min(view.getUint32(sizePointer, true), bytes.length);
+    new Uint8Array(hostMemory.buffer, pointer, size).set(bytes.subarray(0, size));
+    view.setUint32(sizePointer, size, true);
+  };
+  const encode = new TextEncoder();
+  const stop = () => { if (worker) worker.terminate(); worker = null; active = null; };
+  return {
+    inspect: () => ({active: active ? {id: active.id, phase: active.phase, status: active.status} : null, last}),
+    _materia_worker_start: (pointer, length) => {
+      if (active) stop();
+      if (!worker) {
+        worker = new Worker("preparation-worker.js");
+        worker.onmessage = ({data}) => {
+          if (!active || data.version !== 1 || data.id !== active.id) return;
+          if (data.type === "progress") {
+            active.phase = data.phase;
+            if (data.phase === "Preparing geometry and physics") active.preparationFrame = report.frames;
+          }
+          else if (data.type === "complete") { active.bytes = new Uint8Array(data.bytes); active.status = 1;
+            last = {id: active.id,
+              framesDuringPreparation: active.preparationFrame == null ? 0 : report.frames - active.preparationFrame};
+          }
+          else if (data.type === "error") { active.bytes = encode.encode(data.error); active.status = -1; }
+        };
+        worker.onerror = event => {
+          if (active) { active.bytes = encode.encode(event.message || "Preparation worker failed"); active.status = -1; }
+        };
+      }
+      // The editor retains its artifact for materialization. Transfers move these staging copies.
+      const bytes = new Uint8Array(hostMemory.buffer).slice(pointer, pointer + length);
+      active = {id: nextId++, phase: "Starting preparation worker", status: 0, bytes: null};
+      worker.postMessage({version: 1, type: "prepare", id: active.id, artifact: bytes.buffer},
+        [bytes.buffer]);
+      return active.id;
+    },
+    _materia_worker_status: id => active?.id === id ? active.status : -1,
+    _materia_worker_phase: (id, pointer, size) => {
+      if (active?.id !== id) return -1;
+      answer(encode.encode(active.phase), pointer, size); return 0;
+    },
+    _materia_worker_result: (id, pointer, size) => {
+      if (active?.id !== id || !active.bytes) return -1;
+      answer(active.bytes, pointer, size); return 0;
+    },
+    _materia_worker_cancel: id => {
+      if (active?.id !== id) return;
+      if (active.status !== 1) stop();
+      else active = null;
+    }
+  };
+})();
+
+report.preparation = () => preparation.inspect();
+
+function printGuest(text) {
+  if (text.startsWith("project-open-profile ")) report.projectOpenProfile = JSON.parse(text.slice(21));
+  console.log(text);
+}
+
+const examples = MateriaExamples.create(() => hostMemory);
+report.examples = () => examples.inspect();
+
 async function startGuest() {
-  await files.load();
+  await Promise.all([files.load(), examples.load()]);
+  const identityResponse = await fetch("materia_guest.wasm.build-id");
+  if (!identityResponse.ok) throw new Error("the guest build identity is missing");
+  const editorIdentity = (await identityResponse.text()).trim();
+  const workerResponse = await fetch("materia_preparation.wasm.build-id");
+  if (!workerResponse.ok) throw new Error("the preparation build identity is missing");
+  const workerIdentity = (await workerResponse.text()).trim();
+  if (!/^[a-f0-9]{64}$/.test(editorIdentity) || !/^[a-f0-9]{64}$/.test(workerIdentity))
+    throw new Error("invalid browser module identity");
+  const identityBytes = new TextEncoder().encode(editorIdentity + ":" + workerIdentity);
+  buildIdentity = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", identityBytes)),
+    value => value.toString(16).padStart(2, "0")).join("");
+  if (!/^[a-f0-9]{64}$/.test(buildIdentity)) throw new Error("the guest build identity is invalid");
   const started = await HaxeonWasmHost.instantiate(fetch("materia_guest.wasm"),
-    {emscripten: Module, memory: hostMemory, contract: hostContract()});
+    {emscripten: Module, memory: hostMemory, contract: hostContract(), print: printGuest});
   guest = started.exports;
   report.unavailable = started.unavailable;
   const dark = matchMedia("(prefers-color-scheme: dark)").matches ? 1 : 0;
@@ -220,8 +321,37 @@ var Module = {
     }
     startGuest().catch(error => fail("The editor failed to start: " + (error.stack || error.message)));
   },
-  print: text => console.log(text),
+  print: printGuest,
   printErr: text => console.error(text),
   // haxeon-host.js binds the guest's materia_web_files imports to these.
-  ...files.imports
+  ...files.imports,
+  ...examples.imports,
+  ...Object.fromEntries(Object.entries(preparation).filter(([name]) => name.startsWith("_")))
 };
+
+// The File menu uses the browser chooser. Embedders and drag-and-drop use this same document workflow.
+report.openArtifact = async (source, name = "Project.mtrg") => {
+  if (!guest || pendingArtifact) throw new Error("The editor is not ready to open a project");
+  let bytes;
+  if (source instanceof Blob) {
+    if (source.size > 150000000) throw new Error("Project artifact exceeds 150 MB");
+    name = source.name || name;
+    bytes = new Uint8Array(await source.arrayBuffer());
+  } else if (source instanceof Uint8Array) bytes = source;
+  else if (source instanceof ArrayBuffer) bytes = new Uint8Array(source);
+  else throw new TypeError("openArtifact expects a File, Blob, ArrayBuffer or Uint8Array");
+  if (bytes.length > 150000000 || !name.toLowerCase().endsWith(".mtrg")) throw new Error("Choose a .mtrg project artifact up to 150 MB");
+  pendingArtifact = {name, bytes};
+  try {
+    const status = guest["app.MainWeb.openArtifact"]();
+    if (status !== 0) throw new Error("The editor could not queue the project (status " + status + ")");
+  } finally { pendingArtifact = null; }
+};
+canvas.addEventListener("dragover", event => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); });
+canvas.addEventListener("drop", event => {
+  event.preventDefault();
+  const file = event.dataTransfer.files[0];
+  if (file) report.openArtifact(file).catch(error => {
+    statusLine.textContent = error.message; statusLine.hidden = false;
+  });
+});

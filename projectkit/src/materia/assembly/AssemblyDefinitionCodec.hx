@@ -53,7 +53,7 @@ class AssemblyDefinitionCodec {
 		if (definition != null && !supportedVersion(definition.schemaVersion))
 			throw 'schema v${definition.schemaVersion} is unsupported; supported v$VERSION through v$VELOCITY_VERSION';
 		if (definition != null && definition.assemblies != null && definition.assemblies.length > 0) {
-			validateFlat(AssemblyDefinitionFlattener.flatten(definition));
+			validateFlat(AssemblyDefinitionFlattener.flattenView(definition));
 			return;
 		}
 		validateFlat(definition);
@@ -336,7 +336,7 @@ class AssemblyDefinitionCodec {
 	public static function validateState(definition:AssemblyDefinition, state:AssemblyStateRecord):Void {
 		validate(definition);
 		state = AssemblyDefinitionFlattener.flattenState(definition, state);
-		definition = AssemblyDefinitionFlattener.flatten(definition);
+		definition = AssemblyDefinitionFlattener.flattenView(definition);
 		if (state == null || !supportedVersion(state.schemaVersion) || state.definition != definition.id ||
 			state.jointCoordinates == null || state.rootPoses == null ||
 			state.jointCoordinates.length > definition.joints.length ||
@@ -386,7 +386,7 @@ class AssemblyDefinitionCodec {
 	}
 
 	public static function rootOccurrences(definition:AssemblyDefinition):Map<String, Bool> {
-		definition = AssemblyDefinitionFlattener.flatten(definition);
+		definition = AssemblyDefinitionFlattener.flattenView(definition);
 		var hasParent = new Map<String, Bool>();
 		for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree) hasParent.set(joint.child, true);
 		var result = new Map<String, Bool>();

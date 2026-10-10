@@ -1,0 +1,26 @@
+--- a/clutter/clutter/cogl/clutter-stage-cogl.c
++++ b/clutter/clutter/cogl/clutter-stage-cogl.c
+@@ -174,7 +174,22 @@
+   int64_t next_presentation_time;
+ 
+   if (stage_cogl->update_time != -1)
+-    return;
++    {
++      /* An urgent frame must also advance an update queued by another client.
++       * Preserve an already due update and never move a deadline later.
++       */
++      if (sync_delay < 0)
++        {
++          now = g_get_monotonic_time ();
++          if (stage_cogl->update_time > now)
++            {
++              stage_cogl->update_time = now;
++              stage_cogl->next_presentation_time = -1;
++              stage_cogl->last_sync_delay = sync_delay;
++            }
++        }
++      return;
++    }
+ 
+   stage_cogl->last_sync_delay = sync_delay;
+ 

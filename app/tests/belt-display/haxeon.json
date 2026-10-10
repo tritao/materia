@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "belt-display-tests"},
+  "entry": "BeltDisplayTests",
+  "sourceRoots": ["."],
+  "dependencies": {"app": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

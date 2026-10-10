@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "project-loading-tests"},
+  "entry": "ProjectLoadingTests",
+  "sourceRoots": ["."],
+  "dependencies": {"app": {"path": "../.."}},
+  "target": "host",
+  "outputDir": "build"
+}

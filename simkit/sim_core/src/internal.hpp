@@ -289,6 +289,8 @@ public:
     nksim_result set_shape_contact(nksim_shape shape, double margin, double gap);
     nksim_result set_shape_surface(nksim_shape shape, const nksim_surface &surface);
     nksim_result create_contact_pair(const nksim_contact_pair_desc &desc);
+    nksim_result set_exclusions(const nksim_body *bodies, uint32_t body_count, const uint32_t *pairs,
+                                uint32_t pair_count);
     nksim_result destroy_shape(nksim_shape shape);
     nksim_result create_body(const nksim_body_desc &desc, nksim_body *out_body);
     nksim_result destroy_body(nksim_body body);

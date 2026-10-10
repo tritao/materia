@@ -28,7 +28,7 @@
 	path = kinematicskit/native/vendor/proxsuite
 	url = https://github.com/Simple-Robotics/proxsuite.git
 [submodule "kinematicskit/native/vendor/coal"]
-	path = kinematicskit/native/vendor/coal
+	path = collisionkit/native/vendor/coal
 	url = https://github.com/tritao/coal.git
 	branch = materia
 [submodule "motionkit/native/vendor/eigen"]
@@ -73,3 +73,6 @@
 [submodule "motionkit/native/vendor/eaik"]
 	path = motionkit/native/vendor/eaik
 	url = https://github.com/OstermD/EAIK.git
+[submodule "collisionkit/native/vendor/v-hacd"]
+	path = collisionkit/native/vendor/v-hacd
+	url = https://github.com/kmammou/v-hacd.git

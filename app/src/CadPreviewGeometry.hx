@@ -4,34 +4,39 @@ import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
 import materia.project.SceneArtifact.SceneArtifactPart;
 
+import app.PortableCadGeometry.PreparedCadGeometry;
+
 /** Converts a code-generated CAD tessellation artifact into SceneKit geometry. */
 class CadPreviewGeometry {
   /** Build generated geometry directly from the validated binary artifact. */
   public static function fromArtifact(part:SceneArtifactPart, minimum:Array<Float>,
       maximum:Array<Float>, scale:Float, centered:Bool = true,
       includeTopology:Bool = false):GeometryData {
-    if (!finite(scale) || scale <= 0 || part.vertexCount <= 0 || part.indexCount <= 0 ||
-        part.indexCount % 3 != 0 || part.vertices.length != part.vertexCount * 24 ||
-        part.normals.length != part.vertexCount * 24 || part.indices.length != part.indexCount * 4)
-      throw "CAD mesh has inconsistent streams";
-    var geometry = new GeometryData();
-    var positions = Bytes.alloc(part.vertexCount * 12);
-    var normals = Bytes.alloc(part.vertexCount * 12);
+    return fromPrepared(part, prepare(part, minimum, maximum, scale, centered), scale, centered, includeTopology);
+  }
+
+  /** The expensive per-vertex conversion is independent of native geometry ownership. */
+  public static function prepare(part:SceneArtifactPart, minimum:Array<Float>, maximum:Array<Float>,
+      scale:Float, centered:Bool = true):PreparedCadGeometry {
+    return PortableCadGeometry.prepare(part, minimum, maximum, scale, centered);
+  }
+
+  /** Reconstruct fresh native geometry from portable streams and the validated source artifact. */
+  public static function fromPrepared(part:SceneArtifactPart, prepared:PreparedCadGeometry,
+      scale:Float, centered:Bool = true, includeTopology:Bool = false):GeometryData {
+    var minimum = prepared.minimum, maximum = prepared.maximum;
+    if (prepared.positions.length != part.vertexCount * 12 || prepared.normals.length != part.vertexCount * 12)
+      throw "Prepared CAD streams have invalid sizes";
+    var positions = prepared.positions, normals = prepared.normals;
     var centerX = centered ? (minimum[0] + maximum[0]) * 0.5 : 0.0;
     var centerY = centered ? (minimum[1] + maximum[1]) * 0.5 : 0.0;
     var centerZ = centered ? (minimum[2] + maximum[2]) * 0.5 : 0.0;
-    for (index in 0...part.vertexCount) {
-      var source = index * 24, target = index * 12;
-      var x = (part.vertices.getDouble(source) - centerX) * scale;
-      var y = (part.vertices.getDouble(source + 8) - centerY) * scale;
-      var z = (part.vertices.getDouble(source + 16) - centerZ) * scale;
-      var nx = part.normals.getDouble(source), ny = part.normals.getDouble(source + 8),
-        nz = part.normals.getDouble(source + 16);
-      if (!finite(x) || !finite(y) || !finite(z) || !finite(nx) || !finite(ny) || !finite(nz))
-        throw "CAD mesh contains a non-finite vertex or normal";
-      if (includeTopology) geometry.addVertex(x, y, z);
-      positions.setFloat(target, x); positions.setFloat(target + 4, y); positions.setFloat(target + 8, z);
-      normals.setFloat(target, nx); normals.setFloat(target + 4, ny); normals.setFloat(target + 8, nz);
+    var geometry = new GeometryData();
+    if (includeTopology) for (index in 0...part.vertexCount) {
+      var source = index * 24;
+      geometry.addVertex((part.vertices.getDouble(source) - centerX) * scale,
+        (part.vertices.getDouble(source + 8) - centerY) * scale,
+        (part.vertices.getDouble(source + 16) - centerZ) * scale);
     }
     for (triangle in 0...Std.int(part.indexCount / 3)) {
       var offset = triangle * 12;

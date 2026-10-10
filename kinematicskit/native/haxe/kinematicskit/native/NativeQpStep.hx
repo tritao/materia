@@ -10,10 +10,14 @@ class QpStepResult {
   public final status:Int;
   public final iterations:Int;
 
-  public function new(step:Array<Float>, status:Int, iterations:Int) {
+  /** Rows (of `solveRows`) whose relaxation was needed; empty when the rows held as given. */
+  public final relaxed:Array<Int>;
+
+  public function new(step:Array<Float>, status:Int, iterations:Int, ?relaxed:Array<Int>) {
     this.step = step;
     this.status = status;
     this.iterations = iterations;
+    this.relaxed = relaxed == null ? [] : relaxed;
   }
 
   public function solved():Bool return status == KinematicsKitNativeConstants.KK_QP_SOLVED;
@@ -47,6 +51,38 @@ class NativeQpStep {
     if (result.status != KinematicsKitNativeConstants.KK_OK)
       throw 'Native QP step failed with error ${result.status}';
     return new QpStepResult(result.out_step, result.out_status, result.out_iterations);
+  }
+
+  /**
+   * As `solve`, with general rows `rowLower <= C·Δ <= rowUpper` (`constraint` row-major, `width` columns).
+   * When they and the bounds admit no step, every row is relaxed by a heavily penalized slack, and
+   * `relaxed` lists the rows that needed it.
+   */
+  public function solveRows(jacobian:Array<Float>, residual:Array<Float>, lower:Array<Float>, upper:Array<Float>,
+      constraint:Array<Float>, rowLower:Array<Float>, rowUpper:Array<Float>, damping:Float, ?tolerance:Float = 1e-9,
+      ?maxIterations:Int = 1000):QpStepResult {
+    if (disposed) throw "Native QP step has been disposed";
+    var set = KinematicsKitNative.kk_qp_set_rows(owner.borrow(), constraint, rowLower, rowUpper);
+    if (set != KinematicsKitNativeConstants.KK_OK) throw 'Native QP rows failed with error $set';
+    try {
+      var result = KinematicsKitNative.kk_qp_solve(owner.borrow(), jacobian, residual, lower, upper, damping, tolerance,
+        maxIterations, width);
+      if (result.status != KinematicsKitNativeConstants.KK_OK)
+        throw 'Native QP step failed with error ${result.status}';
+      var flags = KinematicsKitNative.kk_qp_relaxed(owner.borrow(), rowLower.length);
+      if (flags.status != KinematicsKitNativeConstants.KK_OK) throw 'Native QP relaxation flags failed with error ${flags.status}';
+      clearRows();
+      var relaxed = flags.out_relaxed;
+      return new QpStepResult(result.out_step, result.out_status, result.out_iterations,
+        [for (row in 0...rowLower.length) if (relaxed[row] != 0) row]);
+    } catch (error:Dynamic) {
+      clearRows();
+      throw error;
+    }
+  }
+
+  function clearRows():Void {
+    KinematicsKitNative.kk_qp_set_rows(owner.borrow(), [], [], []);
   }
 
   public function dispose():Void {

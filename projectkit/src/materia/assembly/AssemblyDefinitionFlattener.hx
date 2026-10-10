@@ -69,6 +69,13 @@ class AssemblyDefinitionFlattener {
 		return null;
 	}
 
+	/** A read-only flat view. Already-flat definitions are borrowed; nested definitions are expanded.
+	 * Call flatten instead when the result will be edited independently of the source. */
+	public static function flattenView(source:AssemblyDefinition):AssemblyDefinition {
+		if (source == null) throw "Assembly definition is null";
+		return source.assemblies == null || source.assemblies.length == 0 ? source : flatten(source);
+	}
+
 	public static function flatten(source:AssemblyDefinition):AssemblyDefinition {
 		if (source == null) throw "Assembly definition is null";
 		if (source.assemblies == null || source.assemblies.length == 0)

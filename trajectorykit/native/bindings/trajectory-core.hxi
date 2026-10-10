@@ -58,6 +58,15 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 	extern fn mk_plan_segment_durations(plan: mk_plan_handle) -> ptr<const<i64>> @span("mk_plan_segment_array_count");
 	extern fn mk_plan_segment_starts(plan: mk_plan_handle) -> ptr<const<i64>> @span("mk_plan_segment_array_count");
 	/**
+	 * Records the planner's clearance check: status (MK_CHECK_PASSED or
+	 * MK_CHECK_FAILED), method (MK_CHECK_METHOD_BOUND or SAMPLED), the
+	 * distance and required clearance, the time of the named pair (seconds), the
+	 * segment (equal ends for an instant), the sampling resolution (zero for a
+	 * bound), object ids (UINT32_MAX when unknown) and names (UTF-8, truncated to
+	 * MK_ASSUMPTION_LENGTH - 1 bytes).
+	 */
+	extern fn mk_report_set_collision(report: ptr<mk_validation_report>, status: u32, method: u32, distance: f64, required: f64, time_seconds: f64, segment_start: f64, segment_end: f64, resolution_ns: u64, object_a: u32, object_b: u32, name_a: ptr<const<u8>> @in_array("name_a_length"), name_a_length: u32, name_b: ptr<const<u8>> @in_array("name_b_length"), name_b_length: u32) -> mk_result;
+	/**
 	 * Fills the planner-owned sampled task-space check in a validation report.
 	 */
 	extern fn mk_report_set_task_space(report: ptr<mk_validation_report>, status: u32, worst: f64, time_seconds: f64, tolerance: f64, resolution_ns: u64) -> mk_result;
@@ -89,6 +98,23 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 	extern fn mk_validate(trajectory: mk_trajectory_handle, limits: ptr<const<mk_limits>>, out_report: ptr<mk_validation_report>) -> mk_result;
 	struct mk_assumption @layout(96, 1) {
 		text: array<c_char, 96> @offset(0);
+	}
+	/**
+	 * The pair a clearance check names (COLLISION.md CL4b): the closest pair when
+	 * it passed, the offending pair when it failed, or the first segment a
+	 * conservative check could not close when it is sampled. Object ids are
+	 * UINT32_MAX when the clearance world names bodies only.
+	 */
+	struct mk_collision_pair @layout(216, 8) {
+		object_a: u32 @offset(0);
+		object_b: u32 @offset(4);
+		/**
+		 * < Seconds from the trajectory epoch; equal to segment_end for one instant.
+		 */
+		segment_start: f64 @offset(8);
+		segment_end: f64 @offset(16);
+		name_a: array<c_char, 96> @offset(24);
+		name_b: array<c_char, 96> @offset(120);
 	}
 	/**
 	 * Maximum absolute jump for each derivative across one segment boundary.
@@ -262,7 +288,7 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 		 */
 		resolution_ns: u64 @offset(56);
 	}
-	struct mk_validation_report @layout(31144, 8) {
+	struct mk_validation_report @layout(31424, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		assumption_count: u32 @offset(4);
 		model_revision: u64 @offset(8);
@@ -274,6 +300,16 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 		 * < Effective validation time resolution.
 		 */
 		executor_time_resolution_ns: u64 @offset(31136);
+		/**
+		 * Clearance against the cell (planner-owned, like task space; UNCHECKED
+		 * without a clearance world). value is the distance, limit the
+		 * clearance required, margin their difference; BOUND when a continuous
+		 * motion bound closed every segment, SAMPLED otherwise. It is kept out
+		 * of `checks` because mk_validate decides every check there except
+		 * task space.
+		 */
+		collision: mk_validation_check @offset(31144);
+		collision_pair: mk_collision_pair @offset(31208);
 	}
 	type mk_event_hold_policy = u32;
 	type mk_event_kind = u32;

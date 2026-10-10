@@ -58,5 +58,22 @@ Run the direct ProjectKit suite with
 `./haxeon/scripts/haxeon run --project=projectkit/tests/haxeon.json` from the
 repository root. It exercises units, assembly codecs and frames, scene artifact
 versions, and materials without loading a downstream kit or any native library.
-The suite currently has 131 assertions; keep it passing when changing the
-portable assembly or scene records consumed by other kits.
+Keep it passing when changing the portable assembly or scene records consumed by
+other kits.
+
+For read-only validation, `AssemblyDefinitionFlattener.flattenView` borrows an
+already-flat definition and expands nested definitions. `flatten` continues to
+return an independent editable copy. Neither validation path mutates its source.
+
+`SceneArtifact.decode` returns independent mesh buffers. `decodeView` validates the
+same format while borrowing mesh streams from its input; those views retain the
+input storage, which callers must keep immutable. The project loader uses this
+path for its immutable artifact snapshot. Scalar and text reads avoid temporary
+byte buffers in both paths. See [decoding benchmarks](tests/decoding/README.md) for
+native allocation measurements and the Chrome runner.
+
+Scene artifact schema 18 adds optional project runtime settings: a selected job,
+dynamic occurrence IDs and joint motion tracks. Native publishers resolve these
+from source manifests so downloaded artifacts open independently of source files.
+The decoder also accepts schema 17, with no project settings. Project settings
+validate occurrence/joint references, duplicate IDs and bounded motion keyframes.

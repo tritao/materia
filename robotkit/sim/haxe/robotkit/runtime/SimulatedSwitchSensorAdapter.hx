@@ -7,18 +7,24 @@ import robotkit.model.SwitchReading;
  * The reader supplies actual joint coordinates, including any simulated slip. */
 class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
   final runtime:RobotRuntime;
-  final readPositions:Void->Array<Float>;
+  final readPositionsInto:Array<Float>->Void;
+  final positions:Array<Float>;
+  final counters:Array<Float>;
+  final values:Array<Float> = [0.0, 0.0, 0.0, 0.0];
   final readings:Array<SwitchReading> = [];
   final joints:Array<Int> = [];
   final drives:Array<SwitchDriveBinding> = [];
   final jointCount:Int;
   var sequence:Int64 = Int64.ofInt(0);
 
-  public function new(blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime, readPositions:Void->Array<Float>) {
-    if (blueprint == null || blueprint.identity == null || runtime == null || readPositions == null)
+  public function new(blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime,
+      readPositionsInto:Array<Float>->Void) {
+    if (blueprint == null || blueprint.identity == null || runtime == null || readPositionsInto == null)
       throw "Switch sensor adapter needs a model, runtime, actual-position reader and clock";
-    this.runtime = runtime; this.readPositions = readPositions;
+    this.runtime = runtime; this.readPositionsInto = readPositionsInto;
     jointCount = blueprint.jointCount;
+    positions = [for (_ in 0...jointCount) 0.0];
+    counters = [for (_ in 0...jointCount) 0.0];
     var indices = bindingIndices(blueprint);
     for (index in indices) joints.push(index);
     for (contact in blueprint.switches) {
@@ -58,13 +64,10 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
   }
 
   public function afterSimulationStep(sourceTimestampNs:Int64):Void {
-    var positions = readPositions();
-    if (positions == null || positions.length != jointCount)
-      throw "Switch actual-position reader returned the wrong joint count";
+    readPositionsInto(positions);
     // Use the joint sample's source time, avoiding rounding differences between
     // the session's floating-point clock and the observer's integer tick clock.
-    var snapshot = runtime.snapshot();
-    var counters = snapshot.q.toArray();
+    var sourceTime = runtime.copyJointObservationInto(counters);
     sequence = Int64.add(sequence, Int64.ofInt(1));
     for (i in 0...readings.length) {
       var value = readings[i];
@@ -74,9 +77,12 @@ class SimulatedSwitchSensorAdapter implements SimulationStepObserver {
       var edge:Null<Float> = physicalEdge == null ? null : physicalEdge +
         drives[i].position(counters[joint] - runtime.referenceOffset(joint)) -
         drives[i].position(positions[joint]);
+      values[0] = active ? 1.0 : 0.0;
+      values[1] = edge == null ? 0.0 : 1.0;
+      values[2] = edge == null ? 0.0 : edge;
+      values[3] = value.closingEdges;
       runtime.publishSensorFrame(value.source.id,
-        [active ? 1.0 : 0.0, edge == null ? 0.0 : 1.0, edge == null ? 0.0 : edge, value.closingEdges], sequence,
-        snapshot.sourceTimestampNs, runtime.endpoint.sourceClockId(), null);
+        values, sequence, sourceTime, runtime.endpoint.sourceClockId(), null);
     }
   }
 }

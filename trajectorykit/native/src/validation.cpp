@@ -293,6 +293,10 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
     if (!valid_limits(trajectory, limits)) return MK_ERROR_INVALID_ARGUMENT;
     report = {};
     report.struct_size = sizeof(report);
+    report.collision.status = MK_CHECK_UNCHECKED;
+    report.collision.joint = UINT32_MAX;
+    report.collision_pair.object_a = UINT32_MAX;
+    report.collision_pair.object_b = UINT32_MAX;
     report.model_revision = limits.model_revision;
     report.calibration_revision = limits.calibration_revision;
     report.trajectory_revision = trajectory.revision();

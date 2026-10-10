@@ -187,7 +187,7 @@ class WorkerDemoTests {
   static function legacyHumansRefused():Void {
     var editor = new ReferenceEditorApp();
     var refused:Null<String> = null;
-    try editor.session.open("fixtures/worker-legacy.materia") catch (error:Dynamic) refused = Std.string(error);
+    try editor.session.open(TestPaths.of("app/tests/fixtures/worker-legacy.materia")) catch (error:Dynamic) refused = Std.string(error);
     if (refused == null) throw "A scene with the retired humans section opened";
     if (refused.indexOf("humans") < 0 || refused.indexOf("no longer supported") < 0)
       throw 'The refusal does not say why: $refused';

@@ -416,6 +416,21 @@ NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_compound(
 /** Adds an explicit contact pair between two existing bodies' shape parts. */
 NKSIM_API nksim_result NKSIM_CALL nksim_contact_pair_create(
     nksim_world world, const nksim_contact_pair_desc *desc);
+#ifndef NKSIM_HAXEON_IMPORT
+/**
+ * Declares which pairs among `bodies` (one articulation) never collide with
+ * each other: exactly `pairs` (two indices into `bodies` per pair). SimKit's
+ * own rule for them (parent and child, or overlapping at rest) then no
+ * longer applies among these bodies; pairs with other bodies keep it. A
+ * collision description's allowed pairs come in this way, so that the
+ * simulation and clearance checks agree on which pairs may touch
+ * (collisionkit/plans/COLLISION.md CL3b). A later call for any of these
+ * bodies replaces the earlier one.
+ */
+NKSIM_API nksim_result NKSIM_CALL nksim_world_set_exclusions(
+    nksim_world world, const nksim_body *bodies, uint32_t body_count,
+    const uint32_t *pairs, uint32_t pair_count);
+#endif /* NKSIM_HAXEON_IMPORT: C callers only (RobotKit's runtime); handle arrays do not cross the FFI. */
 /** Sets a shape's contact surface; like its margin, only before a body uses it. */
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_set_surface(
     nksim_world world, nksim_shape shape, const nksim_surface *surface);

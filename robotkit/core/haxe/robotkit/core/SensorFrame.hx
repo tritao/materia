@@ -25,7 +25,7 @@ class SensorFrame {
       sourceTimestampNs:Int64, values:Array<Float>, ?receivedTimestampNs:Int64,
       ?linkId:String = "", ?mountPosition:Array<Float>, ?mountRotation:Array<Float>,
       ?sourceClockId:String = "unspecified", ?receivedClockId:String = "robotkit.monotonic",
-      ?image:CameraImage) {
+      ?image:CameraImage, ?sharedMount:SensorMount) {
     this.sensorId = sensorId;
     this.kind = kind;
     this.frameId = frameId;
@@ -37,8 +37,10 @@ class SensorFrame {
     this.receivedClockId = receivedClockId;
     this.values = new ImmutableFloatArray(values);
     this.linkId = linkId;
-    this.mountPosition = new ImmutableFloatArray(mountPosition == null ? [0.0, 0.0, 0.0] : mountPosition);
-    this.mountRotation = new ImmutableFloatArray(mountRotation == null ? [0.0, 0.0, 0.0, 1.0] : mountRotation);
+    this.mountPosition = sharedMount == null
+      ? new ImmutableFloatArray(mountPosition == null ? [0.0, 0.0, 0.0] : mountPosition) : sharedMount.position;
+    this.mountRotation = sharedMount == null
+      ? new ImmutableFloatArray(mountRotation == null ? [0.0, 0.0, 0.0, 1.0] : mountRotation) : sharedMount.rotation;
     this.image = image;
   }
 

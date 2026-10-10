@@ -54,6 +54,7 @@ import haxe.io.Bytes;
 @:access(motionkit.robot.ManipulatorMotion)
 @:access(motionkit.robot.PlanExecutor)
 @:access(processkit.WeldingPlanRunner)
+@:access(app.AssemblyRobot)
 class ProjectSourceTests {
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
@@ -1671,7 +1672,7 @@ class ProjectSourceTests {
     checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "gantry MuJoCo", "gantry-welder");
 
   /** A welder cell open in the simulation on MuJoCo, from one of the example's manifests. */
-  static function openWelder(root:String, manifestName:String, ?adjust:app.MateriaProjectRunner.GeneratedAssemblyScene -> Void,
+  static function openWelder(root:String, manifestName:String, ?adjust:app.GeneratedAssemblyScene -> Void,
       ?backend:Int, example:String = "robot-welder"):{session:ProjectDocumentSession, simulation:ApplicationSimulation, mission:MissionPlayer, welder:processkit.simulation.SimulatedWelder,
       beads:WeldBeads} {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/" + example + "/" + manifestName);
@@ -2704,7 +2705,7 @@ class ProjectSourceTests {
    * revolute joint from the plate; the pin keeps its place and turns on the joint; the joint and its coordinate
    * survive a save and reopen; undo brings the mates back.
    */
-  static function checkMateJoint(manifest:String, generated:MateriaProjectRunner.GeneratedAssemblyScene):Void {
+  static function checkMateJoint(manifest:String, generated:GeneratedAssemblyScene):Void {
     var descriptors = generated.faceDescriptorsByDefinition;
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot,
@@ -2753,7 +2754,7 @@ class ProjectSourceTests {
    * are refused without losing the first pick; the second face on another part adds the mate. The mate then
    * shows on the part's inspector, and clearing it removes the mate (undoably).
    */
-  static function checkMatePick(manifest:String, generated:MateriaProjectRunner.GeneratedAssemblyScene):Void {
+  static function checkMatePick(manifest:String, generated:GeneratedAssemblyScene):Void {
     var descriptors = generated.faceDescriptorsByDefinition;
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot,
@@ -2835,6 +2836,123 @@ class ProjectSourceTests {
     var pose = new AssemblyState(definition, record).worldPose("pin");
     check(Math.abs(pose.x - x) < 1e-3 && Math.abs(pose.y - y) < 1e-3 && Math.abs(pose.z - z) < 1e-3,
       '$label: pin at ${pose.x}, ${pose.y}, ${pose.z}');
+  }
+
+  /**
+   * The editor's collision world on a generated arm (COLLISION.md CL8a): nothing collides as
+   * designed, a joint edit that folds the arm into itself reports the pair, and jogging only
+   * re-poses the world.
+   */
+  static function checkSceneCollision(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
+    var editor = new ReferenceEditorApp();
+    editor.openProjectInBackground(manifest);
+    var deadline = Sys.time() + 600.0;
+    while (editor.openingProject() && Sys.time() < deadline) {
+      editor.tick();
+      Sys.sleep(0.01);
+    }
+    check(editor.session.projectAssemblyDefinition != null, "the arm project opens");
+    var collision = new app.SceneCollision(() -> new collisionkit.native.NativeCollisionWorld());
+    function colliding():Array<String>
+      return [for (pair in collision.query(editor.scene, editor.session, 0.01)) if (pair.colliding()) pair.a + "/" + pair.b];
+    var loaded = collision.query(editor.scene, editor.session, 0.01);
+    check([for (pair in loaded) if (pair.colliding()) pair].length == 0,
+      "nothing collides as designed: parts that touch by design are allowed");
+    check(loaded.length == 1 && loaded[0].a == "project:table" && loaded[0].b == "project:workpiece" &&
+      Math.abs(loaded[0].distance - 0.002) < 1e-6, "the workpiece sits 2 mm over the table, a near pair");
+    // Shoulder forward, elbow back: the wrist folds into the pedestal.
+    editor.session.setAssemblyJointCoordinate("j2", 1.5);
+    editor.session.setAssemblyJointCoordinate("j3", -0.78);
+    var folded = colliding();
+    check(folded.indexOf("project:hand/project:pedestal") >= 0, 'the hand hits the pedestal ($folded)');
+    // Shoulder down, elbow up: the suction tool goes into the table.
+    editor.session.setAssemblyJointCoordinate("j2", 2.18);
+    editor.session.setAssemblyJointCoordinate("j3", 2.5);
+    var reached = colliding();
+    check(reached.indexOf("project:table/project:tool/cup") >= 0, 'the cup hits the table ($reached)');
+    editor.session.setAssemblyJointCoordinate("j2", 0.0);
+    editor.session.setAssemblyJointCoordinate("j3", 0.0);
+    check(colliding().length == 0, "back at zero, nothing collides");
+    check(collision.builds == 1, 'jogging only re-poses the world (${collision.builds} builds)');
+    // What a drag costs per frame: one joint edit and one query.
+    var started = Sys.time();
+    for (step in 0...50) {
+      editor.session.setAssemblyJointCoordinate("j1", step * 0.01);
+      collision.query(editor.scene, editor.session, 0.01);
+    }
+    var queryStarted = Sys.time();
+    for (step in 0...50) editor.session.setAssemblyJointCoordinate("j1", step * 0.01);
+    var editSeconds = (Sys.time() - queryStarted) / 50, totalSeconds = (queryStarted - started) / 50;
+    Sys.println('SCENE_COLLISION_COST ${editor.scene.items().length} objects: edit+query ${Math.round(totalSeconds * 1e5) / 100} ms, edit alone ${Math.round(editSeconds * 1e5) / 100} ms');
+    Sys.println("Scene collision on the generated arm passed");
+    collision.dispose();
+    editor.dispose();
+  }
+
+  /**
+   * Collisions while the generated arm simulates (COLLISION.md CL8c): the world follows the
+   * simulation's poses, a box put into the pedestal collides there too, and the pick-and-place
+   * mission runs without the arm hitting anything.
+   */
+  static function checkSimulationCollision(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
+    var editor = new ReferenceEditorApp();
+    editor.openProjectInBackground(manifest);
+    var deadline = Sys.time() + 600.0;
+    while (editor.openingProject() && Sys.time() < deadline) {
+      editor.tick();
+      Sys.sleep(0.01);
+    }
+    var found = editor.scene.object("project:pedestal");
+    if (found == null) throw "the arm has no pedestal";
+    var pedestal:app.EditorScene.EditorSceneObject = found;
+    check(editor.scene.createRectangle(), "a box is added beside the arm");
+    var box = editor.scene.selectedId;
+    editor.scene.setDimensions(box, 0.1, 0.1, 0.1);
+    editor.scene.setPosition(box, 0, pedestal.x);
+    editor.scene.setPosition(box, 1, pedestal.y);
+    var collision = new app.SceneCollision(() -> new collisionkit.native.NativeCollisionWorld());
+    function colliding(pairs:Array<app.SceneCollision.SceneCollisionPair>):Array<String>
+      return [for (pair in pairs) if (pair.colliding()) pair.a + "/" + pair.b + " " + Math.round(pair.distance * 1e4) / 10 + " mm"];
+    var editing = colliding(collision.query(editor.scene, editor.session, 0.01));
+    check(editing.length == 1 && StringTools.startsWith(editing[0], "project:pedestal/" + box), 'the box is in the pedestal ($editing)');
+    var simulation = editor.simulation;
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(editor.session.sensors, editor.scene, editor.session), "the arm simulates: " + simulation.error);
+    var mission = simulation.missionPlayer();
+    if (mission == null) throw "the arm has no mission";
+    var robot:AssemblyRobot = mission.robot;
+    var excludes = AssemblyRobot.simulationExcludes(robot.model, [for (hull in robot.hulls) {link: hull.link, vertices: hull.vertices}]);
+    var links = [for (link in robot.model.links) link.id];
+    // The simulation leaves out what the collision description allows (CL3b in the app): only the six
+    // jointed neighbours; the pedestal and the forearm, say, are checked, as the planner checks them.
+    var excluded = [for (i in 0...Std.int(excludes.length / 2)) links[excludes[2 * i]] + "-" + links[excludes[2 * i + 1]]];
+    check(excluded.join(" ") == "assembly-root-turret turret-upperArm upperArm-forearm forearm-wristBody wristBody-hand hand-toolFlange",
+      'the arm simulation excludes only its jointed neighbours (${excluded.join(" ")})');
+    var deepest = new Map<String, Float>();
+    while (mission.completed < 2 && simulation.activeSession().simulationTime() < 60) {
+      simulation.step();
+      var frame = simulation.capturePresentationSnapshot();
+      var pairs = collision.query(editor.scene, editor.session, 0.01, app.SceneCollision.SIMULATION_CONTACT,
+        frame.environment, frame.revision);
+      var crashed = [for (entry in colliding(pairs)) if (!StringTools.startsWith(entry, "project:pedestal/" + box)) entry];
+      check(crashed.length == 0, 'the pick and place hits nothing ($crashed)');
+      check(colliding(pairs).length == 1, "the box stays in the pedestal while simulating");
+      for (pair in pairs) if (pair.distance < 0) {
+        var key = pair.a + "/" + pair.b, known = deepest.get(key);
+        if (known == null || pair.distance < known) deepest.set(key, pair.distance);
+      }
+    }
+    check(mission.completed >= 2, "the arm picks and places");
+    var gripped = deepest.get("project:tool/cup/project:workpiece");
+    check(gripped != null && gripped > -app.SceneCollision.SIMULATION_CONTACT,
+      "the bodies follow the simulation: the suction cup reaches the workpiece and only touches it");
+    check(collision.builds == 1, 'simulating only re-poses the world (${collision.builds} builds)');
+    Sys.println("Scene collision while simulating the arm passed");
+    collision.dispose();
+    simulation.dispose();
+    editor.dispose();
   }
 
   static function checkBackgroundLaunch(root:String):Void {
@@ -2993,8 +3111,14 @@ class ProjectSourceTests {
       checkCartesianAnalyticExamples(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "scene-collision") {
+      checkSceneCollision(root);
+      checkSimulationCollision(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {
       checkRobotArm(root);
+      checkSceneCollision(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-whole") {
@@ -3361,6 +3485,7 @@ class ProjectSourceTests {
     session.dispose();
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
     checkRobotArm(root);
+    checkSceneCollision(root);
     checkCobotArms(root);
     checkGantryPicker(root);
     checkGantryPicker(root, true);

@@ -42,7 +42,7 @@ class SerialRuntimeEndpoint {
       device.set_feedback_ratio(i, channel.feedbackRatio);
       device.set_feedback_offset(i, channel.feedbackOffset);
       device.set_actuator_steps_per_unit(i, channel.stepsPerUnit);
-      device.set_actuator_max_rate(i, channel.maxRate);
+      device.set_actuator_min_step_ticks(i, channel.minStepTicks);
       device.set_actuator_direction_setup_ticks(i, channel.directionSetupTicks);
       device.set_actuator_skew_bound(i, channel.skewBound);
       if (channel.actuatorId.length > 63) throw "Serial actuator ID is longer than 63 characters";

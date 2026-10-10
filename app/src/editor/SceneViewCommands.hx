@@ -18,7 +18,10 @@ class SceneViewCommands {
     app.commands.register(new Command("scene.frame-selected", "Frame selected", function() {
       if (app.perspectiveViewport != null) app.perspectiveViewport.frameSelected();
       app.log("Framed " + app.scene.selectedId);
-    }, null, function() return !app.documents.blocked() && app.scene.items().length > 0));
+    }, new Shortcut(UiKey.F), function() return !app.documents.blocked() && app.scene.items().length > 0));
+    app.commands.register(new Command("scene.fit-all", "Fit all", function() {
+      if (app.perspectiveViewport != null) app.perspectiveViewport.fitAll();
+    }, new Shortcut(UiKey.Home), function() return !app.documents.blocked() && app.perspectiveViewport != null));
     app.commands.register(new Command("scene.reset-perspective", "Reset perspective view", function() {
       if (app.perspectiveViewport != null) app.perspectiveViewport.resetView();
       app.log("Perspective view reset");
@@ -37,6 +40,10 @@ class SceneViewCommands {
       app.preferences.store.set(AppSettings.SIMULATION_OVERLAYS, PropertyValue.Bool(!app.simulationOverlaysVisible));
       app.log(app.simulationOverlaysVisible ? "Simulation overlays shown" : "Simulation overlays hidden");
     }, null, null, function() return app.simulationOverlaysVisible));
+    app.commands.register(new Command("scene.toggle-collisions", "Toggle collisions", function() {
+      app.preferences.store.set(AppSettings.COLLISIONS_VISIBLE, PropertyValue.Bool(!app.collisionsVisible));
+      app.log(app.collisionsVisible ? "Collisions shown" : "Collisions hidden");
+    }, null, null, function() return app.collisionsVisible));
     app.commands.register(new Command("scene.toggle-grid-snap", "Toggle grid snapping", function() {
       app.preferences.store.set(AppSettings.GRID_SNAP, PropertyValue.Bool(!app.gridSnapEnabled));
       app.log(app.gridSnapEnabled ? "Grid snapping enabled" : "Grid snapping disabled");
