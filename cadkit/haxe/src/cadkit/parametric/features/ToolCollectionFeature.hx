@@ -42,7 +42,7 @@ class ToolCollectionFeature extends Feature {
 		try {
 			for (tool in tools)
 				copies.push(context.shape(tool).cloneShape());
-			var result = EvaluationResult.fromShape(Shape.fromOwnedHandle(CadKit.compoundChecked(Model.refs(copies))));
+			var result = EvaluationResult.fromShape(Shape.compound(copies));
 			for (copy in copies)
 				copy.close();
 			return result;

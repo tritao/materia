@@ -8,6 +8,8 @@ import machinekit.component.Dimension;
 import materia.project.MaterialLibrary;
 
 import cadkit.modeling.Part;
+import cadkit.threads.Threads;
+import cadkit.threads.ThreadedFace.ThreadStart;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
@@ -147,10 +149,10 @@ class LeadScrewNut extends MachineComponent {
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Solids.named(Part.cylinderSpan(bodyDiameter / 2, 0, bodyLength), "body");
-		if (!flanged) return Solids.cut(body, [Part.cylinderSpan(screwDiameter / 2, -0.1, bodyLength + 0.1)]);
+		if (!flanged) return Solids.cut(body, [threadedBore(bodyLength)]);
 		var flange = Solids.named(Part.cylinderSpan(flangeDiameter / 2, bodyLength, bodyLength + flangeThickness), "flange");
 		var solidPart = Solids.union([body, flange]);
-		var boreTool = Solids.named(Part.cylinderSpan(screwDiameter / 2, -0.1, bodyLength + flangeThickness + 0.1), "bore");
+		var boreTool = threadedBore(bodyLength + flangeThickness);
 		if (detail == Envelope) return Solids.cut(solidPart, [boreTool]);
 		var screw = mountScrewPart(10);
 		var tools = [boreTool];
@@ -159,6 +161,15 @@ class LeadScrewNut extends MachineComponent {
 			tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, bodyLength - 0.1,
 				bodyLength + flangeThickness + 0.1, point.x, point.y), "bolt" + bolt++));
 		return Solids.cut(solidPart, tools);
+	}
+
+	private function threadedBore(length:Float):Part {
+		var bore = Solids.named(Part.cylinderSpan(screwDiameter / 2, -0.1, length + 0.1), "bore");
+		try {
+			var result = new Part(Threads.attach(bore.shape, "bore:cyl.side", thread.threadSpec(true), AxisMinimum));
+			bore.close();
+			return result;
+		} catch (error:Dynamic) { bore.close(); throw error; }
 	}
 
 	private static var recipeTypeCache:Null<ComponentType>;

@@ -42,6 +42,6 @@ class LoftFeature extends Feature {
 		var shapes:Array<Shape> = [];
 		for (section in sections)
 			shapes.push(context.shape(section));
-		return EvaluationResult.fromOperation(new Operation(CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0)));
+		return EvaluationResult.fromOperation(new Operation(CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0), shapes));
 	}
 }

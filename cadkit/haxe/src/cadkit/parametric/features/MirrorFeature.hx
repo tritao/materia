@@ -54,7 +54,7 @@ class MirrorFeature extends Feature {
 				reflection.close();
 				return EvaluationResult.fromOperation(fused);
 			}
-			var compound = Shape.fromOwnedHandle(CadKit.compoundChecked(Model.refs([sourceShape, reflected])));
+			var compound = Shape.compound([sourceShape, reflected]);
 			reflected.close();
 			reflection.close();
 			return EvaluationResult.fromShape(compound);

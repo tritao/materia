@@ -471,3 +471,20 @@ radius, angle, bendLength)` and `deduction` consume the same stock object.
 Air bending refuses hems and tool-limited angles. The sheet checks use the
 assumed 0.7V flange minimum, with V=8T as the default for stock up to 3 mm;
 thicker stock requires selected tooling.
+
+## Threads on named faces
+
+`cadkit.threads.ThreadSpec` describes nominal dimensions without helical geometry.
+`Threads.attach(shape, faceName, spec, AxisMinimum|AxisMaximum, length, offset)`
+returns an independent shape owner. The face name must resolve strongly to one
+cylindrical or conical face; radius and axis never select a replacement. The start
+binds in the surface's native axial parameters. Booleans follow native topology
+history; splits retain clipped intervals and proved deletions remove attributes.
+Copies, placements and named pattern instances retain attributes. Manufacturing
+mirrors retain the specified hand.
+
+`Threads.of(part)` and `Threads.ofShape(shape)` derive visible intervals and frames
+from the current named faces. Frame +Z proceeds into a tapped bore or toward a
+screw tip. The physical face clips both ends of the manufacturing interval.
+`HoleFeature.tapped` saves its internal spec, tap drill and independently editable
+thread depth; saved frames are never caches. Recessed tapped holes are rejected.

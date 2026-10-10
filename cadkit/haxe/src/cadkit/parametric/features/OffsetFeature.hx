@@ -33,6 +33,6 @@ class OffsetFeature extends Feature {
 	}
 
 	override public function evaluate(context:EvaluationContext):EvaluationResult {
-		return EvaluationResult.fromOperation(new Operation(CadKit.wireOffsetOperationChecked(context.shape(source).borrowHandle(), distance.value)));
+		return EvaluationResult.fromOperation(new Operation(CadKit.wireOffsetOperationChecked(context.shape(source).borrowHandle(), distance.value), [context.shape(source)]));
 	}
 }

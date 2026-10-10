@@ -11,6 +11,8 @@ import machinekit.standard.PropertyClass.PropertyClasses;
 import machinekit.standard.FastenerTightening.TighteningTableRow;
 
 import cadkit.modeling.Part;
+import cadkit.threads.Threads;
+import cadkit.threads.ThreadedFace.ThreadStart;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.catalog.CatalogMetadata.Conformance;
@@ -133,7 +135,9 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var head = Solids.named(Part.cylinderSpan(spec.headDiameter / 2, 0, spec.headHeight), "head");
 		var shank = Solids.named(Part.cylinderSpan(diameter / 2, -length, 0), "shank");
-		var body = Solids.union([head, shank]);
+		var threaded = new Part(Threads.attach(shank.shape, "shank:cyl.side", thread, AxisMaximum, threadLength, length - threadLength));
+		shank.close();
+		var body = Solids.union([head, threaded]);
 		if (detail == Envelope) return body;
 		var top = spec.headHeight;
 		var socket = Solids.named(Part.prism(cadkit.modeling.Polygon.regular(6, spec.socketSize), top - spec.socketDepth, top + 0.1),
@@ -153,9 +157,9 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
 	public function clearanceHole(depth:Float, fit:ClearanceFit = Medium):Part
 		return Part.cylinderSpan(clearanceDiameter(fit) / 2, -depth, 0);
 
-	/** Tap-drill tool from z=0 down to z=-depth; the thread itself is not modelled. */
+	/** Tap-drill tool from z=0 down to z=-depth; the named bore carries its internal thread. */
 	public function tapHole(depth:Float):Part
-		return Part.cylinderSpan(spec.tapDrill / 2, -depth, 0);
+		return Threads.tappedBore(thread.mating(), spec.tapDrill, depth);
 
 	/** Counterbored through-hole tool. The screw's `head` sits at z=-counterboreDepth. */
 	public function counterboreHole(depth:Float, fit:ClearanceFit = Medium):Part {

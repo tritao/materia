@@ -65,7 +65,7 @@ class LinearPatternFeature extends Feature {
 						otherCount > 1 ? "i" + index + "." + other : "i" + index));
 				}
 			}
-			var result = EvaluationResult.fromShape(Shape.fromOwnedHandle(CadKit.compoundChecked(Model.refs(copies))));
+			var result = EvaluationResult.fromShape(Shape.compound(copies));
 			for (copy in copies)
 				copy.close();
 			return result;

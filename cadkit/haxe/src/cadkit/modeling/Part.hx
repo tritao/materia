@@ -160,7 +160,7 @@ class Part extends Model {
 				wires.push(wire);
 				shapes.push(wire.shape);
 			}
-			var result = fromOperation(new Operation(CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0)));
+			var result = fromOperation(new Operation(CadKit.loftOperationChecked(Model.refs(shapes), 1, ruled ? 1 : 0), shapes));
 			for (wire in wires)
 				wire.close();
 			return result;
@@ -246,7 +246,7 @@ class Part extends Model {
 	}
 
 	public function shell(faces:Selection, thickness:Float):Part {
-		return fromOperation(new Operation(CadKit.shellOperationChecked(shape.borrowHandle(), Model.refs(faces.borrowShapes()), thickness)));
+		return fromOperation(new Operation(CadKit.shellOperationChecked(shape.borrowHandle(), Model.refs(faces.borrowShapes()), thickness), [shape]));
 	}
 
 	public function volume():Float {

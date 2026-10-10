@@ -536,7 +536,7 @@ class MachineKitSmoke {
 		check(customMotor.componentType() == null && StringTools.startsWith(customMotor.designation, "CUSTOM-17HS19-custom-IF"),
 			"custom NEMA variants are code-only and prefixed");
 		customCodeOnly(HexBolt.custom(HexBolt.catalog().get("M5"), 20), "hex bolt");
-		customCodeOnly(HexNut.custom(HexNut.catalog().get("M5")), "hex nut");
+		customCodeOnly(HexNut.custom(HexNut.catalog().get("M5"), machinekit.standard.FastenerThreads.coarse(5).mating()), "hex nut");
 		customCodeOnly(FlatWasher.custom(FlatWasher.catalog().get("M5")), "flat washer");
 		customCodeOnly(ParallelKey.custom(ParallelKey.catalog().get("2x2"), 10), "parallel key");
 		customCodeOnly(RetainingRing.custom(RetainingRing.catalog().get("8")), "retaining ring");
@@ -2558,6 +2558,7 @@ class MachineKitSmoke {
 		}
 		var everything = Shards.run([
 			{name: "TendingCell.TendingMissionChecks.run", run: () -> TendingCell.TendingMissionChecks.run(), weight: 1.0},
+			{name: "FastenerThreadTests.run", run: FastenerThreadTests.run, weight: 0.05},
 			{name: "FastenerDataTests.run", run: FastenerDataTests.run, weight: 0.05},
 			{name: "AxisBuilderChecks.run", run: () -> AxisBuilderChecks.run(), weight: 1.0},
 			{name: "AssemblyIntegrityTests.run", run: () -> AssemblyIntegrityTests.run(), weight: 1.0},

@@ -87,6 +87,7 @@ class HaxeonSmoke {
 		DiagnosisInvarianceSmoke.run();
 		PatternSmoke.run();
 		HoleSmoke.run();
+		ThreadSmoke.run();
 		TypedParameterSmoke.run();
 		TypedPropertySmoke.run();
 		RelationshipSmoke.run();

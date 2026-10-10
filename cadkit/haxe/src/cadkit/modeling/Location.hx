@@ -50,10 +50,18 @@ class Location {
 	}
 
 	public function applyOperation(shape:Shape):Operation {
-		return new Operation(CadKit.shapePlaceOperationChecked(shape.borrowHandle(), plane.origin.native(), plane.xDirection.native(), plane.normal.native()));
+		return new Operation(CadKit.shapePlaceOperationChecked(shape.borrowHandle(), plane.origin.native(), plane.xDirection.native(), plane.normal.native()), [shape]);
 	}
 
 	public function apply(shape:Shape):Shape {
+		if (shape.threadedFaces().length > 0) {
+			var operation = applyOperation(shape);
+			try {
+				var result = operation.resultShape();
+				operation.close();
+				return result;
+			} catch (error:Dynamic) { operation.close(); throw error; }
+		}
 		return Shape.fromOwnedHandle(CadKit.shapePlaceChecked(shape.borrowHandle(), plane.origin.native(), plane.xDirection.native(), plane.normal.native()));
 	}
 }

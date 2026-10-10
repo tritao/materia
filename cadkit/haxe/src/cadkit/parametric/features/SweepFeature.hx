@@ -31,6 +31,6 @@ class SweepFeature extends Feature {
 
 	override public function evaluate(context:EvaluationContext):EvaluationResult {
 		return EvaluationResult.fromOperation(new Operation(CadKit.sweepOperationChecked(context.shape(profile).borrowHandle(),
-			context.shape(path).borrowHandle())));
+			context.shape(path).borrowHandle()), [context.shape(profile), context.shape(path)]));
 	}
 }

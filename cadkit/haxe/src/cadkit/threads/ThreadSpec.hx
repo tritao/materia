@@ -48,6 +48,15 @@ class ThreadSpec {
 		this.profile = profile;
 	}
 
+	public function data():ThreadSpecData return {
+		designation: designation, majorDiameter: majorDiameter, pitch: pitch, starts: starts,
+		hand: hand, internal: internal, toleranceClass: toleranceClass, profile: profile
+	};
+
+	public static function fromData(data:ThreadSpecData):ThreadSpec
+		return new ThreadSpec(data.designation, data.majorDiameter, data.pitch, data.starts,
+			data.hand, data.internal, data.toleranceClass, data.profile);
+
 	function get_lead():Float return pitch * starts;
 
 	/** The same nominal thread on its mating face. */

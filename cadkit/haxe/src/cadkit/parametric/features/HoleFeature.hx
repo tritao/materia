@@ -2,6 +2,9 @@ package cadkit.parametric.features;
 
 import cadkit.parametric.ParameterKind;
 import cadkit.Shape;
+import cadkit.threads.ThreadSpec;
+import cadkit.threads.Threads;
+import cadkit.threads.ThreadedFace.ThreadStart;
 import cadkit.modeling.Location;
 import cadkit.modeling.Axis;
 import cadkit.modeling.Plane;
@@ -17,7 +20,7 @@ import cadkit.parametric.ParametricError;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.sketch.FaceWorkplane;
 
-/** Face-attached cutting tool for plain and counterbored holes. */
+/** Face-attached cutting tool for plain, recessed and tapped holes. */
 class HoleFeature extends Feature {
 	public final target:Feature;
 	public final selection:SelectionRecipe;
@@ -33,18 +36,25 @@ class HoleFeature extends Feature {
 	public final recessDiameter:Parameter;
 	public final recessDepth:Parameter;
 	public final includedAngle:Parameter;
+	public final thread:Null<ThreadSpec>;
+	public final threadDepth:Parameter;
 
 	public function new(target:Feature, selection:SelectionRecipe, xDirection:Vector, style:String, mode:String,
 		xValue:Float, yValue:Float, diameterValue:Float, depthValue:Float = 1,
 		recessDiameterValue:Float = 1, recessDepthValue:Float = 1, offset:Float = 0, flipped:Bool = false,
-		includedAngleValue:Float = Math.PI / 2) {
+		includedAngleValue:Float = Math.PI / 2, thread:Null<ThreadSpec> = null, threadDepthValue:Float = 1) {
 		super();
-		if (style != "plain" && style != "counterbore" && style != "countersink")
-			throw new ParametricError("hole style must be plain, counterbore, or countersink");
+		if (style != "plain" && style != "counterbore" && style != "countersink" && style != "tapped")
+			throw new ParametricError("hole style must be plain, counterbore, countersink, or tapped");
 		if (mode != "blind" && mode != "through-all")
 			throw new ParametricError("hole mode must be blind or through-all");
 		if (!Math.isFinite(offset))
 			throw new ParametricError("hole attachment offset must be finite");
+		if ((style == "tapped") != (thread != null))
+			throw new ParametricError("only a tapped hole accepts a thread; recessed tapped holes are unsupported");
+		if (thread != null && !(cast thread : ThreadSpec).internal) throw new ParametricError("tapped hole needs an internal thread");
+		this.thread = thread;
+		threadDepth = new Parameter(this, "hole.threadDepth", threadDepthValue, 0, false, 1e300, ParameterKind.Length);
 		this.target = target;
 		this.selection = selection;
 		this.xDirection = xDirection;
@@ -64,6 +74,14 @@ class HoleFeature extends Feature {
 	public static function plain(target:Feature, selection:SelectionRecipe, xDirection:Vector, mode:String,
 		x:Float, y:Float, diameter:Float, depth:Float = 1, offset:Float = 0, flipped:Bool = false):HoleFeature {
 		return new HoleFeature(target, selection, xDirection, "plain", mode, x, y, diameter, depth, 1, 1, offset, flipped);
+	}
+
+	/** The tap drill cuts the bore; nominal thread dimensions and depth remain semantic. */
+	public static function tapped(target:Feature, selection:SelectionRecipe, xDirection:Vector, mode:String,
+		x:Float, y:Float, tapDrill:Float, depth:Float, thread:ThreadSpec, threadDepth:Float,
+		offset:Float = 0, flipped:Bool = false):HoleFeature {
+		return new HoleFeature(target, selection, xDirection, "tapped", mode, x, y, tapDrill, depth,
+			1, 1, offset, flipped, Math.PI / 2, thread, threadDepth);
 	}
 
 	public static function counterbore(target:Feature, selection:SelectionRecipe, xDirection:Vector, mode:String,
@@ -106,6 +124,16 @@ class HoleFeature extends Feature {
 		var boreLength = mode == "blind" ? depth.value + margin : span + 2 * margin;
 		// Each body is named, so the bore and its recess keep separate face names (plans/TOPOLOGICAL_NAMING.md).
 		var bore = Shape.instance(cylinderAt(plane, diameter.value / 2, boreLength, margin), "bore");
+		if (style == "tapped") {
+			var spec:ThreadSpec = cast thread;
+			try {
+				if (diameter.value >= spec.majorDiameter || (mode == "blind" && threadDepth.value > depth.value))
+					throw new ParametricError("tap drill must be below major diameter and thread depth must fit the bore");
+				var threaded = Threads.attach(bore, "bore:cyl.side", spec, AxisMinimum, threadDepth.value + margin);
+				bore.close();
+				return EvaluationResult.fromShape(threaded);
+			} catch (error:Dynamic) { bore.close(); throw error; }
+		}
 		if (style == "plain")
 			return EvaluationResult.fromShape(bore);
 		if (style == "countersink") {

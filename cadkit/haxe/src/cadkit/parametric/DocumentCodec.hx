@@ -48,6 +48,9 @@ import cadkit.sketch.SolverSettings;
 import haxe.Json;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
+import cadkit.threads.ThreadSpec;
+import cadkit.threads.ThreadSpecData;
+import haxeon.wire.JsonWire;
 import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.CylinderFeature;
 import cadkit.parametric.features.ImportedShapeFeature;
@@ -1145,12 +1148,15 @@ class DocumentCodec {
 				numberField(record, "angularSpan"), decodeVector(requiredField(record, "axisOrigin")), decodeVector(requiredField(record, "axisDirection")),
 				decodeVector(requiredField(record, "radialDirection")), boolField(record, "orientInstances"), numberField(record, "startAngle"));
 		if (type == "hole") {
-			var rawIncludedAngle:Dynamic = Reflect.field(record, "includedAngle");
+			if (!Reflect.hasField(record, "thread")) throw new ParametricError("document field is missing: thread");
+			var rawThread:Dynamic = Reflect.field(record, "thread");
+			var threadData:Null<ThreadSpecData> = rawThread == null ? null : JsonWire.decode(Json.stringify(rawThread));
 			return new HoleFeature(requiredFeature(document, intField(record, "target")), decodeSelection(requiredField(record, "selection")),
 				decodeVector(requiredField(record, "xDirection")), stringField(record, "style"), stringField(record, "mode"), numberField(record, "x"),
 				numberField(record, "y"), numberField(record, "diameter"), numberField(record, "depth"), numberField(record, "recessDiameter"),
 				numberField(record, "recessDepth"), numberField(record, "offset"), boolField(record, "flipped"),
-				rawIncludedAngle == null ? Math.PI / 2 : finiteNumber(rawIncludedAngle, "includedAngle"));
+				numberField(record, "includedAngle"), threadData == null ? null : ThreadSpec.fromData(cast threadData),
+				numberField(record, "threadDepth"));
 		}
 		return null;
 	}
@@ -1307,7 +1313,9 @@ class DocumentCodec {
 				depth: value.depth.value,
 				recessDiameter: value.recessDiameter.value,
 				recessDepth: value.recessDepth.value,
-				includedAngle: value.includedAngle.value
+				includedAngle: value.includedAngle.value,
+				thread: value.thread == null ? null : Json.parse(JsonWire.encode((cast value.thread : ThreadSpec).data())),
+				threadDepth: value.threadDepth.value
 			};
 		}
 		return null;

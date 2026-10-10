@@ -2,9 +2,12 @@ package cadkit;
 
 import CadKit;
 import cadkit.Geometry;
+import cadkit.threads.ThreadedFace;
+import cadkit.threads.Threads;
 
 /** Owning, headless CAD shape façade for Haxeon applications. */
 class Shape {
+	private var threadAttributes:Array<ThreadedFace>;
 	private var native:CadKit.OwnedShapeHandle;
 	private var meshCache:Array<{linearDeflection:Float, angularDeflection:Float, mesh:Mesh}>;
 	/** A shape never changes, so its names are read across the ABI once per kind. */
@@ -17,6 +20,7 @@ class Shape {
 
 	private function new(native:CadKit.OwnedShapeHandle) {
 		this.native = native;
+		threadAttributes = [];
 		meshCache = [];
 		faceNames = null;
 		edgeNames = null;
@@ -56,7 +60,7 @@ class Shape {
 	}
 
 	public function cloneShape():Shape {
-		return new Shape(CadKit.shapeCloneChecked(native.borrow()));
+		return copiedAttributes(new Shape(CadKit.shapeCloneChecked(native.borrow())));
 	}
 
 	/** Borrow the native handle for a synchronous bulk ABI call. */
@@ -209,7 +213,7 @@ class Shape {
 		wire edges and their vertices.
 	**/
 	public function withElementNames(kind:CadKit.ShapeKind, ids:Array<String>):Shape {
-		return new Shape(CadKit.shapeSeedNamesChecked(native.borrow(), kind, ids.join("\n")));
+		return copiedAttributes(new Shape(CadKit.shapeSeedNamesChecked(native.borrow(), kind, ids.join("\n"))), true);
 	}
 
 	/** A copy whose names that no input has are prefixed by `tag:`: what was created from the inputs. */
@@ -220,7 +224,7 @@ class Shape {
 			ref.set_shape(input.borrowHandle());
 			refs.push(ref);
 		}
-		return new Shape(CadKit.shapeStampNamesChecked(native.borrow(), tag, refs));
+		return copiedAttributes(new Shape(CadKit.shapeStampNamesChecked(native.borrow(), tag, refs)), true);
 	}
 
 	/**
@@ -323,25 +327,28 @@ class Shape {
 	}
 
 	public function translate(delta:CadKit.Vec3):Shape {
+		if (threadAttributes.length > 0) return operationShape(translateOperation(delta));
 		return new Shape(CadKit.shapeTranslateChecked(native.borrow(), delta));
 	}
 
 	public function translateOperation(delta:CadKit.Vec3):Operation {
-		return new Operation(CadKit.shapeTranslateOperationChecked(native.borrow(), delta));
+		return new Operation(CadKit.shapeTranslateOperationChecked(native.borrow(), delta), [this]);
 	}
 
 	public function extrude(delta:CadKit.Vec3):Shape {
+		if (threadAttributes.length > 0) return operationShape(extrudeOperation(delta));
 		return new Shape(CadKit.shapeExtrudeChecked(native.borrow(), delta));
 	}
 
 	public function extrudeOperation(delta:CadKit.Vec3):Operation {
-		return new Operation(CadKit.shapeExtrudeOperationChecked(native.borrow(), delta));
+		return new Operation(CadKit.shapeExtrudeOperationChecked(native.borrow(), delta), [this]);
 	}
 
 	public function revolve(
 		axisOrigin:CadKit.Vec3,
 		axisDirection:CadKit.Vec3,
 		angle:Float):Shape {
+		if (threadAttributes.length > 0) return operationShape(revolveOperation(axisOrigin, axisDirection, angle));
 		return new Shape(CadKit.shapeRevolveChecked(
 			native.borrow(), axisOrigin, axisDirection, angle));
 	}
@@ -351,79 +358,87 @@ class Shape {
 		axisDirection:CadKit.Vec3,
 		angle:Float):Operation {
 		return new Operation(CadKit.shapeRevolveOperationChecked(
-			native.borrow(), axisOrigin, axisDirection, angle));
+			native.borrow(), axisOrigin, axisDirection, angle), [this]);
 	}
 
 	public function fillet(radius:Float):Shape {
+		if (threadAttributes.length > 0) return operationShape(filletOperation(radius));
 		return new Shape(CadKit.shapeFilletChecked(native.borrow(), radius));
 	}
 
 	public function filletOperation(radius:Float):Operation {
-		return new Operation(CadKit.shapeFilletOperationChecked(native.borrow(), radius));
+		return new Operation(CadKit.shapeFilletOperationChecked(native.borrow(), radius), [this]);
 	}
 
 	public function chamfer(distance:Float):Shape {
+		if (threadAttributes.length > 0) return operationShape(chamferOperation(distance));
 		return new Shape(CadKit.shapeChamferChecked(native.borrow(), distance));
 	}
 
 	public function chamferOperation(distance:Float):Operation {
-		return new Operation(CadKit.shapeChamferOperationChecked(native.borrow(), distance));
+		return new Operation(CadKit.shapeChamferOperationChecked(native.borrow(), distance), [this]);
 	}
 
 	public function filletEdges(edges:Array<Edge>, radius:Float):Shape {
+		if (threadAttributes.length > 0) return operationShape(filletEdgesOperation(edges, radius));
 		return new Shape(CadKit.shapeFilletEdgesChecked(
 			native.borrow(), edgeRefs(edges), radius));
 	}
 
 	public function filletEdgesOperation(edges:Array<Edge>, radius:Float):Operation {
 		return new Operation(CadKit.shapeFilletEdgesOperationChecked(
-			native.borrow(), edgeRefs(edges), radius));
+			native.borrow(), edgeRefs(edges), radius), [this]);
 	}
 
 	public function chamferEdges(edges:Array<Edge>, distance:Float):Shape {
+		if (threadAttributes.length > 0) return operationShape(chamferEdgesOperation(edges, distance));
 		return new Shape(CadKit.shapeChamferEdgesChecked(
 			native.borrow(), edgeRefs(edges), distance));
 	}
 
 	public function chamferEdgesOperation(edges:Array<Edge>, distance:Float):Operation {
 		return new Operation(CadKit.shapeChamferEdgesOperationChecked(
-			native.borrow(), edgeRefs(edges), distance));
+			native.borrow(), edgeRefs(edges), distance), [this]);
 	}
 
 	public function rotateOperation(axis:CadKit.Vec3, angle:Float):Operation {
-		return new Operation(CadKit.shapeRotateOperationChecked(native.borrow(), axis, angle));
+		return new Operation(CadKit.shapeRotateOperationChecked(native.borrow(), axis, angle), [this]);
 	}
 
 	public function mirror(planeOrigin:CadKit.Vec3, planeNormal:CadKit.Vec3):Shape {
+		if (threadAttributes.length > 0) return operationShape(mirrorOperation(planeOrigin, planeNormal));
 		return new Shape(CadKit.shapeMirrorChecked(native.borrow(), planeOrigin, planeNormal));
 	}
 
 	public function mirrorOperation(planeOrigin:CadKit.Vec3, planeNormal:CadKit.Vec3):Operation {
-		return new Operation(CadKit.shapeMirrorOperationChecked(native.borrow(), planeOrigin, planeNormal));
+		return new Operation(CadKit.shapeMirrorOperationChecked(native.borrow(), planeOrigin, planeNormal), [this]);
 	}
 
 	public function fuse(other:Shape):Shape {
+		if (threadAttributes.length > 0 || other.threadAttributes.length > 0) return operationShape(fuseOperation(other));
 		return new Shape(CadKit.fuseChecked(native.borrow(), other.native.borrow()));
 	}
 
 	public function fuseOperation(other:Shape):Operation {
-		return new Operation(CadKit.fuseOperationChecked(native.borrow(), other.native.borrow()));
+		return new Operation(CadKit.fuseOperationChecked(native.borrow(), other.native.borrow()), [this, other]);
 	}
 
 	public function cut(other:Shape):Shape {
+		if (threadAttributes.length > 0 || other.threadAttributes.length > 0) return operationShape(cutOperation(other));
 		return new Shape(CadKit.cutChecked(native.borrow(), other.native.borrow()));
 	}
 
 	public function cutOperation(other:Shape):Operation {
-		return new Operation(CadKit.cutOperationChecked(native.borrow(), other.native.borrow()));
+		return new Operation(CadKit.cutOperationChecked(native.borrow(), other.native.borrow()), [this, other]);
 	}
 
 	public function common(other:Shape):Shape {
+		if (threadAttributes.length > 0 || other.threadAttributes.length > 0) return operationShape(commonOperation(other));
 		return new Shape(CadKit.commonChecked(native.borrow(), other.native.borrow()));
 	}
 
 	public function commonOperation(other:Shape):Operation {
-		return new Operation(CadKit.commonOperationChecked(native.borrow(), other.native.borrow()));
+		return new Operation(CadKit.commonOperationChecked(native.borrow(), other.native.borrow()), [this, other]);
 	}
 
 	/** The planar faces of this solid on the plane through `origin` with `normal`, holes kept; an empty region when it misses. */
@@ -460,6 +475,52 @@ class Shape {
 
 	public function isClosed():Bool {
 		return native.isClosed();
+	}
+
+	/** Semantic face attributes travel with the immutable B-rep owner. */
+	public function threadedFaces():Array<ThreadedFace> return threadAttributes.copy();
+
+	/** Internal propagation boundary; attributes contain no native handles. */
+	public function setThreadedFaces(attributes:Array<ThreadedFace>):Void threadAttributes = attributes.copy();
+
+	private function copiedAttributes(copy:Shape, rename:Bool = false):Shape {
+		try {
+			var attributes:Array<ThreadedFace> = [];
+			for (attribute in threadAttributes) {
+				var index = Threads.namedIndex(this, attribute.faceName);
+				attributes.push(rename ? attribute.renamed(copy.elementName(CadKit.ShapeKind.Face, index)) : attribute);
+			}
+			copy.setThreadedFaces(attributes);
+			return copy;
+		} catch (error:Dynamic) {
+			copy.close();
+			throw error;
+		}
+	}
+
+	public static function compound(shapes:Array<Shape>):Shape {
+		var refs:Array<CadKit.ShapeRef> = [];
+		var attributes:Array<ThreadedFace> = [];
+		for (shape in shapes) {
+			var ref = new CadKit.ShapeRef();
+			ref.set_shape(shape.borrowHandle());
+			refs.push(ref);
+			for (attribute in shape.threadedFaces()) attributes.push(attribute);
+		}
+		var result = fromOwnedHandle(CadKit.compoundChecked(refs));
+		result.setThreadedFaces(attributes);
+		return result;
+	}
+
+	private static function operationShape(operation:Operation):Shape {
+		try {
+			var result = operation.resultShape();
+			operation.close();
+			return result;
+		} catch (error:Dynamic) {
+			operation.close();
+			throw error;
+		}
 	}
 
 	private static function edgeRefs(edges:Array<Edge>):Array<CadKit.ShapeRef> {

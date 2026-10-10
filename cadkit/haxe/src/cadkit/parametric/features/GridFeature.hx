@@ -53,7 +53,7 @@ class GridFeature extends Feature {
 					copies.push(Shape.instance(context.shape(source)
 						.translate(new Vector((column - (columns - 1) / 2) * spacingX.value, (row - (rows - 1) / 2) * spacingY.value).native()),
 						"i" + column + "." + row));
-			var result = EvaluationResult.fromShape(Shape.fromOwnedHandle(CadKit.compoundChecked(Model.refs(copies))));
+			var result = EvaluationResult.fromShape(Shape.compound(copies));
 			for (copy in copies)
 				copy.close();
 			return result;

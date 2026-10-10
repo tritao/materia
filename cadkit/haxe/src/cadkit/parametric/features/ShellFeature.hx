@@ -51,7 +51,7 @@ class ShellFeature extends Feature {
 				solid = shape.subshape(CadKit.ShapeKind.Solid, 0);
 				shape = solid;
 			}
-			var result = EvaluationResult.fromOperation(new Operation(CadKit.shellOperationChecked(shape.borrowHandle(), Model.refs(faces), thickness.value)));
+			var result = EvaluationResult.fromOperation(new Operation(CadKit.shellOperationChecked(shape.borrowHandle(), Model.refs(faces), thickness.value), [context.shape(source)]));
 			if (solid != null)
 				solid.close();
 			for (face in faces)

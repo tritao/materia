@@ -8,6 +8,8 @@ import machinekit.component.Dimension;
 import materia.project.MaterialLibrary;
 
 import cadkit.modeling.Part;
+import cadkit.threads.Threads;
+import cadkit.threads.ThreadedFace.ThreadStart;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
@@ -92,8 +94,14 @@ class LeadScrew extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.cylinderSpan(thread.screwDiameter / 2, 0, totalLength);
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var shaft = Part.cylinderSpan(thread.screwDiameter / 2, 0, totalLength);
+		try {
+			var result = new Part(Threads.attach(shaft.shape, "cyl.side", thread.threadSpec(), AxisMinimum));
+			shaft.close();
+			return result;
+		} catch (error:Dynamic) { shaft.close(); throw error; }
+	}
 
 	private static var recipeTypeCache:Null<ComponentType>;
 

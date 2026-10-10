@@ -9,6 +9,9 @@ import machinekit.component.Dimension;
 import materia.project.MaterialLibrary;
 
 import cadkit.modeling.Part;
+import cadkit.threads.ThreadSpec;
+import cadkit.threads.Threads;
+import cadkit.threads.ThreadedFace.ThreadStart;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.catalog.CatalogMetadata.Conformance;
@@ -26,6 +29,7 @@ class HexNut extends MachineComponent {
 	static var table:Null<Catalog<HexNutSpec>>;
 
 	public final spec:HexNutSpec;
+	public final thread:ThreadSpec;
 	public var acrossFlats(get, never):Float;
 	public var height(get, never):Float;
 
@@ -52,16 +56,20 @@ class HexNut extends MachineComponent {
 	public static function metric(size:String):HexNut
 		return new HexNut(catalog().get(size));
 
-	public static function custom(spec:HexNutSpec):HexNut
-		return new HexNut(spec, true);
+	public static function custom(spec:HexNutSpec, thread:ThreadSpec):HexNut
+		return new HexNut(spec, true, thread);
 
-	private function new(spec:HexNutSpec, codeOnly:Bool = false) {
+	private function new(spec:HexNutSpec, codeOnly:Bool = false, thread:Null<ThreadSpec> = null) {
 		if (!(spec.diameter > 0) || !(spec.acrossFlats > spec.diameter) || !(spec.height > 0))
 			throw 'Hex nut ${spec.size} has inconsistent dimensions';
 		var designation = 'ISO4032-${spec.size}';
 		var customName = '${spec.size}-D${Dimension.format(spec.diameter)}-AF${Dimension.format(spec.acrossFlats)}-H${Dimension.format(spec.height)}';
+		if (thread != null) customName += '-P${Dimension.format((cast thread : ThreadSpec).pitch)}-S${(cast thread : ThreadSpec).starts}-${(cast thread : ThreadSpec).hand}-${(cast thread : ThreadSpec).profile}-${(cast thread : ThreadSpec).toleranceClass}';
 		super(codeOnly ? customDesignation(customName) : designation, 'Hex nut ${spec.size}', "steel 8", codeOnly);
 		this.spec = spec;
+		this.thread = thread == null ? FastenerThreads.coarse(spec.diameter).mating() : cast thread;
+		if (!this.thread.internal || Math.abs(this.thread.majorDiameter - spec.diameter) > 1e-6)
+			throw "Nut thread must be internal and match its nominal bore";
 		addConnector("front", Face, Solids.axial(0, 0, 0));
 		addConnector("axis", Axis, Solids.axial(0, 0, spec.height / 2));
 		addConnector("back", Face, Solids.axial(0, 0, spec.height));
@@ -72,7 +80,10 @@ class HexNut extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.prism(cadkit.modeling.Polygon.regular(6, spec.acrossFlats), 0, spec.height);
 		if (detail == Envelope) return body;
-		return Solids.cut(body, [Part.cylinderSpan(spec.diameter / 2, -0.1, spec.height + 0.1)]);
+		var bore = Solids.named(Part.cylinderSpan(spec.diameter / 2, -0.1, spec.height + 0.1), "bore");
+		var threaded = new Part(Threads.attach(bore.shape, "bore:cyl.side", thread, AxisMinimum));
+		bore.close();
+		return Solids.cut(body, [threaded]);
 	}
 
 	/** Cutting tool for a trapped-nut pocket, sized with a 0.5 mm diametral clearance around
