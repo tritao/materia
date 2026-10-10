@@ -10,8 +10,11 @@ import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.SceneArtifact.SceneArtifactMission;
 import materia.project.SceneArtifact.SceneArtifactMissionStep;
+import materia.project.SceneArtifact.SceneArtifactMobileBase;
+import materia.project.SceneArtifact.SceneArtifactMobileEnergy;
 import materia.project.SceneArtifact.SceneArtifactPlace;
 import materia.project.SceneArtifact.SceneArtifactRobotTool;
+import materia.project.SceneArtifact.SceneArtifactTorch;
 import materia.project.SceneArtifact.SceneArtifactTorchPose;
 import materia.project.SceneArtifact.SceneArtifactWeld;
 import materia.project.SceneContactRegistration.SceneContactWork;
@@ -37,6 +40,7 @@ import processkit.WeldingPlanRunner;
 import processkit.WeldStowPlanner;
 import processkit.skill.WeldPlan;
 import processkit.skill.WeldSeam;
+import processkit.tool.WeldArcModel;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.collision.CollisionClearance;
@@ -96,6 +100,16 @@ typedef MissionProgress = {
   var completedInLoop:Int;
   var loop:Int;
   var failure:Null<String>;
+}
+
+private enum EnergyTransferStage {
+  NoEnergyTransfer;
+  StowingForDock;
+  ToChargingDock;
+  SettlingAtDock;
+  ChargingAtDock;
+  ReturningFromDock;
+  SettlingAtStation;
 }
 
 /**
@@ -213,9 +227,21 @@ class MissionPlayer implements SessionMember {
   var wheelsSeeded:Bool = false;
   final timestep:Float;
   final idle = new PerceptionSnapshot();
+  final energyPower:Null<SimulatedMobilePower>;
+  var energyStage:EnergyTransferStage = NoEnergyTransfer;
+  var energyRunner:Null<SkillRunner> = null;
+  var energyReturnPose:Null<Pose2> = null;
+  var energyHandoffAt:Int64 = Int64.ofInt(0);
+  var energyTargetWattHours:Float = 0.0;
+  var energyChargeStartWattHours:Float = 0.0;
+  var energyReadyStep:Int = -1;
+  public var energyDockTrips(default, null):Int = 0;
+  public var energyChargedWattHours(default, null):Float = 0.0;
+  public var energyChargeSeconds(default, null):Float = 0.0;
 
   public function new(mission:SceneArtifactMission, robot:AssemblyRobot, simulation:Simulation, robotIndex:Int,
-      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, weldAcceleration:Float = ARM_ACCELERATION) {
+      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession,
+      weldAcceleration:Float = ARM_ACCELERATION, ?energyPower:SimulatedMobilePower) {
     if (!Math.isFinite(weldAcceleration) || weldAcceleration <= 0.0 || weldAcceleration > ARM_ACCELERATION)
       throw "Invalid welding planning acceleration";
     if (mission.steps.length == 0) throw "A mission needs steps";
@@ -225,6 +251,7 @@ class MissionPlayer implements SessionMember {
     this.obstacles = standing(obstacles);
     this.simulation = simulation;
     this.weldAcceleration = weldAcceleration;
+    this.energyPower = energyPower;
     this.objects = objects;
     this.robotIndex = robotIndex;
     this.project = project;
@@ -255,9 +282,11 @@ class MissionPlayer implements SessionMember {
       var margin = robotkit.navigation.FloorMap.navigationMargin(footprint.radius, 0.3, RESOLUTION);
       var map = new Costmap2(floorPlan(obstacles, poses, margin), footprint.radius, true, 0.3, 1.5, MEMORY_SECONDS);
       costmap = map;
-      var navigation = new Navigation(base, localization, 0.35, 0.5, 1.2, false);
       var lidars = [for (sensor in project.robotSensors) if (sensor.kind == "lidar") sensor];
       if (lidars.length > 1) throw 'A mission reads one lidar, the robot has ${lidars.length}';
+      // SceneArtifact lidar sensors scan the full circle. That coverage permits a guarded
+      // reverse correction at a path end; without it the mission remains forward-only.
+      var navigation = new Navigation(base, localization, 0.35, 0.5, 1.2, lidars.length == 1);
       if (lidars.length == 0) {
         scanner = null;
         scanning = null;
@@ -525,6 +554,11 @@ class MissionPlayer implements SessionMember {
     var snapshot = robot.robot.snapshot();
     localization.update(snapshot);
     trackWheels(snapshot);
+    if (energyStage != NoEnergyTransfer) {
+      advanceEnergyTransfer(snapshot);
+      return;
+    }
+    if (runner.status() != Running && beginEnergyTransfer(snapshot)) return;
     switch runner.status() {
       case Running:
       case _:
@@ -537,9 +571,437 @@ class MissionPlayer implements SessionMember {
     settle();
   }
 
+  /** Reserve one complete weld and the two navigation legs needed to dock, charge and resume. */
+  function beginEnergyTransfer(snapshot:RobotSnapshot):Bool {
+    var energy = energyPower;
+    var mobile = project.mobileBase;
+    if (energy == null || mobile == null || mobile.energy == null || mission.steps[stepIndex].kind != "weld")
+      return false;
+    if (energyReadyStep == stepIndex) return false;
+    var energyProfile:SceneArtifactMobileEnergy = cast mobile.energy;
+    var state = localization.state();
+    if (state == null || navigator == null) {
+      failure = "Energy reserve needs a localized mobile base and dock route planner";
+      return true;
+    }
+    var dock = energyProfile.dockPose;
+    var dockPose = new Pose2(dock.x, dock.y, dock.yaw);
+    var resumePose = energyResumePose(state.pose);
+    var outbound:Null<robotkit.navigation.Path> = null, inbound:Null<robotkit.navigation.Path> = null;
+    try {
+      outbound = navigator.planner.plan(state.pose, dockPose);
+    } catch (error:Dynamic) {
+      failure = 'Energy reserve route planning to dock (${poseText(dockPose)}) failed: ${Std.string(error)}';
+      return true;
+    }
+    try {
+      inbound = navigator.planner.plan(dockPose, resumePose);
+    } catch (error:Dynamic) {
+      failure = 'Energy reserve return route to station (${poseText(resumePose)}) failed: ${Std.string(error)}';
+      return true;
+    }
+    if (outbound == null || inbound == null) {
+      failure = "Energy reserve cannot plan a route between the seam station and charging dock";
+      return true;
+    }
+    var outboundWh = routeEnergyWh(outbound.length, state.pose.yaw, dockPose.yaw, mobile);
+    var inboundWh = routeEnergyWh(inbound.length, dockPose.yaw, resumePose.yaw, mobile);
+    var weldWh:Float;
+    try weldWh = weldEnergyWh(cast mission.steps[stepIndex].weld, energyProfile)
+    catch (error:Dynamic) {
+      failure = 'Energy reserve could not estimate seam $stepIndex: ${Std.string(error)}';
+      return true;
+    }
+    var reserveWh = Math.max(5.0, energyProfile.capacityWh * 0.03);
+    var voltageSupportWh = minimumVoltageSupportWh(cast mission.steps[stepIndex].weld, energyProfile);
+    energyTargetWattHours = inboundWh + weldWh + outboundWh + reserveWh + voltageSupportWh;
+    var beforeDockWh = outboundWh + energyTargetWattHours;
+    var remaining = energy.batteryState();
+    if (remaining == null) {
+      failure = "Energy reserve has no battery observation";
+      return true;
+    }
+    var remainingWh = remaining.remainingEnergyWattHours == null ? 0.0 :
+      (cast remaining.remainingEnergyWattHours:Float);
+    if (energyTargetWattHours > energyProfile.capacityWh) {
+      failure = 'Seam ${stepIndex} requires ${roundWh(energyTargetWattHours)} Wh after docking, beyond pack capacity';
+      return true;
+    }
+    if (remainingWh >= beforeDockWh) return false;
+    if (remainingWh <= outboundWh + reserveWh) {
+      failure = 'Pack has ${roundWh(remainingWh)} Wh and cannot reserve ${roundWh(outboundWh + reserveWh)} Wh to reach the dock';
+      return true;
+    }
+
+    energyReturnPose = new Pose2(resumePose.x, resumePose.y, resumePose.yaw);
+    energyDockTrips++;
+    energyPower.requestCharging(false);
+    energyStage = StowingForDock;
+    energyRunner = new SkillRunner();
+    energyRunner.start(stow());
+    return true;
+  }
+
+  /** Advance the internal dock/charge/return transfer without consuming the mission's weld step. */
+  function advanceEnergyTransfer(snapshot:RobotSnapshot):Bool {
+    if (energyStage == NoEnergyTransfer) return false;
+    var power = energyPower;
+    if (power == null) {
+      failure = "Energy transfer lost its battery model";
+      energyStage = NoEnergyTransfer;
+      return true;
+    }
+    if (energyStage == StowingForDock) {
+      var stowing = energyRunner;
+      if (stowing == null) {
+        failure = "Energy transfer lost the clearance-checked torch stow";
+        energyStage = NoEnergyTransfer;
+        return true;
+      }
+      if (stowing.status() == Running) stowing.update(snapshot, timestep);
+      switch stowing.status() {
+        case Running: return true;
+        case Succeeded:
+          energyRunner = null;
+          var mobile = project.mobileBase;
+          var energy:SceneArtifactMobileEnergy = mobile == null || mobile.energy == null ? null : cast mobile.energy;
+          if (energy == null) {
+            failure = "Energy transfer lost the CAD charging dock profile after stow";
+            energyStage = NoEnergyTransfer;
+            return true;
+          }
+          var dock = energy.dockPose;
+          energyStage = ToChargingDock;
+          startEnergyNavigation(new Pose2(dock.x, dock.y, dock.yaw));
+        case Failed(message):
+          failure = 'Energy reserve could not clearance-check the torch stow: $message';
+          energyRunner = null;
+          energyStage = NoEnergyTransfer;
+        case Cancelled:
+          failure = "Energy reserve torch stow was cancelled";
+          energyRunner = null;
+          energyStage = NoEnergyTransfer;
+        case Idle:
+          failure = "Energy reserve torch stow returned to idle";
+          energyRunner = null;
+          energyStage = NoEnergyTransfer;
+      }
+      return true;
+    }
+    if (energyStage == SettlingAtDock || energyStage == SettlingAtStation) {
+      if (snapshot.sourceTimestampNs <= energyHandoffAt) return true;
+      if (snapshot.sourceTimestampNs - energyHandoffAt > Int64.fromFloat(5e9)) {
+        failure = energyStage == SettlingAtDock
+          ? "Mobile drive did not settle at the CAD charging dock"
+          : "Mobile drive did not settle at the welding station after charging";
+        energyStage = NoEnergyTransfer;
+        return true;
+      }
+      if (!energyDriveStopped(snapshot)) return true;
+      energyHandoffAt = Int64.ofInt(0);
+      if (energyStage == SettlingAtDock) {
+        if (!power.atDock()) {
+          failure = "Mobile drive left the CAD charging dock while settling";
+          energyStage = NoEnergyTransfer;
+          return true;
+        }
+        var mobile = project.mobileBase;
+        if (mobile == null || mobile.energy == null) {
+          failure = "CAD charging dock lost its mobile energy profile";
+          energyStage = NoEnergyTransfer;
+          return true;
+        }
+        var state = power.batteryState();
+        energyChargeStartWattHours = state == null || state.remainingEnergyWattHours == null
+          ? 0.0 : cast state.remainingEnergyWattHours;
+        energyStage = ChargingAtDock;
+        power.requestCharging(true);
+      } else finishPostDockReturn(snapshot);
+      return true;
+    }
+    if (energyStage == ChargingAtDock) {
+      if (!power.atDock()) {
+        power.requestCharging(false);
+        failure = "Charging stopped because the robot left its CAD dock pose";
+        energyStage = NoEnergyTransfer;
+        return true;
+      }
+      power.requestCharging(true);
+      energyChargeSeconds += timestep;
+      var state = power.batteryState();
+      var remaining:Float = state == null || state.remainingEnergyWattHours == null
+        ? 0.0 : cast state.remainingEnergyWattHours;
+      if (remaining + 1e-6 >= energyTargetWattHours) {
+        energyChargedWattHours += Math.max(0.0, remaining - energyChargeStartWattHours);
+        power.requestCharging(false);
+        energyStage = ReturningFromDock;
+        var pose = energyReturnPose;
+        if (pose == null) {
+          failure = "Energy transfer lost the saved seam station pose";
+          energyStage = NoEnergyTransfer;
+          return true;
+        }
+        startEnergyNavigation(pose);
+      }
+      return true;
+    }
+
+    var active = energyRunner;
+    if (active == null) {
+      failure = "Energy transfer has no navigation runner";
+      energyStage = NoEnergyTransfer;
+      return true;
+    }
+    if (active.status() == Running) active.update(snapshot, timestep);
+    if (active.status() == Running) return true;
+    switch active.status() {
+      case Running: return true;
+      case Succeeded:
+        if (energyStage == ToChargingDock) {
+          if (!power.atDock()) {
+            failure = "Navigation reported success outside the CAD charging dock tolerance";
+            energyStage = NoEnergyTransfer;
+            return true;
+          }
+          energyStage = SettlingAtDock;
+          energyHandoffAt = snapshot.sourceTimestampNs;
+        } else if (energyStage == ReturningFromDock) {
+          power.requestCharging(false);
+          energyStage = SettlingAtStation;
+          energyHandoffAt = snapshot.sourceTimestampNs;
+        }
+      case Failed(message):
+        power.requestCharging(false);
+        failure = 'Energy dock navigation failed: $message';
+        energyStage = NoEnergyTransfer;
+      case Cancelled:
+        power.requestCharging(false);
+        failure = "Energy dock navigation was cancelled";
+        energyStage = NoEnergyTransfer;
+      case Idle:
+        power.requestCharging(false);
+        failure = "Energy dock navigation returned to idle";
+        energyStage = NoEnergyTransfer;
+    }
+    return true;
+  }
+
+  function energyDriveStopped(snapshot:RobotSnapshot):Bool {
+    var mobile = project.mobileBase;
+    if (mobile == null) return false;
+    var names = robot.robot.description().joints;
+    var left = names.indexOf(mobile.leftWheel), right = names.indexOf(mobile.rightWheel);
+    return left >= 0 && right >= 0 && Math.abs(snapshot.velocities.get(left)) <= 1e-5 &&
+      Math.abs(snapshot.velocities.get(right)) <= 1e-5;
+  }
+
+  function finishPostDockReturn(snapshot:RobotSnapshot):Void {
+    var job = energyContactWork(stepIndex);
+    var odometry = wheels;
+    var localized = localization.state();
+    if (odometry == null || localized == null || localized.referenceFrame != FRAME ||
+        localized.bodyFrame != robot.rootLink || localized.sequence != snapshot.sourceSequence) {
+      failure = "Energy return needs a fresh map pose before resuming the saved work frame";
+      energyStage = NoEnergyTransfer;
+      return;
+    }
+    if (switch localized.quality { case robotkit.localization.LocalizationQuality.Invalid: true; case _: false; }) {
+      failure = "Energy return localization is invalid";
+      energyStage = NoEnergyTransfer;
+      return;
+    }
+    if (job != null && !registeredWorkWorld.exists(job.frame)) {
+      failure = "Energy return lost the map-anchored contact registration for the clamped workpiece";
+      energyStage = NoEnergyTransfer;
+      return;
+    }
+    if (job != null) {
+      var covariance = localized.covariance;
+      var planarTrace = covariance.xx + covariance.yy;
+      var planarSpread = Math.sqrt(Math.max(0.0,
+        (covariance.xx - covariance.yy) * (covariance.xx - covariance.yy) + 4.0 * covariance.xy * covariance.xy));
+      var positionThreeSigma = 3.0 * Math.sqrt(Math.max(0.0, 0.5 * (planarTrace + planarSpread)));
+      var headingThreeSigma = 3.0 * Math.sqrt(Math.max(0.0, covariance.yawYaw));
+      var positionEnvelope = job.translation.length < 2 ? 0.0 : Math.min(job.translation[0], job.translation[1]);
+      var headingEnvelope = job.rotation.length < 3 ? 0.0 : job.rotation[2];
+      if (positionThreeSigma > positionEnvelope || headingThreeSigma > headingEnvelope) {
+        failure = 'Energy return localization uncertainty exceeds the saved contact envelope: ' +
+          '3σ position=${positionThreeSigma} m / ${positionEnvelope} m, ' +
+          'heading=${headingThreeSigma} rad / ${headingEnvelope} rad';
+        energyStage = NoEnergyTransfer;
+        return;
+      }
+    }
+    // The clamped workpiece stays fixed in the map while the robot charges. Dock
+    // alignment is only an energy connection; fresh map localization re-anchors
+    // wheel odometry, while the accepted contact frame remains map-anchored.
+    odometry.rebase(localized, snapshot);
+    energyReadyStep = stepIndex;
+    finishEnergyTransfer();
+  }
+
+  function energyContactWork(weldStep:Int):Null<SceneContactWork> {
+    if (weldStep < 0 || weldStep >= mission.steps.length || mission.steps[weldStep].kind != "weld") return null;
+    var weld:SceneArtifactWeld = cast mission.steps[weldStep].weld;
+    var index = weldStep - 1;
+    while (index >= 0) {
+      var step = mission.steps[index];
+      if (step.kind == "findWork" && step.contactWork != null) {
+        var job:SceneContactWork = cast step.contactWork;
+        if (job.frame == weld.frame) return job;
+      }
+      index--;
+    }
+    return null;
+  }
+
+  function finishEnergyTransfer():Void {
+    energyStage = NoEnergyTransfer;
+    energyRunner = null;
+    energyReturnPose = null;
+    energyTargetWattHours = 0.0;
+    energyHandoffAt = Int64.ofInt(0);
+  }
+
+  function startEnergyNavigation(pose:Pose2):Void {
+    var activeNavigator = navigator;
+    if (activeNavigator == null) throw "Energy docking requires a Navigator";
+    var mobile = project.mobileBase;
+    var energy:SceneArtifactMobileEnergy = mobile == null || mobile.energy == null ? null : cast mobile.energy;
+    if (energy == null) throw "Energy docking requires the CAD dock alignment profile";
+    var atDock = energyStage == ToChargingDock;
+    var tolerances = atDock
+      ? [energy.dockPositionToleranceMeters, energy.dockHeadingToleranceRadians]
+      : contactNavigationTolerances(energyContactWork(stepIndex));
+    energyRunner = new SkillRunner();
+    energyRunner.start(new GoTo(activeNavigator,
+      new NavigationGoal(pose, FRAME, tolerances[0], tolerances[1]), observe));
+  }
+
+  /**
+   * A station approach precedes touch registration. Spend at most half of its
+   * declared translation/heading envelope on base parking error so probing
+   * retains clearance and reach margin for the actual part displacement.
+   */
+  function contactNavigationTolerances(contact:Null<SceneContactWork>):Array<Float> {
+    var position = POSITION_TOLERANCE, heading = HEADING_TOLERANCE;
+    if (contact != null) {
+      if (contact.translation.length >= 2) {
+        var planar = Math.min(contact.translation[0], contact.translation[1]);
+        if (Math.isFinite(planar) && planar > 0.0)
+          position = Math.min(position, planar * 0.5);
+      }
+      if (contact.rotation.length >= 3 && Math.isFinite(contact.rotation[2]) && contact.rotation[2] > 0.0)
+        heading = Math.min(heading, contact.rotation[2] * 0.5);
+    }
+    return [position, heading];
+  }
+
+  /** Return to the authored station goal; measured arrival can sit in a blocked neighboring costmap cell. */
+  function energyResumePose(fallback:Pose2):Pose2 {
+    var index = stepIndex - 1;
+    while (index >= 0) {
+      var step = mission.steps[index];
+      if (step.kind == "goTo") return floorPose(step);
+      index--;
+    }
+    return new Pose2(fallback.x, fallback.y, fallback.yaw);
+  }
+
+  static function poseText(pose:Pose2):String return '(${pose.x},${pose.y},${pose.yaw})';
+
+  /** Conservative energy for a full CAD seam, its passes, pauses and arm load envelope. */
+  function weldEnergyWh(weld:SceneArtifactWeld, energy:materia.project.SceneArtifact.SceneArtifactMobileEnergy):Float {
+    var tools = project.robotTools;
+    var torches = [for (tool in tools) if (tool.kind == "torch") tool];
+    if (torches.length != 1 || torches[0].torch == null) throw "Energy reservation needs the CAD torch process profile";
+    var torch:SceneArtifactTorch = cast torches[0].torch;
+    var arc = new WeldArcModel({maxCurrentA: torch.maxCurrentA, efficiency: torch.efficiency,
+      wireDiameterMm: torch.wireDiameterMm, stickoutMm: torch.stickoutMm});
+    var length = 0.0;
+    for (segment in weld.path) {
+      var a = segment.start.position, b = segment.stop.position;
+      length += Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2) + Math.pow(b[2] - a[2], 2));
+    }
+    var maxArmMechanicalWatts = maximumJointPower(false, project.mobileBase);
+    var armBusWatts = maxArmMechanicalWatts / (energy.armDriveEfficiency * energy.armSupplyEfficiency);
+    var computerWatts = energy.computerLoadWatts / energy.computerSupplyEfficiency;
+    var wattHours = 0.0;
+    for (pass in weld.passes) {
+      var weaveFactor = pass.weave == null ? 1.0 : 1.0 + 2.0 * pass.weave.amplitude * pass.weave.cyclesPerMetre;
+      var seconds = length * weaveFactor / pass.process.travelSpeed + pass.process.startDwell +
+        pass.process.craterDwell + pass.process.burnback + WeldArcModel.IGNITION_DELAY;
+      var current = arc.currentFor(pass.process.wireSpeed);
+      var volts = WeldArcModel.arcVoltage(pass.process.voltage, WeldArcModel.NOMINAL_ARC_LENGTH);
+      var mainsWatts = current * volts / torch.efficiency;
+      var dcWatts = mainsWatts / energy.inverterEfficiency;
+      wattHours += (dcWatts + armBusWatts + computerWatts) * seconds / 3600.0;
+      wattHours += computerWatts * pass.interpassDwell / 3600.0;
+    }
+    return wattHours * 1.25;
+  }
+
+  /** Keep enough open-circuit voltage after the seam and return reserve to survive its peak load. */
+  function minimumVoltageSupportWh(weld:SceneArtifactWeld,
+      energy:SceneArtifactMobileEnergy):Float {
+    var torch:SceneArtifactTorch = null;
+    for (tool in project.robotTools) if (tool.kind == "torch" && tool.torch != null) torch = cast tool.torch;
+    if (torch == null) throw "Voltage reserve needs the CAD torch process profile";
+    var arc = new WeldArcModel({maxCurrentA: torch.maxCurrentA, efficiency: torch.efficiency,
+      wireDiameterMm: torch.wireDiameterMm, stickoutMm: torch.stickoutMm});
+    var peakPackWatts = 0.0;
+    var armWatts = maximumJointPower(false, project.mobileBase) /
+      (energy.armDriveEfficiency * energy.armSupplyEfficiency);
+    var computerWatts = energy.computerLoadWatts / energy.computerSupplyEfficiency;
+    for (pass in weld.passes) {
+      var arcWatts = arc.currentFor(pass.process.wireSpeed) *
+        WeldArcModel.arcVoltage(pass.process.voltage, WeldArcModel.NOMINAL_ARC_LENGTH) /
+        (torch.efficiency * energy.inverterEfficiency);
+      peakPackWatts = Math.max(peakPackWatts, arcWatts + armWatts + computerWatts);
+    }
+    var requiredOpenCircuit = energy.cutoffVoltage +
+      peakPackWatts * energy.internalResistanceOhms / energy.cutoffVoltage;
+    if (requiredOpenCircuit >= energy.fullVoltage) return energy.capacityWh + 1.0;
+    var fraction = Math.max(0.0, (requiredOpenCircuit - energy.emptyVoltage) /
+      (energy.fullVoltage - energy.emptyVoltage));
+    return fraction * energy.capacityWh;
+  }
+
+  /** Rated joint power comes from the CAD-mapped runtime drive limits. */
+  function maximumJointPower(wheelsOnly:Bool, mobile:Null<SceneArtifactMobileBase>):Float {
+    var names = robot.robot.description().joints;
+    var power = 0.0;
+    for (index in 0...names.length) {
+      var wheel = mobile != null && (names[index] == mobile.leftWheel || names[index] == mobile.rightWheel);
+      if (wheel != wheelsOnly) continue;
+      var joint = robot.blueprint.joints[index];
+      if (joint.maxEffort != null && joint.maxRate != null)
+        power += (cast joint.maxEffort:Float) * (cast joint.maxRate:Float);
+    }
+    return power;
+  }
+
+  function routeEnergyWh(distance:Float, startYaw:Float, endYaw:Float,
+      mobile:SceneArtifactMobileBase):Float {
+    var energy:SceneArtifactMobileEnergy = cast mobile.energy;
+    if (energy == null) return 0.0;
+    var driveMechanicalWatts = maximumJointPower(true, mobile);
+    var driveBusWatts = driveMechanicalWatts / (energy.driveMotorEfficiency * energy.driveGearEfficiency *
+      energy.driveSupplyEfficiency);
+    var computerWatts = energy.computerLoadWatts / energy.computerSupplyEfficiency;
+    var turn = Math.atan2(Math.sin(endYaw - startYaw), Math.cos(endYaw - startYaw));
+    var travelSeconds = distance / mobile.maxLinearSpeed * 1.8 + Math.abs(turn) / mobile.maxAngularSpeed * 1.8 + 2.0;
+    return (driveBusWatts + computerWatts) * travelSeconds / 3600.0 * 1.25;
+  }
+
+  static function roundWh(value:Float):Float return Math.round(value * 10.0) / 10.0;
+
   /** The step that was running stops through the robot's runtime, which still answers until the session resets. */
   public function beforeReset():Void {
     runner.cancel();
+    if (energyRunner != null) energyRunner.cancel();
+    var power = energyPower;
+    if (power != null) power.requestCharging(false);
     if (homing != null && homing.isMoving()) homing.abort();
   }
 
@@ -552,6 +1014,16 @@ class MissionPlayer implements SessionMember {
     completed = 0;
     failure = null;
     finished = false;
+    energyStage = NoEnergyTransfer;
+    energyRunner = null;
+    energyReturnPose = null;
+    energyHandoffAt = Int64.ofInt(0);
+    energyTargetWattHours = 0.0;
+    energyChargeStartWattHours = 0.0;
+    energyReadyStep = -1;
+    energyDockTrips = 0;
+    energyChargedWattHours = 0.0;
+    energyChargeSeconds = 0.0;
     grasped = null;
     wheelsSeeded = false;
     scanned = null;
@@ -624,8 +1096,13 @@ class MissionPlayer implements SessionMember {
       case "goTo":
         registeredWorkWorld = new Map<String, Transform3>();
         var activeNavigator:Navigator = cast navigator;
-        return new GoTo(activeNavigator, new NavigationGoal(floorPose(step), FRAME, POSITION_TOLERANCE, HEADING_TOLERANCE),
-          observe);
+        var contact:Null<SceneContactWork> = null;
+        if (stepIndex + 1 < mission.steps.length) {
+          var next = mission.steps[stepIndex + 1];
+          if (next.kind == "findWork" && next.contactWork != null) contact = cast next.contactWork;
+        }
+        var tolerances = contactNavigationTolerances(contact);
+        return new GoTo(activeNavigator, new NavigationGoal(floorPose(step), FRAME, tolerances[0], tolerances[1]), observe);
       case "pick":
         cast(handling,HandlingPlanRunner).configuration=configurationFor(step);
         var at:SceneArtifactPlace = cast step.at;
@@ -847,6 +1324,17 @@ class MissionPlayer implements SessionMember {
 
   /** How many times the navigator has replanned the current goal. */
   public function replans():Int return navigator == null ? 0 : navigator.replanCount;
+
+  /** The current energy-transfer phase, for the mission view and bounded execution diagnostics. */
+  public function energyTransferPhase():String return switch energyStage {
+    case NoEnergyTransfer: "idle";
+    case StowingForDock: "stowing-for-dock";
+    case ToChargingDock: "to-dock";
+    case SettlingAtDock: "settling-at-dock";
+    case ChargingAtDock: "charging";
+    case ReturningFromDock: "returning-from-dock";
+    case SettlingAtStation: "settling-at-station";
+  };
 
   /** Where the grasp connector `at` of a free part is now, in metres. */
   function graspPoint(at:SceneArtifactPlace):Vec3 {
