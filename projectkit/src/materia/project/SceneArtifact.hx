@@ -206,6 +206,39 @@ typedef SceneArtifactMobileBase = {
 	@:optional var footprintWidth:Float;
 	@:optional var robot:String;
 	@:optional var origin:SceneArtifactFloorPose;
+	/** Battery, conversion, auxiliary-load and dock data derived from the CAD machine. */
+	@:optional var energy:SceneArtifactMobileEnergy;
+}
+
+typedef SceneArtifactMobileEnergy = {
+	/** Runtime scenario state; electrical ratings below come from the CAD pack and service components. */
+	var initialChargeFraction:Float;
+	var batteryOccurrence:String;
+	var nominalVolts:Float;
+	var capacityWh:Float;
+	var fullVoltage:Float;
+	var emptyVoltage:Float;
+	var cutoffVoltage:Float;
+	var internalResistanceOhms:Float;
+	var maxDischargeCurrentA:Float;
+	var maxChargePowerW:Float;
+	var chargeEfficiency:Float;
+	var inverterContinuousWatts:Float;
+	var inverterEfficiency:Float;
+	var armSupplyEfficiency:Float;
+	var driveSupplyEfficiency:Float;
+	var computerSupplyEfficiency:Float;
+	/** Electrical output to mechanical joint power; explicit motor and driver model assumptions. */
+	var armDriveEfficiency:Float;
+	var driveMotorEfficiency:Float;
+	var driveGearEfficiency:Float;
+	var computerLoadWatts:Float;
+	var chargerOccurrence:String;
+	var chargerPowerWatts:Float;
+	var dockPose:SceneArtifactFloorPose;
+	/** Physical charging-contact alignment bounds, in metres and radians. */
+	var dockPositionToleranceMeters:Float;
+	var dockHeadingToleranceRadians:Float;
 }
 
 /**
@@ -424,7 +457,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 18;
+	public static inline var VERSION:Int = 20;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -1294,6 +1327,30 @@ class SceneArtifact {
 			var length:Float = cast base.footprintLength, width:Float = cast base.footprintWidth;
 			if (!finite(length) || length <= 0 || !finite(width) || width <= 0) fail("needs a positive footprint");
 		}
+		if (base.energy != null) {
+			var energy = base.energy;
+			var occurrences = new Map<String, Bool>();
+			for (item in flat.occurrences) occurrences.set(item.id, true);
+			for (name in [energy.batteryOccurrence, energy.chargerOccurrence])
+				if (name == null || name.length == 0 || !occurrences.exists(name)) fail('energy profile names no occurrence "$name"');
+			if (!finite(energy.initialChargeFraction) || energy.initialChargeFraction < 0 || energy.initialChargeFraction > 1)
+				fail("needs a valid initial charge fraction");
+			for (value in [energy.nominalVolts, energy.capacityWh, energy.fullVoltage, energy.emptyVoltage,
+				energy.cutoffVoltage, energy.internalResistanceOhms, energy.maxDischargeCurrentA,
+				energy.maxChargePowerW, energy.inverterContinuousWatts, energy.computerLoadWatts, energy.chargerPowerWatts])
+				if (!finite(value) || value <= 0) fail("needs positive battery, load and charger ratings");
+			for (value in [energy.chargeEfficiency, energy.inverterEfficiency, energy.armSupplyEfficiency,
+				energy.driveSupplyEfficiency, energy.computerSupplyEfficiency, energy.armDriveEfficiency,
+				energy.driveMotorEfficiency, energy.driveGearEfficiency])
+				if (!finite(value) || value <= 0 || value > 1) fail("needs conversion efficiencies in (0, 1]");
+			if (!(energy.emptyVoltage < energy.nominalVolts && energy.nominalVolts < energy.fullVoltage &&
+				energy.emptyVoltage < energy.cutoffVoltage && energy.cutoffVoltage < energy.fullVoltage) ||
+				!finiteFloorPose(energy.dockPose)) fail("has an invalid voltage curve or dock pose");
+			if (!finite(energy.dockPositionToleranceMeters) || energy.dockPositionToleranceMeters <= 0 ||
+				energy.dockPositionToleranceMeters > 0.18 || !finite(energy.dockHeadingToleranceRadians) ||
+				energy.dockHeadingToleranceRadians <= 0 || energy.dockHeadingToleranceRadians >= Math.PI / 2)
+				fail("has invalid charging-contact alignment tolerances");
+		}
 	}
 
 	/** A mobile base from its JSON section, typed field by field. */
@@ -1324,6 +1381,39 @@ class SceneArtifact {
 		if (Reflect.field(decoded, "robot") != null) base.robot = text("robot");
 		var origin:Dynamic = Reflect.field(decoded, "origin");
 		if (origin != null) base.origin = floorPose(origin);
+		var energyRaw:Dynamic = Reflect.field(decoded, "energy");
+		if (energyRaw != null) {
+			function energyText(name:String):String {
+				var value:Dynamic = Reflect.field(energyRaw, name);
+				return Std.isOfType(value, String) ? value : fail();
+			}
+			function energyNumber(name:String):Float {
+				var value:Dynamic = Reflect.field(energyRaw, name);
+				return Std.isOfType(value, Float) || Std.isOfType(value, Int) ? (value:Float) : fail();
+			}
+			base.energy = {initialChargeFraction: energyNumber("initialChargeFraction"),
+				batteryOccurrence: energyText("batteryOccurrence"),
+				nominalVolts: energyNumber("nominalVolts"), capacityWh: energyNumber("capacityWh"),
+				fullVoltage: energyNumber("fullVoltage"), emptyVoltage: energyNumber("emptyVoltage"),
+				cutoffVoltage: energyNumber("cutoffVoltage"),
+				internalResistanceOhms: energyNumber("internalResistanceOhms"),
+				maxDischargeCurrentA: energyNumber("maxDischargeCurrentA"),
+				maxChargePowerW: energyNumber("maxChargePowerW"), chargeEfficiency: energyNumber("chargeEfficiency"),
+				inverterContinuousWatts: energyNumber("inverterContinuousWatts"),
+				inverterEfficiency: energyNumber("inverterEfficiency"),
+				armSupplyEfficiency: energyNumber("armSupplyEfficiency"),
+				driveSupplyEfficiency: energyNumber("driveSupplyEfficiency"),
+				computerSupplyEfficiency: energyNumber("computerSupplyEfficiency"),
+				armDriveEfficiency: energyNumber("armDriveEfficiency"),
+				driveMotorEfficiency: energyNumber("driveMotorEfficiency"),
+				driveGearEfficiency: energyNumber("driveGearEfficiency"),
+				computerLoadWatts: energyNumber("computerLoadWatts"),
+				chargerOccurrence: energyText("chargerOccurrence"),
+				chargerPowerWatts: energyNumber("chargerPowerWatts"),
+				dockPose: floorPose(Reflect.field(energyRaw, "dockPose")),
+				dockPositionToleranceMeters: energyNumber("dockPositionToleranceMeters"),
+				dockHeadingToleranceRadians: energyNumber("dockHeadingToleranceRadians")};
+		}
 		return base;
 	}
 
@@ -1510,7 +1600,7 @@ private class SceneArtifactReader {
 		for (expected in [77, 84, 82, 71]) if (readByte() != expected)
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
-		if (version != SceneArtifact.VERSION && version != 17)
+		if (version != SceneArtifact.VERSION)
 			throw 'schema v$version is unsupported; expected v${SceneArtifact.VERSION}';
 		var metresPerUnit = readDouble();
 		var lengthUnit = readText();
@@ -1622,11 +1712,9 @@ private class SceneArtifactReader {
     if (machineLength > 0)
       machineMotion = @:privateAccess SceneArtifact.decodeMachineMotion(haxe.Json.parse(readString(machineLength)));
     var project:Null<SceneArtifactProject> = null;
-    if (version >= 18) {
-      var projectLength = readInt();
-      if (projectLength < 0 || projectLength > 2000000) throw "Scene artifact project settings are too large";
-      if (projectLength > 0) project = @:privateAccess SceneArtifact.decodeProject(haxe.Json.parse(readString(projectLength)));
-    }
+    var projectLength = readInt();
+    if (projectLength < 0 || projectLength > 2000000) throw "Scene artifact project settings are too large";
+    if (projectLength > 0) project = @:privateAccess SceneArtifact.decodeProject(haxe.Json.parse(readString(projectLength)));
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts,

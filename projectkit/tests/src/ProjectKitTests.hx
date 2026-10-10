@@ -135,7 +135,7 @@ class ProjectKitTests {
     var legacy = Bytes.alloc(encoded.length - 4);
     legacy.blit(0, encoded, 0, legacy.length);
     legacy.setInt32(4, 17);
-    check(SceneArtifact.decodeView(legacy).project == null, "v17 artifacts remain readable without project settings");
+    rejects(function() SceneArtifact.decodeView(legacy), "v17 scene artifacts are rejected");
     data.project = {job: "fixture", dynamicParts: ["part"], motions: []};
     var bundled = SceneArtifact.decode(SceneArtifact.encode(data));
     check(bundled.project != null && bundled.project.job == "fixture" && bundled.project.dynamicParts[0] == "part",
@@ -260,6 +260,36 @@ class ProjectKitTests {
     check(restored.leftWheel == "wheel_l" && restored.rightWheel == "wheel_r" && restored.wheelRadius == 0.075 &&
       restored.trackWidth == 0.3 && restored.maxAngularAcceleration == 1.5 && restored.footprintWidth == 0.44,
       "mobile base round trip");
+    robot.occurrences.push({id: "battery", definition: "body", initialPose: frame});
+    robot.occurrences.push({id: "charger", definition: "body", initialPose: frame});
+    base.energy = {initialChargeFraction: 1.0, batteryOccurrence: "battery", nominalVolts: 48, capacityWh: 25000,
+      fullVoltage: 54.6, emptyVoltage: 40, cutoffVoltage: 42, internalResistanceOhms: 0.02,
+      maxDischargeCurrentA: 250, maxChargePowerW: 5000, chargeEfficiency: 0.95,
+      inverterContinuousWatts: 10000,
+      inverterEfficiency: 0.92, armSupplyEfficiency: 0.95, driveSupplyEfficiency: 0.95,
+      computerSupplyEfficiency: 0.95, armDriveEfficiency: 0.72, driveMotorEfficiency: 0.68,
+      driveGearEfficiency: 0.9, computerLoadWatts: 120, chargerOccurrence: "charger",
+      chargerPowerWatts: 3000, dockPose: {x: -3.35, y: 0, yaw: Math.PI / 2},
+      dockPositionToleranceMeters: 0.015, dockHeadingToleranceRadians: 0.02};
+    var energyRestored = SceneArtifact.decode(SceneArtifact.encode(data)).mobileBase;
+    if (energyRestored == null || energyRestored.energy == null) throw "mobile battery profile round trip lost data";
+    check(energyRestored.energy.batteryOccurrence == "battery" &&
+      energyRestored.energy.chargerOccurrence == "charger" && energyRestored.energy.capacityWh == 25000 &&
+      energyRestored.energy.inverterContinuousWatts == 10000 && energyRestored.energy.inverterEfficiency == 0.92 &&
+      energyRestored.energy.dockPose.yaw == Math.PI / 2 &&
+      energyRestored.energy.dockPositionToleranceMeters == 0.015 &&
+      energyRestored.energy.dockHeadingToleranceRadians == 0.02 &&
+      energyRestored.energy.initialChargeFraction == 1,
+      "mobile battery, conversion and CAD dock profile round trip");
+    base.energy.batteryOccurrence = "missing";
+    rejects(function() SceneArtifact.encode(data), "mobile energy profile with no battery occurrence");
+    base.energy.batteryOccurrence = "battery";
+    base.energy.dockPositionToleranceMeters = 0;
+    rejects(function() SceneArtifact.encode(data), "mobile energy profile with no physical dock alignment tolerance");
+    base.energy.dockPositionToleranceMeters = 0.015;
+    base.energy.dockHeadingToleranceRadians = Math.PI / 2;
+    rejects(function() SceneArtifact.encode(data), "mobile energy profile with unbounded dock heading tolerance");
+    base.energy.dockHeadingToleranceRadians = 0.02;
     data.mobileBase = base;
     base.rightWheel = "lift";
     rejects(function() SceneArtifact.encode(data), "mobile base wheel on a sliding joint");
