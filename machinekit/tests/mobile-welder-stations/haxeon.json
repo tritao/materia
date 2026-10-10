@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-mobile-welder-stations-tests"},
+  "entry": "MobileWelderStationTests",
+  "sourceRoots": [".", "../../examples/robot-welder", "../../examples/robot-arm", "../../examples/mobile-base"],
+  "dependencies": {
+    "collisionkit-native": {"path": "../../../collisionkit/native"},
+    "cadbridge": {"path": "../../../robotkit/cadbridge"},
+    "cadkit": {"path": "../../../cadkit"},
+    "machinekit": {"path": "../.."},
+    "machinekit-process": {"path": "../../process"},
+    "machinekit-robot": {"path": "../../robot"},
+    "processkit": {"path": "../../../processkit"},
+    "projectkit": {"path": "../../../projectkit"}
+  },
+  "target": "host",
+  "outputDir": "build"
+}
