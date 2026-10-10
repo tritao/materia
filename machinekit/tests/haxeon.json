@@ -7,6 +7,7 @@
 		"collisionkit-native": {"path": "../../collisionkit/native"},
 		"motionkit-robot": { "path": "../../motionkit/robot" },
 		"processkit": { "path": "../../processkit" },
+		"machinekit-process": { "path": "../process" },
 		"projectkit": { "path": "../../projectkit" },
 		"manufacturingkit": { "path": "../../manufacturingkit" },
 		"cadkit": { "path": "../../cadkit" },
