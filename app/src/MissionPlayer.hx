@@ -47,6 +47,7 @@ import robotkit.model.SteadyLoads;
 import robotkit.skill.HandlePart;
 import robotkit.spatial.Vec3;
 import robotkit.localization.SimulationTruthLocalization;
+import robotkit.localization.Localization;
 import robotkit.localization.WheelOdometryLocalization;
 import robotkit.mobile.Pose2;
 import robotkit.navigation.AStarPlanner;
@@ -178,7 +179,8 @@ class MissionPlayer implements SessionMember {
   final newWelding:Null<Void->WeldingPlanRunner>;
   final weldSensor:Null<String>;
   final newRegistration:Null<SceneContactWork->processkit.ContactRegistrationRunner>;
-  var registeredWork = new Map<String, Transform3>();
+  /** Contact-registered work frames in the map frame, retained across dock excursions. */
+  var registeredWorkWorld = new Map<String, Transform3>();
   /** What welds are planned clear of, and where the arm's joints are among the robot's. */
   var clearance:Null<CollisionClearance> = null;
   var clearanceJoints:Array<Int> = [];
@@ -199,7 +201,8 @@ class MissionPlayer implements SessionMember {
   /** The grasp connector of the part the last pick took hold of. */
   var grasped:Null<SceneArtifactPlace> = null;
   final navigator:Null<Navigator>;
-  final localization:SimulationTruthLocalization;
+  /** Map localization shared by navigation and accepted work frames. */
+  final localization:Localization;
   /** The lidar's perception, in the map frame, and the sensor it reads. */
   final scanning:Null<FrameAwarePerception>;
   final scanner:Null<String>;
@@ -544,7 +547,7 @@ class MissionPlayer implements SessionMember {
   public function reset():Void {
     runner = new SkillRunner();
     jointMotions = new Map<String, ManipulatorMotion>();
-    registeredWork = new Map<String, Transform3>();
+    registeredWorkWorld = new Map<String, Transform3>();
     stepIndex = 0;
     completed = 0;
     failure = null;
@@ -619,7 +622,7 @@ class MissionPlayer implements SessionMember {
       case "stow":
         return stow();
       case "goTo":
-        registeredWork = new Map<String, Transform3>();
+        registeredWorkWorld = new Map<String, Transform3>();
         var activeNavigator:Navigator = cast navigator;
         return new GoTo(activeNavigator, new NavigationGoal(floorPose(step), FRAME, POSITION_TOLERANCE, HEADING_TOLERANCE),
           observe);
@@ -639,13 +642,36 @@ class MissionPlayer implements SessionMember {
           [for (pass in weld.passes) pass.interpassDwell]);
       case "findWork":
         var job:SceneContactWork = cast step.contactWork;
-        registeredWork.remove(job.frame);
+        registeredWorkWorld.remove(job.frame);
         var factory = newRegistration;
         if (factory == null) throw "Contact mission has no registration runner";
-        return new processkit.skill.FindWeldWork(() -> factory(job), (frame) -> registeredWork.set(job.frame, frame));
+        return new processkit.skill.FindWeldWork(() -> factory(job), (frame) -> acceptRegisteredWork(job, frame));
       default:
         throw 'Mission step kind "${step.kind}" is not supported';
     }
+  }
+
+  function acceptRegisteredWork(job:SceneContactWork, measured:Transform3):Void {
+    var estimate = localization.state();
+    var snapshot = robot.robot.snapshot();
+    if (estimate == null || estimate.referenceFrame != FRAME || estimate.bodyFrame != robot.rootLink ||
+        estimate.sequence != snapshot.sourceSequence)
+      throw "Contact registration cannot anchor its measured work frame without a fresh valid map pose";
+    if (switch estimate.quality { case robotkit.localization.LocalizationQuality.Invalid: true; case _: false; })
+      throw "Contact registration cannot anchor its measured work frame without a fresh valid map pose";
+    var covariance = estimate.covariance;
+    var planarTrace = covariance.xx + covariance.yy;
+    var planarSpread = Math.sqrt(Math.max(0.0,
+      (covariance.xx - covariance.yy) * (covariance.xx - covariance.yy) + 4.0 * covariance.xy * covariance.xy));
+    var positionThreeSigma = 3.0 * Math.sqrt(Math.max(0.0, 0.5 * (planarTrace + planarSpread)));
+    var headingThreeSigma = 3.0 * Math.sqrt(Math.max(0.0, covariance.yawYaw));
+    var positionEnvelope = job.translation.length < 2 ? 0.0 : Math.min(job.translation[0], job.translation[1]);
+    var headingEnvelope = job.rotation.length < 3 ? 0.0 : job.rotation[2];
+    if (positionThreeSigma > positionEnvelope || headingThreeSigma > headingEnvelope)
+      throw 'Contact registration map uncertainty exceeds the saved contact envelope: ' +
+        '3σ position=${positionThreeSigma} m / ${positionEnvelope} m, ' +
+        'heading=${headingThreeSigma} rad / ${headingEnvelope} rad';
+    registeredWorkWorld.set(job.frame, Transform3.fromPose2(estimate.pose).compose(measured));
   }
 
   /** Plans absolute mechanical coordinates on the chain ending at the named connector. */
@@ -736,7 +762,7 @@ class MissionPlayer implements SessionMember {
     cast(welding,WeldingPlanRunner).configuration=configuration;
     if (requiresRegistration(weld)) {
       if (wheels == null) throw "Registered welding has no wheel pose estimate";
-      return new WeldSeam(cast welding, wheels, () -> weldPlan(weld, pass), cast weldSensor);
+      return new WeldSeam(cast welding, localization, () -> weldPlan(weld, pass), cast weldSensor);
     }
     return new WeldSeam(cast welding, localization, () -> weldPlan(weld, pass), cast weldSensor);
   }
@@ -750,10 +776,9 @@ class MissionPlayer implements SessionMember {
   function referenceFrame(weld:SceneArtifactWeld):Transform3 {
     if (weld.frame == null || weld.frame == "") return Transform3.identity();
     if (requiresRegistration(weld)) {
-      var measured = registeredWork.get(weld.frame);
-      var estimate = wheels == null ? null : wheels.state();
-      if (measured == null || estimate == null) throw "Weld work has no accepted registration at this station";
-      return Transform3.fromPose2(estimate.pose).compose(measured);
+      var measured = registeredWorkWorld.get(weld.frame);
+      if (measured == null) throw "Weld work has no accepted map-frame registration at this station";
+      return measured;
     }
     var live = assemblyParts.get("project:" + weld.frame).pose();
     return new Transform3(new Vec3(live.position[0], live.position[1], live.position[2]),
