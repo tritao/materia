@@ -29,6 +29,8 @@ import robotkit.spatial.Vec3;
  * with `RedundancyResolver`.
  */
 class ManipulatorKinematics implements RedundantPathSolver {
+  static inline var CANDIDATE_SEEDS_PER_RESULT:Int = 8;
+
   /** The group solved: an arm (`Manipulator`), or an arm with external axes and a work frame. */
   public final manipulator:KinematicGroup;
   /**
@@ -154,7 +156,11 @@ class ManipulatorKinematics implements RedundantPathSolver {
     // A redundant arm finds a few IK branches this way, then sweeps each around its swivel.
     var redundant = manipulator.redundant();
     var branchLimit = redundant ? Std.int(Math.max(1, Math.min(4, maxCount))) : maxCount;
-    var attemptLimit = Math.min(combinationCount, Math.max(32, maxCount * 32));
+    // Enumerate small lattices completely. For larger groups, spend seeds in
+    // proportion to the useful branch count; a one-branch feasibility screen
+    // should stay cheaper than full path preparation.
+    var attemptLimit = combinationCount <= 32 ? combinationCount
+      : Math.min(combinationCount, Math.max(CANDIDATE_SEEDS_PER_RESULT, branchLimit * CANDIDATE_SEEDS_PER_RESULT));
     for (attempt in 0...Std.int(attemptLimit)) {
       var code = attempt;
       var shift = attempt % 3;

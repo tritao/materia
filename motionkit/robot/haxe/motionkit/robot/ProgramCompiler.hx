@@ -832,8 +832,15 @@ class ProgramCompiler {
         joints.copy();
       case PoseTarget(pose, requestedFrame, _):
         requireFrame(requestedFrame, index);
-        var candidates = configurationConstraint==null ? solver.sampleCandidates(pose, 32, ikTolerance, null) :
-          configurationConstraint.candidates(pose,start);
+        var candidates:Array<Array<Float>>;
+        if (configurationConstraint != null) {
+          candidates = configurationConstraint.candidates(pose, start);
+        } else {
+          // Preserve the locally reached branch before enumerating alternatives.
+          var seeded = solver.solvePose(pose, start, ikTolerance, null);
+          if (seeded != null) return seeded;
+          candidates = solver.sampleCandidates(pose, 32, ikTolerance, null);
+        }
         if (candidates.length == 0) throw 'Motion program op $index unreachable pose';
         var best:Null<Array<Float>> = null;
         var bestCost = Math.POSITIVE_INFINITY;
