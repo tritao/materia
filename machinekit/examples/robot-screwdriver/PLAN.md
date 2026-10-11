@@ -1225,6 +1225,8 @@ values, saved format or native code changed, and no new Haxeon issue was found.
 
 ### SD7 observer and head-seat checkpoint (2026-10-11)
 
+Implementation commit: `2b7d15c71`.
+
 The simulated tool now retains a successful released engagement using exact
 connection/body identity, resumes cumulative angle and preload, and verifies
 the actual body and intrinsic socket/lead-in geometry when vacuum recontacts.
@@ -1296,5 +1298,5 @@ reports and physical whole-cell two-stage acceptance still need implementation.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — CAD execution, transport-loss recovery and endpoint access pass full checkpoint gates; retained observer, head-seat stop and shared budget pass focused/quick checks; staged mission and final full gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a` |
+| SD7 | in progress — CAD execution, transport-loss recovery and endpoint access pass full checkpoint gates; retained observer, head-seat stop and shared budget pass focused/quick checks; staged mission and final full gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71` |
 | SD8 | open — machine tending landed; not started | |
