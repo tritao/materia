@@ -598,21 +598,7 @@ class ProgramCompiler {
       if (event.distance >= section.offset && (last || event.distance < end))
         new PathEvent(event.distance - section.offset, event.channel, event.value,
           event.leadSeconds, event.holdPolicy)], c.currentIndex,null,0.0,curve,section.offset,last);
-    } catch (error:Dynamic) {
-      releaseTransitions();
-      // Timing can fail where several limits meet along a long, tight path; the same path in two halves,
-      // each from rest to rest, has fewer places to meet. Cut it at the middle primitive and plan the halves.
-      var primitives = section.path.primitives;
-      if (curve != null || primitives.length < 2 || Std.string(error).indexOf("path.time failed") < 0) throw error;
-      var middle = primitives.length >> 1;
-      var first = section.path.sub(0, middle), second = section.path.sub(middle, primitives.length);
-      c.sections.splice(k, 1);
-      c.sections.insert(k, {path: second, offset: section.offset + first.length()});
-      c.sections.insert(k, {path: first, offset: section.offset});
-      c.sectionIndex = k;
-      c.sink.note('Motion program op ${c.currentIndex} timing failed over ${primitives.length} primitives: planned in two halves');
-      return;
-    }
+    } catch (error:Dynamic) { releaseTransitions(); throw error; }
     try {
       var moved = false;
       for (joint in 0...c.q.length) if (Math.abs(pathStart[joint]-c.q[joint]) > 1e-7) moved = true;

@@ -10,8 +10,8 @@
 	url = https://github.com/pantor/ruckig.git
 [submodule "motionkit/native/vendor/toppra"]
 	path = motionkit/native/vendor/toppra
-	url = https://github.com/hungpham2511/toppra.git
-	branch = develop
+	url = https://github.com/tritao/toppra.git
+	branch = materia
 [submodule "motionkit/native/vendor/descartes_light"]
 	path = motionkit/native/vendor/descartes_light
 	url = https://github.com/swri-robotics/descartes_light.git

@@ -651,12 +651,12 @@ Done. What was built and decided:
   millimetres of path costs a few milliseconds. The plan's "windows with boundary speeds" is not done: with the
   stops this cheap and every layer change a stop anyway, carrying a speed across windows would add a feasibility
   fallback for no measurable time. Timing that still fails (`path.time failed`) is retried in two halves, each
-  from rest to rest, down to a single primitive.
+  from rest to rest, down to a single primitive. (Removed in AM5b item 2.)
 - **TOPP-RA.** The stock forward pass gave up ("forward pass" failure, seen on every load sliced from exact
   geometry) where the speed it had reached was the greatest the controllable set allows, a vertex where two
   constraints meet and rounding leaves no acceleration. The submodule is not ours to patch, so motionkit
   subclasses `TOPPRA` and retries the stage with the speed lowered by 1e-9, 1e-7, 1e-5, 1e-3 (relative); the lowered
-  trajectory is still validated against the caller's limits.
+  trajectory is still validated against the caller's limits. (Replaced by a fix in our TOPP-RA fork in AM5b item 2.)
 - Gate (`machinekit/examples/printer/benchmark`, run with no arguments; in the workspace as `printing-gate`) on a thin
   gear (module 1.5, 40 teeth, 1.2 mm: 6 layers, 11 797 moves): planning at least 2x faster than the print over the whole
   job and its worst 10 s, planned time within 15 % of the reference, no failure. **Passed**: 1047.9 s planned,
@@ -956,8 +956,37 @@ left in the motion path.
    `1e-6` fallback: move the rule into trajectorykit's shared validator (`trajectory_core`) once, and settle where a
    homed axis should rest (a home coordinate exactly on the travel limit is the root cause).
 2. TOPP-RA's forward-pass failure: replace the lowered-speed retry subclass and the string-matched "path.time failed"
-   halving with a real fix of TOPP-RA's forward-pass numerics (a fork and an upstream pull request). Forking is
-   outward-facing and needs the user's approval: pending approval.
+   halving with a real fix of TOPP-RA's forward-pass numerics (a fork and an upstream pull request). **Fixed in our
+   fork; retry and halving deleted, one failure left (below).** The submodule now follows github.com/tritao/toppra
+   branch `materia` (8e9fe00 on 0.6.10: three fix commits and a changelog line, the same as upstream pull request
+   hungpham2511/toppra#302, branch `fix-degenerate-stages`; when it is merged, follow upstream again). Root cause, from 40 failures recorded on the gate and replayed
+   bit for bit against stock 0.6.10: the forward pass clamps each state into the next controllable set, so wherever the
+   profile follows the upper boundary (decelerating into a corner, holding an arc's limit) the state is exactly the
+   set's upper bound, the optimum of the same stage LP the backward pass solved, usually a vertex admitting a single
+   control. Re-solved with x fixed (`algorithm/toppra.cpp` computeForwardPass), rounding left it none, three ways:
+   (a) Seidel's 2D loop (`solver/seidel.cpp` solve_lp2d) moves onto the line of any constraint violated by more than
+   an absolute 1e-13 while its 1D problems accept crossings of 1e-10 relative to the line parameter, so it moves onto
+   lines it already enforces (a duplicate row); there the other CoreXY motor's row, equal to the last digits, projects
+   to a bound whose slope is the difference of slopes (4e-10) and whose offset is one rounding of 77.1 (1.4e-14),
+   placing it anywhere on the line (this also failed the backward pass, ERR_FAIL_CONTROLLABLE, on the test tower);
+   (b) a joint at rest along the path has a path-acceleration coefficient that is rounding (1.8e-16) next to its
+   curvature (5e4), so at the vertex its row bounds the control arbitrarily (empty ranges of 0.3 to 115 in path
+   acceleration); (c) the backward pass's own vertex overshoots by its tolerances (residual 1e-14 to 1.6e-8). Fixes:
+   Seidel takes a constraint violated within 1e-10 of its terms as satisfied (a); `computeControllableSets` keeps the
+   control that reaches the next set from each upper bound and the forward pass uses it when the stage fails there
+   (b, c); a step that ends on the next upper bound to within its own rounding lands on it, else the next stage sits one
+   rounding below the vertex (seen on the 8 mm gear). Four recorded spans are tests in TOPP-RA's suite
+   (`test_degenerate_stages.cpp`, each failing without its fix).
+   Before (retry subclass and halving): the gate had 146 forward-pass failures rescued by the retry; the test tower 19
+   halvings (242 sections). After: none; the tower plans in 223 sections, the gear (8 mm) and cube unchanged in planned
+   time (2356.9 s, 870.3 s, tower 471.5 s). **Left: the gate's extruder check now fails** (`path.time failed`, op 15),
+   which the halving had been hiding and which is not TOPP-RA's: `mk_time_path` rounds each stage down to whole
+   nanoseconds and derives its acceleration from that, and on the 1.1 micrometre spans of a corner arc a stage lasts
+   about 1 us, so 1 ns of rounding moves the path acceleration by about 60 m/s^2 (stage 16007: -59.7 against TOPP-RA's
+   0.53), a joint acceleration 4.9x its limit that stretching and softening cannot cure. It fails identically with the
+   old library; it needs stage times that are not quantized this coarsely, or arcs that small not made (item 4).
+   The app's `PROJECT_SOURCE_ONLY=printer` (SmallTab, op 15, layer 3) fails the same way (2.5 um spans, a pulley at
+   2.4x its acceleration limit on the first lowering).
 3. Replace the `MAX_SECTION_PRIMITIVES` forced rests with timing windows that carry boundary speeds (AM-D4's original
    design).
 4. Derive `CornerBlender.MIN_RADIUS` from the machine (an arc whose v^2 / r exceeds the acceleration cannot be followed)

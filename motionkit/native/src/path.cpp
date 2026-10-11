@@ -329,46 +329,6 @@ private:
     std::vector<double> caps_;
 };
 
-// TOPP-RA whose forward pass tolerates the vertex a controllable set ends in. The speed the previous stage
-// reached can be the greatest the controllable set allows, where two constraints meet; rounding then leaves
-// the next stage no acceleration to choose and the stock pass gives up ("forward pass" failure, seen on the
-// tight rounded corners of printed outlines). Here the stage retries with the speed lowered by the least
-// relative amount that restores one. Stage accelerations are derived from the speeds afterwards, and the
-// lowered trajectory is validated against the caller's limits.
-class Toppra final : public toppra::algorithm::TOPPRA {
-public:
-    using toppra::algorithm::TOPPRA::TOPPRA;
-
-protected:
-    toppra::ReturnCode computeForwardPass(toppra::value_type vel_start) override {
-        toppra::Vector g_upper{2}, solution{2};
-        toppra::Matrix H;
-        auto deltas = m_solver->deltas();
-        toppra::Bound x, x_next;
-        m_data.parametrization(0) = vel_start;
-        for (std::size_t i = 0; i + 1 < static_cast<std::size_t>(m_data.parametrization.size()); i++) {
-            g_upper << -2 * deltas(i), -1;
-            x.setConstant(m_data.parametrization(i));
-            x_next = m_data.controllable_sets.row(i + 1);
-            bool solved = m_solver->solveStagewiseOptim(i, H, g_upper, x, x_next, solution);
-            for (const double shrink : {1e-9, 1e-7, 1e-5, 1e-3}) {
-                if (solved) break;
-                x.setConstant(m_data.parametrization(i) * (1.0 - shrink));
-                solved = m_solver->solveStagewiseOptim(i, H, g_upper, x, x_next, solution);
-                if (solved) m_data.parametrization(i) = x(0);
-            }
-            if (!solved) {
-                m_errorStream << "Forward pass failed at idx " << i << '\n';
-                return toppra::ReturnCode::ERR_FAIL_FORWARD_PASS;
-            }
-            m_data.parametrization(i + 1) = std::min(m_data.controllable_sets(i + 1, 1),
-                std::max(m_data.controllable_sets(i + 1, 0),
-                    m_data.parametrization(i) + 2 * deltas(i) * solution(0)));
-        }
-        return toppra::ReturnCode::OK;
-    }
-};
-
 bool valid_timing_request(const std::vector<mk_path_sample> &path,
                           const double *velocity, const double *acceleration,
                           uint32_t joints, const double *caps, uint32_t cap_count,
@@ -734,7 +694,7 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
                 lower_acceleration, upper_acceleration)};
         for (auto &constraint : constraints)
             constraint->discretizationType(toppra::DiscretizationType::Collocation);
-        auto algorithm = std::make_unique<Toppra>(constraints, geometric);
+        auto algorithm = std::make_unique<toppra::algorithm::TOPPRA>(constraints, geometric);
         algorithm->solver(std::make_shared<toppra::solver::Seidel>());
         algorithm->setGridpoints(grid);
         algorithm->setInitialXBounds(toppra::Bound{0.0, 1e16});
