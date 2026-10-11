@@ -963,6 +963,23 @@ Order: CL9a, CL9b, CL9c, CL9d, CL9e. Each step is one commit.
 - No new dependencies, forks, simulation mission behaviour changes, pushes
   or OCCT rebuilds.
 
+### CL9d: kit motion bounds (2026-10-11)
+
+- ClearanceMotionBounds and ClearanceMotionEnvelope now live in pure
+  kinematicskit on KinematicModel, KinematicState, DOF/body/frame indices
+  and kit Transform. RobotKit's files are gone; the kit has no RobotKit
+  types. CollisionClearance, JointCurveClearance and JointCurveTask use
+  them. MotionKit retains the bisection and continuous-motion proof.
+- No existing assertion or expected value changed. All required gates and
+  the CAD cell, MuJoCo, CadBridge, clearance-validation and planner checks
+  pass. The 23 clearance-validation assertions retain their reported
+  distances. A new kit test checks actual body/TCP displacement with held
+  prismatic travel, a root override and a moving work frame.
+- The pure kit still fails only its known DLS allocation assertion (now
+  40.96 bytes after the additional test; previously -40.8). It is recorded,
+  not changed. No new dependencies, forks, simulation mission behaviour
+  changes, pushes or OCCT rebuilds.
+
 ### Plan revision (2026-10-01, after CL1)
 
 A review of the plan against CL1 and the code around it changed:

@@ -12,8 +12,8 @@ import collisionkit.DescribedObject;
 import robotkit.model.CollisionShape;
 import robotkit.manipulation.ClearanceChange;
 import robotkit.manipulation.ClearanceScene;
-import robotkit.manipulation.ClearanceMotionBounds;
-import robotkit.manipulation.ClearanceMotionEnvelope;
+import kinematicskit.ClearanceMotionBounds;
+import kinematicskit.ClearanceMotionEnvelope;
 import robotkit.manipulation.ClearanceViolation;
 import robotkit.manipulation.ClearanceWorld;
 import robotkit.manipulation.KinematicGroup;
@@ -480,15 +480,19 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   }
 
   public function displacementBounds(q:Array<Float>, errors:Array<Float>):Array<Float> {
-    var bounds = new ClearanceMotionBounds(arm, q, errors);
-    return [for (i in 0...bodies.length) bounds.point(bodyLinks[i], originRadius(corners[i]))];
+    var bounds = new ClearanceMotionBounds(arm.model, [for(id in arm.group.jointIds)arm.model.dofIndex(id)], arm.stateOf(q), errors, arm.model.frameIndex(arm.flangeFrame), robotkit.kinematics.RobotKinematics.toTransform(arm.flangeTTcp), arm.workFrame == null ? -1 : arm.model.frameIndex(arm.workFrame));
+    return [for (i in 0...bodies.length) bounds.point(arm.model.bodyIndex(bodyLinks[i]), originRadius(corners[i]))];
   }
 
   public function motionEnvelope(lower:Array<Float>, upper:Array<Float>):ClearanceMotionEnvelope
-    return new ClearanceMotionEnvelope(arm, lower, upper, bodyLinks.copy(), corners);
+    return new ClearanceMotionEnvelope(arm.model, [for(id in arm.group.jointIds)arm.model.dofIndex(id)],
+      arm.stateOf([for(i in 0...lower.length)lower[i]+(upper[i]-lower[i])*0.5]),
+      lower, upper, [for(link in bodyLinks)arm.model.bodyIndex(link)], corners,
+      arm.model.frameIndex(arm.flangeFrame), robotkit.kinematics.RobotKinematics.toTransform(arm.flangeTTcp),
+      arm.workFrame == null ? -1 : arm.model.frameIndex(arm.workFrame));
 
   public function tcpDisplacementBound(q:Array<Float>, errors:Array<Float>):Float
-    return new ClearanceMotionBounds(arm, q, errors).tcp();
+    return new ClearanceMotionBounds(arm.model, [for(id in arm.group.jointIds)arm.model.dofIndex(id)], arm.stateOf(q), errors, arm.model.frameIndex(arm.flangeFrame), robotkit.kinematics.RobotKinematics.toTransform(arm.flangeTTcp), arm.workFrame == null ? -1 : arm.model.frameIndex(arm.workFrame)).tcp();
 
   public function auditDisplacement(q:Array<Float>, perturbed:Array<Float>, errors:Array<Float>, ?envelope:ClearanceMotionEnvelope):Float {
     var bounds = envelope == null ? displacementBounds(q, errors) : envelope.bounds(errors);
