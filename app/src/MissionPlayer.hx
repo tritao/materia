@@ -342,6 +342,7 @@ class MissionPlayer implements SessionMember {
   var screwRun:Null<FasteningExecution> = null;
   var recordedScrewRun:Null<FasteningExecution> = null;
   final screwdrivers:Array<SimulatedScrewdriver>;
+  final screwFeeders:Array<SimulatedScrewFeeder>;
   var screwArm:Null<Manipulator> = null;
   var screwing:Null<ScrewdrivingRunner> = null;
   var recordedScrew:Null<ScrewdrivingRunner> = null;
@@ -432,7 +433,7 @@ class MissionPlayer implements SessionMember {
   public var energyChargeSeconds(default, null):Float = 0.0;
 
   public function new(mission:SceneArtifactMission, robot:AssemblyRobot, simulation:Simulation, robotIndex:Int,
-      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, cellRobots:Array<AssemblyRobot>, ?cellInput:String->Null<EventValue>, ?cellOutput:String->Bool->Void, ?jointMotionPolicy:JointMotionPolicy, weldAcceleration:Float = ARM_ACCELERATION, ?energyPower:SimulatedMobilePower, ?screwdrivers:Array<SimulatedScrewdriver>) {
+      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, cellRobots:Array<AssemblyRobot>, ?cellInput:String->Null<EventValue>, ?cellOutput:String->Bool->Void, ?jointMotionPolicy:JointMotionPolicy, weldAcceleration:Float = ARM_ACCELERATION, ?energyPower:SimulatedMobilePower, ?screwdrivers:Array<SimulatedScrewdriver>, ?screwFeeders:Array<SimulatedScrewFeeder>) {
     if (!Math.isFinite(weldAcceleration) || weldAcceleration <= 0.0 || weldAcceleration > ARM_ACCELERATION)
       throw "Invalid welding planning acceleration";
     if (mission.steps.length == 0) throw "A mission needs steps";
@@ -452,6 +453,7 @@ class MissionPlayer implements SessionMember {
     this.robotIndex = robotIndex;
     this.project = project;
     this.screwdrivers = screwdrivers == null ? new Array<SimulatedScrewdriver>() : screwdrivers.copy();
+    this.screwFeeders = screwFeeders == null ? new Array<SimulatedScrewFeeder>() : screwFeeders.copy();
     if ([for (step in mission.steps) if (step.kind == "screw") step].length > 0) {
       var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
       if (tools.length != 1) throw "Screw mission needs exactly one screwdriver";
@@ -1809,8 +1811,12 @@ class MissionPlayer implements SessionMember {
       return present == null ? false : switch present {case Digital(value):value;case _:false;};
     });
     screwing = active;
+    var supplies = [for (feeder in screwFeeders) if (feeder.definition.presenter == job.presenter && feeder.definition.inventory.indexOf(job.screw) >= 0) feeder];
+    if (supplies.length > 1) throw "Screw attempt has ambiguous feeder ownership";
+    var preparation:Null<robotkit.skill.Skill> = supplies.length == 0 || retightening ? null
+      : new processkit.skill.WaitForScrewFeeder(supplies[0].select(job.screw),supplies[0].definition.deliveryTimeout+supplies[0].definition.trackDelay);
     return new processkit.skill.DriveScrew(active,localization,
-      () -> ScrewScenePlan.plan(job,livePart(presenter),livePart(work),finalContact,stopAtSeat,qualifiedSlot),sensor);
+      () -> ScrewScenePlan.plan(job,livePart(presenter),livePart(work),finalContact,stopAtSeat,qualifiedSlot),sensor,preparation);
   }
 
   function handlingToolChannel(step:SceneArtifactMissionStep):String {

@@ -25,13 +25,17 @@ typedef ScrewdrivingDesign = {
 
 /** Every flange fastening has its own supported supply and one physically separate replacement. */
 class ScrewdrivingAssemblyPreview {
-	public static function design():ScrewdrivingDesign {
+	public static function design(bowlFed:Bool = false):ScrewdrivingDesign {
 		var cell = new ScrewdrivingCell(new machinekit.screwdriving.ScrewdriverBit(HexSocket(5),45,6,0.05),0,
-			machinekit.standard.DeepGrooveBearing.metric("6003"));
+			machinekit.standard.DeepGrooveBearing.metric("6003"),bowlFed);
 		var positions = [[250.0,-450.0],[180.0,-380.0],[250.0,-380.0],[110.0,-450.0],[110.0,-380.0],[320.0,-450.0],[320.0,-380.0]];
-		var supplyNames = ["presenter","supply2","supply3","supply4"];
+		var supplyNames = bowlFed ? ["presenter","presenter","presenter","presenter"] : ["presenter","supply2","supply3","supply4"];
 		var spareNames = ["reserve1","reserve2","reserve3","reserve4"];
-		var additional = supplyNames.slice(1).concat(spareNames);
+		var additional = bowlFed ? spareNames.copy() : supplyNames.slice(1).concat(spareNames);
+		if (bowlFed) {
+			cell.include("feeder",new machinekit.screwdriving.ScrewBowlFeeder(cell.presenter.screw),AssemblyFrames.translation(180,-650,RobotArm.TABLE_TOP));
+			cell.exposePort("feederControl","feeder/drive","control");
+		}
 		for (i in 0...additional.length) {
 			var name = additional[i];
 			cell.include(name,new ScrewPresenter(cell.presenter.screw),AssemblyFrames.translation(positions[i][0],positions[i][1],RobotArm.TABLE_TOP));
@@ -68,8 +72,8 @@ class ScrewdrivingAssemblyPreview {
 		return {cell:cell,scene:scene,state:state,found:found,jobs:jobs,staging:staging};
 	}
 
-	public static function scene(twoStage:Bool = false):SceneArtifactData {
-		var design = design(), cell = design.cell, scene = design.scene, state = design.state;
+	public static function scene(twoStage:Bool = false, bowlFed:Bool = false):SceneArtifactData {
+		var design = design(bowlFed), cell = design.cell, scene = design.scene, state = design.state;
 		var jobs = design.jobs, staging = design.staging, found = design.found;
 		var tools = [for (tool in scene.robotTools) if (tool.screwdriver != null) tool];
 		if (tools.length != 1) throw "Whole screw access lost its feed capability";
@@ -84,6 +88,23 @@ class ScrewdrivingAssemblyPreview {
 		parts.close();
 		ScrewdrivingExecution.stage(scene,staging);
 		scene.mission = {steps:mission.require()};
+		if (bowlFed) {
+			var metres = scene.metresPerUnit;
+			var deposit = AssemblyFrames.compose(AssemblyFrames.inverse(state.worldPose("presenter/nest")),state.worldPose("presenter/screw"));
+			deposit.x *= metres; deposit.y *= metres; deposit.z *= metres;
+			scene.mission.screwFeeders = [{id:"bowl",presenter:"presenter/nest",presentSensor:"presenter/part-present",
+				inventory:[for (job in jobs) job.screw],deposit:deposit,bufferCapacity:2,trackDelay:0.2,deliveryDelay:0.3,deliveryTimeout:3}];
+			var flat = scene.assemblyDefinition;
+			if (flat == null) throw "Fed cell lost its independent supplies";
+			var execution = new AssemblyState(flat,scene.assemblyState);
+			for (i in 0...jobs.length) {
+				var stored = state.worldPose("presenter/screw");
+				stored.x = 180+(i-1.5)*(cell.presenter.screw.spec.headDiameter+5);
+				stored.y = -650; stored.z = RobotArm.TABLE_TOP+15+4+cell.presenter.screw.length;
+				execution.setRootPose(jobs[i].screw,stored);
+			}
+			scene.assemblyState = execution.record();
+		}
 		var controllers = scene.controllers;
 		if (controllers != null) {
 			var owners = [for (controller in controllers) if (controller.kind == "robot" && controller.joints.indexOf("arm/j1") >= 0) controller];
@@ -94,6 +115,7 @@ class ScrewdrivingAssemblyPreview {
 	}
 	public static function assembly():Bytes return SceneArtifact.encode(scene());
 	public static function staged():Bytes return SceneArtifact.encode(scene(true));
+	public static function fed():Bytes return SceneArtifact.encode(scene(false,true));
 }
 function main():Void {
 	var decoded = SceneArtifact.decode(ScrewdrivingAssemblyPreview.assembly());

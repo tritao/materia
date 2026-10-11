@@ -2141,6 +2141,67 @@ class ProjectSourceTests {
     Sys.println("Screwdriving whole assembly passed on both backends with cross-thread replacement recovery");
   }
 
+  /** Buffered supply deposits each identified screw; pickup and tightening remain physical. */
+  static function checkScrewFeeder(root:String):Void {
+    var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.feeder.project.json");
+    for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (jam in [false,true]) {
+      Sys.println('Screw feeder CAD: begin backend $backend, jam $jam');
+      var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.mission;
+      if (definition == null || definition.screwFeeders == null || definition.screwFeeders.length != 1)
+        throw "Fed flange lost its one replenishing material path";
+      var jobs:Array<materia.project.SceneScrewDefinition.SceneScrew> = [];
+      for (step in definition.steps) {
+        var job = materia.project.SceneScrewInvocation.job(step.screw,definition.steps);
+        if (job == null) throw "Fed flange lost its CAD fastening"; jobs.push(job);
+      }
+      check(jobs.length == 4 && [for (job in jobs) job.presenter].join(",") == "presenter/nest,presenter/nest,presenter/nest,presenter/nest",
+        "All four CAD screws use the same replenished pickup nest");
+      var session = new ProjectDocumentSession(null,false), simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.setBackend(backend);
+      try {
+        session.openGeneratedProject(generated,manifest);
+        check(simulation.rebuild(session.sensors,session.scene,session),'Fed flange builds: ${simulation.error}');
+        var mission = simulation.missionPlayer(), clock = simulation.activeSession(), tools = @:privateAccess simulation.tools;
+        if (mission == null || clock == null || tools == null || tools.screwFeeders.length != 1) throw "Fed flange lost its live device";
+        var feeder = tools.screwFeeders[0];
+        var injected = false, witnessed:Map<String,Bool> = [];
+        while (!mission.finished && mission.failure == null && clock.simulationTime() < 600) {
+          simulation.step();
+          var delivered = feeder.model.delivered;
+          var feedback = feeder.model.reading();
+          if (delivered != null && feedback != null && feedback.present) witnessed.set(delivered,true);
+          if (jam && !injected && feeder.model.deliveries == 1 && feeder.model.delivered == null) {
+            feeder.model.setJam(true); injected = true;
+          }
+        }
+        if (jam) check(injected && mission.failure != null && mission.failure.indexOf("jam") >= 0 && feeder.model.deliveries == 1,
+          "A physical pickup followed by a jam stops the next delivery with its diagnostic");
+        else {
+          check(mission.finished && mission.failure == null && feeder.model.deliveries == 4,"One buffered delivery supplies each fastening");
+          var results = mission.screwResults;
+          check(results.length == 4,"Fed flange records all four results");
+          for (job in jobs) check(witnessed.exists(job.screw),"Each identified screw is sensed at the nest before pickup");
+          for (result in results) check(result.outcome == robotkit.tool.ScrewdriverContract.OK && Math.abs(result.torqueNm-16.5) < 1e-8,
+            "Feeding preserves the published M6 tightening target");
+          check(simulation.heldObjectIds().length == 0,"Fed flange releases the final screw");
+          check(simulation.reset() && feeder.model.deliveries == 0 && feeder.model.bulk() == 4,
+            "Reset restores physical stock and its authored feeder inventory");
+          for (_ in 0...10) simulation.step();
+          var resetReading = feeder.model.reading();
+          check(feeder.model.deliveries == 0 && resetReading != null && !resetReading.present,
+            "Reset has no latent release and the sensed pickup nest is physically empty");
+        }
+        simulation.clear(); session.dispose();
+      } catch (error:Dynamic) {simulation.clear(); session.dispose(); throw error;}
+      Sys.println('Screw feeder CAD: end backend $backend, jam $jam');
+    }
+    var portable = materia.project.SceneArtifact.decode(MateriaProjectRunner.exportArtifact(manifest));
+    var work = portable.mission;
+    check(work != null && work.screwFeeders != null && work.screwFeeders.length == 1 && work.screwFeeders[0].inventory.length == 4,
+      "Portable fed flange retains one material path and all four inventory identities");
+    Sys.println("Screw feeder CAD passed on both backends with physical replenishment and jam diagnostics");
+  }
+
   /** Staged execution shares physical supplies and preserves the installed body's measured engagement. */
   static function checkScrewdrivingStaged(root:String):Void {
     var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.staged.project.json");

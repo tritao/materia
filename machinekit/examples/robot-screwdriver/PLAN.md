@@ -641,8 +641,8 @@ Here:
 ## Follow-on plan (2026-10-11)
 
 SD0–SD8 are complete. The decisions above describe that completed scope;
-SD9–SD15 below are proposed extensions, all unstarted. SD9 is the next
-increment: automate replenishment of the existing presenter before changing
+SD9–SD15 below extend that scope. SD9 is complete; SD10–SD15
+remain proposed and unstarted. SD9 automates replenishment of the existing presenter before changing
 how the robot receives a screw. The other extensions have their own acceptance
 boundaries and need not all be implemented to use automatic feeding.
 
@@ -780,13 +780,96 @@ boundaries and need not all be implemented to use automatic feeding.
   mission behavior on both backends and scripted cell/tool-change I/O.
 
 Follow-on dependencies:
-- SD9 is next and keeps the existing screwdriver pickup/mission boundary.
+- SD9 is complete and keeps the existing screwdriver pickup/mission boundary.
+  SD10 (blow-feed delivery) is next.
 - SD10 builds on SD9; SD11 and SD14 can proceed independently.
 - SD12 uses a known or SD11-registered approach. SD13 is conditional on needing
   physical thread reactions for SD12 or another compliance experiment.
 - SD15 integrates the landed machine-tending interfaces and automatic tool
   change. It can initially use SD9 presenters; blow-feed and force search are
   optional capabilities, not prerequisites for every cell.
+
+### SD9 implementation decisions and progress
+
+- Feeder equipment is a custom envelope: a 120 mm bowl, 60 mm height, 15 mm
+  vibration-drive height and 115 mm sloping track terminate at the presenter's
+  rear inlet. Tooling derives from the chosen screw's head/shank dimensions and
+  explicit 0.5 mm clearance. The bowl's compound collision hull keeps its
+  interior open on both backends. Architecture references above do not supply
+  these custom dimensions or production timing.
+- `ScrewFeederDevice` is shared by the buffered model and commissioned discrete
+  I/O. Readiness and receipt are separate. Optional empty/jam pins remain
+  unknown when absent; acquisitions preserve source clock/time and sequence.
+  Acquisition faults latch and safe both outputs. The I/O host owns independent
+  polling, polarity and the physical watchdog, as with the screwdriver boundary.
+- SceneArtifact advances from v32 to v33. One current wire packet per pickup
+  nest declares identified free inventory, deposit frame, buffer capacity and
+  transport timing in the mission. The typed fields have explicit wire IDs;
+  numeric capacities are checked against coercion/wrap. The existing mission
+  envelope omits absent feeder packets, retaining previous geometry sizes.
+- All four primary screws share the existing supported nest. Each delivery
+  stages the actual identified body's pose for the next physics tick; presence
+  is still measured from geometry. Replenishment requires that exact body held
+  clear of the nest, never an inferred pickup from presence loss. The existing
+  separate replacement presenters and tightening programs remain intact.
+- `DriveScrew` accepts a feeder preparation skill. Actual receipt precedes
+  unchanged pickup motion; wrong inventory order or unexpected nest occupancy
+  faults rather than selecting a nearby body. Stop cancels pending release,
+  restart requires an explicit request, and reset restores authored inventory.
+  Robot faults/e-stop inhibit feeding. Bulk transport is behavioral, with no
+  claim of detailed vibratory orientation physics.
+- The new example is `materia.feeder.project.json` and has its own editor
+  browser entry. Pure model/scripted-I/O and wire checks plus actual flange,
+  jam-after-pickup and reset checks on both backends pass. The final full gate
+  and retained-number comparisons pass; SD9 is complete.
+
+The first `sd9-core` quick gate passes CadKit and ProjectKit, including 14 new
+feeder wire/boundary checks, but MachineKit compilation exposes an untyped
+`cast null` bug in the new hardware preparation test. `ExpressionTyper.typeCast`
+(`haxeon/src/compiler/types/typing/ExpressionTyper.hx:776`) types the operand
+without its destination context; `ConversionResolver.adaptFunctionValue`
+wraps the resulting `TNull` in `TCast` without coercing the null. The cast branch
+in `haxeon/src/compiler/ir/IrGenerator.hx:1352` lowers that operand first and
+hits the uncoerced-null rejection at line 1084. The local workaround constructs
+a real immutable `RobotSnapshot`, which is also a better skill fixture. No
+Haxeon source or pin changes. The initial physical feeder proof passes normal
+and jam-after-pickup flange cases on both backends and portable export, but
+predates the final reset/boundary checks; those require a fresh build and gate.
+
+The `sd9-core-retry` quick gate passes all three stages. All 133 retained
+MachineKit result lines match SD8 exactly, with 43 new model/scripted-I/O
+feeder checks. ProjectKit retains its 199 assertions and adds 15 feeder
+wire/boundary checks. The full `sd9-final` gate passes all seven stages. Before that run,
+430 old compiled example caches with embedded source paths exclusively from
+this worktree were removed, reclaiming 4.6 GB and restoring 7.6 GB free;
+source files, other worktrees and their compiled caches were untouched.
+
+The final `sd9-final` full gate rebuilds the app (2,240 sources) and editor
+(2,216 sources), then passes the editor and project-source suites. The actual
+bowl-fed flange passes normal and jam-after-confirmed-pickup cases on MuJoCo
+and the deterministic backend, plus portable export. Normal cases witness all
+four identified bodies at the sensed nest, finish four 16.5 N m tightenings,
+and reset to an empty nest with restored stock and no latent delivery. Jam
+cases stop at exactly one delivery with a named mission diagnostic. Hardware
+acceptance uses scripted discrete I/O; production hardware/timing commissioning
+is outside this demonstration.
+
+All 133 previous MachineKit result lines, all 16 editor passing summaries and
+all 123 normalized app result lines match SD8. All 16 whole-screw and 44 staged
+transition lines match exactly. All 71 previous artifact generations retain
+their sizes; five new feeder generations are 2,325,519 bytes each. SceneArtifact
+is now v33 and refuses v32. The original geometry, mechanical results, published
+fastener qualifications and old examples' artifact sizes remain unchanged.
+
+Raw profiling observations move from 58,569/60,272 to 58,487/60,282 bytes/tick
+for the two pickers and from 53,576.93323 to 53,393.43703 bytes/tick for the mill.
+Router allocation observations remain 39.5/43.8 KB/tick, with 16/16 collections.
+These are the previously inspected global HashLink allocation-buffer refill
+measurements: the extra preceding CAD cohort changes heap/refill phase, while
+picker, mill and router implementations remain unchanged. All budgets pass.
+Wall-clock planning/rendering timings vary; the app suite peaks at 3.9 GB
+(previous SD8: 4.3 GB). Proof logs, source hashes and retained-number comparisons
+are archived under `build/sd9-core-retry-*` and `build/sd9-final-*`.
 
 ## Order
 
@@ -1688,6 +1771,7 @@ still required. The earlier 21-test proof predates this wire extension.
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
 | SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71`, `7038a4fee` |
 | SD8 | done — virtual unchanged CAD mission, hardware owner/acquisition binding, scripted/TCP controller and repeated-STOP proofs pass; final full gate passed | `f19115ae0`, `84c004fab`, `40d2f9b66` |
+| SD9 | done — buffered bowl supply, scripted I/O, physical replenishment/jam/reset on both backends and portable export pass; final full gate passed | SD9 implementation in this commit |
 
 ### SD8 hardware integration work (2026-10-11)
 

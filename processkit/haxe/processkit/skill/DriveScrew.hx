@@ -18,14 +18,22 @@ class DriveScrew implements Skill {
   final plan:Void -> ScrewPlan;
   final lifecycle = new SkillLifecycle();
   final frames:ScrewdriverFrames;
+  final prepare:Null<robotkit.skill.Skill>;
+  var prepared = false;
 
-  public function new(runner:ScrewdrivingRunner, localization:Localization, plan:Void -> ScrewPlan, sensor:String) {
+  public function new(runner:ScrewdrivingRunner, localization:Localization, plan:Void -> ScrewPlan, sensor:String, ?prepare:robotkit.skill.Skill) {
     if (runner == null || localization == null || plan == null || sensor == null || sensor.length == 0)
       throw "DriveScrew needs a runner, localization, fastening plan and screwdriver sensor";
-    this.runner = runner; this.localization = localization; this.plan = plan; frames = new ScrewdriverFrames(sensor);
+    this.runner = runner; this.localization = localization; this.plan = plan; this.prepare = prepare; frames = new ScrewdriverFrames(sensor);
   }
   public function start():Void {
-    lifecycle.begin(); frames.reset();
+    lifecycle.begin(); frames.reset(); prepared = prepare == null;
+    try {
+      if (prepare != null) {prepare.start(); return;}
+      startRunner();
+    } catch (error:Dynamic) fail(Std.string(error));
+  }
+  function startRunner():Void {
     try {
       var state = localization.state();
       if (state == null) throw "DriveScrew has no robot pose";
@@ -35,6 +43,15 @@ class DriveScrew implements Skill {
   public function update(snapshot:RobotSnapshot, durationSeconds:Float):SkillStatus {
     if (!lifecycle.isRunning()) return lifecycle.status();
     try {
+      if (!prepared && prepare != null) {
+        switch prepare.update(snapshot,durationSeconds) {
+          case Succeeded: prepared = true; frames.reset(); startRunner();
+          case Failed(message): fail(message);
+          case Cancelled: lifecycle.cancel();
+          case _: {}
+        }
+        return lifecycle.status();
+      }
       var reading = frames.read(snapshot,durationSeconds);
       if (reading != null) {
         runner.update(durationSeconds,reading);
@@ -47,11 +64,13 @@ class DriveScrew implements Skill {
   }
   public function cancel():Void {
     if (!lifecycle.isRunning()) return;
-    runner.abort(); lifecycle.cancel();
+    if (!prepared && prepare != null) prepare.cancel();
+    if (runner.running()) runner.abort(); lifecycle.cancel();
   }
   public function status():SkillStatus return lifecycle.status();
   public function result():Null<SkillResult> return lifecycle.result();
   function fail(message:String):Void {
+    try { if (!prepared && prepare != null) prepare.cancel(); } catch (_:Dynamic) {}
     try { if (runner.running()) runner.abort(); } catch (_:Dynamic) {}
     lifecycle.fail(message);
   }

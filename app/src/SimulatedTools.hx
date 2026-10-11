@@ -24,6 +24,7 @@ class SimulatedTools implements SessionMember {
 	public final grippers:Array<SimulatedPneumaticGripper> = [];
 	public final welders:Array<SimulatedWelder> = [];
 	public final screwdrivers:Array<processkit.simulation.SimulatedScrewdriver> = [];
+	public final screwFeeders:Array<SimulatedScrewFeeder> = [];
 	final objects:Array<GripObject>;
 	final simulation:Simulation;
 
@@ -149,6 +150,8 @@ class SimulatedTools implements SessionMember {
 
 	public function beforeReset():Void {}
 
+	public function safeFeeders():Void {for (feeder in screwFeeders) feeder.safe();}
+
 	public function safeWelders():Void {
 		for (welder in welders) if (welder.supply != null) welder.supply.safe();
 	}
@@ -158,6 +161,7 @@ class SimulatedTools implements SessionMember {
 		for (gripper in grippers) gripper.reset();
 		for (welder in welders) welder.reset();
 		for (driver in screwdrivers) driver.reset();
+		for (feeder in screwFeeders) feeder.reset();
 	}
 
 	public function present():Void {}

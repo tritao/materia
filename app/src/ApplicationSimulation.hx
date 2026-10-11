@@ -506,6 +506,16 @@ class ApplicationSimulation {
       }
       var work = session == null ? null : session.mission;
       if (work != null) {
+        var feeders = work.screwFeeders;
+        if (feeders != null) {
+          if (candidateAssembly == null || candidateTools.screwdrivers.length != 1)
+            throw "Screw feeding needs one assembly and mounted screwdriver";
+          var feederParts = new SimulationAssemblyParts(candidate,[candidateAssembly],candidateTools.objectsByScene(),session);
+          for (definition in feeders) {
+            var feeder = new SimulatedScrewFeeder(definition,candidate,candidateAssembly.runtime,feederParts,candidateTools.screwdrivers[0]);
+            candidateTools.screwFeeders.push(feeder); candidate.addStepObserver(feeder);
+          }
+        }
         if (candidateAssembly == null) throw "A mission needs the project's assembly";
         var pairedScrews:Map<String,Bool> = [];
         for (step in work.steps) if (step.kind == "screw") {
@@ -537,7 +547,7 @@ class ApplicationSimulation {
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId),
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.outputFor(work.controllerId), null,
           virtualWelder || virtualNutrunner ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
-            : MissionPlayer.ARM_ACCELERATION, candidatePower,candidateTools.screwdrivers);
+            : MissionPlayer.ARM_ACCELERATION, candidatePower,candidateTools.screwdrivers,candidateTools.screwFeeders);
         // A mission that welds lays the weld metal as the welder deposits it.
         if (welds) {
           var active:ProjectDocumentSession = cast session;
@@ -769,7 +779,7 @@ class ApplicationSimulation {
     #end
   }
   public function stop():Void { stopPlayback(); var active = space; if (active != null) active.session.stop(); running = false; pumpStamp = -1.0;
-    if (tools != null) tools.safeWelders();
+    if (tools != null) {tools.safeWelders(); tools.safeFeeders();}
     if (presentAssemblyPhysics) presentationEpoch++;
     presentAssemblyPhysics = false; }
   public function reset():Bool {
