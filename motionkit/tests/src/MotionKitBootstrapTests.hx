@@ -6,6 +6,16 @@ class MotionKitBootstrapTests {
     if (Sys.getEnv("MOTIONKIT_SEEDS_ONLY") == "1") { CandidateSeedTests.main(); return; }
     if (Sys.getEnv("MOTIONKIT_HOMING_ONLY") == "1") { HomingTests.run(); return; }
     var plannerTests:PlannerTests = new PlannerTests();
+    var visibilityTests = new RrtVisibilityTests();
+    visibilityTests.testVisibility();
+    visibilityTests.testBlockedConnection();
+    visibilityTests.testTimedRefinement();
+    visibilityTests.testJointPathTiming();
+    visibilityTests.testPoseSampling();
+    if (Sys.getEnv("MOTIONKIT_VISIBILITY_ONLY") == "1") {
+      Sys.println('Joint path visibility and timing tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     var streamTests:StreamTests = new StreamTests();
     var sessionTests:SessionTests = new SessionTests();
     var programTests:ProgramTests = new ProgramTests();

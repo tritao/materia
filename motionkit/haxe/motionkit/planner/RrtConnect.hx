@@ -8,10 +8,14 @@ package motionkit.planner;
  * Each iteration samples a configuration, extends one tree toward it by at
  * most `step` (Euclidean, joint units), and tries to connect the other tree
  * to the new node: its nearest node's straight steps toward it are checked in
- * one batch, and the clear prefix is added; reaching the node joins the
+ * bounded batches, stopping at the first blocked edge and adding only the
+ * clear prefix; reaching the node joins the
  * trees. Trees store nodes flat and find neighbours by k-d tree once they
  * grow (`PlannerTree`). Shortcutting then tries `shortcutRounds` random
- * direct edges between waypoints, in batches.
+ * direct edges between waypoints, in batches. A final visibility pass keeps
+ * the farthest certified successor of each retained waypoint, so random
+ * shortcutting leaves fewer avoidable stops in a rest-to-rest motion, within
+ * a separate bounded collision-check budget.
  */
 class RrtConnect implements MotionPlanner {
   public final space:PlannerSpace;
@@ -19,6 +23,8 @@ class RrtConnect implements MotionPlanner {
   public var maxIterations:Int = 5000;
   public var step:Float = 0.3;
   public var shortcutRounds:Int = 64;
+  /** Maximum edge checks in the final visibility pass; zero disables it. */
+  public var visibilityCheckLimit:Int = 1024;
   public var kdThreshold:Int = 64;
   var checkSeconds = 0.0;
   var edgeChecks = 0;
@@ -84,16 +90,22 @@ class RrtConnect implements MotionPlanner {
     var from = tree.node(near);
     var total = PlannerTree.distance(from, target);
     var steps = Std.int(Math.max(1, Math.ceil(total / step)));
-    var points = [from];
-    for (i in 1...steps + 1) {
-      var t = i / steps;
-      points.push([for (k in 0...from.length) from[k] + (target[k] - from[k]) * t]);
-    }
-    var flags = clear(points);
     var parent = near;
-    for (i in 0...steps) {
-      if (!flags[i]) return -1;
-      parent = tree.add(points[i + 1], parent);
+    var advanced = 0;
+    while (advanced < steps) {
+      var end = Std.int(Math.min(steps, advanced + 8));
+      var points = [tree.node(parent)];
+      // Keep the original interpolation so batching changes neither nodes nor rounding.
+      for (i in advanced + 1...end + 1) {
+        var t = i / steps;
+        points.push([for (k in 0...from.length) from[k] + (target[k] - from[k]) * t]);
+      }
+      var flags = clear(points);
+      for (i in 0...end - advanced) {
+        if (!flags[i]) return -1;
+        parent = tree.add(points[i + 1], parent);
+      }
+      advanced = end;
     }
     return parent;
   }
@@ -154,7 +166,34 @@ class RrtConnect implements MotionPlanner {
         break;
       }
     }
-    return path;
+    if (shortcutRounds <= 0 || visibilityCheckLimit <= 0 || path.length <= 2) return path;
+    var reduced = [path[0]], from = 0;
+    var remaining = visibilityCheckLimit;
+    while (from < path.length - 1) {
+      var next = from + 1, candidate = path.length - 1;
+      while (candidate > next && remaining > 0) {
+        // Bound each native batch while checking farthest successors first.
+        var indices:Array<Int> = [], edges:Array<Float> = [];
+        while (candidate > next && indices.length < 64 && indices.length < remaining) {
+          indices.push(candidate);
+          for (value in path[from]) edges.push(value);
+          for (value in path[candidate]) edges.push(value);
+          candidate--;
+        }
+        edgeChecks += indices.length;
+        remaining -= indices.length;
+        var began = Sys.time();
+        var flags = space.edgesClear(edges, indices.length);
+        checkSeconds += Sys.time() - began;
+        var found = false;
+        for (index in 0...indices.length) if (flags[index]) {
+          next = indices[index]; found = true; break;
+        }
+        if (found) break;
+      }
+      reduced.push(path[next]); from = next;
+    }
+    return reduced;
   }
 
   function done(path:Array<Array<Float>>, iterations:Int, nodes:Int, began:Float):MotionPlan

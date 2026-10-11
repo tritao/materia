@@ -98,6 +98,8 @@ class ProgramCompiler {
   public var clearanceEvents:Array<ClearanceEvent> = [];
   /** How deep the conservative clearance check of a joint or generated move bisects (CL4b). */
   public var clearanceDepthLimit:Int = 16;
+  /** Maximum task rotation per selection sample, in radians; clearance is certified separately. */
+  public var angularResolution:Float = 0.25;
   /** Plans the path of a joint move whose options ask for it (`MotionOptions.planned`; COLLISION.md CL7). */
   public var motionPlanner:Null<motionkit.planner.MotionPlanner> = null;
 
@@ -113,6 +115,7 @@ class ProgramCompiler {
     result.motorSpace=motorSpace;result.pathEventSchedule=pathEventSchedule;result.requireFeasiblePath=requireFeasiblePath;
     result.clearanceEvents=clearanceEvents.copy();result.clearanceDepthLimit=clearanceDepthLimit;
     result.motionPlanner=motionPlanner;
+    result.angularResolution=angularResolution;
     return result;
   }
 
@@ -139,6 +142,7 @@ class ProgramCompiler {
     worker.clearanceEvents = clearanceEvents.copy();
     worker.clearanceDepthLimit = clearanceDepthLimit;
     worker.motionPlanner = motionPlanner;
+    worker.angularResolution = angularResolution;
     return worker;
   }
 
@@ -708,20 +712,9 @@ class ProgramCompiler {
     var plan = planner.plan(from, to);
     var path = plan.waypoints;
     if (path == null) throw 'Motion program op $index has no planned path: ${plan.failure}';
-    var segments:Array<{timeFromStartNs:Int64, durationNs:Int64, coefficients:Array<Array<Float>>}> = [];
-    var offset = Int64.ofInt(0);
-    for (k in 1...path.length) {
-      var edge = Trajectory.generateStateToState(path[k - 1], zeros(), zeros(), path[k], velocity, acceleration, jerk, true);
-      var last = Int64.ofInt(0);
-      for (segment in edge.segments()) {
-        segments.push({timeFromStartNs: segment.timeFromStartNs + offset, durationNs: segment.durationNs,
-          coefficients: segment.coefficients});
-        last = segment.timeFromStartNs + segment.durationNs;
-      }
-      offset = offset + last;
-      edge.dispose();
-    }
-    return Trajectory.fromSegments(segments);
+    var timing = new JointPathTiming([for (joint in 0...velocity.length)
+      {velocity: velocity[joint], acceleration: acceleration[joint], jerk: jerk[joint]}]);
+    return timing.trajectory(path);
   }
 
   function hasClearanceEvents(op:Int):Bool {
@@ -1220,7 +1213,7 @@ class ProgramCompiler {
     var start = 0.0;
     for (k in 0...path.primitives.length) {
       var primitive = path.primitives[k], length = primitive.length();
-      var pieces = motionkit.path.PoseSampling.pieces(primitive,cartesianResolution);
+      var pieces = motionkit.path.PoseSampling.pieces(primitive,cartesianResolution,angularResolution);
       for (piece in 1...(pieces + 1)) {
         var last = piece == pieces;
         // Exactly the end: `length * pieces / pieces` can round one ulp past it.

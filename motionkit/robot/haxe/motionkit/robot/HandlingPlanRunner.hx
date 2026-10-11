@@ -31,6 +31,12 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
   public static inline var FRAME:String = "arm-base";
   /** Default vertical clearance between the grasp plane and the transport pose. */
   public static inline var DEFAULT_APPROACH_HEIGHT:Float = 0.12;
+  public static inline var CARTESIAN_RESOLUTION:Float = 0.0075;
+  public static inline var MAX_JOINT_JUMP:Float = 0.2;
+  public static inline var ANGULAR_RESOLUTION:Float = MAX_JOINT_JUMP / 2;
+
+  /** Physical pad placement needs the same geometric precision in study and execution. */
+  public static function gripperTolerance():IkTolerance return new IkTolerance(0.0001, 0.0001, 300, 0.03);
 
   public final motion:ManipulatorMotion;
   public final channel:String;
@@ -71,8 +77,9 @@ class HandlingPlanRunner implements robotkit.skill.HandlingRunner {
     var compiler = new ProgramCompiler(solver, limits, FRAME,
       planning.velocity, planning.acceleration, planning.jerk,
       planning.startTolerances(0.005),
-      null, 0.0075, 0.2, 0.002, 0.02, ikTolerance == null ? new IkTolerance(2e-3, 5e-3, 300, 0.03) : ikTolerance,pathPlanner);
+      null, CARTESIAN_RESOLUTION, MAX_JOINT_JUMP, 0.002, 0.02, ikTolerance == null ? new IkTolerance(2e-3, 5e-3, 300, 0.03) : ikTolerance,pathPlanner);
     compiler.planningAssumptions = planning.assumptions.copy();
+    compiler.angularResolution = ANGULAR_RESOLUTION;
     compiler.planCheck = planning.check();
     var motion = new ManipulatorMotion(robot, compiler, function(_) return null, eventSource, indices);
     // Arm joint values are relative to the robot's starting pose.

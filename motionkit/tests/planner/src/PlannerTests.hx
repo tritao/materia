@@ -93,6 +93,12 @@ class PlannerTests {
     var edges:Array<Float> = [];
     for (i in 1...path.length) edges = edges.concat(path[i - 1]).concat(path[i]);
     check(scene.space.edgesClear(edges, path.length - 1).indexOf(false) < 0, "its edges are clear");
+    var shortcuts:Array<Float> = [], shortcutCount = 0;
+    for (i in 0...path.length - 2) for (j in i + 2...path.length) {
+      shortcuts = shortcuts.concat(path[i]).concat(path[j]); shortcutCount++;
+    }
+    check(shortcutCount == 0 || scene.space.edgesClear(shortcuts, shortcutCount).indexOf(true) < 0,
+      "the certified path has no avoidable intermediate stops");
     var crossing = false;
     for (i in 1...path.length) if ((path[i - 1][0] < 0) != (path[i][0] < 0)) {
       var t = -path[i - 1][0] / (path[i][0] - path[i - 1][0]);
