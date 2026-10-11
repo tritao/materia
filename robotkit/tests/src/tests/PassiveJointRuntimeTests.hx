@@ -35,7 +35,7 @@ class PassiveJointRuntimeTests {
       var harness = new SimulationHarness(0.001, 1, backend);
       try {
         var runtime = harness.simulation.addRobotAtPose(blueprint, [0, 0, 0], [0, 0, 0, 1],
-          null, null, null, null, null, null, null, null, null, true);
+          null, null, null, null, null, null, null, true);
         if (passive) {
           var rejected = false;
           try runtime.submitTargets([JointTarget.position(0, 0)], 1)

@@ -2105,3 +2105,10 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   check 0.1 mm penetration and a 0.3/0.4 mm diagonal gap's 0.5 mm distance, including reversed
   object order. The maintained prism check count increases from 52 to 55 for these three
   additional assertions. Focused log `sm10-coal-prism-focus.log` passes.
+
+- Main collision integration follow-up: the initial `sm10-coal-full` workspace compilation
+  found our SM8b passive-joint fixture still passed the removed hull arguments to
+  `Simulation.addRobotAtPose`. Remove both obsolete slots, retaining `holdAtRest=true`
+  at the current typed argument position. The two world-test compilations require a
+  corrected recheck after the active gate; this is an integration error, not a haxeon bug.
+  The initial full gate's five quick stages pass with all P1–P5 times unchanged.
