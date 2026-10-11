@@ -15,6 +15,7 @@ import RobotArm;
 import BenchMill;
 import BenchMillPreview;
 import TendingControllers;
+import TendingCell.TendingMissionChecks;
 import machinekit.robotics.DualArmGripperTool;
 import machinekit.robotics.ArmGripperTool;
 import machinekit.robot.RobotScene;
@@ -3338,11 +3339,13 @@ class ProjectSourceTests {
 
   /** Four real blank-to-outfeed cycles through the saved robot mission and wired CNC interface. */
   static function checkMachineTending(root:String, routeOnly:Bool = false):Void {
+    TendingCyclePlan.TendingCyclePlanChecks.run();
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/machine-tending/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var savedMission = generated.mission;
     if (savedMission == null || savedMission.steps.length == 0)
       throw "The playable tending project does not save its robot mission";
+    TendingMissionChecks.check(savedMission);
     for (step in savedMission.steps) if (step.kind == "pick" || step.kind == "place")
       check(step.yaw == null && step.toolYaw != null && Math.isFinite(step.toolYaw),
         "each reach-certified tending grasp saves its tool roll separately from part heading");
@@ -3726,6 +3729,27 @@ class ProjectSourceTests {
       while ((mission.failure != null || mission.stepIndex <= doorWait) && doorRetryTicks < 1000) {
         simulation.step(); doorRetryTicks++;
       }
+      var doorContacts:Array<String> = [];
+      if (mission.failure != null || !cellSignal(RobotInterfaceChannels.DOOR_OPEN))
+        for (contact in physics.robotContacts(cnc.robot.runtime)) {
+          if (!contact.active || contact.linkIndex != doorPart.linkIndex) continue;
+          var other = "world";
+          switch contact.otherKind {
+            case robotkit.runtime.RobotContactOtherKind.Object:
+              other = 'object ${contact.otherObject}';
+              for (entry in simulation.simulatedObjects)
+                if (entry.object.handle.rawValue() == contact.otherObject) other = entry.id;
+            case robotkit.runtime.RobotContactOtherKind.RobotLink:
+              other = 'robot ${contact.otherRobot}/link ${contact.otherLink}';
+              if (contact.otherRobot >= 0 && contact.otherRobot < simulation.simulatedLinks.length) {
+                var links = simulation.simulatedLinks[contact.otherRobot];
+                if (contact.otherLink >= 0 && contact.otherLink < links.length)
+                  other = simulation.simulatedIds[contact.otherRobot] + "/" + links[contact.otherLink];
+              }
+            case _: {}
+          }
+          doorContacts.push('$other (${contact.distance * 1000} mm)');
+        }
       check(mission.failure == null && mission.stepIndex > doorWait && mission.completed > beforeDoorRetry &&
         cellSignal(RobotInterfaceChannels.DOOR_OPEN),
         'door-jam recovery resets the PLC, opens the door and resumes its failed wait ' +
@@ -3734,6 +3758,7 @@ class ProjectSourceTests {
           'request=${cncRequest(RobotInterfaceChannels.REQUEST_DOOR_OPEN)}, ' +
           'faultReset=${cncRequest(RobotInterfaceChannels.FAULT_RESET)}, cncAlarm=${cnc.interfaceAlarm}, ' +
           'door=${cnc.robot.robot.snapshot().positions.get(doorJoint)}, ' +
+          'doorContacts=${doorContacts.join("; ")}, ' +
           'runner=${mission.runner.status()}, ticks=$doorRetryTicks/1000)');
       check(cellSignal(RobotInterfaceChannels.DOOR_OPEN) && mission.failure == null,
         "the first physical door request reaches its open switch before injected cycle interlock");
@@ -3837,6 +3862,17 @@ class ProjectSourceTests {
       Sys.println('tending recovery: missing-part clamp passed at ${simulation.activeSession().simulationTime()} s');
       var productionStart = simulation.activeSession().simulationTime();
       var ticks = 0, spindleTicks = 0, observedStocks = 0, maxSimultaneousHeld = 0;
+      var cellTicks = 0, cellSpindleTicks = 0;
+      var fourthOutfeedTime = 0.0;
+      function sensedOutfeeds():Int {
+        var count = 0;
+        for (frame in mission.robot.runtime.snapshot().sensors.toArray())
+          if (StringTools.startsWith(frame.sensorId, "outfeed/slot-") && frame.values.length > 0 && frame.values.get(0) >= 0.5)
+            count++;
+        return count;
+      }
+      var phaseStep = mission.stepIndex, phaseStart = productionStart;
+      var exchangeOnly = Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-exchange";
       var lastCycleStart = 0.0, lastCycleTime = 0.0, wasCycleActive = false;
       var cycleTimes:Array<Float> = [];
       var expectedRemoval = expectedBearingBlockRemoval();
@@ -3857,19 +3893,33 @@ class ProjectSourceTests {
         var signalBus = simulation.cellSignals;
         if (mission.failure != null)
           throw 'Tending mission failed at step ${mission.stepIndex}/${mission.mission.steps.length}: ${mission.failure}';
+        if (mission.stepIndex != phaseStep) {
+          var phase = mission.mission.steps[phaseStep];
+          var seconds = simulation.activeSession().simulationTime() - phaseStart;
+          if (seconds >= 1.0)
+            Sys.println('tending phase $phaseStep: ${phase.kind}, ' +
+              '${phase.at == null ? "signals" : phase.at.occurrence}, $seconds s');
+          phaseStep = mission.stepIndex; phaseStart = simulation.activeSession().simulationTime();
+        }
         var machine:Null<Robot> = null;
         for (id in simulation.simulatedRobotIds()) if (StringTools.endsWith(id, ":mill/cncController"))
           machine = simulation.world.robot(id);
         if (machine == null) throw "Playable tending cell lost its CNC controller runtime";
         var spindle = machine.description().joints.indexOf("mill/mill/spindle-turn");
         if (spindle < 0) throw "Playable tending cell has no spindle encoder";
+        var spindleRunning = Math.abs(machine.snapshot().velocities.get(spindle)) > 5.0 * 2 * Math.PI / 60.0;
+        if (fourthOutfeedTime == 0.0) {
+          cellTicks++;
+          if (spindleRunning) cellSpindleTicks++;
+          if (cnc.completedStocks.length == 4 && heldNow == 0 && sensedOutfeeds() == 4)
+            fourthOutfeedTime = simulation.activeSession().simulationTime();
+        }
         var cycleState = signalBus == null ? null : signalBus.input("robotController", RobotInterfaceChannels.IN_CYCLE);
         var cycleActive = cycleState != null && switch cycleState {case Digital(value): value; case _: false;};
         if (cycleActive && !wasCycleActive) lastCycleStart = simulation.activeSession().simulationTime();
         wasCycleActive = cycleActive;
         if (cycleActive) ticks++;
-        if (cycleActive &&
-            Math.abs(machine.snapshot().velocities.get(spindle)) > 5.0 * 2 * Math.PI / 60.0) spindleTicks++;
+        if (cycleActive && spindleRunning) spindleTicks++;
         if (cnc.interfaceAlarm != RobotInterfaceAlarm.None)
           throw 'Tending CNC interface alarm ${cnc.interfaceAlarm} after ${simulation.activeSession().simulationTime()} s';
         var finished = cnc.completedStocks;
@@ -3890,6 +3940,12 @@ class ProjectSourceTests {
           Sys.println('tending cut: blank $observedStocks, $lastCycleTime s, ${stock.removedVolume * 1e9} mm³ removed, ' +
             '${stock.leftover * 1e9} mm³ leftover, ${stock.gouge * 1e9} mm³ gouge');
         }
+        if (exchangeOnly && observedStocks == 2) {
+          check(maxSimultaneousHeld == 2, "The focused exchange physically retains both workpieces");
+          Sys.println('tending exchange: two cuts, ${simulation.activeSession().simulationTime() - productionStart} s, ' +
+            'whole-cell spindle use ${100.0 * cellSpindleTicks / cellTicks}%');
+          simulation.dispose(); session.dispose(); return;
+        }
       }
       // Successful replayed requests also increment the cumulative counter.
       check(mission.finished && mission.stepIndex == mission.mission.steps.length - 1 &&
@@ -3900,18 +3956,18 @@ class ProjectSourceTests {
         'four loose infeed blanks are machined and reported, got ${cnc.completedStocks.length}');
       check(cnc.interfaceAlarm == RobotInterfaceAlarm.None && simulation.cncFailure() == null,
         'four tending cycles finish without an interlock or CNC alarm');
-      var outfeedCount = 0;
-      for (frame in mission.robot.runtime.snapshot().sensors.toArray())
-        if (StringTools.startsWith(frame.sensorId, "outfeed/slot-") && frame.values.length > 0 && frame.values.get(0) >= 0.5)
-          outfeedCount++;
+      var outfeedCount = sensedOutfeeds();
       check(outfeedCount == 4,
         'four finished blanks occupy their sensed outfeed seats, got $outfeedCount');
-      check(maxSimultaneousHeld == 1,
-        'the sequential MT10–MT11 mission carries one workpiece at a time, max $maxSimultaneousHeld');
+      check(maxSimultaneousHeld == 2,
+        'the MT12 exchange retains both independently gripped workpieces, max $maxSimultaneousHeld');
       check(cycleTimes.length == 4 && lastCycleTime > 0 && ticks > 0 && spindleTicks > 0,
         'the tending run reports all four CNC cycle intervals and spindle time');
-      var productionSeconds = simulation.activeSession().simulationTime() - productionStart;
+      check(fourthOutfeedTime > productionStart && fourthOutfeedTime <= simulation.activeSession().simulationTime(),
+        "whole-cell measurement ends at the fourth sensed outfeed with every physical gripper empty");
+      var productionSeconds = fourthOutfeedTime - productionStart;
       var spindleUse = spindleTicks / ticks;
+      var cellSpindleUse = cellSpindleTicks / cellTicks;
       check(Math.abs(cnc.spindleUtilization - spindleUse) < 0.05,
         'CNC-panel spindle utilization agrees with encoder sampling, got ${cnc.spindleUtilization * 100}% vs ${spindleUse * 100}%');
       var measuredUse = cnc.spindleUtilization;
@@ -3920,7 +3976,10 @@ class ProjectSourceTests {
         "spindle utilization holds its completed-cycle measurement while the cell is idle");
       Sys.println('tending production: ${cnc.completedStocks.length} blanks, first clamp to fourth outfeed ' +
         '${productionSeconds} s, ' +
-        'spindle active ${Math.round(cnc.spindleUtilization * 1000) / 10}%, cycle intervals ${cycleTimes.join(", ")} s');
+        'spindle active within cuts ${Math.round(cnc.spindleUtilization * 1000) / 10}%, ' +
+        'whole-cell spindle use ${Math.round(cellSpindleUse * 1000) / 10}%, cycle intervals ${cycleTimes.join(", ")} s');
+      check(cellSpindleUse >= 0.75,
+        'MT12 needs at least 75% whole-cell spindle use, got ${cellSpindleUse * 100}%');
     } catch (error:Dynamic) {
       var cleanupError:Null<String> = null;
       try simulation.dispose() catch (disposeError:Dynamic) cleanupError = Std.string(disposeError);
@@ -4963,7 +5022,12 @@ class ProjectSourceTests {
       checkTendingRobotInterface(root);
       return 0;
     }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending" || Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-reach" || Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-vise") {
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-plan") {
+      TendingCyclePlan.TendingCyclePlanChecks.run();
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending" || Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-reach" ||
+        Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-vise" || Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-exchange") {
       checkMachineTending(root);
       return 0;
     }

@@ -15,11 +15,12 @@ import materia.project.SceneArtifact;
 import haxe.io.Bytes;
 import cnckit.controller.RobotInterfaceChannels;
 
-/** The two independently controlled machines of the tending cell, before interlock logic. */
+/** The independently controlled machines and production reach study of the tending cell. */
 class TendingControllers extends MachineAssembly {
 	public final mill:EnclosedBenchMill;
 	public final arm:CobotArm;
 	public final reach:TendingReachResult;
+	public final production:TendingCyclePlan;
 	public final infeedTray:PartTray;
 	public final outfeedTray:PartTray;
 	public final cellTable:TendingCellTable;
@@ -34,17 +35,18 @@ class TendingControllers extends MachineAssembly {
 		return {occurrence: 'outfeedTray/${target.occurrence}', connector: target.connector};
 	}
 
-	public function new() {
+	public function new(?production:TendingCyclePlan) {
 		super();
+		this.production = production == null ? TendingCyclePlan.bearingBlocks() : production;
 		// Tended stock enters as a free infeed blank; keep the vise empty in the machine body.
 		mill = new EnclosedBenchMill(false);
-		reach = TendingReach.study(mill);
+		reach = TendingReach.study(mill, this.production);
 		var infeed = [for (tray in reach.trays) if (tray.id == "infeedTray") tray][0];
 		var outfeed = [for (tray in reach.trays) if (tray.id == "outfeedTray") tray][0];
-		infeedTray = new PartTray(2, 3, BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH,
-			TendingReach.trayPitchX(), TendingReach.trayPitchY());
-		outfeedTray = new PartTray(2, 3, BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH,
-			TendingReach.trayPitchX(), TendingReach.trayPitchY());
+		infeedTray = new PartTray(this.production.rows, this.production.columns, BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH,
+			infeed.pitchX, infeed.pitchY);
+		outfeedTray = new PartTray(this.production.rows, this.production.columns, BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH,
+			outfeed.pitchX, outfeed.pitchY);
 		cellTable = new TendingCellTable(reach.tableWidth, reach.tableDepth, reach.tableTop, reach.tableOffset);
 		var infeedBlanks = new MachineAssembly();
 		for (slot in infeed.slots) {

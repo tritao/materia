@@ -7,6 +7,8 @@ import collisionkit.CollisionMargins;
 import robotkit.collision.RobotCollision;
 import robotkit.collision.RobotCollision.RobotCollisionOptions;
 import motionkit.robot.CollisionPlannerSpace;
+import collisionkit.CollisionPairRule;
+import collisionkit.CollisionPairStatus;
 import motionkit.robot.ManipulatorPlannerSpace;
 import motionkit.planner.MotionPlanner;
 import motionkit.planner.PlannerSpace;
@@ -509,7 +511,7 @@ class MissionPlayer implements SessionMember {
             PlanningLimits.ofGroup(selectedArm, new SteadyLoads(), ARM_ACCELERATION, null,
               state.modelRevision, state.calibrationRevision),
             HandlingPlanRunner.DEFAULT_APPROACH_HEIGHT, 0.3, 0.08, 0.4, isGripper ? 0.0 : 0.003, isGripper,
-            isGripper ? new IkTolerance(0.0001, 0.0001, 300, 0.03) : null);
+            isGripper ? HandlingPlanRunner.gripperTolerance() : null);
         };
         handlingTools.set(selectedTool.channel, selectedTool);
         if (isGripper) gripperTools.set(selectedTool.channel, selectedTool);
@@ -1874,7 +1876,28 @@ class MissionPlayer implements SessionMember {
       else
         description.addFixed(body.name, basePose, CollisionGeometry.Convex(body.vertices), options.linkGroup, 0.0, "cell hull");
     }
-    RobotCollision.describeClearanceBodies(description, bodies, geometry);
+    var objects = RobotCollision.describeClearanceBodies(description, bodies, geometry);
+    for (channel in carryingTools.keys()) if (carryingTools.get(channel) == true) {
+      var held = heldParts.get(channel), tool = handlingTools.get(channel);
+      if (held == null || tool == null) throw "Confirmed payload lost its named tool or workpiece";
+      var holder = tool.contact.occurrence;
+      var prefix = holder.substr(0, holder.lastIndexOf("/") + 1);
+      for (index in 0...geometry.length) if (geometry[index].name == held.occurrence ||
+          StringTools.startsWith(geometry[index].name, held.occurrence + "#")) {
+        var payload = objects[index];
+        for (other in 0...description.objects.length) {
+          if (other == payload) continue;
+          var name = description.objects[other].name;
+          var ownPad = tool.kind == "suction" ? name == bodies.bodies.name + "/" + holder :
+            name == bodies.bodies.name + "/" + prefix + "fingerLeft" ||
+            name == bodies.bodies.name + "/" + prefix + "fingerRight";
+          // Contact pressure physically holds stock at its named pads. Other arm
+          // links and the inactive gripper must never inherit rest-overlap permission.
+          description.setObjectRule(payload, other, ownPad ? CollisionPairRule.Allow : CollisionPairRule.Check,
+            ownPad ? CollisionPairStatus.ProcessContact : CollisionPairStatus.Checked);
+        }
+      }
+    }
     var world = new NativeCollisionWorld();
     var build = description.build(world);
     var collisionSpace = new CollisionPlannerSpace(description, build, bodies.bodies,

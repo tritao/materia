@@ -10,15 +10,20 @@ class TendingCell {
 		var cell = new TendingControllers();
 		var scene = SceneArtifact.decode(cell.previewArtifact());
 		scene.mission = {controllerId: TendingMission.ROBOT_CONTROLLER, loop: false,
-			steps: TendingMission.generate(cell, [0, 1, 2, 3])};
+			steps: TendingMission.generate(cell)};
 		return SceneArtifact.encode(scene);
 	}
 }
 
 class TendingMissionChecks {
 	public static function run():Void {
+		TendingCyclePlan.TendingCyclePlanChecks.run();
 		var scene = SceneArtifact.decode(TendingCell.preview());
-		var mission = scene.mission;
+		check(scene.mission);
+	}
+
+	/** Validate the shipped sequence without constructing another CAD cell. */
+	public static function check(mission:Null<SceneArtifact.SceneArtifactMission>):Void {
 		if (mission == null || mission.controllerId != TendingMission.ROBOT_CONTROLLER || mission.loop == true)
 			throw "Tending cell needs its finite robot-controlled mission";
 		var picks = [for (step in mission.steps) if (step.kind == "pick") step];
@@ -30,8 +35,8 @@ class TendingMissionChecks {
 		}
 		var via = [for (step in mission.steps) if (step.kind == "moveVia") step];
 		var requests = [for (step in mission.steps) if (step.kind == "signal") step];
-		if (via.length == 0 || via[0].poses == null || via[0].poses.length != 2)
-			throw "The first tray approach needs both the geometry-derived clearance and approach poses";
+		if (via.length == 0 || via[0].poses == null || via[0].poses.length < 2)
+			throw "Startup needs complete joint waypoints through tray clearance to approach";
 		function signalCount(name:String, value:Bool):Int {
 			var count = 0;
 			for (step in requests) if (step.signal != null && step.signal.name == name && step.signal.value == value) count++;
@@ -39,10 +44,10 @@ class TendingMissionChecks {
 		}
 		if (picks.length != 8 || places.length != 8 || cuts.length != 4 || via.length < 12 || requests.length == 0)
 			throw 'Tending mission must unroll four pick/place/cut cycles; got ${picks.length}/${places.length}/${cuts.length}/${via.length}';
-		if (signalCount(RobotInterfaceChannels.REQUEST_DOOR_OPEN, true) != 8 ||
-			signalCount(RobotInterfaceChannels.REQUEST_DOOR_CLOSE, true) != 8 ||
+		if (signalCount(RobotInterfaceChannels.REQUEST_DOOR_OPEN, true) != 5 ||
+			signalCount(RobotInterfaceChannels.REQUEST_DOOR_CLOSE, true) != 5 ||
 			signalCount(RobotInterfaceChannels.REQUEST_CLAMP, true) != 4 ||
-			signalCount(RobotInterfaceChannels.REQUEST_UNCLAMP, true) != 8 ||
+			signalCount(RobotInterfaceChannels.REQUEST_UNCLAMP, true) != 5 ||
 			signalCount(RobotInterfaceChannels.CYCLE_START, true) != 4)
 			throw "Each tending cycle needs door, clamp, unclamp and CNC start outputs";
 		for (step in mission.steps) if (step.kind == "waitFor" && step.waitFor != null &&
@@ -53,21 +58,41 @@ class TendingMissionChecks {
 		var selectedSlots = ["0-0", "0-1", "0-2", "1-0"];
 		var outfeedSeats = ["seat-r0-c0-x-1-y-1", "seat-r0-c1-x-1-y-1",
 			"seat-r0-c2-x-1-y-1", "seat-r1-c0-x-1-y-1"];
-		for (cycle in 0...selectedSlots.length) {
-			var tool = cycle % 2 == 0 ? DualArmGripperTool.TOOL_CHANNEL_A : DualArmGripperTool.TOOL_CHANNEL_B;
-			for (phase in 0...2) {
-				var index = cycle * 2 + phase;
-				var pick = picks[index], pickAt = pick.at;
-				if (pickAt == null || pickAt.occurrence != "infeed/blank-" + selectedSlots[cycle] ||
-					pickAt.connector != "grasp" || pick.tool != tool || pick.yaw != null || pick.toolYaw == null || !Math.isFinite(pick.toolYaw))
-					throw 'Tending pick $index does not load and unload its assigned blank';
-				var place = places[index], placeAt = place.at;
-				var destination = phase == 0 ? "mill/mill/vise/body" : "outfeedTray/" + outfeedSeats[cycle];
-				if (placeAt == null || placeAt.occurrence != destination || placeAt.connector != (phase == 0 ? "load" : "seat") ||
-					place.tool != tool || place.yaw != null || place.toolYaw == null || !Math.isFinite(place.toolYaw))
-					throw 'Tending place $index does not seat its assigned blank';
+		var inventory = new Map<String, String>(), handled = new Map<String, Int>();
+		var sourcePicks = new Map<String, Int>(), outfeeds = new Map<String, Int>();
+		var maximumHeld = 0;
+		for (index in 0...mission.steps.length) {
+			var step = mission.steps[index], at = step.at, tool = step.tool;
+			if (step.kind != "pick" && step.kind != "place") continue;
+			if (at == null || tool == null || step.yaw != null || step.toolYaw == null || !Math.isFinite(step.toolYaw))
+				throw 'Handling step $index needs its own physical TCP and checked roll';
+			if (step.kind == "pick") {
+				var cycle = selectedSlots.indexOf(at.occurrence.substr("infeed/blank-".length));
+				if (!StringTools.startsWith(at.occurrence, "infeed/blank-") || cycle < 0 ||
+					at.connector != "grasp" || inventory.exists(tool) ||
+					tool != (cycle % 2 == 0 ? DualArmGripperTool.TOOL_CHANNEL_A : DualArmGripperTool.TOOL_CHANNEL_B))
+					throw 'Pick $index has the wrong part, occupied gripper or TCP';
+				if (!handled.exists(at.occurrence)) sourcePicks.set(at.occurrence, index);
+				var count = handled.get(at.occurrence);
+				handled.set(at.occurrence, count == null ? 1 : count + 1);
+				inventory.set(tool, at.occurrence);
+				var held = [for (part in inventory) part].length;
+				maximumHeld = Std.int(Math.max(maximumHeld, held));
+			} else {
+				var part = inventory.get(tool);
+				if (part == null) throw 'Place $index has no part in its selected gripper';
+				var cycle = selectedSlots.indexOf(part.substr("infeed/blank-".length));
+				var load = at.occurrence == "mill/mill/vise/body" && at.connector == "load";
+				if (!load && (at.occurrence != "outfeedTray/" + outfeedSeats[cycle] || at.connector != "seat"))
+					throw 'Place $index has the wrong destination for $part';
+				if (!load) outfeeds.set(part, index);
+				inventory.remove(tool);
 			}
 		}
+		if (maximumHeld != 2 || [for (part in inventory) part].length != 0)
+			throw "The exchange must carry two distinct parts and finish with both grippers empty";
+		for (slot in selectedSlots) if (handled.get("infeed/blank-" + slot) != 2 || !outfeeds.exists("infeed/blank-" + slot))
+			throw 'Blank $slot must be loaded, unloaded and delivered to outfeed';
 		var viaA = 0, viaB = 0;
 		for (step in via) {
 			var at = step.at, poses = step.poses;
@@ -122,20 +147,22 @@ class TendingMissionChecks {
 				signal.name == RobotInterfaceChannels.CYCLE_START && signal.value) cycleStarts.push(index);
 		}
 		if (cycleStarts.length != 4) throw "Every unattended cut needs one CNC start edge";
-		for (cycle in 0...4) {
-			var unloaded = -1, nextPick = -1;
-			for (index in completedCycles[cycle]...mission.steps.length) {
-				var step = mission.steps[index], at = step.at;
-				if (unloaded < 0 && step.kind == "place" && at != null &&
-					at.occurrence == "outfeedTray/" + outfeedSeats[cycle]) unloaded = index;
-				if (cycle < 3 && nextPick < 0 && step.kind == "pick" && at != null &&
-					at.occurrence == "infeed/blank-" + selectedSlots[cycle + 1]) nextPick = index;
-			}
-			if (unloaded <= completedCycles[cycle] || (cycle < 3 && nextPick <= unloaded))
-				throw 'Cycle $cycle must place its finish in outfeed before picking the next blank';
+		for (cycle in 0...3) {
+			var nextPick = sourcePicks.get("infeed/blank-" + selectedSlots[cycle + 1]);
+			var finishedOutfeed = outfeeds.get("infeed/blank-" + selectedSlots[cycle]);
+			if (nextPick == null || nextPick <= cycleStarts[cycle] || nextPick >= completedCycles[cycle] ||
+				finishedOutfeed == null || finishedOutfeed <= cycleStarts[cycle + 1])
+				throw 'Cycle $cycle must pre-stage during cutting and deliver its finish after starting the next cut';
 		}
 		for (cycle in 0...completedCycles.length) {
 			var complete = completedCycles[cycle];
+			var staging = -1;
+			for (index in cycleStarts[cycle]...complete)
+				if (mission.steps[index].kind == "moveVia") staging = index;
+			var unloadingBody = cycle % 2 == 0 ? DualArmGripperTool.GRIPPER_A_BODY : DualArmGripperTool.GRIPPER_B_BODY;
+			var stagingAt = staging < 0 ? null : mission.steps[staging].at;
+			if (stagingAt == null || stagingAt.occurrence != "arm/" + unloadingBody)
+				throw 'Cycle $cycle must stage its unloading gripper before CNC completion';
 			var end = cycle + 1 < completedCycles.length ? completedCycles[cycle + 1] : mission.steps.length;
 			var start = complete + 1;
 			var ready = -1, door = -1, unclamp = -1, unclamped = -1, pick = -1;

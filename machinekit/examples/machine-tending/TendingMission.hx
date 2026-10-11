@@ -4,6 +4,7 @@ import materia.project.SceneArtifact.SceneArtifactMissionStep;
 import materia.project.SceneArtifact.SceneArtifactMissionWaypoint;
 import materia.project.SceneArtifact.SceneArtifactJointTarget;
 import machinekit.robotics.DualArmGripperTool;
+import TendingCyclePlan.TendingOperation;
 
 /** Unrolled, signal-interlocked tending cycles from the cell's checked reach poses. */
 class TendingMission {
@@ -16,15 +17,9 @@ class TendingMission {
 	// is bounded by this per-step simulation-time budget, including planning and settling.
 	static inline var MOTION_TIMEOUT:Float = 90.0;
 
-	/** Generate complete cycles for distinct tray slot indices in row-major order. */
-	public static function generate(cell:TendingControllers, slots:Array<Int>):Array<SceneArtifactMissionStep> {
-		if (cell == null || slots == null || slots.length == 0) throw "Tending mission needs a cell and at least one infeed slot";
-		var slotCount = cell.infeedTray.rows * cell.infeedTray.columns;
-		var seen = new Map<Int, Bool>();
-		for (slot in slots) {
-			if (slot < 0 || slot >= slotCount || seen.exists(slot)) throw 'Invalid or repeated tending slot $slot';
-			seen.set(slot, true);
-		}
+	/** Resolve the production sequence into frames, outputs and certified paths. */
+	public static function generate(cell:TendingControllers):Array<SceneArtifactMissionStep> {
+		if (cell == null) throw "Tending mission needs its configured cell";
 		var result:Array<SceneArtifactMissionStep> = [];
 		function signal(name:String, value:Bool):Int {
 			var index = result.length;
@@ -37,20 +32,16 @@ class TendingMission {
 			if (retryStep >= 0) condition.retryStep = retryStep;
 			result.push({kind: "waitFor", waitFor: condition});
 		}
-		function move(names:Array<String>, tool:String):Void {
-			var waypoints:Array<SceneArtifactMissionWaypoint> = [];
-			for (name in names) waypoints.push(jointWaypoint(cell, name, tool));
-			result.push({kind: "moveVia", at: {occurrence: toolTcp(tool), connector: "tcp"}, poses: waypoints,
-				timeoutSeconds: MOTION_TIMEOUT});
+		function movePath(positions:Array<Array<Float>>, tool:String):Void {
+			result.push({kind: "moveVia", at: {occurrence: toolTcp(tool), connector: "tcp"},
+				poses: [for (position in positions) jointWaypointAt(cell, position)], timeoutSeconds: MOTION_TIMEOUT});
 		}
-		function moveTray(station:String, tool:String):Void
-			move([station + "-clearance", station + "-approach"], tool);
 		function moveToVise(tool:String, station:String = "vise"):Void
-			move(TendingReach.viseTransitStations(station).slice(1), tool);
+			movePath(TendingReach.transferPositions(cell.reach, station, tool, tool).slice(1), tool);
 		function moveFromVise(tool:String, station:String = "vise"):Void {
-			var path = TendingReach.viseTransitStations(station);
+			var path = TendingReach.transferPositions(cell.reach, station, tool, tool);
 			path.reverse();
-			move(path, tool);
+			movePath(path, tool);
 		}
 		function pick(occurrence:String, station:String, tool:String):Void result.push({kind: "pick",
 			at: {occurrence: occurrence, connector: "grasp"}, tool: tool,
@@ -60,8 +51,8 @@ class TendingMission {
 			result.push({kind: "place", at: target, tool: tool, timeoutSeconds: MOTION_TIMEOUT,
 				approachDistance: cell.reach.handlingApproachMm / 1000,
 				toolYaw: TendingReach.toolYaw(cell.reach, station, tool)});
-		function rowOf(slot:Int):Int return Std.int(slot / cell.infeedTray.columns);
-		function columnOf(slot:Int):Int return slot % cell.infeedTray.columns;
+		function rowOf(slot:Int):Int return cell.production.rowOf(slot);
+		function columnOf(slot:Int):Int return cell.production.columnOf(slot);
 		function blankOf(slot:Int):String return 'infeed/blank-${rowOf(slot)}-${columnOf(slot)}';
 		function waitInfeed(slot:Int):Void wait('infeed/slot-${rowOf(slot)}-${columnOf(slot)}-present', true, PRESENCE_TIMEOUT);
 		function openDoor():Void {
@@ -69,11 +60,7 @@ class TendingMission {
 			wait(RobotInterfaceChannels.DOOR_OPEN, true, CNC_SIGNAL_TIMEOUT, request);
 			signal(RobotInterfaceChannels.REQUEST_DOOR_OPEN, false);
 		}
-		function closeDoor():Void {
-			var request = signal(RobotInterfaceChannels.REQUEST_DOOR_CLOSE, true);
-			wait(RobotInterfaceChannels.DOOR_CLOSED, true, CNC_SIGNAL_TIMEOUT, request);
-			signal(RobotInterfaceChannels.REQUEST_DOOR_CLOSE, false);
-		}
+
 		function unclampPart():Void {
 			var request = signal(RobotInterfaceChannels.REQUEST_UNCLAMP, true);
 			wait(RobotInterfaceChannels.UNCLAMPED, true, CNC_SIGNAL_TIMEOUT, request);
@@ -91,50 +78,61 @@ class TendingMission {
 			signal(RobotInterfaceChannels.CYCLE_START, false);
 			return request;
 		}
-		var toolA = DualArmGripperTool.TOOL_CHANNEL_A;
-		var toolB = DualArmGripperTool.TOOL_CHANNEL_B;
-		function toolFor(cycle:Int):String return cycle % 2 == 0 ? toolA : toolB;
-		// MT10–MT11 handles one blank at a time. Pre-staging and a two-part
-		// exchange are MT12 throughput work, after this cell's recovery gate.
-		for (cycle in 0...slots.length) {
-			var slot = slots[cycle], tool = toolFor(cycle);
+		function collect(slot:Int, tool:String, fromTool:String, initial:Bool = false):Void {
 			var station = 'infeed-${rowOf(slot)}-${columnOf(slot)}';
+			var transport = TendingReach.transferPositions(cell.reach, station, tool, fromTool);
+			var approach = TendingReach.transferPositions(cell.reach, TendingCyclePlan.approachRoute(station), tool, tool);
 			waitInfeed(slot);
-			moveTray(station, tool);
+			var incoming = initial ? TendingReach.transferPositions(cell.reach, TendingCyclePlan.startupRoute(station), tool, tool) : transport;
+			movePath(incoming.slice(1).concat(approach.slice(1)), tool);
 			pick(blankOf(slot), station, tool);
-			move([station + "-clearance", "outside staging"], tool);
-			signal(RobotInterfaceChannels.ROBOT_CLEAR, true);
-			openDoor();
-			unclampPart();
-			signal(RobotInterfaceChannels.ROBOT_CLEAR, false);
-			moveToVise(tool, "vise-load");
+			approach.reverse();
+			transport.reverse();
+			movePath(approach.slice(1).concat(transport.slice(1)), fromTool);
+		}
+		function load(tool:String, ?fromTool:String):Void {
+			if (fromTool != null) {
+				movePath(TendingReach.transferPositions(cell.reach, "exchange", tool, fromTool).slice(1), tool);
+			}
+			else moveToVise(tool, "vise-load");
 			place(cell.viseLoadPlace(), "vise-load", tool);
 			clampPart();
 			moveFromVise(tool, "vise-load");
-			signal(RobotInterfaceChannels.ROBOT_CLEAR, true);
-			closeDoor();
-			var cycleRequest = startCycle();
-			wait(RobotInterfaceChannels.CYCLE_COMPLETE, true, CYCLE_TIMEOUT, cycleRequest);
-			wait(RobotInterfaceChannels.CNC_READY, true, CNC_SIGNAL_TIMEOUT);
-			openDoor();
-			signal(RobotInterfaceChannels.ROBOT_CLEAR, false);
-			moveToVise(tool);
-			unclampPart();
-			pick(blankOf(slot), "vise", tool);
-			moveFromVise(tool);
-			signal(RobotInterfaceChannels.ROBOT_CLEAR, true);
-			closeDoor();
-			var outfeedStation = 'outfeed-${rowOf(slot)}-${columnOf(slot)}';
-			moveTray(outfeedStation, tool);
-			place(cell.outfeedPlace(rowOf(slot), columnOf(slot)), outfeedStation, tool);
+		}
+		var cycleRequest = -1, doorCloseRequest = -1;
+		for (operation in cell.production.operations()) switch operation {
+			case Collect(slot, tool, fromTool, initial): collect(slot, tool, fromTool, initial);
+			case Clear(value): signal(RobotInterfaceChannels.ROBOT_CLEAR, value);
+			case OpenDoor: openDoor();
+			case RequestDoorClose:
+				if (doorCloseRequest >= 0) throw "Tending production repeats an unfinished door-close request";
+				doorCloseRequest = signal(RobotInterfaceChannels.REQUEST_DOOR_CLOSE, true);
+			case DoorClosed:
+				if (doorCloseRequest < 0) throw "Tending production waits without a door-close request";
+				wait(RobotInterfaceChannels.DOOR_CLOSED, true, CNC_SIGNAL_TIMEOUT, doorCloseRequest);
+				signal(RobotInterfaceChannels.REQUEST_DOOR_CLOSE, false);
+				doorCloseRequest = -1;
+			case Unclamp: unclampPart();
+			case Load(tool, fromTool): load(tool, fromTool);
+			case StartCycle: cycleRequest = startCycle();
+			case CycleReady:
+				if (cycleRequest < 0) throw "Tending production waits without a cycle request";
+				wait(RobotInterfaceChannels.CYCLE_COMPLETE, true, CYCLE_TIMEOUT, cycleRequest);
+				wait(RobotInterfaceChannels.CNC_READY, true, CNC_SIGNAL_TIMEOUT);
+			case Unload(slot, tool):
+				moveToVise(tool);
+				unclampPart();
+				pick(blankOf(slot), "vise", tool);
+			case Retreat(tool): moveFromVise(tool);
+			case Deliver(slot, tool, fromTool, returnToStage):
+				var station = 'outfeed-${rowOf(slot)}-${columnOf(slot)}';
+				var outfeed = TendingReach.transferPositions(cell.reach, station, tool, fromTool);
+				var approach = TendingReach.transferPositions(cell.reach, TendingCyclePlan.approachRoute(station), tool, tool);
+				movePath(outfeed.slice(1).concat(approach.slice(1)), tool);
+				place(cell.outfeedPlace(rowOf(slot), columnOf(slot)), station, tool);
+				if (returnToStage) { approach.reverse(); outfeed.reverse(); movePath(approach.slice(1).concat(outfeed.slice(1)), fromTool); }
 		}
 		return result;
-	}
-
-	static function jointWaypoint(cell:TendingControllers, name:String, tool:String):SceneArtifactMissionWaypoint {
-		var position = TendingReach.toolPose(cell.reach, name, tool);
-		if (position.length != cell.arm.modules.length) throw 'Tending reach pose "$name" has the wrong joint count';
-		return jointWaypointAt(cell, position);
 	}
 
 	static function toolTcp(tool:String):String {
