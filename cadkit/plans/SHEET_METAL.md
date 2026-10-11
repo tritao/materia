@@ -497,9 +497,11 @@ table in `tools/README.md`.
   segments, tool segments (gooseneck profiles split into convex parts), and the machine as a few
   boxes. The first implementation was an interim separating-axis test. CL2–CL4 are now on
   local main `0650f8ee4`; `CoalPrismQuery` uses CollisionKit's native signed convex distance
-  in press-frame mm, with explicit per-query ownership and a common translation removed.
-  The interim implementation is deleted. Positive Euclidean distance replaces the old support
-  gap as the clearance certificate; uncertainty and exact material refinement remain unchanged.
+  for press-frame mm, with explicit per-query ownership and a common translation removed.
+  Native coordinates are micrometres so EPA's absolute tolerance stays below the default
+  mm penetration tolerance. Coal's finite normalized returned direction supplies a positive
+  support-gap clearance certificate, not its estimated witness-point distance. The interim
+  implementation is deleted; uncertainty and exact material refinement remain unchanged.
 - Curved approximations retain their geometric error. Prism overlap alone cannot diagnose a
   physical collision at intended rounded contact. Refine those pairs against the exact authored
   line/arc tool sections and evaluated bend sectors where their extrusion axes admit an exact
@@ -550,9 +552,12 @@ table in `tools/README.md`.
 - In the press frame, the part's bend line stays at the punch tip and both sides rotate up by half
   the current bend angle; the back flange slides along the fingers (which retract, as the real
   retract function does).
-- **To verify first (SM12):** that SimKit can update weld equality relative poses at runtime
-  (`eq_data`). Fallback: rebuild the sheet's bodies once per bend (a geometry swap like the
-  welder's bead), with the bend itself animated kinematically.
+- SM12 API verification: `nksim_closure_create` returns no removable handle or relative-pose
+  setter. MuJoCo builds weld `eq_data` only during model construction; the generic joint API
+  exposes targets and brakes, not weld rest-pose changes. Use the fallback: animate the bend
+  kinematically and rebuild its physical bodies once per completed bend. The welder bead
+  swaps display geometry only, so it cannot supply the physical geometry replacement.
+  Outside the press, removable fixed tree joints provide rigid wall connections.
 - **Rejected:** FEM or flexible bodies. Accuracy comes from the process model and calibration,
   not from simulating the metal.
 
@@ -1041,9 +1046,9 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM8a | done: cylinder parts and coupled mechanical assembly; typed planning geometry derived from physical datums, independent reference comparisons, full-bed force/depth and conservative demo/frame checks; Start-page project with editable ram, X/R and depth-stop axes. Quick gates `sm8a-cylinder-parts`, `sm8a-mechanical-assembly` and full gate `sm8a-press-assembly-full` pass every stage; original MachineKit and router engineering summaries unchanged | 1d1517683; bc64109d8; final assembly integration |
 | SM8b | done: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; explicit immutable phase-speed model added, its quick gate `sm8b-phase-speeds` passes all five suites; assembly format 7 hydraulic data passes focused tests (187 ProjectKit assertions), full gate `sm8b-hydraulic-format-full` passes every stage; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries; typed shared cylinder runtime and current RobotModel 12 fixtures pass focused model (30), both-backend hydraulic (14), world (5004), maintained MuJoCo and four-platform ABI checks; full gate `sm8b-cylinder-runtime-verified-full` passes every stage including project-source runtime; actual press hydraulic service, distribution blocks, bore-area frame-pressure limit and both guide bindings pass quick gate `sm8b-fluid-bindings-verified`; authored passive-joint support reaches assembly/model/runtime, passes 36 model, 192 ProjectKit and both-backend ownership tests (MuJoCo gravity verified); full gate `sm8b-passive-joints-full` passes every stage with unchanged five engineering summaries and app engineering baselines; typed convex-hull contact settings and maintained primitive/hull finger-contact tests pass 6 MuJoCo assertions and the four-platform ABI audit; full gate `sm8b-hull-contact-full` passes every stage with unchanged original MachineKit and app engineering baselines; the later health audit strengthens contact proof to 12 fault-free outcomes; typed assembly 9, machine recipe 16 and scene 17 transport stops, contacts and native timed outputs; quick gate `sm8b-assembled-press-verified` passes all five suites with unchanged original MachineKit summaries; assembled press contacts, stroke, home and lifecycle pass in the rebuilt app; full gate `sm8b-assembled-press-full` passes every stage, including workspace, app build and complete project-source runtime (215 ProjectKit assertions and 12 fault-free finger-contact outcomes)  Post-rebase checkpoint on local main 943ab6eb3: quick gate `local-main-943-quick` passes all five suites (SheetMetalSmoke 7602, ProjectKit 217, ManufacturingKit 54, MachineKit press baselines unchanged); ProjectKit is 217 because local main adds Contact work saved format coverage. Full gate `local-main-943-full` passes app compilation, but workspace reports 8 failed actions (MotionKit/ToolpathKit stale `switchZhome` observations and RobotKit core missing `libnativekit.so`) and project-source stops at the gantry-picker homing check for the same stale observation.  Current main e6fc61d58 checkpoint: all five quick stages pass, rebuilt app build/runtime and isolated RobotKit core pass; full workspace has three unchanged configuration failures (five actions), detailed below. | 6cef6c0e4; 3e60efc0d; 4d75583a3; c26992364; df79b2c75; cec8715d6; 47312cd36; 6bffdf03c|
 | SM9 | done: typed loaded-stroke evaluation, explicit process-compatible P1–P5 stock, physical manual finger datums, symmetric press placement and exact straight/arc backgauge registration; complete setup checks process compatibility, tonnage, both flange minima, material-bearing tool support and sampled nominal ram travel. Maintained checks pass independent P2 first/later oracles, folded R lift, physical contacts, loaded depth/force, sampled swing and named refusals. Quick gates `sm9a-loaded-stroke`, `sm9b-manufacturing-setup`, `sm9c-press-placement`, `sm9d-backgauge-registration` and final `sm9-single-bend-complete` pass all five suites (7594 sheet assertions); original engineering results unchanged | b1ad051ca; a47776fb1; 2bf6a43aa; 34b9d6102; 9715488e8 |
-| SM10 | done: typed convex-prism data and narrow collision interface; interim exact SAT checks face normals and every edge-cross-product axis. Focused collision checks pass 24 assertions; quick gate `sm10a-prism-collision` passes all five suites with unchanged engineering results. SM10b wall decomposition preserves holes/concavity and explicit arc chord error; focused checks pass 19 assertions, quick gate `sm10b-sheet-prisms` passes all five suites. SM10c bend decomposition preserves developed holes through flat, partial, loaded and zero-radius hem states with explicit mapping error; focused checks pass 66 assertions; quick gate `sm10c-bend-prisms` passes all five suites with unchanged engineering results. SM10d press-frame collision assembly derives all installed tool rows, moving machine boxes and exact open frame volumes, retaining typed owners and approximation errors; focused checks pass 73 assertions; quick gate `sm10d-collision-geometry` passes all five suites with unchanged engineering results. SM10e analytic tool-contact refinement distinguishes material overlap from tip/shoulder tangency; focused checks pass 786 assertions; serial full gate `sm10e-exact-contact-full` passes every stage, including all five quick suites, workspace, app build and project-source runtime. SM10f exact uncut bend/prism refinement supports arbitrary axes, finite widths and hollow interiors; maintained contact checks pass 1082 assertions; quick gate `sm10f-bend-obstacles` passes all five suites with unchanged original engineering results. SM10g typed material query combines exact refinement, support-gap clearance and face-inset collision certificates; sampled stroke checks every installed tool and machine volume, including clamps and explicit backgauge withdrawal; maintained checks pass 50 prism, 1748 contact and 76 geometry assertions plus checked P2 withdrawal/collision/travel outcomes. Quick gate `sm10g-stroke-material` passes all five suites with unchanged engineering results. SM10h exact wall/prism refinement retains curved boundaries, holes and finite thickness at arbitrary orientation; typed GripCheck with an explicit gripper box checks full patch support and physical clearance through withdrawal/stroke, without exempting the gripped wall; 160 maintained grip assertions pass. Quick gate `sm10h-grip-geometry` passes all five suites with unchanged engineering results (52 prism, 1748 contact, 76 geometry assertions). SM10i: finite event candidates include seam and tool ends, horn transitions and finger datums; typed best-first search uses admissible bend/flip time bounds, explicit node/setup budgets and retained physical failure witnesses. Immutable `BendPreparation` derives each program step, checked withdrawal/regrip/flip cost and fresh final state. `GripCheck` returns ordered typed candidate outcomes, and the geometric checker shares per-setup stroke geometry across grips. Maintained checks plan P1-P5: P3 flips, P4 ends on gooseneck, P5 uses gapped V12 rows without horns in order 2,4,1,3 (22.0915 s); both orders of the negative fixture report physical collision witnesses. Final quick gate `sm10i-sequence-search-own-cadkit` passes all five suites: 7602 sheet assertions, ProjectKit 215, ManufacturingKit 54; press-brake checks include 101355 tool-support, 1751 contact, 76 collision-geometry and 164 grip assertions. All 11 original MachineKit engineering/diagnostic rows match baseline. No casts or saved-format changes. SM10j backend catch-up in progress: local main CL2–CL4 picked up; Coal adapter replaces the interim SAT, the maintained prism fixtures pass 55 assertions, and broad gates are pending. | eeda1886e; cc0545645; 720ca4b49; 8d7b48ea6; 67c493959; 5067f196a; 9b7bcea80 |
+| SM10 | done: typed convex-prism data and narrow collision interface; interim exact SAT checks face normals and every edge-cross-product axis. Focused collision checks pass 24 assertions; quick gate `sm10a-prism-collision` passes all five suites with unchanged engineering results. SM10b wall decomposition preserves holes/concavity and explicit arc chord error; focused checks pass 19 assertions, quick gate `sm10b-sheet-prisms` passes all five suites. SM10c bend decomposition preserves developed holes through flat, partial, loaded and zero-radius hem states with explicit mapping error; focused checks pass 66 assertions; quick gate `sm10c-bend-prisms` passes all five suites with unchanged engineering results. SM10d press-frame collision assembly derives all installed tool rows, moving machine boxes and exact open frame volumes, retaining typed owners and approximation errors; focused checks pass 73 assertions; quick gate `sm10d-collision-geometry` passes all five suites with unchanged engineering results. SM10e analytic tool-contact refinement distinguishes material overlap from tip/shoulder tangency; focused checks pass 786 assertions; serial full gate `sm10e-exact-contact-full` passes every stage, including all five quick suites, workspace, app build and project-source runtime. SM10f exact uncut bend/prism refinement supports arbitrary axes, finite widths and hollow interiors; maintained contact checks pass 1082 assertions; quick gate `sm10f-bend-obstacles` passes all five suites with unchanged original engineering results. SM10g typed material query combines exact refinement, support-gap clearance and face-inset collision certificates; sampled stroke checks every installed tool and machine volume, including clamps and explicit backgauge withdrawal; maintained checks pass 50 prism, 1748 contact and 76 geometry assertions plus checked P2 withdrawal/collision/travel outcomes. Quick gate `sm10g-stroke-material` passes all five suites with unchanged engineering results. SM10h exact wall/prism refinement retains curved boundaries, holes and finite thickness at arbitrary orientation; typed GripCheck with an explicit gripper box checks full patch support and physical clearance through withdrawal/stroke, without exempting the gripped wall; 160 maintained grip assertions pass. Quick gate `sm10h-grip-geometry` passes all five suites with unchanged engineering results (52 prism, 1748 contact, 76 geometry assertions). SM10i: finite event candidates include seam and tool ends, horn transitions and finger datums; typed best-first search uses admissible bend/flip time bounds, explicit node/setup budgets and retained physical failure witnesses. Immutable `BendPreparation` derives each program step, checked withdrawal/regrip/flip cost and fresh final state. `GripCheck` returns ordered typed candidate outcomes, and the geometric checker shares per-setup stroke geometry across grips. Maintained checks plan P1-P5: P3 flips, P4 ends on gooseneck, P5 uses gapped V12 rows without horns in order 2,4,1,3 (22.0915 s); both orders of the negative fixture report physical collision witnesses. Final quick gate `sm10i-sequence-search-own-cadkit` passes all five suites: 7602 sheet assertions, ProjectKit 215, ManufacturingKit 54; press-brake checks include 101355 tool-support, 1751 contact, 76 collision-geometry and 164 grip assertions. All 11 original MachineKit engineering/diagnostic rows match baseline. No casts or saved-format changes. SM10j backend catch-up done: local main CL2–CL4 picked up; Coal replaces the interim SAT, returning certified directional clearance and validated signed penetration in mm. The maintained prism fixtures pass 58 assertions; final quick gate `sm10-coal-certificate-quick` passes all five kits, with P1–P5 times unchanged. Full gate and corrected world/press rechecks are recorded below, including upstream failures. | eeda1886e; cc0545645; 720ca4b49; 8d7b48ea6; 67c493959; 5067f196a; 9b7bcea80 |
 | SM11 | done: typed measured press handshake and hydraulic adapter; scene schema 29, real registration/clamp/withdrawal/depth/return, flow timings within 5%, fault/reset recovery and convex tooling pieces; final quick gate `sm11-closing-quick` passes all five kits, corrected full app suite and app/worker supplement pass; all restructuring stages run, with recorded baseline manifest failures and native test stack requirement; P1–P5 times unchanged | 8c06e5235; d4f28d1da; 44025b3c9; e32798dd8 |
-| SM12 | ready: SM11 done; MT6–MT8 and MT10 are on local main `e6fc61d58`; first verify weld-equality relative-pose updates | |
+| SM12 | in progress: SM11 done; runtime weld rest-pose updates unavailable, so use the SM-D11 kinematic/rebuild fallback; physical implementation and gates pending | |
 | SM13 | blocked: requires SM12; MT8 gripper support and MT10 mission steps are now on local main `e6fc61d58` | |
 | SM14 | blocked: requires the SM13 one-bend cell | |
 | SM15 | blocked: requires SM14 multi-bend simulation to supply measured bends for calibration | |
@@ -2098,8 +2103,8 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   byte-for-byte unchanged. Submodule pins did not change. SM-D10's Coal backend catch-up
   is now due because CL2–CL4 are on local main.
 
-- SM10j: CollisionKit's caller-defined length unit is mm here. Signed Euclidean convex
-  distance supplies clearance and penetration, while exact authored wall/tool/bend queries
+- SM10j: CollisionKit uses micrometres internally and the planner returns mm. Signed native
+  penetration and directional support-gap certificates supply the prism query, while exact authored wall/tool/bend queries
   still decide rounded contact. Each native query closes its world on success or failure;
   there is no retained native cache or RobotKit dependency. Independent analytic fixtures
   check 0.1 mm penetration and a 0.3/0.4 mm diagonal gap's 0.5 mm distance, including reversed
@@ -2112,3 +2117,49 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   at the current typed argument position. The two world-test compilations require a
   corrected recheck after the active gate; this is an integration error, not a haxeon bug.
   The initial full gate's five quick stages pass with all P1–P5 times unchanged.
+
+- SM10j numerical certificate correction: Coal's `QueryRequest` defaults to relative GJK
+  convergence and EPA tolerance `1e-6` (`collision_data.h`, `narrowphase_defaults.h`).
+  Its finite distance estimate is not a clearance lower bound. Project both convex vertex
+  sets on the returned normalized direction instead; a positive support gap proves clearance
+  even if that direction has not converged. A failed certificate returns zero for refinement.
+  This tests one Coal-provided direction and does not reintroduce SAT's axis enumeration.
+  Scale native coordinates by 1000 (micrometres), converting penetration back to mm; this
+  reduces EPA's absolute tolerance without claiming to improve relative GJK convergence.
+  Validate the witness points and normal as well as the scalar: Coal's hard fallback emits
+  a finite negative maximum with NaN witnesses. Native refusals carry `press.collision-query`
+  and both prism identities. Focused `sm10-coal-prism-certificate.log` passes all 58 assertions (+3 for the
+  distant analytic lower bound and the named native refusal). Final quick gate `sm10-coal-certificate-quick` passes all five kits; P1–P5 planning
+  times match `sm-main-collision` exactly. Counts remain 7602 sheet, ProjectKit 275 and
+  ManufacturingKit 54. No new haxeon compiler issue, cast or saved-format change.
+
+- SM12 groundwork: `LoadedSheetMotion` snapshots the sheet/state and inverts canonical
+  `PressSheetPose` depth by bounded bisection, preserving signed bend direction and every
+  wall frame. Nonfinite/out-of-contact depths and nonmonotonic contact construction are
+  diagnosed. `sm12-loaded-motion-focus.log` passes both signs, reversed orientations,
+  near-flat/partial/loaded states, caller-state isolation and depth refusal checks.
+  This is the measured-depth geometry primitive, not the physical sheet acceptance.
+- Session compound-convex objects retain separate hulls on one body, including ray/volume
+  queries over their union. The four-platform ABI audit `sm12-compound-hxi.log` passes;
+  `sm12-compound-session-tests.log` passes the whole native session test, including empty
+  gap/material probes, malformed counts and teardown. The maintained Haxe wrapper checks pass in the full ordinary RobotKit world recheck;
+  broad SM12 gates remain pending.
+- Initial full gate `sm10-coal-full`: all five quick stages pass; workspace reports nine
+  failed actions (five existing native artifact/library actions, two stale passive-joint
+  compilation actions and their two dependent tests). App compilation fails in
+  `checkTendingPayloadCarriers`: it iterates `CollisionDescription` as the removed hull
+  array. The same function is present on local main `0650f8ee4`, so this upstream test
+  failure is recorded without changing unrelated tending code. App runtime is skipped.
+
+- Main integration corrected ordinary world recheck `sm11-world-collision-recheck.log`
+  passes the whole suite (5483 printed assertions), including the compound-object Haxe
+  wrapper. MuJoCo also needed the press finger fixture converted from the removed
+  `SimulationLinkHull` type to a normal `CollisionShape` on its link; its old transport
+  slots are removed. The whole MuJoCo world suite compiles after this correction but
+  stops at upstream `SimulationPoseResetTests.posedToolShapes`, also after a clean build
+  (`sm11-mujoco-world-collision-clean.log`). That fixture's robot root is kinematic and
+  its obstacles static; main's unchanged MuJoCo contact filter explicitly excludes
+  pairs where neither body can become dynamic. No test or filter is weakened. The
+  independent press integration `sm11-press-mujoco-integration-recheck-fixed.log`
+  passes passive (3), finger-contact (12), hydraulic (5) and pressure-loss (2) assertions.
+  This does not turn the whole MuJoCo world failure into a pass.

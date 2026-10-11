@@ -77,6 +77,18 @@ class PrismCollisionChecks {
 		var diagonal = rod.placed(Location.translation(new Vector(4.3, 0.8, 0)));
 		check(Math.abs(query.separation(rod, diagonal) - 0.5) < 1e-8, "Separated corners have Euclidean distance rather than a projection gap");
 		check(Math.abs(query.separation(diagonal, rod) - 0.5) < 1e-8, "Metric distance is symmetric");
+		var farDiagonal = rod.placed(Location.translation(new Vector(400.3, 0.8, 0)));
+		var analyticGap = Math.sqrt(396.3 * 396.3 + 0.4 * 0.4), certifiedGap = query.separation(rod, farDiagonal);
+		check(certifiedGap > 396 && certifiedGap <= analyticGap + 1e-8, "A distant directional certificate never overstates the analytic Euclidean gap");
+		var slender = box("unresolvable-slender", 10000, 0.2, 0.000001), diagnosed = false;
+		try { var result = query.overlap(slender, rod); }
+		catch (failure:SheetDiagnosis) {
+			check(failure.code == "press.collision-query" && failure.elements.length == 2
+				&& failure.elements[0] == slender.id && failure.elements[1] == rod.id,
+				"Native geometry rejection names both queried prisms");
+			diagnosed = true;
+		}
+		check(diagnosed, "An unresolvable native hull never becomes unchecked clearance");
 		var rotation = Location.rotation(new Axis(new Vector(), new Vector(1, 2, 3)), 0.9);
 		var skew = rod.placed(Location.translation(new Vector(0, 0, 0.8)).compose(rotation));
 		check(faceProjectionsOverlap(rod, skew), "Skew fixture overlaps on every face-normal projection");
