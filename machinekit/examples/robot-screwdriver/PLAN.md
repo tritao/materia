@@ -407,8 +407,10 @@ The recorded step gates below ran before rebasing onto local main `35f350bae`.
 Rebasing combined SD0's removal of the saved duplicate material field with
 MachineAssembly v17, so the current format is v18. It combined SD2's thread packet
 with SceneArtifact v27, so the current format is v28. Both formats reject their
-pre-change versions. Post-rebase gates remain pending: only 1.7 GB was free, below
-the required 3 GB reserve, so no build or suite was started.
+pre-change versions. The first post-rebase attempt stopped before building because
+only 1.7 GB was free, below the required 3 GB reserve. Validation resumed on
+2026-10-11 with 47 GB free; the full gate uses the canonical project-source target
+as described below.
 
 SD0 full gate (`sd-suite-sd0.txt`) passed, including 303 new fastener assertions.
 The 29 MachineKit engineering-result lines and project-source simulation results
@@ -470,12 +472,70 @@ its field's expected type before resolving that type. Nested field assignments
 such as `data.parts[0].faceRanges = []` therefore fail empty-array inference.
 The local workaround uses typed arrays or `resize(0)`; haxeon is unchanged.
 
+Post-rebase compiler findings use the worktree's pre-existing Haxeon checkout
+`84d9795d`; its recorded parent pin `8d675fde` is unchanged. In
+`Scope.mergeRefinementsFrom` (`haxeon/src/compiler/types/analysis/Scope.hx:157`),
+merged expression facts lose their stable flag. A nested `if` therefore makes a
+guarded final nullable field lose its non-null refinement at a later method call
+(`CallResolver.hx:600`). The minimal control compiles; adding the nested guard
+produces E1005. Sources and logs are in `build/sd-rebase-flow/`. BenchMill captures
+its checked vise in a local to retain the same object across calls.
+
+`FlowAnalysis.accessPath` (`haxeon/src/compiler/types/analysis/FlowAnalysis.hx:236`)
+does not represent array indexing, so repeated nullable reads through an array
+element cannot be narrowed. This affected the inherited gripper and tending
+checks and the stock-density conditional in `ProjectArtifactLoader`. Locals
+capture the element or nullable value before the guard; the checks and material
+fallback remain the same. No Haxeon source or submodule pin is changed.
+
+The compiler-server allocation log can print `bytes=-2147483648` on a large
+compile. `CompilerServer.hx:65` rounds the floating-point cumulative allocation
+delta with `Math.round`, whose result is a 32-bit Int. The MachineKit rebuild
+allocated over 9 GB cumulatively, overflowing that diagnostic conversion; this
+is not its peak resident memory or a simulation result. Haxeon is unchanged.
+
+The current compiler's `PackageManifest` supports `scopeSourceRoots`, but not
+`unscopedSourceRoots`. The project-source gate now uses the existing
+`app/tests/project-source/haxeon.json`: it inherits the app package and its native
+dependencies while leaving fixture roots unscoped. The duplicated
+`app/haxeon.project-source.json` is removed and its commands use the canonical
+target. The SD0 synthetic ball-race fixture now states its root explicitly, as
+required by main's constructor; its asserted nominal thread facts are unchanged.
+
+Post-rebase full gate (`sd-suite-rebase.txt`) passes all seven stages with zero
+failures: CadKit, ProjectKit, MachineKit, app build, editor build, editor runtime
+and all project-source simulations. Cosmetic threads retain 855 checks; fastener
+facts retain 303 assertions and CAD fastenings retain 74. ProjectKit now has 199
+assertions: main contributes 192 and this branch seven thread checks. The
+pre-rebase 188 used an older main; the redundant v18 rejection was removed when
+the schema assertion advanced to v28. No native OCCT build was needed.
+
+All 118 existing MachineKit result lines match the saved main replay exactly
+(`build/sd-rebase-machinekit-compare.txt`). All 114 project-source result lines
+match after excluding wall-clock profiling and allocation measurements
+(`build/sd-rebase-app-compare.txt`); physical values, cycle times, pose counts,
+tracking, stock removal, weld sizes, drive findings and diagnostics are unchanged.
+Compared with main, picker allocation averages move from 58627/60271 to
+58559/60170 bytes/tick and mill allocation from 53456.18 to 53488.44 bytes/tick.
+These measure global GC allocation-buffer refills across tick windows, as noted
+above; router allocations remain 39.5/43.8 KB/tick while collections move from 15
+to 16. Wall-clock planning and tick profiling vary with machine load. Saved thread
+packets enlarge artifacts without changing simulation geometry.
+
+Failed attempts are retained as `sd-suite-rebase-initial.txt`,
+`sd-suite-rebase-scoping.txt` and `sd-suite-rebase-runtime.txt`; their logs are
+archived with the corresponding `sd-rebase-` prefixes. A clean compiler retry
+reproduced the BenchMill narrowing failure before applying the local workaround.
+The full gate runs the source fixes in `ffee5362f`. SD4–SD8 remain unstarted;
+the prior desktop thread capture remains recorded, and the unavailable web
+capture remains undone.
+
 | Step | State | Commits |
 | --- | --- | --- |
-| SD0 | done — post-rebase gate pending | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
-| SD1 | done — post-rebase gate pending | `86181a642`, `a6b9ccd55` |
-| SD2 | done — post-rebase gate pending | `154ca5491`, `35a195269`, `24b5d1a02` |
-| SD3 | done — post-rebase gate pending | `fbbe14d0c`, `6c338344d` |
+| SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
+| SD1 | done — post-rebase full gate passed | `86181a642`, `a6b9ccd55` |
+| SD2 | done — post-rebase full gate passed | `154ca5491`, `35a195269`, `24b5d1a02` |
+| SD3 | done — post-rebase full gate passed | `fbbe14d0c`, `6c338344d`, `ffee5362f` |
 | SD4 | open — machine tending landed; not started | |
 | SD5 | open — machine tending landed; not started | |
 | SD6 | open — machine tending landed; not started | |
