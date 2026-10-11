@@ -58,6 +58,8 @@ struct BodyRecord {
     std::string name;
     double free_mass = 0.0;
     std::array<double, 3> free_inertia{};
+    std::array<double, 3> free_center{};
+    std::array<double, 4> free_rotation{};
     bool free_inertia_saved = false;
 };
 
@@ -508,7 +510,8 @@ public:
             return NKSIM_ERROR_INVALID_HANDLE;
         const auto joint_id = model->body_jntadr[body_id];
         if (joint_id >= 0 && model->jnt_type[joint_id] == mjJNT_FREE) {
-            // Both a DYNAMIC root and a childless KINEMATIC root
+            // A DYNAMIC root or a driven KINEMATIC free root (including
+            // a formerly dynamic rigid tree held by a carrier)
             // (configure_body gives both a free joint) land here. For a KINEMATIC root this is
             // just bookkeeping for the tick: it records the driven pose and
             // twist in found->second.state below, which step()'s
@@ -570,6 +573,8 @@ public:
             if (!record.free_inertia_saved) {
                 record.free_mass = model->body_mass[body_id];
                 std::copy_n(model->body_inertia + 3 * body_id, 3, record.free_inertia.begin());
+                std::copy_n(model->body_ipos + 3 * body_id, 3, record.free_center.begin());
+                std::copy_n(model->body_iquat + 4 * body_id, 4, record.free_rotation.begin());
                 record.free_inertia_saved = true;
             }
             const double ratio = mass / record.free_mass;
@@ -610,9 +615,9 @@ public:
         if (motion_type != NKSIM_MOTION_DYNAMIC && motion_type != NKSIM_MOTION_KINEMATIC)
             return NKSIM_ERROR_INVALID_ARGUMENT;
         if (found->second.desc.motion_type == motion_type) return NKSIM_OK;
-        // Only a childless root has the free joint used by both motion types.
-        // A jointed body would need a different compiled topology.
-        if (parent_joint_id(id) != 0 || has_children(id)) return NKSIM_ERROR_UNSUPPORTED;
+        // A free root can carry rigid descendants without changing its DOFs.
+        // Articulated descendants retain the robot-base restriction.
+        if (parent_joint_id(id) != 0 || has_articulated_descendants(id)) return NKSIM_ERROR_UNSUPPORTED;
         const int model_id = model_body_id(id);
         if (model_id < 0) return NKSIM_ERROR_INVALID_HANDLE;
         const int joint_id = model->body_jntadr[model_id];
@@ -622,9 +627,15 @@ public:
         if (!record.free_inertia_saved) {
             record.free_mass = model->body_mass[model_id];
             std::copy_n(model->body_inertia + 3 * model_id, 3, record.free_inertia.begin());
+            std::copy_n(model->body_ipos + 3 * model_id, 3, record.free_center.begin());
+            std::copy_n(model->body_iquat + 4 * model_id, 4, record.free_rotation.begin());
             record.free_inertia_saved = true;
         }
         const bool held = motion_type == NKSIM_MOTION_KINEMATIC;
+        if (!held) {
+            std::copy(record.free_center.begin(), record.free_center.end(), model->body_ipos + 3 * model_id);
+            std::copy(record.free_rotation.begin(), record.free_rotation.end(), model->body_iquat + 4 * model_id);
+        }
         model->body_mass[model_id] = held ? kKinematicBodyMass : record.free_mass;
         for (int axis = 0; axis < 3; ++axis)
             model->body_inertia[3 * model_id + axis] =
@@ -1146,14 +1157,27 @@ private:
         return false;
     }
 
-    // A KINEMATIC root that carries no other bodies moves on a free joint
-    // (see configure_body). One with bodies beneath it, such as a robot's
-    // base, stays welded to its scripted pose: a free joint's own dynamics
-    // leak into the joints beneath it, however stiff it is made.
+    bool has_articulated_descendants(std::uint64_t body_id) const {
+        for (const auto &[id, joint] : joints) {
+            if (joint.desc.type == NKSIM_JOINT_FIXED) continue;
+            auto ancestor = joint.desc.body_a;
+            while (ancestor != 0) {
+                if (ancestor == body_id) return true;
+                const auto *parent = parent_joint(ancestor);
+                ancestor = parent ? parent->desc.body_a : 0;
+            }
+        }
+        return false;
+    }
+
+    // A held, formerly dynamic rigid tree keeps the free joint used on release.
+    // Authored kinematic robot bases keep their existing welded topology; a free
+    // root's dynamics must not leak into articulated joints beneath it.
     bool free_kinematic_root(std::uint64_t body_id) const {
         const auto &record = bodies.at(body_id);
         return record.desc.motion_type == NKSIM_MOTION_KINEMATIC &&
-               parent_joint_id(body_id) == 0 && !has_children(body_id);
+               parent_joint_id(body_id) == 0 && (!has_children(body_id) ||
+                   (record.free_inertia_saved && !has_articulated_descendants(body_id)));
     }
 
     bool would_create_cycle(std::uint64_t parent, std::uint64_t child) const {
@@ -1834,6 +1858,12 @@ private:
         }
         write_pose(local_position, local_rotation, *body);
 
+        // Release restores the physical inertial frame after a held rebuild.
+        // MuJoCo's simple-body optimization cannot change that frame at runtime.
+        if (found->second.free_inertia_saved &&
+            (found->second.free_center != Vec3{} ||
+             found->second.free_rotation != std::array<double, 4>{1, 0, 0, 0}))
+            body->simple = 0;
         const auto body_result = configure_body(*body, found->second.desc, incoming,
                                                 free_kinematic_root(id), found->second.name);
         if (body_result != NKSIM_OK)

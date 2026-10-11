@@ -95,7 +95,10 @@ class SheetSolid {
 	}
 	static function vector(point:Point2):Vector { return new Vector(point.x, point.y, 0); }
 
-	static function wallSolid(wall:Wall, thickness:Float):Shape {
+	/** Own one exact wall-region extrusion, including holes, without evaluating the whole sheet. */
+	public static function wallSolid(wall:Wall, thickness:Float):Shape {
+		if (wall == null || !Math.isFinite(thickness) || thickness <= 0)
+			throw new SheetDiagnosis("sheet.invalid-thickness", "Wall extrusion needs a region and positive thickness");
 		var sources:Map<String, String> = new Map();
 		var sketch = profile(wall, sources);
 		var part:Null<Part> = null;

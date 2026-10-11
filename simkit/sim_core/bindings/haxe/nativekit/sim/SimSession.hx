@@ -11,12 +11,14 @@ import nativekit.scene.Scene;
  */
 class SimSession {
     final owner:Ownednksim_session;
+    final world:nksim_world;
     final stepObservers:Array<{id:Int, callback:Void->Void}> = [];
     final resetObservers:Array<{id:Int, callback:Void->Void}> = [];
     var nextStepObserverId:Int = 1;
     var disposed:Bool = false;
 
     public function new(scene:Scene, world:nksim_world) {
+        this.world = world;
         var desc = new nksim_session_desc();
         desc.set_struct_size(nksim_session_desc.size());
         desc.set_scene(scene.nativeHandle());
@@ -144,9 +146,20 @@ class SimSession {
     public function fixedTimestep():Float
         return status().get_fixed_timestep();
 
+    /** Batch topology changes after stop(), preserving the shared clock and other participants. */
+    public function beginTopologyUpdate():Void {
+        ensureLive();
+        if (isRunning()) throw "Stop the session before changing topology";
+        SimWorld.check(NativeKitSim.nksim_world_begin_topology_update(world), "session.beginTopologyUpdate");
+    }
+    public function endTopologyUpdate():Void {
+        ensureLive();
+        SimWorld.check(NativeKitSim.nksim_world_end_topology_update(world), "session.endTopologyUpdate");
+    }
+
     public function createObject(motion:MotionType, shape:SimShape, pose:SimPose,
             mass:Float = 0.0, ?restContactGroup:haxe.Int64,
-            ?surface:SimContactSurface):SimObject {
+            ?surface:SimContactSurface, ?inertial:SimInertialProperties):SimObject {
         ensureLive();
         var desc = new nksim_object_desc();
         desc.set_struct_size(nksim_object_desc.size());
@@ -154,6 +167,7 @@ class SimSession {
         desc.set_shape(shape.toNative());
         desc.set_pose(pose.toNative());
         desc.set_mass(mass);
+        if (inertial != null) inertial.writeNative(desc);
         if (restContactGroup != null) desc.set_rest_contact_group(restContactGroup);
         var nativeSurface = new nksim_surface();
         nativeSurface.set_struct_size(nksim_surface.size());
@@ -241,6 +255,33 @@ class SimSession {
         ensureLive();
         SimWorld.check(NativeKitSim.nksim_session_release_object(owner.borrow(), object.handle),
             "session.releaseObject");
+    }
+
+    /** Read this object's measured world pose, including while stopped. */
+    public function objectPose(object:SimObject):SimPose {
+        ensureLive();
+        if (object == null || object.session != this) throw "Pose observation needs this session's object";
+        var found = NativeKitSim.nksim_session_get_object_body(owner.borrow(), object.handle);
+        SimWorld.check(found.status, "session.objectPoseBody");
+        return bodyPose(found.out_body);
+    }
+
+    /** Read a carrier's measured world pose from this shared world. */
+    public function bodyPose(body:nksim_body):SimPose {
+        ensureLive();
+        var pose = new nksim_pose(); pose.set_struct_size(nksim_pose.size());
+        SimWorld.check(NativeKitSim.nksim_session_get_body_pose(owner.borrow(), body, pose).status, "session.bodyPose");
+        return SimPose.fromNative(pose);
+    }
+
+    /** Hold one session object from another's measured frame without exposing a body handle. */
+    public function holdObjectFromObject(object:SimObject, carrier:SimObject, offset:SimPose):Void {
+        ensureLive();
+        if (object == null || carrier == null || object.session != this || carrier.session != this)
+            throw "Object hold needs two objects from this session";
+        var found = NativeKitSim.nksim_session_get_object_body(owner.borrow(), carrier.handle);
+        SimWorld.check(found.status, "session.objectCarrierBody");
+        holdObject(object, found.out_body, offset);
     }
 
     /**

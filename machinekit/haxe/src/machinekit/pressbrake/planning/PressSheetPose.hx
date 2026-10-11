@@ -7,6 +7,7 @@ import cadkit.sheetmetal.Sheet;
 import cadkit.sheetmetal.SheetDiagnosis;
 import cadkit.sheetmetal.SheetEvaluation;
 import cadkit.sheetmetal.SheetState;
+import cadkit.sheetmetal.ManufacturedSheetState;
 import cadkit.sheetmetal.process.BendProcessResult;
 import cadkit.sheetmetal.process.ProcessTooling;
 
@@ -28,8 +29,24 @@ class PressSheetPose {
 			throw new SheetDiagnosis("press.stroke-angle", "Air-bending placement needs a loaded angle below 180 degrees", ["bend:" + bend]);
 		if ((target > 0) != orientation.faceAUp)
 			throw new SheetDiagnosis("press.bend-face", "The bend's concave face must face the punch", ["bend:" + bend]);
-		var evaluation = sheet.evaluateStroke(state, bend, process);
+		return fromEvaluation(sheet, sheet.evaluateStroke(state, bend, process), bend,
+			tooling, station, orientation, process.depthOffset, process.loadedAngle);
+	}
+
+	/** Actual stock contact geometry is independent of a planner's learned depth correction. */
+	public static function manufactured(sheet:Sheet, state:ManufacturedSheetState, bend:Int,
+			tooling:ProcessTooling, station:PressStationGeometry, orientation:BendOrientation):PressSheetPose {
+		if ((sheet.bend(bend).angle > 0) != orientation.faceAUp)
+			throw new SheetDiagnosis("press.bend-face", "The bend's concave face must face the punch", ["bend:" + bend]);
+		return fromEvaluation(sheet, sheet.evaluateManufactured(state), bend, tooling, station, orientation, 0, 1);
+	}
+
+	static function fromEvaluation(sheet:Sheet, evaluation:SheetEvaluation, bend:Int,
+			tooling:ProcessTooling, station:PressStationGeometry, orientation:BendOrientation,
+			depthOffset:Float, loadedAngle:Float):PressSheetPose {
 		var zone = evaluation.bend(bend), halfAngle = zone.angle / 2;
+		if (Math.abs(zone.angle) >= Math.PI)
+			throw new SheetDiagnosis("press.stroke-angle", "Air-bending placement needs an angle below 180 degrees", ["bend:" + bend]);
 		var upperDepth = orientation.faceAUp ? 0.0 : sheet.thickness();
 		var source = new Location(new Plane(zone.point(0.5, zone.width / 2, upperDepth),
 			zone.frame.direction(new Vector(Math.cos(halfAngle), 0, Math.sin(halfAngle))),
@@ -45,7 +62,7 @@ class PressSheetPose {
 			depth = (-sheet.thickness() + tooling.vWidth / 2 * Math.sin(beta)
 				- (radius + tooling.shoulderRadius) * loss) / Math.cos(beta);
 			// Measured depth correction is interpolated from first contact to the loaded endpoint.
-			depth += process.depthOffset * Math.abs(zone.angle / process.loadedAngle);
+			depth += depthOffset * Math.abs(zone.angle / loadedAngle);
 		}
 		if (!Math.isFinite(depth))
 			throw new SheetDiagnosis("press.stroke-depth", "Stroke contact depth exceeds the finite range", ["bend:" + bend]);

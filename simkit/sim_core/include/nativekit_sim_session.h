@@ -75,6 +75,9 @@ typedef struct nksim_object_desc {
     uint32_t collision_mask;
     uint64_t rest_contact_group; /**< Same mounted-contact policy as nksim_body_desc. */
     nksim_surface surface; /**< Contact surface of this environment object's shape. */
+    uint32_t has_inertial_properties;
+    double center_of_mass[3]; /**< Local centre in metres. */
+    double inertia_tensor[9]; /**< Centroidal row-major tensor in kg m². */
 } nksim_object_desc;
 
 /** One kinematic body of an actor. */
@@ -164,6 +167,9 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_create_fixed_joint(
 /** Removes a fixed joint owned by this session while stopped. */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_destroy_fixed_joint(
     nksim_session session, nksim_joint joint);
+/** Reads a body's measured pose from the latest hosted observation, or the stopped world. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_get_body_pose(
+    nksim_session session, nksim_body body, nksim_pose *out_pose NK_INOUT);
 /** Moves an object at rest while stopped; the pose also becomes its reset pose. */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_teleport_object(
     nksim_session session, nksim_object object, const nksim_pose *pose);

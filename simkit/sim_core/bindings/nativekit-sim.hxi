@@ -203,6 +203,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	extern fn nksim_session_find_object(session: nksim_session, body: nksim_body, out_object: ptr<nksim_object> @out) -> nksim_result;
 	extern fn nksim_session_get_actor_body(session: nksim_session, actor: nksim_actor, part: u32, out_body: ptr<nksim_body> @out) -> nksim_result;
+	/**
+	 * Reads a body's measured pose from the latest hosted observation, or the stopped world.
+	 */
+	extern fn nksim_session_get_body_pose(session: nksim_session, body: nksim_body, out_pose: ptr<nksim_pose> @inout) -> nksim_result;
 	extern fn nksim_session_get_object_body(session: nksim_session, object: nksim_object, out_body: ptr<nksim_body> @out) -> nksim_result;
 	/**
 	 * Returns zero in out_carrier when the object is free.
@@ -546,7 +550,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		end_velocity: f64 @offset(72);
 		reference_duration: f64 @offset(80);
 	}
-	struct nksim_object_desc @layout(208, 8) {
+	struct nksim_object_desc @layout(312, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		/**
 		 * < NKSIM_MOTION_STATIC, _KINEMATIC, or _DYNAMIC.
@@ -574,6 +578,15 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		 * < Contact surface of this environment object's shape.
 		 */
 		surface: nksim_surface @offset(152);
+		has_inertial_properties: u32 @offset(208);
+		/**
+		 * < Local centre in metres.
+		 */
+		center_of_mass: array<f64, 3> @offset(216);
+		/**
+		 * < Centroidal row-major tensor in kg m².
+		 */
+		inertia_tensor: array<f64, 9> @offset(240);
 	}
 	struct nksim_pose @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;

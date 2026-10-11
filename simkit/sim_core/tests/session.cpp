@@ -524,6 +524,51 @@ void owner_paced_ticks() {
     assert(nksim_session_stop(space.session) == NKSIM_OK);
 }
 
+void owned_carriers_use_current_targets_in_dependency_order() {
+    Space space;
+    nksim_object_desc desc{};
+    desc.struct_size = sizeof(desc); desc.motion_type = NKSIM_MOTION_DYNAMIC; desc.mass = 1;
+    desc.shape.type = NKSIM_SHAPE_BOX;
+    desc.shape.parameters[0] = desc.shape.parameters[1] = desc.shape.parameters[2] = 0.05;
+    desc.pose = pose_at(0, 0, 3);
+    nksim_object leaf = 0, parent = 0, carrier = 0;
+    assert(nksim_session_create_object(space.session, &desc, &leaf) == NKSIM_OK);
+    desc.pose = pose_at(1, 0, 3);
+    assert(nksim_session_create_object(space.session, &desc, &parent) == NKSIM_OK);
+    desc.motion_type = NKSIM_MOTION_KINEMATIC; desc.pose = pose_at(0, 0, 3);
+    assert(nksim_session_create_object(space.session, &desc, &carrier) == NKSIM_OK);
+    nksim_body parent_body = 0, carrier_body = 0, leaf_body = 0;
+    assert(nksim_session_get_object_body(space.session, parent, &parent_body) == NKSIM_OK);
+    assert(nksim_session_get_object_body(space.session, carrier, &carrier_body) == NKSIM_OK);
+    assert(nksim_session_get_object_body(space.session, leaf, &leaf_body) == NKSIM_OK);
+    const auto parent_offset = pose_at(0.2, 0, 0), leaf_offset = pose_at(0.4, 0, 0);
+    assert(nksim_session_hold_object(space.session, parent, carrier_body, &parent_offset) == NKSIM_OK);
+    assert(nksim_session_hold_object(space.session, leaf, parent_body, &leaf_offset) == NKSIM_OK);
+    for (int i = 1; i <= 3; ++i) {
+        const double angle = i * std::acos(-1.0) / 6;
+        auto target = pose_at(1, 2, 3);
+        target.rotation[2] = std::sin(angle / 2); target.rotation[3] = std::cos(angle / 2);
+        assert(nksim_session_drive_object(space.session, carrier, &target) == NKSIM_OK);
+        assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+        auto actual = pose_at(0, 0, 0);
+        assert(nksim_session_get_body_pose(space.session, leaf_body, &actual) == NKSIM_OK);
+        assert(std::abs(actual.position[0] - (1 + 0.6 * std::cos(angle))) < 1e-6);
+        assert(std::abs(actual.position[1] - (2 + 0.6 * std::sin(angle))) < 1e-6);
+        assert(std::abs(actual.position[2] - 3) < 1e-6);
+    }
+    assert(nksim_session_stop(space.session) == NKSIM_OK);
+    assert(nksim_session_release_object(space.session, parent) == NKSIM_OK);
+    nksim_joint fixed = 0;
+    assert(nksim_session_create_fixed_joint(space.session, carrier, parent, &fixed) == NKSIM_OK);
+    const auto target = pose_at(2, 3, 3);
+    assert(nksim_session_drive_object(space.session, carrier, &target) == NKSIM_OK);
+    assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+    auto actual = pose_at(0, 0, 0);
+    assert(nksim_session_get_body_pose(space.session, leaf_body, &actual) == NKSIM_OK);
+    assert(std::abs(actual.position[0] - 3.4) < 1e-6);
+    assert(std::abs(actual.position[1] - 3) < 1e-6);
+}
+
 } // namespace
 
 // Ground planes and cylinders are session objects too: a plane must be static,
@@ -704,5 +749,6 @@ int main() {
     fixed_connections_use_reference_frames_and_session_ownership();
     actors_follow_timed_keyframes();
     participants_share_every_tick();
+    owned_carriers_use_current_targets_in_dependency_order();
     return 0;
 }

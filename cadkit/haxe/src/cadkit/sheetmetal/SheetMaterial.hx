@@ -9,7 +9,8 @@ class SheetMaterial {
 	public final id:String;
 	public final thickness:Float;
 	public final bendRule:Null<BendRule>;
-	public final mechanical:Null<MaterialMechanical>;
+	final mechanicalData:Null<MaterialMechanical>;
+	public var mechanical(get, never):Null<MaterialMechanical>;
 	public final defaultRadiusRatio:Null<Float>;
 	public final minRadiusRatio:Null<Float>;
 	/** Undirected rolling axis in the root wall frame, radians modulo pi. */
@@ -42,9 +43,9 @@ class SheetMaterial {
 			if (!Math.isFinite(mechanical.uts) || !Math.isFinite(mechanical.yield) || !Math.isFinite(mechanical.youngs)
 				|| mechanical.uts <= 0 || mechanical.yield <= 0 || mechanical.youngs <= mechanical.yield || mechanical.yield > mechanical.uts)
 				throw new SheetDiagnosis("sheet.invalid-mechanical-data", "Strengths must be positive MPa, with yield no greater than UTS and elastic modulus above yield");
-			this.mechanical = {uts: mechanical.uts, yield: mechanical.yield, youngs: mechanical.youngs};
+			this.mechanicalData = {uts: mechanical.uts, yield: mechanical.yield, youngs: mechanical.youngs};
 		} else
-			this.mechanical = null;
+			this.mechanicalData = null;
 		this.id = id;
 		this.thickness = thickness;
 		this.bendRule = bendRule;
@@ -59,6 +60,11 @@ class SheetMaterial {
 			if (!Math.isFinite(grainAngle)) throw new SheetDiagnosis("sheet.invalid-grain", "Grain angle must be finite radians", [id]);
 			var angle = grainAngle % Math.PI; this.grainAngle = angle < 0 ? angle + Math.PI : angle;
 		}
+	}
+	/** Strength data is plain wire data; return a copy so callers cannot alter authored stock. */
+	function get_mechanical():Null<MaterialMechanical> {
+		var data = mechanicalData;
+		return data == null ? null : {uts: data.uts, yield: data.yield, youngs: data.youngs};
 	}
 	public function defaultRadius(?angle:Float):Float {
 		if (bendRule != null) switch (bendRule) {
