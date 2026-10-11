@@ -1189,3 +1189,83 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | planned | |
+
+## Next: a large-format pellet printer (PL0 to PL12)
+
+Planned 2026-10-12, to start after AM0 to AM12, AM9b and the AM5b items needed for landing are done and merged. It builds
+on everything above: the extruder joint, heaters, deposition, the slicer, input shaping and the trim side of the CNC
+router.
+
+**Goal.** A gantry pellet printer of about 1.5 x 1.2 x 1 m that prints large parts from dried, fibre-filled pellets,
+then trims them to CAD with a spindle on the same gantry, simulated end to end (print, cool, deposit, trim) and driven
+by our stack. The hybrid print-then-trim cycle is what our stack does that Klipper-class tools do not.
+
+**Reference extruder: IEMAI Pellet Ext P10** (https://www.iemai3d.com/index.php/pellet-3d-extruders/). It is 10 kg and
+makes 10 kg/h. The screw is 34 x 363 mm (L/D 10.7) with a 60 rpm maximum, driven by a 600 W servo (1.91 N m) through a
+1:50 planetary reducer, which gives about 2.8 g per screw turn. It has 3 heater zones and a water-cooled feed throat, takes
+2 to 10 mm nozzles and prints 0.5 to 5 mm layers, at 220 V. Its kit adds a 12 kg controller (servo driver, heater
+controllers, cooling, feed control, compressed air at 0.6 to 0.8 MPa), a 25 kg hopper dryer and a 65 L compressor. The
+vendor's STEP files (extruder, controller, dryer, compressor) are public on Google Drive but carry no licence: they stay
+in `materia-cache` as display and collision geometry, are not committed, and the part model carries the specification.
+In the extruder's STEP the nozzle tip is at the origin and an 84 x 132 x 8 mm mounting plate sits at z of about 287 to
+419 mm. The CAD volumes overstate the mass (the barrel is one lump), so the mass is the specification's. Not documented:
+how the controller takes screw speed (pulses, analog or fieldbus); ask the vendor. Alternatives: RobotDigg PE3000S
+(3 kg/h, 7 kg) and PEA15000 (15 to 20 kg/h, 42 kg); IEMAI L35 (20 kg/h, 180 kg, with a melt pump and a melt pressure
+sensor) for a later, larger machine.
+
+**Decisions.**
+- PL-D1. Cartesian gantry, not CoreXY. The head (10 kg plus a spindle) dominates the moving mass, belts are too soft over
+  1 to 1.5 m, and milling needs stiff drives both ways. Y is a beam driven at both ends (two servos on racks, kept square:
+  `GantrySpec.dualY` and its racking tolerance), X a carriage on the beam (rack and pinion or ballscrew), Z a ballscrew
+  on the gantry. Servos throughout, with motor-derived limits.
+- PL-D2. The screw is the extruder joint of AM-D3, driven by path distance through mass per screw turn, with its motor's
+  limits through the reducer. Its flow responds over seconds (melt pressure), so the plan gets a screw-flow model in the
+  simulation (lag, ooze, pressure) and a feed-forward term in the planner (pressure advance at this scale). Starts and
+  stops are planned out where possible (continuous paths, coasting, wipes) because retraction barely works.
+- PL-D3. The layer-time window is a planning constraint: a layer printed too fast slumps, too slow does not bond. A
+  per-layer thermal model (bead size, length, convection, material) gives the window; the planner slows a short layer
+  or the program waits. It is checked in simulation, not only asserted.
+- PL-D4. Hybrid from the start: the slicer prints oversize by a trim allowance, the CAM trims the printed stock to CAD
+  with the router's milling stack, on the same dexel stock the deposition fills.
+- PL-D5. The extruder controller is a device peripheral: our device drives the screw (step and direction to its servo
+  driver, if the vendor confirms) and the heater zones' targets; the vendor box's own heater loops are modelled, not
+  replaced, unless we take over the heaters (then AM7's heater module runs three zones).
+- PL-D6. Cell equipment (dryer, compressor, conveying) is ProcessKit sequencing and scene geometry, not motion.
+
+**Test parts.** A tall thin-walled box 600 x 300 x 400 mm with a single bead wall (layer time and slump); a mould-pattern
+segment printed oversize and trimmed (hybrid accuracy); a ribbed panel (sparse infill sized to the bead).
+
+**Steps.**
+- PL0. Survey and worktree: confirm the P10's drive interface and controller I/O with the vendor (or record an
+  assumption); licences of the STEP files; references for large-format slicing and layer-time control (ideas only,
+  licences checked); baseline suite.
+- PL1. `PelletExtruder` part (`machinekit.printing`): screw, barrel zones, reducer, servo, feed throat, nozzle set, mount
+  plate and tool frame, mass from the specification, assumed values marked; vendor STEP as optional display geometry
+  from `materia-cache`. Controller, dryer and compressor as cell equipment parts.
+- PL2. The machine: the gantry assembly (dual-driven Y on racks, X, Z ballscrew), vacuum table, the P10 and a trim
+  spindle beside it, homing, a Start-page entry; motor-derived limits including the moving mass of the head.
+- PL3. Screw-flow model: melt-pressure lag and ooze in the simulation (first order to begin with, parameters per
+  material and nozzle, assumed), deposition rate from it, and a test that the deposited flow follows a step in screw
+  speed with the modelled lag.
+- PL4. Planning the screw: feed-forward on the screw joint from the flow model, start and stop handling (coast, wipe,
+  prime), a check that the deposited bead width stays within tolerance along a path with speed changes.
+- PL5. Thermal layer model: per-layer cooling from bead size, length and convection; the layer-time window per material
+  as data; layer temperature at the next layer's start recorded per layer.
+- PL6. Layer-time control in the planner: slow a layer that is too short (down to a floor), then wait; fail a program
+  whose layers cannot meet the window. Test on the thin box: every layer in its window.
+- PL7. Slicer for large beads (`camkit.additive`): single and double bead walls, continuous spiral and minimal-start
+  paths, sparse infill sized to the bead, the trim allowance, layer-time awareness (reorders or merges regions).
+- PL8. Deposition at this scale: bead footprints in the dexel stock at 5 to 15 mm beads, slump as a function of layer
+  temperature from PL5 (a simple model), checks of volume, bounding box and wall thickness.
+- PL9. Hybrid trim: CAM roughs and finishes the printed stock to CAD with the router's milling stack, the extruder
+  parked or retracted, tool change to the spindle; check the trimmed part against CAD within tolerance.
+- PL10. Cell: dryer and compressor as equipment, pellet conveying and hopper level as signals, the print-then-trim cycle
+  in ProcessKit, heater and feed interlocks (a cold barrel never turns the screw, an empty hopper pauses).
+- PL11. Input shaping and gantry dynamics: the gantry's structural modes in the simulation (beam bending, rack
+  compliance), shaping tuned to them, residual vibration and the head's deviation checked at print speeds.
+- PL12. End to end: the thin box and the mould segment printed, cooled, deposited and trimmed in the app; numbers
+  recorded (print time, layer temperatures, slump, volume, trim time, accuracy).
+
+**Later.** Robot-arm or track-arm deposition (non-planar), the L35 class with a melt pump and closed-loop melt pressure, an IR camera in the simulation, real hardware.
+
+**Order.** PL0 -> PL1 -> PL2 -> (PL3 -> PL4) and (PL5 -> PL6) in parallel -> PL7 -> PL8 -> PL9 -> PL10 -> PL11 -> PL12.
