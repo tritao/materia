@@ -161,7 +161,12 @@ class SimSession {
         if (surface != null) surface.writeNative(nativeSurface);
         desc.set_surface(nativeSurface);
         var handle:nksim_object;
-        if (shape.type == ShapeType.Convex) {
+        if (shape.type == ShapeType.Compound) {
+            var result = NativeKitSim.nksim_session_create_compound_convex_object(owner.borrow(), desc,
+                shape.convexVertices(), shape.convexPieceCounts());
+            SimWorld.check(result.status, "session.createCompoundConvexObject");
+            handle = result.out_object;
+        } else if (shape.type == ShapeType.Convex) {
             var result = NativeKitSim.nksim_session_create_convex_object(owner.borrow(), desc, shape.convexVertices());
             SimWorld.check(result.status, "session.createConvexObject");
             handle = result.out_object;
@@ -171,6 +176,16 @@ class SimSession {
             handle = result.out_object;
         }
         return new SimObject(this, handle, motion, shape);
+    }
+
+    /** Rigidly connect objects using their creation frames; the parent retains its motion. */
+    public function createFixedJoint(parent:SimObject, child:SimObject):SimFixedJoint {
+        ensureLive();
+        if (parent == null || child == null || parent.session != this || child.session != this)
+            throw "A fixed connection needs two objects from this session";
+        var result = NativeKitSim.nksim_session_create_fixed_joint(owner.borrow(), parent.handle, child.handle);
+        SimWorld.check(result.status, "session.createFixedJoint");
+        return new SimFixedJoint(this, result.out_joint);
     }
 
     /** Tests one free dynamic object against an oriented query box. */

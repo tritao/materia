@@ -51,10 +51,12 @@ class PressFingerContactTests {
     for (x in [-0.010, 0.010]) for (y in [-0.050, 0.010]) for (z in [0.0, 0.021]) {
       vertices.push(x); vertices.push(y); vertices.push(z);
     }
-    var hull:robotkit.runtime.Simulation.SimulationLinkHull = {
-      link: 1, vertices: vertices, surface: shape.surface, contact: shape.contact
-    };
-    if (!useHull) finger.collisionShapes.push(shape);
+    if (useHull) {
+      shape = new CollisionShape(collisionkit.CollisionGeometry.Convex(vertices));
+      shape.surface = surface;
+      shape.contact = ShapeContact.PairsAndEnvironment;
+    }
+    finger.collisionShapes.push(shape);
     var hinge = model.addJoint(new Joint("finger-hinge", JointType.Revolute, base, finger));
     hinge.axis = [-1, 0, 0]; hinge.parentFramePosition = [0, 0.050, 1];
     hinge.limits.lower = -Math.PI / 360; hinge.limits.upper = 0;
@@ -79,7 +81,7 @@ class PressFingerContactTests {
     var tick = 0;
     try {
       var runtime = harness.simulation.addRobotAtPose(blueprint, [0, 0, 0], [0, 0, 0, 1],
-        null, null, null, null, null, null, null, null, useHull ? [hull] : null, true);
+        null, null, null, null, null, null, null, true);
       var substeps:Int = @:privateAccess harness.space.requiredSubsteps;
       Sys.println('Finger integration hull=$useHull tick=$timestep substeps=$substeps');
       for (_ in 0...restTicks) {

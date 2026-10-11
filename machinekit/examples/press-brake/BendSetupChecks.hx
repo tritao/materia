@@ -5,6 +5,7 @@ import cadkit.sheetmetal.SheetMaterial;
 import cadkit.sheetmetal.process.ProcessBendRule;
 import cadkit.sheetmetal.process.ProcessTooling;
 import machinekit.pressbrake.planning.BendOrientation;
+import machinekit.pressbrake.planning.LoadedSheetMotion;
 import machinekit.pressbrake.planning.PressSheetPose;
 import machinekit.pressbrake.planning.PressStationGeometry;
 
@@ -24,6 +25,10 @@ class BendSetupChecks {
 		for (bend in sheet.bends()) for (reverse in [false, true]) {
 			var process = rule.predict(stock, bend.angle, bend.edgeA.span.length());
 			var orientation = new BendOrientation(bend.angle > 0, reverse, -10);
+			var initial = sheet.flat();
+			var motion = new LoadedSheetMotion(sheet, initial, bend.id, process, tooling, station, orientation);
+			// The physical driver owns a snapshot; edits to the caller's state cannot move it.
+			for (other in sheet.bends()) initial.set(other.id, other.angle);
 			for (fraction in [0.0, 1e-8, 0.25, 0.5, 0.75, 1.0]) {
 				var state = sheet.flat().set(bend.id, process.loadedAngle * fraction);
 				var pose = PressSheetPose.at(sheet, state, bend.id, process, tooling, station, orientation);
@@ -38,6 +43,19 @@ class BendSetupChecks {
 				if (before.z < -1e-8) throw "Press placement bends down toward the die";
 				if (fraction == 0) near(pose.depth, -stock.thickness, "Flat contact lies one thickness above die");
 				if (fraction == 1) near(pose.depth, process.depth, "Loaded placement reaches predicted depth");
+				var measured = motion.atDepth(pose.depth);
+				near(measured.evaluation.bend(bend.id).angle, zone.angle, "Measured depth recovers the signed loaded angle");
+				for (wall in sheet.walls()) {
+					var actual = measured.wall(wall.id), expected = pose.wall(wall.id);
+					near(actual.plane.origin.subtract(expected.plane.origin).length(), 0, "Measured depth recovers the wall position");
+					near(actual.plane.normal.subtract(expected.plane.normal).length(), 0, "Measured depth recovers the wall normal");
+				}
+			}
+			for (invalidDepth in [Math.NaN, motion.contactDepth - 0.01, motion.loadedDepth + 0.01]) {
+				var refused = false;
+				try { var invalid = motion.atDepth(invalidDepth); }
+				catch (failure:SheetDiagnosis) { refused = failure.code == "press.measured-depth"; }
+				if (!refused) throw "Invalid measured contact depth was accepted";
 			}
 			var rejected = false;
 			try {

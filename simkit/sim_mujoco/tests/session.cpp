@@ -217,10 +217,94 @@ void held_object_tracks_pushes_and_releases() {
     nkscene_scene_destroy(scene);
 }
 
+void fixed_object_tree_survives_free_motion_and_child_rebuild() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.002;
+    world_desc.physics_substeps = 1;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+    nksim_session_desc session_desc{};
+    session_desc.struct_size = sizeof(session_desc);
+    session_desc.scene = scene;
+    session_desc.world = world;
+    nksim_session session = 0;
+    assert(nksim_session_create(&session_desc, &session) == NKSIM_OK);
+    make_box(session, NKSIM_MOTION_STATIC, 0, pose_at(0, 0, -0.05), 10, 10, 0.05);
+    const auto parent = make_box(session, NKSIM_MOTION_DYNAMIC, 0.2, pose_at(0, 0, 0.5), 0.05, 0.05, 0.05);
+    auto child = make_box(session, NKSIM_MOTION_DYNAMIC, 0.2, pose_at(0.4, 0, 0.5), 0.05, 0.05, 0.05);
+    auto moved = pose_at(1, 2, 0.5);
+    moved.rotation[2] = moved.rotation[3] = std::sqrt(0.5);
+    assert(nksim_session_teleport_object(session, parent, &moved) == NKSIM_OK);
+    nksim_joint joint = 0;
+    assert(nksim_session_create_fixed_joint(session, parent, child, &joint) == NKSIM_OK);
+    for (int tick = 0; tick < 1000; ++tick)
+        assert(nksim_session_step(session, 0, nullptr) == NKSIM_OK);
+    nksim_frame frame = 0;
+    assert(nksim_session_capture(session, &frame) == NKSIM_OK);
+    const auto a = object_pose(frame, parent), b = object_pose(frame, child);
+    assert(std::abs(a.position[2] - 0.05) < 0.01);
+    const double x = a.rotation[0], y = a.rotation[1], z = a.rotation[2], w = a.rotation[3];
+    assert(std::abs(b.position[0] - a.position[0] - 0.4 * (1 - 2 * (y*y + z*z))) < 1e-6);
+    assert(std::abs(b.position[1] - a.position[1] - 0.8 * (x*y + z*w)) < 1e-6);
+    assert(std::abs(b.position[2] - a.position[2] - 0.8 * (x*z - y*w)) < 1e-6);
+    nksim_frame_destroy(frame);
+    assert(nksim_session_stop(session) == NKSIM_OK);
+    nksim_body root_body = 0;
+    assert(nksim_session_get_object_body(session, parent, &root_body) == NKSIM_OK);
+    assert(nksim_session_destroy_fixed_joint(session, joint) == NKSIM_OK);
+    assert(nksim_session_destroy_object(session, child) == NKSIM_OK);
+    // Rebuild a child's geometry in the stable root's original reference frame.
+    child = make_box(session, NKSIM_MOTION_DYNAMIC, 0.2, pose_at(0.4, 0, 0.7), 0.05, 0.05, 0.05);
+    assert(nksim_session_create_fixed_joint(session, parent, child, &joint) == NKSIM_OK);
+    nksim_body preserved_body = 0;
+    assert(nksim_session_get_object_body(session, parent, &preserved_body) == NKSIM_OK);
+    assert(preserved_body == root_body);
+    nksim_session_status status{};
+    status.struct_size = sizeof(status);
+    assert(nksim_session_get_status(session, &status) == NKSIM_OK);
+    assert(status.step_index == 1000);
+    assert(nksim_session_capture(session, &frame) == NKSIM_OK);
+    const auto preserved = object_pose(frame, parent);
+    for (int axis = 0; axis < 3; ++axis)
+        assert(std::abs(preserved.position[axis] - a.position[axis]) < 1e-8);
+    nksim_frame_destroy(frame);
+    assert(nksim_session_step(session, 0, nullptr) == NKSIM_OK);
+    assert(nksim_session_capture(session, &frame) == NKSIM_OK);
+    const auto current = object_pose(frame, parent), rebuilt = object_pose(frame, child);
+    const double qx = current.rotation[0], qy = current.rotation[1], qz = current.rotation[2], qw = current.rotation[3];
+    assert(std::abs(rebuilt.position[0] - current.position[0] -
+        (0.4 * (1 - 2 * (qy*qy + qz*qz)) + 0.4 * (qx*qz + qy*qw))) < 1e-6);
+    assert(std::abs(rebuilt.position[1] - current.position[1] -
+        (0.8 * (qx*qy + qz*qw) + 0.4 * (qy*qz - qx*qw))) < 1e-6);
+    assert(std::abs(rebuilt.position[2] - current.position[2] -
+        (0.8 * (qx*qz - qy*qw) + 0.2 * (1 - 2 * (qx*qx + qy*qy)))) < 1e-6);
+    nksim_frame_destroy(frame);
+    assert(nksim_session_stop(session) == NKSIM_OK);
+    assert(nksim_session_reset(session) == NKSIM_OK);
+    assert(nksim_session_capture(session, &frame) == NKSIM_OK);
+    const auto reset_parent = object_pose(frame, parent), reset_child = object_pose(frame, child);
+    assert(std::abs(reset_parent.position[0] - 1) < 1e-6);
+    assert(std::abs(reset_parent.position[1] - 2) < 1e-6);
+    assert(std::abs(reset_parent.position[2] - 0.5) < 1e-6);
+    assert(std::abs(reset_child.position[0] - 1) < 1e-6);
+    assert(std::abs(reset_child.position[1] - 2.4) < 1e-6);
+    assert(std::abs(reset_child.position[2] - 0.7) < 1e-6);
+    nksim_frame_destroy(frame);
+    nksim_session_destroy(session);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 } // namespace
 
 int main() {
     actor_pushes_dynamic_object_without_being_pushed();
     held_object_tracks_pushes_and_releases();
+    fixed_object_tree_survives_free_motion_and_child_rebuild();
     return 0;
 }

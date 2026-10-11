@@ -1,7 +1,7 @@
 package cadkit.sheetmetal;
 
 /** Explicit per-bend angles. Missing, unknown or out-of-range entries are diagnosed by evaluation. */
-class SheetState {
+class SheetState implements SheetAngles {
 	final angles:Map<Int, Float>;
 	public function new() {
 		angles = new Map();

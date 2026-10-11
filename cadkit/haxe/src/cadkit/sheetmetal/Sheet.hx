@@ -261,7 +261,14 @@ class Sheet {
 		return evaluateAngles(state, root, tolerance, activeBend, process.loadedAngle);
 	}
 
-	function evaluateAngles(state:SheetState, root:Int, tolerance:Float, activeBend:Int, loadedAngle:Float):SheetEvaluation {
+	/** Evaluate actual angles without changing design limits, material or developed lengths. */
+	public function evaluateManufactured(state:ManufacturedSheetState, root:Int = 0,
+			tolerance:Float = 1e-8):SheetEvaluation {
+		return evaluateAngles(state, root, tolerance, 0, 0, true);
+	}
+
+	function evaluateAngles(state:SheetAngles, root:Int, tolerance:Float, activeBend:Int,
+			loadedAngle:Float, manufactured:Bool = false):SheetEvaluation {
 		if (!Math.isFinite(tolerance) || tolerance <= 0)
 			throw new SheetDiagnosis("sheet.invalid-tolerance", "Closure tolerance must be finite and positive");
 		if (material.bendRule == null)
@@ -277,7 +284,15 @@ class Sheet {
 			validateMaterial(b);
 			var a = state.angle(b.id);
 			var limit = b.id == activeBend ? loadedAngle : b.angle;
-			if (a * limit < 0 || Math.abs(a) > Math.abs(limit))
+			if (!Math.isFinite(a))
+				throw new SheetDiagnosis("sheet.invalid-state", "State angles must be finite", ["bend:" + b.id]);
+			if (manufactured) {
+				var allowance = bendAllowance(b);
+				var neutralOffset = allowance / Math.abs(b.angle) - b.radius;
+				if (Math.abs(a) >= 2 * Math.PI || (a != 0 && allowance / Math.abs(a) < neutralOffset))
+					throw new SheetDiagnosis("sheet.invalid-manufactured-angle",
+						"Actual angle requires a complete turn or a negative inner radius", ["bend:" + b.id]);
+			} else if (a * limit < 0 || Math.abs(a) > Math.abs(limit))
 				throw new SheetDiagnosis("sheet.invalid-state", "State angle must lie between zero and its permitted target", ["bend:" + b.id]);
 		}
 		var frames:Map<Int, Location> = new Map();

@@ -25,6 +25,28 @@ class SharedSessionTests {
     var scene = Scene.create();
     var world = new SimWorld(scene, {timestep: 0.01});
     var session = new SimSession(scene, world.nativeHandle());
+    var pieces:Array<Array<Float>> = [];
+    for (centre in [-0.3, 0.3]) {
+      var coordinates:Array<Float> = [];
+      for (x in [-0.1, 0.1]) for (y in [-0.2, 0.2]) for (z in [-0.05, 0.05]) {
+        coordinates.push(centre + x); coordinates.push(y); coordinates.push(z);
+      }
+      pieces.push(coordinates);
+    }
+    var compoundShape = SimShape.compoundConvex(pieces);
+    pieces[0][0] = 100;
+    var copied = compoundShape.convexVertices(); copied[0] = 200;
+    var counts = compoundShape.convexPieceCounts(); counts[0] = 0;
+    if (compoundShape.convexVertices()[0] != -0.4 || compoundShape.convexPieceCounts()[0] != 24)
+      throw "Compound shape lost ownership of its piece geometry";
+    var compound = session.createObject(MotionType.Dynamic, compoundShape, new SimPose(5, 0, 2), 0.8);
+    if (compound.overlapsVolume(new SimPose(5, 0, 2), [0.02, 0.02, 0.02]) ||
+        !compound.overlapsVolume(new SimPose(5.3, 0, 2), [0.02, 0.02, 0.02]))
+      throw "Compound object's query filled its empty gap or lost its material";
+    if (Math.abs(session.raycast(new SimPose(5, 0, 3), 0, 0, -1, 3) - 3) > 1e-9 ||
+        Math.abs(session.raycast(new SimPose(5.3, 0, 3), 0, 0, -1, 3) - 0.95) > 1e-9)
+      throw "Compound object's ray query did not preserve its empty gap";
+    compound.dispose();
     var simulation = Simulation.inSession(session);
     var runtime = simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1), [0.0, 0.0, 0.0],
       [0.0, 0.0, 0.0, 1.0]);
@@ -32,6 +54,9 @@ class SharedSessionTests {
     simulation.addStepObserver(ticks);
     var crate = session.createObject(MotionType.Dynamic, SimShape.box(0.2, 0.2, 0.2),
       new SimPose(3.0, 0.0, 2.0), 1.0);
+    var connected = session.createObject(MotionType.Dynamic, SimShape.box(0.1, 0.1, 0.1),
+      new SimPose(3.6, 0.0, 2.0), 1.0);
+    var rigid = session.createFixedJoint(crate, connected);
     var person = session.createActor([SimShape.capsule(0.2, 1.2)], [new SimPose(-2.0, 0.0, 0.8)]);
     var held = session.createObject(MotionType.Dynamic, SimShape.box(0.1, 0.1, 0.1),
       new SimPose(-1.5, 0.0, 1.0), 1.0);
@@ -62,12 +87,17 @@ class SharedSessionTests {
       throw "person did not follow its keyframes on the shared clock";
     if (frame.objectPose(crate).z >= 2.0)
       throw "the shared session's crate did not fall";
+    if (Math.abs(frame.objectPose(connected).x - frame.objectPose(crate).x - 0.6) > 1e-6 ||
+        Math.abs(frame.objectPose(connected).z - frame.objectPose(crate).z) > 1e-6)
+      throw "The session's fixed connection lost its relative frame while falling";
     if (Math.abs(frame.objectPose(held).x + 1.0) > 1e-6)
       throw "held object did not follow its carrier";
     presentation.dispose();
     frame.dispose();
 
     session.stop();
+    rigid.dispose();
+    connected.dispose();
     session.releaseObject(held);
     if (session.objectCarrier(held) == person.partBody(0))
       throw "Released object still reports a carrier";

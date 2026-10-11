@@ -1,4 +1,6 @@
 import cadkit.sheetmetal.BendRule;
+import cadkit.sheetmetal.KFactorTable;
+import cadkit.sheetmetal.ManufacturedSheetState;
 import cadkit.sheetmetal.Sheet;
 import cadkit.sheetmetal.SheetDemoParts;
 import cadkit.sheetmetal.SheetDiagnosis;
@@ -63,11 +65,33 @@ class SheetStrokeSmoke {
 			diagnosis("sheet.invalid-state", function() { var result = sheet.evaluateStroke(tooFar, bend.id, process); });
 			var otherOverbend = new SheetState().set(bend.id, 0).set(second.id, second.angle * 1.01);
 			diagnosis("sheet.invalid-state", function() { var result = sheet.evaluateStroke(otherOverbend, bend.id, process); });
+			var actual = new ManufacturedSheetState(otherOverbend).set(bend.id, process.loadedAngle);
+			var manufactured = sheet.evaluateManufactured(actual);
+			near(manufactured.bend(second.id).angle, second.angle * 1.01, "actual prior bend can exceed its design target");
+			near(manufactured.bend(bend.id).allowance, length, "actual angles preserve the blank");
+			near(manufactured.bend(bend.id).curvedInnerRadius(), process.loadedRadius, "actual loaded radius uses fixed neutral length");
+			var changedSource = otherOverbend.set(second.id, 0);
+			near(actual.angle(second.id), second.angle * 1.01, "manufactured state owns its angle snapshot");
+			var fullTurn = new ManufacturedSheetState(flat).set(bend.id, 2 * Math.PI);
+			diagnosis("sheet.invalid-manufactured-angle", function() { var result = sheet.evaluateManufactured(fullTurn); });
+			var omitted = new ManufacturedSheetState(new SheetState());
+			diagnosis("sheet.invalid-state", function() { var result = sheet.evaluateManufactured(omitted); });
+			var unknown = new ManufacturedSheetState(flat).set(9999, 0);
+			diagnosis("sheet.missing-bend", function() { var result = sheet.evaluateManufactured(unknown); });
+			var reversed = new ManufacturedSheetState(flat).set(bend.id, -bend.angle / 2);
+			near(sheet.evaluateManufactured(reversed).bend(bend.id).angle, -bend.angle / 2,
+				"actual geometry records a bend in the wrong direction");
 			var wrongProcess = setup.predict(stock, sign * Math.PI / 3, 100);
 			diagnosis("sheet.stroke-process-mismatch", function() { var result = sheet.evaluateStroke(flat, bend.id, wrongProcess); });
 			near(sheet.bend(bend.id).angle, sign * Math.PI / 2, "stroke leaves authored target intact");
 			near(sheet.evaluate(flat).bend(bend.id).allowance, length, "stroke leaves developed blank intact");
 		}
+		var sharpStock = new SheetMaterial("sharp-state", 1, BendRule.KFactor(new KFactorTable([0], [0.5])));
+		var sharp = new Sheet(sharpStock);
+		var sharpBase = sharp.addWall(WallOutline.rectangle(60, 100));
+		var sharpSide = SheetDemoParts.flange(sharp, sharpBase, 1, 40, Math.PI / 2, 0);
+		var negativeRadius = new ManufacturedSheetState(sharp.folded()).set(sharp.bends()[0].id, Math.PI * 0.6);
+		diagnosis("sheet.invalid-manufactured-angle", function() { var result = sharp.evaluateManufactured(negativeRadius); });
 		return checks;
 	}
 }
