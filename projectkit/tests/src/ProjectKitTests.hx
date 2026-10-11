@@ -259,11 +259,11 @@ class ProjectKitTests {
     check(encoded.getInt32(4) == SceneArtifact.VERSION, "current scene version");
     var legacy = Bytes.alloc(encoded.length - 4);
     legacy.blit(0, encoded, 0, legacy.length);
-    legacy.setInt32(4, 28);
+    legacy.setInt32(4, 29);
     var oldRefusal = refusal(() -> SceneArtifact.decodeView(legacy));
-    check(oldRefusal.indexOf("schema v28 is unsupported") >= 0 &&
+    check(oldRefusal.indexOf("schema v29 is unsupported") >= 0 &&
       oldRefusal.indexOf('expected v${SceneArtifact.VERSION}') >= 0,
-      "clean scene format break rejects v28 and names the current version");
+      "clean scene format break rejects v29 and names the current version");
     var thread:materia.project.ThreadRenderData = {faceName: "bore:cyl.side", faceIndex: 7,
       spec: {designation: "M6", majorDiameter: 6, pitch: 1, starts: 2,
         hand: materia.project.ThreadSpecData.ThreadHand.LeftHand, internal: true,
@@ -290,6 +290,7 @@ class ProjectKitTests {
     thread.length = 20; thread.spec.pitch = 0;
     rejects(function() SceneArtifact.encode(data), "nominal thread pitch must be positive");
     thread.spec.pitch = 1;
+    SceneScrewTests.namedFace(data, thread);
     data.parts[0].threads = new Array<materia.project.ThreadRenderData>(); data.parts[0].faceRanges.resize(0);
     data.project = {job: "fixture", dynamicParts: ["part"], motions: []};
     var bundled = SceneArtifact.decode(SceneArtifact.encode(data));
@@ -1072,6 +1073,7 @@ class ProjectKitTests {
   }
 
   static function main():Void {
+    SceneScrewTests.run();
     near(LengthUnit.metresPerUnit("mm"), 0.001, "millimetres");
     near(LengthUnit.metresPerUnit("in"), 0.0254, "inches");
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");

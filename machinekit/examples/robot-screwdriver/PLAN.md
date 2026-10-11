@@ -177,6 +177,14 @@ simulation and hardware, and a mission step drives it.
   The simulated endpoint declares a 16-double-epsilon observation precision: a
   MuJoCo feed at its zero stop otherwise faults on roundoff near 1e-20 m and
   releases vacuum. Authored overtravel and commanded limits remain unchanged.
+- **SD6 — Saved screw missions share the qualified program boundary.** ProjectKit
+  owns the wire settings and validates them for both scene missions and live
+  ProcessKit programs. SceneArtifact v30 rejects v29 and carries the identified
+  screw, presenter sensor, threaded occurrence and exact topological face name.
+  Socket, pickup, entry, seat and hole frames use metres; lead and feed windows
+  use millimetres. Validation compares the hole frame, lead and hand with that
+  occurrence's exact named thread packet and requires its presenter's declared
+  presence sensor. An equal bore cannot repair a missing or ambiguous reference.
 
 ## What exists
 
@@ -717,12 +725,45 @@ unequal ticks. The probe uses distinct collision shapes with self-collision
 still enabled. No new Haxeon bug was found; the failed snapshot argument test
 correctly distinguished runtime and core snapshot classes.
 
-SD6 is not complete: the scene screw DTO/schema, CAD-derived mission authoring,
-MissionPlayer/factory integration and the real M6 CAD cell test remain. That test
+SD6 is not complete: CAD-derived mission authoring, MissionPlayer/factory
+integration and the real M6 CAD cell test remain. That test
 must prove seating after vacuum release and retraction, with the fastened screw
 following the live threaded member, not the withdrawn bit. The focused synthetic
 transport probe has no tapped fixture and cannot prove this final constraint.
-The full SD6 gate remains pending.
+The full final SD6 gate remains pending. The portable scene record is implemented
+in the schema checkpoint below.
+
+### SD6 schema checkpoint (2026-10-11)
+
+SceneArtifact v30 stores the freshly derived screw mission packet and rejects
+v29. ProjectKit owns the wire program settings and their validation; ProcessKit
+uses that same boundary rather than retaining a duplicate typedef or validator.
+Seventeen new checks cover decoding, named identity, metre/mm units, program and
+frame windows, and fractional/overflowing slots. Six further checks resolve the
+exact threaded occurrence/face packet, its frame, hand and multi-start lead, and
+the scoped presenter sensor. Existing ProjectKit assertions remain 199.
+
+Full gate `sd-suite-sd6-schema.txt` passes all seven stages, including the 31
+process checks, 72 simulation checks on both backends and 855 cosmetic-thread
+checks. The seven logs and summary are retained in `build/sd6-schema-*`.
+Compared with SD5, 122 MachineKit result lines and 115 normalized project-source
+result lines match exactly. The only replaced lines are the process count
+(29 to 31) and simulation count (44 to 72), from the committed SD6 core.
+Physical values, geometry, cycle times and machining results are unchanged.
+
+Of 41 artifact loads, 11 retain their size; the rest grow by 13 bytes per mission
+step for the optional `"screw":null` field. The observed byte deltas are 13 (13
+loads), 39 (six), 52 (five), 78 (one), 104 (three) and 156 (two). The equipment
+preview remains 2206852 bytes. Comparison reports are retained as
+`build/sd6-schema-*-compare.txt`.
+
+Picker allocation averages move from 58379/60224 to 58648/60286 bytes/tick;
+mill allocation moves from 53332.62 to 53555.72 bytes/tick. These use the same
+global HashLink allocation-buffer counter documented above. Router allocations
+remain 39.5/43.8 KB/tick; belt-router collections move from 16 to 15. Allocation
+budgets pass and wall-clock profiling varies. No new Haxeon bug, native change,
+OCCT build or submodule pin change was needed for this schema checkpoint.
+CAD mission authoring, app execution and the seated-screw handoff remain pending.
 
 | Step | State | Commits |
 | --- | --- | --- |
@@ -732,6 +773,6 @@ The full SD6 gate remains pending.
 | SD3 | done — post-rebase full gate passed | `fbbe14d0c`, `6c338344d`, `ffee5362f` |
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
-| SD6 | in progress — core focused checks pass; scene integration and full gate pending | |
+| SD6 | in progress — core and portable schema implemented; scene integration and final full gate pending | `95a9dbb28` |
 | SD7 | open — machine tending landed; not started | |
 | SD8 | open — machine tending landed; not started | |

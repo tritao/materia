@@ -422,6 +422,7 @@ typedef SceneArtifactMissionWaypoint = {
  * - `waitFor`: wait for one digital input on the mission's controller until its simulation-time timeout.
  * - `moveVia`: move the chain ending at `at` through exact-stop joint or robot-root-frame pose waypoints.
  * - `weld`: weld the seam `weld` describes with the robot's torch.
+ * - `screw`: pick and drive the named CAD fastening with the robot's screwdriver.
  * - `findWork`: measure the named work frame from contact probes on saved nominal CAD faces.
  * - `stow`: return the welding arm to its CAD ready posture using its measured joints and live cell clearance.
  */
@@ -436,6 +437,7 @@ typedef SceneArtifactMissionStep = {
 	/** Requested handling-tool roll about world +Z in radians; independent of part heading. */
 	@:optional var toolYaw:Float;
 	@:optional var weld:SceneArtifactWeld;
+	@:optional var screw:SceneScrewDefinition.SceneScrew;
 	@:optional var joints:Array<SceneArtifactJointTarget>;
 	@:optional var contactWork:SceneContactRegistration.SceneContactWork;
 	@:optional var signal:SceneArtifactMissionSignal;
@@ -705,7 +707,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 33;
+	public static inline var VERSION:Int = 34;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -1656,7 +1658,7 @@ class SceneArtifact {
 				for (connector in component.connectors) if (connector.name == place.connector) return true;
 			return false;
 		}
-		var handles = false, welds = false;
+		var handles = false, welds = false, screws = false;
 		var handlingTools:Array<SceneArtifactRobotTool> = data.robotTools == null ? [] : [for (tool in data.robotTools)
 			if (tool.kind == "gripper" || tool.kind == "suction") tool];
 		for (index in 0...mission.steps.length) {
@@ -1664,7 +1666,7 @@ class SceneArtifact {
 			if (step == null) fail('step $index is empty');
 			if (step.configuration != null) {
 				var pin:SceneArtifactArmConfiguration = step.configuration;
-				if (step.kind != "pick" && step.kind != "place" && step.kind != "weld" &&
+				if (step.kind != "pick" && step.kind != "place" && step.kind != "weld" && step.kind != "screw" &&
 					step.kind != "moveJoints" && step.kind != "moveVia")
 					fail('step $index cannot carry an arm configuration pin');
 				if ((pin.shoulder != "front" && pin.shoulder != "back") ||
@@ -1794,6 +1796,12 @@ class SceneArtifact {
 							}
 						}
 					}
+				case "screw":
+					screws = true;
+					var screw = step.screw;
+					if (screw == null || flat == null) fail('step $index needs a screw definition and assembly');
+					else SceneScrewDefinition.validateScene(screw,flat,data);
+
 				case "weld":
 					welds = true;
 					validateWeld(step.weld, index, flat, fail);
@@ -1826,6 +1834,20 @@ class SceneArtifact {
 						fail('step $index pass "${pass.name}" needs ${pass.process.wireSpeed} m/min of wire, past the feeder\'s top speed of ${feeder.maxWireSpeedMPerMin} m/min');
 			}
 		}
+		var drivers = data.robotTools == null ? [] : [for (tool in data.robotTools) if (tool.kind == "screwdriver") tool];
+		if (screws && (drivers.length != 1 || handles || welds)) fail("screwdriving needs one screwdriver and one tool type");
+		if (screws && drivers.length == 1) {
+			var capacity = drivers[0].screwdriver;
+			if (capacity == null) fail("screwdriver capacity is missing");
+			else for (step in mission.steps) {
+				var screw = step.screw;
+				if (screw != null && (screw.program.finalTorqueLimit > capacity.maxTorque ||
+					screw.program.runDownSpeed > capacity.maxSpeed || screw.program.finalSpeed > capacity.maxSpeed ||
+					screw.program.maximumStroke > capacity.strokeMm))
+					fail('fastening "${screw.fastening}" program exceeds the screwdriver capacity');
+			}
+		}
+
 		if (welds && handles) fail("picks and places and welds: the robot's arm carries one tool, a suction cup or a torch");
 	}
 
@@ -2116,6 +2138,8 @@ class SceneArtifact {
 			}
 			var weld:Dynamic = Reflect.field(raw, "weld");
 			if (weld != null) step.weld = decodeWeld(weld);
+			var screw:Dynamic = Reflect.field(raw,"screw");
+			if (screw != null) step.screw = SceneScrewDefinition.decode(screw);
 			var contact:Dynamic = Reflect.field(raw, "contactWork");
 			if (contact != null) step.contactWork = SceneContactRegistration.decode(contact);
 			var signal:Dynamic = Reflect.field(raw, "signal");
