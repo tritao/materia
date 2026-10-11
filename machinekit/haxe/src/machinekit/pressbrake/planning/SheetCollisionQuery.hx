@@ -1,8 +1,8 @@
 package machinekit.pressbrake.planning;
 
-/** Narrow collision boundary. The interim prism implementation is replaced when CollisionKit lands on main. */
+/** Narrow convex material boundary; curved-contact refinement remains in the press queries. */
 interface SheetCollisionQuery {
 	function overlap(a:ConvexPrism, b:ConvexPrism):Bool;
-	/** Largest signed support gap in mm; a positive value is a lower bound on material distance. */
+	/** Signed convex distance in mm; positive separation certifies material clearance. */
 	function separation(a:ConvexPrism, b:ConvexPrism):Float;
 }

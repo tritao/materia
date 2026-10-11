@@ -5,7 +5,7 @@ import cadkit.sheetmetal.Point2;
 import cadkit.sheetmetal.Segment;
 import cadkit.sheetmetal.WallOutline;
 import machinekit.pressbrake.planning.ConvexPrism;
-import machinekit.pressbrake.planning.PrismSatQuery;
+import machinekit.pressbrake.planning.CoalPrismQuery;
 import machinekit.pressbrake.planning.SheetPrismProfile;
 
 /** Material decomposition preserves concavity and holes; curved boundaries report their approximation. */
@@ -21,7 +21,7 @@ class SheetPrismChecks {
 			new Vector(x + 0.1, y + 0.1, -1), new Vector(x - 0.1, y + 0.1, -1)], new Vector(0, 0, 0.5));
 	}
 	static function overlaps(profile:SheetPrismProfile, point:ConvexPrism):Bool {
-		var query = new PrismSatQuery();
+		var query = new CoalPrismQuery();
 		for (piece in profile.pieces()) if (query.overlap(piece, point)) return true;
 		return false;
 	}
@@ -60,7 +60,7 @@ class SheetPrismChecks {
 		check(overlaps(holed, probe(1, 1)), "Material outside hole is present");
 		check(overlaps(holed, probe(2, 5)), "Probe penetrating hole boundary hits material");
 		var transform = Location.translation(new Vector(1000, 2000, 3000)).compose(Location.rotation(Axis.X(), 0.3));
-		var transformedProbe = probe(5, 5).placed(transform), query = new PrismSatQuery();
+		var transformedProbe = probe(5, 5).placed(transform), query = new CoalPrismQuery();
 		var hit = false;
 		for (piece in holed.pieces()) if (query.overlap(piece.placed(transform), transformedProbe)) hit = true;
 		check(!hit, "Rigid placement preserves the hole");

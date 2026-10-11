@@ -33,8 +33,8 @@ class PressMaterialQuery {
 				}
 			case _: throw new SheetDiagnosis("press.material-query", "Material query requires an evaluated sheet wall or bend");
 		}
-		// Projection is 1-Lipschitz: moving either approximated surface by its error can
-		// close at most the sum of those errors on any unit separating axis.
+		// Distance is 1-Lipschitz: moving either approximated surface by its error can
+		// close at most the sum of those errors between the two convex pieces.
 		var uncertainty = material.error + obstacle.error;
 		var unresolved = false;
 		for (a in material.pieces()) for (b in obstacle.pieces()) {

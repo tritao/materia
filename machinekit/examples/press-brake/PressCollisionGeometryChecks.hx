@@ -25,7 +25,7 @@ import machinekit.pressbrake.planning.PressCollisionGeometry;
 import machinekit.pressbrake.planning.PressCollisionOwner;
 import machinekit.pressbrake.planning.PressGeometry;
 import machinekit.pressbrake.planning.PressSheetPose;
-import machinekit.pressbrake.planning.PrismSatQuery;
+import machinekit.pressbrake.planning.CoalPrismQuery;
 
 /** Independent press-frame material probes verify row placement, relief and evaluated sheet ownership. */
 class PressCollisionGeometryChecks {
@@ -38,7 +38,7 @@ class PressCollisionGeometryChecks {
 			new Vector(x+h,y+h,z-h), new Vector(x-h,y+h,z-h)], new Vector(0,0,2*h));
 	}
 	static function overlaps(bodies:Array<PressCollisionBody>, point:Vector):Bool {
-		var query = new PrismSatQuery(), target = probe(point);
+		var query = new CoalPrismQuery(), target = probe(point);
 		for (body in bodies) for (piece in body.pieces()) if (query.overlap(piece,target)) return true;
 		return false;
 	}

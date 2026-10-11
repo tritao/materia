@@ -12,7 +12,7 @@ import cadkit.sheetmetal.process.AirBending;
 import cadkit.sheetmetal.process.ProcessTooling;
 import machinekit.pressbrake.planning.BendPrismProfile;
 import machinekit.pressbrake.planning.ConvexPrism;
-import machinekit.pressbrake.planning.PrismSatQuery;
+import machinekit.pressbrake.planning.CoalPrismQuery;
 
 /** Bend pieces follow exact FK datums and preserve developed holes through bounded curved mapping. */
 class BendPrismChecks {
@@ -42,7 +42,7 @@ class BendPrismChecks {
 			new Vector(x - 0.01, y + 0.01, z - 0.01)], new Vector(0, 0, 0.02));
 	}
 	static function overlaps(profile:BendPrismProfile, point:Vector):Bool {
-		var query = new PrismSatQuery(), target = probe(point);
+		var query = new CoalPrismQuery(), target = probe(point);
 		for (piece in profile.pieces()) if (query.overlap(piece, target)) return true;
 		return false;
 	}

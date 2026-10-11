@@ -25,7 +25,7 @@ import machinekit.pressbrake.planning.GripCandidateResult.GripRejected;
 import machinekit.pressbrake.planning.GripperBox;
 import machinekit.pressbrake.planning.PressGeometry;
 import machinekit.pressbrake.planning.PressWallPrismQuery;
-import machinekit.pressbrake.planning.PrismSatQuery;
+import machinekit.pressbrake.planning.CoalPrismQuery;
 import machinekit.pressbrake.planning.SheetGrip;
 
 /** Whole-patch support and physical gripper clearance through registration, withdrawal and bending. */
@@ -64,7 +64,7 @@ class GripChecks {
 		var planner = new BendSetup(geometry), bend = sheet.bends()[0], setup = planner.plan(sheet,sheet.flat(),bend.id,station,
 			new BendOrientation(true,false,-10),new GaugeEdge(bend.wallB,new WallEdge(1)),new AirBending());
 		var withdrawal = new BackgaugeStroke(setup.registration,20), envelope = new GripperBox(10,10,15);
-		var geometric = new GeometricGripCheck(geometry,envelope,new PrismSatQuery()), checker:GripCheck = geometric;
+		var geometric = new GeometricGripCheck(geometry,envelope,new CoalPrismQuery()), checker:GripCheck = geometric;
 		var grip = new SheetGrip(root.id,new Point2(10,50),true);
 		check(envelope.supported(sheet,grip),"The complete patch lies on the chosen wall");
 		checker.check(sheet,setup,grip,withdrawal); checks++;
@@ -94,7 +94,7 @@ class GripChecks {
 				"Underside grip follows the stock face and points away from material through the stroke");
 		}
 		check(!envelope.supported(sheet,new SheetGrip(root.id,new Point2(1,50),true)),"Patch crossing a wall boundary is refused");
-		var oversized:GripCheck = new GeometricGripCheck(geometry,new GripperBox(10,10,350),new PrismSatQuery());
+		var oversized:GripCheck = new GeometricGripCheck(geometry,new GripperBox(10,10,350),new CoalPrismQuery());
 		var interference = diagnosis("press.grip-collision",function() {
 			oversized.check(sheet,setup,new SheetGrip(root.id,new Point2(30,50),true),withdrawal);
 		});

@@ -15,7 +15,7 @@ import machinekit.pressbrake.planning.BendTimeModel;
 import machinekit.pressbrake.planning.GeometricGripCheck;
 import machinekit.pressbrake.planning.GripperBox;
 import machinekit.pressbrake.planning.PressGeometry;
-import machinekit.pressbrake.planning.PrismSatQuery;
+import machinekit.pressbrake.planning.CoalPrismQuery;
 import machinekit.pressbrake.ToolLayout;
 import machinekit.pressbrake.ToolRow;
 import machinekit.pressbrake.ToolSegment;
@@ -28,7 +28,7 @@ class BendSequenceChecks {
 	public static function main():Void run();
 	public static function run():Void {
 		checkTimeBounds();
-		var press = new PressBrake(true,null,null,30), geometry = PressGeometry.of(press), prisms = new PrismSatQuery();
+		var press = new PressBrake(true,null,null,30), geometry = PressGeometry.of(press), prisms = new CoalPrismQuery();
 		var tooling = press.toolLayout.stations()[0].processTooling();
 		var stock = new SheetMaterial("sequence-steel",1.5,BendRule.Process(new ProcessBendRule(tooling)),{uts:400,yield:250,youngs:205000});
 		var grips = new GeometricGripCheck(geometry,new GripperBox(10,10,15),prisms);

@@ -15,7 +15,7 @@ import machinekit.pressbrake.planning.BendTimeModel;
 import machinekit.pressbrake.planning.GeometricGripCheck;
 import machinekit.pressbrake.planning.GripperBox;
 import machinekit.pressbrake.planning.PressGeometry;
-import machinekit.pressbrake.planning.PrismSatQuery;
+import machinekit.pressbrake.planning.CoalPrismQuery;
 
 /** A narrow channel must name the physical punch interference after exhausting both orders. */
 class BendSequenceFailureChecks {
@@ -32,7 +32,7 @@ class BendSequenceFailureChecks {
 		var radius = stock.defaultRadius(Math.PI/2);
 		var left = SheetDemoParts.flange(sheet,root,1,40,Math.PI/2,radius);
 		var right = SheetDemoParts.flange(sheet,root,3,40,Math.PI/2,radius);
-		var geometry = PressGeometry.of(press), prisms = new PrismSatQuery();
+		var geometry = PressGeometry.of(press), prisms = new CoalPrismQuery();
 		var grips = new GeometricGripCheck(geometry,new GripperBox(10,10,15),prisms);
 		var timing = new BendTimeModel(press.phaseSpeeds,1,3,1,4,2,200,100,0.3);
 		var search = new BendSequencer(geometry,new AirBending(),timing,grips,prisms);

@@ -23,7 +23,7 @@ import machinekit.pressbrake.planning.PressBendPrismQuery;
 import machinekit.pressbrake.planning.PressCollisionGeometry;
 import machinekit.pressbrake.planning.PressCollisionBody;
 import machinekit.pressbrake.planning.PressMaterialQuery;
-import machinekit.pressbrake.planning.PrismSatQuery;
+import machinekit.pressbrake.planning.CoalPrismQuery;
 import machinekit.pressbrake.planning.PressContactQuery;
 import machinekit.pressbrake.planning.PressGeometry;
 import machinekit.pressbrake.planning.PressPrismSection;
@@ -104,7 +104,7 @@ class PressContactChecks {
 		var press = new PressBrake(true,null,null,30), geometry = PressGeometry.of(press), station = press.toolLayout.stations()[0];
 		var tooling = station.processTooling(), physical = geometry.station(station.id), contactQuery = new PressContactQuery();
 		var bendQuery = new PressBendPrismQuery();
-		var materialQuery = new PressMaterialQuery(new PrismSatQuery());
+		var materialQuery = new PressMaterialQuery(new CoalPrismQuery());
 		var stock = new SheetMaterial("exact-contact-steel",1.5,BendRule.Process(new ProcessBendRule(tooling)),{uts:400,yield:250,youngs:205000});
 		for (sign in [1.0,-1.0]) {
 			var sheet = new Sheet(stock), root = sheet.addWall(WallOutline.rectangle(60,100));

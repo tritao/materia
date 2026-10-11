@@ -14,7 +14,7 @@ import machinekit.pressbrake.planning.BendSetup;
 import machinekit.pressbrake.planning.GaugeEdge;
 import machinekit.pressbrake.planning.PressGeometry;
 import machinekit.pressbrake.planning.PressStrokeCollision;
-import machinekit.pressbrake.planning.PrismSatQuery;
+import machinekit.pressbrake.planning.CoalPrismQuery;
 import machinekit.pressbrake.planning.BackgaugeStroke;
 
 /** Whole single-bend setup acceptance and named manufacturing refusals. */
@@ -41,7 +41,7 @@ class SingleBendSetupChecks {
 		var sheet = SheetDemoParts.p2(stock), bend = sheet.bends()[0], state = sheet.flat();
 		var orientation = new BendOrientation(true, false, -10), edge = new GaugeEdge(bend.wallB, new WallEdge(1));
 		var result = planner.plan(sheet, state, bend.id, station, orientation, edge, process);
-		var collision = new PressStrokeCollision(geometry, new PrismSatQuery());
+		var collision = new PressStrokeCollision(geometry, new CoalPrismQuery());
 		var unretracted = diagnosis("press.collision", function() { collision.check(sheet, result); });
 		if (unretracted.elements.indexOf("machine:fingerLeft") < 0)
 			throw "Unretracted backgauge collision must name the physical finger";

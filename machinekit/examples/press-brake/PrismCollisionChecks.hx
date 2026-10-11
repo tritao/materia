@@ -3,10 +3,10 @@ import cadkit.modeling.Location;
 import cadkit.modeling.Vector;
 import cadkit.sheetmetal.SheetDiagnosis;
 import machinekit.pressbrake.planning.ConvexPrism;
-import machinekit.pressbrake.planning.PrismSatQuery;
+import machinekit.pressbrake.planning.CoalPrismQuery;
 import machinekit.pressbrake.planning.SheetCollisionQuery;
 
-/** Independent contact, containment and skew-edge fixtures for the interim convex-prism query. */
+/** Independent contact, containment and skew-edge fixtures for the CollisionKit convex-prism query. */
 class PrismCollisionChecks {
 	static var checks:Int = 0;
 	public static function main():Void run();
@@ -35,7 +35,7 @@ class PrismCollisionChecks {
 	}
 	public static function run():Void {
 		checks = 0;
-		var query:SheetCollisionQuery = new PrismSatQuery();
+		var query:SheetCollisionQuery = new CoalPrismQuery();
 		var rod = box("rod", 2, 0.2, 0.2), contained = box("contained", 0.1, 0.1, 0.1);
 		var rodInset = rod.inset(0.1);
 		check(rodInset != null, "Inset retains a sufficiently thick prism");
@@ -67,23 +67,27 @@ class PrismCollisionChecks {
 		check(!query.overlap(rod, separated), "Separated prisms do not overlap");
 		check(Math.abs(query.separation(rod, separated) - 0.1) < 1e-8, "Support gap has physical mm units");
 		check(Math.abs(query.separation(separated, rod) - 0.1) < 1e-8, "Support gap is symmetric");
-		check(Math.abs(query.separation(rod, touching)) < 1e-8, "Touching has zero support gap");
-		check(query.separation(rod, penetrating) < 0, "Overlapping prisms have negative support gaps");
+		check(Math.abs(query.separation(rod, touching)) < 1e-8, "Touching has zero convex distance");
+		check(query.separation(rod, penetrating) < 0, "Overlapping prisms have negative convex distance");
 		check(!query.overlap(rod, rod.placed(Location.translation(new Vector(4, 0.4, 0.4)))), "Vertex contact is permitted");
 		var tiny = rod.placed(Location.translation(new Vector(3.995, 0, 0)));
 		check(query.overlap(rod, tiny), "Small penetration above default tolerance is detected");
-		check(!new PrismSatQuery(0.01).overlap(rod, tiny), "Declared mm penetration tolerance is applied");
+		check(!new CoalPrismQuery(0.01).overlap(rod, tiny), "Declared mm penetration tolerance is applied");
+		check(Math.abs(query.separation(rod, penetrating) + 0.1) < 1e-8, "Signed distance measures penetration in mm");
+		var diagonal = rod.placed(Location.translation(new Vector(4.3, 0.8, 0)));
+		check(Math.abs(query.separation(rod, diagonal) - 0.5) < 1e-8, "Separated corners have Euclidean distance rather than a projection gap");
+		check(Math.abs(query.separation(diagonal, rod) - 0.5) < 1e-8, "Metric distance is symmetric");
 		var rotation = Location.rotation(new Axis(new Vector(), new Vector(1, 2, 3)), 0.9);
 		var skew = rod.placed(Location.translation(new Vector(0, 0, 0.8)).compose(rotation));
 		check(faceProjectionsOverlap(rod, skew), "Skew fixture overlaps on every face-normal projection");
-		check(!query.overlap(rod, skew), "Edge-cross-product axis separates the skew rods");
+		check(!query.overlap(rod, skew), "Convex distance separates the skew rods");
 		check(!query.overlap(skew, rod), "Skew separation is symmetric");
-		check(query.separation(rod, skew) > 0, "Edge-axis separation also certifies a positive distance bound");
+		check(query.separation(rod, skew) > 0, "Skew separation certifies a positive convex distance");
 		var common = Location.translation(new Vector(1000, 2000, 3000)).compose(
 			Location.rotation(new Axis(new Vector(), new Vector(3, 1, 2)), 0.7));
 		check(query.overlap(rod.placed(common), penetrating.placed(common)), "Rigid transform preserves penetration");
 		check(!query.overlap(rod.placed(common), skew.placed(common)), "Rigid transform preserves edge-axis separation");
-		check(Math.abs(query.separation(rod.placed(common), separated.placed(common)) - 0.1) < 1e-8, "Rigid transform preserves the metric support gap");
+		check(Math.abs(query.separation(rod.placed(common), separated.placed(common)) - 0.1) < 1e-8, "Rigid transform preserves convex distance");
 		check(query.overlap(rod.placed(common), contained.placed(common)), "Rigid transform preserves containment");
 		var almostParallel = separated.placed(Location.rotation(Axis.Z(), 1e-13));
 		check(!query.overlap(rod, almostParallel), "Nearly parallel edges retain a stable separation");
