@@ -20,6 +20,26 @@ class CollisionDescription {
 
   public function new() {}
 
+  /** Appends another scene, remapping its body/object references and rules. */
+  public function append(other:CollisionDescription):Void {
+    if (other == this) throw "Cannot append a collision description to itself";
+    var bodyIds = [for (body in other.bodies) addBody(body.name, body.group, body.fixed, body.pose)];
+    var objectIds = [for (object in other.objects) addObject(object.name,
+      object.body < 0 ? -1 : bodyIds[object.body], object.offset, object.geometry, object.inflation, object.source)];
+    for (rule in other.bodyRules) setBodyRule(rule.a < 0 ? -1 : bodyIds[rule.a],
+      rule.b < 0 ? -1 : bodyIds[rule.b], rule.rule, rule.reason);
+    for (rule in other.objectRules) setObjectRule(objectIds[rule.a], objectIds[rule.b], rule.rule, rule.reason);
+    for (articulation in other.articulations)
+      addArticulation(articulation.name, [for (body in articulation.bodies) bodyIds[body]], articulation.reference);
+    for (assumption in other.assumptions) note(assumption);
+  }
+
+  public function copy():CollisionDescription {
+    var result = new CollisionDescription();
+    result.append(this);
+    return result;
+  }
+
   /** Adds a body; `pose` is where it starts (an articulation's bodies start at its reference). */
   public function addBody(name:String, group:Int, fixed:Bool, ?pose:CollisionPose):Int {
     if (group < 0) throw 'Collision body "$name" needs a group from 0';

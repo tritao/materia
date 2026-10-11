@@ -1,5 +1,7 @@
 package app;
 
+import robotkit.collision.CollisionClearance;
+
 import robotkit.world.RobotWorld;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.EaikKinematics;

@@ -128,9 +128,9 @@ class ContactSearchMotionTests {
         "Probe approach clamps representation-sized observed-start overshoot to the exact joint limit");
       function cube(z:Float):Array<Float> return [for (x in [-0.001, 0.001]) for (y in [-0.001, 0.001])
         for (height in [z - 0.001, z + 0.001]) for (value in [x, y, height]) value];
-      var probeContact = new CollisionClearance(arm, [
-        {name: "tool", link: tool.id, vertices: cube(0), tool: true},
-        {name: "fixture", link: base.id, vertices: cube(0.014612), tool: false}], [0.0], () -> new NativeCollisionWorld(), 0.003,
+      var probeContact = new CollisionClearance(arm, CollisionClearance.combine([
+        CollisionClearance.convex("tool", tool.id, cube(0), true),
+        CollisionClearance.convex("fixture", base.id, cube(0.014612), false)]), [0.0], () -> new NativeCollisionWorld(), 0.003,
         CollisionClearance.CONTACT_MARGIN);
       var blocked = probeContact;
       var checkedProbe = new ProbeMotionPlanner(arm, planning.compiler, probeContact);
@@ -154,7 +154,7 @@ class ContactSearchMotionTests {
       try uncertainProbe.precontactDistance(0.01, 0.01) catch (_:Dynamic) noAir = true;
       check(noAir, "A probe with no clearance before possible touch cannot be prepared");
       var wire = new processkit.ProbeWireClearance(arm, tool.id, Transform3.identity(), 0.001, 0.015,
-        [{name: "fixture", link: base.id, vertices: cube(0.015), tool: false}]);
+        CollisionClearance.combine([CollisionClearance.convex("fixture", base.id, cube(0.015), false)]));
       var wireGuarded = new ProbeMotionPlanner(arm, planning.compiler, null, wire);
       var safeSpeed = wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0.0005);
       check(safeSpeed > 0 && safeSpeed < 0.02, "Calibration and CAD wire extent bound requested sensing speed");
@@ -394,7 +394,7 @@ class ContactSearchMotionTests {
       servo.dispose(); harness.dispose(); return;
     }
     var planning = WeldingPlanRunner.planning(fixture.arm, 1.0);
-    var clear = new CollisionClearance(fixture.arm, [], [0.0], () -> new NativeCollisionWorld());
+    var clear = new CollisionClearance(fixture.arm, CollisionClearance.combine([]), [0.0], () -> new NativeCollisionWorld());
     var stow = WeldStowPlanner.plan(fixture.arm, planning.compiler, clear, [0.03], [0.0]);
     check(stow.ops.length == 1 && switch stow.ops[0] {
       case motionkit.program.MotionOp.MoveJ(motionkit.program.MoveTarget.JointTarget(goal), _, _): Math.abs(goal[0]) < 1e-12;

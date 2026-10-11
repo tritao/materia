@@ -940,6 +940,29 @@ Order: CL9a, CL9b, CL9c, CL9d, CL9e. Each step is one commit.
 - No new dependencies, forks, simulation mission behaviour changes, pushes
   or OCCT rebuilds.
 
+### CL9c: one clearance engine (2026-10-11)
+
+- Surface placement, reachability, Paint, Sand and FinishSurface now query
+  CollisionClearance. Authored obstacles are Box objects; carried geometry
+  uses CollisionDescription bodies and link/tool shapes, preserving poses,
+  inflation and pair rules. Shapes already owned by the robot are replaced
+  by name when prepared, rather than added twice. The obsolete SAT checker
+  and clearance records are deleted and their names are absent from code.
+- Changed assertions: PlacementTests' preparation counter was
+  `preparationCount == preparedBefore + 1`; it is now `worlds == 1` for the
+  one candidate. ConstructionSkillTests' context-reuse counter was
+  `preparationCount == preparedBeforeSkill`; it now checks
+  `cell.obstacles.objects.length == preparedBeforeSkill && worlds > 0`.
+  These check backend preparation and description preservation. No existing
+  distance, reachability or simulation expectation was rebaselined.
+- All required gates pass (standalone C++ 3 + 16, native kit, collisionkit,
+  MotionKit, RobotKit 5,473, processkit and full app missions), with only the
+  known pure-kit DLS -40.8-byte allocation failure. CAD cell, MuJoCo,
+  CadBridge, clearance-validation (23) and planner checks pass too. RobotKit
+  and the app were rerun after the final shape-preservation audit.
+- No new dependencies, forks, simulation mission behaviour changes, pushes
+  or OCCT rebuilds.
+
 ### Plan revision (2026-10-01, after CL1)
 
 A review of the plan against CL1 and the code around it changed:

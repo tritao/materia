@@ -1,7 +1,9 @@
 package processkit;
 
+import robotkit.collision.CollisionClearance;
+
 import robotkit.manipulation.Manipulator;
-import robotkit.manipulation.ClearanceBodyData;
+import collisionkit.CollisionDescription;
 import robotkit.manipulation.ClearanceViolation;
 import robotkit.model.LinkId;
 import robotkit.spatial.Transform3;
@@ -15,9 +17,9 @@ private class WireObstacle {
   public final corners:Array<Float>;
   public final centre:Vec3;
   public final radius:Float;
-  public function new(body:ClearanceBodyData, link:Int) {
+  public function new(body:collisionkit.DescribedObject, link:Int) {
     name = body.name; this.link = link;
-    corners = new ConvexSolid(body.vertices).cornerPoints();
+    corners = new ConvexSolid(CollisionClearance.vertices(body)).cornerPoints();
     var sum = new Vec3();
     var count = Std.int(corners.length / 3);
     for (index in 0...count) sum = sum.add(new Vec3(corners[3 * index], corners[3 * index + 1], corners[3 * index + 2]));
@@ -42,7 +44,7 @@ class ProbeWireClearance {
   final airMargin:Float;
 
   public function new(arm:Manipulator, link:LinkId, tip:Transform3, diameter:Float, stickout:Float,
-      bodies:Array<ClearanceBodyData>, airMargin:Float = WeldPathPlanner.AIR_MARGIN) {
+      bodies:collisionkit.CollisionDescription, airMargin:Float = WeldPathPlanner.AIR_MARGIN) {
     if (arm == null || link == null || tip == null || bodies == null || !Math.isFinite(diameter) || !(diameter > 0) ||
         !Math.isFinite(stickout) || !(stickout > 0) || !Math.isFinite(airMargin) || !(airMargin > 0))
       throw "Probe wire clearance needs CAD wire dimensions, its link-local tip and finite air clearance";
@@ -57,11 +59,11 @@ class ProbeWireClearance {
     }
     centre = tip.transformPoint(new Vec3(0, 0, -stickout / 2));
     radius = Math.sqrt(2 * half * half + stickout * stickout / 4);
-    for (body in bodies) {
+    for (body in bodies.objects) {
       // Tool skins are the wire's own rigid assembly; their clearance remains checked by CollisionClearance.
-      if (body.tool || body.link == link) continue;
-      var index = links.indexOf(body.link);
-      if (index < 0) { index = links.length; links.push(body.link); }
+      if (CollisionClearance.isTool(bodies, body) || CollisionClearance.link(bodies, body) == link) continue;
+      var index = links.indexOf(CollisionClearance.link(bodies, body));
+      if (index < 0) { index = links.length; links.push(CollisionClearance.link(bodies, body)); }
       obstacles.push(new WireObstacle(body, index));
     }
   }

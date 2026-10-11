@@ -2,7 +2,7 @@ package processkit.skill;
 
 import robotkit.skill.*;
 
-import robotkit.manipulation.BaseObstacle;
+import collisionkit.CollisionDescription;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.ToolPlanningContext;
 import robotkit.navigation.Navigator;
@@ -28,7 +28,7 @@ class Sand implements Skill {
       map_T_surface:Transform3, surface:WorkSurface, spec:FinishSpec,
       observePerception:RobotSnapshot -> PerceptionSnapshot, sander:Sander,
       speedRpm:Float, contactForceNewtons:Float, seed:Array<Float>,
-      runner:SurfacePlanRunner, ?obstacles:Array<BaseObstacle>, ?toolPlanning:ToolPlanningContext) {
+      runner:SurfacePlanRunner, ?obstacles:CollisionDescription, ?toolPlanning:ToolPlanningContext) {
     if (sander == null) throw "Sand requires a sander";
     var adapter = new ChannelToolAdapter();
     adapter.bind("surface.process", function(event) {

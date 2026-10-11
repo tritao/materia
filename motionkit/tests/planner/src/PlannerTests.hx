@@ -22,7 +22,7 @@ import motionkit.program.MoveTarget;
 import motionkit.robot.CollisionPlannerSpace;
 import motionkit.robot.StructuredJointPathPlanner;
 import robotkit.collision.CollisionClearance;
-import robotkit.manipulation.ClearanceBodyData;
+import collisionkit.CollisionDescription;
 import robotkit.manipulation.Manipulator;
 
 /**
@@ -254,22 +254,20 @@ class PlannerTests {
     var model = arm.model;
     var goal = START.copy();
     goal[0] += 1.2;
-    var torch:ClearanceBodyData = {name: "torch", link: "wrist_3_link",
-      vertices: WeldPlanningTests.box(-0.012, 0.012, D6 - 0.012, D6 + 0.012, -0.14, -0.03), tool: true};
-    var table:ClearanceBodyData = {name: "table", link: "base_link", vertices: WeldPlanningTests.box(-0.8, 0.8, -0.8, 0.8, -0.1, 0.0), tool: false};
+    var torch:collisionkit.CollisionDescription = CollisionClearance.convex("torch", "wrist_3_link", WeldPlanningTests.box(-0.012, 0.012, D6 - 0.012, D6 + 0.012, -0.14, -0.03), true);
+    var table:collisionkit.CollisionDescription = CollisionClearance.convex("table", "base_link", WeldPlanningTests.box(-0.8, 0.8, -0.8, 0.8, -0.1, 0.0), false);
     // The post stands where the torch passes halfway round.
     var halfway = START.copy();
     halfway[0] += 0.6;
     var tip = arm.linkPoses(halfway, ["wrist_3_link"])[0].transformPoint(new robotkit.spatial.Vec3(0, D6, -0.09));
-    var post:ClearanceBodyData = {name: "post", link: "base_link",
-      vertices: WeldPlanningTests.box(tip.x - 0.03, tip.x + 0.03, tip.y - 0.03, tip.y + 0.03, 0.0, tip.z + 0.05), tool: false};
+    var post:collisionkit.CollisionDescription = CollisionClearance.convex("post", "base_link", WeldPlanningTests.box(tip.x - 0.03, tip.x + 0.03, tip.y - 0.03, tip.y + 0.03, 0.0, tip.z + 0.05), false);
     // The planner's world: the arm's bodies from its model, the same hulls.
     var description = new CollisionDescription();
     var bodies = ModelBodies.describe(description, model, "ur", 0, arm.stateOf(START), "start", true);
-    description.addObject("torch", bodies.bodies[model.bodyIndex("wrist_3_link")], CollisionPose.identity(), CollisionGeometry.Convex(torch.vertices));
+    description.addObject("torch", bodies.bodies[model.bodyIndex("wrist_3_link")], CollisionPose.identity(), CollisionGeometry.Convex(CollisionClearance.vertices(torch.objects[0])));
     bodies.declare();
-    description.addFixed("table", CollisionPose.identity(), CollisionGeometry.Convex(table.vertices), 1);
-    description.addFixed("post", CollisionPose.identity(), CollisionGeometry.Convex(post.vertices), 1);
+    description.addFixed("table", CollisionPose.identity(), CollisionGeometry.Convex(CollisionClearance.vertices(table.objects[0])), 1);
+    description.addFixed("post", CollisionPose.identity(), CollisionGeometry.Convex(CollisionClearance.vertices(post.objects[0])), 1);
     var world = new NativeCollisionWorld();
     var build = description.build(world);
     var space = new CollisionPlannerSpace(description, build, bodies, new CollisionMargins(2, 0.007));
@@ -277,7 +275,7 @@ class PlannerTests {
     var planner = new RrtConnect(new BoundedSpace(space, [for (j in 0...6) Math.min(START[j], goal[j]) - 0.8],
       [for (j in 0...6) Math.max(START[j], goal[j]) + 0.8]), 2);
     // Validation: the adapter on the same hulls, with CollisionClearance's margins.
-    var clearance = new CollisionClearance(arm, [torch, table, post], START, () -> new NativeCollisionWorld());
+    var clearance = new CollisionClearance(arm, CollisionClearance.combine([torch, table, post]), START, () -> new NativeCollisionWorld());
     check(clearance.sweep(START, goal) != null, "the direct turn sweeps the torch through the post");
     var compiler = processkit.WeldingPlanRunner.planning(arm, 2.0).compiler.withJointPathPlanner(
       new StructuredJointPathPlanner(arm, null, null, clearance, 8, false));

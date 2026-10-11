@@ -10,7 +10,6 @@ import kinematicskit.KinematicModel;
 import kinematicskit.KinematicState;
 import kinematicskit.Transform;
 import robotkit.kinematics.RobotKinematics;
-import robotkit.manipulation.ClearanceBodyData;
 import robotkit.model.CollisionShape;
 import robotkit.model.RobotModel;
 import robotkit.spatial.Transform3;
@@ -165,22 +164,24 @@ class RobotCollision {
     return new RobotCollisionBodies(robot, model, bodies, shapes, hulls, toolBody, toolObjects);
   }
 
-  /**
-   * The hulls `CollisionClearance` checks (`ClearanceBodyData`: simulation hulls,
-   * assembly parts and deposited weld beads carried on links), as objects on
-   * the robot's link bodies, so both worlds see the same scene (CL4a).
-   * Tool hulls go on the tool body, which must exist when any is given.
-   */
-  public static function describeClearanceBodies(description:CollisionDescription, robot:RobotCollisionBodies,
-      data:Array<ClearanceBodyData>):Array<Int> {
-    return [for (body in data) {
-      var on = body.tool ? robot.toolBody : robot.linkBody(body.link);
-      if (body.tool && on < 0) throw 'Clearance body "${body.name}" is a tool hull, but the robot has no tool body';
-      // A tool hull is given in its link's frame; the tool body shares that link's pose.
-      if (body.tool && robot.model.bodyIndex(body.link) != robot.bodies.followed[robot.bodies.followers.indexOf(on)])
-        throw 'Clearance tool hull "${body.name}" is not on the tool\'s link';
-      description.addObject('${robot.bodies.name}/${body.name}', on, CollisionPose.identity(),
-        CollisionGeometry.Convex(body.vertices), 0.0, "hull");
+  /** Adds another description's carried shapes to this robot's model/tool bodies. */
+  public static function addDescriptionShapes(description:CollisionDescription, robot:RobotCollisionBodies,
+      data:CollisionDescription):Array<Int> {
+    return [for (object in data.objects) {
+      var link = CollisionClearance.link(data, object);
+      var tool = CollisionClearance.isTool(data, object);
+      var on = tool ? robot.toolBody : robot.linkBody(link);
+      if (tool && on < 0) throw 'Tool shape "${object.name}" needs a declared tool body';
+      if (tool && robot.model.bodyIndex(link) != robot.bodies.followed[robot.bodies.followers.indexOf(on)])
+        throw 'Tool shape "${object.name}" is not on the tool link';
+      var name = '${robot.bodies.name}/${object.name}';
+      var existing = -1;
+      for (i in 0...description.objects.length) if (description.objects[i].name == name) { existing = i; break; }
+      if (existing >= 0) {
+        description.objects[existing] = new collisionkit.DescribedObject(name, on, object.offset,
+          object.geometry, object.inflation, object.source);
+        existing;
+      } else description.addObject(name, on, object.offset, object.geometry, object.inflation, object.source);
     }];
   }
 

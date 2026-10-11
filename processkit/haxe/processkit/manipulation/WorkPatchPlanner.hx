@@ -1,5 +1,6 @@
 package processkit.manipulation;
 
+import collisionkit.CollisionDescription;
 import robotkit.manipulation.*;
 
 import robotkit.spatial.Vec3;
@@ -14,14 +15,15 @@ import processkit.work.SourceKind;
 import processkit.work.RasterToolpathGenerator;
 import processkit.path.Toolpath;
 import robotkit.model.CollisionShape;
-import robotkit.tool.ToolGeometry;
+import collisionkit.CollisionWorld;
+import robotkit.collision.CollisionClearance;
 
 /**
  * Splits a `WorkSurface` into axis-aligned column patches (no wider than
  * `maxPatchWidth`, mirroring `RasterToolpathGenerator`'s axis-aligned
  * scope), builds a raster `Toolpath` per patch, and searches a grid of
  * candidate base placements — in front of the wall, in a fixed standoff
- * band, facing the wall, at least `clearance` from every `BaseObstacle` — to
+ * band, facing the wall, at least `clearance` from the authored obstacles — to
  * find one from which the whole patch toolpath is reachable
  * (`ReachabilityChecker`). Base motion between the returned patches is the
  * existing planar `Navigator`/`GoTo`, driven by each patch's `basePose`;
@@ -32,10 +34,10 @@ class WorkPatchPlanner {
       maxPatchWidth:Float, toolWidth:Float, overlap:Float, standoff:Float, feedRate:Float, leadInOut:Float,
       standoffDistanceMin:Float, standoffDistanceMax:Float, seed:Array<Float>,
       ?standoffSteps:Int = 3, ?lateralSteps:Int = 5, ?clearance:Float = 0.4,
-      ?obstacles:Array<BaseObstacle>, ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3,
-      ?toolCollision:Array<CollisionShape>, ?toolObstacles:Array<ToolBoxObstacle>,
+      ?obstacles:CollisionDescription, ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3,
+      ?toolCollision:Array<CollisionShape>, ?toolObstacles:CollisionDescription,
       ?toolClearance:Float = 0.0, ?toolJointStep:Null<Float>,
-      ?maxToolStep:Float = 0.005, ?preparedToolShape:ToolClearanceShape,
+      ?maxToolStep:Float = 0.005, ?makeWorld:Void->CollisionWorld,
       ?checkApproach:Bool = false):WorkPatchPlanResult {
     if (design == null) throw "Work patch planning requires a design work surface";
     if (map_T_surface == null) throw "Work patch planning requires a map_T_surface transform";
@@ -43,14 +45,13 @@ class WorkPatchPlanner {
     if (!Math.isFinite(maxPatchWidth) || maxPatchWidth <= 0.0) throw "Work patch planning max patch width must be positive and finite";
     if (!Math.isFinite(standoffDistanceMin) || !Math.isFinite(standoffDistanceMax) || standoffDistanceMin > standoffDistanceMax)
       throw "Work patch planning requires standoffDistanceMin <= standoffDistanceMax";
-    var obstacleList = obstacles == null ? [] : obstacles;
-    var toolObstacleList = toolObstacles == null ? [] : toolObstacles;
-    if (toolObstacleList.length > 0 && toolCollision == null)
+    var obstacleList = obstacles == null ? new CollisionDescription() : obstacles;
+    var toolObstacleList = toolObstacles == null ? new CollisionDescription() : toolObstacles;
+    if (toolObstacleList.objects.length > 0 && toolCollision == null)
       throw "Tool obstacles require a tool collision shape";
-    if (preparedToolShape != null && toolCollision != preparedToolShape.shape)
-      throw "Prepared tool shape must use the same collision shape instance";
-    var prepared = toolCollision == null || toolObstacleList.length == 0 ? null :
-      preparedToolShape == null ? ToolClearanceShape.prepare(toolCollision) : preparedToolShape;
+    if ((obstacleList.objects.length > 0 || toolObstacleList.objects.length > 0) && makeWorld == null)
+      throw "Work obstacles require a collision backend";
+
 
     var bounds = design.boundary.bounds();
     var width = bounds.maxX - bounds.minX;
@@ -101,24 +102,50 @@ class WorkPatchPlanner {
           var candidatePosMap = map_T_surface.transformPoint(candidateLocal);
           var wallPointMap = map_T_surface.transformPoint(new Vec3(midX + lateral, patchCenterY, 0.0));
 
-          var blocked = false;
-          for (obstacle in obstacleList) {
-            var dx = candidatePosMap.x - obstacle.centerX;
-            var dy = candidatePosMap.y - obstacle.centerY;
-            if (Math.sqrt(dx * dx + dy * dy) < obstacle.radius + clearance) { blocked = true; break; }
-          }
-          if (blocked) continue;
+          if (obstacleList.objects.length > 0 &&
+              !CollisionClearance.placementClear(obstacleList, candidatePosMap, clearance, cast makeWorld)) continue;
 
           var yaw = Math.atan2(wallPointMap.y - candidatePosMap.y, wallPointMap.x - candidatePosMap.x);
           var candidateTransform = new Transform3(candidatePosMap, Quat.fromAxisAngle(new Vec3(0.0, 0.0, 1.0), yaw));
           var candidatePose = candidateTransform.toPose2();
           var base_T_work = candidateTransform.inverse().compose(map_T_surface);
-          var collisionChecker = toolCollision == null || toolObstacleList.length == 0 ? null : new ToolClearanceChecker(toolCollision,
-            [for (obstacle in toolObstacleList) new ToolBoxObstacle(
-              candidateTransform.inverse().compose(obstacle.pose), obstacle.halfExtents)], toolClearance, prepared);
-          var result = ReachabilityChecker.check(manipulator, patchToolpath, base_T_work, seed,
-            positionTolerance, orientationTolerance, 100, 0.02, collisionChecker, toolJointStep,
-            maxToolStep, checkApproach);
+          var collisionChecker:Null<CollisionClearance> = null;
+          if (toolCollision != null && toolObstacleList.objects.length > 0) {
+            var scene = new CollisionDescription();
+            for (link in manipulator.robot.links)
+              scene.append(CollisionClearance.shapes(link.id, link.collisionShapes));
+            var flange = manipulator.model.frameTransform(manipulator.model.frameIndex(manipulator.flangeFrame));
+            var prepared:Array<CollisionShape> = [];
+            for (i in 0...toolCollision.length) {
+              var shape = toolCollision[i], p = shape.position, q = shape.rotation;
+              var at = flange.compose(new kinematicskit.Transform(p[0],p[1],p[2],q[0],q[1],q[2],q[3]));
+              var posed = new CollisionShape(shape.geometry, [at.x,at.y,at.z], [at.qx,at.qy,at.qz,at.qw]);
+              posed.name = shape.name == "" ? 'tool$i' : shape.name;
+              posed.inflation = shape.inflation;
+              prepared.push(posed);
+            }
+            scene.append(CollisionClearance.shapes(manipulator.flangeLink, prepared, true));
+            var obstacles = toolObstacleList.copy();
+            for (body in obstacles.bodies) {
+              var p = body.pose;
+              var at = candidateTransform.inverse().compose(new Transform3(new Vec3(p.x,p.y,p.z),
+                new Quat(p.qx,p.qy,p.qz,p.qw)));
+              var t = at.translation, r = at.rotation;
+              body.pose = new collisionkit.CollisionPose(t.x,t.y,t.z,r.x,r.y,r.z,r.w);
+            }
+            scene.append(obstacles);
+            collisionChecker = new CollisionClearance(manipulator, scene, seed, cast makeWorld, toolClearance, toolClearance);
+          }
+          var result:ReachabilityChecker.ReachabilityResult;
+          try {
+            result = ReachabilityChecker.check(manipulator, patchToolpath, base_T_work, seed,
+              positionTolerance, orientationTolerance, 100, 0.02, collisionChecker, toolJointStep,
+              maxToolStep, checkApproach);
+          } catch (error:Dynamic) {
+            if (collisionChecker != null) collisionChecker.world.dispose();
+            throw error;
+          }
+          if (collisionChecker != null) collisionChecker.world.dispose();
 
           if (best == null || result.reachableFraction > best.reachableFraction) {
             best = result;

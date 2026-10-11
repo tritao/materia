@@ -11,11 +11,12 @@ import robotkit.spatial.Transform3;
 import robotkit.manipulation.Manipulator;
 import processkit.manipulation.ReachabilityChecker;
 import processkit.manipulation.WorkPatchPlanner;
-import robotkit.manipulation.BaseObstacle;
-import robotkit.manipulation.ToolBoxObstacle;
-import robotkit.manipulation.ToolClearanceChecker;
-import robotkit.manipulation.ToolClearanceShape;
 import robotkit.model.CollisionShape;
+import robotkit.collision.CollisionClearance;
+import collisionkit.CollisionDescription;
+import collisionkit.CollisionGeometry;
+import collisionkit.CollisionPose;
+import collisionkit.native.NativeCollisionWorld;
 import robotkit.tool.ToolGeometry;
 import processkit.path.ToolpathPoint;
 import processkit.path.Toolpath;
@@ -92,9 +93,9 @@ class PlacementTests {
       0.2, 0.08, 0.0, 0.02, 0.05, 0.0, 0.46, 0.5, scenario.seed, 2, 1, 0.02);
     var originalPose = withoutObstacle.patches[0].basePose;
 
-    var obstacles = [new BaseObstacle(originalPose.x, originalPose.y, 0.01)];
+    var obstacles = obstacle(new Transform3(new Vec3(originalPose.x, originalPose.y, 0), Quat.identity()), new Vec3(0.01,0.01,1));
     var withObstacle = WorkPatchPlanner.plan(scenario.design, scenario.map_T_surface, scenario.manipulator,
-      0.2, 0.08, 0.0, 0.02, 0.05, 0.0, 0.46, 0.5, scenario.seed, 2, 1, 0.02, obstacles);
+      0.2, 0.08, 0.0, 0.02, 0.05, 0.0, 0.46, 0.5, scenario.seed, 2, 1, 0.02, obstacles, 1e-4, 1e-3, null, null, 0, null, 0.005, () -> new NativeCollisionWorld());
     var movedPose = withObstacle.patches[0].basePose;
 
     var moved = Math.abs(movedPose.x - originalPose.x) > 1e-6 || Math.abs(movedPose.y - originalPose.y) > 1e-6;
@@ -102,17 +103,31 @@ class PlacementTests {
     check(withObstacle.patches[0].reachableFraction == 1.0, "The alternate base pose still fully reaches the patch");
   }
 
+  static function obstacle(pose:Transform3, half:Vec3):CollisionDescription {
+    var scene = new CollisionDescription(), p = pose.translation, q = pose.rotation;
+    scene.addFixed("obstacle", new CollisionPose(p.x,p.y,p.z,q.x,q.y,q.z,q.w), Box(half.x,half.y,half.z), 0);
+    return scene;
+  }
+
+  static function toolClearance(manipulator:Manipulator, shapes:Array<CollisionShape>,
+      pose:Transform3, half:Vec3):CollisionClearance {
+    var scene = CollisionClearance.shapes(manipulator.flangeLink, shapes, true);
+    scene.append(obstacle(pose, half));
+    return new CollisionClearance(manipulator, scene, [0.0], () -> new NativeCollisionWorld(), 0, 0);
+  }
+
   static function testConvexToolClearancePreservesEmptyCorner():Void {
     var shape = ToolGeometry.convex([
       boxVertices(new Vec3(0.0, 0.0, 0.5), new Vec3(0.05, 0.05, 0.5)),
       boxVertices(new Vec3(0.45, 0.0, 0.95), new Vec3(0.45, 0.05, 0.05))
     ], 0.0);
-    var gap = new ToolClearanceChecker(shape, [new ToolBoxObstacle(
-      new Transform3(new Vec3(0.45, 0.0, 0.45), Quat.identity()), new Vec3(0.04, 0.04, 0.04))]);
-    check(gap.isClear(Transform3.identity()), "Tool hulls leave the L-shaped empty corner clear");
-    var cup = new ToolClearanceChecker(shape, [new ToolBoxObstacle(
-      new Transform3(new Vec3(0.85, 0.0, 0.95), Quat.identity()), new Vec3(0.04, 0.04, 0.04))]);
-    check(!cup.isClear(Transform3.identity()), "Tool hull detects an obstacle touching the offset cup");
+    var manipulator = slidingManipulator();
+    var gap = toolClearance(manipulator, shape,
+      new Transform3(new Vec3(0.45, 0.0, 0.45), Quat.identity()), new Vec3(0.04, 0.04, 0.04));
+    check(gap.violation([0.0]) == null, "Tool hulls leave the L-shaped empty corner clear");
+    var cup = toolClearance(manipulator, shape,
+      new Transform3(new Vec3(0.85, 0.0, 0.95), Quat.identity()), new Vec3(0.04, 0.04, 0.04));
+    check(cup.violation([0.0]) != null, "Tool hull detects an obstacle touching the offset cup");
   }
 
   static function testToolClearanceChecksJointMotion():Void {
@@ -125,12 +140,12 @@ class PlacementTests {
     joint.limits.upper = 1.0;
     var flange = model.addFrame(new Frame("flange", moving));
     var manipulator = new Manipulator(model, base.id, flange.id);
-    var checker = new ToolClearanceChecker(ToolGeometry.convex([
+    var checker = toolClearance(manipulator, ToolGeometry.convex([
       boxVertices(Vec3.zero(), new Vec3(0.05, 0.05, 0.05))], 0.0),
-      [new ToolBoxObstacle(Transform3.identity(), new Vec3(0.1, 0.1, 0.1))]);
-    check(checker.isClear(manipulator.forwardKinematics([-1.0])), "Motion starts clear");
-    check(checker.isClear(manipulator.forwardKinematics([1.0])), "Motion ends clear");
-    check(!checker.clearJointSegment(manipulator, [-1.0], [1.0]),
+      Transform3.identity(), new Vec3(0.1, 0.1, 0.1));
+    check(checker.violation([-1.0]) == null, "Motion starts clear");
+    check(checker.violation([1.0]) == null, "Motion ends clear");
+    check(checker.sweep([-1.0], [1.0], false, checker.jointStep([-1.0], [1.0], 0.005)) != null,
       "Joint motion checks the obstacle between clear endpoints");
 
     var path = new Toolpath("base", [
@@ -149,20 +164,20 @@ class PlacementTests {
       new Point2(0.1, 0.3), new Point2(-0.1, 0.3)
     ]));
     var shape = ToolGeometry.box(new Vec3(0.05, 0.05, 0.05));
-    var obstacle = new ToolBoxObstacle(Transform3.identity(), new Vec3(10.0, 10.0, 10.0));
-    var preparedBefore = ToolClearanceShape.preparationCount;
+    var obstacles = obstacle(Transform3.identity(), new Vec3(10.0, 10.0, 10.0));
+    var worlds = 0;
     var plan = WorkPatchPlanner.plan(small, scenario.map_T_surface, scenario.manipulator,
       0.2, 0.08, 0.0, 0.02, 0.05, 0.0, 0.46, 0.5, scenario.seed,
-      1, 1, 0.02, null, 1e-4, 1e-3, shape, [obstacle]);
+      1, 1, 0.02, null, 1e-4, 1e-3, shape, obstacles, 0, null, 0.005, () -> { worlds++; return new NativeCollisionWorld(); });
     check(!plan.fullyPlanned, "Work patch planner rejects a path blocked by a 3D tool obstacle");
-    check(ToolClearanceShape.preparationCount == preparedBefore + 1,
-      "Work patch planner prepares the tool shape once per plan");
+    check(worlds == 1,
+      "Work patch planner builds one collision world for its one candidate");
   }
 
   static function testFirstPointDoesNotCheckSeedApproach():Void {
     var manipulator = slidingManipulator();
-    var checker = new ToolClearanceChecker(ToolGeometry.box(new Vec3(0.001, 0.001, 0.001)),
-      [new ToolBoxObstacle(Transform3.identity(), new Vec3(0.01, 0.01, 0.01))]);
+    var checker = toolClearance(manipulator, ToolGeometry.box(new Vec3(0.001, 0.001, 0.001)),
+      Transform3.identity(), new Vec3(0.01, 0.01, 0.01));
     var path = new Toolpath("base", [
       new ToolpathPoint(manipulator.tcpPose([0.1]), 0.05, true),
       new ToolpathPoint(manipulator.tcpPose([0.2]), 0.05, true)
@@ -177,8 +192,8 @@ class PlacementTests {
 
   static function testFiveMillimetreObstacleBetweenPoints():Void {
     var manipulator = slidingManipulator();
-    var checker = new ToolClearanceChecker(ToolGeometry.box(new Vec3(0.001, 0.001, 0.001)),
-      [new ToolBoxObstacle(Transform3.identity(), new Vec3(0.0025, 0.0025, 0.0025))]);
+    var checker = toolClearance(manipulator, ToolGeometry.box(new Vec3(0.001, 0.001, 0.001)),
+      Transform3.identity(), new Vec3(0.0025, 0.0025, 0.0025));
     var path = new Toolpath("base", [
       new ToolpathPoint(manipulator.tcpPose([-0.01]), 0.05, true),
       new ToolpathPoint(manipulator.tcpPose([0.01]), 0.05, true)

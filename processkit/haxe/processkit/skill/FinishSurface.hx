@@ -3,7 +3,7 @@ package processkit.skill;
 import robotkit.skill.*;
 
 import robotkit.localization.LocalizationState;
-import robotkit.manipulation.BaseObstacle;
+import collisionkit.CollisionDescription;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.ToolPlanningContext;
 import processkit.manipulation.WorkPatch;
@@ -75,7 +75,7 @@ class FinishSurface implements Skill {
   public final toolAdapter:ChannelToolAdapter;
   public final processChannel:String;
   public final seed:Array<Float>;
-  public final obstacles:Array<BaseObstacle>;
+  public final obstacles:CollisionDescription;
   public final toolPlanning:Null<ToolPlanningContext>;
 
   /** Cumulative coverage across every executed patch; available once planning succeeds. */
@@ -93,7 +93,7 @@ class FinishSurface implements Skill {
       map_T_surface:Transform3, surface:WorkSurface, spec:FinishSpec,
       observePerception:RobotSnapshot -> PerceptionSnapshot,
       runner:SurfacePlanRunner, toolAdapter:ChannelToolAdapter, processChannel:String,
-      seed:Array<Float>, ?obstacles:Array<BaseObstacle>, ?toolPlanning:ToolPlanningContext) {
+      seed:Array<Float>, ?obstacles:CollisionDescription, ?toolPlanning:ToolPlanningContext) {
     if (navigator == null || manipulator == null || robot == null || map_T_surface == null ||
         surface == null || spec == null || observePerception == null || runner == null ||
         toolAdapter == null || processChannel == null || seed == null)
@@ -109,7 +109,7 @@ class FinishSurface implements Skill {
     this.toolAdapter = toolAdapter;
     this.processChannel = processChannel;
     this.seed = seed.copy();
-    this.obstacles = obstacles == null ? [] : obstacles;
+    this.obstacles = obstacles == null ? new CollisionDescription() : obstacles;
     if (toolPlanning != null &&
         (toolPlanning.tool.flangeTTcp.translation.sub(manipulator.flangeTTcp.translation).norm() > 1e-6 ||
          toolPlanning.tool.flangeTTcp.rotation.angularDistance(manipulator.flangeTTcp.rotation) > 1e-6))
@@ -129,7 +129,7 @@ class FinishSurface implements Skill {
         toolPlanning == null ? 0.0 : toolPlanning.clearance,
         toolPlanning == null ? null : toolPlanning.maxJointStep,
         toolPlanning == null ? 0.005 : toolPlanning.maxToolStep,
-        toolPlanning == null ? null : toolPlanning.preparedShape);
+        toolPlanning == null ? null : toolPlanning.makeWorld);
       if (result.patches.length == 0) {
         lifecycle.fail("work patch planner produced no patches");
         return;

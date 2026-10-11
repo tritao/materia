@@ -12,7 +12,7 @@ import motionkit.robot.TrajectoryClearanceProof.ClearanceEvent;
 import motionkit.trajectory.ValidationReport;
 import robotkit.collision.CollisionClearance;
 import robotkit.collision.CollisionClearance;
-import robotkit.manipulation.ClearanceBodyData;
+import collisionkit.CollisionDescription;
 import robotkit.manipulation.ClearanceChange;
 import robotkit.manipulation.ClearanceWorld;
 import robotkit.manipulation.Manipulator;
@@ -43,14 +43,14 @@ class ClearanceValidationTests {
     Sys.println('Clearance validation tests passed ($assertions assertions)');
   }
 
-  static function torch():ClearanceBodyData
-    return {name: "torch", link: "wrist_3_link", vertices: WeldPlanningTests.box(-0.012, 0.012, D6 - 0.012, D6 + 0.012, -0.14, -0.03), tool: true};
+  static function torch():collisionkit.CollisionDescription
+    return CollisionClearance.convex("torch", "wrist_3_link", WeldPlanningTests.box(-0.012, 0.012, D6 - 0.012, D6 + 0.012, -0.14, -0.03), true);
 
-  static function neck():ClearanceBodyData
-    return {name: "neck", link: "wrist_3_link", vertices: WeldPlanningTests.box(0.0, 0.10, D6 - 0.012, D6 + 0.012, -0.14, -0.10), tool: true};
+  static function neck():collisionkit.CollisionDescription
+    return CollisionClearance.convex("neck", "wrist_3_link", WeldPlanningTests.box(0.0, 0.10, D6 - 0.012, D6 + 0.012, -0.14, -0.10), true);
 
-  static function table():ClearanceBodyData
-    return {name: "table", link: "base_link", vertices: WeldPlanningTests.box(-0.8, 0.8, -0.8, 0.8, -0.1, 0.0), tool: false};
+  static function table():collisionkit.CollisionDescription
+    return CollisionClearance.convex("table", "base_link", WeldPlanningTests.box(-0.8, 0.8, -0.8, 0.8, -0.1, 0.0), false);
 
   static function compiler(world:ClearanceWorld):ProgramCompiler
     return processkit.WeldingPlanRunner.planning(arm, 2.0).compiler.withJointPathPlanner(
@@ -81,7 +81,7 @@ class ClearanceValidationTests {
   }
 
   static function testPassingAndFailingCells():Void {
-    var world = new CollisionClearance(arm, [torch(), neck(), table()], START, () -> new NativeCollisionWorld());
+    var world = new CollisionClearance(arm, CollisionClearance.combine([torch(), neck(), table()]), START, () -> new NativeCollisionWorld());
     var target = shifted(START, [0.4, 0.1, 0.0, 0.0, 0.0, 0.2]);
     var compiled = compiler(world).compile(moves([target]), START, Int64.ofInt(1));
     var report = reports(compiled)[0];
@@ -113,8 +113,7 @@ class ClearanceValidationTests {
 
   /** A 1 mm bead swept across a half-millimetre plate: between the sampled check's samples, inside the bound's. */
   static function testBoundCatchesWhatSamplesMiss():Void {
-    var bead:ClearanceBodyData = {name: "bead", link: "wrist_3_link",
-      vertices: WeldPlanningTests.box(-0.0005, 0.0005, D6 - 0.0005, D6 + 0.0005, -0.1405, -0.1395), tool: true};
+    var bead:collisionkit.CollisionDescription = CollisionClearance.convex("bead", "wrist_3_link", WeldPlanningTests.box(-0.0005, 0.0005, D6 - 0.0005, D6 + 0.0005, -0.1405, -0.1395), true);
     // The arm reaches out, so the base's turn moves the bead about 12 mm between the sampled check's samples.
     var reach = START, farthest = 0.0;
     for (i in 0...16) for (k in 0...16) {
@@ -157,7 +156,7 @@ class ClearanceValidationTests {
     for (x in [radius - 0.05, radius + 0.05]) for (y in [-0.00025, 0.00025]) for (z in [centre.z - 0.05, centre.z + 0.05]) {
       plate.push(c * x - s * y); plate.push(s * x + c * y); plate.push(z);
     }
-    var world = new CollisionClearance(arm, [bead, {name: "plate", link: "base_link", vertices: plate, tool: false}], from, () -> new NativeCollisionWorld(), 0.0002, 0.0002);
+    var world = new CollisionClearance(arm, CollisionClearance.combine([bead, CollisionClearance.convex("plate", "base_link", plate, false)]), from, () -> new NativeCollisionWorld(), 0.0002, 0.0002);
     check(world.violation(from) == null && world.violation(to) == null, "both ends are clear");
     var message = throwsWith(() -> compiler(world).compile(moves([to]), from, Int64.ofInt(1)).dispose());
     check(message.indexOf("trajectory clearance bound (bead, plate)") >= 0,
@@ -167,7 +166,7 @@ class ClearanceValidationTests {
 
   /** With no bisection the bound cannot close, and the report says sampled over the open interval. */
   static function testDepthLimitIsSampled():Void {
-    var world = new CollisionClearance(arm, [torch(), neck(), table()], START, () -> new NativeCollisionWorld());
+    var world = new CollisionClearance(arm, CollisionClearance.combine([torch(), neck(), table()]), START, () -> new NativeCollisionWorld());
     var shallow = compiler(world);
     shallow.clearanceDepthLimit = 0;
     var compiled = shallow.compile(moves([shifted(START, [0.4, 0.1, 0.0, 0.0, 0.0, 0.2])]), START, Int64.ofInt(1));
@@ -181,8 +180,8 @@ class ClearanceValidationTests {
 
   /** A part grasped at the torch tip rides along, and stays where it is placed while the torch leaves it. */
   static function testGraspAndPlace():Void {
-    var part:ClearanceBodyData = {name: "part", link: "base_link", vertices: inWrist(START, -0.012, -0.004, D6 - 0.004, D6 + 0.004, -0.146, -0.138), tool: false};
-    var world = new CollisionClearance(arm, [torch(), neck(), table(), part], START, () -> new NativeCollisionWorld(), 0.001, 0.0005);
+    var part:collisionkit.CollisionDescription = CollisionClearance.convex("part", "base_link", inWrist(START, -0.012, -0.004, D6 - 0.004, D6 + 0.004, -0.146, -0.138), false);
+    var world = new CollisionClearance(arm, CollisionClearance.combine([torch(), neck(), table(), part]), START, () -> new NativeCollisionWorld(), 0.001, 0.0005);
     check(world.violation(START) != null, "the grasped part touches the torch");
     var carry = shifted(START, [0.5, -0.2, 0.0, 0.0, 0.0, 0.0]), leave = shifted(carry, [0.0, -0.25, 0.2, 0.0, 0.0, 0.0]);
     var program = moves([carry, leave]);
@@ -208,8 +207,8 @@ class ClearanceValidationTests {
 
   /** The torch closes to 2 mm of its seam: inside the 5 mm margin, outside the window's 1 mm approach margin. */
   static function testTorchWindow():Void {
-    var seam:ClearanceBodyData = {name: "seam", link: "base_link", vertices: inWrist(START, -0.012, -0.006, D6 - 0.012, D6 + 0.012, -0.152, -0.142), tool: false};
-    var world = new CollisionClearance(arm, [torch(), neck(), table(), seam], START, () -> new NativeCollisionWorld());
+    var seam:collisionkit.CollisionDescription = CollisionClearance.convex("seam", "base_link", inWrist(START, -0.012, -0.006, D6 - 0.012, D6 + 0.012, -0.152, -0.142), false);
+    var world = new CollisionClearance(arm, CollisionClearance.combine([torch(), neck(), table(), seam]), START, () -> new NativeCollisionWorld());
     var above = shifted(START, [0.0, -0.2, 0.15, 0.0, 0.0, 0.0]);
     check(world.violation(above) == null, "the approach starts clear");
     var closing = world.violation(START);
@@ -235,9 +234,9 @@ class ClearanceValidationTests {
     var model = arm.model;
     var bodies = collisionkit.kinematics.ModelBodies.describe(description, model, "ur", 0, arm.stateOf(START), "start", true);
     var wrist = bodies.bodies[model.bodyIndex("wrist_3_link")];
-    description.addObject("torch", wrist, collisionkit.CollisionPose.identity(), collisionkit.CollisionGeometry.Convex(torch().vertices));
+    description.addObject("torch", wrist, collisionkit.CollisionPose.identity(), collisionkit.CollisionGeometry.Convex(CollisionClearance.vertices(torch().objects[0])));
     bodies.declare();
-    description.addFixed("table", collisionkit.CollisionPose.identity(), collisionkit.CollisionGeometry.Convex(table().vertices), 1);
+    description.addFixed("table", collisionkit.CollisionPose.identity(), collisionkit.CollisionGeometry.Convex(CollisionClearance.vertices(table().objects[0])), 1);
     var world = new NativeCollisionWorld();
     var build = description.build(world);
     check(build.layoutErrors.length == 0, "the arm starts clear of the table");

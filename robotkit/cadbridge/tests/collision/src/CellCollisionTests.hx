@@ -1,3 +1,5 @@
+
+import robotkit.collision.CollisionClearance;
 import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblySimulationBridge.AssemblySimulationModel;
@@ -256,11 +258,11 @@ class CellCollisionTests {
   static function testClearanceBodies():Void {
     var description = new CollisionDescription();
     var robot = RobotCollision.describe(description, arm(), armOptions("arm"));
-    var objects = RobotCollision.describeClearanceBodies(description, robot, [
-      {name: "upper-hull", link: "upper", vertices: cube(0.5, 0, 0, 0.05), tool: false},
-      {name: "torch", link: "fore", vertices: cube(1.05, 0, 0, 0.03), tool: true},
-      {name: "workpiece", link: "base", vertices: cube(1.5, 1.0, 0, 0.1), tool: false}
-    ]);
+    var objects = RobotCollision.addDescriptionShapes(description, robot, CollisionClearance.combine([
+      CollisionClearance.convex("upper-hull", "upper", cube(0.5, 0, 0, 0.05), false),
+      CollisionClearance.convex("torch", "fore", cube(1.05, 0, 0, 0.03), true),
+      CollisionClearance.convex("workpiece", "base", cube(1.5, 1.0, 0, 0.1), false)
+    ]));
     check(description.objects[objects[0]].body == robot.linkBody("upper"), "a link hull is on its link");
     check(description.objects[objects[1]].body == robot.toolBody, "a tool hull is on the tool body");
     check(description.objects[objects[2]].body == robot.linkBody("base"), "a part carried by the base is on the base");
