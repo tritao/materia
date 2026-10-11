@@ -12,7 +12,8 @@
     "../machinekit/examples/machine-tending",
     "../machinekit/examples/robot-arm",
     "../processkit/tests/modbus",
-    "../machinekit/examples/press-brake"
+    "../machinekit/examples/press-brake",
+    "../processkit/tests/moonraker"
   ],
   "unscopedSourceRoots": [
     "../machinekit/examples/bench-mill",
@@ -20,7 +21,8 @@
     "../machinekit/examples/machine-tending",
     "../machinekit/examples/robot-arm",
     "../processkit/tests/modbus",
-    "../machinekit/examples/press-brake"
+    "../machinekit/examples/press-brake",
+    "../processkit/tests/moonraker"
   ],
   "dependencies": {
     "collisionkit-native": {"path": "../collisionkit/native"},

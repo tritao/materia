@@ -28,6 +28,11 @@ class AppSettings {
   /** How close two objects count as near, in millimetres. */
   public static inline var COLLISION_NEAR:String = "editors/3d/collision/near_mm";
 
+  /** Where a Klipper printer's Moonraker listens, `host` or `host:port`; empty until one is set. */
+  public static inline var PRINTER_ENDPOINT:String = "machine/printer/moonraker_endpoint";
+  /** The Klipper `printer.cfg` that Install Klipper config sends (the printer example exports one); empty until one is set. */
+  public static inline var PRINTER_CONFIG:String = "machine/printer/klipper_config_file";
+
   public static final LIGHTING_PRESETS:Array<String> = haxeon.editor.ViewportLook.PresetNames;
 
   /** A registry holding every setting the editor defines. */
@@ -59,6 +64,15 @@ class AppSettings {
     lighting.options = [new PropertyOption("studio", "Studio"), new PropertyOption("soft", "Soft"),
       new PropertyOption("contrast", "Contrast")];
     registry.define(LIGHTING, PropertyType.Enum, PropertyValue.Enum("studio"), lighting);
+
+    var printer = new SettingOptions();
+    printer.label = "Moonraker Address";
+    printer.tooltip = "The host (and port, 7125 unless given) of the Klipper printer that Send to printer talks to.";
+    registry.define(PRINTER_ENDPOINT, PropertyType.Text, PropertyValue.Text(""), printer);
+    var config = new SettingOptions();
+    config.label = "Klipper Config File";
+    config.tooltip = "The printer.cfg that Install Klipper config uploads to the printer, restarts Klipper on, and reads back.";
+    registry.define(PRINTER_CONFIG, PropertyType.Text, PropertyValue.Text(""), config);
 
     registry.define(GRID_VISIBLE, PropertyType.Bool, PropertyValue.Bool(true));
     var overlays = new SettingOptions();

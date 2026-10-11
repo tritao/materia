@@ -60,6 +60,10 @@ import robotkit.execution.ExecutionPlanSubmission;
 import robotkit.device.DeviceBinding;
 import robotkit.device.DeviceLayout;
 import motionkit.trajectory.PlanDiagnostic;
+import haxeon.platform.NativeKitRuntime;
+import processkit.moonraker.MoonrakerStatus;
+import processkit.testing.FakeMoonrakerServer;
+import machinekit.printing.KlipperConfig;
 import sys.FileSystem;
 import sys.io.File;
 import haxe.io.Bytes;
@@ -489,6 +493,98 @@ class ProjectSourceTests {
     } catch (error:Dynamic) { harness.dispose(); throw error; }
     printSmallTab(session, simulation, world, model);
     simulation.dispose();
+    session.dispose();
+  }
+
+  /**
+   * The editor's link to a printer: the print is sent to a Moonraker (a fake on a real socket) and started, and the
+   * printer model follows the machine over the WebSocket subscription, each update putting the model's axes and
+   * extruder where the nozzle is (`motion_report.live_position`, not the end of the queued moves), so the twin is
+   * exactly the machine's state after the one update. Then a Klipper config is installed: uploaded, the firmware
+   * restarted, read back.
+   */
+  static function checkPrinterMirror(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var job = session.printJob, definition = session.projectAssemblyDefinition;
+    if (job == null || definition == null) throw "the printer project has no print to send";
+    var runtime = NativeKitRuntime.start();
+    var fake = FakeMoonrakerServer.start(runtime, 36292);
+    var link = new PrinterLink();
+    var seen:Array<MoonrakerStatus> = [];
+    link.onStatus = function(status) {
+      seen.push(status);
+      PrinterMirror.follow(session, status);
+    };
+    check(PrinterLink.parse("printer.local").port == 7125 && PrinterLink.parse("10.0.0.5:80").port == 80, "an address is host or host:port");
+    var refused = false;
+    try PrinterLink.parse("host:port") catch (_:Dynamic) refused = true;
+    check(refused, "an address with a bad port is refused");
+    fake.route = [[10.0, 10.0, 0.2, 0.0], [60.0, 10.0, 0.2, 5.0], [60.0, 60.0, 0.2, 10.0]];
+    fake.speed = 30.0;
+    link.connect("127.0.0.1:36292");
+    function pump(until:Void->Bool, what:String):Void {
+      var limit = Sys.time() + 5.0;
+      while (!until() && Sys.time() < limit && link.error == null) {
+        runtime.events.poll(); fake.poll(); link.poll(Sys.time()); runtime.events.wait(0.001);
+      }
+      check(link.error == null, '$what: ${link.error}');
+      check(until(), '$what timed out');
+    }
+    pump(function() return link.connected() && link.status != null, "subscribing");
+    link.send("printer.gcode", job.source, true);
+    pump(function() return fake.state == "printing", "sending the print");
+    check(fake.files.get("printer.gcode") == job.source, "the machine received the program whole");
+    pump(function() return seen[seen.length - 1].state == "printing", "the start of the print is pushed");
+    // The twin follows: one update of the machine and the model stands exactly where the nozzle is, not where the queue ends.
+    var unit = 0.001 / session.assemblyUnitMetres();
+    function modelAt(id:String):Float {
+      var record = session.projectAssemblyState;
+      if (record == null) throw "no assembly state";
+      return new AssemblyState(definition, record).joint(id);
+    }
+    var worstOff = 0.0, worstExtruder = 0.0, ahead = 0.0;
+    for (step in 0...40) {
+      var before = seen.length;
+      fake.advance(0.05);
+      pump(function() return seen.length > before, "update " + step);
+      check(seen.length == before + 1, "one advance of the machine is one update");
+      var status = seen[seen.length - 1];
+      for (axis in 0...3) worstOff = Math.max(worstOff, Math.abs(modelAt(job.axes[axis]) - fake.position[axis] * unit));
+      worstExtruder = Math.max(worstExtruder, Math.abs(modelAt(job.extruder) * job.gearRadius * 1000.0 - fake.position[3]));
+      ahead = Math.max(ahead, Math.abs(modelAt(job.axes[0]) - status.queuedPosition[0] * unit));
+    }
+    check(worstOff < 1e-9, 'the model is where the nozzle is after each update (off by ${worstOff})');
+    check(ahead > 1.0, 'and not where the queued moves end, which is ahead of it (${ahead} units)');
+    check(worstExtruder < 1e-6, 'the extruder follows the filament position to ${worstExtruder} mm');
+    check(fake.position[0] > 40.0 && fake.state == "printing" && modelAt(job.axes[0]) / unit > 10.0, "the toolhead went somewhere and the model with it");
+    link.pause();
+    pump(function() return fake.state == "paused", "pause");
+    link.resume();
+    pump(function() return fake.state == "printing", "resume");
+    link.cancel();
+    pump(function() return fake.state == "cancelled", "cancel");
+    pump(function() return seen[seen.length - 1].state == "cancelled", "the cancel is mirrored");
+    // A Klipper config goes to the machine and is read back.
+    var text = "[stepper_x]\nrotation_distance: 40\nmicrosteps: 16\n\n[extruder]\nrotation_distance: 22.93\ngear_ratio: 54:18\n";
+    link.installConfig("printer.cfg", text, KlipperConfig.parse(text));
+    pump(function() return link.configMismatches != null, "installing the config");
+    var first = link.configMismatches;
+    if (first == null) throw "the install did not finish";
+    check(first.length == 0 && fake.configFiles.get("printer.cfg") == text && fake.restarts == 1, 'Klipper runs the config that was sent ($first)');
+    fake.deviations.set("extruder/rotation_distance", "23.5");
+    link.installConfig("printer.cfg", text, KlipperConfig.parse(text));
+    pump(function() return link.configMismatches != null, "installing it again");
+    var second = link.configMismatches;
+    if (second == null) throw "the second install did not finish";
+    check(second.length == 1 && second[0].indexOf("rotation_distance") >= 0, 'a value Klipper changed is reported ($second)');
+    check(link.summary().indexOf("differs") >= 0, "and the link says so");
+    link.disconnect();
+    fake.stop();
+    runtime.dispose();
+    Sys.println('printer link: ${seen.length} updates mirrored, the model exactly at the nozzle, ${Math.round(ahead * 10) / 10} units behind the queue end; config install checked');
     session.dispose();
   }
 
@@ -5317,8 +5413,13 @@ class ProjectSourceTests {
       checkMissionOverlayEdge();
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer-mirror") {
+      checkPrinterMirror(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer") {
       checkPrinter(root);
+      checkPrinterMirror(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "corexy") {
@@ -5482,6 +5583,7 @@ class ProjectSourceTests {
       checkBeltRouter(root);
       checkCoreXyPlotter(root);
       checkPrinter(root);
+      checkPrinterMirror(root);
       checkMobileBase(root);
       checkMobileMission(root);
       checkMobileObstacle(root);
@@ -5854,6 +5956,7 @@ class ProjectSourceTests {
     checkBeltRouter(root);
     checkCoreXyPlotter(root);
     checkPrinter(root);
+    checkPrinterMirror(root);
     checkMobileBase(root);
     checkMobileMission(root);
     checkMobileObstacle(root);

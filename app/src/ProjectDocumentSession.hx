@@ -786,6 +786,25 @@ class ProjectDocumentSession {
       function() applyAssemblyStateRecord(before)));
   }
 
+  /** Metres in one unit of the project's assembly. */
+  public function assemblyUnitMetres():Float return assemblyMetresPerUnit;
+
+  /**
+   * Shows the assembly with these joints (by id, in the assembly's units) set, without recording history: a mirror of a
+   * machine somewhere else, which the editor follows rather than edits. Joints the assembly does not have are refused.
+   */
+  public function previewAssemblyJoints(values:Map<String, Float>):Void {
+    var state = assemblyRuntime, definition = projectAssemblyDefinition;
+    if (state == null || definition == null) throw "This project has no assembly state to show";
+    var candidate = new AssemblyState(definition, state.record());
+    for (id in values.keys()) {
+      var value = values.get(id);
+      if (!Math.isFinite(value)) throw 'Joint "$id" has no finite coordinate to show';
+      candidate.setJoint(id, value);
+    }
+    applyAssemblyStateRecord(candidate.record());
+  }
+
   /**
    * Starts an IK drag of an assembly occurrence (`project:<id>`) from a world point in metres: the
    * point follows the targets given to `update`, moving the joints above it and the dependent joints

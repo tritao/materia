@@ -16,6 +16,7 @@ import app.editor.EditorDocumentCommands;
 import app.editor.SceneObjectCommands;
 import app.editor.AssemblyCommands;
 import app.editor.SceneViewCommands;
+import app.editor.PrinterCommands;
 import app.editor.SimulationCommands;
 import app.editor.ExampleCatalog;
 import app.editor.ExampleCatalog.ExampleEntry;
@@ -593,6 +594,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final storage:FileDockWorkspacePersistence;
   final workspaceSaves:WorkspaceSaveWorker;
   public final session:ProjectDocumentSession;
+  /** The link to a real printer, and whether the project's printer model follows it. */
+  public final printerLink = new PrinterLink();
+  public var mirrorPrinter:Bool = false;
+  var reportedPrinterSummary:String = "";
+
+  /** The name a print goes to the printer under: the printer assembly's own. */
+  function printFileName():String {
+    var definition = session.projectAssemblyDefinition;
+    return (definition == null ? "materia" : definition.id) + ".gcode";
+  }
   public final documents:SceneDocumentController;
   public var scene(get, never):EditorScene;
   function get_scene():EditorScene return session.scene;
@@ -1053,6 +1064,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (simulation.isActive() && simulation.isRunning()) {
       simulation.pump();
       if (hostContext != null) hostContext.requestFrame();
+    }
+    printerLink.poll(Sys.time());
+    var printerSummary = printerLink.summary();
+    if (printerSummary != reportedPrinterSummary) {
+      reportedPrinterSummary = printerSummary;
+      if (printerLink.connected() || printerLink.error != null) {
+        log(printerSummary);
+        invalidateView();
+      }
     }
     var activeMission = simulation.missionPlayer();
     var missionFailure = activeMission == null ? null : activeMission.failure;
@@ -1641,7 +1661,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation, appearance.theme.tokens.surface,
         appearance.theme.tokens.textSecondary, simulation)),
       new DockPanelContent("mission", function(_) return missionPanel.build(missionController, appearance.theme.tokens)),
-      new DockPanelContent("cnc", function(_) return cncPanel.build(simulation, appearance.theme.tokens))
+      new DockPanelContent("cnc", function(_) return cncPanel.build(simulation, appearance.theme.tokens,
+        printerLink.connected() || printerLink.error != null ? printerLink.summary() : null))
     ];
 
     result.setDefaultLayout(EditorWorkspaceLayout.defaultLayout());
@@ -2039,6 +2060,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     SceneViewCommands.install(this);
     AssemblyCommands.install(this);
     SimulationCommands.install(this);
+    PrinterCommands.install(this);
     commands.register(new Command("start.show", "Show Start page", showStartPage));
     commands.register(new Command("console.copy-all", "Copy console output", function() {
       ui.clipboard.writeText(consoleDocument.text);

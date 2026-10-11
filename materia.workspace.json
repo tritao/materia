@@ -14,6 +14,7 @@
 		{ "path": "motionkit/tests/haxeon.json", "name": "motionkit", "shards": 4 },
 		{ "path": "machinekit/examples/printer/benchmark/haxeon.json", "name": "printing-gate", "tags": ["cadkit"] },
 		{ "path": "processkit/tests/haxeon.json", "name": "processkit" },
+		{ "path": "processkit/tests/moonraker/haxeon.json", "name": "processkit-moonraker" },
 		{ "path": "projectkit/tests/haxeon.json", "name": "projectkit" },
 		{ "path": "robotkit/core/tests/haxeon.json", "name": "robotkit-core" },
 		{ "path": "robotkit/tests/haxeon.json", "name": "robotkit" },

@@ -966,6 +966,43 @@ Done. What was built and decided:
   printer assembly's joints from the reported toolhead position and shows temperatures.
   - Test: against the fake server, the mirror follows within one poll period.
 
+Done. What was built and decided (Moonraker and Klipper are GPL: written from their documented APIs only, none of their code):
+- **`processkit.moonraker`**: `HttpFrames` (HTTP/1.1 framing by Content-Length; chunked refused), `MoonrakerClient` (HTTP over
+  `NativeTransport`: file upload as multipart to any root, `printer/gcode/script`, print start/pause/resume/cancel,
+  `server/info`, the running configuration), `MoonrakerStatus`, and the three additions below. An error status, a transport
+  failure, a malformed body or a reply that does not come in time is the client's `fault`.
+- **Addition 1: the live position.** The mirror follows `motion_report.live_position` (and `live_velocity`,
+  `live_extruder_velocity`), where the nozzle is. `toolhead.position` is the end of the last queued move and runs ahead of the
+  nozzle by everything Klipper has planned but not stepped; it is kept apart as `queuedPosition` and nothing follows it. The
+  fake server keeps both and puts the queued end 8 mm of route ahead while printing, so the tests catch the wrong one (the app
+  check asserts the model is exactly at the nozzle and more than a unit away from the queue's end).
+- **Addition 2: the WebSocket subscription.** `Sha1` (RFC 3174, since the standard library has none) and `WebSocketFrames`
+  (RFC 6455 handshake key and answer, masked and unmasked frames, 16- and 64-bit lengths, fragments, pings; the RFC's own
+  example bytes are tests) under `MoonrakerSocket`: JSON-RPC `printer.objects.subscribe` for the objects `MoonrakerStatus`
+  reads, then `notify_status_update` pushes of only the fields that changed, merged into the state kept. HTTP stays for upload and
+  print control. `PrinterLink` has no poll period any more: an update is given to the mirror when it arrives, and the test
+  asserts one advance of the machine is exactly one update and the model is at the nozzle after it (within 1e-9).
+- **Addition 3: installing a Klipper config.** `ConfigInstaller` uploads the `printer.cfg` to the config root, sends
+  `FIRMWARE_RESTART` through the gcode script endpoint, asks `server/info` until Klippy is `ready` again (or reports its error
+  state and message, or that it did not come back in time), reads `configfile.settings` and `configfile.warnings` and
+  `ConfigReadback.compare`s them with the file it sent: a missing section or key, a value that differs (numbers to 1e-6
+  relative, booleans, text ignoring case; Klipper lower-cases keys and adds defaults) and each warning are a sentence in
+  `mismatches`. The fake models it: the file is read at the restart, Klippy answers `startup` twice, `deviations` change
+  values the way Klipper's own limits might and `warnings` warn, and a missing file leaves Klippy in `error`. The editor has
+  `Printer: Install Klipper config` (the file is the setting Machine > Printer > Klipper Config File; the printer example's
+  export writes one) and `Printer: Send to printer`, `Pause`, `Resume`, `Cancel` and `Mirror`; the address is the setting
+  Machine > Printer > Moonraker Address.
+- **What the review of the unverified draft changed.** It polled `printer/objects/query` on a timer and mirrored
+  `toolhead.position`; its fake served one connection; the mirror test measured a lag of up to one poll period. All three
+  changed as above; the fake now accepts any number of connections and `FakeMoonrakerServer.start` does the listening so
+  that the processkit test and the app check share it.
+- **Tests.** `processkit/tests/moonraker`: 164 assertions (framing, SHA-1 vectors, WebSocket frames, status parsing, readback
+  comparison, and the conversation: upload and start, HTTP status, subscription updates, pause/resume/cancel, config install
+  with a deviation and a refused config, a 404, a silent server, a closed connection). `ProjectSourceTests.checkPrinterMirror`
+  (`PROJECT_SOURCE_ONLY=printer-mirror`, also part of `printer`): the print is sent and started, then 45 updates are mirrored, each
+  leaving the model within 1e-9 of the nozzle and 8 units (mm) behind the end of the queued moves, the extruder within 1e-6 mm, and pause, resume and cancel follow; a config
+  installs and reads back clean, then a value Klipper changed is reported. 14 s wall.
+
 **AM12. Input shaping (AM-D10).**
 - ZV, MZV and EI shapers in TrajectoryKit or MotionKit, with frequency and damping as machine
   data, on the axes or motor joints.
@@ -1110,5 +1147,5 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM8 | done | see the commits below |
 | AM9 | planned | |
 | AM10 | done | see the commit below |
-| AM11 | planned | |
+| AM11 | done | see the commit below |
 | AM12 | planned | |

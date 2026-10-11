@@ -33,7 +33,8 @@ class CncPanel {
 
   public function new() {}
 
-  public function build(simulation:ApplicationSimulation, tokens:ThemeTokens):View {
+  /** `printer` is the line about a printer the editor is connected to (its state, progress and temperatures), if any. */
+  public function build(simulation:ApplicationSimulation, tokens:ThemeTokens, ?printer:String):View {
     var style = fill();
     style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
     style.childGap = 8.0;
@@ -41,9 +42,12 @@ class CncPanel {
     var player = simulation.toolpathPlayer();
     var heading = new KeyedView("heading", new Text(player == null ? "CNC PROGRAM" : player.title(), null, tokens.textSecondary,
       TextStyleOverride.text(11.0, 0.8)));
-    if (player == null)
-      return new Column("cnc-panel", [heading, new KeyedView("empty",
-        new Text("Play a project with a machining or print job to run its program here."))], style);
+    var link = new KeyedView("printer", new Text(printer == null ? "" : "Printer: " + printer));
+    var linked = printer != null;
+    if (player == null) {
+      var empty = new KeyedView("empty", new Text("Play a project with a machining or print job to run its program here."));
+      return linked ? new Column("cnc-panel", [heading, link, empty], style) : new Column("cnc-panel", [heading, empty], style);
+    }
     model.show(player.sourceLines(), player.currentLine, tokens.selectionField);
     // Follow the running line, keeping a few lines of context above it.
     if (player.currentLine > 0 && player.currentLine != followedLine) {
@@ -72,14 +76,11 @@ class CncPanel {
     listStyle.clipVertical = true;
     var list = new ListView("cnc-gcode", model, listStyle, scroll, 300.0, selectedLine - 1,
       index -> selectedLine = index + 1);
-    return new Column("cnc-panel", [
-      heading,
-      new KeyedView("status", new Text(status)),
-      new KeyedView("buttons", new Row("cnc-buttons", [new KeyedView("hold", hold),
-        new KeyedView("resume", resume), new KeyedView("restart", restart)], buttonsStyle)),
-      new KeyedView("speed", speed),
-      new KeyedView("gcode", list)
-    ], style);
+    var buttons = new KeyedView("buttons", new Row("cnc-buttons", [new KeyedView("hold", hold),
+      new KeyedView("resume", resume), new KeyedView("restart", restart)], buttonsStyle));
+    var state = new KeyedView("status", new Text(status)), speedRow = new KeyedView("speed", speed), gcode = new KeyedView("gcode", list);
+    return linked ? new Column("cnc-panel", [heading, state, link, buttons, speedRow, gcode], style) :
+      new Column("cnc-panel", [heading, state, buttons, speedRow, gcode], style);
   }
 
   static function fill():LayoutStyle {
