@@ -8,6 +8,9 @@ import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.SimulatedSuctionTool;
 import robotkit.runtime.SimulationStepObserver;
 import robotkit.tool.ScrewdriverContract;
+import robotkit.spatial.Transform3;
+import robotkit.spatial.Quat;
+import robotkit.spatial.Vec3;
 import processkit.screwdriving.*;
 import processkit.screwdriving.TighteningModel.TighteningJoint;
 import processkit.screwdriving.ScrewdriverProcessDevice.ScrewdriverChannelNames;
@@ -60,6 +63,8 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
   var activeSlot = 0;
   var lastStart = false;
   var observed:ScrewdriverReading;
+  /** Starting body relative to the live socket frame, after physical lead-in contact. */
+  var anchoredBody:Null<Transform3> = null;
 
   public function new(simulation:Simulation, runtime:RobotRuntime, robotIndex:Int, linkIndex:Int,
       feedJoint:Int, spindleJoint:Int, tipPosition:Array<Float>, axis:Array<Float>, channels:ScrewdriverChannelNames,
@@ -94,7 +99,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
   }
   public function reading():ScrewdriverReading return ScrewdriverSensor.reading(ScrewdriverSensor.values(observed));
   public function reset():Void {
-    holding.reset(); model = null; selected = null; lastTime = null; angle = 0; reversed = false; reverseTargetAngle = 0; origin = 0;
+    holding.reset(); anchoredBody = null; model = null; selected = null; lastTime = null; angle = 0; reversed = false; reverseTargetAngle = 0; origin = 0;
     activeSlot = 0; lastStart = false; observed = ScrewdriverSensor.idle();
   }
   public function afterSimulationStep(timestamp:Int64):Void {
@@ -107,13 +112,16 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     if (slot != activeSlot || (start && selected == null)) {
       var setup = setups.get(slot);
       if (setup == null && start) throw 'Screwdriver slot $slot has no qualified joint program';
-      selected = setup; activeSlot = slot; model = setup == null ? null : new TighteningModel(setup.program, setup.joint); angle = 0; reversed = false; reverseTargetAngle = 0; origin = runtime.snapshot().q.get(spindleJoint);
+      anchoredBody = null; selected = setup; activeSlot = slot; model = setup == null ? null : new TighteningModel(setup.program, setup.joint); angle = 0; reversed = false; reverseTargetAngle = 0; origin = runtime.snapshot().q.get(spindleJoint);
     }
     if (start && reverse && model == null) throw "Cannot reverse without a configured screw cycle";
     lastStart = start;
     var setup = selected, process = model;
     if (start && !reverse && reversed) throw "Screwdriver needs a newly configured cycle after reversal";
-    if (!vacuum && holding.held != null) holding.release();
+    if (!vacuum) {
+      if (holding.held != null) holding.release();
+      anchoredBody = null;
+    }
     if (setup != null && process != null) {
       var state = setup.work();
       if (state.hole == null || state.hole.length != 3 || state.direction == null || state.direction.length != 3 || state.head == null || state.screwPose == null ||
@@ -135,25 +143,51 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       var driveSpeed = 0.0;
       var feed = q.get(feedJoint);
       var freeTip = [for (i in 0...3) tip[i] - direction[i] * feed];
-      var advanced = process.advanceAtAngle(angle) / 1000;
-      var toHead = [state.head.x + holeAxis[0]*advanced - freeTip[0],
-        state.head.y + holeAxis[1]*advanced - freeTip[1], state.head.z + holeAxis[2]*advanced - freeTip[2]];
-      var stroke = Math.max(0, -dot(toHead, direction) * 1000);
-      var headError = [for (i in 0...3) state.engagementPoint[i] - state.hole[i]];
-      var along = dot(headError,holeAxis);
-      var radial = Math.sqrt(Math.max(0,dot(headError,headError)-along*along))*1000;
+      var screw = setup.screw;
+      var referenceHead = transform(state.head);
+      var bodyToHead = transform(state.screwPose).inverse().compose(referenceHead);
+      var leadInHead = referenceHead.inverse().transformPoint(Vec3.fromArray(state.engagementPoint));
+      var actualBody = screw == null ? transform(state.screwPose) : transform(simulation.objectPose(screw));
+      var actualHead = actualBody.compose(bodyToHead);
+      var headAxis = actualHead.transformVector(new Vec3(0,0,1));
+      var pickError = actualHead.translation.sub(Vec3.fromArray(tip));
+      var pickAlignment = Math.acos(Math.max(-1,Math.min(1,headAxis.x*direction[0]+headAxis.y*direction[1]+headAxis.z*direction[2])));
+      // The named socket is calibrated against the body's collision origin. Only the
+      // identified body can seal; another screw near the bit is never substituted.
+      if (vacuum && screw != null && holding.held == null && pickError.norm() <= SimulatedSuctionTool.REACH &&
+          pickAlignment <= setup.joint.maximumAxisAngle) holding.attach(screw, pose(actualBody));
+      var lead = actualHead.transformPoint(leadInHead);
+      var leadError = lead.sub(Vec3.fromArray(state.hole));
+      var along = leadError.dot(Vec3.fromArray(holeAxis));
+      var radial = Math.sqrt(Math.max(0,leadError.dot(leadError)-along*along))*1000;
+      var screwAlignment = Math.acos(Math.max(-1,Math.min(1,headAxis.x*holeAxis[0]+headAxis.y*holeAxis[1]+headAxis.z*holeAxis[2])));
+      var alignment = Math.max(pickAlignment,screwAlignment);
+      var anchor = anchoredBody;
+      if (anchor == null && holding.held != null && !reversed &&
+          radial <= setup.joint.leadInMm && Math.abs(along)*1000 <= setup.joint.leadInMm &&
+          alignment <= setup.joint.maximumAxisAngle) {
+        // Retain the actual contact pose rather than snapping to the nominal CAD axis.
+        anchor = referenceHead.inverse().compose(actualBody);
+        anchoredBody = anchor;
+      }
+      var startingBody = anchor == null ? actualBody : referenceHead.compose(anchor);
+      var startingHead = startingBody.compose(bodyToHead);
+      var head = startingHead.translation;
+      var leadStart = startingHead.transformPoint(leadInHead);
+      var headError = leadStart.sub(Vec3.fromArray(state.hole));
+      along = headError.dot(Vec3.fromArray(holeAxis));
+      radial = Math.sqrt(Math.max(0,headError.dot(headError)-along*along))*1000;
       var toolError = [for (i in 0...3) freeTip[i]-state.hole[i]];
       var toolAlong = dot(toolError,holeAxis);
       radial = Math.max(radial,Math.sqrt(Math.max(0,dot(toolError,toolError)-toolAlong*toolAlong))*1000);
-      var headAxis = new robotkit.spatial.Quat(state.head.qx,state.head.qy,state.head.qz,state.head.qw).rotate(new robotkit.spatial.Vec3(0,0,1));
-      var screwAlignment = Math.acos(Math.max(-1,Math.min(1,headAxis.x*holeAxis[0]+headAxis.y*holeAxis[1]+headAxis.z*holeAxis[2])));
-      var alignment = Math.acos(Math.max(-1,Math.min(1,dot(direction,holeAxis))));
-      alignment = Math.max(alignment,screwAlignment);
-      var screw = setup.screw;
-      if (vacuum && screw != null && holding.held == null && Math.sqrt(dot(toHead,toHead)) <= SimulatedSuctionTool.REACH) {
-        var actual = simulation.objectPose(screw);
-        var gap = [actual.x-state.screwPose.x,actual.y-state.screwPose.y,actual.z-state.screwPose.z];
-        if (Math.sqrt(dot(gap,gap)) <= SimulatedSuctionTool.REACH) holding.attach(screw, actual);
+      var advanced = process.advanceAtAngle(angle) / 1000;
+      var toHead = [head.x + holeAxis[0]*advanced - freeTip[0],
+        head.y + holeAxis[1]*advanced - freeTip[1],head.z + holeAxis[2]*advanced - freeTip[2]];
+      // During transfer the bit carries the screw freely. Compliance only compresses
+      // against a contacted thread, never against the distant authored work frame.
+      var stroke = anchor == null ? 0.0 : Math.max(0,-dot(toHead,direction)*1000);
+      if (anchor != null && reversed && angle == 0 && !start && dot(toHead,direction) > SimulatedSuctionTool.REACH) {
+        anchoredBody = null; anchor = null; stroke = 0;
       }
       if (reverse && start) {
         if (!reversed) { reversed = true; reverseTargetAngle = angle; }
@@ -178,15 +212,15 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       simulation.driveProcessJoint(robotIndex, spindleJoint, origin + setup.hand*targetAngle,
         setup.hand*driveSpeed);
       observed.speed = setup.hand*measured.dq.get(spindleJoint);
-      if (holding.held != null) {
+      if (holding.held != null && anchor != null) {
         var advance = process.advanceAtAngle(angle)/1000;
         var rotation = robotkit.spatial.Quat.fromAxisAngle(new robotkit.spatial.Vec3(holeAxis[0],holeAxis[1],holeAxis[2]), setup.hand*angle);
-        var initial = new robotkit.spatial.Quat(state.screwPose.qx,state.screwPose.qy,state.screwPose.qz,state.screwPose.qw);
+        var initial = startingBody.rotation;
         var turned = rotation.multiply(initial);
-        var offset = rotation.rotate(new robotkit.spatial.Vec3(state.screwPose.x-state.head.x,
-          state.screwPose.y-state.head.y,state.screwPose.z-state.head.z));
-        holding.placeHeld(new SimPose(state.head.x+offset.x+holeAxis[0]*advance,state.head.y+offset.y+holeAxis[1]*advance,
-          state.head.z+offset.z+holeAxis[2]*advance,turned.x,turned.y,turned.z,turned.w));
+        var offset = rotation.rotate(new robotkit.spatial.Vec3(startingBody.translation.x-head.x,
+          startingBody.translation.y-head.y,startingBody.translation.z-head.z));
+        holding.placeHeld(new SimPose(head.x+offset.x+holeAxis[0]*advance,head.y+offset.y+holeAxis[1]*advance,
+          head.z+offset.z+holeAxis[2]*advance,turned.x,turned.y,turned.z,turned.w));
       }
     } else {
       observed = ScrewdriverSensor.idle();
@@ -201,6 +235,11 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       runtime.snapshot().sourceTimestampNs, runtime.endpoint.sourceClockId());
   }
   static function dot(a:Array<Float>,b:Array<Float>):Float return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  static function transform(value:SimPose):Transform3
+    return new Transform3(new Vec3(value.x,value.y,value.z),new Quat(value.qx,value.qy,value.qz,value.qw));
+  static function pose(value:Transform3):SimPose
+    return new SimPose(value.translation.x,value.translation.y,value.translation.z,
+      value.rotation.x,value.rotation.y,value.rotation.z,value.rotation.w);
   function digital(channel:String):Bool return switch runtime.channelValue(channel) {
     case Digital(on): on; case _: throw 'Screwdriver channel "$channel" needs digital values';
   };

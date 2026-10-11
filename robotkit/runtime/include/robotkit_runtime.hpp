@@ -141,8 +141,9 @@ public:
     }
 
     /**
-     * Relative precision of the positions sample() reports: 0 for full double
-     * precision, the float epsilon for a link that carries 32-bit floats. A
+     * Relative precision of the positions sample() reports: 0 for exact double
+     * samples, a small double roundoff allowance for numerical physics, or the
+     * float epsilon for a link that carries 32-bit floats. A
      * joint resting exactly on a limit may read that far past it, so the
      * runtime's observed-limit check allows it on top of the blueprint's
      * tolerance.

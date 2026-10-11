@@ -158,6 +158,26 @@ simulation and hardware, and a mission step drives it.
   pose. Reverse unloads elastic rotation before axial withdrawal; a new tightening
   cycle after reversal requires explicit reconfiguration. No saved schema changes.
 
+- **SD6 — Pickup preserves the actual body/socket calibration.** The observer
+  computes the identified screw's live socket from its actual collision-body pose
+  and the separately supplied CAD head/body frames. During transfer, native
+  holding carries it on the bit; the distant work frame cannot pull it out of
+  the presenter. The thread constraint begins only within the live lead-in and
+  retains the actual contact offset. Measured axial offset changes run-down
+  travel so the CAD seat stays fixed, rather than snapping the screw to its
+  nominal start. Physical presenter fixtures support their screws before sealing.
+- **SD6 — Arm motion excludes the process coordinates.** A derived planning TCP
+  at the uncompressed bit is mounted on the feed's parent. Its chain excludes
+  both named process joints; the real runtime TCP remains on the spindle.
+  The runner follows measured compression near the qualified stroke midpoint,
+  rather than deriving arm advance from cycle angle (which includes slipping
+  and elastic rotation). It stops the spindle, waits for measured rotation to
+  cease, then releases vacuum and retracts. Failed tightening retains vacuum
+  for the recovery step; result records preserve measured cycle angle explicitly.
+  The simulated endpoint declares a 16-double-epsilon observation precision: a
+  MuJoCo feed at its zero stop otherwise faults on roundoff near 1e-20 m and
+  releases vacuum. Authored overtravel and commanded limits remain unchanged.
+
 ## What exists
 
 - Fasteners in `machinekit.standard`: `SocketHeadCapScrew` (ISO 4762),
@@ -674,6 +694,36 @@ SD6 must extend the observer from an already-positioned screw to pickup and
 transport before applying the live thread constraint. SD6–SD8 remain open;
 the conditional web screenshot omission remains recorded under SD2.
 
+### SD6 core checkpoint (2026-10-11)
+
+Pickup/transport, the arm-only planning TCP, the position-motion adapter,
+`ScrewdrivingRunner` and `DriveScrew` are implemented. Focused validation
+`build/sd6-transport-calibrated.log` passes 31 model checks and 72 simulation
+checks on MuJoCo and the deterministic backend, plus the unchanged equipment
+project preview on both. The preview artifact remains 2206852 bytes. The
+focused script retains the shared heavy-run locks, 12 GB cap and prebuilt OCCT
+configuration used in SD5. Disk was 26 GB free before the native RobotKit rebuild.
+
+The new checks prove natural pickup/transport, actual socket/body calibration,
+lead-in contact, seating before release, measured feed following, confirmed
+spindle stop before release, named results, missing presenter parts, cached
+sensor timeout and exclusion of both process joints from arm IK. Commands even
+1e-15 m beyond the feed stop remain rejected. The endpoint precision fix resolves
+the reproduced MuJoCo limit fault at roughly 1e-20 m. The support fixtures now
+settle before pickup and retain the actual contact pose, including MuJoCo's
+small support penetration. Native holding consumes the carrier's new pose on
+its following physics tick; tests observe the settled pose instead of comparing
+unequal ticks. The probe uses distinct collision shapes with self-collision
+still enabled. No new Haxeon bug was found; the failed snapshot argument test
+correctly distinguished runtime and core snapshot classes.
+
+SD6 is not complete: the scene screw DTO/schema, CAD-derived mission authoring,
+MissionPlayer/factory integration and the real M6 CAD cell test remain. That test
+must prove seating after vacuum release and retraction, with the fastened screw
+following the live threaded member, not the withdrawn bit. The focused synthetic
+transport probe has no tapped fixture and cannot prove this final constraint.
+The full SD6 gate remains pending.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
@@ -682,6 +732,6 @@ the conditional web screenshot omission remains recorded under SD2.
 | SD3 | done — post-rebase full gate passed | `fbbe14d0c`, `6c338344d`, `ffee5362f` |
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
-| SD6 | open — machine tending landed; not started | |
+| SD6 | in progress — core focused checks pass; scene integration and full gate pending | |
 | SD7 | open — machine tending landed; not started | |
 | SD8 | open — machine tending landed; not started | |

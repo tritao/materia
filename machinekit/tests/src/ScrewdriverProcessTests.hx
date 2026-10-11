@@ -65,6 +65,14 @@ class ScrewdriverProcessTests {
 		var lostReading = lost.step(sample);
 		check(lostReading.result == ScrewdriverContract.SCREW_LOST && lostReading.angle == 1 && lostReading.speed == 0,
 			"Lost vacuum stops at the current measured spindle angle");
+		for (offset in [-0.2,0.2]) {
+			var actualStart = new TighteningModel(program(),joint());
+			var measured = input(0); measured.axialErrorMm = offset;
+			var seated = runToEnd(actualStart,measured);
+			check(seated.result == ScrewdriverContract.OK && Math.abs(actualStart.advanceMm+offset-2) < 1e-9,
+				"Measured lead-in contact offset changes travel while retaining the CAD seat");
+		}
+
 		var a = new TighteningModel(program(),joint()), b = new TighteningModel(program(),joint());
 		var same = true;
 		for (i in 0...1500) if (haxe.Json.stringify(a.step(input(i*0.01))) != haxe.Json.stringify(b.step(input(i*0.01)))) same = false;

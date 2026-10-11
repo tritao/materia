@@ -34,6 +34,7 @@ class TighteningModel {
   public var reading(default, null):ScrewdriverReading;
   public var advanceMm(default, null):Float = 0;
   var snugAngle = 0.0;
+  var contactRunDownMm = 0.0;
   var engaged = false;
   var hadScrew = false;
   var started = false;
@@ -53,6 +54,7 @@ class TighteningModel {
     reset();
   }
   public function reset():Void {
+    contactRunDownMm = joint.runDownMm;
     advanceMm = 0; snugAngle = 0; lastAngle = 0; engaged = false; hadScrew = false; started = false;
     reading = ScrewdriverSensor.idle();
   }
@@ -106,7 +108,11 @@ class TighteningModel {
         if (input.angle >= settings.maximumRunDownAngle) return finish(ScrewdriverContract.NO_START);
         reading.speed = settings.runDownSpeed; return copy();
       }
+      // A screw caught within the lead-in can start above or below the nominal
+      // entry. Its seat stays fixed; that measured offset changes the travel to it.
+      contactRunDownMm = Math.max(0,joint.runDownMm-input.axialErrorMm);
       engaged = true;
+      expectedRunDownAngle = runDownAngle();
       // Rotation spent slipping before engagement cannot advance the screw.
       snugAngle = input.angle - delta + expectedRunDownAngle;
     }
@@ -117,7 +123,7 @@ class TighteningModel {
       return finish(ScrewdriverContract.EARLY_HIGH_TORQUE);
     }
     var stopAngle = Math.min(input.angle,Math.min(snugAngle,settings.maximumRunDownAngle));
-    advanceMm = stopAngle >= snugAngle ? joint.runDownMm :
+    advanceMm = stopAngle >= snugAngle ? contactRunDownMm :
       Math.max(0,(stopAngle-(snugAngle-expectedRunDownAngle))*joint.leadMm/(2*Math.PI));
     if (snugAngle > settings.maximumRunDownAngle && input.angle >= settings.maximumRunDownAngle) {
       reading.angle = settings.maximumRunDownAngle;
@@ -154,7 +160,7 @@ class TighteningModel {
     var engagementAngle = snugAngle - runDownAngle();
     return Math.min(advanceMm,Math.max(0,(angle-engagementAngle)*joint.leadMm/(2*Math.PI)));
   }
-  function runDownAngle():Float return joint.runDownMm*2*Math.PI/joint.leadMm;
+  function runDownAngle():Float return contactRunDownMm*2*Math.PI/joint.leadMm;
   function finish(result:Int):ScrewdriverReading {
     reading.result = result; reading.phase = ScrewdriverContract.COMPLETE; reading.speed = 0; return copy();
   }
