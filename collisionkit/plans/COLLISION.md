@@ -980,6 +980,39 @@ Order: CL9a, CL9b, CL9c, CL9d, CL9e. Each step is one commit.
   not changed. No new dependencies, forks, simulation mission behaviour
   changes, pushes or OCCT rebuilds.
 
+### CL9e: measured broadphase (2026-10-11)
+
+- World uses coal's DynamicAABBTreeCollisionManager above **512 checked
+  candidate pairs**, retaining the original allocation-free pair/AABB loop
+  below it. Trees separate moving and fixed objects, update changed poses,
+  preserve explicit static Check rules, and keep infinite shapes outside
+  the finite tree. Candidates return in ID order; narrow-phase queries and
+  first-violation/closest ordering retain their previous semantics.
+- Release C++ benchmark `ck_broadphase_benchmark` on an i5-13600K: six
+  rotary joints/capsule links against N boxes, FK/pose updates plus violation,
+  50 warmups and median of five 3,000-query runs (microseconds per query):
+
+  | N boxes | Checked pairs | Pair loop | Tree |
+  | ---: | ---: | ---: | ---: |
+  | 10 | 70 | 0.767 | 1.480 |
+  | 100 | 610 | 3.569 | 1.504 |
+  | 1000 | 6010 | 15.326 | 6.384 |
+
+  512 keeps the small cell on the faster loop and selects the tree before
+  the first measured winning case (610 pairs). Build/run the standalone
+  `ck_broadphase_benchmark` target to reproduce the measurement.
+- The new C++ same-scene test compares every result field exactly across
+  both policies, including rules, inflation, reference overlaps, attach/
+  remove, fixed-body updates, height fields, infinite shapes, boundary
+  contact, and crossing the production threshold in both directions.
+- All gates pass: standalone C++ (4 + 16, plus MuJoCo), native kit,
+  collisionkit, MotionKit, RobotKit, processkit and app missions. CAD cell,
+  collision/MuJoCo, CadBridge, clearance-validation and planner also pass.
+  Pure kit retains only the known DLS allocation failure (40.96 bytes).
+  No existing assertions changed, new dependencies, forks, simulation
+  mission behaviour changes, pushes or OCCT rebuilds.
+- **CL9 is done:** CL9a–CL9e, one commit each, synced onto local main.
+
 ### Plan revision (2026-10-01, after CL1)
 
 A review of the plan against CL1 and the code around it changed:
