@@ -326,6 +326,30 @@ simulation and hardware, and a mission step drives it.
   reason and no tightening measurement. Controller/recovery faults stop the
   mission and cannot become a skipped or measured successful final.
 
+- **SD8 — Protocol enable and measured process feedback are separate.** The
+  Open Protocol client implements the commissioned single-station revision-1
+  profile from Atlas Copco's published
+  [specification 2.16.0](https://asutp.org/Atlas_Copco/OpenProtocol_Specification_R_2.16.0.pdf).
+  MID 0043 unlocks the tool; it does not start tightening. Start, reverse and
+  vacuum require commissioned machine I/O. MID 0061 supplies measured torque
+  and a reported angle, not live speed, feed stroke or a guaranteed cumulative
+  spindle datum. Its NOK remains unclassified; no cross-thread or stripped
+  result is inferred from that bit. Hardware feedback must supply the canonical
+  seven measured values independently, with the engagement angle datum.
+  This profile does not negotiate revisions or claim support for MTFocus6000:
+  its [2026 controller appendix](https://servaid.atlascopco.com/AssertWeb/cs/AtlasCopco/Document/28551388/DownloadConvertedFileAsPdf)
+  requires communication-start revision 6.
+- **SD8 — Acquisition freshness belongs to the source.** The discrete profile
+  commissions program codes, LSB-first pins, reverse/start semantics and the
+  acquisition clock and maximum age. Its I/O supplies one atomic digital and
+  measured-value snapshot, source sequence and acquisition timestamp. Polling
+  a repeated snapshot cannot refresh it; conflicting repeats, wrong clocks,
+  future times, backwards sequences and stale measurements stop drive and
+  reverse while retaining vacuum. OK/NOK inputs must agree with the measured
+  result and complete phase. Link/acquisition faults latch. The common process
+  device optionally consults this controller readiness and fault boundary;
+  the established simulated device behavior stays unchanged.
+
 ## What exists
 
 - Fasteners in `machinekit.standard`: `SocketHeadCapScrew` (ISO 4762),
@@ -584,8 +608,10 @@ Here:
 - Open Protocol client (TCP): communication start, parameter-set select, tool
   enable/disable, tightening-result subscription and keep-alive; the message ids
   and revisions come from the protocol specification, recorded in the client.
-- A discrete I/O profile (program bits, start, reverse, OK/NOK, ready) for
-  controllers without a network interface.
+- A commissioned discrete I/O profile (program bits, start, reverse, OK/NOK,
+  ready) for controllers without a network interface. Its atomic acquisition
+  includes fresh measured seven-value feedback, sequence and source clock/time;
+  digital result bits cannot supply torque, angle, speed or stroke.
 - An RKD6 virtual nutrunner behind the same contract.
 - `ScrewdriverProcessDevice` runs against either, with the same mission
   unchanged from simulation.
@@ -1391,6 +1417,69 @@ results remain exact. App runtime peaks at 3.6 GB under its 18 GB cap; no exit
 137 occurred. Generated lodepng CMake input was moved to the ignored build
 archive after validation, leaving its populated checkout clean.
 
+### SD8 controller profile checkpoint (2026-10-11)
+
+The revision-1 Open Protocol client uses bounded byte framing, including partial
+and coalesced TCP reads, and serializes acknowledged commands. Communication
+start (0001/0002) precedes disable (0042) and result subscription (0060).
+Parameter-set selection (0018) must be acknowledged before enable (0043).
+Results (0061) acknowledge with 0062; exact duplicates do not republish, and
+changed or regressing tightening IDs fault. uint32 IDs remain numeric Floats
+rather than overflowing Haxe Ints. Torque converts hundredths of Nm and angle
+converts integer degrees to radians. Those reported resolutions and angle
+semantics are retained; no live process quantities or fault classification
+are fabricated. The client records specification sections alongside the MIDs.
+Ten-second inactivity sends 9999; missing echoes and command acknowledgements
+fault and close the connection. Closing is not an acknowledged physical stop.
+
+`DiscreteScrewdriver` implements the common output, feedback and status
+interfaces against explicitly commissioned I/O. It copies the profile and
+returns copied measured readings. Selection waits for a new acquisition;
+program changes while driving or reversing are rejected. The reverse profile
+explicitly selects whether start is also required. A controlled stop retains
+vacuum. A shared `ScrewdriverProcessDevice` carries the source readiness and
+named acquisition fault instead of accepting idle feedback as readiness.
+
+The focused compiler-only build and `build/sd8-controller-proof-6.log` pass
+141 pure controller checks and 5 real NativeKit loopback TCP checks on port
+36279. `machinekit/tests/screw-controller/haxeon.json` supplies the standalone
+entry; `run()` is the pure group in the ordinary MachineKit gate, while `main()`
+also exercises TCP with the existing host NativeKit libraries.
+The wire trace is exactly 1,42,60,18,43,62,42: handshake, disable, subscription,
+selection, enable, result acknowledge and disable. Pure tests cover all packet
+split points, coalescing, malformed headers/tags, overflow IDs, duplicate
+results, late enable acknowledgements during safe, timeout, clock regression,
+commissioned discrete controls, measured SI values, NOK classification,
+readiness, stale acquisition shutdown and retained vacuum.
+
+Two haxeon differences were encountered and handled locally: empty `Array.shift`
+throws in `haxeon/native/runtime/arrays.c:387` and `:524`, so both result
+consumption and scripted transport reads guard the length. Strings containing
+NUL are rejected by `haxeon/src/compiler/hl/HlWriter.hx:384`; the wire terminator
+is therefore written directly into Bytes, and result fingerprints exclude it.
+These are explicit runtime/compiler restrictions, not new typing defects;
+haxeon and its pin are unchanged. The initial focused run omitted the native
+environment and CadKit refused configuration before any OCCT build. Its generated
+build was moved to `build/sd8-controller-failed-native`; subsequent focused checks
+use compiler-only builds and the existing native libraries. A boundary test
+uses a time strictly beyond the age limit to avoid binary floating-point
+subtraction at the exact decimal boundary.
+
+The initial quick gate `sd8-controller` passed CadKit and ProjectKit but failed
+when the TCP integration test tried loading `libnativekit.so`, absent from the
+ordinary MachineKit gate library path. The tests now expose separate pure and
+standalone TCP entry points; both focused groups pass with the correct host
+libraries. The quick regression gate `sd8-controller-retry` passes all three stages;
+MachineKit peaks at 2.0 GB and no exit 137 occurs. All 131 previous normalized
+MachineKit result lines match exactly; only the 141-check controller summary
+is added. ProjectKit stays at 199 assertions. Source hashes stay unchanged
+through the gate, with unique-prefix logs and archived comparisons under
+`build/sd8-controller-*`. No saved format, native source, published torque,
+qualification or submodule pin changes at this checkpoint. The RKD6 virtual
+nutrunner, controller owner/channel binding, network-plus-measured-I/O adapter,
+and unchanged actual SD6 CAD mission proof remain unfinished. This is a
+controller profile checkpoint, not completed SD8 acceptance.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
@@ -1401,4 +1490,4 @@ archive after validation, leaving its populated checkout clean.
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
 | SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71`, `7038a4fee` |
-| SD8 | open — machine tending landed; not started | |
+| SD8 | in progress — controller profiles and loopback TCP pass; checkpoint quick gate passed; RKD6 and unchanged CAD mission proof pending | controller profiles (this commit) |

@@ -1,0 +1,9 @@
+{
+	"version": 1,
+	"package": { "name": "screw-controller-tests" },
+	"entry": "ScrewControllerTests",
+	"sourceRoots": ["../src"],
+	"dependencies": { "processkit": { "path": "../../../processkit" } },
+	"target": "host",
+	"outputDir": "build"
+}
