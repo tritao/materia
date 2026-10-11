@@ -1097,6 +1097,8 @@ and the final SD7 gate remain pending. SD8 is unstarted; SD7 is not complete.
 
 ### SD7 endpoint access checkpoint (2026-10-11)
 
+Implementation commit: `091f0a97a`.
+
 Whole-cell generation now uses `ScrewdrivingAccess` before staging its free
 bodies. `ScrewdrivingAssemblyPreview.design` exposes the freshly rebuilt CAD
 and qualified jobs for this check and for focused tests. The 40 mm example
@@ -1138,5 +1140,5 @@ Optional snug/final execution and SD8 remain open; SD7 is still in progress.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — CAD execution and transport-loss recovery pass both backends and full checkpoint gates; endpoint access passes its full checkpoint; snug/final execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40` |
+| SD7 | in progress — CAD execution and transport-loss recovery pass both backends and full checkpoint gates; endpoint access passes its full checkpoint; snug/final execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a` |
 | SD8 | open — machine tending landed; not started | |
