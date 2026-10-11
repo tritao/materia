@@ -43,7 +43,7 @@ class PathDifferential {
     var jacobian=projectMatrix(originalJacobian),projectedVelocity=projectVector(velocity);
     for(row in 0...6)request.set_task_velocity(row,projectedVelocity[row]);
     var first=MotionKitNative.mk_path_differential(request,jacobian,[for(_ in jacobian)0.0],n);
-    if(first.status!=TrajectoryCoreConstants.MK_OK)throw 'Differential velocity failed: ${first.status}, rank ${first.out_report.get_rank()}';
+    if(first.status!=TrajectoryCoreConstants.MK_OK)throw 'Differential velocity failed: ${first.status}, rank ${first.out_report.get_rank()}, joints $q, task velocity $projectedVelocity';
     var scale=1.0;for(value in first.out_first)scale=Math.max(scale,Math.abs(value));
     var step=differenceStep/scale;
     var before=[for(j in 0...n)q[j]-step*first.out_first[j]],after=[for(j in 0...n)q[j]+step*first.out_first[j]];

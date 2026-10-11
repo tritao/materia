@@ -61,6 +61,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
   public final channels:ScrewdriverChannelNames;
   public final sensorId:String;
   public var model(default, null):Null<TighteningModel> = null;
+  public var supply:Null<SimulationScrewdriverSupply> = null;
   final robotIndex:Int;
   final linkIndex:Int;
   final feedJoint:Int;
@@ -151,24 +152,29 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     throw 'Fastening "${connection.fastening}" has no retained successful engagement for its exact screw, member and face';
   }
   /** Absolute measured shaft coordinate, used to align the next free-bit approach. */
-  public function spindlePosition():Float return runtime.snapshot().q.get(spindleJoint);
-  public function reading():ScrewdriverReading return ScrewdriverSensor.reading(ScrewdriverSensor.values(observed));
+  public function spindlePosition():Float return supply == null ? runtime.snapshot().q.get(spindleJoint) : supply.joints().spindlePosition;
+  public function reading():ScrewdriverReading return supply == null ? ScrewdriverSensor.reading(ScrewdriverSensor.values(observed)) : supply.reading();
   public function reset():Void {
     holding.reset(); anchoredBody = null; model = null; selected = null; lastTime = null; angle = 0; reversed = false; reverseTargetAngle = 0; origin = 0;
     activeSlot = 0; lastStart = false; observed = ScrewdriverSensor.idle();
     retained.resize(0); pendingEngagement = null;
+    if (supply != null) supply.reset();
   }
   public function afterSimulationStep(timestamp:Int64):Void {
     var previous = lastTime; lastTime = timestamp;
     var dt = previous == null ? 0.0 : Math.max(0, Int64.toFloat(Int64.sub(timestamp, previous)) * 1e-9);
-    var start = digital(channels.start), vacuum = digital(channels.vacuum), reverse = digital(channels.direction);
-    var slotValue = analog(channels.program);
+    var controls = supply == null ? null : supply.controls();
+    var joints = supply == null ? null : supply.joints();
+    var start = controls == null ? digital(channels.start) : controls.start;
+    var vacuum = controls == null ? digital(channels.vacuum) : controls.vacuum;
+    var reverse = controls == null ? digital(channels.direction) : controls.reverse;
+    var slotValue = controls == null ? analog(channels.program) : controls.program;
     var slot = ScrewdriverProcessDevice.programSlot(slotValue, true);
     if (start && lastStart && slot != activeSlot) throw "Screwdriver program cannot change during a cycle";
     if (slot != activeSlot || (start && selected == null)) {
       var setup = setups.get(slot);
       if (setup == null && start) throw 'Screwdriver slot $slot has no qualified joint program';
-      anchoredBody = null; selected = setup; activeSlot = slot; model = setup == null ? null : new TighteningModel(setup.program, setup.joint); angle = 0; reversed = false; reverseTargetAngle = 0; origin = runtime.snapshot().q.get(spindleJoint);
+      anchoredBody = null; selected = setup; activeSlot = slot; model = setup == null ? null : new TighteningModel(setup.program, setup.joint); angle = 0; reversed = false; reverseTargetAngle = 0; origin = joints == null ? runtime.snapshot().q.get(spindleJoint) : joints.spindlePosition;
       pendingEngagement = null;
       if (setup != null) {
         if (setup.retightening == true) {
@@ -229,7 +235,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       var measured = runtime.snapshot();
       var q = measured.q;
       var driveSpeed = 0.0;
-      var feed = q.get(feedJoint);
+      var feed = joints == null ? q.get(feedJoint) : joints.feedPosition;
       var freeTip = [for (i in 0...3) tip[i] - direction[i] * feed];
       var screw = setup.screw;
       var referenceHead = transform(state.head);
@@ -294,7 +300,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       if (reverse && start) {
         if (!reversed) { reversed = true; reverseTargetAngle = angle; }
         reverseTargetAngle = Math.max(0, reverseTargetAngle - setup.program.settings.runDownSpeed * dt);
-        angle = Math.max(0, setup.hand*(q.get(spindleJoint)-origin));
+        angle = Math.max(0, setup.hand*((joints == null ? q.get(spindleJoint) : joints.spindlePosition)-origin));
         // Numerical zero for a settled spindle, while retaining measured reversal feedback.
         if (angle < 1e-6) angle = 0;
         observed.torqueNm = 0; observed.angle = angle; observed.speed = -setup.program.settings.runDownSpeed;
@@ -302,7 +308,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
         driveSpeed = observed.speed;
         observed.strokeMm = stroke; observed.vacuum = holding.held != null;
       } else if (!reversed) {
-        if (start) angle = Math.max(angle, setup.hand*(q.get(spindleJoint)-origin));
+        if (start) angle = Math.max(angle, setup.hand*((joints == null ? q.get(spindleJoint) : joints.spindlePosition)-origin));
         observed = process.step({screwPresent:setup.screw != null && holding.held == setup.screw, vacuum:vacuum && holding.held != null,
           start:start, angle:angle, strokeMm:stroke, radialErrorMm:radial, axialErrorMm:along*1000, axisAngle:alignment, damagedLeadIn:state.damagedLeadIn});
         if (observed.result != ScrewdriverContract.NONE) angle = observed.angle;
@@ -313,7 +319,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       var targetAngle = start && reverse ? reverseTargetAngle : angle + driveSpeed*dt;
       simulation.driveProcessJoint(robotIndex, spindleJoint, origin + setup.hand*targetAngle,
         setup.hand*driveSpeed);
-      observed.speed = setup.hand*measured.dq.get(spindleJoint);
+      observed.speed = setup.hand*(joints == null ? measured.dq.get(spindleJoint) : joints.spindleSpeed);
       if (holding.held != null && anchor != null) {
         var advance = process.advanceAtAngle(angle)/1000;
         holding.placeHeld(turnedPose(startingBody,head,holeAxis,setup.hand*angle,advance));
@@ -321,18 +327,19 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     } else {
       observed = ScrewdriverSensor.idle();
       var measured = runtime.snapshot();
-      observed.strokeMm = Math.max(0,-measured.q.get(feedJoint)*1000);
-      observed.speed = measured.dq.get(spindleJoint);
+      observed.strokeMm = Math.max(0,-(joints == null ? measured.q.get(feedJoint) : joints.feedPosition)*1000);
+      observed.speed = joints == null ? measured.dq.get(spindleJoint) : joints.spindleSpeed;
       observed.vacuum = holding.held != null;
       simulation.driveProcessJoint(robotIndex,feedJoint,0,0);
-      simulation.driveProcessJoint(robotIndex,spindleJoint,measured.q.get(spindleJoint),0);
+      simulation.driveProcessJoint(robotIndex,spindleJoint,joints == null ? measured.q.get(spindleJoint) : joints.spindlePosition,0);
     }
     // The process result retains its final angle. Live feedback follows the
     // measured shaft through stopping and reversal, including physical coast.
-    var measuredAngle = selected == null ? observed.angle : Math.max(0,selected.hand*(runtime.snapshot().q.get(spindleJoint)-origin));
+    var measuredAngle = selected == null ? observed.angle : Math.max(0,selected.hand*((joints == null ? runtime.snapshot().q.get(spindleJoint) : joints.spindlePosition)-origin));
     observed = {torqueNm:observed.torqueNm,angle:measuredAngle,speed:observed.speed,
       strokeMm:observed.strokeMm,phase:observed.phase,result:observed.result,vacuum:holding.held != null};
-    runtime.publishSensorFrame(sensorId, ScrewdriverSensor.values(observed), Int64.ofInt(++sequence),
+    if (supply != null) supply.publish(observed);
+    else runtime.publishSensorFrame(sensorId, ScrewdriverSensor.values(observed), Int64.ofInt(++sequence),
       runtime.snapshot().sourceTimestampNs, runtime.endpoint.sourceClockId());
   }
   static function dot(a:Array<Float>,b:Array<Float>):Float return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];

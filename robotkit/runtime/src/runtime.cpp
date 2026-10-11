@@ -72,7 +72,12 @@ rk_result RobotRuntime::write_output(const char *channel, const rk_event_value &
     const auto &current = channel_outputs_[index];
     const bool unchanged = value.kind == RK_EVENT_DIGITAL
         ? current.digital == value.digital : current.analog == value.analog;
-    if (unchanged) return RK_OK;
+    if (unchanged && !control_.channel_has_fired[index]) return RK_OK;
+    const auto result = endpoint_->write_output(index, value);
+    if (result != RK_OK) return result;
+    // A controller write supersedes this channel's old scheduled HOLD/resume latch.
+    control_.channel_hold_policies[index] = RK_EVENT_KEEP;
+    control_.channel_has_fired[index] = false;
     record_event(index, value, 0, 0, state_.source_timestamp_ns, RK_EVENT_CONTROLLER);
     return RK_OK;
 }

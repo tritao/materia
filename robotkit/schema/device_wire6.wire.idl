@@ -1,6 +1,6 @@
 # RKD generation 6 scheduled payload records; independent wire revision below.
 # Outer frame uses the generation marker RKD6, length and CRC32.
-const PROTOCOL_VERSION : u8 = 14;
+const PROTOCOL_VERSION : u8 = 15;
 const MAX_ACTUATORS : u8 = 64;
 
 enum MessageType6 : u8 {
@@ -21,6 +21,7 @@ enum MessageType6 : u8 {
     state6 = 15
     event = 16
     sensor6 = 17
+    controller_output = 18
     homing_scope = 21
     homing_side = 22
     homing_control_ack = 23
@@ -224,4 +225,14 @@ packed HomingCounterBatch6 endian little {
     second : u8
     first_delta : f64
     second_delta : f64
+}
+
+# Controller-owned digital/analog outputs are independent of the arm path queue.
+packed ControllerOutput6 endian little {
+    session : u64
+    sequence : u64
+    channel : u8
+    kind : u8
+    digital : u8
+    analog : f32
 }

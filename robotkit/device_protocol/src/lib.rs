@@ -31,3 +31,5 @@ pub mod heater;
 // Sensor layout generated from ProcessKit's canonical welding channel contract.
 #[path = "../../../processkit/schema/weld_contract.rs"]
 pub mod weld_contract;
+#[path = "../../../processkit/schema/screwdriver_contract.rs"]
+pub mod screwdriver_contract;

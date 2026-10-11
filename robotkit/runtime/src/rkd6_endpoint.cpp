@@ -752,6 +752,23 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
     return RK_OK;
 }
 
+rk_result Rkd6Endpoint::write_output(uint32_t channel, const rk_event_value &value) {
+    if (channel >= 32 || output_sequence_ == std::numeric_limits<uint64_t>::max() ||
+        (value.kind != RK_EVENT_DIGITAL && value.kind != RK_EVENT_ANALOG) ||
+        (value.kind == RK_EVENT_DIGITAL && value.digital > 1) ||
+        (value.kind == RK_EVENT_ANALOG && !std::isfinite(static_cast<float>(value.analog))))
+        return RK_ERROR_INVALID_ARGUMENT;
+    device_wire6::ControllerOutput6 output{};
+    output.session = ack_.session; output.sequence = output_sequence_ + 1;
+    output.channel = static_cast<uint8_t>(channel); output.kind = static_cast<uint8_t>(value.kind);
+    if (value.kind == RK_EVENT_DIGITAL) output.digital = value.digital;
+    else output.analog = static_cast<float>(value.analog);
+    std::vector<uint8_t> payload(output.SIZE);
+    if (!device_wire6::encode(output, payload) || !send_record(18, payload)) return RK_ERROR_BACKEND;
+    output_sequence_ = output.sequence;
+    return RK_OK;
+}
+
 rk_result Rkd6Endpoint::apply(const rk_robot_command &command) {
     std::uint8_t kind = 0;
     switch (command.kind) {

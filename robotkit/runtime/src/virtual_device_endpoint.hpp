@@ -78,6 +78,9 @@ public:
     rk_result rebase_counters(const uint32_t *joints, const double *deltas, uint32_t count) override {
         return inner_->rebase_counters(joints, deltas, count);
     }
+    rk_result write_output(uint32_t channel, const rk_event_value &value) override {
+        return inner_->write_output(channel, value);
+    }
     bool reports_safety_state() const noexcept override { return true; }
     double observed_position_precision() const noexcept override {
         return inner_->observed_position_precision();

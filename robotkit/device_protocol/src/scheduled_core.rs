@@ -298,8 +298,13 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
 
     /// Process event policy may require the link lease while motion is at rest.
     pub fn tick_with_process<B: Board>(&mut self, board: &mut B, process_requires_link: bool) {
-        if self.stopped { return; }
         let now = board.now_ticks();
+        // Controller-owned process outputs still need their lease when the arm is stopped.
+        if process_requires_link && matches!(self.stopping, None | Some(StopReason::Stop | StopReason::Abort)) &&
+            now.saturating_sub(self.last_frame_tick) > self.link_loss_ticks {
+            self.stop(StopReason::LinkLost);
+        }
+        if self.stopped { return; }
         if now < self.last_device_tick { self.stop(StopReason::LinkLost); }
         let dt_ticks = now.saturating_sub(self.last_device_tick);
         self.last_device_tick = now;

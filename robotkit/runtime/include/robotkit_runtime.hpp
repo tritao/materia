@@ -123,6 +123,10 @@ public:
      */
     virtual rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) = 0;
 
+    /** Send a controller-owned digital/analog output independently of the path queue.
+     * Local endpoints consume the runtime channel value during their owner tick. */
+    virtual rk_result write_output(uint32_t, const rk_event_value &) { return RK_OK; }
+
     /** Returns true when sample() supplies the endpoint's observed safety state. */
     virtual rk_result device_homing_control(const rk_device_homing_control &) { return RK_ERROR_UNSUPPORTED; }
     virtual rk_result device_homing_status(uint64_t) const { return RK_ERROR_UNSUPPORTED; }

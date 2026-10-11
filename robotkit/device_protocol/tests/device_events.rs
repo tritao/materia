@@ -1,5 +1,5 @@
 #![cfg(feature = "std")]
-use robotkit_device_protocol::device_wire6::{Event6, SessionBegin6};
+use robotkit_device_protocol::device_wire6::{ControllerOutput6, Event6, SessionBegin6};
 use robotkit_device_protocol::{DeviceEvents, Output, StopReason, VirtualBoard};
 
 fn session() -> SessionBegin6 {
@@ -110,4 +110,19 @@ fn a_channel_not_restored_after_hold_no_longer_requires_the_link() {
     events.hold(&mut board); events.resume(&mut board);
     assert_eq!(board.digital(0), Some(false));
     assert!(!events.requires_link());
+}
+
+#[test]
+fn controller_ownership_supersedes_a_scheduled_hold_and_restore_latch() {
+    for value in [0,1] {
+        let mut board = VirtualBoard::<1,32>::new(1_000_000,0,0,[1.0]);
+        let mut events = DeviceEvents::<4>::new(&session());
+        events.queue_begin(1,0,0).unwrap(); events.push(digital_event(1,100,true)).unwrap();
+        events.commit(200); events.tick(100,&mut board);
+        let output = ControllerOutput6 {session:7,sequence:1,channel:0,kind:1,digital:value,analog:0.0};
+        events.controller_output(output,&mut board,true).unwrap();
+        events.hold(&mut board); assert_eq!(board.digital(0),Some(value != 0));
+        events.resume(&mut board); assert_eq!(board.digital(0),Some(value != 0));
+        events.stop(&mut board,StopReason::Stop); assert_eq!(board.digital(0),Some(false));
+    }
 }

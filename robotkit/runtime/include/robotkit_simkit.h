@@ -327,6 +327,23 @@ RK_API rk_result RK_CALL rk_simulation_get_virtual_device_sensor(
     rk_simulation simulation, uint32_t robot_index, uint32_t slot,
     rk_simulation_device_sensor *out_sensor RK_INOUT);
 
+/** One joint from the immutable physics snapshot; its clock is the simulation clock,
+ * independently of a robot controller's last received STATE6 observation. */
+typedef struct rk_simulation_joint_sample {
+    uint64_t step_index;
+    double simulation_time;
+    double position;
+    double velocity;
+    double effort;
+} rk_simulation_joint_sample;
+RK_API rk_result RK_CALL rk_simulation_get_joint_sample(
+    rk_simulation simulation, uint32_t robot_index, uint32_t joint,
+    rk_simulation_joint_sample *out_sample RK_INOUT);
+
+/** Actual virtual-board GPIO/analog output, not the host's requested channel value. */
+RK_API rk_result RK_CALL rk_simulation_get_virtual_device_channel(
+    rk_simulation simulation, uint32_t robot_index, uint32_t channel, double *out_value RK_OUT);
+
 /** rk_simulation_differential_drive_desc.reversed_wheels bits. */
 enum { RK_DRIVE_REVERSED_LEFT = 1, RK_DRIVE_REVERSED_RIGHT = 2 };
 

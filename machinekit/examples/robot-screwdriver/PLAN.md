@@ -341,7 +341,9 @@ simulation and hardware, and a mission step drives it.
   requires communication-start revision 6.
 - **SD8 — Acquisition freshness belongs to the source.** The discrete profile
   commissions program codes, LSB-first pins, reverse/start semantics and the
-  acquisition clock and maximum age. Its I/O supplies one atomic digital and
+  acquisition clock and maximum age. Readiness requires the acquired program
+  echo to match the commissioned code; a ready bit alone cannot acknowledge
+  selection. Its I/O supplies one atomic digital and
   measured-value snapshot, source sequence and acquisition timestamp. Polling
   a repeated snapshot cannot refresh it; conflicting repeats, wrong clocks,
   future times, backwards sequences and stale measurements stop drive and
@@ -349,6 +351,23 @@ simulation and hardware, and a mission step drives it.
   result and complete phase. Link/acquisition faults latch. The common process
   device optionally consults this controller readiness and fault boundary;
   the established simulated device behavior stays unchanged.
+
+- **SD8 — The virtual nutrunner acquires the existing CAD plant.** One Haxe
+  torque-angle plant follows physical feed/spindle snapshots and the executed
+  RKD6 outputs. Rust captures its seven measured values atomically, with the
+  actual acquisition sequence and device time; repeated UART publication cannot
+  refresh an acquisition. The native ADC guard stops active drive on missing or
+  stale measurements. Virtual counters use the loaded CAD joint origin rather
+  than applying physical encoder offsets again.
+- **SD8 — Independent outputs cross the device boundary.** Generated wire
+  revision 15 adds a typed, session/sequence-qualified controller output record.
+  Path events and independent controller writes share the declared channel
+  kinds and STOP safety policy. A controller write supersedes that channel's
+  scheduled HOLD/resume latch, including a write of the same value; arm HOLD
+  preserves these independent outputs. Faults and e-stop still enforce safe
+  values, and active process outputs retain their link lease after arm STOP.
+  The current schema lock is regenerated without migrations; saved scene
+  formats and existing native ABI layouts do not change.
 
 ## What exists
 
@@ -610,7 +629,8 @@ Here:
   and revisions come from the protocol specification, recorded in the client.
 - A commissioned discrete I/O profile (program bits, start, reverse, OK/NOK,
   ready) for controllers without a network interface. Its atomic acquisition
-  includes fresh measured seven-value feedback, sequence and source clock/time;
+  includes the acquired selected-program code, fresh measured seven-value
+  feedback, sequence and source clock/time;
   digital result bits cannot supply torque, angle, speed or stroke.
 - An RKD6 virtual nutrunner behind the same contract.
 - `ScrewdriverProcessDevice` runs against either, with the same mission
@@ -1480,6 +1500,48 @@ nutrunner, controller owner/channel binding, network-plus-measured-I/O adapter,
 and unchanged actual SD6 CAD mission proof remain unfinished. This is a
 controller profile checkpoint, not completed SD8 acceptance.
 
+### SD8 virtual nutrunner investigation (2026-10-11)
+
+The uncommitted RKD6 profile stages one canonical seven-value acquisition and
+captures it atomically with its actual device ticks and sequence. It reads
+executed board channels and physical joint snapshots; the existing Haxe CAD
+plant remains the sole torque-angle model. Repeated UART state publication
+cannot refresh an old acquisition. Rust proof `build/sd8-nutrunner-rust-4.log`
+passes 21 tests, including wire timestamps, watchdog shutdown and channel stop
+policies. The generated SimKit binding audit passes all four platforms in
+`build/sd8-simkit-hxi.log`. New native measurement functions are additive; existing
+ABI layouts and saved formats are unchanged.
+
+App build `build/sd8-virtual-build-retry.log` passes 2223 sources. The initial
+build used unavailable `Int64.mul`: Haxeon's reduced Int64 stdlib has add/sub
+but no multiplication helper. The local acquisition conversion instead uses
+Float arithmetic within the native profile's explicit exact-integer range
+below 2^53; no compiler/runtime patch is involved.
+
+Actual SD6 CAD acceptance is **not passing yet**. The first pickup approach
+fails with a rank-5 differential solve; the authored mission is unchanged.
+`build/sd8-virtual-cad-joints.log` compares physical joint positions with RKD6
+feedback and shows the virtual board moving the loaded CAD pose through its
+encoder offsets. Emulated servo counters are being validated with the loaded
+CAD joint origin. Inspection of native setup confirms that process-owned
+feed/spindle joints already have `actuated_joints_ = false`, so the additional
+submission-loop guard considered during diagnosis was redundant and removed.
+`build/sd8-virtual-build-origins.log` is the queued rebuild; the focused CAD
+rerun and full regression gate remain due. SD8 is still in progress, and the
+network-plus-measured-I/O adapter remains unfinished.
+
+The origin-corrected rebuild `build/sd8-virtual-build-origins.log` passes.
+`build/sd8-virtual-cad-origins.log` now passes the first arm approach, but pickup
+reports NO_SCREW. This exposes the next real boundary issue: runtime
+`writeOutput` records controller-owned values locally and does not transmit
+those independent outputs to RKD6. The new board read correctly remains at
+its unchanged vacuum/program values. A typed session/sequence-qualified
+`ControllerOutput6` message (kind 18) is being added independently of the
+committed arm path queue. Wire revision 15 and the re-baselined current lock
+are generated from the IDL; Rust/C++ framing validation is updated. Device
+execution, runtime forwarding, protocol fixtures and physical acceptance are
+still required. The earlier 21-test proof predates this wire extension.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
@@ -1490,4 +1552,69 @@ controller profile checkpoint, not completed SD8 acceptance.
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
 | SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71`, `7038a4fee` |
-| SD8 | in progress — controller profiles and loopback TCP pass; checkpoint quick gate passed; RKD6 and unchanged CAD mission proof pending | `f19115ae0` |
+| SD8 | in progress — controller profiles, loopback TCP and focused RKD6 unchanged CAD proof pass; virtual full gate passed; hardware binding and repeated-STOP repair pending | `f19115ae0` |
+
+### SD8 hardware integration work (2026-10-11)
+
+The independent-output native probe found a repeated-STOP gap: after an
+ordinary STOP, a controller output can be reactivated, but another STOP reuses
+the cached stopped policy and leaves that output active.
+`build/sd8-controller-repeat-stop-probe-2.log` proves program output 8 remains
+8 after the second explicit STOP. The first probe instead reused host value 7
+following a direct device stop and demonstrated suppression of an unchanged
+write; it did not reach the repeated-stop assertion. Both boundary cases need
+regression coverage and repair before SD8 completion.
+
+Hardware adapter/owner tests and the selected-program acquisition echo are in
+progress. These drafts are outside the 39-source virtual gate snapshot and
+are not validated by that run. The network adapter composes acknowledged
+program selection/enable with measured I/O, keeping MID 0061 reports separate
+from the cumulative spindle sensor. Independent owner polling, unchanged
+runner reverse/start semantics and fresh measured stop acknowledgement are
+required by the new tests. SD8 remains open.
+
+### SD8 virtual nutrunner validation checkpoint (2026-10-11)
+
+`sd8-virtual-retry` passes all seven full-gate stages. Its 39 frozen source
+files remain unchanged through execution; later hardware drafts are excluded
+from this checkpoint. Actual unchanged SD6 CAD execution passes normal and
+empty-presenter cases on MuJoCo and the deterministic backend, plus portable
+export. The focused clock proof also checks actual ADC sequence/acquisition
+time and the physical-joint query bounds. Both backends use the canonical CAD
+plant; no alternate mission or duplicated Rust torque-angle model is used.
+
+Rust protocol checks pass 47 tests, virtual-device checks pass 25, and native
+RKD6/virtual endpoint and shared framing proofs pass. The native controller
+output proof includes HOLD preserving independent outputs, STOP channel
+policies, rejected float overflow and safe vacuum release. The earlier
+`sd8-virtual` full run was deliberately stopped after six passing stages to
+repair the separately proved HOLD latch defect; it is not a passing full run
+and was not exit 137. Logs are archived under `build/sd8-virtual-*`. The
+SimKit binding audit passes all four platforms.
+
+All 132 previous MachineKit results match exactly, as do all 122 normalized
+app results. The one new app summary is the additional virtual CAD cohort.
+All 16 previous whole-screw transition times remain exact. All 66 SD7 artifact
+generations match their original sizes; five new virtual drive-one generations
+are the unchanged 2237922 bytes. Saved version 32, engineering qualifications,
+published torque values, component geometry and submodule pins stay unchanged.
+Wire revision 15 changes the six existing shared fixtures only at the revision
+byte and its CRC; a seventh controller-output fixture is added.
+
+Picker allocation observations move from 58649/60286 to 58575/60386 bytes/tick,
+and the mill from 53385.12443 to 53411.01214. Router allocations remain
+39.5/43.7 KB/tick with 16/16 collections. The additional early CAD cohort
+changes the previously documented global HashLink allocation-buffer refill
+phase. All budgets pass; all physical and engineering results remain exact.
+The app peaks at 4.5 GB under its 18 GB cap. No exit 137 occurs. Comparisons,
+source hashes, all stage logs and the suite summary are archived under
+`build/sd8-virtual-retry-*`.
+
+This commits the virtual checkpoint, not completed SD8. The separately proved
+repeated-STOP and unchanged-output-after-device-STOP gaps above still require
+repair and regression checks. Hardware owner, program echo, measured sensor
+publication and common channel-binding drafts require their own final gate.
+The first hardware execution omitted the runtime library path and failed to
+load `haxeon_runtime.hdll`; rerunning with the host environment passes 36
+checks in `build/sd8-hardware-proof-2.log`. That proof predates the subsequent
+acquisition publication bridge changes. No new Haxeon typing defect was found.

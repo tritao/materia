@@ -2269,13 +2269,15 @@ class ProjectSourceTests {
     Sys.println("Screwdriving staged assembly passed on both backends with retained engagement and shared replacement recovery");
   }
 
-  static function checkScrewdrivingOne(root:String):Void {
+  static function checkScrewdrivingOne(root:String, virtualNutrunner:Bool = false):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-screwdriver/materia.drive.project.json");
     for (backend in [ApplicationSimulation.MUJOCO, ApplicationSimulation.DETERMINISTIC]) for (absent in [false,true]) {
-      Sys.println('Screwdriving CAD: begin backend $backend, absent $absent');
+      if (virtualNutrunner) Sys.println('Virtual nutrunner CAD: begin backend $backend, absent $absent');
+      else Sys.println('Screwdriving CAD: begin backend $backend, absent $absent');
       var generated = MateriaProjectRunner.loadProject(manifest);
       var work = generated.mission;
       if (work == null || work.steps.length != 1) throw "Drive-one CAD must publish one mission step";
+      var authoredMission = virtualNutrunner ? haxe.Json.stringify(work) : null;
       var step = work.steps[0], job = materia.project.SceneScrewInvocation.job(step.screw,work.steps);
       if (job == null) throw "Drive-one CAD lost its named screw packet";
       var assembly = requiredAssemblyDefinition(generated.assemblyDefinition);
@@ -2290,6 +2292,7 @@ class ProjectSourceTests {
         job.leadMm == 1 && job.program.targetTorque == 16.5,"The actual M6 12.9 fastening supplies its lead and published target");
       var session = new ProjectDocumentSession(null,false);
       var simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.virtualNutrunner = virtualNutrunner;
       simulation.setBackend(backend);
       try {
         session.openGeneratedProject(generated,manifest);
@@ -2310,7 +2313,8 @@ class ProjectSourceTests {
             var arm = @:privateAccess mission.robot;
             var contacts = [for (contact in mission.simulation.robotContacts(arm.runtime)) if (contact.active) contact];
             Sys.println("Screwdriving CAD trace: "+haxe.Json.stringify({time:clock.simulationTime(),
-              body:mission.simulation.objectPose(body),readings:readings,contacts:contacts}));
+              body:mission.simulation.objectPose(body),readings:readings,contacts:contacts,
+              joints:[for (i in 0...arm.model.joints.length) arm.robot.snapshot().positions.get(i)],physical:[for (i in 0...arm.model.joints.length) {id:arm.model.joints[i].id,position:mission.simulation.jointSample(arm.parts[0].robotIndex,i).get_position()}]}));
             traceAt += 0.5;
           }
         }
@@ -2322,6 +2326,32 @@ class ProjectSourceTests {
             presenter:mission.assemblyParts.get("project:"+job.presenter).pose(),pickup:job.pickup,sensors:frames}));
         }
         var results = mission.screwResults;
+        if (virtualNutrunner) {
+          check(haxe.Json.stringify(work) == authoredMission,"The RKD6 nutrunner executes the unchanged authored SD6 mission");
+          var tools = @:privateAccess simulation.tools;
+          if (tools == null || tools.screwdrivers.length != 1) throw "Virtual nutrunner lost its mounted tool";
+          var driver = tools.screwdrivers[0];
+          check(Std.isOfType(driver.supply,processkit.simulation.VirtualNutrunnerSupply),"The CAD spindle uses the actual RKD6 supply");
+          var supply = cast(driver.supply,processkit.simulation.VirtualNutrunnerSupply);
+          check(haxe.Int64.compare(@:privateAccess supply.sequence,haxe.Int64.ofInt(0)) > 0,
+            "The unchanged mission receives real seven-value SENSOR6 acquisitions");
+          var toolIndex = @:privateAccess supply.robotIndex;
+          var acquired = mission.simulation.virtualDeviceSensor(toolIndex,0).get_sample();
+          var physical = mission.simulation.jointSample(toolIndex,@:privateAccess driver.spindleJoint);
+          var defaults = new robotkit.runtime.VirtualDeviceOptions();
+          var phaseNs = haxe.Int64.toFloat(defaults.offsetTicks) * 1e9 / haxe.Int64.toFloat(defaults.tickHz);
+          var acquisitionNs = haxe.Int64.toFloat(acquired.get_sequence()) * mission.simulation.fixedTimestepSeconds * 1e9;
+          check(acquired.get_value_count() == 7 &&
+            Math.abs(haxe.Int64.toFloat(acquired.get_source_timestamp_ns())-phaseNs-acquisitionNs) < 1.0,
+            "SENSOR6 retains the physical acquisition tick and the actual board oscillator phase");
+          check(haxe.Int64.compare(acquired.get_sequence(),physical.get_step_index()) <= 0 &&
+            physical.get_simulation_time()-acquisitionNs*1e-9 < processkit.screwdriving.ScrewdriverFrames.MAXIMUM_SILENCE,
+            "UART feedback is a completed fresh physical acquisition, not a restamped host value");
+          var arm = @:privateAccess mission.robot;
+          var rejected = false;
+          try mission.simulation.jointSample(toolIndex,arm.blueprint.jointCount) catch (_:Dynamic) rejected = true;
+          check(rejected,"Physical joint queries reject an undeclared joint");
+        }
         check(results.length == 1 && results[0].fastening == job.fastening,
           'The measured result names the actual fastening: ${mission.failure}');
         if (absent) {
@@ -2352,15 +2382,18 @@ class ProjectSourceTests {
         }
       } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
       simulation.clear(); session.dispose();
-      Sys.println('Screwdriving CAD: end backend $backend, absent $absent');
+      if (virtualNutrunner) Sys.println('Virtual nutrunner CAD: end backend $backend, absent $absent');
+      else Sys.println('Screwdriving CAD: end backend $backend, absent $absent');
     }
-    Sys.println("Screwdriving CAD: begin portable export");
+    if (virtualNutrunner) Sys.println("Virtual nutrunner CAD: begin portable export");
+    else Sys.println("Screwdriving CAD: begin portable export");
     var portable = materia.project.SceneArtifact.decode(MateriaProjectRunner.exportArtifact(manifest));
     var flags = portable.project, task = portable.mission;
     check(flags != null && flags.dynamicParts.length == 1 && flags.dynamicParts[0] == "work/flange/screw1" &&
       task != null && task.steps.length == 1 && task.steps[0].screw != null,
       "The portable artifact retains the identified free screw and its CAD mission");
-    Sys.println("Screwdriving CAD: end portable export");
+    if (virtualNutrunner) Sys.println("Virtual nutrunner CAD: end portable export");
+    else Sys.println("Screwdriving CAD: end portable export");
     Sys.println("Screwdriving CAD mission passed on MuJoCo and the test backend, including the empty presenter");
   }
 

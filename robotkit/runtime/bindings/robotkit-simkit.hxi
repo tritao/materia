@@ -160,6 +160,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Reads one robot's differential-drive plant state.
 	 */
 	extern fn rk_simulation_get_differential_drive_state(simulation: rk_simulation, robot_index: u32, out_state: ptr<rk_simulation_differential_drive_state> @inout) -> rk_result;
+	extern fn rk_simulation_get_joint_sample(simulation: rk_simulation, robot_index: u32, joint: u32, out_sample: ptr<rk_simulation_joint_sample> @inout) -> rk_result;
 	/**
 	 * The physics body that carries one robot link. Pass it to nksim_session_hold_object() as the
 	 * carrier to attach a session object to that link, for instance a workpiece held by a suction cup.
@@ -195,6 +196,10 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Reads one robot base pose from the latest physics state.
 	 */
 	extern fn rk_simulation_get_robot_pose(simulation: rk_simulation, robot_index: u32, out_pose: ptr<rk_simulation_pose> @inout) -> rk_result;
+	/**
+	 * Actual virtual-board GPIO/analog output, not the host's requested channel value.
+	 */
+	extern fn rk_simulation_get_virtual_device_channel(simulation: rk_simulation, robot_index: u32, channel: u32, out_value: ptr<f64> @out) -> rk_result;
 	extern fn rk_simulation_get_virtual_device_sensor(simulation: rk_simulation, robot_index: u32, slot: u32, out_sensor: ptr<rk_simulation_device_sensor> @inout) -> rk_result;
 	/**
 	 * Jumps one attached robot's base to a pose for the next tick.
@@ -451,6 +456,17 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		left_wheel_rate: f64 @offset(40);
 		right_wheel_rate: f64 @offset(48);
 		reserved: array<u64, 2> @offset(56);
+	}
+	/**
+	 * One joint from the immutable physics snapshot; its clock is the simulation clock,
+	 * independently of a robot controller's last received STATE6 observation.
+	 */
+	struct rk_simulation_joint_sample @layout(40, 8) {
+		step_index: u64 @offset(0);
+		simulation_time: f64 @offset(8);
+		position: f64 @offset(16);
+		velocity: f64 @offset(24);
+		effort: f64 @offset(32);
 	}
 	/**
 	 * One convex hull of a link built from several rigid parts, as XYZ vertices in

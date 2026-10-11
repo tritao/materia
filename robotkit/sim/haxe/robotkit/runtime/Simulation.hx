@@ -608,6 +608,23 @@ class Simulation {
     return value;
   }
 
+  /** Actual physics joint sample, with its own completed-snapshot clock. */
+  public function jointSample(robotIndex:Int, joint:Int):rk_simulation_joint_sample {
+    ensureLive();
+    var value = new rk_simulation_joint_sample();
+    check(RobotKitSimKit.rk_simulation_get_joint_sample(owner.borrow(),robotIndex,joint,value).status,
+      "simulation.jointSample");
+    return value;
+  }
+
+  /** GPIO/analog output already executed by the virtual board. */
+  public function virtualDeviceChannel(robotIndex:Int, channel:Int):Float {
+    ensureLive();
+    var call = RobotKitSimKit.rk_simulation_get_virtual_device_channel(owner.borrow(),robotIndex,channel);
+    check(call.status,"simulation.virtualDeviceChannel");
+    return call.out_value;
+  }
+
   /** Injects a virtual RKD6 link loss or reconnects the link. */
   public function cutVirtualDeviceLink(robotIndex:Int, cut:Bool):Void {
     ensureLive();

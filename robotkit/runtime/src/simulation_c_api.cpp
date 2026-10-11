@@ -199,6 +199,20 @@ rk_result RK_CALL rk_simulation_get_virtual_device_sensor(
     return value ? value->get_virtual_device_sensor(robot_index, slot, *out_sensor) : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_get_joint_sample(rk_simulation simulation,
+    uint32_t robot_index, uint32_t joint, rk_simulation_joint_sample *out_sample) {
+    if (!out_sample) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->get_joint_sample(robot_index, joint, *out_sample) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_get_virtual_device_channel(rk_simulation simulation,
+    uint32_t robot_index, uint32_t channel, double *out_value) {
+    if (!out_value) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->get_virtual_device_channel(robot_index, channel, *out_value) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_cut_virtual_device_link(
     rk_simulation simulation, uint32_t robot_index, uint32_t cut) {
     if (cut > 1) return RK_ERROR_INVALID_ARGUMENT;

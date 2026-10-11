@@ -8,7 +8,7 @@
 
 namespace robotkit::device_wire6 {
 
-inline constexpr std::uint8_t PROTOCOL_VERSION = 14;
+inline constexpr std::uint8_t PROTOCOL_VERSION = 15;
 inline constexpr std::uint8_t MAX_ACTUATORS = 64;
 
 enum class MessageType6 : std::uint8_t {
@@ -29,6 +29,7 @@ enum class MessageType6 : std::uint8_t {
     state6 = 15,
     event = 16,
     sensor6 = 17,
+    controller_output = 18,
     homing_scope = 21,
     homing_side = 22,
     homing_control_ack = 23,
@@ -2139,6 +2140,93 @@ inline bool decode(std::span<const std::uint8_t> input, HomingCounterBatch6 &val
     bits_second_delta |= static_cast<std::uint64_t>(input[offset++]) << 48;
     bits_second_delta |= static_cast<std::uint64_t>(input[offset++]) << 56;
     value.second_delta = std::bit_cast<double>(bits_second_delta);
+    return true;
+}
+
+inline constexpr std::size_t ControllerOutput6_SIZE = 23;
+struct ControllerOutput6 {
+    static constexpr std::size_t SIZE = ControllerOutput6_SIZE;
+    std::uint64_t session{};
+    std::uint64_t sequence{};
+    std::uint8_t channel{};
+    std::uint8_t kind{};
+    std::uint8_t digital{};
+    float analog{};
+};
+
+inline bool encode(const ControllerOutput6 &value, std::span<std::uint8_t> out) {
+    if (out.size() < ControllerOutput6_SIZE) return false;
+    std::size_t offset = 0;
+    const std::uint64_t bits_session = static_cast<std::uint64_t>(value.session);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_session >> 56);
+    const std::uint64_t bits_sequence = static_cast<std::uint64_t>(value.sequence);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_sequence >> 56);
+    const std::uint8_t bits_channel = static_cast<std::uint8_t>(value.channel);
+    out[offset++] = static_cast<std::uint8_t>(bits_channel >> 0);
+    const std::uint8_t bits_kind = static_cast<std::uint8_t>(value.kind);
+    out[offset++] = static_cast<std::uint8_t>(bits_kind >> 0);
+    const std::uint8_t bits_digital = static_cast<std::uint8_t>(value.digital);
+    out[offset++] = static_cast<std::uint8_t>(bits_digital >> 0);
+    const std::uint32_t bits_analog = std::bit_cast<std::uint32_t>(value.analog);
+    out[offset++] = static_cast<std::uint8_t>(bits_analog >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_analog >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_analog >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_analog >> 24);
+    return true;
+}
+
+inline bool decode(std::span<const std::uint8_t> input, ControllerOutput6 &value) {
+    if (input.size() != ControllerOutput6_SIZE) return false;
+    std::size_t offset = 0;
+    std::uint64_t bits_session = 0;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_session |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.session = bits_session;
+    std::uint64_t bits_sequence = 0;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_sequence |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.sequence = bits_sequence;
+    std::uint8_t bits_channel = 0;
+    bits_channel |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.channel = bits_channel;
+    std::uint8_t bits_kind = 0;
+    bits_kind |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.kind = bits_kind;
+    std::uint8_t bits_digital = 0;
+    bits_digital |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.digital = bits_digital;
+    std::uint32_t bits_analog = 0;
+    bits_analog |= static_cast<std::uint32_t>(input[offset++]) << 0;
+    bits_analog |= static_cast<std::uint32_t>(input[offset++]) << 8;
+    bits_analog |= static_cast<std::uint32_t>(input[offset++]) << 16;
+    bits_analog |= static_cast<std::uint32_t>(input[offset++]) << 24;
+    value.analog = std::bit_cast<float>(bits_analog);
     return true;
 }
 

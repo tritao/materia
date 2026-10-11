@@ -567,6 +567,7 @@ void midsegment_replacement_keeps_events() {
     blueprint.channel_count = 1;
     std::strcpy(blueprint.channels[0].id, "sprayer.flow");
     blueprint.channels[0].kind = RK_EVENT_DIGITAL;
+    blueprint.channels[0].kind = RK_EVENT_DIGITAL;
     blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
     VirtualDeviceConfig6 config;
     config.controller.fill(8);
@@ -650,6 +651,7 @@ std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop, bool keep_
     blueprint.joints[0].max_acceleration = (blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 10);
     blueprint.channel_count = 1;
     std::strcpy(blueprint.channels[0].id, "sprayer.flow");
+    blueprint.channels[0].kind = RK_EVENT_DIGITAL;
     blueprint.channels[0].kind = RK_EVENT_DIGITAL;
     blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
     if (keep_on_stop) blueprint.channels[0].stop_policy = RK_CHANNEL_KEEP_ON_STOP;
@@ -745,6 +747,7 @@ void runtime_hold_rest_resume_fires_final_event() {
     joint.max_acceleration = (joint.limit_flags |= RK_LIMIT_ACCELERATION, 2.0);
     blueprint.channel_count = 1;
     std::strcpy(blueprint.channels[0].id, "sprayer.flow");
+    blueprint.channels[0].kind = RK_EVENT_DIGITAL;
     blueprint.channels[0].kind = RK_EVENT_DIGITAL;
     blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
 
@@ -945,7 +948,57 @@ void runtime_boot_anchor_uses_device_counter_origin() {
     assert(std::abs(snapshot.position[0] - held) < 1e-9);
 }
 
+void controller_outputs_cross_the_runtime_and_uart() {
+    rk_robot_runtime_blueprint blueprint{};
+    blueprint.struct_size = sizeof(blueprint); blueprint.joint_count = 1;
+    blueprint.owner_period_ns = 10'000'000;
+    blueprint.joints[0].lower_limit = -10; blueprint.joints[0].upper_limit = 10;
+    blueprint.joints[0].max_velocity = 10; blueprint.joints[0].max_acceleration = 10;
+    blueprint.joints[0].limit_flags = RK_LIMIT_VELOCITY | RK_LIMIT_ACCELERATION;
+    blueprint.channel_count = 2;
+    std::strcpy(blueprint.channels[0].id, "vacuum");
+    blueprint.channels[0].kind = RK_EVENT_DIGITAL;
+    blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
+    blueprint.channels[0].stop_policy = RK_CHANNEL_KEEP_ON_STOP;
+    std::strcpy(blueprint.channels[1].id, "program");
+    blueprint.channels[1].kind = RK_EVENT_ANALOG;
+    blueprint.channels[1].safe_value.kind = RK_EVENT_ANALOG;
+    VirtualDeviceConfig6 config; config.steps_per_unit = {1000.0};
+    auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(endpoint);
+    RobotRuntime runtime(blueprint, endpoint, std::chrono::nanoseconds(10'000'000));
+    rk_robot_state state{};
+    for (uint64_t now = 0; now <= 20'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    rk_event_value digital{}; digital.kind = RK_EVENT_DIGITAL; digital.digital = 1;
+    assert(runtime.write_output("vacuum", digital) == RK_OK);
+    assert(endpoint->channel_values()[0] == 0); // Still on the simulated UART.
+    assert(endpoint->sample(30'000'000, state) == RK_OK);
+    assert(endpoint->channel_values()[0] == 1);
+    rk_event_value analog{}; analog.kind = RK_EVENT_ANALOG; analog.analog = 7;
+    assert(runtime.write_output("program", analog) == RK_OK);
+    assert(endpoint->sample(40'000'000, state) == RK_OK);
+    assert(endpoint->channel_values()[1] == 7);
+    rk_robot_command hold{}; hold.kind = RK_COMMAND_HOLD;
+    assert(endpoint->apply(hold) == RK_OK);
+    assert(endpoint->sample(45'000'000, state) == RK_OK);
+    assert(endpoint->channel_values()[0] == 1 && endpoint->channel_values()[1] == 7);
+
+    assert(runtime.write_output("vacuum", analog) == RK_ERROR_INVALID_ARGUMENT);
+    analog.analog = 4e38; // Finite double, outside the board's float representation.
+    assert(runtime.write_output("program", analog) == RK_ERROR_INVALID_ARGUMENT);
+    rk_event_value retained{};
+    assert(runtime.channel_value("program", retained) == RK_OK && retained.analog == 7);
+
+    assert(endpoint->stop_device());
+    assert(endpoint->channel_values()[0] == 1 && endpoint->channel_values()[1] == 0);
+    digital.digital = 0; assert(runtime.write_output("vacuum", digital) == RK_OK);
+    assert(endpoint->sample(50'000'000, state) == RK_OK);
+    assert(endpoint->channel_values()[0] == 0);
+}
+
 int main() {
+    controller_outputs_cross_the_runtime_and_uart();
     runtime_boot_anchor_uses_device_counter_origin();
     motor_feedback_reconstructs_leaders();
     dual_drive_layout();

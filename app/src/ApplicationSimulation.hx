@@ -60,6 +60,7 @@ class ApplicationSimulation {
   public final world:RobotWorld;
   /** Supply selection belongs to the cell, while its authored mission stays unchanged. */
   public var virtualWelder:Bool = false;
+  public var virtualNutrunner:Bool = false;
   var virtualDevicePrepared:Bool = false;
   public var welderSupplyFactory:Null<processkit.simulation.SimulatedWelder -> processkit.simulation.SimulationWelderSupply> = null;
   public var appliedRevision(default, null):Int = 0;
@@ -290,7 +291,7 @@ class ApplicationSimulation {
           var processChannels = ownsPress ? processkit.pressbrake.PressBrakeChannels.declarations()
             : ownsJob ? CncProgramPlayer.processChannels(job, interfaceManaged) : null;
           var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
-            appliedRevision + 1, robotIndex, processChannels, virtualWelder, control, restContactGroup);
+            appliedRevision + 1, robotIndex, processChannels, virtualWelder, control, restContactGroup, virtualNutrunner);
           candidateRobots.push(built.robot);
           candidateLinks.push([for (link in built.model.links) link.id]);
           candidateRobotModels.push(built.model);
@@ -479,7 +480,10 @@ class ApplicationSimulation {
           }
         }
         if (tool.kind == "screwdriver") {
-          candidate.addStepObserver(candidateTools.addScrewdriver(candidateTools.screwdriverFor(candidate, toolRobot, toolIndex, tool, session)));
+          var driver = candidateTools.screwdriverFor(candidate,toolRobot,toolIndex,tool,session);
+          if (virtualNutrunner) driver.supply = new processkit.simulation.VirtualNutrunnerSupply(candidate,toolRobot.runtime,
+            toolIndex,tool.sensor,toolRobot.blueprint,driver.channels,@:privateAccess driver.feedJoint,@:privateAccess driver.spindleJoint);
+          candidate.addStepObserver(candidateTools.addScrewdriver(driver));
           continue;
         }
         if (tool.kind == "torch") {
@@ -532,7 +536,7 @@ class ApplicationSimulation {
           candidateTools.objectsByScene(), session, [for (id in candidateByController.keys()) candidateByController.get(id)],
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId),
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.outputFor(work.controllerId), null,
-          virtualWelder ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
+          virtualWelder || virtualNutrunner ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
             : MissionPlayer.ARM_ACCELERATION, candidatePower,candidateTools.screwdrivers);
         // A mission that welds lays the weld metal as the welder deposits it.
         if (welds) {
@@ -991,8 +995,10 @@ class ApplicationSimulation {
   function feedMembers():Void {
     if (virtualWelder && !virtualDevicePrepared && simulation != null && tools != null && tools.welders.length > 0)
       virtualDevicePrepared = simulation.virtualDeviceReady(tools.welders[0].robotIndex);
+    if (virtualNutrunner && !virtualDevicePrepared && simulation != null && tools != null && tools.screwdrivers.length > 0)
+      virtualDevicePrepared = simulation.virtualDeviceReady(@:privateAccess tools.screwdrivers[0].robotIndex);
     for (member in members) {
-      if (virtualWelder && !virtualDevicePrepared && member == mission) continue;
+      if ((virtualWelder || virtualNutrunner) && !virtualDevicePrepared && member == mission) continue;
       // The editor's realtime run plans a program's first plan beside the simulation; a deterministic step waits for it.
       if (Std.isOfType(member, ToolpathPlayer)) {
         var toolpath:ToolpathPlayer = cast member;

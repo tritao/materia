@@ -1941,6 +1941,41 @@ rk_result Simulation::get_virtual_device_sensor(uint32_t robot_index, uint32_t s
     return virtual_devices_[robot_index]->sensor_sample(slot, sensor.sample, sensor.values) ? RK_OK : RK_ERROR_INVALID_ARGUMENT;
 }
 
+rk_result Simulation::get_joint_sample(uint32_t robot_index, uint32_t joint, rk_simulation_joint_sample &sample) {
+    Lock lock(session_);
+    if (robot_index >= bindings_.size()) return RK_ERROR_INVALID_ARGUMENT;
+    const auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    if (joint >= binding->joints_.size()) return RK_ERROR_INVALID_ARGUMENT;
+    const auto snapshot = nksim_session_latest_snapshot(session_);
+    nksim_clock clock{};
+    clock.struct_size = sizeof(clock);
+    uint64_t count = 0;
+    if (!snapshot || nksim_snapshot_get_clock(snapshot, &clock) != NKSIM_OK ||
+        nksim_snapshot_get_joint_count(snapshot, &count) != NKSIM_OK) return RK_ERROR_INVALID_STATE;
+    for (uint64_t index = 0; index < count; ++index) {
+        nksim_joint_state state{};
+        state.struct_size = sizeof(state);
+        if (nksim_snapshot_get_joint(snapshot, index, &state) != NKSIM_OK) return RK_ERROR_BACKEND;
+        if (state.joint != binding->joints_[joint]) continue;
+        if (!std::isfinite(state.position) || !std::isfinite(state.velocity) || !std::isfinite(state.effort))
+            return RK_ERROR_BACKEND;
+        sample = {clock.step_index, clock.time, state.position, state.velocity, state.effort};
+        return RK_OK;
+    }
+    return RK_ERROR_BACKEND;
+}
+
+rk_result Simulation::get_virtual_device_channel(uint32_t robot_index, uint32_t channel, double &value) {
+    Lock lock(session_);
+    if (robot_index >= virtual_devices_.size() || !virtual_devices_[robot_index] ||
+        channel >= runtimes_[robot_index]->blueprint().channel_count) return RK_ERROR_INVALID_ARGUMENT;
+    const auto channels = virtual_devices_[robot_index]->channel_values();
+    if (channel >= channels.size() || !std::isfinite(channels[channel])) return RK_ERROR_BACKEND;
+    value = channels[channel];
+    return RK_OK;
+}
+
 rk_result Simulation::cut_virtual_device_link(uint32_t robot_index, bool cut) {
     Lock lock(session_);
     if (robot_index >= virtual_devices_.size() || !virtual_devices_[robot_index])

@@ -86,6 +86,7 @@ public:
         std::uint8_t actuator, bool hold);
     /** STALE_STATE means waiting for acknowledgment; OK means device acceptance. */
     rk_result homing_control_status(std::uint64_t sequence) const;
+    rk_result write_output(uint32_t channel, const rk_event_value &value) override;
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
     bool reports_safety_state() const noexcept override { return true; }
@@ -179,6 +180,7 @@ private:
     std::array<device_wire6::ActuatorState6, device_wire6::MAX_ACTUATORS> actuators_{};
     std::array<device_wire6::InputState6, 64> inputs_{};
     std::vector<DeviceInput6> input_layout_;
+    std::uint64_t output_sequence_ = 0;
     std::uint64_t control_sequence_ = 0;
     std::uint64_t control_scope_ = 0;
     std::uint64_t control_sent_ns_ = 0;

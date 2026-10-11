@@ -6,7 +6,7 @@
     },
     "PROTOCOL_VERSION": {
       "type": "u8",
-      "value": 14
+      "value": 15
     }
   },
   "enums": {
@@ -15,6 +15,7 @@
       "values": {
         "abort": 10,
         "commit": 7,
+        "controller_output": 18,
         "emergency_stop": 12,
         "event": 16,
         "hold": 8,
@@ -75,6 +76,42 @@
         }
       ],
       "size": 8
+    },
+    "ControllerOutput6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "sequence",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "channel",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "kind",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "digital",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "analog",
+          "type": "f32"
+        }
+      ],
+      "size": 23
     },
     "Event6": {
       "endian": "little",

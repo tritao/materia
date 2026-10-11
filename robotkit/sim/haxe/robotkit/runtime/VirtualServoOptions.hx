@@ -40,7 +40,9 @@ class VirtualServoOptions {
           var coarsened = tickHz / rate < encoderCountsPerUnit;
           var countsPerUnit = coarsened ? tickHz / rate : encoderCountsPerUnit;
           var ticks = coarsened ? 1 : StepTicks.forLimit(rate * encoderCountsPerUnit, tickHz);
-          options.actuators.push(new VirtualActuatorOptions(actuator.id, index, ratio, offset, countsPerUnit, ticks));
+          // The virtual board starts its counters at zero in the loaded CAD joint frame.
+          // Physical encoder offsets remain in the model; applying them again would move the loaded pose.
+          options.actuators.push(new VirtualActuatorOptions(actuator.id, index, ratio, 0.0, countsPerUnit, ticks));
           options.targetError = Math.max(options.targetError, 1.0 / (countsPerUnit * Math.abs(ratio)));
       }
     }

@@ -1,9 +1,9 @@
-# RobotKit scheduled device protocol (generation 6, wire revision 13)
+# RobotKit scheduled device protocol (generation 6, wire revision 15)
 
-The protocol name is **RKD generation 6, wire revision 13**. The four-byte sync
+The protocol name is **RKD generation 6, wire revision 15**. The four-byte sync
 marker `RKD6` identifies the scheduled-execution generation, not the wire revision.
 `PROTOCOL_VERSION` identifies the wire revision; peers must agree on its exact value
-(currently 13). A receiver never infers a revision from the marker or accepts an older
+(currently 15). A receiver never infers a revision from the marker or accepts an older
 revision. The `6` suffix in `device_wire6`, `device_frame6`, `Rkd6Endpoint`,
 `rkd6_endpoint`, `device_compiler6`, `robotkit_device_compiler6` and the serial C API
 likewise means generation 6. Keep these generation names when incrementing a wire
@@ -56,6 +56,24 @@ and the motor's speed (`robotkit.runtime.StepTicks`), and plans at the rate it
 reaches; the device only enforces it. As a rate, the tick ceiling could round
 under itself in f32 and cost a whole tick, halving the motor's speed. Revision
 13 is rejected rather than migrated.
+Wire revision 15 adds `CONTROLLER_OUTPUT6` (message 18). Its fixed record
+carries the session, a strictly increasing per-session output sequence, a
+declared channel, kind and canonical digital or float analog value. These
+controller-owned outputs execute when the board receives them, independently
+of the arm's committed path queue. Scheduled events retain their path clock and HOLD policies. Controller writes
+keep their value through an arm HOLD and supersede any obsolete scheduled
+HOLD/resume latch, including a write of the same current value. STOP safety
+continues to use the separately declared channel stop policy.
+Digital/analog kinds must match the session declaration; faults and emergency
+stops accept safe values only. A controlled arm stop may preserve vacuum and
+accept independent process controls, which still require the owner link lease.
+The runtime records a controller output only after the endpoint accepts its
+transmission. Measured device feedback remains the authority for execution,
+not that host record. Revision 14 is rejected rather than migrated. The
+current schema lock and shared fixtures are regenerated; reproduce the fixtures
+with `cargo run --manifest-path robotkit/device_protocol/Cargo.toml --example
+frame_vectors`. Native and Rust framing validate the same record.
+
 Protocol version 8 also carries steps per actuator unit, actuator rate limits,
 direction setup ticks, source joint indices, transmission ratios and dual-drive
 skew bounds, all derived by the host from the model and the deployment's

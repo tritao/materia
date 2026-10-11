@@ -68,6 +68,7 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
         15 | 6 => None,
         16 => Some(Event6::SIZE),
         17 => None,
+        18 => Some(ControllerOutput6::SIZE),
         21 => Some(HomingScope6::SIZE), 22 => Some(HomingSide6::SIZE),
         23 => Some(HomingControlAck6::SIZE),
         24 => Some(HomingCounterBatch6::SIZE),
@@ -165,6 +166,14 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
     if kind == 23 {
         let ack = HomingControlAck6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
         if ack.session == 0 || ack.sequence == 0 || ack.scope == 0 || ack.accepted > 1 { return Err(Frame6Error::BadPayload); }
+    }
+    if kind == 18 {
+        let output = ControllerOutput6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
+        if output.session == 0 || output.sequence == 0 || output.channel >= 32 ||
+            !(1..=2).contains(&output.kind) || output.digital > 1 || !output.analog.is_finite() ||
+            output.kind == 1 && output.analog != 0.0 || output.kind == 2 && output.digital != 0 {
+            return Err(Frame6Error::BadPayload);
+        }
     }
     if kind == 16 {
         let event = Event6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;

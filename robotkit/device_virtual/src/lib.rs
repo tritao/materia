@@ -9,6 +9,7 @@ use robotkit_device_protocol::{
 use std::collections::VecDeque;
 pub mod heaters;
 pub mod welder;
+pub mod nutrunner;
 #[cfg(test)]
 mod retrofit_tests;
 
@@ -34,6 +35,7 @@ pub struct VirtualDevice {
     actuator_ratio: [f32; ACTUATORS],
     homing_scope: Option<u64>,
     control_sequence: u64,
+    output_sequence: u64,
     homing_stop: bool,
     step_tick_hz: u32,
     profile: u8,
@@ -46,6 +48,7 @@ pub struct VirtualDevice {
     weld_sequence: u64,
     heaters: heaters::VirtualHeaters,
     heater_sequence: [u64; 8],
+    nutrunner: Option<nutrunner::VirtualNutrunner>,
 }
 
 impl VirtualDevice {
@@ -87,6 +90,7 @@ impl VirtualDevice {
             actuator_ratio: [1.0; ACTUATORS],
             homing_scope: None,
             control_sequence: 0,
+            output_sequence: 0,
             homing_stop: false,
             step_tick_hz,
             profile,
@@ -98,14 +102,61 @@ impl VirtualDevice {
             weld_sequence: 0,
             heaters: heaters::VirtualHeaters::default(),
             heater_sequence: [0; 8],
+            nutrunner: None,
         })
     }
 
     /// The process profile is configured before opening its deployment session.
     pub fn configure_welder(&mut self, config: welder::WelderConfig) -> bool {
-        if self.core.is_some() { return false; }
+        if self.core.is_some() || self.nutrunner.is_some() { return false; }
         self.welder = welder::VirtualWelder::new(config);
         self.welder.is_some()
+    }
+
+    pub fn configure_nutrunner(&mut self, config: nutrunner::NutrunnerConfig) -> bool {
+        if self.core.is_some() || self.welder.is_some() { return false; }
+        self.nutrunner = nutrunner::VirtualNutrunner::new(config);
+        self.nutrunner.is_some()
+    }
+
+    pub fn set_nutrunner_input(&mut self, input: u32, value: f64) -> bool {
+        let Some(nutrunner) = self.nutrunner.as_mut() else { return false; };
+        if input < 7 { return nutrunner.input(input as usize,value); }
+        // Input 7 commits one physical acquisition at its completed simulation time.
+        // Integers through 2^53 are exact in the generic double-valued input ABI.
+        if input != 7 || !value.is_finite() || value < 0.0 || value >= 9_007_199_254_740_992.0
+            || value.fract() != 0.0 || value < self.host_ns as f64 || !nutrunner.can_capture(value as u64) {
+            return false;
+        }
+        if !self.advance(value as u64) { return false; }
+        self.nutrunner.as_mut().unwrap().capture(value as u64,self.board.now_ticks())
+    }
+
+    fn valid_nutrunner_channels(&self, begin: &SessionBegin6) -> bool {
+        let Some(nutrunner) = self.nutrunner.as_ref() else { return true; };
+        let c = nutrunner.config;
+        [c.start_channel,c.direction_channel,c.program_channel,c.vacuum_channel].iter()
+            .all(|&i| i < begin.channel_count as usize)
+            && begin.channel_kind[c.start_channel] == 1 && begin.channel_kind[c.direction_channel] == 1
+            && begin.channel_kind[c.program_channel] == 2 && begin.channel_kind[c.vacuum_channel] == 1
+            && begin.safe_digital[c.start_channel] == 0 && begin.safe_digital[c.direction_channel] == 0
+            && begin.safe_analog[c.program_channel] == 0.0 && begin.safe_digital[c.vacuum_channel] == 0
+            && begin.channel_stop_policy[c.start_channel] == 0 && begin.channel_stop_policy[c.direction_channel] == 0
+            && begin.channel_stop_policy[c.program_channel] == 0 && begin.channel_stop_policy[c.vacuum_channel] == 1
+    }
+
+    fn update_nutrunner(&mut self) {
+        let Some(nutrunner) = self.nutrunner.as_mut() else { return; };
+        let active = self.board.digital(nutrunner.config.start_channel).unwrap_or(false)
+            || self.board.digital(nutrunner.config.direction_channel).unwrap_or(false);
+        if nutrunner.tick(self.host_ns,active) {
+            if let Some(core) = self.core.as_mut() {
+                if matches!(core.stop_reason(), None | Some(StopReason::Stop | StopReason::Abort)) { core.stop(StopReason::ProcessFault); }
+                self.events.as_mut().unwrap().stop(&mut self.board,StopReason::ProcessFault);
+                self.events.as_mut().unwrap().apply_safe(&mut self.board,StopReason::ProcessFault);
+                self.final_safe_applied = true;
+            }
+        }
     }
 
     pub fn set_welder_grounded(&mut self, grounded: bool) -> bool {
@@ -161,7 +212,7 @@ impl VirtualDevice {
             if let Some(core) = self.core.as_mut() {
                 if core.stop_reason().is_none() { core.stop(StopReason::ProcessFault); }
                 self.events.as_mut().unwrap().stop(&mut self.board, StopReason::ProcessFault);
-                self.events.as_ref().unwrap().apply_safe(&mut self.board, StopReason::ProcessFault);
+                self.events.as_mut().unwrap().apply_safe(&mut self.board, StopReason::ProcessFault);
                 self.final_safe_applied = true;
             }
         }
@@ -171,6 +222,7 @@ impl VirtualDevice {
     fn update_peripherals(&mut self, dt: f64) {
         self.update_welder(dt);
         self.update_heaters(dt);
+        self.update_nutrunner();
     }
 
     fn valid_weld_channels(&self, begin: &SessionBegin6) -> bool {
@@ -195,9 +247,9 @@ impl VirtualDevice {
             self.board.analog(c.voltage_channel).unwrap_or(0.0));
         if welder.faulted() {
             if let Some(core) = self.core.as_mut() {
-                if core.stop_reason().is_none() { core.stop(StopReason::ProcessFault); }
+                if matches!(core.stop_reason(), None | Some(StopReason::Stop | StopReason::Abort)) { core.stop(StopReason::ProcessFault); }
                 self.events.as_mut().unwrap().stop(&mut self.board, StopReason::ProcessFault);
-                self.events.as_ref().unwrap().apply_safe(&mut self.board, StopReason::ProcessFault);
+                self.events.as_mut().unwrap().apply_safe(&mut self.board, StopReason::ProcessFault);
                 welder.tick(0.0, false, 0.0, 0.0);
                 self.final_safe_applied = true;
             }
@@ -246,6 +298,7 @@ impl VirtualDevice {
                 };
                 if self.valid_weld_channels(&begin)
                     && self.valid_heater_channels(&begin)
+                    && self.valid_nutrunner_channels(&begin)
                     && controller_matches(&begin.expected_controller, &self.controller)
                     && begin.actuator_count > 0
                     && begin.actuator_count as usize <= self.count
@@ -305,6 +358,7 @@ impl VirtualDevice {
                     );
                     core.initialize_clock(self.board.now_ticks());
                     if let Some(welder) = self.welder.as_mut() { welder.reset(); }
+                    if let Some(nutrunner) = self.nutrunner.as_mut() { nutrunner.reset(); }
                     self.weld_sequence = 0;
                     for heater in self.heaters.heaters.iter_mut() { heater.reset(); }
                     self.heater_sequence = [0; 8];
@@ -313,6 +367,7 @@ impl VirtualDevice {
                     self.actuator_ratio = begin.actuator_ratio;
                     self.homing_scope = None;
                     self.control_sequence = 0;
+                    self.output_sequence = 0;
                     self.homing_stop = false;
                     self.core = Some(core);
                     self.events = Some(DeviceEvents::new(&begin));
@@ -536,6 +591,18 @@ impl VirtualDevice {
                 true
             }
             13 => false,
+            18 => {
+                let Ok(output) = ControllerOutput6::decode(payload) else { return false; };
+                if output.session != self.session || output.sequence <= self.output_sequence { return false; }
+                let active_allowed = matches!(self.core.as_ref().unwrap().stop_reason(),
+                    None | Some(StopReason::Stop | StopReason::Abort));
+                if self.events.as_mut().unwrap().controller_output(output, &mut self.board, active_allowed).is_err() {
+                    return false;
+                }
+                self.output_sequence = output.sequence;
+                self.update_nutrunner();
+                true
+            }
             16 => {
                 let Ok(event) = Event6::decode(payload) else { return false; };
                 self.events.as_mut().unwrap().push(event).is_ok()
@@ -560,7 +627,7 @@ impl VirtualDevice {
                 if let Some(reason) = core.stop_reason() {
                     self.events.as_mut().unwrap().stop(&mut self.board, reason);
                     if core.is_stopped() && !self.final_safe_applied {
-                        self.events.as_ref().unwrap().apply_safe(&mut self.board, reason);
+                        self.events.as_mut().unwrap().apply_safe(&mut self.board, reason);
                         self.final_safe_applied = true;
                     }
                 } else {
@@ -684,6 +751,21 @@ impl VirtualDevice {
             }
             self.emit(17, &body);
         }
+        if let Some(nutrunner) = self.nutrunner.as_mut() {
+            if nutrunner.sequence > nutrunner.sent_sequence {
+                let header = Sensor6Header {session:self.session,timestamp_ticks:nutrunner.source_ticks,
+                    sequence:nutrunner.sequence,slot:nutrunner.config.sensor_slot,value_count:7};
+                let values = nutrunner.values();
+                nutrunner.sent_sequence = nutrunner.sequence;
+                let mut body = [0; Sensor6Header::SIZE + 7 * Sensor6Value::SIZE];
+                header.encode(&mut body[..Sensor6Header::SIZE]).unwrap();
+                for (i,value) in values.iter().enumerate() {
+                    let start = Sensor6Header::SIZE + i * Sensor6Value::SIZE;
+                    Sensor6Value {value:*value}.encode(&mut body[start..start + Sensor6Value::SIZE]).unwrap();
+                }
+                self.emit(17,&body);
+            }
+        }
     }
 
     pub fn take_frame(&mut self) -> Option<Vec<u8>> { self.outbox.pop_front() }
@@ -723,12 +805,22 @@ pub unsafe extern "C" fn rkd_virtual_create(
     .map_or(std::ptr::null_mut(), |v| Box::into_raw(Box::new(v)))
 }
 
-// Profile 1 is the board's welding simulator. Host transport treats its parameters as opaque data.
+// Profile 1 is the board's welding simulator, 2 its heaters, 3 its nutrunner. Host transport treats its parameters as opaque data.
 #[no_mangle]
 pub unsafe extern "C" fn rkd_virtual_configure_peripheral(
     device: *mut VirtualDevice, kind: u32, parameters: *const f64, count: usize,
 ) -> i32 {
     if parameters.is_null() { return 0; }
+    if kind == 3 && count == 6 {
+        if device.is_null() { return 0; }
+        let p = std::slice::from_raw_parts(parameters,count);
+        if p.iter().any(|v| !v.is_finite()) || p[..5].iter().any(|v| *v < 0.0 || v.fract() != 0.0)
+            || p[0] >= 8.0 || p[1..5].iter().any(|v| *v >= 32.0)
+            || p[5]*1_000_000_000.0 < 1.0 || p[5]*1_000_000_000.0 >= u64::MAX as f64 { return 0; }
+        return (&mut *device).configure_nutrunner(nutrunner::NutrunnerConfig {sensor_slot:p[0] as u8,
+            start_channel:p[1] as usize,direction_channel:p[2] as usize,program_channel:p[3] as usize,
+            vacuum_channel:p[4] as usize,maximum_age_ns:(p[5]*1_000_000_000.0) as u64}) as i32;
+    }
     if kind == 2 {
         let Some(device) = device.as_mut() else { return 0; };
         return device.configure_heaters(std::slice::from_raw_parts(parameters, count)) as i32;
@@ -745,7 +837,8 @@ pub unsafe extern "C" fn rkd_virtual_set_peripheral_input(
     device: *mut VirtualDevice, input: u32, value: f64,
 ) -> i32 {
     let Some(device) = device.as_mut() else { return 0; };
-    // A device with heaters takes their inputs (`heaters::input`); otherwise input 0 grounds the welding workpiece.
+    // A nutrunner or heaters take their own inputs (`heaters::input`); otherwise input 0 grounds the welding workpiece.
+    if device.nutrunner.is_some() { return device.set_nutrunner_input(input, value) as i32; }
     if !device.heaters.heaters.is_empty() { return device.set_heater_input(input, value) as i32; }
     if input != 0 || (value != 0.0 && value != 1.0) { return 0; }
     rkd_virtual_set_welder_grounded(device, value as u8)
@@ -1120,6 +1213,121 @@ mod tests {
     }
     fn welding_device(grounded: bool) -> VirtualDevice {
         welding_device_with_duration(grounded, 1_000_000)
+    }
+
+    fn nutrunner_device(vacuum_policy: u8) -> VirtualDevice {
+        let mut d = VirtualDevice::new(1_000_000,40_000,50_000,0,1,
+            [1_000.0; ACTUATORS],[7;16],1).unwrap();
+        let parameters = [0.0,0.0,1.0,2.0,3.0,0.05];
+        assert_eq!(unsafe { rkd_virtual_configure_peripheral(&mut d,3,parameters.as_ptr(),parameters.len()) },1);
+        let mut begin = begin_for([7;16]);
+        begin.channel_count = 4; begin.channel_kind[..4].copy_from_slice(&[1,1,2,1]);
+        begin.channel_stop_policy[3] = vacuum_policy;
+        for (i,name) in [b"start".as_slice(),b"direction".as_slice(),b"program".as_slice(),b"vacuum".as_slice()].iter().enumerate() {
+            begin.channel_id[i*48..i*48+name.len()].copy_from_slice(name);
+        }
+        assert_eq!(ack_to(&mut d,&begin).0.status,if vacuum_policy == 1 {1} else {0});
+        d
+    }
+    fn capture_nutrunner(d: &mut VirtualDevice, time: f64) -> bool {
+        for (i,value) in [16.5,12.5,0.0,5.0,5.0,1.0,1.0].iter().enumerate() {
+            assert_eq!(unsafe {rkd_virtual_set_peripheral_input(d,i as u32,*value)},1);
+        }
+        (unsafe {rkd_virtual_set_peripheral_input(d,7,time)}) == 1
+    }
+    #[test]
+    fn nutrunner_sensor_frames_keep_the_physical_acquisition_ticks() {
+        let mut d = nutrunner_device(1);
+        assert!(capture_nutrunner(&mut d,0.0)); assert!(d.advance(10_000_000));
+        let mut sensors = Vec::new();
+        while let Some(frame) = d.take_frame() {
+            let (kind,body) = decode_frame6(&frame).unwrap();
+            if kind == 17 {
+                let header = Sensor6Header::decode(&body[..Sensor6Header::SIZE]).unwrap();
+                assert_eq!(header.value_count,7); assert_eq!(header.sequence,1);
+                assert_eq!(header.timestamp_ticks,50_000);
+                assert_eq!(Sensor6Value::decode(&body[Sensor6Header::SIZE..Sensor6Header::SIZE+4]).unwrap().value,16.5);
+                sensors.push(header);
+            }
+        }
+        assert_eq!(sensors.len(),1);
+        assert!(d.advance(20_000_000));
+        while let Some(frame) = d.take_frame() {assert_ne!(decode_frame6(&frame).unwrap().0,17);}
+        assert!(!capture_nutrunner(&mut d,0.0));
+        assert!(capture_nutrunner(&mut d,30_000_000.0));
+        assert_eq!(d.nutrunner.as_ref().unwrap().source_ticks,80_000);
+    }
+    #[test]
+    fn nutrunner_watchdog_stops_executed_outputs_without_inventing_a_result() {
+        let mut d = nutrunner_device(1); assert!(capture_nutrunner(&mut d,0.0));
+        d.board.set_digital(0,true); d.board.set_digital(1,true); d.board.set_digital(3,true);
+        assert!(d.advance(50_000_000));
+        assert_eq!(d.core.as_ref().unwrap().stop_reason(),Some(StopReason::ProcessFault));
+        for i in [0,1,3] {assert_eq!(d.board.digital(i),Some(false));}
+        assert_eq!(d.nutrunner.as_ref().unwrap().sequence,1);
+        assert_eq!(d.nutrunner.as_ref().unwrap().source_ticks,50_000);
+        assert_eq!(unsafe {rkd_virtual_set_peripheral_input(&mut d,0,1.0)},0);
+    }
+    fn send_controller_output(d: &mut VirtualDevice, sequence: u64, channel: u8,
+        kind: u8, digital: u8, analog: f32) -> bool {
+        let output = ControllerOutput6 {session: d.session, sequence, channel, kind, digital, analog};
+        let mut body = [0; ControllerOutput6::SIZE]; output.encode(&mut body).unwrap();
+        send::<ControllerOutput6>(d,18,&body)
+    }
+    #[test]
+    fn nutrunner_controller_outputs_execute_without_an_arm_queue() {
+        let mut d = nutrunner_device(1); assert!(capture_nutrunner(&mut d,0.0));
+        assert!(send_controller_output(&mut d,1,2,2,0,3.0));
+        assert_eq!(d.board.analog(2),Some(3.0));
+        assert!(send_controller_output(&mut d,2,3,1,1,0.0));
+        assert!(send_controller_output(&mut d,3,0,1,1,0.0));
+        assert_eq!(d.board.digital(0),Some(true)); assert_eq!(d.board.digital(3),Some(true));
+        assert!(!send_controller_output(&mut d,2,0,1,0,0.0));
+        assert!(!send_controller_output(&mut d,4,2,1,1,0.0));
+        assert!(!send_controller_output(&mut d,4,4,1,1,0.0));
+        assert_eq!(d.board.digital(0),Some(true));
+        assert!(send_controller_output(&mut d,4,0,1,0,0.0));
+        assert_eq!(d.board.digital(0),Some(false));
+        assert!(send::<SessionBegin6>(&mut d,11,&[]));
+        assert_eq!(d.board.digital(3),Some(true));
+        assert_eq!(d.board.analog(2),Some(0.0));
+        assert!(send_controller_output(&mut d,5,3,1,0,0.0));
+        assert_eq!(d.board.digital(3),Some(false));
+    }
+    #[test]
+    fn controller_outputs_keep_the_link_lease_after_arm_stop() {
+        let mut d = nutrunner_device(1);
+        assert!(send::<SessionBegin6>(&mut d,11,&[])); assert!(d.advance(1_000_000));
+        assert!(send_controller_output(&mut d,1,2,2,0,1.0));
+        assert!(d.advance(2_100_000_000));
+        assert_eq!(d.core.as_ref().unwrap().stop_reason(),Some(StopReason::LinkLost));
+        assert_eq!(d.board.analog(2),Some(0.0));
+        assert!(!send_controller_output(&mut d,2,0,1,1,0.0));
+        assert!(send_controller_output(&mut d,2,0,1,0,0.0));
+    }
+    #[test]
+    fn nutrunner_watchdog_can_fault_independent_reverse_after_arm_stop() {
+        let mut d = nutrunner_device(1); assert!(capture_nutrunner(&mut d,0.0));
+        assert!(send::<SessionBegin6>(&mut d,11,&[])); assert!(d.advance(1_000_000));
+        assert!(send_controller_output(&mut d,1,3,1,1,0.0));
+        assert!(send_controller_output(&mut d,2,1,1,1,0.0));
+        assert!(d.advance(50_000_000));
+        assert_eq!(d.core.as_ref().unwrap().stop_reason(),Some(StopReason::ProcessFault));
+        assert_eq!(d.board.digital(1),Some(false)); assert_eq!(d.board.digital(3),Some(false));
+        assert_eq!(d.nutrunner.as_ref().unwrap().sequence,1);
+    }
+    #[test]
+    fn controller_outputs_cannot_reenergize_an_emergency_stop() {
+        let mut d = nutrunner_device(1);
+        assert!(send_controller_output(&mut d,1,3,1,1,0.0));
+        assert!(send::<SessionBegin6>(&mut d,12,&[]));
+        assert_eq!(d.board.digital(3),Some(false));
+        assert!(!send_controller_output(&mut d,2,3,1,1,0.0));
+        assert!(send_controller_output(&mut d,2,3,1,0,0.0));
+    }
+    #[test]
+    fn nutrunner_rejects_unsafe_vacuum_policy() {
+        assert!(nutrunner_device(0).core.is_none());
     }
     fn welding_device_with_duration(grounded: bool, duration_ticks: u64) -> VirtualDevice {
         let mut d = VirtualDevice::new(1_000_000, 40_000, 0, 0, 1,

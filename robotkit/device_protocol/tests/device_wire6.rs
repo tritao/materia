@@ -1,4 +1,4 @@
-use robotkit_device_protocol::device_wire6::{Event6, SessionBegin6, Segment6Header, TimeSyncRequest, Sensor6Header, Sensor6Value, PROTOCOL_VERSION};
+use robotkit_device_protocol::device_wire6::{ControllerOutput6, Event6, SessionBegin6, Segment6Header, TimeSyncRequest, Sensor6Header, Sensor6Value, PROTOCOL_VERSION};
 use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6,
     slide_to_frame_marker, Frame6Error, MAX_FRAME_SIZE};
 
@@ -107,7 +107,7 @@ fn shared_frame_vectors() {
             .collect();
         let (kind, payload) = decode_frame6(&bytes).unwrap();
         let expected = match name { "time_sync_request" => 3, "hold" => 8, "stop" => 11,
-            "session_begin6_v14" => 1, "digital_event" => 16, "sensor6" => 17,
+            "session_begin6_v15" => 1, "digital_event" => 16, "sensor6" => 17, "controller_output" => 18,
             _ => panic!("unknown vector") };
         assert_eq!(kind, expected);
         let mut encoded = [0; MAX_FRAME_SIZE];
@@ -163,4 +163,23 @@ fn sensor_frame_rejects_invalid_samples() {
     Sensor6Value { value: f32::NAN }.encode(&mut body[Sensor6Header::SIZE..]).unwrap();
     assert_eq!(encode_frame6(17, &body, &mut frame), Err(Frame6Error::BadPayload));
     assert!(encode_frame6(17, &body[..Sensor6Header::SIZE], &mut frame).is_err());
+}
+
+#[test]
+fn controller_output_requires_a_session_sequence_and_canonical_value() {
+    let mut output = ControllerOutput6 {session:7,sequence:1,channel:3,kind:1,digital:1,analog:0.0};
+    let mut body = [0;ControllerOutput6::SIZE]; let mut frame = [0;MAX_FRAME_SIZE];
+    output.encode(&mut body).unwrap();
+    let size = encode_frame6(18,&body,&mut frame).unwrap();
+    assert_eq!(decode_frame6(&frame[..size]).unwrap().0,18);
+    output.session = 0; output.encode(&mut body).unwrap();
+    assert_eq!(encode_frame6(18,&body,&mut frame),Err(Frame6Error::BadPayload));
+    output.session = 7; output.sequence = 0; output.encode(&mut body).unwrap();
+    assert_eq!(encode_frame6(18,&body,&mut frame),Err(Frame6Error::BadPayload));
+    output.sequence = 1; output.analog = 1.0; output.encode(&mut body).unwrap();
+    assert_eq!(encode_frame6(18,&body,&mut frame),Err(Frame6Error::BadPayload));
+    output.kind = 2; output.digital = 0; output.encode(&mut body).unwrap();
+    assert!(encode_frame6(18,&body,&mut frame).is_ok());
+    output.analog = f32::NAN; output.encode(&mut body).unwrap();
+    assert_eq!(encode_frame6(18,&body,&mut frame),Err(Frame6Error::BadPayload));
 }

@@ -6,6 +6,7 @@ import robotkit.tool.ScrewdriverContract;
 
 /** Reads fresh frames from one declared tool, with the same timeout for driving and recovery. */
 class ScrewdriverFrames {
+  public static inline var MAXIMUM_SILENCE:Float = 2.0;
   final sensor:String;
   var silent = 0.0;
   var lastSequence:Null<Int64> = null;
@@ -32,7 +33,7 @@ class ScrewdriverFrames {
     }
     if (reading == null) {
       silent += durationSeconds;
-      if (silent > 2) throw 'Screwdriver sensor "$sensor" has not reported a fresh frame';
+      if (silent > MAXIMUM_SILENCE) throw 'Screwdriver sensor "$sensor" has not reported a fresh frame';
     } else silent = 0;
     return reading;
   }

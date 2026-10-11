@@ -3,7 +3,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error { ShortBuffer, WrongLength }
 
-pub const PROTOCOL_VERSION: u8 = 14;
+pub const PROTOCOL_VERSION: u8 = 15;
 pub const MAX_ACTUATORS: u8 = 64;
 
 #[repr(u8)]
@@ -26,6 +26,7 @@ pub enum MessageType6 {
     State6 = 15,
     Event = 16,
     Sensor6 = 17,
+    ControllerOutput = 18,
     HomingScope = 21,
     HomingSide = 22,
     HomingControlAck = 23,
@@ -1452,5 +1453,68 @@ impl HomingCounterBatch6 {
         offset += 8;
         let _ = offset;
         Ok(Self { session, sequence, scope, first, second, first_delta, second_delta })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ControllerOutput6 {
+    pub session: u64,
+    pub sequence: u64,
+    pub channel: u8,
+    pub kind: u8,
+    pub digital: u8,
+    pub analog: f32,
+}
+
+impl ControllerOutput6 {
+    pub const SIZE: usize = 23;
+
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
+        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        let mut offset = 0usize;
+        out[offset..offset + 8].copy_from_slice(&self.session.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.sequence.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 1].copy_from_slice(&self.channel.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 1].copy_from_slice(&self.kind.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 1].copy_from_slice(&self.digital.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 4].copy_from_slice(&self.analog.to_le_bytes());
+        offset += 4;
+        Ok(offset)
+    }
+
+    pub fn decode(input: &[u8]) -> Result<Self, Error> {
+        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
+        let mut offset = 0usize;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let session = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let sequence = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let channel = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let kind = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let digital = u8::from_le_bytes(bytes);
+        offset += 1;
+        let mut bytes = [0u8; 4];
+        bytes.copy_from_slice(&input[offset..offset + 4]);
+        let analog = f32::from_le_bytes(bytes);
+        offset += 4;
+        let _ = offset;
+        Ok(Self { session, sequence, channel, kind, digital, analog })
     }
 }

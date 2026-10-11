@@ -233,7 +233,7 @@ class AssemblyRobot {
   public static function add(candidate:Simulation, scene:EditorScene, session:ProjectDocumentSession,
       assembly:AssemblyDefinition, supportsClosures:Bool, revision:Int, robotIndex:Int,
       ?channels:Array<ProcessChannelDeclaration>, virtualWelder:Bool = false, ?control:SceneArtifactCellController,
-      ?restContactGroup:haxe.Int64):AssemblyRobot {
+      ?restContactGroup:haxe.Int64, virtualNutrunner:Bool = false):AssemblyRobot {
     var warnings:Array<String> = [];
     var parts:Array<AssemblyPart> = [];
     var physical = session.projectPhysical;
@@ -465,7 +465,7 @@ class AssemblyRobot {
     var machine = session.machineMotion;
     var device:Null<robotkit.runtime.VirtualDeviceOptions> = null;
     var extruder:Null<robotkit.runtime.VirtualHeaters.HeaterExtruder> = null;
-    if (virtualWelder) device = robotkit.runtime.VirtualServoOptions.fromModel(converted.model);
+    if (virtualWelder || virtualNutrunner) device = robotkit.runtime.VirtualServoOptions.fromModel(converted.model);
     else if (printJob != null) {
       // The printer's heaters run on the device. Its board has no switch inputs for a CoreXY (a switch joint driven by
       // two motors), so the machine is referenced where its initial pose has it, and its home switches are not wired.
@@ -485,7 +485,7 @@ class AssemblyRobot {
       device.actuators = binding.virtualActuators();
     }
     if (machine != null && (machine.program != null || machine.pressBrake != null)) converted.model.materializeLimits(true);
-    if (virtualWelder) {
+    if (virtualWelder || virtualNutrunner) {
       // The device's braking bound is the same arm-program policy, rather than an invented motor acceleration.
       for (joint in converted.model.joints) {
         var acceleration = joint.limits.maxAcceleration;
@@ -541,6 +541,18 @@ class AssemblyRobot {
       if (welding == null) throw "Virtual welding profile is missing";
       processkit.simulation.VirtualWelderSupply.configure(device, blueprint,
         {arc:torch.channel, wireSpeed:welding.wireSpeedChannel, voltage:welding.voltageChannel}, welding.efficiency);
+    }
+    if (virtualNutrunner) {
+      if (virtualWelder) throw "One virtual controller cannot have welding and nutrunner profiles together";
+      var drivers = [for (tool in session.robotTools) if (tool.screwdriver != null) tool];
+      if (drivers.length != 1 || device == null) throw "A virtual nutrunner needs exactly one screwdriver";
+      var tool = drivers[0], driver = tool.screwdriver;
+      if (driver == null) throw "Virtual nutrunner capability is missing";
+      // Process-owned axes are measured in the physical load, not emulated arm servo commands.
+      device.actuators = [for (actuator in device.actuators) if (blueprint.processModelJoints.indexOf(actuator.jointIndex) < 0) actuator];
+      processkit.simulation.VirtualNutrunnerSupply.configure(device,blueprint,
+        {start:tool.channel,direction:driver.directionChannel,program:driver.programChannel,vacuum:driver.vacuumChannel},
+        processkit.screwdriving.ScrewdriverFrames.MAXIMUM_SILENCE);
     }
     // A mobile robot stands at its origin on the floor; its root link is framed there.
     var origin = session.mobileBase == null ? null : session.mobileBase.origin;

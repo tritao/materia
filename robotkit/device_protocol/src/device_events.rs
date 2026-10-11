@@ -1,5 +1,5 @@
 //! Fixed-capacity process events driven by the scheduled path clock.
-use crate::device_wire6::{Event6, SessionBegin6};
+use crate::device_wire6::{ControllerOutput6, Event6, SessionBegin6};
 use crate::{Board, StopReason};
 
 const CHANNELS: usize = 32;
@@ -49,6 +49,7 @@ pub struct DeviceEvents<const CAP: usize> {
     committed_until: u64,
     held: bool,
     stopped: bool,
+    stop_reason: Option<StopReason>,
     channel_count: usize,
     channel_kind: [u8; CHANNELS],
     safe: [Value; CHANNELS],
@@ -77,7 +78,7 @@ impl<const CAP: usize> DeviceEvents<CAP> {
                 argument: session.safe_argument[i], command };
         }
         Self { events: [None; CAP], len: 0, next: 0, revision: 0,
-            replace_after: 0, committed_until: 0, held: false, stopped: false,
+            replace_after: 0, committed_until: 0, held: false, stopped: false, stop_reason: None,
             channel_count: session.channel_count as usize,
             channel_kind: session.channel_kind, safe, live: safe, keep_on_stop, fired: [Value::ZERO; CHANNELS],
             fired_policy: [0; CHANNELS], has_fired: [false; CHANNELS],
@@ -88,7 +89,6 @@ impl<const CAP: usize> DeviceEvents<CAP> {
     /// A safe-on-stop output away from its safe value still needs a live owner,
     /// even after the arm reaches rest. Held channels already made safe do not.
     pub fn requires_link(&self) -> bool {
-        if self.stopped { return false; }
         (0..self.channel_count).any(|i| {
             if self.keep_on_stop[i] { return false; }
             let value = self.live[i]; let safe = self.safe[i];
@@ -99,6 +99,31 @@ impl<const CAP: usize> DeviceEvents<CAP> {
                 _ => false,
             }
         })
+    }
+    /// Controller outputs use the live owner clock, independently of committed path events.
+    pub fn controller_output<B: Board>(&mut self, output: ControllerOutput6, board: &mut B,
+        active_allowed: bool) -> Result<(), EventError> {
+        let channel = output.channel as usize;
+        if channel >= self.channel_count || output.kind != self.channel_kind[channel] ||
+            output.digital > 1 || !output.analog.is_finite() ||
+            !(1..=2).contains(&output.kind) ||
+            output.kind == 1 && output.analog != 0.0 || output.kind == 2 && output.digital != 0 {
+            return Err(EventError::Invalid);
+        }
+        let value = Value { kind: output.kind, digital: output.digital, analog: output.analog,
+            argument: 0.0, command: [0; 48] };
+        let safe = self.safe[channel];
+        let is_safe = match value.kind {
+            1 => value.digital == safe.digital,
+            2 => value.analog == safe.analog,
+            _ => false,
+        };
+        if !active_allowed && !is_safe { return Err(EventError::Invalid); }
+        value.apply(channel, board);
+        self.live[channel] = value;
+        // Independent controller ownership supersedes the old path HOLD/resume latch.
+        self.has_fired[channel] = false;
+        Ok(())
     }
     pub fn records(&self) -> &[Option<FiredEventRecord>] {
         &self.records[..self.record_count]
@@ -121,6 +146,7 @@ impl<const CAP: usize> DeviceEvents<CAP> {
         self.committed_until = committed_until;
         if self.stopped {
             self.stopped = false;
+            self.stop_reason = None;
             self.held = false;
         }
         Ok(())
@@ -202,8 +228,9 @@ impl<const CAP: usize> DeviceEvents<CAP> {
     }
 
     pub fn stop<B: Board>(&mut self, board: &mut B, reason: StopReason) {
-        if self.stopped { return; }
+        if self.stop_reason == Some(reason) { return; }
         self.apply_safe(board, reason);
+        self.stop_reason = Some(reason);
         self.events.fill(None);
         self.len = 0;
         self.next = 0;
@@ -212,11 +239,12 @@ impl<const CAP: usize> DeviceEvents<CAP> {
 
     /// Every channel to its safe value, but a commanded stop or abort leaves the channels that
     /// keep their output on stop as they are; an emergency stop or a fault safes them all.
-    pub fn apply_safe<B: Board>(&self, board: &mut B, reason: StopReason) {
+    pub fn apply_safe<B: Board>(&mut self, board: &mut B, reason: StopReason) {
         let commanded = matches!(reason, StopReason::Stop | StopReason::Abort);
         for i in 0..self.channel_count {
             if commanded && self.keep_on_stop[i] { continue; }
             self.safe[i].apply(i, board);
+            self.live[i] = self.safe[i];
         }
     }
 }
