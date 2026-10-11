@@ -979,14 +979,29 @@ left in the motion path.
    (`test_degenerate_stages.cpp`, each failing without its fix).
    Before (retry subclass and halving): the gate had 146 forward-pass failures rescued by the retry; the test tower 19
    halvings (242 sections). After: none; the tower plans in 223 sections, the gear (8 mm) and cube unchanged in planned
-   time (2356.9 s, 870.3 s, tower 471.5 s). **Left: the gate's extruder check now fails** (`path.time failed`, op 15),
-   which the halving had been hiding and which is not TOPP-RA's: `mk_time_path` rounds each stage down to whole
-   nanoseconds and derives its acceleration from that, and on the 1.1 micrometre spans of a corner arc a stage lasts
-   about 1 us, so 1 ns of rounding moves the path acceleration by about 60 m/s^2 (stage 16007: -59.7 against TOPP-RA's
-   0.53), a joint acceleration 4.9x its limit that stretching and softening cannot cure. It fails identically with the
-   old library; it needs stage times that are not quantized this coarsely, or arcs that small not made (item 4).
-   The app's `PROJECT_SOURCE_ONLY=printer` (SmallTab, op 15, layer 3) fails the same way (2.5 um spans, a pulley at
-   2.4x its acceleration limit on the first lowering).
+   time (2356.9 s, 870.3 s, tower 471.5 s). The gate's extruder check then failed (`path.time failed`, op 15), which
+   the halving had been hiding and which was not TOPP-RA's: `mk_time_path` rounded each stage down to whole
+   nanoseconds and derived its acceleration from that, and on the 1.1 micrometre spans of a corner arc a stage lasts
+   about 1 us, so 1 ns of rounding moved the path acceleration by about 60 m/s^2 (stage 16007: -59.7 against TOPP-RA's
+   0.53), a joint acceleration 4.9x its limit that stretching and softening could not cure; each stage's speed error
+   was handed to the next with its sign flipped, so it never died out. The app's `PROJECT_SOURCE_ONLY=printer`
+   (SmallTab, op 15, layer 3) failed the same way. **Fixed** (`motionkit/native/src/path.cpp`, `stages_from_profile`):
+   only knot times are rounded, each from the exact time since its span's start; every knot keeps TOPP-RA's speed, so
+   a stage's acceleration is TOPP-RA's to 1 ns over its duration (relative); a reference stage shorter than a
+   nanosecond merges into the next; each path sample is reached exactly at a knot (lowering needs it there), the span's
+   duration rounding up and its interior knot speeds scaled by 1 - c t (L - t), the least-acceleration correction,
+   at most about 6 v (1 ns) / L^2. The captured requests now pass at once: gate op 15 at 10.47 m/s^2 against 12.56
+   (was 61.5, 24 attempts, 12 s; now 0 adjustments, 0.6 s), the app's SmallTab request the same, the gear and tower
+   requests unchanged. Laws now cruise exactly at a limit where the old ones ended a 0.2 % stretch below it, which
+   showed that `mk_merge_segments` checked merged quintics only at sample points and let a plateau rise 1e-6 above
+   the original: the merged form of the gate's step moves broke 0.25 m/s by 1.9e-7 and was refused. Merging now bounds
+   each quintic's speed and acceleration at its stationary points and allows a plateau only rounding (1e-9 of the
+   limit) above the original. Tests: `motionkit/native/tests/path.cpp` (a 1 mm arc sampled every 1.5 um, which the
+   old law missed by 3.7x; a step move cruising at its limit, merged). Gate: passes, planned 1047.2 s (unchanged;
+   294 s of CPU with the native rebuild); gear 2356.9 s, cube 870.3 s, tower 471.5 s, all unchanged (404 s of CPU for
+   the three). Item 4 would not have avoided it, only made it rarer: with an arc sampled at the same count, a larger radius lengthens its stages only as the square root of the
+   radius at the speed the radius allows, so the error (2 v (1 ns) / stage^2) falls as 1 / sqrt(r), and 4x the
+   radius still leaves 2.4x the limit; the error also hit any micrometre spans, not only arcs.
 3. Replace the `MAX_SECTION_PRIMITIVES` forced rests with timing windows that carry boundary speeds (AM-D4's original
    design).
 4. Derive `CornerBlender.MIN_RADIUS` from the machine (an arc whose v^2 / r exceeds the acceleration cannot be followed)

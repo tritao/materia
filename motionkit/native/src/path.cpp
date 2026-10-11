@@ -381,69 +381,160 @@ mk_timing_binding binding_for_stage(const std::vector<mk_path_sample> &path,
     return binding;
 }
 
-// Nanosecond rounding perturbs the last constant-acceleration stage's exit
-// speed, and re-deriving every stage's acceleration (stretching, softening)
-// accumulates that error over thousands of stages. Enforce an authored rest
-// boundary exactly; the path-distance change stays below the quantization
-// error, which is checked.
-bool settle_at_rest(std::vector<mk_time_stage> &stages) {
-    auto &last = stages.back();
-    const double duration = static_cast<double>(last.duration_ns) * 1e-9;
-    const double old_end = end_s(last);
-    last.acceleration = -last.speed / duration;
-    return std::abs(end_s(last) - old_end) <= 1e-8 * std::max(1.0, std::abs(old_end));
-}
-
-// Rebuilds the stages over their own distances, from `start_speed`, each
-// constant-acceleration stage aimed at its target end speed from the speed
-// the previous one actually reached. Durations round down to whole
-// nanoseconds, so each stage ends at or just above its target, never below
-// zero, and the rounding of one stage is corrected by the next instead of
-// accumulating over thousands of stages.
-bool retime_stages(std::vector<mk_time_stage> &stages, double start_speed,
-                   const std::vector<double> &end_speeds) {
-    std::vector<double> starts, distances;
-    starts.reserve(stages.size());
-    distances.reserve(stages.size());
-    for (const auto &stage : stages) {
-        starts.push_back(stage.start_s);
-        distances.push_back(end_s(stage) - stage.start_s);
+// Builds the integer-nanosecond law for a reference profile: path positions
+// `s` with path speeds `v` at them, each reference stage at constant
+// acceleration, so stage j lasts exactly 2*(s[j+1]-s[j])/(v[j]+v[j+1]).
+//
+// Only knot times are rounded, each from the exact time since its span's
+// start, so rounding never compounds; every knot keeps its reference speed, so a law
+// stage's acceleration is its reference stage's, off by at most a nanosecond
+// over the stage's duration (relative). Deriving acceleration from a rounded
+// duration instead turns 1 ns on a 1 us stage of a micrometre corner span
+// into tens of m/s^2. A reference stage shorter than the rounding merges into
+// the next.
+//
+// Anchors (the path samples, which lowering needs at knots) are reached
+// exactly at their knots. Rounding the span's duration up leaves its stages
+// up to a nanosecond of travel too far; that is taken off by scaling the
+// interior knot speeds by 1 - c*t*(L-t), a parabola in time that vanishes at
+// both anchors (least acceleration for a nearly constant speed: at most about
+// 6*v*(1 ns)/L^2, about 1% of a printer's limit on a 1.5 um span) and, being
+// relative, never reverses a knot at or near rest.
+bool stages_from_profile(const std::vector<double> &s, const std::vector<double> &v,
+                         const std::vector<char> &anchor,
+                         std::vector<mk_time_stage> &stages) {
+    if (s.size() < 2 || v.size() != s.size() || anchor.size() != s.size()) return false;
+    const size_t n = s.size() - 1;
+    std::vector<double> times(n + 1, 0.0);
+    for (size_t j = 0; j < n; ++j) {
+        const double ds = s[j + 1] - s[j];
+        const double duration = 2.0 * ds / (std::max(0.0, v[j]) + std::max(0.0, v[j + 1]));
+        if (!(ds > 0.0) || !std::isfinite(duration) || duration <= 0.0 || v[j] < 0.0)
+            return false;
+        times[j + 1] = times[j] + duration;
     }
+    if (!(times[n] < static_cast<double>(INT64_MAX / 2) * 1e-9) || v[n] < 0.0) return false;
+    stages.clear();
+    stages.reserve(n);
     int64_t start_ns = 0;
-    double speed = std::max(0.0, start_speed);
-    for (size_t i = 0; i < stages.size(); ++i) {
-        auto &stage = stages[i];
-        const double distance = distances[i];
-        const double seconds = 2.0 * distance / (speed + std::max(0.0, end_speeds[i]));
-        if (!(distance > 0.0) || !std::isfinite(seconds) || seconds <= 0.0 ||
-            seconds > static_cast<double>(INT64_MAX - start_ns) * 1e-9) return false;
-        const int64_t duration_ns = std::max<int64_t>(1,
-            static_cast<int64_t>(std::floor(seconds * 1e9)));
-        const double rounded = static_cast<double>(duration_ns) * 1e-9;
-        stage.start_ns = start_ns;
-        stage.duration_ns = duration_ns;
-        stage.start_s = starts[i];
-        stage.speed = speed;
-        stage.acceleration = 2.0 * (distance - speed * rounded) / (rounded * rounded);
-        speed += stage.acceleration * rounded;
-        start_ns += duration_ns;
+    double speed = v.front();
+    std::vector<int64_t> knots;
+    std::vector<double> speeds;
+    for (size_t a = 0; a < n;) {
+        size_t b = a + 1;
+        while (b < n && !anchor[b]) ++b;
+        // The span's knots: its anchors and each interior reference knot
+        // that rounds strictly between them.
+        // The span's duration rounds up, so making up its travel only ever
+        // slows the reference (never past a bound it holds); the law's clock
+        // falls behind the reference's by under a nanosecond a span.
+        const int64_t end_ns = start_ns +
+            std::max<int64_t>(static_cast<int64_t>(std::ceil((times[b] - times[a]) * 1e9)), 1);
+        knots.assign(1, start_ns);
+        speeds.assign(1, speed);
+        for (size_t j = a + 1; j < b; ++j) {
+            const int64_t knot = start_ns + std::llround((times[j] - times[a]) * 1e9);
+            if (knot > knots.back() && knot < end_ns) {
+                knots.push_back(knot);
+                speeds.push_back(v[j]);
+            }
+        }
+        knots.push_back(end_ns);
+        speeds.push_back(v[b]);
+        const size_t m = knots.size() - 1;
+        if (m > 1) {
+            const double length = static_cast<double>(end_ns - start_ns) * 1e-9;
+            double travel = 0.0, weight = 0.0;
+            std::vector<double> bump(m + 1);
+            for (size_t k = 0; k <= m; ++k) {
+                const double x = static_cast<double>(knots[k] - start_ns) * 1e-9;
+                bump[k] = k == 0 || k == m ? 0.0 : x * (length - x) * speeds[k];
+            }
+            for (size_t k = 0; k < m; ++k) {
+                const double duration = static_cast<double>(knots[k + 1] - knots[k]) * 1e-9;
+                travel += 0.5 * (speeds[k] + speeds[k + 1]) * duration;
+                weight += 0.5 * (bump[k] + bump[k + 1]) * duration;
+            }
+            // With every interior knot at rest there is nothing to adjust;
+            // the last stage then takes up the difference.
+            const double scale = weight > 0.0 ? (s[b] - s[a] - travel) / weight : 0.0;
+            for (size_t k = 1; k < m; ++k) {
+                speeds[k] += scale * bump[k];
+                if (!(speeds[k] >= 0.0)) return false;
+            }
+        }
+        double position = s[a];
+        for (size_t k = 0; k < m; ++k) {
+            const int64_t duration_ns = knots[k + 1] - knots[k];
+            const double duration = static_cast<double>(duration_ns) * 1e-9;
+            mk_time_stage stage{};
+            stage.struct_size = sizeof(stage);
+            stage.start_ns = knots[k];
+            stage.duration_ns = duration_ns;
+            stage.start_s = position;
+            stage.speed = speed;
+            // The span's last stage lands on its anchor exactly; its end speed
+            // is the anchor's to rounding (or, for a one-stage span, whatever
+            // reaching the anchor takes).
+            stage.acceleration = k + 1 < m ? (speeds[k + 1] - speed) / duration
+                : 2.0 * (s[b] - position - speed * duration) / (duration * duration);
+            stages.push_back(stage);
+            position = k + 1 < m ? end_s(stage) : s[b];
+            speed = stage_speed(stage, knots[k + 1]);
+            if (speed < 0.0) {
+                if (speed < -1e-9 * std::max(1.0, v[b])) return false;
+                speed = 0.0;
+            }
+        }
+        start_ns = end_ns;
+        a = b;
     }
     return true;
 }
 
+// Anchors the law's stage boundaries that are path samples.
+std::vector<char> sample_anchors(const std::vector<mk_path_sample> &samples,
+                                 const std::vector<double> &positions) {
+    std::vector<double> sample_s;
+    sample_s.reserve(samples.size());
+    for (const auto &sample : samples) sample_s.push_back(sample.s);
+    std::vector<char> anchor(positions.size(), 0);
+    for (size_t i = 0; i < positions.size(); ++i)
+        anchor[i] = std::binary_search(sample_s.begin(), sample_s.end(), positions[i]);
+    if (!anchor.empty()) anchor.front() = anchor.back() = 1;
+    return anchor;
+}
+
+// Rebuilds the stages over their own distances, from `start_speed`, each
+// stage reaching its target end speed.
+bool retime_stages(std::vector<mk_time_stage> &stages,
+                   const std::vector<mk_path_sample> &samples, double start_speed,
+                   const std::vector<double> &end_speeds) {
+    std::vector<double> positions, speeds{start_speed};
+    positions.reserve(stages.size() + 1);
+    for (const auto &stage : stages) positions.push_back(stage.start_s);
+    positions.push_back(end_s(stages.back()));
+    // A law's speeds can dip below zero by rounding where it comes to rest.
+    for (double speed : end_speeds) speeds.push_back(std::max(0.0, speed));
+    speeds.front() = std::max(0.0, speeds.front());
+    return stages_from_profile(positions, speeds, sample_anchors(samples, positions), stages);
+}
+
 // Slows the whole law down uniformly by `factor`: every speed divided by it.
-bool stretch_stages(std::vector<mk_time_stage> &stages, double factor) {
+bool stretch_stages(std::vector<mk_time_stage> &stages,
+                    const std::vector<mk_path_sample> &samples, double factor) {
     if (stages.empty() || !(factor > 0.0)) return false;
     std::vector<double> ends;
     ends.reserve(stages.size());
     for (const auto &stage : stages)
         ends.push_back(stage_speed(stage, stage.start_ns + stage.duration_ns) / factor);
-    return retime_stages(stages, stages.front().speed / factor, ends);
+    return retime_stages(stages, samples, stages.front().speed / factor, ends);
 }
 
 // A collocation peak can exceed a joint bound after quintic lowering. Reduce
 // path speed around that peak, preserving all other stages' time scale.
-bool soften_stages(std::vector<mk_time_stage> &stages, double peak_time,
+bool soften_stages(std::vector<mk_time_stage> &stages,
+                   const std::vector<mk_path_sample> &samples, double peak_time,
                    double factor) {
     if (stages.empty() || !std::isfinite(peak_time) || factor <= 1.0) return false;
     const int64_t peak_ns = static_cast<int64_t>(std::llround(peak_time * 1e9));
@@ -477,7 +568,7 @@ bool soften_stages(std::vector<mk_time_stage> &stages, double peak_time,
         }
     }
     if (!changed) return false;
-    return retime_stages(stages, speeds.front(),
+    return retime_stages(stages, samples, speeds.front(),
         std::vector<double>(speeds.begin() + 1, speeds.end()));
 }
 
@@ -705,41 +796,28 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         const auto &data = algorithm->getParameterizationData();
         std::vector<mk_time_stage> stages;
         std::vector<mk_timing_binding> bindings;
-        stages.reserve(static_cast<size_t>(grid.size() - 1));
-        bindings.reserve(stages.capacity());
-        int64_t start_ns = 0;
-        double speed = start_speed;
-        for (Eigen::Index i = 0; i + 1 < grid.size(); ++i) {
-            const double ds = grid[i + 1] - grid[i];
-            const double target_speed = std::sqrt(std::max(0.0, data.parametrization[i + 1]));
-            const double duration = 2.0 * ds / (speed + target_speed);
-            if (!std::isfinite(duration) || duration <= 0.0 ||
-                duration > static_cast<double>(INT64_MAX - start_ns) * 1e-9)
-                return MK_ERROR_GENERATION;
-            const int64_t duration_ns = std::max<int64_t>(1,
-                static_cast<int64_t>(std::floor(duration * 1e9)));
-            const double rounded = static_cast<double>(duration_ns) * 1e-9;
-            const double path_acceleration = 2.0 * (ds - speed * rounded) /
-                (rounded * rounded);
-            mk_time_stage stage{};
-            stage.struct_size = sizeof(stage);
-            stage.start_ns = start_ns;
-            stage.duration_ns = duration_ns;
-            stage.start_s = grid[i];
-            stage.speed = speed;
-            stage.acceleration = path_acceleration;
-            stages.push_back(stage);
-            const auto span = static_cast<size_t>(i) / 32;
-            const double mid_s = 0.5 * (grid[i] + grid[i + 1]);
-            const double mid_speed_squared = speed * speed + path_acceleration * ds;
+        std::vector<double> positions(grid.data(), grid.data() + grid.size());
+        std::vector<double> speeds(positions.size());
+        speeds.front() = start_speed;
+        for (size_t i = 1; i < speeds.size(); ++i)
+            speeds[i] = std::sqrt(std::max(0.0, data.parametrization[static_cast<Eigen::Index>(i)]));
+        speeds.back() = end_speed;
+        std::vector<char> anchors(positions.size(), 0);
+        for (size_t i = 0; i < anchors.size(); i += 32) anchors[i] = 1;
+        anchors.back() = 1;
+        if (!stages_from_profile(positions, speeds, anchors, stages)) return MK_ERROR_GENERATION;
+        // Bindings name TOPP-RA's own stages, with its own control.
+        bindings.reserve(positions.size() - 1);
+        for (size_t i = 0; i + 1 < positions.size(); ++i) {
+            const double ds = positions[i + 1] - positions[i];
+            const double path_acceleration =
+                (speeds[i + 1] * speeds[i + 1] - speeds[i] * speeds[i]) / (2.0 * ds);
+            const auto span = i / 32;
             bindings.push_back(binding_for_stage(samples, static_cast<uint32_t>(span),
-                static_cast<uint32_t>(i), mid_s, std::max(0.0, mid_speed_squared),
+                static_cast<uint32_t>(i), 0.5 * (positions[i] + positions[i + 1]),
+                std::max(0.0, speeds[i] * speeds[i] + path_acceleration * ds),
                 path_acceleration, max_velocity, max_acceleration, caps[span]));
-            speed += path_acceleration * rounded;
-            start_ns += duration_ns;
         }
-        if (end_speed == 0.0 && !stages.empty() && !settle_at_rest(stages))
-            return MK_ERROR_GENERATION;
         mk_time_law_handle created{};
         bool accepted = false;
         for (int attempt = 0; attempt < 24; ++attempt) {
@@ -811,12 +889,9 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             // Both boundaries are at rest here (checked above).
             if (stages.size() > 1000 &&
                 acceleration_check.status == MK_CHECK_FAILED && attempt < 20 &&
-                soften_stages(stages, acceleration_check.time_seconds, factor * 1.002)) {
-                if (!settle_at_rest(stages)) return MK_ERROR_GENERATION;
+                soften_stages(stages, samples, acceleration_check.time_seconds, factor * 1.002))
                 continue;
-            }
-            if (!stretch_stages(stages, factor * 1.002) || !settle_at_rest(stages))
-                return MK_ERROR_GENERATION;
+            if (!stretch_stages(stages, samples, factor * 1.002)) return MK_ERROR_GENERATION;
         }
         if (!accepted) return MK_ERROR_GENERATION;
         {
@@ -1026,6 +1101,7 @@ mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const doubl
         state.struct_size = sizeof(state);
         // Whether the quintic follows the segments it replaces at their joins and at fifteen even steps across.
         auto follows = [&](uint32_t first, uint32_t last) -> mk_result {
+            std::vector<double> peak_velocity(joints, 0.0), peak_acceleration(joints, 0.0);
             std::vector<int64_t> times;
             const uint32_t stride = std::max<uint32_t>(1, (last - first + 1) / 24);
             for (uint32_t i = first; i <= last; i += stride) times.push_back(start[i]);
@@ -1042,16 +1118,40 @@ mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const doubl
                         std::abs(mine.acceleration - state.acceleration[joint]) > acceleration_tolerance[joint])
                         return MK_ERROR_GENERATION;
                     // A merged run does not take a joint past a limit that the segments it replaces keep to, nor, where they
-                    // are past it themselves (a plateau at the limit, as a timed path cruises), past what they are.
-                    // The same for the position bounds, to a nanometre.
+                    // are past it themselves (a plateau at the limit, as a timed path cruises), past what they are by
+                    // more than rounding (1e-9 of the limit, the validator's own floor: a plan cruising at the limit is
+                    // checked against it). The same for the position bounds, to a nanometre.
                     if (mine.position < position_lower[joint] && mine.position < state.position[joint] - 1e-9) return MK_ERROR_GENERATION;
                     if (mine.position > position_upper[joint] && mine.position > state.position[joint] + 1e-9) return MK_ERROR_GENERATION;
                     if ((std::abs(mine.velocity) > velocity_limit[joint] &&
-                         std::abs(mine.velocity) > std::abs(state.velocity[joint]) * (1.0 + 1e-6)) ||
+                         std::abs(mine.velocity) > std::abs(state.velocity[joint]) + 1e-9 * velocity_limit[joint]) ||
                         (std::abs(mine.acceleration) > acceleration_limit[joint] &&
-                         std::abs(mine.acceleration) > std::abs(state.acceleration[joint]) * (1.0 + 1e-6)))
+                         std::abs(mine.acceleration) > std::abs(state.acceleration[joint]) + 1e-9 * acceleration_limit[joint]))
                         return MK_ERROR_GENERATION;
+                    peak_velocity[joint] = std::max(peak_velocity[joint], std::abs(state.velocity[joint]));
+                    peak_acceleration[joint] = std::max(peak_acceleration[joint],
+                        std::abs(state.acceleration[joint]));
                 }
+            }
+            // Samples can miss the quintic's own peaks between them, as on a plateau at a limit: bound its speed and
+            // acceleration exactly, at its stationary points.
+            const double T = static_cast<double>(candidate->duration_ns) * 1e-9;
+            for (uint32_t joint = 0; joint < joints; ++joint) {
+                Poly p(6);
+                double scale = 1.0;
+                for (int k = 0; k < 6; ++k) { p[k] = candidate->coefficients[joint].value[k] * scale; scale *= T; }
+                const Poly v = derivative(p), a = derivative(v);
+                auto peak = [](const Poly &q) {
+                    double worst = std::max(std::abs(eval(q, 0.0)), std::abs(eval(q, 1.0)));
+                    for (double x : roots(derivative(q))) worst = std::max(worst, std::abs(eval(q, x)));
+                    return worst;
+                };
+                const double v_peak = peak(v) / T, a_peak = peak(a) / (T * T);
+                if ((v_peak > velocity_limit[joint] * (1.0 + 1e-9) &&
+                     v_peak > peak_velocity[joint] + 1e-9 * velocity_limit[joint]) ||
+                    (a_peak > acceleration_limit[joint] * (1.0 + 1e-9) &&
+                     a_peak > peak_acceleration[joint] + 1e-9 * acceleration_limit[joint]))
+                    return MK_ERROR_GENERATION;
             }
             return MK_OK;
         };

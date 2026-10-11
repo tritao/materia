@@ -272,4 +272,110 @@ int main() {
     mk_trajectory_destroy(rapid_trajectory);
     mk_time_law_destroy(law);
     mk_path_destroy(path);
+
+    // A slow 1 mm-radius arc sampled every 1.5 um, as a printer's corner arcs
+    // are: TOPP-RA's stages on it last ~2 us. Deriving each stage's
+    // acceleration from its nanosecond-rounded duration made errors of several
+    // m/s^2 there (AM5B), and no slowdown removes them; each stage must keep
+    // TOPP-RA's, and the law must pass at once.
+    {
+        const double spacing = 1.5e-6, radius = 1e-3;
+        std::vector<mk_path_sample> fine(401);
+        for (size_t i = 0; i < fine.size(); ++i) {
+            auto &q = fine[i];
+            q = mk_path_sample{};
+            q.struct_size = sizeof(q);
+            q.joint_count = 2;
+            q.s = spacing * static_cast<double>(i);
+            const double phi = q.s / radius;
+            q.position[0] = radius * std::sin(phi);
+            q.position[1] = radius * (1.0 - std::cos(phi));
+            q.first[0] = std::cos(phi);
+            q.first[1] = std::sin(phi);
+            q.second[0] = q.second_before[0] = -std::sin(phi) / radius;
+            q.second[1] = q.second_before[1] = std::cos(phi) / radius;
+        }
+        assert(mk_path_create(fine.data(), static_cast<uint32_t>(fine.size()), &path) == MK_OK);
+        const double xy_velocity[2] = {0.25, 0.25}, xy_acceleration[2] = {1.0, 1.0};
+        const std::vector<double> feed(fine.size() - 1, 0.02);
+        mk_timing_report fine_report{};
+        mk_trajectory_handle fine_trajectory{};
+        assert(mk_time_path(path, xy_velocity, xy_acceleration, 2, feed.data(),
+            static_cast<uint32_t>(feed.size()), 0.0, 0.0, 1e-9, 1, &fine_report, &law,
+            &fine_trajectory) == MK_OK);
+        assert(fine_report.adjustments == 0);
+        mk_limits xy_limits{};
+        xy_limits.struct_size = sizeof(xy_limits);
+        xy_limits.joint_count = 2;
+        for (int j = 0; j < 2; ++j) {
+            xy_limits.derivative_claimed[j] = 3u;
+            xy_limits.max_velocity[j] = xy_velocity[j];
+            xy_limits.max_acceleration[j] = xy_acceleration[j];
+        }
+        mk_validation_report fine_validation{};
+        fine_validation.struct_size = sizeof(fine_validation);
+        assert(mk_validate(fine_trajectory, &xy_limits, &fine_validation) == MK_OK);
+        // Collocation plans a curved path to 0.8 of the limit; the law keeps it.
+        assert(fine_validation.checks[MK_CHECK_ACCELERATION].value < 0.85);
+        // Every sample is passed at a knot of the law.
+        for (const auto &q : fine) {
+            assert(mk_path_distance_to_time(law, q.s, &time) == MK_OK);
+            assert(std::abs(time * 1e9 - std::round(time * 1e9)) < 1e-3);
+        }
+        mk_trajectory_destroy(fine_trajectory);
+        mk_time_law_destroy(law);
+        mk_path_destroy(path);
+    }
+
+    // A step move timed to cruise at the speed limit, then merged into longer quintics as a compiler does: a
+    // merged run may not lift the plateau past the limit between the points it is checked at, or the plan
+    // validator refuses the merged form.
+    {
+        std::vector<mk_path_sample> step(51);
+        for (size_t i = 0; i < step.size(); ++i) {
+            auto &q = step[i];
+            q = mk_path_sample{};
+            q.struct_size = sizeof(q);
+            q.joint_count = 2;
+            q.s = 0.002 * static_cast<double>(i);
+            q.position[0] = q.s;
+            q.first[0] = 1.0;
+        }
+        assert(mk_path_create(step.data(), static_cast<uint32_t>(step.size()), &path) == MK_OK);
+        const double step_velocity[2] = {0.25, 0.25}, step_acceleration[2] = {12.5627130716, 24.09};
+        mk_trajectory_handle step_trajectory{}, step_merged{};
+        assert(mk_time_path(path, step_velocity, step_acceleration, 2, nullptr, 0, 0.0, 0.0, 1e-6, 0,
+            nullptr, &law, &step_trajectory) == MK_OK);
+        double position_tolerance[2], velocity_tolerance[2], acceleration_tolerance[2];
+        const double lower[2] = {-1e9, -1e9}, upper[2] = {1e9, 1e9};
+        for (int j = 0; j < 2; ++j) {
+            position_tolerance[j] = 10e-6 * step_velocity[j];
+            velocity_tolerance[j] = 0.01 * step_velocity[j];
+            acceleration_tolerance[j] = 0.1 * step_acceleration[j];
+        }
+        assert(mk_merge_segments(step_trajectory, position_tolerance, velocity_tolerance,
+            acceleration_tolerance, step_velocity, step_acceleration, lower, upper, 2, 0.01,
+            &step_merged) == MK_OK);
+        uint32_t lowered_count = 0, merged_count = 0;
+        assert(mk_trajectory_segment_count(step_trajectory, &lowered_count) == MK_OK);
+        assert(mk_trajectory_segment_count(step_merged, &merged_count) == MK_OK);
+        assert(merged_count * 10 < lowered_count);
+        mk_limits step_limits{};
+        step_limits.struct_size = sizeof(step_limits);
+        step_limits.joint_count = 2;
+        for (int j = 0; j < 2; ++j) {
+            step_limits.derivative_claimed[j] = 3u;
+            step_limits.max_velocity[j] = step_velocity[j];
+            step_limits.max_acceleration[j] = step_acceleration[j];
+        }
+        mk_validation_report step_report{};
+        step_report.struct_size = sizeof(step_report);
+        assert(mk_validate(step_merged, &step_limits, &step_report) == MK_OK);
+        assert(step_report.checks[MK_CHECK_VELOCITY].status != MK_CHECK_FAILED);
+        assert(step_report.checks[MK_CHECK_ACCELERATION].status != MK_CHECK_FAILED);
+        mk_trajectory_destroy(step_merged);
+        mk_trajectory_destroy(step_trajectory);
+        mk_time_law_destroy(law);
+        mk_path_destroy(path);
+    }
 }
