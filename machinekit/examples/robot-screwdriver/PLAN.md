@@ -1176,6 +1176,8 @@ physical two-stage acceptance still need implementation. SD7 remains open.
 
 ### SD7 final-pass motion checkpoint (2026-10-11)
 
+Implementation commit: `6ae7b158a`.
+
 `ScrewPlan.finalContact` and the runner's final-approach/contact/seal/engage
 phases now acquire an already installed screw without consulting a presenter.
 The reference for measured compression following and recovery is derived from
@@ -1202,5 +1204,5 @@ values, saved format or native code changed, and no new Haxeon issue was found.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — CAD execution and transport-loss recovery pass both backends and full checkpoint gates; endpoint access passes its full checkpoint; snug/final execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba` |
+| SD7 | in progress — CAD execution and transport-loss recovery pass both backends and full checkpoint gates; endpoint access passes its full checkpoint; snug/final execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a` |
 | SD8 | open — machine tending landed; not started | |
