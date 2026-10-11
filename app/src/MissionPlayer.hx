@@ -1734,7 +1734,8 @@ class MissionPlayer implements SessionMember {
     screwArm = arm;
     var work = assemblyParts.get("project:"+job.frame), presenter = assemblyParts.get("project:"+job.presenter);
     driver.configure(job.slot,{program:new TighteningProgram(job.program),joint:ScrewScenePlan.joint(job,capacity.springRate),
-      screw:screw.freeBody(),hand:job.hand,retain:work.retain,
+      screw:screw.freeBody(),hand:job.hand,fixture:work,
+      connection:{fastening:job.fastening,member:job.frame,face:job.threadFace},
       work:() -> ScrewScenePlan.work(job,livePart(work),screw.center)});
     var state = robot.runtime.snapshot();
     var planning = PlanningLimits.ofGroup(arm,new SteadyLoads(),ARM_ACCELERATION,null,state.modelRevision,state.calibrationRevision);

@@ -153,6 +153,30 @@ class ScrewRecoveryTests {
 		runOrchestrationFaults();
 
 		Sys.println('Screw recovery: $count checks passed');
+		runRemainingBudget();
+	}
+	static function runRemainingBudget():Void {
+		count = 0;
+		var created = 0, outputs = new RecoveryOutputs();
+		var attempt:Int->processkit.skill.DriveFastening.ScrewAttempt = (index) -> {
+			if (index != 0 || created != 0) throw "Final pass requested a supply after exhausting its shared budget";
+			created++;
+			var drive = failed(new RecoveryMotion(),outputs);
+			return {screw:"installed-reserve",runner:drive,skill:new AttemptSkillFixture(drive)};
+		};
+		var recover:ScrewdrivingRunner->Skill = (drive) -> new RecoverySkillFixture(drive,outputs);
+		refuses(() -> {var invalid = new DriveFastening("recovery-probe",attempt,recover,0);});
+		refuses(() -> {var invalid = new DriveFastening("recovery-probe",attempt,recover,3);});
+		var execution = new DriveFastening("recovery-probe",attempt,recover,1);
+		execution.start();
+		for (_ in 0...100) {var status = execution.update(null,0.01);}
+		check(execution.status() == Succeeded && created == 1 && execution.report.finished && execution.report.failed,
+			"An exhausted supply budget recovers the installed body's NOK and continues without another attempt");
+		check(execution.report.attempts.length == 1 && execution.report.attempts[0].screw == "installed-reserve" &&
+			execution.report.attempts[0].result.outcome == ScrewdriverContract.CROSS_THREAD && execution.report.attempts[0].disposition == Rejected,
+			"A one-attempt final run retains its exact rejected body and measured failure");
+		check(execution.report.installed() == null,"Exhausted final recovery does not fabricate an installed body");
+		Sys.println('Screw remaining supply budget: $count checks passed');
 	}
 	static function runTransportLoss(pickup:Bool):Void {
 		var motion = new RecoveryMotion(), outputs = new RecoveryOutputs();

@@ -10,6 +10,7 @@ import processkit.screwdriving.*;
 import processkit.screwdriving.TighteningModel.TighteningJoint;
 import processkit.screwdriving.ScrewdriverProcessDevice.ScrewdriverChannelNames;
 import processkit.simulation.SimulatedScrewdriver;
+import processkit.simulation.SimulatedScrewdriver.ScrewdriverSetup;
 import nativekit.sim.SimPose;
 
 /** Process-owned tool motion, live frames, holding, feedback and stop/resume on both backends. */
@@ -29,7 +30,7 @@ class ScrewdriverSimulationTests {
     count = 0;
     for (backend in [SimulationSpace.DETERMINISTIC,SimulationSpace.MUJOCO]) {
       runBackend(backend);
-      runTransport(backend);
+      runTransport(backend,false,false,false);
     }
     runSequencing();
     var device = new DriverDeviceFixture();
@@ -49,6 +50,15 @@ class ScrewdriverSimulationTests {
     device.feedback.result = ScrewdriverContract.CROSS_THREAD;
     check(process.fault() == "screwdriver: cross-thread","Hardware and simulation share result diagnostics");
     Sys.println('Screwdriver simulation: $count checks passed on MuJoCo and the test backend');
+    count = 0;
+    for (backend in [SimulationSpace.DETERMINISTIC,SimulationSpace.MUJOCO]) {
+      runTransport(backend,true,false,false);
+      runTransport(backend,true,true,false);
+    }
+    Sys.println('Screwdriver retained engagement: $count checks passed on both backends');
+    count = 0;
+    for (backend in [SimulationSpace.DETERMINISTIC,SimulationSpace.MUJOCO]) runTransport(backend,true,false,true);
+    Sys.println('Screwdriver head-seat continuation: $count checks passed on both backends');
   }
   static function runSequencing():Void {
     var device = new DriverDeviceFixture();
@@ -93,7 +103,8 @@ class ScrewdriverSimulationTests {
     refuses(() -> { var invalid = new processkit.skill.DriveScrew(null,null,null,""); });
   }
   /** A distant lead-in cannot pull a screw out of the presenter or compress its feed. */
-  static function runTransport(backend:Int):Void {
+  static function runTransport(backend:Int, retighten:Bool = false, detached:Bool = false, headSeat:Bool = false):Void {
+    var expectedTorque = headSeat ? joint().prevailingTorque : 9.9;
     var harness = new SimulationHarness(0.01,1,backend);
     try {
       var model = new RobotModel("screw transport probe");
@@ -137,8 +148,9 @@ class ScrewdriverSimulationTests {
       var body = new SimPose(0.02,0,0.101,0,0,0,1);
       var fixture = new SimulationAssemblyPart("work-fixture",harness.simulation,[0.0,0.0,0.0],[],
         {id:"work-fixture",robotIndex:0,linkIndex:4,offset:materia.assembly.AssemblyFrames.identity(),center:[0.0,0.0,0.0]},null);
-      observer.configure(1,{program:program(),joint:joint(),screw:screw,hand:1,
-        retain:fixture.retain,
+      observer.configure(1,{program:new TighteningProgram(program().settings,headSeat),joint:joint(),screw:screw,hand:1,
+        fixture:fixture,
+        connection:{fastening:"transport-probe",member:"work-fixture",face:"bore"},
         work:() -> ({head:head,screwPose:body,engagementPoint:[0.02,0.0,0.1],hole:[0.02,0.0,0.1],direction:[0.0,0.0,1.0],damagedLeadIn:false})});
       var id = harness.simulation.addStepObserver(observer);
       var outputs = new ChannelScrewdriverOutputs(runtime,channels);
@@ -166,12 +178,30 @@ class ScrewdriverSimulationTests {
         "The slide compresses only after the carried screw reaches the lead-in");
       outputs.start(true);
       for (_ in 0...5000) if (observer.reading().result == ScrewdriverContract.NONE) harness.step();
-      check(observer.reading().result == ScrewdriverContract.OK,
-        "A screw carried from the presenter tightens successfully on the real tool joints");
+      check(observer.reading().result == ScrewdriverContract.OK &&
+        observer.reading().torqueNm == expectedTorque,
+        'A screw carried from the presenter completes its qualified pass on the real tool joints (head-seat $headSeat, measured torque ${observer.reading().torqueNm})');
       var seated = harness.simulation.objectPose(screw);
+      var retainedTorque = observer.reading().torqueNm;
       check(Math.abs(seated.z-0.103) < 0.0001 && Math.abs(seated.x-0.02) <= 0.00051,
         "The transported screw reaches its seat while retaining its actual lead-in contact offset");
-      outputs.start(false); harness.step(); outputs.vacuum(false); harness.step();
+      var continuation:Null<ScrewdriverSetup> = null;
+      if (retighten) {
+        var settings = program().settings;
+        // Explicit probe qualification; this does not add a production torque table entry.
+        settings.targetTorque = 14; settings.finalTorqueLimit = 16; settings.minimumAngle = 0.6; settings.maximumAngle = 0.8;
+        var qualified:ScrewdriverSetup = {program:new TighteningProgram(settings),joint:joint(),screw:screw,hand:1,
+          fixture:fixture,connection:{fastening:"transport-probe",member:"work-fixture",face:"bore"},retightening:true,
+          work:() -> ({head:head,screwPose:body,engagementPoint:[0.02,0.0,0.1],hole:[0.02,0.0,0.1],direction:[0.0,0.0,1.0],damagedLeadIn:false})};
+        continuation = qualified;
+        refuses(() -> {var contact = observer.configure(2,qualified);});
+      }
+      outputs.start(false); harness.step();
+      if (retighten) {
+        for (_ in 0...100) if (Math.abs(observer.reading().speed)>0.01) harness.step();
+        harness.step();
+      }
+      outputs.vacuum(false); harness.step();
       runtime.submitPosition(0,0,3);
       for (_ in 0...1000) if (runtime.snapshot().q.get(0) > 1e-5) harness.step();
       var released = harness.simulation.objectPose(screw);
@@ -179,7 +209,71 @@ class ScrewdriverSimulationTests {
         "Vacuum release retains the actual seated screw through retraction and gravity");
       check(fixture.carries(screw),
         "The named fixture owns the fastened screw after the bit releases it");
-      runtime.submitPosition(3,0.01,4);
+      if (retighten) {
+        if (continuation == null) throw "Retightening probe lost its qualification";
+        var qualified:ScrewdriverSetup = cast continuation;
+        var identity = qualified.connection;
+        if (identity == null) throw "Retightening probe lost its named connection";
+        identity.face = "another-bore";
+        refuses(() -> {var contact = observer.configure(2,qualified);});
+        identity.face = "bore";
+        var other = harness.spawnBox([0.01,0,0.101],[0.0001,0.0001,0.0001],true,0.01);
+        var wrong:ScrewdriverSetup = {program:qualified.program,joint:qualified.joint,screw:other,hand:1,
+          fixture:fixture,connection:identity,retightening:true,work:qualified.work};
+        refuses(() -> {var contact = observer.configure(2,wrong);});
+        var wrongFixture = new SimulationAssemblyPart("different-fixture",harness.simulation,[0.0,0.0,0.0],[],null,freeFixture);
+        var misplaced:ScrewdriverSetup = {program:qualified.program,joint:qualified.joint,screw:screw,hand:1,
+          fixture:wrongFixture,connection:identity,retightening:true,work:qualified.work};
+        refuses(() -> {var contact = observer.configure(2,misplaced);});
+        var contact = observer.configure(2,qualified);
+        check(contact != null && Math.abs(contact.socket.translation.z-(released.z-0.001))<1e-8 && contact.advanceMm > 1.9,
+          "Final contact comes from the actual released body and retained calibrated advancement");
+        var prior = observer.model;
+        if (prior == null) throw "Retightening probe lost its engaged model";
+        var retainedAngle = prior.reading.angle;
+        outputs.selectProgram(2); harness.step();
+        check(observer.reading().result == ScrewdriverContract.NONE && Math.abs(observer.reading().angle-retainedAngle)<1e-9 &&
+          observer.reading().torqueNm == retainedTorque && observer.reading().strokeMm == 0 && fixture.carries(screw),
+          "Selecting final retains preload and angle without moving or acquiring the seated body");
+        runtime.submitPosition(0,0.02,5);
+        for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(0)-0.02)>1e-5) harness.step();
+        outputs.vacuum(true); harness.step(); harness.step();
+        check(observer.holding.held == screw && !fixture.carries(screw) && observer.reading().strokeMm > 0.5,
+          "Final recontact acquires the same body and compresses the physical feed before starting");
+        outputs.start(true);
+        for (_ in 0...5000) if (observer.reading().result == ScrewdriverContract.NONE) harness.step();
+        check(observer.reading().result == ScrewdriverContract.OK && observer.reading().torqueNm == 14 &&
+          Math.abs(observer.reading().angle-retainedAngle-(14-retainedTorque)/19.4)<0.02 &&
+          Math.abs(harness.simulation.objectPose(screw).z-released.z)<0.00001,
+          'Final adds only remaining elastic rotation, preserves the original snug window and leaves the body seated (backend $backend, head-seat $headSeat, source torque $retainedTorque, source angle $retainedAngle, result ${haxe.Json.stringify(observer.reading())}, seat ${seated.z}, actual ${harness.simulation.objectPose(screw).z})');
+        outputs.start(false);
+        for (_ in 0...100) if (Math.abs(observer.reading().speed)>0.01) harness.step();
+        outputs.vacuum(false); harness.step();
+        runtime.submitPosition(0,0,6);
+        for (_ in 0...1000) if (runtime.snapshot().q.get(0)>1e-5) harness.step();
+        check(fixture.carries(screw) && observer.holding.held == null,
+          "Successful final release returns the exact screw to its named fixture");
+        var settings = program().settings;
+        settings.targetTorque = 18; settings.finalTorqueLimit = 20; settings.minimumAngle = 0.8; settings.maximumAngle = 1;
+        var higher:ScrewdriverSetup = {program:new TighteningProgram(settings),joint:joint(),screw:screw,hand:1,
+          fixture:fixture,connection:identity,retightening:true,work:qualified.work};
+        var eligible = observer.configure(3,higher);
+        check(eligible != null,"Ownership and reset tests start from a valid higher-target continuation");
+        if (detached) {
+          var actual = harness.simulation.objectPose(screw);
+          harness.simulation.releaseObject(screw);
+          check(!fixture.carries(screw),"Native detachment removes the joint even when its body pose is unchanged");
+          refuses(() -> {var contact = observer.configure(3,higher);});
+          fixture.retain(screw,actual);
+          refuses(() -> {var contact = observer.configure(3,higher);});
+        } else {
+          observer.reset();
+          refuses(() -> {var contact = observer.configure(3,higher);});
+          // Keep the remaining fixture-motion/freshness checks on an idle slot.
+          outputs.selectProgram(1);
+        }
+      }
+      runtime.submitPosition(3,0.01,retighten ? 7 : 4);
       for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(3)-0.01) > 1e-5) harness.step();
       harness.step();
       var moved = harness.simulation.objectPose(screw);

@@ -76,5 +76,38 @@ class ScrewRetighteningTests {
 		var shortened = ScrewdriverProcessTests.program().settings; shortened.maximumRunDownAngle = 1;
 		rejects(() -> {var invalid = retained.retighten(new TighteningProgram(shortened),ScrewdriverProcessTests.joint());});
 		Sys.println('Screw retightening: $count checks passed');
+		runHeadSeat();
+	}
+	static function runHeadSeat():Void {
+		count = 0;
+		var qualification = ScrewdriverProcessTests.program();
+		var first = new TighteningModel(new TighteningProgram(qualification.settings,true),ScrewdriverProcessTests.joint());
+		// Cross the seat and final thresholds in one sample: snug must still stop
+		// at the calibrated seat without adding a fabricated elastic preload.
+		var start = input(0); start.axialErrorMm = 0.2;
+		var engaged = first.step(start);
+		var stopped = first.step(input(100));
+		check(stopped.result == ScrewdriverContract.OK && Math.abs(first.advanceMm-1.8)<1e-9 &&
+			Math.abs(stopped.angle-1.8*2*Math.PI)<1e-9 && stopped.torqueNm == first.joint.prevailingTorque,
+			"Snug stops at the measured head seat even when one sample crosses final thresholds");
+		check(first.program.settings.targetTorque == qualification.settings.targetTorque &&
+			first.program.settings.minimumAngle == qualification.settings.minimumAngle,
+			"Snug retains the final qualification rather than inventing a lower torque target");
+		var finalPass = first.retighten(qualification,ScrewdriverProcessTests.joint());
+		var finished = finalPass.step(input(100));
+		var elastic = (qualification.settings.targetTorque-first.joint.prevailingTorque)/first.joint.stiffnessNmPerRad;
+		check(finished.result == ScrewdriverContract.OK && finished.torqueNm == qualification.settings.targetTorque &&
+			Math.abs(finished.angle-stopped.angle-elastic)<1e-9 && finalPass.advanceMm == first.advanceMm,
+			"Final resumes the original head seat and applies the qualified elastic rotation once");
+		rejects(() -> {var invalid = first.retighten(new TighteningProgram(qualification.settings,true),ScrewdriverProcessTests.joint());});
+		var damaged = new TighteningModel(new TighteningProgram(qualification.settings,true),ScrewdriverProcessTests.joint());
+		var bad = input(100); bad.damagedLeadIn = true;
+		check(damaged.step(bad).result == ScrewdriverContract.CROSS_THREAD,
+			"Snug still rejects a damaged lead-in before the seat");
+		var limited = ScrewdriverProcessTests.program().settings; limited.maximumRunDownAngle = 1;
+		var tooLong = new TighteningModel(new TighteningProgram(limited,true),ScrewdriverProcessTests.joint());
+		check(tooLong.step(input(100)).result == ScrewdriverContract.RUN_DOWN_TOO_LONG,
+			"Snug retains the qualified run-down watchdog");
+		Sys.println('Screw head-seat stop: $count checks passed');
 	}
 }

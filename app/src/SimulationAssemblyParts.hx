@@ -9,7 +9,7 @@ import nativekit.sim.SimPose;
 import robotkit.runtime.Simulation;
 
 /** A CAD occurrence's live frame and collision pieces, whether carried by a robot or a scene object. */
-class SimulationAssemblyPart {
+class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture {
   public final id:String;
   /** Preview geometry centre in the occurrence's own frame, in metres. */
   public final center:Array<Float>;

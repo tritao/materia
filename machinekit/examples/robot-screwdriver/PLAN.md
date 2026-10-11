@@ -283,6 +283,28 @@ simulation and hardware, and a mission step drives it.
   follow that same reference. Vacuum loss during final engagement uses the
   existing controlled arm stop and retains the cumulative failure angle.
 
+- **SD7 — A retained simulation joint belongs to one released body.** The
+  observer records successful fixture transfer against the exact fastening,
+  threaded member, named face, body and thread hand. Selection consumes that
+  state; a failed continuation cannot restore an earlier OK. Final setup
+  returns the live body's socket and calibrated advancement while keeping its
+  anchor inactive until vacuum reacquires the body. Recontact verifies the
+  intrinsic socket/lead-in geometry and actual seated pose against that retained
+  engagement. Reset/rebuild discards every retained entry. Final shaft angle
+  uses a fresh measured origin plus the retained cumulative joint angle, so
+  stopping coast does not discard preload or add invented thread travel.
+- **SD7 — The replacement budget spans passes.** `DriveFastening` accepts one
+  or two remaining attempts; the existing default is two. A final run after a
+  snug replacement must allow only its installed-body attempt, recover its NOK
+  and report exhaustion without asking for a third supply. The staged mission
+  coordinator must derive this limit from the preceding measured snug report.
+- **SD7 — Snug stops at the measured head seat.** `TighteningProgram.stopAtSeat`
+  preserves the final program qualification and stops at the calibrated snug
+  angle with prevailing torque, even if a sample crosses later thresholds.
+  Lead-in, run-down torque, feed-force and run-down watchdog failures still
+  apply. A continuation requires a final program. This does not introduce a
+  lower catalog torque or reinterpret a snug OK as final tightening.
+
 ## What exists
 
 - Fasteners in `machinekit.standard`: `SocketHeadCapScrew` (ISO 4762),
@@ -524,6 +546,12 @@ Here:
   primary/reserve supply, pickup/lift, thread entry/seat and reject pose, full
   socket orientation and actual arm/tool/held-body CAD clearance. Contact and
   retreat samples use the qualified feed window and authored approach length.
+  Snug uses an explicitly commissioned head-seat program slot, distinct from
+  the qualified final slot. It stops at the measured seat rather than at an
+  invented lower torque. Final resumes the actual successful snug body's
+  retained engagement and checks angles from its original snug point. Both
+  passes share the one replacement supply; a failed snug explicitly skips its
+  final pass without fabricating a measured tightening result.
 - Not-OK recovery: reverse out by the driven angle, drop the screw in a reject
   bin, retry with a new screw once, then report the fastening as failed and go
   on.
@@ -1195,6 +1223,70 @@ execution still need implementation; these runner tests
 are not physical two-stage acceptance, and SD7 remains in progress. No catalog
 values, saved format or native code changed, and no new Haxeon issue was found.
 
+### SD7 observer and head-seat checkpoint (2026-10-11)
+
+The simulated tool now retains a successful released engagement using exact
+connection/body identity, resumes cumulative angle and preload, and verifies
+the actual body and intrinsic socket/lead-in geometry when vacuum recontacts.
+The CAD player supplies the freshly qualified connection identity to its slot.
+`DriveFastening` also accepts a bounded remaining attempt count for the shared
+snug/final supply budget. Both now pass the focused physical and budget checks below.
+
+Focused `build/sd7-retained-seat-app-build.log` and
+`build/sd7-retained-seat-app-process.log` pass compilation and 104 physical checks
+on both backends, keeping the existing 80-check simulation cohort unchanged.
+The fixture implements a function-only `SimulationObjectFixture` interface:
+continuation verifies actual native ownership, and observed loss permanently
+invalidates the saved engagement. Wrong new face, body or fixture qualification
+fails without destroying a still-valid source joint. Separate eligible higher
+programs prove reset and detached/re-attached body invalidation, without relying
+on an already-invalid target. `build/sd7-retained-budget.log` passes five new
+remaining-budget checks, with 31 process, 14 retained-core, 11 final-runner,
+13 generator and 51 recovery checks unchanged. The equipment artifact remains
+2238283 bytes.
+
+Production catalog values and saved schema 31 remain unchanged; the probe's
+14/18 Nm targets are test qualification only. The first physical probe failed
+because its fixture-motion command reused sequence 4 after new commands 5/6;
+correcting that authored sequence order made both backend cases pass. This was
+a test error, not a Haxeon issue. Whole-CAD focused acceptance in
+`build/sd7-retained-cad.log` passes normal and cross-thread replacement cases
+on both backends and portable export, at the unchanged 2269798 bytes; the
+required full gate remains due when SD7 is complete.
+The optional snug stage will stop at the actual head seat, retaining the
+original final torque qualification. It will not introduce an arbitrary lower
+torque as a substitute for the plan's snug phase. This requires an explicit
+saved pass and schema bump when the staged mission is wired.
+
+The head-seat model now passes six additional focused checks in
+`build/sd7-head-seat.log`: calibrated seat despite a large sample, unchanged
+final qualification, retained final elastic angle, refusal of another snug
+continuation, damaged lead-in and run-down watchdog. The first new physical
+assertion sampled the body on the result tick, before native pose settling:
+0.102973520436 m versus the subsequent 0.103 m seat. Final correctly retained
+the released 0.103 m seat and reached 14 Nm. Comparing against the actual
+released socket fixes that test timing error without changing the process.
+A clean rebuild reproduced the timing error, so stale compilation was ruled
+out. A separate optional-Bool argument probe passes, and no new Haxeon compiler
+bug has been confirmed. Quick gate `sd7-retained-seat` passes all three stages. All 127 existing
+MachineKit result lines match the final-contact checkpoint exactly; only the
+six head-seat and five remaining-budget summaries are added. Archived logs
+and comparison are `build/sd7-retained-seat-*`. The final physical head-seat
+assertion explicitly distinguishes the unchanged 9.9 Nm pass from a seat
+stop at prevailing torque and compares against the actual released pose.
+Its final focused rerun passes the unchanged 80 simulation checks, 104
+retained-engagement checks and 50 head-seat continuation checks on both
+backends. The four ownership cases now each include rejection of a different
+native fixture. Explicit mode arguments and the first result's expected torque
+prove that ordinary passes still finish at 9.9 Nm and head-seat passes at the
+joint's 0.2 Nm prevailing torque. Final reaches the probe's 14 Nm target from
+the same retained seat. Equipment remains 2238283 bytes. No engineering value,
+saved schema, native source or submodule pin changes; no new Haxeon issue was
+found. The full gate remains due at SD7 completion.
+
+Stage-linked generation, installed-body selection, shared-budget coordination,
+reports and physical whole-cell two-stage acceptance still need implementation.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
@@ -1204,5 +1296,5 @@ values, saved format or native code changed, and no new Haxeon issue was found.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — CAD execution and transport-loss recovery pass both backends and full checkpoint gates; endpoint access passes its full checkpoint; snug/final execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a` |
+| SD7 | in progress — CAD execution, transport-loss recovery and endpoint access pass full checkpoint gates; retained observer, head-seat stop and shared budget pass focused/quick checks; staged mission and final full gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a` |
 | SD8 | open — machine tending landed; not started | |

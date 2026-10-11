@@ -14,15 +14,18 @@ class DriveFastening implements Skill {
   public final report:FasteningRunReport;
   final attempt:Int -> ScrewAttempt;
   final recover:ScrewdrivingRunner -> Skill;
+  final attemptLimit:Int;
   final lifecycle = new SkillLifecycle();
   var index = 0;
   var recovering = false;
   var active:Null<Skill> = null;
   var runner:Null<ScrewdrivingRunner> = null;
   var screw:String = "";
-  public function new(fastening:String, attempt:Int -> ScrewAttempt, recover:ScrewdrivingRunner -> Skill) {
+  public function new(fastening:String, attempt:Int -> ScrewAttempt, recover:ScrewdrivingRunner -> Skill, attemptLimit:Int = 2) {
     if (attempt == null || recover == null) throw "Fastening execution needs identified attempts and a recovery skill";
+    if (attemptLimit < 1 || attemptLimit > 2) throw "Fastening execution allows one or two identified attempts";
     report = new FasteningRunReport(fastening); this.attempt = attempt; this.recover = recover;
+    this.attemptLimit = attemptLimit;
   }
   public function start():Void {
     lifecycle.begin(); report.reset(); index = 0; recovering = false; active = null; runner = null;
@@ -45,8 +48,8 @@ class DriveFastening implements Skill {
         case Succeeded:
           if (recovering) {
             report.recovered();
-            if (index == 0) {index++; beginAttempt();}
-            else {report.finish(); lifecycle.succeed("fastening failed after one replacement");}
+            if (index+1 < attemptLimit) {index++; beginAttempt();}
+            else {report.finish(); lifecycle.succeed(attemptLimit == 2 ? "fastening failed after one replacement" : "fastening failed with no replacement remaining");}
           } else {
             var result = drive.tighteningResult;
             if (result == null || result.outcome != ScrewdriverContract.OK) throw "Successful screw skill has no measured OK result";

@@ -71,6 +71,7 @@ class TighteningModel {
         joint.prevailingTorque != other.prevailingTorque || joint.stiffnessNmPerRad != other.stiffnessNmPerRad ||
         joint.stripTorque != other.stripTorque)
       throw "Retightening cannot change the engaged joint's geometry or response";
+    if (next.stopAtSeat) throw "Retightening needs a final program, not another head-seat stop";
     if (next.settings.targetTorque <= reading.torqueNm || next.settings.maximumRunDownAngle < snugAngle)
       throw "Retightening needs a higher target and the original run-down allowance";
     resumed.contactRunDownMm = contactRunDownMm;
@@ -158,6 +159,11 @@ class TighteningModel {
     }
     if (input.angle < snugAngle) {
       reading.speed = settings.runDownSpeed; return copy();
+    }
+    if (program.stopAtSeat) {
+      reading.angle = snugAngle;
+      reading.phase = ScrewdriverContract.SNUG;
+      return finish(ScrewdriverContract.OK);
     }
     var finalAngle = Math.max(0, input.angle - snugAngle);
     reading.phase = finalAngle == 0 ? ScrewdriverContract.SNUG : ScrewdriverContract.FINAL;
