@@ -1144,6 +1144,8 @@ Optional snug/final execution and SD8 remain open; SD7 is still in progress.
 
 ### SD7 retained engagement core checkpoint (2026-10-11)
 
+Implementation commit: `b0b4743ba`.
+
 `TighteningModel.retighten` now preserves calibrated contact travel, original
 snug and cumulative angle, preload and reversal distance while starting a
 new measured result. It rejects empty/failed/unseated models, changed joint
@@ -1172,5 +1174,5 @@ physical two-stage acceptance still need implementation. SD7 remains open.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — CAD execution and transport-loss recovery pass both backends and full checkpoint gates; endpoint access passes its full checkpoint; snug/final execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a` |
+| SD7 | in progress — CAD execution and transport-loss recovery pass both backends and full checkpoint gates; endpoint access passes its full checkpoint; snug/final execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba` |
 | SD8 | open — machine tending landed; not started | |
