@@ -302,7 +302,7 @@ Here:
 **SD4. Screwdriving equipment and the cell.**
 - MachineKit `machinekit.screwdriving`:
   - `ScrewdriverSpindle`: motor and gearbox body, the spindle as a real
-    revolute tool joint, on a feed slide that is a real prismatic tool joint
+    continuous revolute tool joint, on a feed slide that is a real prismatic tool joint
     with a spring rate and a sensed stroke. `tcp` at the bit tip.
   - `ScrewdriverBit` for a `ScrewDrive`, with a vacuum sleeve (`Vacuum` port).
   - `TighteningController` (mains input, tool cable, control port; program
@@ -310,7 +310,8 @@ Here:
   - `ScrewPresenter`: nest, escapement and part-present sensor, fed by hand for
     now, holding one screw size.
   - Capabilities: `ScrewdriverFacet(tcpConnector, controlPort, maxTorque,
-    maxSpeed, strokeMm, springRate)` and `TighteningSupplyFacet(programs,
+    maxSpeed, strokeMm, springRate, bit, feedJoint, spindleJoint,
+    strokeEncoder)` and `TighteningSupplyFacet(programs,
     controlInterface)`.
 - `ArmScrewdrivingTool implements ArmTool`.
 - `EndEffectorControls`: a `Driver` control with channels
@@ -556,13 +557,60 @@ The full gate runs the source fixes in `ffee5362f`. At that checkpoint SD4–SD8
 the prior desktop thread capture remains recorded, and the unavailable web
 capture remains undone.
 
+### SD4 equipment and cell (2026-10-11)
+
+Equipment implementation: `fdc6da0c0`. The start-page project opens the cell,
+checks its four CAD fastenings and presenter, and declares a screwdriver tool
+without a driving mission. The feed and spindle move as real joints; the stroke
+encoder is physical. The Decisions above record custom equipment assumptions,
+capability references, bit preview profiles, channel stop policy and the v29
+scene contract. SD5–SD8 remain unstarted.
+
+Full gate: `sd-suite-sd4-final.txt`, run with
+`build/sd-suite-local.sh sd4-final full`, passes all seven stages. ProjectKit retains 199 assertions. MachineKit
+adds 28 equipment checks, including real TCP travel/rotation, bridge bindings,
+bit and controller validation, capacity/axis/clearance failures, malformed scene
+packets and feed limits expressed in metres. The project-source suite opens the
+new project on MuJoCo and the deterministic test backend and verifies that it has
+no mission runner yet. App and editor builds and all editor tests pass. The run
+uses prebuilt OCCT; no native sources or submodule pins changed.
+
+All 121 existing MachineKit result lines match exactly
+(`build/sd4-final-machinekit-compare.txt`). All 114 existing project-source result
+lines match after excluding timing and allocation profiling
+(`build/sd4-final-app-compare.txt`). Cycle times, tracking, stock removal, weld
+sizes, pose counts, drive findings and diagnostics are unchanged. Of 40 existing
+artifact loads, 15 keep their byte size, 24 grow by 19 bytes and one grows by 38:
+the optional `"screwdriver":null` JSON field costs 19 bytes per existing tool.
+The new cell artifact is 2206852 bytes (`build/sd4-final-artifact-compare.txt`).
+
+Compared with the post-rebase baseline, picker allocation averages move from
+58559/60170 to 58618/60341 bytes/tick; mill allocation moves from 53488.44 to
+53580.00 bytes/tick (53.5 to 53.6 KB/tick when rounded). These intervals read the
+global HashLink allocation-buffer refill counter, not exact per-tick object
+allocations (`haxeon/vendor/hashlink/src/gc.c`, `gc_tlab_alloc` and
+`hl_gc_total_allocated`). The first full SD4 run measured 58517/60274 and
+53489.42 respectively, with the same physical results. Router allocation stays
+39.5/43.8 KB/tick; collections move from 16/16 to 15/15. Allocation budgets pass;
+wall-clock profiling varies with machine load.
+
+The first full gate, `sd-suite-sd4.txt`, also passed. After correcting the scene
+validator's length-unit conversion, `sd-suite-sd4-unit-initial.txt` records an
+interrupted rerun: the added fixture accessed an optional field without checking
+it (E1005). Explicit checked locals fix the fixture. `BodyTyper.typedMember`
+rejects nullable receivers as designed; this is not a new compiler bug. No
+Haxeon patches were made. Initial, interrupted and final logs are preserved in
+`build/sd4-initial-*.log`, `build/sd4-unit-initial-*.log` and
+`build/sd4-final-*.log`. The earlier unavailable web thread screenshot remains
+recorded in SD2; no further screenshot was required by SD4.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
 | SD1 | done — post-rebase full gate passed | `86181a642`, `a6b9ccd55` |
 | SD2 | done — post-rebase full gate passed | `154ca5491`, `35a195269`, `24b5d1a02` |
 | SD3 | done — post-rebase full gate passed | `fbbe14d0c`, `6c338344d`, `ffee5362f` |
-| SD4 | in progress — equipment and cell implemented; gate pending | |
+| SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | open — machine tending landed; not started | |
 | SD6 | open — machine tending landed; not started | |
 | SD7 | open — machine tending landed; not started | |
