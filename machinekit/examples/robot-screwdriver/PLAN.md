@@ -859,6 +859,6 @@ integration defects. SD7 and SD8 remain unimplemented.
 | SD3 | done — post-rebase full gate passed | `fbbe14d0c`, `6c338344d`, `ffee5362f` |
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
-| SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220` |
+| SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
 | SD7 | open — machine tending landed; not started | |
 | SD8 | open — machine tending landed; not started | |
