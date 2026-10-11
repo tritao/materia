@@ -1552,7 +1552,7 @@ still required. The earlier 21-test proof predates this wire extension.
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
 | SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71`, `7038a4fee` |
-| SD8 | done — virtual unchanged CAD mission, hardware owner/acquisition binding, scripted/TCP controller and repeated-STOP proofs pass; final full gate passed | `f19115ae0`, `84c004fab`, final hardware commit below |
+| SD8 | done — virtual unchanged CAD mission, hardware owner/acquisition binding, scripted/TCP controller and repeated-STOP proofs pass; final full gate passed | `f19115ae0`, `84c004fab`, `40d2f9b66` |
 
 ### SD8 hardware integration work (2026-10-11)
 
@@ -1622,6 +1622,7 @@ acquisition publication bridge changes. No new Haxeon typing defect was found.
 ### SD8 hardware and stop-boundary proof (2026-10-11)
 
 Virtual implementation checkpoint: `84c004fab`.
+Final hardware and stop-boundary implementation: `40d2f9b66`.
 
 The commissioned controller now supplies the acquired selected-program code,
 so fresh ready feedback cannot acknowledge a different parameter set. Both
