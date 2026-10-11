@@ -626,6 +626,54 @@ Haxeon patches were made. Initial, interrupted and final logs are preserved in
 `build/sd4-final-*.log`. The earlier unavailable web thread screenshot remains
 recorded in SD2; no further screenshot was required by SD4.
 
+### SD5 tightening process (2026-10-11)
+
+Implementation: `bc00c869a`; physical feed verification: `e4655adc1`.
+The canonical seven-field sensor contract lives in RobotKit, with the Rust
+constants generated from it. ProcessKit owns the deterministic tightening model,
+validated qualified programs, typed output device and simulation observer.
+MachineKit's process bridge derives the target from a CAD fastening and requires
+an authored angle qualification. No stiffness, angle window or controller
+program is guessed from the published torque table.
+
+Full gate `sd-suite-sd5-final.txt` passes all seven stages. ProjectKit retains
+199 assertions. MachineKit adds 29 process checks covering all nine outcomes,
+ordered thresholds, engagement errors and deterministic traces. The app adds
+44 simulation checks on MuJoCo and the test backend, including measured shaft
+speed, physical feed compression, independent arm motion, retained vacuum,
+reversal and separate screw-body/socket frames. Editor tests and both builds
+pass. The Rust contract freshness check, Rust metadata compilation and the
+four-architecture SimKit FFI signature check pass.
+
+All 122 existing MachineKit result lines match exactly; all 115 existing
+project-source result lines match after excluding timing and allocation
+profiling. All 41 artifact loads retain their byte sizes. Reports are archived
+as `build/sd5-final-*-compare.txt`, and the seven logs and summary as
+`build/sd5-final-*`. Physical results, cycle times, geometry and saved formats
+are unchanged.
+
+Picker allocation averages move from 58618/60341 to 58379/60224 bytes/tick;
+mill allocation moves from 53580.00 to 53332.62 bytes/tick. These windows read
+the same global HashLink allocation-buffer refill counter documented in SD4;
+they are not exact object-allocation counts. Router allocations remain
+39.5/43.8 KB/tick, with collections moving from 15/15 to 16/16. All allocation
+budgets pass; wall-clock profiling varies with machine load.
+
+The full gate uses local copies `build/sd5-full.sh`,
+`build/sd-suite-held-slot.sh` and `build/sd-heavy-run.sh`. They preserve the
+shared slot locks, RAM checks and per-stage memory caps, while holding one slot
+for the sequential suite and polling queued acquisition more frequently. This
+avoids starvation from other sessions immediately reusing slots. Original
+shared scripts were not edited. Compiler servers are disabled for this run.
+The initial focused fixture put its screw inside a fallback collision box;
+moving the fixture TCP outside that box resolved its displacement. No new
+Haxeon compiler bug was confirmed and no compiler patches were made. No OCCT
+build, CadKit native change or submodule pin change was needed.
+
+SD6 must extend the observer from an already-positioned screw to pickup and
+transport before applying the live thread constraint. SD6–SD8 remain open;
+the conditional web screenshot omission remains recorded under SD2.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
@@ -633,7 +681,7 @@ recorded in SD2; no further screenshot was required by SD4.
 | SD2 | done — post-rebase full gate passed | `154ca5491`, `35a195269`, `24b5d1a02` |
 | SD3 | done — post-rebase full gate passed | `fbbe14d0c`, `6c338344d`, `ffee5362f` |
 | SD4 | done — full gate passed | `fdc6da0c0` |
-| SD5 | in progress — focused model checks pass; simulation and full gate pending | |
+| SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | open — machine tending landed; not started | |
 | SD7 | open — machine tending landed; not started | |
 | SD8 | open — machine tending landed; not started | |
