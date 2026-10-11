@@ -945,6 +945,8 @@ measured engagement and elastic rotation, not initialize a fresh empty model.
 
 ### SD7 CAD execution checkpoint (2026-10-11)
 
+Implementation: `20c52bb69`.
+
 The whole flange project stages four primary screws and four separately
 identified reserves at actual presenter templates. Its qualified jobs retain
 fresh CAD cross order 1,3,2,4, exact threaded faces and the published 16.5 Nm
@@ -1016,5 +1018,5 @@ not mark SD7 complete.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — generation gate passed; four-screw CAD execution and physical recovery pass both backends; staged execution and final gate pending | `a6123a912`, `c0bedd1b3` |
+| SD7 | in progress — generation gate passed; four-screw CAD execution and physical recovery pass both backends; staged execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69` |
 | SD8 | open — machine tending landed; not started | |
