@@ -186,7 +186,7 @@ app. Use the build command again after changing app or native sources.
 The save/reopen integration check uses the app's native build:
 
 ```sh
-./haxeon/scripts/haxeon run --project=app/haxeon.project-source.json \
+./haxeon/scripts/haxeon run --project=app/tests/project-source/haxeon.json \
   --output="$PWD/app/build/host/project-source.hl"
 ```
 

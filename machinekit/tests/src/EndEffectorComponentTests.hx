@@ -284,10 +284,13 @@ class EndEffectorComponentTests {
 		var gripperArtifact = AssemblyPreview.scene(armCell, "physical-gripper-tool");
 		gripperArtifact.robotTools = RobotScene.robotTools(mountedTool, "arm/tool");
 		var restoredGripper = SceneArtifact.decode(SceneArtifact.encode(gripperArtifact));
-		if (restoredGripper.robotTools == null || restoredGripper.robotTools.length != 1 ||
-			restoredGripper.robotTools[0].kind != "gripper" || restoredGripper.robotTools[0].gripper == null ||
-			restoredGripper.robotTools[0].sensor != "arm/tool/gripper/gripped" ||
-			restoredGripper.robotTools[0].gripper.fingerPadFrictionCoefficient !=
+		var restoredTools = restoredGripper.robotTools;
+		if (restoredTools == null || restoredTools.length != 1)
+			throw "Physical gripper tool capability must survive scene artifact validation and round trip";
+		var restoredTool = restoredTools[0], restoredCapability = restoredTool.gripper;
+		if (restoredTool.kind != "gripper" || restoredCapability == null ||
+			restoredTool.sensor != "arm/tool/gripper/gripped" ||
+			restoredCapability.fingerPadFrictionCoefficient !=
 				ParallelGripperSpec.FINGER_PAD_FRICTION_COEFFICIENT)
 			throw "Physical gripper tool capability must survive scene artifact validation and round trip";
 		var savedAssemblyDefinition = restoredGripper.assemblyDefinition;

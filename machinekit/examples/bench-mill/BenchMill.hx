@@ -173,7 +173,8 @@ class BenchMill extends MachineAssembly {
 		addAtSpeed("spindle-at-speed", "spindle-turn");
 		attach("holder", holder, gaugeZero, "spindle");
 		attach("tool", tool, AssemblyFrames.translation(0, spindleY, gaugeZero.z - tool.stickout), "spindle");
-		if (vise == null) {
+		var installedVise = vise;
+		if (installedVise == null) {
 			if (includeWorkpiece) {
 				attach("stock", new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
 					AssemblyFrames.translation(tableX, saddleY, tableTop), "table");
@@ -186,18 +187,18 @@ class BenchMill extends MachineAssembly {
 			// Mount off centre only as far as needed to bring the entire vise beside
 			// the retracted head at the X stop. Keep the complete blank machinable.
 			var halfTravel = (specs[0].upper - specs[0].lower) / 2;
-			var loadingRadius = head.width / 2 + vise.body.width / 2 + robotkit.collision.CollisionClearance.MARGIN * 1000;
+			var loadingRadius = head.width / 2 + installedVise.body.width / 2 + robotkit.collision.CollisionClearance.MARGIN * 1000;
 			var fixtureOffset = Math.max(0.0, loadingRadius - halfTravel);
-			if (fixtureOffset + STOCK_WIDTH / 2 > halfTravel || fixtureOffset + vise.body.width / 2 > table.width / 2)
+			if (fixtureOffset + STOCK_WIDTH / 2 > halfTravel || fixtureOffset + installedVise.body.width / 2 > table.width / 2)
 				throw "The vise cannot load beside the head while retaining full blank travel";
 			var visePose = AssemblyFrames.translation(tableX + fixtureOffset, saddleY, tableTop);
-			include("vise", vise, visePose);
+			include("vise", installedVise, visePose);
 			zeroPoses.set("vise/body", visePose);
 			connect("table", "vise/body");
 			addMate("vise-mount", "fixed", "table", "to-vise/body", "vise/body", "attach-vise/body");
 			if (includeWorkpiece)
 				attach("stock", new RouterPlate(STOCK_WIDTH, STOCK_DEPTH, STOCK_HEIGHT, "aluminium 6061", "Bearing block blank"),
-					AssemblyFrames.compose(zeroPose("vise/body"), vise.seat), "vise/body");
+					AssemblyFrames.compose(zeroPose("vise/body"), installedVise.seat), "vise/body");
 		}
 
 		exposeConnector("gaugeLine", "spindle", "gaugeLine");
@@ -367,8 +368,9 @@ class BenchMill extends MachineAssembly {
 	}
 
 	public function workOffset():Array<Float> {
-		if (vise != null) {
-			var datum = AssemblyFrames.compose(zeroPose("vise/body"), vise.datum);
+		var installedVise = vise;
+		if (installedVise != null) {
+			var datum = AssemblyFrames.compose(zeroPose("vise/body"), installedVise.datum);
 			return [datum.x - gaugeZero.x, datum.y - gaugeZero.y, datum.z + STOCK_HEIGHT - gaugeZero.z];
 		}
 		var stock = zeroPose("stock");

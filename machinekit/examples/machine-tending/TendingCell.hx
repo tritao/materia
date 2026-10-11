@@ -35,11 +35,17 @@ class TendingMissionChecks {
 		}
 		var via = [for (step in mission.steps) if (step.kind == "moveVia") step];
 		var requests = [for (step in mission.steps) if (step.kind == "signal") step];
-		if (via.length == 0 || via[0].poses == null || via[0].poses.length < 2)
-			throw "Startup needs complete joint waypoints through tray clearance to approach";
+		if (via.length == 0)
+			throw "The first tray approach needs both the geometry-derived clearance and approach poses";
+		var firstViaPoses = via[0].poses;
+		if (firstViaPoses == null || firstViaPoses.length < 2)
+			throw "The first tray approach needs both the geometry-derived clearance and approach poses";
 		function signalCount(name:String, value:Bool):Int {
 			var count = 0;
-			for (step in requests) if (step.signal != null && step.signal.name == name && step.signal.value == value) count++;
+			for (step in requests) {
+				var signal = step.signal;
+				if (signal != null && signal.name == name && signal.value == value) count++;
+			}
 			return count;
 		}
 		if (picks.length != 8 || places.length != 8 || cuts.length != 4 || via.length < 12 || requests.length == 0)
@@ -50,11 +56,14 @@ class TendingMissionChecks {
 			signalCount(RobotInterfaceChannels.REQUEST_UNCLAMP, true) != 5 ||
 			signalCount(RobotInterfaceChannels.CYCLE_START, true) != 4)
 			throw "Each tending cycle needs door, clamp, unclamp and CNC start outputs";
-		for (step in mission.steps) if (step.kind == "waitFor" && step.waitFor != null &&
-			StringTools.startsWith(step.waitFor.name, "cnc.") &&
-			step.waitFor.name != RobotInterfaceChannels.CYCLE_COMPLETE &&
-			step.waitFor.timeout <= RobotInterface.DEFAULT_REQUEST_TIMEOUT_SECONDS)
-			throw 'Mission wait for ${step.waitFor.name} must leave a signal round trip after the PLC timeout';
+		for (step in mission.steps) {
+			var waitFor = step.waitFor;
+			if (step.kind == "waitFor" && waitFor != null &&
+				StringTools.startsWith(waitFor.name, "cnc.") &&
+				waitFor.name != RobotInterfaceChannels.CYCLE_COMPLETE &&
+				waitFor.timeout <= RobotInterface.DEFAULT_REQUEST_TIMEOUT_SECONDS)
+				throw 'Mission wait for ${waitFor.name} must leave a signal round trip after the PLC timeout';
+		}
 		var selectedSlots = ["0-0", "0-1", "0-2", "1-0"];
 		var outfeedSeats = ["seat-r0-c0-x-1-y-1", "seat-r0-c1-x-1-y-1",
 			"seat-r0-c2-x-1-y-1", "seat-r1-c0-x-1-y-1"];

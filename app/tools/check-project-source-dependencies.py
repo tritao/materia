@@ -6,8 +6,9 @@ from pathlib import Path
 
 
 app_dir = Path(__file__).resolve().parents[1]
-app = json.loads((app_dir / "haxeon.json").read_text())
-source = json.loads((app_dir / "haxeon.project-source.json").read_text())
-if source["dependencies"] != app["dependencies"]:
-    raise SystemExit("app/haxeon.project-source.json dependencies differ from app/haxeon.json")
-print("Project-source dependencies match app")
+source_path = app_dir / "tests/project-source/haxeon.json"
+source = json.loads(source_path.read_text())
+app_dependency = source["dependencies"].get("app", {})
+if (source_path.parent / app_dependency.get("path", "")).resolve() != app_dir:
+    raise SystemExit("Project-source tests must inherit the app package")
+print("Project-source dependencies inherit app")

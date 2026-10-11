@@ -96,7 +96,9 @@ class FastenerDataTests {
 			default: throw "Drive changed in wire format";
 		}
 		for (family in [MetricTrapezoidal, Acme, Ball]) for (hand in [RightHand, LeftHand]) {
-			var lead = new LeadScrewThread(family, 12, 2, 4, hand);
+			// The synthetic ball race states its root; nominal thread facts do not depend on it.
+			var raceRoot:Null<Float> = family == Ball ? 10.0 : null;
+			var lead = new LeadScrewThread(family, 12, 2, 4, hand, raceRoot);
 			var spec = lead.threadSpec();
 			near(spec.pitch * spec.starts, lead.lead, "shared lead");
 			check(spec.hand == (hand == RightHand ? materia.project.ThreadSpecData.ThreadHand.RightHand

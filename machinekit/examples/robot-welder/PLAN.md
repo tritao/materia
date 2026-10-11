@@ -413,7 +413,7 @@ fault now and then after the results were printed) is explained and fixed under 
 Done before W4, on the review of W0-W3. What was found and decided:
 
 - **Native host libraries are the worktree's own.** The project-source runs borrowed another worktree's
-  `app/build/host/native`, which can change under a run. A plain `haxeon build --project app/haxeon.project-source.json
+  `app/build/host/native`, which can change under a run. A plain `haxeon build --project app/tests/project-source/haxeon.json
   --output=<wt>/app/build/host/project-source.hl` (no `--compiler-only`) builds them into `<wt>/app/build/host/native`
   (`app`, `kinematicskit-native`, `stockkit`; 207 MB, about 8 minutes on 20 cores, against the shared prebuilt OCCT via
   `CADKIT_OCCT_DIR`). It needs the worktree's submodules for `animkit/native/vendor/*` and `haxeon/packages/ui/vendor/*`

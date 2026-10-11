@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run compiled acceptance checks and retain their measured planning/quality records.
 
-Build app/haxeon.project-source.json and robotkit/tests/haxeon.json first.
+Build app/tests/project-source/haxeon.json and robotkit/tests/haxeon.json first.
 For wall-finishing-mujoco, also build robotkit/tests/mujoco/haxeon.json.
 No historical values or estimates are substituted for missing measurements.
 Set PROCESS_PATH_PROFILE=1 to retain structured planner phase timings too.

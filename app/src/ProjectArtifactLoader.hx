@@ -165,20 +165,21 @@ class ProjectArtifactLoader {
       if (occurrences.length != 1) throw 'Machining stock "$stock" must be one assembly occurrence';
       var component = [for (part in artifact.parts) if (part.id == occurrences[0].definition) part];
       if (component.length != 1) throw 'Machining stock "$stock" has no unique geometry definition';
+      var stockPart = component[0];
       var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
       var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
-      for (vertex in 0...component[0].vertexCount) for (axis in 0...3) {
-        var coordinate = component[0].vertices.getDouble(vertex * 24 + axis * 8);
+      for (vertex in 0...stockPart.vertexCount) for (axis in 0...3) {
+        var coordinate = stockPart.vertices.getDouble(vertex * 24 + axis * 8);
         low[axis] = Math.min(low[axis], coordinate);
         high[axis] = Math.max(high[axis], coordinate);
       }
-      var material = component[0].materialId == null ? "neutral" : component[0].materialId;
+      var materialId = stockPart.materialId, density = stockPart.materialDensity;
+      var material = materialId == null ? "neutral" : materialId;
       stockSources.push({occurrence: stock,
         minimum: [for (value in low) value * scale], maximum: [for (value in high) value * scale],
         center: [for (axis in 0...3) (low[axis] + high[axis]) * 0.5 * scale],
-        density: component[0].materialDensity == null ? MaterialLibrary.require(material).physical.density
-          : component[0].materialDensity,
-        mesh: partMesh(component[0].id)});
+        density: density == null ? MaterialLibrary.require(material).physical.density : density,
+        mesh: partMesh(stockPart.id)});
     }
     var entered = machining.sacrificial == null ? [] : machining.sacrificial.copy();
     for (stock in machining.stocks) entered.push(stock);

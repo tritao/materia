@@ -160,7 +160,7 @@ export CADKIT_OCCT_DIR=$OCCT
   - Compile, about 1 min. `--output` must be absolute, or the binary silently lands elsewhere:
 
     ```
-    haxeon/scripts/haxeon build --project app/haxeon.project-source.json --compiler-only --output=$WT/app/build/host/project-source.hl
+    haxeon/scripts/haxeon build --project app/tests/project-source/haxeon.json --compiler-only --output=$WT/app/build/host/project-source.hl
     ```
 
     If the native host libraries are missing, run the same command without `--compiler-only` once (about 8 min).
