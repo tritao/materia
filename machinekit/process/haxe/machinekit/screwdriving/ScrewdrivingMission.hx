@@ -46,8 +46,12 @@ class ScrewdrivingMission {
 			try {
 				var request = job(fastening);
 				if (request == null || request.fastening != name) throw "Qualified job does not identify its source fastening";
-				if (screws.exists(request.screw)) throw 'Screw occurrence "${request.screw}" supplies more than one fastening';
-				screws.set(request.screw,true);
+				var supplies = [request.screw], recovery = request.recovery;
+				if (recovery != null) supplies.push(recovery.replacement.screw);
+				for (body in supplies) {
+					if (screws.exists(body)) throw 'Screw occurrence "$body" supplies more than one attempt or fastening';
+					screws.set(body,true);
+				}
 				steps.push({kind:"screw",screw:request});
 			} catch (error:Dynamic) diagnostics.error("screw.qualification",name,'Fastening "$name" has no qualified job: $error');
 		}

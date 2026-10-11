@@ -60,6 +60,28 @@ class SceneScrewTests {
     refused("named thread is ambiguous");
     data.parts[0].threads = [thread];
     Sys.println("Scene screw named faces: 6 checks passed");
+    flat.occurrences.push({id:"spare",definition:"part",initialPose:AssemblyFrames.identity()});
+    flat.occurrences.push({id:"reserve",definition:"nest",initialPose:AssemblyFrames.identity()});
+    flat.occurrences.push({id:"bin",definition:"bin",initialPose:AssemblyFrames.identity()});
+    var sensors = flat.sensors;
+    if (sensors == null) throw "Recovery fixture lost its presence sensors";
+    sensors.push({id:"reserve/present",kind:"presence",occurrence:"reserve",connector:"sense",range:8});
+    candidate.recovery = {replacement:{screw:"spare",presenter:"reserve",presentSensor:"reserve/present",pickup:AssemblyFrames.identity()},
+      rejectMember:"bin",reject:AssemblyFrames.translation(0,0,0.1)};
+    SceneScrewDefinition.validateScene(candidate,flat,data);
+    check(true,"The replacement resolves its exact component and scoped presence sensor");
+    flat.occurrences[3].definition = "similar-part";
+    refused("exact screw component definition");
+    flat.occurrences[3].definition = "part";
+    sensors[1].occurrence = "nest";
+    refused("replacement presenter sensor");
+    sensors[1].occurrence = "reserve";
+    sensors.push(sensors[1]);
+    refused("replacement presenter sensor");
+    sensors.pop();
+    flat.occurrences.pop();
+    refused('recovery occurrence "bin"');
+    Sys.println("Scene screw recovery identity: 5 checks passed");
   }
   public static function run():Void {
     var source = job();
@@ -89,6 +111,24 @@ class SceneScrewTests {
       try { var ignored = SceneScrewDefinition.decode(raw); } catch (_:Dynamic) refused = true;
       check(refused,"Fractional and overflowing slots are rejected before integer conversion");
     }
+    var recovering = job();
+    recovering.recovery = {replacement:{screw:"spare",presenter:"reserve",presentSensor:"reserve/present",pickup:AssemblyFrames.translation(0,0,0.1)},
+      rejectMember:"bin",reject:AssemblyFrames.translation(0,0,0.1)};
+    var restoredRecovery = SceneScrewDefinition.decode(haxe.Json.parse(haxe.Json.stringify(recovering)));
+    SceneScrewDefinition.validate(restoredRecovery,["screw1","work","nest","spare","reserve","bin"]);
+    var replacement = SceneScrewDefinition.replacement(restoredRecovery);
+    check(replacement.screw == "spare" && replacement.fastening == recovering.fastening && replacement.threadFace == recovering.threadFace,
+      "A replacement changes only supply identity while preserving the exact connection");
+    var same = recovering.recovery;
+    if (same == null) throw "Recovery fixture lost its supply";
+    same.replacement.screw = "screw1";
+    var rejected = false;
+    try SceneScrewDefinition.validate(recovering,["screw1","work","nest","reserve","bin"]) catch (_:Dynamic) rejected = true;
+    check(rejected,"A replacement cannot reuse the original occurrence");
+    same.replacement.screw = "spare"; same.reject.qw = 2;
+    rejected = false;
+    try SceneScrewDefinition.validate(recovering,["screw1","work","nest","spare","reserve","bin"]) catch (_:Dynamic) rejected = true;
+    check(rejected,"Reject frames require a unit rotation");
     Sys.println('Scene screw definitions: $checks checks passed');
   }
 }

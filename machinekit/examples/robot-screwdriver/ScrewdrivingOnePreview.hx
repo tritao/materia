@@ -29,31 +29,7 @@ class ScrewdrivingOnePreview {
 		if (definition == null) throw "Drive-one scene lost its assembly";
 		var flat = AssemblyDefinitionFlattener.flatten(definition);
 		var state = new AssemblyState(flat,scene.assemblyState);
-		// Start above the presenter rather than sweeping the parked tool through
-		// the workpiece on its first Cartesian move.
-		var pick = state.worldPose("presenter/screw");
-		var initialTarget = materia.assembly.AssemblyFrames.compose(pick,cell.presenter.screw.driveFrame());
-		var initialDirection = materia.assembly.AssemblyFrames.transformVector(initialTarget,0,0,1);
-		var initialJoints = [for (i in 1...7) 'arm/j$i'];
-		var initialLimits = [for (spec in cell.arm.specs) {lower:spec.lower,upper:spec.upper}];
-		var initial = machinekit.robot.ToolAxisReach.solve(state,initialJoints,initialLimits,
-			{x:initialTarget.x-initialDirection.x*40,y:initialTarget.y-initialDirection.y*40,z:initialTarget.z-initialDirection.z*40},
-			initialDirection,cell.readyPose(),"arm/tool/driver/carrier","tcp");
-		if (initial == null) throw "Drive-one presenter approach has no initial arm pose";
-		for (i in 0...6) state.setJoint(initialJoints[i],initial[i]);
-		var initialTcp = state.worldConnector("arm/tool/driver/carrier","tcp");
-		var initialX = materia.assembly.AssemblyFrames.transformVector(initialTcp,1,0,0);
-		var desiredX = materia.assembly.AssemblyFrames.transformVector(initialTarget,1,0,0);
-		var crossX = {x:initialX.y*desiredX.z-initialX.z*desiredX.y,
-			y:initialX.z*desiredX.x-initialX.x*desiredX.z,z:initialX.x*desiredX.y-initialX.y*desiredX.x};
-		var roll = Math.atan2(initialDirection.x*crossX.x+initialDirection.y*crossX.y+initialDirection.z*crossX.z,
-			initialX.x*desiredX.x+initialX.y*desiredX.y+initialX.z*desiredX.z);
-		state.setJoint(initialJoints[5],initial[5]+0.001);
-		var rotatedX = materia.assembly.AssemblyFrames.transformVector(state.worldConnector("arm/tool/driver/carrier","tcp"),1,0,0);
-		var sense = initialDirection.x*(initialX.y*rotatedX.z-initialX.z*rotatedX.y)
-			+initialDirection.y*(initialX.z*rotatedX.x-initialX.x*rotatedX.z)
-			+initialDirection.z*(initialX.x*rotatedX.y-initialX.y*rotatedX.x);
-		state.setJoint(initialJoints[5],initial[5]+(sense > 0 ? roll : -roll));
+		ScrewdrivingExecution.align(cell,state,"presenter/screw");
 		scene.assemblyState = state.record();
 		var pickupBody = state.worldPose("presenter/screw");
 		// Derive the job from the seated CAD first; the execution scene then frees

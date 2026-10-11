@@ -507,13 +507,16 @@ class ApplicationSimulation {
           var job = step.screw;
           if (job == null || candidateTools.screwdrivers.length != 1)
             throw "A screw mission needs its named screw and one declared screwdriver";
-          var screws = [for (object in candidateTools.objectsByScene()) if (object.id == "project:"+job.screw) object.object];
-          if (screws.length != 1) throw 'Fastening "${job.fastening}" has no unique independent screw body';
+          var identities = [job.screw];
+          var recovery = job.recovery;
+          if (recovery != null) identities.push(recovery.replacement.screw);
           var holder = candidateTools.screwdrivers[0].holding;
-          // The inserted bit and its kinematically held screw are coupled by
-          // the process model. Native contact between them cannot yield and
-          // would push the feed backwards; surrounding contacts remain physical.
-          candidate.excludeContactPair(holder.robotIndex,holder.linkIndex,screws[0]);
+          // Only declared bit/screw couplings exclude mutual contact; fixture contacts remain physical.
+          for (identity in identities) {
+            var screws = [for (object in candidateTools.objectsByScene()) if (object.id == "project:"+identity) object.object];
+            if (screws.length != 1) throw 'Fastening "${job.fastening}" has no unique independent screw body "$identity"';
+            candidate.excludeContactPair(holder.robotIndex,holder.linkIndex,screws[0]);
+          }
         }
         var welds = [for (step in work.steps) if (step.kind == "weld") step].length > 0;
         var mobileProfile = session == null ? null : session.mobileBase;

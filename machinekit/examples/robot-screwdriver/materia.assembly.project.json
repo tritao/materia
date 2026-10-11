@@ -1,0 +1,27 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Robot screwdriver: whole flange",
+	"defaultEntrypoint": "assembly",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.assembly.json"
+	},
+	"entrypoints": {
+		"assembly": {
+			"kind": "cad-preview",
+			"module": "ScrewdrivingAssemblyPreview",
+			"function": "assembly"
+		}
+	},
+	"dynamicParts": [
+		"work/flange/screw1",
+		"work/flange/screw2",
+		"work/flange/screw3",
+		"work/flange/screw4",
+		"replacement/screw1",
+		"replacement/screw2",
+		"replacement/screw3",
+		"replacement/screw4"
+	]
+}

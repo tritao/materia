@@ -31,6 +31,8 @@ class ScrewdrivingRunner {
   var reverseAngle = 0.0;
   var previousReverseAngle = 0.0;
   var recoveryHeld = false;
+  static inline var STOP_SPEED:Float = 0.01;
+  static inline var ANGLE_RESOLUTION:Float = 1e-6;
   public var tighteningResult(default, null):Null<TighteningResult> = null;
 
   public function new(motion:ScrewdrivingMotion, outputs:ScrewdriverOutputs, present:Void -> Bool) {
@@ -110,7 +112,7 @@ class ScrewdrivingRunner {
             }
           }
         case Stopping:
-          if (Math.abs(reading.speed) <= 0.01 && motion.completed()) {
+          if (Math.abs(reading.speed) <= STOP_SPEED && motion.completed()) {
             var result = tighteningResult;
             if (result == null) throw "Stopped screwdriver has no result";
             if (result.outcome != ScrewdriverContract.OK) { fail(resultMessage(result.outcome)); return; }
@@ -122,7 +124,7 @@ class ScrewdrivingRunner {
         case Retracting:
           if (motion.completed()) phase = Done;
         case RecoveryStop:
-          if (Math.abs(reading.speed) <= 0.01) {
+          if (Math.abs(reading.speed) <= STOP_SPEED) {
             var result = tighteningResult;
             if (result == null) throw "Recovery lost its tightening result";
             recoveryHeld = reading.vacuum;
@@ -132,13 +134,15 @@ class ScrewdrivingRunner {
               phase = RecoveryRetract;
               motion.move(ScrewPlan.along(result.outcome == ScrewdriverContract.NO_SCREW ? selected.pickup : selected.entry,-selected.approach),true);
             } else {
+              if (!Math.isFinite(reading.angle) || reading.angle < 0) throw "Stopped recovery spindle has no valid measured angle";
+              reverseAngle = reading.angle; previousReverseAngle = reading.angle;
               outputs.reverse(true); outputs.start(true); phase = Reversing; elapsed = 0;
             }
           } else if (elapsed > 2) throw "Recovery spindle did not stop";
         case Reversing:
           if (!reading.vacuum) throw "Failed screw lost vacuum while reversing";
-          if (!Math.isFinite(reading.angle) || reading.angle < 0 || reading.angle > previousReverseAngle+1e-5)
-            throw "Screw recovery angle did not reverse monotonically";
+          if (!Math.isFinite(reading.angle) || reading.angle < 0 || reading.angle > previousReverseAngle+STOP_SPEED*durationSeconds+ANGLE_RESOLUTION)
+            throw 'Screw recovery angle did not reverse monotonically: ${reading.angle} after $previousReverseAngle';
           previousReverseAngle = reading.angle;
           if (reading.angle <= 1e-6) {
             outputs.start(false); outputs.reverse(false); phase = ReverseStop; elapsed = 0;
@@ -154,7 +158,7 @@ class ScrewdrivingRunner {
           }
         case ReverseStop:
           if (!reading.vacuum) throw "Failed screw lost vacuum before withdrawal";
-          if (Math.abs(reading.speed) <= 0.01 && motion.completed()) {
+          if (Math.abs(reading.speed) <= STOP_SPEED && motion.completed()) {
             phase = RecoveryRetract;
             motion.move(ScrewPlan.along(selected.entry,-selected.approach),true);
           } else if (elapsed > 2) throw "Reversed spindle did not stop";

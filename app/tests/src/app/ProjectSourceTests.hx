@@ -1978,7 +1978,99 @@ class ProjectSourceTests {
     Sys.println("Screwdriver equipment project passed on MuJoCo and the test backend");
   }
 
-  /** Actual M6 CAD pickup, tightening and post-release seating, plus an empty nest. */
+  /** Four actual CAD screws, separate replacements and physical reject-bin recovery. */
+  static function checkScrewdrivingAssembly(root:String):Void {
+    var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.assembly.project.json");
+    for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (damaged in [false,true]) {
+      Sys.println('Screwdriving CAD: begin whole backend $backend, damaged $damaged');
+      var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.mission;
+      if (definition == null || definition.steps.length != 4) throw "Whole screw cell lost its mission";
+      var jobs:Array<materia.project.SceneScrewDefinition.SceneScrew> = [];
+      for (step in definition.steps) {var job = step.screw; if (job == null) throw "Whole cell lost a fastening"; jobs.push(job);}
+      check([for (job in jobs) job.screw].join(",") == "work/flange/screw1,work/flange/screw3,work/flange/screw2,work/flange/screw4","Whole flange uses CAD cross order");
+      var session = new ProjectDocumentSession(null,false), simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.setBackend(backend);
+      try {
+        session.openGeneratedProject(generated,manifest);
+        check(simulation.rebuild(session.sensors,session.scene,session),'Whole screw cell builds: ${simulation.error}');
+        var mission = simulation.missionPlayer(), clock = simulation.activeSession();
+        var original = simulation.environmentObject("project:"+jobs[0].screw);
+        if (mission == null || clock == null || original == null) throw "Whole cell lost its identified first screw";
+        var injected = false, observedStep = -1;
+        while (!mission.finished && mission.failure == null && clock.simulationTime() < 600) {
+          if (mission.stepIndex != observedStep) {
+            observedStep = mission.stepIndex;
+            Sys.println('Whole screw transition $observedStep at ${clock.simulationTime()}');
+          }
+          simulation.step();
+          if (damaged && !injected) {
+            var tools = @:privateAccess simulation.tools;
+            if (tools == null || tools.screwdrivers.length != 1) throw "Whole cell lost its mounted observer";
+            var driver = tools.screwdrivers[0];
+            var setup = @:privateAccess driver.setups.get(jobs[0].slot);
+            if (setup != null && setup.screw == original) {
+              var priorWork = setup.work;
+              setup.work = () -> {var state = priorWork(); state.damagedLeadIn = true; return state;};
+              injected = true;
+            }
+          }
+        }
+        var currentScrew = @:privateAccess mission.screwing;
+        var currentPhase = currentScrew == null ? "none" : Std.string(@:privateAccess currentScrew.phase);
+        check(mission.finished && mission.failure == null && mission.completed == 4,
+          'Whole screw sequence completes: ${mission.failure}, time ${clock.simulationTime()}, step ${mission.stepIndex}, phase ${currentPhase}, q ${(@:privateAccess mission.robot).runtime.snapshot().q.toArray()}');
+        check(!damaged || injected,"Cross-thread injection targets the original body rather than its replacement");
+        check(mission.screwRuns.length == 4,"Every fastening has a run report");
+        for (index in 0...jobs.length) {
+          var job = jobs[index], report = mission.screwRuns[index];
+          check(report.fastening == job.fastening && report.finished && !report.failed && report.fault == null,"Each named fastening finishes with a measured OK");
+          check(report.attempts.length == (damaged && index == 0 ? 2 : 1),"Only the damaged screw consumes its one replacement");
+          var last = report.attempts[report.attempts.length-1];
+          check(last.result.outcome == robotkit.tool.ScrewdriverContract.OK && Math.abs(last.result.torqueNm-job.program.targetTorque) < 1e-8,"Final torque comes from the actual qualified cycle");
+          var installed = report.installed();
+          if (installed == null) throw "Completed fastening has no installed body";
+          var body = simulation.environmentObject("project:"+installed);
+          if (body == null) throw "Completed fastening lost its actual installed occurrence";
+          var fixture = mission.assemblyParts.get("project:"+job.frame);
+          check(fixture.carries(body),"The exact threaded fixture carries the actual installed body");
+          var actual = mission.assemblyParts.get("project:"+installed).pose(), live = fixture.pose();
+          var socket = AssemblyFrames.compose({x:actual.position[0],y:actual.position[1],z:actual.position[2],
+            qx:actual.rotation[0],qy:actual.rotation[1],qz:actual.rotation[2],qw:actual.rotation[3]},job.socket);
+          var seat = AssemblyFrames.compose({x:live.position[0],y:live.position[1],z:live.position[2],
+            qx:live.rotation[0],qy:live.rotation[1],qz:live.rotation[2],qw:live.rotation[3]},job.seat);
+          var offset = AssemblyFrames.compose(AssemblyFrames.inverse(seat),socket);
+          check(Math.sqrt(offset.x*offset.x+offset.y*offset.y) <= job.simulation.leadInMm/1000 && Math.abs(offset.z) < 0.00015,
+            'Installed screw "$installed" remains on its actual CAD seat: ${haxe.Json.stringify(offset)}');
+        }
+        if (damaged) {
+          var first = mission.screwRuns[0];
+          check(first.attempts[0].result.outcome == robotkit.tool.ScrewdriverContract.CROSS_THREAD && first.attempts[0].result.angle > 0,
+            "Recovery retains the measured cross-thread result and driven angle");
+          check(first.installed() != jobs[0].screw,"Recovery installs a distinct identified replacement");
+          for (_ in 0...100) simulation.step();
+          var bin = mission.assemblyParts.get("project:reject/floor").pose(), dropped = mission.simulation.objectPose(original);
+          check(Math.abs(dropped.x-bin.position[0]) < 0.036 && Math.abs(dropped.y-bin.position[1]) < 0.036 && dropped.z > bin.position[2] && dropped.z < bin.position[2]+0.06,
+            'The actual failed screw rests inside the physical reject bin: ${haxe.Json.stringify(dropped)}');
+        }
+        check(simulation.heldObjectIds().length == 0,"Whole assembly leaves no body on the bit");
+        simulation.clear(); session.dispose();
+      } catch (error:Dynamic) {simulation.clear(); session.dispose(); throw error;}
+      Sys.println('Screwdriving CAD: end whole backend $backend, damaged $damaged');
+    }
+    Sys.println("Screwdriving CAD: begin whole portable export");
+    var portable = materia.project.SceneArtifact.decode(MateriaProjectRunner.exportArtifact(manifest));
+    var flags = portable.project, mission = portable.mission;
+    check(flags != null && flags.dynamicParts.length == 8 && mission != null && mission.steps.length == 4,
+      "Portable assembly retains all eight identified screw supplies and four CAD fastenings");
+    if (mission == null) throw "Portable assembly lost its mission";
+    for (step in mission.steps) {
+      var job = step.screw;
+      check(job != null && job.recovery != null,"Portable assembly preserves each exact replacement and reject frame");
+    }
+    Sys.println("Screwdriving CAD: end whole portable export");
+    Sys.println("Screwdriving whole assembly passed on both backends with cross-thread replacement recovery");
+  }
+
   static function checkScrewdrivingOne(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-screwdriver/materia.drive.project.json");
     for (backend in [ApplicationSimulation.MUJOCO, ApplicationSimulation.DETERMINISTIC]) for (absent in [false,true]) {

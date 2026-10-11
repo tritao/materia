@@ -13,12 +13,14 @@ class ManipulatorPlannerSpace implements BoxClearanceSpace {
   final mappedBuffer:Array<Float> = [];
   final widthBuffer:Array<Float> = [];
 
+  /** Preserve measured process coordinates outside the arm while varying only the arm DOFs. */
   public function new(inner:CollisionPlannerSpace, arm:Manipulator, reference:Array<Float>, ?fullReference:Array<Float>) {
     this.inner = inner;
     this.arm = arm;
     this.reference = fullReference == null ? arm.stateOf(reference).q.copy() : fullReference.copy();
     if (this.reference.length != inner.bodies.model.dofCount())
       throw "Manipulator collision reference has the wrong complete-model dimension";
+    for (value in this.reference) if (!Math.isFinite(value)) throw "Manipulator planner needs finite reference coordinates";
     var zero = [for (_ in 0...arm.dofCount()) 0.0];
     var base = arm.stateOf(zero).q;
     dofs = [];

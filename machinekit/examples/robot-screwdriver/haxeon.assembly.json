@@ -1,0 +1,39 @@
+{
+	"version": 1,
+	"package": {
+		"name": "machinekit-screwdriving-assembly"
+	},
+	"entry": "ScrewdrivingAssemblyPreview",
+	"sources": [
+		"ScrewdrivingCell.hx",
+		"ScrewdrivingChecks.hx",
+		"ScrewdrivingPreview.hx",
+		"ScrewdrivingOnePreview.hx",
+		"../robot-arm/RobotArm.hx",
+		"ScrewdrivingExecution.hx",
+		"ScrewdrivingAssemblyPreview.hx"
+	],
+	"sourceRoots": [
+		".",
+		"../robot-arm"
+	],
+	"dependencies": {
+		"projectkit": {
+			"path": "../../../projectkit"
+		},
+		"cadkit": {
+			"path": "../../../cadkit"
+		},
+		"machinekit": {
+			"path": "../.."
+		},
+		"machinekit-robot": {
+			"path": "../../robot"
+		},
+		"machinekit-process": {
+			"path": "../../process"
+		}
+	},
+	"target": "host",
+	"outputDir": "build/assembly"
+}

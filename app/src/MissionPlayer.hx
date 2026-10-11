@@ -62,6 +62,9 @@ import processkit.screwdriving.TighteningProgram;
 import processkit.screwdriving.ScrewdrivingRunner.TighteningResult;
 import processkit.simulation.SimulatedScrewdriver;
 import materia.project.SceneScrewDefinition.SceneScrew;
+import materia.project.SceneScrewDefinition;
+import processkit.skill.DriveFastening;
+import processkit.screwdriving.FasteningRunReport;
 import processkit.WeldStowPlanner;
 import processkit.skill.WeldPlan;
 import processkit.skill.WeldSeam;
@@ -332,6 +335,9 @@ class MissionPlayer implements SessionMember {
   public var completed(default, null):Int = 0;
   /** Measured results from the named fastenings, including a failed pickup. */
   public final screwResults:Array<TighteningResult> = [];
+  public final screwRuns:Array<FasteningRunReport> = [];
+  var screwRun:Null<DriveFastening> = null;
+  var recordedScrewRun:Null<DriveFastening> = null;
   final screwdrivers:Array<SimulatedScrewdriver>;
   var screwArm:Null<Manipulator> = null;
   var screwing:Null<ScrewdrivingRunner> = null;
@@ -1339,7 +1345,7 @@ class MissionPlayer implements SessionMember {
     registeredWorkWorld = new Map<String, Transform3>();
     stepIndex = 0;
     completed = 0;
-    screwResults.resize(0); screwing = null; recordedScrew = null;
+    screwResults.resize(0); screwRuns.resize(0); screwing = null; recordedScrew = null; screwRun = null; recordedScrewRun = null;
     failure = null;
     alarmCode = null;
     failedStepIndex = -1;
@@ -1675,6 +1681,13 @@ class MissionPlayer implements SessionMember {
   }
 
   function recordScrewResult():Void {
+    var run = screwRun;
+    if (mission.steps[stepIndex].kind == "screw" && run != null) {
+      if (run == recordedScrewRun) return;
+      screwRuns.push(run.report);
+      for (attempt in run.report.attempts) screwResults.push(attempt.result);
+      recordedScrewRun = run; return;
+    }
     var active = screwing;
     if (mission.steps[stepIndex].kind != "screw" || active == null || active == recordedScrew) return;
     var result = active.tighteningResult;
@@ -1689,6 +1702,23 @@ class MissionPlayer implements SessionMember {
   }
 
   function screwSkill(job:SceneScrew, configuration:Null<motionkit.kinematics.SixAxisConfiguration>):Skill {
+    screwRun = null;
+    var recovery = job.recovery;
+    if (recovery == null) return screwAttempt(job,configuration);
+    var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
+    if (tools.length != 1 || tools[0].sensor == null) throw "Fastening recovery lost its screwdriver sensor";
+    var sensor:String = cast tools[0].sensor;
+    var bin = assemblyParts.get("project:"+recovery.rejectMember);
+    var sequence = new DriveFastening(job.fastening,(index) -> {
+      var selected = index == 0 ? job : SceneScrewDefinition.replacement(job);
+      var skill = screwAttempt(selected,configuration,true);
+      return {screw:selected.screw,runner:skill.runner,skill:skill};
+    },(failed) -> new processkit.skill.RecoverScrew(failed,localization,
+      () -> livePart(bin).compose(ScrewScenePlan.frame(recovery.reject)),sensor));
+    screwRun = sequence; return sequence;
+  }
+
+  function screwAttempt(job:SceneScrew, configuration:Null<motionkit.kinematics.SixAxisConfiguration>, plannedTravel:Bool = false):processkit.skill.DriveScrew {
     var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
     var arm = screwArm;
     if (tools.length != 1 || arm == null) throw 'Fastening "${job.fastening}" has no configured screwdriver arm';
@@ -1698,6 +1728,10 @@ class MissionPlayer implements SessionMember {
       driver.sensorId == sensor && driver.channels.start == tool.channel) driver];
     if (found.length != 1) throw 'Fastening "${job.fastening}" has no unique mounted screwdriver observer';
     var driver = found[0], screw = assemblyParts.get("project:"+job.screw);
+    var tcp = robot.toolFrames.get(tool.contact.occurrence);
+    if (tcp == null) throw "Screwdriver lost its physical TCP";
+    arm = ScrewdriverArmKinematics.atSpindle(robot.model,robot.rootLink,tcp.id,capacity.feedJoint,capacity.spindleJoint,driver.spindlePosition());
+    screwArm = arm;
     var work = assemblyParts.get("project:"+job.frame), presenter = assemblyParts.get("project:"+job.presenter);
     driver.configure(job.slot,{program:new TighteningProgram(job.program),joint:ScrewScenePlan.joint(job,capacity.springRate),
       screw:screw.freeBody(),hand:job.hand,retain:work.retain,
@@ -1709,8 +1743,23 @@ class MissionPlayer implements SessionMember {
     var compiler = new ProgramCompiler(solver,planning.validation(),FRAME,planning.velocity,planning.acceleration,planning.jerk,
       planning.startTolerances(0.005),null,0.002,0.2,0.00005,0.02,new IkTolerance(0.00005,0.001,300,0.03));
     compiler.planningAssumptions = planning.assumptions.copy(); compiler.planCheck = planning.check();
-    var motion = new ScrewdrivingArmMotion(new ManipulatorMotion(robot.robot,compiler,(_) -> null,
-      () -> robot.runtime.pollEvents(),arm.jointIndices()));
+    var executing = new ManipulatorMotion(robot.robot,compiler,(_) -> null,
+      () -> robot.runtime.pollEvents(),arm.jointIndices());
+    var planningArm = arm;
+    var cached:CachedJointMotion = {motion:executing,space:null};
+    var prepareTravel:Null<Void->Void> = null;
+    if (plannedTravel) {
+      jointMotions.set("screw:"+job.screw,cached);
+      prepareTravel = () -> {
+        if (executing.shutdownPlanning() != 0) throw "Screw transfer planner did not stop before replacing its collision world";
+        if (cached.space != null) cached.space.dispose();
+        cached.space = null; executing.reset();
+        var reference = startingJointPositions(executing,planningArm.jointIndices());
+        var planned = missionMotionPlanner(planningArm, reference, cellCollisionSnapshot([]));
+        cached.space = planned.space; compiler.motionPlanner = planned.planner;
+      };
+    }
+    var motion = new ScrewdrivingArmMotion(executing,0.08,0.01,prepareTravel);
     motion.configuration = configuration;
     var active = new ScrewdrivingRunner(motion,new ChannelScrewdriverOutputs(robot.runtime,driver.channels),() -> {
       var present = missionInput(job.presentSensor);

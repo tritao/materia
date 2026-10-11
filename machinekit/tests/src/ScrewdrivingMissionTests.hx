@@ -67,6 +67,20 @@ class ScrewdrivingMissionTests {
 		check(duplicate.steps.length == 0 && duplicate.diagnostics.hasErrors(),"Duplicate connection and body identities cannot enter a mission");
 		var wrong = ScrewdrivingMission.generate(found,(_) -> job(found.fastenings[0]));
 		check(wrong.steps.length == 0 && wrong.diagnostics.hasErrors(),"A job author cannot substitute another source fastening");
+		var reusedSpare = ScrewdrivingMission.generate(found,(fastening) -> {
+			var selected = job(fastening);
+			selected.recovery = {replacement:{screw:"shared/spare",presenter:"reserve/nest",presentSensor:"reserve/present",pickup:selected.pickup},
+				rejectMember:"reject",reject:selected.pickup};
+			return selected;
+		});
+		check(reusedSpare.steps.length == 0 && reusedSpare.diagnostics.hasErrors(),"A reserved replacement cannot supply two fastenings");
+		var reusedPrimary = ScrewdrivingMission.generate(found,(fastening) -> {
+			var selected = job(fastening);
+			selected.recovery = {replacement:{screw:"work/flange/screw4",presenter:"reserve/nest",presentSensor:"reserve/present",pickup:selected.pickup},
+				rejectMember:"reject",reject:selected.pickup};
+			return selected;
+		});
+		check(reusedPrimary.steps.length == 0 && reusedPrimary.diagnostics.hasErrors(),"A replacement cannot consume another fastening's primary supply");
 		Sys.println('Screwdriving mission: $count checks passed');
 	}
 	static function main():Void run();

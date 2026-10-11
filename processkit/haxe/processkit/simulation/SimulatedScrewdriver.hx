@@ -99,6 +99,8 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     setups.set(slot, setup);
     if (activeSlot == slot) { activeSlot = 0; selected = null; model = null; }
   }
+  /** Absolute measured shaft coordinate, used to align the next free-bit approach. */
+  public function spindlePosition():Float return runtime.snapshot().q.get(spindleJoint);
   public function reading():ScrewdriverReading return ScrewdriverSensor.reading(ScrewdriverSensor.values(observed));
   public function reset():Void {
     holding.reset(); anchoredBody = null; model = null; selected = null; lastTime = null; angle = 0; reversed = false; reverseTargetAngle = 0; origin = 0;
@@ -240,6 +242,11 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       simulation.driveProcessJoint(robotIndex,feedJoint,0,0);
       simulation.driveProcessJoint(robotIndex,spindleJoint,measured.q.get(spindleJoint),0);
     }
+    // The process result retains its final angle. Live feedback follows the
+    // measured shaft through stopping and reversal, including physical coast.
+    var measuredAngle = selected == null ? observed.angle : Math.max(0,selected.hand*(runtime.snapshot().q.get(spindleJoint)-origin));
+    observed = {torqueNm:observed.torqueNm,angle:measuredAngle,speed:observed.speed,
+      strokeMm:observed.strokeMm,phase:observed.phase,result:observed.result,vacuum:holding.held != null};
     runtime.publishSensorFrame(sensorId, ScrewdriverSensor.values(observed), Int64.ofInt(++sequence),
       runtime.snapshot().sourceTimestampNs, runtime.endpoint.sourceClockId());
   }

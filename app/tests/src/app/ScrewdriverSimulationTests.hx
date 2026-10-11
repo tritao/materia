@@ -258,11 +258,16 @@ class ScrewdriverSimulationTests {
       for (_ in 0...20) harness.step();
       check(observer.reading().angle > 0 && observer.reading().result == 0,"The spindle advances the real screw angle during run-down");
       check(observer.reading().speed == runtime.snapshot().dq.get(2),"Speed feedback comes from the actual spindle, independently of its program setpoint");
-      var paused = observer.reading().angle;
+      var process = observer.model;
+      if (process == null) throw "Started driver has no process model";
+      var paused = process.reading.angle;
       outputs.start(false);
       harness.step();
       for (_ in 0...5000) if (Math.abs(observer.reading().speed) > 0.01) harness.step();
-      check(observer.reading().angle == paused && observer.holding.held == screw && Math.abs(observer.reading().speed) <= 0.01,"Stop retains the screw and pauses process advance while the physical spindle settles");
+      var measuredAngle = Math.max(0,runtime.snapshot().q.get(2)-(@:privateAccess observer.origin));
+      check(process.reading.angle == paused && observer.reading().angle == measuredAngle &&
+        observer.holding.held == screw && Math.abs(observer.reading().speed) <= 0.01,
+        "Stop pauses process advance and retains the screw while feedback follows the settling physical shaft");
       outputs.start(true);
       for (_ in 0...5000) if (observer.reading().result == 0) harness.step();
       var result = observer.reading();

@@ -96,8 +96,10 @@ class ScrewRecoveryTests {
 		var feedback = reading(0.3); feedback.speed = 1;
 		runner.update(0.01,feedback);
 		check(!outputs.startOn && !outputs.reverseOn && outputs.vacuumOn,"Recovery waits for measured spindle stop before reversing");
-		feedback.speed = 0; runner.update(0.01,feedback);
+		feedback.speed = 0; feedback.angle = 0.31; runner.update(0.01,feedback);
 		check(outputs.startOn && outputs.reverseOn && outputs.vacuumOn,"Recovery reverses the same held screw after stop");
+		feedback.angle = 0.305; runner.update(0.01,feedback);
+		check(runner.failure() == null && (@:privateAccess runner.previousReverseAngle) == 0.305,"Reversal starts from the fresh stopped angle while retaining the original NOK result");
 		feedback.angle = 0.2; feedback.strokeMm += 1; runner.update(0.01,feedback);
 		check(Math.abs(motion.targets[motion.targets.length-1].translation.z-(plan().entry.translation.z+(plan().strokeMm-1)/1000)) < 1e-9,
 			"Reverse withdrawal follows measured compression backwards");

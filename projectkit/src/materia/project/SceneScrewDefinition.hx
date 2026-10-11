@@ -28,6 +28,21 @@ import materia.project.SceneArtifact.SceneArtifactData;
 	@:id(5) var stripTorque:Float;
 }
 
+/** A physically distinct supply for one replacement attempt; lengths use scene metres. */
+@:wire typedef ScrewSupply = {
+	@:id(1) var screw:String;
+	@:id(2) var presenter:String;
+	@:id(3) var presentSensor:String;
+	@:id(4) var pickup:AssemblyFrame;
+}
+
+/** Reject pose follows its declared fixture, and a replacement is never another guessed nearby body. */
+@:wire typedef ScrewRecovery = {
+	@:id(1) var replacement:ScrewSupply;
+	@:id(2) var rejectMember:String;
+	@:id(3) var reject:AssemblyFrame;
+}
+
 /** A freshly derived CAD fastening. All frames use metres; named occurrences own their live poses. */
 @:wire typedef SceneScrew = {
 	@:id(1) var fastening:String;
@@ -51,6 +66,7 @@ import materia.project.SceneArtifact.SceneArtifactData;
 	@:id(15) var program:TighteningSettings;
 	@:id(16) var simulation:ScrewSimulationSettings;
 	@:id(17) var approach:Float;
+	@:id(18) @:optional var recovery:ScrewRecovery;
 }
 
 /** Strict saved-data boundary, shared with the live process program. No CAD or process dependency. */
@@ -117,7 +133,30 @@ class SceneScrewDefinition {
 		if (Math.abs(screw.entry.qx*screw.seat.qx+screw.entry.qy*screw.seat.qy+screw.entry.qz*screw.seat.qz+screw.entry.qw*screw.seat.qw) < 1-1e-8)
 			fail("entry and seat have different socket rotations");
 		if (runDownMm(screw) < -1e-8) fail("seat lies behind the thread entry");
+		var recovery = screw.recovery;
+		if (recovery != null) {
+			var supply = recovery.replacement;
+			if (supply == null) {fail("replacement supply is missing"); return;}
+			for (member in [supply.screw,supply.presenter,recovery.rejectMember])
+				if (!named(member) || occurrences.indexOf(member) < 0) fail('recovery occurrence "$member" does not exist');
+			if (supply.screw == screw.screw || supply.screw == screw.frame || supply.screw == supply.presenter || supply.screw == recovery.rejectMember)
+				fail("replacement must be a distinct screw occurrence");
+			if (!named(supply.presentSensor) || !validFrame(supply.pickup) || !validFrame(recovery.reject))
+				fail("replacement sensor and recovery frames must be valid");
+		}
+
 	}
+	/** A replacement changes only supply identity and pickup; the qualified connection has one owner. */
+	public static function replacement(job:SceneScrew):SceneScrew {
+		var recovery = job.recovery;
+		if (recovery == null) throw 'Scene screw "${job.fastening}" has no declared replacement';
+		var supply = recovery.replacement;
+		return {fastening:job.fastening,screw:supply.screw,frame:job.frame,threadFace:job.threadFace,
+			presenter:supply.presenter,presentSensor:supply.presentSensor,pickup:supply.pickup,socket:job.socket,
+			entry:job.entry,seat:job.seat,hole:job.hole,leadMm:job.leadMm,hand:job.hand,slot:job.slot,
+			program:job.program,simulation:job.simulation,approach:job.approach};
+	}
+
 	/** Validate identity against the actual named thread packet, never another equal bore. */
 	public static function validateScene(screw:SceneScrew, flat:AssemblyDefinition, data:SceneArtifactData):Void {
 		validate(screw,[for (item in flat.occurrences) item.id]);
@@ -145,6 +184,17 @@ class SceneScrewDefinition {
 		var present = sensors == null ? [] : [for (sensor in sensors) if (sensor.id == screw.presentSensor &&
 			sensor.kind == "presence" && sensor.occurrence == screw.presenter) sensor];
 		if (present.length != 1) throw 'Scene screw "${screw.fastening}": presenter sensor "${screw.presentSensor}" is missing or ambiguous';
+		var recovery = screw.recovery;
+		if (recovery != null) {
+			var supply = recovery.replacement;
+			var original = [for (item in flat.occurrences) if (item.id == screw.screw) item];
+			var spare = [for (item in flat.occurrences) if (item.id == supply.screw) item];
+			if (original.length != 1 || spare.length != 1 || original[0].definition != spare[0].definition)
+				throw 'Scene screw "${screw.fastening}": replacement does not share the exact screw component definition';
+			var supplied = sensors == null ? [] : [for (sensor in sensors) if (sensor.id == supply.presentSensor && sensor.kind == "presence" && sensor.occurrence == supply.presenter) sensor];
+			if (supplied.length != 1) throw 'Scene screw "${screw.fastening}": replacement presenter sensor is missing or ambiguous';
+		}
+
 	}
 	static function number(raw:Dynamic, name:String):Float {
 		var value:Dynamic = Reflect.field(raw,name);
@@ -169,10 +219,17 @@ class SceneScrewDefinition {
 	}
 	public static function decode(raw:Dynamic):SceneScrew {
 		var program:Dynamic = Reflect.field(raw,"program"), response:Dynamic = Reflect.field(raw,"simulation");
+		var recovering:Dynamic = Reflect.field(raw,"recovery");
+		var recovery:Null<ScrewRecovery> = null;
+		if (recovering != null) {
+			var supply:Dynamic = Reflect.field(recovering,"replacement");
+			recovery = {replacement:{screw:text(supply,"screw"),presenter:text(supply,"presenter"),presentSensor:text(supply,"presentSensor"),pickup:frame(supply,"pickup")},
+				rejectMember:text(recovering,"rejectMember"),reject:frame(recovering,"reject")};
+		}
 		return {fastening:text(raw,"fastening"),screw:text(raw,"screw"),frame:text(raw,"frame"),threadFace:text(raw,"threadFace"),
 			presenter:text(raw,"presenter"),presentSensor:text(raw,"presentSensor"),socket:frame(raw,"socket"),pickup:frame(raw,"pickup"),
 			entry:frame(raw,"entry"),seat:frame(raw,"seat"),hole:frame(raw,"hole"),leadMm:number(raw,"leadMm"),
-			hand:integer(raw,"hand"),slot:integer(raw,"slot"),approach:number(raw,"approach"),
+			hand:integer(raw,"hand"),slot:integer(raw,"slot"),approach:number(raw,"approach"),recovery:recovery,
 			program:{runDownSpeed:number(program,"runDownSpeed"),finalSpeed:number(program,"finalSpeed"),targetTorque:number(program,"targetTorque"),
 				minimumAngle:number(program,"minimumAngle"),maximumAngle:number(program,"maximumAngle"),runDownTorqueLimit:number(program,"runDownTorqueLimit"),
 				finalTorqueLimit:number(program,"finalTorqueLimit"),maximumRunDownAngle:number(program,"maximumRunDownAngle"),

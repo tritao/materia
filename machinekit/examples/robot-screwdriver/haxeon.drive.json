@@ -9,7 +9,8 @@
 		"ScrewdrivingChecks.hx",
 		"ScrewdrivingPreview.hx",
 		"ScrewdrivingOnePreview.hx",
-		"../robot-arm/RobotArm.hx"
+		"../robot-arm/RobotArm.hx",
+		"ScrewdrivingExecution.hx"
 	],
 	"sourceRoots": [
 		".",

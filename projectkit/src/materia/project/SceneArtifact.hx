@@ -707,7 +707,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 34;
+	public static inline var VERSION:Int = 35;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -1659,6 +1659,7 @@ class SceneArtifact {
 			return false;
 		}
 		var handles = false, welds = false, screws = false;
+		var screwSupplies:Map<String,String> = [];
 		var handlingTools:Array<SceneArtifactRobotTool> = data.robotTools == null ? [] : [for (tool in data.robotTools)
 			if (tool.kind == "gripper" || tool.kind == "suction") tool];
 		for (index in 0...mission.steps.length) {
@@ -1800,7 +1801,17 @@ class SceneArtifact {
 					screws = true;
 					var screw = step.screw;
 					if (screw == null || flat == null) fail('step $index needs a screw definition and assembly');
-					else SceneScrewDefinition.validateScene(screw,flat,data);
+					else {
+						SceneScrewDefinition.validateScene(screw,flat,data);
+						var supplies = [screw.screw], recovery = screw.recovery;
+						if (recovery != null) supplies.push(recovery.replacement.screw);
+						for (body in supplies) {
+							var owner = screwSupplies.get(body);
+							if (owner != null && owner != screw.fastening)
+								fail('step $index reuses screw occurrence "$body" from fastening "$owner"');
+							screwSupplies.set(body,screw.fastening);
+						}
+					}
 
 				case "weld":
 					welds = true;

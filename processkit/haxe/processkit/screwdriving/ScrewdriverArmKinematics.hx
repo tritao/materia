@@ -42,4 +42,22 @@ class ScrewdriverArmKinematics {
     model.addFrame(fixedTip);
     return new Manipulator(model,root,fixedTip.id);
   }
+  /** Rebuild the free-bit planning frame at the measured shaft phase, without commanding either process coordinate. */
+  public static function atSpindle(model:RobotModel, root:LinkId, tcp:FrameId, feedId:JointId, spindleId:JointId, shaft:Float):Manipulator {
+    if (!Math.isFinite(shaft)) throw "Screwdriver planning needs a finite measured spindle position";
+    var feeds = [for (joint in model.joints) if (joint.id == feedId) joint];
+    var frames = [for (frame in model.frames) if (frame.id == Std.string(tcp)+":uncompressed") frame];
+    if (feeds.length != 1 || frames.length != 1) throw "Screwdriver planning lost its declared feed or planning frame";
+    var compiled = RobotKinematics.compile(model), state = new KinematicState(compiled);
+    state.q[compiled.dofIndex(Std.string(feedId))] = 0;
+    state.q[compiled.dofIndex(Std.string(spindleId))] = shaft;
+    var snapshot = KinematicSnapshot.of(state);
+    var parent = RobotKinematics.toTransform3(snapshot.bodyPose(compiled.bodyIndex(feeds[0].parent.id)));
+    var tip = RobotKinematics.toTransform3(snapshot.framePose(compiled.frameIndex(tcp)));
+    var mount = parent.inverse().compose(tip), fixedTip = frames[0];
+    fixedTip.position = mount.translation.toArray();
+    fixedTip.rotation = [mount.rotation.x,mount.rotation.y,mount.rotation.z,mount.rotation.w];
+    return new Manipulator(model,root,fixedTip.id);
+  }
+
 }

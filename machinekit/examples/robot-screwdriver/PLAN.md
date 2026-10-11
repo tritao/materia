@@ -207,6 +207,31 @@ simulation and hardware, and a mission step drives it.
   entry and seat; lateral seat offset must stay inside the authored 0.5 mm
   lead-in window. Initial arm roll matches the socket before the first move.
 
+
+- **SD7 — Replacement supply and rejection are portable facts.** SceneArtifact
+  v31 rejects v30. Each job may declare one separately identified replacement
+  screw, its presenter and scoped presence sensor, and a reject pose relative
+  to an exact bin member. Validation requires the replacement's exact component
+  definition, not similar dimensions. Derived replacement jobs retain the one
+  qualified connection and change only supply identity and pickup. The generator
+  reserves both primary and replacement bodies across the whole assembly.
+- **SD7 — Travel accommodates the measured spindle phase.** Each attempt
+  derives its free-bit planning frame from the measured shaft coordinate. The
+  whole-cell adapter uses collision-planned joint travel between approaches,
+  then axial Cartesian contact and withdrawal. Linear transfers accumulated
+  wrist compensation until the fourth cycle hit its wrist limit; joint travel
+  can choose a bounded equivalent wrist pose. Planning retains measured process
+  coordinates outside the six arm DOFs. Its live cell geometry retains compound
+  pieces instead of also adding their filled enclosing box. Drive-one retains
+  its established Cartesian sequence.
+- **SD7 — Recovery consumes live stop and release feedback.** The failed result
+  keeps its original measured angle; reversal starts from the fresh stopped
+  angle, including physical coast. Allowed sample variation derives from the
+  stop-speed threshold times the sample duration plus angular resolution.
+  Observer feedback follows the actual shaft and held-body state through stopped
+  reversal and vacuum release, instead of latching the process result's angle
+  or the last reversing frame's vacuum.
+
 ## What exists
 
 - Fasteners in `machinekit.standard`: `SocketHeadCapScrew` (ISO 4762),
@@ -917,6 +942,71 @@ cross-thread/replacement proof, access geometry checks, optional snug/final
 execution and final full gate remain pending. Retightening must preserve the
 measured engagement and elastic rotation, not initialize a fresh empty model.
 
+
+### SD7 CAD execution checkpoint (2026-10-11)
+
+The whole flange project stages four primary screws and four separately
+identified reserves at actual presenter templates. Its qualified jobs retain
+fresh CAD cross order 1,3,2,4, exact threaded faces and the published 16.5 Nm
+final target. A rigid open reject bin supplies a named live floor frame.
+MissionPlayer runs the existing bounded recovery wrapper and records each
+attempt's actual body and measurements. The start-page card opens this project;
+the equipment and drive-one manifests remain independently testable.
+
+Focused `build/sd7-assembly-live-vacuum.log` passes all four whole-cell cases:
+normal and injected cross-thread on both MuJoCo and the deterministic backend.
+Every connection finishes with measured OK and its exact fixture carries the
+installed body. Cross-thread recovery reverses the actual spindle, releases
+the failed body into the physical bin, and installs the separately identified
+reserve before continuing. The test checks the original body inside the bin
+and no body left on the bit. Additional current tests check every CAD seat and
+portable export; they run in the full checkpoint gate below.
+
+Initial integration exposed two physical feedback defects and one planning
+limitation. The fourth linear transfer exhausted the wrist range after phase
+compensation accumulated (last wrist coordinate 5.53 rad). Collision-planned
+joint transfers permit a bounded wrist pose while preserving measured feed and
+shaft coordinates. Reversal now starts from the fresh stopped angle, retaining
+the original NOK result; vacuum feedback updates after stopped reversal and
+actual release. The new scene packet is v31, with 20 screw-definition checks,
+6 existing named-face checks and 5 new recovery identity checks. Generation and
+recovery checks grow from 11/34 to 13/35. No new haxeon bug was found; temporary
+wrong receiver, missing-variable and unchecked-null diagnostics were ordinary
+integration edits.
+
+Resumed full gate `sd-suite-sd7-cad-checkpoint-retry.txt` passes all seven
+stages. The initial `sd-suite-sd7-cad-checkpoint.txt` passed six stages and
+stopped on an old simulation assertion that equated live angle with the paused
+process model. The corrected assertion independently verifies model pause,
+actual shaft feedback, retained vacuum and measured stop. Focused
+`build/sd7-cad-app-retry.log` passes all 80 simulation checks and the SD6 CAD
+cases on both backends plus portable export. Only that app test changed after
+the initial gate: the resumed local suite retains its three unchanged library
+results and rebuilds/reruns the app, editor and full project-source targets.
+Original failure and resumed logs are preserved in `build/sd7-cad-checkpoint-*`.
+
+All 123 existing MachineKit lines and all 117 normalized existing app result
+lines match the SD6 final baseline exactly. The 40 comparable old artifact
+loads retain their byte sizes; one earlier generation reused a decoded
+current-format cache and emitted no size line. Equipment remains 2238283 bytes.
+Drive-one grows from 2237585 to 2237601 bytes for `"recovery":null`; the new
+whole-cell artifact is 2269798 bytes. Comparison reports are
+`build/sd7-cad-checkpoint-{machinekit,app,artifact}-compare.txt`.
+
+Picker allocation samples change from 58653/60284 to 58678/60321 bytes/tick;
+mill allocation changes from 53454.96 to 53463.26. Screw router stays at
+39.5 KB/tick and 16 collections; belt router moves from 43.7 to 43.8 KB/tick
+with 16 collections unchanged. These read the global HashLink buffer-refill
+counter documented above; the additional early CAD cases change heap/refill
+phase at sample boundaries. All budgets pass. Physical results, cycle times,
+tracking, removed stock and qualified torques are unchanged. No native source,
+OCCT build, submodule pin change or new haxeon compiler bug was needed.
+
+CAD endpoint access checks for all supplies and the reject pose, optional
+snug/final execution with retained engagement, transport-loss stopping semantics,
+and the final SD7 gate remain pending. SD8 is unstarted. This checkpoint does
+not mark SD7 complete.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
@@ -926,5 +1016,5 @@ measured engagement and elastic rotation, not initialize a fresh empty model.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — generation gate passed; recovery/reporting core tested; CAD execution and final gate pending | `a6123a912` |
+| SD7 | in progress — generation gate passed; four-screw CAD execution and physical recovery pass both backends; staged execution and final gate pending | `a6123a912`, `c0bedd1b3` |
 | SD8 | open — machine tending landed; not started | |
