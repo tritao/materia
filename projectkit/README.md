@@ -11,7 +11,7 @@ base layer.
 `materia.project.SceneArtifact` is the shared writer and reader for generated
 viewport geometry. A project generator writes the artifact to a file; Materia
 loads and validates that file after the generator exits. The current `MTRG`
-version 28 contains a metres-per-coordinate scale and independent mesh parts.
+version 29 contains a metres-per-coordinate scale and independent mesh parts.
 Each part has a stable ID, display name, color, vertex and normal streams,
 triangle indices, CAD face ranges, and persistent edge identities. It can also
 carry rigid instance poses, named connector frames, and fixed, revolute,
@@ -37,7 +37,7 @@ joints, explicit unit axes, optional limits, and a `tree` or `closure` role.
 `AssemblyDefinitionCodec` validates and encodes this schema independently from
 the binary scene artifact version. `AssemblyStateRecord` stores joint
 coordinates and root placements separately from the definition. Scene artifact
-version 28 can carry both payloads; geometry part IDs identify component
+version 29 can carry both payloads; geometry part IDs identify component
 definitions so repeated occurrences can share one geometry payload.
 
 Assembly schema version 10 includes a reusable `assemblies` table. An occurrence selects a
@@ -72,7 +72,7 @@ path for its immutable artifact snapshot. Scalar and text reads avoid temporary
 byte buffers in both paths. See [decoding benchmarks](tests/decoding/README.md) for
 native allocation measurements and the Chrome runner.
 
-Scene artifact schema 28 includes optional project runtime settings: a selected job,
+Scene artifact schema 29 includes optional project runtime settings: a selected job,
 dynamic occurrence IDs and joint motion tracks. Native publishers resolve these
 from source manifests so downloaded artifacts open independently of source files.
 Only the current schema is accepted. Project settings
@@ -80,4 +80,8 @@ validate occurrence/joint references, duplicate IDs and bounded motion keyframes
 
 Machine motion uses typed wire records for axis and digital programs and per-hull
 contact settings. Hydraulic actuator data uses wire field 28; motor brakes retain
-field 27. These records are part of assembly schema 10 and scene schema 28.
+field 27. These records are part of assembly schema 10 and scene schema 29.
+The optional press controller record names its owned ram, depth and backgauge axes,
+measured top and finger switches, and program steps in millimetres. Position tolerances,
+request deadlines and simulated unloading limits are explicit saved values; the loader
+validates references, controller ownership and ordered clamp/depth travel before execution.

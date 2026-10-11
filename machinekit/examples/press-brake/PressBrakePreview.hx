@@ -15,6 +15,31 @@ class PressBrakePreview {
 		return SceneArtifact.encode(scene);
 	}
 
+	/** Controller fixture; registration stock is supplied by the script before requesting a stroke. */
+	public static function controlledPressBrake():Bytes {
+		var press = new PressBrake(), geometry = PressGeometry.of(press);
+		var scene = AssemblyPreview.scene(press, "press-brake");
+		var motion = scene.machineMotion;
+		if (motion == null) throw "Press preview lost its machine metadata";
+		var station = press.toolLayout.stations()[0];
+		var stock = cadkit.sheetmetal.SheetDemoParts.materialA();
+		var prediction = new cadkit.sheetmetal.process.AirBending().predict(stock,
+			station.processTooling(), Math.PI / 2, 100);
+		var installed = geometry.stations()[0];
+		var gap = installed.openTipHeight - installed.dieTopHeight;
+		motion.pressBrake = {
+			ramJoint: "Y1", depthAxis: "depth", gaugeX: "X", gaugeR: "R",
+			topSwitch: "ram-top", fingerSwitches: ["fingerLeft-contact", "fingerRight-contact"],
+			// Registration fixture stays behind the tool line; deforming stock belongs to SM12.
+			steps: [{gaugeXmm: 150, gaugeRmm: 0, clampTravelMm: gap - stock.thickness,
+				depthTravelMm: gap + prediction.depth, withdrawalMm: 20}],
+			positionToleranceMm: 0.05, requestTimeoutSeconds: 20,
+			// Assumed simulation unloading limits, independent of real hydraulic safety feedback.
+			releaseTravelMm: 0.5, releaseClosingForceN: 5000
+		};
+		return SceneArtifact.encode(scene);
+	}
+
 	/** Ideal timing leaves 10 mm tool clearance; a full-travel return seats home before the neutral dwell. */
 	public static function emptyStroke(press:PressBrake):SceneArtifactDigitalProgram {
 		var geometry = PressGeometry.of(press);

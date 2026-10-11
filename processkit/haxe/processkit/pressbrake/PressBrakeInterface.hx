@@ -4,7 +4,7 @@ package processkit.pressbrake;
 class PressBrakeInterface {
 	public final requestTimeoutSeconds:Float;
 	var phase:PressBrakePhase = Idle;
-	var alarm:PressBrakeAlarm = None;
+	public var alarm(default, null):PressBrakeAlarm = None;
 	var elapsed:Float = 0;
 	var previous:Null<PressBrakeInput>;
 	var step:Int = -1;
@@ -41,12 +41,13 @@ class PressBrakeInterface {
 		if (alarm == None) {
 			if ((stroke ? 1 : 0) + (clamp ? 1 : 0) + (open ? 1 : 0) > 1)
 				fail(ConflictingRequests);
-			else if (phase != Idle && (input.programStep != step || input.configuredStep != step))
+			else if (phase != Idle && (input.programStep != step || phase != Positioning && input.configuredStep != step))
 				fail(ProgramChanged);
+			else if (phase == Positioning && (!input.atTop || !input.decompressed)) fail(PositioningLost);
 			else if (phase == ClosingToClamp && (!input.fingerLeft || !input.fingerRight))
 				fail(RegistrationLost);
 			else if (phase == ClosingToClamp && !input.holding) fail(RobotHoldLost);
-			else if (phase != Idle && !input.depthStopInPosition) fail(PositioningLost);
+			else if (phase != Idle && phase != Positioning && !input.depthStopInPosition) fail(PositioningLost);
 			else if ((phase == ClosingToClamp || phase == Clamped) && !input.axesInPosition)
 				fail(PositioningLost);
 			else if (phase != Idle && (stroke || clamp)) fail(Busy);
@@ -66,9 +67,16 @@ class PressBrakeInterface {
 				fail(OpenInterlock);
 			else begin(Decompressing);
 		}
+		if (alarm == None && phase == Idle && input.atTop && input.decompressed &&
+			(input.programStep != input.configuredStep || !input.axesInPosition || !input.depthStopInPosition)) {
+			step = input.programStep;
+			begin(Positioning);
+		}
 		if (alarm == None) {
 			var entered = phase;
 			switch phase {
+				case Positioning:
+					if (input.configuredStep == step && input.axesInPosition && input.depthStopInPosition) { begin(Idle); step = -1; }
 				case ClosingToClamp: if (input.atClamp) begin(clampOnly ? Clamped : Withdrawing);
 				case Withdrawing: if (input.backgaugeWithdrawn) begin(Working);
 				case Working: if (input.atBottom) begin(Bottom);
@@ -97,13 +105,20 @@ class PressBrakeInterface {
 			owned || phase == Opening, input.ramPositionMm);
 	}
 
+	/** Hosting faults enter the same latched hold state as an interlock failure. */
+	public function trip(code:PressBrakeAlarm):Void {
+		if (code == None) throw "A press trip needs a named failure";
+		if (alarm == None) fail(code);
+	}
+
 	function begin(next:PressBrakePhase):Void { phase = next; elapsed = 0; }
 	function fail(code:PressBrakeAlarm):Void { alarm = code; begin(Fault); }
 	function pending():Bool return switch phase {
-		case ClosingToClamp, Withdrawing, Working, Decompressing, Opening: true;
+		case Positioning, ClosingToClamp, Withdrawing, Working, Decompressing, Opening: true;
 		case _: false;
 	};
 	function timeoutAlarm():PressBrakeAlarm return switch phase {
+		case Positioning: PositionTimeout;
 		case ClosingToClamp: ClampTimeout;
 		case Withdrawing: WithdrawalTimeout;
 		case Working: DepthTimeout;

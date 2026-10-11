@@ -13,6 +13,7 @@ import machinekit.pressbrake.ToolRow;
 import machinekit.pressbrake.ToolStation;
 import machinekit.pressbrake.ToolLayout;
 import machinekit.pressbrake.ToolingCatalogue;
+import machinekit.component.CollisionHullFacet;
 
 /** Segment sums and gap intervals remain distinct throughout paired tooling layouts. */
 class ToolLayoutTests {
@@ -33,6 +34,21 @@ class ToolLayoutTests {
 			|| positions[1].end != 360 || positions[2].start != 375 || positions[2].end != 395)
 			throw "Gaps determine segment bed intervals";
 		var dieRow = new ToolRow([new ToolSegment(die, 200)], []);
+		var dieHulls = CollisionHullFacet.of(new ToolSegment(die, 200));
+		if (dieHulls == null || dieHulls.hulls.length < 2) throw "Die simulation needs separate convex material pieces";
+		for (hull in dieHulls.hulls) {
+			// The groove centre one millimetre below the shoulders must remain empty.
+			var count = Std.int(hull.length / 6);
+			var positive = false, negative = false;
+			for (i in 0...count) {
+				var next = (i + 1) % count;
+				var y = hull[i * 3 + 1], z = hull[i * 3 + 2];
+				var cross = (hull[next * 3 + 1] - y) * (-1 - z) - (hull[next * 3 + 2] - z) * -y;
+				if (cross > 1e-9) positive = true;
+				if (cross < -1e-9) negative = true;
+			}
+			if (!positive || !negative) throw "Simulation collision hull fills the die groove";
+		}
 		var first = new ToolStation("first", row, dieRow, 200);
 		if (first.length != 170 || first.span != 200 || first.end != 400) throw "Paired station reserves both rows";
 		var second = new ToolStation("second", row, dieRow, 400);

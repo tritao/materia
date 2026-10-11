@@ -595,6 +595,24 @@ table in `tools/README.md`.
   inconsistent feedback latches a hold alarm. Reset requires a fresh request, safe/decompressed top,
   robot clear and no motion request. The simulation adapter supplies the hydraulic command feedback;
   hardware requests stay behind the certified machine controller.
+- The SM11 simulation adapter positions X/R and the depth stop through MotionKit and samples
+  real joint-switch frames and ram travel. Its flow-limited hydraulic model has no chamber-pressure
+  transient state: simulated decompression requires measured lift from the opening request's
+  ram position plus net closing actuator effort below explicit saved limits. These limits are
+  simulation assumptions, not certified hydraulic pressure measurements. The rigid registration
+  fixture stays behind the tool line; deforming stock under the tools belongs to SM12.
+- Tooling collision geometry reuses `ToolSegment.collisionPrisms(0.01)` through the existing
+  component collision-hull facet. The 0.01 mm conservative section approximation preserves die
+  grooves, punch necks and horn relief in physics; CAD geometry still supplies mass and inertia.
+- SM11 timing acceptance includes the backend's finite velocity-mode response, exposed by
+  `MujocoSimWorld.velocityResponseRate()` from the same native constant used by the solver.
+  A fixed-tick unloaded reference integrates the configured approach/working/return speeds
+  and that response; measured flow-phase durations must agree within 5%. Home valve neutralisation
+  uses measured zero travel, then the interface waits for the physical top switch to acknowledge.
+  Report that compliant-stop settling latency separately (90 ms in the initial measured fixture);
+  it is not hydraulic flow travel and retains the opening request's deadline. The instantaneous-switch
+  ideal underpredicted speed-change overshoot and overpredicted approach time by about 9%.
+  Planner ideal timing and native velocity response remain unchanged; no gain is tuned to a test.
 - Simulated safety (e-stop chain, fence, mode selector, light curtain muted in automatic) is
   modelled as signals for behaviour tests only. On hardware, safety is hardwired and certified
   (SM-D14).
@@ -899,8 +917,9 @@ This changes the implementation order, not the required correctness of a future 
 - `PressBrakeInterface` (SM-D13) as a pure state machine with pure tests for every interlock and
   timeout.
 - Scripted test without a robot: a rigid plate placed against the fingers by script, stroke to
-  the clamping point and to depth, the interface's signal sequence and timings match the phase
-  speeds within 5 %.
+  the clamping point and to depth. Verify the interface's signal sequence; measured hydraulic
+  flow-phase durations match the phase speeds with the backend's declared finite velocity response
+  within 5 %. Report the physical top-switch settling delay separately (SM-D13).
 
 **SM12. The sheet in simulation.**
 - First verify weld equality relative-pose updates at runtime in SimKit/MuJoCo (SM-D11); record
@@ -1021,7 +1040,7 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
 | SM8b | done: MT5 is on local main 1484b924d and merged; shared typed fluid cylinder/valve/pressure-source interfaces replace pneumatic-only interfaces, and pressure resolution no longer casts components; explicit immutable phase-speed model added, its quick gate `sm8b-phase-speeds` passes all five suites; assembly format 7 hydraulic data passes focused tests (187 ProjectKit assertions), full gate `sm8b-hydraulic-format-full` passes every stage; quick gate `sm8b-fluid-interfaces` passes all five suites with unchanged original MachineKit summaries; typed shared cylinder runtime and current RobotModel 12 fixtures pass focused model (30), both-backend hydraulic (14), world (5004), maintained MuJoCo and four-platform ABI checks; full gate `sm8b-cylinder-runtime-verified-full` passes every stage including project-source runtime; actual press hydraulic service, distribution blocks, bore-area frame-pressure limit and both guide bindings pass quick gate `sm8b-fluid-bindings-verified`; authored passive-joint support reaches assembly/model/runtime, passes 36 model, 192 ProjectKit and both-backend ownership tests (MuJoCo gravity verified); full gate `sm8b-passive-joints-full` passes every stage with unchanged five engineering summaries and app engineering baselines; typed convex-hull contact settings and maintained primitive/hull finger-contact tests pass 6 MuJoCo assertions and the four-platform ABI audit; full gate `sm8b-hull-contact-full` passes every stage with unchanged original MachineKit and app engineering baselines; the later health audit strengthens contact proof to 12 fault-free outcomes; typed assembly 9, machine recipe 16 and scene 17 transport stops, contacts and native timed outputs; quick gate `sm8b-assembled-press-verified` passes all five suites with unchanged original MachineKit summaries; assembled press contacts, stroke, home and lifecycle pass in the rebuilt app; full gate `sm8b-assembled-press-full` passes every stage, including workspace, app build and complete project-source runtime (215 ProjectKit assertions and 12 fault-free finger-contact outcomes)  Post-rebase checkpoint on local main 943ab6eb3: quick gate `local-main-943-quick` passes all five suites (SheetMetalSmoke 7602, ProjectKit 217, ManufacturingKit 54, MachineKit press baselines unchanged); ProjectKit is 217 because local main adds Contact work saved format coverage. Full gate `local-main-943-full` passes app compilation, but workspace reports 8 failed actions (MotionKit/ToolpathKit stale `switchZhome` observations and RobotKit core missing `libnativekit.so`) and project-source stops at the gantry-picker homing check for the same stale observation.  Current main e6fc61d58 checkpoint: all five quick stages pass, rebuilt app build/runtime and isolated RobotKit core pass; full workspace has three unchanged configuration failures (five actions), detailed below. | 6cef6c0e4; 3e60efc0d; 4d75583a3; c26992364; df79b2c75; cec8715d6; 47312cd36; 6bffdf03c|
 | SM9 | done: typed loaded-stroke evaluation, explicit process-compatible P1–P5 stock, physical manual finger datums, symmetric press placement and exact straight/arc backgauge registration; complete setup checks process compatibility, tonnage, both flange minima, material-bearing tool support and sampled nominal ram travel. Maintained checks pass independent P2 first/later oracles, folded R lift, physical contacts, loaded depth/force, sampled swing and named refusals. Quick gates `sm9a-loaded-stroke`, `sm9b-manufacturing-setup`, `sm9c-press-placement`, `sm9d-backgauge-registration` and final `sm9-single-bend-complete` pass all five suites (7594 sheet assertions); original engineering results unchanged | b1ad051ca; a47776fb1; 2bf6a43aa; 34b9d6102; 9715488e8 |
 | SM10 | done: typed convex-prism data and narrow collision interface; interim exact SAT checks face normals and every edge-cross-product axis. Focused collision checks pass 24 assertions; quick gate `sm10a-prism-collision` passes all five suites with unchanged engineering results. SM10b wall decomposition preserves holes/concavity and explicit arc chord error; focused checks pass 19 assertions, quick gate `sm10b-sheet-prisms` passes all five suites. SM10c bend decomposition preserves developed holes through flat, partial, loaded and zero-radius hem states with explicit mapping error; focused checks pass 66 assertions; quick gate `sm10c-bend-prisms` passes all five suites with unchanged engineering results. SM10d press-frame collision assembly derives all installed tool rows, moving machine boxes and exact open frame volumes, retaining typed owners and approximation errors; focused checks pass 73 assertions; quick gate `sm10d-collision-geometry` passes all five suites with unchanged engineering results. SM10e analytic tool-contact refinement distinguishes material overlap from tip/shoulder tangency; focused checks pass 786 assertions; serial full gate `sm10e-exact-contact-full` passes every stage, including all five quick suites, workspace, app build and project-source runtime. SM10f exact uncut bend/prism refinement supports arbitrary axes, finite widths and hollow interiors; maintained contact checks pass 1082 assertions; quick gate `sm10f-bend-obstacles` passes all five suites with unchanged original engineering results. SM10g typed material query combines exact refinement, support-gap clearance and face-inset collision certificates; sampled stroke checks every installed tool and machine volume, including clamps and explicit backgauge withdrawal; maintained checks pass 50 prism, 1748 contact and 76 geometry assertions plus checked P2 withdrawal/collision/travel outcomes. Quick gate `sm10g-stroke-material` passes all five suites with unchanged engineering results. SM10h exact wall/prism refinement retains curved boundaries, holes and finite thickness at arbitrary orientation; typed GripCheck with an explicit gripper box checks full patch support and physical clearance through withdrawal/stroke, without exempting the gripped wall; 160 maintained grip assertions pass. Quick gate `sm10h-grip-geometry` passes all five suites with unchanged engineering results (52 prism, 1748 contact, 76 geometry assertions). SM10i: finite event candidates include seam and tool ends, horn transitions and finger datums; typed best-first search uses admissible bend/flip time bounds, explicit node/setup budgets and retained physical failure witnesses. Immutable `BendPreparation` derives each program step, checked withdrawal/regrip/flip cost and fresh final state. `GripCheck` returns ordered typed candidate outcomes, and the geometric checker shares per-setup stroke geometry across grips. Maintained checks plan P1-P5: P3 flips, P4 ends on gooseneck, P5 uses gapped V12 rows without horns in order 2,4,1,3 (22.0915 s); both orders of the negative fixture report physical collision witnesses. Final quick gate `sm10i-sequence-search-own-cadkit` passes all five suites: 7602 sheet assertions, ProjectKit 215, ManufacturingKit 54; press-brake checks include 101355 tool-support, 1751 contact, 76 collision-geometry and 164 grip assertions. All 11 original MachineKit engineering/diagnostic rows match baseline. No casts or saved-format changes. | eeda1886e; cc0545645; 720ca4b49; 8d7b48ea6; 67c493959; 5067f196a; 9b7bcea80 |
-| SM11 | in progress: MT6/MT7 prerequisites verified on local main e6fc61d58; SM11a pure ProcessKit handshake passes 101 assertions and quick gate sm11a-press-interface-quick; simulation hosting, physical timing, full and restructuring closing gates remain | |
+| SM11 | in progress: MT6/MT7 prerequisites verified on local main e6fc61d58; SM11a pure handshake and quick gate pass; typed physical adapter, scene schema 29 and tooling collision pieces implemented; focused MuJoCo registration/stroke/return/fault test passes, with flow timings within 5%; closing full gate sm11-controller-full passes all five kit stages; workspace retains five baseline packaging failures; corrected full app rerun passes; restructuring gates pending | 8c06e5235 |
 | SM12 | blocked: requires SM11; MT6–MT8 and MT10 are now on local main `e6fc61d58`; verify weld-equality updates when unblocked | |
 | SM13 | blocked: requires SM11 and SM12; MT8 gripper support and MT10 mission steps are now on local main `e6fc61d58` | |
 | SM14 | blocked: requires the SM13 one-bend cell | |
@@ -1043,12 +1062,36 @@ SM0 ── SM1 ── SM2 ── SM3 ─┬─ SM4 ── SM4b
   exactly unchanged. No format, ABI, cast or compiler change. The full runner was
   stopped after its quick stages to continue the physical adapter; full workspace/app
   and all restructuring stages belong to the closing SM11 integration commit.
-  SM11 remains in progress: positioning-request hosting, feedback-driven hydraulic
-  commands and decompression modelling, scripted registration and measured stroke
-  timing acceptance still require implementation. Native snapshots expose actuator
-  effort, but the current flow-limited model does not expose chamber-pressure transients;
-  the simulation adapter must state its unloading model rather than infer completion
-  from a delay alone.
+  At the SM11a commit, positioning-request hosting, feedback-driven hydraulics and the
+  physical acceptance were still pending. Native snapshots expose actuator effort,
+  but not chamber-pressure transients; SM-D13 now records the adapter's explicit
+  unloading and finite-response timing models.
+
+- SM11b integration (closing gates pending): `PressBrakeControllerPlayer` owns the
+  press simulation clock, streams depth/X/R positioning through MotionKit and drives
+  the existing shared hydraulic valve from the pure interface. It consumes process
+  events between axis moves, preserving one event consumer and preventing analogue
+  feedback from overflowing an idle queue. Press status channels persist across ordinary
+  axis stops; native faults force an alarm image. Hosting faults preserve the first cause,
+  neutralise both coils and require session reset; interlock faults use the pure reset rules.
+  Scene artifact schema 29 saves semantic bindings, controller ownership, program steps,
+  deadlines and unloading limits. Typed save/load tests reject aliased axes, missing
+  switches/cabinets, foreign ownership, unsupported R and out-of-travel withdrawal.
+  The original empty-stroke preview stays available; the controlled fixture is
+  `machinekit/examples/press-brake/materia.controller.project.json`.
+  Focused physical gate `sm11-controller-physical-focus-14.log` passes registration,
+  clamp/withdrawal/depth/return, native fault/reset, fresh-request recovery and
+  first-alarm preservation. The scripted fixture is restored off the gauge before
+  reset: SimObject.teleport changes the reset pose, so retaining its registration
+  pose collides with the returning carriage. Measured/reference flow times:
+  approach 1.91/1.92 s, working 0.53/0.54 s, return 1.21/1.21 s. Physical home switch
+  acknowledgement is 1.30 s, including 90 ms of compliant-stop settling. Four-target
+  MuJoCo HXI audit `sm11-mujoco-hxi.log` passes. Full gate `sm11-controller-full`
+  passes all five kit stages (7602 sheet, 275 ProjectKit, 54 manufacturing assertions;
+  110 press-interface assertions), with P1–P5 planning times unchanged. Its workspace
+  stage retains the same five baseline packaging failures. The corrected full app
+  rerun `sm11-controller-project-source-final.log` passes. All RobotKit restructuring
+  stages remain required before marking SM11 complete.
 
 - Current rebase gate (local main `e6fc61d58`): the five quick stages in
   `sm-suite-main-e6fc-integrated-full.txt` pass (7602 sheet, 265 ProjectKit and

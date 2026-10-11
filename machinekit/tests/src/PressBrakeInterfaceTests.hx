@@ -4,6 +4,7 @@ import processkit.pressbrake.PressBrakeOutputs;
 import processkit.pressbrake.PressBrakeAlarm;
 import processkit.pressbrake.PressBrakePhase;
 import processkit.pressbrake.PressBrakeCommand;
+import processkit.pressbrake.PressBrakeChannels;
 
 /** Controller-image tests independent of flow speeds and simulation backends. */
 class PressBrakeInterfaceTests {
@@ -192,6 +193,40 @@ class PressBrakeInterfaceTests {
 			try { var invalid = fresh().update(new PressImage().sample(), seconds); } catch (_:Dynamic) { rejected = true; }
 			check(rejected, "controller time must be finite and positive");
 		}
+		image = new PressImage(); fsm = fresh(); image.programStep = 1;
+		output = tick(fsm, image);
+		check(output.phase == Positioning && !output.ready && output.command == Hold,
+			"program selection waits for the positioned step without moving the ram");
+		image.configuredStep = 1; image.axesInPosition = false; output = tick(fsm, image);
+		check(output.phase == Positioning, "accepted program still waits for measured axes");
+		image.axesInPosition = true; image.depthStopInPosition = false; output = tick(fsm, image);
+		check(output.phase == Positioning, "positioning includes the depth stop independently");
+		image.depthStopInPosition = true; output = tick(fsm, image);
+		check(output.ready && output.phase == Idle, "positioned program acknowledges readiness");
+		image = new PressImage(); fsm = fresh(); image.axesInPosition = false;
+		timeout(fsm, image, PositionTimeout);
+		image = new PressImage(); fsm = fresh(); image.programStep = 1; tick(fsm, image);
+		image.programStep = 2;
+		fault(tick(fsm, image), ProgramChanged, "pending positioning does not silently replace the selected step");
+		image = new PressImage(); fsm = fresh(); image.axesInPosition = false; tick(fsm, image);
+		image.atTop = false;
+		fault(tick(fsm, image), PositioningLost, "ram must remain open while the axes position");
+		image = new PressImage(); fsm = fresh();
+		fsm.trip(AxisMotionFailure); fsm.trip(RuntimeFailure);
+		fault(tick(fsm, image), AxisMotionFailure, "hosting trips preserve the first named cause");
+		var channels = PressBrakeChannels.declarations();
+		var alarmSafe = false, codeSafe = false;
+		for (channel in channels) {
+			if (channel.id == PressBrakeChannels.ALARM) switch channel.safeValue {
+				case Digital(value): alarmSafe = value;
+				case _: throw "Press alarm must be digital";
+			}
+			if (channel.id == PressBrakeChannels.ALARM_CODE) switch channel.safeValue {
+				case Analog(value): codeSafe = value == PressBrakeChannels.alarmCode(RuntimeFailure);
+				case _: throw "Press alarm code must be analog";
+			}
+		}
+		check(alarmSafe && codeSafe, "native safe outputs report a stopped press controller");
 		Sys.println('Press brake interface tests passed ($assertions assertions)');
 	}
 }

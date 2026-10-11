@@ -447,7 +447,7 @@ class AssemblyRobot {
       device = new robotkit.runtime.VirtualDeviceOptions();
       device.actuators = binding.virtualActuators();
     }
-    if (machine != null && machine.program != null) converted.model.materializeLimits(true);
+    if (machine != null && (machine.program != null || machine.pressBrake != null)) converted.model.materializeLimits(true);
     if (virtualWelder) {
       // The device's braking bound is the same arm-program policy, rather than an invented motor acceleration.
       for (joint in converted.model.joints) {

@@ -121,6 +121,34 @@ typedef SceneArtifactProjectMotion = {
   @:id(4) @:optional var contacts:Array<SceneArtifactHullContact>;
   /** Timed digital process outputs executed by the native plan runtime. */
   @:id(5) @:optional var digitalProgram:SceneArtifactDigitalProgram;
+  /** Feedback-driven press controller, independent of the robot mission. */
+  @:id(6) @:optional var pressBrake:SceneArtifactPressBrake;
+}
+
+/** Press travel and gauge setup use millimetres; axis planning converts to SI once. */
+@:wire typedef SceneArtifactPressBrakeStep = {
+  @:id(1) var gaugeXmm:Float;
+  @:id(2) var gaugeRmm:Float;
+  @:id(3) var clampTravelMm:Float;
+  @:id(4) var depthTravelMm:Float;
+  @:id(5) var withdrawalMm:Float;
+}
+
+/** Runtime bindings are authored semantic ids; geometry supplies each program step. */
+@:wire typedef SceneArtifactPressBrake = {
+  @:id(1) @:optional var controllerId:String;
+  @:id(2) var ramJoint:String;
+  @:id(3) var depthAxis:String;
+  @:id(4) var gaugeX:String;
+  @:id(5) @:optional var gaugeR:String;
+  @:id(6) var topSwitch:String;
+  @:id(7) var fingerSwitches:Array<String>;
+  @:id(8) var steps:Array<SceneArtifactPressBrakeStep>;
+  @:id(9) var positionToleranceMm:Float;
+  @:id(10) var requestTimeoutSeconds:Float;
+  /** Explicit simulation unloading criterion, not a chamber-pressure measurement. */
+  @:id(11) var releaseTravelMm:Float;
+  @:id(12) var releaseClosingForceN:Float;
 }
 
 @:wire typedef SceneArtifactBeltVisual = {
@@ -550,7 +578,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 28;
+	public static inline var VERSION:Int = 29;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -817,6 +845,66 @@ class SceneArtifact {
         for (value in [surface.contactTimeConstant, surface.contactDampingRatio])
           if (!finite(value) || value < 0) throw "Machine contact compliance must be finite and non-negative";
       }
+    }
+    var press = motion.pressBrake;
+    if (press != null) {
+      if (motion.digitalProgram != null || motion.virtualDevice == true)
+        throw "Press controller cannot share timed outputs or a virtual axis device";
+      var owned = [press.ramJoint, press.depthAxis, press.gaugeX];
+      if (press.gaugeR != null) owned.push(press.gaugeR);
+      var seen = new Map<String, Bool>();
+      for (id in owned) {
+        if (id == null || joints.indexOf(id) < 0 || seen.exists(id))
+          throw "Press controller needs distinct known ram and positioning axes";
+        for (joint in definition.joints) if (joint.id == id && joint.type != materia.assembly.AssemblyDefinition.AssemblyJointType.Prismatic)
+          throw 'Press controller axis "$id" must have linear travel';
+        seen.set(id, true);
+      }
+      if (press.fingerSwitches == null || press.fingerSwitches.length != 2 ||
+          press.fingerSwitches[0] == press.fingerSwitches[1] ||
+          press.fingerSwitches.indexOf(press.topSwitch) >= 0)
+        throw "Press controller needs distinct top and two finger switches";
+      for (id in [press.topSwitch].concat(press.fingerSwitches)) {
+        var found = false;
+        var sensors = definition.sensors;
+        if (sensors != null) for (sensor in sensors) if (sensor.id == id && sensor.kind == "joint_switch") found = true;
+        if (!found) throw 'Press controller switch "$id" is missing';
+      }
+      for (value in [press.positionToleranceMm, press.requestTimeoutSeconds, press.releaseTravelMm, press.releaseClosingForceN])
+        if (!finite(value) || value <= 0) throw "Press controller needs positive finite tolerances and unloading limits";
+      if (press.steps == null || press.steps.length == 0 || press.steps.length > 10000)
+        throw "Press controller needs a bounded nonempty program";
+      function pressTravel(id:String, millimetres:Float):Void {
+        for (joint in definition.joints) if (joint.id == id) {
+          var bounds = joint.limits;
+          var coordinate = millimetres * 0.001 / data.metresPerUnit;
+          if (bounds == null || bounds.lower == null || bounds.upper == null ||
+              coordinate < bounds.lower || coordinate > bounds.upper)
+            throw 'Press program exceeds bounded travel of axis "$id"';
+        }
+      }
+      for (step in press.steps) {
+        for (value in [step.gaugeXmm, step.gaugeRmm, step.clampTravelMm, step.depthTravelMm, step.withdrawalMm])
+          if (!finite(value) || value < 0) throw "Press program coordinates must be finite and nonnegative";
+        if (step.depthTravelMm <= step.clampTravelMm || step.clampTravelMm <= press.positionToleranceMm ||
+            press.releaseTravelMm >= step.depthTravelMm - step.clampTravelMm || step.withdrawalMm <= 0 ||
+            (press.gaugeR == null && step.gaugeRmm != 0))
+          throw "Press program needs ordered clamp/depth travel, withdrawal and supported R";
+        pressTravel(press.ramJoint, step.clampTravelMm);
+        pressTravel(press.ramJoint, step.depthTravelMm);
+        pressTravel(press.depthAxis, step.depthTravelMm);
+        pressTravel(press.gaugeX, step.gaugeXmm);
+        pressTravel(press.gaugeX, step.gaugeXmm + step.withdrawalMm);
+        if (press.gaugeR != null) pressTravel(press.gaugeR, step.gaugeRmm);
+      }
+      var controls = data.controllers;
+      if (controls != null && controls.length > 0) {
+        var matches = [for (control in controls) if (control.id == press.controllerId) control];
+        if (matches.length != 1) throw "Press controller binding is missing";
+        for (id in owned) if (matches[0].joints.indexOf(id) < 0) throw 'Press controller does not own joint "$id"';
+        for (id in [press.topSwitch].concat(press.fingerSwitches))
+          if (matches[0].sensors.indexOf(id) < 0) throw 'Press controller does not own switch "$id"';
+      } else if (press.controllerId != null) throw "Press controller binding names an absent cabinet";
     }
     var digital = motion.digitalProgram;
     if (digital != null) {

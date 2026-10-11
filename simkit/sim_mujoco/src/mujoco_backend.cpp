@@ -24,6 +24,8 @@
 namespace nksim_mujoco {
 namespace {
 
+constexpr double velocity_response_rate = 50.0;
+
 // Marks a geom as one of ours in mjModel::geom_user, so the contact filter below treats any other model as MuJoCo
 // would. Slot 0 is the marker; slot 1 is 1 for a geom whose body is, or can become, dynamic.
 constexpr mjtNum kGeomMarker = 7019.3125;
@@ -2169,8 +2171,7 @@ private:
                 break;
             }
             case NKSIM_JOINT_TARGET_VELOCITY: {
-                constexpr double kv = 50.0;
-                qacc_desired[dof] = kv * (joint.target - qdot);
+                qacc_desired[dof] = velocity_response_rate * (joint.target - qdot);
                 break;
             }
             }
@@ -2356,6 +2357,10 @@ extern "C" {
 
 uint64_t NKSIMMUJOCO_CALL nksim_mujoco_distance_call_count(void) {
     return nksim_mujoco::distance_call_count.load(std::memory_order_relaxed);
+}
+
+double NKSIMMUJOCO_CALL nksim_mujoco_velocity_response_rate(void) {
+    return nksim_mujoco::velocity_response_rate;
 }
 
 nksim_result NKSIMMUJOCO_CALL nksim_mujoco_world_create(

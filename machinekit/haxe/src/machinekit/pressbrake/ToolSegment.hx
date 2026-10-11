@@ -5,6 +5,7 @@ import cadkit.sheetmetal.OutlineBoolean;
 import cadkit.sheetmetal.Point2;
 import cadkit.sheetmetal.WallOutline;
 import machinekit.component.ComponentDetail;
+import machinekit.component.CollisionHullFacet;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentRecipeSupport;
@@ -40,6 +41,17 @@ class ToolSegment extends MachineComponent {
 		this.profile = profile;
 		this.length = length;
 		this.horn = horn;
+		// Reuse the planner's conservative sections so physics retains the die groove
+		// and punch relief. Coordinates stay in the component's local CAD frame.
+		var hulls:Array<Array<Float>> = [];
+		for (prism in collisionPrisms(0.01)) {
+			var hull:Array<Float> = [];
+			for (x in [prism.start, prism.end]) for (point in prism.section.points()) {
+				hull.push(x); hull.push(point.y); hull.push(point.z);
+			}
+			hulls.push(hull);
+		}
+		addFacet(new CollisionHullFacet(hulls));
 		var height = ToolProfiles.height(profile);
 		var mountX = horn == null ? length / 2 : switch horn.end {
 			case Left: (length + horn.reliefLength) / 2;

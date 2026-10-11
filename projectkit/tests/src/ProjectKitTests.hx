@@ -416,6 +416,52 @@ class ProjectKitTests {
     digital.events[1].timeSec = 1.5;
     motion.program = {axes: ["hinge"], waypoints: [[0.2]], loop: false};
     rejects(function() SceneArtifact.encode(data), "axis and digital program execution conflict");
+    motion.program = null; motion.digitalProgram = null;
+    var pressAssembly = definition(), frame = AssemblyFrames.identity();
+    pressAssembly.joints[0].type = AssemblyJointType.Prismatic;
+    pressAssembly.joints[0].limits.upper = 300;
+    for (id in ["depth", "X"]) {
+      pressAssembly.occurrences.push({id: id, definition: "body", initialPose: frame});
+      pressAssembly.joints.push({id: id, type: AssemblyJointType.Prismatic, role: AssemblyJointRole.Tree,
+        parent: "base", parentConnector: "pin", child: id, childConnector: "pin",
+        axis: {x: 0.0, y: 0.0, z: 1.0},
+        limits: {lower: 0.0, upper: 300.0, velocity: null, effort: null}, defaultValue: 0.0});
+    }
+    pressAssembly.sensors = [for (id in ["top", "left", "right"])
+      {id: id, kind: "joint_switch", joint: "hinge", windowLower: -0.1, windowUpper: 0.1, hysteresis: 0.001}];
+    data.assemblyDefinition = pressAssembly;
+    var press:materia.project.SceneArtifact.SceneArtifactPressBrake = {
+      ramJoint: "hinge", depthAxis: "depth", gaugeX: "X", topSwitch: "top", fingerSwitches: ["left", "right"],
+      steps: [{gaugeXmm: 150, gaugeRmm: 0, clampTravelMm: 78.5, depthTravelMm: 83, withdrawalMm: 20}],
+      positionToleranceMm: 0.05, requestTimeoutSeconds: 20, releaseTravelMm: 0.5, releaseClosingForceN: 5000};
+    motion.pressBrake = press;
+    var pressSaved = SceneArtifact.decode(SceneArtifact.encode(data)).machineMotion;
+    if (pressSaved == null || pressSaved.pressBrake == null) throw "Press controller disappeared";
+    near(pressSaved.pressBrake.steps[0].depthTravelMm, 83, "typed press depth round trip");
+    press.fingerSwitches[1] = "left";
+    rejects(function() SceneArtifact.encode(data), "press needs independent registration switches");
+    press.fingerSwitches[1] = "right"; press.depthAxis = "hinge";
+    rejects(function() SceneArtifact.encode(data), "press cannot alias ram and depth ownership");
+    press.depthAxis = "depth"; press.steps[0].depthTravelMm = 78;
+    rejects(function() SceneArtifact.encode(data), "press depth must follow clamp travel");
+    press.steps[0].depthTravelMm = 83; press.steps[0].gaugeRmm = 1;
+    rejects(function() SceneArtifact.encode(data), "press cannot program an absent R axis");
+    press.steps[0].gaugeRmm = 0; motion.digitalProgram = digital;
+    rejects(function() SceneArtifact.encode(data), "press cannot share hydraulic output authority");
+    motion.digitalProgram = null; press.controllerId = "absent";
+    rejects(function() SceneArtifact.encode(data), "press cannot name an absent cabinet");
+    press.controllerId = null; press.steps[0].gaugeXmm = 290;
+    rejects(function() SceneArtifact.encode(data), "press withdrawal must fit bounded backgauge travel");
+    press.steps[0].gaugeXmm = 150; press.controllerId = "press";
+    data.controllers = [{id: "press", kind: "cnc", joints: ["hinge", "depth", "X"],
+      sensors: ["top", "left", "right"], channels: []}];
+    data.signals = [];
+    var cabinetPress = SceneArtifact.decode(SceneArtifact.encode(data)).machineMotion;
+    check(cabinetPress != null && cabinetPress.pressBrake != null && cabinetPress.pressBrake.controllerId == "press",
+      "press controller ownership round trip");
+    data.controllers[0].joints = ["hinge", "depth"];
+    data.controllers.push({id: "robot", kind: "robot", joints: ["X"], sensors: [], channels: []});
+    rejects(function() SceneArtifact.encode(data), "press cannot drive another cabinet's gauge axis");
   }
 
   static function mobileBase():Void {

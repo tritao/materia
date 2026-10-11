@@ -13,9 +13,14 @@ enum PressBrakeAlarm {
 	RegistrationLost;
 	RobotHoldLost;
 	PositioningLost;
+	PositionTimeout;
 	ClampTimeout;
 	WithdrawalTimeout;
 	DepthTimeout;
 	DecompressionTimeout;
 	OpenTimeout;
+	AxisMotionFailure;
+	InvalidProgramStep;
+	RuntimeFailure;
+	EventOverflow;
 }

@@ -1,0 +1,17 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Feedback-controlled sheet metal press",
+	"defaultEntrypoint": "press-controller",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.json"
+	},
+	"entrypoints": {
+		"press-controller": {
+			"kind": "cad-preview",
+			"module": "PressBrakePreview",
+			"function": "controlledPressBrake"
+		}
+	}
+}
