@@ -169,7 +169,7 @@ class Fastenings {
 				}
 				if (valid) fastenings.push(new Fastening({member: id, faceName: external.attribute.faceName},
 					{member: clamp, faceName: clearance.name}, {member: target.member, faceName: target.thread.attribute.faceName},
-					new Plane(origin.add(axis.scale(target.bore.minimum)), external.frame.xDirection, axis), engagement, minimum,
+					new Plane(origin.add(axis.scale(target.bore.minimum)), external.frame.xDirection, axis), origin.add(axis.scale(tip)), engagement, minimum,
 					external.attribute.spec, cast tightening, policy == null ? null : policy.angleWindow));
 			}
 			if (policies != null) for (id in policies.keys()) if (!visited.exists(id))

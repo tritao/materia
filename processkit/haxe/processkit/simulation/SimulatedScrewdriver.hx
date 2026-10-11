@@ -32,6 +32,8 @@ typedef ScrewdriverSetup = {
   var work:Void -> ScrewdriverWorkState;
   /** +1 for right-hand tightening, -1 for left-hand. */
   var hand:Float;
+  /** On successful release, retain the actual seated body on its identified threaded member. */
+  @:optional var retain:SimObject -> SimPose -> Void;
 };
 
 /** Deterministic screw process on a compliant tool; only its two tool joints are driven. */
@@ -119,7 +121,14 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     var setup = selected, process = model;
     if (start && !reverse && reversed) throw "Screwdriver needs a newly configured cycle after reversal";
     if (!vacuum) {
-      if (holding.held != null) holding.release();
+      var held = holding.held;
+      if (held != null) {
+        var pose = simulation.objectPose(held);
+        var retain = setup == null ? null : setup.retain;
+        var fastened = anchoredBody != null && process != null && process.reading.result == ScrewdriverContract.OK;
+        holding.release();
+        if (fastened && retain != null) retain(held,pose);
+      }
       anchoredBody = null;
     }
     if (setup != null && process != null) {

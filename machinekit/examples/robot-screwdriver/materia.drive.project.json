@@ -1,0 +1,20 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Robot screwdriver: drive one",
+	"defaultEntrypoint": "one",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.drive.json"
+	},
+	"entrypoints": {
+		"one": {
+			"kind": "cad-preview",
+			"module": "ScrewdrivingOnePreview",
+			"function": "one"
+		}
+	},
+	"dynamicParts": [
+		"work/flange/screw1"
+	]
+}

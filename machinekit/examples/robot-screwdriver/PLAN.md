@@ -185,6 +185,27 @@ simulation and hardware, and a mission step drives it.
   use millimetres. Validation compares the hole frame, lead and hand with that
   occurrence's exact named thread packet and requires its presenter's declared
   presence sensor. An equal bore cannot repair a missing or ambiguous reference.
+- **SD6 — Released screws belong to their actual fixture.** An OK release
+  transfers the native body to the exact threaded occurrence, preserving its
+  measured pose. Both robot-link fixtures and independent environment fixtures
+  carry it when they move. Failed tightening keeps vacuum for recovery.
+- **SD6 — Collision pieces preserve openings in generated previews.** Socket,
+  shank, bit and presenter pieces are authored with their component geometry.
+  Generated previews have no editable CAD session, so their already-centred
+  pieces also pass through the canonical assembly collision boundary. A session
+  compound copies its convex pieces into one body; presence and ray queries use
+  the pieces, and the deterministic backend resolves their transformed OBBs
+  separately. It still approximates each convex piece by its local box. The
+  presenter's conservative supports stay outside its circular bore. Only the
+  declared bit carrier and its identified, kinematically held screw exclude
+  mutual native contact; presenter and workpiece contacts remain enabled.
+- **SD6 — The drive-one example qualifies M6 explicitly.** Bearing 6003 gives
+  the M6 connection; the original 608 equipment preview remains M5. The new
+  example authors its process limits and 0.05 mm across-flats bit clearance.
+  Nominal drive identity and the published 16.5 Nm target remain separate from
+  that fit allowance. The actual socket datum and measured solid tip derive
+  entry and seat; lateral seat offset must stay inside the authored 0.5 mm
+  lead-in window. Initial arm roll matches the socket before the first move.
 
 ## What exists
 
@@ -765,6 +786,71 @@ budgets pass and wall-clock profiling varies. No new Haxeon bug, native change,
 OCCT build or submodule pin change was needed for this schema checkpoint.
 CAD mission authoring, app execution and the seated-screw handoff remain pending.
 
+### SD6 CAD integration and final gate (2026-10-11)
+
+The drive-one example uses bearing 6003 for the required M6 fastening; the
+existing 608 equipment preview retains its M5 screws and dimensions. The
+socket-bottom datum and actual solid tip derive live entry and seat. Successful
+release transfers the actual body to the exact threaded member, preserving its
+measured pose. Fixture tests cover robot links and independent environment
+carriers, movement after handoff, and rejection of self-holding.
+
+Physical pickup exposed filled openings and false tapers from union hulls.
+Separate pieces preserve the screw socket, head/shank transition, bit sleeve
+and presenter bore. Constant sections extrude triangles from their authored
+CAD caps; the presenter uses conservative box supports outside its circular
+bore for the deterministic backend's OBB queries. Existing component solids
+stay unchanged. Bit length must exceed its 8 mm tip plus 3 mm sleeve floor;
+the new M6 example separately authors 0.05 mm across-flats fit clearance while
+retaining nominal drive identity. Its target remains the cited 16.5 Nm table
+value; other process limits are explicit example qualifications.
+
+The initial arm starts above the physically supported presenter with its roll
+aligned to the socket. Native contact between the bit and its kinematically
+held screw pushed the feed backwards (`build/sd6-cad-contacts.log`). Setup now
+excludes only that explicitly identified pair; workpiece and presenter contacts
+remain enabled. Seat height stays at the CAD datum and radial contact offset
+must remain inside the authored 0.5 mm lead-in window, rather than an invented
+0.15 mm radial limit.
+
+Generated previews have no editable CAD session and previously fell back to a
+single scene bounding box despite carrying authored collision pieces. They
+now use the canonical assembly collision boundary in their already-centred
+frame. The session API copies convex pieces into one compound body, retaining
+body identity and testing presence and rays per piece. The deterministic
+backend resolves transformed pieces separately instead of filling the whole
+compound's enclosing box; its per-piece OBB approximation remains explicit.
+
+Full gate `sd-suite-sd6-final.txt` passes all seven stages. Archived logs are
+`build/sd6-final-*.log`. It proves the actual M6 cycle and empty presenter on
+both backends, the CAD seat, exact fixture ownership, gravity retention, all
+native presentation coordinates, and portable export. Process checks remain
+31; simulation checks grow from 72 to 80. ProjectKit passes its 199 main
+assertions plus 17 screw-definition and 6 exact-face checks; cosmetic threads
+retain all 855 checks. Native core, host, session and MuJoCo session regressions
+pass (`build/sd6-native-regressions.log`), including copied inputs, malformed
+counts, rotated gaps, presence, rays, body identity and cradle support. The
+four-platform ABI audit passes (`build/sd6-compound-ffi.log`). CadKit and OCCT
+were not rebuilt; disk remained above 23 GB free.
+
+Against the schema checkpoint, all 123 MachineKit result lines match exactly.
+All 115 comparable existing app result lines match after normalizing wall time
+and allocation profiling. Of 41 existing artifacts, 40 retain their size; only
+the equipment preview grows by 31431 bytes, from 2206852 to 2238283, for authored
+collision metadata. This gate adds fresh CAD mission loads outside that cohort.
+The comparison reports are `build/sd6-final-{machinekit,app,artifact}-compare.txt`.
+
+Profiling changes: the two pickers read 58653/60284 rather than 58648/60286
+bytes per execution tick; the mill reads 53454.96 rather than 53555.72. Screw
+router remains 39.5 KB/tick and 16 collections; belt router reads 43.7 rather
+than 43.8 KB/tick, with 16 rather than 15 collections. HashLink's
+`gc_tlab_alloc` counts reserved buffer runs at refill, and collections empty
+those buffers. Additional earlier CAD tests change the heap and refill phase
+at measurement boundaries; these are reserved-allocation observations, not
+changed engineering results. All allocation budgets pass. No new haxeon bug
+was found; compound contacts and preview conversion were application/native
+integration defects. SD7 and SD8 remain unimplemented.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
@@ -773,6 +859,6 @@ CAD mission authoring, app execution and the seated-screw handoff remain pending
 | SD3 | done — post-rebase full gate passed | `fbbe14d0c`, `6c338344d`, `ffee5362f` |
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
-| SD6 | in progress — core and portable schema implemented; scene integration and final full gate pending | `95a9dbb28` |
+| SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220` |
 | SD7 | open — machine tending landed; not started | |
 | SD8 | open — machine tending landed; not started | |

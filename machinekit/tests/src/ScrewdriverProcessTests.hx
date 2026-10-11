@@ -106,7 +106,7 @@ class ScrewdriverProcessTests {
 			{runDownSpeed:20,finalSpeed:2,runDownTorqueLimit:1,finalTorqueLimit:20,maximumRunDownAngle:30,minimumStroke:1,maximumStroke:15}); });
 		var fastening = cell.work.fastenings().require()[0];
 		var qualified = new machinekit.screwdriving.Fastening(fastening.screw,fastening.clamped,fastening.threaded,
-			fastening.frame,fastening.engagementLength,fastening.minimumEngagement,fastening.thread,fastening.tightening,{minimum:0.4,maximum:0.6});
+			fastening.frame,fastening.tip,fastening.engagementLength,fastening.minimumEngagement,fastening.thread,fastening.tightening,{minimum:0.4,maximum:0.6});
 		var derived = machinekit.screwdriving.TighteningPrograms.fromFastening(qualified,
 			{runDownSpeed:20,finalSpeed:2,runDownTorqueLimit:1,finalTorqueLimit:20,maximumRunDownAngle:30,minimumStroke:1,maximumStroke:15});
 		check(derived.settings.targetTorque == fastening.tightening.torqueNm && derived.settings.minimumAngle == 0.4,

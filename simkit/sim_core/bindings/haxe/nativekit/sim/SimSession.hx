@@ -284,6 +284,23 @@ class SimSession {
         holdObject(object, found.out_body, offset);
     }
 
+    /** Retains a dynamic part relative to an explicitly identified environment object. */
+    public function holdObjectOnObject(object:SimObject, carrier:SimObject, offset:SimPose):Void {
+        ensureLive();
+        if (object == null || carrier == null || object == carrier || object.session != this || carrier.session != this)
+            throw "Object holding needs two distinct objects from this session";
+        holdObject(object, objectBody(carrier), offset);
+    }
+
+    /** The physics body of this session's explicitly identified environment object. */
+    public function objectBody(object:SimObject):nksim_body {
+        ensureLive();
+        if (object == null || object.session != this) throw "Object body needs this session's object";
+        var found = NativeKitSim.nksim_session_get_object_body(owner.borrow(), object.handle);
+        SimWorld.check(found.status, "session.objectBody");
+        return found.out_body;
+    }
+
     /**
      * Places a free dynamic object at the start of the next physics tick and clears its velocity.
      * Unlike teleport(), this is safe while the session is hosted and does not change the reset pose.

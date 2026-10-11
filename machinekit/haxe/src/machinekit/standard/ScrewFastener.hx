@@ -11,4 +11,6 @@ interface ScrewFastener {
 	public function shankLength():Float;
 	public function threadedLength():Float;
 	public function tightening():TighteningTableRow;
+	/** Bit contact in component millimetres, with +Z into the shank. */
+	public function driveFrame():materia.assembly.AssemblyRecord.AssemblyFrame;
 }

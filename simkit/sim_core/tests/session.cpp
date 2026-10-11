@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <string>
@@ -337,6 +338,93 @@ void convex_objects_keep_their_actual_volume() {
     assert(nksim_session_raycast(space.session, &ray, &distance) == NKSIM_OK);
     assert(near(distance, 3));
     assert(nksim_session_create_convex_object(space.session, &desc, vertices, 12, &object) == NKSIM_ERROR_INVALID_ARGUMENT);
+}
+
+void compound_objects_preserve_gaps_and_identity() {
+    Space space;
+    nksim_object_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.shape.type = NKSIM_SHAPE_COMPOUND;
+    desc.pose = pose_at(3, 4, 5);
+    desc.pose.rotation[2] = desc.pose.rotation[3] = std::sqrt(0.5);
+    desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    desc.mass = 1.0;
+    std::vector<double> vertices;
+    for (double side : {-1.0, 1.0})
+        for (double x : {1.0, 2.0}) for (double y : {-0.5, 0.5}) for (double z : {0.0, 1.0}) {
+            vertices.push_back(side*x); vertices.push_back(y); vertices.push_back(z);
+        }
+    uint32_t counts[] = {24, 24};
+    nksim_object object = 0;
+    assert(nksim_session_create_compound_convex_object(space.session, &desc, vertices.data(), 47,
+        counts, 2, &object) == NKSIM_ERROR_INVALID_ARGUMENT && object == 0);
+    assert(nksim_session_create_compound_convex_object(space.session, &desc, vertices.data(), 48,
+        counts, 0, &object) == NKSIM_ERROR_INVALID_ARGUMENT && object == 0);
+    assert(nksim_session_create_compound_convex_object(space.session, &desc, vertices.data(), 48,
+        counts, 2, &object) == NKSIM_OK);
+    std::fill(vertices.begin(),vertices.end(),0.0);
+    counts[0] = counts[1] = 0; // Both arrays are copied.
+    const double half[] = {0.05,0.05,0.05};
+    uint32_t present = 1;
+    auto query = pose_at(3,4,5.5);
+    assert(nksim_session_overlap_free_objects(space.session,&query,half,&present) == NKSIM_OK && present == 0);
+    assert(nksim_session_object_overlaps_volume(space.session,object,&query,0.05,0.05,0.05,&present) == NKSIM_OK && present == 0);
+    query = pose_at(3,5.5,5.5);
+    assert(nksim_session_object_overlaps_volume(space.session,object,&query,0.05,0.05,0.05,&present) == NKSIM_OK && present == 1);
+    nksim_ray ray{};
+    ray.struct_size = sizeof(ray);
+    ray.origin[0] = 3; ray.origin[1] = 4; ray.origin[2] = 7;
+    ray.direction[2] = -1; ray.max_distance = 3;
+    double distance = 0;
+    assert(nksim_session_raycast(space.session,&ray,&distance) == NKSIM_OK && near(distance,3));
+    ray.origin[1] = 5.5;
+    assert(nksim_session_raycast(space.session,&ray,&distance) == NKSIM_OK && near(distance,1));
+    nksim_body body = 0;
+    assert(nksim_session_get_object_body(space.session,object,&body) == NKSIM_OK && body != 0);
+    assert(nksim_session_find_object(space.session,body,&object) == NKSIM_OK);
+    assert(nksim_session_step(space.session,0,nullptr) == NKSIM_OK);
+    assert(nksim_session_get_object_body(space.session,object,&body) == NKSIM_OK);
+}
+
+void compound_contacts_support_parts_without_filling_the_gap() {
+    Space space;
+    std::vector<double> vertices;
+    for (const auto &bounds : std::vector<std::array<double,6>>{
+        {-2,-2,-0.1,2,2,0}, {-2,-2,0,-1,2,2}, {1,-2,0,2,2,2}})
+        for (double x : {bounds[0],bounds[3]}) for (double y : {bounds[1],bounds[4]})
+            for (double z : {bounds[2],bounds[5]}) { vertices.push_back(x); vertices.push_back(y); vertices.push_back(z); }
+    const uint32_t counts[] = {24,24,24};
+    nksim_object_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.shape.type = NKSIM_SHAPE_COMPOUND;
+    desc.motion_type = NKSIM_MOTION_STATIC;
+    desc.pose = pose_at(0.1,0.2,0.3);
+    desc.pose.rotation[2] = desc.pose.rotation[3] = std::sqrt(0.5);
+    nksim_object fixture = 0;
+    assert(nksim_session_create_compound_convex_object(space.session,&desc,vertices.data(),72,counts,3,&fixture) == NKSIM_OK);
+    auto box = [&](const nksim_pose &pose) {
+        nksim_object_desc moving{};
+        moving.struct_size = sizeof(moving);
+        moving.shape.type = NKSIM_SHAPE_BOX;
+        moving.shape.parameters[0] = moving.shape.parameters[1] = moving.shape.parameters[2] = 0.2;
+        moving.motion_type = NKSIM_MOTION_DYNAMIC;
+        moving.mass = 1;
+        moving.pose = pose;
+        nksim_object object = 0;
+        assert(nksim_session_create_object(space.session,&moving,&object) == NKSIM_OK);
+        return object;
+    };
+    const auto gap = box(pose_at(0.1,0.2,1.3));
+    const auto wall = box(pose_at(0.1,1.7,3.3));
+    for (int i = 0; i < 100; ++i) assert(nksim_session_step(space.session,0,nullptr) == NKSIM_OK);
+    nksim_frame frame = 0;
+    assert(nksim_session_capture(space.session,&frame) == NKSIM_OK);
+    auto pose = pose_at(0,0,0);
+    assert(nksim_frame_get_object_pose(frame,gap,&pose) == NKSIM_OK);
+    assert(near(pose.position[0],0.1) && near(pose.position[1],0.2) && near(pose.position[2],0.5));
+    assert(nksim_frame_get_object_pose(frame,wall,&pose) == NKSIM_OK);
+    assert(near(pose.position[0],0.1) && near(pose.position[1],1.7) && near(pose.position[2],2.5));
+    nksim_frame_destroy(frame);
 }
 
 void actors_follow_timed_keyframes() {
@@ -770,6 +858,8 @@ int main() {
     convex_objects_keep_their_actual_volume();
     compound_objects_preserve_empty_gaps();
     fixed_connections_use_reference_frames_and_session_ownership();
+    compound_objects_preserve_gaps_and_identity();
+    compound_contacts_support_parts_without_filling_the_gap();
     actors_follow_timed_keyframes();
     participants_share_every_tick();
     owned_carriers_use_current_targets_in_dependency_order();

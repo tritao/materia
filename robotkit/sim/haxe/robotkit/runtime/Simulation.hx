@@ -948,6 +948,19 @@ class Simulation {
     session.releaseObject(object);
   }
 
+  /** Retains a part in an identified environment object's body frame. */
+  public function holdObjectOnObject(object:nativekit.sim.SimObject, carrier:nativekit.sim.SimObject,
+      relative:nativekit.sim.SimPose):Void {
+    ensureLive();
+    session.holdObjectOnObject(object,carrier,relative);
+  }
+
+  /** The physics body belonging to an identified environment object. */
+  public function objectBody(object:nativekit.sim.SimObject):nksim_body {
+    ensureLive();
+    return session.objectBody(object);
+  }
+
   /** Reads an articulated link pose without mutating the simulation. */
   public function linkPose(robotIndex:Int, linkIndex:Int):{position:Array<Float>,rotation:Array<Float>} {
     ensureLive();

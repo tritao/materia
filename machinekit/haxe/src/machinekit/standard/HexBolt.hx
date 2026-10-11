@@ -99,11 +99,16 @@ class HexBolt extends MachineComponent implements ScrewFastener {
 		thread = FastenerThreads.metric(spec.diameter, spec.pitch);
 		addConnector("head", Face, Solids.axial(0, 0, 0));
 		addConnector("tip", Face, Solids.axial(0, 0, -length));
+		addFacet(new machinekit.component.CollisionHullFacet([
+			machinekit.component.CollisionHullFacet.cylinder(diameter/2,-length,0),
+			machinekit.component.CollisionHullFacet.prism(cadkit.modeling.Polygon.regular(6,spec.acrossFlats),0,spec.headHeight)]));
 	}
 
 	override public function hasGeometry():Bool return true;
 
 	public function screwDrive():ScrewDrive return drive;
+	public function driveFrame():materia.assembly.AssemblyRecord.AssemblyFrame
+		return {x:0,y:0,z:spec.headHeight,qx:1,qy:0,qz:0,qw:0};
 	public function threadSpec():ThreadSpec return thread;
 	public function fastenerClass():PropertyClass return propertyClass;
 	public function shankLength():Float return length;

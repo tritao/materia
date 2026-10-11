@@ -1,6 +1,7 @@
 package machinekit.screwdriving;
 
 import cadkit.modeling.Plane;
+import cadkit.modeling.Vector;
 import cadkit.threads.ThreadSpec;
 import machinekit.standard.FastenerTightening.TighteningTableRow;
 
@@ -16,6 +17,8 @@ class Fastening {
 	public final clamped:FasteningFace;
 	public final threaded:FasteningFace;
 	public final frame:Plane;
+	/** Actual solid tip in the source assembly's millimetres, rebuilt with the seat connection. */
+	public final tip:Vector;
 	public final engagementLength:Float;
 	public final minimumEngagement:Float;
 	public final thread:ThreadSpec;
@@ -23,10 +26,11 @@ class Fastening {
 	public final angleWindow:Null<TighteningAngleWindow>;
 
 	public function new(screw:FasteningFace, clamped:FasteningFace, threaded:FasteningFace,
-		frame:Plane, engagementLength:Float, minimumEngagement:Float, thread:ThreadSpec,
+		frame:Plane, tip:Vector, engagementLength:Float, minimumEngagement:Float, thread:ThreadSpec,
 		tightening:TighteningTableRow, angleWindow:Null<TighteningAngleWindow>) {
 		this.screw = screw; this.clamped = clamped; this.threaded = threaded;
 		this.frame = frame; this.engagementLength = engagementLength;
+		this.tip = tip;
 		this.minimumEngagement = minimumEngagement; this.thread = thread;
 		this.tightening = tightening;
 		this.angleWindow = angleWindow == null ? null : {minimum: angleWindow.minimum, maximum: angleWindow.maximum};

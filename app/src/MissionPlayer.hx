@@ -53,6 +53,15 @@ import motionkit.robot.StepperSlip;
 import robotkit.runtime.EncoderMonitor;
 import motionkit.robot.PlanningLimits;
 import processkit.WeldingPlanRunner;
+import processkit.screwdriving.ScrewScenePlan;
+import processkit.screwdriving.ScrewdrivingRunner;
+import processkit.screwdriving.ScrewdrivingArmMotion;
+import processkit.screwdriving.ScrewdriverArmKinematics;
+import processkit.screwdriving.ChannelScrewdriverOutputs;
+import processkit.screwdriving.TighteningProgram;
+import processkit.screwdriving.ScrewdrivingRunner.TighteningResult;
+import processkit.simulation.SimulatedScrewdriver;
+import materia.project.SceneScrewDefinition.SceneScrew;
 import processkit.WeldStowPlanner;
 import processkit.skill.WeldPlan;
 import processkit.skill.WeldSeam;
@@ -321,6 +330,12 @@ class MissionPlayer implements SessionMember {
   public var stepIndex(default, null):Int = 0;
   /** Steps finished since the session started. */
   public var completed(default, null):Int = 0;
+  /** Measured results from the named fastenings, including a failed pickup. */
+  public final screwResults:Array<TighteningResult> = [];
+  final screwdrivers:Array<SimulatedScrewdriver>;
+  var screwArm:Null<Manipulator> = null;
+  var screwing:Null<ScrewdrivingRunner> = null;
+  var recordedScrew:Null<ScrewdrivingRunner> = null;
   /** Why the mission stopped, or null while it runs. */
   public var failure(default, null):Null<String> = null;
   /** Stable alarm code for the operator panel and recovery decision. */
@@ -408,7 +423,7 @@ class MissionPlayer implements SessionMember {
   public var energyChargeSeconds(default, null):Float = 0.0;
 
   public function new(mission:SceneArtifactMission, robot:AssemblyRobot, simulation:Simulation, robotIndex:Int,
-      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, cellRobots:Array<AssemblyRobot>, ?cellInput:String->Null<EventValue>, ?cellOutput:String->Bool->Void, ?jointMotionPolicy:JointMotionPolicy, weldAcceleration:Float = ARM_ACCELERATION, ?energyPower:SimulatedMobilePower) {
+      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, cellRobots:Array<AssemblyRobot>, ?cellInput:String->Null<EventValue>, ?cellOutput:String->Bool->Void, ?jointMotionPolicy:JointMotionPolicy, weldAcceleration:Float = ARM_ACCELERATION, ?energyPower:SimulatedMobilePower, ?screwdrivers:Array<SimulatedScrewdriver>) {
     if (!Math.isFinite(weldAcceleration) || weldAcceleration <= 0.0 || weldAcceleration > ARM_ACCELERATION)
       throw "Invalid welding planning acceleration";
     if (mission.steps.length == 0) throw "A mission needs steps";
@@ -427,6 +442,14 @@ class MissionPlayer implements SessionMember {
     this.objects = objects;
     this.robotIndex = robotIndex;
     this.project = project;
+    this.screwdrivers = screwdrivers == null ? new Array<SimulatedScrewdriver>() : screwdrivers.copy();
+    if ([for (step in mission.steps) if (step.kind == "screw") step].length > 0) {
+      var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
+      if (tools.length != 1) throw "Screw mission needs exactly one screwdriver";
+      var tool = tools[0], capacity = tool.screwdriver, tcp = robot.toolFrames.get(tool.contact.occurrence);
+      if (capacity == null || tcp == null) throw "Screw mission lost its declared tool joints or TCP";
+      screwArm = ScrewdriverArmKinematics.create(robot.model,robot.rootLink,tcp.id,capacity.feedJoint,capacity.spindleJoint);
+    }
     assemblyParts = new SimulationAssemblyParts(simulation, this.cellRobots, objects, project);
     var physical = project.projectPhysical;
     metres = physical == null ? 1.0 : physical.metresPerUnit;
@@ -1316,6 +1339,7 @@ class MissionPlayer implements SessionMember {
     registeredWorkWorld = new Map<String, Transform3>();
     stepIndex = 0;
     completed = 0;
+    screwResults.resize(0); screwing = null; recordedScrew = null;
     failure = null;
     alarmCode = null;
     failedStepIndex = -1;
@@ -1512,6 +1536,7 @@ class MissionPlayer implements SessionMember {
   /** After a tick: a finished step hands over to the next, a failed one stops the mission. */
   function settle():Void switch runner.status() {
     case Succeeded:
+      recordScrewResult();
       var completedStep = mission.steps[stepIndex];
       if (completedStep.kind == "pick" || completedStep.kind == "place") {
         var channel = handlingToolChannel(completedStep);
@@ -1547,6 +1572,7 @@ class MissionPlayer implements SessionMember {
         deenergizeMissionOutputs();
       }
     case Failed(message):
+      recordScrewResult();
       var code = alarmForFailure(mission.steps[stepIndex], message);
       failMission('step $stepIndex (${mission.steps[stepIndex].kind}): $message', code);
     case _:
@@ -1627,6 +1653,10 @@ class MissionPlayer implements SessionMember {
         return new processkit.skill.WeldPasses([for (pass in weld.passes)
           () -> weldPassSkill(weld, pass,configurationFor(step))],
           [for (pass in weld.passes) pass.interpassDwell]);
+      case "screw":
+        var job = step.screw;
+        if (job == null) throw "Screw mission step has no fastening definition";
+        return withTimeout(step,screwSkill(job,configurationFor(step)));
       case "findWork":
         var job = step.contactWork;
         if (job == null) throw "Contact mission step has no work definition";
@@ -1642,6 +1672,53 @@ class MissionPlayer implements SessionMember {
   function withTimeout(step:SceneArtifactMissionStep, skill:Skill):Skill {
     var seconds = step.timeoutSeconds;
     return seconds == null ? skill : new MissionTimedSkill(skill, step.kind, seconds);
+  }
+
+  function recordScrewResult():Void {
+    var active = screwing;
+    if (mission.steps[stepIndex].kind != "screw" || active == null || active == recordedScrew) return;
+    var result = active.tighteningResult;
+    if (result == null) return;
+    screwResults.push({fastening:result.fastening,torqueNm:result.torqueNm,angle:result.angle,outcome:result.outcome});
+    recordedScrew = active;
+  }
+
+  static function livePart(part:SimulationAssemblyPart):Transform3 {
+    var pose = part.pose();
+    return new Transform3(Vec3.fromArray(pose.position),new Quat(pose.rotation[0],pose.rotation[1],pose.rotation[2],pose.rotation[3]));
+  }
+
+  function screwSkill(job:SceneScrew, configuration:Null<motionkit.kinematics.SixAxisConfiguration>):Skill {
+    var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
+    var arm = screwArm;
+    if (tools.length != 1 || arm == null) throw 'Fastening "${job.fastening}" has no configured screwdriver arm';
+    var tool = tools[0], capacity = tool.screwdriver, sensor = tool.sensor;
+    if (capacity == null || sensor == null) throw 'Fastening "${job.fastening}" lost its screwdriver capability';
+    var found = [for (driver in screwdrivers) if (driver.runtime == robot.runtime &&
+      driver.sensorId == sensor && driver.channels.start == tool.channel) driver];
+    if (found.length != 1) throw 'Fastening "${job.fastening}" has no unique mounted screwdriver observer';
+    var driver = found[0], screw = assemblyParts.get("project:"+job.screw);
+    var work = assemblyParts.get("project:"+job.frame), presenter = assemblyParts.get("project:"+job.presenter);
+    driver.configure(job.slot,{program:new TighteningProgram(job.program),joint:ScrewScenePlan.joint(job,capacity.springRate),
+      screw:screw.freeBody(),hand:job.hand,retain:work.retain,
+      work:() -> ScrewScenePlan.work(job,livePart(work),screw.center)});
+    var state = robot.runtime.snapshot();
+    var planning = PlanningLimits.ofGroup(arm,new SteadyLoads(),ARM_ACCELERATION,null,state.modelRevision,state.calibrationRevision);
+    var solver = new ManipulatorKinematics(arm,1e-8);
+    solver.preferTargetOrientation = true;
+    var compiler = new ProgramCompiler(solver,planning.validation(),FRAME,planning.velocity,planning.acceleration,planning.jerk,
+      planning.startTolerances(0.005),null,0.002,0.2,0.00005,0.02,new IkTolerance(0.00005,0.001,300,0.03));
+    compiler.planningAssumptions = planning.assumptions.copy(); compiler.planCheck = planning.check();
+    var motion = new ScrewdrivingArmMotion(new ManipulatorMotion(robot.robot,compiler,(_) -> null,
+      () -> robot.runtime.pollEvents(),arm.jointIndices()));
+    motion.configuration = configuration;
+    var active = new ScrewdrivingRunner(motion,new ChannelScrewdriverOutputs(robot.runtime,driver.channels),() -> {
+      var present = missionInput(job.presentSensor);
+      return present == null ? false : switch present {case Digital(value):value;case _:false;};
+    });
+    screwing = active;
+    return new processkit.skill.DriveScrew(active,localization,
+      () -> ScrewScenePlan.plan(job,livePart(presenter),livePart(work)),sensor);
   }
 
   function handlingToolChannel(step:SceneArtifactMissionStep):String {

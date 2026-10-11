@@ -17,9 +17,9 @@ class ScrewdrivingCell extends MachineAssembly {
 	public final arm:RobotArm;
 	public final controller:TighteningController;
 	public final presenter:ScrewPresenter;
-	public function new(?bit:ScrewdriverBit, workX:Float = 0) {
+	public function new(?bit:ScrewdriverBit, workX:Float = 0, ?bearing:DeepGrooveBearing) {
 		super();
-		work = new FlangeBearingMount(DeepGrooveBearing.metric("608"));
+		work = new FlangeBearingMount(bearing == null ? DeepGrooveBearing.metric("608") : bearing);
 		tool = new ArmScrewdrivingTool(bit == null ? new ScrewdriverBit(work.flange.screw.screwDrive()) : bit);
 		arm = new RobotArm(false, tool); controller = new TighteningController();
 		presenter = new ScrewPresenter(work.flange.screw);

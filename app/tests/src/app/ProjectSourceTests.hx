@@ -1978,6 +1978,102 @@ class ProjectSourceTests {
     Sys.println("Screwdriver equipment project passed on MuJoCo and the test backend");
   }
 
+  /** Actual M6 CAD pickup, tightening and post-release seating, plus an empty nest. */
+  static function checkScrewdrivingOne(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-screwdriver/materia.drive.project.json");
+    for (backend in [ApplicationSimulation.MUJOCO, ApplicationSimulation.DETERMINISTIC]) for (absent in [false,true]) {
+      Sys.println('Screwdriving CAD: begin backend $backend, absent $absent');
+      var generated = MateriaProjectRunner.loadProject(manifest);
+      var work = generated.mission;
+      if (work == null || work.steps.length != 1) throw "Drive-one CAD must publish one mission step";
+      var step = work.steps[0], job = step.screw;
+      if (job == null) throw "Drive-one CAD lost its named screw packet";
+      var assembly = requiredAssemblyDefinition(generated.assemblyDefinition);
+      var screws = [for (item in assembly.occurrences) if (item.id == job.screw) item];
+      if (screws.length != 1) throw "Drive-one CAD lost its identified screw occurrence";
+      var screwComponents = [for (item in assembly.definitions) if (item.id == screws[0].definition) item];
+      if (screwComponents.length != 1) throw "Drive-one CAD lost its screw component";
+      var screwPieces = screwComponents[0].collisionHulls;
+      check(screwPieces != null && screwPieces.length > 1,"The CAD screw retains separate head, socket and shank collision pieces");
+      if (Sys.getEnv("SCREWDRIVING_TRACE") == "1") Sys.println("Screwdriving CAD job: "+haxe.Json.stringify(job));
+      check(step.kind == "screw" && job.screw == "work/flange/screw1" && job.frame == "work/plate" &&
+        job.leadMm == 1 && job.program.targetTorque == 16.5,"The actual M6 12.9 fastening supplies its lead and published target");
+      var session = new ProjectDocumentSession(null,false);
+      var simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.setBackend(backend);
+      try {
+        session.openGeneratedProject(generated,manifest);
+        check(simulation.rebuild(session.sensors,session.scene,session),'Drive-one CAD builds: ${simulation.error}');
+        var mission = simulation.missionPlayer(), clock = simulation.activeSession();
+        var body = simulation.environmentObject("project:"+job.screw);
+        if (mission == null || clock == null || body == null) throw "Drive-one CAD lost its mission or identified free screw";
+        if (absent) {
+          var before = mission.simulation.objectPose(body);
+          body.setPoseForNextTick(new nativekit.sim.SimPose(before.x+0.1,before.y,before.z,before.qx,before.qy,before.qz,before.qw));
+        }
+        var traceAt = 0.0;
+        while (!mission.finished && mission.failure == null && clock.simulationTime() < 180) {
+          simulation.step();
+          if (Sys.getEnv("SCREWDRIVING_TRACE") == "1" && clock.simulationTime() >= traceAt) {
+            var readings = [for (robot in simulation.snapshot().robots()) for (frame in robot.sensors.toArray())
+              if (frame.kind == robotkit.tool.ScrewdriverContract.SENSOR_KIND) frame.values.toArray()];
+            var arm = @:privateAccess mission.robot;
+            var contacts = [for (contact in mission.simulation.robotContacts(arm.runtime)) if (contact.active) contact];
+            Sys.println("Screwdriving CAD trace: "+haxe.Json.stringify({time:clock.simulationTime(),
+              body:mission.simulation.objectPose(body),readings:readings,contacts:contacts}));
+            traceAt += 0.5;
+          }
+        }
+        if (mission.failure != null && !absent) {
+          var frames = [for (robot in simulation.snapshot().robots()) for (frame in robot.sensors.toArray())
+            if (frame.sensorId == job.presentSensor || frame.kind == robotkit.tool.ScrewdriverContract.SENSOR_KIND)
+              {id:frame.sensorId,values:frame.values.toArray()}];
+          Sys.println("Screwdriving CAD diagnostic: "+haxe.Json.stringify({body:mission.simulation.objectPose(body),
+            presenter:mission.assemblyParts.get("project:"+job.presenter).pose(),pickup:job.pickup,sensors:frames}));
+        }
+        var results = mission.screwResults;
+        check(results.length == 1 && results[0].fastening == job.fastening,
+          'The measured result names the actual fastening: ${mission.failure}');
+        if (absent) {
+          check(mission.failure != null && results[0].outcome == robotkit.tool.ScrewdriverContract.NO_SCREW,
+            'The emptied physical nest reports no screw: ${mission.failure}');
+        } else {
+          check(mission.finished && mission.failure == null && results[0].outcome == robotkit.tool.ScrewdriverContract.OK &&
+            Math.abs(results[0].torqueNm-job.program.targetTorque) < 1e-8 && results[0].angle > 2*Math.PI,
+            'The real M6 reaches its target and completes retract on backend $backend: ${mission.failure}');
+          for (_ in 0...50) simulation.step();
+          var screw = mission.assemblyParts.get("project:"+job.screw), fixture = mission.assemblyParts.get("project:"+job.frame);
+          var actual = screw.pose(), live = fixture.pose();
+          var socket = AssemblyFrames.compose({x:actual.position[0],y:actual.position[1],z:actual.position[2],
+            qx:actual.rotation[0],qy:actual.rotation[1],qz:actual.rotation[2],qw:actual.rotation[3]},job.socket);
+          var seat = AssemblyFrames.compose({x:live.position[0],y:live.position[1],z:live.position[2],
+            qx:live.rotation[0],qy:live.rotation[1],qz:live.rotation[2],qw:live.rotation[3]},job.seat);
+          var offsetX = socket.x-seat.x, offsetY = socket.y-seat.y;
+          check(Math.sqrt(offsetX*offsetX+offsetY*offsetY) <= job.simulation.leadInMm/1000 && Math.abs(socket.z-seat.z) < 0.00015 &&
+            fixture.carries(body) && simulation.heldObjectIds().length == 0,
+            'The M6 remains on its CAD seat after vacuum release, retraction and gravity: socket ${haxe.Json.stringify(socket)}, seat ${haxe.Json.stringify(seat)}');
+          var visible = [for (pose in simulation.capturePresentationSnapshot().environment) if (pose.id == "project:"+job.screw) pose];
+          var physical = mission.simulation.objectPose(body);
+          check(visible.length == 1 && Math.abs(visible[0].position[0]-physical.x) < 1e-9 &&
+            Math.abs(visible[0].position[1]-physical.y) < 1e-9 && Math.abs(visible[0].position[2]-physical.z) < 1e-9 &&
+            Math.abs(visible[0].rotation[0]-physical.qx) < 1e-9 && Math.abs(visible[0].rotation[1]-physical.qy) < 1e-9 &&
+            Math.abs(visible[0].rotation[2]-physical.qz) < 1e-9 && Math.abs(visible[0].rotation[3]-physical.qw) < 1e-9,
+            "The screw's runtime presentation carries the actual rotated body pose for its cosmetic-thread children");
+        }
+      } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
+      simulation.clear(); session.dispose();
+      Sys.println('Screwdriving CAD: end backend $backend, absent $absent');
+    }
+    Sys.println("Screwdriving CAD: begin portable export");
+    var portable = materia.project.SceneArtifact.decode(MateriaProjectRunner.exportArtifact(manifest));
+    var flags = portable.project, task = portable.mission;
+    check(flags != null && flags.dynamicParts.length == 1 && flags.dynamicParts[0] == "work/flange/screw1" &&
+      task != null && task.steps.length == 1 && task.steps[0].screw != null,
+      "The portable artifact retains the identified free screw and its CAD mission");
+    Sys.println("Screwdriving CAD: end portable export");
+    Sys.println("Screwdriving CAD mission passed on MuJoCo and the test backend, including the empty presenter");
+  }
+
   static function checkRobotArm(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);

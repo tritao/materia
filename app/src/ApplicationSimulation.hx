@@ -399,7 +399,7 @@ class ApplicationSimulation {
                 if (vertices == null) throw "Environment part has no physical collision hull: " + object.id;
                 var centre = session.assemblyPreviewCenter(occurrence.definition);
                 if (centre == null) throw "Environment part has no preview centre: " + object.id;
-                hull = [for (i in 0...vertices.length) (vertices[i] - centre[i % 3]) * physical.metresPerUnit];
+                hull = [for (i in 0...vertices.length) (vertices[i]-centre[i%3])*physical.metresPerUnit];
               }
           if (hull == null) {
             var derived = scene.cadSession(object.id).collisionHull();
@@ -408,6 +408,10 @@ class ApplicationSimulation {
           }
           shape = SimShape.convex(hull);
         }
+        // Generated previews are already centred and have no editable CAD
+        // session. Their authored pieces are still component facts.
+        var authored = projectEnvironmentShape(session,object.id);
+        if (authored != null) shape = authored;
         var rotation=object.rotation==null?[0.0,0.0,0.0,1.0]:object.rotation;
         var surface = object.collisionEnabled
           ? (object.dynamicBody ? pneumaticWorkpieceSurface : null)
@@ -499,6 +503,18 @@ class ApplicationSimulation {
       var work = session == null ? null : session.mission;
       if (work != null) {
         if (candidateAssembly == null) throw "A mission needs the project's assembly";
+        for (step in work.steps) if (step.kind == "screw") {
+          var job = step.screw;
+          if (job == null || candidateTools.screwdrivers.length != 1)
+            throw "A screw mission needs its named screw and one declared screwdriver";
+          var screws = [for (object in candidateTools.objectsByScene()) if (object.id == "project:"+job.screw) object.object];
+          if (screws.length != 1) throw 'Fastening "${job.fastening}" has no unique independent screw body';
+          var holder = candidateTools.screwdrivers[0].holding;
+          // The inserted bit and its kinematically held screw are coupled by
+          // the process model. Native contact between them cannot yield and
+          // would push the feed backwards; surrounding contacts remain physical.
+          candidate.excludeContactPair(holder.robotIndex,holder.linkIndex,screws[0]);
+        }
         var welds = [for (step in work.steps) if (step.kind == "weld") step].length > 0;
         var mobileProfile = session == null ? null : session.mobileBase;
         if (welds && mobileProfile != null && mobileProfile.energy != null) {
@@ -511,7 +527,7 @@ class ApplicationSimulation {
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId),
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.outputFor(work.controllerId), null,
           virtualWelder ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
-            : MissionPlayer.ARM_ACCELERATION, candidatePower);
+            : MissionPlayer.ARM_ACCELERATION, candidatePower,candidateTools.screwdrivers);
         // A mission that welds lays the weld metal as the welder deposits it.
         if (welds) {
           var active:ProjectDocumentSession = cast session;
@@ -1093,6 +1109,27 @@ class ApplicationSimulation {
     var result = snapshot.environment;
     return result;
   }
+  /** Authored CAD pieces use the same source as robot links, centred on the scene body. */
+  static function projectEnvironmentShape(project:Null<ProjectDocumentSession>, id:String):Null<SimShape> {
+    if (project == null) return null;
+    var definition = project.projectAssemblyDefinition;
+    if (definition == null) return null;
+    var occurrences = [for (item in definition.occurrences) if (id == "project:"+item.id) item];
+    if (occurrences.length == 0) return null;
+    if (occurrences.length != 1) throw "Environment body has ambiguous CAD identity: "+id;
+    var occurrence = occurrences[0];
+    var components = [for (item in definition.definitions) if (item.id == occurrence.definition) item];
+    if (components.length != 1) throw "Environment body has no unique CAD component: "+id;
+    var component = components[0];
+    if (component.collisionHulls == null) return null;
+    var physical = project.projectPhysical, center = project.assemblyPreviewCenter(occurrence.definition);
+    if (physical == null || center == null) throw "Environment body has no CAD collision frame: "+id;
+    var source = cadbridge.AssemblySimulationBridge.collisionPieces(occurrence.id,component,null);
+    var pieces = [for (vertices in source)
+      [for (i in 0...vertices.length) (vertices[i]-center[i%3])*physical.metresPerUnit]];
+    return pieces.length == 1 ? SimShape.convex(pieces[0]) : SimShape.compound(pieces);
+  }
+
   public function clear():Void {
     stop();
     if (mission != null) mission.beforeReset();

@@ -332,26 +332,36 @@ public:
             // turned box would reach well beyond it, so an arm link at an angle shoved parts it
             // never touched.
             struct Box { Vec3 center; std::array<Vec3, 3> axes; Vec3 half; };
-            auto box_of = [](const TestBody &body) {
+            auto box_of = [](const TestBody &body, int piece) {
                 Box box{};
                 box.center = body.state.position;
+                auto rotation = body.state.rotation;
+                const auto *part = piece < 0 ? nullptr : &body.desc.shape_parts[piece];
+                const auto type = part ? part->type : body.desc.shape_type;
+                const auto &parameters = part ? part->parameters : body.desc.shape_parameters;
+                const auto &vertices = part ? part->vertices : body.desc.shape_vertices;
+                if (part) {
+                    box.center = add(box.center,rotate(rotation,part->position));
+                    rotation = multiply(rotation,part->rotation);
+                }
                 for (int axis = 0; axis < 3; ++axis) {
                     Vec3 local{};
                     local[axis] = 1.0;
-                    box.axes[axis] = rotate(body.state.rotation, local);
-                    box.half[axis] = body.desc.shape_parameters[axis];
+                    box.axes[axis] = rotate(rotation, local);
+                    box.half[axis] = parameters[axis];
                 }
-                if (body.desc.shape_type == NKSIM_SHAPE_CONVEX && !body.desc.shape_vertices.empty()) {
+                if (type == NKSIM_SHAPE_CONVEX && !vertices.empty()) {
                     Vec3 minimum{INFINITY, INFINITY, INFINITY};
                     Vec3 maximum{-INFINITY, -INFINITY, -INFINITY};
-                    for (std::size_t i = 0; i < body.desc.shape_vertices.size(); ++i) {
+                    for (std::size_t i = 0; i < vertices.size(); ++i) {
                         const auto axis = i % 3;
                         minimum[axis] = std::min(minimum[axis],
-                                                 static_cast<double>(body.desc.shape_vertices[i]));
+                                                 static_cast<double>(vertices[i]));
                         maximum[axis] = std::max(maximum[axis],
-                                                 static_cast<double>(body.desc.shape_vertices[i]));
+                                                 static_cast<double>(vertices[i]));
                     }
-                    box.center = add(box.center, rotate(body.state.rotation,
+                    for (int axis = 0; axis < 3; ++axis) box.half[axis] = (maximum[axis]-minimum[axis])*0.5;
+                    box.center = add(box.center, rotate(rotation,
                         {(minimum[0] + maximum[0]) * 0.5,
                          (minimum[1] + maximum[1]) * 0.5,
                          (minimum[2] + maximum[2]) * 0.5}));
@@ -384,42 +394,54 @@ public:
                         (moving.desc.collision_mask & obstacle.desc.collision_layer) == 0 ||
                         (obstacle.desc.collision_mask & moving.desc.collision_layer) == 0)
                         continue;
-                    const auto a = box_of(moving), b = box_of(obstacle);
-                    const Vec3 between{a.center[0] - b.center[0], a.center[1] - b.center[1],
-                                       a.center[2] - b.center[2]};
-                    // Face normals first, so a tie between a face and an edge crossing pushes off
-                    // the face; an edge crossing must part the boxes clearly better to be chosen.
-                    std::array<Vec3, 15> candidates{};
-                    int count = 0;
-                    for (int i = 0; i < 3; ++i) candidates[count++] = a.axes[i];
-                    for (int i = 0; i < 3; ++i) candidates[count++] = b.axes[i];
-                    for (int i = 0; i < 3; ++i)
-                        for (int j = 0; j < 3; ++j) candidates[count++] = cross3(a.axes[i], b.axes[j]);
-                    bool separated = false;
-                    double least = std::numeric_limits<double>::infinity();
-                    Vec3 normal{};
-                    for (int k = 0; k < count && !separated; ++k) {
-                        auto axis = candidates[k];
-                        const double length = std::sqrt(dot3(axis, axis));
-                        if (length < 1e-9) continue;  // parallel edges: a face axis covers it
-                        for (auto &c : axis) c /= length;
-                        const double distance = dot3(between, axis);
-                        const double penetration = radius(a, axis) + radius(b, axis) - std::abs(distance);
-                        if (penetration <= 0.0) { separated = true; break; }
-                        const double weighted = k < 6 ? penetration : penetration * 1.05 + 1e-9;
-                        if (weighted < least) {
-                            least = weighted;
-                            const double sign = distance >= 0.0 ? 1.0 : -1.0;
-                            normal = {axis[0] * sign, axis[1] * sign, axis[2] * sign};
+                    // Keep compound gaps: its enclosing box is a broad bound,
+                    // never a solid contact surface. Recompute the moving pose
+                    // after each piece resolves a contact.
+                    const int moving_count = std::max(1,static_cast<int>(moving.desc.shape_parts.size()));
+                    const int obstacle_count = std::max(1,static_cast<int>(obstacle.desc.shape_parts.size()));
+                    for (int mi = 0; mi < moving_count; ++mi) for (int oi = 0; oi < obstacle_count; ++oi) {
+                        const int m = moving.desc.shape_parts.empty() ? -1 : mi;
+                        const int o = obstacle.desc.shape_parts.empty() ? -1 : oi;
+                        auto supported = [](uint32_t type) { return type == NKSIM_SHAPE_BOX || type == NKSIM_SHAPE_CONVEX; };
+                        if ((m >= 0 && !supported(moving.desc.shape_parts[m].type)) ||
+                            (o >= 0 && !supported(obstacle.desc.shape_parts[o].type))) continue;
+                        const auto a = box_of(moving,m), b = box_of(obstacle,o);
+                        const Vec3 between{a.center[0] - b.center[0], a.center[1] - b.center[1],
+                                           a.center[2] - b.center[2]};
+                        // Face normals first, so a tie between a face and an edge crossing pushes off
+                        // the face; an edge crossing must part the boxes clearly better to be chosen.
+                        std::array<Vec3, 15> candidates{};
+                        int count = 0;
+                        for (int i = 0; i < 3; ++i) candidates[count++] = a.axes[i];
+                        for (int i = 0; i < 3; ++i) candidates[count++] = b.axes[i];
+                        for (int i = 0; i < 3; ++i)
+                            for (int j = 0; j < 3; ++j) candidates[count++] = cross3(a.axes[i], b.axes[j]);
+                        bool separated = false;
+                        double least = std::numeric_limits<double>::infinity();
+                        Vec3 normal{};
+                        for (int k = 0; k < count && !separated; ++k) {
+                            auto axis = candidates[k];
+                            const double length = std::sqrt(dot3(axis, axis));
+                            if (length < 1e-9) continue;  // parallel edges: a face axis covers it
+                            for (auto &c : axis) c /= length;
+                            const double distance = dot3(between, axis);
+                            const double penetration = radius(a, axis) + radius(b, axis) - std::abs(distance);
+                            if (penetration <= 0.0) { separated = true; break; }
+                            const double weighted = k < 6 ? penetration : penetration * 1.05 + 1e-9;
+                            if (weighted < least) {
+                                least = weighted;
+                                const double sign = distance >= 0.0 ? 1.0 : -1.0;
+                                normal = {axis[0] * sign, axis[1] * sign, axis[2] * sign};
+                            }
                         }
+                        if (separated) continue;
+                        const double push = radius(a, normal) + radius(b, normal) - std::abs(dot3(between, normal));
+                        for (int axis = 0; axis < 3; ++axis) moving.state.position[axis] += normal[axis] * push;
+                        const double approach = dot3(moving.state.linear_velocity, normal);
+                        if (approach < 0.0)
+                            for (int axis = 0; axis < 3; ++axis)
+                                moving.state.linear_velocity[axis] -= approach * normal[axis];
                     }
-                    if (separated) continue;
-                    const double push = radius(a, normal) + radius(b, normal) - std::abs(dot3(between, normal));
-                    for (int axis = 0; axis < 3; ++axis) moving.state.position[axis] += normal[axis] * push;
-                    const double approach = dot3(moving.state.linear_velocity, normal);
-                    if (approach < 0.0)
-                        for (int axis = 0; axis < 3; ++axis)
-                            moving.state.linear_velocity[axis] -= approach * normal[axis];
                 }
             }
         }

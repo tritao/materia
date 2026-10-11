@@ -115,11 +115,21 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
 		thread = FastenerThreads.metric(spec.diameter, spec.pitch);
 		addConnector("head", Face, Solids.axial(0, 0, 0));
 		addConnector("tip", Face, Solids.axial(0, 0, -length));
+		var floor = driveFrame().z;
+		var pieces = [machinekit.component.CollisionHullFacet.cylinder(diameter/2,-length,0),
+			machinekit.component.CollisionHullFacet.cylinder(spec.headDiameter/2,0,floor)];
+		var part = geometry(Preview);
+		try pieces = pieces.concat(machinekit.component.CollisionHullFacet.fromExtrusion(part,floor,spec.headHeight).hulls)
+		catch (error:Dynamic) { part.close(); throw error; }
+		part.close();
+		addFacet(new machinekit.component.CollisionHullFacet(pieces));
 	}
 
 	override public function hasGeometry():Bool return true;
 
 	public function screwDrive():ScrewDrive return drive;
+	public function driveFrame():materia.assembly.AssemblyRecord.AssemblyFrame
+		return {x:0,y:0,z:spec.headHeight-spec.socketDepth,qx:1,qy:0,qz:0,qw:0};
 	public function threadSpec():ThreadSpec return thread;
 	public function fastenerClass():PropertyClass return propertyClass;
 	public function shankLength():Float return length;
@@ -140,7 +150,7 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
 		var body = Solids.union([head, threaded]);
 		if (detail == Envelope) return body;
 		var top = spec.headHeight;
-		var socket = Solids.named(Part.prism(cadkit.modeling.Polygon.regular(6, spec.socketSize), top - spec.socketDepth, top + 0.1),
+		var socket = Solids.named(Part.prism(cadkit.modeling.Polygon.regular(6, spec.socketSize), driveFrame().z, top + 0.1),
 			"socket");
 		return Solids.cut(body, [socket]);
 	}

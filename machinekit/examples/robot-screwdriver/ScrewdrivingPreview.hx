@@ -6,9 +6,9 @@ import materia.project.SceneArtifact;
 import haxe.io.Bytes;
 /** Equipment preview only; the tightening process and mission are later steps. */
 class ScrewdrivingPreview {
-	public static function state(cell:ScrewdrivingCell):AssemblyState {
+	public static function state(cell:ScrewdrivingCell, assemblyId:String = "screwdriving-cell"):AssemblyState {
 		var model = new AssemblyModel("mm"); cell.addTo(model, "");
-		var state = new AssemblyState(model.definition("screwdriving-cell"));
+		var state = new AssemblyState(model.definition(assemblyId));
 		var q = cell.readyPose();
 		for (i in 0...6) state.setJoint('arm/j${i + 1}', q[i]);
 		return state;

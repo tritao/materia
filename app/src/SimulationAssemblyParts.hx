@@ -55,6 +55,37 @@ class SimulationAssemblyPart {
   public var freeObject(get, never):Bool;
   function get_freeObject():Bool return object != null;
 
+  /** The independently simulated body of this exact screw occurrence. */
+  public function freeBody():SimObject {
+    var body = object;
+    if (body == null) throw 'Assembly occurrence "$id" has no independent screw body';
+    return body;
+  }
+
+  /** Fasten at the actual seated pose, preserving the member's live carrier and all offsets. */
+  public function retain(body:SimObject, world:SimPose):Void {
+    var member = part, carrier = object;
+    var parent = member != null ? simulation.linkPose(member.robotIndex,member.linkIndex) : null;
+    if (carrier != null) {
+      var live = simulation.objectPose(carrier);
+      parent = {position:[live.x,live.y,live.z],rotation:[live.qx,live.qy,live.qz,live.qw]};
+    }
+    if (parent == null) throw 'Assembly occurrence "$id" lost its fastening carrier';
+    var p = parent.position, q = parent.rotation;
+    var relative = AssemblyFrames.compose(AssemblyFrames.inverse({x:p[0],y:p[1],z:p[2],qx:q[0],qy:q[1],qz:q[2],qw:q[3]}),
+      {x:world.x,y:world.y,z:world.z,qx:world.qx,qy:world.qy,qz:world.qz,qw:world.qw});
+    var pose = new SimPose(relative.x,relative.y,relative.z,relative.qx,relative.qy,relative.qz,relative.qw);
+    if (member != null) simulation.holdObjectOnLink(body,member.robotIndex,member.linkIndex,pose);
+    else if (carrier != null) simulation.holdObjectOnObject(body,carrier,pose);
+  }
+
+  /** Whether this occurrence's exact native carrier retains the fastened body. */
+  public function carries(body:SimObject):Bool {
+    var member = part, carrier = object;
+    if (member != null) return simulation.objectCarrier(body) == simulation.linkBody(member.robotIndex,member.linkIndex);
+    return carrier != null && simulation.objectCarrier(body) == simulation.objectBody(carrier);
+  }
+
   /** Excludes only this free workpiece from one cutter link's rigid-body contacts. */
   public function excludeContactWith(robotIndex:Int, linkIndex:Int):Void {
     var body = object;

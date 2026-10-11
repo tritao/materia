@@ -27,18 +27,31 @@ class ScrewPresenter extends MachineAssembly {
 }
 private class PresenterNest extends MachineComponent {
 	final screw:SocketHeadCapScrew;
+	static inline var BORE_FLOOR:Float = 14;
+	final height:Float;
 
 	public function new(screw:SocketHeadCapScrew) {
 		super("CUSTOM-SCREW-PRESENTER-NEST-" + screw.designation, "Hand-loaded screw presenter nest", "aluminium 6061", true);
 		this.screw = screw;
+		height = screw.length+15;
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("gate", Mount, AssemblyFrames.translation(20, 0, 10));
 		addConnector("seat", Mount, Solids.axial(0, 0, screw.length + 15));
 		addConnector("sense", Mount, AssemblyFrames.translation(0, 0, screw.length + 15));
+		var radius = boreRadius();
+		// Conservative solid supports outside the circular bore. Axis-aligned
+		// boxes also retain the opening on the deterministic OBB backend.
+		addFacet(machinekit.component.CollisionHullFacet.fromBoxes([
+			[-25.0,-25.0,0.0,25.0,25.0,BORE_FLOOR],
+			[-25.0,-25.0,BORE_FLOOR,-radius,25.0,height],
+			[radius,-25.0,BORE_FLOOR,25.0,25.0,height],
+			[-radius,-25.0,BORE_FLOOR,radius,-radius,height],
+			[-radius,radius,BORE_FLOOR,radius,25.0,height]]));
 	}
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.cut(Part.box(50, 50, screw.length + 15), [Part.cylinderSpan(screw.diameter / 2 + 0.3, 14, screw.length + 15.1)]);
+		return Solids.cut(Part.box(50, 50, height), [Part.cylinderSpan(boreRadius(), BORE_FLOOR, height+0.1)]);
+	function boreRadius():Float return screw.diameter/2+0.3;
 }
 private class PresenterGate extends MachineComponent {
 	public function new() {
