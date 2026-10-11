@@ -8,19 +8,20 @@ class ToolAxisReach {
 
 	/** The joint values that put the tip on `target` with the wire along `direction`, or null. */
 	public static function solve(state:AssemblyState, joints:Array<String>, limits:Array<{lower:Float, upper:Float}>,
-			target:{x:Float, y:Float, z:Float}, direction:{x:Float, y:Float, z:Float}, seed:Array<Float>, occurrence:String, connector:String):Null<Array<Float>> {
+			target:{x:Float, y:Float, z:Float}, direction:{x:Float, y:Float, z:Float}, seed:Array<Float>, occurrence:String, connector:String,
+			?xDirection:{x:Float, y:Float, z:Float}):Null<Array<Float>> {
 		var q = [for (j in 0...joints.length) Math.min(limits[j].upper, Math.max(limits[j].lower, seed[j]))];
-		var residual = evaluate(state, joints, q, target, direction, occurrence, connector);
+		var residual = evaluate(state, joints, q, target, direction, occurrence, connector, xDirection);
 		var damping = 1.0;
 		for (iteration in 0...120) {
-			if (norm(residual) < 0.05) return q;
+			if (norm(residual) < (xDirection == null ? 0.05 : 0.005)) return q;
 			var jacobian:Array<Array<Float>> = [];
 			for (j in 0...joints.length) {
 				var step = q.copy();
 				var h = q[j] + 1e-4 <= limits[j].upper ? 1e-4 : -1e-4;
 				step[j] += h;
-				var moved = evaluate(state, joints, step, target, direction, occurrence, connector);
-				jacobian.push([for (k in 0...6) (moved[k] - residual[k]) / h]);
+				var moved = evaluate(state, joints, step, target, direction, occurrence, connector, xDirection);
+				jacobian.push([for (k in 0...residual.length) (moved[k] - residual[k]) / h]);
 			}
 			// (J^T J + damping I) delta = -J^T r, with jacobian[j][k] = d residual k / d joint j.
 			var normal:Array<Array<Float>> = [];
@@ -28,34 +29,48 @@ class ToolAxisReach {
 				var row:Array<Float> = [];
 				for (b in 0...joints.length) {
 					var sum = a == b ? damping : 0.0;
-					for (k in 0...6) sum += jacobian[a][k] * jacobian[b][k];
+					for (k in 0...residual.length) sum += jacobian[a][k] * jacobian[b][k];
 					row.push(sum);
 				}
 				var rhs = 0.0;
-				for (k in 0...6) rhs -= jacobian[a][k] * residual[k];
+				for (k in 0...residual.length) rhs -= jacobian[a][k] * residual[k];
 				row.push(rhs);
 				normal.push(row);
 			}
 			var delta = gauss(normal);
 			var next = [for (j in 0...joints.length) Math.min(limits[j].upper, Math.max(limits[j].lower, q[j] + delta[j]))];
-			var nextResidual = evaluate(state, joints, next, target, direction, occurrence, connector);
+			var nextResidual = evaluate(state, joints, next, target, direction, occurrence, connector, xDirection);
 			if (norm(nextResidual) < norm(residual)) {
 				q = next;
 				residual = nextResidual;
 				damping = Math.max(1e-6, damping * 0.5);
 			} else damping *= 4;
 		}
-		return norm(residual) < 0.5 ? q : null;
+		return norm(residual) < (xDirection == null ? 0.5 : 0.005) ? q : null;
 	}
 
+	/** Full socket orientation, including roll; the free-axis solver's existing tolerance is unchanged. */
+	public static function solveFrame(state:AssemblyState, joints:Array<String>, limits:Array<{lower:Float, upper:Float}>,
+			target:materia.assembly.AssemblyRecord.AssemblyFrame, seed:Array<Float>, occurrence:String, connector:String):Null<Array<Float>>
+		return solve(state,joints,limits,{x:target.x,y:target.y,z:target.z},
+			AssemblyFrames.transformVector(target,0,0,1),seed,occurrence,connector,AssemblyFrames.transformVector(target,1,0,0));
+
 	static function evaluate(state:AssemblyState, joints:Array<String>, q:Array<Float>, target:{x:Float, y:Float, z:Float},
-			direction:{x:Float, y:Float, z:Float}, occurrence:String, connector:String):Array<Float> {
+			direction:{x:Float, y:Float, z:Float}, occurrence:String, connector:String,
+			?xDirection:{x:Float, y:Float, z:Float}):Array<Float> {
 		for (i in 0...joints.length) state.setJoint(joints[i], q[i]);
 		state.forwardKinematics();
 		var tcp = state.worldConnector(occurrence, connector);
 		var wire = AssemblyFrames.transformVector(tcp, 0, 0, 1);
-		return [tcp.x - target.x, tcp.y - target.y, tcp.z - target.z, DIRECTION_WEIGHT * (wire.x - direction.x),
+		var residual = [tcp.x - target.x, tcp.y - target.y, tcp.z - target.z, DIRECTION_WEIGHT * (wire.x - direction.x),
 			DIRECTION_WEIGHT * (wire.y - direction.y), DIRECTION_WEIGHT * (wire.z - direction.z)];
+		if (xDirection != null) {
+			var x = AssemblyFrames.transformVector(tcp,1,0,0);
+			residual.push(DIRECTION_WEIGHT*(x.x-xDirection.x));
+			residual.push(DIRECTION_WEIGHT*(x.y-xDirection.y));
+			residual.push(DIRECTION_WEIGHT*(x.z-xDirection.z));
+		}
+		return residual;
 	}
 
 	static function norm(values:Array<Float>):Float {

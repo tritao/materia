@@ -13,9 +13,19 @@ import machinekit.robot.RobotScene;
 import RobotArm.ArmBlock;
 import haxe.io.Bytes;
 
+/** CAD design and qualification before free-body staging; derived afresh for each rebuild. */
+typedef ScrewdrivingDesign = {
+	var cell:ScrewdrivingCell;
+	var scene:SceneArtifactData;
+	var state:AssemblyState;
+	var found:machinekit.screwdriving.Fastenings.FasteningsResult;
+	var jobs:Array<SceneScrew>;
+	var staging:Array<ScrewdrivingExecution.ScrewStaging>;
+}
+
 /** Every flange fastening has its own supported supply and one physically separate replacement. */
 class ScrewdrivingAssemblyPreview {
-	public static function scene():SceneArtifactData {
+	public static function design():ScrewdrivingDesign {
 		var cell = new ScrewdrivingCell(new machinekit.screwdriving.ScrewdriverBit(HexSocket(5),45,6,0.05),0,
 			machinekit.standard.DeepGrooveBearing.metric("6003"));
 		var positions = [[250.0,-450.0],[180.0,-380.0],[250.0,-380.0],[110.0,-450.0],[110.0,-380.0],[320.0,-450.0],[320.0,-380.0]];
@@ -55,11 +65,23 @@ class ScrewdrivingAssemblyPreview {
 			staging.push({body:job.screw,template:supply+"/screw",like:job.screw});
 			staging.push({body:spare,template:reserve+"/screw",like:job.screw});
 		}
-		var mission = ScrewdrivingMission.generate(found,(fastening) -> {
+		return {cell:cell,scene:scene,state:state,found:found,jobs:jobs,staging:staging};
+	}
+
+	public static function scene():SceneArtifactData {
+		var design = design(), cell = design.cell, scene = design.scene, state = design.state;
+		var jobs = design.jobs, staging = design.staging, found = design.found;
+		var tools = [for (tool in scene.robotTools) if (tool.screwdriver != null) tool];
+		if (tools.length != 1) throw "Whole screw access lost its feed capability";
+		var parts = new machinekit.assembly.PosedParts();
+		var access = new ScrewdrivingAccess(cell,state,jobs,staging,parts,scene.metresPerUnit,tools[0]);
+		var mission:machinekit.screwdriving.ScrewdrivingMission;
+		try mission = ScrewdrivingMission.generate(found,(fastening) -> {
 			var candidates = [for (job in jobs) if (job.fastening == fastening.name()) job];
 			if (candidates.length != 1) throw "Whole screw cell lost a qualified connection";
 			return candidates[0];
-		});
+		},access) catch (error:Dynamic) {parts.close(); throw error;}
+		parts.close();
 		ScrewdrivingExecution.stage(scene,staging);
 		scene.mission = {steps:mission.require()};
 		var controllers = scene.controllers;
@@ -75,6 +97,7 @@ class ScrewdrivingAssemblyPreview {
 function main():Void {
 	var decoded = SceneArtifact.decode(ScrewdrivingAssemblyPreview.assembly());
 	if (decoded.mission == null || decoded.mission.steps.length != 4) throw "Whole screw mission lost its four fastenings";
+	ScrewdrivingAccessTests.run();
 	trace("Screwdriving assembly CAD mission passed");
 }
 

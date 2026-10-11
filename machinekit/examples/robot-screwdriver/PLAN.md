@@ -249,6 +249,20 @@ simulation and hardware, and a mission step drives it.
   at least half its measured positive gap along every checked edge. Overlap or
   another blocked pair causes a bounded clearance wait and a named failure.
 
+- **SD7 — Endpoint access uses the actual CAD solids.** Whole-cell generation
+  checks primary and replacement pickup/lift, thread entry and head seat with
+  the qualified feed compression, and rejection. Samples follow the authored
+  approach distance. Full socket orientation includes roll and stays inside
+  arm joint limits; the original free-axis solver retains its old tolerance.
+  CAD booleans check the arm/tool against the cell, the tool against nonadjacent
+  arm members, and the held fastener against the cell and non-carrier arm parts.
+  Only CAD rigid/adjacent relations and the qualified fastener/threaded-member
+  engagement are intended contacts. The active fastener is staged, so its
+  display seat and occupied presenter template are not duplicated obstacles;
+  other seated heads and supplies remain a conservative occupancy check.
+  Every check restores the initial arm and feed coordinates and releases its
+  owned geometry, including when access fails.
+
 ## What exists
 
 - Fasteners in `machinekit.standard`: `SocketHeadCapScrew` (ISO 4762),
@@ -486,7 +500,10 @@ Here:
 - `ScrewdrivingMission.generate`: every fastening into `screw` steps, with
   presenter trips; ordering by pattern (cross order on a bolt circle) and an
   optional two-stage run (all to snug, then all to final); reach and clearance
-  diagnostics shaped like `WeldAccess`.
+  diagnostics shaped like `WeldAccess`. Access checks include each identified
+  primary/reserve supply, pickup/lift, thread entry/seat and reject pose, full
+  socket orientation and actual arm/tool/held-body CAD clearance. Contact and
+  retreat samples use the qualified feed window and authored approach length.
 - Not-OK recovery: reverse out by the driven angle, drop the screw in a reject
   bin, retry with a new screw once, then report the fastening as failed and go
   on.
@@ -1078,6 +1095,40 @@ results are unchanged.
 Endpoint access checks, optional snug/final execution retaining engagement,
 and the final SD7 gate remain pending. SD8 is unstarted; SD7 is not complete.
 
+### SD7 endpoint access checkpoint (2026-10-11)
+
+Whole-cell generation now uses `ScrewdrivingAccess` before staging its free
+bodies. `ScrewdrivingAssemblyPreview.design` exposes the freshly rebuilt CAD
+and qualified jobs for this check and for focused tests. The 40 mm example
+checks 140 contact/retreat poses across four fastenings. Full-pose solving
+adds socket roll and a 0.005 mm residual bound; free-axis solving retains its
+existing arithmetic, 0.05 mm convergence and 0.5 mm final tolerance.
+
+Focused `build/sd7-access-solids.log` passes generation with actual arm/tool,
+held-body and tool-to-arm CAD solid checks. `build/sd7-access-negative.log`
+passes the positive generation plus an unreachable reserve, an actual
+controller-body obstruction, named diagnostics and exact restoration of all
+six arm coordinates and the feed coordinate. TCP and process-joint identities
+come from the declared tool contact and screwdriver capability. The final
+`build/sd7-access-capability.log` rerun also passes positive generation and
+both negative cases with these declared identities.
+
+Full gate `sd7-access` passes all seven stages. Archived logs and comparisons
+are `build/sd7-access-*`: all 125 transport-loss MachineKit results match
+exactly, and all 119 normalized app results match. All 50 previous artifact
+generation byte sizes match; three formerly cached loads now regenerate at
+their same 2725209/17794359/17943600-byte sizes. Whole-cell, equipment and
+one-screw artifacts remain 2269798/2238283/2237601 bytes, with schema 31.
+
+Picker allocation observations change from 58612/60342 to 58412/60308
+bytes/tick; mill observations change from 53388.75 to 53551.21. Router
+allocations remain 39.5/43.8 KB/tick; collections change from 16/16 to 16/15.
+The additional CAD queries and regenerated caches change the global HashLink
+buffer-refill and collection phase documented above. All allocation budgets
+pass; physical timing, stock, tracking and mission results are unchanged.
+No native change, submodule-pin change or new Haxeon compiler issue was needed.
+Optional snug/final execution and SD8 remain open; SD7 is still in progress.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
@@ -1087,5 +1138,5 @@ and the final SD7 gate remain pending. SD8 is unstarted; SD7 is not complete.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — CAD execution and transport-loss recovery pass both backends and full checkpoint gates; endpoint access, snug/final execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40` |
+| SD7 | in progress — CAD execution and transport-loss recovery pass both backends and full checkpoint gates; endpoint access passes its full checkpoint; snug/final execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40` |
 | SD8 | open — machine tending landed; not started | |
