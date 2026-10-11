@@ -880,6 +880,43 @@ remain to implement. Retightening must preserve the measured engaged state
 and elastic rotation from snug; restarting an empty model would discard
 preload and produce an incorrect reverse distance. No completed SD7 is claimed.
 
+### SD7 recovery core checkpoint (2026-10-11)
+
+`ScrewdrivingRunner.recover` keeps the failed result, stops the spindle,
+reverses to measured zero with a bounded watchdog, follows measured feed
+compression backwards, waits for actual rotation to stop, withdraws, travels
+to the qualified reject pose, releases vacuum and retracts. Increasing reverse
+angle, vacuum loss and motion faults stop recovery. Empty presenters and
+already-lost bodies retract without inventing a body dropped into the bin.
+Recovery completion is distinct from successful tightening.
+
+`DriveFastening` owns two identified attempts at most, using `RecoverScrew`
+between them. It reports an exhausted second NOK and lets the mission continue;
+a motion, feedback or recovery fault stops it. `FasteningRunReport` copies
+measured outcomes, torque, angle and actual supply identity, distinguishing
+pending recovery, rejected, missing, lost, tightened and recovery-failed bodies.
+A replacement cannot reuse an attempted identity. `installed()` names only
+the body actually seated after a successful final attempt; later retightening
+must use that identity, not the original screw now in the reject bin. An OK
+process result followed by an arm fault is retained alongside that fault.
+Driving and recovery share the fresh-frame reader and its sequence/timeout
+checks; neither clears a controller safety fault.
+
+Focused `build/sd7-recovery-body-retry.log` passes 31 existing process checks,
+11 generator checks and 34 recovery/reporting checks. These isolate sequencing
+from arm planning; they do not prove physical reject-bin placement or a whole
+CAD cell. `build/sd7-recovery-app.log` passes all 80 existing simulation checks,
+the unchanged equipment preview, and the actual SD6 M6/empty-presenter cases
+on both backends plus portable export. Equipment/drive artifact sizes remain
+2238283/2237585 bytes. No native ABI, saved schema or component solid changes
+occur in this checkpoint. No new haxeon bug was found; a temporary missing
+`screw` field in the test attempt factory was an ordinary incomplete edit.
+
+The four-fastening CAD supply, reject bin, MissionPlayer wiring, physical
+cross-thread/replacement proof, access geometry checks, optional snug/final
+execution and final full gate remain pending. Retightening must preserve the
+measured engagement and elastic rotation, not initialize a fresh empty model.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
@@ -889,5 +926,5 @@ preload and produce an incorrect reverse distance. No completed SD7 is claimed.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — CAD generator and access diagnostics pass quick gate; execution and final gate pending | `a6123a912` |
+| SD7 | in progress — generation gate passed; recovery/reporting core tested; CAD execution and final gate pending | `a6123a912` |
 | SD8 | open — machine tending landed; not started | |

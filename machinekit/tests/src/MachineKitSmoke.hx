@@ -2555,6 +2555,7 @@ class MachineKitSmoke {
 		if (Sys.getEnv("MACHINEKIT_SCREWDRIVER_ONLY") == "1") {
 			ScrewdriverProcessTests.run();
 			ScrewdrivingMissionTests.run();
+			ScrewRecoveryTests.run();
 			return;
 		}
 		if (Sys.getEnv("MACHINEKIT_BRAKE_ONLY") == "1") {
@@ -2568,6 +2569,7 @@ class MachineKitSmoke {
 			{name: "FasteningTests.run", run: FasteningTests.run, weight: 0.05},
 			{name: "ScrewdriverProcessTests.run", run: ScrewdriverProcessTests.run, weight: 0.05},
 			{name: "ScrewdrivingMissionTests.run", run: ScrewdrivingMissionTests.run, weight: 0.05},
+			{name: "ScrewRecoveryTests.run", run: ScrewRecoveryTests.run, weight: 0.05},
 			{name: "ScrewdrivingEquipmentTests.run", run: ScrewdrivingEquipmentTests.run, weight: 1.5},
 			{name: "AxisBuilderChecks.run", run: () -> AxisBuilderChecks.run(), weight: 1.0},
 			{name: "AssemblyIntegrityTests.run", run: () -> AssemblyIntegrityTests.run(), weight: 1.0},
