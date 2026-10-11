@@ -1028,6 +1028,8 @@ not mark SD7 complete.
 
 ### SD7 transport-loss checkpoint (2026-10-11)
 
+Implementation: `98afa7c40`.
+
 Focused `build/sd7-controlled-stop.log` passes 31 process, 13 generation and
 51 recovery checks. The additional checks delay arm-stop confirmation during
 pickup and transfer, refuse premature recovery, preserve a real motion fault,
@@ -1085,5 +1087,5 @@ and the final SD7 gate remain pending. SD8 is unstarted; SD7 is not complete.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — CAD execution and transport-loss recovery pass both backends and full checkpoint gates; endpoint access, snug/final execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69` |
+| SD7 | in progress — CAD execution and transport-loss recovery pass both backends and full checkpoint gates; endpoint access, snug/final execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40` |
 | SD8 | open — machine tending landed; not started | |
