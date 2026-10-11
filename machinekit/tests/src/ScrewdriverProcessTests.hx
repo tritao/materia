@@ -114,5 +114,6 @@ class ScrewdriverProcessTests {
 		check(good.advanceAtAngle(4*Math.PI+0.25) == 2 && Math.abs(good.advanceAtAngle(2*Math.PI)-1)<1e-9,
 			"Reverse unloads the elastic angle before backing the screw out by its lead");
 		Sys.println('Screwdriver process: $count checks passed');
+		ScrewRetighteningTests.run();
 	}
 }

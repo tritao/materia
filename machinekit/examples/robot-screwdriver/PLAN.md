@@ -263,6 +263,17 @@ simulation and hardware, and a mission step drives it.
   Every check restores the initial arm and feed coordinates and releases its
   owned geometry, including when access fails.
 
+- **SD7 — Final passes retain engaged joint state.** `TighteningModel.retighten`
+  copies a successfully seated model into an independent continuation. It
+  preserves measured contact travel, original snug angle, cumulative rotation
+  and preload; the newly qualified higher target cannot change the thread or
+  joint response. Start rechecks measured vacuum, alignment and feed force.
+  Final angle limits remain relative to the original snug point, and reversal
+  unloads the retained elastic rotation before backing out the full thread
+  engagement. The simulation/mission binding must retain this state only for
+  the exact successfully released body and fastening; resetting an empty model
+  between passes is not a valid implementation.
+
 ## What exists
 
 - Fasteners in `machinekit.standard`: `SocketHeadCapScrew` (ISO 4762),
@@ -1130,6 +1141,27 @@ buffer-refill and collection phase documented above. All allocation budgets
 pass; physical timing, stock, tracking and mission results are unchanged.
 No native change, submodule-pin change or new Haxeon compiler issue was needed.
 Optional snug/final execution and SD8 remain open; SD7 is still in progress.
+
+### SD7 retained engagement core checkpoint (2026-10-11)
+
+`TighteningModel.retighten` now preserves calibrated contact travel, original
+snug and cumulative angle, preload and reversal distance while starting a
+new measured result. It rejects empty/failed/unseated models, changed joint
+geometry or response, a non-increasing target and a shortened original
+run-down allowance. The continuation owns independent state and validates
+actual recontact force and alignment before advancing. Focused tests use an
+explicit 2.14 Nm test-only snug qualification, followed by the existing
+published 9.9 Nm test program; no catalog or production qualification changed.
+
+Focused `build/sd7-retightening-core.log` passes all 14 new checks alongside
+the unchanged 31 process, 13 generator and 51 recovery checks. Quick gate
+`sd7-retightening-core` passes all three stages; all 125 access-checkpoint
+MachineKit result lines match exactly, with only the new 14-check summary
+added. Logs and comparison are archived in `build/sd7-retightening-core-*`.
+No published values, saved format, native code or submodule pins changed,
+and no new Haxeon compiler issue was found. Simulation retention, stage-linked mission identity,
+shared replacement budget, actual installed-body final approach, reports and
+physical two-stage acceptance still need implementation. SD7 remains open.
 
 | Step | State | Commits |
 | --- | --- | --- |

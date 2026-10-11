@@ -39,6 +39,7 @@ class TighteningModel {
   var hadScrew = false;
   var started = false;
   var lastAngle = 0.0;
+  var recontact = false;
 
   public function new(program:TighteningProgram, joint:TighteningJoint) {
     if (program == null || joint == null) throw "Tightening model needs a program and joint";
@@ -56,7 +57,28 @@ class TighteningModel {
   public function reset():Void {
     contactRunDownMm = joint.runDownMm;
     advanceMm = 0; snugAngle = 0; lastAngle = 0; engaged = false; hadScrew = false; started = false;
+    recontact = false;
     reading = ScrewdriverSensor.idle();
+  }
+  /** Continue a successfully seated joint without losing its calibrated travel or elastic rotation. */
+  public function retighten(next:TighteningProgram, qualified:TighteningJoint):TighteningModel {
+    if (reading.result != ScrewdriverContract.OK || !engaged || !started || advanceMm != contactRunDownMm)
+      throw "Retightening needs a successfully seated screw";
+    var resumed = new TighteningModel(next,qualified);
+    var other = resumed.joint;
+    if (joint.leadMm != other.leadMm || joint.runDownMm != other.runDownMm || joint.leadInMm != other.leadInMm ||
+        joint.maximumAxisAngle != other.maximumAxisAngle || joint.springRate != other.springRate ||
+        joint.prevailingTorque != other.prevailingTorque || joint.stiffnessNmPerRad != other.stiffnessNmPerRad ||
+        joint.stripTorque != other.stripTorque)
+      throw "Retightening cannot change the engaged joint's geometry or response";
+    if (next.settings.targetTorque <= reading.torqueNm || next.settings.maximumRunDownAngle < snugAngle)
+      throw "Retightening needs a higher target and the original run-down allowance";
+    resumed.contactRunDownMm = contactRunDownMm;
+    resumed.advanceMm = advanceMm; resumed.snugAngle = snugAngle; resumed.lastAngle = reading.angle;
+    resumed.engaged = true; resumed.hadScrew = true; resumed.started = true; resumed.recontact = true;
+    resumed.reading = {torqueNm:reading.torqueNm,angle:reading.angle,speed:0,strokeMm:0,
+      phase:ScrewdriverContract.FINAL,result:ScrewdriverContract.NONE,vacuum:false};
+    return resumed;
   }
   public function speed():Float return reading.result != ScrewdriverContract.NONE || !started ? 0 :
     (reading.phase == ScrewdriverContract.FINAL || reading.phase == ScrewdriverContract.SNUG) ? program.settings.finalSpeed : program.settings.runDownSpeed;
@@ -87,6 +109,11 @@ class TighteningModel {
     var minimumForce = joint.springRate * settings.minimumStroke;
     var maximumForce = joint.springRate * settings.maximumStroke;
     if (engaged && (force < minimumForce - 1e-9 || force > maximumForce + 1e-9)) return finish(ScrewdriverContract.NO_START);
+    if (recontact) {
+      if (input.radialErrorMm > joint.leadInMm || input.axisAngle > joint.maximumAxisAngle)
+        return finish(ScrewdriverContract.NO_START);
+      recontact = false;
+    }
     if (!engaged) {
       if (input.radialErrorMm > joint.leadInMm || Math.abs(input.axialErrorMm) > joint.leadInMm || input.axisAngle > joint.maximumAxisAngle || force < minimumForce - 1e-9 || force > maximumForce + 1e-9) {
         reading.torqueNm = 0;
