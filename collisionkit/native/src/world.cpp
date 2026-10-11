@@ -200,6 +200,10 @@ bool World::make_pair(uint32_t a, uint32_t b, Pair &pair) {
     pair.b = ordered.second;
     pair.body_a = first.body;
     pair.body_b = second.body;
+    const auto object_rule = object_rules_.find(ordered);
+    const auto body_rule = body_rules_.find(body_key(first.body, second.body));
+    pair.touch = object_rule != object_rules_.end() ? object_rule->second.rule == CK_RULE_TOUCH :
+                 body_rule != body_rules_.end() && body_rule->second.rule == CK_RULE_TOUCH;
     pair.first = first.object.get();
     pair.second = second.object.get();
     pair.field = first.height_field ? 1 : second.height_field ? 2 : 0;
@@ -235,6 +239,13 @@ void World::rebuild_pairs() {
 }
 
 bool World::collides(Pair &pair, double margin, coal::CollisionRequest &request) {
+    if (pair.touch && margin == 0.0) {
+        coal::DistanceRequest distance_request(false, true);
+        coal::DistanceResult result;
+        // A contact interface may touch. This absolute precision allowance is
+        // numerical (one nanometre), not an engineering clearance or compliance.
+        return (*pair.distance)(pair.first->getTransform(), pair.second->getTransform(), distance_request, result) < -1e-9;
+    }
     if (pair.field) {
         coal::DistanceRequest distance_request(false, true);
         coal::DistanceResult result;
@@ -334,7 +345,9 @@ bool World::violation(const Margins &margins, const double *inflation, bool &fou
     coal::CollisionRequest request(coal::NO_REQUEST, 1);
     for (Pair &pair : pairs_) {
         double required = margins.between(group_of(pair.body_a), group_of(pair.body_b));
-        if (inflation) {
+        // These radii bound rigid-body motion. Shapes on the same body have
+        // no relative motion; their geometric inflation is already in the shapes.
+        if (inflation && pair.body_a != pair.body_b) {
             if (pair.body_a >= 0) required += inflation[pair.body_a];
             if (pair.body_b >= 0) required += inflation[pair.body_b];
         }

@@ -50,7 +50,9 @@ interface CollisionWorld {
    */
   function allowOverlapping(bodies:Array<Int>):Int;
 
-  /** Checked pairs closer than `margin` (0: touching or penetrating), in id order. */
+  /** Checked pairs closer than `margin` (0: touching or penetrating), in id order.
+   * Explicit Touch rules permit zero-margin contact, but still reject penetration beyond numerical precision.
+   */
   function colliding(margin:Float):Array<CollisionPair>;
   /** Checked pairs closer than `queryDistance`, closest first. */
   function distances(queryDistance:Float):Array<CollisionDistance>;
@@ -58,7 +60,9 @@ interface CollisionWorld {
   function pairDistances(pairs:Array<CollisionPair>):Array<CollisionDistance>;
   /**
    * The first checked pair, in id order, closer than its group margin plus
-   * both bodies' `inflation` (one per body; null for none), or null.
+   * both bodies' motion bounds in `inflation` (one per body; null for none), or null.
+   * Shapes on one body have no relative motion and retain only their group margin.
+   * Geometric object inflation still applies.
    */
   function violation(margins:CollisionMargins, ?inflation:Array<Float>):Null<CollisionViolation>;
   /** The closest checked pair, clear or not, with its group margin as `required`; null when none is checked. */

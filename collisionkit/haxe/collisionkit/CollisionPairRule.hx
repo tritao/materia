@@ -8,4 +8,6 @@ enum abstract CollisionPairRule(Int) to Int {
   var Allow = 1;
   /** Checked even where the defaults would not check it. */
   var Check = 2;
+  /** Checked; at zero margin, touching is permitted but penetration beyond numerical precision is not. */
+  var Touch = 3;
 }

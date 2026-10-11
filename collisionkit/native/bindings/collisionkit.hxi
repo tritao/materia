@@ -60,6 +60,11 @@ interface CollisionKitNative @target("portable-abi64") @library("collisionkit_co
 	 */
 	const CK_RULE_DEFAULT = 0;
 	/**
+	 * Checked. At zero margin, contact is permitted; penetration deeper than 1 nm is rejected.
+	 * Positive margins and conservative motion inflation retain normal collision semantics.
+	 */
+	const CK_RULE_TOUCH = 3;
+	/**
 	 * Half extents x, y, z.
 	 */
 	const CK_SHAPE_BOX = 0;
@@ -207,9 +212,11 @@ interface CollisionKitNative @target("portable-abi64") @library("collisionkit_co
 	extern fn ck_set_object_rule(world: ck_world_handle, a: u32, b: u32, rule: i32, reason: i32) -> ck_result;
 	/**
 	 * The first checked pair, in id order, closer than its margin plus each
-	 * body's inflation: `margins` per group pair (see above) plus
+	 * body's motion bound: `margins` per group pair (see above) plus
 	 * `inflation[body a] + inflation[body b]` (one entry per body, or none;
-	 * the world's is zero). This is the query main's clearance proof makes
+	 * the world's is zero). Shapes on the same body retain their margin but
+	 * have no relative body motion, so these bounds are not added to their pair.
+	 * Geometric inflation from `ck_set_inflation` still applies. This is the query main's clearance proof makes
 	 * (CL-D12), with the inflation carrying CL-D5's motion bound.
 	 * `out_found` is 1 when there is one: its four ints in `out_pair`, its
 	 * signed distance and required clearance in `out_result`.

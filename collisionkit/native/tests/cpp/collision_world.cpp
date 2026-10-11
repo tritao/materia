@@ -120,6 +120,44 @@ Violation violation(ck_world_handle world, const std::vector<double> &margins, c
 } // namespace
 
 int main() {
+    // A body's motion cannot change the distance between two shapes fixed on it.
+    // Explicit checks still enforce their margin and geometric inflation.
+    {
+        ck_world_handle rigid{0};
+        expect(ck_world_create(&rigid) == CK_OK, "rigid-motion world created");
+        uint32_t carrier = 0, other = 0;
+        expect(ck_add_body(rigid, 0, &carrier) == CK_OK, "rigid carrier created");
+        expect(ck_add_body(rigid, 0, &other) == CK_OK, "independent carrier created");
+        const auto a = shape(rigid, int32_t(carrier), at(0, 0, 0), CK_SHAPE_BOX, {0.5, 0.5, 0.5});
+        const auto b = shape(rigid, int32_t(carrier), at(1.01, 0, 0), CK_SHAPE_BOX, {0.5, 0.5, 0.5});
+        expect(ck_set_object_rule(rigid, a, b, CK_RULE_CHECK, CK_PAIR_CHECKED) == CK_OK, "rigid pair explicitly checked");
+        const std::vector<double> motion = {0.1, 0.1}, margin = {0.005};
+        expect(!violation(rigid, margin, {}).found, "rigid pair clears its margin");
+        expect(!violation(rigid, margin, motion).found, "common rigid motion preserves clearance");
+        expect(violation(rigid, {0.02}, motion).found, "rigid checks retain the requested margin");
+        std::vector<double> poses;
+        for (const auto &pose : {turned(0, 0, 0, 0), turned(3, -2, 1, 0.7)}) {
+            poses.insert(poses.end(), pose.begin(), pose.end());
+            poses.insert(poses.end(), kIdentity, kIdentity + 7);
+        }
+        const std::vector<double> motions = {0.1, 0.1, 0.2, 0.2};
+        int32_t flags[2] = {-1, -1};
+        expect(ck_violation_sets(rigid, poses.data(), uint32_t(poses.size()), motions.data(), 4,
+                                margin.data(), 1, flags, 2) == CK_OK && flags[0] == 0 && flags[1] == 0,
+               "batched translations and rotations preserve a checked rigid gap");
+        expect(ck_set_inflation(rigid, a, 0.006) == CK_OK && ck_set_inflation(rigid, b, 0.006) == CK_OK,
+               "rigid shapes geometrically inflated");
+        expect(violation(rigid, margin, motion).found, "geometric inflation still detects rigid penetration");
+        expect(ck_set_inflation(rigid, a, 0) == CK_OK && ck_set_inflation(rigid, b, 0) == CK_OK,
+               "rigid geometric inflation removed");
+        const std::vector<double> identities = {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1};
+        expect(ck_set_body_poses(rigid, 0, identities.data(), 14) == CK_OK, "carriers reset");
+        const auto offset = at(1.01, 0, 0);
+        expect(ck_attach(rigid, b, int32_t(other), offset.data(), 7) == CK_OK, "second shape moved to independent carrier");
+        expect(!violation(rigid, margin, {}).found, "independent pair still clears at its current pose");
+        expect(violation(rigid, margin, motion).found, "independent body motion retains both bounds");
+        ck_world_destroy(rigid);
+    }
     ck_world_handle world{0};
     expect(ck_world_create(&world) == CK_OK, "world created");
     uint32_t body = 99;
@@ -477,6 +515,26 @@ int main() {
         expect(ck_pair_distances(world, pair, 2, row, 10) == CK_OK, "distance to the 60-point convex");
         near(row[0], 0.4 - top, 1e-9, "the 60-point convex's top below the plate");
         expect(ck_remove(world, big) == CK_OK && ck_remove(world, plate) == CK_OK, "removed");
+    }
+
+    // Intended contact is checked, rather than excluded. Normal Check still rejects touching.
+    {
+        ck_world_handle contact{0};
+        expect(ck_world_create(&contact) == CK_OK, "contact world created");
+        const uint32_t first = shape(contact, -1, at(0, 0, 0), CK_SHAPE_BOX, {1, 1, 1});
+        const uint32_t second = shape(contact, -1, at(2, 0, 0), CK_SHAPE_BOX, {1, 1, 1});
+        expect(ck_set_object_rule(contact, first, second, CK_RULE_CHECK, CK_PAIR_CHECKED) == CK_OK,
+               "ordinary check declared");
+        expect(violation(contact, {0.0}, {}).found, "ordinary check rejects touching");
+        expect(ck_set_object_rule(contact, first, second, CK_RULE_TOUCH, CK_PAIR_CHECKED) == CK_OK,
+               "contact check declared");
+        expect(status(contact, first, second) == CK_PAIR_CHECKED, "contact remains a checked pair");
+        expect(!violation(contact, {0.0}, {}).found, "contact permits exact touching");
+        expect(violation(contact, {0.005}, {}).found, "contact does not loosen a positive margin");
+        const auto penetrating = at(2 - 1e-6, 0, 0);
+        expect(ck_attach(contact, second, -1, penetrating.data(), 7) == CK_OK, "contact object moved inward");
+        expect(violation(contact, {0.0}, {}).found, "contact rejects one micrometre penetration");
+        ck_world_destroy(contact);
     }
 
     // Arguments and handles.

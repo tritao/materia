@@ -106,6 +106,8 @@ private:
         std::unique_ptr<coal::ComputeDistance> distance;
         /** 1 when `first` is a height field, 2 when `second` is, else 0. */
         int field = 0;
+        /** Explicit zero-margin contact permission; penetration is still checked. */
+        bool touch = false;
     };
     using Key = std::pair<uint32_t, uint32_t>;
     using BodyKey = std::pair<int32_t, int32_t>;

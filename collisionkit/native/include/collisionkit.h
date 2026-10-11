@@ -134,7 +134,10 @@ enum {
     /** Clears a declared rule. */
     CK_RULE_DEFAULT = 0,
     CK_RULE_ALLOW = 1,
-    CK_RULE_CHECK = 2
+    CK_RULE_CHECK = 2,
+    /** Checked. At zero margin, contact is permitted; penetration deeper than 1 nm is rejected.
+     * Positive margins and conservative motion inflation retain normal collision semantics. */
+    CK_RULE_TOUCH = 3
 };
 
 typedef struct ck_world_handle { uint32_t id; } ck_world_handle
@@ -286,9 +289,11 @@ CK_API ck_result CK_CALL ck_pair_distances(ck_world_handle world,
 
 /**
  * The first checked pair, in id order, closer than its margin plus each
- * body's inflation: `margins` per group pair (see above) plus
+ * body's motion bound: `margins` per group pair (see above) plus
  * `inflation[body a] + inflation[body b]` (one entry per body, or none;
- * the world's is zero). This is the query main's clearance proof makes
+ * the world's is zero). Shapes on the same body retain their margin but
+ * have no relative body motion, so these bounds are not added to their pair.
+ * Geometric inflation from `ck_set_inflation` still applies. This is the query main's clearance proof makes
  * (CL-D12), with the inflation carrying CL-D5's motion bound.
  * `out_found` is 1 when there is one: its four ints in `out_pair`, its
  * signed distance and required clearance in `out_result`.

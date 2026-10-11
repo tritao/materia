@@ -198,7 +198,13 @@ process-path plan, `motionkit/plans/PROCESS_PATH_PLANNING.md`):
   (Implementation revised 2026-10-09: main's `ClearanceMotionEnvelope`
   and `JointCurveClearance` are this decision's implementation; see
   CL-D12. They use one midpoint query per span with the margin raised by
-  `Ba + Bb`, an equally sound form of the two-endpoint bound below. No
+  `Ba + Bb`, an equally sound form of the two-endpoint bound below. For
+  two objects on the same rigid body, their relative motion is zero:
+  keep their declared check and group margin, but do not add the body's
+  motion bound twice. Geometric object inflation remains in their shapes.
+  Native regressions cover a checked rigid gap under translation and
+  rotation, geometric penetration, stricter margins and independent
+  motion after reattachment. No
   second proof is built. Certificates are reported with main's
   `MK_CHECK_METHOD_BOUND`.) Between two checked configurations, no point on a body moves further than a bound
   `B`, the sum of:
@@ -328,6 +334,12 @@ process-path plan, `motionkit/plans/PROCESS_PATH_PLANNING.md`):
     - a bucket in the soil.
   - MotionKit validation (CL4b) consumes the declarations. Without them,
     every contact is a collision.
+  - Machine tending MT12 adds an explicit checked `Touch` pair rule for
+    nonpenetrating contact. At zero margin it permits touching with a 1 nm
+    numerical tolerance; penetration beyond that remains a violation. Positive
+    margins and motion inflation retain the usual checks. `Check` continues to
+    reject touching, and `Allow` continues to exclude a pair altogether. Native
+    regressions cover exact contact, a positive margin and 1 µm penetration.
 
 - **CL-D10 — RobotKit's contact settings are simulation-only, except
   contact pairs.** (Decided 2026-10-09.)
@@ -1368,6 +1380,13 @@ Done as planned, with these choices:
   eight. Trees store nodes flat (`PlannerTree`: one coordinate array, one
   parent array) and find neighbours with a k-d tree rebuilt as the tree
   doubles past 64 nodes, plus a scan of the nodes added since.
+- **MT12 simplification:** after random shortcutting, check the farthest
+  visible successor in batches of at most 64 edges. Every replacement uses
+  the same conservative edge predicate. `visibilityCheckLimit` bounds this
+  additional work (1024 checks by default); exhaustion retains certified
+  edges. Exact wall-and-gap regressions cover endpoint preservation, safe
+  shortcuts and budget exhaustion. This does not promise a globally shortest
+  path.
 - **The space** (`motionkit.robot.CollisionPlannerSpace`): a model's
   bodies in a collision description. An edge is clear when its midpoint is
   clear with each body inflated by its bound over half the edge's per-joint

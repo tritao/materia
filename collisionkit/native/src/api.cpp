@@ -339,7 +339,7 @@ CK_API ck_result CK_CALL ck_remove(ck_world_handle handle, uint32_t object) {
 CK_API ck_result CK_CALL ck_set_body_rule(ck_world_handle handle, int32_t a, int32_t b, int32_t rule,
                                           int32_t reason) {
     return with_world(handle, [&](World &world) -> ck_result {
-        if (a == b || !world.has_body(a) || !world.has_body(b) || rule < CK_RULE_DEFAULT || rule > CK_RULE_CHECK ||
+        if (a == b || !world.has_body(a) || !world.has_body(b) || rule < CK_RULE_DEFAULT || rule > CK_RULE_TOUCH ||
             !reason_ok(rule, reason))
             return CK_ERROR_INVALID_ARGUMENT;
         world.set_body_rule(a, b, rule, reason);
@@ -350,7 +350,7 @@ CK_API ck_result CK_CALL ck_set_body_rule(ck_world_handle handle, int32_t a, int
 CK_API ck_result CK_CALL ck_set_object_rule(ck_world_handle handle, uint32_t a, uint32_t b, int32_t rule,
                                             int32_t reason) {
     return with_world(handle, [&](World &world) -> ck_result {
-        if (a == b || !world.contains(a) || !world.contains(b) || rule < CK_RULE_DEFAULT || rule > CK_RULE_CHECK ||
+        if (a == b || !world.contains(a) || !world.contains(b) || rule < CK_RULE_DEFAULT || rule > CK_RULE_TOUCH ||
             !reason_ok(rule, reason))
             return CK_ERROR_INVALID_ARGUMENT;
         world.set_object_rule(a, b, rule, reason);
