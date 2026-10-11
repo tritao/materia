@@ -274,6 +274,15 @@ simulation and hardware, and a mission step drives it.
   the exact successfully released body and fastening; resetting an empty model
   between passes is not a valid implementation.
 
+- **SD7 — Final motion acquires the installed socket directly.** A
+  `ScrewPlan.finalContact` carries the measured socket and retained advancement.
+  The runner approaches it without a presenter trip, seals vacuum, compresses
+  the feed and only then starts tightening. It derives the following/recovery
+  origin by backing out the retained advance along this live socket axis, so
+  actual contact calibration and roll remain intact. Retraction and reversal
+  follow that same reference. Vacuum loss during final engagement uses the
+  existing controlled arm stop and retains the cumulative failure angle.
+
 ## What exists
 
 - Fasteners in `machinekit.standard`: `SocketHeadCapScrew` (ISO 4762),
@@ -1164,6 +1173,25 @@ No published values, saved format, native code or submodule pins changed,
 and no new Haxeon compiler issue was found. Simulation retention, stage-linked mission identity,
 shared replacement budget, actual installed-body final approach, reports and
 physical two-stage acceptance still need implementation. SD7 remains open.
+
+### SD7 final-pass motion checkpoint (2026-10-11)
+
+`ScrewPlan.finalContact` and the runner's final-approach/contact/seal/engage
+phases now acquire an already installed screw without consulting a presenter.
+The reference for measured compression following and recovery is derived from
+the live socket and retained advancement. Localization transforms the socket
+along with the plan and leaves advancement in millimetres. Existing single-pass
+construction and pickup sequencing remain unchanged.
+
+Focused `build/sd7-final-contact.log` passes 11 new runner checks, with the
+existing 31 process, 14 retained-engagement, 13 generator and 51 recovery checks
+unchanged. Quick gate `sd7-final-contact` passes all three stages. All 126
+retained-core MachineKit result lines match exactly, with only the new
+11-check runner summary added. Logs and comparison are archived in
+`build/sd7-final-contact-*`. Observer retention and stage-linked mission
+execution still need implementation; these runner tests
+are not physical two-stage acceptance, and SD7 remains in progress. No catalog
+values, saved format or native code changed, and no new Haxeon issue was found.
 
 | Step | State | Commits |
 | --- | --- | --- |

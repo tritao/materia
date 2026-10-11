@@ -14,6 +14,7 @@ typedef TighteningResult = {
 private enum ScrewPhase {
   Idle; PickupApproach; PickupContact; Sealing; PickupRetract;
   WorkApproach; Engage; Driving; Stopping; Releasing; Retracting; Done; Failed;
+  FinalApproach; FinalContact; FinalSealing; FinalEngage;
   ProcessStop; RecoveryStop; Reversing; ReverseStop; RecoveryRetract; RejectTravel; RejectRelease; RejectRetract; Recovered;
 }
 
@@ -48,8 +49,14 @@ class ScrewdrivingRunner {
     if (running() || requested == null) throw "Screw runner needs an idle runner and qualified plan";
     plan = requested; tighteningResult = null; failureMessage = null; elapsed = 0; followDepth = 0; lossAtPickup = false;
     outputs.start(false); outputs.reverse(false); outputs.vacuum(false); outputs.selectProgram(requested.slot);
-    phase = PickupApproach;
-    motion.move(ScrewPlan.along(requested.pickup,-requested.approach),false);
+    var contact = requested.finalContact;
+    if (contact == null) {
+      phase = PickupApproach;
+      motion.move(ScrewPlan.along(requested.pickup,-requested.approach),false);
+    } else {
+      phase = FinalApproach;
+      motion.move(ScrewPlan.along(contact.socket,-requested.approach),false);
+    }
   }
   /** Recover a process NOK with the same held body and program; motion faults are not recoverable here. */
   public function recover(reject:Transform3):Void {
@@ -72,6 +79,24 @@ class ScrewdrivingRunner {
       var fault = motion.failure();
       if (fault != null) throw fault;
       switch phase {
+        case FinalApproach:
+          if (motion.completed()) {
+            var contact = selected.finalContact;
+            if (contact == null) throw "Final approach lost its installed socket";
+            phase = FinalContact; motion.move(contact.socket,true);
+          }
+        case FinalContact:
+          if (motion.completed()) {outputs.vacuum(true); phase = FinalSealing; elapsed = 0;}
+        case FinalSealing:
+          if (reading.vacuum) {
+            var contact = selected.finalContact;
+            if (contact == null) throw "Final recontact lost its retained advancement";
+            followDepth = contact.advanceMm/1000+selected.strokeMm/1000;
+            phase = FinalEngage; motion.move(ScrewPlan.along(contact.socket,selected.strokeMm/1000),true);
+          } else if (elapsed > 2) finishFailure(reading,ScrewdriverContract.NO_START);
+        case FinalEngage:
+          if (!reading.vacuum) {finishFailure(reading,ScrewdriverContract.SCREW_LOST); return;}
+          if (motion.completed()) {outputs.start(true); phase = Driving; elapsed = 0;}
         case PickupApproach:
           if (motion.completed()) { phase = PickupContact; motion.move(selected.pickup,true); }
         case PickupContact:

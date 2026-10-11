@@ -115,5 +115,6 @@ class ScrewdriverProcessTests {
 			"Reverse unloads the elastic angle before backing the screw out by its lead");
 		Sys.println('Screwdriver process: $count checks passed');
 		ScrewRetighteningTests.run();
+		ScrewFinalPassTests.run();
 	}
 }
