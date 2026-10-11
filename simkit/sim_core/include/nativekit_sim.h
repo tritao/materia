@@ -95,7 +95,10 @@ enum {
      * effort = stiffness * (target - q) + damping * (velocity - qdot) + feedforward,
      * clamped to max_force. This is the command legged-robot controllers emit.
      */
-    NKSIM_JOINT_TARGET_SERVO = 4
+    NKSIM_JOINT_TARGET_SERVO = 4,
+    /** Flow-limited joint speed with measured contact-load compensation.
+     * Zero closes the fluid path; stopping remains bounded by max_force. */
+    NKSIM_JOINT_TARGET_FLOW = 5
 };
 
 /** Numerical integrators a backend may offer; the default is the backend's own. */

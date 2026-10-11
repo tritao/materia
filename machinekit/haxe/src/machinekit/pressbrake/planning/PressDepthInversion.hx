@@ -17,7 +17,8 @@ class PressDepthInversion {
 	}
 	public function atDepth(depth:Float):PressSheetPose {
 		if (!Math.isFinite(depth) || depth < contactDepth || depth > limitDepth)
-			throw new SheetDiagnosis("press.measured-depth", "Measured depth lies outside the contact stroke", ["bend:" + bend]);
+			throw new SheetDiagnosis("press.measured-depth", "Measured depth " + depth + " mm lies outside the contact stroke ["
+				+ contactDepth + ", " + limitDepth + "] mm", ["bend:" + bend]);
 		if (depth == contactDepth) return pose(0);
 		if (depth == limitDepth) return pose(limitAngle);
 		var low = 0.0, high = 1.0, lowDepth = contactDepth, highDepth = limitDepth;

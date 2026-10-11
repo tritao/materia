@@ -826,7 +826,7 @@ public:
             if (found == joints.end())
                 return NKSIM_ERROR_INVALID_HANDLE;
             if (targets[index].mode < NKSIM_JOINT_TARGET_POSITION ||
-                targets[index].mode > NKSIM_JOINT_TARGET_SERVO ||
+                targets[index].mode > NKSIM_JOINT_TARGET_FLOW ||
                 !std::isfinite(targets[index].target) ||
                 !std::isfinite(targets[index].max_force))
                 return NKSIM_ERROR_INVALID_ARGUMENT;
@@ -2173,6 +2173,21 @@ private:
             return;
         std::vector<mjtNum> qacc_desired(nv, 0.0);
         std::vector<mjtNum> m_qacc(nv, 0.0);
+        std::vector<mjtNum> contact_load(nv, 0.0);
+        const bool has_speed_source = std::any_of(joint_order.begin(), joint_order.end(),
+            [&](auto id) { return joints.at(id).target_mode == NKSIM_JOINT_TARGET_FLOW; });
+        if (has_speed_source && data->nefc > 0) {
+            // A flow source raises pressure to meet contact load, up to its force ceiling.
+            // Joint limits, brakes and transmission equalities remain uncompensated.
+            std::vector<mjtNum> contact_forces(data->nefc, 0.0);
+            for (int row = 0; row < data->nefc; ++row) {
+                const auto type = data->efc_type[row];
+                if (type == mjCNSTR_CONTACT_FRICTIONLESS || type == mjCNSTR_CONTACT_PYRAMIDAL ||
+                    type == mjCNSTR_CONTACT_ELLIPTIC)
+                    contact_forces[row] = data->efc_force[row];
+            }
+            mj_mulJacTVec(model, data, contact_load.data(), contact_forces.data());
+        }
 
         // Effort-mode joints need no mass matrix at all; apply directly.
         // Position/velocity-mode joints contribute a desired acceleration
@@ -2180,7 +2195,8 @@ private:
         for (const auto joint_id : joint_order) {
             auto &joint = joints.at(joint_id);
             if (joint.target_mode != NKSIM_JOINT_TARGET_POSITION &&
-                joint.target_mode != NKSIM_JOINT_TARGET_VELOCITY)
+                joint.target_mode != NKSIM_JOINT_TARGET_VELOCITY &&
+                joint.target_mode != NKSIM_JOINT_TARGET_FLOW)
                 continue;
             const auto model_id = model_joint_id(joint);
             if (model_id < 0)
@@ -2202,6 +2218,13 @@ private:
             }
             case NKSIM_JOINT_TARGET_VELOCITY: {
                 qacc_desired[dof] = velocity_response_rate * (joint.target - qdot);
+                break;
+            }
+            case NKSIM_JOINT_TARGET_FLOW: {
+                // Closing the fluid path requests no displacement this substep;
+                // the common force ceiling still bounds the stopping effort.
+                qacc_desired[dof] = joint.target == 0.0 ? -qdot / model->opt.timestep
+                    : velocity_response_rate * (joint.target - qdot);
                 break;
             }
             }
@@ -2267,6 +2290,9 @@ private:
             case NKSIM_JOINT_TARGET_POSITION:
             case NKSIM_JOINT_TARGET_VELOCITY:
                 torque = m_qacc[dof] + bias;
+                break;
+            case NKSIM_JOINT_TARGET_FLOW:
+                torque = m_qacc[dof] + bias - contact_load[dof];
                 break;
             case NKSIM_JOINT_TARGET_SERVO:
                 break; // The servo actuator below applies it.

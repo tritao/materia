@@ -536,7 +536,7 @@ nksim_result World::set_joint_targets(const nksim_joint_target *targets, std::ui
         const auto &source = targets[index];
         if (!valid_struct_size(source.struct_size, sizeof(source)))
             return NKSIM_ERROR_INVALID_ARGUMENT;
-        if (source.mode < NKSIM_JOINT_TARGET_POSITION || source.mode > NKSIM_JOINT_TARGET_SERVO)
+        if (source.mode < NKSIM_JOINT_TARGET_POSITION || source.mode > NKSIM_JOINT_TARGET_FLOW)
             return NKSIM_ERROR_INVALID_ARGUMENT;
         if (source.mode == NKSIM_JOINT_TARGET_SERVO &&
             (!std::isfinite(source.velocity) || !std::isfinite(source.stiffness) ||

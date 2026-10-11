@@ -11,14 +11,16 @@
     "../machinekit/examples/cnc-router",
     "../machinekit/examples/machine-tending",
     "../machinekit/examples/robot-arm",
-    "../processkit/tests/modbus"
+    "../processkit/tests/modbus",
+    "../machinekit/examples/press-brake"
   ],
   "unscopedSourceRoots": [
     "../machinekit/examples/bench-mill",
     "../machinekit/examples/cnc-router",
     "../machinekit/examples/machine-tending",
     "../machinekit/examples/robot-arm",
-    "../processkit/tests/modbus"
+    "../processkit/tests/modbus",
+    "../machinekit/examples/press-brake"
   ],
   "dependencies": {
     "collisionkit-native": {"path": "../collisionkit/native"},

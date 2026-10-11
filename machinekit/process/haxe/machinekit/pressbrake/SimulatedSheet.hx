@@ -41,6 +41,16 @@ class SimulatedSheet {
 	var stroke:Null<SheetStroke> = null;
 	var disposed:Bool = false;
 
+	/** Prepare stock at first tool contact using the canonical CAD-to-physics placement. */
+	public static function atContact(session:SimSession, sheet:Sheet, initial:ManufacturedSheetState,
+			bend:Int, tooling:ProcessTooling, station:PressStationGeometry, orientation:BendOrientation,
+			pressFrame:Transform3, density:Float, maximumError:Float = 0.05,
+			?actualMechanical:MaterialMechanical):SimulatedSheet {
+		var pose = PressSheetPose.manufactured(sheet, initial, bend, tooling, station, orientation);
+		return new SimulatedSheet(session, sheet, initial, pressFrame.compose(transform(pose.placement)),
+			density, maximumError, actualMechanical);
+	}
+
 	/** Density is explicit kg/m³. The optional actual lot changes recovery, never the authored blank. */
 	public function new(session:SimSession, sheet:Sheet, initial:SheetAngles, placement:Transform3,
 			density:Float, maximumError:Float = 0.05, ?actualMechanical:MaterialMechanical) {

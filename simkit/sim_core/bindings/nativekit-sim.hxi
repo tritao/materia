@@ -53,6 +53,11 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	const NKSIM_JOINT_SPHERICAL = 4;
 	const NKSIM_JOINT_TARGET_EFFORT = 3;
+	/**
+	 * Flow-limited joint speed with measured contact-load compensation.
+	 * Zero closes the fluid path; stopping remains bounded by max_force.
+	 */
+	const NKSIM_JOINT_TARGET_FLOW = 5;
 	const NKSIM_JOINT_TARGET_POSITION = 1;
 	/**
 	 * Joint-space servo evaluated every physics substep:

@@ -281,7 +281,7 @@ std::optional<ProcessChannelFault> SimulationRobot::apply_cylinder_valves(const 
         target.struct_size = sizeof(target);
         target.joint = joints_[drive.joint];
         if (drive.control == RK_CYLINDER_FLOW_LIMITED) {
-            target.mode = NKSIM_JOINT_TARGET_VELOCITY;
+            target.mode = NKSIM_JOINT_TARGET_FLOW;
             target.target = 0.0; // A closed centre requests no fluid displacement.
             auto force = std::max(drive.extension_force, drive.retraction_force);
             if (coil_a != coil_b) {
