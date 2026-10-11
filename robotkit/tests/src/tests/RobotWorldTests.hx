@@ -4777,8 +4777,9 @@ class RobotWorldTests {
   }
 
   static function testProcessChannelDeployment():Void {
-    var deployment = new SerialDeployment(
-      "fixtures/device-deployment/deployment.json");
+    var path = Sys.getCwd() + "/robotkit/tests/fixtures/device-deployment/deployment.json";
+    if (!sys.FileSystem.exists(path)) path = Sys.getCwd() + "/fixtures/device-deployment/deployment.json";
+    var deployment = new SerialDeployment(path);
     equal(deployment.channels.length, 1, "deployment declares one process channel");
     equal(deployment.channels[0].id, "sprayer.flow", "deployment keeps channel ID");
     var blueprint = RobotRuntimeCompiler.compile(deployment.binding.model, deployment.profile);

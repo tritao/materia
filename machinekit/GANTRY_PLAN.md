@@ -569,7 +569,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G15 | complete; four-run/ten-seam MuJoCo mission and Phase D gate passed | see progress notes |
 | G16 | complete; focused FK, solid/runtime clearance, drive and ownership checks passed | see progress notes |
 | G17 | complete | Two-station handling, 2.6 m FollowPath and CAD fillet pass; full Phase E gate passes. |
-| G18 | complete | Inverted XYZ gantry arm, full-table reach, handling and coordinated MuJoCo acceptance pass; full app integration passes. Extra RobotKit Haxe gate has an unresolved endpoint-test failure (see close-out). |
+| G18 | complete | Inverted XYZ gantry arm, full-table reach, handling and coordinated MuJoCo acceptance pass; full app integration passes. Full RobotKit Haxe gate also passes after fixture-path and observation-race fixes. |
 
 ### G0 — merged-base baseline (2026-10-04)
 
@@ -4052,9 +4052,11 @@ The full app integration run passes, including G18 and the existing floor arms,
 pickers, welders, CNC, tending and mobile checks. G17 retains its established
 232.5 s cycle for the 2,600 mm weld.
 
-An additional RobotKit Haxe gate compiled successfully but is not clean: one run
-failed in `RuntimeEndpointTests` with "Physical position read changed endpoint
-coordinates"; other attempts reported "Could not open source file". These are
-outside the G18 acceptance checks; their cause is unresolved, so this close-out
-does not claim that the complete RobotKit Haxe suite passes. Logs are in
-`/home/joao/dev/materia-cache/claude-scratch/g18-*`.
+The additional full RobotKit Haxe gate passes from both the repository root and
+`robotkit/tests` (5,461 assertions per run). Its two
+failures were test defects: `testProcessChannelDeployment` assumed the working
+directory was `robotkit/tests`, and `RuntimeEndpointTests` compared a snapshot
+from a live owner with later reads after stopping it. The deployment lookup now
+supports the repository root and test directory, matching the adjacent tests;
+the endpoint check joins the owner before taking its reference observation.
+Logs are in `/home/joao/dev/materia-cache/claude-scratch/g18-*`.
