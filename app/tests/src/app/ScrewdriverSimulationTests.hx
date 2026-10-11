@@ -94,6 +94,8 @@ class ScrewdriverSimulationTests {
       for (_ in 0...5000) if (observer.reading().result == 0) harness.step();
       var result = observer.reading();
       check(result.result == ScrewdriverContract.OK && Math.abs(result.torqueNm-9.9) < 1e-9,"Measured spindle rotation reaches the qualified torque and angle window");
+      check(Math.abs(runtime.snapshot().q.get(1)+result.strokeMm/1000) < 0.0001,
+        "The physical feed follows the computed compression within 0.1 mm");
       check(Math.abs(runtime.snapshot().q.get(0)-0.25) < 1e-5,"The driver preserves the unrelated arm's independent position command");
       var posed = harness.simulation.objectPose(screw);
       check(Math.abs(posed.z-0.103) < 0.00002,"The held body preserves its offset from the head while advancing to the seat");
