@@ -15,7 +15,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * segments it replaces keep to it, and is no longer than `max_duration_seconds`. Segments of degree 1 (chords) are
 	 * never merged. Runs are found longest first by doubling and then bisecting.
 	 */
-	extern fn mk_merge_segments(trajectory: mk_trajectory_handle, position_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_tolerance: ptr<const<f64>> @in_array("joint_count"), acceleration_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_limit: ptr<const<f64>> @in_array("joint_count"), acceleration_limit: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, max_duration_seconds: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	extern fn mk_merge_segments(trajectory: mk_trajectory_handle, position_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_tolerance: ptr<const<f64>> @in_array("joint_count"), acceleration_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_limit: ptr<const<f64>> @in_array("joint_count"), acceleration_limit: ptr<const<f64>> @in_array("joint_count"), position_lower: ptr<const<f64>> @in_array("joint_count"), position_upper: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, max_duration_seconds: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	/**
 	 * A copy of `trajectory` in which `joint` runs `lead_seconds` ahead of itself, the lead taken on its velocity averaged
 	 * over `window_seconds`: position + lead * (position(t + w/2) - position(t - w/2)) / w. It is the pressure-advance

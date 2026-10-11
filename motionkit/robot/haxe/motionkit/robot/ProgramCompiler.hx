@@ -682,8 +682,8 @@ class ProgramCompiler {
           [for (joint in 0...count) MERGE_TIMING * maxVelocity[joint]],
           [for (joint in 0...count) 0.01 * maxVelocity[joint]],
           [for (joint in 0...count) 0.1 * maxAcceleration[joint]],
-          [for (joint in 0...count) 0.98 * maxVelocity[joint]],
-          [for (joint in 0...count) 0.98 * maxAcceleration[joint]], mergeSegmentsSeconds);
+          maxVelocity.slice(0, count), maxAcceleration.slice(0, count), positionBounds(count, false), positionBounds(count, true),
+          mergeSegmentsSeconds);
         // The followers are again exactly the sum of their terms, in the merged coefficients.
         if (couplingIndices.length > 0) { merged = projectCouplings(runs); runs.dispose(); } else merged = runs;
       }
@@ -763,6 +763,13 @@ class ProgramCompiler {
       if (merged != null) merged.dispose();
       throw 'Motion program op ${pending.opIndex}: $error';
     }
+  }
+
+  /** The lower (or upper) position bound each joint is claimed to keep to, unbounded where none is claimed. */
+  function positionBounds(count:Int, upper:Bool):Array<Float> {
+    var claims = limits.nativeValue();
+    return [for (joint in 0...count) claims.get_position_claimed(joint) == 0 ? (upper ? 1e300 : -1e300) :
+      (upper ? claims.get_position_upper(joint) : claims.get_position_lower(joint))];
   }
 
   /**

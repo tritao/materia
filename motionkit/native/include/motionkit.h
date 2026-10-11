@@ -581,12 +581,15 @@ MK_API mk_result MK_CALL mk_project_couplings(mk_trajectory_handle trajectory,
  * segments a second does not fill a robot's queue or a device's link. A run is merged when the quintic through its
  * start state and end state stays within the per-joint tolerances of the segments it replaces, in position, velocity and
  * acceleration, at their joins and across the run, takes no joint past its velocity or acceleration limit where the
- * segments it replaces keep to it, and is no longer than `max_duration_seconds`. Segments of degree 1 (chords) are
+ * segments it replaces keep to it (and no further than they are where they are past it themselves, as a path timed
+ * to cruise at a limit is), stays within the position bounds `position_lower` and `position_upper` in the same way
+ * (a path held at a bound stays on it), and is no longer than `max_duration_seconds`. Segments of degree 1 (chords) are
  * never merged. Runs are found longest first by doubling and then bisecting.
  */
 MK_API mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const double *position_tolerance,
                                            const double *velocity_tolerance, const double *acceleration_tolerance,
                                            const double *velocity_limit, const double *acceleration_limit,
+                                           const double *position_lower, const double *position_upper,
                                            uint32_t joint_count, double max_duration_seconds,
                                            mk_trajectory_handle *out_trajectory);
 

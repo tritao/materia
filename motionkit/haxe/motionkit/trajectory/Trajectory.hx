@@ -181,14 +181,14 @@ class Trajectory implements TimedJointTrajectory {
   **/
   public function mergeSegments(positionTolerance:Array<Float>, velocityTolerance:Array<Float>,
       accelerationTolerance:Array<Float>, velocityLimit:Array<Float>, accelerationLimit:Array<Float>,
-      maxSeconds:Float):Trajectory {
+      positionLower:Array<Float>, positionUpper:Array<Float>, maxSeconds:Float):Trajectory {
     ensureLive();
     var count = positionTolerance.length;
     if (velocityTolerance.length != count || accelerationTolerance.length != count || velocityLimit.length != count ||
-        accelerationLimit.length != count)
-      throw "Merging segments needs a position, velocity and acceleration tolerance and limit for each joint";
+        accelerationLimit.length != count || positionLower.length != count || positionUpper.length != count)
+      throw "Merging segments needs a position, velocity and acceleration tolerance and limit and position bounds for each joint";
     var created = MotionKitNative.mk_merge_segments(owner.borrow(), positionTolerance, velocityTolerance,
-      accelerationTolerance, velocityLimit, accelerationLimit, maxSeconds);
+      accelerationTolerance, velocityLimit, accelerationLimit, positionLower, positionUpper, maxSeconds);
     check(created.status, "trajectory.mergeSegments");
     return new Trajectory(created.out_trajectory);
   }

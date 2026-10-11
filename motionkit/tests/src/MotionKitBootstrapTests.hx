@@ -206,6 +206,7 @@ class MotionKitBootstrapTests {
       {name: "plannerTests.testNativeValidationAndPlan", run: () -> plannerTests.testNativeValidationAndPlan(), weight: 0.05},
       {name: "plannerTests.testPlannerIsDeterministicAndBounded", run: () -> plannerTests.testPlannerIsDeterministicAndBounded(), weight: 0.05},
       {name: "plannerTests.testToppraExactStopsAndBindings", run: () -> plannerTests.testToppraExactStopsAndBindings(), weight: 0.05},
+      {name: "plannerTests.testMergedSegmentsFollowTheOriginals", run: () -> plannerTests.testMergedSegmentsFollowTheOriginals(), weight: 0.1},
       {name: "plannerTests.testToppraCircleAcceleration", run: () -> plannerTests.testToppraCircleAcceleration(), weight: 0.05},
       {name: "plannerTests.testCircularSegments", run: () -> plannerTests.testCircularSegments(), weight: 1.7},
       {name: "processTests.testLinearAxisCompilesToRobotModel", run: () -> processTests.testLinearAxisCompilesToRobotModel(), weight: 0.05},

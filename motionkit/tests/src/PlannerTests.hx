@@ -506,7 +506,7 @@ class PlannerTests extends MotionKitTestSupport {
       speed += acceleration * dt;
     }
     var ramp = motionkit.trajectory.Trajectory.fromSegments(segments);
-    var merged = ramp.mergeSegments([1e-6, 2e-6], [0.01, 0.02], [1.0, 2.0], [100.0, 200.0], [1000.0, 2000.0], 0.01);
+    var merged = ramp.mergeSegments([1e-6, 2e-6], [0.01, 0.02], [1.0, 2.0], [100.0, 200.0], [1000.0, 2000.0], [-1e9, -1e9], [1e9, 1e9], 0.01);
     check(merged.segments().length <= 8, 'the ramp merges to a few segments, got ${merged.segments().length} of $pieces');
     check(merged.durationSeconds() == ramp.durationSeconds(), "and keeps its duration");
     var worst = 0.0, worstSpeed = 0.0, worstAcceleration = 0.0;
@@ -522,13 +522,13 @@ class PlannerTests extends MotionKitTestSupport {
     check(worst <= 2e-6 && worstSpeed <= 0.02 && worstAcceleration <= 2.0,
       'the merged ramp follows the original: $worst m, $worstSpeed m/s, $worstAcceleration m/s^2');
     // A limit the original keeps to is kept: the same ramp with an acceleration limit below its peak is not merged across the turn.
-    var limited = ramp.mergeSegments([1e-6, 2e-6], [0.01, 0.02], [1.0, 2.0], [100.0, 200.0], [9.9, 19.8], 0.01);
+    var limited = ramp.mergeSegments([1e-6, 2e-6], [0.01, 0.02], [1.0, 2.0], [100.0, 200.0], [9.9, 19.8], [-1e9, -1e9], [1e9, 1e9], 0.01);
     check(limited.segments().length == pieces || limited.segments().length >= merged.segments().length, "a limit the pieces keep to is not broken by a merge");
     // A zigzag of 0.1 ms pieces turns more often than a quintic can follow.
     var zigzag = [for (i in 0...100) {timeFromStartNs: Int64.ofInt(i * 100000), durationNs: Int64.ofInt(100000),
       coefficients: [[i % 2 == 0 ? 0.0 : 0.0005, i % 2 == 0 ? 5.0 : -5.0, 0.0], [0.0, 0.0, 0.0]]}];
     var saw = motionkit.trajectory.Trajectory.fromSegments(zigzag);
-    var kept = saw.mergeSegments([1e-6, 1e-6], [0.01, 0.01], [1.0, 1.0], [100.0, 100.0], [1000.0, 1000.0], 0.01);
+    var kept = saw.mergeSegments([1e-6, 1e-6], [0.01, 0.01], [1.0, 1.0], [100.0, 100.0], [1000.0, 1000.0], [-1e9, -1e9], [1e9, 1e9], 0.01);
     check(kept.segments().length > 40, 'a zigzag stays mostly as it was, ${kept.segments().length} of 100 segments');
     ramp.dispose(); merged.dispose(); limited.dispose(); saw.dispose(); kept.dispose();
   }

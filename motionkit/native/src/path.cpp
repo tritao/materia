@@ -963,17 +963,19 @@ Kin kin_of(const mk_joint_coefficients &c, uint32_t degree, double tau) {
 mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const double *position_tolerance,
                                     const double *velocity_tolerance, const double *acceleration_tolerance,
                                     const double *velocity_limit, const double *acceleration_limit,
+                                    const double *position_lower, const double *position_upper,
                                     uint32_t joint_count, double max_duration_seconds,
                                     mk_trajectory_handle *out_trajectory) {
     if (!out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
     out_trajectory->id = 0;
     if (!position_tolerance || !velocity_tolerance || !acceleration_tolerance || !velocity_limit || !acceleration_limit ||
-        joint_count == 0 ||
+        !position_lower || !position_upper || joint_count == 0 ||
         !std::isfinite(max_duration_seconds) || max_duration_seconds <= 0.0)
         return MK_ERROR_INVALID_ARGUMENT;
     for (uint32_t j = 0; j < joint_count; ++j)
         if (!(position_tolerance[j] > 0.0) || !(velocity_tolerance[j] > 0.0) || !(acceleration_tolerance[j] > 0.0) ||
-            !(velocity_limit[j] > 0.0) || !(acceleration_limit[j] > 0.0))
+            !(velocity_limit[j] > 0.0) || !(acceleration_limit[j] > 0.0) || std::isnan(position_lower[j]) ||
+            std::isnan(position_upper[j]) || position_lower[j] > position_upper[j])
             return MK_ERROR_INVALID_ARGUMENT;
     uint32_t joints = 0, count = 0;
     auto status = mk_trajectory_joint_count(trajectory, &joints);
@@ -1039,10 +1041,15 @@ mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const doubl
                         std::abs(mine.velocity - state.velocity[joint]) > velocity_tolerance[joint] ||
                         std::abs(mine.acceleration - state.acceleration[joint]) > acceleration_tolerance[joint])
                         return MK_ERROR_GENERATION;
-                    // A merged run does not take a joint past a limit that the segments it replaces keep to.
-                    if ((std::abs(mine.velocity) > velocity_limit[joint] && std::abs(state.velocity[joint]) <= velocity_limit[joint]) ||
+                    // A merged run does not take a joint past a limit that the segments it replaces keep to, nor, where they
+                    // are past it themselves (a plateau at the limit, as a timed path cruises), past what they are.
+                    // The same for the position bounds, to a nanometre.
+                    if (mine.position < position_lower[joint] && mine.position < state.position[joint] - 1e-9) return MK_ERROR_GENERATION;
+                    if (mine.position > position_upper[joint] && mine.position > state.position[joint] + 1e-9) return MK_ERROR_GENERATION;
+                    if ((std::abs(mine.velocity) > velocity_limit[joint] &&
+                         std::abs(mine.velocity) > std::abs(state.velocity[joint]) * (1.0 + 1e-6)) ||
                         (std::abs(mine.acceleration) > acceleration_limit[joint] &&
-                         std::abs(state.acceleration[joint]) <= acceleration_limit[joint]))
+                         std::abs(mine.acceleration) > std::abs(state.acceleration[joint]) * (1.0 + 1e-6)))
                         return MK_ERROR_GENERATION;
                 }
             }
