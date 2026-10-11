@@ -69,7 +69,7 @@ class EndEffectorContactMuJoCo {
 
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1),
-      [0, 0, 0], [0, 0, 0, 1], null, null, null, null, tool.collision, 0);
+      [0, 0, 0], [0, 0, 0, 1], null, null, null, tool.collision, 0);
     var obstacle = simulationHarness.spawnBox([
       cup.centre.x, cup.centre.y, cup.centre.z + cup.halfExtents.z + 0.007],
       [0.005, 0.005, 0.005]);
@@ -121,7 +121,7 @@ class EndEffectorContactMuJoCo {
 
     var simulation = simulationHarness.simulation;
     var robot = simulation.addRobotAtPose(blueprint,
-      [0, 0, 0], [0, 0, 0, 1], null, null, null, null,
+      [0, 0, 0], [0, 0, 0, 1], null, null, null,
       bundle.runtime.tool.collision, 0, 0, 0.01);
     var selection = new ToolRuntimeSelection();
     selection.select(bundle.runtime, simulation.sourceTimestampNs(), robot.sourceClockId);

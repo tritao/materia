@@ -597,8 +597,8 @@ class MissionPlayer implements SessionMember {
   /** The simulation's articulated hulls plus its current cell geometry, all in this robot's root frame. */
   function cellCollisionBodies(arm:Manipulator, toolPrefix:Null<String>, ignored:Array<String>):Array<robotkit.manipulation.ClearanceBodyData> {
     var links = robot.model.links;
-    var bodies = [for (hull in robot.hulls) if (ignored.indexOf(hull.part) < 0)
-      {name: hull.part, link: links[hull.link].id, vertices: hull.vertices, tool: toolPrefix != null && StringTools.startsWith(hull.part, toolPrefix)}];
+    var bodies = [for (hull in robot.shapes) if (ignored.indexOf(hull.shape.name) < 0)
+      {name: hull.shape.name, link: links[hull.link].id, vertices: hull.shape.convexVertices(), tool: toolPrefix != null && StringTools.startsWith(hull.shape.name, toolPrefix)}];
     var carriedLinks = new Map<String, Int>();
     for (channel in carryingTools.keys()) if (carryingTools.get(channel) == true) {
       var held = heldParts.get(channel), kinematics = toolKinematics.get(channel);
@@ -643,17 +643,18 @@ class MissionPlayer implements SessionMember {
     for (body in bodies) included.set(body.name, true);
     for (other in cellRobots) if (other != robot && other.parts.length > 0) {
       var index = other.parts[0].robotIndex;
-      for (hull in other.hulls) if (!included.exists(hull.part) && ignored.indexOf(hull.part) < 0) {
+      for (hull in other.shapes) if (!included.exists(hull.shape.name) && ignored.indexOf(hull.shape.name) < 0) {
         var pose = simulation.linkPose(index, hull.link);
         var worldPose = new Transform3(new Vec3(pose.position[0], pose.position[1], pose.position[2]),
           new Quat(pose.rotation[0], pose.rotation[1], pose.rotation[2], pose.rotation[3]));
         var localPose = baseInverse.compose(worldPose), vertices:Array<Float> = [];
-        for (corner in 0...Std.int(hull.vertices.length / 3)) {
-          var point = localPose.transformPoint(new Vec3(hull.vertices[corner * 3], hull.vertices[corner * 3 + 1], hull.vertices[corner * 3 + 2]));
+        var points = hull.shape.convexVertices();
+        for (corner in 0...Std.int(points.length / 3)) {
+          var point = localPose.transformPoint(new Vec3(points[corner * 3], points[corner * 3 + 1], points[corner * 3 + 2]));
           vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
         }
-        bodies.push({name: hull.part, link: links[0].id, vertices: vertices, tool: false});
-        included.set(hull.part, true);
+        bodies.push({name: hull.shape.name, link: links[0].id, vertices: vertices, tool: false});
+        included.set(hull.shape.name, true);
       }
     }
     for (entry in objects) {
@@ -1872,7 +1873,7 @@ class MissionPlayer implements SessionMember {
     options.referenceName = "mission start";
     var bodies = RobotCollision.describe(description, arm.robot, options);
     var owned = new Map<String, Bool>();
-    for (hull in robot.hulls) owned.set(hull.part, true);
+    for (hull in robot.shapes) owned.set(hull.shape.name, true);
     // Cell geometry is expressed in the base frame but is not part of the
     // robot's articulation. Otherwise reference-overlap rules would permit an
     // independent obstacle just because it intersects the initial arm pose.

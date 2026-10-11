@@ -71,10 +71,12 @@ enum {
     /** size[0]: radius; size[1]: half-length of the straight part, along local Z. */
     RK_LINK_SHAPE_CAPSULE = 3,
     /** size[0]: radius; size[1]: half-length along local Z. */
-    RK_LINK_SHAPE_CYLINDER = 4
+    RK_LINK_SHAPE_CYLINDER = 4,
+    RK_LINK_SHAPE_CONVEX = 5 /**< vertices: XYZ triples, 4..64 points. */
 };
 
-enum { RK_MAX_LINK_SHAPES = 256 };
+// Covers the former 256 primitives plus 512 per-part hulls.
+enum { RK_MAX_LINK_SHAPES = 768 };
 enum { RK_MAX_LINK_HULLS = 512 };
 
 /**
@@ -116,6 +118,8 @@ typedef struct rk_simulation_link_shape {
      * environment object, using this shape's surface.
      */
     uint32_t contact_filter;
+    uint32_t vertex_count;
+    double vertices[64 * 3];
 } rk_simulation_link_shape;
 
 enum { RK_MAX_CONTACT_PAIRS = 128 };

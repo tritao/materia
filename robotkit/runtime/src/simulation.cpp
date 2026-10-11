@@ -42,10 +42,16 @@ void require_scene(nkscene_result result, const char *operation) {
 
 bool valid_link_shape(const rk_simulation_link_shape &shape, uint32_t link_count) {
     if (shape.link >= link_count || shape.type < RK_LINK_SHAPE_BOX ||
-        shape.type > RK_LINK_SHAPE_CYLINDER || !valid_pose(shape.position, shape.rotation) ||
+        shape.type > RK_LINK_SHAPE_CONVEX || !valid_pose(shape.position, shape.rotation) ||
         !valid_contact_surface(shape.friction, shape.friction_dimensions,
             shape.contact_time_constant, shape.contact_damping_ratio, shape.contact_filter))
         return false;
+    if (shape.type == RK_LINK_SHAPE_CONVEX) {
+        if (shape.vertex_count < 4 || shape.vertex_count > 64) return false;
+        for (uint32_t i = 0; i < shape.vertex_count * 3; ++i)
+            if (!std::isfinite(shape.vertices[i])) return false;
+        return true;
+    }
     const uint32_t sized = shape.type == RK_LINK_SHAPE_BOX ? 3
         : shape.type == RK_LINK_SHAPE_SPHERE ? 1 : 2;
     for (uint32_t axis = 0; axis < sized; ++axis)
@@ -616,6 +622,10 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 case RK_LINK_SHAPE_CAPSULE:
                     require_sim(nksim_shape_create_capsule(world, source.size[0],
                         2.0 * source.size[1], &primitive), "nksim_shape_create_capsule(link primitive)");
+                    break;
+                case RK_LINK_SHAPE_CONVEX:
+                    require_sim(nksim_shape_create_convex(world, source.vertices,
+                        source.vertex_count * 3, &primitive), "nksim_shape_create_convex(link shape)");
                     break;
                 default:
                     require_sim(nksim_shape_create_cylinder(world, source.size[0],

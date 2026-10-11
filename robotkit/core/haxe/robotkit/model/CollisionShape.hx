@@ -1,13 +1,7 @@
 package robotkit.model;
 
-/** Primitive collision geometry. Sizes are in metres; lengths run along local Z. */
-enum CollisionPrimitive {
-  Box(halfX:Float, halfY:Float, halfZ:Float);
-  Sphere(radius:Float);
-  /** A capsule's half-length covers only its straight part, excluding the caps. */
-  Capsule(radius:Float, halfLength:Float);
-  Cylinder(radius:Float, halfLength:Float);
-}
+import collisionkit.CollisionGeometry;
+
 
 /**
  * How a collision shape touches others. Zero fields keep the simulator's
@@ -54,9 +48,12 @@ enum ShapeContact {
   PairsAndEnvironment;
 }
 
-/** One primitive collision shape, posed in its link's frame. */
+/** One collision shape, posed in its link's frame. */
 class CollisionShape {
-  public var primitive:CollisionPrimitive;
+  public var geometry:CollisionGeometry;
+  public var inflation:Float = 0.0;
+  /** Source identity, such as a CAD occurrence id. */
+  public var name:String = "";
   public var position:Array<Float>;
   /** Unit quaternion in x, y, z, w order. */
   public var rotation:Array<Float>;
@@ -64,20 +61,43 @@ class CollisionShape {
   public var surface:Null<ContactSurface> = null;
   public var contact:ShapeContact = ShapeContact.Layers;
 
-  public function new(primitive:CollisionPrimitive, ?position:Array<Float>,
+  public function new(geometry:CollisionGeometry, ?position:Array<Float>,
       ?rotation:Array<Float>) {
-    if (primitive == null) throw "Collision shape primitive is required";
-    this.primitive = primitive;
+    if (geometry == null) throw "Collision shape geometry is required";
+    this.geometry = geometry;
     this.position = position == null ? [0.0, 0.0, 0.0] : position;
     this.rotation = rotation == null ? [0.0, 0.0, 0.0, 1.0] : rotation;
   }
 
+  /** Convex vertices in the link frame, including this shape's pose. */
+  public function convexVertices():Array<Float> {
+    var points = switch geometry { case Convex(value): value; case _: throw "Shape is not convex"; };
+    var result:Array<Float> = [];
+    var qx = rotation[0], qy = rotation[1], qz = rotation[2], qw = rotation[3];
+    for (i in 0...Std.int(points.length / 3)) {
+      var x = points[3*i], y = points[3*i+1], z = points[3*i+2];
+      var tx = 2*(qy*z-qz*y), ty = 2*(qz*x-qx*z), tz = 2*(qx*y-qy*x);
+      result.push(position[0]+x+qw*tx+qy*tz-qz*ty);
+      result.push(position[1]+y+qw*ty+qz*tx-qx*tz);
+      result.push(position[2]+z+qw*tz+qx*ty-qy*tx);
+    }
+    return result;
+  }
+
   /** Returns why the shape is invalid, or null when it is valid. */
   public function validate():Null<String> {
-    var sizes = switch primitive {
+    if (!Math.isFinite(inflation) || inflation < 0.0) return "collision inflation must be finite and non-negative";
+    if (geometry == null) return "collision geometry is required";
+    var sizes = switch geometry {
       case Box(x, y, z): [x, y, z];
       case Sphere(radius): [radius];
       case Capsule(radius, half), Cylinder(radius, half): [radius, half];
+      case Convex(points):
+        if (points == null || points.length < 12 || points.length % 3 != 0) return "convex collision needs at least four XYZ points";
+        for (value in points) if (!Math.isFinite(value)) return "convex collision points must be finite";
+        [];
+      case Mesh(_, _), HeightField(_, _, _, _, _), HalfSpace(_, _, _, _):
+        return "scene geometry is not accepted on a link";
     };
     for (size in sizes)
       if (!Math.isFinite(size) || size <= 0.0) return "collision shape sizes must be finite and positive";

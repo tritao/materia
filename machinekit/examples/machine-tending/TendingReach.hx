@@ -464,9 +464,9 @@ class TendingReach {
 			frame.position = [tcp.x, tcp.y, tcp.z]; frame.rotation = [tcp.qx, tcp.qy, tcp.qz, tcp.qw];
 			var rootLink = converted.model.links[baseCarrier.link].id;
 			var arm = new Manipulator(converted.model, rootLink, frame.id);
-			var clearance = reachClearances(arm, [for (hull in converted.linkHulls)
-				{name: hull.part, link: converted.model.links[hull.link].id, vertices: hull.vertices,
-					tool: StringTools.startsWith(hull.part, toolPrefix)}], source.ready(), [], false, converted.jointInterfaces)[0];
+			var clearance = reachClearances(arm, [for (hull in cadbridge.AssemblySimulationBridge.shapes(converted.model))
+				{name: hull.shape.name, link: converted.model.links[hull.link].id, vertices: hull.shape.convexVertices(),
+					tool: StringTools.startsWith(hull.shape.name, toolPrefix)}], source.ready(), [], false, converted.jointInterfaces)[0];
 			var toolStandOff = toolLength + source.baseFlange.flangeDiameter + toolDepth + 20;
 			// The static tool envelope includes its assumed hose clearance. Keep the
 			// runtime's full obstacle margin beyond that envelope at the door plane.
@@ -627,9 +627,9 @@ class TendingReach {
 					seed = selected.copy();
 				}
 				if (valid) {
-					var bodies:Array<robotkit.manipulation.ClearanceBodyData> = [for (hull in converted.linkHulls)
-						{name: hull.part, link: converted.model.links[hull.link].id, vertices: hull.vertices,
-							tool: StringTools.startsWith(hull.part, toolPrefix)}];
+					var bodies:Array<robotkit.manipulation.ClearanceBodyData> = [for (hull in cadbridge.AssemblySimulationBridge.shapes(converted.model))
+						{name: hull.shape.name, link: converted.model.links[hull.link].id, vertices: hull.shape.convexVertices(),
+							tool: StringTools.startsWith(hull.shape.name, toolPrefix)}];
 					for (body in environment) {
 						var vertices:Array<Float> = [];
 						for (i in 0...Std.int(body.vertices.length / 3)) {
@@ -672,7 +672,7 @@ class TendingReach {
 							var body = bodies[index];
 							if (body.name == "machine:infeedTray/blank-0-0" || StringTools.startsWith(body.name, "machine:door-closed/")) continue;
 							var vertices = index < loadedHulls.length && StringTools.startsWith(body.name, activePrefix)
-								? loadedHulls[index].vertices : body.vertices;
+								? loadedHulls[index].shape.convexVertices() : body.vertices;
 							transitBodies.push({name: body.name, link: body.link, vertices: vertices, tool: body.tool});
 						}
 						var payloadBody:robotkit.manipulation.ClearanceBodyData = {name: "reach-payload",
@@ -700,7 +700,7 @@ class TendingReach {
 							var body = bodies[index];
 							if (!exterior && StringTools.startsWith(body.name, "machine:door-closed/")) continue;
 							var active = StringTools.startsWith(body.name, activeToolPrefix);
-							var vertices = index < loadedHulls.length && active ? loadedHulls[index].vertices : body.vertices;
+							var vertices = index < loadedHulls.length && active ? loadedHulls[index].shape.convexVertices() : body.vertices;
 							pointBodies.push({name: body.name, link: body.link, vertices: vertices, tool: active});
 						}
 						var selectedStock = trayStock(request.name);
@@ -900,7 +900,7 @@ class TendingReach {
 	 * The study freezes process DOFs, so their real closing motion must be in the hull.
 	 */
 	static function sweepGripperClosure(converted:cadbridge.AssemblySimulationBridge.AssemblySimulationModel,
-		scene:materia.project.SceneArtifact.SceneArtifactData, spec:machinekit.robotics.ParallelGripperSpec):Array<cadbridge.AssemblySimulationBridge.AssemblyLinkHull> {
+		scene:materia.project.SceneArtifact.SceneArtifactData, spec:machinekit.robotics.ParallelGripperSpec):Array<robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape> {
 		var definition = scene.assemblyDefinition;
 		if (definition == null) throw "Gripper envelope needs the reach assembly";
 		var open = new AssemblyState(definition), closed = new AssemblyState(definition);
@@ -909,19 +909,24 @@ class TendingReach {
 		for (joint in flat.joints) {
 			if (StringTools.endsWith(joint.id, "/jaw-left-slide")) closed.setJoint(joint.id, travel);
 		}
-		var result = [for (hull in converted.linkHulls) {link: hull.link, part: hull.part, vertices: hull.vertices.copy()}];
+		var result = [for (hull in cadbridge.AssemblySimulationBridge.shapes(converted.model)) {
+      var shape = new robotkit.model.CollisionShape(CollisionGeometry.Convex(hull.shape.convexVertices()));
+      shape.name = hull.shape.name;
+      new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape(hull.link, shape);
+    }];
 		for (hull in result) {
-			var delta = AssemblyFrames.compose(AssemblyFrames.inverse(open.worldPose(hull.part)), closed.worldPose(hull.part));
+			var delta = AssemblyFrames.compose(AssemblyFrames.inverse(open.worldPose(hull.shape.name)), closed.worldPose(hull.shape.name));
 			if (Math.abs(delta.x) + Math.abs(delta.y) + Math.abs(delta.z) < 1e-9) continue;
-			var carrier = converted.partLinks.get(hull.part);
+			var carrier = converted.partLinks.get(hull.shape.name);
 			if (carrier == null) throw "Gripper envelope lost its physical carrier";
 			var metric:AssemblyFrame = {x: delta.x * scene.metresPerUnit, y: delta.y * scene.metresPerUnit,
 				z: delta.z * scene.metresPerUnit, qx: delta.qx, qy: delta.qy, qz: delta.qz, qw: delta.qw};
 			var shift = AssemblyFrames.compose(carrier.offset, AssemblyFrames.compose(metric, AssemblyFrames.inverse(carrier.offset)));
-			var original = hull.vertices.copy();
+			var vertices = switch hull.shape.geometry { case Convex(points): points; case _: throw "Envelope must be convex"; };
+			var original = vertices.copy();
 			for (i in 0...Std.int(original.length / 3)) {
 				var point = AssemblyFrames.transformPoint(shift, original[3 * i], original[3 * i + 1], original[3 * i + 2]);
-				hull.vertices.push(point.x); hull.vertices.push(point.y); hull.vertices.push(point.z);
+				vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
 			}
 		}
 		return result;

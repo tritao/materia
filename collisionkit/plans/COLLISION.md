@@ -844,6 +844,52 @@ Order: CL9a, CL9b, CL9c, CL9d, CL9e. Each step is one commit.
 
 ## Progress log
 
+### CL9a blocked: schema-version assertion (2026-10-11)
+
+- Starting point: `collision` and local `main` are both `9b0f5e935`.
+- CL-D15 requires the RobotModel codec to bump its schema version and reject
+  the old version without migration. `RobotModel.CURRENT_VERSION` is 12,
+  and `RobotModelCodec.VERSION` aliases it.
+- `robotkit/tests/src/tests/RobotWorldTests.hx:5069` explicitly asserts
+  `RobotModelCodec.VERSION == 12` in "RobotModel v12 preserves the typed
+  spindle process binding". The required bump would fail this assertion;
+  making that suite green would require changing its expected version.
+- CL9's gates prohibit assertion or expected-value changes except in CL9c.
+  Stopped before feature edits rather than choosing an exception. Resuming
+  CL9a needs an explicit exception for this schema-version assertion (or a
+  revision to CL-D15). No assertions were changed, no step was committed,
+  local `main` was not moved, and nothing was pushed. The gate suites have
+  not been run; this is a source-level blocker, not a reported green step.
+- Preparation: exported the specified cache and OCCT paths, ran
+  `git -c protocol.file.allow=always submodule update --init --recursive`,
+  and ran `scripts/build-native.sh` from `haxeon/` successfully (Ninja:
+  "no work to do"). The script's build-preset lookup requires that working
+  directory; its first invocation from the repository root failed to find
+  the root `CMakePresets.json`. OCCT was not rebuilt.
+
+### CL9a: link shapes (2026-10-11)
+
+- Resumed on the user's "ok continue": the schema-version assertion is
+  explicitly updated from 12 to 13. No other existing expected values change.
+  Version 13 stores geometry, pose, name, inflation, surface and contact;
+  version 12 is rejected without migration. Authored fixtures use version 13.
+- Link hulls now live on links as named `Convex` collision shapes. The old
+  link-shape types and Simulation hull arguments are gone. Native Convex
+  transport preserves pose and contact; inflation remains query-only.
+- A rotated inflated Convex regression exposed a collisionkit boolean-query
+  discrepancy. The wrapper uses coal's signed distance for inflated Convex
+  queries, matching its distance results; coal itself is unchanged.
+- Gates: standalone C++ (collisionkit 3, MotionKit 16), native kit (695),
+  collisionkit (364), MotionKit (1,224,709), RobotKit (5,469), processkit and
+  the full app suite pass. Pure kit retains only the documented DLS allocation
+  failure (-40.8 bytes). The full project-source mission run exits successfully
+  with existing physics assertions. Added Convex pose/inflation/contact checks
+  pass against MuJoCo (63 assertions). No deleted link-shape names remain.
+- Local main advanced to `de3188e28` during validation; collision was
+  fast-forwarded to it while preserving these edits. Its overhead-arm catalog
+  entry needed the missing Start-page category to pass the app gate.
+  Only robotkit-core → pure collisionkit was added; no fork or OCCT rebuild.
+
 ### Plan revision (2026-10-01, after CL1)
 
 A review of the plan against CL1 and the code around it changed:

@@ -4,7 +4,6 @@ import collisionkit.CollisionPose;
 import collisionkit.native.NativeCollisionWorld;
 import robotkit.collision.RobotCollision;
 import robotkit.collision.RobotCollision.RobotCollisionOptions;
-import robotkit.collision.RobotCollision.RobotLinkHull;
 import robotkit.model.CollisionShape;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
@@ -29,7 +28,46 @@ class CollisionMuJoCoTests {
 
   public static function main():Void {
     testSharedDescription();
+    testConvexPoseAndInflation();
     Sys.println('Collision MuJoCo tests passed ($assertions assertions)');
+  }
+
+  /** Authored convex pose/contact reaches MuJoCo; query inflation stays in coal. */
+  static function testConvexPoseAndInflation():Void {
+    var model = new RobotModel("posed-convex");
+    model.collisionApproximation = robotkit.model.CollisionApproximation.None;
+    var link = model.addLink(new Link("base"));
+    var points = [for (i in 0...8) for (axis in 0...3)
+      (((i >> axis) & 1) == 0 ? -1 : 1) * (axis == 0 ? 0.3 : 0.05)];
+    var shape = new CollisionShape(Convex(points), [1.0, 0, 0],
+      [0.0, 0.0, Math.sin(Math.PI/4), Math.cos(Math.PI/4)]);
+    shape.inflation = 0.1;
+    shape.surface = new robotkit.model.CollisionShape.ContactSurface([0.7, 0.01, 0.001], 4, 0.01, 0.9);
+    shape.contact = robotkit.model.CollisionShape.ShapeContact.PairsAndEnvironment;
+    link.collisionShapes.push(shape);
+    var description = new CollisionDescription();
+    var robot = RobotCollision.describe(description, model, new RobotCollisionOptions("posed"));
+    // Make these checked pairs in the query world, including the fixed robot root.
+    var boxes = [for (x in [1.0, 1.12]) {
+      var body = description.addBody("box", 1, false, CollisionPose.translation(x, 0.2, 0));
+      description.addObject("box", body, CollisionPose.identity(), Box(0.02, 0.02, 0.02));
+    }];
+    var world = new NativeCollisionWorld();
+    var build = description.build(world);
+    check(world.distances(0).length == 2, "coal signed distances apply the authored convex pose and inflation");
+    check(world.colliding(0).length == 2, "convex collision queries agree with the inflated signed distances");
+    var harness = new SimulationHarness(0.01, 1, SimulationSpace.MUJOCO);
+    var runtime = harness.simulation.addRobot(RobotRuntimeCompiler.compile(model, new RobotProfile()));
+    var physical = harness.spawnBox([1.0,0.2,0], [0.02,0.02,0.02], true, 1.0);
+    var near = harness.spawnBox([1.12,0.2,0], [0.02,0.02,0.02], true, 1.0);
+    harness.step();
+    var contacts = harness.simulation.robotContacts(runtime);
+    check(contacts.filter(c -> c.active && c.otherObject == physical.handle.rawValue()).length > 0,
+      "MuJoCo collides with the posed convex shape using its environment contact filter");
+    check(contacts.filter(c -> c.active && c.otherObject == near.handle.rawValue()).length == 0,
+      "MuJoCo receives the convex geometry without query inflation");
+    harness.dispose();
+    world.dispose();
   }
 
   /** Base -> shoulder (z) -> upper -> elbow (z, x = 1) -> fore: boxes along the links, a hull on the upper arm. */
@@ -59,7 +97,7 @@ class CollisionMuJoCoTests {
     var model = arm();
     var description = new CollisionDescription();
     var options = new RobotCollisionOptions("arm");
-    options.hulls = [new RobotLinkHull(1, "upper-hull", cube(0.3, 0, 0.0, 0.06))];
+    model.links[1].collisionShapes.push(new CollisionShape(Convex(cube(0.3, 0, 0.0, 0.06))));
     var robot = RobotCollision.describe(description, model, options);
     var boxes = [for (box in BOXES)
       description.addFixed('box', CollisionPose.translation(box[0], box[1], box[2]), CollisionGeometry.Box(box[3], box[4], box[5]), 1)];
@@ -69,8 +107,8 @@ class CollisionMuJoCoTests {
     var excludes = RobotCollision.simulationExcludes(description, build, robot);
     var pairs = [for (i in 0...Std.int(excludes.length / 2)) excludes[2 * i] + "-" + excludes[2 * i + 1]];
     check(pairs.join(",") == "0-1,1-2", 'the description allows base-upper and upper-fore, and checks base-fore (${pairs.join(",")})');
-    var hulls:Array<robotkit.runtime.Simulation.SimulationLinkHull> =
-      [for (hull in RobotCollision.simulationHulls(description, robot)) {link: hull.link, vertices: hull.vertices}];
+    var hulls = [for (shape in model.links[1].collisionShapes) if (switch shape.geometry { case Convex(_): true; case _: false; })
+      new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape(1, shape)];
     check(hulls.length == 1 && hulls[0].link == 1, "the description's hull feeds the simulation");
     var blueprint = RobotRuntimeCompiler.compile(model, new RobotProfile());
 
@@ -78,8 +116,7 @@ class CollisionMuJoCoTests {
     function contactsAt(q:Array<Float>, shared:Bool):Array<{link:Int, otherLink:Int, box:Int, distance:Float}> {
       var harness = new SimulationHarness(0.01, 1, SimulationSpace.MUJOCO);
       var simulation = harness.simulation;
-      var runtime = simulation.addRobotAtPose(blueprint, [0, 0, 0], [0, 0, 0, 1], null, null, null, null, null, null, null,
-        null, hulls, false, shared ? excludes : null);
+      var runtime = simulation.addRobotAtPose(blueprint, [0, 0, 0], [0, 0, 0, 1], null, null, null, null, null, null, null, false, shared ? excludes : null);
       var objects = [for (box in BOXES) harness.spawnBox([box[0], box[1], box[2]], [box[3], box[4], box[5]])];
       simulation.setJointPositions(0, q);
       harness.step();

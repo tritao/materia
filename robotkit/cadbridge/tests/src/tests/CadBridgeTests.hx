@@ -829,22 +829,22 @@ class CadBridgeTests {
       check(domain.model.joints.length == 1 && domain.model.joints[0].id == joint,
         "shared support retains each controller's own joint and its root anchor");
       check(!domain.partLinks.exists("base") &&
-        [for (hull in domain.linkHulls) if (hull.part == "base") hull].length == 0 &&
+        [for (hull in cadbridge.AssemblySimulationBridge.shapes(domain.model)) if (hull.shape.name == "base") hull].length == 0 &&
         domain.model.links[0].mass < 0.01,
         "shared fixed support belongs to the environment without duplicate mass or collision geometry");
     }
     check(Math.abs(lead.stiffness - 1.0e5) < 1e-6 && Math.abs(lead.backlash - 5e-5) < 1e-15 && lead.drag == 0.02 &&
       Math.abs(lead.efficiency - 0.4) < 1e-15, "a coupling's stiffness, backlash and drag reach the robot in SI units");
-    check(translated.linkHulls.length == 2 && translated.linkHulls[0].link == 0 &&
-      translated.linkHulls[1].link == 1 && translated.linkHulls[1].vertices.length <= 64 * 3,
+    check(cadbridge.AssemblySimulationBridge.shapes(translated.model).length == 2 && cadbridge.AssemblySimulationBridge.shapes(translated.model)[0].link == 0 &&
+      cadbridge.AssemblySimulationBridge.shapes(translated.model)[1].link == 1 && cadbridge.AssemblySimulationBridge.shapes(translated.model)[1].shape.convexVertices().length <= 64 * 3,
       "physical-part view supplies each part's bounded hull on its link");
     var authored = assembly.definition("authored-collision");
     var authoredSlider = [for (entry in authored.definitions) if (entry.id == "slider") entry][0];
     authoredSlider.collisionHulls = machinekit.component.CollisionHullFacet.fromBoxes([
       [-20, -20, 0, -10, 20, 5], [10, -20, 0, 20, 20, 5]]).hulls;
-    var pieces = AssemblySimulationBridge.toRobotModel(authored, parts).linkHulls;
+    var pieces = AssemblySimulationBridge.shapes(AssemblySimulationBridge.toRobotModel(authored, parts).model);
     check(pieces.length == 3 && pieces[1].link == 1 && pieces[2].link == 1 &&
-      pieces[1].vertices.length == 24 && pieces[2].vertices.length == 24,
+      pieces[1].shape.convexVertices().length == 24 && pieces[2].shape.convexVertices().length == 24,
       "authored convex pieces replace the envelope hull without filling the gap");
     var baseLink = translated.partLinks.get("base"), sliderLink = translated.partLinks.get("slider");
     check(baseLink != null && sliderLink != null && baseLink.link == 0 && sliderLink.link == 1,
@@ -884,8 +884,8 @@ class CadBridgeTests {
     var tip = body.partLinks.get("tip");
     if (tip == null) throw "the tip has no link";
     check(Math.abs(tip.offset.x - 0.1) < 1e-12 && tip.link == 1, "the tip rides the slider's link 100 mm out");
-    var tipHull = [for (hull in body.linkHulls) if (hull.part == "tip") hull][0];
-    var xs = [for (index in 0...Std.int(tipHull.vertices.length / 3)) tipHull.vertices[index * 3]];
+    var tipHull = [for (hull in cadbridge.AssemblySimulationBridge.shapes(body.model)) if (hull.shape.name == "tip") hull][0];
+    var xs = [for (index in 0...Std.int(tipHull.shape.convexVertices().length / 3)) tipHull.shape.convexVertices()[index * 3]];
     var lowX = xs[0], highX = xs[0];
     for (x in xs) { lowX = Math.min(lowX, x); highX = Math.max(highX, x); }
     check(tipHull.link == 1 && Math.abs(lowX - 0.1) < 1e-12 && Math.abs(highX - 0.11) < 1e-12,

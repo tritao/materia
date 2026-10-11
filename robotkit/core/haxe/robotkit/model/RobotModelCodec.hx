@@ -2,6 +2,7 @@ package robotkit.model;
 
 
 import haxe.Json;
+import collisionkit.CollisionGeometry;
 import haxe.io.Bytes;
 import robotkit.model.ActuatorDrive;
 import robotkit.model.ProcessVelocityDrive;
@@ -535,14 +536,16 @@ class RobotModelCodec {
 
   public static function encodeCollisionShape(shape:CollisionShape):Dynamic {
     var kind:String, size:Array<Float>;
-    switch shape.primitive {
+    switch shape.geometry {
       case Box(x, y, z): kind = "box"; size = [x, y, z];
       case Sphere(radius): kind = "sphere"; size = [radius];
       case Capsule(radius, half): kind = "capsule"; size = [radius, half];
       case Cylinder(radius, half): kind = "cylinder"; size = [radius, half];
+      case Convex(points): kind = "convex"; size = points;
+      case _: throw "Scene geometry is not accepted on a link";
     }
     var surface = shape.surface;
-    return {kind: kind, size: size, position: shape.position, rotation: shape.rotation,
+    return {kind: kind, size: size, name: shape.name, inflation: shape.inflation, position: shape.position, rotation: shape.rotation,
       surface: surface == null ? null : encodeSurface(surface),
       contact: switch shape.contact {
         case Layers: "layers";
@@ -564,7 +567,7 @@ class RobotModelCodec {
   }
 
   public static function readCollisionShape(record:Dynamic):CollisionShape {
-    var primitive = switch text(record, "kind") {
+    var geometry:CollisionGeometry = switch text(record, "kind") {
       case "box":
         var size = vectorField(record, "size", 3);
         Box(size[0], size[1], size[2]);
@@ -575,10 +578,15 @@ class RobotModelCodec {
       case "cylinder":
         var size = vectorField(record, "size", 2);
         Cylinder(size[0], size[1]);
+      case "convex": Convex(vectorField(record, "size", array(record, "size").length));
       case other: throw 'Unsupported RobotModel collision shape kind $other';
     };
-    var shape = new CollisionShape(primitive, vectorField(record, "position", 3),
+    var shape = new CollisionShape(geometry, vectorField(record, "position", 3),
       vectorField(record, "rotation", 4));
+    shape.inflation = number(record, "inflation");
+    var shapeName:Dynamic = required(record, "name");
+    if (!Std.isOfType(shapeName, String)) throw "Collision shape name must be a string";
+    shape.name = cast shapeName;
     var surface:Dynamic = required(record, "surface");
     if (surface != null) shape.surface = readSurface(surface);
     shape.contact = switch text(record, "contact") {

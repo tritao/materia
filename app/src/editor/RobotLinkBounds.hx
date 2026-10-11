@@ -2,7 +2,7 @@ package app.editor;
 
 import nativekit.sim.SimPose;
 import robotkit.model.CollisionShape;
-import robotkit.model.CollisionShape.CollisionPrimitive;
+import collisionkit.CollisionGeometry;
 import robotkit.model.RobotModel;
 
 /** Bounding spheres for a robot model's authored link collision shapes. */
@@ -19,10 +19,15 @@ class RobotLinkBounds {
   }
 
   public static function radius(shape:CollisionShape):Float
-    return switch shape.primitive {
-      case Sphere(value): value;
-      case Capsule(value, half), Cylinder(value, half): value + half;
-      case Box(x, y, z): Math.sqrt(x * x + y * y + z * z);
+    return switch shape.geometry {
+      case Sphere(value): value + shape.inflation;
+      case Capsule(value, half), Cylinder(value, half): value + half + shape.inflation;
+      case Box(x, y, z): Math.sqrt(x * x + y * y + z * z) + shape.inflation;
+      case Convex(points):
+        var radius = 0.0;
+        for (i in 0...Std.int(points.length/3)) radius = Math.max(radius, Math.sqrt(points[3*i]*points[3*i]+points[3*i+1]*points[3*i+1]+points[3*i+2]*points[3*i+2]));
+        radius + shape.inflation;
+      case _: throw "Scene geometry is not accepted on a link";
     };
 
   /** Applies a link's world rotation to a link-local collision centre. */

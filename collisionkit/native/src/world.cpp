@@ -235,7 +235,14 @@ void World::rebuild_pairs() {
 }
 
 bool World::collides(Pair &pair, double margin, coal::CollisionRequest &request) {
-    if (pair.field) {
+    // Coal's convex collision fast path can miss contact made only by its
+    // swept-sphere radius. Its signed-distance query includes that radius.
+    const auto inflated_convex = [](const coal::CollisionObject *object) {
+        const auto *geometry = object->collisionGeometryPtr();
+        return geometry->getNodeType() == coal::GEOM_CONVEX &&
+            static_cast<const coal::ConvexBase *>(geometry)->getSweptSphereRadius() > 0.0;
+    };
+    if (pair.field || inflated_convex(pair.first) || inflated_convex(pair.second)) {
         coal::DistanceRequest distance_request(false, true);
         coal::DistanceResult result;
         return (*pair.distance)(pair.first->getTransform(), pair.second->getTransform(), distance_request, result) <=

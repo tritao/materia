@@ -20,7 +20,6 @@ import processkit.collision.HeightMapCollision;
 import processkit.work.HeightMap;
 import robotkit.collision.RobotCollision;
 import robotkit.collision.RobotCollision.RobotCollisionOptions;
-import robotkit.collision.RobotCollision.RobotLinkHull;
 import robotkit.model.CollisionShape;
 import robotkit.model.CollisionShape.ShapeContact;
 import robotkit.model.ContactPair;
@@ -78,6 +77,7 @@ class CellCollisionTests {
     fore.collisionShapes.push(left);
     fore.collisionShapes.push(right);
     model.contactPairs.push(new ContactPair(fore.id, 1, fore.id, 2));
+    model.links[1].collisionShapes.push(new CollisionShape(Convex(cube(0.2, 0, 0, 0.04))));
     return model;
   }
 
@@ -86,7 +86,6 @@ class CellCollisionTests {
     options.tool = new Tool("probe", "probe", new Transform3(new Vec3(0.1, 0, 0), new Quat(0, 0, 0, 1)),
       ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05), new Vec3(0.05, 0, 0)));
     options.toolFrame = "flange";
-    options.hulls = [new RobotLinkHull(1, "upper-hull", cube(0.2, 0, 0, 0.04))];
     return options;
   }
 

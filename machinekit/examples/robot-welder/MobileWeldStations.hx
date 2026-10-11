@@ -113,9 +113,9 @@ class MobileWeldStations {
     work = transform(state.worldPose(weldment.reference), scene.metresPerUnit);
     metal = WeldMetal.carrierOf(cell, weldment);
     var prefix = contact.occurrence.substr(0, contact.occurrence.lastIndexOf("/") + 1);
-    robotBodies = [for (hull in converted.linkHulls) if (hull.part != metal)
-      {name: hull.part, link: converted.model.links[hull.link].id, vertices: hull.vertices,
-        tool: StringTools.startsWith(hull.part, prefix)}];
+    robotBodies = [for (hull in cadbridge.AssemblySimulationBridge.shapes(converted.model)) if (hull.shape.name != metal)
+      {name: hull.shape.name, link: converted.model.links[hull.link].id, vertices: hull.shape.convexVertices(),
+        tool: StringTools.startsWith(hull.shape.name, prefix)}];
     for (occurrence in flat.occurrences) if (!converted.partLinks.exists(occurrence.id) && occurrence.id != metal) {
       var part = [for (body in physical.parts) if (body.id == occurrence.definition) body][0];
       var hull:Array<Float> = cast part.collisionHull;

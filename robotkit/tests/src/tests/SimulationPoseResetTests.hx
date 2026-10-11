@@ -31,7 +31,7 @@ class SimulationPoseResetTests {
       piece.push((index & 4) == 0 ? 0.0 : 0.02);
     }
     simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1), position, rotation,
-      null, null, null, null, ToolCollisionShape.Hulls([piece], 0.005), 0);
+      null, null, null, ToolCollisionShape.Hulls([piece], 0.005), 0);
     simulationHarness.teleportRobot(0, [4.0, 5.0, 6.0]);
     simulationHarness.resetRobot(0);
     checkPose(simulation, position, rotation, 'resetRobot on backend $backend');
@@ -43,7 +43,7 @@ class SimulationPoseResetTests {
 
     var boxSimulation = boxSimulationHarness.simulation;
     boxSimulation.addRobotAtPose(new RobotRuntimeBlueprint(2, 0, 1), [0, 0, 0],
-      [0, 0, 0, 1], null, null, null, null,
+      [0, 0, 0, 1], null, null, null,
       ToolCollisionShape.Box(new Vec3(0.01, 0.01, 0.02), new Vec3(0, 0, 0.02)), 0);
     boxSimulationHarness.step(Int64.ofInt(0));
     boxSimulationHarness.dispose();
@@ -201,7 +201,7 @@ class SimulationPoseResetTests {
       cup.push((index & 4) == 0 ? 0.0 : 0.02);
     }
     var runtime = simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1),
-      [0, 0, 0], [0, 0, 0, 1], null, null, null, null,
+      [0, 0, 0], [0, 0, 0, 1], null, null, null,
       ToolCollisionShape.Hulls([cup], 0.03), 0);
     var obstacle = simulationHarness.spawnBox([0, 0, 0.05], [0.01, 0.01, 0.01]);
     simulationHarness.step(Int64.ofInt(0));
