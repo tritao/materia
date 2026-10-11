@@ -10,9 +10,11 @@ and approach clearance. Equipment dimensions and spindle capacities are explicit
 custom design assumptions; tightening guidance comes from the published SD0
 catalog. The scene declares real tool joints and four control channels.
 
-This is the SD4 equipment preview. Tightening behavior and the process sensor are
-SD5; an automatic screw-driving mission is SD6. The model and controller slots
-carry no fabricated tightening program or angle limits.
+The SD5 process observer publishes torque, angle, speed, stroke, phase, result
+and vacuum. It starts idle: a qualified program must supply the fastening's angle
+window and explicit joint response before driving. The model and controller slots
+carry no fabricated tightening program or angle limits. An automatic screw-driving
+mission remains SD6.
 
 The separate `materia.threads.project.json` and `materia.fastenings.project.json`
 retain the thread rendering and CAD workpiece previews. See [PLAN.md](PLAN.md).

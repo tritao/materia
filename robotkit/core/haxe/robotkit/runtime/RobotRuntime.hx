@@ -739,6 +739,9 @@ class RobotRuntime {
       case "tool_vacuum_kpa":
         if (image != null || values.length != 1 || values[0] < 0.0)
           throw 'Vacuum "$sensorId" publication requires one non-negative kPa value';
+      case "tool_screwdriver":
+        if (image != null || !robotkit.tool.ScrewdriverContract.valid(values))
+          throw 'Screwdriver sensor "$sensorId" publication requires torque, angle, speed, stroke, phase, result and vacuum';
       case "tool_weld":
         if (image != null || !validExternalWeldFrame(values))
           throw 'Weld sensor "$sensorId" publication requires arc, current, voltage, touch, fault and power values';

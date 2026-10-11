@@ -628,6 +628,12 @@ RK_API rk_result RK_CALL rk_simulation_get_omni_drive_state(
 RK_API rk_result RK_CALL rk_simulation_set_joint_positions(
     rk_simulation simulation, uint32_t robot_index,
     const double *positions RK_IN_ARRAY(count), uint32_t count);
+/** Drives one process-owned tool joint without changing other joints or their commands.
+ * Called between physics ticks. Only prismatic and rotary tool coordinates are admitted.
+ */
+RK_API rk_result RK_CALL rk_simulation_drive_process_joint(
+    rk_simulation simulation, uint32_t robot_index, uint32_t joint,
+    double position, double velocity);
 /** Reads one robot base pose from the latest physics state. */
 RK_API rk_result RK_CALL rk_simulation_get_robot_pose(
     rk_simulation simulation, uint32_t robot_index,

@@ -56,6 +56,7 @@ public:
                                   const uint32_t *side_drives = nullptr, uint32_t side_count = 0);
     rk_result teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose);
     rk_result set_joint_positions(uint32_t robot_index, const double *positions, uint32_t count);
+    rk_result drive_process_joint(uint32_t robot_index, uint32_t joint, double position, double velocity);
     /**
      * Moves one kinematic robot base for the next tick without stopping the
      * owner, resetting sensors, or replacing the reset pose.

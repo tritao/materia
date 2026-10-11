@@ -1675,6 +1675,38 @@ rk_result Simulation::set_joint_positions(uint32_t robot_index, const double *po
     return RK_OK;
 }
 
+rk_result Simulation::drive_process_joint(uint32_t robot_index, uint32_t joint,
+                                            double position, double velocity) {
+    Lock lock(session_);
+    if (robot_index >= bindings_.size()) return RK_ERROR_INVALID_ARGUMENT;
+    auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    const auto &blueprint = runtimes_[robot_index]->blueprint();
+    if (joint >= binding->joints_.size() || !std::isfinite(position) || !std::isfinite(velocity) ||
+        !blueprint.process_joint[joint]) return RK_ERROR_INVALID_ARGUMENT;
+    const auto &limits = blueprint.joints[joint];
+    if ((limits.type != RK_RUNTIME_JOINT_PRISMATIC && limits.type != RK_RUNTIME_JOINT_REVOLUTE) ||
+        position < limits.lower_limit || position > limits.upper_limit ||
+        ((limits.limit_flags & RK_LIMIT_VELOCITY) && std::abs(velocity) > limits.max_velocity))
+        return RK_ERROR_INVALID_ARGUMENT;
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target);
+    target.joint = binding->joints_[joint];
+    target.mode = NKSIM_JOINT_TARGET_POSITION;
+    target.target = position;
+    target.max_force = (limits.limit_flags & RK_LIMIT_EFFORT) && limits.max_effort == 0.0
+        ? -1.0 : limits.max_effort;
+    const auto &gains = binding->servo_[joint];
+    if (gains.stiffness > 0.0) {
+        target.mode = NKSIM_JOINT_TARGET_SERVO;
+        target.stiffness = gains.stiffness;
+        target.damping = gains.damping;
+        target.velocity = velocity;
+    }
+    return nksim_session_submit_joint_targets(session_, &target, 1) == NKSIM_OK
+        ? RK_OK : RK_ERROR_BACKEND;
+}
+
 rk_result Simulation::get_robot_pose(uint32_t robot_index,rk_simulation_pose &out_pose) const {
     Lock lock(session_);
     if(out_pose.struct_size<sizeof(out_pose)||robot_index>=robot_base_bodies_.size())

@@ -99,7 +99,23 @@ class SimulatedSuctionTool implements SimulationStepObserver {
     held = touched.object;
   }
 
-  function release():Void {
+  /** Attaches an explicitly identified screw or part using the same holding path as contact sealing. */
+  public function attach(object:SimObject, worldPose:SimPose):Void {
+    if (object == null || worldPose == null || held != null) throw "Suction attach needs an unoccupied tool and a part pose";
+    var link = simulation.linkPose(robotIndex, linkIndex);
+    simulation.holdObjectOnLink(object, robotIndex, linkIndex, relativePose(link.position, link.rotation, worldPose));
+    held = object;
+  }
+
+  /** Changes the held part's pose through the existing link attachment. */
+  public function placeHeld(worldPose:SimPose):Void {
+    var object = held;
+    if (object == null || worldPose == null) throw "Suction placement needs a held part";
+    var link = simulation.linkPose(robotIndex, linkIndex);
+    simulation.holdObjectOnLink(object, robotIndex, linkIndex, relativePose(link.position, link.rotation, worldPose));
+  }
+
+  public function release():Void {
     var object = held;
     held = null;
     if (object != null) simulation.releaseObject(object);

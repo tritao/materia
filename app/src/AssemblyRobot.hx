@@ -399,14 +399,13 @@ class AssemblyRobot {
       if (sensorId == null) continue;
       var carrier = converted.partLinks.get(tool.contact.occurrence);
       if (carrier == null) throw 'Robot tool "${tool.contact.occurrence}" is not part of the robot';
-      // The process sensor is installed with the tightening observer in SD5.
-      if (tool.kind == "screwdriver") continue;
       if (tool.kind == "gripper") {
         var physical = [for (sensor in converted.model.sensors) if (sensor.id == sensorId) sensor];
         if (physical.length != 1 || physical[0].kind != "joint_switch")
           throw 'Gripper sensor "$sensorId" must be a joint switch in the robot assembly';
       } else {
-        var kind = tool.kind == "torch" ? processkit.tool.WeldSensor.KIND : "tool_vacuum_kpa";
+        var kind = tool.kind == "screwdriver" ? robotkit.tool.ScrewdriverContract.SENSOR_KIND :
+          tool.kind == "torch" ? processkit.tool.WeldSensor.KIND : "tool_vacuum_kpa";
         var sensor = converted.model.addSensor(new robotkit.model.Sensor(sensorId, kind, 0.0, sensorId));
         var mount = converted.model.addFrame(new robotkit.model.Frame(sensorId + " mount", converted.model.links[carrier.link]));
         mount.position = [carrier.offset.x, carrier.offset.y, carrier.offset.z];
@@ -512,6 +511,12 @@ class AssemblyRobot {
       if (control != null && converted.partLinks.get(tool.contact.occurrence) == null) continue;
       var driver = tool.screwdriver;
       if (driver != null) {
+        for (name in [driver.feedJoint, driver.spindleJoint]) {
+          var index = -1;
+          for (i in 0...converted.model.joints.length) if (converted.model.joints[i].id == name) index = i;
+          if (index < 0) throw 'Screwdriver process joint "$name" is absent';
+          blueprint.processModelJoints.push(index);
+        }
         blueprint.addTool(new robotkit.tool.ScrewdriverChannels(tool.channel, driver.directionChannel,
           driver.programChannel, driver.vacuumChannel));
         continue;

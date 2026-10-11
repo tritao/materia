@@ -345,6 +345,13 @@ rk_result RK_CALL rk_simulation_set_joint_positions(rk_simulation simulation,
                  : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_drive_process_joint(rk_simulation simulation,
+    uint32_t robot_index, uint32_t joint, double position, double velocity) {
+    const auto value = resolve(simulation);
+    return value ? value->drive_process_joint(robot_index, joint, position, velocity)
+                 : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_get_robot_pose(rk_simulation simulation,uint32_t robot_index,
                                                 rk_simulation_pose *out_pose) {
     if(!out_pose)return RK_ERROR_INVALID_ARGUMENT;

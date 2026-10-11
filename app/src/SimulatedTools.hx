@@ -23,6 +23,7 @@ class SimulatedTools implements SessionMember {
 	public final tools:Array<SimulatedSuctionTool> = [];
 	public final grippers:Array<SimulatedPneumaticGripper> = [];
 	public final welders:Array<SimulatedWelder> = [];
+	public final screwdrivers:Array<processkit.simulation.SimulatedScrewdriver> = [];
 	final objects:Array<GripObject>;
 	final simulation:Simulation;
 
@@ -83,9 +84,45 @@ class SimulatedTools implements SessionMember {
 				stickoutMm: welding.stickoutMm});
 	}
 
+	public function addScrewdriver(driver:processkit.simulation.SimulatedScrewdriver):processkit.simulation.SimulatedScrewdriver {
+		screwdrivers.push(driver); return driver;
+	}
+
+	/** An idle observer for the authored driver. A qualified joint is configured explicitly before use. */
+	public function screwdriverFor(simulation:Simulation, robot:AssemblyRobot, robotIndex:Int, tool:SceneArtifactRobotTool,
+			project:ProjectDocumentSession):processkit.simulation.SimulatedScrewdriver {
+		var driver = tool.screwdriver, sensor = tool.sensor, definition = project.projectAssemblyDefinition;
+		if (driver == null || sensor == null || definition == null) throw "A screwdriver needs its capability, sensor and assembly";
+		var flat = AssemblyDefinitionFlattener.flatten(definition);
+		var physical = project.projectPhysical;
+		var metres = physical == null ? 1.0 : physical.metresPerUnit;
+		var contact:Null<AssemblyFrame> = null;
+		for (occurrence in flat.occurrences) if (occurrence.id == tool.contact.occurrence)
+			for (component in flat.definitions) if (component.id == occurrence.definition)
+				for (connector in component.connectors) if (connector.name == tool.contact.connector) contact = connector.frame;
+		if (contact == null) throw 'Screwdriver connector "${tool.contact.occurrence}/${tool.contact.connector}" does not exist';
+		var part = robot.part("project:" + tool.contact.occurrence);
+		var tip = AssemblyFrames.compose(part.offset, {x:contact.x*metres,y:contact.y*metres,z:contact.z*metres,
+			qx:contact.qx,qy:contact.qy,qz:contact.qz,qw:contact.qw});
+		var feed = -1, spindle = -1;
+		for (i in 0...robot.model.joints.length) {
+			if (robot.model.joints[i].id == driver.feedJoint) feed = i;
+			if (robot.model.joints[i].id == driver.spindleJoint) spindle = i;
+		}
+		if (feed < 0 || spindle < 0) throw "Screwdriver's declared tool joints are absent from its robot";
+		return new processkit.simulation.SimulatedScrewdriver(simulation, robot.runtime, robotIndex, part.linkIndex,
+			feed, spindle, [tip.x,tip.y,tip.z], AssemblyRobot.rotate([tip.qx,tip.qy,tip.qz,tip.qw],[0.0,0.0,1.0]),
+			{start:tool.channel,direction:driver.directionChannel,program:driver.programChannel,vacuum:driver.vacuumChannel},
+			sensor,driver.strokeMm,driver.maxSpeed,driver.maxTorque,driver.springRate);
+	}
+
 	/** Scene ids of the objects the tools hold right now. */
 	public function heldIds():Array<String> {
 		var result:Array<String> = [];
+		for (driver in screwdrivers) {
+			var held = driver.holding.held;
+			if (held != null) for (entry in objects) if (entry.object == held) result.push(entry.id);
+		}
 		for (tool in tools) {
 			var held = tool.held;
 			if (held != null) for (entry in objects) if (entry.object == held) result.push(entry.id);
@@ -120,6 +157,7 @@ class SimulatedTools implements SessionMember {
 		for (tool in tools) tool.reset();
 		for (gripper in grippers) gripper.reset();
 		for (welder in welders) welder.reset();
+		for (driver in screwdrivers) driver.reset();
 	}
 
 	public function present():Void {}

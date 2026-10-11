@@ -2552,6 +2552,10 @@ class MachineKitSmoke {
 
 	/** The groups of this suite, each independent of the others, so that the workspace can run them as parallel shards. */
 	static function main():Void {
+		if (Sys.getEnv("MACHINEKIT_SCREWDRIVER_ONLY") == "1") {
+			ScrewdriverProcessTests.run();
+			return;
+		}
 		if (Sys.getEnv("MACHINEKIT_BRAKE_ONLY") == "1") {
 			MotorBrakeTests.run();
 			return;
@@ -2561,6 +2565,7 @@ class MachineKitSmoke {
 			{name: "FastenerThreadTests.run", run: FastenerThreadTests.run, weight: 0.05},
 			{name: "FastenerDataTests.run", run: FastenerDataTests.run, weight: 0.05},
 			{name: "FasteningTests.run", run: FasteningTests.run, weight: 0.05},
+			{name: "ScrewdriverProcessTests.run", run: ScrewdriverProcessTests.run, weight: 0.05},
 			{name: "ScrewdrivingEquipmentTests.run", run: ScrewdrivingEquipmentTests.run, weight: 1.5},
 			{name: "AxisBuilderChecks.run", run: () -> AxisBuilderChecks.run(), weight: 1.0},
 			{name: "AssemblyIntegrityTests.run", run: () -> AssemblyIntegrityTests.run(), weight: 1.0},

@@ -137,6 +137,27 @@ simulation and hardware, and a mission step drives it.
   on both backends. The process observer and sensor contract remain SD5, so the
   equipment is not silently treated as a suction tool or given a fabricated sensor.
 
+- **SD5 — Programs require qualified joint inputs.** `TighteningPrograms` lives
+  in MachineKit's process package, where ProcessKit is already a dependency.
+  It derives target torque and qualified angles from the current fastening;
+  speeds, stroke windows, torque limits and run-down watchdog are explicit policy.
+  Joint stiffness, prevailing torque, strip threshold and lead-in tolerance are
+  explicit simulation inputs, never inferred from the torque/preload table.
+  The equipment cell has no qualified angle window and therefore starts with an
+  idle, unconfigured observer. Starting an unqualified slot names the missing slot.
+- **SD5 — Sensor units and process ownership are shared.** RobotKit owns the
+  seven-value contract (Nm, radians, rad/s, mm, phase, result, sealed vacuum flag);
+  ProcessKit generates the Rust layout from it. Joint stiffness is Nm/radian.
+  Model thresholds resolve in order even when a sample crosses several of them.
+  The model returns a requested spindle rate; the observer publishes measured
+  shaft speed and follows measured rotation while reversing.
+  Feed and spindle use the existing native process-ownership bits; a narrow
+  tick-path API drives only those coordinates and preserves arm commands.
+  The live callback supplies separate starting head and body poses plus the
+  thread lead-in point, so runtime screw advance never becomes the next starting
+  pose. Reverse unloads elastic rotation before axial withdrawal; a new tightening
+  cycle after reversal requires explicit reconfiguration. No saved schema changes.
+
 ## What exists
 
 - Fasteners in `machinekit.standard`: `SocketHeadCapScrew` (ISO 4762),
@@ -337,7 +358,7 @@ Here:
     cross-threads (torque rise before the expected run-down angle);
   - run-down: advance = angle × lead, prevailing torque;
   - snug: when the head reaches its seat face;
-  - final: torque rises with joint stiffness per degree until the target.
+  - final: torque rises with explicit joint stiffness in Nm/radian until the target.
   Outcomes: OK, no screw, no start, cross-thread, stripped (torque drops), early
   high torque, angle out of window, run-down too long, screw lost.
 - `ScrewdriverSensor` contract: torque, angle, speed, stroke, phase, result
@@ -346,7 +367,8 @@ Here:
   channels, computes the stroke from the TCP depth against the screw head, runs
   the model, drives the spindle and slide joints to the model's state, moves the
   held screw, and publishes the sensor frame. Holding reuses
-  `SimulatedSuctionTool`'s attach.
+  `SimulatedSuctionTool`'s attach. SD5 installs the app observer factory and
+  declares the process sensor; qualified slots are configured explicitly.
 - `ScrewdriverProcessDevice` with `ScrewdriverOutputs` (select program, start,
   reverse, vacuum) and `ScrewdriverFeedback` (result, live values).
 - Checks: each outcome from a constructed case; an M6 into steel reaches
@@ -360,8 +382,8 @@ Here:
   presenter (vacuum and present check), approach on the hole axis, engage at
   run-down speed, follow the screw at the feed stroke's midpoint while driving,
   wait for the result, release vacuum, retract.
-- App: `MissionPlayer.skillFor` gains `screw`; `SimulatedTools.screwdriverFor`;
-  the sensor kind in `AssemblyRobot`. The screw occurrence moves and turns with
+- App: `MissionPlayer.skillFor` gains `screw`, using SD5's observer factory and
+  sensor kind. The screw occurrence moves and turns with
   the model as runtime pose, and its cosmetic thread turns with it (SD2), so the
   screw is seen winding into the hole.
 - A tightening result record per fastening (final torque, angle, outcome).
@@ -611,7 +633,7 @@ recorded in SD2; no further screenshot was required by SD4.
 | SD2 | done — post-rebase full gate passed | `154ca5491`, `35a195269`, `24b5d1a02` |
 | SD3 | done — post-rebase full gate passed | `fbbe14d0c`, `6c338344d`, `ffee5362f` |
 | SD4 | done — full gate passed | `fdc6da0c0` |
-| SD5 | open — machine tending landed; not started | |
+| SD5 | in progress — focused model checks pass; simulation and full gate pending | |
 | SD6 | open — machine tending landed; not started | |
 | SD7 | open — machine tending landed; not started | |
 | SD8 | open — machine tending landed; not started | |

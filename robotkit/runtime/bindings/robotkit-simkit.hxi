@@ -123,6 +123,11 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_destroy(simulation: rk_simulation) -> void;
 	/**
+	 * Drives one process-owned tool joint without changing other joints or their commands.
+	 * Called between physics ticks. Only prismatic and rotary tool coordinates are admitted.
+	 */
+	extern fn rk_simulation_drive_process_joint(simulation: rk_simulation, robot_index: u32, joint: u32, position: f64, velocity: f64) -> rk_result;
+	/**
 	 * Drives one attached robot's kinematic base to a pose for the next tick.
 	 *
 	 * Unlike rk_simulation_teleport_robot(), this is accepted while the shared

@@ -66,14 +66,20 @@ class RobotRuntimeBlueprint {
   public final cylinderDrives:Array<RobotRuntimeCylinderDriveBlueprint> = [];
   /** Velocity process drives are bound to analog channels, never to trajectory axes. */
   public final velocityDrives:Array<RobotRuntimeVelocityDriveBlueprint> = [];
+  /** Coordinates driven by a deterministic process observer, excluded from arm trajectories. */
+  public final processModelJoints:Array<Int> = [];
   public final brakes:Array<RobotRuntimeBrakeBlueprint> = [];
   public final brakePhysics:Array<RobotRuntimeBrakePhysicsBlueprint> = [];
   public final links:Array<RobotRuntimeLinkBlueprint> = [];
   /** Process ownership covers the whole mechanically coupled set, not just its motor shaft. */
   public function processJoints():Array<Bool> {
     var owned = [for (_ in joints) false];
+    for (joint in processModelJoints) {
+      if (joint < 0 || joint >= joints.length) throw "Process model joint is outside the blueprint";
+      owned[joint] = true;
+    }
     for (drive in cylinderDrives) {
-      if (drive.joint < 0 || drive.joint >= joints.length) throw "Pneumatic drive joint is outside the blueprint";
+      if (drive.joint < 0 || drive.joint >= joints.length) throw "Cylinder drive joint is outside the blueprint";
       owned[drive.joint] = true;
     }
     for (drive in velocityDrives) {
@@ -247,6 +253,10 @@ class RobotRuntimeBlueprint {
     if (cylinderDrives.length > RobotKitRuntimeConstants.RK_MAX_JOINTS)
       throw "Too many process-driven joints";
     var processJointIds = new Map<Int, Bool>();
+    for (joint in processModelJoints) {
+      if (joint < 0 || joint >= jointCount || processJointIds.exists(joint)) throw "Invalid or duplicate process model joint";
+      processJointIds.set(joint, true);
+    }
     for (drive in cylinderDrives) {
       if (drive.joint < 0 || drive.joint >= jointCount)
         throw 'Cylinder process drive references unknown joint ${drive.joint}';

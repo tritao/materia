@@ -855,6 +855,13 @@ class Simulation {
       "simulation.setJointPositions");
   }
 
+  /** Drives a process-owned tool coordinate between ticks, preserving other joint commands. */
+  public function driveProcessJoint(robotIndex:Int, joint:Int, position:Float, velocity:Float):Void {
+    ensureLive();
+    check(RobotKitSimKit.rk_simulation_drive_process_joint(owner.borrow(), robotIndex, joint, position, velocity),
+      "simulation.driveProcessJoint");
+  }
+
   /**
    * Pushes a robot's base for the next tick: a world-frame force (N) and
    * torque (N m) at its centre of mass. Repeat every tick to push for longer.

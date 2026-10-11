@@ -1963,7 +1963,13 @@ class ProjectSourceTests {
         try {
           check(simulation.rebuild(session.sensors, session.scene, session),
             'Screwdriver equipment builds on backend $backend: ${simulation.error}');
-          check(simulation.missionPlayer() == null, "The equipment has no process runner before SD5/SD6");
+          check(simulation.missionPlayer() == null, "The equipment has no driving mission before SD6");
+          simulation.step();
+          var driverFrame = false;
+          for (robot in simulation.snapshot().robots()) for (frame in robot.sensors.toArray())
+            if (frame.kind == robotkit.tool.ScrewdriverContract.SENSOR_KIND)
+              driverFrame = robotkit.tool.ScrewdriverContract.valid(frame.values.toArray());
+          check(driverFrame,"The equipment publishes an idle screwdriver frame on both backends");
         } catch (error:Dynamic) { simulation.clear(); throw error; }
         simulation.clear();
       }
