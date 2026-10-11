@@ -10,24 +10,10 @@ import kinematicskit.KinematicModel;
 import kinematicskit.KinematicState;
 import kinematicskit.Transform;
 import robotkit.kinematics.RobotKinematics;
-import robotkit.manipulation.ClearanceBodyData;
 import robotkit.model.CollisionShape;
 import robotkit.model.RobotModel;
 import robotkit.spatial.Transform3;
 import robotkit.tool.Tool;
-
-/** One convex hull on a robot link (x, y, z triples in the link's frame, metres): simulation or CAD-sourced. */
-class RobotLinkHull {
-  public final link:Int;
-  public final name:String;
-  public final vertices:Array<Float>;
-
-  public function new(link:Int, name:String, vertices:Array<Float>) {
-    this.link = link;
-    this.name = name;
-    this.vertices = vertices;
-  }
-}
 
 /** How `RobotCollision.describe` places and groups a robot. */
 class RobotCollisionOptions {
@@ -43,8 +29,6 @@ class RobotCollisionOptions {
   public var reference:Null<Array<Float>> = null;
   /** What the reference is called in the report (e.g. "home"). */
   public var referenceName:String = "zero";
-  /** Convex hulls per link: the simulation's or CAD-sourced (`AssemblySimulationBridge`'s link hulls). */
-  public var hulls:Array<RobotLinkHull> = [];
   public var tool:Null<Tool> = null;
   /** The flange frame the tool's geometry is in; else `toolLink`'s frame. */
   public var toolFrame:Null<String> = null;
@@ -62,7 +46,7 @@ class RobotCollisionBodies {
   public final robot:RobotModel;
   public final model:KinematicModel;
   public final bodies:ModelBodies;
-  /** Per link, the described objects of its primitive shapes, in `collisionShapes` order. */
+  /** Per link, the described objects of its shapes, in `collisionShapes` order. */
   public final shapes:Array<Array<Int>>;
   public final hulls:Array<Int>;
   /** The tool's described body (following its flange link), or -1. */
@@ -118,12 +102,17 @@ class RobotCollision {
       description.note('Robot "$name": the simulation\'s self-collision opt-out is simulation-only and ignored (CL-D10)');
 
     var shapes:Array<Array<Int>> = [];
+    var hulls:Array<Int> = [];
     for (link in robot.links) {
       var body = bodies.bodies[model.bodyIndex(link.id)];
       var objects:Array<Int> = [];
       for (index in 0...link.collisionShapes.length) {
         var shape = link.collisionShapes[index];
-        objects.push(description.addObject('$name/${link.id}/shape$index', body, offsetOf(shape), geometryOf(shape)));
+        var object = description.addObject(shape.name == "" ? '$name/${link.id}/shape$index' : '$name/${shape.name}',
+          body, offsetOf(shape), shape.geometry, shape.inflation,
+          switch shape.geometry { case Convex(_): "hull"; case _: "primitive"; });
+        objects.push(object);
+        switch shape.geometry { case Convex(_): hulls.push(object); case _: }
         var simulationOnly = switch shape.contact {
           case Layers: false;
           case _: true;
@@ -144,21 +133,11 @@ class RobotCollision {
       description.setObjectRule(a, b, CollisionPairRule.Allow, CollisionPairStatus.DeclaredContact);
     }
 
-    var hulls:Array<Int> = [];
-    for (hull in options.hulls) {
-      var link = robot.links[hull.link];
-      hulls.push(description.addObject('$name/${hull.name}', bodies.bodies[model.bodyIndex(link.id)],
-        CollisionPose.identity(), CollisionGeometry.Convex(hull.vertices), 0.0, "hull"));
-    }
-
     var toolBody = -1;
     var toolObjects:Array<Int> = [];
     var tool = options.tool;
-    var toolShape = tool == null ? robotkit.tool.ToolCollisionShape.NoCollision : tool.collision;
-    var hasTool = switch toolShape {
-      case NoCollision: false;
-      case _: true;
-    }
+    var toolShape = tool == null ? [] : tool.collision;
+    var hasTool = toolShape.length > 0;
     if (hasTool && tool != null) {
       var flangeBody:Int, flange:Transform;
       if (options.toolFrame != null) {
@@ -174,41 +153,35 @@ class RobotCollision {
       }
       toolBody = bodies.follow(flangeBody, 'tool/${tool.id}', options.toolGroup);
       var at = (local:Transform) -> ModelBodies.pose(flange.compose(local));
-      switch toolShape {
-        case NoCollision:
-        case Box(half, centre):
-          var c = centre == null ? Transform.identity() : Transform.translation(centre.x, centre.y, centre.z);
-          toolObjects.push(description.addObject('$name/tool', toolBody, at(c), CollisionGeometry.Box(half.x, half.y, half.z)));
-        case Cylinder(radius, height):
-          toolObjects.push(description.addObject('$name/tool', toolBody, at(Transform.identity()),
-            CollisionGeometry.Cylinder(radius, height / 2)));
-        case Hulls(pieces, padding):
-          for (i in 0...pieces.length)
-            toolObjects.push(description.addObject('$name/tool/piece$i', toolBody, at(Transform.identity()),
-              CollisionGeometry.Convex(pieces[i]), padding, "hull with padding"));
-          if (padding > 0) description.note('Robot "$name": tool hulls are inflated by their padding ($padding m)');
+      for (i in 0...toolShape.length) {
+        var shape = toolShape[i], p = shape.position, q = shape.rotation;
+        var local = new Transform(p[0],p[1],p[2],q[0],q[1],q[2],q[3]);
+        toolObjects.push(description.addObject('$name/tool/piece$i', toolBody, at(local),
+          shape.geometry, shape.inflation, "tool shape"));
       }
     }
     bodies.declare();
     return new RobotCollisionBodies(robot, model, bodies, shapes, hulls, toolBody, toolObjects);
   }
 
-  /**
-   * The hulls `CollisionClearance` checks (`ClearanceBodyData`: simulation hulls,
-   * assembly parts and deposited weld beads carried on links), as objects on
-   * the robot's link bodies, so both worlds see the same scene (CL4a).
-   * Tool hulls go on the tool body, which must exist when any is given.
-   */
-  public static function describeClearanceBodies(description:CollisionDescription, robot:RobotCollisionBodies,
-      data:Array<ClearanceBodyData>):Array<Int> {
-    return [for (body in data) {
-      var on = body.tool ? robot.toolBody : robot.linkBody(body.link);
-      if (body.tool && on < 0) throw 'Clearance body "${body.name}" is a tool hull, but the robot has no tool body';
-      // A tool hull is given in its link's frame; the tool body shares that link's pose.
-      if (body.tool && robot.model.bodyIndex(body.link) != robot.bodies.followed[robot.bodies.followers.indexOf(on)])
-        throw 'Clearance tool hull "${body.name}" is not on the tool\'s link';
-      description.addObject('${robot.bodies.name}/${body.name}', on, CollisionPose.identity(),
-        CollisionGeometry.Convex(body.vertices), 0.0, "hull");
+  /** Adds another description's carried shapes to this robot's model/tool bodies. */
+  public static function addDescriptionShapes(description:CollisionDescription, robot:RobotCollisionBodies,
+      data:CollisionDescription):Array<Int> {
+    return [for (object in data.objects) {
+      var link = CollisionClearance.link(data, object);
+      var tool = CollisionClearance.isTool(data, object);
+      var on = tool ? robot.toolBody : robot.linkBody(link);
+      if (tool && on < 0) throw 'Tool shape "${object.name}" needs a declared tool body';
+      if (tool && robot.model.bodyIndex(link) != robot.bodies.followed[robot.bodies.followers.indexOf(on)])
+        throw 'Tool shape "${object.name}" is not on the tool link';
+      var name = '${robot.bodies.name}/${object.name}';
+      var existing = -1;
+      for (i in 0...description.objects.length) if (description.objects[i].name == name) { existing = i; break; }
+      if (existing >= 0) {
+        description.objects[existing] = new collisionkit.DescribedObject(name, on, object.offset,
+          object.geometry, object.inflation, object.source);
+        existing;
+      } else description.addObject(name, on, object.offset, object.geometry, object.inflation, object.source);
     }];
   }
 
@@ -251,26 +224,6 @@ class RobotCollision {
     return follower >= 0 ? robot.bodies.followed[follower] : -1;
   }
 
-  /**
-   * Every convex object on the robot's links in `description` (link hulls,
-   * CAD hulls, decomposed pieces; the tool's hulls are given to the
-   * simulation as its tool shape instead), for `Simulation.addRobotAtPose
-   * (linkHulls)`. Their inflation is not carried: MuJoCo has no swept-sphere
-   * radius, so the simulation's pieces are the uninflated ones.
-   */
-  public static function simulationHulls(description:CollisionDescription, robot:RobotCollisionBodies):Array<RobotLinkHull> {
-    var hulls:Array<RobotLinkHull> = [];
-    for (object in description.objects) {
-      var link = robot.bodies.bodies.indexOf(object.body);
-      if (link < 0) continue;
-      switch object.geometry {
-        case Convex(points): hulls.push(new RobotLinkHull(link, object.name, points));
-        case _:
-      }
-    }
-    return hulls;
-  }
-
   static function zeroWithinLimits(model:KinematicModel):Array<Float>
     return [for (dof in 0...model.dofCount()) Math.min(Math.max(0.0, model.dofLower[dof]), model.dofUpper[dof])];
 
@@ -280,12 +233,4 @@ class RobotCollision {
     return new CollisionPose(p[0], p[1], p[2], r[0], r[1], r[2], r[3]);
   }
 
-  static function geometryOf(shape:CollisionShape):CollisionGeometry {
-    return switch shape.primitive {
-      case Box(halfX, halfY, halfZ): CollisionGeometry.Box(halfX, halfY, halfZ);
-      case Sphere(radius): CollisionGeometry.Sphere(radius);
-      case Capsule(radius, halfLength): CollisionGeometry.Capsule(radius, halfLength);
-      case Cylinder(radius, halfLength): CollisionGeometry.Cylinder(radius, halfLength);
-    }
-  }
 }

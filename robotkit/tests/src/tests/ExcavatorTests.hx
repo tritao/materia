@@ -16,7 +16,8 @@ import robotkit.spatial.Transform3;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.JointGroup;
 import robotkit.tool.Tool;
-import robotkit.tool.ToolCollisionShape;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
@@ -409,7 +410,7 @@ class ExcavatorTests {
 
     var arm = new Manipulator(model, undercarriage.id, flange.id);
     var tool = new Tool("bucket", "bucket", new Transform3(new Vec3(0.9, 0.0, -0.1), Quat.identity()),
-      ToolCollisionShape.Box(new Vec3(0.5, 0.6, 0.4)), 400.0);
+      ToolGeometry.box(new Vec3(0.5, 0.6, 0.4)), 400.0);
     var manipulator = arm.withTool(tool.flangeTTcp);
     return { model: model, arm: arm, manipulator: manipulator, tool: tool };
   }

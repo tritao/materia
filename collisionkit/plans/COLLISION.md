@@ -747,6 +747,91 @@ Gates, for work without review:
   `MATERIA_CACHE_DIR=/home/joao/dev/materia-cache`. The shared checkout is
   touched only to move local `main`.
 
+## CL9: One shape vocabulary (2026-10-11)
+
+After CL8, five collision geometry vocabularies remain:
+- collisionkit's `CollisionGeometry`;
+- RobotKit's `CollisionPrimitive` (link shapes, also the editor's box proxies in `RobotLinkBounds`);
+- `ToolCollisionShape` (`NoCollision`, `Box`, `Cylinder`, `Hulls` with padding);
+- four records for "a convex hull on a link": `RobotLinkHull`, SimKit's `SimulationLinkHull`, cadbridge's `AssemblyLinkHull` and `ClearanceBodyData`;
+- a second clearance engine: `ToolClearanceChecker` (SAT of tool pieces against `ToolBoxObstacle`s), with `ToolClearanceShape` and `BaseObstacle`, still used by processkit's `WorkPatchPlanner` and `ReachabilityChecker`.
+
+Every new user (machine tending, sheet metal, screwdriving) picks one of these, so they get harder to merge each week.
+
+### CL-D15: `CollisionGeometry` is the only geometry type
+
+- `robotkit-core` depends on `collisionkit` (its pure half; no native code needed to compile).
+- A link's collision is `Array<CollisionShape>`. `CollisionShape` keeps its pose, surface and contact, and holds:
+  - `geometry:CollisionGeometry`;
+  - `inflation:Float` (default 0).
+- Convex hulls are `Convex` shapes on links, so a part hull's surface and contact live on the shape like any other.
+- Not accepted on a link: `Mesh`, `HeightField` and `HalfSpace`. These are scene geometry, and `validate` rejects them on links.
+- A tool's collision is also `Array<CollisionShape>`, in the flange frame. Empty means no collision. A box centre is the shape's position, and hull padding is `inflation`.
+- SimKit maps shapes to MuJoCo the way it maps hulls today. `Convex` becomes a mesh geom, and inflation is not carried (CL3b).
+- One schema version: the RobotModel codec bumps `VERSION` and rejects the old one, with no migration (no legacy compat).
+
+### Steps
+
+**CL9a: link shapes.**
+- Replace `CollisionPrimitive` with `CollisionGeometry` in `CollisionShape`, add `inflation`, and move link hulls onto links as `Convex` shapes.
+- Delete `CollisionPrimitive`, `RobotLinkHull`, `SimulationLinkHull` and `AssemblyLinkHull`. Remove `Simulation`'s `linkHulls` parameters and `RobotCollisionOptions.hulls`.
+- Update the users: URDF loader, codec, `Simulation`, `RobotCollision`, `AssemblyRobot`, `AssemblySimulationBridge`, `RobotLinkBounds`, `SimulationContactSurfaces`, the tests.
+- Accept when: none of the deleted names is found by grep, and the gates below pass.
+
+**CL9b: tool shapes.**
+- Replace `ToolCollisionShape` with `Array<CollisionShape>` on `Tool`.
+- Move `ToolCollisionShapes.bounds` to a collisionkit `CollisionBounds.of(geometry, pose, inflation)`. The editor and the tool code use it.
+- Update `RobotCollision`'s tool description, `EndEffectorBridge`, `EndEffectorVacuumFeedback`, `RobotRuntimeBlueprint` and the tests.
+- Accept when: `ToolCollisionShape` is not found by grep, and the gates pass.
+
+**CL9c: retire the second clearance engine.**
+- Port `WorkPatchPlanner`, `ReachabilityChecker` and the processkit skills (Paint, Sand, FinishSurface) onto `CollisionClearance`, as PP10 did for `ArmClearance`. Obstacles become `Box` objects in the description.
+- `ClearanceBodyData` becomes link shapes plus the tool body's shapes. The tool flag comes from the body, not the record.
+- Delete `ToolClearanceChecker`, `ToolClearanceShape`, `ToolBoxObstacle`, `BaseObstacle`, `ToolPlanningContext`'s use of them, and `ClearanceBodyData`.
+- Expected value changes are allowed here, and only here. Exact distances replace the SAT's conservative ones. The log lists each changed assertion with the old and new value.
+- Accept when: the deleted names are not found by grep, and the gates pass.
+
+**CL9d: the motion bound in kinematicskit.**
+- Move `ClearanceMotionEnvelope` and `ClearanceMotionBounds` to kinematicskit on `KinematicModel` (body ids, kit transforms), with no RobotKit types.
+- `CollisionClearance` and MotionKit's `JointCurveClearance` and `JointCurveTask` call the kit. The bisection proof stays in MotionKit.
+- Accept when: the robotkit files are gone, and the gates pass with no value changes.
+
+**CL9e: broadphase.**
+- Above a candidate-pair threshold, `World` uses coal's `DynamicAABBTreeCollisionManager` instead of the per-pair AABB loop. Below it, the loop stays.
+- Pick the threshold from a C++ benchmark: a cell with N boxes against a 6-axis arm, at N = 10, 100 and 1000. Record it in the log.
+- Accept when: both paths give identical results in a C++ test, on one scene run above and below the threshold, and the gates pass.
+
+Order: CL9a, CL9b, CL9c, CL9d, CL9e. Each step is one commit.
+
+### Gates
+
+- The suites as in "Order and gates":
+  - standalone C++;
+  - native and pure kinematicskit;
+  - collisionkit;
+  - MotionKit;
+  - RobotKit;
+  - processkit;
+  - the app suite.
+- No assertion or expected value changes, except where CL9c allows them and logs them.
+- Known failure: the pure kit's "DLS allocates nothing per iteration" fails on main too. Record it, don't fix it.
+- Stop and write up, instead of deciding alone, on:
+  - a new dependency other than `robotkit-core` → `collisionkit`;
+  - a fork;
+  - a simulation behaviour change visible in the app's mission suite.
+- No pushes. Sync each finished step onto local `main` (no topic branches left behind).
+- Never rebuild OCCT: export `MATERIA_CACHE_DIR=/home/joao/dev/materia-cache` and `CADKIT_OCCT_DIR=/home/joao/dev/materia-cache/occt-f1dc4efb-release`.
+
+## Long-term commitments (2026-10-11)
+
+- **One collision world** (done in PP10) and **one description shared with SimKit** (done in CL3b). New code builds on `CollisionDescription`, never on its own geometry.
+- **One shape vocabulary:** CL9.
+- **The motion bound belongs to the kit** (CL9d). MotionKit owns the proof that a move is clear.
+- **coal is fixed in our fork** (CL-D13). The patches go upstream as a PR when the user says so.
+- **MuJoCo stays the simulator.** It does dynamics contact on a compiled model, with hull meshes and 32-bit contact masks. It is not a query engine: it has no distance between arbitrary pairs at a pose without stepping, and no inflation.
+- **Jolt is the fallback backend** if coal ever stops fitting: it is maintained, MIT, and has convex radius and narrow-phase queries. The `ck_*` C ABI is the seam, so a switch replaces `collisionkit/native` only.
+- **Not yet planned:** trajectory optimization (the PP-D11 refiner on CL5's avoidance rows), task-level pick and place with CAD grasps (machine tending first), perception into the scene (octomap through coal), CL6's clearance cost, and planner speed (lazy edge checks, native FK).
+
 ## Out of scope
 
 - Continuous collision on swept volumes. CL-D5's bound gives the same
@@ -758,6 +843,175 @@ Gates, for work without review:
 - A pure-Haxe collision backend, until a need appears (CL-D2).
 
 ## Progress log
+
+### CL9a blocked: schema-version assertion (2026-10-11)
+
+- Starting point: `collision` and local `main` are both `9b0f5e935`.
+- CL-D15 requires the RobotModel codec to bump its schema version and reject
+  the old version without migration. `RobotModel.CURRENT_VERSION` is 12,
+  and `RobotModelCodec.VERSION` aliases it.
+- `robotkit/tests/src/tests/RobotWorldTests.hx:5069` explicitly asserts
+  `RobotModelCodec.VERSION == 12` in "RobotModel v12 preserves the typed
+  spindle process binding". The required bump would fail this assertion;
+  making that suite green would require changing its expected version.
+- CL9's gates prohibit assertion or expected-value changes except in CL9c.
+  Stopped before feature edits rather than choosing an exception. Resuming
+  CL9a needs an explicit exception for this schema-version assertion (or a
+  revision to CL-D15). No assertions were changed, no step was committed,
+  local `main` was not moved, and nothing was pushed. The gate suites have
+  not been run; this is a source-level blocker, not a reported green step.
+- Preparation: exported the specified cache and OCCT paths, ran
+  `git -c protocol.file.allow=always submodule update --init --recursive`,
+  and ran `scripts/build-native.sh` from `haxeon/` successfully (Ninja:
+  "no work to do"). The script's build-preset lookup requires that working
+  directory; its first invocation from the repository root failed to find
+  the root `CMakePresets.json`. OCCT was not rebuilt.
+
+### CL9a: link shapes (2026-10-11)
+
+- Resumed on the user's "ok continue": the schema-version assertion is
+  explicitly updated from 12 to 13. No other existing expected values change.
+  Version 13 stores geometry, pose, name, inflation, surface and contact;
+  version 12 is rejected without migration. Authored fixtures use version 13.
+- Link hulls now live on links as named `Convex` collision shapes. The old
+  link-shape types and Simulation hull arguments are gone. Native Convex
+  transport preserves pose and contact; inflation remains query-only.
+- A rotated inflated Convex regression exposed a collisionkit boolean-query
+  discrepancy. The wrapper uses coal's signed distance for inflated Convex
+  queries, matching its distance results; coal itself is unchanged.
+- Gates: standalone C++ (collisionkit 3, MotionKit 16), native kit (695),
+  collisionkit (364), MotionKit (1,224,709), RobotKit (5,469), processkit and
+  the full app suite pass. Pure kit retains only the documented DLS allocation
+  failure (-40.8 bytes). The full project-source mission run exits successfully
+  with existing physics assertions. Added Convex pose/inflation/contact checks
+  pass against MuJoCo (63 assertions). No deleted link-shape names remain.
+- Local main advanced to `de3188e28` during validation; collision was
+  fast-forwarded to it while preserving these edits. Its overhead-arm catalog
+  entry needed the missing Start-page category to pass the app gate.
+  Only robotkit-core → pure collisionkit was added; no fork or OCCT rebuild.
+
+### CL9b blocked: omitted tool-box centre assertion (2026-10-11)
+
+- CL9a is committed as `9e527c17e`; local main was fast-forwarded to it.
+- CL9b's tool array port is implemented but uncommitted. One existing
+  CadBridge assertion requires an omitted `ToolCollisionShape.Box` centre
+  to be `null` ("existing flange-centred Box construction remains valid",
+  originally `CadBridgeTests.hx:354`). A `CollisionShape` instead stores the
+  flange origin as its position `[0, 0, 0]`; its pose validation rejects
+  null positions. Preserving the null assertion and satisfying CL-D15 are
+  incompatible. The user's continuation resolved the schema-version blocker,
+  not this separate expected-value change.
+- During the port this assertion was changed to check the zero position.
+  That was an unauthorized expected-value change; its null expectation is
+  restored, and the unfinished step is not committed or marked green.
+  Resuming needs an explicit exception for this assertion, null → zero pose.
+- Before restoring that expectation: standalone C++ (3 + 16), native kit
+  (695), collisionkit (367), MotionKit (1,224,709), RobotKit (5,469),
+  processkit, CadBridge (178) and end-effector MuJoCo proximity/vacuum pass.
+  Pure kit has the documented DLS failure (-40.8 bytes). New tests cover
+  rotated bounds and posed tool shapes with link/tool contact identity.
+  The full app suite also completed successfully before the null expectation
+  was restored; no mission behaviour change was observed. The remaining
+  supplementary gate run was interrupted. These earlier results do not make
+  the restored null assertion green.
+- No new dependencies, forks, pushes or OCCT rebuilds. Main remains at
+  the completed CL9a commit. CL9c–CL9e have not started.
+
+### CL9b: tool shapes (2026-10-11)
+
+- Resumed under the user's "finish the plan, if you stop do best long term
+  clean approach" instruction. The omitted-centre assertion now checks the
+  canonical zero pose instead of null; this is the sole existing expected
+  representation change in CL9b. No geometric or physical values change.
+- Tools use flange-posed `Array<CollisionShape>`. `CollisionBounds.of` owns
+  geometry bounds; tool unions and editor radii use it. The old tool enum and
+  bounds class are gone. RobotCollision and end-effector bridges use the same
+  geometry, pose and inflation as links.
+- Native tool transport uses general shapes only; the superseded hull-only
+  fields are removed and C++ fixtures are ported without assertion changes.
+  Native creation is shared with links. Tool contact indices remain correct
+  alongside link geometry; padding stays a proximity gap, not physical inflation.
+- Fresh gates pass: standalone C++ (3 + 16, plus RobotKit MuJoCo), native kit
+  (695), collisionkit (367), MotionKit (1,224,709), RobotKit (5,469),
+  processkit and the full app suite. Pure kit retains the known -40.8-byte DLS
+  allocation failure. CAD cell, collision/MuJoCo, CadBridge, clearance-validation,
+  planner and end-effector proximity/vacuum checks also pass. Deleted names
+  are absent from code; the native ABI audit passes on all four platforms.
+- No new dependencies, forks, simulation mission behaviour changes, pushes
+  or OCCT rebuilds.
+
+### CL9c: one clearance engine (2026-10-11)
+
+- Surface placement, reachability, Paint, Sand and FinishSurface now query
+  CollisionClearance. Authored obstacles are Box objects; carried geometry
+  uses CollisionDescription bodies and link/tool shapes, preserving poses,
+  inflation and pair rules. Shapes already owned by the robot are replaced
+  by name when prepared, rather than added twice. The obsolete SAT checker
+  and clearance records are deleted and their names are absent from code.
+- Changed assertions: PlacementTests' preparation counter was
+  `preparationCount == preparedBefore + 1`; it is now `worlds == 1` for the
+  one candidate. ConstructionSkillTests' context-reuse counter was
+  `preparationCount == preparedBeforeSkill`; it now checks
+  `cell.obstacles.objects.length == preparedBeforeSkill && worlds > 0`.
+  These check backend preparation and description preservation. No existing
+  distance, reachability or simulation expectation was rebaselined.
+- All required gates pass (standalone C++ 3 + 16, native kit, collisionkit,
+  MotionKit, RobotKit 5,473, processkit and full app missions), with only the
+  known pure-kit DLS -40.8-byte allocation failure. CAD cell, MuJoCo,
+  CadBridge, clearance-validation (23) and planner checks pass too. RobotKit
+  and the app were rerun after the final shape-preservation audit.
+- No new dependencies, forks, simulation mission behaviour changes, pushes
+  or OCCT rebuilds.
+
+### CL9d: kit motion bounds (2026-10-11)
+
+- ClearanceMotionBounds and ClearanceMotionEnvelope now live in pure
+  kinematicskit on KinematicModel, KinematicState, DOF/body/frame indices
+  and kit Transform. RobotKit's files are gone; the kit has no RobotKit
+  types. CollisionClearance, JointCurveClearance and JointCurveTask use
+  them. MotionKit retains the bisection and continuous-motion proof.
+- No existing assertion or expected value changed. All required gates and
+  the CAD cell, MuJoCo, CadBridge, clearance-validation and planner checks
+  pass. The 23 clearance-validation assertions retain their reported
+  distances. A new kit test checks actual body/TCP displacement with held
+  prismatic travel, a root override and a moving work frame.
+- The pure kit still fails only its known DLS allocation assertion (now
+  40.96 bytes after the additional test; previously -40.8). It is recorded,
+  not changed. No new dependencies, forks, simulation mission behaviour
+  changes, pushes or OCCT rebuilds.
+
+### CL9e: measured broadphase (2026-10-11)
+
+- World uses coal's DynamicAABBTreeCollisionManager above **512 checked
+  candidate pairs**, retaining the original allocation-free pair/AABB loop
+  below it. Trees separate moving and fixed objects, update changed poses,
+  preserve explicit static Check rules, and keep infinite shapes outside
+  the finite tree. Candidates return in ID order; narrow-phase queries and
+  first-violation/closest ordering retain their previous semantics.
+- Release C++ benchmark `ck_broadphase_benchmark` on an i5-13600K: six
+  rotary joints/capsule links against N boxes, FK/pose updates plus violation,
+  50 warmups and median of five 3,000-query runs (microseconds per query):
+
+  | N boxes | Checked pairs | Pair loop | Tree |
+  | ---: | ---: | ---: | ---: |
+  | 10 | 70 | 0.767 | 1.480 |
+  | 100 | 610 | 3.569 | 1.504 |
+  | 1000 | 6010 | 15.326 | 6.384 |
+
+  512 keeps the small cell on the faster loop and selects the tree before
+  the first measured winning case (610 pairs). Build/run the standalone
+  `ck_broadphase_benchmark` target to reproduce the measurement.
+- The new C++ same-scene test compares every result field exactly across
+  both policies, including rules, inflation, reference overlaps, attach/
+  remove, fixed-body updates, height fields, infinite shapes, boundary
+  contact, and crossing the production threshold in both directions.
+- All gates pass: standalone C++ (4 + 16, plus MuJoCo), native kit,
+  collisionkit, MotionKit, RobotKit, processkit and app missions. CAD cell,
+  collision/MuJoCo, CadBridge, clearance-validation and planner also pass.
+  Pure kit retains only the known DLS allocation failure (40.96 bytes).
+  No existing assertions changed, new dependencies, forks, simulation
+  mission behaviour changes, pushes or OCCT rebuilds.
+- **CL9 is done:** CL9a–CL9e, one commit each, synced onto local main.
 
 ### Plan revision (2026-10-01, after CL1)
 

@@ -272,7 +272,7 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
                 shapes.push_back("{\"kind\": " + json_string(kind) + ", \"size\": " + array(sizes) +
                                  ", \"position\": " + array(pos) + ", \"rotation\": " +
                                  array(rot) + ", \"surface\": " + surface_of(geom) +
-                                 ", \"contact\": " + json_string(contact_of(geom)) + "}");
+                                 ", \"name\": \"\", \"inflation\": 0, \"contact\": " + json_string(contact_of(geom)) + "}");
             } else if (type == mjGEOM_MESH && m->geom_dataid[geom] >= 0) {
                 const int mesh = m->geom_dataid[geom];
                 const float *vertices = m->mesh_vert + 3 * m->mesh_vertadr[mesh];

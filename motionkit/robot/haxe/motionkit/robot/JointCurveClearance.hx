@@ -17,7 +17,7 @@ class JointCurveClearance implements JointPathClearanceProof {
   final guard:Null<(Pose3,Float)->Bool>;
   final tolerance:Float;
   final snapshot:JointPathSamples;
-  final envelope:robotkit.manipulation.ClearanceMotionEnvelope;
+  final envelope:kinematicskit.ClearanceMotionEnvelope;
   final loweringDelta:Array<Float>;
   var checked:Bool = false;
   public var queries(default,null):Int = 0;

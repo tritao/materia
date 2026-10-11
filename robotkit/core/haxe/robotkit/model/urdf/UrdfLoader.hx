@@ -1,5 +1,7 @@
 package robotkit.model.urdf;
 
+import collisionkit.CollisionGeometry;
+
 import robotkit.model.CollisionShape;
 import robotkit.model.Transmission;
 
@@ -198,13 +200,13 @@ class UrdfLoader {
     var shape = geometry.firstElement();
     if (shape == null) throw 'URDF link ${link.name} collision geometry is empty';
     var origin = readOrigin(element);
-    var primitive:Null<CollisionPrimitive> = switch shape.nodeName {
+    var primitive:Null<CollisionGeometry> = switch shape.nodeName {
       case "box":
         var size = vector(shape, "size", 3);
-        CollisionPrimitive.Box(size[0] / 2, size[1] / 2, size[2] / 2);
-      case "sphere": CollisionPrimitive.Sphere(number(shape, "radius", 0.0));
+        CollisionGeometry.Box(size[0] / 2, size[1] / 2, size[2] / 2);
+      case "sphere": CollisionGeometry.Sphere(number(shape, "radius", 0.0));
       case "cylinder":
-        CollisionPrimitive.Cylinder(number(shape, "radius", 0.0), number(shape, "length", 0.0) / 2);
+        CollisionGeometry.Cylinder(number(shape, "radius", 0.0), number(shape, "length", 0.0) / 2);
       case "mesh":
         if (link.collisionGeometry == null) link.collisionGeometry = required(shape, "filename");
         warnings.push('link ${link.name}: collision mesh ${shape.get("filename")} is kept as a reference, not a collision shape');

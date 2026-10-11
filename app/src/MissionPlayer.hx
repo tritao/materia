@@ -589,16 +589,16 @@ class MissionPlayer implements SessionMember {
     return armClearance(arm, weldCollisionBodies(arm, torch, ignored));
   }
 
-  function weldCollisionBodies(arm:Manipulator, torch:String, ignored:Array<String>):Array<robotkit.manipulation.ClearanceBodyData> {
+  function weldCollisionBodies(arm:Manipulator, torch:String, ignored:Array<String>):collisionkit.CollisionDescription {
     var toolPrefix = torch.substr(0, torch.lastIndexOf("/") + 1);
     return cellCollisionBodies(arm, toolPrefix, ignored);
   }
 
   /** The simulation's articulated hulls plus its current cell geometry, all in this robot's root frame. */
-  function cellCollisionBodies(arm:Manipulator, toolPrefix:Null<String>, ignored:Array<String>):Array<robotkit.manipulation.ClearanceBodyData> {
+  function cellCollisionBodies(arm:Manipulator, toolPrefix:Null<String>, ignored:Array<String>):collisionkit.CollisionDescription {
     var links = robot.model.links;
-    var bodies = [for (hull in robot.hulls) if (ignored.indexOf(hull.part) < 0)
-      {name: hull.part, link: links[hull.link].id, vertices: hull.vertices, tool: toolPrefix != null && StringTools.startsWith(hull.part, toolPrefix)}];
+    var bodies = CollisionClearance.combine([for (hull in robot.shapes) if (ignored.indexOf(hull.shape.name) < 0)
+      CollisionClearance.shapes(links[hull.link].id, [hull.shape], toolPrefix != null && StringTools.startsWith(hull.shape.name, toolPrefix))]);
     var carriedLinks = new Map<String, Int>();
     for (channel in carryingTools.keys()) if (carryingTools.get(channel) == true) {
       var held = heldParts.get(channel), kinematics = toolKinematics.get(channel);
@@ -635,25 +635,25 @@ class MissionPlayer implements SessionMember {
           vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
         }
         var name = entry.id.substr(8);
-        bodies.push({name: part.pieces.length == 1 ? name : '$name#$index',
-          link: links[attached >= 0 ? attached : 0].id, vertices: vertices, tool: attached >= 0});
+        bodies.append(CollisionClearance.convex(part.pieces.length == 1 ? name : '$name#$index', links[attached >= 0 ? attached : 0].id, vertices, attached >= 0));
       }
     }
     var included = new Map<String, Bool>();
-    for (body in bodies) included.set(body.name, true);
+    for (body in bodies.objects) included.set(body.name, true);
     for (other in cellRobots) if (other != robot && other.parts.length > 0) {
       var index = other.parts[0].robotIndex;
-      for (hull in other.hulls) if (!included.exists(hull.part) && ignored.indexOf(hull.part) < 0) {
+      for (hull in other.shapes) if (!included.exists(hull.shape.name) && ignored.indexOf(hull.shape.name) < 0) {
         var pose = simulation.linkPose(index, hull.link);
         var worldPose = new Transform3(new Vec3(pose.position[0], pose.position[1], pose.position[2]),
           new Quat(pose.rotation[0], pose.rotation[1], pose.rotation[2], pose.rotation[3]));
         var localPose = baseInverse.compose(worldPose), vertices:Array<Float> = [];
-        for (corner in 0...Std.int(hull.vertices.length / 3)) {
-          var point = localPose.transformPoint(new Vec3(hull.vertices[corner * 3], hull.vertices[corner * 3 + 1], hull.vertices[corner * 3 + 2]));
+        var points = hull.shape.convexVertices();
+        for (corner in 0...Std.int(points.length / 3)) {
+          var point = localPose.transformPoint(new Vec3(points[corner * 3], points[corner * 3 + 1], points[corner * 3 + 2]));
           vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
         }
-        bodies.push({name: hull.part, link: links[0].id, vertices: vertices, tool: false});
-        included.set(hull.part, true);
+        bodies.append(CollisionClearance.convex(hull.shape.name, links[0].id, vertices, false));
+        included.set(hull.shape.name, true);
       }
     }
     for (entry in objects) {
@@ -679,7 +679,7 @@ class MissionPlayer implements SessionMember {
           (corner & 2) == 0 ? -half.y : half.y, (corner & 4) == 0 ? -half.z : half.z));
         vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
       }
-      bodies.push({name: name, link: links[attached >= 0 ? attached : 0].id, vertices: vertices, tool: attached >= 0});
+      bodies.append(CollisionClearance.convex(name, links[attached >= 0 ? attached : 0].id, vertices, attached >= 0));
       included.set(name, true);
     }
     for (hull in depositedWeldHulls()) {
@@ -688,12 +688,12 @@ class MissionPlayer implements SessionMember {
         var point = baseInverse.transformPoint(new Vec3(hull.vertices[index * 3], hull.vertices[index * 3 + 1], hull.vertices[index * 3 + 2]));
         vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
       }
-      bodies.push({name: hull.name, link: links[0].id, vertices: vertices, tool: false});
+      bodies.append(CollisionClearance.convex(hull.name, links[0].id, vertices, false));
     }
     return bodies;
   }
 
-  function armClearance(arm:Manipulator, bodies:Array<robotkit.manipulation.ClearanceBodyData>, ?reference:Array<Float>):CollisionClearance {
+  function armClearance(arm:Manipulator, bodies:collisionkit.CollisionDescription, ?reference:Array<Float>):CollisionClearance {
     var positions = robot.robot.snapshot().positions;
     var indices = [for (target in arm.toJointTargets([for (_ in 0...arm.dofCount()) 0.0])) target.joint];
     clearanceJoints = indices;
@@ -1760,10 +1760,20 @@ class MissionPlayer implements SessionMember {
     var arm = new Manipulator(robot.model, robot.model.links[0].id, frame.id);
     var count = arm.group.count();
     var indices = [for (target in arm.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
+    var revision = robot.runtime.snapshot();
     var cached = jointMotions.get(name);
+    if (cached != null && (Int64.compare(cached.motion.compiler.limits.modelRevision, revision.modelRevision) != 0 ||
+        Int64.compare(cached.motion.compiler.limits.calibrationRevision, revision.calibrationRevision) != 0)) {
+      if (cached.motion.shutdownPlanning() != 0)
+        throw 'Joint-motion planner "$name" did not stop before updating its reference';
+      cached.motion.reset();
+      if (cached.space != null) cached.space.dispose();
+      jointMotions.remove(name);
+      cached = null;
+    }
     var motion = cached == null ? null : cached.motion;
     if (motion == null) {
-      var limits = new ValidationLimits(count, Int64.ofInt(1), Int64.ofInt(0));
+      var limits = new ValidationLimits(count, revision.modelRevision, revision.calibrationRevision);
       var velocities:Array<Float> = [];
       var accelerations:Array<Float> = [];
       var jerks:Array<Float> = [];
@@ -1855,26 +1865,26 @@ class MissionPlayer implements SessionMember {
   }
 
   function missionMotionPlanner(arm:Manipulator, reference:Array<Float>,
-      data:Array<robotkit.manipulation.ClearanceBodyData>):{planner:MotionPlanner, space:ManipulatorPlannerSpace} {
+      data:collisionkit.CollisionDescription):{planner:MotionPlanner, space:ManipulatorPlannerSpace} {
     var description = new CollisionDescription();
     var options = new RobotCollisionOptions("mission-arm");
     options.reference = arm.stateOf(reference).q;
     options.referenceName = "mission start";
     var bodies = RobotCollision.describe(description, arm.robot, options);
     var owned = new Map<String, Bool>();
-    for (hull in robot.hulls) owned.set(hull.part, true);
+    for (hull in robot.shapes) owned.set(hull.shape.name, true);
     // Cell geometry is expressed in the base frame but is not part of the
     // robot's articulation. Otherwise reference-overlap rules would permit an
     // independent obstacle just because it intersects the initial arm pose.
     var basePose = description.bodies[bodies.linkBody(robot.model.links[0].id)].pose;
-    var geometry:Array<robotkit.manipulation.ClearanceBodyData> = [];
-    for (body in data) {
-      if (owned.exists(body.name) || body.tool)
-        geometry.push({name: body.name, link: body.link, vertices: body.vertices, tool: false});
+    var geometry:collisionkit.CollisionDescription = new collisionkit.CollisionDescription();
+    for (body in data.objects) {
+      if (owned.exists(body.name) || CollisionClearance.isTool(data, body))
+        geometry.append(CollisionClearance.convex(body.name, CollisionClearance.link(data, body), CollisionClearance.vertices(body), false));
       else
-        description.addFixed(body.name, basePose, CollisionGeometry.Convex(body.vertices), options.linkGroup, 0.0, "cell hull");
+        description.addFixed(body.name, basePose, CollisionGeometry.Convex(CollisionClearance.vertices(body)), options.linkGroup, 0.0, "cell hull");
     }
-    RobotCollision.describeClearanceBodies(description, bodies, geometry);
+    RobotCollision.addDescriptionShapes(description, bodies, geometry);
     var world = new NativeCollisionWorld();
     var build = description.build(world);
     var collisionSpace = new CollisionPlannerSpace(description, build, bodies.bodies,

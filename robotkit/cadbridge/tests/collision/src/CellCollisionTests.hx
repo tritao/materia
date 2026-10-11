@@ -1,3 +1,5 @@
+
+import robotkit.collision.CollisionClearance;
 import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblySimulationBridge.AssemblySimulationModel;
@@ -20,7 +22,6 @@ import processkit.collision.HeightMapCollision;
 import processkit.work.HeightMap;
 import robotkit.collision.RobotCollision;
 import robotkit.collision.RobotCollision.RobotCollisionOptions;
-import robotkit.collision.RobotCollision.RobotLinkHull;
 import robotkit.model.CollisionShape;
 import robotkit.model.CollisionShape.ShapeContact;
 import robotkit.model.ContactPair;
@@ -33,7 +34,8 @@ import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.tool.Tool;
-import robotkit.tool.ToolCollisionShape;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 
 /**
  * A cell's collision geometry (COLLISION.md CL3a): a robot with primitives,
@@ -78,15 +80,15 @@ class CellCollisionTests {
     fore.collisionShapes.push(left);
     fore.collisionShapes.push(right);
     model.contactPairs.push(new ContactPair(fore.id, 1, fore.id, 2));
+    model.links[1].collisionShapes.push(new CollisionShape(Convex(cube(0.2, 0, 0, 0.04))));
     return model;
   }
 
   static function armOptions(name:String):RobotCollisionOptions {
     var options = new RobotCollisionOptions(name);
     options.tool = new Tool("probe", "probe", new Transform3(new Vec3(0.1, 0, 0), new Quat(0, 0, 0, 1)),
-      ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05), new Vec3(0.05, 0, 0)));
+      ToolGeometry.box(new Vec3(0.05, 0.05, 0.05), new Vec3(0.05, 0, 0)));
     options.toolFrame = "flange";
-    options.hulls = [new RobotLinkHull(1, "upper-hull", cube(0.2, 0, 0, 0.04))];
     return options;
   }
 
@@ -256,11 +258,11 @@ class CellCollisionTests {
   static function testClearanceBodies():Void {
     var description = new CollisionDescription();
     var robot = RobotCollision.describe(description, arm(), armOptions("arm"));
-    var objects = RobotCollision.describeClearanceBodies(description, robot, [
-      {name: "upper-hull", link: "upper", vertices: cube(0.5, 0, 0, 0.05), tool: false},
-      {name: "torch", link: "fore", vertices: cube(1.05, 0, 0, 0.03), tool: true},
-      {name: "workpiece", link: "base", vertices: cube(1.5, 1.0, 0, 0.1), tool: false}
-    ]);
+    var objects = RobotCollision.addDescriptionShapes(description, robot, CollisionClearance.combine([
+      CollisionClearance.convex("upper-hull", "upper", cube(0.5, 0, 0, 0.05), false),
+      CollisionClearance.convex("torch", "fore", cube(1.05, 0, 0, 0.03), true),
+      CollisionClearance.convex("workpiece", "base", cube(1.5, 1.0, 0, 0.1), false)
+    ]));
     check(description.objects[objects[0]].body == robot.linkBody("upper"), "a link hull is on its link");
     check(description.objects[objects[1]].body == robot.toolBody, "a tool hull is on the tool body");
     check(description.objects[objects[2]].body == robot.linkBody("base"), "a part carried by the base is on the base");

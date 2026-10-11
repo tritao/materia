@@ -556,12 +556,12 @@ class WeldPlanningTests {
   static function cell(wallX:Null<Float>):{planner:WeldPathPlanner, clearance:CollisionClearance, start:Array<Float>} {
     var made = arm();
     var d6 = 0.0823;
-    var bodies = [
-      {name: "torch", link: "wrist_3_link", vertices: box(-0.012, 0.012, d6 - 0.012, d6 + 0.012, -0.14, -0.03), tool: true},
-      {name: "neck", link: "wrist_3_link", vertices: box(0.0, 0.10, d6 - 0.012, d6 + 0.012, -0.14, -0.10), tool: true},
-      {name: "table", link: "base_link", vertices: box(-0.8, 0.8, -0.8, 0.8, -0.1, 0.0), tool: false}
-    ];
-    if (wallX != null) bodies.push({name: "wall", link: "base_link", vertices: box(wallX, wallX + 0.05, 0.05, 0.35, 0.0, 0.5), tool: false});
+    var bodies = CollisionClearance.combine([
+      CollisionClearance.convex("torch", "wrist_3_link", box(-0.012, 0.012, d6 - 0.012, d6 + 0.012, -0.14, -0.03), true),
+      CollisionClearance.convex("neck", "wrist_3_link", box(0.0, 0.10, d6 - 0.012, d6 + 0.012, -0.14, -0.10), true),
+      CollisionClearance.convex("table", "base_link", box(-0.8, 0.8, -0.8, 0.8, -0.1, 0.0), false)
+    ]);
+    if (wallX != null) bodies.append(CollisionClearance.convex("wall", "base_link", box(wallX, wallX + 0.05, 0.05, 0.35, 0.0, 0.5), false));
     var start = [0.0, -1.5708, 1.5708, -1.5708, -1.5708, 0.0];
     var clearance = new CollisionClearance(made.arm, bodies, start, () -> new NativeCollisionWorld());
     var solver = new ManipulatorKinematics(made.arm, 1e-8);
@@ -792,12 +792,12 @@ private class EntryTrajectoryClearance implements robotkit.manipulation.Clearanc
   public function closestSweep(from:Array<Float>, to:Array<Float>, ?contact:Bool, ?maxJointStep:Float,
       ?wanted:Float):Null<robotkit.manipulation.ClearanceViolation>
     return unused("closestSweep");
-  public function motionEnvelope(lower:Array<Float>, upper:Array<Float>):robotkit.manipulation.ClearanceMotionEnvelope
+  public function motionEnvelope(lower:Array<Float>, upper:Array<Float>):kinematicskit.ClearanceMotionEnvelope
     return unused("motionEnvelope");
   public function displacementBounds(q:Array<Float>, errors:Array<Float>):Array<Float> return unused("displacementBounds");
   public function tcpDisplacementBound(q:Array<Float>, errors:Array<Float>):Float return unused("tcpDisplacementBound");
   public function auditDisplacement(q:Array<Float>, perturbed:Array<Float>, errors:Array<Float>,
-      ?envelope:robotkit.manipulation.ClearanceMotionEnvelope):Float
+      ?envelope:kinematicskit.ClearanceMotionEnvelope):Float
     return unused("auditDisplacement");
   public function withGroup(group:robotkit.manipulation.KinematicGroup):robotkit.manipulation.ClearanceWorld
     return new EntryTrajectoryClearance(group);

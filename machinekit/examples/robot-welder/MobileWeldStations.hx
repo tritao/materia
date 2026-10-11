@@ -33,7 +33,7 @@ import machinekit.welding.WeldProbeGeometry.WeldProbeFace;
 import robotkit.manipulation.Manipulator;
 import robotkit.collision.CollisionClearance;
 import robotkit.manipulation.JointRoute;
-import robotkit.manipulation.ClearanceBodyData;
+import collisionkit.CollisionDescription;
 import robotkit.model.Frame;
 import robotkit.mobile.Pose2;
 import robotkit.navigation.FloorMap;
@@ -60,12 +60,12 @@ class MobileWeldStations {
   final probeStickout:Float;
   final work:Transform3;
   final metal:String;
-  final robotBodies:Array<ClearanceBodyData>;
+  final robotBodies:collisionkit.CollisionDescription;
   final external:Array<{name:String, vertices:Array<Float>}> = [];
   final boxes:Array<FloorBox> = [];
   final planning:Map<String, WeldPlanning> = new Map();
   final clearances:Map<String, CollisionClearance> = new Map();
-  final clearanceBodies:Map<String, Array<ClearanceBodyData>> = new Map();
+  final clearanceBodies:Map<String, collisionkit.CollisionDescription> = new Map();
   final registrationChecks:Map<String, Null<String>> = new Map();
   final verifiedSchedules:Map<String, MobileStationSchedule> = new Map();
   var registrationJoints:Array<Float> = [];
@@ -113,9 +113,8 @@ class MobileWeldStations {
     work = transform(state.worldPose(weldment.reference), scene.metresPerUnit);
     metal = WeldMetal.carrierOf(cell, weldment);
     var prefix = contact.occurrence.substr(0, contact.occurrence.lastIndexOf("/") + 1);
-    robotBodies = [for (hull in converted.linkHulls) if (hull.part != metal)
-      {name: hull.part, link: converted.model.links[hull.link].id, vertices: hull.vertices,
-        tool: StringTools.startsWith(hull.part, prefix)}];
+    robotBodies = CollisionClearance.combine([for (hull in cadbridge.AssemblySimulationBridge.shapes(converted.model)) if (hull.shape.name != metal)
+      CollisionClearance.shapes(converted.model.links[hull.link].id, [hull.shape], StringTools.startsWith(hull.shape.name, prefix))]);
     for (occurrence in flat.occurrences) if (!converted.partLinks.exists(occurrence.id) && occurrence.id != metal) {
       var part = [for (body in physical.parts) if (body.id == occurrence.definition) body][0];
       var hull:Array<Float> = cast part.collisionHull;
@@ -158,7 +157,7 @@ class MobileWeldStations {
   static function transform(frame:AssemblyFrame, scale:Float):Transform3
     return new Transform3(new Vec3(frame.x * scale, frame.y * scale, frame.z * scale), new Quat(frame.qx, frame.qy, frame.qz, frame.qw));
 
-  function bodiesAt(station:WeldStationCandidate):Array<ClearanceBodyData> {
+  function bodiesAt(station:WeldStationCandidate):collisionkit.CollisionDescription {
     var cached = clearanceBodies.get(station.id);
     if (cached != null) return cached.copy();
     var bodies = robotBodies.copy();
@@ -169,7 +168,7 @@ class MobileWeldStations {
         var point = inverse.transformPoint(new Vec3(body.vertices[index * 3], body.vertices[index * 3 + 1], body.vertices[index * 3 + 2]));
         vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
       }
-      bodies.push({name: body.name, link: arm.baseLink, vertices: vertices, tool: false});
+      bodies.append(CollisionClearance.convex(body.name, arm.baseLink, vertices, false));
     }
     clearanceBodies.set(station.id, bodies);
     return bodies.copy();

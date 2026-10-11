@@ -2,7 +2,7 @@ package processkit.skill;
 
 import robotkit.skill.*;
 
-import robotkit.manipulation.BaseObstacle;
+import collisionkit.CollisionDescription;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.ToolPlanningContext;
 import robotkit.navigation.Navigator;
@@ -27,7 +27,7 @@ class Paint implements Skill {
       map_T_surface:Transform3, surface:WorkSurface, spec:FinishSpec,
       observePerception:RobotSnapshot -> PerceptionSnapshot, sprayer:Sprayer,
       litersPerMinute:Float, pressureBar:Float, seed:Array<Float>,
-      runner:SurfacePlanRunner, ?obstacles:Array<BaseObstacle>, ?toolPlanning:ToolPlanningContext) {
+      runner:SurfacePlanRunner, ?obstacles:CollisionDescription, ?toolPlanning:ToolPlanningContext) {
     if (sprayer == null) throw "Paint requires a sprayer";
     var adapter = new ChannelToolAdapter();
     adapter.bind("surface.process", function(event) {

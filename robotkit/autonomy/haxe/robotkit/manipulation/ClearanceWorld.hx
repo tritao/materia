@@ -1,6 +1,7 @@
 package robotkit.manipulation;
 
 import robotkit.manipulation.ClearanceViolation;
+import kinematicskit.ClearanceMotionEnvelope;
 
 /**
  * What process planning asks of a clearance world (COLLISION.md CL-D12):

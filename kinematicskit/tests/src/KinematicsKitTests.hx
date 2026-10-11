@@ -27,6 +27,7 @@ class KinematicsKitTests {
   static var assertions = 0;
 
   public static function main():Void {
+    testClearanceMotionBounds();
     testTransformAlgebra();
     testPlanar2R();
     testPrismaticAndRootPose();
@@ -67,6 +68,44 @@ class KinematicsKitTests {
     var q = a.transformPoint(inner.x, inner.y, inner.z);
     check(near(p.x, q.x, 1e-12) && near(p.y, q.y, 1e-12) && near(p.z, q.z, 1e-12),
       "(a · b)(p) = a(b(p))");
+  }
+
+  static function testClearanceMotionBounds():Void {
+    var builder = new KinematicModelBuilder();
+    var base = builder.addBody("motion base"), rotary = builder.addBody("rotary");
+    var slide = builder.addBody("slide"), work = builder.addBody("work");
+    var z = new Vector3(0,0,1);
+    builder.addJoint("rotate", Revolute, base, rotary, Transform.identity(), Transform.identity(), z);
+    builder.addJoint("slide", Prismatic, rotary, slide, Transform.translation(0.5,0,0),
+      Transform.identity(), new Vector3(1,0,0));
+    builder.addJoint("work rotate", Revolute, base, work, Transform.translation(-0.3,0,0), Transform.identity(), z);
+    var flange = builder.addFrame("flange", slide, Transform.translation(0.2,0,0));
+    var reference = builder.addFrame("reference", work, Transform.translation(0.1,0,0));
+    var model = builder.build(), state = new KinematicState(model, [0.4,0.3,-0.2]);
+    state.setRootPose(base, Transform.translation(2,3,4));
+    var dofs = [model.dofIndex("rotate"),model.dofIndex("work rotate")];
+    var error = [0.1,0.07], offset = Transform.translation(0.15,0.02,0);
+    var bounds = new kinematicskit.ClearanceMotionBounds(model,dofs,state,error,flange,offset,reference);
+    var envelope = new kinematicskit.ClearanceMotionEnvelope(model,dofs,state,
+      [0.3,-0.27],[0.5,-0.13],[slide],[[0.35,0.02,0]],flange,offset,reference);
+    var first = KinematicSnapshot.of(state);
+    var p = first.bodyPose(slide).transformPoint(0.35,0.02,0);
+    var tcp = first.framePose(reference).inverse().compose(first.framePose(flange)).compose(offset);
+    var radius = Math.sqrt(0.35*0.35+0.02*0.02);
+    for (i in 0...21) {
+      var moved = state.copy();
+      moved.q[dofs[0]] += error[0]*(i/10-1);
+      moved.q[dofs[1]] += error[1]*Math.sin(i);
+      var snapshot = KinematicSnapshot.of(moved);
+      var point = snapshot.bodyPose(slide).transformPoint(0.35,0.02,0);
+      var distance = Math.sqrt(Math.pow(point.x-p.x,2)+Math.pow(point.y-p.y,2)+Math.pow(point.z-p.z,2));
+      check(distance <= bounds.point(slide,radius)+1e-12 && distance <= envelope.bounds(error)[0]+1e-12,
+        "kit body motion bounds contain actual motion with a held prismatic joint");
+      var tip = snapshot.framePose(reference).inverse().compose(snapshot.framePose(flange)).compose(offset);
+      var displacement = Math.sqrt(Math.pow(tip.x-tcp.x,2)+Math.pow(tip.y-tcp.y,2)+Math.pow(tip.z-tcp.z,2));
+      check(displacement <= bounds.tcp()+1e-12 && displacement <= envelope.tcp(error)+1e-12,
+        "kit TCP bounds contain actual motion relative to a moving work frame");
+    }
   }
 
   static function testPlanar2R():Void {

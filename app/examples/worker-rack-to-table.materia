@@ -200,7 +200,9 @@
                     1
                   ],
                   "surface": null,
-                  "contact": "layers"
+                  "contact": "layers",
+                  "inflation": 0,
+                  "name": ""
                 }
               ],
               "id": "worker-demo-arm",

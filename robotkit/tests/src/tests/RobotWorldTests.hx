@@ -1,5 +1,7 @@
 package tests;
 
+import collisionkit.CollisionGeometry;
+
 import RobotKitRuntime;
 import haxe.Int64;
 import sys.thread.Mutex;
@@ -232,6 +234,7 @@ class RobotWorldTests {
     testMobileLayer();
     testModelDrivenConfiguration();
     testRobotModelCodec();
+    testUnifiedCollisionShapes();
     testBrakeModel();
     testEncoders();
     testMjcfWalkerImport();
@@ -929,6 +932,39 @@ class RobotWorldTests {
     check(invalid, "an encoder needs a resolution");
   }
 
+  static function testUnifiedCollisionShapes():Void {
+    var model = new RobotModel("convex-codec");
+    var link = model.addLink(new Link("base"));
+    var points = [for (i in 0...8) for (axis in 0...3) ((i >> axis) & 1) == 0 ? -0.1 : 0.1];
+    var shape = new CollisionShape(CollisionGeometry.Convex(points), [0.2, 0.3, 0.4],
+      [0.0, 0.0, Math.sin(Math.PI/4), Math.cos(Math.PI/4)]);
+    shape.name = "part";
+    shape.inflation = 0.005;
+    shape.surface = new ContactSurface([0.7, 0.01, 0.001], 4, 0.01, 0.9);
+    shape.contact = ShapeContact.PairsAndEnvironment;
+    link.collisionShapes.push(shape);
+    var encoded = RobotModelCodec.encode(model);
+    var restored = RobotModelCodec.decode(encoded).links[0].collisionShapes[0];
+    var surface:ContactSurface = cast restored.surface;
+    check(restored.name == "part" && restored.inflation == 0.005 &&
+      restored.contact == ShapeContact.PairsAndEnvironment && surface.frictionDimensions == 4,
+      "convex link shapes retain inflation, identity and contact response");
+    check(switch restored.geometry { case Convex(value): value.join(",") == points.join(","); case _: false; },
+      "convex link geometry roundtrips without changing its points");
+    var posed = restored.convexVertices();
+    check(Math.abs(posed[0]-0.3) < 1e-12 && Math.abs(posed[1]-0.2) < 1e-12 && Math.abs(posed[2]-0.3) < 1e-12,
+      "convex points include their shape's rotated and translated pose");
+    var old = haxe.Json.parse(encoded.toString());
+    Reflect.setField(old, "schemaVersion", 12);
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(old))),
+      "the previous collision schema is rejected without migration");
+    for (geometry in [CollisionGeometry.Mesh(points, [0,1,2]), CollisionGeometry.HalfSpace(0,0,1,0),
+        CollisionGeometry.HeightField(1,1,[0.0,0,0,0],2,-1)])
+      check(new CollisionShape(geometry).validate() != null, "scene geometry is rejected on links");
+    shape.inflation = -0.001;
+    check(shape.validate() != null, "negative link inflation is rejected");
+  }
+
   static function testRobotModelCodec():Void {
     var sourceDefinition = configuredForkliftModel();
     var source = sourceDefinition.model;
@@ -951,15 +987,15 @@ class RobotWorldTests {
     source.frames[0].rotation = [0.0, 0.0, 0.38268343236509, 0.923879532511287];
     source.sensors[0].startAngleRadians = -0.4;
     source.sensors[0].fieldOfViewRadians = 2.4;
-    source.links[0].collisionShapes.push(new CollisionShape(CollisionPrimitive.Sphere(0.05),
+    source.links[0].collisionShapes.push(new CollisionShape(CollisionGeometry.Sphere(0.05),
       [0.1, 0.0, -0.2]));
     source.links[0].collisionShapes.push(new CollisionShape(
-      CollisionPrimitive.Capsule(0.03, 0.12), [0.0, 0.0, 0.0],
+      CollisionGeometry.Capsule(0.03, 0.12), [0.0, 0.0, 0.0],
       [0.70710678118654757, 0.0, 0.0, 0.70710678118654757]));
     source.links[1].collisionShapes.push(new CollisionShape(
-      CollisionPrimitive.Cylinder(0.04, 0.1)));
+      CollisionGeometry.Cylinder(0.04, 0.1)));
     source.links[1].collisionShapes.push(new CollisionShape(
-      CollisionPrimitive.Box(0.1, 0.2, 0.3), [0.0, 0.5, 0.0]));
+      CollisionGeometry.Box(0.1, 0.2, 0.3), [0.0, 0.5, 0.0]));
     source.links[1].collisionShapes[1].surface = new ContactSurface([0.7, 0.01, 0.001], 4, 0.01, 0.9);
     source.joints[2].armature = 0.02;
     source.joints[2].damping = 1.5;
@@ -1151,8 +1187,8 @@ class RobotWorldTests {
       case _: throw "Expected recorded servo targets";
     }
     equal(restored.links[0].collisionShapes.length, 2, "RobotModel codec preserves link collision shapes");
-    check(switch restored.links[0].collisionShapes[1].primitive {
-      case CollisionPrimitive.Capsule(radius, half): radius == 0.03 && half == 0.12;
+    check(switch restored.links[0].collisionShapes[1].geometry {
+      case CollisionGeometry.Capsule(radius, half): radius == 0.03 && half == 0.12;
       case _: false;
     }, "RobotModel codec preserves capsule radius and half-length");
     equal(restored.links[0].collisionShapes[0].position[2], -0.2,
@@ -1166,7 +1202,7 @@ class RobotWorldTests {
     shapeHarness.step(Int64.ofInt(0));
     shapeHarness.dispose();
     var badShape = RobotModelCodec.decode(encoded);
-    badShape.links[1].collisionShapes.push(new CollisionShape(CollisionPrimitive.Sphere(0.0)));
+    badShape.links[1].collisionShapes.push(new CollisionShape(CollisionGeometry.Sphere(0.0)));
     check(hasDiagnostic(RobotRuntimeCompiler.validate(badShape, new robotkit.profile.RobotProfile()), "RK_COLLISION_SHAPE"),
       "compiler rejects a non-positive collision shape size");
     throws(function() RobotModelCodec.encode(badShape), "codec rejects an invalid collision shape");
@@ -1258,8 +1294,8 @@ class RobotWorldTests {
     equal(knee.childFramePosition[2], 0.02, "the joint frame sits at the joint anchor in the child");
     equal(foot.type, JointType.Fixed, "a jointless body attaches through a fixed joint");
     var thigh = model.links[1].collisionShapes[0];
-    check(switch thigh.primitive {
-      case CollisionPrimitive.Capsule(radius, half): radius == 0.05 && half == 0.2;
+    check(switch thigh.geometry {
+      case CollisionGeometry.Capsule(radius, half): radius == 0.05 && half == 0.2;
       case _: false;
     }, "a fromto capsule keeps its radius and half-length");
     equal(thigh.position[2], -0.2, "a fromto capsule is centred between its ends");
@@ -1290,12 +1326,12 @@ class RobotWorldTests {
     equal(model.links.length, 4, "the world link is dropped");
     equal(model.links[0].id, "link/torso", "URDF link IDs follow RobotModel conventions");
     equal(model.links[0].visualGeometry, "package://walker/meshes/torso.stl", "visual mesh references are kept");
-    check(switch model.links[0].collisionShapes[0].primitive {
-      case CollisionPrimitive.Box(x, y, z): x == 0.15 && y == 0.1 && z == 0.2;
+    check(switch model.links[0].collisionShapes[0].geometry {
+      case CollisionGeometry.Box(x, y, z): x == 0.15 && y == 0.1 && z == 0.2;
       case _: false;
     }, "a URDF box size becomes half extents");
-    check(switch model.links[1].collisionShapes[0].primitive {
-      case CollisionPrimitive.Cylinder(radius, half): radius == 0.05 && half == 0.2;
+    check(switch model.links[1].collisionShapes[0].geometry {
+      case CollisionGeometry.Cylinder(radius, half): radius == 0.05 && half == 0.2;
       case _: false;
     }, "a URDF cylinder length becomes a half-length");
     equal(model.links[1].collisionShapes[0].position[2], -0.2, "collision origins are kept");
@@ -4780,8 +4816,9 @@ class RobotWorldTests {
   }
 
   static function testProcessChannelDeployment():Void {
-    var deployment = new SerialDeployment(
-      "fixtures/device-deployment/deployment.json");
+    var path = Sys.getCwd() + "/robotkit/tests/fixtures/device-deployment/deployment.json";
+    if (!sys.FileSystem.exists(path)) path = Sys.getCwd() + "/fixtures/device-deployment/deployment.json";
+    var deployment = new SerialDeployment(path);
     equal(deployment.channels.length, 1, "deployment declares one process channel");
     equal(deployment.channels[0].id, "sprayer.flow", "deployment keeps channel ID");
     var blueprint = RobotRuntimeCompiler.compile(deployment.binding.model, deployment.profile);

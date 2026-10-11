@@ -181,11 +181,12 @@ class ProjectSourceTests {
       vertices.push((index & 2) == 0 ? -0.5 : 0.5);
       vertices.push((index & 4) == 0 ? -0.5 : 0.5);
     }
+    if (enabled) model.links[0].collisionShapes.push(new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Convex(vertices)));
     var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
     var simulation = simulationHarness.simulation;
     simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
-      [0.0, 0.0, 0.0, 1.0], null, null, [enabled ? vertices : null]);
+      [0.0, 0.0, 0.0, 1.0]);
     var box = simulationHarness.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
     var height = simulationHarness.objectPose(box).position[2];
@@ -201,12 +202,13 @@ class ProjectSourceTests {
     var wedge = [-0.5, -0.5, -0.5, 0.5, -0.5, -0.5,
       -0.5, -0.5, 0.5, -0.5, 0.5, -0.5,
       0.5, 0.5, -0.5, -0.5, 0.5, 0.5];
+    model.links[0].collisionShapes.push(new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Convex(wedge)));
     for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
       var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
       var simulation = simulationHarness.simulation;
       simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 1.0], null, null, [wedge]);
+        [0.0, 0.0, 0.0, 1.0]);
       var box = simulationHarness.spawnBox([0.35, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
       for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
       var height = simulationHarness.objectPose(box).position[2];
@@ -242,11 +244,12 @@ class ProjectSourceTests {
     model.collisionApproximation = robotkit.model.CollisionApproximation.None;
     for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO])
       for (enabled in [true, false]) {
+        model.links[0].collisionShapes = enabled ? [new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Convex(hull))] : [];
         var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
         var simulation = simulationHarness.simulation;
         simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 1.0], null, null, [enabled ? hull : null]);
+          [0.0, 0.0, 0.0, 1.0]);
         var box = simulationHarness.spawnBox([0.0, 0.0, top + 0.5], [0.05, 0.05, 0.05], true, 1.0);
         for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
         var height = simulationHarness.objectPose(box).position[2];
@@ -1022,12 +1025,13 @@ class ProjectSourceTests {
           if (supported) continue;
           if (contact.linkIndex != toolLink) {
             var body = mission.simulation.linkPose(0, contact.linkIndex);
-            for (hull in mission.robot.hulls) if (hull.link == contact.linkIndex) {
+            for (hull in mission.robot.shapes) if (hull.link == contact.linkIndex) {
               var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
               var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
-              for (vertex in 0...Std.int(hull.vertices.length / 3)) {
-                var point = rotateVector(hull.vertices[vertex * 3], hull.vertices[vertex * 3 + 1],
-                  hull.vertices[vertex * 3 + 2], body.rotation);
+              var points = hull.shape.convexVertices();
+              for (vertex in 0...Std.int(points.length / 3)) {
+                var point = rotateVector(points[vertex * 3], points[vertex * 3 + 1],
+                  points[vertex * 3 + 2], body.rotation);
                 for (axis in 0...3) {
                   lo[axis] = Math.min(lo[axis], point[axis] + body.position[axis]);
                   hi[axis] = Math.max(hi[axis], point[axis] + body.position[axis]);
@@ -1036,7 +1040,7 @@ class ProjectSourceTests {
               var point = [contact.position.x, contact.position.y, contact.position.z];
               var near = true;
               for (axis in 0...3) if (point[axis] < lo[axis] - 0.002 || point[axis] > hi[axis] + 0.002) near = false;
-              if (near) Sys.println("picker contact candidate: " + hull.part + "; bounds=" + lo.join(",") + " / " + hi.join(","));
+              if (near) Sys.println("picker contact candidate: " + hull.shape.name + "; bounds=" + lo.join(",") + " / " + hi.join(","));
             }
           }
           // The compliant cup deliberately presses at most 3 mm into its intended grasp surface.
@@ -1349,7 +1353,7 @@ class ProjectSourceTests {
     check(simulation.rebuild(session.sensors, session.scene, session), "held-clearance fixture builds: " + simulation.error);
     var mission = simulation.missionPlayer(), object = simulation.environmentObject("held-clearance-probe");
     if (mission == null || object == null) throw "Held-clearance fixture needs its robot and loose object";
-    var flange = [for (hull in mission.robot.hulls) if (hull.part == "toolFlange") hull];
+    var flange = [for (hull in mission.robot.shapes) if (hull.shape.name == "toolFlange") hull];
     if (flange.length != 1) throw "Held-clearance fixture needs one flange hull";
     var link = flange[0].link, pose = mission.simulation.linkPose(mission.robotIndex, link);
     var carrier = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(pose.position[0], pose.position[1], pose.position[2]),
@@ -5237,6 +5241,10 @@ class ProjectSourceTests {
       checkTrackArm(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "overhead-arm") {
+      OverheadArmTests.run(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-welder") {
       checkGantryWelder(root);
       return 0;
@@ -5734,6 +5742,7 @@ class ProjectSourceTests {
     checkGantryPicker(root, true);
     checkGantryWelder(root);
     checkTrackArm(root);
+    OverheadArmTests.run(root);
     checkJointSceneClearance(root);
     checkHeldJointSceneClearance(root);
     checkRobotWelder(root);

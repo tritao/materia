@@ -16,9 +16,11 @@ import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.manipulation.Manipulator;
-import robotkit.manipulation.ToolBoxObstacle;
 import robotkit.manipulation.ToolPlanningContext;
-import robotkit.manipulation.ToolClearanceShape;
+import collisionkit.CollisionDescription;
+import collisionkit.CollisionGeometry;
+import collisionkit.CollisionPose;
+import collisionkit.native.NativeCollisionWorld;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -47,7 +49,8 @@ import processkit.skill.Sand;
 import robotkit.tool.SimulatedSprayer;
 import robotkit.tool.SimulatedSander;
 import robotkit.tool.Tool;
-import robotkit.tool.ToolCollisionShape;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 import processkit.work.WorkSurface;
 import processkit.work.Polygon2;
 import processkit.work.Point2;
@@ -201,16 +204,18 @@ class ConstructionSkillTests {
     // A skill must pass its mounted tool and cell obstacles to the planner,
     // then stop before navigation or process output when the tool is blocked.
     var mounted = new Tool("paint-head", "paint head", Transform3.identity(),
-      ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05)));
-    var cell = new ToolPlanningContext(mounted, [new ToolBoxObstacle(
-      Transform3.identity(), new Vec3(10.0, 10.0, 10.0))]);
-    var preparedBeforeSkill = ToolClearanceShape.preparationCount;
+      ToolGeometry.box(new Vec3(0.05, 0.05, 0.05)));
+    var obstacles = new CollisionDescription();
+    obstacles.addFixed("wall", CollisionPose.identity(), Box(10,10,10), 0);
+    var worlds = 0;
+    var cell = new ToolPlanningContext(mounted, obstacles, () -> { worlds++; return new NativeCollisionWorld(); });
+    var preparedBeforeSkill = cell.obstacles.objects.length;
     var blockedPaint = new Paint(navigator, manipulator, robot,
       registered.frame_T_surface, registered, spec, observe, new SimulatedSprayer(),
       0.3, 2.0, seed, paintMotion, null, cell);
     var blockedStatus = runToCompletion(blockedPaint);
-    check(ToolClearanceShape.preparationCount == preparedBeforeSkill,
-      "FinishSurface reuses the planning context's prepared tool shape");
+    check(cell.obstacles.objects.length == preparedBeforeSkill && worlds > 0,
+      "FinishSurface preserves the planning description and uses its collision backend");
     check(switch blockedStatus { case Failed(_): true; case _: false; },
       "Paint rejects a path blocked by a 3D obstacle at planning time");
     check(blockedPaint.coverage() == null,
@@ -218,12 +223,12 @@ class ConstructionSkillTests {
 
     var wrongTcp = new Tool("wrong-tcp", "wrong TCP",
       new Transform3(new Vec3(0.01, 0.0, 0.0), Quat.identity()),
-      ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05)));
+      ToolGeometry.box(new Vec3(0.05, 0.05, 0.05)));
     var rejected = false;
     try {
       new Paint(navigator, manipulator, robot, registered.frame_T_surface, registered,
         spec, observe, new SimulatedSprayer(), 0.3, 2.0, seed, paintMotion, null,
-        new ToolPlanningContext(wrongTcp, cell.obstacles));
+        new ToolPlanningContext(wrongTcp, cell.obstacles, cell.makeWorld));
     } catch (_:Dynamic) rejected = true;
     check(rejected, "Paint rejects a tool whose TCP differs from the manipulator TCP");
 

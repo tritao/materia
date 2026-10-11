@@ -66,9 +66,8 @@ class LinearTrackCheck {
 		for (index in 1...7) check(!manipulator.external[index], "six arm joints retain arm ownership");
 		check(manipulator.swivel == null, "six-axis arm on a track has no fabricated swivel");
 		var reference = [for (_ in 0...7) 0.0];
-		var clearance = new CollisionClearance(manipulator, [for (hull in converted.linkHulls)
-			{name: hull.part, link: model.links[hull.link].id, vertices: hull.vertices,
-				tool: StringTools.startsWith(hull.part, "arm/tool/")}], reference, () -> new NativeCollisionWorld(), 0.003);
+		var clearance = new CollisionClearance(manipulator, CollisionClearance.combine([for (hull in cadbridge.AssemblySimulationBridge.shapes(converted.model))
+			CollisionClearance.shapes(model.links[hull.link].id, [hull.shape], StringTools.startsWith(hull.shape.name, "arm/tool/"))]), reference, () -> new NativeCollisionWorld(), 0.003);
 		for (coordinate in [manipulator.group.limitsOf(0).lower, manipulator.group.limitsOf(0).upper]) {
 			var q = reference.copy(); q[0] = coordinate;
 			var hit = clearance.violation(q);

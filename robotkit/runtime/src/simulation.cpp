@@ -40,12 +40,54 @@ void require_scene(nkscene_result result, const char *operation) {
         throw std::runtime_error(operation);
 }
 
+nksim_shape create_collision_shape(nksim_world world, const rk_simulation_link_shape &source) {
+    nksim_shape primitive = 0;
+    switch (source.type) {
+    case RK_LINK_SHAPE_BOX:
+        require_sim(nksim_shape_create_box(world, source.size, &primitive),
+                    "nksim_shape_create_box(link primitive)");
+        break;
+    case RK_LINK_SHAPE_SPHERE:
+        require_sim(nksim_shape_create_sphere(world, source.size[0], &primitive),
+                    "nksim_shape_create_sphere(link primitive)");
+        break;
+    case RK_LINK_SHAPE_CAPSULE:
+        require_sim(nksim_shape_create_capsule(world, source.size[0],
+            2.0 * source.size[1], &primitive), "nksim_shape_create_capsule(link primitive)");
+        break;
+    case RK_LINK_SHAPE_CONVEX:
+        require_sim(nksim_shape_create_convex(world, source.vertices,
+            source.vertex_count * 3, &primitive), "nksim_shape_create_convex(link shape)");
+        break;
+    default:
+        require_sim(nksim_shape_create_cylinder(world, source.size[0],
+            2.0 * source.size[1], &primitive), "nksim_shape_create_cylinder(link primitive)");
+        break;
+    }
+    nksim_surface surface{};
+    surface.struct_size = sizeof(surface);
+    surface.friction_dimensions = source.friction_dimensions;
+    std::copy_n(source.friction, 3, surface.friction);
+    surface.contact_time_constant = source.contact_time_constant;
+    surface.contact_damping_ratio = source.contact_damping_ratio;
+    surface.contact_filter = source.contact_filter;
+    require_sim(nksim_shape_set_surface(world, primitive, &surface),
+                "nksim_shape_set_surface(link primitive)");
+    return primitive;
+}
+
 bool valid_link_shape(const rk_simulation_link_shape &shape, uint32_t link_count) {
     if (shape.link >= link_count || shape.type < RK_LINK_SHAPE_BOX ||
-        shape.type > RK_LINK_SHAPE_CYLINDER || !valid_pose(shape.position, shape.rotation) ||
+        shape.type > RK_LINK_SHAPE_CONVEX || !valid_pose(shape.position, shape.rotation) ||
         !valid_contact_surface(shape.friction, shape.friction_dimensions,
             shape.contact_time_constant, shape.contact_damping_ratio, shape.contact_filter))
         return false;
+    if (shape.type == RK_LINK_SHAPE_CONVEX) {
+        if (shape.vertex_count < 4 || shape.vertex_count > 64) return false;
+        for (uint32_t i = 0; i < shape.vertex_count * 3; ++i)
+            if (!std::isfinite(shape.vertices[i])) return false;
+        return true;
+    }
     const uint32_t sized = shape.type == RK_LINK_SHAPE_BOX ? 3
         : shape.type == RK_LINK_SHAPE_SPHERE ? 1 : 2;
     for (uint32_t axis = 0; axis < sized; ++axis)
@@ -503,9 +545,9 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                     "nksim_world_begin_topology_update");
         topology_update = true;
         const bool has_tool = robot_desc &&
-            robot_desc->tool_piece_count > 0;
+            robot_desc->tool_shape_count > 0;
         if (has_tool && (robot_desc->tool_link_index >= blueprint.link_count ||
-                         robot_desc->tool_piece_count > 16))
+                         robot_desc->tool_shape_count > 16))
             throw std::invalid_argument("invalid tool attachment link or piece count");
         const auto link_shape_count = robot_desc
             ? robot_desc->link_shape_count : 0;
@@ -620,34 +662,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 const auto &source = robot_desc->link_shapes[shape_index];
                 if (source.link != index) continue;
                 if (children.empty() && has_link_shape) add_child(desc.shape, origin, identity);
-                nksim_shape primitive = 0;
-                switch (source.type) {
-                case RK_LINK_SHAPE_BOX:
-                    require_sim(nksim_shape_create_box(world, source.size, &primitive),
-                                "nksim_shape_create_box(link primitive)");
-                    break;
-                case RK_LINK_SHAPE_SPHERE:
-                    require_sim(nksim_shape_create_sphere(world, source.size[0], &primitive),
-                                "nksim_shape_create_sphere(link primitive)");
-                    break;
-                case RK_LINK_SHAPE_CAPSULE:
-                    require_sim(nksim_shape_create_capsule(world, source.size[0],
-                        2.0 * source.size[1], &primitive), "nksim_shape_create_capsule(link primitive)");
-                    break;
-                default:
-                    require_sim(nksim_shape_create_cylinder(world, source.size[0],
-                        2.0 * source.size[1], &primitive), "nksim_shape_create_cylinder(link primitive)");
-                    break;
-                }
-                nksim_surface surface{};
-                surface.struct_size = sizeof(surface);
-                surface.friction_dimensions = source.friction_dimensions;
-                std::copy_n(source.friction, 3, surface.friction);
-                surface.contact_time_constant = source.contact_time_constant;
-                surface.contact_damping_ratio = source.contact_damping_ratio;
-                surface.contact_filter = source.contact_filter;
-                require_sim(nksim_shape_set_surface(world, primitive, &surface),
-                            "nksim_shape_set_surface(link primitive)");
+                nksim_shape primitive = create_collision_shape(world, source);
                 link_shapes_.push_back(primitive);
                 shape_parts[shape_index] = static_cast<uint32_t>(children.size());
                 add_child(primitive, source.position, source.rotation);
@@ -655,22 +670,22 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             }
             if (has_tool && index == robot_desc->tool_link_index) {
                 if (!std::isfinite(robot_desc->tool_margin) ||
-                    !std::isfinite(robot_desc->tool_gap) ||
-                    robot_desc->tool_margin < 0.0 || robot_desc->tool_gap < 0.0)
+                    robot_desc->tool_margin < 0.0)
                     throw std::invalid_argument("invalid tool contact margin or gap");
                 if (children.empty()) add_child(desc.shape, origin, identity);
-                for (uint32_t piece = 0; piece < robot_desc->tool_piece_count; ++piece) {
-                    const auto count = robot_desc->tool_piece_vertex_count[piece];
-                    if (count < 4 || count > 64)
-                        throw std::invalid_argument("invalid tool collision hull vertex count");
-                    const auto *vertices = robot_desc->tool_piece_vertices + piece * 64 * 3;
-                    nksim_shape tool_shape = 0;
-                    require_sim(nksim_shape_create_convex(world, vertices, count * 3,
-                                                          &tool_shape), "nksim_shape_create_convex(tool)");
+                binding->tool_link_ = index;
+                binding->tool_part_start_ = static_cast<uint32_t>(children.size());
+                binding->tool_part_count_ = robot_desc->tool_shape_count;
+                for (uint32_t piece = 0; piece < robot_desc->tool_shape_count; ++piece) {
+                    const auto &source = robot_desc->tool_shapes[piece];
+                    if (!valid_link_shape(source, blueprint.link_count) || source.link != index ||
+                        !std::isfinite(robot_desc->tool_shape_gap[piece]) || robot_desc->tool_shape_gap[piece] < 0)
+                        throw std::invalid_argument("invalid tool collision shape");
+                    nksim_shape tool_shape = create_collision_shape(world, source);
                     require_sim(nksim_shape_set_contact(world, tool_shape,
-                        robot_desc->tool_margin, robot_desc->tool_gap), "nksim_shape_set_contact(tool)");
+                        robot_desc->tool_margin, robot_desc->tool_shape_gap[piece]), "nksim_shape_set_contact(tool)");
                     link_shapes_.push_back(tool_shape);
-                    add_child(tool_shape, origin, identity);
+                    add_child(tool_shape, source.position, source.rotation);
                 }
                 has_link_shape = true;
             }
@@ -1711,7 +1726,9 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
             result.other_robot = UINT32_MAX;
             result.other_link = UINT32_MAX;
             result.link_index = link;
-            result.tool_piece_index = part - 1;
+            result.tool_piece_index = link == binding->tool_link_ && part >= binding->tool_part_start_ &&
+                part < binding->tool_part_start_ + binding->tool_part_count_
+                ? static_cast<int32_t>(part - binding->tool_part_start_) : -1;
             const auto other_body = source.body_a == body ? source.body_b : source.body_a;
             nksim_object other_object = 0;
             if (nksim_session_find_object(session_, other_body, &other_object) == NKSIM_OK) {

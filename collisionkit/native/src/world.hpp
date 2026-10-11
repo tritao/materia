@@ -3,12 +3,14 @@
 #include <coal/collision.h>
 #include <coal/collision_object.h>
 #include <coal/distance.h>
+#include <coal/broadphase/broadphase_dynamic_AABB_tree.h>
 
 #include <cstdint>
 #include <map>
 #include <memory>
 #include <set>
 #include <utility>
+#include <unordered_map>
 #include <vector>
 
 namespace ck {
@@ -37,6 +39,10 @@ struct Margins {
  */
 class World {
 public:
+    /** Above this many checked candidate pairs, use coal's tree (CL9e benchmark). */
+    static constexpr size_t kBroadphaseThreshold = 512;
+    /** The override is internal C++ policy, also used by the same-scene test and benchmark. */
+    explicit World(size_t broadphase_threshold = kBroadphaseThreshold) : broadphase_threshold_(broadphase_threshold) {}
     uint32_t add_body(int32_t group);
     uint32_t body_count() const { return uint32_t(bodies_.size()); }
     bool has_body(int32_t body) const { return body >= -1 && body < int32_t(bodies_.size()); }
@@ -117,6 +123,18 @@ private:
     bool is_static(int32_t body) const { return body < 0 || bodies_[size_t(body)].fixed; }
     void pose(Object &object);
     void rebuild_pairs();
+    /** Checked pairs in id order whose boxes can be within radius. */
+    struct Candidates {
+        explicit Candidates(size_t count) : count(count) {}
+        std::vector<size_t> indices;
+        size_t count;
+        bool filtered = false;
+        size_t size() const { return filtered ? indices.size() : count; }
+        size_t operator[](size_t i) const { return filtered ? indices[i] : i; }
+    };
+    Candidates candidates(double radius);
+    void rebuild_tree();
+    bool use_tree() const { return pairs_.size() > broadphase_threshold_; }
     /** A pair for coal's queries, or false when coal cannot compare the two. */
     bool make_pair(uint32_t a, uint32_t b, Pair &out);
     /** True when the pair is closer than `margin` (touching counts at 0); `request` carries the margin for coal. */
@@ -134,6 +152,14 @@ private:
     std::set<Key> reference_;
     std::vector<Pair> pairs_;
     bool pairs_dirty_ = true, unsupported_ = false;
+    size_t broadphase_threshold_;
+    std::unique_ptr<coal::DynamicAABBTreeCollisionManager> moving_tree_, fixed_tree_;
+    bool tree_dirty_ = true, checked_fixed_pairs_ = false;
+    std::set<coal::CollisionObject *> moved_;
+    std::unordered_map<const coal::CollisionObject *, uint32_t> object_ids_;
+    std::map<Key, size_t> pair_indices_;
+    /** Infinite shapes stay outside the finite tree and are always considered. */
+    std::vector<size_t> unbounded_pairs_;
 };
 
 /** A convex set from its points alone: no hull topology, so support queries scan the points (coal without qhull). */

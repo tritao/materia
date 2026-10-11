@@ -97,6 +97,9 @@ private:
     std::vector<rk_robot_joint_coupling> kinematic_couplings_;
     std::vector<nkscene_node_id> nodes_;
     std::vector<nksim_body> bodies_;
+    uint32_t tool_link_ = UINT32_MAX;
+    uint32_t tool_part_start_ = 0;
+    uint32_t tool_part_count_ = 0;
     std::vector<nksim_joint> joints_;
     std::vector<uint8_t> actuated_joints_;
     /**

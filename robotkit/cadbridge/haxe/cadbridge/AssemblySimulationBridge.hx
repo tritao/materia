@@ -36,21 +36,12 @@ import cadkit.modeling.AssemblyState;
 typedef AssemblySimulationModel = {
   var model:RobotModel;
   var profile:robotkit.profile.RobotProfile;
-  /** Each part's convex hull, in its link's frame, for Simulation.addRobotAtPose. */
-  var linkHulls:Array<AssemblyLinkHull>;
   /** Part pairs that form designed interfaces across a moving assembly joint. */
   var jointInterfaces:Array<AssemblyJointInterface>;
   /** Each simulated part's link and its frame within that link. */
   var partLinks:Map<String, AssemblyPartLink>;
   var closureIds:Array<String>;
   var closures:Array<AssemblySimulationClosure>;
-}
-
-/** One part's collision hull: XYZ triples in the frame of link `link`. */
-typedef AssemblyLinkHull = {
-  var link:Int;
-  var part:String;
-  var vertices:Array<Float>;
 }
 
 /** Candidate occurrence hulls on opposite sides of a mechanical joint. */
@@ -225,7 +216,6 @@ class AssemblySimulationBridge {
     var partLinks = new Map<String, AssemblyPartLink>();
     var offsets = new Map<String, AssemblyFrame>();
     var linkIndexOfPart = new Map<String, Int>();
-    var linkHulls:Array<AssemblyLinkHull> = [];
     for (body in AssemblyBodies.of(definition)) {
       if (free.exists(body.id)) continue;
       var environmentAnchor = false;
@@ -300,7 +290,9 @@ class AssemblySimulationBridge {
             vertices.push(point.y * scale);
             vertices.push(point.z * scale);
           }
-          linkHulls.push({link: index, part: id, vertices: vertices});
+          var shape = new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Convex(vertices));
+          shape.name = id;
+          links[index].collisionShapes.push(shape);
         }
       }
     }
@@ -654,18 +646,18 @@ class AssemblySimulationBridge {
         mobileBase.maxLinearAcceleration, mobileBase.maxAngularAcceleration,
         mobileBase.footprintLength, mobileBase.footprintWidth);
     }
-    return {model: model, profile: profile, linkHulls: linkHulls,
-      jointInterfaces: jointInterfaces(definition, model, linkHulls), partLinks: partLinks,
+    return {model: model, profile: profile,
+      jointInterfaces: jointInterfaces(definition, model), partLinks: partLinks,
       closureIds: closures, closures: closureGeometry};
   }
 
 /** Candidate part pairs across a mechanical joint, derived from the kinematic tree.
  * `CollisionClearance` activates the smaller interface margin only for pairs within the
  * ordinary clearance at its planning reference. */
-  public static function jointInterfaces(definition:AssemblyDefinition, model:RobotModel,
-      hulls:Array<AssemblyLinkHull>):Array<AssemblyJointInterface> {
-    var available = new Map<String, AssemblyLinkHull>();
-    for (hull in hulls) available.set(hull.part, hull);
+  public static function jointInterfaces(definition:AssemblyDefinition, model:RobotModel):Array<AssemblyJointInterface> {
+    var hulls = shapes(model);
+    var available = new Map<String, robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape>();
+    for (hull in hulls) available.set(hull.shape.name, hull);
     var result:Array<AssemblyJointInterface> = [];
     var seen = new Map<String, Bool>();
     var pneumatic = new Map<String, Bool>();
@@ -716,23 +708,28 @@ class AssemblySimulationBridge {
     // Include every physical pair on the two adjacent rigid links as a candidate;
     // CollisionClearance keeps the global obstacle margin for parts that are not close
     // interfaces at its reference pose.
-    var hullsByLink = new Map<Int, Array<AssemblyLinkHull>>();
+    var hullsByLink = new Map<Int, Array<robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape>>();
     for (hull in hulls) {
-      var linkHulls = hullsByLink.get(hull.link);
-      if (linkHulls == null) {
-        linkHulls = [];
-        hullsByLink.set(hull.link, linkHulls);
+      var linkShapes = hullsByLink.get(hull.link);
+      if (linkShapes == null) {
+        linkShapes = [];
+        hullsByLink.set(hull.link, linkShapes);
       }
-      linkHulls.push(hull);
+      linkShapes.push(hull);
     }
     for (joint in model.joints) {
       var parent = model.links.indexOf(joint.parent), child = model.links.indexOf(joint.child);
       var parentParts = hullsByLink.get(parent), childParts = hullsByLink.get(child);
       if (parentParts == null || childParts == null) continue;
-      for (first in parentParts) for (second in childParts) add(first.part, second.part);
+      for (first in parentParts) for (second in childParts) add(first.shape.name, second.shape.name);
     }
     return result;
   }
+
+  /** Link-owned collision shapes, with their runtime link indices. */
+  public static function shapes(model:RobotModel):Array<robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape>
+    return [for (link in 0...model.links.length) for (shape in model.links[link].collisionShapes)
+      new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape(link, shape)];
 
   /** A frame with its translation scaled to metres. */
   static function scaled(frame:AssemblyFrame, scale:Float):AssemblyFrame

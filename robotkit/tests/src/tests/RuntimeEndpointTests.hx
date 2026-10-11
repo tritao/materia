@@ -18,10 +18,12 @@ class RuntimeEndpointTests {
     var runtime = RobotRuntime.create(blueprint, endpoint);
     runtime.start();
     runtime.submitPositions([0.25], 7);
+    // Join the owner before comparing observations: a live worker can publish
+    // another position or source timestamp between the reads below.
+    runtime.stop();
     var observation = runtime.snapshot();
     if (runtime.sourceClockId != endpoint.sourceClockId())
       throw "RobotRuntime did not expose its endpoint's current source-clock identity";
-    runtime.stop();
     if (endpoint.starts != 1 || endpoint.submits != 1 || endpoint.observations != 1 ||
         endpoint.stops != 1 || observation.q.length != 1)
       throw "RobotRuntime did not use its supplied endpoint for start, submit, observe and stop";

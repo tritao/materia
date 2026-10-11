@@ -389,7 +389,7 @@ class RobotRuntimeBlueprint {
 
 }
 
-/** One primitive collision shape on the link at a runtime link index. */
+/** One collision shape on the link at a runtime link index. */
 class RobotRuntimeLinkShape {
   public final link:Int;
   public final shape:robotkit.model.CollisionShape;
