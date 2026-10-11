@@ -928,7 +928,7 @@ class ProjectKitTests {
     }
     var job:materia.project.SceneArtifact.SceneArtifactPrinting = {source: "G21\nG90\nM83\nG1 X10 Y10 E0.5 F1200\n",
       axes: ["x", "y", "z"], extruder: "e", filamentDiameter: 1.75e-3, gearRadius: 3.65e-3, maxFlow: 15e-9,
-      pressureAdvance: 0.04, pressureAdvanceWindow: 0.04, rampLength: 0.0005, minExtrusionTemperature: 170.0,
+      pressureAdvance: 0.04, pressureAdvanceWindow: 0.04, meltLag: 0.04, rampLength: 0.0005, minExtrusionTemperature: 170.0,
       heaters: [heater("hotend", 0, "sensor", "fan.part"), heater("bed", 1, "bedSensor")], controller: {stepTickHz: 40000}};
     var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
       parts: [part("body")], assemblyDefinition: printer, printing: job};
@@ -936,7 +936,7 @@ class ProjectKitTests {
     if (restored == null) throw "print job round trip lost the job";
     check(restored.source == job.source && restored.axes.join(",") == "x,y,z" && restored.extruder == "e" &&
       restored.filamentDiameter == 1.75e-3 && restored.gearRadius == 3.65e-3 && restored.maxFlow == 15e-9 &&
-      restored.pressureAdvance == 0.04 && restored.minExtrusionTemperature == 170.0 && restored.controller.stepTickHz == 40000,
+      restored.pressureAdvance == 0.04 && restored.meltLag == 0.04 && restored.minExtrusionTemperature == 170.0 && restored.controller.stepTickHz == 40000,
       "print job round trip");
     check(restored.heaters.length == 2 && restored.heaters[0].fan == "fan.part" && restored.heaters[1].fan == null &&
       restored.heaters[0].feedsExtruder && !restored.heaters[1].feedsExtruder && restored.heaters[1].slot == 1 &&

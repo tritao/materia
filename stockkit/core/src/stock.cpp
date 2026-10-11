@@ -214,7 +214,7 @@ bool DexelGrid::ray_range(const Bounds &b, RayRange &out) const {
 }
 
 void DexelGrid::cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uint32_t owners, bool measure,
-    CutWorker &worker) {
+    CutWorker &worker, bool adding) {
     if (grid_.count[0] == 0 || grid_.count[1] == 0) return;
     RayRange all;
     if (!ray_range(move.reach, all)) return;
@@ -227,17 +227,19 @@ void DexelGrid::cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner,
             const uint32_t tile_index = tj * tiles_i_ + ti;
             const Tile &tile = *tiles_[tile_index];
             const uint32_t w = grid_.axis;
-            if (!(tile.top > move.reach.min[w]) || !(tile.bottom < move.reach.max[w])) {
+            // Material to cut has to be in reach; a sweep that adds lands in empty tiles as well.
+            if (!adding && (!(tile.top > move.reach.min[w]) || !(tile.bottom < move.reach.max[w]))) {
                 ++worker.stats.tiles_skipped;
                 continue;
             }
             MoveResult result;
             bool touched = false;
-            if (cuts && cut_tile(tile_index, move.cutting, cutting, move.source, worker, result.removed))
+            if (cuts && (adding ? add_tile(tile_index, move.cutting, cutting, move.source, worker, result.removed)
+                                : cut_tile(tile_index, move.cutting, cutting, move.source, worker, result.removed)))
                 touched = true;
             // Bands measure the stock this move leaves behind.
             for (const auto &band : move.bands) {
-                if (!measure) break;
+                if (!measure || adding) break;
                 RayRange range;
                 if (!ray_range(band.second.bounds(), range)) continue;
                 // The cut may have replaced a shared tile with a private copy.
@@ -324,6 +326,98 @@ bool DexelGrid::cut_tile(uint32_t index, const SweptVolume &sweep, const RayRang
             }
             write_local(*writable, local, scratch.data(), static_cast<uint32_t>(scratch.size()));
             removed_volume += removed * area;
+            tile_lo = std::min(tile_lo, changed_lo);
+            tile_hi = std::max(tile_hi, changed_hi);
+            ++stats.rays_changed;
+            changed = true;
+        }
+    if (changed) writable->refresh_bounds();
+    if (changed && axis != 2 && !worker.marks.dirty.empty()) worker.marks.mark(axis, view->i0, tile_lo, tile_hi);
+    return changed;
+}
+
+bool DexelGrid::add_tile(uint32_t index, const SweptVolume &sweep, const RayRange &range, uint32_t source,
+    CutWorker &worker, double &added_volume) {
+    Tile *writable = nullptr;
+    const Tile *view = tiles_[index].get();
+    CutStats &stats = worker.stats;
+    std::vector<Span> &spans = worker.spans;
+    std::vector<Interval> &scratch = worker.scratch;
+    const double area = grid_.spacing * grid_.spacing;
+    const uint32_t axis = grid_.axis;
+    if (range.i1 < int64_t(view->i0) || range.j1 < int64_t(view->j0)) return false;
+    uint32_t ia = std::max<uint32_t>(uint32_t(std::max<int64_t>(range.i0, 0)), view->i0);
+    uint32_t ja = std::max<uint32_t>(uint32_t(std::max<int64_t>(range.j0, 0)), view->j0);
+    uint32_t ib = std::min<uint32_t>(uint32_t(range.i1), view->i0 + view->ni - 1);
+    uint32_t jb = std::min<uint32_t>(uint32_t(range.j1), view->j0 + view->nj - 1);
+    bool changed = false;
+    double tile_lo = std::numeric_limits<double>::infinity(), tile_hi = -tile_lo;
+    for (uint32_t j = ja; j <= jb; ++j)
+        for (uint32_t i = ia; i <= ib; ++i) {
+            const uint32_t local = (j - view->j0) * view->ni + (i - view->i0);
+            const uint32_t n = view->count[local];
+            const uint32_t first = view->first[local];
+            ++stats.rays_tested;
+            sweep.intersect(axis, ray_u(i), ray_v(j), spans);
+            if (spans.empty()) continue;
+            // Merge the ray's intervals and the sweep's spans in order of their lower ends. A span's normals point
+            // into the swept solid; the material it adds faces out of it.
+            scratch.clear();
+            double before = 0, after = 0, changed_lo = std::numeric_limits<double>::infinity(), changed_hi = -changed_lo;
+            Interval open;
+            bool have = false;
+            auto take = [&](const Interval &next) {
+                if (!have) { open = next; have = true; return; }
+                if (next.lo <= open.hi) {
+                    if (next.hi > open.hi) {
+                        open.hi = next.hi;
+                        std::copy_n(next.hi_normal, 3, open.hi_normal);
+                        open.hi_source = next.hi_source;
+                    }
+                } else {
+                    scratch.push_back(open);
+                    open = next;
+                }
+            };
+            uint32_t k = 0;
+            size_t s = 0;
+            while (k < n || s < spans.size()) {
+                if (s >= spans.size() || (k < n && view->lo[first + k] <= spans[s].lo)) {
+                    const uint32_t at = first + k++;
+                    Interval piece;
+                    piece.lo = view->lo[at];
+                    piece.hi = view->hi[at];
+                    std::copy_n(&view->lo_normal[3 * size_t(at)], 3, piece.lo_normal);
+                    std::copy_n(&view->hi_normal[3 * size_t(at)], 3, piece.hi_normal);
+                    piece.lo_source = view->lo_source[at];
+                    piece.hi_source = view->hi_source[at];
+                    before += piece.hi - piece.lo;
+                    take(piece);
+                } else {
+                    const Span &span = spans[s++];
+                    Interval piece;
+                    piece.lo = span.lo;
+                    piece.hi = span.hi;
+                    for (int c = 0; c < 3; ++c) {
+                        piece.lo_normal[c] = -span.lo_normal[c];
+                        piece.hi_normal[c] = -span.hi_normal[c];
+                    }
+                    piece.lo_source = piece.hi_source = source;
+                    changed_lo = std::min(changed_lo, span.lo);
+                    changed_hi = std::max(changed_hi, span.hi);
+                    take(piece);
+                }
+            }
+            if (have) scratch.push_back(open);
+            for (const Interval &piece : scratch) after += piece.hi - piece.lo;
+            // A sweep inside the material already there changes nothing.
+            if (!(after > before)) continue;
+            if (!writable) {
+                writable = &mutable_tile(index);
+                view = writable;
+            }
+            write_local(*writable, local, scratch.data(), static_cast<uint32_t>(scratch.size()));
+            added_volume += (after - before) * area;
             tile_lo = std::min(tile_lo, changed_lo);
             tile_hi = std::max(tile_hi, changed_hi);
             ++stats.rays_changed;
@@ -459,6 +553,14 @@ Stock::Stock(const Lattice &lattice) : lattice_(lattice) {
 }
 
 void Stock::cut(const std::vector<MoveSweep> &moves, MoveResult *results, CutStats *summary) {
+    run(moves, results, summary, false);
+}
+
+void Stock::add(const std::vector<MoveSweep> &moves, MoveResult *results, CutStats *summary) {
+    run(moves, results, summary, true);
+}
+
+void Stock::run(const std::vector<MoveSweep> &moves, MoveResult *results, CutStats *summary, bool adding) {
     uint32_t tiles = 0;
     for (const auto &grid : grids_)
         if (grid) tiles += grid->tile_count();
@@ -479,7 +581,7 @@ void Stock::cut(const std::vector<MoveSweep> &moves, MoveResult *results, CutSta
         CutWorker &worker = workers_[owner];
         for (size_t k = 0; k < moves.size(); ++k)
             for (uint32_t axis = 0; axis < 3; ++axis)
-                if (grids_[axis]) grids_[axis]->cut_owned(moves[k], uint32_t(k), owner, owners, axis == 2, worker);
+                if (grids_[axis]) grids_[axis]->cut_owned(moves[k], uint32_t(k), owner, owners, axis == 2, worker, adding);
     });
     // Per-tile results of the Z grid, summed per move in tile order whatever the thread count.
     std::vector<CutWorker::Record> all;

@@ -20,6 +20,7 @@ import machinekit.motion.NemaStepper;
 import machinekit.motion.PowerSupply;
 import machinekit.motion.ProximitySwitch;
 import machinekit.printing.Extruder;
+import machinekit.printing.PrintedPart;
 import machinekit.printing.Fan;
 import machinekit.printing.HeatedBed;
 import machinekit.printing.HeaterCartridge;
@@ -331,6 +332,8 @@ class CoreXyPrinter extends AxisBuilder {
 		attach("blockZRight", LinearRailBlock.metric(Z_RAIL), AxisBuilder.orient(RAIL_X, postFront, blockMid, [0.0, -1, 0], vertical), "wingRight");
 		attach("bedSupport", new GantryPlate("Bed support", 250, 250, 6), AssemblyFrames.translation(0, 0, supportBottom), "carrier");
 		attach("bed", bed, AssemblyFrames.translation(0, 0, bedTop), "bedSupport");
+		// Where the print is laid: at the machine's zero, the bed's front left corner at its surface.
+		attach("printed", new PrintedPart(), AssemblyFrames.translation(MACHINE_ZERO_X, MACHINE_ZERO_Y, bedTop), "bed");
 		attach("bedThermistor", new Thermistor(), AxisBuilder.orient(110, 0, bedTop - bed.thickness(), up, alongY), "bedSupport");
 		// Three screws, each on its own motor standing on the base plate.
 		var motorBase = 26.0, motorBody = motor.bodyLength;

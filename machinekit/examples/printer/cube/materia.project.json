@@ -1,0 +1,14 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "CoreXY 3D printer, calibration cube",
+	"defaultEntrypoint": "cube",
+	"build": { "system": "haxeon", "manifest": "../haxeon.json" },
+	"entrypoints": {
+		"cube": {
+			"kind": "cad-preview",
+			"module": "CoreXyPrinterPreview",
+			"function": "cube"
+		}
+	}
+}

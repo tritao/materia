@@ -922,6 +922,45 @@ Done. What was built and decided:
   - no deposit outside the part's footprint plus a bead.
 - Print the numbers.
 
+Done. What was built and decided:
+- **StockKit** (API version 3): `sk_stock_create_empty` and `sk_stock_add` (C ABI, HXI, `Stock.empty` and `Stock.add` in Haxe). A move's
+  swept solid is merged into each ray's intervals (all three grids, the Z grid measuring the volume added); the surfaces it makes take the
+  move's source and face out of the solid; a sweep inside material already there changes nothing; threads, ordering and determinism are
+  those of `sk_stock_cut`. C tests: 20,906 checks pass; Haxe StockKit tests 100,681 assertions.
+- **App.** `PrintingStock` (the `MachiningStock` counterpart): `follow` reads where the nozzle tip is and how much filament the extruder
+  has fed (both from the simulation, so slip, a flow the hotend cannot melt and the pressure-advance lead show), and lays the stretch as a
+  bead of the layer's height and the width that holds the fed volume (the filament per distance smoothed over 1.5 mm of travel so the stepper's few steps per tick
+  do not swell and thin the bead; filament pulled back is owed first; filament pushed while the tip stands piles up as a blob). A melt lag
+  (`Hotend.pressureLag`, assumed 40 ms, the job's `meltLag`) models the spring of filament and melt that pressure advance cancels. Shortfalls
+  of beads that overlap their neighbours are made up by the next beads, except on the outer wall and the skirt, which face the air, so
+  dimensions hold. `StockMeshes` (extracted from `MachiningStock`, now also its user) contours the stock on the preview worker; the
+  `PrintedPart` marker at the bed's front left corner is replaced by the material (`SceneArtifactPrinting.deposit`). `SceneArtifact` version
+  29 (28 rejected). Also a fix to a stale native test (`robotkit_device_compiler6`: a motor built with a double where the field became whole
+  step ticks) and the device compiler accepts the position error of a float that carries an extruder angle many turns from zero.
+- **The cube's hole, diagnosed.** The WIP check failed with "the hole measures 5.66 mm across, CAD 6". The slicer is right (its own test
+  puts the nearest bead centre 3.225 mm from the hole's axis, wall plus half a bead, and the walls are exact arcs); the deposit is right (the
+  bead's footprint conserves volume; the short cube below measures 6.0 mm both ways). The measurement was wrong: the calibration cube's hole
+  is off centre by (2, -1) mm, and the check ran its ray through the cube's centre, 1 mm from the hole's axis, where the chord of a
+  3 mm radius circle is 2 sqrt(9 - 1) = 5.657 mm. It now measures along x and along y through the hole's own centre (112, 109 mm),
+  tolerance unchanged at 0.3 mm.
+- **Checks** (`checkPrinterCube`, `measurePrinted`): the deposited material against the filament fed (2 %), the volume in the cube's footprint
+  (solid: within 3 % of CAD; sparse: below the solid volume), the bounding box within 0.2 mm, the hole's diameter within 0.3 mm, and nothing
+  laid beside the part but the skirt. `printer-cube-short` is the regular check (a 4 mm, solid block with the same hole: 20 layers), run in the
+  app suite; the full 100-layer cube (`printer-cube`, default infill) runs by itself and in the full suite only (`am-suite.sh`).
+- **Numbers.** SmallTab (`printer`): printed in 163.5 s (hotend 103.6 s, bed 90.5 s), filament 56.08 of 56.08 mm, 0.3 % flow difference at half speed;
+  plan checks on 26 plans, 17 flagged, worst torque 42 % (motor A), worst deviation 329 um (y) (AM8 notes: 169.8 s, 39 plans, 30 flagged,
+  45 %, 329 um: the planning fixes of AM5b shortened it); the print laid 135 mm^3 in 5,664 beads for 134.9 mm^3 of filament, the tab holds
+  118 mm^3 of its CAD 120 (-1.7 %), spans 104.9..115 x 104.9..115 x 0..1.2 mm, 0 mm^3 beside it. Short cube: 526 s of simulation (534 s wall),
+  1,470 mm^3 in the cube of 1,491 laid for 1,497 fed, CAD 1,487 (-1.1 %), spans 100..120 x 99.9..120 x 0..4 mm, hole 6.0 x 6.0 mm, 41,212 beads.
+
+**AM9b. The app's print simulation at real time.** The full cube simulates its heat-up at about 9x real time but prints at about 1.7x slower than
+real time (each 100 s of print costs about 155 s of wall time, steady across the 100 layers, so a constant per-tick cost, not one that grows with
+the part); SmallTab keeps up (174 s of print in about 118 s; the short cube takes 534 s of wall time for 526 s). An editor preview of a dense part therefore lags.
+Profile a slice of the cube print (from layer 10, a few minutes) with `perf` and the allocation census, split the per-tick cost between MuJoCo,
+the virtual device's stepping, planning, deposition into the dexel stock, the stock preview's remeshing and the per-tick checks, and fix the top
+costs. Done when the full cube simulates at least at real time on this machine with the same results (hole, volume, bounding box, SmallTab numbers
+unchanged).
+
 **AM10. Klipper config and G-code (AM-D9).**
 - `PrinterKlipperConfig.generate(assembly, controller)` produces `printer.cfg` text.
 - Tests:
@@ -1145,7 +1184,8 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM6 | done | see the commit below |
 | AM7 | done | see the commit below |
 | AM8 | done | see the commits below |
-| AM9 | planned | |
+| AM9 | done | see the commit below |
+| AM9b | planned | |
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | planned | |

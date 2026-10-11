@@ -102,6 +102,9 @@ class ToolpathPlayer implements SessionMember {
 	/** Whether a pass starts on this step: the first one, and again whenever a looping job has completed. */
 	function startsPass():Bool return !started || (loop && motion.completed && !motion.running);
 
+	/** The motion stopped with `reason`; the player adds what it knows of why. */
+	function failureReason(reason:String):String return reason;
+
 	/** The job stops for `reason`. */
 	function fail(reason:String):Void {
 		if (failure == null) failure = reason;
@@ -214,7 +217,7 @@ class ToolpathPlayer implements SessionMember {
 		var spent = Sys.time() - clock;
 		motionSeconds += spent;
 		slowestUpdate = Math.max(slowestUpdate, spent);
-		if (motion.failure != null && !stoppedOnPurpose()) fail(motion.failure);
+		if (motion.failure != null && !stoppedOnPurpose()) fail(failureReason(motion.failure));
 		var progress = motion.progress();
 		var at = originalAt(progress.op, progress.pathDistance);
 		var provenance = at.op < 0 ? null : sourceMap.provenanceAt(at.op, at.distance);

@@ -1451,7 +1451,120 @@ void horizontal_sampled() {
     for (const Shape &shape : shapes) sk_tool_destroy(shape.handle);
 }
 
+/** A flat disc of diameter `d` and height `h`: swept along a line it lays a bead of that width and height. */
+std::vector<double> add(sk_stock_handle s, sk_tool_handle t, const std::vector<sk_move> &moves, const std::string &what) {
+    std::vector<double> added(moves.size());
+    sk_add_summary summary{};
+    check(sk_stock_add(s, t, moves.data(), uint32_t(moves.size()), added.data(), &summary) == SK_OK, what);
+    double total = 0;
+    for (double volume : added) total += volume;
+    check(summary.moves == moves.size() && summary.added == total, what + ": summary adds up the moves");
+    return added;
+}
+
+/** Material is built up from empty stock: volumes, unions, provenance, normals, every grid and any thread count. */
+void adding() {
+    const double spacing = 0.1;
+    // 14 x 8 x 4 mm of lattice, with nodes off the faces of what is added (a bead 0.5 wide holds five rays).
+    sk_lattice g = lattice(-1.043, -1.037, -0.553, spacing, 140, 80, 40);
+    sk_stock_handle empty{};
+    check(sk_stock_create_empty(&g, &empty) == SK_OK, "empty stock");
+    sk_stock_info before = info_of(empty);
+    check(before.volume == 0 && before.grids[0].interval_count == 0 && before.grids[2].interval_count == 0, "empty stock holds nothing");
+    sk_stock_handle none{};
+    sk_lattice bad = g;
+    bad.spacing = 0;
+    check(sk_stock_create_empty(&bad, &none) == SK_ERROR_INVALID_ARGUMENT, "empty stock needs a lattice");
+    check(sk_stock_create_empty(&g, nullptr) == SK_ERROR_INVALID_ARGUMENT, "empty stock needs somewhere to put the handle");
+
+    // A bead 0.5 wide and 0.2 high: a disc of diameter 0.5, 0.2 tall, tip down, along x. Volume: width x height x
+    // length plus the two end caps (a disc's own volume).
+    sk_tool_handle bead = flat(0.5, 0.2);
+    const double w = 0.5, h = 0.2, length = 8.0;
+    const double disc = kPi * (w / 2) * (w / 2) * h;
+    std::vector<double> first = add(empty, bead, {line_move(0, 0, 0, length, 0, 0, 7)}, "one bead");
+    const double expected = w * h * length + disc;
+    near(first[0], expected, 0.06 * expected, "a bead adds its swept volume");
+    sk_stock_info one = info_of(empty);
+    near(one.volume, first[0], 1e-12, "the stock holds what was added");
+    for (int axis = 0; axis < 3; ++axis)
+        near(one.grids[axis].volume, one.volume, 0.08 * one.volume, "every grid sees the bead's volume");
+
+    // The same move again adds nothing; a move overlapping it adds only what is new.
+    std::vector<double> again = add(empty, bead, {line_move(0, 0, 0, length, 0, 0, 8)}, "the same bead again");
+    near(again[0], 0, 1e-12, "a bead inside material adds nothing");
+    sk_stock_info same = info_of(empty);
+    near(same.volume, one.volume, 1e-12, "and the stock does not change");
+    std::vector<double> longer = add(empty, bead, {line_move(length / 2, 0, 0, length + 4, 0, 0, 9)}, "an overlapping bead");
+    near(longer[0], w * h * 4, 0.1 * (w * h * 4), "an overlapping bead adds only its new stretch");
+    near(info_of(empty).volume, w * h * (length + 4) + disc, 0.06 * (w * h * (length + 4) + disc), "the union is one longer bead");
+
+    // Provenance and normals: the top of the bead faces up and records the move that laid it; its start is
+    // the first move's, the stretch added later the later move's.
+    Rays rays = read_all(empty);
+    uint32_t n = 0;
+    // Ray over the middle of the first stretch: x = 2, y = 0.
+    uint32_t i = uint32_t(std::lround((2.0 - g.origin[0]) / spacing)), j = uint32_t(std::lround((0.0 - g.origin[1]) / spacing));
+    const sk_interval *middle = rays.at(i, j, n);
+    check(n == 1, "one interval over the bead");
+    near(middle[0].lo, 0, 1e-9, "the bead's underside is at the tip");
+    near(middle[0].hi, h, 1e-9, "its top is a layer height up");
+    check(middle[0].hi_normal[2] > 0.99f && middle[0].lo_normal[2] < -0.99f, "the top faces up and the underside down");
+    check(middle[0].lo_source == 7 && middle[0].hi_source == 7, "and both record the move that made them");
+    uint32_t end_i = uint32_t(std::lround((10.0 - g.origin[0]) / spacing));
+    const sk_interval *tail = rays.at(end_i, j, n);
+    check(n == 1 && tail[0].hi_source == 9 && tail[0].lo_source == 9, "the stretch added later records the later move");
+
+    // A second layer on top of the first stands on it: one interval of twice the height, the top the new move's.
+    std::vector<double> top = add(empty, bead, {line_move(0, 0, h, length, 0, h, 11)}, "a second layer");
+    check(top[0] > 0.5 * w * h * length, "the second layer adds a bead's worth");
+    Rays stacked = read_all(empty);
+    const sk_interval *column = stacked.at(i, j, n);
+    check(n == 1, "a bead on a bead is one interval");
+    near(column[0].hi, 2 * h, 1e-9, "twice a layer high");
+    check(column[0].lo_source == 7 && column[0].hi_source == 11, "bottom from the first layer, top from the second");
+
+    // The thread count changes nothing.
+    sk_stock_handle serial{}, parallel{};
+    check(sk_stock_create_empty(&g, &serial) == SK_OK && sk_stock_create_empty(&g, &parallel) == SK_OK, "two empty stocks");
+    sk_stock_set_threads(serial, 1);
+    sk_stock_set_threads(parallel, 4);
+    std::vector<sk_move> program;
+    for (int row = 0; row < 12; ++row) {
+        double y = -2.0 + 0.4 * row;
+        program.push_back(line_move(row % 2 ? 6 : -4, y, 0, row % 2 ? -4 : 6, y, 0, uint32_t(100 + row)));
+    }
+    program.push_back(arc_move(1, 1, 0.2, 1.5, 0, 4.0, 0.3, 200));
+    std::vector<double> a = add(serial, bead, program, "serial add"), b = add(parallel, bead, program, "parallel add");
+    bool identical = a.size() == b.size();
+    for (size_t k = 0; identical && k < a.size(); ++k) identical = a[k] == b[k];
+    check(identical && info_of(serial).volume == info_of(parallel).volume, "adding is bit-identical for any thread count");
+
+    // Adding is the inverse of cutting: add a bead, cut the same sweep out, nothing is left.
+    sk_stock_handle round{};
+    check(sk_stock_create_empty(&g, &round) == SK_OK, "round trip stock");
+    add(round, bead, {line_move(0, 0, 0, 5, 0, 0, 1)}, "round trip add");
+    check(info_of(round).volume > 0, "the round trip stock holds a bead");
+    cut(round, bead, {line_move(0, 0, 0, 5, 0, 0, 2)}, "round trip cut");
+    near(info_of(round).volume, 0, 1e-9, "cutting the same sweep leaves nothing");
+
+    // A bad move leaves the stock as it was.
+    sk_move invalid = line_move(0, 0, 0, 1, 0, 0);
+    invalid.struct_size = 1;
+    double volume = 0;
+    sk_add_summary summary{};
+    double stock_before = info_of(empty).volume;
+    check(sk_stock_add(empty, bead, &invalid, 1, &volume, &summary) == SK_ERROR_INVALID_ARGUMENT, "a malformed move is refused");
+    check(info_of(empty).volume == stock_before, "and adds nothing");
+    sk_stock_handle stale{};
+    check(sk_stock_add(stale, bead, &invalid, 1, &volume, &summary) == SK_ERROR_INVALID_HANDLE, "a stale stock is refused");
+
+    sk_tool_destroy(bead);
+    for (sk_stock_handle s : {empty, serial, parallel, round}) sk_stock_destroy(s);
+}
+
 int main() {
+    adding();
     flat_slot();
     ball_slot();
     bull_arc();

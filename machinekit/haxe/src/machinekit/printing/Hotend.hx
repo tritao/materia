@@ -29,6 +29,12 @@ typedef HotendSpec = {
 	var fanLossCoefficient:Float;
 	/** What the melt zone can deliver (assumed), mm^3/s, and the coldest it may extrude, degrees C. */
 	var maxVolumetricFlow:Float;
+	/**
+	 * How long the melt takes to follow the filament (assumed): the filament and the melt behind the nozzle are a
+	 * spring, so the flow out of the nozzle is the feed passed through a lag of this time constant, seconds.
+	 * Pressure advance cancels it.
+	 */
+	var pressureLag:Float;
 	var minExtrusionTemperature:Float;
 	var maxTemperature:Float;
 }
@@ -48,7 +54,7 @@ class Hotend extends MachineComponent {
 		if (table == null) table = new Catalog("hotend", s -> s.designation, [
 			{designation: "GENERIC-V6-STYLE", heatsinkDiameter: 22.0, heatsinkLength: 30.0, blockWidth: 16.0, blockDepth: 20.0,
 				blockHeight: 11.5, filamentDiameter: 1.75, heatCapacity: 13.5, lossCoefficient: 0.12, fanLossCoefficient: 0.05,
-				maxVolumetricFlow: 15.0, minExtrusionTemperature: 170.0, maxTemperature: 285.0}
+				maxVolumetricFlow: 15.0, pressureLag: 0.04, minExtrusionTemperature: 170.0, maxTemperature: 285.0}
 		], _ -> ({source: "Assumed V6-style hotend; thermal and flow values are not measured", standard: null,
 			standardEdition: null, dimensionKind: Unverified, conformance: GenericApproximation, verifiedFields: []}));
 		return table;

@@ -514,6 +514,7 @@ class ApplicationSimulation {
       power = candidatePower;
       workforce = candidateWorkforce;
       if (cnc != null) cnc.dispose();
+      if (print != null) print.dispose();
       for (visual in beltVisuals) visual.reset();
       beltVisuals = candidateBelts;
       if (machineProgram != null) machineProgram.beforeReset();
@@ -843,6 +844,7 @@ class ApplicationSimulation {
     }
     workforce = null; motions = null; tools = null; power = null;
     if (cnc != null) cnc.dispose();
+    if (print != null) print.dispose();
     if (beads != null) beads.dispose();
     for (visual in beltVisuals) visual.reset();
     beltVisuals = [];

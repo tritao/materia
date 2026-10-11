@@ -25,8 +25,12 @@ import toolpathkit.motion.PrinterBinding;
 import toolpathkit.motion.ToolpathChannels;
 import toolpathkit.motion.ToolpathMotion;
 import toolpathkit.motion.ToolpathMotionBinding;
+import toolpathkit.path.GeometryTools;
 import toolpathkit.path.Point3;
+import toolpathkit.path.PrintFeature;
 import toolpathkit.path.Provenance;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.ToolpathProgram;
 
 /**
  * Prints a project's job on its simulated printer (see SceneArtifactPrinting): the G-code is compiled against the
@@ -37,12 +41,18 @@ import toolpathkit.path.Provenance;
 class PrintProgramPlayer extends ToolpathPlayer {
 	/** Two time-sync replies establish the board's host clock before the device is used, simulated seconds. */
 	static inline final SYNC_DELAY = 0.15;
+	/** The printed material goes to the scene at most this often, in simulated seconds. */
+	static inline final STOCK_REFRESH = 0.1;
 	/**
 	 * The printer's link to its controller: the board's native USB (full speed, 12 Mbit/s), not a plain UART. A sliced
 	 * curve plans to thousands of segments a second (see AM5b) and each carries a polynomial per motor, which the
 	 * endpoint's link qualification refuses to refill in time at the welding device's 3 Mbaud or a UART's 921600.
 	 */
 	public static inline final LINK_BAUD = 12000000;
+	/** Ray spacing of the printed material, in metres: a fifth of a bead's height; coarser only for a bed full of it. */
+	static inline final STOCK_SPACING = 0.0001;
+	/** Most rays in the Z grid of the printed material before its spacing grows. */
+	static inline final STOCK_RAYS = 2000000.0;
 	/** How far an axis may stand from where a plan ends, metres, before the plan is not complete: about four microsteps. */
 	static inline final POSITION_TOLERANCE = 5e-5;
 
@@ -80,6 +90,26 @@ class PrintProgramPlayer extends ToolpathPlayer {
 	var layerLines:Array<Int> = [];
 	var readyAt:Float;
 	var synchronised = false;
+	/** Whether the printed material is contoured for the scene as it grows; a measurement that only reads the stock turns it off. */
+	public var showPrint:Bool = true;
+	/** The ray spacing of the printed material, in metres; read when the print lays its first bead. */
+	public var stockSpacing:Float = STOCK_SPACING;
+	/** The printed material, once the print has laid some, and the object that shows it. */
+	public var stock(default, null):Null<PrintingStock> = null;
+	final newStock:Null<Void->PrintingStock>;
+	final stockObject:Null<String>;
+	var stockShownAt = Math.NEGATIVE_INFINITY;
+	final extruderIndex:Int;
+	final gearRadius:Float;
+	/** What the program says of each G-code line: the layer height in force and the feature printed. */
+	var heightLines:Array<Int> = [];
+	var heights:Array<Float> = [];
+	var featureLines:Array<Int> = [];
+	var features:Array<PrintFeature> = [];
+	var lastHeight = 0.0;
+	/** Wall-clock seconds spent laying and meshing the printed material, for profiling. */
+	public var depositSeconds(default, null):Float = 0.0;
+	public var meshingSeconds(default, null):Float = 0.0;
 	/** The layer the machine is printing (1 for the first, 0 before it), and the layers in the job. */
 	public var layer(default, null):Int = 0;
 	public var layerCount(default, null):Int = 0;
@@ -155,6 +185,26 @@ class PrintProgramPlayer extends ToolpathPlayer {
 		}
 		layerLines = lines;
 		layerCount = lines.length;
+		var extent = scanProgram(compiled);
+		extruderIndex = printer.extruderIndex;
+		gearRadius = job.gearRadius;
+		var shown = job.deposit;
+		if (shown == null) {
+			newStock = null;
+			stockObject = null;
+		} else {
+			var occurrence = [for (item in definition.occurrences) if (item.id == shown) item];
+			var center = occurrence.length == 1 ? project.assemblyPreviewCenter(occurrence[0].definition) : null;
+			if (center == null) throw 'The print is shown on "$shown", which is not a part of the printer';
+			var centerMetres = [for (coordinate in center) coordinate * metresPerUnit];
+			var filament = job.filamentDiameter, lag = job.meltLag;
+			var margin = 0.001;
+			var low = [for (axis in 0...3) extent.low[axis] - margin], high = [for (axis in 0...3) extent.high[axis] + margin];
+			// The Z grid has a ray a spacing; a bed's worth of beads at a fifth of their height would be too many.
+			newStock = () -> new PrintingStock(low, high, centerMetres,
+				Math.max(stockSpacing, Math.sqrt((high[0] - low[0]) * (high[1] - low[1]) / STOCK_RAYS)), filament, lag, featureAt);
+			stockObject = "project:" + shown;
+		}
 		var robotIndex = robot.parts[0].robotIndex;
 		var axisJoint = new Map<String, Int>();
 		for (index in 0...job.axes.length)
@@ -237,12 +287,109 @@ class PrintProgramPlayer extends ToolpathPlayer {
 	}
 
 	override function afterStep(at:{op:Int, distance:Float}, provenance:Null<Provenance>, passFinished:Bool):Void {
-		var current = 0;
-		for (line in layerLines) if (line <= currentLine) current++;
-		layer = current;
+		layer = countThrough(layerLines, currentLine);
+		if (newStock == null || extruderIndex < 0) return;
+		if (stock == null) stock = newStock();
+		var clock = Sys.time();
+		// What the machine did, not what was asked: the joints where the simulation has them.
+		var positions = robot.robot.snapshot().positions;
+		var pose = solver.forward([for (index in axisJoints) positions.get(index)]);
+		var fed = positions.get(extruderIndex) * gearRadius;
+		stock.follow(new Point3(pose.x, pose.y, pose.z), fed, heightAt(currentLine), session.fixedTimestep(), at.op,
+			provenance == null ? new Provenance(0, 0, 0) : provenance);
+		depositSeconds += Sys.time() - clock;
+	}
+
+	/** Shows the printed material as it grows: a few times a second it is contoured on its own thread and the chunks that changed are shown. */
+	override public function present():Void {
+		var laid = stock, id = stockObject;
+		if (laid == null || id == null || !showPrint) return;
+		var clock = Sys.time();
+		var chunks = laid.takePreview();
+		if (chunks != null) project.scene.setRuntimeGeometryParts(id, laid.previewChunks(), chunks);
+		var now = session.simulationTime();
+		if (laid.hasChanged() && (now - stockShownAt >= STOCK_REFRESH || now < stockShownAt) && laid.refreshPreview())
+			stockShownAt = now;
+		meshingSeconds += Sys.time() - clock;
+	}
+
+	/** Stops printing and gives the printed part's object its own geometry back. */
+	public function dispose():Void {
+		if (stock != null) stock.dispose();
+		stock = null;
+		if (stockObject != null) project.scene.clearRuntimeGeometry(stockObject);
+	}
+
+	/**
+	 * The program's heights and features by G-code line, and the box its beads lie in (machine coordinates, metres):
+	 * the stock for the print is as big as the print.
+	 */
+	function scanProgram(compiled:ToolpathProgram):{low:Array<Float>, high:Array<Float>} {
+		var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, 0.0];
+		var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, 0.0];
+		var depositing = false, width = 0.0, height = 0.0;
+		heightLines = []; heights = []; featureLines = []; features = [];
+		function include(point:Point3):Void {
+			low[0] = Math.min(low[0], point.x - width / 2.0); high[0] = Math.max(high[0], point.x + width / 2.0);
+			low[1] = Math.min(low[1], point.y - width / 2.0); high[1] = Math.max(high[1], point.y + width / 2.0);
+			high[2] = Math.max(high[2], point.z);
+		}
+		for (op in compiled.ops) switch op {
+			case Deposit(_, beadWidth, beadHeight, provenance):
+				depositing = true; width = beadWidth; height = beadHeight;
+				heightLines.push(provenance.line); heights.push(beadHeight);
+			case DepositOff(_): depositing = false;
+			case Feature(kind, provenance): featureLines.push(provenance.line); features.push(kind);
+			case Move(Cut, geometry, _, _, _) if (depositing):
+				var length = GeometryTools.length(geometry);
+				for (step in 0...Std.int(Math.ceil(length / 0.0005)) + 1)
+					include(GeometryTools.pointAt(geometry, Math.min(length, step * 0.0005)));
+			case _:
+		}
+		if (!(low[0] <= high[0])) { low = [0.0, 0.0, 0.0]; high = [0.001, 0.001, 0.001]; }
+		return {low: low, high: high};
+	}
+
+	/** How many of `lines` (ascending) are at or before `line`. */
+	static function countThrough(lines:Array<Int>, line:Int):Int {
+		var low = 0, high = lines.length;
+		while (low < high) {
+			var middle = (low + high) >> 1;
+			if (lines[middle] <= line) low = middle + 1; else high = middle;
+		}
+		return low;
+	}
+
+	/** The feature a G-code line is printed as, or null before any is named. */
+	function featureAt(line:Int):Null<PrintFeature> {
+		var count = countThrough(featureLines, line);
+		return count == 0 ? null : features[count - 1];
+	}
+
+	/** The height of the bead the program lays at a G-code line: the last it set at or before it. */
+	function heightAt(line:Int):Float {
+		var count = countThrough(heightLines, line);
+		if (count > 0) lastHeight = heights[count - 1];
+		return lastHeight;
+	}
+
+	/** A robot that faults while the print runs is told with the heaters' last reports: the controller's fault shows there first. */
+	override function failureReason(reason:String):String {
+		var seen = [for (name in heaterNames()) {
+			var reading = readings.get(name);
+			reading == null ? '$name (no report)' : '$name ${Math.round(reading.celsius)}/${Math.round(reading.targetCelsius)} C duty ${Math.round(reading.duty * 100)} % fault ${reading.fault}';
+		}];
+		return '$reason (${seen.join(", ")}; line $currentLine, layer $layer)';
 	}
 
 	override function resetJob():Void {
+		if (stock != null) {
+			stock.dispose();
+			stock = null;
+			stockShownAt = Math.NEGATIVE_INFINITY;
+		}
+		if (stockObject != null) project.scene.clearRuntimeGeometry(stockObject);
+		lastHeight = 0.0;
 		heaters.reset();
 		readings.clear();
 		layer = 0;

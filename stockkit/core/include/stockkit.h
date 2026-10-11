@@ -64,7 +64,7 @@ extern "C" {
  * same stock. Handles are process-local, generation-checked and never zero.
  */
 
-enum { SK_API_VERSION = 2 };
+enum { SK_API_VERSION = 3 };
 
 typedef int32_t sk_result;
 enum {
@@ -226,6 +226,16 @@ typedef struct sk_stock_info {
     sk_grid_info grids[3];
 } sk_stock_info;
 
+/** What one `sk_stock_add` call did in total, over its moves and every grid. */
+typedef struct sk_add_summary {
+    uint32_t struct_size SK_STRUCT_SIZE;
+    uint32_t moves;
+    /** Volume the moves added, measured on the Z grid. */
+    double added;
+    uint64_t rays_tested;
+    uint64_t rays_changed;
+} sk_add_summary;
+
 /** What one `sk_stock_cut` call did in total, over its moves and every grid. */
 typedef struct sk_cut_summary {
     uint32_t struct_size SK_STRUCT_SIZE;
@@ -261,6 +271,12 @@ SK_API sk_result SK_CALL sk_sweep_ray(sk_tool_handle tool, const sk_move *move,
 
 /** Solid box stock. */
 SK_API sk_result SK_CALL sk_stock_create_box(const sk_lattice *lattice, const sk_box *box,
+    sk_stock_handle *out_stock SK_OUT SK_OWNED);
+
+/**
+ * Stock with no material, on `lattice`: what an additive process builds up in with `sk_stock_add`.
+ */
+SK_API sk_result SK_CALL sk_stock_create_empty(const sk_lattice *lattice,
     sk_stock_handle *out_stock SK_OUT SK_OWNED);
 
 /**
@@ -324,6 +340,20 @@ SK_API sk_result SK_CALL sk_stock_set_threads(sk_stock_handle stock, uint32_t th
 SK_API sk_result SK_CALL sk_stock_cut(sk_stock_handle stock, sk_tool_handle tool,
     const sk_move *moves SK_IN_ARRAY(move_count), uint32_t move_count,
     sk_move_result *out_results SK_OUT_ARRAY(move_count), sk_cut_summary *out_summary SK_OUT);
+
+/**
+ * Adds the material swept by each move of `tool`'s cutting zone to every grid, in order: the stock becomes its
+ * union with the swept solid, starting from empty stock if need be (`sk_stock_create_empty`). The surfaces the
+ * sweep makes take the move's source and face out of the swept solid; where it lies inside material already there
+ * nothing changes. `out_added` is the volume each move added, measured on the Z grid. Every move is validated
+ * before any is added; threads and ordering are those of `sk_stock_cut`, and so is the bit-exact result.
+ *
+ * A bead of filament is such a sweep: the tool is the bead's cross-section revolved about the nozzle's axis (a
+ * stadium of the bead's width and height), and the move is the nozzle tip's.
+ */
+SK_API sk_result SK_CALL sk_stock_add(sk_stock_handle stock, sk_tool_handle tool,
+    const sk_move *moves SK_IN_ARRAY(move_count), uint32_t move_count,
+    double *out_added SK_OUT_ARRAY(move_count), sk_add_summary *out_summary SK_OUT);
 
 /**
  * The rays of the grid along `axis` in the block [i0, i0 + ni) x [j0, j0 +

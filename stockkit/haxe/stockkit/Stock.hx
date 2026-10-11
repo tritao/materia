@@ -36,6 +36,13 @@ class Stock {
     this.owner = owner;
   }
 
+  /** Stock with no material, to build up with `add`. */
+  public static function empty(lattice:StockLattice):Stock {
+    var created = StockKitNative.sk_stock_create_empty(nativeLattice(lattice));
+    check(created.status, "stock.empty");
+    return new Stock(lattice, created.out_stock);
+  }
+
   /** A solid box; rays on its sides count as inside. */
   public static function box(lattice:StockLattice, minX:Float, minY:Float, minZ:Float,
       maxX:Float, maxY:Float, maxZ:Float):Stock {
@@ -107,6 +114,32 @@ class Stock {
       start = end;
     }
     return new CutReport(outcomes);
+  }
+
+  /**
+    Adds the material each move's cutting zone sweeps, in order: the stock becomes its union with it, from empty
+    stock if need be. The surfaces a move makes face out of what it swept and record its index in `history` as
+    their source. Returns the volume each move added (cubic metres, measured on the Z grid). A bead of filament is
+    such a move: the tool is the bead's cross-section revolved about the nozzle's axis.
+  **/
+  public function add(moves:Array<CutMove>):Array<Float> {
+    alive();
+    var volumes:Array<Float> = [];
+    var start = 0;
+    while (start < moves.length) {
+      var end = start + 1;
+      while (end < moves.length && moves[end].tool == moves[start].tool) end++;
+      var first = history.length;
+      var native = [for (index in start...end) nativeMove(moves[index], first + index - start)];
+      var result = StockKitNative.sk_stock_add(owner.borrow(), toolFor(moves[start].tool).borrow(), native);
+      check(result.status, "stock.add");
+      for (index in start...end) {
+        history.push(moves[index]);
+        volumes.push(result.out_added[index - start]);
+      }
+      start = end;
+    }
+    return volumes;
   }
 
   /**

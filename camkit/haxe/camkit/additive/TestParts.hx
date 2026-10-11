@@ -8,10 +8,13 @@ import cadkit.modeling.Part;
  * centred on the origin; the caller closes them.
  */
 class TestParts {
-  /** A 20 mm cube with a 6 mm hole through it along z, off centre: for dimensional checks. */
-  public static function calibrationCube():Part {
-    var cube = Part.box(20, 20, 20);
-    var hole = Part.cylinderSpan(3, -1, 21, 2, -1);
+  /**
+   * A 20 mm square block `height` millimetres tall (a cube at the default 20) with a 6 mm hole through it along z, off
+   * centre by (2, -1): for dimensional checks.
+   */
+  public static function calibrationCube(height:Float = 20.0):Part {
+    var cube = Part.box(20, 20, height);
+    var hole = Part.cylinderSpan(3, -1, height + 1, 2, -1);
     var part = cube.subtract(hole);
     cube.close(); hole.close();
     return part;

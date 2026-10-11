@@ -353,6 +353,20 @@ SK_API sk_result SK_CALL sk_stock_create_box(const sk_lattice *lattice, const sk
     });
 }
 
+SK_API sk_result SK_CALL sk_stock_create_empty(const sk_lattice *lattice, sk_stock_handle *out_stock) {
+    return guarded([&]() -> sk_result {
+        if (!out_stock) return SK_ERROR_INVALID_ARGUMENT;
+        out_stock->id = 0;
+        Lattice l;
+        sk_result result = to_lattice(lattice, l);
+        if (result != SK_OK) return result;
+        uint32_t id = stocks().add(std::make_unique<Stock>(l));
+        if (id == 0) return SK_ERROR_LIMIT;
+        out_stock->id = id;
+        return SK_OK;
+    });
+}
+
 SK_API sk_result SK_CALL sk_stock_create_mesh(const sk_lattice *lattice, const double *positions,
     uint32_t position_count, const uint32_t *indices, uint32_t index_count, sk_stock_handle *out_stock) {
     return guarded([&]() -> sk_result {
@@ -504,6 +518,38 @@ SK_API sk_result SK_CALL sk_stock_cut(sk_stock_handle stock, sk_tool_handle tool
                 out_results[k].contact[z] = results[k].contact[z];
                 out_summary->contact[z] += results[k].contact[z];
             }
+        }
+        return SK_OK;
+    });
+}
+
+SK_API sk_result SK_CALL sk_stock_add(sk_stock_handle stock, sk_tool_handle tool, const sk_move *moves,
+    uint32_t move_count, double *out_added, sk_add_summary *out_summary) {
+    return guarded([&]() -> sk_result {
+        if ((move_count > 0 && (!moves || !out_added)) || !out_summary) return SK_ERROR_INVALID_ARGUMENT;
+        *out_summary = sk_add_summary{};
+        out_summary->struct_size = sizeof(sk_add_summary);
+        Stock *s = stocks().get(stock.id);
+        Tool *t = tools().get(tool.id);
+        if (!s || !t) return SK_ERROR_INVALID_HANDLE;
+        // Validate everything first so a bad move leaves the stock untouched.
+        std::vector<Motion> motions(move_count);
+        for (uint32_t k = 0; k < move_count; ++k) {
+            sk_result result = to_motion(&moves[k], motions[k]);
+            if (result != SK_OK) return result;
+        }
+        std::vector<MoveSweep> sweeps;
+        sweeps.reserve(move_count);
+        for (uint32_t k = 0; k < move_count; ++k) sweeps.emplace_back(*t, motions[k], moves[k].source);
+        std::vector<MoveResult> results(move_count);
+        CutStats stats;
+        s->add(sweeps, results.data(), &stats);
+        out_summary->moves = move_count;
+        out_summary->rays_tested = stats.rays_tested;
+        out_summary->rays_changed = stats.rays_changed;
+        for (uint32_t k = 0; k < move_count; ++k) {
+            out_added[k] = results[k].removed;
+            out_summary->added += results[k].removed;
         }
         return SK_OK;
     });

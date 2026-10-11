@@ -16,6 +16,38 @@ class CutMoveTests {
     tools();
     sharedProgram();
     camProgram();
+    additive();
+  }
+
+  /**
+    A bead of filament is a stadium swept along the nozzle's path, laid on stock that starts empty: its volume, the
+    union of overlapping beads, a second layer standing on the first, and the move that made each surface.
+  **/
+  static function additive():Void {
+    var lattice = new stockkit.StockLattice(-0.001043, -0.001037, -0.000553, 0.0001, 140, 80, 40);
+    var stock = stockkit.Stock.empty(lattice);
+    Assert.near(stock.volume(), 0.0, "empty stock holds nothing", 1e-18);
+    var height = 0.0002, width = 0.0005, flat = width / 2 - height / 2, radius = height / 2;
+    var bead = Tool.shaped(1, height, new CutterProfile([
+      Line(0, 0, flat, 0, Cutting),
+      Arc(flat, radius, flat, 0, flat + radius, radius, Cutting),
+      Arc(flat, radius, flat + radius, radius, flat, height, Cutting)
+    ]));
+    var source = Provenance.cam(1);
+    function laid(z:Float, from:Float, to:Float):stockkit.CutMove
+      return new stockkit.CutMove(bead, Path(Line(new Point3(from, 0.0, z), new Point3(to, 0.0, z))), Cut, 0, source);
+    var area = (width - height) * height + Math.PI * height * height / 4;
+    var first = stock.add([laid(0.0, 0.0, 0.008)])[0];
+    Assert.check(first > area * 0.008 && first < area * 0.008 * 1.15, "a bead adds its section times its length and a little for its ends");
+    Assert.near(stock.volume(), first, "the stock holds what was added", 1e-15);
+    Assert.near(stock.add([laid(0.0, 0.0, 0.008)])[0], 0.0, "a bead inside material adds nothing", 1e-15);
+    var second = stock.add([laid(height, 0.0, 0.008)])[0];
+    Assert.check(second > 0.7 * area * 0.008, "a second layer adds a bead's worth");
+    var ray = stock.ray(31, 10);
+    Assert.check(ray.length == 1, "two layers are one interval");
+    Assert.near(ray[0].hi - ray[0].lo, 2 * height, "two layers high", 1e-12);
+    Assert.check(stock.history.length == 3, "every add is in the history, as a cut is");
+    stock.dispose();
   }
 
   static function sharedProgram():Void {

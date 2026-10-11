@@ -70,6 +70,8 @@ robotkit::TrajectorySegment through_run(std::span<const robotkit::TrajectorySegm
 
 /** The accuracy a merged run of segments must keep on every motor: a tenth of a step of position, a percent of the step rate in speed. */
 constexpr double MERGE_POSITION_STEPS = 0.1;
+/** What a position may be off by in the float the wire carries it in, in steps, where that is more than the declared error. */
+constexpr double CONVERSION_STEPS = 0.1;
 constexpr double MERGE_SPEED_FRACTION = 0.01;
 /**
   Only segments shorter than this are merged, and a merged segment is no longer than the next: a link refills a
@@ -398,9 +400,12 @@ CompiledDevicePlan6 compile_once(
                 const auto exact = evaluate_f64(reference.coefficients[joint], reference.degree, reference_tau);
                 const auto error = std::abs(actual / ratio + offset - exact);
                 result.worst_position_error = std::max(result.worst_position_error, error);
-                // A merged segment keeps to a tenth of a step of the originals on top of the conversion's own error.
-                const auto allowed = target_error + (is_merged[i] ?
-                    MERGE_POSITION_STEPS / (std::abs(ratio) * (layout.empty() ? 1.0 : layout[actuator].steps_per_unit)) : 0.0);
+                // The conversion may be off by the declared error, or by a tenth of a step where that is more (a position
+                // far from zero, an extruder that has turned a thousand times, is held in a float that cannot say better);
+                // a merged segment keeps to a tenth of a step of the originals on top of that.
+                const auto one_step = layout.empty() ? 0.0 : 1.0 / (std::abs(ratio) * layout[actuator].steps_per_unit);
+                const auto allowed = std::max(target_error, CONVERSION_STEPS * one_step) +
+                    (is_merged[i] ? MERGE_POSITION_STEPS * one_step : 0.0);
                 if (error > allowed) return reject("converted trajectory exceeds target_error");
                 if (!layout.empty()) {
                     double velocity = 0.0;
@@ -425,7 +430,10 @@ CompiledDevicePlan6 compile_once(
     limits.executor_time_resolution_ns = resolution_ns;
     // Both neighbouring float segments approximate the same authored seam within
     // target_error, so their positions may differ by twice that declared error.
-    limits.max_continuity_jump[0] = 2.0 * target_error;
+    double seam = target_error;
+    for (const auto &actuator : layout)
+        seam = std::max(seam, CONVERSION_STEPS / (std::abs(actuator.ratio) * actuator.steps_per_unit));
+    limits.max_continuity_jump[0] = 2.0 * seam;
     for (std::uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
         const auto &source = blueprint.joints[joint];
         limits.position_claimed[joint] = 1;

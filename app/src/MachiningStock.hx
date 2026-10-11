@@ -1,6 +1,5 @@
 package app;
 
-import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
 import app.SimulationAssemblyParts.SimulationAssemblyPart;
 import stockkit.CutMotion;
@@ -8,8 +7,6 @@ import stockkit.CutMove;
 import stockkit.Stock;
 import stockkit.StockColoring;
 import stockkit.StockLattice;
-import stockkit.StockMesh;
-import stockkit.StockPreviewWorker;
 import toolpathkit.path.MoveKind;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.Point3;
@@ -48,16 +45,13 @@ class MachiningStock {
 	/** The finished part on the same lattice, when the job has one. */
 	public final target:Null<Stock>;
 	/** Contours the stock on its own thread, from snapshots, as it is cut. */
-	final preview:StockPreviewWorker;
-	/** Each chunk's latest mesh, row by row, as refreshes have delivered them. */
-	var chunkMeshes:Array<Null<StockMesh>> = [];
+	final meshes:StockMeshes;
 	/** The tool in the spindle; nothing cuts until one is loaded. */
 	var tool:Null<Tool> = null;
 	final stockPart:SimulationAssemblyPart;
 	final spindlePart:SimulationAssemblyPart;
 	final center:Array<Float>;
 	var last:Null<Point3> = null;
-	var changed = true;
 	/** Volume removed so far, in cubic metres. */
 	public var removed(default, null):Float = 0.0;
 	/** Segments that rapid moves cut, and segments whose shank or holder met the stock. */
@@ -84,14 +78,14 @@ class MachiningStock {
 				stockMesh.positions[index] - center[index % 3]], stockMesh.indices);
 		if (targetMesh == null) {
 			target = null;
-			preview = new StockPreviewWorker(stock, BySource(_ -> CUT, UNTOUCHED));
+			meshes = new StockMeshes(stock, BySource(_ -> CUT, UNTOUCHED));
 		} else {
 			// The target is given in the stock part's frame; the stock lives shifted to its centre.
 			var positions = [for (index in 0...targetMesh.positions.length)
 				targetMesh.positions[index] - center[index % 3]];
 			var finished = Stock.fromTriangles(lattice, positions, targetMesh.indices);
 			target = finished;
-			preview = new StockPreviewWorker(stock, ByDeviation(finished, TOLERANCE, ON_TARGET, LEFTOVER, GOUGE));
+			meshes = new StockMeshes(stock, ByDeviation(finished, TOLERANCE, ON_TARGET, LEFTOVER, GOUGE));
 		}
 		var axis = spindleAxis();
 		if (axis[2] < 1 - 1e-6)
@@ -122,90 +116,28 @@ class MachiningStock {
 		}
 		var report = stock.cut([new CutMove(loaded, CutMotion.Path(PathGeometry.Line(start, tip)), kind, opIndex, provenance)]);
 		var volume = report.removedVolume();
-		if (volume > 0) changed = true;
+		if (volume > 0) meshes.markChanged();
 		removed += volume;
 		rapidContacts += report.rapidContacts(CONTACT_VOLUME).length;
 		collisions += report.collisions(CONTACT_VOLUME).length;
 	}
 
 	/** Whether the stock changed since the last refresh started. */
-	public function hasChanged():Bool return changed;
+	public function hasChanged():Bool return meshes.hasChanged();
 
 	/** Starts contouring the stock as it is now, unless a refresh is under way; returns whether it started. */
-	public function refreshPreview():Bool {
-		if (!preview.refresh()) return false;
-		changed = false;
-		return true;
-	}
+	public function refreshPreview():Bool return meshes.refresh();
 
 	/**
 	 * The chunks finished refreshes rebuilt, as geometry by chunk index, or null when none finished.
 	 * `previewChunks` is how many chunks the stock shows as.
 	 */
-	public function takePreview():Null<Map<Int, GeometryData>> {
-		var updates = preview.take();
-		if (updates.length == 0) return null;
-		var changedChunks:Map<Int, GeometryData> = new Map();
-		for (update in updates) {
-			if (chunkMeshes.length != update.chunksX * update.chunksY)
-				chunkMeshes = [for (_ in 0...update.chunksX * update.chunksY) null];
-			for (k in 0...update.chunks.length) {
-				chunkMeshes[update.chunks[k]] = update.meshes[k];
-				changedChunks.set(update.chunks[k], meshGeometry([update.meshes[k]]));
-			}
-		}
-		return changedChunks;
-	}
+	public function takePreview():Null<Map<Int, GeometryData>> return meshes.take();
 
-	public function previewChunks():Int return chunkMeshes.length;
+	public function previewChunks():Int return meshes.chunks();
 
 	/** The whole stock as it is now, as one mesh: waits for its contouring. */
-	public function geometry():GeometryData {
-		preview.wait();
-		refreshPreview();
-		preview.wait();
-		takePreview();
-		return meshGeometry([for (mesh in chunkMeshes) if (mesh != null) mesh]);
-	}
-
-	function meshGeometry(meshes:Array<StockMesh>):GeometryData {
-		var vertices = 0, triangles = 0;
-		for (mesh in meshes) {
-			vertices += mesh.vertexCount;
-			triangles += mesh.triangleCount;
-		}
-		var positions = Bytes.alloc(vertices * 12), normals = Bytes.alloc(vertices * 12);
-		var colors = Bytes.alloc(vertices * 4), indices = Bytes.alloc(triangles * 12);
-		var vertexBase = 0, indexBase = 0;
-		for (mesh in meshes) {
-			positions.blit(vertexBase * 12, mesh.positions, 0, mesh.vertexCount * 12);
-			normals.blit(vertexBase * 12, mesh.normals, 0, mesh.vertexCount * 12);
-			colors.blit(vertexBase * 4, mesh.colors, 0, mesh.vertexCount * 4);
-			if (vertexBase == 0) indices.blit(indexBase * 4, mesh.indices, 0, mesh.triangleCount * 12);
-			else for (index in 0...mesh.triangleCount * 3)
-				indices.setInt32((indexBase + index) * 4, mesh.indices.getInt32(index * 4) + vertexBase);
-			vertexBase += mesh.vertexCount;
-			indexBase += mesh.triangleCount * 3;
-		}
-		var geometry = new GeometryData();
-		geometry.addStream(1, 2, positions, vertices, 12);
-		geometry.addStream(2, 2, normals, vertices, 12);
-		geometry.addStream(6, 4, colors, vertices, 4);
-		geometry.setIndexBuffer(indices, triangles * 3);
-		// Bounds of the meshes' own vertices, so a chunk culls as itself.
-		if (vertices > 0) {
-			var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
-			var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
-			for (vertex in 0...vertices)
-				for (axis in 0...3) {
-					var value = positions.getFloat(vertex * 12 + axis * 4);
-					if (value < low[axis]) low[axis] = value;
-					if (value > high[axis]) high[axis] = value;
-				}
-			geometry.setBounds(low[0], low[1], low[2], high[0], high[1], high[2]);
-		}
-		return geometry;
-	}
+	public function geometry():GeometryData return meshes.geometry();
 
 	/** The tip of `loaded`, its length below the gauge line, in the stock's frame. */
 	function toolTip(loaded:Tool):Point3 {
@@ -248,7 +180,7 @@ class MachiningStock {
 
 	public function dispose():Void {
 		// The worker reads the target while it contours: stop it first.
-		preview.dispose();
+		meshes.dispose();
 		stock.dispose();
 		if (target != null) target.dispose();
 	}

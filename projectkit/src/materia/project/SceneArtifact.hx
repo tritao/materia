@@ -594,7 +594,7 @@ typedef SceneArtifactTool = {
 
 
 /**
- * A print job the generator made for its own printer (since version 30). Lengths are metres, whatever the scene's unit.
+ * A print job the generator made for its own printer (since version 30; the melt lag and `deposit` since 31). Lengths are metres, whatever the scene's unit.
  *
  * `source` is the program as the printer's G-code (Klipper flavour: relative extrusion, `M104`/`M109`/`M140`/`M190`,
  * `M106`/`M107`), in machine coordinates: the positions of the three `axes`, prismatic joints whose values are
@@ -603,14 +603,19 @@ typedef SceneArtifactTool = {
  * no switch inputs for a CoreXY yet. The `extruder` is the joint of the filament drive gear: it turns
  * `1 / gearRadius` radians per metre of filament, and the hotend melts at most `maxFlow` cubic metres a second.
  * `pressureAdvance` seconds (0 is off) is how far the extruder runs ahead of the flow it feeds, averaged over
- * `pressureAdvanceWindow` seconds; `rampLength` is how far along the path its rate ramps. `controller` is the
+ * `pressureAdvanceWindow` seconds; `rampLength` is how far along the path its rate ramps. `meltLag` seconds is how long
+ * the melt takes to follow the filament: what flows out of the nozzle is the feed through a lag of that time, which
+ * pressure advance (of the same time) cancels. `controller` is the
  * controller the steppers are wired to, as in a machining job.
  *
  * Each heater (the hotend, the bed) is run by the controller: the host sets its target on the analog channel
  * `target`, the board's PID and watchdog do the rest, and its report is the `tool_heater` sensor `sensor`, in the
  * board's slot `slot`, mounted on the occurrence `mount`. The numbers are the controller's tuning and the part's
  * assumed thermal plant. A heater's `fan` is the analog channel (duty 0 to 1) of the part fan that blows on it;
- * `feedsExtruder` says that pushing filament while it is below `minExtrusionTemperature` is a fault.
+ * `feedsExtruder` says that pushing filament while it is below `minExtrusionTemperature` is a fault. `deposit`, when
+ * given, is the occurrence that shows what is printed: the simulation lays the material on it as geometry of its own,
+ * in the frame of the occurrence, whose origin is the machine's zero (the bed's front left corner at its surface),
+ * and it rides the bed.
  */
 typedef SceneArtifactPrinting = {
 	var source:String;
@@ -621,11 +626,13 @@ typedef SceneArtifactPrinting = {
 	var maxFlow:Float;
 	var pressureAdvance:Float;
 	var pressureAdvanceWindow:Float;
+	var meltLag:Float;
 	var rampLength:Float;
 	var heaters:Array<SceneArtifactHeater>;
 	var controller:SceneArtifactController;
 	/** The material's minimum extrusion temperature, degrees Celsius: the static check and the controller refuse to extrude colder. */
 	var minExtrusionTemperature:Float;
+	@:optional var deposit:String;
 }
 
 /** One heater of a print job; see SceneArtifactPrinting. */
@@ -663,7 +670,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 30;
+	public static inline var VERSION:Int = 31;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -1391,7 +1398,7 @@ class SceneArtifact {
 			extruder: text(decoded, "extruder"),
 			filamentDiameter: field(decoded, "filamentDiameter"), gearRadius: field(decoded, "gearRadius"),
 			maxFlow: field(decoded, "maxFlow"), pressureAdvance: field(decoded, "pressureAdvance"),
-			pressureAdvanceWindow: field(decoded, "pressureAdvanceWindow"), rampLength: field(decoded, "rampLength"),
+			pressureAdvanceWindow: field(decoded, "pressureAdvanceWindow"), meltLag: field(decoded, "meltLag"), rampLength: field(decoded, "rampLength"),
 			minExtrusionTemperature: field(decoded, "minExtrusionTemperature"),
 			heaters: [for (raw in array(Reflect.field(decoded, "heaters"))) {
 				var heater:SceneArtifactHeater = {name: text(raw, "name"), sensor: text(raw, "sensor"), slot: integer(raw, "slot"),
@@ -1409,6 +1416,8 @@ class SceneArtifact {
 				heater;
 			}],
 			controller: {stepTickHz: integer(controller, "stepTickHz")}};
+		var deposit:Dynamic = Reflect.field(decoded, "deposit");
+		if (deposit != null) job.deposit = Std.isOfType(deposit, String) ? deposit : fail();
 		return job;
 	}
 
@@ -1430,8 +1439,10 @@ class SceneArtifact {
 		for (value in [job.filamentDiameter, job.gearRadius, job.maxFlow, job.rampLength, job.pressureAdvanceWindow])
 			if (!finite(value) || value <= 0.0) fail("has a filament, gear, flow, ramp or window size that is not positive");
 		if (!finite(job.pressureAdvance) || job.pressureAdvance < 0.0 || job.pressureAdvance > 1.0) fail("has a pressure advance outside 0 to 1 s");
+		if (!finite(job.meltLag) || job.meltLag < 0.0 || job.meltLag > 1.0) fail("has a melt lag outside 0 to 1 s");
 		if (!finite(job.minExtrusionTemperature) || job.minExtrusionTemperature < 0.0) fail("has a minimum extrusion temperature below 0");
 		if (job.controller == null || job.controller.stepTickHz <= 0) fail("needs a controller step rate");
+		if (job.deposit != null && occurrences.indexOf(job.deposit) < 0) fail('shows what is printed on "${job.deposit}", which is no occurrence');
 		if (job.heaters == null || job.heaters.length == 0 || job.heaters.length > 2) fail("needs one or two heaters");
 		var slots = new Map<Int, Bool>(), channels = new Map<String, Bool>();
 		for (heater in job.heaters) {

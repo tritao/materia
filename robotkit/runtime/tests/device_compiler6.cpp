@@ -209,7 +209,7 @@ int main() {
     blueprint.owner_period_ns = 10'000'000;
     blueprint.joints[0].max_velocity = 1.0;
     blueprint.joints[0].max_acceleration = 100.0;
-    robotkit::DeviceActuator6 motor{0, 1.0, 0.0, 10'000.0, 0.5};
+    robotkit::DeviceActuator6 motor{0, 1.0, 0.0, 10'000.0, 1};
     const robotkit::DeviceActuator6 motors[] = {motor};
     std::vector<robotkit::TrajectorySegment> ramp(400);
     double position = 0.0, speed = 0.0;

@@ -209,7 +209,7 @@ public:
      * bands overlap after its cut, for the Z grid's accounting.
      */
     void cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uint32_t owners, bool measure,
-        CutWorker &worker);
+        CutWorker &worker, bool adding = false);
     uint32_t tile_count() const { return tiles_i_ * tiles_j_; }
 
     /**
@@ -260,6 +260,9 @@ private:
     bool ray_range(const Bounds &bounds, RayRange &out) const;
     bool cut_tile(uint32_t index, const SweptVolume &sweep, const RayRange &range, uint32_t source,
         CutWorker &worker, double &removed_volume);
+    /** The union of `sweep` with the tile's rays, the new surfaces taking `source`; empty rays take it too. */
+    bool add_tile(uint32_t index, const SweptVolume &sweep, const RayRange &range, uint32_t source,
+        CutWorker &worker, double &added_volume);
     double touch_tile(const Tile &tile, const SweptVolume &sweep, const RayRange &range, CutWorker &worker) const;
     /** The tile for writing: a private copy if a snapshot still shares it; bumps its revision. */
     Tile &mutable_tile(uint32_t index);
@@ -310,6 +313,12 @@ public:
      * tool climbs) is not seen.
      */
     void cut(const std::vector<MoveSweep> &moves, MoveResult *results, CutStats *summary = nullptr);
+    /**
+     * Adds each move's cutting sweep, in order, to every grid: the stock becomes its union with the sweep, from
+     * empty stock if need be. The surfaces the sweep makes take the move's source and face outward; `removed` in
+     * each result is the volume added. Threads, ordering and determinism are those of `cut`.
+     */
+    void add(const std::vector<MoveSweep> &moves, MoveResult *results, CutStats *summary = nullptr);
     /** Totals over every cut so far, over all grids. */
     const CutStats &stats() const { return stats_; }
 
@@ -329,6 +338,7 @@ public:
     uint64_t bytes() const;
 
 private:
+    void run(const std::vector<MoveSweep> &moves, MoveResult *results, CutStats *summary, bool adding);
     /** Renews the revision of every Z tile a worker marked during the last cut. */
     void touch_marked();
 

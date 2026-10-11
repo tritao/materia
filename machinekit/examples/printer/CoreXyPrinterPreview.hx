@@ -23,6 +23,22 @@ import materia.project.SceneArtifact;
 class CoreXyPrinterPreview {
 	public static inline var ASSEMBLY_ID:String = "corexy-printer";
 
+	/** The printer printing the slicer's calibration cube (20 mm with a 6 mm hole through it) at its default infill: the slow dimensional check. */
+	public static function cube():Bytes {
+		var printer = new CoreXyPrinter();
+		var scene = AssemblyPreview.scene(printer, ASSEMBLY_ID);
+		scene.printing = CoreXyPrinterJob.calibrationCube(printer, 20.0, 0.15);
+		return SceneArtifact.encode(scene);
+	}
+
+	/** The same block 4 mm tall and solid (20 layers): the regular dimensional check, a few minutes of printing. */
+	public static function cubeShort():Bytes {
+		var printer = new CoreXyPrinter();
+		var scene = AssemblyPreview.scene(printer, ASSEMBLY_ID);
+		scene.printing = CoreXyPrinterJob.calibrationCube(printer, 4.0, 1.0);
+		return SceneArtifact.encode(scene);
+	}
+
 	/**
 	 * Geometry, joints and initial pose of the printer (parts with equal designations share geometry), and the job it
 	 * prints: the slicer's small tab.
@@ -42,14 +58,20 @@ class CoreXyPrinterPreview {
 class CoreXyPrinterJob {
 	/** The step rate of the controller the steppers are wired to, as the router's. */
 	public static inline var STEP_TICK_HZ:Int = 40000;
-	/** Pressure advance of a direct-drive extruder, seconds. */
-	public static inline var PRESSURE_ADVANCE:Float = 0.04;
 	/** The room, degrees Celsius. */
 	public static inline var AMBIENT:Float = 22.0;
 
 	/** The slicer's `SmallTab` (10 x 10 x 1.2 mm, six layers) with its default settings. */
 	public static function smallTab(printer:CoreXyPrinter):SceneArtifactPrinting {
 		var sliced = Slicer.slice(TestParts.smallTab(), new SlicerSettings());
+		return job(printer, PrinterWriter.write(sliced.program, new CncController(Printer), Klipper));
+	}
+
+	/** The slicer's calibration block (20 mm square, `height` millimetres tall, with a 6 mm hole through it) at infill `density`. */
+	public static function calibrationCube(printer:CoreXyPrinter, height:Float, density:Float):SceneArtifactPrinting {
+		var settings = new SlicerSettings();
+		settings.infillDensity = density;
+		var sliced = Slicer.slice(TestParts.calibrationCube(height), settings);
 		return job(printer, PrinterWriter.write(sliced.program, new CncController(Printer), Klipper));
 	}
 
@@ -65,9 +87,9 @@ class CoreXyPrinterJob {
 			bed.heatCapacity, bed.watts, bed.lossCoefficient, 0.0, bed.maxTemperature);
 		return {source: source, axes: ["x", "y", "z"], extruder: "e",
 			filamentDiameter: hotend.filamentDiameter * 1e-3, gearRadius: printer.extruder.spec.hobDiameter * 0.5e-3,
-			maxFlow: hotend.maxVolumetricFlow * 1e-9, pressureAdvance: PRESSURE_ADVANCE, pressureAdvanceWindow: 0.04, rampLength: 0.0005,
+			maxFlow: hotend.maxVolumetricFlow * 1e-9, pressureAdvance: hotend.pressureLag, pressureAdvanceWindow: 0.04, meltLag: hotend.pressureLag, rampLength: 0.0005,
 			minExtrusionTemperature: hotend.minExtrusionTemperature, heaters: [hotendHeater, bedHeater],
-			controller: {stepTickHz: STEP_TICK_HZ}};
+			controller: {stepTickHz: STEP_TICK_HZ}, deposit: "printed"};
 	}
 
 	/**

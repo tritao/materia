@@ -497,6 +497,133 @@ class ProjectSourceTests {
   }
 
   /**
+   * What a printed stock holds in the box `[x0, x1] x [y0, y1]` grown by `margin`: the volume, the extent of the material
+   * from the exact ends of the X and Y rays and the Z rays' intervals, and the volume in the ring `margin` .. 3 mm
+   * outside (where only the skirt may be). Metres, in the stock's frame shifted to its preview centre: the stock's
+   * lattice and the box are both given in the frame of machine coordinates, so the shift is added back.
+   */
+  static function measurePrinted(stock:stockkit.Stock, x0:Float, x1:Float, y0:Float, y1:Float, margin:Float,
+      ?shift:Array<Float>):{volume:Float, low:Array<Float>, high:Array<Float>, outside:Float} {
+    var lattice = stock.lattice;
+    var offset = shift == null ? [0.0, 0.0, 0.0] : shift;
+    var volume = 0.0, outside = 0.0, area = lattice.spacing * lattice.spacing;
+    var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+    var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+    var rays = stock.rays(0, 0, lattice.countX, lattice.countY);
+    for (j in 0...lattice.countY) for (i in 0...lattice.countX) {
+      var intervals = rays[j * lattice.countX + i];
+      if (intervals.length == 0) continue;
+      var x = lattice.x(i) + offset[0], y = lattice.y(j) + offset[1];
+      var inside = x >= x0 - margin && x <= x1 + margin && y >= y0 - margin && y <= y1 + margin;
+      var length = 0.0;
+      for (interval in intervals) length += interval.hi - interval.lo;
+      if (inside) {
+        volume += length * area;
+        low[2] = Math.min(low[2], intervals[0].lo + offset[2]);
+        high[2] = Math.max(high[2], intervals[intervals.length - 1].hi + offset[2]);
+      } else if (x >= x0 - 1.5e-3 && x <= x1 + 1.5e-3 && y >= y0 - 1.5e-3 && y <= y1 + 1.5e-3) outside += length * area;
+    }
+    // The extent in x and y from the rays along them, whose interval ends are exact.
+    var xRays = stock.rays(0, 0, lattice.countY, lattice.countZ, stockkit.StockAxis.X);
+    for (k in 0...lattice.countZ) for (j in 0...lattice.countY) {
+      var intervals = xRays[k * lattice.countY + j];
+      var y = lattice.y(j) + offset[1];
+      if (intervals.length == 0 || y < y0 - margin || y > y1 + margin) continue;
+      for (interval in intervals) {
+        var lo = interval.lo + offset[0], hi = interval.hi + offset[0];
+        if (hi < x0 - margin || lo > x1 + margin) continue;
+        low[0] = Math.min(low[0], lo); high[0] = Math.max(high[0], hi);
+      }
+    }
+    var yRays = stock.rays(0, 0, lattice.countX, lattice.countZ, stockkit.StockAxis.Y);
+    for (k in 0...lattice.countZ) for (i in 0...lattice.countX) {
+      var intervals = yRays[k * lattice.countX + i];
+      var x = lattice.x(i) + offset[0];
+      if (intervals.length == 0 || x < x0 - margin || x > x1 + margin) continue;
+      for (interval in intervals) {
+        var lo = interval.lo + offset[1], hi = interval.hi + offset[1];
+        if (hi < y0 - margin || lo > y1 + margin) continue;
+        low[1] = Math.min(low[1], lo); high[1] = Math.max(high[1], hi);
+      }
+    }
+    return {volume: volume, low: low, high: high, outside: outside};
+  }
+
+  /**
+   * The printer prints a calibration cube (20 mm square with a 6 mm hole through it, off centre by (2, -1) mm) and the
+   * stock it laid is measured: the plastic against the filament the program feeds (and, for a solid cube, against the
+   * CAD part's volume), the box, the hole's diameter at mid-height along x and along y through the hole's own centre,
+   * and nothing laid beside the cube but the skirt. `project` is the example directory (`cube`: 100 layers at the
+   * slicer's default infill, slow; `cube-short`: 4 mm, solid, the regular check), `height` its height in millimetres.
+   * Runs on the deterministic backend and by itself (`PROJECT_SOURCE_ONLY=printer-cube-short` or `printer-cube`).
+   */
+  static function checkPrinterCube(root:String, project:String, height:Float, solid:Bool):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/" + project + "/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var world = new RobotWorld();
+    var simulation = new ApplicationSimulation(world);
+    simulation.setBackend(ApplicationSimulation.DETERMINISTIC);
+    check(simulation.rebuild(session.sensors, session.scene, session), "the cube printer builds: " + simulation.error);
+    var player = simulation.printPlayer(), job = session.printJob;
+    if (player == null || job == null) throw "the cube printer has no print player";
+    player.showPrint = false;
+    // Half a tenth of a millimetre between rays keeps a bead of 0.4 mm to eight and the hole's diameter to a tenth.
+    player.stockSpacing = 0.00005;
+    var dt = simulation.timestep, ticks = 0, limit = Math.round(3600.0 / dt);
+    var wall = Sys.time();
+    while (player.passes == 0 && player.failure == null && ticks++ < limit) {
+      simulation.step();
+      if (ticks % 10000 == 0) Sys.println('printer $project: ${ticks * dt} s, layer ${player.layer} of ${player.layerCount}, ${Math.round((Sys.time() - wall) * 10) / 10} s wall');
+    }
+    check(player.failure == null, "the printer prints the cube: " + player.failure);
+    check(player.passes == 1, 'the cube is done in ${ticks * dt} s (limit ${limit * dt} s)');
+    var laid = player.stock;
+    if (laid == null) throw "the cube print laid no material";
+    var cube = measurePrinted(laid.stock, 0.100, 0.120, 0.100, 0.120, 0.0005, laid.center);
+    var tall = height * 1e-3;
+    var fed = programFilament(job.source) * 1e-3 * Math.PI * job.filamentDiameter * job.filamentDiameter / 4.0;
+    var cad = (20.0 * 20.0 * height - Math.PI * 3.0 * 3.0 * height) * 1e-9;
+    check(Math.abs(laid.deposited - fed) <= 0.02 * fed, 'the print laid ${laid.deposited * 1e9} mm^3 in ${laid.beads} beads for ${fed * 1e9} mm^3 of filament');
+    check(cube.volume <= laid.deposited && cube.volume >= 0.9 * laid.deposited, 'the cube holds ${cube.volume * 1e9} mm^3 of the ${laid.deposited * 1e9} laid');
+    if (solid) check(Math.abs(cube.volume - cad) <= 0.03 * cad, 'the solid cube holds ${cube.volume * 1e9} mm^3, its CAD volume is ${cad * 1e9}');
+    else check(cube.volume < cad && cube.volume > 0.25 * cad, 'the sparse cube holds ${cube.volume * 1e9} mm^3 of its solid CAD volume ${cad * 1e9}');
+    for (axis in 0...3) {
+      var wanted = [[0.100, 0.120], [0.100, 0.120], [0.0, tall]][axis];
+      check(Math.abs(cube.low[axis] - wanted[0]) <= 0.0002 && Math.abs(cube.high[axis] - wanted[1]) <= 0.0002,
+        'the cube spans ${cube.low[axis] * 1000}..${cube.high[axis] * 1000} mm on axis $axis, CAD ${wanted[0] * 1000}..${wanted[1] * 1000}');
+    }
+    check(cube.outside <= 1e-12, 'nothing is laid next to the cube but the skirt: ${cube.outside * 1e9} mm^3');
+    // The hole at mid-height, through its own centre: the part's centre (0.110, 0.110) plus the hole's offset (2, -1) mm.
+    var holeX = 0.112, holeY = 0.109;
+    var lattice = laid.stock.lattice;
+    var i = Math.round((holeX - laid.center[0] - lattice.originX) / lattice.spacing);
+    var j = Math.round((holeY - laid.center[1] - lattice.originY) / lattice.spacing);
+    var k = Math.round((tall / 2.0 - laid.center[2] - lattice.originZ) / lattice.spacing);
+    function gapAt(across:Array<stockkit.StockInterval>, offset:Float, centre:Float):Float {
+      var found = 0.0;
+      for (index in 0...across.length - 1) {
+        var from = across[index].hi + offset, to = across[index + 1].lo + offset;
+        if (from < centre && to > centre) found = to - from;
+      }
+      return found;
+    }
+    var alongX = gapAt(laid.stock.ray(j, k, stockkit.StockAxis.X), laid.center[0], holeX);
+    var alongY = gapAt(laid.stock.ray(i, k, stockkit.StockAxis.Y), laid.center[1], holeY);
+    check(Math.abs(alongX - 0.006) <= 0.0003, 'the hole measures ${alongX * 1000} mm across along x, CAD 6');
+    check(Math.abs(alongY - 0.006) <= 0.0003, 'the hole measures ${alongY * 1000} mm across along y, CAD 6');
+    Sys.println('printer $project: printed in ${Math.round(ticks * dt * 10) / 10} s (${Math.round((Sys.time() - wall) * 10) / 10} s wall), ' +
+      '${Math.round(cube.volume * 1e10) / 10} mm^3 in the cube of ${Math.round(laid.deposited * 1e10) / 10} laid for ${Math.round(fed * 1e10) / 10} fed (CAD ${Math.round(cad * 1e10) / 10}, ' +
+      '${Math.round((cube.volume / cad - 1.0) * 1000) / 10} %), spans ' +
+      '${Math.round(cube.low[0] * 1e4) / 10}..${Math.round(cube.high[0] * 1e4) / 10} x ${Math.round(cube.low[1] * 1e4) / 10}..${Math.round(cube.high[1] * 1e4) / 10} x ' +
+      '${Math.round(cube.low[2] * 1e4) / 10}..${Math.round(cube.high[2] * 1e4) / 10} mm, hole ${Math.round(alongX * 1e4) / 10} x ${Math.round(alongY * 1e4) / 10} mm, ' +
+      '${laid.beads} beads laid in ${Math.round(player.depositSeconds * 10) / 10} s');
+    simulation.dispose();
+    session.dispose();
+  }
+
+  /**
    * The editor's link to a printer: the print is sent to a Moonraker (a fake on a real socket) and started, and the
    * printer model follows the machine over the WebSocket subscription, each update putting the model's axes and
    * extruder where the nozzle is (`motion_report.live_position`, not the end of the queued moves), so the twin is
@@ -619,6 +746,8 @@ class ProjectSourceTests {
       throw 'the printer has no joint $id';
     }
     var x = joint("x"), y = joint("y"), z = joint("z"), e = joint("e");
+    // The material is measured by rays: half a tenth of a millimetre between them keeps a bead of 0.4 mm to eight.
+    player.stockSpacing = 0.00005;
     var dt = simulation.timestep, every = 5;
     function robot():robotkit.core.RobotSnapshot return world.snapshot().robots()[0];
     var first = robot();
@@ -675,6 +804,21 @@ class ProjectSourceTests {
     }
     var shown = ui.submit(new app.editor.CncPanel().build(simulation, theme.tokens), new LayoutFrame(480.0, 720.0));
     check(find(shown, "cnc-hold") != null && find(shown, "cnc-speed") != null, "the panel offers hold and a speed override for a print");
+    // What the nozzle laid, measured on the printed material: the tab's volume, its box, and nothing beyond its footprint
+    // and a bead (the skirt and the purge line are away from it).
+    var laid = player.stock;
+    if (laid == null) throw "the print laid no material";
+    var tab = measurePrinted(laid.stock, 0.105, 0.115, 0.105, 0.115, 0.0005, laid.center);
+    var cad = 10.0 * 10.0 * 1.2 * 1e-9;
+    check(Math.abs(tab.volume - cad) <= 0.03 * cad, 'the tab holds ${tab.volume * 1e9} mm^3 of material, its CAD volume is ${cad * 1e9}');
+    for (axis in 0...3) {
+      var wanted = [[0.105, 0.115], [0.105, 0.115], [0.0, 0.0012]][axis];
+      check(Math.abs(tab.low[axis] - wanted[0]) <= 0.0002 && Math.abs(tab.high[axis] - wanted[1]) <= 0.0002,
+        'the tab spans ${tab.low[axis] * 1000}..${tab.high[axis] * 1000} mm on axis $axis, CAD ${wanted[0] * 1000}..${wanted[1] * 1000}');
+    }
+    check(tab.outside <= 1e-12, 'nothing is laid next to the tab but the skirt: ${tab.outside * 1e9} mm^3');
+    var skirt = laid.deposited - tab.volume;
+    check(skirt > 0 && laid.beads > 100, 'the skirt and the purge line were laid too ($skirt m^3 in ${laid.beads} beads)');
     var checks = player.planChecks();
     check(checks.count(PlanDiagnosticKind.StepperStall) == 0, 'no plan of the print stalls a stepper (${checks.count(PlanDiagnosticKind.StepperStall)} findings)');
     check(end.safety == 0 && end.faultCode == 0, "the print ends with the runtime ready and no fault");
@@ -684,6 +828,11 @@ class ProjectSourceTests {
       'plan checks: ${checks.plans} plans, ${checks.flagged} flagged, worst torque ${Math.round(checks.worstTorqueRatio * 100)} % (${checks.worstMotor}), ' +
       'worst deviation ${Math.round(checks.worstDeviation * 1e6)} um (${checks.worstAxis}); ' +
       'motion cost ${Math.round(player.motionSeconds * 10) / 10} s of ${Math.round(wallSeconds * 10) / 10} s wall, slowest tick ${Math.round(player.slowestUpdate * 1000)} ms');
+    Sys.println('printer: the print laid ${Math.round(laid.deposited * 1e10) / 10} mm^3 in ${laid.beads} beads for ${Math.round(asked * 2.405 * 10) / 10} mm^3 of filament; the tab holds ' +
+      '${Math.round(tab.volume * 1e10) / 10} mm^3 of its CAD ${Math.round(cad * 1e10) / 10} (${Math.round((tab.volume / cad - 1.0) * 1000) / 10} %), spans ' +
+      '${Math.round(tab.low[0] * 1e4) / 10}..${Math.round(tab.high[0] * 1e4) / 10} x ${Math.round(tab.low[1] * 1e4) / 10}..${Math.round(tab.high[1] * 1e4) / 10} x ' +
+      '${Math.round(tab.low[2] * 1e4) / 10}..${Math.round(tab.high[2] * 1e4) / 10} mm, ${Math.round(tab.outside * 1e12) / 1000} mm^3 beside it; ' +
+      'laying ${Math.round(player.depositSeconds * 10) / 10} s, meshing ${Math.round(player.meshingSeconds * 10) / 10} s');
   }
 
   static function checkCoreXyPlotter(root:String):Void {
@@ -5413,6 +5562,14 @@ class ProjectSourceTests {
       checkMissionOverlayEdge();
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer-cube") {
+      checkPrinterCube(root, "cube", 20.0, false);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer-cube-short") {
+      checkPrinterCube(root, "cube-short", 4.0, true);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer-mirror") {
       checkPrinterMirror(root);
       return 0;
@@ -5583,6 +5740,7 @@ class ProjectSourceTests {
       checkBeltRouter(root);
       checkCoreXyPlotter(root);
       checkPrinter(root);
+      checkPrinterCube(root, "cube-short", 4.0, true);
       checkPrinterMirror(root);
       checkMobileBase(root);
       checkMobileMission(root);
@@ -5956,6 +6114,7 @@ class ProjectSourceTests {
     checkBeltRouter(root);
     checkCoreXyPlotter(root);
     checkPrinter(root);
+    checkPrinterCube(root, "cube-short", 4.0, true);
     checkPrinterMirror(root);
     checkMobileBase(root);
     checkMobileMission(root);
