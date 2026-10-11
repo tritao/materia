@@ -747,6 +747,91 @@ Gates, for work without review:
   `MATERIA_CACHE_DIR=/home/joao/dev/materia-cache`. The shared checkout is
   touched only to move local `main`.
 
+## CL9: One shape vocabulary (2026-10-11)
+
+After CL8, five collision geometry vocabularies remain:
+- collisionkit's `CollisionGeometry`;
+- RobotKit's `CollisionPrimitive` (link shapes, also the editor's box proxies in `RobotLinkBounds`);
+- `ToolCollisionShape` (`NoCollision`, `Box`, `Cylinder`, `Hulls` with padding);
+- four records for "a convex hull on a link": `RobotLinkHull`, SimKit's `SimulationLinkHull`, cadbridge's `AssemblyLinkHull` and `ClearanceBodyData`;
+- a second clearance engine: `ToolClearanceChecker` (SAT of tool pieces against `ToolBoxObstacle`s), with `ToolClearanceShape` and `BaseObstacle`, still used by processkit's `WorkPatchPlanner` and `ReachabilityChecker`.
+
+Every new user (machine tending, sheet metal, screwdriving) picks one of these, so they get harder to merge each week.
+
+### CL-D15: `CollisionGeometry` is the only geometry type
+
+- `robotkit-core` depends on `collisionkit` (its pure half; no native code needed to compile).
+- A link's collision is `Array<CollisionShape>`. `CollisionShape` keeps its pose, surface and contact, and holds:
+  - `geometry:CollisionGeometry`;
+  - `inflation:Float` (default 0).
+- Convex hulls are `Convex` shapes on links, so a part hull's surface and contact live on the shape like any other.
+- Not accepted on a link: `Mesh`, `HeightField` and `HalfSpace`. These are scene geometry, and `validate` rejects them on links.
+- A tool's collision is also `Array<CollisionShape>`, in the flange frame. Empty means no collision. A box centre is the shape's position, and hull padding is `inflation`.
+- SimKit maps shapes to MuJoCo the way it maps hulls today. `Convex` becomes a mesh geom, and inflation is not carried (CL3b).
+- One schema version: the RobotModel codec bumps `VERSION` and rejects the old one, with no migration (no legacy compat).
+
+### Steps
+
+**CL9a: link shapes.**
+- Replace `CollisionPrimitive` with `CollisionGeometry` in `CollisionShape`, add `inflation`, and move link hulls onto links as `Convex` shapes.
+- Delete `CollisionPrimitive`, `RobotLinkHull`, `SimulationLinkHull` and `AssemblyLinkHull`. Remove `Simulation`'s `linkHulls` parameters and `RobotCollisionOptions.hulls`.
+- Update the users: URDF loader, codec, `Simulation`, `RobotCollision`, `AssemblyRobot`, `AssemblySimulationBridge`, `RobotLinkBounds`, `SimulationContactSurfaces`, the tests.
+- Accept when: none of the deleted names is found by grep, and the gates below pass.
+
+**CL9b: tool shapes.**
+- Replace `ToolCollisionShape` with `Array<CollisionShape>` on `Tool`.
+- Move `ToolCollisionShapes.bounds` to a collisionkit `CollisionBounds.of(geometry, pose, inflation)`. The editor and the tool code use it.
+- Update `RobotCollision`'s tool description, `EndEffectorBridge`, `EndEffectorVacuumFeedback`, `RobotRuntimeBlueprint` and the tests.
+- Accept when: `ToolCollisionShape` is not found by grep, and the gates pass.
+
+**CL9c: retire the second clearance engine.**
+- Port `WorkPatchPlanner`, `ReachabilityChecker` and the processkit skills (Paint, Sand, FinishSurface) onto `CollisionClearance`, as PP10 did for `ArmClearance`. Obstacles become `Box` objects in the description.
+- `ClearanceBodyData` becomes link shapes plus the tool body's shapes. The tool flag comes from the body, not the record.
+- Delete `ToolClearanceChecker`, `ToolClearanceShape`, `ToolBoxObstacle`, `BaseObstacle`, `ToolPlanningContext`'s use of them, and `ClearanceBodyData`.
+- Expected value changes are allowed here, and only here. Exact distances replace the SAT's conservative ones. The log lists each changed assertion with the old and new value.
+- Accept when: the deleted names are not found by grep, and the gates pass.
+
+**CL9d: the motion bound in kinematicskit.**
+- Move `ClearanceMotionEnvelope` and `ClearanceMotionBounds` to kinematicskit on `KinematicModel` (body ids, kit transforms), with no RobotKit types.
+- `CollisionClearance` and MotionKit's `JointCurveClearance` and `JointCurveTask` call the kit. The bisection proof stays in MotionKit.
+- Accept when: the robotkit files are gone, and the gates pass with no value changes.
+
+**CL9e: broadphase.**
+- Above a candidate-pair threshold, `World` uses coal's `DynamicAABBTreeCollisionManager` instead of the per-pair AABB loop. Below it, the loop stays.
+- Pick the threshold from a C++ benchmark: a cell with N boxes against a 6-axis arm, at N = 10, 100 and 1000. Record it in the log.
+- Accept when: both paths give identical results in a C++ test, on one scene run above and below the threshold, and the gates pass.
+
+Order: CL9a, CL9b, CL9c, CL9d, CL9e. Each step is one commit.
+
+### Gates
+
+- The suites as in "Order and gates":
+  - standalone C++;
+  - native and pure kinematicskit;
+  - collisionkit;
+  - MotionKit;
+  - RobotKit;
+  - processkit;
+  - the app suite.
+- No assertion or expected value changes, except where CL9c allows them and logs them.
+- Known failure: the pure kit's "DLS allocates nothing per iteration" fails on main too. Record it, don't fix it.
+- Stop and write up, instead of deciding alone, on:
+  - a new dependency other than `robotkit-core` → `collisionkit`;
+  - a fork;
+  - a simulation behaviour change visible in the app's mission suite.
+- No pushes. Sync each finished step onto local `main` (no topic branches left behind).
+- Never rebuild OCCT: export `MATERIA_CACHE_DIR=/home/joao/dev/materia-cache` and `CADKIT_OCCT_DIR=/home/joao/dev/materia-cache/occt-f1dc4efb-release`.
+
+## Long-term commitments (2026-10-11)
+
+- **One collision world** (done in PP10) and **one description shared with SimKit** (done in CL3b). New code builds on `CollisionDescription`, never on its own geometry.
+- **One shape vocabulary:** CL9.
+- **The motion bound belongs to the kit** (CL9d). MotionKit owns the proof that a move is clear.
+- **coal is fixed in our fork** (CL-D13). The patches go upstream as a PR when the user says so.
+- **MuJoCo stays the simulator.** It does dynamics contact on a compiled model, with hull meshes and 32-bit contact masks. It is not a query engine: it has no distance between arbitrary pairs at a pose without stepping, and no inflation.
+- **Jolt is the fallback backend** if coal ever stops fitting: it is maintained, MIT, and has convex radius and narrow-phase queries. The `ck_*` C ABI is the seam, so a switch replaces `collisionkit/native` only.
+- **Not yet planned:** trajectory optimization (the PP-D11 refiner on CL5's avoidance rows), task-level pick and place with CAD grasps (machine tending first), perception into the scene (octomap through coal), CL6's clearance cost, and planner speed (lazy edge checks, native FK).
+
 ## Out of scope
 
 - Continuous collision on swept volumes. CL-D5's bound gives the same
