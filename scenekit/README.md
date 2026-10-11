@@ -60,3 +60,91 @@ The Haxeon end-to-end smoke test uses the SceneKit build directory:
 ```sh
 NATIVEKIT_BUILD="$PWD/build" scene_render/tools/test-haxeon.sh
 ```
+
+## Reusable translation gizmos
+
+`scene_interaction/haxe` is a pure Haxe package (`scenekit-gizmo`, namespace
+`nativekit.scene.gizmo`) for perspective translation handles. It has no NativeKit
+FFI, UI, scene-entity, document or undo dependencies. The root SceneKit manifest
+also exposes its source root.
+
+```haxe
+var eye = camera.eyePosition();
+var view = new GizmoCamera(new GizmoVec3(eye[0], eye[1], eye[2]),
+  new GizmoVec3(camera.targetX, camera.targetY, camera.targetZ),
+  new GizmoVec3(0, 0, 1), viewportWidth, viewportHeight,
+  PerspectiveCamera.FOV_Y, camera.clipNear, camera.clipFar);
+var layout = new TranslationGizmo(view, worldPivot);
+var handle = layout.pick(pointerX, pointerY);
+if (handle != null) {
+  var drag = layout.begin(handle, pointerX, pointerY, snapIncrement);
+  var proposed = drag.update(nextPointerX, nextPointerY);
+  // Proposed is absolute World displacement from pointer-down, or null.
+  // On release, pass drag.finish() to the consumer's commit operation.
+  // On cancellation, drag.cancel(); discard the consumer's transient preview.
+}
+```
+
+First scope is world X/Y/Z axes and XY/XZ/YZ pads, one pivot. `shapes()` returns
+immutable labelled segments or convex quads in logical viewport pixels; drawing
+and picking use the same geometry. Two-point primitives describe an axis shaft
+and tip; the UI may decorate that tip with an arrow and label. Plane pads require
+an inside-polygon hit. Handle picking precedes normal scene selection in the
+consumer. Picking ties resolve by screen distance, depth, then stable handle
+order. Arrays are detached copies and vectors/points are immutable.
+
+Default projected size is approximately 90 logical pixels, hit radius 8 pixels.
+The world size derives from pivot eye-depth and perspective FOV. View-aligned
+axes (absolute eye dot above 0.99), edge-on planes (normal eye dot below 0.2),
+axis segments below 12 pixels and plane pads below 36 square pixels are absent
+from both drawing and picking. Pivot/vertices outside the camera depth range are
+rejected; an offscreen pivot has no handles. The UI clips overlay geometry to
+the viewport. Handle geometry can extend beyond viewport boundaries, but picking
+is restricted to the viewport. No GPU picking/readback is required.
+
+A drag freezes camera, pivot, handle, constraint plane, starting intersection and
+snap increment. Axis planes face the eye while containing the axis; plane pads
+use their World plane. Proposals derive from current minus initial plane hits,
+then project into the constrained axis/plane basis. Snap rounds displacement
+coefficients, not the pivot's absolute grid position. Parallel rays (absolute
+normal dot below 1e-6), behind-eye intersections and nonfinite inputs return null
+and retain `lastDelta`. The next valid update can recover. Finish/cancel close
+the solver; late updates throw. `translatedShapes(delta)` follows an accepted
+proposal using the captured size/visible handles instead of changing the active
+constraint as the pivot moves. Perspective projection is the only supported
+camera mode in this checkpoint.
+
+Consumers own pointer capture, hover/active colours and labels, camera locking,
+selection/document/asset/viewport revision guards and cancellation. Documents
+converts World displacement to local position through its captured parent and
+validates its detached World. The solver does not decide whether a proposal can
+be admitted or commit any scene/source/history state. When validation rejects a
+proposal, use the last admitted displacement for the displayed overlay, rather
+than the solver's latest unadmitted proposal. Resize, focus loss, camera movement
+or canonical-state changes cancel the consumer gesture.
+
+Tests (use an available Haxeon executable, tested with Beartooth's pinned 73e448aa):
+
+```sh
+haxeon run --project scenekit/scene_interaction/tests/gizmo/haxeon.json
+python3 scenekit/scene_interaction/tests/camera-gizmo/check-beartooth.py \
+  --haxeon /path/to/beartooth/haxeon/scripts/haxeon \
+  --preview-project /path/to/beartooth/libs/document-world/preview/haxeon.json
+```
+
+The second check creates a temporary project around Beartooth's accepted render
+boundary and compares frozen rays/projections with its actual PerspectiveCamera.
+It also feeds solver displacement into the Documents transient preview under a
+rotated/nonuniformly scaled parent and verifies single commit/exact-source undo.
+It does not edit dependency pins. Pure tests cover six constraints, geometry/pick
+agreement, immutable data, zoom/viewport sizing, snapping and off-grid grab,
+parallel/behind-eye recovery, clip rejection and lifecycle. Desktop integration,
+local-orientation handles, rotation/scale and final usability tuning remain later
+gates. C++/C ABI contracts are unchanged.
+
+Reference techniques were reviewed at these revisions; no third-party runtime
+or implementation code was imported:
+
+- [Godot viewport, 232e6b14](https://github.com/godotengine/godot/blob/232e6b14abf6e590b41d60f11704e42de22bff72/editor/scene/3d/node_3d_editor_viewport.cpp)
+- [Three.js TransformControls, a505186b](https://github.com/mrdoob/three.js/blob/a505186b5185088bd800de092568d0643e96bd75/examples/jsm/controls/TransformControls.js)
+- [ImGuizmo, 105e4fde](https://github.com/CedricGuillemet/ImGuizmo/blob/105e4fde45e4e74aae8973d98750820ef7aca7e2/src/ImGuizmo.cpp)

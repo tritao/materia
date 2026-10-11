@@ -5,7 +5,8 @@
   },
   "sourceRoots": [
     "scene/bindings/haxe",
-    "scene_render/bindings/haxe"
+    "scene_render/bindings/haxe",
+    "scene_interaction/haxe/src"
   ],
   "scopeSourceRoots": false,
   "dependencies": {
