@@ -225,6 +225,14 @@ class ScrewdriverSimulationTests {
         var misplaced:ScrewdriverSetup = {program:qualified.program,joint:qualified.joint,screw:screw,hand:1,
           fixture:wrongFixture,connection:identity,retightening:true,work:qualified.work};
         refuses(() -> {var contact = observer.configure(2,misplaced);});
+        // CAD members can share a native rigid parent. That parent alone does
+        // not identify the member on which this particular joint was released.
+        var alias = new SimulationAssemblyPart("another-member",harness.simulation,[0.0,0.0,0.0],[],
+          {id:"another-member",robotIndex:0,linkIndex:4,offset:materia.assembly.AssemblyFrames.identity(),center:[0.0,0.0,0.0]},null);
+        var aliased:ScrewdriverSetup = {program:qualified.program,joint:qualified.joint,screw:screw,hand:1,
+          fixture:alias,connection:identity,retightening:true,work:qualified.work};
+        if (!alias.carries(screw)) throw "Alias probe must share the actual native parent";
+        refuses(() -> {var contact = observer.configure(2,aliased);});
         var contact = observer.configure(2,qualified);
         check(contact != null && Math.abs(contact.socket.translation.z-(released.z-0.001))<1e-8 && contact.advanceMm > 1.9,
           "Final contact comes from the actual released body and retained calibrated advancement");

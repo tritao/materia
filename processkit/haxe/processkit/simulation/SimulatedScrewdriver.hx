@@ -144,8 +144,8 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
         throw 'Fastening "${connection.fastening}" is no longer retained by its named threaded member "${connection.member}"';
       }
       var fixture = setup.fixture;
-      if (fixture == null || !fixture.carries(engagement.screw))
-        throw 'Fastening "${connection.fastening}" final setup has no valid native fixture for member "${connection.member}"';
+      if (fixture == null || fixture != engagement.fixture || !fixture.carries(engagement.screw))
+        throw 'Fastening "${connection.fastening}" final setup does not identify its original release fixture for member "${connection.member}"';
       return engagement;
     }
     throw 'Fastening "${connection.fastening}" has no retained successful engagement for its exact screw, member and face';

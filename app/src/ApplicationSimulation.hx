@@ -503,8 +503,9 @@ class ApplicationSimulation {
       var work = session == null ? null : session.mission;
       if (work != null) {
         if (candidateAssembly == null) throw "A mission needs the project's assembly";
+        var pairedScrews:Map<String,Bool> = [];
         for (step in work.steps) if (step.kind == "screw") {
-          var job = step.screw;
+          var job = materia.project.SceneScrewInvocation.job(step.screw,work.steps);
           if (job == null || candidateTools.screwdrivers.length != 1)
             throw "A screw mission needs its named screw and one declared screwdriver";
           var identities = [job.screw];
@@ -513,9 +514,11 @@ class ApplicationSimulation {
           var holder = candidateTools.screwdrivers[0].holding;
           // Only declared bit/screw couplings exclude mutual contact; fixture contacts remain physical.
           for (identity in identities) {
+            if (pairedScrews.exists(identity)) continue;
             var screws = [for (object in candidateTools.objectsByScene()) if (object.id == "project:"+identity) object.object];
             if (screws.length != 1) throw 'Fastening "${job.fastening}" has no unique independent screw body "$identity"';
             candidate.excludeContactPair(holder.robotIndex,holder.linkIndex,screws[0]);
+            pairedScrews.set(identity,true);
           }
         }
         var welds = [for (step in work.steps) if (step.kind == "weld") step].length > 0;

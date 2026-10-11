@@ -4,6 +4,7 @@ import processkit.screwdriving.ScrewdrivingRunner.TighteningResult;
 import robotkit.tool.ScrewdriverContract;
 
 enum ScrewDisposition { Tightened; PendingRecovery; Rejected; Missing; Lost; RecoveryFailed; }
+enum FasteningPass { SinglePass; SnugPass; FinalPass; }
 
 typedef ScrewAttemptResult = {
   var attempt:Int;
@@ -16,15 +17,24 @@ typedef ScrewAttemptResult = {
 /** Measured attempts and their disposition; exhausting a replacement does not become a motion fault or an OK. */
 class FasteningRunReport {
   public final fastening:String;
+  public final pass:FasteningPass;
   public final attempts:Array<ScrewAttemptResult> = [];
   public var finished(default, null) = false;
   public var failed(default, null) = false;
   public var fault(default, null):Null<String> = null;
-  public function new(fastening:String) {
+  public var skipped(default, null):Null<String> = null;
+  public function new(fastening:String, pass:FasteningPass = SinglePass) {
     if (fastening == null || fastening.length == 0) throw "Fastening report needs its CAD identity";
     this.fastening = fastening;
+    this.pass = pass;
   }
-  public function reset():Void {attempts.resize(0); finished = false; failed = false; fault = null;}
+  public function reset():Void {attempts.resize(0); finished = false; failed = false; fault = null; skipped = null;}
+  /** A skipped final has a reason and no invented torque, angle or body disposition. */
+  public function skip(reason:String):Void {
+    if (pass != FinalPass || finished || fault != null || attempts.length != 0 || reason == null || reason.length == 0)
+      throw "Only an unattempted final pass can be explicitly skipped";
+    skipped = reason; finished = true; failed = true;
+  }
   public function record(attempt:Int, screw:String, result:TighteningResult):Void {
     if (finished || screw == null || screw.length == 0 || result == null || result.fastening != fastening || attempt != attempts.length || attempt > 1 ||
         result.outcome == ScrewdriverContract.NONE || !Math.isFinite(result.torqueNm) || result.torqueNm < 0 ||

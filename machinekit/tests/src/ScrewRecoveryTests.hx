@@ -5,6 +5,7 @@ import robotkit.skill.*;
 import robotkit.core.RobotSnapshot;
 import processkit.skill.DriveFastening;
 import processkit.screwdriving.FasteningRunReport.ScrewDisposition;
+import processkit.screwdriving.FasteningRunReport.FasteningPass;
 
 private class RecoveryOutputs implements ScrewdriverOutputs {
 	public var startOn = false;
@@ -177,6 +178,29 @@ class ScrewRecoveryTests {
 			"A one-attempt final run retains its exact rejected body and measured failure");
 		check(execution.report.installed() == null,"Exhausted final recovery does not fabricate an installed body");
 		Sys.println('Screw remaining supply budget: $count checks passed');
+		runSkippedFinal();
+	}
+	static function runSkippedFinal():Void {
+		count = 0;
+		var snug = new FasteningRunReport("recovery-probe",SnugPass);
+		var result = {fastening:"recovery-probe",torqueNm:1.0,angle:0.3,outcome:ScrewdriverContract.CROSS_THREAD};
+		snug.record(0,"original",result); snug.recovered();
+		snug.record(1,"reserve",result); snug.recovered(); snug.finish();
+		var finalPass = new processkit.skill.SkippedFinalFastening(snug);
+		finalPass.start();
+		check(finalPass.update(null,0.01) == Succeeded && finalPass.runReport().finished && finalPass.runReport().failed &&
+			finalPass.runReport().pass == FinalPass && finalPass.runReport().skipped != null,
+			"Failed snug explicitly skips final and lets the mission continue with its reason");
+		check(finalPass.runReport().attempts.length == 0 && finalPass.runReport().installed() == null && snug.attempts.length == 2,
+			"Skipping final fabricates no torque, angle, installed body or third supply");
+		var pending = new FasteningRunReport("recovery-probe",SnugPass);
+		refuses(() -> {var invalid = new processkit.skill.SkippedFinalFastening(pending);});
+		snug.stop("controller fault");
+		refuses(() -> {var invalid = new processkit.skill.SkippedFinalFastening(snug);});
+		var single = new FasteningRunReport("recovery-probe");
+		single.record(0,"original",result); single.recovered(); single.finish();
+		refuses(() -> {var invalid = new processkit.skill.SkippedFinalFastening(single);});
+		Sys.println('Screw skipped final: $count checks passed');
 	}
 	static function runTransportLoss(pickup:Bool):Void {
 		var motion = new RecoveryMotion(), outputs = new RecoveryOutputs();

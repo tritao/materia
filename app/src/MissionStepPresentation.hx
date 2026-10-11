@@ -20,6 +20,11 @@ class MissionStepPresentation {
       case "findWork": "Locate workpiece";
       case "weld": "Weld seam";
       case "stow": "Return arm";
+      case "screw": step.screw == null ? "Drive screw" : switch step.screw {
+        case Single(_): "Drive screw";
+        case Snug(_,_): "Snug screw";
+        case Final(_): "Final tightening";
+      };
       default: step.kind;
     };
     var target = targetOf(step);

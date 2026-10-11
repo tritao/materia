@@ -68,7 +68,7 @@ class ScrewdrivingAssemblyPreview {
 		return {cell:cell,scene:scene,state:state,found:found,jobs:jobs,staging:staging};
 	}
 
-	public static function scene():SceneArtifactData {
+	public static function scene(twoStage:Bool = false):SceneArtifactData {
 		var design = design(), cell = design.cell, scene = design.scene, state = design.state;
 		var jobs = design.jobs, staging = design.staging, found = design.found;
 		var tools = [for (tool in scene.robotTools) if (tool.screwdriver != null) tool];
@@ -80,7 +80,7 @@ class ScrewdrivingAssemblyPreview {
 			var candidates = [for (job in jobs) if (job.fastening == fastening.name()) job];
 			if (candidates.length != 1) throw "Whole screw cell lost a qualified connection";
 			return candidates[0];
-		},access) catch (error:Dynamic) {parts.close(); throw error;}
+		},access,twoStage ? (_) -> 2 : null) catch (error:Dynamic) {parts.close(); throw error;}
 		parts.close();
 		ScrewdrivingExecution.stage(scene,staging);
 		scene.mission = {steps:mission.require()};
@@ -93,6 +93,7 @@ class ScrewdrivingAssemblyPreview {
 		return scene;
 	}
 	public static function assembly():Bytes return SceneArtifact.encode(scene());
+	public static function staged():Bytes return SceneArtifact.encode(scene(true));
 }
 function main():Void {
 	var decoded = SceneArtifact.decode(ScrewdrivingAssemblyPreview.assembly());

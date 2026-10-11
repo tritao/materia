@@ -64,6 +64,9 @@ import processkit.simulation.SimulatedScrewdriver;
 import materia.project.SceneScrewDefinition.SceneScrew;
 import materia.project.SceneScrewDefinition;
 import processkit.skill.DriveFastening;
+import processkit.skill.FasteningExecution;
+import processkit.screwdriving.FasteningRunReport.FasteningPass;
+import materia.project.SceneScrewInvocation.ScrewInvocation;
 import processkit.screwdriving.FasteningRunReport;
 import processkit.WeldStowPlanner;
 import processkit.skill.WeldPlan;
@@ -336,8 +339,8 @@ class MissionPlayer implements SessionMember {
   /** Measured results from the named fastenings, including a failed pickup. */
   public final screwResults:Array<TighteningResult> = [];
   public final screwRuns:Array<FasteningRunReport> = [];
-  var screwRun:Null<DriveFastening> = null;
-  var recordedScrewRun:Null<DriveFastening> = null;
+  var screwRun:Null<FasteningExecution> = null;
+  var recordedScrewRun:Null<FasteningExecution> = null;
   final screwdrivers:Array<SimulatedScrewdriver>;
   var screwArm:Null<Manipulator> = null;
   var screwing:Null<ScrewdrivingRunner> = null;
@@ -1684,8 +1687,8 @@ class MissionPlayer implements SessionMember {
     var run = screwRun;
     if (mission.steps[stepIndex].kind == "screw" && run != null) {
       if (run == recordedScrewRun) return;
-      screwRuns.push(run.report);
-      for (attempt in run.report.attempts) screwResults.push(attempt.result);
+      screwRuns.push(run.runReport());
+      for (attempt in run.runReport().attempts) screwResults.push(attempt.result);
       recordedScrewRun = run; return;
     }
     var active = screwing;
@@ -1701,24 +1704,52 @@ class MissionPlayer implements SessionMember {
     return new Transform3(Vec3.fromArray(pose.position),new Quat(pose.rotation[0],pose.rotation[1],pose.rotation[2],pose.rotation[3]));
   }
 
-  function screwSkill(job:SceneScrew, configuration:Null<motionkit.kinematics.SixAxisConfiguration>):Skill {
+  function screwSkill(invocation:ScrewInvocation, configuration:Null<motionkit.kinematics.SixAxisConfiguration>):Skill {
     screwRun = null;
+    var job = materia.project.SceneScrewInvocation.job(invocation,mission.steps);
+    if (job == null) throw "Screw invocation lost its qualified CAD job";
+    var pass:FasteningPass = switch invocation {case Single(_):SinglePass; case Snug(_,_):SnugPass; case Final(_):FinalPass;};
+    var stopAtSeat = pass == SnugPass;
+    var slot = switch invocation {case Snug(_,slot):slot; case _:job.slot;};
+    var prior:Null<FasteningRunReport> = null;
+    if (pass == FinalPass) {
+      var matches = [for (report in screwRuns) if (report.fastening == job.fastening && report.pass == SnugPass) report];
+      if (matches.length != 1 || !matches[0].finished || matches[0].fault != null)
+        throw 'Final fastening "${job.fastening}" needs its exact completed snug report';
+      prior = matches[0];
+      if (prior.failed) {
+        var skipped = new processkit.skill.SkippedFinalFastening(prior);
+        screwRun = skipped; return skipped;
+      }
+    }
+    var previous = prior;
     var recovery = job.recovery;
-    if (recovery == null) return screwAttempt(job,configuration);
+    if (recovery == null) {
+      if (pass != SinglePass) throw 'Staged fastening "${job.fastening}" needs an explicit replacement and reject policy';
+      return screwAttempt(job,configuration);
+    }
+    var installed = previous == null ? job.screw : previous.installed();
+    if (installed == null || (installed != job.screw && installed != recovery.replacement.screw))
+      throw 'Final fastening "${job.fastening}" has no declared installed supply';
+    var firstJob = installed == job.screw ? job : SceneScrewDefinition.replacement(job);
+    var attemptLimit = previous == null ? 2 : 3-previous.attempts.length;
+    if (previous != null && (previous.attempts.length < 1 || previous.attempts.length > 2 ||
+        (previous.attempts.length == 2 && installed != recovery.replacement.screw)))
+      throw 'Final fastening "${job.fastening}" has an inconsistent snug supply history';
     var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
     if (tools.length != 1 || tools[0].sensor == null) throw "Fastening recovery lost its screwdriver sensor";
     var sensor:String = cast tools[0].sensor;
     var bin = assemblyParts.get("project:"+recovery.rejectMember);
     var sequence = new DriveFastening(job.fastening,(index) -> {
-      var selected = index == 0 ? job : SceneScrewDefinition.replacement(job);
-      var skill = screwAttempt(selected,configuration,true);
+      var selected = index == 0 ? firstJob : SceneScrewDefinition.replacement(job);
+      var skill = screwAttempt(selected,configuration,true,pass == FinalPass && index == 0,stopAtSeat,slot);
       return {screw:selected.screw,runner:skill.runner,skill:skill};
     },(failed) -> new processkit.skill.RecoverScrew(failed,localization,
-      () -> livePart(bin).compose(ScrewScenePlan.frame(recovery.reject)),sensor));
+      () -> livePart(bin).compose(ScrewScenePlan.frame(recovery.reject)),sensor),attemptLimit,pass);
     screwRun = sequence; return sequence;
   }
 
-  function screwAttempt(job:SceneScrew, configuration:Null<motionkit.kinematics.SixAxisConfiguration>, plannedTravel:Bool = false):processkit.skill.DriveScrew {
+  function screwAttempt(job:SceneScrew, configuration:Null<motionkit.kinematics.SixAxisConfiguration>, plannedTravel:Bool = false, retightening:Bool = false, stopAtSeat:Bool = false, slot:Int = 0):processkit.skill.DriveScrew {
     var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
     var arm = screwArm;
     if (tools.length != 1 || arm == null) throw 'Fastening "${job.fastening}" has no configured screwdriver arm';
@@ -1733,10 +1764,12 @@ class MissionPlayer implements SessionMember {
     arm = ScrewdriverArmKinematics.atSpindle(robot.model,robot.rootLink,tcp.id,capacity.feedJoint,capacity.spindleJoint,driver.spindlePosition());
     screwArm = arm;
     var work = assemblyParts.get("project:"+job.frame), presenter = assemblyParts.get("project:"+job.presenter);
-    driver.configure(job.slot,{program:new TighteningProgram(job.program),joint:ScrewScenePlan.joint(job,capacity.springRate),
-      screw:screw.freeBody(),hand:job.hand,fixture:work,
+    var qualifiedSlot = slot == 0 ? job.slot : slot;
+    var finalContact = driver.configure(qualifiedSlot,{program:new TighteningProgram(job.program,stopAtSeat),joint:ScrewScenePlan.joint(job,capacity.springRate),
+      screw:screw.freeBody(),hand:job.hand,fixture:work,retightening:retightening,
       connection:{fastening:job.fastening,member:job.frame,face:job.threadFace},
       work:() -> ScrewScenePlan.work(job,livePart(work),screw.center)});
+    if (retightening && finalContact == null) throw "Final setup lost its measured installed socket";
     var state = robot.runtime.snapshot();
     var planning = PlanningLimits.ofGroup(arm,new SteadyLoads(),ARM_ACCELERATION,null,state.modelRevision,state.calibrationRevision);
     var solver = new ManipulatorKinematics(arm,1e-8);
@@ -1777,7 +1810,7 @@ class MissionPlayer implements SessionMember {
     });
     screwing = active;
     return new processkit.skill.DriveScrew(active,localization,
-      () -> ScrewScenePlan.plan(job,livePart(presenter),livePart(work)),sensor);
+      () -> ScrewScenePlan.plan(job,livePart(presenter),livePart(work),finalContact,stopAtSeat,qualifiedSlot),sensor);
   }
 
   function handlingToolChannel(step:SceneArtifactMissionStep):String {

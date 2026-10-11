@@ -5,6 +5,10 @@ import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.project.SceneArtifact.SceneArtifactData;
 import materia.project.ThreadRenderData;
+import materia.project.SceneScrewInvocation;
+import materia.project.SceneScrewInvocation.ScrewInvocation;
+import materia.project.SceneWireJson;
+import materia.project.SceneArtifact.SceneArtifactMissionStep;
 
 /** Saved screw missions keep identity and qualified units at the boundary. */
 class SceneScrewTests {
@@ -85,7 +89,7 @@ class SceneScrewTests {
   }
   public static function run():Void {
     var source = job();
-    var restored = SceneScrewDefinition.decode(haxe.Json.parse(haxe.Json.stringify(source)));
+    var restored = SceneScrewDefinition.decode(haxeon.wire.JsonWire.encode(source));
     SceneScrewDefinition.validate(restored,["screw1","work","nest"]);
     check(restored.screw == "screw1" && restored.threadFace == "bore:cyl.side", "Named screw and face survive decoding");
     check(SceneScrewDefinition.runDownMm(restored) == 10 && restored.approach == 0.04,
@@ -105,16 +109,17 @@ class SceneScrewTests {
     bad(s -> s.program.minimumAngle = 2, "inconsistent windows");
     bad(s -> s.simulation.prevailingTorque = -1, "prevailing torque");
     for (value in [1.5,2147483648.0]) {
-      var raw:Dynamic = haxe.Json.parse(haxe.Json.stringify(job()));
-      Reflect.setField(raw,"slot",value);
+      var encoded = haxeon.wire.JsonWire.encode(job());
+      var malformed = StringTools.replace(encoded,'["14:slot",1]','["14:slot",'+haxe.Json.stringify(value)+']');
+      if (malformed == encoded) throw "Wire slot mutation did not find its explicit field ID";
       var refused = false;
-      try { var ignored = SceneScrewDefinition.decode(raw); } catch (_:Dynamic) refused = true;
-      check(refused,"Fractional and overflowing slots are rejected before integer conversion");
+      try { var ignored = SceneScrewDefinition.decode(malformed); } catch (_:Dynamic) refused = true;
+      check(refused,'Fractional and overflowing slots are rejected before integer conversion: $value');
     }
     var recovering = job();
     recovering.recovery = {replacement:{screw:"spare",presenter:"reserve",presentSensor:"reserve/present",pickup:AssemblyFrames.translation(0,0,0.1)},
       rejectMember:"bin",reject:AssemblyFrames.translation(0,0,0.1)};
-    var restoredRecovery = SceneScrewDefinition.decode(haxe.Json.parse(haxe.Json.stringify(recovering)));
+    var restoredRecovery = SceneScrewDefinition.decode(haxeon.wire.JsonWire.encode(recovering));
     SceneScrewDefinition.validate(restoredRecovery,["screw1","work","nest","spare","reserve","bin"]);
     var replacement = SceneScrewDefinition.replacement(restoredRecovery);
     check(replacement.screw == "spare" && replacement.fastening == recovering.fastening && replacement.threadFace == recovering.threadFace,
@@ -130,5 +135,81 @@ class SceneScrewTests {
     try SceneScrewDefinition.validate(recovering,["screw1","work","nest","spare","reserve","bin"]) catch (_:Dynamic) rejected = true;
     check(rejected,"Reject frames require a unit rotation");
     Sys.println('Scene screw definitions: $checks checks passed');
+    runInvocations();
+  }
+  static function runInvocations():Void {
+    checks = 0;
+    var qualified = job();
+    qualified.recovery = {replacement:{screw:"spare",presenter:"reserve",presentSensor:"reserve/present",pickup:qualified.pickup},
+      rejectMember:"bin",reject:qualified.pickup};
+    var staged:Array<SceneArtifactMissionStep> = [{kind:"screw",screw:Snug(qualified,2)},
+      {kind:"screw",screw:Final(qualified.fastening)}];
+    SceneScrewInvocation.validate(staged);
+    var invocation:ScrewInvocation = Snug(qualified,2);
+    var restored:ScrewInvocation = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(invocation));
+    check(switch restored {case Snug(job,slot):slot == 2 && job.slot == 1 && job.recovery != null; case _:false;},
+      "Wire IDs retain distinct snug/final slots and one replacement definition");
+    check(SceneScrewInvocation.job(staged[1].screw,staged) == qualified,
+      "Final resolves the exact canonical snug job without another geometry or supply copy");
+    function refused(steps:Array<SceneArtifactMissionStep>):Void {
+      var failed = false; try SceneScrewInvocation.validate(steps) catch (_:Dynamic) failed = true;
+      check(failed,"Invalid stage or supply ownership must be rejected");
+    }
+    refused([staged[1]]);
+    refused([staged[0]]);
+    refused([staged[0],staged[1],staged[1]]);
+    refused([staged[1],staged[0]]);
+    refused([{kind:"screw",screw:Snug(qualified,1)},staged[1]]);
+    refused([{kind:"screw",screw:Single(qualified)},staged[0],staged[1]]);
+    var other = job(); other.fastening = "second-connection";
+    refused([{kind:"screw",screw:Single(qualified)},{kind:"screw",screw:Single(other)}]);
+    var unqualified = job();
+    refused([{kind:"screw",screw:Snug(unqualified,2)},{kind:"screw",screw:Final(unqualified.fastening)}]);
+    refused([null]);
+    var unnamed = job(); unnamed.fastening = "";
+    refused([{kind:"screw",screw:Single(unnamed)}]);
+    var missingSupply = job(); missingSupply.screw = "";
+    refused([{kind:"screw",screw:Single(missingSupply)}]);
+    Sys.println('Scene screw invocation: $checks checks passed');
+    runWireNumbers(qualified);
+  }
+  static function runWireNumbers(qualified:SceneScrew):Void {
+    checks = 0;
+    var encoded = haxeon.wire.JsonWire.encode(qualified);
+    var malformed = StringTools.replace(encoded,'["14:slot",1]','["14:slot","1"]');
+    var failed = false;
+    try { var ignored = SceneScrewDefinition.decode(malformed); } catch (_:Dynamic) failed = true;
+    check(malformed != encoded && failed,"Numeric strings cannot stand in for a qualified integer slot");
+    var badId = StringTools.replace(encoded,'"1:runDownSpeed"','"4294967297:runDownSpeed"');
+    failed = false;
+    try { var ignored = SceneScrewDefinition.decode(badId); } catch (_:Dynamic) failed = true;
+    check(badId != encoded && failed,"Nested program field IDs cannot wrap into a valid field through annotated-string parsing");
+    var invocation:ScrewInvocation = Snug(qualified,2);
+    var staged = haxeon.wire.JsonWire.encode(invocation);
+    for (value in ["2147483648","-2147483649","1.5",'"2"']) {
+      // Replace the final argument without depending on field order inside the job.
+      var end = staged.lastIndexOf(",2]]]");
+      if (end < 0) throw "Wire snug mutation did not find its final numeric argument";
+      var corrupted = staged.substr(0,end)+','+value+staged.substr(end+2);
+      failed = false;
+      try { var ignored = SceneScrewInvocation.decode(corrupted); } catch (_:Dynamic) failed = true;
+      check(failed,'Snug slot refuses non-integer JSON values: $value');
+    }
+    var restored = SceneScrewInvocation.decode(staged);
+    check(switch restored {case Snug(_,slot):slot == 2; case _:false;},"Current valid snug slot remains decodable");
+    var text = '{"coordinate":2147483648,"minimum":-2147483648,"label":"2147483648 \\\"quoted\\\""}';
+    var preserved = SceneWireJson.preserveNumbers(text);
+    var raw:Dynamic = haxe.Json.parse(preserved);
+    check(Reflect.field(raw,"coordinate") == 2147483648.0 && Reflect.field(raw,"minimum") == -2147483648.0,
+      "Large Float coordinates retain their value while the signed Int32 boundary remains valid");
+    check(Reflect.field(raw,"label") == '2147483648 "quoted"',"Numeric preservation leaves quoted and escaped text unchanged");
+    var large = job(); large.pickup.x = 2147483648.0;
+    var mission: materia.project.SceneArtifact.SceneArtifactMission = {steps:[{kind:"screw",screw:Single(large)}]};
+    var encodedMission = @:privateAccess materia.project.SceneArtifact.encodeMission(mission);
+    var decodedMission = @:privateAccess materia.project.SceneArtifact.decodeMission(haxe.Json.parse(SceneWireJson.preserveNumbers(encodedMission)));
+    var decodedJob = SceneScrewInvocation.job(decodedMission.steps[0].screw,decodedMission.steps);
+    check(decodedJob != null && decodedJob.pickup.x == large.pickup.x,
+      "Mission envelope encoding preserves large Float coordinates through its intermediate JSON parse");
+    Sys.println('Scene wire numbers: $checks checks passed');
   }
 }

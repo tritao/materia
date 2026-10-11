@@ -51,7 +51,7 @@ class ScrewdrivingOnePreview {
 		for (root in previous.rootPoses) if (root.occurrence != "presenter/screw" && root.occurrence != job.screw)
 			execution.setRootPose(root.occurrence,root.pose);
 		scene.assemblyState = execution.record();
-		scene.mission = {steps:[{kind:"screw",screw:job}]};
+		scene.mission = {steps:[{kind:"screw",screw:materia.project.SceneScrewInvocation.ScrewInvocation.Single(job)}]};
 		var controllers = scene.controllers;
 		if (controllers != null && controllers.length > 0) {
 			var owners = [for (controller in controllers) if (controller.kind == "robot" && controller.joints.indexOf("arm/j1") >= 0) controller];

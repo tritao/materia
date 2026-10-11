@@ -4,6 +4,7 @@ import cadkit.modeling.Vector;
 import machinekit.assembly.Diagnostics;
 import machinekit.screwdriving.Fastenings.FasteningsResult;
 import materia.project.SceneScrewDefinition.SceneScrew;
+import materia.project.SceneScrewInvocation.ScrewInvocation;
 import materia.project.SceneArtifact.SceneArtifactMissionStep;
 
 /** The cell owns reach and clearance; the generator asks about every named connection. */
@@ -27,7 +28,7 @@ class ScrewdrivingMission {
 	}
 
 	/** The cell derives each qualified job and binds its actual supply; access failures prevent partial missions. */
-	public static function generate(found:FasteningsResult, job:Fastening -> SceneScrew, ?access:ScrewAccess):ScrewdrivingMission {
+	public static function generate(found:FasteningsResult, job:Fastening -> SceneScrew, ?access:ScrewAccess, ?snugSlot:Fastening -> Int):ScrewdrivingMission {
 		if (found == null || job == null) throw "Screw mission needs current CAD connections and a qualified job author";
 		var diagnostics = new Diagnostics();
 		for (item in found.diagnostics.items) diagnostics.add(item.severity,item.code,item.subject,item.message);
@@ -52,10 +53,18 @@ class ScrewdrivingMission {
 					if (screws.exists(body)) throw 'Screw occurrence "$body" supplies more than one attempt or fastening';
 					screws.set(body,true);
 				}
-				steps.push({kind:"screw",screw:request});
+				if (snugSlot == null) steps.push({kind:"screw",screw:Single(request)});
+				else {
+					if (recovery == null) throw "Staged fastening needs an explicit replacement and reject policy";
+					var slot = snugSlot(fastening);
+					if (slot <= 0 || slot == request.slot) throw "Snug and final need distinct positive program slots";
+					steps.push({kind:"screw",screw:Snug(request,slot)});
+				}
 			} catch (error:Dynamic) diagnostics.error("screw.qualification",name,'Fastening "$name" has no qualified job: $error');
 		}
 		if (ordered.length == 0 && !diagnostics.hasErrors()) diagnostics.error("screw.empty","assembly","The assembly has no driven fastenings");
+		if (snugSlot != null && !diagnostics.hasErrors())
+			for (fastening in ordered) steps.push({kind:"screw",screw:Final(fastening.name())});
 		return new ScrewdrivingMission(diagnostics.hasErrors() ? [] : steps,ordered,diagnostics);
 	}
 

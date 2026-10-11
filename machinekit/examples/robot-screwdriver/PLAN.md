@@ -290,7 +290,10 @@ simulation and hardware, and a mission step drives it.
   returns the live body's socket and calibrated advancement while keeping its
   anchor inactive until vacuum reacquires the body. Recontact verifies the
   intrinsic socket/lead-in geometry and actual seated pose against that retained
-  engagement. Reset/rebuild discards every retained entry. Final shaft angle
+  engagement. The fixture instance must also be the original release fixture:
+  different CAD members can share a native rigid parent, so native ownership
+  alone cannot reidentify the threaded member. Reset/rebuild discards every
+  retained entry. Final shaft angle
   uses a fresh measured origin plus the retained cumulative joint angle, so
   stopping coast does not discard preload or add invented thread travel.
 - **SD7 — The replacement budget spans passes.** `DriveFastening` accepts one
@@ -302,8 +305,26 @@ simulation and hardware, and a mission step drives it.
   preserves the final program qualification and stops at the calibrated snug
   angle with prevailing torque, even if a sample crosses later thresholds.
   Lead-in, run-down torque, feed-force and run-down watchdog failures still
-  apply. A continuation requires a final program. This does not introduce a
+  apply; a strip threshold at or below prevailing torque cannot produce a
+  successful seat stop. A continuation requires a final program. This does not introduce a
   lower catalog torque or reinterpret a snug OK as final tightening.
+
+- **SD7 — Staged missions store each qualified job once.** SceneArtifact v32
+  rejects v31. Wire invocations are `Single(job)`, `Snug(job, slot)` and
+  `Final(fastening)` with explicit variant IDs. Final resolves the unique
+  preceding snug definition; geometry, final qualification and supplies are
+  not copied into a second saved job. The mission envelope encodes these
+  invocations through the generated wire codec, and the old plain-job decoder
+  is removed. Validation rejects reused jobs/supplies, missing or repeated
+  finals, out-of-order snug passes and equal/invalid stage slots.
+- **SD7 — Stage reports preserve measurements and actual supply use.** Every
+  snug/final run records its pass and measured attempts. Final starts with the
+  preceding successful report's exact `installed()` identity and has
+  `3 - snug.attempts.length` attempts remaining. Its first attempt recontacts
+  retained engagement; an unused reserve, when permitted, starts a fresh full
+  final cycle. An exhausted snug produces an explicitly skipped final with a
+  reason and no tightening measurement. Controller/recovery faults stop the
+  mission and cannot become a skipped or measured successful final.
 
 ## What exists
 
@@ -1289,6 +1310,87 @@ found. The full gate remains due at SD7 completion.
 Stage-linked generation, installed-body selection, shared-budget coordination,
 reports and physical whole-cell two-stage acceptance still need implementation.
 
+### SD7 staged mission completion (2026-10-11)
+
+Current-format ProjectKit checks pass: the existing 20 screw-definition,
+6 named-face and 5 recovery-identity checks, plus 13 invocation and 10 numeric
+boundary checks. The negative overflow check exposed a Haxeon stdlib issue:
+`haxeon/stdlib/haxe/format/JsonParser.hx:185` sends integral JSON tokens to
+`Std.parseInt`, which wraps values outside Int32 before the wire reader sees
+them. `JsonWireReader.readInt` also accepts numeric strings through the same
+conversion used for annotated field keys. This is a parser/reader issue, not
+a confirmed compiler typing defect. ProjectKit's local `SceneWireJson` preserves
+out-of-range numeric tokens as Float before parsing, then rejects non-numeric,
+fractional or overflowing integer values and field IDs. Integer field IDs are
+derived from the generated current codec, rather than duplicated by hand.
+Nested program/frame map IDs are checked too: an annotated `4294967297`
+otherwise wraps to field 1 through the reader's `Std.parseInt` key path.
+Quoted/escaped text and valid large Float coordinates, including the mission
+encoder's intermediate JSON parse, are covered explicitly;
+no Haxeon source or pin changes were made.
+
+The generator now emits the complete snug cohort in CAD cross order followed
+by final references in the same order. `materia.staged.project.json` exports
+this optional eight-step mission with the existing eight distinct physical
+supplies; the single-pass whole-cell and drive-one examples remain available.
+The player resolves exact canonical jobs, chooses the actual installed snug
+body, resumes the observer's measured contact and derives the shared attempt
+budget. Reports distinguish passes and explicit final skips. Saved version 32
+uses the current wire enum codec, with no migration or plain-job alias.
+
+Added checks cover saved stage ownership and wire round-trip, eight-step
+generation, skips without fabricated measurements and actual two-stage CAD
+execution on both backends. Physical scenarios are normal whole-cell execution,
+original snug cross-thread followed by reserve final, a weak test joint that
+strips during final with/without an unused reserve, and both snug supplies
+rejected followed by explicit final skip. The weak 8 Nm strip threshold is a
+test-only response, qualified before both passes; the production 22 Nm response
+and published 16.5 Nm final target remain unchanged. A new alias probe also rejects a different CAD member sharing the original
+native rigid parent; this adds four retained and two head-seat checks without
+changing the existing 80-check cohort. Focused build
+`build/sd7-staged-app-build.log` compiles 2211 sources. The build helper now
+uses an absolute output path: relative `--output` resolves against the test
+package, so the initial output was copied byte-for-byte to the canonical app
+path before execution. This was a helper error, not stale compilation.
+`build/sd7-staged-cad.log` passes all ten physical cases and portable export,
+with the staged artifact at 2272982 bytes. Full gate `sd7-final` passes all
+seven stages, including these ten cases again, portable export and the existing
+SD6/single-pass/transport-loss acceptance. SD7 is complete; SD8 is unstarted.
+
+The full gate's library portion passes CadKit, ProjectKit and MachineKit.
+`build/sd7-final-machinekit-compare.txt` retains 128 of 129 prior result lines
+exactly. The sole changed line is the head-seat count from six to seven for
+the added strip-at-seat boundary check; staged generation adds ten checks
+(including a missing recovery-policy diagnostic) and explicit final skips add
+five. Existing 31 process, 14 retained-model, 11 final-runner, 13 single-pass
+generation, 51 recovery and 5 remaining-budget checks stay unchanged.
+All previous engineering result lines match. All 119 normalized prior app
+results also match, with only 108 retained-engagement, 52 head-seat-continuation
+and staged-CAD summaries added. The old 80-check simulation cohort stays
+unchanged. Counts rise from the focused 104/50 to 108/52 solely for the four
+retained and two head-seat alias-fixture checks. Source hashes remain unchanged
+through the gate; logs, summary and comparisons are archived as
+`build/sd7-final-*`. The local gate uses `sd7-final-sd-s-<name>.log` beside the
+suite summary so concurrent sessions cannot overwrite its evidence.
+
+All 53 previously logged artifact generations are accounted for. Drive-one grows
+from 2237601 to 2237922 bytes and single-pass assembly from 2269798 to 2271418
+bytes for current wire mission packets; equipment stays 2238283 bytes. Eleven
+new staged generations (ten cases and export) are 2272982 bytes. Formerly cached
+1690475/45240-byte loads now regenerate at the same sizes, proved by the earlier
+SD6 generation and transport-loss cache records respectively. No native source,
+component solid, published torque, qualification or submodule pin changed.
+
+Picker allocation observations move from 58412/60308 to 58649/60286 bytes/tick;
+mill observations move from 53551.21 to 53385.12. Router allocations stay at
+39.5 KB/tick for screw drive and move from 43.8 to 43.7 for belt drive; collections
+are 16/16 rather than 16/15. Added early CAD cases and regenerated current-format
+caches alter the global HashLink buffer-refill/collection phase documented above.
+All budgets pass. Physical timing, stock removal, tracking and engineering
+results remain exact. App runtime peaks at 3.6 GB under its 18 GB cap; no exit
+137 occurred. Generated lodepng CMake input was moved to the ignored build
+archive after validation, leaving its populated checkout clean.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
@@ -1298,5 +1400,5 @@ reports and physical whole-cell two-stage acceptance still need implementation.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — CAD execution, transport-loss recovery and endpoint access pass full checkpoint gates; retained observer, head-seat stop and shared budget pass focused/quick checks; staged mission and final full gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71` |
+| SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71`, staged final (this commit) |
 | SD8 | open — machine tending landed; not started | |

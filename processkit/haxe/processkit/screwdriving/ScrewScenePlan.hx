@@ -6,6 +6,7 @@ import materia.project.SceneScrewDefinition.SceneScrew;
 import processkit.screwdriving.TighteningModel.TighteningJoint;
 import processkit.simulation.SimulatedScrewdriver.ScrewdriverWorkState;
 import robotkit.spatial.Transform3;
+import processkit.screwdriving.ScrewPlan.ScrewFinalContact;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import nativekit.sim.SimPose;
@@ -18,10 +19,11 @@ class ScrewScenePlan {
     var p = value.translation, q = value.rotation;
     return new SimPose(p.x,p.y,p.z,q.x,q.y,q.z,q.w);
   }
-  public static function plan(job:SceneScrew, presenter:Transform3, work:Transform3):ScrewPlan
-    return new ScrewPlan(job.fastening,job.slot,new TighteningProgram(job.program),
+  public static function plan(job:SceneScrew, presenter:Transform3, work:Transform3,
+      ?finalContact:ScrewFinalContact, stopAtSeat:Bool = false, slot:Int = 0):ScrewPlan
+    return new ScrewPlan(job.fastening,slot == 0 ? job.slot : slot,new TighteningProgram(job.program,stopAtSeat),
       presenter.compose(frame(job.pickup)),work.compose(frame(job.entry)),job.leadMm,
-      SceneScrewDefinition.runDownMm(job),job.approach);
+      SceneScrewDefinition.runDownMm(job),job.approach,finalContact);
   public static function joint(job:SceneScrew, springRate:Float):TighteningJoint {
     var response = job.simulation;
     return {leadMm:job.leadMm,runDownMm:SceneScrewDefinition.runDownMm(job),leadInMm:response.leadInMm,

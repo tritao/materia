@@ -108,6 +108,10 @@ class ScrewRetighteningTests {
 		var tooLong = new TighteningModel(new TighteningProgram(limited,true),ScrewdriverProcessTests.joint());
 		check(tooLong.step(input(100)).result == ScrewdriverContract.RUN_DOWN_TOO_LONG,
 			"Snug retains the qualified run-down watchdog");
+		var weakJoint = ScrewdriverProcessTests.joint(); weakJoint.stripTorque = weakJoint.prevailingTorque;
+		var weak = new TighteningModel(new TighteningProgram(qualification.settings,true),weakJoint);
+		check(weak.step(input(100)).result == ScrewdriverContract.STRIPPED && weak.reading.torqueNm == 0,
+			"A joint already at its strip threshold cannot become a successful head-seat stop");
 		Sys.println('Screw head-seat stop: $count checks passed');
 	}
 }

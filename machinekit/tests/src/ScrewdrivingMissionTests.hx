@@ -23,7 +23,7 @@ class ScrewdrivingMissionTests {
 	static function jobs(mission:ScrewdrivingMission):Array<SceneScrew> {
 		var result:Array<SceneScrew> = [];
 		for (step in mission.steps) {
-			var job = step.screw;
+			var job = materia.project.SceneScrewInvocation.job(step.screw,mission.steps);
 			if (job == null) throw "Generated step lost its screw job";
 			result.push(job);
 		}
@@ -82,6 +82,27 @@ class ScrewdrivingMissionTests {
 		});
 		check(reusedPrimary.steps.length == 0 && reusedPrimary.diagnostics.hasErrors(),"A replacement cannot consume another fastening's primary supply");
 		Sys.println('Screwdriving mission: $count checks passed');
+		count = 0;
+		var staged = ScrewdrivingMission.generate(found,(fastening) -> {
+			var request = job(fastening);
+			request.recovery = {replacement:{screw:"reserve/"+fastening.screw.member,presenter:"reserve/nest",presentSensor:"reserve/present",pickup:request.pickup},
+				rejectMember:"reject",reject:request.pickup};
+			return request;
+		},null,(_) -> 2);
+		check(staged.require().length == 8,"A staged mission runs four snug passes then four final passes");
+		materia.project.SceneScrewInvocation.validate(staged.steps);
+		for (index in 0...4) {
+			var first = staged.steps[index].screw, finalPass = staged.steps[index+4].screw;
+			if (first == null || finalPass == null) throw "Staged generator lost an invocation";
+			check(switch first {case Snug(job,slot):slot == 2 && job.fastening == staged.fastenings[index].name(); case _:false;},
+				"Snug keeps the CAD cross order and its explicitly qualified slot");
+			check(switch finalPass {case Final(name):name == staged.fastenings[index].name(); case _:false;},
+				"Final references the corresponding snug job without duplicating supplies or qualification");
+		}
+		var missingPolicy = ScrewdrivingMission.generate(found,job,null,(_) -> 2);
+		check(missingPolicy.steps.length == 0 && missingPolicy.diagnostics.hasErrors(),
+			"Missing staged replacement policy produces named generation diagnostics before scene encoding");
+		Sys.println('Screw staged generation: $count checks passed');
 	}
 	static function main():Void run();
 }

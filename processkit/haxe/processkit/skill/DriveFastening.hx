@@ -5,12 +5,13 @@ import robotkit.skill.*;
 import robotkit.tool.ScrewdriverContract;
 import processkit.screwdriving.ScrewdrivingRunner;
 import processkit.screwdriving.FasteningRunReport;
+import processkit.screwdriving.FasteningRunReport.FasteningPass;
 
 /** The cell binds an attempt's body, program and motion before its skill starts. */
 typedef ScrewAttempt = {var screw:String; var skill:Skill; var runner:ScrewdrivingRunner;}
 
 /** Try an identified screw, recover a NOK, then use one identified replacement before reporting and moving on. */
-class DriveFastening implements Skill {
+class DriveFastening implements FasteningExecution {
   public final report:FasteningRunReport;
   final attempt:Int -> ScrewAttempt;
   final recover:ScrewdrivingRunner -> Skill;
@@ -21,10 +22,10 @@ class DriveFastening implements Skill {
   var active:Null<Skill> = null;
   var runner:Null<ScrewdrivingRunner> = null;
   var screw:String = "";
-  public function new(fastening:String, attempt:Int -> ScrewAttempt, recover:ScrewdrivingRunner -> Skill, attemptLimit:Int = 2) {
+  public function new(fastening:String, attempt:Int -> ScrewAttempt, recover:ScrewdrivingRunner -> Skill, attemptLimit:Int = 2, pass:FasteningPass = SinglePass) {
     if (attempt == null || recover == null) throw "Fastening execution needs identified attempts and a recovery skill";
     if (attemptLimit < 1 || attemptLimit > 2) throw "Fastening execution allows one or two identified attempts";
-    report = new FasteningRunReport(fastening); this.attempt = attempt; this.recover = recover;
+    report = new FasteningRunReport(fastening,pass); this.attempt = attempt; this.recover = recover;
     this.attemptLimit = attemptLimit;
   }
   public function start():Void {
@@ -83,6 +84,7 @@ class DriveFastening implements Skill {
   }
   public function status():SkillStatus return lifecycle.status();
   public function result():Null<SkillResult> return lifecycle.result();
+  public function runReport():FasteningRunReport return report;
   function fail(message:String):Void {
     var skill = active;
     if (skill != null) try skill.cancel() catch (_:Dynamic) {}

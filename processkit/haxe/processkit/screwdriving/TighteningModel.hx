@@ -163,6 +163,10 @@ class TighteningModel {
     if (program.stopAtSeat) {
       reading.angle = snugAngle;
       reading.phase = ScrewdriverContract.SNUG;
+      if (joint.stripTorque <= joint.prevailingTorque) {
+        reading.torqueNm = 0;
+        return finish(ScrewdriverContract.STRIPPED);
+      }
       return finish(ScrewdriverContract.OK);
     }
     var finalAngle = Math.max(0, input.angle - snugAngle);

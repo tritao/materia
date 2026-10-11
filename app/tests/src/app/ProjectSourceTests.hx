@@ -1985,7 +1985,7 @@ class ProjectSourceTests {
       Sys.println('Screwdriving CAD: begin transport loss backend $backend, pickup $pickup');
       var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.mission;
       if (definition == null || definition.steps.length != 4) throw "Transport-loss cell lost its CAD mission";
-      var job = definition.steps[0].screw;
+      var job = materia.project.SceneScrewInvocation.job(definition.steps[0].screw,definition.steps);
       if (job == null) throw "Transport-loss cell lost its first fastening";
       definition.steps = [definition.steps[0]];
       var session = new ProjectDocumentSession(null,false), simulation = new ApplicationSimulation(new RobotWorld());
@@ -2056,7 +2056,7 @@ class ProjectSourceTests {
       var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.mission;
       if (definition == null || definition.steps.length != 4) throw "Whole screw cell lost its mission";
       var jobs:Array<materia.project.SceneScrewDefinition.SceneScrew> = [];
-      for (step in definition.steps) {var job = step.screw; if (job == null) throw "Whole cell lost a fastening"; jobs.push(job);}
+      for (step in definition.steps) {var job = materia.project.SceneScrewInvocation.job(step.screw,definition.steps); if (job == null) throw "Whole cell lost a fastening"; jobs.push(job);}
       check([for (job in jobs) job.screw].join(",") == "work/flange/screw1,work/flange/screw3,work/flange/screw2,work/flange/screw4","Whole flange uses CAD cross order");
       var session = new ProjectDocumentSession(null,false), simulation = new ApplicationSimulation(new RobotWorld());
       simulation.setBackend(backend);
@@ -2134,11 +2134,139 @@ class ProjectSourceTests {
       "Portable assembly retains all eight identified screw supplies and four CAD fastenings");
     if (mission == null) throw "Portable assembly lost its mission";
     for (step in mission.steps) {
-      var job = step.screw;
+      var job = materia.project.SceneScrewInvocation.job(step.screw,mission.steps);
       check(job != null && job.recovery != null,"Portable assembly preserves each exact replacement and reject frame");
     }
     Sys.println("Screwdriving CAD: end whole portable export");
     Sys.println("Screwdriving whole assembly passed on both backends with cross-thread replacement recovery");
+  }
+
+  /** Staged execution shares physical supplies and preserves the installed body's measured engagement. */
+  static function checkScrewdrivingStaged(root:String):Void {
+    var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.staged.project.json");
+    for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (scenario in 0...5) {
+      Sys.println('Screwdriving CAD: begin staged backend $backend, scenario $scenario');
+      var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.mission;
+      if (definition == null || definition.steps.length != 8) throw "Staged CAD cell needs four snug and four final passes";
+      var jobs:Array<materia.project.SceneScrewDefinition.SceneScrew> = [];
+      for (index in 0...4) {
+        var job = materia.project.SceneScrewInvocation.job(definition.steps[index].screw,definition.steps);
+        if (job == null) throw "Staged CAD cell lost a canonical job";
+        jobs.push(job);
+      }
+      check([for (job in jobs) job.screw].join(",") == "work/flange/screw1,work/flange/screw3,work/flange/screw2,work/flange/screw4",
+        "Snug follows the same CAD cross order as final");
+      var first = jobs[0], recovery = first.recovery;
+      if (recovery == null) throw "Staged CAD cell lost its reserve supply";
+      // The same explicitly weak test joint is qualified before both passes.
+      // It seats at prevailing torque, then strips before the published final target.
+      if (scenario == 2 || scenario == 3) first.simulation.stripTorque = 8;
+      if (scenario >= 2) definition.steps = [definition.steps[0],definition.steps[4]];
+      var count = scenario >= 2 ? 1 : 4;
+      var session = new ProjectDocumentSession(null,false), simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.setBackend(backend);
+      try {
+        session.openGeneratedProject(generated,manifest);
+        check(simulation.rebuild(session.sensors,session.scene,session),'Staged CAD cell builds: ${simulation.error}');
+        var mission = simulation.missionPlayer(), clock = simulation.activeSession();
+        if (mission == null || clock == null) throw "Staged CAD cell lost its live mission";
+        var injected:Array<String> = [], observedStep = -1;
+        while (!mission.finished && mission.failure == null && clock.simulationTime() < 800) {
+          if (mission.stepIndex != observedStep) {
+            observedStep = mission.stepIndex;
+            Sys.println('Staged screw transition $observedStep at ${clock.simulationTime()}');
+            if (observedStep == count) check(mission.screwRuns.length == count,
+              "Every snug report is complete before the first final begins");
+          }
+          simulation.step();
+          if (scenario == 1 || scenario == 3 || scenario == 4) {
+            var tools = @:privateAccess simulation.tools;
+            if (tools == null || tools.screwdrivers.length != 1) throw "Staged CAD cell lost its observer";
+            var setup = @:privateAccess tools.screwdrivers[0].setups.get(2);
+            var identities = scenario == 4 ? [first.screw,recovery.replacement.screw] : [first.screw];
+            for (identity in identities) if (setup != null && setup.screw == simulation.environmentObject("project:"+identity) && injected.indexOf(identity) < 0) {
+              var originalWork = setup.work;
+              setup.work = () -> {var state = originalWork(); state.damagedLeadIn = true; return state;};
+              injected.push(identity);
+            }
+          }
+        }
+        check(mission.finished && mission.failure == null && mission.completed == 2*count,
+          'Staged mission completes backend $backend scenario $scenario: ${mission.failure}, step ${mission.stepIndex}, time ${clock.simulationTime()}');
+        check(mission.screwRuns.length == 2*count,"Both stages retain their own reports");
+        check(injected.length == (scenario == 4 ? 2 : scenario == 1 || scenario == 3 ? 1 : 0),
+          "Snug damage targets only the exact intended bodies");
+        for (index in 0...count) {
+          var job = jobs[index], snug = mission.screwRuns[index], finalPass = mission.screwRuns[index+count];
+          check(snug.fastening == job.fastening && finalPass.fastening == job.fastening &&
+            snug.pass == processkit.screwdriving.FasteningRunReport.FasteningPass.SnugPass &&
+            finalPass.pass == processkit.screwdriving.FasteningRunReport.FasteningPass.FinalPass &&
+            snug.finished && finalPass.finished && snug.fault == null && finalPass.fault == null,
+            "Reports identify each CAD connection and distinguish snug from final");
+          if (scenario == 4) {
+            check(snug.failed && snug.attempts.length == 2 && snug.installed() == null &&
+              finalPass.failed && finalPass.skipped != null && finalPass.attempts.length == 0 && finalPass.installed() == null,
+              "Exhausted snug explicitly skips final without invented measurements or another body");
+          } else {
+            var seated = snug.attempts[snug.attempts.length-1];
+            check(!snug.failed && seated.result.outcome == robotkit.tool.ScrewdriverContract.OK &&
+              seated.result.torqueNm == job.simulation.prevailingTorque,
+              "Snug stops at the actual head seat with prevailing torque");
+            var continued = finalPass.attempts[0];
+            check(continued.screw == snug.installed() && continued.result.angle > seated.result.angle,
+              "Final recontacts the actual installed body and retains cumulative angle from snug");
+            check(snug.attempts.length == (index == 0 && (scenario == 1 || scenario == 3) ? 2 : 1),
+              "Only the intended snug failure consumes its reserve");
+            if (scenario == 2 || scenario == 3) {
+              check(finalPass.failed && finalPass.attempts.length == (scenario == 2 ? 2 : 1) && finalPass.installed() == null,
+                "Final shares the one reserve across passes and reports exhaustion without a third supply");
+              for (attempt in finalPass.attempts) check(attempt.result.outcome == robotkit.tool.ScrewdriverContract.STRIPPED &&
+                attempt.disposition == processkit.screwdriving.FasteningRunReport.ScrewDisposition.Rejected,
+                "Every final NOK is measured and its actual body is rejected");
+            } else {
+              check(!finalPass.failed && finalPass.attempts.length == 1 && continued.result.outcome == robotkit.tool.ScrewdriverContract.OK &&
+                Math.abs(continued.result.torqueNm-job.program.targetTorque) < 1e-8,
+                "Final reaches the unchanged published torque using its retained joint");
+              var installed = finalPass.installed();
+              if (installed == null) throw "Final report lost its installed body";
+              var body = simulation.environmentObject("project:"+installed);
+              check(body != null && mission.assemblyParts.get("project:"+job.frame).carries(body),
+                "The exact threaded fixture owns the final installed body");
+              var actual = mission.assemblyParts.get("project:"+installed).pose();
+              var live = mission.assemblyParts.get("project:"+job.frame).pose();
+              var socket = AssemblyFrames.compose({x:actual.position[0],y:actual.position[1],z:actual.position[2],
+                qx:actual.rotation[0],qy:actual.rotation[1],qz:actual.rotation[2],qw:actual.rotation[3]},job.socket);
+              var seat = AssemblyFrames.compose({x:live.position[0],y:live.position[1],z:live.position[2],
+                qx:live.rotation[0],qy:live.rotation[1],qz:live.rotation[2],qw:live.rotation[3]},job.seat);
+              var offset = AssemblyFrames.compose(AssemblyFrames.inverse(seat),socket);
+              check(Math.sqrt(offset.x*offset.x+offset.y*offset.y) <= job.simulation.leadInMm/1000 && Math.abs(offset.z) < 0.00015,
+                'Final installed screw "$installed" remains on its actual CAD seat: ${haxe.Json.stringify(offset)}');
+            }
+          }
+        }
+        check(simulation.heldObjectIds().length == 0,"Staged completion leaves no screw on the bit");
+        if (scenario > 0) {
+          for (_ in 0...100) simulation.step();
+          var bin = mission.assemblyParts.get("project:reject/floor").pose();
+          for (report in mission.screwRuns) for (attempt in report.attempts)
+            if (attempt.disposition == processkit.screwdriving.FasteningRunReport.ScrewDisposition.Rejected) {
+              var rejectedBody = simulation.environmentObject("project:"+attempt.screw);
+              if (rejectedBody == null) throw "Rejected staged screw lost its actual body";
+              var dropped = mission.simulation.objectPose(rejectedBody);
+              check(Math.abs(dropped.x-bin.position[0]) < 0.036 && Math.abs(dropped.y-bin.position[1]) < 0.036 &&
+                dropped.z > bin.position[2] && dropped.z < bin.position[2]+0.06,
+                'Actual rejected staged screw "${attempt.screw}" rests inside the physical bin: ${haxe.Json.stringify(dropped)}');
+            }
+        }
+        simulation.clear(); session.dispose();
+      } catch (error:Dynamic) {simulation.clear(); session.dispose(); throw error;}
+      Sys.println('Screwdriving CAD: end staged backend $backend, scenario $scenario');
+    }
+    var portable = materia.project.SceneArtifact.decode(MateriaProjectRunner.exportArtifact(manifest));
+    var mission = portable.mission, flags = portable.project;
+    check(mission != null && mission.steps.length == 8 && flags != null && flags.dynamicParts.length == 8,
+      "Portable staged CAD keeps eight passes and exactly eight distinct supplies");
+    Sys.println("Screwdriving staged assembly passed on both backends with retained engagement and shared replacement recovery");
   }
 
   static function checkScrewdrivingOne(root:String):Void {
@@ -2148,7 +2276,7 @@ class ProjectSourceTests {
       var generated = MateriaProjectRunner.loadProject(manifest);
       var work = generated.mission;
       if (work == null || work.steps.length != 1) throw "Drive-one CAD must publish one mission step";
-      var step = work.steps[0], job = step.screw;
+      var step = work.steps[0], job = materia.project.SceneScrewInvocation.job(step.screw,work.steps);
       if (job == null) throw "Drive-one CAD lost its named screw packet";
       var assembly = requiredAssemblyDefinition(generated.assemblyDefinition);
       var screws = [for (item in assembly.occurrences) if (item.id == job.screw) item];

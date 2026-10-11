@@ -196,45 +196,15 @@ class SceneScrewDefinition {
 		}
 
 	}
-	static function number(raw:Dynamic, name:String):Float {
-		var value:Dynamic = Reflect.field(raw,name);
-		if (!Std.isOfType(value,Float) && !Std.isOfType(value,Int)) throw 'Scene screw field "$name" must be numeric';
-		return cast value;
+	public static function validateWireIntegers(raw:Dynamic, job:SceneScrew):Void {
+		var canonical:Dynamic = haxe.Json.parse(haxeon.wire.JsonWire.encode(job));
+		SceneWireJson.integerFields(raw,Reflect.field(canonical,"value"),["hand","slot"]);
 	}
-	static function integer(raw:Dynamic, name:String):Int {
-		var value = number(raw,name);
-		if (!Math.isFinite(value) || value < -2147483647 || value > 2147483647 || Math.floor(value) != value)
-			throw 'Scene screw field "$name" must be an integer';
-		return Std.int(value);
-	}
-	static function text(raw:Dynamic, name:String):String {
-		var value:Dynamic = Reflect.field(raw,name);
-		if (!Std.isOfType(value,String)) throw 'Scene screw field "$name" must be text';
-		return cast value;
-	}
-	static function frame(raw:Dynamic, name:String):AssemblyFrame {
-		var value:Dynamic = Reflect.field(raw,name);
-		return {x:number(value,"x"),y:number(value,"y"),z:number(value,"z"),qx:number(value,"qx"),
-			qy:number(value,"qy"),qz:number(value,"qz"),qw:number(value,"qw")};
-	}
-	public static function decode(raw:Dynamic):SceneScrew {
-		var program:Dynamic = Reflect.field(raw,"program"), response:Dynamic = Reflect.field(raw,"simulation");
-		var recovering:Dynamic = Reflect.field(raw,"recovery");
-		var recovery:Null<ScrewRecovery> = null;
-		if (recovering != null) {
-			var supply:Dynamic = Reflect.field(recovering,"replacement");
-			recovery = {replacement:{screw:text(supply,"screw"),presenter:text(supply,"presenter"),presentSensor:text(supply,"presentSensor"),pickup:frame(supply,"pickup")},
-				rejectMember:text(recovering,"rejectMember"),reject:frame(recovering,"reject")};
-		}
-		return {fastening:text(raw,"fastening"),screw:text(raw,"screw"),frame:text(raw,"frame"),threadFace:text(raw,"threadFace"),
-			presenter:text(raw,"presenter"),presentSensor:text(raw,"presentSensor"),socket:frame(raw,"socket"),pickup:frame(raw,"pickup"),
-			entry:frame(raw,"entry"),seat:frame(raw,"seat"),hole:frame(raw,"hole"),leadMm:number(raw,"leadMm"),
-			hand:integer(raw,"hand"),slot:integer(raw,"slot"),approach:number(raw,"approach"),recovery:recovery,
-			program:{runDownSpeed:number(program,"runDownSpeed"),finalSpeed:number(program,"finalSpeed"),targetTorque:number(program,"targetTorque"),
-				minimumAngle:number(program,"minimumAngle"),maximumAngle:number(program,"maximumAngle"),runDownTorqueLimit:number(program,"runDownTorqueLimit"),
-				finalTorqueLimit:number(program,"finalTorqueLimit"),maximumRunDownAngle:number(program,"maximumRunDownAngle"),
-				minimumStroke:number(program,"minimumStroke"),maximumStroke:number(program,"maximumStroke")},
-			simulation:{leadInMm:number(response,"leadInMm"),maximumAxisAngle:number(response,"maximumAxisAngle"),prevailingTorque:number(response,"prevailingTorque"),
-				stiffnessNmPerRad:number(response,"stiffnessNmPerRad"),stripTorque:number(response,"stripTorque")}};
+	/** Current wire representation only; older scene versions are rejected by SceneArtifact. */
+	public static function decode(source:String):SceneScrew {
+		var preserved = SceneWireJson.preserveNumbers(source);
+		var job:SceneScrew = haxeon.wire.JsonWire.decode(preserved);
+		validateWireIntegers(Reflect.field(haxe.Json.parse(preserved),"value"),job);
+		return job;
 	}
 }

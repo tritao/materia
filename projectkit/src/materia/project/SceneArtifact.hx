@@ -437,7 +437,7 @@ typedef SceneArtifactMissionStep = {
 	/** Requested handling-tool roll about world +Z in radians; independent of part heading. */
 	@:optional var toolYaw:Float;
 	@:optional var weld:SceneArtifactWeld;
-	@:optional var screw:SceneScrewDefinition.SceneScrew;
+	@:optional var screw:SceneScrewInvocation.ScrewInvocation;
 	@:optional var joints:Array<SceneArtifactJointTarget>;
 	@:optional var contactWork:SceneContactRegistration.SceneContactWork;
 	@:optional var signal:SceneArtifactMissionSignal;
@@ -707,7 +707,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 35;
+	public static inline var VERSION:Int = 36;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -734,7 +734,7 @@ class SceneArtifact {
 		var machining = data.machining == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.machining));
 		if (machining.length > 8000000) throw "Scene artifact machining job is too large";
 		var mobileBase = data.mobileBase == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.mobileBase));
-		var mission = data.mission == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.mission));
+		var mission = data.mission == null ? Bytes.alloc(0) : Bytes.ofString(encodeMission(data.mission));
 		if (mission.length > 1000000) throw "Scene artifact mission is too large";
 		var robotTools = data.robotTools == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.robotTools));
 		if (robotTools.length > 100000) throw "Scene artifact robot tools are too large";
@@ -1624,11 +1624,29 @@ class SceneArtifact {
 	static function finiteFloorPose(pose:Null<SceneArtifactFloorPose>):Bool
 		return pose != null && finite(pose.x) && finite(pose.y) && finite(pose.yaw);
 
+	/** Mission envelopes retain their ordinary fields; wire invocations use their explicit IDs. */
+	static function encodeMission(mission:SceneArtifactMission):String {
+		var envelope:Dynamic = {};
+		for (name in Reflect.fields(mission)) if (name != "steps") Reflect.setField(envelope,name,Reflect.field(mission,name));
+		var steps:Array<Dynamic> = [];
+		for (step in mission.steps) {
+			var encoded:Dynamic = {};
+			for (name in Reflect.fields(step)) if (name != "screw") Reflect.setField(encoded,name,Reflect.field(step,name));
+			var invocation = step.screw;
+			if (invocation != null) Reflect.setField(encoded,"screw",haxe.Json.parse(SceneWireJson.preserveNumbers(JsonWire.encode(invocation))));
+			else if (Reflect.hasField(step,"screw")) Reflect.setField(encoded,"screw",null);
+			steps.push(encoded);
+		}
+		Reflect.setField(envelope,"steps",steps);
+		return haxe.Json.stringify(envelope);
+	}
+
 	static function validateMission(mission:SceneArtifactMission, data:SceneArtifactData):Void {
 		function fail(detail:String):Void throw 'Scene artifact mission $detail';
 		validatePowerUpOffsets(mission.powerUpOffsets, data.assemblyDefinition);
 		validatePowerUpSideOffsets(mission.powerUpSideOffsets, data.assemblyDefinition);
 		if (mission.steps == null || mission.steps.length == 0) fail("has no steps");
+		SceneScrewInvocation.validate(mission.steps);
 		var definition = data.assemblyDefinition;
 		var flat = definition == null ? null : AssemblyDefinitionFlattener.flattenView(definition);
 		var missionController:Null<SceneArtifactCellController> = null;
@@ -1659,7 +1677,6 @@ class SceneArtifact {
 			return false;
 		}
 		var handles = false, welds = false, screws = false;
-		var screwSupplies:Map<String,String> = [];
 		var handlingTools:Array<SceneArtifactRobotTool> = data.robotTools == null ? [] : [for (tool in data.robotTools)
 			if (tool.kind == "gripper" || tool.kind == "suction") tool];
 		for (index in 0...mission.steps.length) {
@@ -1799,19 +1816,9 @@ class SceneArtifact {
 					}
 				case "screw":
 					screws = true;
-					var screw = step.screw;
+					var screw = SceneScrewInvocation.job(step.screw,mission.steps);
 					if (screw == null || flat == null) fail('step $index needs a screw definition and assembly');
-					else {
-						SceneScrewDefinition.validateScene(screw,flat,data);
-						var supplies = [screw.screw], recovery = screw.recovery;
-						if (recovery != null) supplies.push(recovery.replacement.screw);
-						for (body in supplies) {
-							var owner = screwSupplies.get(body);
-							if (owner != null && owner != screw.fastening)
-								fail('step $index reuses screw occurrence "$body" from fastening "$owner"');
-							screwSupplies.set(body,screw.fastening);
-						}
-					}
+					else SceneScrewDefinition.validateScene(screw,flat,data);
 
 				case "weld":
 					welds = true;
@@ -1851,7 +1858,7 @@ class SceneArtifact {
 			var capacity = drivers[0].screwdriver;
 			if (capacity == null) fail("screwdriver capacity is missing");
 			else for (step in mission.steps) {
-				var screw = step.screw;
+				var screw = SceneScrewInvocation.job(step.screw,mission.steps);
 				if (screw != null && (screw.program.finalTorqueLimit > capacity.maxTorque ||
 					screw.program.runDownSpeed > capacity.maxSpeed || screw.program.finalSpeed > capacity.maxSpeed ||
 					screw.program.maximumStroke > capacity.strokeMm))
@@ -2150,7 +2157,10 @@ class SceneArtifact {
 			var weld:Dynamic = Reflect.field(raw, "weld");
 			if (weld != null) step.weld = decodeWeld(weld);
 			var screw:Dynamic = Reflect.field(raw,"screw");
-			if (screw != null) step.screw = SceneScrewDefinition.decode(screw);
+			if (screw != null) {
+				var invocation = SceneScrewInvocation.decode(haxe.Json.stringify(screw));
+				step.screw = invocation;
+			}
 			var contact:Dynamic = Reflect.field(raw, "contactWork");
 			if (contact != null) step.contactWork = SceneContactRegistration.decode(contact);
 			var signal:Dynamic = Reflect.field(raw, "signal");
@@ -2569,7 +2579,7 @@ private class SceneArtifactReader {
 				faceRanges.push({faceIndex: readInt(), firstIndex: readInt(), indexCount: readInt()});
 			var faceDescriptors = readOpaqueText(16000000, 'part "$id" face descriptors');
 			var threadText = readOpaqueText(16000000, 'part "$id" threads');
-			var threads:Array<ThreadRenderData> = threadText.length == 0 ? [] : JsonWire.decode(threadText);
+			var threads:Array<ThreadRenderData> = threadText.length == 0 ? [] : JsonWire.decode(SceneWireJson.preserveNumbers(threadText));
 			var part:SceneArtifactPart = {threads: threads, id: id, name: name, red: red, green: green, blue: blue,
 				appearance: appearance, materialId: materialId, materialDensity: density, materialSpec: materialSpec,
 				volume: volume, centerOfMass: center, inertia: inertia,
@@ -2627,7 +2637,7 @@ private class SceneArtifactReader {
 		var missionLength = readInt();
 		if (missionLength < 0 || missionLength > 1000000) throw "Scene artifact mission is too large";
 		if (missionLength > 0)
-			mission = @:privateAccess SceneArtifact.decodeMission(haxe.Json.parse(readString(missionLength)));
+			mission = @:privateAccess SceneArtifact.decodeMission(haxe.Json.parse(SceneWireJson.preserveNumbers(readString(missionLength))));
 		var robotTools:Null<Array<SceneArtifactRobotTool>> = null;
 		var toolsLength = readInt();
 		if (toolsLength < 0 || toolsLength > 100000) throw "Scene artifact robot tools are too large";
