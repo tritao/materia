@@ -14,7 +14,7 @@ typedef TighteningResult = {
 private enum ScrewPhase {
   Idle; PickupApproach; PickupContact; Sealing; PickupRetract;
   WorkApproach; Engage; Driving; Stopping; Releasing; Retracting; Done; Failed;
-  RecoveryStop; Reversing; ReverseStop; RecoveryRetract; RejectTravel; RejectRelease; RejectRetract; Recovered;
+  ProcessStop; RecoveryStop; Reversing; ReverseStop; RecoveryRetract; RejectTravel; RejectRelease; RejectRetract; Recovered;
 }
 
 /** Picks, drives and releases one screw using position motion and measured tool feedback. */
@@ -31,6 +31,7 @@ class ScrewdrivingRunner {
   var reverseAngle = 0.0;
   var previousReverseAngle = 0.0;
   var recoveryHeld = false;
+  var lossAtPickup = false;
   static inline var STOP_SPEED:Float = 0.01;
   static inline var ANGLE_RESOLUTION:Float = 1e-6;
   public var tighteningResult(default, null):Null<TighteningResult> = null;
@@ -45,7 +46,7 @@ class ScrewdrivingRunner {
   public function failure():Null<String> return failureMessage;
   public function run(requested:ScrewPlan):Void {
     if (running() || requested == null) throw "Screw runner needs an idle runner and qualified plan";
-    plan = requested; tighteningResult = null; failureMessage = null; elapsed = 0; followDepth = 0;
+    plan = requested; tighteningResult = null; failureMessage = null; elapsed = 0; followDepth = 0; lossAtPickup = false;
     outputs.start(false); outputs.reverse(false); outputs.vacuum(false); outputs.selectProgram(requested.slot);
     phase = PickupApproach;
     motion.move(ScrewPlan.along(requested.pickup,-requested.approach),false);
@@ -123,6 +124,12 @@ class ScrewdrivingRunner {
           else if (elapsed > 2) throw 'Fastening "${selected.fastening}" vacuum did not release';
         case Retracting:
           if (motion.completed()) phase = Done;
+        case ProcessStop:
+          if (motion.stopped()) {
+            var result = tighteningResult;
+            if (result == null) throw "Stopped arm lost its process failure result";
+            phase = Failed; failureMessage = 'Fastening "${selected.fastening}": ${resultMessage(result.outcome)}';
+          } else if (elapsed > 2) throw "Arm did not stop after screw transport loss";
         case RecoveryStop:
           if (Math.abs(reading.speed) <= STOP_SPEED) {
             var result = tighteningResult;
@@ -132,7 +139,8 @@ class ScrewdrivingRunner {
               if (result.outcome != ScrewdriverContract.NO_SCREW && result.outcome != ScrewdriverContract.SCREW_LOST)
                 throw "Failed screw lost vacuum before recovery";
               phase = RecoveryRetract;
-              motion.move(ScrewPlan.along(result.outcome == ScrewdriverContract.NO_SCREW ? selected.pickup : selected.entry,-selected.approach),true);
+              var from = result.outcome == ScrewdriverContract.NO_SCREW || lossAtPickup ? selected.pickup : selected.entry;
+              motion.move(ScrewPlan.along(from,-selected.approach),result.outcome != ScrewdriverContract.SCREW_LOST);
             } else {
               if (!Math.isFinite(reading.angle) || reading.angle < 0) throw "Stopped recovery spindle has no valid measured angle";
               reverseAngle = reading.angle; previousReverseAngle = reading.angle;
@@ -193,7 +201,11 @@ class ScrewdrivingRunner {
     var selected = plan;
     if (selected == null) throw "Failed screwdriver has no fastening";
     tighteningResult = {fastening:selected.fastening,torqueNm:reading.torqueNm,angle:reading.angle,outcome:outcome};
-    fail(resultMessage(outcome));
+    if (outcome == ScrewdriverContract.SCREW_LOST) {
+      lossAtPickup = phase == PickupRetract;
+      outputs.start(false); outputs.reverse(false);
+      motion.stop(); phase = ProcessStop; elapsed = 0;
+    } else fail(resultMessage(outcome));
   }
   static function resultMessage(outcome:Int):String {
     var message = ScrewdriverSensor.faultMessage(outcome);

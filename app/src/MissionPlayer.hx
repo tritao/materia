@@ -1747,7 +1747,7 @@ class MissionPlayer implements SessionMember {
       () -> robot.runtime.pollEvents(),arm.jointIndices());
     var planningArm = arm;
     var cached:CachedJointMotion = {motion:executing,space:null};
-    var prepareTravel:Null<Void->Void> = null;
+    var prepareTravel:Null<Void->Null<String>> = null;
     if (plannedTravel) {
       jointMotions.set("screw:"+job.screw,cached);
       prepareTravel = () -> {
@@ -1755,8 +1755,17 @@ class MissionPlayer implements SessionMember {
         if (cached.space != null) cached.space.dispose();
         cached.space = null; executing.reset();
         var reference = startingJointPositions(executing,planningArm.jointIndices());
-        var planned = missionMotionPlanner(planningArm, reference, cellCollisionSnapshot([]));
+        var escape:Null<{screw:String, link:String, contacts:Array<String>}> = null;
+        var current = screwing;
+        if (current != null && current.tighteningResult != null &&
+            current.tighteningResult.outcome == robotkit.tool.ScrewdriverContract.SCREW_LOST) {
+          var spindle = [for (joint in robot.model.joints) if (joint.id == capacity.spindleJoint) joint];
+          if (spindle.length != 1) throw "Lost-screw escape needs its identified spindle joint";
+          escape = {screw:job.screw,link:spindle[0].child.id,contacts:[job.presenter,job.frame]};
+        }
+        var planned = missionMotionPlanner(planningArm, reference, cellCollisionSnapshot([]), escape);
         cached.space = planned.space; compiler.motionPlanner = planned.planner;
+        return null;
       };
     }
     var motion = new ScrewdrivingArmMotion(executing,0.08,0.01,prepareTravel);
@@ -1965,8 +1974,8 @@ class MissionPlayer implements SessionMember {
     }
   }
 
-  function missionMotionPlanner(arm:Manipulator, reference:Array<Float>,
-      snapshot:CellCollisionSnapshot):{planner:MotionPlanner, space:ManipulatorPlannerSpace} {
+  function missionMotionPlanner(arm:Manipulator, reference:Array<Float>, snapshot:CellCollisionSnapshot,
+      ?escape:{screw:String, link:String, contacts:Array<String>}):{planner:MotionPlanner, space:ManipulatorPlannerSpace} {
     var scene = snapshot.describe(arm, reference, CollisionClearance.MARGIN);
     var members = weldingMembers();
     if (members.length > 0)
@@ -1981,10 +1990,64 @@ class MissionPlayer implements SessionMember {
       for (name in scene.contacts([held.occurrence]))
         scene.payload(name, pads, CollisionPairRule.Allow, CollisionPairStatus.ProcessContact, 0.0);
     }
-    var build = scene.build(new NativeCollisionWorld());
+    var world = new NativeCollisionWorld();
+    var build = scene.build(world);
     var collisionSpace = new CollisionPlannerSpace(scene.description, build, scene.bodies, scene.margins());
     var space = new ManipulatorPlannerSpace(collisionSpace, arm, reference, scene.bodies.reference.q);
-    var planner = new RrtConnect(space, 17);
+    var planner:MotionPlanner = new RrtConnect(space, 17);
+    if (escape != null) {
+      var modelLink = scene.bodies.model.bodyIndex(escape.link);
+      if (modelLink < 0) throw 'Lost-screw escape has no spindle link "${escape.link}"';
+      var spindleBody = scene.bodies.bodies[modelLink];
+      var spindleObjects = [for (i in 0...scene.description.objects.length)
+        if (scene.description.objects[i].body == spindleBody) i];
+      var screwObjects = [for (name in scene.contacts([escape.screw])) scene.object(name)];
+      if (spindleObjects.length == 0) throw 'Lost-screw escape has no collision geometry on spindle link "${escape.link}"';
+      if (screwObjects.length == 0) throw 'Lost-screw escape has no observed geometry for screw "${escape.screw}"';
+
+      // The transition may start with the loose screw inside the usual margin.
+      // Measure only the identified screw/spindle pairs and retain half of each
+      // positive gap, capped at the normal contact margin.
+      var pairs:Array<collisionkit.CollisionPair> = [];
+      var pairIndices:Array<{first:Int, second:Int}> = [];
+      var pairKeys = new Map<String, Bool>();
+      function addPairs(objects:Array<Int>):Void {
+        for (first in spindleObjects) for (second in objects) {
+          if (first == second || scene.description.objects[first].body == scene.description.objects[second].body) continue;
+          var a = first, b = second;
+          if (a > b) { var swap = a; a = b; b = swap; }
+          var key = '$a\n$b';
+          if (pairKeys.exists(key)) continue;
+          pairKeys.set(key, true);
+          pairIndices.push({first:a,second:b});
+          var firstObject = scene.description.objects[a], secondObject = scene.description.objects[b];
+          pairs.push(new collisionkit.CollisionPair(build.objects[a], build.objects[b],
+            build.bodies[firstObject.body], build.bodies[secondObject.body]));
+        }
+      }
+      addPairs(screwObjects);
+      var screwPairCount = pairs.length;
+      var fixtureObjects = [for (name in scene.contacts(escape.contacts)) scene.object(name)];
+      if (fixtureObjects.length == 0) throw "Lost-screw escape has no observed contact fixtures";
+      addPairs(fixtureObjects);
+      if (pairs.length == 0) throw "Lost-screw escape has no identified spindle contact pairs";
+
+      // Pose the model at the measured start before querying the exact pairs.
+      var _ = space.violation(reference);
+      var distances = build.world.pairDistances(pairs);
+      if (distances.length != pairs.length) throw "Lost-screw escape could not measure every named contact pair";
+      var escapeMargins:Array<{first:Int, second:Int, margin:Float, air:Float, contact:Float}> = [];
+      for (i in 0...pairIndices.length) {
+        var pair = pairIndices[i], margin = CollisionClearance.CONTACT_MARGIN;
+        if (i < screwPairCount && distances[i].distance > 0)
+          margin = Math.min(margin, distances[i].distance / 2);
+        escapeMargins.push({first:build.objects[pair.first],second:build.objects[pair.second],margin:margin,
+          air:scene.description.marginBetweenObjects(pair.first,pair.second),
+          contact:scene.description.marginBetweenObjects(pair.first,pair.second,true)});
+      }
+      collisionSpace.depthLimit = 20;
+      planner = new ScrewEscapePlanner(space, space, new ManipulatorKinematics(arm,1e-8), world, escapeMargins);
+    }
     return {planner: planner, space: space};
   }
 

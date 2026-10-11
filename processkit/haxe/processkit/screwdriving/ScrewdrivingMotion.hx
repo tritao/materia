@@ -8,5 +8,9 @@ interface ScrewdrivingMotion {
   function update(durationSeconds:Float):Void;
   function completed():Bool;
   function failure():Null<String>;
+  /** Request a controlled stop without clearing any motion or runtime fault. */
+  function stop():Void;
+  /** True only after motion update confirms physical rest, with no fault. */
+  function stopped():Bool;
   function abort():Void;
 }

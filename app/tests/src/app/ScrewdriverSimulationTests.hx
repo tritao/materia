@@ -328,10 +328,14 @@ private class DriverDeviceFixture implements ScrewdriverOutputs implements Screw
 private class DriverMotionFixture implements ScrewdrivingMotion {
   public final targets:Array<Transform3> = [];
   var done = false;
+  var idle = true;
+  var stopping = false;
   public function new() {}
-  public function move(target:Transform3,contact:Bool):Void { targets.push(target); done = false; }
-  public function update(durationSeconds:Float):Void done = true;
+  public function move(target:Transform3,contact:Bool):Void { targets.push(target); done = false; idle = false; }
+  public function update(durationSeconds:Float):Void {idle = true; done = !stopping; stopping = false;}
   public function completed():Bool return done;
   public function failure():Null<String> return null;
-  public function abort():Void done = false;
+  public function stop():Void {stopping = true; idle = false; done = false;}
+  public function stopped():Bool return idle;
+  public function abort():Void {done = false; idle = false;}
 }

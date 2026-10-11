@@ -18,14 +18,24 @@ private class RecoveryOutputs implements ScrewdriverOutputs {
 }
 private class RecoveryMotion implements ScrewdrivingMotion {
 	public final targets:Array<Transform3> = [];
+	public final contacts:Array<Bool> = [];
 	public var problem:Null<String> = null;
 	var done = false;
+	var idle = true;
+	var stopping = false;
+	public var stopWait = 0;
+	public var stopRequests = 0;
 	public function new() {}
-	public function move(target:Transform3, contact:Bool):Void {targets.push(target); done = false;}
-	public function update(dt:Float):Void done = true;
+	public function move(target:Transform3, contact:Bool):Void {targets.push(target); contacts.push(contact); done = false; idle = false;}
+	public function update(dt:Float):Void {
+		if (stopping) {if (stopWait-- <= 0) {stopping = false; idle = true;} }
+		else {done = true; idle = true;}
+	}
 	public function completed():Bool return done;
 	public function failure():Null<String> return problem;
-	public function abort():Void done = false;
+	public function stop():Void {stopRequests++; stopping = true; done = false; idle = false;}
+	public function stopped():Bool return idle && problem == null;
+	public function abort():Void {done = false; idle = false;}
 }
 
 private class AttemptSkillFixture implements Skill {
@@ -136,11 +146,54 @@ class ScrewRecoveryTests {
 		for (_ in 0...10) if (empty.running()) empty.update(0.01,ScrewdriverSensor.idle());
 		empty.recover(reject); empty.update(0.01,ScrewdriverSensor.idle()); empty.update(0.01,ScrewdriverSensor.idle());
 		check(empty.recoveryCompleted() && !emptyOutputs.startOn && emptyMotion.targets.length == 3,"An empty nest retracts without reversing or inventing a rejected body");
+		runTransportLoss(true);
+		runTransportLoss(false);
 		runReplacementSkill(false);
 		runReplacementSkill(true);
 		runOrchestrationFaults();
 
 		Sys.println('Screw recovery: $count checks passed');
+	}
+	static function runTransportLoss(pickup:Bool):Void {
+		var motion = new RecoveryMotion(), outputs = new RecoveryOutputs();
+		var runner = new ScrewdrivingRunner(motion,outputs,() -> true), requested = plan();
+		runner.run(requested);
+		var feedback = ScrewdriverSensor.idle(); feedback.strokeMm = requested.strokeMm;
+		var targetCount = pickup ? 3 : 4;
+		for (_ in 0...10) if (motion.targets.length < targetCount) {
+			feedback.vacuum = outputs.vacuumOn; runner.update(0.01,feedback);
+		}
+		motion.stopWait = 3; feedback.vacuum = false;
+		runner.update(0.01,feedback);
+		check(motion.stopRequests == 1 && runner.running() && runner.failure() == null,
+			"Transport loss requests a controlled arm stop before finishing the failed attempt");
+		refuses(() -> runner.recover(Transform3.identity()));
+		for (_ in 0...3) runner.update(0.01,feedback);
+		check(runner.running() && runner.failure() == null && motion.targets.length == targetCount,
+			"A stop request cannot stand in for measured rest or start a recovery move");
+		runner.update(0.01,feedback);
+		check(!runner.running() && runner.failure() != null && motion.failure() == null && !motion.completed(),
+			"Confirmed rest finishes the lost-screw attempt without fabricating an arm fault or a completed program");
+		runner.recover(Transform3.identity()); runner.update(0.01,feedback);
+		var from = pickup ? requested.pickup : requested.entry;
+		var retreat = motion.targets[motion.targets.length-1];
+		check(retreat.translation.x == from.translation.x && retreat.translation.z == from.translation.z-requested.approach &&
+			!motion.contacts[motion.contacts.length-1] && !outputs.reverseOn,
+			"Lost-body recovery uses checked travel to the qualified retreat, without reversing an absent screw");
+		runner.update(0.01,feedback);
+		var result = runner.tighteningResult;
+		check(runner.recoveryCompleted() && motion.targets.length == targetCount+1 && result != null && result.outcome == ScrewdriverContract.SCREW_LOST,
+			"Lost-screw recovery retains the measured failure without inventing a body delivered to the bin");
+		var faultyMotion = new RecoveryMotion(), faultyOutputs = new RecoveryOutputs();
+		var faulty = new ScrewdrivingRunner(faultyMotion,faultyOutputs,() -> true); faulty.run(requested);
+		for (_ in 0...10) if (faultyMotion.targets.length < targetCount) {
+			feedback.vacuum = faultyOutputs.vacuumOn; faulty.update(0.01,feedback);
+		}
+		faultyMotion.stopWait = 3; feedback.vacuum = false; faulty.update(0.01,feedback);
+		faultyMotion.problem = "Runtime stop rejection"; faulty.update(0.01,feedback);
+		check(faulty.failure() != null && faultyMotion.failure() == "Runtime stop rejection",
+			"A real fault while stopping remains an arm fault and cannot be acknowledged as recovered");
+		refuses(() -> faulty.recover(Transform3.identity()));
 	}
 	static function runReplacementSkill(exhausted:Bool):Void {
 		var created = 0;

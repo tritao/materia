@@ -1978,6 +1978,76 @@ class ProjectSourceTests {
     Sys.println("Screwdriver equipment project passed on MuJoCo and the test backend");
   }
 
+  /** Actual vacuum loss while the arm is moving must stop before a replacement can start. */
+  static function checkScrewdrivingLoss(root:String):Void {
+    var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.assembly.project.json");
+    for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (pickup in [true,false]) {
+      Sys.println('Screwdriving CAD: begin transport loss backend $backend, pickup $pickup');
+      var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.mission;
+      if (definition == null || definition.steps.length != 4) throw "Transport-loss cell lost its CAD mission";
+      var job = definition.steps[0].screw;
+      if (job == null) throw "Transport-loss cell lost its first fastening";
+      definition.steps = [definition.steps[0]];
+      var session = new ProjectDocumentSession(null,false), simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.setBackend(backend);
+      try {
+        session.openGeneratedProject(generated,manifest);
+        check(simulation.rebuild(session.sensors,session.scene,session),'Transport-loss cell builds: ${simulation.error}');
+        var mission = simulation.missionPlayer(), clock = simulation.activeSession();
+        var original = simulation.environmentObject("project:"+job.screw);
+        if (mission == null || clock == null || original == null) throw "Transport-loss cell lost its original body";
+        var injected = false, observedStop = false;
+        var previousArm:Array<Float> = [], previousPhase = "";
+        while (!mission.finished && mission.failure == null && clock.simulationTime() < 300) {
+          simulation.step();
+          var active = @:privateAccess mission.screwing;
+          if (active != null) {
+            var phase = Std.string(@:privateAccess active.phase);
+            if (injected && phase == "ProcessStop") observedStop = true;
+            var arm = @:privateAccess mission.screwArm;
+            if (arm == null) throw "Transport-loss cell lost its arm";
+            var robot = @:privateAccess mission.robot;
+            var snapshot = robot.runtime.snapshot();
+            var positions = [for (index in arm.jointIndices()) snapshot.q.get(index)], moving = false;
+            if (phase == previousPhase && previousArm.length == positions.length)
+              for (index in 0...positions.length)
+                if (Math.abs(positions[index]-previousArm[index]) > 0.000001) moving = true;
+            if (!injected && phase == (pickup ? "PickupRetract" : "WorkApproach")) {
+              if (moving) {
+                var tools = @:privateAccess simulation.tools;
+                if (tools == null || tools.screwdrivers.length != 1) throw "Transport-loss cell lost its observer";
+                var driver = tools.screwdrivers[0];
+                if (driver.holding.held != original) throw "Vacuum-loss injection has no original body held";
+                driver.runtime.writeOutput(driver.channels.vacuum,ProcessEventValue.Digital(false));
+                injected = true;
+              }
+            }
+            previousArm = positions; previousPhase = phase;
+          }
+        }
+        check(injected && observedStop,'Actual arm motion loses vacuum and enters the controlled-stop phase (injected $injected, stopped $observedStop, failure ${mission.failure})');
+        check(mission.finished && mission.failure == null && mission.completed == 1,
+          'Transport loss recovers and installs its reserve: ${mission.failure}, time ${clock.simulationTime()}');
+        check(mission.screwRuns.length == 1,"Transport loss retains one named fastening report");
+        var report = mission.screwRuns[0];
+        check(report.finished && !report.failed && report.fault == null && report.attempts.length == 2 &&
+          report.attempts[0].screw == job.screw && report.attempts[0].result.outcome == robotkit.tool.ScrewdriverContract.SCREW_LOST &&
+          report.attempts[0].disposition == processkit.screwdriving.FasteningRunReport.ScrewDisposition.Lost,
+          "The original body is reported lost, with no fabricated rejection or arm fault");
+        var installed = report.installed();
+        if (installed == null) throw "Transport-loss replacement has no installed identity";
+        var body = simulation.environmentObject("project:"+installed);
+        check(installed != job.screw && body != null && mission.assemblyParts.get("project:"+job.frame).carries(body) &&
+          simulation.heldObjectIds().length == 0,"The exact replacement is installed after the controlled stop");
+        var robot = @:privateAccess mission.robot;
+        check(robot.runtime.snapshot().faultCode == 0,"Transport loss does not dismiss or fabricate a runtime safety fault");
+        simulation.clear(); session.dispose();
+      } catch (error:Dynamic) {simulation.clear(); session.dispose(); throw error;}
+      Sys.println('Screwdriving CAD: end transport loss backend $backend, pickup $pickup');
+    }
+    Sys.println("Screwdriving transport loss passed during pickup and transfer on both backends");
+  }
+
   /** Four actual CAD screws, separate replacements and physical reject-bin recovery. */
   static function checkScrewdrivingAssembly(root:String):Void {
     var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.assembly.project.json");

@@ -242,6 +242,23 @@ class ManipulatorMotion {
 
   public function hold():Void if (running && !starting) executor.hold();
   public function resume():Void if (running && !starting) executor.resume();
+  /** Discard the current program with a controlled stop; update confirms rest without creating or clearing a fault. */
+  public function stop():Void {
+    if (failure != null || session.isFaulted()) throw "Cannot request a controlled stop on a failed manipulator motion";
+    pendingProgram = null;
+    programCompleted = false;
+    lastCommandedQ = null;
+    if (!running) return;
+    if (starting) {
+      // Nothing has moved yet: dropping the planning is the whole stop.
+      release();
+      return;
+    }
+    try executor.abort() catch (error:Dynamic) {
+      session.reject();
+      fail('Controlled stop rejected: ${Std.string(error)}',false);
+    }
+  }
   public function abort():Void {
     if (!running) return;
     pendingProgram = null;

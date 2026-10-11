@@ -232,6 +232,23 @@ simulation and hardware, and a mission step drives it.
   reversal and vacuum release, instead of latching the process result's angle
   or the last reversing frame's vacuum.
 
+- **SD7 — Transport loss stops the arm before recovery.** A process NOK does
+  not fabricate a manipulator fault. The controlled stop discards queued motion,
+  preserves existing faults and waits for confirmed rest before publishing the
+  failed attempt. A lost body is neither reversed nor reported as rejected.
+  Its retreat is collision-planned from the measured stopped pose. Only the
+  identified spindle body, lost screw and named contact fixtures receive escape
+  clearance; normal 5 mm clearance is required again at the retreat endpoint.
+  Withdrawal retains measured tool orientation until the bit is clear, with
+  inverse-kinematic samples and every connecting joint edge checked. Normal
+  joint travel changes orientation only after withdrawal. A random joint-space
+  search inside the socket was prohibitively slow; the constrained withdrawal
+  keeps its search bounded without weakening the collision proof. Contact
+  fixtures retain their CAD rigid/adjacent collision rules. If a loose
+  screw settles inside the usual 0.5 mm contact margin, the escape preserves
+  at least half its measured positive gap along every checked edge. Overlap or
+  another blocked pair causes a bounded clearance wait and a named failure.
+
 ## What exists
 
 - Fasteners in `machinekit.standard`: `SocketHeadCapScrew` (ISO 4762),
@@ -1009,6 +1026,56 @@ snug/final execution with retained engagement, transport-loss stopping semantics
 and the final SD7 gate remain pending. SD8 is unstarted. This checkpoint does
 not mark SD7 complete.
 
+### SD7 transport-loss checkpoint (2026-10-11)
+
+Focused `build/sd7-controlled-stop.log` passes 31 process, 13 generation and
+51 recovery checks. The additional checks delay arm-stop confirmation during
+pickup and transfer, refuse premature recovery, preserve a real motion fault,
+and retain the original lost identity without a fabricated reject or reverse.
+The new physical CAD test releases actual vacuum while the arm is moving and
+requires the separately identified reserve to finish on the exact fixture.
+Focused `build/sd7-physical-loss-positions.log` passes all four cases: pickup
+and transfer on MuJoCo and the deterministic backend. Each actual vacuum loss
+stops the moving arm, retains the original lost result and installs its exact
+reserve on the threaded fixture, without a fabricated reject or runtime fault.
+Motion is detected through measured joint-position changes across consecutive
+samples of the selected phase, rather than a backend-dependent velocity field.
+The artifact remains 2269798 bytes.
+
+The first physical runs exposed legitimate clearance checks: the stopped bit
+remains inside the presenter's travel margin, and the loose screw can settle
+with about 0.25 mm positive clearance. Copying the contact fixture to a separate
+clearance group must also preserve its existing rigid rules, or its designed
+nest/escapement overlap becomes a false collision. These are application
+collision-description issues; no Haxeon compiler defect has been confirmed.
+The ordinary clearance subdivision budget was insufficient for the small
+positive-gap escape; the contact escape uses finer conservative bounds. Random
+joint-space searches inside the socket remained impractically slow, so they
+were stopped explicitly (exit 143), not killed for memory. A straight withdrawal
+with retained measured orientation and checked joint edges resolves this; only
+after restoring normal clearance may a joint planner change orientation.
+Full gate `sd-suite-sd7-transport-loss.txt` passes all seven stages. The
+seven logs and summary are archived as `build/sd7-transport-loss-*`. All 118
+prior normalized app results match; MachineKit retains 124 of 125 checkpoint
+result lines exactly, changing only the recovery count from 35 to 51 for the
+16 added checks. All 123 pre-SD7 engineering/result lines remain unchanged.
+All 36 comparable artifact generation sizes match. Four loads reuse decoded
+schema-31 caches instead of logging regeneration; their files retain the exact
+checkpoint sizes (45240, 2725209, 17794359 and 17943600 bytes). Thus all 40
+checkpoint loads are accounted for. The comparison reports record these files
+and their hashes. No saved schema, native source, OCCT or submodule pin changes
+were needed; no new Haxeon compiler bug was confirmed.
+
+Picker allocation observations move from 58678/60321 to 58612/60342 bytes/tick;
+mill observations move from 53463.26 to 53388.75. Router observations remain
+39.5/43.8 KB/tick and 16/16 collections. The additional earlier CAD recovery
+cases change heap and global HashLink buffer-refill phase, as documented above;
+all budgets pass. Physical values, mission times, stock removal and tracking
+results are unchanged.
+
+Endpoint access checks, optional snug/final execution retaining engagement,
+and the final SD7 gate remain pending. SD8 is unstarted; SD7 is not complete.
+
 | Step | State | Commits |
 | --- | --- | --- |
 | SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
@@ -1018,5 +1085,5 @@ not mark SD7 complete.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — generation gate passed; four-screw CAD execution and physical recovery pass both backends; staged execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69` |
+| SD7 | in progress — CAD execution and transport-loss recovery pass both backends and full checkpoint gates; endpoint access, snug/final execution and final gate pending | `a6123a912`, `c0bedd1b3`, `20c52bb69` |
 | SD8 | open — machine tending landed; not started | |
