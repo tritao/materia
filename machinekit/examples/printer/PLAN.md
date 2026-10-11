@@ -986,6 +986,23 @@ left in the motion path.
    fast path is tested against. Done when, on the printing gate, the planned time is within 0.5 % of TOPP-RA's (or
    shorter), no joint or motor limit is exceeded, the plan checks find nothing new, and planning is at least 10x faster
    than with TOPP-RA (the worst 10 s window included), aiming at real time on a Raspberry Pi class CPU.
+11. The general path (TOPP-RA) after item 2: every machine that is not affine keeps it (arms, the welder, the tending
+   cell, non-planar printing). AM5's profile predates AM8's segment merging, the rebase and the WIP planner changes, and
+   the gate's peak memory has grown to 11.4 GB, so profile again first (`perf` and the allocation census, the printing
+   gate and a robot-arm load), then fix the top costs. Expected, to be confirmed by the profile:
+   - the fixed 32 stages per span (each stage is an LP in both passes and a lowered segment): an adaptive grid by span
+     length and curvature (item 8), checked against the 0.8 margin that a uniform coarsening once broke on a Paint path;
+   - lowering to one segment per stage and then merging (`SmallTab`: 163,392 -> 25,580): lower straight to long
+     quintics where the path allows, so neither the surplus segments nor the merge's searches are paid for;
+   - sections start and end at rest (layer changes, turns above 150 degrees, every 4,000 primitives), so they are
+     independent: plan them on several cores, which matters most for the worst 10 s window;
+   - count the retries that remain per load (smoothing re-lowerings when a lowered trajectory breaks a limit; the
+     forward-pass retries and halvings are gone with item 2), since each one is a whole re-plan;
+   - what keeps plans and trajectories alive long enough for an 11.4 GB peak, and the collector's cost of marking it;
+   - the share of the Haxe-side checks (task-space, torque and deviation plan checks) that is left after AM5.
+   Done when the printing gate and the robot-arm load plan measurably faster (numbers before and after, processor
+   time) and use less memory, the planned times and the plan checks' results are unchanged within their tolerances,
+   and the full suite passes.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
