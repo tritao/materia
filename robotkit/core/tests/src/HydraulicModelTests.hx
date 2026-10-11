@@ -50,6 +50,8 @@ class HydraulicModelTests {
     var source = model();
     var blueprint = RobotRuntimeCompiler.compile(source, new RobotProfile());
     check(blueprint.cylinderDrives.length == 1 && blueprint.channels.length == 2, "one shared process binding and two coils");
+    for (channel in blueprint.channels)
+      check(!channel.keepOnStop, "hydraulic stop de-energizes the closed-centre valve");
     var binding = blueprint.cylinderDrives[0];
     check(binding.control == CylinderControl.FlowLimited, "hydraulic binding selects flow control");
     near(binding.extensionForce, hydraulic.extensionForce(), "compiled extension force");

@@ -52,10 +52,10 @@ class RobotRuntimeCompiler {
       var drive = actuator.drive;
       var cylinder = drive == null ? null : drive.cylinder();
       if (cylinder != null) {
-        // An ordinary program stop preserves cylinder outputs. Emergency stops
-        // and faults de-energize coils; the simulated valve owns its latch state.
-        ensureDigitalChannel(result, cylinder.channelA, true);
-        if (cylinder.channelB != null) ensureDigitalChannel(result, cylinder.channelB, true);
+        // Pneumatic outputs survive an ordinary stop; hydraulic valves close centre.
+        // Emergency stops and faults de-energize every coil.
+        ensureDigitalChannel(result, cylinder.channelA, cylinder.hydraulic() == null);
+        if (cylinder.channelB != null) ensureDigitalChannel(result, cylinder.channelB, cylinder.hydraulic() == null);
       }
       var processVelocity = actuator.processVelocity;
       if (processVelocity != null) {

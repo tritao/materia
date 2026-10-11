@@ -130,7 +130,6 @@ class AssemblyDefinitionFlattener {
 		}
 		if (actuator.hydraulic != null) {
 			var h = actuator.hydraulic;
-			var prefix = id.substr(0, id.length - actuator.id.length);
 			copy.hydraulic = {bore: h.bore, rod: h.rod, stroke: h.stroke,
 				approachSpeed: h.approachSpeed, workingSpeed: h.workingSpeed, returnSpeed: h.returnSpeed,
 				changePoint: h.changePoint, pressurePa: h.pressurePa,

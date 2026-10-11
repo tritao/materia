@@ -288,14 +288,15 @@ class ApplicationSimulation {
                 machine.virtualDevice == true, candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id));
             }
           }
+          if (machine != null && machine.digitalProgram != null) {
+            if (candidateDigital != null || session.controllers.length > 1 || job != null ||
+                machine.program != null || session.mission != null || built.mobile != null)
+              throw "Machine digital program needs exclusive assembly execution ownership";
+            candidateDigital = new MachineDigitalProgramPlayer(machine.digitalProgram, built);
+          }
         }
         if (session.machineMotion != null && session.machineMotion.program != null && candidateProgram == null)
           throw "Machine axis program has no controller owning its axes";
-        if (machine != null && machine.digitalProgram != null) {
-          if (job != null || machine.program != null || session.mission != null || built.mobile != null)
-            throw "Machine digital program needs exclusive assembly execution ownership";
-          candidateDigital = new MachineDigitalProgramPlayer(machine.digitalProgram, built);
-        }
       }
       var resolvedMotions = RobotMotionPlayer.resolve(candidateMotions,
         [for (robot in candidateRobots) robot.id()], candidateRobotModels);
@@ -305,10 +306,10 @@ class ApplicationSimulation {
       var environmentRecords = scene.records();
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
       var hasPneumaticActuator = candidateAssembly != null &&
-        candidateAssembly.blueprint.pneumaticDrives.length > 0;
+        hasPneumaticCylinder(candidateAssembly.blueprint);
       if (!hasPneumaticActuator && session != null) for (control in session.controllers) {
         var built = candidateByController.get(control.id);
-        if (built != null && built.blueprint.pneumaticDrives.length > 0) hasPneumaticActuator = true;
+        if (built != null && hasPneumaticCylinder(built.blueprint)) hasPneumaticActuator = true;
       }
       var pneumaticWorkpieceSurface = hasPneumaticActuator
         ? SimulationContactSurfaces.environmentPart() : null;
@@ -628,6 +629,12 @@ class ApplicationSimulation {
   /** The project's CNC program player, or null when the project has no CNC job. */
   public function cncPlayer():Null<CncProgramPlayer> return cnc;
   public function programPlayer():Null<MachineProgramPlayer> return machineProgram;
+  static function hasPneumaticCylinder(blueprint:robotkit.runtime.RobotRuntimeBlueprint):Bool {
+    for (drive in blueprint.cylinderDrives)
+      if (drive.control == robotkit.runtime.CylinderControl.PressureEffort) return true;
+    return false;
+  }
+
   public function digitalProgramPlayer():Null<MachineDigitalProgramPlayer> return digitalProgram;
   public function beltDisplayUpdates():Int {
     var count = 0;

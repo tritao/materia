@@ -3365,7 +3365,7 @@ class ProjectSourceTests {
         var station:Null<materia.project.SceneArtifact.SceneArtifactPlace> = null;
         for (step in mission.mission.steps) if (station == null && step.kind == "place") station = step.at;
         if (nativeSession == null || freeBlank == null || station == null) throw "Vise seating fixture is incomplete";
-        var drives = [for (drive in cnc.robot.blueprint.pneumaticDrives)
+        var drives = [for (drive in cnc.robot.blueprint.cylinderDrives)
           if (cnc.robot.model.joints[drive.joint].id == "mill/mill/vise/jaw") drive];
         if (drives.length != 1) throw "Vise seating fixture needs one real cylinder";
         var drive = drives[0], retract = drive.channelB;
@@ -4736,7 +4736,7 @@ class ProjectSourceTests {
   }
 
   /** The generated CAD hulls, hydraulic circuit and passive contacts run at the normal app tick. */
-  static function checkPressBrakePhysics(generated:app.MateriaProjectRunner.GeneratedAssemblyScene, manifest:String):Void {
+  static function checkPressBrakePhysics(generated:app.GeneratedAssemblyScene, manifest:String):Void {
     var definition = generated.assemblyDefinition, physical = generated.physical;
     if (definition == null || physical == null) throw "Press simulation lost its assembly or physical data";
     var initial = new AssemblyState(definition, generated.assemblyState);

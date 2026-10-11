@@ -197,7 +197,7 @@ class ProjectKitTests {
     near(h.returnSpeed, 70, "hydraulic return speed round trip");
     near(h.changePoint, 68.5, "hydraulic change point round trip");
     near(h.extendSign, 1, "hydraulic extension sign round trip");
-    var copy = AssemblyDefinitionFlattener.copyActuator(restored.actuators[0], "press/ram", "press/hinge");
+    var copy = AssemblyDefinitionFlattener.copyActuator(restored.actuators[0], "press/ram", "press/hinge", "press/");
     var copied = copy.hydraulic; if (copied == null) throw "Hydraulic copy lost its drive";
     check(copied.channelA == "press/valve/coilA" && copied.channelB == "press/valve/coilB",
       "hydraulic channels follow nested member scope");

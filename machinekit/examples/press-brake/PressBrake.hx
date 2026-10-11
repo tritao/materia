@@ -216,12 +216,13 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 				at(side * 450, -240, bedHeight - 20), "bed");
 			fixed(side < 0 ? "curtainLeft" : "curtainRight", new PressLightCurtain(), at(side * 900, -300, 600), "bed");
 		}
-		fixed("power", new PowerSupply(48, 20, 3), at(0, 420, 500), "bed");
+		// Assumed 48 V bus covers simultaneous peak servo demand and a 1.5 kW braking shunt.
+		fixed("power", new PowerSupply(ServoMotor.LOW_VOLTAGE_BUS, new machinekit.power.DcCurrent(30), 3, 120, 60, 30, 1500), at(0, 420, 500), "bed");
 		// The stop is independent of the ram. Its face descends by the commanded stopping travel.
 		slide("depth", "depthStop", new PressBlock("Mechanical depth stop", 100, 80, 40),
 			at(0, 300, bedHeight + openHeight), "bed", {x: 0, y: 0, z: -1}, stroke);
 		servoScrew("depth", "depthStop", "depth", new BallScrew(300), at(0, 300, bedHeight + openHeight - 180),
-			at(0, 300, bedHeight + openHeight - 20), {x: 0, y: 0, z: -1}, {x: 0, y: 0, z: 1}, "GENERIC-SERVO-50W", 1);
+			at(0, 300, bedHeight + openHeight - 20), {x: 0, y: 0, z: -1}, {x: 0, y: 0, z: 1}, "GENERIC-LV-SERVO-50W", 1);
 		slide("X", "gaugeX", new PressBlock("Backgauge carriage", gaugeWidth, 80, 60), at(0, 0, 660), "bed", {x: 0, y: 1, z: 0}, gaugeTravel);
 		for (side in [-1, 1]) {
 			var name = side < 0 ? "Left" : "Right", block = LinearRailBlock.metric("MGN12C");
@@ -235,7 +236,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 		var alongY:AssemblyFrame = {x: 0, y: -70, z: 640, qx: -Math.sin(Math.PI / 4), qy: 0, qz: 0, qw: Math.cos(Math.PI / 4)};
 		var nutY:AssemblyFrame = {x: 0, y: 10, z: 640, qx: alongY.qx, qy: 0, qz: 0, qw: alongY.qw};
 		servoScrew("X", "gaugeX", "gaugeX", new BallScrew(650), alongY, nutY,
-			{x: 0, y: 1, z: 0}, {x: 0, y: 1, z: 0}, "GENERIC-SERVO-200W", 2);
+			{x: 0, y: 1, z: 0}, {x: 0, y: 1, z: 0}, "GENERIC-LV-SERVO-200W", 2);
 		var gaugeParent = "gaugeX";
 		if (withR) {
 			slide("R", "gaugeR", new PressBlock("Backgauge lift", gaugeWidth, 40, 40), at(0, 40, gaugeBaseHeight - 40),
@@ -246,7 +247,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 				fixed('gaugeRBlock$name', LinearRailBlock.metric("MGN12C"), at(side * 200, 40, gaugeBaseHeight - 50), "gaugeR");
 			}
 			servoScrew("R", "gaugeR", "gaugeR", new BallScrew(300), at(0, 60, gaugeBaseHeight - 130), at(0, 60, gaugeBaseHeight - 30),
-				{x: 0, y: 0, z: 1}, {x: 0, y: 0, z: 1}, "GENERIC-SERVO-100W", 3, "gaugeX");
+				{x: 0, y: 0, z: 1}, {x: 0, y: 0, z: 1}, "GENERIC-LV-SERVO-100W", 3, "gaugeX");
 			gaugeParent = "gaugeR";
 		}
 		for (side in [-1, 1]) {
@@ -311,7 +312,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 		var sense = machinekit.assembly.Sense.SenseTools.fromAlignment(axis.x * along.x + axis.y * along.y + axis.z * along.z);
 		var ratio = addTransmission('$id-lead', joint, '$id-turn', Transmission.LeadScrew('$id-screw', '$id-nut'), sense);
 		var speedCap = supportScrew('$id-lead', near.support, far.support, farPosition - nearPosition);
-		fixed('$id-driver', new MotorDriver("GENERIC-SERVO-AMP", 3), at(-200 + outlet * 100, 420, 600), "bed");
+		fixed('$id-driver', new MotorDriver("GENERIC-LV-SERVO-AMP", new machinekit.power.PhaseRmsCurrent(32)), at(-200 + outlet * 100, 420, 600), "bed");
 		connectPorts('$id-power', "power", 'power$outlet', '$id-driver', "power");
 		addMotor('$id-drive', '$id-turn', '$id-motor', '$id-driver');
 	}

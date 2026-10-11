@@ -321,7 +321,6 @@ std::optional<ProcessChannelFault> SimulationRobot::apply_cylinder_valves(const 
             }
         } else {
             const bool to_a = spool_states[index];
-            drive.to_a = to_a;
             target.mode = NKSIM_JOINT_TARGET_EFFORT;
             target.target = to_a ? drive.extension_force * drive.extend_sign
                 : -drive.retraction_force * drive.extend_sign;
@@ -329,6 +328,10 @@ std::optional<ProcessChannelFault> SimulationRobot::apply_cylinder_valves(const 
         }
         targets.push_back(target);
     }
+    // Backend phase reads may fail too; commit pneumatic latches only after every drive resolves.
+    for (std::size_t index = 0; index < cylinder_drives_.size(); ++index)
+        if (cylinder_drives_[index].control == RK_CYLINDER_PRESSURE_EFFORT)
+            cylinder_drives_[index].to_a = spool_states[index];
     return std::nullopt;
 }
 

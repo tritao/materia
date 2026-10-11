@@ -17,7 +17,7 @@
       "type": "rectangle",
       "visible": true,
       "width": 7.5,
-      "x": 1.0,
+      "x": 1,
       "y": 15.8,
       "z": -0.1,
       "materialId": "neutral",
@@ -135,7 +135,7 @@
         ]
       },
       "x": 0,
-      "y": 0.0,
+      "y": 0,
       "z": 0,
       "materialId": "neutral"
     },
@@ -245,7 +245,7 @@
         ]
       },
       "x": 0,
-      "y": 6.0,
+      "y": 6,
       "z": 0,
       "materialId": "neutral"
     },
@@ -355,7 +355,7 @@
         ]
       },
       "x": 0,
-      "y": 12.0,
+      "y": 12,
       "z": 0,
       "materialId": "neutral"
     },
@@ -465,7 +465,7 @@
         ]
       },
       "x": 0,
-      "y": 18.0,
+      "y": 18,
       "z": 0,
       "materialId": "neutral"
     },
@@ -575,7 +575,7 @@
         ]
       },
       "x": 0,
-      "y": 24.0,
+      "y": 24,
       "z": 0,
       "materialId": "neutral"
     },
@@ -595,7 +595,7 @@
       "visible": true,
       "width": 0.4,
       "x": 0.9,
-      "y": 30.0,
+      "y": 30,
       "z": 1.01,
       "materialId": "neutral",
       "visualOverrides": {
@@ -649,7 +649,7 @@
       "visible": true,
       "width": 0.36,
       "x": 0.9,
-      "y": 30.0,
+      "y": 30,
       "z": 1.1,
       "materialId": "neutral",
       "visualOverrides": {
@@ -685,7 +685,7 @@
         ]
       },
       "x": 0,
-      "y": 30.0,
+      "y": 30,
       "z": 0,
       "materialId": "neutral"
     }
@@ -697,8 +697,10 @@
         "schemaVersion": 1,
         "robotId": "materia/robot",
         "model": {
+          "schemaVersion": 13,
           "name": "Materia robot",
           "collisionApproximation": "bounds-box",
+          "floatingBase": false,
           "links": [
             {
               "centerOfMass": [
@@ -771,7 +773,26 @@
           ],
           "joints": [
             {
-              "axis": [
+              "id": "worker-demo-pivot",
+              "name": "Arm pivot",
+              "type": "revolute",
+              "parentLink": "base",
+              "childLink": "worker-demo-arm",
+              "includePath": null,
+              "limits": {
+                "lower": -0.8,
+                "upper": 0.8,
+                "velocity": 2,
+                "effort": 5,
+                "maxAcceleration": null
+              },
+              "parentFramePosition": [
+                0,
+                0,
+                1.3
+              ],
+              "parentFrameRotation": [
+                0,
                 0,
                 0,
                 1
@@ -787,34 +808,15 @@
                 0,
                 1
               ],
-              "id": "worker-demo-pivot",
-              "limits": {
-                "effort": 5,
-                "lower": -0.8,
-                "upper": 0.8,
-                "velocity": 2,
-                "maxAcceleration": null
-              },
-              "name": "Arm pivot",
-              "parentFramePosition": [
-                0,
-                0,
-                1.3
-              ],
-              "parentFrameRotation": [
-                0,
+              "axis": [
                 0,
                 0,
                 1
               ],
-              "type": "revolute",
-              "parentLink": "base",
-              "childLink": "worker-demo-arm",
               "dynamics": {
                 "armature": 0,
                 "damping": 0,
                 "frictionLoss": 0,
-                "limitTimeConstant": 0,
                 "limitDampingRatio": 0,
                 "limitImpedance": [
                   0,
@@ -822,13 +824,18 @@
                   0,
                   0,
                   0
-                ]
+                ],
+                "limitTimeConstant": 0
               }
             }
           ],
+          "actuators": [],
+          "couplings": [],
           "frames": [
             {
+              "flangeIncludePath": null,
               "id": "base/sensors",
+              "link": "base",
               "name": "Base sensor mount",
               "position": [
                 0,
@@ -840,31 +847,24 @@
                 0,
                 0,
                 1
-              ],
-              "link": "base"
+              ]
             }
           ],
           "sensors": [
             {
-              "fieldOfViewRadians": 6.283185307179586,
               "id": "sensor/1",
-              "kind": "lidar",
-              "maxRange": 10,
               "name": "lidar 1",
-              "noiseSeed": 1,
-              "noiseStddev": 0,
-              "rayCount": 8,
-              "startAngleRadians": 0,
+              "kind": "lidar",
               "updateRate": 0,
-              "frame": "base/sensors"
+              "frame": "base/sensors",
+              "rayCount": 8,
+              "maxRange": 10,
+              "startAngleRadians": 0,
+              "fieldOfViewRadians": 6.283185307179586,
+              "noiseStddev": 0,
+              "noiseSeed": 1
             }
           ],
-          "schemaVersion": 12,
-          "floatingBase": false,
-          "actuators": [],
-          "encoders": [],
-          "couplings": [],
-          "elasticNetworks": [],
           "contactPairs": []
         },
         "profile": {

@@ -17,7 +17,10 @@ That gap leaves 20 mm of penetration within the nominal ram stroke.
 `PressGeometry.of(press)` rebuilds planning dimensions from connector poses,
 part bounds and joint limits. Cylinder bodies, moving rods, frame envelopes,
 servo ratings and the 40 t capacity are explicit assumptions pending vendor
-drawings. Frame and demo envelope checks do not rate the tools or certify a
+drawings. Its assumed 48 V servo bus uses the low-voltage winding family,
+32 A phase-RMS amplifiers and a 30 A DC source with a 1.5 kW regenerative
+shunt. Assembly rebuild checks their simultaneous peak demand; the mechanical
+torque-speed curves are unchanged. Frame and demo envelope checks do not rate the tools or certify a
 bend sequence. Tool contact and bend-order collisions are checked by the later
 single-bend and sequence-planning steps.
 

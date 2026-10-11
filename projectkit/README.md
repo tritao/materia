@@ -11,14 +11,14 @@ base layer.
 `materia.project.SceneArtifact` is the shared writer and reader for generated
 viewport geometry. A project generator writes the artifact to a file; Materia
 loads and validates that file after the generator exits. The current `MTRG`
-version 16 contains a metres-per-coordinate scale and independent mesh parts.
+version 28 contains a metres-per-coordinate scale and independent mesh parts.
 Each part has a stable ID, display name, color, vertex and normal streams,
 triangle indices, CAD face ranges, and persistent edge identities. It can also
 carry rigid instance poses, named connector frames, and fixed, revolute,
 continuous, or prismatic joints. Readers reject unsupported versions, duplicate
 IDs, invalid units, malformed buffers, and out-of-range indices. Earlier
-versions are rejected. Version 16 can also carry a versioned assembly definition
-and a separate kinematic state alongside the pose record. Version 16 adds
+versions are rejected. The current format can also carry a versioned assembly definition
+and a separate kinematic state alongside the pose record. The current format adds
 validated moving-belt routes and independent-axis playback metadata, including
 an optional streamed virtual-device deployment.
 
@@ -37,10 +37,10 @@ joints, explicit unit axes, optional limits, and a `tree` or `closure` role.
 `AssemblyDefinitionCodec` validates and encodes this schema independently from
 the binary scene artifact version. `AssemblyStateRecord` stores joint
 coordinates and root placements separately from the definition. Scene artifact
-version 16 can carry both payloads; geometry part IDs identify component
+version 28 can carry both payloads; geometry part IDs identify component
 definitions so repeated occurrences can share one geometry payload.
 
-Schema version 2 adds a reusable `assemblies` table. An occurrence selects a
+Assembly schema version 10 includes a reusable `assemblies` table. An occurrence selects a
 subassembly by setting `assembly` and `definition` to its table ID. Each entry
 can expose connectors from its members, including connectors passed through a
 deeper subassembly. `AssemblyDefinitionFlattener` prefixes nested IDs with the
@@ -72,8 +72,12 @@ path for its immutable artifact snapshot. Scalar and text reads avoid temporary
 byte buffers in both paths. See [decoding benchmarks](tests/decoding/README.md) for
 native allocation measurements and the Chrome runner.
 
-Scene artifact schema 18 adds optional project runtime settings: a selected job,
+Scene artifact schema 28 includes optional project runtime settings: a selected job,
 dynamic occurrence IDs and joint motion tracks. Native publishers resolve these
 from source manifests so downloaded artifacts open independently of source files.
-The decoder also accepts schema 17, with no project settings. Project settings
+Only the current schema is accepted. Project settings
 validate occurrence/joint references, duplicate IDs and bounded motion keyframes.
+
+Machine motion uses typed wire records for axis and digital programs and per-hull
+contact settings. Hydraulic actuator data uses wire field 28; motor brakes retain
+field 27. These records are part of assembly schema 10 and scene schema 28.

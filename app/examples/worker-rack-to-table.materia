@@ -146,7 +146,7 @@
         "schemaVersion": 1,
         "robotId": "materia/robot",
         "model": {
-          "schemaVersion": 9,
+          "schemaVersion": 13,
           "name": "Materia robot",
           "collisionApproximation": "bounds-box",
           "floatingBase": false,
@@ -227,6 +227,7 @@
               "type": "revolute",
               "parentLink": "base",
               "childLink": "worker-demo-arm",
+              "includePath": null,
               "limits": {
                 "lower": -0.8,
                 "upper": 0.8,
@@ -281,6 +282,7 @@
           "couplings": [],
           "frames": [
             {
+              "flangeIncludePath": null,
               "id": "base/sensors",
               "link": "base",
               "name": "Base sensor mount",
@@ -312,12 +314,6 @@
               "noiseSeed": 1
             }
           ],
-          "schemaVersion": 12,
-          "floatingBase": false,
-          "actuators": [],
-          "encoders": [],
-          "couplings": [],
-          "elasticNetworks": [],
           "contactPairs": []
         },
         "profile": {
