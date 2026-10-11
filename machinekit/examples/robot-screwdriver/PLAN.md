@@ -1355,7 +1355,7 @@ path before execution. This was a helper error, not stale compilation.
 `build/sd7-staged-cad.log` passes all ten physical cases and portable export,
 with the staged artifact at 2272982 bytes. Full gate `sd7-final` passes all
 seven stages, including these ten cases again, portable export and the existing
-SD6/single-pass/transport-loss acceptance. SD7 is complete; SD8 is unstarted.
+SD6/single-pass/transport-loss acceptance. All 16 existing whole-screw transition times also match exactly. SD7 is complete; SD8 is unstarted.
 
 The full gate's library portion passes CadKit, ProjectKit and MachineKit.
 `build/sd7-final-machinekit-compare.txt` retains 128 of 129 prior result lines
@@ -1400,5 +1400,5 @@ archive after validation, leaving its populated checkout clean.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71`, staged final (this commit) |
+| SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71`, `7038a4fee` |
 | SD8 | open — machine tending landed; not started | |
