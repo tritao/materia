@@ -2604,6 +2604,7 @@ class MachineKitSmoke {
 			{name: "CoreXyDriveTests.run", run: CoreXyDriveTests.run, weight: 0.5},
 			{name: "PrintingPartTests.run", run: PrintingPartTests.run, weight: 0.3},
 			{name: "CoreXyPrinterChecks.run", run: CoreXyPrinterChecks.run, weight: 4},
+			{name: "PrinterKlipperTests.run", run: PrinterKlipperTests.run, weight: 3},
 			{name: "assemblyPreviewSharing", run: assemblyPreviewSharing, weight: 0.05},
 			{name: "RecipeContractTests.run", run: RecipeContractTests.run, weight: 7.1},
 			{name: "MotorDriverTests.run", run: MotorDriverTests.run, weight: 0.05},

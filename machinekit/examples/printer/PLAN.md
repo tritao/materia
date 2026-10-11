@@ -932,6 +932,31 @@ Done. What was built and decided:
 - The Klipper G-code flavour from AM2 is used for the sliced demo bracket, written next to the
   config as the example's export.
 
+Done. What was built and decided:
+- **`machinekit.printing.KlipperConfig`** (typed model of a CoreXY `printer.cfg`, `render`, `parse` (a small INI reader),
+  `pins`, `pinReport`) and **`CoreXyPrinterKlipper.printer(...)`**, which fills the model from the printer's parts and
+  the print job; `CoreXyPrinterExport.write` writes `printer.cfg`, `pins.txt` and the sliced `NemaMountBracket` (a
+  printable L bracket for a NEMA 17, new) as Klipper G-code into one directory.
+- **Numbers come from the parts.** Belts `rotation_distance` 40 (GT2 pitch x 20 teeth), the three bed screws 8 (the Tr8x2
+  four-start thread, now `CoreXyPrinter.zThread()` used by the model and the config), the extruder 22.93 (pi x the 7.3 mm
+  hob) with `gear_ratio: 54:18` from the two gears, 16 microsteps, `max_velocity`/`max_accel` the slower belt axis's
+  `coupledLimits` (250 mm/s, 12,563 mm/s^2), `max_z_*` the bed's (100 mm/s, 18,066 mm/s^2), the heaters' PID gains times 255
+  (Klipper's base), pressure advance and minimum extrusion temperature from the job.
+- **What the review of the unverified draft changed.** (1) The drivers' `run_current` was the model's 1.68 A times 0.7071,
+  but `PhaseRmsCurrent` is already an RMS value and Klipper's TMC `run_current` is RMS: it is the model's setting
+  (1.68 A, 1.0 A for the extruder), asserted. (2) The bed's second and third screw steppers carried their own endstop,
+  travel and homing keys; only the stepper that owns the switch does now (`leads`), the others have just their drive, so
+  the config is what Klipper accepts for several steppers on one rail and the pin report has 35 pins, not 36 (the model has
+  one Z switch). (3) Added `[probe]` from the model (offsets `CoreXyPrinter.PROBE_X/PROBE_Y`, now shared with the builder,
+  and `z_offset` = sensing distance - the face's height above the tip = 1 mm), and `[virtual_sdcard]`, `[pause_resume]`
+  and `[exclude_object]` that Moonraker needs to run a print.
+- **Homing speed** is a derived conservative value (a fifth of the axis's speed, at most 50 mm/s), not `HomingDynamics`'
+  seek speed: the homing axes are internal to `MotionSystem`; Klipper's `homing_speed` is a preference, not a limit.
+- Each pin is a `PIN_*` placeholder; the pin report lists every one and the test checks the file and the report agree.
+- **Tests.** `PrinterKlipperTests` (machinekit smoke): 122 assertions (golden rotation distances, gear ratio, limits equal to
+  `coupledLimits`, gains, drivers, probe, followers without switches, pin report against the file, INI round trip, a key outside
+  a section refused, the export directory and the bracket's Klipper G-code: `M83`, `EXCLUDE_OBJECT_DEFINE`, `M109 S210`).
+
 **AM11. Moonraker client and twin mirror (AM-D9).**
 - A client over `NativeTransport`: HTTP/1.1 requests, JSON, file upload (multipart), print
   start/pause/resume/cancel and status query. WebSocket subscription is optional.
@@ -1084,6 +1109,6 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM7 | done | see the commit below |
 | AM8 | done | see the commits below |
 | AM9 | planned | |
-| AM10 | planned | |
+| AM10 | done | see the commit below |
 | AM11 | planned | |
 | AM12 | planned | |

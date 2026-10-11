@@ -82,6 +82,11 @@ class CoreXyPrinter extends AxisBuilder {
 	public static inline var SUPPLY_VOLTS:Float = 24;
 	public static inline var MICROSTEPS:Int = 16;
 	public static inline var STEP_TICK_HZ:Int = 40000;
+	/** What the stepper drivers are set to (amperes per phase): the belt and screw motors', and the extruder's. */
+	public static inline var DRIVER_CURRENT:Float = 1.68;
+	public static inline var EXTRUDER_DRIVER_CURRENT:Float = 1.0;
+	/** The bed's screws: a Tr8x2 thread of four starts, so one turn lifts the bed 8 mm. */
+	public static function zThread():LeadScrewThread return new LeadScrewThread(MetricTrapezoidal, 8, 2, 4);
 	/** Where the three bed screws stand. */
 	public static final SCREWS:Array<{id:String, x:Float, y:Float}> = [
 		{id: "screwZRearLeft", x: -140, y: 130}, {id: "screwZRearRight", x: 140, y: 130}, {id: "screwZFront", x: 0, y: -130}];
@@ -301,7 +306,7 @@ class CoreXyPrinter extends AxisBuilder {
 
 	function addBed(axis:PrinterAxisSpec, railSpec:machinekit.motion.LinearRailProfile.LinearRailProfileSpec, shaft:Float):Void {
 		var up = [0.0, 0, 1], vertical = [0.0, 0, 1], alongY = [0.0, 1, 0];
-		var thread = new LeadScrewThread(MetricTrapezoidal, 8, 2, 4);
+		var thread = zThread();
 		var bedTop = NOZZLE_Z;
 		var supportBottom = bedTop - bed.thickness() - 6, carrierBottom = supportBottom - 8;
 		// Two MGN9 rails on the faces of the rear posts, and the blocks that carry the bed's frame.
@@ -364,8 +369,8 @@ class CoreXyPrinter extends AxisBuilder {
 		var probe = new ProximitySwitch();
 		var nx = xc, ny = gy - TOOL_OFFSET_Y;
 		var face = NOZZLE_Z + PROBE_FACE_ABOVE_TIP;
-		attach("probeMount", new GantryPlate("Probe mount", 30, 20, 6), AssemblyFrames.translation(nx + 33, ny - 4, face + probe.spec.length - 6), "toolheadMount");
-		attach("probe", probe, AxisBuilder.orient(nx + 38, ny - 4, face + probe.spec.length, [1.0, 0, 0], [0.0, 0, -1]), "probeMount");
+		attach("probeMount", new GantryPlate("Probe mount", 30, 20, 6), AssemblyFrames.translation(nx + PROBE_X - 5, ny + PROBE_Y, face + probe.spec.length - 6), "toolheadMount");
+		attach("probe", probe, AxisBuilder.orient(nx + PROBE_X, ny + PROBE_Y, face + probe.spec.length, [1.0, 0, 0], [0.0, 0, -1]), "probeMount");
 	}
 
 	/** Underside of the bed's carrier with the bed up. */
@@ -373,6 +378,9 @@ class CoreXyPrinter extends AxisBuilder {
 
 	/** How far above the nozzle tip the probe's face sits; the probe trips when the bed is its sensing distance below. */
 	public static inline var PROBE_FACE_ABOVE_TIP:Float = 1.0;
+	/** Where the probe stands relative to the nozzle, millimetres: to the right of it and a little in front. */
+	public static inline var PROBE_X:Float = 38;
+	public static inline var PROBE_Y:Float = -4;
 
 	/**
 	 * A roller switch on `fixed`, pressed by a flag on `moving` at `point` (the flag's base centre, zero pose) as axis
@@ -452,7 +460,8 @@ class CoreXyPrinter extends AxisBuilder {
 			supplyAdded = true;
 		}
 		var extruderMotor = motorId == "motorE";
-		attach(id, new MotorDriver("GENERIC-TMC2209", new machinekit.power.PhaseRmsCurrent(extruderMotor ? 1.0 : 1.68), MICROSTEPS),
+		attach(id, new MotorDriver("GENERIC-TMC2209",
+			new machinekit.power.PhaseRmsCurrent(extruderMotor ? EXTRUDER_DRIVER_CURRENT : DRIVER_CURRENT), MICROSTEPS),
 			AssemblyFrames.translation(-120 + 40 * driverIndex++, FRONT_Y + 80, 26), "basePlate");
 		connectPorts('$id-power', "powerSupply", 'power$driverIndex', id, "power");
 		return id;
