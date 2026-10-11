@@ -139,7 +139,7 @@ class RobotArm extends MachineAssembly {
 		return {id: id, lower: lower, upper: upper, initial: initial, servo: servo, gearbox: gearbox};
 	}
 
-	public function new(withCell:Bool = true, ?armTool:ArmTool, cls:IndustrialArmClass = Reach900) {
+	public function new(withCell:Bool = true, ?armTool:ArmTool, cls:IndustrialArmClass = Reach900, invertedMount:Bool = false) {
 		super();
 		this.cls = cls;
 		reference = IndustrialArmReference.of(cls);
@@ -154,6 +154,9 @@ class RobotArm extends MachineAssembly {
 		// sets the horizontal zero; its starting coordinate preserves the former
 		// physical ready pose so cell fixtures need not move without reach evidence.
 		var initial = [0.0, 0.4, pi / 2 - 1.4, 0.0, pi - 1.8, 0.0];
+		// A ceiling-mounted arm turns its tool over so the saved ready pose
+		// still approaches a workpiece from above. Geometry and limits stay shared.
+		if (invertedMount) initial[4] -= pi;
 		var ratios = [250.0, 250.0, 220.0, 175.0, 175.0, 130.0];
 		specs = [for (i in 0...6) spec('j${i + 1}', reference.lowerDegrees[i] * pi / 180,
 			reference.upperDegrees[i] * pi / 180, initial[i], i < 3 ? "GENERIC-LV-SERVO-200W" : "GENERIC-LV-SERVO-50W", ratios[i])];

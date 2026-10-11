@@ -569,7 +569,7 @@ G0 → G1 → G2 → G3 ──────────────────�
 | G15 | complete; four-run/ten-seam MuJoCo mission and Phase D gate passed | see progress notes |
 | G16 | complete; focused FK, solid/runtime clearance, drive and ownership checks passed | see progress notes |
 | G17 | complete | Two-station handling, 2.6 m FollowPath and CAD fillet pass; full Phase E gate passes. |
-| G18 | deferred (optional): inverted arm on an overhead gantry | — |
+| G18 | complete | Inverted XYZ gantry arm, full-table reach, handling and coordinated MuJoCo acceptance pass; full app integration passes. Extra RobotKit Haxe gate has an unresolved endpoint-test failure (see close-out). |
 
 ### G0 — merged-base baseline (2026-10-04)
 
@@ -3996,3 +3996,65 @@ stays constant. RobotKit's focused clearance tests passed 406 assertions and
 MotionKit's external-path posture regression passed three. KinematicsKit,
 RobotKit, MotionKit and the app compiled with `--compiler-only`. No native
 sources changed and no full cross-kit phase-boundary gate was repeated.
+
+
+### G18 — inverted arm on an XYZ overhead gantry (2026-10-11)
+
+Rebased `gantries` onto local main `9b0f5e935` before starting G18.
+`examples/overhead-arm` suspends the complete Reach900 industrial arm from a
+bored adapter on the gantry's Z carriage. The physical mount is inverted, not
+just the preview camera. X/Y travel is 3000/1500 mm, Z travel is 300 mm, and the
+800 mm tabletop extends 100 mm beyond each horizontal travel edge. The arm's
+optional inverted ready pose changes only its initial wrist coordinate; the
+floor-mounted examples retain their original pose and physical joint limits.
+The example appears in the app's Start catalogue and the MachineKit build/smoke
+suite. It exports the whole assembly, sensed suction tool and six-step mission.
+
+Fifteen analytic reach witnesses cover the table corners, edges and interior,
+including the border outside external-axis travel. Stations lower Z by 150 mm.
+On MuJoCo the arm picks near one corner, carries the part to the opposite corner
+and places it; all six steps complete in 24.9 simulated seconds. Like G17, this
+physical handling acceptance uses MuJoCo: the deterministic backend does not
+support the compound-body contacts needed by the assembly-owned table.
+
+The coordinated diagonal FollowPath is 2.86749 m, more than twice the stated
+1.2 m conservative arm reach. All three external axes supply over 80% of their
+corresponding task displacement. Observed TCP error is 0.05752 mm (2 mm limit),
+minimum arm limit margin 0.29440 rad (0.15 rad requirement), and maximum arm
+joint step 0.00210 rad (0.05 rad limit). Geometric IK branch labels remain fixed;
+the wrist winding is checked separately. Supported motion uses analytic IK.
+The full arm, gantry, table and inventory participate in continuous clearance
+certification and feedback checks. The stated planning margin is 2 mm: the
+existing switch-trigger/pinion gap is nominally 3 mm, so this leaves positive
+room for the continuous displacement bound without ignoring collision pairs.
+
+The accepted path's certified duration is 36.776 s. Its initial time law needed
+two constraint-tightening passes before satisfying acceleration limits. This is
+functional G18 acceptance, not a no-retry or planning-time performance claim.
+Measurements ran on the shared, non-quiet host.
+
+The example exposed two real integration issues after automatic homing.
+RRT-Connect now snaps only floating-point residue at joint stops, preserving the
+caller's arrays and rejecting real overtravel; its endpoint regressions pass.
+Mission joint-move planners now use the live model/calibration revisions and
+recreate their cached compiler after a reference change, rather than stamping
+all moves with calibration revision zero. G18's homing-to-positioning mission
+covers that handoff.
+
+The full MachineKit suite passes, including the new assembly check. MotionKit
+passes 1,224,709 assertions and CadBridge 178. Toolpath passes Motion 18,
+accuracy 2, machining 12 and scenarios 3,020 assertions. The app and all
+three dependent test packages compile with `--compiler-only`. The app's complete
+native runtime was rebuilt; standalone RobotKit and MotionKit native CTest each
+pass 16 tests. RobotKit's test executable needs a 64 MB stack on this host (its
+large test stack frame overflows the default 8 MB stack).
+The full app integration run passes, including G18 and the existing floor arms,
+pickers, welders, CNC, tending and mobile checks. G17 retains its established
+232.5 s cycle for the 2,600 mm weld.
+
+An additional RobotKit Haxe gate compiled successfully but is not clean: one run
+failed in `RuntimeEndpointTests` with "Physical position read changed endpoint
+coordinates"; other attempts reported "Could not open source file". These are
+outside the G18 acceptance checks; their cause is unresolved, so this close-out
+does not claim that the complete RobotKit Haxe suite passes. Logs are in
+`/home/joao/dev/materia-cache/claude-scratch/g18-*`.

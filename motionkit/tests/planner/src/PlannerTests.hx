@@ -41,11 +41,25 @@ class PlannerTests {
   public static function main():Void {
     testNarrowPassage();
     testEndpointsInCollision();
+    testEndpointRounding();
     testDeterministicFromSeed();
     testPlannedMoveThroughValidation();
     var bench = Sys.getEnv("PLANNER_BENCH_DIR");
     if (bench != null && bench != "") benchmark(bench);
     Sys.println('Planner tests passed ($assertions assertions)');
+  }
+
+  static function testEndpointRounding():Void {
+    var scene = maze();
+    var planner = new RrtConnect(scene.space);
+    var start = [-1.0 - 2e-16, 0.0];
+    var goal = [-0.8, 1.0 + 2e-16];
+    var plan = planner.plan(start, goal);
+    check(plan.found(), "One-ULP endpoint residue is snapped to the physical stop");
+    check(start[0] < -1.0 && goal[1] > 1.0, "Endpoint snapping preserves caller coordinates");
+    check(!planner.plan([-1.000001, 0.0], [-0.8, 0.0]).found(), "Real start overtravel remains invalid");
+    check(!planner.plan([-0.8, 0.0], [-0.8, 1.000001]).found(), "Real goal overtravel remains invalid");
+    scene.world.dispose();
   }
 
   /** A 10 cm sphere carried by x and y slides, and a wall across x = 0 with a 16 cm gap at y = 0. */

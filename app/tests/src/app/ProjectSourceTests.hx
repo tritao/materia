@@ -4859,6 +4859,10 @@ class ProjectSourceTests {
       checkTrackArm(root);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "overhead-arm") {
+      OverheadArmTests.run(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-welder") {
       checkGantryWelder(root);
       return 0;
@@ -5354,6 +5358,7 @@ class ProjectSourceTests {
     checkGantryPicker(root, true);
     checkGantryWelder(root);
     checkTrackArm(root);
+    OverheadArmTests.run(root);
     checkJointSceneClearance(root);
     checkHeldJointSceneClearance(root);
     checkRobotWelder(root);

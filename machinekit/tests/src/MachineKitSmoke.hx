@@ -13,6 +13,7 @@ import RobotWelderPreview.RobotWelderChecks;
 import CoreXyPlotterPreview.CoreXyPlotterChecks;
 import GantryPickerPreview.GantryPickerChecks;
 import TrackArmPreview.TrackArmChecks;
+import OverheadArmPreview.OverheadArmChecks;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
@@ -2560,6 +2561,7 @@ class MachineKitSmoke {
 			{name: "RotaryHeadCheck.run", run: () -> RotaryHeadCheck.run(), weight: 1.0},
 			{name: "LinearTrackCheck.run", run: () -> LinearTrackCheck.run(), weight: 1.0},
 			{name: "TrackArmChecks.run", run: () -> TrackArmChecks.run(), weight: 1.0},
+			{name: "OverheadArmChecks.run", run: () -> OverheadArmChecks.run(), weight: 1.0},
 			{name: "GantryPickerChecks.run", run: () -> GantryPickerChecks.run(), weight: 1.0},
 			{name: "BenchMillPreview.BenchMillChecks.run", run: () -> BenchMillPreview.BenchMillChecks.run(), weight: 1.0},
 			{name: "BenchMillGuideLoads.bare", run: () -> BenchMillGuideLoads.run(new BenchMill(),
