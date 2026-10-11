@@ -227,6 +227,12 @@ impl<const CAP: usize> DeviceEvents<CAP> {
         self.held = false;
     }
 
+    /// An explicit command must safe any independently reactivated outputs again.
+    pub fn command_stop<B: Board>(&mut self, board: &mut B, reason: StopReason) {
+        self.stop_reason = None;
+        self.stop(board, reason);
+    }
+
     pub fn stop<B: Board>(&mut self, board: &mut B, reason: StopReason) {
         if self.stop_reason == Some(reason) { return; }
         self.apply_safe(board, reason);

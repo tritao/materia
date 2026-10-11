@@ -9,6 +9,8 @@ typedef ScrewdriverIoSample = {
   var sequence:Int64;
   var acquiredAt:Float;
   var clockId:String;
+  /** Controller-acquired program echo, in the commissioned binary code space. */
+  var selectedProgramCode:Int;
   var inputs:Array<Bool>;
   var values:Array<Float>;
 }

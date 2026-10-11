@@ -40,6 +40,7 @@ private class ScriptedScrewIo implements ScrewdriverIo {
 	public function sample():Null<ScrewdriverIoSample> return latest;
 	public function acquire(sequence:Int, timestamp:Float, result:Int = 0):Void {
 		latest = {sequence:Int64.ofInt(sequence),acquiredAt:timestamp,clockId:"commissioned-host-clock",
+			selectedProgramCode:(outputs[0] ? 1 : 0) + (outputs[1] ? 2 : 0),
 			inputs:[true,result == 1,result > 1],values:[0.2,4*Math.PI,2,5,result == 0 ? 2 : 5,result,1]};
 	}
 }
@@ -72,6 +73,7 @@ class ScrewControllerTests {
 	/** The standalone entry also exercises TCP with the host's NativeKit library. */
 	public static function main():Void {
 		run();
+		ScrewHardwareTests.native();
 		var pureCount = count; tcp();
 		trace('Open Protocol TCP controller tests passed (${count - pureCount} checks)');
 	}
@@ -142,6 +144,7 @@ class ScrewControllerTests {
 		stopping.safe(); stopping.poll(0.07); check(!stopping.ready(),"Late enable acknowledgement cannot defeat queued disable");
 		stopping.poll(0.08); check(stopping.safeAcknowledged(),"Late enable is followed by acknowledged disable");
 		trace('Screw controller profile tests passed ($count checks)');
+		ScrewHardwareTests.run();
 	}
 	static function profile():ScrewdriverIoProfile return new ScrewdriverIoProfile([0,1],
 		[{slot:1,code:2},{slot:2,code:1}],2,3,4,0,1,2,true,"commissioned-host-clock",0.05);

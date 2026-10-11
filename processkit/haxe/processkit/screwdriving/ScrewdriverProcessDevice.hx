@@ -11,20 +11,22 @@ class ScrewdriverProcessDevice implements processkit.ProcessDevice {
   final feedback:ScrewdriverFeedback;
   final channels:ScrewdriverChannelNames;
   final slot:Int;
-  final status:Null<ScrewdriverDeviceStatus>;
+  final status:Null<ScrewdriverDeviceControl>;
   var prepared = false;
   public function new(outputs:ScrewdriverOutputs, feedback:ScrewdriverFeedback, channels:ScrewdriverChannelNames, slot:Int,
-      status:Null<ScrewdriverDeviceStatus> = null) {
+      status:Null<ScrewdriverDeviceControl> = null) {
     if (outputs == null || feedback == null || channels == null || slot <= 0) throw "Screwdriver device needs outputs, feedback, channels and a program slot";
     var names = [channels.start, channels.direction, channels.program, channels.vacuum];
     for (i in 0...names.length) {
       if (names[i] == null || StringTools.trim(names[i]).length == 0) throw "Screwdriver device needs channel names";
       for (j in 0...i) if (names[i] == names[j]) throw "Screwdriver device needs distinct channels";
     }
-    this.outputs = outputs; this.feedback = feedback; this.channels = channels; this.slot = slot; this.status = status;
+    this.outputs = outputs; this.feedback = feedback;
+    this.channels = {start:channels.start,direction:channels.direction,program:channels.program,vacuum:channels.vacuum};
+    this.slot = slot; this.status = status;
   }
   public function prepare():Void {
-    outputs.start(false); outputs.reverse(false); outputs.selectProgram(slot); prepared = true;
+    safe(); outputs.selectProgram(slot); prepared = true;
   }
   public function ready():Bool return prepared && fault() == null && (status == null || status.ready());
   public function fault():Null<String> {
@@ -32,7 +34,11 @@ class ScrewdriverProcessDevice implements processkit.ProcessDevice {
     return detail == null ? ScrewdriverSensor.faultMessage(feedback.reading().result) : detail;
   }
   /** A controlled process stop retains the held screw; e-stop policy is declared by the tool channels. */
-  public function safe():Void { outputs.start(false); outputs.reverse(false); prepared = false; }
+  public function safe():Void {
+    prepared = false;
+    if (status != null) status.safe();
+    else {outputs.start(false); outputs.reverse(false);}
+  }
   /** Decode an analog selection without silently truncating it to a signed Haxe Int. */
   public static function programSlot(value:Float, allowIdle:Bool = false):Int {
     if (!Math.isFinite(value) || value < (allowIdle ? 0 : 1) || value > 2147483647 || value != Math.floor(value))

@@ -570,7 +570,7 @@ impl VirtualDevice {
                 self.steps.end_homing_pair(); self.homing_scope = None; self.homing_stop = false;
                 self.core.as_mut().unwrap().abort();
                 if let Some(reason) = self.core.as_ref().unwrap().stop_reason() {
-                    self.events.as_mut().unwrap().stop(&mut self.board, reason);
+                    self.events.as_mut().unwrap().command_stop(&mut self.board, reason);
                 }
                 self.update_peripherals(0.0);
                 true
@@ -578,7 +578,8 @@ impl VirtualDevice {
             11 => {
                 self.steps.end_homing_pair(); self.homing_scope = None; self.homing_stop = false;
                 self.core.as_mut().unwrap().stop(StopReason::Stop);
-                self.events.as_mut().unwrap().stop(&mut self.board, StopReason::Stop);
+                let reason = self.core.as_ref().unwrap().stop_reason().unwrap();
+                self.events.as_mut().unwrap().command_stop(&mut self.board, reason);
                 self.update_peripherals(0.0);
                 true
             }
@@ -1324,6 +1325,26 @@ mod tests {
         assert_eq!(d.board.digital(3),Some(false));
         assert!(!send_controller_output(&mut d,2,3,1,1,0.0));
         assert!(send_controller_output(&mut d,2,3,1,0,0.0));
+        for kind in [11,10] {
+            assert!(send::<SessionBegin6>(&mut d,kind,&[]));
+            assert_eq!(d.core.as_ref().unwrap().stop_reason(),Some(StopReason::EmergencyStop));
+            assert!(!send_controller_output(&mut d,3,3,1,1,0.0));
+        }
+    }
+    #[test]
+    fn repeated_stop_safes_new_independent_outputs_without_dropping_vacuum() {
+        let mut d = nutrunner_device(1); assert!(capture_nutrunner(&mut d,0.0));
+        assert!(send_controller_output(&mut d,1,3,1,1,0.0));
+        assert!(send::<SessionBegin6>(&mut d,11,&[]));
+        assert!(d.advance(1_000_000)); // Wait for the original arm STOP to finish.
+        assert!(send_controller_output(&mut d,2,2,2,0,3.0));
+        assert!(send_controller_output(&mut d,3,1,1,1,0.0));
+        assert!(d.advance(2_000_000));
+        assert_eq!(d.board.digital(1),Some(true));
+        assert!(send::<SessionBegin6>(&mut d,11,&[]));
+        assert_eq!(d.board.digital(1),Some(false));
+        assert_eq!(d.board.analog(2),Some(0.0));
+        assert_eq!(d.board.digital(3),Some(true));
     }
     #[test]
     fn nutrunner_rejects_unsafe_vacuum_policy() {

@@ -36,9 +36,8 @@ class OpenProtocolClient {
   var closed = false;
 
   public function new(transport:OpenProtocolTransport, timeout:Float = 0.5) {
-    if (transport == null || !Math.isFinite(timeout) || timeout <= 0 || timeout >= 10)
-      throw "Open Protocol needs a transport and a response timeout below ten seconds";
-    this.transport = transport; this.timeout = timeout;
+    if (transport == null) throw "Open Protocol needs a transport";
+    this.transport = transport; this.timeout = checkedTimeout(timeout);
     enqueue(1,"",function() {
       enqueue(42,"",function() {
         disabledAcknowledged = true;
@@ -46,8 +45,16 @@ class OpenProtocolClient {
       });
     });
   }
-  public static function connect(host:String, port:Int, timeout:Float = 0.5):OpenProtocolClient
-    return new OpenProtocolClient(new OpenProtocolTcp(host,port),timeout);
+  static function checkedTimeout(value:Float):Float {
+    if (!Math.isFinite(value) || value <= 0 || value >= 10)
+      throw "Open Protocol needs a positive response timeout below ten seconds";
+    return value;
+  }
+  public static function connect(host:String, port:Int, timeout:Float = 0.5):OpenProtocolClient {
+    // Reject invalid configuration before constructing an owned socket.
+    var responseTimeout = checkedTimeout(timeout);
+    return new OpenProtocolClient(new OpenProtocolTcp(host,port),responseTimeout);
+  }
   function enqueue(mid:Int, data:String, complete:Void->Void):Void {
     if (closed || fault != null) throw "Open Protocol client is disconnected";
     if (queue.length >= 64) throw "Open Protocol command backlog exceeded";

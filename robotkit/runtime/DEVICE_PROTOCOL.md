@@ -240,3 +240,11 @@ can idle between pulses. Earlier deployment
 versions, which named a compiled `fingerprint`, are rejected. The POSIX serial
 endpoint, virtual endpoint, PTY harness and two-joint Nucleo stub share this
 protocol.
+
+Explicit STOP and ABORT commands reapply the declared channel safety policy,
+including outputs independently reactivated after an earlier arm stop. Ordinary
+stopped-clock updates preserve those independently controlled outputs. A normal
+stop or abort cannot clear an existing fault or emergency-stop reason. Host
+output writes transmit even when the desired host value is unchanged, because
+the device may have made it safe independently; unchanged values do not add
+another host output-change record.

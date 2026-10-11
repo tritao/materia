@@ -1552,7 +1552,7 @@ still required. The earlier 21-test proof predates this wire extension.
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
 | SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71`, `7038a4fee` |
-| SD8 | in progress — controller profiles, loopback TCP and focused RKD6 unchanged CAD proof pass; virtual full gate passed; hardware binding and repeated-STOP repair pending | `f19115ae0` |
+| SD8 | done — virtual unchanged CAD mission, hardware owner/acquisition binding, scripted/TCP controller and repeated-STOP proofs pass; final full gate passed | `f19115ae0`, `84c004fab`, final hardware commit below |
 
 ### SD8 hardware integration work (2026-10-11)
 
@@ -1618,3 +1618,72 @@ The first hardware execution omitted the runtime library path and failed to
 load `haxeon_runtime.hdll`; rerunning with the host environment passes 36
 checks in `build/sd8-hardware-proof-2.log`. That proof predates the subsequent
 acquisition publication bridge changes. No new Haxeon typing defect was found.
+
+### SD8 hardware and stop-boundary proof (2026-10-11)
+
+Virtual implementation checkpoint: `84c004fab`.
+
+The commissioned controller now supplies the acquired selected-program code,
+so fresh ready feedback cannot acknowledge a different parameter set. Both
+reverse wiring profiles accept the unchanged runner's reverse-then-start
+sequence. A priority stop discards queued drive work, retains vacuum and
+requires fresh measured zero speed to acknowledge rest. The shared process
+device delegates this stop to its controller, including network disable.
+`OpenProtocolScrewdriver` keeps controller reports separate from canonical
+measured I/O. `ScrewdriverDeviceOwner` polls independently of planning;
+`ScrewdriverRuntimeBinding` routes named tool channels and publishes each new
+validated acquisition into the existing mission sensor stream, retaining its
+source clock/time and sequence. No hardware endpoint/profile is saved in CAD.
+
+`build/sd8-controller-final-proof.log` passes the unchanged 141 profile checks,
+36 hardware/owner checks, nine native sensor/entry-validation checks and five
+real loopback TCP checks. The bridge proves acquisition timestamp/clock and
+values in a real runtime snapshot, and unchanged receipt time under repeated
+polls. Invalid response timeout is rejected before socket construction.
+App rebuilds compile 2229 sources. `build/sd8-final-focused-cad-2.log` passes
+all four unchanged SD6 cases and export, including shared process-device checks
+on the actual mounted RKD6 tool. The first added check incorrectly treated an
+empty presenter as a controller NOK: the runner detects pickup failure before
+starting the spindle, so controller feedback remains idle. The corrected check
+preserves that measured feedback and the separate mission diagnostic.
+
+Explicit STOP/ABORT now resafe independently reactivated outputs and preserve
+existing faults/e-stop. An explicit unchanged host write is still sent because
+the device may have made its output safe independently. The rebuilt full
+native endpoint proof passes in `build/sd8-stop-endpoint.log`. Rust protocol
+checks pass 48 tests and the virtual device passes 26, including emergency
+stop followed by STOP/ABORT and repeated controlled stop retaining vacuum.
+The initial repeated-stop fixture activated reverse before the original arm
+STOP had finished; waiting for that original rest before the independent
+activation fixes its timing. This is a fixture error, not a compiler issue.
+Logs are `build/sd8-stop-protocol.log` and `build/sd8-stop-virtual-2.log`.
+
+Full gate `sd8-final` passes all seven stages, with zero failures and an app
+peak of 4.3 GB. The 52 frozen SD8 source hashes match after the gate. All 132
+previous MachineKit result lines remain exact; the only addition is the 36
+hardware-binding checks. All 122 normalized app results remain, with one
+additional virtual drive-one CAD cohort summary. All 16 whole-screw and 44
+staged transition times match exactly. All 66 previous geometry generations
+retain their sizes; five additional virtual generations are 2237922 bytes.
+Physical dimensions, torque targets, mission cycles, tracking errors, removal
+volumes and planning counts remain unchanged.
+
+Compared with SD7, picker allocation observations are 58649 to 58569 and
+60286 to 60272 bytes/tick. The mill moves from 53385.12443095599 to
+53576.933232169955 bytes/tick (53.4 to 53.6 KB in its rounded summary).
+Router allocations are 39.5/43.7 to 39.5/43.8 KB/tick, with 16/16 collections
+unchanged. These use the previously inspected global HashLink buffer-refill
+counter, rather than exact per-tick object allocation; the additional earlier
+CAD/controller cohort changes heap and refill phase. No picker, mill or router
+implementation changes in SD8, and all allocation budgets pass. Wall-clock
+planning and runtime measurements also vary; engineering results remain exact.
+
+Logs, summary, frozen hashes and comparisons are archived as
+`build/sd8-final-*`; the suite summary is
+`/home/joao/dev/materia-cache/claude-scratch/sd-suite-sd8-final.txt`.
+SD8 and the plan are complete. No physical controller was available; hardware
+acceptance uses commissioned I/O fixtures, a scripted controller and actual
+NativeKit TCP loopback, as allowed by SD8. The SD2 web screenshot remains
+unrun because its web toolchain was unavailable, as recorded above. No saved
+format, published value or submodule pin changed in this final checkpoint;
+no new Haxeon defect was found.

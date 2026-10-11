@@ -992,8 +992,14 @@ void controller_outputs_cross_the_runtime_and_uart() {
 
     assert(endpoint->stop_device());
     assert(endpoint->channel_values()[0] == 1 && endpoint->channel_values()[1] == 0);
-    digital.digital = 0; assert(runtime.write_output("vacuum", digital) == RK_OK);
+    analog.analog = 7; // Same host value, independently made safe on the device.
+    assert(runtime.write_output("program", analog) == RK_OK);
     assert(endpoint->sample(50'000'000, state) == RK_OK);
+    assert(endpoint->channel_values()[1] == 7);
+    assert(endpoint->stop_device());
+    assert(endpoint->channel_values()[0] == 1 && endpoint->channel_values()[1] == 0);
+    digital.digital = 0; assert(runtime.write_output("vacuum", digital) == RK_OK);
+    assert(endpoint->sample(60'000'000, state) == RK_OK);
     assert(endpoint->channel_values()[0] == 0);
 }
 

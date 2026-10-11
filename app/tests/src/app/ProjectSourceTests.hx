@@ -2380,6 +2380,25 @@ class ProjectSourceTests {
             Math.abs(visible[0].rotation[2]-physical.qz) < 1e-9 && Math.abs(visible[0].rotation[3]-physical.qw) < 1e-9,
             "The screw's runtime presentation carries the actual rotated body pose for its cosmetic-thread children");
         }
+        if (virtualNutrunner) {
+          var tools = @:privateAccess simulation.tools;
+          if (tools == null || tools.screwdrivers.length != 1) throw "Shared process proof lost its actual CAD tool";
+          var driver = tools.screwdrivers[0];
+          var supply = cast(driver.supply,processkit.simulation.VirtualNutrunnerSupply);
+          var vacuum = supply.controls().vacuum;
+          var common = new processkit.screwdriving.ScrewdriverProcessDevice(
+            new processkit.screwdriving.ChannelScrewdriverOutputs(driver.runtime,driver.channels),driver,driver.channels,job.slot);
+          var actualFault = processkit.screwdriving.ScrewdriverSensor.faultMessage(driver.reading().result);
+          common.prepare();
+          check(common.ready() == (actualFault == null) && common.fault() == actualFault,
+            "The shared process boundary retains measured controller feedback without fabricating a presenter-failure NOK");
+          common.apply([new robotkit.execution.FiredProcessEvent(Int64.ofInt(0),driver.channels.start,
+            ProcessEventValue.Digital(false),Int64.ofInt(0),Int64.ofInt(0),0)]);
+          common.safe(); for (_ in 0...50) simulation.step();
+          var controls = supply.controls();
+          check(!common.ready() && !controls.start && !controls.reverse && controls.program == job.slot && controls.vacuum == vacuum,
+            "Shared named process channels execute on RKD6 and controlled safe retains vacuum");
+        }
       } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
       simulation.clear(); session.dispose();
       if (virtualNutrunner) Sys.println('Virtual nutrunner CAD: end backend $backend, absent $absent');

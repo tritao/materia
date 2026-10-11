@@ -279,6 +279,11 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         self.stop(StopReason::Abort);
     }
     pub fn stop(&mut self, reason: StopReason) {
+        // A commanded stop cannot clear the fault that prevents re-energizing outputs.
+        if matches!(reason, StopReason::Stop | StopReason::Abort) &&
+            self.stopping.is_some_and(|prior| !matches!(prior, StopReason::Stop | StopReason::Abort)) {
+            return;
+        }
         self.stopping = Some(reason);
         self.target_rate = 0.0;
         self.abort_at_end = false;

@@ -126,3 +126,16 @@ fn controller_ownership_supersedes_a_scheduled_hold_and_restore_latch() {
         events.stop(&mut board,StopReason::Stop); assert_eq!(board.digital(0),Some(false));
     }
 }
+
+#[test]
+fn repeated_explicit_stop_safes_independently_reactivated_outputs() {
+    let mut board = VirtualBoard::<1,32>::new(1_000_000,0,0,[1.0]);
+    let mut events = DeviceEvents::<4>::new(&session());
+    events.command_stop(&mut board,StopReason::Stop);
+    let output = ControllerOutput6 {session:7,sequence:1,channel:0,kind:1,digital:1,analog:0.0};
+    events.controller_output(output,&mut board,true).unwrap();
+    events.stop(&mut board,StopReason::Stop); // Ordinary stopped clock tick.
+    assert_eq!(board.digital(0),Some(true));
+    events.command_stop(&mut board,StopReason::Stop);
+    assert_eq!(board.digital(0),Some(false));
+}
