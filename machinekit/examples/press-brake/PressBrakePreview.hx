@@ -61,3 +61,6 @@ class PressBrakePreview {
 		]};
 	}
 }
+
+/** Standalone builds exercise the same physical assembly checks as the kit smoke suite. */
+function main():Void PressBrakeChecks.run();
