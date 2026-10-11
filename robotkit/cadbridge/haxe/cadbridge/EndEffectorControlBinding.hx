@@ -6,5 +6,6 @@ enum EndEffectorControlBinding {
   Vacuum(channel:String, instanceId:String, inletPort:String);
   Lock(channel:String, instanceId:String, inletPort:String);
   /** An arc torch's trigger. The arc is worked by the robot's welder (RobotKit's `SimulatedWelder`), not by a tool runtime. */
+  Driver(channel:String, directionChannel:String, programChannel:String, vacuumChannel:String, instanceId:String, controlPort:String);
   Arc(channel:String, instanceId:String, controlPort:String);
 }

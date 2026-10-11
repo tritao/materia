@@ -399,6 +399,8 @@ class AssemblyRobot {
       if (sensorId == null) continue;
       var carrier = converted.partLinks.get(tool.contact.occurrence);
       if (carrier == null) throw 'Robot tool "${tool.contact.occurrence}" is not part of the robot';
+      // The process sensor is installed with the tightening observer in SD5.
+      if (tool.kind == "screwdriver") continue;
       if (tool.kind == "gripper") {
         var physical = [for (sensor in converted.model.sensors) if (sensor.id == sensorId) sensor];
         if (physical.length != 1 || physical[0].kind != "joint_switch")
@@ -508,6 +510,12 @@ class AssemblyRobot {
     // go off on any stop. A declaration made above that disagrees with the tool is refused.
     for (tool in session.robotTools) {
       if (control != null && converted.partLinks.get(tool.contact.occurrence) == null) continue;
+      var driver = tool.screwdriver;
+      if (driver != null) {
+        blueprint.addTool(new robotkit.tool.ScrewdriverChannels(tool.channel, driver.directionChannel,
+          driver.programChannel, driver.vacuumChannel));
+        continue;
+      }
       var welder = tool.torch;
       blueprint.addTool(welder != null
         ? new processkit.tool.WeldChannels(tool.channel, welder.wireSpeedChannel, welder.voltageChannel)

@@ -1946,6 +1946,32 @@ class ProjectSourceTests {
       simulation.dispose(); session.dispose();
   }
 
+  static function checkScrewdrivingEquipment(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-screwdriver/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var tools = generated.robotTools;
+    if (tools == null || tools.length != 1 || tools[0].kind != "screwdriver") throw "Equipment project must carry one screwdriver";
+    var tool = tools[0], driver = tool.screwdriver;
+    if (driver == null) throw "Equipment project lost its screwdriver description";
+    check(generated.mission == null, "The equipment preview has no tightening mission yet");
+    var session = new ProjectDocumentSession(null, false);
+    try {
+      session.openGeneratedProject(generated, manifest);
+      for (backend in [ApplicationSimulation.MUJOCO, ApplicationSimulation.DETERMINISTIC]) {
+        var simulation = new ApplicationSimulation(new RobotWorld());
+        simulation.setBackend(backend);
+        try {
+          check(simulation.rebuild(session.sensors, session.scene, session),
+            'Screwdriver equipment builds on backend $backend: ${simulation.error}');
+          check(simulation.missionPlayer() == null, "The equipment has no process runner before SD5/SD6");
+        } catch (error:Dynamic) { simulation.clear(); throw error; }
+        simulation.clear();
+      }
+    } catch (error:Dynamic) { session.dispose(); throw error; }
+    session.dispose();
+    Sys.println("Screwdriver equipment project passed on MuJoCo and the test backend");
+  }
+
   static function checkRobotArm(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);

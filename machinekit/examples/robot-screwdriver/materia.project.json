@@ -1,0 +1,17 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Robot screwdriver equipment",
+	"defaultEntrypoint": "cell",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.cell.json"
+	},
+	"entrypoints": {
+		"cell": {
+			"kind": "cad-preview",
+			"module": "ScrewdrivingPreview",
+			"function": "cell"
+		}
+	}
+}

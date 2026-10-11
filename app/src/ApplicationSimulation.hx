@@ -474,6 +474,8 @@ class ApplicationSimulation {
             toolIndex = index;
           }
         }
+        // Equipment is declared in SD4; the tightening observer is supplied by SD5.
+        if (tool.kind == "screwdriver") continue;
         if (tool.kind == "torch") {
           var welder = candidateTools.welderFor(candidate, toolRobot, toolIndex, tool, session);
           if (virtualWelder) welder.supply = new processkit.simulation.VirtualWelderSupply(candidate,

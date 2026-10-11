@@ -60,6 +60,7 @@ class ExampleBrowser {
   }
 
   public static function familyId(id:String):String return switch id {
+    case "robot-screwdriver": "robot-screwdriving";
     case "robot-welder", "robot-welder-seam", "robot-welder-post", "robot-welder-weave", "robot-welder-multipass": "robot-welding";
     case "mobile-robot-welder", "mobile-welding-mission": "mobile-welding";
     case "cobot-reach500", "cobot-reach850", "cobot-reach900", "cobot-reach1300": "cobots";
@@ -82,7 +83,7 @@ class ExampleBrowser {
     case "printer": "3D printing";
     case "motor-shaft-bearings", "cad-modeling": "CAD & design";
     case "two-robot", "worker-rack-to-table", "worker-gallery": "People & simulation";
-    case "picking-station", "robot-arm", "cobot-reach500", "cobot-reach850", "cobot-reach900", "cobot-reach1300", "gantry-picker", "overhead-arm", "mobile-base", "tending-controllers", "machine-tending": "Robotics & handling";
+    case "robot-screwdriver", "picking-station", "robot-arm", "cobot-reach500", "cobot-reach850", "cobot-reach900", "cobot-reach1300", "gantry-picker", "overhead-arm", "mobile-base", "tending-controllers", "machine-tending": "Robotics & handling";
     default: throw 'Example "$id" needs a Start-page category';
   };
 

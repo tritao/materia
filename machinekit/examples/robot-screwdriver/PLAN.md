@@ -80,7 +80,7 @@ simulation and hardware, and a mission step drives it.
   once in ProjectKit, avoiding a reverse dependency on the B-rep. Wire IDs stay
   identical. The original SD2 implementation advanced SceneArtifact v18 to v19.
   Rebasing onto main's v27 format and adding the thread packet advances the current
-  format to v28; older versions are rejected.
+  format to v28 (before the SD4 v29 extension); older versions are rejected.
   Each part carries freshly derived named intervals beside its exact tessellation;
   frame and length use the part unit, while nominal dimensions remain millimetres.
   Robot tools and mission semantics are unchanged.
@@ -110,6 +110,32 @@ simulation and hardware, and a mission step drives it.
   move into `NemaMountPlate`, without changing its geometry or screw size.
   Standard nut height may likewise be an explicit joint minimum; the conservative
   steel default remains 1 d.
+
+- **SD4 — Equipment ratings are explicit design assumptions.** The custom spindle
+  has a 20 Nm capacity, a 600 rpm speed limit, 20 mm of feed and a 2 N/mm
+  spring rate. These are authored equipment inputs, not vendor ratings or new
+  tightening-table values. The feed is a bounded prismatic joint with an absolute
+  linear scale; the spindle is a continuous revolute joint. Spring rate travels
+  with the capability; SD5 uses it to calculate feed force in the process model.
+  The tool cable carries separate electrical power and signal services in the
+  port graph. The carrier declares its fitted bit and its scoped joint/encoder names. Channels
+  derive from that capability, without looking for similarly sized components.
+- **SD4 — The preview stops at equipment.** Four seated SD3 screws and a
+  hand-loaded presenter remain CAD members. The cell checks each fastening's
+  drive and torque capacity, on-axis reach at the socket and at 10 mm intervals
+  out to the 40 mm approach, and exact solid clearance at the approach samples.
+  The existing design-only axis reach solver is shared with welding without
+  changing its math. Hex-socket bit tips use their nominal across-flats profile;
+  other symbolic drives retain an explicitly documented preview envelope.
+- **SD4 — Scene tool data identifies real motion.** SceneArtifact advances to
+  v29 and rejects v28. A screwdriver packet carries bit identity, capacities,
+  stroke and spring rate, four channels and the real feed/spindle/encoder IDs;
+  validation requires those joints on the contact chain and matching feed travel,
+  converting the assembly length unit to mm before comparing the stated stroke.
+  Start and reverse stop on every stop; vacuum follows the suction holding policy
+  through a commanded stop. The app declares the channels and loads the equipment
+  on both backends. The process observer and sensor contract remain SD5, so the
+  equipment is not silently treated as a suction tool or given a fabricated sensor.
 
 ## What exists
 
@@ -406,7 +432,7 @@ pins. All native CadKit configurations use the prebuilt OCCT cache.
 The recorded step gates below ran before rebasing onto local main `35f350bae`.
 Rebasing combined SD0's removal of the saved duplicate material field with
 MachineAssembly v17, so the current format is v18. It combined SD2's thread packet
-with SceneArtifact v27, so the current format is v28. Both formats reject their
+with SceneArtifact v27, giving v28 at the post-rebase checkpoint before SD4. Both formats reject their
 pre-change versions. The first post-rebase attempt stopped before building because
 only 1.7 GB was free, below the required 3 GB reserve. Validation resumed on
 2026-10-11 with 47 GB free; the full gate uses the canonical project-source target
@@ -526,7 +552,7 @@ Failed attempts are retained as `sd-suite-rebase-initial.txt`,
 `sd-suite-rebase-scoping.txt` and `sd-suite-rebase-runtime.txt`; their logs are
 archived with the corresponding `sd-rebase-` prefixes. A clean compiler retry
 reproduced the BenchMill narrowing failure before applying the local workaround.
-The full gate runs the source fixes in `ffee5362f`. SD4–SD8 remain unstarted;
+The full gate runs the source fixes in `ffee5362f`. At that checkpoint SD4–SD8 were unstarted;
 the prior desktop thread capture remains recorded, and the unavailable web
 capture remains undone.
 
@@ -536,7 +562,7 @@ capture remains undone.
 | SD1 | done — post-rebase full gate passed | `86181a642`, `a6b9ccd55` |
 | SD2 | done — post-rebase full gate passed | `154ca5491`, `35a195269`, `24b5d1a02` |
 | SD3 | done — post-rebase full gate passed | `fbbe14d0c`, `6c338344d`, `ffee5362f` |
-| SD4 | open — machine tending landed; not started | |
+| SD4 | in progress — equipment and cell implemented; gate pending | |
 | SD5 | open — machine tending landed; not started | |
 | SD6 | open — machine tending landed; not started | |
 | SD7 | open — machine tending landed; not started | |

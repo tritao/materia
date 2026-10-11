@@ -13,6 +13,8 @@ enum EndEffectorControl {
 	Lock(channel:String, member:String, inletPort:String);
 	/** An arc torch's trigger: the channel that lights its arc and the control inlet it drives. */
 	Arc(channel:String, member:String, controlPort:String);
+	/** Start, reverse, program selection and vacuum are worked by the screwdriving process. */
+	Driver(channel:String, directionChannel:String, programChannel:String, vacuumChannel:String, member:String, controlPort:String);
 }
 
 /** Where a suction cup meets what it holds: its member and its contact connector. */
@@ -42,6 +44,18 @@ typedef ArcTorchControl = {
 };
 
 /**
+ * Spindle control and sensed feed, derived from the mounted carrier and its bit.
+ * Start and vacuum are digital; direction is digital (true reverses), and program
+ * is an integral analogue slot number, with zero meaning no selected program.
+ */
+typedef ScrewdriverControl = {
+	member:String, channel:String, directionChannel:String, programChannel:String, vacuumChannel:String,
+	sensor:String, controlPort:String, tcpConnector:String, feedJoint:String, spindleJoint:String,
+	strokeEncoder:String, bit:materia.project.SceneArtifact.SceneArtifactScrewdriverBit,
+	maxTorque:Float, maxSpeed:Float, strokeMm:Float, springRate:Float
+};
+
+/**
  * What it takes to run an end effector, read from the facets its parts declare: the digital
  * controls that work its gripper, vacuum and changer lock, each on a channel named
  * `<prefix>/<member>.<action>`; the vacuum pressure sensor, if it has one, as
@@ -57,14 +71,16 @@ class EndEffectorControls {
 	public final suctions:Array<SuctionContact>;
 	public final grippers:Array<GripperContact>;
 	public final arcs:Array<ArcTorchControl>;
+	public final drivers:Array<ScrewdriverControl>;
 
 	function new(controls:Array<EndEffectorControl>, vacuumSensor:Null<String>, suctions:Array<SuctionContact>,
-			grippers:Array<GripperContact>, arcs:Array<ArcTorchControl>) {
+			grippers:Array<GripperContact>, arcs:Array<ArcTorchControl>, drivers:Array<ScrewdriverControl>) {
 		this.controls = controls;
 		this.vacuumSensor = vacuumSensor;
 		this.suctions = suctions;
 		this.grippers = grippers;
 		this.arcs = arcs;
+		this.drivers = drivers;
 	}
 
 	/** The first arc torch's channel, or null when the effector has none. */
@@ -94,6 +110,7 @@ class EndEffectorControls {
 		var suctions:Array<SuctionContact> = [];
 		var grippers:Array<GripperContact> = [];
 		var arcs:Array<ArcTorchControl> = [];
+		var drivers:Array<ScrewdriverControl> = [];
 		var sensorId:Null<String> = null;
 		var occurrences = materia.assembly.AssemblyDefinitionFlattener.flatten(configuration.definition()).occurrences;
 		var hasVacuum = false, hasLock = false;
@@ -154,6 +171,18 @@ class EndEffectorControls {
 			} else if (Std.isOfType(facet, machinekit.pneumatic.SuctionFacet)) {
 				var suction:machinekit.pneumatic.SuctionFacet = cast facet;
 				suctions.push({member: member.id, connector: suction.contactConnector});
+			} else if (Std.isOfType(facet, machinekit.screwdriving.ScrewdriverFacet)) {
+				var driver:machinekit.screwdriving.ScrewdriverFacet = cast facet;
+				requireInlet(configuration, member.id, driver.controlPort, [PortKind.Signal]);
+				if (drivers.length > 0) throw "Ambiguous screwdriver runtime ports";
+				var scope = name.substr(0, name.lastIndexOf("/") + 1);
+				controls.push(Driver('$name.drive', '$name.direction', '$name.program', '$name.vacuum', member.id, driver.controlPort));
+				drivers.push({member: member.id, channel: '$name.drive', directionChannel: '$name.direction',
+					programChannel: '$name.program', vacuumChannel: '$name.vacuum', sensor: '$name.screwdriver',
+					controlPort: driver.controlPort, tcpConnector: driver.tcpConnector,
+					feedJoint: scope + driver.feedJoint, spindleJoint: scope + driver.spindleJoint, strokeEncoder: scope + driver.strokeEncoder,
+					bit: driver.bit.driveData(), maxTorque: driver.maxTorque, maxSpeed: driver.maxSpeed,
+					strokeMm: driver.strokeMm, springRate: driver.springRate});
 			} else if (Std.isOfType(facet, machinekit.welding.ArcTorchFacet)) {
 				var torch:machinekit.welding.ArcTorchFacet = cast facet;
 				requireInlet(configuration, member.id, torch.controlPort, [PortKind.Signal]);
@@ -165,7 +194,9 @@ class EndEffectorControls {
 			}
 		}
 		if (sensorId != null && !hasVacuum) throw "Vacuum pressure sensor has no bound vacuum actuator";
-		return new EndEffectorControls(controls, sensorId, suctions, grippers, arcs);
+		if (drivers.length > 0 && (arcs.length > 0 || grippers.length > 0 || suctions.length > 0))
+			throw "A screwdriver cannot share its mounted end effector with another process tool";
+		return new EndEffectorControls(controls, sensorId, suctions, grippers, arcs, drivers);
 	}
 
 	static function requireInlet(configuration:EndEffector, instanceId:String, portName:String, allowed:Array<PortKind>):Void {

@@ -259,11 +259,11 @@ class ProjectKitTests {
     check(encoded.getInt32(4) == SceneArtifact.VERSION, "current scene version");
     var legacy = Bytes.alloc(encoded.length - 4);
     legacy.blit(0, encoded, 0, legacy.length);
-    legacy.setInt32(4, 27);
+    legacy.setInt32(4, 28);
     var oldRefusal = refusal(() -> SceneArtifact.decodeView(legacy));
-    check(oldRefusal.indexOf("schema v27 is unsupported") >= 0 &&
+    check(oldRefusal.indexOf("schema v28 is unsupported") >= 0 &&
       oldRefusal.indexOf('expected v${SceneArtifact.VERSION}') >= 0,
-      "clean scene format break explains that v27 needs migration");
+      "clean scene format break rejects v28 and names the current version");
     var thread:materia.project.ThreadRenderData = {faceName: "bore:cyl.side", faceIndex: 7,
       spec: {designation: "M6", majorDiameter: 6, pitch: 1, starts: 2,
         hand: materia.project.ThreadSpecData.ThreadHand.LeftHand, internal: true,

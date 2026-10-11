@@ -20,6 +20,15 @@ class RobotScene {
 	public static function robotTools(tool:EndEffector, prefix:String, ?welding:WeldingEquipmentData):Array<SceneArtifactRobotTool> {
 		var controls = EndEffectorControls.derive(tool, prefix);
 		var members = [for (member in tool.components()) prefix + "/" + member.id];
+		if (controls.drivers.length > 0) return [for (driver in controls.drivers) {
+			kind: "screwdriver", members: members.copy(),
+			contact: {occurrence: prefix + "/" + driver.member, connector: driver.tcpConnector},
+			channel: driver.channel, sensor: driver.sensor,
+			screwdriver: {bit: driver.bit, directionChannel: driver.directionChannel,
+				programChannel: driver.programChannel, vacuumChannel: driver.vacuumChannel,
+				feedJoint: driver.feedJoint, spindleJoint: driver.spindleJoint, strokeEncoder: driver.strokeEncoder,
+				maxTorque: driver.maxTorque, maxSpeed: driver.maxSpeed, strokeMm: driver.strokeMm, springRate: driver.springRate}
+		}];
 		if (controls.arcs.length > 0) return torchTools(controls, prefix, welding, members);
 		if (controls.grippers.length > 0) {
 			if (controls.suctions.length != 0)

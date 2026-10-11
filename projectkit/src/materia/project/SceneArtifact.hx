@@ -226,7 +226,9 @@ typedef SceneArtifactRobotSensor = {
  *
  * A `torch` tool is a MIG/MAG welding torch: `contact` is the connector at its wire tip (the tool point),
  * `channel` is the digital channel that lights its arc, `sensor` is its `tool_weld` sensor, and `torch`
- * describes the welder behind it. The kind is part of the same JSON section, so it needs no format version.
+ * describes the welder behind it. A `screwdriver` carries its bit, capacities and named tool joints;
+ * its process sensor and tightening observer are supplied by the driving process. Tool data requires
+ * the current scene schema; older versions are rejected.
  */
 typedef SceneArtifactRobotTool = {
 	var kind:String;
@@ -237,6 +239,24 @@ typedef SceneArtifactRobotTool = {
 	@:optional var sensor:String;
 	@:optional var gripper:SceneArtifactGripper;
 	@:optional var torch:SceneArtifactTorch;
+	@:optional var screwdriver:SceneArtifactScrewdriver;
+}
+
+/** Nominal bit identity, portable without a dependency on MachineKit. */
+typedef SceneArtifactScrewdriverBit = {var kind:String; var size:String;}
+/** Tool capacity in Nm and rad/s, travel in mm, spring rate in N/mm. Joint names identify real tool motion. */
+typedef SceneArtifactScrewdriver = {
+	var bit:SceneArtifactScrewdriverBit;
+	var directionChannel:String;
+	var programChannel:String;
+	var vacuumChannel:String;
+	var feedJoint:String;
+	var spindleJoint:String;
+	var strokeEncoder:String;
+	var maxTorque:Float;
+	var maxSpeed:Float;
+	var strokeMm:Float;
+	var springRate:Float;
 }
 
 /** Assumed physical limits used to choose and orient a grasp from the blank's planar faces. */
@@ -685,7 +705,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 32;
+	public static inline var VERSION:Int = 33;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -1248,9 +1268,9 @@ class SceneArtifact {
 		if (definition == null) fail("needs the robot's assembly definition");
 		var flat = AssemblyDefinitionFlattener.flattenView(cast definition);
 		var channels = new Map<String, Bool>();
-		var torches = 0;
+		var torches = 0, drivers = 0;
 		for (tool in tools) {
-	if (tool == null || (tool.kind != "suction" && tool.kind != "gripper" && tool.kind != "torch"))
+			if (tool == null || (tool.kind != "suction" && tool.kind != "gripper" && tool.kind != "torch" && tool.kind != "screwdriver"))
 				fail('kind "${tool == null ? null : tool.kind}" is unknown');
 			var contact = tool.contact;
 			var occurrence = contact == null ? [] : [for (item in flat.occurrences) if (item.id == contact.occurrence) item];
@@ -1271,6 +1291,47 @@ class SceneArtifact {
 				fail("needs a channel of its own");
 			channels.set(tool.channel, true);
 			if (tool.sensor != null && tool.sensor.length == 0) fail("has an empty sensor name");
+			if (tool.kind != "screwdriver" && tool.screwdriver != null) fail("has screwdriver data on another tool kind");
+			if (tool.kind == "screwdriver") {
+				function driverProblem(detail:String):Void fail('"${contact.occurrence}" $detail');
+				if (++drivers > 1 || tool.torch != null || tool.gripper != null || tool.sensor == null)
+					driverProblem("needs one screwdriver, a sensor and no other process description");
+				var driver = tool.screwdriver;
+				if (driver == null) { driverProblem("has no screwdriver description"); return; }
+				if (driver.bit == null || ["hex-socket", "hexalobular", "cross", "hex-head", "slot"].indexOf(driver.bit.kind) < 0 ||
+					driver.bit.size == null || driver.bit.size.length == 0) driverProblem("has an invalid bit drive");
+				if (driver.bit.kind != "hexalobular") {
+					var size = Std.parseFloat(driver.bit.size);
+					if (!finite(size) || Std.string(size) != driver.bit.size || (driver.bit.kind == "cross" ? size < 0 || size != Math.floor(size) : size <= 0))
+						driverProblem("has an invalid numeric bit size");
+				}
+				for (value in [driver.maxTorque, driver.maxSpeed, driver.strokeMm, driver.springRate])
+					if (!finite(value) || value <= 0) driverProblem("needs finite positive capacity, stroke and spring rate");
+				for (name in [driver.directionChannel, driver.programChannel, driver.vacuumChannel]) {
+					if (name == null || name.length == 0 || channels.exists(name)) driverProblem("needs distinct driver channels");
+					channels.set(name, true);
+				}
+				var feed = [for (joint in flat.joints) if (joint.id == driver.feedJoint && joint.type == "prismatic") joint];
+				var spindle = [for (joint in flat.joints) if (joint.id == driver.spindleJoint && joint.type == "continuous") joint];
+				if (feed.length != 1 || spindle.length != 1 || spindle[0].child != contact.occurrence || spindle[0].parent != feed[0].child)
+					driverProblem("needs its real feed and spindle joints on the contact chain");
+				var limits = feed[0].limits;
+				var millimetresPerUnit = LengthUnit.metresPerUnit(flat.lengthUnit == null ? "mm" : flat.lengthUnit) * 1000;
+				if (limits == null || limits.lower == null || limits.upper == null ||
+					Math.abs(((cast limits.upper:Float) - (cast limits.lower:Float)) * millimetresPerUnit - driver.strokeMm) > 1e-6)
+					driverProblem("feed limits disagree with its stated stroke");
+				var rotation = spindle[0].limits;
+				if (rotation == null || rotation.velocity == null || rotation.effort == null ||
+					Math.abs((cast rotation.velocity:Float) - driver.maxSpeed) > 1e-6 ||
+					Math.abs((cast rotation.effort:Float) - driver.maxTorque) > 1e-6)
+					driverProblem("spindle limits disagree with its stated capacity");
+				if (limits.effort == null || Math.abs((cast limits.effort:Float) - driver.springRate * driver.strokeMm) > 1e-6)
+					driverProblem("feed effort disagrees with its spring at full stroke");
+				var encoders = flat.encoders == null ? [] : flat.encoders;
+				if ([for (encoder in encoders) if (encoder.id == driver.strokeEncoder && encoder.joint == driver.feedJoint) encoder].length != 1)
+					driverProblem("needs its feed stroke encoder");
+				continue;
+			}
 			if (tool.kind == "suction") {
 				if (tool.torch != null) fail("is a suction tool with a torch description");
 				continue;
@@ -1525,6 +1586,20 @@ class SceneArtifact {
 					nominalPartWidthMm: number("nominalPartWidthMm"),
 					maximumPartWidthMm: number("maximumPartWidthMm"), fingerLengthMm: number("fingerLengthMm"),
 					fingerPadFrictionCoefficient: number("fingerPadFrictionCoefficient")};
+			}
+			var driver:Dynamic = Reflect.field(raw, "screwdriver");
+			if (driver != null) {
+				function number(name:String):Float {
+					var item:Dynamic = Reflect.field(driver, name);
+					return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
+				}
+				var bit:Dynamic = Reflect.field(driver, "bit");
+				if (bit == null) fail();
+				tool.screwdriver = {bit: {kind: text(bit, "kind"), size: text(bit, "size")},
+					directionChannel: text(driver, "directionChannel"), programChannel: text(driver, "programChannel"),
+					vacuumChannel: text(driver, "vacuumChannel"), feedJoint: text(driver, "feedJoint"),
+					spindleJoint: text(driver, "spindleJoint"), strokeEncoder: text(driver, "strokeEncoder"),
+					maxTorque: number("maxTorque"), maxSpeed: number("maxSpeed"), strokeMm: number("strokeMm"), springRate: number("springRate")};
 			}
 			var welder:Dynamic = Reflect.field(raw, "torch");
 			if (welder != null) {
