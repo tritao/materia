@@ -11,12 +11,12 @@ found in the CAD, the tool is declared through capabilities, a deterministic
 process model runs in simulation, a `ProcessDevice` boundary is shared by
 simulation and hardware, and a mission step drives it.
 
-## Decisions (2026-10-09)
+## Decisions for SD0–SD8 (2026-10-09)
 
 - **Axial compliance is in the tool, not the arm.** The spindle sits on a
   spring-loaded feed slide with a sensed stroke, as on production screwdriving
   units. The arm only makes position moves, and the slide supplies and measures
-  the feed force. No force control on the arm in this plan (see Later).
+  the feed force. No force control on the arm in SD0–SD8 (see SD12).
 - **The screw is simulated by a process model, not by thread contact.** A
   deterministic torque-angle model decides how the screw advances and seats, as
   `WeldArcModel` decides the arc. The screw is held on the bit and moved
@@ -638,20 +638,155 @@ Here:
 - Checks: the client against a recorded or scripted controller; the virtual
   device runs the SD6 mission unchanged.
 
-## Later
+## Follow-on plan (2026-10-11)
 
-- **Force control on the arm:** a force/torque sensor kind, contact-force
-  readout from MuJoCo (`mj_contactForce`), an admittance loop over
-  `ServoSession`, and a spiral hole search. Needed for holes whose position is
-  uncertain beyond the lead-in, and for screwing without a compliant slide.
-- **Blow-feed:** a feeder, a feed-tube port kind and a nosepiece on the tool.
-- **Hole location by vision or touch,** reusing the welder's registration.
-- **Physical screw joints** (spindle plus coupled revolute/prismatic screw in
-  the world), if a process ever needs MuJoCo to feel the thread.
-- **Drawings:** cosmetic thread lines from the same `ThreadedFace` data.
-- **Pick, place and fasten cells** wait for machine tending's physical jaws
-  (MT8), cell signals (MT6/MT7) and part trays (MT9), and an automatic tool
-  change.
+SD0–SD8 are complete. The decisions above describe that completed scope;
+SD9–SD15 below are proposed extensions, all unstarted. SD9 is the next
+increment: automate replenishment of the existing presenter before changing
+how the robot receives a screw. The other extensions have their own acceptance
+boundaries and need not all be implemented to use automatic feeding.
+
+**SD9. Vibratory bowl feeder and automatic presenter.**
+- Model the bulk bowl, vibration drive, oriented guide track, escapement and
+  pickup nest as equipment. Track and escapement tooling are commissioned for
+  an explicit screw recipe; compatibility comes from its actual head, shank,
+  length and drive, not a universal screw-size guess. Equipment assumptions and
+  vendor dimensions retain their sources.
+- The material path is bowl → guide track → escapement → pickup nest. The
+  escapement meters one screw; the robot keeps its current vacuum pickup and
+  tightening sequence. Replenish after confirmed pickup without inserting a
+  second screw into an occupied nest.
+- Define a shared feeder device contract with feed enable/request, ready,
+  screw-present, empty-supply and jam/fault states. Hardware commissioning
+  records which observations are available; never infer an empty bowl or a jam
+  from an unsupported sensor. Preserve source sequence/time and diagnose stale
+  observations and delivery timeouts explicitly.
+- Simulate inventory, track buffering, delivery delay, one-at-a-time release,
+  empty supply and jam behavior. Use an explicit behavioral model initially;
+  thousands of colliding screws and detailed vibration/orientation physics are
+  a separate equipment-design project. Actual delivery deposits an identified
+  screw in the supported nest; it does not fabricate pickup success.
+- Checks: repeated feed/pick cycles, occupied-nest interlock, depletion,
+  refill, delayed delivery, jam and recovery, stale feedback, and stop/restart
+  without unintended release. Run the flange mission from a replenished
+  presenter on both backends and exercise the same feeder contract against
+  scripted hardware I/O.
+- Reference: [Carlson A24 vibratory bowl screw presenter](https://www.carlsoneng.com/vibratory-bowl-feeders/a24-vibratory-bowl-screw-presenter/)
+  separates screws along an escapement track and presents them at a pickup
+  point. [DEPRAG screw presenters](https://www.deprag.com/en/feeding-technology/feeding-systems/screw-presenter.html)
+  document controlled pickup, vibrating guide rails and pickup monitoring.
+  These establish the architecture, not dimensions or performance assumptions.
+
+**SD10. Blow-feed delivery to the screwdriver.**
+- Reuse SD9's supply and metering boundary. Add a feed-tube port kind, delivery
+  tube, air control and receiving nosepiece to the tool CAD. Commission screw
+  and tube compatibility explicitly; presenter feeding remains a supported
+  delivery arrangement.
+- Deliver a separated screw to the tool instead of returning to a pickup nest.
+  Require confirmed receipt before driving, coordinate delivery with tool
+  readiness, and prevent double delivery. The mission's delivery behavior must
+  be explicit rather than pretending that a nosepiece is a remote presenter.
+- Include nosepiece geometry and tube-routing assumptions in tool reach and
+  approach-clearance qualification. Record air/delivery timing as commissioned
+  inputs, never published tightening values.
+- Checks: delivery and receipt, missing screw, delayed delivery, blocked tube,
+  receiving-nosepiece jam, stop during delivery and explicit recovery. Execute
+  a CAD-derived fastening with the same tightening controller/program contract
+  in simulation and with scripted delivery I/O.
+
+**SD11. Hole location using vision or touch.**
+- Reuse the welder's registration boundary to relate measured workpiece
+  coordinates to CAD. Support camera-derived reference features or probing of
+  reference surfaces/hole entrances; define measurement identity, units,
+  coordinate frame, timestamp and uncertainty.
+- Derive corrected hole approaches from registration on every rebuild/run.
+  Keep the nominal CAD fastening and the measured placement distinct. Reject
+  missing, stale, ambiguous or inconsistent observations rather than guessing
+  a hole or silently editing design geometry.
+- Registration supplies the approximate location. SD12 can search for entry
+  within the remaining uncertainty; its search region must agree with the
+  registration's bounds.
+- Checks: known translated/rotated workpieces, frame calibration, insufficient
+  or conflicting measurements, uncertainty beyond the allowed approach and
+  unreachable corrected poses. Drive the intended named fastening at its
+  measured placement on both backends.
+
+**SD12. Arm force control and spiral hole search.**
+- Add a force/torque sensor contract with explicit frame, units, source clock
+  and acquisition freshness. Obtain simulated contact forces through MuJoCo
+  (`mj_contactForce`) and expose corresponding measured hardware feedback.
+- Implement a bounded admittance loop over `ServoSession`: measured contact
+  forces produce small arm motion corrections. Commission force targets,
+  gains, travel/speed limits and entry criteria; no invented safe defaults.
+- Approach under controlled axial force, search a bounded spiral when the
+  screw misses the entrance, recognize entry, and hand over to the qualified
+  tightening cycle. Stop on stale feedback, excess force/travel, exhausted
+  search, lost screw or invalid contact. Retract/recover explicitly.
+- This extends the original position-controlled arm and may supplement or
+  replace reliance on the compliant feed slide. Identify which configuration
+  is active and avoid two controllers competing for the same feed motion.
+- Checks: nominal entry, bounded lateral offsets, missing/obstructed hole,
+  unexpected contact, stale sensor, stop during search and failure to enter.
+  Verify force/travel limits, entry detection and clean tightening handover;
+  a scripted force trace alone does not establish physical contact behavior.
+
+**SD13. Physical screw joints in simulation.**
+- Add an explicitly selected physical-engagement representation: spindle
+  rotation and screw axial travel couple through the thread lead using
+  revolute/prismatic coordinates. The physics solver can then transmit
+  reaction forces to the tool, arm and workpiece.
+- Define ownership between this constraint and the existing torque-angle
+  process model. Do not command axial travel twice or count tightening
+  resistance twice. Lead-in engagement, retained contact offset, seating,
+  reverse/unloading and disengagement need explicit state transitions.
+- Start with coupled joints/constraints; tooth-level helical collision geometry
+  is not required. Preserve the existing process-model mode for missions that
+  do not require physical thread reactions.
+- Checks: pitch/lead travel, force and torque reaction, supported workpiece
+  motion, seating, reverse withdrawal and disengagement. Verify solver
+  stability across commissioned time steps and compare unchanged qualified
+  mission outcomes. Implement when a force-control or compliance experiment
+  requires these physical reactions, not as an automatic feeding dependency.
+
+**SD14. Cosmetic threads in drawings.**
+- Project conventional thread lines, limits and end representation into
+  drawing views from the same named-face `ThreadedFace` data already used by
+  the editor. Derive size/pitch/depth callouts from that specification where
+  the drawing annotation system supports them.
+- Define visibility in projected and section views, including internal/external
+  threads and partially threaded faces. A drawing must not maintain a second
+  thread specification or require helical solid geometry.
+- Checks: tapped through/blind holes, external partial threads, plain portions,
+  section/hidden-line behavior, callout consistency and named-face edits.
+  Inspect exported drawing artifacts as well as the editor view. This is an
+  independent extension of SD1/SD2.
+
+**SD15. Pick, place and fasten cells.**
+- Compose tray pickup, part placement/location, fixture confirmation,
+  CAD-derived fastening and finished-assembly unloading into one cell mission.
+  Retain measured part identity/pose and existing fastening recovery records.
+- Integrate machine tending's physical jaws (MT8), cell signals (MT6/MT7) and
+  part trays (MT9). Audit their landed interfaces before implementation; the
+  old dependency list does not imply that those features are still unlanded.
+- Add automatic tool change when one robot alternates between gripper and
+  screwdriver: model docking, tool identity, confirmed lock/unlock, TCP and
+  capability changes, and ownership of the outgoing tool's live process.
+- Coordinate feeder readiness, fixture/clamp state and tool readiness. A
+  failure must leave a named, recoverable part/tool state rather than replaying
+  a whole cell cycle with duplicate pickups or fastenings.
+- Checks: a complete tray-to-finished-assembly cycle, fixture-not-ready,
+  missing/misplaced part, unavailable or wrong tool, failed tool change, screw
+  supply failure, interrupted fastening and resume/recovery. Prove equivalent
+  mission behavior on both backends and scripted cell/tool-change I/O.
+
+Follow-on dependencies:
+- SD9 is next and keeps the existing screwdriver pickup/mission boundary.
+- SD10 builds on SD9; SD11 and SD14 can proceed independently.
+- SD12 uses a known or SD11-registered approach. SD13 is conditional on needing
+  physical thread reactions for SD12 or another compliance experiment.
+- SD15 integrates the landed machine-tending interfaces and automatic tool
+  change. It can initially use SD9 presenters; blow-feed and force search are
+  optional capabilities, not prerequisites for every cell.
 
 ## Order
 
