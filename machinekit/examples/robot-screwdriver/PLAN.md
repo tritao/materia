@@ -849,7 +849,36 @@ those buffers. Additional earlier CAD tests change the heap and refill phase
 at measurement boundaries; these are reserved-allocation observations, not
 changed engineering results. All allocation budgets pass. No new haxeon bug
 was found; compound contacts and preview conversion were application/native
-integration defects. SD7 and SD8 remain unimplemented.
+integration defects. SD7 execution and SD8 remain unimplemented.
+
+### SD7 generation checkpoint (2026-10-11)
+
+`ScrewdrivingMission.generate` consumes freshly discovered connections and asks
+its cell author for each qualified job and actual supply. Jobs must identify
+their exact source fastening and cannot reuse a driven body. Every source or
+access error prevents partial mission output; diagnostics identify the failed
+connection. `ScrewAccess` follows `WeldAccess`: the cell owns the reach and
+clearance decision, and the generator asks it about every connection.
+
+Cross order groups common clamped/threaded members, axial direction and seat
+plane. Equal radii and one unique opposite partner per point prove the bolt
+circle; repeated points and unsupported patterns keep stable source order.
+The convention chooses the lowest remaining member name, then its opposite,
+so face orientation and discovery order cannot reverse it. The flange's four
+connections therefore produce 1,3,2,4. The initial angle convention also gave
+the valid 1,3,4,2 sequence; the explicit member convention removes that ambiguity.
+
+Focused `build/sd7-generator-order.log` passes all 31 process checks and 11
+new mission-generation checks, including exact body/face identity, shuffled
+CAD discovery, access rejection, empty assemblies and conflicting jobs.
+Quick gate `sd-suite-sd7-generator.txt` passes all three stages; all 123
+existing MachineKit result lines match the SD6 final baseline exactly, with
+only the new 11-check summary added. Logs and the comparison are archived in
+`build/sd7-generator-*`. Whole-cell motion, a physical replacement supply,
+reverse/reject/retry recovery, the run report and optional snug/final passes
+remain to implement. Retightening must preserve the measured engaged state
+and elastic rotation from snug; restarting an empty model would discard
+preload and produce an incorrect reverse distance. No completed SD7 is claimed.
 
 | Step | State | Commits |
 | --- | --- | --- |
@@ -860,5 +889,5 @@ integration defects. SD7 and SD8 remain unimplemented.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | open — machine tending landed; not started | |
+| SD7 | in progress — CAD generator and access diagnostics implemented; execution and final gate pending | |
 | SD8 | open — machine tending landed; not started | |
