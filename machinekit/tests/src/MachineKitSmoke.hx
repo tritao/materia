@@ -2580,6 +2580,7 @@ class MachineKitSmoke {
 			{name: "HydraulicPartTests.run", run: () -> HydraulicPartTests.run(), weight: 0.5},
 			{name: "ToolProfileTests.run", run: () -> ToolProfileTests.run(), weight: 0.1},
 			{name: "ToolLayoutTests.run", run: () -> ToolLayoutTests.run(), weight: 0.1},
+			{name: "PressBrakeInterfaceTests.run", run: () -> PressBrakeInterfaceTests.run(), weight: 0.1},
 			{name: "PressBrakePartTests.run", run: () -> PressBrakePartTests.run(), weight: 0.1},
 			{name: "PressBrakeChecks.run", run: () -> PressBrakeChecks.run(), weight: 1.0},
 			{name: "namedStepperFaces", run: namedStepperFaces, weight: 0.1},
