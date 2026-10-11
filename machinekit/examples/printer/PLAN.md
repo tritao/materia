@@ -974,6 +974,18 @@ left in the motion path.
    than the machine can follow (item 4).
 9. The first plan of a print compiles synchronously inside a tick (13.8 s for `SmallTab` in the app): plan it on the
    planner thread, as a mission's programs are, and start the print when the first plan is ready.
+10. A fast path for machines whose kinematics are exact and affine (the capability of item 5: Cartesian, CoreXY,
+   routers, gantries). TOPP-RA costs a grid of 32 stages per span and a small LP per stage; Klipper and Marlin plan the
+   same machines with constant-cost trapezoids and a look-ahead pass, and the benchmark's Marlin-style reference is
+   only 0.3 % faster than our plan for the gear. On an affine machine the limits along a straight piece are constant
+   and along an arc depend only on its radius, so a piece's speed and acceleration bounds come in closed form from its
+   direction against every joint row and the motor-space rows (a CoreXY motor bounds `|vx ± vy|`), and centripetal
+   acceleration bounds an arc (`v^2 / r`). Plan the C1-blended path (still no velocity jumps, AM-D4) with a look-ahead
+   pass over jerk-limited (S-curve) profiles in path distance, emit the same polynomial segments, and keep the plan
+   checks (torque, stall margin, deviation) unchanged. TOPP-RA stays for every other machine and is the reference the
+   fast path is tested against. Done when, on the printing gate, the planned time is within 0.5 % of TOPP-RA's (or
+   shorter), no joint or motor limit is exceeded, the plan checks find nothing new, and planning is at least 10x faster
+   than with TOPP-RA (the worst 10 s window included), aiming at real time on a Raspberry Pi class CPU.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
