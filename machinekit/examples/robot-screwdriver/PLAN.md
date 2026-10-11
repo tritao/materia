@@ -889,5 +889,5 @@ preload and produce an incorrect reverse distance. No completed SD7 is claimed.
 | SD4 | done — full gate passed | `fdc6da0c0` |
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | in progress — CAD generator and access diagnostics implemented; execution and final gate pending | |
+| SD7 | in progress — CAD generator and access diagnostics pass quick gate; execution and final gate pending | `a6123a912` |
 | SD8 | open — machine tending landed; not started | |
