@@ -11,4 +11,6 @@ package machinekit.component;
 	@:id(6) Wire;
 	/** Hydraulic oil service, distinct from compressed air. */
 	@:id(7) Hydraulic;
+	/** Oriented separated screws through a commissioned delivery tube. */
+	@:id(8) ScrewFeed;
 }

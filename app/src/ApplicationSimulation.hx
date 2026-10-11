@@ -516,6 +516,14 @@ class ApplicationSimulation {
             candidateTools.screwFeeders.push(feeder); candidate.addStepObserver(feeder);
           }
         }
+        if (work.blowFeeds != null) {
+          if (candidateAssembly == null || candidateTools.screwdrivers.length != 1) throw "Blow feed needs its assembly and one mounted screwdriver";
+          var parts = new SimulationAssemblyParts(candidate,[candidateAssembly],candidateTools.objectsByScene(),session);
+          for (definition in work.blowFeeds) {
+            var delivery = new SimulatedBlowFeed(definition,candidateAssembly.runtime,parts,candidateTools.screwdrivers[0]);
+            candidateTools.blowFeeds.push(delivery); candidate.addStepObserver(delivery);
+          }
+        }
         if (candidateAssembly == null) throw "A mission needs the project's assembly";
         var pairedScrews:Map<String,Bool> = [];
         for (step in work.steps) if (step.kind == "screw") {
@@ -547,7 +555,7 @@ class ApplicationSimulation {
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId),
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.outputFor(work.controllerId), null,
           virtualWelder || virtualNutrunner ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
-            : MissionPlayer.ARM_ACCELERATION, candidatePower,candidateTools.screwdrivers,candidateTools.screwFeeders);
+            : MissionPlayer.ARM_ACCELERATION, candidatePower,candidateTools.screwdrivers,candidateTools.screwFeeders,candidateTools.blowFeeds);
         // A mission that welds lays the weld metal as the welder deposits it.
         if (welds) {
           var active:ProjectDocumentSession = cast session;

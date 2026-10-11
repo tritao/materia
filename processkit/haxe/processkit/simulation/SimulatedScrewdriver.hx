@@ -153,6 +153,15 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
   }
   /** Absolute measured shaft coordinate, used to align the next free-bit approach. */
   public function spindlePosition():Float return supply == null ? runtime.snapshot().q.get(spindleJoint) : supply.joints().spindlePosition;
+  /** Receiving interlock uses measured angular/feed speeds with explicit commissioned limits. */
+  public function receivingReady(angularSpeed:Float, feedSpeed:Float):Bool {
+    if (!Math.isFinite(angularSpeed) || angularSpeed <= 0 || !Math.isFinite(feedSpeed) || feedSpeed <= 0)
+      throw "Receiving speed bounds must be commissioned positive values";
+    if (holding.held != null) return false;
+    var measured = runtime.snapshot();
+    for (i in 0...measured.dq.length) if (Math.abs(measured.dq.get(i)) > (i == feedJoint ? feedSpeed : angularSpeed)) return false;
+    return !digital(channels.start) && !digital(channels.direction);
+  }
   public function reading():ScrewdriverReading return supply == null ? ScrewdriverSensor.reading(ScrewdriverSensor.values(observed)) : supply.reading();
   public function reset():Void {
     holding.reset(); anchoredBody = null; model = null; selected = null; lastTime = null; angle = 0; reversed = false; reverseTargetAngle = 0; origin = 0;

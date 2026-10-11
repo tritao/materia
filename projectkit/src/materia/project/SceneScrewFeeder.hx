@@ -76,8 +76,9 @@ class SceneScrewFeeders {
 			if (Math.abs(pose.qx*pose.qx+pose.qy*pose.qy+pose.qz*pose.qz+pose.qw*pose.qw-1) > 1e-8)
 				throw "Screw feeder deposit frame needs a unit quaternion";
 			for (job in jobs) {
-				if (job.socket == null || job.pickup == null) throw "Screw feeder job lost its CAD socket/pickup frames";
-				var socket = materia.assembly.AssemblyFrames.compose(pose,job.socket), pickup = job.pickup;
+				var pickup = job.pickup;
+				if (job.socket == null || pickup == null) throw "Screw feeder job lost its CAD socket/pickup frames";
+				var socket = materia.assembly.AssemblyFrames.compose(pose,job.socket);
 				if (Math.abs(socket.x-pickup.x) > 1e-8 || Math.abs(socket.y-pickup.y) > 1e-8 || Math.abs(socket.z-pickup.z) > 1e-8
 					|| Math.abs(Math.abs(socket.qx*pickup.qx+socket.qy*pickup.qy+socket.qz*pickup.qz+socket.qw*pickup.qw)-1) > 1e-8)
 					throw 'Screw feeder "${feeder.id}" deposit does not match fastening "${job.fastening}" pickup calibration';

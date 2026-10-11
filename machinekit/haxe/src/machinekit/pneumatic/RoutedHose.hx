@@ -29,7 +29,7 @@ class RoutedHose extends MachineComponent {
 			outerDiameterMm <= 0 || !Math.isFinite(innerDiameterMm) || innerDiameterMm <= 0 ||
 			innerDiameterMm >= outerDiameterMm || !Math.isFinite(massPerMetreKg) ||
 			massPerMetreKg <= 0 ||
-			(serviceKind != Vacuum && serviceKind != Pneumatic))
+			(serviceKind != Vacuum && serviceKind != Pneumatic && serviceKind != ScrewFeed))
 			throw "Routed hose needs a route, wall thickness, mass per metre and fluid service";
 		var copied:Array<Vector> = [];
 		for (point in route) {
@@ -44,7 +44,7 @@ class RoutedHose extends MachineComponent {
 			if (!(extent > 0)) throw "Routed hose has a zero-length segment";
 			length += extent;
 		}
-		super(designation, 'Routed ${serviceKind == Vacuum ? "vacuum" : "air"} hose, ${Math.round(length)} mm cut',
+		super(designation, 'Routed ${serviceKind == Vacuum ? "vacuum" : serviceKind == Pneumatic ? "air" : "screw delivery"} hose, ${Math.round(length)} mm cut',
 			material, codeOnly);
 		this.route = copied;
 		this.outerDiameterMm = outerDiameterMm;
@@ -122,10 +122,10 @@ class RoutedHose extends MachineComponent {
 	public static function recipeType():ComponentType {
 		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.pneumatic.routed-hose", [ComponentRecipeSupport.text("designation", "HOSE"), ComponentRecipeSupport.text("route", ComponentRecipeSupport.defaultRoute()),
 			ComponentRecipeSupport.length("outerDiameterMm", 4), ComponentRecipeSupport.length("innerDiameterMm", 2), ComponentRecipeSupport.scalar("massPerMetreKg", 0.01),
-			ComponentRecipeSupport.choice("service", ["Vacuum", "Pneumatic"], "Vacuum")],
+			ComponentRecipeSupport.choice("service", ["Vacuum", "Pneumatic", "ScrewFeed"], "Vacuum")],
 			v -> new RoutedHose(v.token("designation"), ComponentRecipeSupport.route(v.token("route")),
 				v.number("outerDiameterMm"), v.number("innerDiameterMm"), v.number("massPerMetreKg"),
-				v.token("service") == "Vacuum" ? machinekit.component.PortKind.Vacuum : machinekit.component.PortKind.Pneumatic,
+				v.token("service") == "Vacuum" ? machinekit.component.PortKind.Vacuum : v.token("service") == "Pneumatic" ? machinekit.component.PortKind.Pneumatic : machinekit.component.PortKind.ScrewFeed,
 				"polyurethane PU", false), true, false, ["route"]);
 		return recipeTypeCache;
 	}

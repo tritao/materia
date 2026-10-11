@@ -376,6 +376,7 @@ typedef SceneArtifactPowerUpSideOffset = {
 typedef SceneArtifactMission = {
 	/** Optional replenishing screw supplies, each declared once for its pickup nest. */
 	@:optional var screwFeeders:Array<materia.project.SceneScrewFeeder>;
+	@:optional var blowFeeds:Array<materia.project.SceneBlowFeed>;
 	var steps:Array<SceneArtifactMissionStep>;
 	@:optional var loop:Bool;
 	@:optional var powerUpOffsets:Array<SceneArtifactPowerUpOffset>;
@@ -709,7 +710,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 37;
+	public static inline var VERSION:Int = 38;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -1629,7 +1630,8 @@ class SceneArtifact {
 	/** Mission envelopes retain their ordinary fields; wire invocations use their explicit IDs. */
 	static function encodeMission(mission:SceneArtifactMission):String {
 		var envelope:Dynamic = {};
-		for (name in Reflect.fields(mission)) if (name != "steps" && name != "screwFeeders") Reflect.setField(envelope,name,Reflect.field(mission,name));
+		for (name in Reflect.fields(mission)) if (name != "steps" && name != "screwFeeders" && name != "blowFeeds") Reflect.setField(envelope,name,Reflect.field(mission,name));
+		if (mission.blowFeeds != null) Reflect.setField(envelope,"blowFeeds",haxe.Json.parse(SceneWireJson.preserveNumbers(JsonWire.encode(mission.blowFeeds))));
 		if (mission.screwFeeders != null) Reflect.setField(envelope,"screwFeeders",haxe.Json.parse(SceneWireJson.preserveNumbers(JsonWire.encode(mission.screwFeeders))));
 		var steps:Array<Dynamic> = [];
 		for (step in mission.steps) {
@@ -1646,6 +1648,7 @@ class SceneArtifact {
 
 	static function validateMission(mission:SceneArtifactMission, data:SceneArtifactData):Void {
 		materia.project.SceneScrewFeeder.SceneScrewFeeders.validate(mission.screwFeeders,data);
+		materia.project.SceneBlowFeed.SceneBlowFeeds.validate(mission.blowFeeds,data);
 		function fail(detail:String):Void throw 'Scene artifact mission $detail';
 		validatePowerUpOffsets(mission.powerUpOffsets, data.assemblyDefinition);
 		validatePowerUpSideOffsets(mission.powerUpSideOffsets, data.assemblyDefinition);
@@ -2223,6 +2226,8 @@ class SceneArtifact {
 		if (sides != null) mission.powerUpSideOffsets = decodePowerUpSideOffsets(sides);
 		var controllerId:Dynamic = Reflect.field(decoded, "controllerId");
 		if (controllerId != null) mission.controllerId = Std.isOfType(controllerId, String) ? controllerId : fail();
+		var blow:Dynamic = Reflect.field(decoded,"blowFeeds");
+		if (blow != null) mission.blowFeeds = materia.project.SceneBlowFeed.SceneBlowFeeds.decode(blow);
 		var feeders:Dynamic = Reflect.field(decoded,"screwFeeders");
 		if (feeders != null) mission.screwFeeders = materia.project.SceneScrewFeeder.SceneScrewFeeders.decode(feeders);
 		return mission;

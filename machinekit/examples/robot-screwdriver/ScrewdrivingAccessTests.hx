@@ -23,9 +23,11 @@ class ScrewdrivingAccessTests {
 			if (unreachable == null || unreachable.indexOf("replacement pickup") < 0 || unreachable.indexOf("unreachable") < 0)
 				throw 'Unreachable reserve has no named access diagnostic: $unreachable';
 			var controller = state.worldPose("controller");
+			var pickup = selected.pickup;
+			if (pickup == null) throw "Presented access fixture lost its pickup";
 			var pick = AssemblyFrames.compose(state.worldPose(selected.presenter),
-				{x:selected.pickup.x/design.scene.metresPerUnit,y:selected.pickup.y/design.scene.metresPerUnit,
-				 z:selected.pickup.z/design.scene.metresPerUnit,qx:selected.pickup.qx,qy:selected.pickup.qy,qz:selected.pickup.qz,qw:selected.pickup.qw});
+				{x:pickup.x/design.scene.metresPerUnit,y:pickup.y/design.scene.metresPerUnit,
+				 z:pickup.z/design.scene.metresPerUnit,qx:pickup.qx,qy:pickup.qy,qz:pickup.qz,qw:pickup.qw});
 			state.setRootPose("controller",AssemblyFrames.translation(pick.x,pick.y,pick.z));
 			var blocked = access.problem(fastening);
 			state.setRootPose("controller",controller);

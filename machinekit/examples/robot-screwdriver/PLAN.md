@@ -641,7 +641,7 @@ Here:
 ## Follow-on plan (2026-10-11)
 
 SD0–SD8 are complete. The decisions above describe that completed scope;
-SD9–SD15 below extend that scope. SD9 is complete; SD10–SD15
+SD9–SD15 below extend that scope. SD9 is complete; SD10 is in progress. SD11–SD15
 remain proposed and unstarted. SD9 automates replenishment of the existing presenter before changing
 how the robot receives a screw. The other extensions have their own acceptance
 boundaries and need not all be implemented to use automatic feeding.
@@ -870,6 +870,63 @@ picker, mill and router implementations remain unchanged. All budgets pass.
 Wall-clock planning/rendering timings vary; the app suite peaks at 3.9 GB
 (previous SD8: 4.3 GB). Proof logs, source hashes and retained-number comparisons
 are archived under `build/sd9-core-retry-*` and `build/sd9-final-*`.
+
+### SD10 draft and resource checkpoint (2026-10-12)
+
+SD10 is in progress, not accepted. This checkpoint makes delivery explicit as
+`Presented` or `BlowFeed(feeder)` in each current wire fastening. A blown job
+has no presenter, presenter sensor or pickup frame. SceneArtifact advances to
+v34, rejecting v33; presenter jobs retain their real pickup data. The explicit
+mode tag necessarily changes serialized fastening sizes, which must be
+accounted for in the retained-number comparison rather than hidden as a
+geometry or mechanical change. The program, published tightening target and
+named-thread data remain the same.
+
+The CAD draft adds a `ScrewFeed` port service, metering/air-valve equipment, a
+non-rotating receiving nosepiece and a local tube section carried by the feed
+slide. Tube compatibility uses the selected screw's actual drive/head/length,
+the fitted sleeve and a conservative rigid-cylinder bend sagitta. Demo inputs
+are 14/18 mm tube ID/OD, 200 mm minimum bend radius, 2,500 mm external tube
+length and a 0.08 kg/m local-tube mass assumption. Local nose/tube geometry is
+included in the existing reach/approach checks. External routing assumes a
+commissioned dress-pack kept clear of the work; its length bound includes a
+complete bend loop plus end-to-end approach travel. This is not a solved
+flexible-hose contact model or a claim of verified production routing.
+
+The draft reuses SD9's buffered transport and fresh discrete-I/O acquisitions.
+Air and metering have separate outputs. Actual receipt and vacuum holding
+precede arm travel directly to the hole; the runner does not visit a fake
+remote presenter. Source block/nose-jam observations are separately
+commissioned, and absent diagnostics stay unsupported. Air pulse, delivery
+latency, pressure and receiving velocity bounds are explicit demonstration
+inputs: 0.2 s air pulse, 0.4 s delivery, 3 s receipt timeout, 4 bar,
+0.01 rad/s angular and 0.001 m/s feed readiness limits. They are independent of
+published tightening guidance. Stop cancels pending metering and air; recovery
+is explicit. Stock and body poses rewind together only on a cell reset.
+
+Initial `sd10-core-retry-build` / `sd10-core-proof` compile and pass 29
+model/scripted-I/O checks. Later transit-loss and application integration
+changes have not yet been rebuilt. `sd10-projectkit-pass` passes all existing
+199 assertions, the retained 15 SD9 wire checks and 14 new blow-feed wire/mode
+checks. Ordinary optional-frame typing required explicit local null guards;
+no new compiler bug or Haxeon source/pin change is established.
+
+The first isolated build omitted `CADKIT_OCCT_DIR`; CadKit refused to configure
+and no OCCT was built. That failed build directory was moved out of its build
+path, and the successful retry uses the worktree's cached native libraries
+with both prebuilt CadKit/OCCT environment settings exported. Proof logs live
+under `build/sd10-*`.
+
+The app build was queued through heavy-run when free disk dropped below the
+user's 3 GB reserve (2.9 GB observed). It was cancelled before compilation
+started. Removing 35 old compiled example caches with embedded source paths
+exclusively from this worktree reclaimed 394,964,718 bytes, but available disk
+fell below the reserve again. App compilation, actual CAD delivery/fault/stop
+checks, the quick/full gates, retained-number/size accounting and desktop
+inspection remain pending. The new example is
+`materia.blow-feed.project.json`; it is a draft until those checks pass. SD11
+and later steps are unstarted. Resume SD10 with sufficient free disk for the
+rebuilds and final suite while preserving at least 3 GB.
 
 ## Order
 
@@ -1772,6 +1829,7 @@ still required. The earlier 21-test proof predates this wire extension.
 | SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71`, `7038a4fee` |
 | SD8 | done — virtual unchanged CAD mission, hardware owner/acquisition binding, scripted/TCP controller and repeated-STOP proofs pass; final full gate passed | `f19115ae0`, `84c004fab`, `40d2f9b66` |
 | SD9 | done — buffered bowl supply, scripted I/O, physical replenishment/jam/reset on both backends and portable export pass; final full gate passed | SD9 implementation in this commit |
+| SD10 | in progress — initial model/I/O and current wire checks pass; app/CAD/quick/full acceptance blocked by disk reserve | SD10 draft checkpoint |
 
 ### SD8 hardware integration work (2026-10-11)
 

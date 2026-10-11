@@ -343,6 +343,7 @@ class MissionPlayer implements SessionMember {
   var recordedScrewRun:Null<FasteningExecution> = null;
   final screwdrivers:Array<SimulatedScrewdriver>;
   final screwFeeders:Array<SimulatedScrewFeeder>;
+  final blowFeeds:Array<SimulatedBlowFeed>;
   var screwArm:Null<Manipulator> = null;
   var screwing:Null<ScrewdrivingRunner> = null;
   var recordedScrew:Null<ScrewdrivingRunner> = null;
@@ -433,7 +434,7 @@ class MissionPlayer implements SessionMember {
   public var energyChargeSeconds(default, null):Float = 0.0;
 
   public function new(mission:SceneArtifactMission, robot:AssemblyRobot, simulation:Simulation, robotIndex:Int,
-      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, cellRobots:Array<AssemblyRobot>, ?cellInput:String->Null<EventValue>, ?cellOutput:String->Bool->Void, ?jointMotionPolicy:JointMotionPolicy, weldAcceleration:Float = ARM_ACCELERATION, ?energyPower:SimulatedMobilePower, ?screwdrivers:Array<SimulatedScrewdriver>, ?screwFeeders:Array<SimulatedScrewFeeder>) {
+      timestep:Float, obstacles:Array<FloorObstacle>, objects:Array<GripObject>, project:ProjectDocumentSession, cellRobots:Array<AssemblyRobot>, ?cellInput:String->Null<EventValue>, ?cellOutput:String->Bool->Void, ?jointMotionPolicy:JointMotionPolicy, weldAcceleration:Float = ARM_ACCELERATION, ?energyPower:SimulatedMobilePower, ?screwdrivers:Array<SimulatedScrewdriver>, ?screwFeeders:Array<SimulatedScrewFeeder>, ?blowFeeds:Array<SimulatedBlowFeed>) {
     if (!Math.isFinite(weldAcceleration) || weldAcceleration <= 0.0 || weldAcceleration > ARM_ACCELERATION)
       throw "Invalid welding planning acceleration";
     if (mission.steps.length == 0) throw "A mission needs steps";
@@ -454,6 +455,7 @@ class MissionPlayer implements SessionMember {
     this.project = project;
     this.screwdrivers = screwdrivers == null ? new Array<SimulatedScrewdriver>() : screwdrivers.copy();
     this.screwFeeders = screwFeeders == null ? new Array<SimulatedScrewFeeder>() : screwFeeders.copy();
+    this.blowFeeds = blowFeeds == null ? new Array<SimulatedBlowFeed>() : blowFeeds.copy();
     if ([for (step in mission.steps) if (step.kind == "screw") step].length > 0) {
       var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
       if (tools.length != 1) throw "Screw mission needs exactly one screwdriver";
@@ -1765,7 +1767,7 @@ class MissionPlayer implements SessionMember {
     if (tcp == null) throw "Screwdriver lost its physical TCP";
     arm = ScrewdriverArmKinematics.atSpindle(robot.model,robot.rootLink,tcp.id,capacity.feedJoint,capacity.spindleJoint,driver.spindlePosition());
     screwArm = arm;
-    var work = assemblyParts.get("project:"+job.frame), presenter = assemblyParts.get("project:"+job.presenter);
+    var work = assemblyParts.get("project:"+job.frame), presenter = job.delivery == Presented ? assemblyParts.get("project:"+job.presenter) : null;
     var qualifiedSlot = slot == 0 ? job.slot : slot;
     var finalContact = driver.configure(qualifiedSlot,{program:new TighteningProgram(job.program,stopAtSeat),joint:ScrewScenePlan.joint(job,capacity.springRate),
       screw:screw.freeBody(),hand:job.hand,fixture:work,retightening:retightening,
@@ -1797,7 +1799,7 @@ class MissionPlayer implements SessionMember {
             current.tighteningResult.outcome == robotkit.tool.ScrewdriverContract.SCREW_LOST) {
           var spindle = [for (joint in robot.model.joints) if (joint.id == capacity.spindleJoint) joint];
           if (spindle.length != 1) throw "Lost-screw escape needs its identified spindle joint";
-          escape = {screw:job.screw,link:spindle[0].child.id,contacts:[job.presenter,job.frame]};
+          escape = {screw:job.screw,link:spindle[0].child.id,contacts:job.delivery == Presented ? [job.presenter,job.frame] : [job.frame]};
         }
         var planned = missionMotionPlanner(planningArm, reference, cellCollisionSnapshot([]), escape);
         cached.space = planned.space; compiler.motionPlanner = planned.planner;
@@ -1806,7 +1808,20 @@ class MissionPlayer implements SessionMember {
     }
     var motion = new ScrewdrivingArmMotion(executing,0.08,0.01,prepareTravel);
     motion.configuration = configuration;
-    var active = new ScrewdrivingRunner(motion,new ChannelScrewdriverOutputs(robot.runtime,driver.channels),() -> {
+    var blowing:Null<SimulatedBlowFeed> = null;
+    switch job.delivery {
+      case BlowFeed(id):
+        var candidates = [for (feeder in blowFeeds) if (feeder.definition.id == id) feeder];
+        if (candidates.length != 1) throw 'Fastening "${job.fastening}" lost its explicit blow-feed device "$id"';
+        blowing = candidates[0];
+      case Presented: {}
+    }
+    var deliveryDevice = blowing;
+    var outputs = new ChannelScrewdriverOutputs(robot.runtime,driver.channels);
+    var active = new ScrewdrivingRunner(motion,outputs,() -> {
+      if (deliveryDevice != null) {
+        var receipt = deliveryDevice.reading(); return receipt != null && receipt.present;
+      }
       var present = missionInput(job.presentSensor);
       return present == null ? false : switch present {case Digital(value):value;case _:false;};
     });
@@ -1815,8 +1830,10 @@ class MissionPlayer implements SessionMember {
     if (supplies.length > 1) throw "Screw attempt has ambiguous feeder ownership";
     var preparation:Null<robotkit.skill.Skill> = supplies.length == 0 || retightening ? null
       : new processkit.skill.WaitForScrewFeeder(supplies[0].select(job.screw),supplies[0].definition.deliveryTimeout+supplies[0].definition.trackDelay);
+    if (deliveryDevice != null && !retightening) preparation = new processkit.skill.ReceiveBlownScrew(deliveryDevice.select(job),
+      deliveryDevice.definition.deliveryTimeout+deliveryDevice.definition.trackDelay,outputs,qualifiedSlot);
     return new processkit.skill.DriveScrew(active,localization,
-      () -> ScrewScenePlan.plan(job,livePart(presenter),livePart(work),finalContact,stopAtSeat,qualifiedSlot),sensor,preparation);
+      () -> ScrewScenePlan.plan(job,presenter == null ? null : livePart(presenter),livePart(work),finalContact,stopAtSeat,qualifiedSlot),sensor,preparation);
   }
 
   function handlingToolChannel(step:SceneArtifactMissionStep):String {

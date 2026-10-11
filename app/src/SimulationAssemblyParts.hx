@@ -115,6 +115,17 @@ class SimulationAssemblyParts {
     for (component in flat.definitions) components.set(component.id, component);
   }
 
+  /** Resolve a named CAD connector in metres from the current rebuilt component definition. */
+  public function connectorFrame(id:String, name:String):materia.assembly.AssemblyRecord.AssemblyFrame {
+    var key = definitions.get(id), component = key == null ? null : components.get(key);
+    var physical = project.projectPhysical;
+    if (component == null || physical == null) throw 'No CAD connector definition for "$id/$name"';
+    var found = [for (connector in component.connectors) if (connector.name == name) connector.frame];
+    if (found.length != 1) throw 'No unique named CAD connector "$id/$name"';
+    var frame = found[0], scale = physical.metresPerUnit;
+    return {x:frame.x*scale,y:frame.y*scale,z:frame.z*scale,qx:frame.qx,qy:frame.qy,qz:frame.qz,qw:frame.qw};
+  }
+
   public function get(id:String):SimulationAssemblyPart {
     var cached = cache.get(id);
     if (cached != null) return cached;

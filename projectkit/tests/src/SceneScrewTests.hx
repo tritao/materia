@@ -18,7 +18,7 @@ class SceneScrewTests {
     if (!ok) throw message;
   }
   static function job():SceneScrew {
-    return {fastening:"work/screw1:bore", screw:"screw1", frame:"work", threadFace:"bore:cyl.side",
+    return {delivery:Presented,fastening:"work/screw1:bore", screw:"screw1", frame:"work", threadFace:"bore:cyl.side",
       presenter:"nest", presentSensor:"nest/present", socket:AssemblyFrames.identity(),
       pickup:AssemblyFrames.translation(0,0,0.1), entry:AssemblyFrames.translation(0,0,-0.01),
       seat:AssemblyFrames.identity(), hole:AssemblyFrames.identity(), leadMm:1, hand:1, slot:1, approach:0.04,
@@ -203,12 +203,17 @@ class SceneScrewTests {
     check(Reflect.field(raw,"coordinate") == 2147483648.0 && Reflect.field(raw,"minimum") == -2147483648.0,
       "Large Float coordinates retain their value while the signed Int32 boundary remains valid");
     check(Reflect.field(raw,"label") == '2147483648 "quoted"',"Numeric preservation leaves quoted and escaped text unchanged");
-    var large = job(); large.pickup.x = 2147483648.0;
+    var large = job(), largePickup = large.pickup;
+    if (largePickup == null) throw "Fixture lost its presented pickup";
+    largePickup.x = 2147483648.0;
     var mission: materia.project.SceneArtifact.SceneArtifactMission = {steps:[{kind:"screw",screw:Single(large)}]};
     var encodedMission = @:privateAccess materia.project.SceneArtifact.encodeMission(mission);
     var decodedMission = @:privateAccess materia.project.SceneArtifact.decodeMission(haxe.Json.parse(SceneWireJson.preserveNumbers(encodedMission)));
     var decodedJob = SceneScrewInvocation.job(decodedMission.steps[0].screw,decodedMission.steps);
-    check(decodedJob != null && decodedJob.pickup.x == large.pickup.x,
+    if (decodedJob == null) throw "Decoded mission lost its fastening";
+    var decodedPickup = decodedJob.pickup;
+    if (decodedPickup == null) throw "Decoded presenter lost its pickup frame";
+    check(decodedPickup.x == largePickup.x,
       "Mission envelope encoding preserves large Float coordinates through its intermediate JSON parse");
     Sys.println('Scene wire numbers: $checks checks passed');
   }

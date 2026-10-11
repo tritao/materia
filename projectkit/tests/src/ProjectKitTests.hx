@@ -1075,6 +1075,7 @@ class ProjectKitTests {
   static function main():Void {
     SceneScrewTests.run();
     SceneScrewFeederTests.run();
+    SceneBlowFeedTests.run();
     near(LengthUnit.metresPerUnit("mm"), 0.001, "millimetres");
     near(LengthUnit.metresPerUnit("in"), 0.0254, "inches");
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");

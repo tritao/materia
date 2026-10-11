@@ -14,6 +14,8 @@ The examples in this directory are:
 - `materia.staged.project.json`: snug, then final tightening of installed screws.
 - `materia.feeder.project.json`: a bowl and buffered track replenish one pickup
   nest for all four primary screws. Replacement presenters remain separate.
+- `materia.blow-feed.project.json`: draft tube-to-tool delivery for the four
+  CAD fastenings; app/CAD acceptance is pending (see SD10 in the plan).
 - `materia.threads.project.json` and `materia.fastenings.project.json`: cosmetic
   threads and CAD fastening discovery.
 
@@ -40,3 +42,11 @@ A hardware feeder uses `processkit.feeding.DiscreteScrewFeeder` with a
 commissioned I/O profile and atomic timestamped acquisitions. Empty/jam inputs
 are optional: missing sensors remain unknown. The I/O host polls independently
 of planning and owns electrical polarity and its physical output watchdog.
+
+The SD10 draft adds metering and a separate air pulse, a receiving nosepiece
+and measured receipt before direct travel to the hole. Presenter jobs remain
+available through an explicit acquisition mode. The tube dimensions, local
+mass, pressure, timing, receiving-speed limits and external dress-pack routing
+are demonstration/commissioning assumptions recorded in [PLAN.md](PLAN.md).
+The scene format is v34. The draft is not accepted until its app/CAD and final
+gates pass; the disk reserve stopped that validation run.

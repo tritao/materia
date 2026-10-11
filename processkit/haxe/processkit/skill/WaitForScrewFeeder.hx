@@ -9,14 +9,15 @@ import haxe.Int64;
 class WaitForScrewFeeder implements Skill {
   final feeder:ScrewFeederDevice;
   final timeout:Float;
+  final receiptLabel:String;
   final lifecycle = new SkillLifecycle();
   var elapsed = 0.0;
   var silent = 0.0;
   var previous:Null<Int64> = null;
   var requested = false;
-  public function new(feeder:ScrewFeederDevice, timeout:Float) {
+  public function new(feeder:ScrewFeederDevice, timeout:Float, receiptLabel:String = "pickup nest") {
     if (feeder == null || !Math.isFinite(timeout) || timeout <= 0) throw "Feeder wait needs a device and explicit timeout";
-    this.feeder = feeder; this.timeout = timeout;
+    this.feeder = feeder; this.timeout = timeout; this.receiptLabel = receiptLabel;
   }
   public function start():Void {
     lifecycle.begin(); elapsed = 0; silent = 0; previous = null; requested = false;
@@ -36,7 +37,7 @@ class WaitForScrewFeeder implements Skill {
         if (prior == null || Int64.compare(value.sequence,prior) > 0) {silent = 0; previous = value.sequence;}
         else silent += durationSeconds;
         if (value.jammed == true) throw "Feeder jam prevents delivery";
-        if (value.present) lifecycle.succeed("screw physically present at pickup nest");
+        if (value.present) lifecycle.succeed("screw physically present at "+receiptLabel);
         else if (!requested && value.empty == true) throw "Feeder supply is empty";
         else if (!requested && value.ready) {feeder.request(); requested = true;}
       }

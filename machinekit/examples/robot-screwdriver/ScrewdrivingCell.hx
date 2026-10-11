@@ -17,12 +17,13 @@ class ScrewdrivingCell extends MachineAssembly {
 	public final arm:RobotArm;
 	public final controller:TighteningController;
 	public final presenter:ScrewPresenter;
-	public function new(?bit:ScrewdriverBit, workX:Float = 0, ?bearing:DeepGrooveBearing, automaticSupply:Bool = false) {
+	public function new(?bit:ScrewdriverBit, workX:Float = 0, ?bearing:DeepGrooveBearing, automaticSupply:Bool = false, blowSupply:Bool = false) {
 		super();
 		work = new FlangeBearingMount(bearing == null ? DeepGrooveBearing.metric("608") : bearing);
-		tool = new ArmScrewdrivingTool(bit == null ? new ScrewdriverBit(work.flange.screw.screwDrive()) : bit);
+		var fitted = bit == null ? new ScrewdriverBit(work.flange.screw.screwDrive()) : bit;
+		tool = blowSupply ? new machinekit.screwdriving.BlowFeedTool(fitted,work.flange.screw,14,18,200,2500) : new ArmScrewdrivingTool(fitted);
 		arm = new RobotArm(false, tool); controller = new TighteningController();
-		presenter = automaticSupply ? new machinekit.screwdriving.AutomaticScrewPresenter(work.flange.screw) : new ScrewPresenter(work.flange.screw);
+		presenter = automaticSupply || blowSupply ? new machinekit.screwdriving.AutomaticScrewPresenter(work.flange.screw) : new ScrewPresenter(work.flange.screw);
 		include("arm", arm);
 		addComponent("table", new ArmTable(700, 400, RobotArm.TABLE_TOP), AssemblyFrames.translation(0, -520, 0));
 		addComponent("controller", controller, AssemblyFrames.translation(-800, 200, 0));

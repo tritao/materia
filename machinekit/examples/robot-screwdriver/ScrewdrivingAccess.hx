@@ -88,8 +88,12 @@ class ScrewdrivingAccess implements ScrewAccess {
 	function check(job:SceneScrew):Null<String> {
 		var targets:Array<AccessPose> = [];
 		var primary = template(job.screw);
-		targets.push({label:"primary pickup",member:job.presenter,frame:job.pickup,feed:0,held:false,threaded:false,template:primary});
-		targets.push({label:"primary lift",member:job.presenter,frame:job.pickup,feed:0,held:true,threaded:false,template:primary});
+		if (job.delivery == Presented) {
+			var pickup = job.pickup;
+			if (pickup == null) return "Presented fastening lost its pickup frame";
+			targets.push({label:"primary pickup",member:job.presenter,frame:pickup,feed:0,held:false,threaded:false,template:primary});
+			targets.push({label:"primary lift",member:job.presenter,frame:pickup,feed:0,held:true,threaded:false,template:primary});
+		}
 		var recovery = job.recovery;
 		if (recovery != null) {
 			var spare = recovery.replacement;
@@ -111,6 +115,13 @@ class ScrewdrivingAccess implements ScrewAccess {
 			var socket = world(target.member,target.frame), direction = AssemblyFrames.transformVector(socket,0,0,1);
 			socket.x -= direction.x*out; socket.y -= direction.y*out; socket.z -= direction.z*out;
 			state.setJoint(feed,out == 0 ? target.feed : 0);
+			if (Std.isOfType(cell.tool,machinekit.screwdriving.BlowFeedTool)) {
+				// External tube follows a reserved dress-pack route; this bound includes a complete bend loop and end-to-end travel.
+				var source = state.worldConnector("blowMeter","outlet"), dx = socket.x-source.x, dy = socket.y-source.y, dz = socket.z-source.z;
+				var tool:machinekit.screwdriving.BlowFeedTool = cast cell.tool;
+				if (Math.sqrt(dx*dx+dy*dy+dz*dz)+2*Math.PI*tool.minimumBendRadius > tool.externalTubeLength)
+					return "Blow-feed dress-pack tube length cannot cover the qualified approach and reserved bend";
+			}
 			var label = '${target.label} at $out mm out', found = false;
 			var collision:Null<String> = null;
 			var seeds = [current,cell.readyPose()];

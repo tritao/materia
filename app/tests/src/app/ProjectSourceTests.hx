@@ -2202,6 +2202,59 @@ class ProjectSourceTests {
     Sys.println("Screw feeder CAD passed on both backends with physical replenishment and jam diagnostics");
   }
 
+  /** Air delivery reaches the actual tool socket; the arm never visits a remote pickup nest. */
+  static function checkBlowFeed(root:String):Void {
+    var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.blow-feed.project.json");
+    for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (failure in ["none","missing","blocked","nose-jam","stop"]) {
+      Sys.println('Blow-feed CAD: begin backend $backend, $failure');
+      var generated = MateriaProjectRunner.loadProject(manifest), work = generated.mission;
+      if (work == null || work.blowFeeds == null || work.blowFeeds.length != 1) throw "Blown flange lost its receiving path";
+      for (step in work.steps) {
+        var job = materia.project.SceneScrewInvocation.job(step.screw,work.steps);
+        check(job != null && job.presenter == null && job.pickup == null,"Blown CAD jobs contain no remote presenter pose");
+      }
+      var session = new ProjectDocumentSession(null,false), simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.setBackend(backend);
+      try {
+        session.openGeneratedProject(generated,manifest);
+        check(simulation.rebuild(session.sensors,session.scene,session),'Blown flange builds: ${simulation.error}');
+        var mission = simulation.missionPlayer(), clock = simulation.activeSession(), tools = @:privateAccess simulation.tools;
+        if (mission == null || clock == null || tools == null || tools.blowFeeds.length != 1) throw "Blown flange lost its live device";
+        var feeder = tools.blowFeeds[0];
+        if (failure == "missing") feeder.model.setTransitLoss(true);
+        if (failure == "blocked") feeder.model.setBlocked(true);
+        if (failure == "nose-jam") feeder.model.setNoseJam(true);
+        var stopped = false, witnessed:Map<String,Bool> = [];
+        while (!mission.finished && mission.failure == null && clock.simulationTime() < 600) {
+          simulation.step();
+          var reading = feeder.model.reading(), delivered = feeder.model.transport.delivered;
+          if (reading != null && reading.present && delivered != null) witnessed.set(delivered,true);
+          if (failure == "stop" && !stopped && feeder.model.airOn) {
+            simulation.stop(); feeder.safe(); stopped = true;
+            for (_ in 0...100) feeder.poll(clock.simulationTime());
+            check(!feeder.model.airOn && feeder.model.transport.deliveries == 0,"Stop during air delivery cancels release and retains stock");
+            check(simulation.reset(),"Explicit cell reset recovers interrupted delivery");
+            break;
+          }
+        }
+        if (failure == "none") {
+          check(mission.finished && mission.failure == null && feeder.model.transport.deliveries == 4,'Blown flange tightens four delivered screws: ${mission.failure}');
+          check(mission.screwResults.length == 4,"Blown flange records the unchanged qualified controller outcomes");
+          for (result in mission.screwResults) check(result.outcome == robotkit.tool.ScrewdriverContract.OK && Math.abs(result.torqueNm-16.5) < 1e-8,"Blow feed preserves the published M6 tightening target");
+          check([for (id in witnessed.keys()) id].length == 4,"Every actual received body is witnessed at the tool");
+          check(simulation.heldObjectIds().length == 0 && simulation.reset() && feeder.model.transport.bulk() == 4,"Blown inventory and physical poses reset together");
+        } else if (failure == "stop") check(stopped,"Stop case reaches actual metering before explicit recovery");
+        else check(mission.failure != null && (failure == "missing" ? mission.failure.indexOf("receipt") >= 0 : failure == "blocked" ? mission.failure.indexOf("blocked") >= 0 : mission.failure.indexOf("nosepiece") >= 0)
+          && !feeder.model.airOn,"Missing receipt, tube block and receiver jam stop with their own diagnosis");
+        simulation.clear(); session.dispose();
+      } catch (error:Dynamic) {simulation.clear(); session.dispose(); throw error;}
+      Sys.println('Blow-feed CAD: end backend $backend, $failure');
+    }
+    var portable = materia.project.SceneArtifact.decode(MateriaProjectRunner.exportArtifact(manifest));
+    check(portable.mission != null && portable.mission.blowFeeds != null && portable.mission.blowFeeds.length == 1,"Portable CAD retains the receiving path");
+    Sys.println("Blow-feed CAD passed on both backends with measured receipt, faults and explicit stop recovery");
+  }
+
   /** Staged execution shares physical supplies and preserves the installed body's measured engagement. */
   static function checkScrewdrivingStaged(root:String):Void {
     var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.staged.project.json");

@@ -12,7 +12,7 @@ typedef TighteningResult = {
   var outcome:Int;
 };
 private enum ScrewPhase {
-  Idle; PickupApproach; PickupContact; Sealing; PickupRetract;
+  Idle; ToolReceipt; PickupApproach; PickupContact; Sealing; PickupRetract;
   WorkApproach; Engage; Driving; Stopping; Releasing; Retracting; Done; Failed;
   FinalApproach; FinalContact; FinalSealing; FinalEngage;
   ProcessStop; RecoveryStop; Reversing; ReverseStop; RecoveryRetract; RejectTravel; RejectRelease; RejectRetract; Recovered;
@@ -48,11 +48,13 @@ class ScrewdrivingRunner {
   public function run(requested:ScrewPlan):Void {
     if (running() || requested == null) throw "Screw runner needs an idle runner and qualified plan";
     plan = requested; tighteningResult = null; failureMessage = null; elapsed = 0; followDepth = 0; lossAtPickup = false;
-    outputs.start(false); outputs.reverse(false); outputs.vacuum(false); outputs.selectProgram(requested.slot);
+    outputs.start(false); outputs.reverse(false); outputs.vacuum(requested.finalContact == null && requested.toolFed); outputs.selectProgram(requested.slot);
     var contact = requested.finalContact;
-    if (contact == null) {
+    if (contact == null && requested.toolFed) {
+      phase = ToolReceipt;
+    } else if (contact == null) {
       phase = PickupApproach;
-      motion.move(ScrewPlan.along(requested.pickup,-requested.approach),false);
+      motion.move(ScrewPlan.along(requested.pickupPose(),-requested.approach),false);
     } else {
       phase = FinalApproach;
       motion.move(ScrewPlan.along(contact.socket,-requested.approach),false);
@@ -79,6 +81,9 @@ class ScrewdrivingRunner {
       var fault = motion.failure();
       if (fault != null) throw fault;
       switch phase {
+        case ToolReceipt:
+          if (present() && reading.vacuum) {phase = WorkApproach; motion.move(ScrewPlan.along(selected.entry,-selected.approach),false);}
+          else if (elapsed > 2) finishFailure(reading,ScrewdriverContract.NO_SCREW);
         case FinalApproach:
           if (motion.completed()) {
             var contact = selected.finalContact;
@@ -98,7 +103,7 @@ class ScrewdrivingRunner {
           if (!reading.vacuum) {finishFailure(reading,ScrewdriverContract.SCREW_LOST); return;}
           if (motion.completed()) {outputs.start(true); phase = Driving; elapsed = 0;}
         case PickupApproach:
-          if (motion.completed()) { phase = PickupContact; motion.move(selected.pickup,true); }
+          if (motion.completed()) { phase = PickupContact; motion.move(selected.pickupPose(),true); }
         case PickupContact:
           if (motion.completed()) {
             if (!present()) { finishFailure(reading,ScrewdriverContract.NO_SCREW); return; }
@@ -107,7 +112,7 @@ class ScrewdrivingRunner {
         case Sealing:
           if (reading.vacuum) {
             phase = PickupRetract;
-            motion.move(ScrewPlan.along(selected.pickup,-selected.approach),true);
+            motion.move(ScrewPlan.along(selected.pickupPose(),-selected.approach),true);
           } else if (elapsed > 2) finishFailure(reading,ScrewdriverContract.NO_SCREW);
         case PickupRetract:
           if (!reading.vacuum) { finishFailure(reading,ScrewdriverContract.SCREW_LOST); return; }
@@ -164,7 +169,7 @@ class ScrewdrivingRunner {
               if (result.outcome != ScrewdriverContract.NO_SCREW && result.outcome != ScrewdriverContract.SCREW_LOST)
                 throw "Failed screw lost vacuum before recovery";
               phase = RecoveryRetract;
-              var from = result.outcome == ScrewdriverContract.NO_SCREW || lossAtPickup ? selected.pickup : selected.entry;
+              var from = !selected.toolFed && (result.outcome == ScrewdriverContract.NO_SCREW || lossAtPickup) ? selected.pickupPose() : selected.entry;
               motion.move(ScrewPlan.along(from,-selected.approach),result.outcome != ScrewdriverContract.SCREW_LOST);
             } else {
               if (!Math.isFinite(reading.angle) || reading.angle < 0) throw "Stopped recovery spindle has no valid measured angle";

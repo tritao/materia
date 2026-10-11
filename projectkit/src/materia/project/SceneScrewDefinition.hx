@@ -43,18 +43,24 @@ import materia.project.SceneArtifact.SceneArtifactData;
 	@:id(3) var reject:AssemblyFrame;
 }
 
+/** Explicit acquisition arrangement; a tool receiver never supplies a remote pickup pose. */
+@:wire enum ScrewDeliveryMode {
+	@:id(1) Presented;
+	@:id(2) BlowFeed(feeder:String);
+}
+
 /** A freshly derived CAD fastening. All frames use metres; named occurrences own their live poses. */
 @:wire typedef SceneScrew = {
 	@:id(1) var fastening:String;
 	@:id(2) var screw:String;
 	@:id(3) var frame:String;
 	@:id(4) var threadFace:String;
-	@:id(5) var presenter:String;
-	@:id(6) var presentSensor:String;
+	@:id(5) @:optional var presenter:String;
+	@:id(6) @:optional var presentSensor:String;
 	/** Socket bottom in the screw's CAD frame, with +Z into its shank. */
 	@:id(7) var socket:AssemblyFrame;
 	/** Pickup socket in the presenter's frame. */
-	@:id(8) var pickup:AssemblyFrame;
+	@:id(8) @:optional var pickup:AssemblyFrame;
 	/** Starting socket, final socket and thread lead-in in the threaded member's frame. */
 	@:id(9) var entry:AssemblyFrame;
 	@:id(10) var seat:AssemblyFrame;
@@ -67,6 +73,7 @@ import materia.project.SceneArtifact.SceneArtifactData;
 	@:id(16) var simulation:ScrewSimulationSettings;
 	@:id(17) var approach:Float;
 	@:id(18) @:optional var recovery:ScrewRecovery;
+	@:id(19) var delivery:ScrewDeliveryMode;
 }
 
 /** Strict saved-data boundary, shared with the live process program. No CAD or process dependency. */
@@ -106,11 +113,19 @@ class SceneScrewDefinition {
 		function fail(detail:String):Void throw 'Scene screw "${screw == null ? "missing" : screw.fastening}": $detail';
 		if (screw == null) { fail("definition is missing"); return; }
 		if (!named(screw.fastening) || !named(screw.threadFace)) fail("fastening and topological face names are required");
-		for (member in [screw.screw,screw.frame,screw.presenter])
+		for (member in [screw.screw,screw.frame])
 			if (!named(member) || occurrences.indexOf(member) < 0) fail('occurrence "$member" does not exist');
 		if (screw.screw == screw.frame || screw.screw == screw.presenter) fail("the screw must have its own occurrence");
-		if (!named(screw.presentSensor)) fail("presenter sensor is missing");
-		for (frame in [screw.socket,screw.pickup,screw.entry,screw.seat,screw.hole])
+		if (screw.delivery == null) fail("delivery arrangement is missing");
+		switch screw.delivery {
+			case Presented:
+				if (!named(screw.presenter) || occurrences.indexOf(screw.presenter) < 0 || !named(screw.presentSensor) || !validFrame(screw.pickup))
+					fail("presented delivery needs its actual presenter, sensor and pickup frame");
+			case BlowFeed(feeder):
+				if (!named(feeder) || screw.presenter != null || screw.presentSensor != null || screw.pickup != null)
+					fail("blow delivery needs a named feeder and no presenter/pickup fields");
+		}
+		for (frame in [screw.socket,screw.entry,screw.seat,screw.hole])
 			if (!validFrame(frame)) fail("frame must have finite coordinates and a unit rotation");
 		if (screw.slot <= 0 || (screw.hand != 1 && screw.hand != -1)) fail("program slot or thread hand is invalid");
 		if (!Math.isFinite(screw.leadMm) || screw.leadMm <= 0 || !Math.isFinite(screw.approach) || screw.approach <= 0 || screw.approach > 1)
@@ -151,7 +166,7 @@ class SceneScrewDefinition {
 		var recovery = job.recovery;
 		if (recovery == null) throw 'Scene screw "${job.fastening}" has no declared replacement';
 		var supply = recovery.replacement;
-		return {fastening:job.fastening,screw:supply.screw,frame:job.frame,threadFace:job.threadFace,
+		return {delivery:Presented,fastening:job.fastening,screw:supply.screw,frame:job.frame,threadFace:job.threadFace,
 			presenter:supply.presenter,presentSensor:supply.presentSensor,pickup:supply.pickup,socket:job.socket,
 			entry:job.entry,seat:job.seat,hole:job.hole,leadMm:job.leadMm,hand:job.hand,slot:job.slot,
 			program:job.program,simulation:job.simulation,approach:job.approach};
@@ -183,7 +198,7 @@ class SceneScrewDefinition {
 		var sensors = flat.sensors;
 		var present = sensors == null ? [] : [for (sensor in sensors) if (sensor.id == screw.presentSensor &&
 			sensor.kind == "presence" && sensor.occurrence == screw.presenter) sensor];
-		if (present.length != 1) throw 'Scene screw "${screw.fastening}": presenter sensor "${screw.presentSensor}" is missing or ambiguous';
+		if (screw.delivery == Presented && present.length != 1) throw 'Scene screw "${screw.fastening}": presenter sensor "${screw.presentSensor}" is missing or ambiguous';
 		var recovery = screw.recovery;
 		if (recovery != null) {
 			var supply = recovery.replacement;

@@ -21,7 +21,7 @@ class ScrewdrivingChecks {
 		var ready = cell.readyPose();
 		var targets:Array<{name:String, member:String, connector:String}> = [for (fastening in fastenings)
 			{name: fastening.name(), member: "work/" + fastening.screw.member, connector: "head"}];
-		targets.push({name: "presenter", member: "presenter/screw", connector: "head"});
+		if (!Std.isOfType(cell.tool,machinekit.screwdriving.BlowFeedTool)) targets.push({name: "presenter", member: "presenter/screw", connector: "head"});
 		var moving = [for (member in cell.components()) if (StringTools.startsWith(member.id, "arm/tool/")) member.id];
 		var fixed = [for (member in cell.components()) if (!StringTools.startsWith(member.id, "arm/")) member.id];
 		PosedParts.scope(parts -> {

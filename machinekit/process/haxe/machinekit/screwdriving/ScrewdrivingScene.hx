@@ -54,7 +54,7 @@ class ScrewdrivingScene {
 			qx:seat.qx,qy:seat.qy,qz:seat.qz,qw:seat.qw};
 		var pickup = scaled(AssemblyFrames.compose(AssemblyFrames.inverse(state.worldPose(presenter)),
 			AssemblyFrames.compose(state.worldPose(presentedScrew),socket)),metres);
-		var job:SceneScrew = {fastening:fastening.name(),screw:screwId,frame:frameId,threadFace:fastening.threaded.faceName,
+		var job:SceneScrew = {delivery:Presented,fastening:fastening.name(),screw:screwId,frame:frameId,threadFace:fastening.threaded.faceName,
 			presenter:presenter,presentSensor:presentSensor,socket:scaled(socket,metres),pickup:pickup,entry:entry,seat:seat,hole:lead,
 			leadMm:fastening.thread.pitch*fastening.thread.starts,hand:switch fastening.thread.hand {case RightHand:1;case LeftHand:-1;},
 			slot:slot,program:TighteningPrograms.fromFastening(fastening,policy).settings,simulation:simulation,approach:approach};

@@ -28,6 +28,7 @@ class ScrewdriverProcessTests {
 	public static function run():Void {
 		ScrewControllerTests.run();
 		ScrewFeederTests.run();
+		BlowFeedTests.run();
 		count = 0;
 		var good = new TighteningModel(program(),joint());
 		var ok = runToEnd(good,input(0));

@@ -25,16 +25,23 @@ typedef ScrewdrivingDesign = {
 
 /** Every flange fastening has its own supported supply and one physically separate replacement. */
 class ScrewdrivingAssemblyPreview {
-	public static function design(bowlFed:Bool = false):ScrewdrivingDesign {
+	public static function design(bowlFed:Bool = false, blowFed:Bool = false):ScrewdrivingDesign {
 		var cell = new ScrewdrivingCell(new machinekit.screwdriving.ScrewdriverBit(HexSocket(5),45,6,0.05),0,
-			machinekit.standard.DeepGrooveBearing.metric("6003"),bowlFed);
+			machinekit.standard.DeepGrooveBearing.metric("6003"),bowlFed,blowFed);
 		var positions = [[250.0,-450.0],[180.0,-380.0],[250.0,-380.0],[110.0,-450.0],[110.0,-380.0],[320.0,-450.0],[320.0,-380.0]];
-		var supplyNames = bowlFed ? ["presenter","presenter","presenter","presenter"] : ["presenter","supply2","supply3","supply4"];
+		var supplyNames = bowlFed || blowFed ? ["presenter","presenter","presenter","presenter"] : ["presenter","supply2","supply3","supply4"];
 		var spareNames = ["reserve1","reserve2","reserve3","reserve4"];
-		var additional = bowlFed ? spareNames.copy() : supplyNames.slice(1).concat(spareNames);
-		if (bowlFed) {
+		var additional = bowlFed || blowFed ? spareNames.copy() : supplyNames.slice(1).concat(spareNames);
+		if (bowlFed || blowFed) {
 			cell.include("feeder",new machinekit.screwdriving.ScrewBowlFeeder(cell.presenter.screw),AssemblyFrames.translation(180,-650,RobotArm.TABLE_TOP));
 			cell.exposePort("feederControl","feeder/drive","control");
+		}
+		if (blowFed) {
+			var tool:machinekit.screwdriving.BlowFeedTool = cast cell.tool;
+			cell.addComponent("blowMeter",new machinekit.screwdriving.BlowFeedMeter(tool.outerDiameter));
+			cell.addMate("blow-meter-track","fixed","feeder/trackLeft","outlet","blowMeter","inlet");
+			cell.connectPorts("screw-delivery-tube","blowMeter","screw","arm/tool/feedTube","input");
+			cell.exposePort("blowAir","blowMeter","air"); cell.exposePort("blowControl","blowMeter","control");
 		}
 		for (i in 0...additional.length) {
 			var name = additional[i];
@@ -65,6 +72,7 @@ class ScrewdrivingAssemblyPreview {
 			var spare = 'replacement/screw${index+1}';
 			job.recovery = {replacement:{screw:spare,presenter:reserve+"/nest",presentSensor:reserve+"/part-present",pickup:pickup},
 				rejectMember:"reject/floor",reject:{x:0,y:0,z:0.1,qx:1,qy:0,qz:0,qw:0}};
+			if (blowFed) {job.delivery = BlowFeed("blow"); job.presenter = null; job.presentSensor = null; job.pickup = null;}
 			jobs.push(job);
 			staging.push({body:job.screw,template:supply+"/screw",like:job.screw});
 			staging.push({body:spare,template:reserve+"/screw",like:job.screw});
@@ -72,8 +80,8 @@ class ScrewdrivingAssemblyPreview {
 		return {cell:cell,scene:scene,state:state,found:found,jobs:jobs,staging:staging};
 	}
 
-	public static function scene(twoStage:Bool = false, bowlFed:Bool = false):SceneArtifactData {
-		var design = design(bowlFed), cell = design.cell, scene = design.scene, state = design.state;
+	public static function scene(twoStage:Bool = false, bowlFed:Bool = false, blowFed:Bool = false):SceneArtifactData {
+		var design = design(bowlFed,blowFed), cell = design.cell, scene = design.scene, state = design.state;
 		var jobs = design.jobs, staging = design.staging, found = design.found;
 		var tools = [for (tool in scene.robotTools) if (tool.screwdriver != null) tool];
 		if (tools.length != 1) throw "Whole screw access lost its feed capability";
@@ -88,12 +96,21 @@ class ScrewdrivingAssemblyPreview {
 		parts.close();
 		ScrewdrivingExecution.stage(scene,staging);
 		scene.mission = {steps:mission.require()};
-		if (bowlFed) {
+		if (bowlFed || blowFed) {
 			var metres = scene.metresPerUnit;
 			var deposit = AssemblyFrames.compose(AssemblyFrames.inverse(state.worldPose("presenter/nest")),state.worldPose("presenter/screw"));
 			deposit.x *= metres; deposit.y *= metres; deposit.z *= metres;
-			scene.mission.screwFeeders = [{id:"bowl",presenter:"presenter/nest",presentSensor:"presenter/part-present",
+			if (bowlFed) scene.mission.screwFeeders = [{id:"bowl",presenter:"presenter/nest",presentSensor:"presenter/part-present",
 				inventory:[for (job in jobs) job.screw],deposit:deposit,bufferCapacity:2,trackDelay:0.2,deliveryDelay:0.3,deliveryTimeout:3}];
+			if (blowFed) {
+				var tool:machinekit.screwdriving.BlowFeedTool = cast cell.tool;
+				scene.mission.blowFeeds = [{id:"blow",receiver:"arm/tool/receiver",socketConnector:"receipt",
+					receiptSensor:"arm/tool/screw-receipt",inventory:[for (job in jobs) job.screw],bufferCapacity:2,
+					trackDelay:0.2,deliveryDelay:0.4,deliveryTimeout:3,airPulse:0.2,airPressureBar:4,
+					tube:"arm/tool/feedTube",externalTubeLengthMm:tool.externalTubeLength,minimumBendRadiusMm:tool.minimumBendRadius,
+					receivingAngularSpeed:0.01,receivingFeedSpeed:0.001}];
+			}
+
 			var flat = scene.assemblyDefinition;
 			if (flat == null) throw "Fed cell lost its independent supplies";
 			var execution = new AssemblyState(flat,scene.assemblyState);
@@ -116,6 +133,7 @@ class ScrewdrivingAssemblyPreview {
 	public static function assembly():Bytes return SceneArtifact.encode(scene());
 	public static function staged():Bytes return SceneArtifact.encode(scene(true));
 	public static function fed():Bytes return SceneArtifact.encode(scene(false,true));
+	public static function blown():Bytes return SceneArtifact.encode(scene(false,false,true));
 }
 function main():Void {
 	var decoded = SceneArtifact.decode(ScrewdrivingAssemblyPreview.assembly());
