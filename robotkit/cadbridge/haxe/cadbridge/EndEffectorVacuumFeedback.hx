@@ -9,7 +9,8 @@ import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationStepObserver;
 import robotkit.tool.SimulatedVacuum;
-import robotkit.tool.ToolCollisionShape;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 import robotkit.tool.ToolRuntimeSelection;
 
 /** Deterministic pressure feedback from simulation contact on one cup piece.
@@ -54,10 +55,11 @@ class EndEffectorVacuumFeedback implements SimulationStepObserver {
         cupIndex = index;
       }
     if (cupIndex < 0) throw "Suction cup has no collision piece";
-    switch bundle.runtime.tool.collision {
-      case Hulls(pieces, _):
-        if (pieces.length != collision.pieces.length)
-          throw "Mounted tool collision does not match the coupled configuration";
+    var shapes = bundle.runtime.tool.collision;
+    if (shapes.length != collision.pieces.length)
+      throw "Mounted tool collision does not match the coupled configuration";
+    for (shape in shapes) switch shape.geometry {
+      case Convex(_):
       case _: throw "Simulation vacuum feedback needs per-member tool hulls";
     }
     this.selection = selection;

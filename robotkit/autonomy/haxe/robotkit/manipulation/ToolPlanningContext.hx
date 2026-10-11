@@ -17,10 +17,8 @@ class ToolPlanningContext {
         !Math.isFinite(maxToolStep) || maxToolStep <= 0.0 ||
         (maxJointStep != null && (!Math.isFinite(maxJointStep) || maxJointStep <= 0.0)))
       throw "Tool planning requires a mounted tool, obstacles, and valid clearance settings";
-    if (obstacles.length > 0) switch (tool.collision) {
-      case NoCollision: throw "Tool planning requires collision geometry for a mounted tool";
-      case _:
-    }
+    if (obstacles.length > 0 && tool.collision.length == 0)
+      throw "Tool planning requires collision geometry for a mounted tool";
     for (obstacle in obstacles) if (obstacle == null)
       throw "Tool planning obstacles cannot contain null";
     this.tool = tool;

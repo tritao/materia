@@ -137,11 +137,8 @@ class RobotCollision {
     var toolBody = -1;
     var toolObjects:Array<Int> = [];
     var tool = options.tool;
-    var toolShape = tool == null ? robotkit.tool.ToolCollisionShape.NoCollision : tool.collision;
-    var hasTool = switch toolShape {
-      case NoCollision: false;
-      case _: true;
-    }
+    var toolShape = tool == null ? [] : tool.collision;
+    var hasTool = toolShape.length > 0;
     if (hasTool && tool != null) {
       var flangeBody:Int, flange:Transform;
       if (options.toolFrame != null) {
@@ -157,19 +154,11 @@ class RobotCollision {
       }
       toolBody = bodies.follow(flangeBody, 'tool/${tool.id}', options.toolGroup);
       var at = (local:Transform) -> ModelBodies.pose(flange.compose(local));
-      switch toolShape {
-        case NoCollision:
-        case Box(half, centre):
-          var c = centre == null ? Transform.identity() : Transform.translation(centre.x, centre.y, centre.z);
-          toolObjects.push(description.addObject('$name/tool', toolBody, at(c), CollisionGeometry.Box(half.x, half.y, half.z)));
-        case Cylinder(radius, height):
-          toolObjects.push(description.addObject('$name/tool', toolBody, at(Transform.identity()),
-            CollisionGeometry.Cylinder(radius, height / 2)));
-        case Hulls(pieces, padding):
-          for (i in 0...pieces.length)
-            toolObjects.push(description.addObject('$name/tool/piece$i', toolBody, at(Transform.identity()),
-              CollisionGeometry.Convex(pieces[i]), padding, "hull with padding"));
-          if (padding > 0) description.note('Robot "$name": tool hulls are inflated by their padding ($padding m)');
+      for (i in 0...toolShape.length) {
+        var shape = toolShape[i], p = shape.position, q = shape.rotation;
+        var local = new Transform(p[0],p[1],p[2],q[0],q[1],q[2],q[3]);
+        toolObjects.push(description.addObject('$name/tool/piece$i', toolBody, at(local),
+          shape.geometry, shape.inflation, "tool shape"));
       }
     }
     bodies.declare();

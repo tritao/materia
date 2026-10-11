@@ -32,7 +32,8 @@ import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.tool.Tool;
-import robotkit.tool.ToolCollisionShape;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 
 /**
  * A cell's collision geometry (COLLISION.md CL3a): a robot with primitives,
@@ -84,7 +85,7 @@ class CellCollisionTests {
   static function armOptions(name:String):RobotCollisionOptions {
     var options = new RobotCollisionOptions(name);
     options.tool = new Tool("probe", "probe", new Transform3(new Vec3(0.1, 0, 0), new Quat(0, 0, 0, 1)),
-      ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05), new Vec3(0.05, 0, 0)));
+      ToolGeometry.box(new Vec3(0.05, 0.05, 0.05), new Vec3(0.05, 0, 0)));
     options.toolFrame = "flange";
     return options;
   }

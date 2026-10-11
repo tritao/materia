@@ -236,11 +236,7 @@ typedef struct rk_simulation_robot_desc {
     uint32_t virtual_device_profile; /**< 1 full, 2 minimal; zero defaults to full. */
     /** Optional tool collision geoms, expressed in the flange link frame. */
     uint32_t tool_link_index;
-    uint32_t tool_piece_count;
-    uint32_t tool_piece_vertex_count[16];
-    double tool_piece_vertices[16 * 64 * 3];
     double tool_margin;
-    double tool_gap;
     /**
      * Optional primitive collision shapes. A link that has any collides
      * through them together with its hull or box above, if given, and its
@@ -286,6 +282,10 @@ typedef struct rk_simulation_robot_desc {
     /** Appended tail: link index pairs that never collide, used with RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES. */
     uint32_t link_exclude_count;
     uint32_t link_excludes[RK_MAX_LINK_EXCLUDES * 2];
+    /** General tool shapes, in flange coordinates; supersedes convex-only pieces. */
+    uint32_t tool_shape_count;
+    rk_simulation_link_shape tool_shapes[16];
+    double tool_shape_gap[16];
 } rk_simulation_robot_desc;
 
 /** Latest numeric device observation, independent of the authored sensor layout. */

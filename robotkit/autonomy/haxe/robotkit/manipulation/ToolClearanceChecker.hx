@@ -2,7 +2,7 @@ package robotkit.manipulation;
 
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
-import robotkit.tool.ToolCollisionShape;
+import robotkit.model.CollisionShape;
 
 private typedef ClearancePiece = {
   vertices:Array<Vec3>,
@@ -18,7 +18,7 @@ class ToolClearanceChecker {
   final obstacles:Array<ToolBoxObstacle>;
   final clearance:Float;
 
-  public function new(shape:ToolCollisionShape, obstacles:Array<ToolBoxObstacle>,
+  public function new(shape:Array<CollisionShape>, obstacles:Array<ToolBoxObstacle>,
       ?clearance:Float = 0.0, ?preparedShape:ToolClearanceShape) {
     if (shape == null || obstacles == null || !Math.isFinite(clearance) || clearance < 0)
       throw "Tool clearance requires a shape, obstacles, and non-negative clearance";
@@ -31,33 +31,25 @@ class ToolClearanceChecker {
       return;
     }
     var padding = 0.0;
-    switch (shape) {
-      case NoCollision:
-      case Box(half, centre):
-        if (half.x <= 0 || half.y <= 0 || half.z <= 0) throw "Tool box half-extents must be positive";
-        var c = centre == null ? Vec3.zero() : centre;
-        var vertices:Array<Vec3> = [];
-        for (x in [-1.0, 1.0]) for (y in [-1.0, 1.0]) for (z in [-1.0, 1.0])
-          vertices.push(c.add(new Vec3(x * half.x, y * half.y, z * half.z)));
-        pieces.push(prepare(vertices));
-      case Cylinder(radius, height):
-        if (radius <= 0 || height <= 0) throw "Tool cylinder dimensions must be positive";
-        // Enclosing box is conservative for this less common shape.
-        var vertices:Array<Vec3> = [];
-        for (x in [-1.0, 1.0]) for (y in [-1.0, 1.0]) for (z in [-1.0, 1.0])
-          vertices.push(new Vec3(x * radius, y * radius, z * height * 0.5));
-        pieces.push(prepare(vertices));
-      case Hulls(hulls, hullPadding):
-        if (!Math.isFinite(hullPadding) || hullPadding < 0) throw "Tool hull padding must be non-negative";
-        padding = hullPadding;
-        for (hull in hulls) {
-          if (hull == null || hull.length < 12 || hull.length % 3 != 0)
-            throw "Tool hull requires at least four vertices";
-          var vertices:Array<Vec3> = [];
-          for (i in 0...Std.int(hull.length / 3))
-            vertices.push(new Vec3(hull[3 * i], hull[3 * i + 1], hull[3 * i + 2]));
-          pieces.push(prepare(vertices));
-        }
+    for (collision in shape) {
+      var invalid = collision.validate(); if (invalid != null) throw invalid;
+      padding = Math.max(padding, collision.inflation);
+      var points:Array<Float> = switch collision.geometry {
+        case Convex(_): collision.convexVertices();
+        case _:
+          var bounds = collisionkit.CollisionBounds.of(collision.geometry, collisionkit.CollisionPose.identity());
+          var half = bounds.halfExtents;
+          var vertices:Array<Float> = [];
+          var p = collision.position, q = collision.rotation;
+          var pose = new Transform3(new Vec3(p[0],p[1],p[2]),new robotkit.spatial.Quat(q[0],q[1],q[2],q[3]));
+          for (x in [-1.0,1.0]) for (y in [-1.0,1.0]) for (z in [-1.0,1.0]) {
+            var v = pose.transformPoint(new Vec3(x*half.x,y*half.y,z*half.z));
+            vertices.push(v.x); vertices.push(v.y); vertices.push(v.z);
+          }
+          vertices;
+      };
+      pieces.push(prepare([for (i in 0...Std.int(points.length/3))
+        new Vec3(points[3*i],points[3*i+1],points[3*i+2])]));
     }
     this.clearance = clearance + padding;
   }

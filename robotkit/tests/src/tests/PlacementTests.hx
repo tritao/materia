@@ -15,7 +15,8 @@ import robotkit.manipulation.BaseObstacle;
 import robotkit.manipulation.ToolBoxObstacle;
 import robotkit.manipulation.ToolClearanceChecker;
 import robotkit.manipulation.ToolClearanceShape;
-import robotkit.tool.ToolCollisionShape;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 import processkit.path.ToolpathPoint;
 import processkit.path.Toolpath;
 import processkit.work.WorkSurface;
@@ -102,7 +103,7 @@ class PlacementTests {
   }
 
   static function testConvexToolClearancePreservesEmptyCorner():Void {
-    var shape = ToolCollisionShape.Hulls([
+    var shape = ToolGeometry.convex([
       boxVertices(new Vec3(0.0, 0.0, 0.5), new Vec3(0.05, 0.05, 0.5)),
       boxVertices(new Vec3(0.45, 0.0, 0.95), new Vec3(0.45, 0.05, 0.05))
     ], 0.0);
@@ -124,7 +125,7 @@ class PlacementTests {
     joint.limits.upper = 1.0;
     var flange = model.addFrame(new Frame("flange", moving));
     var manipulator = new Manipulator(model, base.id, flange.id);
-    var checker = new ToolClearanceChecker(ToolCollisionShape.Hulls([
+    var checker = new ToolClearanceChecker(ToolGeometry.convex([
       boxVertices(Vec3.zero(), new Vec3(0.05, 0.05, 0.05))], 0.0),
       [new ToolBoxObstacle(Transform3.identity(), new Vec3(0.1, 0.1, 0.1))]);
     check(checker.isClear(manipulator.forwardKinematics([-1.0])), "Motion starts clear");
@@ -147,7 +148,7 @@ class PlacementTests {
       new Point2(-0.1, 0.0), new Point2(0.1, 0.0),
       new Point2(0.1, 0.3), new Point2(-0.1, 0.3)
     ]));
-    var shape = ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05));
+    var shape = ToolGeometry.box(new Vec3(0.05, 0.05, 0.05));
     var obstacle = new ToolBoxObstacle(Transform3.identity(), new Vec3(10.0, 10.0, 10.0));
     var preparedBefore = ToolClearanceShape.preparationCount;
     var plan = WorkPatchPlanner.plan(small, scenario.map_T_surface, scenario.manipulator,
@@ -160,7 +161,7 @@ class PlacementTests {
 
   static function testFirstPointDoesNotCheckSeedApproach():Void {
     var manipulator = slidingManipulator();
-    var checker = new ToolClearanceChecker(ToolCollisionShape.Box(new Vec3(0.001, 0.001, 0.001)),
+    var checker = new ToolClearanceChecker(ToolGeometry.box(new Vec3(0.001, 0.001, 0.001)),
       [new ToolBoxObstacle(Transform3.identity(), new Vec3(0.01, 0.01, 0.01))]);
     var path = new Toolpath("base", [
       new ToolpathPoint(manipulator.tcpPose([0.1]), 0.05, true),
@@ -176,7 +177,7 @@ class PlacementTests {
 
   static function testFiveMillimetreObstacleBetweenPoints():Void {
     var manipulator = slidingManipulator();
-    var checker = new ToolClearanceChecker(ToolCollisionShape.Box(new Vec3(0.001, 0.001, 0.001)),
+    var checker = new ToolClearanceChecker(ToolGeometry.box(new Vec3(0.001, 0.001, 0.001)),
       [new ToolBoxObstacle(Transform3.identity(), new Vec3(0.0025, 0.0025, 0.0025))]);
     var path = new Toolpath("base", [
       new ToolpathPoint(manipulator.tcpPose([-0.01]), 0.05, true),

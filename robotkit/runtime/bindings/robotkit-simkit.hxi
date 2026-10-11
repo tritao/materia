@@ -543,7 +543,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
 	}
-	struct rk_simulation_robot_desc @layout(3850448, 8) {
+	struct rk_simulation_robot_desc @layout(3852800, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		flags: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -602,70 +602,72 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		 * Optional tool collision geoms, expressed in the flange link frame.
 		 */
 		tool_link_index: u32 @offset(1612956);
-		tool_piece_count: u32 @offset(1612960);
-		tool_piece_vertex_count: array<u32, 16> @offset(1612964);
-		tool_piece_vertices: array<f64, 3072> @offset(1613032);
-		tool_margin: f64 @offset(1637608);
-		tool_gap: f64 @offset(1637616);
+		tool_margin: f64 @offset(1612960);
 		/**
 		 * Optional primitive collision shapes. A link that has any collides
 		 * through them together with its hull or box above, if given, and its
 		 * tool pieces; otherwise the link keeps the legacy shape policy.
 		 */
-		link_shape_count: u32 @offset(1637624);
-		link_shapes: array<rk_simulation_link_shape, 768> @offset(1637632);
+		link_shape_count: u32 @offset(1612968);
+		link_shapes: array<rk_simulation_link_shape, 768> @offset(1612976);
 		/**
 		 * Optional explicit contacts between link shapes.
 		 */
-		contact_pair_count: u32 @offset(2927872);
-		contact_pairs: array<rk_simulation_contact_pair, 128> @offset(2927880);
+		contact_pair_count: u32 @offset(2903216);
+		contact_pairs: array<rk_simulation_contact_pair, 128> @offset(2903224);
 		/**
 		 * Optional convex hulls of links built from several rigid parts, one per
 		 * part. A link collides through a compound of its hull or box above, these
 		 * hulls, its primitives and its tool pieces.
 		 */
-		link_hull_count: u32 @offset(2935048);
-		link_hulls: array<rk_simulation_link_hull, 512> @offset(2935056);
+		link_hull_count: u32 @offset(2910392);
+		link_hulls: array<rk_simulation_link_hull, 512> @offset(2910400);
 		/**
 		 * Appended v28 tail: physical cylinders are simulation models, not runtime targets.
 		 */
-		pneumatic_drive_count: u32 @offset(3750160);
-		pneumatic_drives: array<rk_simulation_pneumatic_drive, 512> @offset(3750168);
+		pneumatic_drive_count: u32 @offset(3725504);
+		pneumatic_drives: array<rk_simulation_pneumatic_drive, 512> @offset(3725512);
 		/**
 		 * Appended v29 tail: spindle speed is a typed analog process drive.
 		 */
-		velocity_drive_count: u32 @offset(3774744);
-		velocity_drives: array<rk_simulation_velocity_drive, 512> @offset(3774752);
+		velocity_drive_count: u32 @offset(3750088);
+		velocity_drives: array<rk_simulation_velocity_drive, 512> @offset(3750096);
 		/**
 		 * Optional board-defined peripheral profile; zero disables it.
 		 */
-		virtual_peripheral_kind: u32 @offset(3795232);
-		virtual_peripheral_parameter_count: u32 @offset(3795236);
-		virtual_external_sensor_mask: u32 @offset(3795240);
-		virtual_peripheral_parameters: array<f64, 16> @offset(3795248);
+		virtual_peripheral_kind: u32 @offset(3770576);
+		virtual_peripheral_parameter_count: u32 @offset(3770580);
+		virtual_external_sensor_mask: u32 @offset(3770584);
+		virtual_peripheral_parameters: array<f64, 16> @offset(3770592);
 		/**
 		 * Optional physical virtual-device switch wiring and step thresholds.
 		 */
-		virtual_device_input_count: u32 @offset(3795376);
-		virtual_device_input_actuator: array<u8, 64> @offset(3795380);
-		virtual_device_input_active_high: array<u8, 64> @offset(3795444);
-		virtual_device_input_active_above: array<u8, 64> @offset(3795508);
-		virtual_device_input_threshold_steps: array<i64, 64> @offset(3795576);
-		virtual_device_input_switch_ids: array<u8, 4096> @offset(3796088);
+		virtual_device_input_count: u32 @offset(3770720);
+		virtual_device_input_actuator: array<u8, 64> @offset(3770724);
+		virtual_device_input_active_high: array<u8, 64> @offset(3770788);
+		virtual_device_input_active_above: array<u8, 64> @offset(3770852);
+		virtual_device_input_threshold_steps: array<i64, 64> @offset(3770920);
+		virtual_device_input_switch_ids: array<u8, 4096> @offset(3771432);
 		/**
 		 * Optional original shaft feedback mappings; count zero keeps legacy mappings.
 		 */
-		virtual_device_feedback_count: u32 @offset(3800184);
-		virtual_device_feedback_joint: array<u8, 64> @offset(3800188);
-		virtual_device_feedback_ratio: array<f64, 64> @offset(3800256);
-		virtual_device_feedback_offset: array<f64, 64> @offset(3800768);
-		brake_count: u32 @offset(3801280);
-		brakes: array<rk_simulation_brake, 512> @offset(3801288);
+		virtual_device_feedback_count: u32 @offset(3775528);
+		virtual_device_feedback_joint: array<u8, 64> @offset(3775532);
+		virtual_device_feedback_ratio: array<f64, 64> @offset(3775600);
+		virtual_device_feedback_offset: array<f64, 64> @offset(3776112);
+		brake_count: u32 @offset(3776624);
+		brakes: array<rk_simulation_brake, 512> @offset(3776632);
 		/**
 		 * Appended tail: link index pairs that never collide, used with RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES.
 		 */
-		link_exclude_count: u32 @offset(3817672);
-		link_excludes: array<u32, 8192> @offset(3817676);
+		link_exclude_count: u32 @offset(3793016);
+		link_excludes: array<u32, 8192> @offset(3793020);
+		/**
+		 * General tool shapes, in flange coordinates; supersedes convex-only pieces.
+		 */
+		tool_shape_count: u32 @offset(3825788);
+		tool_shapes: array<rk_simulation_link_shape, 16> @offset(3825792);
+		tool_shape_gap: array<f64, 16> @offset(3852672);
 	}
 	/**
 	 * World-frame twist of one body: metres per second and radians per second.

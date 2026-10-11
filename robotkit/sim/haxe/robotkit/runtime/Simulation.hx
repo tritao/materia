@@ -8,8 +8,7 @@ import nativekit.sim.SimSession;
 import robotkit.mobile.Pose2;
 import collisionkit.CollisionGeometry;
 import robotkit.model.CollisionShape.ShapeContact;
-import robotkit.tool.ToolCollisionShape;
-import robotkit.tool.ToolCollisionShapes;
+import robotkit.model.CollisionShape;
 import robotkit.spatial.Vec3;
 
 private typedef StepObserverEntry = {id:Int, observer:SimulationStepObserver};
@@ -87,7 +86,7 @@ class Simulation {
 
   /** Adds topology before the first start or step. */
   public function addRobot(blueprint:RobotRuntimeBlueprint, ?initialPose:Pose2,
-      ?virtualDevice:VirtualDeviceOptions, ?tool:ToolCollisionShape,
+      ?virtualDevice:VirtualDeviceOptions, ?tool:Array<CollisionShape>,
       ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float):RobotRuntime {
     return addRobotWithPose(blueprint, initialPose == null ? null :
       makePose([initialPose.x, initialPose.y, 0.0],
@@ -101,7 +100,7 @@ class Simulation {
   public function addRobotAtPose(blueprint:RobotRuntimeBlueprint, position:Array<Float>,
       rotation:Array<Float>, ?virtualDevice:VirtualDeviceOptions,
       ?linkCollisionBoxes:Array<Null<Array<Float>>>,
-      ?closures:Array<SimulationClosure>, ?tool:ToolCollisionShape,
+      ?closures:Array<SimulationClosure>, ?tool:Array<CollisionShape>,
       ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float,
       holdAtRest:Bool = false, ?linkExcludes:Array<Int>, ?restContactGroup:Int64):RobotRuntime {
     if (position == null || position.length != 3 || rotation == null || rotation.length != 4)
@@ -115,7 +114,7 @@ class Simulation {
       initialPose:Null<rk_simulation_pose>,
       ?virtualDevice:VirtualDeviceOptions,
       ?linkCollisionBoxes:Array<Null<Array<Float>>>,
-      ?closures:Array<SimulationClosure>, ?tool:ToolCollisionShape,
+      ?closures:Array<SimulationClosure>, ?tool:Array<CollisionShape>,
       ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float,
       holdAtRest:Bool = false, ?linkExcludes:Array<Int>, ?restContactGroup:Int64):RobotRuntime {
     ensureLive();
@@ -326,48 +325,80 @@ class Simulation {
         robotDesc.set_closures(index, native);
       }
     }
-    if (tool != null) {
-      var hulls:Array<Array<Float>> = switch tool {
-        case NoCollision: [];
-        case Hulls(pieces, _): pieces;
-        case Box(half, centre):
-          var c = centre == null ? Vec3.zero() : centre;
-          [[for (index in 0...8) for (axis in 0...3)
-            (axis == 0 ? c.x : axis == 1 ? c.y : c.z) +
-            ((index & (1 << axis)) == 0 ? -1 : 1) *
-            (axis == 0 ? half.x : axis == 1 ? half.y : half.z)]];
-        case Cylinder(_, _): throw "Simulation tool collision supports Hulls or Box";
+    function nativeShape(shape:CollisionShape, link:Int):rk_simulation_link_shape {
+      var invalid = shape.validate(); if (invalid != null) throw invalid;
+      var native = new rk_simulation_link_shape();
+      native.set_link(link);
+      var size:Array<Float> = switch shape.geometry {
+        case CollisionGeometry.Box(x, y, z):
+          native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_BOX);
+          [x, y, z];
+        case CollisionGeometry.Sphere(radius):
+          native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_SPHERE);
+          [radius];
+        case CollisionGeometry.Capsule(radius, half):
+          native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_CAPSULE);
+          [radius, half];
+        case CollisionGeometry.Cylinder(radius, half):
+          native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_CYLINDER);
+          [radius, half];
+        case Convex(points):
+          if (points.length < 12 || points.length > 192 || points.length % 3 != 0)
+            throw "Simulation convex shape needs 4..64 vertices";
+          native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_CONVEX);
+          native.set_vertex_count(Std.int(points.length/3));
+          for (i in 0...points.length) native.set_vertices(i, points[i]);
+          [];
+        case _: throw "Scene geometry is not accepted on a link";
       };
-      if (hulls.length > 0) {
-        ToolCollisionShapes.bounds(tool);
-        if (hulls.length > 16) throw "Simulation tool supports at most 16 convex pieces";
-        var link = toolLink == null ? blueprint.linkCount - 1 : toolLink;
-        if (link < 0 || link >= blueprint.linkCount)
-          throw "Simulation tool link is outside the robot";
-        var padding = switch tool { case Hulls(_, value): value; case _: 0.0; };
-        var margin = toolMargin == null ? 0.0 : toolMargin;
-        var gap = toolGap == null ? padding : toolGap;
-        if (!Math.isFinite(margin) || !Math.isFinite(gap) || margin < 0 || gap < 0)
-          throw "Simulation tool margin and gap are invalid";
-        if (robotDesc == null) {
-          robotDesc = new rk_simulation_robot_desc();
-          robotDesc.set_struct_size(rk_simulation_robot_desc.size());
-        }
-        robotDesc.set_tool_link_index(link);
-        robotDesc.set_tool_piece_count(hulls.length);
-        robotDesc.set_tool_margin(margin);
-        robotDesc.set_tool_gap(gap);
-        for (piece in 0...hulls.length) {
-          var vertices = hulls[piece];
-          if (vertices == null || vertices.length < 12 || vertices.length > 192 ||
-              vertices.length % 3 != 0)
-            throw "Simulation tool hull needs 4..64 vertices";
-          robotDesc.set_tool_piece_vertex_count(piece, Std.int(vertices.length / 3));
-          for (index in 0...vertices.length) {
-            if (!Math.isFinite(vertices[index])) throw "Simulation tool hull vertex is not finite";
-            robotDesc.set_tool_piece_vertices(piece * 64 * 3 + index, vertices[index]);
-          }
-        }
+      for (axis in 0...size.length) native.set_size(axis, size[axis]);
+      for (axis in 0...3) native.set_position(axis, shape.position[axis]);
+      for (axis in 0...4) native.set_rotation(axis, shape.rotation[axis]);
+      var surface = shape.surface;
+      if (surface != null) {
+        for (axis in 0...3) native.set_friction(axis, surface.friction[axis]);
+        native.set_friction_dimensions(surface.frictionDimensions);
+        native.set_contact_time_constant(surface.contactTimeConstant);
+        native.set_contact_damping_ratio(surface.contactDampingRatio);
+      }
+      native.set_contact_filter(switch shape.contact {
+        case Layers: 0;
+        case PairsOnly: 1;
+        case PairsAndEnvironment: 2;
+      });
+      return native;
+    }
+    if (tool != null && tool.length > 0) {
+      if (tool.length > 16) throw "Simulation tool supports at most 16 shapes";
+      var link = toolLink == null ? blueprint.linkCount - 1 : toolLink;
+      if (link < 0 || link >= blueprint.linkCount) throw "Simulation tool link is outside the robot";
+      var margin = toolMargin == null ? 0.0 : toolMargin;
+      if (!Math.isFinite(margin) || margin < 0) throw "Simulation tool margin is invalid";
+      if (robotDesc == null) {
+        robotDesc = new rk_simulation_robot_desc();
+        robotDesc.set_struct_size(rk_simulation_robot_desc.size());
+      }
+      robotDesc.set_tool_link_index(link);
+      robotDesc.set_tool_shape_count(tool.length);
+      robotDesc.set_tool_margin(margin);
+      for (index in 0...tool.length) {
+        var shape = tool[index];
+        if (shape == null) throw "Simulation tool shapes cannot contain null";
+        var invalid = shape.validate();
+        if (invalid != null) throw invalid;
+        // Preserve the existing tool box's convex contact representation.
+        var transported = switch shape.geometry {
+          case Box(x,y,z):
+            var points = [for (i in 0...8) for (a in 0...3)
+              ((i & (1 << a)) == 0 ? -1 : 1) * (a == 0 ? x : a == 1 ? y : z)];
+            var convex = new CollisionShape(Convex(points),shape.position,shape.rotation);
+            convex.surface = shape.surface; convex.contact = shape.contact; convex;
+          case _: shape;
+        };
+        var gap = toolGap == null ? shape.inflation : toolGap;
+        if (!Math.isFinite(gap) || gap < 0) throw "Simulation tool gap is invalid";
+        robotDesc.set_tool_shape_gap(index,gap);
+        robotDesc.set_tool_shapes(index,nativeShape(transported,link));
       }
     }
     var shapes = blueprint.linkCollisionShapes;
@@ -383,45 +414,7 @@ class Simulation {
         var source = shapes[index];
         var invalid = source.shape.validate();
         if (invalid != null) throw invalid;
-        var native = new rk_simulation_link_shape();
-        native.set_link(source.link);
-        var size:Array<Float> = switch source.shape.geometry {
-          case CollisionGeometry.Box(x, y, z):
-            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_BOX);
-            [x, y, z];
-          case CollisionGeometry.Sphere(radius):
-            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_SPHERE);
-            [radius];
-          case CollisionGeometry.Capsule(radius, half):
-            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_CAPSULE);
-            [radius, half];
-          case CollisionGeometry.Cylinder(radius, half):
-            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_CYLINDER);
-            [radius, half];
-          case Convex(points):
-            if (points.length < 12 || points.length > 192 || points.length % 3 != 0)
-              throw "Simulation convex shape needs 4..64 vertices";
-            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_CONVEX);
-            native.set_vertex_count(Std.int(points.length/3));
-            for (i in 0...points.length) native.set_vertices(i, points[i]);
-            [];
-          case _: throw "Scene geometry is not accepted on a link";
-        };
-        for (axis in 0...size.length) native.set_size(axis, size[axis]);
-        for (axis in 0...3) native.set_position(axis, source.shape.position[axis]);
-        for (axis in 0...4) native.set_rotation(axis, source.shape.rotation[axis]);
-        var surface = source.shape.surface;
-        if (surface != null) {
-          for (axis in 0...3) native.set_friction(axis, surface.friction[axis]);
-          native.set_friction_dimensions(surface.frictionDimensions);
-          native.set_contact_time_constant(surface.contactTimeConstant);
-          native.set_contact_damping_ratio(surface.contactDampingRatio);
-        }
-        native.set_contact_filter(switch source.shape.contact {
-          case Layers: 0;
-          case PairsOnly: 1;
-          case PairsAndEnvironment: 2;
-        });
+        var native = nativeShape(source.shape, source.link);
         robotDesc.set_link_shapes(index, native);
       }
       var pairs = blueprint.contactPairs;

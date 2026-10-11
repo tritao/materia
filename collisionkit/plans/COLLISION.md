@@ -890,6 +890,56 @@ Order: CL9a, CL9b, CL9c, CL9d, CL9e. Each step is one commit.
   entry needed the missing Start-page category to pass the app gate.
   Only robotkit-core → pure collisionkit was added; no fork or OCCT rebuild.
 
+### CL9b blocked: omitted tool-box centre assertion (2026-10-11)
+
+- CL9a is committed as `9e527c17e`; local main was fast-forwarded to it.
+- CL9b's tool array port is implemented but uncommitted. One existing
+  CadBridge assertion requires an omitted `ToolCollisionShape.Box` centre
+  to be `null` ("existing flange-centred Box construction remains valid",
+  originally `CadBridgeTests.hx:354`). A `CollisionShape` instead stores the
+  flange origin as its position `[0, 0, 0]`; its pose validation rejects
+  null positions. Preserving the null assertion and satisfying CL-D15 are
+  incompatible. The user's continuation resolved the schema-version blocker,
+  not this separate expected-value change.
+- During the port this assertion was changed to check the zero position.
+  That was an unauthorized expected-value change; its null expectation is
+  restored, and the unfinished step is not committed or marked green.
+  Resuming needs an explicit exception for this assertion, null → zero pose.
+- Before restoring that expectation: standalone C++ (3 + 16), native kit
+  (695), collisionkit (367), MotionKit (1,224,709), RobotKit (5,469),
+  processkit, CadBridge (178) and end-effector MuJoCo proximity/vacuum pass.
+  Pure kit has the documented DLS failure (-40.8 bytes). New tests cover
+  rotated bounds and posed tool shapes with link/tool contact identity.
+  The full app suite also completed successfully before the null expectation
+  was restored; no mission behaviour change was observed. The remaining
+  supplementary gate run was interrupted. These earlier results do not make
+  the restored null assertion green.
+- No new dependencies, forks, pushes or OCCT rebuilds. Main remains at
+  the completed CL9a commit. CL9c–CL9e have not started.
+
+### CL9b: tool shapes (2026-10-11)
+
+- Resumed under the user's "finish the plan, if you stop do best long term
+  clean approach" instruction. The omitted-centre assertion now checks the
+  canonical zero pose instead of null; this is the sole existing expected
+  representation change in CL9b. No geometric or physical values change.
+- Tools use flange-posed `Array<CollisionShape>`. `CollisionBounds.of` owns
+  geometry bounds; tool unions and editor radii use it. The old tool enum and
+  bounds class are gone. RobotCollision and end-effector bridges use the same
+  geometry, pose and inflation as links.
+- Native tool transport uses general shapes only; the superseded hull-only
+  fields are removed and C++ fixtures are ported without assertion changes.
+  Native creation is shared with links. Tool contact indices remain correct
+  alongside link geometry; padding stays a proximity gap, not physical inflation.
+- Fresh gates pass: standalone C++ (3 + 16, plus RobotKit MuJoCo), native kit
+  (695), collisionkit (367), MotionKit (1,224,709), RobotKit (5,469),
+  processkit and the full app suite. Pure kit retains the known -40.8-byte DLS
+  allocation failure. CAD cell, collision/MuJoCo, CadBridge, clearance-validation,
+  planner and end-effector proximity/vacuum checks also pass. Deleted names
+  are absent from code; the native ABI audit passes on all four platforms.
+- No new dependencies, forks, simulation mission behaviour changes, pushes
+  or OCCT rebuilds.
+
 ### Plan revision (2026-10-01, after CL1)
 
 A review of the plan against CL1 and the code around it changed:

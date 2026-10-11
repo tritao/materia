@@ -13,7 +13,8 @@ import processkit.work.Provenance;
 import processkit.work.SourceKind;
 import processkit.work.RasterToolpathGenerator;
 import processkit.path.Toolpath;
-import robotkit.tool.ToolCollisionShape;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 
 /**
  * Splits a `WorkSurface` into axis-aligned column patches (no wider than
@@ -32,7 +33,7 @@ class WorkPatchPlanner {
       standoffDistanceMin:Float, standoffDistanceMax:Float, seed:Array<Float>,
       ?standoffSteps:Int = 3, ?lateralSteps:Int = 5, ?clearance:Float = 0.4,
       ?obstacles:Array<BaseObstacle>, ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3,
-      ?toolCollision:ToolCollisionShape, ?toolObstacles:Array<ToolBoxObstacle>,
+      ?toolCollision:Array<CollisionShape>, ?toolObstacles:Array<ToolBoxObstacle>,
       ?toolClearance:Float = 0.0, ?toolJointStep:Null<Float>,
       ?maxToolStep:Float = 0.005, ?preparedToolShape:ToolClearanceShape,
       ?checkApproach:Bool = false):WorkPatchPlanResult {

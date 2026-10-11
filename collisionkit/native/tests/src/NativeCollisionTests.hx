@@ -37,6 +37,7 @@ class NativeCollisionTests {
   static var assertions = 0;
 
   public static function main():Void {
+    testGeometryBounds();
     testBodyPairsForCollision();
     testWorldFollowsTheSnapshot();
     testStatusesAndChanges();
@@ -49,6 +50,23 @@ class NativeCollisionTests {
     testRecoversFromInsideTheMargin();
     testRelaxesRowsThatCannotHold();
     Sys.println('CollisionKit native tests passed ($assertions assertions)');
+  }
+
+  static function testGeometryBounds():Void {
+    var q = Math.sqrt(0.5);
+    var pose = new CollisionPose(1, 2, 3, 0, 0, q, q);
+    var box = collisionkit.CollisionBounds.of(Box(2, 1, 0.5), pose, 0.1);
+    check(Math.abs(box.centre.x - 1) < 1e-12 && Math.abs(box.centre.y - 2) < 1e-12 &&
+      Math.abs(box.halfExtents.x - 1.1) < 1e-12 && Math.abs(box.halfExtents.y - 2.1) < 1e-12,
+      "box bounds apply rotation, translation and inflation");
+    var convex = collisionkit.CollisionBounds.of(Convex([0,0,0, 2,0,0, 0,1,0, 0,0,1]), pose, 0.1);
+    check(Math.abs(convex.centre.x - 0.5) < 1e-12 && Math.abs(convex.centre.y - 3) < 1e-12 &&
+      Math.abs(convex.halfExtents.x - 0.6) < 1e-12 && Math.abs(convex.halfExtents.y - 1.1) < 1e-12,
+      "convex bounds use posed vertices and inflation");
+    var cylinder = collisionkit.CollisionBounds.of(Cylinder(0.5, 2),
+      new CollisionPose(0,0,0, 0,q,0,q));
+    check(Math.abs(cylinder.halfExtents.x - 2) < 1e-12 && Math.abs(cylinder.halfExtents.z - 0.5) < 1e-12,
+      "axial primitive bounds rotate their axial and radial extents");
   }
 
   /** Rigid, adjacent and closure pairs, with their reasons, from the structure alone (COLLISION.md CL-D3). */

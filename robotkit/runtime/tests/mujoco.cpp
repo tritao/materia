@@ -201,11 +201,15 @@ static void tool_hulls_collide_only_on_their_pieces() {
     robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
     robot_desc.initial_pose.rotation[3] = 1.0;
     robot_desc.tool_link_index = 0;
-    robot_desc.tool_piece_count = 2;
-    robot_desc.tool_piece_vertex_count[0] = 8;
-    robot_desc.tool_piece_vertex_count[1] = 8;
+    robot_desc.tool_shape_count = 2;
+    robot_desc.tool_shapes[0].type = RK_LINK_SHAPE_CONVEX;
+    robot_desc.tool_shapes[0].rotation[3] = 1;
+    robot_desc.tool_shapes[0].vertex_count = 8;
+    robot_desc.tool_shapes[1].type = RK_LINK_SHAPE_CONVEX;
+    robot_desc.tool_shapes[1].rotation[3] = 1;
+    robot_desc.tool_shapes[1].vertex_count = 8;
     for (int piece = 0; piece < 2; ++piece) for (int vertex = 0; vertex < 8; ++vertex) {
-        auto *point = robot_desc.tool_piece_vertices + piece * 64 * 3 + vertex * 3;
+        auto *point = robot_desc.tool_shapes[piece].vertices + vertex * 3;
         point[0] = piece == 0 ? ((vertex & 1) ? 1.0 : 0.0) :
             ((vertex & 1) ? 1.0 : 0.9);
         point[1] = (vertex & 2) ? 0.05 : -0.05;
@@ -248,11 +252,13 @@ static void tool_piece_contact_is_reported(double obstacle_z, bool expected_acti
     robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
     robot_desc.initial_pose.rotation[3] = 1.0;
     robot_desc.tool_link_index = 0;
-    robot_desc.tool_piece_count = 1;
-    robot_desc.tool_gap = 0.03;
-    robot_desc.tool_piece_vertex_count[0] = 8;
+    robot_desc.tool_shape_count = 1;
+    robot_desc.tool_shape_gap[0] = 0.03;
+    robot_desc.tool_shapes[0].type = RK_LINK_SHAPE_CONVEX;
+    robot_desc.tool_shapes[0].rotation[3] = 1;
+    robot_desc.tool_shapes[0].vertex_count = 8;
     for (int vertex = 0; vertex < 8; ++vertex) {
-        auto *point = robot_desc.tool_piece_vertices + vertex * 3;
+        auto *point = robot_desc.tool_shapes[0].vertices + vertex * 3;
         point[0] = (vertex & 1) ? 0.05 : -0.05;
         point[1] = (vertex & 2) ? 0.05 : -0.05;
         point[2] = (vertex & 4) ? 1.0 : 0.0;
@@ -324,11 +330,13 @@ static void captured_contacts_survive_realtime_steps() {
     desc.collision_half_extents[0] = desc.collision_half_extents[1] =
         desc.collision_half_extents[2] = 0.1;
     desc.tool_link_index = 0;
-    desc.tool_piece_count = 1;
-    desc.tool_gap = 0.03;
-    desc.tool_piece_vertex_count[0] = 8;
+    desc.tool_shape_count = 1;
+    desc.tool_shape_gap[0] = 0.03;
+    desc.tool_shapes[0].type = RK_LINK_SHAPE_CONVEX;
+    desc.tool_shapes[0].rotation[3] = 1;
+    desc.tool_shapes[0].vertex_count = 8;
     for (int vertex = 0; vertex < 8; ++vertex) {
-        auto *point = desc.tool_piece_vertices + vertex * 3;
+        auto *point = desc.tool_shapes[0].vertices + vertex * 3;
         point[0] = (vertex & 1) ? 0.1 : -0.1;
         point[1] = (vertex & 2) ? 0.1 : -0.1;
         point[2] = (vertex & 4) ? 0.1 : -0.1;

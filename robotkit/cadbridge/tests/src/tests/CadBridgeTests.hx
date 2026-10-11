@@ -60,8 +60,8 @@ import machinekit.pneumatic.VacuumPressureSensor;
 import machinekit.pneumatic.VacuumControlValve;
 import machinekit.welding.WeldingInterfaces;
 import machinekit.welding.WeldingTorch;
-import robotkit.tool.ToolCollisionShape;
-import robotkit.tool.ToolCollisionShapes;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 import robotkit.tool.ToolRuntimeSelection;
 import robotkit.tool.SimulatedGripper;
 import robotkit.tool.SimulatedVacuum;
@@ -124,14 +124,14 @@ class CadBridgeTests {
     check(collision.pieces.length == 2 && collision.excluded.length == 0,
       "L-shaped effector keeps separate conservative pieces");
     var tool = EndEffectorBridge.toTool(effector, "tip");
-    var bounds = ToolCollisionShapes.bounds(tool.collision);
+    var bounds = ToolGeometry.bounds(tool.collision);
     var point = [0.05, -0.05, 0.005];
     var insideBox = Math.abs(point[0] - bounds.centre.x) < bounds.halfExtents.x &&
       Math.abs(point[1] - bounds.centre.y) < bounds.halfExtents.y &&
       Math.abs(point[2] - bounds.centre.z) < bounds.halfExtents.z;
     var insidePieceBounds = false;
     for (piece in collision.pieces) {
-      var pieceBounds = ToolCollisionShapes.bounds(ToolCollisionShape.Hulls([piece.vertices], 0));
+      var pieceBounds = ToolGeometry.bounds(ToolGeometry.convex([piece.vertices], 0));
       if (Math.abs(point[0] - pieceBounds.centre.x) < pieceBounds.halfExtents.x &&
         Math.abs(point[1] - pieceBounds.centre.y) < pieceBounds.halfExtents.y &&
         Math.abs(point[2] - pieceBounds.centre.z) < pieceBounds.halfExtents.z)
@@ -167,7 +167,7 @@ class CadBridgeTests {
     var gapPoint = new Vec3(0.2, 0, 0);
     var gapCovered = false;
     for (piece in separate.pieces) {
-      var box = ToolCollisionShapes.bounds(ToolCollisionShape.Hulls([piece.vertices], 0));
+      var box = ToolGeometry.bounds(ToolGeometry.convex([piece.vertices], 0));
       if (Math.abs(gapPoint.x - box.centre.x) <= box.halfExtents.x &&
           Math.abs(gapPoint.y - box.centre.y) <= box.halfExtents.y &&
           Math.abs(gapPoint.z - box.centre.z) <= box.halfExtents.z) gapCovered = true;
@@ -338,11 +338,13 @@ class CadBridgeTests {
     check(approx(tool.mass, 3, 1e-12), "attached tube contributes to RobotKit tool mass");
     check(tool.massProperties != null && approx(tool.massProperties.massKg, 3, 1e-12),
       "end effector bridge preserves complete tool mass properties");
-    check(switch tool.collision { case Hulls(pieces, _): pieces.length == 1; case _: false; },
+    check(tool.collision.length == 1 && switch tool.collision[0].geometry { case Convex(_): true; case _: false; },
       "end effector emits convex hull collision by default");
     var boxTool = EndEffectorBridge.toTool(endEffector, "contact", null, null, null, true);
-    var boxCorrect = switch boxTool.collision {
-      case Box(half, centre): centre != null &&
+    var boxCorrect = switch boxTool.collision[0].geometry {
+      case Box(x,y,z):
+        var half = new Vec3(x,y,z), centre = new Vec3(boxTool.collision[0].position[0],boxTool.collision[0].position[1],boxTool.collision[0].position[2]);
+        centre != null &&
         approx(centre.x, -0.01, 1e-6) && approx(centre.y, 0, 1e-6) &&
         approx(centre.z, 0.015, 1e-6) &&
         approx(half.x, 0.01, 1e-6) && approx(half.y, 0.005, 1e-6) &&
@@ -350,11 +352,8 @@ class CadBridgeTests {
       case _: false;
     };
     check(boxCorrect, "offset envelope box follows the actual body bounds");
-    var centredBox = ToolCollisionShape.Box(new Vec3(0.01, 0.02, 0.03));
-    check(switch centredBox {
-      case Box(_, centre): centre == null;
-      case _: false;
-    }, "existing flange-centred Box construction remains valid");
+    var centredBox = ToolGeometry.box(new Vec3(0.01, 0.02, 0.03));
+    check(centredBox[0].position[0] == 0 && centredBox[0].position[1] == 0 && centredBox[0].position[2] == 0, "existing flange-centred Box construction remains valid");
     var inspection = EndEffectorBridge.toTool(endEffector, "inspection");
     check(inspection.id == "inspection" &&
       inspection.flangeTTcp.translation.norm() < 1e-12,
@@ -387,8 +386,8 @@ class CadBridgeTests {
         approx(original.flangeTTcp.translation.z, restored.flangeTTcp.translation.z, 1e-12) &&
         approx(original.mass, restored.mass, 1e-12),
         "saved EOAT configuration changes RobotKit TCP or mass");
-      var originalBounds = ToolCollisionShapes.bounds(original.collision);
-      var restoredBounds = ToolCollisionShapes.bounds(restored.collision);
+      var originalBounds = ToolGeometry.bounds(original.collision);
+      var restoredBounds = ToolGeometry.bounds(restored.collision);
       check(approx(originalBounds.centre.x, restoredBounds.centre.x, 1e-12) &&
         approx(originalBounds.centre.y, restoredBounds.centre.y, 1e-12) &&
         approx(originalBounds.centre.z, restoredBounds.centre.z, 1e-12) &&
@@ -401,7 +400,7 @@ class CadBridgeTests {
     var longTool = EndEffectorBridge.toTool(set.configuration("long"), "contact", null, "long/contact");
     check(shortTool.id == "short/contact" && longTool.id == "long/contact" &&
       shortTool.id != longTool.id, "configuration-qualified RobotKit tool IDs are distinct");
-    var hullBounds = ToolCollisionShapes.bounds(shortTool.collision);
+    var hullBounds = ToolGeometry.bounds(shortTool.collision);
     check(hullBounds.centre.z - hullBounds.halfExtents.z >= -0.001 &&
       hullBounds.centre.z + hullBounds.halfExtents.z <=
         shortTool.flangeTTcp.translation.z + 0.001,
@@ -411,8 +410,10 @@ class CadBridgeTests {
       approx(tcpX.z, 0, 1e-9), "cup TCP X retains the flange locating-pin direction");
     var shortBox = EndEffectorBridge.toTool(set.configuration("short"), "contact", null,
       "short/contact-box", null, true);
-    var forwardBox = switch shortBox.collision {
-      case Box(half, centre): centre != null &&
+    var forwardBox = switch shortBox.collision[0].geometry {
+      case Box(x,y,z):
+        var half = new Vec3(x,y,z), centre = new Vec3(shortBox.collision[0].position[0],shortBox.collision[0].position[1],shortBox.collision[0].position[2]);
+        centre != null &&
         approx(centre.z - half.z, 0, 1e-6) &&
         approx(centre.z + half.z, shortTool.flangeTTcp.translation.z, 1e-6);
       case _: false;

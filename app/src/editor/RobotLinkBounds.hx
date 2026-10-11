@@ -19,16 +19,7 @@ class RobotLinkBounds {
   }
 
   public static function radius(shape:CollisionShape):Float
-    return switch shape.geometry {
-      case Sphere(value): value + shape.inflation;
-      case Capsule(value, half), Cylinder(value, half): value + half + shape.inflation;
-      case Box(x, y, z): Math.sqrt(x * x + y * y + z * z) + shape.inflation;
-      case Convex(points):
-        var radius = 0.0;
-        for (i in 0...Std.int(points.length/3)) radius = Math.max(radius, Math.sqrt(points[3*i]*points[3*i]+points[3*i+1]*points[3*i+1]+points[3*i+2]*points[3*i+2]));
-        radius + shape.inflation;
-      case _: throw "Scene geometry is not accepted on a link";
-    };
+    return collisionkit.CollisionBounds.of(shape.geometry, collisionkit.CollisionPose.identity(), shape.inflation).radius;
 
   /** Applies a link's world rotation to a link-local collision centre. */
   public static function worldCenter(position:Array<Float>, rotation:Array<Float>, offset:Array<Float>):SimPose {

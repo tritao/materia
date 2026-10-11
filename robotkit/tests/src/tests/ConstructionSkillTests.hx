@@ -47,7 +47,8 @@ import processkit.skill.Sand;
 import robotkit.tool.SimulatedSprayer;
 import robotkit.tool.SimulatedSander;
 import robotkit.tool.Tool;
-import robotkit.tool.ToolCollisionShape;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 import processkit.work.WorkSurface;
 import processkit.work.Polygon2;
 import processkit.work.Point2;
@@ -201,7 +202,7 @@ class ConstructionSkillTests {
     // A skill must pass its mounted tool and cell obstacles to the planner,
     // then stop before navigation or process output when the tool is blocked.
     var mounted = new Tool("paint-head", "paint head", Transform3.identity(),
-      ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05)));
+      ToolGeometry.box(new Vec3(0.05, 0.05, 0.05)));
     var cell = new ToolPlanningContext(mounted, [new ToolBoxObstacle(
       Transform3.identity(), new Vec3(10.0, 10.0, 10.0))]);
     var preparedBeforeSkill = ToolClearanceShape.preparationCount;
@@ -218,7 +219,7 @@ class ConstructionSkillTests {
 
     var wrongTcp = new Tool("wrong-tcp", "wrong TCP",
       new Transform3(new Vec3(0.01, 0.0, 0.0), Quat.identity()),
-      ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05)));
+      ToolGeometry.box(new Vec3(0.05, 0.05, 0.05)));
     var rejected = false;
     try {
       new Paint(navigator, manipulator, robot, registered.frame_T_surface, registered,
