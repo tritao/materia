@@ -1490,4 +1490,4 @@ controller profile checkpoint, not completed SD8 acceptance.
 | SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
 | SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
 | SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71`, `7038a4fee` |
-| SD8 | in progress — controller profiles and loopback TCP pass; checkpoint quick gate passed; RKD6 and unchanged CAD mission proof pending | controller profiles (this commit) |
+| SD8 | in progress — controller profiles and loopback TCP pass; checkpoint quick gate passed; RKD6 and unchanged CAD mission proof pending | `f19115ae0` |
