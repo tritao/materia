@@ -59,7 +59,8 @@ class PrinterAxes {
     var axes = [for (id in ["x", "y", "z"]) {
       var joint = planning.joints[[for (j in planning.joints) j.id].indexOf(id)];
       if (joint.type != JointType.Prismatic) throw 'printer joint $id is not an axis';
-      var limits = planning.coupledLimits(id, new SteadyLoads());
+      // The motors' full rate: the pulleys' columns of the plan bound a move by both motors' rows (AM5b item 7).
+      var limits = planning.coupledLimits(id, new SteadyLoads(), true);
       speed.push(limits.requireVelocity());
       acceleration.push(limits.requireAcceleration());
       new MotionAxisBlueprint(id, [id], joint.limits.lower, joint.limits.upper, limits.requireVelocity(), limits.requireAcceleration(),

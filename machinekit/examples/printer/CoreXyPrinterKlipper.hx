@@ -21,8 +21,13 @@ class CoreXyPrinterKlipper {
 	static inline var HOMING_FRACTION:Float = 0.2;
 	static inline var HOMING_CAP:Float = 50.0;
 
+	/**
+	 * `x` and `y` are the axes' limits at the motors' full rate, so a pure x or y move can be faster than a diagonal;
+	 * Klipper has one `max_velocity` for every direction, which is `cartesianSpeed`, the speed the motors give on the
+	 * worst direction (`MotorSpaceConstraints.inscribedSpeed`), at most the axes' own.
+	 */
 	public static function printer(source:CoreXyPrinter, job:SceneArtifactPrinting, x:PrinterAxisLimit, y:PrinterAxisLimit,
-			z:PrinterAxisLimit):KlipperPrinter {
+			z:PrinterAxisLimit, cartesianSpeed:Float):KlipperPrinter {
 		function homing(limit:PrinterAxisLimit):Float return Math.min(HOMING_CAP, HOMING_FRACTION * limit.speed * 1000.0);
 		var belt = 2.0 * Math.PI * source.pulleyRadius;
 		var screw = CoreXyPrinter.zThread().lead;
@@ -44,7 +49,7 @@ class CoreXyPrinterKlipper {
 		// One screw to each corner of the bed's carrier: three motors that turn together, the first with the switch.
 		for (name in ["z", "z1", "z2"]) steppers.push(stepper(name, screw, z, travel[2], true, name == "z"));
 		var hotend = source.hotend.spec;
-		return {name: "CoreXY printer", maxVelocity: Math.min(x.speed, y.speed) * 1000.0,
+		return {name: "CoreXY printer", maxVelocity: Math.min(Math.min(x.speed, y.speed), cartesianSpeed) * 1000.0,
 			maxAccel: Math.min(x.acceleration, y.acceleration) * 1000.0, maxZVelocity: z.speed * 1000.0,
 			maxZAccel: z.acceleration * 1000.0, steppers: steppers,
 			extruder: {rotationDistance: Math.PI * source.extruder.spec.hobDiameter,
@@ -60,6 +65,6 @@ class CoreXyPrinterKlipper {
 
 	/** The config as text. */
 	public static function config(source:CoreXyPrinter, job:SceneArtifactPrinting, x:PrinterAxisLimit, y:PrinterAxisLimit,
-			z:PrinterAxisLimit):String
-		return KlipperConfig.render(printer(source, job, x, y, z));
+			z:PrinterAxisLimit, cartesianSpeed:Float):String
+		return KlipperConfig.render(printer(source, job, x, y, z, cartesianSpeed));
 }

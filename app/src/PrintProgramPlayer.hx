@@ -143,8 +143,9 @@ class PrintProgramPlayer extends ToolpathPlayer {
 			if (lower == null || upper == null) throw 'Print axis "$id" needs travel limits';
 			var initial = placement.joint(id) * metresPerUnit;
 			start.push(initial);
-			// The axis is as fast as the joints turning with it and their motors allow: belts, screws and the motors.
-			var coupled = machineModel.coupledLimits(id, steady);
+			// The axis is as fast as the joints turning with it and their motors allow: belts, screws and the motors at their full rate.
+			// What both motors of a CoreXY ask together is bounded by their rows in the plan (the pulleys' columns), not by a share here.
+			var coupled = machineModel.coupledLimits(id, steady, true);
 			if (coupled.velocity == null || coupled.maxAcceleration == null || !(coupled.velocity > 0) || !(coupled.maxAcceleration > 0))
 				throw 'Print axis "$id" needs velocity and acceleration limits, its own or its motors\'';
 			rapid = Math.max(rapid, coupled.velocity);

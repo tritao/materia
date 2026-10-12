@@ -2,6 +2,7 @@ import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.AssemblySimulationBridge;
 import haxe.io.Bytes;
 import machinekit.printing.KlipperConfig;
+import motionkit.robot.MotorSpaceConstraints;
 import materia.project.SceneArtifact;
 import robotkit.device.DeviceBinding;
 import robotkit.model.SteadyLoads;
@@ -34,10 +35,14 @@ class PrinterKlipperTests {
 			scene.assemblyState).model;
 		var planning = DeviceBinding.planningModel(model, CoreXyPrinter.STEP_TICK_HZ);
 		var limits = [for (id in ["x", "y", "z"]) {
-			var found = planning.coupledLimits(id, new SteadyLoads());
+			// The motors' full rate (the plan bounds a move by both motors' rows, `MotorSpaceConstraints`).
+			var found = planning.coupledLimits(id, new SteadyLoads(), true);
 			{speed: found.requireVelocity(), acceleration: found.requireAcceleration()};
 		}];
-		var klipper = CoreXyPrinterKlipper.printer(printer, job, limits[0], limits[1], limits[2]);
+		// Klipper has one speed for every direction: the motors' rows give it, at the 45 degree move that turns one motor flat out.
+		var rows = MotorSpaceConstraints.of(planning, ["x", "y"]);
+		var cartesian = rows.inscribedSpeed();
+		var klipper = CoreXyPrinterKlipper.printer(printer, job, limits[0], limits[1], limits[2], cartesian);
 		var text = KlipperConfig.render(klipper);
 		var config = KlipperConfig.parse(text);
 
@@ -74,8 +79,10 @@ class PrinterKlipperTests {
 		check(config.exists("tmc2209 stepper_x") && config.exists("tmc2209 extruder") && config.exists("heater_fan hotend_fan"), "drivers and fans");
 
 		// The limits are the drives'.
-		var speed = Math.min(limits[0].speed, limits[1].speed) * 1000.0, accel = Math.min(limits[0].acceleration, limits[1].acceleration) * 1000.0;
-		near(value("printer", "max_velocity"), speed, "max_velocity is the slower axis's", 1e-5);
+		check(rows.rows.length >= 2 && cartesian < limits[0].speed, "two motors bound x and y together, below an axis's own speed");
+		near(cartesian, limits[0].speed / Math.sqrt(2.0), "a diagonal turns one motor at the rate both axes' sum asks: the axes' speed over the square root of two", 1e-9);
+		var speed = Math.min(Math.min(limits[0].speed, limits[1].speed), cartesian) * 1000.0, accel = Math.min(limits[0].acceleration, limits[1].acceleration) * 1000.0;
+		near(value("printer", "max_velocity"), speed, "max_velocity is the motors' on the worst direction", 1e-5);
 		near(value("printer", "max_accel"), accel, "max_accel is the weaker axis's", 1e-5);
 		near(value("printer", "max_z_velocity"), limits[2].speed * 1000.0, "max_z_velocity is the bed's", 1e-5);
 		near(value("printer", "max_z_accel"), limits[2].acceleration * 1000.0, "max_z_accel is the bed's", 1e-5);
@@ -119,7 +126,7 @@ class PrinterKlipperTests {
 
 		// The export directory: the config, the pins and the bracket as Klipper G-code.
 		var directory = "build/export";
-		var written = CoreXyPrinterExport.write(directory, printer, job, limits[0], limits[1], limits[2]);
+		var written = CoreXyPrinterExport.write(directory, printer, job, limits[0], limits[1], limits[2], cartesian);
 		check(written.length == 3, "the export writes three files");
 		for (path in written) check(FileSystem.exists(path) && File.getContent(path).length > 100, 'the export wrote $path');
 		var gcode = File.getContent(directory + "/" + CoreXyPrinterExport.BRACKET);

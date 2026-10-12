@@ -700,7 +700,8 @@ Done. What was built and decided:
   motors' full rate (`coupledLimits(..., motorSpaceVelocity = true)` with `MotorSpaceConstraints` rows, as the
   plotter's machine program does) would make pure axis moves up to twice as fast. The printer plans derived joints as
   columns of the timed path, which carry the motor rows already, so the rows would be duplicates; whether to take the
-  speed is a decision for the cube's print time (AM5b).
+  speed is a decision for the cube's print time (AM5b). **Taken in AM5b item 7:** the axes now run at the motors' full
+  rate (500 mm/s), the prints are unchanged.
 - Tests: `ToolpathMotionTests.printerLowering` (rounding across speeds, the arc's speed, stops by reason),
   `PlannerTests.testLongPathQueries` (grid distance against a scan, bisection at boundaries, sections of a long
   path), `CoreXyTests.testDerivedPulleysFollowBothAxes` (pulleys are the sums of their terms along a plan).
@@ -1237,7 +1238,28 @@ left in the motion path.
    binding now quantises its steps per unit once (`StepTicks.wire`) and plans, deploys and checks with that value, so
    `deployed` and the compiler's `static_cast<float>` are gone; the binding tests assert the held value is the wire's.
 7. Decide whether the printer's axes take the motors' full rate with motor-space rows (see the AM5 notes on CoreXY motor
-   limits), against the cube's print time.
+   limits), against the cube's print time. **Done: the axes take the motors' full rate (the user's decision, the mechanically
+   correct model).** `coupledLimits(id, steady, true)` is the axis's limit at the motors' rate (a motor's rate over the
+   ratio of the pulley to the axis, not over the sum of the pulley's couplings), and the print player, the printing gate
+   (`PrinterAxes`) and the Klipper test take it. The motor-space rows are not a second place to bound a move: the plan
+   already times a derived joint (a CoreXY pulley) as a column with its own drive's rate (`ToolpathMotionBinding`: the
+   `min` of the sum of its terms and `coupledLimits(pulley, null, true)`), and those columns are `MotorSpaceConstraints`'
+   rows for the printer, so a pure x or y move is bounded by both motors (`|vx + vy|` and `|vx - vy|`, each at most
+   a motor's rate times the pulley radius) and a 45 degree move by one motor at its full rate. **Numbers, before to
+   after** (the gate's `motorChecks`, a 100 mm move sampled every millisecond, plan check on): the axes' speed 250 to
+   500 mm/s (acceleration unchanged, 24.09 m/s2 x and 12.56 y); x move 411 to 221 ms, y move 421 to 240 ms, with the
+   motors at 39 rad/s each (half of 79, the cost of a share) before and 78 and 78 of 79 after; the 45 and 135 degree
+   moves 303 ms before and after, one motor at 78 of 79 (the other still); the worst torque 29 % on x and y and
+   40 % on the diagonals before and after, and the plan check finds nothing. **The prints do not change:** the cube
+   870.1 s, the 8 mm gear 2358.7 s, SmallTab 48.13 s plain (48.48 shaped), the gate's gear 1047.6 s, all to the
+   decimal, since a print move runs at the slicer's feed (rapids run at the feed, `setRapidsAtFeed`) and no feed asks for
+   more than the old 250 mm/s on an axis. Nothing is lost and a faster profile now has room. **Klipper:**
+   `max_velocity` is one speed for every direction, so it is the speed the motors give on the worst direction,
+   `MotorSpaceConstraints.inscribedSpeed()` (the radius of the largest ball in the rows' bounds, here the axes' speed
+   over the square root of two): **250 mm/s to 353.6 mm/s** (`max_accel` 12,563 mm/s2 and the z limits unchanged;
+   the Klipper test asserts the new value against the model). There are no golden values to update: the test derives
+   every limit from the model. The planner-side limit of the axes is the larger value (500 mm/s) because the plan
+   bounds the diagonal through the pulleys' columns.
 8. The corner arcs still lower to tens of thousands of sub-millisecond segments (`SmallTab`: 18,900 of 25,580 under
    1 ms after merging): an adaptive TOPP-RA grid by span length and curvature (the fixed 32 per span is calibrated with
    the 0.8 margin; see the RobotKit Paint path that failed when it was coarsened), or arcs that are not made smaller
@@ -1418,7 +1440,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
-| AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10, 3 and 9 and belt damping done; item 7 left to the user | item 6 c6d2df30a, 52eaa27db; item 1 7f392fd39; item 5 71b2c6c5a; item 4 1859d5f56; item 8 3891585f4; item 11 b7320e39f; item 10 43de352f0; item 3 b5a86c01d; item 9 970440ac8; belt damping 54326ccc7 |
+| AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10, 3, 9 and 7 and belt damping done | item 6 c6d2df30a, 52eaa27db; item 1 7f392fd39; item 5 71b2c6c5a; item 4 1859d5f56; item 8 3891585f4; item 11 b7320e39f; item 10 43de352f0; item 3 b5a86c01d; item 9 970440ac8; belt damping 54326ccc7; item 7 (axes at the motors' rate) see the commits below |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 

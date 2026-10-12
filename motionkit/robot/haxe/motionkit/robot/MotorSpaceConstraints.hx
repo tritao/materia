@@ -63,6 +63,20 @@ class MotorSpaceConstraints {
     return new MotorSpaceConstraints(rows, rates);
   }
 
+  /**
+   * The speed the planned joints can move at in every direction at once: the radius of the largest ball inside the rows'
+   * bounds, `min(rate / |row|)`. On a CoreXY that is the 45 degree move that turns one motor at its full rate; a firmware
+   * that has one speed for all directions (Klipper's `max_velocity`) can promise no more. `infinity` when no row binds.
+   */
+  public function inscribedSpeed():Float {
+    var speed = Math.POSITIVE_INFINITY;
+    for (i in 0...rows.length) {
+      var norm = Math.sqrt(dot(rows[i], rows[i]));
+      if (norm > 1e-12) speed = Math.min(speed, rates[i] / norm);
+    }
+    return speed;
+  }
+
   function dot(row:Array<Float>, values:Array<Float>):Float {
     if (row.length != values.length) throw "Motor constraints and planned joint counts differ";
     var value = 0.0;
