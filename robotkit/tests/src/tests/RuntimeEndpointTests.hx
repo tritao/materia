@@ -27,6 +27,9 @@ class RuntimeEndpointTests {
       throw "RobotRuntime did not use its supplied endpoint for start, submit, observe and stop";
     if (endpoint.sequence != 7 || runtime.contacts().length != 0)
       throw "Endpoint changed command identity or fabricated contacts";
+    // stop joins the owner thread. Its final publication can be newer than
+    // the snapshot taken while running; compare subsequent reads to that image.
+    var stoppedObservation = runtime.snapshot();
     var sensorPolls = 0;
     runtime.installSensorPoller(function(_) sensorPolls++);
     if (runtime.status() != robotkit.core.RobotStatus.Ready || sensorPolls != 0)
@@ -42,14 +45,14 @@ class RuntimeEndpointTests {
     if (runtime.status() != robotkit.core.RobotStatus.Ready)
       throw "Status retained a stale fault";
     var physical = runtime.physicalPositions();
-    if (physical.length != observation.q.length || physical[0] != observation.q.get(0))
+    if (physical.length != stoppedObservation.q.length || physical[0] != stoppedObservation.q.get(0))
       throw "Physical position read changed endpoint coordinates";
     physical[0] = 12345.0;
     if (runtime.physicalPositions()[0] == 12345.0 || sensorPolls != 0)
       throw "Physical position reads must own their arrays and avoid device sensor polling";
     var joints = runtime.jointObservation();
-    if (joints.positions.length != observation.q.length || joints.positions[0] != observation.q.get(0) ||
-        joints.sourceTimestampNs != observation.sourceTimestampNs || sensorPolls != 0)
+    if (joints.positions.length != stoppedObservation.q.length || joints.positions[0] != stoppedObservation.q.get(0) ||
+        joints.sourceTimestampNs != stoppedObservation.sourceTimestampNs || sensorPolls != 0)
       throw "Joint observations must preserve counter coordinates and source time without polling sensors";
     joints.positions[0] = 12345.0;
     if (runtime.jointObservation().positions[0] == 12345.0)
