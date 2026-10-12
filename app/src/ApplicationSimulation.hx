@@ -732,6 +732,11 @@ class ApplicationSimulation {
       virtualDevicePrepared = simulation.virtualDeviceReady(tools.welders[0].robotIndex);
     for (member in members) {
       if (virtualWelder && !virtualDevicePrepared && member == mission) continue;
+      // The editor's realtime run plans a program's first plan beside the simulation; a deterministic step waits for it.
+      if (Std.isOfType(member, ToolpathPlayer)) {
+        var toolpath:ToolpathPlayer = cast member;
+        toolpath.planAhead = running;
+      }
       member.feed();
     }
   }

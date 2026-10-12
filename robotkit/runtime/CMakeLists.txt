@@ -4,9 +4,11 @@ file(GLOB_RECURSE RK_DEVICE_RUST_SOURCES CONFIGURE_DEPENDS
 
 if(RK_BUILD_VIRTUAL_DEVICE)
     find_program(RK_VIRTUAL_CARGO_EXECUTABLE cargo REQUIRED)
-    set(RK_VIRTUAL_LIB ${CMAKE_CURRENT_BINARY_DIR}/cargo-virtual/debug/librobotkit_device_virtual.a)
+    set(RK_VIRTUAL_LIB ${CMAKE_CURRENT_BINARY_DIR}/cargo-virtual/release/librobotkit_device_virtual.a)
     add_custom_command(OUTPUT ${RK_VIRTUAL_LIB}
-        COMMAND ${RK_VIRTUAL_CARGO_EXECUTABLE} build
+        # Optimised: the simulated device steps every actuator at the step tick, which is most of what a print costs in
+        # the editor, and unoptimised Rust with debug assertions made it ten times slower.
+        COMMAND ${RK_VIRTUAL_CARGO_EXECUTABLE} build --release
             --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/Cargo.toml
             --target-dir ${CMAKE_CURRENT_BINARY_DIR}/cargo-virtual
         DEPENDS

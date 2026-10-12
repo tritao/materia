@@ -85,7 +85,9 @@ class ManipulatorMotion {
     executor = new PlanExecutor(robot, this.jointIndices, session, completionPositionTolerance);
   }
 
-  function get_running():Bool return session.isActive();
+  /** A program started with `run(program, false)` whose first plan is still being made. */
+  var starting:Bool = false;
+  function get_running():Bool return starting || session.isActive();
   function get_completed():Bool return programCompleted;
   public function sessionState():SessionState return session.state;
 
@@ -104,7 +106,14 @@ class ManipulatorMotion {
     return nextPlanId;
   }
 
-  public function run(program:MotionProgram):Void {
+  /**
+    Starts `program`. By default it waits for the first plan, so a program that cannot start fails here (`failure`)
+    before the session begins. With `waitForFirstPlan` false it returns at once and the first plan is made on the
+    planner thread while the caller keeps its frame: `running` is true meanwhile, and `update` begins the program (or
+    fails it) when that plan is ready. A deterministic stepper, whose results must not depend on how long planning
+    takes, waits; an interactive one does not.
+  **/
+  public function run(program:MotionProgram, ?waitForFirstPlan:Bool = true):Void {
     session.requireReady();
     if (program == null) throw "Manipulator program is required";
     if (session.isStopping()) {
@@ -121,6 +130,7 @@ class ManipulatorMotion {
         ? [for (index in jointIndices) positions.get(index)]
         : lastCommandedQ.copy(), nextPlanId, 0, speedOverride, LOOKAHEAD_SECONDS);
       planner = started;
+      if (!waitForFirstPlan) { starting = true; return; }
       // Wait for the first motion or barrier, so a program that cannot start
       // fails here, before the session begins.
       while (!started.blocks.hasWork()) waitForPlans(started);
@@ -154,6 +164,7 @@ class ManipulatorMotion {
     if (!running) return;
     if (!Math.isFinite(dtSeconds) || dtSeconds <= 0.0)
       throw "Manipulator update duration must be finite and positive";
+    if (starting && !startWhenPlanned()) return;
     try {
       collectEvents();
       if (session.isFaulted()) return;
@@ -200,11 +211,42 @@ class ManipulatorMotion {
     speedOverride = scale;
   }
 
-  public function hold():Void if (running) executor.hold();
-  public function resume():Void if (running) executor.resume();
+  /** Begins a program started without waiting once its first plan is there; false while it is not, or if it failed. */
+  function startWhenPlanned():Bool {
+    var planning = planner;
+    try {
+      if (planning == null) throw "The program's planning was released before it started";
+      planning.poll();
+      var problem = planning.failure;
+      if (problem != null) throw problem;
+      if (!planning.blocks.hasWork()) {
+        if (planning.isStopped() && !planning.poll())
+          throw "Program planning stopped before the program was planned";
+        return false;
+      }
+      nextPlanId = planning.nextPlanId;
+      starting = false;
+      session.begin();
+      advance(0.0);
+      return true;
+    } catch (error:Dynamic) {
+      starting = false;
+      fail(Std.string(error), false);
+      return false;
+    }
+  }
+
+  public function hold():Void if (running && !starting) executor.hold();
+  public function resume():Void if (running && !starting) executor.resume();
   public function abort():Void {
     if (!running) return;
     pendingProgram = null;
+    if (starting) {
+      starting = false;
+      release();
+      fail("Program aborted", false);
+      return;
+    }
     fail("Program aborted", true);
   }
   public function reset():Void {
@@ -362,6 +404,7 @@ class ManipulatorMotion {
     }
   }
   function release():Void {
+    starting = false;
     var planning = planner;
     if (planning != null) {
       nextPlanId = planning.nextPlanId;

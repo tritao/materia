@@ -113,7 +113,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
     pub fn committed_until(&self) -> u64 { self.committed_until }
     /// End of the last segment held: the boundaries received so far, or 0 when none is held.
     pub fn received_until(&self) -> u64 {
-        if self.len == 0 { 0 } else { self.segments[self.len - 1].unwrap().end_ticks() }
+        if self.len == 0 { 0 } else { self.segments[self.len - 1].as_ref().unwrap().end_ticks() }
     }
     pub fn path_clock(&self) -> u64 { self.path_clock }
     pub fn rate(&self) -> f32 { self.rate }
@@ -149,8 +149,9 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         0
     }
     fn committed_len(&self) -> usize {
+        // By reference: a segment is a kilobyte, and this runs several times a tick over the whole queue.
         self.segments[..self.len].iter().take_while(|s|
-            s.unwrap().end_ticks() <= self.committed_until).count()
+            s.as_ref().unwrap().end_ticks() <= self.committed_until).count()
     }
     pub fn note_host_frame(&mut self, now_ticks: u64) { self.last_frame_tick = now_ticks; }
     pub fn initialize_clock(&mut self, now_ticks: u64) {
@@ -253,7 +254,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
     }
     pub fn commit(&mut self, through_ticks: u64) -> Result<(), QueueError> {
         if through_ticks < self.committed_until || self.len == 0 ||
-           through_ticks > self.segments[self.len - 1].unwrap().end_ticks() ||
+           through_ticks > self.segments[self.len - 1].as_ref().unwrap().end_ticks() ||
            !self.segments[..self.len].iter().any(|s| s.unwrap().end_ticks() == through_ticks) {
             return Err(QueueError::InvalidCommit);
         }
@@ -265,7 +266,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
     pub fn abort(&mut self) {
         let committed_len = self.committed_len();
         if committed_len != 0 {
-            let final_segment = self.segments[committed_len - 1].unwrap();
+            let final_segment = self.segments[committed_len - 1].as_ref().unwrap();
             let remaining = final_segment.end_ticks().saturating_sub(self.path_clock) as f32 /
                 self.tick_hz as f32;
             let braking = self.velocity.iter().enumerate().fold(0.0f32, |t, (a, v)|
@@ -305,7 +306,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         let dt = dt_ticks as f32 / self.tick_hz as f32;
         let committed_len = self.committed_len();
         let active_motion = committed_len > 0 && {
-            let last = self.segments[committed_len - 1].unwrap();
+            let last = self.segments[committed_len - 1].as_ref().unwrap();
             self.path_clock < last.end_ticks() || !last.ends_at_rest
         };
         if self.stopping.is_none() && (active_motion || process_requires_link) &&
@@ -365,8 +366,8 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         // Retire completed committed segments so a small device queue can stream
         // plans longer than its physical capacity. Keep the final segment until
         // its at-rest or underflow decision has been made below.
-        while self.committed_len() > 1 && self.segments[0].unwrap().end_ticks() < self.path_clock &&
-            self.segments[0].unwrap().end_ticks() <= self.committed_until {
+        while self.committed_len() > 1 && self.segments[0].as_ref().unwrap().end_ticks() < self.path_clock &&
+            self.segments[0].as_ref().unwrap().end_ticks() <= self.committed_until {
             self.segments.copy_within(1..self.len, 0);
             self.len -= 1;
             self.segments[self.len] = None;
@@ -395,13 +396,13 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
                 self.velocity.fill(0.0);
                 for a in 0..A { board.velocity_target(a, 0.0); }
             }
-            if self.abort_at_end && self.path_clock >= self.segments[committed_len - 1].unwrap().end_ticks() {
+            if self.abort_at_end && self.path_clock >= self.segments[committed_len - 1].as_ref().unwrap().end_ticks() {
                 self.stop(StopReason::Abort);
                 board.stop_all();
                 self.stopped = true;
             }
         } else if committed_len != 0 {
-            let final_segment = self.segments[committed_len - 1].unwrap();
+            let final_segment = self.segments[committed_len - 1].as_ref().unwrap();
             if final_segment.ends_at_rest {
                 let (position, _) = final_segment.evaluate(final_segment.end_ticks(), self.tick_hz);
                 self.position = position;

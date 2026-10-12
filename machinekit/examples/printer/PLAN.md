@@ -961,6 +961,28 @@ the virtual device's stepping, planning, deposition into the dexel stock, the st
 costs. Done when the full cube simulates at least at real time on this machine with the same results (hole, volume, bounding box, SmallTab numbers
 unchanged).
 
+**Done (AM5b item 9's session, 2026-10-12).** The profile (`perf` over the 4 mm cube, the same per-tick work as the full one; the cube runs on the
+deterministic backend, not MuJoCo, and with the preview off) put **91 % of the time in the virtual device's Rust**
+(`ScheduledCore::tick`, `ScheduledSegment::evaluate`, and 31 % in `memmove`), planning, the stock and the Haxe side
+together under 9 %. The device library was built with `cargo build`, the debug profile: no optimisation and
+debug assertions (the symbols show `core::iter::range::spec_next_back` and `unchecked_sub::precondition_check` not inlined), a
+segment of the queue is a kilobyte (40 actuators of six coefficients) and `committed_len()` copied each one (`Option<ScheduledSegment>`
+is `Copy`) to read its end, several times a tick over a queue of up to 80. Fixed: the library is built `--release`
+(`robotkit/runtime/CMakeLists.txt`), and the queue is read by reference. Result, on this machine: the full cube **1031.1 s of
+print in 62.7 s of wall time (16x real time; it was 1040.6 s in 996 s, 1.04x)**, the short cube 530.5 s in 30.4 s (it was 559 s),
+SmallTab 163.2 s in 7.5 s (it was 59 s wall for the print, 102 s in the last full suite), peak memory 2.2 GB. Results: volume 2788.2 mm^3 in the
+cube of 2809.3 laid for 2810 fed, the same to the digit; planned/printed time 1040.6 s -> 1031.1 s (the planner's work of
+items 3 to 11, not this), the short cube 529.7 -> 530.5 s; the bounding box and the hole print one decimal differently
+(box 99.9..120 where it printed 100..120, hole 5.9 x 6 where 6 x 6, 87,811 beads where 88,415): the stock is measured by rays
+0.05 mm apart, and a plan that is a few micrometres different (different stages, different merges within a tenth of a
+step) puts an edge across a ray; every check passes with its margin, and SmallTab's volume, spans and counts are as before
+(5,676 beads for 5,679). SmallTab's worst belt deviation went 232 -> 273 um (y): the coarser grid of item 8 lets the lowered
+plan reach 0.9 of the acceleration limit between TOPP-RA's grid points where it reached 0.82, and the belt's stretch goes with the
+acceleration (273 / 232 = 1.18 against 0.9 / 0.82 = 1.10 and the plans' other changes); it is a recorded finding, 17 of 26 plans flagged as
+before, none a stall. Not done: the allocation census (the collector is 4 % of the cube's time now), the stock preview (off in the
+test; AM9 measured it) and MuJoCo (SmallTab's check is on it, not the cube's). What is left per tick (`perf`): the device's
+tick 9 %, the segment's evaluation 9 % (40 actuators where eight are used: a clear next step), `memmove` 7 %, marking 4 %.
+
 **AM10. Klipper config and G-code (AM-D9).**
 - `PrinterKlipperConfig.generate(assembly, controller)` produces `printer.cfg` text.
 - Tests:
@@ -1239,7 +1261,17 @@ left in the motion path.
    machine's arcs half a radian apart (the capability of item 5) did not reduce them and cost 0.02 s of planned time
    (a full radian 1.2 %), so it was not kept.
 9. The first plan of a print compiles synchronously inside a tick (13.8 s for `SmallTab` in the app): plan it on the
-   planner thread, as a mission's programs are, and start the print when the first plan is ready.
+   planner thread, as a mission's programs are, and start the print when the first plan is ready. **Done; the cost it was
+   written for is gone, and the start is asynchronous anyway.** `ManipulatorMotion.run(program, waitForFirstPlan)`: with
+   `false` it returns at once (`running` is true) and `update` begins the program when the planner thread has its first
+   plan or barrier, or fails it (`ProgramTests`: a program started this way completes; an impossible one fails once
+   planned, not at the call). `ToolpathPlayer.planAhead` selects it; `ApplicationSimulation` sets it while the realtime
+   simulation runs (`start`/`pump`), and a deterministic `step` waits as before, so a test's results do not depend on how
+   long planning takes. What the 13.8 s was: the first tick after the start, which waited for the plans the planner had
+   not yet made because planning was 3 to 5 times dearer then (items 8, 10 and 11); the planner plans a second ahead of
+   the plans started, and the print's first block is its heater barrier, which it sits at for 100 s while the next
+   plans are made. Measured in the app now (`PROJECT_SOURCE_ONLY=printer`, which prints it): the program starts in 1 ms and
+   the slowest simulated tick of the print is 26 ms (at 150 s, where the first layer's plans arrive), against 13.8 s.
 10. A fast path for machines whose kinematics are exact and affine (the capability of item 5: Cartesian, CoreXY,
    routers, gantries). TOPP-RA costs a grid of 32 stages per span and a small LP per stage; Klipper and Marlin plan the
    same machines with constant-cost trapezoids and a look-ahead pass, and the benchmark's Marlin-style reference is
@@ -1373,11 +1405,11 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM7 | done | see the commit below |
 | AM8 | done | see the commits below |
 | AM9 | done | see the commit below |
-| AM9b | planned | |
+| AM9b | done (AM5b item 9's session) | see the commits below |
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
-| AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10 and 3 done | see the commits below |
+| AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10, 3 and 9 done | see the commits below |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 

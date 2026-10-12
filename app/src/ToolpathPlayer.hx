@@ -67,6 +67,12 @@ class ToolpathPlayer implements SessionMember {
 	public var homingSeconds(default, null):Float = 0.0;
 	/** Wall-clock seconds spent running the machine, for profiling. */
 	public var motionSeconds(default, null):Float = 0.0;
+	/**
+	 * Whether the program's first plan is made on the planner thread while the simulation goes on, as it is in the
+	 * editor, rather than waited for, as a deterministic stepper (a test) does so that its results do not depend on how
+	 * long planning takes. Set by whoever drives the simulation.
+	 */
+	public var planAhead:Bool = false;
 	public var runSeconds(default, null):Float = 0.0;
 	public var slowestUpdate(default, null):Float = 0.0;
 	/** The G-code line the machine is executing; 0 between lines. */
@@ -198,7 +204,7 @@ class ToolpathPlayer implements SessionMember {
 			// A program runs from wherever the machine is: the position the planner last
 			// commanded, or where the robot stands when there is none.
 			if (started) compileFrom(machinePositionAtMotionEnd());
-			motion.run(program);
+			motion.run(program, !planAhead);
 			started = true;
 			passCounted = false;
 			runSeconds += Sys.time() - clock;

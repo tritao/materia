@@ -810,8 +810,12 @@ class ProjectSourceTests {
     var ratios = {slow: new Array<Float>(), fast: new Array<Float>()};
     var last = first, lastE = e0, slowed = false, restored = false, detail = "";
     var wall = Sys.time();
+    var slowestStep = 0.0, slowestAt = 0.0;
     while (player.passes == 0 && player.failure == null && ticks++ < limit) {
+      var stepBegan = Sys.time();
       simulation.step();
+      var stepTook = Sys.time() - stepBegan;
+      if (stepTook > slowestStep) { slowestStep = stepTook; slowestAt = ticks * dt; }
       if (ticks % every != 0) continue;
       var seen = robot();
       var now = ticks * dt;
@@ -881,7 +885,8 @@ class ProjectSourceTests {
       'filament per metre of path ${Math.round(fast * 1e5) / 100} mm at full speed and ${Math.round(slow * 1e5) / 100} mm at half; ' +
       'plan checks: ${checks.plans} plans, ${checks.flagged} flagged, worst torque ${Math.round(checks.worstTorqueRatio * 100)} % (${checks.worstMotor}), ' +
       'worst deviation ${Math.round(checks.worstDeviation * 1e6)} um (${checks.worstAxis}); ' +
-      'motion cost ${Math.round(player.motionSeconds * 10) / 10} s of ${Math.round(wallSeconds * 10) / 10} s wall, slowest tick ${Math.round(player.slowestUpdate * 1000)} ms');
+      'motion cost ${Math.round(player.motionSeconds * 10) / 10} s of ${Math.round(wallSeconds * 10) / 10} s wall, slowest tick ${Math.round(player.slowestUpdate * 1000)} ms, ' +
+      'the program started in ${Math.round(player.runSeconds * 1000)} ms; the slowest simulated tick took ${Math.round(slowestStep * 1000)} ms, at ${Math.round(slowestAt * 10) / 10} s');
     Sys.println('printer: the print laid ${Math.round(laid.deposited * 1e10) / 10} mm^3 in ${laid.beads} beads for ${Math.round(asked * 2.405 * 10) / 10} mm^3 of filament; the tab holds ' +
       '${Math.round(tab.volume * 1e10) / 10} mm^3 of its CAD ${Math.round(cad * 1e10) / 10} (${Math.round((tab.volume / cad - 1.0) * 1000) / 10} %), spans ' +
       '${Math.round(tab.low[0] * 1e4) / 10}..${Math.round(tab.high[0] * 1e4) / 10} x ${Math.round(tab.low[1] * 1e4) / 10}..${Math.round(tab.high[1] * 1e4) / 10} x ' +

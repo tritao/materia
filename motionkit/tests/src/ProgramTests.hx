@@ -848,6 +848,16 @@ class ProgramTests extends MotionKitTestSupport {
     motion.run(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal),new MotionOptions(),Blend.ExactStop)]));
     for(_ in 0...300){motion.update(0.01);harness.step(Int64.ofInt(++tick));if(motion.completed || motion.failure!=null)break;}
     check(motion.completed && motion.failure==null,"normal worker planning continues with unused ids after compiled execution");
+    // A program started without waiting returns at once, runs while its first plan is made, and then goes like any other.
+    motion.run(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(origin),new MotionOptions(),Blend.ExactStop)]),false);
+    check(motion.running && !motion.completed && motion.failure==null,"a program started without waiting is running at once");
+    for(_ in 0...600){motion.update(0.01);harness.step(Int64.ofInt(++tick));if(motion.completed || motion.failure!=null)break;}
+    check(motion.completed && motion.failure==null,'a program started without waiting completes: ${motion.failure}');
+    // One that cannot be planned fails when its plan is not made, not at the call, and leaves the motion idle.
+    motion.run(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget([for(_ in origin)1.0e6]),new MotionOptions(),Blend.ExactStop)]),false);
+    check(motion.running && motion.failure==null,"an impossible program started without waiting does not fail at the call");
+    for(_ in 0...600){motion.update(0.01);harness.step(Int64.ofInt(++tick));if(!motion.running)break;}
+    check(!motion.running && motion.failure!=null,"an impossible program started without waiting fails once planned");
     harness.dispose();
   }
 
