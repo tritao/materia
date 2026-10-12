@@ -26,6 +26,8 @@ def main():
         shutil.copyfile(fixture / 'CameraCompatibilityTests.hx', temporary / 'CameraCompatibilityTests.hx')
         manifest['package']['name'] = 'scenekit-gizmo-camera-compat'
         manifest['entry'] = 'CameraCompatibilityTests'
+        # Test this checkout's core even after the consumer adopts a prepared package.
+        manifest['dependencies'].pop('scenekit-gizmo', None)
         manifest['sourceRoots'] = [str((base / root).resolve()) for root in manifest['sourceRoots'] if root != 'src'] + [str(package), str(temporary)]
         manifest['outputDir'] = 'build'
         for dependency in manifest['dependencies'].values():
