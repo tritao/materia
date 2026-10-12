@@ -1235,6 +1235,39 @@ left in the motion path.
    fast path is tested against. Done when, on the printing gate, the planned time is within 0.5 % of TOPP-RA's (or
    shorter), no joint or motor limit is exceeded, the plan checks find nothing new, and planning is at least 10x faster
    than with TOPP-RA (the worst 10 s window included), aiming at real time on a Raspberry Pi class CPU.
+   **Done as a grid, not a second solver; 4.6x to 7.3x faster than the TOPP-RA path (the 10x aim is not met).** The profile of
+   item 11 changed the question: TOPP-RA's solve is under 4 % of planning, the costs grow with the number of stages (every
+   stage is lowered, validated and a candidate of the merge), and on a line the number of stages came from the sampling,
+   not from anything the profile needs. So the fast path is the closed form TOPP-RA is given the grid for, with TOPP-RA
+   kept as the one solver and every plan check unchanged:
+   1. **One sample per straight primitive on an exact affine machine** (the capability of item 5: `PoseSampling.pieces(...,
+      exactAffine)`; the joint-jump check, which guards against a branch of an inverse flipping, is skipped there, as an exact
+      affine map has none). A 100 mm line is one span, not fifty.
+   2. **A straight span's stages follow where its speed changes** (`nodes_for_span`): its limits are constant, so the
+      profile bends only in the stretch `Z = v^2 / 2a` next to each end (v the fastest it can go, a the path acceleration
+      the joints give, both with the margins); ten stages cover each stretch (1.5 Z, so the profile cannot start bending
+      before the grid does) and one stage the cruise between, whatever the length. A line costs about 31 stages.
+   3. The Haxe side of a sample (22 % of the gate's processor time): `AxisKinematics.completeDerived` repeated its passes
+      (the derived joints are held in dependency order, one pass), `solvePose` looked its couplings up by name in a map
+      (index tables), `checkJointPosition` called the validator for every joint of every sample (only for a position
+      outside its bounds, where the start-at-limit rule matters), and `GeometricPath.distanceTo` kept a list of primitives
+      seen and searched it linearly (quadratic around a gear's teeth; a primitive measured twice costs nothing).
+   Numbers (processor seconds of planning, the TOPP-RA path with the old 32 stages a span first, then after item 8, item 11
+   and this): gate gear 78.8 -> 60.2 -> 28.7 -> **13.3 s (5.9x; 79x real time; the worst 10 s window 4.2x -> 12.1x)**; 8 mm gear
+   276.0 -> 209.8 -> 100.0 -> **60.0 s (4.6x)**; cube 59.5 -> 39.5 -> 18.1 -> **8.2 s (7.3x; 107x real time, the worst window
+   64x)**; tower 49.9 -> 28.3 -> 13.4 -> **7.5 s (6.7x)**. Segments after merging (plain / shaped): tab 6,938 / 8,657 -> 2,575 /
+   4,442 (those under 1 ms 1,165 / 2,299 -> 1,087 / 1,540: the long lines are single segments now, so the arcs' short ones
+   are most of what is left), cube 115,385 / 132,620 -> 47,059 / 71,191 (those under 1 ms 13,371 / 24,605 -> 11,392 / 20,072). **Planned times**: gate 1047.2 -> 1047.6 s (+0.04 %), 8 mm gear
+   2356.9 -> 2358.6 s (+0.07 %), cube 870.3 -> 870.1 s, tower 471.5 s, tab 48.13 / 48.48 s: within the 0.5 % of the aim, and
+   the few millisecond a plan loses are not the zone resolution (20 stages a zone gives the same) but where a long line's
+   cruise stage meets TOPP-RA's checks (a law at its acceleration limit fails the lowered check by a few millionths and is
+   slowed by 0.2 % of its whole section, whether it is one span or fifty). Not reached: 10x. What is left of the gate's
+   13.3 s, by `perf` and the Haxe sampler: the native time law (TOPP-RA, lowering, validation: 19 %), the merge of
+   arcs (14 %), the task-space check (7 %), `mk_shape_trajectory` and `mk_project_couplings` (9 %); on this machine's P cores
+   that is 79x to 107x real time, 12x to 64x in the worst window, which is real time with room on a Raspberry Pi class CPU
+   (5 to 10x slower per core), the aim behind the 10x. Tests: `PlannerTests`, the native path test (a 100 mm line as
+   one span or fifty: both a trapezoid's time to 0.4 %, the single span with a tenth of the stages).
+
 11. The general path (TOPP-RA) after item 2: every machine that is not affine keeps it (arms, the welder, the tending
    cell, non-planar printing). AM5's profile predates AM8's segment merging, the rebase and the WIP planner changes, and
    the gate's peak memory has grown to 11.4 GB, so profile again first (`perf` and the allocation census, the printing
@@ -1327,7 +1360,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
-| AM5b | in progress: items 6, 1, 5, 4 and 8 done | see the commits below |
+| AM5b | in progress: items 6, 1, 5, 4, 8, 11 and 10 done | see the commits below |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 

@@ -1057,6 +1057,7 @@ class ProgramCompiler {
       ?preplannedCurve:JointPathSamples, eventOffset:Float=0.0, eventLast:Bool=true):PendingMotion {
     if (path.length() <= 0.0) throw 'Motion program op $index has zero path length';
     var samples = pathSamples(path);
+    var exactMap = solver.affineMap();
     var count = samples.length - 1;
     if (count > 10000) throw 'Motion program op $index exceeds Cartesian sample budget';
     var distances = [for (sample in samples) sample.distance];
@@ -1095,7 +1096,8 @@ class ProgramCompiler {
         throw 'Motion program op $index unreachable pose at path distance $distance${solverFailure()}';
       checkJointPosition(solved, index, distance, startQ);
       if (sample > 0) {
-        for (joint in 0...startQ.length)
+        // An exact affine map has one solution per pose: no branch to flip, and a long piece is one span.
+        if (exactMap == null) for (joint in 0...startQ.length)
           if (Math.abs(solved[joint] - previous[joint]) > perJointMaxJump[joint])
             throw 'Motion program op $index IK discontinuity at path distance $distance';
         caps.push(speedScale * Math.min(feed, primitiveSpeedAt(path,
@@ -1303,10 +1305,13 @@ class ProgramCompiler {
     var nativeLimits = limits.nativeValue();
     for (joint in 0...q.length)
       if (nativeLimits.get_position_claimed(joint) != 0) {
-        var bounds = start == null
-          ? {lower: nativeLimits.get_position_lower(joint), upper: nativeLimits.get_position_upper(joint)}
-          : limits.admittedBounds(joint, start[joint], startTolerances.position[joint]);
-        if (q[joint] < bounds.lower - 1e-9 || q[joint] > bounds.upper + 1e-9) {
+        var lower = nativeLimits.get_position_lower(joint), upper = nativeLimits.get_position_upper(joint);
+        // Only a position outside the claimed bounds can need the start-at-limit rule (a call into the validator).
+        if (start != null && (q[joint] < lower - 1e-9 || q[joint] > upper + 1e-9)) {
+          var bounds = limits.admittedBounds(joint, start[joint], startTolerances.position[joint]);
+          lower = bounds.lower; upper = bounds.upper;
+        }
+        if (q[joint] < lower - 1e-9 || q[joint] > upper + 1e-9) {
           var location = distance == null ? "" : ' at path distance $distance';
           throw 'Motion program op $index joint limit $joint$location';
         }
@@ -1359,6 +1364,8 @@ class ProgramCompiler {
   **/
   function pathSamples(path:PosePath):Array<PathSample> {
     var first = path.primitives[0];
+    // On a machine whose joints are an exact affine map of the pose a straight piece needs no samples inside it.
+    var exact = solver.affineMap() != null;
     var samples:Array<PathSample> = [{distance: 0.0, primitive: first, local: 0.0, arriving: null}];
     var start = 0.0;
     // A distance-driven joint changes its rate's slope at its stations: they are sampled too.
@@ -1366,7 +1373,7 @@ class ProgramCompiler {
     var stationAt = 0;
     for (k in 0...path.primitives.length) {
       var primitive = path.primitives[k], length = primitive.length();
-      var pieces = motionkit.path.PoseSampling.pieces(primitive,cartesianResolution,angularResolution);
+      var pieces = motionkit.path.PoseSampling.pieces(primitive,cartesianResolution,angularResolution,exact);
       var locals = [for (piece in 1...pieces) length * piece / pieces];
       while (stationAt < stations.length && stations[stationAt] <= start + 1e-12) stationAt++;
       var extra = stationAt;

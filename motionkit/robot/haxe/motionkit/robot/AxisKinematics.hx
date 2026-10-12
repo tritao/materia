@@ -23,6 +23,11 @@ class AxisKinematics implements KinematicsSolver {
   **/
   final derived:Array<Int> = [];
   final terms:Array<Array<{leader:Int, ratio:Float, offset:Float}>> = [];
+  /** Every coupling between joints of the model, by index, for `solvePose`'s check that followers keep their ratio. */
+  final couplingLeaders:Array<Int> = [];
+  final couplingFollowers:Array<Int> = [];
+  final couplingRatios:Array<Float> = [];
+  final couplingOffsets:Array<Float> = [];
 
   public function new(blueprint:MotionSystemBlueprint,
       ?xAxisId:String = "x", ?yAxisId:String = "y", ?zAxisId:String = "z") {
@@ -48,6 +53,27 @@ class AxisKinematics implements KinematicsSolver {
       if (leader >= 0 && follower >= 0) terms[follower].push({leader: leader, ratio: coupling.ratio, offset: coupling.offset});
     }
     for (index in 0...ids.length) if (terms[index].length > 0 && !used.exists(index)) derived.push(index);
+    // Each derived joint after the derived joints it follows, so one pass completes them all.
+    var placed:Array<Int> = [];
+    while (placed.length < derived.length) {
+      var before = placed.length;
+      for (index in derived) {
+        if (placed.indexOf(index) >= 0) continue;
+        var ready = true;
+        for (term in terms[index]) if (derived.indexOf(term.leader) >= 0 && placed.indexOf(term.leader) < 0) ready = false;
+        if (ready) placed.push(index);
+      }
+      if (placed.length == before) { for (index in derived) if (placed.indexOf(index) < 0) placed.push(index); break; }
+    }
+    derived.splice(0, derived.length);
+    for (index in placed) derived.push(index);
+    for (coupling in blueprint.model.couplings) {
+      var leader = ids.indexOf(coupling.leader), follower = ids.indexOf(coupling.follower);
+      if (leader >= 0 && follower >= 0) {
+        couplingLeaders.push(leader); couplingFollowers.push(follower);
+        couplingRatios.push(coupling.ratio); couplingOffsets.push(coupling.offset);
+      }
+    }
     home = [for (_ in names) 0.0];
     x.writeLogicalPosition(home, x.homePosition);
     y.writeLogicalPosition(home, y.homePosition);
@@ -110,21 +136,15 @@ class AxisKinematics implements KinematicsSolver {
     }
     completeDerived(result, true);
     // A follower is the sum of its couplings' terms.
-    var sums = new Map<String, Float>();
-    for (coupling in blueprint.model.couplings) {
-      var leader = -1, follower = -1;
-      for (index in 0...blueprint.model.joints.length) {
-        if (blueprint.model.joints[index].id == coupling.leader) leader = index;
-        if (blueprint.model.joints[index].id == coupling.follower) follower = index;
-      }
-      if (leader < 0 || follower < 0) continue;
-      var sum = sums.get(coupling.follower);
-      sums.set(coupling.follower, (sum == null ? 0.0 : sum) + coupling.ratio * result[leader] + coupling.offset);
+    var sums = [for (_ in 0...result.length) 0.0];
+    var summed = [for (_ in 0...result.length) false];
+    for (coupling in 0...couplingLeaders.length) {
+      var follower = couplingFollowers[coupling];
+      sums[follower] += couplingRatios[coupling] * result[couplingLeaders[coupling]] + couplingOffsets[coupling];
+      summed[follower] = true;
     }
-    for (index in 0...blueprint.model.joints.length) {
-      var sum = sums.get(blueprint.model.joints[index].id);
-      if (sum != null && Math.abs(result[index] - sum) > tolerance.position) return null;
-    }
+    for (index in 0...result.length)
+      if (summed[index] && Math.abs(result[index] - sums[index]) > tolerance.position) return null;
     return result;
   }
 
@@ -165,11 +185,11 @@ class AxisKinematics implements KinematicsSolver {
 
   /**
     Sets every joint no axis owns that follows others to the sum of its terms: positions with the terms' offsets, rates
-    (`positions` false) without. Repeated passes put each after what it follows. A driven joint (an extruder) is set
+    (`positions` false) without. They are held in dependency order, so one pass puts each after what it follows. A driven joint (an extruder) is set
     first, and its followers (the motor behind its gears) come out here.
   **/
   public function completeDerived(q:Array<Float>, positions:Bool):Void {
-    for (_ in derived) for (index in derived) {
+    for (index in derived) {
       var sum = 0.0;
       for (term in terms[index]) sum += term.ratio * q[term.leader] + (positions ? term.offset : 0.0);
       q[index] = sum;

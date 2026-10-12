@@ -65,18 +65,15 @@ class GeometricPath implements MotionPath {
     var fx = point.x / CELL - ix, fy = point.y / CELL - iy, fz = point.z / CELL - iz;
     var inner = Math.min(Math.min(Math.min(fx, 1.0 - fx), Math.min(fy, 1.0 - fy)), Math.min(fz, 1.0 - fz)) * CELL;
     var best = Math.POSITIVE_INFINITY;
-    // Primitives already measured by this query (one reaching several cells is measured once); the path itself
-    // stays unchanged by a query, so threads may share it.
-    var seen:Array<Int> = [];
+    // A primitive reaching several cells is measured in each: the nearest distance is unchanged by it, and keeping a
+    // list of the primitives measured made a query quadratic in the primitives around the point (a gear's teeth).
+    // The path itself stays unchanged by a query, so threads may share it.
     for (ring in 0...9) {
       for (dx in -ring...(ring + 1)) for (dy in -ring...(ring + 1)) for (dz in -ring...(ring + 1)) {
         if (Math.max(Math.abs(dx), Math.max(Math.abs(dy), Math.abs(dz))) != ring) continue;
         var found = cells.get(cellKey(ix + dx, iy + dy, iz + dz));
         if (found == null) continue;
-        for (index in found) if (seen.indexOf(index) < 0) {
-          seen.push(index);
-          best = Math.min(best, distanceToPrimitive(primitives[index], point));
-        }
+        for (index in found) best = Math.min(best, distanceToPrimitive(primitives[index], point));
       }
       // Everything the visited block reaches has been seen; nothing unvisited is nearer than that.
       if (best <= ring * CELL + inner) return best;

@@ -62,8 +62,7 @@ class AxisJointPathPlanner implements JointPathPlanner {
         if (Math.abs(q[joint]-exact[joint])/Math.abs(axis.jointScale(slot)) > request.tolerance.position)
           throw 'Axis path start violates joint mapping at sample $i';
       }
-      for (joint in 0...q.length) if (Math.abs(q[joint] - previous[joint]) > request.maxJump[joint])
-        throw 'Axis path exceeds joint $joint jump at sample $i, distance ${request.distances[i]}';
+      // The map is exact and affine: one solution per pose, nothing to jump between, however far the samples are.
       function map(values:Array<Float>, rate:Float):Array<Float> {
         var mapped = solver.solveDifferential(q, new Twist6(values[0], values[1], values[2],
           values[3], values[4], values[5]), null, task.freedom);

@@ -326,6 +326,47 @@ int main() {
         mk_path_destroy(path);
     }
 
+    // A straight move of a Cartesian machine, a hundred millimetres at a 60 mm/s feed and 12.5 m/s^2 along the path,
+    // rest to rest: the stages of a straight span follow where the speed changes (the stretch of v^2 / 2a at each end),
+    // not its length, so one span of 100 mm and fifty of 2 mm take about as long, the single span with a tenth of the
+    // stages, and both about what a trapezoid takes.
+    {
+        const double length = 0.1, feed = 0.06, acceleration = 12.5;
+        double duration[2] = {};
+        uint32_t stage_count[2] = {};
+        const int span_counts[2] = {1, 50};
+        for (int variant = 0; variant < 2; ++variant) {
+            const int spans = span_counts[variant];
+            std::vector<mk_path_sample> line(static_cast<size_t>(spans) + 1);
+            for (int i = 0; i <= spans; ++i) {
+                auto &q = line[static_cast<size_t>(i)];
+                q = mk_path_sample{};
+                q.struct_size = sizeof(q);
+                q.joint_count = 2;
+                q.s = length * i / spans;
+                q.position[0] = 0.8 * q.s; q.first[0] = 0.8;
+                q.position[1] = 0.6 * q.s; q.first[1] = 0.6;
+            }
+            assert(mk_path_create(line.data(), static_cast<uint32_t>(line.size()), &path) == MK_OK);
+            const double velocity[2] = {0.25, 0.25}, joint_acceleration[2] = {acceleration * 0.8, acceleration * 0.6};
+            const std::vector<double> feeds(static_cast<size_t>(spans), feed);
+            mk_trajectory_handle line_trajectory{};
+            assert(mk_time_path(path, velocity, joint_acceleration, 2, feeds.data(), static_cast<uint32_t>(feeds.size()),
+                0.0, 0.0, 1e-6, 0, nullptr, &law, &line_trajectory) == MK_OK);
+            int64_t nanoseconds = 0;
+            assert(mk_trajectory_duration_ns(line_trajectory, &nanoseconds) == MK_OK);
+            duration[variant] = static_cast<double>(nanoseconds) * 1e-9;
+            assert(mk_time_law_binding_count(law, &stage_count[variant]) == MK_OK);
+            mk_trajectory_destroy(line_trajectory);
+            mk_time_law_destroy(law);
+            mk_path_destroy(path);
+        }
+        const double ideal = length / feed + feed / acceleration;
+        assert(std::abs(duration[0] - ideal) < 0.004 * ideal);
+        assert(std::abs(duration[1] - ideal) < 0.004 * ideal);
+        assert(stage_count[0] <= 40 && stage_count[0] * 10 < stage_count[1]);
+    }
+
     // A slow 1 mm-radius arc sampled every 1.5 um, as a printer's corner arcs
     // are: TOPP-RA's stages on it last ~2 us. Deriving each stage's
     // acceleration from its nanosecond-rounded duration made errors of several

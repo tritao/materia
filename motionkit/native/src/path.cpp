@@ -452,15 +452,24 @@ constexpr size_t MIN_STAGES_PER_SPAN = 2;
 constexpr double PROFILE_STEP = 0.05;
 constexpr double MAX_STAGE_TURN = 0.6;
 
-size_t stages_for_span(const std::vector<mk_path_sample> &samples, size_t span,
-                       const double *velocity, const double *acceleration, uint32_t joints,
-                       double cap, double margin) {
+// A straight span (every joint affine in s: a line of a Cartesian machine, however long) has the same limits
+// everywhere, so its speed profile changes only in the stretch next to each end where it speeds up to its fastest or
+// slows from it, `Z = v^2 / 2a` long (`v` the fastest it can go, `a` the path acceleration the joints allow): beyond
+// that it cruises, and one stage covers the middle. The stretches get `ZONE_STAGES` stages each, so the stages of a line
+// do not grow with its length, where a stage per few micrometres of a hundred millimetres was a million for a cube.
+constexpr size_t ZONE_STAGES = 10;
+constexpr double ZONE_REACH = 1.5;
+
+// The fractions of the span at which its stages start, the first being zero.
+std::vector<double> nodes_for_span(const std::vector<mk_path_sample> &samples, size_t span,
+                                   const double *velocity, const double *acceleration, uint32_t joints,
+                                   double cap, double margin) {
     const double length = samples[span + 1].s - samples[span].s;
     double fastest = cap > 0.0 ? cap : std::numeric_limits<double>::infinity();
     double accelerating = std::numeric_limits<double>::infinity();
     double turn = 0.0;
     std::vector<double> before(joints, 0.0), after(joints, 0.0);
-    bool moving = false;
+    bool moving = false, straight = true;
     for (int point = 0; point <= 4; ++point) {
         const double s = samples[span].s + length * point / 4.0;
         double load = 0.0;
@@ -485,12 +494,36 @@ size_t stages_for_span(const std::vector<mk_path_sample> &samples, size_t span,
         }
         before = after;
     }
-    if (!moving) return MIN_STAGES_PER_SPAN;
+    for (uint32_t j = 0; j < joints && straight; ++j) {
+        const Small q = small_hermite(samples[span], samples[span + 1], j);
+        straight = std::abs(q.c[2]) < 1e-12 && std::abs(q.c[3]) < 1e-12 &&
+            std::abs(q.c[4]) < 1e-12 && std::abs(q.c[5]) < 1e-12;
+    }
+    auto uniform = [](size_t count) {
+        std::vector<double> nodes(count);
+        for (size_t step = 0; step < count; ++step) nodes[step] = static_cast<double>(step) / static_cast<double>(count);
+        return nodes;
+    };
+    if (!moving) return uniform(MIN_STAGES_PER_SPAN);
+    if (straight && std::isfinite(accelerating) && std::isfinite(fastest) && fastest > 0.0) {
+        // The stretch where the speed changes, with room to spare: the profile may start slowing a little before the
+        // distance the limits give (their margins are not the whole story), and a node must not come after it.
+        const double exact = fastest * fastest / (2.0 * margin * accelerating);
+        const double step = exact / static_cast<double>(ZONE_STAGES);
+        const size_t zone_stages = static_cast<size_t>(std::lround(ZONE_REACH * static_cast<double>(ZONE_STAGES)));
+        const double zone = step * static_cast<double>(zone_stages);
+        if (length <= 2.0 * zone + step)
+            return uniform(std::clamp(static_cast<size_t>(std::ceil(length / step)), MIN_STAGES_PER_SPAN, 2 * zone_stages + 1));
+        std::vector<double> nodes;
+        for (size_t k = 0; k <= zone_stages; ++k) nodes.push_back(step * static_cast<double>(k) / length);
+        for (size_t k = 0; k < zone_stages; ++k) nodes.push_back((length - zone + step * static_cast<double>(k)) / length);
+        return nodes;
+    }
     const double profile = accelerating * length / (PROFILE_STEP * fastest * fastest);
     const double stages = std::max(profile, turn / MAX_STAGE_TURN);
-    if (!std::isfinite(stages)) return MAX_STAGES_PER_SPAN;
-    return static_cast<size_t>(std::clamp(std::ceil(stages),
-        static_cast<double>(MIN_STAGES_PER_SPAN), static_cast<double>(MAX_STAGES_PER_SPAN)));
+    if (!std::isfinite(stages)) return uniform(MAX_STAGES_PER_SPAN);
+    return uniform(static_cast<size_t>(std::clamp(std::ceil(stages),
+        static_cast<double>(MIN_STAGES_PER_SPAN), static_cast<double>(MAX_STAGES_PER_SPAN))));
 }
 
 bool valid_timing_request(const std::vector<mk_path_sample> &path,
@@ -925,21 +958,20 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         // Stages per span, and the grid they make: each span's first point is a path sample (an anchor).
         std::vector<size_t> span_first(samples.size(), 0);
         std::vector<uint32_t> stage_span;
+        std::vector<double> grid_values;
         for (size_t span = 0; span + 1 < samples.size(); ++span) {
             span_first[span] = stage_span.size();
-            const size_t count = stages_for_span(samples, span, max_velocity, max_acceleration, joint_count,
+            const auto nodes = nodes_for_span(samples, span, max_velocity, max_acceleration, joint_count,
                 speed_cap_count ? speed_caps[span] : 0.0, interpolation_margin);
-            stage_span.insert(stage_span.end(), count, static_cast<uint32_t>(span));
+            const double begin = samples[span].s, length = samples[span + 1].s - begin;
+            for (const double node : nodes) {
+                stage_span.push_back(static_cast<uint32_t>(span));
+                grid_values.push_back(begin + length * node);
+            }
         }
         span_first.back() = stage_span.size();
-        toppra::Vector grid(static_cast<Eigen::Index>(1 + stage_span.size()));
-        for (size_t span = 0; span + 1 < samples.size(); ++span) {
-            const size_t count = span_first[span + 1] - span_first[span];
-            for (size_t step = 0; step < count; ++step)
-                grid[static_cast<Eigen::Index>(span_first[span] + step)] = samples[span].s +
-                    (samples[span + 1].s - samples[span].s) * static_cast<double>(step) / static_cast<double>(count);
-        }
-        grid[grid.size() - 1] = samples.back().s;
+        grid_values.push_back(samples.back().s);
+        toppra::Vector grid = Eigen::Map<const toppra::Vector>(grid_values.data(), static_cast<Eigen::Index>(grid_values.size()));
         const double moving_boundary_margin = (start_speed > 0.0 || end_speed > 0.0)
             ? 0.98 : 1.0;
         toppra::Vector lower_velocity(dof), upper_velocity(dof);
