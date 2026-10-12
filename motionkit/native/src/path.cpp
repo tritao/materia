@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -29,10 +30,19 @@ std::unordered_map<uint32_t, std::vector<mk_path_sample>> paths;
 struct Law {
     std::vector<mk_time_stage> stages;
     std::vector<mk_timing_binding> bindings;
+    // Which limit bound each of TOPP-RA's stages is worked out when it is asked for (a plan rarely is).
+    std::function<std::vector<mk_timing_binding>()> make_bindings;
 };
 std::unordered_map<uint32_t, Law> laws;
 uint32_t next_path = 1;
 uint32_t next_law = 1;
+
+// Called with the mutex held.
+void ensure_bindings(Law &law) {
+    if (!law.make_bindings) return;
+    law.bindings = law.make_bindings();
+    law.make_bindings = nullptr;
+}
 
 double end_s(const mk_time_stage &stage) {
     const double duration = static_cast<double>(stage.duration_ns) * 1e-9;
@@ -242,7 +252,78 @@ PathState path_state(const mk_path_sample &a, const mk_path_sample &b,
         eval(derivative(derivative(q)), x) / (ds * ds)};
 }
 
-bool append_interval(const std::vector<mk_path_sample> &path,
+// Polynomials of the lowering: composing a quintic path with a quadratic time law gives degree ten, and this runs for
+// every joint of every interval of a print (a million), so they live on the stack.
+struct Small {
+    double c[13];
+    int n;
+};
+
+Small small_hermite(const mk_path_sample &a, const mk_path_sample &b, uint32_t joint) {
+    const double ds = b.s - a.s;
+    const double p0 = a.position[joint], v0 = a.first[joint] * ds, a0 = a.second[joint] * ds * ds;
+    const double p1 = b.position[joint], v1 = b.first[joint] * ds, a1 = b.second_before[joint] * ds * ds;
+    const double d = p1 - p0 - v0 - 0.5 * a0;
+    const double e = v1 - v0 - a0;
+    const double f = a1 - a0;
+    Small q{};
+    q.n = 6;
+    q.c[0] = p0; q.c[1] = v0; q.c[2] = 0.5 * a0; q.c[3] = 10.0 * d - 4.0 * e + 0.5 * f;
+    q.c[4] = -15.0 * d + 7.0 * e - f; q.c[5] = 6.0 * d - 3.0 * e + 0.5 * f;
+    return q;
+}
+
+// `outer(inner(x))` by Horner's scheme, the same sums as `compose`, keeping the first `keep` coefficients.
+Small small_compose(const Small &outer, const double inner[3], int keep) {
+    Small result{};
+    result.n = 1;
+    for (int k = outer.n - 1; k >= 0; --k) {
+        double product[13] = {};
+        const int size = std::min(result.n + 2, keep);
+        for (int i = 0; i < result.n; ++i)
+            for (int j = 0; j < 3; ++j)
+                if (i + j < size) product[i + j] += result.c[i] * inner[j];
+        for (int i = 0; i < size; ++i) result.c[i] = product[i];
+        result.n = size;
+        result.c[0] += outer.c[k];
+    }
+    return result;
+}
+
+// The path's position, first and second derivative at `x` on [0,1] of a span `ds` long.
+PathState small_state(const Small &q, double ds, double x) {
+    double d1[12], d2[11];
+    for (int i = 1; i < q.n; ++i) d1[i - 1] = q.c[i] * static_cast<double>(i);
+    for (int i = 1; i < q.n - 1; ++i) d2[i - 1] = d1[i] * static_cast<double>(i);
+    auto horner = [x](const double *c, int count) {
+        double value = 0.0;
+        for (int i = count - 1; i >= 0; --i) value = value * x + c[i];
+        return value;
+    };
+    return {horner(q.c, q.n), horner(d1, q.n - 1) / ds, horner(d2, q.n - 2) / (ds * ds)};
+}
+
+// The span's polynomials, kept between the intervals of one stage and the stages that share a span.
+struct SpanCache {
+    size_t index = SIZE_MAX;
+    Small poly[MK_MAX_JOINTS];
+    bool exact[MK_MAX_JOINTS];
+
+    void load(const std::vector<mk_path_sample> &path, size_t span) {
+        index = span;
+        const auto &a = path[span], &b = path[span + 1];
+        for (uint32_t joint = 0; joint < a.joint_count; ++joint) {
+            poly[joint] = small_hermite(a, b, joint);
+            const auto &c = poly[joint].c;
+            // A joint that is affine in s over the span (a straight move of a Cartesian machine) is composed with the
+            // time law exactly: nothing is approximated, so there is no residual to bound.
+            exact[joint] = std::abs(c[2]) < 1e-12 && std::abs(c[3]) < 1e-12 &&
+                std::abs(c[4]) < 1e-12 && std::abs(c[5]) < 1e-12;
+        }
+    }
+};
+
+bool append_interval(const std::vector<mk_path_sample> &path, SpanCache &cache,
                      const mk_time_stage &stage, int64_t t0, int64_t t1,
                      double tolerance, mk_trajectory_handle trajectory,
                      uint32_t depth) {
@@ -252,12 +333,15 @@ bool append_interval(const std::vector<mk_path_sample> &path,
         [](double value, const mk_path_sample &sample) { return value < sample.s; });
     const size_t index = static_cast<size_t>(found - path.begin() - 1);
     if (index + 1 >= path.size()) return false;
+    if (cache.index != index) cache.load(path, index);
     const auto &a = path[index], &b = path[index + 1];
     const double duration = static_cast<double>(t1 - t0) * 1e-9;
     const double v0 = stage_speed(stage, t0), v1 = stage_speed(stage, t1);
     const double ds = b.s - a.s;
-    const Poly normalized_s{(s0 - a.s) / ds, v0 * duration / ds,
+    const double normalized_s[3] = {(s0 - a.s) / ds, v0 * duration / ds,
         0.5 * stage.acceleration * duration * duration / ds};
+    double duration_power[6];
+    for (int i = 0; i < 6; ++i) duration_power[i] = std::pow(duration, i);
 
     mk_segment segment{};
     segment.struct_size = sizeof(segment);
@@ -267,40 +351,58 @@ bool append_interval(const std::vector<mk_path_sample> &path,
     segment.joint_count = a.joint_count;
     double worst = 0.0;
     for (uint32_t joint = 0; joint < a.joint_count; ++joint) {
-        const Poly authored = path_poly(a, b, joint);
-        Poly fit;
-        // A joint that is affine in s over the span (a straight move of a Cartesian machine) is
-        // composed with the time law exactly: nothing is approximated, so there is no residual to bound.
-        const bool exact = std::abs(authored[2]) < 1e-12 && std::abs(authored[3]) < 1e-12 &&
-            std::abs(authored[4]) < 1e-12 && std::abs(authored[5]) < 1e-12;
-        if (exact) fit = compose(authored, normalized_s);
-        else {
-            const auto left = path_state(a, b, joint, s0);
-            const auto right = path_state(a, b, joint, s1);
-            fit = hermite(left.position, left.first * v0 * duration,
-                (left.second * v0 * v0 + left.first * stage.acceleration) * duration * duration,
-                right.position, right.first * v1 * duration,
-                (right.second * v1 * v1 + right.first * stage.acceleration) * duration * duration);
+        const Small &authored = cache.poly[joint];
+        if (cache.exact[joint]) {
+            const Small fit = small_compose(authored, normalized_s, 6);
+            for (int i = 0; i < 6; ++i) segment.coefficients[joint].value[i] = fit.c[i] / duration_power[i];
+            continue;
         }
+        const auto left = small_state(authored, ds, std::clamp((s0 - a.s) / ds, 0.0, 1.0));
+        const auto right = small_state(authored, ds, std::clamp((s1 - a.s) / ds, 0.0, 1.0));
+        const Poly fit = hermite(left.position, left.first * v0 * duration,
+            (left.second * v0 * v0 + left.first * stage.acceleration) * duration * duration,
+            right.position, right.first * v1 * duration,
+            (right.second * v1 * v1 + right.first * stage.acceleration) * duration * duration);
         for (size_t i = 0; i < fit.size(); ++i)
-            segment.coefficients[joint].value[i] = fit[i] / std::pow(duration, static_cast<int>(i));
-        if (exact) continue;
-        Poly residual = compose(authored, normalized_s);
-        for (size_t i = 0; i < fit.size(); ++i) residual[i] -= fit[i];
+            segment.coefficients[joint].value[i] = fit[i] / duration_power[i];
+        const Small full = small_compose(authored, normalized_s, 13);
+        double residual[13] = {};
+        double bound = 0.0;
+        for (int i = 0; i < full.n; ++i) {
+            residual[i] = full.c[i] - (i < 6 ? fit[static_cast<size_t>(i)] : 0.0);
+            bound += std::abs(residual[i]);
+        }
         // On [0,1] a polynomial stays within the sum of its coefficients' magnitudes: when that is within the
         // tolerance there is no need to isolate its extrema (nearly every stage of a fine path).
-        double bound = 0.0;
-        for (double coefficient : residual) bound += std::abs(coefficient);
         if (bound <= tolerance) { worst = std::max(worst, bound); continue; }
-        worst = std::max(worst, std::abs(eval(residual, 0.5)));
-        for (double root : roots(derivative(residual)))
-            worst = std::max(worst, std::abs(eval(residual, root)));
+        // The fit matches the path's position, velocity and acceleration at both ends of the interval, so the residual
+        // is x^3 (1 - x)^3 g(x) (at most g / 64) plus rounding: bounded by its quotient, it needs no extrema either
+        // unless the quotient is large (a stage that cuts a tight curve in one piece).
+        {
+            const double divisor[7] = {0.0, 0.0, 0.0, 1.0, -3.0, 3.0, -1.0};
+            double rest[13];
+            std::copy(residual, residual + 13, rest);
+            double quotient_sum = 0.0;
+            for (int k = 12; k >= 6; --k) {
+                const double q = rest[k] / divisor[6];
+                quotient_sum += std::abs(q);
+                for (int j = 0; j <= 6; ++j) rest[k - 6 + j] -= q * divisor[j];
+            }
+            double remainder_sum = 0.0;
+            for (int k = 0; k < 6; ++k) remainder_sum += std::abs(rest[k]);
+            const double hull = quotient_sum / 64.0 + remainder_sum;
+            if (hull <= tolerance) { worst = std::max(worst, hull); continue; }
+        }
+        const Poly extremum(residual, residual + full.n);
+        worst = std::max(worst, std::abs(eval(extremum, 0.5)));
+        for (double root : roots(derivative(extremum)))
+            worst = std::max(worst, std::abs(eval(extremum, root)));
     }
     if (worst > tolerance) {
         if (depth >= 40 || t1 - t0 < 2) return false;
         const int64_t middle = t0 + (t1 - t0) / 2;
-        return append_interval(path, stage, t0, middle, tolerance, trajectory, depth + 1) &&
-            append_interval(path, stage, middle, t1, tolerance, trajectory, depth + 1);
+        return append_interval(path, cache, stage, t0, middle, tolerance, trajectory, depth + 1) &&
+            append_interval(path, cache, stage, middle, t1, tolerance, trajectory, depth + 1);
     }
     return mk_trajectory_append_segment(trajectory, &segment) == MK_OK;
 }
@@ -719,6 +821,7 @@ mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
             std::abs(samples.back().s - end_s(stages.back())) > 1e-8)
             return MK_ERROR_INVALID_ARGUMENT;
         mk_trajectory_handle trajectory{};
+        auto cache = std::make_unique<SpanCache>();
         auto result = mk_trajectory_create(samples.front().joint_count, &trajectory);
         if (result != MK_OK) return result;
         for (const auto &stage : stages) {
@@ -739,7 +842,7 @@ mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
             std::sort(knots.begin(), knots.end());
             knots.erase(std::unique(knots.begin(), knots.end()), knots.end());
             for (size_t i = 1; i < knots.size(); ++i) {
-                if (!append_interval(samples, stage, knots[i - 1], knots[i],
+                if (!append_interval(samples, *cache, stage, knots[i - 1], knots[i],
                     tolerance, trajectory, 0)) {
                     mk_trajectory_destroy(trajectory);
                     return MK_ERROR_GENERATION;
@@ -869,7 +972,6 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             toppra::ReturnCode::OK) return MK_ERROR_GENERATION;
         const auto &data = algorithm->getParameterizationData();
         std::vector<mk_time_stage> stages;
-        std::vector<mk_timing_binding> bindings;
         std::vector<double> positions(grid.data(), grid.data() + grid.size());
         std::vector<double> speeds(positions.size());
         speeds.front() = start_speed;
@@ -880,18 +982,6 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         for (size_t span = 0; span + 1 < samples.size(); ++span) anchors[span_first[span]] = 1;
         anchors.back() = 1;
         if (!stages_from_profile(positions, speeds, anchors, stages)) return MK_ERROR_GENERATION;
-        // Bindings name TOPP-RA's own stages, with its own control.
-        bindings.reserve(positions.size() - 1);
-        for (size_t i = 0; i + 1 < positions.size(); ++i) {
-            const double ds = positions[i + 1] - positions[i];
-            const double path_acceleration =
-                (speeds[i + 1] * speeds[i + 1] - speeds[i] * speeds[i]) / (2.0 * ds);
-            const auto span = stage_span[i];
-            bindings.push_back(binding_for_stage(samples, static_cast<uint32_t>(span),
-                static_cast<uint32_t>(i), 0.5 * (positions[i] + positions[i + 1]),
-                std::max(0.0, speeds[i] * speeds[i] + path_acceleration * ds),
-                path_acceleration, max_velocity, max_acceleration, caps[span]));
-        }
         mk_time_law_handle created{};
         bool accepted = false;
         for (int attempt = 0; attempt < 24; ++attempt) {
@@ -969,8 +1059,30 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         }
         if (!accepted) return MK_ERROR_GENERATION;
         {
+            // Bindings name TOPP-RA's own stages, with its own control.
+            auto shared_samples = std::make_shared<const std::vector<mk_path_sample>>(std::move(samples));
+            std::vector<double> velocity_limits(max_velocity, max_velocity + joint_count);
+            std::vector<double> acceleration_limits(max_acceleration, max_acceleration + joint_count);
+            auto make = [shared_samples, positions = std::move(positions), speeds = std::move(speeds),
+                         stage_span = std::move(stage_span), caps = std::move(caps),
+                         velocity_limits = std::move(velocity_limits),
+                         acceleration_limits = std::move(acceleration_limits)]() {
+                std::vector<mk_timing_binding> bindings;
+                bindings.reserve(positions.size() - 1);
+                for (size_t i = 0; i + 1 < positions.size(); ++i) {
+                    const double ds = positions[i + 1] - positions[i];
+                    const double path_acceleration =
+                        (speeds[i + 1] * speeds[i + 1] - speeds[i] * speeds[i]) / (2.0 * ds);
+                    const auto span = stage_span[i];
+                    bindings.push_back(binding_for_stage(*shared_samples, static_cast<uint32_t>(span),
+                        static_cast<uint32_t>(i), 0.5 * (positions[i] + positions[i + 1]),
+                        std::max(0.0, speeds[i] * speeds[i] + path_acceleration * ds),
+                        path_acceleration, velocity_limits.data(), acceleration_limits.data(), caps[span]));
+                }
+                return bindings;
+            };
             std::lock_guard lock(mutex);
-            laws.at(created.id).bindings = std::move(bindings);
+            laws.at(created.id).make_bindings = std::move(make);
         }
         *out_law = created;
         return MK_OK;
@@ -1217,16 +1329,44 @@ mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const doubl
                 Poly p(6);
                 double scale = 1.0;
                 for (int k = 0; k < 6; ++k) { p[k] = candidate->coefficients[joint].value[k] * scale; scale *= T; }
+                // A joint that holds still, or moves at a constant speed, has nothing to find the peaks of.
+                if (p[2] == 0.0 && p[3] == 0.0 && p[4] == 0.0 && p[5] == 0.0) {
+                    if (std::abs(p[1]) / T > velocity_limit[joint] * (1.0 + 1e-9) &&
+                        std::abs(p[1]) / T > peak_velocity[joint] + 1e-9 * velocity_limit[joint])
+                        return MK_ERROR_GENERATION;
+                    continue;
+                }
                 const Poly v = derivative(p), a = derivative(v);
+                // The control points of the Bernstein form bound a polynomial on [0,1]: when they keep within the
+                // limit, or within what the segments replaced already reach, there are no peaks to find.
+                auto hull = [](const Poly &q) {
+                    const int n = static_cast<int>(q.size()) - 1;
+                    double bound = 0.0;
+                    for (int k = 0; k <= n; ++k) {
+                        double control = 0.0, ratio = 1.0;
+                        for (int i = 0; i <= k; ++i) {
+                            if (i) ratio *= static_cast<double>(k - i + 1) / static_cast<double>(n - i + 1);
+                            control += ratio * q[static_cast<size_t>(i)];
+                        }
+                        bound = std::max(bound, std::abs(control));
+                    }
+                    return bound;
+                };
                 auto peak = [](const Poly &q) {
                     double worst = std::max(std::abs(eval(q, 0.0)), std::abs(eval(q, 1.0)));
                     for (double x : roots(derivative(q))) worst = std::max(worst, std::abs(eval(q, x)));
                     return worst;
                 };
-                const double v_peak = peak(v) / T, a_peak = peak(a) / (T * T);
-                if ((v_peak > velocity_limit[joint] * (1.0 + 1e-9) &&
+                const double v_hull = hull(v) / T, a_hull = hull(a) / (T * T);
+                const bool v_open = v_hull > velocity_limit[joint] * (1.0 + 1e-9) &&
+                    v_hull > peak_velocity[joint] + 1e-9 * velocity_limit[joint];
+                const bool a_open = a_hull > acceleration_limit[joint] * (1.0 + 1e-9) &&
+                    a_hull > peak_acceleration[joint] + 1e-9 * acceleration_limit[joint];
+                if (!v_open && !a_open) continue;
+                const double v_peak = v_open ? peak(v) / T : 0.0, a_peak = a_open ? peak(a) / (T * T) : 0.0;
+                if ((v_open && v_peak > velocity_limit[joint] * (1.0 + 1e-9) &&
                      v_peak > peak_velocity[joint] + 1e-9 * velocity_limit[joint]) ||
-                    (a_peak > acceleration_limit[joint] * (1.0 + 1e-9) &&
+                    (a_open && a_peak > acceleration_limit[joint] * (1.0 + 1e-9) &&
                      a_peak > peak_acceleration[joint] + 1e-9 * acceleration_limit[joint]))
                     return MK_ERROR_GENERATION;
             }
@@ -1454,6 +1594,7 @@ mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,
     std::lock_guard lock(mutex);
     const auto found = laws.find(law.id);
     if (found == laws.end()) return MK_ERROR_INVALID_HANDLE;
+    ensure_bindings(found->second);
     *out_count = static_cast<uint32_t>(found->second.bindings.size());
     return MK_OK;
 }
@@ -1465,6 +1606,7 @@ mk_result MK_CALL mk_time_law_get_binding(mk_time_law_handle law,
     std::lock_guard lock(mutex);
     const auto found = laws.find(law.id);
     if (found == laws.end()) return MK_ERROR_INVALID_HANDLE;
+    ensure_bindings(found->second);
     if (index >= found->second.bindings.size()) return MK_ERROR_INVALID_ARGUMENT;
     *out_binding = found->second.bindings[index];
     return MK_OK;

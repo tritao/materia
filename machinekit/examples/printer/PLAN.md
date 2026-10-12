@@ -1252,6 +1252,40 @@ left in the motion path.
    Done when the printing gate and the robot-arm load plan measurably faster (numbers before and after, processor
    time) and use less memory, the planned times and the plan checks' results are unchanged within their tolerances,
    and the full suite passes.
+   **Profiled and fixed (the general path; item 10 follows).** `perf` on the cube after item 8, then phase timers inside
+   `mk_time_path` (500 calls, 524 attempts, 1.08 M stages): TOPP-RA's solve was 1.4 s of 40 s of processor time (the Seidel LP
+   0.4 %), the grid's setup 0.8 s, the per-stage bindings 2.7 s, lowering 8.0 s, the validation of the lowered path
+   10.6 s, and 16 s outside (merge, plan creation, task-space check). The collector's marking (`gc_flush_mark`, 21 % of
+   samples) runs on mark threads and does not move the planner's processor time (the same 40 s with the mark threshold
+   at 0.2, 1.0 and 1000, which never collects); the Haxe side is 5 %. So a faster TOPP-RA, or a replacement, could not have
+   bought more than a few percent; the costs were in what is done with its stages. Fixed, in order of size:
+   1. Validation (`trajectory_core validate`, long double throughout, a root search for every joint of every segment): it
+      computes the derivative maxima that tolerances read only for the checks that are claimed (the planner's timing check
+      claims velocity and acceleration, so it skipped orders 1 and 4), skips a joint that holds still, and extends the
+      Bernstein-hull dominance proof (a segment whose hull stays under the worst score so far changes neither the worst
+      value nor the verdict) from positions to velocity, acceleration and jerk, computed in double with the reserve
+      already sized for it. 40 -> 31 s on the cube with the lowering below.
+   2. `mk_path_lower` composed a quintic with a quadratic through heap-allocated polynomials for every joint of every
+      interval, and cut roots of a degree-eleven residual with a recursive search; it now works on the stack, caches the
+      span's polynomials, bounds the residual by its quotient by the vanishing factor x^3 (1 - x)^3 before any root
+      search (the fit matches position, velocity and acceleration at both ends) and computes `pow` once an interval.
+   3. The merge (`mk_merge_segments`) cut a quartic and a cubic's peaks for every joint of every try; a joint that holds
+      still or moves at a constant speed is settled by its coefficients, the others by the Bernstein hull, with the
+      exact roots only when the hull is within reach of a limit.
+   4. The timing bindings (which limit bound each stage; read by the plan check's report only) are computed when asked for.
+   5. Trajectories are stored compactly (`Trajectory`: a header and `joint_count` coefficient sets a segment; an
+      `mk_segment` has room for 64 joints, 3 KB, for a machine of 8 joints and a print of a million segments).
+   Result (processor seconds of planning; the planned times are identical: gate 1047.2 s, 8 mm gear 2356.9 s, cube
+   870.3 s, tower 471.5 s, and the plans' segment counts and the tab's 48.134 / 48.484 s the same): gate gear 78.8 s
+   before AM5b item 8, 60.2 s after it, **28.7 s now (2.7x overall, 36x real time; the worst 10 s window 4.2x -> 9.6x)**;
+   8 mm gear 276.0 -> 209.8 -> **100.0 s**; cube 59.5 -> 39.5 -> **18.1 s (48x real time, worst window 30.8x)**; tower
+   49.9 -> 28.3 -> **13.4 s**. Peak resident memory of the whole gate (slicing included): 1.79 GB before this commit, 0.93 GB
+   after. The robot-arm load is a synthetic six-joint curved path timed through `mk_time_path` (20,000 spans, a
+   benchmark kept in `materia-cache/claude-scratch/pathbench`; the arm paths of the test suites are too short to time):
+   0.93 s -> 0.38 s (2.4x), and 2.57 s -> 1.16 s on 60,000 spans, with identical stages, segments and duration. Tests: the
+   motionkit, robotkit and toolpath-motion suites, the native path, trajectory, validation, generator and
+   device-compiler tests (the step-move merge test now asserts the ratio of the adaptive grid's fewer stages;
+   `Toolpath scenarios` counts 2,999 assertions instead of 3,020 because a test asserts per lowered segment).
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

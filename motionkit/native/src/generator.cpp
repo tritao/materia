@@ -170,7 +170,8 @@ mk_result MK_CALL mk_generate_state_to_state(const mk_state_to_state_request *re
         auto status = mk_trajectory_create(request->joint_count, out_trajectory);
         if (status != MK_OK) return status;
         for (uint32_t index = 0; index < generated->segment_count(); ++index) {
-            status = mk_trajectory_append_segment(*out_trajectory, &generated->segment(index));
+            const mk_segment segment = generated->segment(index);
+            status = mk_trajectory_append_segment(*out_trajectory, &segment);
             if (status != MK_OK) {
                 mk_trajectory_destroy(*out_trajectory);
                 out_trajectory->id = 0;

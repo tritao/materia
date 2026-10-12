@@ -13,16 +13,16 @@
 namespace motionkit {
 
 /** Shared polynomial evaluator for the planner, validator and RobotKit runtime. */
-inline void evaluate_segment(const mk_segment &segment, double seconds,
-                             mk_trajectory_state &state) noexcept {
-    state.joint_count = segment.joint_count;
-    for (uint32_t joint = 0; joint < segment.joint_count; ++joint) {
-        const auto *c = segment.coefficients[joint].value;
+inline void evaluate_coefficients(const mk_joint_coefficients *coefficients, uint32_t degree_count,
+                                  uint32_t joints, double seconds, mk_trajectory_state &state) noexcept {
+    state.joint_count = joints;
+    for (uint32_t joint = 0; joint < joints; ++joint) {
+        const auto *c = coefficients[joint].value;
         double position = 0.0;
         double velocity = 0.0;
         double acceleration = 0.0;
         double jerk = 0.0;
-        for (int degree = static_cast<int>(segment.degree); degree >= 0; --degree) {
+        for (int degree = static_cast<int>(degree_count); degree >= 0; --degree) {
             jerk = jerk * seconds + 3.0 * acceleration;
             acceleration = acceleration * seconds + 2.0 * velocity;
             velocity = velocity * seconds + position;
@@ -33,6 +33,11 @@ inline void evaluate_segment(const mk_segment &segment, double seconds,
         state.acceleration[joint] = acceleration;
         state.jerk[joint] = jerk;
     }
+}
+
+inline void evaluate_segment(const mk_segment &segment, double seconds,
+                             mk_trajectory_state &state) noexcept {
+    evaluate_coefficients(segment.coefficients, segment.degree, segment.joint_count, seconds, state);
 }
 
 /** One derivative source for runtime STOP and host-side hold lead. */
@@ -112,17 +117,33 @@ inline bool estimate_path_derivatives(const std::vector<mk_segment> &segments,
     return true;
 }
 
+/**
+ * A timed polynomial path. The segments are kept compact (a header and `joint_count` sets of coefficients each): an
+ * `mk_segment` carries room for 64 joints, 3 KB, which a machine of eight joints and a print of a million segments
+ * would waste in gigabytes. `segment(index)` builds the full record on demand.
+ */
 class Trajectory {
 public:
     explicit Trajectory(uint32_t joint_count) : joint_count_(joint_count) {}
 
     uint32_t joint_count() const noexcept { return joint_count_; }
-    uint32_t segment_count() const noexcept { return static_cast<uint32_t>(segments_.size()); }
+    uint32_t segment_count() const noexcept { return static_cast<uint32_t>(records_.size()); }
     uint64_t revision() const noexcept { return revision_; }
-    const mk_segment &segment(uint32_t index) const { return segments_.at(index); }
+    mk_segment segment(uint32_t index) const {
+        const Record &record = records_.at(index);
+        mk_segment result{};
+        result.struct_size = sizeof(mk_segment);
+        result.t0_ns = record.t0_ns;
+        result.duration_ns = record.duration_ns;
+        result.degree = record.degree;
+        result.joint_count = joint_count_;
+        std::copy_n(coefficients_.data() + static_cast<size_t>(index) * joint_count_, joint_count_,
+            result.coefficients);
+        return result;
+    }
     int64_t duration_ns() const noexcept {
-        if (segments_.empty()) return 0;
-        return segments_.back().t0_ns + segments_.back().duration_ns - segments_.front().t0_ns;
+        if (records_.empty()) return 0;
+        return records_.back().t0_ns + records_.back().duration_ns - records_.front().t0_ns;
     }
 
     bool append(const mk_segment &segment) {
@@ -131,10 +152,10 @@ public:
             segment.duration_ns <= 0 ||
             segment.t0_ns > std::numeric_limits<int64_t>::max() - segment.duration_ns)
             return false;
-        if (!segments_.empty() && segment.t0_ns !=
-                segments_.back().t0_ns + segments_.back().duration_ns)
+        if (!records_.empty() && segment.t0_ns !=
+                records_.back().t0_ns + records_.back().duration_ns)
             return false;
-        const int64_t first = segments_.empty() ? segment.t0_ns : segments_.front().t0_ns;
+        const int64_t first = records_.empty() ? segment.t0_ns : records_.front().t0_ns;
         const int64_t end = segment.t0_ns + segment.duration_ns;
         if (static_cast<uint64_t>(end) - static_cast<uint64_t>(first) >
             static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))
@@ -142,33 +163,46 @@ public:
         for (uint32_t joint = 0; joint < joint_count_; ++joint)
             for (uint32_t degree = 0; degree <= segment.degree; ++degree)
                 if (!std::isfinite(segment.coefficients[joint].value[degree])) return false;
-        segments_.push_back(segment);
+        records_.push_back({segment.t0_ns, segment.duration_ns, segment.degree});
+        for (uint32_t joint = 0; joint < joint_count_; ++joint) {
+            mk_joint_coefficients kept{};
+            for (uint32_t degree = 0; degree <= segment.degree; ++degree)
+                kept.value[degree] = segment.coefficients[joint].value[degree];
+            coefficients_.push_back(kept);
+        }
         ++revision_;
         return true;
     }
 
     bool evaluate(int64_t time_ns, mk_trajectory_state &state) const noexcept {
-        if (segments_.empty()) return false;
+        if (records_.empty()) return false;
         // Exact knots select the segment on the right. The final endpoint
         // selects the final segment evaluated at its duration.
         uint32_t low = 0;
-        uint32_t high = static_cast<uint32_t>(segments_.size());
+        uint32_t high = static_cast<uint32_t>(records_.size());
         while (low + 1 < high) {
             const uint32_t middle = low + (high - low) / 2;
-            if (segments_[middle].t0_ns <= time_ns) low = middle;
+            if (records_[middle].t0_ns <= time_ns) low = middle;
             else high = middle;
         }
-        const auto &segment = segments_[low];
-        const int64_t clamped = time_ns <= segment.t0_ns ? 0 :
-            time_ns >= segment.t0_ns + segment.duration_ns ? segment.duration_ns :
-            time_ns - segment.t0_ns;
-        evaluate_segment(segment, static_cast<double>(clamped) / 1'000'000'000.0, state);
+        const Record &record = records_[low];
+        const int64_t clamped = time_ns <= record.t0_ns ? 0 :
+            time_ns >= record.t0_ns + record.duration_ns ? record.duration_ns :
+            time_ns - record.t0_ns;
+        evaluate_coefficients(coefficients_.data() + static_cast<size_t>(low) * joint_count_, record.degree,
+            joint_count_, static_cast<double>(clamped) / 1'000'000'000.0, state);
         return true;
     }
 
 private:
+    struct Record {
+        int64_t t0_ns;
+        int64_t duration_ns;
+        uint32_t degree;
+    };
     uint32_t joint_count_;
-    std::vector<mk_segment> segments_;
+    std::vector<Record> records_;
+    std::vector<mk_joint_coefficients> coefficients_;
     uint64_t revision_ = 0;
 };
 
@@ -178,7 +212,6 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
 /** The bounds of a joint starting at `start`: see `mk_limits_admit_start`. */
 void admit_start(const mk_limits &limits, uint32_t joint, double start, double tolerance,
                  double &lower, double &upper);
-
 
 } // namespace motionkit
 
