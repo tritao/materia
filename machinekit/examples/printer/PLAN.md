@@ -1154,7 +1154,25 @@ left in the motion path.
 3. Replace the `MAX_SECTION_PRIMITIVES` forced rests with timing windows that carry boundary speeds (AM-D4's original
    design).
 4. Derive `CornerBlender.MIN_RADIUS` from the machine (an arc whose v^2 / r exceeds the acceleration cannot be followed)
-   or from the binding, instead of a global 50 micrometre constant, and stop the slicer emitting micro-segments.
+   or from the binding, instead of a global 50 micrometre constant, and stop the slicer emitting micro-segments. **Done; the numbers do not move.**
+   `MIN_RADIUS` is gone. A machine holds an arc of radius r at no more than sqrt(a r) (centripetal acceleration v^2 / r
+   against the acceleration a it gives in the plane), so a corner is worth rounding if the machine can take it at
+   `CornerBlender.CORNER_SPEED_SHARE` (half) of the slower move's speed: `minimumRadius(speed, a) = (0.5 v)^2 / a`.
+   `ToolpathLowering` passes each corner its own (the two moves' speeds; `MachineBinding.cornerAcceleration`, the weaker of
+   the X and Y axes' limits, set by `ToolpathMotionBinding`), `PathPlanner` derives it from its axes and options, and a
+   caller that knows no acceleration sets no minimum (`blendLinear`). The rule keeps its old shape: a corner whose arc comes
+   out under that radius and under half of what its tolerance wanted is stopped at, so a corner whose own tolerance asks for
+   a tight arc keeps it. The share is a policy (half the speed), written down; it replaces a constant that was a speed
+   at one feed and acceleration only. Result on the printer (printing gate, tab, cube): no corner changes, because every
+   printer arc is within half of what its tolerance wanted (planned times and stops by reason identical: gate gear 1047.2 s,
+   cube 870.3 s plain / 879.5 s shaped, tab 48.1 / 48.5 s; segments 115,385 / 132,620 and 6,938 / 8,657). Test:
+   `PlannerTests` (the formula; a corner of 0.1 mm lines rounded without a minimum and stopped at with it).
+   The slicer part: measured, not a slicer problem. The tab holds 421 moves, none under 0.25 mm and 21 under 0.5 mm (the cube
+   4,841 with 192 under 0.5 mm); the benchmark now prints these counts (`authored moves shorter than ...`). What makes
+   micro-segments is lowering: 394 of the tab's 421 moves are corners, most of them the zigzag infill's 0.29 and 0.58 mm
+   connecting travels with 135 degree turns whose 80 micrometre tolerance gives 50 micrometre arcs of 4.7 ms, which TOPP-RA
+   cuts into 32 stages each. Connecting the lines with an extruded bead would remove them but changes the laid volume
+   (about 18 mm^3 of 135), so the slicer is left as it is and item 8 (an adaptive grid) addresses the segments.
 5. Replace `Std.isOfType(solver, AxisKinematics)` (which skips the clock-sampled task-space check) with a capability
    the solver declares (exact, affine kinematics). **Done.** `KinematicsSolver.affineMap()` returns
    an `AffineJointMap` (joint = offset + a column per tool coordinate) when the solver is exactly affine, else null;
@@ -1248,7 +1266,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
-| AM5b | in progress: items 6, 1 and 5 done | see the commits below |
+| AM5b | in progress: items 6, 1, 5 and 4 done | see the commits below |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 

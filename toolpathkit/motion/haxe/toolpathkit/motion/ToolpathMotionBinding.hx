@@ -62,6 +62,8 @@ class ToolpathMotionBinding {
     machine.setTravel(new TravelEnvelope(
       new Point3(envelopeLower[0], envelopeLower[1], envelopeLower[2]),
       new Point3(envelopeUpper[0], envelopeUpper[1], envelopeUpper[2])));
+    // A corner is taken in the XY plane, where the weaker of the two axes bounds the acceleration along any direction.
+    machine.setCornerAcceleration(Math.min(solver.x.maxAcceleration, solver.y.maxAcceleration));
     var limits = new ValidationLimits(count,
       modelRevision == null ? Int64.ofInt(blueprint.runtime.revision) : modelRevision,
       calibrationRevision == null ? Int64.ofInt(blueprint.runtime.calibrationRevision) : calibrationRevision);

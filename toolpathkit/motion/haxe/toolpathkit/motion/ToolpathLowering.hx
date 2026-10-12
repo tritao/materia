@@ -184,8 +184,11 @@ class ToolpathLowering {
       count("no blend tolerance");
     if (rounded) {
       var authored = new GeometricPath(pending);
+      // A corner is worth rounding only if the machine can take it at a good share of the slower move's speed.
+      var minRadii = [for (i in 0...corners.length)
+        CornerBlender.minimumRadius(Math.min(pendingSpeeds[i], pendingSpeeds[i + 1]), machine.cornerAcceleration)];
       var blended = CornerBlender.blendPerCorner(authored, corners,
-        machine.maxBlendTurnAngleRadians);
+        machine.maxBlendTurnAngleRadians, minRadii);
       var spans = [for (index in blended.sourcePrimitiveIndices)
         pendingSpans[index]];
       for (warning in 0...blended.diagnostics.length) {

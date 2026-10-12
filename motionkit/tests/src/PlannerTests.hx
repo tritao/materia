@@ -749,6 +749,17 @@ class PlannerTests extends MotionKitTestSupport {
       check(worst <= tolerance * 1.01,
         '$degrees degree fillet stays within the authored corner polyline');
     }
+    // The tightest worthwhile arc comes from the machine: (half the speed)^2 over the acceleration it gives.
+    near(CornerBlender.minimumRadius(0.1, 12.5), 0.0025 / 12.5, "a corner is worth rounding if the machine keeps half the speed");
+    near(CornerBlender.minimumRadius(0.1, 0.0), 0.0, "an unknown acceleration sets no minimum");
+    // Lines of 0.1 mm meeting at a right angle can only be rounded by an arc of 45 um, under half of the 121 um that a
+    // 50 um tolerance wanted, and tighter than the machine takes at 0.1 m/s (200 um).
+    var shortCorner = GeometricPath.lines([new PathPoint(), new PathPoint(0.0001, 0.0), new PathPoint(0.0001, 0.0001)]);
+    var untried = CornerBlender.blend(shortCorner, 0.00005, Math.PI * 0.9);
+    var judged = CornerBlender.blend(shortCorner, 0.00005, Math.PI * 0.9, CornerBlender.minimumRadius(0.1, 12.5));
+    check(untried.path.primitives.length == 3 && untried.diagnostics.length == 0, "without a minimum a short corner is rounded");
+    check(judged.path.primitives.length == 2 && judged.diagnostics.length == 1,
+      "a corner the machine cannot take at a good speed is stopped at: " + judged.diagnostics);
     var mixedCorner = new GeometricPath([
       new LineSegment(new PathPoint(0.0, 0.0), new PathPoint(0.05, 0.0)),
       new ArcSegment(new PathPoint(0.07, 0.0), 0.02, Math.PI, -Math.PI * 0.5)

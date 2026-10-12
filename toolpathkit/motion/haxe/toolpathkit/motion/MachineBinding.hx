@@ -15,6 +15,11 @@ class MachineBinding {
   public final maxBlendTurnAngleRadians:Float;
   public var travel(default, null):Null<TravelEnvelope> = null;
   /**
+    The acceleration the machine gives in the XY plane, metres per second squared: what bounds the speed of a rounded
+    corner (`CornerBlender.minimumRadius`). Zero until the motion binding sets it from the axes' limits.
+  **/
+  public var cornerAcceleration(default, null):Float = 0.0;
+  /**
     Whether `Rapid`, `Link` and `Retract` moves run at their own feed (bounded by `rapidSpeed`) and round
     their corners within their tolerance, as a printer's travels do, instead of at `rapidSpeed` with
     exact stops, as a mill's rapids do.
@@ -49,6 +54,11 @@ class MachineBinding {
   }
 
   public function setTravel(value:Null<TravelEnvelope>):Void travel = value;
+
+  public function setCornerAcceleration(value:Float):Void {
+    if (!(value >= 0.0) || !Math.isFinite(value)) throw "machine binding needs a finite non-negative corner acceleration";
+    cornerAcceleration = value;
+  }
 
   public function setRapidsAtFeed(value:Bool):Void rapidsAtFeed = value;
 

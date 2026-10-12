@@ -454,6 +454,15 @@ class PrintingBenchmark {
   /** `report` without the printing: only the planned time. */
   static function report0(name:String, machine:PrinterAxes, program:ToolpathProgram):BenchmarkResult {
     var moves = motionOnly(program);
+    // The authored moves the slicer emitted that are shorter than 0.1, 0.25 and 0.5 mm: each costs its corners their arcs.
+    var authored = [0, 0, 0];
+    for (op in moves.ops) switch op {
+      case Move(_, geometry, _, _, _), MachineMove(_, geometry, _, _, _):
+        var length = toolpathkit.path.GeometryTools.length(geometry);
+        for (bin in 0...3) if (length < [0.0001, 0.00025, 0.0005][bin]) authored[bin]++;
+      case _:
+    }
+    Sys.println('  $name: authored moves shorter than 0.1 / 0.25 / 0.5 mm: ${authored.join(" / ")} of ${moves.ops.length}');
     var lowered = ToolpathMotion.lower(moves, machine.binding.machine);
     var motion = lowered.program;
     if (motion == null) throw '$name has no motion';

@@ -10,26 +10,41 @@ class CornerBlender {
   public static inline final GEOMETRY_SHARE = 0.8;
 
   /**
-    The tightest arc a corner may be rounded to, metres, unless its tolerance asks for tighter. A corner between
-    very short moves can only be rounded within its tolerance by an arc of a few micrometres, which no machine
-    follows and which the timing cannot resolve (accelerations along it exceed the limits by half again); such a
-    corner is stopped at instead, as its speed would be next to nothing either way. A corner whose own tolerance
-    needs a tighter arc (a few micrometres of tolerance round a right angle at about twice that radius) keeps it.
+    Share of the slower move's speed that a rounded corner must be able to keep to be worth rounding. A machine
+    holds an arc of radius `r` at no more than `sqrt(a r)` (centripetal acceleration `v^2 / r` is bounded by the
+    acceleration `a` it gives in the plane), so a corner between very short moves, which only a tiny arc can round
+    within its tolerance, would be taken at next to no speed: stopping there costs about the same and spares the
+    timing an arc it cannot resolve. See `minimumRadius`.
   **/
-  public static inline final MIN_RADIUS = 5e-5;
+  public static inline final CORNER_SPEED_SHARE = 0.5;
+
+  /**
+    The tightest arc, metres, that a machine giving `acceleration` in the plane can take at `CORNER_SPEED_SHARE` of
+    `speed`: `(share v)^2 / a`. Zero when the machine's acceleration is unknown (no minimum). A corner whose own
+    tolerance asks for a tighter arc keeps it (`blendPerCorner`).
+  **/
+  public static function minimumRadius(speed:Float, acceleration:Float):Float {
+    if (!(acceleration > 0.0) || !(speed > 0.0) || !Math.isFinite(speed) || !Math.isFinite(acceleration)) return 0.0;
+    var kept = CORNER_SPEED_SHARE * speed;
+    return kept * kept / acceleration;
+  }
 
   public static function blend(path:GeometricPath, tolerance:Float,
-      maxTurnAngleRadians:Float):BlendedGeometry {
+      maxTurnAngleRadians:Float, ?minRadius:Float = 0.0):BlendedGeometry {
     if (path == null || !Math.isFinite(tolerance) || tolerance < 0.0)
       throw "Invalid corner blend request";
     return blendPerCorner(path,
       [for (_ in 0...Std.int(Math.max(0, path.primitives.length - 1))) tolerance],
-      maxTurnAngleRadians);
+      maxTurnAngleRadians, [for (_ in 0...Std.int(Math.max(0, path.primitives.length - 1))) minRadius]);
   }
 
-  /** Each entry bounds deviation at the join after its authored primitive. */
+  /**
+    Each entry bounds deviation at the join after its authored primitive. `minRadii`, when given, is each corner's
+    tightest worthwhile arc (`minimumRadius`); a corner whose arc would come out tighter, and under half of what its
+    tolerance wanted, is stopped at.
+  **/
   public static function blendPerCorner(path:GeometricPath,
-      cornerTolerances:Array<Float>, maxTurnAngleRadians:Float):BlendedGeometry {
+      cornerTolerances:Array<Float>, maxTurnAngleRadians:Float, ?minRadii:Array<Float>):BlendedGeometry {
     if (path == null || cornerTolerances == null ||
         cornerTolerances.length != path.primitives.length - 1 ||
         !Math.isFinite(maxTurnAngleRadians) || maxTurnAngleRadians <= 0.0 ||
@@ -38,6 +53,8 @@ class CornerBlender {
     for (tolerance in cornerTolerances)
       if (!Math.isFinite(tolerance) || tolerance < 0.0)
         throw "Invalid corner blend tolerance";
+    if (minRadii != null && minRadii.length != cornerTolerances.length)
+      throw "Corner minimum radii must match the corners";
     var count = path.primitives.length;
     var arcs:Array<Null<ArcSegment>> = [for (_ in 0...count) null];
     var mixed:Array<Null<PathPrimitive>> = [for (_ in 0...count) null];
@@ -47,6 +64,7 @@ class CornerBlender {
     var diagnosticCorners:Array<Int> = [];
     for (i in 0...(count - 1)) {
       var tolerance = cornerTolerances[i];
+      var minRadius = minRadii == null ? 0.0 : minRadii[i];
       if (tolerance == 0.0) continue;
       var before = path.primitives[i];
       var after = path.primitives[i + 1];
@@ -98,7 +116,8 @@ class CornerBlender {
               var tightest = 0.0;
               for (sample in 0...65)
                 tightest = Math.max(tightest, Math.abs(candidate.curvatureAt(candidate.length() * sample / 64.0)));
-              if (tightest > 1.0 / Math.min(MIN_RADIUS, 1.2 * tolerance)) break;
+              var floor = Math.min(minRadius, 1.2 * tolerance);
+              if (floor > 0.0 && tightest > 1.0 / floor) break;
               accepted = candidate;
               break;
             }
@@ -159,7 +178,7 @@ class CornerBlender {
       }
       var wanted = radius;
       radius = cut / halfTangent;
-      if (radius < Math.min(MIN_RADIUS, 0.5 * wanted)) {
+      if (radius < Math.min(minRadius, 0.5 * wanted)) {
         diagnostics.push('corner ${i + 1}: exact stop (blend radius below the minimum)');
         diagnosticCorners.push(i + 1);
         continue;

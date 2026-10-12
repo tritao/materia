@@ -78,8 +78,14 @@ class PathPlanner {
     var options = pathOptions == null ? PathPlanningOptions.exactStopMode() : pathOptions;
     var planningPath = path;
     if (!options.exactStop && options.blendTolerance > 0.0) {
+      // Rounded corners are worth keeping where the axes can take them at a good share of the path speed.
+      var cornerSpeed = Math.min(requireAxis("x").maxVelocity, requireAxis("y").maxVelocity);
+      var cornerAcceleration = Math.min(requireAxis("x").maxAcceleration, requireAxis("y").maxAcceleration);
+      if (motionOptions != null && motionOptions.maxVelocity > 0.0) cornerSpeed = Math.min(cornerSpeed, motionOptions.maxVelocity);
+      if (motionOptions != null && motionOptions.maxAcceleration > 0.0)
+        cornerAcceleration = Math.min(cornerAcceleration, motionOptions.maxAcceleration);
       var blended = CornerBlender.blend(path, options.blendTolerance * CornerBlender.GEOMETRY_SHARE,
-        options.maxBlendTurnAngleRadians);
+        options.maxBlendTurnAngleRadians, CornerBlender.minimumRadius(cornerSpeed, cornerAcceleration));
       planningPath = blended.path;
       diagnostics = blended.diagnostics;
     }
