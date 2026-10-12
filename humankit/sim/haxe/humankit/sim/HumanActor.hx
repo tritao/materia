@@ -2,7 +2,7 @@ package humankit.sim;
 
 import humankit.CapsulePlacement;
 import humankit.HumanBodyProxy;
-import humankit.rig.HumanPose;
+import haxeon.animation.rig.HumanPose;
 import nativekit.sim.SimActor;
 import nativekit.sim.SimPose;
 import nativekit.sim.SimSession;

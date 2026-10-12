@@ -1,4 +1,4 @@
-import humankit.rig.HumanBone;
+import haxeon.animation.rig.HumanBone;
 
 /**
  * After setting a part down, the worker withdraws the hand and walks away. The hand must stay in

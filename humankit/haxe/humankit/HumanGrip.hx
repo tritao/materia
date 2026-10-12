@@ -1,6 +1,6 @@
 package humankit;
 
-import humankit.rig.Mat4;
+import haxeon.animation.rig.Mat4;
 
 /** Prop offsets for HumanCharacter.attach, expressed in the standard hand frame (see HumanPose). */
 class HumanGrip {

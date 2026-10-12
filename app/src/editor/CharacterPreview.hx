@@ -1,20 +1,20 @@
 package app.editor;
 
-import animkit.AnimationAsset;
-import animkit.AnimationInstance;
-import animkit.ClipPlayer;
+import haxeon.animation.AnimationAsset;
+import haxeon.animation.AnimationInstance;
+import haxeon.animation.ClipPlayer;
 import animkit.scene.SkinnedModel;
 import app.SessionParticipant;
 import humankit.HumanBodyProxy;
 import humankit.HumanBodyView;
-import humankit.rig.HumanBone;
+import haxeon.animation.rig.HumanBone;
 import humankit.HumanCharacter;
 import humankit.HumanDescription;
 import humankit.HumanDisplay;
 import humankit.HumanGrip;
 import humankit.HumanLimb;
-import humankit.rig.HumanPose;
-import humankit.rig.HumanoidRig;
+import haxeon.animation.rig.HumanPose;
+import haxeon.animation.rig.HumanoidRig;
 import humankit.action.HumanReachTask;
 import humankit.HumanWalker;
 import humankit.sim.HumanActor;

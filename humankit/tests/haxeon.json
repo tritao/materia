@@ -18,12 +18,12 @@
       "libraries": ["nativekit", "nativekit_gpu", "nativekit_scene", "nativekit_scene_render", "animkit_core"],
       "inputs": [
         "../../animkit/tests/native/CMakeLists.txt",
-        "../../animkit/native/CMakeLists.txt",
-        "../../animkit/native/include/animkit.h",
-        "../../animkit/native/src/api.cpp",
-        "../../animkit/native/src/import.cpp",
-        "../../animkit/native/src/runtime.cpp",
-        "../../animkit/native/src/vendor.cpp",
+        "../../haxeon/packages/animation/native/CMakeLists.txt",
+        "../../haxeon/packages/animation/native/include/animkit.h",
+        "../../haxeon/packages/animation/native/src/api.cpp",
+        "../../haxeon/packages/animation/native/src/import.cpp",
+        "../../haxeon/packages/animation/native/src/runtime.cpp",
+        "../../haxeon/packages/animation/native/src/vendor.cpp",
         "../../scenekit/scene/CMakeLists.txt",
         "../../haxeon/vendor/nativekit/CMakeLists.txt"
       ]

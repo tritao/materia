@@ -3,7 +3,7 @@ package humankit.action;
 import humankit.HumanBody;
 import humankit.HumanLimb;
 import humankit.HumanTargetBox;
-import humankit.rig.HumanBone;
+import haxeon.animation.rig.HumanBone;
 
 /**
  * Chooses where a worker stands, how it faces and how it holds its body (crouched or kneeling, leaned, bent at the hips) to

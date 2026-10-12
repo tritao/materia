@@ -1,16 +1,19 @@
 # AnimKit
 
+The import, pose evaluation and CPU skinning implementation now lives in
+[Haxeon animation](../haxeon/packages/animation/README.md). This package keeps the SceneKit `SkinnedModel` adapter; the application owns its character assets.
+
 AnimKit imports glTF 2.0 characters and props and poses them with
 [ozz-animation](https://github.com/guillaumeblanc/ozz-animation). It is the
-animation layer that a future HumanKit will build on: one skeleton drives the
+animation layer HumanKit builds on: one skeleton drives the
 visible mesh, and later the collision proxy, landmarks, and attachments too.
 
 The package has three parts:
 
-- `native/`: the `animkit_core` library with a C ABI (`include/animkit.h`).
+- `native/`: a CMake compatibility entry point for Haxeon’s `animkit_core` library.
   It parses glTF with cgltf, decodes PNG/JPEG textures with stb_image, builds
   ozz skeletons and clips, and skins meshes on the CPU.
-- `haxe/animkit`: Haxe wrappers. `AnimationAsset` loads a file,
+- Haxeon’s `haxeon.animation`: shared Haxe wrappers. `AnimationAsset` loads a file,
   `AnimationInstance` blends up to four clip layers, solves up to four
   two-bone inverse kinematics chains on top (`setIk`: an end joint reaches a
   scene-space target with its middle joint pointing along a pole direction),
@@ -20,6 +23,11 @@ The package has three parts:
   SceneKit scene and republishes its geometry after each evaluation.
 
 ```haxe
+import haxeon.animation.AnimationAsset;
+import haxeon.animation.AnimationInstance;
+import haxeon.animation.ClipPlayer;
+import animkit.scene.SkinnedModel;
+
 var asset = AnimationAsset.load("animkit/assets/kenney/character-soldier.glb");
 var instance = new AnimationInstance(asset);
 var model = new SkinnedModel(scene, instance);
@@ -73,7 +81,7 @@ skinned deformation, looping, clamping, step keys, layer blending, the axis
 conversion, and error handling. The Haxe test drives the bundled CC0 Kenney
 soldier through a real scene.
 
-After changing `include/animkit.h`, regenerate the committed FFI interface:
+After changing Haxeon’s `packages/animation/native/include/animkit.h`, regenerate its committed FFI interface:
 
 ```sh
 animkit/native/tools/check-hxi.sh

@@ -1,10 +1,10 @@
 package humankit;
 
-import animkit.AnimationAsset;
-import animkit.AnimationInstance;
+import haxeon.animation.AnimationAsset;
+import haxeon.animation.AnimationInstance;
 import humankit.quality.Naturalness;
-import humankit.rig.HumanPose;
-import humankit.rig.HumanoidRig;
+import haxeon.animation.rig.HumanPose;
+import haxeon.animation.rig.HumanoidRig;
 
 /**
  * The natural ground speed of a looping locomotion clip. While a foot is

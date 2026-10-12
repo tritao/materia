@@ -1,13 +1,19 @@
 {
   "version": 1,
-  "package": { "name": "animkit" },
-  "sourceRoots": ["haxe"],
+  "package": {
+    "name": "animkit"
+  },
+  "sourceRoots": [
+    "haxe"
+  ],
   "scopeSourceRoots": false,
   "dependencies": {
-    "scenekit": { "path": "../scenekit" }
-  },
-  "ffi": {
-    "interfaces": ["native/bindings/animkit.hxi"]
+    "scenekit": {
+      "path": "../scenekit"
+    },
+    "haxeon-animation": {
+      "path": "../haxeon/packages/animation"
+    }
   },
   "target": "host"
 }

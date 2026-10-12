@@ -1,6 +1,6 @@
 package app;
 
-import animkit.AnimationAsset;
+import haxeon.animation.AnimationAsset;
 import app.editor.RobotLinkBounds;
 import app.editor.WorkerAssetPath;
 import app.editor.WorkerSceneTargets;
@@ -9,7 +9,7 @@ import humankit.HumanCharacter;
 import humankit.HumanDescription;
 import humankit.job.HumanJob;
 import humankit.job.HumanJobSpec;
-import humankit.rig.HumanoidRig;
+import haxeon.animation.rig.HumanoidRig;
 import humankit.action.Wait;
 import humankit.sim.HumanWorker;
 import humankit.sim.HumanWorkerSignals;

@@ -1,8 +1,8 @@
 package humankit;
 
-import humankit.rig.HumanBone;
-import humankit.rig.HumanPose;
-import humankit.rig.Mat4;
+import haxeon.animation.rig.HumanBone;
+import haxeon.animation.rig.HumanPose;
+import haxeon.animation.rig.Mat4;
 
 /**
  * A person's body measurements in metres. Measured from a rig's rest pose by

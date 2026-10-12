@@ -1,6 +1,6 @@
 package humankit;
 
-import humankit.rig.HumanBone;
+import haxeon.animation.rig.HumanBone;
 
 /**
  * One capsule of a body proxy. It runs from its `from` bone towards its `to`

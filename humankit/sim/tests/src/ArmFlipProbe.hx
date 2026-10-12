@@ -1,5 +1,5 @@
-import humankit.rig.HumanBone;
-import humankit.rig.Mat4;
+import haxeon.animation.rig.HumanBone;
+import haxeon.animation.rig.Mat4;
 
 /**
  * Diagnostic: one rack-to-table layout with a hinge allowed together with a crouch or kneel, printing the arm's bend
