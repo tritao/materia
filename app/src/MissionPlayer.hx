@@ -1691,8 +1691,11 @@ class MissionPlayer implements SessionMember {
     var run = screwRun;
     if (mission.steps[stepIndex].kind == "screw" && run != null) {
       if (run == recordedScrewRun) return;
-      screwRuns.push(run.runReport());
-      for (attempt in run.runReport().attempts) screwResults.push(attempt.result);
+      var report = run.runReport();
+      for (attempt in report.attempts) if (attempt.disposition == processkit.screwdriving.FasteningRunReport.ScrewDisposition.Rejected)
+        for (feeder in blowFeeds) if (feeder.model.transport.delivered == attempt.screw) feeder.confirmRejected(attempt.screw);
+      screwRuns.push(report);
+      for (attempt in report.attempts) screwResults.push(attempt.result);
       recordedScrewRun = run; return;
     }
     var active = screwing;

@@ -911,6 +911,16 @@ changes have not yet been rebuilt. `sd10-projectkit-pass` passes all existing
 checks. Ordinary optional-frame typing required explicit local null guards;
 no new compiler bug or Haxeon source/pin change is established.
 
+Source review found that a delivered identity was confirmed only after the
+threaded fixture carried it. A rejected primary screw remains in the physical
+reject bin, so MissionPlayer now releases that exact outstanding identity only
+after the fastening report records a completed rejection through its declared
+reject travel and release; the app also checks that the tool has let go and the
+nosepiece sensor is clear. The CAD acceptance now injects a cross-thread on the
+first blown screw and expects its presenter-fed reserve and later bowl
+deliveries to complete. This source correction has not yet been compiled or
+run.
+
 The first isolated build omitted `CADKIT_OCCT_DIR`; CadKit refused to configure
 and no OCCT was built. That failed build directory was moved out of its build
 path, and the successful retry uses the worktree's cached native libraries
@@ -1829,7 +1839,7 @@ still required. The earlier 21-test proof predates this wire extension.
 | SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71`, `7038a4fee` |
 | SD8 | done — virtual unchanged CAD mission, hardware owner/acquisition binding, scripted/TCP controller and repeated-STOP proofs pass; final full gate passed | `f19115ae0`, `84c004fab`, `40d2f9b66` |
 | SD9 | done — buffered bowl supply, scripted I/O, physical replenishment/jam/reset on both backends and portable export pass; final full gate passed | SD9 implementation in this commit |
-| SD10 | in progress — initial model/I/O and current wire checks pass; app/CAD/quick/full acceptance blocked by disk reserve | SD10 draft checkpoint |
+| SD10 | in progress — initial model/I/O and current wire checks pass; reject-bin accounting and a cross-thread CAD scenario added but unverified; app/CAD/quick/full acceptance blocked by disk reserve | SD10 draft checkpoint |
 
 ### SD8 hardware integration work (2026-10-11)
 

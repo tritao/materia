@@ -2205,7 +2205,7 @@ class ProjectSourceTests {
   /** Air delivery reaches the actual tool socket; the arm never visits a remote pickup nest. */
   static function checkBlowFeed(root:String):Void {
     var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.blow-feed.project.json");
-    for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (failure in ["none","missing","blocked","nose-jam","stop"]) {
+    for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (failure in ["none","damaged","missing","blocked","nose-jam","stop"]) {
       Sys.println('Blow-feed CAD: begin backend $backend, $failure');
       var generated = MateriaProjectRunner.loadProject(manifest), work = generated.mission;
       if (work == null || work.blowFeeds == null || work.blowFeeds.length != 1) throw "Blown flange lost its receiving path";
@@ -2221,14 +2221,28 @@ class ProjectSourceTests {
         var mission = simulation.missionPlayer(), clock = simulation.activeSession(), tools = @:privateAccess simulation.tools;
         if (mission == null || clock == null || tools == null || tools.blowFeeds.length != 1) throw "Blown flange lost its live device";
         var feeder = tools.blowFeeds[0];
+        var firstJob = materia.project.SceneScrewInvocation.job(work.steps[0].screw,work.steps);
+        if (firstJob == null) throw "Blown flange lost its first CAD fastening";
+        var original = simulation.environmentObject("project:"+firstJob.screw);
+        if (original == null) throw "Blown flange lost its first physical screw";
         if (failure == "missing") feeder.model.setTransitLoss(true);
         if (failure == "blocked") feeder.model.setBlocked(true);
         if (failure == "nose-jam") feeder.model.setNoseJam(true);
-        var stopped = false, witnessed:Map<String,Bool> = [];
+        var stopped = false, damaged = false, witnessed:Map<String,Bool> = [];
         while (!mission.finished && mission.failure == null && clock.simulationTime() < 600) {
           simulation.step();
           var reading = feeder.model.reading(), delivered = feeder.model.transport.delivered;
           if (reading != null && reading.present && delivered != null) witnessed.set(delivered,true);
+          if (failure == "damaged" && !damaged) {
+            if (tools.screwdrivers.length != 1) throw "Blown flange lost its screwdriver observer";
+            var driver = tools.screwdrivers[0];
+            var setup = @:privateAccess driver.setups.get(firstJob.slot);
+            if (setup != null && setup.screw == original) {
+              var priorWork = setup.work;
+              setup.work = () -> {var state = priorWork(); state.damagedLeadIn = true; return state;};
+              damaged = true;
+            }
+          }
           if (failure == "stop" && !stopped && feeder.model.airOn) {
             simulation.stop(); feeder.safe(); stopped = true;
             for (_ in 0...100) feeder.poll(clock.simulationTime());
@@ -2243,6 +2257,16 @@ class ProjectSourceTests {
           for (result in mission.screwResults) check(result.outcome == robotkit.tool.ScrewdriverContract.OK && Math.abs(result.torqueNm-16.5) < 1e-8,"Blow feed preserves the published M6 tightening target");
           check([for (id in witnessed.keys()) id].length == 4,"Every actual received body is witnessed at the tool");
           check(simulation.heldObjectIds().length == 0 && simulation.reset() && feeder.model.transport.bulk() == 4,"Blown inventory and physical poses reset together");
+        } else if (failure == "damaged") {
+          check(damaged && mission.finished && mission.failure == null && mission.completed == 4 && feeder.model.transport.deliveries == 4,
+            'Rejected blow-fed screw is physically accounted before the next delivery: ${mission.failure}');
+          check(mission.screwRuns.length == 4 && mission.screwRuns[0].attempts.length == 2 &&
+            mission.screwRuns[0].attempts[0].result.outcome == robotkit.tool.ScrewdriverContract.CROSS_THREAD &&
+            mission.screwRuns[0].attempts[0].disposition == processkit.screwdriving.FasteningRunReport.ScrewDisposition.Rejected &&
+            mission.screwRuns[0].installed() != firstJob.screw,
+            "CAD reject-bin confirmation releases the exact delivered identity and installs its declared reserve");
+          check([for (id in witnessed.keys()) id].length == 4 && simulation.heldObjectIds().length == 0,
+            "All four primary screws have measured receipt and the recovered cell releases the tool");
         } else if (failure == "stop") check(stopped,"Stop case reaches actual metering before explicit recovery");
         else check(mission.failure != null && (failure == "missing" ? mission.failure.indexOf("receipt") >= 0 : failure == "blocked" ? mission.failure.indexOf("blocked") >= 0 : mission.failure.indexOf("nosepiece") >= 0)
           && !feeder.model.airOn,"Missing receipt, tube block and receiver jam stop with their own diagnosis");

@@ -68,6 +68,14 @@ class SimulatedBlowFeed implements ScrewFeederDevice implements SimulationStepOb
   public function faultDetail():Null<String> return model.faultDetail();
   public function safe():Void model.safe();
   public function reset():Void {model.reset(); selected = null;}
+  /** Confirms disposal only after the fastening runner completed its declared reject travel and release. */
+  public function confirmRejected(identity:String):Void {
+    var job = selected;
+    if (job == null || job.screw != identity || job.recovery == null || model.transport.delivered != identity ||
+        driver.holding.held != null || present())
+      throw 'Blow-feed "${definition.id}" cannot confirm rejected screw "$identity" before measured release clear of the nosepiece';
+    model.confirmConsumed(identity);
+  }
   public function poll(time:Float):Void model.poll(time);
   public function afterSimulationStep(timestamp:Int64):Void {
     var state = runtime.snapshot();
