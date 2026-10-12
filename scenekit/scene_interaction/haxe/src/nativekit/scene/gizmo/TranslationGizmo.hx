@@ -7,20 +7,22 @@ private typedef WorldPrimitive = {final handle:TranslationHandle; final vertices
 /** Immutable translation layout and synchronous handle picker. No scene or UI ownership. */
 class TranslationGizmo {
   public final camera:GizmoCamera;
+  public final basis:GizmoBasis;
   public final pivot:GizmoVec3;
   public final worldSize:Float;
   public final hitRadius:Float;
   final geometry:Array<TranslationShape> = [];
   final worldGeometry:Array<WorldPrimitive> = [];
-  public function new(camera:GizmoCamera, pivot:GizmoVec3, pixels:Float = 90, hitRadius:Float = 8) {
+  public function new(camera:GizmoCamera, pivot:GizmoVec3, pixels:Float = 90, hitRadius:Float = 8, basis:Null<GizmoBasis> = null) {
     if (camera == null || pivot == null || !Math.isFinite(pixels) || pixels <= 0 || pixels > 512 || !Math.isFinite(hitRadius) || hitRadius <= 0 || hitRadius > 64)
       throw "Invalid translation gizmo layout";
+    this.basis = basis == null ? GizmoBasis.world() : basis;
     this.camera = camera; this.pivot = pivot; this.hitRadius = hitRadius;
     var projected = camera.project(pivot); worldSize = projected == null ? 0 : camera.worldLength(pivot, pixels);
     if (projected == null || !camera.contains(projected.x, projected.y) || !Math.isFinite(worldSize) || worldSize <= 0) return;
     var eyeDirection = camera.eye.subtract(pivot).normalized();
     for (handle in [AxisX, AxisY, AxisZ]) {
-      var direction = axis(handle);
+      var direction = this.basis.axis(handle);
       if (Math.abs(direction.dot(eyeDirection)) > 0.99) continue;
       var vertices = [pivot.add(direction.scaled(worldSize*0.16)), pivot.add(direction.scaled(worldSize))];
       var points = project(vertices);
@@ -31,7 +33,7 @@ class TranslationGizmo {
       worldGeometry.push({handle:handle, vertices:vertices});
     }
     for (handle in [PlaneXY, PlaneXZ, PlaneYZ]) {
-      var axes = planeAxes(handle), normal = axes[0].cross(axes[1]);
+      var axes = this.basis.planeAxes(handle), normal = axes[0].cross(axes[1]);
       if (Math.abs(normal.dot(eyeDirection)) < 0.2) continue;
       var vertices = [for (pair in [[0.22,0.22],[0.40,0.22],[0.40,0.40],[0.22,0.40]])
         pivot.add(axes[0].scaled(pair[0]*worldSize)).add(axes[1].scaled(pair[1]*worldSize))];
@@ -75,7 +77,7 @@ class TranslationGizmo {
   }
   public function begin(handle:TranslationHandle, x:Float, y:Float, snap:Float = 0):TranslationDrag {
     if (handle == null || pick(x, y) != handle) throw "Translation drag must begin on a visible picked handle";
-    return new TranslationDrag(camera, pivot, handle, x, y, snap);
+    return new TranslationDrag(camera, pivot, handle, x, y, snap, basis);
   }
   public static function axis(handle:TranslationHandle):GizmoVec3 return switch handle {
     case AxisX: new GizmoVec3(1,0,0); case AxisY: new GizmoVec3(0,1,0); case AxisZ: new GizmoVec3(0,0,1);

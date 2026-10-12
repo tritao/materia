@@ -40,6 +40,29 @@ class TranslationGizmoTests {
       var saved = drag.lastDelta; check(drag.update(Math.NaN,0) == null && drag.lastDelta == saved, "Invalid update discarded last valid proposal");
       check(drag.finish() == saved && drag.closed, "Finish did not return last valid proposal"); rejects(() -> drag.update(0,0)); rejects(() -> drag.finish());
     }
+    rejects(() -> new GizmoBasis(new GizmoVec3(2,0,0),new GizmoVec3(0,1,0),new GizmoVec3(0,0,1)));
+    rejects(() -> GizmoBasis.fromQuaternion(0,0,0,0));
+    rejects(() -> GizmoBasis.fromQuaternion(Math.NaN,0,0,1));
+    var basis = GizmoBasis.fromQuaternion(0,0,Math.sin(Math.PI/8),Math.cos(Math.PI/8));
+    var localCamera = new GizmoCamera(new GizmoVec3(0,14,10),pivot,new GizmoVec3(0,0,1),800,600);
+    var oriented = new TranslationGizmo(localCamera,pivot,90,8,basis);
+    check(oriented.shapes().length == 6, "Missing oriented handles");
+    for (handle in [AxisX,AxisY,AxisZ,PlaneXY,PlaneXZ,PlaneYZ]) {
+      var grab = center(shape(oriented,handle));
+      var axes = switch handle { case AxisX,AxisY,AxisZ: [basis.axis(handle)]; default: basis.planeAxes(handle); };
+      var eye = localCamera.eye.normalized();
+      var normal = axes.length == 1 ? eye.subtract(axes[0].scaled(axes[0].dot(eye))).normalized() : axes[0].cross(axes[1]);
+      var ray = localCamera.rayDirection(grab.x,grab.y);
+      var start = localCamera.eye.add(ray.scaled(normal.dot(pivot.subtract(localCamera.eye))/normal.dot(ray)));
+      var movement = axes[0].scaled(0.7); if (axes.length == 2) movement = movement.add(axes[1].scaled(-0.3));
+      var target = localCamera.project(start.add(movement)); if (target == null) throw "Missing oriented target";
+      var drag = oriented.begin(handle,grab.x,grab.y,0.5);
+      var zero = drag.update(grab.x,grab.y); check(zero != null && close(zero.dot(zero),0), "Oriented grab jumped");
+      var delta = drag.update(target.x,target.y);
+      var expected = axes[0].scaled(0.5); if (axes.length == 2) expected = expected.add(axes[1].scaled(-0.5));
+      check(delta != null && close(delta.x,expected.x) && close(delta.y,expected.y) && close(delta.z,expected.z), "Oriented snapping used World components");
+      drag.cancel();
+    }
     var followed = layout.translatedShapes(new GizmoVec3(0.5,0.0,0.0));
     check(followed.length == layout.shapes().length && followed[0].handle == layout.shapes()[0].handle, "Following geometry changed captured handles");
     var followedTip = followed[0].points()[1], expectedTip = view.project(new GizmoVec3(layout.worldSize+0.5,0,0));

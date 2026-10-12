@@ -12,16 +12,16 @@ class TranslationDrag {
   final initial:GizmoVec3;
   final snap:Float;
   @:allow(nativekit.scene.gizmo.TranslationGizmo)
-  private function new(camera:GizmoCamera, pivot:GizmoVec3, handle:TranslationHandle, x:Float, y:Float, snap:Float) {
+  private function new(camera:GizmoCamera, pivot:GizmoVec3, handle:TranslationHandle, x:Float, y:Float, snap:Float, basis:GizmoBasis) {
     if (!Math.isFinite(snap) || snap < 0) throw "Translation snap must be a finite nonnegative increment";
     this.camera = camera; this.pivot = pivot; this.handle = handle; this.snap = snap;
     switch handle {
       case AxisX, AxisY, AxisZ:
-        axes = [TranslationGizmo.axis(handle)];
+        axes = [basis.axis(handle)];
         var eye = camera.eye.subtract(pivot).normalized();
         normal = eye.subtract(axes[0].scaled(axes[0].dot(eye))).normalized();
       default:
-        axes = TranslationGizmo.planeAxes(handle); normal = axes[0].cross(axes[1]).normalized();
+        axes = basis.planeAxes(handle); normal = axes[0].cross(axes[1]).normalized();
     }
     var start = intersect(x, y); if (start == null) throw "Unstable translation drag start"; initial = start;
   }

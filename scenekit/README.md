@@ -148,3 +148,5 @@ or implementation code was imported:
 - [Godot viewport, 232e6b14](https://github.com/godotengine/godot/blob/232e6b14abf6e590b41d60f11704e42de22bff72/editor/scene/3d/node_3d_editor_viewport.cpp)
 - [Three.js TransformControls, a505186b](https://github.com/mrdoob/three.js/blob/a505186b5185088bd800de092568d0643e96bd75/examples/jsm/controls/TransformControls.js)
 - [ImGuizmo, 105e4fde](https://github.com/CedricGuillemet/ImGuizmo/blob/105e4fde45e4e74aae8973d98750820ef7aca7e2/src/ImGuizmo.cpp)
+
+Translation gizmos accept an optional immutable `GizmoBasis`; the default remains World axes. `GizmoBasis.fromQuaternion` produces rotation-only local axes from the consumer's composed World orientation. Scale and shear do not define movement axes. Drawing, picking, frozen drag constraints and snap coefficients share this basis. Snapping measures World distance along each chosen axis, relative to pointer-down.

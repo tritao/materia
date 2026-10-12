@@ -41,6 +41,26 @@ class CameraCompatibilityTests {
     drag.finish(); host.commitPositionPreview(token);
     check(host.revision==1 && Math.abs(host.entities()[1].x-visible.x)<0.00001,"Gesture did not commit one matching World pose");
     host.undo(1); check(host.source==source,"Consumer gesture undo lost exact source"); host.dispose();
+    var localHost = new BtSceneHost(source,new BtTransformBinding(File.getContent(Sys.programPath()+".descriptors.json")));
+    localHost.select("c102",0); var localInitial = localHost.entities()[1];
+    var basis = GizmoBasis.fromQuaternion(localInitial.qx,localInitial.qy,localInitial.qz,localInitial.qw);
+    var localLayout = new TranslationGizmo(snapshot,new GizmoVec3(localInitial.x,localInitial.y,localInitial.z),90,8,basis);
+    var localStart:Null<GizmoPoint> = null;
+    for (shape in localLayout.shapes()) if (shape.handle == AxisX) {
+      var points = shape.points(); localStart = new GizmoPoint((points[0].x+points[1].x)*0.5,(points[0].y+points[1].y)*0.5,points[0].depth);
+    }
+    if (localStart == null) throw "Missing local X handle";
+    var localDrag = localLayout.begin(AxisX,localStart.x,localStart.y,0.1), localToken = localHost.beginPositionPreview("c102",0);
+    var localDelta = localDrag.update(localStart.x+40,localStart.y); if (localDelta == null) throw "Missing local displacement";
+    check(Math.abs(localDelta.x)<0.000001 && Math.abs(localDelta.z)<0.000001 && Math.abs(localDelta.y)>0.01,"Local X did not follow composed parent rotation");
+    localHost.updateWorldDisplacement(localToken,[localDelta.x,localDelta.y,localDelta.z]);
+    var localVisible = localHost.displayEntities()[1];
+    check(localHost.source==source && localHost.revision==0 && Math.abs(localVisible.localX-1-localDelta.y/2)<0.00001 && Math.abs(localVisible.localY-2)<0.00001,"Local gesture inherited parent scale instead of inverse mapping movement");
+    localDrag.finish(); localHost.commitPositionPreview(localToken); localHost.undo(1);
+    check(localHost.source==source,"Local gesture undo lost exact source");
+    var cancelled = localHost.beginPositionPreview("c102",2);
+    localHost.updateWorldDisplacement(cancelled,[localDelta.x,localDelta.y,localDelta.z]); localHost.cancelPositionPreview(cancelled);
+    check(localHost.source==source && localHost.revision==2,"Local cancellation changed canonical state"); localHost.dispose();
     Sys.println("SceneKit translation solver to Documents parent-aware preview/commit/undo compatibility passed");
     Sys.println("Pinned SceneKit PerspectiveCamera and frozen gizmo ray/projection compatibility passed");
   }
