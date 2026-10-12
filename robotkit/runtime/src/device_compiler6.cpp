@@ -415,8 +415,8 @@ CompiledDevicePlan6 compile_once(
                         power *= host_tau;
                     }
                     const auto actuator_rate = std::abs(velocity * ratio);
-                    // The device steps at most once per `min_step_ticks`, counting with its f32 steps per unit.
-                    const auto steps = static_cast<double>(static_cast<float>(layout[actuator].steps_per_unit));
+                    // The device steps at most once per `min_step_ticks`; the layout's steps per unit are the wire's f32 value.
+                    const auto steps = layout[actuator].steps_per_unit;
                     if (actuator_rate * steps * layout[actuator].min_step_ticks > step_tick_hz + 1e-6)
                         return reject("actuator step-rate limit exceeded");
                 }

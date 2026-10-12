@@ -4758,8 +4758,7 @@ class ProjectSourceTests {
       check(motorRatio > 0, '$kind axis ${joint.id} has a motor');
       var ceiling = critical, channels = 0;
       for (channel in binding.channels) if (wired.joints[channel.jointIndex].id == joint.id) {
-        var pulseRate = binding.stepTickHz / (channel.minStepTicks *
-          robotkit.runtime.StepTicks.deployed(channel.stepsPerUnit));
+        var pulseRate = binding.stepTickHz / (channel.minStepTicks * channel.stepsPerUnit);
         ceiling = Math.min(ceiling, Math.min(channel.maxRate, pulseRate) / Math.abs(channel.ratio));
         channels++;
       }

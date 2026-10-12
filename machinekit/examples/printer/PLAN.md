@@ -1145,7 +1145,12 @@ left in the motion path.
 5. Replace `Std.isOfType(solver, AxisKinematics)` (which skips the clock-sampled task-space check) with a capability
    the solver declares (exact, affine kinematics).
 6. RKD6: send the step interval as an integer tick count so host and device cannot disagree (`PulseRate` now mirrors
-   the device's f32 arithmetic).
+   the device's f32 arithmetic). **Done.** The integer was already on the wire: wire revision 14 (`e7779c599`,
+   `SESSION_BEGIN6.min_step_ticks`, `robotkit.runtime.StepTicks`) replaced `max_rate`, and `PulseRate` no longer exists; the
+   device (`step_generator.rs`) only counts ticks. What was left was one mirror of the device's f32: the binding's steps
+   per unit (an f32 on the wire) was rounded again in `StepTicks.deployed`, the compiler's rate check and a test. The
+   binding now quantises its steps per unit once (`StepTicks.wire`) and plans, deploys and checks with that value, so
+   `deployed` and the compiler's `static_cast<float>` are gone; the binding tests assert the held value is the wire's.
 7. Decide whether the printer's axes take the motors' full rate with motor-space rows (see the AM5 notes on CoreXY motor
    limits), against the cube's print time.
 8. The corner arcs still lower to tens of thousands of sub-millisecond segments (`SmallTab`: 18,900 of 25,580 under
@@ -1224,6 +1229,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
+| AM5b | in progress: item 6 done (af87f34a7) | |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 

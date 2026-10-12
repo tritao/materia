@@ -4740,8 +4740,8 @@ class RobotWorldTests {
     equal(current.clockSyncBoundNs, haxe.Int64.ofInt(30000000), "v5 sync bound");
     equal(current.controller, "0123456789abcdef0123456789abcdef", "v5 names the board it is for");
     equal(current.binding.channels.length, 3, "the layout wires three channels");
-    // 200 full steps at 16 microsteps a turn; the lift's 8 mm lead gives its ratio.
-    check(Math.abs(current.binding.channels[0].stepsPerUnit - 3200.0 / (2.0 * Math.PI)) < 1e-9,
+    // 200 full steps at 16 microsteps a turn; the lift's 8 mm lead gives its ratio. The binding holds it as the wire carries it (f32).
+    check(Math.abs(current.binding.channels[0].stepsPerUnit - 3200.0 / (2.0 * Math.PI)) < 3200.0 / (2.0 * Math.PI) * 6e-8,
       "steps per radian come from the model and the wiring");
     equal(current.binding.channels[2].jointIndex, 2, "the lift's channel drives the lift joint");
     check(current.binding.model.actuators[2].requireRate() > 0.0,

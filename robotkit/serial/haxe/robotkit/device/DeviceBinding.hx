@@ -121,7 +121,7 @@ class DeviceBinding {
       var setting = actuator.microsteps, driverRate = actuator.maxStepRate;
       if (setting == null || driverRate == null)
         throw 'Stepper actuator "$name" requires microsteps and a driver step-rate ceiling';
-      var stepsPerUnit = actuator.fullStepsPerRevolution * setting / (2.0 * Math.PI);
+      var stepsPerUnit = StepTicks.wire(actuator.fullStepsPerRevolution * setting / (2.0 * Math.PI));
       var pulseRate:Float = Math.min(stepTickHz, driverRate);
       var ceiling = pulseRate / stepsPerUnit;
       var motorRate = actuator.planningRate();
@@ -129,7 +129,7 @@ class DeviceBinding {
       // The device steps at most once per `ticks` (an integer chosen here, from the driver's ceiling and the
       // motor's speed in deployed steps), so planning uses the rate those ticks reach, never more.
       var ticks = StepTicks.forLimit(motorRate == null ? driverRate
-        : Math.min(driverRate, motorRate * StepTicks.deployed(stepsPerUnit)), stepTickHz);
+        : Math.min(driverRate, motorRate * stepsPerUnit), stepTickHz);
       var feedbackJoint = -1, feedbackRatio = 0.0, feedbackOffset = 0.0;
       switch actuator.transmission {
         case SimpleTransmission(shaft, directRatio, directOffset):

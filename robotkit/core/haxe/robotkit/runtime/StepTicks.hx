@@ -16,12 +16,15 @@ class StepTicks {
     return Std.int(Math.ceil(tickHz / stepsPerSecond));
   }
 
-  /** The rate, in units per second, a device stepping every `ticks` reaches with its f32 `stepsPerUnit`. */
+  /** The rate, in units per second, a device stepping every `ticks` reaches with `stepsPerUnit` (already `wire`). */
   public static function rate(ticks:Int, stepsPerUnit:Float, tickHz:Int):Float
-    return tickHz / (ticks * deployed(stepsPerUnit));
+    return tickHz / (ticks * stepsPerUnit);
 
-  /** Steps per unit as the device holds them (f32 on the wire). */
-  public static function deployed(stepsPerUnit:Float):Float {
+  /**
+   * Steps per unit as the wire carries them (f32). The binding quantises its steps per unit here once and
+   * plans, deploys and checks with that value, so no later stage has to mirror the device's rounding.
+   */
+  public static function wire(stepsPerUnit:Float):Float {
     var wire = haxe.io.Bytes.alloc(4);
     wire.setFloat(0, stepsPerUnit);
     return wire.getFloat(0);

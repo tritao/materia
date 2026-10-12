@@ -12,6 +12,7 @@ import robotkit.model.JointType;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.Transmission;
+import robotkit.runtime.StepTicks;
 
 /** The join of a machine model and a deployment's wiring into the device's actuator layout. */
 class DeviceBindingTests {
@@ -35,7 +36,7 @@ class DeviceBindingTests {
       {"index": 0, "actuator": "motor", "direction": -1, "direction_setup_ticks": 2}]}'));
     var binding = DeviceBinding.bind(model, layout, 20000);
     var channel = binding.channels[0];
-    near(channel.stepsPerUnit, 3200.0 / (2.0 * Math.PI), "steps per radian from the motor's steps and the driver's microsteps");
+    near(channel.stepsPerUnit, StepTicks.wire(3200.0 / (2.0 * Math.PI)), "steps per radian from the motor's steps and the driver's microsteps");
     near(channel.ratio, Math.PI * 1000.0, "a reversed driver flips the composed screw ratio");
     check(channel.jointIndex == 0 && channel.directionSetupTicks == 2, "the channel follows the independent carriage leader");
     near(channel.maxRate, 20000.0 / channel.stepsPerUnit, "the step tick caps the actuator's rate below its own 100 rad/s");
@@ -63,14 +64,13 @@ class DeviceBindingTests {
     near(slow.channels[0].maxRate, 10.0, "an actuator slower than the step tick keeps its rate");
     // 10 rad/s requests a non-integral pulse interval. A continuous ceiling
     // would leave physical counters chasing the plan after its nominal stop.
-    var wire = Bytes.alloc(8);
-    wire.setFloat(0, slow.channels[0].maxRate);
-    wire.setFloat(4, slow.channels[0].stepsPerUnit);
-    var stepInterval = Math.ceil(20000 / (wire.getFloat(0) * wire.getFloat(4)));
+    var steps = slow.channels[0].stepsPerUnit;
+    check(StepTicks.wire(steps) == steps, "the binding holds steps per unit as the wire carries them");
+    var stepInterval = slow.channels[0].minStepTicks;
     check(slow.model.actuators[0].requireRate() < slow.channels[0].maxRate,
       "integer pulse spacing tightens a non-integral rate ceiling");
-    near(slow.model.actuators[0].requireRate(), 20000 / (stepInterval * wire.getFloat(4)),
-      "planner speed matches the pulse generator's deployed f32 settings");
+    near(slow.model.actuators[0].requireRate(), 20000 / (stepInterval * steps),
+      "planner speed is the rate the whole step ticks reach");
     var unlimited = DeviceBinding.bind(axisModel(null), layout, 20000);
     near(unlimited.channels[0].maxRate, 20000.0 / channel.stepsPerUnit, "an unlimited actuator takes the step tick's ceiling");
     near(channel.feedbackRatio, -1.0, "physical shaft feedback retains the direct reversed transmission");
@@ -126,7 +126,7 @@ class DeviceBindingTests {
       "the axis names its driver speed ceiling");
     var automatic = DeviceLayout.forActuators(pulseLimited);
     var fastBoard = DeviceBinding.bind(pulseLimited, automatic, 100000);
-    near(fastBoard.channels[0].maxRate, 10000.0 / fastBoard.channels[0].stepsPerUnit,
+    near(fastBoard.channels[0].maxRate, Math.min(driverCeiling, 10000.0 / fastBoard.channels[0].stepsPerUnit),
       "a faster board clock respects the driver's maximum pulse rate");
     var slowBoard = DeviceBinding.bind(pulseLimited, automatic, 5000);
     near(slowBoard.channels[0].maxRate, 5000.0 / slowBoard.channels[0].stepsPerUnit,
