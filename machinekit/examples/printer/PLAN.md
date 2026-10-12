@@ -1414,11 +1414,11 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM7 | done | see the commit below |
 | AM8 | done | see the commits below |
 | AM9 | done | see the commit below |
-| AM9b | done (AM5b item 9's session) | see the commits below |
+| AM9b | done (AM5b item 9's session) | 970440ac8 |
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
-| AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10, 3 and 9 and belt damping done | see the commits below |
+| AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10, 3 and 9 and belt damping done; item 7 left to the user | item 6 c6d2df30a, 52eaa27db; item 1 7f392fd39; item 5 71b2c6c5a; item 4 1859d5f56; item 8 3891585f4; item 11 b7320e39f; item 10 43de352f0; item 3 b5a86c01d; item 9 970440ac8; belt damping 54326ccc7 |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 
@@ -1499,3 +1499,12 @@ segment printed oversize and trimmed (hybrid accuracy); a ribbed panel (sparse i
 **Later.** Robot-arm or track-arm deposition (non-planar), the L35 class with a melt pump and closed-loop melt pressure, an IR camera in the simulation, real hardware.
 
 **Order.** PL0 -> PL1 -> PL2 -> (PL3 -> PL4) and (PL5 -> PL6) in parallel -> PL7 -> PL8 -> PL9 -> PL10 -> PL11 -> PL12.
+
+**Rebased onto main f28178ac7 (2026-10-12).** Conflicts were list merges (Start-page catalog, component registry, test source roots, project-source roots) and the
+versions: main moved `SceneArtifact` to 29, `AssemblyDefinitionCodec` to 10 and kept `MachineAssembly` at 18, so ours are now 32, 11 and 19 (`RobotModel` 14
+was free), with the old projectkit hydraulic fixture and the old-version list regenerated. Full `am-suite.sh`: every stage green except main's own breakages,
+none of them in the printer's path: `humankit-sim` and `visionkit` blocked (native builds), `robotkit-mujoco` (posed tool shapes lose tool-piece identity), the
+press brake's `ram returns to its measured top switch` in the app project-source suite (the same q = -0.0001076 m on a sheet-metal worktree before the rebase,
+so not ours), and the editor's Start-page test (`press-brake` has no category in `ExampleBrowser.categoryOf`), which stops that suite at its first failure. The
+checks after the app's first failure were run one by one: printer, corexy, belts, mobile, controls and tending all pass. The full cube prints in 1031.1 s of
+simulated time in 74 s of wall time (13.9x), with the results above unchanged.
