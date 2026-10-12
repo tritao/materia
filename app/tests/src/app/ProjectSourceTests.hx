@@ -635,11 +635,14 @@ class ProjectSourceTests {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/materia.project.json");
     var ends:Array<Float> = [], finishes:Array<Int> = [], rings:Array<Float> = [], swings:Array<Int> = [];
     var step = 0.0;
-    for (shaped in [false, true]) {
+    // The move plain, shaped for the belts' frequency, and shaped for a frequency ten percent off either way.
+    var variants = [{shaped: false, detune: 1.0}, {shaped: true, detune: 1.0}, {shaped: true, detune: 0.9}, {shaped: true, detune: 1.1}];
+    for (variant in variants) {
       var generated = MateriaProjectRunner.loadProject(manifest);
       var job = generated.printJob;
       if (job == null || job.shaping == null) throw "the printer example states no input shapers";
-      if (!shaped) job.shaping = null;
+      if (!variant.shaped) job.shaping = null;
+      else for (shaper in job.shaping) shaper.frequency *= variant.detune;
       // Only motion: a move to the start, a pause, then the 50 mm move that is measured; no heating, no extrusion.
       job.source = "G21\nG90\nM83\nG0 X30 Y30 F9000\nG4 P1000\nG1 X80 Y30 F9000\n";
       var session = new ProjectDocumentSession(null, false);
@@ -701,17 +704,20 @@ class ProjectSourceTests {
       simulation.dispose();
       session.dispose();
     }
-    check(Math.abs(ends[0] - 0.080) <= 20e-6 && Math.abs(ends[1] - 0.080) <= 20e-6,
-      'both moves end at X 80 mm: ${ends[0] * 1000} and ${ends[1] * 1000} mm');
+    for (end in ends) check(Math.abs(end - 0.080) <= 20e-6, 'every move ends at X 80 mm: ${[for (value in ends) value * 1000].join(", ")} mm');
     // The belts' damping ratio rides into the simulation (the printer's states 0.1): the carriage, which the device leaves to
-    // the belts, swings through its rest position instead of creeping to it. How much a shaper takes out of that swing is the
-    // gate's analytic check (356 um plain, 7 um shaped on x): the carriage swings at about 5 Hz in the multi-body
-    // printer, not the belts' 53 Hz, so the shaper's notch does not line up with it (PLAN, X9).
+    // the belts, swings through its rest position instead of creeping to it, at the belts' frequency (the gate's analytic
+    // check and the simulation agree on the plant). A shaper at that frequency, and one ten percent either side of it,
+    // leave at least five times less of that swing.
     check(rings[0] > 100e-6 && swings[0] >= 2, 'the plain move leaves the carriage swinging in MuJoCo: ${rings[0] * 1e6} um, ${swings[0]} crossings');
+    for (index in 1...variants.length)
+      check(rings[index] * 5.0 <= rings[0], 'shaped at ${Math.round(variants[index].detune * 100)} % of the belts\' frequency the carriage swings ' +
+        '${rings[index] * 1e6} um, the plain move ${rings[0] * 1e6} um: under 5x less');
     var later = (finishes[1] - finishes[0]) * step;
     check(later >= 0.01 && later <= 0.06, 'the shaped move completes ${later * 1000} ms after the plain one (the shapers\' delay and tail)');
-    Sys.println('printer shaping: both moves end within ${Math.round(Math.max(Math.abs(ends[0] - 0.080), Math.abs(ends[1] - 0.080)) * 1e7) / 10} um of X 80 mm in MuJoCo; ' +
-      'the shaped one completes ${Math.round(later * 1000)} ms later; the carriage swings ${Math.round(rings[0] * 1e6)} um plain and ${Math.round(rings[1] * 1e6)} um shaped, ${swings[0]} and ${swings[1]} crossings');
+    Sys.println('printer shaping: the moves end within ${Math.round(Math.max(Math.max(Math.abs(ends[0] - 0.080), Math.abs(ends[1] - 0.080)), Math.max(Math.abs(ends[2] - 0.080), Math.abs(ends[3] - 0.080))) * 1e7) / 10} um of X 80 mm in MuJoCo; ' +
+      'the shaped one completes ${Math.round(later * 1000)} ms later; the carriage swings ${Math.round(rings[0] * 1e6)} um plain and ${Math.round(rings[1] * 1e6)} um shaped ' +
+      '(${Math.round(rings[0] / Math.max(rings[1], 1e-9))}x less; ${Math.round(rings[2] * 1e6)} um at -10 %, ${Math.round(rings[3] * 1e6)} um at +10 %), ${swings[0]} crossings plain');
   }
 
   /**

@@ -558,7 +558,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
 	}
-	struct rk_simulation_robot_desc @layout(3881856, 8) {
+	struct rk_simulation_robot_desc @layout(3882880, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		flags: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -683,6 +683,13 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		tool_shape_count: u32 @offset(3854844);
 		tool_shapes: array<rk_simulation_link_shape, 16> @offset(3854848);
 		tool_shape_gap: array<f64, 16> @offset(3881728);
+		/**
+		 * Appended tail: how stiffly a virtual-device actuator holds the joint it measures, in that joint's coordinate
+		 * (N/m or N m/rad) with its damping. A stepper that drives a compliant coupling holds its pulley as a spring of its
+		 * torque-angle stiffness; zero keeps the simulation's default position loop.
+		 */
+		virtual_device_actuator_hold_stiffness: array<f64, 64> @offset(3881856);
+		virtual_device_actuator_hold_damping: array<f64, 64> @offset(3882368);
 	}
 	/**
 	 * World-frame twist of one body: metres per second and radians per second.

@@ -76,6 +76,11 @@ class SimulationSpace {
 		var interval = blueprint.pneumaticStabilityInterval();
 		if (rate > 0.0) interval = Math.min(interval,
 			Math.min(1.0 / rate, blueprint.servoStabilityInterval()));
+		requireInterval(interval);
+	}
+
+	/** Steps the world at least this finely (a spring integrated explicitly, a stiff cushion), and implicitly. */
+	public function requireInterval(interval:Float):Void {
 		if (!Math.isFinite(interval) || !(interval > 0.0)) return;
 		requiredSubsteps = Std.int(Math.max(requiredSubsteps, Math.ceil(timestep / interval)));
 		integrator = NativeKitSimConstants.NKSIM_INTEGRATOR_IMPLICIT_FAST;

@@ -1093,7 +1093,7 @@ Done. What was built and decided:
   and treats `RK_ERROR_QUEUE_FULL` as flow control (the chunk goes again later), not a fault.
 - **Resonances come from the model.** The gate checks each axis's shaper frequency against the drive model (`DriveLoads.forAxis`: the mass the axis
   moves on the stiffness of its belts, x 0.748 kg on 84,238 N/m = 53.4 Hz, y 1.806 kg on 84,238 N/m = 34.4 Hz) to ten percent.
-- **Acceptance (the printing gate, `shapingChecks`).** A 50 mm step move along x, along y and on the diagonal, planned plain and shaped; the carriage
+- **Acceptance (the printing gate, `shapingChecks`; also in MuJoCo, see Belts in MuJoCo below).** A 50 mm step move along x, along y and on the diagonal, planned plain and shaped; the carriage
   (that mass on those belts, damping 0.1, the plan driving the far end of the belts, integrated at 20 us) is left shaking for 356 -> 7 um on x
   (51.8x), 370 -> 8 um on y (48.6x), and 59 -> 1 um and 361 -> 7 um on the diagonal (44x and 48x); at the design frequency and ten percent either side
   of it every case drops at least 5x. The shaped plan is the plain one lagging by the shaper's mean delay and ending its tail later (233 ms against
@@ -1104,15 +1104,50 @@ Done. What was built and decided:
   `nksim_joint_coupling_desc.damping_ratio`, the runtime blueprint's `coupling_damping_ratio`, the belt model's `TimingBelt` statement, the assembly
   records; zero is critical, so the default is unchanged). Saved formats: `RobotModel` 14, `AssemblyDefinitionCodec` 9, `MachineAssembly` schema 18, the
   older ones rejected. The printer's belts state `SHAPER_DAMPING` (0.1); a simkit unit test shows a force-pushed leader overshooting 85 % at 0.1 and not at
-  the default. Two findings on the way: (1) the soft constraint's frequency now comes from the compliance over the inertia the leaders carry (the load),
-  not the follower's, which is a few grams of pulley held by its drive; (2) a virtual device drove every joint to its reconstructed state with a huge
+  the default. Two findings on the way: (1) the soft constraint's frequency came from the compliance over the inertia the leaders carry (the load), not the
+  follower's, which is a few grams of pulley held by its drive (this was not enough: see the next paragraph); (2) a virtual device drove every joint to its reconstructed state with a huge
   force (and the rest hold kept the carriage), so no coupling could stretch: it now drives only the joints its actuators measure, and the loads of a
   compliant coupling (carriage, gantry and the idlers that turn with them) are left to the physics. The snapshot still reports the device's view (a machine
-  knows only its motors), so the test reads the carriage's link pose (`ApplicationSimulation.physicalLinkPosition`). **Result and limit:** the carriage
-  now swings in MuJoCo (4 crossings of its rest position, 3.1 mm plain and 1.8 mm shaped over the first 150 ms), but at about 5 Hz, not the belts' 53 Hz,
-  so the shaper's notch does not line up and the simulation does not show the 5x. The multi-body printer's soft equality (two sum rows on x and y, MuJoCo's
-  impedance) does not yet have the belts' stiffness over the carriage's mass as its frequency: calibrating it is open. **The acceptance of the shaping
-  stays the gate's analytic check** (356 um plain, 7 um shaped on x), with `printer-shaping` asserting that the simulated carriage swings.
+  knows only its motors), so the test reads the carriage's link pose (`ApplicationSimulation.physicalLinkPosition`).
+  **The 5 Hz, found and fixed (AM5b follow-up).** The carriage swung at about 5 Hz, not the belts' 53 Hz (x 0.748 kg on 84,238 N/m)
+  and 34 Hz (y). Three causes, found by a minimal simkit test (`a_belt_carriage_rings_at_its_belt_frequency`: a carriage of
+  0.748 and 1.806 kg on 84,238 N/m, a pulley of 20 g and of 200 g held by a drive, a step of the command; the test measures
+  the frequency from the upward crossings and the damping ratio from the decay, and asserts both within 3 % and 0.02):
+  1. *The soft equality was not a spring.* MuJoCo spends the force `I (a_ref - a_free) / A` on a constraint row, `A = J M^-1 J^T` the
+     inverse inertia of the constraint (the lightest body it joins, which on a belt is the pulley held by its drive: 5 g, or its
+     reflected rotor) and `I` its impedance (0.9 to 0.95 by default). The old mapping took the time constant from the
+     carriage's mass alone, so the force was the pulley's mass times the reference: a belt a hundred times too soft; and at
+     that impedance the drive's own force passes through the row (the stretch's acceleration is forced), so with a constant
+     impedance near 1 the belt does not stretch at all. A soft constraint cannot be made into a spring without knowing `A`
+     and keeping `I` small, so **a coupling with stiffness is now a spring**: the fixed tendon of the stretch (the leaders'
+     motion less the follower's) carries MuJoCo's passive spring and damper, `K` in the follower's coordinate and
+     `C = 2 zeta sqrt(K / L)` with `L = sum(ratio^2 / m_leader)` the load's inverse inertia, so the damping ratio is the carriage's
+     whatever the pulley weighs. A coupling without stiffness stays an equality.
+  2. *A follower with two leaders was half as stiff.* A CoreXY pulley follows x and y; the old row took the terms' compliances in
+     series (a belt that two carriages share came out with half the stiffness the drive model gives, 42,074 N/m on x
+     against 84,238). It is one belt: the row has the terms' mean stiffness (each term's value is the belt's seen from its
+     leader), the damping ratios weighted by stiffness.
+  3. *The pulley was held by a ten hertz position loop.* The virtual device drives a stepper's pulley with the backend's default
+     position target (a computed-torque loop of 10 Hz, critically damped), which is softer than the belt it drives
+     (0.03 N m/rad against 1.7): the carriage rang on the loop, not on the belt. A stepper holds its rotor with its
+     torque-angle stiffness, the holding torque times the rotor teeth (a quarter of its full steps) per radian (0.45 N m x 50 =
+     22.5 N m/rad for the printer's), and now the device holds a pulley a belt stretches from (the follower of a coupling with
+     stiffness) with that, in series with the belt (4 % of the frequency), critically damped on the inertia it turns; where the load
+     is rigid there is no belt to be softer than and nothing changes. The ABI grows a tail on `rk_simulation_robot_desc`
+     (`virtual_device_actuator_hold_stiffness`, `_damping`; `VirtualActuatorOptions.holdStiffness`, `holdInertia`, filled by
+     `DeviceBinding` from the actuator's `StepperDrive`), and the world is stepped at the finer interval the hold needs
+     (`0.5 sqrt(I / S)`, `SimulationSpace.requireInterval`).
+  A belt's spring is integrated explicitly and the damper on a pulley of grams is stiff, so the backend steps a world with belts
+  on `implicitfast` and divides the caller's step until `0.5 / sqrt(K A)` is resolved (a free pulley on the gantry turns at 300 rad/s,
+  its picker runs at 10 ms): found when the gantry blew up at the first try. **Known gap:** a servo that drives a belt's pulley
+  (no machine in the repository does; the gantry's pulleys follow servo axes) still reflects its load into the stability interval
+  as if the belt were rigid (`RobotRuntimeCompiler`).
+  **Numbers.** The printer's carriage in MuJoCo (the 50 mm move of `printer-shaping`, a tick of a millisecond): 247 to 251 um
+  left shaking plain, 9 to 11 um shaped (23x to 28x less), **8 um at a shaper tuned 10 % low and 22 to 24 um at 10 % high (10x to 31x
+  less)**, 30 crossings in 0.3 s (about 53 Hz) where it had 4 crossings in 0.15 s (5 Hz) and a shaped move leaving 1.8 mm against
+  3.1 mm. The gate's analytic check says 356 um plain and 7 um shaped for the same move; MuJoCo's finite holding stiffness and the
+  plan's sampling make the plain residual smaller, and the two agree on the shaper's effect. **`printer-shaping` now asserts the
+  5x in MuJoCo** (plain, shaped, 90 % and 110 % of the belts' frequency) and the gate keeps the analytic check.
 - **Tests.** `PlannerTests.testShapedTrajectoryIsTheWeightedSumOfDelays` (the sum of delays, limits not raised, the shapers' amplitudes and
   residuals, refusals), the C++ `motionkit_path` test (`mk_shape_trajectory`: sums of delays, a delay-only joint, three refusals), `ProjectKitTests` (shaper
   round trip and five rejections), the printing gate (`shapingChecks`; `PRINTING_BENCHMARK_ONLY=shaping` alone), `printer-shaping` in the app.
@@ -1440,7 +1475,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
-| AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10, 3, 9 and 7 and belt damping done | item 6 c6d2df30a, 52eaa27db; item 1 7f392fd39; item 5 71b2c6c5a; item 4 1859d5f56; item 8 3891585f4; item 11 b7320e39f; item 10 43de352f0; item 3 b5a86c01d; item 9 970440ac8; belt damping 54326ccc7; item 7 (axes at the motors' rate) see the commits below |
+| AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10, 3, 9 and 7 and belt damping done | item 6 c6d2df30a, 52eaa27db; item 1 7f392fd39; item 5 71b2c6c5a; item 4 1859d5f56; item 8 3891585f4; item 11 b7320e39f; item 10 43de352f0; item 3 b5a86c01d; item 9 970440ac8; belt damping 54326ccc7; item 7 (axes at the motors' rate) and the belt spring in MuJoCo with the shaping acceptance there: see the commits below |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 

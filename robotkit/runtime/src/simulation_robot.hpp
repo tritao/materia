@@ -1,6 +1,7 @@
 #ifndef ROBOTKIT_SIMULATION_ROBOT_HPP
 #define ROBOTKIT_SIMULATION_ROBOT_HPP
 
+#include <optional>
 #include "robotkit_runtime.hpp"
 #include "robotkit_simkit.h"
 #include "nativekit_sim.h"
@@ -121,6 +122,10 @@ private:
     // Joints a virtual device does not drive: the loads of a compliant coupling (a belt's carriage) move as the
     // physics lets them, not as the device's reconstructed state says.
     std::vector<uint8_t> device_free_;
+    // Where the device said each driven joint was at the last tick: its servo's velocity is the change over a step.
+    std::vector<std::optional<double>> device_previous_;
+    // The device's holding stiffness and damping of the joints it measures, in the joint's coordinate; zero is the default loop.
+    std::vector<double> device_hold_stiffness_, device_hold_damping_;
     /** Seconds between commands, to estimate a servo's velocity target from successive positions. */
     double step_ = 0.01;
     std::vector<nksim_joint_target> pending_targets_;

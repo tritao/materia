@@ -265,6 +265,7 @@ class RobotModel {
       Every descendant contributes its rotated tensor and parallel-axis term.
       Simulation uses the live articulated mass matrix for acceleration feedforward. */
   @:allow(robotkit.model.DriveLoads)
+  @:allow(robotkit.device.DeviceBinding)
   function turningInertia(joint:Joint):Float {
     if (joint.type == JointType.Prismatic) return carriedMass(joint) + joint.armature;
     var childFrame = jointFrame(joint.childFramePosition, joint.childFrameRotation);

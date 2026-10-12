@@ -382,6 +382,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         return RK_ERROR_INVALID_ARGUMENT;
     std::shared_ptr<VirtualDeviceEndpoint> virtual_endpoint;
     std::vector<std::size_t> device_measured_joints;
+    // How stiffly the device's actuators hold the joints they measure (zero: the default position loop).
+    std::vector<double> device_hold_stiffness(blueprint.joint_count, 0.0), device_hold_damping(blueprint.joint_count, 0.0);
     if (robot_desc &&
         robot_desc->virtual_device_enabled) {
 #if !defined(RK_HAS_VIRTUAL_DEVICE)
@@ -461,7 +463,18 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 config.inputs.push_back(std::move(input));
             }
         }
-        for (const auto &actuator : config.actuators) device_measured_joints.push_back(actuator.measured_joint());
+        for (std::size_t index = 0; index < config.actuators.size(); ++index) {
+            const auto joint = config.actuators[index].measured_joint();
+            device_measured_joints.push_back(joint);
+            const auto stiffness = robot_desc->virtual_device_actuator_hold_stiffness[index];
+            const auto damping = robot_desc->virtual_device_actuator_hold_damping[index];
+            if (!std::isfinite(stiffness) || stiffness < 0.0 || !std::isfinite(damping) || damping < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
+            if (joint < blueprint.joint_count) {
+                device_hold_stiffness[joint] = stiffness;
+                device_hold_damping[joint] = damping;
+            }
+        }
         virtual_endpoint = VirtualDeviceEndpoint::create(blueprint, config);
         if (!virtual_endpoint) return RK_ERROR_INVALID_ARGUMENT;
 #endif
@@ -942,6 +955,9 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         topology_update = false;
         require_sim(topology_result, "nksim_world_end_topology_update");
         binding->device_free_.assign(blueprint.joint_count, 0);
+        binding->device_previous_.assign(blueprint.joint_count, std::nullopt);
+        binding->device_hold_stiffness_ = std::move(device_hold_stiffness);
+        binding->device_hold_damping_ = std::move(device_hold_damping);
         if (virtual_endpoint && robot_desc) {
             // A device drives the joints its actuators measure. The rest of a compliant coupling is left to the physics.
             std::vector<uint8_t> measured(blueprint.joint_count, 0);
@@ -1957,6 +1973,16 @@ rk_result Simulation::submit(const nksim_tick &tick) {
                 target.mode = NKSIM_JOINT_TARGET_POSITION;
                 target.target = positions[joint];
                 target.max_force = 1e9;
+                // A stepper that holds a belt's pulley holds it as a spring of its own stiffness to where the device says
+                // the pulley is, not as the default position loop (a softer spring than the belt it drives).
+                if (binding->device_hold_stiffness_[joint] > 0.0) {
+                    target.mode = NKSIM_JOINT_TARGET_SERVO;
+                    target.stiffness = binding->device_hold_stiffness_[joint];
+                    target.damping = binding->device_hold_damping_[joint];
+                    target.velocity = binding->device_previous_[joint].has_value()
+                        ? (positions[joint] - *binding->device_previous_[joint]) / binding->step_ : 0.0;
+                    binding->device_previous_[joint] = positions[joint];
+                }
                 targets.push_back(target);
             }
         }

@@ -10,6 +10,7 @@
 #include <atomic>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -940,6 +941,13 @@ public:
     nksim_result step(double dt, std::uint32_t substeps) override {
         if (!model || !data || !std::isfinite(dt) || dt <= 0.0 || substeps == 0)
             return NKSIM_ERROR_INVALID_ARGUMENT;
+        // A belt's spring is integrated explicitly: a light pulley on it resolves the stretch at a rate the caller's step
+        // may not (a free pulley on a gantry turns at hundreds of radians a second), so the step is divided until it does.
+        // Its damper on a pulley of grams is stiffer still: the integrator that takes dampers implicitly is the one for it.
+        if (coupling_interval < dt)
+            substeps = std::max(substeps, static_cast<std::uint32_t>(std::ceil(dt / coupling_interval)));
+        if (std::isfinite(coupling_interval) && model->opt.integrator == mjINT_EULER)
+            model->opt.integrator = mjINT_IMPLICITFAST;
         model->opt.timestep = dt / static_cast<double>(substeps);
         // Topology owns the physical response; only the integration floor changes here.
         for (const auto &response : coupling_responses) {
@@ -1298,13 +1306,14 @@ private:
             if (follower == joints.end() || joints.find(coupling.leader) == joints.end())
                 return NKSIM_ERROR_INVALID_STATE;
             std::size_t terms = 0;
-            bool first = true;
+            bool first = true, soft = false;
             for (std::size_t other = 0; other < couplings.size(); ++other)
                 if (couplings[other].follower == coupling.follower) {
                     ++terms;
+                    soft |= couplings[other].stiffness > 0.0;
                     if (other < index) first = false;
                 }
-            if (terms == 1) {
+            if (terms == 1 && !soft) {
                 // One leader: a joint equality, follower = ratio * leader + offset.
                 const auto leader = joints.find(coupling.leader);
                 auto *equality = mjs_addEquality(spec, nullptr);
@@ -1320,7 +1329,7 @@ private:
                 continue;
             }
             if (!first) continue;
-            // Several leaders: a fixed tendon of sum(ratio_i * leader_i) - follower, held by a tendon
+            // Several leaders (or a belt): a fixed tendon of sum(ratio_i * leader_i) - follower, held by a tendon
             // equality at minus the summed offsets, so follower = sum(ratio_i * leader_i + offset_i).
             // Like the joint equality, the constraint is measured from the joints' reference pose.
             const std::string tendon_name = "nksim_coupling_" + std::to_string(coupling.follower);
@@ -1335,6 +1344,9 @@ private:
                 if (!mjs_wrapJoint(tendon, leader->second.name.c_str(), term.ratio)) return NKSIM_ERROR_BACKEND;
                 offsets += term.offset;
             }
+            // A belt (a coupling with stiffness) is that tendon with a spring and a damper on it, no equality: see
+            // `rebuild_coupling_responses`.
+            if (soft) continue;
             auto *equality = mjs_addEquality(spec, nullptr);
             if (!equality) return NKSIM_ERROR_OUT_OF_MEMORY;
             const std::string name = "nksim_drive_coupling_" + std::to_string(coupling.follower);
@@ -1573,48 +1585,65 @@ private:
         }
     }
 
+    // A coupling with stiffness is a belt, and a belt is a spring: the fixed tendon of the stretch (the leaders'
+    // motion less the follower's) carries MuJoCo's own passive spring and damper, so the force is the belt's whatever
+    // the bodies weigh or drive it. (A soft equality constraint is not that. Its force is its reference acceleration
+    // scaled by the inverse inertia of the constraint, which a light pulley held by its drive dominates, and by an
+    // impedance that lets the drive's own force through; a belt built on it came out a hundred times too soft or
+    // not a spring at all.) A tendon wraps every term, so a follower with several leaders (a CoreXY pulley) is one
+    // belt: its stiffness is the terms' mean, each term's being the belt's seen from its leader, and its damping
+    // ratios are weighted by stiffness (an unset ratio is critical). The damping ratio is the load's: the leaders
+    // carry an inverse inertia L = sum(ratio^2 / m_leader) in the follower's coordinate, so C = 2 zeta sqrt(K / L),
+    // the damping the carriage rings with whatever the pulley weighs. A coupling without stiffness stays an equality
+    // with MuJoCo's standard reference and the follower's inertia.
     void rebuild_coupling_responses() {
         coupling_responses.clear();
-        std::map<std::uint64_t, double> compliances, damped;
+        coupling_interval = std::numeric_limits<double>::infinity();
+        std::map<std::uint64_t, double> stiffnesses, damped;
+        std::map<std::uint64_t, int> softs;
+        std::map<std::uint64_t, double> offsets;
         for (const auto &term : couplings) {
-            auto &compliance = compliances[term.follower];
+            stiffnesses[term.follower];
+            offsets[term.follower] += term.offset;
             if (term.stiffness > 0.0) {
-                compliance += 1.0 / term.stiffness;
-                // The damping ratio of the terms in series, weighted by their compliance; an unset one is critical.
-                damped[term.follower] += (term.damping_ratio > 0.0 ? term.damping_ratio : 1.0) / term.stiffness;
+                stiffnesses[term.follower] += term.stiffness;
+                damped[term.follower] += (term.damping_ratio > 0.0 ? term.damping_ratio : 1.0) * term.stiffness;
+                ++softs[term.follower];
             }
         }
-        for (const auto &[follower_id, compliance] : compliances) {
+        for (const auto &[follower_id, total] : stiffnesses) {
             const int jid = model_joint_id(joints.at(follower_id));
-            const std::string name = "nksim_drive_coupling_" + std::to_string(follower_id);
-            const int equality = mj_name2id(model, mjOBJ_EQUALITY, name.c_str());
-            if (jid < 0 || equality < 0) continue;
-            double inverse_inertia = model->dof_invweight0[model->jnt_dofadr[jid]];
-            // A spring between a driven shaft and the load it moves rings against the load: the shaft is held by its
-            // drive, so the frequency is the spring's over the inertia of what the leaders carry, in the follower's
-            // coordinate. (The shaft's own inertia, often a few grams of pulley, would make the spring a hundred times
-            // stiffer than it is.) A coupling without stiffness keeps the follower's.
-            if (compliance > 0.0) {
+            if (jid < 0) continue;
+            const double follower_inverse = model->dof_invweight0[model->jnt_dofadr[jid]];
+            if (total > 0.0) {
+                const int tendon = mj_name2id(model, mjOBJ_TENDON, ("nksim_coupling_" + std::to_string(follower_id)).c_str());
+                if (tendon < 0) continue;
                 double load = 0.0;
                 for (const auto &term : couplings) {
                     if (term.follower != follower_id) continue;
                     const int leader = model_joint_id(joints.at(term.leader));
                     if (leader >= 0) load += term.ratio * term.ratio * model->dof_invweight0[model->jnt_dofadr[leader]];
                 }
-                if (load > 0.0) inverse_inertia = load;
+                if (!(load > 0.0)) load = follower_inverse;
+                if (!(load > 0.0)) continue;
+                const double stiffness = total / softs.at(follower_id), ratio = damped.at(follower_id) / total;
+                // At rest the follower stands where its leaders put it: the tendon is as long as it was at the reference
+                // pose less the terms' offsets (follower = sum(ratio_i * leader_i + offset_i)).
+                const double rest = model->tendon_length0[tendon] - offsets.at(follower_id);
+                // The stretch turns at sqrt(K A) with A the inverse inertia of the follower and its load; half a radian a step
+                // keeps the explicit spring stable and its period resolved.
+                coupling_interval = std::min(coupling_interval, 0.5 / std::sqrt(stiffness * (follower_inverse + load)));
+                model->tendon_stiffness[tendon] = stiffness;
+                model->tendon_damping[tendon] = 2.0 * ratio * std::sqrt(stiffness / load);
+                model->tendon_lengthspring[2 * tendon] = model->tendon_lengthspring[2 * tendon + 1] = rest;
+                continue;
             }
-            if (inverse_inertia > 0.0) {
-                // A zero-stiffness relation is an ideal mechanical constraint. Give
-                // it the smallest stable MuJoCo time constant at step time; leaving
-                // the default 20 ms response lets high-force drives stretch it.
-                // MuJoCo's soft constraint is a spring of natural frequency 1 / (time constant * damping ratio), so a
-                // coupling that rings (ratio under one) keeps the natural frequency its compliance gives by taking a
-                // time constant of the compliance's over the ratio; a critical one (the default) is unchanged.
-                const double ratio = compliance > 0.0 ? damped[follower_id] / compliance : 1.0;
-                const double time_constant = compliance > 0.0
-                    ? std::sqrt(compliance / inverse_inertia) / ratio : 0.0;
-                coupling_responses.push_back({equality, time_constant, ratio});
-            }
+            const int equality = mj_name2id(model, mjOBJ_EQUALITY, ("nksim_drive_coupling_" + std::to_string(follower_id)).c_str());
+            if (equality < 0) continue;
+            // A zero-stiffness relation is an ideal mechanical constraint. Give
+            // it the smallest stable MuJoCo time constant at step time; leaving
+            // the default 20 ms response lets high-force drives stretch it.
+            if (follower_inverse > 0.0) coupling_responses.push_back({equality, 0.0, 1.0});
         }
     }
 
@@ -2389,12 +2418,16 @@ private:
         return false;
     }
     std::vector<nksim::BackendJointCoupling> couplings;
+    // How the solver treats a rigid coupling's equality: MuJoCo's standard reference, a time constant and a damping
+    // ratio, floored at two steps.
     struct CouplingResponse {
         int equality;
         double time_constant;
         double damping_ratio;
     };
     std::vector<CouplingResponse> coupling_responses;
+    // The longest step the belts' springs are stable and resolved at, seconds; infinite without a belt.
+    double coupling_interval = std::numeric_limits<double>::infinity();
     struct BrakeSolverResponse {
         JointRecord *joint = nullptr;
         int dof = 0;

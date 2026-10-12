@@ -123,6 +123,7 @@ class Simulation {
       SimulatedSwitchSensorAdapter.bindingIndices(blueprint);
     if (space != null) {
       space.requireDrives(blueprint);
+      if (virtualDevice != null) for (actuator in virtualDevice.actuators) space.requireInterval(actuator.holdInterval());
       space.requireStops(blueprint);
       for (shape in blueprint.linkCollisionShapes) {
         var surface = shape.shape.surface;
@@ -213,6 +214,8 @@ class Simulation {
           robotDesc.set_virtual_device_actuator_direction_setup_ticks(i,
             actuator.directionSetupTicks);
           robotDesc.set_virtual_device_actuator_skew_bound(i, actuator.skewBound);
+          robotDesc.set_virtual_device_actuator_hold_stiffness(i, actuator.holdStiffness);
+          robotDesc.set_virtual_device_actuator_hold_damping(i, actuator.holdDamping());
           for (byte in 0...actuator.id.length)
             robotDesc.set_virtual_device_actuator_ids(i * 64 + byte,
               actuator.id.charCodeAt(byte));

@@ -2,11 +2,13 @@
 #include "nativekit_sim.h"
 #include "nativekit_sim_mujoco.h"
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstddef>
 #include <cmath>
 #include <cstdio>
+#include <vector>
 
 namespace {
 
@@ -1872,6 +1874,117 @@ void a_coupling_rings_as_its_damping_ratio_says() {
     nkscene_scene_destroy(scene);
 }
 
+// A carriage on a belt rings at the belt's frequency. The motor (a light joint held by its drive) pulls a carriage of
+// known mass through a coupling of known stiffness; a step of the motor's command makes the carriage swing, and its
+// frequency must be sqrt(k / m) / 2 pi and its decay the damping ratio's. The motor's coordinate is the carriage's
+// scaled by `ratio` (a pulley turning `ratio` radians for each metre of belt), so the coupling's follower-coordinate
+// stiffness is k / ratio^2.
+struct BeltRing {
+    double frequency; // Hz, undamped (the damped one corrected by the measured ratio)
+    double damping_ratio;
+    int crossings;
+};
+
+BeltRing belt_ring(double mass, double stiffness, double damping_ratio, double ratio, uint32_t motor_type,
+                   double timestep, uint32_t substeps, double follower_mass, double servo_stiffness) {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = timestep;
+    desc.physics_substeps = substeps;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const auto base = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_STATIC, 0.0);
+    const auto carriage_body = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, mass);
+    const auto motor_body = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, follower_mass);
+    nksim_joint_desc joint{};
+    joint.struct_size = sizeof(joint);
+    joint.type = NKSIM_JOINT_PRISMATIC;
+    joint.body_a = base;
+    joint.axis_a[0] = 1.0;
+    joint.lower_limit = -100.0;
+    joint.upper_limit = 100.0;
+    joint.max_force = 1.0e5;
+    nksim_joint carriage = 0, motor = 0;
+    joint.body_b = carriage_body;
+    assert(nksim_joint_create(world, &joint, &carriage) == NKSIM_OK);
+    joint.body_b = motor_body;
+    joint.type = motor_type;
+    assert(nksim_joint_create(world, &joint, &motor) == NKSIM_OK);
+    nksim_joint_coupling_desc coupling{};
+    coupling.struct_size = sizeof(coupling);
+    coupling.leader = carriage;
+    coupling.follower = motor;
+    coupling.ratio = ratio;
+    coupling.stiffness = stiffness / (ratio * ratio);
+    coupling.damping_ratio = damping_ratio;
+    assert(nksim_joint_couple(world, &coupling) == NKSIM_OK);
+    // The drive moves the belt a millimetre in four milliseconds and holds. Its stiffness (in the carriage's metres) is
+    // in series with the belt's.
+    const double step = 1.0e-3 * ratio;
+    nksim_joint_target hold{};
+    hold.struct_size = sizeof(hold);
+    hold.joint = motor;
+    hold.mode = NKSIM_JOINT_TARGET_SERVO;
+    hold.target = 0.0;
+    hold.end_position = step;
+    hold.reference_duration = 0.004;
+    hold.max_force = 1.0e5;
+    hold.stiffness = servo_stiffness / (ratio * ratio);
+    hold.damping = 2.0 * std::sqrt(hold.stiffness * follower_mass);
+    assert(nksim_world_set_joint_targets(world, &hold, 1) == NKSIM_OK);
+    nksim_joint_state state{};
+    state.struct_size = sizeof(state);
+    std::vector<double> position;
+    const int ticks = static_cast<int>(0.6 / timestep);
+    for (int tick = 0; tick < ticks; ++tick) {
+        step_world(world, 1);
+        assert(nksim_joint_get_state(world, carriage, &state) == NKSIM_OK);
+        position.push_back(state.position - 1.0e-3);
+    }
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+    // Upward crossings of the rest position give the period; the first two peaks of the same sign give the decay.
+    std::vector<double> up;
+    for (size_t index = 1; index < position.size(); ++index)
+        if (position[index - 1] < 0.0 && position[index] >= 0.0)
+            up.push_back((static_cast<double>(index - 1) + -position[index - 1] / (position[index] - position[index - 1])) * timestep);
+    BeltRing ring{0.0, 0.0, static_cast<int>(up.size())};
+    if (up.size() < 3) return ring;
+    const double period = (up[2] - up[0]) / 2.0;
+    double peaks[2] = {0.0, 0.0};
+    for (int run = 0; run < 2; ++run)
+        for (size_t index = 0; index < position.size(); ++index) {
+            const double time = static_cast<double>(index) * timestep;
+            if (time >= up[run] && time < up[run + 1]) peaks[run] = std::max(peaks[run], position[index]);
+        }
+    const double decrement = std::log(peaks[0] / peaks[1]);
+    ring.damping_ratio = decrement / std::sqrt(4.0 * M_PI * M_PI + decrement * decrement);
+    ring.frequency = 1.0 / period / std::sqrt(1.0 - ring.damping_ratio * ring.damping_ratio);
+    return ring;
+}
+
+
+void a_belt_carriage_rings_at_its_belt_frequency() {
+    // The printer's belts: 84,238 N/m under a carriage of 0.748 kg (53 Hz) or a gantry of 1.806 kg (34 Hz), damping 0.1.
+    // The pulley is a light joint held by a drive of 2 MN/m, a step of 62.5 us: its stiffness is in series with the belt.
+    const double stiffness = 84238.0, servo = 2.0e6, series = stiffness * servo / (stiffness + servo);
+    for (const double mass : {0.748, 1.806}) {
+        // The same belt under a pulley of 20 g and one of 200 g: the force is the belt's, not the bodies'.
+        for (const double pulley : {0.02, 0.2}) {
+            const double expected = std::sqrt(series / mass) / (2.0 * M_PI);
+            const auto ring = belt_ring(mass, stiffness, 0.1, 1.0, NKSIM_JOINT_PRISMATIC, 0.001, 16, pulley, servo);
+            std::fprintf(stderr, "belt ring: %.3f kg on %.0f N/m under %.2f kg: %.2f Hz (expected %.2f), damping %.3f (expected 0.1)\n",
+                         mass, stiffness, pulley, ring.frequency, expected, ring.damping_ratio);
+            assert(ring.crossings >= 3);
+            assert(std::abs(ring.frequency / expected - 1.0) < 0.03);
+            assert(std::abs(ring.damping_ratio - 0.1) < 0.02);
+        }
+    }
+}
+
 // A follower with two leaders is held by a fixed tendon and a tendon equality, like a CoreXY
 // motor turning with both axes.
 void a_follower_with_two_leaders_uses_a_tendon_equality() {
@@ -2909,6 +3022,7 @@ int main() {
     rigid_coupling_holds_under_high_effort();
     a_follower_with_two_leaders_uses_a_tendon_equality();
     a_coupling_rings_as_its_damping_ratio_says();
+    a_belt_carriage_rings_at_its_belt_frequency();
     convex_hulls_overlapping_at_rest_do_not_collide();
     mounted_contact_groups_span_articulations_only();
     assembly_closures_compile_as_equalities();

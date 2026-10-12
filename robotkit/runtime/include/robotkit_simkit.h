@@ -300,6 +300,13 @@ typedef struct rk_simulation_robot_desc {
     uint32_t tool_shape_count;
     rk_simulation_link_shape tool_shapes[16];
     double tool_shape_gap[16];
+    /**
+     * Appended tail: how stiffly a virtual-device actuator holds the joint it measures, in that joint's coordinate
+     * (N/m or N m/rad) with its damping. A stepper that drives a compliant coupling holds its pulley as a spring of its
+     * torque-angle stiffness; zero keeps the simulation's default position loop.
+     */
+    double virtual_device_actuator_hold_stiffness[64];
+    double virtual_device_actuator_hold_damping[64];
 } rk_simulation_robot_desc;
 
 /** Latest numeric device observation, independent of the authored sensor layout. */

@@ -26,10 +26,13 @@ class BoundChannel {
   public final feedbackJointIndex:Int;
   public final feedbackRatio:Float;
   public final feedbackOffset:Float;
+  /** The stiffness the actuator holds its shaft joint with and the inertia that joint turns (see `VirtualActuatorOptions`). */
+  public final holdStiffness:Float;
+  public final holdInertia:Float;
 
   public function new(channel:Int, actuatorId:String, jointIndex:Int, ratio:Float, offset:Float,
       stepsPerUnit:Float, maxRate:Float, minStepTicks:Int, directionSetupTicks:Int, skewBound:Float,
-      feedbackJointIndex:Int, feedbackRatio:Float, feedbackOffset:Float) {
+      feedbackJointIndex:Int, feedbackRatio:Float, feedbackOffset:Float, holdStiffness:Float = 0.0, holdInertia:Float = 0.0) {
     this.channel = channel;
     this.actuatorId = actuatorId;
     this.jointIndex = jointIndex;
@@ -43,6 +46,8 @@ class BoundChannel {
     this.feedbackJointIndex = feedbackJointIndex;
     this.feedbackRatio = feedbackRatio;
     this.feedbackOffset = feedbackOffset;
+    this.holdStiffness = holdStiffness;
+    this.holdInertia = holdInertia;
   }
 }
 
@@ -139,9 +144,19 @@ class DeviceBinding {
       }
       if (feedbackJoint < 0 || !Math.isFinite(feedbackRatio) || feedbackRatio == 0 || !Math.isFinite(feedbackOffset))
         throw "Device actuator has no valid physical feedback mapping";
+      // A stepper that drives a belt's pulley holds it against the belt with its torque-angle stiffness: the torque it
+      // keeps at holding current, times the rotor teeth (a quarter of the full steps) per radian. Without it the
+      // simulation holds the pulley with a ten hertz position loop, a softer spring than the belt, and the carriage
+      // would ring on the loop. Where the load is rigid there is no belt to be softer than, so nothing changes.
+      var holdStiffness = 0.0, holdInertia = 0.0;
+      var stepper = actuator.drive == null ? null : actuator.drive.stepper();
+      if (stepper != null && stepper.hasTorqueData() && drivesCompliantFollower(robot, robot.joints[feedbackJoint].id)) {
+        holdStiffness = stepper.holdingTorque * stepper.fullStepsPerRevolution * 0.25 * feedbackRatio * feedbackRatio;
+        holdInertia = Math.max(robot.turningInertia(robot.joints[feedbackJoint]), stepper.rotorInertia * feedbackRatio * feedbackRatio);
+      }
       bound.push(new BoundChannel(position, name, jointIndex, ratio * channel.direction, offset,
         stepsPerUnit, rate, ticks, channel.directionSetupTicks, channel.skewBound,
-        feedbackJoint, feedbackRatio, feedbackOffset));
+        feedbackJoint, feedbackRatio, feedbackOffset, holdStiffness, holdInertia));
       var capped = find(tightened, name);
       if (capped != null) {
         if ((stepTickHz < driverRate) &&
@@ -219,7 +234,12 @@ class DeviceBinding {
     return [for (channel in channels) new VirtualActuatorOptions(channel.actuatorId,
       channel.jointIndex, channel.ratio, channel.offset, channel.stepsPerUnit, channel.minStepTicks,
       channel.directionSetupTicks, channel.skewBound, channel.feedbackJointIndex,
-      channel.feedbackRatio, channel.feedbackOffset)];
+      channel.feedbackRatio, channel.feedbackOffset, channel.holdStiffness, channel.holdInertia)];
+
+  static function drivesCompliantFollower(robot:RobotModel, joint:String):Bool {
+    for (coupling in robot.couplings) if (coupling.follower == joint && coupling.stiffness > 0.0) return true;
+    return false;
+  }
 
   static function find(robot:RobotModel, id:String):Null<Actuator> {
     for (actuator in robot.actuators) if (actuator.id == id) return actuator;
