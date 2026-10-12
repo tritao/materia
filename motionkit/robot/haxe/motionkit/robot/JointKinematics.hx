@@ -1,5 +1,6 @@
 package motionkit.robot;
 
+import motionkit.kinematics.AffineJointMap;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.IkTolerance;
@@ -15,6 +16,7 @@ class JointKinematics implements KinematicsSolver {
     this.count = count;
   }
   public function jointCount():Int return count;
+  public function affineMap():Null<AffineJointMap> return null;
   public function fork():KinematicsSolver return this;
   public function forward(q:Array<Float>):Pose3 throw "This machine exposes joint motion only";
   public function solvePose(target:Pose3, seed:Array<Float>, tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>>

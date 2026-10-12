@@ -20,6 +20,7 @@ import motionkit.event.HoldPolicy;
 import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
 import motionkit.kinematics.IkTolerance;
+import motionkit.kinematics.AffineJointMap;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
@@ -457,6 +458,7 @@ class MotionKitTestSupport {
 
 /** Deterministic IK branch switch at a synthetic wrist singularity. */
 class WristBranchSolver implements KinematicsSolver {
+  public function affineMap():Null<AffineJointMap> return null;
   public function fork():KinematicsSolver return this;
 
   final jump:Bool;
@@ -480,6 +482,7 @@ class WristBranchSolver implements KinematicsSolver {
 }
 
 class PlanarSolver implements KinematicsSolver {
+  public function affineMap():Null<AffineJointMap> return null;
   public function fork():KinematicsSolver return this;
 
   public function new() {}

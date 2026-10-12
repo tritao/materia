@@ -713,6 +713,7 @@ class WeldPlanningTests {
 private class EntryBranchFixture implements motionkit.kinematics.KinematicsSolver {
   public function new() {}
   public function jointCount():Int return 1;
+  public function affineMap():Null<motionkit.kinematics.AffineJointMap> return null;
   public function fork():motionkit.kinematics.KinematicsSolver return this;
   public function forward(q:Array<Float>):motionkit.kinematics.Pose3 throw "The fixture only solves poses";
   public function sampleCandidates(target:motionkit.kinematics.Pose3, maxCount:Int,

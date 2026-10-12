@@ -11,6 +11,11 @@ interface KinematicsSolver {
    * no mutable state returns itself.
    */
   function fork():KinematicsSolver;
+  /**
+   * The exact affine map from tool position to joints when this solver is one (see `AffineJointMap`), else null. The
+   * capability a planner reads to skip checks that exactness makes redundant and to bound motion in closed form.
+   */
+  function affineMap():Null<AffineJointMap>;
   function forward(q:Array<Float>):Pose3;
   function solvePose(target:Pose3, seed:Array<Float>,
     tolerance:IkTolerance, ?freedom:OrientationPolicy):Null<Array<Float>>;

@@ -5,6 +5,7 @@ import haxe.Int64;
 import materia.project.SceneArtifact;
 import motionkit.MotionOptions;
 import motionkit.kinematics.IkTolerance;
+import motionkit.kinematics.AffineJointMap;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
@@ -32,6 +33,7 @@ import robotkit.simulation.SimulatedRobot;
 /** The two axes of a Cartesian machine as a two-joint chain: the pose is where the joints are. */
 class CartesianSolver implements KinematicsSolver {
   public function new() {}
+  public function affineMap():Null<AffineJointMap> return null;
   public function fork():KinematicsSolver return this;
   public function jointCount():Int return 2;
   public function forward(q:Array<Float>):Pose3 return new Pose3(q[0], q[1]);

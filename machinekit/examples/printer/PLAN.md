@@ -1156,7 +1156,13 @@ left in the motion path.
 4. Derive `CornerBlender.MIN_RADIUS` from the machine (an arc whose v^2 / r exceeds the acceleration cannot be followed)
    or from the binding, instead of a global 50 micrometre constant, and stop the slicer emitting micro-segments.
 5. Replace `Std.isOfType(solver, AxisKinematics)` (which skips the clock-sampled task-space check) with a capability
-   the solver declares (exact, affine kinematics).
+   the solver declares (exact, affine kinematics). **Done.** `KinematicsSolver.affineMap()` returns
+   an `AffineJointMap` (joint = offset + a column per tool coordinate) when the solver is exactly affine, else null;
+   `AxisKinematics` reads it off its axes and couplings, every other solver answers null. `ProgramCompiler` skips the
+   clock-sampled task-space check by that capability, and item 10's fast path reads the same map for its closed-form
+   limits. The planner factory (`defaultJointPathPlanner`) still chooses `AxisJointPathPlanner` by type: that is a class
+   of planner for one solver family, not a decision about which checks to skip. Test: `KinematicsTests.testAxisKinematics`
+   (the map reproduces IK and the differential, with a coupled follower; a joint-space solver declares none).
 6. RKD6: send the step interval as an integer tick count so host and device cannot disagree (`PulseRate` now mirrors
    the device's f32 arithmetic). **Done.** The integer was already on the wire: wire revision 14 (`e7779c599`,
    `SESSION_BEGIN6.min_step_ticks`, `robotkit.runtime.StepTicks`) replaced `max_rate`, and `PulseRate` no longer exists; the
@@ -1242,7 +1248,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
-| AM5b | in progress: items 6 and 1 done | see the commits below |
+| AM5b | in progress: items 6, 1 and 5 done | see the commits below |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 

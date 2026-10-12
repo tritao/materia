@@ -2765,6 +2765,16 @@ class KinematicsTests extends MotionKitTestSupport {
     near(velocity[0], 0.02, "axis differential IK maps X velocity");
     near(velocity[1], -0.03,
       "axis differential IK keeps follower velocity in proportion");
+    // The solver declares itself exactly affine, and its map is the one its IK follows.
+    var affine = solver.affineMap();
+    check(affine != null && affine.jointCount() == 4, "axis kinematics declares an exact affine map");
+    if (affine == null) throw "axis kinematics declared no affine map";
+    for (joint in 0...4)
+      near(affine.offsets[joint] + affine.columns[0][joint] * 0.01 + affine.columns[1][joint] * 0.02 +
+        affine.columns[2][joint] * -0.03, q[joint], 'the affine map reproduces IK joint $joint');
+    near(affine.columns[0][1], -1.5, "the affine map keeps the follower's ratio on X");
+    near(affine.rate(1, 0.02, 0.01, -0.01), velocity[1], "the affine map's rate is the differential IK's");
+    check(new motionkit.robot.JointKinematics(4).affineMap() == null, "a joint-space solver declares no affine map");
     var path = new PosePath("work", [new PoseLine(new PoseWaypoint(target, 1e-6, 1e-6),
       new PoseWaypoint(new Pose3(0.03, 0.02, -0.03), 1e-6, 1e-6), OrientationPolicy.Fixed, 0.1, 0.1)]);
     var planner = new motionkit.robot.AxisJointPathPlanner(solver);

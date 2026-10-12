@@ -4,6 +4,7 @@ import motionkit.path.OrientationPolicy;
 
 import motionkit.axis.MotionAxis;
 import motionkit.kinematics.IkTolerance;
+import motionkit.kinematics.AffineJointMap;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.PathRequest;
 import motionkit.kinematics.Pose3;
@@ -54,6 +55,32 @@ class AxisKinematics implements KinematicsSolver {
   }
 
   public function jointCount():Int return blueprint.model.joints.length;
+
+  var affine:Null<AffineJointMap> = null;
+
+  /**
+    The joints are exactly affine in the logical axes: each axis scales and offsets its joints and the followers sum
+    their terms. Read off by placing the tool at the origin and a metre along each axis, limits aside (a joint no axis
+    owns and nothing drives, an extruder, stays zero).
+  **/
+  public function affineMap():Null<AffineJointMap> {
+    if (affine != null) return affine;
+    var count = jointCount();
+    function placed(position:Array<Float>):Array<Float> {
+      var joints = [for (_ in 0...count) 0.0];
+      for (index in 0...3) [x, y, z][index].writeLogicalPosition(joints, position[index]);
+      completeDerived(joints, true);
+      return joints;
+    }
+    var origin = placed([0.0, 0.0, 0.0]);
+    var columns = [for (axis in 0...3) {
+      var along = [0.0, 0.0, 0.0];
+      along[axis] = 1.0;
+      var moved = placed(along);
+      [for (joint in 0...count) moved[joint] - origin[joint]];
+    }];
+    return affine = new AffineJointMap(origin, columns);
+  }
 
   public function forward(q:Array<Float>):Pose3 {
     requireJoints(q);

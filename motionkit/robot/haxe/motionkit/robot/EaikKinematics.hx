@@ -1,5 +1,6 @@
 package motionkit.robot;
 import motionkit.robot.AnalyticIk.AnalyticBranch;
+import motionkit.kinematics.AffineJointMap;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.PathRequest;
@@ -16,6 +17,7 @@ class EaikKinematics implements KinematicsSolver implements AnalyticIk {
   public function new(group:KinematicGroup) {
     manipulator=group;analytic=new EaikAnalyticIk(group);differential=new ManipulatorKinematics(group);
   }
+  public function affineMap():Null<AffineJointMap> return null;
   public function fork():KinematicsSolver return new EaikKinematics(manipulator);
   public function family():String return analytic.family();
   public function jointCount():Int return analytic.jointCount();

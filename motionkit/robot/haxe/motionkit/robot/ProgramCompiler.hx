@@ -1177,7 +1177,7 @@ class ProgramCompiler {
       // Axis machines map a path to joints exactly, so the executed position can differ from the path's only by
       // the lowering tolerance, which the lowering itself bounds: the clock need not be sampled every millisecond
       // (a long print has millions), the path's own samples above are checked.
-      var timeSteps = Std.isOfType(solver, AxisKinematics) ? 1 : Std.int(Math.max(1,
+      var timeSteps = solver.affineMap() != null ? 1 : Std.int(Math.max(1,
         Math.ceil(timed.trajectory.durationSeconds() / 0.001)));
       var taskSampleDistances:Array<Float> = [];
       if (timed.hasDirectInverse()) {

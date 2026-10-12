@@ -5,6 +5,7 @@ import motionkit.path.PoseMath;
 
 import kinematicskit.LinearAlgebra;
 import motionkit.kinematics.IkTolerance;
+import motionkit.kinematics.AffineJointMap;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.PathRequest;
 import motionkit.kinematics.PathSolution;
@@ -90,6 +91,8 @@ class ManipulatorKinematics implements RedundantPathSolver {
     parameterization = manipulator.redundant() ? new SwivelParameterization(manipulator)
       : manipulator.external.indexOf(true) >= 0 ? new ExternalAxesParameterization(manipulator) : null;
   }
+
+  public function affineMap():Null<AffineJointMap> return null;
 
   /** The same kinematics with its own posture preference; the group is shared, as it is safe to. */
   public function fork():KinematicsSolver {
