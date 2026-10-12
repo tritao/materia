@@ -15,6 +15,7 @@ class TranslationGizmoTests {
     return new GizmoPoint(x,y,depth);
   }
   static function main():Void {
+    ScaleGizmoTests.run();
     var rotationView = camera(), rotationPivot=new GizmoVec3(0,0,0);
     for(rotationBasis in [GizmoBasis.world(),GizmoBasis.fromQuaternion(0,0,Math.sin(Math.PI/12),Math.cos(Math.PI/12))]) {
     var rotation=new RotationGizmo(rotationView,rotationPivot,75,rotationBasis);
