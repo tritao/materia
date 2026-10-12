@@ -505,6 +505,12 @@ typedef struct rk_robot_runtime_blueprint {
     double sensor_hysteresis[RK_MAX_SENSORS];
     uint32_t brake_count;
     rk_robot_brake_interlock brakes[RK_MAX_JOINTS];
+    /**
+     * Coupling damping as a ratio of critical damping, indexed like the couplings: how a coupling's response to a
+     * load rings out (a timing belt's is small, so a carriage on it rings). Zero is the simulation's default,
+     * critical damping.
+     */
+    double coupling_damping_ratio[RK_MAX_JOINT_COUPLINGS];
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */

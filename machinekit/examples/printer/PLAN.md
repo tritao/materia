@@ -1098,11 +1098,20 @@ Done. What was built and decided:
   of it every case drops at least 5x. The shaped plan is the plain one lagging by the shaper's mean delay and ending its tail later (233 ms against
   211 ms on x), never above the axes' velocity and acceleration limits (1.001), and keeps its merged form (no merge refusals). **The cube's planned
   time grows from 870.3 s to 880.5 s (1.2 %, limit 5 %)**, 115,240 segments plain and 132,669 shaped (132 and 151 a second).
-- **Belts in MuJoCo (X9).** X9 does give MuJoCo a belt spring (a soft equality with the belt's compliance), but the backend fixes its damping ratio at 1,
-  critically damped, so the carriage cannot ring there. With the shapers on, the virtual-device print still runs on MuJoCo: the 50 mm move ends at X 80 mm
-  within one microstep and completes later than the plain one by the shapers' delay and tail (`PROJECT_SOURCE_ONLY=printer-shaping`, numbers below).
-  Validating the ringing itself in MuJoCo needs an authored damping ratio on the coupling (`JointCoupling`, the simulation's coupling description and the
-  belt model; zero keeping today's default): left open, and the gate's check uses the same mass and stiffness analytically.
+- **Belts in MuJoCo (X9).** X9 gives MuJoCo a belt spring (a soft equality with the belt's compliance); its damping ratio was fixed at 1 (critical), so the
+  carriage could not ring. **Done in AM5b (belt damping):** a coupling now carries an authored damping ratio (`JointCoupling.dampingRatio`, the simulation's
+  `nksim_joint_coupling_desc.damping_ratio`, the runtime blueprint's `coupling_damping_ratio`, the belt model's `TimingBelt` statement, the assembly
+  records; zero is critical, so the default is unchanged). Saved formats: `RobotModel` 14, `AssemblyDefinitionCodec` 9, `MachineAssembly` schema 18, the
+  older ones rejected. The printer's belts state `SHAPER_DAMPING` (0.1); a simkit unit test shows a force-pushed leader overshooting 85 % at 0.1 and not at
+  the default. Two findings on the way: (1) the soft constraint's frequency now comes from the compliance over the inertia the leaders carry (the load),
+  not the follower's, which is a few grams of pulley held by its drive; (2) a virtual device drove every joint to its reconstructed state with a huge
+  force (and the rest hold kept the carriage), so no coupling could stretch: it now drives only the joints its actuators measure, and the loads of a
+  compliant coupling (carriage, gantry and the idlers that turn with them) are left to the physics. The snapshot still reports the device's view (a machine
+  knows only its motors), so the test reads the carriage's link pose (`ApplicationSimulation.physicalLinkPosition`). **Result and limit:** the carriage
+  now swings in MuJoCo (4 crossings of its rest position, 3.1 mm plain and 1.8 mm shaped over the first 150 ms), but at about 5 Hz, not the belts' 53 Hz,
+  so the shaper's notch does not line up and the simulation does not show the 5x. The multi-body printer's soft equality (two sum rows on x and y, MuJoCo's
+  impedance) does not yet have the belts' stiffness over the carriage's mass as its frequency: calibrating it is open. **The acceptance of the shaping
+  stays the gate's analytic check** (356 um plain, 7 um shaped on x), with `printer-shaping` asserting that the simulated carriage swings.
 - **Tests.** `PlannerTests.testShapedTrajectoryIsTheWeightedSumOfDelays` (the sum of delays, limits not raised, the shapers' amplitudes and
   residuals, refusals), the C++ `motionkit_path` test (`mk_shape_trajectory`: sums of delays, a delay-only joint, three refusals), `ProjectKitTests` (shaper
   round trip and five rejections), the printing gate (`shapingChecks`; `PRINTING_BENCHMARK_ONLY=shaping` alone), `printer-shaping` in the app.
@@ -1409,7 +1418,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
-| AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10, 3 and 9 done | see the commits below |
+| AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10, 3 and 9 and belt damping done | see the commits below |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 

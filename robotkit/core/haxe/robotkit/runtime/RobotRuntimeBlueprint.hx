@@ -299,6 +299,7 @@ class RobotRuntimeBlueprint {
     for (index in 0...couplings.length) {
       value.set_couplings(index, couplings[index].nativeValue());
       value.set_coupling_stiffness(index, couplings[index].stiffness);
+      value.set_coupling_damping_ratio(index, couplings[index].dampingRatio);
     }
     value.set_link_count(linkCount);
     value.set_frame_count(frameCount);

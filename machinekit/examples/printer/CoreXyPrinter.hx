@@ -88,7 +88,8 @@ class CoreXyPrinter extends AxisBuilder {
 	public static inline var EXTRUDER_DRIVER_CURRENT:Float = 1.0;
 	/**
 	 * Input shaping: the resonance (hertz) of each belt axis, the carriage on its belts for x and the gantry carrying it
-	 * for y, and the damping ratio of a belt-driven carriage. The printing gate checks them against the drive model (the
+	 * for y, and the damping ratio of a belt-driven carriage (the belts' own: they state it, and it rides into the
+	 * simulation as the damping of their couplings, so a carriage rings there as it does in the shaper's model). The printing gate checks them against the drive model (the
 	 * mass an axis moves on the stiffness of its belts) to ten percent. MZV is the shaper Klipper recommends for
 	 * a printer whose resonance is known only to a few percent: it stays under 5 % vibration for 20 % either side.
 	 */
@@ -181,11 +182,11 @@ class CoreXyPrinter extends AxisBuilder {
 		var beltA = new TimingBelt(GT2, BELT_WIDTH, [
 			new BeltWrap(-INNER_X, gy, R, 1), new BeltWrap(COLUMN_X - 2 * R, gy - 2 * R, R, -1),
 			new BeltWrap(COLUMN_X, FRONT_Y, R, 1), new BeltWrap(COLUMN_X, REAR_Y, R, 1),
-			new BeltWrap(-INNER_X, REAR_Y, R, 1)]);
+			new BeltWrap(-INNER_X, REAR_Y, R, 1)], null, 0.0, SHAPER_DAMPING);
 		var beltB = new TimingBelt(GT2, BELT_WIDTH, [
 			new BeltWrap(INNER_X, gy, R, -1), new BeltWrap(-(COLUMN_X - 2 * R), gy - 2 * R, R, 1),
 			new BeltWrap(-COLUMN_X, FRONT_Y, R, -1), new BeltWrap(-COLUMN_X, REAR_Y, R, -1),
-			new BeltWrap(INNER_X, REAR_Y, R, -1)]);
+			new BeltWrap(INNER_X, REAR_Y, R, -1)], null, 0.0, SHAPER_DAMPING);
 		attach("beltA", beltA, AssemblyFrames.translation(0, 0, levelA), "sideTopLeft");
 		attach("beltB", beltB, AssemblyFrames.translation(0, 0, levelB), "sideTopLeft");
 		for (entry in [{id: "A", x: COLUMN_X}, {id: "B", x: -COLUMN_X}]) {

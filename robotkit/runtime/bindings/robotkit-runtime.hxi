@@ -843,7 +843,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		stiffness: f64 @offset(0);
 		damping: f64 @offset(8);
 	}
-	struct rk_robot_runtime_blueprint @layout(303064, 8) {
+	struct rk_robot_runtime_blueprint @layout(307160, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -957,6 +957,12 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		sensor_hysteresis: array<f64, 8> @offset(286608);
 		brake_count: u32 @offset(286672);
 		brakes: array<rk_robot_brake_interlock, 512> @offset(286680);
+		/**
+		 * Coupling damping as a ratio of critical damping, indexed like the couplings: how a coupling's response to a
+		 * load rings out (a timing belt's is small, so a carriage on it rings). Zero is the simulation's default,
+		 * critical damping.
+		 */
+		coupling_damping_ratio: array<f64, 512> @offset(303064);
 	}
 	/**
 	 * One compiled joint and its limits in a RobotRuntimeBlueprint.

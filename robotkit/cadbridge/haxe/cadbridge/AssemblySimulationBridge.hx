@@ -405,6 +405,7 @@ class AssemblySimulationBridge {
       // Stiffness and backlash are in the leader's units, which a sliding leader measures in assembly units.
       var stiffness = coupling.stiffness, backlash = coupling.backlash, drag = coupling.drag;
       if (stiffness != null) added.stiffness = stiffness / leaderScale;
+      if (coupling.dampingRatio != null) added.dampingRatio = coupling.dampingRatio;
       if (backlash != null) added.backlash = backlash * leaderScale;
       if (drag != null) added.drag = drag * followerScale;
       if (coupling.assumptions != null) added.assumptions = [for (value in coupling.assumptions)

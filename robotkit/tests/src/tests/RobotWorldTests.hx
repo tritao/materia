@@ -1007,6 +1007,7 @@ class RobotWorldTests {
     source.joints[1].limits.overtravel = 0.004;
     source.actuators[0].servoStiffness = 75.0;
     source.couplings[0].stiffness = 5.0e4;
+    source.couplings[0].dampingRatio = 0.1;
     source.couplings[0].backlash = 1.0e-4;
     source.couplings[0].drag = 0.02;
     source.actuators[0].fullStepsPerRevolution = 200.0;
@@ -1118,6 +1119,7 @@ class RobotWorldTests {
     equal(restored.actuators[0].servoStiffness, 75.0, "RobotModel codec preserves servo stiffness");
     check(restored.couplings[0].stiffness == 5.0e4 && restored.couplings[0].backlash == 1.0e-4 && restored.couplings[0].drag == 0.02,
       "RobotModel codec preserves a coupling's stiffness, backlash and drag");
+    equal(restored.couplings[0].dampingRatio, 0.1, "RobotModel codec preserves a coupling's damping ratio");
     equal(restored.actuators[0].fullStepsPerRevolution, 200.0, "RobotModel codec preserves a stepper's full steps");
     var restoredStepper = restored.actuators[0].drive;
     check(restoredStepper != null && restoredStepper.kind() == "stepper" && restoredStepper.rotorInertia == 3e-5 &&

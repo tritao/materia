@@ -97,6 +97,8 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 	@:id(9) @:optional var far:Null<machinekit.motion.ScrewSupport>;
 	/** Longest unsupported stretch in mm; absent means the whole screw. */
 	@:id(10) @:optional var unsupported:Null<Float>;
+	/** Stated damping of the coupling's response, as a ratio of critical damping. */
+	@:id(11) @:optional var dampingRatio:Null<Float>;
 }
 
 /**

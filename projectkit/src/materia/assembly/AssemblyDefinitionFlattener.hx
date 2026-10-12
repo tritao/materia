@@ -294,6 +294,7 @@ class AssemblyDefinitionFlattener {
 				target: scoped(prefix, coupling.target), ratio: coupling.ratio, offset: coupling.offset};
 			if (coupling.efficiency != null) expanded.efficiency = coupling.efficiency;
 			if (coupling.stiffness != null) expanded.stiffness = coupling.stiffness;
+			if (coupling.dampingRatio != null) expanded.dampingRatio = coupling.dampingRatio;
 			if (coupling.backlash != null) expanded.backlash = coupling.backlash;
 			if (coupling.drag != null) expanded.drag = coupling.drag;
 			if (coupling.assumptions != null) expanded.assumptions = [for (value in coupling.assumptions)

@@ -116,6 +116,7 @@ struct BackendJointCoupling {
     double ratio = 0.0;
     double offset = 0.0;
     double stiffness = 0.0;
+    double damping_ratio = 0.0;
 };
 
 struct BackendClosure {

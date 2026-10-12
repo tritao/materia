@@ -122,10 +122,19 @@ class TimingBelt extends MachineComponent {
 	final pair:Null<BeltPair>;
 	/** Explicit assumed cord EA per mm of belt width, N; zero selects recorded family data. */
 	public final statedCordRigidity:Float;
+	/**
+	 * The belt drive's damping as a ratio of critical damping, stated by whoever knows the belt (a rubber belt on a
+	 * carriage rings, about 0.1; a stated value rides into the simulation, where zero leaves the critical damping it
+	 * has always had). Zero is not stated.
+	 */
+	public final statedDampingRatio:Float;
 
-	public function new(beltProfile:TimingBeltProfile, width:Float, loop:Array<BeltWrap>, ?pair:BeltPair, statedCordRigidity:Float = 0) {
+	public function new(beltProfile:TimingBeltProfile, width:Float, loop:Array<BeltWrap>, ?pair:BeltPair, statedCordRigidity:Float = 0,
+			statedDampingRatio:Float = 0) {
 		if (!(statedCordRigidity >= 0) || !Math.isFinite(statedCordRigidity)) throw "Belt cord rigidity must be finite and nonnegative";
+		if (!(statedDampingRatio >= 0) || !Math.isFinite(statedDampingRatio)) throw "Belt damping ratio must be finite and nonnegative";
 		this.statedCordRigidity = statedCordRigidity;
+		this.statedDampingRatio = statedDampingRatio;
 		var pitch = TimingPulley.profileDimensions(beltProfile).pitch;
 		if (!(width > 0) || !Math.isFinite(width)) throw "Timing belt needs a positive width";
 		if (loop == null || loop.length < 2) throw "Timing belt needs at least two pulleys";
@@ -154,7 +163,8 @@ class TimingBelt extends MachineComponent {
 			Math.round(wrap.radius * 100) * 17 + wrap.side) % 1000003;
 		if (key < 0) key = -key;
 		super('BELT-$name-W${Dimension.format(width)}-${count}T' + (pair == null ? '-L$key' : "") +
-			(statedCordRigidity == 0 ? "" : '-EA${Dimension.format(statedCordRigidity)}'),
+			(statedCordRigidity == 0 ? "" : '-EA${Dimension.format(statedCordRigidity)}') +
+			(statedDampingRatio == 0 ? "" : '-Z${Dimension.format(statedDampingRatio)}'),
 			'$name timing belt, ${Dimension.format(pitch)} mm pitch, ${count} teeth, ${Dimension.format(width)} mm wide', "rubber",
 			pair == null);
 		this.beltProfile = beltProfile;
@@ -208,13 +218,15 @@ class TimingBelt extends MachineComponent {
 	 * A belt round two pulleys of the same family, a driver at the origin and an idler
 	 * `centreDistance` away along +X, both wrapped counter-clockwise.
 	 */
-	public static function twoPulley(beltProfile:TimingBeltProfile, driverTeeth:Int, idlerTeeth:Int, centreDistance:Float, width:Float, statedCordRigidity:Float = 0):TimingBelt {
+	public static function twoPulley(beltProfile:TimingBeltProfile, driverTeeth:Int, idlerTeeth:Int, centreDistance:Float, width:Float, statedCordRigidity:Float = 0,
+			statedDampingRatio:Float = 0):TimingBelt {
 		var pitch = TimingPulley.profileDimensions(beltProfile).pitch;
 		if (driverTeeth < 8 || idlerTeeth < 8) throw "Timing belt pulleys need at least 8 teeth";
 		return new TimingBelt(beltProfile, width, [
 			new BeltWrap(0, 0, pitch * driverTeeth / (2 * Math.PI)),
 			new BeltWrap(centreDistance, 0, pitch * idlerTeeth / (2 * Math.PI))
-		], switch beltProfile { case Custom(_, _, _): null; default: new BeltPair(driverTeeth, idlerTeeth, centreDistance); }, statedCordRigidity);
+		], switch beltProfile { case Custom(_, _, _): null; default: new BeltPair(driverTeeth, idlerTeeth, centreDistance); }, statedCordRigidity,
+			statedDampingRatio);
 	}
 
 	public function wraps():Array<BeltWrap> return loop.copy();
@@ -483,9 +495,10 @@ class TimingBelt extends MachineComponent {
 			pairRecipeTypeCache = new ComponentType("machinekit.transmission.timing-belt",
 			[ComponentRecipeSupport.choice("profile", ["GT2", "HTD3M", "HTD5M", "HTD8M", "HTD14M", "T5", "XL"], "GT2"),
 				ComponentRecipeSupport.count("driverTeeth", 20), ComponentRecipeSupport.count("idlerTeeth", 20),
-				ComponentRecipeSupport.length("centreDistance", 200), ComponentRecipeSupport.length("width", 6), ComponentRecipeSupport.scalar("cordRigidity", 0, 0)],
+				ComponentRecipeSupport.length("centreDistance", 200), ComponentRecipeSupport.length("width", 6), ComponentRecipeSupport.scalar("cordRigidity", 0, 0),
+				ComponentRecipeSupport.scalar("dampingRatio", 0, 0)],
 			v -> TimingBelt.twoPulley(ComponentRecipeSupport.profile(v.token("profile")), v.integer("driverTeeth"),
-				v.integer("idlerTeeth"), v.number("centreDistance"), v.number("width"), v.number("cordRigidity")));
+				v.integer("idlerTeeth"), v.number("centreDistance"), v.number("width"), v.number("cordRigidity"), v.number("dampingRatio")));
 		return pairRecipeTypeCache;
 	}
 
@@ -496,7 +509,7 @@ class TimingBelt extends MachineComponent {
 		if (layout == null) throw 'Belt "$designation" has no recipe values';
 		return new ComponentValues().setToken("profile", Std.string(beltProfile))
 			.setInteger("driverTeeth", layout.driverTeeth).setInteger("idlerTeeth", layout.idlerTeeth)
-			.setNumber("centreDistance", layout.centreDistance).setNumber("width", width).setNumber("cordRigidity", statedCordRigidity)
+			.setNumber("centreDistance", layout.centreDistance).setNumber("width", width).setNumber("cordRigidity", statedCordRigidity).setNumber("dampingRatio", statedDampingRatio)
 			.setToken("material", materialSpec());
 	}
 }

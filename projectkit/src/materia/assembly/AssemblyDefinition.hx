@@ -163,6 +163,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	/** Engineering inputs assumed by the source of this coupling; absent when none. */
 	@:id(10) @:optional var assumed:Null<ReadOnlyArray<String>>;
 	@:id(11) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
+	/** How damped the coupling's response is, as a ratio of critical damping (a timing belt's is about 0.1); absent is critical. */
+	@:id(12) @:optional var dampingRatio:Null<Float>;
 }
 
 /** A derived elastic span; displacement coefficients use assembly length per joint unit. */

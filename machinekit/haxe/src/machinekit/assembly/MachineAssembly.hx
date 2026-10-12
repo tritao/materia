@@ -53,7 +53,7 @@ typedef MachineAssemblyMassProperties = {
 @:allow(machinekit.assembly)
 class MachineAssembly {
 	/** Current MachineKit assembly format; older descriptions must be regenerated. */
-	public static inline var SCHEMA_VERSION:Int = 18;
+	public static inline var SCHEMA_VERSION:Int = 19;
 	/** Findings from rebuilding sources; invalid transmissions remain available for repair. */
 	public final diagnostics:Diagnostics = new Diagnostics();
 	final mechanical:MechanicalAssembly = new MechanicalAssembly();
@@ -270,7 +270,7 @@ class MachineAssembly {
 
 	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
 			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float, ?assumed:haxe.ds.ReadOnlyArray<String>,
-			?assumptions:haxe.ds.ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>):Void {
+			?assumptions:haxe.ds.ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>, ?dampingRatio:Float):Void {
 		if (drives.transmission(id) != null) throw 'Transmission coupling "$id" is read-only; edit its parts or allowances';
 		requireOperationId(id);
 		if (source == null || source.length == 0 || target == null || target.length == 0)
@@ -279,6 +279,7 @@ class MachineAssembly {
 			target: target, ratio: ratio, offset: offset};
 		if (efficiency != null) coupling.efficiency = efficiency;
 		if (stiffness != null) coupling.stiffness = stiffness;
+		if (dampingRatio != null) coupling.dampingRatio = dampingRatio;
 		if (backlash != null) coupling.backlash = backlash;
 		if (drag != null) coupling.drag = drag;
 		if (assumptions != null && assumptions.length > 0) coupling.assumptions = [for (value in assumptions)
@@ -745,7 +746,7 @@ class MachineAssembly {
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),
 				join(prefix, coupling.target), coupling.ratio, coupling.offset, coupling.efficiency,
-				coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions);
+				coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions, coupling.dampingRatio);
 		if (mechanical.elasticNetworks != null) for (network in mechanical.elasticNetworks)
 			model.addElasticNetwork(materia.assembly.AssemblyDefinitionFlattener.copyElasticNetwork(network, id -> join(prefix, id)));
 		if (mechanical.switches != null) for (contact in mechanical.switches)

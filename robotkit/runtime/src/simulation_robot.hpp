@@ -118,6 +118,9 @@ private:
     std::vector<rk_robot_joint_servo> servo_;
     /** Joints that only move through couplings to a servo joint: they get no targets of their own. */
     std::vector<uint8_t> passive_;
+    // Joints a virtual device does not drive: the loads of a compliant coupling (a belt's carriage) move as the
+    // physics lets them, not as the device's reconstructed state says.
+    std::vector<uint8_t> device_free_;
     /** Seconds between commands, to estimate a servo's velocity target from successive positions. */
     double step_ = 0.01;
     std::vector<nksim_joint_target> pending_targets_;

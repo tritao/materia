@@ -487,7 +487,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * several couplings is the sum of their terms (a CoreXY motor follows both axes). Each leader and
 	 * follower pair is coupled once, and the couplings may not form a cycle.
 	 */
-	struct nksim_joint_coupling_desc @layout(40, 8) {
+	struct nksim_joint_coupling_desc @layout(48, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		leader: nksim_joint @offset(4);
 		follower: nksim_joint @offset(8);
@@ -497,6 +497,12 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		 * Follower-coordinate stiffness; zero preserves the backend default.
 		 */
 		stiffness: f64 @offset(32);
+		/**
+		 * How damped the coupling's response is, as a ratio of critical damping (a timing belt's is small, 0.1 or so,
+		 * so a carriage on it rings); zero preserves the backend default, critical damping (1). With several couplings
+		 * on one follower the backend takes the mean of their ratios weighted by compliance.
+		 */
+		damping_ratio: f64 @offset(40);
 	}
 	struct nksim_joint_desc @layout(288, 8) {
 		struct_size: u32 @offset(0) @struct_size;

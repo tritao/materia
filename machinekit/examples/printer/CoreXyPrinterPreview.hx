@@ -198,7 +198,15 @@ class CoreXyPrinterChecks {
 			var drive = printer.transmissionFor(coupling.id);
 			if (drive == null) throw 'coupling ${coupling.id} has no transmission';
 			switch drive.source {
-				case TimingBelt(_, _), BeltIdler(_, _): near(Math.abs(coupling.ratio), 1 / radius, '${coupling.id} turns one pitch radius per radian', 1e-12);
+				case TimingBelt(_, _), BeltIdler(_, _):
+					near(Math.abs(coupling.ratio), 1 / radius, '${coupling.id} turns one pitch radius per radian', 1e-12);
+					// The belts state their damping, and it rides on the coupling a belt's stiffness does (a carriage rings on it).
+					switch drive.source {
+						case TimingBelt(_, _):
+							if (coupling.dampingRatio == null) throw '${coupling.id} carries no damping ratio from its belt';
+							near(coupling.dampingRatio, CoreXyPrinter.SHAPER_DAMPING, '${coupling.id} carries its belt\'s damping ratio', 1e-12);
+						default:
+					}
 				case LeadScrew(_, _): near(Math.abs(coupling.ratio), 2 * Math.PI / 8, '${coupling.id}: a T8 screw turns 2 pi per 8 mm of bed travel', 1e-12);
 				case GearMesh(_, _): near(coupling.ratio, -3, "the extruder gears turn the motor three times as far as the hobbed gear", 1e-12);
 				default: throw 'unexpected transmission for ${coupling.id}';

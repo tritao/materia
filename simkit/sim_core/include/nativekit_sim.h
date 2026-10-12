@@ -246,6 +246,12 @@ typedef struct nksim_joint_coupling_desc {
     double offset;
     /** Follower-coordinate stiffness; zero preserves the backend default. */
     double stiffness;
+    /**
+     * How damped the coupling's response is, as a ratio of critical damping (a timing belt's is small, 0.1 or so,
+     * so a carriage on it rings); zero preserves the backend default, critical damping (1). With several couplings
+     * on one follower the backend takes the mean of their ratios weighted by compliance.
+     */
+    double damping_ratio;
 } nksim_joint_coupling_desc;
 
 /** Closed-loop fixed, revolute, or prismatic joint between tree bodies. */

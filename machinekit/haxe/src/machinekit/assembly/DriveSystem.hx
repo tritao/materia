@@ -8,6 +8,7 @@ import machinekit.transmission.BeltPoseContext;
 import machinekit.transmission.TransmissionDesignError;
 import machinekit.transmission.TransmissionRelation;
 import machinekit.transmission.TransmissionResolver;
+import machinekit.transmission.ValueBasis;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyActuator;
 import materia.assembly.AssemblyDefinition.AssemblyEncoder;
@@ -209,6 +210,7 @@ class DriveSystem {
 					var belt:machinekit.transmission.TimingBelt = cast flat.member(beltId);
 					var derived = machinekit.transmission.BeltStretch.stiffness(belt, paths[0], leader, pulley, mechanical, context);
 					if (record.stiffness == null) relation.stiffness = derived;
+					beltDamping(relation, belt, record);
 				}
 			case BeltReduction(beltId, driver, driven):
 				var coupling = findCoupling(mechanical, record.coupling);
@@ -230,10 +232,22 @@ class DriveSystem {
 					var derived = machinekit.transmission.BeltStretch.reduction(belt, paths[0], leader, follower, driver, driven,
 						mechanical, relation, context);
 					if (record.stiffness == null) relation.stiffness = derived;
+					beltDamping(relation, belt, record);
 				}
 			case _:
 		}
 		return relation;
+	}
+
+	/** A belt's damping is the belt part's, unless the transmission states its own. */
+	static function beltDamping(relation:TransmissionRelation, belt:machinekit.transmission.TimingBelt, record:TransmissionRecord):Void {
+		if (record.dampingRatio != null) {
+			relation.dampingRatio = record.dampingRatio;
+			relation.setBasis("dampingRatio", ValueBasis.Stated);
+		} else if (belt.statedDampingRatio > 0) {
+			relation.dampingRatio = belt.statedDampingRatio;
+			relation.setBasis("dampingRatio", ValueBasis.Stated);
+		}
 	}
 
 	/** Write a resolved relation into the coupling and its follower joint's speed limit. */
@@ -246,6 +260,7 @@ class DriveSystem {
 		coupling.offset = -relation.ratio * transmission.leaderZero;
 		coupling.efficiency = relation.efficiency;
 		coupling.stiffness = relation.stiffness;
+		coupling.dampingRatio = relation.dampingRatio;
 		coupling.backlash = relation.backlash;
 		coupling.drag = relation.drag;
 		var fields = relation.assumptions();
@@ -701,6 +716,7 @@ class DriveSystem {
 			source: TransmissionResolver.mapSource(transmission.source, map), sense: transmission.sense,
 			leaderZero: transmission.leaderZero};
 		copy.stiffness = transmission.stiffness;
+		copy.dampingRatio = transmission.dampingRatio;
 		copy.backlash = transmission.backlash;
 		copy.drag = transmission.drag;
 		copy.near = transmission.near;

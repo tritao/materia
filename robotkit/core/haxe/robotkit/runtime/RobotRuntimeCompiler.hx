@@ -180,6 +180,7 @@ class RobotRuntimeCompiler {
       var compiledCoupling = new RobotRuntimeJointCouplingBlueprint(
         leader, follower, coupling.ratio, coupling.offset);
       compiledCoupling.stiffness = coupling.stiffness / (coupling.ratio * coupling.ratio);
+      compiledCoupling.dampingRatio = coupling.dampingRatio;
       result.couplings.push(compiledCoupling);
     }
     var children = [for (joint in robot.joints) joint.child];

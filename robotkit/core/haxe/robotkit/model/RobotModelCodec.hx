@@ -369,6 +369,7 @@ class RobotModelCodec {
         coupling.efficiency = efficiency;
       }
       if (Reflect.hasField(record, "stiffness")) coupling.stiffness = nonNegative(number(record, "stiffness"), "coupling stiffness");
+      if (Reflect.hasField(record, "dampingRatio")) coupling.dampingRatio = nonNegative(number(record, "dampingRatio"), "coupling damping ratio");
       if (Reflect.hasField(record, "backlash")) coupling.backlash = nonNegative(number(record, "backlash"), "coupling backlash");
       if (Reflect.hasField(record, "drag")) coupling.drag = nonNegative(number(record, "drag"), "coupling drag");
       coupling.assumed = readAssumed(record);
@@ -617,6 +618,7 @@ class RobotModelCodec {
       ratio: coupling.ratio, offset: coupling.offset, efficiency: coupling.efficiency
     };
     if (coupling.stiffness != 0.0) record.stiffness = nonNegative(coupling.stiffness, "coupling stiffness");
+    if (coupling.dampingRatio != 0.0) record.dampingRatio = nonNegative(coupling.dampingRatio, "coupling damping ratio");
     if (coupling.backlash != 0.0) record.backlash = nonNegative(coupling.backlash, "coupling backlash");
     if (coupling.drag != 0.0) record.drag = nonNegative(coupling.drag, "coupling drag");
     if (coupling.assumptions.length > 0) record.assumptions = coupling.assumptions.copy();

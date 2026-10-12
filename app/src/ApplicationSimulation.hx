@@ -748,6 +748,11 @@ class ApplicationSimulation {
 
   /** True in both running and paused simulation modes. */
   public function isActive():Bool return simulation!=null;
+  /** Where physics has a robot's link, not where the robot's device reports its joints (a machine knows only its motors). */
+  public function physicalLinkPosition(robotIndex:Int, linkIndex:Int):Array<Float> {
+    if (simulation == null) throw "no simulation is running";
+    return simulation.linkPose(robotIndex, linkIndex).position.copy();
+  }
   /** The live session, for people and other participants that join it. */
   public function activeSession():Null<SimSession> { var active = space; return active == null ? null : active.session; }
   public function environmentObject(id:String):Null<SimObject> {

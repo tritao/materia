@@ -16,7 +16,7 @@ import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
-	public static inline var VERSION:Int = 10;
+	public static inline var VERSION:Int = 11;
 
 	public static function validateStop(stop:AssemblyJointStop, joint:String):Void {
 		if (stop == null || !Math.isFinite(stop.timeConstantSec) || stop.timeConstantSec <= 0 ||
@@ -178,6 +178,7 @@ class AssemblyDefinitionCodec {
 				!Math.isFinite(coupling.ratio) || coupling.ratio == 0 || !Math.isFinite(coupling.offset) ||
 				(coupling.efficiency != null && !(coupling.efficiency > 0 && coupling.efficiency <= 1)) ||
 				(coupling.stiffness != null && !(coupling.stiffness > 0 && Math.isFinite(coupling.stiffness))) ||
+				(coupling.dampingRatio != null && !(coupling.dampingRatio >= 0 && Math.isFinite(coupling.dampingRatio))) ||
 				(coupling.backlash != null && !(coupling.backlash >= 0 && Math.isFinite(coupling.backlash))) ||
 				(coupling.drag != null && !(coupling.drag >= 0 && Math.isFinite(coupling.drag))))
 				throw "Assembly has an invalid coupled joint";

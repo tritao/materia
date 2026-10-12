@@ -146,7 +146,7 @@
         "schemaVersion": 1,
         "robotId": "materia/robot",
         "model": {
-          "schemaVersion": 13,
+          "schemaVersion": 14,
           "name": "Materia robot",
           "collisionApproximation": "bounds-box",
           "floatingBase": false,

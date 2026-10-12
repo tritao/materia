@@ -480,7 +480,7 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
     };
     std::string name = m->names; // The first name is the model's.
     if (name.empty()) name = "mjcf-robot";
-    return "{\n  \"schemaVersion\": 13,\n  \"name\": " + json_string(name) +
+    return "{\n  \"schemaVersion\": 14,\n  \"name\": " + json_string(name) +
            ",\n  \"collisionApproximation\": \"none\",\n  \"floatingBase\": " +
            (floating ? "true" : "false") + ",\n  \"links\": " + join(links) +
            ",\n  \"joints\": " + join(joints) + ",\n  \"actuators\": " + join(actuators) +

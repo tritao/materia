@@ -392,7 +392,7 @@ class MachineAssemblyCodec {
 		}
 		for (coupling in level.couplings)
 			target.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset,
-				coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions);
+				coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions, coupling.dampingRatio);
 		for (path in machine.beltPaths) target.addBeltPath(path);
 		// A transmission whose coupling is gone goes too. The rest take their ratios from their parts as
 		// they are now, not as they were saved; a change is reported.
@@ -437,7 +437,7 @@ class MachineAssemblyCodec {
 	}
 
 	static function couplingValues(coupling:AssemblyJointCoupling):Array<Null<Float>>
-		return [coupling.ratio, coupling.offset, coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag];
+		return [coupling.ratio, coupling.offset, coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.dampingRatio];
 
 	/** The member path and connector behind exposed connector `name` of a table entry. */
 	static function exposedMember(entry:AssemblySubdefinition, table:Map<String, AssemblySubdefinition>,

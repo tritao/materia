@@ -177,7 +177,7 @@ class BeltStretch {
 			if (Math.abs(point.z) > 1e-5) throw new TransmissionDesignError("Belt wrap leaves its plane; align its pulley attachment");
 			wraps.push(new BeltWrap(point.x, point.y, original[index].radius, original[index].side));
 		}
-		try return new TimingBelt(belt.beltProfile, belt.width, wraps, null, belt.statedCordRigidity) catch (error:Dynamic)
+		try return new TimingBelt(belt.beltProfile, belt.width, wraps, null, belt.statedCordRigidity, belt.statedDampingRatio) catch (error:Dynamic)
 			throw new TransmissionDesignError('Belt "${path.belt}" wrap geometry is incompatible; update its pulley attachments: $error');
 	}
 

@@ -943,9 +943,9 @@ public:
         model->opt.timestep = dt / static_cast<double>(substeps);
         // Topology owns the physical response; only the integration floor changes here.
         for (const auto &response : coupling_responses) {
-            model->eq_solref[2 * response.first] =
-                std::max(2.0 * model->opt.timestep, response.second);
-            model->eq_solref[2 * response.first + 1] = 1.0;
+            model->eq_solref[2 * response.equality] =
+                std::max(2.0 * model->opt.timestep, response.time_constant);
+            model->eq_solref[2 * response.equality + 1] = response.damping_ratio;
         }
         const auto drives = kinematic_drives();
         for (std::uint32_t index = 0; index < substeps; ++index) {
@@ -1575,24 +1575,45 @@ private:
 
     void rebuild_coupling_responses() {
         coupling_responses.clear();
-        std::map<std::uint64_t, double> compliances;
+        std::map<std::uint64_t, double> compliances, damped;
         for (const auto &term : couplings) {
             auto &compliance = compliances[term.follower];
-            if (term.stiffness > 0.0) compliance += 1.0 / term.stiffness;
+            if (term.stiffness > 0.0) {
+                compliance += 1.0 / term.stiffness;
+                // The damping ratio of the terms in series, weighted by their compliance; an unset one is critical.
+                damped[term.follower] += (term.damping_ratio > 0.0 ? term.damping_ratio : 1.0) / term.stiffness;
+            }
         }
         for (const auto &[follower_id, compliance] : compliances) {
             const int jid = model_joint_id(joints.at(follower_id));
             const std::string name = "nksim_drive_coupling_" + std::to_string(follower_id);
             const int equality = mj_name2id(model, mjOBJ_EQUALITY, name.c_str());
             if (jid < 0 || equality < 0) continue;
-            const double inverse_inertia = model->dof_invweight0[model->jnt_dofadr[jid]];
+            double inverse_inertia = model->dof_invweight0[model->jnt_dofadr[jid]];
+            // A spring between a driven shaft and the load it moves rings against the load: the shaft is held by its
+            // drive, so the frequency is the spring's over the inertia of what the leaders carry, in the follower's
+            // coordinate. (The shaft's own inertia, often a few grams of pulley, would make the spring a hundred times
+            // stiffer than it is.) A coupling without stiffness keeps the follower's.
+            if (compliance > 0.0) {
+                double load = 0.0;
+                for (const auto &term : couplings) {
+                    if (term.follower != follower_id) continue;
+                    const int leader = model_joint_id(joints.at(term.leader));
+                    if (leader >= 0) load += term.ratio * term.ratio * model->dof_invweight0[model->jnt_dofadr[leader]];
+                }
+                if (load > 0.0) inverse_inertia = load;
+            }
             if (inverse_inertia > 0.0) {
                 // A zero-stiffness relation is an ideal mechanical constraint. Give
                 // it the smallest stable MuJoCo time constant at step time; leaving
                 // the default 20 ms response lets high-force drives stretch it.
+                // MuJoCo's soft constraint is a spring of natural frequency 1 / (time constant * damping ratio), so a
+                // coupling that rings (ratio under one) keeps the natural frequency its compliance gives by taking a
+                // time constant of the compliance's over the ratio; a critical one (the default) is unchanged.
+                const double ratio = compliance > 0.0 ? damped[follower_id] / compliance : 1.0;
                 const double time_constant = compliance > 0.0
-                    ? std::sqrt(compliance / inverse_inertia) : 0.0;
-                coupling_responses.emplace_back(equality, time_constant);
+                    ? std::sqrt(compliance / inverse_inertia) / ratio : 0.0;
+                coupling_responses.push_back({equality, time_constant, ratio});
             }
         }
     }
@@ -2368,7 +2389,12 @@ private:
         return false;
     }
     std::vector<nksim::BackendJointCoupling> couplings;
-    std::vector<std::pair<int, double>> coupling_responses;
+    struct CouplingResponse {
+        int equality;
+        double time_constant;
+        double damping_ratio;
+    };
+    std::vector<CouplingResponse> coupling_responses;
     struct BrakeSolverResponse {
         JointRecord *joint = nullptr;
         int dof = 0;

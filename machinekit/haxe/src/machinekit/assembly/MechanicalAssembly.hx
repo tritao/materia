@@ -124,6 +124,7 @@ class MechanicalAssembly {
 			target: map(coupling.target), ratio: coupling.ratio, offset: coupling.offset};
 		if (coupling.efficiency != null) copy.efficiency = coupling.efficiency;
 		if (coupling.stiffness != null) copy.stiffness = coupling.stiffness;
+		if (coupling.dampingRatio != null) copy.dampingRatio = coupling.dampingRatio;
 		if (coupling.backlash != null) copy.backlash = coupling.backlash;
 		if (coupling.drag != null) copy.drag = coupling.drag;
 		if (coupling.assumptions != null && coupling.assumptions.length > 0)

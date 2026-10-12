@@ -1787,6 +1787,91 @@ void rigid_coupling_holds_under_high_effort() {
     nkscene_scene_destroy(scene);
 }
 
+// A soft coupling rings as its damping ratio says. A body of mass 1 kg follows another through a spring of 400 N/m
+// (the coupling's stiffness) while a force of 20 N pushes the leader: the follower lags behind it, settling to a
+// constant lag (F / 2k, the pair accelerating together) after ringing about it. With a damping ratio of 0.1 the lag
+// overshoots its final value by tens of percent; with the ratio left unset, the default, it is critically damped
+// and hardly does.
+double coupling_overshoot(double damping_ratio) {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.002;
+    desc.physics_substeps = 4;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const auto base = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_STATIC, 0.0);
+    const auto leader_body = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0);
+    const auto follower_body = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0);
+    nksim_joint_desc joint{};
+    joint.struct_size = sizeof(joint);
+    joint.type = NKSIM_JOINT_PRISMATIC;
+    joint.body_a = base;
+    joint.axis_a[0] = 1.0;
+    joint.lower_limit = -100.0;
+    joint.upper_limit = 100.0;
+    joint.max_force = 1000.0;
+    nksim_joint source = 0, target = 0;
+    joint.body_b = leader_body;
+    assert(nksim_joint_create(world, &joint, &source) == NKSIM_OK);
+    joint.body_b = follower_body;
+    assert(nksim_joint_create(world, &joint, &target) == NKSIM_OK);
+    nksim_joint_coupling_desc coupling{};
+    coupling.struct_size = sizeof(coupling);
+    coupling.leader = source;
+    coupling.follower = target;
+    coupling.ratio = 1.0;
+    coupling.stiffness = 400.0;
+    coupling.damping_ratio = damping_ratio;
+    assert(nksim_joint_couple(world, &coupling) == NKSIM_OK);
+    nksim_joint_target push{};
+    push.struct_size = sizeof(push);
+    push.joint = source;
+    push.mode = NKSIM_JOINT_TARGET_EFFORT;
+    push.target = 20.0;
+    push.max_force = 1000.0;
+    assert(nksim_world_set_joint_targets(world, &push, 1) == NKSIM_OK);
+    nksim_joint_state leader{}, follower{};
+    leader.struct_size = follower.struct_size = sizeof(leader);
+    double peak = 0.0, settled = 0.0;
+    const int ticks = 600, tail = 40;
+    for (int tick = 0; tick < ticks; ++tick) {
+        step_world(world, 1);
+        assert(nksim_joint_get_state(world, source, &leader) == NKSIM_OK);
+        assert(nksim_joint_get_state(world, target, &follower) == NKSIM_OK);
+        const double lag = leader.position - follower.position;
+        peak = std::max(peak, lag);
+        if (tick >= ticks - tail) settled += lag / tail;
+    }
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+    assert(settled > 0.0);
+    return peak / settled - 1.0;
+}
+
+void a_coupling_rings_as_its_damping_ratio_says() {
+    const double critical = coupling_overshoot(0.0), ringing = coupling_overshoot(0.1);
+    assert(critical < 0.05);
+    assert(ringing > 0.5);
+    nksim_joint_coupling_desc invalid{};
+    invalid.struct_size = sizeof(invalid);
+    invalid.damping_ratio = -1.0;
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 2;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    assert(nksim_joint_couple(world, &invalid) != NKSIM_OK);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 // A follower with two leaders is held by a fixed tendon and a tendon equality, like a CoreXY
 // motor turning with both axes.
 void a_follower_with_two_leaders_uses_a_tendon_equality() {
@@ -2823,6 +2908,7 @@ int main() {
     coupled_prismatic_joints_use_equality_and_convex_collision();
     rigid_coupling_holds_under_high_effort();
     a_follower_with_two_leaders_uses_a_tendon_equality();
+    a_coupling_rings_as_its_damping_ratio_says();
     convex_hulls_overlapping_at_rest_do_not_collide();
     mounted_contact_groups_span_articulations_only();
     assembly_closures_compile_as_equalities();

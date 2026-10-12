@@ -190,7 +190,7 @@
               "frame": "base/sensors"
             }
           ],
-          "schemaVersion": 13,
+          "schemaVersion": 14,
           "floatingBase": false,
           "actuators": [],
           "encoders": [],

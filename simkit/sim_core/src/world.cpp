@@ -1212,8 +1212,9 @@ nksim_result World::couple_joint(const nksim_joint_coupling_desc &desc) {
     if (!valid_struct_size(desc.struct_size, sizeof(desc))) return NKSIM_ERROR_INVALID_ARGUMENT;
     const double stiffness = desc.stiffness;
     if (!std::isfinite(stiffness) || stiffness < 0.0) return NKSIM_ERROR_INVALID_ARGUMENT;
+    if (!std::isfinite(desc.damping_ratio) || desc.damping_ratio < 0.0) return NKSIM_ERROR_INVALID_ARGUMENT;
     return backend->joint_couple({leader->backend_joint, follower->backend_joint,
-                                  desc.ratio, desc.offset, stiffness});
+                                  desc.ratio, desc.offset, stiffness, desc.damping_ratio});
 }
 
 nksim_result World::create_closure(const nksim_closure_desc &desc) {

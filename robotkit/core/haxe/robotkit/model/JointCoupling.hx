@@ -25,6 +25,12 @@ class JointCoupling {
    * sliding leader, N m/rad for a turning one), such as a timing belt's stretch. Zero means rigid.
    */
   public var stiffness:Float = 0.0;
+  /**
+   * How damped the coupling's response is, as a ratio of critical damping: a timing belt's is small (about 0.1), so a
+   * carriage on it rings after a push, where a rigid or critically damped coupling does not. Zero leaves the simulation's
+   * default, critical damping (1). Meaningful only with a stiffness.
+   */
+  public var dampingRatio:Float = 0.0;
   /** Lost motion when the coupling reverses, in the leader's units, such as a lead screw nut's backlash. */
   public var backlash:Float = 0.0;
   /**

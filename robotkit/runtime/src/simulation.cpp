@@ -381,6 +381,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                          !valid_pose(initial_pose->position, initial_pose->rotation)))
         return RK_ERROR_INVALID_ARGUMENT;
     std::shared_ptr<VirtualDeviceEndpoint> virtual_endpoint;
+    std::vector<std::size_t> device_measured_joints;
     if (robot_desc &&
         robot_desc->virtual_device_enabled) {
 #if !defined(RK_HAS_VIRTUAL_DEVICE)
@@ -460,6 +461,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 config.inputs.push_back(std::move(input));
             }
         }
+        for (const auto &actuator : config.actuators) device_measured_joints.push_back(actuator.measured_joint());
         virtual_endpoint = VirtualDeviceEndpoint::create(blueprint, config);
         if (!virtual_endpoint) return RK_ERROR_INVALID_ARGUMENT;
 #endif
@@ -855,6 +857,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             coupling.ratio = source.ratio;
             coupling.offset = source.offset;
             coupling.stiffness = blueprint.coupling_stiffness[index];
+            coupling.damping_ratio = blueprint.coupling_damping_ratio[index];
             require_sim(nksim_joint_couple(world, &coupling), "nksim_joint_couple");
         }
         for (uint32_t index = 0; index < contact_pair_count; ++index) {
@@ -938,6 +941,30 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         const auto topology_result = nksim_world_end_topology_update(world);
         topology_update = false;
         require_sim(topology_result, "nksim_world_end_topology_update");
+        binding->device_free_.assign(blueprint.joint_count, 0);
+        if (virtual_endpoint && robot_desc) {
+            // A device drives the joints its actuators measure. The rest of a compliant coupling is left to the physics.
+            std::vector<uint8_t> measured(blueprint.joint_count, 0);
+            for (const auto joint : device_measured_joints)
+                if (joint < blueprint.joint_count) measured[joint] = 1;
+            for (uint32_t index = 0; index < blueprint.coupling_count; ++index) {
+                if (blueprint.coupling_stiffness[index] <= 0.0) continue;
+                for (const auto joint : {blueprint.couplings[index].leader, blueprint.couplings[index].follower})
+                    if (!measured[joint]) binding->device_free_[joint] = 1;
+            }
+            // The load's rigid partners (the idlers that turn with the carriage) are free with it.
+            for (bool changed = true; changed;) {
+                changed = false;
+                for (uint32_t index = 0; index < blueprint.coupling_count; ++index) {
+                    const auto leader = blueprint.couplings[index].leader, follower = blueprint.couplings[index].follower;
+                    if (binding->device_free_[leader] == binding->device_free_[follower]) continue;
+                    const auto other = binding->device_free_[leader] ? follower : leader;
+                    if (measured[other]) continue;
+                    binding->device_free_[other] = 1;
+                    changed = true;
+                }
+            }
+        }
         if (robot_desc && (robot_desc->flags & RK_SIMULATION_ROBOT_HOLD_AT_REST)) {
             std::vector<uint8_t> held(blueprint.joint_count, 0);
             for (uint32_t index = 0; index < blueprint.joint_count; ++index)
@@ -947,7 +974,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             // A servo motor is held at rest by its servo, wherever it sits in its couplings.
             for (uint32_t index = 0; index < blueprint.joint_count; ++index) {
                 if (binding->servo_[index].stiffness > 0.0) held[index] = binding->actuated_joints_[index];
-                if (binding->passive_[index]) held[index] = 0;
+                if (binding->passive_[index] || binding->device_free_[index]) held[index] = 0;
             }
             for (uint32_t index = 0; index < blueprint.joint_count; ++index)
                     if (blueprint.external_joint[index]) held[index] = 0;
@@ -1923,7 +1950,7 @@ rk_result Simulation::submit(const nksim_tick &tick) {
             const auto positions = virtual_devices_[binding_index]->joint_positions();
             if (positions.size() != binding->joints_.size()) return RK_ERROR_BACKEND;
             for (std::size_t joint = 0; joint < positions.size(); ++joint) {
-                if (!binding->actuated_joints_[joint]) continue;
+                if (!binding->actuated_joints_[joint] || binding->device_free_[joint]) continue;
                 nksim_joint_target target{};
                 target.struct_size = sizeof(target);
                 target.joint = binding->joints_[joint];

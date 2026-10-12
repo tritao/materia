@@ -7,6 +7,8 @@ class TransmissionRelation {
 	public var ratio:Float;
 	public var efficiency:Float;
 	public var stiffness:Null<Float>;
+	/** How damped the coupling's response is, as a ratio of critical damping; null is the simulation's default (critical). */
+	public var dampingRatio:Null<Float>;
 	public var backlash:Null<Float>;
 	public var drag:Null<Float>;
 	public var followerSpeedCap:Null<Float>;
@@ -16,7 +18,7 @@ class TransmissionRelation {
 	public var assumed(get, never):ReadOnlyArray<String>;
 
 	public function setBasis(field:String, basis:ValueBasis, ?label:String):Void {
-		if (!switch field { case "ratio", "efficiency", "stiffness", "backlash", "drag", "followerSpeedCap": true; default: false; })
+		if (!switch field { case "ratio", "efficiency", "stiffness", "dampingRatio", "backlash", "drag", "followerSpeedCap": true; default: false; })
 			throw 'Unknown relation field "$field"';
 		bases.set(field, basis);
 		if (basis == Assumed) labels.set(field, label == null ? field : label);

@@ -626,13 +626,14 @@ class ProjectSourceTests {
   /**
    * Input shaping on the printer in the shared simulation (MuJoCo, through the virtual device): a 50 mm move along x with the
    * job's shapers and without them. The shaped move is the same move delayed by the shapers' mean delay and ending their tail
-   * later, and the carriage ends where it was sent, to within one microstep of the belt (12.5 um). (The belts are springs in
-   * MuJoCo but critically damped, so the carriage does not ring there; the ringing is checked in the printing gate against
-   * the same mass and stiffness.)
+   * later, and the carriage ends where it was sent, to within one microstep of the belt (12.5 um). The belts are springs of
+   * damping ratio 0.1 in MuJoCo (they state it), so the carriage swings there after the plain move. The shaping's size
+   * (at least five times less) is the printing gate's analytic acceptance; in MuJoCo the carriage swings at about 5 Hz, not the
+   * belts' 53 Hz, so the shaper's notch does not line up (PLAN, X9).
    */
   static function checkPrinterShaping(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/materia.project.json");
-    var ends:Array<Float> = [], finishes:Array<Int> = [];
+    var ends:Array<Float> = [], finishes:Array<Int> = [], rings:Array<Float> = [], swings:Array<Int> = [];
     var step = 0.0;
     for (shaped in [false, true]) {
       var generated = MateriaProjectRunner.loadProject(manifest);
@@ -649,32 +650,68 @@ class ProjectSourceTests {
       var world = new RobotWorld();
       var simulation = new ApplicationSimulation(world);
       simulation.setBackend(ApplicationSimulation.MUJOCO);
+      // A tick of a millisecond: the carriage rings at 53 Hz, which a tick of 10 ms cannot see.
+      simulation.setTimestep(0.001);
       check(simulation.rebuild(session.sensors, session.scene, session), "the printer builds: " + simulation.error);
       var player = simulation.printPlayer();
       if (player == null) throw "the printer has no print player";
       var x = -1;
       for (index in 0...model.joints.length) if (model.joints[index].id == "x") x = index;
       var dt = simulation.timestep, ticks = 0, limit = Math.round(30.0 / dt), finished = -1;
+      // The carriage, once the plan's setpoint has arrived at X 80 mm (the machine's x is the nozzle's distance from the
+      // bed's middle in the assembly, 110 mm less than the machine's), and for 0.3 s after.
+      var carriageLink = model.links.indexOf(model.joints[x].child);
+      var carriage:Array<Float> = [], pathPoints:Array<Array<Float>> = [], arrived = false, origin:Null<Array<Float>> = null;
       while (ticks++ < limit && player.failure == null && finished < 0) {
         simulation.step();
+        var frame = world.snapshot().robots()[0];
+        if (origin == null && Math.abs(frame.setpointPositions.get(x) + 0.110 - 0.030) < 1e-9) origin = simulation.physicalLinkPosition(0, carriageLink);
+        if (!arrived && Math.abs(frame.setpointPositions.get(x) + 0.110 - 0.080) < 1e-9) arrived = true;
+        if (arrived) {
+          carriage.push(frame.positions.get(x) + 0.110);
+          pathPoints.push(simulation.physicalLinkPosition(0, carriageLink));
+        }
         if (player.passes == 1) finished = ticks;
       }
       check(player.failure == null, "the move runs: " + player.failure);
       check(finished > 0, "the move completes");
-      for (_ in 0...Math.round(0.3 / dt)) simulation.step();
-      // The machine's x is the nozzle's distance from the bed's middle in the assembly (110 mm less than the machine's).
-      ends.push(world.snapshot().robots()[0].positions.get(x) + 0.110);
+      for (_ in 0...Math.round(0.3 / dt)) {
+        simulation.step();
+        carriage.push(world.snapshot().robots()[0].positions.get(x) + 0.110);
+        pathPoints.push(simulation.physicalLinkPosition(0, carriageLink));
+      }
+      ends.push(carriage[carriage.length - 1]);
       finishes.push(finished);
       step = dt;
+      // What is left shaking: how far the carriage strays from where it settles in the 150 ms after the setpoint arrives.
+      // The carriage as physics has it, along the way it settles from where it was when the setpoint arrived.
+      var last = pathPoints[pathPoints.length - 1];
+      check(origin != null, "the carriage is seen at X 30 mm");
+      var direction = [for (axis in 0...3) last[axis] - origin[axis]];
+      var length = Math.sqrt(direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]);
+      var along = [for (point in pathPoints) (direction[0] * (point[0] - last[0]) + direction[1] * (point[1] - last[1]) + direction[2] * (point[2] - last[2])) / Math.max(length, 1e-9)];
+      var tail = Math.round(0.05 / dt), settled = 0.0, ringing = 0.0;
+      for (index in along.length - tail...along.length) settled += along[index] / tail;
+      for (index in 0...Math.round(0.15 / dt)) ringing = Math.max(ringing, Math.abs(along[index] - settled));
+      // How often the carriage passes through where it settles: a spring that rings does, one that creeps does not.
+      var crossings = 0;
+      for (index in 1...Math.round(0.3 / dt)) if ((along[index] - settled) * (along[index - 1] - settled) < 0.0) crossings++;
+      swings.push(crossings);
+      rings.push(ringing);
       simulation.dispose();
       session.dispose();
     }
     check(Math.abs(ends[0] - 0.080) <= 20e-6 && Math.abs(ends[1] - 0.080) <= 20e-6,
       'both moves end at X 80 mm: ${ends[0] * 1000} and ${ends[1] * 1000} mm');
+    // The belts' damping ratio rides into the simulation (the printer's states 0.1): the carriage, which the device leaves to
+    // the belts, swings through its rest position instead of creeping to it. How much a shaper takes out of that swing is the
+    // gate's analytic check (356 um plain, 7 um shaped on x): the carriage swings at about 5 Hz in the multi-body
+    // printer, not the belts' 53 Hz, so the shaper's notch does not line up with it (PLAN, X9).
+    check(rings[0] > 100e-6 && swings[0] >= 2, 'the plain move leaves the carriage swinging in MuJoCo: ${rings[0] * 1e6} um, ${swings[0]} crossings');
     var later = (finishes[1] - finishes[0]) * step;
     check(later >= 0.01 && later <= 0.06, 'the shaped move completes ${later * 1000} ms after the plain one (the shapers\' delay and tail)');
     Sys.println('printer shaping: both moves end within ${Math.round(Math.max(Math.abs(ends[0] - 0.080), Math.abs(ends[1] - 0.080)) * 1e7) / 10} um of X 80 mm in MuJoCo; ' +
-      'the shaped one completes ${Math.round(later * 1000)} ms later');
+      'the shaped one completes ${Math.round(later * 1000)} ms later; the carriage swings ${Math.round(rings[0] * 1e6)} um plain and ${Math.round(rings[1] * 1e6)} um shaped, ${swings[0]} and ${swings[1]} crossings');
   }
 
   /**
