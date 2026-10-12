@@ -594,7 +594,7 @@ typedef SceneArtifactTool = {
 
 
 /**
- * A print job the generator made for its own printer (since version 30; the melt lag and `deposit` since 31). Lengths are metres, whatever the scene's unit.
+ * A print job the generator made for its own printer (since version 30; the melt lag and `deposit` since 31, `shaping` since 32). Lengths are metres, whatever the scene's unit.
  *
  * `source` is the program as the printer's G-code (Klipper flavour: relative extrusion, `M104`/`M109`/`M140`/`M190`,
  * `M106`/`M107`), in machine coordinates: the positions of the three `axes`, prismatic joints whose values are
@@ -615,7 +615,9 @@ typedef SceneArtifactTool = {
  * `feedsExtruder` says that pushing filament while it is below `minExtrusionTemperature` is a fault. `deposit`, when
  * given, is the occurrence that shows what is printed: the simulation lays the material on it as geometry of its own,
  * in the frame of the occurrence, whose origin is the machine's zero (the bed's front left corner at its surface),
- * and it rides the bed.
+ * and it rides the bed. `shaping`, when given, names the axes whose motion is input-shaped and with what: the shaper
+ * (`zv`, `mzv` or `ei`) cancels the vibration of a mode at `frequency` hertz and `damping` ratio, and the other joints
+ * are delayed to stay in step (see `InputShaper`).
  */
 typedef SceneArtifactPrinting = {
 	var source:String;
@@ -633,6 +635,15 @@ typedef SceneArtifactPrinting = {
 	/** The material's minimum extrusion temperature, degrees Celsius: the static check and the controller refuse to extrude colder. */
 	var minExtrusionTemperature:Float;
 	@:optional var deposit:String;
+	@:optional var shaping:Array<SceneArtifactShaper>;
+}
+
+/** One axis's input shaper in a print job; see SceneArtifactPrinting. */
+typedef SceneArtifactShaper = {
+	var axis:String;
+	var kind:String;
+	var frequency:Float;
+	var damping:Float;
 }
 
 /** One heater of a print job; see SceneArtifactPrinting. */
@@ -670,7 +681,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 31;
+	public static inline var VERSION:Int = 32;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -1418,6 +1429,10 @@ class SceneArtifact {
 			controller: {stepTickHz: integer(controller, "stepTickHz")}};
 		var deposit:Dynamic = Reflect.field(decoded, "deposit");
 		if (deposit != null) job.deposit = Std.isOfType(deposit, String) ? deposit : fail();
+		var shaping:Dynamic = Reflect.field(decoded, "shaping");
+		if (shaping != null)
+			job.shaping = [for (raw in array(shaping)) {axis: text(raw, "axis"), kind: text(raw, "kind"), frequency: field(raw, "frequency"),
+				damping: field(raw, "damping")}];
 		return job;
 	}
 
@@ -1443,6 +1458,14 @@ class SceneArtifact {
 		if (!finite(job.minExtrusionTemperature) || job.minExtrusionTemperature < 0.0) fail("has a minimum extrusion temperature below 0");
 		if (job.controller == null || job.controller.stepTickHz <= 0) fail("needs a controller step rate");
 		if (job.deposit != null && occurrences.indexOf(job.deposit) < 0) fail('shows what is printed on "${job.deposit}", which is no occurrence');
+		var shaped = new Map<String, Bool>();
+		if (job.shaping != null) for (shaper in job.shaping) {
+			if (job.axes.indexOf(shaper.axis) < 0 || shaped.exists(shaper.axis)) fail('shapes axis "${shaper.axis}", which is not one of its axes or is shaped twice');
+			shaped.set(shaper.axis, true);
+			if (["zv", "mzv", "ei"].indexOf(shaper.kind) < 0) fail('has an input shaper of unknown kind "${shaper.kind}"');
+			if (!finite(shaper.frequency) || shaper.frequency < 1.0 || shaper.frequency > 1000.0) fail("has an input shaper frequency outside 1 to 1000 Hz");
+			if (!finite(shaper.damping) || shaper.damping < 0.0 || shaper.damping > 0.9) fail("has an input shaper damping outside 0 to 0.9");
+		}
 		if (job.heaters == null || job.heaters.length == 0 || job.heaters.length > 2) fail("needs one or two heaters");
 		var slots = new Map<Int, Bool>(), channels = new Map<String, Bool>();
 		for (heater in job.heaters) {

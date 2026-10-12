@@ -158,6 +158,16 @@ class ToolpathMotionBinding {
       // A sliced curve lowers to thousands of segments a second, more than the robot's queue or a device's link takes:
       // runs of them are merged into one quintic each where it follows them closely (an owner period at most).
       compiler.mergeSegmentsSeconds = 0.01;
+      // The axes with a shaper have their motion convolved with it; the other joints are delayed to keep in step.
+      var shapers:Array<Null<motionkit.trajectory.InputShaper>> = [for (_ in 0...count) null];
+      var any = false;
+      for (axis in [solver.x, solver.y, solver.z]) {
+        var shaper = printer.shapers.get(axis.id);
+        if (shaper == null) continue;
+        any = true;
+        for (joint in axis.jointIndices) shapers[joint] = shaper;
+      }
+      if (any) compiler.shapeJoints(shapers);
     }
   }
 

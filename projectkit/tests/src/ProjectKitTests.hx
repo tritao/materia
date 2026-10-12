@@ -941,6 +941,22 @@ class ProjectKitTests {
     check(restored.heaters.length == 2 && restored.heaters[0].fan == "fan.part" && restored.heaters[1].fan == null &&
       restored.heaters[0].feedsExtruder && !restored.heaters[1].feedsExtruder && restored.heaters[1].slot == 1 &&
       restored.heaters[0].heatCapacity == 13.5 && restored.heaters[0].mount == "sensor", "print job heaters round trip");
+    check(restored.shaping == null, "a job without shapers has none");
+    job.shaping = [{axis: "x", kind: "mzv", frequency: 52.5, damping: 0.1}, {axis: "y", kind: "ei", frequency: 40.0, damping: 0.05}];
+    var shaped = SceneArtifact.decode(SceneArtifact.encode(data)).printing;
+    check(shaped != null && shaped.shaping != null && shaped.shaping.length == 2 && shaped.shaping[0].axis == "x" && shaped.shaping[0].kind == "mzv" &&
+      shaped.shaping[0].frequency == 52.5 && shaped.shaping[1].damping == 0.05, "input shapers round trip");
+    job.shaping = [{axis: "e", kind: "mzv", frequency: 50.0, damping: 0.1}];
+    rejects(function() SceneArtifact.encode(data), "a shaper on a joint that is no print axis");
+    job.shaping = [{axis: "x", kind: "zv", frequency: 50.0, damping: 0.1}, {axis: "x", kind: "zv", frequency: 50.0, damping: 0.1}];
+    rejects(function() SceneArtifact.encode(data), "an axis shaped twice");
+    job.shaping = [{axis: "x", kind: "wiggle", frequency: 50.0, damping: 0.1}];
+    rejects(function() SceneArtifact.encode(data), "a shaper of unknown kind");
+    job.shaping = [{axis: "x", kind: "zv", frequency: 0.0, damping: 0.1}];
+    rejects(function() SceneArtifact.encode(data), "a shaper with no frequency");
+    job.shaping = [{axis: "x", kind: "zv", frequency: 50.0, damping: 1.0}];
+    rejects(function() SceneArtifact.encode(data), "a shaper with a damping ratio of one");
+    job.shaping = null;
     // The job's own rules.
     job.axes = ["x", "y", "e"];
     rejects(function() SceneArtifact.encode(data), "a print axis that does not slide");

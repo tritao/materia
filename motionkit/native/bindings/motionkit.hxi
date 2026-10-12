@@ -24,6 +24,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * trajectory. Each segment of the joint becomes a cubic through the corrected position and velocity at its ends, so the
 	 * result is continuous in both. The caller follows with `mk_project_couplings` for the joints that follow `joint`.
 	 */
+	extern fn mk_shape_trajectory(trajectory: mk_trajectory_handle, impulse_counts: ptr<const<u32>> @in_array("joint_count"), delays_seconds: ptr<const<f64>> @in_array("table_size"), amplitudes: ptr<const<f64>> @in_array("table_size"), joint_count: u32, table_size: u32, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	extern fn mk_advance_joint(trajectory: mk_trajectory_handle, joint: u32, lead_seconds: f64, window_seconds: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	extern fn mk_analytic_cartesian_forward(model: ptr<const<mk_analytic_cartesian_model>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_analytic_pose> @out) -> mk_result;
 	/**

@@ -13,6 +13,7 @@ import machinekit.transmission.SpurGear;
 import materia.project.SceneArtifact;
 import motionkit.axis.MotionAxisBlueprint;
 import motionkit.robot.ProgramBlocks;
+import motionkit.trajectory.InputShaper;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.ProgramSink;
 import motionkit.robot.MotionSystemBlueprint;
@@ -43,9 +44,15 @@ class PrinterAxes {
   public final acceleration:Array<Float> = [];
   public final start:Array<Float>;
   public final printer:PrinterBinding;
+  /** The printer job's input shapers (machine data), whether or not this machine applies them. */
+  public final shaping:Array<materia.project.SceneArtifact.SceneArtifactShaper>;
 
-  public function new(?pressureAdvance:Float = 0.0) {
+  /** `shaped` plans with the printer's input shapers, as the app does; without it the motion is as the planner times it. */
+  public function new(?pressureAdvance:Float = 0.0, ?shaped:Bool = false) {
     var scene = SceneArtifact.decode(CoreXyPrinterPreview.printer());
+    var job = scene.printing;
+    if (job == null || job.shaping == null) throw "the printer example states no input shapers";
+    shaping = job.shaping;
     var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),
       scene.assemblyState).model;
     var planning = DeviceBinding.planningModel(model, 40000);
@@ -65,6 +72,7 @@ class PrinterAxes {
     var printed = new CoreXyPrinter();
     printer = new PrinterBinding("e", printed.hotend.spec.filamentDiameter * 1e-3, printed.extruder.spec.hobDiameter * 0.5e-3,
       printed.hotend.spec.maxVolumetricFlow * 1e-9, 0.0005, pressureAdvance);
+    if (shaped) for (shaper in shaping) printer.shapers.set(shaper.axis, InputShaper.named(shaper.kind, shaper.frequency, shaper.damping));
     machine.setPrinter(printer);
     binding = new ToolpathMotionBinding(machine, blueprint);
     // Where homing leaves the nozzle (the slicer's profile).
@@ -73,7 +81,7 @@ class PrinterAxes {
     start = stateAt(0.0, 0.0, 0.01);
   }
 
-  final planning:robotkit.model.RobotModel;
+  public final planning:robotkit.model.RobotModel;
   var ids:Array<String> = [];
 
   /** Every joint's value with the nozzle at (x, y, z) of the bed's frame, each coupled joint where its leaders put it. */
@@ -106,6 +114,7 @@ typedef BenchmarkResult = {
   var overall:Float;
   var worstWindow:Float;
   var sections:Int;
+  var segments:Int;
 }
 
 /** Notes when each plan arrived and how long it runs, then releases it; barriers and notes go to a `ProgramBlocks`. */
@@ -118,6 +127,10 @@ class TimedSink implements ProgramSink {
   final trace:Bool = Sys.getEnv("PRINTING_BENCHMARK_TRACE") != null;
   /** The largest garbage-collected heap seen as plans arrived, bytes. */
   public var peakHeap:Float = 0.0;
+  /** Polynomial segments in all the plans: what the robot's queue and the device's link have to carry. */
+  public var segments:Int = 0;
+  /** How many segments are shorter than 0.1, 0.5, 1, 2 and 4 ms. */
+  public final shorter:Array<Int> = [0, 0, 0, 0, 0];
 
   public function new() {}
 
@@ -129,6 +142,12 @@ class TimedSink implements ProgramSink {
     if (trace) Sys.println('TRACE plan ${run.length} op $opIndex: ${Math.round(plan.durationSeconds * 1000)} ms of motion, path ${Math.round(length * 1e5) / 100} mm, planned in ${Math.round((now - last) * 1000)} ms');
     last = now;
     run.push(plan.durationSeconds);
+    var durations = plan.segmentDurations();
+    segments += durations.length();
+    for (index in 0...durations.length()) {
+      var nanoseconds = haxe.Int64.toInt(durations.get(index));
+      for (bin in 0...5) if (nanoseconds < [100000, 500000, 1000000, 2000000, 4000000][bin]) shorter[bin]++;
+    }
     peakHeap = Math.max(peakHeap, hl.Gc.heapBytes());
     // A plan is measured and let go, as an executor does once it has run it: a long print's plans do not fit in memory together.
     plan.dispose();
@@ -146,7 +165,8 @@ class TimedSink implements ProgramSink {
  * look-ahead planner with Marlin's junction deviation at the same accelerations.
  *
  * Run with no arguments it is the gate. `PRINTING_BENCHMARK_ONLY` names a load instead: `gear`, `cube`, `gcode` (a tower
- * through G-code and back) or `all`.
+ * through G-code and back), `shaping` (the input-shaping checks alone), `tab` or `cubes` (the planned time and
+ * segment counts of the small tab or the calibration cube, plain and shaped) or `all`.
  */
 class PrintingBenchmark {
   /** The process's peak resident memory in megabytes (the kernel's high-water mark), or -1. */
@@ -222,7 +242,7 @@ class PrintingBenchmark {
       '${Math.round((hl.Gc.totalAllocated() - allocatedBefore) / 1048576)} MB allocated while planning');
     sink.blocks.dispose();
     return {failure: failure, planned: planned, reference: estimate.seconds, wall: compileSeconds,
-      overall: planned / Math.max(compileSeconds, 1e-9), worstWindow: worstRatio, sections: sink.run.length};
+      overall: planned / Math.max(compileSeconds, 1e-9), worstWindow: worstRatio, sections: sink.run.length, segments: sink.segments};
   }
 
   /**
@@ -233,6 +253,7 @@ class PrintingBenchmark {
    */
   static function gate(machine:PrinterAxes, settings:SlicerSettings, profile:PrinterProfile):Void {
     motorChecks(machine);
+    shapingChecks(machine, settings, profile);
     extruderChecks(machine, settings, profile);
     // Pressure advance runs the extruder 40 ms ahead of the flow: the same filament in the end, and every plan still within its limits.
     extruderChecks(new PrinterAxes(0.04), settings, profile);
@@ -301,6 +322,153 @@ class PrintingBenchmark {
       compiled.dispose();
     }
     machine.binding.compiler.planCheck = null;
+  }
+
+  /**
+   * What an axis rings at: the mass it moves on the stiffness of its belts, from the drive model, as a frequency (Hz).
+   */
+  static function resonance(machine:PrinterAxes, axis:String):{mass:Float, stiffness:Float, frequency:Float} {
+    var load = robotkit.model.DriveLoads.forAxis(machine.planning, axis, new SteadyLoads());
+    if (load == null || !(load.stiffness > 0.0) || !(load.mass > 0.0)) throw 'axis $axis has no belt stiffness and mass to resonate with';
+    return {mass: load.mass, stiffness: load.stiffness, frequency: Math.sqrt(load.stiffness / load.mass) / (2.0 * Math.PI)};
+  }
+
+  /**
+   * How far a mass on a spring and damper is left shaking when a plan drives its far end: the carriage (`mass`) hangs on
+   * its belts (`stiffness`, `damping` ratio) from the axis position the plan commands, and the answer is the largest
+   * distance from the final commanded position over the quarter second after the plan ends.
+   */
+  static function residualVibration(plan:ExecutionPlan, joint:Int, mass:Float, stiffness:Float, damping:Float):Float {
+    var omega = Math.sqrt(stiffness / mass), drag = 2.0 * damping * omega;
+    var end = plan.durationSeconds, target = plan.evaluate(end).positions[joint];
+    var x = plan.evaluate(0.0).positions[joint], v = 0.0, peak = 0.0;
+    var dt = 20e-6, steps = Math.ceil((end + 0.25) / dt);
+    for (step in 0...steps) {
+      var t = (step + 0.5) * dt;
+      var u = plan.evaluate(Math.min(t, end)).positions[joint];
+      // Semi-implicit Euler: the velocity first, then the position with the new velocity.
+      v += (omega * omega * (u - x) - drag * v) * dt;
+      x += v * dt;
+      if (t + 0.5 * dt >= end) peak = Math.max(peak, Math.abs(x - target));
+    }
+    return peak;
+  }
+
+  /**
+   * Input shaping (AM12): the printer's shapers state the resonance of each belt axis, which must be what the drive model
+   * gives (the mass an axis moves on the stiffness of its belts); a 50 mm move that would ring the carriage leaves at
+   * least five times less vibration when it is shaped, at the design frequency and ten percent either side of it; the shaped
+   * plan is the unshaped one lagging by the shaper's mean delay and ending its tail later, and never faster or harder than the
+   * unshaped; and the calibration cube takes less than five percent longer.
+   */
+  static function shapingChecks(machine:PrinterAxes, settings:SlicerSettings, profile:PrinterProfile):Void {
+    var shaped = new PrinterAxes(0.0, true);
+    var origin = new toolpathkit.path.Point3(PrinterAxes.ORIGIN_X, PrinterAxes.ORIGIN_Y, PrinterAxes.ORIGIN_Z);
+    var ids = [for (joint in machine.planning.joints) joint.id];
+    var resonances = new Map<String, {mass:Float, stiffness:Float, frequency:Float}>();
+    var tails = new Map<String, Float>();
+    for (data in machine.shaping) {
+      var found = resonance(machine, data.axis);
+      resonances.set(data.axis, found);
+      var ratio = data.frequency / found.frequency;
+      check(Math.abs(ratio - 1.0) < 0.1, 'the ${data.axis} shaper says ${data.frequency} Hz, the model gives ${found.frequency} Hz (${found.mass} kg on ${found.stiffness} N/m)');
+      tails.set(data.axis, InputShaper.named(data.kind, data.frequency, data.damping).impulses.tail());
+    }
+    var report:Array<String> = [];
+    for (move in [{name: "x", dx: 1.0, dy: 0.0}, {name: "y", dx: 0.0, dy: 1.0}, {name: "45", dx: 1.0, dy: 1.0}]) {
+      var length = Math.sqrt(move.dx * move.dx + move.dy * move.dy);
+      var from = new toolpathkit.path.Point3(0.11 - 0.025 * move.dx / length, 0.11 - 0.025 * move.dy / length, 0.01);
+      var to = new toolpathkit.path.Point3(0.11 + 0.025 * move.dx / length, 0.11 + 0.025 * move.dy / length, 0.01);
+      function plans(axes:PrinterAxes):ExecutionPlan {
+        var program = new ToolpathProgram([ToolpathOp.Move(Cut, toolpathkit.path.PathGeometry.Line(from, to), 1.0, 0.0001,
+          new toolpathkit.path.Provenance(1, 1, 0))], new toolpathkit.tool.ToolLibrary(), [new toolpathkit.setup.Setup("1", origin)]);
+        var lowered = ToolpathMotion.lower(program, axes.binding.machine);
+        if (lowered.program == null) throw "the step move lowers to nothing";
+        var compiled = axes.binding.compiler.compile(lowered.program, axes.stateAt(from.x, from.y, 0.01), Int64.ofInt(1));
+        var found:Array<ExecutionPlan> = [];
+        for (block in compiled.blocks) for (plan in block.plans) found.push(plan);
+        if (found.length != 1) throw 'the ${move.name} step move plans as ${found.length} plans, not one';
+        return found[0];
+      }
+      var plain = plans(machine), cut = plans(shaped);
+      var line = '${move.name}: ${Math.round(plain.durationSeconds * 1000)} ms plain (${plain.segmentDurations().length()} segments), ${Math.round(cut.durationSeconds * 1000)} ms shaped (${cut.segmentDurations().length()} segments)';
+      var longest = 0.0;
+      for (data in machine.shaping) {
+        var tail = tails.get(data.axis);
+        if (tail != null) longest = Math.max(longest, tail);
+      }
+      check(Math.abs(cut.durationSeconds - plain.durationSeconds - longest) < 0.003,
+        '${move.name}: the shaped plan runs ${cut.durationSeconds - plain.durationSeconds} s longer, the shaper tail is $longest s');
+      // Shaping blends delayed copies of the plan's motion, so it keeps the axes within the limits the plan was timed for
+      // (exactly, as `testShapedTrajectoryIsTheWeightedSumOfDelays` shows; the plan's merged segments follow within a tenth of a percent).
+      for (step in 0...Math.ceil(cut.durationSeconds / 0.0005) + 1) {
+        var state = cut.evaluate(Math.min(cut.durationSeconds, step * 0.0005));
+        for (i in 0...2) {
+          var id = i == 0 ? "x" : "y";
+          check(Math.abs(state.velocities[ids.indexOf(id)]) <= machine.speed[i] * 1.001, '${move.name}: shaping raised $id velocity to ${state.velocities[ids.indexOf(id)]} over ${machine.speed[i]}');
+          check(Math.abs(state.accelerations[ids.indexOf(id)]) <= machine.acceleration[i] * 1.001, '${move.name}: shaping raised $id acceleration to ${state.accelerations[ids.indexOf(id)]} over ${machine.acceleration[i]}');
+        }
+      }
+      // What the carriage is left shaking with, each axis on its own resonance and at 10 % off it.
+      for (data in machine.shaping) {
+        var found = resonances.get(data.axis);
+        if (found == null) throw 'no resonance for ${data.axis}';
+        var joint = ids.indexOf(data.axis);
+        var moved = Math.abs(plain.evaluate(plain.durationSeconds).positions[joint] - plain.evaluate(0.0).positions[joint]);
+        if (moved < 1e-4) continue;
+        for (error in [0.0, -0.1, 0.1]) {
+          var stiffness = found.stiffness * (1.0 + error) * (1.0 + error);
+          var before = residualVibration(plain, joint, found.mass, stiffness, data.damping);
+          var after = residualVibration(cut, joint, found.mass, stiffness, data.damping);
+          check(before > 1e-6, '${move.name}: the unshaped move does not excite the ${data.axis} resonance (${before} m)');
+          check(after * 5.0 <= before, '${move.name}: ${data.axis} resonance ${Math.round(error * 100)} % off: residual ${after * 1e6} um shaped, ${before * 1e6} um plain, under 5x');
+          if (error == 0.0) line += '; ${data.axis} rings ${Math.round(before * 1e6)} -> ${Math.round(after * 1e6)} um (${Math.round(before / Math.max(after, 1e-12) * 10) / 10}x)';
+        }
+      }
+      report.push(line);
+      plain.dispose();
+      cut.dispose();
+    }
+    check(machine.binding.compiler.mergeRefusals == 0 && shaped.binding.compiler.mergeRefusals == 0,
+      'the step moves keep their merged form: ${machine.binding.compiler.lastMergeRefusal} ${shaped.binding.compiler.lastMergeRefusal}');
+    for (line in report) Sys.println('shaping: $line');
+    for (data in machine.shaping) {
+      var found = resonances.get(data.axis);
+      if (found == null) throw 'no resonance for ${data.axis}';
+      Sys.println('shaping: ${data.axis} ${data.kind} at ${data.frequency} Hz, damping ${data.damping}; the model gives ${Math.round(found.frequency * 10) / 10} Hz ' +
+        '(${Math.round(found.mass * 1000) / 1000} kg on ${Math.round(found.stiffness)} N/m)');
+    }
+    // A job pays the tail at every stop: the calibration cube's planned time with and without shaping.
+    var part = TestParts.calibrationCube();
+    var sliced = Slicer.slice(part, settings, profile, "cube");
+    part.close();
+    var plainResult = report0("cube without shaping", machine, sliced.program);
+    var shapedResult = report0("cube shaped", shaped, sliced.program);
+    var growth = shapedResult.planned / plainResult.planned - 1.0;
+    Sys.println('shaping: the cube plans in ${Math.round(plainResult.planned * 10) / 10} s plain and ${Math.round(shapedResult.planned * 10) / 10} s shaped in ${shapedResult.sections} sections (${Math.round(growth * 1000) / 10} % longer); ' +
+      'segments: ${plainResult.segments} plain (${Math.round(plainResult.segments / plainResult.planned)} a second), ${shapedResult.segments} shaped (${Math.round(shapedResult.segments / shapedResult.planned)} a second)');
+    check(shapedResult.failure == null, "the shaped cube plans: " + shapedResult.failure);
+    check(growth < 0.05, 'shaping makes the cube ${growth * 100} % longer, over 5 %');
+  }
+
+  /** `report` without the printing: only the planned time. */
+  static function report0(name:String, machine:PrinterAxes, program:ToolpathProgram):BenchmarkResult {
+    var moves = motionOnly(program);
+    var lowered = ToolpathMotion.lower(moves, machine.binding.machine);
+    var motion = lowered.program;
+    if (motion == null) throw '$name has no motion';
+    var sink = new TimedSink();
+    sink.reset();
+    var failure:Null<String> = null;
+    var compilation = machine.binding.compiler.begin(motion, machine.start, Int64.ofInt(1), 0, 1.0, sink);
+    try {
+      while (compilation.step()) {}
+    } catch (error:Dynamic) { failure = Std.string(error); compilation.dispose(); }
+    var planned = 0.0;
+    for (seconds in sink.run) planned += seconds;
+    sink.blocks.dispose();
+    Sys.println('  $name: segments shorter than 0.1 / 0.5 / 1 / 2 / 4 ms: ${sink.shorter.join(" / ")} of ${sink.segments}');
+    return {failure: failure, planned: planned, reference: 0.0, wall: 0.0, overall: 0.0, worstWindow: 0.0, sections: sink.run.length, segments: sink.segments};
   }
 
   /**
@@ -374,6 +542,7 @@ class PrintingBenchmark {
     var only = Sys.getEnv("PRINTING_BENCHMARK_ONLY");
     var machine = new PrinterAxes();
     for (axis in machine.blueprint.axes) Sys.println('  axis ${axis.id}: ${axis.lowerLimit} .. ${axis.upperLimit}');
+    Sys.println('  joints: ${[for (joint in machine.planning.joints) joint.id].join(", ")}');
     Sys.println('printer axes: x ${Math.round(machine.speed[0] * 1e4) / 10} mm/s ${Math.round(machine.acceleration[0] * 100) / 100} m/s2, ' +
       'y ${Math.round(machine.speed[1] * 1e4) / 10} mm/s ${Math.round(machine.acceleration[1] * 100) / 100} m/s2, ' +
       'z ${Math.round(machine.speed[2] * 1e4) / 10} mm/s ${Math.round(machine.acceleration[2] * 100) / 100} m/s2');
@@ -382,6 +551,18 @@ class PrintingBenchmark {
     // Without a named load the run is the gate, which the suites run; the loads are for measuring.
     if (only == null && Sys.getEnv("PRINTING_BENCHMARK_GCODE") == null || only == "gate") {
       gate(machine, settings, profile);
+      return;
+    }
+    if (only == "tab" || only == "cubes") {
+      var sliced = Slicer.slice(only == "tab" ? TestParts.smallTab() : TestParts.calibrationCube(), settings, profile, "tab");
+      var shaped = new PrinterAxes(0.04, true), plain = new PrinterAxes(0.04, false);
+      var a = report0("tab plain", plain, sliced.program), b = report0("tab shaped", shaped, sliced.program);
+      Sys.println('tab: ${Math.round(a.planned * 10) / 10} s plain with ${a.segments} segments (${Math.round(a.segments / a.planned)} a second), ' +
+        '${Math.round(b.planned * 10) / 10} s shaped with ${b.segments} (${Math.round(b.segments / b.planned)} a second); merge refusals ${plain.binding.compiler.mergeRefusals} (${plain.binding.compiler.lastMergeRefusal}) and ${shaped.binding.compiler.mergeRefusals} (${shaped.binding.compiler.lastMergeRefusal})');
+      return;
+    }
+    if (only == "shaping") {
+      shapingChecks(machine, settings, profile);
       return;
     }
     var dump = Sys.getEnv("PRINTING_BENCHMARK_DUMP");

@@ -89,6 +89,10 @@ class TrajectoryStream {
   public var finalEndSeconds(default, null):Float = 0.0;
   public var finalDurationNs(default, null):Int64 = Int64.ofInt(0);
   var segments:StreamSegments = new ArrayStreamSegments([]);
+  /** Segments before this one have run: the submitted ones that are still to run are queued whatever the snapshot has seen. */
+  var finishedSegments:Int = 0;
+  /** Knots of the runtime's queue left unused: it counts a closing knot for each chunk it holds besides the segments'. */
+  static inline var QUEUE_MARGIN:Int = 128;
   var durationSeconds:Float = 0.0;
   var references:Map<String, Float> = new Map();
   var nextMotionTag:Int64 = Int64.ofInt(1);
@@ -109,6 +113,7 @@ class TrajectoryStream {
     elapsedSeconds = 0.0;
     submitted = false;
     nextSegment = 0;
+    finishedSegments = 0;
     chunkStartSeconds = 0.0;
     chunkEndSeconds = 0.0;
     finalTag = Int64.ofInt(0);
@@ -142,6 +147,24 @@ class TrajectoryStream {
       throw error;
     }
     observe(session, robot.snapshot());
+  }
+
+  /**
+    Submits a chunk of a plan. False when the runtime had no room for it, which is flow control and not a fault (a dense
+    path can fill the runtime's queue before the two seconds the stream keeps ahead are in it); any other refusal faults
+    the session.
+  **/
+  function submitChunk(session:MotionSession, command:RobotCommand):Bool {
+    try robot.submit(command) catch (error:RobotRuntimeError) {
+      if (error.status == RobotKitRuntimeConstants.RK_ERROR_QUEUE_FULL) return false;
+      session.reject();
+      throw error;
+    } catch (error:Dynamic) {
+      session.reject();
+      throw error;
+    }
+    observe(session, robot.snapshot());
+    return true;
   }
 
   public function stop(session:MotionSession, mode:StopMode):Void {
@@ -187,11 +210,17 @@ class TrajectoryStream {
     var total = segments.count();
     var ahead = chunkEndSeconds - elapsedSeconds;
     if (nextSegment >= total || ahead >= BUFFER_SECONDS) return;
-    // A submission is bounded only by the room left in the runtime's queue.
-    var available = RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS -
-      robot.snapshot().trajectoryQueueDepth;
+    // A submission is bounded only by the room left in the runtime's queue. The depth the snapshot reports lags the
+    // submissions still on their way to it, and a dense path (a shaped curve) can fill the queue in a tick or two, so what
+    // was submitted and has not run yet is counted as well (and a margin: the runtime counts a knot at the end of every chunk it holds).
+    while (finishedSegments < nextSegment &&
+        Int64.toFloat(Int64.add(segments.startNs(finishedSegments), segments.durationNs(finishedSegments))) * 1e-9 <= elapsedSeconds)
+      finishedSegments++;
+    var queued = Std.int(Math.max(robot.snapshot().trajectoryQueueDepth, nextSegment - finishedSegments));
+    var available = RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS - queued - QUEUE_MARGIN;
     var room = Std.int(Math.min(available, total - nextSegment));
-    if (room < 1) return;
+    // A queue with no room to speak of is waited on rather than fed a segment at a time.
+    if (room < Math.min(16, total - nextSegment)) return;
     var horizonNs = Trajectory.nanoseconds(Math.max(elapsedSeconds, chunkEndSeconds) +
       Math.max(CHUNK_SECONDS, MIN_LEAD_SECONDS - ahead));
     var count = 1;
@@ -204,7 +233,13 @@ class TrajectoryStream {
     var tag = programTags ? nextProgramTag : nextMotionTag;
     if (programTags) nextProgramTag = Int64.add(nextProgramTag, Int64.ofInt(1));
     var submission = build(first, last, tag, startNs, endNs);
-    try submit(session, RobotCommand.ExecutionPlan(submission)) catch (error:Dynamic)
+    try {
+      if (!submitChunk(session, RobotCommand.ExecutionPlan(submission))) {
+        // The runtime's queue is full: nothing was taken, and the chunk goes again once the robot has run some of it.
+        if (programTags) nextProgramTag = tag;
+        return;
+      }
+    } catch (error:Dynamic)
       throw describeFailure(first, last, error);
     if (!programTags) nextMotionTag = Int64.add(nextMotionTag, Int64.ofInt(1));
     var startSeconds = Int64.toFloat(startNs) * 1e-9;

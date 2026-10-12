@@ -12,6 +12,7 @@ import motionkit.robot.MotionSystemBlueprint;
 import motionkit.robot.PlanCheck;
 import motionkit.robot.PlanCheck.PlanCheckOptions;
 import motionkit.robot.StepperSlip;
+import motionkit.trajectory.InputShaper;
 import nativekit.sim.SimSession;
 import robotkit.device.DeviceBinding;
 import robotkit.runtime.EncoderMonitor;
@@ -155,6 +156,8 @@ class PrintProgramPlayer extends ToolpathPlayer {
 		machine.setRapidsAtFeed(true);
 		var printer = new PrinterBinding(job.extruder, job.filamentDiameter, job.gearRadius, job.maxFlow, job.rampLength,
 			job.pressureAdvance, job.pressureAdvanceWindow);
+		if (job.shaping != null) for (shaper in job.shaping)
+			printer.shapers.set(shaper.axis, InputShaper.named(shaper.kind, shaper.frequency, shaper.damping));
 		machine.setPrinter(printer);
 		var binding = new ToolpathMotionBinding(machine, blueprint);
 		// Every plan is checked against the drives: the plan's joints are all of the machine's, the axes' and the extruder's motors are loaded.

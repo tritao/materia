@@ -37,6 +37,8 @@ import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
 import motionkit.trajectory.ExecutionPlan;
 import motionkit.trajectory.Trajectory;
+import motionkit.trajectory.InputShaper;
+import motionkit.trajectory.ShaperImpulses;
 import motionkit.trajectory.ValidationLimits;
 
 /** A joint-space sample of a path: where, on which primitive, and the primitive arriving there. */
@@ -95,8 +97,23 @@ class ProgramCompiler {
     fill the robot's queue and a device's link; the default of zero leaves a path as it was lowered.
   **/
   public var mergeSegmentsSeconds:Float = 0.0;
+  /** How many plans were built from the lowered path because their merged form broke a limit, and why the last one did. */
+  public var mergeRefusals:Int = 0;
+  public var lastMergeRefusal:String = "";
   /** The position error a merged segment may have, as seconds of motion at the joint's speed limit. */
   public static inline var MERGE_TIMING:Float = 10e-6;
+  /**
+    The impulses each joint's motion is convolved with (see `shapeJoints`), in joint order; null shapes nothing. Their
+    amplitudes are positive and add up to one, so shaping blends delayed copies of a plan's motion and cannot raise a
+    velocity or an acceleration past the limits the plan was timed for.
+  **/
+  var shaping:Null<Array<ShaperImpulses>> = null;
+  /** How far the shaped motion lags the lowered one on average, seconds: every joint is lined up to this. */
+  var shapingDelay:Float = 0.0;
+  /** The shaped plan's extra length: the longest impulse delay, seconds. */
+  var shapingTail:Float = 0.0;
+  /** Bound on how far shaping can move a joint from the lowered motion delayed by `shapingDelay`, in the joint's units. */
+  var shapingDeviation:Float = 0.0;
   /** Seconds a path's distance-driven joint (an extruder) runs ahead of the flow it feeds; 0 is off. */
   public var pressureAdvance:Float = 0.0;
   /** The window, seconds, over which the driven joint's velocity is averaged for the advance. */
@@ -121,6 +138,46 @@ class ProgramCompiler {
   /** Plans the path of a joint move whose options ask for it (`MotionOptions.planned`; COLLISION.md CL7). */
   public var motionPlanner:Null<motionkit.planner.MotionPlanner> = null;
 
+  /**
+    Shapes the motion of the joints that have a shaper (`shapers`, one entry per joint in joint order, null for a joint
+    that is not shaped): each path's motion is convolved with the shaper's impulses, which keeps the carriage from
+    ringing at the machine's resonance. A joint without a shaper (the other axis, the extruder) is delayed by the same
+    average, so everything stays in step, and the path's events with it. Joints that follow others are shaped through
+    their leaders. Shaping is only meaningful where a joint's motion is the tool's (Cartesian axes): the task-space
+    check allows the shaped tool the spread that the impulses can open between the motion and its delayed copy.
+  **/
+  public function shapeJoints(shapers:Null<Array<Null<InputShaper>>>):Void {
+    if (shapers == null) {
+      shaping = null; shapingDelay = 0.0; shapingTail = 0.0; shapingDeviation = 0.0;
+      return;
+    }
+    if (shapers.length != maxVelocity.length) throw "Input shaping needs a shaper or null for each joint";
+    var reference = 0.0, any = false;
+    for (shaper in shapers) if (shaper != null) { any = true; reference = Math.max(reference, shaper.impulses.meanDelay()); }
+    if (!any) { shapeJoints(null); return; }
+    var impulses:Array<ShaperImpulses> = [];
+    var tail = 0.0, deviation = 0.0;
+    for (joint in 0...shapers.length) {
+      var shaper = shapers[joint];
+      var own = shaper == null ? ShaperImpulses.delay(0.0) : shaper.impulses;
+      var lined = own.later(reference - own.meanDelay());
+      impulses.push(lined);
+      tail = Math.max(tail, lined.tail());
+      // Taylor: |sum a_i x(t - T_i) - x(t - d)| <= A / 2 * sum a_i (T_i - d)^2, with d the mean delay and A the
+      // largest acceleration (the velocity term cancels because d is the mean).
+      if (shaper != null) {
+        var sum = 0.0;
+        for (index in 0...lined.delays.length) sum += lined.amplitudes[index] * Math.pow(lined.delays[index] - reference, 2);
+        deviation = Math.max(deviation, 0.5 * sum * maxAcceleration[joint]);
+      }
+    }
+    shaping = impulses; shapingDelay = reference; shapingTail = tail; shapingDeviation = deviation;
+  }
+
+  function copyShaping(into:ProgramCompiler):Void {
+    into.shaping = shaping; into.shapingDelay = shapingDelay; into.shapingTail = shapingTail; into.shapingDeviation = shapingDeviation;
+  }
+
   /** Preserve compiler limits/checks while timing an already selected route. */
   public function withJointPathPlanner(planner:JointPathPlanner):ProgramCompiler {
     if(planner==null)throw "A replacement joint path planner is required";
@@ -134,6 +191,7 @@ class ProgramCompiler {
     result.clearanceEvents=clearanceEvents.copy();result.clearanceDepthLimit=clearanceDepthLimit;
     result.motionPlanner=motionPlanner;
     result.angularResolution=angularResolution;
+    copyShaping(result);
     return result;
   }
 
@@ -157,6 +215,7 @@ class ProgramCompiler {
       new ConfigurationConstraint(forked,configurationConstraint.configuration);
     worker.motorSpace = motorSpace;
     worker.mergeSegmentsSeconds = mergeSegmentsSeconds;
+    copyShaping(worker);
     worker.pathEventSchedule = pathEventSchedule;
     worker.clearanceEvents = clearanceEvents.copy();
     worker.clearanceDepthLimit = clearanceDepthLimit;
@@ -664,6 +723,7 @@ class ProgramCompiler {
     };
     var plan:Null<ExecutionPlan> = null;
     var projected:Null<Trajectory> = null;
+    var shaped:Null<Trajectory> = null;
     var merged:Null<Trajectory> = null;
     try {
       var motors = motorSpace;
@@ -676,9 +736,25 @@ class ProgramCompiler {
       if (couplingIndices.length > 0) projected = projectCouplings(timed);
       else if (advanced != null) { projected = advanced; advanced = null; }
       if (advanced != null) advanced.dispose();
+      // Input shaping: each shaped joint's motion becomes the weighted sum of delayed copies of itself, rest to rest,
+      // and the plan ends the shaper's tail later. What the plan does at a given instant is the lowered motion's some
+      // `shapingDelay` earlier, so the events and the times that locate the plan on its path move with it.
+      var impulses = shaping;
+      if (impulses != null && pending.path != null) {
+        var cut = (projected == null ? pending.trajectory : projected).shape([for (joint in impulses) joint.delays],
+          [for (joint in impulses) joint.amplitudes]);
+        if (couplingIndices.length > 0) { shaped = projectCouplings(cut); cut.dispose(); } else shaped = cut;
+        var lag = Trajectory.nanoseconds(shapingDelay);
+        var later = [for (event in pending.events) new TimedEvent(Int64.add(event.timeNs, lag), event.channel, event.value, event.holdPolicy)];
+        pending.events.splice(0, pending.events.length);
+        for (event in later) pending.events.push(event);
+        for (index in 0...pending.times.length) pending.times[index] += shapingDelay;
+        for (index in 0...pending.checkTimes.length) pending.checkTimes[index] += shapingDelay;
+      }
+      var timedMotion = shaped != null ? shaped : (projected == null ? pending.trajectory : projected);
       if (mergeSegmentsSeconds > 0.0 && pending.path != null) {
         var count = maxVelocity.length;
-        var runs = (projected == null ? pending.trajectory : projected).mergeSegments(
+        var runs = timedMotion.mergeSegments(
           [for (joint in 0...count) MERGE_TIMING * maxVelocity[joint]],
           [for (joint in 0...count) 0.01 * maxVelocity[joint]],
           [for (joint in 0...count) 0.1 * maxAcceleration[joint]],
@@ -696,13 +772,13 @@ class ProgramCompiler {
       // With changes to the cell in this op, the conservative check below replays them instead.
       if (jointPathPlanner != null && (!pending.geometryClearance || Sys.getEnv("PROCESS_PATH_VERIFY_CLEARANCE")=="1") &&
           !hasClearanceEvents(pending.opIndex)) {
-        var failure = jointPathPlanner.checkMotion(projected == null ? pending.trajectory : projected);
+        // What is checked is what is executed: the shaped motion, when there is shaping.
+        var failure = jointPathPlanner.checkMotion(timedMotion);
         if (failure != null)
           throw 'compiled trajectory clearance (${failure.a}, ${failure.b}): ${failure.distance} < ${failure.required}';
       }
       mark("trajectoryClearance");
-      if(configurationConstraint!=null)configurationConstraint.checkTrajectory(
-        projected == null ? pending.trajectory : projected,controllerPeriodSeconds);
+      if(configurationConstraint!=null)configurationConstraint.checkTrajectory(timedMotion,controllerPeriodSeconds);
       mark("configurationCheck");
       var planLimits = pending.path == null ? limits : limits.withoutJerk();
       var completedPlan:ExecutionPlan;
@@ -713,8 +789,10 @@ class ProgramCompiler {
         completedPlan = ExecutionPlan.create(merged, planLimits, id, pending.startQ, zeros(), zeros(),
           startTolerances.position, startTolerances.velocity, startTolerances.acceleration, pending.events);
       } catch (error:Dynamic) {
+        mergeRefusals++;
+        lastMergeRefusal = Std.string(error);
         if (merged != null) { merged.dispose(); merged = null; }
-        completedPlan = ExecutionPlan.create(projected == null ? pending.trajectory : projected,
+        completedPlan = ExecutionPlan.create(timedMotion,
           planLimits, id, pending.startQ,
           zeros(), zeros(), startTolerances.position, startTolerances.velocity,
           startTolerances.acceleration, pending.events);
@@ -734,14 +812,15 @@ class ProgramCompiler {
       mark("taskSpaceCertificate");
       var auditTask=Sys.getEnv("PROCESS_PATH_VERIFY_TASK")=="1";
       if(pending.path!=null && (taskProof==null || auditTask))checkTaskSpace(completedPlan,pending.path,pending.checkDistances,
-        pending.checkTimes,pending.opIndex,pending.authoredPolyline,pending.blendTolerance,pending.taskSampleDistances,taskProof);
+        pending.checkTimes,pending.opIndex,pending.authoredPolyline,pending.blendTolerance,pending.taskSampleDistances,taskProof,
+        shaped != null ? shapingDelay : 0.0, shaped != null ? shapingTail : 0.0, shaped != null ? shapingDeviation : 0.0);
       if(taskProof!=null)completedPlan.report.setTaskSpaceBound(taskProof.positionBound,taskProof.positionTolerance);
       if(profiling && pending.path!=null)Sys.println("PROCESS_PATH_TASK_CERTIFICATE "+haxe.Json.stringify({
         op:pending.opIndex,certified:taskProof!=null,audited:auditTask && taskProof!=null,
         queries:taskProof==null?0:taskProof.queries,positionBound:taskProof==null?null:taskProof.positionBound,
         orientationBound:taskProof==null?null:taskProof.orientationBound}));
       mark("taskSpaceCheck");
-      recordClearance(completedPlan, pending, projected == null ? pending.trajectory : projected);
+      recordClearance(completedPlan, pending, timedMotion);
       mark("clearanceReport");
       var check = planCheck;
       if (check != null && check.checks()) {
@@ -755,11 +834,13 @@ class ProgramCompiler {
       if (profiling) Sys.println("PROCESS_PATH_COMPILE_CHECKS " + haxe.Json.stringify({op:pending.opIndex, stages:profileRows}));
       pending.trajectory.dispose();
       if (projected != null) projected.dispose();
+      if (shaped != null) shaped.dispose();
       if (merged != null) merged.dispose();
       return completedPlan;
     } catch (error:Dynamic) {
       if (plan != null) plan.dispose();
       if (projected != null) projected.dispose();
+      if (shaped != null) shaped.dispose();
       if (merged != null) merged.dispose();
       throw 'Motion program op ${pending.opIndex}: $error';
     }
@@ -1144,7 +1225,7 @@ class ProgramCompiler {
   function checkTaskSpace(plan:ExecutionPlan, path:PosePath,
       checkDistances:Array<Float>, checkTimes:Array<Float>, index:Int,
       authoredPolyline:Null<Array<Pose3>>, blendTolerance:Float,
-      taskSampleDistances:Array<Float>,?certificate:JointCurveTask):Void {
+      taskSampleDistances:Array<Float>,?certificate:JointCurveTask, ?lag:Float = 0.0, ?tail:Float = 0.0, ?spread:Float = 0.0):Void {
     var worst = 0.0, worstTime = 0.0,worstOrientation=0.0;
     var tolerance = authoredPolyline == null && path.authoredGeometry == null ?
       positionTolerance : authoredPolyline == null ? path.blendTolerance : blendTolerance;
@@ -1158,9 +1239,9 @@ class ProgramCompiler {
         path.authoredGeometry != null ?
           distanceToGeometry(actual, path.authoredGeometry) :
           PoseMath.distance(actual, desired.pose);
-      var allowed = authoredPolyline != null ? blendTolerance :
+      var allowed = spread + (authoredPolyline != null ? blendTolerance :
         path.authoredGeometry != null ? path.blendTolerance :
-          desired.positionTolerance;
+          desired.positionTolerance);
       var angle = orientationError(actual, desired.pose,
         path.orientationPolicyAt(distance));
       worstOrientation=Math.max(worstOrientation,angle);
@@ -1175,7 +1256,8 @@ class ProgramCompiler {
     // Cover the trajectory clock as well as the authored path geometry.
     var timeSteps = taskSampleDistances.length - 1;
     for (sample in 0...(timeSteps + 1)) {
-      var time = plan.durationSeconds * sample / timeSteps;
+      // The lowered motion's clock: the shaped plan runs `lag` behind it and `tail` longer.
+      var time = lag + (plan.durationSeconds - tail) * sample / timeSteps;
       inspect(taskSampleDistances[sample], time);
     }
     plan.report.setTaskSpace(failure == null ? TrajectoryCoreConstants.MK_CHECK_PASSED :

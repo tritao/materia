@@ -534,6 +534,70 @@ class PlannerTests extends MotionKitTestSupport {
   }
 
 
+  /**
+    Input shaping: the shaped motion is the weighted sum of the original delayed by each impulse, held at rest beyond its
+    ends, so it ends the longest delay later at the same place, never goes faster or harder than the original, and a joint
+    given only a delay is the original that much later. The shapers' impulses add up to one and cancel their own mode.
+  **/
+  public function testShapedTrajectoryIsTheWeightedSumOfDelays():Void {
+    // A rest-to-rest move of 50 ms accelerating, 100 ms cruising, 50 ms decelerating at 8 m/s^2 (joint 0) and its twin (joint 1).
+    var a = 8.0, t1 = 0.05, t2 = 0.1;
+    var v = a * t1, d1 = 0.5 * a * t1 * t1, d2 = v * t2;
+    var segments = [
+      {timeFromStartNs: Int64.ofInt(0), durationNs: Int64.ofInt(50000000), coefficients: [[0.0, 0.0, 0.5 * a], [0.0, 0.0, a]]},
+      {timeFromStartNs: Int64.ofInt(50000000), durationNs: Int64.ofInt(100000000), coefficients: [[d1, v, 0.0], [2.0 * d1, 2.0 * v, 0.0]]},
+      {timeFromStartNs: Int64.ofInt(150000000), durationNs: Int64.ofInt(50000000), coefficients: [[d1 + d2, v, -0.5 * a], [2.0 * (d1 + d2), 2.0 * v, -a]]}];
+    var original = motionkit.trajectory.Trajectory.fromSegments(segments);
+    var shaper = new motionkit.trajectory.InputShaper(motionkit.trajectory.InputShaper.InputShaperKind.MZV, 50.0, 0.1);
+    var impulses = shaper.impulses;
+    var delayOnly = motionkit.trajectory.ShaperImpulses.delay(impulses.meanDelay());
+    var shaped = original.shape([impulses.delays, delayOnly.delays], [impulses.amplitudes, delayOnly.amplitudes]);
+    near(shaped.durationSeconds(), original.durationSeconds() + impulses.tail(), "shaping ends the shaper's tail later", 2e-9);
+    function held(trajectory:motionkit.trajectory.Trajectory, joint:Int, time:Float):Float
+      return trajectory.evaluate(Math.min(Math.max(time, 0.0), trajectory.durationSeconds())).positions[joint];
+    var worst = 0.0, fastest = 0.0, hardest = 0.0, original_fastest = 0.0, original_hardest = 0.0;
+    for (step in 0...2000) {
+      var t = shaped.durationSeconds() * (step + 0.5) / 2000;
+      var sum = 0.0;
+      for (i in 0...impulses.delays.length) sum += impulses.amplitudes[i] * held(original, 0, t - impulses.delays[i]);
+      var state = shaped.evaluate(t);
+      worst = Math.max(worst, Math.abs(state.positions[0] - sum));
+      worst = Math.max(worst, Math.abs(state.positions[1] - held(original, 1, t - delayOnly.delays[0])));
+      fastest = Math.max(fastest, Math.abs(state.velocities[0])); hardest = Math.max(hardest, Math.abs(state.accelerations[0]));
+      var before = original.evaluate(Math.min(t, original.durationSeconds()));
+      original_fastest = Math.max(original_fastest, Math.abs(before.velocities[0])); original_hardest = Math.max(original_hardest, Math.abs(before.accelerations[0]));
+    }
+    check(worst < 1e-9, 'the shaped joints are the weighted sums of the delayed originals, off by $worst m');
+    check(fastest <= original_fastest * (1.0 + 1e-9) && hardest <= original_hardest * (1.0 + 1e-9),
+      'shaping raises no velocity or acceleration: $fastest of $original_fastest m/s, $hardest of $original_hardest m/s^2');
+    var end = shaped.evaluate(shaped.durationSeconds());
+    near(end.positions[0], d1 * 2.0 + d2, "the shaped move ends where the original does", 1e-9);
+    near(end.velocities[0], 0.0, "at rest", 1e-9);
+    near(shaped.evaluate(0.0).positions[0], 0.0, "and starts there", 1e-12);
+    // Rejected: amplitudes that do not add up to one, a negative delay, no impulse, too many impulses.
+    function rejects(delays:Array<Float>, amplitudes:Array<Float>):Bool {
+      try { new motionkit.trajectory.ShaperImpulses(delays, amplitudes); return false; } catch (_:Dynamic) return true;
+    }
+    check(rejects([0.0, 0.01], [0.5, -0.5]) && rejects([-0.01], [1.0]) && rejects([], []) && rejects([for (i in 0...9) i * 0.001], [for (i in 0...9) 1.0]),
+      "impulses with a non-positive amplitude, a negative delay, none or nine are refused");
+    var refused = false;
+    try original.shape([impulses.delays], [impulses.amplitudes]) catch (_:Dynamic) refused = true;
+    check(refused, "shaping needs impulses for every joint");
+    // The shapers' impulses add up to one and cancel their mode (ZV exactly, MZV to 3 % at a damping of 0.1, EI to 5 %), and MZV stays low in a band around it.
+    for (kind in [motionkit.trajectory.InputShaper.InputShaperKind.ZV, motionkit.trajectory.InputShaper.InputShaperKind.MZV, motionkit.trajectory.InputShaper.InputShaperKind.EI]) {
+      var each = new motionkit.trajectory.InputShaper(kind, 50.0, 0.1);
+      var total = 0.0;
+      for (amplitude in each.impulses.amplitudes) total += amplitude;
+      near(total, 1.0, 'the $kind amplitudes add up to one', 1e-12);
+      var residual = each.impulses.residual(50.0, 0.1);
+      check(residual <= (kind == motionkit.trajectory.InputShaper.InputShaperKind.EI ? 0.0501 : kind == motionkit.trajectory.InputShaper.InputShaperKind.MZV ? 0.03 : 1e-9),
+        'the $kind shaper leaves $residual of its own mode');
+      if (kind == motionkit.trajectory.InputShaper.InputShaperKind.MZV)
+        check(each.impulses.residual(45.0, 0.1) < 0.1 && each.impulses.residual(55.0, 0.1) < 0.1, "MZV keeps under 10 % for a frequency 10 % off");
+    }
+    original.dispose(); shaped.dispose();
+  }
+
   public function testToppraExactStopsAndBindings():Void {
     var path = new JointPathSamples([0.0, 0.05, 0.1], [[0.0], [0.05], [0.1]],
       [[1.0], [1.0], [1.0]], [[0.0], [0.0], [0.0]]);

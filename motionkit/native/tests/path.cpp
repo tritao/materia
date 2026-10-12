@@ -1,5 +1,6 @@
 #include "motionkit.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <initializer_list>
@@ -377,5 +378,54 @@ int main() {
         mk_trajectory_destroy(step_trajectory);
         mk_time_law_destroy(law);
         mk_path_destroy(path);
+    }
+
+    // An input shaper convolves a move with delayed copies of itself: a quadratic run (accelerating at 8 m/s^2 for 0.1 s)
+    // shaped by two equal impulses 20 ms apart, and a second joint that is only delayed by 10 ms.
+    {
+        mk_segment run{};
+        run.struct_size = sizeof(run);
+        run.t0_ns = 0;
+        run.duration_ns = 100'000'000;
+        run.degree = 2;
+        run.joint_count = 2;
+        run.coefficients[0].value[2] = 4.0;
+        run.coefficients[1].value[2] = 4.0;
+        mk_trajectory_handle original{}, shaped{};
+        assert(mk_trajectory_create(2, &original) == MK_OK);
+        assert(mk_trajectory_append_segment(original, &run) == MK_OK);
+        uint32_t counts[2] = {2, 1};
+        double delays[2 * MK_MAX_SHAPER_IMPULSES] = {}, amplitudes[2 * MK_MAX_SHAPER_IMPULSES] = {};
+        delays[1] = 0.02; amplitudes[0] = amplitudes[1] = 0.5;
+        delays[MK_MAX_SHAPER_IMPULSES] = 0.01; amplitudes[MK_MAX_SHAPER_IMPULSES] = 1.0;
+        assert(mk_shape_trajectory(original, counts, delays, amplitudes, 2, 2 * MK_MAX_SHAPER_IMPULSES, &shaped) == MK_OK);
+        auto at = [&](mk_trajectory_handle h, double seconds, int joint) {
+            mk_trajectory_state state{};
+            state.struct_size = sizeof(state);
+            assert(mk_trajectory_evaluate(h, static_cast<int64_t>(std::llround(seconds * 1e9)), &state) == MK_OK);
+            return state.position[joint];
+        };
+        auto held = [&](double seconds, int joint) {
+            if (seconds <= 0.0) return 0.0;
+            return at(original, std::min(seconds, 0.1), joint);
+        };
+        // The longest delay (20 ms) lengthens the move; the joint with one impulse is the original 10 ms later.
+        for (double time : {0.005, 0.015, 0.03, 0.07, 0.1, 0.11, 0.119}) {
+            assert(std::abs(at(shaped, time, 0) - 0.5 * (held(time, 0) + held(time - 0.02, 0))) < 1e-12);
+            assert(std::abs(at(shaped, time, 1) - held(time - 0.01, 1)) < 1e-12);
+        }
+        assert(std::abs(at(shaped, 0.12, 0) - 0.04) < 1e-12);
+        uint32_t pieces = 0;
+        assert(mk_trajectory_segment_count(shaped, &pieces) == MK_OK && pieces >= 3);
+        // Amplitudes that do not add up to one, a negative delay and no impulses are refused.
+        mk_trajectory_handle none{};
+        amplitudes[1] = 0.6;
+        assert(mk_shape_trajectory(original, counts, delays, amplitudes, 2, 2 * MK_MAX_SHAPER_IMPULSES, &none) == MK_ERROR_INVALID_ARGUMENT);
+        amplitudes[1] = 0.5; delays[1] = -0.02;
+        assert(mk_shape_trajectory(original, counts, delays, amplitudes, 2, 2 * MK_MAX_SHAPER_IMPULSES, &none) == MK_ERROR_INVALID_ARGUMENT);
+        delays[1] = 0.02; counts[0] = 0;
+        assert(mk_shape_trajectory(original, counts, delays, amplitudes, 2, 2 * MK_MAX_SHAPER_IMPULSES, &none) == MK_ERROR_INVALID_ARGUMENT);
+        mk_trajectory_destroy(shaped);
+        mk_trajectory_destroy(original);
     }
 }

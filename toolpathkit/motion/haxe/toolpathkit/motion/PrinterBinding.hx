@@ -1,5 +1,7 @@
 package toolpathkit.motion;
 
+import motionkit.trajectory.InputShaper;
+
 /**
  * What lowering needs to know of a printer beyond its axes: the extruder joint and how it turns per metre of
  * filament, the hotend's melt-rate limit, and how the heaters and fans are reached. A bead of cross-section `area`
@@ -20,6 +22,8 @@ class PrinterBinding {
   public final pressureAdvance:Float;
   /** The window over which the extruder's velocity is averaged for the advance, seconds: it keeps the advance within the drive's limits. */
   public final pressureAdvanceWindow:Float;
+  /** Input shapers by axis id (the axes of the machine binding): those axes' motion is shaped, everything else is delayed to match. */
+  public final shapers:Map<String, InputShaper> = new Map<String, InputShaper>();
   /** The extruder joint's index in the machine, set by the `ToolpathMotionBinding` that finds it. */
   public var extruderIndex(default, null):Int = -1;
 

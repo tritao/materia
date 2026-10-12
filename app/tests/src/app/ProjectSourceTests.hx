@@ -624,6 +624,60 @@ class ProjectSourceTests {
   }
 
   /**
+   * Input shaping on the printer in the shared simulation (MuJoCo, through the virtual device): a 50 mm move along x with the
+   * job's shapers and without them. The shaped move is the same move delayed by the shapers' mean delay and ending their tail
+   * later, and the carriage ends where it was sent, to within one microstep of the belt (12.5 um). (The belts are springs in
+   * MuJoCo but critically damped, so the carriage does not ring there; the ringing is checked in the printing gate against
+   * the same mass and stiffness.)
+   */
+  static function checkPrinterShaping(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/materia.project.json");
+    var ends:Array<Float> = [], finishes:Array<Int> = [];
+    var step = 0.0;
+    for (shaped in [false, true]) {
+      var generated = MateriaProjectRunner.loadProject(manifest);
+      var job = generated.printJob;
+      if (job == null || job.shaping == null) throw "the printer example states no input shapers";
+      if (!shaped) job.shaping = null;
+      // Only motion: a move to the start, a pause, then the 50 mm move that is measured; no heating, no extrusion.
+      job.source = "G21\nG90\nM83\nG0 X30 Y30 F9000\nG4 P1000\nG1 X80 Y30 F9000\n";
+      var session = new ProjectDocumentSession(null, false);
+      session.openGeneratedProject(generated, manifest);
+      var definition = session.projectAssemblyDefinition, physical = session.projectPhysical;
+      if (definition == null || physical == null) throw "the printer has no assembly";
+      var model = AssemblySimulationBridge.toRobotModel(definition, physical, session.projectAssemblyState).model;
+      var world = new RobotWorld();
+      var simulation = new ApplicationSimulation(world);
+      simulation.setBackend(ApplicationSimulation.MUJOCO);
+      check(simulation.rebuild(session.sensors, session.scene, session), "the printer builds: " + simulation.error);
+      var player = simulation.printPlayer();
+      if (player == null) throw "the printer has no print player";
+      var x = -1;
+      for (index in 0...model.joints.length) if (model.joints[index].id == "x") x = index;
+      var dt = simulation.timestep, ticks = 0, limit = Math.round(30.0 / dt), finished = -1;
+      while (ticks++ < limit && player.failure == null && finished < 0) {
+        simulation.step();
+        if (player.passes == 1) finished = ticks;
+      }
+      check(player.failure == null, "the move runs: " + player.failure);
+      check(finished > 0, "the move completes");
+      for (_ in 0...Math.round(0.3 / dt)) simulation.step();
+      // The machine's x is the nozzle's distance from the bed's middle in the assembly (110 mm less than the machine's).
+      ends.push(world.snapshot().robots()[0].positions.get(x) + 0.110);
+      finishes.push(finished);
+      step = dt;
+      simulation.dispose();
+      session.dispose();
+    }
+    check(Math.abs(ends[0] - 0.080) <= 20e-6 && Math.abs(ends[1] - 0.080) <= 20e-6,
+      'both moves end at X 80 mm: ${ends[0] * 1000} and ${ends[1] * 1000} mm');
+    var later = (finishes[1] - finishes[0]) * step;
+    check(later >= 0.01 && later <= 0.06, 'the shaped move completes ${later * 1000} ms after the plain one (the shapers\' delay and tail)');
+    Sys.println('printer shaping: both moves end within ${Math.round(Math.max(Math.abs(ends[0] - 0.080), Math.abs(ends[1] - 0.080)) * 1e7) / 10} um of X 80 mm in MuJoCo; ' +
+      'the shaped one completes ${Math.round(later * 1000)} ms later');
+  }
+
+  /**
    * The editor's link to a printer: the print is sent to a Moonraker (a fake on a real socket) and started, and the
    * printer model follows the machine over the WebSocket subscription, each update putting the model's axes and
    * extruder where the nozzle is (`motion_report.live_position`, not the end of the queued moves), so the twin is
@@ -5570,12 +5624,17 @@ class ProjectSourceTests {
       checkPrinterCube(root, "cube-short", 4.0, true);
       return 0;
     }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer-shaping") {
+      checkPrinterShaping(root);
+      return 0;
+    }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer-mirror") {
       checkPrinterMirror(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer") {
       checkPrinter(root);
+      checkPrinterShaping(root);
       checkPrinterMirror(root);
       return 0;
     }
@@ -5741,6 +5800,7 @@ class ProjectSourceTests {
       checkCoreXyPlotter(root);
       checkPrinter(root);
       checkPrinterCube(root, "cube-short", 4.0, true);
+      checkPrinterShaping(root);
       checkPrinterMirror(root);
       checkMobileBase(root);
       checkMobileMission(root);
@@ -6115,6 +6175,7 @@ class ProjectSourceTests {
     checkCoreXyPlotter(root);
     checkPrinter(root);
     checkPrinterCube(root, "cube-short", 4.0, true);
+    checkPrinterShaping(root);
     checkPrinterMirror(root);
     checkMobileBase(root);
     checkMobileMission(root);

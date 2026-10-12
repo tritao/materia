@@ -1050,6 +1050,41 @@ Done. What was built and decided (Moonraker and Klipper are GPL: written from th
 - Test: a step move on the printer; the residual vibration at the modelled resonance drops by
   at least 5× with the shaper, and the cube's print time grows by less than 5 %.
 
+Done. What was built and decided:
+- **Shapers** (`motionkit.trajectory.InputShaper`, `ShaperImpulses`): ZV, MZV and EI from the standard impulse formulas (Singhose; the same
+  parametrisation Klipper documents: MZV at 0, 0.375 and 0.75 of the damped period, EI at 5 % tolerance), with frequency and damping as machine data.
+  `mk_shape_trajectory` (MotionKit native, `Trajectory.shape`) convolves a timed trajectory exactly: each piece of the result is the
+  sum of the delayed polynomials, cut wherever any delayed copy changes segment, held at rest beyond either end. Amplitudes are positive and add up
+  to one, so a shaped joint never goes faster or harder than the plan it came from; the result is as much longer as the longest delay
+  (the shaper's tail). A joint without a shaper (the other axis, the extruder, the bed) is only delayed by the same mean delay to stay in step.
+  CoreXY motors are shaped through their axes: the followers are projected again from the shaped leaders.
+- **Where it is applied.** `ProgramCompiler.shapeJoints` after timing and before merging (the shaper is machine data of the axes: the printer job's
+  `shaping`, `PrinterBinding.shapers`, `SceneArtifact` version 30, `CoreXyPrinter.SHAPER_X_HZ` 53.4, `SHAPER_Y_HZ` 34.4, damping 0.1, MZV). The plan's
+  events and its path-distance clock move with the motion by the mean delay; the task-space check allows the spread that the impulses open between
+  the motion and its delayed copy (a bound from the largest acceleration). The merge (`mk_merge_segments`) joins a run shorter than 4 us (a cut
+  of a shaped path landing a few nanoseconds from another) to its neighbour through the end states of both.
+- **The known gap, fixed.** With shaping on, `jointPathPlanner.checkMotion`, the configuration constraint and `recordClearance` checked the unshaped
+  motion; they now check `timedMotion`, the motion that is executed (shaped, projected), and the clearance report's times are the shaped plan's.
+- **The streaming fix a shaped print needed.** A shaped path is denser; the robot's trajectory queue filled before the stream's two seconds were
+  in it and a refusal faulted the session. `TrajectoryStream` counts what it has submitted and the plan has not yet run, keeps a margin of 128 knots
+  and treats `RK_ERROR_QUEUE_FULL` as flow control (the chunk goes again later), not a fault.
+- **Resonances come from the model.** The gate checks each axis's shaper frequency against the drive model (`DriveLoads.forAxis`: the mass the axis
+  moves on the stiffness of its belts, x 0.748 kg on 84,238 N/m = 53.4 Hz, y 1.806 kg on 84,238 N/m = 34.4 Hz) to ten percent.
+- **Acceptance (the printing gate, `shapingChecks`).** A 50 mm step move along x, along y and on the diagonal, planned plain and shaped; the carriage
+  (that mass on those belts, damping 0.1, the plan driving the far end of the belts, integrated at 20 us) is left shaking for 356 -> 7 um on x
+  (51.8x), 370 -> 8 um on y (48.6x), and 59 -> 1 um and 361 -> 7 um on the diagonal (44x and 48x); at the design frequency and ten percent either side
+  of it every case drops at least 5x. The shaped plan is the plain one lagging by the shaper's mean delay and ending its tail later (233 ms against
+  211 ms on x), never above the axes' velocity and acceleration limits (1.001), and keeps its merged form (no merge refusals). **The cube's planned
+  time grows from 870.3 s to 880.5 s (1.2 %, limit 5 %)**, 115,240 segments plain and 132,669 shaped (132 and 151 a second).
+- **Belts in MuJoCo (X9).** X9 does give MuJoCo a belt spring (a soft equality with the belt's compliance), but the backend fixes its damping ratio at 1,
+  critically damped, so the carriage cannot ring there. With the shapers on, the virtual-device print still runs on MuJoCo: the 50 mm move ends at X 80 mm
+  within one microstep and completes later than the plain one by the shapers' delay and tail (`PROJECT_SOURCE_ONLY=printer-shaping`, numbers below).
+  Validating the ringing itself in MuJoCo needs an authored damping ratio on the coupling (`JointCoupling`, the simulation's coupling description and the
+  belt model; zero keeping today's default): left open, and the gate's check uses the same mass and stiffness analytically.
+- **Tests.** `PlannerTests.testShapedTrajectoryIsTheWeightedSumOfDelays` (the sum of delays, limits not raised, the shapers' amplitudes and
+  residuals, refusals), the C++ `motionkit_path` test (`mk_shape_trajectory`: sums of delays, a delay-only joint, three refusals), `ProjectKitTests` (shaper
+  round trip and five rejections), the printing gate (`shapingChecks`; `PRINTING_BENCHMARK_ONLY=shaping` alone), `printer-shaping` in the app.
+
 **AM5b. Motion cleanup (after AM12).** Planned work, not for the AM run. Each item removes a workaround that AM3 to AM8
 left in the motion path.
 1. The start-at-limit tolerance (`ae6e95ec5`) is duplicated in four places (`ValidationLimits.admittingStart`,
@@ -1188,7 +1223,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM9b | planned | |
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
-| AM12 | planned | |
+| AM12 | done | see the commit below |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 

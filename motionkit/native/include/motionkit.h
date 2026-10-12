@@ -593,6 +593,24 @@ MK_API mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, cons
                                            uint32_t joint_count, double max_duration_seconds,
                                            mk_trajectory_handle *out_trajectory);
 
+/** The most impulses one joint's input shaper may have. */
+enum { MK_MAX_SHAPER_IMPULSES = 8 };
+/**
+ * A copy of `trajectory` convolved with an input shaper: joint `j` of the result is the sum over its impulses `i` of
+ * `amplitudes[j * MK_MAX_SHAPER_IMPULSES + i]` times the joint's original motion delayed by `delays_seconds[j *
+ * MK_MAX_SHAPER_IMPULSES + i]`. The trajectory is held at rest beyond either end (its first position before it starts,
+ * its last position after it ends), so the result is as much longer as the longest delay: the shaper's tail, in which
+ * the machine settles. Impulse counts are at most MK_MAX_SHAPER_IMPULSES; the amplitudes of a joint are positive and add
+ * up to 1, which is why shaping never raises a joint's velocity or acceleration; delays are not negative. A joint
+ * with one impulse of amplitude 1 is only delayed. The result is exact: each piece of it is the sum of the delayed
+ * polynomials, and its segments are cut wherever any delayed copy changes segment. `table_size` is `joint_count *
+ * MK_MAX_SHAPER_IMPULSES`. Joints that follow others are to be projected again after.
+ */
+MK_API mk_result MK_CALL mk_shape_trajectory(mk_trajectory_handle trajectory, const uint32_t *impulse_counts MK_IN_ARRAY(joint_count),
+                                             const double *delays_seconds MK_IN_ARRAY(table_size),
+                                             const double *amplitudes MK_IN_ARRAY(table_size), uint32_t joint_count,
+                                             uint32_t table_size, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+
 /**
  * A copy of `trajectory` in which `joint` runs `lead_seconds` ahead of itself, the lead taken on its velocity averaged
  * over `window_seconds`: position + lead * (position(t + w/2) - position(t - w/2)) / w. It is the pressure-advance

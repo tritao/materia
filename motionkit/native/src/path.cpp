@@ -1065,6 +1065,9 @@ mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const doubl
     try {
         std::vector<int64_t> start(count), duration(count);
         std::vector<uint8_t> smooth(count);
+        // The segment held back until the next one shows whether a too-short one is to be joined to it.
+        std::unique_ptr<mk_segment> held;
+        constexpr int64_t kSliver = 4000;
         auto first_segment = std::make_unique<mk_segment>(), last_segment = std::make_unique<mk_segment>();
         auto candidate = std::make_unique<mk_segment>(), best_segment = std::make_unique<mk_segment>();
         for (uint32_t i = 0; i < count; ++i) {
@@ -1193,12 +1196,181 @@ mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const doubl
                 if (result != MK_ERROR_GENERATION) { mk_trajectory_destroy(merged); return result; }
                 failed = middle;
             }
-            status = mk_trajectory_append_segment(merged, best_segment.get());
-            if (status != MK_OK) { mk_trajectory_destroy(merged); return status; }
+            // A run that came out shorter than a device's clock can resolve is joined to its neighbour, through the two
+            // together's end states (so the path stays continuous and the sliver's own few microseconds of motion are all
+            // that is smoothed over): the cuts of a shaped path land a few nanoseconds from each other now and then.
+            if (held && (held->duration_ns < kSliver || best_segment->duration_ns < kSliver) && held->degree >= 2 &&
+                best_segment->degree >= 2) {
+                const double span = static_cast<double>(held->duration_ns + best_segment->duration_ns) * 1e-9;
+                const double end = static_cast<double>(best_segment->duration_ns) * 1e-9;
+                mk_segment joined = *held;
+                joined.duration_ns = held->duration_ns + best_segment->duration_ns;
+                joined.degree = 5;
+                for (uint32_t joint = 0; joint < joints; ++joint) {
+                    const auto from = kin_of(held->coefficients[joint], held->degree, 0.0);
+                    const auto to = kin_of(best_segment->coefficients[joint], best_segment->degree, end);
+                    const double V0 = from.velocity * span, A0 = from.acceleration * span * span;
+                    const double V1 = to.velocity * span, A1 = to.acceleration * span * span;
+                    const double D = to.position - from.position - V0 - 0.5 * A0, E = V1 - V0 - A0, F = A1 - A0;
+                    const double normalized[6] = {from.position, V0, 0.5 * A0, 10.0 * D - 4.0 * E + 0.5 * F,
+                        -15.0 * D + 7.0 * E - F, 6.0 * D - 3.0 * E + 0.5 * F};
+                    double scale = 1.0;
+                    for (int k = 0; k < 6; ++k) { joined.coefficients[joint].value[k] = normalized[k] / scale; scale *= span; }
+                }
+                *held = joined;
+            } else {
+                if (held) {
+                    status = mk_trajectory_append_segment(merged, held.get());
+                    if (status != MK_OK) { mk_trajectory_destroy(merged); return status; }
+                }
+                if (!held) held = std::make_unique<mk_segment>();
+                *held = *best_segment;
+            }
             first = best + 1;
+        }
+        if (held) {
+            status = mk_trajectory_append_segment(merged, held.get());
+            if (status != MK_OK) { mk_trajectory_destroy(merged); return status; }
         }
     } catch (const std::bad_alloc &) { mk_trajectory_destroy(merged); return MK_ERROR_OUT_OF_MEMORY; }
     *out_trajectory = merged;
+    return MK_OK;
+}
+
+mk_result MK_CALL mk_shape_trajectory(mk_trajectory_handle trajectory, const uint32_t *impulse_counts,
+                                       const double *delays_seconds, const double *amplitudes, uint32_t joint_count,
+                                       uint32_t table_size, mk_trajectory_handle *out_trajectory) {
+    if (!out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
+    out_trajectory->id = 0;
+    if (!impulse_counts || !delays_seconds || !amplitudes || joint_count == 0 ||
+        table_size != joint_count * static_cast<uint32_t>(MK_MAX_SHAPER_IMPULSES))
+        return MK_ERROR_INVALID_ARGUMENT;
+    constexpr uint32_t kSlots = MK_MAX_SHAPER_IMPULSES;
+    std::vector<int64_t> delay_ns(table_size, 0);
+    for (uint32_t j = 0; j < joint_count; ++j) {
+        if (impulse_counts[j] == 0 || impulse_counts[j] > kSlots) return MK_ERROR_INVALID_ARGUMENT;
+        double sum = 0.0;
+        for (uint32_t i = 0; i < impulse_counts[j]; ++i) {
+            const double delay = delays_seconds[j * kSlots + i], amplitude = amplitudes[j * kSlots + i];
+            if (!std::isfinite(delay) || delay < 0.0 || delay > 60.0 || !std::isfinite(amplitude) || !(amplitude > 0.0))
+                return MK_ERROR_INVALID_ARGUMENT;
+            delay_ns[j * kSlots + i] = static_cast<int64_t>(std::llround(delay * 1e9));
+            sum += amplitude;
+        }
+        if (std::abs(sum - 1.0) > 1e-6) return MK_ERROR_INVALID_ARGUMENT;
+    }
+    uint32_t joints = 0, count = 0;
+    auto status = mk_trajectory_joint_count(trajectory, &joints);
+    if (status != MK_OK) return status;
+    if (joints != joint_count) return MK_ERROR_INVALID_ARGUMENT;
+    status = mk_trajectory_segment_count(trajectory, &count);
+    if (status != MK_OK) return status;
+    if (count == 0) return MK_ERROR_INVALID_ARGUMENT;
+    constexpr int kTerms = MK_MAX_DEGREE + 1;
+    mk_trajectory_handle shaped{};
+    status = mk_trajectory_create(joints, &shaped);
+    if (status != MK_OK) return status;
+    try {
+        // The input in compact form: where each segment starts, how long it is, its degree and its coefficients.
+        std::vector<int64_t> start(count), length(count);
+        std::vector<uint8_t> degree(count);
+        std::vector<double> coefficient(static_cast<size_t>(count) * joints * kTerms, 0.0);
+        {
+            auto segment = std::make_unique<mk_segment>();
+            for (uint32_t s = 0; s < count; ++s) {
+                *segment = mk_segment{};
+                segment->struct_size = sizeof(mk_segment);
+                status = mk_trajectory_get_segment(trajectory, s, segment.get());
+                if (status != MK_OK) { mk_trajectory_destroy(shaped); return status; }
+                start[s] = segment->t0_ns;
+                length[s] = segment->duration_ns;
+                degree[s] = static_cast<uint8_t>(segment->degree);
+                for (uint32_t j = 0; j < joints; ++j)
+                    for (int k = 0; k < kTerms; ++k)
+                        coefficient[(static_cast<size_t>(s) * joints + j) * kTerms + k] = segment->coefficients[j].value[k];
+            }
+        }
+        const int64_t origin = start[0], finish = start[count - 1] + length[count - 1];
+        auto coefficients_of = [&](uint32_t s, uint32_t j) { return &coefficient[(static_cast<size_t>(s) * joints + j) * kTerms]; };
+        // A joint's position at the end of the last segment: where it is held afterwards.
+        std::vector<double> first_position(joints), last_position(joints);
+        for (uint32_t j = 0; j < joints; ++j) {
+            first_position[j] = coefficients_of(0, j)[0];
+            const double tau = static_cast<double>(length[count - 1]) * 1e-9;
+            double p = 0.0;
+            for (int k = kTerms - 1; k >= 0; --k) p = p * tau + coefficients_of(count - 1, j)[k];
+            last_position[j] = p;
+        }
+        // Every instant at which some delayed copy of some joint changes segment, the start and the end of the result.
+        std::vector<int64_t> distinct;
+        for (uint32_t j = 0; j < joints; ++j)
+            for (uint32_t i = 0; i < impulse_counts[j]; ++i) {
+                const auto offset = delay_ns[j * kSlots + i];
+                if (std::find(distinct.begin(), distinct.end(), offset) == distinct.end()) distinct.push_back(offset);
+            }
+        int64_t longest = 0;
+        for (const auto offset : distinct) longest = std::max(longest, offset);
+        std::vector<int64_t> cuts;
+        cuts.reserve((static_cast<size_t>(count) + 1) * distinct.size() + 2);
+        cuts.push_back(origin);
+        cuts.push_back(finish + longest);
+        for (const auto offset : distinct) {
+            for (uint32_t s = 0; s < count; ++s) cuts.push_back(start[s] + offset);
+            cuts.push_back(finish + offset);
+        }
+        std::sort(cuts.begin(), cuts.end());
+        cuts.erase(std::unique(cuts.begin(), cuts.end()), cuts.end());
+        // Index of the segment holding instant `t` (start[s] <= t < start[s] + length[s]), found from a moving guess.
+        auto segment_at = [&](int64_t t) {
+            const auto found = std::upper_bound(start.begin(), start.end(), t);
+            return static_cast<uint32_t>(found - start.begin()) - 1;
+        };
+        double binomial[kTerms][kTerms] = {};
+        for (int m = 0; m < kTerms; ++m) {
+            binomial[m][0] = 1.0;
+            for (int k = 1; k <= m; ++k) binomial[m][k] = binomial[m - 1][k - 1] + (k <= m - 1 ? binomial[m - 1][k] : 0.0);
+        }
+        auto output = std::make_unique<mk_segment>();
+        for (size_t c = 0; c + 1 < cuts.size(); ++c) {
+            const int64_t u0 = cuts[c], u1 = cuts[c + 1];
+            *output = mk_segment{};
+            output->struct_size = sizeof(mk_segment);
+            output->t0_ns = u0;
+            output->duration_ns = u1 - u0;
+            uint32_t used_degree = 0;
+            for (uint32_t j = 0; j < joints; ++j) {
+                double sum[kTerms] = {};
+                for (uint32_t i = 0; i < impulse_counts[j]; ++i) {
+                    const double amplitude = amplitudes[j * kSlots + i];
+                    const int64_t begin = u0 - delay_ns[j * kSlots + i];
+                    // The copy is in the segment it spends the interval in (its middle says which, for a cut that was dropped
+                    // as too close leaves a change of segment a hair inside the interval).
+                    const int64_t middle = begin + (u1 - u0) / 2;
+                    if (middle < origin) { sum[0] += amplitude * first_position[j]; continue; }
+                    if (middle >= finish) { sum[0] += amplitude * last_position[j]; continue; }
+                    const uint32_t s = segment_at(middle);
+                    used_degree = std::max<uint32_t>(used_degree, degree[s]);
+                    // The segment's polynomial in the time since `u0`: its coefficients moved by `shift` seconds.
+                    const double shift = static_cast<double>(begin - start[s]) * 1e-9;
+                    const double *source = coefficients_of(s, j);
+                    for (int k = 0; k <= static_cast<int>(degree[s]); ++k) {
+                        double moved = 0.0, power = 1.0;
+                        for (int m = k; m <= static_cast<int>(degree[s]); ++m) {
+                            moved += binomial[m][k] * source[m] * power;
+                            power *= shift;
+                        }
+                        sum[k] += amplitude * moved;
+                    }
+                }
+                for (int k = 0; k < kTerms; ++k) output->coefficients[j].value[k] = sum[k];
+            }
+            output->joint_count = joints;
+            output->degree = used_degree;
+            status = mk_trajectory_append_segment(shaped, output.get());
+            if (status != MK_OK) { mk_trajectory_destroy(shaped); return status; }
+        }
+    } catch (const std::bad_alloc &) { mk_trajectory_destroy(shaped); return MK_ERROR_OUT_OF_MEMORY; }
+    *out_trajectory = shaped;
     return MK_OK;
 }
 

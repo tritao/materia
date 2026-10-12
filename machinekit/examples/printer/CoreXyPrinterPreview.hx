@@ -89,7 +89,9 @@ class CoreXyPrinterJob {
 			filamentDiameter: hotend.filamentDiameter * 1e-3, gearRadius: printer.extruder.spec.hobDiameter * 0.5e-3,
 			maxFlow: hotend.maxVolumetricFlow * 1e-9, pressureAdvance: hotend.pressureLag, pressureAdvanceWindow: 0.04, meltLag: hotend.pressureLag, rampLength: 0.0005,
 			minExtrusionTemperature: hotend.minExtrusionTemperature, heaters: [hotendHeater, bedHeater],
-			controller: {stepTickHz: STEP_TICK_HZ}, deposit: "printed"};
+			controller: {stepTickHz: STEP_TICK_HZ}, deposit: "printed",
+			shaping: [{axis: "x", kind: "mzv", frequency: CoreXyPrinter.SHAPER_X_HZ, damping: CoreXyPrinter.SHAPER_DAMPING},
+				{axis: "y", kind: "mzv", frequency: CoreXyPrinter.SHAPER_Y_HZ, damping: CoreXyPrinter.SHAPER_DAMPING}]};
 	}
 
 	/**

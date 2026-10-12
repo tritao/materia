@@ -86,6 +86,15 @@ class CoreXyPrinter extends AxisBuilder {
 	/** What the stepper drivers are set to (amperes per phase): the belt and screw motors', and the extruder's. */
 	public static inline var DRIVER_CURRENT:Float = 1.68;
 	public static inline var EXTRUDER_DRIVER_CURRENT:Float = 1.0;
+	/**
+	 * Input shaping: the resonance (hertz) of each belt axis, the carriage on its belts for x and the gantry carrying it
+	 * for y, and the damping ratio of a belt-driven carriage. The printing gate checks them against the drive model (the
+	 * mass an axis moves on the stiffness of its belts) to ten percent. MZV is the shaper Klipper recommends for
+	 * a printer whose resonance is known only to a few percent: it stays under 5 % vibration for 20 % either side.
+	 */
+	public static inline var SHAPER_X_HZ:Float = 53.4;
+	public static inline var SHAPER_Y_HZ:Float = 34.4;
+	public static inline var SHAPER_DAMPING:Float = 0.1;
 	/** The bed's screws: a Tr8x2 thread of four starts, so one turn lifts the bed 8 mm. */
 	public static function zThread():LeadScrewThread return new LeadScrewThread(MetricTrapezoidal, 8, 2, 4);
 	/** Where the three bed screws stand. */

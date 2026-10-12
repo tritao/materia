@@ -193,6 +193,35 @@ class Trajectory implements TimedJointTrajectory {
     return new Trajectory(created.out_trajectory);
   }
 
+  /** The most impulses one joint's shaper may have (`MK_MAX_SHAPER_IMPULSES`). */
+  public static inline var MAX_SHAPER_IMPULSES:Int = 8;
+
+  /**
+    A copy convolved with an input shaper (see `mk_shape_trajectory`): joint `j` is the sum of its original motion
+    delayed by each of `delays[j]`, weighted by `amplitudes[j]` (positive, adding up to 1). The motion is held at rest
+    beyond its ends, so the copy is as much longer as the longest delay. Joints that follow others are to be projected
+    again afterwards.
+  **/
+  public function shape(delays:Array<Array<Float>>, amplitudes:Array<Array<Float>>):Trajectory {
+    ensureLive();
+    var count = delays.length;
+    if (amplitudes.length != count) throw "Shaping needs delays and amplitudes for each joint";
+    var counts:Array<Int> = [], flatDelays:Array<Float> = [], flatAmplitudes:Array<Float> = [];
+    for (joint in 0...count) {
+      var impulses = delays[joint].length;
+      if (impulses < 1 || impulses > MAX_SHAPER_IMPULSES || amplitudes[joint].length != impulses)
+        throw "A joint's shaper needs between one and " + MAX_SHAPER_IMPULSES + " impulses, each with a delay and an amplitude";
+      counts.push(impulses);
+      for (slot in 0...MAX_SHAPER_IMPULSES) {
+        flatDelays.push(slot < impulses ? delays[joint][slot] : 0.0);
+        flatAmplitudes.push(slot < impulses ? amplitudes[joint][slot] : 0.0);
+      }
+    }
+    var created = MotionKitNative.mk_shape_trajectory(owner.borrow(), counts, flatDelays, flatAmplitudes);
+    check(created.status, "trajectory.shape");
+    return new Trajectory(created.out_trajectory);
+  }
+
   /**
     A copy in which joint `joint` runs `leadSeconds` ahead of itself, the lead taken on its velocity averaged over
     `windowSeconds`: an extruder's pressure advance. The joints that follow it are to be projected again afterwards.
