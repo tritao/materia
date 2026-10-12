@@ -82,7 +82,7 @@ class CoreXyDriveTests {
 		// A controller's step rate caps the motors, and through them both axes: 16 microsteps at 40 kHz is 78.5 rad/s.
 		var binding = DeviceBinding.bind(model, DeviceLayout.forActuators(model), 40000);
 		if (binding.channels.length != 2) throw "the plotter's two motors take two channels";
-		var pulseCeiling = 40000.0 / (200.0 * 16.0 / (2 * Math.PI));
+		var pulseCeiling = 40000.0 / robotkit.runtime.StepTicks.wire(200.0 * 16.0 / (2 * Math.PI));
 		near(binding.channels[0].maxRate, pulseCeiling, "the channel exposes the continuous pulse ceiling", 1e-6);
 		// The binding chooses the deployed tick spacing directly from pulse limits.
 		// Turning rounded channel rates back into ticks would incorrectly halve
