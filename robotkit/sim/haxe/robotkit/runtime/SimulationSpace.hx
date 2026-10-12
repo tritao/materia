@@ -73,7 +73,9 @@ class SimulationSpace {
 	/** Derives integration from the drive loops and their mechanical loads. */
 	public function requireDrives(blueprint:RobotRuntimeBlueprint):Void {
 		var rate = blueprint.fastestPositionLoopRate();
-		var interval = blueprint.pneumaticStabilityInterval();
+		// A servo that drives a compliant coupling integrates its spring against its own inertia, whatever position loop
+		// the drive states.
+		var interval = Math.min(blueprint.pneumaticStabilityInterval(), blueprint.servoStabilityInterval(true));
 		if (rate > 0.0) interval = Math.min(interval,
 			Math.min(1.0 / rate, blueprint.servoStabilityInterval()));
 		requireInterval(interval);

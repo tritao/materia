@@ -266,6 +266,7 @@ class RobotModel {
       Simulation uses the live articulated mass matrix for acceleration feedforward. */
   @:allow(robotkit.model.DriveLoads)
   @:allow(robotkit.device.DeviceBinding)
+  @:allow(robotkit.runtime.RobotRuntimeCompiler)
   function turningInertia(joint:Joint):Float {
     if (joint.type == JointType.Prismatic) return carriedMass(joint) + joint.armature;
     var childFrame = jointFrame(joint.childFramePosition, joint.childFrameRotation);

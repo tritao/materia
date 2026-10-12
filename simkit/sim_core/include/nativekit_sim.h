@@ -245,14 +245,14 @@ typedef struct nksim_joint_coupling_desc {
     double ratio;
     double offset;
     /**
-     * Follower-coordinate stiffness, N/m or N m/rad: the coupling is a spring of this stiffness (a timing belt) with the
-     * damping below, whatever the bodies it joins weigh; zero preserves the backend default, an ideal constraint. A
-     * follower with several couplings is one spring, of their mean stiffness.
+     * Follower-coordinate stiffness, N/m or N m/rad. With a damping ratio below the coupling is a spring of this
+     * stiffness (a timing belt), whatever the bodies it joins weigh; a follower with several such couplings is one
+     * spring, of their mean stiffness. Without one, or with zero stiffness, the backend keeps an ideal constraint.
      */
     double stiffness;
     /**
      * How damped the coupling's response is, as a ratio of critical damping (a timing belt's is small, 0.1 or so,
-     * so a carriage on it rings); zero preserves the backend default, critical damping (1). With several couplings
+     * so a carriage on it rings); zero preserves the backend default: the coupling is not simulated as a spring. With several couplings
      * on one follower the backend takes the mean of their ratios weighted by stiffness.
      */
     double damping_ratio;

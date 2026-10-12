@@ -237,7 +237,7 @@ class DeviceBinding {
       channel.feedbackRatio, channel.feedbackOffset, channel.holdStiffness, channel.holdInertia)];
 
   static function drivesCompliantFollower(robot:RobotModel, joint:String):Bool {
-    for (coupling in robot.couplings) if (coupling.follower == joint && coupling.stiffness > 0.0) return true;
+    for (coupling in robot.couplings) if (coupling.follower == joint && coupling.stiffness > 0.0 && coupling.dampingRatio > 0.0) return true;
     return false;
   }
 

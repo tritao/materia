@@ -1119,10 +1119,10 @@ Done. What was built and decided:
      carriage's mass alone, so the force was the pulley's mass times the reference: a belt a hundred times too soft; and at
      that impedance the drive's own force passes through the row (the stretch's acceleration is forced), so with a constant
      impedance near 1 the belt does not stretch at all. A soft constraint cannot be made into a spring without knowing `A`
-     and keeping `I` small, so **a coupling with stiffness is now a spring**: the fixed tendon of the stretch (the leaders'
+     and keeping `I` small, so **a coupling with stiffness and an authored damping ratio is now a spring** (an oscillator, a timing belt; a stiffness alone, such as a lead screw's or the gantry's unauthored belts, stays an ideal constraint, because the stiffness there is a compliance for planning and plan checks: made a spring, the bench mill's screws and the machine-tending cell failed, and the gantry's search stopped on a runtime limit by micrometres): the fixed tendon of the stretch (the leaders'
      motion less the follower's) carries MuJoCo's passive spring and damper, `K` in the follower's coordinate and
      `C = 2 zeta sqrt(K / L)` with `L = sum(ratio^2 / m_leader)` the load's inverse inertia, so the damping ratio is the carriage's
-     whatever the pulley weighs. A coupling without stiffness stays an equality.
+     whatever the pulley weighs. 
   2. *A follower with two leaders was half as stiff.* A CoreXY pulley follows x and y; the old row took the terms' compliances in
      series (a belt that two carriages share came out with half the stiffness the drive model gives, 42,074 N/m on x
      against 84,238). It is one belt: the row has the terms' mean stiffness (each term's value is the belt's seen from its
@@ -1139,9 +1139,7 @@ Done. What was built and decided:
      (`0.5 sqrt(I / S)`, `SimulationSpace.requireInterval`).
   A belt's spring is integrated explicitly and the damper on a pulley of grams is stiff, so the backend steps a world with belts
   on `implicitfast` and divides the caller's step until `0.5 / sqrt(K A)` is resolved (a free pulley on the gantry turns at 300 rad/s,
-  its picker runs at 10 ms): found when the gantry blew up at the first try. **Known gap:** a servo that drives a belt's pulley
-  (no machine in the repository does; the gantry's pulleys follow servo axes) still reflects its load into the stability interval
-  as if the belt were rigid (`RobotRuntimeCompiler`).
+  its picker runs at 10 ms): found when the gantry blew up at the first try. A servo that drives a belt's pulley (spring coupling) reflects only its own inertia into the stability interval (`RobotRuntimeJointBlueprint.compliantLoad`; no repository machine does yet).
   **Numbers.** The printer's carriage in MuJoCo (the 50 mm move of `printer-shaping`, a tick of a millisecond): 247 to 251 um
   left shaking plain, 9 to 11 um shaped (23x to 28x less), **8 um at a shaper tuned 10 % low and 22 to 24 um at 10 % high (10x to 31x
   less)**, 30 crossings in 0.3 s (about 53 Hz) where it had 4 crossings in 0.15 s (5 Hz) and a shaped move leaving 1.8 mm against

@@ -1310,7 +1310,7 @@ private:
             for (std::size_t other = 0; other < couplings.size(); ++other)
                 if (couplings[other].follower == coupling.follower) {
                     ++terms;
-                    soft |= couplings[other].stiffness > 0.0;
+                    soft |= is_spring(couplings[other]);
                     if (other < index) first = false;
                 }
             if (terms == 1 && !soft) {
@@ -1585,7 +1585,12 @@ private:
         }
     }
 
-    // A coupling with stiffness is a belt, and a belt is a spring: the fixed tendon of the stretch (the leaders'
+    // Whether a coupling is a spring to simulate: one with a stiffness and an authored damping ratio, an oscillator (a
+    // timing belt). A stiffness alone is a compliance for planning and plan checks (a lead screw's stretch is far above
+    // anything a step resolves, and critical damping, the default, does not ring): the coupling stays an ideal constraint.
+    static bool is_spring(const nksim::BackendJointCoupling &term) { return term.stiffness > 0.0 && term.damping_ratio > 0.0; }
+
+    // A coupling with stiffness and a damping ratio is a belt, and a belt is a spring: the fixed tendon of the stretch (the leaders'
     // motion less the follower's) carries MuJoCo's own passive spring and damper, so the force is the belt's whatever
     // the bodies weigh or drive it. (A soft equality constraint is not that. Its force is its reference acceleration
     // scaled by the inverse inertia of the constraint, which a light pulley held by its drive dominates, and by an
@@ -1605,7 +1610,7 @@ private:
         for (const auto &term : couplings) {
             stiffnesses[term.follower];
             offsets[term.follower] += term.offset;
-            if (term.stiffness > 0.0) {
+            if (is_spring(term)) {
                 stiffnesses[term.follower] += term.stiffness;
                 damped[term.follower] += (term.damping_ratio > 0.0 ? term.damping_ratio : 1.0) * term.stiffness;
                 ++softs[term.follower];

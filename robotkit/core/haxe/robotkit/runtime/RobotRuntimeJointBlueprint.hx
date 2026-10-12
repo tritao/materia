@@ -36,6 +36,8 @@ class RobotRuntimeJointBlueprint {
   public var servoDamping:Float = 0.0;
   public var reflectedInertia:Float = 0.0;
   public var positionLoopRate:Float = 0.0;
+  /** The servo drives a screw or pulley a compliant coupling stretches from: its reflected inertia is its own, not the load's. */
+  public var compliantLoad:Bool = false;
   public var armature:Float = 0.0;
   public var damping:Float = 0.0;
   public var frictionLoss:Float = 0.0;

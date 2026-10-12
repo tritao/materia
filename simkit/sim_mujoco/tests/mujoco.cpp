@@ -1794,7 +1794,7 @@ void rigid_coupling_holds_under_high_effort() {
 // constant lag (F / 2k, the pair accelerating together) after ringing about it. With a damping ratio of 0.1 the lag
 // overshoots its final value by tens of percent; with the ratio left unset, the default, it is critically damped
 // and hardly does.
-double coupling_overshoot(double damping_ratio) {
+double coupling_overshoot(double damping_ratio, bool ideal = false) {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
     nksim_world_desc desc{};
@@ -1849,13 +1849,16 @@ double coupling_overshoot(double damping_ratio) {
     }
     nksim_world_destroy(world);
     nkscene_scene_destroy(scene);
+    if (ideal) return std::abs(settled) + std::abs(peak);
     assert(settled > 0.0);
     return peak / settled - 1.0;
 }
 
 void a_coupling_rings_as_its_damping_ratio_says() {
-    const double critical = coupling_overshoot(0.0), ringing = coupling_overshoot(0.1);
-    assert(critical < 0.05);
+    // With a damping ratio the coupling is a spring and rings. With stiffness alone (critical damping, the default) it is an
+    // ideal constraint, which keeps the follower at the leader's side: no lag at all.
+    const double ideal = coupling_overshoot(0.0, true), ringing = coupling_overshoot(0.1);
+    assert(ideal < 0.05);
     assert(ringing > 0.5);
     nksim_joint_coupling_desc invalid{};
     invalid.struct_size = sizeof(invalid);

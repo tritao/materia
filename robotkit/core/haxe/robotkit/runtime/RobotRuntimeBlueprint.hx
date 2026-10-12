@@ -28,9 +28,9 @@ class RobotRuntimeBlueprint {
     return rate;
   }
   /** Conservative integration interval from servo gain and reflected inertia, seconds. */
-  public function servoStabilityInterval():Float {
+  public function servoStabilityInterval(?onCompliantLoads:Bool = false):Float {
     var interval = Math.POSITIVE_INFINITY;
-    for (joint in joints) if (joint.servoStiffness > 0 && joint.reflectedInertia > 0)
+    for (joint in joints) if (joint.servoStiffness > 0 && joint.reflectedInertia > 0 && (!onCompliantLoads || joint.compliantLoad))
       interval = Math.min(interval, 0.5 * Math.sqrt(joint.reflectedInertia / joint.servoStiffness));
     return interval;
   }
