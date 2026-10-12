@@ -1090,7 +1090,20 @@ left in the motion path.
 1. The start-at-limit tolerance (`ae6e95ec5`) is duplicated in four places (`ValidationLimits.admittingStart`,
    `ProgramCompiler.checkJointPosition`, `runtime.cpp validate_appended_path`, `device_compiler6.cpp`) with a magic
    `1e-6` fallback: move the rule into trajectorykit's shared validator (`trajectory_core`) once, and settle where a
-   homed axis should rest (a home coordinate exactly on the travel limit is the root cause).
+   homed axis should rest (a home coordinate exactly on the travel limit is the root cause). **Done.** The rule lives once,
+   in `trajectory_core` (`validation.cpp admit_start`): `mk_limits` carries a per-joint `position_start_tolerance`, and
+   `mk_validate` / `mk_plan_create` widen a claimed bound to the trajectory's first state when it rests outside by no more
+   than that, the bound reaching the start and no further; `mk_limits_admit_start` is the same rule for callers that check
+   samples before a trajectory exists (`ValidationLimits.admittedBounds`, used by `ProgramCompiler.checkJointPosition`).
+   `ExecutionPlan.create`, the runtime's appended-path validation and the RKD6 device compiler only pass the plan's start
+   tolerances; their copies and the `1e-6` fallback (a zero tolerance now admits nothing) are deleted. Test:
+   `motionkit/native/tests/validation.cpp start_at_limit_admitted_once`. Root cause: `HomingAxis.home` was the authored home,
+   which defaults to the lower limit, but homing knows the rest only to within its precision (the switch repeatability,
+   `positionTolerance`; the cycle accepts any rest within it), so half the runs rested outside the claimed bound. A homed
+   axis now rests that precision inside the travel (`HomingAxis.home`, clamped on both limits, tested in `HomingTests`);
+   the authored home coordinate is unchanged. The rule stays in the validator for any other plan that starts a hair
+   outside (a stop, drift): the toolpath motion tests pass with the rule disabled and the old home too, so the
+   homing case is no longer what keeps it needed.
 2. TOPP-RA's forward-pass failure: replace the lowered-speed retry subclass and the string-matched "path.time failed"
    halving with a real fix of TOPP-RA's forward-pass numerics (a fork and an upstream pull request). **Fixed in our
    fork; retry and halving deleted, one failure left (below).** The submodule now follows github.com/tritao/toppra
@@ -1229,7 +1242,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
-| AM5b | in progress: item 6 done (af87f34a7) | |
+| AM5b | in progress: items 6 and 1 done | see the commits below |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 

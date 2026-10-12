@@ -344,6 +344,16 @@ mk_result MK_CALL mk_trajectory_from_samples(uint32_t joint_count,
     }
 }
 
+mk_result MK_CALL mk_limits_admit_start(const mk_limits *limits, uint32_t joint, double start,
+                                        double tolerance, double *out_lower, double *out_upper) {
+    if (limits == nullptr || out_lower == nullptr || out_upper == nullptr ||
+        joint >= limits->joint_count || joint >= MK_MAX_JOINTS || !std::isfinite(start) ||
+        !std::isfinite(tolerance) || tolerance < 0.0 || !limits->position_claimed[joint])
+        return MK_ERROR_INVALID_ARGUMENT;
+    motionkit::admit_start(*limits, joint, start, tolerance, *out_lower, *out_upper);
+    return MK_OK;
+}
+
 mk_result MK_CALL mk_validate(mk_trajectory_handle trajectory, const mk_limits *limits,
                               mk_validation_report *out_report) {
     if (limits == nullptr || out_report == nullptr ||

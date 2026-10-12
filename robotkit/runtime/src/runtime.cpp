@@ -237,10 +237,8 @@ void evaluate_knot(const RobotRuntime::RuntimeTrajectoryPoint &knot, uint64_t ti
   junction, so the new segments and the queued segment they join are all
   that need checking: an append costs its own length, not the queue's.
 
-  `start_tolerance`, when given, is the submitted plan's per-joint start position tolerance.
-  A joint resting just outside a position limit by no more than that (a stepper homed onto its
-  limit comes to rest a step or two past it) may begin there: its bound reaches the first
-  position of the validated path and no further.
+  `start_tolerance`, when given, is the submitted plan's per-joint start position tolerance, which
+  the validator applies to the path's first state (`mk_limits::position_start_tolerance`).
 **/
 rk_result validate_appended_path(
     const std::deque<RobotRuntime::RuntimeTrajectoryPoint> &queued,
@@ -251,17 +249,10 @@ rk_result validate_appended_path(
     if (mk_trajectory_create(blueprint.joint_count, &handle) != MK_OK)
         return RK_ERROR_OUT_OF_MEMORY;
     uint32_t segments = 0;
-    double first_position[RK_MAX_TRAJECTORY_JOINTS]{};
     auto append = [&](const RobotRuntime::RuntimeTrajectoryPoint &knot) {
         if (!knot.has_segment) return true;
         const auto native = knot.segment.native();
         if (mk_trajectory_append_segment(handle, &native) != MK_OK) return false;
-        if (segments == 0) {
-            mk_trajectory_state first{};
-            motionkit::evaluate_segment(native, 0.0, first);
-            std::copy_n(first.position, std::min<uint32_t>(first.joint_count, RK_MAX_TRAJECTORY_JOINTS),
-                first_position);
-        }
         ++segments;
         return true;
     };
@@ -298,15 +289,7 @@ rk_result validate_appended_path(
         const double travel = homing && has_overtravel ? blueprint.joint_overtravel[joint] : 0.0;
         limits.position_lower[joint] = source.lower_limit - travel;
         limits.position_upper[joint] = source.upper_limit + travel;
-        if (start_tolerance != nullptr && limits.position_claimed[joint]) {
-            const double slack = start_tolerance[joint] > 0.0 ? start_tolerance[joint] : 1e-6;
-            if (first_position[joint] < limits.position_lower[joint] &&
-                first_position[joint] >= limits.position_lower[joint] - slack)
-                limits.position_lower[joint] = first_position[joint];
-            if (first_position[joint] > limits.position_upper[joint] &&
-                first_position[joint] <= limits.position_upper[joint] + slack)
-                limits.position_upper[joint] = first_position[joint];
-        }
+        if (start_tolerance != nullptr) limits.position_start_tolerance[joint] = start_tolerance[joint];
         if (!std::isfinite(limits.position_lower[joint]) ||
             !std::isfinite(limits.position_upper[joint])) {
             mk_trajectory_destroy(handle);

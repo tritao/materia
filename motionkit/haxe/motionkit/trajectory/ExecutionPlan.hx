@@ -156,7 +156,7 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
         accelerations.length != count || positionTolerances.length != count ||
         velocityTolerances.length != count || accelerationTolerances.length != count)
       throw "Plan start-state joint count mismatch";
-    limits = limits.admittingStart(positions, positionTolerances);
+    limits = limits.withStartTolerance(positionTolerances);
     var start = new mk_start_state();
     start.set_struct_size(mk_start_state.size());
     start.set_joint_count(count);

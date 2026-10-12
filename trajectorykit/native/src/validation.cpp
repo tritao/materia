@@ -288,9 +288,28 @@ double position_comparison_tolerance(double lower, double upper,
 
 } // namespace
 
-mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
+void admit_start(const mk_limits &limits, uint32_t joint, double start, double tolerance,
+                 double &lower, double &upper) {
+    lower = limits.position_lower[joint];
+    upper = limits.position_upper[joint];
+    if (!(tolerance > 0.0)) return;
+    if (start < lower && start >= lower - tolerance) lower = start;
+    if (start > upper && start <= upper + tolerance) upper = start;
+}
+
+mk_result validate(const Trajectory &trajectory, const mk_limits &requested,
                    mk_validation_report &report) {
-    if (!valid_limits(trajectory, limits)) return MK_ERROR_INVALID_ARGUMENT;
+    if (!valid_limits(trajectory, requested)) return MK_ERROR_INVALID_ARGUMENT;
+    // A joint resting just outside a claimed bound within its start tolerance begins there.
+    mk_limits limits = requested;
+    if (requested.struct_size >= sizeof(mk_limits)) {
+        mk_trajectory_state first{};
+        evaluate_segment(trajectory.segment(0), 0.0, first);
+        for (uint32_t joint = 0; joint < limits.joint_count; ++joint)
+            if (limits.position_claimed[joint])
+                admit_start(requested, joint, first.position[joint], requested.position_start_tolerance[joint],
+                    limits.position_lower[joint], limits.position_upper[joint]);
+    }
     report = {};
     report.struct_size = sizeof(report);
     report.collision.status = MK_CHECK_UNCHECKED;

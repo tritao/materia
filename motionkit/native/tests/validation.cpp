@@ -468,7 +468,58 @@ void continuity_position_units_and_origin() {
             }
 }
 
+
+// A stepper homed onto its limit rests a step or two past it: the first state may start there within its
+// start tolerance, the bound reaching the start position and no further.
+void start_at_limit_admitted_once() {
+    const auto check = [](double start, double end, double tolerance) {
+        mk_trajectory_handle trajectory{};
+        assert(mk_trajectory_create(1, &trajectory) == MK_OK);
+        mk_segment segment{};
+        segment.struct_size = sizeof(segment);
+        segment.duration_ns = 1'000'000'000;
+        segment.degree = 1;
+        segment.joint_count = 1;
+        segment.coefficients[0].value[0] = start;
+        segment.coefficients[0].value[1] = end - start;
+        assert(mk_trajectory_append_segment(trajectory, &segment) == MK_OK);
+        mk_limits limits{};
+        limits.struct_size = sizeof(limits);
+        limits.joint_count = 1;
+        limits.position_claimed[0] = 1;
+        limits.position_lower[0] = 0.0;
+        limits.position_upper[0] = 1.0;
+        limits.position_start_tolerance[0] = tolerance;
+        mk_validation_report report{};
+        report.struct_size = sizeof(report);
+        assert(mk_validate(trajectory, &limits, &report) == MK_OK);
+        const bool passed = report.checks[MK_CHECK_POSITION].status == MK_CHECK_PASSED;
+        mk_trajectory_destroy(trajectory);
+        return passed;
+    };
+    assert(!check(-0.0000125, 0.5, 0.0));       // no tolerance: refused, as before
+    assert(check(-0.0000125, 0.5, 0.00005));    // rests just outside, moves inward
+    assert(!check(-0.0001, 0.5, 0.00005));      // farther out than the tolerance
+    assert(!check(-0.0000125, -0.00005, 0.00005)); // the bound reaches the start, not past it
+    assert(check(-0.0000125, -0.0000125, 0.00005)); // holding still is fine
+    // The same rule through the C call the path planners use.
+    mk_limits limits{};
+    limits.struct_size = sizeof(limits);
+    limits.joint_count = 1;
+    limits.position_claimed[0] = 1;
+    limits.position_lower[0] = 0.0;
+    limits.position_upper[0] = 1.0;
+    double lower = 0.0, upper = 0.0;
+    assert(mk_limits_admit_start(&limits, 0, -0.0000125, 0.00005, &lower, &upper) == MK_OK);
+    near(lower, -0.0000125);
+    near(upper, 1.0);
+    assert(mk_limits_admit_start(&limits, 0, 1.0001, 0.00005, &lower, &upper) == MK_OK);
+    near(lower, 0.0);
+    near(upper, 1.0);
+}
+
 int main() {
+    start_at_limit_admitted_once();
     continuity_position_units_and_origin();
     velocity_extremum_and_plan_rejection();
     position_extremum_between_samples();

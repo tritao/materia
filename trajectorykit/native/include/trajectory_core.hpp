@@ -175,6 +175,10 @@ private:
 mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
                    mk_validation_report &report);
 
+/** The bounds of a joint starting at `start`: see `mk_limits_admit_start`. */
+void admit_start(const mk_limits &limits, uint32_t joint, double start, double tolerance,
+                 double &lower, double &upper);
+
 
 } // namespace motionkit
 

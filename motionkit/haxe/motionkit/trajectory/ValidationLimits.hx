@@ -69,33 +69,30 @@ class ValidationLimits {
   public function nativeValue():mk_limits return native;
 
   /** Preserve machine claims while leaving path-timed jerk unclaimed. */
-  public function withoutJerk():ValidationLimits return copy(false, null, null);
+  public function withoutJerk():ValidationLimits return copy(false, null);
 
   /**
-   * The same claims for a plan that starts at `positions`. A joint resting just outside a claimed
-   * position bound, within its start tolerance (a stepper homed onto a limit comes to rest a step
-   * or two past it), may begin there, so its bound reaches the start position and no further.
+   * The same claims for a plan that starts at a state with these position tolerances. A joint resting just outside a
+   * claimed position bound, within its tolerance (a stepper homed onto a limit comes to rest a step or two past it), may
+   * begin there: the validator widens its bound to the start position and no further (`mk_limits_admit_start`).
    */
-  public function admittingStart(positions:Array<Float>, tolerances:Array<Float>):ValidationLimits {
-    var outside = false;
-    for (joint in 0...jointCount)
-      if (native.get_position_claimed(joint) != 0 &&
-          (positions[joint] < native.get_position_lower(joint) || positions[joint] > native.get_position_upper(joint)))
-        outside = true;
-    return outside ? copy(true, positions, tolerances) : this;
+  public function withStartTolerance(tolerances:Array<Float>):ValidationLimits return copy(true, tolerances);
+
+  /** The position bounds a joint starting at `start` is held to, by the validator's own start-at-limit rule. */
+  public function admittedBounds(joint:Int, start:Float, tolerance:Float):{lower:Float, upper:Float} {
+    validJoint(joint);
+    if (native.get_position_claimed(joint) == 0) return {lower: Math.NEGATIVE_INFINITY, upper: Math.POSITIVE_INFINITY};
+    var result = TrajectoryCore.mk_limits_admit_start(native, joint, start, tolerance);
+    if (result.status != 0) throw "Invalid start position or tolerance";
+    return {lower: result.out_lower, upper: result.out_upper};
   }
 
-  function copy(keepJerk:Bool, startPositions:Null<Array<Float>>, startTolerances:Null<Array<Float>>):ValidationLimits {
+  function copy(keepJerk:Bool, startTolerances:Null<Array<Float>>):ValidationLimits {
     var result = new ValidationLimits(jointCount, modelRevision, calibrationRevision);
     for (joint in 0...jointCount) {
       if (native.get_position_claimed(joint) != 0) {
-        var lower = native.get_position_lower(joint), upper = native.get_position_upper(joint);
-        if (startPositions != null) {
-          var start = startPositions[joint], tolerance = startTolerances[joint];
-          if (start < lower && start >= lower - tolerance) lower = start;
-          if (start > upper && start <= upper + tolerance) upper = start;
-        }
-        result.position(joint, lower, upper);
+        result.position(joint, native.get_position_lower(joint), native.get_position_upper(joint));
+        if (startTolerances != null) result.native.set_position_start_tolerance(joint, startTolerances[joint]);
       }
       if ((native.get_derivative_claimed(joint) & 1) != 0)
         result.velocity(joint, native.get_max_velocity(joint));

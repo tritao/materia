@@ -442,14 +442,7 @@ CompiledDevicePlan6 compile_once(
         const auto travel = homing && has_overtravel ? blueprint.joint_overtravel[joint] : 0.0;
         limits.position_lower[joint] = source.lower_limit - travel;
         limits.position_upper[joint] = source.upper_limit + travel;
-        if (start_tolerance != nullptr) {
-            const double first = original_segments[0].coefficients[joint].value[0];
-            const double slack = start_tolerance[joint] > 0.0 ? start_tolerance[joint] : 1e-6;
-            if (first < limits.position_lower[joint] && first >= limits.position_lower[joint] - slack)
-                limits.position_lower[joint] = first;
-            if (first > limits.position_upper[joint] && first <= limits.position_upper[joint] + slack)
-                limits.position_upper[joint] = first;
-        }
+        if (start_tolerance != nullptr) limits.position_start_tolerance[joint] = start_tolerance[joint];
         limits.max_velocity[joint] = source.max_velocity;
         limits.max_acceleration[joint] = source.max_acceleration;
         limits.derivative_claimed[joint] = ((source.limit_flags & RK_LIMIT_VELOCITY) ? 1u : 0u) |

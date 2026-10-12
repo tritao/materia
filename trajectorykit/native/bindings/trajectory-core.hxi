@@ -41,6 +41,12 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 	const MK_MAX_JOINTS = 64;
 	const MK_MAX_PLAN_EVENTS = 256;
 	const MK_OK = 0;
+	/**
+	 * The position bounds a joint that starts at `start` is held to: the claimed bounds, widened to include `start` when
+	 * it rests outside one of them by no more than `tolerance`. The one place the start-at-limit rule lives; `mk_validate`
+	 * and `mk_plan_create` apply it with `position_start_tolerance` to the trajectory's first state.
+	 */
+	extern fn mk_limits_admit_start(limits: ptr<const<mk_limits>>, joint: u32, start: f64, tolerance: f64, out_lower: ptr<f64> @out, out_upper: ptr<f64> @out) -> mk_result;
 	extern fn mk_plan_coefficient_array_count(plan: mk_plan_handle) -> usize;
 	/**
 	 * Deep-copies the trajectory and refuses any failed validation check.
@@ -143,7 +149,7 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 	/**
 	 * Zero motion limits are unclaimed. Position limits use an explicit flag so zero is usable.
 	 */
-	struct mk_limits @layout(3128, 8) {
+	struct mk_limits @layout(3640, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		joint_count: u32 @offset(4);
 		model_revision: u64 @offset(8);
@@ -166,6 +172,12 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 		 * Zero defaults to 1 ns. Round non-integer device tick periods up (e.g. 5.88 ns to 6 ns).
 		 */
 		executor_time_resolution_ns: u64 @offset(3120);
+		/**
+		 * Per joint, how far outside a claimed position bound the trajectory's first state may rest and still
+		 * begin there (a stepper homed onto a limit comes to rest a step or two past it). Zero admits none.
+		 * The bound then reaches the start position and no further (`mk_limits_admit_start`).
+		 */
+		position_start_tolerance: array<f64, 64> @offset(3128);
 	}
 	/**
 	 * Shared STOP/hold-lead derivative estimate for one queued path region.

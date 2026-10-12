@@ -145,6 +145,12 @@ typedef struct mk_limits {
     double max_continuity_jump[3]; /**< Optional C0, C1, C2 jump claims. */
     /** Zero defaults to 1 ns. Round non-integer device tick periods up (e.g. 5.88 ns to 6 ns). */
     uint64_t executor_time_resolution_ns;
+    /**
+     * Per joint, how far outside a claimed position bound the trajectory's first state may rest and still
+     * begin there (a stepper homed onto a limit comes to rest a step or two past it). Zero admits none.
+     * The bound then reaches the start position and no further (`mk_limits_admit_start`).
+     */
+    double position_start_tolerance[MK_MAX_JOINTS];
 } mk_limits;
 
 typedef struct mk_validation_check {
@@ -293,6 +299,13 @@ TC_API mk_result MK_CALL mk_trajectory_from_samples(uint32_t joint_count,
 /** Reports exact polynomial extrema; failed checks return MK_OK with failed status. */
 TC_API mk_result MK_CALL mk_validate(mk_trajectory_handle trajectory,
     const mk_limits *limits, mk_validation_report *out_report);
+/**
+ * The position bounds a joint that starts at `start` is held to: the claimed bounds, widened to include `start` when
+ * it rests outside one of them by no more than `tolerance`. The one place the start-at-limit rule lives; `mk_validate`
+ * and `mk_plan_create` apply it with `position_start_tolerance` to the trajectory's first state.
+ */
+TC_API mk_result MK_CALL mk_limits_admit_start(const mk_limits *limits, uint32_t joint, double start,
+    double tolerance, double *out_lower MK_OUT, double *out_upper MK_OUT);
 /** Fills the planner-owned sampled task-space check in a validation report. */
 TC_API mk_result MK_CALL mk_report_set_task_space(mk_validation_report *report,
     uint32_t status, double worst, double time_seconds, double tolerance,

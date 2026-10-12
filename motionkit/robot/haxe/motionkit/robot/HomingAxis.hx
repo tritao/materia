@@ -16,6 +16,11 @@ class HomingAxis {
   public final releaseSearchDistance:Float;
   public final releaseDistance:Float;
   public final maximumTravel:Float;
+  /**
+    Where the axis rests after homing: the authored home, held `positionTolerance` inside the travel. Homing only
+    knows the rest to within that tolerance, so a home exactly on a travel limit would put half the runs outside
+    the claimed position bound (a stepper homed onto its limit came to rest one or two steps past it).
+  **/
   public final home:Float;
   public final positionTolerance:Float;
   public final timestep:Float;
@@ -31,7 +36,7 @@ class HomingAxis {
     if (!Math.isFinite(lower) || !Math.isFinite(upper) || upper <= lower ||
         !Math.isFinite(home) || home < lower || home > upper) throw "Homing axis has invalid travel/home";
     this.id = id; this.joint = joint; this.switches = switches.copy();
-    this.acceleration = acceleration; this.home = home;
+    this.acceleration = acceleration;
     if (switches[0] == null) throw "Homing has a null home switch";
     this.timestep = timestep;
     lowerTravel = lower - overtravel; upperTravel = upper + overtravel;
@@ -72,5 +77,7 @@ class HomingAxis {
         !Math.isFinite(backoffSpeed) || backoffSpeed <= 0 ||
         !Math.isFinite(capturedApproachSpeed) || capturedApproachSpeed <= 0) throw "Homing derived travel/speeds must be finite and positive";
     positionTolerance = precision;
+    if (upper - lower <= 2 * precision) throw "Homing axis travel is shorter than its homing precision";
+    this.home = Math.min(Math.max(home, lower + precision), upper - precision);
   }
 }

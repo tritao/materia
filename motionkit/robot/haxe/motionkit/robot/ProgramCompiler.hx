@@ -1296,20 +1296,17 @@ class ProgramCompiler {
   }
   /**
     A joint may sit at its `start` position even just outside its bound, within the start tolerance
-    (a stepper homed onto a limit comes to rest a step or two past it): see ValidationLimits.admittingStart.
+    (a stepper homed onto a limit comes to rest a step or two past it): the validator's rule, ValidationLimits.admittedBounds.
   **/
   function checkJointPosition(q:Array<Float>, index:Int,
       distance:Null<Float>, ?start:Array<Float>):Void {
     var nativeLimits = limits.nativeValue();
     for (joint in 0...q.length)
       if (nativeLimits.get_position_claimed(joint) != 0) {
-        var lower = nativeLimits.get_position_lower(joint), upper = nativeLimits.get_position_upper(joint);
-        if (start != null) {
-          var tolerance = startTolerances.position[joint];
-          if (start[joint] < lower && start[joint] >= lower - tolerance) lower = start[joint];
-          if (start[joint] > upper && start[joint] <= upper + tolerance) upper = start[joint];
-        }
-        if (q[joint] < lower - 1e-9 || q[joint] > upper + 1e-9) {
+        var bounds = start == null
+          ? {lower: nativeLimits.get_position_lower(joint), upper: nativeLimits.get_position_upper(joint)}
+          : limits.admittedBounds(joint, start[joint], startTolerances.position[joint]);
+        if (q[joint] < bounds.lower - 1e-9 || q[joint] > bounds.upper + 1e-9) {
           var location = distance == null ? "" : ' at path distance $distance';
           throw 'Motion program op $index joint limit $joint$location';
         }
