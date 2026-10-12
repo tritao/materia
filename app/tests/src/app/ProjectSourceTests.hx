@@ -3451,6 +3451,28 @@ class ProjectSourceTests {
             'time=${simulation.activeSession().simulationTime()} s, ' +
             'doorOpen=$doorOpen, runner=${mission.runner.status()})');
         check(checkedPayloadCarrier, "The startup route checks its confirmed payload carrier before placement");
+        var cycleCommand = -1;
+        for (index in clampConfirmed...mission.mission.steps.length) {
+          var step = mission.mission.steps[index];
+          if (step.kind == "signal" && step.signal != null &&
+              step.signal.name == RobotInterfaceChannels.CYCLE_START && step.signal.value) {
+            cycleCommand = index; break;
+          }
+        }
+        if (cycleCommand < 0) throw "Tending route has no first machining request";
+        // Clamp feedback reports jaw contact, not the end of its contact transient.
+        // Check machining alignment at the authored start boundary, after the arm
+        // retreats and the door closes; do not add a test-only settling delay.
+        while (mission.stepIndex < cycleCommand && mission.failure == null && routeTicks < routeTickBudget) {
+          simulation.step(); routeTicks++;
+        }
+        var doorClosed = signals != null && switch signals.input("robotController", RobotInterfaceChannels.DOOR_CLOSED) {
+          case Digital(value): value;
+          case _: false;
+        };
+        check(mission.stepIndex == cycleCommand && mission.failure == null && doorClosed &&
+            simulation.heldObjectIds().length == 0 && cnc.completedStocks.length == 0,
+          "The startup route reaches machining readiness with the door closed and the gripper empty");
         var placed = mission.partFrame("infeed/blank-0-0");
         var stockAxis = new robotkit.spatial.Quat(placed.qx, placed.qy, placed.qz, placed.qw)
           .conjugate().rotate(new robotkit.spatial.Vec3(0, 0, 1));
