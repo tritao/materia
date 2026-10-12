@@ -150,3 +150,5 @@ or implementation code was imported:
 - [ImGuizmo, 105e4fde](https://github.com/CedricGuillemet/ImGuizmo/blob/105e4fde45e4e74aae8973d98750820ef7aca7e2/src/ImGuizmo.cpp)
 
 Translation gizmos accept an optional immutable `GizmoBasis`; the default remains World axes. `GizmoBasis.fromQuaternion` produces rotation-only local axes from the consumer's composed World orientation. Scale and shear do not define movement axes. Drawing, picking, frozen drag constraints and snap coefficients share this basis. Snapping measures World distance along each chosen axis, relative to pointer-down.
+
+`RotationGizmo` and `RotationDrag` provide projected axis rings and signed degrees about a frozen World axis. Picking uses the drawn polyline, hides near-edge-on/near-clipped rings, and rejects unstable ray/plane updates while retaining the last angle. Successive samples unwrap the ±180° boundary; snapping uses movement increments in degrees. Consumers own TRS admission, authored Euler branches and atomic publication. Ring constraints and orientation remain frozen during capture.

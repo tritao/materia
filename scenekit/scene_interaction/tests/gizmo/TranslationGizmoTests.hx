@@ -15,6 +15,30 @@ class TranslationGizmoTests {
     return new GizmoPoint(x,y,depth);
   }
   static function main():Void {
+    var rotationView = camera(), rotationPivot=new GizmoVec3(0,0,0);
+    for(rotationBasis in [GizmoBasis.world(),GizmoBasis.fromQuaternion(0,0,Math.sin(Math.PI/12),Math.cos(Math.PI/12))]) {
+    var rotation=new RotationGizmo(rotationView,rotationPivot,75,rotationBasis);
+    check(rotation.shapes().length==3,"Missing rotation rings");
+    for(shape in rotation.shapes()) {
+      var start:Null<GizmoPoint> = null;
+      for(point in shape.points()) if(rotation.pick(point.x,point.y)==shape.handle) {start=point;break;}
+      if(start==null) throw "No pickable rotation ring";
+      var drag=rotation.begin(shape.handle,start.x,start.y,15);
+      check(drag.update(start.x,start.y)==0,"Rotation grab jumped");
+      var axis=rotation.basis.axis(shape.handle),ray=rotationView.rayDirection(start.x,start.y);
+      var hit=rotationView.eye.add(ray.scaled(axis.dot(rotationPivot.subtract(rotationView.eye))/axis.dot(ray))).subtract(rotationPivot);
+      for(angle in [45.0,170.0,190.0,270.0,350.0,370.0]) {
+        var rad=angle*Math.PI/180;
+        var target=rotationView.project(rotationPivot.add(hit.scaled(Math.cos(rad))).add(axis.cross(hit).scaled(Math.sin(rad))));
+        if(target==null) throw "Missing rotation test projection";
+        var proposed=drag.update(target.x,target.y);check(proposed!=null && close(proposed,Math.fround(angle/15)*15),"Rotation sign, unwrap or snap failed");
+      }
+      var last=drag.lastDegrees;check(drag.update(Math.NaN,0)==null && drag.lastDegrees==last,"Invalid rotation replaced valid angle");
+      drag.finish();rejects(()->drag.update(start.x,start.y));
+    }
+    rejects(()->rotation.begin(AxisX,400,300));
+    var detached=rotation.shapes();detached.pop();check(rotation.shapes().length==3,"Rotation leaked shapes");
+    }
     var view = camera(), pivot = new GizmoVec3(0,0,0), layout = new TranslationGizmo(view,pivot);
     check(layout.shapes().length == 6, "Expected three axes and three plane pads");
     var leaked = layout.shapes(); leaked.pop(); check(layout.shapes().length == 6, "Layout leaked collection");
