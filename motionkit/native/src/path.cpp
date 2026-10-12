@@ -329,6 +329,68 @@ private:
     std::vector<double> caps_;
 };
 
+// TOPP-RA's stages in a span of the path: enough that the profile and the acceleration peaks between its grid points
+// are resolved, never more than `MAX_STAGES_PER_SPAN` (the grid every span used to have, which the 0.8 interpolation
+// margin is calibrated with).
+//
+// Two things need stages. The speed profile: a stage assumes one path acceleration, so it should change the speed by
+// no more than `PROFILE_STEP` of itself, `a ds <= PROFILE_STEP v^2`, with `a` the path acceleration the joints allow
+// and `v` the fastest the span can be taken (a joint's velocity limit, the centripetal bound of its curvature, the
+// span's cap). And the collocation: the acceleration constraint is imposed at the grid points, and between them the
+// joint-space direction turns; a stage turns it by at most `MAX_STAGE_TURN`, which bounds the missed peak well inside
+// the margin (about turn^2 / 8 of it, 4.5 % at 0.6 rad). A straight span of a few micrometres needs two stages, a
+// quarter circle of fifty micrometres' radius four.
+//
+// Measured on a 135 degree arc of 50 micrometres (tests/path.cpp), the acceleration the lowered law reaches over what
+// TOPP-RA planned (0.8 of the limit) is about 2.4 `PROFILE_STEP`: 2.3 % with the old 32 stages a span, 12 % at 0.05
+// (the value here, 0.9 of the limit), 24 % at 0.1 and, at 0.2, the whole of the margin. The planned time of the printing
+// loads is unchanged at 0.05 (the 8 mm gear 2356.9 s, the cube 870.3 s, the gate 1047.2 s) and 0.015 % longer at 0.1.
+constexpr size_t MAX_STAGES_PER_SPAN = 32;
+constexpr size_t MIN_STAGES_PER_SPAN = 2;
+constexpr double PROFILE_STEP = 0.05;
+constexpr double MAX_STAGE_TURN = 0.6;
+
+size_t stages_for_span(const std::vector<mk_path_sample> &samples, size_t span,
+                       const double *velocity, const double *acceleration, uint32_t joints,
+                       double cap, double margin) {
+    const double length = samples[span + 1].s - samples[span].s;
+    double fastest = cap > 0.0 ? cap : std::numeric_limits<double>::infinity();
+    double accelerating = std::numeric_limits<double>::infinity();
+    double turn = 0.0;
+    std::vector<double> before(joints, 0.0), after(joints, 0.0);
+    bool moving = false;
+    for (int point = 0; point <= 4; ++point) {
+        const double s = samples[span].s + length * point / 4.0;
+        double load = 0.0;
+        for (uint32_t j = 0; j < joints; ++j) {
+            const auto q = path_state(samples[span], samples[span + 1], j, s);
+            after[j] = q.first / velocity[j];
+            load = std::max(load, std::abs(after[j]));
+            if (q.first != 0.0) accelerating = std::min(accelerating, acceleration[j] / std::abs(q.first));
+            if (q.second != 0.0)
+                fastest = std::min(fastest, std::sqrt(margin * acceleration[j] / std::abs(q.second)));
+        }
+        if (load > 0.0) {
+            moving = true;
+            fastest = std::min(fastest, 1.0 / load);
+            if (point > 0) {
+                double dot = 0.0, a = 0.0, b = 0.0;
+                for (uint32_t j = 0; j < joints; ++j) {
+                    dot += before[j] * after[j]; a += before[j] * before[j]; b += after[j] * after[j];
+                }
+                if (a > 0.0 && b > 0.0) turn += std::acos(std::clamp(dot / std::sqrt(a * b), -1.0, 1.0));
+            }
+        }
+        before = after;
+    }
+    if (!moving) return MIN_STAGES_PER_SPAN;
+    const double profile = accelerating * length / (PROFILE_STEP * fastest * fastest);
+    const double stages = std::max(profile, turn / MAX_STAGE_TURN);
+    if (!std::isfinite(stages)) return MAX_STAGES_PER_SPAN;
+    return static_cast<size_t>(std::clamp(std::ceil(stages),
+        static_cast<double>(MIN_STAGES_PER_SPAN), static_cast<double>(MAX_STAGES_PER_SPAN)));
+}
+
 bool valid_timing_request(const std::vector<mk_path_sample> &path,
                           const double *velocity, const double *acceleration,
                           uint32_t joints, const double *caps, uint32_t cap_count,
@@ -757,11 +819,23 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         // path. Reserve room for those peaks; final validation still uses the
         // caller's exact acceleration limit.
         const double interpolation_margin = nonlinear ? 0.8 : 1.0;
-        toppra::Vector grid(static_cast<Eigen::Index>(1 + 32 * (samples.size() - 1)));
-        for (size_t span = 0; span + 1 < samples.size(); ++span)
-            for (int step = 0; step < 32; ++step)
-                grid[static_cast<Eigen::Index>(span * 32 + step)] = samples[span].s +
-                    (samples[span + 1].s - samples[span].s) * step / 32.0;
+        // Stages per span, and the grid they make: each span's first point is a path sample (an anchor).
+        std::vector<size_t> span_first(samples.size(), 0);
+        std::vector<uint32_t> stage_span;
+        for (size_t span = 0; span + 1 < samples.size(); ++span) {
+            span_first[span] = stage_span.size();
+            const size_t count = stages_for_span(samples, span, max_velocity, max_acceleration, joint_count,
+                speed_cap_count ? speed_caps[span] : 0.0, interpolation_margin);
+            stage_span.insert(stage_span.end(), count, static_cast<uint32_t>(span));
+        }
+        span_first.back() = stage_span.size();
+        toppra::Vector grid(static_cast<Eigen::Index>(1 + stage_span.size()));
+        for (size_t span = 0; span + 1 < samples.size(); ++span) {
+            const size_t count = span_first[span + 1] - span_first[span];
+            for (size_t step = 0; step < count; ++step)
+                grid[static_cast<Eigen::Index>(span_first[span] + step)] = samples[span].s +
+                    (samples[span + 1].s - samples[span].s) * static_cast<double>(step) / static_cast<double>(count);
+        }
         grid[grid.size() - 1] = samples.back().s;
         const double moving_boundary_margin = (start_speed > 0.0 || end_speed > 0.0)
             ? 0.98 : 1.0;
@@ -803,7 +877,7 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             speeds[i] = std::sqrt(std::max(0.0, data.parametrization[static_cast<Eigen::Index>(i)]));
         speeds.back() = end_speed;
         std::vector<char> anchors(positions.size(), 0);
-        for (size_t i = 0; i < anchors.size(); i += 32) anchors[i] = 1;
+        for (size_t span = 0; span + 1 < samples.size(); ++span) anchors[span_first[span]] = 1;
         anchors.back() = 1;
         if (!stages_from_profile(positions, speeds, anchors, stages)) return MK_ERROR_GENERATION;
         // Bindings name TOPP-RA's own stages, with its own control.
@@ -812,7 +886,7 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             const double ds = positions[i + 1] - positions[i];
             const double path_acceleration =
                 (speeds[i + 1] * speeds[i + 1] - speeds[i] * speeds[i]) / (2.0 * ds);
-            const auto span = i / 32;
+            const auto span = stage_span[i];
             bindings.push_back(binding_for_stage(samples, static_cast<uint32_t>(span),
                 static_cast<uint32_t>(i), 0.5 * (positions[i] + positions[i + 1]),
                 std::max(0.0, speeds[i] * speeds[i] + path_acceleration * ds),

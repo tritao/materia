@@ -1193,7 +1193,34 @@ left in the motion path.
 8. The corner arcs still lower to tens of thousands of sub-millisecond segments (`SmallTab`: 18,900 of 25,580 under
    1 ms after merging): an adaptive TOPP-RA grid by span length and curvature (the fixed 32 per span is calibrated with
    the 0.8 margin; see the RobotKit Paint path that failed when it was coarsened), or arcs that are not made smaller
-   than the machine can follow (item 4).
+   than the machine can follow (item 4). **Done: an adaptive grid; planning
+   time falls by a quarter to a half, planned times are unchanged.** `mk_time_path` (`motionkit/native/src/path.cpp`,
+   `stages_for_span`) gives each span as many TOPP-RA stages as it needs, from 2 to the old 32. Two things need stages:
+   the speed profile (a stage should change the squared speed by no more than `PROFILE_STEP` = 0.05 of itself:
+   `a ds <= step v^2`, `a` the path acceleration the joints allow, `v` the fastest the span can go: a joint's velocity
+   limit, the centripetal bound of its curvature `sqrt(0.8 a / |q''|)`, the span's feed cap) and the collocation (the
+   joint-space direction turns by at most `MAX_STAGE_TURN` = 0.6 rad a stage). A long straight span keeps its 32, a
+   50 micrometre arc span gets 4 to 6. **The regression test for the grid is RobotKit's Paint skill**
+   (`ConstructionSkillTests`, "Paint completes through SkillRunner"; run by `robotkit/tests`, and alone with
+   `ROBOTKIT_ONLY=construction`), the path that a first, cruder adaptive grid (4 to 32 by joint-tangent change) broke
+   with `MK_ERROR_GENERATION`; it passes on this grid, and `motionkit/native/tests/path.cpp` has a new test of the tightest
+   printer corner (135 degrees at 50 micrometres, ten quarter-radian spans: 60 stages instead of 320, the lowered law
+   under 0.92 of the limit). Why the step is 0.05 and not more: the 0.8 margin was calibrated with 32 stages a span, and
+   what a coarser grid reaches between its points grows with the step (measured on that arc, over what TOPP-RA planned:
+   2.3 % with 32 a span, 12 % at 0.05, 24 % at 0.1, the whole margin at 0.2, which would be a timing failure); a
+   uniform coarsening has nothing to say about this, so the step is the bound. Planned time at 0.05: tab 48.134 / 48.484 s
+   (48.13 / 48.48 s before), 0.1 gives +0.015 % and 0.25 +2.8 %. Numbers, before to after (processor seconds of
+   planning, planned seconds; the planned times did not change): gate gear 78.8 to 60.2 s (13.3x to 17.4x real time,
+   worst 10 s window 4.2x to 5.3x), 8 mm gear 276.0 to 209.8 s (2356.9 s), cube 59.5 to 39.5 s (870.3 s plain, 879.5 s
+   shaped), tower 49.9 to 28.3 s (471.5 s), tab 46 s to 20 s of wall time (48.1 s / 48.5 s). Segments
+   after merging (plain / shaped): tab 6,938 / 8,657 to 6,742 / 7,987, of them under 1 ms 1,165 / 2,299 to 821 / 1,530; cube
+   115,385 / 132,620 to 113,410 / 129,331, under 1 ms 13,371 / 24,605 to 10,758 / 21,095. **The "SmallTab: 18,900 of
+   25,580 under 1 ms" figure was stale** (measured before AM9's later merging; the benchmark's tab is 6,938 segments, 1,165
+   of them under 1 ms before and 821 after). The sub-millisecond segments that remain are not the grid's: the path is
+   sampled a quarter radian apart on an arc (`PoseSampling`, 10 spans of 12 micrometres on a 135 degree corner) and every
+   sample is a knot of the law, and the merge leaves a remainder at the end of each 10 ms run. Sampling an exact affine
+   machine's arcs half a radian apart (the capability of item 5) did not reduce them and cost 0.02 s of planned time
+   (a full radian 1.2 %), so it was not kept.
 9. The first plan of a print compiles synchronously inside a tick (13.8 s for `SmallTab` in the app): plan it on the
    planner thread, as a mission's programs are, and start the print when the first plan is ready.
 10. A fast path for machines whose kinematics are exact and affine (the capability of item 5: Cartesian, CoreXY,
@@ -1266,7 +1293,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
-| AM5b | in progress: items 6, 1, 5 and 4 done | see the commits below |
+| AM5b | in progress: items 6, 1, 5, 4 and 8 done | see the commits below |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 

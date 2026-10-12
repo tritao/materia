@@ -566,8 +566,8 @@ class PrintingBenchmark {
       var sliced = Slicer.slice(only == "tab" ? TestParts.smallTab() : TestParts.calibrationCube(), settings, profile, "tab");
       var shaped = new PrinterAxes(0.04, true), plain = new PrinterAxes(0.04, false);
       var a = report0("tab plain", plain, sliced.program), b = report0("tab shaped", shaped, sliced.program);
-      Sys.println('tab: ${Math.round(a.planned * 10) / 10} s plain with ${a.segments} segments (${Math.round(a.segments / a.planned)} a second), ' +
-        '${Math.round(b.planned * 10) / 10} s shaped with ${b.segments} (${Math.round(b.segments / b.planned)} a second); merge refusals ${plain.binding.compiler.mergeRefusals} (${plain.binding.compiler.lastMergeRefusal}) and ${shaped.binding.compiler.mergeRefusals} (${shaped.binding.compiler.lastMergeRefusal})');
+      Sys.println('tab: ${Math.round(a.planned * 1000) / 1000} s plain with ${a.segments} segments (${Math.round(a.segments / a.planned)} a second), ' +
+        '${Math.round(b.planned * 1000) / 1000} s shaped with ${b.segments} (${Math.round(b.segments / b.planned)} a second); merge refusals ${plain.binding.compiler.mergeRefusals} (${plain.binding.compiler.lastMergeRefusal}) and ${shaped.binding.compiler.mergeRefusals} (${shaped.binding.compiler.lastMergeRefusal})');
       return;
     }
     if (only == "shaping") {

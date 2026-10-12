@@ -274,6 +274,58 @@ int main() {
     mk_time_law_destroy(law);
     mk_path_destroy(path);
 
+    // A printer's tightest corner, a 135 degree arc of 50 um radius sampled a quarter radian apart: ten spans of 12 um
+    // that the speed profile and the collocation resolve with a few stages each, where a fixed 32 gave 320 of 0.4 um.
+    // The law passes at once, and keeps its stage count to a quarter of that. A coarser grid reaches more of the limit
+    // between its points (2.3 % over the planned 0.8 of it with 32 stages a span, 12 % here): it stays under 0.92.
+    {
+        const double radius = 5e-5, sweep = 0.75 * 3.14159265358979323846;
+        const int spans = 10;
+        std::vector<mk_path_sample> arc(spans + 1);
+        for (int i = 0; i <= spans; ++i) {
+            auto &q = arc[static_cast<size_t>(i)];
+            q = mk_path_sample{};
+            q.struct_size = sizeof(q);
+            q.joint_count = 2;
+            const double phi = sweep * i / spans;
+            q.s = radius * phi;
+            q.position[0] = radius * std::sin(phi);
+            q.position[1] = radius * (1.0 - std::cos(phi));
+            q.first[0] = std::cos(phi);
+            q.first[1] = std::sin(phi);
+            q.second[0] = q.second_before[0] = -std::sin(phi) / radius;
+            q.second[1] = q.second_before[1] = std::cos(phi) / radius;
+        }
+        assert(mk_path_create(arc.data(), static_cast<uint32_t>(arc.size()), &path) == MK_OK);
+        const double corner_velocity[2] = {0.25, 0.25}, corner_acceleration[2] = {12.5, 12.5};
+        const std::vector<double> feed(arc.size() - 1, 0.06);
+        mk_timing_report corner_report{};
+        mk_trajectory_handle corner_trajectory{};
+        assert(mk_time_path(path, corner_velocity, corner_acceleration, 2, feed.data(),
+            static_cast<uint32_t>(feed.size()), 0.0, 0.0, 1e-9, 1, &corner_report, &law,
+            &corner_trajectory) == MK_OK);
+        assert(corner_report.adjustments == 0);
+        uint32_t stage_count = 0;
+        assert(mk_time_law_binding_count(law, &stage_count) == MK_OK);
+        mk_limits corner_limits{};
+        corner_limits.struct_size = sizeof(corner_limits);
+        corner_limits.joint_count = 2;
+        for (int j = 0; j < 2; ++j) {
+            corner_limits.derivative_claimed[j] = 3u;
+            corner_limits.max_velocity[j] = corner_velocity[j];
+            corner_limits.max_acceleration[j] = corner_acceleration[j];
+        }
+        mk_validation_report corner_validation{};
+        corner_validation.struct_size = sizeof(corner_validation);
+        assert(mk_validate(corner_trajectory, &corner_limits, &corner_validation) == MK_OK);
+        assert(corner_validation.checks[MK_CHECK_ACCELERATION].status == MK_CHECK_PASSED);
+        assert(corner_validation.checks[MK_CHECK_ACCELERATION].value < 0.92 * corner_acceleration[0]);
+        assert(stage_count >= 2 * spans && stage_count <= 8 * spans);
+        mk_trajectory_destroy(corner_trajectory);
+        mk_time_law_destroy(law);
+        mk_path_destroy(path);
+    }
+
     // A slow 1 mm-radius arc sampled every 1.5 um, as a printer's corner arcs
     // are: TOPP-RA's stages on it last ~2 us. Deriving each stage's
     // acceleration from its nanosecond-rounded duration made errors of several
@@ -360,7 +412,7 @@ int main() {
         uint32_t lowered_count = 0, merged_count = 0;
         assert(mk_trajectory_segment_count(step_trajectory, &lowered_count) == MK_OK);
         assert(mk_trajectory_segment_count(step_merged, &merged_count) == MK_OK);
-        assert(merged_count * 10 < lowered_count);
+        assert(merged_count * 5 < lowered_count); // 450 stages to 46 on the adaptive grid (1,600 to under 160 on a fixed 32 a span)
         mk_limits step_limits{};
         step_limits.struct_size = sizeof(step_limits);
         step_limits.joint_count = 2;
