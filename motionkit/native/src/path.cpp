@@ -458,10 +458,23 @@ constexpr double MAX_STAGE_TURN = 0.6;
 // that it cruises, and one stage covers the middle. The stretches get `ZONE_STAGES` stages each, so the stages of a line
 // do not grow with its length, where a stage per few micrometres of a hundred millimetres was a million for a cube.
 constexpr size_t ZONE_STAGES = 10;
+
+// The windows a long path is timed in: about this many grid points each (TOPP-RA's tables are linear in them), a window
+// ending at the share `BOUNDARY_SHARE` of the speed the path could be at there, where its joints give the path
+// `TANGENTIAL_SHARE` of the acceleration they would along a straight line (a curve keeps the rest for itself).
+constexpr size_t WINDOW_NODES = 8192;
+constexpr double BOUNDARY_SHARE = 0.7;
+constexpr double TANGENTIAL_SHARE = 0.4;
 constexpr double ZONE_REACH = 1.5;
 
-// The fractions of the span at which its stages start, the first being zero.
-std::vector<double> nodes_for_span(const std::vector<mk_path_sample> &samples, size_t span,
+// A span's stages, and what bounds its speed: the fastest it can be taken and the path acceleration its joints allow.
+struct SpanGrid {
+    std::vector<double> nodes; // the fractions of the span at which its stages start, the first being zero
+    double fastest = std::numeric_limits<double>::infinity();
+    double accelerating = std::numeric_limits<double>::infinity();
+};
+
+SpanGrid nodes_for_span(const std::vector<mk_path_sample> &samples, size_t span,
                                    const double *velocity, const double *acceleration, uint32_t joints,
                                    double cap, double margin) {
     const double length = samples[span + 1].s - samples[span].s;
@@ -499,10 +512,13 @@ std::vector<double> nodes_for_span(const std::vector<mk_path_sample> &samples, s
         straight = std::abs(q.c[2]) < 1e-12 && std::abs(q.c[3]) < 1e-12 &&
             std::abs(q.c[4]) < 1e-12 && std::abs(q.c[5]) < 1e-12;
     }
-    auto uniform = [](size_t count) {
-        std::vector<double> nodes(count);
-        for (size_t step = 0; step < count; ++step) nodes[step] = static_cast<double>(step) / static_cast<double>(count);
-        return nodes;
+    SpanGrid grid;
+    grid.fastest = fastest;
+    grid.accelerating = accelerating * margin;
+    auto uniform = [&grid](size_t count) {
+        grid.nodes.resize(count);
+        for (size_t step = 0; step < count; ++step) grid.nodes[step] = static_cast<double>(step) / static_cast<double>(count);
+        return grid;
     };
     if (!moving) return uniform(MIN_STAGES_PER_SPAN);
     if (straight && std::isfinite(accelerating) && std::isfinite(fastest) && fastest > 0.0) {
@@ -514,10 +530,9 @@ std::vector<double> nodes_for_span(const std::vector<mk_path_sample> &samples, s
         const double zone = step * static_cast<double>(zone_stages);
         if (length <= 2.0 * zone + step)
             return uniform(std::clamp(static_cast<size_t>(std::ceil(length / step)), MIN_STAGES_PER_SPAN, 2 * zone_stages + 1));
-        std::vector<double> nodes;
-        for (size_t k = 0; k <= zone_stages; ++k) nodes.push_back(step * static_cast<double>(k) / length);
-        for (size_t k = 0; k < zone_stages; ++k) nodes.push_back((length - zone + step * static_cast<double>(k)) / length);
-        return nodes;
+        for (size_t k = 0; k <= zone_stages; ++k) grid.nodes.push_back(step * static_cast<double>(k) / length);
+        for (size_t k = 0; k < zone_stages; ++k) grid.nodes.push_back((length - zone + step * static_cast<double>(k)) / length);
+        return grid;
     }
     const double profile = accelerating * length / (PROFILE_STEP * fastest * fastest);
     const double stages = std::max(profile, turn / MAX_STAGE_TURN);
@@ -958,13 +973,15 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         // Stages per span, and the grid they make: each span's first point is a path sample (an anchor).
         std::vector<size_t> span_first(samples.size(), 0);
         std::vector<uint32_t> stage_span;
-        std::vector<double> grid_values;
+        std::vector<double> grid_values, span_fastest, span_accelerating;
         for (size_t span = 0; span + 1 < samples.size(); ++span) {
             span_first[span] = stage_span.size();
-            const auto nodes = nodes_for_span(samples, span, max_velocity, max_acceleration, joint_count,
+            const auto span_grid = nodes_for_span(samples, span, max_velocity, max_acceleration, joint_count,
                 speed_cap_count ? speed_caps[span] : 0.0, interpolation_margin);
+            span_fastest.push_back(span_grid.fastest);
+            span_accelerating.push_back(span_grid.accelerating);
             const double begin = samples[span].s, length = samples[span + 1].s - begin;
-            for (const double node : nodes) {
+            for (const double node : span_grid.nodes) {
                 stage_span.push_back(static_cast<uint32_t>(span));
                 grid_values.push_back(begin + length * node);
             }
@@ -994,22 +1011,85 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
                 lower_acceleration, upper_acceleration)};
         for (auto &constraint : constraints)
             constraint->discretizationType(toppra::DiscretizationType::Collocation);
-        auto algorithm = std::make_unique<toppra::algorithm::TOPPRA>(constraints, geometric);
-        algorithm->solver(std::make_shared<toppra::solver::Seidel>());
-        algorithm->setGridpoints(grid);
-        algorithm->setInitialXBounds(toppra::Bound{0.0, 1e16});
-        // TOPP-RA's forward pass stores its first parameter as squared path
-        // speed, while the public endpoint contract uses path speed.
-        if (algorithm->computePathParametrization(start_speed * start_speed, end_speed) !=
-            toppra::ReturnCode::OK) return MK_ERROR_GENERATION;
-        const auto &data = algorithm->getParameterizationData();
+        // A long path is timed in windows, each from a speed the one before ends at to a speed the next can still start
+        // from, so the work of TOPP-RA (its constraint tables, its passes) stays bounded and the path never rests
+        // where it was cut. A boundary speed is a share of the speed the path could have there, found by a
+        // forward and a backward pass over the spans' own limits (the fastest a span goes, and the acceleration its
+        // joints give along it, in part: the curvature takes the rest). If a window cannot be timed between its
+        // boundary speeds the share is lowered, down to zero, which is the rest this replaces.
+        std::vector<size_t> window_first{0};
+        const size_t span_count = samples.size() - 1;
+        for (size_t span = 1; span < span_count; ++span)
+            if (span_first[span] - span_first[window_first.back()] >= WINDOW_NODES &&
+                span_first[span_count] - span_first[span] >= WINDOW_NODES / 4) window_first.push_back(span);
+        std::vector<double> speeds(grid_values.size(), 0.0);
+        std::vector<double> boundary(window_first.size() + 1, 0.0);
+        boundary.front() = start_speed;
+        boundary.back() = end_speed;
+        bool timed = false;
+        for (const double share : {BOUNDARY_SHARE, BOUNDARY_SHARE / 2, BOUNDARY_SHARE / 4, 0.0}) {
+            if (window_first.size() > 1) {
+                std::vector<double> limit_sq(span_count + 1), forward(span_count + 1), backward(span_count + 1);
+                for (size_t at = 0; at <= span_count; ++at) {
+                    const double before = at > 0 ? span_fastest[at - 1] : std::numeric_limits<double>::infinity();
+                    const double after = at < span_count ? span_fastest[at] : std::numeric_limits<double>::infinity();
+                    const double limit = std::min(before, after);
+                    limit_sq[at] = std::isfinite(limit) ? limit * limit : std::numeric_limits<double>::infinity();
+                }
+                forward[0] = start_speed * start_speed;
+                for (size_t at = 0; at < span_count; ++at) {
+                    const double room = 2.0 * TANGENTIAL_SHARE * span_accelerating[at] * (samples[at + 1].s - samples[at].s);
+                    forward[at + 1] = std::min(limit_sq[at + 1], forward[at] + (std::isfinite(room) ? room : 0.0));
+                }
+                backward[span_count] = end_speed * end_speed;
+                for (size_t at = span_count; at-- > 0;) {
+                    const double room = 2.0 * TANGENTIAL_SHARE * span_accelerating[at] * (samples[at + 1].s - samples[at].s);
+                    backward[at] = std::min(limit_sq[at], backward[at + 1] + (std::isfinite(room) ? room : 0.0));
+                }
+                for (size_t window = 1; window < window_first.size(); ++window) {
+                    const size_t at = window_first[window];
+                    const double reach = std::min(forward[at], backward[at]);
+                    boundary[window] = share * std::sqrt(std::max(0.0, std::isfinite(reach) ? reach : 0.0));
+                }
+            }
+            timed = true;
+            for (size_t window = 0; window < window_first.size() && timed; ++window) {
+                const size_t first_node = span_first[window_first[window]];
+                const size_t last_node = window + 1 < window_first.size() ? span_first[window_first[window + 1]]
+                    : grid_values.size() - 1;
+                toppra::Vector window_grid = Eigen::Map<const toppra::Vector>(grid_values.data() + first_node,
+                    static_cast<Eigen::Index>(last_node - first_node + 1));
+                // The window's own part of the path: TOPP-RA wants the grid to span the path it is given.
+                const size_t first_span = window_first[window];
+                const size_t after_span = window + 1 < window_first.size() ? window_first[window + 1] : span_count;
+                std::shared_ptr<toppra::GeometricPath> window_path = geometric;
+                if (window_first.size() > 1) {
+                    toppra::Matrices window_coefficients(coefficients.begin() + static_cast<std::ptrdiff_t>(first_span),
+                        coefficients.begin() + static_cast<std::ptrdiff_t>(after_span));
+                    std::vector<double> window_knots(knots.begin() + static_cast<std::ptrdiff_t>(first_span),
+                        knots.begin() + static_cast<std::ptrdiff_t>(after_span) + 1);
+                    window_path = std::make_shared<toppra::PiecewisePolyPath>(window_coefficients, window_knots);
+                }
+                auto algorithm = std::make_unique<toppra::algorithm::TOPPRA>(constraints, window_path);
+                algorithm->solver(std::make_shared<toppra::solver::Seidel>());
+                algorithm->setGridpoints(window_grid);
+                algorithm->setInitialXBounds(toppra::Bound{0.0, 1e16});
+                // TOPP-RA's forward pass stores its first parameter as squared path
+                // speed, while the public endpoint contract uses path speed.
+                const auto window_rc = algorithm->computePathParametrization(boundary[window] * boundary[window],
+                        boundary[window + 1]);
+                if (window_rc != toppra::ReturnCode::OK) { timed = false; break; }
+                const auto &data = algorithm->getParameterizationData();
+                for (size_t node = first_node; node <= last_node; ++node)
+                    speeds[node] = std::sqrt(std::max(0.0, data.parametrization[static_cast<Eigen::Index>(node - first_node)]));
+                speeds[first_node] = boundary[window];
+                speeds[last_node] = boundary[window + 1];
+            }
+            if (timed || window_first.size() == 1) break;
+        }
+        if (!timed) return MK_ERROR_GENERATION;
         std::vector<mk_time_stage> stages;
         std::vector<double> positions(grid.data(), grid.data() + grid.size());
-        std::vector<double> speeds(positions.size());
-        speeds.front() = start_speed;
-        for (size_t i = 1; i < speeds.size(); ++i)
-            speeds[i] = std::sqrt(std::max(0.0, data.parametrization[static_cast<Eigen::Index>(i)]));
-        speeds.back() = end_speed;
         std::vector<char> anchors(positions.size(), 0);
         for (size_t span = 0; span + 1 < samples.size(); ++span) anchors[span_first[span]] = 1;
         anchors.back() = 1;

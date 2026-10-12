@@ -266,7 +266,7 @@ class PlannerTests extends MotionKitTestSupport {
 
     var feed = 0.05;
     function waypoint(x:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x, 0.0, 0.0), 1e-6, 1e-3);
-    var lines:Array<motionkit.path.PosePrimitive> = [for (i in 0...(2 * ProgramCompiler.MAX_SECTION_PRIMITIVES + 10))
+    var lines:Array<motionkit.path.PosePrimitive> = [for (i in 0...8010)
       new PoseLine(waypoint(i * 0.001), waypoint((i + 1) * 0.001), OrientationPolicy.Fixed, 0.1, feed)];
     var pose = new PosePath("work", lines);
     check(pose.indexAt(0.0) == 0 && pose.indexAt(0.001) == 0 && pose.indexAfter(0.001) == 1 && pose.indexAt(0.0015) == 1,
@@ -276,9 +276,13 @@ class PlannerTests extends MotionKitTestSupport {
     near(pose.startOf(2500), 2.5, "primitives start where the ones before them end", 1e-9);
     near(pose.waypointAt(2.5004).pose.x, 2.5004, "a pose along a long path", 1e-9);
     var sections = ProgramCompiler.timingSections(pose);
-    check(sections.length == 3 && sections[0].path.primitives.length == ProgramCompiler.MAX_SECTION_PRIMITIVES &&
-      sections[2].path.primitives.length == 10, 'a straight path of ${lines.length} primitives is cut into sections of at most ${ProgramCompiler.MAX_SECTION_PRIMITIVES}');
-    near(sections[1].offset, ProgramCompiler.MAX_SECTION_PRIMITIVES * 0.001, "each section knows where it starts", 1e-9);
+    check(sections.length == 1 && sections[0].path.primitives.length == lines.length && sections[0].offset == 0.0,
+      'a straight path of ${lines.length} primitives is one section: a path rests where it turns, not where it is long');
+    var turning:Array<motionkit.path.PosePrimitive> = lines.slice(0, 5000);
+    turning.push(new PoseLine(waypoint(5.0), new PoseWaypoint(new Pose3(5.0, 0.001, 0.0), 1e-6, 1e-3), OrientationPolicy.Fixed, 0.1, feed));
+    var corner = ProgramCompiler.timingSections(new PosePath("work", turning));
+    check(corner.length == 2 && corner[0].path.primitives.length == 5000, "a turn still ends a section");
+    near(corner[1].offset, 5.0, "each section knows where it starts", 1e-9);
   }
 
   /**

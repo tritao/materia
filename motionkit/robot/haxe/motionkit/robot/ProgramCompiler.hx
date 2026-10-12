@@ -602,7 +602,7 @@ class ProgramCompiler {
           }
           plannedOffset+=part.path.length();
         }
-        if(distances.length>10001)throw 'Motion program op ${c.currentIndex} exceeds Cartesian sample budget';
+        if(distances.length>MAX_SECTION_SAMPLES+1)throw 'Motion program op ${c.currentIndex} exceeds Cartesian sample budget';
         var destination=structured.retreatTarget();
         c.sectionCurves=structured.planSections([for(part in c.sections)part.path],new PathRequest(
           distances,poses,c.q,ikTolerance,perJointMaxJump,maxVelocity,48,freedoms),
@@ -634,7 +634,7 @@ class ProgramCompiler {
       if (c.sectionCurves == null && jointPathPlanner != null && (k == 0 && jointPathPlanner.allowsFreeStart() || retreat != null)) {
         var freeStart = k == 0 && jointPathPlanner.allowsFreeStart();
         var samples = pathSamples(section.path);
-        if (samples.length > 10001) throw 'Motion program op ${c.currentIndex} exceeds Cartesian sample budget';
+        if (samples.length > MAX_SECTION_SAMPLES + 1) throw 'Motion program op ${c.currentIndex} exceeds Cartesian sample budget';
         curve = jointPathPlanner.plan(section.path,new PathRequest(
           [for (sample in samples) sample.distance],
           [for (sample in samples) sample.primitive.waypointAt(sample.local).pose],
@@ -1059,7 +1059,8 @@ class ProgramCompiler {
     var samples = pathSamples(path);
     var exactMap = solver.affineMap();
     var count = samples.length - 1;
-    if (count > 10000) throw 'Motion program op $index exceeds Cartesian sample budget';
+    if (count > (exactMap == null ? MAX_SECTION_SAMPLES : MAX_AFFINE_SECTION_SAMPLES))
+      throw 'Motion program op $index exceeds Cartesian sample budget';
     var distances = [for (sample in samples) sample.distance];
     var positions:Array<Array<Float>> = [];
     var caps:Array<Float> = [];
@@ -1321,8 +1322,13 @@ class ProgramCompiler {
     `path` split at its sharp corners, where one primitive's end tangent is
     not the next one's start tangent, with each section's distance along it.
   **/
-  /** Most primitives one timed section holds; a longer smooth path is cut (and rests) at the next primitive boundary. */
-  public static inline final MAX_SECTION_PRIMITIVES = 4000;
+  /**
+    Most samples one timed section holds. An arm's samples each cost an inverse-kinematics search, so its budget is
+    small; on a machine whose joints are an exact affine map a straight piece is one sample, and what a section costs is
+    native memory (a sample is 2 KB).
+  **/
+  public static inline final MAX_SECTION_SAMPLES = 10000;
+  public static inline final MAX_AFFINE_SECTION_SAMPLES = 100000;
 
   /** Split authored task-velocity discontinuities into independently timed stops. */
   public static function timingSections(path:PosePath):Array<{path:PosePath, offset:Float}> {
@@ -1339,8 +1345,8 @@ class ProgramCompiler {
         for (axis in 0...3) turn = Math.max(turn, Math.max(
           Math.abs(arriving.linear[axis] - leaving.linear[axis]),
           Math.abs(beforeAngular[axis] - leavingAngular[axis])));
-        // A smooth path longer than a section may be rests there too: the plan stays bounded in samples and memory.
-        if (turn > 1e-6 || k - start >= MAX_SECTION_PRIMITIVES) {
+        // A path rests only where it turns: a long smooth one is timed in windows that carry their boundary speeds.
+        if (turn > 1e-6) {
           sections.push({path: path.sub(start, k), offset: sectionOffset});
           start = k;
           sectionOffset = offset;

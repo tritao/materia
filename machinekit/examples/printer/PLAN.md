@@ -1152,7 +1152,24 @@ left in the motion path.
    radius at the speed the radius allows, so the error (2 v (1 ns) / stage^2) falls as 1 / sqrt(r), and 4x the
    radius still leaves 2.4x the limit; the error also hit any micrometre spans, not only arcs.
 3. Replace the `MAX_SECTION_PRIMITIVES` forced rests with timing windows that carry boundary speeds (AM-D4's original
-   design).
+   design). **Done.** A path rests only where it turns now:
+   `ProgramCompiler.timingSections` no longer cuts a smooth path every 4,000 primitives, and the sample budget is a count
+   of samples, 10,000 for an arm (each costs an inverse-kinematics search) and 100,000 on an exact affine machine, where a
+   straight primitive is one sample and the cost is native memory (2 KB a sample). The windows are inside `mk_time_path`:
+   a path of more than about 8,192 grid points is timed in windows of that size, each from the speed the previous one ends
+   at to the next one's start, TOPP-RA given each window's own part of the path (it wants its grid to span the path it
+   holds). A boundary speed is `BOUNDARY_SHARE` (0.7) of the speed the path could have there, from a forward and a backward
+   pass over the spans' own limits (the fastest a span can go, and 0.4 of the acceleration its joints give along it, a curve
+   keeping the rest); if a window cannot be timed between its boundary speeds the share is halved, then quartered, then
+   zero, which is the rest this replaces. Everything after the profile (the stages, the lowering, the validation and its
+   retries) is of the whole path as before. AM-D4's wording was "the next window could still stop"; the forward and backward
+   passes give that and the look-ahead of the next window's slow spots. The shares cost a little where the path could have
+   gone faster: a synthetic six-joint path of 20,000 spans (5 windows) takes 21.555 s against 21.470 s as one window
+   (0.4 %), where a rest at each boundary costs more. Nothing in the printing loads reaches the old cut (their longest
+   smooth sections are under 4,000 primitives; the 8 mm gear has sections of eleven windows), so their planned times are
+   unchanged (gate 1047.6 s, 8 mm gear 2358.7 s, cube 870.1 s, tower 471.5 s). Tests: `PlannerTests` (a straight path of
+   8,010 primitives is one section; a turn still ends one) and the native path test (the six-joint path in one go takes
+   less than in two halves from and to rest, and is under way where the halves would stop).
 4. Derive `CornerBlender.MIN_RADIUS` from the machine (an arc whose v^2 / r exceeds the acceleration cannot be followed)
    or from the binding, instead of a global 50 micrometre constant, and stop the slicer emitting micro-segments. **Done; the numbers do not move.**
    `MIN_RADIUS` is gone. A machine holds an arc of radius r at no more than sqrt(a r) (centripetal acceleration v^2 / r
@@ -1360,7 +1377,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM10 | done | see the commit below |
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
-| AM5b | in progress: items 6, 1, 5, 4, 8, 11 and 10 done | see the commits below |
+| AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10 and 3 done | see the commits below |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 

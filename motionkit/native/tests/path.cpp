@@ -367,6 +367,70 @@ int main() {
         assert(stage_count[0] <= 40 && stage_count[0] * 10 < stage_count[1]);
     }
 
+    // A long smooth path is timed in windows that carry their boundary speeds: six joints over twenty thousand spans
+    // (forty thousand grid points, five windows) are timed in one go, never come to rest where a window ends, and take
+    // less than the same path in two halves, each from and to rest.
+    {
+        const int spans = 20000;
+        const double step = 0.002;
+        const double amp[6] = {0.8, 0.6, 0.5, 0.9, 0.4, 0.7}, freq[6] = {3.1, 2.3, 4.7, 1.9, 5.3, 2.9},
+            phase[6] = {0.1, 0.7, 1.3, 2.1, 0.4, 1.7};
+        const double velocity[6] = {1.5, 1.5, 1.5, 2.0, 2.0, 2.5}, acceleration[6] = {8, 8, 8, 12, 12, 16};
+        auto sample_path = [&](int first, int count) {
+            std::vector<mk_path_sample> samples(static_cast<size_t>(count) + 1);
+            for (int i = 0; i <= count; ++i) {
+                auto &q = samples[static_cast<size_t>(i)];
+                q = mk_path_sample{};
+                q.struct_size = sizeof(q);
+                q.joint_count = 6;
+                q.s = step * i;
+                const double at = step * (first + i);
+                for (int j = 0; j < 6; ++j) {
+                    const double w = freq[j] * 0.37;
+                    q.position[j] = amp[j] * std::sin(w * at + phase[j]);
+                    q.first[j] = amp[j] * w * std::cos(w * at + phase[j]);
+                    q.second[j] = q.second_before[j] = -amp[j] * w * w * std::sin(w * at + phase[j]);
+                }
+            }
+            return samples;
+        };
+        auto duration_of = [&](int first, int count, mk_trajectory_handle &out) {
+            const auto samples = sample_path(first, count);
+            mk_path_handle long_path{};
+            assert(mk_path_create(samples.data(), static_cast<uint32_t>(samples.size()), &long_path) == MK_OK);
+            mk_time_law_handle long_law{};
+            assert(mk_time_path(long_path, velocity, acceleration, 6, nullptr, 0, 0.0, 0.0, 1e-6, 0, nullptr,
+                &long_law, &out) == MK_OK);
+            int64_t nanoseconds = 0;
+            assert(mk_trajectory_duration_ns(out, &nanoseconds) == MK_OK);
+            mk_time_law_destroy(long_law);
+            mk_path_destroy(long_path);
+            return static_cast<double>(nanoseconds) * 1e-9;
+        };
+        mk_trajectory_handle whole{}, first_half{}, second_half{};
+        const double together = duration_of(0, spans, whole);
+        const double apart = duration_of(0, spans / 2, first_half) + duration_of(spans / 2, spans / 2, second_half);
+        assert(together < apart);
+        // Under way where the halves rest: the joints' speed at the middle of the path.
+        mk_trajectory_state middle{};
+        middle.struct_size = sizeof(middle);
+        mk_trajectory_state at_rest{};
+        at_rest.struct_size = sizeof(at_rest);
+        int64_t whole_ns = 0;
+        assert(mk_trajectory_duration_ns(whole, &whole_ns) == MK_OK);
+        double fastest = 0.0;
+        for (int64_t ns = whole_ns / 2 - 50'000'000; ns <= whole_ns / 2 + 50'000'000; ns += 1'000'000) {
+            assert(mk_trajectory_evaluate(whole, ns, &middle) == MK_OK);
+            double speed = 0.0;
+            for (int j = 0; j < 6; ++j) speed += middle.velocity[j] * middle.velocity[j];
+            fastest = std::max(fastest, speed);
+        }
+        assert(fastest > 0.01);
+        mk_trajectory_destroy(whole);
+        mk_trajectory_destroy(first_half);
+        mk_trajectory_destroy(second_half);
+    }
+
     // A slow 1 mm-radius arc sampled every 1.5 um, as a printer's corner arcs
     // are: TOPP-RA's stages on it last ~2 us. Deriving each stage's
     // acceleration from its nanosecond-rounded duration made errors of several
