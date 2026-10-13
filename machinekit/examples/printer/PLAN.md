@@ -1544,6 +1544,17 @@ findings with their evidence). Fixed, one commit each:
   its own height left a gap or an overlap between its last perimeter and its infill. Every job uses equal heights today,
   so no number moves. The inset is per layer now. Test: `AdditiveSlicerTests.tab` (a 0.3 mm first layer's infill reaches its
   own core; CamKit 12,442 -> 12,443 assertions).
+- **A homed axis rests at its authored home again (concern 6).** AM5b item 1 moved `HomingAxis.home` one homing precision
+  inside the travel, which made two homes: `HomingCycle` returned to the moved one while `MotionSystem.home()`,
+  `AxisKinematics` and `MotionAxisCouplings` kept `MotionAxis.homePosition`. Its stated root cause was not the cause: a
+  device floors a step target, so a rest on a lower limit lands up to a step below it whatever the switch's repeatability
+  (the precision the clamp used, with a 1e-6 fallback where it is zero). The shared validator's start rule, which item 1
+  put in one place, is what admits that step, and the toolpath motion tests passed without the clamp before. Reverted
+  here; making the rule's tolerance the drive's resolution is RF8. The question asked, whether home should be the switch
+  position with the travel limit beyond it, is answered by the model already in place: `DriveSystem.resolveSwitch` puts
+  the trip strictly between the soft limit and the end stop, with repeatability margins (Klipper's `position_endstop`
+  outside `position_min` is the same), so normal motion never trips a switch; a home is a commanded point inside the
+  travel. Test: `HomingTests`.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

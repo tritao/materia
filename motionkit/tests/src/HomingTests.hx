@@ -28,10 +28,8 @@ class HomingTests {
     // Fast switch release must not create a long precision-speed return.
     var contact = new JointSwitch("home", "z", "frame", "home", -1, -0.001, 0.0002, 0.00002, 1);
     var axis = new HomingAxis("z", 0, [contact], 1.0, 2.0, 0.0, 0.5, 0.01, 0.0, 0.02);
-    check(axis.positionTolerance == 0.00002 && axis.home == 0.0 + axis.positionTolerance,
-      "A home on the travel limit rests one homing precision inside it, where homing can put the axis");
-    var upperHome = new HomingAxis("z", 0, [contact], 1.0, 2.0, 0.0, 0.5, 0.01, 0.5, 0.02);
-    check(upperHome.home == 0.5 - 0.00002, "A home on the upper limit rests inside it too");
+    check(axis.positionTolerance == 0.00002 && axis.home == 0.0,
+      "A homed axis rests at its authored home, the one coordinate the motion system knows as its home");
     check(axis.dynamics.stoppingDistance(axis.seekSpeed) <= 0.009 + 1e-12,
       "Search speed accounts for latency, acceleration and jerk before the end stop");
     check(axis.capturedApproachSpeed > axis.latchSpeed,
