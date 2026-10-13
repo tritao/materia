@@ -585,4 +585,83 @@ int main() {
         mk_trajectory_destroy(shaped);
         mk_trajectory_destroy(original);
     }
+
+    // Pressure advance on a rest-to-rest plan: an extruder (joint 0) whose rate rises smoothly to 10 rad/s over 50 ms (five
+    // segments; a smoothstep, so the plan is continuous in acceleration as a lowered one is), holds for 400 ms in one long
+    // segment and falls the same way, as the straight-line grid lowers a bead. The advanced joint starts and ends exactly
+    // in the plan's own state (the plan before or after meets it there), is continuous in position, velocity and
+    // acceleration, and away from the ends it is the plan plus `lead` seconds of the window's mean velocity everywhere,
+    // inside the long segment too, where the window reaches the rise and the fall.
+    {
+        const double lead = 0.04, window = 0.04, rate = 10.0, ramp = 0.05, cruise = 0.4;
+        const double T = 2 * ramp + cruise, total = rate * ramp + rate * cruise;
+        mk_trajectory_handle plan{}, advanced{};
+        assert(mk_trajectory_create(2, &plan) == MK_OK);
+        // Position and its first four derivatives at `t` (held at rest beyond the ends).
+        auto exact = [&](double t, int order) -> double {
+            if (t <= 0.0) return 0.0;
+            if (t >= T) return order == 0 ? total : 0.0;
+            if (t >= ramp && t <= ramp + cruise)
+                return order == 0 ? rate * ramp / 2.0 + rate * (t - ramp) : order == 1 ? rate : 0.0;
+            const bool rising = t < ramp;
+            const double x = (rising ? t : T - t) / ramp, sign = rising ? 1.0 : -1.0;
+            switch (order) {
+                case 0: return rising ? rate * ramp * (x * x * x - x * x * x * x / 2.0) : total - rate * ramp * (x * x * x - x * x * x * x / 2.0);
+                case 1: return rate * (3.0 * x * x - 2.0 * x * x * x);
+                case 2: return sign * rate * 6.0 * x * (1.0 - x) / ramp;
+                case 3: return rate * 6.0 * (1.0 - 2.0 * x) / (ramp * ramp);
+                default: return -sign * 12.0 * rate / (ramp * ramp * ramp);
+            }
+        };
+        auto add = [&](double t0, double t1) {
+            mk_segment piece{};
+            piece.struct_size = sizeof(piece);
+            piece.t0_ns = static_cast<int64_t>(std::llround(t0 * 1e9));
+            piece.duration_ns = static_cast<int64_t>(std::llround(t1 * 1e9)) - piece.t0_ns;
+            piece.degree = 4;
+            piece.joint_count = 2;
+            // The plan's Taylor coefficients at the piece's start, its derivatives taken from inside the piece (the rise
+            // and the fall meet the cruise at piece boundaries).
+            const double factorial[5] = {1, 1, 2, 6, 24};
+            for (int k = 0; k <= 4; ++k) piece.coefficients[0].value[k] = exact(t0 + 1e-12, k) / factorial[k];
+            piece.coefficients[0].value[0] = exact(t0, 0);
+            piece.coefficients[1].value[0] = 0.25;  // a joint that holds still keeps its value
+            assert(mk_trajectory_append_segment(plan, &piece) == MK_OK);
+        };
+        for (int i = 0; i < 5; ++i) add(ramp * i / 5, ramp * (i + 1) / 5);
+        add(ramp, ramp + cruise);
+        for (int i = 0; i < 5; ++i) add(ramp + cruise + ramp * i / 5, ramp + cruise + ramp * (i + 1) / 5);
+        assert(mk_advance_joint(plan, 0, lead, window, &advanced) == MK_OK);
+        auto state = [&](mk_trajectory_handle h, double t) {
+            mk_trajectory_state out{};
+            out.struct_size = sizeof(out);
+            assert(mk_trajectory_evaluate(h, static_cast<int64_t>(std::llround(t * 1e9)), &out) == MK_OK);
+            return out;
+        };
+        // The plan itself is the profile above.
+        for (double t = 0.0; t <= T; t += 0.001) assert(std::abs(state(plan, t).position[0] - exact(t, 0)) < 1e-9);
+        for (double t : {0.0, T}) {
+            const auto a = state(plan, t), b = state(advanced, t);
+            assert(std::abs(a.position[0] - b.position[0]) < 1e-12);
+            assert(std::abs(a.velocity[0] - b.velocity[0]) < 1e-9);
+            assert(std::abs(a.acceleration[0] - b.acceleration[0]) < 1e-6);
+            assert(b.position[1] == 0.25 && a.position[1] == 0.25);
+        }
+        // Continuous everywhere: a nanosecond either side of every millisecond.
+        for (double t = 0.001; t < T; t += 0.001) {
+            const auto before = state(advanced, t - 1e-9), after = state(advanced, t + 1e-9);
+            assert(std::abs(before.position[0] - after.position[0]) < 1e-7);
+            assert(std::abs(before.velocity[0] - after.velocity[0]) < 1e-5);
+            assert(std::abs(before.acceleration[0] - after.acceleration[0]) < 1e-2);
+        }
+        // Away from the ends the lead is the whole of it: the plan plus lead times the window's mean velocity.
+        double worst = 0.0;
+        for (double t = window; t <= T - window + 1e-12; t += 0.0005) {
+            const double mean = (exact(t + window / 2, 0) - exact(t - window / 2, 0)) / window;
+            worst = std::max(worst, std::abs(state(advanced, t).position[0] - (exact(t, 0) + lead * mean)));
+        }
+        assert(worst < 1e-9);
+        mk_trajectory_destroy(advanced);
+        mk_trajectory_destroy(plan);
+    }
 }

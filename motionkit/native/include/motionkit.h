@@ -617,11 +617,17 @@ MK_API mk_result MK_CALL mk_shape_trajectory(mk_trajectory_handle trajectory, co
 
 /**
  * A copy of `trajectory` in which `joint` runs `lead_seconds` ahead of itself, the lead taken on its velocity averaged
- * over `window_seconds`: position + lead * (position(t + w/2) - position(t - w/2)) / w. It is the pressure-advance
- * correction of an extruder: the filament is pushed ahead of the flow it will feed, and the window keeps a trajectory
- * whose acceleration steps from asking for more than the drive has. The joint is held at rest beyond the ends of the
- * trajectory. Each segment of the joint becomes a cubic through the corrected position and velocity at its ends, so the
- * result is continuous in both. The caller follows with `mk_project_couplings` for the joints that follow `joint`.
+ * over `window_seconds`: position + lead * (position(t + w/2) - position(t - w/2)) / w * taper(t). It is the
+ * pressure-advance correction of an extruder: the filament is pushed ahead of the flow it will feed, and the window keeps
+ * a trajectory whose acceleration steps from asking for more than the drive has. A trajectory is a plan that starts and
+ * ends at rest, so the average never reaches past its ends (the joint is held at rest beyond them) and the lead tapers
+ * to nothing over the window next to each end (`taper` is the product of a rise from the start and a fall to the end,
+ * each 10x^3 - 15x^4 + 6x^5 of the distance from its end in windows and 1 beyond one window): the corrected joint starts and ends exactly at the plan's own position, velocity and
+ * acceleration, where the plan before and the one after meet it. The result is cut at every segment boundary, each
+ * boundary half a window either side and the taper's ends (where the correction changes form), and each piece of the
+ * joint is the quintic through the corrected position, velocity and acceleration at its ends: exact away from the
+ * tapers, continuous in all three everywhere. The other joints keep their motion. The caller follows with
+ * `mk_project_couplings` for the joints that follow `joint`.
  */
 MK_API mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joint, double lead_seconds,
     double window_seconds, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);

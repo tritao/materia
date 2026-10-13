@@ -10,11 +10,17 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	const MK_TIMING_BINDING_JOINT_VELOCITY = 1;
 	/**
 	 * A copy of `trajectory` in which `joint` runs `lead_seconds` ahead of itself, the lead taken on its velocity averaged
-	 * over `window_seconds`: position + lead * (position(t + w/2) - position(t - w/2)) / w. It is the pressure-advance
-	 * correction of an extruder: the filament is pushed ahead of the flow it will feed, and the window keeps a trajectory
-	 * whose acceleration steps from asking for more than the drive has. The joint is held at rest beyond the ends of the
-	 * trajectory. Each segment of the joint becomes a cubic through the corrected position and velocity at its ends, so the
-	 * result is continuous in both. The caller follows with `mk_project_couplings` for the joints that follow `joint`.
+	 * over `window_seconds`: position + lead * (position(t + w/2) - position(t - w/2)) / w * taper(t). It is the
+	 * pressure-advance correction of an extruder: the filament is pushed ahead of the flow it will feed, and the window keeps
+	 * a trajectory whose acceleration steps from asking for more than the drive has. A trajectory is a plan that starts and
+	 * ends at rest, so the average never reaches past its ends (the joint is held at rest beyond them) and the lead tapers
+	 * to nothing over the window next to each end (`taper` is the product of a rise from the start and a fall to the end,
+	 * each 10x^3 - 15x^4 + 6x^5 of the distance from its end in windows and 1 beyond one window): the corrected joint starts and ends exactly at the plan's own position, velocity and
+	 * acceleration, where the plan before and the one after meet it. The result is cut at every segment boundary, each
+	 * boundary half a window either side and the taper's ends (where the correction changes form), and each piece of the
+	 * joint is the quintic through the corrected position, velocity and acceleration at its ends: exact away from the
+	 * tapers, continuous in all three everywhere. The other joints keep their motion. The caller follows with
+	 * `mk_project_couplings` for the joints that follow `joint`.
 	 */
 	extern fn mk_advance_joint(trajectory: mk_trajectory_handle, joint: u32, lead_seconds: f64, window_seconds: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	extern fn mk_analytic_cartesian_forward(model: ptr<const<mk_analytic_cartesian_model>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_analytic_pose> @out) -> mk_result;

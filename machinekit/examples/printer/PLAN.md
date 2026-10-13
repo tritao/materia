@@ -1450,6 +1450,19 @@ findings with their evidence). Fixed, one commit each:
   in `motionkit.hxi` that its declaration in `motionkit.h` did not state, so regenerating the binding
   (`motionkit/native/tools/check-hxi.sh`) dropped them and broke `Trajectory.mergeSegments`. The declaration states them
   now and the binding is the generator's output (which also exports `MK_MAX_SHAPER_IMPULSES`).
+- **Pressure advance could not run in a plan.** `mk_advance_joint` (AM8) took the window's mean velocity across a plan's
+  ends, so the advanced extruder started away from the plan's own start, at a speed (the runtime refuses such a plan: `RK_ERROR_INVALID_STATE`,
+  which H2 below uncovered), and ended away from its end. A plan starts and ends at rest, so the
+  lead now tapers to nothing over the window next to each end (the product of a rise and a fall, each `10x^3 - 15x^4 +
+  6x^5`), and the advanced joint starts and ends exactly in the plan's state. And each segment was one cubic (now quintic)
+  through the advance at its two ends, while the advance changes form wherever the window crosses a neighbouring
+  segment's boundary: on the straight-line grid a cruise is one long segment, whose single polynomial bent the extruder
+  across the whole cruise to meet the slowing at its end (half the short cube's filament went into beads over 1.1 mm wide,
+  and 206 of 1,498 mm^3 into material already there). The result is now cut at every boundary, each boundary half a window
+  either side, and the tapers, so each piece is exact away from the tapers and continuous in position, velocity and
+  acceleration. Test: `motionkit/native/tests/path.cpp` (a smooth rate rise, a 400 ms cruise in one segment and a fall:
+  ends exact, continuous everywhere, the plan plus lead times the mean velocity to 1e-9 inside the long segment). The
+  gate's extruder check with pressure advance now takes the program's filament exactly (0 %, was -0.039 %).
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

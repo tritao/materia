@@ -1265,55 +1265,138 @@ mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joi
     if (status != MK_OK) return status;
     const int64_t half_ns = std::max<int64_t>(1, static_cast<int64_t>(std::llround(window_seconds * 0.5e9)));
     const double window = static_cast<double>(2 * half_ns) * 1e-9;
-    // The joint's position and velocity at `t`, the trajectory held at rest beyond either end.
-    auto state_at = [&](int64_t t, double &position, double &velocity) -> mk_result {
+    // The joint's position, velocity and acceleration at `t`, the trajectory held at rest beyond either end.
+    auto state_at = [&](int64_t t, double &position, double &velocity, double &acceleration) -> mk_result {
         mk_trajectory_state state{};
         state.struct_size = sizeof(state);
         const int64_t clamped = std::clamp<int64_t>(t, 0, duration_ns);
         const auto result = mk_trajectory_evaluate(trajectory, clamped, &state);
         if (result != MK_OK) return result;
+        const bool outside = t < 0 || t > duration_ns;
         position = state.position[joint];
-        velocity = (t < 0 || t > duration_ns) ? 0.0 : state.velocity[joint];
+        velocity = outside ? 0.0 : state.velocity[joint];
+        acceleration = outside ? 0.0 : state.acceleration[joint];
         return MK_OK;
     };
-    // The corrected position and velocity at `t`.
-    auto corrected = [&](int64_t t, double &position, double &velocity) -> mk_result {
-        double p = 0, v = 0, pa = 0, va = 0, pb = 0, vb = 0;
-        auto result = state_at(t, p, v);
-        if (result == MK_OK) result = state_at(t + half_ns, pa, va);
-        if (result == MK_OK) result = state_at(t - half_ns, pb, vb);
+    // The taper and its first two derivatives at `t`: the product of a rise from the start and a fall to the end, each
+    // zero with both derivatives at its end and one from a window in, so a plan shorter than two windows is smooth too.
+    auto smoother = [&](double x, double &value, double &first, double &second) {
+        if (x >= 1.0) { value = 1.0; first = 0.0; second = 0.0; return; }
+        x = std::max(x, 0.0);
+        value = x * x * x * (10.0 + x * (-15.0 + 6.0 * x));
+        first = 30.0 * x * x * (1.0 - x) * (1.0 - x) / window;
+        second = 60.0 * x * (1.0 - x) * (1.0 - 2.0 * x) / (window * window);
+    };
+    auto taper = [&](int64_t t, double &value, double &first, double &second) {
+        double u = 0, du = 0, ddu = 0, v = 0, dv = 0, ddv = 0;
+        smoother(static_cast<double>(t) * 1e-9 / window, u, du, ddu);
+        smoother(static_cast<double>(duration_ns - t) * 1e-9 / window, v, dv, ddv);
+        dv = -dv;  // the fall runs backwards in time
+        value = u * v;
+        first = du * v + u * dv;
+        second = ddu * v + 2.0 * du * dv + u * ddv;
+    };
+    // The corrected position, velocity and acceleration at `t`: p + lead * mean velocity * taper.
+    auto corrected = [&](int64_t t, double &position, double &velocity, double &acceleration) -> mk_result {
+        double p = 0, v = 0, a = 0, pa = 0, va = 0, aa = 0, pb = 0, vb = 0, ab = 0;
+        auto result = state_at(t, p, v, a);
+        if (result == MK_OK) result = state_at(t + half_ns, pa, va, aa);
+        if (result == MK_OK) result = state_at(t - half_ns, pb, vb, ab);
         if (result != MK_OK) return result;
-        position = p + lead_seconds * (pa - pb) / window;
-        velocity = v + lead_seconds * (va - vb) / window;
+        const double mean = (pa - pb) / window, mean_rate = (va - vb) / window, mean_slope = (aa - ab) / window;
+        double w = 0, dw = 0, ddw = 0;
+        taper(t, w, dw, ddw);
+        position = p + lead_seconds * mean * w;
+        velocity = v + lead_seconds * (mean_rate * w + mean * dw);
+        acceleration = a + lead_seconds * (mean_slope * w + 2.0 * mean_rate * dw + mean * ddw);
         return MK_OK;
     };
+    // The advance changes form wherever the window's ends cross a boundary of the plan's segments, and at the taper's
+    // ends; between those instants it is a polynomial (of degree five, or nine under the taper). So the trajectory is cut
+    // at every segment boundary, each boundary half a window either side, and the taper's ends (the tapers cut eight
+    // times more), and each piece of the joint is the quintic through the advance's position, velocity and acceleration
+    // at its ends: exact where the advance is a quintic, and within a piece's rounding under the taper. The other joints
+    // keep their polynomials, re-expressed from the start of each piece.
+    std::vector<mk_segment> source;
+    try {
+        source.resize(segments);
+        for (uint32_t index = 0; index < segments; ++index) {
+            source[index] = mk_segment{};
+            source[index].struct_size = sizeof(mk_segment);
+            status = mk_trajectory_get_segment(trajectory, index, &source[index]);
+            if (status != MK_OK) return status;
+        }
+    } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
+    std::vector<int64_t> cuts;
+    const int64_t window_ns = 2 * half_ns;
+    auto cut = [&](int64_t at) { if (at > 0 && at < duration_ns) cuts.push_back(at); };
+    for (const auto &piece : source) {
+        for (const int64_t boundary : {piece.t0_ns, piece.t0_ns + piece.duration_ns}) {
+            cut(boundary); cut(boundary - half_ns); cut(boundary + half_ns);
+        }
+    }
+    for (int k = 1; k <= 8; ++k) {
+        cut(window_ns * k / 8);
+        cut(duration_ns - window_ns * k / 8);
+    }
+    cuts.push_back(0);
+    cuts.push_back(duration_ns);
+    std::sort(cuts.begin(), cuts.end());
+    cuts.erase(std::unique(cuts.begin(), cuts.end()), cuts.end());
     mk_trajectory_handle advanced{};
     status = mk_trajectory_create(joints, &advanced);
     if (status != MK_OK) return status;
     try {
-        auto segment = std::make_unique<mk_segment>();
-        double position_a = 0, velocity_a = 0;
-        for (uint32_t index = 0; index < segments; ++index) {
-            *segment = mk_segment{};
-            segment->struct_size = sizeof(mk_segment);
-            status = mk_trajectory_get_segment(trajectory, index, segment.get());
-            if (status == MK_OK && index == 0) status = corrected(segment->t0_ns, position_a, velocity_a);
-            double position_b = 0, velocity_b = 0;
-            if (status == MK_OK) status = corrected(segment->t0_ns + segment->duration_ns, position_b, velocity_b);
-            if (status != MK_OK) { mk_trajectory_destroy(advanced); return status; }
-            const double h = static_cast<double>(segment->duration_ns) * 1e-9;
-            const double delta = position_b - position_a;
-            auto &c = segment->coefficients[joint].value;
+        auto piece = std::make_unique<mk_segment>();
+        size_t from = 0;
+        double position_a = 0, velocity_a = 0, acceleration_a = 0;
+        status = corrected(0, position_a, velocity_a, acceleration_a);
+        for (size_t index = 0; index + 1 < cuts.size() && status == MK_OK; ++index) {
+            const int64_t begin = cuts[index], finish = cuts[index + 1];
+            // The plan's segment the piece lies in.
+            while (from + 1 < source.size() && source[from].t0_ns + source[from].duration_ns <= begin) ++from;
+            const auto &original = source[from];
+            *piece = mk_segment{};
+            piece->struct_size = sizeof(mk_segment);
+            piece->t0_ns = begin;
+            piece->duration_ns = finish - begin;
+            piece->joint_count = original.joint_count;
+            piece->degree = 5;
+            // p(shift + tau) = sum_k c_k (shift + tau)^k, re-expanded in tau.
+            const double shift = static_cast<double>(begin - original.t0_ns) * 1e-9;
+            for (uint32_t joint_index = 0; joint_index < original.joint_count; ++joint_index) {
+                const auto &c = original.coefficients[joint_index].value;
+                auto &out = piece->coefficients[joint_index].value;
+                for (int m = 0; m <= MK_MAX_DEGREE; ++m) {
+                    double sum = 0.0, binomial = 1.0, power = 1.0;
+                    for (int k = m; k <= static_cast<int>(original.degree); ++k) {
+                        sum += c[k] * binomial * power;
+                        binomial = binomial * static_cast<double>(k + 1) / static_cast<double>(k + 1 - m);
+                        power *= shift;
+                    }
+                    out[m] = sum;
+                }
+            }
+            double position_b = 0, velocity_b = 0, acceleration_b = 0;
+            status = corrected(finish, position_b, velocity_b, acceleration_b);
+            if (status != MK_OK) break;
+            // The quintic through both ends' position, velocity and acceleration.
+            const double h = static_cast<double>(piece->duration_ns) * 1e-9;
+            const double d = position_b - position_a - velocity_a * h - 0.5 * acceleration_a * h * h;
+            const double e = velocity_b - velocity_a - acceleration_a * h;
+            const double f = acceleration_b - acceleration_a;
+            auto &c = piece->coefficients[joint].value;
             for (auto &value : c) value = 0.0;
             c[0] = position_a;
             c[1] = velocity_a;
-            c[2] = 3.0 * delta / (h * h) - (2.0 * velocity_a + velocity_b) / h;
-            c[3] = -2.0 * delta / (h * h * h) + (velocity_a + velocity_b) / (h * h);
-            if (segment->degree < 3) segment->degree = 3;
-            status = mk_trajectory_append_segment(advanced, segment.get());
-            if (status != MK_OK) { mk_trajectory_destroy(advanced); return status; }
-            position_a = position_b; velocity_a = velocity_b;
+            c[2] = 0.5 * acceleration_a;
+            c[3] = (10.0 * d - 4.0 * e * h + 0.5 * f * h * h) / (h * h * h);
+            c[4] = (-15.0 * d + 7.0 * e * h - f * h * h) / (h * h * h * h);
+            c[5] = (6.0 * d - 3.0 * e * h + 0.5 * f * h * h) / (h * h * h * h * h);
+            status = mk_trajectory_append_segment(advanced, piece.get());
+            position_a = position_b; velocity_a = velocity_b; acceleration_a = acceleration_b;
         }
+        if (status != MK_OK) { mk_trajectory_destroy(advanced); return status; }
     } catch (const std::bad_alloc &) { mk_trajectory_destroy(advanced); return MK_ERROR_OUT_OF_MEMORY; }
     *out_trajectory = advanced;
     return MK_OK;
