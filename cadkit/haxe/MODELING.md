@@ -283,6 +283,49 @@ angles must lie strictly between zero and `π` radians. `CountersunkFlange.hx`
 patterns a face-attached countersink tool around a bolt circle and keeps the
 through cut valid when flange radius and thickness change.
 
+## Sheet metal
+
+`cadkit.sheetmetal.Sheet` owns an exact line/arc wall graph, permanent wall/bend ids,
+thickness through `SheetMaterial`, and an explicit bend rule. Angles are radians and lengths
+are millimetres. Side A is local z = 0; the material grows toward negative Z. A missing
+bend rule is diagnosed, never supplied implicitly.
+
+`evaluate(flat())` and `evaluate(folded())` derive wall placements and bend strips without
+native geometry. `SheetState` also supports partial angles, preserving the bend allowance's
+neutral length. Evaluations keep immutable wall snapshots. Rips cut connectivity at the
+child-side bend seam and retain the strip on the parent; closure failures name the measured gap.
+
+`SheetSolid.build(sheet, state)` returns an owning `Shape`: wall extrusions and bend-strip
+revolutions fused into one result. Face identities come from wall/loop/segment and bend roles,
+seeded before fusing. The native naming grammar escapes their logical identifiers. Close the
+returned shape when done. Native history is used within the extrusion to match side faces to
+their exact input edges; graph identity supplies persistence across rebuilds.
+
+`FlatPattern.of(sheet)` derives an exact developed blank without native geometry. `regions()`
+returns its outer contours and holes; `domains()` retains typed wall/bend ownership for checks.
+`bends()` returns a table sorted by permanent bend id, including signed angle, inner radius,
+allowance and the material-covered fold-line intervals. `length()` sums those intervals;
+`nominalWidth` preserves the attachment width before cuts. Returned arrays are isolated copies.
+
+When `SheetMaterial.grainAngle` is authored, it is an undirected rolling angle in radians relative
+to the root wall frame. The flat pattern's `plane` aligns its X axis with that grain; without
+grain it uses the root plane. Bounds and all contour coordinates refer to this exported plane.
+The document saves the material snapshot, including grain, with its current schema version.
+
+`cadkit.drawing.Drawing2D.of(flat)` supplies exact contours, bend markings, annotations and
+an optional grain arrow to both exporters. `Dxf.write(drawing)` returns R12 ASCII with only
+LINE, ARC, CIRCLE and TEXT entities; clockwise contours retain their winding through negative-Z
+object coordinates. `Svg.write(drawing)` returns a millimetre SVG with the same manufacturing
+layers. Both return text for the caller to save and perform no native operation. DXF annotations
+must be printable ASCII; SVG annotations escape XML text.
+
+`SheetChecks.of(sheet)` returns a developed snapshot plus named manufacturability findings.
+Each finding has a typed kind, measurement, assumption flag and exact geometry in the report's
+flat plane. Checks cover overlaps, minimum straight flange legs, cut/hole clearance, internal
+bend endings, explicit material radius minima and grain direction. The provisional `4T` tooling
+minimum and `2.5T + R` cut clearance are marked assumed. Relief boundaries carry an explicit
+purpose, so checks do not infer it from edge names.
+
 ## Validation
 
 `ctest --test-dir build/debug --output-on-failure` exercises the C boundary,
@@ -340,3 +383,91 @@ writes JSON and STEP, exercises undo/redo, reloads the JSON, and exports the
 reloaded shape. The JSON stores the feature graph and current parameters,
 including the selection recipe; it does not store the undo/redo session stack.
 After reload, subsequent edits create a new undo/redo history.
+
+### Sheet corners
+
+`SheetCornerEdge.fromFace(source.sheet(), face)` resolves a picked straight side
+face into a permanent wall id and authored boundary identity. A corner closes
+two flange ends on a common parent. `CornerJoin.Gap` gives each end the stated
+perpendicular stand-off from its mate's full thickness slab; `OverlapFirst` or
+`OverlapSecond` extends that flange past the mate's far face by the stated overlap.
+The selected supporting edges must run along the folded planes' intersection.
+Parallel planes and missing selections receive named diagnoses.
+
+```haxe
+var gap = builder.length("corner.gap", 0.5);
+var relief = builder.length("corner.relief", 8);
+var corner = builder.sheetCorner(source,
+    SheetCornerEdge.fromFace(source.sheet(), firstSide),
+    SheetCornerEdge.fromFace(source.sheet(), secondSide),
+    gap, CornerRelief.Round, relief);
+```
+
+Round relief size is diameter; square size is side length, with its first axis
+along the first parent bend seam. One exact blank-space tool trims adjoining
+walls and bend strips. Contour changes and relief publish together after seam
+validation, retaining wall/bend ids and nominal datums. A gap that needs more
+seam trimming than the relief provides fails material validation. Saved corners
+contain authored picks and dimensions; development and solids are rebuilt.
+The current document format is 16 and rejects previous versions.
+
+### Sheet manufacturing blanks
+
+`SheetBlank.requirement(FlatPattern.of(sheet), order)` derives material, thickness
+and rectangular stock dimensions from the current sheet. Supply a typed
+`SheetBlankOrder` with requirement and part ids, their positive revisions, quantity,
+and `SheetTolerance(minus, plus)` values in mm for thickness, width and height.
+The exported X axis follows authored grain; grained stock permits rotation 0,
+while ungrained stock permits 0/90 degrees. The result is ManufacturingKit
+`SheetPartRequirement`, ready for its current project codec and stock planning.
+
+### Editing sheets in the app
+
+In an empty CAD part, create and apply a constrained sketch. Select its feature,
+choose a sheet grade, thickness in mm and rolling direction in the sketch frame,
+then choose **Create sheet base**. Leave the K-factor override blank to use the
+grade table; an explicit material identity without sheet defaults needs an ANSI K factor. Pick a straight wall-side face in
+the folded viewport, enter the straight flange length, signed bend angle in
+degrees and inner radius in mm, then choose **Create edge flange**.
+
+The selected sheet feature exposes editable dimensions and the bend table.
+**Flat pattern** switches the viewport to the derived blank and shows up/down
+bend intervals in blue/orange. This is view state; it does not edit the saved
+feature graph. Flanges are created in folded view. **Export flat DXF** and
+**Export flat SVG** export the exact current blank, bend marks and annotations.
+
+### Air-bending predictions
+
+`cadkit.sheetmetal.process.BendProcess` accepts typed stock and tooling, a signed
+bend angle in radians and an effective bend length in mm. `AirBending` requires
+UTS, yield and Young's modulus in MPa. Tool included angles are radians; tool
+radii and V opening are mm. Predictions distinguish the loaded and released
+inner radii, conserve neutral length, and return signed overbend, punch-bottom
+depth below the die top, force in kN and an assumed 90-degree minimum flange.
+The initial formulas are assumed estimates; tool angle/contact failures are
+named diagnoses.
+
+```haxe
+var stock = new SheetMaterial("mild-steel", 1.5, null,
+    {uts: 400, yield: 250, youngs: 205000});
+var tools = new ProcessTooling("acute-punch", "v12", 0.6,
+    Math.PI / 6, 12, Math.PI / 6, 0.5);
+var process:BendProcess = new AirBending();
+var prediction = process.predict(stock, tools, Math.PI / 2, 120);
+```
+
+`CalibrationEntry` supplies an explicit material lot, thickness, tool ids,
+half-open angle-magnitude band, depth offset and measured final inner radius.
+Pass an immutable `CalibrationTable` to `AirBending` and the lot as the fifth
+prediction argument to apply it. The model reconstructs loaded radius and depth
+from the measured final radius before adding the offset. Overlapping entries
+and measurements incompatible with the punch are refused. Without a matching
+lot/key, `calibrated` is false and depth remains analytic. Use `BendRule.Process(new ProcessBendRule(tools, calibration, lot))` on stock
+with mechanical properties to develop sheets for that setup. A flange with an
+omitted radius derives its released radius from the process on every rebuild;
+an explicit radius must match the prediction. Stock, tools, lot and calibration
+are saved; derived predictions are rebuilt. `BendDimensions.allowance(stock,
+radius, angle, bendLength)` and `deduction` consume the same stock object.
+Air bending refuses hems and tool-limited angles. The sheet checks use the
+assumed 0.7V flange minimum, with V=8T as the default for stock up to 3 mm;
+thicker stock requires selected tooling.

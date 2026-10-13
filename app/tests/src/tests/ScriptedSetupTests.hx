@@ -169,7 +169,7 @@ class ScriptedSetupTests {
       mismatchLidar.updateRate == 33.0,
       "script identity mismatch stays open with a diagnostic and valid overrides");
 
-    var legacy = '{"format":"materia.scene","version":1,"objects":[],"sensors":null,"script":{'
+    var legacy = '{"format":"materia.scene","version":2,"objects":[],"sensors":null,"script":{'
       + '"reference":"${TwoRobotSetupScript.REFERENCE}","version":1,"overridesEnabled":true,'
       + '"overrides":[{"targetId":"$sensorTarget","property":"updateRate","value":44.0}]}}';
     var migrated:app.ScriptOwnershipRecord = cast SceneCodec.decodeScript(legacy);

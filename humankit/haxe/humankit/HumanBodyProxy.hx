@@ -1,8 +1,8 @@
 package humankit;
 
-import humankit.rig.HumanBone;
-import humankit.rig.HumanPose;
-import humankit.rig.Mat4;
+import haxeon.animation.rig.HumanBone;
+import haxeon.animation.rig.HumanPose;
+import haxeon.animation.rig.Mat4;
 
 /**
  * A person's collision stand-in: fifteen capsules between standard bones

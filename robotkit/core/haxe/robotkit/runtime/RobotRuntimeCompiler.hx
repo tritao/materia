@@ -50,12 +50,12 @@ class RobotRuntimeCompiler {
       compileConfiguration(robot, profile), calibrationRevision);
     for (actuator in robot.actuators) {
       var drive = actuator.drive;
-      var pneumatic = drive == null ? null : drive.pneumatic();
-      if (pneumatic != null) {
-        // An ordinary program stop preserves pneumatic outputs. Emergency stops
-        // and faults de-energize coils; the simulated valve owns its latch state.
-        ensureDigitalChannel(result, pneumatic.channelA, true);
-        if (pneumatic.channelB != null) ensureDigitalChannel(result, pneumatic.channelB, true);
+      var cylinder = drive == null ? null : drive.cylinder();
+      if (cylinder != null) {
+        // Pneumatic outputs survive an ordinary stop; hydraulic valves close centre.
+        // Emergency stops and faults de-energize every coil.
+        ensureDigitalChannel(result, cylinder.channelA, cylinder.hydraulic() == null);
+        if (cylinder.channelB != null) ensureDigitalChannel(result, cylinder.channelB, cylinder.hydraulic() == null);
       }
       var processVelocity = actuator.processVelocity;
       if (processVelocity != null) {
@@ -106,15 +106,13 @@ class RobotRuntimeCompiler {
         joint.childFramePosition, joint.childFrameRotation, joint.axis,
         joint.limits.maxAcceleration);
       compiled.overtravel = joint.limits.overtravel;
+      compiled.passive = joint.passive;
       for (actuator in robot.actuators) switch actuator.transmission {
         case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id):
           var drive = actuator.drive;
-          var pneumatic = drive == null ? null : drive.pneumatic();
-          if (pneumatic != null) {
-            result.pneumaticDrives.push(new RobotRuntimePneumaticDriveBlueprint(index,
-              pneumatic.channelA, pneumatic.channelB, pneumatic.normallyToA,
-              pneumatic.extensionForce(), pneumatic.retractionForce(), pneumatic.extendSign,
-              pneumatic.ratedSpeed));
+          var cylinder = drive == null ? null : drive.cylinder();
+          if (cylinder != null) {
+            result.cylinderDrives.push(new RobotRuntimeCylinderDriveBlueprint(index, cylinder));
           }
           if (actuator.processVelocity != null) {
             var process = actuator.processVelocity;
@@ -238,9 +236,9 @@ class RobotRuntimeCompiler {
       keepOnStop:Bool):Void {
     for (channel in blueprint.channels) if (channel.id == id) {
       if (channel.safeValue != robotkit.execution.ProcessEventValue.Digital(false))
-        throw 'Pneumatic valve channel "$id" must be digital and safe when de-energized';
+        throw 'Cylinder valve channel "$id" must be digital and safe when de-energized';
       if (channel.keepOnStop != keepOnStop)
-        throw 'Pneumatic valve channel "$id" has the wrong normal-stop policy';
+        throw 'Cylinder valve channel "$id" has the wrong normal-stop policy';
       return;
     }
     blueprint.channels.push(new ProcessChannelDeclaration(id,
@@ -414,6 +412,9 @@ class RobotRuntimeCompiler {
         }
       }
 
+      if (joint.passive && (joint.type == JointType.Fixed || joint.type == JointType.Floating))
+        diagnostics.push(new RobotCompileDiagnostic("RK_PASSIVE_JOINT", path,
+          "passive ownership requires a movable single-axis joint"));
       if (joint.limits == null)
         diagnostics.push(new RobotCompileDiagnostic("RK_LIMITS_NULL", '$path.limits',
           "joint limits are missing"));
@@ -524,12 +525,38 @@ class RobotRuntimeCompiler {
           "actuator transmission is missing"));
       else switch actuator.transmission {
         case SimpleTransmission(jointId, ratio, offset):
+          for (joint in robot.joints) if (joint != null && joint.id == jointId && joint.passive)
+            diagnostics.push(new RobotCompileDiagnostic("RK_PASSIVE_ACTUATOR", '$path.transmission.jointId',
+              'an actuator cannot drive passive joint "$jointId"'));
           if (!jointIds.exists(jointId))
             diagnostics.push(new RobotCompileDiagnostic("RK_TRANSMISSION_JOINT",
               '$path.transmission.jointId', 'unknown joint ID "$jointId"'));
           if (!Math.isFinite(ratio) || ratio == 0.0 || !Math.isFinite(offset))
             diagnostics.push(new RobotCompileDiagnostic("RK_TRANSMISSION_VALUE",
               '$path.transmission', "transmission ratio must be finite and nonzero, and offset finite"));
+      }
+      var cylinderDrive = actuator.drive == null ? null : actuator.drive.cylinder();
+      if (cylinderDrive != null) {
+        var cylinderJoint:Null<Joint> = null;
+        if (actuator.transmission != null) switch actuator.transmission {
+          case SimpleTransmission(jointId, _, _):
+            for (joint in robot.joints) if (joint.id == jointId) cylinderJoint = joint;
+          case _:
+        }
+        if (cylinderJoint == null || cylinderJoint.type != JointType.Prismatic)
+          diagnostics.push(new RobotCompileDiagnostic("RK_CYLINDER_JOINT", '$path.drive',
+            "a cylinder process drive needs a prismatic joint in this model"));
+        var hydraulic = cylinderDrive.hydraulic();
+        if (hydraulic != null && cylinderJoint != null) {
+          var lower = cylinderJoint.limits.lower, upper = cylinderJoint.limits.upper;
+          if (!Math.isFinite(lower + upper) || Math.abs(upper - lower - hydraulic.stroke) > 1e-9)
+            diagnostics.push(new RobotCompileDiagnostic("RK_HYDRAULIC_TRAVEL", '$path.drive.stroke',
+              "hydraulic stroke must match the guide's nominal travel"));
+          var home = hydraulic.extendSign > 0.0 ? lower : upper;
+          if (Math.abs(hydraulic.retractedPosition - home) > 1e-9)
+            diagnostics.push(new RobotCompileDiagnostic("RK_HYDRAULIC_HOME", '$path.drive.retractedPosition',
+              "hydraulic retracted position must be its guide's extension-side limit"));
+        }
       }
       if (actuator.processVelocity != null) {
         var process = actuator.processVelocity;
@@ -550,9 +577,9 @@ class RobotRuntimeCompiler {
           diagnostics.push(new RobotCompileDiagnostic("RK_PROCESS_VELOCITY_JOINT", '$path.processVelocity',
             "process velocity drive needs a continuous joint in this model"));
         var drive = actuator.drive;
-        if (drive != null && drive.pneumatic() != null)
+        if (drive != null && drive.cylinder() != null)
           diagnostics.push(new RobotCompileDiagnostic("RK_PROCESS_VELOCITY_DRIVE", '$path.processVelocity',
-            "a process velocity joint cannot also be a pneumatic joint"));
+            "a process velocity joint cannot also be a cylinder joint"));
       }
     }
 

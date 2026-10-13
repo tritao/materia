@@ -43,8 +43,19 @@ class RrtConnect implements MotionPlanner {
     if (start == null || goal == null || start.length != n || goal.length != n)
       throw 'RRT-Connect needs a start and a goal of $n joints';
     var lower = space.lower(), upper = space.upper();
+    // Runtime setpoints can land one ULP outside an exact stop after coupled
+    // coordinates are reconstructed. Snap residue before collision checks;
+    // keep the caller's arrays intact and reject physical overtravel.
+    start = start.copy(); goal = goal.copy();
     for (q in [start, goal]) for (k in 0...n)
-      if (!(q[k] >= lower[k] && q[k] <= upper[k])) return failed('${q == start ? "start" : "goal"} outside the joint bounds', 0, 0, began);
+      if (!(q[k] >= lower[k] && q[k] <= upper[k])) {
+        var tolerance = 1e-12 * Math.max(1.0, Math.max(
+          Math.isFinite(lower[k]) ? Math.abs(lower[k]) : 0.0,
+          Math.isFinite(upper[k]) ? Math.abs(upper[k]) : 0.0));
+        if (Math.isFinite(q[k]) && q[k] < lower[k] && lower[k] - q[k] <= tolerance) q[k] = lower[k];
+        else if (Math.isFinite(q[k]) && q[k] > upper[k] && q[k] - upper[k] <= tolerance) q[k] = upper[k];
+        else return failed('${q == start ? "start" : "goal"} outside the joint bounds: joint $k (${q[k]}), ${lower[k]}..${upper[k]}', 0, 0, began);
+      }
     var startProblem = timed(() -> space.invalid(start));
     if (startProblem != null) return failed('start in collision: $startProblem', 0, 0, began);
     var goalProblem = timed(() -> space.invalid(goal));

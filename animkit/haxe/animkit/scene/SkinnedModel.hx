@@ -1,7 +1,7 @@
 package animkit.scene;
 
-import animkit.AnimationAsset;
-import animkit.AnimationInstance;
+import haxeon.animation.AnimationAsset;
+import haxeon.animation.AnimationInstance;
 import haxe.io.Bytes;
 import nativekit.scene.Geometry;
 import nativekit.scene.GeometryData;

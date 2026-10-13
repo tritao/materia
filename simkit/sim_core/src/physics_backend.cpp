@@ -278,6 +278,7 @@ public:
                 joint->state.velocity = 0.0;
                 break;
             case NKSIM_JOINT_TARGET_VELOCITY:
+            case NKSIM_JOINT_TARGET_FLOW:
                 joint->state.velocity = targets[index].target;
                 break;
             case NKSIM_JOINT_TARGET_EFFORT:

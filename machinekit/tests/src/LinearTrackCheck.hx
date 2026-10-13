@@ -71,8 +71,8 @@ class LinearTrackCheck {
 		collisionOptions.reference = manipulator.stateOf(reference).q;
 		var collisionRobot = cadbridge.CadCollision.describeMechanism(collisionDescription, converted, collisionOptions);
 		var clearance = new CollisionClearance(manipulator,
-		  new robotkit.collision.CollisionClearanceLayout(collisionDescription, collisionRobot.bodies), reference,
-		  () -> new NativeCollisionWorld());
+		  collisionDescription, reference,
+		  () -> new NativeCollisionWorld(), collisionRobot.bodies);
 		for (coordinate in [manipulator.group.limitsOf(0).lower, manipulator.group.limitsOf(0).upper]) {
 			var q = reference.copy(); q[0] = coordinate;
 			var hit = clearance.violation(q);

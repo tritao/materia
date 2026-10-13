@@ -131,7 +131,9 @@ private class BuiltinObjectKind implements ObjectKindProvider {
     if (kind == "cad-part") {
       if (scene.canCreateSketch()) result.push("scene.create-sketch");
       if (scene.canCreateFaceSketch()) result.push("scene.create-face-sketch");
-      if (scene.canCreateExtrusion()) result.push("scene.create-extrusion");
+      if (scene.canCreateExtrusion()) { result.push("scene.create-extrusion"); result.push("scene.create-sheet-base"); }
+      if (scene.canCreateSheetFlange()) result.push("scene.create-sheet-flange");
+      if (scene.selectedSheetFeature() != null) { result.push("scene.export-sheet-dxf"); result.push("scene.export-sheet-svg"); }
       if (scene.canCreatePocket()) result.push("scene.create-pocket");
       if (scene.canCreateVerticalFillet()) result.push("scene.create-vertical-fillet");
     }

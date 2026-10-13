@@ -1,6 +1,6 @@
-import animkit.AnimationAsset;
-import animkit.AnimationInstance;
-import animkit.ClipPlayer;
+import haxeon.animation.AnimationAsset;
+import haxeon.animation.AnimationInstance;
+import haxeon.animation.ClipPlayer;
 import animkit.scene.SkinnedModel;
 import nativekit.scene.Scene;
 import sys.FileSystem;

@@ -16,6 +16,7 @@ import sys.io.AtomicFile;
 import sys.FileSystem;
 import haxe.io.Path as FilePath;
 import haxe.Json;
+import haxeon.wire.JsonWire;
 import app.ScriptOwnership.ScriptMaterialization;
 import haxeon.ui.editing.EditorDocument;
 import haxeon.ui.editing.EditHistory;
@@ -1341,7 +1342,7 @@ class ProjectDocumentSession {
       rotation: rotation, cadGraph: null, meshSnapshot: "_", sketchDraft: null
     };
     var result = SceneCodec.decode(Json.stringify({format: SceneCodec.FORMAT,
-      version: SceneCodec.VERSION, materials: MaterialLibrary.all().concat(materials),
+      version: SceneCodec.VERSION, materials: Json.parse(JsonWire.encode(MaterialLibrary.all().concat(materials))),
       objects: [SceneCodec.encodeObject(candidate, materials)]}))[0];
     result.meshSnapshot = snapshot;
     return result;

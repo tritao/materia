@@ -2711,7 +2711,79 @@ void joint_limit_softness_reaches_the_backend() {
     assert(soft > 5.0 * stiff);
 }
 
+// A pressure-limited speed source builds contact effort without changing unloaded response.
+nksim_joint_state run_speed_source(uint32_t mode, double ceiling, bool loaded, double upper = 1.0,
+                                  uint32_t load_motion = NKSIM_MOTION_DYNAMIC, bool close_valve = false) {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc); desc.scene = scene;
+    desc.fixed_timestep = 0.001; desc.physics_substeps = 2; desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const double floor_half[] = {2, 2, 0.1};
+    nksim_shape floor_shape = 0;
+    assert(nksim_shape_create_box(world, floor_half, &floor_shape) == NKSIM_OK);
+    make_body(world, make_node_xyz(scene, 0, 0, -0.1), NKSIM_MOTION_STATIC, 0, floor_shape);
+    const auto shape = make_box(world);
+    const auto base = make_body(world, make_node_xyz(scene, -0.2, 0, 0.1), NKSIM_MOTION_STATIC, 0);
+    const auto slider = make_body(world, make_node_xyz(scene, -0.2, 0, 0.1), NKSIM_MOTION_DYNAMIC, 100, shape);
+    if (loaded) make_body(world, make_node_xyz(scene, 0, 0, 0.1), load_motion,
+        load_motion == NKSIM_MOTION_DYNAMIC ? 100 : 0, shape);
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc); joint_desc.type = NKSIM_JOINT_PRISMATIC;
+    joint_desc.body_a = base; joint_desc.body_b = slider; joint_desc.axis_a[0] = 1;
+    joint_desc.lower_limit = -1; joint_desc.upper_limit = upper; joint_desc.max_force = ceiling;
+    nksim_joint joint = 0;
+    assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+    step_world(world, 200);
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target); target.joint = joint; target.mode = mode;
+    target.target = 0.01; target.max_force = ceiling;
+    assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
+    step_world(world, 2000);
+    nksim_joint_state state{}; state.struct_size = sizeof(state);
+    assert(nksim_joint_get_state(world, joint, &state) == NKSIM_OK);
+    if (close_valve) {
+        const auto position = state.position;
+        target.target = 0;
+        assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
+        step_world(world, 200);
+        assert(nksim_joint_get_state(world, joint, &state) == NKSIM_OK);
+        state.position -= position;
+    }
+    std::printf("speed source mode=%u load=%d ceiling=%g q=%g v=%g effort=%g\n",
+        mode, loaded, ceiling, state.position, state.velocity, state.effort);
+    nksim_world_destroy(world); nkscene_scene_destroy(scene);
+    return state;
+}
+
+void pressure_limited_speed_source_carries_load_and_stalls_at_capacity() {
+    const auto unloaded = run_speed_source(NKSIM_JOINT_TARGET_VELOCITY, 2000, false);
+    const auto source = run_speed_source(NKSIM_JOINT_TARGET_FLOW, 2000, false);
+    assert(std::abs(source.position - unloaded.position) < 1e-9);
+    assert(std::abs(source.velocity - unloaded.velocity) < 1e-9);
+    const auto ordinary = run_speed_source(NKSIM_JOINT_TARGET_VELOCITY, 2000, true);
+    const auto powered = run_speed_source(NKSIM_JOINT_TARGET_FLOW, 2000, true);
+    assert(ordinary.velocity < 0.005);
+    assert(std::abs(powered.velocity - 0.01) <= 0.0005);
+    assert(std::abs(powered.effort) <= 2000.0001);
+    const auto stalled = run_speed_source(NKSIM_JOINT_TARGET_FLOW, 100, true, 1.0,
+        NKSIM_MOTION_STATIC);
+    assert(std::abs(stalled.velocity) < 0.0001);
+    assert(std::abs(stalled.effort) <= 100.0001);
+    const auto stopped = run_speed_source(NKSIM_JOINT_TARGET_FLOW, 2000, false, 0.005);
+    assert(stopped.position < 0.0051);
+    assert(std::abs(stopped.velocity) < 0.0001);
+    const auto closed = run_speed_source(NKSIM_JOINT_TARGET_FLOW, 2000, false, 1.0,
+        NKSIM_MOTION_DYNAMIC, true);
+    assert(std::abs(closed.position) < 0.00001);
+    assert(std::abs(closed.velocity) < 0.0001);
+    assert(std::abs(closed.effort) <= 2000.0001);
+}
+
 int main() {
+    pressure_limited_speed_source_carries_load_and_stalls_at_capacity();
     spring_applied_brake_holds_without_a_motor_target();
     joint_limit_softness_reaches_the_backend();
     contact_filters_and_pairs_decide_contacts();

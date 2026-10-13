@@ -5,6 +5,15 @@ MachineKit is a Haxe-only layer of machine components above CadKit. A
 BOM line. `addTo(model, id)` registers an instance and its connectors on a
 CadKit `AssemblyModel`, so components mate through the existing assembly API.
 
+Fluid components expose typed `CylinderSpec`, `ValveSpec` and `PressureSource`
+capabilities. `addCylinder` binds a part to its existing prismatic guide; each
+rebuild resolves pressure from service connections, geometry from the parts and
+coil direction from the actual A/B hoses. Pneumatic bindings use a pressure-effort
+spool law. Hydraulic bindings require explicit `CylinderPhaseSpeeds` and a
+closed-centre valve. Geometry and phase travel use mm, phase rates mm/s, supply
+pressure Pa and pressure-area force N. Saved MachineAssembly descriptions use
+one current schema version; old schemas are rejected.
+
 Connector frames use the CadKit joint convention: mated frames coincide, and
 revolute or prismatic joints act along the frame's +Y axis. Component CAD
 frames put their axis along +Z, and every connector's +Y points along +Z.

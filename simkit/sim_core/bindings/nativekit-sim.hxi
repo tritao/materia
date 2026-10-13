@@ -53,6 +53,11 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	const NKSIM_JOINT_SPHERICAL = 4;
 	const NKSIM_JOINT_TARGET_EFFORT = 3;
+	/**
+	 * Flow-limited joint speed with measured contact-load compensation.
+	 * Zero closes the fluid path; stopping remains bounded by max_force.
+	 */
+	const NKSIM_JOINT_TARGET_FLOW = 5;
 	const NKSIM_JOINT_TARGET_POSITION = 1;
 	/**
 	 * Joint-space servo evaluated every physics substep:
@@ -141,10 +146,24 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	extern fn nksim_session_create_actor(session: nksim_session, parts: ptr<const<nksim_actor_part>> @in_array("part_count"), part_count: u32, out_actor: ptr<nksim_actor> @out) -> nksim_result;
 	/**
+	 * Creates one body containing a union of convex hulls in its local frame.
+	 * The descriptor selects COMPOUND. Each piece has 4 to 64 vertices; counts
+	 * are XYZ coordinate counts, whose sum equals coordinate_count. Inputs are copied.
+	 * Separate pieces preserve concavity and holes instead of filling their joint hull.
+	 */
+	extern fn nksim_session_create_compound_convex_object(session: nksim_session, desc: ptr<const<nksim_object_desc>>, vertices: ptr<const<f64>> @in_array("coordinate_count"), coordinate_count: u32, piece_counts: ptr<const<u32>> @in_array("piece_count"), piece_count: u32, out_object: ptr<nksim_object> @out) -> nksim_result;
+	/**
 	 * Creates a convex object from 4 to 64 hull vertices in its local frame.
 	 * The descriptor selects CONVEX; coordinates are copied before returning.
 	 */
 	extern fn nksim_session_create_convex_object(session: nksim_session, desc: ptr<const<nksim_object_desc>>, vertices: ptr<const<f64>> @in_array("coordinate_count"), coordinate_count: u32, out_object: ptr<nksim_object> @out) -> nksim_result;
+	/**
+	 * Connects two session objects as a rigid tree while stopped, using their
+	 * creation reference poses. The child follows the parent's measured pose;
+	 * its current loose pose does not redefine the relative transform.
+	 * Remove this session-owned joint before removing either object.
+	 */
+	extern fn nksim_session_create_fixed_joint(session: nksim_session, parent: nksim_object, child: nksim_object, out_joint: ptr<nksim_joint> @out) -> nksim_result;
 	/**
 	 * Adds one environment body while stopped.
 	 */
@@ -154,6 +173,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	extern fn nksim_session_destroy(session: nksim_session) -> void;
 	extern fn nksim_session_destroy_actor(session: nksim_session, actor: nksim_actor) -> nksim_result;
+	/**
+	 * Removes a fixed joint owned by this session while stopped.
+	 */
+	extern fn nksim_session_destroy_fixed_joint(session: nksim_session, joint: nksim_joint) -> nksim_result;
 	/**
 	 * Removes one environment body while stopped.
 	 */
@@ -174,6 +197,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	extern fn nksim_session_due_ticks(session: nksim_session, elapsed_ns: u64, max_ticks: u32, out_ticks: ptr<u32> @out) -> nksim_result;
 	/**
+	 * Excludes contacts between two bodies before the session's first tick.
+	 */
+	extern fn nksim_session_exclude_body_pair(session: nksim_session, first: nksim_body, second: nksim_body) -> nksim_result;
+	/**
 	 * The session object bound to a body, for a body a session participant
 	 * observes in a contact or elsewhere. Returns NKSIM_ERROR_INVALID_HANDLE if
 	 * the body is not a current session object's body (for instance, a robot
@@ -181,11 +208,11 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	extern fn nksim_session_find_object(session: nksim_session, body: nksim_body, out_object: ptr<nksim_object> @out) -> nksim_result;
 	extern fn nksim_session_get_actor_body(session: nksim_session, actor: nksim_actor, part: u32, out_body: ptr<nksim_body> @out) -> nksim_result;
+	/**
+	 * Reads a body's measured pose from the latest hosted observation, or the stopped world.
+	 */
+	extern fn nksim_session_get_body_pose(session: nksim_session, body: nksim_body, out_pose: ptr<nksim_pose> @inout) -> nksim_result;
 	extern fn nksim_session_get_object_body(session: nksim_session, object: nksim_object, out_body: ptr<nksim_body> @out) -> nksim_result;
-	/** Changes a dynamic object's inertial mass without resetting its pose or velocity. */
-	extern fn nksim_session_set_object_mass(session: nksim_session, object: nksim_object, mass: f64) -> nksim_result;
-	/** Excludes contacts between two bodies before the session's first tick. */
-	extern fn nksim_session_exclude_body_pair(session: nksim_session, first: nksim_body, second: nksim_body) -> nksim_result;
 	/**
 	 * Returns zero in out_carrier when the object is free.
 	 */
@@ -198,13 +225,15 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	extern fn nksim_session_hold_object(session: nksim_session, object: nksim_object, carrier: nksim_body, offset: ptr<const<nksim_pose>>) -> nksim_result;
 	/**
+	 * Tests one free dynamic object against the same oriented volume.
+	 */
+	extern fn nksim_session_object_overlaps_volume(session: nksim_session, object: nksim_object, pose: ptr<const<nksim_pose>>, half_extent_x: f64, half_extent_y: f64, half_extent_z: f64, out_overlaps: ptr<u32> @out) -> nksim_result;
+	/**
 	 * True when the oriented query box intersects a free dynamic object in
 	 * the latest physics state. Static fixtures, kinematic actors and carried
 	 * objects are excluded. Query dimensions are positive half extents.
 	 */
 	extern fn nksim_session_overlap_free_objects(session: nksim_session, pose: ptr<const<nksim_pose>>, half_extents: ptr<const<f64>>, out_present: ptr<u32> @out) -> nksim_result;
-	/** Tests one free dynamic object against the same oriented volume. */
-	extern fn nksim_session_object_overlaps_volume(session: nksim_session, object: nksim_object, pose: ptr<const<nksim_pose>>, half_extent_x: f64, half_extent_y: f64, half_extent_z: f64, out_overlaps: ptr<u32> @out) -> nksim_result;
 	/**
 	 * Adds a keyframe to an actor's trajectory: the pose of every part at
 	 * simulation time `time`, while stopped or running. Each tick moves every
@@ -237,6 +266,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * Writes physical body states for the next tick; each body must belong to this session.
 	 */
 	extern fn nksim_session_set_body_states(session: nksim_session, states: ptr<const<nksim_body_state>> @in_array("count"), count: u32) -> nksim_result;
+	/**
+	 * Changes a dynamic object's inertial mass without resetting its pose or velocity.
+	 */
+	extern fn nksim_session_set_object_mass(session: nksim_session, object: nksim_object, mass: f64) -> nksim_result;
 	/**
 	 * Starts a realtime owner loop that ticks at the fixed timestep.
 	 */
@@ -522,7 +555,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		end_velocity: f64 @offset(72);
 		reference_duration: f64 @offset(80);
 	}
-	struct nksim_object_desc @layout(208, 8) {
+	struct nksim_object_desc @layout(312, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		/**
 		 * < NKSIM_MOTION_STATIC, _KINEMATIC, or _DYNAMIC.
@@ -550,6 +583,15 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		 * < Contact surface of this environment object's shape.
 		 */
 		surface: nksim_surface @offset(152);
+		has_inertial_properties: u32 @offset(208);
+		/**
+		 * < Local centre in metres.
+		 */
+		center_of_mass: array<f64, 3> @offset(216);
+		/**
+		 * < Centroidal row-major tensor in kg m².
+		 */
+		inertia_tensor: array<f64, 9> @offset(240);
 	}
 	struct nksim_pose @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;

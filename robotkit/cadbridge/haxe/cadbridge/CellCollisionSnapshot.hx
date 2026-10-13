@@ -78,7 +78,7 @@ class CellCollisionSnapshot {
 			var points:Array<Float> = [];
 			for (piece in list) {
 				if (piece.link != link) throw 'Physical CAD member "$member" spans different mechanical links';
-				for (point in CollisionSceneBuilder.placed(piece.vertices, poses[link])) points.push(point);
+				for (point in robotkit.collision.CollisionClearance.placed(piece.vertices, poses[link])) points.push(point);
 			}
 			var fixed = compiled.bodyChain[compiled.bodyIndex(model.links[link].id)].length == 0;
 			if (ids.exists(member)) {
@@ -88,7 +88,7 @@ class CellCollisionSnapshot {
 				// All pieces of a shared fixed occurrence remain one environment object set.
 				for (piece in 0...list.length) {
 					var id = list.length == 1 ? member : '$member/piece$piece';
-					var world = CollisionSceneBuilder.placed(list[piece].vertices, poses[link]);
+					var world = robotkit.collision.CollisionClearance.placed(list[piece].vertices, poses[link]);
 					for (i in 0...hulls.length) if (hulls[i].id == id)
 						hulls[i] = observation(id, Fixture, world, root.inverse(), false, member);
 				}
@@ -182,7 +182,7 @@ class CellCollisionSnapshot {
 				case Mechanism(owner, _) | Held(owner, _): movesWithPrimary = owner == controller;
 				case Fixture | Loose:
 			}
-			result.physical.set(id, {points: movesWithPrimary ? CollisionSceneBuilder.placed(observation.points, relocation)
+			result.physical.set(id, {points: movesWithPrimary ? robotkit.collision.CollisionClearance.placed(observation.points, relocation)
 				: observation.points.copy(), fixed: observation.fixed});
 		}
 		return result;
@@ -222,7 +222,7 @@ class CellCollisionSnapshot {
 			for (index in indices) {
 				var object = description.objects[index], body = description.bodies[object.body];
 				var vertices = switch object.geometry { case Convex(points): points; case _: throw "Fixed CAD bounds need finite convex geometry"; };
-				var points = CollisionSceneBuilder.placed(vertices, Transform3.fromArrays(
+				var points = robotkit.collision.CollisionClearance.placed(vertices, Transform3.fromArrays(
 					[body.pose.x, body.pose.y, body.pose.z], [body.pose.qx, body.pose.qy, body.pose.qz, body.pose.qw]));
 				var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
 				var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
@@ -236,7 +236,7 @@ class CellCollisionSnapshot {
 				case Fixture | Loose: true;
 			};
 			if (!independent) continue;
-			var points = CollisionSceneBuilder.placed(hull.vertices, root.compose(hull.pose));
+			var points = robotkit.collision.CollisionClearance.placed(hull.vertices, root.compose(hull.pose));
 			var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
 			var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
 			for (i in 0...points.length) {
@@ -250,14 +250,14 @@ class CellCollisionSnapshot {
 
 	/** Build in the compiled model's cell frame, without changing the captured geometry. */
 	public function describe(arm:KinematicGroup, reference:Array<Float>, margin:Float):CollisionSceneBuilder {
-		var mechanismHulls:Array<robotkit.collision.RobotCollision.RobotLinkHull> = [];
+		var mechanismHulls:Array<robotkit.collision.RobotCollision.RobotLinkShape> = [];
 		for (hull in hulls) switch hull.owner {
 			case Mechanism(owner, link) if (owner == controller):
 				var index = -1;
 				for (i in 0...arm.robot.links.length) if (arm.robot.links[i].id == link) index = i;
 				if (index < 0) throw 'Observed hull "${hull.id}" has unknown link "$link"';
-				mechanismHulls.push(new robotkit.collision.RobotCollision.RobotLinkHull(index, hull.id,
-					CollisionSceneBuilder.placed(hull.vertices, hull.pose), hull.tool ? collisionkit.CollisionMarginClass.Tool : collisionkit.CollisionMarginClass.Installed, hull.member));
+				mechanismHulls.push(new robotkit.collision.RobotCollision.RobotLinkShape(index, hull.id,
+					new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Convex(robotkit.collision.CollisionClearance.placed(hull.vertices, hull.pose))), hull.tool ? collisionkit.CollisionMarginClass.Tool : collisionkit.CollisionMarginClass.Installed, hull.member));
 			case _:
 		}
 		var scene = new CollisionSceneBuilder(arm, reference, controller, margin, observed, mechanismHulls);

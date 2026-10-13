@@ -13,7 +13,7 @@ import motionkit.robot.TrajectoryClearanceProof.ClearanceEvent;
 import motionkit.trajectory.ValidationReport;
 import robotkit.collision.CollisionClearance;
 import robotkit.collision.CollisionClearance;
-import robotkit.manipulation.ClearanceBodyData;
+import ClearanceBodyData;
 import robotkit.manipulation.ClearanceChange;
 import robotkit.manipulation.ClearanceWorld;
 import robotkit.manipulation.Manipulator;

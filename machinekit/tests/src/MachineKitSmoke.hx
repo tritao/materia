@@ -13,6 +13,7 @@ import RobotWelderPreview.RobotWelderChecks;
 import CoreXyPlotterPreview.CoreXyPlotterChecks;
 import GantryPickerPreview.GantryPickerChecks;
 import TrackArmPreview.TrackArmChecks;
+import OverheadArmPreview.OverheadArmChecks;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
@@ -644,7 +645,7 @@ class MachineKitSmoke {
 		check(bom.quantity("608-2Z") == 1 && bom.quantity("6000-2Z") == 1,
 			"document BOM groups recipe instances by values");
 		var saved = DocumentCodec.encode(document);
-		check(DocumentCodec.VERSION == 11, "document version 11");
+		check(DocumentCodec.VERSION == 16, "document version 16");
 		var loaded = DocumentCodec.decode(saved);
 		check(MachineKitDocuments.bom(loaded).lines().length == 2, "recipe BOM survives save and reload");
 		loaded.close();
@@ -2560,6 +2561,7 @@ class MachineKitSmoke {
 			{name: "RotaryHeadCheck.run", run: () -> RotaryHeadCheck.run(), weight: 1.0},
 			{name: "LinearTrackCheck.run", run: () -> LinearTrackCheck.run(), weight: 1.0},
 			{name: "TrackArmChecks.run", run: () -> TrackArmChecks.run(), weight: 1.0},
+			{name: "OverheadArmChecks.run", run: () -> OverheadArmChecks.run(), weight: 1.0},
 			{name: "GantryPickerChecks.run", run: () -> GantryPickerChecks.run(), weight: 1.0},
 			{name: "BenchMillPreview.BenchMillChecks.run", run: () -> BenchMillPreview.BenchMillChecks.run(), weight: 1.0},
 			{name: "BenchMillGuideLoads.bare", run: () -> BenchMillGuideLoads.run(new BenchMill(),
@@ -2577,6 +2579,12 @@ class MachineKitSmoke {
 			{name: "MobileWelderChecks.run", run: () -> MobileWelderChecks.run(false), weight: 1.0},
 			{name: "MillPartTests.run", run: () -> MillPartTests.run(), weight: 1.0},
 			{name: "PneumaticPartTests.run", run: () -> PneumaticPartTests.run(), weight: 1.0},
+			{name: "HydraulicPartTests.run", run: () -> HydraulicPartTests.run(), weight: 0.5},
+			{name: "ToolProfileTests.run", run: () -> ToolProfileTests.run(), weight: 0.1},
+			{name: "ToolLayoutTests.run", run: () -> ToolLayoutTests.run(), weight: 0.1},
+			{name: "PressBrakeInterfaceTests.run", run: () -> PressBrakeInterfaceTests.run(), weight: 0.1},
+			{name: "PressBrakePartTests.run", run: () -> PressBrakePartTests.run(), weight: 0.1},
+			{name: "PressBrakeChecks.run", run: () -> PressBrakeChecks.run(), weight: 1.0},
 			{name: "namedStepperFaces", run: namedStepperFaces, weight: 0.1},
 			{name: "MachineKitNamingAudit.run", run: MachineKitNamingAudit.run, weight: 0.4},
 			{name: "MachineAssemblyDescriptionTests.run", run: MachineAssemblyDescriptionTests.run, weight: 10.5},

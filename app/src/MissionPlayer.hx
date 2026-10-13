@@ -652,7 +652,7 @@ class MissionPlayer implements SessionMember {
       if (vertices.length == 0) {
         var half = entry.object.shape.boundingHalfExtents();
         if (half == null) throw 'Joint clearance needs finite geometry for "${entry.id}"';
-        vertices = CollisionSceneBuilder.box(half.x, half.y, half.z);
+        vertices = collisionkit.CollisionBounds.of(collisionkit.CollisionGeometry.Box(half.x, half.y, half.z), collisionkit.CollisionPose.identity()).corners();
       }
       var pose = simulation.objectPose(entry.object);
       captured.object(name, [vertices], new Transform3(new Vec3(pose.x, pose.y, pose.z),
@@ -1730,10 +1730,20 @@ class MissionPlayer implements SessionMember {
     var arm = new Manipulator(robot.model, robot.model.links[0].id, frame.id);
     var count = arm.group.count();
     var indices = [for (target in arm.toJointTargets([for (_ in 0...count) 0.0])) target.joint];
+    var revision = robot.runtime.snapshot();
     var cached = jointMotions.get(name);
+    if (cached != null && (Int64.compare(cached.motion.compiler.limits.modelRevision, revision.modelRevision) != 0 ||
+        Int64.compare(cached.motion.compiler.limits.calibrationRevision, revision.calibrationRevision) != 0)) {
+      if (cached.motion.shutdownPlanning() != 0)
+        throw 'Joint-motion planner "$name" did not stop before updating its reference';
+      cached.motion.reset();
+      if (cached.space != null) cached.space.dispose();
+      jointMotions.remove(name);
+      cached = null;
+    }
     var motion = cached == null ? null : cached.motion;
     if (motion == null) {
-      var limits = new ValidationLimits(count, Int64.ofInt(1), Int64.ofInt(0));
+      var limits = new ValidationLimits(count, revision.modelRevision, revision.calibrationRevision);
       var velocities:Array<Float> = [];
       var accelerations:Array<Float> = [];
       var jerks:Array<Float> = [];

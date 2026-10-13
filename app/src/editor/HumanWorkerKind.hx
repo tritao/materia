@@ -1,7 +1,7 @@
 package app.editor;
 
-import animkit.AnimationAsset;
-import animkit.AnimationInstance;
+import haxeon.animation.AnimationAsset;
+import haxeon.animation.AnimationInstance;
 import app.CadDocumentSession;
 import app.EditorScene;
 import app.SceneObjectData;

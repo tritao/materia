@@ -72,7 +72,8 @@ class Shape {
 		return CadKit.shapeAreaChecked(native.borrow());
 	}
 
-	public function volume():Float {
+	public function volume(?relativeTolerance:Float):Float {
+		if (relativeTolerance != null) return CadKit.shapeVolumeWithToleranceChecked(native.borrow(), relativeTolerance);
 		return CadKit.shapeVolumeChecked(native.borrow());
 	}
 
@@ -96,6 +97,25 @@ class Shape {
 
 	public function subshape(kind:CadKit.ShapeKind, index:Int):Shape {
 		return new Shape(CadKit.shapeSubshapeAtChecked(native.borrow(), kind, index));
+	}
+
+	/** Unique containing subshapes, with names inherited from this source. */
+	public function ancestorCount(sub:Shape, kind:CadKit.ShapeKind):Int {
+		return CadKit.shapeAncestorCountChecked(native.borrow(), sub.borrowHandle(), kind);
+	}
+	public function ancestor(sub:Shape, kind:CadKit.ShapeKind, index:Int):Shape {
+		return new Shape(CadKit.shapeAncestorAtChecked(native.borrow(), sub.borrowHandle(), kind, index));
+	}
+	public function ancestors(sub:Shape, kind:CadKit.ShapeKind):Array<Shape> {
+		var result:Array<Shape> = [];
+		try {
+			var count = ancestorCount(sub, kind);
+			for (index in 0...count) result.push(ancestor(sub, kind, index));
+			return result;
+		} catch (error:Dynamic) {
+			for (shape in result) shape.close();
+			throw error;
+		}
 	}
 
 	public function faces():FaceCollection {

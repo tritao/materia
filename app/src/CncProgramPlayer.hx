@@ -833,9 +833,9 @@ class CncProgramPlayer implements SessionMember {
 	}
 
 	function pneumaticDriveFor(robot:AssemblyRobot,
-			jointId:String):robotkit.runtime.RobotRuntimePneumaticDriveBlueprint {
-		for (drive in robot.blueprint.pneumaticDrives)
-			if (drive.joint >= 0 && drive.joint < robot.model.joints.length &&
+			jointId:String):robotkit.runtime.RobotRuntimeCylinderDriveBlueprint {
+		for (drive in robot.blueprint.cylinderDrives)
+			if (drive.control == robotkit.runtime.CylinderControl.PressureEffort && drive.joint >= 0 && drive.joint < robot.model.joints.length &&
 				robot.model.joints[drive.joint].id == jointId) return drive;
 		throw 'Robot-tended CNC machine is missing its pneumatic actuator on joint "$jointId"';
 	}

@@ -356,6 +356,17 @@ CADKIT_API cad_result cad_shape_extrude_operation(
     cad_vec3 delta,
     cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
+/* Map one exact planar XY developed bend region onto its radial thickness.
+ * Cylinder pcurves remain analytic; 3D edge curves use OCCT's 1e-8 tolerance.
+ * At zero inner radius, the input is a hole-free Y-monotone radial sector. */
+CADKIT_API cad_result cad_sheet_bend_region_operation(
+    cad_shape profile,
+    double thickness,
+    double angle,
+    double allowance,
+    double inner_radius,
+    cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
 CADKIT_API cad_result cad_shape_revolve_operation(
     cad_shape profile,
     cad_vec3 axis_origin,
@@ -429,6 +440,12 @@ CADKIT_API cad_result cad_shape_volume(
     cad_shape shape,
     double* out_volume CADKIT_HXI_OUT);
 
+/* Adaptive integration for curved trimmed faces; tolerance is relative, in [1e-12, 1e-3]. */
+CADKIT_API cad_result cad_shape_volume_with_tolerance(
+    cad_shape shape,
+    double relative_tolerance,
+    double* out_volume CADKIT_HXI_OUT);
+
 /* Volumetric properties for solid shapes; coordinates and measures use kernel units. */
 CADKIT_API cad_result cad_shape_mass_properties(
     cad_shape shape,
@@ -455,6 +472,26 @@ CADKIT_API cad_result cad_shape_subshape_at(
 
 CADKIT_API cad_result cad_shape_subshapes(
     cad_shape shape,
+    cad_shape_kind kind,
+    cad_shape* output,
+    uint32_t capacity);
+
+/* Unique ancestors of a member subshape, ignoring its orientation. Ancestor kind
+ * must strictly contain the subshape kind. Returned handles retain source names. */
+CADKIT_API cad_result cad_shape_ancestor_count(
+    cad_shape shape,
+    cad_shape sub,
+    cad_shape_kind kind,
+    uint32_t* out_count CADKIT_HXI_OUT);
+CADKIT_API cad_result cad_shape_ancestor_at(
+    cad_shape shape,
+    cad_shape sub,
+    cad_shape_kind kind,
+    uint32_t index,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_shape_ancestors(
+    cad_shape shape,
+    cad_shape sub,
     cad_shape_kind kind,
     cad_shape* output,
     uint32_t capacity);

@@ -1,9 +1,14 @@
 import haxe.io.Bytes;
+import haxeon.wire.JsonWire;
 import materia.assembly.AssemblyCodec;
 import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyJointStop;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
+import materia.assembly.AssemblyDefinition.AssemblyHydraulicDrive;
+import materia.assembly.AssemblyDefinitionFlattener;
+import sys.io.File;
 import materia.assembly.AssemblyBodies;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyFrames;
@@ -50,6 +55,38 @@ class ProjectKitTests {
     var model = definition();
     var decoded = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(model));
     check(decoded.joints[0].role == AssemblyJointRole.Tree, "tree role round trip");
+    var response:AssemblyJointStop = {timeConstantSec: 0.001, dampingRatio: 1.0};
+    model.joints[0].stop = response;
+    var stopped = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(model));
+    var stop = stopped.joints[0].stop;
+    if (stop == null) throw "Saved assembly lost its mechanical end stop";
+    near(stop.timeConstantSec, 0.001, "end-stop response time round trip");
+    near(stop.dampingRatio, 1, "end-stop damping round trip");
+    var flattenedStop = AssemblyDefinitionFlattener.flatten(stopped).joints[0].stop;
+    check(flattenedStop != null && flattenedStop.timeConstantSec == stop.timeConstantSec,
+      "flattening retains the authored mechanical end stop");
+    for (value in [0.0, -1.0, Math.NaN]) {
+      var invalid = definition();
+      var badResponse:AssemblyJointStop = {timeConstantSec: value, dampingRatio: 1.0};
+      invalid.joints[0].stop = badResponse;
+      rejects(function() AssemblyDefinitionCodec.encode(invalid), "invalid mechanical stop response");
+    }
+    var undamped = definition();
+    var noDamping:AssemblyJointStop = {timeConstantSec: 0.001, dampingRatio: 0.0};
+    undamped.joints[0].stop = noDamping;
+    rejects(function() AssemblyDefinitionCodec.encode(undamped), "mechanical stop needs positive damping");
+    var fixedStop = definition(); fixedStop.joints[0].type = AssemblyJointType.Fixed;
+    fixedStop.joints[0].stop = response;
+    rejects(function() AssemblyDefinitionCodec.encode(fixedStop), "fixed joint cannot have moving end stops");
+    model.joints[0].passive = true;
+    var passive = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(model));
+    check(passive.joints[0].passive == true, "passive ownership round trip");
+    model.joints[0].driven = true;
+    rejects(function() AssemblyDefinitionCodec.encode(model), "passive joint cannot be driven");
+    model.joints[0].driven = false;
+    model.joints[0].type = AssemblyJointType.Fixed;
+    rejects(function() AssemblyDefinitionCodec.encode(model), "fixed joint cannot be passive");
+    model = definition();
     model.joints[0].role = AssemblyJointRole.Closure;
     check(AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(model)).joints[0].role ==
       AssemblyJointRole.Closure, "closure role round trip");
@@ -124,6 +161,86 @@ class ProjectKitTests {
     near(identity.x, 0, "inverse x");
     near(identity.y, 0, "inverse y");
     near(identity.qw, 1, "inverse rotation");
+  }
+
+  static function hydraulicDefinition():AssemblyDefinition {
+    var model = definition();
+    model.id = "hydraulic-reference";
+    model.joints[0].type = AssemblyJointType.Prismatic;
+    model.joints[0].limits.lower = 0; model.joints[0].limits.upper = 100;
+    model.actuators = [{id: "ram", joint: "hinge", drive: "hydraulic", maxEffort: 201061.92982974676,
+      maxRate: 80, hydraulic: {bore: 160, rod: 100, stroke: 100, approachSpeed: 80,
+        workingSpeed: 8, returnSpeed: 70, changePoint: 68.5, pressurePa: 10e6,
+        channelA: "valve/coilA", channelB: "valve/coilB", extendSign: 1}}];
+    return model;
+  }
+
+  static function rejectHydraulic(change:AssemblyHydraulicDrive->Void, message:String):Void {
+    var model = hydraulicDefinition();
+    var hydraulic = model.actuators[0].hydraulic;
+    if (hydraulic == null) throw "Missing hydraulic fixture data";
+    change(hydraulic);
+    rejects(function() AssemblyDefinitionCodec.encode(model), message);
+  }
+
+  static function hydraulic():Void {
+    var model = hydraulicDefinition();
+    var encoded = AssemblyDefinitionCodec.encode(model);
+    var restored = AssemblyDefinitionCodec.decode(encoded);
+    var h = restored.actuators[0].hydraulic;
+    if (h == null) throw "Hydraulic round trip lost its typed drive";
+    check(restored.schemaVersion == AssemblyDefinitionCodec.VERSION && restored.actuators[0].drive == "hydraulic", "current hydraulic format");
+    near(h.bore, 160, "hydraulic bore round trip"); near(h.rod, 100, "hydraulic rod round trip");
+    near(h.stroke, 100, "hydraulic stroke round trip"); near(h.pressurePa, 10e6, "hydraulic pressure round trip");
+    near(h.approachSpeed, 80, "hydraulic approach speed round trip");
+    near(h.workingSpeed, 8, "hydraulic working speed round trip");
+    near(h.returnSpeed, 70, "hydraulic return speed round trip");
+    near(h.changePoint, 68.5, "hydraulic change point round trip");
+    near(h.extendSign, 1, "hydraulic extension sign round trip");
+    var copy = AssemblyDefinitionFlattener.copyActuator(restored.actuators[0], "press/ram", "press/hinge", "press/");
+    var copied = copy.hydraulic; if (copied == null) throw "Hydraulic copy lost its drive";
+    check(copied.channelA == "press/valve/coilA" && copied.channelB == "press/valve/coilB",
+      "hydraulic channels follow nested member scope");
+    copied.pressurePa = 1;
+    near(h.pressurePa, 10e6, "hydraulic copies own their data");
+    var nested:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "cell", lengthUnit: "mm",
+      definitions: [], occurrences: [{id: "press", definition: model.id, assembly: model.id,
+        initialPose: AssemblyFrames.identity()}], joints: [], assemblies: [{id: model.id,
+        definitions: model.definitions, occurrences: model.occurrences, joints: model.joints,
+        actuators: model.actuators}]};
+    var flat = AssemblyDefinitionFlattener.flatten(AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(nested)));
+    check(flat.actuators[0].joint == "press/hinge", "nested hydraulic joint scope");
+    var flatDrive = flat.actuators[0].hydraulic; if (flatDrive == null) throw "Flattening lost hydraulic data";
+    check(flatDrive.channelA == "press/valve/coilA" && flatDrive.channelB == "press/valve/coilB",
+      "nested hydraulic valve channels scope");
+    var fixture = "fixtures/hydraulic-assembly.json";
+    if (Sys.getEnv("PROJECTKIT_WRITE_FIXTURES") == "1") File.saveContent(fixture, encoded + "\n");
+    check(AssemblyDefinitionCodec.encode(AssemblyDefinitionCodec.decode(File.getContent(fixture))) == encoded,
+      "hydraulic fixture is generated by the current codec");
+    for (version in [3, 4, 5, 6, 7, 8, 9]) {
+      var old = hydraulicDefinition(); old.schemaVersion = version;
+      rejects(function() AssemblyDefinitionCodec.encode(old), "old assembly definition rejected");
+    }
+    rejectHydraulic(h -> h.bore = 100, "hydraulic rod consumes its bore");
+    rejectHydraulic(h -> h.workingSpeed = 0, "zero hydraulic working speed");
+    rejectHydraulic(h -> h.changePoint = 101, "hydraulic change point past stroke");
+    rejectHydraulic(h -> h.changePoint = -1, "negative hydraulic change point");
+    rejectHydraulic(h -> h.pressurePa = -1, "negative hydraulic pressure");
+    rejectHydraulic(h -> h.returnSpeed = Math.NaN, "nonfinite hydraulic return speed");
+    rejectHydraulic(h -> h.channelB = h.channelA, "hydraulic coils share a channel");
+    rejectHydraulic(h -> h.extendSign = 0, "invalid hydraulic direction");
+    var passiveRam = hydraulicDefinition(); passiveRam.joints[0].passive = true;
+    rejects(function() AssemblyDefinitionCodec.encode(passiveRam), "passive ram cannot have a hydraulic actuator");
+    var rotating = hydraulicDefinition(); rotating.joints[0].type = AssemblyJointType.Revolute;
+    rejects(function() AssemblyDefinitionCodec.encode(rotating), "hydraulic joint cannot rotate");
+    var wrongKind = hydraulicDefinition(); wrongKind.actuators[0].drive = "servo";
+    rejects(function() AssemblyDefinitionCodec.encode(wrongKind), "hydraulic data cannot describe an electric drive");
+    var untyped = hydraulicDefinition(); untyped.actuators[0].drive = null;
+    rejects(function() AssemblyDefinitionCodec.encode(untyped), "hydraulic data needs a declared drive kind");
+    var shortGuide = hydraulicDefinition(); shortGuide.joints[0].limits.upper = 99;
+    rejects(function() AssemblyDefinitionCodec.encode(shortGuide), "hydraulic stroke differs from guide travel");
+    var lowCeiling = hydraulicDefinition(); lowCeiling.actuators[0].maxRate = 79;
+    rejects(function() AssemblyDefinitionCodec.encode(lowCeiling), "hydraulic phase speed exceeds ceiling");
   }
 
   static function scene():Void {
@@ -244,6 +361,109 @@ class ProjectKitTests {
   }
 
   /** A mobile base names its robot's wheel joints and carries positive dimensions and limits. */
+  /** Saved machine metadata stays typed, including nested output events and contact filters. */
+  static function machineMetadata():Void {
+    var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
+    vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
+    var corners = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+    for (i in 0...corners.length) indices.setInt32(i * 4, corners[i]);
+    var surface:materia.project.SceneContactSurface = {friction: [0.3, 0, 0], frictionDimensions: 3,
+      contactTimeConstant: 0.002, contactDampingRatio: 1,
+      filter: materia.project.SceneContactFilter.PairsAndEnvironment};
+    var contacts:Array<materia.project.SceneArtifact.SceneArtifactHullContact> = [{occurrence: "arm", surface: surface}];
+    var motion:materia.project.SceneArtifact.SceneArtifactMachineMotion = {belts: [],
+      contacts: contacts, program: {axes: ["hinge"], waypoints: [[0.2]], loop: true},
+      virtualDevice: true};
+    var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
+      parts: [{id: "body", name: "Body", red: 0.2, green: 0.3, blue: 0.4,
+        vertexCount: 4, indexCount: 12, vertices: vertices, normals: normals, indices: indices, faceRanges: []}],
+      assemblyDefinition: definition(), machineMotion: motion};
+    var restored = SceneArtifact.decode(SceneArtifact.encode(data)).machineMotion;
+    if (restored == null) throw "Machine metadata disappeared";
+    var restoredProgram = restored.program, restoredContacts = restored.contacts;
+    if (restoredProgram == null || restoredContacts == null) throw "Machine metadata disappeared";
+    near(restoredProgram.waypoints[0][0], 0.2, "typed axis waypoint round trip");
+    check(restored.virtualDevice == true, "typed virtual axis device round trip");
+    check(restoredContacts[0].surface.filter == materia.project.SceneContactFilter.PairsAndEnvironment,
+      "typed hull contact filter round trip");
+    near(restoredContacts[0].surface.contactTimeConstant, 0.002, "typed hull compliance round trip");
+    motion.program = null; motion.virtualDevice = false;
+    var digital:materia.project.SceneArtifact.SceneArtifactDigitalProgram = {durationSec: 2, loop: false, events: [
+      {timeSec: 0.1, channel: "valve/A", value: true}, {timeSec: 1.5, channel: "valve/A", value: false}]};
+    motion.digitalProgram = digital;
+    var saved = SceneArtifact.decode(SceneArtifact.encode(data)).machineMotion;
+    if (saved == null) throw "Digital program disappeared";
+    var savedProgram = saved.digitalProgram;
+    if (savedProgram == null) throw "Digital program disappeared";
+    check(savedProgram.events[1].channel == "valve/A" && !savedProgram.events[1].value,
+      "typed digital terminal output round trip");
+    near(savedProgram.durationSec, 2, "typed digital duration round trip");
+    contacts.push(contacts[0]);
+    rejects(function() SceneArtifact.encode(data), "duplicate hull contact occurrence");
+    contacts.pop(); contacts[0].occurrence = "absent";
+    rejects(function() SceneArtifact.encode(data), "unknown hull contact occurrence");
+    contacts[0].occurrence = "arm"; surface.frictionDimensions = 2;
+    rejects(function() SceneArtifact.encode(data), "unsupported contact friction dimensions");
+    surface.frictionDimensions = 3; surface.contactTimeConstant = -1;
+    rejects(function() SceneArtifact.encode(data), "negative contact compliance");
+    surface.contactTimeConstant = 0.002;
+    digital.events[1].timeSec = 0.05;
+    rejects(function() SceneArtifact.encode(data), "digital events out of order");
+    digital.events[1].timeSec = 2;
+    rejects(function() SceneArtifact.encode(data), "digital terminal event at program end");
+    digital.events[1].timeSec = 0.1;
+    rejects(function() SceneArtifact.encode(data), "digital output assigned twice at one time");
+    digital.events[1].timeSec = 1.5;
+    motion.program = {axes: ["hinge"], waypoints: [[0.2]], loop: false};
+    rejects(function() SceneArtifact.encode(data), "axis and digital program execution conflict");
+    motion.program = null; motion.digitalProgram = null;
+    var pressAssembly = definition(), frame = AssemblyFrames.identity();
+    pressAssembly.joints[0].type = AssemblyJointType.Prismatic;
+    pressAssembly.joints[0].limits.upper = 300;
+    for (id in ["depth", "X"]) {
+      pressAssembly.occurrences.push({id: id, definition: "body", initialPose: frame});
+      pressAssembly.joints.push({id: id, type: AssemblyJointType.Prismatic, role: AssemblyJointRole.Tree,
+        parent: "base", parentConnector: "pin", child: id, childConnector: "pin",
+        axis: {x: 0.0, y: 0.0, z: 1.0},
+        limits: {lower: 0.0, upper: 300.0, velocity: null, effort: null}, defaultValue: 0.0});
+    }
+    pressAssembly.sensors = [for (id in ["top", "left", "right"])
+      {id: id, kind: "joint_switch", joint: "hinge", windowLower: -0.1, windowUpper: 0.1, hysteresis: 0.001}];
+    data.assemblyDefinition = pressAssembly;
+    var press:materia.project.SceneArtifact.SceneArtifactPressBrake = {
+      ramJoint: "hinge", depthAxis: "depth", gaugeX: "X", topSwitch: "top", fingerSwitches: ["left", "right"],
+      steps: [{gaugeXmm: 150, gaugeRmm: 0, clampTravelMm: 78.5, depthTravelMm: 83, withdrawalMm: 20}],
+      positionToleranceMm: 0.05, requestTimeoutSeconds: 20, releaseTravelMm: 0.5, releaseClosingForceN: 5000};
+    motion.pressBrake = press;
+    var pressSaved = SceneArtifact.decode(SceneArtifact.encode(data)).machineMotion;
+    if (pressSaved == null || pressSaved.pressBrake == null) throw "Press controller disappeared";
+    near(pressSaved.pressBrake.steps[0].depthTravelMm, 83, "typed press depth round trip");
+    press.fingerSwitches[1] = "left";
+    rejects(function() SceneArtifact.encode(data), "press needs independent registration switches");
+    press.fingerSwitches[1] = "right"; press.depthAxis = "hinge";
+    rejects(function() SceneArtifact.encode(data), "press cannot alias ram and depth ownership");
+    press.depthAxis = "depth"; press.steps[0].depthTravelMm = 78;
+    rejects(function() SceneArtifact.encode(data), "press depth must follow clamp travel");
+    press.steps[0].depthTravelMm = 83; press.steps[0].gaugeRmm = 1;
+    rejects(function() SceneArtifact.encode(data), "press cannot program an absent R axis");
+    press.steps[0].gaugeRmm = 0; motion.digitalProgram = digital;
+    rejects(function() SceneArtifact.encode(data), "press cannot share hydraulic output authority");
+    motion.digitalProgram = null; press.controllerId = "absent";
+    rejects(function() SceneArtifact.encode(data), "press cannot name an absent cabinet");
+    press.controllerId = null; press.steps[0].gaugeXmm = 290;
+    rejects(function() SceneArtifact.encode(data), "press withdrawal must fit bounded backgauge travel");
+    press.steps[0].gaugeXmm = 150; press.controllerId = "press";
+    data.controllers = [{id: "press", kind: "cnc", joints: ["hinge", "depth", "X"],
+      sensors: ["top", "left", "right"], channels: []}];
+    data.signals = [];
+    var cabinetPress = SceneArtifact.decode(SceneArtifact.encode(data)).machineMotion;
+    check(cabinetPress != null && cabinetPress.pressBrake != null && cabinetPress.pressBrake.controllerId == "press",
+      "press controller ownership round trip");
+    data.controllers[0].joints = ["hinge", "depth"];
+    data.controllers.push({id: "robot", kind: "robot", joints: ["X"], sensors: [], channels: []});
+    rejects(function() SceneArtifact.encode(data), "press cannot drive another cabinet's gauge axis");
+  }
+
   static function mobileBase():Void {
     var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
     vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
@@ -724,8 +944,8 @@ class ProjectKitTests {
     near(LengthUnit.metresPerUnit("in"), 0.0254, "inches");
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");
     rejects(function() LengthUnit.metresPerUnit("feet"), "unsupported unit");
-    assembly();
-    homingDependencies(); frames(); scene(); machining(); mobileBase(); torchTool(); bodies();
+    assembly(); hydraulic();
+    homingDependencies(); frames(); scene(); machineMetadata(); machining(); mobileBase(); torchTool(); bodies();
     check(MaterialLibrary.require("steel-c45").physical.density == 7850, "steel density");
     check(MaterialLibrary.fromSpec("steel C45") == "steel-c45", "material lookup");
     rejects(function() MaterialLibrary.require("unknown"), "unknown material");
@@ -736,6 +956,35 @@ class ProjectKitTests {
     check(true, "valid custom material");
     rejects(function() MaterialLibrary.validateCustom([custom, custom]),
       "duplicate custom material");
+    var sheetGrades = MaterialLibrary.sheetMaterials();
+    check(sheetGrades.length == 2, "specific sheet grades have development defaults");
+    check(MaterialLibrary.require("painted").mechanical == null, "visual steel does not infer a structural grade");
+    var steel = MaterialLibrary.require("mild-steel");
+    MaterialLibrary.validateSheetProperties(steel);
+    var mechanical = steel.mechanical; if (mechanical == null) throw "missing steel properties";
+    near(mechanical.uts, 400, "plan material A UTS in MPa");
+    near(mechanical.youngs, 205000, "plan material A modulus in MPa");
+    var aluminium = MaterialLibrary.require("aluminium-5052-h32");
+    var aluminiumMechanical = aluminium.mechanical; if (aluminiumMechanical == null) throw "missing aluminium properties";
+    near(aluminiumMechanical.yield, 193, "plan material B yield in MPa");
+    var encoded = JsonWire.encode(sheetGrades);
+    var decoded:Array<MaterialDef> = JsonWire.decode(encoded);
+    check(decoded.length == 2, "typed material array round trip");
+    var decodedSheet = decoded[0].sheet; if (decodedSheet == null) throw "missing decoded sheet defaults";
+    near(decodedSheet.kFactorTable[1].k, 0.38, "typed sheet defaults round trip");
+    check(decodedSheet.grain, "rolling-direction requirement round trip");
+    custom.mechanical = {uts: 200, yield: 300, youngs: 70000};
+    rejects(function() MaterialLibrary.validateCustom([custom]), "yield above UTS rejected");
+    custom.mechanical = null;
+    custom.sheet = {kFactorTable: [{ratio: 1, k: 0.4}, {ratio: 1, k: 0.4}],
+      defaultRadiusRatio: 1, minRadiusRatio: 0.5, grain: false};
+    rejects(function() MaterialLibrary.validateCustom([custom]), "unordered or duplicate K rows rejected");
+    var customSheet = custom.sheet; if (customSheet == null) throw "missing custom sheet";
+    customSheet.kFactorTable = [{ratio: 0, k: 0.6}];
+    rejects(function() MaterialLibrary.validateCustom([custom]), "K outside ANSI range rejected");
+    customSheet.kFactorTable = [{ratio: 0, k: 0.4}];
+    customSheet.minRadiusRatio = 2;
+    rejects(function() MaterialLibrary.validateCustom([custom]), "default radius below minimum rejected");
     check(Appearances.same(Appearances.neutral(), null), "default appearance");
     check(Appearances.preset("rubber") != null, "appearance preset");
     Sys.println('ProjectKit tests passed ($assertions assertions)');

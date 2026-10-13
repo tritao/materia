@@ -1,10 +1,10 @@
-import animkit.AnimationAsset;
+import haxeon.animation.AnimationAsset;
 import humankit.HumanBodyProxy;
 import humankit.HumanCharacter;
 import humankit.HumanDescription;
 import humankit.job.HumanJobSpec;
 import humankit.HumanLimb;
-import humankit.rig.HumanoidRig;
+import haxeon.animation.rig.HumanoidRig;
 import humankit.sim.HumanWorker;
 import nativekit.scene.Scene;
 import nativekit.sim.MotionType;

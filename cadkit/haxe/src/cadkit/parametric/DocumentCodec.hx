@@ -16,6 +16,30 @@ import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.sheetmetal.SheetBaseFeature;
+import cadkit.sheetmetal.SheetFeature;
+import cadkit.sheetmetal.SheetEdgeFlangeFeature;
+import cadkit.sheetmetal.SheetEdgeFeature;
+import cadkit.sheetmetal.SheetHemFeature;
+import cadkit.sheetmetal.SheetRipFeature;
+import cadkit.sheetmetal.SheetCutFeature;
+import cadkit.sheetmetal.SheetCornerFeature;
+import cadkit.sheetmetal.SheetCornerEdge;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetCornerRecord;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetCutRecord;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetRipRecord;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetHemRecord;
+import cadkit.sheetmetal.SheetIdentityLedger;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetBaseRecord;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetFlangeRecord;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetStockRecord;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetSavedBendRule;
+import cadkit.sheetmetal.SheetFeatureRecord.SheetFaceRecord;
+import haxeon.wire.JsonWire;
+import cadkit.sheetmetal.SheetMaterial;
+import cadkit.sheetmetal.BendRule;
+import cadkit.sheetmetal.KFactorTable;
+import cadkit.sheetmetal.process.ProcessBendRule;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchPoint;
 import cadkit.sketch.SketchEntity;
@@ -60,7 +84,7 @@ import cadkit.parametric.RelationshipId;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 11;
+	public static inline var VERSION:Int = 16;
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
 		for (index in 0...document.featureCount()) {
@@ -260,6 +284,43 @@ class DocumentCodec {
 					feature = document.add(modeling);
 				} else if (featureType == "constrained-sketch") {
 					feature = document.add(decodeConstrainedSketch(record, document));
+				} else if (featureType == "sheet-base") {
+					var data:SheetBaseRecord = JsonWire.decode(Json.stringify(requiredField(record, "sheet")));
+					var source = Std.downcast(requiredFeature(document, data.source), ConstrainedSketchFeature);
+					if (source == null) throw new ParametricError("sheet base source must be a constrained sketch");
+					feature = document.add(new SheetBaseFeature(source, decodeSheetStock(data.material, data.thickness), data.side,
+						new SheetIdentityLedger(data.identities.nextWall, data.identities.nextBend)));
+				} else if (featureType == "sheet-edge-flange") {
+					var data:SheetFlangeRecord = JsonWire.decode(Json.stringify(requiredField(record, "sheet")));
+					var source = Std.downcast(requiredFeature(document, data.source), SheetFeature);
+					if (source == null) throw new ParametricError("flange source must be a sheet feature");
+					feature = document.add(new SheetEdgeFlangeFeature(source, null, data.length, data.angle, data.radius,
+						data.lengthSpec, data.position, data.offset, data.gap1, data.gap2, data.extend1, data.extend2,
+						[for (face in data.faces) decodeSheetFace(face)], data.walls, data.bends,
+						data.reliefType, data.reliefSizing, data.reliefWidth, data.reliefDepth));
+				} else if (featureType == "sheet-hem") {
+					var data:SheetHemRecord = JsonWire.decode(Json.stringify(requiredField(record, "sheet")));
+					var source = Std.downcast(requiredFeature(document, data.source), SheetFeature);
+					if (source == null) throw new ParametricError("hem source must be a sheet feature");
+					feature = document.add(new SheetHemFeature(source, null, data.spec, data.length, data.side,
+						[for (face in data.faces) decodeSheetFace(face)], data.walls, data.bends));
+				} else if (featureType == "sheet-rip") {
+					var data:SheetRipRecord = JsonWire.decode(Json.stringify(requiredField(record, "sheet")));
+					var source = Std.downcast(requiredFeature(document, data.source), SheetFeature);
+					if (source == null) throw new ParametricError("rip source must be a sheet feature");
+					feature = document.add(new SheetRipFeature(source, data.bend));
+				} else if (featureType == "sheet-corner") {
+					var data:SheetCornerRecord = JsonWire.decode(Json.stringify(requiredField(record, "sheet")));
+					var source = Std.downcast(requiredFeature(document, data.source), SheetFeature);
+					if (source == null) throw new ParametricError("corner source must be a sheet feature");
+					feature = document.add(new SheetCornerFeature(source, new SheetCornerEdge(data.firstWall, data.firstEdge),
+						new SheetCornerEdge(data.secondWall, data.secondEdge), data.join, data.gap, data.overlap, data.relief, data.reliefSize));
+				} else if (featureType == "sheet-cut") {
+					var data:SheetCutRecord = JsonWire.decode(Json.stringify(requiredField(record, "sheet")));
+					var source = Std.downcast(requiredFeature(document, data.source), SheetFeature);
+					var profile = Std.downcast(requiredFeature(document, data.profile), ConstrainedSketchFeature);
+					if (source == null || profile == null) throw new ParametricError("sheet cut requires a sheet source and constrained sketch");
+					feature = document.add(new SheetCutFeature(source, profile, data.wall, data.side));
 				} else if (featureType == "datum-sketch") {
 					feature = document.add(new DatumSketchFeature(stringField(record, "profile"), numberField(record, "width"), numberField(record, "height"),
 						decodeElementReferenceInDocument(requiredField(record, "datum")), numberField(record, "offset")));
@@ -504,6 +565,10 @@ class DocumentCodec {
 		} else if (featureType == "chamfer") {
 			var selectedChamfer:ChamferFeature = cast feature;
 			excluded = selectedChamfer.edgeReferences;
+		} else if (featureType == "sheet-edge-flange" || featureType == "sheet-hem") {
+			var selectedFlange = Std.downcast(feature, SheetEdgeFeature);
+			if (selectedFlange == null) throw new ParametricError("sheet edge feature has the wrong feature class");
+			excluded = selectedFlange.faceReferences();
 		} else if (featureType == "constrained-sketch") {
 			var selectedSketch:ConstrainedSketchFeature = cast feature;
 			if (selectedSketch.supportFaceReference != null)
@@ -520,6 +585,52 @@ class DocumentCodec {
 		var modeling = encodeModelingFeature(feature, references);
 		if (modeling != null)
 			return modeling;
+		if (featureType == "sheet-base") {
+			var base = Std.downcast(feature, SheetBaseFeature);
+			if (base == null) throw new ParametricError("sheet-base has the wrong feature class");
+			var data:SheetBaseRecord = {source: base.source.id.toInt(), thickness: base.thickness.value, side: base.side,
+				material: encodeSheetStock(base.stock()),
+				identities: {nextWall: base.identityLedger().wallCounter(), nextBend: base.identityLedger().bendCounter()}};
+			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
+		}
+		if (featureType == "sheet-edge-flange") {
+			var flange = Std.downcast(feature, SheetEdgeFlangeFeature);
+			if (flange == null) throw new ParametricError("sheet-edge-flange has the wrong feature class");
+			var data:SheetFlangeRecord = {source: flange.source.id.toInt(), angle: flange.angle.value, length: flange.length.value,
+				radius: flange.useMaterialRadius ? null : flange.radius.value, lengthSpec: flange.lengthSpec, position: flange.position,
+				offset: flange.offset.value, gap1: flange.gap1.value, gap2: flange.gap2.value,
+				extend1: flange.extend1.value, extend2: flange.extend2.value, walls: flange.wallIds(), bends: flange.bendIds(),
+				faces: [for (reference in flange.faceReferences()) encodeSheetFace(reference.fingerprintData())],
+				reliefType: flange.reliefType, reliefSizing: flange.reliefSizing, reliefWidth: flange.reliefWidth.value, reliefDepth: flange.reliefDepth.value};
+			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
+		}
+		if (featureType == "sheet-hem") {
+			var hem = Std.downcast(feature, SheetHemFeature);
+			if (hem == null) throw new ParametricError("sheet-hem has the wrong feature class");
+			var data:SheetHemRecord = {source: hem.source.id.toInt(), length: hem.length.value, spec: hem.authoredSpec(), side: hem.side,
+				walls: hem.wallIds(), bends: hem.bendIds(), faces: [for (reference in hem.faceReferences()) encodeSheetFace(reference.fingerprintData())]};
+			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
+		}
+		if (featureType == "sheet-rip") {
+			var rip = Std.downcast(feature, SheetRipFeature);
+			if (rip == null) throw new ParametricError("sheet-rip has the wrong feature class");
+			var data:SheetRipRecord = {source: rip.source.id.toInt(), bend: rip.bend};
+			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
+		}
+		if (featureType == "sheet-corner") {
+			var corner = Std.downcast(feature, SheetCornerFeature);
+			if (corner == null) throw new ParametricError("sheet-corner has the wrong feature class");
+			var data:SheetCornerRecord = {source: corner.source.id.toInt(), firstWall: corner.first.wall, firstEdge: corner.first.identity,
+				secondWall: corner.second.wall, secondEdge: corner.second.identity, join: corner.join, gap: corner.gap.value,
+				overlap: corner.overlap.value, relief: corner.relief, reliefSize: corner.reliefSize.value};
+			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
+		}
+		if (featureType == "sheet-cut") {
+			var cut = Std.downcast(feature, SheetCutFeature);
+			if (cut == null) throw new ParametricError("sheet-cut has the wrong feature class");
+			var data:SheetCutRecord = {source: cut.source.id.toInt(), profile: cut.profile.id.toInt(), wall: cut.wall, side: cut.side};
+			return {id: feature.id.toInt(), type: featureType, sheet: Json.parse(JsonWire.encode(data)), references: references};
+		}
 		if (featureType == "datum-sketch") {
 			var sketch:DatumSketchFeature = cast feature;
 			return {
@@ -759,6 +870,39 @@ class DocumentCodec {
 	private static function decodePlacement(value:Dynamic):Placement
 		return new Placement(new Plane(decodeVector(requiredField(value, "origin")), decodeVector(requiredField(value, "xDirection")),
 			decodeVector(requiredField(value, "normal"))));
+
+	private static function encodeSheetFace(face:TopologyFingerprint):SheetFaceRecord {
+		if (face.kind != CadKit.ShapeKind.Face || face.surfaceKind != CadKit.SurfaceKind.Plane)
+			throw new ParametricError("sheet flange requires a planar wall-side face fingerprint");
+		return {surface: "plane", curve: "unknown", x: face.x, y: face.y, z: face.z, dx: face.dx, dy: face.dy, dz: face.dz,
+			measure: face.measure, name: face.name, naming: face.name == null ? null : cadkit.Shape.namingScheme()};
+	}
+	private static function decodeSheetFace(face:SheetFaceRecord):TopologyFingerprint {
+		if (face.surface != "plane" || face.curve != "unknown")
+			throw new ParametricError("sheet flange requires a planar wall-side face fingerprint");
+		var name = face.naming == cadkit.Shape.namingScheme() ? face.name : null;
+		return TopologyFingerprint.fromData(CadKit.ShapeKind.Face, CadKit.SurfaceKind.Plane, CadKit.CurveKind.Unknown,
+			face.x, face.y, face.z, face.dx, face.dy, face.dz, face.measure, false, name);
+	}
+	private static function encodeSheetStock(stock:SheetMaterial):SheetStockRecord {
+		var rule:Null<SheetSavedBendRule> = null;
+		if (stock.bendRule != null)
+			switch (stock.bendRule) {
+				case KFactor(table): rule = SheetSavedBendRule.KFactor(table.rows());
+				case Process(setup): rule = SheetSavedBendRule.Process(setup.record());
+			}
+		return {id: stock.id, rule: rule, mechanical: stock.mechanical,
+			defaultRadiusRatio: stock.defaultRadiusRatio, minRadiusRatio: stock.minRadiusRatio, grainAngle: stock.grainAngle};
+	}
+	private static function decodeSheetStock(record:SheetStockRecord, thickness:Float):SheetMaterial {
+		var rule:Null<BendRule> = null;
+		if (record.rule != null)
+			switch (record.rule) {
+				case KFactor(rows): rule = BendRule.KFactor(new KFactorTable([for (row in rows) row.ratio], [for (row in rows) row.k]));
+				case Process(setup): rule = BendRule.Process(ProcessBendRule.fromRecord(setup));
+			}
+		return new SheetMaterial(record.id, thickness, rule, record.mechanical, record.defaultRadiusRatio, record.minRadiusRatio, record.grainAngle);
+	}
 
 	private static function encodeProperties(values:Array<TypedProperty>):Array<Dynamic> {
 		var result:Array<Dynamic> = [];

@@ -1,6 +1,7 @@
 package machinekit.pneumatic;
 
 import cadkit.modeling.Part;
+import machinekit.fluid.CylinderSpec;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
@@ -12,7 +13,7 @@ import machinekit.component.Solids;
  * Catalogue bore/rod pairs are reference sizes; envelopes and flow-limited speeds are assumed.
  * The rod belongs to the guided moving member, so the cylinder adds no second mechanical joint.
  */
-class PneumaticCylinder extends MachineComponent implements PneumaticCylinderSpec {
+class PneumaticCylinder extends MachineComponent implements CylinderSpec {
 	public final family:String;
 	public final bore:Float;
 	public final rod:Float;
@@ -57,8 +58,8 @@ class PneumaticCylinder extends MachineComponent implements PneumaticCylinderSpe
 	public function boreMm():Float return bore;
 	public function rodMm():Float return rod;
 	public function strokeMm():Float return stroke;
-	public function ratedSpeedMmPerSecond():Float return ratedSpeed;
-	override public function pneumaticCylinderSpec():Null<PneumaticCylinderSpec> return this;
+	public function controlSpec():machinekit.fluid.CylinderControlSpec return PressureEffort(ratedSpeed);
+	override public function cylinderSpec():Null<CylinderSpec> return this;
 	static function checkedPressure(value:Float):Float {
 		if (!(value >= 0) || !Math.isFinite(value)) throw "Cylinder pressure must be finite and nonnegative";
 		return value;

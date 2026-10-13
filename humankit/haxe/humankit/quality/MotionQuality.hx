@@ -1,7 +1,7 @@
 package humankit.quality;
 
-import humankit.rig.HumanPose;
-import humankit.rig.Mat4;
+import haxeon.animation.rig.HumanPose;
+import haxeon.animation.rig.Mat4;
 
 /** What a run of poses did to one arm, in model space (+Z up, +X forward). */
 typedef ArmQuality = {

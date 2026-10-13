@@ -39,24 +39,25 @@ class CollisionDescription {
     if (!Math.isFinite(margin) || margin < 0) throw "Collision description needs a finite nonnegative margin";
   }
 
-  /** An independent mutable description for a live world; geometry is shared read-only. */
+  /** Appends another scene, remapping its body/object references and rules. */
+  public function append(other:CollisionDescription):Void {
+    if (other == this) throw "Cannot append a collision description to itself";
+    var bodyIds = [for (body in other.bodies) addBody(body.name, body.group, body.fixed, body.pose)];
+    var objectIds = [for (object in other.objects) addObject(object.name,
+      object.body < 0 ? -1 : bodyIds[object.body], object.offset, object.geometry, object.inflation, object.source, object.member, object.tool)];
+    for (rule in other.bodyRules) setBodyRule(rule.a < 0 ? -1 : bodyIds[rule.a],
+      rule.b < 0 ? -1 : bodyIds[rule.b], rule.rule, rule.reason);
+    for (rule in other.objectRules) setObjectRule(objectIds[rule.a], objectIds[rule.b], rule.rule, rule.reason);
+    for (articulation in other.articulations)
+      addArticulation(articulation.name, [for (body in articulation.bodies) bodyIds[body]], articulation.reference);
+    for (margin in other.pairMargins) setGroupMargins(margin.first, margin.second, margin.air, margin.contact);
+    for (margin in other.objectMargins) setObjectMargins(objectIds[margin.first], objectIds[margin.second], margin.air, margin.contact);
+    for (assumption in other.assumptions) note(assumption);
+  }
+
   public function copy():CollisionDescription {
     var result = new CollisionDescription(defaultMargin);
-    result.groups = groups;
-    for (key in pairMargins.keys()) {
-      var value = pairMargins.get(key);
-      if (value != null) result.pairMargins.set(key, value);
-    }
-    for (key in objectMargins.keys()) {
-      var value = objectMargins.get(key);
-      if (value != null) result.objectMargins.set(key, value);
-    }
-    for (body in bodies) result.bodies.push(body);
-    for (object in objects) result.objects.push(object);
-    for (rule in bodyRules) result.bodyRules.push(rule);
-    for (rule in objectRules) result.objectRules.push(rule);
-    for (articulation in articulations) result.articulations.push(articulation);
-    for (assumption in assumptions) result.assumptions.push(assumption);
+    result.append(this);
     return result;
   }
 
@@ -70,10 +71,10 @@ class CollisionDescription {
 
   /** Adds a shape on `body` (-1: the world) at `offset`; `source` says what it approximates. */
   public function addObject(name:String, body:Int, offset:CollisionPose, geometry:CollisionGeometry,
-      inflation:Float = 0.0, source:String = "primitive", ?member:String):Int {
+      inflation:Float = 0.0, source:String = "primitive", ?member:String, tool:Bool = false):Int {
     if (body < -1 || body >= bodies.length) throw 'Collision object "$name" is on an unknown body $body';
     if (!Math.isFinite(inflation) || inflation < 0) throw 'Collision object "$name" needs a finite, nonnegative inflation';
-    objects.push(new DescribedObject(name, body, offset, geometry, inflation, source, member));
+    objects.push(new DescribedObject(name, body, offset, geometry, inflation, source, member, tool));
     return objects.length - 1;
   }
 

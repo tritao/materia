@@ -1,9 +1,9 @@
 package humankit;
 
-import animkit.AnimationAsset;
-import animkit.AnimationInstance;
-import humankit.rig.HumanPose;
-import humankit.rig.HumanoidRig;
+import haxeon.animation.AnimationAsset;
+import haxeon.animation.AnimationInstance;
+import haxeon.animation.rig.HumanPose;
+import haxeon.animation.rig.HumanoidRig;
 
 /**
  * A one-way clip of going down into a crouch, measured so that any depth between standing and crouched can be posed

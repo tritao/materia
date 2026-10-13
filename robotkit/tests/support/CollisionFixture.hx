@@ -6,7 +6,7 @@ import robotkit.collision.CollisionSceneBuilder.CollisionOwner;
 import robotkit.spatial.Transform3;
 import robotkit.collision.CollisionClearance;
 import robotkit.collision.CollisionClearanceLayout;
-import robotkit.collision.RobotCollision.RobotLinkHull;
+import robotkit.collision.RobotCollision.RobotLinkShape;
 import robotkit.manipulation.KinematicGroup;
 
 /** Standalone fixtures author mechanisms and work/obstacles explicitly through the kit adapters. */
@@ -15,7 +15,7 @@ class CollisionFixture {
   final reference:Array<Float>;
   final margin:Float;
   final contactMargin:Float;
-  final hulls:Array<{hull:RobotLinkHull, tool:Bool}> = [];
+  final hulls:Array<{hull:RobotLinkShape, tool:Bool}> = [];
   final fixtures:Array<{name:String, vertices:Array<Float>, pose:CollisionPose, work:Bool}> = [];
 
   public function new(arm:KinematicGroup, reference:Array<Float>, margin:Float = 0.005, contactMargin:Float = 0.0005) {
@@ -26,7 +26,7 @@ class CollisionFixture {
     var index = -1;
     for (i in 0...arm.robot.links.length) if (arm.robot.links[i].id == link) index = i;
     if (index < 0) throw 'Fixture hull "$name" has unknown link "$link"';
-    hulls.push({hull: new RobotLinkHull(index, name, vertices, tool ? CollisionMarginClass.Tool : CollisionMarginClass.Installed), tool: tool});
+    hulls.push({hull: new RobotLinkShape(index, name, new robotkit.model.CollisionShape(CollisionGeometry.Convex(vertices)), tool ? CollisionMarginClass.Tool : CollisionMarginClass.Installed), tool: tool});
   }
 
   public function fixture(name:String, vertices:Array<Float>, work:Bool, ?pose:CollisionPose):Void
@@ -48,5 +48,8 @@ class CollisionFixture {
   }
 
   public function clearance():CollisionClearance
-    return new CollisionClearance(arm, layout(), reference, () -> new collisionkit.native.NativeCollisionWorld());
+    {
+      var layout = layout();
+      return new CollisionClearance(arm, layout.description, reference, () -> new collisionkit.native.NativeCollisionWorld(), layout.bodies);
+    }
 }

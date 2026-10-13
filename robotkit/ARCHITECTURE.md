@@ -189,7 +189,7 @@ the configuration it receives is checked by digest (see the device protocol).
 
 ### Transmissions (model contract and RKD6 implementation)
 
-RobotModel v9 owns actuators independently of joints. Each actuator has a
+RobotModel owns actuators independently of joints. Each actuator has a
 stable ID, effort/rate limits in actuator units, and a `SimpleTransmission`
 with `jointId`, `ratio`, and `offset`. Coordinates are SI and obey
 `joint = offset + actuator / ratio`: for a motor driving a linear joint,
@@ -199,9 +199,18 @@ logical coordinate and derives the other joint scales and offsets by equating
 actuator coordinates, using the first actuator authored for each joint as its
 mapping reference. Additional actuators on that joint do not change the
 logical-axis mapping. Explicit authored axis maps remain a deprecated override.
-`RobotModelCodec` accepts v9 only; older schemas are rejected, not migrated.
+`RobotModelCodec` accepts v12 only; older schemas are rejected, not migrated.
 
-RobotModel v9 adds `floatingBase`. When true, the root link is a free six-DOF
+Fluid actuators expose a typed `CylinderDrive` capability. Pneumatic drives apply
+pressure-area effort through spring-return or latched directional valves.
+Hydraulic drives own approach, working and return speeds, a measured-extension
+change point and the retracted joint coordinate. Their shared cylinder blueprint
+selects flow control with full-bore or annular pressure-area force ceilings.
+Agreeing hydraulic coil states close the centre; zero pressure leaves the drive
+unpowered. Process-owned cylinder joints are excluded from trajectory planning.
+Hydraulic parameters use a typed wire record inside the current model JSON format.
+
+RobotModel carries `floatingBase`. When true, the root link is a free six-DOF
 body, as for a legged or humanoid robot, instead of a base fixed to or driven
 over the world. It is a model property rather than a joint, so runtime joints
 stay one-DOF and joint indices, targets, and plans are unchanged;
@@ -212,7 +221,7 @@ as `floating_base`. `Simulation` then creates the root as a dynamic body
 and wheel couplings for it. A floating base cannot bind a mobile-base profile. `RobotProfile` schema v1 stores mobile and fork roles separately from the mechanical model; `RobotRuntimeCompiler.compile(model, profile)` validates their stable joint IDs.
 See `robotkit/plans/HUMANOID.md`.
 
-RobotModel v9 links also carry `collisionShapes`: boxes, spheres, capsules and
+RobotModel links also carry `collisionShapes`: boxes, spheres, capsules and
 cylinders, each posed in the link frame, with capsule and cylinder lengths
 given as half-lengths along local Z (MuJoCo's convention). The compiler copies
 them onto the blueprint, and `Simulation` sends them in the robot

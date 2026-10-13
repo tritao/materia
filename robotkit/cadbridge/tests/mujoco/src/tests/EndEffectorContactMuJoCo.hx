@@ -25,8 +25,8 @@ import robotkit.simulation.SimulatedRobot;
 import robotkit.recording.RobotRecording;
 import robotkit.recording.ReplayRobot;
 import robotkit.core.SensorFrame;
-import robotkit.tool.ToolCollisionShape;
-import robotkit.tool.ToolCollisionShapes;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 import robotkit.tool.ToolRuntimeSelection;
 import robotkit.tool.SimulatedVacuum;
 import robotkit.execution.FiredProcessEvent;
@@ -62,14 +62,14 @@ class EndEffectorContactMuJoCo {
     for (index in 0...collision.pieces.length)
       if (collision.pieces[index].memberIds.indexOf("tool/cup") >= 0) cupIndex = index;
     if (cupIndex < 0) throw "Example cup has no collision piece";
-    var cup = ToolCollisionShapes.bounds(ToolCollisionShape.Hulls(
+    var cup = ToolGeometry.bounds(ToolGeometry.convex(
       [collision.pieces[cupIndex].vertices], 0));
     var tool = EndEffectorBridge.toTool(effector, "contact", null, "short/contact", options);
     var simulationHarness = new SimulationHarness(0.01, 2, 1);
 
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1),
-      [0, 0, 0], [0, 0, 0, 1], null, null, null, null, tool.collision, 0);
+      [0, 0, 0], [0, 0, 0, 1], null, null, null, tool.collision, 0);
     var obstacle = simulationHarness.spawnBox([
       cup.centre.x, cup.centre.y, cup.centre.z + cup.halfExtents.z + 0.007],
       [0.005, 0.005, 0.005]);
@@ -109,7 +109,7 @@ class EndEffectorContactMuJoCo {
     for (index in 0...pieces.pieces.length)
       if (pieces.pieces[index].memberIds.indexOf("tool/cup") >= 0) cupIndex = index;
     if (cupIndex < 0) throw "Sensed cup has no tool piece";
-    var bounds = ToolCollisionShapes.bounds(ToolCollisionShape.Hulls(
+    var bounds = ToolGeometry.bounds(ToolGeometry.convex(
       [pieces.pieces[cupIndex].vertices], 0));
     var blueprint = new RobotRuntimeBlueprint(1, 0, 1);
     var authored = EndEffectorRuntimeBridge.addVacuumSensorToBlueprint(set,
@@ -121,7 +121,7 @@ class EndEffectorContactMuJoCo {
 
     var simulation = simulationHarness.simulation;
     var robot = simulation.addRobotAtPose(blueprint,
-      [0, 0, 0], [0, 0, 0, 1], null, null, null, null,
+      [0, 0, 0], [0, 0, 0, 1], null, null, null,
       bundle.runtime.tool.collision, 0, 0, 0.01);
     var selection = new ToolRuntimeSelection();
     selection.select(bundle.runtime, simulation.sourceTimestampNs(), robot.sourceClockId);

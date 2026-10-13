@@ -1,11 +1,11 @@
-import animkit.AnimationAsset;
+import haxeon.animation.AnimationAsset;
 import humankit.HumanBodyProxy;
 import humankit.HumanCharacter;
 import humankit.HumanDescription;
 import humankit.job.HumanJob;
 import humankit.job.HumanJobSpec;
-import humankit.rig.HumanBone;
-import humankit.rig.HumanoidRig;
+import haxeon.animation.rig.HumanBone;
+import haxeon.animation.rig.HumanoidRig;
 import humankit.action.Pick;
 import humankit.action.Place;
 import humankit.action.ApproachFor;

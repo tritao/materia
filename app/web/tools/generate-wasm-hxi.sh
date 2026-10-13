@@ -19,7 +19,7 @@ generators=(
 	"robotkit/policy/tools/check-hxi.sh:robotkit-policy.hxi"
 	"robotkit/inference/tools/check-hxi.sh:robotkit-inference.hxi"
 	"visionkit/native/tools/check-hxi.sh:visionkit.hxi"
-	"animkit/native/tools/check-hxi.sh:animkit.hxi"
+	"haxeon/packages/animation/native/tools/check-hxi.sh:animkit.hxi"
 	"stockkit/core/tools/check-hxi.sh:stockkit.hxi"
 	"trajectorykit/native/tools/check-hxi.sh:trajectory-core.hxi"
 	"kinematicskit/native/tools/check-hxi.sh:kinematicskit.hxi"

@@ -142,10 +142,10 @@ class ToolpathProcessTests extends ToolpathTestSupport {
     if (gantryCouplings == null) throw "Gantry definition has no drive couplings";
     check(blueprint.model.couplings.length == gantryCouplings.length,
       "physical gantry keeps every part-derived drive coupling");
-    var hasTenMillimetreVertex = false, linksValid = physical.linkHulls.length > 0;
-    for (hull in physical.linkHulls) {
+    var hasTenMillimetreVertex = false, linksValid = cadbridge.AssemblySimulationBridge.shapes(physical.model).length > 0;
+    for (hull in cadbridge.AssemblySimulationBridge.shapes(physical.model)) {
       if (hull.link < 0 || hull.link >= blueprint.model.links.length) linksValid = false;
-      for (value in hull.vertices)
+      for (value in hull.shape.convexVertices())
         if (Math.abs(value - 0.01) < 1e-12) hasTenMillimetreVertex = true;
     }
     check(linksValid && hasTenMillimetreVertex,
@@ -215,9 +215,7 @@ class ToolpathProcessTests extends ToolpathTestSupport {
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobotAtPose(blueprint.runtime,
-      [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], null, null, null, null, null,
-      null, null, null, [for (hull in physical.linkHulls)
-        {link: hull.link, vertices: hull.vertices}]);
+      [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], null);
     var robot = new SimulatedRobot("physical-cnc", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);

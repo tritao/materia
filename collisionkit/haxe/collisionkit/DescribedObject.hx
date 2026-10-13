@@ -10,6 +10,8 @@ class DescribedObject {
   public final name:String;
   /** Physical source member shared by all of its convex pieces; never inferred from the display name. */
   public final member:String;
+  /** Tool identity is independent of margin classes and carrier ownership. */
+  public final tool:Bool;
   public final body:Int;
   public final offset:CollisionPose;
   public final geometry:CollisionGeometry;
@@ -17,8 +19,9 @@ class DescribedObject {
   public final source:String;
 
   public function new(name:String, body:Int, offset:CollisionPose, geometry:CollisionGeometry, inflation:Float,
-      source:String, ?member:String) {
+      source:String, ?member:String, tool:Bool = false) {
     this.name = name;
+    this.tool = tool;
     this.member = member == null ? name : member;
     this.body = body;
     this.offset = offset;

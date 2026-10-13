@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "package": {
+    "name": "app"
+  },
+  "entry": "app.SheetPressIntegrationTests",
+  "sourceRoots": [
+    "src",
+    "tests/src",
+    "../machinekit/examples/bench-mill",
+    "../machinekit/examples/cnc-router",
+    "../machinekit/examples/machine-tending",
+    "../machinekit/examples/robot-arm",
+    "../processkit/tests/modbus",
+    "../machinekit/examples/press-brake"
+  ],
+  "unscopedSourceRoots": [
+    "../machinekit/examples/bench-mill",
+    "../machinekit/examples/cnc-router",
+    "../machinekit/examples/machine-tending",
+    "../machinekit/examples/robot-arm",
+    "../processkit/tests/modbus",
+    "../machinekit/examples/press-brake"
+  ],
+  "dependencies": {
+    "collisionkit-native": {
+      "path": "../collisionkit/native"
+    },
+    "machinekit-process": {
+      "path": "../machinekit/process"
+    },
+    "projectkit": {
+      "path": "../projectkit"
+    },
+    "manufacturingkit": {
+      "path": "../manufacturingkit"
+    },
+    "haxeon-platform": {
+      "path": "../haxeon/packages/platform"
+    },
+    "cadkit": {
+      "path": "../cadkit"
+    },
+    "machinekit": {
+      "path": "../machinekit"
+    },
+    "bimkit": {
+      "path": "../bimkit"
+    },
+    "haxeon-ui": {
+      "path": "../haxeon/packages/ui"
+    },
+    "robotkit": {
+      "path": "../robotkit"
+    },
+    "simkit": {
+      "path": "../simkit"
+    },
+    "cadbridge": {
+      "path": "../robotkit/cadbridge"
+    },
+    "scenekit": {
+      "path": "../scenekit"
+    },
+    "animkit": {
+      "path": "../animkit"
+    },
+    "humankit": {
+      "path": "../humankit"
+    },
+    "humankit-sim": {
+      "path": "../humankit/sim"
+    },
+    "humankit-facility": {
+      "path": "../humankit/facility"
+    },
+    "materia-automation": {
+      "path": "../automationkit"
+    },
+    "stockkit": {
+      "path": "../stockkit"
+    },
+    "camkit": {
+      "path": "../camkit"
+    },
+    "cnckit": {
+      "path": "../cnckit"
+    },
+    "toolpathkit": {
+      "path": "../toolpathkit"
+    },
+    "toolpathkit-motion": {
+      "path": "../toolpathkit/motion"
+    },
+    "motionkit": {
+      "path": "../motionkit"
+    },
+    "motionkit-robot": {
+      "path": "../motionkit/robot"
+    },
+    "processkit": {
+      "path": "../processkit"
+    }
+  },
+  "native": {
+    "cmake": {
+      "source": "native",
+      "target": "haxeon_app_native",
+      "libraries": [
+        "nativekit",
+        "nativekit_gpu",
+        "nativekit_ui",
+        "nativekit_scene",
+        "nativekit_scene_render",
+        "nativekit_sim_core",
+        "trajectory_core",
+        "motionkit_core",
+        "robotkit_runtime",
+        "animkit_core"
+      ],
+      "inputs": [
+        "native/CMakeLists.txt",
+        "../haxeon/vendor/nativekit/CMakeLists.txt",
+        "../haxeon/vendor/nativekit/modules/gpu/CMakeLists.txt",
+        "../haxeon/packages/ui/CMakeLists.txt",
+        "../scenekit/scene/CMakeLists.txt",
+        "../scenekit/scene_render/CMakeLists.txt",
+        "../simkit/sim_core/CMakeLists.txt",
+        "../simkit/sim_mujoco/CMakeLists.txt",
+        "../cadkit/CMakeLists.txt",
+        "../cadkit/core/CMakeLists.txt",
+        "../robotkit/CMakeLists.txt",
+        "../robotkit/runtime/CMakeLists.txt",
+        "../animkit/native/CMakeLists.txt",
+        "../animkit/native/include/animkit.h",
+        "../animkit/native/src/api.cpp",
+        "../animkit/native/src/import.cpp",
+        "../animkit/native/src/runtime.cpp"
+      ]
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

@@ -32,8 +32,31 @@ class MaterialLibrary {
     material("cast-iron", "Cast iron", [0.35, 0.37, 0.39], 0.60, 0.55, 7200, "cast iron"),
     material("bronze", "Bronze", [0.55, 0.38, 0.20], 0.70, 0.38, 8800, "bronze"),
     material("brass", "Brass", [0.69, 0.55, 0.29], 0.75, 0.34, 8500, "brass"),
-    material("spring-steel", "Spring steel", [0.56, 0.58, 0.60], 0.75, 0.38, 7850, "spring steel")
+    material("spring-steel", "Spring steel", [0.56, 0.58, 0.60], 0.75, 0.38, 7850, "spring steel"),
+    sheetSteel(), sheetAluminium()
   ];
+
+  /** Plan material A. Mechanical values and development defaults are assumed, not lot certificates. */
+  static function sheetSteel():MaterialDef {
+    var result = material("mild-steel", "Mild steel sheet", [0.62, 0.64, 0.67], 0.8, 0.34, 7850, "mild steel sheet");
+    result.mechanical = {uts: 400, yield: 250, youngs: 205000};
+    result.sheet = {kFactorTable: [{ratio: 0, k: 0.30}, {ratio: 1, k: 0.38}, {ratio: 3, k: 0.45}],
+      defaultRadiusRatio: 1, minRadiusRatio: 0.5, grain: true};
+    return result;
+  }
+
+  /** Plan material B. Mechanical values and development defaults are assumed, not lot certificates. */
+  static function sheetAluminium():MaterialDef {
+    var result = material("aluminium-5052-h32", "5052-H32 aluminium sheet", [0.68, 0.70, 0.72], 0.72, 0.42, 2680, "aluminium 5052-H32 sheet");
+    result.mechanical = {uts: 228, yield: 193, youngs: 70000};
+    result.sheet = {kFactorTable: [{ratio: 0, k: 0.33}, {ratio: 1, k: 0.40}, {ratio: 3, k: 0.45}],
+      defaultRadiusRatio: 1, minRadiusRatio: 1, grain: true};
+    return result;
+  }
+
+  public static function sheetMaterials():Array<MaterialDef> {
+    return [for (item in all()) if (item.sheet != null) item];
+  }
 
   public static function get(id:String):Null<MaterialDef> {
     for (item in all()) if (item.id == id) return item;
@@ -69,7 +92,39 @@ class MaterialLibrary {
       for (channel in item.visual.baseColor)
         if (!Math.isFinite(channel) || channel < 0 || channel > 1)
           throw "Invalid custom material color";
+      var emissive = item.visual.emissive;
+      if (emissive != null) {
+        if (emissive.length != 3) throw "Invalid custom material emissive color";
+        for (channel in emissive)
+          if (!Math.isFinite(channel) || channel < 0 || channel > 1) throw "Invalid custom material emissive color";
+      }
+      var alpha = item.visual.alpha;
+      if (alpha != null && (!Math.isFinite(alpha) || alpha < 0 || alpha > 1))
+        throw "Invalid custom material alpha";
+      validateSheetProperties(item);
       seen.set(item.id, true);
+    }
+  }
+
+  /** Validate optional structural and development data without assigning defaults. */
+  public static function validateSheetProperties(item:MaterialDef):Void {
+    var mechanical = item.mechanical;
+    if (mechanical != null && (!Math.isFinite(mechanical.uts) || mechanical.uts <= 0
+        || !Math.isFinite(mechanical.yield) || mechanical.yield <= 0 || mechanical.yield > mechanical.uts
+        || !Math.isFinite(mechanical.youngs) || mechanical.youngs <= mechanical.yield))
+      throw "Invalid material mechanical properties";
+    var sheet = item.sheet;
+    if (sheet == null) return;
+    if (!Math.isFinite(sheet.defaultRadiusRatio) || !Math.isFinite(sheet.minRadiusRatio)
+        || sheet.minRadiusRatio < 0 || sheet.defaultRadiusRatio < sheet.minRadiusRatio
+        || sheet.kFactorTable == null || sheet.kFactorTable.length == 0)
+      throw "Invalid material sheet properties";
+    var previous = -1.0;
+    for (row in sheet.kFactorTable) {
+      if (!Math.isFinite(row.ratio) || row.ratio < 0 || row.ratio <= previous
+          || !Math.isFinite(row.k) || row.k < 0 || row.k > 0.5)
+        throw "Invalid material K-factor table";
+      previous = row.ratio;
     }
   }
 

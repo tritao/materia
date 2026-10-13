@@ -8,6 +8,8 @@ import RobotKitRuntime;
  * buffered trajectory chunks.
  */
 class RobotRuntimeJointBlueprint {
+  /** Physical motion without host position targets or a power-on hold. */
+  public var passive:Bool = false;
   public final joint:Int;
   public final type:Int;
   public final parentLink:Int;

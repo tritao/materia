@@ -30,7 +30,7 @@ class SimulatedPneumaticGripper implements SimulationStepObserver {
 		var sensor = blueprint.sensorById(graspSensor);
 		if (sensor == null || sensor.kind != "joint_switch" || sensor.joint < 0)
 			throw 'Gripper feedback "$graspSensor" must be a joint switch';
-		var drives = [for (drive in blueprint.pneumaticDrives) if (drive.joint == sensor.joint) drive];
+		var drives = [for (drive in blueprint.cylinderDrives) if (drive.control == CylinderControl.PressureEffort && drive.joint == sensor.joint) drive];
 		if (drives.length != 1 || drives[0].channelB == null)
 			throw 'Gripper switch "$graspSensor" needs one double-solenoid cylinder on its jaw joint';
 		this.runtime = runtime;

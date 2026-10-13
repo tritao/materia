@@ -1,8 +1,8 @@
 package app.editor;
 
-import animkit.AnimationAsset;
+import haxeon.animation.AnimationAsset;
 import humankit.HumanCharacter;
-import humankit.rig.HumanoidRig;
+import haxeon.animation.rig.HumanoidRig;
 import nativekit.scene.NodeId;
 import nativekit.scene.Scene;
 

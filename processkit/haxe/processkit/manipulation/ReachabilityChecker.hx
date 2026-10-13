@@ -1,6 +1,7 @@
 package processkit.manipulation;
 
 import robotkit.manipulation.*;
+import robotkit.collision.CollisionClearance;
 
 import robotkit.manipulation.IkOptions.IkMethod;
 import robotkit.spatial.Transform3;
@@ -52,7 +53,7 @@ class ReachabilityChecker {
   public static function check(manipulator:Manipulator, toolpath:Toolpath, base_T_work:Transform3,
       seed:Array<Float>, ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3,
       ?maxIterations:Int = 100, ?damping:Float = 0.02,
-      ?toolClearance:ToolClearanceChecker, ?toolJointStep:Null<Float>,
+      ?toolClearance:CollisionClearance, ?toolJointStep:Null<Float>,
       ?maxToolStep:Float = 0.005, ?checkApproach:Bool = false):ReachabilityResult {
     if (manipulator == null || toolpath == null || base_T_work == null)
       throw "Reachability check requires a manipulator, toolpath, and base_T_work transform";
@@ -74,9 +75,9 @@ class ReachabilityChecker {
         seedQ, new IkOptions(positionTolerance, orientationTolerance, maxIterations, damping));
       lastQ = ik.q;
       var clear = ik.converged && (toolClearance == null || (reachableCount == 0 && !checkApproach
-        ? toolClearance.isClear(manipulator.forwardKinematics(ik.q))
-        : toolClearance.clearJointSegment(manipulator, seedQ, ik.q,
-            toolJointStep, maxToolStep)));
+        ? toolClearance.violation(ik.q) == null
+        : toolClearance.sweep(seedQ, ik.q, false,
+            toolJointStep == null ? toolClearance.jointStep(seedQ, ik.q, maxToolStep) : toolJointStep) == null));
       if (clear) {
         reachableCount++;
         seedQ = ik.q;

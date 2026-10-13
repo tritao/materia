@@ -166,6 +166,7 @@ class MachineAssemblyDescriptionTests {
 		suctionInterfaceRoundTrip();
 		documentRoundTrip();
 		transmissionsFollowTheirParts();
+		passiveRoundTrip();
 		beltReductions();
 		BeltElasticityTests.run();
 		motorsDriveJoints();
@@ -437,7 +438,7 @@ class MachineAssemblyDescriptionTests {
 
 	/** A coupling's ratio comes from the parts that drive it, so editing a part changes it. */
 	static function transmissionsFollowTheirParts():Void {
-		for (version in [2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 16]) {
+		for (version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]) {
 			var oldRejected = false;
 			var oldVersion:machinekit.assembly.MachineAssemblyDescription.DescriptionVersion = {schemaVersion: version};
 			var oldText = haxeon.wire.JsonWire.encode(oldVersion);
@@ -528,6 +529,31 @@ class MachineAssemblyDescriptionTests {
 	}
 
 	/** A drive's allowances: a screw's critical speed, its nut's backlash and drag, a belt's stiffness. */
+	static function passiveRoundTrip():Void {
+		function definition(machine:MachineAssembly):materia.assembly.AssemblyDefinition {
+			var model = new AssemblyModel();
+			machine.addTo(model, "");
+			return model.definition("passive");
+		}
+		var inner = new MachineAssembly();
+		inner.addComponent("base", new RobotFlange(50));
+		inner.addComponent("finger", new RobotFlange(50));
+		inner.addMate("hinge", "revolute", "base", "face", "finger", "face");
+		inner.setPassive("hinge");
+		if (definition(inner).joints[0].passive != true)
+			throw "Machine assembly lost passive joint ownership";
+
+		var outer = new MachineAssembly();
+		outer.include("gauge", inner);
+		var rebuilt = MachineAssembly.decode(outer.encode());
+		var flattened = definition(rebuilt);
+		if (flattened.joints.length != 1 || flattened.joints[0].id != "gauge/hinge" ||
+			flattened.joints[0].passive != true)
+			throw "Included passive joint did not survive machine assembly round trip";
+		if (definition(rebuilt.subassemblies()[0].assembly).joints[0].passive != true)
+			throw "Nested machine assembly lost its passive joint";
+	}
+
 	static function transmissionsCarryAllowances():Void {
 		function near(actual:Null<Float>, expected:Float, what:String, tolerance:Float = 1e-9):Void {
 			if (actual == null) throw '$what: missing value';

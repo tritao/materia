@@ -26,6 +26,8 @@ NKSIMMUJOCO_API nksim_result NKSIMMUJOCO_CALL nksim_mujoco_world_create(
     const nksim_world_desc *desc, nksim_world *out_world NK_OUT NK_OWNED);
 /** Diagnostic count of fallback geom-distance calls since process start. */
 NKSIMMUJOCO_API uint64_t NKSIMMUJOCO_CALL nksim_mujoco_distance_call_count(void);
+/** Velocity-mode response rate in inverse seconds, before force limits and contacts. */
+NKSIMMUJOCO_API double NKSIMMUJOCO_CALL nksim_mujoco_velocity_response_rate(void);
 
 #ifdef __cplusplus
 }

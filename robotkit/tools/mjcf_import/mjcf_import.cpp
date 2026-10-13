@@ -1,4 +1,4 @@
-// Imports an MJCF robot description into a RobotModel v9 artifact.
+// Imports an MJCF robot description into the current RobotModel v12 artifact.
 //
 // The file is compiled by the vendored MuJoCo, so default classes, includes,
 // angle conventions, `fromto` geometry and inertia computed from geometry mean
@@ -272,7 +272,7 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
                 shapes.push_back("{\"kind\": " + json_string(kind) + ", \"size\": " + array(sizes) +
                                  ", \"position\": " + array(pos) + ", \"rotation\": " +
                                  array(rot) + ", \"surface\": " + surface_of(geom) +
-                                 ", \"contact\": " + json_string(contact_of(geom)) + "}");
+                                 ", \"name\": \"\", \"inflation\": 0, \"contact\": " + json_string(contact_of(geom)) + "}");
             } else if (type == mjGEOM_MESH && m->geom_dataid[geom] >= 0) {
                 const int mesh = m->geom_dataid[geom];
                 const float *vertices = m->mesh_vert + 3 * m->mesh_vertadr[mesh];
@@ -480,7 +480,7 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
     };
     std::string name = m->names; // The first name is the model's.
     if (name.empty()) name = "mjcf-robot";
-    return "{\n  \"schemaVersion\": 9,\n  \"name\": " + json_string(name) +
+    return "{\n  \"schemaVersion\": 13,\n  \"name\": " + json_string(name) +
            ",\n  \"collisionApproximation\": \"none\",\n  \"floatingBase\": " +
            (floating ? "true" : "false") + ",\n  \"links\": " + join(links) +
            ",\n  \"joints\": " + join(joints) + ",\n  \"actuators\": " + join(actuators) +

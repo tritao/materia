@@ -40,12 +40,54 @@ void require_scene(nkscene_result result, const char *operation) {
         throw std::runtime_error(operation);
 }
 
+nksim_shape create_collision_shape(nksim_world world, const rk_simulation_link_shape &source) {
+    nksim_shape primitive = 0;
+    switch (source.type) {
+    case RK_LINK_SHAPE_BOX:
+        require_sim(nksim_shape_create_box(world, source.size, &primitive),
+                    "nksim_shape_create_box(link primitive)");
+        break;
+    case RK_LINK_SHAPE_SPHERE:
+        require_sim(nksim_shape_create_sphere(world, source.size[0], &primitive),
+                    "nksim_shape_create_sphere(link primitive)");
+        break;
+    case RK_LINK_SHAPE_CAPSULE:
+        require_sim(nksim_shape_create_capsule(world, source.size[0],
+            2.0 * source.size[1], &primitive), "nksim_shape_create_capsule(link primitive)");
+        break;
+    case RK_LINK_SHAPE_CONVEX:
+        require_sim(nksim_shape_create_convex(world, source.vertices,
+            source.vertex_count * 3, &primitive), "nksim_shape_create_convex(link shape)");
+        break;
+    default:
+        require_sim(nksim_shape_create_cylinder(world, source.size[0],
+            2.0 * source.size[1], &primitive), "nksim_shape_create_cylinder(link primitive)");
+        break;
+    }
+    nksim_surface surface{};
+    surface.struct_size = sizeof(surface);
+    surface.friction_dimensions = source.friction_dimensions;
+    std::copy_n(source.friction, 3, surface.friction);
+    surface.contact_time_constant = source.contact_time_constant;
+    surface.contact_damping_ratio = source.contact_damping_ratio;
+    surface.contact_filter = source.contact_filter;
+    require_sim(nksim_shape_set_surface(world, primitive, &surface),
+                "nksim_shape_set_surface(link primitive)");
+    return primitive;
+}
+
 bool valid_link_shape(const rk_simulation_link_shape &shape, uint32_t link_count) {
     if (shape.link >= link_count || shape.type < RK_LINK_SHAPE_BOX ||
-        shape.type > RK_LINK_SHAPE_CYLINDER || !valid_pose(shape.position, shape.rotation) ||
+        shape.type > RK_LINK_SHAPE_CONVEX || !valid_pose(shape.position, shape.rotation) ||
         !valid_contact_surface(shape.friction, shape.friction_dimensions,
             shape.contact_time_constant, shape.contact_damping_ratio, shape.contact_filter))
         return false;
+    if (shape.type == RK_LINK_SHAPE_CONVEX) {
+        if (shape.vertex_count < 4 || shape.vertex_count > 64) return false;
+        for (uint32_t i = 0; i < shape.vertex_count * 3; ++i)
+            if (!std::isfinite(shape.vertices[i])) return false;
+        return true;
+    }
     const uint32_t sized = shape.type == RK_LINK_SHAPE_BOX ? 3
         : shape.type == RK_LINK_SHAPE_SPHERE ? 1 : 2;
     for (uint32_t axis = 0; axis < sized; ++axis)
@@ -277,14 +319,14 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         for (uint32_t j = 0; j < i; ++j)
             if (robot_desc->brakes[j].joint == brake.joint) return RK_ERROR_INVALID_ARGUMENT;
     }
-    const bool has_pneumatic_desc = robot_desc != nullptr;
-    const auto pneumatic_count = has_pneumatic_desc ? robot_desc->pneumatic_drive_count : 0;
-    if (pneumatic_count > RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
-    for (uint32_t index = 0; index < pneumatic_count; ++index) {
-        const auto &drive = robot_desc->pneumatic_drives[index];
+    const bool has_cylinder_desc = robot_desc != nullptr;
+    const auto cylinder_count = has_cylinder_desc ? robot_desc->cylinder_drive_count : 0;
+    if (cylinder_count > RK_MAX_JOINTS) return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t index = 0; index < cylinder_count; ++index) {
+        const auto &drive = robot_desc->cylinder_drives[index];
         if (drive.joint >= blueprint.joint_count ||
             blueprint.joints[drive.joint].type != RK_RUNTIME_JOINT_PRISMATIC ||
-            !blueprint.process_joint[drive.joint] ||
+            !blueprint.external_joint[drive.joint] ||
             drive.channel_a >= blueprint.channel_count ||
             (drive.channel_b != UINT32_MAX && drive.channel_b >= blueprint.channel_count) ||
             drive.channel_a == drive.channel_b || drive.normally_to_a > 1 ||
@@ -297,8 +339,19 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             (drive.channel_b != UINT32_MAX &&
              blueprint.channels[drive.channel_b].kind != RK_EVENT_DIGITAL))
             return RK_ERROR_INVALID_ARGUMENT;
+        if (drive.control != RK_CYLINDER_PRESSURE_EFFORT && drive.control != RK_CYLINDER_FLOW_LIMITED)
+            return RK_ERROR_INVALID_ARGUMENT;
+        if (drive.control == RK_CYLINDER_FLOW_LIMITED &&
+            (drive.channel_b == UINT32_MAX || !std::isfinite(drive.stroke) || drive.stroke <= 0.0 ||
+             !std::isfinite(drive.approach_speed) || drive.approach_speed <= 0.0 ||
+             !std::isfinite(drive.working_speed) || drive.working_speed <= 0.0 ||
+             !std::isfinite(drive.return_speed) || drive.return_speed <= 0.0 ||
+             !std::isfinite(drive.change_point) || drive.change_point < 0.0 || drive.change_point > drive.stroke ||
+             !std::isfinite(drive.retracted_position) ||
+             std::max({drive.approach_speed, drive.working_speed, drive.return_speed}) > drive.rated_speed))
+            return RK_ERROR_INVALID_ARGUMENT;
         for (uint32_t earlier = 0; earlier < index; ++earlier)
-            if (robot_desc->pneumatic_drives[earlier].joint == drive.joint)
+            if (robot_desc->cylinder_drives[earlier].joint == drive.joint)
                 return RK_ERROR_INVALID_ARGUMENT;
     }
     const bool has_velocity_desc = robot_desc != nullptr;
@@ -307,7 +360,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
     for (uint32_t index = 0; index < velocity_count; ++index) {
         const auto &drive = robot_desc->velocity_drives[index];
         if (drive.joint >= blueprint.joint_count ||
-            !blueprint.process_joint[drive.joint] ||
+            !blueprint.external_joint[drive.joint] ||
             drive.speed_channel >= blueprint.channel_count ||
             drive.direction_channel >= blueprint.channel_count ||
             drive.speed_channel == drive.direction_channel ||
@@ -320,8 +373,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         for (uint32_t earlier = 0; earlier < index; ++earlier)
             if (robot_desc->velocity_drives[earlier].joint == drive.joint)
                 return RK_ERROR_INVALID_ARGUMENT;
-        for (uint32_t pneumatic = 0; pneumatic < pneumatic_count; ++pneumatic)
-            if (robot_desc->pneumatic_drives[pneumatic].joint == drive.joint)
+        for (uint32_t cylinder = 0; cylinder < cylinder_count; ++cylinder)
+            if (robot_desc->cylinder_drives[cylinder].joint == drive.joint)
                 return RK_ERROR_INVALID_ARGUMENT;
     }
     if (initial_pose && (initial_pose->struct_size < sizeof(*initial_pose) ||
@@ -413,10 +466,16 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
     }
     try {
         auto binding = std::shared_ptr<SimulationRobot>(new SimulationRobot(*this));
-        for (uint32_t index = 0; index < pneumatic_count; ++index) {
-            const auto &source = robot_desc->pneumatic_drives[index];
-            SimulationRobot::PneumaticDriveState drive;
+        for (uint32_t index = 0; index < cylinder_count; ++index) {
+            const auto &source = robot_desc->cylinder_drives[index];
+            SimulationRobot::CylinderDriveState drive;
             drive.joint = source.joint;
+            drive.control = source.control;
+            drive.approach_speed = source.approach_speed;
+            drive.working_speed = source.working_speed;
+            drive.return_speed = source.return_speed;
+            drive.change_point = source.change_point;
+            drive.retracted_position = source.retracted_position;
             drive.channel_a = blueprint.channels[source.channel_a].id;
             drive.has_channel_b = source.channel_b != UINT32_MAX;
             if (drive.has_channel_b) drive.channel_b = blueprint.channels[source.channel_b].id;
@@ -425,7 +484,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             drive.extension_force = source.extension_force;
             drive.retraction_force = source.retraction_force;
             drive.extend_sign = source.extend_sign;
-            binding->pneumatic_drives_.push_back(std::move(drive));
+            binding->cylinder_drives_.push_back(std::move(drive));
         }
         for (uint32_t index = 0; index < velocity_count; ++index) {
             const auto &source = robot_desc->velocity_drives[index];
@@ -486,9 +545,9 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                     "nksim_world_begin_topology_update");
         topology_update = true;
         const bool has_tool = robot_desc &&
-            robot_desc->tool_piece_count > 0;
+            robot_desc->tool_shape_count > 0;
         if (has_tool && (robot_desc->tool_link_index >= blueprint.link_count ||
-                         robot_desc->tool_piece_count > 16))
+                         robot_desc->tool_shape_count > 16))
             throw std::invalid_argument("invalid tool attachment link or piece count");
         const auto link_shape_count = robot_desc
             ? robot_desc->link_shape_count : 0;
@@ -603,34 +662,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 const auto &source = robot_desc->link_shapes[shape_index];
                 if (source.link != index) continue;
                 if (children.empty() && has_link_shape) add_child(desc.shape, origin, identity);
-                nksim_shape primitive = 0;
-                switch (source.type) {
-                case RK_LINK_SHAPE_BOX:
-                    require_sim(nksim_shape_create_box(world, source.size, &primitive),
-                                "nksim_shape_create_box(link primitive)");
-                    break;
-                case RK_LINK_SHAPE_SPHERE:
-                    require_sim(nksim_shape_create_sphere(world, source.size[0], &primitive),
-                                "nksim_shape_create_sphere(link primitive)");
-                    break;
-                case RK_LINK_SHAPE_CAPSULE:
-                    require_sim(nksim_shape_create_capsule(world, source.size[0],
-                        2.0 * source.size[1], &primitive), "nksim_shape_create_capsule(link primitive)");
-                    break;
-                default:
-                    require_sim(nksim_shape_create_cylinder(world, source.size[0],
-                        2.0 * source.size[1], &primitive), "nksim_shape_create_cylinder(link primitive)");
-                    break;
-                }
-                nksim_surface surface{};
-                surface.struct_size = sizeof(surface);
-                surface.friction_dimensions = source.friction_dimensions;
-                std::copy_n(source.friction, 3, surface.friction);
-                surface.contact_time_constant = source.contact_time_constant;
-                surface.contact_damping_ratio = source.contact_damping_ratio;
-                surface.contact_filter = source.contact_filter;
-                require_sim(nksim_shape_set_surface(world, primitive, &surface),
-                            "nksim_shape_set_surface(link primitive)");
+                nksim_shape primitive = create_collision_shape(world, source);
                 link_shapes_.push_back(primitive);
                 shape_parts[shape_index] = static_cast<uint32_t>(children.size());
                 add_child(primitive, source.position, source.rotation);
@@ -638,22 +670,22 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             }
             if (has_tool && index == robot_desc->tool_link_index) {
                 if (!std::isfinite(robot_desc->tool_margin) ||
-                    !std::isfinite(robot_desc->tool_gap) ||
-                    robot_desc->tool_margin < 0.0 || robot_desc->tool_gap < 0.0)
+                    robot_desc->tool_margin < 0.0)
                     throw std::invalid_argument("invalid tool contact margin or gap");
                 if (children.empty()) add_child(desc.shape, origin, identity);
-                for (uint32_t piece = 0; piece < robot_desc->tool_piece_count; ++piece) {
-                    const auto count = robot_desc->tool_piece_vertex_count[piece];
-                    if (count < 4 || count > 64)
-                        throw std::invalid_argument("invalid tool collision hull vertex count");
-                    const auto *vertices = robot_desc->tool_piece_vertices + piece * 64 * 3;
-                    nksim_shape tool_shape = 0;
-                    require_sim(nksim_shape_create_convex(world, vertices, count * 3,
-                                                          &tool_shape), "nksim_shape_create_convex(tool)");
+                binding->tool_link_ = index;
+                binding->tool_part_start_ = static_cast<uint32_t>(children.size());
+                binding->tool_part_count_ = robot_desc->tool_shape_count;
+                for (uint32_t piece = 0; piece < robot_desc->tool_shape_count; ++piece) {
+                    const auto &source = robot_desc->tool_shapes[piece];
+                    if (!valid_link_shape(source, blueprint.link_count) || source.link != index ||
+                        !std::isfinite(robot_desc->tool_shape_gap[piece]) || robot_desc->tool_shape_gap[piece] < 0)
+                        throw std::invalid_argument("invalid tool collision shape");
+                    nksim_shape tool_shape = create_collision_shape(world, source);
                     require_sim(nksim_shape_set_contact(world, tool_shape,
-                        robot_desc->tool_margin, robot_desc->tool_gap), "nksim_shape_set_contact(tool)");
+                        robot_desc->tool_margin, robot_desc->tool_shape_gap[piece]), "nksim_shape_set_contact(tool)");
                     link_shapes_.push_back(tool_shape);
-                    add_child(tool_shape, origin, identity);
+                    add_child(tool_shape, source.position, source.rotation);
                 }
                 has_link_shape = true;
             }
@@ -703,10 +735,10 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             desc.axis_a[2] = a[2] + q[3]*t[2] + q[0]*t[1] - q[1]*t[0];
             std::copy_n(source.parent_frame_rotation, 4, desc.rotation_a);
             std::copy_n(source.child_frame_rotation, 4, desc.rotation_b);
-            // A pneumatic cylinder's overtravel is its compressible end cushion: keep
+            // A cylinder's overtravel is its compressible end cushion: keep
             // the physics stop at the stroke boundary while the runtime tolerates
             // that small penetration in the observed joint position.
-            const double overtravel = blueprint.process_joint[index] ? 0.0 : blueprint.joint_overtravel[index];
+            const double overtravel = blueprint.external_joint[index] ? 0.0 : blueprint.joint_overtravel[index];
             desc.lower_limit = source.lower_limit - overtravel;
             desc.upper_limit = source.upper_limit + overtravel;
             // SimKit uses zero for an unspecified force ceiling. A negative
@@ -722,19 +754,20 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 desc.limit_damping_ratio = dynamics.limit_damping_ratio;
                 std::copy_n(dynamics.limit_impedance, 5, desc.limit_impedance);
             }
-            for (uint32_t drive_index = 0; drive_index < pneumatic_count; ++drive_index) {
-                const auto &drive = robot_desc->pneumatic_drives[drive_index];
+            for (uint32_t drive_index = 0; drive_index < cylinder_count; ++drive_index) {
+                const auto &drive = robot_desc->cylinder_drives[drive_index];
                 if (drive.joint != index) continue;
                 desc.max_force = std::max(desc.max_force,
                     std::max(drive.extension_force, drive.retraction_force));
-                desc.damping += std::max(drive.extension_force, drive.retraction_force) /
-                    drive.rated_speed;
+                if (drive.control == RK_CYLINDER_PRESSURE_EFFORT)
+                    desc.damping += std::max(drive.extension_force, drive.retraction_force) /
+                        drive.rated_speed;
             }
             nksim_joint joint = 0;
             require_sim(nksim_joint_create(world, &desc, &joint), "nksim_joint_create");
             binding->joints_.push_back(joint);
-            const bool process_joint = blueprint.process_joint[index] != 0;
-            binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED && !process_joint);
+            const bool external_joint = blueprint.external_joint[index] != 0;
+            binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED && !external_joint);
             joints_.push_back(joint);
         }
         for (uint32_t i = 0; i < brake_count; ++i) {
@@ -917,7 +950,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 if (binding->passive_[index]) held[index] = 0;
             }
             for (uint32_t index = 0; index < blueprint.joint_count; ++index)
-                    if (blueprint.process_joint[index]) held[index] = 0;
+                    if (blueprint.external_joint[index]) held[index] = 0;
             binding->hold_at_rest(std::move(held));
         }
         bindings_.push_back(binding);
@@ -1693,7 +1726,9 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
             result.other_robot = UINT32_MAX;
             result.other_link = UINT32_MAX;
             result.link_index = link;
-            result.tool_piece_index = part - 1;
+            result.tool_piece_index = link == binding->tool_link_ && part >= binding->tool_part_start_ &&
+                part < binding->tool_part_start_ + binding->tool_part_count_
+                ? static_cast<int32_t>(part - binding->tool_part_start_) : -1;
             const auto other_body = source.body_a == body ? source.body_b : source.body_a;
             nksim_object other_object = 0;
             if (nksim_session_find_object(session_, other_body, &other_object) == NKSIM_OK) {
@@ -1865,7 +1900,7 @@ rk_result Simulation::submit(const nksim_tick &tick) {
         auto targets = binding->take_pending_targets();
         if (binding_index >= runtimes_.size()) return RK_ERROR_BACKEND;
         auto &runtime = *runtimes_[binding_index];
-        auto process_fault = binding->apply_pneumatic_valves(runtime, targets);
+        auto process_fault = binding->apply_cylinder_valves(runtime, targets);
         if (!process_fault) process_fault = binding->apply_velocity_drives(runtime, targets);
         rk_result brake_result = RK_OK;
         if (!process_fault) brake_result = binding->apply_brake_coils(runtime, process_fault);
@@ -1874,7 +1909,7 @@ rk_result Simulation::submit(const nksim_tick &tick) {
             // apply physical de-energized behavior (latched valves retain supply air).
             runtime.fail_tick(process_fault ? process_fault->code() : RK_FAULT_ENDPOINT);
             targets = binding->take_pending_targets();
-            const auto safe_valves = binding->apply_pneumatic_valves(runtime, targets, true);
+            const auto safe_valves = binding->apply_cylinder_valves(runtime, targets, true);
             const auto safe_velocity = binding->apply_velocity_drives(runtime, targets, true);
             std::optional<ProcessChannelFault> safe_brake_fault;
             if (binding->apply_brake_coils(runtime, safe_brake_fault, true) != RK_OK) return RK_ERROR_BACKEND;

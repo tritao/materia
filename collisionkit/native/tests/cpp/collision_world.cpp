@@ -537,6 +537,33 @@ int main() {
         ck_world_destroy(contact);
     }
 
+    // A rotated convex whose inflation alone reaches a box must agree with
+    // signed distances, including when that inflation is removed again.
+    {
+        ck_world_handle inflated_world{};
+        expect(ck_world_create(&inflated_world) == CK_OK, "inflated convex world");
+        uint32_t moving_body = 0;
+        expect(ck_add_body(inflated_world, 0, &moving_body) == CK_OK, "inflated convex body");
+        std::vector<double> points;
+        for (int i = 0; i < 8; ++i) for (int axis = 0; axis < 3; ++axis)
+            points.push_back(((i >> axis) & 1 ? 1.0 : -1.0) * (axis == 0 ? 0.3 : 0.05));
+        auto posed = at(1, 0, 0);
+        posed[5] = posed[6] = std::sqrt(0.5);
+        uint32_t convex = 0;
+        expect(ck_add_convex(inflated_world, moving_body, posed.data(), 7, points.data(),
+                             uint32_t(points.size()), &convex) == CK_OK, "posed convex added");
+        const auto box = shape(inflated_world, -1, at(1.12, 0.2, 0), CK_SHAPE_BOX, {0.02, 0.02, 0.02});
+        expect(colliding(inflated_world, 0).empty(), "uninflated convex is clear");
+        expect(ck_set_inflation(inflated_world, convex, 0.1) == CK_OK, "convex inflation applied");
+        const auto distances = distance_of(inflated_world, convex, box, 0);
+        expect(distances.size() == 10, "inflated convex has a negative distance");
+        if (distances.size() == 10) near(distances[0], -0.05, 1e-8, "inflated convex penetration");
+        expect(colliding(inflated_world, 0).size() == 1, "inflated convex collision agrees with distance");
+        expect(ck_set_inflation(inflated_world, convex, 0) == CK_OK, "convex inflation removed");
+        expect(colliding(inflated_world, 0).empty(), "removing convex inflation restores clearance");
+        ck_world_destroy(inflated_world);
+    }
+
     // Arguments and handles.
     {
         uint32_t id = 0;

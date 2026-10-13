@@ -14,7 +14,8 @@ import robotkit.model.Actuator;
 import robotkit.model.ActuatorDrive.ServoDrive;
 import robotkit.model.Transmission;
 import haxe.Int64;
-import robotkit.tool.ToolCollisionShape;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 import robotkit.spatial.Vec3;
 
 class SimulationPoseResetTests {
@@ -31,7 +32,7 @@ class SimulationPoseResetTests {
       piece.push((index & 4) == 0 ? 0.0 : 0.02);
     }
     simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1), position, rotation,
-      null, null, null, null, ToolCollisionShape.Hulls([piece], 0.005), 0);
+      null, null, null, ToolGeometry.convex([piece], 0.005), 0);
     simulationHarness.teleportRobot(0, [4.0, 5.0, 6.0]);
     simulationHarness.resetRobot(0);
     checkPose(simulation, position, rotation, 'resetRobot on backend $backend');
@@ -43,11 +44,11 @@ class SimulationPoseResetTests {
 
     var boxSimulation = boxSimulationHarness.simulation;
     boxSimulation.addRobotAtPose(new RobotRuntimeBlueprint(2, 0, 1), [0, 0, 0],
-      [0, 0, 0, 1], null, null, null, null,
-      ToolCollisionShape.Box(new Vec3(0.01, 0.01, 0.02), new Vec3(0, 0, 0.02)), 0);
+      [0, 0, 0, 1], null, null, null,
+      ToolGeometry.box(new Vec3(0.01, 0.01, 0.02), new Vec3(0, 0, 0.02)), 0);
     boxSimulationHarness.step(Int64.ofInt(0));
     boxSimulationHarness.dispose();
-    if (backend == 1) toolProximity();
+    if (backend == 1) { toolProximity(); posedToolShapes(); }
     driveReferenceCompilation();
     downstreamInertia();
     coupling(backend);
@@ -201,8 +202,8 @@ class SimulationPoseResetTests {
       cup.push((index & 4) == 0 ? 0.0 : 0.02);
     }
     var runtime = simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1),
-      [0, 0, 0], [0, 0, 0, 1], null, null, null, null,
-      ToolCollisionShape.Hulls([cup], 0.03), 0);
+      [0, 0, 0], [0, 0, 0, 1], null, null, null,
+      ToolGeometry.convex([cup], 0.03), 0);
     var obstacle = simulationHarness.spawnBox([0, 0, 0.05], [0.01, 0.01, 0.01]);
     simulationHarness.step(Int64.ofInt(0));
     var contacts = runtime.toolProximity();
@@ -210,6 +211,31 @@ class SimulationPoseResetTests {
         contacts[0].otherObject != obstacle.handle.rawValue())
       throw "Tool cup proximity was not reported";
     simulationHarness.dispose();
+  }
+
+  static function posedToolShapes():Void {
+    var harness = new SimulationHarness(0.01, 2, 1);
+    var blueprint = new RobotRuntimeBlueprint(1, 0, 1);
+    blueprint.linkCollisionShapes.push(new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape(0,
+      new CollisionShape(collisionkit.CollisionGeometry.Box(0.01, 0.01, 0.01))));
+    var points:Array<Float> = [for (i in 0...8) for (a in 0...3)
+      ((i & (1 << a)) == 0 ? -1 : 1) * (a == 0 ? 0.1 : 0.01)];
+    var q = Math.sqrt(0.5);
+    var rotated = new CollisionShape(collisionkit.CollisionGeometry.Convex(points), [1,0,0], [0,0,q,q]);
+    var sphere = new CollisionShape(collisionkit.CollisionGeometry.Sphere(0.02), [-1,0,0]);
+    var runtime = harness.simulation.addRobotAtPose(blueprint, [0,0,0], [0,0,0,1],
+      null, null, null, [sphere,rotated], 0);
+    var atTool = harness.spawnBox([1,0.06,0], [0.01,0.01,0.01]);
+    var atLink = harness.spawnBox([0.015,0,0], [0.01,0.01,0.01]);
+    harness.step(Int64.ofInt(0));
+    var toolContact = false, linkContact = false;
+    for (contact in runtime.contacts()) {
+      if (contact.otherObject == atTool.handle.rawValue() && contact.toolPieceIndex == 1) toolContact = true;
+      if (contact.otherObject == atLink.handle.rawValue() && contact.toolPieceIndex == -1) linkContact = true;
+    }
+    harness.dispose();
+    if (!toolContact || !linkContact)
+      throw "Posed tool shapes must preserve tool-piece identity alongside link geometry";
   }
 
   static function coupling(backend:Int):Void {

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "package": {
+    "name": "machinekit-overhead-arm-example"
+  },
+  "entry": "OverheadArmPreview",
+  "sources": [
+    "OverheadArm.hx",
+    "OverheadArmPreview.hx",
+    "../robot-arm/RobotArm.hx"
+  ],
+  "sourceRoots": [
+    ".",
+    "../robot-arm"
+  ],
+  "dependencies": {
+    "collisionkit-native": {
+      "path": "../../../collisionkit/native"
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../.."
+    },
+    "machinekit-robot": {
+      "path": "../../robot"
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

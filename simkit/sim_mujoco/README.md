@@ -46,6 +46,11 @@ the internal backend seam and applied through private MuJoCo actuators and
 `mjData.ctrl`. MuJoCo actuator objects and types are intentionally not part of
 the NativeKit API.
 
+Unloaded velocity targets have a finite first-order response before force limits
+and contacts. `MujocoSimWorld.velocityResponseRate()` reports the native solver's
+rate in inverse seconds so process timing references can include speed-change
+and stopping transients without duplicating the solver constant.
+
 Haxeon consumers use `bindings/nativekit-sim-mujoco.hxi` and the thin
 `nativekit.sim.MujocoSimWorld` façade. It creates a MuJoCo-backed world while
 returning the engine-neutral `Shape`, `Body`, `Joint`, `StepResult`, and

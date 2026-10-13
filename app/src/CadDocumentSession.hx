@@ -2,6 +2,9 @@ package app;
 
 import CadKit;
 import cadkit.Shape;
+import cadkit.sheetmetal.SheetFeature;
+import cadkit.sheetmetal.SheetSolid;
+import cadkit.sheetmetal.FlatPattern;
 import cadkit.parametric.Document;
 import cadkit.parametric.EvaluationCancelled;
 import cadkit.parametric.TopologyFingerprint;
@@ -20,6 +23,32 @@ class CadDocumentSession {
   public var previewResult(default, null):Null<Shape> = null;
   public var collisionBounds(default, null):Null<CadCollisionBounds> = null;
   public var lastPublicationSeconds(default, null):Float = 0;
+
+  var flatPatternOwner:Null<SheetFeature> = null;
+  var flatPatternSnapshot:Null<FlatPattern> = null;
+
+  /** One immutable developed snapshot per published revision and selected sheet feature. */
+  public function sheetFlatPattern(feature:SheetFeature):FlatPattern {
+    ensureOpen();
+    if (feature.document != document) throw "The sheet feature belongs to another document";
+    if (flatPatternOwner == feature && flatPatternSnapshot != null) return flatPatternSnapshot;
+    var next = FlatPattern.of(feature.sheet());
+    flatPatternOwner = feature; flatPatternSnapshot = next;
+    return next;
+  }
+
+  public var sheetFlatView(default, null):Bool = false;
+
+  /** View state only; rebuilding derives the current flat solid from the authored sheet. */
+  public function setSheetFlatView(flat:Bool):Void {
+    ensureOpen();
+    if (sheetFlatView == flat) return;
+    var output = Std.downcast(document.outputFeatureOrNull(), SheetFeature);
+    if (output == null) throw "The document output is not a sheet";
+    var previous = sheetFlatView;
+    sheetFlatView = flat;
+    try publishCurrent(beginEvaluation()) catch (error:Dynamic) { sheetFlatView = previous; throw error; }
+  }
 
   var publishedShape:Null<Shape>;
   var publishedGeometry:Null<GeometryData>;
@@ -214,9 +243,15 @@ class CadDocumentSession {
     try {
       ensureEvaluationCurrent(ticket);
       var source = document.result();
-      nextShape = source.cloneShape();
-      nextGeometry = model.geometryFor(cast nextShape, true);
-      nextCollisionBounds = model.collisionBoundsFor(cast nextShape);
+      var sheetOutput = Std.downcast(document.outputFeatureOrNull(), SheetFeature);
+      var candidate:Shape;
+      if (sheetFlatView && sheetOutput != null) {
+        var graph = sheetOutput.sheet();
+        candidate = SheetSolid.build(graph, graph.flat());
+      } else candidate = source.cloneShape();
+      nextShape = candidate;
+      nextGeometry = model.geometryFor(candidate, true);
+      nextCollisionBounds = model.collisionBoundsFor(candidate);
       ensureEvaluationCurrent(ticket);
     } catch (error:Dynamic) {
       lastPublicationSeconds = Sys.time() - publicationStarted;
@@ -225,12 +260,14 @@ class CadDocumentSession {
       throw error;
     }
 
+    if (nextGeometry == null) throw "CAD publication produced no geometry";
     var priorShape = publishedShape;
     publishedShape = nextShape;
-    publishedGeometry = cast nextGeometry;
+    publishedGeometry = nextGeometry;
     collisionBounds = nextCollisionBounds;
     pendingFineGeometry = true;
     refinementFrameRequested = false;
+    flatPatternOwner = null; flatPatternSnapshot = null;
     revision++;
     lastPublicationSeconds = Sys.time() - publicationStarted;
     if (priorShape != null)
@@ -246,6 +283,7 @@ class CadDocumentSession {
     collisionBounds = null;
     pendingFineGeometry = false;
     refinementFrameRequested = false;
+    flatPatternOwner = null; flatPatternSnapshot = null;
     revision++;
     lastPublicationSeconds = Sys.time() - publicationStarted;
     if (priorShape != null)
@@ -267,7 +305,9 @@ class CadDocumentSession {
   public function refinePublishedGeometry():Bool {
     if (!needsGeometryRefinement() || !refinementFrameRequested)
       return false;
-    var nextGeometry = model.geometryFor(cast publishedShape, false);
+    var source = publishedShape;
+    if (source == null) return false;
+    var nextGeometry = model.geometryFor(source, false);
     if (closed || !pendingFineGeometry)
       return false;
     publishedGeometry = nextGeometry;

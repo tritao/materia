@@ -1,6 +1,7 @@
 package machinekit.pneumatic;
 
 import cadkit.modeling.Part;
+import machinekit.fluid.ValveSpec;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
@@ -12,7 +13,7 @@ import machinekit.component.Solids;
  * A single coil reverses the spring-return state. Double coils select and latch A/B.
  * Installed 6 mm fittings and the valve envelope are assumed.
  */
-class SolenoidValve extends MachineComponent implements PneumaticValveSpec {
+class SolenoidValve extends MachineComponent implements ValveSpec {
 	public final doubleSolenoid:Bool;
 	public final normallyToA:Bool;
 	/** Assumed installed body envelope, in mm. Geometry and mounting clearances use these same dimensions. */
@@ -40,9 +41,8 @@ class SolenoidValve extends MachineComponent implements PneumaticValveSpec {
 	/** Pure spool transition. Retain the previous state when double coils agree. */
 	public function routesToA(coilA:Bool, coilB:Bool, previousToA:Bool):Bool
 		return doubleSolenoid ? (coilA == coilB ? previousToA : coilA) : (coilA ? !normallyToA : normallyToA);
-	public function isDoubleSolenoid():Bool return doubleSolenoid;
-	public function defaultsToA():Bool return normallyToA;
-	override public function pneumaticValveSpec():Null<PneumaticValveSpec> return this;
+	public function controlSpec():machinekit.fluid.ValveControlSpec return PressureEffort(doubleSolenoid, normallyToA);
+	override public function valveSpec():Null<ValveSpec> return this;
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.named(Part.box(bodyWidth, bodyDepth, bodyHeight), "valve");

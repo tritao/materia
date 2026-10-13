@@ -1,6 +1,7 @@
 package materia.project;
 
 import haxe.io.Bytes;
+import haxeon.wire.JsonWire;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyDefinitionCodec;
@@ -111,38 +112,88 @@ typedef SceneArtifactProjectMotion = {
   var keys:Array<{time:Float, position:Float}>;
 }
 
-typedef SceneArtifactMachineMotion = {
-  var belts:Array<SceneArtifactBeltVisual>;
-  @:optional var program:SceneArtifactAxisProgram;
+@:wire typedef SceneArtifactMachineMotion = {
+  @:id(1) var belts:Array<SceneArtifactBeltVisual>;
+  @:id(2) @:optional var program:SceneArtifactAxisProgram;
   /** Execute the authored machine program on a streamed stepper board in the app. */
-  @:optional var virtualDevice:Bool;
+  @:id(3) @:optional var virtualDevice:Bool;
+  /** Contact surfaces of CAD hulls, keyed by assembly occurrence. */
+  @:id(4) @:optional var contacts:Array<SceneArtifactHullContact>;
+  /** Timed digital process outputs executed by the native plan runtime. */
+  @:id(5) @:optional var digitalProgram:SceneArtifactDigitalProgram;
+  /** Feedback-driven press controller, independent of the robot mission. */
+  @:id(6) @:optional var pressBrake:SceneArtifactPressBrake;
 }
 
-typedef SceneArtifactBeltVisual = {
-  var occurrence:String;
-  var pitch:Float;
-  var width:Float;
-  var thickness:Float;
-  var driverJoint:String;
-  var driverWrap:Int;
-  var driverSign:Float;
-  var wraps:Array<SceneArtifactBeltWrap>;
+/** Press travel and gauge setup use millimetres; axis planning converts to SI once. */
+@:wire typedef SceneArtifactPressBrakeStep = {
+  @:id(1) var gaugeXmm:Float;
+  @:id(2) var gaugeRmm:Float;
+  @:id(3) var clampTravelMm:Float;
+  @:id(4) var depthTravelMm:Float;
+  @:id(5) var withdrawalMm:Float;
 }
 
-typedef SceneArtifactBeltWrap = {
-  var occurrence:String;
-  var connector:String;
-  var radius:Float;
-  var side:Int;
+/** Runtime bindings are authored semantic ids; geometry supplies each program step. */
+@:wire typedef SceneArtifactPressBrake = {
+  @:id(1) @:optional var controllerId:String;
+  @:id(2) var ramJoint:String;
+  @:id(3) var depthAxis:String;
+  @:id(4) var gaugeX:String;
+  @:id(5) @:optional var gaugeR:String;
+  @:id(6) var topSwitch:String;
+  @:id(7) var fingerSwitches:Array<String>;
+  @:id(8) var steps:Array<SceneArtifactPressBrakeStep>;
+  @:id(9) var positionToleranceMm:Float;
+  @:id(10) var requestTimeoutSeconds:Float;
+  /** Explicit simulation unloading criterion, not a chamber-pressure measurement. */
+  @:id(11) var releaseTravelMm:Float;
+  @:id(12) var releaseClosingForceN:Float;
+}
+
+@:wire typedef SceneArtifactBeltVisual = {
+  @:id(1) var occurrence:String;
+  @:id(2) var pitch:Float;
+  @:id(3) var width:Float;
+  @:id(4) var thickness:Float;
+  @:id(5) var driverJoint:String;
+  @:id(6) var driverWrap:Int;
+  @:id(7) var driverSign:Float;
+  @:id(8) var wraps:Array<SceneArtifactBeltWrap>;
+}
+
+@:wire typedef SceneArtifactBeltWrap = {
+  @:id(1) var occurrence:String;
+  @:id(2) var connector:String;
+  @:id(3) var radius:Float;
+  @:id(4) var side:Int;
 }
 
 /** Metre-valued independent-axis waypoints, run as exact-stop moves. */
-typedef SceneArtifactAxisProgram = {
-  var axes:Array<String>;
-  var waypoints:Array<Array<Float>>;
-  var loop:Bool;
+@:wire typedef SceneArtifactAxisProgram = {
+  @:id(1) var axes:Array<String>;
+  @:id(2) var waypoints:Array<Array<Float>>;
+  @:id(3) var loop:Bool;
   /** Allowed measured endpoint error in axis SI units, including device step resolution. */
-  @:optional var positionTolerance:Float;
+  @:id(4) @:optional var positionTolerance:Float;
+}
+
+
+@:wire typedef SceneArtifactHullContact = {
+  @:id(1) var occurrence:String;
+  @:id(2) var surface:SceneContactSurface;
+}
+
+@:wire typedef SceneArtifactDigitalProgram = {
+  @:id(1) var durationSec:Float;
+  @:id(2) var events:Array<SceneArtifactDigitalEvent>;
+  @:id(3) var loop:Bool;
+}
+
+@:wire typedef SceneArtifactDigitalEvent = {
+  @:id(1) var timeSec:Float;
+  @:id(2) var channel:String;
+  @:id(3) var value:Bool;
 }
 
 /**
@@ -541,7 +592,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 29;
+	public static inline var VERSION:Int = 30;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -576,7 +627,8 @@ class SceneArtifact {
 		if (robotSensors.length > 100000) throw "Scene artifact robot sensors are too large";
     var project = data.project == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.project));
     if (project.length > 2000000) throw "Scene artifact project settings are too large";
-    var machineMotion = data.machineMotion == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.machineMotion));
+    var authoredMotion = data.machineMotion;
+    var machineMotion = authoredMotion == null ? Bytes.alloc(0) : Bytes.ofString(JsonWire.encode(authoredMotion));
     if (machineMotion.length > 1000000) throw "Scene artifact machine motion is too large";
 		var controllers = data.controllers == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.controllers));
 		var signals = data.signals == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.signals));
@@ -762,9 +814,11 @@ class SceneArtifact {
   }
 
   static function validateMachineMotion(motion:SceneArtifactMachineMotion, data:SceneArtifactData):Void {
-    if (data.assemblyDefinition == null || motion.belts == null || motion.belts.length > 128)
-      throw "Machine motion needs an assembly and a bounded belt list";
-    var definition = AssemblyDefinitionFlattener.flattenView(cast data.assemblyDefinition);
+    var source = data.assemblyDefinition;
+    if (source == null) throw "Machine motion needs an assembly";
+    if (motion.belts == null || motion.belts.length > 128)
+      throw "Machine motion needs a bounded belt list";
+    var definition = AssemblyDefinitionFlattener.flattenView(source);
     var occurrences = [for (value in definition.occurrences) value.id];
     var joints = [for (value in definition.joints) value.id];
     for (belt in motion.belts) {
@@ -784,6 +838,105 @@ class SceneArtifact {
         for (component in definition.definitions) if (component.id == occurrence.definition)
           for (connector in component.connectors) if (connector.name == wrap.connector) found = true;
         if (!found) throw "Moving belt wrap connector is missing";
+      }
+    }
+    var contacts = motion.contacts;
+    if (contacts != null) {
+      if (contacts.length > 1000) throw "Machine contact surface list is too large";
+      var seen = new Map<String, Bool>();
+      for (contact in contacts) {
+        if (occurrences.indexOf(contact.occurrence) < 0 || seen.exists(contact.occurrence))
+          throw "Machine contact surfaces need distinct known occurrences";
+        seen.set(contact.occurrence, true);
+        var surface = contact.surface;
+        if (surface == null || surface.friction == null || surface.friction.length != 3 || surface.filter == null)
+          throw "Machine contact surface needs friction and a filter";
+        for (value in surface.friction)
+          if (!finite(value) || value < 0) throw "Machine contact friction must be finite and non-negative";
+        if (surface.frictionDimensions != 0 && surface.frictionDimensions != 1 && surface.frictionDimensions != 3 &&
+            surface.frictionDimensions != 4 && surface.frictionDimensions != 6)
+          throw "Machine contact friction dimensions must be 0, 1, 3, 4 or 6";
+        for (value in [surface.contactTimeConstant, surface.contactDampingRatio])
+          if (!finite(value) || value < 0) throw "Machine contact compliance must be finite and non-negative";
+      }
+    }
+    var press = motion.pressBrake;
+    if (press != null) {
+      if (motion.digitalProgram != null || motion.virtualDevice == true)
+        throw "Press controller cannot share timed outputs or a virtual axis device";
+      var owned = [press.ramJoint, press.depthAxis, press.gaugeX];
+      if (press.gaugeR != null) owned.push(press.gaugeR);
+      var seen = new Map<String, Bool>();
+      for (id in owned) {
+        if (id == null || joints.indexOf(id) < 0 || seen.exists(id))
+          throw "Press controller needs distinct known ram and positioning axes";
+        for (joint in definition.joints) if (joint.id == id && joint.type != materia.assembly.AssemblyDefinition.AssemblyJointType.Prismatic)
+          throw 'Press controller axis "$id" must have linear travel';
+        seen.set(id, true);
+      }
+      if (press.fingerSwitches == null || press.fingerSwitches.length != 2 ||
+          press.fingerSwitches[0] == press.fingerSwitches[1] ||
+          press.fingerSwitches.indexOf(press.topSwitch) >= 0)
+        throw "Press controller needs distinct top and two finger switches";
+      for (id in [press.topSwitch].concat(press.fingerSwitches)) {
+        var found = false;
+        var sensors = definition.sensors;
+        if (sensors != null) for (sensor in sensors) if (sensor.id == id && sensor.kind == "joint_switch") found = true;
+        if (!found) throw 'Press controller switch "$id" is missing';
+      }
+      for (value in [press.positionToleranceMm, press.requestTimeoutSeconds, press.releaseTravelMm, press.releaseClosingForceN])
+        if (!finite(value) || value <= 0) throw "Press controller needs positive finite tolerances and unloading limits";
+      if (press.steps == null || press.steps.length == 0 || press.steps.length > 10000)
+        throw "Press controller needs a bounded nonempty program";
+      function pressTravel(id:String, millimetres:Float):Void {
+        for (joint in definition.joints) if (joint.id == id) {
+          var bounds = joint.limits;
+          var coordinate = millimetres * 0.001 / data.metresPerUnit;
+          if (bounds == null || bounds.lower == null || bounds.upper == null ||
+              coordinate < bounds.lower || coordinate > bounds.upper)
+            throw 'Press program exceeds bounded travel of axis "$id"';
+        }
+      }
+      for (step in press.steps) {
+        for (value in [step.gaugeXmm, step.gaugeRmm, step.clampTravelMm, step.depthTravelMm, step.withdrawalMm])
+          if (!finite(value) || value < 0) throw "Press program coordinates must be finite and nonnegative";
+        if (step.depthTravelMm <= step.clampTravelMm || step.clampTravelMm <= press.positionToleranceMm ||
+            press.releaseTravelMm >= step.depthTravelMm - step.clampTravelMm || step.withdrawalMm <= 0 ||
+            (press.gaugeR == null && step.gaugeRmm != 0))
+          throw "Press program needs ordered clamp/depth travel, withdrawal and supported R";
+        pressTravel(press.ramJoint, step.clampTravelMm);
+        pressTravel(press.ramJoint, step.depthTravelMm);
+        pressTravel(press.depthAxis, step.depthTravelMm);
+        pressTravel(press.gaugeX, step.gaugeXmm);
+        pressTravel(press.gaugeX, step.gaugeXmm + step.withdrawalMm);
+        if (press.gaugeR != null) pressTravel(press.gaugeR, step.gaugeRmm);
+      }
+      var controls = data.controllers;
+      if (controls != null && controls.length > 0) {
+        var matches = [for (control in controls) if (control.id == press.controllerId) control];
+        if (matches.length != 1) throw "Press controller binding is missing";
+        for (id in owned) if (matches[0].joints.indexOf(id) < 0) throw 'Press controller does not own joint "$id"';
+        for (id in [press.topSwitch].concat(press.fingerSwitches))
+          if (matches[0].sensors.indexOf(id) < 0) throw 'Press controller does not own switch "$id"';
+      } else if (press.controllerId != null) throw "Press controller binding names an absent cabinet";
+    }
+    var digital = motion.digitalProgram;
+    if (digital != null) {
+      if (motion.program != null || motion.virtualDevice == true || data.machining != null || data.mission != null)
+        throw "Machine digital program needs exclusive execution ownership";
+      if (!finite(digital.durationSec) || digital.durationSec <= 0 || digital.durationSec * 1e9 > 9007199254740991.0 ||
+          digital.events == null || digital.events.length == 0 || digital.events.length > 10000)
+        throw "Machine digital program needs a bounded duration and output list";
+      var previous = 0.0;
+      var times = new Map<String, Float>();
+      for (event in digital.events) {
+        if (!finite(event.timeSec) || event.timeSec < previous || event.timeSec >= digital.durationSec ||
+            event.channel == null || event.channel.length == 0)
+          throw "Machine digital events need ordered times before the end and a channel";
+        var last = times.get(event.channel);
+        if (last != null && last == event.timeSec) throw "Machine digital output is assigned twice at one time";
+        times.set(event.channel, event.timeSec);
+        previous = event.timeSec;
       }
     }
     var program = motion.program;
@@ -1129,45 +1282,6 @@ class SceneArtifact {
 		}];
 	}
 
-  /** Decode JSON into concrete records; native targets cannot cast dynamic objects to records. */
-  static function decodeMachineMotion(decoded:Dynamic):SceneArtifactMachineMotion {
-    function fail():Dynamic throw "Scene artifact machine motion is invalid";
-    function array(value:Dynamic):Array<Dynamic> return Std.isOfType(value, Array) ? cast value : fail();
-    function text(value:Dynamic, name:String):String {
-      var item:Dynamic = Reflect.field(value, name);
-      return Std.isOfType(item, String) ? item : fail();
-    }
-    function number(value:Dynamic):Float
-      return Std.isOfType(value, Float) || Std.isOfType(value, Int) ? (value:Float) : fail();
-    function field(value:Dynamic, name:String):Float return number(Reflect.field(value, name));
-    function integer(value:Dynamic, name:String):Int {
-      var result = field(value, name);
-      return result == Math.floor(result) ? Std.int(result) : fail();
-    }
-    var motion:SceneArtifactMachineMotion = {belts: [for (raw in array(Reflect.field(decoded, "belts"))) {
-      var belt:SceneArtifactBeltVisual = {occurrence: text(raw, "occurrence"), pitch: field(raw, "pitch"),
-        width: field(raw, "width"), thickness: field(raw, "thickness"), driverJoint: text(raw, "driverJoint"),
-        driverWrap: integer(raw, "driverWrap"), driverSign: field(raw, "driverSign"),
-        wraps: [for (wrap in array(Reflect.field(raw, "wraps"))) {
-          var item:SceneArtifactBeltWrap = {occurrence: text(wrap, "occurrence"), connector: text(wrap, "connector"),
-            radius: field(wrap, "radius"), side: integer(wrap, "side")};
-          item;
-        }]};
-      belt;
-    }]};
-    var virtual:Dynamic = Reflect.field(decoded, "virtualDevice");
-    if (virtual != null) motion.virtualDevice = Std.isOfType(virtual, Bool) ? (virtual:Bool) : fail();
-    var raw:Dynamic = Reflect.field(decoded, "program");
-    if (raw != null) {
-      var loop:Dynamic = Reflect.field(raw, "loop");
-      if (!Std.isOfType(loop, Bool)) fail();
-      motion.program = {axes: [for (axis in array(Reflect.field(raw, "axes"))) Std.isOfType(axis, String) ? (axis:String) : fail()],
-        waypoints: [for (waypoint in array(Reflect.field(raw, "waypoints"))) [for (q in array(waypoint)) number(q)]], loop: loop};
-      var tolerance:Dynamic = Reflect.field(raw, "positionTolerance");
-      if (tolerance != null) motion.program.positionTolerance = number(tolerance);
-    }
-    return motion;
-  }
 
 	/** Robot tools from their JSON section, typed field by field. */
 	static function decodeRobotTools(decoded:Dynamic):Array<SceneArtifactRobotTool> {
@@ -2197,8 +2311,10 @@ private class SceneArtifactReader {
     var machineMotion:Null<SceneArtifactMachineMotion> = null;
     var machineLength = readInt();
     if (machineLength < 0 || machineLength > 1000000) throw "Scene artifact machine motion is too large";
-	if (machineLength > 0)
-	  machineMotion = @:privateAccess SceneArtifact.decodeMachineMotion(haxe.Json.parse(readString(machineLength)));
+    if (machineLength > 0) {
+      var decodedMotion:SceneArtifactMachineMotion = JsonWire.decode(readBytes(machineLength).getString(0, machineLength));
+      machineMotion = decodedMotion;
+    }
 		var controllers:Null<Array<SceneArtifactCellController>> = null;
 		var controllerLength = readInt();
 		if (controllerLength < 0 || controllerLength > 100000) throw "Scene artifact controllers are too large";

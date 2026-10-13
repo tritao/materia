@@ -89,7 +89,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 32 /**< Deployment wiring, drive references, brakes and collision surfaces. */
+    RK_API_VERSION = 33 /**< Typed fluid drives and passive/process joint ownership. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -496,8 +496,8 @@ typedef struct rk_robot_runtime_blueprint {
     rk_robot_joint_servo joint_servo[RK_MAX_JOINTS];
     /** Coupling stiffness in follower-coordinate effort per unit of follower travel. */
     double coupling_stiffness[RK_MAX_JOINT_COUPLINGS];
-    /** Command ownership: process joints accept no host or trajectory targets. */
-    uint32_t process_joint[RK_MAX_JOINTS];
+    /** Command ownership: passive and process joints accept no host or trajectory targets. */
+    uint32_t external_joint[RK_MAX_JOINTS];
     /** Metadata for joint switches and speed sensors; ordinary sensor slots use UINT32_MAX. */
     uint32_t sensor_joint[RK_MAX_SENSORS];
     double sensor_window_lower[RK_MAX_SENSORS];

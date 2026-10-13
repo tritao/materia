@@ -1,6 +1,6 @@
 package humankit;
 
-import humankit.rig.HumanBone;
+import haxeon.animation.rig.HumanBone;
 
 /**
  * While the idle pose shows (standing, and the fade into and out of a walk), the feet are held where they stand:

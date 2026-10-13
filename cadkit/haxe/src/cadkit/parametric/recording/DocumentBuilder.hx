@@ -34,6 +34,24 @@ import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.parametric.features.CylinderFeature;
 import cadkit.parametric.features.PocketFeature;
 import cadkit.sketch.ConstrainedSketch;
+import cadkit.sheetmetal.SheetBaseFeature;
+import cadkit.sheetmetal.SheetFeature;
+import cadkit.sheetmetal.SheetEdgeFlangeFeature;
+import cadkit.sheetmetal.SheetHemFeature;
+import cadkit.sheetmetal.SheetRipFeature;
+import cadkit.sheetmetal.SheetCutFeature;
+import cadkit.sheetmetal.SheetCornerFeature;
+import cadkit.sheetmetal.SheetCornerEdge;
+import cadkit.sheetmetal.CornerJoin;
+import cadkit.sheetmetal.CornerRelief;
+import cadkit.sheetmetal.HemSpec;
+import cadkit.sheetmetal.LengthSpec;
+import cadkit.sheetmetal.FlangePosition;
+import cadkit.sheetmetal.ReliefType;
+import cadkit.sheetmetal.ReliefSizing;
+import cadkit.Shape;
+import cadkit.sheetmetal.SheetMaterial;
+import cadkit.sheetmetal.SheetSide;
 
 /** Explicit recorder for the serializable document feature set.
  * Methods borrow features and dimensions and return document-owned features.
@@ -113,6 +131,62 @@ class DocumentBuilder {
 		var feature = document.add(new SketchFeature("slot", length.value, width.value, plane));
 		bind(length, feature, "sketch.width");
 		bind(width, feature, "sketch.height");
+		return feature;
+	}
+
+	/** Base stock from one closed constrained-sketch region, with an optional shared thickness dimension. */
+	public function sheetBase(source:ConstrainedSketchFeature, stock:SheetMaterial, ?thickness:NamedParameter,
+		side:SheetSide = A):SheetBaseFeature {
+		check();
+		var selectedStock = thickness == null ? stock
+			: new SheetMaterial(stock.id, thickness.value, stock.bendRule, stock.mechanical, stock.defaultRadiusRatio, stock.minRadiusRatio, stock.grainAngle);
+		var feature = document.add(new SheetBaseFeature(source, selectedStock, side));
+		if (thickness != null) bind(thickness, feature, "sheet.thickness");
+		return feature;
+	}
+
+	/** Through-wall cut from an exact constrained sketch on the chosen sheet side. */
+	public function sheetCut(source:SheetFeature, profile:ConstrainedSketchFeature, wall:Int, side:SheetSide = A):SheetCutFeature {
+		check(); return document.add(new SheetCutFeature(source, profile, wall, side));
+	}
+
+	/** Cut the child-side seam of one permanent bend without deleting its allowance strip. */
+	public function sheetRip(source:SheetFeature, bend:Int):SheetRipFeature {
+		check(); return document.add(new SheetRipFeature(source, bend));
+	}
+
+	/** Close two graph-owned flange ends, with shared gap, relief and optional overlap dimensions. */
+	public function sheetCorner(source:SheetFeature, first:SheetCornerEdge, second:SheetCornerEdge,
+		gap:NamedParameter, relief:CornerRelief, reliefSize:NamedParameter, join:CornerJoin = Gap,
+		?overlap:NamedParameter):SheetCornerFeature {
+		check();
+		var feature = document.add(new SheetCornerFeature(source, first, second, join, gap.value,
+			overlap == null ? 0 : overlap.value, relief, reliefSize.value));
+		bind(gap, feature, "sheet.corner.gap"); bind(reliefSize, feature, "sheet.corner.relief-size");
+		if (overlap != null) bind(overlap, feature, "sheet.corner.overlap");
+		return feature;
+	}
+
+	/** Return hem on selected wall-side faces, with one shared straight-return dimension. */
+	public function sheetHem(source:SheetFeature, faces:Array<Shape>, spec:HemSpec, length:NamedParameter,
+		side:SheetSide = A):SheetHemFeature {
+		check();
+		var feature = document.add(new SheetHemFeature(source, faces, spec, length.value, side));
+		bind(length, feature, "sheet.hem.length");
+		return feature;
+	}
+
+	/** Flange selected wall-side faces, with shared length/angle dimensions and an optional explicit radius. */
+	public function sheetEdgeFlange(source:SheetFeature, faces:Array<Shape>, length:NamedParameter, angle:NamedParameter,
+		?radius:NamedParameter, lengthSpec:LengthSpec = Leg, position:FlangePosition = BendOutside,
+		offset:Float = 0, gap1:Float = 0, gap2:Float = 0, extend1:Float = 0, extend2:Float = 0,
+		reliefType:ReliefType = None, reliefSizing:ReliefSizing = Absolute, reliefWidth:Float = 0, reliefDepth:Float = 0):SheetEdgeFlangeFeature {
+		check();
+		var feature = document.add(new SheetEdgeFlangeFeature(source, faces, length.value, angle.value,
+			radius == null ? null : radius.value, lengthSpec, position, offset, gap1, gap2, extend1, extend2,
+			null, null, null, reliefType, reliefSizing, reliefWidth, reliefDepth));
+		bind(length, feature, "sheet.length"); bind(angle, feature, "sheet.angle");
+		if (radius != null) bind(radius, feature, "sheet.radius");
 		return feature;
 	}
 

@@ -1,4 +1,4 @@
-# MachineKit restructuring (MK0–MK9)
+# MachineKit restructuring (MK0–MK10)
 
 Planned 2026-10-04 from an outside architecture review, checked against main 712019dbc. The domain
 model and the dependency direction (ProjectKit ← CadKit ← MachineKit ← adapters) stay as they are.
@@ -120,6 +120,26 @@ This plan simplifies the implementation around them.
 - `machinekit.motion` → `machinekit.drive`; `Transmission`, `Sense` and `AllowanceEdit` →
   `machinekit.transmission`.
 - Optional later: `FrameAssembly.asComponent()` (a weldment as one rigid component with a cut list).
+
+### MK10 — one assembly integrity check for every machine
+Added 2026-10-12. Today each machine hand-rolls a clearance check over `PosedParts`
+(`CncRouterPreview.checkClearWith`, the mobile-base, robot-welder and CoreXY preview checks,
+`machinekit/tests/src/GantryClearanceChecks`), each with its own list of allowed overlaps, and none
+checks the opposite failure: a fixed member that does not touch what it is mated to. The press brake
+showed parts "fixed to the bed" half a metre away from it (sheet metal plan SM13R R12).
+- `machinekit.assembly.AssemblyIntegrity` (built first by sheet metal SM13R R12 and used by the press
+  brake) checks any `MachineAssembly`:
+  - **support**: every fixed mate's two members touch (CAD solids, small gap tolerance), and every
+    member is reachable from the ground through touching mates;
+  - **no interference at rest**: no two members overlap except declared interfaces;
+  - **sweeps**: moving bodies stay clear through their joint travel;
+  - **allowed contacts are derived, not listed**: shaft-in-journal from continuous joints, rack/pinion
+    and belt meshes and nut-on-screw from transmissions, fastener seats from connectors.
+- MK10 runs it in the MachineKit smoke suite over every example assembly (router, CoreXY, mobile base,
+  robot arm, cobots, gantries, robot welder, bench mill, machine tending, picking station, EOAT, press
+  brake), fixes the floating or interpenetrating parts it finds, and deletes the per-machine clearance
+  checks (or reduces them to thin callers). Numbers that move are recorded with a reason.
+- Prerequisite: SM13R R12 has landed `AssemblyIntegrity` on local main.
 
 ## Coordination
 

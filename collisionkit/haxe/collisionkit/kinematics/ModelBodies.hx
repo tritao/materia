@@ -49,6 +49,23 @@ class ModelBodies {
     snapshot = new KinematicSnapshot(model);
   }
 
+  /** Bind authored link-named bodies without replacing their geometry or pair policy. */
+  public static function bind(description:CollisionDescription, model:KinematicModel,
+      reference:KinematicState):ModelBodies {
+    if (reference.model != model) throw "Collision mapping needs a state of its model";
+    var direct = [for (_ in 0...model.bodyCount()) -1];
+    var result = new ModelBodies(description, model, "description", direct, reference, "authored reference");
+    for (i in 0...description.bodies.length) {
+      var body = description.bodies[i];
+      if (body.fixed) continue;
+      var carrier = model.bodyIndex(body.name);
+      if (carrier < 0) throw 'Collision body "${body.name}" needs a named mechanical carrier';
+      if (direct[carrier] < 0) direct[carrier] = i;
+      else { result.followers.push(i); result.followed.push(carrier); }
+    }
+    return result;
+  }
+
   /**
    * Adds `model`'s bodies to `description` in `group`, named
    * `name/bodyId`, posed at `reference` (called `referenceName`). With
@@ -106,7 +123,7 @@ class ModelBodies {
   }
 
   /** Every described body of this model, followers last. */
-  public function all():Array<Int> return bodies.concat(followers);
+  public function all():Array<Int> return [for (body in bodies.concat(followers)) if (body >= 0) body];
 
   /** An independently mutable mapping for a world's live copy of the description. */
   public function copyForDescription(live:CollisionDescription):ModelBodies {
@@ -151,7 +168,7 @@ class ModelBodies {
     if (state.model != model) throw 'State must be of the model of "$name"';
     snapshot.evaluate(state);
     var poses:Array<Float> = [for (_ in 0...7) 0.0];
-    for (body in 0...bodies.length) {
+    for (body in 0...bodies.length) if (bodies[body] >= 0) {
       snapshot.bodyPoseInto(body, poses, 0);
       build.world.setBodyPoses(build.bodies[bodies[body]], poses);
     }

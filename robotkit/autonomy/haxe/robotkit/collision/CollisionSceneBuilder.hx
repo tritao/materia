@@ -48,7 +48,7 @@ class CollisionSceneBuilder {
 	var sealed = false;
 
 	public function new(arm:KinematicGroup, reference:Array<Float>, owner:String, margin:Float,
-		?observed:kinematicskit.KinematicState, ?hulls:Array<robotkit.collision.RobotCollision.RobotLinkHull>) {
+		?observed:kinematicskit.KinematicState, ?hulls:Array<robotkit.collision.RobotCollision.RobotLinkShape>) {
 		if (owner == null || owner.length == 0 || !Math.isFinite(margin) || margin < 0)
 			throw "Cell collision scene needs an owner and finite nonnegative margin";
 		this.arm = arm; this.reference = reference.copy(); this.owner = owner;
@@ -64,14 +64,14 @@ class CollisionSceneBuilder {
 		options.linkGroup = CollisionMarginClass.Installed;
 		options.referenceName = "cell snapshot";
 		options.declareArticulation = false;
-		if (hulls != null) options.hulls = hulls;
+		if (hulls != null) options.linkShapes = hulls;
 		var converted = RobotCollision.describe(description, arm.robot, options);
 		bodies = converted.bodies;
 		// Preserve the source's stable object ids; the adapter owns all geometry and adjacency.
 		if (hulls != null) for (i in 0...hulls.length) {
-			var index = converted.hulls[i], before = description.objects[index];
+			var index = converted.sourceObjects[i], before = description.objects[index];
 			description.objects[index] = new collisionkit.DescribedObject(hulls[i].name, before.body, before.offset,
-				before.geometry, before.inflation, before.source, before.member);
+				before.geometry, before.inflation, before.source, before.member, before.tool);
 		}
 		// The other coordinates are held by this snapshot. In particular a
 		// stopped mobile wheel is not a moving obstacle to its support floor.
@@ -89,6 +89,8 @@ class CollisionSceneBuilder {
 	public function identify(id:String, owner:CollisionOwner, tool:Bool):Void {
 		var index = object(id);
 		ownership.set(id, {owner: owner, tool: tool});
+		var object = description.objects[index];
+		description.objects[index] = new collisionkit.DescribedObject(object.name, object.body, object.offset, object.geometry, object.inflation, object.source, object.member, tool);
 		memberBodies.set(description.objects[index].member, description.objects[index].body);
 	}
 
@@ -142,7 +144,7 @@ class CollisionSceneBuilder {
 		}
 		memberBodies.set(physical, body);
 		objects.set(id, description.addObject(id, body, pose(offset), geometry, 0,
-			"cell CAD/simulation hull", physical));
+			"cell CAD/simulation hull", physical, tool));
 		ownership.set(id, {owner: owner, tool: tool});
 	}
 
@@ -181,8 +183,7 @@ class CollisionSceneBuilder {
 	public function toolObjects():Array<Int> {
 		var result:Array<Int> = [];
 		for (i in 0...description.objects.length) {
-			var metadata = ownership.get(description.objects[i].name);
-			if (metadata != null && metadata.tool) result.push(i);
+			if (description.objects[i].tool) result.push(i);
 		}
 		return result;
 	}
@@ -221,32 +222,10 @@ class CollisionSceneBuilder {
 		sealed = true;
 		var articulation = bodies.declare();
 		return new robotkit.collision.CollisionClearance(arm,
-			new robotkit.collision.CollisionClearanceLayout(description, bodies), reference, makeWorld);
-	}
-
-	/** Enclosing corners for a finite primitive when no explicit hull is supplied. */
-	public static function box(x:Float, y:Float, z:Float):Array<Float> {
-		if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z) || x < 0 || y < 0 || z < 0)
-			throw "Cell primitive needs finite nonnegative half extents";
-		var vertices:Array<Float> = [];
-		for (corner in 0...8) {
-			vertices.push((corner & 1) == 0 ? -x : x);
-			vertices.push((corner & 2) == 0 ? -y : y);
-			vertices.push((corner & 4) == 0 ? -z : z);
-		}
-		return vertices;
+			description, reference, makeWorld, bodies);
 	}
 
 	public static function pose(value:Transform3):CollisionPose return new CollisionPose(value.translation.x,
 		value.translation.y, value.translation.z, value.rotation.x, value.rotation.y, value.rotation.z, value.rotation.w);
 
-	/** Transform xyz hulls once at the snapshot boundary. */
-	public static function placed(vertices:Array<Float>, at:Transform3):Array<Float> {
-		var result:Array<Float> = [];
-		for (i in 0...Std.int(vertices.length / 3)) {
-			var point = at.transformPoint(new Vec3(vertices[3 * i], vertices[3 * i + 1], vertices[3 * i + 2]));
-			result.push(point.x); result.push(point.y); result.push(point.z);
-		}
-		return result;
-	}
 }

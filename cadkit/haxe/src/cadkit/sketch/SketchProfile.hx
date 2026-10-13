@@ -1,6 +1,5 @@
 package cadkit.sketch;
 
-import cadkit.modeling.Curve;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
@@ -44,6 +43,11 @@ private class ProfileBoundary {
 /** Curve-aware validation and exact native construction of solved profile boundaries. */
 class SketchProfile {
 	public static function build(authored:ConstrainedSketch, solved:SolvedSketch):Sketch {
+		return geometry(authored, solved).build();
+	}
+
+	/** Validate once and expose exact, canonical regions without recognising a native face. */
+	public static function geometry(authored:ConstrainedSketch, solved:SolvedSketch):ProfileGeometry {
 		var factor = LengthUnits.factorToMillimetres(authored.units);
 		if (factor == null)
 			throw new ProfileError("invalid", [], "unsupported sketch length unit: " + authored.units);
@@ -77,7 +81,41 @@ class SketchProfile {
 			boundaries.push(circleBoundary(circle, canonical, tolerance));
 		validateIntersections(boundaries, tolerance);
 		classifyNesting(boundaries, tolerance);
-		return constructFaces(boundaries, authored.plane, canonical);
+		var regions:Array<ProfileRegion> = [];
+		for (index in 0...boundaries.length) {
+			if (boundaries[index].depth % 2 != 0) continue;
+			var holes:Array<Array<ProfileCurve>> = [];
+			for (candidate in 0...boundaries.length)
+				if (boundaries[candidate].parent == index && boundaries[candidate].depth % 2 == 1)
+					holes.push(curveData(boundaries[candidate], canonical));
+			var ids = boundaries[index].entityIds.copy();
+			ids.sort(Reflect.compare);
+			regions.push(new ProfileRegion("r." + ids.join("+"), curveData(boundaries[index], canonical), holes));
+		}
+		return new ProfileGeometry(authored.plane, regions);
+	}
+
+	private static function curveData(boundary:ProfileBoundary, solved:SolvedSketch):Array<ProfileCurve> {
+		if (boundary.circle != null) {
+			var entity = boundary.circle;
+			var center = solved.point(entity.first);
+			var radius = solved.radius(entity.id);
+			var start = new Vector(center[0] + radius, center[1]);
+			return [new ProfileCurve(entity.id, start, start, new Vector(center[0], center[1]), radius, 0, 2 * Math.PI)];
+		}
+		var result:Array<ProfileCurve> = [];
+		for (segment in boundary.segments) {
+			var start = new Vector(segment.start[0], segment.start[1]);
+			var end = new Vector(segment.end[0], segment.end[1]);
+			var entity = segment.entity;
+			if (entity.kind == "line") result.push(new ProfileCurve(entity.id, start, end));
+			else {
+				var center = solved.point(entity.first);
+				result.push(new ProfileCurve(entity.id, start, end, new Vector(center[0], center[1]), solved.radius(entity.id),
+					segment.reversed ? entity.endAngle : entity.startAngle, segment.reversed ? -arcDelta(entity) : arcDelta(entity)));
+			}
+		}
+		return result;
 	}
 
 	private static function toMillimetres(authored:ConstrainedSketch, solved:SolvedSketch, factor:Float):SolvedSketch {
@@ -171,85 +209,6 @@ class SketchProfile {
 					throw new ProfileError("overlapping", boundaries[first].entityIds.concat(boundaries[second].entityIds),
 						"profile boundaries overlap or touch");
 			}
-		}
-	}
-
-	private static function constructFaces(boundaries:Array<ProfileBoundary>, plane:Plane, solved:SolvedSketch):Sketch {
-		var curves:Array<Curve> = [];
-		var result:Null<Sketch> = null;
-		try {
-			for (boundary in boundaries)
-				curves.push(makeCurve(boundary, plane, solved));
-			for (index in 0...boundaries.length) {
-				if (boundaries[index].depth % 2 != 0)
-					continue;
-				var holes:Array<Curve> = [];
-				for (candidate in 0...boundaries.length)
-					if (boundaries[candidate].parent == index && boundaries[candidate].depth % 2 == 1)
-						holes.push(curves[candidate]);
-				// Edges are named by their entities (makeCurve); a region by the entities of its outer loop.
-				var regionIds = boundaries[index].entityIds.copy();
-				regionIds.sort(Reflect.compare);
-				var face = Sketch.named(Sketch.face(curves[index], holes, plane), "r." + regionIds.join("+"));
-				if (result == null) {
-					result = face;
-				} else {
-					var combined = result.combine(face);
-					result.close();
-					face.close();
-					result = combined;
-				}
-			}
-			if (result == null)
-				throw new ProfileError("ambiguous", allIds(boundaries), "profile has no outer boundary");
-			for (curve in curves)
-				curve.close();
-			return result;
-		} catch (error:Dynamic) {
-			for (curve in curves)
-				curve.close();
-			if (result != null)
-				result.close();
-			if (Std.isOfType(error, ProfileError))
-				throw error;
-			throw new ProfileError("invalid", allIds(boundaries), "native profile construction failed: " + Std.string(error));
-		}
-	}
-
-	private static function makeCurve(boundary:ProfileBoundary, plane:Plane, solved:SolvedSketch):Curve {
-		if (boundary.circle != null) {
-			var entity = boundary.circle;
-			var center = solved.point(entity.first);
-			var localPlane = new Plane(world(plane, center), plane.xDirection, plane.normal);
-			return Curve.named(Curve.circle(solved.radius(entity.id), localPlane), "e." + entity.id);
-		}
-		var parts:Array<Curve> = [];
-		try {
-			for (segment in boundary.segments) {
-				if (segment.entity.kind == "line") {
-					parts.push(Curve.named(Curve.line(world(plane, segment.start), world(plane, segment.end)), "e." + segment.entity.id));
-					continue;
-				}
-				var entity = segment.entity;
-				var center = solved.point(entity.first);
-				var radius = solved.radius(entity.id);
-				var delta = arcDelta(entity);
-				var startAngle = entity.startAngle;
-				if (segment.reversed) {
-					startAngle = entity.endAngle;
-					delta = -delta;
-				}
-				parts.push(Curve.named(Curve.arc(world(plane, segment.start), world(plane, arcPoint(center, radius, startAngle + delta / 2)),
-					world(plane, segment.end)), "e." + entity.id));
-			}
-			var wire = Curve.wire(parts);
-			for (part in parts)
-				part.close();
-			return wire;
-		} catch (error:Dynamic) {
-			for (part in parts)
-				part.close();
-			throw error;
 		}
 	}
 
@@ -437,9 +396,7 @@ class SketchProfile {
 			values.push(point);
 	}
 
-	private static function world(plane:Plane, point:Array<Float>):Vector {
-		return plane.toWorld(new Vector(point[0], point[1]));
-	}
+
 
 	private static function near(first:Array<Float>, second:Array<Float>, tolerance:Float):Bool {
 		return distance(first, second) <= tolerance;

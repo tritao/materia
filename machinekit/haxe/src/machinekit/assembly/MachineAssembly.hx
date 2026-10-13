@@ -11,6 +11,8 @@ import machinekit.component.MachineComponent;
 import machinekit.component.MassProperties;
 import machinekit.assembly.MachineAssemblyDescription;
 import machinekit.assembly.MachineAssemblyDescription.TransmissionRecord;
+import machinekit.assembly.MachineAssemblyDescription.CylinderRecord;
+import machinekit.fluid.CylinderPhaseSpeeds;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyFrames;
@@ -50,8 +52,8 @@ typedef MachineAssemblyMassProperties = {
  */
 @:allow(machinekit.assembly)
 class MachineAssembly {
-	/** Current MachineKit assembly format; older descriptions require migration. */
-	public static inline var SCHEMA_VERSION:Int = 17;
+	/** Current MachineKit assembly format; older descriptions must be regenerated. */
+	public static inline var SCHEMA_VERSION:Int = 18;
 	/** Findings from rebuilding sources; invalid transmissions remain available for repair. */
 	public final diagnostics:Diagnostics = new Diagnostics();
 	final mechanical:MechanicalAssembly = new MechanicalAssembly();
@@ -232,6 +234,38 @@ class MachineAssembly {
 		if (joint.role == AssemblyJointRole.Closure && tolerance != null) saved.closureTolerance = tolerance;
 		mechanical.joints.push(saved);
 		changed();
+	}
+
+	/** Declare physical motion without host position control or a power-on hold. */
+	public function setPassive(jointId:String, passive:Bool = true):Void {
+		for (joint in mechanical.joints) if (joint.id == jointId) {
+			if (joint.role != AssemblyJointRole.Tree || !AssemblyDefinitionCodec.hasCoordinate(joint.type) ||
+				(passive && joint.driven == true)) throw 'Assembly joint "$jointId" cannot be passive';
+			if (passive) {
+				for (motor in drives.motors) if (motor.joint == jointId)
+					throw 'Passive assembly joint "$jointId" cannot have a motor';
+				for (cylinder in drives.cylinders) if (cylinder.joint == jointId)
+					throw 'Passive assembly joint "$jointId" cannot have a cylinder';
+				joint.passive = true;
+			} else Reflect.deleteField(joint, "passive");
+			changed();
+			return;
+		}
+		throw 'Missing assembly joint "$jointId"';
+	}
+
+	/** Declare the physical response of a bounded joint's mechanical end stops. */
+	public function setJointStop(jointId:String, stop:materia.assembly.AssemblyJointStop):Void {
+		AssemblyDefinitionCodec.validateStop(stop, jointId);
+		for (joint in mechanical.joints) if (joint.id == jointId) {
+			if (joint.role != AssemblyJointRole.Tree || !AssemblyDefinitionCodec.hasCoordinate(joint.type) ||
+				joint.limits.lower == null || joint.limits.upper == null || joint.limits.lower >= joint.limits.upper)
+				throw 'Assembly joint "$jointId" needs bounded tree travel for its end stops';
+			joint.stop = {timeConstantSec: stop.timeConstantSec, dampingRatio: stop.dampingRatio};
+			changed();
+			return;
+		}
+		throw 'Missing assembly joint "$jointId"';
 	}
 
 	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
@@ -455,6 +489,8 @@ class MachineAssembly {
 			processVelocity: processVelocity});
 
 	function addMotorRecord(record:MotorRecord):Void {
+		for (joint in mechanical.joints) if (joint.id == record.joint && joint.passive == true)
+			throw 'Passive assembly joint "${record.joint}" cannot have a motor';
 		DriveSystem.checkMotor(flat(), record);
 		drives.motors.push(DriveSystem.copyMotor(record, same));
 		changed();
@@ -511,17 +547,35 @@ class MachineAssembly {
 
 
 	/** Bind a cylinder to an existing prismatic guide joint; pressure and direction are rebuilt from parts. */
-	public function addCylinder(id:String, joint:String, cylinderMember:String, valveMember:String):Void {
+	public function addCylinder(id:String, joint:String, cylinderMember:String, valveMember:String,
+			?phases:CylinderPhaseSpeeds):Void {
 		requireOperationId(id);
-		var record = {actuator: id, joint: joint, cylinder: cylinderMember, valve: valveMember};
-		DriveSystem.checkCylinder(flat(), record);
-		drives.cylinders.push(record);
+		var record:CylinderRecord = {actuator: id, joint: joint, cylinder: cylinderMember, valve: valveMember};
+		if (phases != null) record.phases = {approach: phases.approach, working: phases.working,
+			returning: phases.returning, changePoint: phases.changePoint};
+		for (edge in mechanical.joints) if (edge.id == joint && edge.passive == true)
+			throw 'Passive assembly joint "$joint" cannot have a cylinder';
+		DriveSystem.checkCylinder(flat(), record, phases);
+		drives.cylinders.push(DriveSystem.copyCylinder(record, same));
 		changed();
+	}
+
+	function addCylinderRecord(record:CylinderRecord):Void {
+		var cylinder = requireMember(record.cylinder).cylinderSpec();
+		if (cylinder == null) throw "Cylinder binding lost its typed cylinder part";
+		var saved = record.phases;
+		var phases = saved == null ? null : new CylinderPhaseSpeeds(cylinder.strokeMm(), saved.approach,
+			saved.working, saved.returning, saved.changePoint);
+		addCylinder(record.actuator, record.joint, record.cylinder, record.valve, phases);
 	}
 
 	/** Gauge pressure at a pneumatic consumer, resolved from its current service wiring. */
 	public function airPressure(instanceId:String, portName:String):Float
 		return DriveSystem.airPressure(flat(), instanceId, portName);
+
+	/** Gauge pressure at a fluid consumer, resolved from its current service wiring. */
+	public function fluidPressure(instanceId:String, portName:String):Float
+		return DriveSystem.fluidPressure(flat(), instanceId, portName);
 
 	/** A physical switch whose trip travel follows its fixed housing and moving trigger. */
 	public function addTripSwitch(id:String, joint:String, part:String,
@@ -685,6 +739,8 @@ class MachineAssembly {
 			else model.constrainOnAxis(join(prefix, joint.id), joint.type, join(prefix, joint.parent),
 					joint.parentConnector, join(prefix, joint.child), joint.childConnector,
 					joint.axis, joint.closureTolerance, joint.limits);
+			if (joint.passive == true) model.setPassive(join(prefix, joint.id));
+			if (joint.stop != null) model.setJointStop(join(prefix, joint.id), joint.stop);
 		}
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),

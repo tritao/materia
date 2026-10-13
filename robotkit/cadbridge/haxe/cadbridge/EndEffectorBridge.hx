@@ -12,7 +12,8 @@ import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.tool.Tool;
 import robotkit.tool.MassProperties;
-import robotkit.tool.ToolCollisionShape;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 import cadbridge.EndEffectorCollision.EndEffectorCollisionOptions;
 
 /** Convert one end-effector working frame into a RobotKit tool. */
@@ -41,13 +42,13 @@ class EndEffectorBridge {
       .rotated(new Quat(Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)));
     var mass = new MassProperties(properties.mass,
       new Vec3(centre.x * 0.001, centre.y * 0.001, centre.z * 0.001), inertia);
-    var collision:ToolCollisionShape;
+    var collision:Array<CollisionShape>;
     if (boxCollision) {
       var bounds = envelopeBox(endEffector, solved);
-      collision = ToolCollisionShape.Box(bounds.halfExtents, bounds.centre);
+      collision = ToolGeometry.box(bounds.halfExtents, bounds.centre);
     } else {
       var result = EndEffectorCollision.pieces(endEffector, state, collisionOptions, solved);
-      collision = ToolCollisionShape.Hulls([for (piece in result.pieces) piece.vertices], result.padding);
+      collision = ToolGeometry.convex([for (piece in result.pieces) piece.vertices], result.padding);
     }
     return new Tool(id == null ? frameName : id, frameName, transform,
       collision, properties.mass, mass);

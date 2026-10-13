@@ -1,5 +1,21 @@
 #include "cadkit.h"
 
+#include <BRepBuilderAPI_MakeSolid.hxx>
+#include <BRepBuilderAPI_Sewing.hxx>
+#include <BRepFill.hxx>
+#include <BRepLib.hxx>
+#include <BRepTools_WireExplorer.hxx>
+#include <ElSLib.hxx>
+#include <GeomConvert.hxx>
+#include <Geom_BSplineCurve.hxx>
+#include <Geom_TrimmedCurve.hxx>
+#include <NCollection_Array2.hxx>
+#include <Geom2dConvert.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <Geom2d_TrimmedCurve.hxx>
+#include <ShapeFix_Shell.hxx>
+#include <TopoDS_Solid.hxx>
+#include <gp_Pln.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
@@ -77,6 +93,7 @@
 #include <TopLoc_Location.hxx>
 #include <TopExp.hxx>
 #include <TopTools_ShapeMapHasher.hxx>
+#include <NCollection_IndexedDataMap.hxx>
 #include <TCollection_AsciiString.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Shape.hxx>
@@ -518,6 +535,27 @@ cad_curve_kind curve_kind_from_occt(GeomAbs_CurveType kind) {
         return CAD_CURVE_UNKNOWN;
     }
     return CAD_CURVE_UNKNOWN;
+}
+
+cad_result collect_ancestors(const TopoDS_Shape& source, const TopoDS_Shape& sub,
+    cad_shape_kind kind, std::vector<TopoDS_Shape>& output) {
+    TopAbs_ShapeEnum ancestor_kind = TopAbs_SHAPE;
+    if (!shape_kind_to_occt(kind, ancestor_kind) || ancestor_kind >= sub.ShapeType()) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "ancestor kind must strictly contain the subshape kind");
+    }
+    NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> map;
+    TopExp::MapShapesAndAncestors(source, sub.ShapeType(), ancestor_kind, map);
+    if (!map.Contains(sub)) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "subshape is not a member of the source shape");
+    }
+    NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> unique;
+    for (const auto& ancestor : map.FindFromKey(sub)) {
+        if (!unique.Contains(ancestor)) {
+            unique.Add(ancestor);
+            output.push_back(ancestor);
+        }
+    }
+    return CAD_OK;
 }
 
 cad_result collect_subshapes(
@@ -2134,6 +2172,126 @@ extern "C" CADKIT_API cad_result cad_shape_extrude_operation(
     return make_extrusion_operation(profile, gp_Vec(delta.x, delta.y, delta.z), out_operation);
 }
 
+extern "C" CADKIT_API cad_result cad_sheet_bend_region_operation(
+    cad_shape profile, double thickness, double angle, double allowance, double inner_radius,
+    cad_operation* out_operation) {
+    clear_error();
+    if (out_operation == nullptr) return fail(CAD_ERROR_INVALID_ARGUMENT, "out_operation must not be null");
+    *out_operation = 0;
+    if (!std::isfinite(thickness) || thickness <= 0 || !std::isfinite(angle) ||
+        std::abs(angle) <= 1e-15 || std::abs(angle) >= 2 * std::acos(-1.0) ||
+        !std::isfinite(allowance) || allowance <= 0 || !std::isfinite(inner_radius) || inner_radius < 0)
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "mapped bend needs positive thickness and allowance, nonnegative radius and a nonzero angle below a full turn");
+    TopoDS_Shape source;
+    const auto copied = copy_shape(profile, source);
+    if (copied != CAD_OK) return copied;
+    if (source.ShapeType() != TopAbs_FACE)
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "mapped bend profile must be one planar XY face");
+    try {
+        const auto face = TopoDS::Face(source);
+        const BRepAdaptor_Surface adaptor(face);
+        if (adaptor.GetType() != GeomAbs_Plane)
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "mapped bend profile must be planar");
+        const auto plane = adaptor.Plane();
+        if (std::abs(plane.Axis().Direction().Z()) < 1 - 1e-12 || std::abs(plane.Location().Z()) > 1e-8)
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "mapped bend profile must lie on global XY");
+        const bool up = angle > 0;
+        const gp_Ax3 axes(gp_Pnt(0, 0, up ? inner_radius : -thickness - inner_radius),
+                          gp_Dir(0, 1, 0), gp_Dir(0, 0, up ? -1 : 1));
+        const occ::handle<Geom_CylindricalSurface> surfaces[2] = {
+            new Geom_CylindricalSurface(axes, inner_radius),
+            new Geom_CylindricalSurface(axes, inner_radius + thickness)};
+        std::vector<TopoDS_Wire> wires[2];
+        OperationData data;
+        BRepBuilderAPI_Sewing sewing(1e-7);
+        const auto outer = BRepTools::OuterWire(face);
+        std::vector<TopoDS_Wire> source_wires{outer};
+        for (TopExp_Explorer explorer(face, TopAbs_WIRE); explorer.More(); explorer.Next())
+            if (!explorer.Current().IsSame(outer)) source_wires.push_back(TopoDS::Wire(explorer.Current()));
+        if (inner_radius == 0 && source_wires.size() != 1)
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "collapsed-axis radial regions must be decomposed into hole-free sectors");
+        for (const auto& wire : source_wires) {
+            BRepBuilderAPI_MakeWire builders[2];
+            for (BRepTools_WireExplorer explorer(wire, face); explorer.More(); explorer.Next()) {
+                const auto edge = explorer.Current();
+                double first = 0, last = 0;
+                auto curve = BRep_Tool::CurveOnSurface(edge, face, first, last);
+                if (curve.IsNull()) return fail(CAD_ERROR_OPERATION_FAILED, "profile boundary has no planar pcurve");
+                auto mapped = Geom2dConvert::CurveToBSplineCurve(new Geom2d_TrimmedCurve(curve, first, last));
+                for (int pole = 1; pole <= mapped->NbPoles(); ++pole) {
+                    const auto uv = mapped->Pole(pole);
+                    const auto point = ElSLib::Value(uv.X(), uv.Y(), plane);
+                    mapped->SetPole(pole, gp_Pnt2d(-angle * point.X() / allowance, point.Y()));
+                }
+                TopoDS_Edge radial_edges[2];
+                for (int skin = inner_radius == 0 ? 1 : 0; skin < 2; ++skin) {
+                    radial_edges[skin] = BRepBuilderAPI_MakeEdge(mapped, surfaces[skin]).Edge();
+                    if (!BRepLib::BuildCurves3d(radial_edges[skin], 1e-8))
+                        return fail(CAD_ERROR_OPERATION_FAILED, "mapped boundary 3D curve could not meet tolerance");
+                    auto oriented = radial_edges[skin]; oriented.Orientation(edge.Orientation());
+                    builders[skin].Add(oriented);
+                }
+                TopoDS_Face side;
+                if (inner_radius > 0) side = BRepFill::Face(radial_edges[0], radial_edges[1]);
+                else {
+                    // A ruled surface reaches the axis directly. Its constant-y cap is a
+                    // valid degenerate surface edge, rather than a zero-radius cylinder.
+                    double curve_first = 0, curve_last = 0;
+                    auto outer_curve = BRep_Tool::Curve(radial_edges[1], curve_first, curve_last);
+                    auto spline = GeomConvert::CurveToBSplineCurve(new Geom_TrimmedCurve(outer_curve, curve_first, curve_last));
+                    NCollection_Array2<gp_Pnt> poles(1, spline->NbPoles(), 1, 2);
+                    NCollection_Array2<double> weights(1, spline->NbPoles(), 1, 2);
+                    for (int pole = 1; pole <= spline->NbPoles(); ++pole) {
+                        const auto point = spline->Pole(pole);
+                        poles(pole, 1) = gp_Pnt(0, point.Y(), axes.Location().Z());
+                        poles(pole, 2) = point;
+                        weights(pole, 1) = weights(pole, 2) = spline->Weight(pole);
+                    }
+                    NCollection_Array1<double> radial_knots(1, 2); radial_knots(1) = 0; radial_knots(2) = 1;
+                    NCollection_Array1<int> radial_mults(1, 2); radial_mults(1) = radial_mults(2) = 2;
+                    occ::handle<Geom_BSplineSurface> ruled = new Geom_BSplineSurface(
+                        poles, weights, spline->Knots(), radial_knots, spline->Multiplicities(), radial_mults, spline->Degree(), 1);
+                    side = BRepBuilderAPI_MakeFace(ruled, spline->FirstParameter(), spline->LastParameter(), 0, 1, 1e-8).Face();
+                }
+                sewing.Add(side); data.generated.push_back({edge, side});
+            }
+            for (int skin = inner_radius == 0 ? 1 : 0; skin < 2; ++skin) {
+                auto mapped_wire = builders[skin].Wire();
+                if (up) mapped_wire.Reverse();
+                wires[skin].push_back(mapped_wire);
+            }
+        }
+        for (int skin = inner_radius == 0 ? 1 : 0; skin < 2; ++skin) {
+            BRepBuilderAPI_MakeFace builder(surfaces[skin], wires[skin][0], true);
+            for (std::size_t hole = 1; hole < wires[skin].size(); ++hole) builder.Add(wires[skin][hole]);
+            auto skin_face = builder.Face();
+            if (skin == 0) skin_face.Reverse();
+            sewing.Add(skin_face); data.generated.push_back({face, skin_face});
+        }
+        sewing.Perform();
+        const auto sewed = sewing.SewedShape();
+        if (sewed.ShapeType() != TopAbs_SHELL)
+            return fail(CAD_ERROR_OPERATION_FAILED, "mapped bend did not sew into one shell");
+        ShapeFix_Shell fixer(TopoDS::Shell(sewed));
+        fixer.FixFaceOrientation(TopoDS::Shell(sewed));
+        auto solid = BRepBuilderAPI_MakeSolid(fixer.Shell()).Solid();
+        if (!BRepLib::OrientClosedSolid(solid) || !BRepCheck_Analyzer(solid).IsValid())
+            return fail(CAD_ERROR_OPERATION_FAILED, "mapped bend produced invalid solid topology");
+        data.result = solid;
+        for (auto& relation : data.generated)
+            if (sewing.IsModifiedSubShape(relation.target)) relation.target = sewing.ModifiedSubShape(relation.target);
+        return insert_operation(std::move(data), out_operation);
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown mapped bend exception");
+    }
+}
+
 extern "C" CADKIT_API cad_result cad_shape_revolve_operation(
     cad_shape profile,
     cad_vec3 axis_origin,
@@ -2335,6 +2493,16 @@ extern "C" CADKIT_API cad_result cad_shape_volume(
     clear_error();
     return measure_shape(shape, out_volume, [](const TopoDS_Shape& source, GProp_GProps& properties) {
         BRepGProp::VolumeProperties(source, properties);
+    });
+}
+
+extern "C" CADKIT_API cad_result cad_shape_volume_with_tolerance(
+    cad_shape shape, double relative_tolerance, double* out_volume) {
+    clear_error();
+    if (!std::isfinite(relative_tolerance) || relative_tolerance < 1e-12 || relative_tolerance > 1e-3)
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "adaptive volume tolerance must be between 1e-12 and 1e-3");
+    return measure_shape(shape, out_volume, [relative_tolerance](const TopoDS_Shape& source, GProp_GProps& properties) {
+        BRepGProp::VolumeProperties(source, properties, relative_tolerance);
     });
 }
 
@@ -2577,6 +2745,112 @@ extern "C" CADKIT_API cad_result cad_shape_subshapes(
             ++inserted;
         }
         return CAD_OK;
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
+extern "C" CADKIT_API cad_result cad_shape_ancestor_count(cad_shape shape, cad_shape sub,
+    cad_shape_kind kind, std::uint32_t* out_count) {
+    clear_error();
+    if (out_count == nullptr) return fail(CAD_ERROR_INVALID_ARGUMENT, "out_count must not be null");
+    *out_count = 0;
+    naming::NamedShape source;
+    auto result = copy_named_shape(shape, source);
+    if (result != CAD_OK) return result;
+    TopoDS_Shape member;
+    result = copy_shape(sub, member);
+    if (result != CAD_OK) return result;
+    try {
+        std::vector<TopoDS_Shape> ancestors;
+        result = collect_ancestors(source.shape, member, kind, ancestors);
+        if (result != CAD_OK) return result;
+        if (ancestors.size() > std::numeric_limits<std::uint32_t>::max())
+            return fail(CAD_ERROR_OPERATION_FAILED, "ancestor count exceeds 32-bit range");
+        for (std::size_t index = 0; index < ancestors.size(); ++index) ++*out_count;
+        return CAD_OK;
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
+extern "C" CADKIT_API cad_result cad_shape_ancestor_at(cad_shape shape, cad_shape sub,
+    cad_shape_kind kind, std::uint32_t index, cad_shape* out_shape) {
+    clear_error();
+    if (out_shape == nullptr) return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
+    *out_shape = 0;
+    naming::NamedShape source;
+    auto result = copy_named_shape(shape, source);
+    if (result != CAD_OK) return result;
+    TopoDS_Shape member;
+    result = copy_shape(sub, member);
+    if (result != CAD_OK) return result;
+    try {
+        std::vector<TopoDS_Shape> ancestors;
+        result = collect_ancestors(source.shape, member, kind, ancestors);
+        if (result != CAD_OK) return result;
+        if (index >= ancestors.size()) return fail(CAD_ERROR_INVALID_ARGUMENT, "ancestor index is out of range");
+        return insert_shape(ancestors[index], out_shape,
+            naming::restrict_to(source.shape, *source.names, ancestors[index]));
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
+extern "C" CADKIT_API cad_result cad_shape_ancestors(cad_shape shape, cad_shape sub,
+    cad_shape_kind kind, cad_shape* output, std::uint32_t capacity) {
+    clear_error();
+    naming::NamedShape source;
+    auto result = copy_named_shape(shape, source);
+    if (result != CAD_OK) return result;
+    TopoDS_Shape member;
+    result = copy_shape(sub, member);
+    if (result != CAD_OK) return result;
+    try {
+        std::vector<TopoDS_Shape> ancestors;
+        result = collect_ancestors(source.shape, member, kind, ancestors);
+        if (result != CAD_OK) return result;
+        if (capacity < ancestors.size()) return fail(CAD_ERROR_BUFFER_TOO_SMALL, "ancestor output buffer is too small");
+        if (!ancestors.empty() && output == nullptr) return fail(CAD_ERROR_INVALID_ARGUMENT, "ancestor output buffer must not be null");
+        std::vector<cad_shape> inserted;
+        inserted.reserve(ancestors.size());
+        try {
+            std::uint32_t index = 0;
+            for (const auto& ancestor : ancestors) {
+                cad_shape handle = 0;
+                result = insert_shape(ancestor, &handle, naming::restrict_to(source.shape, *source.names, ancestor));
+                if (result != CAD_OK) break;
+                inserted.push_back(handle);
+                output[index++] = handle;
+            }
+        } catch (...) {
+            std::lock_guard lock(g_shapes_mutex);
+            for (const auto handle : inserted) release_shape_locked(handle);
+            throw;
+        }
+        if (result != CAD_OK) {
+            std::lock_guard lock(g_shapes_mutex);
+            for (const auto handle : inserted) release_shape_locked(handle);
+        }
+        return result;
     } catch (const Standard_Failure& error) {
         return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
     } catch (const std::bad_alloc& error) {

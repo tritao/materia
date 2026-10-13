@@ -24,17 +24,19 @@ class SimulationSpace {
 	final releaseWorld:Void->Void;
 	final configureWorld:(Int, Int)->Void;
 	var requiredSubsteps:Int;
+	var integrator:Int;
 	final timestep:Float;
 	var disposed:Bool = false;
 
 	function new(scene:Scene, session:SimSession, releaseWorld:Void->Void,
-		configureWorld:(Int, Int)->Void, timestep:Float, substeps:Int) {
+		configureWorld:(Int, Int)->Void, timestep:Float, substeps:Int, integrator:Int) {
 		this.scene = scene;
 		this.session = session;
 		this.releaseWorld = releaseWorld;
 		this.configureWorld = configureWorld;
 		this.timestep = timestep;
 		this.requiredSubsteps = substeps;
+		this.integrator = integrator;
 	}
 
 	/**
@@ -52,15 +54,16 @@ class SimulationSpace {
 			options.lineSearchIterations = solver.lineSearchIterations;
 		}
 		var scene = Scene.create();
+		var integrator = options.integrator == null ? NativeKitSimConstants.NKSIM_INTEGRATOR_DEFAULT : options.integrator;
 		try {
 			if (backend == MUJOCO) {
 				var world = MujocoSimWorld.create(scene, options);
 				return new SimulationSpace(scene, new SimSession(scene, world.nativeHandle()), world.dispose,
-					world.configureIntegration, timestep, physicsSubsteps);
+					world.configureIntegration, timestep, physicsSubsteps, integrator);
 			}
 			var world = new SimWorld(scene, options);
 			return new SimulationSpace(scene, new SimSession(scene, world.nativeHandle()), world.dispose,
-					world.configureIntegration, timestep, physicsSubsteps);
+					world.configureIntegration, timestep, physicsSubsteps, integrator);
 		} catch (error:Dynamic) {
 			scene.dispose();
 			throw error;
@@ -75,7 +78,33 @@ class SimulationSpace {
 			Math.min(1.0 / rate, blueprint.servoStabilityInterval()));
 		if (!Math.isFinite(interval) || !(interval > 0.0)) return;
 		requiredSubsteps = Std.int(Math.max(requiredSubsteps, Math.ceil(timestep / interval)));
-		configureWorld(requiredSubsteps, NativeKitSimConstants.NKSIM_INTEGRATOR_IMPLICIT_FAST);
+		integrator = NativeKitSimConstants.NKSIM_INTEGRATOR_IMPLICIT_FAST;
+		configureWorld(requiredSubsteps, integrator);
+	}
+
+	/** Resolves authored positive contact time constants without MuJoCo's two-step safety floor changing them. */
+	public function requireContact(surface:robotkit.model.CollisionShape.ContactSurface):Void {
+		var issue = surface.validate();
+		if (issue != null) throw 'Simulation contact: $issue';
+		requireConstraintInterval(surface.contactTimeConstant);
+	}
+
+	/** Joint stops have the same two-step resolution requirement as shape contacts. */
+	public function requireStops(blueprint:RobotRuntimeBlueprint):Void {
+		for (joint in blueprint.joints) requireConstraintInterval(joint.limitTimeConstant);
+	}
+
+	function requireConstraintInterval(timeConstant:Float):Void {
+		if (!Math.isFinite(timeConstant) || timeConstant < 0)
+			throw "Simulation constraint time constant must be finite and non-negative";
+		if (timeConstant == 0) return;
+		var requested = 2.0 * timestep / timeConstant;
+		if (!Math.isFinite(requested) || requested > 2147483647.0)
+			throw "Simulation constraint time constant needs an unrepresentable number of physics substeps";
+		var substeps = Std.int(Math.ceil(requested));
+		if (substeps <= requiredSubsteps) return;
+		requiredSubsteps = substeps;
+		configureWorld(requiredSubsteps, integrator);
 	}
 
 	/** Releases the session, then the world it borrowed, then the scene. */

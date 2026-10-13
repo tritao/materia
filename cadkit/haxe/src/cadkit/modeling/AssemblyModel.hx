@@ -122,10 +122,37 @@ class AssemblyModel {
 			if (joint.id == jointId) {
 				if (joint.role != AssemblyJointRole.Tree || !AssemblyDefinitionCodec.hasCoordinate(joint.type))
 					throw 'Assembly joint "$jointId" is not a movable tree joint';
+				if (driven && joint.passive == true) throw 'Passive assembly joint "$jointId" cannot be driven';
 				if (driven) joint.driven = true; else Reflect.deleteField(joint, "driven");
 				solved = null;
 				return;
 			}
+		throw 'Missing assembly joint "$jointId"';
+	}
+
+	/** Declare physical motion without host position control or a power-on hold. */
+	public function setPassive(jointId:String, passive:Bool = true):Void {
+		for (joint in data.joints) if (joint.id == jointId) {
+			if (joint.role != AssemblyJointRole.Tree || !AssemblyDefinitionCodec.hasCoordinate(joint.type) ||
+				(passive && joint.driven == true)) throw 'Assembly joint "$jointId" cannot be passive';
+			if (passive) joint.passive = true; else Reflect.deleteField(joint, "passive");
+			solved = null;
+			return;
+		}
+		throw 'Missing assembly joint "$jointId"';
+	}
+
+	/** Give a bounded moving joint its authored mechanical end-stop response. */
+	public function setJointStop(jointId:String, stop:materia.assembly.AssemblyJointStop):Void {
+		AssemblyDefinitionCodec.validateStop(stop, jointId);
+		for (joint in data.joints) if (joint.id == jointId) {
+			if (joint.role != AssemblyJointRole.Tree || !AssemblyDefinitionCodec.hasCoordinate(joint.type) ||
+				joint.limits.lower == null || joint.limits.upper == null || joint.limits.lower >= joint.limits.upper)
+				throw 'Assembly joint "$jointId" needs bounded tree travel for its end stops';
+			joint.stop = {timeConstantSec: stop.timeConstantSec, dampingRatio: stop.dampingRatio};
+			solved = null;
+			return;
+		}
 		throw 'Missing assembly joint "$jointId"';
 	}
 

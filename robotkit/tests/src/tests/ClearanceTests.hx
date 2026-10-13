@@ -1,5 +1,7 @@
 package tests;
 
+import collisionkit.native.NativeCollisionWorld;
+
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 
@@ -23,6 +25,7 @@ class ClearanceTests {
 
   public static function run():Int {
     assertions = 0;
+    testDescribedShapesAndRules();
     testPosesAndPath();
     testMargins();
     testTouchingByDesign();
@@ -33,6 +36,31 @@ class ClearanceTests {
     testSolidEdges();
     Sys.println('RobotKit clearance tests passed ($assertions assertions)');
     return assertions;
+  }
+
+  static function testDescribedShapesAndRules():Void {
+    var model = new RobotModel("described clearance");
+    var base = model.addLink(new Link("base")), tool = model.addLink(new Link("tool"));
+    var slide = model.addJoint(new Joint("slide", JointType.Prismatic, base, tool));
+    slide.axis = [1,0,0]; slide.limits.lower = -0.1; slide.limits.upper = 0.1;
+    var frame = model.addFrame(new Frame("tip", tool));
+    var arm = new Manipulator(model, base.id, frame.id);
+    var shape = new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Box(0.01,0.01,0.01));
+    shape.name = "tool skin"; shape.inflation = 0.002;
+    var scene = CollisionClearance.shapes(tool.id, [shape], true);
+    var wall = scene.addFixed("wall", collisionkit.CollisionPose.translation(0.03,0,0),
+      collisionkit.CollisionGeometry.Box(0.01,0.01,0.01), 0);
+    var clearance = new CollisionClearance(arm, scene, [0.02], () -> new NativeCollisionWorld());
+    check(clearance.violation([0.02]) != null, "environment overlap at reference stays checked beside an adjacent link");
+    check(clearance.violation([0.005]) != null && clearance.violation([0.005], true) == null,
+      "general shape inflation and tool contact margins come from the described tool body");
+    scene.setObjectRule(0, wall, collisionkit.CollisionPairRule.Allow, collisionkit.CollisionPairStatus.ProcessContact);
+    clearance.reset();
+    check(clearance.violation([0.02]) == null, "description contact rules are honored by clearance");
+    scene.setObjectRule(0, wall, collisionkit.CollisionPairRule.Check, collisionkit.CollisionPairStatus.Checked);
+    clearance.reset();
+    check(clearance.violation([0.02]) != null, "an explicit description check restores collision checking");
+    clearance.world.dispose();
   }
 
   static function testCoupledDriveContact():Void {

@@ -1,9 +1,9 @@
 package humankit;
 
-import animkit.AnimationAsset;
-import animkit.AnimationInstance;
-import humankit.rig.HumanPose;
-import humankit.rig.HumanoidRig;
+import haxeon.animation.AnimationAsset;
+import haxeon.animation.AnimationInstance;
+import haxeon.animation.rig.HumanPose;
+import haxeon.animation.rig.HumanoidRig;
 
 /**
  * A turn-in-place clip, measured: how far the body has turned by the end of the clip and how long that takes.

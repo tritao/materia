@@ -243,6 +243,7 @@ class EditorPerspectiveViewport implements View {
     paintCollisions(canvas, geometry.width, geometry.height);
     paintAssemblyDrag(canvas, geometry.width, geometry.height);
     paintSketchDraft(canvas, geometry.width, geometry.height);
+    paintSheetBends(canvas, geometry.width, geometry.height);
     paintOrbitPivot(canvas, geometry.width, geometry.height);
   }
 
@@ -655,6 +656,30 @@ class EditorPerspectiveViewport implements View {
     surface = null;
     if (renderer != null) renderer.dispose();
     renderer = null;
+  }
+
+  /** Exact developed fold intervals projected from the sheet's export plane. */
+  function paintSheetBends(canvas:Canvas, width:Float, height:Float):Void {
+    if (simulationActive || scene.selectedSheetFeature() == null) return;
+    var session = scene.cadSession(scene.selectedId);
+    if (!session.sheetFlatView) return;
+    var item = scene.requiredObject(scene.selectedId);
+    var flat = scene.selectedSheetFlatPattern();
+    for (bend in flat.bends()) {
+      var path = new PathBuilder();
+      var visible = false;
+      for (line in bend.lines()) {
+        var a = flat.plane.toWorld(new Vector(line.start.x, line.start.y, 0));
+        var b = flat.plane.toWorld(new Vector(line.end.x, line.end.y, 0));
+        var projected = camera.projectSegment(item.x + a.x * 0.001, item.y + a.y * 0.001, item.z + a.z * 0.001,
+          item.x + b.x * 0.001, item.y + b.y * 0.001, item.z + b.z * 0.001, width, height);
+        if (projected == null) continue;
+        path.moveTo(projected[0].x, projected[0].y).lineTo(projected[1].x, projected[1].y);
+        visible = true;
+      }
+      if (visible) canvas.strokeTransient(path.build(), bend.up() ? Color.rgba(0.2, 0.65, 1, 1)
+        : Color.rgba(1, 0.55, 0.15, 1), 1.5);
+    }
   }
 
   function paintWorkplane(canvas:Canvas, width:Float, height:Float):Void {

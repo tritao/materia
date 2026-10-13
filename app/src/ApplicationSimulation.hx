@@ -78,6 +78,8 @@ class ApplicationSimulation {
   var cnc:Null<CncProgramPlayer> = null;
   var beltVisuals:Array<BeltVisuals> = [];
   var machineProgram:Null<MachineProgramPlayer> = null;
+  var digitalProgram:Null<MachineDigitalProgramPlayer> = null;
+  var pressBrake:Null<PressBrakeControllerPlayer> = null;
   /** The project's wheeled assembly's drive, when it has one. */
   var mobile:Null<robotkit.mobile.MobileBase> = null;
   /** The work the assembly robot does on its own, when its project ships a mission. */
@@ -148,6 +150,8 @@ class ApplicationSimulation {
     if (power != null) members.push(power);
     if (cnc != null) members.push(cnc);
     if (machineProgram != null) members.push(machineProgram);
+    if (digitalProgram != null) members.push(digitalProgram);
+    if (pressBrake != null) members.push(pressBrake);
     if (mission != null) members.push(mission);
     if (beads != null) members.push(beads);
     if (workforce != null) members.push(workforce);
@@ -173,6 +177,8 @@ class ApplicationSimulation {
       input:Null<String->Null<EventValue>>, interfaceManaged:Bool}> = null;
     var candidateBelts:Array<BeltVisuals> = [];
     var candidateProgram:Null<MachineProgramPlayer> = null;
+    var candidateDigital:Null<MachineDigitalProgramPlayer> = null;
+    var candidatePress:Null<PressBrakeControllerPlayer> = null;
     var candidateMobile:Null<robotkit.mobile.MobileBase> = null;
     var candidatePower:Null<SimulatedMobilePower> = null;
     var candidateMission:Null<MissionPlayer> = null;
@@ -248,11 +254,20 @@ class ApplicationSimulation {
 			var ownsJob = job != null && (control == null || job.controllerId == control.id);
 			var interfaceManaged = ownsJob && control != null && control.kind == "cnc" &&
 				session.controllers.length > 1;
-			var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
-				appliedRevision + 1, robotIndex, ownsJob ? CncProgramPlayer.processChannels(job, interfaceManaged) : null, virtualWelder, control, restContactGroup);
+          var pressConfig = session.machineMotion == null ? null : session.machineMotion.pressBrake;
+          var ownsPress = pressConfig != null && (control == null || control.id == pressConfig.controllerId);
+          if (ownsPress && ownsJob) throw "One controller cannot own both a press and a CNC job";
+          var processChannels = ownsPress ? processkit.pressbrake.PressBrakeChannels.declarations()
+            : ownsJob ? CncProgramPlayer.processChannels(job, interfaceManaged) : null;
+          var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
+            appliedRevision + 1, robotIndex, processChannels, virtualWelder, control, restContactGroup);
           candidateRobots.push(built.robot);
           candidateLinks.push([for (link in built.model.links) link.id]);
           candidateRobotModels.push(built.model);
+          if (ownsPress) {
+            if (candidatePress != null || pressConfig == null) throw "Press controller execution ownership is ambiguous";
+            candidatePress = new PressBrakeControllerPlayer(pressConfig, built, createdSpace.session);
+          }
           candidateRuntimes.push(built.runtime);
           candidateBlueprints.push(built.blueprint);
           for (part in built.parts) candidateAssemblyParts.push(prepareAssemblyVisual(part));
@@ -280,24 +295,38 @@ class ApplicationSimulation {
             if (ownedBelts.length > 0) candidateBelts.push(new BeltVisuals(session, built, candidate, ownedBelts));
             if (machine.program != null && machine.program.axes.length > 0 &&
                 jointIds.indexOf(machine.program.axes[0]) >= 0) {
-              if (ownsJob) throw "A controller cannot run a CNC job and an axis program together";
+              if (ownsJob || ownsPress) throw "A controller cannot share CNC or press execution with an axis program";
               candidateProgram = new MachineProgramPlayer(machine.program, built, createdSpace.session,
                 machine.virtualDevice == true, candidateSignals == null || control == null ? null : candidateSignals.inputFor(control.id));
             }
           }
+          if (machine != null && machine.digitalProgram != null) {
+            if (candidateDigital != null || session.controllers.length > 1 || job != null ||
+                machine.program != null || session.mission != null || built.mobile != null)
+              throw "Machine digital program needs exclusive assembly execution ownership";
+            candidateDigital = new MachineDigitalProgramPlayer(machine.digitalProgram, built);
+          }
         }
         if (session.machineMotion != null && session.machineMotion.program != null && candidateProgram == null)
           throw "Machine axis program has no controller owning its axes";
+        if (session.machineMotion != null && session.machineMotion.pressBrake != null && candidatePress == null)
+          throw "Press program has no controller owning its axes";
       }
       var resolvedMotions = RobotMotionPlayer.resolve(candidateMotions,
         [for (robot in candidateRobots) robot.id()], candidateRobotModels);
+      if (candidateDigital != null && candidateAssembly != null)
+        for (track in resolvedMotions) if (track.robotId == candidateAssembly.robot.id())
+          throw "Machine digital program cannot share its assembly with a robot motion track";
+      if (candidatePress != null)
+        for (track in resolvedMotions) if (track.robotId == candidatePress.robotId())
+          throw "Press control cannot share its controller with a robot motion track";
       var environmentRecords = scene.records();
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
       var hasPneumaticActuator = candidateAssembly != null &&
-        candidateAssembly.blueprint.pneumaticDrives.length > 0;
+        hasPneumaticCylinder(candidateAssembly.blueprint);
       if (!hasPneumaticActuator && session != null) for (control in session.controllers) {
         var built = candidateByController.get(control.id);
-        if (built != null && built.blueprint.pneumaticDrives.length > 0) hasPneumaticActuator = true;
+        if (built != null && hasPneumaticCylinder(built.blueprint)) hasPneumaticActuator = true;
       }
       var pneumaticWorkpieceSurface = hasPneumaticActuator
         ? SimulationContactSurfaces.environmentPart() : null;
@@ -479,6 +508,10 @@ class ApplicationSimulation {
       beltVisuals = candidateBelts;
       if (machineProgram != null) machineProgram.beforeReset();
       machineProgram = candidateProgram;
+      if (digitalProgram != null) digitalProgram.beforeReset();
+      digitalProgram = candidateDigital;
+      if (pressBrake != null) pressBrake.beforeReset();
+      pressBrake = candidatePress;
       cnc = candidateCnc;
       mobile = candidateMobile;
       mission = candidateMission;
@@ -615,6 +648,14 @@ class ApplicationSimulation {
   /** The project's CNC program player, or null when the project has no CNC job. */
   public function cncPlayer():Null<CncProgramPlayer> return cnc;
   public function programPlayer():Null<MachineProgramPlayer> return machineProgram;
+  static function hasPneumaticCylinder(blueprint:robotkit.runtime.RobotRuntimeBlueprint):Bool {
+    for (drive in blueprint.cylinderDrives)
+      if (drive.control == robotkit.runtime.CylinderControl.PressureEffort) return true;
+    return false;
+  }
+
+  public function digitalProgramPlayer():Null<MachineDigitalProgramPlayer> return digitalProgram;
+  public function pressBrakePlayer():Null<PressBrakeControllerPlayer> return pressBrake;
   public function beltDisplayUpdates():Int {
     var count = 0;
     for (visual in beltVisuals) count += visual.updates;
@@ -790,6 +831,10 @@ class ApplicationSimulation {
     beltVisuals = [];
     if (machineProgram != null) machineProgram.beforeReset();
     machineProgram = null;
+    if (digitalProgram != null) digitalProgram.beforeReset();
+    digitalProgram = null;
+    if (pressBrake != null) pressBrake.beforeReset();
+    pressBrake = null;
     cnc = null; mobile = null; mission = null; beads = null; cellSignals = null; refreshMembers();
     // A mission's programs are planned on worker threads that finish the plan they are on after they are cancelled; the
     // world they plan for goes now, so wait for them (see ProgramPlanner).

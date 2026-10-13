@@ -103,6 +103,9 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_polyline(points: ptr<const<cad_vec3>> @in_array("point_count"), point_count: u32, closed: u8, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_project(curve: cad_shape, target: cad_shape, direction: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_resource_counts_get(out_counts: ptr<cad_resource_counts> @out) -> cad_result;
+	extern fn cad_shape_ancestor_at(shape: cad_shape, sub: cad_shape, kind: cad_shape_kind, index: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_shape_ancestor_count(shape: cad_shape, sub: cad_shape, kind: cad_shape_kind, out_count: ptr<u32> @out) -> cad_result;
+	extern fn cad_shape_ancestors(shape: cad_shape, sub: cad_shape, kind: cad_shape_kind, output: ptr<cad_shape>, capacity: u32) -> cad_result;
 	extern fn cad_shape_area(shape: cad_shape, out_area: ptr<f64> @out) -> cad_result;
 	extern fn cad_shape_bounds(shape: cad_shape, out_bounds: ptr<cad_bounds> @out) -> cad_result;
 	extern fn cad_shape_chamfer(shape: cad_shape, distance: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
@@ -141,6 +144,8 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_shape_translate_operation(shape: cad_shape, delta: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_valid(shape: cad_shape, out_valid: ptr<u8> @out) -> cad_result;
 	extern fn cad_shape_volume(shape: cad_shape, out_volume: ptr<f64> @out) -> cad_result;
+	extern fn cad_shape_volume_with_tolerance(shape: cad_shape, relative_tolerance: f64, out_volume: ptr<f64> @out) -> cad_result;
+	extern fn cad_sheet_bend_region_operation(profile: cad_shape, thickness: f64, angle: f64, allowance: f64, inner_radius: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shell(solid: cad_shape, faces: ptr<const<cad_shape_ref>> @in_array("face_count"), face_count: u32, thickness: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shell_operation(solid: cad_shape, faces: ptr<const<cad_shape_ref>> @in_array("face_count"), face_count: u32, thickness: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_sphere(radius: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;

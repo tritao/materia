@@ -7,7 +7,7 @@ import motionkit.path.PoseMath;
 import motionkit.planner.JointPathSamples;
 import motionkit.planner.JointPathPolynomial;
 import robotkit.manipulation.KinematicGroup;
-import robotkit.manipulation.ClearanceMotionEnvelope;
+import kinematicskit.ClearanceMotionEnvelope;
 
 /** Continuous task bounds for the actual quintic, including native lowering.
  * The linearized FK residual is a Bernstein polynomial. Rigid-chain Taylor
@@ -33,7 +33,10 @@ class JointCurveTask {
     }
     lowering=[for(_ in lower)1.01*tolerance];
     for(j in 0...lower.length){lower[j]-=lowering[j];upper[j]+=lowering[j];}
-    envelope=new ClearanceMotionEnvelope(arm,lower,upper,[],[]);
+    envelope=new ClearanceMotionEnvelope(arm.model,[for(id in arm.group.jointIds)arm.model.dofIndex(id)],
+      arm.stateOf([for(i in 0...lower.length)lower[i]+(upper[i]-lower[i])*0.5]),lower,upper,[],[],
+      arm.model.frameIndex(arm.flangeFrame),robotkit.kinematics.RobotKinematics.toTransform(arm.flangeTTcp),
+      arm.workFrame==null ? -1 : arm.model.frameIndex(arm.workFrame));
   }
 
   public static function prove(arm:KinematicGroup,path:PosePath,curve:JointPathSamples,

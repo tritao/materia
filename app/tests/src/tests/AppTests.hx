@@ -8,6 +8,7 @@ class AppTests {
 		ProjectProcessTests.run();
     if (StartPageTests.main() != 0) return 1;
     if (MissionJobsTests.main() != 0) return 1;
+		SheetMaterialIntegrationTests.run();
 		if (AppPreferencesTests.main() != 0) return 1;
 		if (EditorSettingsDialogTests.main() != 0) return 1;
 		if (SceneAtomicityTests.main() != 0) return 1;

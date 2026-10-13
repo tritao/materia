@@ -1,6 +1,11 @@
 package robotkit.collision;
 
 import collisionkit.CollisionMargins;
+import collisionkit.CollisionDescription;
+import collisionkit.DescribedObject;
+import collisionkit.CollisionGeometry;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ConvexSolid;
 import collisionkit.CollisionPairRule;
 import collisionkit.CollisionPairStatus;
 import collisionkit.CollisionPose;
@@ -8,8 +13,8 @@ import collisionkit.CollisionViolation;
 import collisionkit.CollisionWorld;
 import robotkit.manipulation.ClearanceChange;
 import robotkit.manipulation.ClearanceScene;
-import robotkit.manipulation.ClearanceMotionBounds;
-import robotkit.manipulation.ClearanceMotionEnvelope;
+import kinematicskit.ClearanceMotionBounds;
+import kinematicskit.ClearanceMotionEnvelope;
 import robotkit.manipulation.ClearanceViolation;
 import robotkit.manipulation.ClearanceWorld;
 import robotkit.manipulation.KinematicGroup;
@@ -33,7 +38,8 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   public var world(default, null):CollisionWorld;
   final makeWorld:Void->CollisionWorld;
   final reference:Array<Float>;
-  final layout:CollisionClearanceLayout;
+  final data:collisionkit.CollisionDescription;
+  final mapping:collisionkit.kinematics.ModelBodies;
   var described:Null<collisionkit.CollisionBuild> = null;
   var snapshot:Null<kinematicskit.KinematicSnapshot> = null;
   var mechanics:Null<collisionkit.kinematics.ModelBodies> = null;
@@ -50,14 +56,84 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   var airMarginCache:Null<{wanted:Null<Float>, table:CollisionMargins}> = null;
   var contactMarginCache:Null<{wanted:Null<Float>, table:CollisionMargins}> = null;
 
+  /** Exact placement clearance against an authored obstacle description. */
+  public static function placementClear(description:CollisionDescription, position:robotkit.spatial.Vec3,
+      clearance:Float, makeWorld:Void->CollisionWorld):Bool {
+    var scene = description.copy();
+    var body = scene.addBody("placement probe", 1, false,
+      CollisionPose.translation(position.x,position.y,position.z));
+    scene.addObject("placement probe", body, CollisionPose.identity(), Sphere(1e-12));
+    var world = makeWorld();
+    try {
+      scene.build(world);
+      var groups = 1;
+      for (body in scene.bodies) groups = Std.int(Math.max(groups, body.group + 1));
+      var clear = world.violation(new collisionkit.CollisionMargins(groups, clearance)) == null;
+      world.dispose();
+      return clear;
+    } catch (error:Dynamic) { world.dispose(); throw error; }
+  }
+
+  /** Combines scene fragments; geometry and role information stay in the description. */
+  public static function combine(parts:Array<CollisionDescription>):CollisionDescription {
+    var result = new CollisionDescription(MARGIN);
+    for (part in parts) result.append(part);
+    return result;
+  }
+
+  /** Shapes on a named link, or on a tool body following that link (group 1). */
+  public static function shapes(link:String, shapes:Array<CollisionShape>, isTool:Bool = false):CollisionDescription {
+    var result = new CollisionDescription(MARGIN);
+    result.setGroupMargins(collisionkit.CollisionMarginClass.Tool, collisionkit.CollisionMarginClass.Air, MARGIN, CONTACT_MARGIN);
+    var body = result.addBody(link, isTool ? collisionkit.CollisionMarginClass.Tool : collisionkit.CollisionMarginClass.Installed, false);
+    for (i in 0...shapes.length) {
+      var shape = shapes[i];
+      var invalid = shape.validate(); if (invalid != null) throw invalid;
+      var p = shape.position, q = shape.rotation;
+      result.addObject(shape.name == "" ? link + "/shape/" + i : shape.name, body, new CollisionPose(p[0],p[1],p[2],q[0],q[1],q[2],q[3]),
+        shape.geometry, shape.inflation, "authored shape", null, isTool);
+    }
+    return result;
+  }
+
+  public static function convex(name:String, link:String, vertices:Array<Float>, isTool:Bool = false):CollisionDescription {
+    var shape = new CollisionShape(Convex(vertices));
+    shape.name = name;
+    return shapes(link, [shape], isTool);
+  }
+
+  public static function link(data:CollisionDescription, object:DescribedObject):String {
+    if (object.body < 0) throw "A carried collision shape requires a body";
+    return data.bodies[object.body].name;
+  }
+
+  public static function isTool(data:CollisionDescription, object:DescribedObject):Bool
+    return object.tool;
+
+  static function transform(p:CollisionPose):Transform3
+    return new Transform3(new robotkit.spatial.Vec3(p.x,p.y,p.z), new robotkit.spatial.Quat(p.qx,p.qy,p.qz,p.qw));
+
+  /** Finite, link-local points for motion bounds; queries retain exact geometry. */
+  public static function vertices(object:DescribedObject):Array<Float> {
+    switch object.geometry {
+      case Convex(points) if (object.inflation == 0):
+        return placed(new ConvexSolid(points).cornerPoints(), transform(object.offset));
+      case _:
+        var bounds = collisionkit.CollisionBounds.of(object.geometry, object.offset, object.inflation);
+        return bounds.corners();
+    }
+  }
+
   /** The complete described cell and its kinematic mapping; every fixture builds a description first. */
-  public function new(arm:KinematicGroup, layout:CollisionClearanceLayout, reference:Array<Float>, makeWorld:Void->CollisionWorld) {
-    if (arm == null || layout == null || reference == null || makeWorld == null)
+  public function new(arm:KinematicGroup, data:collisionkit.CollisionDescription, reference:Array<Float>, makeWorld:Void->CollisionWorld,
+      ?mapping:collisionkit.kinematics.ModelBodies) {
+    if (arm == null || data == null || reference == null || makeWorld == null)
       throw "Collision clearance needs an arm, a description, a reference configuration and a world";
     this.arm = arm;
     this.reference = reference.copy();
     this.makeWorld = makeWorld;
-    this.layout = layout;
+    this.data = data;
+    this.mapping = mapping == null ? collisionkit.kinematics.ModelBodies.bind(data, arm.model, arm.stateOf(reference)) : mapping;
     build();
   }
 
@@ -79,18 +155,18 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   }
 
   function buildDescription():Void {
-    var source = layout;
-    var built = source.description.build(world);
+    var source = mapping;
+    var built = data.build(world);
     described = built;
-    mechanics = source.bodies.copyForDescription(built.description);
-    snapshot = new kinematicskit.KinematicSnapshot(source.bodies.model);
-    for (i in 0...source.description.bodies.length) {
+    mechanics = source.copyForDescription(built.description);
+    snapshot = new kinematicskit.KinematicSnapshot(source.model);
+    for (i in 0...data.bodies.length) {
       if (built.bodies[i] != i) throw "Described clearance requires an initially empty collision world";
       var carrier = descriptionMechanics().carrier(i);
-      var link = carrier < 0 ? arm.rootLink : source.bodies.model.bodyIds[carrier];
-      names.push(source.description.bodies[i].name);
+      var link = carrier < 0 ? arm.rootLink : source.model.bodyIds[carrier];
+      names.push(data.bodies[i].name);
       bodyLinks.push(link);
-      corners.push(source.corners(i)); moving.push(carrier >= 0 && arm.moves(link));
+      corners.push(bodyCorners(data, i)); moving.push(carrier >= 0 && arm.moves(link));
       bodies.push(built.bodies[i]);
     }
     for (object in built.objects) objects.push(object);
@@ -110,8 +186,8 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
         var named:Array<Int> = [];
         for (name in contacts) {
           var found = -1;
-          for (i in 0...layout.description.objects.length)
-            if (layout.description.objects[i].name == name) found = i;
+          for (i in 0...data.objects.length)
+            if (data.objects[i].name == name) found = i;
           if (found < 0) throw 'Clearance attachment has unknown contact "$name"';
           named.push(found);
         }
@@ -138,16 +214,16 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   }
 
   function hull(name:String):Int {
-    for (object in layout.description.objects) if (object.name == name || object.member == name) return object.body;
+    for (object in data.objects) if (object.name == name || object.member == name) return object.body;
     throw 'Clearance world has no body "$name"';
   }
 
   function move(i:Int, link:LinkId, q:Array<Float>, contacts:Array<Int>, detached:Bool):Void {
-    var source = layout;
-    var carrier = source.bodies.model.bodyIndex(link);
+    var source = mapping;
+    var carrier = source.model.bodyIndex(link);
     if (carrier < 0) throw 'Clearance attachment has unknown link "$link"';
     // A carrier's mechanical body cannot be transferred like a workpiece.
-    if (source.bodies.bodies.indexOf(i) >= 0) throw "A clearance attachment needs an independent part body";
+    if (source.bodies.indexOf(i) >= 0) throw "A clearance attachment needs an independent part body";
     fill(q);
     var at = 7 * i;
     var current = Transform3.fromArrays(poses.slice(at, at + 3), poses.slice(at + 3, at + 7));
@@ -156,7 +232,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
       descriptionSnapshot().bodyPose(carrier);
     var inverse = robotkit.kinematics.RobotKinematics.toTransform3(target).inverse();
     var delta = inverse.compose(current);
-    corners[i] = CollisionSceneBuilder.placed(corners[i], delta);
+    corners[i] = placed(corners[i], delta);
     descriptionMechanics().transfer(descriptionBuild(), i, new CollisionPose(current.translation.x, current.translation.y,
       current.translation.z, current.rotation.x, current.rotation.y, current.rotation.z, current.rotation.w),
       new CollisionPose(target.x, target.y, target.z, target.qx, target.qy, target.qz, target.qw),
@@ -176,14 +252,14 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
     for (i in 0...bodies.length) world.setBodyGroup(bodies[i], groupOf(i));
   }
 
-  function baseGroups():Int return layout.description.margins.groups;
+  function baseGroups():Int return data.margins.groups;
 
   function groupOf(i:Int):Int {
     for (k in 0...windows.length) {
       if (windows[k].a == i) return baseGroups() + 2 * k;
       if (windows[k].b == i) return baseGroups() + 1 + 2 * k;
     }
-    return layout.description.bodies[i].group;
+    return data.bodies[i].group;
   }
 
   public function group():KinematicGroup return arm;
@@ -193,7 +269,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
 
   /** A concrete owned copy, for callers responsible for the native world's lifetime. */
   public function copyForGroup(group:KinematicGroup):CollisionClearance
-    return new CollisionClearance(group, layout, reference, makeWorld);
+    return new CollisionClearance(group, data, reference, makeWorld, mapping);
 
   public function pairCount():Int return checkedPairs;
 
@@ -203,7 +279,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   public function bodyIndex(name:String):Int return hull(name);
 
   public function movingNames():Array<String>
-    return [for (object in layout.description.objects) if (object.body >= 0 && moving[object.body]) object.name];
+    return [for (object in data.objects) if (object.body >= 0 && moving[object.body]) object.name];
 
   public function distanceBetween(q:Array<Float>, first:String, second:String):Float {
     var build = descriptionBuild(), objects = build.description.objects;
@@ -286,26 +362,39 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
     return best;
   }
 
+  public function jointStep(from:Array<Float>, to:Array<Float>, maxToolStep:Float):Float {
+    if (!Math.isFinite(maxToolStep) || maxToolStep <= 0) throw "Tool sampling distance must be positive";
+    var errors = [for (i in 0...from.length) Math.abs(to[i] - from[i])];
+    var lower = [for (i in 0...from.length) Math.min(from[i],to[i])];
+    var upper = [for (i in 0...from.length) Math.max(from[i],to[i])];
+    var motion = 0.0, delta = 0.0;
+    for (bound in motionEnvelope(lower, upper).bounds(errors)) motion = Math.max(motion, bound);
+    for (value in errors) delta = Math.max(delta,value);
+    return motion > 0 && delta > 0 ? maxToolStep * delta / motion : maxToolStep;
+  }
+
   public function displacementBounds(q:Array<Float>, errors:Array<Float>):Array<Float> {
-    var held = layout.bodies.reference.q;
-    var bounds = new ClearanceMotionBounds(arm, q, errors, held);
-    return [for (i in 0...bodies.length) bounds.point(bodyLinks[i], originRadius(corners[i]))];
+    var bounds = new ClearanceMotionBounds(arm.model, [for(id in arm.group.jointIds)arm.model.dofIndex(id)], arm.stateOf(q, mapping.reference.q), errors, arm.model.frameIndex(arm.flangeFrame), robotkit.kinematics.RobotKinematics.toTransform(arm.flangeTTcp), arm.workFrame == null ? -1 : arm.model.frameIndex(arm.workFrame));
+    return [for (i in 0...bodies.length) bounds.point(arm.model.bodyIndex(bodyLinks[i]), originRadius(corners[i]))];
   }
 
   public function motionEnvelope(lower:Array<Float>, upper:Array<Float>):ClearanceMotionEnvelope
-    return new ClearanceMotionEnvelope(arm, lower, upper, bodyLinks.copy(), corners,
-      layout.bodies.reference.q);
+    return new ClearanceMotionEnvelope(arm.model, [for(id in arm.group.jointIds)arm.model.dofIndex(id)],
+      arm.stateOf([for(i in 0...lower.length)lower[i]+(upper[i]-lower[i])*0.5], mapping.reference.q),
+      lower, upper, [for(link in bodyLinks)arm.model.bodyIndex(link)], corners,
+      arm.model.frameIndex(arm.flangeFrame), robotkit.kinematics.RobotKinematics.toTransform(arm.flangeTTcp),
+      arm.workFrame == null ? -1 : arm.model.frameIndex(arm.workFrame));
 
   public function tcpDisplacementBound(q:Array<Float>, errors:Array<Float>):Float
-    return new ClearanceMotionBounds(arm, q, errors, layout.bodies.reference.q).tcp();
+    return new ClearanceMotionBounds(arm.model, [for(id in arm.group.jointIds)arm.model.dofIndex(id)], arm.stateOf(q, mapping.reference.q), errors, arm.model.frameIndex(arm.flangeFrame), robotkit.kinematics.RobotKinematics.toTransform(arm.flangeTTcp), arm.workFrame == null ? -1 : arm.model.frameIndex(arm.workFrame)).tcp();
 
   public function auditDisplacement(q:Array<Float>, perturbed:Array<Float>, errors:Array<Float>, ?envelope:ClearanceMotionEnvelope):Float {
     var bounds = envelope == null ? displacementBounds(q, errors) : envelope.bounds(errors);
     fill(q); var first = poses.copy(); fill(perturbed); var ratio = 0.0;
     for (i in 0...bodies.length) {
       var at = 7 * i;
-      var a = CollisionSceneBuilder.placed(corners[i], Transform3.fromArrays(first.slice(at, at + 3), first.slice(at + 3, at + 7)));
-      var b = CollisionSceneBuilder.placed(corners[i], Transform3.fromArrays(poses.slice(at, at + 3), poses.slice(at + 3, at + 7)));
+      var a = placed(corners[i], Transform3.fromArrays(first.slice(at, at + 3), first.slice(at + 3, at + 7)));
+      var b = placed(corners[i], Transform3.fromArrays(poses.slice(at, at + 3), poses.slice(at + 3, at + 7)));
       for (j in 0...Std.int(a.length / 3)) {
         var dx = a[3 * j] - b[3 * j], dy = a[3 * j + 1] - b[3 * j + 1], dz = a[3 * j + 2] - b[3 * j + 2];
         var moved = Math.sqrt(dx * dx + dy * dy + dz * dz);
@@ -322,13 +411,13 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   function margins(contact:Bool, wanted:Null<Float>):CollisionMargins {
     if (wanted != null && (!Math.isFinite(wanted) || wanted < 0))
       throw "Clearance margin must be finite and nonnegative";
-    var source = descriptionLayout();
-    var original = contact ? source.description.contactMargins : source.description.margins;
+    var source = mapping;
+    var original = contact ? data.contactMargins : data.margins;
     if (windows.length == 0 && wanted == null) return original;
     var cached = contact ? contactMarginCache : airMarginCache;
     if (cached != null && cached.wanted == wanted) return cached.table;
     var roles = [for (g in 0...original.groups) g];
-    for (window in windows) { roles.push(layout.description.bodies[window.a].group); roles.push(layout.description.bodies[window.b].group); }
+    for (window in windows) { roles.push(data.bodies[window.a].group); roles.push(data.bodies[window.b].group); }
     var table = new CollisionMargins(roles.length, 0.0, contact, wanted);
     for (g in 0...roles.length) for (h in g...roles.length) {
       var value = original.between(roles[g], roles[h]);
@@ -345,9 +434,9 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
 
   /** Every body's pose (its link's, in the arm's reference frame) for `q`, into `poses`. */
   function fill(q:Array<Float>):Void {
-    var source = descriptionLayout(), snapshot = descriptionSnapshot();
-    var observed = arm.stateOf(q, source.bodies.reference.q).q;
-    snapshot.evaluate(source.bodies.state(observed));
+    var source = mapping, snapshot = descriptionSnapshot();
+    var observed = arm.stateOf(q, source.reference.q).q;
+    snapshot.evaluate(source.state(observed));
     for (i in 0...bodies.length) {
       var carrier = descriptionMechanics().carrier(i);
       if (carrier >= 0) snapshot.bodyPoseInto(carrier, poses, 7 * i);
@@ -366,14 +455,13 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
 
   function named(found:Null<CollisionViolation>):Null<ClearanceViolation> {
     if (found == null) return null;
-    var source = descriptionLayout(), built = descriptionBuild();
+    var source = mapping, built = descriptionBuild();
     var a = built.objectOf(found.a), b = built.objectOf(found.b);
     if (a < 0 || b < 0) throw "Clearance violation lost its described object";
-    return {a: source.description.objects[a].name, b: source.description.objects[b].name,
+    return {a: data.objects[a].name, b: data.objects[b].name,
       distance: Math.max(0.0, found.distance), required: found.required};
   }
 
-  function descriptionLayout():CollisionClearanceLayout return layout;
 
   function descriptionMechanics():collisionkit.kinematics.ModelBodies {
     var value = mechanics;
@@ -391,6 +479,24 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
     var built = snapshot;
     if (built == null) throw "Clearance cell kinematics have not been initialized";
     return built;
+  }
+
+  public static function placed(points:Array<Float>, pose:Transform3):Array<Float> {
+    var out:Array<Float> = [];
+    for (i in 0...Std.int(points.length / 3)) {
+      var p = pose.transformPoint(new robotkit.spatial.Vec3(points[3 * i], points[3 * i + 1], points[3 * i + 2]));
+      out.push(p.x);
+      out.push(p.y);
+      out.push(p.z);
+    }
+    return out;
+  }
+
+  static function bodyCorners(description:CollisionDescription, body:Int):Array<Float> {
+    var result:Array<Float> = [];
+    for (object in description.objects) if (object.body == body)
+      for (value in vertices(object)) result.push(value);
+    return result;
   }
 
   static function originRadius(points:Array<Float>):Float {

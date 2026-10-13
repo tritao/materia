@@ -82,8 +82,6 @@ class CadCollision {
   /** A CAD mechanism, converted to a RobotKit model, with its link hulls (CAD-sourced). */
   public static function describeMechanism(description:CollisionDescription, mechanism:AssemblySimulationModel,
       options:RobotCollisionOptions):RobotCollisionBodies {
-    options.hulls = options.hulls.concat([for (hull in mechanism.linkHulls)
-      new RobotLinkHull(hull.link, hull.part, hull.vertices)]);
     description.note('Mechanism "${options.name}": CAD hulls are enclosing hulls of the parts\' tessellations');
     return RobotCollision.describe(description, mechanism.model, options);
   }

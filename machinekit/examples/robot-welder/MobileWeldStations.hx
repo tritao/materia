@@ -35,7 +35,7 @@ import machinekit.welding.WeldProbeGeometry.WeldProbeFace;
 import robotkit.manipulation.Manipulator;
 import robotkit.collision.CollisionClearance;
 import robotkit.manipulation.JointRoute;
-import robotkit.manipulation.ClearanceBodyData;
+import collisionkit.CollisionDescription;
 import robotkit.model.Frame;
 import robotkit.mobile.Pose2;
 import robotkit.navigation.FloorMap;

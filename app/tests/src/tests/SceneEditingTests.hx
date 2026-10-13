@@ -508,7 +508,7 @@ class SceneEditingTests {
     var directory = "build/editing-lifecycle-" + Std.random(100000000);
     FileSystem.createDirectory(directory);
     var file = directory + "/scene.materia.json";
-    File.saveContent(file, '{"format":"materia.scene","version":1,"objects":[]}');
+    File.saveContent(file, '{"format":"materia.scene","version":2,"objects":[]}');
     var session = new ProjectDocumentSession();
     session.open(file);
     var empty = session.scene;

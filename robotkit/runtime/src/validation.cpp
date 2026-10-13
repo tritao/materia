@@ -102,7 +102,7 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
         if (!is_finite(blueprint->joint_overtravel[joint]) || blueprint->joint_overtravel[joint] < 0.0 ||
             !is_finite(servo.stiffness) || servo.stiffness < 0.0 ||
             !is_finite(servo.damping) || servo.damping < 0.0 ||
-            blueprint->process_joint[joint] > 1)
+            blueprint->external_joint[joint] > 1)
             return RK_ERROR_INVALID_ARGUMENT;
     }
     for (uint32_t i = 0; i < blueprint->channel_count; ++i) {
@@ -122,7 +122,7 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             blueprint->joints[c.leader].type == RK_RUNTIME_JOINT_FIXED ||
             blueprint->joints[c.follower].type == RK_RUNTIME_JOINT_FIXED ||
             !is_finite(blueprint->coupling_stiffness[i]) || blueprint->coupling_stiffness[i] < 0.0 ||
-            blueprint->process_joint[c.leader] != blueprint->process_joint[c.follower])
+            blueprint->external_joint[c.leader] != blueprint->external_joint[c.follower])
             return RK_ERROR_INVALID_ARGUMENT;
         for (uint32_t j = 0; j < i; ++j)
             if (c.follower == blueprint->couplings[j].follower && c.leader == blueprint->couplings[j].leader)
@@ -185,7 +185,7 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
     for (uint32_t i = 0; i < blueprint->brake_count; ++i) {
         const auto &brake = blueprint->brakes[i];
         if (brake.joint >= blueprint->joint_count || brake.joint >= RK_MAX_SERVO_JOINTS ||
-            blueprint->process_joint[brake.joint] || blueprint->joint_servo[brake.joint].stiffness <= 0.0 ||
+            blueprint->external_joint[brake.joint] || blueprint->joint_servo[brake.joint].stiffness <= 0.0 ||
             !(blueprint->joints[brake.joint].limit_flags & RK_LIMIT_EFFORT) ||
             blueprint->joints[brake.joint].max_effort <= 0.0 ||
             brake.release_channel >= blueprint->channel_count || brake.released_sensor >= blueprint->sensor_count ||
@@ -287,7 +287,7 @@ rk_result RK_CALL rk_robot_command_validate_for_blueprint(
     for (uint32_t index = 0; index < command->target_count; ++index) {
         if (command->targets[index].joint >= blueprint->joint_count)
             return RK_ERROR_INVALID_ARGUMENT;
-        if (blueprint->process_joint[command->targets[index].joint])
+        if (blueprint->external_joint[command->targets[index].joint])
             return RK_ERROR_INVALID_ARGUMENT;
     }
     if (command->kind == RK_COMMAND_JOINT_TARGETS) {
@@ -412,7 +412,7 @@ rk_result validate_segments_for_blueprint(const SegmentBatch &batch,
             }
         }
     for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
-        if (!blueprint.process_joint[joint]) continue;
+        if (!blueprint.external_joint[joint]) continue;
         for (const auto &segment : batch.segments)
             for (uint32_t degree = 1; degree <= segment.degree; ++degree)
                 if (std::abs(segment.coefficients[joint].value[degree]) > 1e-12)
@@ -448,7 +448,7 @@ rk_result validate_plan_for_blueprint(const PlanRequest &plan,
         !coupled_values(&blueprint, plan.start_acceleration, 1e-6, false))
         return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
-        if (!blueprint.process_joint[joint]) continue;
+        if (!blueprint.external_joint[joint]) continue;
         if (std::abs(plan.segments.segments.front().coefficients[joint].value[0] -
                 plan.start_position[joint]) > 1e-9)
             return RK_ERROR_INVALID_ARGUMENT;

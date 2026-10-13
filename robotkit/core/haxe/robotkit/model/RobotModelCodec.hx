@@ -2,8 +2,11 @@ package robotkit.model;
 
 
 import haxe.Json;
+import haxeon.wire.JsonWire;
+import collisionkit.CollisionGeometry;
 import haxe.io.Bytes;
 import robotkit.model.ActuatorDrive;
+import robotkit.model.ActuatorDrive.HydraulicDrive;
 import robotkit.model.ProcessVelocityDrive;
 import robotkit.model.CollisionShape;
 import robotkit.model.Transmission;
@@ -59,6 +62,8 @@ class RobotModelCodec {
       if (joints.exists(joint.id)) throw 'Duplicate robot joint ${joint.id}';
       if (!links.exists(joint.parent.id) || !links.exists(joint.child.id))
         throw 'Joint ${joint.id} references an unknown link';
+      if (joint.passive && (joint.type == JointType.Fixed || joint.type == JointType.Floating))
+        throw 'Passive joint ${joint.id} needs a movable single-axis joint';
       joints.set(joint.id, true);
       vector(joint.parentFramePosition, 3, "joint parentFramePosition");
       vector(joint.parentFrameRotation, 4, "joint parentFrameRotation");
@@ -92,6 +97,12 @@ class RobotModelCodec {
     var actuators = new Map<String, Bool>();
     for (actuator in model.actuators) {
       validateActuator(actuator, joints);
+      switch actuator.transmission {
+        case SimpleTransmission(jointId, _, _):
+          for (joint in model.joints) if (joint.id == jointId && joint.passive)
+            throw 'Actuator ${actuator.id} cannot drive passive joint $jointId';
+        case _:
+      }
       if (actuators.exists(actuator.id)) throw 'Duplicate robot actuator ${actuator.id}';
       actuators.set(actuator.id, true);
     }
@@ -213,6 +224,7 @@ class RobotModelCodec {
         dynamics: {armature: joint.armature, damping: joint.damping, frictionLoss: joint.frictionLoss,
           limitTimeConstant: joint.limitTimeConstant, limitDampingRatio: joint.limitDampingRatio,
           limitImpedance: joint.limitImpedance}};
+        if (joint.passive) record.passive = true;
         var mechanical = joint.mechanicalLimits;
         if (mechanical != null) record.mechanicalLimits = encodeLimits(mechanical);
         record;
@@ -336,6 +348,7 @@ class RobotModelCodec {
       joint.childFrameRotation = vectorField(record, "childFrameRotation", 4);
       joint.axis = vectorField(record, "axis", 3);
       joint.includePath = includeScope(record, "includePath");
+      joint.passive = Reflect.hasField(record, "passive") && bool(record, "passive");
       var dynamics:Dynamic = required(record, "dynamics");
       joint.armature = nonNegative(number(dynamics, "armature"), "joint armature");
       joint.damping = nonNegative(number(dynamics, "damping"), "joint damping");
@@ -535,14 +548,16 @@ class RobotModelCodec {
 
   public static function encodeCollisionShape(shape:CollisionShape):Dynamic {
     var kind:String, size:Array<Float>;
-    switch shape.primitive {
+    switch shape.geometry {
       case Box(x, y, z): kind = "box"; size = [x, y, z];
       case Sphere(radius): kind = "sphere"; size = [radius];
       case Capsule(radius, half): kind = "capsule"; size = [radius, half];
       case Cylinder(radius, half): kind = "cylinder"; size = [radius, half];
+      case Convex(points): kind = "convex"; size = points;
+      case _: throw "Scene geometry is not accepted on a link";
     }
     var surface = shape.surface;
-    return {kind: kind, size: size, position: shape.position, rotation: shape.rotation,
+    return {kind: kind, size: size, name: shape.name, inflation: shape.inflation, position: shape.position, rotation: shape.rotation,
       surface: surface == null ? null : encodeSurface(surface),
       contact: switch shape.contact {
         case Layers: "layers";
@@ -564,7 +579,7 @@ class RobotModelCodec {
   }
 
   public static function readCollisionShape(record:Dynamic):CollisionShape {
-    var primitive = switch text(record, "kind") {
+    var geometry:CollisionGeometry = switch text(record, "kind") {
       case "box":
         var size = vectorField(record, "size", 3);
         Box(size[0], size[1], size[2]);
@@ -575,10 +590,15 @@ class RobotModelCodec {
       case "cylinder":
         var size = vectorField(record, "size", 2);
         Cylinder(size[0], size[1]);
+      case "convex": Convex(vectorField(record, "size", array(record, "size").length));
       case other: throw 'Unsupported RobotModel collision shape kind $other';
     };
-    var shape = new CollisionShape(primitive, vectorField(record, "position", 3),
+    var shape = new CollisionShape(geometry, vectorField(record, "position", 3),
       vectorField(record, "rotation", 4));
+    shape.inflation = number(record, "inflation");
+    var shapeName:Dynamic = required(record, "name");
+    if (!Std.isOfType(shapeName, String)) throw "Collision shape name must be a string";
+    shape.name = cast shapeName;
     var surface:Dynamic = required(record, "surface");
     if (surface != null) shape.surface = readSurface(surface);
     shape.contact = switch text(record, "contact") {
@@ -633,6 +653,7 @@ class RobotModelCodec {
       var stepper = drive.stepper();
       var servo = drive.servo();
       var pneumatic = drive.pneumatic();
+      var hydraulic = drive.hydraulic();
       if (stepper != null) {
         record.drive = {kind: "stepper", fullStepsPerRevolution: stepper.fullStepsPerRevolution,
           rotorInertia: stepper.rotorInertia, holdingTorque: stepper.holdingTorque, curve: stepper.curve.flatten()};
@@ -645,12 +666,27 @@ class RobotModelCodec {
           stroke: pneumatic.stroke, ratedSpeed: pneumatic.ratedSpeed, pressurePa: pneumatic.pressurePa,
           channelA: pneumatic.channelA, channelB: pneumatic.channelB,
           normallyToA: pneumatic.normallyToA, extendSign: pneumatic.extendSign};
+      } else if (hydraulic != null) {
+        var channelB = hydraulic.channelB;
+        if (channelB == null) throw 'Hydraulic actuator ${value.id} has no return coil';
+        var saved:HydraulicDriveRecord = {bore: hydraulic.bore, rod: hydraulic.rod,
+          stroke: hydraulic.stroke, pressurePa: hydraulic.pressurePa, approachSpeed: hydraulic.approachSpeed,
+          workingSpeed: hydraulic.workingSpeed, returnSpeed: hydraulic.returnSpeed,
+          changePoint: hydraulic.changePoint, channelA: hydraulic.channelA, channelB: channelB,
+          extendSign: hydraulic.extendSign, retractedPosition: hydraulic.retractedPosition};
+        record.drive = {kind: "hydraulic", parameters: Json.parse(JsonWire.encode(saved))};
       } else throw 'Actuator ${value.id} has an unsupported drive';
     }
     return record;
   }
 
   static function readActuatorDrive(record:Dynamic):ActuatorDrive {
+    if (text(record, "kind") == "hydraulic") {
+      var saved:HydraulicDriveRecord = JsonWire.decode(Json.stringify(Reflect.field(record, "parameters")));
+      return new HydraulicDrive(saved.bore, saved.rod, saved.stroke, saved.pressurePa,
+        saved.approachSpeed, saved.workingSpeed, saved.returnSpeed, saved.changePoint,
+        saved.channelA, saved.channelB, saved.extendSign, saved.retractedPosition);
+    }
     if (text(record, "kind") == "pneumatic")
       return new PneumaticDrive(number(record, "bore"), number(record, "rod"), number(record, "stroke"),
         number(record, "ratedSpeed"), number(record, "pressurePa"), text(record, "channelA"),
@@ -683,8 +719,8 @@ class RobotModelCodec {
       throw "Actuator microsteps must be an integer from 1 to 1024";
     if (value.maxStepRate != null && (!(value.maxStepRate > 0) || !Math.isFinite(value.maxStepRate)))
       throw "Actuator maxStepRate must be finite and positive";
-    if (value.drive != null && !Std.isOfType(value.drive, StepperDrive) && !Std.isOfType(value.drive, ServoDrive) &&
-        !Std.isOfType(value.drive, PneumaticDrive))
+    var drive = value.drive;
+    if (drive != null && drive.stepper() == null && drive.servo() == null && drive.cylinder() == null)
       throw 'Actuator ${value.id} has an unsupported drive';
     requireText(value.id, "actuator ID");
     if (value.maxEffort != null) finite(value.maxEffort, "actuator maxEffort");

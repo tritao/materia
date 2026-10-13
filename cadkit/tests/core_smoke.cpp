@@ -406,6 +406,38 @@ int main() {
 
     cad_shape edge = 0;
     assert(cad_shape_subshape_at(shape, CAD_SHAPE_EDGE, 0, &edge) == CAD_OK);
+    {
+        std::uint32_t ancestor_count = 0;
+        assert(cad_shape_ancestor_count(shape, edge, CAD_SHAPE_FACE, &ancestor_count) == CAD_OK);
+        assert(ancestor_count == 2);
+        cad_shape ancestor_faces[2] = {0, 0};
+        assert(cad_shape_ancestors(shape, edge, CAD_SHAPE_FACE, ancestor_faces, 1) == CAD_ERROR_BUFFER_TOO_SMALL);
+        assert(ancestor_faces[0] == 0 && ancestor_faces[1] == 0);
+        assert(cad_shape_ancestors(shape, edge, CAD_SHAPE_FACE, nullptr, 2) == CAD_ERROR_INVALID_ARGUMENT);
+        assert(cad_shape_ancestors(shape, edge, CAD_SHAPE_FACE, ancestor_faces, 2) == CAD_OK);
+        for (std::uint32_t index = 0; index < 2; ++index) {
+            cad_shape ancestor = 0;
+            assert(cad_shape_ancestor_at(shape, edge, CAD_SHAPE_FACE, index, &ancestor) == CAD_OK);
+            std::uint8_t same = 0;
+            assert(cad_shape_is_same(ancestor, ancestor_faces[index], &same) == CAD_OK && same == 1);
+            cad_shape_kind ancestor_kind = CAD_SHAPE_UNKNOWN;
+            assert(cad_shape_kind_get(ancestor, &ancestor_kind) == CAD_OK && ancestor_kind == CAD_SHAPE_FACE);
+            cad_shape_destroy(ancestor);
+            cad_shape_destroy(ancestor_faces[index]);
+        }
+        cad_shape invalid_ancestor = 0;
+        assert(cad_shape_ancestor_at(shape, edge, CAD_SHAPE_FACE, 2, &invalid_ancestor) == CAD_ERROR_INVALID_ARGUMENT);
+        assert(invalid_ancestor == 0);
+        assert(cad_shape_ancestor_count(shape, edge, CAD_SHAPE_EDGE, &ancestor_count) == CAD_ERROR_INVALID_ARGUMENT);
+        assert(ancestor_count == 0);
+        cad_shape foreign_box = 0, foreign_edge = 0;
+        assert(cad_box(10.0, 20.0, 30.0, &foreign_box) == CAD_OK);
+        assert(cad_shape_subshape_at(foreign_box, CAD_SHAPE_EDGE, 0, &foreign_edge) == CAD_OK);
+        assert(cad_shape_ancestor_count(shape, foreign_edge, CAD_SHAPE_FACE, &ancestor_count) == CAD_ERROR_INVALID_ARGUMENT);
+        assert(ancestor_count == 0);
+        cad_shape_destroy(foreign_edge);
+        cad_shape_destroy(foreign_box);
+    }
     cad_curve_kind curve_kind = CAD_CURVE_UNKNOWN;
     assert(cad_edge_curve_kind(edge, &curve_kind) == CAD_OK);
     assert(curve_kind == CAD_CURVE_LINE);

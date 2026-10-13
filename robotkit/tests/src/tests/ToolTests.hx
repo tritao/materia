@@ -20,7 +20,8 @@ import robotkit.manipulation.ReachLoadChart;
 import robotkit.tool.Tool;
 import robotkit.tool.MassProperties;
 import robotkit.tool.WorkpieceLoad;
-import robotkit.tool.ToolCollisionShape;
+import robotkit.model.CollisionShape;
+import robotkit.tool.ToolGeometry;
 import robotkit.tool.SimulatedSprayer;
 import robotkit.tool.SuctionGrip;
 import robotkit.tool.SuctionMotionSample;
@@ -48,7 +49,7 @@ class ToolTests {
     // at the flange should land at +Y once the arm has rotated 90 degrees.
     var fixture = buildSingleJointFixture();
     var tool = new Tool("probe", "probe", new Transform3(new Vec3(0.2, 0.0, 0.0), Quat.identity()),
-      ToolCollisionShape.NoCollision, 0.1);
+      [], 0.1);
     var manipulator = fixture.arm.withTool(tool.flangeTTcp);
 
     var zero = manipulator.tcpPose([0.0]);
@@ -181,7 +182,7 @@ class ToolTests {
     var flange = model.addFrame(new Frame("flange", carriage));
     var manipulator = new Manipulator(model, base.id, flange.id);
     var tool = new Tool("pickup", "pickup", Transform3.identity(),
-      ToolCollisionShape.NoCollision, 1.0,
+      [], 1.0,
       new MassProperties(1.0, new Vec3(0.1, 0, 0), Inertia3.zero()));
     var part = new WorkpieceLoad("part-a", new MassProperties(2.0,
       new Vec3(0.1, 0, 0), Inertia3.zero()), Transform3.identity());
@@ -205,7 +206,7 @@ class ToolTests {
       "Robot poses beyond the load chart are rejected");
     var missingCentre = false;
     try PayloadChecker.checkPath(manipulator,
-      new Tool("mass-only", "mass-only", Transform3.identity(), NoCollision, 1.0),
+      new Tool("mass-only", "mass-only", Transform3.identity(), [], 1.0),
       null, chart, [[0.2]])
     catch (error:Dynamic) missingCentre = Std.string(error).indexOf("centre of mass") >= 0;
     check(missingCentre, "Payload check rejects legacy tools with mass but no centre of mass");

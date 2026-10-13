@@ -182,11 +182,12 @@ class ProjectSourceTests {
       vertices.push((index & 2) == 0 ? -0.5 : 0.5);
       vertices.push((index & 4) == 0 ? -0.5 : 0.5);
     }
+    if (enabled) model.links[0].collisionShapes.push(new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Convex(vertices)));
     var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
     var simulation = simulationHarness.simulation;
     simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
-      [0.0, 0.0, 0.0, 1.0], null, null, [enabled ? vertices : null]);
+      [0.0, 0.0, 0.0, 1.0]);
     var box = simulationHarness.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
     for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
     var height = simulationHarness.objectPose(box).position[2];
@@ -202,12 +203,13 @@ class ProjectSourceTests {
     var wedge = [-0.5, -0.5, -0.5, 0.5, -0.5, -0.5,
       -0.5, -0.5, 0.5, -0.5, 0.5, -0.5,
       0.5, 0.5, -0.5, -0.5, 0.5, 0.5];
+    model.links[0].collisionShapes.push(new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Convex(wedge)));
     for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
       var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
       var simulation = simulationHarness.simulation;
       simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0, 1.0], null, null, [wedge]);
+        [0.0, 0.0, 0.0, 1.0]);
       var box = simulationHarness.spawnBox([0.35, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
       for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
       var height = simulationHarness.objectPose(box).position[2];
@@ -243,11 +245,12 @@ class ProjectSourceTests {
     model.collisionApproximation = robotkit.model.CollisionApproximation.None;
     for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO])
       for (enabled in [true, false]) {
+        model.links[0].collisionShapes = enabled ? [new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Convex(hull))] : [];
         var simulationHarness = new SimulationHarness(0.01, 1, backend);
 
         var simulation = simulationHarness.simulation;
         simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile()), [0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 1.0], null, null, [enabled ? hull : null]);
+          [0.0, 0.0, 0.0, 1.0]);
         var box = simulationHarness.spawnBox([0.0, 0.0, top + 0.5], [0.05, 0.05, 0.05], true, 1.0);
         for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
         var height = simulationHarness.objectPose(box).position[2];
@@ -1023,12 +1026,13 @@ class ProjectSourceTests {
           if (supported) continue;
           if (contact.linkIndex != toolLink) {
             var body = mission.simulation.linkPose(0, contact.linkIndex);
-            for (hull in mission.robot.hulls) if (hull.link == contact.linkIndex) {
+            for (hull in mission.robot.shapes) if (hull.link == contact.linkIndex) {
               var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
               var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
-              for (vertex in 0...Std.int(hull.vertices.length / 3)) {
-                var point = rotateVector(hull.vertices[vertex * 3], hull.vertices[vertex * 3 + 1],
-                  hull.vertices[vertex * 3 + 2], body.rotation);
+              var points = hull.shape.convexVertices();
+              for (vertex in 0...Std.int(points.length / 3)) {
+                var point = rotateVector(points[vertex * 3], points[vertex * 3 + 1],
+                  points[vertex * 3 + 2], body.rotation);
                 for (axis in 0...3) {
                   lo[axis] = Math.min(lo[axis], point[axis] + body.position[axis]);
                   hi[axis] = Math.max(hi[axis], point[axis] + body.position[axis]);
@@ -1037,7 +1041,7 @@ class ProjectSourceTests {
               var point = [contact.position.x, contact.position.y, contact.position.z];
               var near = true;
               for (axis in 0...3) if (point[axis] < lo[axis] - 0.002 || point[axis] > hi[axis] + 0.002) near = false;
-              if (near) Sys.println("picker contact candidate: " + hull.part + "; bounds=" + lo.join(",") + " / " + hi.join(","));
+              if (near) Sys.println("picker contact candidate: " + hull.shape.name + "; bounds=" + lo.join(",") + " / " + hi.join(","));
             }
           }
           // The compliant cup deliberately presses at most 3 mm into its intended grasp surface.
@@ -1350,7 +1354,7 @@ class ProjectSourceTests {
     check(simulation.rebuild(session.sensors, session.scene, session), "held-clearance fixture builds: " + simulation.error);
     var mission = simulation.missionPlayer(), object = simulation.environmentObject("held-clearance-probe");
     if (mission == null || object == null) throw "Held-clearance fixture needs its robot and loose object";
-    var flange = [for (hull in mission.robot.hulls) if (hull.part == "toolFlange") hull];
+    var flange = [for (hull in mission.robot.shapes) if (hull.shape.name == "toolFlange") hull];
     if (flange.length != 1) throw "Held-clearance fixture needs one flange hull";
     var link = flange[0].link, pose = mission.simulation.linkPose(mission.robotIndex, link);
     var carrier = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(pose.position[0], pose.position[1], pose.position[2]),
@@ -3372,7 +3376,7 @@ class ProjectSourceTests {
         var station:Null<materia.project.SceneArtifact.SceneArtifactPlace> = null;
         for (step in mission.mission.steps) if (station == null && step.kind == "place") station = step.at;
         if (nativeSession == null || freeBlank == null || station == null) throw "Vise seating fixture is incomplete";
-        var drives = [for (drive in cnc.robot.blueprint.pneumaticDrives)
+        var drives = [for (drive in cnc.robot.blueprint.cylinderDrives)
           if (cnc.robot.model.joints[drive.joint].id == "mill/mill/vise/jaw") drive];
         if (drives.length != 1) throw "Vise seating fixture needs one real cylinder";
         var drive = drives[0], retract = drive.channelB;
@@ -4141,7 +4145,7 @@ class ProjectSourceTests {
       var expectedViseSeconds = gripTravel * 0.98 / viseDrive.ratedSpeed;
       check(doorOpenStart > 0 && doorOpenReached > doorOpenStart &&
         Math.abs(doorOpenSeconds / expectedDoorSeconds - 1.0) <= 0.1,
-        'MuJoCo door extension takes stroke / rated speed within 10%, measured $doorOpenSeconds s; start=$doorOpenStart reached=$doorOpenReached position=$lastDoorPosition peak=$peakDoorPosition effort=$peakDoorEffort stroke=${doorDrive.stroke} speed=${doorDrive.ratedSpeed} sign=${doorDrive.extendSign} drives=${blueprint.pneumaticDrives.length}, trajectory=${runtime.snapshot().trajectoryTimeNs}, active=${runtime.snapshot().trajectoryActive}, safety=${runtime.snapshot().safety}');
+        'MuJoCo door extension takes stroke / rated speed within 10%, measured $doorOpenSeconds s; start=$doorOpenStart reached=$doorOpenReached position=$lastDoorPosition peak=$peakDoorPosition effort=$peakDoorEffort stroke=${doorDrive.stroke} speed=${doorDrive.ratedSpeed} sign=${doorDrive.extendSign} drives=${blueprint.cylinderDrives.length}, trajectory=${runtime.snapshot().trajectoryTimeNs}, active=${runtime.snapshot().trajectoryActive}, safety=${runtime.snapshot().safety}');
       check(doorCloseStart > 0 && doorCloseReached > doorCloseStart &&
         Math.abs(doorCloseSeconds / expectedDoorCloseSeconds - 1.0) <= 0.1,
         'MuJoCo door retraction takes stroke / rated speed within 10%, measured $doorCloseSeconds s');
@@ -4787,6 +4791,196 @@ class ProjectSourceTests {
     missing.dispose();
   }
 
+  /** The press preview is a mechanical assembly whose coupled ram and gauges remain editable. */
+  /** Unloaded flow reference with the backend's declared finite velocity response. */
+  static function checkPressController(root:String):Void {
+    PressBrakeSimulationChecks.run(root, false);
+  }
+
+  static function checkPressBrake(root:String):Void {
+    var manifest = root + "/machinekit/examples/press-brake/materia.project.json";
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition = generated.assemblyDefinition;
+    if (definition == null) throw "Press preview lost its assembly definition";
+    check(generated.objects.length == definition.occurrences.length, "press preview includes every physical member");
+    for (part in generated.objects) check(part.mass > 0, 'press part ${part.id} has material-derived mass');
+    var session = new ProjectDocumentSession(null, false);
+    try {
+      session.openGeneratedScene(generated.objects, manifest, generated.geometryBySnapshot, definition,
+        generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
+        generated.physical, generated.recipeDocument);
+      var initial = new AssemblyState(definition, session.projectAssemblyState);
+      var ramZ = initial.worldConnector("ram", "tool-mount").z;
+      check(session.setAssemblyJointCoordinate("Y1", 25), "press ram can move through the editor");
+      check(session.setAssemblyJointCoordinate("X", 125), "press X backgauge can move through the editor");
+      check(session.setAssemblyJointCoordinate("R", 20), "press R backgauge can move through the editor");
+      check(session.setAssemblyJointCoordinate("depth", 30), "press depth stop can move independently");
+      var moved = new AssemblyState(definition, session.projectAssemblyState);
+      check(Math.abs(moved.worldConnector("ram", "tool-mount").z - (ramZ - 25)) < 1e-6,
+        "editor ram coordinate moves its installed tool stack");
+      check(Math.abs(moved.worldPose("guideLeft").z - moved.worldPose("guideRight").z) < 1e-6,
+        "editor keeps the torsion-bar ram guides together");
+      var finger = moved.worldConnector("fingerLeft", "contact");
+      check(Math.abs(finger.y - 125) < 1e-6 && Math.abs(finger.z - 850) < 1e-6,
+        "editor X/R coordinates move the physical finger contact");
+    } catch (error:Dynamic) { session.dispose(); throw error; }
+    session.dispose();
+    Sys.println("press brake project: coupled ram, independent depth stop and X/R editor axes passed");
+    checkPressBrakePhysics(generated, manifest);
+  }
+
+  /** The generated CAD hulls, hydraulic circuit and passive contacts run at the normal app tick. */
+  static function checkPressBrakePhysics(generated:app.GeneratedAssemblyScene, manifest:String):Void {
+    var definition = generated.assemblyDefinition, physical = generated.physical;
+    if (definition == null || physical == null) throw "Press simulation lost its assembly or physical data";
+    var initial = new AssemblyState(definition, generated.assemblyState);
+    var nominalContact = initial.worldConnector("fingerLeft", "contact");
+    var stockHeight = nominalContact.z * generated.metresPerUnit;
+    var gaugeFace = nominalContact.y * generated.metresPerUnit;
+    var punchTip = Math.POSITIVE_INFINITY, dieTop = Math.NEGATIVE_INFINITY;
+    for (occurrence in definition.occurrences) {
+      if (occurrence.id.indexOf("-punch-") >= 0 && !StringTools.endsWith(occurrence.id, "-clamp"))
+        punchTip = Math.min(punchTip, initial.worldConnector(occurrence.id, "contact").z);
+      if (occurrence.id.indexOf("-die-") >= 0)
+        dieTop = Math.max(dieTop, initial.worldConnector(occurrence.id, "contact").z);
+    }
+    var toolGap = (punchTip - dieTop) * generated.metresPerUnit;
+    check(Math.isFinite(toolGap) && toolGap > 0, "press test has installed tool contact datums");
+    var model = AssemblySimulationBridge.toRobotModel(definition, physical, generated.assemblyState).model;
+    var indices = new Map<String, Int>();
+    for (i in 0...model.joints.length) indices.set(model.joints[i].id, i);
+    var ram = indices.get("Y1"), follower = indices.get("Y2");
+    var left = indices.get("fingerLeft-hinge"), right = indices.get("fingerRight-hinge");
+    var gaugeX = indices.get("X"), gaugeR = indices.get("R");
+    if (ram == null || follower == null || left == null || right == null) throw "Press simulation lost a ram or contact hinge";
+    if (gaugeX == null || gaugeR == null) throw "Press simulation lost a backgauge axis";
+    var sheet:SceneObjectData = {id: "contact-sheet", label: "Contact test stock", type: "rectangle",
+      x: 0, y: gaugeFace - 0.052, z: stockHeight + 0.00075, width: 0.7, height: 0.1, depth: 0.0015,
+      collisionEnabled: true, dynamicBody: false, mass: 0.7 * 0.1 * 0.0015 * 7850,
+      red: 0.3, green: 0.5, blue: 0.6, visible: true};
+    generated.objects.push(sheet);
+    var session = new ProjectDocumentSession(null, false);
+    var world = new RobotWorld();
+    var simulation = new ApplicationSimulation(world);
+    try {
+      session.openGeneratedProject(generated, manifest);
+      simulation.setBackend(ApplicationSimulation.MUJOCO);
+      check(simulation.rebuild(session.sensors, session.scene, session), 'press simulation builds: ${simulation.error}');
+      var player = simulation.digitalProgramPlayer();
+      if (player == null) throw "Press simulation lost its timed hydraulic program";
+      var robot:AssemblyRobot = @:privateAccess player.robot;
+      var unknown:materia.project.SceneArtifact.SceneArtifactDigitalProgram = {durationSec: 1, loop: false,
+        events: [{timeSec: 0, channel: "absent", value: false}]};
+      rejectDigital(() -> { var invalid = new MachineDigitalProgramPlayer(unknown, robot); }, "unknown output channel");
+      var unsafe:materia.project.SceneArtifact.SceneArtifactDigitalProgram = {durationSec: 1, loop: false,
+        events: [{timeSec: 0, channel: "ramValve/coilA", value: true}]};
+      rejectDigital(() -> { var invalid = new MachineDigitalProgramPlayer(unsafe, robot); }, "unsafe terminal coil output");
+      robot.blueprint.channels.push(new robotkit.execution.ProcessChannelDeclaration("test-analog", ProcessEventValue.Analog(0)));
+      var analog:materia.project.SceneArtifact.SceneArtifactDigitalProgram = {durationSec: 1, loop: false,
+        events: [{timeSec: 0, channel: "test-analog", value: false}]};
+      rejectDigital(() -> { var invalid = new MachineDigitalProgramPlayer(analog, robot); }, "non-digital output channel");
+      robot.blueprint.channels.pop();
+      robot.blueprint.channels.push(new robotkit.execution.ProcessChannelDeclaration("test-held", ProcessEventValue.Digital(false), true));
+      var held:materia.project.SceneArtifact.SceneArtifactDigitalProgram = {durationSec: 1, loop: false,
+        events: [{timeSec: 0, channel: "test-held", value: false}]};
+      rejectDigital(() -> { var invalid = new MachineDigitalProgramPlayer(held, robot); }, "output retained on stop");
+      robot.blueprint.channels.pop();
+      var stock = simulation.environmentObject("contact-sheet");
+      if (stock == null) throw "Press simulation lost its test stock";
+      var peak = 0.0, changed = false;
+      for (_ in 0...100) {
+        simulation.step();
+        var observed = world.snapshot().robots()[0];
+        peak = Math.max(peak, observed.positions.get(ram));
+        if (pressSignal(observed, "ram-speed-change") == 1) changed = true;
+      }
+      var resting = world.snapshot().robots()[0];
+      check(resting.positions.get(left) < -0.006 && resting.positions.get(right) < -0.006 &&
+        pressSignal(resting, "fingerLeft-contact") == 0 && pressSignal(resting, "fingerRight-contact") == 0,
+        "both CAD gauge fingers drop under gravity and open their measured switches");
+      for (advance in 0...20) {
+        var measured = world.snapshot().robots()[0];
+        // Place stock against the measured carrier; the passive finger's angle is never prescribed.
+        var tip = gaugeFace + measured.positions.get(gaugeX) - 0.002 + 0.002 * (advance + 1) / 20;
+        simulation.stop();
+        stock.teleport(new nativekit.sim.SimPose(0, tip - 0.050, stockHeight + measured.positions.get(gaugeR) + 0.00075));
+        for (_ in 0...2) {
+          simulation.step();
+          var observed = world.snapshot().robots()[0];
+          peak = Math.max(peak, observed.positions.get(ram));
+          if (pressSignal(observed, "ram-speed-change") == 1) changed = true;
+        }
+      }
+      for (_ in 0...100) {
+        var measured = world.snapshot().robots()[0];
+        simulation.stop();
+        stock.teleport(new nativekit.sim.SimPose(0, gaugeFace + measured.positions.get(gaugeX) - 0.050,
+          stockHeight + measured.positions.get(gaugeR) + 0.00075));
+        simulation.step();
+      }
+      check(player.failure == null, 'press program remains healthy while stock settles: ${player.failure}');
+      var touching = world.snapshot().robots()[0];
+      var leftContact = pressSignal(touching, "fingerLeft-contact"), rightContact = pressSignal(touching, "fingerRight-contact");
+      var contactDatum = initial.worldConnector("fingerLeft", "contact");
+      check(touching.positions.get(left) > -0.001 && touching.positions.get(right) > -0.001 &&
+        leftContact == 1 && rightContact == 1,
+        'stock contact closes both measured CAD finger switches: q=${touching.positions.get(left)}, ${touching.positions.get(right)}; signals=$leftContact, $rightContact; X=${touching.positions.get(gaugeX)} R=${touching.positions.get(gaugeR)}; initial contact=${contactDatum.x}, ${contactDatum.y}, ${contactDatum.z}');
+      simulation.stop();
+      stock.teleport(new nativekit.sim.SimPose(0, -1, stockHeight + 0.00075));
+      for (_ in 0...100) simulation.step();
+      var released = world.snapshot().robots()[0];
+      check(released.positions.get(left) < -0.006 && released.positions.get(right) < -0.006 &&
+        pressSignal(released, "fingerLeft-contact") == 0 && pressSignal(released, "fingerRight-contact") == 0,
+        "removing stock lets both CAD contact fingers reset by gravity");
+      check(simulation.reset(), "press resets after independent stock contact checks");
+      peak = 0; changed = false;
+      var ticks = 0;
+      while (player.passes == 0 && player.failure == null && ticks++ < 1000) {
+        simulation.step();
+        var observed = world.snapshot().robots()[0];
+        peak = Math.max(peak, observed.positions.get(ram));
+        if (pressSignal(observed, "ram-speed-change") == 1) changed = true;
+        check(Math.abs(observed.positions.get(ram) - observed.positions.get(follower)) < 0.0005,
+          "both hydraulic ram guides remain coupled");
+        check(pressSignal(observed, "ram-bottom") == 0, "empty tooling stroke stays away from nominal mechanical bottom");
+      }
+      check(player.failure == null && player.passes == 1, 'press completes its native timed valve plan: ${player.failure}');
+      check(peak > 0 && peak < toolGap && changed, 'press crosses its speed-change switch with installed tooling still clear: peak=$peak gap=$toolGap');
+      var returned = world.snapshot().robots()[0];
+      check(Math.abs(returned.positions.get(ram)) < 0.0002 && pressSignal(returned, "ram-top") == 1,
+        "ram returns to its measured top switch");
+      check(simulation.reset() && player.passes == 0, "press reset clears its timed program completion");
+      for (_ in 0...25) simulation.step();
+      check(player.failure == null && world.snapshot().robots()[0].trajectoryActive,
+        "press timed valve program restarts after reset");
+      robot.robot.stop(robotkit.core.StopMode.Emergency);
+      simulation.step(); simulation.step();
+      check(player.failure != null, "press timed program reports native emergency-stop failure");
+      check(simulation.reset() && player.failure == null, "press reset clears its native fault diagnosis");
+      Sys.println('press brake simulation: contacts, hydraulic stroke, home and lifecycle passed (peak=$peak m)');
+      simulation.dispose(); session.dispose(); generated.objects.pop();
+    } catch (error:Dynamic) {
+      simulation.dispose(); session.dispose(); generated.objects.pop(); throw error;
+    }
+  }
+
+  static function rejectDigital(action:Void->Void, label:String):Void {
+    var refused = false;
+    try action() catch (_:Dynamic) refused = true;
+    check(refused, 'Machine digital program rejects $label');
+  }
+
+  static function pressSignal(snapshot:robotkit.core.RobotSnapshot, id:String):Float {
+    if (snapshot.faultCode != 0 || snapshot.safety != RobotKitRuntimeConstants.RK_SAFETY_READY)
+      throw 'Press runtime failed while observing "$id": fault ${snapshot.faultCode}, safety ${snapshot.safety}';
+    for (index in 0...snapshot.sensors.length) {
+      var sensor = snapshot.sensors.get(index);
+      if (sensor.sensorId == id) return sensor.values.get(0);
+    }
+    var observed = [for (index in 0...snapshot.sensors.length) snapshot.sensors.get(index).sensorId];
+    throw 'Press simulation lost measured switch "$id"; observed ${observed.join(", ")}; fault ${snapshot.faultCode}, safety ${snapshot.safety}, positions ${snapshot.positions.toArray()}';
+  }
+
   public static function main():Int {
     var code = checks();
     // No worker may still be planning when the process exits: the native library's destructors would run under it.
@@ -4876,6 +5070,18 @@ class ProjectSourceTests {
       root = parent;
     }
     Sys.setCwd(root);
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "sheet-press") {
+      PressBrakeSimulationChecks.run(root, true);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "press-controller") {
+      checkPressController(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "press-brake") {
+      checkPressBrake(root);
+      return 0;
+    }
     // PROJECT_SOURCE_ONLY=mobile, =arm or =welder runs just those example's checks, for iterating on them.
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-registration-boundary") {
       MobileWelderTests.runRegistration(root, true);
@@ -4942,6 +5148,10 @@ class ProjectSourceTests {
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "track-arm") {
       checkTrackArm(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "overhead-arm") {
+      OverheadArmTests.run(root);
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-welder") {
@@ -5437,6 +5647,9 @@ class ProjectSourceTests {
     }
     session.dispose();
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
+    checkPressBrake(root);
+    checkPressController(root);
+    PressBrakeSimulationChecks.run(root, true);
     checkRobotArm(root);
     checkParallelGripperMission(root);
     checkCobotArms(root);
@@ -5444,6 +5657,7 @@ class ProjectSourceTests {
     checkGantryPicker(root, true);
     checkGantryWelder(root);
     checkTrackArm(root);
+    OverheadArmTests.run(root);
     checkJointSceneClearance(root);
     checkHeldJointSceneClearance(root);
     checkRobotWelder(root);

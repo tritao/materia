@@ -179,6 +179,130 @@ void presence_uses_loose_object_shapes() {
     }
 }
 
+void fixed_connections_use_reference_frames_and_session_ownership() {
+    Space space;
+    nksim_object_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    desc.mass = 0.2;
+    desc.shape.type = NKSIM_SHAPE_BOX;
+    for (double &extent : desc.shape.parameters) extent = 0.05;
+    desc.pose = pose_at(0, 0, 5);
+    nksim_object parent = 0, child = 0;
+    assert(nksim_session_create_object(space.session, &desc, &parent) == NKSIM_OK);
+    desc.pose = pose_at(0.4, 0, 5);
+    assert(nksim_session_create_object(space.session, &desc, &child) == NKSIM_OK);
+    auto moved = pose_at(1, 2, 5);
+    moved.rotation[2] = moved.rotation[3] = std::sqrt(0.5);
+    assert(nksim_session_teleport_object(space.session, parent, &moved) == NKSIM_OK);
+    nksim_joint joint = 0, invalid = 99;
+    assert(nksim_session_create_fixed_joint(space.session, parent, child, &joint) == NKSIM_OK);
+    assert(nksim_session_create_fixed_joint(space.session, child, parent, &invalid) == NKSIM_ERROR_INVALID_STATE);
+    assert(invalid == 0);
+    nksim_body parent_body = 0, child_body = 0;
+    assert(nksim_session_get_object_body(space.session, parent, &parent_body) == NKSIM_OK);
+    assert(nksim_session_get_object_body(space.session, child, &child_body) == NKSIM_OK);
+    const auto offset = pose_at(0, 0, 0);
+    assert(nksim_session_hold_object(space.session, child, parent_body, &offset) == NKSIM_ERROR_INVALID_STATE);
+    assert(nksim_session_hold_object(space.session, parent, child_body, &offset) == NKSIM_ERROR_INVALID_STATE);
+    assert(nksim_session_destroy_object(space.session, child) == NKSIM_ERROR_INVALID_STATE);
+    assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+    nksim_frame frame = 0;
+    assert(nksim_session_capture(space.session, &frame) == NKSIM_OK);
+    nksim_pose a{}, b{};
+    a.struct_size = b.struct_size = sizeof(a);
+    assert(nksim_frame_get_object_pose(frame, parent, &a) == NKSIM_OK);
+    assert(nksim_frame_get_object_pose(frame, child, &b) == NKSIM_OK);
+    assert(near(b.position[0] - a.position[0], 0));
+    assert(near(b.position[1] - a.position[1], 0.4));
+    assert(near(b.position[2] - a.position[2], 0));
+    assert(near(std::abs(b.rotation[2]), std::sqrt(0.5)));
+    nksim_frame_destroy(frame);
+    assert(nksim_session_destroy_fixed_joint(space.session, joint) == NKSIM_ERROR_INVALID_STATE);
+    assert(nksim_session_stop(space.session) == NKSIM_OK);
+    assert(nksim_session_reset(space.session) == NKSIM_OK);
+    assert(nksim_session_capture(space.session, &frame) == NKSIM_OK);
+    assert(nksim_frame_get_object_pose(frame, parent, &a) == NKSIM_OK);
+    assert(nksim_frame_get_object_pose(frame, child, &b) == NKSIM_OK);
+    assert(near(a.position[0], 1) && near(a.position[1], 2) && near(a.position[2], 5));
+    assert(near(b.position[0], 1) && near(b.position[1], 2.4) && near(b.position[2], 5));
+    nksim_frame_destroy(frame);
+    assert(nksim_session_destroy_fixed_joint(space.session, joint) == NKSIM_OK);
+    assert(nksim_session_hold_object(space.session, parent, child_body, &offset) == NKSIM_OK);
+    assert(nksim_session_create_fixed_joint(space.session, parent, child, &invalid) == NKSIM_ERROR_INVALID_STATE);
+    assert(nksim_session_release_object(space.session, parent) == NKSIM_OK);
+    assert(nksim_session_destroy_object(space.session, child) == NKSIM_OK);
+    // A session tears its remaining joints down before their body resources.
+    desc.pose = pose_at(0.4, 0, 5);
+    assert(nksim_session_create_object(space.session, &desc, &child) == NKSIM_OK);
+    assert(nksim_session_create_fixed_joint(space.session, parent, child, &joint) == NKSIM_OK);
+    desc.motion_type = NKSIM_MOTION_STATIC;
+    desc.pose = pose_at(0, 0, 5);
+    nksim_object carrier = 0;
+    nksim_body carrier_body = 0;
+    assert(nksim_session_create_object(space.session, &desc, &carrier) == NKSIM_OK);
+    assert(nksim_session_get_object_body(space.session, carrier, &carrier_body) == NKSIM_OK);
+    auto carried_offset = pose_at(1, 2, 0);
+    carried_offset.rotation[2] = carried_offset.rotation[3] = std::sqrt(0.5);
+    assert(nksim_session_hold_object(space.session, parent, carrier_body, &carried_offset) == NKSIM_OK);
+    assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+    assert(nksim_session_capture(space.session, &frame) == NKSIM_OK);
+    assert(nksim_frame_get_object_pose(frame, child, &b) == NKSIM_OK);
+    assert(near(b.position[0], 1) && near(b.position[1], 2.4) && near(b.position[2], 5));
+    nksim_frame_destroy(frame);
+}
+
+void compound_objects_preserve_empty_gaps() {
+    Space space;
+    std::vector<double> vertices;
+    // Two separated bars share one body, with a genuinely empty central gap.
+    for (const double centre : {-0.3, 0.3})
+        for (const double x : {-0.1, 0.1})
+            for (const double y : {-0.2, 0.2})
+                for (const double z : {-0.05, 0.05}) {
+                    vertices.push_back(centre + x);
+                    vertices.push_back(y);
+                    vertices.push_back(z);
+                }
+    const uint32_t counts[] = {24, 24};
+    nksim_object_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    desc.mass = 0.8;
+    desc.shape.type = NKSIM_SHAPE_COMPOUND;
+    desc.pose = pose_at(0, 0, 2);
+    nksim_object object = 0;
+    assert(nksim_session_create_compound_convex_object(space.session, &desc,
+        vertices.data(), vertices.size(), counts, 2, &object) == NKSIM_OK);
+    uint32_t overlap = 1;
+    auto query = pose_at(0, 0, 2);
+    assert(nksim_session_object_overlaps_volume(space.session, object, &query, 0.02, 0.02, 0.02, &overlap) == NKSIM_OK);
+    assert(overlap == 0);
+    query = pose_at(0.3, 0, 2);
+    assert(nksim_session_object_overlaps_volume(space.session, object, &query, 0.02, 0.02, 0.02, &overlap) == NKSIM_OK);
+    assert(overlap == 1);
+    nksim_ray ray{};
+    ray.struct_size = sizeof(ray);
+    ray.origin[2] = 3;
+    ray.direction[2] = -1;
+    ray.max_distance = 3;
+    double hit = 0;
+    assert(nksim_session_raycast(space.session, &ray, &hit) == NKSIM_OK);
+    assert(near(hit, 3));
+    ray.origin[0] = 0.3;
+    assert(nksim_session_raycast(space.session, &ray, &hit) == NKSIM_OK);
+    assert(near(hit, 0.95));
+    nksim_object invalid = 99;
+    assert(nksim_session_create_compound_convex_object(space.session, &desc,
+        vertices.data(), vertices.size() - 1, counts, 2, &invalid) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(invalid == 0);
+    assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+    assert(nksim_session_stop(space.session) == NKSIM_OK);
+    assert(nksim_session_destroy_object(space.session, object) == NKSIM_OK);
+    assert(nksim_session_raycast(space.session, &ray, &hit) == NKSIM_OK);
+    assert(near(hit, 3));
+}
+
 void convex_objects_keep_their_actual_volume() {
     Space space;
     nksim_object_desc desc{};
@@ -400,6 +524,51 @@ void owner_paced_ticks() {
     assert(nksim_session_stop(space.session) == NKSIM_OK);
 }
 
+void owned_carriers_use_current_targets_in_dependency_order() {
+    Space space;
+    nksim_object_desc desc{};
+    desc.struct_size = sizeof(desc); desc.motion_type = NKSIM_MOTION_DYNAMIC; desc.mass = 1;
+    desc.shape.type = NKSIM_SHAPE_BOX;
+    desc.shape.parameters[0] = desc.shape.parameters[1] = desc.shape.parameters[2] = 0.05;
+    desc.pose = pose_at(0, 0, 3);
+    nksim_object leaf = 0, parent = 0, carrier = 0;
+    assert(nksim_session_create_object(space.session, &desc, &leaf) == NKSIM_OK);
+    desc.pose = pose_at(1, 0, 3);
+    assert(nksim_session_create_object(space.session, &desc, &parent) == NKSIM_OK);
+    desc.motion_type = NKSIM_MOTION_KINEMATIC; desc.pose = pose_at(0, 0, 3);
+    assert(nksim_session_create_object(space.session, &desc, &carrier) == NKSIM_OK);
+    nksim_body parent_body = 0, carrier_body = 0, leaf_body = 0;
+    assert(nksim_session_get_object_body(space.session, parent, &parent_body) == NKSIM_OK);
+    assert(nksim_session_get_object_body(space.session, carrier, &carrier_body) == NKSIM_OK);
+    assert(nksim_session_get_object_body(space.session, leaf, &leaf_body) == NKSIM_OK);
+    const auto parent_offset = pose_at(0.2, 0, 0), leaf_offset = pose_at(0.4, 0, 0);
+    assert(nksim_session_hold_object(space.session, parent, carrier_body, &parent_offset) == NKSIM_OK);
+    assert(nksim_session_hold_object(space.session, leaf, parent_body, &leaf_offset) == NKSIM_OK);
+    for (int i = 1; i <= 3; ++i) {
+        const double angle = i * std::acos(-1.0) / 6;
+        auto target = pose_at(1, 2, 3);
+        target.rotation[2] = std::sin(angle / 2); target.rotation[3] = std::cos(angle / 2);
+        assert(nksim_session_drive_object(space.session, carrier, &target) == NKSIM_OK);
+        assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+        auto actual = pose_at(0, 0, 0);
+        assert(nksim_session_get_body_pose(space.session, leaf_body, &actual) == NKSIM_OK);
+        assert(std::abs(actual.position[0] - (1 + 0.6 * std::cos(angle))) < 1e-6);
+        assert(std::abs(actual.position[1] - (2 + 0.6 * std::sin(angle))) < 1e-6);
+        assert(std::abs(actual.position[2] - 3) < 1e-6);
+    }
+    assert(nksim_session_stop(space.session) == NKSIM_OK);
+    assert(nksim_session_release_object(space.session, parent) == NKSIM_OK);
+    nksim_joint fixed = 0;
+    assert(nksim_session_create_fixed_joint(space.session, carrier, parent, &fixed) == NKSIM_OK);
+    const auto target = pose_at(2, 3, 3);
+    assert(nksim_session_drive_object(space.session, carrier, &target) == NKSIM_OK);
+    assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+    auto actual = pose_at(0, 0, 0);
+    assert(nksim_session_get_body_pose(space.session, leaf_body, &actual) == NKSIM_OK);
+    assert(std::abs(actual.position[0] - 3.4) < 1e-6);
+    assert(std::abs(actual.position[1] - 3) < 1e-6);
+}
+
 } // namespace
 
 // Ground planes and cylinders are session objects too: a plane must be static,
@@ -576,7 +745,10 @@ int main() {
     presence_counts_only_free_boxes_in_its_volume();
     presence_uses_loose_object_shapes();
     convex_objects_keep_their_actual_volume();
+    compound_objects_preserve_empty_gaps();
+    fixed_connections_use_reference_frames_and_session_ownership();
     actors_follow_timed_keyframes();
     participants_share_every_tick();
+    owned_carriers_use_current_targets_in_dependency_order();
     return 0;
 }

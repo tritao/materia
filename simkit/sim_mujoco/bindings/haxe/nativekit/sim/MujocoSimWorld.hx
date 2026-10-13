@@ -7,6 +7,9 @@ import nativekit.scene.Scene;
 
 /** Creates the engine-neutral simulation façade with the MuJoCo backend. */
 class MujocoSimWorld {
+    /** Unloaded velocity-mode response rate; force limits and contacts may reduce tracking. */
+    public static function velocityResponseRate():Float
+        return NativeKitSimMujoco.nksim_mujoco_velocity_response_rate();
     final world:SimWorld;
 
     private function new(world:SimWorld) {

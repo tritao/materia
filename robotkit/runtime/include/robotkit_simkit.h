@@ -71,10 +71,12 @@ enum {
     /** size[0]: radius; size[1]: half-length of the straight part, along local Z. */
     RK_LINK_SHAPE_CAPSULE = 3,
     /** size[0]: radius; size[1]: half-length along local Z. */
-    RK_LINK_SHAPE_CYLINDER = 4
+    RK_LINK_SHAPE_CYLINDER = 4,
+    RK_LINK_SHAPE_CONVEX = 5 /**< vertices: XYZ triples, 4..64 points. */
 };
 
-enum { RK_MAX_LINK_SHAPES = 256 };
+// Covers the former 256 primitives plus 512 per-part hulls.
+enum { RK_MAX_LINK_SHAPES = 768 };
 enum { RK_MAX_LINK_HULLS = 512 };
 
 /**
@@ -116,6 +118,8 @@ typedef struct rk_simulation_link_shape {
      * environment object, using this shape's surface.
      */
     uint32_t contact_filter;
+    uint32_t vertex_count;
+    double vertices[64 * 3];
 } rk_simulation_link_shape;
 
 enum { RK_MAX_CONTACT_PAIRS = 128 };
@@ -135,17 +139,31 @@ typedef struct rk_simulation_contact_pair {
     uint32_t reserved0;
 } rk_simulation_contact_pair;
 
-/** A simulation-owned cylinder and valve latch acting on one process joint. */
-typedef struct rk_simulation_pneumatic_drive {
+/** The control law of a process-owned fluid cylinder. */
+enum rk_cylinder_control {
+    RK_CYLINDER_PRESSURE_EFFORT = 0,
+    RK_CYLINDER_FLOW_LIMITED = 1
+};
+
+/** A simulation-owned cylinder and valve acting on one process joint. SI units. */
+typedef struct rk_simulation_cylinder_drive {
     uint32_t joint;
     uint32_t channel_a;
     uint32_t channel_b; /**< UINT32_MAX for a single-coil, spring-return valve. */
     uint32_t normally_to_a;
+    uint32_t control;
+    uint32_t reserved0;
     double extension_force;
     double retraction_force;
     double extend_sign;
     double rated_speed;
-} rk_simulation_pneumatic_drive;
+    double stroke;
+    double approach_speed;
+    double working_speed;
+    double return_speed;
+    double change_point;
+    double retracted_position;
+} rk_simulation_cylinder_drive;
 
 /** Simulation-owned spring-applied friction brake; all values are SI units. */
 typedef struct rk_simulation_brake {
@@ -232,11 +250,7 @@ typedef struct rk_simulation_robot_desc {
     uint32_t virtual_device_profile; /**< 1 full, 2 minimal; zero defaults to full. */
     /** Optional tool collision geoms, expressed in the flange link frame. */
     uint32_t tool_link_index;
-    uint32_t tool_piece_count;
-    uint32_t tool_piece_vertex_count[16];
-    double tool_piece_vertices[16 * 64 * 3];
     double tool_margin;
-    double tool_gap;
     /**
      * Optional primitive collision shapes. A link that has any collides
      * through them together with its hull or box above, if given, and its
@@ -255,8 +269,8 @@ typedef struct rk_simulation_robot_desc {
     uint32_t link_hull_count;
     rk_simulation_link_hull link_hulls[RK_MAX_LINK_HULLS];
     /** Appended v28 tail: physical cylinders are simulation models, not runtime targets. */
-    uint32_t pneumatic_drive_count;
-    rk_simulation_pneumatic_drive pneumatic_drives[RK_MAX_JOINTS];
+    uint32_t cylinder_drive_count;
+    rk_simulation_cylinder_drive cylinder_drives[RK_MAX_JOINTS];
     /** Appended v29 tail: spindle speed is a typed analog process drive. */
     uint32_t velocity_drive_count;
     rk_simulation_velocity_drive velocity_drives[RK_MAX_JOINTS];
@@ -282,6 +296,10 @@ typedef struct rk_simulation_robot_desc {
     /** Appended tail: link index pairs that never collide, used with RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES. */
     uint32_t link_exclude_count;
     uint32_t link_excludes[RK_MAX_LINK_EXCLUDES * 2];
+    /** General tool shapes, in flange coordinates; supersedes convex-only pieces. */
+    uint32_t tool_shape_count;
+    rk_simulation_link_shape tool_shapes[16];
+    double tool_shape_gap[16];
 } rk_simulation_robot_desc;
 
 /** Latest numeric device observation, independent of the authored sensor layout. */

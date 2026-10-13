@@ -1,6 +1,7 @@
 package machinekit.pneumatic;
 
 import cadkit.modeling.Part;
+import machinekit.fluid.PressureSource;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
@@ -23,6 +24,7 @@ class AirSupply extends MachineComponent implements PressureSource {
 		if (port != "air") throw 'Unknown regulated-air outlet "$port"';
 		return pressurePa;
 	}
+	override public function pressureSource():Null<PressureSource> return this;
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.named(Part.box(60, 40, 100), "frl");

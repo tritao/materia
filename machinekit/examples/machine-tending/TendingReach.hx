@@ -1525,7 +1525,7 @@ class TendingReach {
 		var description = environmentDescription(part, true), object = description.objects[0];
 		var vertices = switch object.geometry { case Convex(points): points; case _: throw "Reach source needs a convex hull"; };
 		var pose = description.bodies[object.body].pose;
-		return CollisionSceneBuilder.placed(vertices, Transform3.fromArrays([pose.x, pose.y, pose.z],
+		return robotkit.collision.CollisionClearance.placed(vertices, Transform3.fromArrays([pose.x, pose.y, pose.z],
 			[pose.qx, pose.qy, pose.qz, pose.qw]));
 	}
 
@@ -1584,19 +1584,24 @@ class TendingReach {
 			if (switches.length != 1 || switches[0].joint == null) throw "Gripper sweep lost its typed jaw switch";
 			closed.setJoint(switches[0].joint, travel);
 		}
-		var result = [for (hull in converted.linkHulls) {link: hull.link, part: hull.part, vertices: hull.vertices.copy()}];
+		var result = [for (hull in cadbridge.AssemblySimulationBridge.shapes(converted.model)) {
+      var shape = new robotkit.model.CollisionShape(CollisionGeometry.Convex(hull.shape.convexVertices()));
+      shape.name = hull.shape.name;
+      new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape(hull.link, shape);
+    }];
 		for (hull in result) {
-			var delta = AssemblyFrames.compose(AssemblyFrames.inverse(open.worldPose(hull.part)), closed.worldPose(hull.part));
+			var delta = AssemblyFrames.compose(AssemblyFrames.inverse(open.worldPose(hull.shape.name)), closed.worldPose(hull.shape.name));
 			if (Math.abs(delta.x) + Math.abs(delta.y) + Math.abs(delta.z) < 1e-9) continue;
-			var carrier = converted.partLinks.get(hull.part);
+			var carrier = converted.partLinks.get(hull.shape.name);
 			if (carrier == null) throw "Gripper envelope lost its physical carrier";
 			var metric:AssemblyFrame = {x: delta.x * scene.metresPerUnit, y: delta.y * scene.metresPerUnit,
 				z: delta.z * scene.metresPerUnit, qx: delta.qx, qy: delta.qy, qz: delta.qz, qw: delta.qw};
 			var shift = AssemblyFrames.compose(carrier.offset, AssemblyFrames.compose(metric, AssemblyFrames.inverse(carrier.offset)));
-			var original = hull.vertices.copy();
+			var vertices = switch hull.shape.geometry { case Convex(points): points; case _: throw "Envelope must be convex"; };
+			var original = vertices.copy();
 			for (i in 0...Std.int(original.length / 3)) {
 				var point = AssemblyFrames.transformPoint(shift, original[3 * i], original[3 * i + 1], original[3 * i + 2]);
-				hull.vertices.push(point.x); hull.vertices.push(point.y); hull.vertices.push(point.z);
+				vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
 			}
 		}
 		return result;

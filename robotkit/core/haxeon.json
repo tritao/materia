@@ -13,6 +13,9 @@
     },
     "trajectorykit": {
       "path": "../../trajectorykit"
+    },
+    "collisionkit": {
+      "path": "../../collisionkit"
     }
   },
   "target": "host",

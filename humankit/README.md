@@ -1,10 +1,17 @@
 # HumanKit
 
+The renderer-independent rig types now live in `haxeon.animation.rig` in
+[Haxeon animation](../haxeon/packages/animation/README.md). Character presentation, jobs,
+walking and simulation remain in HumanKit.
+
 HumanKit turns an AnimKit character into a human: a standard skeleton that
 code can address by anatomy, landmarks read from the current pose, and rigid
 props that follow bones. It is pure Haxe above AnimKit and SceneKit.
 
 ```haxe
+import haxeon.animation.AnimationAsset;
+import haxeon.animation.rig.HumanBone;
+
 var worker = AnimationAsset.load("animkit/assets/quaternius/worker.glb");
 var human = new HumanCharacter(scene, worker);        // rig detected from joint names
 human.attach(wrench, HumanBone.HandR, HumanGrip.handle(0.12));
@@ -18,7 +25,7 @@ var head = human.pose.bonePosition(HumanBone.Head);  // model space, metres
 ## Layout
 
 `haxe/humankit/` holds the character, body, walker, job and proxy types that the app and the simulation use. Three groups that stand apart
-have their own subpackage: `rig/` (the skeleton and pose data: `HumanBone`, `HumanoidRig`, `RigMapping`, `HumanPose`, `Mat4`), `action/` (the
+have their own subpackage: `action/` (the
 job actions and the planner: `Pick`, `Place`, `Press`, `Carry`, `Reach`, `WalkTo`, `ApproachFor`, and the rest), `job/` (the job document and what
 builds it into actions: `HumanJob`, `HumanJobSpec`, `HumanJobBuilder` and their result, hold and target types) and `quality/` (`MotionQuality`,
 `Naturalness`). `humankit.sim` is the physics worker and `humankit.facility` the AutomationKit adapters, each in its own folder.

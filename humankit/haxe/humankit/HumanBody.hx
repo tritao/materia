@@ -2,8 +2,8 @@ package humankit;
 
 import humankit.action.Carry;
 import humankit.action.Reach;
-import humankit.rig.HumanBone;
-import humankit.rig.Mat4;
+import haxeon.animation.rig.HumanBone;
+import haxeon.animation.rig.Mat4;
 
 /**
  * Animation and locomotion state shared by every action in a worker's job.

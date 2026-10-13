@@ -25,7 +25,10 @@ cad_shape circle(double x, double y, double z, double radius) {
     ok(cad_wire(refs,1,&wire)); return keep(wire);
 }
 void valid(cad_shape shape) { uint8_t result=0; ok(cad_shape_valid(shape,&result)); check(result==1); }
-void near(double actual,double expected,double tolerance=1e-6) { check(std::abs(actual-expected)<tolerance); }
+void near(double actual,double expected,double tolerance=1e-6) {
+    if (std::abs(actual-expected)>=tolerance) std::fprintf(stderr,"expected %.17g, got %.17g (tolerance %.3g)\n",expected,actual,tolerance);
+    check(std::abs(actual-expected)<tolerance);
+}
 // Ball-mill (radius r, height h) cross-section in the vertical plane through
 // `o` along +x: material from x-r(z) to x+r(z), or from the axis if `half`.
 cad_shape ball_section(cad_vec3 o,double offset,double r,double h,bool half) {
@@ -194,5 +197,39 @@ int main() {
     check(cad_shape_place_operation(box,{0,0,0},{1,0,0},{0,0,1},nullptr)==CAD_ERROR_INVALID_ARGUMENT);
     cad_shape empty=0; ok(cad_compound(nullptr,0,&empty)); keep(empty); valid(empty);
     check(cad_shape_valid(0,nullptr)==CAD_ERROR_INVALID_ARGUMENT);
+    // Developed circular holes remain analytic pcurves on both bend skins.
+    cad_vec3 strip_points[] = {{0,0,0},{4,0,0},{4,20,0},{0,20,0}};
+    cad_shape strip_wire=0; ok(cad_polyline(strip_points,4,1,&strip_wire)); keep(strip_wire);
+    cad_shape_ref strip_holes[]={{circle(2,10,0,0.5)}};
+    cad_shape strip_face=0; ok(cad_planar_face(strip_wire,strip_holes,1,&strip_face)); keep(strip_face);
+    for (double bend_angle : {std::acos(-1.0)/2, -std::acos(-1.0)/2, std::acos(-1.0)/4}) {
+        cad_operation mapped=0;
+        ok(cad_sheet_bend_region_operation(strip_face,1.5,bend_angle,4,1,&mapped));
+        cad_shape bent=0; ok(cad_operation_result_shape(mapped,&bent)); keep(bent); valid(bent);
+        double bent_volume=0; ok(cad_shape_volume_with_tolerance(bent,1e-10,&bent_volume));
+        near(bent_volume,(80-std::acos(-1.0)/4)*1.5*1.75*std::abs(bend_angle)/4,1e-6);
+        uint32_t count=0; ok(cad_operation_history_count(mapped,CAD_HISTORY_GENERATED,&count));
+        check(count==7); // Four rectangle edges, one circle, two radial skins.
+        uint32_t result_faces=0; ok(cad_shape_subshape_count(bent,CAD_SHAPE_FACE,&result_faces));
+        for (uint32_t relation=0; relation<count; ++relation) {
+            cad_shape target=0; ok(cad_operation_history_target_at(mapped,CAD_HISTORY_GENERATED,relation,&target)); keep(target);
+            bool found=false;
+            for (uint32_t index=0; index<result_faces; ++index) {
+                cad_shape candidate=0; ok(cad_shape_subshape_at(bent,CAD_SHAPE_FACE,index,&candidate)); keep(candidate);
+                uint8_t same=0; ok(cad_shape_is_same(target,candidate,&same)); if (same) found=true;
+            }
+            check(found);
+        }
+        cad_operation_destroy(mapped);
+    }
+    cad_shape radial_profile=0; ok(cad_planar_face(strip_wire,nullptr,0,&radial_profile)); keep(radial_profile);
+    for (double bend_angle : {std::acos(-1.0), -std::acos(-1.0)}) {
+        cad_operation radial=0; ok(cad_sheet_bend_region_operation(radial_profile,1.5,bend_angle,4,0,&radial));
+        cad_shape sector=0; ok(cad_operation_result_shape(radial,&sector)); keep(sector); valid(sector);
+        double sector_volume=0; ok(cad_shape_volume_with_tolerance(sector,1e-10,&sector_volume));
+        near(sector_volume,20*std::abs(bend_angle)*1.5*1.5/2,1e-6); cad_operation_destroy(radial);
+    }
+    cad_operation invalid_mapped=99;
+    check(cad_sheet_bend_region_operation(strip_face,1.5,0,4,1,&invalid_mapped)==CAD_ERROR_INVALID_ARGUMENT && invalid_mapped==0);
     for(auto shape:owned) cad_shape_destroy(shape);
 }

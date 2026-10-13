@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <limits>
 
 namespace ck {
 
@@ -55,6 +56,7 @@ void World::set_body_static(uint32_t body, bool fixed) {
 
 void World::set_body_pose(uint32_t body, const double *pose) {
     Body &target = bodies_[body];
+    if (std::equal(pose, pose + 7, target.pose)) return;
     std::copy(pose, pose + 7, target.pose);
     for (uint32_t id : target.objects) this->pose(objects_.at(id));
 }
@@ -106,6 +108,7 @@ bool World::set_heights(uint32_t id, const double *values, uint32_t count) {
     field->updateHeights(heights);
     field->computeLocalAABB();
     object.object->computeAABB();
+    if (!tree_dirty_) moved_.insert(object.object.get());
     return true;
 }
 
@@ -193,6 +196,7 @@ void World::pose(Object &object) {
     else
         object.object->setTransform(transform_of(bodies_[size_t(object.body)].pose) * transform_of(object.offset));
     object.object->computeAABB();
+    if (!tree_dirty_) moved_.insert(object.object.get());
 }
 
 bool World::make_pair(uint32_t a, uint32_t b, Pair &pair) {
@@ -238,6 +242,95 @@ void World::rebuild_pairs() {
         }
     }
     pairs_dirty_ = false;
+    tree_dirty_ = true;
+}
+
+namespace {
+
+bool bounded(const coal::CollisionObject *object) {
+    const auto kind = object->collisionGeometryPtr()->getNodeType();
+    if (kind == coal::GEOM_PLANE || kind == coal::GEOM_HALFSPACE) return false;
+    const auto &box = object->getAABB();
+    return box.min_.allFinite() && box.max_.allFinite();
+}
+
+/** Keeps the search radius fixed: collect every nearby pair, not just the
+ * first or the closest one visited by the tree. The caller restores id order. */
+struct CandidateCallback : coal::DistanceCallBackBase {
+    const std::unordered_map<const coal::CollisionObject *, uint32_t> &ids;
+    const std::map<std::pair<uint32_t,uint32_t>, size_t> &indices;
+    const double radius;
+    std::vector<size_t> &result;
+    CandidateCallback(const decltype(ids) ids, const decltype(indices) indices,
+                      double radius, std::vector<size_t> &result)
+        : ids(ids), indices(indices), radius(radius), result(result) {}
+    bool distance(coal::CollisionObject *a, coal::CollisionObject *b, coal::CoalScalar &distance) override {
+        // Coal prunes with strict <. One ULP includes boundary contact at zero
+        // and at an exact margin, as the pair loop does.
+        distance = std::nextafter(radius, std::numeric_limits<double>::infinity());
+        auto first = ids.at(a), second = ids.at(b);
+        if (first > second) std::swap(first, second);
+        auto pair = indices.find({first, second});
+        if (pair != indices.end() && box_gap(*a, *b) <= radius) result.push_back(pair->second);
+        return false;
+    }
+};
+
+} // namespace
+
+void World::rebuild_tree() {
+    if (!tree_dirty_) return;
+    moving_tree_ = std::make_unique<coal::DynamicAABBTreeCollisionManager>();
+    fixed_tree_ = std::make_unique<coal::DynamicAABBTreeCollisionManager>();
+    object_ids_.clear(); pair_indices_.clear(); unbounded_pairs_.clear();
+    checked_fixed_pairs_ = false;
+    for (auto &entry : objects_) {
+        auto *object = entry.second.object.get();
+        object_ids_.emplace(object, entry.first);
+        if (!bounded(object)) continue;
+        auto &tree = is_static(entry.second.body) ? fixed_tree_ : moving_tree_;
+        tree->registerObject(object);
+    }
+    for (size_t i = 0; i < pairs_.size(); ++i) {
+        const auto &pair = pairs_[i];
+        if (!bounded(pair.first) || !bounded(pair.second)) unbounded_pairs_.push_back(i);
+        else {
+            pair_indices_.emplace(Key(pair.a,pair.b),i);
+            if (is_static(pair.body_a) && is_static(pair.body_b)) checked_fixed_pairs_ = true;
+        }
+    }
+    moving_tree_->setup(); fixed_tree_->setup();
+    moved_.clear(); tree_dirty_ = false;
+}
+
+World::Candidates World::candidates(double radius) {
+    radius = std::max(radius, 0.0);
+    Candidates result(pairs_.size());
+    // Keep the original pair loop without allocation on small scenes and
+    // unbounded searches. Dirty poses remain pending for the next tree query.
+    if (!use_tree() || !std::isfinite(radius)) return result;
+    result.filtered = true;
+    rebuild_tree();
+    if (!moved_.empty()) {
+        std::vector<coal::CollisionObject *> moving, fixed;
+        for (auto *object : moved_) {
+            if (!bounded(object)) continue;
+            const auto id = object_ids_.at(object);
+            (is_static(objects_.at(id).body) ? fixed : moving).push_back(object);
+        }
+        if (!moving.empty()) moving_tree_->update(moving);
+        if (!fixed.empty()) fixed_tree_->update(fixed);
+        moved_.clear();
+    }
+    result.indices = unbounded_pairs_;
+    CandidateCallback callback(object_ids_,pair_indices_,radius,result.indices);
+    moving_tree_->distance(&callback);
+    moving_tree_->distance(fixed_tree_.get(),&callback);
+    // Explicit Check rules may override the ordinary static-static exclusion.
+    if (checked_fixed_pairs_) fixed_tree_->distance(&callback);
+    std::sort(result.indices.begin(),result.indices.end());
+    result.indices.erase(std::unique(result.indices.begin(),result.indices.end()),result.indices.end());
+    return result;
 }
 
 bool World::collides(Pair &pair, double margin, coal::CollisionRequest &request) {
@@ -248,7 +341,14 @@ bool World::collides(Pair &pair, double margin, coal::CollisionRequest &request)
         // numerical (one nanometre), not an engineering clearance or compliance.
         return (*pair.distance)(pair.first->getTransform(), pair.second->getTransform(), distance_request, result) < -1e-9;
     }
-    if (pair.field) {
+    // Coal's convex collision fast path can miss contact made only by its
+    // swept-sphere radius. Its signed-distance query includes that radius.
+    const auto inflated_convex = [](const coal::CollisionObject *object) {
+        const auto *geometry = object->collisionGeometryPtr();
+        return geometry->getNodeType() == coal::GEOM_CONVEX &&
+            static_cast<const coal::ConvexBase *>(geometry)->getSweptSphereRadius() > 0.0;
+    };
+    if (pair.field || inflated_convex(pair.first) || inflated_convex(pair.second)) {
         coal::DistanceRequest distance_request(false, true);
         coal::DistanceResult result;
         return (*pair.distance)(pair.first->getTransform(), pair.second->getTransform(), distance_request, result) <=
@@ -285,7 +385,9 @@ uint32_t World::allow_overlapping(const std::vector<int32_t> &bodies) {
     rebuild_pairs();
     coal::CollisionRequest request(coal::NO_REQUEST, 1);
     std::vector<Key> overlapping;
-    for (Pair &pair : pairs_) {
+    const auto nearby = candidates(0.0);
+    for (size_t i = 0; i < nearby.size(); ++i) {
+        Pair &pair = pairs_[nearby[i]];
         if (pair.body_a == pair.body_b || !within.count(pair.body_a) || !within.count(pair.body_b)) continue;
         const Key ordered(pair.a, pair.b);
         if (object_rules_.count(ordered) || body_rules_.count(body_key(pair.body_a, pair.body_b))) continue;
@@ -302,7 +404,9 @@ bool World::check(double margin, std::vector<PairResult> &out) {
     rebuild_pairs();
     if (unsupported_) return false;
     coal::CollisionRequest request(coal::NO_REQUEST, 1);
-    for (Pair &pair : pairs_) {
+    const auto nearby = candidates(margin);
+    for (size_t i = 0; i < nearby.size(); ++i) {
+        Pair &pair = pairs_[nearby[i]];
         const coal::AABB &a = pair.first->getAABB(), &b = pair.second->getAABB();
         if (margin > 0.0 ? a.distance(b) > margin : !a.overlap(b)) continue;
         if (!collides(pair, margin, request)) continue;
@@ -321,7 +425,9 @@ bool World::distances(double query, std::vector<PairResult> &out) {
     out.clear();
     rebuild_pairs();
     if (unsupported_) return false;
-    for (Pair &pair : pairs_) {
+    const auto nearby = candidates(query);
+    for (size_t i = 0; i < nearby.size(); ++i) {
+        Pair &pair = pairs_[nearby[i]];
         // Boxes never report penetration: a negative query still needs every overlapping pair.
         if (pair.first->getAABB().distance(pair.second->getAABB()) > std::max(query, 0.0)) continue;
         PairResult found;
@@ -360,10 +466,22 @@ bool World::violation(const Margins &margins, const double *inflation, bool &fou
     rebuild_pairs();
     if (unsupported_) return false;
     coal::CollisionRequest request(coal::NO_REQUEST, 1);
-    for (Pair &pair : pairs_) {
+    double radius = 0.0;
+    for (uint32_t g = 0; g < margins.groups; ++g)
+        for (uint32_t h = g; h < margins.groups; ++h) radius = std::max(radius,margins.between(g,h));
+    for (const auto &entry : object_margins_) {
+        double value = margins.contact ? entry.second.contact : entry.second.air;
+        if (value >= 0) radius = std::max(radius, margins.ceiling < 0 ? value : std::min(value, margins.ceiling));
+    }
+    if (inflation) {
+        double most = 0.0;
+        for (size_t i = 0; i < bodies_.size(); ++i) most = std::max(most,inflation[i]);
+        radius += 2*most;
+    }
+    const auto nearby = candidates(radius);
+    for (size_t i = 0; i < nearby.size(); ++i) {
+        Pair &pair = pairs_[nearby[i]];
         double required = required_margin(pair, margins);
-        // These radii bound rigid-body motion. Shapes on the same body have
-        // no relative motion; their geometric inflation is already in the shapes.
         if (inflation && pair.body_a != pair.body_b) {
             if (pair.body_a >= 0) required += inflation[pair.body_a];
             if (pair.body_b >= 0) required += inflation[pair.body_b];
@@ -383,10 +501,24 @@ bool World::closest(const Margins &margins, bool &found, PairResult &out) {
     rebuild_pairs();
     if (unsupported_) return false;
     double best = INFINITY;
-    for (Pair &pair : pairs_) {
+    Candidates indices(pairs_.size());
+    PairResult seed;
+    const bool tree = use_tree() && !pairs_.empty();
+    if (tree) {
+        // The first pair supplies a finite search radius. Every pair that can
+        // beat it is retained, then evaluated in precisely the old id order.
+        measure(pairs_.front(),seed);
+        indices = candidates(seed.distance);
+        if (indices.filtered && (indices.indices.empty() || indices.indices.front() != 0))
+            indices.indices.insert(indices.indices.begin(),0);
+    }
+    for (size_t i = 0; i < indices.size(); ++i) {
+        const size_t index = indices[i];
+        Pair &pair = pairs_[index];
         if (found && box_gap(*pair.first, *pair.second) >= best) continue;
         PairResult candidate;
-        measure(pair, candidate);
+        if (tree && index == 0) candidate = seed;
+        else measure(pair, candidate);
         if (found && !(candidate.distance < best)) continue;
         candidate.required = required_margin(pair, margins);
         out = candidate;

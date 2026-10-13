@@ -75,6 +75,9 @@ typedef struct nksim_object_desc {
     uint32_t collision_mask;
     uint64_t rest_contact_group; /**< Same mounted-contact policy as nksim_body_desc. */
     nksim_surface surface; /**< Contact surface of this environment object's shape. */
+    uint32_t has_inertial_properties;
+    double center_of_mass[3]; /**< Local centre in metres. */
+    double inertia_tensor[9]; /**< Centroidal row-major tensor in kg m². */
 } nksim_object_desc;
 
 /** One kinematic body of an actor. */
@@ -142,9 +145,31 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_create_convex_object(
     nksim_session session, const nksim_object_desc *desc,
     const double *vertices NK_IN_ARRAY(coordinate_count), uint32_t coordinate_count,
     nksim_object *out_object NK_OUT);
+/** Creates one body containing a union of convex hulls in its local frame.
+ * The descriptor selects COMPOUND. Each piece has 4 to 64 vertices; counts
+ * are XYZ coordinate counts, whose sum equals coordinate_count. Inputs are copied.
+ * Separate pieces preserve concavity and holes instead of filling their joint hull. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_create_compound_convex_object(
+    nksim_session session, const nksim_object_desc *desc,
+    const double *vertices NK_IN_ARRAY(coordinate_count), uint32_t coordinate_count,
+    const uint32_t *piece_counts NK_IN_ARRAY(piece_count), uint32_t piece_count,
+    nksim_object *out_object NK_OUT);
 /** Removes one environment body while stopped. */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_destroy_object(
     nksim_session session, nksim_object object);
+/** Connects two session objects as a rigid tree while stopped, using their
+ * creation reference poses. The child follows the parent's measured pose;
+ * its current loose pose does not redefine the relative transform.
+ * Remove this session-owned joint before removing either object. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_create_fixed_joint(
+    nksim_session session, nksim_object parent, nksim_object child,
+    nksim_joint *out_joint NK_OUT);
+/** Removes a fixed joint owned by this session while stopped. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_destroy_fixed_joint(
+    nksim_session session, nksim_joint joint);
+/** Reads a body's measured pose from the latest hosted observation, or the stopped world. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_get_body_pose(
+    nksim_session session, nksim_body body, nksim_pose *out_pose NK_INOUT);
 /** Moves an object at rest while stopped; the pose also becomes its reset pose. */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_teleport_object(
     nksim_session session, nksim_object object, const nksim_pose *pose);

@@ -333,6 +333,11 @@ std::uint64_t monotonic_now_ns() {
         std::chrono::steady_clock::now().time_since_epoch()).count());
 }
 
+struct HullPiece {
+    std::vector<double> vertices;
+    std::vector<std::array<double, 4>> planes;
+};
+
 struct Part {
     nkscene_node_id node{};
     nksim_shape shape = 0;
@@ -340,6 +345,9 @@ struct Part {
     nksim_shape_desc shape_desc{};
     std::vector<double> vertices;
     std::vector<std::array<double, 4>> planes;
+    std::vector<HullPiece> pieces;
+    /** Creation reference used by rigid joints; teleport changes reset, not joint rest geometry. */
+    nksim_pose reference{};
     nksim_pose initial{};
     /** The pose most recently written to the node. */
     nksim_pose pose{};
@@ -353,6 +361,20 @@ struct Object {
     nksim_pose offset{};
     Part part;
 };
+
+nksim_result part_volume_overlap(const nksim_pose &pose, const double half_extents[3],
+        const nksim_body_state &state, const Part &part, bool &present) {
+    if (part.shape_desc.type != NKSIM_SHAPE_COMPOUND)
+        return volume_overlap(pose, half_extents, state, part.shape_desc, present, part.vertices);
+    nksim_shape_desc convex{};
+    convex.type = NKSIM_SHAPE_CONVEX;
+    present = false;
+    for (const auto &piece : part.pieces) {
+        const auto result = volume_overlap(pose, half_extents, state, convex, present, piece.vertices);
+        if (result != NKSIM_OK || present) return result;
+    }
+    return NKSIM_OK;
+}
 
 struct Keyframe {
     double time = 0.0;
@@ -486,9 +508,21 @@ public:
         step_index_ = 0;
         simulation_time_ = 0.0;
         pace_ns_ = 0;
-        for (auto &[id, object] : objects_)
-            if ((result = place(object.part, object.part.initial, object.motion_type)) != NKSIM_OK)
+        for (auto &[id, object] : objects_) {
+            bool rigid_child = false;
+            for (const auto &[joint, pair] : fixed_joints_)
+                if (pair.second == id) { rigid_child = true; break; }
+            if (!rigid_child && (result = place(object.part, object.part.initial, object.motion_type)) != NKSIM_OK)
                 return result;
+        }
+        // A rigid child's pose is derived from its root, not independently reset.
+        for (const auto &[joint, pair] : fixed_joints_) {
+            auto &part = objects_.at(pair.second).part;
+            nksim_body_state state{};
+            state.struct_size = sizeof(state);
+            if ((result = nksim_body_get_state(world_, part.body, &state)) != NKSIM_OK) return result;
+            part.pose = part.tick_pose = make_pose(state.position, state.rotation);
+        }
         for (auto &[id, actor] : actors_) {
             actor.keyframes.clear();
             for (auto &part : actor.parts)
@@ -502,17 +536,31 @@ public:
     }
 
     nksim_result create_object(const nksim_object_desc &desc, nksim_object &out,
-                               const double *vertices = nullptr, uint32_t coordinates = 0) {
+                               const double *vertices = nullptr, uint32_t coordinates = 0,
+                               const uint32_t *piece_counts = nullptr, uint32_t piece_count = 0) {
         std::lock_guard lock(mutex);
         if (host_ != 0) return NKSIM_ERROR_INVALID_STATE;
         const bool convex = desc.shape.type == NKSIM_SHAPE_CONVEX;
+        const bool compound = desc.shape.type == NKSIM_SHAPE_COMPOUND;
+        if (compound) {
+            if (!vertices || !piece_counts || piece_count == 0) return NKSIM_ERROR_INVALID_ARGUMENT;
+            uint64_t total = 0;
+            for (uint32_t i = 0; i < piece_count; ++i) {
+                if (piece_counts[i] < 12 || piece_counts[i] > 192 || piece_counts[i] % 3 != 0)
+                    return NKSIM_ERROR_INVALID_ARGUMENT;
+                total += piece_counts[i];
+            }
+            if (total != coordinates) return NKSIM_ERROR_INVALID_ARGUMENT;
+            for (uint32_t i = 0; i < coordinates; ++i)
+                if (!std::isfinite(vertices[i])) return NKSIM_ERROR_INVALID_ARGUMENT;
+        } else if (piece_counts || piece_count) return NKSIM_ERROR_INVALID_ARGUMENT;
         if (convex) {
             if (!vertices || coordinates < 12 || coordinates > 192 || coordinates % 3 != 0)
                 return NKSIM_ERROR_INVALID_ARGUMENT;
             for (uint32_t i = 0; i < coordinates; ++i)
                 if (!std::isfinite(vertices[i])) return NKSIM_ERROR_INVALID_ARGUMENT;
-        } else if (vertices || coordinates) return NKSIM_ERROR_INVALID_ARGUMENT;
-        if (desc.motion_type > NKSIM_MOTION_DYNAMIC || (!convex && !valid_shape(desc.shape)) ||
+        } else if (!compound && (vertices || coordinates)) return NKSIM_ERROR_INVALID_ARGUMENT;
+        if (desc.motion_type > NKSIM_MOTION_DYNAMIC || (!convex && !compound && !valid_shape(desc.shape)) ||
             (desc.shape.type == NKSIM_SHAPE_PLANE && desc.motion_type != NKSIM_MOTION_STATIC) ||
             desc.pose.struct_size < sizeof(desc.pose) || !valid_pose(desc.pose) ||
             (desc.motion_type == NKSIM_MOTION_DYNAMIC &&
@@ -524,12 +572,23 @@ public:
             object.part.planes = geometry::hull_planes(object.part.vertices);
             if (object.part.planes.size() < 4) return NKSIM_ERROR_INVALID_ARGUMENT;
         }
+        if (compound) {
+            uint32_t offset = 0;
+            for (uint32_t i = 0; i < piece_count; ++i) {
+                HullPiece piece;
+                piece.vertices.assign(vertices + offset, vertices + offset + piece_counts[i]);
+                piece.planes = geometry::hull_planes(piece.vertices);
+                if (piece.planes.size() < 4) return NKSIM_ERROR_INVALID_ARGUMENT;
+                object.part.pieces.push_back(std::move(piece));
+                offset += piece_counts[i];
+            }
+        }
         object.motion_type = desc.motion_type;
         const bool default_layers = desc.collision_layer == 0 && desc.collision_mask == 0;
         const auto result = create_part(object.part, desc.shape, desc.pose, desc.motion_type,
             desc.motion_type == NKSIM_MOTION_DYNAMIC ? desc.mass : 0.0,
             default_layers ? 1u : desc.collision_layer, default_layers ? 1u : desc.collision_mask,
-            desc.rest_contact_group, desc.surface.struct_size == 0 ? nullptr : &desc.surface);
+            desc.rest_contact_group, desc.surface.struct_size == 0 ? nullptr : &desc.surface, &desc);
         if (result != NKSIM_OK) return result;
         out = next_object_++;
         objects_.emplace(out, std::move(object));
@@ -541,6 +600,8 @@ public:
         if (host_ != 0) return NKSIM_ERROR_INVALID_STATE;
         const auto found = objects_.find(id);
         if (found == objects_.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        for (const auto &[joint, pair] : fixed_joints_)
+            if (pair.first == id || pair.second == id) return NKSIM_ERROR_INVALID_STATE;
         for (auto &[other_id, object] : objects_)
             if (other_id != id && object.carrier == found->second.part.body) {
                 const auto result = release_object(other_id);
@@ -548,6 +609,44 @@ public:
             }
         destroy_part(found->second.part);
         objects_.erase(found);
+        return NKSIM_OK;
+    }
+
+    nksim_result create_fixed_joint(nksim_object parent, nksim_object child, nksim_joint &out) {
+        std::lock_guard lock(mutex);
+        if (host_ != 0) return NKSIM_ERROR_INVALID_STATE;
+        const auto first = objects_.find(parent), second = objects_.find(child);
+        if (first == objects_.end() || second == objects_.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        if (parent == child || second->second.carrier != 0)
+            return NKSIM_ERROR_INVALID_STATE;
+        for (const auto &[joint, pair] : fixed_joints_)
+            if (pair.second == child) return NKSIM_ERROR_INVALID_STATE;
+        if (object_dependency_cycle(parent, child)) return NKSIM_ERROR_INVALID_STATE;
+        const auto &a = first->second.part.reference, &b = second->second.part.reference;
+        nksim_joint_desc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.type = NKSIM_JOINT_FIXED;
+        desc.body_a = first->second.part.body;
+        desc.body_b = second->second.part.body;
+        desc.rotation_a[3] = 1.0;
+        // Both joint frames coincide with the parent's creation frame.
+        double delta[3];
+        for (int axis = 0; axis < 3; ++axis) delta[axis] = a.position[axis] - b.position[axis];
+        rotate(b.rotation, delta, desc.anchor_b, true);
+        const double inverse_b[4] = {-b.rotation[0], -b.rotation[1], -b.rotation[2], b.rotation[3]};
+        multiply(inverse_b, a.rotation, desc.rotation_b);
+        const auto result = nksim_joint_create(world_, &desc, &out);
+        if (result == NKSIM_OK) fixed_joints_.emplace(out, std::make_pair(parent, child));
+        return result;
+    }
+
+    nksim_result destroy_fixed_joint(nksim_joint joint) {
+        std::lock_guard lock(mutex);
+        if (host_ != 0) return NKSIM_ERROR_INVALID_STATE;
+        const auto found = fixed_joints_.find(joint);
+        if (found == fixed_joints_.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        nksim_joint_destroy(world_, joint);
+        fixed_joints_.erase(found);
         return NKSIM_OK;
     }
 
@@ -588,6 +687,11 @@ public:
         if (offset.struct_size < sizeof(offset) || !valid_pose(offset) || carrier == 0 ||
             carrier == found->second.part.body)
             return NKSIM_ERROR_INVALID_ARGUMENT;
+        for (const auto &[joint, pair] : fixed_joints_)
+            if (pair.second == id) return NKSIM_ERROR_INVALID_STATE;
+        for (const auto &[other_id, other] : objects_)
+            if (other.part.body == carrier && object_dependency_cycle(other_id, id))
+                return NKSIM_ERROR_INVALID_STATE;
         nksim_body_state carrier_state{};
         carrier_state.struct_size = sizeof(carrier_state);
         if (const auto result = body_state(carrier, carrier_state); result != NKSIM_OK)
@@ -751,6 +855,13 @@ public:
             for (int axis = 0; axis < 3; ++axis) delta[axis] = origin[axis] - state.position[axis];
             rotate(state.rotation, delta, local_origin, true);
             rotate(state.rotation, direction, local_direction, true);
+            if (part.shape_desc.type == NKSIM_SHAPE_COMPOUND) {
+                for (const auto &piece : part.pieces)
+                    nearest = std::min(nearest, geometry::ray_hull(piece.planes,
+                        {local_origin[0], local_origin[1], local_origin[2]},
+                        {local_direction[0], local_direction[1], local_direction[2]}, nearest));
+                return NKSIM_OK;
+            }
             const double hit = part.shape_desc.type == NKSIM_SHAPE_CONVEX ?
                 geometry::ray_hull(part.planes, {local_origin[0], local_origin[1], local_origin[2]},
                     {local_direction[0], local_direction[1], local_direction[2]}, nearest) :
@@ -778,7 +889,7 @@ public:
             if (const auto result = body_state(object.part.body, state); result != NKSIM_OK)
                 return result;
             bool present = false;
-            if (const auto result = volume_overlap(pose, half_extents, state, object.part.shape_desc, present, object.part.vertices);
+            if (const auto result = part_volume_overlap(pose, half_extents, state, object.part, present);
                 result != NKSIM_OK) return result;
             if (present) {
                 out = 1;
@@ -805,8 +916,8 @@ public:
         state.struct_size = sizeof(state);
         if (const auto result = body_state(object.part.body, state); result != NKSIM_OK) return result;
         bool overlaps = false;
-        if (const auto result = volume_overlap(pose, half_extents, state, object.part.shape_desc,
-                overlaps, object.part.vertices); result != NKSIM_OK) return result;
+        if (const auto result = part_volume_overlap(pose, half_extents, state, object.part,
+                overlaps); result != NKSIM_OK) return result;
         out = overlaps ? 1u : 0u;
         return NKSIM_OK;
     }
@@ -911,6 +1022,25 @@ public:
     }
 
 private:
+    // Every object has at most one motion owner: a rigid parent or a carrier.
+    bool object_dependency_cycle(nksim_object ancestor, nksim_object child) const {
+        for (std::size_t visited = 0; visited <= objects_.size(); ++visited) {
+            if (ancestor == child) return true;
+            nksim_object parent = 0;
+            for (const auto &[joint, pair] : fixed_joints_)
+                if (pair.second == ancestor) { parent = pair.first; break; }
+            if (parent == 0) {
+                const auto found = objects_.find(ancestor);
+                if (found != objects_.end())
+                    for (const auto &[id, object] : objects_)
+                        if (object.part.body == found->second.carrier) { parent = id; break; }
+            }
+            if (parent == 0) return false;
+            ancestor = parent;
+        }
+        return true;
+    }
+
     nksim_result tick(std::uint64_t owner_time_ns, bool realtime) {
         const auto hosted = ensure_host();
         if (hosted != NKSIM_OK) return hosted;
@@ -1000,35 +1130,79 @@ private:
         return NKSIM_OK;
     }
 
+    static nksim_pose compose_pose(const nksim_pose &parent, const nksim_pose &local) {
+        auto result = parent;
+        double displacement[3]{};
+        rotate(parent.rotation, local.position, displacement);
+        for (int axis = 0; axis < 3; ++axis) result.position[axis] += displacement[axis];
+        multiply(parent.rotation, local.rotation, result.rotation);
+        return result;
+    }
+
+    nksim_result planned_carrier_pose(nksim_body carrier,
+            std::map<nksim_object, nksim_pose> &targets, nksim_pose &out) {
+        for (const auto &[id, object] : objects_)
+            if (object.part.body == carrier) return planned_object_pose(id, targets, out);
+        for (const auto &[id, actor] : actors_)
+            for (const auto &part : actor.parts)
+                if (part.body == carrier) { out = part.pose; return NKSIM_OK; }
+        nksim_body_state state{}; state.struct_size = sizeof(state);
+        const auto result = body_state(carrier, state);
+        if (result == NKSIM_OK) out = make_pose(state.position, state.rotation);
+        return result;
+    }
+
+    // Resolve the acyclic motion-owner graph before submitting any drives. Own
+    // carriers use this tick's target; unrelated dynamic carriers use measured state.
+    nksim_result planned_object_pose(nksim_object id,
+            std::map<nksim_object, nksim_pose> &targets, nksim_pose &out) {
+        const auto cached = targets.find(id);
+        if (cached != targets.end()) { out = cached->second; return NKSIM_OK; }
+        const auto &object = objects_.at(id);
+        if (object.carrier != 0) {
+            nksim_pose carrier{};
+            const auto result = planned_carrier_pose(object.carrier, targets, carrier);
+            if (result != NKSIM_OK) return result;
+            out = compose_pose(carrier, object.offset);
+        } else {
+            nksim_object parent = 0;
+            for (const auto &[joint, pair] : fixed_joints_)
+                if (pair.second == id) { parent = pair.first; break; }
+            if (parent != 0) {
+                nksim_pose parent_pose{};
+                const auto result = planned_object_pose(parent, targets, parent_pose);
+                if (result != NKSIM_OK) return result;
+                const auto &a = objects_.at(parent).part.reference, &b = object.part.reference;
+                nksim_pose local{}; local.struct_size = sizeof(local);
+                double delta[3];
+                for (int axis = 0; axis < 3; ++axis) delta[axis] = b.position[axis] - a.position[axis];
+                rotate(a.rotation, delta, local.position, true);
+                const double inverse[4] = {-a.rotation[0], -a.rotation[1], -a.rotation[2], a.rotation[3]};
+                multiply(inverse, b.rotation, local.rotation);
+                out = compose_pose(parent_pose, local);
+            } else if (object.motion_type == NKSIM_MOTION_DYNAMIC) {
+                nksim_body_state state{}; state.struct_size = sizeof(state);
+                const auto result = body_state(object.part.body, state);
+                if (result != NKSIM_OK) return result;
+                out = make_pose(state.position, state.rotation);
+            } else out = object.part.pose;
+        }
+        targets.emplace(id, out);
+        return NKSIM_OK;
+    }
+
     nksim_result advance_held_objects() {
+        std::map<nksim_object, nksim_pose> targets;
+        std::vector<Part *> parts;
+        std::vector<nksim_pose> poses;
         for (auto &[id, object] : objects_) {
             if (object.carrier == 0) continue;
-            nksim_pose carrier_pose{};
-            bool actor_part = false;
-            for (const auto &[actor_id, actor] : actors_)
-                for (const auto &part : actor.parts)
-                    if (part.body == object.carrier) {
-                        carrier_pose = part.pose;
-                        actor_part = true;
-                    }
-            if (!actor_part) {
-                nksim_body_state state{};
-                state.struct_size = sizeof(state);
-                const auto result = body_state(object.carrier, state);
-                if (result != NKSIM_OK) return result;
-                carrier_pose = make_pose(state.position, state.rotation);
-            }
-            nksim_pose target = carrier_pose;
-            double displacement[3]{};
-            rotate(carrier_pose.rotation, object.offset.position, displacement);
-            for (int axis = 0; axis < 3; ++axis)
-                target.position[axis] += displacement[axis];
-            multiply(carrier_pose.rotation, object.offset.rotation, target.rotation);
-            Part *part = &object.part;
-            const auto result = drive_parts(&part, &target, 1);
+            nksim_pose target{};
+            const auto result = planned_object_pose(id, targets, target);
             if (result != NKSIM_OK) return result;
+            parts.push_back(&object.part); poses.push_back(target);
         }
-        return NKSIM_OK;
+        return parts.empty() ? NKSIM_OK : drive_parts(parts.data(), poses.data(), parts.size());
     }
 
     // Writes each part's node and drives its kinematic body continuously from
@@ -1066,10 +1240,34 @@ private:
         return result;
     }
 
+    nksim_result create_part_shape(Part &part, const nksim_shape_desc &shape) {
+        if (shape.type == NKSIM_SHAPE_CONVEX)
+            return nksim_shape_create_convex(world_, part.vertices.data(), part.vertices.size(), &part.shape);
+        if (shape.type != NKSIM_SHAPE_COMPOUND)
+            return nksim_shape_create(world_, &shape, &part.shape);
+        std::vector<nksim_shape> children;
+        std::vector<nksim_shape_pose> poses(part.pieces.size());
+        nksim_result result = NKSIM_OK;
+        for (uint32_t i = 0; i < part.pieces.size(); ++i) {
+            nksim_shape child = 0;
+            const auto &vertices = part.pieces[i].vertices;
+            result = nksim_shape_create_convex(world_, vertices.data(), vertices.size(), &child);
+            if (result != NKSIM_OK) break;
+            children.push_back(child);
+            poses[i].rotation[3] = 1.0;
+        }
+        if (result == NKSIM_OK)
+            result = nksim_shape_create_compound(world_, children.data(), poses.data(), children.size(), &part.shape);
+        // The compound copies each child geometry, so temporary handles are never retained.
+        for (const auto child : children) nksim_shape_destroy(world_, child);
+        return result;
+    }
+
     nksim_result create_part(Part &part, const nksim_shape_desc &shape, const nksim_pose &pose,
                              uint32_t motion_type, double mass, uint32_t layer, uint32_t mask,
                              uint64_t rest_contact_group = 0,
-                             const nksim_surface *surface = nullptr) {
+                             const nksim_surface *surface = nullptr,
+                             const nksim_object_desc *inertial = nullptr) {
         part.shape_desc = shape;
         part.initial = part.pose = part.tick_pose = pose;
         nkscene_transaction transaction = 0;
@@ -1086,9 +1284,7 @@ private:
         if (changes != 0) nkscene_change_set_destroy(changes);
         auto shape_desc = shape;
         shape_desc.struct_size = sizeof(shape_desc);
-        auto result = shape.type == NKSIM_SHAPE_CONVEX ?
-            nksim_shape_create_convex(world_, part.vertices.data(), part.vertices.size(), &part.shape) :
-            nksim_shape_create(world_, &shape_desc, &part.shape);
+        auto result = create_part_shape(part, shape_desc);
         if (result != NKSIM_OK) {
             destroy_part(part);
             return result;
@@ -1106,10 +1302,24 @@ private:
         body.collision_layer = layer;
         body.collision_mask = mask;
         body.rest_contact_group = rest_contact_group;
+        if (inertial && inertial->has_inertial_properties) {
+            body.has_inertial_properties = inertial->has_inertial_properties;
+            std::copy_n(inertial->center_of_mass, 3, body.center_of_mass);
+            std::copy_n(inertial->inertia_tensor, 9, body.inertia_tensor);
+        }
         if ((result = nksim_body_create(world_, &body, &part.body)) != NKSIM_OK) {
             destroy_part(part);
             return result;
         }
+        // The scene transform stores floats. Capture the actual native rest frame,
+        // rather than assuming the input doubles survived that boundary unchanged.
+        nksim_body_state reference{};
+        reference.struct_size = sizeof(reference);
+        if ((result = nksim_body_get_state(world_, part.body, &reference)) != NKSIM_OK) {
+            destroy_part(part);
+            return result;
+        }
+        part.reference = make_pose(reference.position, reference.rotation);
         return NKSIM_OK;
     }
 
@@ -1243,6 +1453,8 @@ private:
         std::lock_guard lock(mutex);
         participants_.clear();
         batch_topology([&] {
+            for (const auto &[joint, pair] : fixed_joints_) nksim_joint_destroy(world_, joint);
+            fixed_joints_.clear();
             for (auto &[id, object] : objects_) destroy_part(object.part);
             for (auto &[id, actor] : actors_)
                 for (auto &part : actor.parts) destroy_part(part);
@@ -1269,6 +1481,7 @@ private:
     bool stopping_ = false;
     std::thread worker_;
     std::map<nksim_object, Object> objects_;
+    std::map<nksim_joint, std::pair<nksim_object, nksim_object>> fixed_joints_;
     std::map<nksim_actor, Actor> actors_;
     // Ordered by registration, so every tick visits participants alike.
     std::map<nksim_participant, nksim_participant_desc> participants_;
@@ -1413,9 +1626,32 @@ nksim_result NKSIM_CALL nksim_session_create_convex_object(nksim_session session
     return value->create_object(*desc, *out_object, vertices, coordinate_count);
 }
 
+nksim_result NKSIM_CALL nksim_session_create_compound_convex_object(nksim_session session,
+    const nksim_object_desc *desc, const double *vertices, uint32_t coordinate_count,
+    const uint32_t *piece_counts, uint32_t piece_count, nksim_object *out_object) {
+    if (!desc || !out_object || !nksim::valid_struct_size(desc->struct_size, sizeof(*desc)) ||
+        desc->shape.type != NKSIM_SHAPE_COMPOUND) return NKSIM_ERROR_INVALID_ARGUMENT;
+    *out_object = 0;
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->create_object(*desc, *out_object, vertices, coordinate_count, piece_counts, piece_count);
+}
+
 nksim_result NKSIM_CALL nksim_session_destroy_object(nksim_session session, nksim_object object) {
     NKSIM_SESSION_OR_FAIL(value);
     return value->destroy_object(object);
+}
+
+nksim_result NKSIM_CALL nksim_session_create_fixed_joint(nksim_session session,
+    nksim_object parent, nksim_object child, nksim_joint *out_joint) {
+    if (!out_joint) return NKSIM_ERROR_INVALID_ARGUMENT;
+    *out_joint = 0;
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->create_fixed_joint(parent, child, *out_joint);
+}
+
+nksim_result NKSIM_CALL nksim_session_destroy_fixed_joint(nksim_session session, nksim_joint joint) {
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->destroy_fixed_joint(joint);
 }
 
 nksim_result NKSIM_CALL nksim_session_teleport_object(nksim_session session, nksim_object object,
@@ -1464,6 +1700,18 @@ nksim_result NKSIM_CALL nksim_session_set_object_mass(nksim_session session, nks
                                                        double mass) {
     NKSIM_SESSION_OR_FAIL(value);
     return value->set_object_mass(object, mass);
+}
+
+nksim_result NKSIM_CALL nksim_session_get_body_pose(nksim_session session, nksim_body body,
+                                                    nksim_pose *out_pose) {
+    if (!out_pose || out_pose->struct_size < sizeof(*out_pose)) return NKSIM_ERROR_INVALID_ARGUMENT;
+    NKSIM_SESSION_OR_FAIL(value);
+    nksim_body_state state{}; state.struct_size = sizeof(state);
+    const auto result = value->body_state(body, state);
+    if (result != NKSIM_OK) return result;
+    std::copy_n(state.position, 3, out_pose->position);
+    std::copy_n(state.rotation, 4, out_pose->rotation);
+    return NKSIM_OK;
 }
 
 nksim_result NKSIM_CALL nksim_session_exclude_body_pair(nksim_session session,

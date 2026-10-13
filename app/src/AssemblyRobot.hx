@@ -11,6 +11,8 @@ import materia.project.SceneArtifact.SceneArtifactCellController;
 import materia.project.MaterialLibrary;
 import robotkit.mobile.MobileBase;
 import robotkit.model.CollisionApproximation;
+import robotkit.model.CollisionShape.ContactSurface;
+import robotkit.model.CollisionShape.ShapeContact;
 import robotkit.model.RobotModel;
 import robotkit.model.Transmission;
 import robotkit.runtime.RobotRuntime;
@@ -18,7 +20,7 @@ import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationClosure;
-import robotkit.runtime.Simulation.SimulationLinkHull;
+import robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape;
 import robotkit.execution.ProcessChannelDeclaration;
 import robotkit.execution.ProcessEventValue;
 import robotkit.simulation.SimulatedRobot;
@@ -45,7 +47,7 @@ class AssemblyRobot {
   public final blueprint:RobotRuntimeBlueprint;
   public final parts:Array<AssemblyPart>;
   /** The collision hull of each part that has one, in the frame of the link that carries it (metres), by occurrence id. */
-  public final hulls:Array<cadbridge.AssemblySimulationBridge.AssemblyLinkHull>;
+  public final shapes:Array<RobotRuntimeLinkShape>;
   /** Part pairs that meet as designed interfaces across moving joints. */
   public final jointInterfaces:Array<cadbridge.AssemblySimulationBridge.AssemblyJointInterface>;
   /** Parts whose collision shape could not be made exact, each tagged with its part. */
@@ -63,7 +65,7 @@ class AssemblyRobot {
   public final missionFrames:Map<String, robotkit.model.Frame>;
 
   function new(robot:SimulatedRobot, runtime:RobotRuntime, model:RobotModel, blueprint:RobotRuntimeBlueprint,
-      parts:Array<AssemblyPart>, hulls:Array<cadbridge.AssemblySimulationBridge.AssemblyLinkHull>,
+      parts:Array<AssemblyPart>, shapes:Array<RobotRuntimeLinkShape>,
       jointInterfaces:Array<cadbridge.AssemblySimulationBridge.AssemblyJointInterface>, warnings:Array<String>,
       mobile:Null<MobileBase>, toolFrames:Map<String, robotkit.model.Frame>, missionFrames:Map<String, robotkit.model.Frame>) {
     this.robot = robot;
@@ -71,7 +73,7 @@ class AssemblyRobot {
     this.model = model;
     this.blueprint = blueprint;
     this.parts = parts;
-    this.hulls = hulls;
+    this.shapes = shapes;
     this.jointInterfaces = jointInterfaces;
     this.warnings = warnings;
     this.mobile = mobile;
@@ -198,12 +200,20 @@ class AssemblyRobot {
    * the robot's starting configuration (its joints start at zero, the loaded state). SimKit's own rule
    * (bounding spheres overlapping at rest) would leave out more and check fewer real contacts.
    */
-  static function simulationExcludes(model:RobotModel, hulls:Array<SimulationLinkHull>):Array<Int> {
+  static function simulationExcludes(model:RobotModel, shapes:Array<RobotRuntimeLinkShape>):Array<Int> {
     var description = new collisionkit.CollisionDescription();
     var options = new robotkit.collision.RobotCollision.RobotCollisionOptions("robot");
-    options.hulls = [for (index in 0...hulls.length)
-      new robotkit.collision.RobotCollision.RobotLinkHull(hulls[index].link, 'hull$index', hulls[index].vertices)];
-    var robot = robotkit.collision.RobotCollision.describe(description, model, options);
+    var saved = [for (link in model.links) link.collisionShapes];
+    for (link in model.links) link.collisionShapes = [];
+    for (source in shapes) model.links[source.link].collisionShapes.push(source.shape);
+    var robot:robotkit.collision.RobotCollision.RobotCollisionBodies;
+    try {
+      robot = robotkit.collision.RobotCollision.describe(description, model, options);
+    } catch (error:Dynamic) {
+      for (i in 0...model.links.length) model.links[i].collisionShapes = saved[i];
+      throw error;
+    }
+    for (i in 0...model.links.length) model.links[i].collisionShapes = saved[i];
     var world = new collisionkit.native.NativeCollisionWorld();
     try {
       var build = description.build(world);
@@ -279,7 +289,11 @@ class AssemblyRobot {
           if (joint.id == left || joint.id == right) rolling.set(converted.model.links.indexOf(joint.child), true);
       case _:
     }
-    var linkHulls:Array<SimulationLinkHull> = [];
+    var contacts = new Map<String, materia.project.SceneContactSurface>();
+    var motion = session.machineMotion;
+    if (motion != null && motion.contacts != null)
+      for (contact in motion.contacts) contacts.set(contact.occurrence, contact.surface);
+    var simulationShapes:Array<RobotRuntimeLinkShape> = [];
     // CAD physical-part hulls retain their exact convex geometry. A pneumatic
     // joint's connected links need an explicit contact response: the simulator's
     // generic soft-contact default lets cylinder force push a workpiece through
@@ -320,16 +334,26 @@ class AssemblyRobot {
       var surface = SimulationContactSurfaces.gripperFinger(gripper.fingerPadFrictionCoefficient);
       for (member in gripper.padMembers) fingerPadSurfaces.set(member, surface);
     }
-    for (hull in converted.linkHulls) {
-      var record = sceneParts.get("project:" + hull.part);
+    for (hull in cadbridge.AssemblySimulationBridge.shapes(converted.model)) {
+      var record = sceneParts.get("project:" + hull.shape.name);
       if (record != null && record.collisionEnabled && !rolling.exists(hull.link)) {
-        var simulationHull:SimulationLinkHull = {link: hull.link, vertices: hull.vertices};
-        var padSurface = fingerPadSurfaces.get(hull.part);
-        if (padSurface != null)
-          simulationHull.surface = padSurface;
-        else if (pneumaticContact != null && pneumaticContactLinks.exists(hull.link))
-          simulationHull.surface = pneumaticContact;
-        linkHulls.push(simulationHull);
+        var simulationShape = hull.shape;
+        var surface = contacts.get(hull.shape.name);
+        if (surface != null) {
+          simulationShape.surface = new ContactSurface(surface.friction.copy(), surface.frictionDimensions,
+            surface.contactTimeConstant, surface.contactDampingRatio);
+          simulationShape.contact = switch surface.filter {
+            case Layers: ShapeContact.Layers;
+            case PairsOnly: ShapeContact.PairsOnly;
+            case PairsAndEnvironment: ShapeContact.PairsAndEnvironment;
+          };
+        } else {
+          var padSurface = fingerPadSurfaces.get(hull.shape.name);
+          if (padSurface != null) simulationShape.surface = padSurface;
+          else if (pneumaticContact != null && pneumaticContactLinks.exists(hull.link))
+            simulationShape.surface = pneumaticContact;
+        }
+        simulationShapes.push(hull);
       }
     }
     if (converted.closureIds.length > 0 && !supportsClosures)
@@ -430,7 +454,7 @@ class AssemblyRobot {
       device = new robotkit.runtime.VirtualDeviceOptions();
       device.actuators = binding.virtualActuators();
     }
-    if (machine != null && machine.program != null) converted.model.materializeLimits(true);
+    if (machine != null && (machine.program != null || machine.pressBrake != null)) converted.model.materializeLimits(true);
     if (virtualWelder) {
       // The device's braking bound is the same arm-program policy, rather than an invented motor acceleration.
       for (joint in converted.model.joints) {
@@ -440,6 +464,8 @@ class AssemblyRobot {
       }
     }
     var blueprint = RobotRuntimeCompiler.compile(converted.model, converted.profile, revision);
+    blueprint.linkCollisionShapes.resize(0);
+    for (source in simulationShapes) blueprint.linkCollisionShapes.push(source);
     if (control != null) for (name in control.channels) {
       var found = false;
       for (entry in blueprint.channels) if (entry.id == name) found = true;
@@ -474,8 +500,8 @@ class AssemblyRobot {
     var rotation = origin == null ? [0.0, 0.0, 0.0, 1.0] : [0.0, 0.0, Math.sin(origin.yaw / 2), Math.cos(origin.yaw / 2)];
     // Like a machine whose servos are on, its joints hold their designed pose until something commands
     // them, such as an arm while its base drives.
-    var runtime = candidate.addRobotAtPose(blueprint, position, rotation, device, null, null, closures, null, null, null, null,
-      linkHulls, true, simulationExcludes(converted.model, linkHulls), restContactGroup);
+    var runtime = candidate.addRobotAtPose(blueprint, position, rotation, device, null, closures, null, null, null, null,
+      true, simulationExcludes(converted.model, simulationShapes), restContactGroup);
     var authored:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset>> = session.cncJob != null ? session.cncJob.powerUpOffsets :
       session.mission == null ? null : session.mission.powerUpOffsets;
     var sideOffsets:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>> = session.cncJob != null ? session.cncJob.powerUpSideOffsets :
@@ -522,7 +548,7 @@ class AssemblyRobot {
       parts.push({id: "project:" + occurrence.id, robotIndex: robotIndex, linkIndex: placed.link,
         offset: placed.offset, center: [for (coordinate in center) coordinate * physical.metresPerUnit]});
     }
-    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, converted.linkHulls,
+    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, cadbridge.AssemblySimulationBridge.shapes(converted.model),
       converted.jointInterfaces, warnings, mobile,
       toolFrames, missionFrames);
   }

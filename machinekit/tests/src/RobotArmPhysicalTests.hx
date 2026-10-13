@@ -32,8 +32,8 @@ class RobotArmPhysicalTests {
     collisionOptions.reference = arm.stateOf(home).q;
     var collisionRobot = cadbridge.CadCollision.describeMechanism(collisionDescription, converted, collisionOptions);
     var clearance = new CollisionClearance(arm,
-      new robotkit.collision.CollisionClearanceLayout(collisionDescription, collisionRobot.bodies), home,
-      () -> new NativeCollisionWorld());
+      collisionDescription, home,
+      () -> new NativeCollisionWorld(), collisionRobot.bodies);
     var continuous:Array<Float> = [];
     for(index in 0...6){
       var id=arm.jointIds()[index];

@@ -128,6 +128,13 @@ class AssemblyDefinitionFlattener {
 				channelB: p.channelB == null ? null : prefix + p.channelB,
 				normallyToA: p.normallyToA, extendSign: p.extendSign};
 		}
+		if (actuator.hydraulic != null) {
+			var h = actuator.hydraulic;
+			copy.hydraulic = {bore: h.bore, rod: h.rod, stroke: h.stroke,
+				approachSpeed: h.approachSpeed, workingSpeed: h.workingSpeed, returnSpeed: h.returnSpeed,
+				changePoint: h.changePoint, pressurePa: h.pressurePa,
+				channelA: prefix + h.channelA, channelB: prefix + h.channelB, extendSign: h.extendSign};
+		}
 		if (actuator.processVelocity != null) {
 			var process = actuator.processVelocity;
 			copy.processVelocity = {speedChannel: prefix + process.speedChannel,
@@ -272,6 +279,9 @@ class AssemblyDefinitionFlattener {
 			if (joint.closureTolerance != null) expanded.closureTolerance = joint.closureTolerance;
 			if (joint.driven == true) expanded.driven = true;
 			expanded.includePath = joint.includePath == null || joint.includePath == "" ? prefix : scoped(prefix, joint.includePath);
+			if (joint.passive == true) expanded.passive = true;
+			if (joint.stop != null) expanded.stop = {timeConstantSec: joint.stop.timeConstantSec,
+				dampingRatio: joint.stop.dampingRatio};
 			flat.joints.push(expanded);
 		}
 		if (networks != null) {

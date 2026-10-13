@@ -34,7 +34,7 @@ class PneumaticPartTests {
 					throw '$family bore ${bores[i]} disagrees with reference force table';
 				var recipe = cylinder.componentType();
 				if (recipe == null) throw "Cylinder recipe is missing";
-				var rebuilt = recipe.create(cylinder.values()).pneumaticCylinderSpec();
+				var rebuilt = recipe.create(cylinder.values()).cylinderSpec();
 				if (rebuilt == null) throw "Cylinder recipe did not rebuild its typed pneumatic specification";
 				close(rebuilt.retractForce(600000), cylinder.retractForce(600000), "reconstructed annular force");
 			}
@@ -64,8 +64,8 @@ class PneumaticPartTests {
 		assembly.connectPorts("retractHose", "valve", "B", "cylinder", "B", hose);
 		var upstream = assembly.upstream("cylinder", "A");
 		if (upstream.port.instanceId != "supply" || upstream.port.portName != "air") throw "Cylinder pressure does not trace to supply";
-		close(assembly.airPressure("cylinder", "A"), 600000, "pressure traced through valve");
-		close(assembly.airPressure("cylinder", "B"), 600000, "pressure traced through second hose");
+		close(assembly.fluidPressure("cylinder", "A"), 600000, "pressure traced through valve");
+		close(assembly.fluidPressure("cylinder", "B"), 600000, "pressure traced through second hose");
 		var lines = assembly.billOfMaterials().lines();
 		var quantity = 0.0;
 		for (line in lines) if (line.partNumber == hose.partNumber) quantity += line.quantity;

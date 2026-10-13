@@ -10,8 +10,12 @@ import haxeon.ui.widgets.controls.Button;
 import haxeon.ui.widgets.layout.Column;
 import haxeon.ui.widgets.layout.Row;
 import haxeon.ui.widgets.properties.PropertyInspector;
+import haxeon.ui.widgets.controls.Select;
+import haxeon.ui.widgets.controls.SelectOption;
+import materia.project.MaterialLibrary;
 import app.editor.SheetWorkflowPanel;
 import haxeon.ui.widgets.text.Text;
+import haxeon.ui.widgets.text.TextField;
 
 /** Selected-object inspector dock panel. */
 @:access(app.Main.ReferenceEditorApp)
@@ -81,6 +85,38 @@ class InspectorPanel {
       if (mateJointType != null)
         rows.push(new KeyedView("convert-mates-to-joint", sceneAction("convert-mates-to-joint", "assembly.convert-to-joint",
           "Make " + mateJointType + " joint", IconName.Plus)));
+    }
+    if (scene.canCreateExtrusion() || scene.canCreateSheetFlange()) {
+      var input = scene.sheetAuthoring;
+      var entries:Array<{key:String, label:String, read:Void->String, write:String->Void}> = [];
+      if (scene.canCreateExtrusion()) {
+        var grades = MaterialLibrary.sheetMaterials();
+        for (grade in session.customMaterials) if (grade.sheet != null) grades.push(grade);
+        var options = [for (grade in grades) new SelectOption<String>(grade.id, grade.name, grade.id)];
+        rows.push(new KeyedView("sheet-material-select", new Select<String>("sheet-material-select", options,
+          input.materialId, function(value) { input.materialId = value; input.kFactor = ""; app.commands.refresh(); })));
+        entries.push({key:"material", label:"Sheet material identity", read:function() return input.materialId, write:function(v) input.materialId = v});
+        entries.push({key:"thickness", label:"Thickness (mm)", read:function() return input.thickness, write:function(v) input.thickness = v});
+        entries.push({key:"k", label:"ANSI K factor override (blank uses sheet grade)", read:function() return input.kFactor, write:function(v) input.kFactor = v});
+        entries.push({key:"grain", label:"Rolling direction in sketch (deg)", read:function() return input.grainDegrees, write:function(v) input.grainDegrees = v});
+      } else {
+        entries.push({key:"length", label:"Flange straight length (mm)", read:function() return input.length, write:function(v) input.length = v});
+        entries.push({key:"angle", label:"Signed bend angle (deg)", read:function() return input.angleDegrees, write:function(v) input.angleDegrees = v});
+        entries.push({key:"radius", label:"Inner radius (mm)", read:function() return input.radius, write:function(v) input.radius = v});
+      }
+      for (entry in entries) {
+        var field = new TextField("sheet-authoring-" + entry.key, entry.read(), entry.write);
+        field.label = entry.label;
+        rows.push(new KeyedView("sheet-input-" + entry.key, field));
+      }
+    }
+    if (scene.selectedSheetFeature() != null) {
+      var bendLines:Array<String> = ["Bend · direction · angle (deg) · radius (mm) · allowance (mm) · length (mm)"];
+      for (bend in scene.selectedSheetBends())
+        bendLines.push("B" + bend.id + " · " + (bend.up() ? "up" : "down") + " · " +
+          Std.string(bend.angle * 180 / Math.PI) + " · " + Std.string(bend.innerRadius) + " · " +
+          Std.string(bend.allowance) + " · " + Std.string(bend.length()));
+      rows.push(new KeyedView("sheet-bend-table", textLines("sheet-bend-rows", bendLines)));
     }
     if (scene.hasActiveSketchEdit()) {
       var summary = scene.sketchEditSummary();
@@ -167,6 +203,12 @@ class InspectorPanel {
           sceneAction("create-face-sketch", commandId, "Sketch on face", IconName.Plus)));
         case "scene.create-extrusion": rows.push(new KeyedView("create-extrusion",
           sceneAction("create-extrusion", commandId, "Extrude", IconName.Plus)));
+        case "scene.create-sheet-base": rows.push(new KeyedView("create-sheet-base",
+          sceneAction("create-sheet-base", commandId, "Create sheet base", IconName.Plus)));
+        case "scene.create-sheet-flange": rows.push(new KeyedView("create-sheet-flange",
+          sceneAction("create-sheet-flange", commandId, "Create edge flange", IconName.Plus)));
+        case "scene.export-sheet-dxf", "scene.export-sheet-svg": rows.push(new KeyedView(commandId,
+          sceneAction(commandId, commandId, commandId == "scene.export-sheet-dxf" ? "Export flat DXF" : "Export flat SVG", IconName.Save)));
         case "scene.create-pocket": rows.push(new KeyedView("create-pocket",
           sceneAction("create-pocket", commandId, "Pocket", IconName.Plus)));
         case "scene.create-vertical-fillet": rows.push(new KeyedView("create-vertical-fillet",

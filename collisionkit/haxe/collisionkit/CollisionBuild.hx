@@ -51,7 +51,7 @@ class CollisionBuild {
       var at = delta.compose(new kinematicskit.Transform(old.x, old.y, old.z, old.qx, old.qy, old.qz, old.qw));
       var offset = new CollisionPose(at.x, at.y, at.z, at.qx, at.qy, at.qz, at.qw);
       world.attach(objects[i], bodies[body], offset);
-      description.objects[i] = new DescribedObject(shape.name, body, offset, shape.geometry, shape.inflation, shape.source, shape.member);
+      description.objects[i] = new DescribedObject(shape.name, body, offset, shape.geometry, shape.inflation, shape.source, shape.member, shape.tool);
     }
     var previous = description.bodies[body];
     description.bodies[body] = new DescribedBody(previous.name, previous.group, fixed, target);

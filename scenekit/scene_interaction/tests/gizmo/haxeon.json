@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": { "name": "scenekit-translation-gizmo-tests" },
+  "entry": "TranslationGizmoTests",
+  "sourceRoots": [".", "../../haxe/src"],
+  "scopeSourceRoots": false,
+  "target": "host",
+  "outputDir": "build"
+}

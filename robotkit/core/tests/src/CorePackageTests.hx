@@ -12,6 +12,7 @@ import robotkit.runtime.RobotRuntimeCompiler;
 /** This consumer deliberately depends only on robotkit-core. */
 class CorePackageTests {
   static function main():Void {
+    HydraulicModelTests.run();
     var model = new RobotModel("core-only");
     var base = model.addLink(new Link("base"));
     var tip = model.addLink(new Link("tip"));

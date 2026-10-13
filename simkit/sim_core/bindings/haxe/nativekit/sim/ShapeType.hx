@@ -6,5 +6,6 @@ enum abstract ShapeType(Int) from Int to Int {
     var Capsule = 3;
     var Plane = 4;
     var Convex = 5;
+    var Compound = 6;
     var Cylinder = 7;
 }

@@ -2,7 +2,7 @@ package app.editor;
 
 import nativekit.sim.SimPose;
 import robotkit.model.CollisionShape;
-import robotkit.model.CollisionShape.CollisionPrimitive;
+import collisionkit.CollisionGeometry;
 import robotkit.model.RobotModel;
 
 /** Bounding spheres for a robot model's authored link collision shapes. */
@@ -19,11 +19,7 @@ class RobotLinkBounds {
   }
 
   public static function radius(shape:CollisionShape):Float
-    return switch shape.primitive {
-      case Sphere(value): value;
-      case Capsule(value, half), Cylinder(value, half): value + half;
-      case Box(x, y, z): Math.sqrt(x * x + y * y + z * z);
-    };
+    return collisionkit.CollisionBounds.of(shape.geometry, collisionkit.CollisionPose.identity(), shape.inflation).radius;
 
   /** Applies a link's world rotation to a link-local collision centre. */
   public static function worldCenter(position:Array<Float>, rotation:Array<Float>, offset:Array<Float>):SimPose {

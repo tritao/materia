@@ -117,12 +117,12 @@ int main() {
     blueprint.coupling_count = 1;
     blueprint.couplings[0] = {0, 1, -2.0, 0.1};
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
-    blueprint.process_joint[1] = 1;
+    blueprint.external_joint[1] = 1;
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
-    blueprint.process_joint[0] = 1;
+    blueprint.external_joint[0] = 1;
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
     assert(rk_robot_command_validate_for_blueprint(&command, &blueprint) == RK_ERROR_INVALID_ARGUMENT);
-    blueprint.process_joint[0] = blueprint.process_joint[1] = 0;
+    blueprint.external_joint[0] = blueprint.external_joint[1] = 0;
     command.targets[0].target = 0.2;
     command.targets[1].target = -0.3;
     assert(rk_robot_command_validate_for_blueprint(&command, &blueprint) == RK_OK);
