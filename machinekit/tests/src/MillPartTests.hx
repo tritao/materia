@@ -18,6 +18,11 @@ class MillPartTests {
 		near(nut.rotationFor(-5), 2 * Math.PI, "Ball nut signed travel");
 		near(screw.axialStiffness(), 200000 * Math.PI * 13 * 13 / 1600, "Shaft axial stiffness");
 		near(new BallScrew(200).axialStiffness(), 2 * screw.axialStiffness(), "Shorter shaft stiffness");
+		// The coupling carries it in the linear axis's units, N/m (it once took the N/mm value as N/m: a thousand times soft).
+		var stiffness = relation.stiffness;
+		near(stiffness == null ? 0 : stiffness, screw.axialStiffness() * 1000, "a ball screw coupling's stiffness is in N/m");
+		if (relation.assumptions().filter(a -> a.label.indexOf("ball screw shaft stiffness") >= 0).length != 1)
+			throw "A ball screw's stiffness is stated as the shaft's, not as rigid";
 		var rebuilt:BallScrew = cast screw.componentType().create(screw.values());
 		near(rebuilt.criticalSpeed(Fixed, Simple), screw.criticalSpeed(Fixed, Simple), "Rebuilt support speed");
 		var rebuiltNut:BallNut = cast nut.componentType().create(nut.values());

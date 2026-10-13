@@ -1487,6 +1487,14 @@ findings with their evidence). Fixed, one commit each:
   of the device channel's ratio (`PrintProgramPlayer.extruderOnDevice`). Tests: the Rust heater tests and
   `HeaterDeviceTests` (a reversed extruder faults pushing into a cold hotend and not retracting; RobotKit world 5,515 ->
   5,517 assertions), `checkPrinter` asserts the printer's extruder feeds at -1.
+- **H4. Ball screws were a thousand times too soft (main's, found by concern 4).** `LeadScrew.relation` passed the
+  shaft's axial stiffness, which `axialStiffness()` states in N/mm (66,366 for the bench mill's SFU1605), as the coupling's
+  stiffness, which is N/m for a sliding leader (the printer's belts give 84,238 N/m), and then overwrote its basis with
+  "rigid". This is why making screws springs (8e3372228) broke `mill` and tending-route: a 66 kN/m screw under a 15 to 20 kg
+  table rings at about 9 Hz and deflects m a / K, 0.5 to 2 mm (a vertical Z sags m g / K, 2 to 4 mm); at the real 66 MN/m
+  it is about 300 Hz and micrometres. The relation now carries N/m and the shaft's basis. Test: `MillPartTests`. The
+  mill and tending numbers do not move (screws stay ideal constraints in the simulation until the spring model of RF2;
+  the bench mill's plan checks still flag 56 of 78 plans, so those flags were not the screws).
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

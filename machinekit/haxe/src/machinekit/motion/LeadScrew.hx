@@ -21,13 +21,14 @@ class LeadScrew extends MachineComponent {
 	/** Resolve the coupling from these parts. */
 	public static function relation(screw:LeadScrew, nut:LeadScrewNut, alignment:Float):machinekit.transmission.TransmissionRelation {
 		if (screw.thread.designation != nut.thread.designation) throw new machinekit.transmission.TransmissionDesignError("Lead screw and nut threads differ; update the nut to match the screw");
+		// A coupling's stiffness is in the leader's units, the linear axis's: N/m, where the shaft's is stated in N/mm.
 		var result = new machinekit.transmission.TransmissionRelation(2 * Math.PI * alignment / screw.thread.signedLead(),
-			nut.efficiency(), screw.thread.family == Ball ? screw.axialStiffness() : null, nut.backlash(), nut.drag());
-		if (screw.thread.family == Ball) result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "ball screw shaft stiffness (nut and bearing compliance omitted)");
+			nut.efficiency(), screw.thread.family == Ball ? screw.axialStiffness() * 1000 : null, nut.backlash(), nut.drag());
+		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed,
+			screw.thread.family == Ball ? "ball screw shaft stiffness (nut and bearing compliance omitted)" : "rigid");
 		result.setBasis("efficiency", machinekit.transmission.ValueBasis.Assumed, screw.thread.family == Ball ? "ball screw efficiency" : "nut friction");
 		result.setBasis("backlash", machinekit.transmission.ValueBasis.Assumed, "nut backlash");
 		result.setBasis("drag", machinekit.transmission.ValueBasis.Assumed, "nut drag");
-		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed, "rigid");
 		return result;
 	}
 
