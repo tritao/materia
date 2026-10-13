@@ -614,29 +614,56 @@ class ProjectSourceTests {
         'the cube spans ${cube.low[axis] * 1000}..${cube.high[axis] * 1000} mm on axis $axis, CAD ${wanted[0] * 1000}..${wanted[1] * 1000}');
     }
     check(cube.outside <= 1e-12, 'nothing is laid next to the cube but the skirt: ${cube.outside * 1e9} mm^3');
-    // The hole at mid-height, through its own centre: the part's centre (0.110, 0.110) plus the hole's offset (2, -1) mm.
-    var holeX = 0.112, holeY = 0.109;
+    // The hole: every wall point that the X and the Y rays crossing it meet, over the middle half of the part's height
+    // (a ray's interval ends are exact, so each is a point of the printed wall), fitted with a circle by least squares.
+    // Its centre is the part's centre (0.110, 0.110) plus the hole's offset (2, -1) mm.
+    var holeX = 0.112, holeY = 0.109, holeRadius = 0.003;
     var lattice = laid.stock.lattice;
-    var i = Math.round((holeX - laid.center[0] - lattice.originX) / lattice.spacing);
-    var j = Math.round((holeY - laid.center[1] - lattice.originY) / lattice.spacing);
-    var k = Math.round((tall / 2.0 - laid.center[2] - lattice.originZ) / lattice.spacing);
-    function gapAt(across:Array<stockkit.StockInterval>, offset:Float, centre:Float):Float {
-      var found = 0.0;
+    var holeWall:Array<Array<Float>> = [];
+    function wallOn(across:Array<stockkit.StockInterval>, offset:Float, centre:Float, other:Float, alongX:Bool):Void {
       for (index in 0...across.length - 1) {
         var from = across[index].hi + offset, to = across[index + 1].lo + offset;
-        if (from < centre && to > centre) found = to - from;
+        if (from < centre && to > centre) {
+          holeWall.push(alongX ? [from, other] : [other, from]);
+          holeWall.push(alongX ? [to, other] : [other, to]);
+        }
       }
-      return found;
     }
-    var alongX = gapAt(laid.stock.ray(j, k, stockkit.StockAxis.X), laid.center[0], holeX);
-    var alongY = gapAt(laid.stock.ray(i, k, stockkit.StockAxis.Y), laid.center[1], holeY);
-    check(Math.abs(alongX - 0.006) <= 0.0003, 'the hole measures ${alongX * 1000} mm across along x, CAD 6');
-    check(Math.abs(alongY - 0.006) <= 0.0003, 'the hole measures ${alongY * 1000} mm across along y, CAD 6');
+    var kLow = Math.round((tall / 4.0 - laid.center[2] - lattice.originZ) / lattice.spacing);
+    var kHigh = Math.round((3.0 * tall / 4.0 - laid.center[2] - lattice.originZ) / lattice.spacing);
+    // Only rays that pass through the hole (a ray beyond it could find a gap of the sparse infill instead).
+    var reach = Math.floor(holeRadius / lattice.spacing) - 1;
+    var jCentre = Math.round((holeY - laid.center[1] - lattice.originY) / lattice.spacing);
+    var iCentre = Math.round((holeX - laid.center[0] - lattice.originX) / lattice.spacing);
+    for (k in kLow...kHigh + 1) for (d in -reach...reach + 1) {
+      var y = lattice.originY + (jCentre + d) * lattice.spacing + laid.center[1];
+      var x = lattice.originX + (iCentre + d) * lattice.spacing + laid.center[0];
+      wallOn(laid.stock.ray(jCentre + d, k, stockkit.StockAxis.X), laid.center[0], holeX, y, true);
+      wallOn(laid.stock.ray(iCentre + d, k, stockkit.StockAxis.Y), laid.center[1], holeY, x, false);
+    }
+    // x^2 + y^2 + D x + E y + F = 0 by least squares (Kasa), solved by its normal equations.
+    var m = [for (_ in 0...3) [0.0, 0.0, 0.0, 0.0]];
+    for (point in holeWall) {
+      var u = point[0] - holeX, v = point[1] - holeY, rhs = -(u * u + v * v);
+      var row = [u, v, 1.0];
+      for (a in 0...3) { for (b in 0...3) m[a][b] += row[a] * row[b]; m[a][3] += row[a] * rhs; }
+    }
+    for (pivot in 0...3) for (r in 0...3) if (r != pivot) {
+      var f = m[r][pivot] / m[pivot][pivot];
+      for (c in 0...4) m[r][c] -= f * m[pivot][c];
+    }
+    var dCoef = m[0][3] / m[0][0], eCoef = m[1][3] / m[1][1], fCoef = m[2][3] / m[2][2];
+    var holeDiameter = 2.0 * Math.sqrt(dCoef * dCoef / 4.0 + eCoef * eCoef / 4.0 - fCoef);
+    var holeOffCentre = Math.sqrt(dCoef * dCoef + eCoef * eCoef) / 2.0;
+    check(holeWall.length > 100, 'the hole has a printed holeWall to measure: ${holeWall.length} points');
+    check(Math.abs(holeDiameter - 0.006) <= 0.0003, 'the hole measures ${holeDiameter * 1000} mm across, CAD 6');
+    check(holeOffCentre <= 0.0002, 'the hole is ${holeOffCentre * 1e6} um from where CAD has it');
     Sys.println('printer $project: printed in ${Math.round(ticks * dt * 10) / 10} s (${Math.round((Sys.time() - wall) * 10) / 10} s wall), ' +
       '${Math.round(cube.volume * 1e10) / 10} mm^3 in the cube of ${Math.round(laid.deposited * 1e10) / 10} laid for ${Math.round(fed * 1e10) / 10} fed (CAD ${Math.round(cad * 1e10) / 10}, ' +
       '${Math.round((cube.volume / cad - 1.0) * 1000) / 10} %), spans ' +
       '${Math.round(cube.low[0] * 1e4) / 10}..${Math.round(cube.high[0] * 1e4) / 10} x ${Math.round(cube.low[1] * 1e4) / 10}..${Math.round(cube.high[1] * 1e4) / 10} x ' +
-      '${Math.round(cube.low[2] * 1e4) / 10}..${Math.round(cube.high[2] * 1e4) / 10} mm, hole ${Math.round(alongX * 1e4) / 10} x ${Math.round(alongY * 1e4) / 10} mm, ' +
+      '${Math.round(cube.low[2] * 1e4) / 10}..${Math.round(cube.high[2] * 1e4) / 10} mm (to the um: ${[for (a in 0...3) Math.round(cube.low[a] * 1e6)]}..${[for (a in 0...3) Math.round(cube.high[a] * 1e6)]}), ' +
+      'hole ${Math.round(holeDiameter * 1e6)} um across, ${Math.round(holeOffCentre * 1e6)} um off its CAD centre (${holeWall.length} holeWall points), ' +
       '${laid.beads} beads laid in ${Math.round(player.depositSeconds * 10) / 10} s');
     simulation.dispose();
     session.dispose();

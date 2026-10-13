@@ -974,9 +974,10 @@ print in 62.7 s of wall time (16x real time; it was 1040.6 s in 996 s, 1.04x)**,
 SmallTab 163.2 s in 7.5 s (it was 59 s wall for the print, 102 s in the last full suite), peak memory 2.2 GB. Results: volume 2788.2 mm^3 in the
 cube of 2809.3 laid for 2810 fed, the same to the digit; planned/printed time 1040.6 s -> 1031.1 s (the planner's work of
 items 3 to 11, not this), the short cube 529.7 -> 530.5 s; the bounding box and the hole print one decimal differently
-(box 99.9..120 where it printed 100..120, hole 5.9 x 6 where 6 x 6, 87,811 beads where 88,415): the stock is measured by rays
-0.05 mm apart, and a plan that is a few micrometres different (different stages, different merges within a tenth of a
-step) puts an edge across a ray; every check passes with its margin, and SmallTab's volume, spans and counts are as before
+(box 99.9..120 where it printed 100..120, hole 5.9 x 6 where 6 x 6, 87,811 beads where 88,415): the numbers were printed to
+a tenth of a millimetre, so a measurement near 5.95 or 99.95 mm flips its last digit on a plan a few micrometres different
+(the review corrected an earlier reading of this, that the rays 0.05 mm apart moved the edges: a ray's interval ends are
+exact); every check passes with its margin, and SmallTab's volume, spans and counts are as before
 (5,676 beads for 5,679). SmallTab's worst belt deviation went 232 -> 273 um (y): the coarser grid of item 8 lets the lowered
 plan reach 0.9 of the acceleration limit between TOPP-RA's grid points where it reached 0.82, and the belt's stretch goes with the
 acceleration (273 / 232 = 1.18 against 0.9 / 0.82 = 1.10 and the plans' other changes); it is a recorded finding, 17 of 26 plans flagged as
@@ -1580,6 +1581,13 @@ findings with their evidence). Fixed, one commit each:
   the printer would not have changed the job (AM-D1: nothing typed twice). The printer holds its cartridge and both
   thermistors (`CoreXyPrinter.cartridge`, `hotendThermistor`, `bedThermistor`), attaches them, and the job reads them. The
   parts are the same today, so the heat-up times do not move (hotend 103.6 s, bed 90.5 s).
+- **The hole is measured by a circle through its whole printed wall (concern 8).** The dexel stock already gives exact
+  edges along a ray (an interval's ends), so the measurement was not the problem AM9b took it for; it measured the hole
+  on one chord along x and one along y through the CAD centre, and printed everything to a tenth of a millimetre. The check
+  now collects every wall point the X and Y rays through the hole meet over the middle half of the part's height, fits a
+  circle by least squares, and asserts its diameter (6 mm within 0.3, as before) and its centre (within 0.2 mm of CAD's),
+  and the cube's box and hole print to the micrometre. Short cube: hole 5,956 um across, 52 um off its CAD centre, from
+  8,030 wall points; box 99,994..119,994 x 99,930..120,000 x -5..4,010 um.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
