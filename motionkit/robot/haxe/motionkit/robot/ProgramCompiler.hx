@@ -97,7 +97,10 @@ class ProgramCompiler {
     fill the robot's queue and a device's link; the default of zero leaves a path as it was lowered.
   **/
   public var mergeSegmentsSeconds:Float = 0.0;
-  /** How many plans were built from the lowered path because their merged form broke a limit, and why the last one did. */
+  /**
+    How many plans were built from the lowered path because their merged form broke a limit, and why the last one did. A
+    plan that was not merged (merging off, a joint move) is not a refusal.
+  **/
   public var mergeRefusals:Int = 0;
   public var lastMergeRefusal:String = "";
   /** The position error a merged segment may have, as seconds of motion at the joint's speed limit. */
@@ -783,22 +786,24 @@ class ProgramCompiler {
       if(configurationConstraint!=null)configurationConstraint.checkTrajectory(timedMotion,controllerPeriodSeconds);
       mark("configurationCheck");
       var planLimits = pending.path == null ? limits : limits.withoutJerk();
-      var completedPlan:ExecutionPlan;
-      // A merged path follows what it replaces closely but not exactly: should it break a limit anyway, the path
-      // goes as it was lowered.
-      try {
-        if (merged == null) throw "not merged";
-        completedPlan = ExecutionPlan.create(merged, planLimits, id, pending.startQ, zeros(), zeros(),
-          startTolerances.position, startTolerances.velocity, startTolerances.acceleration, pending.events);
-      } catch (error:Dynamic) {
-        mergeRefusals++;
-        lastMergeRefusal = Std.string(error);
-        if (merged != null) { merged.dispose(); merged = null; }
-        completedPlan = ExecutionPlan.create(timedMotion,
-          planLimits, id, pending.startQ,
-          zeros(), zeros(), startTolerances.position, startTolerances.velocity,
-          startTolerances.acceleration, pending.events);
+      var mergedPlan:Null<ExecutionPlan> = null;
+      // A merged path follows what it replaces closely but not exactly: should it break a limit anyway, it is a
+      // refusal, and the path goes as it was lowered.
+      if (merged != null) {
+        try {
+          mergedPlan = ExecutionPlan.create(merged, planLimits, id, pending.startQ, zeros(), zeros(),
+            startTolerances.position, startTolerances.velocity, startTolerances.acceleration, pending.events);
+        } catch (error:Dynamic) {
+          mergeRefusals++;
+          lastMergeRefusal = Std.string(error);
+          merged.dispose();
+          merged = null;
+        }
       }
+      var completedPlan:ExecutionPlan = mergedPlan != null ? mergedPlan : ExecutionPlan.create(timedMotion,
+        planLimits, id, pending.startQ,
+        zeros(), zeros(), startTolerances.position, startTolerances.velocity,
+        startTolerances.acceleration, pending.events);
       plan=completedPlan;
       mark("executionPlanCreation");
       var taskProof:Null<JointCurveTask> = null;

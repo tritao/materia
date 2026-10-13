@@ -1516,6 +1516,11 @@ findings with their evidence). Fixed, one commit each:
   the spring model (RF2) routes the gantry through it: `SimulationPoseResetTests.compliantServoLoad` builds a carriage on a
   damped belt driven by a servo, and checks the compliant load, the reflected inertia (the pulley's, not the carriage's),
   and a stability interval finite and shorter than the rigid one.
+- **`mergeRefusals` counted plans that were never merged.** The compiler threw "not merged" inside its try whenever a plan
+  had no merged form (every joint move, every filament move, any compiler with merging off), counting a refusal and
+  leaving "not merged" as the reason, so the gate's `mergeRefusals == 0` measured the wrong thing. Only a merged form that
+  `ExecutionPlan.create` refuses is a refusal now. Test: the gate's extruder check (the tab's retractions are joint moves)
+  asserts no refusal.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

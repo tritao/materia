@@ -505,7 +505,11 @@ class PrintingBenchmark {
     }
     check(targets >= 2 && waits == 2, 'the job heats the bed and the hotend and waits for both: $targets targets, $waits waits');
     check(offsets >= 2 && driven >= 3, 'retractions are extruder moves and beads drive the extruder: $offsets moves, $driven driven paths');
+    var refusals = machine.binding.compiler.mergeRefusals;
     var compiled = machine.binding.compiler.compile(motion, machine.start, Int64.ofInt(1));
+    // Retractions are joint moves, which are never merged: not merging them is not a refusal.
+    check(machine.binding.compiler.mergeRefusals == refusals,
+      'the tab keeps every merged plan: ${machine.binding.compiler.mergeRefusals - refusals} refused (${machine.binding.compiler.lastMergeRefusal})');
     var extruder = machine.printer.extruderIndex, taken = 0.0;
     var shortest = 1e9, under = 0, total = 0, seconds = 0.0, plans = 0;
     var all:Array<Float> = [];
