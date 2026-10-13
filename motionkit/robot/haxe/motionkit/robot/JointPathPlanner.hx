@@ -9,6 +9,11 @@ interface JointPathPlanner {
   function withConfiguration(configuration:motionkit.kinematics.SixAxisConfiguration):JointPathPlanner;
   function withSolver(solver:motionkit.kinematics.KinematicsSolver):JointPathPlanner;
   function allowsFreeStart():Bool;
+  /**
+    Whether `plan` writes a path's distance-driven joint (`PosePath.drive`, an extruder) into its samples. A path with a
+    drive must not be planned by one that does not: the joint would silently hold still.
+  **/
+  function appliesDistanceDrive():Bool;
   function retreatTarget():Null<Array<Float>>;
   function checkPathClearance(path:JointPathSamples,tolerance:Float):Bool;
   function checkMotion(trajectory:motionkit.trajectory.Trajectory):Null<robotkit.manipulation.ClearanceViolation>;

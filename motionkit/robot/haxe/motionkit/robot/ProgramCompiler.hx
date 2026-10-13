@@ -1073,6 +1073,8 @@ class ProgramCompiler {
       ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0,
       ?preplannedCurve:JointPathSamples, eventOffset:Float=0.0, eventLast:Bool=true):PendingMotion {
     if (path.length() <= 0.0) throw 'Motion program op $index has zero path length';
+    if (path.drive != null && (jointPathPlanner == null || !jointPathPlanner.appliesDistanceDrive()))
+      throw 'Motion program op $index drives a joint by path distance, which this machine\'s joint path planner does not apply';
     var samples = pathSamples(path);
     var exactMap = solver.affineMap();
     var count = samples.length - 1;

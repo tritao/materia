@@ -1528,6 +1528,11 @@ findings with their evidence). Fixed, one commit each:
   Each shaped joint is now one Cartesian axis of the exact affine map (a joint that moves with several axes, a CoreXY
   motor, is refused: it is shaped through its axes), its bound converted to metres along it, and the axes' bounds combined
   as a root-sum-square. Shaping needs an exact affine machine, and says so. The gate's shaping numbers do not move.
+- **A path's distance drive was dropped silently by any joint path planner but the axis one.** Only
+  `AxisJointPathPlanner` writes the extruder's columns, and `ProgramCompiler.lowerPath` planned a path with a drive
+  through any other planner (an arm printing, listed under Later) with the extruder held still. A planner now declares
+  whether it applies a drive (`JointPathPlanner.appliesDistanceDrive`), and a path with a drive is refused otherwise.
+  Writing the columns after inverse kinematics for any solver goes with the compiler's split (RF5).
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
