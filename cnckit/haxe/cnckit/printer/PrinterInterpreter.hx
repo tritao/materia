@@ -59,6 +59,11 @@ class PrinterInterpreter {
   var layerCounter = 0;
   var activeObject:Null<String> = null;
   var pending:Array<PendingMarker> = [];
+  /**
+    Layer markers placed before their height was known: a command between a layer comment and the layer's first move
+    (Cura's `;LAYER:n` then `M106`) puts the marker where it belongs, and the first move or `;Z:` gives its height.
+  **/
+  var unplaced:Array<{op:Int, index:Int, span:Provenance}> = [];
   var warned:Map<String, Bool> = new Map();
 
   public function new(controller:CncController, start:Point3) {
@@ -131,10 +136,10 @@ class PrinterInterpreter {
         var p = values.get("P"), s = values.get("S");
         var seconds = p != null ? p.value * 0.001 : s != null ? s.value : 0.0;
         if (!(seconds > 0.0)) fail(line, word.column, "G4 needs a positive P (milliseconds) or S (seconds)");
-        flushMarkers(z);
+        placeMarkers();
         ops.push(ToolpathOp.Dwell(seconds, block.span));
       case 10, 11:
-        flushMarkers(z);
+        placeMarkers();
         depositOff(block.span);
         if (number == 10) ops.push(ToolpathOp.FilamentMove(-settings.retractLength, settings.retractSpeed, block.span));
         else ops.push(ToolpathOp.FilamentMove(settings.retractLength + settings.unretractExtraLength,
@@ -159,9 +164,9 @@ class PrinterInterpreter {
   function mCode(number:Int, word:CncWord, values:Map<String, CncWord>, block:CncBlock):Void {
     var line = block.span.line;
     switch number {
-      case 0: flushMarkers(z); ops.push(ToolpathOp.ProgramStop(block.span));
-      case 1: flushMarkers(z); ops.push(ToolpathOp.OptionalStop(block.span));
-      case 2, 30: flushMarkers(z); depositOff(block.span); ops.push(ToolpathOp.End(block.span));
+      case 0: placeMarkers(); ops.push(ToolpathOp.ProgramStop(block.span));
+      case 1: placeMarkers(); ops.push(ToolpathOp.OptionalStop(block.span));
+      case 2, 30: placeMarkers(); depositOff(block.span); ops.push(ToolpathOp.End(block.span));
       case 82: relativeE = false;
       case 83: relativeE = true;
       case 104, 109:
@@ -184,7 +189,7 @@ class PrinterInterpreter {
         var p = values.get("P"), s = values.get("S");
         var duty = number == 107 ? 0.0 : s == null ? 1.0 : s.value / 255.0;
         if (!(duty >= 0.0 && duty <= 1.0)) fail(line, columnOf(s, word.column), "M106 S is 0 to 255");
-        flushMarkers(z);
+        placeMarkers();
         ops.push(ToolpathOp.Fan(fanName(p == null ? 0 : Std.int(p.value)), duty, block.span));
       case 220, 221:
         var s = values.get("S");
@@ -201,7 +206,7 @@ class PrinterInterpreter {
 
   function heat(heater:String, celsius:Float, wait:Bool, block:CncBlock):Void {
     if (!(celsius >= 0.0)) fail(block.span.line, 1, "temperatures cannot be negative");
-    flushMarkers(z);
+    placeMarkers();
     ops.push(ToolpathOp.Heat(heater, celsius, wait, block.span));
   }
 
@@ -364,22 +369,41 @@ class PrinterInterpreter {
     return Other(text);
   }
 
+  /** Places the pending markers at the height the layer has now reached (a move's target, or `;Z:`). */
   function flushMarkers(height:Float):Void {
+    for (layer in unplaced) {
+      // A refused line takes back what it pushed; a marker it took back is pending again in no form.
+      if (layer.op < ops.length) ops[layer.op] = ToolpathOp.Layer(layer.index, layerAt(height), layer.span);
+    }
+    unplaced = [];
     for (marker in pending) switch marker {
-      case PendingLayer(index, span):
-        if (previousLayerZ == null) layerHeight = Math.max(height, 1e-6);
-        else if (height - previousLayerZ > 1e-9) layerHeight = height - previousLayerZ;
-        previousLayerZ = height;
-        ops.push(ToolpathOp.Layer(index, height, span));
-      case PendingFeature(kind, span):
-        ops.push(ToolpathOp.Feature(kind, span));
+      case PendingLayer(index, span): ops.push(ToolpathOp.Layer(index, layerAt(height), span));
+      case PendingFeature(kind, span): ops.push(ToolpathOp.Feature(kind, span));
     }
     pending = [];
   }
 
+  /** Places the pending markers before a command that is not a move, their layer's height still to come. */
+  function placeMarkers():Void {
+    for (marker in pending) switch marker {
+      case PendingLayer(index, span):
+        unplaced.push({op: ops.length, index: index, span: span});
+        ops.push(ToolpathOp.Layer(index, z, span));
+      case PendingFeature(kind, span): ops.push(ToolpathOp.Feature(kind, span));
+    }
+    pending = [];
+  }
+
+  function layerAt(height:Float):Float {
+    if (previousLayerZ == null) layerHeight = Math.max(height, 1e-6);
+    else if (height - previousLayerZ > 1e-9) layerHeight = height - previousLayerZ;
+    previousLayerZ = height;
+    return height;
+  }
+
   function startObject(name:String, span:Provenance):Void {
     if (activeObject == name) return;
-    flushMarkers(z);
+    placeMarkers();
     if (activeObject != null) ops.push(ToolpathOp.PrintObject(activeObject, false, span));
     ops.push(ToolpathOp.PrintObject(name, true, span));
     activeObject = name;
@@ -387,7 +411,7 @@ class PrinterInterpreter {
 
   function endObject(name:String, span:Provenance):Void {
     if (activeObject != name) return;
-    flushMarkers(z);
+    placeMarkers();
     ops.push(ToolpathOp.PrintObject(name, false, span));
     activeObject = null;
   }
@@ -440,7 +464,7 @@ class PrinterInterpreter {
       case "SET_FAN_SPEED":
         var duty = Std.parseFloat(required("SPEED"));
         if (!(duty >= 0.0 && duty <= 1.0)) fail(line, 1, "SPEED is 0 to 1");
-        flushMarkers(z);
+        placeMarkers();
         ops.push(ToolpathOp.Fan(required("FAN"), duty, block.span));
       case "TURN_OFF_HEATERS":
         heat("hotend", 0.0, false, block);

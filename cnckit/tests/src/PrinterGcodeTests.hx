@@ -189,6 +189,23 @@ class PrinterGcodeTests {
     var layerZ = [for (item in layersOf(result.program.ops)) item.z];
     near(layerZ[0], 0.0003, "layer 0 sits where the first move put the nozzle", 1e-12);
     check(layerZ.length == 2, "two layers");
+
+    // Cura sets the fan between ;LAYER: and the layer's first move: the marker stays before the fan command and takes
+    // its height from the move after it, so the layer is 0.3 mm tall, not 0.6 mm measured from the previous layer.
+    var fan = compile("M83\nM104 S200\nM109 S200\nG0 F3600 X10 Y10 Z0.3\n;LAYER:0\nG1 F1800 X20 Y10 E0.37\n" +
+      ";LAYER:1\nM106 S255\nG0 F3600 X10 Y10 Z0.6\nG1 F1800 X20 Y10 E0.37\nM2\n");
+    check(errors(fan).length == 0, "the fan between ;LAYER: and its move: no errors: " + errors(fan));
+    var fanLayers = [for (item in layersOf(fan.program.ops)) Math.round(item.z * 1e7)];
+    check(fanLayers.join(",") == "3000,6000", "the layer after the fan command sits at its first move's Z: " + fanLayers);
+    var order = tags(fan.program.ops);
+    check(order.indexOf("layer 1") >= 0 && order.indexOf("layer 1") < order.indexOf("fan part 255"),
+      "the layer marker precedes its fan command: " + order.join("|"));
+    var heights:Array<Int> = [];
+    for (op in fan.program.ops) switch op {
+      case Deposit(_, _, height, _): heights.push(Math.round(height * 1e7));
+      case _:
+    }
+    check(heights.join(",") == "3000,3000", "both layers' beads are 0.3 mm tall: " + heights);
   }
 
   static function orca():Void {

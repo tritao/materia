@@ -1442,6 +1442,10 @@ findings with their evidence). Fixed, one commit each:
   long diagonal cost the volume of its box even below the limit. `GeometricPath` now files each half-cell piece of a primitive
   by its own box: the entries grow with the path's length, the limit is gone. Test: `PlannerTests.testLongPathQueries` (a
   full-travel three-axis rapid and a 200 mm arc measured like a scan). `PROJECT_SOURCE_ONLY=mill` passes again.
+- **A layer marker before a command that is not a move took the previous layer's height.** Cura writes `;LAYER:n`, then
+  `M106`, then the layer's first move; the fan command placed the marker at the old Z, so the layer's height (the next one's
+  `Deposit` height and width) came out doubled. A marker placed before such a command now takes its height from the next move
+  (or `;Z:`). Test: `PrinterGcodeTests.cura` (CncKit 432 -> 436 assertions).
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
