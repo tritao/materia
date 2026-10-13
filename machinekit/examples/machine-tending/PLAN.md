@@ -1108,7 +1108,7 @@ Done. What was built and decided:
 | MT10 | done; CollisionKit integration closing gate passed | a5c6bb9da, f2e04aff3, 9b5bfb299, 3dd21bd25 |
 | MT11 | done; physical production, recovery and integration gates passed | a65789a38, 81f5563f7, 3dd21bd25 |
 | MT12 | implemented: 287.74 s, 75.1% spindle-on / 74.65% cutting; release depends on MT12b; MT14 hardens acceptance | `e46b42297`, `a1e9ab0dd`, `955e5196e`, `b71c18787`, `f4a2030a6` |
-| MT12b | done: CL9 reconciled, v30 clean break and full repaired/resumed 37-stage gate passed; awaiting landing review | `024ab9242`, `a8afd9f13`, `45c0a5c75`, `17908acce`, closing commit |
+| MT12b | done: CL9 reconciled, v30 clean break and full repaired/resumed 37-stage gate passed; awaiting landing review | `024ab9242`, `a8afd9f13`, `45c0a5c75`, `17908acce`, `6813c938a` |
 | MT13 | planned | |
 | MT14 | planned: cell hardening checklist from review sections B–D | |
 
