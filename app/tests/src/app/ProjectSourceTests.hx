@@ -444,6 +444,12 @@ class ProjectSourceTests {
     check(compiled.couplings.length == model.couplings.length, "the runtime blueprint carries every coupling");
     // The controller's 40 kHz step tick, as the router's.
     var planning = DeviceBinding.planningModel(model, 40000);
+    // The extruder's motor turns backwards as it pushes (one gear mesh): the board's cold-extrusion guard counts its
+    // steps that way, so a cold push faults and a retraction does not.
+    var deviceModel = AssemblySimulationBridge.toRobotModel(definition, physical, session.projectAssemblyState).model;
+    deviceModel.switches.resize(0);
+    var extruder = PrintProgramPlayer.extruderOnDevice(DeviceBinding.bind(deviceModel, robotkit.device.DeviceLayout.forActuators(deviceModel), 40000), "e");
+    check(extruder.feed == -1, 'the extruder motor steps down as it pushes filament: feed ${extruder.feed}');
     var xLimits = planning.coupledLimits("x"), yLimits = planning.coupledLimits("y"), zLimits = planning.coupledLimits("z");
     check(xLimits.requireAcceleration() > yLimits.requireAcceleration() && yLimits.requireAcceleration() > 5,
       'the carriage accelerates harder than the gantry it rides: ${xLimits.requireAcceleration()} against ${yLimits.requireAcceleration()}');

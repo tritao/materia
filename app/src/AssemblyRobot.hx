@@ -463,7 +463,7 @@ class AssemblyRobot {
     }
     var machine = session.machineMotion;
     var device:Null<robotkit.runtime.VirtualDeviceOptions> = null;
-    var extruderChannel = -1;
+    var extruder:Null<robotkit.runtime.VirtualHeaters.HeaterExtruder> = null;
     if (virtualWelder) device = robotkit.runtime.VirtualServoOptions.fromModel(converted.model);
     else if (printJob != null) {
       // The printer's heaters run on the device. Its board has no switch inputs for a CoreXY (a switch joint driven by
@@ -475,8 +475,7 @@ class AssemblyRobot {
       device = new robotkit.runtime.VirtualDeviceOptions();
       device.actuators = binding.virtualActuators();
       device.baud = PrintProgramPlayer.LINK_BAUD;
-      for (channel in binding.channels) if (converted.model.joints[channel.jointIndex].id == printJob.extruder) extruderChannel = channel.channel;
-      if (extruderChannel < 0) throw 'The printer\'s extruder joint "${printJob.extruder}" has no motor on the device';
+      extruder = PrintProgramPlayer.extruderOnDevice(binding, printJob.extruder);
     } else if (machine != null && machine.virtualDevice == true) {
       var binding = robotkit.device.DeviceBinding.bind(converted.model,
         robotkit.device.DeviceLayout.forActuators(converted.model), 40000);
@@ -517,7 +516,7 @@ class AssemblyRobot {
     }
     var heaterSetups:Array<robotkit.runtime.VirtualHeaters.HeaterSetup> = [];
     if (printJob != null && device != null) {
-      heaterSetups = PrintProgramPlayer.heaterSetups(printJob, extruderChannel);
+      heaterSetups = PrintProgramPlayer.heaterSetups(printJob, extruder);
       for (heater in printJob.heaters) blueprint.addTool(new robotkit.tool.HeaterChannels(heater.target, heater.fan));
       robotkit.runtime.VirtualHeaters.configure(device, blueprint, heaterSetups);
     }

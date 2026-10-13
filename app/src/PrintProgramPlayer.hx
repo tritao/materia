@@ -57,14 +57,24 @@ class PrintProgramPlayer extends ToolpathPlayer {
 	/** How far an axis may stand from where a plan ends, metres, before the plan is not complete: about four microsteps. */
 	static inline final POSITION_TOLERANCE = 5e-5;
 
-	/** The virtual heaters a job asks for, with the extruder's motor on device channel `extruderChannel`. */
-	public static function heaterSetups(job:SceneArtifactPrinting, extruderChannel:Int):Array<HeaterSetup> {
+	/**
+		The device actuator that drives the extruder joint `joint`, and which way its steps count as it pushes filament: the
+		motor may turn either way (the printer's turns backwards, through one gear mesh).
+	**/
+	public static function extruderOnDevice(binding:robotkit.device.DeviceBinding, joint:String):robotkit.runtime.VirtualHeaters.HeaterExtruder {
+		for (channel in binding.channels) if (binding.model.joints[channel.jointIndex].id == joint)
+			return robotkit.runtime.VirtualHeaters.HeaterExtruder.onChannel(channel.channel, channel.ratio);
+		throw 'The printer\'s extruder joint "$joint" has no motor on the device';
+	}
+
+	/** The virtual heaters a job asks for, with the extruder's motor on the device as `extruder` says. */
+	public static function heaterSetups(job:SceneArtifactPrinting, extruder:robotkit.runtime.VirtualHeaters.HeaterExtruder):Array<HeaterSetup> {
 		var result:Array<HeaterSetup> = [];
 		for (heater in job.heaters) {
 			var setup = new HeaterSetup(heater.name, heater.sensor, heater.slot, heater.target);
 			setup.fanChannel = heater.fan;
 			if (heater.feedsExtruder) {
-				setup.extruderActuator = extruderChannel;
+				setup.extruder = extruder;
 				setup.minExtrusionTemperature = job.minExtrusionTemperature;
 			}
 			setup.r0Ohm = heater.r0Ohm; setup.t0Celsius = heater.t0Celsius; setup.beta = heater.beta;

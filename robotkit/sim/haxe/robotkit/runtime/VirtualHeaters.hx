@@ -17,8 +17,8 @@ class HeaterSetup {
   /** The analog channel the target (degrees Celsius) is set on, and the fan channel that blows on this heater, if any. */
   public final targetChannel:String;
   public var fanChannel:Null<String> = null;
-  /** The deployment actuator of the extruder this heater feeds (pushing it forward while cold is a fault), or -1. */
-  public var extruderActuator:Int = -1;
+  /** The extruder this heater feeds (pushing filament while cold is a fault), or null. */
+  public var extruder:Null<HeaterExtruder> = null;
   public var r0Ohm:Float = 100000.0;
   public var t0Celsius:Float = 25.0;
   public var beta:Float = 3950.0;
@@ -46,6 +46,25 @@ class HeaterSetup {
 
   public function new(name:String, sensorId:String, sensorSlot:Int, targetChannel:String) {
     this.name = name; this.sensorId = sensorId; this.sensorSlot = sensorSlot; this.targetChannel = targetChannel;
+  }
+}
+
+/** The deployment actuator that drives an extruder, and which way its step count goes when it pushes filament in. */
+class HeaterExtruder {
+  public final actuator:Int;
+  /** +1 when the actuator's steps count up as filament is pushed in, -1 when they count down (a motor geared the other way round). */
+  public final feed:Int;
+
+  public function new(actuator:Int, feed:Int) {
+    if (actuator < 0) throw "An extruder's actuator is a deployment index";
+    if (feed != 1 && feed != -1) throw "An extruder's feed direction is +1 or -1";
+    this.actuator = actuator; this.feed = feed;
+  }
+
+  /** The extruder on a device channel whose actuator is `ratio` times the extruder joint (pushing filament turns the joint forward). */
+  public static function onChannel(channel:Int, ratio:Float):HeaterExtruder {
+    if (!(ratio != 0.0 && Math.isFinite(ratio))) throw "An extruder's channel ratio must be finite and non-zero";
+    return new HeaterExtruder(channel, ratio > 0.0 ? 1 : -1);
   }
 }
 
@@ -92,7 +111,8 @@ class VirtualHeaters {
     for (setup in setups) {
       slots.push(setup.sensorSlot);
       parameters = parameters.concat([setup.sensorSlot, channelIndex(setup.targetChannel),
-        setup.fanChannel == null ? -1 : channelIndex(setup.fanChannel), setup.extruderActuator,
+        setup.fanChannel == null ? -1 : channelIndex(setup.fanChannel),
+        setup.extruder == null ? -1 : setup.extruder.actuator, setup.extruder == null ? 0 : setup.extruder.feed,
         setup.r0Ohm, setup.t0Celsius, setup.beta, setup.pullupOhm, setup.vRef, setup.kp, setup.ki, setup.kd, setup.maxDuty,
         setup.maxTemperature, setup.minExtrusionTemperature, setup.bandCelsius, setup.pidRangeCelsius,
         setup.gainWindowSeconds, setup.gainMinCelsius, setup.hysteresisCelsius, setup.hysteresisWindowSeconds,

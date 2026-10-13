@@ -15,8 +15,17 @@ pub struct Wiring {
     pub target_channel: usize,
     /// An analog channel carrying a fan's duty (0 to 1), which cools this heater when it blows on it.
     pub fan_channel: Option<usize>,
-    /// The actuator of the extruder this heater feeds: pushing it forward while cold is a fault.
-    pub extruder_actuator: Option<usize>,
+    /// The extruder this heater feeds: pushing filament while cold is a fault.
+    pub extruder: Option<ExtruderWiring>,
+}
+
+/// The actuator that drives an extruder, and which way its step count goes when it pushes filament in.
+#[derive(Clone, Copy, Debug)]
+pub struct ExtruderWiring {
+    pub actuator: usize,
+    /// +1 when the step count rises as filament is pushed in, -1 when it falls (a motor geared the other way round,
+    /// as a single gear mesh turns it).
+    pub feed: i8,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -91,6 +100,7 @@ impl VirtualHeater {
     pub fn new(wiring: Wiring, config: HeaterConfig, plant: Plant) -> Option<Self> {
         if wiring.sensor_slot >= 8 || wiring.target_channel >= 32 || !plant.valid() { return None; }
         if wiring.fan_channel.map_or(false, |c| c >= 32 || c == wiring.target_channel) { return None; }
+        if wiring.extruder.map_or(false, |e| e.feed != 1 && e.feed != -1) { return None; }
         let heater = Heater::new(config)?;
         Some(Self { wiring, plant, heater,
             rig: Rig { config, celsius: plant.ambient, attached: true, ambient: plant.ambient, open: false, short: false, duty: 0.0 },
@@ -121,10 +131,11 @@ impl VirtualHeater {
         true
     }
 
-    /// Advances `dt` seconds with the host's `target`, the fan's duty, and the extruder actuator's step count.
+    /// Advances `dt` seconds with the host's `target`, the fan's duty, and the extruder actuator's step count (pushing is
+    /// the direction of the wiring's `feed`).
     pub fn tick(&mut self, dt: f64, target: f32, fan: f32, extruder_steps: Option<i64>) {
-        if let (Some(now), Some(before)) = (extruder_steps, self.extruder_steps) {
-            if now > before { self.extruding = true; }
+        if let (Some(now), Some(before), Some(extruder)) = (extruder_steps, self.extruder_steps, self.wiring.extruder) {
+            if (now - before) * extruder.feed as i64 > 0 { self.extruding = true; }
         }
         self.extruder_steps = extruder_steps;
         self.pending += dt;
@@ -158,12 +169,13 @@ impl VirtualHeaters {
 }
 
 /// Parameters per heater in a peripheral profile's list: wiring, controller, plant.
-pub const PARAMETERS_PER_HEATER: usize = 4 + 17 + 5;
+pub const PARAMETERS_PER_HEATER: usize = 5 + 17 + 5;
 
 /// One heater's entry in the parameter list: the inverse of what `from_parameters` reads.
 pub fn parameters(wiring: Wiring, c: &HeaterConfig, plant: &Plant) -> Vec<f64> {
     let index = |v: Option<usize>| v.map_or(-1.0, |v| v as f64);
-    vec![wiring.sensor_slot as f64, wiring.target_channel as f64, index(wiring.fan_channel), index(wiring.extruder_actuator),
+    vec![wiring.sensor_slot as f64, wiring.target_channel as f64, index(wiring.fan_channel),
+        index(wiring.extruder.map(|e| e.actuator)), wiring.extruder.map_or(0.0, |e| e.feed as f64),
         c.r0_ohm as f64, c.t0_c as f64, c.beta as f64, c.pullup_ohm as f64, c.v_ref as f64, c.kp as f64, c.ki as f64,
         c.kd as f64, c.max_duty as f64, c.max_temperature_c as f64, c.min_extrude_c as f64, c.band_c as f64,
         c.pid_range_c as f64, c.gain_window_s, c.gain_min_c as f64, c.hysteresis_c as f64, c.hysteresis_window_s,
@@ -171,7 +183,8 @@ pub fn parameters(wiring: Wiring, c: &HeaterConfig, plant: &Plant) -> Vec<f64> {
 }
 
 /// Builds the heaters of peripheral profile 2: the heater count, then per heater its sensor slot, target
-/// channel, fan channel (-1 for none), extruder actuator (-1 for none), the controller's `r0, t0, beta, pullup,
+/// channel, fan channel (-1 for none), extruder actuator (-1 for none) and its feed direction (+1 or -1, 0 for none),
+/// the controller's `r0, t0, beta, pullup,
 /// v_ref, kp, ki, kd, max_duty, max_temperature, min_extrude, band, pid_range, gain_window, gain_min, hysteresis,
 /// hysteresis_window`, and the plant's `capacity, power, loss, fan_loss, ambient`.
 pub fn from_parameters(p: &[f64]) -> Option<VirtualHeaters> {
@@ -185,16 +198,20 @@ pub fn from_parameters(p: &[f64]) -> Option<VirtualHeaters> {
             if v == -1.0 { Some(None) } else if v >= 0.0 && v.fract() == 0.0 && v < 64.0 { Some(Some(v as usize)) } else { None }
         };
         if q[0] < 0.0 || q[0].fract() != 0.0 || q[1] < 0.0 || q[1].fract() != 0.0 { return None; }
-        let wiring = Wiring { sensor_slot: q[0] as u8, target_channel: q[1] as usize, fan_channel: index(q[2])?,
-            extruder_actuator: index(q[3])? };
-        let c = &q[4..21];
+        let extruder = match (index(q[3])?, q[4]) {
+            (None, feed) if feed == 0.0 => None,
+            (Some(actuator), feed) if feed == 1.0 || feed == -1.0 => Some(ExtruderWiring { actuator, feed: feed as i8 }),
+            _ => return None,
+        };
+        let wiring = Wiring { sensor_slot: q[0] as u8, target_channel: q[1] as usize, fan_channel: index(q[2])?, extruder };
+        let c = &q[5..22];
         let config = HeaterConfig { r0_ohm: c[0] as f32, t0_c: c[1] as f32, beta: c[2] as f32, pullup_ohm: c[3] as f32,
             v_ref: c[4] as f32, kp: c[5] as f32, ki: c[6] as f32, kd: c[7] as f32, max_duty: c[8] as f32,
             max_temperature_c: c[9] as f32, min_extrude_c: c[10] as f32, band_c: c[11] as f32,
             pid_range_c: c[12] as f32, gain_window_s: c[13], gain_min_c: c[14] as f32, hysteresis_c: c[15] as f32,
             hysteresis_window_s: c[16] };
-        let plant = Plant { capacity: q[21] as f32, power: q[22] as f32, loss: q[23] as f32, fan_loss: q[24] as f32,
-            ambient: q[25] as f32 };
+        let plant = Plant { capacity: q[22] as f32, power: q[23] as f32, loss: q[24] as f32, fan_loss: q[25] as f32,
+            ambient: q[26] as f32 };
         result.heaters.push(VirtualHeater::new(wiring, config, plant)?);
     }
     // Two heaters cannot share a slot or a target channel.
@@ -216,11 +233,12 @@ mod tests {
             band_c: 3.0, pid_range_c: 10.0, gain_window_s: 20.0, gain_min_c: 2.0, hysteresis_c: 15.0, hysteresis_window_s: 10.0 }
     }
     fn hotend() -> VirtualHeater {
-        VirtualHeater::new(Wiring { sensor_slot: 0, target_channel: 0, fan_channel: Some(1), extruder_actuator: Some(3) }, config(),
+        VirtualHeater::new(Wiring { sensor_slot: 0, target_channel: 0, fan_channel: Some(1),
+            extruder: Some(ExtruderWiring { actuator: 3, feed: 1 }) }, config(),
             Plant { capacity: 10.0, power: 40.0, loss: 0.06, fan_loss: 0.05, ambient: 22.0 }).unwrap()
     }
     fn bed() -> VirtualHeater {
-        VirtualHeater::new(Wiring { sensor_slot: 1, target_channel: 2, fan_channel: None, extruder_actuator: None },
+        VirtualHeater::new(Wiring { sensor_slot: 1, target_channel: 2, fan_channel: None, extruder: None },
             HeaterConfig { kp: 0.2, ki: 0.0008, kd: 2.0, min_extrude_c: 0.0, max_temperature_c: 120.0, gain_window_s: 120.0,
                 hysteresis_c: 10.0, hysteresis_window_s: 20.0, ..config() },
             Plant { capacity: 500.0, power: 250.0, loss: 0.7, fan_loss: 0.0, ambient: 22.0 }).unwrap()
@@ -305,13 +323,22 @@ mod tests {
         let mut cold = hotend();
         for step in 0..100 { cold.tick(0.01, 0.0, 0.0, Some(-step * 10)); }
         assert_eq!(cold.values()[heater::FAULT], 0.0);
+        // A motor geared the other way round (the printer's, through one gear mesh) pushes with its count falling.
+        let reversed = |h: VirtualHeater| VirtualHeater::new(Wiring { extruder: Some(ExtruderWiring { actuator: 3, feed: -1 }), ..h.wiring },
+            config(), h.plant).unwrap();
+        let mut pushing = reversed(hotend());
+        for step in 0..100 { pushing.tick(0.01, 0.0, 0.0, Some(-step * 10)); }
+        assert_eq!(pushing.values()[heater::FAULT], heater::fault::COLD_EXTRUSION as f32);
+        let mut retracting = reversed(hotend());
+        for step in 0..100 { retracting.tick(0.01, 0.0, 0.0, Some(step * 10)); }
+        assert_eq!(retracting.values()[heater::FAULT], 0.0);
     }
 
     #[test]
     fn parameters_build_heaters_and_reject_nonsense() {
         let c = config();
         let one = |slot: u8, target: usize| -> Vec<f64> {
-            parameters(Wiring { sensor_slot: slot, target_channel: target, fan_channel: None, extruder_actuator: None }, &c,
+            parameters(Wiring { sensor_slot: slot, target_channel: target, fan_channel: None, extruder: None }, &c,
                 &Plant { capacity: 10.0, power: 40.0, loss: 0.06, fan_loss: 0.05, ambient: 22.0 })
         };
         let mut list = vec![2.0]; list.extend(one(0, 0)); list.extend(one(1, 2));
@@ -323,7 +350,14 @@ mod tests {
         assert!(from_parameters(&short).is_none());
         let mut nan = list.clone(); nan[5] = f64::NAN;
         assert!(from_parameters(&nan).is_none());
-        let mut bad = list.clone(); bad[10] = -1.0; // a negative gain
+        let mut bad = list.clone(); bad[11] = -1.0; // a negative gain
         assert!(from_parameters(&bad).is_none());
+        // An extruder needs a feed direction of +1 or -1, and no extruder has none.
+        let mut fed = list.clone(); fed[4] = 3.0; fed[5] = -1.0;
+        assert_eq!(from_parameters(&fed).unwrap().heaters[0].wiring.extruder.map(|e| (e.actuator, e.feed)), Some((3, -1)));
+        let mut unfed = list.clone(); unfed[4] = 3.0;
+        assert!(from_parameters(&unfed).is_none());
+        let mut stray = list.clone(); stray[5] = 1.0;
+        assert!(from_parameters(&stray).is_none());
     }
 }

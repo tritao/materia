@@ -1479,6 +1479,14 @@ findings with their evidence). Fixed, one commit each:
   its x edge at 99.994 mm (99.949). The beads are more even: 71 % of the volume in beads 0.6 to 0.7 mm wide (40 % without
   the advance), the blobs where the tip stood 11.5 mm^3 (18.7). The first plans cost more (the slowest simulated tick 552 ms
   at 110.7 s, was 87 ms: the advance cuts each plan into three times the segments before the merge).
+- **H3. The cold-extrusion guard was inverted on the printer.** The virtual heater counted the extruder as pushing when
+  its actuator's step count rose (`heaters.rs`), but the printer's motor drives the drive gear through one gear mesh
+  (`GearPair.relation`: ratio -54/18), so its steps count down as filament goes in: a cold push never faulted, a cold
+  retraction would have. The tests drove a +1 ratio only. The wiring now carries the feed direction
+  (`ExtruderWiring.feed`, `HeaterExtruder`, one more value per heater in the peripheral parameters), taken from the sign
+  of the device channel's ratio (`PrintProgramPlayer.extruderOnDevice`). Tests: the Rust heater tests and
+  `HeaterDeviceTests` (a reversed extruder faults pushing into a cold hotend and not retracting; RobotKit world 5,515 ->
+  5,517 assertions), `checkPrinter` asserts the printer's extruder feeds at -1.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

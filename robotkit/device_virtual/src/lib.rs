@@ -143,7 +143,7 @@ impl VirtualDevice {
                 && begin.safe_analog[f] == 0.0);
             target < begin.channel_count as usize && begin.channel_kind[target] == 2 && begin.safe_analog[target] == 0.0
                 && begin.channel_stop_policy[target] == 1 && fan_ok
-                && h.wiring.extruder_actuator.map_or(true, |a| a < begin.actuator_count as usize)
+                && h.wiring.extruder.map_or(true, |e| e.actuator < begin.actuator_count as usize)
         })
     }
 
@@ -153,7 +153,7 @@ impl VirtualDevice {
         for heater in self.heaters.heaters.iter_mut() {
             let target = self.board.analog(heater.wiring.target_channel).unwrap_or(0.0);
             let fan = heater.wiring.fan_channel.and_then(|c| self.board.analog(c)).unwrap_or(0.0);
-            let steps = heater.wiring.extruder_actuator.map(|a| self.board.step_count(a));
+            let steps = heater.wiring.extruder.map(|e| self.board.step_count(e.actuator));
             heater.tick(dt, target, fan, steps);
             faulted |= heater.faulted();
         }
@@ -1328,12 +1328,12 @@ mod tests {
     }
     fn heater_parameters() -> Vec<f64> {
         let hotend = heaters::parameters(heaters::Wiring { sensor_slot: 0, target_channel: 0, fan_channel: Some(1),
-            extruder_actuator: None }, &heater_config(),
+            extruder: None }, &heater_config(),
             &heaters::Plant { capacity: 10.0, power: 40.0, loss: 0.06, fan_loss: 0.05, ambient: 22.0 });
         let bed_config = robotkit_device_protocol::heater::HeaterConfig { kp: 0.2, ki: 0.0008, kd: 2.0, min_extrude_c: 0.0,
             max_temperature_c: 120.0, gain_window_s: 120.0, hysteresis_c: 10.0, hysteresis_window_s: 20.0, ..heater_config() };
         let bed = heaters::parameters(heaters::Wiring { sensor_slot: 1, target_channel: 2, fan_channel: None,
-            extruder_actuator: None }, &bed_config,
+            extruder: None }, &bed_config,
             &heaters::Plant { capacity: 500.0, power: 250.0, loss: 0.7, fan_loss: 0.0, ambient: 22.0 });
         let mut all = vec![2.0]; all.extend(hotend); all.extend(bed); all
     }
