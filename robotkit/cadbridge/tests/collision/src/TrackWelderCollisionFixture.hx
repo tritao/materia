@@ -20,7 +20,7 @@ private typedef TrackInterfaceFixture = {
 /** The shipped track-welder geometry and typed weld interfaces, rather than surrogate boxes. */
 class TrackWelderCollisionFixture {
   static final interfaces:Array<TrackInterfaceFixture> = [
-    {first: "rackSupport", second: "motorPlate", distance: 0.004, margin: 0.003, clear: true}
+    {first: "rackSupport", second: "motorPlate", distance: 0.004, margin: processkit.WeldPathPlanner.AIR_MARGIN, clear: true}
   ];
   public static function run(check:(Bool, String)->Void):Void {
     var artifact = SceneArtifact.decode(TrackWelderPreview.cell());
@@ -51,7 +51,7 @@ class TrackWelderCollisionFixture {
     var scene = captured.describe(arm, reference, 0.005);
     var members:Array<String> = [];
     for (segment in weld.path) for (face in segment.faces) if (members.indexOf(face.member) < 0) members.push(face.member);
-    processkit.WeldCollisionPolicy.apply(scene, scene.memberObjects(members), 0.003, 0.0005);
+    processkit.WeldCollisionPolicy.apply(scene, scene.memberObjects(members), processkit.WeldPathPlanner.AIR_MARGIN, 0.0005);
     var build = scene.build(new NativeCollisionWorld());
     try {
       for (fixture in interfaces) {

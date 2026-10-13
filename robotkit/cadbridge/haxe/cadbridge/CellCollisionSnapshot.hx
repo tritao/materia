@@ -1,6 +1,6 @@
 package cadbridge;
 
-import cadbridge.AssemblySimulationBridge.AssemblyLinkHull;
+import robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape;
 import robotkit.collision.CollisionSceneBuilder;
 import robotkit.collision.CollisionSceneBuilder.CollisionOwner;
 import robotkit.manipulation.KinematicGroup;
@@ -15,6 +15,7 @@ typedef CellCadObservation = {
 	var frame:AssemblyFrame;
 	var metresPerUnit:Float;
 	var collision:CadPartCollision;
+	@:optional var owner:CollisionOwner;
 }
 
 /** Live geometry observations exist only before building the shared description. */
@@ -52,7 +53,7 @@ class CellCollisionSnapshot {
 	}
 
 	/** Other controllers remain independent geometry at their supplied live poses. */
-	public function mechanism(owner:String, model:RobotModel, geometry:Array<AssemblyLinkHull>,
+	public function mechanism(owner:String, model:RobotModel, geometry:Array<RobotRuntimeLinkShape>,
 		poses:Array<Transform3>, ?toolMembers:Array<String>, ?state:kinematicskit.KinematicState):Void {
 		if (poses.length != model.links.length) throw "Cell mechanism needs one current pose per link";
 		var compiled = robotkit.kinematics.RobotKinematics.compile(model);
@@ -63,12 +64,12 @@ class CellCollisionSnapshot {
 				throw "Cell observations use a different DOF ordering";
 			observed = state.copy();
 		}
-		var pieces = new Map<String, Array<AssemblyLinkHull>>();
+		var pieces = new Map<String, Array<RobotRuntimeLinkShape>>();
 		var members:Array<String> = [];
-		for (hull in geometry) if (ignored.indexOf(hull.part) < 0) {
-			if (hull.link < 0 || hull.link >= model.links.length) throw 'Cell hull "${hull.part}" lost its link';
-			var list = pieces.get(hull.part);
-			if (list == null) { list = []; pieces.set(hull.part, list); members.push(hull.part); }
+		for (hull in geometry) if (ignored.indexOf(hull.shape.name) < 0) {
+			if (hull.link < 0 || hull.link >= model.links.length) throw 'Cell hull "${hull.shape.name}" lost its link';
+			var list = pieces.get(hull.shape.name);
+			if (list == null) { list = []; pieces.set(hull.shape.name, list); members.push(hull.shape.name); }
 			list.push(hull);
 		}
 		for (member in members) {
@@ -78,7 +79,7 @@ class CellCollisionSnapshot {
 			var points:Array<Float> = [];
 			for (piece in list) {
 				if (piece.link != link) throw 'Physical CAD member "$member" spans different mechanical links';
-				for (point in robotkit.collision.CollisionClearance.placed(piece.vertices, poses[link])) points.push(point);
+				for (point in robotkit.collision.CollisionClearance.placed(piece.shape.convexVertices(), poses[link])) points.push(point);
 			}
 			var fixed = compiled.bodyChain[compiled.bodyIndex(model.links[link].id)].length == 0;
 			if (ids.exists(member)) {
@@ -88,7 +89,7 @@ class CellCollisionSnapshot {
 				// All pieces of a shared fixed occurrence remain one environment object set.
 				for (piece in 0...list.length) {
 					var id = list.length == 1 ? member : '$member/piece$piece';
-					var world = robotkit.collision.CollisionClearance.placed(list[piece].vertices, poses[link]);
+					var world = robotkit.collision.CollisionClearance.placed(list[piece].shape.convexVertices(), poses[link]);
 					for (i in 0...hulls.length) if (hulls[i].id == id)
 						hulls[i] = observation(id, Fixture, world, root.inverse(), false, member);
 				}
@@ -98,7 +99,7 @@ class CellCollisionSnapshot {
 			var pose = owner == controller ? Transform3.identity() : root.inverse().compose(poses[link]);
 			for (piece in 0...list.length) {
 				var id = list.length == 1 ? member : '$member/piece$piece';
-				add(observation(id, Mechanism(owner, model.links[link].id), list[piece].vertices, pose, tool, member));
+				add(observation(id, Mechanism(owner, model.links[link].id), list[piece].shape.convexVertices(), pose, tool, member));
 			}
 			ids.set(member, true);
 			physical.set(member, {points: points, fixed: fixed});
@@ -196,7 +197,7 @@ class CellCollisionSnapshot {
 		var model = robotkit.kinematics.RobotKinematics.compile(mechanism.model);
 		var snapshot = new kinematicskit.KinematicSnapshot(model);
 		snapshot.evaluate(new kinematicskit.KinematicState(model));
-		result.mechanism(controller, mechanism.model, mechanism.linkHulls,
+		result.mechanism(controller, mechanism.model, AssemblySimulationBridge.shapes(mechanism.model),
 			[for (link in mechanism.model.links) robotkit.kinematics.RobotKinematics.toTransform3(snapshot.bodyPose(model.bodyIndex(link.id)))],
 			toolMembers);
 		var excluded = ignored.copy();
@@ -273,8 +274,14 @@ class CellCollisionSnapshot {
 				[frame.qx, frame.qy, frame.qz, frame.qw]));
 			var posed:AssemblyFrame = {x: at.translation.x / scale, y: at.translation.y / scale, z: at.translation.z / scale,
 				qx: at.rotation.x, qy: at.rotation.y, qz: at.rotation.z, qw: at.rotation.w};
-			var indices = CadCollision.describePart(scene.description, part.member, posed, scale, part.collision, 0);
-			scene.register(indices, Fixture, false);
+			var owner:CollisionOwner = part.owner == null ? Fixture : part.owner;
+			var group:Int = switch owner {
+				case Loose: collisionkit.CollisionMarginClass.Work;
+				case Fixture: collisionkit.CollisionMarginClass.Air;
+				case _: throw "A CAD part observation must be independent fixture or loose stock";
+			};
+			var indices = CadCollision.describePart(scene.description, part.member, posed, scale, part.collision, group);
+			scene.register(indices, owner, false);
 		}
 		// Initial held objects get the same collision policy as a live transfer;
 		// subsequent process policy names the actual permitted contacts.

@@ -27,7 +27,6 @@ enum CollisionOwner {
 /** Ownership and tool identity supplement the collision description; geometry does not. */
 typedef CollisionOwnership = {
 	var owner:CollisionOwner;
-	var tool:Bool;
 }
 
 /**
@@ -88,7 +87,7 @@ class CollisionSceneBuilder {
 	/** Ownership facts for an object already emitted by a canonical source adapter. */
 	public function identify(id:String, owner:CollisionOwner, tool:Bool):Void {
 		var index = object(id);
-		ownership.set(id, {owner: owner, tool: tool});
+		ownership.set(id, {owner: owner});
 		var object = description.objects[index];
 		description.objects[index] = new collisionkit.DescribedObject(object.name, object.body, object.offset, object.geometry, object.inflation, object.source, object.member, tool);
 		memberBodies.set(description.objects[index].member, description.objects[index].body);
@@ -145,7 +144,7 @@ class CollisionSceneBuilder {
 		memberBodies.set(physical, body);
 		objects.set(id, description.addObject(id, body, pose(offset), geometry, 0,
 			"cell CAD/simulation hull", physical, tool));
-		ownership.set(id, {owner: owner, tool: tool});
+		ownership.set(id, {owner: owner});
 	}
 
 	public function pair(first:String, second:String, rule:CollisionPairRule, reason:CollisionPairStatus,
@@ -160,12 +159,8 @@ class CollisionSceneBuilder {
 	public function payload(id:String, contacts:Array<String>, rule:CollisionPairRule,
 		reason:CollisionPairStatus, contactMargin:Float):Void {
 		var held = object(id);
-		description.setHeldContacts(description.objects[held].body, [for (contact in contacts) object(contact)], rule, reason);
-		for (other in description.objects) if (other.body != description.objects[held].body) {
-			var contact = contacts.indexOf(other.name) >= 0;
-			pair(id, other.name, contact ? rule : CollisionPairRule.Check,
-				contact ? reason : CollisionPairStatus.Checked, contact ? contactMargin : description.defaultMargin);
-		}
+		description.setHeldContacts(description.objects[held].body,
+			[for (i in 0...description.objects.length) if (contacts.indexOf(description.objects[i].name) >= 0 || contacts.indexOf(description.objects[i].member) >= 0) i], rule, reason, contactMargin);
 	}
 
 	public function contacts(members:Array<String>):Array<String> {
@@ -202,7 +197,8 @@ class CollisionSceneBuilder {
 			var object = description.objects[index];
 			if (objects.exists(object.name)) throw 'Duplicate cell collision id "${object.name}"';
 			objects.set(object.name, index);
-			ownership.set(object.name, {owner: owner, tool: tool});
+			ownership.set(object.name, {owner: owner});
+			description.objects[index] = new collisionkit.DescribedObject(object.name, object.body, object.offset, object.geometry, object.inflation, object.source, object.member, tool);
 			memberBodies.set(object.member, object.body);
 		}
 	}

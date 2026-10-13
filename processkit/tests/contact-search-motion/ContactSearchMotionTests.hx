@@ -161,16 +161,25 @@ class ContactSearchMotionTests {
       var wireClearance = wireScene.clearance(() -> new NativeCollisionWorld());
       var wireGuarded = new ProbeMotionPlanner(arm, planning.compiler, wireClearance, wire);
       check(switch wireScene.description.objects[wire.object].geometry {
-        case Capsule(radius, halfLength): Math.abs(radius - 0.0005) < 1e-12 && Math.abs(2 * (radius + halfLength) - 0.015) < 1e-12;
+        case Cylinder(radius, halfLength): Math.abs(radius - 0.0005) < 1e-12 && Math.abs(2 * halfLength - 0.015) < 1e-12;
         case _: false;
-      }, "The shared capsule has the declared wire diameter and complete stickout");
+      }, "The shared flat-ended cylinder has the declared wire diameter and complete stickout");
       var wireGap = wireClearance.closest([0.0]);
       check(wireGap != null && Math.abs(wireGap.distance - 0.014) < 1e-9,
-        "Native collision geometry puts the capsule's distal surface at the physical sensing tip");
+        "Native collision geometry puts the flat-ended cylinder's distal surface at the physical sensing tip");
       var safeSpeed = wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0.0005);
       check(safeSpeed > 0 && safeSpeed < 0.02, "Calibration and CAD wire extent bound requested sensing speed");
       check(safeSpeed * 0.04 + safeSpeed * safeSpeed / 2 <= 0.0005 - planning.compiler.ikTolerance.position - wire.envelopeExcess + 1e-10,
         "The derived prismatic speed fits the entire deadline and braking travel inside touch stand-off");
+      var rimScene = new robotkit.collision.CollisionSceneBuilder(arm, [0.0], "cut-wire", 0.003);
+      rimScene.addGeometry("rim obstacle", robotkit.collision.CollisionSceneBuilder.CollisionOwner.Fixture,
+        collisionkit.CollisionGeometry.Sphere(0.000005), new Transform3(new Vec3(0.000499, 0, -0.000001), Quat.identity()));
+      var cutWire = processkit.ProbeWire.describe(rimScene, arm, tool.id, Transform3.identity(), 0.001, 0.015,
+        [], rimScene.memberObjects(["rim obstacle"]));
+      var rimClearance = rimScene.clearance(() -> new NativeCollisionWorld());
+      check(rimClearance.violation([0.0], true) != null,
+        "the flat cut-end rim collides where a rounded capsule would miss the obstacle");
+      rimClearance.world.dispose();
       var localSolver = new StepLimitedProbeSolver(arm, 0.0005);
       var localCompiler = new motionkit.robot.ProgramCompiler(localSolver, source.limits, source.frameId,
         source.maxVelocity, source.maxAcceleration, source.maxJerk, source.startTolerances,

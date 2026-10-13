@@ -160,6 +160,9 @@ class RobotCollision {
     var sourceObjects:Array<Int> = [];
     var hullBodies = new Map<String, Int>();
     for (hull in options.linkShapes == null ? [] : options.linkShapes) {
+      var invalid = hull.shape.validate();
+      if (invalid != null) throw invalid;
+      if (hull.link < 0 || hull.link >= robot.links.length) throw "Source shape needs a valid robot link";
       var link = robot.links[hull.link];
       var body = bodies.bodies[model.bodyIndex(link.id)];
       if (hull.group >= 0) {
@@ -197,7 +200,7 @@ class RobotCollision {
         var shape = toolShape[i], p = shape.position, q = shape.rotation;
         var local = new Transform(p[0],p[1],p[2],q[0],q[1],q[2],q[3]);
         toolObjects.push(description.addObject('$name/tool/piece$i', toolBody, at(local),
-          shape.geometry, shape.inflation, "tool shape"));
+          shape.geometry, shape.inflation, "tool shape", null, true));
       }
     }
     if (options.declareArticulation) bodies.declare();

@@ -144,11 +144,11 @@ class ModelBodies {
 
   /** Transfer collision geometry and its mechanical follower together. */
   public function transfer(build:CollisionBuild, body:Int, current:CollisionPose, target:CollisionPose,
-      fixed:Bool, carrier:Int, contacts:Array<Int>):Void {
+      fixed:Bool, carrier:Int, contacts:Array<Int>, ?releasedPolicy:CollisionDescription):Void {
     if (build.description != description) throw "Transfer needs this mapping's live collision description";
     if (bodies.indexOf(body) >= 0 || carrier < -1 || carrier >= model.bodyCount())
       throw "Transfer needs an independent part and a valid mechanical carrier";
-    build.transferBody(body, current, target, fixed, contacts);
+    build.transferBody(body, current, target, fixed, contacts, releasedPolicy);
     var follower = followers.indexOf(body);
     if (carrier < 0) {
       if (follower >= 0) { followers.splice(follower, 1); followed.splice(follower, 1); }

@@ -103,11 +103,11 @@
         "../cadkit/core/CMakeLists.txt",
         "../robotkit/CMakeLists.txt",
         "../robotkit/runtime/CMakeLists.txt",
-        "../animkit/native/CMakeLists.txt",
-        "../animkit/native/include/animkit.h",
-        "../animkit/native/src/api.cpp",
-        "../animkit/native/src/import.cpp",
-        "../animkit/native/src/runtime.cpp"
+        "../haxeon/packages/animation/native/CMakeLists.txt",
+        "../haxeon/packages/animation/native/include/animkit.h",
+        "../haxeon/packages/animation/native/src/api.cpp",
+        "../haxeon/packages/animation/native/src/import.cpp",
+        "../haxeon/packages/animation/native/src/runtime.cpp"
       ]
     }
   },

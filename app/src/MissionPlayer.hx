@@ -616,7 +616,7 @@ class MissionPlayer implements SessionMember {
     var captured = new CellCollisionSnapshot(robot.robot.id(), linkPose(robotIndex, 0), ignored);
     var toolMembers:Array<String> = [];
     for (tool in project.robotTools) for (member in tool.members) if (toolMembers.indexOf(member) < 0) toolMembers.push(member);
-    captured.mechanism(robot.robot.id(), robot.model, robot.hulls,
+    captured.mechanism(robot.robot.id(), robot.model, robot.shapes,
       [for (index in 0...robot.model.links.length) linkPose(robotIndex, index)], toolMembers,
       robotkit.kinematics.RobotKinematics.observedState(robot.model, robot.robot.snapshot().positions.toArray()));
     var heldCarriers = new Map<String, String>();
@@ -633,17 +633,18 @@ class MissionPlayer implements SessionMember {
         if (simulation.linkBody(robotIndex, index) == body) return robot.model.links[index].id;
       return null;
     }
+    for (other in cellRobots) if (other != robot && other.parts.length > 0) {
+      var index = other.parts[0].robotIndex;
+      captured.mechanism(other.robot.id(), other.model, other.shapes,
+        [for (link in 0...other.model.links.length) linkPose(index, link)]);
+    }
     for (entry in objects) if (StringTools.startsWith(entry.id, "project:")) {
+      if (captured.includes(entry.id.substr(8))) continue;
       var part = assemblyParts.get(entry.id);
       if (part == null || part.pieces.length == 0) continue;
       var pose = part.pose();
       captured.object(entry.id.substr(8), part.pieces, Transform3.fromArrays(pose.position, pose.rotation), carrier(entry),
         entry.object.motion == nativekit.sim.MotionType.Static ? CollisionOwner.Fixture : CollisionOwner.Loose);
-    }
-    for (other in cellRobots) if (other != robot && other.parts.length > 0) {
-      var index = other.parts[0].robotIndex;
-      captured.mechanism(other.robot.id(), other.model, other.hulls,
-        [for (link in 0...other.model.links.length) linkPose(index, link)]);
     }
     for (entry in objects) {
       var name = StringTools.startsWith(entry.id, "project:") ? entry.id.substr(8) : entry.id;

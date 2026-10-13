@@ -134,8 +134,8 @@ class WorkPatchPlanner {
               body.pose = new collisionkit.CollisionPose(t.x,t.y,t.z,r.x,r.y,r.z,r.w);
             }
             scene.append(obstacles);
-            for (first in scene.bodies) for (second in scene.bodies)
-              scene.setGroupMargins(first.group, second.group, toolClearance, toolClearance);
+            for (first in 0...scene.groupCount()) for (second in first...scene.groupCount())
+              scene.setGroupMargins(first, second, toolClearance, toolClearance);
             collisionChecker = new CollisionClearance(manipulator, scene, seed, cast makeWorld);
           }
           var result:ReachabilityChecker.ReachabilityResult;

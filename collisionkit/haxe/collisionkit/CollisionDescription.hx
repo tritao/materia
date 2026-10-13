@@ -28,6 +28,8 @@ class CollisionDescription {
   var contactTable:Null<CollisionMargins> = null;
   public final bodies:Array<DescribedBody> = [];
   public final objects:Array<DescribedObject> = [];
+  final bodyRuleIndex:Map<String, Int> = new Map();
+  final objectRuleIndex:Map<String, Int> = new Map();
   public final bodyRules:Array<DescribedRule> = [];
   public final objectRules:Array<DescribedRule> = [];
   public final articulations:Array<DescribedArticulation> = [];
@@ -87,41 +89,68 @@ class CollisionDescription {
 
   public function setBodyRule(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void {
     if (a == b || a < -1 || b < -1 || a >= bodies.length || b >= bodies.length) throw 'Bad body rule $a-$b';
-    for (i in 0...bodyRules.length) {
-      var previous = bodyRules[i];
-      if ((previous.a == a && previous.b == b) || (previous.a == b && previous.b == a)) {
-        bodyRules[i] = new DescribedRule(a, b, rule, reason);
-        return;
-      }
-    }
-    bodyRules.push(new DescribedRule(a, b, rule, reason));
+    var key = pairKey(a, b), index = bodyRuleIndex.get(key);
+    var value = new DescribedRule(a, b, rule, reason);
+    if (index != null) bodyRules[index] = value;
+    else { bodyRuleIndex.set(key, bodyRules.length); bodyRules.push(value); }
   }
 
   public function setObjectRule(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void {
     if (a == b || a < 0 || b < 0 || a >= objects.length || b >= objects.length) throw 'Bad object rule $a-$b';
-    for (i in 0...objectRules.length) {
-      var previous = objectRules[i];
-      if ((previous.a == a && previous.b == b) || (previous.a == b && previous.b == a)) {
-        objectRules[i] = new DescribedRule(a, b, rule, reason);
-        return;
-      }
+    var key = pairKey(a, b), index = objectRuleIndex.get(key);
+    var value = new DescribedRule(a, b, rule, reason);
+    if (index != null) objectRules[index] = value;
+    else { objectRuleIndex.set(key, objectRules.length); objectRules.push(value); }
+  }
+
+  static function pairKey(a:Int, b:Int):String return a < b ? '$a\n$b' : '$b\n$a';
+
+  public function bodyRule(a:Int, b:Int):Null<DescribedRule> {
+    var index = bodyRuleIndex.get(pairKey(a, b));
+    return index == null ? null : bodyRules[index];
+  }
+
+  public function objectRule(a:Int, b:Int):Null<DescribedRule> {
+    var index = objectRuleIndex.get(pairKey(a, b));
+    return index == null ? null : objectRules[index];
+  }
+
+  /** Release restores authored seat/contact policy instead of a carried part's exclusions. */
+  public function restoreBodyPolicy(body:Int, authored:CollisionDescription):Void {
+    if (authored == null || authored.bodies.length != bodies.length || authored.objects.length != objects.length)
+      throw "Release needs the original description with stable geometry ids";
+    for (other in -1...bodies.length) if (other != body) {
+      var rule = authored.bodyRule(body, other);
+      setBodyRule(body, other, rule == null ? CollisionPairRule.Default : rule.rule,
+        rule == null ? CollisionPairStatus.Checked : rule.reason);
     }
-    objectRules.push(new DescribedRule(a, b, rule, reason));
+    for (a in 0...objects.length) if (objects[a].body == body)
+      for (b in 0...objects.length) if (objects[b].body != body) {
+        var rule = authored.objectRule(a, b);
+        setObjectRule(a, b, rule == null ? CollisionPairRule.Default : rule.rule,
+          rule == null ? CollisionPairStatus.Checked : rule.reason);
+        var key = pairKey(a, b), margin = authored.objectMargins.get(key);
+        if (margin == null) objectMargins.remove(key); else objectMargins.set(key, margin);
+      }
   }
 
   /** Carried stock checks every outside shape except its explicitly named contact surfaces. */
   public function setHeldContacts(body:Int, contacts:Array<Int>,
       contactRule:CollisionPairRule = CollisionPairRule.Allow,
-      contactReason:CollisionPairStatus = CollisionPairStatus.ProcessContact):Void {
+      contactReason:CollisionPairStatus = CollisionPairStatus.ProcessContact, ?margin:Float):Void {
     if (body < 0 || body >= bodies.length) throw "Held stock needs a described body";
     for (contact in contacts)
       if (contact < 0 || contact >= objects.length || objects[contact].body == body)
         throw "Held contacts must name outside described objects";
-    for (other in 0...bodies.length) if (other != body)
+    var contactIds:Map<Int, Bool> = new Map();
+    for (contact in contacts) contactIds.set(contact, true);
+    for (other in -1...bodies.length) if (other != body)
       setBodyRule(body, other, CollisionPairRule.Check, CollisionPairStatus.Checked);
     for (i in 0...objects.length) if (objects[i].body == body)
       for (j in 0...objects.length) if (objects[j].body != body) {
-        var contact = contacts.indexOf(j) >= 0;
+        var contact = contactIds.exists(j);
+        objectMargins.remove(pairKey(i, j));
+        if (contact && margin != null) setObjectMargins(i, j, margin, margin);
         setObjectRule(i, j, contact ? contactRule : CollisionPairRule.Check,
           contact ? contactReason : CollisionPairStatus.Checked);
       }

@@ -113,6 +113,7 @@ class PlacementTests {
       pose:Transform3, half:Vec3):CollisionClearance {
     var scene = CollisionClearance.shapes(manipulator.flangeLink, shapes, true);
     scene.append(obstacle(pose, half));
+    scene.setGroupMargins(collisionkit.CollisionMarginClass.Tool, collisionkit.CollisionMarginClass.Air, 0.0, 0.0);
     return new CollisionClearance(manipulator, scene, [0.0], () -> new NativeCollisionWorld());
   }
 

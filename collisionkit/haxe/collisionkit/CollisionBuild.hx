@@ -36,11 +36,12 @@ class CollisionBuild {
    * operation for a grasp, a placement, and a transfer between carriers.
    */
   public function transferBody(body:Int, current:CollisionPose, target:CollisionPose, fixed:Bool,
-      ?contacts:Array<Int>):Void {
+      ?contacts:Array<Int>, ?releasedPolicy:CollisionDescription):Void {
     if (body < 0 || body >= bodies.length) throw "Attachment needs a described body";
     var namedContacts = contacts == null ? [] : contacts;
     // Validate and author policy before mutating the physical world.
-    description.setHeldContacts(body, namedContacts);
+    if (releasedPolicy == null) description.setHeldContacts(body, namedContacts);
+    else description.restoreBodyPolicy(body, releasedPolicy);
     var from = kinematicskit.Transform.checked(new kinematicskit.Transform(current.x, current.y, current.z, current.qx, current.qy, current.qz, current.qw), "Attachment source pose");
     var to = kinematicskit.Transform.checked(new kinematicskit.Transform(target.x, target.y, target.z, target.qx, target.qy, target.qz, target.qw), "Attachment target pose");
     var delta = to.inverse().compose(from);
@@ -52,6 +53,8 @@ class CollisionBuild {
       var offset = new CollisionPose(at.x, at.y, at.z, at.qx, at.qy, at.qz, at.qw);
       world.attach(objects[i], bodies[body], offset);
       description.objects[i] = new DescribedObject(shape.name, body, offset, shape.geometry, shape.inflation, shape.source, shape.member, shape.tool);
+      for (other in 0...description.objects.length) if (description.objects[other].body != body)
+        description.applyObjectMargins(world, objects, i, other);
     }
     var previous = description.bodies[body];
     description.bodies[body] = new DescribedBody(previous.name, previous.group, fixed, target);
@@ -90,9 +93,7 @@ class CollisionBuild {
     restoreBodyRule(first, second);
     for (a in 0...description.objects.length) if (description.objects[a].body == first)
       for (b in 0...description.objects.length) if (description.objects[b].body == second) {
-        var rule:Null<DescribedRule> = null;
-        for (candidate in description.objectRules)
-          if ((candidate.a == a && candidate.b == b) || (candidate.a == b && candidate.b == a)) rule = candidate;
+        var rule = description.objectRule(a, b);
         world.setObjectRule(objects[a], objects[b], rule == null ? CollisionPairRule.Default : rule.rule,
           rule == null ? CollisionPairStatus.Checked : rule.reason);
         description.applyObjectMargins(world, objects, a, b);

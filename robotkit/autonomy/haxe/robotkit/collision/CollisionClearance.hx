@@ -185,11 +185,10 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
       case Attach(body, link, contacts):
         var named:Array<Int> = [];
         for (name in contacts) {
-          var found = -1;
-          for (i in 0...data.objects.length)
-            if (data.objects[i].name == name) found = i;
-          if (found < 0) throw 'Clearance attachment has unknown contact "$name"';
-          named.push(found);
+          var matching = [for (i in 0...data.objects.length)
+            if (data.objects[i].name == name || data.objects[i].member == name) i];
+          if (matching.length == 0) throw 'Clearance attachment has unknown contact "$name"';
+          for (index in matching) if (named.indexOf(index) < 0) named.push(index);
         }
         move(hull(body), link, q, named, false);
       case Detach(body):
@@ -219,6 +218,8 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   }
 
   function move(i:Int, link:LinkId, q:Array<Float>, contacts:Array<Int>, detached:Bool):Void {
+    for (window in windows) if (window.a == i || window.b == i)
+      throw "Close contact windows before transferring their body";
     var source = mapping;
     var carrier = source.model.bodyIndex(link);
     if (carrier < 0) throw 'Clearance attachment has unknown link "$link"';
@@ -236,7 +237,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
     descriptionMechanics().transfer(descriptionBuild(), i, new CollisionPose(current.translation.x, current.translation.y,
       current.translation.z, current.rotation.x, current.rotation.y, current.rotation.z, current.rotation.w),
       new CollisionPose(target.x, target.y, target.z, target.qx, target.qy, target.qz, target.qw),
-      detached || !arm.moves(link), detached ? -1 : carrier, contacts);
+      detached || !arm.moves(link), detached ? -1 : carrier, contacts, detached ? data : null);
     bodyLinks[i] = link; moving[i] = !detached && arm.moves(link);
     regroup();
   }
@@ -245,21 +246,10 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
     descriptionBuild().closeContactWindow(i, j);
   }
 
-  /** Every hull's group: its role, or its window's own. */
+  /** Windows use only sparse object overrides; margin classes do not change. */
   function regroup():Void {
     airMarginCache = null;
     contactMarginCache = null;
-    for (i in 0...bodies.length) world.setBodyGroup(bodies[i], groupOf(i));
-  }
-
-  function baseGroups():Int return data.margins.groups;
-
-  function groupOf(i:Int):Int {
-    for (k in 0...windows.length) {
-      if (windows[k].a == i) return baseGroups() + 2 * k;
-      if (windows[k].b == i) return baseGroups() + 1 + 2 * k;
-    }
-    return data.bodies[i].group;
   }
 
   public function group():KinematicGroup return arm;
@@ -416,16 +406,10 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
     if (windows.length == 0 && wanted == null) return original;
     var cached = contact ? contactMarginCache : airMarginCache;
     if (cached != null && cached.wanted == wanted) return cached.table;
-    var roles = [for (g in 0...original.groups) g];
-    for (window in windows) { roles.push(data.bodies[window.a].group); roles.push(data.bodies[window.b].group); }
-    var table = new CollisionMargins(roles.length, 0.0, contact, wanted);
-    for (g in 0...roles.length) for (h in g...roles.length) {
-      var value = original.between(roles[g], roles[h]);
+    var table = new CollisionMargins(original.groups, 0.0, contact, wanted);
+    for (g in 0...original.groups) for (h in g...original.groups) {
+      var value = original.between(g, h);
       table.set(g, h, wanted == null ? value : Math.min(value, wanted));
-    }
-    for (k in 0...windows.length) {
-      var value = windows[k].margin;
-      if (value != null) table.set(original.groups + 2 * k, original.groups + 2 * k + 1, value);
     }
     if (contact) contactMarginCache = {wanted: wanted, table: table};
     else airMarginCache = {wanted: wanted, table: table};

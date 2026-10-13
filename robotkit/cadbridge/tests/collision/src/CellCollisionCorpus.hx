@@ -47,6 +47,7 @@ class CellCollisionCorpus {
     snapshotOwnership();
     foreignGeometryWithNestedArmRoot();
     attachmentAndReset();
+    releasedSeatAndOpenWindows();
     observedProcessJoint();
     sharedFixture();
     attachmentKeepsGeometricInflation();
@@ -56,6 +57,14 @@ class CellCollisionCorpus {
     TrackWelderCollisionFixture.run(check);
     Sys.println('Cell collision corpus passed ($assertions assertions)');
     return assertions;
+  }
+
+  static function linkShapes(data:Array<{part:String, link:Int, vertices:Array<Float>}>):Array<robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape> {
+    return [for (row in data) {
+      var shape = new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Convex(row.vertices));
+      shape.name = row.part;
+      new robotkit.runtime.RobotRuntimeBlueprint.RobotRuntimeLinkShape(row.link, shape);
+    }];
   }
 
   static function arm():Manipulator {
@@ -136,9 +145,9 @@ class CellCollisionCorpus {
   static function snapshotOwnership():Void {
     var arm = arm();
     var captured = new CellCollisionSnapshot("arm", Transform3.identity(), []);
-    captured.mechanism("arm", arm.robot, [{part: "arm/tool", link: 1, vertices: cube(0, 0, 0, 0.01)}],
+    captured.mechanism("arm", arm.robot, linkShapes([{part: "arm/tool", link: 1, vertices: cube(0, 0, 0, 0.01)}]),
       [Transform3.identity(), Transform3.identity()]);
-    captured.mechanism("mill", arm.robot, [{part: "mill/door", link: 1, vertices: cube(0, 0, 0, 0.01)}],
+    captured.mechanism("mill", arm.robot, linkShapes([{part: "mill/door", link: 1, vertices: cube(0, 0, 0, 0.01)}]),
       [Transform3.identity(), new Transform3(new Vec3(0.024, 0, 0), Quat.identity())]);
     var scene = captured.describe(arm, [0.0], 0.005);
     var clearance = scene.clearance(() -> new NativeCollisionWorld());
@@ -177,9 +186,9 @@ class CellCollisionCorpus {
     var arm = new Manipulator(model, mount.id, tool.id);
     var one = new Transform3(new Vec3(1, 0, 0), Quat.identity());
     var captured = new CellCollisionSnapshot("arm", Transform3.identity(), []);
-    captured.mechanism("arm", model, [{part: "arm-object", link: 2, vertices: cube(0, 0, 0, 0.01)}],
+    captured.mechanism("arm", model, linkShapes([{part: "arm-object", link: 2, vertices: cube(0, 0, 0, 0.01)}]),
       [Transform3.identity(), one, one]);
-    captured.mechanism("mill", model, [{part: "foreign-door", link: 2, vertices: cube(0, 0, 0, 0.01)}],
+    captured.mechanism("mill", model, linkShapes([{part: "foreign-door", link: 2, vertices: cube(0, 0, 0, 0.01)}]),
       [Transform3.identity(), one, new Transform3(new Vec3(1.024, 0, 0), Quat.identity())]);
     var clearance = captured.describe(arm, [0.0], 0.005).clearance(() -> new NativeCollisionWorld());
     var found = clearance.closest([0.0]);
@@ -211,6 +220,33 @@ class CellCollisionCorpus {
     clearance.world.dispose();
   }
 
+  static function releasedSeatAndOpenWindows():Void {
+    var arm = arm();
+    var captured = new CellCollisionSnapshot("arm", Transform3.identity(), [], [
+      CellCollisionSnapshot.observation("stock", Loose, cube(1, 0, 0, 0.01)),
+      CellCollisionSnapshot.observation("seat-piece", Fixture, cube(1.02, 0, 0, 0.01), null, false, "vise-seat")
+    ]);
+    var scene = captured.describe(arm, [0.0], 0.005);
+    processkit.HandlingCollisionPolicy.seatedStock(scene, scene.memberObjects(["stock"]), scene.memberObjects(["vise-seat"]));
+    var clearance = scene.clearance(() -> new NativeCollisionWorld());
+    clearance.apply(robotkit.manipulation.ClearanceChange.Attach("stock", "moving", ["vise-seat"]), [0.0]);
+    check(clearance.violation([0.0]) == null, "attachment accepts a physical contact member as well as exact object names");
+    clearance.apply(robotkit.manipulation.ClearanceChange.Detach("stock"), [0.0]);
+    check(clearance.violation([0.0]) == null && Math.abs(clearance.distanceBetween([0.0], "stock", "vise-seat")) < 1e-8,
+      "release onto the vise restores the authored zero-margin seat Touch rule");
+    clearance.apply(robotkit.manipulation.ClearanceChange.OpenWindow("stock", "vise-seat", null), [0.0]);
+    var refused = false;
+    try clearance.apply(robotkit.manipulation.ClearanceChange.Attach("stock", "moving", []), [0.0]) catch (_:Dynamic) refused = true;
+    check(refused && clearance.violation([0.0]) == null,
+      "attachment during an open body window is refused without wiping its permission");
+    refused = false;
+    try clearance.apply(robotkit.manipulation.ClearanceChange.Detach("stock"), [0.0]) catch (_:Dynamic) refused = true;
+    check(refused, "detach during an open body window is refused");
+    clearance.apply(robotkit.manipulation.ClearanceChange.CloseWindow("stock", "vise-seat"), [0.0]);
+    check(clearance.violation([0.0]) == null, "closing the surviving window restores the seat rule");
+    clearance.world.dispose();
+  }
+
   static function observedProcessJoint():Void {
     var robot = new RobotModel("arm with process jaw");
     var root = robot.addLink(new Link("root")), moving = robot.addLink(new Link("moving"));
@@ -222,7 +258,7 @@ class CellCollisionCorpus {
     var tool = robot.addFrame(new Frame("tool", moving));
     var arm = new Manipulator(robot, root.id, tool.id);
     var captured = new CellCollisionSnapshot("arm", Transform3.identity(), []);
-    captured.mechanism("arm", robot, [{part: "jaw/pad", link: 2, vertices: cube(0, 0, 0, 0.01)}],
+    captured.mechanism("arm", robot, linkShapes([{part: "jaw/pad", link: 2, vertices: cube(0, 0, 0, 0.01)}]),
       [Transform3.identity(), Transform3.identity(), new Transform3(new Vec3(0, 0.02, 0), Quat.identity())],
       null, robotkit.kinematics.RobotKinematics.observedState(robot, [0.6, 0.02]));
     captured.fixture("door", cube(0, 0.044, 0, 0.01), Transform3.identity());
@@ -246,21 +282,21 @@ class CellCollisionCorpus {
     var arm = arm(), captured = new CellCollisionSnapshot("arm", Transform3.identity(), []);
     var poses = [Transform3.identity(), Transform3.identity()];
     var floor = [{part: "cell/floor", link: 0, vertices: cube(0, 0, -1, 0.1)}];
-    captured.mechanism("arm", arm.robot, floor, poses);
-    captured.mechanism("mill", arm.robot, floor, poses);
+    captured.mechanism("arm", arm.robot, linkShapes(floor), poses);
+    captured.mechanism("mill", arm.robot, linkShapes(floor), poses);
     check(captured.hulls.length == 1, "shared root geometry enters the cell once");
     var fixture = switch captured.hulls[0].owner { case Fixture: true; case _: false; };
     check(fixture, "a shared fixed floor belongs to the environment rather than a controller");
     var rebased = captured.at(new Transform3(new Vec3(1, 0, 0), Quat.identity()));
-    rebased.mechanism("mill", arm.robot, floor, poses);
+    rebased.mechanism("mill", arm.robot, linkShapes(floor), poses);
     check(rebased.hulls.length == 1 && Math.abs(rebased.fixedBounds()[0].minimum[0] + 0.1) < 1e-12,
       "rebasing retains shared physical identity and the floor's world pose");
     var refused = false;
     try {
       var moving = new CellCollisionSnapshot("arm", Transform3.identity(), []);
       var member = [{part: "ambiguous-jaw", link: 1, vertices: cube(0, 0, 0, 0.01)}];
-      moving.mechanism("arm", arm.robot, member, poses);
-      moving.mechanism("mill", arm.robot, member, poses);
+      moving.mechanism("arm", arm.robot, linkShapes(member), poses);
+      moving.mechanism("mill", arm.robot, linkShapes(member), poses);
     } catch (_:Dynamic) { refused = true; }
     check(refused, "two controllers cannot claim one moving physical occurrence");
   }
@@ -314,7 +350,7 @@ class CellCollisionCorpus {
 
   static function compoundWorkMember():Void {
     var arm = arm(), captured = new CellCollisionSnapshot("arm", Transform3.identity(), []);
-    captured.mechanism("arm", arm.robot, [{part: "torch", link: 1, vertices: cube(0, 0, 0, 0.01)}],
+    captured.mechanism("arm", arm.robot, linkShapes([{part: "torch", link: 1, vertices: cube(0, 0, 0, 0.01)}]),
       [Transform3.identity(), Transform3.identity()], ["torch"]);
     captured.object("work", [cube(0.021, 0, 0, 0.01), cube(0, 0.021, 0, 0.01)], Transform3.identity(), null, Fixture);
     var scene = captured.describe(arm, [0.0], 0.005);
@@ -331,20 +367,23 @@ class CellCollisionCorpus {
 
   static function initialCompoundPayload():Void {
     var arm = arm(), captured = new CellCollisionSnapshot("arm", Transform3.identity(), []);
-    captured.mechanism("arm", arm.robot, [
+    captured.mechanism("arm", arm.robot, linkShapes([
       {part: "pad-A", link: 1, vertices: cube(1, 0, 0, 0.01)},
       {part: "pad-B", link: 1, vertices: cube(1.04, 0, 0, 0.01)},
       {part: "plate", link: 1, vertices: cube(1.1, 0, 0, 0.01)}
-    ], [Transform3.identity(), Transform3.identity()], ["pad-A", "pad-B", "plate"]);
+    ]), [Transform3.identity(), Transform3.identity()], ["pad-A", "pad-B", "plate"]);
     captured.object("stock", [cube(1.02, 0, 0, 0.01), cube(1.02, 0, 0, 0.01)], Transform3.identity(), "moving");
     var scene = captured.describe(arm, [0.0], 0.005), stock = scene.memberObjects(["stock"]);
     var pads = scene.contacts(["pad-A"]);
-    for (index in stock) scene.payload(scene.description.objects[index].name, pads,
+    scene.payload(scene.description.objects[stock[0]].name, pads,
       CollisionPairRule.Allow, CollisionPairStatus.ProcessContact, 0.0);
+    check(scene.description.marginBetweenObjects(stock[1], scene.object("pad-A")) == 0.0 &&
+      scene.description.marginBetweenObjects(stock[1], scene.object("pad-B")) == 0.005,
+      "one payload declaration sets every piece's selected-contact margin and preserves other clearances");
     var build = scene.build(new NativeCollisionWorld());
     var metadata = scene.ownership.get(scene.description.objects[stock[0]].name);
     if (metadata == null) throw "Held stock lost its ownership fact";
-    check(stock.length == 2 && !metadata.tool,
+    check(stock.length == 2 && !scene.description.objects[stock[0]].tool,
       "initial compound held stock keeps its physical identity without becoming tool geometry");
     check(build.world.pairStatus(build.objects[stock[0]], build.objects[stock[1]]) == CollisionPairStatus.Rigid,
       "overlapping hull pieces of the same held part do not check against each other");
