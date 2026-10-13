@@ -1,9 +1,13 @@
 # Machine tending remaining review fixes
 
-MT1–MT6 and the first MT5b review passed their closing gate before the rebase.
-The follow-up review has reopened the integration gate; its remaining work is listed
-at the end of this document. MT7 remains a separate handoff.
-The sections below retain checkpoint history, rather than certify the current work in progress.
+This document retains historical MT1–MT6 integration and review checkpoints. It is not
+current release acceptance. The current plan and remaining review checklist are in
+[PLAN.md](PLAN.md): MT12b is committed and its complete sequential gate passed.
+Current certified reach is **Reach1300 / 550 mm riser / 96 poses / 541 mm stand-off**,
+**10.460036%** minimum joint margin and **0.878105** wrist sine. Reach850/600 mm,
+fifteen-pose and other earlier measurements below are historical results, superseded
+by the physical-tool and dual-gripper studies. MT13 and MT14 remain pending.
+
 Do not retain old-format compatibility: migrate in-repo callers and fixtures, require the
 current format, and remove obsolete paths. Reference hardware data remains explicitly assumed.
 
