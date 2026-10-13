@@ -476,7 +476,7 @@ struct SpanGrid {
 
 SpanGrid nodes_for_span(const std::vector<mk_path_sample> &samples, size_t span,
                                    const double *velocity, const double *acceleration, uint32_t joints,
-                                   double cap, double margin) {
+                                   double cap, double margin, bool reference) {
     const double length = samples[span + 1].s - samples[span].s;
     double fastest = cap > 0.0 ? cap : std::numeric_limits<double>::infinity();
     double accelerating = std::numeric_limits<double>::infinity();
@@ -520,6 +520,7 @@ SpanGrid nodes_for_span(const std::vector<mk_path_sample> &samples, size_t span,
         for (size_t step = 0; step < count; ++step) grid.nodes[step] = static_cast<double>(step) / static_cast<double>(count);
         return grid;
     };
+    if (reference) return uniform(MAX_STAGES_PER_SPAN);
     if (!moving) return uniform(MIN_STAGES_PER_SPAN);
     if (straight && std::isfinite(accelerating) && std::isfinite(fastest) && fastest > 0.0) {
         // The stretch where the speed changes, with room to spare: the profile may start slowing a little before the
@@ -902,14 +903,15 @@ mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
     } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
 }
 
-mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
-                               const double *max_acceleration, uint32_t joint_count,
-                               const double *speed_caps, uint32_t speed_cap_count,
-                               double start_speed, double end_speed,
-                               double lowering_tolerance, uint32_t require_feasible_path,
-                               mk_timing_report *out_report,
-                               mk_time_law_handle *out_law,
-                               mk_trajectory_handle *out_trajectory) {
+namespace {
+mk_result time_path(mk_path_handle path, const double *max_velocity,
+                    const double *max_acceleration, uint32_t joint_count,
+                    const double *speed_caps, uint32_t speed_cap_count,
+                    double start_speed, double end_speed,
+                    double lowering_tolerance, uint32_t require_feasible_path,
+                    mk_timing_report *out_report,
+                    mk_time_law_handle *out_law,
+                    mk_trajectory_handle *out_trajectory, bool reference) {
     if (!out_law || !out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
     out_law->id = 0;
     out_trajectory->id = 0;
@@ -977,7 +979,7 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         for (size_t span = 0; span + 1 < samples.size(); ++span) {
             span_first[span] = stage_span.size();
             const auto span_grid = nodes_for_span(samples, span, max_velocity, max_acceleration, joint_count,
-                speed_cap_count ? speed_caps[span] : 0.0, interpolation_margin);
+                speed_cap_count ? speed_caps[span] : 0.0, interpolation_margin, reference);
             span_fastest.push_back(span_grid.fastest);
             span_accelerating.push_back(span_grid.accelerating);
             const double begin = samples[span].s, length = samples[span + 1].s - begin;
@@ -1019,7 +1021,7 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         // boundary speeds the share is lowered, down to zero, which is the rest this replaces.
         std::vector<size_t> window_first{0};
         const size_t span_count = samples.size() - 1;
-        for (size_t span = 1; span < span_count; ++span)
+        for (size_t span = 1; span < span_count && !reference; ++span)
             if (span_first[span] - span_first[window_first.back()] >= WINDOW_NODES &&
                 span_first[span_count] - span_first[span] >= WINDOW_NODES / 4) window_first.push_back(span);
         std::vector<double> speeds(grid_values.size(), 0.0);
@@ -1027,7 +1029,10 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         boundary.front() = start_speed;
         boundary.back() = end_speed;
         bool timed = false;
+        uint32_t lowerings = 0;
+        if (out_report) out_report->windows = static_cast<uint32_t>(window_first.size());
         for (const double share : {BOUNDARY_SHARE, BOUNDARY_SHARE / 2, BOUNDARY_SHARE / 4, 0.0}) {
+            if (out_report) out_report->boundary_lowerings = lowerings++;
             if (window_first.size() > 1) {
                 std::vector<double> limit_sq(span_count + 1), forward(span_count + 1), backward(span_count + 1);
                 for (size_t at = 0; at <= span_count; ++at) {
@@ -1200,6 +1205,31 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         return MK_OK;
     } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
     catch (...) { return MK_ERROR_GENERATION; }
+}
+} // namespace
+
+mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
+                               const double *max_acceleration, uint32_t joint_count,
+                               const double *speed_caps, uint32_t speed_cap_count,
+                               double start_speed, double end_speed,
+                               double lowering_tolerance, uint32_t require_feasible_path,
+                               mk_timing_report *out_report,
+                               mk_time_law_handle *out_law,
+                               mk_trajectory_handle *out_trajectory) {
+    return time_path(path, max_velocity, max_acceleration, joint_count, speed_caps, speed_cap_count, start_speed,
+        end_speed, lowering_tolerance, require_feasible_path, out_report, out_law, out_trajectory, false);
+}
+
+mk_result MK_CALL mk_time_path_reference(mk_path_handle path, const double *max_velocity,
+                                         const double *max_acceleration, uint32_t joint_count,
+                                         const double *speed_caps, uint32_t speed_cap_count,
+                                         double start_speed, double end_speed,
+                                         double lowering_tolerance, uint32_t require_feasible_path,
+                                         mk_timing_report *out_report,
+                                         mk_time_law_handle *out_law,
+                                         mk_trajectory_handle *out_trajectory) {
+    return time_path(path, max_velocity, max_acceleration, joint_count, speed_caps, speed_cap_count, start_speed,
+        end_speed, lowering_tolerance, require_feasible_path, out_report, out_law, out_trajectory, true);
 }
 
 mk_result MK_CALL mk_project_couplings(mk_trajectory_handle trajectory,

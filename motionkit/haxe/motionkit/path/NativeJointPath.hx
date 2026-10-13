@@ -42,7 +42,7 @@ class NativeJointPath {
   }
 
   public function time(limits:PathTimingLimits,
-      loweringTolerance:Float):{law:PathTimeLaw, trajectory:Trajectory} {
+      loweringTolerance:Float):{law:PathTimeLaw, trajectory:Trajectory, windows:Int, boundaryLowerings:Int} {
     if (disposed) throw "Native joint path has been disposed";
     var created = MotionKitNative.mk_time_path(owner.borrow(), limits.maxVelocity,
       limits.maxAcceleration, limits.speedCaps, limits.startPathSpeed,
@@ -51,7 +51,8 @@ class NativeJointPath {
       throw 'Refined process timing requires an adjustment: joint ${created.out_report.get_joint()}, derivative ${created.out_report.get_derivative()}, ${created.out_report.get_value()} > ${created.out_report.get_limit()}, sustainable feed scale ${created.out_report.get_sustainable_scale()}';
     check(created.status, "path.time");
     return {law: new PathTimeLaw([], created.out_law),
-      trajectory: new Trajectory(created.out_trajectory)};
+      trajectory: new Trajectory(created.out_trajectory), windows: created.out_report.get_windows(),
+      boundaryLowerings: created.out_report.get_boundary_lowerings()};
   }
 
   public function dispose():Void {

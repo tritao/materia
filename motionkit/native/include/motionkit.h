@@ -555,10 +555,30 @@ typedef struct mk_timing_report {
     double value;
     double limit;
     double sustainable_scale;
+    /** How many windows the path was timed in (one for a path that is not cut). */
+    uint32_t windows;
+    /**
+     * How many times the windows' boundary speeds were lowered before they could be timed (0: at the first share; 3:
+     * at zero, where the path rests at each boundary as if it had been cut there).
+     */
+    uint32_t boundary_lowerings;
 } mk_timing_report;
 /** Reachability-based TOPP-RA timing and its validated lowered trajectory.
  * require_feasible_path=1 forbids smoothing retries and uniform stretch. */
 MK_API mk_result MK_CALL mk_time_path(mk_path_handle path,
+    const double *max_velocity MK_IN_ARRAY(joint_count),
+    const double *max_acceleration MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    const double *speed_caps MK_IN_ARRAY(speed_cap_count), uint32_t speed_cap_count,
+    double start_speed, double end_speed, double lowering_tolerance, uint32_t require_feasible_path,
+    mk_timing_report *out_report MK_OUT,
+    mk_time_law_handle *out_law MK_OUT MK_OWNED,
+    mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+/**
+ * The same timing on the grid the adaptive one replaces: 32 TOPP-RA stages a span and the whole path in one window,
+ * whatever its length. It is the reference the adaptive grid and the windows are tested against (their timing within a
+ * fraction of a percent of this one), and costs a grid of every span's 32 stages: for tests and tools, not for planning.
+ */
+MK_API mk_result MK_CALL mk_time_path_reference(mk_path_handle path,
     const double *max_velocity MK_IN_ARRAY(joint_count),
     const double *max_acceleration MK_IN_ARRAY(joint_count), uint32_t joint_count,
     const double *speed_caps MK_IN_ARRAY(speed_cap_count), uint32_t speed_cap_count,

@@ -171,6 +171,12 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 */
 	extern fn mk_time_path(path: mk_path_handle, max_velocity: ptr<const<f64>> @in_array("joint_count"), max_acceleration: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, speed_caps: ptr<const<f64>> @in_array("speed_cap_count"), speed_cap_count: u32, start_speed: f64, end_speed: f64, lowering_tolerance: f64, require_feasible_path: u32, out_report: ptr<mk_timing_report> @out, out_law: ptr<mk_time_law_handle> @out @owned, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	/**
+	 * The same timing on the grid the adaptive one replaces: 32 TOPP-RA stages a span and the whole path in one window,
+	 * whatever its length. It is the reference the adaptive grid and the windows are tested against (their timing within a
+	 * fraction of a percent of this one), and costs a grid of every span's 32 stages: for tests and tools, not for planning.
+	 */
+	extern fn mk_time_path_reference(path: mk_path_handle, max_velocity: ptr<const<f64>> @in_array("joint_count"), max_acceleration: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, speed_caps: ptr<const<f64>> @in_array("speed_cap_count"), speed_cap_count: u32, start_speed: f64, end_speed: f64, lowering_tolerance: f64, require_feasible_path: u32, out_report: ptr<mk_timing_report> @out, out_law: ptr<mk_time_law_handle> @out @owned, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	/**
 	 * Cartesian chain represented by its zero-pose space screws and TCP pose.
 	 * The three translation axes are columns of translation_axes. Optional C/A
 	 * axes and origins are in the same reference frame, in chain order.
@@ -565,7 +571,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * Validation metadata for a time law. Strict process mode reports a binding
 	 * joint and sustainable speed scale instead of retrying or stretching.
 	 */
-	struct mk_timing_report @layout(40, 8) {
+	struct mk_timing_report @layout(48, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		adjustments: u32 @offset(4);
 		joint: u32 @offset(8);
@@ -576,6 +582,15 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		value: f64 @offset(16);
 		limit: f64 @offset(24);
 		sustainable_scale: f64 @offset(32);
+		/**
+		 * How many windows the path was timed in (one for a path that is not cut).
+		 */
+		windows: u32 @offset(40);
+		/**
+		 * How many times the windows' boundary speeds were lowered before they could be timed (0: at the first share; 3:
+		 * at zero, where the path rests at each boundary as if it had been cut there).
+		 */
+		boundary_lowerings: u32 @offset(44);
 	}
 	/**
 	 * Immutable compact candidate layer, generated once and then copied out.

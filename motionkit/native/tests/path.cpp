@@ -358,6 +358,20 @@ int main() {
             duration[variant] = static_cast<double>(nanoseconds) * 1e-9;
             assert(mk_time_law_binding_count(law, &stage_count[variant]) == MK_OK);
             mk_trajectory_destroy(line_trajectory);
+            // The zone grid against the grid it replaces (32 stages a span): within half a percent of it or shorter. On one
+            // 100 mm span the 32 stages cannot follow the ramps (3 mm stages for a 0.14 mm ramp) and the reference is the
+            // slower; on fifty 2 mm spans it can, and the two agree to half a percent.
+            mk_time_law_handle reference_law{};
+            mk_trajectory_handle reference_trajectory{};
+            assert(mk_time_path_reference(path, velocity, joint_acceleration, 2, feeds.data(), static_cast<uint32_t>(feeds.size()),
+                0.0, 0.0, 1e-6, 0, nullptr, &reference_law, &reference_trajectory) == MK_OK);
+            int64_t reference_ns = 0;
+            assert(mk_trajectory_duration_ns(reference_trajectory, &reference_ns) == MK_OK);
+            const double reference_seconds = static_cast<double>(reference_ns) * 1e-9;
+            assert(duration[variant] <= 1.005 * reference_seconds);
+            if (variant == 1) assert(std::abs(duration[variant] - reference_seconds) <= 0.005 * reference_seconds);
+            mk_trajectory_destroy(reference_trajectory);
+            mk_time_law_destroy(reference_law);
             mk_time_law_destroy(law);
             mk_path_destroy(path);
         }
@@ -394,23 +408,33 @@ int main() {
             }
             return samples;
         };
-        auto duration_of = [&](int first, int count, mk_trajectory_handle &out) {
+        auto duration_of = [&](int first, int count, mk_trajectory_handle &out, bool reference = false,
+                               mk_timing_report *report = nullptr) {
             const auto samples = sample_path(first, count);
             mk_path_handle long_path{};
             assert(mk_path_create(samples.data(), static_cast<uint32_t>(samples.size()), &long_path) == MK_OK);
             mk_time_law_handle long_law{};
-            assert(mk_time_path(long_path, velocity, acceleration, 6, nullptr, 0, 0.0, 0.0, 1e-6, 0, nullptr,
-                &long_law, &out) == MK_OK);
+            assert((reference ? mk_time_path_reference : mk_time_path)(long_path, velocity, acceleration, 6, nullptr, 0,
+                0.0, 0.0, 1e-6, 0, report, &long_law, &out) == MK_OK);
             int64_t nanoseconds = 0;
             assert(mk_trajectory_duration_ns(out, &nanoseconds) == MK_OK);
             mk_time_law_destroy(long_law);
             mk_path_destroy(long_path);
             return static_cast<double>(nanoseconds) * 1e-9;
         };
-        mk_trajectory_handle whole{}, first_half{}, second_half{};
-        const double together = duration_of(0, spans, whole);
+        mk_trajectory_handle whole{}, first_half{}, second_half{}, dense{};
+        mk_timing_report windowed_report{}, dense_report{};
+        windowed_report.struct_size = dense_report.struct_size = sizeof(mk_timing_report);
+        const double together = duration_of(0, spans, whole, false, &windowed_report);
         const double apart = duration_of(0, spans / 2, first_half) + duration_of(spans / 2, spans / 2, second_half);
         assert(together < apart);
+        // The adaptive grid in windows against the grid it replaces (32 stages a span, one window): the same path in
+        // the same time to half a percent, timed in several windows that never had to lower their boundary speeds.
+        const double reference = duration_of(0, spans, dense, true, &dense_report);
+        assert(windowed_report.windows > 1 && windowed_report.boundary_lowerings == 0);
+        assert(dense_report.windows == 1);
+        assert(std::abs(together - reference) <= 0.005 * reference);
+        mk_trajectory_destroy(dense);
         // Under way where the halves rest: the joints' speed at the middle of the path.
         mk_trajectory_state middle{};
         middle.struct_size = sizeof(middle);

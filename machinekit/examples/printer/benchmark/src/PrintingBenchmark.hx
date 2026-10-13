@@ -267,6 +267,13 @@ class PrintingBenchmark {
     if (result.overall < 2.0) failures.push('planning is ${result.overall}x real time overall, below 2x');
     if (result.worstWindow < 2.0) failures.push('planning is ${result.worstWindow}x real time over its worst 10 s, below 2x');
     if (result.planned > 1.15 * result.reference) failures.push('planned ${result.planned} s is more than 15 % above the reference ${result.reference} s');
+    // A long smooth path is timed in windows that carry their boundary speeds; lowering those speeds costs time, and
+    // lowering them to zero rests the machine where the path was cut. The gate's windows keep their first speeds.
+    var timing = Std.downcast(machine.binding.compiler.timing, motionkit.planner.ToppraPathTiming);
+    if (timing != null) {
+      Sys.println('  windows: ${timing.windowedPaths} paths timed in windows, boundary speeds lowered ${timing.boundaryLowerings} times');
+      if (timing.boundaryLowerings > 0) failures.push('window boundary speeds were lowered ${timing.boundaryLowerings} times');
+    }
     Sys.println(failures.length == 0 ? "PRINTING GATE PASSED" : "PRINTING GATE FAILED: " + failures.join("; "));
     if (failures.length > 0) Sys.exit(1);
   }

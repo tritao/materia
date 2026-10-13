@@ -1555,6 +1555,18 @@ findings with their evidence). Fixed, one commit each:
   the trip strictly between the soft limit and the end stop, with repeatability margins (Klipper's `position_endstop`
   outside `position_min` is the same), so normal motion never trips a switch; a home is a commanded point inside the
   travel. Test: `HomingTests`.
+- **The adaptive grid and the windows are cross-checked against the grid they replace (concern 1).** The exact-affine
+  "fast path" (43de352f0) is a grid, not a second engine: every span gets its stages from `nodes_for_span` (a straight span
+  its zones, any other its profile and turn) and all of them go to the same TOPP-RA, lowering, validation and stretch
+  loop; every plan check (motor space, clearance, configuration, the plan's limits with the merge fallback, task space,
+  the plan check) runs on the executed motion whatever the grid. The joint-jump check it skips is safe: `AxisKinematics`
+  has no branches, wraps or clamps. But nothing timed the same path both ways, and the windows' last fallback (boundary
+  speed shares 0.7, 0.35, 0.175, then 0: a rest at every boundary) was silent. `mk_time_path_reference` times a path on
+  the old grid (32 stages a span, one window), and `mk_timing_report` says how many windows a path was timed in and how
+  often their boundary speeds were lowered (`ToppraPathTiming.windowedPaths`, `boundaryLowerings`). Tests: the native
+  path test (the six-joint path of 20,000 spans in five windows, with no lowering, within 0.5 % of the reference; a 100 mm
+  line within 0.5 % of it or shorter: on one span the reference's 3 mm stages cannot follow a 0.14 mm ramp and it is 5.7 %
+  slower, on fifty it agrees), the gate (no boundary speed lowered). Exact boundaries without the shares are RF6.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
