@@ -1510,6 +1510,12 @@ findings with their evidence). Fixed, one commit each:
   of two definitions). The damping-ratio docs no longer say zero is critical, and MuJoCo's unused fallback to 1 is gone.
   Tests: the simkit core and MuJoCo native tests (each backend's feature), `checkPrinterCube` (the physical carriage
   crosses the cube). The cube's numbers do not move (its deposition reads the device's view).
+- **The servo-on-a-belt path is tested (concern 9).** 35f49ac33 made a servo that turns a spring belt's pulley integrate
+  its spring against the pulley and its rotor (`compliantLoad`), not the carriage, but no machine reaches it (the printer's
+  belts are held by steppers; the gantry picker's servo belts state no damping) and nothing tested it. It is kept, since
+  the spring model (RF2) routes the gantry through it: `SimulationPoseResetTests.compliantServoLoad` builds a carriage on a
+  damped belt driven by a servo, and checks the compliant load, the reflected inertia (the pulley's, not the carriage's),
+  and a stability interval finite and shorter than the rigid one.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

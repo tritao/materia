@@ -51,6 +51,7 @@ class SimulationPoseResetTests {
     if (backend == 1) { toolProximity(); posedToolShapes(); }
     driveReferenceCompilation();
     downstreamInertia();
+    compliantServoLoad();
     coupling(backend);
     stepperSlip(backend);
     if (backend == 1) servoCoupling();
@@ -82,6 +83,56 @@ class SimulationPoseResetTests {
       throw "Explicit motor gains must be reflected to the joint drive";
     if (Math.abs(physical.joints[0].reflectedInertia - 0.25) > 1e-12)
       throw "An uncoupled geared joint must not reflect its load inertia twice";
+  }
+
+  /**
+   * A servo that turns a belt's pulley: with the belt a spring (a stiffness and a stated damping ratio) the pulley turns
+   * without the carriage, so the servo's spring is integrated against the pulley and its rotor alone, a much shorter
+   * stability interval than against the carriage it would carry through a rigid belt.
+   */
+  static function compliantServoLoad():Void {
+    function build(dampingRatio:Float):RobotRuntimeBlueprint {
+      var model = new RobotModel("servo belt");
+      var base = model.addLink(new Link("base"));
+      var carriage = model.addLink(new Link("carriage"));
+      carriage.mass = 1.0;
+      carriage.inertiaTensor = [0.001, 0.0, 0.0, 0.0, 0.001, 0.0, 0.0, 0.0, 0.001];
+      var wheel = model.addLink(new Link("pulley"));
+      wheel.mass = 0.02;
+      wheel.inertiaTensor = [2e-5, 0.0, 0.0, 0.0, 2e-5, 0.0, 0.0, 0.0, 2e-5];
+      var x = model.addJoint(new Joint("x", JointType.Prismatic, base, carriage));
+      x.axis = [1, 0, 0];
+      x.limits = new JointLimits(-0.2, 0.2);
+      var pulley = model.addJoint(new Joint("pulley", JointType.Revolute, base, wheel));
+      pulley.axis = [0, 0, 1];
+      // A 10 mm pulley: 100 rad a metre of belt.
+      var belt = new JointCoupling("belt", x.id, pulley.id, 100.0, 0.0);
+      belt.stiffness = 80000.0;
+      belt.dampingRatio = dampingRatio;
+      model.addCoupling(belt);
+      var actuator = new Actuator("servo", 0, 0, Transmission.SimpleTransmission(pulley.id, 1, 0));
+      actuator.drive = new ServoDrive(1, 2, 100, 200, 5e-6, 4096);
+      actuator.positionLoopRate = 4000;
+      actuator.servoStiffness = 20;
+      actuator.servoDamping = 0.01;
+      model.addActuator(actuator);
+      return RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
+    }
+    var spring = build(0.1), rigid = build(0.0);
+    var springPulley = spring.joints[1], rigidPulley = rigid.joints[1];
+    if (!springPulley.compliantLoad || rigidPulley.compliantLoad)
+      throw "Only a pulley a spring belt stretches from is a compliant load";
+    // The pulley's own 2e-5 kg m^2 outweighs the rotor's 5e-6.
+    if (Math.abs(springPulley.reflectedInertia - 2e-5) > 1e-12)
+      throw 'A compliant load reflects the pulley and its rotor only: ${springPulley.reflectedInertia}';
+    // Through a rigid belt the carriage turns with the pulley: 1 kg at 10 mm is 1e-4 kg m^2 more.
+    if (!(rigidPulley.reflectedInertia >= 1e-4))
+      throw 'A rigid load reflects the carriage it carries: ${rigidPulley.reflectedInertia}';
+    var compliant = spring.servoStabilityInterval(true);
+    if (!(Math.isFinite(compliant) && Math.abs(compliant - 0.5 * Math.sqrt(2e-5 / 20.0)) < 1e-12 && compliant < rigid.servoStabilityInterval()))
+      throw 'A servo on a spring belt needs the pulley\'s interval: $compliant against ${rigid.servoStabilityInterval()}';
+    if (rigid.servoStabilityInterval(true) != Math.POSITIVE_INFINITY)
+      throw "A rigid machine has no compliant servo load";
   }
 
   /** The drive stability estimate includes masses beyond the immediate child. */
