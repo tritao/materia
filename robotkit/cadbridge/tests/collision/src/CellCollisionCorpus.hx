@@ -380,6 +380,13 @@ class CellCollisionCorpus {
     check(scene.description.marginBetweenObjects(stock[1], scene.object("pad-A")) == 0.0 &&
       scene.description.marginBetweenObjects(stock[1], scene.object("pad-B")) == 0.005,
       "one payload declaration sets every piece's selected-contact margin and preserves other clearances");
+    scene.payload(scene.description.objects[stock[0]].name, scene.contacts(["pad-B"]),
+      CollisionPairRule.Allow, CollisionPairStatus.ProcessContact, 0.0);
+    check(scene.description.marginBetweenObjects(stock[1], scene.object("pad-A")) == 0.005 &&
+      scene.description.marginBetweenObjects(stock[1], scene.object("pad-B")) == 0.0,
+      "changing selected grasp contacts removes only the old grasp's margin overrides");
+    scene.payload(scene.description.objects[stock[0]].name, pads,
+      CollisionPairRule.Allow, CollisionPairStatus.ProcessContact, 0.0);
     var build = scene.build(new NativeCollisionWorld());
     var metadata = scene.ownership.get(scene.description.objects[stock[0]].name);
     if (metadata == null) throw "Held stock lost its ownership fact";

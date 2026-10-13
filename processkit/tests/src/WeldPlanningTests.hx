@@ -793,12 +793,12 @@ private class EntryTrajectoryClearance implements robotkit.manipulation.Clearanc
   public function closestSweep(from:Array<Float>, to:Array<Float>, ?contact:Bool, ?maxJointStep:Float,
       ?wanted:Float):Null<robotkit.manipulation.ClearanceViolation>
     return unused("closestSweep");
-  public function motionEnvelope(lower:Array<Float>, upper:Array<Float>):robotkit.manipulation.ClearanceMotionEnvelope
+  public function motionEnvelope(lower:Array<Float>, upper:Array<Float>):kinematicskit.ClearanceMotionEnvelope
     return unused("motionEnvelope");
   public function displacementBounds(q:Array<Float>, errors:Array<Float>):Array<Float> return unused("displacementBounds");
   public function tcpDisplacementBound(q:Array<Float>, errors:Array<Float>):Float return unused("tcpDisplacementBound");
   public function auditDisplacement(q:Array<Float>, perturbed:Array<Float>, errors:Array<Float>,
-      ?envelope:robotkit.manipulation.ClearanceMotionEnvelope):Float
+      ?envelope:kinematicskit.ClearanceMotionEnvelope):Float
     return unused("auditDisplacement");
   public function withGroup(group:robotkit.manipulation.KinematicGroup):robotkit.manipulation.ClearanceWorld
     return new EntryTrajectoryClearance(group);

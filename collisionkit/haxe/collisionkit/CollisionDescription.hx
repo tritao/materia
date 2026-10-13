@@ -7,6 +7,13 @@ private typedef DescriptionPairMargin = {
   var contact:Float;
 }
 
+private typedef HeldMarginBase = {
+  var body:Int;
+  var first:Int;
+  var second:Int;
+  var authored:Null<DescriptionPairMargin>;
+}
+
 /**
  * A cell's collision description (COLLISION.md CL3): bodies with their
  * groups and poses, shapes on them, rules with their reasons, the
@@ -24,6 +31,7 @@ class CollisionDescription {
   var groups:Int = 1;
   final pairMargins:Map<String, DescriptionPairMargin> = new Map();
   final objectMargins:Map<String, DescriptionPairMargin> = new Map();
+  final heldMarginBases:Map<String, HeldMarginBase> = new Map();
   var airTable:Null<CollisionMargins> = null;
   var contactTable:Null<CollisionMargins> = null;
   public final bodies:Array<DescribedBody> = [];
@@ -54,6 +62,11 @@ class CollisionDescription {
       addArticulation(articulation.name, [for (body in articulation.bodies) bodyIds[body]], articulation.reference);
     for (margin in other.pairMargins) setGroupMargins(margin.first, margin.second, margin.air, margin.contact);
     for (margin in other.objectMargins) setObjectMargins(objectIds[margin.first], objectIds[margin.second], margin.air, margin.contact);
+    for (base in other.heldMarginBases) {
+      var a = objectIds[base.first], b = objectIds[base.second], original = base.authored;
+      heldMarginBases.set(pairKey(a, b), {body: bodyIds[base.body], first: a, second: b,
+        authored: original == null ? null : {first: a, second: b, air: original.air, contact: original.contact}});
+    }
     for (assumption in other.assumptions) note(assumption);
   }
 
@@ -119,6 +132,7 @@ class CollisionDescription {
   public function restoreBodyPolicy(body:Int, authored:CollisionDescription):Void {
     if (authored == null || authored.bodies.length != bodies.length || authored.objects.length != objects.length)
       throw "Release needs the original description with stable geometry ids";
+    restoreHeldMargins(body);
     for (other in -1...bodies.length) if (other != body) {
       var rule = authored.bodyRule(body, other);
       setBodyRule(body, other, rule == null ? CollisionPairRule.Default : rule.rule,
@@ -142,6 +156,8 @@ class CollisionDescription {
     for (contact in contacts)
       if (contact < 0 || contact >= objects.length || objects[contact].body == body)
         throw "Held contacts must name outside described objects";
+    if (margin != null && (!Math.isFinite(margin) || margin < 0)) throw "Held contact margin must be finite and nonnegative";
+    restoreHeldMargins(body);
     var contactIds:Map<Int, Bool> = new Map();
     for (contact in contacts) contactIds.set(contact, true);
     for (other in -1...bodies.length) if (other != body)
@@ -149,11 +165,25 @@ class CollisionDescription {
     for (i in 0...objects.length) if (objects[i].body == body)
       for (j in 0...objects.length) if (objects[j].body != body) {
         var contact = contactIds.exists(j);
-        objectMargins.remove(pairKey(i, j));
-        if (contact && margin != null) setObjectMargins(i, j, margin, margin);
+        if (contact && margin != null) {
+          var key = pairKey(i, j);
+          heldMarginBases.set(key, {body: body, first: i, second: j, authored: objectMargins.get(key)});
+          setObjectMargins(i, j, margin, margin);
+        }
         setObjectRule(i, j, contact ? contactRule : CollisionPairRule.Check,
           contact ? contactReason : CollisionPairStatus.Checked);
       }
+  }
+
+  /** Replacing grasp contacts restores only margins introduced by that grasp. */
+  function restoreHeldMargins(body:Int):Void {
+    var keys = [for (key in heldMarginBases.keys()) key];
+    for (key in keys) {
+      var base = heldMarginBases.get(key);
+      if (base == null || base.body != body) continue;
+      if (base.authored == null) objectMargins.remove(key); else objectMargins.set(key, base.authored);
+      heldMarginBases.remove(key);
+    }
   }
 
   /** Exact object-pair margins do not alter any other object in the same margin class. */

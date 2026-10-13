@@ -1,9 +1,7 @@
 package robotkit.collision;
 
 import collisionkit.CollisionDescription;
-import collisionkit.CollisionGeometry;
 import collisionkit.kinematics.ModelBodies;
-import robotkit.spatial.Transform3;
 
 /** The description plus its mechanical carrier mapping; policy stays in the description. */
 class CollisionClearanceLayout {

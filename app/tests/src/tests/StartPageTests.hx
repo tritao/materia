@@ -54,7 +54,15 @@ class StartPageTests {
     browser.selectCategory("Machining");
     check(browser.filtered(all).length == 0, "search and category compose");
     browser.search("");
-    check(browser.filtered(all).length == 2, "bench mill variants share a card");
+    var machining = browser.filtered(all);
+    check(machining.length == 3, "router, bench mills and press brake form three machining families");
+    var mills = [for (family in machining) if (family.id == "bench-mills") family];
+    check(mills.length == 1 && mills[0].examples.length == 2 &&
+      mills[0].examples[0].id == "bench-mill" && mills[0].examples[1].id == "enclosed-bench-mill",
+      "both bench mill variants share exactly one card");
+    var presses = [for (family in machining) if (family.id == "press-brake") family];
+    check(presses.length == 1 && presses[0].examples.length == 1 && presses[0].examples[0].id == "press-brake",
+      "the press brake remains directly accessible in its own machining card");
     browser.selectCategory("All");
 
     // A partial installation still groups only the variants that are actually available.

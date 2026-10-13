@@ -81,7 +81,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
     return result;
   }
 
-  /** Shapes on a named link, or on a tool body following that link (group 1). */
+  /** Shapes on a named link, with explicit tool identity and margin classes. */
   public static function shapes(link:String, shapes:Array<CollisionShape>, isTool:Bool = false):CollisionDescription {
     var result = new CollisionDescription(MARGIN);
     result.setGroupMargins(collisionkit.CollisionMarginClass.Tool, collisionkit.CollisionMarginClass.Air, MARGIN, CONTACT_MARGIN);
