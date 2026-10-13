@@ -1521,6 +1521,13 @@ findings with their evidence). Fixed, one commit each:
   leaving "not merged" as the reason, so the gate's `mergeRefusals == 0` measured the wrong thing. Only a merged form that
   `ExecutionPlan.create` refuses is a refusal now. Test: the gate's extruder check (the tab's retractions are joint moves)
   asserts no refusal.
+- **The shaping deviation bound mixed joint units with metres.** `shapeJoints` bounded how far shaping moves each joint
+  from its delayed copy (`0.5 sum a_i (T_i - d)^2` times the joint's acceleration limit), in the joint's units, took the
+  largest, and the task-space check added it to a tolerance in metres. That is right only for a prismatic axis of unit
+  scale, and the tool's error is the norm over the shaped axes, so with x and y shaped it was up to 1.4 times too tight.
+  Each shaped joint is now one Cartesian axis of the exact affine map (a joint that moves with several axes, a CoreXY
+  motor, is refused: it is shaped through its axes), its bound converted to metres along it, and the axes' bounds combined
+  as a root-sum-square. Shaping needs an exact affine machine, and says so. The gate's shaping numbers do not move.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

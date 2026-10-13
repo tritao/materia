@@ -115,7 +115,7 @@ class ProgramCompiler {
   var shapingDelay:Float = 0.0;
   /** The shaped plan's extra length: the longest impulse delay, seconds. */
   var shapingTail:Float = 0.0;
-  /** Bound on how far shaping can move a joint from the lowered motion delayed by `shapingDelay`, in the joint's units. */
+  /** Bound on how far shaping can move the tool from the lowered motion delayed by `shapingDelay`, metres. */
   var shapingDeviation:Float = 0.0;
   /** Seconds a path's distance-driven joint (an extruder) runs ahead of the flow it feeds; 0 is off. */
   public var pressureAdvance:Float = 0.0;
@@ -158,8 +158,11 @@ class ProgramCompiler {
     var reference = 0.0, any = false;
     for (shaper in shapers) if (shaper != null) { any = true; reference = Math.max(reference, shaper.impulses.meanDelay()); }
     if (!any) { shapeJoints(null); return; }
+    // The deviation is the tool's, in metres: each shaped joint is one Cartesian axis of an exact affine machine.
+    var map = solver.affineMap();
+    if (map == null) throw "Input shaping needs a machine whose joints are an exact affine map of the tool (Cartesian axes)";
     var impulses:Array<ShaperImpulses> = [];
-    var tail = 0.0, deviation = 0.0;
+    var tail = 0.0, squares = 0.0;
     for (joint in 0...shapers.length) {
       var shaper = shapers[joint];
       var own = shaper == null ? ShaperImpulses.delay(0.0) : shaper.impulses;
@@ -171,10 +174,17 @@ class ProgramCompiler {
       if (shaper != null) {
         var sum = 0.0;
         for (index in 0...lined.delays.length) sum += lined.amplitudes[index] * Math.pow(lined.delays[index] - reference, 2);
-        deviation = Math.max(deviation, 0.5 * sum * maxAcceleration[joint]);
+        // The joint's travel per metre of its axis; a shaped joint that moves with more than one axis (a CoreXY motor)
+        // is shaped through its axes instead.
+        var perMetre = 0.0, axes = 0;
+        for (column in map.columns) if (column[joint] != 0.0) { perMetre = Math.abs(column[joint]); axes++; }
+        if (axes != 1) throw 'Joint $joint is shaped but is not one Cartesian axis: shape the axes it follows';
+        var metres = 0.5 * sum * maxAcceleration[joint] / perMetre;
+        // The axes' deviations are independent components of the tool's.
+        squares += metres * metres;
       }
     }
-    shaping = impulses; shapingDelay = reference; shapingTail = tail; shapingDeviation = deviation;
+    shaping = impulses; shapingDelay = reference; shapingTail = tail; shapingDeviation = Math.sqrt(squares);
   }
 
   /**
