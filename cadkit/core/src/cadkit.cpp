@@ -4261,17 +4261,25 @@ TopoDS_Shape planar_boolean(cad_shape first, cad_shape second, int operation) {
 // 1e-7, inward offsets, both joins): MAT2d_MiniPath::MinimumL1L2 skips the Extrema_ExtCC2d results when
 // IsParallel(). https://github.com/Open-Cascade-SAS/OCCT/issues/1606. A face with a single wire never reaches
 // that code, and rectangular frames do not crash, so a face is never offset with its holes: see `offset_face`.
+// A region shrunk past its own width collapses, and OCCT says so by failing or by giving nothing: that is an empty
+// result. A region grown cannot collapse, so there a failure is OCCT's, and it is reported rather than dropping a
+// skirt, or a hole that the part's inset grows, without a word.
 std::vector<TopoDS_Face> offset_simple(const TopoDS_Face& face, const gp_Pln& plane, double signed_distance) {
+    const bool growing = signed_distance > 0.0;
     std::vector<TopoDS_Wire> wires;
     try {
         BRepOffsetAPI_MakeOffset offset(face, GeomAbs_Arc);
         offset.Perform(signed_distance);
-        if (!offset.IsDone() || offset.Shape().IsNull()) return {};
+        const bool done = offset.IsDone() && !offset.Shape().IsNull();
+        require_model(done || !growing, "growing a planar region failed");
+        if (!done) return {};
         for (TopExp_Explorer explorer(offset.Shape(), TopAbs_WIRE); explorer.More(); explorer.Next())
             wires.push_back(TopoDS::Wire(explorer.Current()));
     } catch (const Standard_Failure&) {
+        require_model(!growing, "growing a planar region failed");
         return {}; // the region collapsed
     }
+    require_model(!wires.empty() || !growing, "growing a planar region gave nothing");
     if (wires.empty()) return {};
     return faces_from_wires(wires, plane);
 }

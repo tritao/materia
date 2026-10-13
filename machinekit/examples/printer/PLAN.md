@@ -1588,6 +1588,11 @@ findings with their evidence). Fixed, one commit each:
   circle by least squares, and asserts its diameter (6 mm within 0.3, as before) and its centre (within 0.2 mm of CAD's),
   and the cube's box and hole print to the micrometre. Short cube: hole 5,956 um across, 52 um off its CAD centre, from
   8,030 wall points; box 99,994..119,994 x 99,930..120,000 x -5..4,010 um.
+- **A failed growing offset is an error, not an empty region.** `cad_planar_offset` turned any OCCT offset failure into an
+  empty result ("the region collapsed"). That is right for a region shrunk past its own width, but a grown region cannot
+  collapse: a skirt, or a hole region that grows while the part is inset (`offset_face` offsets the holes the other way),
+  would have vanished without a word, and the slicer would have printed infill over a hole. A growing offset that fails
+  or gives nothing is now a modelling error with its reason.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
