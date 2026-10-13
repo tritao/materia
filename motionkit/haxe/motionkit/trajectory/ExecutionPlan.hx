@@ -14,7 +14,7 @@ import runtime.memory.NativeSpanOwner;
   assumptions. Its segments stay in native memory: the `segment*` spans read
   them in place while the plan is alive, and `segments()` copies them out.
 **/
-class ExecutionPlan implements NativeSpanOwner {
+class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
   final owner:Ownedmk_plan_handle;
   var disposed:Bool = false;
   public final report:ValidationReport;
@@ -29,6 +29,7 @@ class ExecutionPlan implements NativeSpanOwner {
   public final requiredCapabilities:Int64;
   public final planningAuthority:Int;
   public final durationSeconds:Float;
+  public function duration():Float return durationSeconds;
   public final jointCount:Int;
   final storedEvents:Array<TimedEvent>;
   public var events(get, never):Array<TimedEvent>;

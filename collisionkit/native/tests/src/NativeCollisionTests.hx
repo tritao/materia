@@ -40,6 +40,8 @@ class NativeCollisionTests {
     testBodyPairsForCollision();
     testWorldFollowsTheSnapshot();
     testStatusesAndChanges();
+    testDescribedTransfers();
+    testObjectMarginClasses();
     testTwoModelsInOneWorld();
     testInflationAgainstExactDistances();
     testViolationsAndBatches();
@@ -132,6 +134,84 @@ class NativeCollisionTests {
   }
 
   /** Pair statuses from the kit's pairs, declared rules, reference overlap, re-attaching and terrain. */
+  /** Shared transfers preserve compound geometry, offsets, padding and source data. */
+  static function testDescribedTransfers():Void {
+    var source = new collisionkit.CollisionDescription(0.005);
+    var part = source.addBody("part", 0, false, CollisionPose.translation(1, 0, 0));
+    var carrier = source.addBody("carrier", 1, false);
+    var sphere = source.addObject("part/sphere", part, CollisionPose.translation(0.2, 0, 0), CollisionGeometry.Sphere(0.02), 0.005);
+    var box = source.addObject("part/box", part, CollisionPose.translation(0, 0.2, 0), CollisionGeometry.Box(0.01, 0.02, 0.03));
+    var grip = source.addObject("carrier/grip", carrier, CollisionPose.identity(), CollisionGeometry.Box(0.001, 0.001, 0.001));
+    var otherGrip = source.addObject("carrier/other-grip", carrier, CollisionPose.translation(0, 0, 0.1), CollisionGeometry.Box(0.001, 0.001, 0.001));
+    var first = source.addFixed("probe/sphere", CollisionPose.translation(1.26, 0, 0), CollisionGeometry.Sphere(0.02), 2);
+    var second = source.addFixed("probe/box", CollisionPose.translation(1, 0.25, 0), CollisionGeometry.Sphere(0.01), 3);
+    source.setObjectMargins(sphere, first, 0.005, 0.002);
+    var build = source.build(new NativeCollisionWorld());
+    var ids = build.objects.copy();
+    var queries = [new CollisionPair(ids[sphere], ids[first], build.bodies[part], build.bodies[source.objects[first].body]),
+      new CollisionPair(ids[box], ids[second], build.bodies[part], build.bodies[source.objects[second].body])];
+    var before = build.world.pairDistances(queries);
+    check(before.length == 2 && Math.abs(before[0].distance - 0.015) < 1e-9, "described sphere keeps radial inflation");
+    check(Math.abs(before[1].distance - 0.02) < 1e-9, "compound part keeps its box offset");
+    var target = new CollisionPose(0, 0, 0, 0, 0, Math.sin(Math.PI / 4), Math.cos(Math.PI / 4));
+    build.transferBody(part, CollisionPose.translation(1, 0, 0), target, false, [grip]);
+    var attached = build.world.pairDistances(queries);
+    check(Math.abs(attached[0].distance - before[0].distance) < 1e-9 && Math.abs(attached[1].distance - before[1].distance) < 1e-9,
+      "changing carrier frame preserves every shape's world pose");
+    check(build.objects[sphere] == ids[sphere] && build.objects[box] == ids[box], "transfer preserves collision object ids");
+    check(build.description.bodies[part].fixed == false && build.world.pairStatus(ids[sphere], ids[grip]) == CollisionPairStatus.ProcessContact,
+      "attachment permits the explicitly named grasp contact");
+    check(build.world.pairStatus(ids[sphere], ids[otherGrip]) == CollisionPairStatus.Checked &&
+      build.world.pairStatus(ids[box], ids[otherGrip]) == CollisionPairStatus.Checked,
+      "a second gripper on the same carrier still checks against every stock piece");
+    build.openContactWindow(part, carrier);
+    check(build.world.pairStatus(ids[sphere], ids[otherGrip]) == CollisionPairStatus.ProcessContact,
+      "an explicit process window overrides an authored object check");
+    build.closeContactWindow(part, carrier);
+    check(build.world.pairStatus(ids[sphere], ids[otherGrip]) == CollisionPairStatus.Checked &&
+      build.world.pairStatus(ids[sphere], ids[grip]) == CollisionPairStatus.ProcessContact,
+      "closing a window restores both checked surfaces and named grasp contacts");
+    check(source.objects[sphere].offset.x == 0.2 && source.bodies[part].pose.x == 1,
+      "a live transfer leaves the original description reusable");
+    check(build.description.objects[sphere].inflation == 0.005 && build.description.marginBetweenObjects(sphere, first, true) == 0.002,
+      "live description preserves geometry padding and authored process margins");
+    build.transferBody(part, target, CollisionPose.translation(0, 0.5, 0), true, []);
+    var detached = build.world.pairDistances(queries);
+    check(build.description.bodies[part].fixed && build.world.pairStatus(ids[sphere], ids[grip]) == CollisionPairStatus.Checked &&
+      Math.abs(detached[0].distance - before[0].distance) < 1e-9 && Math.abs(detached[1].distance - before[1].distance) < 1e-9,
+      "detachment preserves shape poses and restores independent collision checks");
+    build.world.dispose();
+  }
+
+  /** Exact pair margins remain independent when many objects share a small set of classes. */
+  static function testObjectMarginClasses():Void {
+    var source = new collisionkit.CollisionDescription(0.005);
+    var moving = source.addBody("moving", 1, false);
+    var first = source.addObject("first", moving, CollisionPose.identity(), CollisionGeometry.Sphere(0.01));
+    var near = source.addFixed("near", CollisionPose.translation(0.024, 0, 0), CollisionGeometry.Sphere(0.01), 1);
+    var other = source.addFixed("other", CollisionPose.translation(-0.024, 0, 0), CollisionGeometry.Sphere(0.01), 1);
+    source.setObjectMargins(first, near, 0.003, 0.0005);
+    source.setObjectMargins(first, other, 0.005, 0.005);
+    var build = source.build(new NativeCollisionWorld());
+    var air = build.world.violation(source.margins), contact = build.world.violation(source.contactMargins);
+    check(source.groupCount() == 2 && air != null && air.b == build.objects[other] && contact != null && contact.b == build.objects[other],
+      "one pair's work allowance never relaxes another pair sharing its margin class");
+    check(source.marginBetweenObjects(first, near) == 0.003 && source.marginBetweenObjects(first, other) == 0.005,
+      "sparse pair margins retain independently authored values");
+    build.world.setObjectRule(build.objects[first], build.objects[other], CollisionPairRule.Allow, CollisionPairStatus.ProcessContact);
+    build.world.setObjectMargins(build.objects[first], build.objects[near], 0.006, 0.0005);
+    var raised = build.world.violation(source.margins);
+    check(raised != null && Math.abs(raised.required - 0.006) < 1e-12 && build.world.violation(source.contactMargins) == null,
+      "air and contact contexts select the same pair's distinct sparse margins");
+    check(build.world.violation(new CollisionMargins(2, 0.005, false, 0.002)) == null,
+      "a query ceiling applies to sparse margins as well as the class table");
+    build.world.setObjectMargins(build.objects[first], build.objects[near], null, null);
+    var restored = build.world.violation(source.margins);
+    check(restored != null && Math.abs(restored.required - 0.005) < 1e-12,
+      "removing a sparse margin restores the group's margin");
+    build.world.dispose();
+  }
+
   static function testStatusesAndChanges():Void {
     var model = twoLinkArm();
     var base = 0, upper = 1, fore = 2, tool = 3;

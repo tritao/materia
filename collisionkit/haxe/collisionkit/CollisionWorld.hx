@@ -41,6 +41,8 @@ interface CollisionWorld {
   function setBodyRule(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void;
   /** A rule for one object pair (process contact); it overrides body rules. */
   function setObjectRule(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void;
+  /** Sparse object-pair margins override group classes; null restores the class margin. */
+  function setObjectMargins(a:Int, b:Int, air:Null<Float>, contact:Null<Float>):Void;
   function pairStatus(a:Int, b:Int):CollisionPairStatus;
   /**
    * Over `bodies` (one articulation, posed at its reference configuration),

@@ -25,6 +25,8 @@ struct PairResult {
 struct Margins {
     uint32_t groups = 0;
     const double *table = nullptr;
+    bool contact = false;
+    double ceiling = -1.0;
     double between(int32_t g, int32_t h) const {
         return g <= h ? table[size_t(g) * groups + size_t(h)] : table[size_t(h) * groups + size_t(g)];
     }
@@ -62,6 +64,7 @@ public:
     void remove(uint32_t object);
     void set_body_rule(int32_t a, int32_t b, int32_t rule, int32_t reason);
     void set_object_rule(uint32_t a, uint32_t b, int32_t rule, int32_t reason);
+    void set_object_margins(uint32_t a, uint32_t b, double air, double contact);
     int32_t status(uint32_t a, uint32_t b) const;
 
     /** Marks the pairs among `bodies` colliding now as overlapping at reference; returns how many. */
@@ -110,12 +113,15 @@ private:
         bool touch = false;
     };
     using Key = std::pair<uint32_t, uint32_t>;
+    struct ObjectMargins { double air, contact; };
+    std::map<Key, ObjectMargins> object_margins_;
     using BodyKey = std::pair<int32_t, int32_t>;
     static Key key(uint32_t a, uint32_t b) { return a < b ? Key(a, b) : Key(b, a); }
     static BodyKey body_key(int32_t a, int32_t b) { return a < b ? BodyKey(a, b) : BodyKey(b, a); }
 
     /** The pair's status before support is considered (CK_PAIR_*). */
     int32_t declared_status(const Key &pair) const;
+    double required_margin(const Pair &pair, const Margins &classes) const;
     bool is_static(int32_t body) const { return body < 0 || bodies_[size_t(body)].fixed; }
     void pose(Object &object);
     void rebuild_pairs();

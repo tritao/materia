@@ -1,3 +1,4 @@
+import CollisionFixture;
 import robotkit.collision.CollisionClearance;
 import collisionkit.native.NativeCollisionWorld;
 import MotionKitNative.mk_lattice_candidate;
@@ -1103,7 +1104,7 @@ class KinematicsTests extends MotionKitTestSupport {
     serialWorkerPlan.dispose();
     var entryPlanner = new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
       new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12,3,8,false),null,
-      new CollisionClearance(fixture.arm,[],start, () -> new NativeCollisionWorld()));
+      new CollisionFixture(fixture.arm, start).clearance());
     var entryCompiler = new ProgramCompiler(solver,serialLimits,"task",
       [for (_ in start) 1.0],[for (_ in start) 2.0],[for (_ in start) 20.0],
       StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,null,entryPlanner);
@@ -1133,7 +1134,7 @@ class KinematicsTests extends MotionKitTestSupport {
     entered.dispose();
     var retreatPlanner = new motionkit.robot.StructuredJointPathPlanner(fixture.arm,
       new motionkit.robot.CandidateProblem.CandidateSamplingOptions(12,3,8,false),null,
-      new CollisionClearance(fixture.arm,[],start, () -> new NativeCollisionWorld()),8,false,null,current);
+      new CollisionFixture(fixture.arm, start).clearance(),8,false,null,current);
     var retreatCompiler = new ProgramCompiler(solver,serialLimits,"task",
       [for (_ in start) 1.0],[for (_ in start) 2.0],[for (_ in start) 20.0],
       StartTolerances.uniform(start.length,0.02,0.02,0.02),null,0.005,0.5,0.005,0.02,null,retreatPlanner);
@@ -1467,12 +1468,14 @@ class KinematicsTests extends MotionKitTestSupport {
       for(dx in [-0.01,0.01])for(y in [-0.01,0.01])for(z in [-0.01,0.01]){
         vertices.push(x+dx);vertices.push(y);vertices.push(z);}
       return vertices;}
-    var rollWorld=new CollisionClearance(rollGroup,[
-      {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
-      {name:"post",link:rollBase.id,vertices:rollHull(0.3),tool:false}],rollStart, () -> new NativeCollisionWorld());
-    var marginWorld=new CollisionClearance(rollGroup,[
-      {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
-      {name:"contact-work",link:rollBase.id,vertices:rollHull(0.124),tool:false}],rollStart, () -> new NativeCollisionWorld(),0.01,0.001);
+    var rollFixture = new CollisionFixture(rollGroup, rollStart);
+    rollFixture.mechanism("offset-tool", rollParent.id, rollHull(0.1), true);
+    rollFixture.fixture("post", rollHull(0.3), false);
+    var rollWorld = rollFixture.clearance();
+    var marginFixture = new CollisionFixture(rollGroup, rollStart, 0.01, 0.001);
+    marginFixture.mechanism("offset-tool", rollParent.id, rollHull(0.1), true);
+    marginFixture.fixture("contact-work", rollHull(0.124), true);
+    var marginWorld = marginFixture.clearance();
     check(marginWorld.violation(rollStart,false)!=null && marginWorld.violation(rollStart,true)==null,
       "contact policy fixture distinguishes air from contact clearance");
     var policyFrom=[0.0,-0.04,0.0,0.0],policyTo=[0.0,0.04,0.0,0.0];
@@ -1614,9 +1617,10 @@ class KinematicsTests extends MotionKitTestSupport {
       "generated trajectory clearance detects the physical mid-motion obstacle");
     excursion.dispose();
     var entryCurrent = [0.0,-0.1,0.0,0.0];
-    var entryWorld = new CollisionClearance(rollGroup,[
-      {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
-      {name:"entry-post",link:rollBase.id,vertices:rollHull(0.2),tool:false}],entryCurrent, () -> new NativeCollisionWorld());
+    var entryFixture = new CollisionFixture(rollGroup, entryCurrent);
+    entryFixture.mechanism("offset-tool", rollParent.id, rollHull(0.1), true);
+    entryFixture.fixture("entry-post", rollHull(0.2), false);
+    var entryWorld = entryFixture.clearance();
     var entryPath = new PosePath("task",[new PoseLine(
       new PoseWaypoint(new Pose3(0.2,0.1,0.0),1e-6,1e-6),
       new PoseWaypoint(new Pose3(0.21,0.1,0.0),1e-6,1e-6),OrientationPolicy.FreeAboutTool,0.1,0.1)]);
@@ -1691,9 +1695,10 @@ class KinematicsTests extends MotionKitTestSupport {
     check(finalSafe.blocks[0].plans.length == 1,
       "final compiler check accepts the obstacle-avoiding timed path after a rejected motion");
     finalSafe.dispose();
-    var blockedWorld=new CollisionClearance(rollGroup,[
-      {name:"offset-tool",link:rollParent.id,vertices:rollHull(0.1),tool:true},
-      {name:"blocking-post",link:rollBase.id,vertices:rollHull(0.1),tool:false}],rollStart, () -> new NativeCollisionWorld());
+    var blockedFixture = new CollisionFixture(rollGroup, rollStart);
+    blockedFixture.mechanism("offset-tool", rollParent.id, rollHull(0.1), true);
+    blockedFixture.fixture("blocking-post", rollHull(0.1), false);
+    var blockedWorld = blockedFixture.clearance();
     var blockage="";
     try {motionkit.robot.LazyCollisionLadder.select(rollProblem,blockedWorld,3);}catch(error:Dynamic){blockage=Std.string(error);}
     check(blockage.indexOf("sample 0")>=0 && blockage.indexOf("offset-tool")>=0 && blockage.indexOf("blocking-post")>=0,
@@ -1709,10 +1714,11 @@ class KinematicsTests extends MotionKitTestSupport {
       for(dx in [-0.01,0.01])for(y in [-0.01,0.01])for(z in [-0.01,0.01]){vertices.push(x+dx);vertices.push(y);vertices.push(z);}
       return vertices;
     }
-    var world=new CollisionClearance(clearanceGroup,[
-      {name:"tool",link:movingLink.id,vertices:cube(0),tool:true},
-      {name:"far",link:fixedLink.id,vertices:cube(1.5),tool:false},
-      {name:"near",link:fixedLink.id,vertices:cube(1),tool:false}],[0.0], () -> new NativeCollisionWorld());
+    var closestFixture = new CollisionFixture(clearanceGroup, [0.0]);
+    closestFixture.mechanism("tool", movingLink.id, cube(0), true);
+    closestFixture.fixture("far", cube(1.5), true);
+    closestFixture.fixture("near", cube(1), true);
+    var world = closestFixture.clearance();
     var closest=world.closest([0.0]);check(closest!=null,"closest clearance reports clear pairs");
     if(closest!=null){near(closest.distance,0.98,"closest clearance measures the nearest hull gap",1e-8);
       check(closest.a=="near" || closest.b=="near","closest clearance retains the nearest body pair");}
@@ -1725,8 +1731,8 @@ class KinematicsTests extends MotionKitTestSupport {
     if(clearSweep!=null)near(clearSweep.distance,0.48,"closest sweep aggregates clear route distances",1e-8);
     throws(function() world.closestSweep([0.0],[0.5],false,Math.POSITIVE_INFINITY),"closest sweep rejects an infinite sampling step");
     var displacement=world.displacementBounds([0.0],[0.002]);
-    near(displacement[0],0.002,"prismatic hull motion includes complete lowering neighborhood",1e-12);
-    near(displacement[1],0,"held hull has zero displacement",1e-12);
+    near(displacement[world.bodyIndex("tool")],0.002,"prismatic hull motion includes complete lowering neighborhood",1e-12);
+    near(displacement[world.bodyIndex("near")],0,"held hull has zero displacement",1e-12);
     var certifiedCurve=new JointPathSamples([0.0,1.0],[[0.0],[0.5]],[[0.5],[0.5]],[[0.0],[0.0]]);
     var certificate=new motionkit.robot.JointCurveClearance(world,certifiedCurve,1e-6,false);
     check(!certificate.covers(certifiedCurve,1e-6),"unchecked curve is not clearance evidence");
@@ -1759,8 +1765,9 @@ class KinematicsTests extends MotionKitTestSupport {
     coupledModel.addCoupling(new JointCoupling("turn-drive",turn.id,follower.id,-0.5,0));
     var flange=coupledModel.addFrame(new Frame("flange",followerLink)),work=coupledModel.addFrame(new Frame("work",slideLink));
     var coupledGroup=new robotkit.manipulation.KinematicGroup(coupledModel,root.id,flange.id,work.id);
-    var coupledWorld=new CollisionClearance(coupledGroup,[
-      {name:"coupled-tool",link:followerLink.id,vertices:cube(0.4),tool:true}],[0,0], () -> new NativeCollisionWorld());
+    var coupledFixture = new CollisionFixture(coupledGroup, [0, 0]);
+    coupledFixture.mechanism("coupled-tool", followerLink.id, cube(0.4), true);
+    var coupledWorld = coupledFixture.clearance();
     var cachedEnvelope=coupledWorld.motionEnvelope([-2.01,-1.51],[2.01,1.51]);
     for(i in 0...100){var q=[Math.sin(i*0.31)*2,Math.cos(i*0.17)*1.5],errors=[0.002,0.001],
       perturbed=[q[0]+errors[0]*(i%2==0?1:-1),q[1]+errors[1]*(i%3==0?1:-1)];
@@ -1786,13 +1793,16 @@ class KinematicsTests extends MotionKitTestSupport {
     var screwFlange=screwModel.addFrame(new Frame("flange",carriage));
     var screwGroup=new robotkit.manipulation.KinematicGroup(screwModel,screwRoot.id,screwFlange.id),shaftCorners:Array<Float> = [];
     for(x in [-0.004,0.004])for(y in [-0.004,0.004])for(z in [-1.0,1.0]){shaftCorners.push(x);shaftCorners.push(y);shaftCorners.push(z);}
-    var screwWorld=new CollisionClearance(screwGroup,[{name:"long-shaft",link:shaft.id,vertices:shaftCorners,tool:false}],[0.0], () -> new NativeCollisionWorld());
+    var screwFixture = new CollisionFixture(screwGroup, [0.0]);
+    screwFixture.mechanism("long-shaft", shaft.id, shaftCorners);
+    var screwWorld = screwFixture.clearance();
     var shaftEnvelope=screwWorld.motionEnvelope([-0.1],[0.1]);
-    check(shaftEnvelope.bounds([1e-6])[0]<0.000012,"axial shaft length does not inflate its rotational lever arm");
+    var shaftBound = shaftEnvelope.bounds([1e-6])[screwWorld.bodyIndex("long-shaft")];
+    check(shaftBound > 0 && shaftBound < 0.000012,"axial shaft length does not inflate its rotational lever arm");
     for(i in 0...50)check(screwWorld.auditDisplacement([0.09*Math.sin(i)],
       [0.09*Math.sin(i)+(i%2==0?1:-1)*1e-6],[1e-6],shaftEnvelope)<=1+1e-8,
       "perpendicular shaft bound covers exact coupled hull movement");
-    var emptyWorld=new CollisionClearance(clearanceGroup,[],[0.0], () -> new NativeCollisionWorld());
+    var emptyWorld=new CollisionFixture(clearanceGroup, [0.0]).clearance();
     check(emptyWorld.closest([0.0])==null,"empty clearance world has no closest pair");
     function waypoint(x:Float,y:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x,y,0),1e-6,1e-6);
     var line=new PoseLine(waypoint(-1,0),waypoint(0,0),motionkit.path.OrientationPolicy.Fixed,0.1,0.1);

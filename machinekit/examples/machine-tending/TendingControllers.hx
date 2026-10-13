@@ -151,7 +151,8 @@ class TendingControllers extends MachineAssembly {
 
 class TendingControllerChecks {
 	public static function run():Void {
-		var scene = SceneArtifact.decode(TendingControllers.preview());
+		var cell = new TendingControllers();
+		var scene = SceneArtifact.decode(cell.previewArtifact());
 		var sceneDefinition = scene.assemblyDefinition;
 		if (sceneDefinition == null) throw "Tending cell has no assembly definition";
 		if (scene.controllers == null || scene.controllers.length != 2 || scene.signals == null ||
@@ -209,7 +210,6 @@ class TendingControllerChecks {
 		rejects(scene, "duplicate or empty channel", "Controller channels must be unique after shared-valve deduplication");
 		mill.channels.pop();
 		SceneArtifact.encode(scene);
-		var cell = new TendingControllers();
 		var assemblyState = scene.assemblyState;
 		if (assemblyState == null) throw "Tending cell has no arm parking state";
 		var parking = new AssemblyState(sceneDefinition, assemblyState);

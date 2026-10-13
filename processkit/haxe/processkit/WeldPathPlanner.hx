@@ -353,7 +353,7 @@ class WeldPathPlanner {
         if (discovery && continued == null && goals.length == 0) unreachable.push('$label, ${way.name}: no entry IK configuration at ' + where(poses[0]));
         goals.sort(function(a, b) return Reflect.compare(cost(a, start), cost(b, start)));
         for (goal in goals) {
-          var air = clearance == null ? null : clearance.sweep(start, goal, false, AIR_STEP, AIR_MARGIN);
+          var air = clearance == null ? null : clearance.sweep(start, goal, false, AIR_STEP);
           if (air != null) {
             collisions.push('$label, ${way.name}: the joint move to the entry (tip bound for ' + where(poses[0]) + ') ' + describeHit(air));
             continue;

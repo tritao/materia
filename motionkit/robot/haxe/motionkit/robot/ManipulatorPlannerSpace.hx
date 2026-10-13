@@ -10,10 +10,12 @@ class ManipulatorPlannerSpace implements PlannerSpace {
   final reference:Array<Float>;
   final dofs:Array<Int>;
 
-  public function new(inner:CollisionPlannerSpace, arm:Manipulator, reference:Array<Float>) {
+  public function new(inner:CollisionPlannerSpace, arm:Manipulator, reference:Array<Float>, ?fullReference:Array<Float>) {
     this.inner = inner;
     this.arm = arm;
-    this.reference = arm.stateOf(reference).q.copy();
+    this.reference = fullReference == null ? arm.stateOf(reference).q.copy() : fullReference.copy();
+    if (this.reference.length != inner.bodies.model.dofCount())
+      throw "Manipulator collision reference has the wrong complete-model dimension";
     var zero = [for (_ in 0...arm.dofCount()) 0.0];
     var base = arm.stateOf(zero).q;
     dofs = [];
@@ -29,6 +31,7 @@ class ManipulatorPlannerSpace implements PlannerSpace {
       if (found < 0) throw 'Manipulator coordinate $i has no collision DOF';
       dofs.push(found);
     }
+    inner.holdOtherDofs(this.reference, dofs);
   }
 
   function full(q:Array<Float>):Array<Float> {

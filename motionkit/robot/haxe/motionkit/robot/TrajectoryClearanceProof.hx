@@ -1,6 +1,6 @@
 package motionkit.robot;
 
-import motionkit.trajectory.Trajectory;
+import motionkit.trajectory.TimedJointTrajectory;
 import robotkit.manipulation.ClearanceChange;
 import robotkit.manipulation.ClearanceScene;
 import robotkit.manipulation.ClearanceViolation;
@@ -58,14 +58,14 @@ class TrajectoryClearanceProof {
   public var closestTime(default, null):Float = 0.0;
 
   final world:ClearanceWorld;
-  final trajectory:Trajectory;
+  final trajectory:TimedJointTrajectory;
   final velocity:Array<Float>;
   final contact:Bool;
   final contactAt:Null<Array<Float>->Bool>;
   final neighbourhood:Null<(Array<Float>, Float)->Bool>;
   final depthLimit:Int;
 
-  function new(world:ClearanceWorld, trajectory:Trajectory, velocity:Array<Float>, contact:Bool,
+  function new(world:ClearanceWorld, trajectory:TimedJointTrajectory, velocity:Array<Float>, contact:Bool,
       contactAt:Null<Array<Float>->Bool>, neighbourhood:Null<(Array<Float>, Float)->Bool>, depthLimit:Int) {
     this.world = world;
     this.trajectory = trajectory;
@@ -82,7 +82,7 @@ class TrajectoryClearanceProof {
    * world that is a `ClearanceScene`; `closestSamples` closest-pair queries
    * are spread over the motion.
    */
-  public static function run(world:ClearanceWorld, trajectory:Trajectory, velocity:Array<Float>, contact:Bool,
+  public static function run(world:ClearanceWorld, trajectory:TimedJointTrajectory, velocity:Array<Float>, contact:Bool,
       ?contactAt:Array<Float>->Bool, ?neighbourhood:(Array<Float>, Float)->Bool, ?events:Array<ClearanceEvent>,
       depthLimit:Int = 16, closestSamples:Int = 8):TrajectoryClearanceProof {
     if (world == null || trajectory == null || velocity == null || depthLimit < 0)
@@ -95,7 +95,7 @@ class TrajectoryClearanceProof {
       if (!Std.isOfType(world, ClearanceScene)) throw "Clearance events need a world that replays changes (a ClearanceScene)";
       scene = cast world;
     }
-    var duration = trajectory.durationSeconds();
+    var duration = trajectory.duration();
     var bounds = [0.0];
     for (event in changes) if (event.timeSeconds > bounds[bounds.length - 1] && event.timeSeconds < duration)
       bounds.push(event.timeSeconds);

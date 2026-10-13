@@ -8,6 +8,8 @@ package collisionkit;
  */
 class DescribedObject {
   public final name:String;
+  /** Physical source member shared by all of its convex pieces; never inferred from the display name. */
+  public final member:String;
   public final body:Int;
   public final offset:CollisionPose;
   public final geometry:CollisionGeometry;
@@ -15,8 +17,9 @@ class DescribedObject {
   public final source:String;
 
   public function new(name:String, body:Int, offset:CollisionPose, geometry:CollisionGeometry, inflation:Float,
-      source:String) {
+      source:String, ?member:String) {
     this.name = name;
+    this.member = member == null ? name : member;
     this.body = body;
     this.offset = offset;
     this.geometry = geometry;

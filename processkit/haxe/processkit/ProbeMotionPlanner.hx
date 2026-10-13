@@ -35,15 +35,15 @@ class ProbeMotionPlanner {
   public final arm:Manipulator;
   public final compiler:ProgramCompiler;
   public final clearance:Null<ClearanceWorld>;
-  public final wireClearance:Null<ProbeWireClearance>;
+  public final wire:Null<ProbeWire>;
   public final airPoseReserve:Float;
   public final inverse:motionkit.kinematics.KinematicsSolver;
   final interval:Float;
   final jointStep:Float;
 
-  public function new(arm:Manipulator, compiler:ProgramCompiler, ?clearance:ClearanceWorld, ?wireClearance:ProbeWireClearance) {
+  public function new(arm:Manipulator, compiler:ProgramCompiler, ?clearance:ClearanceWorld, ?wire:ProbeWire) {
     if (arm == null || compiler == null || compiler.solver.jointCount() != arm.group.count() ||
-        wireClearance != null && wireClearance.arm != arm)
+        wire != null && (wire.arm != arm || clearance == null))
       throw "Probe motion planning needs matching arm kinematics and compiler";
     this.arm = arm; this.compiler = compiler; this.clearance = clearance;
     // Sensor-corridor witnesses use the same compiled geometric backend as
@@ -51,10 +51,10 @@ class ProbeMotionPlanner {
     var family=motionkit.robot.BranchIk.of(arm,compiler.ikTolerance);
     inverse=Std.isOfType(family,motionkit.robot.EaikAnalyticIk) ?
       new motionkit.robot.EaikKinematics(arm) : compiler.solver;
-    this.wireClearance = wireClearance;
+    this.wire = wire;
     var zero = [for (_ in 0...arm.group.count()) 0.0];
-    airPoseReserve = compiler.ikTolerance.position + (wireClearance == null ? 0.0
-      : wireClearance.extentFrom(zero, arm.tcpPose(zero).translation) * compiler.ikTolerance.orientation);
+    airPoseReserve = compiler.ikTolerance.position + (wire == null ? 0.0
+      : wire.extentFrom(zero, arm.tcpPose(zero).translation) * compiler.ikTolerance.orientation);
     var period = Math.POSITIVE_INFINITY, smallest = Math.POSITIVE_INFINITY;
     for (joint in 0...arm.group.count()) {
       var step = arm.robot.joints[arm.jointIndices()[joint]].type == JointType.Prismatic ? 0.001 : 0.02;
@@ -64,13 +64,11 @@ class ProbeMotionPlanner {
   }
 
   public function violation(q:Array<Float>, contact:Bool = false):Null<ClearanceViolation> {
-    var hit = clearance == null ? null : clearance.violation(q, contact);
-    return hit != null || wireClearance == null ? hit : wireClearance.violation(q, contact);
+    return clearance == null ? null : clearance.violation(q, contact);
   }
 
   function sweep(from:Array<Float>, to:Array<Float>, contact:Bool):Null<ClearanceViolation> {
-    var hit = clearance == null ? null : clearance.sweep(from, to, contact, jointStep);
-    return hit != null || wireClearance == null ? hit : wireClearance.sweep(from, to, contact, jointStep);
+    return clearance == null ? null : clearance.sweep(from, to, contact, jointStep);
   }
 
   static function pose(frame:Transform3):Pose3 {
@@ -316,10 +314,10 @@ class ProbeMotionPlanner {
         !Math.isFinite(contactOffset) || contactOffset < 0 || !Math.isFinite(reactionSeconds) || reactionSeconds < 0)
       throw "Probe speed needs a bounded ray, requested speed, calibration and deadline";
     if (contactOffset == 0) {
-      if (wireClearance != null) throw "Wire sensing needs a positive calibrated stopping stand-off";
+      if (wire != null) throw "Wire sensing needs a positive calibrated stopping stand-off";
       return requested;
     }
-    var reserve = compiler.ikTolerance.position + (wireClearance == null ? 0.0 : wireClearance.envelopeExcess);
+    var reserve = compiler.ikTolerance.position + (wire == null ? 0.0 : wire.envelopeExcess);
     var budget = contactOffset - reserve;
     if (!(budget > 0)) throw "Probe calibration leaves no wire stopping reserve";
     var indices = arm.jointIndices();
@@ -328,8 +326,8 @@ class ProbeMotionPlanner {
     var poses = arm.linkPoses(zero, children);
     var origins = [for (i in 0...indices.length) poses[i].transformPoint(Vec3.fromArray(arm.robot.joints[indices[i]].childFramePosition))];
     var last = origins.length - 1;
-    var distal = wireClearance == null ? arm.tcpPose(zero).translation.sub(origins[last]).norm()
-      : wireClearance.extentFrom(zero, origins[last]);
+    var distal = wire == null ? arm.tcpPose(zero).translation.sub(origins[last]).norm()
+      : wire.extentFrom(zero, origins[last]);
     var levers = [for (_ in indices) 0.0];
     for (i in 0...indices.length) {
       var joint = indices.length - 1 - i;

@@ -21,6 +21,7 @@ typedef SuctionContact = {member:String, connector:String};
 /** Physical jaws, their grasp-state switch, and the connector at the finger workspace. */
 typedef GripperContact = {
 	member:String, connector:String, sensor:String,
+	padMembers:Array<String>, envelopeMembers:Array<String>,
 	minimumPartWidthMm:Float, nominalPartWidthMm:Float, maximumPartWidthMm:Float, fingerLengthMm:Float,
 	fingerPadFrictionCoefficient:Float
 };
@@ -94,6 +95,7 @@ class EndEffectorControls {
 		var grippers:Array<GripperContact> = [];
 		var arcs:Array<ArcTorchControl> = [];
 		var sensorId:Null<String> = null;
+		var occurrences = materia.assembly.AssemblyDefinitionFlattener.flatten(configuration.definition()).occurrences;
 		var hasVacuum = false, hasLock = false;
 		var hasExplicitVacuumValve = false;
 		for (member in configuration.components()) if (machinekit.pneumatic.VacuumValveFacet.of(member.component) != null)
@@ -106,13 +108,19 @@ class EndEffectorControls {
 				requireInlet(configuration, member.id, grip.openPort, [PortKind.Pneumatic, PortKind.Signal]);
 				requireInlet(configuration, member.id, grip.closePort, [PortKind.Pneumatic, PortKind.Signal]);
 				controls.push(Gripper('$name.close', member.id, grip.openPort, grip.closePort));
-				var slash = member.id.lastIndexOf("/");
-				var scope = slash < 0 ? "" : member.id.substr(0, slash);
+				var owners = [for (occurrence in occurrences) if (occurrence.id == member.id) occurrence];
+				if (owners.length != 1) throw "Gripper contact lost its CAD occurrence";
+				var scope = owners[0].includePath == null ? "" : owners[0].includePath;
+				var pads = [for (pad in grip.padMembers) scope.length == 0 ? pad : scope + "/" + pad];
+				var envelope = [for (occurrence in occurrences)
+					if ((occurrence.includePath == null ? "" : occurrence.includePath) == scope) occurrence.id];
+				for (pad in pads) if (envelope.indexOf(pad) < 0) throw 'Gripper has no CAD contact member "$pad"';
 				var sensorParts:Array<String> = [];
 				if (prefix != null && prefix.length > 0) sensorParts.push(prefix);
 				if (scope.length > 0) sensorParts.push(scope);
 				sensorParts.push(grip.graspSensor);
 				grippers.push({member: member.id, connector: grip.contactConnector, sensor: sensorParts.join("/"),
+					padMembers: pads, envelopeMembers: envelope,
 					minimumPartWidthMm: grip.minimumPartWidthMm, nominalPartWidthMm: grip.nominalPartWidthMm,
 					maximumPartWidthMm: grip.maximumPartWidthMm, fingerLengthMm: grip.fingerLengthMm,
 					fingerPadFrictionCoefficient: grip.fingerPadFrictionCoefficient});

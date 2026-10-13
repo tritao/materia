@@ -113,14 +113,17 @@ bool read_heights(const double *heights, uint32_t count, uint32_t rows, uint32_t
 }
 
 /** A margin table over every body's group: square, finite and not negative. */
-bool read_margins(const World &world, const double *margins, uint32_t count, ck::Margins &out) {
-    if (!margins || count == 0 || !finite(margins, count)) return false;
+bool read_margins(const World &world, const double *margins, uint32_t count, uint32_t contact, double ceiling, ck::Margins &out) {
+    if (!margins || count == 0 || !finite(margins, count) || contact > 1 ||
+        !std::isfinite(ceiling) || (ceiling < 0 && ceiling != -1)) return false;
     const uint32_t groups = uint32_t(std::lround(std::sqrt(double(count))));
     if (groups * groups != count || int64_t(world.max_group()) >= int64_t(groups)) return false;
     for (uint32_t i = 0; i < count; ++i)
         if (margins[i] < 0.0) return false;
     out.groups = groups;
     out.table = margins;
+    out.contact = contact != 0;
+    out.ceiling = ceiling;
     return true;
 }
 
@@ -358,6 +361,16 @@ CK_API ck_result CK_CALL ck_set_object_rule(ck_world_handle handle, uint32_t a, 
     });
 }
 
+CK_API ck_result CK_CALL ck_set_object_margins(ck_world_handle handle, uint32_t a, uint32_t b,
+                                               double air, double contact) {
+    return with_world(handle, [&](World &world) -> ck_result {
+        if (a == b || !world.contains(a) || !world.contains(b) || !std::isfinite(air) || !std::isfinite(contact) ||
+            (air < 0 && air != -1) || (contact < 0 && contact != -1)) return CK_ERROR_INVALID_ARGUMENT;
+        world.set_object_margins(a, b, air, contact);
+        return CK_OK;
+    });
+}
+
 CK_API ck_result CK_CALL ck_pair_status(ck_world_handle handle, uint32_t a, uint32_t b, int32_t *out_status) {
     if (!out_status) return CK_ERROR_INVALID_ARGUMENT;
     return with_world(handle, [&](World &world) -> ck_result {
@@ -452,7 +465,7 @@ void report(bool found, const ck::PairResult &pair, int32_t *out_pair, double *o
 
 } // namespace
 
-CK_API ck_result CK_CALL ck_violation(ck_world_handle handle, const double *margins, uint32_t margin_count,
+CK_API ck_result CK_CALL ck_violation(ck_world_handle handle, const double *margins, uint32_t margin_count, uint32_t contact, double ceiling,
                                       const double *inflation, uint32_t inflation_count, int32_t *out_pair,
                                       uint32_t pair_capacity, double *out_result, uint32_t result_capacity,
                                       int32_t *out_found) {
@@ -461,7 +474,7 @@ CK_API ck_result CK_CALL ck_violation(ck_world_handle handle, const double *marg
     *out_found = 0;
     return with_world(handle, [&](World &world) -> ck_result {
         ck::Margins table;
-        if (!read_margins(world, margins, margin_count, table) ||
+        if (!read_margins(world, margins, margin_count, contact, ceiling, table) ||
             !read_inflation(inflation, inflation_count, world.body_count()))
             return CK_ERROR_INVALID_ARGUMENT;
         bool found = false;
@@ -473,7 +486,7 @@ CK_API ck_result CK_CALL ck_violation(ck_world_handle handle, const double *marg
     });
 }
 
-CK_API ck_result CK_CALL ck_closest(ck_world_handle handle, const double *margins, uint32_t margin_count,
+CK_API ck_result CK_CALL ck_closest(ck_world_handle handle, const double *margins, uint32_t margin_count, uint32_t contact, double ceiling,
                                     int32_t *out_pair, uint32_t pair_capacity, double *out_result,
                                     uint32_t result_capacity, int32_t *out_found) {
     if (!out_found || !out_pair || pair_capacity < 4 || !out_result || result_capacity < 2)
@@ -481,7 +494,7 @@ CK_API ck_result CK_CALL ck_closest(ck_world_handle handle, const double *margin
     *out_found = 0;
     return with_world(handle, [&](World &world) -> ck_result {
         ck::Margins table;
-        if (!read_margins(world, margins, margin_count, table)) return CK_ERROR_INVALID_ARGUMENT;
+        if (!read_margins(world, margins, margin_count, contact, ceiling, table)) return CK_ERROR_INVALID_ARGUMENT;
         bool found = false;
         ck::PairResult pair;
         if (!world.closest(table, found, pair)) return CK_ERROR_UNSUPPORTED;
@@ -493,7 +506,7 @@ CK_API ck_result CK_CALL ck_closest(ck_world_handle handle, const double *margin
 
 CK_API ck_result CK_CALL ck_violation_batch(ck_world_handle handle, const double *poses, uint32_t pose_count,
                                             const double *inflation, uint32_t inflation_count,
-                                            const double *margins, uint32_t margin_count, int32_t *out_pair,
+                                            const double *margins, uint32_t margin_count, uint32_t contact, double ceiling, int32_t *out_pair,
                                             uint32_t pair_capacity, double *out_result, uint32_t result_capacity,
                                             int32_t *out_set) {
     if (!out_set || !out_pair || pair_capacity < 4 || !out_result || result_capacity < 2)
@@ -502,7 +515,7 @@ CK_API ck_result CK_CALL ck_violation_batch(ck_world_handle handle, const double
     return with_world(handle, [&](World &world) -> ck_result {
         const uint32_t bodies = world.body_count();
         ck::Margins table;
-        if (!read_margins(world, margins, margin_count, table) || bodies == 0 || (pose_count && !poses) ||
+        if (!read_margins(world, margins, margin_count, contact, ceiling, table) || bodies == 0 || (pose_count && !poses) ||
             pose_count % (7 * bodies) != 0)
             return CK_ERROR_INVALID_ARGUMENT;
         const uint32_t sets = pose_count / (7 * bodies);
@@ -594,11 +607,11 @@ CK_API ck_result CK_CALL ck_decomposition_piece(ck_decomposition_handle handle, 
 
 CK_API ck_result CK_CALL ck_violation_sets(ck_world_handle handle, const double *poses, uint32_t pose_count,
                                            const double *inflation, uint32_t inflation_count, const double *margins,
-                                           uint32_t margin_count, int32_t *out_flags, uint32_t flag_capacity) {
+                                           uint32_t margin_count, uint32_t contact, double ceiling, int32_t *out_flags, uint32_t flag_capacity) {
     return with_world(handle, [&](World &world) -> ck_result {
         const uint32_t bodies = world.body_count();
         ck::Margins table;
-        if (!read_margins(world, margins, margin_count, table) || bodies == 0 || (pose_count && !poses) ||
+        if (!read_margins(world, margins, margin_count, contact, ceiling, table) || bodies == 0 || (pose_count && !poses) ||
             pose_count % (7 * bodies) != 0)
             return CK_ERROR_INVALID_ARGUMENT;
         const uint32_t sets = pose_count / (7 * bodies);

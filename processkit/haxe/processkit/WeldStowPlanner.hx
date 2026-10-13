@@ -24,24 +24,17 @@ class WeldStowPlanner {
       throw "Weld stow needs matching arm, compiler, live clearance and endpoint configurations";
     var lower = [for (joint in 0...arm.group.count()) arm.group.limitsOf(joint).lower];
     var upper = [for (joint in 0...arm.group.count()) arm.group.limitsOf(joint).upper];
-    var maxSpeed = 0.0;
-    for (speed in compiler.maxVelocity) maxSpeed = Math.max(maxSpeed, speed);
-    if (!Math.isFinite(maxSpeed) || !(maxSpeed > 0)) throw "Weld stow compiler has no positive joint speed limit";
 
     function clearMove(start:Array<Float>, end:Array<Float>):Bool {
-      if (clearance.sweep(start, end) != null) return false;
+      if (clearance.violation(start) != null) return false;
       var program = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(end), new MotionOptions(), Blend.ExactStop)]);
       var compiled:Null<motionkit.robot.CompiledProgram> = null;
       try {
         compiled = compiler.compile(program, start, Int64.ofInt(1));
-        var previous = start.copy();
         for (block in compiled.blocks) for (trajectory in block.plans) {
-          var samples = Std.int(Math.max(1.0, Math.ceil(trajectory.durationSeconds * maxSpeed / 0.02)));
-          for (sample in 0...samples + 1) {
-            var q = trajectory.evaluate(trajectory.durationSeconds * sample / samples).positions;
-            if (clearance.sweep(previous, q) != null) throw "Weld stow trajectory is obstructed";
-            previous = q.copy();
-          }
+          var proof = motionkit.robot.TrajectoryClearanceProof.run(clearance, trajectory,
+            compiler.maxVelocity, false);
+          if (!proof.closed || proof.failure != null) throw "Weld stow trajectory has no continuous clearance certificate";
         }
         compiled.dispose();
         return true;

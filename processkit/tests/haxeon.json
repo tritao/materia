@@ -5,7 +5,8 @@
   },
   "entry": "ProcessKitTests",
   "sourceRoots": [
-    "src"
+    "src",
+    "../../robotkit/tests/support"
   ],
   "dependencies": {
     "collisionkit-native": {"path": "../../collisionkit/native"},

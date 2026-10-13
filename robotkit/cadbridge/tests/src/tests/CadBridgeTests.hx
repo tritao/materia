@@ -574,19 +574,26 @@ class CadBridgeTests {
     gripperSet.mount("base", "mount");
     gripperSet.exposePort("open", "base", "open");
     gripperSet.exposePort("close", "base", "close");
+    gripperSet.exposePort("air", "base", "air");
     gripperSet.changer("manual", "base", "contact", [
-      {robot: "open", tool: "openAir"}, {robot: "close", tool: "closeAir"}]);
+      {robot: "open", tool: "openAir"}, {robot: "close", tool: "closeAir"},
+      {robot: "air", tool: "compressedAir"}]);
     var gripperTool = new EndEffector();
-    gripperTool.addComponent("gripper", new ParallelGripperBody(new ParallelGripperSpec(40, 60, 60, 12)));
-    gripperTool.mount("gripper", "mount");
-    gripperTool.exposePort("openAir", "gripper", "open");
-    gripperTool.exposePort("closeAir", "gripper", "close");
-    gripperTool.workingFrame("contact", "gripper", "tcp", true);
+    gripperTool.include("gripper", new machinekit.robotics.ParallelGripper(new ParallelGripperSpec(40, 60, 60, 12)));
+    gripperTool.mount("gripper/body", "mount");
+    gripperTool.exposePort("openAir", "gripper/body", "open");
+    gripperTool.exposePort("closeAir", "gripper/body", "close");
+    gripperTool.workingFrame("contact", "gripper/body", "tcp", true);
+    gripperTool.addComponent("valve", new machinekit.pneumatic.SolenoidValve(true, false));
+    gripperTool.addMate("valve-seat", "fixed", "gripper/body", "valveSeat", "valve", "mount");
+    gripperTool.connectPorts("cylinder-a", "valve", "A", "gripper/cylinder", "A");
+    gripperTool.connectPorts("cylinder-b", "valve", "B", "gripper/cylinder", "B");
+    gripperTool.exposePort("compressedAir", "valve", "P");
     gripperSet.addTool("gripper", gripperTool);
     var derivedGripper = EndEffectorRuntimeBridge.toRuntimeFromDesign(gripperSet,
       "gripper", "contact");
     check(derivedGripper.runtime.gripper != null &&
-      derivedGripper.runtime.channelDeclarations()[0].id == "gripper/tool/gripper.close",
+      derivedGripper.runtime.channelDeclarations()[0].id == "gripper/tool/gripper/body.close",
       "gripper valve command derives from declared open and close ports");
   }
 

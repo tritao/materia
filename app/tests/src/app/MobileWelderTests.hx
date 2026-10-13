@@ -10,13 +10,13 @@ import robotkit.skill.SkillStatus;
 @:access(app.ApplicationSimulation)
 @:access(app.MissionPlayer)
 @:access(processkit.skill.FindWeldWork)
+@:access(processkit.ProbePosePlanner)
 @:access(processkit.ContactProbeRunner)
 @:access(processkit.perception.ContactRegistrationSequence)
-@:access(processkit.ProbeWireClearance)
 @:access(processkit.simulation.SimulatedWelder)
 @:access(machinekit.power.BatterySimulator)
 class MobileWelderTests {
-  /** Replay the observed air-contact posture without running the expensive probe selector. */
+  /** Derive a physical normal contact from authored CAD without running the expensive probe selector. */
   public static function runWireClearance(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.mobilemission.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
@@ -46,12 +46,32 @@ class MobileWelderTests {
       if (factory == null) throw "Wire-clearance replay has no probe factory";
       var registration = factory(job);
       var planner = registration.probe.planner;
-      try {
-        var analytic = new motionkit.robot.EaikKinematics(planner.arm);
-        Sys.println("Production probe geometry: compiled-chain EAIK solver available");
-      } catch (error:Dynamic) Sys.println('Production probe geometry: ${Std.string(error)}');
-      var q = [0.6676030989851316, -0.21797454761040297, -0.9093220264586326,
+      var analytic = new motionkit.robot.EaikKinematics(planner.arm);
+      var seed = [0.6676030989851316, -0.21797454761040297, -0.9093220264586326,
         -1.3662865416110088, -0.7644976321991027, 2.464939730522297];
+      var seedPose = planner.arm.tcpPose(seed);
+      var nominal = job.nominal;
+      var workPose = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(nominal.x, nominal.y, nominal.z),
+        new robotkit.spatial.Quat(nominal.qx, nominal.qy, nominal.qz, nominal.qw));
+      var rootInverse = shifted.inverse();
+      var selected:Null<Array<Float>> = null, nearest = Math.POSITIVE_INFINITY;
+      var selectedMember:Null<String> = null;
+      // Select by the authored face and reach alone, independently of the verdict under test.
+      // The old posture is only an IK seed; the contact point follows current CAD and the moved base.
+      for (face in job.faces) if (face.target) {
+        var outward = workPose.rotation.rotate(robotkit.spatial.Vec3.fromArray(face.normal));
+        var worldPoint = workPose.transformPoint(robotkit.spatial.Vec3.fromArray(face.centre))
+          .sub(outward.scale(job.measurementError));
+        var point = rootInverse.transformPoint(worldPoint);
+        var normal = rootInverse.rotation.rotate(outward);
+        var rotation = processkit.ProbePosePlanner.orientations(normal, seedPose.rotation, 1)[0];
+        var candidate = analytic.solvePose(motionkit.kinematics.Pose3.fromArrays(point.toArray(), rotation.toArray()),
+          seed, new motionkit.kinematics.IkTolerance(job.measurementError / 2, 1e-5));
+        var distance = point.sub(seedPose.translation).norm();
+        if (candidate != null && distance < nearest) { selected = candidate; selectedMember = face.member; nearest = distance; }
+      }
+      if (selected == null || selectedMember == null) throw "The authored grounded work has no reachable normal contact posture";
+      var q = selected;
       var indices = planner.arm.jointIndices();
       var snapshot = mission.robot.robot.snapshot();
       var positions = [for (index in 0...snapshot.positions.length) snapshot.positions.get(index)];
@@ -61,10 +81,8 @@ class MobileWelderTests {
         robotkit.core.JointTarget.position(indices[index], q[index])], null));
       // Step physics and its sensor observers directly; do not start the pending findWork skill.
       for (_ in 0...200) simulation.activeSession().step();
-      var wire = planner.wireClearance;
-      if (wire == null) throw "Wire-clearance replay lacks the CAD wire envelope";
-      var poses = planner.arm.linkPoses(q, wire.links);
-      var wirePoints = processkit.ProbeWireClearance.placed(wire.corners, poses[0]);
+      var wire = planner.wire;
+      if (wire == null) throw "Wire-clearance replay lacks the described CAD wire";
       var tip = planner.arm.tcpPose(q).translation;
       var welder:processkit.simulation.SimulatedWelder = cast simulation.welder();
       var tool = physics.linkPose(mission.robotIndex, welder.linkIndex);
@@ -74,21 +92,16 @@ class MobileWelderTests {
       var rootPose = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(rootBody.position),
         robotkit.spatial.Quat.fromArray(rootBody.rotation));
       var actual = rootPose.inverse().transformPoint(actualWorld);
-      var distances:Array<Dynamic> = [];
-      for (body in wire.obstacles) {
-        var points = processkit.ProbeWireClearance.placed(body.corners, poses[body.link]);
-        var pointDistance = new robotkit.tool.ConvexSolid(points).distance(tip.x, tip.y, tip.z);
-        var hullDistance = robotkit.tool.ConvexDistance.between(wirePoints, points, 0.003);
-        distances.push({name: body.name, pointDistance: pointDistance, hullDistance: hullDistance, points: points});
-      }
-      distances.sort((a, b) -> Reflect.compare(a.pointDistance, b.pointDistance));
-      var diagnostic = {joints: q, tip: tip.toArray(), actualSensorTip: actual.toArray(), sensorFkError: tip.sub(actual).norm(),
+      var clearance = planner.clearance;
+      if (clearance == null) throw "The wire fixture lost its shared clearance world";
+      var wireGap = clearance.distanceBetween(q, processkit.ProbeWire.NAME, selectedMember);
+      var diagnostic = {wireGap: wireGap, workMember: selectedMember, joints: q, tip: tip.toArray(), actualSensorTip: actual.toArray(), sensorFkError: tip.sub(actual).norm(),
         touch: welder.reading().touch, groundDistance: welder.work.distance(actualWorld.x, actualWorld.y, actualWorld.z),
-        wirePoints: wirePoints, clearance: planner.violation(q), closest: distances.slice(0, 5)};
+        wireObject: wire.object, clearance: planner.violation(q)};
       sys.io.File.saveContent(root + "/app/build/p3-wire-posture.json", haxe.Json.stringify(diagnostic));
-      if (!welder.reading().touch || tip.sub(actual).norm() > 0.0001 || planner.violation(q) == null)
-        throw "The recorded physical wire-contact posture must be rejected by the matching CAD wire envelope";
-      Sys.println('mobile wire-clearance posture: ${tip.sub(actual).norm()} m sensor/FK error; physical touch rejected');
+      if (!welder.reading().touch || tip.sub(actual).norm() > 0.0001 || wireGap >= 0 || planner.violation(q) == null)
+        throw "The CAD-derived physical wire-contact posture must be rejected by the matching CAD wire envelope";
+      Sys.println('mobile wire-clearance posture: ${tip.sub(actual).norm()} m sensor/FK error; wire gap $wireGap m; physical touch rejected');
     } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
     simulation.clear(); session.dispose();
   }

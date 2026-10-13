@@ -1,10 +1,10 @@
 package tests;
 
-import collisionkit.native.NativeCollisionWorld;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 
 import robotkit.collision.CollisionClearance;
+import CollisionFixture;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
 import robotkit.model.Joint;
@@ -47,11 +47,11 @@ class ClearanceTests {
     model.addCoupling(new robotkit.model.JointCoupling("thread", slide.id, screw.id, 100, 0));
     var tip = model.addFrame(new Frame("tip", carriage));
     var group = new Manipulator(model, base.id, tip.id);
-    var clearance = new CollisionClearance(group, [
-      {name: "nut", link: carriage.id, vertices: box(-0.02, 0.02, -0.04, 0.04, -0.04, 0.04), tool: false},
-      {name: "screw", link: shaft.id, vertices: box(-0.1, 0.5, -0.006, 0.006, -0.006, 0.006), tool: false},
-      {name: "work", link: base.id, vertices: box(0.28, 0.32, 0.025, 0.04, -0.025, 0.025), tool: false}
-    ], [0.0], () -> new NativeCollisionWorld());
+    var fixture = new CollisionFixture(group, [0.0]);
+    fixture.mechanism("nut", carriage.id, box(-0.02, 0.02, -0.04, 0.04, -0.04, 0.04));
+    fixture.mechanism("screw", shaft.id, box(-0.1, 0.5, -0.006, 0.006, -0.006, 0.006));
+    fixture.fixture("work", box(0.28, 0.32, 0.025, 0.04, -0.025, 0.025), true);
+    var clearance = fixture.clearance();
     check(clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
       "a driven nut's designed engagement stays clear at rest and through travel");
     var hit = clearance.violation([0.3]);
@@ -72,12 +72,12 @@ class ClearanceTests {
     model.addCoupling(new robotkit.model.JointCoupling("rack", slide.id, shaft.id, -50, 0));
     var tip = model.addFrame(new Frame("tip", carriage));
     var group = new Manipulator(model, base.id, tip.id);
-    var clearance = new CollisionClearance(group, [
-      {name: "carriage", link: carriage.id, vertices: box(-0.02, 0.02, -0.04, 0.04, 0.08, 0.1), tool: false},
-      {name: "pinion", link: pinion.id, vertices: box(-0.03, 0.03, -0.01, 0.01, -0.03, 0.03), tool: false},
-      {name: "rack", link: base.id, vertices: box(-0.1, 0.6, -0.01, 0.01, -0.02, 0), tool: false},
-      {name: "work", link: base.id, vertices: box(0.28, 0.32, -0.02, 0.02, 0.01, 0.04), tool: false}
-    ], [0.0], () -> new NativeCollisionWorld());
+    var fixture = new CollisionFixture(group, [0.0]);
+    fixture.mechanism("carriage", carriage.id, box(-0.02, 0.02, -0.04, 0.04, 0.08, 0.1));
+    fixture.mechanism("pinion", pinion.id, box(-0.03, 0.03, -0.01, 0.01, -0.03, 0.03));
+    fixture.mechanism("rack", base.id, box(-0.1, 0.6, -0.01, 0.01, -0.02, 0));
+    fixture.fixture("work", box(0.28, 0.32, -0.02, 0.02, 0.01, 0.04), true);
+    var clearance = fixture.clearance();
     check(clearance.violation([0.0]) == null && clearance.violation([0.1]) == null,
       "a moving pinion retains its designed engagement with the fixed rack");
     var hit = clearance.violation([0.3]);
@@ -113,12 +113,12 @@ class ClearanceTests {
     var tip = model.addFrame(new Frame("tip", link2));
     tip.position = [0.3, 0.0, 0.0];
     var arm = new Manipulator(model, base.id, tip.id);
-    var bodies = [
-      {name: "upper", link: link1.id, vertices: box(0.0, 0.3, -linkWidth, linkWidth, -linkWidth, linkWidth), tool: false},
-      {name: "forearm", link: link2.id, vertices: box(0.0, 0.3, -linkWidth, linkWidth, -linkWidth, linkWidth), tool: true}
-    ];
-    for (body in fixed) bodies.push({name: body.name, link: base.id, vertices: body.vertices, tool: false});
-    return {arm: arm, clearance: new CollisionClearance(arm, bodies, reference == null ? [0.0, 0.0] : reference, () -> new NativeCollisionWorld())};
+    var pose = reference == null ? [0.0, 0.0] : reference;
+    var fixture = new CollisionFixture(arm, pose);
+    fixture.mechanism("upper", link1.id, box(0.0, 0.3, -linkWidth, linkWidth, -linkWidth, linkWidth));
+    fixture.mechanism("forearm", link2.id, box(0.0, 0.3, -linkWidth, linkWidth, -linkWidth, linkWidth), true);
+    for (body in fixed) fixture.fixture(body.name, body.vertices, true);
+    return {arm: arm, clearance: fixture.clearance()};
   }
 
   static function testPosesAndPath():Void {
@@ -136,7 +136,7 @@ class ClearanceTests {
     check(cell.clearance.violation([1.4, 0.0]) == null, "the arm swung well past the post is clear");
     check(cell.clearance.sweep([0.0, 0.0], [1.4, 0.0]) != null, "the arm swinging round through the post is found along the way");
     check(cell.clearance.sweep([0.0, 0.0], [-1.4, 0.0]) == null, "the same swing away from the post is clear");
-    check(cell.clearance.pairCount() > 0 && cell.clearance.bodyCount() == 3, "the arm's bodies are checked against the post");
+    check(cell.clearance.pairCount() > 0 && cell.clearance.bodyCount() == 6, "three mechanical frames and three collision bodies check the arm against the post");
   }
 
   static function testMargins():Void {
@@ -154,9 +154,10 @@ class ClearanceTests {
     var roomy = rig([{name: "table", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.02)}]);
     check(roomy.clearance.violation([0.0, 0.0]) == null, "20 mm above the table is clear");
     // With a margin wider than the gap the violation reports the distance between the faces.
-    var strict = new CollisionClearance(cell.arm, [
-      {name: "forearm", link: "link2", vertices: box(0.0, 0.3, -0.025, 0.025, -0.025, 0.025), tool: true},
-      {name: "table", link: "base", vertices: box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.0123), tool: false}], [0.0, 0.0], () -> new NativeCollisionWorld(), 0.05, 0.05);
+    var wideFixture = new CollisionFixture(cell.arm, [0.0, 0.0], 0.05, 0.05);
+    wideFixture.mechanism("forearm", "link2", box(0.0, 0.3, -0.025, 0.025, -0.025, 0.025), true);
+    wideFixture.fixture("table", box(-0.2, 0.8, -0.5, 0.5, -0.2, -0.025 - 0.0123), true);
+    var strict = wideFixture.clearance();
     var found = strict.violation([0.0, 0.0]);
     check(found != null && Math.abs(found.distance - 0.0123) < 1e-6, 'the distance between parallel faces is measured, got ${found == null ? -1 : found.distance}');
   }
@@ -201,10 +202,10 @@ class ClearanceTests {
       var flange = model.addFrame(new Frame("flange", moving));
       var group = new Manipulator(model, base.id, flange.id);
       var tool = box(0.3, 0.6, -0.025, 0.025, -0.025, 0.025);
-      var clearance = new CollisionClearance(group, [
-        {name: "tool", link: moving.id, vertices: tool, tool: true},
-        {name: "obstacle", link: obstacle.id, vertices: vertices, tool: false}
-      ], [0.0], () -> new NativeCollisionWorld());
+      var fixture = new CollisionFixture(group, [0.0]);
+      fixture.mechanism("tool", moving.id, tool, true);
+      fixture.fixture("obstacle", vertices, true);
+      var clearance = fixture.clearance();
       for (sample in 0...61) {
         var q = [-Math.PI + sample * Math.PI / 30];
         var poses = group.linkPoses(q, [moving.id, obstacle.id]);

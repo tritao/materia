@@ -31,6 +31,15 @@ class RobotKinematics {
     return builder.build();
   }
 
+  /** Sensor positions at the scalar RobotModel boundary, converted once into full DOF state. */
+  public static function observedState(robot:RobotModel, positions:Array<Float>):kinematicskit.KinematicState {
+    if (positions == null || positions.length != robot.joints.length)
+      throw "Robot observations need one scalar position per model joint";
+    for (position in positions) if (!Math.isFinite(position)) throw "Robot joint observations must be finite";
+    var model = compile(robot);
+    return new kinematicskit.KinematicState(model, [for (dof in 0...model.dofCount()) positions[model.dofJoint[dof]]]);
+  }
+
   public static function toTransform(value:Transform3):Transform {
     var t = value.translation, r = value.rotation;
     return new Transform(t.x, t.y, t.z, r.x, r.y, r.z, r.w);

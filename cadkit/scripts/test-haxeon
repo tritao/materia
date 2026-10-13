@@ -31,7 +31,7 @@ mkdir -p "$(dirname -- "$output")"
 	"--ffi-projection=$repo_root/haxe/abi/CadKit.hxmap" \
 	"$repo_root/haxe/tests/$entry.hx"
 
-native_paths="$build_root/core:$build_root/lin64/gcc/libd:$haxeon_root/out:$haxeon_root/.tools/hashlink"
+native_paths="$build_root:$build_root/core:$build_root/lin64/gcc/libd:$haxeon_root/out:$haxeon_root/.tools/hashlink"
 if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
 	native_paths="$native_paths:$LD_LIBRARY_PATH"
 fi

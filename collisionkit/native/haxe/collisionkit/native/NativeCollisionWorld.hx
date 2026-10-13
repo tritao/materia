@@ -24,6 +24,9 @@ class NativeCollisionWorld implements CollisionWorld {
   static final none:Array<Float> = [];
 
   public function new() {
+    var version = CollisionKitNative.ck_api_version();
+    if (version != CollisionKitNativeConstants.CK_API_VERSION)
+      throw 'CollisionKit native API v$version is unsupported; expected v${CollisionKitNativeConstants.CK_API_VERSION}; rebuild the native library';
     var created = CollisionKitNative.ck_world_create();
     check(created.status, "world.create");
     owner = created.out_world;
@@ -122,6 +125,12 @@ class NativeCollisionWorld implements CollisionWorld {
     check(CollisionKitNative.ck_set_object_rule(owner.borrow(), a, b, rule, reason), "set_object_rule");
   }
 
+  public function setObjectMargins(a:Int, b:Int, air:Null<Float>, contact:Null<Float>):Void {
+    requireLive();
+    check(CollisionKitNative.ck_set_object_margins(owner.borrow(), a, b, air == null ? -1.0 : air,
+      contact == null ? -1.0 : contact), "set_object_margins");
+  }
+
   public function pairStatus(a:Int, b:Int):CollisionPairStatus {
     requireLive();
     var result = CollisionKitNative.ck_pair_status(owner.borrow(), a, b);
@@ -196,7 +205,7 @@ class NativeCollisionWorld implements CollisionWorld {
 
   public function violation(margins:CollisionMargins, ?inflation:Array<Float>):Null<CollisionViolation> {
     requireLive();
-    var result = CollisionKitNative.ck_violation(owner.borrow(), margins.flat(), inflation == null ? none : inflation, 4,
+    var result = CollisionKitNative.ck_violation(owner.borrow(), margins.flat(), margins.contact ? 1 : 0, margins.ceiling == null ? -1.0 : margins.ceiling, inflation == null ? none : inflation, 4,
       2);
     check(result.status, "violation");
     return result.out_found == 0 ? null : violationOf(result.out_pair, result.out_result, 0);
@@ -204,7 +213,7 @@ class NativeCollisionWorld implements CollisionWorld {
 
   public function closest(margins:CollisionMargins):Null<CollisionViolation> {
     requireLive();
-    var result = CollisionKitNative.ck_closest(owner.borrow(), margins.flat(), 4, 2);
+    var result = CollisionKitNative.ck_closest(owner.borrow(), margins.flat(), margins.contact ? 1 : 0, margins.ceiling == null ? -1.0 : margins.ceiling, 4, 2);
     check(result.status, "closest");
     return result.out_found == 0 ? null : violationOf(result.out_pair, result.out_result, 0);
   }
@@ -212,7 +221,7 @@ class NativeCollisionWorld implements CollisionWorld {
   public function firstViolation(poses:Array<Float>, margins:CollisionMargins, ?inflation:Array<Float>):Null<CollisionViolation> {
     requireLive();
     var result = CollisionKitNative.ck_violation_batch(owner.borrow(), poses, inflation == null ? none : inflation,
-      margins.flat(), 4, 2);
+      margins.flat(), margins.contact ? 1 : 0, margins.ceiling == null ? -1.0 : margins.ceiling, 4, 2);
     check(result.status, "violation_batch");
     return result.out_set < 0 ? null : violationOf(result.out_pair, result.out_result, result.out_set);
   }
@@ -221,7 +230,7 @@ class NativeCollisionWorld implements CollisionWorld {
     requireLive();
     var sets = bodies == 0 ? 0 : Std.int(poses.length / (7 * bodies));
     var result = CollisionKitNative.ck_violation_sets(owner.borrow(), poses, inflation == null ? none : inflation,
-      margins.flat(), sets);
+      margins.flat(), margins.contact ? 1 : 0, margins.ceiling == null ? -1.0 : margins.ceiling, sets);
     check(result.status, "violation_sets");
     var flags = result.out_flags;
     return [for (s in 0...sets) flags[s] != 0];

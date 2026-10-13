@@ -1,5 +1,12 @@
 package collisionkit;
 
+private typedef DescriptionPairMargin = {
+  var first:Int;
+  var second:Int;
+  var air:Float;
+  var contact:Float;
+}
+
 /**
  * A cell's collision description (COLLISION.md CL3): bodies with their
  * groups and poses, shapes on them, rules with their reasons, the
@@ -10,6 +17,15 @@ package collisionkit;
  * simulation, CL3b).
  */
 class CollisionDescription {
+  /** Air and process margins belong to the same description as its pair rules. */
+  public var margins(get, never):CollisionMargins;
+  public var contactMargins(get, never):CollisionMargins;
+  public final defaultMargin:Float;
+  var groups:Int = 1;
+  final pairMargins:Map<String, DescriptionPairMargin> = new Map();
+  final objectMargins:Map<String, DescriptionPairMargin> = new Map();
+  var airTable:Null<CollisionMargins> = null;
+  var contactTable:Null<CollisionMargins> = null;
   public final bodies:Array<DescribedBody> = [];
   public final objects:Array<DescribedObject> = [];
   public final bodyRules:Array<DescribedRule> = [];
@@ -18,21 +34,46 @@ class CollisionDescription {
   /** What the geometry approximates or ignores, once each, in the order noted. */
   public final assumptions:Array<String> = [];
 
-  public function new() {}
+  public function new(margin:Float = 0.0) {
+    defaultMargin = margin;
+    if (!Math.isFinite(margin) || margin < 0) throw "Collision description needs a finite nonnegative margin";
+  }
+
+  /** An independent mutable description for a live world; geometry is shared read-only. */
+  public function copy():CollisionDescription {
+    var result = new CollisionDescription(defaultMargin);
+    result.groups = groups;
+    for (key in pairMargins.keys()) {
+      var value = pairMargins.get(key);
+      if (value != null) result.pairMargins.set(key, value);
+    }
+    for (key in objectMargins.keys()) {
+      var value = objectMargins.get(key);
+      if (value != null) result.objectMargins.set(key, value);
+    }
+    for (body in bodies) result.bodies.push(body);
+    for (object in objects) result.objects.push(object);
+    for (rule in bodyRules) result.bodyRules.push(rule);
+    for (rule in objectRules) result.objectRules.push(rule);
+    for (articulation in articulations) result.articulations.push(articulation);
+    for (assumption in assumptions) result.assumptions.push(assumption);
+    return result;
+  }
 
   /** Adds a body; `pose` is where it starts (an articulation's bodies start at its reference). */
   public function addBody(name:String, group:Int, fixed:Bool, ?pose:CollisionPose):Int {
     if (group < 0) throw 'Collision body "$name" needs a group from 0';
+    if (group >= groups) { groups = group + 1; airTable = null; contactTable = null; }
     bodies.push(new DescribedBody(name, group, fixed, pose == null ? CollisionPose.identity() : pose));
     return bodies.length - 1;
   }
 
   /** Adds a shape on `body` (-1: the world) at `offset`; `source` says what it approximates. */
   public function addObject(name:String, body:Int, offset:CollisionPose, geometry:CollisionGeometry,
-      inflation:Float = 0.0, source:String = "primitive"):Int {
+      inflation:Float = 0.0, source:String = "primitive", ?member:String):Int {
     if (body < -1 || body >= bodies.length) throw 'Collision object "$name" is on an unknown body $body';
     if (!Math.isFinite(inflation) || inflation < 0) throw 'Collision object "$name" needs a finite, nonnegative inflation';
-    objects.push(new DescribedObject(name, body, offset, geometry, inflation, source));
+    objects.push(new DescribedObject(name, body, offset, geometry, inflation, source, member));
     return objects.length - 1;
   }
 
@@ -45,13 +86,104 @@ class CollisionDescription {
 
   public function setBodyRule(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void {
     if (a == b || a < -1 || b < -1 || a >= bodies.length || b >= bodies.length) throw 'Bad body rule $a-$b';
+    for (i in 0...bodyRules.length) {
+      var previous = bodyRules[i];
+      if ((previous.a == a && previous.b == b) || (previous.a == b && previous.b == a)) {
+        bodyRules[i] = new DescribedRule(a, b, rule, reason);
+        return;
+      }
+    }
     bodyRules.push(new DescribedRule(a, b, rule, reason));
   }
 
   public function setObjectRule(a:Int, b:Int, rule:CollisionPairRule, reason:CollisionPairStatus):Void {
     if (a == b || a < 0 || b < 0 || a >= objects.length || b >= objects.length) throw 'Bad object rule $a-$b';
+    for (i in 0...objectRules.length) {
+      var previous = objectRules[i];
+      if ((previous.a == a && previous.b == b) || (previous.a == b && previous.b == a)) {
+        objectRules[i] = new DescribedRule(a, b, rule, reason);
+        return;
+      }
+    }
     objectRules.push(new DescribedRule(a, b, rule, reason));
   }
+
+  /** Carried stock checks every outside shape except its explicitly named contact surfaces. */
+  public function setHeldContacts(body:Int, contacts:Array<Int>,
+      contactRule:CollisionPairRule = CollisionPairRule.Allow,
+      contactReason:CollisionPairStatus = CollisionPairStatus.ProcessContact):Void {
+    if (body < 0 || body >= bodies.length) throw "Held stock needs a described body";
+    for (contact in contacts)
+      if (contact < 0 || contact >= objects.length || objects[contact].body == body)
+        throw "Held contacts must name outside described objects";
+    for (other in 0...bodies.length) if (other != body)
+      setBodyRule(body, other, CollisionPairRule.Check, CollisionPairStatus.Checked);
+    for (i in 0...objects.length) if (objects[i].body == body)
+      for (j in 0...objects.length) if (objects[j].body != body) {
+        var contact = contacts.indexOf(j) >= 0;
+        setObjectRule(i, j, contact ? contactRule : CollisionPairRule.Check,
+          contact ? contactReason : CollisionPairStatus.Checked);
+      }
+  }
+
+  /** Exact object-pair margins do not alter any other object in the same margin class. */
+  public function setObjectMargins(a:Int, b:Int, ?air:Float, ?contact:Float):Void {
+    if (a < 0 || b < 0 || a >= objects.length || b >= objects.length)
+      throw "Collision margins need described objects";
+    if ((air != null && (!Math.isFinite(air) || air < 0)) ||
+        (contact != null && (!Math.isFinite(contact) || contact < 0))) throw "Object margins must be finite and nonnegative";
+    if (air == null && contact == null) return;
+    var key = a < b ? '$a\n$b' : '$b\n$a';
+    var previous = objectMargins.get(key);
+    objectMargins.set(key, {first: a, second: b,
+      air: air == null ? (previous == null ? -1.0 : previous.air) : air,
+      contact: contact == null ? (air == null ? (previous == null ? -1.0 : previous.contact) : air) : contact});
+  }
+
+  /** Restore only this described pair's sparse margins, without rewriting the class table. */
+  public function applyObjectMargins(world:CollisionWorld, ids:Array<Int>, a:Int, b:Int):Void {
+    var value = objectMargins.get(a < b ? '$a\n$b' : '$b\n$a');
+    world.setObjectMargins(ids[a], ids[b], value == null || value.air < 0 ? null : value.air,
+      value == null || value.contact < 0 ? null : value.contact);
+  }
+
+  public function marginBetweenObjects(a:Int, b:Int, contact:Bool = false):Float {
+    if (a < 0 || b < 0 || a >= objects.length || b >= objects.length) throw "Margins need described object ids";
+    var pair = objectMargins.get(a < b ? '$a\n$b' : '$b\n$a');
+    var exact = pair == null ? -1.0 : contact ? pair.contact : pair.air;
+    if (exact >= 0) return exact;
+    var first = objects[a].body, second = objects[b].body;
+    return (contact ? contactMargins : margins).between(first < 0 ? 0 : bodies[first].group,
+      second < 0 ? 0 : bodies[second].group);
+  }
+
+  /** Margin classes are explicit groups, shared by as many objects as belong to that class. */
+  public function setGroupMargins(g:Int, h:Int, ?air:Float, ?contact:Float):Void {
+    if (g < 0 || h < 0) throw "Collision margin classes must be nonnegative";
+    if (g >= groups || h >= groups) groups = Std.int(Math.max(g, h)) + 1;
+    if ((air != null && (!Math.isFinite(air) || air < 0)) || (contact != null && (!Math.isFinite(contact) || contact < 0)))
+      throw "Collision pair margins must be finite and nonnegative";
+    var key = g < h ? '$g\n$h' : '$h\n$g';
+    var previous = pairMargins.get(key);
+    var normal = air == null ? (previous == null ? defaultMargin : previous.air) : air;
+    var process = contact == null ? (air != null ? air : previous == null ? defaultMargin : previous.contact) : contact;
+    pairMargins.set(key, {first: g, second: h, air: normal, contact: process});
+    airTable = null; contactTable = null;
+  }
+
+  public function groupCount():Int return groups;
+
+  function marginTable(contact:Bool):CollisionMargins {
+    var cached = contact ? contactTable : airTable;
+    if (cached != null) return cached;
+    var result = new CollisionMargins(groups, defaultMargin, contact);
+    for (pair in pairMargins) result.set(pair.first, pair.second, contact ? pair.contact : pair.air);
+    if (contact) contactTable = result; else airTable = result;
+    return result;
+  }
+
+  function get_margins():CollisionMargins return marginTable(false);
+  function get_contactMargins():CollisionMargins return marginTable(true);
 
   /** Declares an articulation: its bodies, posed at the named reference configuration. */
   public function addArticulation(name:String, bodies:Array<Int>, reference:String):Int {
@@ -115,6 +247,7 @@ class CollisionDescription {
     }
     for (rule in bodyRules) world.setBodyRule(bodyId(rule.a), bodyId(rule.b), rule.rule, rule.reason);
     for (rule in objectRules) world.setObjectRule(objectIds[rule.a], objectIds[rule.b], rule.rule, rule.reason);
+    for (pair in objectMargins) applyObjectMargins(world, objectIds, pair.first, pair.second);
     var overlaps = 0;
     var articulated = new Map<Int, Int>();
     for (index in 0...articulations.length) {
@@ -128,6 +261,6 @@ class CollisionDescription {
       if (a == null && b == null) continue;
       errors.push(pair);
     }
-    return new CollisionBuild(world, bodyIds, objectIds, overlaps, errors);
+    return new CollisionBuild(world, bodyIds, objectIds, overlaps, errors, this);
   }
 }

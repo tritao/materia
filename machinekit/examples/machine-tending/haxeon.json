@@ -23,6 +23,7 @@
 		"../cnc-router"
 	],
 	"dependencies": {
+		"processkit": {"path": "../../../processkit"},
 		"collisionkit-native": {"path": "../../../collisionkit/native"},
 		"projectkit": {
 			"path": "../../../projectkit"

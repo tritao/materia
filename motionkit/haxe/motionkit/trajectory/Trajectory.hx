@@ -7,7 +7,7 @@ import haxe.Int64;
 /** Owns a native piecewise-polynomial joint trajectory. */
 @:allow(motionkit.trajectory.ExecutionPlan)
 @:allow(motionkit.path.NativeJointPath)
-class Trajectory {
+class Trajectory implements TimedJointTrajectory {
   final owner:Ownedmk_trajectory_handle;
   var disposed:Bool = false;
   /** Requested joint acceleration for controlled stops; independent of physical ratings. */
@@ -192,6 +192,8 @@ class Trajectory {
     check(result.status, "trajectory.duration");
     return Int64.toFloat(result.out_duration_ns) * 1e-9;
   }
+
+  public function duration():Float return durationSeconds();
 
   public function jointCount():Int {
     ensureLive();

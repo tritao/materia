@@ -6,8 +6,8 @@ package robotkit.manipulation;
  * contact windows. Bodies are named as the clearance world names them.
  */
 enum ClearanceChange {
-  /** `body` rides on `link` from now on, where it is (a grasp). */
-  Attach(body:String, link:String);
+  /** `body` rides on `link`; only the named collision objects may contact it. */
+  Attach(body:String, link:String, contacts:Array<String>);
   /** `body` stays where it is, fixed in the cell (a place). */
   Detach(body:String);
   /**

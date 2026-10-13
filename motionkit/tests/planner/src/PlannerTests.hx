@@ -256,7 +256,7 @@ class PlannerTests {
     var post:ClearanceBodyData = {name: "post", link: "base_link",
       vertices: WeldPlanningTests.box(tip.x - 0.03, tip.x + 0.03, tip.y - 0.03, tip.y + 0.03, 0.0, tip.z + 0.05), tool: false};
     // The planner's world: the arm's bodies from its model, the same hulls.
-    var description = new CollisionDescription();
+    var description = new CollisionDescription(0.005);
     var bodies = ModelBodies.describe(description, model, "ur", 0, arm.stateOf(START), "start", true);
     description.addObject("torch", bodies.bodies[model.bodyIndex("wrist_3_link")], CollisionPose.identity(), CollisionGeometry.Convex(torch.vertices));
     bodies.declare();
@@ -269,7 +269,7 @@ class PlannerTests {
     var planner = new RrtConnect(new BoundedSpace(space, [for (j in 0...6) Math.min(START[j], goal[j]) - 0.8],
       [for (j in 0...6) Math.max(START[j], goal[j]) + 0.8]), 2);
     // Validation: the adapter on the same hulls, with CollisionClearance's margins.
-    var clearance = new CollisionClearance(arm, [torch, table, post], START, () -> new NativeCollisionWorld());
+    var clearance = new CollisionClearance(arm, new robotkit.collision.CollisionClearanceLayout(description, bodies), START, () -> new NativeCollisionWorld());
     check(clearance.sweep(START, goal) != null, "the direct turn sweeps the torch through the post");
     var compiler = processkit.WeldingPlanRunner.planning(arm, 2.0).compiler.withJointPathPlanner(
       new StructuredJointPathPlanner(arm, null, null, clearance, 8, false));

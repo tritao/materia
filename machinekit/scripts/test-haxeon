@@ -2,19 +2,21 @@
 set -euo pipefail
 
 # Runs the MachineKit smoke tests against an existing CadKit native build,
-# matching cadkit/scripts/test-haxeon. Build CadKit first with CMake.
+# matching cadkit/scripts/test-haxeon. CMake and app-package builds are supported.
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 materia_root="$(cd -- "$repo_root/.." && pwd)"
 cadkit_build="${CADKIT_BUILD_ROOT:-$materia_root/cadkit/build/debug}"
 
-"$repo_root/scripts/build-examples"
-
-if [[ ! -e "$cadkit_build/core/libcadkit-core.so" && ! -e "$cadkit_build/core/libcadkit-core.dylib" ]]; then
+cadkit_library="$cadkit_build"
+if [[ -d "$cadkit_build/core" ]]; then cadkit_library="$cadkit_build/core"; fi
+if [[ ! -e "$cadkit_library/libcadkit-core.so" && ! -e "$cadkit_library/libcadkit-core.dylib" ]]; then
 	echo "missing CadKit native build in $cadkit_build; build cadkit or set CADKIT_BUILD_ROOT" >&2
 	exit 1
 fi
 
-native_paths="$cadkit_build/core:$cadkit_build/lin64/gcc/libd"
+"$repo_root/scripts/build-examples"
+
+native_paths="$cadkit_library:$cadkit_build/lin64/gcc/libd"
 export LD_LIBRARY_PATH="$native_paths${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export DYLD_LIBRARY_PATH="$native_paths${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 exec "$materia_root/haxeon/scripts/haxeon" run --project "$repo_root/tests/haxeon.json"

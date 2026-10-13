@@ -3283,12 +3283,16 @@ class ProjectSourceTests {
       if (held == null || kinematics == null) throw "The loaded route lost its grasp carrier";
       var tool = mission.handlingTools.get(channel);
       if (tool == null) throw "The loaded route lost its handling tool";
-      var bodies = mission.cellCollisionBodies(mission.toolArm(tool), null, []);
-      var payload = [for (body in bodies) if (body.name == held.occurrence ||
-        StringTools.startsWith(body.name, held.occurrence + "#")) body];
+      var captured = mission.cellCollisionSnapshot([]);
+      var payload = [for (body in captured.hulls) if (body.member == held.occurrence) body];
       check(payload.length > 0, "Confirmed machining stock has CAD clearance geometry");
-      for (piece in payload) check(piece.link == mission.robot.model.links[kinematics.link].id,
-        "Machining stock uses its CAD hull on the gripper carrier despite its editor collision flag");
+      for (piece in payload) {
+        var carrier = switch piece.owner {
+          case Held(controller, link): controller == mission.robotId() && link == mission.robot.model.links[kinematics.link].id;
+          case _: false;
+        };
+        check(carrier, "Machining stock keeps its typed controller and gripper carrier despite its editor collision flag");
+      }
       checked++;
     }
     return checked;

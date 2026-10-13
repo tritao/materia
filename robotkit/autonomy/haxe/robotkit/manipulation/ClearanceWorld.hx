@@ -18,6 +18,9 @@ interface ClearanceWorld {
   /** The arm whose joint values the queries take. */
   function group():KinematicGroup;
 
+  /** Minimum signed gap of named objects or physical members, independent of pair exemptions. */
+  function distanceBetween(q:Array<Float>, first:String, second:String):Float;
+
   /** The first pair closer than it may be at `q`, or null. */
   function violation(q:Array<Float>, ?contact:Bool, ?wanted:Float, ?displacements:Array<Float>):Null<ClearanceViolation>;
   /** The closest checked pair, clear or not, or null when none is checked. */

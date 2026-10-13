@@ -46,7 +46,7 @@ class ParallelGripperBody extends MachineComponent {
 		addPort({name: "close", kind: Signal, role: Consumer, iface: Plug("24V-input", 2), required: false});
 		addFacet(new GripFacet(spec.totalJawTravel, spec.ratedGripForce, "open", "close", "gripped", "tcp",
 			spec.minimumPartWidth(), spec.expectedPartWidth, spec.maximumPartWidth(), spec.fingerLength,
-			spec.fingerPadFrictionCoefficient, spec.supportStep));
+			spec.fingerPadFrictionCoefficient, [ParallelGripper.FINGER_LEFT, ParallelGripper.FINGER_RIGHT], spec.supportStep));
 		addFacet(CollisionHullFacet.fromBoxes(housingCollisionBoxes(spec)));
 	}
 

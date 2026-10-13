@@ -51,6 +51,7 @@ class CellCollisionTests {
     testSimulationContactSettings();
     testDecomposedPartEnclosesItsTessellation();
     testClearanceBodies();
+    assertions += CellCollisionCorpus.run();
     Sys.println('Cell collision tests passed ($assertions assertions)');
   }
 
@@ -255,12 +256,17 @@ class CellCollisionTests {
   /** The hulls CollisionClearance is given (link hulls, a tool hull, parts and welds on the base link) land on the same bodies. */
   static function testClearanceBodies():Void {
     var description = new CollisionDescription();
-    var robot = RobotCollision.describe(description, arm(), armOptions("arm"));
-    var objects = RobotCollision.describeClearanceBodies(description, robot, [
-      {name: "upper-hull", link: "upper", vertices: cube(0.5, 0, 0, 0.05), tool: false},
-      {name: "torch", link: "fore", vertices: cube(1.05, 0, 0, 0.03), tool: true},
-      {name: "workpiece", link: "base", vertices: cube(1.5, 1.0, 0, 0.1), tool: false}
-    ]);
+    var model = arm(), options = armOptions("arm");
+    options.hulls = [
+      new RobotLinkHull(1, "upper-hull", cube(0.5, 0, 0, 0.05)),
+      new RobotLinkHull(0, "workpiece", cube(1.5, 1.0, 0, 0.1))
+    ];
+    options.toolFrame = null;
+    options.toolLink = "fore";
+    options.tool = new Tool("torch", "torch", Transform3.identity(),
+      ToolCollisionShape.Hulls([cube(1.05, 0, 0, 0.03)], 0.0));
+    var robot = RobotCollision.describe(description, model, options);
+    var objects = [robot.hulls[0], robot.toolObjects[0], robot.hulls[1]];
     check(description.objects[objects[0]].body == robot.linkBody("upper"), "a link hull is on its link");
     check(description.objects[objects[1]].body == robot.toolBody, "a tool hull is on the tool body");
     check(description.objects[objects[2]].body == robot.linkBody("base"), "a part carried by the base is on the base");

@@ -133,6 +133,8 @@ void World::remove(uint32_t id) {
     objects_.erase(id);
     for (auto it = object_rules_.begin(); it != object_rules_.end();)
         it = it->first.first == id || it->first.second == id ? object_rules_.erase(it) : std::next(it);
+    for (auto it = object_margins_.begin(); it != object_margins_.end();)
+        it = it->first.first == id || it->first.second == id ? object_margins_.erase(it) : std::next(it);
     for (auto it = reference_.begin(); it != reference_.end();)
         it = it->first == id || it->second == id ? reference_.erase(it) : std::next(it);
     pairs_dirty_ = true;
@@ -338,13 +340,28 @@ bool World::pair_distance(uint32_t a, uint32_t b, PairResult &out) {
     return true;
 }
 
+void World::set_object_margins(uint32_t a, uint32_t b, double air, double contact) {
+    if (air < 0 && contact < 0) object_margins_.erase(key(a, b));
+    else object_margins_[key(a, b)] = {air, contact};
+}
+
+double World::required_margin(const Pair &pair, const Margins &classes) const {
+    double required = classes.between(group_of(pair.body_a), group_of(pair.body_b));
+    auto found = object_margins_.find(key(pair.a, pair.b));
+    if (found != object_margins_.end()) {
+        double value = classes.contact ? found->second.contact : found->second.air;
+        if (value >= 0) required = value;
+    }
+    return classes.ceiling < 0 ? required : std::min(required, classes.ceiling);
+}
+
 bool World::violation(const Margins &margins, const double *inflation, bool &found, PairResult &out) {
     found = false;
     rebuild_pairs();
     if (unsupported_) return false;
     coal::CollisionRequest request(coal::NO_REQUEST, 1);
     for (Pair &pair : pairs_) {
-        double required = margins.between(group_of(pair.body_a), group_of(pair.body_b));
+        double required = required_margin(pair, margins);
         // These radii bound rigid-body motion. Shapes on the same body have
         // no relative motion; their geometric inflation is already in the shapes.
         if (inflation && pair.body_a != pair.body_b) {
@@ -371,7 +388,7 @@ bool World::closest(const Margins &margins, bool &found, PairResult &out) {
         PairResult candidate;
         measure(pair, candidate);
         if (found && !(candidate.distance < best)) continue;
-        candidate.required = margins.between(group_of(pair.body_a), group_of(pair.body_b));
+        candidate.required = required_margin(pair, margins);
         out = candidate;
         best = candidate.distance;
         found = true;

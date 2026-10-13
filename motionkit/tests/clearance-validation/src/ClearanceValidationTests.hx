@@ -1,3 +1,4 @@
+import CollisionFixture;
 import collisionkit.native.NativeCollisionWorld;
 import haxe.Int64;
 import motionkit.MotionOptions;
@@ -80,8 +81,18 @@ class ClearanceValidationTests {
     return "";
   }
 
+  /** Fixture roles and selected work are authored separately from collision queries. */
+  static function cell(start:Array<Float>, margin:Float = 0.005, contactMargin:Float = 0.0005):CollisionFixture {
+    var fixture = new CollisionFixture(arm, start, margin, contactMargin);
+    var torchBody = torch(), neckBody = neck(), tableBody = table();
+    fixture.mechanism(torchBody.name, torchBody.link, torchBody.vertices, true);
+    fixture.mechanism(neckBody.name, neckBody.link, neckBody.vertices, true);
+    fixture.fixture(tableBody.name, tableBody.vertices, true);
+    return fixture;
+  }
+
   static function testPassingAndFailingCells():Void {
-    var world = new CollisionClearance(arm, [torch(), neck(), table()], START, () -> new NativeCollisionWorld());
+    var world = cell(START).clearance();
     var target = shifted(START, [0.4, 0.1, 0.0, 0.0, 0.0, 0.2]);
     var compiled = compiler(world).compile(moves([target]), START, Int64.ofInt(1));
     var report = reports(compiled)[0];
@@ -157,7 +168,10 @@ class ClearanceValidationTests {
     for (x in [radius - 0.05, radius + 0.05]) for (y in [-0.00025, 0.00025]) for (z in [centre.z - 0.05, centre.z + 0.05]) {
       plate.push(c * x - s * y); plate.push(s * x + c * y); plate.push(z);
     }
-    var world = new CollisionClearance(arm, [bead, {name: "plate", link: "base_link", vertices: plate, tool: false}], from, () -> new NativeCollisionWorld(), 0.0002, 0.0002);
+    var fixture = new CollisionFixture(arm, from, 0.0002, 0.0002);
+    fixture.mechanism(bead.name, bead.link, bead.vertices, true);
+    fixture.fixture("plate", plate, true);
+    var world = fixture.clearance();
     check(world.violation(from) == null && world.violation(to) == null, "both ends are clear");
     var message = throwsWith(() -> compiler(world).compile(moves([to]), from, Int64.ofInt(1)).dispose());
     check(message.indexOf("trajectory clearance bound (bead, plate)") >= 0,
@@ -167,7 +181,7 @@ class ClearanceValidationTests {
 
   /** With no bisection the bound cannot close, and the report says sampled over the open interval. */
   static function testDepthLimitIsSampled():Void {
-    var world = new CollisionClearance(arm, [torch(), neck(), table()], START, () -> new NativeCollisionWorld());
+    var world = cell(START).clearance();
     var shallow = compiler(world);
     shallow.clearanceDepthLimit = 0;
     var compiled = shallow.compile(moves([shifted(START, [0.4, 0.1, 0.0, 0.0, 0.0, 0.2])]), START, Int64.ofInt(1));
@@ -182,7 +196,9 @@ class ClearanceValidationTests {
   /** A part grasped at the torch tip rides along, and stays where it is placed while the torch leaves it. */
   static function testGraspAndPlace():Void {
     var part:ClearanceBodyData = {name: "part", link: "base_link", vertices: inWrist(START, -0.012, -0.004, D6 - 0.004, D6 + 0.004, -0.146, -0.138), tool: false};
-    var world = new CollisionClearance(arm, [torch(), neck(), table(), part], START, () -> new NativeCollisionWorld(), 0.001, 0.0005);
+    var fixture = cell(START, 0.001, 0.0005);
+    fixture.fixture(part.name, part.vertices, true);
+    var world = fixture.clearance();
     check(world.violation(START) != null, "the grasped part touches the torch");
     var carry = shifted(START, [0.5, -0.2, 0.0, 0.0, 0.0, 0.0]), leave = shifted(carry, [0.0, -0.25, 0.2, 0.0, 0.0, 0.0]);
     var program = moves([carry, leave]);
@@ -190,7 +206,7 @@ class ClearanceValidationTests {
     check(refused.indexOf("part") >= 0, 'without the grasp the part is in the torch ($refused)');
     var replay = compiler(world);
     replay.clearanceEvents = [
-      new ClearanceEvent(0, 0.0, ClearanceChange.Attach("part", "wrist_3_link")),
+      new ClearanceEvent(0, 0.0, ClearanceChange.Attach("part", "wrist_3_link", ["torch"])),
       new ClearanceEvent(1, 0.0, ClearanceChange.Detach("part")),
       new ClearanceEvent(1, 0.0, ClearanceChange.OpenWindow("torch", "part", null)),
       new ClearanceEvent(1, 1e6, ClearanceChange.CloseWindow("torch", "part"))
@@ -209,7 +225,9 @@ class ClearanceValidationTests {
   /** The torch closes to 2 mm of its seam: inside the 5 mm margin, outside the window's 1 mm approach margin. */
   static function testTorchWindow():Void {
     var seam:ClearanceBodyData = {name: "seam", link: "base_link", vertices: inWrist(START, -0.012, -0.006, D6 - 0.012, D6 + 0.012, -0.152, -0.142), tool: false};
-    var world = new CollisionClearance(arm, [torch(), neck(), table(), seam], START, () -> new NativeCollisionWorld());
+    var fixture = cell(START);
+    fixture.fixture(seam.name, seam.vertices, true);
+    var world = fixture.clearance();
     var above = shifted(START, [0.0, -0.2, 0.15, 0.0, 0.0, 0.0]);
     check(world.violation(above) == null, "the approach starts clear");
     var closing = world.violation(START);

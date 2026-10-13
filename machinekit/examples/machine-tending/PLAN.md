@@ -137,7 +137,7 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
 
 **MT-D9. Collision.**
 - Main's `CollisionDescription` and `CadCollision`/`RobotCollision` adapters describe the world and articulated hulls. MotionKit's `CollisionPlannerSpace` conservatively checks generated joint-space edges against that description; a blocked path is replanned or rejected.
-- Until the cell-level MT12b builder is integrated, MachineTending supplies the assembled cell hulls to the shared collision API and derives approaches from via-poses. The door is open for paths inside the cell.
+- MachineTending supplies typed live-state observations to the shared MT12b description builder and derives approaches from via-poses. The door is open for paths inside the cell.
 - "Robot clear" is computed from the arm and tool hulls against the machine's zone box, not taught.
 
 **MT-D10. Concave things are several convex parts.**
@@ -176,9 +176,10 @@ Surveyed 2026-10-03 on local main 1048bf768, plus the `mobile-welder` and `x7-tr
   - `collisionkit.CollisionDescription` stores bodies, articulated models, stable object ids and pair rules;
   - `RobotCollision` describes RobotKit mechanisms, and `cadbridge.CadCollision` adapts CAD parts and mechanism hulls;
   - `CollisionPlannerSpace` provides conservative motion-planning checks, while `CollisionClearance` supports runtime scene changes and named contact windows.
-- MT12b adds one MachineTending-level builder on those shared APIs:
-  - bodies: hull, owner (a robot's link, or world) and a stable id;
-  - pair rules: margin per pair, allowed contacts and process interfaces, each with its reason.
+- MT12b uses snapshot → one shared builder → `CollisionDescription`, plus typed ownership and carrier metadata only. TendingReach, app skills, welding and standalone fixtures all enter through a snapshot.
+- The builder uses main's `CadCollision.describePart`/`describeMechanism` and `RobotLinkHull`; no second hull transformation or adjacency adapter is retained. Descriptions own object rules and margin classes (or per-object-pair margins). Held stock is checked against everything except explicit typed contact object sets, including on initial construction and on transfer.
+- CollisionKit owns held-part attachment and its rules. Windows override the relevant object rule and cache their margin table until the window changes. CAD/tool identities are typed data; consumers never infer ownership, pads or work from display names or suffixes.
+- A probe wire is a tool-link capsule in that description; there is no Haxe GJK wire engine and no description-to-`ClearanceBodyData` round trip.
 - The static reach study, app mission planner and welder stations consume that cell description. They must not build another collision engine or a second CAD/robot adapter.
 - Clearance queries use the shared `CollisionClearance` and `CollisionPlannerSpace` APIs. Do not restore `ArmClearance`/`ArmPlanClearance` or call `ConvexDistance` directly from cell logic.
 - CL0–CL7 are now in main, including the coal native backend and its test corpus. MT12b tests the MachineTending cell-description adapter against those shared APIs; it does not compare duplicate engines.
@@ -910,11 +911,11 @@ Closing validation:
 - The nominal route test initially checked alignment at the first clamped-switch observation, during the contact transient (**0.008311 rad** tilt). It now follows the authored arm retreat and confirmed door closure to the first machining request, then checks the unchanged machining alignment bound before cutting, with an empty physical gripper. No artificial settling delay, motion change or relaxed tolerance is introduced. The rebuilt focused route passes at **24.23 s** (`f4a2030a6`).
 - Closing coverage is the complete sequential `mt12-close-20261011` gate plus the two focused repairs above. StockKit **100673 + 17494 reference rays**, CamKit **12311**, ProjectKit **192 + 18 contact-wire assertions**, ProcessKit **23 + 19 weld-path assertions**, HumanKit and AnimKit also pass. The original gate summary retains `failures=1` (a failure flag, not a failure count); the RobotKit and route failures are not erased or presented as an uninterrupted pass. Focused logs are `mt12-robotkit-post-stop-recheck.log` and `mt12-route-ready-recheck.log`; physical four-part acceptance is `mt12-final-overlap-production.log`, all in the shared scratch directory. No new Haxeon issue or compiler change was needed; the pin remains `8d675fdef7498c43cf3a11193b74656bd0d890e5`.
 
-The explicit four-part physical check (absent from the normal app suite) passes dual-part retention and **≥75%** whole-cell spindle use from first clamp through fourth sensed outfeed. All required closing checks pass through the sequential gate and focused repairs. MT12 is complete and stops for review before main. MT12b and MT13 have not started; trays still use per-slot presence sensors until MT13 replaces them with the calibrated camera pipeline.
+MT12 implements the four-part physical cycle and dual-part retention, with closing coverage from the sequential gate and focused repairs above. Release depends on completing MT12b and its full gate. The measured **287.74 s** cycle contains **214.8 s** of cuts: **74.65% cutting utilisation**. The recorded **75.1% spindle-on utilisation** also counts run-up/coast-down; it does not establish a cutting-utilisation target with margin. MT14 closes that measurement/acceptance gap and schedules the physical run in the maintained gate. MT13 has not started; tray sensors remain until its calibrated camera pipeline replaces them.
 
 **MT12b. One cell collision description.**
-- **`CellCollisionScene`.** A cell-level builder over main's `CollisionDescription`, `CadCollision` and `RobotCollision`. It collects the cell assembly, controller-owned mechanisms and loose objects once, with owners, stable ids and pair rules with reasons.
-  - Keep it beside the CAD bridge so `TendingReach`, `MissionPlayer` and `MobileWeldStations` can consume the same result.
+- **`CellCollisionSnapshot` → `CollisionSceneBuilder`.** CadBridge captures typed CAD and live-state observations; RobotKit builds one `CollisionDescription` through main's `CadCollision` and `RobotCollision` adapters. The result contains geometry, stable ids and pair rules, plus a minimal ownership map.
+  - Keep capture beside the CAD bridge, the geometry builder in RobotKit, and handling/welding policy in ProcessKit. `TendingReach`, `MissionPlayer`, standalone fixtures and `MobileWeldStations` consume that same builder.
   - Door, vise and other robot poses are inputs, never baked in.
 - **Pair rules are data.** Vise jaws and gripper pads use the work-contact allowance; welder interfaces keep their own margin; other pairs use the general 5 mm margin. Use CollisionKit's pair-rule and group-margin APIs rather than call-site branches or a new distance engine.
 - **Migration, clean break:**
@@ -936,6 +937,20 @@ The explicit four-part physical check (absent from the normal app suite) passes 
   - the track welder's case resolved in the shared description, not by loosening its margin;
   - the corpus passes;
   - the full sequential gate passes.
+
+Done. What was built and decided:
+- One production path now runs snapshot → shared builder → `CollisionDescription`. Reach, app skills, welding and standalone fixtures use main's CAD/mechanism adapters. The alternate hull constructors, duplicate adjacency, geometry gathering and description-to-hull round trips are deleted. Capture stays in CadBridge, construction in RobotKit, and handling/welding policy in ProcessKit.
+- CollisionKit owns held-part transfer and explicit contact exemptions. Other grippers and tool members remain checked; detached stock keeps its current world pose. `ModelBodies` is the sole follower map. Physical member identity survives compound hulls and rebasing, including descendant robot roots and multi-DOF state.
+- Margins use bounded classes (air, installed, tool, work, held), cached tables and sparse pair overrides. Contact windows override and restore object rules. Native API **v2** carries query context per call. SceneArtifact makes a clean break at **v29**; producers and fixtures are migrated, with no old-format reader. Tool/pad and weld-member identity comes from typed records, not names.
+- Margin changes are explicit: unrelated welder obstacles use **5 mm** in planner and runtime, replacing the former **3 mm** runtime air cap. Installed interfaces retain **3 mm**. Named welding work uses **3 mm air / 0.5 mm contact**, replacing the generic planner's former **5 mm** tool/work margin. Application checks pass with these aligned policies; no corpus allowance was widened. The shipped track-welder interface measures **0.004000000000000004 m** and its complete ready pose clears.
+- Conservative motion checks use a typed timed-trajectory interface and preserve inactive DOFs. The probe wire is a capsule in the same description, with **rounded ends assumed**, declared overall stickout and diameter, and no separate Haxe GJK. Physical replay requires actual touch and an independent signed native wire gap: **−0.0100011921 mm**, with **1.2803716526e-15 m** sensor/FK error.
+- Application export now distinguishes dynamic free bodies from externally owned static members. Joined static work stays environment; joined dynamic parts remain invalid. The probe fixture derives its contact from typed CAD faces; its old posture is only an IK seed. The tending manifest declares its ProcessKit dependency. Standalone fixtures use the shared builder and observed reference state; smoke loaders accept the existing app native-library layout without recreating the obsolete external build directory.
+- Reach remains **Reach1300 / 550 mm riser / 96 poses / 541 mm stand-off**, **10.4600359266%** minimum joint margin, **0.8781054926** wrist sine and **196.4113759501 × 186.4113759501 mm** tray pitch. Production remains **287.74 s**, four outfeeds and 144 steps: **74.65% cutting utilisation / 75.1% spindle-on utilisation**. Startup seating is **24.23 s** and the physical CNC-interface check is **61.61 s**. Cutting utilisation with margin remains an MT14 acceptance item.
+- Mill baselines remain **52.73 / 53.70 s** bare/enclosed, with **0.034544 / 0.051464 / 0.059015 mm** X/Y/Z tracking at the **10 ms** controller tick. Door travel remains **1.99 / 2.37 s**, seated clamp **0.08 s**, and declared actuator force **482.548632 N**; this is not a measured jaw–blank contact force. Routers retain **232.2 / 215.2 s**, 128 plans and **0.05 / 1.75 mm** worst deviation. No new timing baseline change was required by MT12b.
+- The complete sequential gate passes, including native collision **3/3**, native motion **16/16**, CollisionKit **380**, clearance **23**, cell **97 (67 corpus)**, contact-search **143**, MuJoCo collision **59**, physical probe, tending-vise, tending-route, interface, four-part production, default app and full editor/Worker document checks. RobotKit **5461**, MotionKit **1225280**, CadBridge **178**, CncKit **317**, CamKit **12311**, ProjectKit **192 + 18** and ProcessKit **23 + 19** pass. Six affected kits were rerun serially after the final code edits and all passed.
+- Evidence is retained under `/home/joao/dev/materia-cache/claude-scratch/`: `mt-suite-mt12b-close3-20261012.txt`, `mt12b-final-affected.txt` and `mt12b-machinekit-coverage.txt`. This was a repaired/resumed gate, not an uninterrupted run. Earlier fixture/dependency/loader failures were fixed. Host `earlyoom` terminated MachineKit during controller checks (SIGTERM, exit 15); existing independent shards completed all **66 groups**, with successful exits and coverage verified. The controller fixture builds one cell without removing assertions. Heavy stages ran serially through `heavy-run`; OCCT was not built.
+- Haxeon commit **`1d96bab5`** fixes the root CFG defect: block-expression lowering discarded enclosing loop context for `break`/`continue`. Compiler unit checks and eight HashLink fixtures pass; this commit pins the fix. No Materia compiler workaround was added.
+- MT13 has not started: tray sensors remain. All section B–D review follow-ups remain tracked as MT14 below. Constructor-time reach search, production force/seat evidence and safety hardening are not claimed complete. Review precedes any main update.
 
 **MT13. Wrist camera for the trays.**
 - **Hardware:**
@@ -966,6 +981,46 @@ The explicit four-part physical check (absent from the normal app suite) passes 
   - the solved hand-eye extrinsic is within 0.5 mm and 0.2° of CAD;
   - the look time is hidden behind the cut, so spindle use is unchanged from MT12;
   - the four-part acceptance still passes with the trays offset from nominal.
+
+**MT14. Cell hardening (MT12 review sections B–D).**
+
+Finish MT12b first. Each line below is an acceptance item, not a claim that the prototype already satisfies it. Small independent fixes may land earlier with their evidence recorded. Heavy stages use `heavy-run`; closing acceptance uses the full sequential gate, and review precedes any main update.
+
+Safety and decisions:
+- [ ] B1: Replace mission-authored `Clear`/`robot.clear` with a robot zone monitor over arm and payload hulls in the MT12b description and the enclosure-derived machine zone volume. Remove `Clear` from `TendingOperation`; PLC door/cycle permission uses the measured monitor.
+- [ ] B2: Move robot-side request/wait/release, retry and alarm mapping into a reusable CncKit `RobotInterface` client. Replace station-prefix/message-substring alarm classification with typed alarm codes.
+- [ ] B3: Derive mill interlock wiring from `connectPorts` and typed sensor/valve roles. Remove hard-coded door/jaw/sensor names, `input${index + 6}`, `baseX + 350`, `-1000,-1000` and string re-prefixing of CNC jobs.
+- [ ] B4: Give gripper, door and vise one controller-layer double-solenoid driver. Move the gripper's 40 ms coil pulse out of `SimulatedPneumaticGripper`; simulation keeps pneumatic physics only.
+- [ ] B5: Add `CamJob.endAt(machinePosition)`. Remove BearingBlockJob's last-operation splice and load-position inference from the final program move.
+- [ ] B6: Put contact surface properties on materials/fixtures; remove the pneumatic-actuator-triggered scene-wide contact switch. Reconcile MT-D5's 1 ms claim with the actual 0.5 ms contact setting.
+- [ ] B7: Restore a real offline reach search or declare class/riser/stand-off as named design inputs with rationale. Remove singleton search loops; store the certified layout instead of solving it in `TendingControllers`. Name/derive tool constants and dimensions (`-12`, `z = 10`, `tendingTool` arguments).
+- [ ] B8: Introduce typed `TendingStation` values; remove parsing of infeed row/column, vise-load, approach and clearance station strings.
+- [ ] B9: Assert that the statically certified grasp equals the runtime handling grasp.
+
+Tests and physical truth:
+- [ ] C1: At every production `CYCLE_START`, assert blank-to-seat alignment near 0.1 mm/2 mrad and settled contact on both jaw faces.
+- [ ] C2: Measure settled MuJoCo jaw–blank normal force against p·A, using a real blank rather than a joint limit. Apply a modelled/equivalent cutting wrench to stock and reassert clamped hold.
+- [ ] C3: Restore a relative clamp-time bound; explain or fix the measured −18% discrepancy. The current ±30 ms bound is about ±31%, compared with the former ±10% requirement.
+- [ ] C4: Accumulate slip, both-pad contact and free-body evidence separately for every gripper channel inside the four-part production loop with the actual tending blank and dual gripper.
+- [ ] C5a: Simulate e-stop mid-carry while holding stock.
+- [ ] C5b: Simulate e-stop mid-cut.
+- [ ] C5c: Simulate loss of air.
+- [ ] C5d: Simulate a door-close jam.
+- [ ] C5e: Simulate a stuck jaw and both `ClampTimeout` and `UnclampTimeout` recovery.
+- [ ] C5f: Simulate a part missing mid-run.
+- [ ] C5g: Simulate occupied outfeed.
+- [ ] C6: Report cutting/in-cycle and spindle-on utilisation separately and state which target applies. 214.8/287.74 s is 74.65% cutting, while 75.1% includes spindle run-up/coast-down. Require real margin for 75% acceptance, fourth-outfeed elapsed time with about 5% slack, and panel/encoder utilisation agreement near 0.01.
+- [ ] C7: Add maintained sequential heavy-run stages for `tending`, `tending-route`, `tending-vise` and `interface`; the explicit four-part acceptance must no longer depend on one scratch log. The gate script now schedules all four unconditionally and removes its duplicate failure-only tending rerun; execution evidence remains pending.
+- [ ] C8a: Assert tray slot pitch equals `pitchX`/`pitchY`, retaining independent non-overlap coverage.
+- [ ] C8b: Exclude same-part convex pieces from held-part Check rules using typed physical-object identity.
+- [ ] C8c: Skip only the candidate whose timing refinement reports an uncertified edge; retain other reach candidates instead of aborting the study.
+
+Structure and plan:
+- [ ] D1a: Split `MissionPlayer` into a skill-runner core and handling, welding, energy and signal modules.
+- [ ] D1b: Move generic `CellSignals` into a kit and delete unused `writeSignal`, which bypasses ownership validation.
+- [ ] D2a: Reconcile current reach statements and REVIEW_FIXES with the MT11 Reach1300 selection and MT12 certified 550 mm riser/541 mm stand-off/0.878 wrist sine. Label old Reach850/600 mm/15-pose values as historical checkpoints rather than current acceptance.
+- [x] D2b: Keep MT12's release dependency on MT12b explicit in progress and acceptance text (amended at the MT12b review boundary).
+- [ ] D2c: Decide whether to move the historical per-step evidence into `HISTORY.md`, preserving links and measurements while keeping this document a usable plan.
 
 **Later.**
 - Real I/O:
@@ -1027,9 +1082,10 @@ Done. What was built and decided:
 | MT9 | done; sequential closing gate passed | ac42c8866, 3dd21bd25 |
 | MT10 | done; CollisionKit integration closing gate passed | a5c6bb9da, f2e04aff3, 9b5bfb299, 3dd21bd25 |
 | MT11 | done; physical production, recovery and integration gates passed | a65789a38, 81f5563f7, 3dd21bd25 |
-| MT12 | done: 287.74 s / 75.1%; full closing coverage with focused repairs | `e46b42297`, `a1e9ab0dd`, `955e5196e`, `b71c18787`, `f4a2030a6` |
-| MT12b | planned | |
+| MT12 | implemented: 287.74 s, 75.1% spindle-on / 74.65% cutting; release depends on MT12b; MT14 hardens acceptance | `e46b42297`, `a1e9ab0dd`, `955e5196e`, `b71c18787`, `f4a2030a6` |
+| MT12b | done: one shared description; complete sequential gate and final affected-kit checks pass | this commit |
 | MT13 | planned | |
+| MT14 | planned: cell hardening checklist from review sections B–D | |
 
 **Environment clearance and support geometry (MT5b follow-up, verified in `8b22593be` and `20f0d3e16`).**
 

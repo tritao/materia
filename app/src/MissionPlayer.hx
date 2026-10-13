@@ -1,11 +1,10 @@
 package app;
 
+import robotkit.collision.CollisionSceneBuilder;
+import cadbridge.CellCollisionSnapshot;
+import robotkit.collision.CollisionSceneBuilder.CollisionOwner;
+
 import collisionkit.native.NativeCollisionWorld;
-import collisionkit.CollisionDescription;
-import collisionkit.CollisionGeometry;
-import collisionkit.CollisionMargins;
-import robotkit.collision.RobotCollision;
-import robotkit.collision.RobotCollision.RobotCollisionOptions;
 import motionkit.robot.CollisionPlannerSpace;
 import collisionkit.CollisionPairRule;
 import collisionkit.CollisionPairStatus;
@@ -558,12 +557,13 @@ class MissionPlayer implements SessionMember {
         var nominal = job.nominal;
         var rootWork = Transform3.fromPose2(observed.pose).inverse().compose(new Transform3(
           new Vec3(nominal.x, nominal.y, nominal.z), new Quat(nominal.qx, nominal.qy, nominal.qz, nominal.qw)));
-        var bodies = weldCollisionBodies(arm, tool.contact.occurrence, metal);
-        var planned = armClearance(arm, bodies);
+        var scene = weldCollisionScene(arm, tool.contact.occurrence, metal);
         var tip = weldKinematics.tip;
-        var wire = new processkit.ProbeWireClearance(arm, robot.model.links[weldKinematics.link].id,
+        var wire = processkit.ProbeWire.describe(scene, arm, robot.model.links[weldKinematics.link].id,
           new Transform3(new Vec3(tip.x, tip.y, tip.z), new Quat(tip.qx, tip.qy, tip.qz, tip.qw)),
-          torch.wireDiameterMm * 0.001, torch.stickoutMm * 0.001, bodies);
+          torch.wireDiameterMm * 0.001, torch.stickoutMm * 0.001,
+          scene.memberObjects(tool.members), scene.memberObjects(weldingMembers()));
+        var planned = scene.clearance(() -> new NativeCollisionWorld());
         clearance = planned;
         var planning = WeldingPlanRunner.planning(arm, weldAcceleration, planned);
         var indices = arm.jointIndices();
@@ -583,124 +583,92 @@ class MissionPlayer implements SessionMember {
 
   /**
    * The clearance a weld is planned with: the collision hulls the simulation uses, each on its link, the torch's marked as
-   * the tool, and the arm's pose now as the one where neighbouring links touch by design. Welding keeps 3 mm between bodies in air
-   * and 0.5 mm between tool and work at the seam; the arm's installed gearheads have 4.5 mm designed clearance to the next tube. `ignored` are occurrences that
+   * the tool, and the arm's current pose. Welding keeps 3 mm between installed mechanism bodies,
+   * 5 mm to unrelated cell obstacles and 0.5 mm between tool and named work at the seam.
+   * The arm's installed gearheads have 4.5 mm designed clearance to the next tube. `ignored` are occurrences that
    * are no obstacle (the weld metal).
    */
-  function weldClearance(arm:Manipulator, torch:String, ignored:Array<String>):CollisionClearance {
-    return armClearance(arm, weldCollisionBodies(arm, torch, ignored));
+  function weldClearance(arm:Manipulator, torch:String, ignored:Array<String>):CollisionClearance
+    return weldCollisionScene(arm, torch, ignored).clearance(() -> new NativeCollisionWorld());
+
+  function weldingMembers():Array<String> {
+    var members:Array<String> = [];
+    for (step in mission.steps) if (step.weld != null)
+      for (segment in step.weld.path) for (face in segment.faces)
+        if (members.indexOf(face.member) < 0) members.push(face.member);
+    for (step in mission.steps) if (step.contactWork != null)
+      for (face in step.contactWork.faces) if (members.indexOf(face.member) < 0) members.push(face.member);
+    return members;
   }
 
-  function weldCollisionBodies(arm:Manipulator, torch:String, ignored:Array<String>):Array<robotkit.manipulation.ClearanceBodyData> {
-    var toolPrefix = torch.substr(0, torch.lastIndexOf("/") + 1);
-    return cellCollisionBodies(arm, toolPrefix, ignored);
+  function weldCollisionScene(arm:Manipulator, torch:String, ignored:Array<String>):CollisionSceneBuilder {
+    var scene = cellCollisionSnapshot(ignored).describe(arm, observedJoints(arm), CollisionClearance.MARGIN);
+    processkit.WeldCollisionPolicy.apply(scene, scene.memberObjects(weldingMembers()), processkit.WeldPathPlanner.AIR_MARGIN, CollisionClearance.CONTACT_MARGIN);
+    return scene;
   }
 
-  /** The simulation's articulated hulls plus its current cell geometry, all in this robot's root frame. */
-  function cellCollisionBodies(arm:Manipulator, toolPrefix:Null<String>, ignored:Array<String>):Array<robotkit.manipulation.ClearanceBodyData> {
-    var links = robot.model.links;
-    var bodies = [for (hull in robot.hulls) if (ignored.indexOf(hull.part) < 0)
-      {name: hull.part, link: links[hull.link].id, vertices: hull.vertices, tool: toolPrefix != null && StringTools.startsWith(hull.part, toolPrefix)}];
-    var carriedLinks = new Map<String, Int>();
+  /** Read live poses and carrier facts; CadBridge owns the collision geometry collection. */
+  function cellCollisionSnapshot(ignored:Array<String>):CellCollisionSnapshot {
+    function linkPose(index:Int, link:Int):Transform3 {
+      var pose = simulation.linkPose(index, link);
+      return Transform3.fromArrays(pose.position, pose.rotation);
+    }
+    var captured = new CellCollisionSnapshot(robot.robot.id(), linkPose(robotIndex, 0), ignored);
+    var toolMembers:Array<String> = [];
+    for (tool in project.robotTools) for (member in tool.members) if (toolMembers.indexOf(member) < 0) toolMembers.push(member);
+    captured.mechanism(robot.robot.id(), robot.model, robot.hulls,
+      [for (index in 0...robot.model.links.length) linkPose(robotIndex, index)], toolMembers,
+      robotkit.kinematics.RobotKinematics.observedState(robot.model, robot.robot.snapshot().positions.toArray()));
+    var heldCarriers = new Map<String, String>();
     for (channel in carryingTools.keys()) if (carryingTools.get(channel) == true) {
-      var held = heldParts.get(channel), kinematics = toolKinematics.get(channel);
-      if (held != null && kinematics != null) carriedLinks.set(held.occurrence, kinematics.link);
+      var held = heldParts.get(channel), tool = toolKinematics.get(channel);
+      if (held != null && tool != null) heldCarriers.set(held.occurrence, robot.model.links[tool.link].id);
     }
-    var base = simulation.linkPose(robotIndex, 0);
-    var baseInverse = new Transform3(new Vec3(base.position[0], base.position[1], base.position[2]),
-      new Quat(base.rotation[0], base.rotation[1], base.rotation[2], base.rotation[3])).inverse();
-    for (entry in objects) if (StringTools.startsWith(entry.id, "project:") && ignored.indexOf(entry.id.substr(8)) < 0) {
+    function carrier(entry:GripObject):Null<String> {
+      var name = StringTools.startsWith(entry.id, "project:") ? entry.id.substr(8) : entry.id;
+      var confirmed = heldCarriers.get(name);
+      if (confirmed != null) return confirmed;
+      var body = simulation.objectCarrier(entry.object);
+      for (index in 0...robot.model.links.length)
+        if (simulation.linkBody(robotIndex, index) == body) return robot.model.links[index].id;
+      return null;
+    }
+    for (entry in objects) if (StringTools.startsWith(entry.id, "project:")) {
       var part = assemblyParts.get(entry.id);
-      if (part.pieces.length == 0) continue;
-      var live = part.pose();
-      // Free CAD objects do not have a physical parent link. During planning,
-      // a confirmed grasp supplies that rigid relationship so the payload hull
-      // follows the actual gripper carrier in the arm's forward kinematics.
-      var attached = -1, carried = carriedLinks.get(entry.id.substr(8));
-      if (carried != null) attached = carried else {
-        var carrier = simulation.objectCarrier(entry.object);
-        for (index in 0...links.length)
-          if (simulation.linkBody(robotIndex, index) == carrier) {attached = index; break;}
-      }
-      var inverse = baseInverse;
-      if (attached >= 0) {
-        var body = simulation.linkPose(robotIndex, attached);
-        inverse = new Transform3(new Vec3(body.position[0], body.position[1], body.position[2]),
-          new Quat(body.rotation[0], body.rotation[1], body.rotation[2], body.rotation[3])).inverse();
-      }
-      var pose = inverse.compose(new Transform3(new Vec3(live.position[0], live.position[1], live.position[2]),
-        new Quat(live.rotation[0], live.rotation[1], live.rotation[2], live.rotation[3])));
-      for (index in 0...part.pieces.length) {
-        var piece = part.pieces[index], vertices:Array<Float> = [];
-        for (vertex in 0...Std.int(piece.length / 3)) {
-          var point = pose.transformPoint(new Vec3(piece[vertex * 3], piece[vertex * 3 + 1], piece[vertex * 3 + 2]));
-          vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
-        }
-        var name = entry.id.substr(8);
-        bodies.push({name: part.pieces.length == 1 ? name : '$name#$index',
-          link: links[attached >= 0 ? attached : 0].id, vertices: vertices, tool: attached >= 0});
-      }
+      if (part == null || part.pieces.length == 0) continue;
+      var pose = part.pose();
+      captured.object(entry.id.substr(8), part.pieces, Transform3.fromArrays(pose.position, pose.rotation), carrier(entry),
+        entry.object.motion == nativekit.sim.MotionType.Static ? CollisionOwner.Fixture : CollisionOwner.Loose);
     }
-    var included = new Map<String, Bool>();
-    for (body in bodies) included.set(body.name, true);
     for (other in cellRobots) if (other != robot && other.parts.length > 0) {
       var index = other.parts[0].robotIndex;
-      for (hull in other.hulls) if (!included.exists(hull.part) && ignored.indexOf(hull.part) < 0) {
-        var pose = simulation.linkPose(index, hull.link);
-        var worldPose = new Transform3(new Vec3(pose.position[0], pose.position[1], pose.position[2]),
-          new Quat(pose.rotation[0], pose.rotation[1], pose.rotation[2], pose.rotation[3]));
-        var localPose = baseInverse.compose(worldPose), vertices:Array<Float> = [];
-        for (corner in 0...Std.int(hull.vertices.length / 3)) {
-          var point = localPose.transformPoint(new Vec3(hull.vertices[corner * 3], hull.vertices[corner * 3 + 1], hull.vertices[corner * 3 + 2]));
-          vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
-        }
-        bodies.push({name: hull.part, link: links[0].id, vertices: vertices, tool: false});
-        included.set(hull.part, true);
-      }
+      captured.mechanism(other.robot.id(), other.model, other.hulls,
+        [for (link in 0...other.model.links.length) linkPose(index, link)]);
     }
     for (entry in objects) {
-      var prefix = "project:";
-      var name = StringTools.startsWith(entry.id, prefix) ? entry.id.substr(prefix.length) : entry.id;
-      if (included.exists(name) || ignored.indexOf(name) >= 0) continue;
-      var half = entry.object.shape.boundingHalfExtents();
-      if (half == null) throw 'Joint clearance needs finite collision geometry for "${entry.id}"';
+      var name = StringTools.startsWith(entry.id, "project:") ? entry.id.substr(8) : entry.id;
+      if (captured.includes(name) || ignored.indexOf(name) >= 0) continue;
+      var vertices = entry.object.shape.convexVertices();
+      if (vertices.length == 0) {
+        var half = entry.object.shape.boundingHalfExtents();
+        if (half == null) throw 'Joint clearance needs finite geometry for "${entry.id}"';
+        vertices = CollisionSceneBuilder.box(half.x, half.y, half.z);
+      }
       var pose = simulation.objectPose(entry.object);
-      var worldPose = new Transform3(new Vec3(pose.x, pose.y, pose.z), new Quat(pose.qx, pose.qy, pose.qz, pose.qw));
-      var carrier = simulation.objectCarrier(entry.object), attached = -1;
-      for (index in 0...links.length)
-        if (simulation.linkBody(robotIndex, index) == carrier) {attached = index; break;}
-      var inverse = baseInverse;
-      if (attached >= 0) {
-        var body = simulation.linkPose(robotIndex, attached);
-        inverse = new Transform3(new Vec3(body.position[0], body.position[1], body.position[2]),
-          new Quat(body.rotation[0], body.rotation[1], body.rotation[2], body.rotation[3])).inverse();
-      }
-      var localPose = inverse.compose(worldPose), vertices:Array<Float> = [];
-      for (corner in 0...8) {
-        var point = localPose.transformPoint(new Vec3((corner & 1) == 0 ? -half.x : half.x,
-          (corner & 2) == 0 ? -half.y : half.y, (corner & 4) == 0 ? -half.z : half.z));
-        vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
-      }
-      bodies.push({name: name, link: links[attached >= 0 ? attached : 0].id, vertices: vertices, tool: attached >= 0});
-      included.set(name, true);
+      captured.object(name, [vertices], new Transform3(new Vec3(pose.x, pose.y, pose.z),
+        new Quat(pose.qx, pose.qy, pose.qz, pose.qw)), carrier(entry),
+        entry.object.motion == nativekit.sim.MotionType.Static ? CollisionOwner.Fixture : CollisionOwner.Loose);
     }
-    for (hull in depositedWeldHulls()) {
-      var vertices:Array<Float> = [];
-      for (index in 0...Std.int(hull.vertices.length / 3)) {
-        var point = baseInverse.transformPoint(new Vec3(hull.vertices[index * 3], hull.vertices[index * 3 + 1], hull.vertices[index * 3 + 2]));
-        vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
-      }
-      bodies.push({name: hull.name, link: links[0].id, vertices: vertices, tool: false});
-    }
-    return bodies;
+    for (hull in depositedWeldHulls()) captured.fixture(hull.name, hull.vertices, Transform3.identity());
+    return captured;
   }
 
-  function armClearance(arm:Manipulator, bodies:Array<robotkit.manipulation.ClearanceBodyData>, ?reference:Array<Float>):CollisionClearance {
+
+  function observedJoints(arm:Manipulator):Array<Float> {
     var positions = robot.robot.snapshot().positions;
-    var indices = [for (target in arm.toJointTargets([for (_ in 0...arm.dofCount()) 0.0])) target.joint];
+    var indices = arm.jointIndices();
     clearanceJoints = indices;
-    var q = reference == null ? [for (index in indices) positions.get(index)] : reference;
-    return new CollisionClearance(arm, bodies, q, () -> new NativeCollisionWorld(), processkit.WeldPathPlanner.AIR_MARGIN);
+    return [for (index in indices) positions.get(index)];
   }
 
   /**
@@ -1801,7 +1769,7 @@ class MissionPlayer implements SessionMember {
     var reference = startingJointPositions(motion, indices);
     // The controller and its limits are reusable; the door, loose inventory
     // and confirmed payload attachments belong to this move's live scene.
-    var planned = missionMotionPlanner(arm, reference, cellCollisionBodies(arm, null, []));
+    var planned = missionMotionPlanner(arm, reference, cellCollisionSnapshot([]));
     cached.space = planned.space;
     motion.compiler.motionPlanner = planned.planner;
     return {motion: motion, arm: arm, indices: indices};
@@ -1857,52 +1825,24 @@ class MissionPlayer implements SessionMember {
   }
 
   function missionMotionPlanner(arm:Manipulator, reference:Array<Float>,
-      data:Array<robotkit.manipulation.ClearanceBodyData>):{planner:MotionPlanner, space:ManipulatorPlannerSpace} {
-    var description = new CollisionDescription();
-    var options = new RobotCollisionOptions("mission-arm");
-    options.reference = arm.stateOf(reference).q;
-    options.referenceName = "mission start";
-    var bodies = RobotCollision.describe(description, arm.robot, options);
-    var owned = new Map<String, Bool>();
-    for (hull in robot.hulls) owned.set(hull.part, true);
-    // Cell geometry is expressed in the base frame but is not part of the
-    // robot's articulation. Otherwise reference-overlap rules would permit an
-    // independent obstacle just because it intersects the initial arm pose.
-    var basePose = description.bodies[bodies.linkBody(robot.model.links[0].id)].pose;
-    var geometry:Array<robotkit.manipulation.ClearanceBodyData> = [];
-    for (body in data) {
-      if (owned.exists(body.name) || body.tool)
-        geometry.push({name: body.name, link: body.link, vertices: body.vertices, tool: false});
-      else
-        description.addFixed(body.name, basePose, CollisionGeometry.Convex(body.vertices), options.linkGroup, 0.0, "cell hull");
-    }
-    var objects = RobotCollision.describeClearanceBodies(description, bodies, geometry);
+      snapshot:CellCollisionSnapshot):{planner:MotionPlanner, space:ManipulatorPlannerSpace} {
+    var scene = snapshot.describe(arm, reference, CollisionClearance.MARGIN);
+    var members = weldingMembers();
+    if (members.length > 0)
+      processkit.WeldCollisionPolicy.apply(scene, scene.memberObjects(members), processkit.WeldPathPlanner.AIR_MARGIN, CollisionClearance.CONTACT_MARGIN);
     for (channel in carryingTools.keys()) if (carryingTools.get(channel) == true) {
       var held = heldParts.get(channel), tool = handlingTools.get(channel);
       if (held == null || tool == null) throw "Confirmed payload lost its named tool or workpiece";
       var holder = tool.contact.occurrence;
-      var prefix = holder.substr(0, holder.lastIndexOf("/") + 1);
-      for (index in 0...geometry.length) if (geometry[index].name == held.occurrence ||
-          StringTools.startsWith(geometry[index].name, held.occurrence + "#")) {
-        var payload = objects[index];
-        for (other in 0...description.objects.length) {
-          if (other == payload) continue;
-          var name = description.objects[other].name;
-          var ownPad = tool.kind == "suction" ? name == bodies.bodies.name + "/" + holder :
-            name == bodies.bodies.name + "/" + prefix + "fingerLeft" ||
-            name == bodies.bodies.name + "/" + prefix + "fingerRight";
-          // Contact pressure physically holds stock at its named pads. Other arm
-          // links and the inactive gripper must never inherit rest-overlap permission.
-          description.setObjectRule(payload, other, ownPad ? CollisionPairRule.Allow : CollisionPairRule.Check,
-            ownPad ? CollisionPairStatus.ProcessContact : CollisionPairStatus.Checked);
-        }
-      }
+      var gripper = tool.gripper;
+      if (tool.kind == "gripper" && gripper == null) throw "Held stock lost its typed gripper contact members";
+      var pads = scene.contacts(gripper == null ? [holder] : gripper.padMembers);
+      for (name in scene.contacts([held.occurrence]))
+        scene.payload(name, pads, CollisionPairRule.Allow, CollisionPairStatus.ProcessContact, 0.0);
     }
-    var world = new NativeCollisionWorld();
-    var build = description.build(world);
-    var collisionSpace = new CollisionPlannerSpace(description, build, bodies.bodies,
-      CollisionMargins.uniform(CollisionClearance.MARGIN));
-    var space = new ManipulatorPlannerSpace(collisionSpace, arm, reference);
+    var build = scene.build(new NativeCollisionWorld());
+    var collisionSpace = new CollisionPlannerSpace(scene.description, build, scene.bodies, scene.margins());
+    var space = new ManipulatorPlannerSpace(collisionSpace, arm, reference, scene.bodies.reference.q);
     var planner = new RrtConnect(space, 17);
     return {planner: planner, space: space};
   }

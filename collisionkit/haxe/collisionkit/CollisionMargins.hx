@@ -7,12 +7,18 @@ package collisionkit;
  */
 class CollisionMargins {
   public final groups:Int;
+  public final contact:Bool;
+  /** Optional upper bound also applies to sparse object-pair margins. */
+  public final ceiling:Null<Float>;
   final table:Array<Float>;
 
-  public function new(groups:Int, initial:Float) {
+  public function new(groups:Int, initial:Float, contact:Bool = false, ?ceiling:Float) {
     if (groups < 1) throw "Collision margins need at least one group";
     checkMargin(initial);
     this.groups = groups;
+    if (ceiling != null) checkMargin(ceiling);
+    this.contact = contact;
+    this.ceiling = ceiling;
     table = [for (_ in 0...groups * groups) initial];
   }
 

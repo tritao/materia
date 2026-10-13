@@ -162,7 +162,7 @@ class WeldingRecipe {
 			if (seams[index].start.subtract(seams[index - 1].stop).length() > WeldSeams.TOUCH)
 				throw 'Seam "${seams[index].name()}" does not start where "${seams[index - 1].name()}" ends: weld them as separate steps';
 		var millimetre = 0.001;
-		return {kind: "weld", weld: {frame: frame, metal: metal, path: [for (seam in seams) {kind: "line", seam: seam.name(), joint: switch seam.joint {
+		return {kind: "weld", weld: {frame: frame, metal: metal, path: [for (seam in seams) {kind: "line", seam: seam.name(), faces: [{member: seam.a.member, face: seam.a.face}, {member: seam.b.member, face: seam.b.face}], joint: switch seam.joint {
 				case Fillet: "fillet";
 				case Lap: "lap";
 				case Butt: "butt";

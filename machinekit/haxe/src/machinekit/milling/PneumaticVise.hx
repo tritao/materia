@@ -11,6 +11,13 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * The datum is the fixed jaw face, parallels' top and end stop face.
  */
 class PneumaticVise extends MachineAssembly {
+	public static inline var FIXED_JAW:String = "fixedJaw";
+	public static inline var MOVING_JAW:String = "movingJaw";
+	public static inline var PARALLEL_FIRST:String = "parallel0";
+	public static inline var PARALLEL_SECOND:String = "parallel1";
+	public static inline var END_STOP:String = "endStop";
+	/** Actual members touching correctly seated and clamped stock. */
+	public function stockContacts():Array<String> return [FIXED_JAW, MOVING_JAW, PARALLEL_FIRST, PARALLEL_SECOND, END_STOP];
 	public final jawWidth:Float = 100;
 	public final stroke:Float = 6;
 	public final blankWidth:Float;
@@ -50,21 +57,21 @@ class PneumaticVise extends MachineAssembly {
 		endStop = new MillPanel(stopWidth, stopWidth, 15);
 		addComponent("body", body);
 		var fixedPose = AssemblyFrames.translation(0, -blankWidth / 2 - fixedJaw.depth / 2, body.height);
-		fixed("fixedJaw", fixedJaw, fixedPose);
+		fixed(FIXED_JAW, fixedJaw, fixedPose);
 		var jawPose = AssemblyFrames.translation(0, -blankWidth / 2 + openGap + movingJaw.depth / 2, body.height);
-		addComponent("movingJaw", movingJaw, jawPose);
+		addComponent(MOVING_JAW, movingJaw, jawPose);
 		addMemberConnector("body", "jawGuide", jawPose);
-		addMemberConnector("movingJaw", "guide", AssemblyFrames.identity());
+		addMemberConnector(MOVING_JAW, "guide", AssemblyFrames.identity());
 		var jawDefault = grippedPosition;
-		addMateOnAxis("jaw", "prismatic", "body", "jawGuide", "movingJaw", "guide", {x: 0, y: -1, z: 0},
+		addMateOnAxis("jaw", "prismatic", "body", "jawGuide", MOVING_JAW, "guide", {x: 0, y: -1, z: 0},
 			jawDefault, {lower: 0, upper: stroke, velocity: null, effort: null,
 				overtravel: cylinder.endStopCompliance});
 		// The piston rod is fixed to the moving jaw and reaches back into the cylinder body.
 		var rodFrame:AssemblyFrame = {x: 0, y: 0, z: 0, qx: Math.sin(Math.PI / 4), qy: 0,
 			qz: 0, qw: Math.cos(Math.PI / 4)};
 		addComponent("clampRod", cylinder.movingRod(), AssemblyFrames.compose(jawPose, rodFrame));
-		addMemberConnector("movingJaw", "clampRodMount", rodFrame);
-		addMate("clamp-rod-mount", "fixed", "movingJaw", "clampRodMount", "clampRod", "mount");
+		addMemberConnector(MOVING_JAW, "clampRodMount", rodFrame);
+		addMate("clamp-rod-mount", "fixed", MOVING_JAW, "clampRodMount", "clampRod", "mount");
 		// The cylinder body is part of the vise; only its air ports cross this assembly boundary.
 		var cylinderPose:AssemblyFrame = {x: 0, y: jawPose.y + cylinder.bodyLength + cylinder.stemLength - jawDefault,
 			z: jawPose.z, qx: rodFrame.qx, qy: rodFrame.qy, qz: rodFrame.qz, qw: rodFrame.qw};
@@ -72,11 +79,11 @@ class PneumaticVise extends MachineAssembly {
 		exposePort("airA", "cylinder", "A");
 		exposePort("airB", "cylinder", "B");
 		var parallelPose = AssemblyFrames.translation(0, -(blankWidth / 2 - 1.5 * parallels.depth), body.height);
-		fixed("parallel0", parallels, parallelPose);
-		fixed("parallel1", parallels, AssemblyFrames.translation(0, -parallelPose.y, parallelPose.z));
+		fixed(PARALLEL_FIRST, parallels, parallelPose);
+		fixed(PARALLEL_SECOND, parallels, AssemblyFrames.translation(0, -parallelPose.y, parallelPose.z));
 		var stopPose = AssemblyFrames.translation(-blankLength / 2 - endStop.width / 2,
 			-(blankWidth - endStop.depth) / 2, body.height);
-		fixed("endStop", endStop, stopPose);
+		fixed(END_STOP, endStop, stopPose);
 		datum = AssemblyFrames.translation(stopPose.x + endStop.width / 2,
 			fixedPose.y + fixedJaw.depth / 2, parallelPose.z + parallels.height);
 		addMemberConnector("body", "datum", datum);

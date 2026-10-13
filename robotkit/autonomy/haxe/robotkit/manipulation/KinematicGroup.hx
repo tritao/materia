@@ -253,9 +253,10 @@ class KinematicGroup {
 
   /** Whether the link moves when one of the group's joints does (it is carried by such a joint, however far out). */
   public function moves(link:LinkId):Bool {
-    for (joint in walk(robot, rootLink, link)) {
-      var index = model.jointIndex(joint.id);
-      if (index >= 0) for (term in model.jointTermStart[index]...model.jointTermStart[index + 1])
+    var body = model.bodyIndex(link);
+    if (body < 0) throw 'Link "$link" is not part of the model';
+    for (joint in model.bodyChain[body]) {
+      for (term in model.jointTermStart[joint]...model.jointTermStart[joint + 1])
         if (model.jointTermScale[term] != 0.0 && dofs.indexOf(model.jointTermDof[term]) >= 0) return true;
     }
     return false;
@@ -414,10 +415,11 @@ class KinematicGroup {
   public function problem():KinematicProblem return limitedProblem();
 
   /** A model state holding `q` on the group's DOFs (the rest at their defaults). */
-  public function stateOf(q:Array<Float>):KinematicState {
+  /** Merge selected coordinates into a complete held state, or the model defaults. */
+  public function stateOf(q:Array<Float>, ?held:Array<Float>):KinematicState {
     if (q == null || q.length != dofs.length)
       throw 'Kinematic group requires ${dofs.length} joint values, got ${q == null ? 0 : q.length}';
-    var result = new KinematicState(model);
+    var result = new KinematicState(model, held);
     for (i in 0...dofs.length) result.q[dofs[i]] = q[i];
     return result;
   }

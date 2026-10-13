@@ -8,6 +8,8 @@ import materia.assembly.AssemblyFrames;
 /** A complete, assumed double-acting pneumatic parallel gripper. One cylinder moves
  * the left jaw; the second jaw follows through a mirrored mechanical coupling. */
 class ParallelGripper extends MachineAssembly {
+	public static inline var FINGER_LEFT:String = "fingerLeft";
+	public static inline var FINGER_RIGHT:String = "fingerRight";
 	public final spec:ParallelGripperSpec;
 
 	public function new(spec:ParallelGripperSpec) {
@@ -23,8 +25,8 @@ class ParallelGripper extends MachineAssembly {
 		addComponent("jawLeft", left);
 		addComponent("jawRight", right);
 		addComponent("rod", cylinder.movingRod());
-		addComponent("fingerLeft", new ParallelGripperFinger(spec, -1));
-		addComponent("fingerRight", new ParallelGripperFinger(spec, 1));
+		addComponent(FINGER_LEFT, new ParallelGripperFinger(spec, -1));
+		addComponent(FINGER_RIGHT, new ParallelGripperFinger(spec, 1));
 		addMateOnAxis("jaw-left-slide", "prismatic", "body", "leftGuide", "jawLeft", "start",
 			{x: 0, y: 1, z: 0}, 0,
 			{lower: 0, upper: spec.jawTravel(), velocity: spec.cylinderSpeed, effort: null, overtravel: cushion});
@@ -32,8 +34,8 @@ class ParallelGripper extends MachineAssembly {
 			{x: 0, y: 1, z: 0}, 0,
 			{lower: -spec.jawTravel(), upper: 0, velocity: spec.cylinderSpeed, effort: null, overtravel: cushion});
 		addCoupling("jaw-mirror", "jaw-left-slide", "jaw-right-slide", -1);
-		addMate("finger-left-mount", "fixed", "jawLeft", "fingerSeat", "fingerLeft", "mount");
-		addMate("finger-right-mount", "fixed", "jawRight", "fingerSeat", "fingerRight", "mount");
+		addMate("finger-left-mount", "fixed", "jawLeft", "fingerSeat", FINGER_LEFT, "mount");
+		addMate("finger-right-mount", "fixed", "jawRight", "fingerSeat", FINGER_RIGHT, "mount");
 		var centre = spec.openJawCentre();
 		var cylinderPose = AssemblyFrames.compose(AssemblyFrames.translation(
 			-centre - cylinder.bodyLength - cylinder.stemLength, 0, spec.bodyLength - spec.jawHeight),

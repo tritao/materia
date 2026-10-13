@@ -161,9 +161,10 @@ class AssemblyRobot {
    * and a mobile robot's surroundings, which simulate as objects of their own, moving or held where
    * they stand; the assembly robot has no link for them.
    */
-  public static function unownedOccurrences(scene:EditorScene, session:ProjectDocumentSession,
-      assembly:AssemblyDefinition):Map<String, Bool> {
-    var result = freeOccurrences(scene, assembly);
+  static function unownedOccurrences(session:ProjectDocumentSession, assembly:AssemblyDefinition,
+      free:Map<String, Bool>):Map<String, Bool> {
+    var result = new Map<String, Bool>();
+    for (id in free.keys()) result.set(id, true);
     var mobile = session.mobileBase;
     if (mobile != null && mobile.robot != null) {
       var prefix = mobile.robot + "/";
@@ -223,7 +224,8 @@ class AssemblyRobot {
     var parts:Array<AssemblyPart> = [];
     var physical = session.projectPhysical;
     if (physical == null) throw "Assembly physical properties are unavailable";
-    var free = unownedOccurrences(scene, session, assembly);
+    var free = freeOccurrences(scene, assembly);
+    var unowned = unownedOccurrences(session, assembly, free);
     var sceneParts = new Map<String, SceneObjectData>();
     for (record in scene.records()) sceneParts.set(record.id, record);
     var physicalParts = new Map<String, cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart>();
@@ -233,7 +235,7 @@ class AssemblyRobot {
     // A part the user gave another material keeps its volume and takes that material's density.
     var masses = new Map<String, Float>();
     for (occurrence in assembly.occurrences) {
-      if (free.exists(occurrence.id)) continue;
+      if (unowned.exists(occurrence.id)) continue;
       var record = sceneParts.get("project:" + occurrence.id);
       var part = physicalParts.get(occurrence.definition);
       if (record == null || part == null)
@@ -312,14 +314,11 @@ class AssemblyRobot {
     }
     var pneumaticContact = hasPneumaticActuator ? SimulationContactSurfaces.robotPart() : null;
     var fingerPadSurfaces = new Map<String, robotkit.model.CollisionShape.ContactSurface>();
-    for (tool in session.robotTools) if (tool.kind == "gripper" && tool.gripper != null) {
-      var occurrence = tool.contact.occurrence;
-      var slash = occurrence.lastIndexOf("/");
-      if (slash < 0) throw 'Gripper tool "${occurrence}" has no member path';
-      var prefix = occurrence.substr(0, slash + 1);
-      var surface = SimulationContactSurfaces.gripperFinger(tool.gripper.fingerPadFrictionCoefficient);
-      fingerPadSurfaces.set(prefix + "fingerLeft", surface);
-      fingerPadSurfaces.set(prefix + "fingerRight", surface);
+    for (tool in session.robotTools) if (tool.kind == "gripper") {
+      var gripper = tool.gripper;
+      if (gripper == null) throw 'Gripper tool "${tool.contact.occurrence}" has no physical pad description';
+      var surface = SimulationContactSurfaces.gripperFinger(gripper.fingerPadFrictionCoefficient);
+      for (member in gripper.padMembers) fingerPadSurfaces.set(member, surface);
     }
     for (hull in converted.linkHulls) {
       var record = sceneParts.get("project:" + hull.part);
@@ -512,7 +511,7 @@ class AssemblyRobot {
         odometry.wheelRadius, odometry.trackWidth, odometry.leftDirection, odometry.rightDirection);
     }
     for (occurrence in assembly.occurrences) {
-      if (free.exists(occurrence.id)) continue;
+      if (unowned.exists(occurrence.id)) continue;
       var placed = converted.partLinks.get(occurrence.id);
       if (control != null && placed == null) continue;
       var center = session.assemblyPreviewCenter(occurrence.definition);

@@ -1,3 +1,4 @@
+import CollisionFixture;
 import collisionkit.native.NativeCollisionWorld;
 import haxe.Int64;
 import processkit.ContactSearchRunner;
@@ -128,10 +129,10 @@ class ContactSearchMotionTests {
         "Probe approach clamps representation-sized observed-start overshoot to the exact joint limit");
       function cube(z:Float):Array<Float> return [for (x in [-0.001, 0.001]) for (y in [-0.001, 0.001])
         for (height in [z - 0.001, z + 0.001]) for (value in [x, y, height]) value];
-      var probeContact = new CollisionClearance(arm, [
-        {name: "tool", link: tool.id, vertices: cube(0), tool: true},
-        {name: "fixture", link: base.id, vertices: cube(0.014612), tool: false}], [0.0], () -> new NativeCollisionWorld(), 0.003,
-        CollisionClearance.CONTACT_MARGIN);
+      var contactFixture = new CollisionFixture(arm, [0.0], 0.003, CollisionClearance.CONTACT_MARGIN);
+      contactFixture.mechanism("tool", tool.id, cube(0), true);
+      contactFixture.fixture("fixture", cube(0.014612), true);
+      var probeContact = contactFixture.clearance();
       var blocked = probeContact;
       var checkedProbe = new ProbeMotionPlanner(arm, planning.compiler, probeContact);
       var brakingHit = checkedProbe.stoppingViolation([0.012], [0.005], 0.02);
@@ -153,9 +154,19 @@ class ContactSearchMotionTests {
       var noAir = false;
       try uncertainProbe.precontactDistance(0.01, 0.01) catch (_:Dynamic) noAir = true;
       check(noAir, "A probe with no clearance before possible touch cannot be prepared");
-      var wire = new processkit.ProbeWireClearance(arm, tool.id, Transform3.identity(), 0.001, 0.015,
-        [{name: "fixture", link: base.id, vertices: cube(0.015), tool: false}]);
-      var wireGuarded = new ProbeMotionPlanner(arm, planning.compiler, null, wire);
+      var wireScene = new robotkit.collision.CollisionSceneBuilder(arm, [0.0], "probe", 0.003);
+      wireScene.add("fixture", robotkit.collision.CollisionSceneBuilder.CollisionOwner.Fixture, cube(0.015));
+      var wire = processkit.ProbeWire.describe(wireScene, arm, tool.id, Transform3.identity(), 0.001, 0.015,
+        [], wireScene.memberObjects(["fixture"]));
+      var wireClearance = wireScene.clearance(() -> new NativeCollisionWorld());
+      var wireGuarded = new ProbeMotionPlanner(arm, planning.compiler, wireClearance, wire);
+      check(switch wireScene.description.objects[wire.object].geometry {
+        case Capsule(radius, halfLength): Math.abs(radius - 0.0005) < 1e-12 && Math.abs(2 * (radius + halfLength) - 0.015) < 1e-12;
+        case _: false;
+      }, "The shared capsule has the declared wire diameter and complete stickout");
+      var wireGap = wireClearance.closest([0.0]);
+      check(wireGap != null && Math.abs(wireGap.distance - 0.014) < 1e-9,
+        "Native collision geometry puts the capsule's distal surface at the physical sensing tip");
       var safeSpeed = wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0.0005);
       check(safeSpeed > 0 && safeSpeed < 0.02, "Calibration and CAD wire extent bound requested sensing speed");
       check(safeSpeed * 0.04 + safeSpeed * safeSpeed / 2 <= 0.0005 - planning.compiler.ikTolerance.position - wire.envelopeExcess + 1e-10,
@@ -188,7 +199,7 @@ class ContactSearchMotionTests {
         catch (_:Dynamic) missingReserve = true;
       check(missingReserve, "A physical wire cannot invent a sensing stand-off when calibration is absent");
       missingReserve = false;
-      try wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0.0001)
+      try wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0.000000001)
         catch (_:Dynamic) missingReserve = true;
       check(missingReserve, "Calibration smaller than the geometry and IK reserve cannot authorize sensing");
       check(wireGuarded.violation([0.0]) == null, "The CAD wire is initially clear of the fixture");
@@ -196,8 +207,9 @@ class ContactSearchMotionTests {
       check(wireGuarded.violation([0.0135], true) == null, "Calibrated near-contact sensing permits the wire to approach without penetration");
       check(wireGuarded.violation([0.0145], true) != null, "Touch sensing cannot authorize wire penetration");
       var wireBrakingHit = wireGuarded.stoppingViolation([0.011], [0.1], 0.02);
-      check(wireBrakingHit != null && wireBrakingHit.a == "contact sensing wire" && wireBrakingHit.b == "fixture",
-        "A rejected deadline brake retains the obstructing CAD bodies");
+      check(wireBrakingHit != null && ((wireBrakingHit.a == "contact sensing wire" && wireBrakingHit.b == "fixture") ||
+          (wireBrakingHit.b == "contact sensing wire" && wireBrakingHit.a == "fixture")),
+        'A rejected deadline brake retains the obstructing CAD bodies: $wireBrakingHit');
       check(!wireGuarded.stoppingClear([0.011], [0.1], 0.02), "Predicted braking also guards the unconsumed wire");
       forbidden = false;
       try wireGuarded.approach(new Transform3(new Vec3(0, 0, 0.06), Quat.identity()), [0.0], 32)
@@ -394,7 +406,7 @@ class ContactSearchMotionTests {
       servo.dispose(); harness.dispose(); return;
     }
     var planning = WeldingPlanRunner.planning(fixture.arm, 1.0);
-    var clear = new CollisionClearance(fixture.arm, [], [0.0], () -> new NativeCollisionWorld());
+    var clear = new CollisionFixture(fixture.arm, [0.0]).clearance();
     var stow = WeldStowPlanner.plan(fixture.arm, planning.compiler, clear, [0.03], [0.0]);
     check(stow.ops.length == 1 && switch stow.ops[0] {
       case motionkit.program.MotionOp.MoveJ(motionkit.program.MoveTarget.JointTarget(goal), _, _): Math.abs(goal[0]) < 1e-12;

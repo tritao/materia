@@ -1,11 +1,13 @@
+import cadbridge.CellCollisionSnapshot;
+import robotkit.collision.CollisionSceneBuilder;
+import cadbridge.CellCollisionSnapshot.CellHullObservation;
+import robotkit.collision.CollisionSceneBuilder.CollisionOwner;
 import collisionkit.native.NativeCollisionWorld;
 import collisionkit.CollisionDescription;
 import collisionkit.CollisionGeometry;
 import collisionkit.CollisionMargins;
 import collisionkit.CollisionPairRule;
 import collisionkit.CollisionPairStatus;
-import robotkit.collision.RobotCollision;
-import robotkit.collision.RobotCollision.RobotCollisionOptions;
 import motionkit.robot.CollisionPlannerSpace;
 import motionkit.robot.ManipulatorPlannerSpace;
 import motionkit.robot.JointMotionPolicy;
@@ -119,10 +121,12 @@ private typedef ReachCandidate = {
 }
 private typedef TrayHandlingProjection = {var radius:Float; var minimumZ:Float;}
 private typedef ReachPayload = {
-	var body:robotkit.manipulation.ClearanceBodyData;
+	var body:CellHullObservation;
 	var holder:String;
+	var contacts:Array<String>;
+	var active:Bool;
 }
-private typedef ReachEnvironmentHull = {var name:String; var vertices:Array<Float>;}
+private typedef ReachEnvironmentHull = {var id:String; var vertices:Array<Float>; var frame:AssemblyFrame; var scale:Float; var loose:Bool;}
 private typedef ReachHoldingPath = {var position:Array<Float>; var entry:Array<Array<Float>>; var exterior:Array<Array<Float>>;}
 
 /** One reversible route must be clear in each physical state in which it is used. */
@@ -162,6 +166,7 @@ private class ReachPlannerStates implements motionkit.planner.PlannerSpace {
  * MotionKit certifies the actual timed joint paths when it admits the generated moveVia plans.
  */
 class TendingReach {
+	static inline var SEATED_STOCK:String = "machine:mill/seated-stock";
 	static inline var MIN_JOINT_MARGIN:Float = 0.1;
 	// Improvements use a smaller search budget after a feasible incumbent is certified.
 	static inline var APPROACH_SEARCH_ITERATIONS:Int = 256;
@@ -256,7 +261,7 @@ class TendingReach {
 	 */
 	static function traySpacing(scene:materia.project.SceneArtifact.SceneArtifactData, physical:cadbridge.AssemblySimulationBridge.AssemblyPhysicalData,
 		spec:machinekit.robotics.ParallelGripperSpec,
-		grasp:AssemblyFrame):{x:Float, y:Float} {
+		grasp:AssemblyFrame, tools:Array<materia.project.SceneArtifact.SceneArtifactRobotTool>):{x:Float, y:Float} {
 		var definition = scene.assemblyDefinition;
 		if (definition == null) throw "Tray sizing needs the tool's assembly definition";
 		var flat = AssemblyDefinitionFlattener.flatten(definition);
@@ -264,14 +269,18 @@ class TendingReach {
 		var allowance = CollisionClearance.MARGIN * 1000 + TRAY_PLACEMENT_ALLOWANCE_MM;
 		var hardwareTop = Math.max(BenchMill.STOCK_HEIGHT, 10 + DigitalSensor.BODY_HEIGHT) + allowance;
 		var radius = 0.0;
-		for (gripper in ["arm/tool/gripperA", "arm/tool/gripperB"]) {
+		for (tool in tools) {
 			var projections = new Map<String, TrayHandlingProjection>();
 			for (closed in [false, true]) {
 				var travel = closed ? (spec.maximumPartWidth() - spec.expectedPartWidth) / 2 : 0.0;
-				for (jaw in ["arm/tool/gripperA", "arm/tool/gripperB"]) state.setJoint(jaw + "/jaw-left-slide", travel);
+				for (jaw in tools) {
+					var switches = [for (sensor in flat.sensors) if (sensor.id == jaw.sensor) sensor];
+					if (switches.length != 1 || switches[0].joint == null) throw "Tray sizing lost its typed jaw joint switch";
+					state.setJoint(switches[0].joint, travel);
+				}
 				var placement = AssemblyFrames.compose(grasp,
-					AssemblyFrames.inverse(state.worldConnector(gripper + "/body", "tcp")));
-				for (occurrence in flat.occurrences) if (StringTools.startsWith(occurrence.id, "arm/tool/")) {
+					AssemblyFrames.inverse(state.worldConnector(tool.contact.occurrence, tool.contact.connector)));
+				for (occurrence in flat.occurrences) if (tool.members.indexOf(occurrence.id) >= 0) {
 					var part = [for (part in physical.parts) if (part.id == occurrence.definition) part][0];
 					var hull = part.collisionHull;
 					if (hull == null) throw 'Tray sizing lost the hull for ${occurrence.id}';
@@ -309,71 +318,32 @@ class TendingReach {
 	}
 
 	/** Main's description owns fixed geometry, articulation and pair-specific contact rules. */
-	static function reachClearances(arm:Manipulator, data:Array<robotkit.manipulation.ClearanceBodyData>,
+	static function reachClearances(arm:Manipulator, data:Array<CellHullObservation>,
 		reference:Array<Float>, contactNames:Array<String>, contact:Bool,
 		interfaces:Array<cadbridge.AssemblySimulationBridge.AssemblyJointInterface>,
-		?payloads:Array<ReachPayload>):Array<ReachClearanceCheck> {
-		var description = new CollisionDescription();
-		var model = robotkit.kinematics.RobotKinematics.compile(arm.robot);
-		var state = new kinematicskit.KinematicState(model, arm.stateOf(reference).q);
-		var bodies = collisionkit.kinematics.ModelBodies.describe(description, model, "reach-arm", 0, state, "reach reference", true);
-		var rootPose = description.bodies[bodies.bodies[model.bodyIndex(arm.rootLink)]].pose;
-		var margins = new CollisionMargins(data.length + 1, CollisionClearance.MARGIN);
-		var objects = new Map<String, Array<Int>>();
-		for (i in 0...data.length) {
-			var hull = data[i], group = i + 1;
-			var object:Int;
-			if (StringTools.startsWith(hull.name, "machine:"))
-				object = description.addFixed(hull.name, rootPose, CollisionGeometry.Convex(hull.vertices), group, 0, "cell hull");
-			else {
-				var link = model.bodyIndex(hull.link);
-				if (link < 0) throw 'Reach hull "${hull.name}" lost its model link';
-				var carrier = bodies.follow(link, hull.name + "#" + i, group);
-				object = description.addObject(hull.name, carrier, collisionkit.CollisionPose.identity(), CollisionGeometry.Convex(hull.vertices));
-			}
-			var pieces = objects.get(hull.name);
-			if (pieces == null) { pieces = []; objects.set(hull.name, pieces); }
-			pieces.push(object);
-		}
-		for (pair in interfaces) {
-			var first = objects.get(pair.first), second = objects.get(pair.second);
-			if (first != null && second != null) for (a in first) for (b in second)
-				margins.set(description.bodies[description.objects[a].body].group,
-					description.bodies[description.objects[b].body].group, 0.001);
-		}
-		if (contact) for (hull in data) if (hull.tool) for (name in contactNames) {
-			var active = objects.get(hull.name), targets = objects.get(name);
-			if (active == null || targets == null) continue;
-			for (a in active) for (b in targets) {
-				margins.set(description.bodies[description.objects[a].body].group,
-					description.bodies[description.objects[b].body].group, CollisionClearance.CONTACT_MARGIN);
-				if (gripPad(hull.name) && StringTools.startsWith(name, "machine:infeedTray/blank-"))
-					description.setObjectRule(a, b, CollisionPairRule.Allow, CollisionPairStatus.ProcessContact);
-			}
-		}
+		?payloads:Array<ReachPayload>, ?pressureTargets:Array<String>,
+		?contactTools:Array<String>, ?contactPads:Array<String>, ?seatMembers:Array<String>):Array<ReachClearanceCheck> {
+		var snapshot = new CellCollisionSnapshot("reach-arm", Transform3.identity(), [], data);
+		var scene = snapshot.describe(arm, reference, CollisionClearance.MARGIN);
+		var description = scene.description, bodies = scene.bodies;
+		if (seatMembers != null) processkit.HandlingCollisionPolicy.seatedStock(scene,
+			scene.memberObjects([SEATED_STOCK]), scene.memberObjects(seatMembers));
+		for (pair in interfaces) for (first in scene.contacts([pair.first])) for (second in scene.contacts([pair.second]))
+			scene.pair(first, second, CollisionPairRule.Default, CollisionPairStatus.DeclaredContact, 0.001);
+		if (contact) processkit.HandlingCollisionPolicy.workInterfaces(scene,
+			scene.memberObjects(contactTools == null ? [] : contactTools), scene.memberObjects(contactNames),
+			scene.memberObjects(contactPads == null ? [] : contactPads),
+			scene.memberObjects(pressureTargets == null ? [] : pressureTargets), CollisionClearance.CONTACT_MARGIN);
 		if (payloads != null) for (payload in payloads) {
-			var pieces = objects.get(payload.body.name);
-			if (pieces == null) throw "Reach payload has no described collision object";
-			for (piece in pieces) for (other in 0...description.objects.length) {
-				if (piece == other) continue;
-				var target = description.objects[other];
-				var holderContact = StringTools.startsWith(target.name, payload.holder + "/");
-				var workContact = payload.body.tool && contact && contactNames.indexOf(target.name) >= 0;
-				margins.set(description.bodies[description.objects[piece].body].group,
-					description.bodies[target.body].group, holderContact || workContact ? 0.0 : CollisionClearance.MARGIN);
-				// Loose stock never inherits a structural reference-overlap exclusion.
-				description.setObjectRule(piece, other, holderContact || workContact ? CollisionPairRule.Touch : CollisionPairRule.Check,
-					CollisionPairStatus.Checked);
-			}
+			var members = payload.contacts.copy();
+			if (payload.active && contact) for (target in contactNames) members.push(target);
+			var contacts = scene.contacts(members);
+			scene.payload(payload.body.id, contacts, CollisionPairRule.Touch, CollisionPairStatus.Checked, 0.0);
 		}
-		var articulation = bodies.declare();
-		var build = description.build(new NativeCollisionWorld());
-		var space = new ManipulatorPlannerSpace(new CollisionPlannerSpace(description, build, bodies, margins), arm, reference);
+		var build = scene.build(new NativeCollisionWorld());
+		var space = new ManipulatorPlannerSpace(new CollisionPlannerSpace(description, build, bodies, scene.margins()), arm, reference, scene.bodies.reference.q);
 		return [{space: space, description: description, build: build}];
 	}
-
-	static function gripPad(name:String):Bool
-		return StringTools.endsWith(name, "/fingerLeft") || StringTools.endsWith(name, "/fingerRight");
 
 	static function clearanceViolation(check:ReachClearanceCheck, q:Array<Float>):Null<robotkit.manipulation.ClearanceViolation> {
 		var found = check.space.violation(q);
@@ -476,6 +446,7 @@ class TendingReach {
 		var payloadFloorOffset = -gripAxialSpan;
 		// Lift the complete allowed payload envelope above tray lands and vise jaws.
 		var vise = cell.mill.vise;
+		var seatMembers = [for (member in vise.stockContacts()) "machine:mill/vise/" + member];
 		if (vise == null) throw "Tending reach needs the mill's preset vise";
 		var movingJaw = state.worldPose("mill/vise/movingJaw");
 		var viseJawClearance = movingJaw.z + vise.movingJaw.height - blank.z + 2 * CollisionClearance.MARGIN * 1000;
@@ -486,17 +457,14 @@ class TendingReach {
 		var trayClearanceMm = approach + gripAxialSpan + 2 * CollisionClearance.MARGIN * 1000;
 		var viseNormal = AssemblyFrames.transformVector(blank, grasp.approachAxis.x,
 			grasp.approachAxis.y, grasp.approachAxis.z);
-		var environment:Array<ReachEnvironmentHull> = [for (occurrence in flat.occurrences) if (occurrence.id != "mill/stock") {
-			var physical = [for (part in millPhysical.parts) if (part.id == occurrence.definition) part][0];
-			var pose = state.worldPose(occurrence.id), vertices:Array<Float> = [];
-			if (physical.collisionHull == null) throw "Reach environment has no collision hull";
-			var hull = physical.collisionHull;
-			for (i in 0...Std.int(hull.length / 3)) {
-				var p = AssemblyFrames.transformPoint(pose, hull[3 * i], hull[3 * i + 1], hull[3 * i + 2]);
-				vertices.push(p.x / 1000); vertices.push(p.y / 1000); vertices.push(p.z / 1000);
-			}
-			{name: occurrence.id, vertices: vertices};
-		}];
+		var environment:Array<ReachEnvironmentHull> = [];
+		var closedDoorIds:Array<String> = [], openDoorIds:Array<String> = [];
+		for (occurrence in flat.occurrences) if (occurrence.id != "mill/stock") {
+			var sourceParts = [for (part in millPhysical.parts) if (part.id == occurrence.definition) part];
+			if (sourceParts.length != 1 || sourceParts[0].collisionHull == null) throw "Reach environment lost its CAD part";
+			environment.push(environmentPart(occurrence.id, sourceParts[0].collisionHull,
+				state.worldPose(occurrence.id), millPhysical.metresPerUnit));
+		}
 		var doorSweeps:Array<ReachEnvironmentHull> = [];
 		// Trays are used with the door closed; enclosure transit uses the open
 		// leaf. Derive both poses from its joint, including every attached part.
@@ -508,17 +476,16 @@ class TendingReach {
 			if (open == null) throw "Reach door image lost an occurrence";
 			if (Math.abs(open.x - closed.x) + Math.abs(open.y - closed.y) + Math.abs(open.z - closed.z) < 1e-6) continue;
 			var physical = [for (part in millPhysical.parts) if (part.id == occurrence.definition) part][0];
-			var hull = physical.collisionHull, vertices:Array<Float> = [];
+			var hull = physical.collisionHull;
 			if (hull == null) throw "Reach closed door has no collision hull";
-			for (i in 0...Std.int(hull.length / 3)) {
-				var point = AssemblyFrames.transformPoint(closed, hull[3 * i], hull[3 * i + 1], hull[3 * i + 2]);
-				vertices.push(point.x / 1000); vertices.push(point.y / 1000); vertices.push(point.z / 1000);
-			}
-			environment.push({name: "door-closed/" + occurrence.id, vertices: vertices});
-			var openHull = [for (body in environment) if (body.name == occurrence.id) body][0];
+			var closedPart = environmentPart("door-closed/" + occurrence.id, hull, closed, millPhysical.metresPerUnit);
+			environment.push(closedPart);
+			closedDoorIds.push("machine:" + closedPart.id); openDoorIds.push("machine:" + occurrence.id);
+			var openHull = [for (body in environment) if (body.id == occurrence.id) body][0];
 			// A prismatic door translates each convex part without rotation. Its
 			// endpoint hull union is the complete sweep, not just two pose checks.
-			doorSweeps.push({name: "door-sweep/" + occurrence.id, vertices: openHull.vertices.concat(vertices)});
+			doorSweeps.push(environmentPart("door-sweep/" + occurrence.id,
+				posedVertices(openHull).concat(posedVertices(closedPart)), AssemblyFrames.identity(), 1.0));
 		}
 		state.setJoint("door", cell.doorStroke);
 		// Build and check the real pocket geometry. The old tray envelope sat 10 mm
@@ -532,7 +499,9 @@ class TendingReach {
 		if (reachAssembly.validate().length != 0) throw "Reach arm pneumatic service does not validate";
 		var armScene = SceneArtifact.decode(SceneArtifact.encode(AssemblyPreview.scene(reachAssembly, "reach-arm")));
 		var armPhysical = AssemblyPhysicalPartView.fromSceneArtifact(armScene);
-		var spacing = traySpacing(armScene, armPhysical, gripper, graspLocal);
+		var tools = machinekit.robot.RobotScene.robotTools(source.tool, "arm/tool");
+		var toolMembers = tools[0].members;
+		var spacing = traySpacing(armScene, armPhysical, gripper, graspLocal, tools);
 		var trayAssembly = new PartTray(production.rows, production.columns, BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH,
 			spacing.x, spacing.y);
 		// The two tray banks are fixed to the tending cell, independent of tool or
@@ -558,13 +527,7 @@ class TendingReach {
 				width: trayAssembly.width, depth: trayAssembly.depth});
 			for (piece in trayAssembly.collisionPieces()) {
 				var pieceFrame = AssemblyFrames.compose(frame, piece.frame);
-				var vertices:Array<Float> = [];
-				for (index in 0...Std.int(piece.vertices.length / 3)) {
-					var point = AssemblyFrames.transformPoint(pieceFrame, piece.vertices[index * 3],
-						piece.vertices[index * 3 + 1], piece.vertices[index * 3 + 2]);
-					vertices.push(point.x / 1000); vertices.push(point.y / 1000); vertices.push(point.z / 1000);
-				}
-				environment.push({name: '$id/${piece.id}', vertices: vertices});
+				environment.push(environmentPart('$id/${piece.id}', piece.vertices, pieceFrame, millPhysical.metresPerUnit));
 			}
 			// Presence heads are fixed to the tray edge, outside the open finger sweep.
 			// Include their real box hulls so the static reach study and runtime planner
@@ -576,10 +539,9 @@ class TendingReach {
 				for (x in [-DigitalSensor.BODY_WIDTH / 2, DigitalSensor.BODY_WIDTH / 2])
 					for (y in [-DigitalSensor.BODY_DEPTH / 2, DigitalSensor.BODY_DEPTH / 2])
 						for (z in [0.0, DigitalSensor.BODY_HEIGHT]) {
-							var point = AssemblyFrames.transformPoint(sensorFrame, x, y, z);
-							vertices.push(point.x / 1000); vertices.push(point.y / 1000); vertices.push(point.z / 1000);
+							vertices.push(x); vertices.push(y); vertices.push(z);
 						}
-				environment.push({name: '$id/${slot.name}-present', vertices: vertices});
+				environment.push(environmentPart('$id/${slot.name}-present', vertices, sensorFrame, millPhysical.metresPerUnit));
 			}
 		}
 		var tableTop = traySeatZ - PartTray.SEAT_Z;
@@ -588,28 +550,16 @@ class TendingReach {
 		var table = new TendingCellTable(tableWidth, tableDepth, tableTop, tableOffset);
 		for (piece in table.collisionPieces()) {
 			var pieceFrame = AssemblyFrames.compose(tableFrame, piece.frame);
-			var vertices:Array<Float> = [];
-			for (index in 0...Std.int(piece.vertices.length / 3)) {
-				var point = AssemblyFrames.transformPoint(pieceFrame, piece.vertices[index * 3],
-					piece.vertices[index * 3 + 1], piece.vertices[index * 3 + 2]);
-				vertices.push(point.x / 1000); vertices.push(point.y / 1000); vertices.push(point.z / 1000);
-			}
-			environment.push({name: 'cellTable/${piece.id}', vertices: vertices});
+			environment.push(environmentPart('cellTable/${piece.id}', piece.vertices, pieceFrame, millPhysical.metresPerUnit));
 		}
 		// Check the complete initial loose-stock layout when choosing a station roll.
 		// Later moving and outfeed blanks are checked at their live poses by each mission plan.
 		for (tray in trayLayouts) if (tray.id == "infeedTray") for (slot in tray.slots) {
-			var vertices:Array<Float> = [];
-			for (index in 0...Std.int(stockHull.length / 3)) {
-				var point = AssemblyFrames.transformPoint(slot.frame, stockHull[index * 3],
-					stockHull[index * 3 + 1], stockHull[index * 3 + 2]);
-				vertices.push(point.x / 1000); vertices.push(point.y / 1000); vertices.push(point.z / 1000);
-			}
-			environment.push({name: '${tray.id}/blank-${slot.name.substr(5)}', vertices: vertices});
+			environment.push(environmentPart('${tray.id}/blank-${slot.name.substr(5)}', stockHull, slot.frame, millPhysical.metresPerUnit, true));
 		}
 		var fixtureBack = Math.NEGATIVE_INFINITY, fixtureLow = Math.POSITIVE_INFINITY, fixtureHigh = Math.NEGATIVE_INFINITY;
 		for (index in fixtureStart...environment.length) {
-			var vertices = environment[index].vertices;
+			var vertices = posedVertices(environment[index]);
 			for (point in 0...Std.int(vertices.length / 3)) {
 				fixtureBack = Math.max(fixtureBack, vertices[3 * point + 1]);
 				fixtureLow = Math.min(fixtureLow, vertices[3 * point + 2]);
@@ -619,10 +569,11 @@ class TendingReach {
 		var doorFront = Math.POSITIVE_INFINITY;
 		for (body in doorSweeps) {
 			var low = Math.POSITIVE_INFINITY, high = Math.NEGATIVE_INFINITY, front = Math.POSITIVE_INFINITY;
-			for (point in 0...Std.int(body.vertices.length / 3)) {
-				front = Math.min(front, body.vertices[3 * point + 1]);
-				low = Math.min(low, body.vertices[3 * point + 2]);
-				high = Math.max(high, body.vertices[3 * point + 2]);
+			var vertices = posedVertices(body);
+			for (point in 0...Std.int(vertices.length / 3)) {
+				front = Math.min(front, vertices[3 * point + 1]);
+				low = Math.min(low, vertices[3 * point + 2]);
+				high = Math.max(high, vertices[3 * point + 2]);
 			}
 			if (low <= fixtureHigh + CollisionClearance.MARGIN && high >= fixtureLow - CollisionClearance.MARGIN)
 				doorFront = Math.min(doorFront, front);
@@ -631,8 +582,8 @@ class TendingReach {
 			throw "Tray placement needs finite fixture and overlapping door sweep bounds";
 		var trayY = (doorFront - fixtureBack - CollisionClearance.MARGIN) * 1000 - TRAY_PLACEMENT_ALLOWANCE_MM;
 		for (index in fixtureStart...environment.length) {
-			var vertices = environment[index].vertices;
-			for (point in 0...Std.int(vertices.length / 3)) vertices[3 * point + 1] += trayY / 1000;
+			var part = environment[index];
+			part.frame.y += trayY / 1000 / part.scale;
 		}
 		for (tray in trayLayouts) {
 			tray.frame.y += trayY;
@@ -658,13 +609,12 @@ class TendingReach {
 			var scene = armScene;
 			var converted = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, armPhysical);
 			var toolOccurrence = "arm/" + DualArmGripperTool.GRIPPER_A_BODY;
-			var toolPrefix = "arm/tool/";
 			var baseCarrier = converted.partLinks.get("arm/baseFlange");
 			var carrier = converted.partLinks.get(toolOccurrence);
 			if (baseCarrier == null || carrier == null) throw "Reach arm has no base or tool link";
 			var toolDefinition:Null<String> = null, tcpConnector:Null<AssemblyFrame> = null;
 			var toolAssembly = AssemblyDefinitionFlattener.flatten(scene.assemblyDefinition);
-			var loadedHulls = sweepGripperClosure(converted, scene, gripper);
+			var loadedHulls = sweepGripperClosure(converted, scene, gripper, tools);
 			for (occurrence in toolAssembly.occurrences) if (occurrence.id == toolOccurrence)
 				toolDefinition = occurrence.definition;
 			for (component in toolAssembly.definitions) if (component.id == toolDefinition)
@@ -689,17 +639,20 @@ class TendingReach {
 					var point = AssemblyFrames.transformPoint(payloadFrame, local.x / 1000, local.y / 1000, local.z / 1000);
 					vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
 				}
-				exchangePayloads.push({body: {name: "payload:" + occurrence, link: converted.model.links[holder.link].id,
-					vertices: vertices, tool: false}, holder: occurrence.substr(0, occurrence.length - "/body".length)});
+				var records = [for (tool in tools) if (tool.contact.occurrence == occurrence) tool];
+				if (records.length != 1 || records[0].gripper == null) throw "Reach payload needs typed gripper contacts";
+				var contacts = records[0].gripper.padMembers;
+				exchangePayloads.push({body: CellCollisionSnapshot.observation("payload:" + occurrence,
+					Held("reach-arm", converted.model.links[holder.link].id), vertices),
+					holder: occurrence, contacts: contacts, active: false});
 			}
 			var rootLink = converted.model.links[baseCarrier.link].id;
 			var arm = new Manipulator(converted.model, rootLink, frame.id);
 			var policy = JointMotionPolicy.mission(), motionJoints = arm.jointIndices();
 			var timing = new JointPathTiming([for (index in 0...motionJoints.length)
 				policy.rates(arm.robot.joints[motionJoints[index]].type, arm.group.limitsOf(index))]);
-			var clearance = reachClearances(arm, [for (hull in converted.linkHulls)
-				{name: hull.part, link: converted.model.links[hull.link].id, vertices: hull.vertices,
-					tool: StringTools.startsWith(hull.part, toolPrefix)}], source.ready(), [], false, converted.jointInterfaces)[0];
+			var clearance = reachClearances(arm, mechanismObservations(converted, toolMembers),
+				source.ready(), [], false, converted.jointInterfaces)[0];
 			var toolStandOff = toolLength + source.baseFlange.flangeDiameter + toolDepth + 20;
 			// The static tool envelope includes its assumed hose clearance. Keep the
 			// runtime's full obstacle margin beyond that envelope at the door plane.
@@ -868,24 +821,16 @@ class TendingReach {
 					seed = selected.copy();
 				}
 				if (valid) {
-					var bodies:Array<robotkit.manipulation.ClearanceBodyData> = [for (hull in converted.linkHulls)
-						{name: hull.part, link: converted.model.links[hull.link].id, vertices: hull.vertices,
-							tool: StringTools.startsWith(hull.part, toolPrefix)}];
+					var bodies = mechanismObservations(converted, toolMembers);
 					for (body in environmentBodies(environment, inverse, rootLink)) bodies.push(body);
 					var sweptDoorBodies = environmentBodies(doorSweeps, inverse, rootLink);
 					// After loading, the new blank stays at the parallels while the
 					// inactive tool carries the finish. A moving payload cannot stand in
 					// for that independent seated obstacle during the retreat.
-					var seatedVertices:Array<Float> = [];
-					for (vertex in 0...Std.int(stockHull.length / 3)) {
-						var point = AssemblyFrames.transformPoint(blank, stockHull[vertex * 3],
-							stockHull[vertex * 3 + 1], stockHull[vertex * 3 + 2]);
-						var local = inverse.transformPoint(new Vec3(point.x / 1000, point.y / 1000, point.z / 1000));
-						seatedVertices.push(local.x); seatedVertices.push(local.y); seatedVertices.push(local.z);
-					}
-					var seatedBody:robotkit.manipulation.ClearanceBodyData = {name: "machine:mill/seated-stock",
-						link: rootLink, vertices: seatedVertices, tool: false};
-					var clampedBodies:Array<robotkit.manipulation.ClearanceBodyData> = [];
+					var seatedBody = CellCollisionSnapshot.observation(SEATED_STOCK, Loose,
+						[for (value in stockHull) value * millPhysical.metresPerUnit],
+						inverse.compose(metricPose(blank, millPhysical.metresPerUnit)));
+					var clampedBodies:Array<CellHullObservation> = [];
 					var clampedParts = new Map<String, Bool>();
 					var openVise = new Map<String, AssemblyFrame>();
 					for (occurrence in flat.occurrences) openVise.set(occurrence.id, state.worldPose(occurrence.id));
@@ -895,24 +840,21 @@ class TendingReach {
 						if (open == null) throw "Clamped vise lost its open geometry";
 						if (Math.abs(open.x - closed.x) + Math.abs(open.y - closed.y) + Math.abs(open.z - closed.z) < 1e-6) continue;
 						var physical = [for (part in millPhysical.parts) if (part.id == occurrence.definition) part][0];
-						var hull = physical.collisionHull, vertices:Array<Float> = [];
+						var hull = physical.collisionHull;
 						if (hull == null) throw "Clamped vise lost its CAD hull";
-						for (vertex in 0...Std.int(hull.length / 3)) {
-							var point = AssemblyFrames.transformPoint(closed, hull[3 * vertex], hull[3 * vertex + 1], hull[3 * vertex + 2]);
-							var local = inverse.transformPoint(new Vec3(point.x / 1000, point.y / 1000, point.z / 1000));
-							vertices.push(local.x); vertices.push(local.y); vertices.push(local.z);
-						}
+						var vertices = [for (value in hull) value * millPhysical.metresPerUnit];
 						clampedParts.set("machine:" + occurrence.id, true);
-						clampedBodies.push({name: "machine:vise-clamped/" + occurrence.id,
-							link: rootLink, vertices: vertices, tool: false});
+						clampedBodies.push(CellCollisionSnapshot.observation("machine:vise-clamped/" + occurrence.id, Fixture,
+							vertices, inverse.compose(metricPose(closed, millPhysical.metresPerUnit)), false, "machine:" + occurrence.id));
 					}
 					state.setJoint("mill/vise/jaw", 0);
 					// Only the active tool-to-vise or selected-slot-blank pairs get the
 					// reduced work-contact margin at their grasp pose. Every other cell
 					// body, including the idle gripper and neighbouring blanks, keeps 5 mm.
-					var viseContactBodies = [for (body in environment)
-						if (StringTools.startsWith(body.name, "mill/vise/") || body.name == "mill/stock") "machine:" + body.name];
-					var full = reachClearances(arm, bodies, parkPose, [], false, converted.jointInterfaces)[0];
+					var viseMembers = [for (member in vise.components()) "machine:mill/vise/" + member.id];
+					var viseContactBodies = [for (body in environment) if (viseMembers.indexOf("machine:" + body.id) >= 0) "machine:" + body.id];
+					var full = reachClearances(arm, bodies, parkPose, [], false, converted.jointInterfaces,
+						null, null, null, null, seatMembers)[0];
 					var readyHit = clearanceViolation(full, parkPose);
 					full.space.dispose();
 					if (readyHit != null) {
@@ -930,16 +872,15 @@ class TendingReach {
 					var retainedPoses = new Map<Int, Bool>();
 					var resolvedPoses = new Map<Int, Bool>();
 					var closedDoorParts = new Map<String, Bool>();
-					for (body in bodies) if (StringTools.startsWith(body.name, "machine:door-closed/"))
-						closedDoorParts.set("machine:" + body.name.substr("machine:door-closed/".length), true);
+					for (id in openDoorIds) closedDoorParts.set(id, true);
 					for (tool in [DualArmGripperTool.TOOL_CHANNEL_A, DualArmGripperTool.TOOL_CHANNEL_B]) {
-						var transitBodies:Array<robotkit.manipulation.ClearanceBodyData> = [];
+						var transitBodies:Array<CellHullObservation> = [];
 						for (index in 0...bodies.length) {
 							var body = bodies[index];
-							if (body.name == "machine:infeedTray/blank-" + firstSeat || StringTools.startsWith(body.name, "machine:door-closed/")) continue;
+							if (body.id == "machine:infeedTray/blank-" + firstSeat || closedDoorIds.indexOf(body.id) >= 0) continue;
 								var vertices = index < loadedHulls.length
 								? loadedHulls[index].vertices : body.vertices;
-							transitBodies.push({name: body.name, link: body.link, vertices: vertices, tool: body.tool});
+							transitBodies.push(CellCollisionSnapshot.observation(body.id, body.owner, vertices, body.pose, body.tool, body.member));
 						}
 						for (payload in exchangePayloads) transitBodies.push(payload.body);
 						transitBodies.push(seatedBody);
@@ -950,14 +891,14 @@ class TendingReach {
 						for (index in 0...requests.length)
 							if (requests[index].tool == tool && requests[index].name == firstStation) graspIndex = index;
 						if (graspIndex < 0) throw "Reach transit has no initial grasp posture";
-						transitSpaces.set(tool, transitSpace(arm, transitBodies, solved[graspIndex], exchangePayloads));
+						transitSpaces.set(tool, transitSpace(arm, transitBodies, solved[graspIndex], exchangePayloads, seatMembers));
 						// Unload waits for the open jaw and removes the seated part before
 						// exchange. Both real held parts remain; the empty vise is not a
 						// third workpiece or a second, clamped copy of the moving jaw.
-						var exchangeBodies = [for (body in transitBodies) if (body.name != seatedBody.name &&
-							!StringTools.startsWith(body.name, "machine:vise-clamped/")) body];
-						exchangeSpaces.set(tool, transitSpace(arm, exchangeBodies, solved[graspIndex], exchangePayloads));
-						var holder = tool == DualArmGripperTool.TOOL_CHANNEL_A ? "arm/tool/gripperA" : "arm/tool/gripperB";
+						var exchangeBodies = [for (body in transitBodies) if (body.id != seatedBody.id &&
+							[for (part in clampedBodies) part.id].indexOf(body.id) < 0) body];
+						exchangeSpaces.set(tool, transitSpace(arm, exchangeBodies, solved[graspIndex], exchangePayloads, seatMembers));
+						var holder = toolRecord(tools, tool).contact.occurrence;
 						var activePayloads = [for (payload in exchangePayloads) if (payload.holder == holder) payload];
 						var inactivePayloads = [for (payload in exchangePayloads) if (payload.holder != holder) payload];
 						// Unload entry and post-load retreat have an empty active gripper,
@@ -965,29 +906,29 @@ class TendingReach {
 						// entry instead carries the active blank into an empty, open vise.
 						// Check those states separately: combining them creates a phantom
 						// duplicate of the same workpiece and blocks otherwise clear paths.
-						var loadedBodies = [for (body in transitBodies) if (body.name != activePayloads[0].body.name && !clampedParts.exists(body.name)) body];
-						var loadBodies = [for (body in exchangeBodies) if (body.name != inactivePayloads[0].body.name) body];
-						var unloadStates = [transitSpace(arm, loadedBodies, solved[graspIndex], inactivePayloads)];
+						var loadedBodies = [for (body in transitBodies) if (body.id != activePayloads[0].body.id && !clampedParts.exists(body.id)) body];
+						var loadBodies = [for (body in exchangeBodies) if (body.id != inactivePayloads[0].body.id) body];
+						var unloadStates = [transitSpace(arm, loadedBodies, solved[graspIndex], inactivePayloads, seatMembers)];
 						if (production.retreatsAfterUnload(tool))
-							unloadStates.push(transitSpace(arm, loadBodies, solved[graspIndex], activePayloads));
+							unloadStates.push(transitSpace(arm, loadBodies, solved[graspIndex], activePayloads, seatMembers));
 						viseSpaces.set("vise@" + tool, new ReachPlannerStates(unloadStates));
 						viseSpaces.set("vise-load@" + tool, new ReachPlannerStates([
-							transitSpace(arm, loadBodies, solved[graspIndex], activePayloads),
-							transitSpace(arm, loadedBodies, solved[graspIndex], inactivePayloads)]));
+							transitSpace(arm, loadBodies, solved[graspIndex], activePayloads, seatMembers),
+							transitSpace(arm, loadedBodies, solved[graspIndex], inactivePayloads, seatMembers)]));
 						// Closed-door handling carries one part: the next blank or the finish.
 						// Both payloads are present together only during the open-door exchange.
 						var closedPayloads = [for (payload in exchangePayloads) if (payload.holder == holder) payload];
 						var closedBodies = [for (body in transitBodies)
-							if (!StringTools.startsWith(body.name, "payload:") && !closedDoorParts.exists(body.name)) body];
+							if (!(switch body.owner { case Held(_, _): true; case _: false; }) && !closedDoorParts.exists(body.id)) body];
 						for (payload in closedPayloads) closedBodies.push(payload.body);
 						// Outside handling may overlap closure. Certify the complete door
 						// sweep rather than just either parked endpoint.
 						for (body in sweptDoorBodies) closedBodies.push(body);
-						closedTransitSpaces.set(tool, transitSpace(arm, closedBodies, solved[graspIndex], closedPayloads));
+						closedTransitSpaces.set(tool, transitSpace(arm, closedBodies, solved[graspIndex], closedPayloads, seatMembers));
 						for (needed in transferRequests) if (needed.role == Startup && needed.tool == tool) {
-							var emptyBodies = [for (body in closedBodies) if (!StringTools.startsWith(body.name, "payload:")) body];
-							for (body in bodies) if (body.name == "machine:infeedTray/blank-" + firstSeat) emptyBodies.push(body);
-							startupSpace = transitSpace(arm, emptyBodies, solved[graspIndex], []);
+							var emptyBodies = [for (body in closedBodies) if (!(switch body.owner { case Held(_, _): true; case _: false; })) body];
+							for (body in bodies) if (body.id == "machine:infeedTray/blank-" + firstSeat) emptyBodies.push(body);
+							startupSpace = transitSpace(arm, emptyBodies, solved[graspIndex], [], seatMembers);
 						}
 						for (index in 0...requests.length)
 							if (requests[index].tool == tool && requests[index].name == "outside staging")
@@ -1018,19 +959,20 @@ class TendingReach {
 							turnReference = solved[from];
 						}
 						preferNearbyTurns(arm, solved[i], turnReference);
-						var activeToolPrefix = request.tool == DualArmGripperTool.TOOL_CHANNEL_A
-							? "arm/tool/gripperA/" : "arm/tool/gripperB/";
+						var activeTool = toolRecord(tools, request.tool);
+						var activeGripper = activeTool.gripper;
+						if (activeGripper == null) throw "Reach station needs typed gripper collision members";
 						// Keep the idle gripper in the scene collision check. Only the selected
 						// fingers and jaw are allowed the reduced margin at the workpiece.
 						var exterior = StringTools.startsWith(request.name, "infeed-") ||
 							StringTools.startsWith(request.name, "outfeed-") || request.name == "outside staging";
-						var pointBodies:Array<robotkit.manipulation.ClearanceBodyData> = [];
+						var pointBodies:Array<CellHullObservation> = [];
 						for (index in 0...bodies.length) {
 							var body = bodies[index];
-							if (!exterior && StringTools.startsWith(body.name, "machine:door-closed/")) continue;
-							var active = StringTools.startsWith(body.name, activeToolPrefix);
+							if (!exterior && closedDoorIds.indexOf(body.id) >= 0) continue;
+							var active = activeGripper.envelopeMembers.indexOf(body.member) >= 0;
 							var vertices = index < loadedHulls.length && active ? loadedHulls[index].vertices : body.vertices;
-							pointBodies.push({name: body.name, link: body.link, vertices: vertices, tool: active});
+							pointBodies.push(CellCollisionSnapshot.observation(body.id, body.owner, vertices, body.pose, body.tool, body.member));
 						}
 						var selectedStock = trayStock(request.name);
 						var contactBodies = viseContactBodies.copy();
@@ -1042,10 +984,9 @@ class TendingReach {
 						if (!StringTools.startsWith(request.name, "infeed-") &&
 							!StringTools.startsWith(request.name, "outfeed-")) {
 							for (payload in exchangePayloads) {
-								var active = StringTools.startsWith(payload.holder + "/", activeToolPrefix);
+								var active = payload.holder == activeTool.contact.occurrence;
 								var body = payload.body;
-								var carried:ReachPayload = {body: {name: body.name, link: body.link,
-									vertices: body.vertices, tool: active}, holder: payload.holder};
+								var carried:ReachPayload = {body: body, holder: payload.holder, contacts: payload.contacts, active: active};
 								pointBodies.push(carried.body); pointPayloads.push(carried);
 							}
 							// At contact the selected payload represents the stock being
@@ -1058,7 +999,8 @@ class TendingReach {
 						if (request.name == "outside staging")
 							for (body in sweptDoorBodies) pointBodies.push(body);
 						var pointClearance = reachClearances(arm, pointBodies, parkPose, contactBodies, contact,
-							converted.jointInterfaces, pointPayloads);
+							converted.jointInterfaces, pointPayloads, selectedStock == null ? [] : ["machine:" + selectedStock],
+							activeGripper.envelopeMembers, activeGripper.padMembers, seatMembers);
 						var paired = -1;
 						if (StringTools.endsWith(request.name, "-approach")) {
 							var station = request.name.substr(0, request.name.length - "-approach".length);
@@ -1069,11 +1011,12 @@ class TendingReach {
 						if (paired >= 0) {
 							var pairedStock = trayStock(requests[paired].name), pairedBodies = viseContactBodies.copy();
 							if (pairedStock != null) pairedBodies.push("machine:" + pairedStock);
-							var contactGeometry = [for (body in pointBodies) if (body.name != seatedBody.name &&
-								!StringTools.startsWith(body.name, "machine:vise-clamped/")) body];
+							var contactGeometry = [for (body in pointBodies) if (body.id != seatedBody.id &&
+								[for (part in clampedBodies) part.id].indexOf(body.id) < 0) body];
 							pairedClearance = reachClearances(arm, contactGeometry, parkPose, pairedBodies,
 								requests[paired].name == "vise" || requests[paired].name == "vise-load" || pairedStock != null,
-								converted.jointInterfaces, pointPayloads);
+								converted.jointInterfaces, pointPayloads, pairedStock == null ? [] : ["machine:" + pairedStock],
+								activeGripper.envelopeMembers, activeGripper.padMembers, seatMembers);
 						}
 						var hit = firstViolation(pointClearance, solved[i]);
 						var point = request.point;
@@ -1127,10 +1070,10 @@ class TendingReach {
 						if (prepareStaging) {
 							if (stagingIndex < 0) throw "Approach ranking lost its cell-derived staging pose";
 							var stagingBodies = pointBodies.copy();
-							for (body in bodies) if (StringTools.startsWith(body.name, "machine:door-closed/")) stagingBodies.push(body);
+							for (body in bodies) if (closedDoorIds.indexOf(body.id) >= 0) stagingBodies.push(body);
 							for (body in sweptDoorBodies) stagingBodies.push(body);
 							stagingChecks = reachClearances(arm, stagingBodies, parkPose, [], false,
-								converted.jointInterfaces, pointPayloads);
+								converted.jointInterfaces, pointPayloads, null, null, null, seatMembers);
 						}
 						var evaluated:Array<Array<Float>> = [];
 						// Preserve the preceding route branch before trying other IK branches.
@@ -1492,10 +1435,10 @@ class TendingReach {
 	 * it never replaces a continuous edge certificate.
 	 */
 	static function holdingPaths(arm:Manipulator, entry:Array<Array<Float>>,
-		data:Array<robotkit.manipulation.ClearanceBodyData>, placement:Transform3, frontMm:Float,
+		data:Array<CellHullObservation>, placement:Transform3, frontMm:Float,
 		checks:Array<ReachClearanceCheck>):Array<ReachHoldingPath> {
-		var moving = [for (body in data) if (!StringTools.startsWith(body.name, "machine:")) body];
-		var links = [for (body in moving) body.link], result:Array<ReachHoldingPath> = [];
+		var moving = [for (body in data) if (switch body.owner { case Mechanism(_, _) | Held(_, _): true; case _: false; }) body];
+		var links = [for (body in moving) switch body.owner { case Mechanism(_, link) | Held(_, link): link; case _: throw "Holding geometry lost its carrier"; }], result:Array<ReachHoldingPath> = [];
 		for (offset in 0...entry.length - 1) {
 			var edge = entry.length - 2 - offset, from = entry[edge], to = entry[edge + 1];
 			for (sample in 0...17) {
@@ -1505,7 +1448,7 @@ class TendingReach {
 				if (!withinMargins(arm, q)) continue;
 				var poses = arm.linkPoses(q, links), outside = true;
 				for (index in 0...moving.length) {
-					var world = placement.compose(poses[index]), hull = moving[index].vertices;
+					var world = placement.compose(poses[index]).compose(moving[index].pose), hull = moving[index].vertices;
 					for (vertex in 0...Std.int(hull.length / 3)) {
 						var point = world.transformPoint(new Vec3(hull[3 * vertex], hull[3 * vertex + 1], hull[3 * vertex + 2]));
 						if (point.y * 1000 > frontMm) { outside = false; break; }
@@ -1532,10 +1475,10 @@ class TendingReach {
 	/** Check actual convex hulls independently of the placement's separating bounds. */
 	static function checkFixtureDoorSweep(sweeps:Array<ReachEnvironmentHull>, fixture:Array<ReachEnvironmentHull>):Void {
 		var description = new CollisionDescription();
-		var doorObjects = [for (body in sweeps) description.addFixed(body.name, collisionkit.CollisionPose.identity(),
-			CollisionGeometry.Convex(body.vertices), 0, 0, "prismatic door sweep")];
-		var fixtureObjects = [for (body in fixture) description.addFixed(body.name, collisionkit.CollisionPose.identity(),
-			CollisionGeometry.Convex(body.vertices), 1, 0, "installed cell fixture hull")];
+		var doorObjects = [for (body in sweeps) description.addFixed(body.id, collisionkit.CollisionPose.identity(),
+			CollisionGeometry.Convex(posedVertices(body)), 0, 0, "prismatic door sweep")];
+		var fixtureObjects = [for (body in fixture) description.addFixed(body.id, collisionkit.CollisionPose.identity(),
+			CollisionGeometry.Convex(posedVertices(body)), 1, 0, "installed cell fixture hull")];
 		for (door in doorObjects) for (part in fixtureObjects)
 			description.setObjectRule(door, part, CollisionPairRule.Check, CollisionPairStatus.Checked);
 		var world = new NativeCollisionWorld();
@@ -1554,16 +1497,58 @@ class TendingReach {
 		if (problem != null) throw problem;
 	}
 
-	/** Transform world hulls into the same root frame as the articulation. */
-	static function environmentBodies(data:Array<ReachEnvironmentHull>, inverse:Transform3, rootLink:String):Array<robotkit.manipulation.ClearanceBodyData> {
-		return [for (body in data) {
-			var vertices:Array<Float> = [];
-			for (index in 0...Std.int(body.vertices.length / 3)) {
-				var point = inverse.transformPoint(new Vec3(body.vertices[3 * index], body.vertices[3 * index + 1], body.vertices[3 * index + 2]));
-				vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
-			}
-			{name: "machine:" + body.name, link: rootLink, vertices: vertices, tool: false};
-		}];
+	/** Keep independent observations posed in the articulation's cell frame. */
+	static function environmentBodies(data:Array<ReachEnvironmentHull>, inverse:Transform3, rootLink:String):Array<CellHullObservation>
+		return [for (body in data) CellCollisionSnapshot.observation("machine:" + body.id, body.loose ? Loose : Fixture,
+			localVertices(body), inverse.compose(metricPose(body.frame, body.scale)))];
+
+	static function environmentPart(id:String, vertices:Array<Float>, frame:AssemblyFrame, scale:Float,
+		loose:Bool = false):ReachEnvironmentHull return {id: id, vertices: vertices,
+		frame: AssemblyFrames.compose(frame, AssemblyFrames.identity()), scale: scale, loose: loose};
+
+	/** The canonical CAD adapter supplies the scaled geometry and posed source frame. */
+	static function environmentDescription(part:ReachEnvironmentHull, world:Bool):CollisionDescription {
+		var description = new CollisionDescription();
+		var objects = cadbridge.CadCollision.describePart(description, part.id,
+			world ? part.frame : AssemblyFrames.identity(), part.scale,
+			cadbridge.CadCollision.CadPartCollision.Hull(part.vertices), 0);
+		if (objects.length != 1) throw "Reach convex source must describe one object";
+		return description;
+	}
+
+	static function localVertices(part:ReachEnvironmentHull):Array<Float> {
+		var description = environmentDescription(part, false);
+		return switch description.objects[0].geometry { case Convex(points): points; case _: throw "Reach source needs a convex hull"; };
+	}
+
+	static function posedVertices(part:ReachEnvironmentHull):Array<Float> {
+		var description = environmentDescription(part, true), object = description.objects[0];
+		var vertices = switch object.geometry { case Convex(points): points; case _: throw "Reach source needs a convex hull"; };
+		var pose = description.bodies[object.body].pose;
+		return CollisionSceneBuilder.placed(vertices, Transform3.fromArrays([pose.x, pose.y, pose.z],
+			[pose.qx, pose.qy, pose.qz, pose.qw]));
+	}
+
+	static function metricPose(frame:AssemblyFrame, scale:Float):Transform3 return new Transform3(
+		new Vec3(frame.x * scale, frame.y * scale, frame.z * scale),
+		new Quat(frame.qx, frame.qy, frame.qz, frame.qw));
+
+	static function mechanismObservations(converted:cadbridge.AssemblySimulationBridge.AssemblySimulationModel,
+		toolMembers:Array<String>):Array<CellHullObservation> {
+		var model = robotkit.kinematics.RobotKinematics.compile(converted.model);
+		var poses = new kinematicskit.KinematicSnapshot(model);
+		poses.evaluate(new kinematicskit.KinematicState(model));
+		var captured = new CellCollisionSnapshot("reach-arm", Transform3.identity(), []);
+		captured.mechanism("reach-arm", converted.model, converted.linkHulls,
+			[for (link in converted.model.links) robotkit.kinematics.RobotKinematics.toTransform3(poses.bodyPose(model.bodyIndex(link.id)))], toolMembers);
+		return captured.hulls;
+	}
+
+	static function toolRecord(tools:Array<materia.project.SceneArtifact.SceneArtifactRobotTool>,
+		channel:String):materia.project.SceneArtifact.SceneArtifactRobotTool {
+		var selected = [for (tool in tools) if (tool.channel == channel) tool];
+		if (selected.length != 1) throw 'Reach needs one physical tool for channel "$channel"';
+		return selected[0];
 	}
 
 	/** Tray endpoints are selected after both production staging postures. */
@@ -1587,14 +1572,17 @@ class TendingReach {
 	 * The study freezes process DOFs, so their real closing motion must be in the hull.
 	 */
 	static function sweepGripperClosure(converted:cadbridge.AssemblySimulationBridge.AssemblySimulationModel,
-		scene:materia.project.SceneArtifact.SceneArtifactData, spec:machinekit.robotics.ParallelGripperSpec):Array<cadbridge.AssemblySimulationBridge.AssemblyLinkHull> {
+		scene:materia.project.SceneArtifact.SceneArtifactData, spec:machinekit.robotics.ParallelGripperSpec,
+		tools:Array<materia.project.SceneArtifact.SceneArtifactRobotTool>):Array<cadbridge.AssemblySimulationBridge.AssemblyLinkHull> {
 		var definition = scene.assemblyDefinition;
 		if (definition == null) throw "Gripper envelope needs the reach assembly";
 		var open = new AssemblyState(definition), closed = new AssemblyState(definition);
 		var flat = AssemblyDefinitionFlattener.flatten(definition);
 		var travel = (spec.maximumPartWidth() - spec.expectedPartWidth) / 2;
-		for (joint in flat.joints) {
-			if (StringTools.endsWith(joint.id, "/jaw-left-slide")) closed.setJoint(joint.id, travel);
+		for (tool in tools) {
+			var switches = [for (sensor in flat.sensors) if (sensor.id == tool.sensor) sensor];
+			if (switches.length != 1 || switches[0].joint == null) throw "Gripper sweep lost its typed jaw switch";
+			closed.setJoint(switches[0].joint, travel);
 		}
 		var result = [for (hull in converted.linkHulls) {link: hull.link, part: hull.part, vertices: hull.vertices.copy()}];
 		for (hull in result) {
@@ -1614,40 +1602,18 @@ class TendingReach {
 		return result;
 	}
 
-	static function transitSpace(arm:Manipulator, data:Array<robotkit.manipulation.ClearanceBodyData>,
-			reference:Array<Float>, payloads:Array<ReachPayload>):ManipulatorPlannerSpace {
-		var description = new CollisionDescription();
-		var options = new RobotCollisionOptions("reach-arm");
-		options.reference = arm.stateOf(reference).q;
-		options.referenceName = "infeed grasp";
-		var described = RobotCollision.describe(description, arm.robot, options);
-		var basePose = description.bodies[described.linkBody(arm.robot.links[0].id)].pose;
-		var moving:Array<robotkit.manipulation.ClearanceBodyData> = [];
-		for (body in data) {
-			if (StringTools.startsWith(body.name, "machine:"))
-				description.addFixed(body.name, basePose, CollisionGeometry.Convex(body.vertices),
-					options.linkGroup, 0.0, "cell hull");
-			else moving.push({name: body.name, link: body.link, vertices: body.vertices, tool: false});
+	static function transitSpace(arm:Manipulator, data:Array<CellHullObservation>,
+			reference:Array<Float>, payloads:Array<ReachPayload>, seatMembers:Array<String>):ManipulatorPlannerSpace {
+		var snapshot = new CellCollisionSnapshot("reach-arm", Transform3.identity(), [], data);
+		var scene = snapshot.describe(arm, reference, CollisionClearance.MARGIN);
+		processkit.HandlingCollisionPolicy.seatedStock(scene, scene.memberObjects([SEATED_STOCK]), scene.memberObjects(seatMembers));
+		for (payload in payloads) {
+			var contacts = scene.contacts(payload.contacts);
+			scene.payload(payload.body.id, contacts, CollisionPairRule.Allow, CollisionPairStatus.DeclaredContact, 0.0);
 		}
-		var hulls = RobotCollision.describeClearanceBodies(description, described, moving);
-		for (carried in payloads) for (index in 0...moving.length) if (moving[index].name == carried.body.name) {
-			var payload = hulls[index];
-			for (other in 0...description.objects.length) {
-				if (other == payload) continue;
-				if (StringTools.startsWith(description.objects[other].name,
-					described.bodies.name + "/" + carried.holder + "/")) {
-					// Point checks certify this contact before travel. The grasp transform
-					// and jaw sweep are fixed in arm FK throughout a transport edge.
-					description.setObjectRule(payload, other, CollisionPairRule.Allow, CollisionPairStatus.DeclaredContact);
-					continue;
-				}
-				// A loose workpiece never acquires structural rest-overlap permissions.
-				description.setObjectRule(payload, other, CollisionPairRule.Check, CollisionPairStatus.Checked);
-			}
-		}
-		var build = description.build(new NativeCollisionWorld());
-		return new ManipulatorPlannerSpace(new CollisionPlannerSpace(description, build, described.bodies,
-			CollisionMargins.uniform(CollisionClearance.MARGIN)), arm, reference);
+		var build = scene.build(new NativeCollisionWorld());
+		return new ManipulatorPlannerSpace(new CollisionPlannerSpace(scene.description, build, scene.bodies,
+			scene.margins()), arm, reference, scene.bodies.reference.q);
 	}
 
 	static function samePosition(a:Array<Float>, b:Array<Float>):Bool {

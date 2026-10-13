@@ -110,7 +110,7 @@ struct Violation {
 Violation violation(ck_world_handle world, const std::vector<double> &margins, const std::vector<double> &inflation) {
     Violation v;
     int32_t found = 0;
-    expect(ck_violation(world, margins.data(), uint32_t(margins.size()), inflation.data(), uint32_t(inflation.size()),
+    expect(ck_violation(world, margins.data(), uint32_t(margins.size()), 0, -1.0, inflation.data(), uint32_t(inflation.size()),
                         v.pair, 4, v.result, 2, &found) == CK_OK,
            "violation query");
     v.found = found != 0;
@@ -143,7 +143,7 @@ int main() {
         const std::vector<double> motions = {0.1, 0.1, 0.2, 0.2};
         int32_t flags[2] = {-1, -1};
         expect(ck_violation_sets(rigid, poses.data(), uint32_t(poses.size()), motions.data(), 4,
-                                margin.data(), 1, flags, 2) == CK_OK && flags[0] == 0 && flags[1] == 0,
+                                margin.data(), 1, 0, -1.0, flags, 2) == CK_OK && flags[0] == 0 && flags[1] == 0,
                "batched translations and rotations preserve a checked rigid gap");
         expect(ck_set_inflation(rigid, a, 0.006) == CK_OK && ck_set_inflation(rigid, b, 0.006) == CK_OK,
                "rigid shapes geometrically inflated");
@@ -342,17 +342,17 @@ int main() {
         int32_t pair[4];
         double result[2];
         int32_t found = 0;
-        expect(ck_closest(world, margins.data(), 4, pair, 4, result, 2, &found) == CK_OK && found == 1, "closest");
+        expect(ck_closest(world, margins.data(), 4, 0, -1.0, pair, 4, result, 2, &found) == CK_OK && found == 1, "closest");
         expect(pair[0] == int32_t(tool) && pair[1] == int32_t(obstacle), "the tool is closest to the obstacle");
         near(result[0], 0.2, 1e-9, "closest distance");
         const std::vector<double> small = {0.1};
-        expect(ck_violation(world, small.data(), 1, nullptr, 0, pair, 4, result, 2, &found) ==
+        expect(ck_violation(world, small.data(), 1, 0, -1.0, nullptr, 0, pair, 4, result, 2, &found) ==
                    CK_ERROR_INVALID_ARGUMENT,
                "the margin table must cover every group");
-        expect(ck_violation(world, margins.data(), 3, nullptr, 0, pair, 4, result, 2, &found) ==
+        expect(ck_violation(world, margins.data(), 3, 0, -1.0, nullptr, 0, pair, 4, result, 2, &found) ==
                    CK_ERROR_INVALID_ARGUMENT,
                "the margin table is square");
-        expect(ck_violation(world, margins.data(), 4, inflation.data(), 3, pair, 4, result, 2, &found) ==
+        expect(ck_violation(world, margins.data(), 4, 0, -1.0, inflation.data(), 3, pair, 4, result, 2, &found) ==
                    CK_ERROR_INVALID_ARGUMENT,
                "inflation covers every body");
 
@@ -364,15 +364,15 @@ int main() {
         inflations[11] = 0.11;
         int32_t set = 99;
         margins = {0.1, 0.1, 0.0, 0.1};
-        expect(ck_violation_batch(world, poses.data(), uint32_t(poses.size()), inflations.data(), 12, margins.data(), 4,
+        expect(ck_violation_batch(world, poses.data(), uint32_t(poses.size()), inflations.data(), 12, margins.data(), 4, 0, -1.0,
                                   pair, 4, result, 2, &set) == CK_OK,
                "batch");
         expect(set == 2 && pair[0] == int32_t(tool), "the third set fails, on its inflation");
         near(result[1], 0.21, 1e-12, "batch required");
-        expect(ck_violation_batch(world, poses.data(), 28, nullptr, 0, margins.data(), 4, pair, 4, result, 2, &set) ==
+        expect(ck_violation_batch(world, poses.data(), 28, nullptr, 0, margins.data(), 4, 0, -1.0, pair, 4, result, 2, &set) ==
                    CK_OK && set == -1,
                "the bent set alone is clear");
-        expect(ck_violation_batch(world, poses.data(), 20, nullptr, 0, margins.data(), 4, pair, 4, result, 2, &set) ==
+        expect(ck_violation_batch(world, poses.data(), 20, nullptr, 0, margins.data(), 4, 0, -1.0, pair, 4, result, 2, &set) ==
                    CK_ERROR_INVALID_ARGUMENT,
                "a pose set covers every body");
         expect(ck_set_body_group(world, 3, 0) == CK_OK, "the tool back in group 0");
@@ -482,7 +482,7 @@ int main() {
             int32_t pair[4];
             double out[2];
             int32_t found = 0;
-            expect(ck_violation(world, margins.data(), 1, nullptr, 0, pair, 4, out, 2, &found) == CK_ERROR_UNSUPPORTED,
+            expect(ck_violation(world, margins.data(), 1, 0, -1.0, nullptr, 0, pair, 4, out, 2, &found) == CK_ERROR_UNSUPPORTED,
                    "violations refuse it too");
         }
         expect(ck_set_object_rule(world, other_terrain, terrain, CK_RULE_ALLOW, CK_PAIR_ALLOWED) == CK_OK, "allow it");

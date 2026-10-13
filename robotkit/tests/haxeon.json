@@ -6,7 +6,8 @@
   "entry": "tests.RobotWorldTests",
   "sourceRoots": [
     "src",
-    "../../sensorkit/sensor_io/haxe"
+    "../../sensorkit/sensor_io/haxe",
+    "support"
   ],
   "dependencies": {
     "collisionkit-native": {"path": "../../collisionkit/native"},

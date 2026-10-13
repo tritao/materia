@@ -116,7 +116,7 @@ class CadCollision {
         description.note('Part "$name" is ${pieces.pieces.length} convex pieces inflated by ${pieces.inflation} m to enclose its tessellation (measured ${pieces.measured} m, sampled every ${pieces.spacing} m); the tessellation lies within ${mesh.linearDeflection} m of the part');
         [for (i in 0...pieces.pieces.length)
           description.addObject('$name/piece$i', body, at, CollisionGeometry.Convex(pieces.pieces[i]), pieces.inflation,
-            "decomposed piece")];
+            "decomposed piece", name)];
     }
   }
 }

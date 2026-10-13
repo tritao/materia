@@ -19,16 +19,18 @@ class RobotScene {
 	 */
 	public static function robotTools(tool:EndEffector, prefix:String, ?welding:WeldingEquipmentData):Array<SceneArtifactRobotTool> {
 		var controls = EndEffectorControls.derive(tool, prefix);
-		if (controls.arcs.length > 0) return torchTools(controls, prefix, welding);
+		var members = [for (member in tool.components()) prefix + "/" + member.id];
+		if (controls.arcs.length > 0) return torchTools(controls, prefix, welding, members);
 		if (controls.grippers.length > 0) {
 			if (controls.suctions.length != 0)
 				throw "A robot end effector cannot mix physical grippers and suction contacts";
 			return [for (grip in controls.grippers) {
 				var channel = controls.gripperChannel(grip.member);
 				if (channel == null) throw 'Parallel gripper "${grip.member}" has no close control';
-				var entry:SceneArtifactRobotTool = {kind: "gripper", contact: {occurrence: prefix + "/" + grip.member,
+				var entry:SceneArtifactRobotTool = {kind: "gripper", members: members.copy(), contact: {occurrence: prefix + "/" + grip.member,
 					connector: grip.connector}, channel: channel, sensor: grip.sensor,
-					gripper: {minimumPartWidthMm: grip.minimumPartWidthMm,
+					gripper: {padMembers: [for (member in grip.padMembers) prefix + "/" + member],
+						envelopeMembers: [for (member in grip.envelopeMembers) prefix + "/" + member], minimumPartWidthMm: grip.minimumPartWidthMm,
 						nominalPartWidthMm: grip.nominalPartWidthMm, maximumPartWidthMm: grip.maximumPartWidthMm,
 						fingerLengthMm: grip.fingerLengthMm,
 						fingerPadFrictionCoefficient: grip.fingerPadFrictionCoefficient}};
@@ -38,7 +40,7 @@ class RobotScene {
 		var channel = controls.vacuumChannel();
 		if (channel == null) throw "The suction tool has no vacuum control";
 		return [for (suction in controls.suctions) {
-			var entry:SceneArtifactRobotTool = {kind: "suction",
+			var entry:SceneArtifactRobotTool = {kind: "suction", members: members.copy(),
 				contact: {occurrence: prefix + "/" + suction.member, connector: suction.connector}, channel: channel};
 			if (controls.vacuumSensor != null) entry.sensor = controls.vacuumSensor;
 			entry;
@@ -50,10 +52,10 @@ class RobotScene {
 	 * welder behind it (`welding`: the supply's limits, the wire, and the work the circuit returns through, found by
 	 * `WeldingEquipment.of`).
 	 */
-	static function torchTools(controls:EndEffectorControls, prefix:String, welding:Null<WeldingEquipmentData>):Array<SceneArtifactRobotTool> {
+	static function torchTools(controls:EndEffectorControls, prefix:String, welding:Null<WeldingEquipmentData>, members:Array<String>):Array<SceneArtifactRobotTool> {
 		if (welding == null) throw "A torch needs the welding equipment of its cell: pass WeldingEquipment.of(...)";
 		return [for (arc in controls.arcs) {
-			kind: "torch",
+			kind: "torch", members: members.copy(),
 			contact: {occurrence: prefix + "/" + arc.member, connector: arc.tcpConnector},
 			channel: arc.channel,
 			sensor: arc.sensor,

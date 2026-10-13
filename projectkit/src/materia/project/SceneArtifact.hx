@@ -173,6 +173,8 @@ typedef SceneArtifactRobotSensor = {
  */
 typedef SceneArtifactRobotTool = {
 	var kind:String;
+	/** Exact CAD members of the complete mounted tool, including its plate and services. */
+	var members:Array<String>;
 	var contact:SceneArtifactPlace;
 	var channel:String;
 	@:optional var sensor:String;
@@ -182,6 +184,10 @@ typedef SceneArtifactRobotTool = {
 
 /** Assumed physical limits used to choose and orient a grasp from the blank's planar faces. */
 typedef SceneArtifactGripper = {
+	/** Exact CAD members which may contact held stock. */
+	var padMembers:Array<String>;
+	/** Exact CAD members of this gripper's mechanical envelope. */
+	var envelopeMembers:Array<String>;
 	var minimumPartWidthMm:Float;
 	var nominalPartWidthMm:Float;
 	var maximumPartWidthMm:Float;
@@ -416,12 +422,19 @@ typedef SceneArtifactWeldWeave = {
 	var edgeDwell:Float;
 }
 
+/** Physical CAD identity is separate from a seam's display name. */
+typedef SceneArtifactWeldFace = {
+	var member:String;
+	var face:String;
+}
+
 /**
  * One primitive of a weld path, the piece of a seam the CAD found. `kind` says what shape it is: only a `line` so far,
  * straight from `start` to `stop` with the torch holding its orientation; an `arc` for a curved seam would add its
  * centre and sweep, and be another kind.
  * - `seam` is its name as the CAD found it (`member:face|member:face`, the two faces the weld metal fills against,
  *   each in the geometry of the occurrence `member`).
+ * - `faces` carry the two CAD member/face identities; consumers never parse `seam`.
  * - `joint` is how the members meet; only a `fillet` is deposited so far.
  * - `start` and `stop` are the poses of the wire tip at the two ends: +Z along the wire out of the torch, +X along
  *   the direction of travel as far as it is square to the wire. They carry the work and travel angles.
@@ -431,6 +444,7 @@ typedef SceneArtifactWeldWeave = {
 typedef SceneArtifactWeldSegment = {
 	var kind:String;
 	var seam:String;
+	var faces:Array<SceneArtifactWeldFace>;
 	var joint:String;
 	var start:SceneArtifactTorchPose;
 	var stop:SceneArtifactTorchPose;
@@ -527,7 +541,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 27;
+	public static inline var VERSION:Int = 29;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -985,6 +999,14 @@ class SceneArtifact {
 			for (component in flat.definitions) if (component.id == occurrence[0].definition)
 				for (connector in component.connectors) if (connector.name == contact.connector) found = true;
 			if (!found) fail('has no contact connector "${contact.connector}" on "${contact.occurrence}"');
+			if (tool.members == null || tool.members.length == 0 || tool.members.indexOf(contact.occurrence) < 0)
+				fail("needs its exact CAD tool members, including the contact occurrence");
+			var memberIds = new Map<String, Bool>();
+			for (member in tool.members) {
+				if (memberIds.exists(member) || [for (item in flat.occurrences) if (item.id == member) item].length != 1)
+					fail('has an invalid or repeated CAD tool member "$member"');
+				memberIds.set(member, true);
+			}
 			if (tool.channel == null || tool.channel.length == 0 || channels.exists(tool.channel))
 				fail("needs a channel of its own");
 			channels.set(tool.channel, true);
@@ -997,13 +1019,24 @@ class SceneArtifact {
 				if (tool.torch != null) fail("is a gripper with a torch description");
 				if (tool.sensor == null) fail("has no jaw-state sensor");
 				var gripper = tool.gripper;
-				if (gripper == null || !finite(gripper.minimumPartWidthMm) ||
+				if (gripper == null) {
+					fail("is a gripper with no jaw description");
+					return;
+				}
+				if (!finite(gripper.minimumPartWidthMm) ||
 					!finite(gripper.nominalPartWidthMm) || !finite(gripper.maximumPartWidthMm) ||
 					!finite(gripper.fingerLengthMm) || !finite(gripper.fingerPadFrictionCoefficient) ||
 					!(gripper.fingerPadFrictionCoefficient > 0) || !(gripper.minimumPartWidthMm > 0) ||
 					gripper.minimumPartWidthMm > gripper.nominalPartWidthMm ||
 					gripper.nominalPartWidthMm > gripper.maximumPartWidthMm || !(gripper.fingerLengthMm > 0))
 					fail("has invalid jaw width or finger reach data");
+				if (gripper.padMembers == null || gripper.padMembers.length == 0 ||
+					gripper.envelopeMembers == null || gripper.envelopeMembers.length == 0)
+					fail("needs named CAD pads and its gripper envelope");
+				for (member in gripper.envelopeMembers) if (!memberIds.exists(member))
+					fail('gripper envelope member "$member" is outside its mounted tool');
+				for (member in gripper.padMembers) if (gripper.envelopeMembers.indexOf(member) < 0)
+					fail('gripper pad "$member" is outside its envelope');
 				var sensors = flat.sensors == null ? [] : flat.sensors;
 				var foundSwitch = [for (sensor in sensors) if (sensor.id == tool.sensor && sensor.kind == "joint_switch") sensor];
 				if (foundSwitch.length != 1) fail('has no physical joint switch "${tool.sensor}"');
@@ -1143,11 +1176,19 @@ class SceneArtifact {
 			var item:Dynamic = Reflect.field(value, name);
 			return Std.isOfType(item, String) ? item : fail();
 		}
+		function members(value:Dynamic, name:String):Array<String> {
+			var raw:Dynamic = Reflect.field(value, name);
+			if (!Std.isOfType(raw, Array)) fail();
+			return [for (item in (cast raw:Array<Dynamic>)) {
+				if (!Std.isOfType(item, String)) fail();
+				(item:String);
+			}];
+		}
 		if (!Std.isOfType(decoded, Array)) fail();
 		return [for (raw in (cast decoded:Array<Dynamic>)) {
 			var contact:Dynamic = Reflect.field(raw, "contact");
 			if (contact == null) fail();
-			var tool:SceneArtifactRobotTool = {kind: text(raw, "kind"),
+			var tool:SceneArtifactRobotTool = {kind: text(raw, "kind"), members: members(raw, "members"),
 				contact: {occurrence: text(contact, "occurrence"), connector: text(contact, "connector")},
 				channel: text(raw, "channel")};
 			if (Reflect.field(raw, "sensor") != null) tool.sensor = text(raw, "sensor");
@@ -1157,7 +1198,8 @@ class SceneArtifact {
 					var item:Dynamic = Reflect.field(gripper, name);
 					return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
 				}
-				tool.gripper = {minimumPartWidthMm: number("minimumPartWidthMm"),
+				tool.gripper = {padMembers: members(gripper, "padMembers"), envelopeMembers: members(gripper, "envelopeMembers"),
+					minimumPartWidthMm: number("minimumPartWidthMm"),
 					nominalPartWidthMm: number("nominalPartWidthMm"),
 					maximumPartWidthMm: number("maximumPartWidthMm"), fingerLengthMm: number("fingerLengthMm"),
 					fingerPadFrictionCoefficient: number("fingerPadFrictionCoefficient")};
@@ -1414,12 +1456,16 @@ class SceneArtifact {
 			if (segment == null) { fail('step $index has an empty segment'); return; }
 			var label = weld.path.length == 1 ? "" : ' segment $number';
 			if (segment.kind != "line") fail('step $index$label is a "${segment.kind}", and only lines are welded');
-			var halves = segment.seam == null ? [] : segment.seam.split("|");
-			if (halves.length != 2) fail('step $index$label names no seam (member:face|member:face), got "${segment.seam}"');
-			// Each half starts with the occurrence whose geometry names the face.
-			for (half in halves) {
-				var colon = half.indexOf(":");
-				var member = colon > 0 ? half.substr(0, colon) : half;
+			if (segment.seam == null || segment.seam.length == 0) fail('step $index$label needs a seam name');
+			if (segment.faces == null || segment.faces.length != 2) {
+				fail('step $index$label needs two CAD seam faces');
+				return;
+			}
+			for (face in segment.faces) {
+				if (face == null || face.face == null || face.face.length == 0) {
+					fail('step $index$label needs a named CAD face'); return;
+				}
+				var member = face.member;
 				if (flat == null || [for (item in flat.occurrences) if (item.id == member) item].length != 1)
 					fail('step $index$label welds a seam of "$member", which is not an occurrence of the assembly');
 			}
@@ -1503,11 +1549,21 @@ class SceneArtifact {
 			if (value == null) fail();
 			return {position: numbers(Reflect.field(value, "position"), 3), rotation: numbers(Reflect.field(value, "rotation"), 4)};
 		}
+		function seamFaces(value:Dynamic):Array<SceneArtifactWeldFace> {
+			if (!Std.isOfType(value, Array)) return fail();
+			var result:Array<SceneArtifactWeldFace> = [];
+			for (item in (cast value:Array<Dynamic>)) {
+				var member:Dynamic = Reflect.field(item, "member"), face:Dynamic = Reflect.field(item, "face");
+				if (!Std.isOfType(member, String) || !Std.isOfType(face, String)) return fail();
+				result.push({member: member, face: face});
+			}
+			return result;
+		}
 		function segment(item:Dynamic):SceneArtifactWeldSegment {
 			var kind:Dynamic = Reflect.field(item, "kind"), seam:Dynamic = Reflect.field(item, "seam"), joint:Dynamic = Reflect.field(item, "joint");
 			var normals:Dynamic = Reflect.field(item, "normals");
 			if (!Std.isOfType(kind, String) || !Std.isOfType(seam, String) || !Std.isOfType(joint, String) || !Std.isOfType(normals, Array)) fail();
-			return {kind: kind, seam: seam, joint: joint, start: pose(Reflect.field(item, "start")), stop: pose(Reflect.field(item, "stop")),
+			return {kind: kind, seam: seam, faces: seamFaces(Reflect.field(item, "faces")), joint: joint, start: pose(Reflect.field(item, "start")), stop: pose(Reflect.field(item, "stop")),
 				normals: [for (normal in (cast normals:Array<Dynamic>)) numbers(normal, 3)]};
 		}
 		var metal:Dynamic = Reflect.field(raw, "metal"), path:Dynamic = Reflect.field(raw, "path"), passes:Dynamic = Reflect.field(raw, "passes");
@@ -2033,7 +2089,7 @@ private class SceneArtifactReader {
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
 		if (version != SceneArtifact.VERSION)
-			throw 'schema v$version is unsupported; expected v${SceneArtifact.VERSION}';
+			throw 'schema v$version is unsupported; expected v${SceneArtifact.VERSION}; rebuild the scene artifact from its project source';
 		var metresPerUnit = readDouble();
 		var lengthUnit = readText();
 		var count = readInt();

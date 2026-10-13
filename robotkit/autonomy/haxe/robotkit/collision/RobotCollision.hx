@@ -10,7 +10,6 @@ import kinematicskit.KinematicModel;
 import kinematicskit.KinematicState;
 import kinematicskit.Transform;
 import robotkit.kinematics.RobotKinematics;
-import robotkit.manipulation.ClearanceBodyData;
 import robotkit.model.CollisionShape;
 import robotkit.model.RobotModel;
 import robotkit.spatial.Transform3;
@@ -21,11 +20,16 @@ class RobotLinkHull {
   public final link:Int;
   public final name:String;
   public final vertices:Array<Float>;
+  /** Optional margin class on a follower body; -1 keeps the link's class. */
+  public final group:Int;
+  public final member:String;
 
-  public function new(link:Int, name:String, vertices:Array<Float>) {
+  public function new(link:Int, name:String, vertices:Array<Float>, group:Int = -1, ?member:String) {
     this.link = link;
     this.name = name;
     this.vertices = vertices;
+    this.group = group;
+    this.member = member == null ? name : member;
   }
 }
 
@@ -51,6 +55,8 @@ class RobotCollisionOptions {
   public var toolLink:Null<String> = null;
   /** The runtime blueprint's self-collision flag: simulation-only, recorded when off (CL-D10). */
   public var selfCollision:Bool = true;
+  /** A cell builder can add follower bodies before declaring the articulation. */
+  public var declareArticulation:Bool = true;
 
   public function new(name:String) {
     this.name = name;
@@ -145,10 +151,17 @@ class RobotCollision {
     }
 
     var hulls:Array<Int> = [];
+    var hullBodies = new Map<String, Int>();
     for (hull in options.hulls) {
       var link = robot.links[hull.link];
-      hulls.push(description.addObject('$name/${hull.name}', bodies.bodies[model.bodyIndex(link.id)],
-        CollisionPose.identity(), CollisionGeometry.Convex(hull.vertices), 0.0, "hull"));
+      var body = bodies.bodies[model.bodyIndex(link.id)];
+      if (hull.group >= 0) {
+        var existing = hullBodies.get(hull.member);
+        body = existing == null ? bodies.follow(model.bodyIndex(link.id), hull.member, hull.group) : existing;
+        hullBodies.set(hull.member, body);
+      }
+      hulls.push(description.addObject('$name/${hull.name}', body,
+        CollisionPose.identity(), CollisionGeometry.Convex(hull.vertices), 0.0, "hull", hull.member));
     }
 
     var toolBody = -1;
@@ -189,27 +202,8 @@ class RobotCollision {
           if (padding > 0) description.note('Robot "$name": tool hulls are inflated by their padding ($padding m)');
       }
     }
-    bodies.declare();
+    if (options.declareArticulation) bodies.declare();
     return new RobotCollisionBodies(robot, model, bodies, shapes, hulls, toolBody, toolObjects);
-  }
-
-  /**
-   * The hulls `CollisionClearance` checks (`ClearanceBodyData`: simulation hulls,
-   * assembly parts and deposited weld beads carried on links), as objects on
-   * the robot's link bodies, so both worlds see the same scene (CL4a).
-   * Tool hulls go on the tool body, which must exist when any is given.
-   */
-  public static function describeClearanceBodies(description:CollisionDescription, robot:RobotCollisionBodies,
-      data:Array<ClearanceBodyData>):Array<Int> {
-    return [for (body in data) {
-      var on = body.tool ? robot.toolBody : robot.linkBody(body.link);
-      if (body.tool && on < 0) throw 'Clearance body "${body.name}" is a tool hull, but the robot has no tool body';
-      // A tool hull is given in its link's frame; the tool body shares that link's pose.
-      if (body.tool && robot.model.bodyIndex(body.link) != robot.bodies.followed[robot.bodies.followers.indexOf(on)])
-        throw 'Clearance tool hull "${body.name}" is not on the tool\'s link';
-      description.addObject('${robot.bodies.name}/${body.name}', on, CollisionPose.identity(),
-        CollisionGeometry.Convex(body.vertices), 0.0, "hull");
-    }];
   }
 
   /**

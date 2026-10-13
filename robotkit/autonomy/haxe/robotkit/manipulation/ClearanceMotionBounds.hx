@@ -8,12 +8,12 @@ class ClearanceMotionBounds {
   final arm:KinematicGroup;
   final values:Array<Float>;
   final errors:Array<Float>;
-  public function new(arm:KinematicGroup,q:Array<Float>,error:Array<Float>) {
+  public function new(arm:KinematicGroup,q:Array<Float>,error:Array<Float>, ?held:Array<Float>) {
     if(q==null || error==null || q.length!=arm.group.count() || error.length!=q.length)
       throw "Motion bounds require one finite neighborhood per group coordinate";
     this.arm=arm;
     var model=arm.model,dofs=[for(id in arm.group.jointIds)model.dofIndex(id)];
-    var state=arm.stateOf(q);
+    var state=arm.stateOf(q, held);
     for(i in 0...error.length)if(!Math.isFinite(q[i]) || !Math.isFinite(error[i]) || error[i]<0)
       throw "Motion neighborhoods must be finite and nonnegative";
     values=[];errors=[];

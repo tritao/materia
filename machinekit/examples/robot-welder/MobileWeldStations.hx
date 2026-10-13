@@ -1,3 +1,5 @@
+import robotkit.collision.CollisionSceneBuilder;
+import cadbridge.CellCollisionSnapshot;
 import collisionkit.native.NativeCollisionWorld;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
@@ -25,7 +27,7 @@ import processkit.WeldingPlanRunner;
 import processkit.WeldingPlanRunner.WeldPlanning;
 import processkit.WeldScenePlan;
 import processkit.ProbeMotionPlanner;
-import processkit.ProbeWireClearance;
+import processkit.ProbeWire;
 import processkit.ContactProbeRunner.ContactProbeRequest;
 import machinekit.welding.WeldContactSelection;
 import machinekit.welding.WeldProbeGeometry;
@@ -60,12 +62,11 @@ class MobileWeldStations {
   final probeStickout:Float;
   final work:Transform3;
   final metal:String;
-  final robotBodies:Array<ClearanceBodyData>;
-  final external:Array<{name:String, vertices:Array<Float>}> = [];
+  final collision:CellCollisionSnapshot;
+  final collisionScenes:Map<String, CollisionSceneBuilder> = new Map();
   final boxes:Array<FloorBox> = [];
   final planning:Map<String, WeldPlanning> = new Map();
   final clearances:Map<String, CollisionClearance> = new Map();
-  final clearanceBodies:Map<String, Array<ClearanceBodyData>> = new Map();
   final registrationChecks:Map<String, Null<String>> = new Map();
   final verifiedSchedules:Map<String, MobileStationSchedule> = new Map();
   var registrationJoints:Array<Float> = [];
@@ -78,12 +79,14 @@ class MobileWeldStations {
     var scene = materia.project.SceneArtifact.decode(materia.project.SceneArtifact.encode(design));
     this.cell = cell;
     this.scene = scene;
-    var definition:materia.assembly.AssemblyDefinition = cast scene.assemblyDefinition;
+    var definition = scene.assemblyDefinition;
+    if (definition == null) throw "Mobile station planning needs its assembly definition";
     var state = new AssemblyState(definition, scene.assemblyState);
     var physical = AssemblyPhysicalPartView.fromSceneArtifact(scene);
     var converted = AssemblySimulationBridge.toRobotModel(definition, physical, scene.assemblyState, null, null, scene.mobileBase);
     var flat = AssemblyDefinitionFlattener.flatten(definition);
-    var tools:Array<materia.project.SceneArtifact.SceneArtifactRobotTool> = cast scene.robotTools;
+    var tools = scene.robotTools;
+    if (tools == null || tools.length != 1) throw "Mobile station planning needs one installed torch";
     var tool = tools[0];
     var contact = tool.contact;
     var mount = converted.partLinks.get(contact.occurrence);
@@ -97,7 +100,7 @@ class MobileWeldStations {
     var frame = converted.model.addFrame(new Frame("welding-contact", converted.model.links[mount.link]));
     frame.position = [tcp.x, tcp.y, tcp.z]; frame.rotation = [tcp.qx, tcp.qy, tcp.qz, tcp.qw];
     arm = new Manipulator(converted.model, converted.model.links[0].id, frame.id, null, null, null, converted.profile);
-    var torch:materia.project.SceneArtifact.SceneArtifactTorch = cast tool.torch;
+    var torch = tool.torch;
     if (torch == null) throw "Mobile station planning needs the CAD torch wire profile";
     probeLink = converted.model.links[mount.link].id;
     probeTip = new Transform3(new Vec3(tcp.x, tcp.y, tcp.z), new Quat(tcp.qx, tcp.qy, tcp.qz, tcp.qw));
@@ -112,30 +115,17 @@ class MobileWeldStations {
     probeGeometry = WeldProbeGeometry.fromContactFaces(probeFaces, 1.0);
     work = transform(state.worldPose(weldment.reference), scene.metresPerUnit);
     metal = WeldMetal.carrierOf(cell, weldment);
-    var prefix = contact.occurrence.substr(0, contact.occurrence.lastIndexOf("/") + 1);
-    robotBodies = [for (hull in converted.linkHulls) if (hull.part != metal)
-      {name: hull.part, link: converted.model.links[hull.link].id, vertices: hull.vertices,
-        tool: StringTools.startsWith(hull.part, prefix)}];
-    for (occurrence in flat.occurrences) if (!converted.partLinks.exists(occurrence.id) && occurrence.id != metal) {
-      var part = [for (body in physical.parts) if (body.id == occurrence.definition) body][0];
-      var hull:Array<Float> = cast part.collisionHull;
-      var pose = transform(state.worldPose(occurrence.id), scene.metresPerUnit);
-      var world:Array<Float> = [];
-      var min = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
-      var max = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
-      for (index in 0...Std.int(hull.length / 3)) {
-        var point = pose.transformPoint(new Vec3(hull[index * 3] * scene.metresPerUnit,
-          hull[index * 3 + 1] * scene.metresPerUnit, hull[index * 3 + 2] * scene.metresPerUnit));
-        var values = point.toArray();
-        for (axis in 0...3) { world.push(values[axis]); min[axis] = Math.min(min[axis], values[axis]); max[axis] = Math.max(max[axis], values[axis]); }
-      }
-      external.push({name: occurrence.id, vertices: world});
-      boxes.push({id: occurrence.id, x: min[0] / 2 + max[0] / 2, y: min[1] / 2 + max[1] / 2,
+    collision = CellCollisionSnapshot.fromAssembly("mobile-welder", definition, physical, state, converted, [metal], tool.members);
+    for (bound in collision.fixedBounds()) {
+      var min = bound.minimum, max = bound.maximum;
+      boxes.push({id: bound.id, x: min[0] / 2 + max[0] / 2, y: min[1] / 2 + max[1] / 2,
         z: min[2] / 2 + max[2] / 2, halfX: (max[0] - min[0]) / 2, halfY: (max[1] - min[1]) / 2,
         halfZ: (max[2] - min[2]) / 2, yaw: 0});
     }
-    var base:materia.project.SceneArtifact.SceneArtifactMobileBase = cast scene.mobileBase;
-    var origin:materia.project.SceneArtifact.SceneArtifactFloorPose = cast base.origin;
+    var base = scene.mobileBase;
+    if (base == null) throw "Mobile station planning needs its base";
+    var origin = base.origin;
+    if (origin == null) throw "Mobile station planning needs its floor origin";
     start = new Pose2(origin.x, origin.y, origin.yaw);
     var chassis = Transform3.fromPose2(start);
     var firstJoint = [for (joint in flat.joints) if (joint.id == arm.group.jointIds[0]) joint][0];
@@ -146,7 +136,8 @@ class MobileWeldStations {
     candidates = WeldStationCandidates.aroundWithHeadings(points, work.toPose2(), armMount.translation,
       0.45, 0.85, 5, 12, 4);
     var poses = [for (candidate in candidates) candidate.pose]; poses.push(start);
-    var length:Float = cast base.footprintLength, width:Float = cast base.footprintWidth;
+    var length = base.footprintLength, width = base.footprintWidth;
+    if (length == null || width == null) throw "Mobile station planning needs its physical footprint";
     var radius = Math.sqrt(length * length + width * width) / 2;
     var map = new Costmap2(FloorMap.rasterize(boxes, poses, FloorMap.DEFAULT_RESOLUTION,
       FloorMap.navigationMargin(radius, 0.3), FloorMap.DEFAULT_CLEARANCE, "map"), radius, true, 0.3, 1.5);
@@ -158,28 +149,22 @@ class MobileWeldStations {
   static function transform(frame:AssemblyFrame, scale:Float):Transform3
     return new Transform3(new Vec3(frame.x * scale, frame.y * scale, frame.z * scale), new Quat(frame.qx, frame.qy, frame.qz, frame.qw));
 
-  function bodiesAt(station:WeldStationCandidate):Array<ClearanceBodyData> {
-    var cached = clearanceBodies.get(station.id);
-    if (cached != null) return cached.copy();
-    var bodies = robotBodies.copy();
-    var inverse = Transform3.fromPose2(station.pose).inverse();
-    for (body in external) {
-      var vertices:Array<Float> = [];
-      for (index in 0...Std.int(body.vertices.length / 3)) {
-        var point = inverse.transformPoint(new Vec3(body.vertices[index * 3], body.vertices[index * 3 + 1], body.vertices[index * 3 + 2]));
-        vertices.push(point.x); vertices.push(point.y); vertices.push(point.z);
-      }
-      bodies.push({name: body.name, link: arm.baseLink, vertices: vertices, tool: false});
-    }
-    clearanceBodies.set(station.id, bodies);
-    return bodies.copy();
+  function collisionAt(station:WeldStationCandidate):CollisionSceneBuilder {
+    var cached = collisionScenes.get(station.id);
+    if (cached != null) return cached;
+    var scene = collision.at(Transform3.fromPose2(station.pose)).describe(arm, ready, CollisionClearance.MARGIN);
+    var work:Array<String> = [];
+    for (seam in seams) for (face in [seam.a, seam.b]) if (work.indexOf(face.member) < 0) work.push(face.member);
+    for (face in probeFaces) if (work.indexOf(face.member) < 0) work.push(face.member);
+    processkit.WeldCollisionPolicy.apply(scene, scene.memberObjects(work), processkit.WeldPathPlanner.AIR_MARGIN, CollisionClearance.CONTACT_MARGIN);
+    collisionScenes.set(station.id, scene);
+    return scene;
   }
 
   function context(station:WeldStationCandidate):WeldPlanning {
     var cached = planning.get(station.id);
     if (cached != null) return cached;
-    var bodies = bodiesAt(station);
-    var clearance = new CollisionClearance(arm, bodies, ready, () -> new NativeCollisionWorld(), processkit.WeldPathPlanner.AIR_MARGIN);
+    var clearance = collisionAt(station).clearance(() -> new NativeCollisionWorld());
     clearances.set(station.id, clearance);
     var made = WeldingPlanRunner.planning(arm, 2.0, clearance);
     planning.set(station.id, made);
@@ -195,7 +180,7 @@ class MobileWeldStations {
   }
 
   function screen(station:WeldStationCandidate, name:String):Null<String> {
-    var cell:robotkit.navigation.GridCell2 = cast navigation.costmap.grid.worldToCell(station.pose);
+    var cell = navigation.costmap.grid.worldToCell(station.pose);
     return cell == null || !navigation.costmap.isTraversable(cell.x, cell.y) ? "parking footprint is blocked" : null;
   }
 
@@ -214,10 +199,15 @@ class MobileWeldStations {
     Sys.println('Mobile station ${station.id} starts its registration preflight');
     try {
       var selected = context(station);
-      var clearance = new CollisionClearance(arm, bodiesAt(station), ready, () -> new NativeCollisionWorld(),
-        processkit.WeldPathPlanner.AIR_MARGIN, CollisionClearance.CONTACT_MARGIN);
-      var wire = new ProbeWireClearance(arm, probeLink, probeTip, probeWireDiameter, probeStickout,
-        bodiesAt(station));
+      // Registration adds the physical wire to its own copy; welding keeps the reusable station description.
+      var scene = collision.at(Transform3.fromPose2(station.pose)).describe(arm, ready, CollisionClearance.MARGIN);
+      var workMembers:Array<String> = [];
+      for (seam in seams) for (face in [seam.a, seam.b]) if (workMembers.indexOf(face.member) < 0) workMembers.push(face.member);
+      for (face in probeFaces) if (workMembers.indexOf(face.member) < 0) workMembers.push(face.member);
+      processkit.WeldCollisionPolicy.apply(scene, scene.memberObjects(workMembers), processkit.WeldPathPlanner.AIR_MARGIN, CollisionClearance.CONTACT_MARGIN);
+      var wire = ProbeWire.describe(scene, arm, probeLink, probeTip, probeWireDiameter, probeStickout,
+        scene.toolObjects(), scene.memberObjects(workMembers));
+      var clearance = scene.clearance(() -> new NativeCollisionWorld());
       var probes = new ProbeMotionPlanner(arm, selected.compiler, clearance, wire);
       registrationJoints = ready.copy();
       var selection = new WeldContactSelection(contactWork(), probes, () -> registrationJoints.copy());
@@ -275,7 +265,7 @@ class MobileWeldStations {
         if (request != null && selectedStage != null)
           Sys.println('Mobile station ${station.id} selected a ${selectedStage.probes.length}-contact registration stage');
       }
-      var result:processkit.perception.ContactRegistration.ContactRegistrationResult = cast sequence.result;
+      var result = sequence.result;
       if (contacts != 6 || result == null || !result.accepted)
         throw result == null ? "CAD registration plan did not fit a complete work frame" :
           'CAD registration plan is not observable: ${result.reason}';
@@ -304,7 +294,8 @@ class MobileWeldStations {
     var step = WeldingRecipe.passStep(found.legSize, {diameterMm: cell.robot.feeder.wireDiameterMm,
       depositionEfficiency: cell.robot.feeder.depositionEfficiency, maxSpeedMPerMin: cell.robot.feeder.maxSpeedMPerMin},
       [found], cell.weldment().reference, metal, scene.metresPerUnit);
-    var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast step.weld;
+    var weld = step.weld;
+    if (weld == null) throw "Generated welding pass has no process definition";
     try {
       var q = ready.copy();
       for(pass in weld.passes){
@@ -349,7 +340,8 @@ class MobileWeldStations {
       var where = Transform3.fromPose2(station.pose).inverse().compose(work);
       var q = ready.copy();
       for (step in steps) if (step.kind == "weld") {
-        var weld:SceneArtifactWeld = cast step.weld;
+        var weld = step.weld;
+        if (weld == null) throw "Generated weld run has no process definition";
         var runNames:Array<String> = [];
         for (segment in weld.path) if (runNames.indexOf(segment.seam) < 0) runNames.push(segment.seam);
         try {
@@ -380,8 +372,9 @@ class MobileWeldStations {
 
   /** Validate the same exact-stop joint motion emitted to the application, including its time law. */
   function airMove(station:WeldStationCandidate, from:Array<Float>, to:Array<Float>):Bool {
-    var clearance:CollisionClearance = cast clearances.get(station.id);
-    if (clearance.sweep(from, to) != null) return false;
+    var clearance = clearances.get(station.id);
+    if (clearance == null) throw 'Station ${station.id} has no collision context';
+    if (clearance.violation(from) != null) return false;
     var moving = false;
     for (i in 0...from.length) if (Math.abs(from[i] - to[i]) > 1e-12) moving = true;
     if (!moving) return true;
@@ -391,14 +384,10 @@ class MobileWeldStations {
       program = selected.compiler.compile(new motionkit.program.MotionProgram([
         motionkit.program.MotionOp.MoveJ(motionkit.program.MoveTarget.JointTarget(to),
           new motionkit.MotionOptions(), motionkit.program.Blend.ExactStop)]), from, haxe.Int64.ofInt(1));
-      var speed = 0.0;
-      for (limit in selected.compiler.maxVelocity) speed = Math.max(speed, limit);
       for (block in program.blocks) for (trajectory in block.plans) {
-        var samples = Std.int(Math.max(1.0, Math.ceil(trajectory.durationSeconds * speed / 0.02)));
-        for (sample in 0...samples + 1)
-          if (clearance.violation(trajectory.evaluate(trajectory.durationSeconds * sample / samples).positions) != null) {
-            program.dispose(); return false;
-          }
+        var proof = motionkit.robot.TrajectoryClearanceProof.run(clearance, trajectory,
+          selected.compiler.maxVelocity, false);
+        if (!proof.closed || proof.failure != null) { program.dispose(); return false; }
       }
       program.dispose(); return true;
     } catch (_:Dynamic) {
@@ -417,7 +406,8 @@ class MobileWeldStations {
       var schedule = verifiedSchedules.get(scheduleKey(station, [for (seam in group) seam.name()]));
       if (schedule == null) throw 'Station ${station.id} has no verified ordered weld schedule';
       result.push({kind: "goTo", pose: {x: station.pose.x, y: station.pose.y, yaw: station.pose.yaw}});
-      var tools:Array<materia.project.SceneArtifact.SceneArtifactRobotTool> = cast scene.robotTools;
+      var tools = scene.robotTools;
+    if (tools == null || tools.length != 1) throw "Mobile station planning needs one installed torch";
       result.push({kind: "findWork", at: tools[0].contact, contactWork: contactWork()});
       for (step in schedule.steps) result.push(step);
       // The runtime replans this semantic stow from the measured post-weld arm

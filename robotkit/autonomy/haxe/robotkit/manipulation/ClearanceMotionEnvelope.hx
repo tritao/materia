@@ -17,12 +17,12 @@ class ClearanceMotionEnvelope {
   final tipPrismatic:Array<Float>;
   final taylorAngles:Array<Float>;
   final tipReach:Float;
-  public function new(arm:KinematicGroup,lower:Array<Float>,upper:Array<Float>,links:Array<String>,corners:Array<Array<Float>>) {
+  public function new(arm:KinematicGroup,lower:Array<Float>,upper:Array<Float>,links:Array<String>,corners:Array<Array<Float>>, ?held:Array<Float>) {
     this.arm=arm;
     var n=arm.group.count(),m=arm.model;
     if(lower.length!=n || upper.length!=n || links.length!=corners.length)throw "Invalid clearance envelope dimensions";
     for(i in 0...n)if(!Math.isFinite(lower[i]) || !Math.isFinite(upper[i]) || lower[i]>upper[i])throw "Invalid clearance envelope joint box";
-    var mid=[for(i in 0...n)lower[i]+(upper[i]-lower[i])*0.5],state=arm.stateOf(mid),
+    var mid=[for(i in 0...n)lower[i]+(upper[i]-lower[i])*0.5],state=arm.stateOf(mid, held),
       dofs=[for(id in arm.group.jointIds)m.dofIndex(id)];
     travel=[];gains=[];
     for(j in 0...m.jointCount()){

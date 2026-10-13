@@ -82,7 +82,7 @@ extern "C" {
  * zero.
  */
 
-enum { CK_API_VERSION = 1 };
+enum { CK_API_VERSION = 2 };
 
 typedef int32_t ck_result;
 enum {
@@ -243,6 +243,9 @@ CK_API ck_result CK_CALL ck_set_body_rule(ck_world_handle world, int32_t a, int3
 CK_API ck_result CK_CALL ck_set_object_rule(ck_world_handle world, uint32_t a, uint32_t b, int32_t rule,
     int32_t reason);
 
+/** Sparse object-pair clearance; -1 independently restores each margin class value. */
+CK_API ck_result CK_CALL ck_set_object_margins(ck_world_handle world, uint32_t a, uint32_t b,
+    double air, double contact);
 /** A pair's status (CK_PAIR_*). */
 CK_API ck_result CK_CALL ck_pair_status(ck_world_handle world, uint32_t a, uint32_t b,
     int32_t *out_status CK_OUT);
@@ -295,11 +298,14 @@ CK_API ck_result CK_CALL ck_pair_distances(ck_world_handle world,
  * have no relative body motion, so these bounds are not added to their pair.
  * Geometric inflation from `ck_set_inflation` still applies. This is the query main's clearance proof makes
  * (CL-D12), with the inflation carrying CL-D5's motion bound.
+ * `contact` selects air (0) or process (1) pair overrides; `ceiling` is -1 (none) or a nonnegative margin cap.
+ * Both belong to this query and leave no persistent query mode in the world.
  * `out_found` is 1 when there is one: its four ints in `out_pair`, its
  * signed distance and required clearance in `out_result`.
  */
 CK_API ck_result CK_CALL ck_violation(ck_world_handle world,
     const double *margins CK_IN_ARRAY(margin_count), uint32_t margin_count,
+    uint32_t contact, double ceiling,
     const double *inflation CK_IN_ARRAY(inflation_count), uint32_t inflation_count,
     int32_t *out_pair CK_OUT_ARRAY(pair_capacity), uint32_t pair_capacity,
     double *out_result CK_OUT_ARRAY(result_capacity), uint32_t result_capacity,
@@ -312,6 +318,7 @@ CK_API ck_result CK_CALL ck_violation(ck_world_handle world,
  */
 CK_API ck_result CK_CALL ck_closest(ck_world_handle world,
     const double *margins CK_IN_ARRAY(margin_count), uint32_t margin_count,
+    uint32_t contact, double ceiling,
     int32_t *out_pair CK_OUT_ARRAY(pair_capacity), uint32_t pair_capacity,
     double *out_result CK_OUT_ARRAY(result_capacity), uint32_t result_capacity,
     int32_t *out_found CK_OUT);
@@ -328,6 +335,7 @@ CK_API ck_result CK_CALL ck_violation_batch(ck_world_handle world,
     const double *poses CK_IN_ARRAY(pose_count), uint32_t pose_count,
     const double *inflation CK_IN_ARRAY(inflation_count), uint32_t inflation_count,
     const double *margins CK_IN_ARRAY(margin_count), uint32_t margin_count,
+    uint32_t contact, double ceiling,
     int32_t *out_pair CK_OUT_ARRAY(pair_capacity), uint32_t pair_capacity,
     double *out_result CK_OUT_ARRAY(result_capacity), uint32_t result_capacity,
     int32_t *out_set CK_OUT);
@@ -342,6 +350,7 @@ CK_API ck_result CK_CALL ck_violation_sets(ck_world_handle world,
     const double *poses CK_IN_ARRAY(pose_count), uint32_t pose_count,
     const double *inflation CK_IN_ARRAY(inflation_count), uint32_t inflation_count,
     const double *margins CK_IN_ARRAY(margin_count), uint32_t margin_count,
+    uint32_t contact, double ceiling,
     int32_t *out_flags CK_OUT_ARRAY(flag_capacity), uint32_t flag_capacity);
 
 /*

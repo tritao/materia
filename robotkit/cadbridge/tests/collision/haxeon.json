@@ -5,7 +5,10 @@
   },
   "entry": "CellCollisionTests",
   "sourceRoots": [
-    "src"
+    "src",
+    "../../../../machinekit/examples/track-arm",
+    "../../../../machinekit/examples/robot-arm",
+    "../../../../machinekit/examples/robot-welder"
   ],
   "dependencies": {
     "haxeon-platform": {

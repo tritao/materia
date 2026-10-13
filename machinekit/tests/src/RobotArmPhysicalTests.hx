@@ -27,8 +27,13 @@ class RobotArmPhysicalTests {
     var model=converted.model,flange=[for(frame in model.frames)if(frame.name=="toolFlange robot flange")frame][0];
     var arm=new Manipulator(model,model.links[0].id,flange.id);
     var home=[for(_ in 0...6)0.0];
-    var clearance=new CollisionClearance(arm,[for(hull in converted.linkHulls){name:hull.part,link:model.links[hull.link].id,
-      vertices:hull.vertices,tool:StringTools.startsWith(hull.part,"tool/")}],home, () -> new NativeCollisionWorld(),processkit.WeldPathPlanner.AIR_MARGIN);
+    var collisionDescription = new collisionkit.CollisionDescription(processkit.WeldPathPlanner.AIR_MARGIN);
+    var collisionOptions = new robotkit.collision.RobotCollision.RobotCollisionOptions("cad-fixture");
+    collisionOptions.reference = arm.stateOf(home).q;
+    var collisionRobot = cadbridge.CadCollision.describeMechanism(collisionDescription, converted, collisionOptions);
+    var clearance = new CollisionClearance(arm,
+      new robotkit.collision.CollisionClearanceLayout(collisionDescription, collisionRobot.bodies), home,
+      () -> new NativeCollisionWorld());
     var continuous:Array<Float> = [];
     for(index in 0...6){
       var id=arm.jointIds()[index];

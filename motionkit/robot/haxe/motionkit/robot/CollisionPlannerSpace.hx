@@ -58,6 +58,16 @@ class CollisionPlannerSpace implements PlannerSpace {
   public function lower():Array<Float> return bodyLower.copy();
   public function upper():Array<Float> return bodyUpper.copy();
 
+  /** A selected chain cannot move other DOFs; their observed positions still set its reach bounds. */
+  @:allow(motionkit.robot.ManipulatorPlannerSpace)
+  function holdOtherDofs(reference:Array<Float>, active:Array<Int>):Void {
+    if (reference.length != dimension()) throw "Held collision state has the wrong model dimension";
+    for (i in 0...reference.length) {
+      if (!Math.isFinite(reference[i])) throw "Held collision state must be finite";
+      if (active.indexOf(i) < 0) { bodyLower[i] = reference[i]; bodyUpper[i] = reference[i]; }
+    }
+  }
+
   public function invalid(q:Array<Float>):Null<String> {
     var found = violation(q);
     if (found == null) return null;

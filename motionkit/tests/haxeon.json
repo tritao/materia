@@ -6,7 +6,8 @@
   "entry": "MotionKitBootstrapTests",
   "sourceRoots": [
     "src",
-    "../../machinekit/examples/corexy"
+    "../../machinekit/examples/corexy",
+    "../../robotkit/tests/support"
   ],
   "dependencies": {
     "collisionkit-native": {"path": "../../collisionkit/native"},

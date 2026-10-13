@@ -365,7 +365,7 @@ class ProjectKitTests {
     mission.steps.push({kind: "pick", at: {occurrence: "mast", connector: "pin"},
       yaw: 0.3, toolYaw: Math.PI / 2});
     rejects(function() SceneArtifact.encode(data), "picking mission without a suction tool");
-    data.robotTools = [{kind: "suction", contact: {occurrence: "chassis", connector: "pin"}, channel: "tool/cup.enable",
+    data.robotTools = [{kind: "suction", members: ["chassis"], contact: {occurrence: "chassis", connector: "pin"}, channel: "tool/cup.enable",
       sensor: "tool/sensor.pressureSignal"}];
     var picked = SceneArtifact.decode(SceneArtifact.encode(data));
     var picking = picked.mission, tools = picked.robotTools;
@@ -374,7 +374,7 @@ class ProjectKitTests {
     check(pickAt.occurrence == "mast" && picking.steps[2].yaw == 0.3 && picking.steps[2].toolYaw == Math.PI / 2 &&
       tools.length == 1 && tools[0].channel == "tool/cup.enable" &&
       tools[0].contact.connector == "pin" && tools[0].sensor == "tool/sensor.pressureSignal", "picking mission and tool round trip");
-    data.robotTools.push({kind: "suction", contact: {occurrence: "mast", connector: "pin"}, channel: "tool/cup2.enable"});
+    data.robotTools.push({kind: "suction", members: ["mast"], contact: {occurrence: "mast", connector: "pin"}, channel: "tool/cup2.enable"});
     mission.steps[2].tool = "tool/cup2.enable";
     var selectedTool = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
     check(selectedTool != null && selectedTool.steps[2].tool == "tool/cup2.enable",
@@ -394,7 +394,7 @@ class ProjectKitTests {
     data.robotTools[0].contact.connector = "nowhere";
     rejects(function() SceneArtifact.encode(data), "suction tool touching with a missing connector");
     data.robotTools[0].contact.connector = "pin";
-    data.robotTools.push({kind: "suction", contact: {occurrence: "mast", connector: "pin"}, channel: "tool/cup.enable"});
+    data.robotTools.push({kind: "suction", members: ["mast"], contact: {occurrence: "mast", connector: "pin"}, channel: "tool/cup.enable"});
     rejects(function() SceneArtifact.encode(data), "two tools on one channel");
     data.robotTools.pop(); mission.steps.pop(); data.robotTools = null;
     // Sensors name the connector they scan from.
@@ -457,7 +457,7 @@ class ProjectKitTests {
       return {wireSpeedChannel: "tool/torch.wire_speed", voltageChannel: "tool/torch.voltage", groundedWork: ["plate", "upright"],
         maxCurrentA: 350.0, efficiency: 0.88, wireDiameterMm: 1.2, stickoutMm: 15.0, maxWireSpeedMPerMin: 20.0, depositionEfficiency: 0.95};
     function torch():materia.project.SceneArtifact.SceneArtifactRobotTool
-      return {kind: "torch", contact: {occurrence: "torch", connector: "tcp"}, channel: "tool/torch.arc",
+      return {kind: "torch", members: ["torch"], contact: {occurrence: "torch", connector: "tcp"}, channel: "tool/torch.arc",
         sensor: "tool/torch.weld", torch: welder()};
     var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
       parts: [{id: "body", name: "body", red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12,
@@ -471,7 +471,7 @@ class ProjectKitTests {
       back.voltageChannel == "tool/torch.voltage" && back.groundedWork.join(",") == "plate,upright" && back.maxCurrentA == 350.0 &&
       back.efficiency == 0.88 && back.wireDiameterMm == 1.2 && back.stickoutMm == 15.0, "torch tool round trip");
     // A suction tool beside it keeps working, and the torch's channels may not collide with it.
-    data.robotTools = [torch(), {kind: "suction", contact: {occurrence: "plate", connector: "tcp"}, channel: "cup.enable"}];
+    data.robotTools = [torch(), {kind: "suction", members: ["plate"], contact: {occurrence: "plate", connector: "tcp"}, channel: "cup.enable"}];
     var both = SceneArtifact.decode(SceneArtifact.encode(data)).robotTools;
     check(both != null && both.length == 2, "torch beside a suction tool");
     data.robotTools = [torch()];
@@ -503,7 +503,7 @@ class ProjectKitTests {
     data.robotTools[1].torch = {wireSpeedChannel: "w2", voltageChannel: "v2", groundedWork: ["plate"], maxCurrentA: 350.0,
       efficiency: 0.88, wireDiameterMm: 1.2, stickoutMm: 15.0, maxWireSpeedMPerMin: 20.0, depositionEfficiency: 0.95};
     rejects(function() SceneArtifact.encode(data), "a second torch");
-    data.robotTools = [{kind: "suction", contact: {occurrence: "plate", connector: "tcp"}, channel: "cup.enable", torch: welder()}];
+    data.robotTools = [{kind: "suction", members: ["plate"], contact: {occurrence: "plate", connector: "tcp"}, channel: "cup.enable", torch: welder()}];
     rejects(function() SceneArtifact.encode(data), "a suction tool with a welder");
     ContactWorkTests.run(data, torch());
     weldMission(data, torch);
@@ -519,13 +519,13 @@ class ProjectKitTests {
     // second upright, whose face looks along -X).
     var intoY = [0.96593, 0.0, 0.0, -0.25882];
     var intoX = [0.0, 0.96593, 0.0, 0.25882];
-    function segment(seam:String, from:Array<Float>, to:Array<Float>, normals:Array<Array<Float>>, rotation:Array<Float>):materia.project.SceneArtifact.SceneArtifactWeldSegment
-      return {kind: "line", seam: seam, joint: "fillet", start: {position: from, rotation: rotation}, stop: {position: to, rotation: rotation},
+    function segment(seam:String, faces:Array<materia.project.SceneArtifact.SceneArtifactWeldFace>, from:Array<Float>, to:Array<Float>, normals:Array<Array<Float>>, rotation:Array<Float>):materia.project.SceneArtifact.SceneArtifactWeldSegment
+      return {kind: "line", seam: seam, faces: faces, joint: "fillet", start: {position: from, rotation: rotation}, stop: {position: to, rotation: rotation},
         normals: normals};
     function line():materia.project.SceneArtifact.SceneArtifactWeldSegment
-      return segment("plate:f3|upright:f7", [0.0, 0.0, 0.01], [0.18, 0.0, 0.01], [[0.0, 0.0, 1.0], [0.0, -1.0, 0.0]], intoY);
+      return segment("plate:f3|upright:f7", [{member: "plate", face: "f3"}, {member: "upright", face: "f7"}], [0.0, 0.0, 0.01], [0.18, 0.0, 0.01], [[0.0, 0.0, 1.0], [0.0, -1.0, 0.0]], intoY);
     function second():materia.project.SceneArtifact.SceneArtifactWeldSegment
-      return segment("plate:f3|plate:f9", [0.18, 0.0, 0.01], [0.18, 0.06, 0.01], [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]], intoX);
+      return segment("plate:f3|plate:f9", [{member: "plate", face: "f3"}, {member: "plate", face: "f9"}], [0.18, 0.0, 0.01], [0.18, 0.06, 0.01], [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]], intoX);
     function seam():materia.project.SceneArtifact.SceneArtifactWeld
       return {frame: "plate", metal: "plate", path: [line()], legSize: 0.005,
         passes: [{name: "single", offset: [0.0, 0.0], interpassDwell: 0.0, process: {wireSpeed: 8.0, voltage: 24.0, travelSpeed: 0.01, approach: 0.05, startDwell: 0.2, craterDwell: 0.3, burnback: 0.1}}]};
@@ -537,6 +537,7 @@ class ProjectKitTests {
     if (back == null || back.steps.length != 1 || back.steps[0].weld == null) throw "weld mission round trip lost the weld";
     var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast back.steps[0].weld;
     check(weld.frame == "plate" && weld.path.length == 1 && weld.path[0].seam == "plate:f3|upright:f7" && weld.path[0].joint == "fillet" &&
+      weld.path[0].faces[0].member == "plate" && weld.path[0].faces[1].face == "f7" &&
       weld.path[0].kind == "line" && weld.metal == "plate" && weld.path[0].stop.position[0] == 0.18 &&
       weld.path[0].normals[1][1] == -1.0 && weld.legSize == 0.005 && weld.passes[0].process.wireSpeed == 8.0 && weld.passes[0].process.travelSpeed == 0.01 &&
       weld.passes[0].process.startDwell == 0.2 && weld.passes[0].process.craterDwell == 0.3 &&
@@ -567,8 +568,8 @@ class ProjectKitTests {
       data.mission = mission(weld);
       rejects(function() SceneArtifact.encode(data), message);
     }
-    bad(function(w) { var g = first(w); g.seam = "plate:f3"; }, "weld of a seam with one face");
-    bad(function(w) { var g = first(w); g.seam = "ghost:f3|upright:f7"; }, "weld of a seam on an occurrence the assembly lacks");
+    bad(function(w) { var g = first(w); g.faces = [{member: "plate", face: "f3"}]; }, "weld of a seam with one face");
+    bad(function(w) { var g = first(w); g.faces[0].member = "ghost"; }, "weld of a seam on an occurrence the assembly lacks");
     bad(function(w) { var g = first(w); g.joint = "butt"; }, "weld of a joint that is not deposited");
     bad(function(w) { var g = first(w); g.kind = "arc"; }, "weld of a segment that is not a line");
     bad(w -> w.metal = "ghost", "weld metal on an occurrence the assembly lacks");
@@ -581,7 +582,7 @@ class ProjectKitTests {
     bad(function(w) { var g = first(w); g.normals = [[0.0, 0.0, 1.0], [0.0, 0.0, -1.0]]; }, "weld between parallel faces");
     bad(function(w) { var g = first(w); g.normals = [[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]]; }, "weld between the same face twice");
     bad(function(w) { var g = first(w); g.start.rotation = [0.0, 0.0, 0.0, 1.0]; g.stop.rotation = [0.0, 0.0, 0.0, 1.0]; }, "weld whose wire points out of the corner");
-    bad(w -> w.path = [line(), segment("plate:f3|plate:f9", [0.5, 0.0, 0.01], [0.5, 0.06, 0.01], [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]], intoX)],
+    bad(w -> w.path = [line(), segment("plate:f3|plate:f9", [{member: "plate", face: "f3"}, {member: "plate", face: "f9"}], [0.5, 0.0, 0.01], [0.5, 0.06, 0.01], [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]], intoX)],
       "a path whose segments do not join");
     bad(w -> w.legSize = 0.0, "weld with no leg");
     bad(w -> w.passes = [], "weld with no passes");
@@ -610,7 +611,7 @@ class ProjectKitTests {
     data.mission = mission(seam());
     // The robot's arm carries one tool: a mission cannot both pick and weld.
     data.mission = {steps: [{kind: "weld", weld: seam()}, {kind: "pick", at: {occurrence: "plate", connector: "tcp"}}]};
-    data.robotTools = [torch(), {kind: "suction", contact: {occurrence: "upright", connector: "tcp"}, channel: "cup.enable"}];
+    data.robotTools = [torch(), {kind: "suction", members: ["upright"], contact: {occurrence: "upright", connector: "tcp"}, channel: "cup.enable"}];
     rejects(function() SceneArtifact.encode(data), "a mission that picks and welds");
     data.mission = mission(seam());
     data.robotTools = null;

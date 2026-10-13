@@ -24,11 +24,13 @@ class GripFacet implements ComponentFacet {
 	public final fingerPadFrictionCoefficient:Float;
 	/** Whether fingers have a physical support toe beneath the fingertip plane. */
 	public final supportStep:Bool;
+	/** Contact members in the containing gripper assembly, declared by its design. */
+	public final padMembers:Array<String>;
 
 	public function new(strokeMm:Float, forceN:Null<Float>, openPort:String, closePort:String,
 			graspSensor:String, contactConnector:String, minimumPartWidthMm:Float,
 			nominalPartWidthMm:Float, maximumPartWidthMm:Float, fingerLengthMm:Float,
-			fingerPadFrictionCoefficient:Float, supportStep:Bool = false) {
+			fingerPadFrictionCoefficient:Float, padMembers:Array<String>, supportStep:Bool = false) {
 		this.strokeMm = strokeMm;
 		this.forceN = forceN;
 		this.openPort = openPort;
@@ -41,6 +43,8 @@ class GripFacet implements ComponentFacet {
 		this.fingerLengthMm = fingerLengthMm;
 		this.fingerPadFrictionCoefficient = fingerPadFrictionCoefficient;
 		this.supportStep = supportStep;
+		if (padMembers == null || padMembers.length == 0) throw "Gripper needs named contact members";
+		this.padMembers = padMembers.copy();
 	}
 
 	public function check(component:MachineComponent):Void {

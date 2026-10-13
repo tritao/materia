@@ -73,12 +73,23 @@ class ModelBodies {
    * on its flange link): it is rigid with that body and takes its rules.
    */
   public function follow(body:Int, followerName:String, group:Int):Int {
+    return addFollower(body, followerName, group, true);
+  }
+
+  /** Carried stock follows the pose without inheriting structural contact exemptions. */
+  public function carry(body:Int, followerName:String, group:Int):Int {
+    var follower = addFollower(body, followerName, group, false);
+    description.setHeldContacts(follower, []);
+    return follower;
+  }
+
+  function addFollower(body:Int, followerName:String, group:Int, structural:Bool):Int {
     if (articulation >= 0) throw 'Bodies of "$name" are already declared as an articulation';
     var target = bodies[body];
     var follower = description.addBody('$name/$followerName', group, description.bodies[target].fixed,
       description.bodies[target].pose);
-    description.setBodyRule(target, follower, CollisionPairRule.Allow, CollisionPairStatus.Rigid);
-    for (rule in description.bodyRules.copy()) {
+    if (structural) description.setBodyRule(target, follower, CollisionPairRule.Allow, CollisionPairStatus.Rigid);
+    if (structural) for (rule in description.bodyRules.copy()) {
       if (rule.rule != CollisionPairRule.Allow) continue;
       if (rule.a == target && rule.b != follower) description.setBodyRule(follower, rule.b, rule.rule, rule.reason);
       else if (rule.b == target && rule.a != follower) description.setBodyRule(rule.a, follower, rule.rule, rule.reason);
@@ -96,6 +107,37 @@ class ModelBodies {
 
   /** Every described body of this model, followers last. */
   public function all():Array<Int> return bodies.concat(followers);
+
+  /** An independently mutable mapping for a world's live copy of the description. */
+  public function copyForDescription(live:CollisionDescription):ModelBodies {
+    var result = new ModelBodies(live, model, name, bodies.copy(), reference.copy(), referenceName);
+    for (follower in followers) result.followers.push(follower);
+    for (body in followed) result.followed.push(body);
+    result.articulation = articulation;
+    return result;
+  }
+
+  /** Model body followed by a described body, or -1 for independent geometry. */
+  public function carrier(body:Int):Int {
+    var direct = bodies.indexOf(body);
+    if (direct >= 0) return direct;
+    var follower = followers.indexOf(body);
+    return follower < 0 ? -1 : followed[follower];
+  }
+
+  /** Transfer collision geometry and its mechanical follower together. */
+  public function transfer(build:CollisionBuild, body:Int, current:CollisionPose, target:CollisionPose,
+      fixed:Bool, carrier:Int, contacts:Array<Int>):Void {
+    if (build.description != description) throw "Transfer needs this mapping's live collision description";
+    if (bodies.indexOf(body) >= 0 || carrier < -1 || carrier >= model.bodyCount())
+      throw "Transfer needs an independent part and a valid mechanical carrier";
+    build.transferBody(body, current, target, fixed, contacts);
+    var follower = followers.indexOf(body);
+    if (carrier < 0) {
+      if (follower >= 0) { followers.splice(follower, 1); followed.splice(follower, 1); }
+    } else if (follower >= 0) followed[follower] = carrier;
+    else { followers.push(body); followed.push(carrier); }
+  }
 
   /** A state of the model at DOF values `q`, with the root poses of the reference (where the model sits in the cell). */
   public function state(q:Array<Float>):KinematicState {
