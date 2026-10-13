@@ -1603,6 +1603,97 @@ findings with their evidence). Fixed, one commit each:
   merges a ramp at exactly its acceleration limits and asserts the merged peaks), and the lowering test passed if either
   the hotend's or the fan's event was there (each is required now).
 
+**Review follow-ups (planned, 2026-10-13).** What the review found that is too big to do in a review commit, each with its
+design. In the order to take them.
+1. **RF1. The extruder's position on the wire.** `device_compiler6.cpp` sends each segment's absolute joint position as an
+   f32 and the device evaluates it in f32 (lines 361-373). The extruder is a continuous joint whose angle grows the whole
+   print: past about 4096 rad of motor (5 m of filament, 15 g of PLA) half an f32 rounding step (2.4e-4 rad) is more than a
+   tenth of a step (1.96e-4 rad), so a long print is refused ("converted trajectory exceeds target_error") or steps with
+   float jitter. The branch loosened the check (`CONVERSION_STEPS`, the seam bound) instead; the full cube (1.2 m of
+   filament) stays under it, so no test sees it. Design: an RKD6 wire revision that carries a segment relative to a 64-bit
+   step base (the base per segment, or per queue with a rebase command), coefficients relative to it, the device adding the
+   base in integers; then `CONVERSION_STEPS` and the seam allowance go. Test: a plan 50 m of filament from zero compiles
+   and replays to a tenth of a step.
+2. **RF2. One spring model (concern 4).** Every coupling with a stiffness is a spring, and only stiffness zero is rigid. A
+   damping ratio always comes from the part, stated as assumed per transmission kind (a rubber belt about 0.1, a ball screw
+   or steel drive about 0.03), and a transmission record may override it; zero no longer means "not a spring". Before:
+   (a) the ball screws' units (done in this review); (b) a stepper hold for every compliant follower, not only damped ones
+   (`DeviceBinding`); (c) a servo on a compliant follower integrated against its pulley (`compliantLoad`, tested in this
+   review) for every stiff coupling; (d) runtime position limits that allow the compliance overshoot `m a / K` from
+   `DriveLoads` (the gantry-starts "runtime limit by micrometres"), or plans that keep that margin; (e) re-baselining the
+   mill, tending, gantry and router numbers, which will move (the bench mill's plan checks flagged 56 of 78 plans with the
+   screws 1000 times too soft). Test: the bench mill's Z under gravity sags `m g / K` (micrometres) in MuJoCo, and the gantry
+   picker's servo pulleys stay stable on spring belts.
+3. **RF3. Deposition from the physical nozzle (AM-D7).** A device robot's snapshot is the device's reconstruction from
+   step counts, so `PrintProgramPlayer.afterStep` lays beads where the motors say the nozzle is, not where the belts put it:
+   in MuJoCo the belt swing never reaches the deposit. Design: read the nozzle's physical pose (the tool link's pose from the
+   simulation, through `Simulation.linkPose`, and the tip's offset in that link from the model) and the extruder's physical
+   joint; the device's view stays what the controller knows. SmallTab's numbers in MuJoCo will move by the belts' stretch
+   (up to about 0.3 mm), which is what the check is for.
+4. **RF4. Networking on NativeKit (concern 5).** `processkit.moonraker` frames HTTP/1.1, RFC 6455 and SHA-1 by hand over
+   robotkit's `NativeTransport`, which cannot run in the web build (no raw TCP in a browser), and the Moonraker test builds
+   the whole robotd native set for one socket. NativeKit already has an HTTP client (`nk_http_*`: curl, fetch, URLSession,
+   WinHTTP; `haxeon/packages/platform`) and a WebSocket transport (`NK_TRANSPORT_WEBSOCKET`: handshake, masking, fragments,
+   pong, close, wss). Design: (a) NativeKit's WebSocket transport gains a message mode (`NK_TRANSPORT_MESSAGES`: a send is one
+   message, a receive one whole message) and text frames, since Moonraker's JSON-RPC needs both; (b) `MoonrakerSocket`
+   connects with kind WEBSOCKET and path `/websocket` (deletes `WebSocketFrames`, `Sha1`, the handshake); (c)
+   `MoonrakerClient` sends through `nk_http`, driven by the NativeKit event pump (a multipart body builder stays in
+   processkit); (d) the transport façade moves from robotkit/remote to the haxeon platform package. JSON-RPC id matching (30
+   lines) stays in processkit; `haxeon.rpc` is MessagePack framing, not JSON-RPC. The fake server stays test-only.
+5. **RF5. Split `ProgramCompiler` (concern 7).** 1,500 lines, and `finish()` chains eight concerns; two hand-kept lists of
+   settings already planned prints without pressure advance (fixed here with one `copySettings`). Stages: `PathSampler`
+   (sections, sample budgets, drive stations), `TimedMotionTransforms` (advance, project, shape, project, merge, project;
+   owns the intermediate trajectories' disposal; returns the executed and merged motion and the lag, tail and spread),
+   `PlanCertification` (clearance, configuration, plan creation with the merge fallback, task space, plan check), with the
+   distance drive's columns written after inverse kinematics for any solver (today only `AxisJointPathPlanner` writes them;
+   the review made the others refuse a drive). And one `CouplingProjection`, built once from the model (order, positions,
+   rates, limit sums; it throws on a cycle), replacing five copies (`AxisKinematics.completeDerived`,
+   `MotionAxisCouplings.derived`, `AxisPlanner.projectDerived`, `ProgramCompiler.projection*`, `ToolpathMotionBinding`'s
+   limit loop; `AxisKinematics` silently appends the joints of a cycle). A pure refactor: every number unchanged.
+6. **RF6. Exact window boundaries.** The windows' boundary speeds are a share (`BOUNDARY_SHARE` 0.7 of a forward and
+   backward pass at `TANGENTIAL_SHARE` 0.4 of the spans' acceleration) lowered 0.35, 0.175, 0 on failure: heuristics. The
+   review made the lowerings visible (`mk_timing_report.boundary_lowerings`, asserted zero in the gate) and cross-checked
+   the windows against one window on the dense grid (`mk_time_path_reference`, within 0.5 %). Design: time the windows
+   back to front for each one's controllable set at its start (TOPP-RA's backward pass), then forward; the boundary speed
+   is the lesser of what the previous window reached and the next one's controllable bound. Exact, and both shares and the
+   ladder go.
+7. **RF7. One segment merge.** `device_compiler6.cpp` (46-125, 196-238) merges segments for the link with its own rules
+   (sampled checks, 65 samples for travel limits), retries unmerged on any failure (a lost clock sync included) and skips
+   the follower-consistency check for merged segments. Design: the device compiler calls `mk_merge_segments` with
+   tolerances in actuator steps (a tenth of a step, a percent of the step rate) and the 2 ms / 4 ms thresholds derived from
+   the link's segment rate and queue depth (the endpoint's "refill 128 segments in time" rule), retries only when the merge
+   was the cause, and keeps a scaled follower check.
+8. **RF8. The start-at-limit tolerance is the drive's resolution (concern 6).** The review returned a homed axis to its
+   authored home (one home coordinate again). The validator's start rule admits a start outside a claimed bound by the
+   plan's start tolerance, which is the planner's start mismatch (the printer's 0.1 mm, 5 mm for the handling, welding and
+   surface runners), not what a drive can miss a target by. Design: a per-joint position resolution from the drive (one
+   step: 1 / steps per unit, as `StepTicks.wire` holds it; one encoder count) passed as `position_start_tolerance`;
+   rounding a step target to the nearest step instead of flooring it (`step_generator.rs:221-225`) halves the error, as a
+   device item of its own.
+9. **RF9. Klipper's `max_accel` in the worst direction (concern 11).** `max_velocity` is right (Klipper bounds each move's
+   Euclidean speed; on CoreXY it has no per-axis XY limit, so the worst direction, `MotorSpaceConstraints.inscribedSpeed`,
+   is the value). `max_accel` is the weaker axis's acceleration, but Klipper's is one Euclidean bound too: with the motors'
+   force rows the worst direction asks more of one motor than either axis alone. Design: `inscribedAcceleration` from the
+   drive model's force rows (min over motors of its force over the norm of its row of the axes' masses), used for
+   `max_accel` and asserted against the model in `PrinterKlipperTests`. Also: write `square_corner_velocity` explicitly with
+   a comment (Klipper jumps velocity at corners, which AM-D4 rejects for our stack).
+10. **RF10. Constants still to derive or bound by a test.** `MAX_STAGE_TURN` 0.6 rad (no test exercises it: a curved path
+   sampled a radian a span, profile not binding, acceleration under the margin); `ZONE_REACH` 1.5 and `ZONE_STAGES` 10
+   (derive the reach from the moving-boundary margin, the stages from a time-error bound); `kSliver` 4 us (derive from the
+   shortest controller period); `MERGE_TIMING` 10 us and its 1 % / 10 % (from the path's remaining deviation budget, not
+   the joint's speed); the extruder's pressure-advance headroom x0.8 velocity and x0.6 acceleration and jerk = 25 x
+   acceleration (`ToolpathMotionBinding`, from K and the window: `v + K a` within the drive); `SHAPER_X_HZ` /
+   `SHAPER_Y_HZ` typed and checked against `DriveLoads` to 10 % instead of derived from it; `HeaterSetup`'s tuning defaults
+   (every caller sets every field: make them required); the PID band, range and watchdog numbers as one written policy;
+   the controller's ADC front end (4.7 k pull-up, 3.3 V) as a controller part.
+11. **RF11. Smaller items.** The slicer's purge prime (1.5 mm, a literal: a `PrinterProfile` field); one `BeadSection`
+   (`area`, `width`, `spacing`, `filamentArea`) for the slicer, the interpreter, the binding and the settings (four copies);
+   the benchmark builds its bindings from the scene's print job like the app, not by hand (origin, rapid speed, ramp);
+   material properties (minimum extrusion temperature, melt lag, filament diameter) on a material spec rather than the
+   hotend; a feed hold pressed while a print is starting is applied when it starts; `MoonrakerStatus` keeps the last value of
+   an absent field instead of zero; IPv6 literal addresses in `PrinterLink`; `validatePrinting` applies the device's
+   positivity rules; a heater fault stops the device once, not every tick; one device input entry point per peripheral kind.
+
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
 - Pause and filament change, runout sensor, cancel object, power-loss recovery.
@@ -1644,6 +1735,7 @@ AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
 | AM11 | done | see the commit below |
 | AM12 | done | see the commit below |
 | AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10, 3, 9 and 7 and belt damping done | item 6 c6d2df30a, 52eaa27db; item 1 7f392fd39; item 5 71b2c6c5a; item 4 1859d5f56; item 8 3891585f4; item 11 b7320e39f; item 10 43de352f0; item 3 b5a86c01d; item 9 970440ac8; belt damping 54326ccc7; item 7 (axes at the motors' rate) and the belt spring in MuJoCo with the shaping acceptance there: see the commits below |
+| Review | done 2026-10-13: 21 fixes; follow-ups RF1 to RF11 planned | see the review list (commits "(3D printing review)") |
 
 ## Next: a large-format pellet printer (PL0 to PL12)
 
