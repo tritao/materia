@@ -174,8 +174,26 @@ class ProgramCompiler {
     shaping = impulses; shapingDelay = reference; shapingTail = tail; shapingDeviation = deviation;
   }
 
-  function copyShaping(into:ProgramCompiler):Void {
+  /**
+    Gives `into` (a compiler of the same machine: a worker's, or one with another joint path planner) every setting of
+    this one that is not a constructor argument, so the two cannot plan differently. Every such setting is copied here
+    and only here: a setting left out of one factory once planned every print on the planner thread without pressure
+    advance.
+  **/
+  function copySettings(into:ProgramCompiler):Void {
+    into.planningAssumptions = planningAssumptions.copy();
+    into.planCheck = planCheck == null ? null : planCheck.fork();
+    into.motorSpace = motorSpace;
+    into.mergeSegmentsSeconds = mergeSegmentsSeconds;
     into.shaping = shaping; into.shapingDelay = shapingDelay; into.shapingTail = shapingTail; into.shapingDeviation = shapingDeviation;
+    into.pressureAdvance = pressureAdvance;
+    into.pressureAdvanceWindow = pressureAdvanceWindow;
+    into.pathEventSchedule = pathEventSchedule;
+    into.requireFeasiblePath = requireFeasiblePath;
+    into.clearanceEvents = clearanceEvents.copy();
+    into.clearanceDepthLimit = clearanceDepthLimit;
+    into.motionPlanner = motionPlanner;
+    into.angularResolution = angularResolution;
   }
 
   /** Preserve compiler limits/checks while timing an already selected route. */
@@ -184,14 +202,8 @@ class ProgramCompiler {
     var result=new ProgramCompiler(solver,limits,frameId,maxVelocity,maxAcceleration,maxJerk,
       startTolerances,timing,cartesianResolution,maxJointJump,positionTolerance,orientationTolerance,
       ikTolerance,planner,perJointMaxJump,jointIds,couplings,controllerPeriodSeconds);
-    result.planningAssumptions=planningAssumptions.copy();
-    result.planCheck=planCheck==null?null:planCheck.fork();
+    copySettings(result);
     result.configurationConstraint=configurationConstraint;
-    result.motorSpace=motorSpace;result.mergeSegmentsSeconds=mergeSegmentsSeconds;result.pathEventSchedule=pathEventSchedule;result.requireFeasiblePath=requireFeasiblePath;
-    result.clearanceEvents=clearanceEvents.copy();result.clearanceDepthLimit=clearanceDepthLimit;
-    result.motionPlanner=motionPlanner;
-    result.angularResolution=angularResolution;
-    copyShaping(result);
     return result;
   }
 
@@ -207,20 +219,10 @@ class ProgramCompiler {
       orientationTolerance, ikTolerance,
       jointPathPlanner == null ? null : jointPathPlanner.withSolver(forked),
       perJointMaxJump, jointIds, couplings, controllerPeriodSeconds);
-    // The worker plans one program in order, so it remembers which way each axis last moved.
-    worker.planningAssumptions = planningAssumptions.copy();
-    worker.requireFeasiblePath=requireFeasiblePath;
-    if (planCheck != null) worker.planCheck = planCheck.fork();
+    // The worker plans one program in order, so it remembers which way each axis last moved (`planningAssumptions`).
+    copySettings(worker);
     worker.configurationConstraint = configurationConstraint == null ? null :
       new ConfigurationConstraint(forked,configurationConstraint.configuration);
-    worker.motorSpace = motorSpace;
-    worker.mergeSegmentsSeconds = mergeSegmentsSeconds;
-    copyShaping(worker);
-    worker.pathEventSchedule = pathEventSchedule;
-    worker.clearanceEvents = clearanceEvents.copy();
-    worker.clearanceDepthLimit = clearanceDepthLimit;
-    worker.motionPlanner = motionPlanner;
-    worker.angularResolution = angularResolution;
     return worker;
   }
 

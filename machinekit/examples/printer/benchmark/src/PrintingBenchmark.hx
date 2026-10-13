@@ -528,6 +528,23 @@ class PrintingBenchmark {
     var expected = machine.printer.radians(filament);
     Sys.println('extruder: the joint turns ${Math.round(taken * 1000) / 1000} rad for ${Math.round(expected * 1000) / 1000} rad of filament (${Math.round((taken / expected - 1) * 1e5) / 1e3} %)');
     check(Math.abs(taken / expected - 1.0) < 0.002, 'the extruder takes what the program lays: $taken against $expected rad');
+    // The app plans on the planner thread, through `forWorker`: a worker plans what the compiler itself plans, pressure
+    // advance and shaping included (a worker once planned every print without its pressure advance).
+    var worker = machine.binding.compiler.forWorker().compile(motion, machine.start, Int64.ofInt(1));
+    var workerPlans = [for (block in worker.blocks) for (plan in block.plans) plan];
+    var directPlans = [for (block in compiled.blocks) for (plan in block.plans) plan];
+    check(workerPlans.length == directPlans.length, 'a worker makes the same plans: ${workerPlans.length} against ${directPlans.length}');
+    var differs = 0.0;
+    for (index in 0...directPlans.length) {
+      var direct = directPlans[index], fromWorker = workerPlans[index];
+      differs = Math.max(differs, Math.abs(direct.durationSeconds - fromWorker.durationSeconds));
+      for (step in 0...9) {
+        var at = Math.min(direct.durationSeconds, fromWorker.durationSeconds) * step / 8;
+        differs = Math.max(differs, Math.abs(direct.evaluate(at).positions[extruder] - fromWorker.evaluate(at).positions[extruder]));
+      }
+    }
+    check(differs < 1e-9, 'a worker plans the extruder exactly as the compiler does: $differs');
+    worker.dispose();
     compiled.dispose();
   }
 

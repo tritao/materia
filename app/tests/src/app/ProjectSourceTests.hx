@@ -842,7 +842,7 @@ class ProjectSourceTests {
       for (index in 0...model.joints.length) if (model.joints[index].id == id) return index;
       throw 'the printer has no joint $id';
     }
-    var x = joint("x"), y = joint("y"), z = joint("z"), e = joint("e");
+    var e = joint("e");
     // The material is measured by rays: half a tenth of a millimetre between them keeps a bead of 0.4 mm to eight.
     player.stockSpacing = 0.00005;
     var dt = simulation.timestep, every = 5;
@@ -850,8 +850,12 @@ class ProjectSourceTests {
     var first = robot();
     var e0 = first.positions.get(e);
     var hotendAt = -1.0, bedAt = -1.0, ticks = 0, limit = Math.round(1500.0 / dt);
-    var ratios = {slow: new Array<Float>(), fast: new Array<Float>()};
-    var last = first, lastE = e0, slowed = false, restored = false, detail = "";
+    // The filament each whole layer takes: pressure advance runs the extruder ahead of the path while it speeds up and
+    // behind while it slows down, so filament per path holds over a layer, not sample by sample (and a path measured
+    // from samples cuts more of each corner the faster it is run). Layer 2 prints at full speed and layer 4 at half; both
+    // are solid with the same infill angle: the same path, so the same filament.
+    var fedByLayer:Array<Float> = [for (_ in 0...8) 0.0];
+    var lastE = e0, slowed = false, restored = false, detail = "";
     var wall = Sys.time();
     var slowestStep = 0.0, slowestAt = 0.0;
     while (player.passes == 0 && player.failure == null && ticks++ < limit) {
@@ -869,13 +873,9 @@ class ProjectSourceTests {
       if (detail == "" && player.layer == 2) detail = player.statusDetail();
       if (!slowed && player.layer >= 3) { player.setSpeedOverride(0.5); slowed = true; }
       if (slowed && !restored && player.layer >= 5) { player.setSpeedOverride(1.0); restored = true; }
-      var path = Math.sqrt(Math.pow(seen.positions.get(x) - last.positions.get(x), 2) + Math.pow(seen.positions.get(y) - last.positions.get(y), 2) +
-        Math.pow(seen.positions.get(z) - last.positions.get(z), 2));
       var fed = (seen.positions.get(e) - lastE) * job.gearRadius;
-      // Cruising on a bead: the nozzle runs at least 4 mm/s and the extruder feeds.
-      if (path / (every * dt) > 0.004 && fed > 0.0 && player.layer >= 2)
-        (slowed && !restored ? ratios.slow : (restored ? ratios.fast : ratios.fast)).push(fed / path);
-      last = seen; lastE = seen.positions.get(e);
+      if (player.layer >= 0 && player.layer < 8) fedByLayer[player.layer] += fed;
+      lastE = seen.positions.get(e);
     }
     var wallSeconds = Sys.time() - wall;
     check(player.failure == null, "the printer prints its tab: " + player.failure);
@@ -885,9 +885,9 @@ class ProjectSourceTests {
     var fedMillimetres = (end.positions.get(e) - e0) * job.gearRadius * 1000.0;
     var asked = programFilament(job.source);
     check(Math.abs(fedMillimetres - asked) <= 0.01 * asked, 'the extruder feeds ${fedMillimetres} mm of filament, the program asks for ${asked} mm');
-    check(ratios.slow.length > 10 && ratios.fast.length > 10, 'cruise samples at both speeds (${ratios.slow.length}, ${ratios.fast.length})');
-    var slow = median(ratios.slow), fast = median(ratios.fast);
-    check(Math.abs(slow - fast) <= 0.02 * fast, 'half speed feeds ${slow * 1000.0} mm of filament per metre of path, full speed ${fast * 1000.0}');
+    var slow = fedByLayer[4], fast = fedByLayer[2];
+    check(fast > 0.001, 'layer 2 takes filament: ${fast * 1000.0} mm');
+    check(Math.abs(slow - fast) <= 0.02 * fast, 'the layer printed at half speed takes ${slow * 1000.0} mm of filament, the same layer at full speed ${fast * 1000.0} mm');
     // The panel shows the print: its layer and temperatures in the status, and the controls a CNC program has.
     check(detail.indexOf('layer 2/${player.layerCount}') >= 0 && detail.indexOf("hotend 2") >= 0 && detail.indexOf("bed 6") >= 0,
       'the print status names the layer and the temperatures: $detail');
@@ -925,7 +925,7 @@ class ProjectSourceTests {
     check(end.safety == 0 && end.faultCode == 0, "the print ends with the runtime ready and no fault");
     Sys.println('printer: SmallTab printed in ${Math.round(ticks * dt * 10) / 10} s (heat-up: hotend ${Math.round(hotendAt * 10) / 10} s, bed ${Math.round(bedAt * 10) / 10} s), ' +
       '${player.layerCount} layers, filament ${Math.round(fedMillimetres * 100) / 100} of ${Math.round(asked * 100) / 100} mm, ' +
-      'filament per metre of path ${Math.round(fast * 1e5) / 100} mm at full speed and ${Math.round(slow * 1e5) / 100} mm at half; ' +
+      'a layer takes ${Math.round(fast * 1e5) / 100} mm of filament at full speed and ${Math.round(slow * 1e5) / 100} mm at half; ' +
       'plan checks: ${checks.plans} plans, ${checks.flagged} flagged, worst torque ${Math.round(checks.worstTorqueRatio * 100)} % (${checks.worstMotor}), ' +
       'worst deviation ${Math.round(checks.worstDeviation * 1e6)} um (${checks.worstAxis}); ' +
       'motion cost ${Math.round(player.motionSeconds * 10) / 10} s of ${Math.round(wallSeconds * 10) / 10} s wall, slowest tick ${Math.round(player.slowestUpdate * 1000)} ms, ' +

@@ -1463,6 +1463,22 @@ findings with their evidence). Fixed, one commit each:
   acceleration. Test: `motionkit/native/tests/path.cpp` (a smooth rate rise, a 400 ms cruise in one segment and a fall:
   ends exact, continuous everywhere, the plan plus lead times the mean velocity to 1e-9 inside the long segment). The
   gate's extruder check with pressure advance now takes the program's filament exactly (0 %, was -0.039 %).
+- **H2. No app print ever ran with pressure advance.** `ProgramCompiler.forWorker` and `withJointPathPlanner` copied the
+  merge period and the shaping but not `pressureAdvance`/`pressureAdvanceWindow`, and the app plans every print on the
+  planner thread (`ProgramPlanner` plans on `forWorker()`), so SmallTab and both cubes printed with the advance off while
+  the binding reserved the extruder's headroom for it and `PrintingStock` modelled the melt lag it cancels. (The gate
+  compiles directly, so it did apply it.) One `copySettings` now gives a worker every setting that is not a constructor
+  argument, so the two lists cannot drift apart. Test: the gate's extruder check with pressure advance asserts a worker
+  plans the extruder exactly as the compiler does. The app's speed-override check compared filament per path sample by
+  sample, which the advance makes uneven by design (it leads while speeding up, lags while slowing), and its path measured
+  from 50 ms samples cuts corners more at full speed; it now compares the filament of two layers with the same path, layer
+  2 at full speed and layer 4 at half. **Numbers** (with the transform fix above): SmallTab 163.2 s as before, filament
+  56.08 of 56.08 mm, a layer takes 8.24 mm of filament at full speed and 8.25 mm at half (0.1 %); laid 135.4 mm^3 in 5,666
+  beads (134.9 in 5,676), the tab holds 118.1 mm^3 of 120 (-1.6 %; was 117.8), spans unchanged; plan checks unchanged (26
+  plans, 17 flagged, 39 %, 273 um). Short cube: 1,492.8 mm^3 laid for 1,497.5 fed (1,491), 1,471.6 in the cube (1,470),
+  its x edge at 99.994 mm (99.949). The beads are more even: 71 % of the volume in beads 0.6 to 0.7 mm wide (40 % without
+  the advance), the blobs where the tip stood 11.5 mm^3 (18.7). The first plans cost more (the slowest simulated tick 552 ms
+  at 110.7 s, was 87 ms: the advance cuts each plan into three times the segments before the merge).
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
