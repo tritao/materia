@@ -7,7 +7,7 @@ class GeometricPath implements MotionPath {
   public final primitives:Array<PathPrimitive>;
   public final totalLength:Float;
   final cumulativeLengths:Array<Float>;
-  /** Primitives by the grid cell their bounding box touches, built on the first distance query. */
+  /** Primitives by the grid cells their pieces touch, built on the first distance query. */
   var grid:Null<Map<Int, Array<Int>>> = null;
   static inline final CELL:Float = 0.001;
 
@@ -53,7 +53,7 @@ class GeometricPath implements MotionPath {
   }
 
   /**
-    How far `point` is from the nearest point of the path. A grid of the primitives' bounding boxes bounds the
+    How far `point` is from the nearest point of the path. A grid of the cells along the primitives bounds the
     search to the cells near the point, so a query costs about the same however long the path is.
   **/
   public function distanceTo(point:PathPoint):Float {
@@ -91,28 +91,27 @@ class GeometricPath implements MotionPath {
     var cells = new Map<Int, Array<Int>>();
     for (index in 0...primitives.length) {
       var primitive = primitives[index], length = primitive.length();
-      // Sample the primitive finely enough that no point is further than one step from a sample.
-      var pieces = Std.int(Math.max(1, Math.min(4096, Math.ceil(length / (CELL * 0.5)))));
+      // Cut the primitive into pieces of at most half a cell and file each piece by its own box, so a primitive
+      // touches only the cells along it: the work and the entries grow with its length, not with the volume of its
+      // bounding box (a long three-axis rapid would otherwise fill every cell of the box it spans).
+      var pieces = Std.int(Math.max(1, Math.ceil(length / (CELL * 0.5))));
       var step = length / pieces;
-      var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
-      var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
-      for (piece in 0...(pieces + 1)) {
+      // A piece of a line is its chord; a piece of an arc bulges past its chord's box by less than the step.
+      var pad = Std.isOfType(primitive, LineSegment) ? 1e-9 : Math.max(step, 1e-9);
+      var previous = primitive.pointAt(0.0);
+      for (piece in 1...(pieces + 1)) {
         var at = primitive.pointAt(piece == pieces ? length : length * piece / pieces);
-        lo[0] = Math.min(lo[0], at.x); hi[0] = Math.max(hi[0], at.x);
-        lo[1] = Math.min(lo[1], at.y); hi[1] = Math.max(hi[1], at.y);
-        lo[2] = Math.min(lo[2], at.z); hi[2] = Math.max(hi[2], at.z);
-      }
-      // A step of arc can bulge past its chord's box by less than the step.
-      var pad = Math.max(step, 1e-9);
-      var x0 = Math.floor((lo[0] - pad) / CELL), x1 = Math.floor((hi[0] + pad) / CELL);
-      var y0 = Math.floor((lo[1] - pad) / CELL), y1 = Math.floor((hi[1] + pad) / CELL);
-      var z0 = Math.floor((lo[2] - pad) / CELL), z1 = Math.floor((hi[2] + pad) / CELL);
-      if ((x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1) > 1e6) throw "Geometric path primitive is too large to index";
-      for (x in Std.int(x0)...Std.int(x1 + 1)) for (y in Std.int(y0)...Std.int(y1 + 1)) for (z in Std.int(z0)...Std.int(z1 + 1)) {
-        var key = cellKey(x, y, z);
-        var list = cells.get(key);
-        if (list == null) { list = []; cells.set(key, list); }
-        list.push(index);
+        var x0 = Std.int(Math.floor((Math.min(previous.x, at.x) - pad) / CELL)), x1 = Std.int(Math.floor((Math.max(previous.x, at.x) + pad) / CELL));
+        var y0 = Std.int(Math.floor((Math.min(previous.y, at.y) - pad) / CELL)), y1 = Std.int(Math.floor((Math.max(previous.y, at.y) + pad) / CELL));
+        var z0 = Std.int(Math.floor((Math.min(previous.z, at.z) - pad) / CELL)), z1 = Std.int(Math.floor((Math.max(previous.z, at.z) + pad) / CELL));
+        for (x in x0...(x1 + 1)) for (y in y0...(y1 + 1)) for (z in z0...(z1 + 1)) {
+          var key = cellKey(x, y, z);
+          var list = cells.get(key);
+          if (list == null) { list = []; cells.set(key, list); }
+          // Consecutive pieces share cells; a primitive is filed once per cell.
+          if (list.length == 0 || list[list.length - 1] != index) list.push(index);
+        }
+        previous = at;
       }
     }
     grid = cells;

@@ -264,6 +264,24 @@ class PlannerTests extends MotionKitTestSupport {
     worst = Math.max(worst, Math.abs(path.distanceTo(far) - brute(far)));
     check(worst < 2e-6, 'the grid finds the nearest point of a long path like a scan of every primitive does: $worst');
 
+    // A machine's full-travel rapid on all three axes (the bench mill leaving its load pose) and a large arc: the grid
+    // files them by the cells along them, not by the millions of cells of their bounding boxes.
+    var rapid = new LineSegment(new PathPoint(0.0, 0.0, -0.25), new PathPoint(0.25, 0.15, 0.0));
+    var wide = new ArcSegment(new PathPoint(0.125, 0.075, -0.1), 0.2, 0.0, 1.5 * Math.PI);
+    var long:Array<motionkit.path.PathPrimitive> = [rapid, wide];
+    var longPath = new GeometricPath(long);
+    var longWorst = 0.0;
+    for (_ in 0...200) {
+      var point = new PathPoint(random() * 0.6 - 0.2, random() * 0.6 - 0.2, random() * 0.3 - 0.3);
+      var dx = rapid.end.x - rapid.start.x, dy = rapid.end.y - rapid.start.y, dz = rapid.end.z - rapid.start.z;
+      var t = Math.max(0.0, Math.min(1.0, ((point.x - rapid.start.x) * dx + (point.y - rapid.start.y) * dy + (point.z - rapid.start.z) * dz) / (dx * dx + dy * dy + dz * dz)));
+      var scan = point.distanceTo(new PathPoint(rapid.start.x + t * dx, rapid.start.y + t * dy, rapid.start.z + t * dz));
+      // Samples 9.4 um apart along the arc: the scan is at most 4.7 um long of the exact distance.
+      for (step in 0...100001) scan = Math.min(scan, point.distanceTo(wide.pointAt(wide.length() * step / 100000)));
+      longWorst = Math.max(longWorst, Math.abs(longPath.distanceTo(point) - scan));
+    }
+    check(longWorst < 5e-6, 'a full-travel three-axis rapid and a 200 mm arc are indexed and measured like a scan: $longWorst');
+
     var feed = 0.05;
     function waypoint(x:Float):PoseWaypoint return new PoseWaypoint(new Pose3(x, 0.0, 0.0), 1e-6, 1e-3);
     var lines:Array<motionkit.path.PosePrimitive> = [for (i in 0...8010)

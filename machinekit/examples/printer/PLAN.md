@@ -1433,6 +1433,16 @@ left in the motion path.
    device-compiler tests (the step-move merge test now asserts the ratio of the adaptive grid's fewer stages;
    `Toolpath scenarios` counts 2,999 assertions instead of 3,020 because a test asserts per lowered segment).
 
+**Review (2026-10-13).** A review of the whole branch before it lands (`materia-cache/claude-scratch/am-review.md` holds the
+findings with their evidence). Fixed, one commit each:
+- **The `mill` check's "Geometric path primitive is too large to index" was this branch's, not main's.** The message and the
+  grid it guards came with AM5 (c46b3aba7); main measured the task-space check by scanning every primitive. The grid filed a
+  primitive under every 1 mm cell of its bounding box and refused more than a million, so a long three-axis move (the bench
+  mill leaving its load pose in the tending cell: about 250 x 150 x 250 mm, 9.4 million cells) could not be indexed, and a
+  long diagonal cost the volume of its box even below the limit. `GeometricPath` now files each half-cell piece of a primitive
+  by its own box: the entries grow with the path's length, the limit is gone. Test: `PlannerTests.testLongPathQueries` (a
+  full-travel three-axis rapid and a 200 mm arc measured like a scan). `PROJECT_SOURCE_ONLY=mill` passes again.
+
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
 - Pause and filament change, runout sensor, cancel object, power-loss recovery.
