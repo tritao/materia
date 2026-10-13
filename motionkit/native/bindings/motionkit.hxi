@@ -2,20 +2,12 @@
 interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @depends("TrajectoryCore") {
 	const MK_CONTROL_POSITION = 0;
 	const MK_CONTROL_VELOCITY_STOP = 1;
+	const MK_MAX_SHAPER_IMPULSES = 8;
 	const MK_SYNCHRONIZATION_PHASE = 1;
 	const MK_SYNCHRONIZATION_TIME = 0;
 	const MK_TIMING_BINDING_FEED_CAP = 3;
 	const MK_TIMING_BINDING_JOINT_ACCELERATION = 2;
 	const MK_TIMING_BINDING_JOINT_VELOCITY = 1;
-	/**
-	 * A copy of `trajectory` with runs of its segments replaced by one quintic each, so a path lowered to hundreds of short
-	 * segments a second does not fill a robot's queue or a device's link. A run is merged when the quintic through its
-	 * start state and end state stays within the per-joint tolerances of the segments it replaces, in position, velocity and
-	 * acceleration, at their joins and across the run, takes no joint past its velocity or acceleration limit where the
-	 * segments it replaces keep to it, and is no longer than `max_duration_seconds`. Segments of degree 1 (chords) are
-	 * never merged. Runs are found longest first by doubling and then bisecting.
-	 */
-	extern fn mk_merge_segments(trajectory: mk_trajectory_handle, position_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_tolerance: ptr<const<f64>> @in_array("joint_count"), acceleration_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_limit: ptr<const<f64>> @in_array("joint_count"), acceleration_limit: ptr<const<f64>> @in_array("joint_count"), position_lower: ptr<const<f64>> @in_array("joint_count"), position_upper: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, max_duration_seconds: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	/**
 	 * A copy of `trajectory` in which `joint` runs `lead_seconds` ahead of itself, the lead taken on its velocity averaged
 	 * over `window_seconds`: position + lead * (position(t + w/2) - position(t - w/2)) / w. It is the pressure-advance
@@ -24,7 +16,6 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * trajectory. Each segment of the joint becomes a cubic through the corrected position and velocity at its ends, so the
 	 * result is continuous in both. The caller follows with `mk_project_couplings` for the joints that follow `joint`.
 	 */
-	extern fn mk_shape_trajectory(trajectory: mk_trajectory_handle, impulse_counts: ptr<const<u32>> @in_array("joint_count"), delays_seconds: ptr<const<f64>> @in_array("table_size"), amplitudes: ptr<const<f64>> @in_array("table_size"), joint_count: u32, table_size: u32, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	extern fn mk_advance_joint(trajectory: mk_trajectory_handle, joint: u32, lead_seconds: f64, window_seconds: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	extern fn mk_analytic_cartesian_forward(model: ptr<const<mk_analytic_cartesian_model>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_analytic_pose> @out) -> mk_result;
 	/**
@@ -71,6 +62,17 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * Infinite planning ranges or a count/index overflow return INVALID_ARGUMENT.
 	 */
 	extern fn mk_joint_lift_count(request: ptr<const<mk_joint_lift_request>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_count: ptr<u32> @out) -> mk_result;
+	/**
+	 * A copy of `trajectory` with runs of its segments replaced by one quintic each, so a path lowered to hundreds of short
+	 * segments a second does not fill a robot's queue or a device's link. A run is merged when the quintic through its
+	 * start state and end state stays within the per-joint tolerances of the segments it replaces, in position, velocity and
+	 * acceleration, at their joins and across the run, takes no joint past its velocity or acceleration limit where the
+	 * segments it replaces keep to it (and no further than they are where they are past it themselves, as a path timed
+	 * to cruise at a limit is), stays within the position bounds `position_lower` and `position_upper` in the same way
+	 * (a path held at a bound stays on it), and is no longer than `max_duration_seconds`. Segments of degree 1 (chords) are
+	 * never merged. Runs are found longest first by doubling and then bisecting.
+	 */
+	extern fn mk_merge_segments(trajectory: mk_trajectory_handle, position_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_tolerance: ptr<const<f64>> @in_array("joint_count"), acceleration_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_limit: ptr<const<f64>> @in_array("joint_count"), acceleration_limit: ptr<const<f64>> @in_array("joint_count"), position_lower: ptr<const<f64>> @in_array("joint_count"), position_upper: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, max_duration_seconds: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	/**
 	 * Count first, then allocate exactly enough output. Invalid requests fail before writing.
 	 */
@@ -141,6 +143,18 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 */
 	extern fn mk_search_ladder_filtered(request: ptr<const<mk_ladder_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_lattice_candidate>> @in_array("candidate_count"), state_costs: ptr<const<f64>> @in_array("candidate_count"), candidate_count: u32, blocked_edges: ptr<const<mk_ladder_edge>> @in_array("blocked_edge_count"), blocked_edge_count: u32, out_indices: ptr<u32> @out_array("sample_count"), out_result: ptr<mk_ladder_result> @out) -> mk_result;
 	extern fn mk_select_configurations(request: ptr<const<mk_configuration_request>>, samples: ptr<const<mk_configuration_sample>> @in_array("sample_count"), sample_count: u32, candidates: ptr<const<mk_configuration_candidate>> @in_array("candidate_count"), candidate_count: u32, out_sequence: ptr<mk_configuration_solution> @out_array("sample_count")) -> mk_result;
+	/**
+	 * A copy of `trajectory` convolved with an input shaper: joint `j` of the result is the sum over its impulses `i` of
+	 * `amplitudes[j * MK_MAX_SHAPER_IMPULSES + i]` times the joint's original motion delayed by `delays_seconds[j *
+	 * MK_MAX_SHAPER_IMPULSES + i]`. The trajectory is held at rest beyond either end (its first position before it starts,
+	 * its last position after it ends), so the result is as much longer as the longest delay: the shaper's tail, in which
+	 * the machine settles. Impulse counts are at most MK_MAX_SHAPER_IMPULSES; the amplitudes of a joint are positive and add
+	 * up to 1, which is why shaping never raises a joint's velocity or acceleration; delays are not negative. A joint
+	 * with one impulse of amplitude 1 is only delayed. The result is exact: each piece of it is the sum of the delayed
+	 * polynomials, and its segments are cut wherever any delayed copy changes segment. `table_size` is `joint_count *
+	 * MK_MAX_SHAPER_IMPULSES`. Joints that follow others are to be projected again after.
+	 */
+	extern fn mk_shape_trajectory(trajectory: mk_trajectory_handle, impulse_counts: ptr<const<u32>> @in_array("joint_count"), delays_seconds: ptr<const<f64>> @in_array("table_size"), amplitudes: ptr<const<f64>> @in_array("table_size"), joint_count: u32, table_size: u32, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	extern fn mk_time_law_binding_count(law: mk_time_law_handle, out_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_time_law_create(stages: ptr<const<mk_time_stage>> @in_array("stage_count"), stage_count: u32, out_law: ptr<mk_time_law_handle> @out @owned) -> mk_result;
 	extern fn mk_time_law_destroy(law: mk_time_law_handle) -> void;

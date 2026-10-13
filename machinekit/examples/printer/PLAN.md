@@ -1446,6 +1446,10 @@ findings with their evidence). Fixed, one commit each:
   `M106`, then the layer's first move; the fan command placed the marker at the old Z, so the layer's height (the next one's
   `Deposit` height and width) came out doubled. A marker placed before such a command now takes its height from the next move
   (or `;Z:`). Test: `PrinterGcodeTests.cura` (CncKit 432 -> 436 assertions).
+- **MotionKit's binding was edited by hand, not generated.** `mk_merge_segments` carried `@in_array` and `@out @owned`
+  in `motionkit.hxi` that its declaration in `motionkit.h` did not state, so regenerating the binding
+  (`motionkit/native/tools/check-hxi.sh`) dropped them and broke `Trajectory.mergeSegments`. The declaration states them
+  now and the binding is the generator's output (which also exports `MK_MAX_SHAPER_IMPULSES`).
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

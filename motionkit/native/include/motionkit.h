@@ -586,12 +586,16 @@ MK_API mk_result MK_CALL mk_project_couplings(mk_trajectory_handle trajectory,
  * (a path held at a bound stays on it), and is no longer than `max_duration_seconds`. Segments of degree 1 (chords) are
  * never merged. Runs are found longest first by doubling and then bisecting.
  */
-MK_API mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const double *position_tolerance,
-                                           const double *velocity_tolerance, const double *acceleration_tolerance,
-                                           const double *velocity_limit, const double *acceleration_limit,
-                                           const double *position_lower, const double *position_upper,
+MK_API mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory,
+                                           const double *position_tolerance MK_IN_ARRAY(joint_count),
+                                           const double *velocity_tolerance MK_IN_ARRAY(joint_count),
+                                           const double *acceleration_tolerance MK_IN_ARRAY(joint_count),
+                                           const double *velocity_limit MK_IN_ARRAY(joint_count),
+                                           const double *acceleration_limit MK_IN_ARRAY(joint_count),
+                                           const double *position_lower MK_IN_ARRAY(joint_count),
+                                           const double *position_upper MK_IN_ARRAY(joint_count),
                                            uint32_t joint_count, double max_duration_seconds,
-                                           mk_trajectory_handle *out_trajectory);
+                                           mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
 
 /** The most impulses one joint's input shaper may have. */
 enum { MK_MAX_SHAPER_IMPULSES = 8 };
