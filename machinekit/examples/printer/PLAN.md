@@ -1539,6 +1539,11 @@ findings with their evidence). Fixed, one commit each:
   the rule `MotionSystem` already used for homing). Unchanged at the app's 10 ms tick and in the gate; in `printer-shaping`,
   which ticks at 1 ms, runs merge to 1 ms now, and the MuJoCo carriage left 247 um shaking plain and 11 um shaped (251 and
   11 before), 22 um and 29 um at 10 % below and above the belts' frequency (8 and 24): still at least five times less.
+- **The first layer's infill started at the normal layer's inset.** The slicer computed the core inset once, from the
+  bead spacing of `layerHeight`, while the first layer's perimeters use `firstLayerHeight`'s spacing, so a first layer of
+  its own height left a gap or an overlap between its last perimeter and its infill. Every job uses equal heights today,
+  so no number moves. The inset is per layer now. Test: `AdditiveSlicerTests.tab` (a 0.3 mm first layer's infill reaches its
+  own core; CamKit 12,442 -> 12,443 assertions).
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

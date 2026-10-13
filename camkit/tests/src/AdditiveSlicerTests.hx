@@ -110,6 +110,16 @@ class AdditiveSlicerTests {
     var back = CncCompiler.compileDetailed(text, new CncController(Printer));
     relative(back.program.depositedVolume(), program.depositedVolume(), "G-code round trip", 0.001);
     check(back.program.layerVolumes().length == program.layerVolumes().length + 0, "and the layers");
+    // A first layer of its own height has its own bead spacing: its infill starts where its own last perimeter ends.
+    var thick = new SlicerSettings();
+    thick.firstLayerHeight = 0.0003;
+    var thickProgram = Slicer.slice(part, thick).program;
+    var spacing = thick.beadSpacing(thick.firstLayerHeight);
+    var inset = thick.lineWidth / 2.0 + (thick.perimeters - 1) * spacing + spacing / 2.0;
+    var reach = 0.0;
+    for (point in beads(thickProgram)) if (point.feature == "SolidInfill" && Math.abs(point.z - 0.0003) < 1e-9)
+      reach = Math.max(reach, Math.max(Math.abs(point.x - centerX), Math.abs(point.y - centerY)));
+    near(reach, 0.005 - inset, "a 0.3 mm first layer's infill reaches its own core", 1e-7);
     part.close();
   }
 

@@ -129,20 +129,21 @@ private class SliceRun {
     report.layers = layers;
 
     var s = settings;
-    var spacing = s.beadSpacing(s.layerHeight);
     var perimeterCount = s.perimeters;
-    // The infill region starts where the last perimeter's share of the layer ends.
-    var coreInset = perimeterCount == 0 ? 0.0 : s.lineWidth / 2.0 + (perimeterCount - 1) * spacing + spacing / 2.0;
     var sections:Array<PlanarRegion> = [], cores:Array<PlanarRegion> = [];
     for (layer in 0...layers) {
       var top = layerTop(layer), thickness = layer == 0 ? s.firstLayerHeight : s.layerHeight;
       var section = keep(PlanarRegion.section(placed, (top - thickness / 2.0) * millimetres));
       sections.push(section);
+      // The infill region starts where the last perimeter's share of the layer ends, at this layer's bead spacing
+      // (a first layer of its own height has its own).
+      var spacing = s.beadSpacing(thickness);
+      var coreInset = s.lineWidth / 2.0 + (perimeterCount - 1) * spacing + spacing / 2.0;
       cores.push(perimeterCount == 0 || section.isEmpty() ? section : keep(section.offset(-coreInset * millimetres)));
     }
 
     startSequence();
-    for (layer in 0...layers) printLayer(layer, sections, cores, coreInset);
+    for (layer in 0...layers) printLayer(layer, sections, cores);
     ops.push(ToolpathOp.PrintObject(objectName, false, Provenance.cam(layers, "object")));
     endSequence();
     var program = new ToolpathProgram(ops, new ToolLibrary(), [new Setup("1", new Point3(0, 0, 0))]);
@@ -193,7 +194,7 @@ private class SliceRun {
 
   // ---- layers ---------------------------------------------------------------------------------
 
-  function printLayer(layer:Int, sections:Array<PlanarRegion>, cores:Array<PlanarRegion>, coreInset:Float):Void {
+  function printLayer(layer:Int, sections:Array<PlanarRegion>, cores:Array<PlanarRegion>):Void {
     var s = settings;
     var section = sections[layer];
     var top = layerTop(layer), thickness = layer == 0 ? s.firstLayerHeight : s.layerHeight;
