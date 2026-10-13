@@ -1593,6 +1593,15 @@ findings with their evidence). Fixed, one commit each:
   collapse: a skirt, or a hole region that grows while the part is inset (`offset_face` offsets the holes the other way),
   would have vanished without a word, and the slicer would have printed infill over a hole. A growing offset that fails
   or gives nothing is now a modelling error with its reason.
+- **Cleanups the review found.** `PrintingStock`'s rounded-bead path was dead (`CORNER = 0`) and its docs described
+  corners rounded to a tenth of the height: removed, the docs say what it lays (the squareness floor is the named
+  `MIN_ASPECT`). The heater fault codes are used by name in `HeaterSensor` and point at the table they mirror. The print job's
+  doc kept a version history in a one-version schema. `checkPrinterShaping`'s doc still described the 5 Hz swing that the
+  belt springs fixed. The `printer` check printed the axes' limits without the motors' rate (250 mm/s where AM5b item 7
+  made them 500 mm/s). Two misplaced doc comments (`ProgramCompiler.timingSections`, a CoreXY test). Two tests that tested
+  little: the merge test's "a limit the pieces keep to" used a limit the pieces broke and accepted almost anything (it now
+  merges a ramp at exactly its acceleration limits and asserts the merged peaks), and the lowering test passed if either
+  the hotend's or the fan's event was there (each is required now).
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

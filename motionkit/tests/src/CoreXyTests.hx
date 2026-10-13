@@ -290,10 +290,6 @@ class CoreXyTests extends MotionKitTestSupport {
   }
 
   /**
-   * Both motors serve both axes, so the plan check adds what each axis asks of a motor: along a diagonal one
-   * motor stands almost still, and the other carries both axes' force.
-   */
-  /**
    * A motor's pulley follows both axes, so no axis owns it: it is a derived joint, and the axis planner (the one jogging
    * and homing use) projects it from the axes' trajectories instead of refusing the machine.
    */
@@ -336,6 +332,10 @@ class CoreXyTests extends MotionKitTestSupport {
     trajectory.dispose();
   }
 
+  /**
+   * Both motors serve both axes, so the plan check adds what each axis asks of a motor: along a diagonal one
+   * motor stands almost still, and the other carries both axes' force.
+   */
   public function testPlanCheckAddsTheAxesOnASharedMotor():Void {
     var scene = SceneArtifact.decode(CoreXyPlotterPreview.plotter());
     var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),

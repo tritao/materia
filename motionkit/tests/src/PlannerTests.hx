@@ -543,9 +543,16 @@ class PlannerTests extends MotionKitTestSupport {
     }
     check(worst <= 2e-6 && worstSpeed <= 0.02 && worstAcceleration <= 2.0,
       'the merged ramp follows the original: $worst m, $worstSpeed m/s, $worstAcceleration m/s^2');
-    // A limit the original keeps to is kept: the same ramp with an acceleration limit below its peak is not merged across the turn.
-    var limited = ramp.mergeSegments([1e-6, 2e-6], [0.01, 0.02], [1.0, 2.0], [100.0, 200.0], [9.9, 19.8], [-1e9, -1e9], [1e9, 1e9], 0.01);
-    check(limited.segments().length == pieces || limited.segments().length >= merged.segments().length, "a limit the pieces keep to is not broken by a merge");
+    // A limit the original keeps to is kept: the ramp accelerates at exactly its acceleration limits (10 and 20), and no
+    // merged quintic may overshoot them where it turns from speeding up to slowing down.
+    var limited = ramp.mergeSegments([1e-6, 2e-6], [0.01, 0.02], [1.0, 2.0], [100.0, 200.0], [10.0, 20.0], [-1e9, -1e9], [1e9, 1e9], 0.01);
+    var peak = [0.0, 0.0];
+    for (step in 0...4000) {
+      var state = limited.evaluate(limited.durationSeconds() * (step + 0.5) / 4000);
+      for (joint in 0...2) peak[joint] = Math.max(peak[joint], Math.abs(state.accelerations[joint]));
+    }
+    check(peak[0] <= 10.0 * (1 + 1e-9) && peak[1] <= 20.0 * (1 + 1e-9) && limited.segments().length < pieces,
+      'a merge keeps to the limits the pieces keep to: peaks ${peak[0]} and ${peak[1]} in ${limited.segments().length} segments');
     // A zigzag of 0.1 ms pieces turns more often than a quintic can follow.
     var zigzag = [for (i in 0...100) {timeFromStartNs: Int64.ofInt(i * 100000), durationNs: Int64.ofInt(100000),
       coefficients: [[i % 2 == 0 ? 0.0 : 0.0005, i % 2 == 0 ? 5.0 : -5.0, 0.0], [0.0, 0.0, 0.0]]}];

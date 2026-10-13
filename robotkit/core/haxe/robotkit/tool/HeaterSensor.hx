@@ -28,7 +28,7 @@ class HeaterSensor {
   public static inline var FAULT:Int = 4;
   public static inline var COUNT:Int = 5;
 
-  /** Fault codes, as the controller latches them. */
+  /** Fault codes, as the controller latches them: the numbers of `fault` in `robotkit/device_protocol/boards/heater.rs`. */
   public static inline var SENSOR_OPEN:Int = 1;
   public static inline var SENSOR_SHORT:Int = 2;
   public static inline var OVER_TEMPERATURE:Int = 3;
@@ -42,17 +42,15 @@ class HeaterSensor {
 
   /** The fault code in words, or null for none. */
   public static function faultMessage(code:Int):Null<String> {
-    return switch code {
-      case 0: null;
-      case 1: "heater: the thermistor reads open (unplugged or broken)";
-      case 2: "heater: the thermistor reads shorted";
-      case 3: "heater: over temperature";
-      case 4: "heater: thermal runaway, it is not heating (the heater or thermistor is disconnected, or a draught takes the heat)";
-      case 5: "heater: thermal runaway, it left its target and did not come back";
-      case 6: "heater: cold extrusion, the extruder pushed filament below the minimum temperature";
-      case 7: "heater: invalid configuration or command";
-      default: 'heater: unknown fault $code';
-    }
+    if (code == 0) return null;
+    if (code == SENSOR_OPEN) return "heater: the thermistor reads open (unplugged or broken)";
+    if (code == SENSOR_SHORT) return "heater: the thermistor reads shorted";
+    if (code == OVER_TEMPERATURE) return "heater: over temperature";
+    if (code == NOT_HEATING) return "heater: thermal runaway, it is not heating (the heater or thermistor is disconnected, or a draught takes the heat)";
+    if (code == LEFT_BAND) return "heater: thermal runaway, it left its target and did not come back";
+    if (code == COLD_EXTRUSION) return "heater: cold extrusion, the extruder pushed filament below the minimum temperature";
+    if (code == INVALID) return "heater: invalid configuration or command";
+    return 'heater: unknown fault $code';
   }
 
   public static function reading(values:Array<Float>):HeaterReading {
@@ -67,6 +65,6 @@ class HeaterSensor {
     for (value in values) if (!Math.isFinite(value)) return false;
     return values[TARGET] >= 0.0 && values[DUTY] >= 0.0 && values[DUTY] <= 1.0 &&
       (values[AT_TARGET] == 0.0 || values[AT_TARGET] == 1.0) && values[FAULT] == Std.int(values[FAULT]) &&
-      values[FAULT] >= 0.0 && values[FAULT] <= 7.0;
+      values[FAULT] >= 0.0 && values[FAULT] <= INVALID;
   }
 }

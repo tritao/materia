@@ -450,7 +450,9 @@ class ProjectSourceTests {
     deviceModel.switches.resize(0);
     var extruder = PrintProgramPlayer.extruderOnDevice(DeviceBinding.bind(deviceModel, robotkit.device.DeviceLayout.forActuators(deviceModel), 40000), "e");
     check(extruder.feed == -1, 'the extruder motor steps down as it pushes filament: feed ${extruder.feed}');
-    var xLimits = planning.coupledLimits("x"), yLimits = planning.coupledLimits("y"), zLimits = planning.coupledLimits("z");
+    // The axes at the motors' full rate (AM5b item 7), as the print player plans them.
+    var xLimits = planning.coupledLimits("x", null, true), yLimits = planning.coupledLimits("y", null, true),
+      zLimits = planning.coupledLimits("z", null, true);
     check(xLimits.requireAcceleration() > yLimits.requireAcceleration() && yLimits.requireAcceleration() > 5,
       'the carriage accelerates harder than the gantry it rides: ${xLimits.requireAcceleration()} against ${yLimits.requireAcceleration()}');
     Sys.println('printer: axes x ${Math.round(xLimits.requireVelocity() * 1e4) / 10} mm/s ${Math.round(xLimits.requireAcceleration() * 100) / 100} m/s², ' +
@@ -673,9 +675,9 @@ class ProjectSourceTests {
    * Input shaping on the printer in the shared simulation (MuJoCo, through the virtual device): a 50 mm move along x with the
    * job's shapers and without them. The shaped move is the same move delayed by the shapers' mean delay and ending their tail
    * later, and the carriage ends where it was sent, to within one microstep of the belt (12.5 um). The belts are springs of
-   * damping ratio 0.1 in MuJoCo (they state it), so the carriage swings there after the plain move. The shaping's size
-   * (at least five times less) is the printing gate's analytic acceptance; in MuJoCo the carriage swings at about 5 Hz, not the
-   * belts' 53 Hz, so the shaper's notch does not line up (PLAN, X9).
+   * damping ratio 0.1 in MuJoCo (they state it), so the carriage swings there after the plain move, at the belts' frequency
+   * (about 53 Hz on x). The shaped move leaves it at least five times less shaking, at the shapers' design frequency and ten
+   * percent either side of it, as the printing gate's analytic acceptance says (PLAN, AM12 and AM5b belt damping).
    */
   static function checkPrinterShaping(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/materia.project.json");

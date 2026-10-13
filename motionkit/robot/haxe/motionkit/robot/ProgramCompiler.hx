@@ -1338,10 +1338,6 @@ class ProgramCompiler {
       }
   }
   /**
-    `path` split at its sharp corners, where one primitive's end tangent is
-    not the next one's start tangent, with each section's distance along it.
-  **/
-  /**
     Most samples one timed section holds. An arm's samples each cost an inverse-kinematics search, so its budget is
     small; on a machine whose joints are an exact affine map a straight piece is one sample, and what a section costs is
     native memory (a sample is 2 KB).
@@ -1349,7 +1345,10 @@ class ProgramCompiler {
   public static inline final MAX_SECTION_SAMPLES = 10000;
   public static inline final MAX_AFFINE_SECTION_SAMPLES = 100000;
 
-  /** Split authored task-velocity discontinuities into independently timed stops. */
+  /**
+    `path` split at its sharp corners, where one primitive's end tangent is not the next one's start tangent (authored
+    task-velocity discontinuities, each timed from rest to rest), with each section's distance along it.
+  **/
   public static function timingSections(path:PosePath):Array<{path:PosePath, offset:Float}> {
     var sections:Array<{path:PosePath, offset:Float}> = [];
     var start = 0, offset = 0.0, sectionOffset = 0.0;

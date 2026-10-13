@@ -594,7 +594,7 @@ typedef SceneArtifactTool = {
 
 
 /**
- * A print job the generator made for its own printer (since version 30; the melt lag and `deposit` since 31, `shaping` since 32). Lengths are metres, whatever the scene's unit.
+ * A print job the generator made for its own printer. Lengths are metres, whatever the scene's unit.
  *
  * `source` is the program as the printer's G-code (Klipper flavour: relative extrusion, `M104`/`M109`/`M140`/`M190`,
  * `M106`/`M107`), in machine coordinates: the positions of the three `axes`, prismatic joints whose values are

@@ -17,8 +17,8 @@ import toolpathkit.tool.Tool;
 /**
  * The material a printer has laid, built up as its nozzle actually moves. Each call to `follow` reads where the nozzle
  * tip is now and how much filament the extruder has fed, and lays the stretch from where the tip was: a bead whose
- * section is the filament that was fed over the distance the tip travelled, as a rounded rectangle of the layer's height with
- * the width that holds that volume (`sections`). Slip, a flow the hotend cannot melt and the pressure-advance
+ * section is the filament that was fed over the distance the tip travelled, as a flat-sided rectangle of the layer's height
+ * with the width that holds that volume (`section`). Slip, a flow the hotend cannot melt and the pressure-advance
  * lead therefore show in what is deposited, not in what was programmed. Filament pulled back (a retraction) is owed
  * before more is laid.
  *
@@ -44,8 +44,8 @@ class PrintingStock {
 	static inline final SQUEEZE = 0.5;
 	/** The shortfall that is carried, at most, in cubic metres: more than a bead spilling out of nothing can be laid is lost. */
 	static inline final LIMIT = 2e-9;
-	/** The radius of a bead's rounded corners, as a fraction of its height. */
-	static inline final CORNER = 0.0;
+	/** How much wider than tall a bead is at least: a section under this squareness is laid as a square widened by it. */
+	static inline final MIN_ASPECT = 1.05;
 
 	public final stock:Stock;
 	final meshes:StockMeshes;
@@ -105,17 +105,15 @@ class PrintingStock {
 	}
 
 	/**
-	 * The bead of section `area` and height `height`: a rectangle with rounded corners (of a tenth of the height) as
-	 * wide as holds the area, or, when the area is less than the height squared allows, the square of that area.
-	 * Returns its width and height. Beads laid side by side at the pitch the slicer keeps (area / height) tile with
-	 * the grooves of their rounded corners the only gaps: a bead round to a half-height, as it is free of its
-	 * neighbours, would lose a tenth of the volume of a solid layer to them, where a squashed one does not.
+	 * The bead of section `area` and height `height`: a flat-sided rectangle of that height as wide as holds the area,
+	 * or, when the area is too small for that height (under `MIN_ASPECT` times its square), a square of that area,
+	 * widened by `MIN_ASPECT`. Returns its width and height. Beads laid side by side at the pitch the slicer keeps
+	 * (area / height) tile a solid layer with no gaps; a bead squashed into the layer is what the nozzle lays.
 	 */
 	public static function section(area:Float, height:Float):{width:Float, height:Float} {
-		var rounded = (4.0 - Math.PI) * CORNER * CORNER * height * height;
-		if (area >= height * height * 1.05) return {width: (area + rounded) / height, height: height};
+		if (area >= height * height * MIN_ASPECT) return {width: area / height, height: height};
 		var side = Math.sqrt(area);
-		return {width: side * 1.05, height: side};
+		return {width: side * MIN_ASPECT, height: side};
 	}
 
 	function toolFor(width:Float, height:Float):Tool {
@@ -124,14 +122,8 @@ class PrintingStock {
 		var key = w + ":" + h;
 		var known = tools.get(key);
 		if (known != null) return known;
-		var tall = h * QUANTUM, corner = tall * CORNER, flat = w * QUANTUM / 2.0 - corner;
-		var profile = corner < QUANTUM ? CutterProfile.flat(w * QUANTUM, tall) : new CutterProfile([
-			Line(0, 0, flat, 0, Cutting),
-			Arc(flat, corner, flat, 0, flat + corner, corner, Cutting),
-			Line(flat + corner, corner, flat + corner, tall - corner, Cutting),
-			Arc(flat, tall - corner, flat + corner, tall - corner, flat, tall, Cutting)
-		]);
-		var made = Tool.shaped(nextTool++, tall, profile);
+		var tall = h * QUANTUM;
+		var made = Tool.shaped(nextTool++, tall, CutterProfile.flat(w * QUANTUM, tall));
 		tools.set(key, made);
 		return made;
 	}

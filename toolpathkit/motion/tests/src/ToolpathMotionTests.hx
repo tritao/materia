@@ -118,8 +118,10 @@ class ToolpathMotionTests {
     var expected = 0.04 * area / printer.filamentArea() / 0.00365;
     if (Math.abs(drive.total() - expected) > 1e-9 * expected) throw 'the extruder is fed what the beads lay: ${drive.total()} against $expected';
     if (Math.abs(capped - 1.0e-8 / area) > 1e-12) throw 'the melt rate caps a bead at ${1.0e-8 / area} m/s, got $capped';
-    if (eventChannels.indexOf("heater.hotend.target") < 0 && eventChannels.indexOf("fan.part") < 0)
-      throw "a heater not waited for and a fan are events on the path";
+    // Each is required: the fan is an event on the path, and the hotend's target is one too or is set before it.
+    if (eventChannels.indexOf("fan.part") < 0) throw 'a fan is an event on the path, got $eventChannels';
+    if (eventChannels.indexOf("heater.hotend.target") < 0 && kinds.indexOf("set heater.hotend.target") < 0)
+      throw 'a heater not waited for is set, not waited for, got ${kinds.join(",")} and $eventChannels';
     // Without a printer binding the printing operations are refused.
     var refused = false;
     try ToolpathMotion.lower(pathProgram([ToolpathOp.Heat("bed", 60.0, true, origin)]), new MachineBinding("work", "x", "y", "z", 0.25, new toolpathkit.motion.ToolpathChannels("")))
