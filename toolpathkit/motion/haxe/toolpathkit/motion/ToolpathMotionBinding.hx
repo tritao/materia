@@ -158,8 +158,8 @@ class ToolpathMotionBinding {
     if (printer != null) {
       compiler.pressureAdvance = printer.pressureAdvance; compiler.pressureAdvanceWindow = printer.pressureAdvanceWindow;
       // A sliced curve lowers to thousands of segments a second, more than the robot's queue or a device's link takes:
-      // runs of them are merged into one quintic each where it follows them closely (an owner period at most).
-      compiler.mergeSegmentsSeconds = 0.01;
+      // runs of them are merged into one quintic each where it follows them closely, up to the robot owner's period.
+      compiler.mergeSegmentsSeconds = blueprint.ownerPeriodSeconds();
       // The axes with a shaper have their motion convolved with it; the other joints are delayed to keep in step.
       var shapers:Array<Null<motionkit.trajectory.InputShaper>> = [for (_ in 0...count) null];
       var any = false;

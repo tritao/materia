@@ -129,8 +129,7 @@ class MotionSystem {
         var physical = blueprint.runtime.joints[joint];
         if (physical.maxRate == null || physical.maxAcceleration == null)
           throw 'Homing axis "${axis.id}" needs physical drive limits';
-        var ownerSeconds = Int64.compare(blueprint.runtime.ownerPeriodNs, Int64.ofInt(0)) > 0 ?
-          Int64.toFloat(blueprint.runtime.ownerPeriodNs) / 1e9 : fixedTimestepSeconds;
+        var ownerSeconds = blueprint.ownerPeriodSeconds();
         var leadSeconds = Int64.compare(blueprint.runtime.commitLeadNs, Int64.ofInt(0)) > 0 ?
           Int64.toFloat(blueprint.runtime.commitLeadNs) / 1e9 : 2 * ownerSeconds;
         var response = blueprint.homingLatencySeconds == null ? leadSeconds + fixedTimestepSeconds : blueprint.homingLatencySeconds;

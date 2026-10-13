@@ -39,6 +39,11 @@ class MotionSystemBlueprint {
     this.replacementOwnerPeriodSeconds = fixedTimestepSeconds;
   }
 
+  /** The robot owner's control period, seconds: the runtime's, or the fixed timestep where the runtime leaves it to that. */
+  public function ownerPeriodSeconds():Float
+    return haxe.Int64.compare(runtime.ownerPeriodNs, haxe.Int64.ofInt(0)) > 0 ? haxe.Int64.toFloat(runtime.ownerPeriodNs) / 1e9 :
+      fixedTimestepSeconds;
+
   public static function fromRobotModel(model:RobotModel, axes:Array<MotionAxisBlueprint>,
       ?revision:Int = 1, ?fixedTimestepSeconds:Float = 0.01):MotionSystemBlueprint {
     if (model == null || axes == null) throw "Motion system needs a model and axes";

@@ -1533,6 +1533,12 @@ findings with their evidence). Fixed, one commit each:
   through any other planner (an arm printing, listed under Later) with the extruder held still. A planner now declares
   whether it applies a drive (`JointPathPlanner.appliesDistanceDrive`), and a path with a drive is refused otherwise.
   Writing the columns after inverse kinematics for any solver goes with the compiler's split (RF5).
+- **The merge period was a literal 10 ms where it is the robot owner's period.** `ToolpathMotionBinding` set
+  `mergeSegmentsSeconds = 0.01`, documented as "an owner period". It is now the motion system's owner period
+  (`MotionSystemBlueprint.ownerPeriodSeconds`: the runtime's, or the fixed timestep where the runtime leaves it to that,
+  the rule `MotionSystem` already used for homing). Unchanged at the app's 10 ms tick and in the gate; in `printer-shaping`,
+  which ticks at 1 ms, runs merge to 1 ms now, and the MuJoCo carriage left 247 um shaking plain and 11 um shaped (251 and
+  11 before), 22 um and 29 um at 10 % below and above the belts' frequency (8 and 24): still at least five times less.
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
