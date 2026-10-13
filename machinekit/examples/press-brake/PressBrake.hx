@@ -104,6 +104,13 @@ class PressLightCurtain extends MachineComponent {
  * Joint Y1/Y2 values are downward ram travel; backgauge X is distance behind the punch line.
  */
 class PressBrake extends MachineAssembly implements PressGeometrySource {
+	/** Assumed hard-cap deflection allowance at maximum no-load flow speed, in millimetres. */
+	public static inline var RAM_STOP_DEFLECTION_MM:Float = 0.05;
+
+	/** Impact energy per unit mass gives stop stiffness per mass v²/d², hence tau = d/v. */
+	public function ramStopResponse():materia.assembly.AssemblyJointStop
+		return {timeConstantSec: RAM_STOP_DEFLECTION_MM / phaseSpeeds.maximumSpeed(), dampingRatio: 1};
+
 	public final profile:PressBrakeProfile = StopControlled;
 	public final bedLength:Float = 1600;
 	public final bedHeight:Float = 800;
@@ -170,6 +177,7 @@ class PressBrake extends MachineAssembly implements PressGeometrySource {
 			fixed('frame$name', frame, at(x, 0, 0), "bed");
 			slide(side < 0 ? "Y1" : "Y2", guide, new PressBlock("Ram guide", 40, 100, 160),
 				at(x, -160, bedHeight + openHeight), 'frame$name', {x: 0, y: 0, z: -1}, stroke, at(side * 650, 0, bedHeight + openHeight + 220));
+			setJointStop(side < 0 ? "Y1" : "Y2", ramStopResponse());
 			fixed('scale$name', new LinearScale(stroke + 40, 1000),
 				at(x, 180, bedHeight + openHeight - stroke), 'frame$name');
 			addEncoder('ram$name', side < 0 ? "Y1" : "Y2", 'scale$name');

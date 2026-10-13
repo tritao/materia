@@ -109,6 +109,12 @@ class PressBrakeChecks {
 				near(lower, -GaugeFinger.DROP_ANGLE, "Declared finger drop travel");
 				near(overtravel, GaugeFinger.OVERTRAVEL, "Declared finger observation margin");
 			}
+			for (name in ["Y1", "Y2"]) {
+				var joints = [for (joint in definition.joints) if (joint.id == name) joint];
+				if (joints.length != 1 || joints[0].stop == null) throw 'Ram "$name" lost its hard-cap response';
+				var stop = joints[0].stop;
+				if (stop.timeConstantSec <= 0 || stop.dampingRatio != 1) throw "Ram stops need a positive critical response";
+			}
 			var switches = definition.sensors;
 			if (switches == null) throw "Press lost its measured switches";
 			for (id in ["ram-top", "ram-speed-change", "ram-bottom", "fingerLeft-contact", "fingerRight-contact"]) {
