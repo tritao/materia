@@ -114,6 +114,10 @@ class CoreXyPrinter extends AxisBuilder {
 	public final nozzle = new Nozzle();
 	public final extruder = new Extruder();
 	public final bed = new HeatedBed();
+	/** The hotend's heater cartridge and thermistor, and the bed's thermistor: the parts the print job's heaters are read from. */
+	public final cartridge = new HeaterCartridge();
+	public final hotendThermistor = new Thermistor();
+	public final bedThermistor = new Thermistor();
 	/** Pinion on the extruder motor and the gear on the hobbed shaft: a 3:1 reduction. */
 	public final pinion = new SpurGear(0.5, 18, 6, SpurGear.STANDARD_PRESSURE_ANGLE, 0, 0, 5);
 	public final bigGear = new SpurGear(0.5, 54, 6, SpurGear.STANDARD_PRESSURE_ANGLE, 0, 0, 5);
@@ -262,8 +266,8 @@ class CoreXyPrinter extends AxisBuilder {
 		attach("toolheadMount", new GantryPlate("Hotend mount", 30, plateY - 3 - (ny - 13), 20), AssemblyFrames.translation(nx, (plateY - 3 + ny - 13) / 2, mountZ), "carriagePlate");
 		attach("hotend", hotend, AssemblyFrames.translation(nx, ny, blockBottom), "toolheadMount");
 		attach("nozzle", nozzle, AssemblyFrames.translation(nx, ny, NOZZLE_Z), "hotend");
-		attach("cartridge", new HeaterCartridge(), AxisBuilder.orient(nx, ny - 10, blockBottom + blockHeight / 2, up, alongY), "hotend");
-		attach("thermistor", new Thermistor(), AxisBuilder.orient(nx - 20, ny, blockBottom + blockHeight / 2 + 3, up, alongX), "hotend");
+		attach("cartridge", cartridge, AxisBuilder.orient(nx, ny - 10, blockBottom + blockHeight / 2, up, alongY), "hotend");
+		attach("thermistor", hotendThermistor, AxisBuilder.orient(nx - 20, ny, blockBottom + blockHeight / 2 + 3, up, alongX), "hotend");
 		// The heatsink fan blows across the heatsink from the right; the blower lies beside the block, its outlet towards the nozzle.
 		attach("hotendFan", new Fan("FAN-4010-24V"), AxisBuilder.orient(nx + 11, ny, blockBottom + blockHeight + 10, up, alongX), "toolheadMount");
 		attach("partBlower", new Fan("BLOWER-5015-24V"), AxisBuilder.orient(nx - 50, ny, blockBottom + 6, alongY, up), "toolheadMount");
@@ -344,7 +348,7 @@ class CoreXyPrinter extends AxisBuilder {
 		attach("bed", bed, AssemblyFrames.translation(0, 0, bedTop), "bedSupport");
 		// Where the print is laid: at the machine's zero, the bed's front left corner at its surface.
 		attach("printed", new PrintedPart(), AssemblyFrames.translation(MACHINE_ZERO_X, MACHINE_ZERO_Y, bedTop), "bed");
-		attach("bedThermistor", new Thermistor(), AxisBuilder.orient(110, 0, bedTop - bed.thickness(), up, alongY), "bedSupport");
+		attach("bedThermistor", bedThermistor, AxisBuilder.orient(110, 0, bedTop - bed.thickness(), up, alongY), "bedSupport");
 		// Three screws, each on its own motor standing on the base plate.
 		var motorBase = 26.0, motorBody = motor.bodyLength;
 		var screwBottom = motorBase + motorBody + motor.variant.shaftLength;

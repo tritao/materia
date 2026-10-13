@@ -11,8 +11,6 @@ import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.PosedParts;
 import machinekit.motion.LinearRail;
 import machinekit.motion.NemaStepper;
-import machinekit.printing.HeaterCartridge;
-import machinekit.printing.Thermistor;
 import machinekit.printing.Thermistor.ThermistorSpec;
 import machinekit.transmission.TimingBelt;
 import machinekit.transmission.TimingBelt.BeltWrap;
@@ -77,13 +75,13 @@ class CoreXyPrinterJob {
 
 	/** `source` (printer G-code in machine coordinates) as a job on this printer. */
 	public static function job(printer:CoreXyPrinter, source:String):SceneArtifactPrinting {
-		var hotend = printer.hotend.spec, cartridge = new HeaterCartridge();
-		var thermistor = new Thermistor();
+		// The heaters are the printer's own parts, not new ones: a part changed in the printer changes the job.
+		var hotend = printer.hotend.spec, cartridge = printer.cartridge, thermistor = printer.hotendThermistor;
 		var hotendHeater = heater("hotend", "thermistor", 0, "fan.part", true, thermistor.spec,
 			hotend.heatCapacity, cartridge.power(cartridge.spec.volts), hotend.lossCoefficient, hotend.fanLossCoefficient,
 			Math.min(hotend.maxTemperature, Math.min(cartridge.spec.maxTemperature, thermistor.spec.maxTemperature)) - 10.0);
 		var bed = printer.bed.spec;
-		var bedHeater = heater("bed", "bedThermistor", 1, null, false, thermistor.spec,
+		var bedHeater = heater("bed", "bedThermistor", 1, null, false, printer.bedThermistor.spec,
 			bed.heatCapacity, bed.watts, bed.lossCoefficient, 0.0, bed.maxTemperature);
 		return {source: source, axes: ["x", "y", "z"], extruder: "e",
 			filamentDiameter: hotend.filamentDiameter * 1e-3, gearRadius: printer.extruder.spec.hobDiameter * 0.5e-3,

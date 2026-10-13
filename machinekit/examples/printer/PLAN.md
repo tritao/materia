@@ -1575,6 +1575,11 @@ findings with their evidence). Fixed, one commit each:
   and the fake reports such a value as Klipper does. (3) An install whose upload or restart failed waited for ever (the
   client's fault was read only after the restart); it ends with the fault now. Tests: `processkit/tests/moonraker`
   (164 -> 166 assertions: the gear ratio read back clean, a list that differs reported, a failed upload ends the install).
+- **The print job read new heater parts, not the printer's.** `CoreXyPrinterPreview.job` made its own `HeaterCartridge`
+  and `Thermistor` (and gave the bed the hotend's thermistor) while the assembly attached others, so changing a part in
+  the printer would not have changed the job (AM-D1: nothing typed twice). The printer holds its cartridge and both
+  thermistors (`CoreXyPrinter.cartridge`, `hotendThermistor`, `bedThermistor`), attaches them, and the job reads them. The
+  parts are the same today, so the heat-up times do not move (hotend 103.6 s, bed 90.5 s).
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
