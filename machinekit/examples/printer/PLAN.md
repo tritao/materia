@@ -1567,6 +1567,14 @@ findings with their evidence). Fixed, one commit each:
   path test (the six-joint path of 20,000 spans in five windows, with no lowering, within 0.5 % of the reference; a 100 mm
   line within 0.5 % of it or shorter: on one span the reference's 3 mm stages cannot follow a 0.14 mm ramp and it is 5.7 %
   slower, on fifty it agrees), the gate (no boundary speed lowered). Exact boundaries without the shares are RF6.
+- **Three ways the Klipper config install would fail on a real machine.** (1) It restarted the firmware with
+  `FIRMWARE_RESTART` through `printer/gcode/script`; Klippy goes away while that script runs, so Moonraker answers with
+  an error and the install ended "connection failed". It uses Moonraker's `POST /printer/firmware_restart` now, and the
+  fake answers the script as Moonraker does (503, "Klippy Disconnected"). (2) Klipper reports a parsed list for
+  `gear_ratio: 54:18` (`[[54, 18]]`), which the readback compared as text, always a mismatch; it compares the numbers now,
+  and the fake reports such a value as Klipper does. (3) An install whose upload or restart failed waited for ever (the
+  client's fault was read only after the restart); it ends with the fault now. Tests: `processkit/tests/moonraker`
+  (164 -> 166 assertions: the gear ratio read back clean, a list that differs reported, a failed upload ends the install).
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

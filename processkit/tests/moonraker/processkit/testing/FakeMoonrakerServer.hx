@@ -33,7 +33,7 @@ private class Link {
  * moves already queued, which runs `lookahead` millimetres ahead along the route while printing (`toolhead.position`).
  *
  * It also models the configuration: a `printer.cfg` uploaded to the config root is parsed when the firmware is restarted
- * (`FIRMWARE_RESTART` through `printer/gcode/script`), after which `configfile.settings` holds what Klipper would report,
+ * (`printer/firmware_restart`; `FIRMWARE_RESTART` as a script fails, as on a machine whose Klippy goes away mid-request), after which `configfile.settings` holds what Klipper would report,
  * with `deviations` replacing values the way Klipper's own rounding or limits might and `warnings` as it would warn.
  */
 class FakeMoonrakerServer {
@@ -297,7 +297,12 @@ class FakeMoonrakerServer {
       case ["POST", "/printer/gcode/script"]:
         var script = query.get("script");
         scripts.push(script);
-        if (script == "FIRMWARE_RESTART") restart();
+        if (script == "FIRMWARE_RESTART") {
+          restart();
+          sendHttp(link, 503, "Service Unavailable", {error: {message: "Klippy Disconnected"}});
+        } else sendHttp(link, 200, "OK", {result: "ok"});
+      case ["POST", "/printer/firmware_restart"]:
+        restart();
         sendHttp(link, 200, "OK", {result: "ok"});
       case ["POST", "/printer/print/start"]:
         if (begin(query.get("filename"))) { sendHttp(link, 200, "OK", {result: "ok"}); push(); }
@@ -372,7 +377,11 @@ class FakeMoonrakerServer {
       if (deviation != null) value = deviation;
       var parsed = number(value);
       var typedValue:Dynamic = value;
-      if (parsed != null) typedValue = parsed;
+      // Klipper parses a ratio list (`gear_ratio: 54:18`) into lists of numbers.
+      var ratios = [for (pair in value.split(",")) [for (part in pair.split(":")) number(StringTools.trim(part))]];
+      var isList = value.indexOf(":") >= 0 && [for (pair in ratios) for (part in pair) if (part == null) part].length == 0;
+      if (isList) typedValue = [for (pair in ratios) [for (part in pair) (part:Float)]];
+      else if (parsed != null) typedValue = parsed;
       else if (value.toLowerCase() == "true") typedValue = true;
       else if (value.toLowerCase() == "false") typedValue = false;
       Reflect.setField(own, key, typedValue);

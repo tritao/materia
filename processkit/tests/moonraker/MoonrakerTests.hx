@@ -302,7 +302,7 @@ class MoonrakerTests {
     check(ask().state == "complete", "the job completes");
 
     // A printer.cfg installed: uploaded to the config root, the firmware restarted, the running configuration read back.
-    var text = "[stepper_x]\nrotation_distance: 40\nmicrosteps: 16\nhoming_positive_dir: true\nendstop_pin: !PIN_X_ENDSTOP\n\n[extruder]\nPID_Kp: 22.5\nrotation_distance: 22.93\n";
+    var text = "[stepper_x]\nrotation_distance: 40\nmicrosteps: 16\nhoming_positive_dir: true\nendstop_pin: !PIN_X_ENDSTOP\n\n[extruder]\nPID_Kp: 22.5\nrotation_distance: 22.93\ngear_ratio: 54:18\n";
     var expected = new Map<String, Map<String, String>>();
     var section:Null<Map<String, String>> = null;
     for (line in text.split("\n")) {
@@ -320,8 +320,11 @@ class MoonrakerTests {
       return made;
     }
     var agreed = install("install");
-    check(fake.configFiles.get("printer.cfg") == text && fake.scripts.indexOf("FIRMWARE_RESTART") >= 0 && fake.restarts == 1, "the file is in the config root and the firmware restarted");
+    check(fake.configFiles.get("printer.cfg") == text && fake.restarts == 1, "the file is in the config root and the firmware restarted");
+    // The gear ratio comes back parsed, as Klipper reports a list ([[54, 18]]): the same numbers are not a difference.
     check(agreed.mismatches.length == 0, 'Klipper runs what was generated: ${agreed.mismatches}');
+    check(ConfigReadback.compare(["extruder" => ["gear_ratio" => "54:18"]], {extruder: {gear_ratio: [[54.0, 17.0]]}}, []).length == 1,
+      "a list that differs is a difference");
     // Klipper reports something else than the file says, and a warning.
     fake.deviations.set("stepper_x/rotation_distance", "39.5");
     fake.warnings.push("Option 'microsteps' is deprecated");
@@ -350,6 +353,15 @@ class MoonrakerTests {
     var limit = Sys.time() + 3.0;
     while (missing.fault == null && Sys.time() < limit) { runtime.events.poll(); fake.poll(); missing.poll(Sys.time()); runtime.events.wait(0.001); }
     check(missing.fault != null && missing.fault.indexOf("404") >= 0 && !answered, "an error status is the client's fault");
+    // An install whose upload cannot go out ends with the client's fault; it does not wait for ever.
+    var nowhere = new MoonrakerClient("127.0.0.1", 1, 0.3);
+    var unsent = new ConfigInstaller(nowhere, "printer.cfg", "[x]\n", new Map<String, Map<String, String>>(), 0.01, 3.0);
+    unsent.start(Sys.time());
+    limit = Sys.time() + 3.0;
+    while (!unsent.done && Sys.time() < limit) { runtime.events.poll(); nowhere.poll(Sys.time()); unsent.poll(Sys.time()); runtime.events.wait(0.001); }
+    check(unsent.done && unsent.mismatches.length == 1 && unsent.mismatches[0].indexOf("Moonraker connection failed") >= 0,
+      'a failed upload ends the install: ${unsent.mismatches}');
+    nowhere.close();
     var quiet = false;
     client.status(function(_) quiet = true);
     limit = Sys.time() + 3.0;

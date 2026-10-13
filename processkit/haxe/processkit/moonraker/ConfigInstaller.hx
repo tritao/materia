@@ -2,7 +2,7 @@ package processkit.moonraker;
 
 /**
  * Puts a `printer.cfg` on a machine and finds out what Klipper made of it: uploads it to Moonraker's config root,
- * restarts the firmware (`FIRMWARE_RESTART`), waits for Klippy to come back, reads the configuration it is running and
+ * restarts the firmware (`printer/firmware_restart`), waits for Klippy to come back, reads the configuration it is running and
  * compares that with the file (see `ConfigReadback`). Polled with the client by whoever owns the clock; `mismatches` is
  * set when `done`.
  */
@@ -40,7 +40,7 @@ class ConfigInstaller {
     phase = 1;
     inFlight = true;
     client.uploadTo("config", filename, text, false, function(_) {
-      client.script("FIRMWARE_RESTART", function() {
+      client.firmwareRestart(function() {
         inFlight = false;
         phase = 2;
         restartedAt = Math.NEGATIVE_INFINITY;
@@ -49,9 +49,11 @@ class ConfigInstaller {
   }
 
   public function poll(now:Float):Void {
-    if (done || phase < 2) return;
-    if (restartedAt == Math.NEGATIVE_INFINITY) restartedAt = now;
+    if (done || phase == 0) return;
+    // A failed upload or restart ends the install too, not only a failure while waiting for Klippy.
     if (client.fault != null) { finish(['Moonraker connection failed: ${client.fault}']); return; }
+    if (phase < 2) return;
+    if (restartedAt == Math.NEGATIVE_INFINITY) restartedAt = now;
     if (inFlight || now - asked < interval) return;
     if (now - restartedAt > readyTimeout) { finish(["Klippy did not come back after the restart"]); return; }
     asked = now;

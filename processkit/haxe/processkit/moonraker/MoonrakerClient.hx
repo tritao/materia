@@ -104,9 +104,16 @@ class MoonrakerClient {
     return out.toString();
   }
 
-  /** Runs G-code or a Klipper command (`FIRMWARE_RESTART`) on the machine. */
+  /** Runs G-code or a Klipper command on the machine. */
   public function script(gcode:String, complete:Void->Void):Void
     send("POST", "/printer/gcode/script?script=" + percentEncode(gcode), function(reply) { json(reply); complete(); });
+
+  /**
+    Restarts the firmware so it reads its configuration again. Moonraker's own endpoint, not `FIRMWARE_RESTART` as a
+    script: Klippy goes away while the script runs, so the script's request ends in an error even when the restart works.
+  **/
+  public function firmwareRestart(complete:Void->Void):Void
+    send("POST", "/printer/firmware_restart", function(reply) { json(reply); complete(); });
 
   /** The configuration Klipper is running: `settings` (section to key to value, as it parsed them) and its `warnings`. */
   public function runningConfig(complete:{settings:Dynamic, warnings:Array<Dynamic>}->Void):Void

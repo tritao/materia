@@ -21,6 +21,16 @@ class ConfigReadback {
     return Math.isFinite(value) ? value : null;
   }
 
+  static function flatten(value:Dynamic):Array<Float> {
+    if (Std.isOfType(value, Array)) {
+      var result:Array<Float> = [];
+      for (item in (value:Array<Dynamic>)) result = result.concat(flatten(item));
+      return result;
+    }
+    if (Std.isOfType(value, Float) || Std.isOfType(value, Int)) return [(value:Float)];
+    return [Math.NaN];
+  }
+
   /** The differences, each a sentence: a section or key the machine does not have, a value that differs, a warning Klipper gave. */
   public static function compare(expected:Map<String, Map<String, String>>, settings:Dynamic, warnings:Array<Dynamic>):Array<String> {
     var problems:Array<String> = [];
@@ -38,7 +48,17 @@ class ConfigReadback {
         var actual:Dynamic = Reflect.field(running, key.toLowerCase());
         if (actual == null) { problems.push('[$name] $key is not in the running configuration'); continue; }
         var same:Bool;
-        if (Std.isOfType(actual, Bool)) same = wanted.toLowerCase() == (actual ? "true" : "false");
+        if (Std.isOfType(actual, Array)) {
+          // A list Klipper parsed (`gear_ratio: 54:18` is [[54, 18]]): the same numbers in the same order.
+          var values = flatten(actual);
+          var parts = [for (part in ~/[,:\n]/g.split(wanted)) number(part)];
+          same = parts.length == values.length;
+          for (index in 0...parts.length) {
+            var part = parts[index];
+            if (!same) break;
+            same = part != null && Math.abs(part - values[index]) <= TOLERANCE * Math.max(1.0, Math.abs(part));
+          }
+        } else if (Std.isOfType(actual, Bool)) same = wanted.toLowerCase() == (actual ? "true" : "false");
         else if (Std.isOfType(actual, Float) || Std.isOfType(actual, Int)) {
           var parsed = number(wanted);
           var value:Float = actual;
