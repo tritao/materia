@@ -144,6 +144,8 @@ public:
     virtual ~PhysicsBackend() = default;
 
     virtual nksim_result initialize(const nksim_world_desc &desc) = 0;
+    /** `NKSIM_WORLD_FEATURE_*` flags of what this backend simulates beyond rigid joints. */
+    virtual std::uint32_t features() const noexcept { return 0; }
 
     virtual nksim_result body_create(const BackendBodyDesc &desc,
                                      std::uint64_t *out_body) = 0;

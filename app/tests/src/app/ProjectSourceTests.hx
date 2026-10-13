@@ -579,12 +579,25 @@ class ProjectSourceTests {
     player.stockSpacing = 0.00005;
     var dt = simulation.timestep, ticks = 0, limit = Math.round(3600.0 / dt);
     var wall = Sys.time();
+    // The physical carriage (the x joint's link), not the device's view of it: the simulation must move the machine.
+    var definition = session.projectAssemblyDefinition, physical = session.projectPhysical;
+    if (definition == null || physical == null) throw "the cube printer has no assembly";
+    var model = AssemblySimulationBridge.toRobotModel(definition, physical, session.projectAssemblyState).model;
+    var carriageLink = model.links.indexOf([for (joint in model.joints) if (joint.id == "x") joint][0].child);
+    var carriageLow = Math.POSITIVE_INFINITY, carriageHigh = Math.NEGATIVE_INFINITY;
     while (player.passes == 0 && player.failure == null && ticks++ < limit) {
       simulation.step();
+      if (ticks % 50 == 0) {
+        var at = simulation.physicalLinkPosition(0, carriageLink)[0];
+        carriageLow = Math.min(carriageLow, at); carriageHigh = Math.max(carriageHigh, at);
+      }
       if (ticks % 10000 == 0) Sys.println('printer $project: ${ticks * dt} s, layer ${player.layer} of ${player.layerCount}, ${Math.round((Sys.time() - wall) * 10) / 10} s wall');
     }
     check(player.failure == null, "the printer prints the cube: " + player.failure);
     check(player.passes == 1, 'the cube is done in ${ticks * dt} s (limit ${limit * dt} s)');
+    // A device drives the motor pulleys; on a backend whose couplings are ideal it drives the carriage too (with springs
+    // the belts carry it), so the physical carriage crosses the cube, not only the device's reconstruction of it.
+    check(carriageHigh - carriageLow > 0.015, 'the physical carriage crosses the cube: ${(carriageHigh - carriageLow) * 1000} mm');
     var laid = player.stock;
     if (laid == null) throw "the cube print laid no material";
     var cube = measurePrinted(laid.stock, 0.100, 0.120, 0.100, 0.120, 0.0005, laid.center);

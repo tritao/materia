@@ -390,6 +390,16 @@ NKSIM_API nksim_result NKSIM_CALL nksim_world_create(
 NKSIM_API void NKSIM_CALL nksim_world_destroy(nksim_world world);
 NKSIM_API nksim_result NKSIM_CALL nksim_world_get_clock(nksim_world world,
                                                          nksim_clock *out_clock NK_INOUT);
+/** What a world's backend simulates beyond rigid joints; flags of `NKSIM_WORLD_FEATURE_*`. */
+enum {
+    /**
+     * A coupling with a stiffness and a damping ratio is a spring: its follower and its leaders move apart under load,
+     * so a target on either end moves the other through the spring. Without it every coupling is ideal (the followers
+     * are set from their leaders).
+     */
+    NKSIM_WORLD_FEATURE_COMPLIANT_COUPLINGS = 1u << 0,
+};
+NKSIM_API nksim_result NKSIM_CALL nksim_world_get_features(nksim_world world, uint32_t *out_features NK_OUT);
 /** Stages body and joint additions before the first world step. */
 NKSIM_API nksim_result NKSIM_CALL nksim_world_begin_topology_update(nksim_world world);
 /** Commits a staged topology update with one backend rebuild. */

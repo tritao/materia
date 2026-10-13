@@ -139,7 +139,7 @@ class RobotRuntimeCompiler {
           compiled.positionLoopRate = Math.max(compiled.positionLoopRate, actuator.positionLoopRate);
           // The inertia the servo's spring is integrated against. A rigid load turns with the shaft; a compliant one (a
           // belt, a screw's stretch) does not, so the shaft turns only itself and its rotor, however heavy the load.
-          if (drivesCompliantFollower(robot, joint)) {
+          if (robot.followsSpring(joint.id)) {
             compiled.compliantLoad = true;
             compiled.reflectedInertia += Math.max(robot.turningInertia(joint), servo.rotorInertia * ratio * ratio);
           } else for (load in robotkit.model.DriveLoads.of(robot))
@@ -239,11 +239,6 @@ class RobotRuntimeCompiler {
   }
 
   /** Whether a joint is the follower of a spring coupling (stiffness and a damping ratio, simulated as a spring): a belt's pulley. */
-  static function drivesCompliantFollower(robot:robotkit.model.RobotModel, joint:robotkit.model.Joint):Bool {
-    for (coupling in robot.couplings) if (coupling.follower == joint.id && coupling.stiffness > 0.0 && coupling.dampingRatio > 0.0) return true;
-    return false;
-  }
-
   static function ensureDigitalChannel(blueprint:RobotRuntimeBlueprint, id:String,
       keepOnStop:Bool):Void {
     for (channel in blueprint.channels) if (channel.id == id) {

@@ -766,6 +766,8 @@ public:
         return NKSIM_OK;
     }
 
+    std::uint32_t features() const noexcept override { return NKSIM_WORLD_FEATURE_COMPLIANT_COUPLINGS; }
+
     nksim_result joint_couple(const nksim::BackendJointCoupling &coupling) override {
         if (joints.find(coupling.leader) == joints.end() ||
             joints.find(coupling.follower) == joints.end())
@@ -1612,7 +1614,7 @@ private:
             offsets[term.follower] += term.offset;
             if (is_spring(term)) {
                 stiffnesses[term.follower] += term.stiffness;
-                damped[term.follower] += (term.damping_ratio > 0.0 ? term.damping_ratio : 1.0) * term.stiffness;
+                damped[term.follower] += term.damping_ratio * term.stiffness;
                 ++softs[term.follower];
             }
         }

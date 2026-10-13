@@ -81,6 +81,12 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	const NKSIM_SHAPE_PLANE = 4;
 	const NKSIM_SHAPE_SPHERE = 2;
 	const NKSIM_SNAPSHOT_PAGE_CAPACITY = 64;
+	/**
+	 * A coupling with a stiffness and a damping ratio is a spring: its follower and its leaders move apart under load,
+	 * so a target on either end moves the other through the spring. Without it every coupling is ideal (the followers
+	 * are set from their leaders).
+	 */
+	const NKSIM_WORLD_FEATURE_COMPLIANT_COUPLINGS = 1;
 	extern fn nksim_body_create(world: nksim_world, desc: ptr<const<nksim_body_desc>>, out_body: ptr<nksim_body> @out) -> nksim_result;
 	extern fn nksim_body_destroy(world: nksim_world, body: nksim_body) -> void;
 	/**
@@ -353,6 +359,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * Pass capacity 0 and out NULL to size a buffer. Read after stepping.
 	 */
 	extern fn nksim_world_get_contacts(world: nksim_world, out: ptr<nksim_contact>, capacity: u32, out_count: ptr<u32> @out) -> nksim_result;
+	extern fn nksim_world_get_features(world: nksim_world, out_features: ptr<u32> @out) -> nksim_result;
 	/**
 	 * Restores body state and the fixed-step clock to their initial values.
 	 */
@@ -494,13 +501,15 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		ratio: f64 @offset(16);
 		offset: f64 @offset(24);
 		/**
-		 * Follower-coordinate stiffness; zero preserves the backend default.
+		 * Follower-coordinate stiffness, N/m or N m/rad. With a damping ratio below the coupling is a spring of this
+		 * stiffness (a timing belt), whatever the bodies it joins weigh; a follower with several such couplings is one
+		 * spring, of their mean stiffness. Without one, or with zero stiffness, the backend keeps an ideal constraint.
 		 */
 		stiffness: f64 @offset(32);
 		/**
 		 * How damped the coupling's response is, as a ratio of critical damping (a timing belt's is small, 0.1 or so,
-		 * so a carriage on it rings); zero preserves the backend default, critical damping (1). With several couplings
-		 * on one follower the backend takes the mean of their ratios weighted by compliance.
+		 * so a carriage on it rings); zero preserves the backend default: the coupling is not simulated as a spring. With several couplings
+		 * on one follower the backend takes the mean of their ratios weighted by stiffness.
 		 */
 		damping_ratio: f64 @offset(40);
 	}

@@ -1685,6 +1685,9 @@ void coupled_prismatic_joints_use_equality_and_convex_collision() {
     desc.physics_substeps = 2;
     nksim_world world = 0;
     assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    // MuJoCo simulates a coupling with a damping ratio as a spring, and says so.
+    uint32_t features = 0;
+    assert(nksim_world_get_features(world, &features) == NKSIM_OK && (features & NKSIM_WORLD_FEATURE_COMPLIANT_COUPLINGS));
     const auto base = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_STATIC, 0.0);
     const auto leader_body = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0);
     const double vertices[] = {

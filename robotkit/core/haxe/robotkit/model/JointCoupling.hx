@@ -27,10 +27,13 @@ class JointCoupling {
   public var stiffness:Float = 0.0;
   /**
    * How damped the coupling's response is, as a ratio of critical damping: a timing belt's is small (about 0.1), so a
-   * carriage on it rings after a push, where a rigid or critically damped coupling does not. Zero leaves the simulation's
-   * default, critical damping (1). Meaningful only with a stiffness.
+   * carriage on it rings after a push. Zero: no damping is stated, and the simulation keeps the coupling an ideal
+   * constraint (`isSpring`); its stiffness is then a compliance for planning and plan checks only.
    */
   public var dampingRatio:Float = 0.0;
+
+  /** Whether a simulation that can makes this coupling a spring: a stiffness and a stated damping ratio. */
+  public function isSpring():Bool return stiffness > 0.0 && dampingRatio > 0.0;
   /** Lost motion when the coupling reverses, in the leader's units, such as a lead screw nut's backlash. */
   public var backlash:Float = 0.0;
   /**

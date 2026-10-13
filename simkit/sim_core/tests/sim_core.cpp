@@ -52,6 +52,10 @@ void offset_convex_fallback_uses_its_bounds_center() {
     world_desc.gravity[2] = -9.81;
     nksim_world world = 0;
     assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+    // The deterministic backend keeps every coupling ideal (a follower is set from its leaders).
+    uint32_t features = 1;
+    assert(nksim_world_get_features(world, &features) == NKSIM_OK && features == 0);
+    assert(nksim_world_get_features(world, nullptr) == NKSIM_ERROR_INVALID_ARGUMENT);
     const double vertices[] = {9.5,-0.5,-0.5, 10.5,-0.5,-0.5,
         9.5,0.5,-0.5, 10.5,0.5,-0.5, 9.5,-0.5,0.5,
         10.5,-0.5,0.5, 9.5,0.5,0.5, 10.5,0.5,0.5};

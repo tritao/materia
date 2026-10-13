@@ -1495,6 +1495,21 @@ findings with their evidence). Fixed, one commit each:
   it is about 300 Hz and micrometres. The relation now carries N/m and the shaft's basis. Test: `MillPartTests`. The
   mill and tending numbers do not move (screws stay ideal constraints in the simulation until the spring model of RF2;
   the bench mill's plan checks still flag 56 of 78 plans, so those flags were not the screws).
+- **H6. On the deterministic backend a device robot's physical carriage stood still (concern 3).** 54326ccc7 let a
+  virtual device drive only the joints its actuators measure and left the rest of a stiff coupling to the physics. On the
+  printer the measured joints are the motor pulleys, the couplings' followers, so x, y and the idlers got no target. MuJoCo
+  moves them through the belt springs; the deterministic backend (on which both cubes print) keeps couplings ideal and sets
+  a follower from its leaders, so the carriage never moved and the pulleys snapped back to it. No check saw it, because
+  the deposition reads the device's reconstruction of the joints, not the physics (RF3). The other machines are not
+  affected: only the printer and the plotter run a virtual device with stiff couplings (the welder's arms have none, the
+  screw router's Tr screws have none; router, gantries, tending, mobile and the press brake run without a device). A
+  backend now says whether it simulates compliant couplings (`nksim_world_get_features`,
+  `NKSIM_WORLD_FEATURE_COMPLIANT_COUPLINGS`: MuJoCo yes, the deterministic backend no), the device frees a load only where
+  it does, and only the load of a spring (a stiffness and a stated damping ratio: one predicate,
+  `JointCoupling.isSpring` / `RobotModel.followsSpring` and `spring_coupling` in the runtime, where there were four,
+  of two definitions). The damping-ratio docs no longer say zero is critical, and MuJoCo's unused fallback to 1 is gone.
+  Tests: the simkit core and MuJoCo native tests (each backend's feature), `checkPrinterCube` (the physical carriage
+  crosses the cube). The cube's numbers do not move (its deposition reads the device's view).
 
 **Later (not in this run).**
 - Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.

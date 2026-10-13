@@ -7,4 +7,12 @@ nksim_result NKSIM_CALL nksim_world_get_clock(nksim_world world, nksim_clock *ou
     return value ? value->get_clock(out_clock) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
+nksim_result NKSIM_CALL nksim_world_get_features(nksim_world world, uint32_t *out_features) {
+    if (!out_features) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto value = nksim::resolve_world(world);
+    if (!value) return NKSIM_ERROR_INVALID_HANDLE;
+    *out_features = value->features();
+    return NKSIM_OK;
+}
+
 } // extern "C"

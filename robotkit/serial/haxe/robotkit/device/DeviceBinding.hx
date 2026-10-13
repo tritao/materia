@@ -150,7 +150,7 @@ class DeviceBinding {
       // would ring on the loop. Where the load is rigid there is no belt to be softer than, so nothing changes.
       var holdStiffness = 0.0, holdInertia = 0.0;
       var stepper = actuator.drive == null ? null : actuator.drive.stepper();
-      if (stepper != null && stepper.hasTorqueData() && drivesCompliantFollower(robot, robot.joints[feedbackJoint].id)) {
+      if (stepper != null && stepper.hasTorqueData() && robot.followsSpring(robot.joints[feedbackJoint].id)) {
         holdStiffness = stepper.holdingTorque * stepper.fullStepsPerRevolution * 0.25 * feedbackRatio * feedbackRatio;
         holdInertia = Math.max(robot.turningInertia(robot.joints[feedbackJoint]), stepper.rotorInertia * feedbackRatio * feedbackRatio);
       }
@@ -235,11 +235,6 @@ class DeviceBinding {
       channel.jointIndex, channel.ratio, channel.offset, channel.stepsPerUnit, channel.minStepTicks,
       channel.directionSetupTicks, channel.skewBound, channel.feedbackJointIndex,
       channel.feedbackRatio, channel.feedbackOffset, channel.holdStiffness, channel.holdInertia)];
-
-  static function drivesCompliantFollower(robot:RobotModel, joint:String):Bool {
-    for (coupling in robot.couplings) if (coupling.follower == joint && coupling.stiffness > 0.0 && coupling.dampingRatio > 0.0) return true;
-    return false;
-  }
 
   static function find(robot:RobotModel, id:String):Null<Actuator> {
     for (actuator in robot.actuators) if (actuator.id == id) return actuator;

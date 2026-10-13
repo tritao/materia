@@ -40,6 +40,14 @@ void require_scene(nkscene_result result, const char *operation) {
         throw std::runtime_error(operation);
 }
 
+/**
+ * A coupling the physics simulates as a spring: a stiffness and an authored damping ratio (a timing belt). Any other
+ * coupling is an ideal constraint, whatever compliance it carries for planning and plan checks.
+ */
+bool spring_coupling(const rk_robot_runtime_blueprint &blueprint, uint32_t index) {
+    return blueprint.coupling_stiffness[index] > 0.0 && blueprint.coupling_damping_ratio[index] > 0.0;
+}
+
 nksim_shape create_collision_shape(nksim_world world, const rk_simulation_link_shape &source) {
     nksim_shape primitive = 0;
     switch (source.type) {
@@ -958,13 +966,17 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         binding->device_previous_.assign(blueprint.joint_count, std::nullopt);
         binding->device_hold_stiffness_ = std::move(device_hold_stiffness);
         binding->device_hold_damping_ = std::move(device_hold_damping);
-        if (virtual_endpoint && robot_desc) {
-            // A device drives the joints its actuators measure. The rest of a compliant coupling is left to the physics.
+        uint32_t world_features = 0;
+        require_sim(nksim_world_get_features(world, &world_features), "nksim_world_get_features");
+        if (virtual_endpoint && robot_desc && (world_features & NKSIM_WORLD_FEATURE_COMPLIANT_COUPLINGS)) {
+            // A device drives the joints its actuators measure. The rest of a spring coupling is left to the physics,
+            // where the physics simulates springs: a backend with ideal couplings sets a follower from its leaders, so
+            // there the device keeps driving every joint it reconstructs.
             std::vector<uint8_t> measured(blueprint.joint_count, 0);
             for (const auto joint : device_measured_joints)
                 if (joint < blueprint.joint_count) measured[joint] = 1;
             for (uint32_t index = 0; index < blueprint.coupling_count; ++index) {
-                if (blueprint.coupling_stiffness[index] <= 0.0) continue;
+                if (!spring_coupling(blueprint, index)) continue;
                 for (const auto joint : {blueprint.couplings[index].leader, blueprint.couplings[index].follower})
                     if (!measured[joint]) binding->device_free_[joint] = 1;
             }

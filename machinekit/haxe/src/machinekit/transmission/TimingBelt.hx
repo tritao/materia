@@ -124,8 +124,8 @@ class TimingBelt extends MachineComponent {
 	public final statedCordRigidity:Float;
 	/**
 	 * The belt drive's damping as a ratio of critical damping, stated by whoever knows the belt (a rubber belt on a
-	 * carriage rings, about 0.1; a stated value rides into the simulation, where zero leaves the critical damping it
-	 * has always had). Zero is not stated.
+	 * carriage rings, about 0.1; a stated value rides into the simulation, which makes the belt a spring). Zero is not
+	 * stated, and the simulation keeps the belt an ideal constraint (`JointCoupling.isSpring`).
 	 */
 	public final statedDampingRatio:Float;
 
