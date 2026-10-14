@@ -418,6 +418,17 @@ class ProgramCompiler {
     c.sink.barrier(barrier);
   }
 
+  /** A copy of `trajectory` in which runs of segments are one quintic each within the merge tolerances (the followers not yet projected). */
+  function mergeRuns(trajectory:Trajectory):Trajectory {
+    var count = maxVelocity.length;
+    return trajectory.mergeSegments(
+      [for (joint in 0...count) MERGE_TIMING * maxVelocity[joint]],
+      [for (joint in 0...count) 0.01 * maxVelocity[joint]],
+      [for (joint in 0...count) 0.1 * maxAcceleration[joint]],
+      maxVelocity.slice(0, count), maxAcceleration.slice(0, count), positionBounds(count, false), positionBounds(count, true),
+      mergeSegmentsSeconds);
+  }
+
   /** Plans the next op of `c`; at the end, finishes its last plan and block. Returns false once done. */
   @:allow(motionkit.robot.ProgramCompilation)
   function advance(c:ProgramCompilation):Bool {
@@ -764,17 +775,30 @@ class ProgramCompiler {
       var advanced:Null<Trajectory> = null;
       var drive = pending.path == null ? null : pending.path.drive;
       if (pressureAdvance > 0.0 && drive != null) advanced = pending.trajectory.advanceJoint(drive.joint, pressureAdvance, pressureAdvanceWindow);
+      mark("pressureAdvance");
       var timed = advanced == null ? pending.trajectory : advanced;
       if (couplingIndices.length > 0) projected = projectCouplings(timed);
       else if (advanced != null) { projected = advanced; advanced = null; }
       if (advanced != null) advanced.dispose();
+      mark("advanceCouplings");
       // Input shaping: each shaped joint's motion becomes the weighted sum of delayed copies of itself, rest to rest,
       // and the plan ends the shaper's tail later. What the plan does at a given instant is the lowered motion's some
       // `shapingDelay` earlier, so the events and the times that locate the plan on its path move with it.
       var impulses = shaping;
       if (impulses != null && pending.path != null) {
-        var cut = (projected == null ? pending.trajectory : projected).shape([for (joint in impulses) joint.delays],
-          [for (joint in impulses) joint.amplitudes]);
+        // The pressure advance cuts every plan into three times the segments, and the shaper cuts each at every delay: the
+        // cuts of the advance are merged away first, so the shaper (and the projection after it) works on the plan's own
+        // segments. The shaper is a weighted sum with weights adding to 1, so the pre-merge's error stays within its tolerance.
+        var coarse:Null<Trajectory> = null;
+        if (projected != null && mergeSegmentsSeconds > 0.0) {
+          var runs = mergeRuns(projected);
+          if (couplingIndices.length > 0) { coarse = projectCouplings(runs); runs.dispose(); } else coarse = runs;
+        }
+        mark("preShapeMerge");
+        var cut = (coarse != null ? coarse : (projected == null ? pending.trajectory : projected)).shape(
+          [for (joint in impulses) joint.delays], [for (joint in impulses) joint.amplitudes]);
+        if (coarse != null) coarse.dispose();
+        mark("shapeConvolution");
         if (couplingIndices.length > 0) { shaped = projectCouplings(cut); cut.dispose(); } else shaped = cut;
         var lag = Trajectory.nanoseconds(shapingDelay);
         var later = [for (event in pending.events) new TimedEvent(Int64.add(event.timeNs, lag), event.channel, event.value, event.holdPolicy)];
@@ -783,19 +807,14 @@ class ProgramCompiler {
         for (index in 0...pending.times.length) pending.times[index] += shapingDelay;
         for (index in 0...pending.checkTimes.length) pending.checkTimes[index] += shapingDelay;
       }
+      mark("inputShaping");
       var timedMotion = shaped != null ? shaped : (projected == null ? pending.trajectory : projected);
       if (mergeSegmentsSeconds > 0.0 && pending.path != null) {
-        var count = maxVelocity.length;
-        var runs = timedMotion.mergeSegments(
-          [for (joint in 0...count) MERGE_TIMING * maxVelocity[joint]],
-          [for (joint in 0...count) 0.01 * maxVelocity[joint]],
-          [for (joint in 0...count) 0.1 * maxAcceleration[joint]],
-          maxVelocity.slice(0, count), maxAcceleration.slice(0, count), positionBounds(count, false), positionBounds(count, true),
-          mergeSegmentsSeconds);
+        var runs = mergeRuns(timedMotion);
         // The followers are again exactly the sum of their terms, in the merged coefficients.
         if (couplingIndices.length > 0) { merged = projectCouplings(runs); runs.dispose(); } else merged = runs;
       }
-      mark("motorValidationAndCouplings");
+      mark("segmentMerge");
       if(pending.geometryCurve!=null && pending.geometryClearance && Sys.getEnv("PROCESS_PATH_VERIFY_CLEARANCE")=="1"){
         var curve:JointPathSamples=cast pending.geometryCurve;
         if(Std.isOfType(curve.clearanceProof,JointCurveClearance)){var proof:JointCurveClearance=cast curve.clearanceProof;
