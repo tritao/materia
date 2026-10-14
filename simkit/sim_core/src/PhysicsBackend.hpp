@@ -156,6 +156,8 @@ public:
     virtual nksim_result initialize(const nksim_world_desc &desc) = 0;
     /** `NKSIM_WORLD_FEATURE_*` flags of what this backend simulates beyond rigid joints. */
     virtual std::uint32_t features() const noexcept { return 0; }
+    /** The tolerance of the constraint solver, as a position error scale; zero when the backend is exact. */
+    virtual double solver_tolerance() const noexcept { return 0.0; }
 
     virtual nksim_result body_create(const BackendBodyDesc &desc,
                                      std::uint64_t *out_body) = 0;

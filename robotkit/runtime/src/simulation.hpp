@@ -135,6 +135,8 @@ private:
     void cleanup() noexcept;
     /** The world, while the session is not hosted, for topology and direct edits. */
     nksim_world stopped_world() const;
+    /** The physics solver's tolerance (a position error scale), read when the session's world was made; zero if unknown. */
+    double solver_tolerance() const noexcept { return solver_tolerance_; }
     // Session participant callbacks.
     rk_result prepare(const nksim_tick &tick);
     void discard() noexcept;
@@ -223,6 +225,7 @@ private:
     nksim_session session_ = 0;
     nksim_participant participant_ = 0;
     nkscene_scene scene_ = 0;
+    double solver_tolerance_ = 0.0;
     nksim_shape shape_ = 0;
     std::vector<nksim_shape> link_shapes_;
     double fixed_timestep_ = 0.01;

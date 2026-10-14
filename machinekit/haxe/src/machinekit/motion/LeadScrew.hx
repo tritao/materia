@@ -28,9 +28,9 @@ class LeadScrew extends MachineComponent {
 		if (screw.thread.designation != nut.thread.designation) throw new machinekit.transmission.TransmissionDesignError("Lead screw and nut threads differ; update the nut to match the screw");
 		// A coupling's stiffness is in the leader's units, the linear axis's: N/m, where the shaft's is stated in N/mm.
 		var result = new machinekit.transmission.TransmissionRelation(2 * Math.PI * alignment / screw.thread.signedLead(),
-			nut.efficiency(), screw.thread.family == Ball ? screw.axialStiffness() * 1000 : null, nut.backlash(), nut.drag());
+			nut.efficiency(), screw.thread.family == Ball ? screw.supportedStiffness(nut) * 1000 : null, nut.backlash(), nut.drag());
 		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed,
-			screw.thread.family == Ball ? "ball screw shaft stiffness (nut and bearing compliance omitted)" : "rigid");
+			screw.thread.family == Ball ? "ball screw drive stiffness (shaft, nut and support bearings in series)" : "rigid");
 		if (screw.thread.family == Ball) {
 			result.dampingRatio = ASSUMED_DAMPING_RATIO;
 			result.setBasis("dampingRatio", machinekit.transmission.ValueBasis.Assumed, "steel screw damping");
@@ -39,6 +39,20 @@ class LeadScrew extends MachineComponent {
 		result.setBasis("backlash", machinekit.transmission.ValueBasis.Assumed, "nut backlash");
 		result.setBasis("drag", machinekit.transmission.ValueBasis.Assumed, "nut drag");
 		return result;
+	}
+
+	/** Assumed axial stiffness of the fixed end's support bearings (an angular-contact pair, preloaded), N/mm: about 200 N/um. */
+	public static inline var SUPPORT_BEARING_STIFFNESS:Float = 200000;
+
+	/**
+	 * What the drive gives against axial force, N/mm: the shaft, the nut and the support bearings in series (each a spring
+	 * the force passes through, so the compliances add). The nut and bearing values are catalogue-typical and assumed.
+	 */
+	public function supportedStiffness(nut:LeadScrewNut):Float {
+		var compliance = 1.0 / axialStiffness() + 1.0 / SUPPORT_BEARING_STIFFNESS;
+		var nutStiffness = nut.axialStiffness();
+		if (nutStiffness != null) compliance += 1.0 / nutStiffness;
+		return 1.0 / compliance;
 	}
 
 	/** Shaft-only axial stiffness, N/mm, from the race root and full shaft length.

@@ -262,12 +262,13 @@ class PrintProgramPlayer extends ToolpathPlayer {
 		newHoming = () -> null;
 		homingComplete = true;
 		var tolerances = completionTolerances(machineModel, job);
+		var frequencies = springFrequencies(machineModel);
 		newMotion = () -> {
 			var state = robot.runtime.snapshot();
 			var currentBinding = new ToolpathMotionBinding(machine, binding.blueprint, state.modelRevision, state.calibrationRevision);
 			currentBinding.compiler.planCheck = binding.compiler.planCheck;
 			var made = new ManipulatorMotion(robot.robot, currentBinding.compiler, channel -> input(channel),
-				() -> robot.runtime.pollEvents(), axisJoints, tolerances);
+				() -> robot.runtime.pollEvents(), axisJoints, tolerances, frequencies);
 			made.slip = slip;
 			return made;
 		};
@@ -295,6 +296,15 @@ class PrintProgramPlayer extends ToolpathPlayer {
 		}
 		// A joint nothing moves holds where it is, and ends a plan where it began.
 		return [for (value in known) value < 0 ? POSITION_TOLERANCE : value];
+	}
+
+	/** The frequency (rad/s) each joint hangs on its drive's spring at, sqrt(K / m) of the axis it is, or 0 for a joint with none. */
+	static function springFrequencies(model:robotkit.model.RobotModel):Array<Float> {
+		var frequencies = [for (_ in model.joints) 0.0];
+		for (load in robotkit.model.DriveLoads.of(model, new robotkit.model.SteadyLoads()))
+			if (load.stiffness > 0.0 && load.mass > 0.0)
+				for (index in 0...model.joints.length) if (model.joints[index].id == load.axis) frequencies[index] = Math.sqrt(load.stiffness / load.mass);
+		return frequencies;
 	}
 
 	/** A digital input of the program: whether a heater is at its target, from its sensor's last frame. */

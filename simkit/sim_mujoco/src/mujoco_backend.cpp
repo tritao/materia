@@ -837,6 +837,7 @@ public:
     }
 
     std::uint32_t features() const noexcept override { return NKSIM_WORLD_FEATURE_COMPLIANT_COUPLINGS; }
+    double solver_tolerance() const noexcept override { return model ? model->opt.tolerance : 0.0; }
 
     nksim_result joint_couple(const nksim::BackendJointCoupling &coupling) override {
         if (joints.find(coupling.leader) == joints.end() ||

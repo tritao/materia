@@ -113,6 +113,16 @@ class LeadScrewNut extends MachineComponent {
 		case PreloadedBallNut: 0.02;
 	};
 
+	/**
+	 * Assumed axial stiffness of the nut, N/mm (catalogue-typical rigidity of a 16 mm class ball nut: about 100 N/um unpreloaded, 300 N/um
+	 * preloaded). A sliding nut is taken as rigid against the shaft (null): its thread stiffness is far above the screw's.
+	 */
+	public function axialStiffness():Null<Float> return switch kind {
+		case BallNut: 100000;
+		case PreloadedBallNut: 300000;
+		default: null;
+	};
+
 	/** Sliding nuts use a greased steel/bronze friction of 0.1; ball nuts assume 90% efficiency. */
 	public function efficiency():Float return (kind == BallNut || kind == PreloadedBallNut) ? LeadScrewThread.BALL_EFFICIENCY : thread.efficiency(0.1);
 

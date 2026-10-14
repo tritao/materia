@@ -237,6 +237,7 @@ void Simulation::attach() {
     Lock lock(session_);
     const auto world = stopped_world();
     if (world == 0) throw std::runtime_error("robots attach to a stopped session");
+    require_sim(nksim_world_get_solver_tolerance(world, &solver_tolerance_), "nksim_world_get_solver_tolerance");
     const double half_extents[] = {0.05, 0.05, 0.05};
     require_sim(nksim_shape_create_box(world, half_extents, &shape_), "nksim_shape_create_box");
     nksim_participant_desc desc{};

@@ -20,9 +20,12 @@ class MillPartTests {
 		near(new BallScrew(200).axialStiffness(), 2 * screw.axialStiffness(), "Shorter shaft stiffness");
 		// The coupling carries it in the linear axis's units, N/m (it once took the N/mm value as N/m: a thousand times soft).
 		var stiffness = relation.stiffness;
-		near(stiffness == null ? 0 : stiffness, screw.axialStiffness() * 1000, "a ball screw coupling's stiffness is in N/m");
-		if (relation.assumptions().filter(a -> a.label.indexOf("ball screw shaft stiffness") >= 0).length != 1)
-			throw "A ball screw's stiffness is stated as the shaft's, not as rigid";
+		// The shaft, the preloaded nut (300 N/um) and the support bearings (200 N/um) are springs in series, in N/m.
+		var series = 1.0 / (1.0 / screw.axialStiffness() + 1.0 / 200000.0 + 1.0 / 300000.0);
+		near(stiffness == null ? 0 : stiffness, series * 1000, "a ball screw coupling's stiffness is in N/m, with the nut and bearings in series");
+		if (!((stiffness == null ? 0 : stiffness) < screw.axialStiffness() * 1000 * 0.8)) throw "the nut and bearings make the drive softer than its shaft alone";
+		if (relation.assumptions().filter(a -> a.label.indexOf("ball screw drive stiffness") >= 0).length != 1)
+			throw "A ball screw's stiffness is stated as assumed (shaft, nut and bearings), not as rigid";
 		var rebuilt:BallScrew = cast screw.componentType().create(screw.values());
 		near(rebuilt.criticalSpeed(Fixed, Simple), screw.criticalSpeed(Fixed, Simple), "Rebuilt support speed");
 		var rebuiltNut:BallNut = cast nut.componentType().create(nut.values());

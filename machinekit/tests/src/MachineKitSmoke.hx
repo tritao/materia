@@ -2575,6 +2575,10 @@ class MachineKitSmoke {
 			MotorBrakeTests.run();
 			return;
 		}
+		if (Sys.getEnv("MACHINEKIT_MILL_ONLY") == "1") {
+			MillPartTests.run();
+			return;
+		}
 		if (Sys.getEnv("MACHINEKIT_KLIPPER_ONLY") == "1") {
 			PrinterKlipperTests.run();
 			return;

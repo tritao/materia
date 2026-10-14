@@ -272,6 +272,7 @@ public:
 
     nksim_result get_clock(nksim_clock *out_clock) const noexcept;
     std::uint32_t features() const noexcept { return backend ? backend->features() : 0u; }
+    double solver_tolerance() const noexcept { return backend ? backend->solver_tolerance() : 0.0; }
     nksim_result begin_topology_update();
     nksim_result end_topology_update();
     nksim_result configure_integration(std::uint32_t substeps, std::uint32_t integrator);

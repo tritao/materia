@@ -367,6 +367,11 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_world_get_contacts(world: nksim_world, out: ptr<nksim_contact>, capacity: u32, out_count: ptr<u32> @out) -> nksim_result;
 	extern fn nksim_world_get_features(world: nksim_world, out_features: ptr<u32> @out) -> nksim_result;
 	/**
+	 * The tolerance of the backend's constraint solver: how far from exact its solution may be, as the scale of a position error
+	 * (metres or radians) that a body resting on a joint limit may show. Zero when the backend is exact.
+	 */
+	extern fn nksim_world_get_solver_tolerance(world: nksim_world, out_tolerance: ptr<f64> @out) -> nksim_result;
+	/**
 	 * Restores body state and the fixed-step clock to their initial values.
 	 */
 	extern fn nksim_world_reset(world: nksim_world) -> nksim_result;

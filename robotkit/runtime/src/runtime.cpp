@@ -2508,11 +2508,9 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
         return result != RK_OK ? result : RK_ERROR_BACKEND;
     }
     const double tolerance = blueprint_.observed_limit_tolerance;
-    // A joint that rests on its stop stands at the limit to the physics solver's convergence (MuJoCo's default tolerance
-    // is 1e-8): a spring-coupled carriage pressed into its stop does, where an ideal constraint stopped short. An
-    // observation may not be more exact than that.
-    constexpr double solver_tolerance = 1e-8;
-    const double precision = std::max(endpoint_->observed_position_precision(), solver_tolerance);
+    // The endpoint's own precision: a float link's epsilon, or the physics solver's tolerance (a carriage pressed into its
+    // stop stands at the limit to that).
+    const double precision = endpoint_->observed_position_precision();
     for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
         const auto &limits = blueprint_.joints[joint];
         const double margin = tolerance + blueprint_.joint_overtravel[joint];

@@ -67,7 +67,7 @@ class ManipulatorMotion {
   public function new(robot:Robot, compiler:ProgramCompiler,
       input:String -> Null<EventValue>,
       eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool},
-      ?jointIndices:Array<Int>, ?completionPositionTolerance:Array<Float>) {
+      ?jointIndices:Array<Int>, ?completionPositionTolerance:Array<Float>, ?springFrequencies:Array<Float>) {
     if (robot == null || compiler == null || input == null || eventSource == null)
       throw "ManipulatorMotion needs a robot, compiler, input and event source";
     this.robot = robot; this.compiler = compiler;
@@ -83,7 +83,7 @@ class ManipulatorMotion {
         throw "ManipulatorMotion needs distinct robot joint indices";
       seen.set(index, true);
     }
-    executor = new PlanExecutor(robot, this.jointIndices, session, completionPositionTolerance);
+    executor = new PlanExecutor(robot, this.jointIndices, session, completionPositionTolerance, springFrequencies);
   }
 
   /** A program started with `run(program, false)` whose first plan is still being made. */

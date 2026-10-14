@@ -22,6 +22,8 @@ class PlanExecutor {
   final ownsSession:Bool;
   /** Optional measured endpoint allowance before advancing an exact-stop program. */
   final completionPositionTolerance:Null<Array<Float>>;
+  /** Each plan joint's spring frequency (rad/s) when it hangs on one, else 0; null for none: see `settled`. */
+  final springFrequencies:Null<Array<Float>>;
   var plan:Null<ExecutionPlan>;
   /** The active plan's segments, read in place over the robot's joints. */
   var planArrays:Null<SegmentArrays> = null;
@@ -33,7 +35,7 @@ class PlanExecutor {
   var deferredRefill:Bool = false;
 
   public function new(robot:Robot, ?jointIndices:Array<Int>,
-      ?session:MotionSession, ?completionPositionTolerance:Array<Float>) {
+      ?session:MotionSession, ?completionPositionTolerance:Array<Float>, ?springFrequencies:Array<Float>) {
     if (robot == null || !robot.capabilities().execution.plans)
       throw "PlanExecutor requires execution plan and trajectory queue support";
     this.robot = robot;
@@ -42,6 +44,9 @@ class PlanExecutor {
     stream = new TrajectoryStream(robot, true);
     this.jointIndices = jointIndices == null ?
       [for (i in 0...robot.description().joints.length) i] : jointIndices.copy();
+    var frequencies = springFrequencies;
+    if (frequencies != null && frequencies.length != this.jointIndices.length) throw "PlanExecutor needs a spring frequency for each plan joint";
+    this.springFrequencies = frequencies == null ? null : frequencies.copy();
     if (completionPositionTolerance != null) {
       if (completionPositionTolerance.length != this.jointIndices.length)
         throw "Plan completion tolerances must match the planned joints";
@@ -71,7 +76,6 @@ class PlanExecutor {
     jerkUnchecked = plan.report.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status ==
       TrajectoryCoreConstants.MK_CHECK_UNCHECKED;
     completed = false;
-    lastSettleCheckNs = null;
     stream.beginSegments(new TrajectoryStream.NativeStreamSegments(arrays), plan.durationSeconds);
     deferredRefill = false;
     if (session.state == Idle) session.begin();
@@ -129,18 +133,17 @@ class PlanExecutor {
     var tolerance = completionPositionTolerance;
     if (!endsAtRest || tolerance == null) return true;
     var target = active.evaluate(active.durationSeconds).positions;
-    // A carriage on a spring swings through the tolerance band: settled also means that it does not leave the band
-    // within the interval between observations at the speed it has (a joint at rest never does).
-    var interval = lastSettleCheckNs == null ? 0.0 : Int64.toInt(Int64.sub(observation.sourceTimestampNs, lastSettleCheckNs)) * 1e-9;
-    lastSettleCheckNs = observation.sourceTimestampNs;
     for (joint in 0...jointIndices.length) {
       var index = jointIndices[joint];
-      if (Math.abs(observation.positions.get(index) - target[joint]) > tolerance[joint]) return false;
-      if (Math.abs(observation.velocities.get(index)) * interval > tolerance[joint]) return false;
+      var error = observation.positions.get(index) - target[joint];
+      // A joint on a spring (a belt carriage) swings through its band, so it is settled when the amplitude its energy allows,
+      // sqrt(x^2 + (v / w)^2) with w the spring's frequency, is inside the band; one with no spring is where it is.
+      var frequency = springFrequencies == null ? 0.0 : springFrequencies[joint];
+      var amplitude = frequency > 0.0 ? Math.sqrt(error * error + Math.pow(observation.velocities.get(index) / frequency, 2)) : Math.abs(error);
+      if (amplitude > tolerance[joint]) return false;
     }
     return true;
   }
-  var lastSettleCheckNs:Null<Int64> = null;
 
   public function hold():Void {
     if (!session.hold() || plan == null) return;
