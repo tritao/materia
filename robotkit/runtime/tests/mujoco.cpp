@@ -1375,7 +1375,6 @@ static void articulated_robot_follower_tracks_and_releases_without_losing_tool_j
     assert(rk_simulation_get_link_pose(fixture.simulation, 1, 0, &docked) == RK_OK);
     for (uint32_t axis = 0; axis < 3; ++axis)
         assert(std::abs(docked.position[axis] - released.position[axis]) < 1e-10);
-    assert(start(fixture.session) == RK_OK);
     for (int tick = settling_ticks + 1; tick <= settling_ticks + 50; ++tick)
         assert(fixture.step(static_cast<uint64_t>(tick) * 1000000) == RK_OK);
     assert(stop(fixture.session) == RK_OK);

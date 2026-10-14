@@ -1677,26 +1677,29 @@ rk_result Simulation::set_joint_positions(uint32_t robot_index, const double *po
 }
 
 rk_result Simulation::drive_process_joint(uint32_t robot_index, uint32_t joint,
-                                            double position, double velocity) {
+                                            double position, double velocity, double max_effort) {
     Lock lock(session_);
     if (robot_index >= bindings_.size()) return RK_ERROR_INVALID_ARGUMENT;
     auto binding = bindings_[robot_index].lock();
     if (!binding) return RK_ERROR_INVALID_HANDLE;
     const auto &blueprint = runtimes_[robot_index]->blueprint();
     if (joint >= binding->joints_.size() || !std::isfinite(position) || !std::isfinite(velocity) ||
-        !blueprint.process_joint[joint]) return RK_ERROR_INVALID_ARGUMENT;
+        !std::isfinite(max_effort) || max_effort < 0.0 || !blueprint.process_joint[joint])
+        return RK_ERROR_INVALID_ARGUMENT;
     const auto &limits = blueprint.joints[joint];
+    const bool rated = (limits.limit_flags & RK_LIMIT_EFFORT) && limits.max_effort > 0.0;
     if ((limits.type != RK_RUNTIME_JOINT_PRISMATIC && limits.type != RK_RUNTIME_JOINT_REVOLUTE) ||
         position < limits.lower_limit || position > limits.upper_limit ||
-        ((limits.limit_flags & RK_LIMIT_VELOCITY) && std::abs(velocity) > limits.max_velocity))
+        ((limits.limit_flags & RK_LIMIT_VELOCITY) && std::abs(velocity) > limits.max_velocity) ||
+        (rated && max_effort > limits.max_effort))
         return RK_ERROR_INVALID_ARGUMENT;
     nksim_joint_target target{};
     target.struct_size = sizeof(target);
     target.joint = binding->joints_[joint];
     target.mode = NKSIM_JOINT_TARGET_POSITION;
     target.target = position;
-    target.max_force = (limits.limit_flags & RK_LIMIT_EFFORT) && limits.max_effort == 0.0
-        ? -1.0 : limits.max_effort;
+    target.max_force = max_effort > 0.0 ? max_effort
+        : (limits.limit_flags & RK_LIMIT_EFFORT) && limits.max_effort == 0.0 ? -1.0 : limits.max_effort;
     const auto &gains = binding->servo_[joint];
     if (gains.stiffness > 0.0) {
         target.mode = NKSIM_JOINT_TARGET_SERVO;
@@ -1704,6 +1707,33 @@ rk_result Simulation::drive_process_joint(uint32_t robot_index, uint32_t joint,
         target.damping = gains.damping;
         target.velocity = velocity;
     }
+    return nksim_session_submit_joint_targets(session_, &target, 1) == NKSIM_OK
+        ? RK_OK : RK_ERROR_BACKEND;
+}
+
+rk_result Simulation::spring_process_joint(uint32_t robot_index, uint32_t joint, double rest_position,
+                                          double stiffness, double damping) {
+    Lock lock(session_);
+    if (robot_index >= bindings_.size()) return RK_ERROR_INVALID_ARGUMENT;
+    auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    const auto &blueprint = runtimes_[robot_index]->blueprint();
+    if (joint >= binding->joints_.size() || !std::isfinite(rest_position) || !std::isfinite(stiffness) ||
+        !(stiffness > 0.0) || !std::isfinite(damping) || damping < 0.0 || !blueprint.process_joint[joint])
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto &limits = blueprint.joints[joint];
+    if ((limits.type != RK_RUNTIME_JOINT_PRISMATIC && limits.type != RK_RUNTIME_JOINT_REVOLUTE) ||
+        rest_position < limits.lower_limit || rest_position > limits.upper_limit)
+        return RK_ERROR_INVALID_ARGUMENT;
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target);
+    target.joint = binding->joints_[joint];
+    target.mode = NKSIM_JOINT_TARGET_SERVO;
+    target.target = rest_position;
+    target.max_force = (limits.limit_flags & RK_LIMIT_EFFORT) && limits.max_effort == 0.0
+        ? -1.0 : limits.max_effort;
+    target.stiffness = stiffness;
+    target.damping = damping;
     return nksim_session_submit_joint_targets(session_, &target, 1) == NKSIM_OK
         ? RK_OK : RK_ERROR_BACKEND;
 }
@@ -1799,23 +1829,26 @@ rk_result Simulation::unbind_object(nksim_object object) {
     return RK_OK;
 }
 
-rk_result Simulation::create_object_slide_follower(const rk_simulation_object_slide_desc &request,
+rk_result Simulation::create_object_screw_joint(const rk_simulation_object_screw_desc &request,
         nksim_joint &out_joint) {
     Lock lock(session_);
     out_joint = 0;
+    const auto finite_positive = [](double value) { return std::isfinite(value) && value > 0.0; };
     if (request.struct_size < sizeof(request) || request.reserved[0] || request.reserved[1] ||
-        request.follower_body == 0 || !std::isfinite(request.lower_limit) ||
-        !std::isfinite(request.upper_limit) || !(request.lower_limit < request.upper_limit) ||
-        !std::isfinite(request.max_force) || !(request.max_force > 0.0) ||
-        !std::isfinite(request.ratio) || request.ratio == 0.0 || !std::isfinite(request.offset) ||
+        request.member_body == 0 || request.screw_body == 0 || request.member_body == request.screw_body ||
+        !std::isfinite(request.lead) || request.lead == 0.0 ||
+        !std::isfinite(request.lower_limit) || !std::isfinite(request.upper_limit) ||
+        !(request.lower_limit < request.upper_limit) ||
+        (request.socket_ratio != 1.0 && request.socket_ratio != -1.0) ||
+        !finite_positive(request.thread_stiffness) || !finite_positive(request.thread_damping_ratio) ||
+        !std::isfinite(request.advance_armature) || request.advance_armature < 0.0 ||
         request.robot_index >= bindings_.size())
         return RK_ERROR_INVALID_ARGUMENT;
     double axis_norm = 0.0;
     for (int i = 0; i < 3; ++i) {
-        if (!std::isfinite(request.anchor_a[i]) || !std::isfinite(request.anchor_b[i]) ||
-            !std::isfinite(request.axis_a[i]))
+        if (!std::isfinite(request.axis_point[i]) || !std::isfinite(request.axis[i]))
             return RK_ERROR_INVALID_ARGUMENT;
-        axis_norm += request.axis_a[i] * request.axis_a[i];
+        axis_norm += request.axis[i] * request.axis[i];
     }
     if (std::abs(axis_norm - 1.0) > 1e-8) return RK_ERROR_INVALID_ARGUMENT;
     const auto world = stopped_world();
@@ -1823,11 +1856,9 @@ rk_result Simulation::create_object_slide_follower(const rk_simulation_object_sl
     const auto binding = bindings_[request.robot_index].lock();
     if (!binding) return RK_ERROR_INVALID_HANDLE;
     const auto &blueprint = runtimes_[request.robot_index]->blueprint();
-    if (request.parent_link_index >= binding->bodies_.size() ||
-        request.driver_joint_index >= binding->joints_.size() ||
-        request.driver_joint_index >= blueprint.joint_count ||
-        blueprint.joints[request.driver_joint_index].type != RK_RUNTIME_JOINT_REVOLUTE ||
-        blueprint.joints[request.driver_joint_index].child_link != request.parent_link_index)
+    if (request.spindle_joint_index >= binding->joints_.size() ||
+        request.spindle_joint_index >= blueprint.joint_count ||
+        blueprint.joints[request.spindle_joint_index].type != RK_RUNTIME_JOINT_REVOLUTE)
         return RK_ERROR_INVALID_ARGUMENT;
     try {
         object_joints_.reserve(object_joints_.size() + 1);
@@ -1835,46 +1866,64 @@ rk_result Simulation::create_object_slide_follower(const rk_simulation_object_sl
         return RK_ERROR_OUT_OF_MEMORY;
     }
 
-    nksim_body_state parent_state{}, follower_state{};
-    parent_state.struct_size = follower_state.struct_size = sizeof(nksim_body_state);
-    if (nksim_body_get_state(world,binding->bodies_[request.parent_link_index],&parent_state) != NKSIM_OK ||
-        nksim_body_get_state(world,request.follower_body,&follower_state) != NKSIM_OK)
+    nksim_body_state member_state{}, screw_state{};
+    member_state.struct_size = screw_state.struct_size = sizeof(nksim_body_state);
+    nksim_joint_state spindle_state{};
+    spindle_state.struct_size = sizeof(spindle_state);
+    const auto spindle = binding->joints_[request.spindle_joint_index];
+    if (nksim_body_get_state(world, request.member_body, &member_state) != NKSIM_OK ||
+        nksim_body_get_state(world, request.screw_body, &screw_state) != NKSIM_OK ||
+        nksim_joint_get_state(world, spindle, &spindle_state) != NKSIM_OK)
         return RK_ERROR_BACKEND;
+    // The joint frame is the screw's own at this measured boundary, so creating the helix moves nothing.
+    const auto member = xform_from(member_state.position, member_state.rotation);
+    const auto screw = xform_from(screw_state.position, screw_state.rotation);
+    const auto member_inverse = xform_inverse(member), screw_inverse = xform_inverse(screw);
+    const auto relative = xform_compose(member_inverse, screw);
+
     const auto began = nksim_world_begin_topology_update(world);
     if (began != NKSIM_OK) return from_sim(began);
     nksim_joint_desc joint_desc{};
     joint_desc.struct_size = sizeof(joint_desc);
-    joint_desc.type = NKSIM_JOINT_PRISMATIC;
-    joint_desc.body_a = binding->bodies_[request.parent_link_index];
-    joint_desc.body_b = request.follower_body;
-    joint_desc.rotation_a[3] = 1.0;
-    const double inverse_follower_rotation[] = {-follower_state.rotation[0],-follower_state.rotation[1],
-        -follower_state.rotation[2],follower_state.rotation[3]};
-    quat_multiply(inverse_follower_rotation,parent_state.rotation,joint_desc.rotation_b);
-    std::copy_n(request.anchor_a, 3, joint_desc.anchor_a);
-    std::copy_n(request.anchor_b, 3, joint_desc.anchor_b);
-    std::copy_n(request.axis_a, 3, joint_desc.axis_a);
+    joint_desc.type = NKSIM_JOINT_HELICAL;
+    joint_desc.body_a = request.member_body;
+    joint_desc.body_b = request.screw_body;
+    std::copy_n(relative.rot, 4, joint_desc.rotation_a);
+    joint_desc.rotation_b[3] = 1.0;
+    double anchor_a[3], anchor_b[3], axis_a[3], rotated[3];
+    quat_rotate(member_inverse.rot, request.axis_point, rotated);
+    for (int i = 0; i < 3; ++i) anchor_a[i] = rotated[i] + member_inverse.pos[i];
+    quat_rotate(screw_inverse.rot, request.axis_point, rotated);
+    for (int i = 0; i < 3; ++i) anchor_b[i] = rotated[i] + screw_inverse.pos[i];
+    quat_rotate(member_inverse.rot, request.axis, axis_a);
+    std::copy_n(anchor_a, 3, joint_desc.anchor_a);
+    std::copy_n(anchor_b, 3, joint_desc.anchor_b);
+    std::copy_n(axis_a, 3, joint_desc.axis_a);
     joint_desc.lower_limit = request.lower_limit;
     joint_desc.upper_limit = request.upper_limit;
-    joint_desc.max_force = request.max_force;
-    nksim_joint follower = 0;
-    auto result = nksim_joint_create(world, &joint_desc, &follower);
+    joint_desc.max_force = -1.0;  // Unpowered: only the socket turns it.
+    joint_desc.lead = request.lead;
+    joint_desc.lead_stiffness = request.thread_stiffness;
+    joint_desc.lead_damping_ratio = request.thread_damping_ratio;
+    joint_desc.lead_armature = request.advance_armature;
+    nksim_joint helix = 0;
+    auto result = nksim_joint_create(world, &joint_desc, &helix);
     if (result == NKSIM_OK) {
-        nksim_joint_coupling_desc coupling{};
-        coupling.struct_size = sizeof(coupling);
-        coupling.leader = binding->joints_[request.driver_joint_index];
-        coupling.follower = follower;
-        coupling.ratio = request.ratio;
-        coupling.offset = request.offset;
-        result = nksim_joint_couple(world, &coupling);
+        // The socket: turn = ratio * spindle + offset, zero turn at the spindle's position now.
+        nksim_joint_coupling_desc socket{};
+        socket.struct_size = sizeof(socket);
+        socket.leader = spindle;
+        socket.follower = helix;
+        socket.ratio = request.socket_ratio;
+        socket.offset = -request.socket_ratio * spindle_state.position;
+        result = nksim_joint_couple(world, &socket);
     }
-    if (result != NKSIM_OK && follower != 0) nksim_joint_destroy(world, follower);
+    if (result != NKSIM_OK && helix != 0) nksim_joint_destroy(world, helix);
     const auto committed = nksim_world_end_topology_update(world);
     if (result != NKSIM_OK) return from_sim(result);
     if (committed != NKSIM_OK) return from_sim(committed);
-    object_joints_.push_back({follower, request.follower_body, request.robot_index,
-        request.parent_link_index});
-    out_joint = follower;
+    object_joints_.push_back({helix, request.screw_body, request.robot_index, 0, false});
+    out_joint = helix;
     return RK_OK;
 }
 
@@ -2146,7 +2195,7 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
     auto internal_to_tool = [&](nksim_body body, uint32_t link_index) {
         if (link_index < binding->bodies_.size() && body == binding->bodies_[link_index]) return true;
         for (const auto &owner : object_joints_)
-            if (owner.robot_index == robot_index && owner.parent_link_index == link_index &&
+            if (owner.tool_load && owner.robot_index == robot_index && owner.parent_link_index == link_index &&
                 owner.follower == body) return true;
         for (const auto &owner : object_carriers_)
             if (owner.robot_index == robot_index && owner.link_index == link_index && owner.body == body)
@@ -2177,7 +2226,7 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
             }
         }
         for (const auto &owner : object_joints_) {
-            if (owner.robot_index != robot_index ||
+            if (!owner.tool_load || owner.robot_index != robot_index ||
                 (source.body_a != owner.follower && source.body_b != owner.follower))
                 continue;
             const auto other_body = source.body_a == owner.follower ? source.body_b : source.body_a;

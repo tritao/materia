@@ -646,11 +646,20 @@ RK_API rk_result RK_CALL rk_simulation_set_joint_positions(
     rk_simulation simulation, uint32_t robot_index,
     const double *positions RK_IN_ARRAY(count), uint32_t count);
 /** Drives one process-owned tool joint without changing other joints or their commands.
- * Called between physics ticks. Only prismatic and rotary tool coordinates are admitted.
+ * Called between physics ticks. Only prismatic and rotary tool coordinates are admitted. `max_effort` is the
+ * controller's force or torque limit for this command, positive and within the joint's rating; zero applies the
+ * rating itself.
  */
 RK_API rk_result RK_CALL rk_simulation_drive_process_joint(
     rk_simulation simulation, uint32_t robot_index, uint32_t joint,
-    double position, double velocity);
+    double position, double velocity, double max_effort);
+/** Makes one process-owned tool joint a passive spring: it rests at `rest_position` with `stiffness`
+ * (N/m or N m/rad) and `damping` (N s/m or N m s/rad), its force capped by the joint's effort limit. A compliant
+ * feed slide is this, mechanically. Called between physics ticks.
+ */
+RK_API rk_result RK_CALL rk_simulation_spring_process_joint(
+    rk_simulation simulation, uint32_t robot_index, uint32_t joint,
+    double rest_position, double stiffness, double damping);
 /** Reads one robot base pose from the latest physics state. */
 RK_API rk_result RK_CALL rk_simulation_get_robot_pose(
     rk_simulation simulation, uint32_t robot_index,
@@ -700,30 +709,45 @@ RK_API rk_result RK_CALL rk_simulation_bind_object_to_link(
 /** Removes a session object's carried-link contact attribution; repeated removal is allowed. */
 RK_API rk_result RK_CALL rk_simulation_unbind_object(
     rk_simulation simulation, nksim_object object);
-/** Prismatic child and lead relation for one dynamic object carried by a robot link. */
-typedef struct rk_simulation_object_slide_desc {
+/**
+ * A dynamic screw threaded into its member: a helical joint from the member's body, turned by one robot revolute
+ * joint through a socket. The socket couples only rotation, so the thread's axial reaction stays between the
+ * screw and the member.
+ */
+typedef struct rk_simulation_object_screw_desc {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint32_t robot_index;
-    uint32_t parent_link_index;
-    uint32_t driver_joint_index;
-    nksim_body follower_body;
-    double anchor_a[3]; /**< Local to the parent link. */
-    double anchor_b[3]; /**< Local to the follower body. */
-    double axis_a[3]; /**< Unit slide axis in the parent link. */
+    /** The revolute joint whose rotation the socket passes to the screw. */
+    uint32_t spindle_joint_index;
+    /** The threaded member's body: a session object's or a robot link's. */
+    nksim_body member_body;
+    nksim_body screw_body;
+    double axis_point[3]; /**< A world point on the thread axis, at the measured boundary. */
+    double axis[3]; /**< World unit direction the screw advances in. */
+    /** Metres of advance per positive turn about `axis`; negative for a left-hand thread. */
+    double lead;
+    /** The screw's turn range from its pose now, in radians. */
     double lower_limit;
     double upper_limit;
-    double max_force;
-    double ratio;
-    double offset;
+    /** Screw turn per spindle radian: +1 or -1 with the spindle axis along or against `axis`. */
+    double socket_ratio;
+    /**
+     * The thread flank as a spring along the axis: stiffness (N/m) and damping ratio. A solver constraint on a
+     * light screw is only as stiff as that screw's mass allows; a stated stiffness is not.
+     */
+    double thread_stiffness;
+    double thread_damping_ratio;
+    /** Inertia (kg) on the advance, so a stiff thread on a light screw stays resolved by the step. */
+    double advance_armature;
     uint64_t reserved[2];
-} rk_simulation_object_slide_desc;
+} rk_simulation_object_screw_desc;
 /**
- * Adds a prismatic child to a robot link and couples its slide to one robot revolute joint.
- * The session must be between ticks with its physics host stopped; ratio and offset follow
- * `follower = ratio * leader + offset` in native joint coordinates.
+ * Threads a dynamic screw into its member at its current measured pose and couples its turn to a robot spindle.
+ * The session must be between ticks with its physics host stopped. The screw's contacts are its member's, not
+ * the robot's: the spindle carries only the socket torque.
  */
-RK_API rk_result RK_CALL rk_simulation_create_object_slide_follower(
-    rk_simulation simulation, const rk_simulation_object_slide_desc *desc,
+RK_API rk_result RK_CALL rk_simulation_create_object_screw_joint(
+    rk_simulation simulation, const rk_simulation_object_screw_desc *desc,
     nksim_joint *out_joint RK_OUT);
 /**
  * Attaches a dynamic session body to a robot link with a removable fixed joint.

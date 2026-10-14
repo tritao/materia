@@ -359,10 +359,17 @@ rk_result RK_CALL rk_simulation_set_joint_positions(rk_simulation simulation,
                  : RK_ERROR_INVALID_HANDLE;
 }
 
-rk_result RK_CALL rk_simulation_drive_process_joint(rk_simulation simulation,
-    uint32_t robot_index, uint32_t joint, double position, double velocity) {
+rk_result RK_CALL rk_simulation_spring_process_joint(rk_simulation simulation,
+    uint32_t robot_index, uint32_t joint, double rest_position, double stiffness, double damping) {
     const auto value = resolve(simulation);
-    return value ? value->drive_process_joint(robot_index, joint, position, velocity)
+    return value ? value->spring_process_joint(robot_index, joint, rest_position, stiffness, damping)
+                 : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_drive_process_joint(rk_simulation simulation,
+    uint32_t robot_index, uint32_t joint, double position, double velocity, double max_effort) {
+    const auto value = resolve(simulation);
+    return value ? value->drive_process_joint(robot_index, joint, position, velocity, max_effort)
                  : RK_ERROR_INVALID_HANDLE;
 }
 
@@ -413,13 +420,13 @@ rk_result RK_CALL rk_simulation_unbind_object(rk_simulation simulation,nksim_obj
     return value?value->unbind_object(object):RK_ERROR_INVALID_HANDLE;
 }
 
-rk_result RK_CALL rk_simulation_create_object_slide_follower(rk_simulation simulation,
-    const rk_simulation_object_slide_desc *desc, nksim_joint *out_joint) {
+rk_result RK_CALL rk_simulation_create_object_screw_joint(rk_simulation simulation,
+    const rk_simulation_object_screw_desc *desc, nksim_joint *out_joint) {
     if (!desc || !out_joint || desc->struct_size < sizeof(*desc)) return RK_ERROR_INVALID_ARGUMENT;
     const auto value = resolve(simulation);
     if (!value) return RK_ERROR_INVALID_HANDLE;
     try {
-        return value->create_object_slide_follower(*desc, *out_joint);
+        return value->create_object_screw_joint(*desc, *out_joint);
     } catch (const std::bad_alloc &) {
         return RK_ERROR_OUT_OF_MEMORY;
     } catch (...) {

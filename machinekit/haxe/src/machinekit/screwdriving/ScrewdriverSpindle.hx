@@ -21,6 +21,9 @@ class ScrewdriverSpindle extends MachineAssembly {
 		addComponent("bit", bit);
 		addMateOnAxis("feed", "prismatic", "body", "end", "slide", "mount", {x: 0, y: 1, z: 0}, 0,
 			{lower: -strokeMm, upper: 0, velocity: 100, effort: springRate * strokeMm, overtravel: 1.1});
+		// The extended stop is steel. A critically damped stop overshoots by about v * tau / e; a light slide released
+		// from full stroke reaches it near 2 m/s, so a 1 ms response holds it inside the 1.1 mm overtravel.
+		setJointStop("feed", {timeConstantSec: 0.001, dampingRatio: 1});
 		addMateOnAxis("spindle", "continuous", "slide", "end", "carrier", "mount", {x: 0, y: 1, z: 0}, 0,
 			{lower: null, upper: null, velocity: maxSpeed, effort: maxTorque});
 		addMate("bit-mount", "fixed", "carrier", "bit", "bit", "mount");

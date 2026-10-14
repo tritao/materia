@@ -42,16 +42,14 @@ class ProjectKitTests {
   /** Force-search commissioning data is explicit, sensor-bound and stable before it reaches a mission. */
   static function screwEntrySearchProfile():Void {
     var profile:materia.project.SceneArtifact.SceneArtifactScrewEntrySearch = {
-      sensor: "tool/force-torque", maximumAgeSeconds: 0.02, targetWrench: [0, 0, -5, 0, 0, 0],
-      virtualMass: [1, 1, 1, 1, 1, 1], damping: [20, 20, 20, 20, 20, 20],
-      maximumLinearSpeed: 0.003, maximumSearchAxialSpeed: 0.0015,
-      contactReliefMeters: 0.002,
-      maximumAngularSpeed: 0.0008, maximumStepSeconds: 0.01,
+      sensor: "tool/force-torque", maximumAgeSeconds: 0.02, contactForceN: 5, contactThresholdN: 2,
+      confirmationSamples: 2, virtualMass: [80, 80, 80, 1, 1, 1], damping: [4000, 4000, 4000, 20, 20, 20],
+      maximumLinearSpeed: 0.004, maximumAngularSpeed: 0.0008, maximumStepSeconds: 0.01, approachSpeed: 0.002,
       maximumForceN: 25, maximumTorqueNm: 2, maximumTravelMeters: 0.045, maximumTravelRadians: 0.06,
-		maximumRunSeconds: 65, regionHalfUMeters: 0.002, regionHalfVMeters: 0.002,
-      contactSeedOffsetUMeters: 0.0004, spiralRadiusMeters: 0.001, spiralTurns: 1.5, spiralDurationSeconds: 35,
-      spiralMaximumLateralSpeed: 0.003, spiralTrackingGainPerSecond: 6,
-      minimumContactLoadN: 3, requiredLoadDropN: 1, candidateProgressTimeoutSeconds: 1.0, confirmationSamples: 2};
+      maximumRunSeconds: 60, regionHalfUMeters: 0.0021, regionHalfVMeters: 0.0021, spiralRadiusMeters: 0.0016,
+      spiralPitchMeters: 0.0004, spiralSpeed: 0.002, spiralTrackingGainPerSecond: 10,
+      spiralTrackingToleranceMeters: 0.00015, entryAdvanceMeters: 0.0003,
+      stallSeconds: 5};
     var sensor:materia.project.SceneArtifact.SceneArtifactRobotSensor = {kind: "force_torque",
       id: "tool/force-torque", mount: {occurrence: "tool", connector: "tcp"}};
     var tool:materia.project.SceneArtifact.SceneArtifactRobotTool = {kind: "screwdriver", members: ["tool"],
@@ -62,67 +60,35 @@ class ProjectKitTests {
         maxSpeed: 1, strokeMm: 20, springRate: 10}};
     var data:materia.project.SceneArtifact.SceneArtifactData = {metresPerUnit: 0.001,
       lengthUnit: "mm", parts: [], robotTools: [tool], robotSensors: [sensor]};
-    function accepted(hasScrews:Bool, approachMeters:Float = 0.0, candidateAdvanceMeters:Float = 0.001):Bool {
+    function accepted(hasScrews:Bool, approachMeters:Float = 0.04):Bool {
       try {
-        @:privateAccess SceneArtifact.validateScrewEntrySearch(profile, hasScrews, approachMeters,
-          candidateAdvanceMeters, data,
+        @:privateAccess SceneArtifact.validateScrewEntrySearch(profile, hasScrews, approachMeters, data,
           function(detail:String):Void throw detail);
         return true;
       } catch (_:Dynamic) return false;
     }
-	check(ScrewEntrySearchBounds.refinementTurns(12.0) == 10.0 &&
-		ScrewEntrySearchBounds.fallbackTurns(12.0) == 14.0 &&
-		Math.abs(ScrewEntrySearchBounds.fallbackDurationSeconds(0.002, 12.0, 0.00014) -
-			0.002 * (1.0 + 2.0 * Math.PI * 14.0) / 0.00014) < 1e-8,
-      "candidate refinement and the full-region fallback share their coverage and duration bounds");
-	var fullSearchMinimum = ScrewEntrySearchBounds.minimumRunSeconds(0.0400217, 0.005,
-		0.000125, 880, 0.0016, 12, 0.00014, 30);
-	check(1660 < fullSearchMinimum && Math.abs(fullSearchMinimum - 3592.01) < 0.01 &&
-		Math.abs(3600 - fullSearchMinimum - 7.99) < 0.01,
-		"The 1.6 mm contact-plane spiral, candidate checks, registered sweeps and one relief retry fit inside the force-search run bound");
-	check(Math.abs(ScrewEntrySearchBounds.catchupRecoverySeconds(0.005, 0.000125, 30) - 110.0) < 1e-8,
-		"One catch-up recovery reserves its timeout and bounded retract/reapproach travel");
-	check(Math.abs(ScrewEntrySearchBounds.catchupReliefDepthMeters(0.0229, 0.005) - 0.0179) < 1e-12 &&
-		ScrewEntrySearchBounds.catchupReliefDepthMeters(-0.004, 0.005) == -0.005,
-		"Catch-up relief is relative to the measured stall and stays inside the commissioned approach clearance");
+    var spiral = ScrewEntrySearchBounds.spiralLengthMeters(0.0016, 0.0004);
+    check(Math.abs(spiral - Math.PI * 0.0016 * 0.0016 / 0.0004) < 0.0004,
+      "an Archimedean spiral's length is close to the area it covers over its pitch");
+    check(Math.abs(ScrewEntrySearchBounds.minimumRunSeconds(0.04, 0.0003, 0.002, 0.0016, 0.0004, 0.002) -
+      (20.15 + spiral / 0.002)) < 1e-9, "the run bound covers the guarded descent and one full spiral");
     check(accepted(true), "a bounded force-search profile matches one mounted screwdriver sensor");
     check(!accepted(false), "force-search profile requires a screw step");
-    check(!accepted(true,0.05), "force-search travel covers the authored approach and spiral");
-    profile.maximumTravelMeters = 0.0401;
-    profile.maximumRunSeconds = 300;
-    profile.maximumTravelRadians = 0.3;
-    check(!accepted(true,0.04), "travel includes CAD approach, contact relief and the full registered spiral region");
-    profile.maximumTravelMeters = 0.041;
-    check(accepted(true,0.04), "travel covers the combined CAD entry and registered search displacement");
-    profile.maximumTravelMeters = 0.06;
-    profile.maximumRunSeconds = 90;
-    profile.maximumTravelRadians = 0.2;
-    profile.maximumAngularSpeed = 0.0008;
-    check(!accepted(true,0.05), "force-search time covers the authored approach and spiral");
-	profile.maximumRunSeconds = 170;
-    check(accepted(true,0.05), "force-search time covers relief, approach, candidate validation and both bounded entry searches");
-    profile.spiralDurationSeconds = 30;
-	profile.maximumRunSeconds = 155;
-    check(!accepted(true,0.05), "force-search spiral lasts through the relief-to-entry axial approach");
-    profile.spiralDurationSeconds = 35;
-    profile.maximumRunSeconds = 20;
-    check(!accepted(true,0.02), "force-search time includes its commissioned early-contact relief");
-    profile.maximumRunSeconds = 50;
-    check(!accepted(true,0.02), "force-search time reserves both bounded entry searches");
-	profile.maximumRunSeconds = 105;
-    check(accepted(true,0.02), "force-search time covers relief, approach, candidate validation and both entry searches");
-    profile.maximumTravelMeters = 0.045;
-    profile.maximumRunSeconds = 20;
-    profile.maximumTravelRadians = 0.05;
-    profile.maximumAngularSpeed = 0.004;
-    check(!accepted(true), "angular speed over the run cannot exceed the commissioned angular travel bound");
+    check(!accepted(true, 0.045), "force-search travel covers the authored approach, entry advance and region");
+    profile.maximumRunSeconds = 30;
+    check(!accepted(true), "force-search time covers the guarded descent and one full spiral");
+    profile.maximumRunSeconds = 32;
+    check(accepted(true), "a run bound just above the descent and spiral is accepted");
+    profile.maximumRunSeconds = 60;
     profile.maximumAngularSpeed = 0.002;
-    profile.maximumSearchAxialSpeed = 0.004;
-    check(!accepted(true), "unvalidated search feed cannot exceed the overall linear speed bound");
-    profile.maximumSearchAxialSpeed = 0.0015;
-    profile.candidateProgressTimeoutSeconds = 0.5;
-    check(!accepted(true), "candidate progress timeout can cover the configured thread lead at search feed speed");
-    profile.candidateProgressTimeoutSeconds = 1.0;
+    check(!accepted(true), "angular speed over the run cannot exceed the commissioned angular travel bound");
+    profile.maximumAngularSpeed = 0.0008;
+    profile.approachSpeed = 0.005;
+    check(!accepted(true), "the guarded descent cannot exceed the linear speed bound");
+    profile.approachSpeed = 0.002;
+    profile.spiralSpeed = 0.005;
+    check(!accepted(true), "spiral speed must fit the linear speed bound");
+    profile.spiralSpeed = 0.002;
     sensor.id = "other-sensor";
     check(!accepted(true), "force-search profile rejects a missing named sensor");
     sensor.id = profile.sensor;
@@ -130,34 +96,37 @@ class ProjectKitTests {
     check(!accepted(true), "force-search profile rejects a sensor mounted off the screwdriver");
     sensor.mount.occurrence = "tool";
     profile.maximumForceN = 4;
-    check(!accepted(true), "force-search target cannot exceed its measured force bound");
-    profile.maximumForceN = 25; profile.maximumStepSeconds = 0.1;
+    check(!accepted(true), "the regulated contact force stays below the hard force bound");
+    profile.maximumForceN = 25;
+    profile.contactThresholdN = 5;
+    check(!accepted(true), "contact is confirmed below the force the regulation holds");
+    profile.contactThresholdN = 2;
+    profile.maximumStepSeconds = 0.1;
     check(!accepted(true), "force-search profile rejects an unstable admittance step");
-    profile.maximumStepSeconds = 0.01; profile.spiralMaximumLateralSpeed = 0.004;
-    check(!accepted(true), "spiral speed must fit the overall linear speed bound");
-    profile.spiralMaximumLateralSpeed = 0.003;
-    profile.contactSeedOffsetUMeters = 0.0011;
-    check(!accepted(true), "force-search seed, spiral and acquisition freshness fit the registered region");
-    profile.contactSeedOffsetUMeters = 0.0004;
-    profile.candidateProgressTimeoutSeconds = 0;
-    check(!accepted(true), "candidate progress must be verified within a positive commissioned timeout");
-    profile.candidateProgressTimeoutSeconds = 1.0;
+    profile.maximumStepSeconds = 0.01;
+    profile.spiralRadiusMeters = 0.002;
+    check(!accepted(true), "the spiral and its tracking tolerance fit the registered region");
+    profile.spiralRadiusMeters = 0.0016;
+    profile.spiralPitchMeters = 0.002;
+    check(!accepted(true), "the spiral pitch is below its radius");
+    profile.spiralPitchMeters = 0.0004;
+    check(accepted(true), "the restored profile is accepted again");
     var engagement:materia.project.SceneArtifact.SceneArtifactScrewEngagement = {
       mode: materia.project.SceneArtifact.SceneArtifactScrewEngagementMode.PhysicalThread,
-      maximumAxialForceN: 25};
+      maximumAxialForceN: 25, threadStiffnessNPerM: 1.0e7};
     var mission:materia.project.SceneArtifact.SceneArtifactMission = {
       steps: [{kind: "screw"}], screwEntrySearch: profile, screwEngagement: engagement};
     var serialized = @:privateAccess SceneArtifact.encodeMission(mission);
     var decoded:materia.project.SceneArtifact.SceneArtifactMission = @:privateAccess
       SceneArtifact.decodeMission(haxe.Json.parse(serialized));
     check(decoded.screwEntrySearch != null && decoded.screwEntrySearch.sensor == profile.sensor &&
-      decoded.screwEntrySearch.targetWrench[2] == -5 && decoded.screwEntrySearch.spiralTurns == 1.5 &&
-      decoded.screwEntrySearch.maximumSearchAxialSpeed == profile.maximumSearchAxialSpeed &&
-      decoded.screwEntrySearch.contactReliefMeters == profile.contactReliefMeters &&
-      decoded.screwEntrySearch.candidateProgressTimeoutSeconds == profile.candidateProgressTimeoutSeconds &&
-      decoded.screwEntrySearch.contactSeedOffsetUMeters == profile.contactSeedOffsetUMeters &&
+      decoded.screwEntrySearch.contactForceN == 5 && decoded.screwEntrySearch.spiralPitchMeters == 0.0004 &&
+      decoded.screwEntrySearch.entryAdvanceMeters == profile.entryAdvanceMeters &&
+      decoded.screwEntrySearch.stallSeconds == profile.stallSeconds &&
+      decoded.screwEntrySearch.damping[2] == 4000 && decoded.screwEntrySearch.confirmationSamples == 2 &&
       decoded.screwEngagement != null && decoded.screwEngagement.mode == engagement.mode &&
-      decoded.screwEngagement.maximumAxialForceN == engagement.maximumAxialForceN,
+      decoded.screwEngagement.maximumAxialForceN == engagement.maximumAxialForceN &&
+      decoded.screwEngagement.threadStiffnessNPerM == 1.0e7,
       "mission force-search and physical-thread selections survive their independent JSON fields");
     var toolChanger:materia.project.SceneArtifact.SceneArtifactToolChanger = {
       master: {occurrence: "robot/master", connector: "tool"}, lockOutput: "changer.lock",
@@ -190,6 +159,10 @@ class ProjectKitTests {
     rejects(() -> @:privateAccess SceneArtifact.validateScrewEngagement(engagement, true,
       function(detail:String):Void throw detail), "Physical thread mode rejects a non-positive force cap");
     engagement.maximumAxialForceN = 25;
+    engagement.threadStiffnessNPerM = null;
+    rejects(() -> @:privateAccess SceneArtifact.validateScrewEngagement(engagement, true,
+      function(detail:String):Void throw detail), "Physical thread mode requires an explicit thread stiffness");
+    engagement.threadStiffnessNPerM = 1.0e7;
     rejects(() -> @:privateAccess SceneArtifact.validateScrewEngagement(engagement, false,
       function(detail:String):Void throw detail), "Physical thread mode requires a screw mission");
     var processWithForce:materia.project.SceneArtifact.SceneArtifactScrewEngagement = {

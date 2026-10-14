@@ -108,6 +108,13 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
     return carrier != null && simulation.objectCarrier(body) == simulation.objectBody(carrier);
   }
 
+  public function threadedBody():NativeKitSim.nksim_body {
+    var member = part, carrier = object;
+    if (member != null) return simulation.linkBody(member.robotIndex, member.linkIndex);
+    if (carrier != null) return simulation.objectBody(carrier);
+    throw 'Assembly occurrence "$id" has no native body to thread into';
+  }
+
   /** Excludes only this free workpiece from one cutter link's rigid-body contacts. */
   public function excludeContactWith(robotIndex:Int, linkIndex:Int):Void {
     var body = object;

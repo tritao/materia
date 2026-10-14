@@ -766,23 +766,47 @@ boundaries and need not all be implemented to use automatic feeding.
   Inspect exported drawing artifacts as well as the editor view. This is an
   independent extension of SD1/SD2.
 
-**SD15. Pick, place and fasten cells.**
-- Compose tray pickup, part placement/location, fixture confirmation,
+**SD15a. Pick, place and fasten cell (no tool change).**
+- Compose tray pickup, part placement and location, fixture confirmation,
   CAD-derived fastening and finished-assembly unloading into one cell mission.
-  Retain measured part identity/pose and existing fastening recovery records.
-- Integrate machine tending's physical jaws (MT8), cell signals (MT6/MT7) and
-  part trays (MT9). Audit their landed interfaces before implementation; the
-  old dependency list does not imply that those features are still unlanded.
-- Add automatic tool change when one robot alternates between gripper and
-  screwdriver: model docking, tool identity, confirmed lock/unlock, TCP and
-  capability changes, and ownership of the outgoing tool's live process.
-- Coordinate feeder readiness, fixture/clamp state and tool readiness. A
-  failure must leave a named, recoverable part/tool state rather than replaying
-  a whole cell cycle with duplicate pickups or fastenings.
-- Checks: a complete tray-to-finished-assembly cycle, fixture-not-ready,
-  missing/misplaced part, unavailable or wrong tool, failed tool change, screw
-  supply failure, interrupted fastening and resume/recovery. Prove equivalent
-  mission behavior on both backends and scripted cell/tool-change I/O.
+- Keep the measured part identity and pose, and the existing fastening recovery
+  records.
+- Handling and screwdriving use separate end effectors that are never
+  exchanged. Either a second arm carries the machine-tending gripper, or
+  fixed-tool stations do the handling. Screws come from the SD9 presenters or
+  the SD10 blow feed.
+- Reuse the landed machine-tending pieces as they are:
+  - physical jaws (MT8);
+  - cell signals (MT6/MT7);
+  - pocketed trays with measured presence (MT9);
+  - the single-part cycle (MT10–MT11).
+- Coordinate feeder readiness, fixture/clamp state and tool readiness. A failure
+  leaves a named, recoverable part/tool state, never a replay of the whole
+  cycle with duplicate pickups or fastenings.
+- Checks:
+  - a complete tray-to-finished-assembly cycle;
+  - fixture not ready;
+  - a missing or misplaced part;
+  - screw supply failure;
+  - an interrupted fastening, resume and recovery.
+
+  Show equivalent mission behaviour on both backends.
+
+**Automatic tool change (moved out, 2026-10-14).** One arm alternating between
+gripper and screwdriver needs a physical tool changer:
+- each tool as its own articulated runtime;
+- a removable joint to the flange or the dock;
+- dock motion;
+- measured lock and identity I/O;
+- swapping TCP, collision geometry and capabilities mid-mission;
+- process ownership across the exchange.
+
+That is shared machinery: machine tending and the welder need it too. It gets
+its own plan, `robotkit/plans/TOOL_CHANGE.md`, seeded from the SD15 drafts
+below (`ToolRuntimeSelection` leases, `ChangerLockObservation`,
+`ToolChangeTransaction`, the floating-subtree CAD split, the robot-to-robot and
+dock followers, the v45 `toolChanger`/`changeTool` mission record). When it
+lands, a cell variant of SD15a uses one arm.
 
 Follow-on dependencies:
 - SD9 is complete and keeps the existing screwdriver pickup/mission boundary.
@@ -790,9 +814,10 @@ Follow-on dependencies:
 - SD10 builds on SD9; SD11 and SD14 proceed independently.
 - SD12 uses a known or SD11-registered approach. SD13 is conditional on needing
   physical thread reactions for SD12 or another compliance experiment.
-- SD15 integrates the landed machine-tending interfaces and automatic tool
-  change. It can initially use SD9 presenters; blow-feed and force search are
-  optional capabilities, not prerequisites for every cell.
+- SD15a integrates the landed machine-tending interfaces without a tool change.
+  It can use SD9 presenters; blow-feed and force search are optional
+  capabilities, not prerequisites for every cell. The one-arm variant waits for
+  `robotkit/plans/TOOL_CHANGE.md`.
 
 ### SD9 implementation decisions and progress
 
@@ -1082,200 +1107,194 @@ with SIGINT when shared root free space fell to 2.5 GB, below the required
 3 GB reserve. That rerun is incomplete, not a test failure; rebuild and rerun
 the deterministic-only app mission and pass the full gate.
 
-### SD12 force-search draft (2026-10-12)
+### SD12 first draft and why it was replaced (2026-10-12 to 10-14)
 
-The source draft adds a `force_torque` sensor measurement with explicit
-environment-on-sensor sign, N and N*m units, named sensor frame, source
-sequence/time/clock, mapped robot time and bounded clock error. Freshness checks
-reject an unknown clock, future interval, stale sample and invalid six-value
-payload. `CartesianAdmittance` integrates the commissioned six-axis virtual
-mass/damper equation, limits linear/angular speed, and rejects a sample period
-outside its stability bound. `ContactAdmittanceRunner` adds fresh-source,
-force/torque, measured TCP travel, angular travel and run-time limits around
-`ServoSession`. The optional spiral must fit within the SD11 contact-region
-bounds and speed limit; it starts only after a measured compression baseline
-and reports entry only after the commissioned force drop repeats for the
-configured sample count. Low-force axial travel without a compression baseline
-is not evidence of a hole: the focused regression rejects this case so a
-missing or obstructed workpiece cannot be accepted as successful entry.
+What the first draft established and keeps:
+- `ForceTorqueMeasurement`: an environment-on-sensor wrench in N and N*m, with
+  a named sensor frame, source sequence, time and clock, mapped robot time and
+  a freshness bound.
+- `SimulatedToolForceTorque`: sums the MuJoCo contact wrenches
+  (`mj_contactForce`) on the tool's links. The contact-order regression covers
+  both body orders.
+- The sensor-to-TCP wrench transform.
+- `CartesianAdmittance`, a six-axis mass/damper with a stable-step bound.
+- The touch-registered force-search CAD acceptance in `ProjectSourceTests`.
+  Its 1 mm case biases the accepted work placement after registration.
 
-An app-level CAD acceptance is drafted in `app/tests/src/app/ProjectSourceTests.hx`.
-It combines the touch-registered project with the force-search profile and runs
-the first named fastening on MuJoCo. The 1 mm case biases the accepted work
-placement after registration; it exercises residual registration error without
-moving the CAD fixture. The test compiles in Haxeon compiler-only mode. Earlier
-setup attempts incorrectly tried to teleport the fixed `work/plate` occurrence
-as an independent `SimObject`; that approach was removed. The fixture's actual
-pose remains available through `mission.assemblyParts`.
+The first `ContactAdmittanceRunner` commanded the axial feed as a speed, scaled
+by force-headroom factors. It ran a time-parameterised spiral, which needed a
+catch-up timer when the tool lagged it. It kept its state in eight `*Active`
+flags and a nullable relief depth. Each hour-long offset run exposed the next
+stall, and each fix added another special case:
+- tool/root contact at 325 N;
+- the torque bound while refining;
+- the run cut off at the mission cutoff;
+- the catch-up timer reset by brief recoveries;
+- an absolute relief depth that demanded a 27.9 mm retract;
+- a large tracking error saturating the search command;
+- finally 53.2 N at 22.9 mm depth, on the flange face beside the clearance
+  bore.
 
-Source inspection showed that `SimSession.holdObject` changes a picked screw
-from dynamic to kinematic and that the work plate is fixed to the assembly
-base. SD13 now drafts an explicitly selected physical screw engagement that
-keeps the screw dynamic after the measured entry handoff. Its native reaction
-regression is not yet built or run. The force-search test reaches `EntrySearch`
-using the currently available native libraries, but both nominal and
-replacement attempts are rejected by the unchanged 25 N limit: measured peaks
-are 325.813 N and 304.570 N. At the first peak, four contacts join the
-screwdriver carrier link to `assembly-root`, at about 2.5 mm radial distance
-and z=+33.1 mm in the sensor/TCP frame, with 37–38 microns of penetration.
-This localizes the measured load to a tool/root collision but does not yet
-identify the exact CAD face or validate the unbuilt native wrench changes. The
-limit has not been raised. The reversed-contact-order wrench regression is
-still unrun. C++ syntax-only checks pass. Disk availability is 1.4 GB, below
-the required 3 GB reserve for native builds and the full gate.
+The commissioned speeds (0.15 mm/s, an 880 s spiral, a 3600 s bound) were
+forced by that structure. They are not a property of the cell.
 
-The pure ProcessKit contact suite compiles and passes its 16 admittance/spiral
-checks, including sensor-to-TCP wrench rotation and moment-arm conversion.
-ProjectKit's focused compiler-only runtime passes 209 assertions, including
-eight new profile validation and mission-wire checks. A mission may now carry
-an explicit force-search profile, validated
-against a uniquely mounted force/torque sensor and screwdriver; SceneArtifact
-is v37. `materia.force-search.project.json` supplies a visibly simulation-only
-commissioning example, and `MissionPlayer` derives its entry axes from the CAD
-fastening and intersects the spiral with any retained SD11 registration bounds.
-The app project-source and screwdriver-example compiler-only builds pass.
-Native source now obtains MuJoCo
-contact wrenches with `mj_contactForce`, carries the signed wrench through the
-robot-contact bridge, and adds a simulated TCP force/torque observer. Those
-native changes and their regression tests have not been built or run; the three
-modified C++ translation units do pass `g++ -fsyntax-only`, which does not
-verify linking or runtime behavior. The
-MuJoCo robot-contact regression now also requires a finite, nonzero downward
-reaction when the tool is contacted from above, with the obstacle created both
-before and after the robot to cover either contact-body ordering. Its test source
-passes `g++ -fsyntax-only`; runtime sign and force checks still need the native
-build and test run.
-The deterministic backend reports geometric contact only and intentionally has no
-force response; hardware binding and physical force-search behavior remain
-outstanding. The previous `sd12-search-recovery` gate passed at 201 ProjectKit
-assertions before these mission-profile changes and has not been rerun. The
-configured prebuilt CadKit build directory is absent; a direct example runtime
-now passes using an existing scratch-cache CadKit library: the force-search
-example builds and its v37 artifact encodes/decodes. This does not run the
-simulation force-search mission. The root still has only 2.2 GB free, below the
-required 3 GB reserve for a native build. Entry-search failure
-recovery retracts to the commissioned safe approach before producing
-`NO_START` or `SCREW_LOST`.
-`NO_START` bypasses spindle reverse, travels to the reject bin, and releases the
-retained screw identity only there; the report preserves the search diagnostic.
-The focused recovery suite passes 58 checks. `sd12-search-recovery` passes
-CadKit, ProjectKit (201 assertions) and MachineKit smoke (peak 0.6 GB). This
-validates the Haxe runner/recovery path, not the unbuilt native wrench bridge or
-a force-search mission. The root has 2.2 GB free, below the required 3 GB
-reserve, so native builds and the full gate remain pending. The focused
-force-search runtime now reaches the search but fails at its commissioned force
-bound as recorded above. SD12 remains a draft.
+### SD12 design: hybrid force/position entry search (2026-10-14)
 
-### SD12 entry-window timing follow-up (2026-10-13)
+Geometry it must handle: the screw passes through the flange housing's
+clearance bore (first surface about 23 mm below the approach) into the tapped
+plate (CAD entry plane about 40 mm below). A registration error puts the first
+contact on the flange face, not at the CAD plane.
 
-The first 12-turn offset run kept the force below 25 N (peak 24.61 N) but hit
-the 2 N m torque bound by 0.025 N m while refining a candidate before the CAD
-entry window. Refinement now waits for the measured TCP to enter that window.
-With that change, the original-speed run reached its 3600 s *global mission*
-cutoff without a runner fault or confirmed entry. A trace at global 1800 s was
-0.039900 m deep against a 0.040027 m CAD entry depth, with a validated
-candidate and a measured load drop. The trace shows the test cutoff included
-the preceding registration time and therefore did not allow the runner its
-commissioned 3600 s. The acceptance loop now starts its deadline when the
-force-search runner starts and allows up to 600 s for the tightening handoff;
-at that checkpoint, the test edit had not compiled or run. The fast diagnostic profile was
-discarded: its increased axial speed hit the housing at 27.32 N before the
-spiral began. Free disk is 2.3 GB, below the 3 GB reserve; rebuild and full
-acceptance remain pending.
+- **Hybrid control.** The advance axis is force-controlled, the hole plane
+  position-controlled.
+  - In free space the tool descends at the commissioned approach speed: a
+    guarded move.
+  - Once contact is confirmed, `CartesianAdmittance` (built in the search frame
+    u, v, n) regulates the axial force to the commissioned contact force
+    through its `target` wrench.
+  - The maximum force and torque are hard stops, never regulators.
+  - Lateral motion tracks the search reference and stays compliant through the
+    admittance's lateral axes.
+- **Search wherever contact happens.** Phases:
+  - `Approach`: free descent holding the nominal axis.
+  - `Search`: contact held, spiral around the lateral target.
+  - `Descend`: through a found hole, laterally compliant, so the bore centres
+    the screw.
+  - `Seated`: done.
+  - `Failed`.
 
-### SD12 compiler-only follow-up (2026-10-13)
+  Transitions:
+  - Contact above the CAD entry window starts a `Search` at that surface. When
+    the measured depth passes the contact depth by the commissioned entry
+    advance, the screw has dropped into a hole and goes to `Descend`.
+  - Contact at the CAD plane searches the same way.
+  - Reaching the CAD entry plane plus the entry advance (within the depth
+    tolerance) is `Seated`, touching or not. That is the tightening handover.
+    Whether a thread is really there is the tightening cycle's question: its
+    lead-in, stroke and torque checks name a missing or damaged thread.
+  - On a searched surface the axis stays force-regulated even through a brief
+    load dip, so a slip on a chamfer cannot turn into a plunge.
+- **Path-parameterised spiral.** An Archimedean spiral of commissioned radius
+  and pitch (radial spacing per turn, chosen against the hole's capture
+  radius).
+  - Its parameter advances at the commissioned path speed only while the
+    surface carries the screw and the measured lateral lag is inside the
+    tracking tolerance.
+  - The lag is judged net of the deflection the controller deliberately allows.
+    Tracking and lateral admittance settle at force / (damping x gain) from the
+    reference under a lateral force. Up to the regulated contact force (about
+    what a chamfer pushes) that offset is excused, so a hole's chamfer pulling
+    the screw towards the hole is not a stall. A wall pressing harder still
+    stalls it.
+  - There is no clock to catch up with, and no relief retry.
+  - A spiral that makes no progress for the commissioned stall time fails with
+    its lag, radius and force. Reaching the radius fails as exhausted.
+- **Explicit phases.** `ScrewEntryController` is pure: measured TCP position,
+  wrench and time in, twist command and phase out. Its transitions are tested
+  against a small simulated plant: a point tool with servo lag and sensor
+  latency, stacked plates with chamfered holes, contact stiffness and friction.
+  That runs in milliseconds and covers:
+  - nominal entry;
+  - an offset through a clearance bore;
+  - a missing hole;
+  - an obstruction;
+  - the force bound at every step.
 
-The runner-relative acceptance deadline and the current simulation-only search
-profile compile in Haxeon: the app project-source compiles 2,498 sources and
-the screwdriver assembly preview compiles 1,718 sources. The current preview
-profile uses a 0.12 mm/s axial cap, 12 initial turns, a 1,100 s initial spiral
-and a 3,600 s runner limit; it has not been run. The earlier 1,660 s runtime
-trace was from a prior profile and reached 39.899 mm against a 40.022 mm CAD
-entry depth under the 25 N force cap, then timed out before confirming entry.
-The deadline and profile edits have compile-only evidence, not runtime
-acceptance. Native wrench changes and the reversed contact-order regression
-remain unbuilt and unrun. Free disk is 1.5 GB, so the native rebuild and full
-gate remain pending the 3 GB reserve.
+  `ForceGuidedScrewEntry` adapts it to `ServoSession`. It builds the controller
+  at the measured approach pose and owns the sensor-freshness, clock, travel,
+  force/torque and run-time checks, and the stop. The CAD offset-hole
+  acceptance on MuJoCo is the final check, not the loop for tuning.
+- **Plant results (stiff tool: 2e5 N/m servo and contact, 10 ms sample
+  latency).**
 
-### SD12 run-bound coverage check (2026-10-14)
+  | Case | Time | Peak force |
+  | --- | --- | --- |
+  | Nominal (seats through the bore without searching) | 20.3 s | 3.2 N |
+  | 1.0 mm offset | 23.0 s | 18.9 N |
+  | 1.14 mm offset | 24.0 s | 18.8 N |
+  | 1.3 mm offset | 25.5 s | 18.6 N |
 
-For the observed 40.022 mm CAD entry depth, 5 mm contact relief, 0.12 mm/s
-axial cap, 1,100 s initial spiral, 12-turn search, 0.14 mm/s lateral cap and
-12 s candidate-progress timeout, `ScrewEntrySearchBounds.minimumRunSeconds`
-derives 3,547.56 s. The current 3,600 s runner bound clears that arithmetic
-minimum by 52.44 s; the previous 1,660 s bound does not. The current ProjectKit
-runtime passes this regression within 339 assertions. That arithmetic does not
-establish physical entry, completion, or successful tightening. The 25 N force
-cap is unchanged.
+  - The missing bore and debris in the bore fail by name; a missing tapped hole
+    seats and is left to the tightening cycle.
+  - With a 2000 N/m feed spring (axial damping 400) between the TCP and the
+    screw, the nominal case is unchanged and the offsets seat in 21.7-24.2 s
+    with a 10.8 N peak: the spring takes up the chamfer climb before the
+    admittance answers.
+  - Each offset peak is the screw climbing back out of the bore's chamfer onto
+    the flat face. The surface rises as fast as the screw moves sideways, faster
+    than an axial admittance damped above contact stiffness x latency can
+    retract.
+  - Commissioning relations the plant exposed:
+    - The tracking gain must keep the compliance lag at the contact force
+      inside the tolerance. 10/s is needed; at 25/s a bore wall was pushed to
+      227 N.
+    - Lower axial damping (2500) or a slower spiral (1 mm/s) cut the peak only
+      to about 16.8 N.
+- **Profile.**
+  - Kept: sensor; age; contact force; contact threshold; per-axis mass and
+    damping in search axes; linear and angular speed; step; approach speed;
+    force and torque bounds; travel and run bounds; registered region; spiral
+    radius, pitch, speed, tracking gain and tolerance; entry advance; stall
+    time; confirmation samples.
+  - Removed: the target wrench in sensor axes, contact seed offset, contact
+    relief, candidate-progress timeout, load-drop threshold, spiral turns,
+    duration and overtravel.
+  - SceneArtifact bumps its version. Old artifacts are rejected.
+- **Simulated reaction path.** A contact force only matters if it pushes back on
+  the tool. While the arm owns axial motion:
+  - the screwdriver's feed slide is what it is mechanically, a spring of the
+    commissioned rate resting extended and critically damped over the feed
+    mass (`rk_simulation_spring_process_joint`), rather than a position-held
+    stroke;
+  - the held screw is a rigid physical child of the bit link (a fixed object
+    joint) instead of a kinematic body placed each tick. A kinematic screw
+    reported the 1 mm offset's flange contact as 229 N that never reached the
+    feed or the arm.
 
-### SD12 measured-travel envelope correction (2026-10-14)
+  `SimulatedScrewdriver` owns the screw through one carriage state, changed
+  only between ticks:
+  - `Empty`.
+  - `Suction`: held on the bit by vacuum.
+  - `Welded`: an arm-owned search.
+  - `Engaged`: held by the thread start on its member and turned by the process
+    model.
+  - `Threaded`: the SD13 helix.
+  - `Seated`: SD13 after the seat.
+- **What the MuJoCo acceptance exposed (2026-10-14).** Each is a modelling fix,
+  not tuning:
+  - **Velocity streaming yields under load.** `ServoSession` sent joint
+    velocity targets, which SimKit realises as a proportional velocity loop
+    with no load compensation, which is deliberate (`FLOW` is the
+    load-compensated mode). The arm stalled at about 1 N against the flange,
+    under the 2 N threshold. The search now streams `ServoPlan` chunks, as a
+    force-controlled cell streams positions, so the drives' position loops
+    push up to their ratings. `ServoPlanOptions` takes the cell's commissioned
+    acceleration limits, the same as its planners.
+  - **Free CAD bodies had no inertia.** Dynamic project parts were created
+    with a mass but no inertial properties, so MuJoCo gave each 1 kg m^2 per
+    axis. Every dynamic project part now carries its CAD centroid and inertia
+    in its body frame.
+  - **The feed end stop was soft.** The spring feed rests on its extended stop.
+    MuJoCo's default limit (20 ms) let a release overshoot it by 1.9 mm, past
+    the 1.1 mm overtravel, and the runtime faulted. `ScrewdriverSpindle` now
+    declares a steel stop: 1 ms, critically damped.
+  - **The simulated thread used the measured work.** The device's live work
+    was the mission's registered estimate. It is now the part's true pose; only
+    planning uses the estimate.
+  - **Teeth are semantic.** Tapped-bore and screw hulls leave the screw free
+    in the bore, and the process model's anchor is the thread start. The anchor
+    now also catches a welded screw under the search. Anchored with a fixture,
+    the screw is `Engaged` on its member, so its contact with the work is not
+    tool load (406 N before the fix).
+- **MuJoCo acceptance (2026-10-14).**
 
-The runner's travel limit measures Euclidean TCP displacement from the initial
-approach pose, not cumulative path length. Relief retracts toward that pose and
-the registered lateral search occurs at the CAD entry plane, so summing those
-segments would reject a valid path. The shared `requiredTravelMeters` bound now
-combines the larger of CAD approach depth and relief with the larger of the
-registered-region diagonal and seeded-spiral reach plus acquisition drift, then
-adds one maximum controller step. Scene validation, mission construction and
-the live runner use this same calculation. The new seed and bound still need a
-fresh nominal MuJoCo run; the earlier travel-cap failure remains the latest
-physical evidence.
+  | Case | Seated | Peak force | Searched surfaces |
+  | --- | --- | --- | --- |
+  | Nominal | 32.9 s | 0 N | 0 |
+  | 1 mm offset | 34.7 s | 7.5 N (25 N bound) | 2: flange face, then plate |
 
-### SD12 bounded tracking recovery follow-up (2026-10-14)
-
-The current simulation-only profile uses a 0.125 mm/s axial cap, an 880 s
-initial spiral, 1.6 mm radius, 12 turns and a 30 s candidate-progress timeout.
-The shared minimum-run calculation includes one catch-up relief retry and
-derives 3,592.01 s for the 40.0217 mm representative entry depth, within the
-3,600 s cap. This arithmetic is a configuration check, not physical acceptance.
-Axial feed reserves vector-force headroom after separating measured lateral
-load; the 25 N force cap is unchanged.
-
-An offset-hole run peaked at 18.494 N but stalled near 22.9 mm depth. Brief
-tracking recoveries kept resetting the catch-up timer, preventing its explicit
-relief retry. Catch-up time now accumulates across those brief recoveries and
-candidate/fallback transitions, pauses during deliberate relief, and permits
-one recovery before a further exhausted allowance fails explicitly.
-The recovery has its own deadline: one candidate-progress window plus two
-commissioned relief traversals, 110 s for this profile. Its first physical run
-exposed an absolute-depth target that demanded a 27.9 mm retraction, exhausting
-that deadline after retracting only 13.75 mm. Catch-up recovery now retracts
-the configured 5 mm from the measured stall depth; startup and rejected-screw
-relief still clear above the approach origin. The relative-relief physical
-rerun completed the relief but then stopped at 26.473 N during resumed lateral
-search, before confirming entry. Its housing-contact trace exposed another
-priority error: only spiral feedforward was tapered by force headroom; a large
-position-tracking error could still saturate the search command. The complete
-position-search velocity is now speed-capped before applying the measured
-force-headroom taper, while admittance retains its unscaled priority. The
-focused ProcessKit suite passes all 35 bounded admittance/spiral checks,
-including the large-tracking-error regression. The physical rerun of that
-change remains pending.
-
-The complete-position taper alone did not establish physical acceptance:
-`sd12-all-motion-offset` stopped at 53.158 N near 22.899 mm depth, before the
-40.027 mm CAD entry plane. Inspection found that the example's 1 kg virtual
-mass saturated its 0.15 mm/s correction in one 10 ms step for a 0.015 N force
-error. The simulation-only linear gains now derive from an explicit 50 ms
-relaxation and a zero-load correction at half the speed cap: 2,000 kg virtual
-mass and 40,000 N s/m damping per translation axis. The 3 N target, all angular
-gains, travel/speed limits and 25 N force cap stay unchanged. Nominal physical
-entry and the offset case must both be rerun with these gains.
-
-Disk availability subsequently rose to 7.1 GB. Rebuilding the current native
-RobotKit/MuJoCo targets reported `ninja: no work to do`: the libraries are
-already newer than the changed sources. The full native RobotKit MuJoCo test
-now compiles after correcting the tool-change fixture's `target` field. Its
-follower tests now stop the world before topology changes and allow the
-effort-limited coupled joints two seconds to settle without relaxing their
-position tolerance. It reaches, but fails, the SD15 static-dock reattachment;
-the dedicated SD12 contact-order/wrench regression is queued separately.
-
-Compiler diagnostics can overflow for this app build: allocation bytes and heap
-print as `-2147483648`. `haxeon/src/compiler/tools/CompilerServer.hx:65` rounds
-the floating-point GC counters with `Math.round`, whose result is a 32-bit
-`Int`. This affects the reported statistics, not compilation; resource checks
-use the heavy-run scope's measured memory instead. Haxeon is not patched.
+  Both hand over to the unchanged qualified program, which ends OK at
+  16.5 N m.
 
 ### SD13 physical reaction-path draft (2026-10-12)
 
@@ -1317,6 +1336,120 @@ pose restoration. This verifies the mission plumbing and generated example,
 not a live physical-thread mission. The native joint-reaction test, 1 ms/2 ms
 solver run and full gate remain pending; only 973 MB is free, below the 3 GB
 native-build reserve.
+
+### SD13 the thread holds under load (2026-10-14)
+
+The native reaction test was built and run for the first time.
+
+What it exposed, layer by layer:
+- **Inertia.** It created the spindle and screw without inertial properties.
+  The MuJoCo backend gives such a dynamic body a nominal 1 kg m^2 per axis, so
+  the 0.02 N m drive could not turn them. The test now states real inertias;
+  CAD-built robots already do.
+- **The thread coupling.** It then turned freely while the screw stood on the
+  plate: the thread slipped 0.57 mm while carrying 0.17 N. MuJoCo scales a soft
+  equality's impedance by the effective mass it acts on, here a 10 g screw, so
+  the "ideal" coupling was a spring of a few hundred N/m. The contact was just
+  as soft.
+- **Chatter.** A stated stiffness (the coupling's spring path) on the bare
+  screw chattered between 0.3 and 312 N. A 10 g body behind 1e7 N/m rings
+  faster than the 125 us substep resolves.
+
+The design that holds:
+- The thread is a critically damped spring of commissioned axial stiffness.
+- The screw slide carries armature: a tenth of the spindle's turning inertia
+  reflected onto the screw axis (I / ratio^2). A rigid thread would add all of
+  it; a tenth adds a tenth to what the spindle drive accelerates.
+- The steel contacts take the stiffest stable time constant: two substeps.
+
+Results at 1 ms and 2 ms steps:
+- the torque-limited spindle stalls at 0.175 rad, against 0.157 rad to close
+  its gap;
+- the thread yields about 6 um, which is F/k;
+- the plate carries the 63 N that 2 pi torque / lead predicts, within 25 %;
+- the whole SimKit MuJoCo suite passes.
+
+What changed outside the test:
+- `rk_simulation_object_slide_desc` states the thread stiffness, damping ratio
+  and slide armature.
+- The simulated screwdriver derives the armature from the spindle's CAD
+  turning inertia.
+- A physical `screwEngagement` now requires `threadStiffnessNPerM` next to its
+  axial-force cap.
+- `checkScrewPhysicalThread` runs the whole flange on MuJoCo through the thread
+  and requires the process model's qualified outcomes on the CAD seats.
+
+### SD13 redesign: the thread joins the screw to the work (2026-10-14)
+
+The first app run of the draft drove feed joint 0 to -22 mm (limit -20) at
+14.6 s. The draft made the spindle the nut: its slide coupled screw travel to
+spindle rotation on the tool. With a frictionless 1 mm lead, a 16.5 N m
+tightening torque is about 100 kN of axial force, and the draft applied it
+between the screw and the tool, so it pushed the tool back. A real thread
+reacts between the screw and the tapped work. The socket transmits only torque,
+and the screw is free to slide in it.
+
+Design:
+- **A helical joint in SimKit.** `NKSIM_JOINT_HELICAL` is a one-coordinate tree
+  joint. Body b turns about `axis_a` and advances `lead` metres per revolution
+  (signed, so a negative lead is left-handed). In MuJoCo it is a hinge, which
+  is the joint's coordinate, plus a slide, held to `lead / 2π` per radian by
+  the same thread spring the SD13 test qualified: commissioned stiffness,
+  critical damping and slide armature.
+- **The screw on the work.** `rk_simulation_create_object_screw_joint` puts the
+  dynamic screw on a helical joint whose parent is the threaded member's body
+  (a session object or a robot link), at the measured pose, on the CAD hole
+  axis. The rotation range comes from the qualified run-down plus the final
+  angle.
+- **The socket.** A joint coupling from the robot's spindle joint to the
+  helical coordinate (ratio = spindle-axis alignment; offset = measured) turns
+  the screw. Axial position is not coupled: the bit and screw contact pair is
+  already excluded, and the feed follows the advance as today.
+- **Ownership.**
+  - The physical thread carries engagement and run-down. The screw's axial
+    position, and the reaction of a supported or loose workpiece, come from
+    the solver.
+  - The torque-angle process model keeps the tightening torque, friction,
+    seat detection and results. The joint stays frictionless, so nothing is
+    counted twice.
+  - At the model's seat the carriage leaves `Threaded`. The screw is retained
+    on its threaded member at the measured seated pose, and the final angle is
+    turned on the retained pose by the process model. The frictionless thread
+    never carries the clamp load, which would be about 10x the real preload.
+  - Reverse runs the helix backwards to the lead-in, then regrips by suction,
+    as the draft did.
+- **Carriage.** The same `ScrewCarriage` state as SD12 (`Suction`, `Welded`,
+  `Threaded`), with transitions only between ticks.
+
+Checks:
+- Native, both step sizes: the lead relation; the screw advancing into a
+  supported plate as the spindle turns; a loose plate pulled up the screw
+  against its support; and no axial force on the spindle link beyond the socket
+  friction.
+- App: `checkScrewPhysicalThread` seats all 4 screws with OK torque, keeps the
+  feed inside its stroke, and matches the process-model mode's outcomes.
+
+Results (2026-10-14):
+- SimKit `a_helical_screw_turned_through_its_socket_clamps_its_seat` at 1 ms
+  and 2 ms:
+  - the screw runs down on its lead;
+  - it seats after 0.314 rad, then the flank stretches by the clamp load over
+    its stiffness;
+  - the seat carries 2 pi torque / lead within 25 %;
+  - the socket winds up about 1.4 mrad at the stall torque.
+- RobotKit `screw_threads_into_its_member...`: threading measures without
+  snapping; topology changes only while stopped.
+- App `checkScrewPhysicalThread` on MuJoCo: all four CAD fastenings seat with
+  the qualified OK result. It needed:
+  - engagement where the process model's anchor is, at the entry within the
+    lead-in, not anywhere within stroke range;
+  - no wait for the Driving phase (the screw passes the entry during the
+    approach);
+  - CAD inertia on the screws;
+  - the run-down torque limited to the program's limit and the thread's axial
+    cap through the lead.
+- On the way, `TOOL_CHANGE.md` TC0's static-dock reattachment failure was
+  diagnosed and fixed (subtree rest frames).
 
 ### SD15 machine-tending interface audit (2026-10-13)
 
@@ -2439,10 +2572,10 @@ still required. The earlier 21-test proof predates this wire extension.
 | SD9 | done — buffered bowl supply, scripted I/O, physical replenishment/jam/reset on both backends and portable export pass; final full gate passed | `979d54b44` |
 | SD10 | in progress — blow-feed delivery/fault/stop acceptance passes both backends; CAD clamped-member retention and exact screwdriver-bit identity compile and pass focused runtime acceptance; CadKit and ProjectKit passed quick-gate attempt `sd10-bit-final`, MachineKit was interrupted at 2.0 GB free; full gate, desktop review and retained-number accounting remain pending | `4fd49844d`, `8f68f6b0a`; `sd10-current-retry`; `sd10-bit-projectkit`; `sd10-bit-app-runtime-retry2`; `sd10-bit-final`; `sd10-app-final`; `sd-machinekit-haxe-only` |
 | SD11 | in progress — displaced-fixture registration and four named fastenings passed on both backends in the `sd10-app-final` app stage; corrected native `sim_core` and C-ABI regressions pass and production RobotKit/SimKit rebuild succeeds; latest deterministic-only mission rerun was stopped below the 3 GB reserve; full gate remains pending | SD11 touch-registration draft; `sd11-simcore-final-test`; `sd11-simcore-final-abi-test`; `sd11-production-native-rebuild`; `sd10-app-final` |
-| SD12 | in progress — 35 focused admittance/spiral checks and the dedicated project-source compile pass; the latest offset run stops at 53.158 N before entry, so the simulation-only linear gains have been corrected and nominal/offset acceptance remain pending; native libraries are current, with contact-order/wrench regression queued separately from the failing SD15 dock test | SD12 bounded tracking recovery follow-up; `sd12-all-motion-offset`; `sd12-native-rebuild`; `sd12-native-mujoco-run` |
-| SD13 | in progress — mission-level `screwEngagement` is independent of force search and requires a physical axial-force cap; ProjectKit now passes 339 assertions including the later engagement and run-bound checks; app and screwdriver assembly compile, and v44 assembly/access runtime passes; native reaction test and 1 ms/2 ms runtime await an exclusive native-build/test window | SD13 physical reaction-path draft; SD13 mission-selection follow-up; `sd-projectkit-runtime` |
+| SD12 | MuJoCo acceptance passes (Claude, 2026-10-14). Hybrid force/position entry search with spring feed, welded carriage and plan-streamed servo. Nominal seats in 32.9 s at 0 N; the 1 mm offset seats in 34.7 s, 7.5 N peak, 2 searched surfaces. Both hand over to the qualified OK tightening. Full gate pending. | uncommitted |
+| SD13 | MuJoCo acceptance passes (Claude, 2026-10-14). Screw-to-work helical joint (`NKSIM_JOINT_HELICAL`, `rk_simulation_create_object_screw_joint`) with socket coupling and a `Seated` hand-off. SimKit and RobotKit native suites pass; all 4 CAD fastenings seat with OK torque. Full gate pending. | uncommitted |
 | SD14 | in progress — orthographic/section SVG projection and CAD-derived thread symbols/callouts pass within the current 339 ProjectKit assertions; three real CAD SVG exports rendered and inspected; full gate awaits at least 3 GB free | SD14 projection draft; `projectkit/tests/haxeon.json`; `machinekit/examples/robot-screwdriver/haxeon.drawing.json`; `sd-projectkit-runtime` |
-| SD15 | in progress — landed MT8 jaws, MT6/MT7 signals, MT9 trays and the MT10–MT11 single-part cycle audited; Haxe-only app, RobotKit and CadBridge builds pass (2,500/1,742/1,805 sources); ProjectKit passes 339 assertions; RobotKit tool-capability runtime passes 660 assertions and CadBridge runtime passes 194; RobotKit native runtime is current; the native MuJoCo follower test reaches static-dock reattachment and fails, while SimKit follower tests and the generated FFI audit remain pending; CAD-subtree/floating-tool and removable dock-mount drafts compile at the Haxe level; app runtime creation, dock motion, measured lock I/O, active TCP/capability exchange and MissionPlayer integration remain pending | `sd-project-source-haxe-only`; `sd-toolcap-haxe-only`; `sd-toolcap-runtime`; `sd-cadbridge-haxe-only-retry`; `sd-cadbridge-runtime`; `sd-projectkit-runtime`; SD15 interface audit; SD15 process-ownership follow-up; SD15 tool-change transaction draft |
+| SD15 | split (2026-10-14). SD15a is pick, place and fasten without a tool change; the tool change moved to `robotkit/plans/TOOL_CHANGE.md` (TC0 to TC6), seeded from the SD15 drafts. | SD15 drafts in `5a6ac41ae` |
 
 ### SD8 hardware integration work (2026-10-11)
 

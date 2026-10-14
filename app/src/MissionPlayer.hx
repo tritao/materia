@@ -33,10 +33,8 @@ import materia.project.SceneArtifact.SceneArtifactWeld;
 import materia.project.SceneContactRegistration.SceneContactWork;
 import processkit.perception.ContactPoseEnvelope;
 import processkit.perception.ContactMeasurement;
-import processkit.perception.ContactPoseEnvelope.ContactRegionBounds;
-import processkit.perception.SpiralSearchTrajectory;
-import processkit.ContactAdmittanceRunner;
-import processkit.ContactAdmittanceRunner.SpiralEntryCriterion;
+import processkit.screwdriving.ForceGuidedScrewEntry;
+import processkit.screwdriving.ScrewEntryController.ScrewEntryLimits;
 import motionkit.robot.HandlingPlanRunner;
 import motionkit.kinematics.IkTolerance;
 import motionkit.robot.ManipulatorMotion;
@@ -1920,28 +1918,29 @@ class MissionPlayer implements SessionMember {
       new Quat(sensorFrame.rotation[0], sensorFrame.rotation[1], sensorFrame.rotation[2], sensorFrame.rotation[3]));
     var tcpPose = new Transform3(new Vec3(tcp.position[0], tcp.position[1], tcp.position[2]),
       new Quat(tcp.rotation[0], tcp.rotation[1], tcp.rotation[2], tcp.rotation[3]));
-    var tcpFromSensor = ContactAdmittanceRunner.sensorTransformAtTcp(sensorPose, tcpPose);
+    var tcpFromSensor = ForceGuidedScrewEntry.sensorTransformAtTcp(sensorPose, tcpPose);
+    // The feed slide is a spring while the arm searches; the controller measures the tip through it.
+    var capacity = tool.screwdriver;
+    if (capacity == null) throw 'Fastening "${job.fastening}" force search lost its screwdriver capability';
+    var feedJoint = -1;
+    for (index in 0...robot.model.joints.length) if (robot.model.joints[index].id == capacity.feedJoint) feedJoint = index;
+    if (feedJoint < 0) throw 'Fastening "${job.fastening}" force search lost its feed slide';
+    var feed = {joint: feedJoint, axisAtTcp: processkit.screwdriving.ScrewdriverArmKinematics.feedAxisAtTip(robot.model,
+      tcp.id, capacity.feedJoint)};
     return (plan:ScrewPlan) -> {
       if (plan == null || plan.fastening != job.fastening) throw "Force search received a different CAD fastening plan";
       var requiredTravel = materia.project.ScrewEntrySearchBounds.requiredTravelMeters(plan.approach,
-        profile.contactReliefMeters, profile.regionHalfUMeters, profile.regionHalfVMeters,
-        profile.contactSeedOffsetUMeters, profile.spiralRadiusMeters,
-        profile.spiralMaximumLateralSpeed * profile.maximumAgeSeconds,
+        profile.entryAdvanceMeters, profile.regionHalfUMeters, profile.regionHalfVMeters,
         profile.maximumLinearSpeed * profile.maximumStepSeconds);
-      var minimumSpiralSeconds = materia.project.ScrewEntrySearchBounds.minimumSpiralSeconds(
-        plan.approach, profile.contactReliefMeters, profile.maximumSearchAxialSpeed);
       var minimumRunSeconds = materia.project.ScrewEntrySearchBounds.minimumRunSeconds(plan.approach,
-        profile.contactReliefMeters, profile.maximumSearchAxialSpeed, profile.spiralDurationSeconds,
-        profile.spiralRadiusMeters, profile.spiralTurns, profile.spiralMaximumLateralSpeed,
-        profile.candidateProgressTimeoutSeconds);
-      if (profile.maximumTravelMeters < requiredTravel ||
-          profile.spiralDurationSeconds < minimumSpiralSeconds ||
-          profile.maximumRunSeconds < minimumRunSeconds)
+        profile.entryAdvanceMeters, profile.approachSpeed, profile.spiralRadiusMeters, profile.spiralPitchMeters,
+        profile.spiralSpeed);
+      if (profile.maximumTravelMeters < requiredTravel || profile.maximumRunSeconds < minimumRunSeconds)
         throw 'Fastening "${job.fastening}" force-search bounds cannot cover its CAD approach and spiral';
       var nominalEntry = ScrewScenePlan.frame(job.entry);
       var halfU = profile.regionHalfUMeters, halfV = profile.regionHalfVMeters;
-      var entryDepthTolerance = profile.maximumLinearSpeed *
-        (profile.maximumAgeSeconds + profile.maximumStepSeconds);
+      // How far the measured depth can sit from the true one: the motion within one sample and step.
+      var depthTolerance = profile.maximumLinearSpeed * (profile.maximumAgeSeconds + profile.maximumStepSeconds);
       var evidence = registeredWork.get(job.frame);
       if (evidence != null) {
         var nominalNormal = nominalEntry.transformVector(new Vec3(0, 0, 1)).normalized();
@@ -1951,27 +1950,28 @@ class MissionPlayer implements SessionMember {
           nominalU, nominalV, evidence.rootWork);
         halfU = Math.min(halfU, registered.halfU);
         halfV = Math.min(halfV, registered.halfV);
-        entryDepthTolerance += registered.normalTravel;
+        depthTolerance += registered.normalTravel;
       }
-      var region = new ContactRegionBounds(halfU, halfV, profile.maximumTravelMeters, 0, 0);
-      var axisU = plan.entry.transformVector(new Vec3(1, 0, 0)).normalized();
-      var axisV = plan.entry.transformVector(new Vec3(0, 1, 0)).normalized();
-      var compressionAxis = plan.entry.transformVector(new Vec3(0, 0, -1)).normalized();
-      var spiral = new SpiralSearchTrajectory(axisU, axisV, region, profile.spiralRadiusMeters,
-        profile.spiralTurns, profile.spiralDurationSeconds, profile.spiralMaximumLateralSpeed,
-        profile.contactSeedOffsetUMeters);
-      var criterion = new SpiralEntryCriterion(compressionAxis, profile.minimumContactLoadN,
-        profile.requiredLoadDropN, profile.confirmationSamples);
-      var wrench = profile.targetWrench;
-      var controller = new CartesianAdmittance(new Wrench3(new Vec3(wrench[0], wrench[1], wrench[2]),
-        new Vec3(wrench[3], wrench[4], wrench[5])), profile.virtualMass, profile.damping,
-        profile.maximumLinearSpeed, profile.maximumAngularSpeed, profile.maximumStepSeconds);
-      return new ContactAdmittanceRunner(new ServoSession(robot.robot, arm), controller, profile.sensor,
-        sensorFrame.id, tcpFromSensor, Int64.fromFloat(profile.maximumAgeSeconds * 1e9), profile.maximumForceN,
-        profile.maximumTorqueNm, profile.maximumSearchAxialSpeed, profile.contactReliefMeters,
-        profile.maximumTravelMeters, profile.maximumTravelRadians,
-        profile.maximumRunSeconds, profile.spiralTrackingGainPerSecond, null, spiral, criterion,
-        plan.entry, entryDepthTolerance, profile.candidateProgressTimeoutSeconds, job.leadMm / 1000.0);
+      var limits = new ScrewEntryLimits(profile.contactForceN, profile.contactThresholdN, profile.confirmationSamples,
+        profile.approachSpeed, profile.maximumLinearSpeed, profile.spiralRadiusMeters, profile.spiralPitchMeters,
+        profile.spiralSpeed, profile.spiralTrackingGainPerSecond, profile.spiralTrackingToleranceMeters,
+        profile.entryAdvanceMeters, profile.stallSeconds);
+      var admittance = new CartesianAdmittance(new Wrench3(new Vec3(0, 0, -profile.contactForceN), Vec3.zero()),
+        profile.virtualMass, profile.damping, profile.maximumLinearSpeed, profile.maximumAngularSpeed,
+        profile.maximumStepSeconds);
+      // The search streams short planned chunks, as a force-controlled cell streams positions: the drives' position
+      // loops track them, so an arm held back by contact builds force up to its ratings instead of yielding like a
+      // bare velocity loop. The lead covers one missed control step.
+      var revisions = robot.runtime.snapshot();
+      var motionLimits = PlanningLimits.ofGroup(arm, new SteadyLoads(), ARM_ACCELERATION, null, revisions.modelRevision,
+        revisions.calibrationRevision);
+      var servo = new ServoSession(robot.robot, arm, profile.maximumStepSeconds, 1e-3, 1e-4,
+        new motionkit.robot.ServoPlan.ServoPlanOptions(revisions.modelRevision, revisions.calibrationRevision,
+          2 * profile.maximumStepSeconds, motionLimits.acceleration));
+      return new ForceGuidedScrewEntry(servo, limits, admittance, plan.entry, depthTolerance,
+        profile.sensor, sensorFrame.id, tcpFromSensor,
+        Int64.fromFloat(profile.maximumAgeSeconds * 1e9), profile.maximumForceN, profile.maximumTorqueNm,
+        profile.maximumTravelMeters, profile.maximumTravelRadians, profile.maximumRunSeconds, halfU, halfV, null, feed);
     };
   }
 
@@ -2008,18 +2008,15 @@ class MissionPlayer implements SessionMember {
       screw:screw.freeBody(),hand:job.hand,fixture:work,retightening:retightening,
       physicalThread:physicalThread,
       threadLeadMm:job.leadMm,
-      physicalEngagementRangeMm:physicalThread ? capacity.strokeMm + screwJoint.leadInMm : null,
       physicalThreadMaxForceN:threadEngagement == null ? null : threadEngagement.maximumAxialForceN,
-      physicalThreadEngagementAllowed:() -> {
-        var currentRunner = screwing;
-        return currentRunner != null && currentRunner.physicalThreadEngagementAllowed();
-      },
+      physicalThreadStiffnessNPerM:threadEngagement == null ? null : threadEngagement.threadStiffnessNPerM,
       armOwnsAxialMotion:() -> {
         var currentRunner = screwing;
         return currentRunner != null && currentRunner.forceSearchOwnsAxialMotion();
       },
       connection:{fastening:job.fastening,member:job.frame,face:job.threadFace},
-      work:() -> ScrewScenePlan.work(job,workPose(),screw.center)});
+      // The simulated device's thread is where the part physically is; only the plan uses the measured estimate.
+      work:() -> ScrewScenePlan.work(job,livePart(work),screw.center)});
     if (retightening && finalContact == null) throw "Final setup lost its measured installed socket";
     var state = robot.runtime.snapshot();
     var planning = PlanningLimits.ofGroup(arm,new SteadyLoads(),ARM_ACCELERATION,null,state.modelRevision,state.calibrationRevision);

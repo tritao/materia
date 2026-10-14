@@ -16,12 +16,21 @@ class ServoPlanOptions {
    * the arm run on before the queue runs dry.
    */
   public final leadSeconds:Float;
+  /**
+   * The cell's commissioned acceleration limit for each arm joint, as its planners use; null takes each joint's
+   * model limit.
+   */
+  public final accelerationLimits:Null<Array<Float>>;
 
-  public function new(modelRevision:Int64, calibrationRevision:Int64, ?leadSeconds:Float = 0.04) {
+  public function new(modelRevision:Int64, calibrationRevision:Int64, ?leadSeconds:Float = 0.04,
+      ?accelerationLimits:Array<Float>) {
     if (!(leadSeconds > 0.0) || !Math.isFinite(leadSeconds)) throw "Servo plan lead must be positive";
+    if (accelerationLimits != null) for (limit in accelerationLimits)
+      if (!(limit > 0.0) || !Math.isFinite(limit)) throw "Servo plan acceleration limits must be positive";
     this.modelRevision = modelRevision;
     this.calibrationRevision = calibrationRevision;
     this.leadSeconds = leadSeconds;
+    this.accelerationLimits = accelerationLimits == null ? null : accelerationLimits.copy();
   }
 }
 
@@ -61,8 +70,11 @@ class ServoPlan {
     this.jointCount = jointCount;
     indices = manipulator.jointIndices();
     accelerationLimits = [];
+    var commissioned = options.accelerationLimits;
+    if (commissioned != null && commissioned.length != indices.length)
+      throw 'Servo plans need one acceleration limit per arm joint, not ${commissioned.length}';
     for (k in 0...indices.length) {
-      var limit = manipulator.group.limitsOf(k).maxAcceleration;
+      var limit = commissioned != null ? commissioned[k] : manipulator.group.limitsOf(k).maxAcceleration;
       if (limit == null || !(limit > 0.0)) throw 'Servo plans need an acceleration limit on arm joint $k';
       accelerationLimits.push(0.999 * limit);
     }

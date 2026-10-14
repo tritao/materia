@@ -67,6 +67,12 @@ class CartesianAdmittance {
 
   public function stop():Void velocity = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
+  /** The commissioned damping of one axis: a steady force error `f` moves that axis at `f / damping`. */
+  public function dampingOf(axis:Int):Float {
+    if (axis < 0 || axis >= 6) throw 'Cartesian admittance has no axis $axis';
+    return damping[axis];
+  }
+
   function clampNorm(values:Array<Float>, start:Int, maximum:Float):Void {
     var norm = Math.sqrt(values[start] * values[start] + values[start + 1] * values[start + 1] + values[start + 2] * values[start + 2]);
     if (norm > maximum) {

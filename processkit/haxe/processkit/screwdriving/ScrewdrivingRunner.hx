@@ -57,11 +57,6 @@ class ScrewdrivingRunner {
   /** The force-controlled arm owns axial motion during search and its recovery. */
   public function forceSearchOwnsAxialMotion():Bool return phase == EntrySearch || phase == EntrySearchStopping ||
 		phase == EntrySearchRecoveryRetraction;
-  /** Physical threads attach only after measured entry and the axial engagement move. */
-  public function physicalThreadEngagementAllowed():Bool {
-    var search = entrySearch;
-    return phase == Driving && (search == null || search.isComplete());
-  }
   public function completed():Bool return phase == Done;
   public function recoveryCompleted():Bool return phase == Recovered;
   public function failure():Null<String> return failureMessage;

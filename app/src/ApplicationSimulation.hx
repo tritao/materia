@@ -384,6 +384,7 @@ class ApplicationSimulation {
         var centerX=object.x,centerY=object.y,centerZ=object.z;
         var halfX=object.width/2.0,halfY=object.height/2.0,halfZ=object.depth/2.0;
         var shape = SimShape.box(halfX, halfY, halfZ);
+        var inertial:Null<nativekit.sim.SimInertialProperties> = null;
         if(scene.isCadPart(object.id)){
           var bounds=scene.cadSession(object.id).collisionBounds;
           if(bounds==null)throw "CAD collision bounds are unavailable for: "+object.id;
@@ -413,6 +414,8 @@ class ApplicationSimulation {
         // session. Their authored pieces are still component facts.
         var authored = projectEnvironmentShape(session,object.id);
         if (authored != null) shape = authored;
+        // A free project part turns with its own CAD inertia, not a solver's nominal one.
+        if (object.dynamicBody) inertial = projectInertial(session, object.id, object.mass);
         var rotation=object.rotation==null?[0.0,0.0,0.0,1.0]:object.rotation;
         var surface = object.collisionEnabled
           ? (object.dynamicBody ? pneumaticWorkpieceSurface : null)
@@ -422,7 +425,7 @@ class ApplicationSimulation {
           new SimPose(centerX,centerY,centerZ,rotation[0],rotation[1],rotation[2],rotation[3]),
           object.dynamicBody?object.mass:0.0,
           !object.dynamicBody && assembly != null && [for (part in assembly.occurrences) if (object.id == "project:" + part.id) part].length == 1 ? restContactGroup : null,
-          surface);
+          surface, inertial);
         candidateObjects.push({id:object.id,object:created});
         if (!object.dynamicBody) heldBoxes.push({id: object.id, x: centerX, y: centerY, z: centerZ,
           halfX: halfX, halfY: halfY, halfZ: halfZ,
@@ -746,6 +749,40 @@ class ApplicationSimulation {
     if (released != null) released.session.stop();
     if (robots != null) robots.dispose();
     if (released != null) released.dispose();
+  }
+
+  /**
+   * A CAD part's mass properties in its free body's frame: the part frame, translated to the preview centre the body's
+   * hull is built around. The tensor is centroidal, from the resolved kg m^2 inertia or the unit-density one, scaled
+   * to the body's mass.
+   */
+  static function projectInertial(session:Null<ProjectDocumentSession>, id:String,
+      mass:Float):Null<nativekit.sim.SimInertialProperties> {
+    var definition = session == null ? null : session.projectAssemblyDefinition;
+    var physical = session == null ? null : session.projectPhysical;
+    if (session == null || definition == null || physical == null) return null;
+    for (occurrence in definition.occurrences) if (id == "project:" + occurrence.id)
+      for (part in physical.parts) if (part.id == occurrence.definition) {
+        var centre = session.assemblyPreviewCenter(occurrence.definition);
+        if (centre == null) throw "Dynamic project part has no preview centre: " + id;
+        return cadInertial(part, centre, physical.metresPerUnit, mass);
+      }
+    return null;
+  }
+
+  static function cadInertial(part:cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart, centre:Array<Float>,
+      metresPerUnit:Float, mass:Float):nativekit.sim.SimInertialProperties {
+    if (!Math.isFinite(mass) || mass <= 0) throw 'Dynamic CAD part "${part.id}" needs a positive mass';
+    var center = [for (axis in 0...3) (part.centerOfMass[axis] - centre[axis]) * metresPerUnit];
+    var resolved = part.physicalInertiaKgM2, resolvedMass = part.physicalMassKg;
+    var tensor:Array<Float>;
+    if (resolved != null && resolvedMass != null) tensor = [for (value in resolved) value * mass / resolvedMass];
+    else {
+      var baseMass = part.volume * part.density * Math.pow(metresPerUnit, 3);
+      var factor = part.density * Math.pow(metresPerUnit, 5) * mass / baseMass;
+      tensor = [for (value in part.inertia) value * factor];
+    }
+    return new nativekit.sim.SimInertialProperties(center, tensor);
   }
 
   public static function rotateOffset(x:Float, y:Float, z:Float, rotation:Null<Array<Float>>):Array<Float> {

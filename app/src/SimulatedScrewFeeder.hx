@@ -72,7 +72,7 @@ class SimulatedScrewFeeder implements SimulationStepObserver implements ScrewFee
     var safety = runtime.snapshot().safety;
     if (safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT || safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP) model.safe();
     var delivered = model.delivered;
-    if (delivered != null && !present() && driver.holding.held == parts.get("project:"+delivered).freeBody())
+    if (delivered != null && !present() && driver.carried() == parts.get("project:"+delivered).freeBody())
       model.confirmPickup(delivered);
     model.poll(Int64.toFloat(timestamp)*1e-9);
   }

@@ -180,32 +180,25 @@ class ScrewdrivingAssemblyPreview {
 	public static function registeredForceSearch():Bytes return SceneArtifact.encode(scene(false,false,false,true,true));
 	public static function forceSearch():Bytes return SceneArtifact.encode(scene(false,false,false,false,true));
 
-	/** Simulation-only commissioning data for the force-search example, not a hardware safety recipe. */
+	/**
+	 * Simulation-only commissioning data for the force-search example, not a hardware safety recipe. The numbers are
+	 * the ones `ScrewEntryPlantTests` exercises: a 5 N contact force, a 2 mm/s guarded descent and a 1.6 mm spiral with
+	 * 0.4 mm pitch (below the clearance bore's capture diameter) at 2 mm/s. While the arm searches, the tool's feed
+	 * slide is its 2 N/mm spring, so each axis is damped above what it pushes against times the 20 ms
+	 * sample-and-step latency: 400 N s/m along the axis (the spring), 4000 N s/m sideways (rigid contact), each with
+	 * a 20 ms relaxation. The 0.3 mm entry advance marks a drop into a bore, or the screw past the CAD entry plane
+	 * into the tapped hole.
+	 */
 	static function forceSearchProfile(sensor:String):materia.project.SceneArtifact.SceneArtifactScrewEntrySearch {
-		var targetLoadN = 3.0;
-		var maximumLinearSpeed = 0.00015;
-		// Commission a 50 ms linear relaxation and a zero-load correction at half
-		// the linear speed cap. Small force errors must not flip a saturated servo.
-		var linearDamping = 2.0 * targetLoadN / maximumLinearSpeed;
-		var linearMass = linearDamping * 0.05;
-		// A 0.4 mm U preload supplies face contact; the runner first contracts toward the CAD axis,
-		// then sweeps outward around that axis if the inward pass does not find the entry. It holds
-		// measured axial compression while sweeping and advances only at a captured candidate.
-		// The 41 mm TCP bound covers the CAD entry pose and registered-region diagonal; relief retracts toward the origin.
-		// 12 initial turns cross the narrow M6 entry with at most 0.083 mm radial miss;
-		// bounded inward refinement and region fallback use at most 10 and 14 turns.
-		// An unvalidated M6 candidate probes its 1 mm lead within half of the 30 s progress bound.
-		// Reserve one bounded retract-and-reposition retry for stalled spiral tracking.
-		// The long-reach force-search variant clears the robot wrist above the flange housing.
-		return {sensor:sensor,maximumAgeSeconds:0.02,targetWrench:[0,0,-targetLoadN,0,0,0],
-			virtualMass:[linearMass,linearMass,linearMass,1,1,1],damping:[linearDamping,linearDamping,linearDamping,20,20,20],
-			maximumLinearSpeed:maximumLinearSpeed,maximumSearchAxialSpeed:0.000125,contactReliefMeters:0.005,
-			maximumAngularSpeed:0.000012,maximumStepSeconds:0.01,
-			maximumForceN:25,maximumTorqueNm:2,maximumTravelMeters:0.041,maximumTravelRadians:0.05,
-			maximumRunSeconds:3600,regionHalfUMeters:0.0021,regionHalfVMeters:0.0021,
-			contactSeedOffsetUMeters:0.0004,spiralRadiusMeters:0.0016,spiralTurns:12.0,spiralDurationSeconds:880,
-			spiralMaximumLateralSpeed:0.00014,spiralTrackingGainPerSecond:6,
-			minimumContactLoadN:targetLoadN,requiredLoadDropN:1,candidateProgressTimeoutSeconds:30.0,confirmationSamples:2};
+		var axial = 400.0, lateral = 4000.0, relaxationSeconds = 0.02;
+		return {sensor:sensor,maximumAgeSeconds:0.02,contactForceN:5,contactThresholdN:2,confirmationSamples:2,
+			virtualMass:[lateral*relaxationSeconds,lateral*relaxationSeconds,axial*relaxationSeconds,1,1,1],
+			damping:[lateral,lateral,axial,20,20,20],
+			maximumLinearSpeed:0.004,maximumAngularSpeed:0.0002,maximumStepSeconds:0.01,approachSpeed:0.002,
+			maximumForceN:25,maximumTorqueNm:2,maximumTravelMeters:0.045,maximumTravelRadians:0.05,maximumRunSeconds:120,
+			regionHalfUMeters:0.0021,regionHalfVMeters:0.0021,spiralRadiusMeters:0.0016,spiralPitchMeters:0.0004,
+			spiralSpeed:0.002,spiralTrackingGainPerSecond:10,spiralTrackingToleranceMeters:0.00015,
+			entryAdvanceMeters:0.0003,stallSeconds:5};
 	}
 
 	/** The side stops move with the plate and provide exposed CAD reference faces. */

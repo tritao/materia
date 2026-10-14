@@ -273,7 +273,11 @@ class RobotModel {
   @:allow(robotkit.model.DriveLoads)
   @:allow(robotkit.device.DeviceBinding)
   @:allow(robotkit.runtime.RobotRuntimeCompiler)
-  function turningInertia(joint:Joint):Float {
+  /**
+   * What accelerating `joint` moves, in its own units: for a revolute joint the moment of inertia of everything it
+   * carries about its axis (kg m^2), for a prismatic joint the carried mass (kg); armature included.
+   */
+  public function turningInertia(joint:Joint):Float {
     if (joint.type == JointType.Prismatic) return carriedMass(joint) + joint.armature;
     var childFrame = jointFrame(joint.childFramePosition, joint.childFrameRotation);
     var axis = childFrame.transformVector(new robotkit.spatial.Vec3(joint.axis[0], joint.axis[1], joint.axis[2])).normalized();

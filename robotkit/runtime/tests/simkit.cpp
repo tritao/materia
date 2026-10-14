@@ -1,6 +1,7 @@
 #include "robotkit_simkit.h"
 #include "../src/sensor_math.hpp"
 
+#include <cstdio>
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -1347,41 +1348,68 @@ void dual_home_removes_one_millimetre_startup_racking(bool full_targets) {
     assert(std::abs((after.position[1] - after.position[2]) / 1000.0) < 0.00002);
 }
 
-void threaded_object_slide_is_owned_by_the_shared_robot_simulation() {
+void screw_threads_into_its_member_and_is_owned_by_the_shared_robot_simulation() {
     SessionFixture fixture(0.001, 4);
     auto model = blueprint(302);
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_simulation_add_robot(fixture.simulation, &model, nullptr, &robot) == RK_OK);
-    const double position[] = {0.0, 0.0, 0.02};
     const double rotation[] = {0.0, 0.0, 0.0, 1.0};
-    const double half_extents[] = {0.003, 0.003, 0.01};
-    const auto screw = spawn_object(fixture.session, NKSIM_MOTION_DYNAMIC, position,
-        rotation, half_extents, 0.01);
-    nksim_body screw_body = 0;
+    const double member_position[] = {0.3, 0.0, -0.01};
+    const double member_half_extents[] = {0.02, 0.02, 0.005};
+    const auto member = spawn_object(fixture.session, NKSIM_MOTION_STATIC, member_position,
+        rotation, member_half_extents, 0.0);
+    const double screw_position[] = {0.3, 0.0, 0.02};
+    const double screw_half_extents[] = {0.003, 0.003, 0.01};
+    const auto screw = spawn_object(fixture.session, NKSIM_MOTION_DYNAMIC, screw_position,
+        rotation, screw_half_extents, 0.01);
+    nksim_body member_body = 0, screw_body = 0;
+    assert(nksim_session_get_object_body(fixture.session, member, &member_body) == NKSIM_OK);
     assert(nksim_session_get_object_body(fixture.session, screw, &screw_body) == NKSIM_OK);
 
-    rk_simulation_object_slide_desc description{};
+    rk_simulation_object_screw_desc description{};
     description.struct_size = sizeof(description);
-    description.parent_link_index = 1;
-    description.driver_joint_index = 0;
-    description.follower_body = screw_body;
-    description.axis_a[2] = 1.0;
-    description.lower_limit = -0.02;
-    description.upper_limit = 0.02;
-    description.max_force = 100.0;
-    description.ratio = 0.001 / (2.0 * 3.14159265358979323846);
-    nksim_joint slide = 0;
-    assert(rk_simulation_create_object_slide_follower(fixture.simulation, &description, &slide) == RK_OK);
-    assert(slide != 0);
+    description.spindle_joint_index = 0;
+    description.member_body = member_body;
+    description.screw_body = screw_body;
+    description.axis_point[0] = 0.3;
+    description.axis_point[2] = 0.0;
+    description.axis[2] = -1.0;
+    description.lead = 0.001;
+    description.lower_limit = -1.0;
+    description.upper_limit = 60.0;
+    description.socket_ratio = 1.0;
+    description.thread_damping_ratio = 1.0;
+    description.advance_armature = 1.0;
+    // A thread needs a stated stiffness: without one it would hold only by solver softness.
+    nksim_joint thread = 0;
+    assert(rk_simulation_create_object_screw_joint(fixture.simulation, &description, &thread) ==
+           RK_ERROR_INVALID_ARGUMENT);
+    description.thread_stiffness = 1.0e7;
+    // A socket passes the spindle's turn whole, one way or the other.
+    description.socket_ratio = 0.5;
+    assert(rk_simulation_create_object_screw_joint(fixture.simulation, &description, &thread) ==
+           RK_ERROR_INVALID_ARGUMENT);
+    description.socket_ratio = 1.0;
+    nksim_body_state before{};
+    before.struct_size = sizeof(before);
+    assert(nksim_session_get_body_state(fixture.session, screw_body, &before) == NKSIM_OK);
+    assert(rk_simulation_create_object_screw_joint(fixture.simulation, &description, &thread) == RK_OK);
+    assert(thread != 0);
+    // Threading measures the screw where it stands: nothing snaps.
+    nksim_body_state threaded{};
+    threaded.struct_size = sizeof(threaded);
+    assert(nksim_session_get_body_state(fixture.session, screw_body, &threaded) == NKSIM_OK);
+    for (int axis = 0; axis < 3; ++axis) assert(std::abs(threaded.position[axis] - before.position[axis]) < 1e-9);
 
     // Topology may change between manual ticks, but never while the host owns the world.
     assert(start(fixture.session) == RK_OK);
     nksim_joint forbidden = 0;
-    assert(rk_simulation_create_object_slide_follower(fixture.simulation, &description, &forbidden) == RK_ERROR_INVALID_STATE);
-    assert(rk_simulation_destroy_object_joint(fixture.simulation, slide) == RK_ERROR_INVALID_STATE);
+    assert(rk_simulation_create_object_screw_joint(fixture.simulation, &description, &forbidden) == RK_ERROR_INVALID_STATE);
+    assert(rk_simulation_destroy_object_joint(fixture.simulation, thread) == RK_ERROR_INVALID_STATE);
     assert(stop(fixture.session) == RK_OK);
-    assert(rk_simulation_destroy_object_joint(fixture.simulation, slide) == RK_OK);
+    assert(rk_simulation_destroy_object_joint(fixture.simulation, thread) == RK_OK);
     remove_object(fixture.session, screw);
+    remove_object(fixture.session, member);
 }
 
 void fixed_object_follower_tracks_and_releases_a_live_cad_body() {
@@ -1442,6 +1470,9 @@ void fixed_object_follower_tracks_and_releases_a_live_cad_body() {
         relative_orientation_dot += parent_after.rotation[axis] * tool_after.rotation[axis];
     assert(std::abs(std::abs(relative_orientation_dot) - 1.0) < 1e-4);
 
+    // Release is a topology change: it waits for the host to stop between ticks.
+    assert(rk_simulation_destroy_object_joint(fixture.simulation, attachment) == RK_ERROR_INVALID_STATE);
+    assert(stop(fixture.session) == RK_OK);
     assert(rk_simulation_destroy_object_joint(fixture.simulation, attachment) == RK_OK);
     nksim_body_state released{};
     released.struct_size = sizeof(released);
@@ -1510,6 +1541,8 @@ void articulated_robot_follower_tracks_and_releases_without_losing_tool_joints()
     assert(std::abs(std::abs(orientation_dot) - 1.0) < 1e-4);
     assert(std::abs(snapshot(tool_runtime).position[0] - 0.3) < 0.02);
 
+    // Release is a topology change: stepping leaves the host running until it is stopped.
+    assert(stop(fixture.session) == RK_OK);
     assert(rk_simulation_destroy_robot_joint(fixture.simulation, mount) == RK_OK);
     rk_simulation_pose released{};
     released.struct_size = sizeof(released);
@@ -1534,7 +1567,6 @@ void articulated_robot_follower_tracks_and_releases_without_losing_tool_joints()
     assert(rk_simulation_get_link_pose(fixture.simulation, 1, 0, &docked) == RK_OK);
     for (uint32_t axis = 0; axis < 3; ++axis)
         assert(std::abs(docked.position[axis] - released.position[axis]) < 1e-10);
-    assert(start(fixture.session) == RK_OK);
     for (uint64_t tick = 501; tick <= 550; ++tick)
         assert(step(fixture.session, tick * 1000000) == RK_OK);
     assert(stop(fixture.session) == RK_OK);
@@ -1563,9 +1595,15 @@ void process_joint_drive_requires_process_ownership() {
     rk_robot_runtime ordinary_runtime = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_simulation_add_robot(fixture.simulation, &ordinary, nullptr, &ordinary_runtime) == RK_OK);
     assert(start(fixture.session) == RK_OK);
-    assert(rk_simulation_drive_process_joint(fixture.simulation, 0, 0, 0.05, 0.0) == RK_OK);
-    assert(rk_simulation_drive_process_joint(fixture.simulation, 0, 0, 0.2, 0.0) == RK_ERROR_INVALID_ARGUMENT);
-    assert(rk_simulation_drive_process_joint(fixture.simulation, 1, 0, 0.05, 0.0) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_drive_process_joint(fixture.simulation, 0, 0, 0.05, 0.0, 0.0) == RK_OK);
+    assert(rk_simulation_drive_process_joint(fixture.simulation, 0, 0, 0.2, 0.0, 0.0) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_drive_process_joint(fixture.simulation, 1, 0, 0.05, 0.0, 0.0) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_drive_process_joint(fixture.simulation, 0, 0, 0.05, 0.0, -1.0) == RK_ERROR_INVALID_ARGUMENT);
+    // A compliant slide: a passive spring on the same process ownership rules.
+    assert(rk_simulation_spring_process_joint(fixture.simulation, 0, 0, 0.0, 2000.0, 20.0) == RK_OK);
+    assert(rk_simulation_spring_process_joint(fixture.simulation, 0, 0, 0.0, 0.0, 20.0) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_spring_process_joint(fixture.simulation, 0, 0, 0.2, 2000.0, 20.0) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_spring_process_joint(fixture.simulation, 1, 0, 0.0, 2000.0, 20.0) == RK_ERROR_INVALID_ARGUMENT);
     assert(stop(fixture.session) == RK_OK);
 }
 
@@ -1587,7 +1625,7 @@ int main() {
     differential_drive_keeps_authored_tilt();
     omni_drive_follows_applied_wheel_targets();
     robots_attach_to_a_shared_session();
-    threaded_object_slide_is_owned_by_the_shared_robot_simulation();
+    screw_threads_into_its_member_and_is_owned_by_the_shared_robot_simulation();
     fixed_object_follower_tracks_and_releases_a_live_cad_body();
     articulated_robot_follower_tracks_and_releases_without_losing_tool_joints();
     process_joint_drive_requires_process_ownership();

@@ -44,7 +44,7 @@ class SimulatedBlowFeed implements ScrewFeederDevice implements SimulationStepOb
   }
   function ready():Bool {
     var state = runtime.snapshot();
-    if (state.safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT || state.safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP || driver.holding.held != null) return false;
+    if (state.safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT || state.safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP || driver.carried() != null) return false;
     return driver.receivingReady(definition.receivingAngularSpeed,definition.receivingFeedSpeed);
   }
   function present():Bool {
@@ -72,7 +72,7 @@ class SimulatedBlowFeed implements ScrewFeederDevice implements SimulationStepOb
   public function confirmRejected(identity:String):Void {
     var job = selected;
     if (job == null || job.screw != identity || job.recovery == null || model.transport.delivered != identity ||
-        driver.holding.held != null || present())
+        driver.carried() != null || present())
       throw 'Blow-feed "${definition.id}" cannot confirm rejected screw "$identity" before measured release clear of the nosepiece';
     model.confirmConsumed(identity);
   }
@@ -81,7 +81,7 @@ class SimulatedBlowFeed implements ScrewFeederDevice implements SimulationStepOb
     var state = runtime.snapshot();
     if (state.safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT || state.safety == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP) safe();
     var id = model.transport.delivered, job = selected;
-    if (id != null && job != null && driver.holding.held == null && !present()
+    if (id != null && job != null && driver.carried() == null && !present()
         && parts.get("project:"+job.frame).carries(parts.get("project:"+id).freeBody())) model.confirmConsumed(id);
     model.poll(Int64.toFloat(timestamp)*1e-9);
   }

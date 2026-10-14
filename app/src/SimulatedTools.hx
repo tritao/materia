@@ -160,7 +160,8 @@ class SimulatedTools implements SessionMember {
 		return new processkit.simulation.SimulatedScrewdriver(simulation, robot.runtime, robotIndex, part.linkIndex,
 			feed, spindle, [tip.x,tip.y,tip.z], toolAxisLocal,
 			{start:tool.channel,direction:driver.directionChannel,program:driver.programChannel,vacuum:driver.vacuumChannel},
-			sensor,driver.strokeMm,driver.maxSpeed,driver.maxTorque,driver.springRate,spindleAxisAlignment);
+			sensor,driver.strokeMm,driver.maxSpeed,driver.maxTorque,driver.springRate,spindleAxisAlignment,
+			robot.model.turningInertia(robot.model.joints[spindle]), robot.model.turningInertia(robot.model.joints[feed]));
 	}
 
 	/** Tool contact links below the sensor, stopping at the named sensor-bearing link. */
@@ -183,7 +184,7 @@ class SimulatedTools implements SessionMember {
 	public function heldIds():Array<String> {
 		var result:Array<String> = [];
 		for (driver in screwdrivers) {
-			var held = driver.holding.held;
+			var held = driver.carried();
 			if (held != null) for (entry in objects) if (entry.object == held) result.push(entry.id);
 		}
 		for (tool in tools) {
@@ -208,7 +209,7 @@ class SimulatedTools implements SessionMember {
 	/** The session's free objects, by scene id. */
 	public function objectsByScene():Array<GripObject> return objects;
 
-	public function feed():Void {for (driver in screwdrivers) driver.preparePhysicalThreadEngagement();}
+	public function feed():Void {for (driver in screwdrivers) driver.prepareCarriage();}
 
 	public function beforeReset():Void {for (driver in screwdrivers) driver.beforeReset();}
 

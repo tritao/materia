@@ -122,11 +122,11 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_create_object_fixed_follower(simulation: rk_simulation, robot_index: u32, parent_link_index: u32, follower_body: nksim_body, out_joint: ptr<nksim_joint> @out) -> rk_result;
 	/**
-	 * Adds a prismatic child to a robot link and couples its slide to one robot revolute joint.
-	 * The session must be between ticks with its physics host stopped; ratio and offset follow
-	 * `follower = ratio * leader + offset` in native joint coordinates.
+	 * Threads a dynamic screw into its member at its current measured pose and couples its turn to a robot spindle.
+	 * The session must be between ticks with its physics host stopped. The screw's contacts are its member's, not
+	 * the robot's: the spindle carries only the socket torque.
 	 */
-	extern fn rk_simulation_create_object_slide_follower(simulation: rk_simulation, desc: ptr<const<rk_simulation_object_slide_desc>>, out_joint: ptr<nksim_joint> @out) -> rk_result;
+	extern fn rk_simulation_create_object_screw_joint(simulation: rk_simulation, desc: ptr<const<rk_simulation_object_screw_desc>>, out_joint: ptr<nksim_joint> @out) -> rk_result;
 	/**
 	 * Attaches a floating articulated robot root to a session body, such as a fixed tool dock, without snapping.
 	 * The session must be between ticks with its physics host stopped.
@@ -161,9 +161,11 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	extern fn rk_simulation_destroy_robot_joint(simulation: rk_simulation, joint: nksim_joint) -> rk_result;
 	/**
 	 * Drives one process-owned tool joint without changing other joints or their commands.
-	 * Called between physics ticks. Only prismatic and rotary tool coordinates are admitted.
+	 * Called between physics ticks. Only prismatic and rotary tool coordinates are admitted. `max_effort` is the
+	 * controller's force or torque limit for this command, positive and within the joint's rating; zero applies the
+	 * rating itself.
 	 */
-	extern fn rk_simulation_drive_process_joint(simulation: rk_simulation, robot_index: u32, joint: u32, position: f64, velocity: f64) -> rk_result;
+	extern fn rk_simulation_drive_process_joint(simulation: rk_simulation, robot_index: u32, joint: u32, position: f64, velocity: f64, max_effort: f64) -> rk_result;
 	/**
 	 * Drives one attached robot's kinematic base to a pose for the next tick.
 	 *
@@ -344,6 +346,12 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_set_squaring_hold(simulation: rk_simulation, robot_index: u32, joint: u32, active: u32, position: f64) -> rk_result;
 	extern fn rk_simulation_set_virtual_device_input(simulation: rk_simulation, robot_index: u32, input: u32, value: f64) -> rk_result;
+	/**
+	 * Makes one process-owned tool joint a passive spring: it rests at `rest_position` with `stiffness`
+	 * (N/m or N m/rad) and `damping` (N s/m or N m s/rad), its force capped by the joint's effort limit. A compliant
+	 * feed slide is this, mechanically. Called between physics ticks.
+	 */
+	extern fn rk_simulation_spring_process_joint(simulation: rk_simulation, robot_index: u32, joint: u32, rest_position: f64, stiffness: f64, damping: f64) -> rk_result;
 	/**
 	 * Deliver STOP6 before freezing the simulated board's clock.
 	 */
@@ -570,32 +578,54 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		vertices: array<f64, 192> @offset(144);
 	}
 	/**
-	 * Prismatic child and lead relation for one dynamic object carried by a robot link.
+	 * A dynamic screw threaded into its member: a helical joint from the member's body, turned by one robot revolute
+	 * joint through a socket. The socket couples only rotation, so the thread's axial reaction stays between the
+	 * screw and the member.
 	 */
-	struct rk_simulation_object_slide_desc @layout(152, 8) {
+	struct rk_simulation_object_screw_desc @layout(144, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		robot_index: u32 @offset(4);
-		parent_link_index: u32 @offset(8);
-		driver_joint_index: u32 @offset(12);
-		follower_body: nksim_body @offset(16);
 		/**
-		 * < Local to the parent link.
+		 * The revolute joint whose rotation the socket passes to the screw.
 		 */
-		anchor_a: array<f64, 3> @offset(24);
+		spindle_joint_index: u32 @offset(8);
 		/**
-		 * < Local to the follower body.
+		 * The threaded member's body: a session object's or a robot link's.
 		 */
-		anchor_b: array<f64, 3> @offset(48);
+		member_body: nksim_body @offset(12);
+		screw_body: nksim_body @offset(16);
 		/**
-		 * < Unit slide axis in the parent link.
+		 * < A world point on the thread axis, at the measured boundary.
 		 */
-		axis_a: array<f64, 3> @offset(72);
-		lower_limit: f64 @offset(96);
-		upper_limit: f64 @offset(104);
-		max_force: f64 @offset(112);
-		ratio: f64 @offset(120);
-		offset: f64 @offset(128);
-		reserved: array<u64, 2> @offset(136);
+		axis_point: array<f64, 3> @offset(24);
+		/**
+		 * < World unit direction the screw advances in.
+		 */
+		axis: array<f64, 3> @offset(48);
+		/**
+		 * Metres of advance per positive turn about `axis`; negative for a left-hand thread.
+		 */
+		lead: f64 @offset(72);
+		/**
+		 * The screw's turn range from its pose now, in radians.
+		 */
+		lower_limit: f64 @offset(80);
+		upper_limit: f64 @offset(88);
+		/**
+		 * Screw turn per spindle radian: +1 or -1 with the spindle axis along or against `axis`.
+		 */
+		socket_ratio: f64 @offset(96);
+		/**
+		 * The thread flank as a spring along the axis: stiffness (N/m) and damping ratio. A solver constraint on a
+		 * light screw is only as stiff as that screw's mass allows; a stated stiffness is not.
+		 */
+		thread_stiffness: f64 @offset(104);
+		thread_damping_ratio: f64 @offset(112);
+		/**
+		 * Inertia (kg) on the advance, so a stiff thread on a light screw stays resolved by the step.
+		 */
+		advance_armature: f64 @offset(120);
+		reserved: array<u64, 2> @offset(128);
 	}
 	/**
 	 * Ideal rolling omni-wheel coupling for one robot's kinematic base.

@@ -58,7 +58,10 @@ public:
                                   const uint32_t *side_drives = nullptr, uint32_t side_count = 0);
     rk_result teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose);
     rk_result set_joint_positions(uint32_t robot_index, const double *positions, uint32_t count);
-    rk_result drive_process_joint(uint32_t robot_index, uint32_t joint, double position, double velocity);
+    rk_result drive_process_joint(uint32_t robot_index, uint32_t joint, double position, double velocity,
+        double max_effort);
+    rk_result spring_process_joint(uint32_t robot_index, uint32_t joint, double rest_position, double stiffness,
+                                   double damping);
     /**
      * Moves one kinematic robot base for the next tick without stopping the
      * owner, resetting sensors, or replacing the reset pose.
@@ -90,7 +93,7 @@ public:
     rk_result get_link_body(uint32_t robot_index, uint32_t link_index, nksim_body &out_body) const;
     rk_result bind_object_to_link(nksim_object object, uint32_t robot_index, uint32_t link_index);
     rk_result unbind_object(nksim_object object);
-    rk_result create_object_slide_follower(const rk_simulation_object_slide_desc &desc,
+    rk_result create_object_screw_joint(const rk_simulation_object_screw_desc &desc,
         nksim_joint &out_joint);
     rk_result create_object_fixed_follower(uint32_t robot_index, uint32_t parent_link_index,
         nksim_body follower_body, nksim_joint &out_joint);
@@ -200,6 +203,8 @@ private:
         nksim_body follower = 0;
         uint32_t robot_index = 0;
         uint32_t parent_link_index = 0;
+        /** Whether the follower's contacts load the robot link: false for a screw threaded into its work. */
+        bool tool_load = true;
     };
     struct RobotJointOwner {
         nksim_joint joint = 0;

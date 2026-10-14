@@ -882,10 +882,21 @@ class Simulation {
   }
 
   /** Drives a process-owned tool coordinate between ticks, preserving other joint commands. */
-  public function driveProcessJoint(robotIndex:Int, joint:Int, position:Float, velocity:Float):Void {
+  /**
+   * Makes a process-owned tool joint a passive spring resting at `restPosition`, with `stiffness` and `damping` in the
+   * joint's units (see `rk_simulation_spring_process_joint`).
+   */
+  public function springProcessJoint(robotIndex:Int, joint:Int, restPosition:Float, stiffness:Float, damping:Float):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_drive_process_joint(owner.borrow(), robotIndex, joint, position, velocity),
-      "simulation.driveProcessJoint");
+    check(RobotKitSimKit.rk_simulation_spring_process_joint(owner.borrow(), robotIndex, joint, restPosition, stiffness,
+      damping), "simulation.springProcessJoint");
+  }
+
+  /** `maxEffort` is the controller's limit for this command, within the joint's rating; zero applies the rating. */
+  public function driveProcessJoint(robotIndex:Int, joint:Int, position:Float, velocity:Float, maxEffort:Float = 0):Void {
+    ensureLive();
+    check(RobotKitSimKit.rk_simulation_drive_process_joint(owner.borrow(), robotIndex, joint, position, velocity,
+      maxEffort), "simulation.driveProcessJoint");
   }
 
   /**
@@ -947,32 +958,38 @@ class Simulation {
     session.stop();
   }
 
-  /** Couples a dynamic object slide to one revolute joint on its parent tool link. */
-  public function createObjectSlideFollower(robotIndex:Int, parentLinkIndex:Int, driverJointIndex:Int,
-      follower:nativekit.sim.SimObject, anchorA:Array<Float>, anchorB:Array<Float>, axis:Array<Float>,
-      lowerLimit:Float, upperLimit:Float, maxForce:Float, ratio:Float, offset:Float):nksim_joint {
+  /**
+   * Threads a dynamic screw into its member's body on a helical joint at their measured poses, turned by one robot
+   * revolute joint through a socket (see `rk_simulation_object_screw_desc`). World point and unit advance axis;
+   * `lead` in metres per positive turn about it.
+   */
+  public function createObjectScrewJoint(robotIndex:Int, spindleJointIndex:Int, member:nksim_body,
+      screw:nativekit.sim.SimObject, axisPoint:Array<Float>, axis:Array<Float>, lead:Float, lowerLimit:Float,
+      upperLimit:Float, socketRatio:Float, threadStiffness:Float, threadDampingRatio:Float,
+      advanceArmature:Float):nksim_joint {
     ensureLive();
-    if (follower == null || anchorA == null || anchorA.length != 3 || anchorB == null || anchorB.length != 3 ||
+    if (screw == null || screw.motion != MotionType.Dynamic || axisPoint == null || axisPoint.length != 3 ||
         axis == null || axis.length != 3)
-      throw "Object slide follower needs a session object and three-component local joint frames";
-    var desc = new rk_simulation_object_slide_desc();
-    desc.set_struct_size(rk_simulation_object_slide_desc.size());
+      throw "Screw joint needs a dynamic session screw and a world thread axis";
+    var desc = new rk_simulation_object_screw_desc();
+    desc.set_struct_size(rk_simulation_object_screw_desc.size());
     desc.set_robot_index(robotIndex);
-    desc.set_parent_link_index(parentLinkIndex);
-    desc.set_driver_joint_index(driverJointIndex);
-    desc.set_follower_body(session.objectBody(follower));
+    desc.set_spindle_joint_index(spindleJointIndex);
+    desc.set_member_body(member);
+    desc.set_screw_body(session.objectBody(screw));
     for (index in 0...3) {
-      desc.set_anchor_a(index, anchorA[index]);
-      desc.set_anchor_b(index, anchorB[index]);
-      desc.set_axis_a(index, axis[index]);
+      desc.set_axis_point(index, axisPoint[index]);
+      desc.set_axis(index, axis[index]);
     }
+    desc.set_lead(lead);
     desc.set_lower_limit(lowerLimit);
     desc.set_upper_limit(upperLimit);
-    desc.set_max_force(maxForce);
-    desc.set_ratio(ratio);
-    desc.set_offset(offset);
-    var result = RobotKitSimKit.rk_simulation_create_object_slide_follower(owner.borrow(), desc);
-    check(result.status, "simulation.createObjectSlideFollower");
+    desc.set_socket_ratio(socketRatio);
+    desc.set_thread_stiffness(threadStiffness);
+    desc.set_thread_damping_ratio(threadDampingRatio);
+    desc.set_advance_armature(advanceArmature);
+    var result = RobotKitSimKit.rk_simulation_create_object_screw_joint(owner.borrow(), desc);
+    check(result.status, "simulation.createObjectScrewJoint");
     return result.out_joint;
   }
 

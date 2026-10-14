@@ -42,6 +42,23 @@ class ScrewdriverArmKinematics {
     model.addFrame(fixedTip);
     return new Manipulator(model,root,fixedTip.id);
   }
+  /**
+   * The unit direction, in the uncompressed planning frame, in which the bit tip moves per positive metre of feed: the
+   * measured tip is that frame plus this axis times the measured feed position.
+   */
+  public static function feedAxisAtTip(model:RobotModel, tcp:FrameId, feedId:JointId):robotkit.spatial.Vec3 {
+    var compiled = RobotKinematics.compile(model);
+    function tip(feed:Float):robotkit.spatial.Transform3 {
+      var state = new KinematicState(compiled);
+      state.q[compiled.dofIndex(Std.string(feedId))] = feed;
+      return RobotKinematics.toTransform3(KinematicSnapshot.of(state).framePose(compiled.frameIndex(tcp)));
+    }
+    var rest = tip(0.0), moved = tip(-0.001);
+    var axis = rest.rotation.conjugate().rotate(rest.translation.sub(moved.translation));
+    if (!(axis.norm() > 1e-6)) throw "Screwdriver feed does not move its bit tip";
+    return axis.normalized();
+  }
+
   /** Rebuild the free-bit planning frame at the measured shaft phase, without commanding either process coordinate. */
   public static function atSpindle(model:RobotModel, root:LinkId, tcp:FrameId, feedId:JointId, spindleId:JointId, shaft:Float):Manipulator {
     if (!Math.isFinite(shaft)) throw "Screwdriver planning needs a finite measured spindle position";

@@ -434,42 +434,50 @@ typedef SceneArtifactScrewEngagement = {
 	var mode:SceneArtifactScrewEngagementMode;
 	/** Required axial constraint-force cap for the physical simulation mode. */
 	@:optional var maximumAxialForceN:Float;
+	/** Required axial stiffness of the engaged thread for the physical simulation mode, in N/m. */
+	@:optional var threadStiffnessNPerM:Float;
 }
 
-/** Commissioned Cartesian force search. Wrenches and gains use sensor axes at the screwdriver TCP origin. */
+/**
+ * Commissioning of a force-guided screw entry (`ScrewEntryController`). Axes are the fastening's: u and v span the
+ * hole plane and n advances into the hole; `virtualMass` and `damping` give u, v, n and the rotations about them.
+ * Lengths are metres, speeds m/s, forces N.
+ */
 typedef SceneArtifactScrewEntrySearch = {
 	var sensor:String;
 	var maximumAgeSeconds:Float;
-	var targetWrench:Array<Float>;
+	/** Axial force regulated while the screw touches a surface. */
+	var contactForceN:Float;
+	/** Compression that, held for `confirmationSamples`, confirms contact. */
+	var contactThresholdN:Float;
+	var confirmationSamples:Int;
 	var virtualMass:Array<Float>;
 	var damping:Array<Float>;
 	var maximumLinearSpeed:Float;
-	/** Axial feed cap while the admittance loop searches and verifies an entry candidate. */
-	var maximumSearchAxialSpeed:Float;
-	/** Clearance distance above the approach pose after premature bore contact. */
-	var contactReliefMeters:Float;
 	var maximumAngularSpeed:Float;
 	var maximumStepSeconds:Float;
+	/** Free-space descent speed before and between contacts. */
+	var approachSpeed:Float;
+	/** Hard stops; the regulation never uses them. */
 	var maximumForceN:Float;
 	var maximumTorqueNm:Float;
-	/** Maximum TCP displacement from search start, including the CAD-authored controlled approach. */
+	/** Maximum TCP displacement from the approach pose. */
 	var maximumTravelMeters:Float;
 	var maximumTravelRadians:Float;
 	var maximumRunSeconds:Float;
 	var regionHalfUMeters:Float;
 	var regionHalfVMeters:Float;
-	/** Deliberate U-axis offset used to establish a measured preload before the search. */
-	var contactSeedOffsetUMeters:Float;
 	var spiralRadiusMeters:Float;
-	var spiralTurns:Float;
-	var spiralDurationSeconds:Float;
-	var spiralMaximumLateralSpeed:Float;
+	/** Radial spacing of spiral turns, below the hole's capture diameter. */
+	var spiralPitchMeters:Float;
+	var spiralSpeed:Float;
 	var spiralTrackingGainPerSecond:Float;
-	var minimumContactLoadN:Float;
-	var requiredLoadDropN:Float;
-	/** Maximum time a candidate entry may hold position without measured axial progress. */
-	var candidateProgressTimeoutSeconds:Float;
-	var confirmationSamples:Int;
+	/** Lag beyond the commanded compliance inside which the spiral advances. */
+	var spiralTrackingToleranceMeters:Float;
+	/** Depth past a touched surface, or past the CAD entry plane, that shows the screw is in a hole. */
+	var entryAdvanceMeters:Float;
+	/** Time the spiral may make no progress before the search fails. */
+	var stallSeconds:Float;
 }
 
 /** Generic geometric labels, with optional physical arm turn counts. */
@@ -801,7 +809,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 39;
+	public static inline var VERSION:Int = 40;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -1757,8 +1765,7 @@ class SceneArtifact {
 	}
 
 static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySearch>, hasScrews:Bool,
-			maximumApproachMeters:Float, maximumCandidateAdvanceMeters:Float,
-			data:SceneArtifactData, fail:String -> Void):Void {
+			maximumApproachMeters:Float, data:SceneArtifactData, fail:String -> Void):Void {
 		if (search == null) return;
 		if (!hasScrews) fail("has a screw entry-search profile but no screw steps");
 		if (search.sensor == null || search.sensor.length == 0) fail("entry search needs a force/torque sensor ID");
@@ -1770,81 +1777,51 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 		if (drivers.length == 1 && sensor.length == 1 &&
 			sensor[0].mount.occurrence != drivers[0].contact.occurrence)
 			fail("entry search force/torque sensor must be mounted on the screwdriver tool occurrence");
-		for (value in [search.maximumAgeSeconds, search.maximumLinearSpeed, search.maximumSearchAxialSpeed,
-			search.contactReliefMeters, search.maximumAngularSpeed,
-			search.maximumStepSeconds, search.maximumForceN, search.maximumTorqueNm, search.maximumTravelMeters,
-			search.maximumTravelRadians, search.maximumRunSeconds, search.regionHalfUMeters,
-			search.regionHalfVMeters, search.spiralRadiusMeters, search.spiralTurns,
-			search.spiralDurationSeconds, search.spiralMaximumLateralSpeed,
-			search.spiralTrackingGainPerSecond, search.minimumContactLoadN, search.requiredLoadDropN])
+		for (value in [search.maximumAgeSeconds, search.contactForceN, search.contactThresholdN,
+			search.maximumLinearSpeed, search.maximumAngularSpeed, search.maximumStepSeconds, search.approachSpeed,
+			search.maximumForceN, search.maximumTorqueNm, search.maximumTravelMeters, search.maximumTravelRadians,
+			search.maximumRunSeconds, search.regionHalfUMeters, search.regionHalfVMeters, search.spiralRadiusMeters,
+			search.spiralPitchMeters, search.spiralSpeed, search.spiralTrackingGainPerSecond,
+			search.spiralTrackingToleranceMeters, search.entryAdvanceMeters, search.stallSeconds])
 			if (!finite(value) || value <= 0) fail("entry search needs finite positive commissioned limits and thresholds");
-		if (!finite(search.candidateProgressTimeoutSeconds) || search.candidateProgressTimeoutSeconds <= 0 ||
-			search.candidateProgressTimeoutSeconds > search.maximumRunSeconds)
-			fail("entry search candidate-progress timeout must fit inside its run bound");
-		if (!finite(search.contactSeedOffsetUMeters)) fail("entry-search contact seed must be finite");
 		if (search.maximumAgeSeconds > 3600 || search.maximumRunSeconds > 3600)
 			fail("entry-search freshness and run bounds cannot exceed one hour");
 		if (search.confirmationSamples < 1 || search.confirmationSamples > 1000)
 			fail("entry search needs between one and 1000 confirming samples");
-		if (search.targetWrench == null || search.targetWrench.length != 6 ||
-			search.virtualMass == null || search.virtualMass.length != 6 ||
-			search.damping == null || search.damping.length != 6)
-			fail("entry search needs six target wrench and gain values in sensor axes");
-		if (search.targetWrench != null && search.targetWrench.length == 6) {
-			for (value in search.targetWrench) if (!finite(value)) fail("entry-search target wrench must be finite");
-			var forceSquared = search.targetWrench[0] * search.targetWrench[0] +
-				search.targetWrench[1] * search.targetWrench[1] + search.targetWrench[2] * search.targetWrench[2];
-			if (!(forceSquared > 0)) fail("entry search needs a nonzero axial target force");
-			var torqueSquared = search.targetWrench[3] * search.targetWrench[3] +
-				search.targetWrench[4] * search.targetWrench[4] + search.targetWrench[5] * search.targetWrench[5];
-			if (forceSquared > search.maximumForceN * search.maximumForceN ||
-				torqueSquared > search.maximumTorqueNm * search.maximumTorqueNm)
-				fail("entry-search target wrench exceeds its commissioned force or torque bound");
+		if (search.virtualMass == null || search.virtualMass.length != 6 || search.damping == null ||
+			search.damping.length != 6)
+			fail("entry search needs six virtual masses and dampings in its search axes");
+		else for (axis in 0...6) {
+			var mass = search.virtualMass[axis], damping = search.damping[axis];
+			if (!finite(mass) || mass <= 0 || !finite(damping) || damping <= 0)
+				fail('entry-search axis $axis needs positive finite virtual mass and damping');
+			else if (search.maximumStepSeconds * damping / mass > 1.0)
+				fail('entry-search timestep is unstable on axis $axis');
 		}
-		if (search.virtualMass != null && search.virtualMass.length == 6 &&
-			search.damping != null && search.damping.length == 6)
-			for (axis in 0...6) {
-				var mass = search.virtualMass[axis], damping = search.damping[axis];
-				if (!finite(mass) || mass <= 0 || !finite(damping) || damping <= 0)
-					fail('entry-search axis $axis needs positive finite virtual mass and damping');
-				else if (search.maximumStepSeconds * damping / mass > 1.0)
-					fail('entry-search timestep is unstable on axis $axis');
-			}
-		var seed = Math.abs(search.contactSeedOffsetUMeters);
-		var freshnessDrift = search.spiralMaximumLateralSpeed * search.maximumAgeSeconds;
-		var requiredTravel = ScrewEntrySearchBounds.requiredTravelMeters(maximumApproachMeters,
-			search.contactReliefMeters, search.regionHalfUMeters, search.regionHalfVMeters,
-			search.contactSeedOffsetUMeters, search.spiralRadiusMeters, freshnessDrift,
-			search.maximumLinearSpeed * search.maximumStepSeconds);
-		var minimumSpiralSeconds = ScrewEntrySearchBounds.minimumSpiralSeconds(
-			maximumApproachMeters, search.contactReliefMeters, search.maximumSearchAxialSpeed);
-		var minimumRunSeconds = ScrewEntrySearchBounds.minimumRunSeconds(maximumApproachMeters,
-			search.contactReliefMeters, search.maximumSearchAxialSpeed, search.spiralDurationSeconds,
-			search.spiralRadiusMeters, search.spiralTurns, search.spiralMaximumLateralSpeed,
-			search.candidateProgressTimeoutSeconds);
-		if (search.maximumRunSeconds < minimumRunSeconds || search.spiralDurationSeconds < minimumSpiralSeconds ||
-			search.maximumTravelMeters < requiredTravel ||
-			search.maximumAngularSpeed * search.maximumRunSeconds > search.maximumTravelRadians + 1e-12 ||
-			search.maximumSearchAxialSpeed > search.maximumLinearSpeed ||
-			(search.maximumSearchAxialSpeed * search.candidateProgressTimeoutSeconds < maximumCandidateAdvanceMeters) ||
-			seed + search.spiralRadiusMeters + freshnessDrift > search.regionHalfUMeters ||
-			search.spiralRadiusMeters + freshnessDrift > search.regionHalfVMeters ||
-			search.spiralMaximumLateralSpeed > search.maximumLinearSpeed ||
-			search.maximumForceN <= search.minimumContactLoadN ||
-			search.requiredLoadDropN >= search.minimumContactLoadN)
-			fail("entry-search approach, region, force, linear/angular travel, speed and time bounds are inconsistent");
-		var spiralSpeed = search.spiralRadiusMeters / search.spiralDurationSeconds +
-			search.spiralRadiusMeters * 2.0 * Math.PI * search.spiralTurns / search.spiralDurationSeconds;
-		if (spiralSpeed > search.spiralMaximumLateralSpeed + 1e-12)
-			fail("entry-search spiral exceeds its commissioned lateral speed bound");
+		if (!(search.contactThresholdN < search.contactForceN && search.contactForceN < search.maximumForceN))
+			fail("entry search needs its contact threshold below its contact force, and that below the force bound");
+		if (search.approachSpeed > search.maximumLinearSpeed || search.spiralSpeed > search.maximumLinearSpeed)
+			fail("entry-search approach and spiral speeds must fit the linear speed bound");
+		if (search.spiralPitchMeters > search.spiralRadiusMeters ||
+			search.spiralRadiusMeters + search.spiralTrackingToleranceMeters >
+				Math.min(search.regionHalfUMeters, search.regionHalfVMeters))
+			fail("entry-search spiral must fit inside the registered region with a pitch below its radius");
+		if (search.maximumTravelMeters < ScrewEntrySearchBounds.requiredTravelMeters(maximumApproachMeters,
+				search.entryAdvanceMeters, search.regionHalfUMeters, search.regionHalfVMeters,
+				search.maximumLinearSpeed * search.maximumStepSeconds) ||
+			search.maximumRunSeconds < ScrewEntrySearchBounds.minimumRunSeconds(maximumApproachMeters,
+				search.entryAdvanceMeters, search.approachSpeed, search.spiralRadiusMeters,
+				search.spiralPitchMeters, search.spiralSpeed) ||
+			search.maximumAngularSpeed * search.maximumRunSeconds > search.maximumTravelRadians + 1e-12)
+			fail("entry-search travel, rotation and run bounds cannot cover the CAD approach and one full spiral");
 	}
 
 	static function validateScrewEngagement(engagement:Null<SceneArtifactScrewEngagement>,
 			hasScrews:Bool, fail:String -> Void):Void {
 		if (engagement == null) return;
 		if (engagement.mode == SceneArtifactScrewEngagementMode.ProcessModel) {
-			if (engagement.maximumAxialForceN != null)
-				fail("process-model screw engagement cannot declare a physical axial-force cap");
+			if (engagement.maximumAxialForceN != null || engagement.threadStiffnessNPerM != null)
+				fail("process-model screw engagement cannot declare a physical axial-force cap or thread stiffness");
 			return;
 		}
 		if (engagement.mode != SceneArtifactScrewEngagementMode.PhysicalThread) {
@@ -1860,6 +1837,9 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 		var forceN:Float = cast force;
 		if (!finite(forceN) || forceN <= 0)
 			fail("physical screw engagement needs an explicit positive axial-force cap");
+		var stiffness = engagement.threadStiffnessNPerM;
+		if (stiffness == null || !finite(cast stiffness) || (cast stiffness : Float) <= 0)
+			fail("physical screw engagement needs an explicit positive thread stiffness");
 	}
 
 	static function validateMission(mission:SceneArtifactMission, data:SceneArtifactData):Void {
@@ -2225,13 +2205,7 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 			fail("a mission that alternates handling and screwdriving needs an explicit changeTool step");
 		if (handles && screws && changer != null && (!changerHasHandlingTool || !changerHasScrewdriverTool))
 			fail("combined handling and screwdriving changer must declare both tool capabilities");
-		var maximumCandidateAdvanceMeters = 0.0;
-		for (step in mission.steps) if (step.kind == "screw") {
-			var job = SceneScrewInvocation.job(step.screw,mission.steps);
-			if (job != null) maximumCandidateAdvanceMeters = Math.max(maximumCandidateAdvanceMeters,job.leadMm/1000.0);
-		}
-		validateScrewEntrySearch(mission.screwEntrySearch, screws, maximumApproachMeters,
-			maximumCandidateAdvanceMeters, data, fail);
+		validateScrewEntrySearch(mission.screwEntrySearch, screws, maximumApproachMeters, data, fail);
 		validateScrewEngagement(mission.screwEngagement, screws, fail);
 		if ((screws || screwdriverRegistrations) && torches > 0)
 			fail("screwdriving registration and torch work need an automatic tool change before they can share a mission");
@@ -2491,23 +2465,19 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 		var sensor:Dynamic = Reflect.field(raw, "sensor");
 		var samples:Dynamic = Reflect.field(raw, "confirmationSamples");
 		if (!Std.isOfType(sensor, String) || !Std.isOfType(samples, Int)) fail();
-		return {sensor: sensor, maximumAgeSeconds: number("maximumAgeSeconds"), targetWrench: vector("targetWrench"),
+		return {sensor: sensor, maximumAgeSeconds: number("maximumAgeSeconds"), contactForceN: number("contactForceN"),
+			contactThresholdN: number("contactThresholdN"), confirmationSamples: samples,
 			virtualMass: vector("virtualMass"), damping: vector("damping"),
-			maximumLinearSpeed: number("maximumLinearSpeed"), maximumSearchAxialSpeed: number("maximumSearchAxialSpeed"),
-			contactReliefMeters: number("contactReliefMeters"),
-			maximumAngularSpeed: number("maximumAngularSpeed"),
-			maximumStepSeconds: number("maximumStepSeconds"), maximumForceN: number("maximumForceN"),
-			maximumTorqueNm: number("maximumTorqueNm"), maximumTravelMeters: number("maximumTravelMeters"),
-			maximumTravelRadians: number("maximumTravelRadians"), maximumRunSeconds: number("maximumRunSeconds"),
-			regionHalfUMeters: number("regionHalfUMeters"), regionHalfVMeters: number("regionHalfVMeters"),
-			contactSeedOffsetUMeters: number("contactSeedOffsetUMeters"),
-			spiralRadiusMeters: number("spiralRadiusMeters"), spiralTurns: number("spiralTurns"),
-			spiralDurationSeconds: number("spiralDurationSeconds"),
-			spiralMaximumLateralSpeed: number("spiralMaximumLateralSpeed"),
+			maximumLinearSpeed: number("maximumLinearSpeed"), maximumAngularSpeed: number("maximumAngularSpeed"),
+			maximumStepSeconds: number("maximumStepSeconds"), approachSpeed: number("approachSpeed"),
+			maximumForceN: number("maximumForceN"), maximumTorqueNm: number("maximumTorqueNm"),
+			maximumTravelMeters: number("maximumTravelMeters"), maximumTravelRadians: number("maximumTravelRadians"),
+			maximumRunSeconds: number("maximumRunSeconds"), regionHalfUMeters: number("regionHalfUMeters"),
+			regionHalfVMeters: number("regionHalfVMeters"), spiralRadiusMeters: number("spiralRadiusMeters"),
+			spiralPitchMeters: number("spiralPitchMeters"), spiralSpeed: number("spiralSpeed"),
 			spiralTrackingGainPerSecond: number("spiralTrackingGainPerSecond"),
-			minimumContactLoadN: number("minimumContactLoadN"), requiredLoadDropN: number("requiredLoadDropN"),
-			candidateProgressTimeoutSeconds: number("candidateProgressTimeoutSeconds"),
-			confirmationSamples: samples};
+			spiralTrackingToleranceMeters: number("spiralTrackingToleranceMeters"),
+			entryAdvanceMeters: number("entryAdvanceMeters"), stallSeconds: number("stallSeconds")};
 	}
 
 	static function decodeScrewEngagement(raw:Dynamic):SceneArtifactScrewEngagement {
@@ -2519,6 +2489,11 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 		if (maximumAxialForce != null) {
 			if (!Std.isOfType(maximumAxialForce, Int) && !Std.isOfType(maximumAxialForce, Float)) fail();
 			result.maximumAxialForceN = maximumAxialForce;
+		}
+		var stiffness:Dynamic = Reflect.field(raw, "threadStiffnessNPerM");
+		if (stiffness != null) {
+			if (!Std.isOfType(stiffness, Int) && !Std.isOfType(stiffness, Float)) fail();
+			result.threadStiffnessNPerM = stiffness;
 		}
 		return result;
 	}
