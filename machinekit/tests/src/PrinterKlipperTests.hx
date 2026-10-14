@@ -42,7 +42,31 @@ class PrinterKlipperTests {
 		// Klipper has one speed for every direction: the motors' rows give it, at the 45 degree move that turns one motor flat out.
 		var rows = MotorSpaceConstraints.of(planning, ["x", "y"]);
 		var cartesian = rows.inscribedSpeed();
-		var klipper = CoreXyPrinterKlipper.printer(printer, job, limits[0], limits[1], limits[2], cartesian);
+		// And one acceleration: the motors' torques on the worst direction, from the axes' masses.
+		var masses = [for (load in robotkit.model.DriveLoads.of(planning, new SteadyLoads(), ["x", "y"])) load.mass];
+		var inscribed = rows.inscribedAcceleration(masses);
+		check(inscribed > 0 && inscribed < Math.POSITIVE_INFINITY, 'the motors give an acceleration in the worst direction: $inscribed');
+		// Every direction keeps both motors inside their torque at that acceleration, and the worst one loads a motor to its limit.
+		var peak = 0.0;
+		var motors = [for (i in 0...rows.rows.length) if (rows.efforts[i] != null) i];
+		check(motors.length == 2, 'the two belt motors have torque limits (${motors.length})');
+		// W = R^-T for the square CoreXY rows: the torques that do the work of an axis force.
+		var r = [for (i in motors) rows.rows[i]];
+		var determinant = r[0][0] * r[1][1] - r[0][1] * r[1][0];
+		var inverseTransposed = [[r[1][1] / determinant, -r[1][0] / determinant], [-r[0][1] / determinant, r[0][0] / determinant]];
+		for (degree in 0...360) {
+			var d = [Math.cos(degree * Math.PI / 180.0), Math.sin(degree * Math.PI / 180.0)];
+			for (k in 0...2) {
+				var torque = inscribed * Math.abs(inverseTransposed[k][0] * masses[0] * d[0] + inverseTransposed[k][1] * masses[1] * d[1]);
+				var effort = rows.efforts[motors[k]];
+				if (effort != null) peak = Math.max(peak, torque / effort);
+			}
+		}
+		check(peak <= 1.0 + 1e-9 && peak > 0.999, 'at the inscribed acceleration the worst direction loads a motor to its limit: ${peak}');
+		Sys.println('Printer Klipper: max_velocity ${Math.round(cartesian * 1000)} mm/s and max_accel ${Math.round(inscribed * 1000)} mm/s^2 in the worst direction (the axes alone: ${Math.round(Math.min(limits[0].acceleration, limits[1].acceleration) * 1000)})');
+		var klipper = CoreXyPrinterKlipper.printer(printer, job, limits[0], limits[1], limits[2], cartesian, inscribed);
+		check(klipper.maxAccel <= Math.min(limits[0].acceleration, limits[1].acceleration) * 1000.0 + 1e-9 && klipper.maxAccel <= inscribed * 1000.0 + 1e-9,
+			'max_accel is no more than the weaker axis or the motors in the worst direction: ${klipper.maxAccel}');
 		var text = KlipperConfig.render(klipper);
 		var config = KlipperConfig.parse(text);
 
@@ -126,7 +150,7 @@ class PrinterKlipperTests {
 
 		// The export directory: the config, the pins and the bracket as Klipper G-code.
 		var directory = "build/export";
-		var written = CoreXyPrinterExport.write(directory, printer, job, limits[0], limits[1], limits[2], cartesian);
+		var written = CoreXyPrinterExport.write(directory, printer, job, limits[0], limits[1], limits[2], cartesian, inscribed);
 		check(written.length == 3, "the export writes three files");
 		for (path in written) check(FileSystem.exists(path) && File.getContent(path).length > 100, 'the export wrote $path');
 		var gcode = File.getContent(directory + "/" + CoreXyPrinterExport.BRACKET);

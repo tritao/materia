@@ -2575,6 +2575,10 @@ class MachineKitSmoke {
 			MotorBrakeTests.run();
 			return;
 		}
+		if (Sys.getEnv("MACHINEKIT_KLIPPER_ONLY") == "1") {
+			PrinterKlipperTests.run();
+			return;
+		}
 		var everything = Shards.run([
 			{name: "ControllerWiringTests.run", run: ControllerWiringTests.run, weight: 0.05},
 			{name: "TendingCell.TendingMissionChecks.run", run: () -> TendingCell.TendingMissionChecks.run(), weight: 1.0},

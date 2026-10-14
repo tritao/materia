@@ -29,9 +29,9 @@ class CoreXyPrinterExport {
 
 	/** Writes the config, the pin report and the bracket's G-code into `directory`; returns the paths. */
 	public static function write(directory:String, source:CoreXyPrinter, job:SceneArtifactPrinting, x:PrinterAxisLimit,
-			y:PrinterAxisLimit, z:PrinterAxisLimit, cartesianSpeed:Float):Array<String> {
+			y:PrinterAxisLimit, z:PrinterAxisLimit, cartesianSpeed:Float, cartesianAcceleration:Float):Array<String> {
 		if (!FileSystem.exists(directory)) FileSystem.createDirectory(directory);
-		var model = CoreXyPrinterKlipper.printer(source, job, x, y, z, cartesianSpeed);
+		var model = CoreXyPrinterKlipper.printer(source, job, x, y, z, cartesianSpeed, cartesianAcceleration);
 		var written:Array<String> = [];
 		function save(name:String, text:String):Void {
 			var path = directory + "/" + name;

@@ -13,12 +13,16 @@ import robotkit.model.RobotModel;
 class MotorSpaceConstraints {
   public final rows:Array<Array<Float>>;
   public final rates:Array<Float>;
+  /** Each row's effort limit (N m at its motor), or null where the row is not a motor's. */
+  public final efforts:Array<Null<Float>>;
 
-  public function new(rows:Array<Array<Float>>, rates:Array<Float>) {
+  public function new(rows:Array<Array<Float>>, rates:Array<Float>, ?efforts:Array<Null<Float>>) {
     if (rows == null || rates == null || rows.length != rates.length)
       throw "Motor constraints need matching rows and rates";
+    if (efforts != null && efforts.length != rows.length) throw "Motor constraints need an effort limit (or null) for each row";
     this.rows = [for (row in rows) row.copy()];
     this.rates = rates.copy();
+    this.efforts = [for (i in 0...rows.length) efforts == null ? null : efforts[i]];
     for (i in 0...rows.length) {
       if (rows[i].length == 0 || rows[i].length != rows[0].length)
         throw "Motor constraint rows must have matching joint counts";
@@ -44,13 +48,13 @@ class MotorSpaceConstraints {
       }
       return result;
     }
-    var rows:Array<Array<Float>> = [], rates:Array<Float> = [];
-    function add(row:Array<Float>, rate:Null<Float>):Void {
+    var rows:Array<Array<Float>> = [], rates:Array<Float> = [], efforts:Array<Null<Float>> = [];
+    function add(row:Array<Float>, rate:Null<Float>, ?effort:Float):Void {
       if (rate == null || rate <= 0.0) return;
       var nonzero = 0;
       for (value in row) if (Math.abs(value) > 1e-12) nonzero++;
       if (nonzero < 2) return;
-      rows.push(row); rates.push(rate * rateScale);
+      rows.push(row); rates.push(rate * rateScale); efforts.push(effort);
     }
     for (joint in model.joints) {
       var mechanical = joint.mechanicalLimits == null ? joint.limits : joint.mechanicalLimits;
@@ -58,9 +62,9 @@ class MotorSpaceConstraints {
     }
     for (actuator in model.actuators) switch actuator.transmission {
       case SimpleTransmission(joint, ratio, _):
-        add([for (value in weights(joint, 0)) value * ratio], actuator.planningRate());
+        add([for (value in weights(joint, 0)) value * ratio], actuator.planningRate(), actuator.planningEffort());
     }
-    return new MotorSpaceConstraints(rows, rates);
+    return new MotorSpaceConstraints(rows, rates, efforts);
   }
 
   /**
@@ -75,6 +79,51 @@ class MotorSpaceConstraints {
       if (norm > 1e-12) speed = Math.min(speed, rates[i] / norm);
     }
     return speed;
+  }
+
+  /**
+   * The acceleration the planned axes (`masses`, kg each) can have in every direction at once, the worst direction: a
+   * firmware with one acceleration for all directions (Klipper's `max_accel`) can promise no more. An axis force F
+   * reaches the motors as the torques that do the same work, `tau = (R R^T)^-1 R F` for the rows `R` that have an effort
+   * limit (the least-torque solution; the motors' own `tau = R^-T F` on a CoreXY), so along the unit direction `d` motor
+   * `m` carries `a * |sum_a W[m][a] mass[a] d[a]|` and the direction that loads it most is along `W[m] * mass`:
+   * `min over motors of effort / |W[m] * mass|`. Drag and steady loads are not counted (the axes' own limits are the ones
+   * that carry them). `infinity` when no row has an effort limit.
+   */
+  public function inscribedAcceleration(masses:Array<Float>):Float {
+    var motors = [for (i in 0...rows.length) if (efforts[i] != null) i];
+    var m = motors.length;
+    if (m == 0) return Math.POSITIVE_INFINITY;
+    var n = masses.length;
+    var r = [for (i in motors) rows[i]];
+    // A = R R^T (m x m), solved against R (m x n) for W = A^-1 R by Gauss-Jordan.
+    var a = [for (i in 0...m) [for (j in 0...m) dot(r[i], r[j])]];
+    var w = [for (i in 0...m) r[i].copy()];
+    for (pivot in 0...m) {
+      var best = pivot;
+      for (row in pivot + 1...m) if (Math.abs(a[row][pivot]) > Math.abs(a[best][pivot])) best = row;
+      if (Math.abs(a[best][pivot]) < 1e-18) throw "The motor rows do not determine the axes' forces";
+      var swapA = a[pivot]; a[pivot] = a[best]; a[best] = swapA;
+      var swapW = w[pivot]; w[pivot] = w[best]; w[best] = swapW;
+      var scale = a[pivot][pivot];
+      for (c in 0...m) a[pivot][c] /= scale;
+      for (c in 0...n) w[pivot][c] /= scale;
+      for (row in 0...m) if (row != pivot) {
+        var factor = a[row][pivot];
+        if (factor == 0.0) continue;
+        for (c in 0...m) a[row][c] -= factor * a[pivot][c];
+        for (c in 0...n) w[row][c] -= factor * w[pivot][c];
+      }
+    }
+    var best = Math.POSITIVE_INFINITY;
+    for (k in 0...m) {
+      var norm = 0.0;
+      for (axis in 0...n) norm += w[k][axis] * masses[axis] * w[k][axis] * masses[axis];
+      norm = Math.sqrt(norm);
+      var effort = efforts[motors[k]];
+      if (effort != null && norm > 1e-18) best = Math.min(best, effort / norm);
+    }
+    return best;
   }
 
   function dot(row:Array<Float>, values:Array<Float>):Float {

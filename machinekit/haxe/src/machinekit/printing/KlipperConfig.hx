@@ -65,6 +65,8 @@ typedef KlipperPrinter = {
 	var maxAccel:Float;
 	var maxZVelocity:Float;
 	var maxZAccel:Float;
+	/** Klipper's corner velocity jump, millimetres per second. */
+	var squareCornerVelocity:Float;
 	/** The two belt motors (`x`, `y`) and the bed's screws (`z`, `z1`, `z2`), in that order. */
 	var steppers:Array<KlipperStepper>;
 	var extruder:KlipperExtruder;
@@ -121,13 +123,16 @@ class KlipperConfig {
 			"# Every PIN_* below is a placeholder for the board's pin; see the pin report.", ""];
 		function section(title:String, entries:Array<Array<String>>):Void {
 			lines.push("[" + title + "]");
-			for (entry in entries) lines.push(entry[0] + ": " + entry[1]);
+			for (entry in entries) lines.push(entry.length == 1 ? entry[0] : entry[0] + ": " + entry[1]);
 			lines.push("");
 		}
 		section("mcu", [["serial", "PIN_MCU_SERIAL"]]);
 		section("printer", [["kinematics", "corexy"], ["max_velocity", number(printer.maxVelocity)],
 			["max_accel", number(printer.maxAccel)], ["max_z_velocity", number(printer.maxZVelocity)],
-			["max_z_accel", number(printer.maxZAccel)]]);
+			["max_z_accel", number(printer.maxZAccel)],
+			["# Klipper jumps a corner's velocity by up to this (junction deviation); this model plans corners as blended arcs with"],
+			["# no jump (AM-D4), so a real machine is slightly harder on its corners than the plan: written out, not left to default."],
+			["square_corner_velocity", number(printer.squareCornerVelocity)]]);
 		for (stepper in printer.steppers) {
 			var upper = stepper.name.toUpperCase();
 			var entries = [["step_pin", 'PIN_${upper}_STEP'], ["dir_pin", 'PIN_${upper}_DIR'], ["enable_pin", '!PIN_${upper}_ENABLE'],
