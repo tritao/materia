@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -15,6 +16,12 @@ namespace {
 
 void assert_close(double actual, double expected) {
     assert(std::abs(actual - expected) < 1e-9);
+}
+
+// OCCT's extrema work to its own precision (1e-7 by default), not to rounding.
+void assert_distance(double actual, double expected) {
+    if (!(std::abs(actual - expected) < 1e-6)) std::fprintf(stderr, "distance %.12g, expected %.12g\n", actual, expected);
+    assert(std::abs(actual - expected) < 1e-6);
 }
 
 struct MeshVertices {
@@ -267,6 +274,23 @@ int main() {
     assert_close(volume, boolean_base_volume);
     assert(cad_shape_volume(boolean_tool_offset, &volume) == CAD_OK);
     assert_close(volume, boolean_tool_volume);
+
+    // Distance between solids as volumes: a box wholly inside another is at 0, as is a box on a face; a box 3 mm off
+    // a face is 3 mm away.
+    double distance = -1.0;
+    assert(cad_shape_distance(boolean_base, boolean_tool_offset, &distance) == CAD_OK);
+    assert_distance(distance, 0.0);
+    cad_shape apart = 0;
+    cad_shape touching = 0;
+    assert(cad_shape_translate(boolean_tool, {13.0, 0.0, 0.0}, &apart) == CAD_OK);
+    assert(cad_shape_translate(boolean_tool, {10.0, 2.0, 2.0}, &touching) == CAD_OK);
+    assert(cad_shape_distance(boolean_base, apart, &distance) == CAD_OK);
+    assert_distance(distance, 3.0);
+    assert(cad_shape_distance(touching, boolean_base, &distance) == CAD_OK);
+    assert_distance(distance, 0.0);
+    assert(cad_shape_distance(boolean_base, apart, nullptr) == CAD_ERROR_INVALID_ARGUMENT);
+    cad_shape_destroy(apart);
+    cad_shape_destroy(touching);
 
     cad_operation cut_operation = 0;
     assert(cad_cut_operation(boolean_base, boolean_tool_offset, &cut_operation) == CAD_OK);

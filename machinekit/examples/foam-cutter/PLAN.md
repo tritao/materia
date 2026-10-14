@@ -533,7 +533,12 @@ FC7 ── FC8 ── FC9 ───────────────┴──
 | Step | State | Commits |
 |---|---|---|
 | FC0 | planned | |
-| FC1 | planned | |
+| FC1a | done: `cad_shape_distance`, CadKit core smoke passes | 20c53b08d |
+| FC1b | planned | |
+| FC1c | planned | |
+| FC1d | planned | |
+| FC1e | planned | |
+| FC1f | planned (a draft of the parts and machine exists uncommitted in the worktree) | |
 | FC2 | planned | |
 | FC3 | planned (after printer RF5) | |
 | FC4 | planned | |

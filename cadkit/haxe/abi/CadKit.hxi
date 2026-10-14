@@ -121,6 +121,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_shape_copy_element_aliases_bytes(shape: cad_shape, kind: cad_shape_kind, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> cad_result;
 	extern fn cad_shape_copy_element_names_bytes(shape: cad_shape, kind: cad_shape_kind, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> cad_result;
 	extern fn cad_shape_destroy(shape: cad_shape) -> void;
+	extern fn cad_shape_distance(first: cad_shape, second: cad_shape, out_distance: ptr<f64> @out) -> cad_result;
 	extern fn cad_shape_extrude(profile: cad_shape, delta: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_extrude_operation(profile: cad_shape, delta: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_fillet(shape: cad_shape, radius: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;

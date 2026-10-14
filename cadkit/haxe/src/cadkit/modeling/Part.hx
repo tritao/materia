@@ -253,6 +253,11 @@ class Part extends Model {
 		return shape.volume();
 	}
 
+	/** The least distance between this part and `other`; zero where they touch or overlap (see `Shape.distance`). */
+	public function distance(other:Part):Float {
+		return shape.distance(other.shape);
+	}
+
 	public function massProperties():PhysicalProperties {
 		return shape.massProperties();
 	}

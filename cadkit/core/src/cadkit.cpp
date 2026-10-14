@@ -2893,6 +2893,42 @@ extern "C" CADKIT_API cad_result cad_shape_is_same(
     return CAD_OK;
 }
 
+extern "C" CADKIT_API cad_result cad_shape_distance(
+    cad_shape first,
+    cad_shape second,
+    double* out_distance) {
+    clear_error();
+    if (out_distance == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_distance must not be null");
+    }
+    *out_distance = 0.0;
+
+    TopoDS_Shape first_shape;
+    const auto first_result = copy_shape(first, first_shape);
+    if (first_result != CAD_OK) {
+        return first_result;
+    }
+    TopoDS_Shape second_shape;
+    const auto second_result = copy_shape(second, second_shape);
+    if (second_result != CAD_OK) {
+        return second_result;
+    }
+    try {
+        BRepExtrema_DistShapeShape distance(first_shape, second_shape);
+        if (!distance.IsDone() || distance.NbSolution() == 0) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "OCCT could not measure the distance between the shapes");
+        }
+        const double value = distance.Value();
+        if (!std::isfinite(value) || value < 0.0) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "OCCT distance is not finite");
+        }
+        *out_distance = value;
+        return CAD_OK;
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    }
+}
+
 extern "C" CADKIT_API cad_result cad_face_surface_kind(
     cad_shape face,
     cad_surface_kind* out_kind) {

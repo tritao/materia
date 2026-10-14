@@ -72,6 +72,11 @@ class Shape {
 		return CadKit.shapeAreaChecked(native.borrow());
 	}
 
+	/** The least distance between this shape and `other`. Solids count as volumes: zero where they touch, overlap or one holds the other. */
+	public function distance(other:Shape):Float {
+		return CadKit.shapeDistanceChecked(native.borrow(), other.native.borrow());
+	}
+
 	public function volume(?relativeTolerance:Float):Float {
 		if (relativeTolerance != null) return CadKit.shapeVolumeWithToleranceChecked(native.borrow(), relativeTolerance);
 		return CadKit.shapeVolumeChecked(native.borrow());

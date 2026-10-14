@@ -530,6 +530,13 @@ CADKIT_API cad_result cad_shape_is_same(
     cad_shape second,
     uint8_t* out_same CADKIT_HXI_OUT);
 
+/* The least distance between the two shapes (OCCT BRepExtrema_DistShapeShape). Solids count as volumes: zero where
+   they touch, overlap or one holds the other. */
+CADKIT_API cad_result cad_shape_distance(
+    cad_shape first,
+    cad_shape second,
+    double* out_distance CADKIT_HXI_OUT);
+
 CADKIT_API cad_result cad_face_surface_kind(
     cad_shape face,
     cad_surface_kind* out_kind CADKIT_HXI_OUT);
