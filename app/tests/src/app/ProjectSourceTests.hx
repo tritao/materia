@@ -6776,6 +6776,18 @@ class ProjectSourceTests {
       suite("press-brake", checkPressBrake),
       suite("press-controller", checkPressController),
       suite("sheet-press", root -> PressBrakeSimulationChecks.run(root, true)),
+      suite("screwdriver-simulation", _ -> ScrewdriverSimulationTests.run()),
+      suite("screwdriver-equipment", checkScrewdrivingEquipment),
+      suite("screwdriver-cad", root -> checkScrewdrivingOne(root)),
+      suite("screwdriver-virtual", root -> checkScrewdrivingOne(root, true)),
+      suite("screwdriver-assembly", checkScrewdrivingAssembly),
+      suite("screwdriver-registration", checkScrewdriverTouchRegistration),
+      suite("screwdriver-feeder", checkScrewFeeder),
+      suite("screwdriver-blow-feed", checkBlowFeed),
+      suite("screwdriver-force-search", checkScrewEntrySearch),
+      suite("screwdriver-physical-thread", checkScrewPhysicalThread),
+      suite("screwdriver-staged", checkScrewdrivingStaged),
+      suite("screwdriver-loss", checkScrewdrivingLoss),
       suite("arm", checkRobotArm),
       suite("gripper", checkParallelGripperMission),
       suite("cobot", root -> checkCobotArms(root)),
@@ -6844,7 +6856,11 @@ class ProjectSourceTests {
       group("mill", ["bench-mill", "enclosed-mill", "interface"]),
       group("printer", ["printer-project", "printer-shaping", "printer-mirror"]),
       group("mobile", ["mobile-base", "mobile-mission", "mobile-obstacle", "overlay-edge"]),
-      group("router", ["cnc-router", "belts"])
+      group("router", ["cnc-router", "belts"]),
+      group("screwdriver-process", ["screwdriver-simulation", "screwdriver-equipment"]),
+      group("screwdriver", ["screwdriver-simulation", "screwdriver-equipment", "screwdriver-cad", "screwdriver-virtual",
+        "screwdriver-assembly", "screwdriver-registration", "screwdriver-feeder", "screwdriver-blow-feed",
+        "screwdriver-force-search", "screwdriver-physical-thread", "screwdriver-staged", "screwdriver-loss"])
     ];
   }
 
