@@ -43,8 +43,11 @@ The work spans kits:
 
 ## What exists
 
-Surveyed 2026-10-13 on local main b3405449e and on branch `3d-printing` 35f49ac33, which is not
-on main. Items marked **[3DP]** exist only on `3d-printing`.
+Surveyed 2026-10-13 on local main b3405449e and on branch `3d-printing` 35f49ac33. Updated
+2026-10-14 on main b190f9126 (= origin/main), which now includes the whole 3D printing work
+(AM0–AM12, AM5b and the review fixes). Everything below is on main. The printer plan's review
+follow-ups RF1–RF11 (`machinekit/examples/printer/PLAN.md`) are planned, not done; RF5 matters
+here (see FC3).
 
 **Machines.**
 - `AxisBuilder` (`machinekit/haxe/src/machinekit/assembly/AxisBuilder.hx`) provides the building
@@ -66,14 +69,18 @@ on main. Items marked **[3DP]** exist only on `3d-printing`.
 - `MachineBinding` requires exactly three axes.
 - The chain is `ToolpathLowering` → `MotionOp.FollowPath(PosePath)` → `ProgramCompiler`
   (`KinematicsSolver.solvePath`, TOPP-RA) → `ProgramPlanner`/`TrajectoryStream`.
-  `AxisKinematics` is the exact Cartesian solver, with `affineMap()` for sparse sampling.
+  `AxisKinematics` is the exact Cartesian solver.
+- A solver may declare an exact affine map: `KinematicsSolver.affineMap():Null<AffineJointMap>`
+  (`motionkit/haxe/motionkit/kinematics/AffineJointMap.hx`). It has **three columns, over the
+  tool's x, y, z**. Affine machines then get the fast planner `AxisJointPathPlanner`
+  (sampled once, staged by speed changes, closed-form bounds) instead of the general TOPP-RA path.
 - `OrientationPolicy {Fixed, Interpolated, Cone, FreeAboutTool, Free}`.
 - Multi-frame IK exists in `kinematicskit` (`KinematicProblem` with several `FrameTask`s) but is
   not wired into toolpaths.
-- [3DP] `DistanceDrive` injects a process-driven joint column after IK. This is the extruder
+- `DistanceDrive` injects a process-driven joint column after IK. This is the extruder
   precedent for "a quantity along the path, not an axis".
-- [3DP] `Heat(heater, celsius, wait)` and `Fan` ops; `ToolpathChannels` heater/fan prefixes.
-- [3DP] `ToolpathPlayer` app base with hooks `prepare/beforeStep/afterStep/resetJob`.
+- `Heat(heater, celsius, wait)` and `Fan` ops; `ToolpathChannels` heater/fan prefixes.
+- `ToolpathPlayer` app base with hooks `prepare/beforeStep/afterStep/resetJob`.
 - `CncInterpreter` (`cnckit/haxe/cnckit/interp/CncInterpreter.hx`) rejects U/V/A/B/C as
   "unsupported word". `CncWriter` is the LinuxCNC post. There is no GRBL anything.
 
@@ -85,27 +92,27 @@ on main. Items marked **[3DP]** exist only on `3d-printing`.
   stock model.
 - `app/src/MachiningStock.follow` cuts the segment the tool travelled each tick.
   `StockPreviewWorker` remeshes changed tiles off-thread.
-- [3DP] `sk_stock_add`. There is no connected-component or severed-piece query.
+- `sk_stock_add`. There is no connected-component or severed-piece query.
 
 **CAD/CAM.**
 - `cad_loft(..., ruled)` builds wing solids and reference ruled surfaces.
 - `cad_wire_offset` (`Curve.offset`) is on main.
-- [3DP] `cad_shape_section(solid, origin, normal)` takes any plane. Also [3DP]:
+- `cad_shape_section(solid, origin, normal)` takes any plane. Also:
   `cad_planar_offset/cut/common/fuse`; `PlanarRegion.section` is z-only.
 - CamKit has 2.5D profile/pocket/drill (`CamJob`) and `toolpathkit` `ArcFitting`.
 
 **Heat.**
-- [3DP] Device `robotkit/device_protocol/boards/heater.rs`: PID, Beta thermistor, latched faults
+- Device `robotkit/device_protocol/boards/heater.rs`: PID, Beta thermistor, latched faults
   (SENSOR_OPEN/SHORT, OVER_TEMPERATURE, NOT_HEATING, LEFT_BAND, ...).
-- [3DP] Virtual plant `robotkit/device_virtual/src/heaters.rs`:
+- Virtual plant `robotkit/device_virtual/src/heaters.rs`:
   `C dT/dt = P·duty − h(T − T_amb)`.
-- [3DP] Host side: `HeaterSensor`, `HeaterChannels`, `VirtualHeaters`. Parts: `HeaterCartridge`,
+- Host side: `HeaterSensor`, `HeaterChannels`, `VirtualHeaters`. Parts: `HeaterCartridge`,
   `Thermistor`.
 - A hot wire has no thermistor; see FC-D4.
 
 **Scene.**
-- `SceneArtifact.VERSION` is 29 on main and 32 on `3d-printing`. It has exclusive `machining`
-  (three mandatory axes, cutter tools), [3DP] `printing` and mission sections. The rule is: bump the
+- `SceneArtifact.VERSION` is 32. It has exclusive `machining`
+  (three mandatory axes, cutter tools), `printing` and mission sections. The rule is: bump the
   version and reject the old one.
 
 **Simulation hooks.**
@@ -156,8 +163,11 @@ closed form.**
 - Inverse: intersect the line through the two station points with both tower planes:
   `P = A + (x_t − wA)/(wB − wA)·(B − A)`, the same as FoamCut.
 - XYUV are **affine in the pair (A, B)**. On `Line` spans the joint paths are exactly linear.
-  `affineMap` is generalised (or a joint-exact primitive path added) so sampling stays sparse.
-  The choice is made in FC2 after reading `PoseSampling`.
+  The cutter should get the affine fast planner, but `AffineJointMap` has three columns over the
+  tool position, and the wire needs six (A and B). Generalise the map's columns from "tool x, y,
+  z" to "the path's coordinates" (3 for a point path, 6 for a ruled path), and let the planner
+  bound both stations' speeds from them. Rejected: a pose-based map with the slide along the wire
+  pinned, which gives up exactness on tapered spans. Settled in FC2.
 - The wire is not a rigid member. The tension spring is a member with a passive prismatic joint.
   Its extension is **derived** from the guide distance and the wire's thermal length:
   `e = |P_L − P_R| − L_wire(T)`.
@@ -193,7 +203,7 @@ closed form.**
 - Temperature is not measured. NiCr80's resistance rises only a few per cent at cutting
   temperature (assumed, check), so estimating temperature from resistance is a later option, not
   the control loop.
-- IR: the [3DP] `Heat` op's `celsius:Float` becomes a typed setpoint
+- IR: the `Heat` op's `celsius:Float` becomes a typed setpoint
   `HeatSetpoint {Temperature(c); Power(w)}`, validated against the heater's kind. `wait` means the
   wire plant has settled. That takes a few seconds; see the reference numbers.
 - Rejected: a separate `WirePower` op. It would duplicate channels, barriers and the player wiring
@@ -351,7 +361,8 @@ The simulation should show this, and FC11 should keep dwell/slow-down as the cor
 - `WireKinematics implements KinematicsSolver`: line → XYUV in closed form, forward XYUV → line,
   `solvePath` exact on lines.
 - Derived spring extension and its limit. Tension from the spring part.
-- Decide how `affineMap` generalises to (A, B), and record it here.
+- Generalise `AffineJointMap` to the path's coordinates (FC-D2) and declare it from
+  `WireKinematics`. Existing affine machines (router, CoreXY, printer) keep their numbers.
 - Tests:
   - FK∘IK to 1e-9 mm over random lines;
   - an over-tapered line is rejected by the spring stroke, with the joint named in the
@@ -362,6 +373,10 @@ The simulation should show this, and FC11 should keep dwell/slow-down as the cor
 - `PathGeometry.Ruled`, setup wire frame and stations, validation.
 - `RuledWirePrimitive` (exact pairing by fraction), lowering, a two-point speed constraint in
   `ProgramCompiler`.
+- Do this after the printer plan's RF5 (split `ProgramCompiler` into `PathSampler`,
+  `TimedMotionTransforms`, `PlanCertification`, one `CouplingProjection`). The two-point speed
+  constraint then lands in `PathSampler`/`AxisJointPathPlanner`, not in the 1,500-line class. If
+  RF5 has not landed when FC3 starts, mark FC3 `blocked: RF5` and do FC4/FC5 first.
 - `MachineBinding` gains a wire binding (the four joints, the stations) next to the 3-axis
   binding, the way the printer added its binding.
 - Tests:
@@ -373,7 +388,7 @@ The simulation should show this, and FC11 should keep dwell/slow-down as the cor
 
 **FC4. StockKit swept slab and severed pieces (FC-D6).**
 - New `SweptVolume` kind and a `CutMotion` variant (wire line pairs plus a per-piece radius).
-  Bump the C API.
+  Bump the C API to 4 (it is 3 after `sk_stock_add`).
 - Connected components, and a "remove pieces not containing point P" call.
 - Tests:
   - exact ray hits against an analytic slab;
@@ -406,7 +421,7 @@ The simulation should show this, and FC11 should keep dwell/slow-down as the cor
   - round trip CAM → G-code → import → same joint paths;
   - a LinuxCNC G94 program times with UV following and differs from G93 by the expected ratio.
 
-### Phase B: heat, process models, the app (after `3d-printing` is on local main)
+### Phase B: heat, process models, the app (dependencies on main since 2026-10-14)
 
 **FC7. Wire heat (FC-D4).**
 - `HeatSetpoint` in the `Heat` op.
@@ -440,10 +455,11 @@ The simulation should show this, and FC11 should keep dwell/slow-down as the cor
 **FC10. The app (FC-D10).**
 - `wireCutting` scene section (version bump, reject the old version).
 - The envelope extraction as its own commit, if the user agrees.
-- `WireCutProgramPlayer extends ToolpathPlayer`.
-- `WireCuttingStock.follow`: wire line from the simulated joints → per-piece kerf from local
-  speed and wire temperature → slab cuts. Cut every ≈ 0.5 mm of travel, not every tick: the wire
-  moves ≈ 0.05 mm per 10 ms tick.
+- `WireCutProgramPlayer extends ToolpathPlayer`, alongside `CncProgramPlayer` and
+  `PrintProgramPlayer`.
+- `WireCuttingStock.follow` (the counterpart of `MachiningStock`/`PrintingStock`): wire line
+  from the simulated joints → per-piece kerf from local speed and wire temperature → slab cuts.
+  Cut every ≈ 0.5 mm of travel, not every tick: the wire moves ≈ 0.05 mm per 10 ms tick.
 - Wire view: a line between the guides, colour by temperature, bow later.
 - Offcuts drop.
 - `ProjectSourceTests.checkFoamCutter` runs the star and the wing.
@@ -490,14 +506,13 @@ with cutting, for revolved parts. Needs a rotary stock sweep and time-varying ru
 ## Order
 
 ```
-FC0 ── FC1 ── FC2 ── FC3 ──┬── FC5 ── FC6
-                           └── FC4 ──┐
-                (3d-printing lands)  │
-                FC7 ── FC8 ── FC9 ───┴── FC10 ── FC11 ── FC12 ── FC13 … FC16
+FC0 ── FC1 ── FC2 ──(RF5)── FC3 ──┬── FC5 ── FC6
+FC4 ─────────────────────────────┤
+FC7 ── FC8 ── FC9 ───────────────┴── FC10 ── FC11 ── FC12 ── FC13 … FC16
 ```
 
-- FC4 is independent of FC1–FC3 and can run in parallel. It bumps the StockKit API, which
-  `3d-printing` also bumps (v3). If that branch has not landed, rebase over it when it does.
+- Every dependency outside this plan is on main except RF5 (printer plan), which gates FC3.
+- FC4 (StockKit) and FC7 (heat) are independent of FC1–FC3 and can run in parallel with them.
 - FC5's heat ops and FC9's model arrive after FC7. Until then FC5 uses uniform kerf.
 
 ## Working rules
@@ -520,14 +535,14 @@ FC0 ── FC1 ── FC2 ── FC3 ──┬── FC5 ── FC6
 | FC0 | planned | |
 | FC1 | planned | |
 | FC2 | planned | |
-| FC3 | planned | |
+| FC3 | planned (after printer RF5) | |
 | FC4 | planned | |
 | FC5 | planned | |
 | FC6 | planned | |
-| FC7 | planned (needs 3d-printing on main) | |
+| FC7 | planned | |
 | FC8 | planned | |
 | FC9 | planned | |
-| FC10 | planned (needs 3d-printing on main) | |
+| FC10 | planned | |
 | FC11 | planned | |
 | FC12 | planned | |
 | FC13–FC16 | later | |
