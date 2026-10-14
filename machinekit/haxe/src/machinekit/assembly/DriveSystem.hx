@@ -680,12 +680,20 @@ class DriveSystem {
 				}
 			} else {
 				var range = record.range, occurrence = record.occurrence, connector = record.connector;
-				if (occurrence == null || connector == null || range == null || !(range > 0) || !Math.isFinite(range))
+				var boxes = record.zoneBoxes;
+				if (occurrence == null || connector == null) throw 'Volume sensor "${record.id}" needs a connector';
+				if (record.kind == "robot_zone") {
+					if (!materia.assembly.AssemblyDefinitionCodec.validZoneBoxes(boxes))
+						throw 'Robot zone "${record.id}" needs boxes of a centre and three positive half extents';
+				} else if (range == null || !(range > 0) || !Math.isFinite(range))
 					throw 'Presence sensor "${record.id}" needs a connector and positive range';
 				var found = false;
 				for (entry in flat.requireDefinition(occurrence).connectors) if (entry.name == connector) found = true;
 				if (!found) throw 'Unknown connector "$occurrence/$connector"';
-				result.push({id: record.id, kind: record.kind, occurrence: occurrence, connector: connector, range: range});
+				if (record.kind == "robot_zone")
+					result.push({id: record.id, kind: record.kind, occurrence: occurrence, connector: connector,
+						zoneBoxes: (cast boxes : Array<Float>).copy()});
+				else result.push({id: record.id, kind: record.kind, occurrence: occurrence, connector: connector, range: range});
 			}
 		}
 		return result;
@@ -708,6 +716,7 @@ class DriveSystem {
 		if (sensor.windowUpper != null) copy.windowUpper = sensor.windowUpper;
 		if (sensor.hysteresis != null) copy.hysteresis = sensor.hysteresis;
 		if (sensor.range != null) copy.range = sensor.range;
+		if (sensor.zoneBoxes != null) copy.zoneBoxes = sensor.zoneBoxes.copy();
 		return copy;
 	}
 

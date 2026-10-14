@@ -632,6 +632,24 @@ class ProjectKitTests {
       mount: {occurrence: "chassis", connector: "pin"}, rayCount: 64, maxRange: 6.0, updateRate: 10.0});
     rejects(function() SceneArtifact.encode(data), "two sensors with one id");
     data.robotSensors.pop();
+    // A robot zone's field is the union of its boxes, each a centre and three positive half extents.
+    robot.sensors = [{id: "chassis/zone", kind: "robot_zone", occurrence: "chassis", connector: "pin",
+      zoneBoxes: [0, 0, 0, 10, 20, 30, 50, 0, 5, 5, 5, 5]}];
+    var zoneDefinition = SceneArtifact.decode(SceneArtifact.encode(data)).assemblyDefinition;
+    var zoneSensors = zoneDefinition == null ? null : zoneDefinition.sensors;
+    var zoneBoxes = zoneSensors == null || zoneSensors.length != 1 ? null : zoneSensors[0].zoneBoxes;
+    check(zoneBoxes != null && zoneBoxes.length == 12 && zoneBoxes[6] == 50 && zoneBoxes[11] == 5,
+      "robot zone round trip keeps every box");
+    var zone = robot.sensors[0];
+    zone.zoneBoxes = [0, 0, 0, 10, 20];
+    rejects(function() SceneArtifact.encode(data), "robot zone box of fewer than six numbers");
+    zone.zoneBoxes = [0, 0, 0, 10, -20, 30];
+    rejects(function() SceneArtifact.encode(data), "robot zone box with a negative half extent");
+    zone.zoneBoxes = null;
+    rejects(function() SceneArtifact.encode(data), "robot zone without boxes");
+    robot.sensors = [{id: "chassis/presence", kind: "presence", occurrence: "chassis",
+      connector: "pin", range: 0.02, zoneBoxes: [0, 0, 0, 1, 1, 1]}];
+    rejects(function() SceneArtifact.encode(data), "presence sensor with zone boxes");
     robot.sensors = [{id: "chassis/presence", kind: "presence", occurrence: "chassis",
       connector: "pin", range: 0.02}];
     data.controllers = [{id: "robotController", kind: "robot", joints: ["wheel_l", "wheel_r", "lift"],

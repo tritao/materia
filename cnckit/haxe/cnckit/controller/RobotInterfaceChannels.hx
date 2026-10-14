@@ -7,7 +7,6 @@ class RobotInterfaceChannels {
   public static inline final REQUEST_CLAMP = "robot.request_clamp";
   public static inline final REQUEST_UNCLAMP = "robot.request_unclamp";
   public static inline final CYCLE_START = "robot.cycle_start";
-  public static inline final ROBOT_CLEAR = "robot.clear";
   public static inline final FAULT_RESET = "robot.fault_reset";
   public static inline final CNC_READY = "cnc.ready";
   public static inline final DOOR_OPEN = "cnc.door_open";
@@ -27,8 +26,7 @@ class RobotInterfaceChannels {
     return scope == null || scope.length == 0 ? "cnc.alarm_code" : scope + "/cnc.alarm_code";
 
   public static function robotRequests():Array<String> return [REQUEST_DOOR_OPEN,
-    REQUEST_DOOR_CLOSE, REQUEST_CLAMP, REQUEST_UNCLAMP, CYCLE_START,
-    ROBOT_CLEAR, FAULT_RESET];
+    REQUEST_DOOR_CLOSE, REQUEST_CLAMP, REQUEST_UNCLAMP, CYCLE_START, FAULT_RESET];
   public static function cncOutputs():Array<String> return [CNC_READY, DOOR_OPEN,
     DOOR_CLOSED, CLAMPED, UNCLAMPED, PART_PRESENT, IN_CYCLE,
     CYCLE_COMPLETE, ALARM].concat(alarmCodeBits());

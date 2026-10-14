@@ -28,6 +28,8 @@ typedef MachineAssemblyConnector = { var instanceId:String; var connectorName:St
 typedef PortRef = { var instanceId:String; var portName:String; }
 typedef UpstreamResult = { var port:PortRef; var external:Bool; }
 typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; var pose:Null<AssemblyFrame>; }
+/** One box of a robot zone: its centre and half extents in millimetres, in the zone connector's frame. */
+typedef RobotZoneBox = { var x:Float; var y:Float; var z:Float; var halfX:Float; var halfY:Float; var halfZ:Float; }
 /** BOM-only mass is a point-mass estimate, fixed or attached to a member. */
 enum AssemblyBomMass {
 	Unknown;
@@ -635,6 +637,18 @@ class MachineAssembly {
 		var target = presenceConnector(connector);
 		addSensorRecord({id: id, kind: "presence", occurrence: target.instanceId,
 			connector: target.connectorName, range: range});
+	}
+
+	/**
+	 * A safety zone: reports any robot link or carried part inside any of `boxes`, like an area
+	 * scanner's field. The boxes are axis-aligned in the frame of an assembly connector, in millimetres.
+	 */
+	public function addRobotZone(id:String, connector:String, boxes:Array<RobotZoneBox>):Void {
+		var target = presenceConnector(connector);
+		var flat:Array<Float> = [];
+		for (box in boxes) for (value in [box.x, box.y, box.z, box.halfX, box.halfY, box.halfZ]) flat.push(value);
+		addSensorRecord({id: id, kind: "robot_zone", occurrence: target.instanceId,
+			connector: target.connectorName, zoneBoxes: flat});
 	}
 
 	function presenceConnector(name:String):MachineAssemblyConnector {

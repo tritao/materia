@@ -95,7 +95,7 @@ class ControllerWiring {
 				cabinet = owner.get(sensor.joint);
 			else {
 				var head = heads.get(sensor.id);
-				var expected = sensor.kind == "presence" ? "presence" : "reed";
+				var expected = sensor.kind == "presence" ? "presence" : sensor.kind == "robot_zone" ? "scanner" : "reed";
 				if (head == null || head.kind != expected) throw 'Sensor "${sensor.id}" has no matching field head';
 				for (wire in flat.connections)
 				if (wire.fromInstance == sensor.id && wire.fromPort == "signal" && cabinets.exists(wire.toInstance)) {

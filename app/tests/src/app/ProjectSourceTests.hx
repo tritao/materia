@@ -3039,7 +3039,8 @@ class ProjectSourceTests {
     var wires = generated.signals;
     if (wires == null) throw "Tending cell lost its signal wires";
     var robotSignals = [for (wire in wires) if (wire.from.controller == "robotController") wire];
-    check(robotSignals.length == 7, "the robot cabinet owns every robot request output");
+    check(robotSignals.length == RobotInterfaceChannels.robotRequests().length,
+      "the robot cabinet owns every robot request output");
     var first = robotSignals[0], output = false, published = false, now = 0.0;
     var bus = new CellSignals(wires, () -> now,
       (controller, channel) -> channel == first.name && output,
@@ -3759,7 +3760,6 @@ class ProjectSourceTests {
       check(armContacts.length == 0,
         'the checked ready pose leaves the CNC machine physically clear at its load position; ' +
         'contacts=${[for (contact in armContacts) "${contact.otherRobot}/${contact.otherLink} on ${contact.linkIndex}"].join("; ")}');
-      signals.writeSignal(RobotInterfaceChannels.ROBOT_CLEAR, true);
       simulation.step();
       request(RobotInterfaceChannels.REQUEST_DOOR_OPEN, RobotInterfaceChannels.DOOR_OPEN, 800);
       var blankObject = simulation.environmentObject("project:interface-test-blank");
@@ -3914,6 +3914,9 @@ class ProjectSourceTests {
         'Tending placement $index approach disagrees with its insertion heading by $error rad');
     }
   }
+
+  /** MT14 C6: measured first clamp to fourth outfeed of the four-part job, seconds (machine-tending PLAN). */
+  static inline var TENDING_FOURTH_OUTFEED_SECONDS:Float = 285.98;
 
   /** Four real blank-to-outfeed cycles through the saved robot mission and wired CNC interface. */
   static function checkMachineTending(root:String, scope:TendingCheck):Void {
@@ -4420,7 +4423,6 @@ class ProjectSourceTests {
           'completed=${mission.completed}, cncAlarm=${cnc.interfaceAlarm}, ' +
           'doorOpen=${cellSignal(RobotInterfaceChannels.DOOR_OPEN)}, ' +
           'doorClosed=${cellSignal(RobotInterfaceChannels.DOOR_CLOSED)}, ' +
-          'clear=${cncRequest(RobotInterfaceChannels.ROBOT_CLEAR)}, ' +
           'requestCycle=${cncRequest(RobotInterfaceChannels.CYCLE_START)}, ' +
           'runner=${mission.runner.status()}, ticks=$clampTicks/$routeTickBudget, $placementDiagnostic)');
       check(cellSignal(RobotInterfaceChannels.PART_PRESENT),
@@ -4568,18 +4570,24 @@ class ProjectSourceTests {
       var productionSeconds = fourthOutfeedTime - productionStart;
       var spindleUse = spindleTicks / ticks;
       var cellSpindleUse = cellSpindleTicks / cellTicks;
-      check(Math.abs(cnc.spindleUtilization - spindleUse) < 0.05,
+      check(Math.abs(cnc.spindleUtilization - spindleUse) < 0.01,
         'CNC-panel spindle utilization agrees with encoder sampling, got ${cnc.spindleUtilization * 100}% vs ${spindleUse * 100}%');
       var measuredUse = cnc.spindleUtilization;
       for (_ in 0...20) simulation.step();
       check(Math.abs(cnc.spindleUtilization - measuredUse) < 1e-12,
         "spindle utilization holds its completed-cycle measurement while the cell is idle");
+      // MT14 C6: the 75% target is cutting utilisation, the CNC's in-cycle time over the whole cell window.
+      // Spindle-on use also counts run-up and coast-down, so it is reported but not the target.
+      var cuttingSeconds = 0.0;
+      for (seconds in cycleTimes) cuttingSeconds += seconds;
+      var cuttingUse = cuttingSeconds / productionSeconds;
       Sys.println('tending production: ${cnc.completedStocks.length} blanks, first clamp to fourth outfeed ' +
-        '${productionSeconds} s, ' +
-        'spindle active within cuts ${Math.round(cnc.spindleUtilization * 1000) / 10}%, ' +
-        'whole-cell spindle use ${Math.round(cellSpindleUse * 1000) / 10}%, cycle intervals ${cycleTimes.join(", ")} s');
-      check(cellSpindleUse >= 0.75,
-        'MT12 needs at least 75% whole-cell spindle use, got ${cellSpindleUse * 100}%');
+        '${productionSeconds} s, cutting utilisation ${Math.round(cuttingUse * 1000) / 10}%, ' +
+        'spindle-on use ${Math.round(cellSpindleUse * 1000) / 10}%, ' +
+        'spindle active within cuts ${Math.round(cnc.spindleUtilization * 1000) / 10}%, cycle intervals ${cycleTimes.join(", ")} s');
+      check(cuttingUse >= 0.75, 'MT12 needs at least 75% cutting utilisation, got ${cuttingUse * 100}%');
+      check(productionSeconds <= TENDING_FOURTH_OUTFEED_SECONDS * 1.05,
+        'four parts reach the outfeed within 5% of the measured ${TENDING_FOURTH_OUTFEED_SECONDS} s, took $productionSeconds s');
     } catch (error:Dynamic) {
       var cleanupError:Null<String> = null;
       try simulation.dispose() catch (disposeError:Dynamic) cleanupError = Std.string(disposeError);

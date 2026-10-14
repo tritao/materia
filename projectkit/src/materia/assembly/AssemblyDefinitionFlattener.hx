@@ -184,6 +184,7 @@ class AssemblyDefinitionFlattener {
 		if (sensor.windowUpper != null) copy.windowUpper = sensor.windowUpper;
 		if (sensor.hysteresis != null) copy.hysteresis = sensor.hysteresis;
 		if (sensor.range != null) copy.range = sensor.range;
+		if (sensor.zoneBoxes != null) copy.zoneBoxes = sensor.zoneBoxes.copy();
 		return copy;
 	}
 	/** Copy physical switch references into a containing namespace. */

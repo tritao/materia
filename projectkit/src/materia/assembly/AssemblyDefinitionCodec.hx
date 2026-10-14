@@ -256,9 +256,12 @@ class AssemblyDefinitionCodec {
 		if (sensors.length > 4000) throw "Assembly has too many sensors";
 		for (sensor in sensors) {
 			if (sensor == null || !validText(sensor.id) || sensorIds.exists(sensor.id) ||
-				(sensor.kind != "joint_switch" && sensor.kind != "at_speed" && sensor.kind != "presence" && sensor.kind != "brake_released"))
+				(sensor.kind != "joint_switch" && sensor.kind != "at_speed" && sensor.kind != "presence" &&
+					sensor.kind != "robot_zone" && sensor.kind != "brake_released"))
 				throw "Assembly has an invalid or duplicate native sensor";
 			sensorIds.set(sensor.id, true);
+			if (sensor.kind != "robot_zone" && sensor.zoneBoxes != null)
+				throw 'Assembly sensor "${sensor.id}" has zone boxes but is no robot zone';
 			if (sensor.kind == "brake_released") {
 				if (sensor.joint == null || movable.get(sensor.joint) == null || sensor.occurrence != null ||
 					sensor.connector != null || sensor.windowLower != null || sensor.windowUpper != null ||
@@ -276,11 +279,14 @@ class AssemblyDefinitionCodec {
 					throw 'Assembly sensor "${sensor.id}" has an invalid joint window';
 			} else {
 				var member = sensor.occurrence == null ? null : occurrences.get(sensor.occurrence);
+				var zone = sensor.kind == "robot_zone";
 				if (sensor.joint != null || sensor.windowLower != null || sensor.windowUpper != null ||
 					sensor.hysteresis != null || member == null || !validText(sensor.connector) ||
-					!hasConnector(definitions.get(member.definition), sensor.connector) || sensor.range == null ||
-					!(sensor.range > 0) || !Math.isFinite(sensor.range))
-					throw 'Assembly sensor "${sensor.id}" has an invalid presence connector or range';
+					!hasConnector(definitions.get(member.definition), sensor.connector))
+					throw 'Assembly sensor "${sensor.id}" has an invalid volume connector';
+				if (zone ? sensor.range != null || !validZoneBoxes(sensor.zoneBoxes)
+					: sensor.range == null || !(sensor.range > 0) || !Math.isFinite(sensor.range))
+					throw 'Assembly sensor "${sensor.id}" has invalid ${zone ? "zone boxes" : "presence range"}';
 			}
 		}
 		var switches = definition.switches == null ? [] : definition.switches;
@@ -544,6 +550,14 @@ class AssemblyDefinitionCodec {
 				actuator.maxSpeed != null && actuator.ratedTorque > 0 && actuator.peakTorque >= actuator.ratedTorque &&
 				actuator.ratedSpeed > 0 && actuator.maxSpeed >= actuator.ratedSpeed;
 		return false;
+	}
+
+	/** One or more boxes of six finite numbers: a centre, then three positive half extents. */
+	public static function validZoneBoxes(boxes:Null<Array<Float>>):Bool {
+		if (boxes == null || boxes.length == 0 || boxes.length % 6 != 0 || boxes.length > 6 * 64) return false;
+		for (index in 0...boxes.length)
+			if (!Math.isFinite(boxes[index]) || (index % 6 >= 3 && !(boxes[index] > 0))) return false;
+		return true;
 	}
 
 	static function validText(value:Null<String>):Bool

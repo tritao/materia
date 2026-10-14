@@ -8,6 +8,7 @@ import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.SimulatedPresenceInputAdapter;
+import robotkit.runtime.SimulatedRobotZoneAdapter;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationSpace;
 import robotkit.runtime.SimulationPresentationSnapshot;
@@ -76,6 +77,8 @@ class ApplicationSimulation {
   /** The battery model of a CAD mobile power system, when present. */
   var power:Null<SimulatedMobilePower> = null;
   var cnc:Null<CncProgramPlayer> = null;
+  /** Robot zone monitors own native collision worlds; they go with their simulation. */
+  var zoneMonitors:Array<SimulatedRobotZoneAdapter> = [];
   var print:Null<PrintProgramPlayer> = null;
   var beltVisuals:Array<BeltVisuals> = [];
   var machineProgram:Null<MachineProgramPlayer> = null;
@@ -170,6 +173,7 @@ class ApplicationSimulation {
     var candidateRobotModels:Array<robotkit.model.RobotModel> = [];
     var candidateRuntimes:Array<RobotRuntime> = [];
     var candidateBlueprints:Array<RobotRuntimeBlueprint> = [];
+    var candidateZones:Array<SimulatedRobotZoneAdapter> = [];
     var candidateObjects:Array<{id:String,object:SimObject}> = [];
     var candidateWorkforce:Null<HumanWorkforce> = null;
     var candidateAssemblyParts:Array<AssemblyVisual> = [];
@@ -416,6 +420,17 @@ class ApplicationSimulation {
           if (sensor.kind == "presence_input") hasPresenceInput = true;
         if (hasPresenceInput) candidate.addStepObserver(new SimulatedPresenceInputAdapter(candidate,
           candidateRuntimes[index], candidateBlueprints[index], index, freeObjects));
+        var hasZone = false;
+        for (sensor in candidateBlueprints[index].externalSensorLayout()) if (sensor.kind == "zone_input") hasZone = true;
+        // A machine's robot zone watches every other robot's simulated links and the parts they carry.
+        if (hasZone) {
+          var zone = new SimulatedRobotZoneAdapter(candidate, candidateRuntimes[index],
+            candidateBlueprints[index], index, [for (other in 0...candidateBlueprints.length) if (other != index)
+              {robotIndex: other, shapes: candidateBlueprints[other].linkCollisionShapes}], freeObjects,
+            robotkit.collision.CollisionClearance.MARGIN, () -> new collisionkit.native.NativeCollisionWorld());
+          candidateZones.push(zone);
+          candidate.addStepObserver(zone);
+        }
       }
       if (session != null && candidateAssembly != null) for (tool in session.robotTools) {
         var toolRobot = candidateAssembly;
@@ -524,6 +539,8 @@ class ApplicationSimulation {
       if (pressBrake != null) pressBrake.beforeReset();
       pressBrake = candidatePress;
       cnc = candidateCnc;
+      var previousZones = zoneMonitors;
+      zoneMonitors = candidateZones;
       print = candidatePrint;
       mobile = candidateMobile;
       mission = candidateMission;
@@ -545,6 +562,7 @@ class ApplicationSimulation {
       scene.setWorkerVisualsVisible(false);
       if (previousWorkforce != null) previousWorkforce.dispose();
       releaseSpace(previousSpace, previousSimulation);
+      for (zone in previousZones) zone.dispose();
       for (robot in previousRobots) robot.close();
       return true;
     } catch (failure:Dynamic) {
@@ -552,6 +570,7 @@ class ApplicationSimulation {
       if (candidateWorkforce != null) candidateWorkforce.dispose();
       if (candidateSpace != null && candidateSpace != space)
         releaseSpace(candidateSpace, candidate);
+      for (zone in candidateZones) zone.dispose();
       return false;
     }
   }
@@ -875,6 +894,8 @@ class ApplicationSimulation {
     collisionWarnings = [];
     presentAssemblyPhysics = false;
     releaseSpace(space, simulation); simulation = null; space = null;
+    for (zone in zoneMonitors) zone.dispose();
+    zoneMonitors = [];
     appliedDocumentRevision=-1;appliedEnvironmentRevision=-1;appliedBackend=-1;appliedTimestep=-1;
     appliedParticipantRevision=-1;
   }

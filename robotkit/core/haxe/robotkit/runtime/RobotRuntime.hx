@@ -733,6 +733,9 @@ class RobotRuntime {
       case "presence_input":
         if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
           throw 'Presence input "$sensorId" publication requires one digital value';
+      case "zone_input":
+        if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
+          throw 'Zone input "$sensorId" publication requires one digital value';
       case "tool_vacuum_kpa":
         if (image != null || values.length != 1 || values[0] < 0.0)
           throw 'Vacuum "$sensorId" publication requires one non-negative kPa value';

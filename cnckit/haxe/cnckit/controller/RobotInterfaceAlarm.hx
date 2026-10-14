@@ -15,4 +15,6 @@ enum abstract RobotInterfaceAlarm(Int) from Int to Int {
   var UnclampTimeout = 10;
   var DoorOpenedDuringCycle = 11;
   var ToolChangeRequired = 12;
+  /** The machine's robot zone was entered while the door closed or the machine cut. */
+  var RobotInZone = 13;
 }

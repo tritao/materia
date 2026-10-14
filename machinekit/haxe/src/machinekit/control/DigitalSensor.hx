@@ -8,7 +8,7 @@ import machinekit.component.ComponentValues;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
-/** A field switch or presence head with one digital output terminal. */
+/** A field switch, presence head or safety area scanner with one digital output terminal. */
 class DigitalSensor extends MachineComponent {
 	public static inline final BODY_WIDTH:Float = 12;
 	public static inline final BODY_DEPTH:Float = 8;
@@ -17,7 +17,7 @@ class DigitalSensor extends MachineComponent {
 	static var recipe:Null<ComponentType>;
 
 	public function new(kind:String = "reed") {
-		if (kind != "reed" && kind != "presence") throw 'Unknown digital sensor kind "$kind"';
+		if (kind != "reed" && kind != "presence" && kind != "scanner") throw 'Unknown digital sensor kind "$kind"';
 		super('DIGITAL-SENSOR-${kind.toUpperCase()}', '$kind digital sensor', "plastic", true);
 		this.kind = kind;
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
@@ -26,7 +26,7 @@ class DigitalSensor extends MachineComponent {
 
 	public static function recipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.control.digital-sensor", [
-			ComponentRecipeSupport.choice("kind", ["reed", "presence"], "reed")
+			ComponentRecipeSupport.choice("kind", ["reed", "presence", "scanner"], "reed")
 		], v -> new DigitalSensor(v.token("kind")));
 		return recipe;
 	}

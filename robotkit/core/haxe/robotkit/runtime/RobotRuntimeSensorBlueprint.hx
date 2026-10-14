@@ -24,12 +24,15 @@ class RobotRuntimeSensorBlueprint {
   public final windowLower:Float;
   public final windowUpper:Float;
   public final hysteresis:Float;
+  /** A `zone_input`'s boxes about its mount, six numbers each (centre, half extents) in metres, or null. */
+  public final zoneBoxes:Null<ImmutableFloatArray>;
 
   public function new(id:String, kind:String, frameId:String, linkId:String, link:Int,
       position:Array<Float>, rotation:Array<Float>, updateRate:Float = 0.0,
       rayCount:Int = 8, maxRange:Float = 10.0, noiseStddev:Float = 0.0, noiseSeed:Int = 1,
       startAngleRadians:Float = 0.0, fieldOfViewRadians:Float = Math.PI * 2.0,
-      joint:Int = -1, windowLower:Float = 0.0, windowUpper:Float = 0.0, hysteresis:Float = 0.0) {
+      joint:Int = -1, windowLower:Float = 0.0, windowUpper:Float = 0.0, hysteresis:Float = 0.0,
+      ?zoneBoxes:Array<Float>) {
     this.id = id; this.kind = kind; this.frameId = frameId; this.linkId = linkId; this.link = link;
     mount = new robotkit.core.SensorMount(position, rotation);
     this.position = mount.position;
@@ -39,6 +42,7 @@ class RobotRuntimeSensorBlueprint {
     this.noiseStddev = noiseStddev; this.noiseSeed = noiseSeed;
     this.joint = joint; this.windowLower = windowLower; this.windowUpper = windowUpper;
     this.hysteresis = hysteresis;
+    this.zoneBoxes = zoneBoxes == null ? null : new ImmutableFloatArray(zoneBoxes);
   }
 
   /**
@@ -48,7 +52,7 @@ class RobotRuntimeSensorBlueprint {
    */
   public static function isExternalKind(kind:String):Bool
     return kind == "camera" || kind == "gnss_pose" ||
-      kind == "digital_input" || kind == "presence_input" || kind == "trip_switch" ||
+      kind == "digital_input" || kind == "presence_input" || kind == "zone_input" || kind == "trip_switch" ||
       kind == "tool_contact" || kind == "tool_vacuum_kpa" || kind == "tool_weld" ||
       kind == "tool_heater";
 

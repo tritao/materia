@@ -5113,6 +5113,23 @@ class RobotWorldTests {
       restored.speedChannel == "spindle.speed" && restored.directionChannel == "spindle.direction" &&
       Math.abs(restored.radiansPerSpeedUnit - 1.0) < 1e-9,
       "Current RobotModel preserves the typed spindle process binding");
+    // A zone input's field is the union of its boxes; the codec and compiler keep and check every one.
+    var zoneModel = RobotModelCodec.decode(encoded);
+    var zone = zoneModel.addSensor(new robotkit.model.Sensor("cell-zone", "zone_input", 0, "sensor/cell-zone"));
+    zone.zoneBoxes = [0.0, 0.0, 0.5, 0.2, 0.2, 0.2, 0.6, 0.0, 0.1, 0.1, 0.05, 0.05];
+    var zoneRestored = RobotModelCodec.decode(RobotModelCodec.encode(zoneModel));
+    var restoredZone = [for (sensor in zoneRestored.sensors) if (sensor.kind == "zone_input") sensor];
+    check(restoredZone.length == 1 && restoredZone[0].zoneBoxes != null && restoredZone[0].zoneBoxes.length == 12 &&
+      restoredZone[0].zoneBoxes[6] == 0.6, "a zone input keeps both of its boxes through the model codec");
+    var zoneLayout = [for (sensor in RobotRuntimeCompiler.compile(zoneRestored, new robotkit.profile.RobotProfile())
+      .externalSensorLayout()) if (sensor.kind == "zone_input") sensor];
+    check(zoneLayout.length == 1 && zoneLayout[0].zoneBoxes != null && zoneLayout[0].zoneBoxes.length == 12,
+      "a compiled zone input carries every box to the runtime");
+    zone.zoneBoxes = [0.0, 0.0, 0.5, 0.2, 0.0, 0.2];
+    throws(() -> RobotRuntimeCompiler.compile(zoneModel, new robotkit.profile.RobotProfile()),
+      "a zone box needs three positive half extents");
+    zone.zoneBoxes = null;
+    throws(() -> RobotModelCodec.encode(zoneModel), "a zone input needs boxes");
     var runtime = simulationHarness.simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("discrete-process-sensors", runtime,
       "discrete-process-sensors", ["base", "carriage", "spindle"], ["slide", "spindle"]);

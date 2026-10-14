@@ -9,6 +9,8 @@ class RobotInterface {
   static inline final CLOSING_DOOR = 2;
   static inline final CLAMPING = 3;
   static inline final UNCLAMPING = 4;
+  /** A door-close request waits, coils off, until the measured robot zone is clear. */
+  static inline final AWAITING_CLEAR = 5;
 
   public final requestTimeoutSeconds:Float;
   var state:Int = IDLE;
@@ -43,6 +45,8 @@ class RobotInterface {
     if (alarmCode == RobotInterfaceAlarm.None && activeCycle && !input.doorClosed) fail(DoorOpenedDuringCycle, true);
     else if (alarmCode == RobotInterfaceAlarm.None && activeCycle && input.toolChangeRequired) fail(ToolChangeRequired, true);
     else if (alarmCode == RobotInterfaceAlarm.None && activeCycle && unclampEdge) fail(UnclampInterlock, false);
+    else if (alarmCode == RobotInterfaceAlarm.None && activeCycle && !input.clear) fail(RobotInZone, true);
+    else if (alarmCode == RobotInterfaceAlarm.None && state == CLOSING_DOOR && !input.clear) fail(RobotInZone, false);
 
     if (alarmCode != RobotInterfaceAlarm.None && resetEdge && safeToReset(input)) {
       alarmCode = RobotInterfaceAlarm.None;
@@ -57,6 +61,7 @@ class RobotInterface {
       (clampEdge ? 1 : 0) + (unclampEdge ? 1 : 0) + (startEdge ? 1 : 0);
     if (alarmCode == RobotInterfaceAlarm.None && requestCount > 1) fail(ConflictingRequests, false);
 
+    if (alarmCode == RobotInterfaceAlarm.None && state == AWAITING_CLEAR && input.clear) begin(CLOSING_DOOR);
     if (alarmCode == RobotInterfaceAlarm.None && state != IDLE) {
       elapsed += dt;
       if (requestReached(input)) {
@@ -77,10 +82,11 @@ class RobotInterface {
           fail(DoorOpenInterlock, false);
         else begin(OPENING_DOOR);
       } else if (closeEdge) {
+        // The robot may ask while it leaves: the door moves only once the zone reads clear.
         if (input.doorClosed) {}
-        else if (!input.clear || !input.spindleStopped || !input.doorOpen)
+        else if (!input.spindleStopped || !input.doorOpen)
           fail(DoorCloseInterlock, false);
-        else begin(CLOSING_DOOR);
+        else begin(input.clear ? CLOSING_DOOR : AWAITING_CLEAR);
       } else if (clampEdge) {
         if (input.clamped && input.partPresent) {}
         else if (!input.doorOpen || !input.partPresent)
@@ -128,6 +134,7 @@ class RobotInterface {
   };
 
   function timeoutCode():RobotInterfaceAlarm return switch state {
+    case AWAITING_CLEAR: DoorCloseInterlock;
     case OPENING_DOOR: DoorOpenTimeout;
     case CLOSING_DOOR: DoorCloseTimeout;
     case CLAMPING: ClampTimeout;
@@ -145,7 +152,8 @@ class RobotInterface {
 
   function safeToReset(input:RobotInterfaceInput):Bool
     return !input.toolChangeRequired && input.spindleStopped && input.axesAtLoad &&
-      (alarmCode != RobotInterfaceAlarm.DoorOpenedDuringCycle || input.doorClosed);
+      (alarmCode != RobotInterfaceAlarm.DoorOpenedDuringCycle || input.doorClosed) &&
+      (alarmCode != RobotInterfaceAlarm.RobotInZone || input.clear);
 
   static function edge(current:Bool, prior:Bool):Bool return current && !prior;
 }

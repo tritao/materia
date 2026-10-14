@@ -74,9 +74,44 @@ class RobotInterfaceTests {
 
     fsm = new RobotInterface();
     output = fsm.update(input(false, true, false, false, false, false,
-      false, false, false, false, true, true, true, false), 0.01);
-    check(output.alarm == RobotInterfaceAlarm.DoorCloseInterlock,
-      "closing is refused unless the robot has cleared the cell");
+      false, false, false, false, true, true, true, true), 0.01);
+    check(output.alarm == RobotInterfaceAlarm.DoorCloseInterlock && !output.doorCoilB,
+      "closing is refused unless the door is open");
+
+    // The robot may request closing while it leaves; the door waits for the measured zone.
+    function closing(clear:Bool):RobotInterfaceInput return input(false, true, false, false, false, false,
+      true, false, true, false, true, true, true, clear);
+    fsm = new RobotInterface(0.03);
+    output = fsm.update(closing(false), 0.01);
+    check(output.alarm == RobotInterfaceAlarm.None && !output.doorCoilB,
+      "a close request inside the robot zone waits with the door coil off");
+    output = fsm.update(closing(false), 0.01);
+    output = fsm.update(closing(true), 0.01);
+    check(output.alarm == RobotInterfaceAlarm.None && output.doorCoilB,
+      "the waiting door closes on the first clear zone reading");
+    output = fsm.update(closing(false), 0.01);
+    check(output.alarm == RobotInterfaceAlarm.RobotInZone && !output.doorCoilB && !output.holdCycle,
+      "a robot entering the zone stops a closing door");
+    output = fsm.update(input(false, false, false, false, false, true,
+      true, false, true, false, true, true, true, false), 0.01);
+    check(output.alarm == RobotInterfaceAlarm.RobotInZone, "a robot-zone alarm cannot reset while the zone is occupied");
+    output = fsm.update(input(false, false, false, false, false, false,
+      true, false, true, false, true, true, true, true), 0.01);
+    output = fsm.update(input(false, false, false, false, false, true,
+      true, false, true, false, true, true, true, true), 0.01);
+    check(output.alarm == RobotInterfaceAlarm.None, "a robot-zone alarm resets once the zone is clear");
+
+    fsm = new RobotInterface(0.03);
+    for (_ in 0...4) output = fsm.update(closing(false), 0.01);
+    check(output.alarm == RobotInterfaceAlarm.DoorCloseInterlock && !output.doorCoilB,
+      "a close request alarms when the robot never leaves the zone");
+
+    fsm = new RobotInterface();
+    output = fsm.update(input(false, false, false, false, true), 0.01);
+    output = fsm.update(input(false, false, false, false, false, false,
+      false, true, true, false, true, true, true, false), 0.01);
+    check(output.alarm == RobotInterfaceAlarm.RobotInZone && output.holdCycle,
+      "a robot entering the zone during a cut holds the cycle");
 
     fsm = new RobotInterface();
     output = fsm.update(input(false, false, false, false, true), 0.01);

@@ -97,12 +97,10 @@ class TendingMission {
 			else moveToVise(tool, "vise-load");
 			place(cell.viseLoadPlace(), "vise-load", tool);
 			clampPart();
-			moveFromVise(tool, "vise-load");
 		}
 		var cycleRequest = -1, doorCloseRequest = -1;
 		for (operation in cell.production.operations()) switch operation {
 			case Collect(slot, tool, fromTool, initial): collect(slot, tool, fromTool, initial);
-			case Clear(value): signal(RobotInterfaceChannels.ROBOT_CLEAR, value);
 			case OpenDoor: openDoor();
 			case RequestDoorClose:
 				if (doorCloseRequest >= 0) throw "Tending production repeats an unfinished door-close request";
@@ -114,6 +112,7 @@ class TendingMission {
 				doorCloseRequest = -1;
 			case Unclamp: unclampPart();
 			case Load(tool, fromTool): load(tool, fromTool);
+			case LeaveVise(tool): moveFromVise(tool, "vise-load");
 			case StartCycle: cycleRequest = startCycle();
 			case CycleReady:
 				if (cycleRequest < 0) throw "Tending production waits without a cycle request";

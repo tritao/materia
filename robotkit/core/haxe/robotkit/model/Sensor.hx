@@ -9,6 +9,8 @@ class Sensor {
   public var frame:Null<Frame>;
   public var rayCount:Int = 8;
   public var maxRange:Float = 10.0;
+  /** A `zone_input`'s boxes in its frame: six numbers per box, its centre and half extents, in metres. */
+  public var zoneBoxes:Null<Array<Float>>;
   /** Joint read by a native switch or speed sensor. */
   public var joint:Null<String>;
 	/** Switch position window in SI units; for `at_speed`, lower is fractional speed tolerance. */
@@ -29,5 +31,13 @@ class Sensor {
     this.name = name;
     this.kind = kind;
     this.updateRate = updateRate;
+  }
+
+  /** Whether `boxes` holds one or more boxes of a finite centre and three positive half extents. */
+  public static function validZoneBoxes(boxes:Null<Array<Float>>):Bool {
+    if (boxes == null || boxes.length == 0 || boxes.length % 6 != 0) return false;
+    for (index in 0...boxes.length)
+      if (!Math.isFinite(boxes[index]) || (index % 6 >= 3 && !(boxes[index] > 0.0))) return false;
+    return true;
   }
 }

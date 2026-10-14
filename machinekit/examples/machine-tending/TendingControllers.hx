@@ -108,7 +108,8 @@ class TendingControllers extends MachineAssembly {
 		for (index in 1...cncNames.length)
 			connectPorts(cncNames[index], "mill/cncController", 'output${index + 1}', "robotController", 'input${index + 1}');
 		for (index in 0...robotNames.length)
-			connectPorts(robotNames[index], "robotController", 'output${index + 1}', "mill/cncController", 'input${index + 6}');
+			connectPorts(robotNames[index], "robotController", 'output${index + 1}', "mill/cncController",
+				'input${mill.fieldInputCount + index + 1}');
 	}
 
 	public static function preview():Bytes {

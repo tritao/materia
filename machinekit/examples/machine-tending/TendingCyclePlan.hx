@@ -1,14 +1,20 @@
 import machinekit.robotics.DualArmGripperTool;
 
 /** Production operations before CAD frames and certified paths are resolved. */
+/**
+ * The robot never reports itself clear: the machine's robot zone measures it. The door is asked
+ * to close as the arm starts to leave the vise, and moves once the zone reads clear.
+ */
 enum TendingOperation {
 	Collect(slot:Int, tool:String, fromTool:String, initial:Bool);
-	Clear(value:Bool);
 	OpenDoor;
 	RequestDoorClose;
 	DoorClosed;
 	Unclamp;
+	/** Places a blank in the vise and clamps it. */
 	Load(tool:String, fromTool:Null<String>);
+	/** Leaves the vise after loading, through the loading route. */
+	LeaveVise(tool:String);
 	StartCycle;
 	CycleReady;
 	Unload(slot:Int, tool:String);
@@ -52,11 +58,14 @@ class TendingCyclePlanChecks {
 			throw "Exchange ranking lost the production frequencies";
 		if (plan.retreatsAfterUnload(a) || !plan.retreatsAfterUnload(b))
 			throw "Final retreat payload state does not follow the production sequence";
-		var closing = false, deliveriesWhileClosing = 0;
+		var closing = false, deliveriesWhileClosing = 0, leavesWhileClosing = 0;
 		for (operation in plan.operations()) switch operation {
 			case RequestDoorClose:
 				if (closing) throw "Door close requests cannot overlap";
 				closing = true;
+			case LeaveVise(_) | Retreat(_):
+				if (!closing) throw "The arm leaves the vise only after asking for the door to close";
+				leavesWhileClosing++;
 			case DoorClosed:
 				if (!closing) throw "Door confirmation needs its owning request";
 				closing = false;
@@ -71,6 +80,7 @@ class TendingCyclePlanChecks {
 		}
 		if (closing || deliveriesWhileClosing != 1)
 			throw "Final delivery overlaps closure and still confirms the closed door";
+		if (leavesWhileClosing != 5) throw "Every vise exit overlaps its measured door closure";
 		var reordered = new TendingCyclePlan(2, 3, [5, 1]);
 		var alternate = [for (request in reordered.transferRequests()) if (request.role == TendingTransferRole.Inventory) request];
 		var stations = ["infeed-1-2", "infeed-0-1", "outfeed-1-2", "outfeed-0-1"];
@@ -144,21 +154,18 @@ class TendingCyclePlan {
 				throw 'Invalid or repeated tending slot $slot';
 			seen.set(slot, true);
 		}
-		sequence = [Collect(firstSlot, toolFor(0), toolFor(0), true), Clear(true), OpenDoor,
-			Unclamp, Clear(false), Load(toolFor(0), null), Clear(true), RequestDoorClose, DoorClosed, StartCycle];
+		sequence = [Collect(firstSlot, toolFor(0), toolFor(0), true), OpenDoor,
+			Unclamp, Load(toolFor(0), null), RequestDoorClose, LeaveVise(toolFor(0)), DoorClosed, StartCycle];
 		for (cycle in 0...slots.length) {
 			var slot = slots[cycle], tool = toolFor(cycle), hasNext = cycle + 1 < slots.length;
 			var nextTool = hasNext ? toolFor(cycle + 1) : tool;
 			if (hasNext) sequence.push(Collect(slots[cycle + 1], nextTool, tool, false));
 			sequence.push(CycleReady);
-			sequence.push(Clear(true));
 			sequence.push(OpenDoor);
-			sequence.push(Clear(false));
 			sequence.push(Unload(slot, tool));
 			if (hasNext) sequence.push(Load(nextTool, tool));
-			else sequence.push(Retreat(tool));
-			sequence.push(Clear(true));
 			sequence.push(RequestDoorClose);
+			sequence.push(hasNext ? LeaveVise(nextTool) : Retreat(tool));
 			if (hasNext) {
 				sequence.push(DoorClosed);
 				sequence.push(StartCycle);
@@ -211,10 +218,11 @@ class TendingCyclePlan {
 				if (initial) add(result, {station: startupRoute(station), tool: tool, fromTool: tool,
 					fromPose: "ready", toPose: station + "-clearance", door: Closed, role: Startup});
 			case Load(tool, fromTool):
-				// Loading always retreats through this route, including an exchange.
+				// Loading always leaves through this route, including after an exchange.
 				vise(result, "vise-load", tool);
 				if (fromTool != null) add(result, {station: "exchange", tool: tool, fromTool: fromTool,
 					fromPose: "vise-approach", toPose: "vise-load-approach", door: Open, role: Exchange});
+			case LeaveVise(tool): vise(result, "vise-load", tool);
 			case Unload(_, tool): vise(result, "vise", tool);
 			case Retreat(tool): vise(result, "vise", tool);
 			case Deliver(slot, tool, fromTool, _):

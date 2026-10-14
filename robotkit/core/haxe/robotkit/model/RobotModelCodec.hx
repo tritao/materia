@@ -180,6 +180,9 @@ class RobotModelCodec {
       }
       if (sensor.kind == "presence" && sensor.maxRange <= 0.0)
         throw 'Sensor ${sensor.id} needs a positive presence range';
+      if ((sensor.kind == "zone_input") != (sensor.zoneBoxes != null) ||
+          (sensor.zoneBoxes != null && !Sensor.validZoneBoxes(sensor.zoneBoxes)))
+        throw 'Sensor ${sensor.id} needs zone boxes exactly when it is a zone input';
     }
     validateBrakes(model);
     var encodedSensors:Array<Dynamic> = [for (sensor in model.sensors) {
@@ -199,6 +202,8 @@ class RobotModelCodec {
         Reflect.setField(record, "windowUpper", sensor.windowUpper);
         if (sensor.kind == "joint_switch") Reflect.setField(record, "hysteresis", sensor.hysteresis);
       }
+      var zone = sensor.zoneBoxes;
+      if (zone != null) Reflect.setField(record, "zoneBoxes", zone.copy());
     }
     var document:Dynamic = {
       schemaVersion: VERSION,
@@ -498,6 +503,15 @@ class RobotModelCodec {
       sensor.windowLower = fieldNumberDefault(record, "windowLower", 0.0);
       sensor.windowUpper = fieldNumberDefault(record, "windowUpper", 0.0);
       sensor.hysteresis = fieldNumberDefault(record, "hysteresis", 0.0);
+      if (Reflect.hasField(record, "zoneBoxes")) {
+        var zone:Array<Dynamic> = Reflect.field(record, "zoneBoxes");
+        if (!Std.isOfType(zone, Array)) throw 'Sensor $id has invalid zone boxes';
+        sensor.zoneBoxes = [for (value in zone) if (Std.isOfType(value, Float) || Std.isOfType(value, Int)) (value : Float)
+          else throw 'Sensor $id has invalid zone boxes'];
+      }
+      if ((sensor.kind == "zone_input") != (sensor.zoneBoxes != null) ||
+          (sensor.zoneBoxes != null && !Sensor.validZoneBoxes(sensor.zoneBoxes)))
+        throw 'Sensor $id needs zone boxes exactly when it is a zone input';
     }
 
     for (record in array(root, "contactPairs")) {
@@ -965,4 +979,5 @@ class RobotModelCodec {
     if (value == null || StringTools.trim(value).length == 0)
       throw 'RobotModel field $name must not be empty';
   }
+
 }

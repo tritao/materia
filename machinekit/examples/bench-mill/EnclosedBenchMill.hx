@@ -1,4 +1,5 @@
 import machinekit.assembly.MachineAssembly;
+import machinekit.assembly.MachineAssembly.RobotZoneBox;
 import machinekit.milling.MillPanel;
 import machinekit.pneumatic.PneumaticCylinder;
 import machinekit.pneumatic.AirSupply;
@@ -36,6 +37,8 @@ class EnclosedBenchMill extends MachineAssembly {
 	public final panelIds:Array<String> = [];
 	public final doorIds:Array<String> = [];
 	public final standIds:Array<String> = [];
+	/** Controller inputs `input1` to `inputN` carry this machine's own field heads. */
+	public final fieldInputCount:Int;
 	final poses = new Map<String, AssemblyFrame>();
 
 	public function new(includesWorkpiece:Bool = true) {
@@ -121,12 +124,12 @@ class EnclosedBenchMill extends MachineAssembly {
 		addMateOnAxis("door", "prismatic", "doorRail", "slide", "doorSlider", "slide", {x: 1, y: 0, z: 0}, 0,
 			{lower: 0, upper: doorStroke, velocity: null, effort: null,
 				overtravel: doorCylinder.endStopCompliance});
-		var frameWidth = 25.0, leafY = front - 10;
-		doorPanel("doorLeft", frameWidth, 4, openingHeight, -(openingWidth - frameWidth) / 2, leafY, opening.z);
-		doorPanel("doorRight", frameWidth, 4, openingHeight, (openingWidth - frameWidth) / 2, leafY, opening.z);
-		doorPanel("doorBottom", openingWidth - 2 * frameWidth, 4, frameWidth, 0, leafY, opening.z);
-		doorPanel("doorTop", openingWidth - 2 * frameWidth, 4, frameWidth, 0, leafY, opening.z + openingHeight - frameWidth);
-		doorPanel("doorWindow", openingWidth - 2 * frameWidth, 4, openingHeight - 2 * frameWidth,
+		var frameWidth = 25.0, leafDepth = 4.0, leafY = front - 10;
+		doorPanel("doorLeft", frameWidth, leafDepth, openingHeight, -(openingWidth - frameWidth) / 2, leafY, opening.z);
+		doorPanel("doorRight", frameWidth, leafDepth, openingHeight, (openingWidth - frameWidth) / 2, leafY, opening.z);
+		doorPanel("doorBottom", openingWidth - 2 * frameWidth, leafDepth, frameWidth, 0, leafY, opening.z);
+		doorPanel("doorTop", openingWidth - 2 * frameWidth, leafDepth, frameWidth, 0, leafY, opening.z + openingHeight - frameWidth);
+		doorPanel("doorWindow", openingWidth - 2 * frameWidth, leafDepth, openingHeight - 2 * frameWidth,
 			0, leafY, opening.z + frameWidth, "polycarbonate");
 		// A closed cabinet is six panels too; it keeps its real material mass.
 		var cabinetX = right + 120, cabinetY = back - 100, cabinetZ = standHeight;
@@ -191,6 +194,20 @@ class EnclosedBenchMill extends MachineAssembly {
 		addSwitch("vise-clamped", "mill/vise/jaw", {lower: vise.grippedPosition - 0.5,
 			upper: vise.grippedPosition + 0.5, velocity: null, effort: null}, 0.25);
 		addPresence("stock-present", "mill/vise/datum", 25);
+		// The robot zone covers what the door moves through and what it encloses: the enclosure with
+		// the leaves' plane across their whole travel, and the carriage's path along its rail above
+		// the opening. The fixed rail itself is no hazard, so it stays outside the field.
+		function box(low:Array<Float>, high:Array<Float>):RobotZoneBox return {
+			x: (low[0] + high[0]) / 2, y: (low[1] + high[1]) / 2, z: (low[2] + high[2]) / 2,
+			halfX: (high[0] - low[0]) / 2, halfY: (high[1] - low[1]) / 2, halfZ: (high[2] - low[2]) / 2
+		};
+		var enclosed = box([left - panelThickness, leafY - leafDepth / 2, bottom],
+			[right + panelThickness, back + panelThickness, top + panelThickness]);
+		var carriage = box([-slider.width / 2, sliderPose.y - slider.depth / 2, sliderPose.z],
+			[doorStroke + slider.width / 2, sliderPose.y + slider.depth / 2, sliderPose.z + slider.height]);
+		addMemberConnector("chipTray", "robotZone", AssemblyFrames.inverse(poses.get("chipTray")));
+		addRobotZone("robot-zone", "chipTray/robotZone", [enclosed, carriage]);
+		var zoneFront = enclosed.y - enclosed.halfY, zoneTop = enclosed.z + enclosed.halfZ;
 		// The logical switch and its field head share an ID; each head has a real cabinet input wire.
 		var viseDatum = state().worldConnector("mill/vise/body", "datum");
 		var heads = [
@@ -198,13 +215,16 @@ class EnclosedBenchMill extends MachineAssembly {
 			{id: "door-open", kind: "reed", x: doorStroke / 2, y: railPose.y - 25, z: railPose.z + 18},
 			{id: "vise-open", kind: "reed", x: viseDatum.x - 40, y: viseDatum.y, z: viseDatum.z + 30},
 			{id: "vise-clamped", kind: "reed", x: viseDatum.x - 25, y: viseDatum.y, z: viseDatum.z + 30},
-			{id: "stock-present", kind: "presence", x: viseDatum.x, y: viseDatum.y - 30, z: viseDatum.z + 30}
+			{id: "stock-present", kind: "presence", x: viseDatum.x, y: viseDatum.y - 30, z: viseDatum.z + 30},
+			// The scanner watches the zone from the enclosure's top front corner, outside the door's travel.
+			{id: "robot-zone", kind: "scanner", x: left - 40, y: Math.min(zoneFront, carriage.y - carriage.halfY) - 20, z: zoneTop}
 		];
 		for (i in 0...heads.length) {
 			var head = heads[i];
 			fixed(head.id, new DigitalSensor(head.kind), AssemblyFrames.translation(head.x, head.y, head.z), "chipTray");
 			connectPorts('sensor-${head.id}', head.id, "signal", "cncController", 'input${i + 1}');
 		}
+		fieldInputCount = heads.length;
 		loadPosition = nearestLoadPosition();
 	}
 

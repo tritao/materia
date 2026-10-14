@@ -539,7 +539,8 @@ class AssemblySimulationBridge {
       // Assembly presence heads are cabinet inputs backed by the simulated
       // free-object volume source. Keep that source external to RobotKit's
       // bounded native sensor pool, just like wired cell digital inputs.
-      var runtimeKind = sensor.kind == "presence" ? "presence_input" : sensor.kind;
+      // A robot zone is the same kind of cabinet input, backed by the robots' bodies.
+      var runtimeKind = sensor.kind == "presence" ? "presence_input" : sensor.kind == "robot_zone" ? "zone_input" : sensor.kind;
       var added = model.addSensor(new Sensor(sensor.id, runtimeKind, 0.0, sensor.id));
       if (sensor.kind == "brake_released") {
         if (sensor.joint == null) throw 'Brake contact "${sensor.id}" has no motor joint';
@@ -559,7 +560,7 @@ class AssemblySimulationBridge {
 		added.windowLower = sensor.kind == "at_speed" ? windowLower : (windowLower - initial) * factor;
         added.windowUpper = sensor.windowUpper == null ? 0.0 : (sensor.windowUpper - initial) * factor;
 		added.hysteresis = sensor.hysteresis == null ? 0.0 : sensor.hysteresis * (sensor.kind == "at_speed" ? 1.0 : factor);
-      } else if (sensor.kind == "presence") {
+      } else if (sensor.kind == "presence" || sensor.kind == "robot_zone") {
         if (sensor.occurrence == null || sensor.connector == null)
           throw 'Assembly presence sensor "${sensor.id}" has no connector or range';
         var definitionId = occurrenceDefinition(definition, sensor.occurrence);
@@ -594,9 +595,12 @@ class AssemblySimulationBridge {
         frame.position = [mounted.x * scale, mounted.y * scale, mounted.z * scale];
         frame.rotation = [mounted.qx, mounted.qy, mounted.qz, mounted.qw];
         added.frame = frame;
-        var range = requiredFloat(sensor.range,
-          'Assembly presence sensor "${sensor.id}" has no connector or range');
-        added.maxRange = range * scale;
+        var zone = sensor.zoneBoxes;
+        if (sensor.kind == "robot_zone") {
+          if (zone == null) throw 'Assembly robot zone "${sensor.id}" has no boxes';
+          added.zoneBoxes = [for (value in zone) value * scale];
+        } else added.maxRange = requiredFloat(sensor.range,
+          'Assembly presence sensor "${sensor.id}" has no connector or range') * scale;
       }
     }
     // Switch coordinates use the same placed zero as the monitored robot joint.

@@ -3,6 +3,7 @@ package robotkit.runtime;
 import robotkit.model.RobotModel;
 import robotkit.profile.RobotProfile;
 import robotkit.model.Joint;
+import robotkit.model.Sensor;
 import robotkit.model.JointCoupling;
 import robotkit.model.JointType;
 import robotkit.spatial.Quat;
@@ -206,7 +207,7 @@ class RobotRuntimeCompiler {
         frame == null ? [0.0, 0.0, 0.0, 1.0] : frame.rotation,
         sensor.updateRate, sensor.rayCount, sensor.maxRange, sensor.noiseStddev, sensor.noiseSeed,
         sensor.startAngleRadians, sensor.fieldOfViewRadians, sensorJoint,
-        sensor.windowLower, sensor.windowUpper, sensor.hysteresis));
+        sensor.windowLower, sensor.windowUpper, sensor.hysteresis, sensor.zoneBoxes));
     }
     for (brake in robot.brakes) {
       var jointIndex = -1;
@@ -685,6 +686,10 @@ class RobotRuntimeCompiler {
       if (sensor.kind == "presence_input" && (!Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0))
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_RANGE", '$path.maxRange',
           "presence input range must be positive"));
+      var zone = sensor.zoneBoxes;
+      if ((sensor.kind == "zone_input") != (zone != null) || (zone != null && !Sensor.validZoneBoxes(zone)))
+        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_ZONE", '$path.zoneBoxes',
+          "a zone input needs boxes of a centre and three positive half extents, and only a zone input has them"));
       if (!Math.isFinite(sensor.updateRate) || sensor.updateRate < 0.0)
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_RATE", '$path.updateRate',
           "sensor update rate must be non-negative"));

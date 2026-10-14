@@ -400,7 +400,11 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(3) var radiansPerSpeedUnit:Float;
 }
 
-/** A native discrete sensor mounted to a joint coordinate or a connector face. */
+/**
+ * A native discrete sensor mounted to a joint coordinate or a connector face. A `robot_zone`
+ * reports a robot body in any of its `zoneBoxes`: six numbers per box, its centre and half
+ * extents in millimetres, in the connector's frame.
+ */
 @:wire typedef AssemblySensor = {
 	@:id(1) var id:String;
 	@:id(2) var kind:String;
@@ -411,6 +415,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(7) @:optional var windowUpper:Null<Float>;
 	@:id(8) @:optional var hysteresis:Null<Float>;
 	@:id(9) @:optional var range:Null<Float>;
+	@:id(10) @:optional var zoneBoxes:Null<Array<Float>>;
 }
 
 /** An engineering assumption attached to the quantity that uses it. */

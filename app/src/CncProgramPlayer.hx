@@ -172,7 +172,8 @@ class CncProgramPlayer extends ToolpathPlayer {
 	final interfaceAlarmCodeChannel:Null<String>;
 	final doorCoils:Null<{a:String, b:String}>;
 	final viseCoils:Null<{a:String, b:String}>;
-	final interfaceSensorIds:Null<{doorOpen:String, doorClosed:String, viseOpen:String, viseClamped:String, presence:String}>;
+	final interfaceSensorIds:Null<{doorOpen:String, doorClosed:String, viseOpen:String, viseClamped:String, presence:String,
+		robotZone:String}>;
 	var loadPosition:Array<Float> = [];
 	var parkingProgram:Null<MotionProgram> = null;
 	var parkingStarted = false;
@@ -299,9 +300,11 @@ class CncProgramPlayer extends ToolpathPlayer {
 			doorCoils = {a:door.channelA, b:doorB};
 			viseCoils = {a:vise.channelA, b:viseB};
 			interfaceSensorIds = {doorOpen:path("door-open"), doorClosed:path("door-closed"),
-				viseOpen:path("vise-open"), viseClamped:path("vise-clamped"), presence:path("stock-present")};
+				viseOpen:path("vise-open"), viseClamped:path("vise-clamped"), presence:path("stock-present"),
+				robotZone:path("robot-zone")};
 			for (id in [interfaceSensorIds.doorOpen, interfaceSensorIds.doorClosed,
-				interfaceSensorIds.viseOpen, interfaceSensorIds.viseClamped, interfaceSensorIds.presence])
+				interfaceSensorIds.viseOpen, interfaceSensorIds.viseClamped, interfaceSensorIds.presence,
+				interfaceSensorIds.robotZone])
 				if (!hasSensor(id)) throw 'Robot-tended CNC machine is missing field sensor "$id"';
 		} else {
 			doorCoils = null;
@@ -557,7 +560,8 @@ class CncProgramPlayer extends ToolpathPlayer {
 			cellDigital(RobotInterfaceChannels.REQUEST_CLAMP),
 			cellDigital(RobotInterfaceChannels.REQUEST_UNCLAMP),
 			cellDigital(RobotInterfaceChannels.CYCLE_START),
-			cellDigital(RobotInterfaceChannels.ROBOT_CLEAR),
+			// The robot is clear when the machine's own zone scanner sees no robot body in its zone.
+			!readSensor(ids.robotZone),
 			cellDigital(RobotInterfaceChannels.FAULT_RESET),
 			readSensor(ids.doorOpen), readSensor(ids.doorClosed),
 			readSensor(ids.viseClamped), readSensor(ids.viseOpen), readSensor(ids.presence),
