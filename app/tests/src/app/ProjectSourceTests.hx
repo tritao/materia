@@ -916,6 +916,10 @@ class ProjectSourceTests {
       PrinterMirror.follow(session, status);
     };
     check(PrinterLink.parse("printer.local").port == 7125 && PrinterLink.parse("10.0.0.5:80").port == 80, "an address is host or host:port");
+    check(PrinterLink.parse("[fe80::1]:80").host == "fe80::1" && PrinterLink.parse("[fe80::1]:80").port == 80 && PrinterLink.parse("[::1]").port == 7125 &&
+      PrinterLink.parse("::1").host == "::1" && PrinterLink.parse("::1").port == 7125, "an IPv6 literal is bracketed with a port, or bare without one");
+    check(processkit.moonraker.HttpFrames.HttpRequest.authority("fe80::1", 80) == "[fe80::1]:80" && processkit.moonraker.HttpFrames.HttpRequest.authority("a.b", 80) == "a.b:80",
+      "the Host header brackets an IPv6 literal");
     var refused = false;
     try PrinterLink.parse("host:port") catch (_:Dynamic) refused = true;
     check(refused, "an address with a bad port is refused");

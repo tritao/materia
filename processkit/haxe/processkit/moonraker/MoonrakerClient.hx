@@ -62,9 +62,16 @@ class MoonrakerClient {
     return Json.parse(reply.text());
   }
 
+  /** The latest status read, whose values an absent field of the next reply keeps. */
+  var lastStatus:Null<MoonrakerStatus> = null;
+
   /** What the machine is doing now. */
   public function status(complete:MoonrakerStatus->Void):Void
-    send("GET", MoonrakerStatus.QUERY, function(reply) complete(MoonrakerStatus.parse(json(reply))));
+    send("GET", MoonrakerStatus.QUERY, function(reply) {
+      var read = MoonrakerStatus.parse(json(reply), lastStatus);
+      lastStatus = read;
+      complete(read);
+    });
 
   /** The server's own information (Klippy's state among it), as Moonraker's `result`. */
   public function serverInfo(complete:Dynamic->Void):Void
@@ -167,7 +174,7 @@ class MoonrakerClient {
         if (next != null) {
           pending = next;
           deadline = now + timeout;
-          var encoded = next.request.encode(host + ":" + port);
+          var encoded = next.request.encode(HttpRequest.authority(host, port));
           var status = NativeTransport.sendStatus(transport.borrow(), encoded);
           if (status != 0) throw 'Moonraker transport send failed: $status';
           sentBytes += encoded.length;

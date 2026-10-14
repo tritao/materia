@@ -5,6 +5,10 @@ import haxe.io.BytesBuffer;
 
 /** A request as it goes on the wire: HTTP/1.1, the body (if any) sized by Content-Length. */
 class HttpRequest {
+  /** The `Host` header's authority for a host and port: an IPv6 literal (it has a colon) goes in brackets. */
+  public static function authority(host:String, port:Int):String
+    return (host.indexOf(":") >= 0 ? "[" + host + "]" : host) + ":" + port;
+
   public final method:String;
   public final target:String;
   public final headers:Map<String, String>;

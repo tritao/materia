@@ -95,7 +95,7 @@ class MoonrakerSocket {
   }
 
   function announce():Void {
-    status = MoonrakerStatus.fromObjects(merged);
+    status = MoonrakerStatus.fromObjects(merged, status);
     updates++;
     var listener = onUpdate;
     if (listener != null) listener(status);
@@ -146,7 +146,7 @@ class MoonrakerSocket {
         headers.set("Connection", "Upgrade");
         headers.set("Sec-WebSocket-Key", key);
         headers.set("Sec-WebSocket-Version", "13");
-        sendFrame(new HttpRequest("GET", "/websocket", headers, Bytes.alloc(0)).encode(host + ":" + port));
+        sendFrame(new HttpRequest("GET", "/websocket", headers, Bytes.alloc(0)).encode(HttpRequest.authority(host, port)));
       }
       var bytes = NativeTransport.receive(transport.borrow(), 65536);
       if (!open) {

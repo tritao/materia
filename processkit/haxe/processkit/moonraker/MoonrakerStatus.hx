@@ -47,21 +47,21 @@ class MoonrakerStatus {
     "&toolhead=position&extruder=temperature,target&heater_bed=temperature,target&print_stats=state,filename,message" +
     "&virtual_sdcard=progress";
 
-  static function number(source:Dynamic, name:String):Float {
+  static function number(source:Dynamic, name:String, fallback:Float = 0.0):Float {
     var value:Dynamic = source == null ? null : Reflect.field(source, name);
-    if (value == null) return 0.0;
+    if (value == null) return fallback;
     if (!Std.isOfType(value, Float) && !Std.isOfType(value, Int)) throw 'Moonraker field "$name" is not a number';
     return value;
   }
 
-  static function text(source:Dynamic, name:String):String {
+  static function text(source:Dynamic, name:String, fallback:String = ""):String {
     var value:Dynamic = source == null ? null : Reflect.field(source, name);
-    return value == null ? "" : Std.string(value);
+    return value == null ? fallback : Std.string(value);
   }
 
-  static function coordinates(source:Dynamic, name:String):Array<Float> {
+  static function coordinates(source:Dynamic, name:String, ?fallback:Array<Float>):Array<Float> {
     var raw:Dynamic = source == null ? null : Reflect.field(source, name);
-    var result = [0.0, 0.0, 0.0, 0.0];
+    var result = fallback == null ? [0.0, 0.0, 0.0, 0.0] : fallback.copy();
     if (raw == null) return result;
     if (!Std.isOfType(raw, Array)) throw 'Moonraker field "$name" is not a list';
     var list:Array<Dynamic> = cast raw;
@@ -72,23 +72,31 @@ class MoonrakerStatus {
     return result;
   }
 
-  /** Reads the `status` object of a query reply or the merged state of a subscription; what the machine left out reads as zero or empty. */
-  public static function fromObjects(status:Dynamic):MoonrakerStatus {
+  /**
+   * Reads the `status` object of a query reply or the merged state of a subscription. What the machine left out keeps its
+   * value in `previous` (the last status read), or is zero or empty when there is none: a field that is not in a reply is not
+   * a reading of zero.
+   */
+  public static function fromObjects(status:Dynamic, ?previous:MoonrakerStatus):MoonrakerStatus {
     var report:Dynamic = Reflect.field(status, "motion_report"), toolhead:Dynamic = Reflect.field(status, "toolhead");
     var extruder:Dynamic = Reflect.field(status, "extruder"), bed:Dynamic = Reflect.field(status, "heater_bed");
     var stats:Dynamic = Reflect.field(status, "print_stats");
-    return new MoonrakerStatus(text(stats, "state"), text(stats, "filename"), number(Reflect.field(status, "virtual_sdcard"), "progress"),
-      coordinates(report, "live_position"), number(report, "live_velocity"), number(report, "live_extruder_velocity"),
-      coordinates(toolhead, "position"),
-      {temperature: number(extruder, "temperature"), target: number(extruder, "target")},
-      {temperature: number(bed, "temperature"), target: number(bed, "target")}, text(stats, "message"));
+    var p = previous;
+    return new MoonrakerStatus(text(stats, "state", p == null ? "" : p.state), text(stats, "filename", p == null ? "" : p.filename),
+      number(Reflect.field(status, "virtual_sdcard"), "progress", p == null ? 0.0 : p.progress),
+      coordinates(report, "live_position", p == null ? null : p.position),
+      number(report, "live_velocity", p == null ? 0.0 : p.velocity), number(report, "live_extruder_velocity", p == null ? 0.0 : p.extruderVelocity),
+      coordinates(toolhead, "position", p == null ? null : p.queuedPosition),
+      {temperature: number(extruder, "temperature", p == null ? 0.0 : p.extruder.temperature), target: number(extruder, "target", p == null ? 0.0 : p.extruder.target)},
+      {temperature: number(bed, "temperature", p == null ? 0.0 : p.bed.temperature), target: number(bed, "target", p == null ? 0.0 : p.bed.target)},
+      text(stats, "message", p == null ? "" : p.message));
   }
 
   /** Reads a reply to `QUERY`; a malformed reply is refused. */
-  public static function parse(reply:Dynamic):MoonrakerStatus {
+  public static function parse(reply:Dynamic, ?previous:MoonrakerStatus):MoonrakerStatus {
     var result:Dynamic = Reflect.field(reply, "result");
     var status:Dynamic = result == null ? null : Reflect.field(result, "status");
     if (status == null) throw "Moonraker status reply has no result.status";
-    return fromObjects(status);
+    return fromObjects(status, previous);
   }
 }

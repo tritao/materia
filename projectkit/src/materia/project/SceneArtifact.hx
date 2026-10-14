@@ -1748,6 +1748,18 @@ class SceneArtifact {
 					heater.gainMinCelsius, heater.hysteresisCelsius, heater.hysteresisWindowSeconds, heater.heatCapacity, heater.power,
 					heater.loss, heater.fanLoss, heater.ambient])
 				if (!finite(value)) fail('heater "${heater.name}" has a value that is not a number');
+			// The board's own rules (`HeaterConfig::valid`, `Plant::valid`), so a job the device would refuse is refused when it is read.
+			for (value in [heater.r0Ohm, heater.beta, heater.pullupOhm, heater.vRef, heater.maxDuty, heater.bandCelsius, heater.pidRangeCelsius,
+					heater.gainMinCelsius, heater.hysteresisCelsius, heater.maxTemperature, heater.gainWindowSeconds,
+					heater.hysteresisWindowSeconds, heater.heatCapacity, heater.power, heater.loss])
+				if (!(value > 0.0)) fail('heater "${heater.name}" needs its thermistor, limits, windows and plant to be positive');
+			if (heater.kp < 0.0 || heater.ki < 0.0 || heater.kd < 0.0 || heater.fanLoss < 0.0)
+				fail('heater "${heater.name}" has a negative gain or fan loss');
+			if (heater.maxDuty > 1.0) fail('heater "${heater.name}" has a duty limit above 1');
+			if (!(heater.t0Celsius > -273.0)) fail('heater "${heater.name}" has a reference temperature below absolute zero');
+			if (!(heater.ambient > -50.0 && heater.ambient < 60.0)) fail('heater "${heater.name}" has a room temperature outside -50 to 60 C');
+			if (job.minExtrusionTemperature >= heater.maxTemperature && heater.feedsExtruder)
+				fail('heater "${heater.name}" cannot reach the minimum extrusion temperature of its material');
 		}
 	}
 

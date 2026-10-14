@@ -34,10 +34,22 @@ class PrinterLink {
 
   public function new() {}
 
-  /** The host and port of an endpoint, `host` or `host:port`. */
+  /**
+   * The host and port of an endpoint, `host` or `host:port`. An IPv6 literal is written in brackets with an optional port
+   * (`[fe80::1]:7125`), or bare when it has no port (`::1`); the host comes back without its brackets.
+   */
   public static function parse(endpoint:String):{host:String, port:Int} {
     var text = StringTools.trim(endpoint);
     if (text.length == 0) throw "The printer's address is empty";
+    if (text.charAt(0) == "[") {
+      var close = text.indexOf("]");
+      var rest = close < 0 ? "" : text.substr(close + 1);
+      if (close < 2 || (rest != "" && rest.charAt(0) != ":")) throw 'The printer address "$text" is not [ipv6] or [ipv6]:port';
+      var number = rest == "" ? DEFAULT_PORT : Std.parseInt(rest.substr(1));
+      if (number == null || number <= 0 || number > 65535) throw 'The printer address "$text" has no valid port';
+      return {host: text.substr(1, close - 1), port: number};
+    }
+    if (text.indexOf(":") != text.lastIndexOf(":")) return {host: text, port: DEFAULT_PORT};
     var colon = text.lastIndexOf(":");
     if (colon < 0) return {host: text, port: DEFAULT_PORT};
     var port = Std.parseInt(text.substr(colon + 1));

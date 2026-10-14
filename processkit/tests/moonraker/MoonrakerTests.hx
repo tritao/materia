@@ -176,6 +176,9 @@ class MoonrakerTests {
     check(fields.indexOf("live_position") >= 0, "and so does the subscription");
     var sparse = MoonrakerStatus.parse(Json.parse('{"result":{"status":{"print_stats":{"state":"standby"}}}}'));
     check(sparse.state == "standby" && sparse.position.join(",") == "0,0,0,0" && sparse.bed.target == 0.0, "what the machine leaves out reads as zero");
+    var kept = MoonrakerStatus.parse(Json.parse('{"result":{"status":{"print_stats":{"state":"paused"}}}}'), status);
+    check(kept.state == "paused" && kept.position.join(",") == "10.5,20,0.3,4.25" && kept.bed.target == 60 && kept.progress == 0.42 &&
+      kept.filename == "tab.gcode", "what a later reply leaves out keeps the last value, not zero");
     var refused = false;
     try MoonrakerStatus.parse(Json.parse('{"error":{"message":"no"}}')) catch (_:Dynamic) refused = true;
     check(refused, "a reply with no status is refused");
