@@ -617,6 +617,9 @@ nksim_result World::contacts(nksim_contact *out, std::uint32_t capacity,
         std::copy(value.normal.begin(), value.normal.end(), contact.normal);
         contact.distance = value.distance;
         contact.active = value.active ? 1u : 0u;
+        contact.wrench_valid = value.wrench_valid ? 1u : 0u;
+        std::copy(value.force_on_body_a.begin(), value.force_on_body_a.end(), contact.force_on_body_a);
+        std::copy(value.torque_on_body_a.begin(), value.torque_on_body_a.end(), contact.torque_on_body_a);
         out[i] = contact;
     }
     return NKSIM_OK;

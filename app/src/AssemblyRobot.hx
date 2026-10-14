@@ -447,9 +447,10 @@ class AssemblyRobot {
     // Each scanner scans from its mount connector.
     for (scanner in session.robotSensors) {
       if (control != null && converted.partLinks.get(scanner.mount.occurrence) == null) continue;
-      var sensor = converted.model.addSensor(new robotkit.model.Sensor(scanner.id, scanner.kind, scanner.updateRate, scanner.id));
-      sensor.rayCount = scanner.rayCount;
-      sensor.maxRange = scanner.maxRange;
+      var sensor = converted.model.addSensor(new robotkit.model.Sensor(scanner.id, scanner.kind,
+        scanner.updateRate == null ? 0.0 : cast scanner.updateRate, scanner.id));
+      if (scanner.rayCount != null) sensor.rayCount = cast scanner.rayCount;
+      if (scanner.maxRange != null) sensor.maxRange = cast scanner.maxRange;
       sensor.frame = mountFrame(scanner.id + " mount", scanner.mount);
     }
     if (control != null) for (wire in session.signals)

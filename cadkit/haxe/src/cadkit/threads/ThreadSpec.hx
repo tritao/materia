@@ -7,6 +7,8 @@ import materia.project.ThreadSpecData.ThreadProfile;
 
 /** Immutable nominal thread dimensions in millimetres; no helical B-rep is made. */
 class ThreadSpec {
+	/** ISO 724:2023 basic external minor-diameter reduction, in pitches. */
+	public static inline final METRIC_EXTERNAL_MINOR_DIAMETER_RATIO:Float = 1.226869;
 	public final designation:String;
 	public final majorDiameter:Float;
 	public final pitch:Float;
@@ -41,6 +43,12 @@ class ThreadSpec {
 	public static function fromData(data:ThreadSpecData):ThreadSpec
 		return new ThreadSpec(data.designation, data.majorDiameter, data.pitch, data.starts,
 			data.hand, data.internal, data.toleranceClass, data.profile);
+
+	/** Basic ISO metric external-thread minor diameter; tolerance allowances are not represented. */
+	public function externalMinorDiameter():Float {
+		if (internal || profile != Metric) throw "External minor diameter is defined here only for ISO metric external threads";
+		return majorDiameter - METRIC_EXTERNAL_MINOR_DIAMETER_RATIO * pitch;
+	}
 
 	function get_lead():Float return pitch * starts;
 

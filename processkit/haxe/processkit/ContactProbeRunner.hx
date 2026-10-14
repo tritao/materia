@@ -11,6 +11,9 @@ import robotkit.spatial.Vec3;
 import robotkit.core.StopMode;
 import robotkit.core.JointTarget;
 import robotkit.core.RobotCommand;
+import robotkit.manipulation.ClearanceChange;
+import robotkit.manipulation.ClearanceScene;
+import robotkit.manipulation.ClearanceViolation;
 import haxe.Int64;
 
 private enum ProbePhase { Idle; Approaching; HandoffCoarse; Coarse; Backoff; HandoffFine; Fine; HandoffBackoff; HandoffRetreat; Retreat; Done; Failed; }
@@ -24,18 +27,30 @@ class ContactProbeRequest {
   public final fineSpeed:Float;
   public final backoff:Float;
   public final contactOffset:Float;
+  /** Calibrated sensor-threshold error bound in metres. */
+  public var calibratedError(default, null):Float = 0.0;
   public final approachJoints:Null<Array<Float>>;
+  /** Exact tool collision-body prefix and CAD member allowed to touch during sensing. */
+  public final contactToolPrefix:Null<String>;
+  public final contactTarget:Null<String>;
 
   public function new(approach:Transform3, direction:Vec3, distance:Float, coarseSpeed:Float = 0.01,
-      fineSpeed:Float = 0.0005, backoff:Float = 0.002, contactOffset:Float = 0.0, ?approachJoints:Array<Float>) {
+      fineSpeed:Float = 0.0005, backoff:Float = 0.002, contactOffset:Float = 0.0, ?approachJoints:Array<Float>,
+      ?contactToolPrefix:String, ?contactTarget:String) {
     if (approach == null || direction == null || !Math.isFinite(direction.norm()) || direction.norm() < 1e-12 ||
         !Math.isFinite(distance) || !(distance > 0) || !Math.isFinite(coarseSpeed) || !(coarseSpeed > 0) ||
         !Math.isFinite(fineSpeed) || !(fineSpeed > 0) || fineSpeed > coarseSpeed || !Math.isFinite(backoff) ||
         !(backoff > contactOffset) || !Math.isFinite(contactOffset) || contactOffset < 0 || contactOffset > 0.002)
       throw "Contact probe needs a prepared pose, finite bounded search and calibrated refinement";
+    if ((contactToolPrefix == null) != (contactTarget == null) ||
+        contactToolPrefix != null && contactTarget != null &&
+        (contactToolPrefix.length == 0 || contactTarget.length == 0))
+      throw "Contact probe contact window needs both an exact tool prefix and CAD member";
     this.approach = approach; this.direction = direction.normalized(); this.distance = distance;
     this.coarseSpeed = coarseSpeed; this.fineSpeed = fineSpeed; this.backoff = backoff; this.contactOffset = contactOffset;
+    calibratedError = 0.0;
     this.approachJoints = approachJoints == null ? null : approachJoints.copy();
+    this.contactToolPrefix = contactToolPrefix; this.contactTarget = contactTarget;
   }
 
   /** Static clearance ends before the earliest possible calibrated touch; sensing owns the uncertain interval. */
@@ -48,13 +63,25 @@ class ContactProbeRequest {
     return travel;
   }
 
-  /** Bound sampling and feedback skew; a fine pass only needs to clear the coarse observation bound. */
-  public function withPrecision(error:Float, maxAgeSeconds:Float):ContactProbeRequest {
-    if (!Math.isFinite(error) || !(error > 0) || !Math.isFinite(maxAgeSeconds) || !(maxAgeSeconds > 0))
-      throw "Contact probe precision needs a positive error and feedback age bound";
-    var speed = Math.min(fineSpeed, error / (2 * maxAgeSeconds));
+  /** Keep calibrated sensor and acquisition-age uncertainty within the total observation budget. */
+  public function withPrecision(error:Float, calibratedError:Float, maxAgeSeconds:Float):ContactProbeRequest {
+    if (!Math.isFinite(error) || !(error > 0) || !Math.isFinite(calibratedError) || calibratedError < 0 ||
+        calibratedError >= error || !Math.isFinite(maxAgeSeconds) || !(maxAgeSeconds > 0))
+      throw "Contact probe precision needs a total error above its calibrated sensor bound and a positive age bound";
+    var speed = Math.min(fineSpeed, (error - calibratedError) / maxAgeSeconds);
     var retreat = Math.min(backoff, contactOffset + 2 * coarseSpeed * maxAgeSeconds + 2 * error);
-    return new ContactProbeRequest(approach, direction, distance, coarseSpeed, speed, retreat, contactOffset, approachJoints);
+    var result = new ContactProbeRequest(approach, direction, distance, coarseSpeed, speed, retreat, contactOffset,
+      approachJoints, contactToolPrefix, contactTarget);
+    result.calibratedError = calibratedError;
+    return result;
+  }
+
+  /** Attach the exact CAD surface selected from the registered contact geometry. */
+  public function withContactWindow(toolPrefix:String, target:String):ContactProbeRequest {
+    var result = new ContactProbeRequest(approach, direction, distance, coarseSpeed, fineSpeed, backoff,
+      contactOffset, approachJoints, toolPrefix, target);
+    result.calibratedError = calibratedError;
+    return result;
   }
 }
 
@@ -63,9 +90,12 @@ class ContactProbeRunner {
   public static inline var SEARCH_AGE_SECONDS:Float = 0.02;
   public final motion:ManipulatorMotion;
   public final planner:ProbeMotionPlanner;
-  public final channels:WelderChannels;
+  public final channels:Null<WelderChannels>;
   public final sensor:String;
+  public final sensorKind:String;
+  public final coordinateFrame:String;
   public var contact(default, null):Null<Vec3> = null;
+  public var contactMeasurement(default, null):Null<processkit.perception.ContactMeasurement> = null;
   public var failure(default, null):Null<String> = null;
   final makeServo:Void -> ServoSession;
   var phase:ProbePhase = Idle;
@@ -74,20 +104,35 @@ class ContactProbeRunner {
   var pendingContact:Null<Vec3> = null;
   var handoffAt:Int64 = Int64.ofInt(0);
   final mappings:Null<robotkit.time.ClockMappings>;
+  final clearanceScene:Null<ClearanceScene>;
+  final safeOutputs:Array<MotionOp>;
   var sourceClock:String = "";
   var approachGoal:Null<Array<Float>> = null;
+  var contactWindow:Null<{a:String, b:String}> = null;
 
-  public function new(motion:ManipulatorMotion, planner:ProbeMotionPlanner, channels:WelderChannels,
-      sensor:String, makeServo:Void -> ServoSession, ?mappings:robotkit.time.ClockMappings) {
-    if (motion == null || planner == null || motion.compiler != planner.compiler || channels == null ||
+  public function new(motion:ManipulatorMotion, planner:ProbeMotionPlanner, channels:Null<WelderChannels>,
+      sensor:String, makeServo:Void -> ServoSession, ?mappings:robotkit.time.ClockMappings,
+      sensorKind:String = processkit.tool.WeldSensor.KIND, coordinateFrame:String = "root", ?safeOutputs:Array<MotionOp>) {
+    if (motion == null || planner == null || motion.compiler != planner.compiler ||
         sensor == null || sensor.length == 0 || makeServo == null)
-      throw "Contact probe needs one motion owner, its checked planner, torch channels and a fresh servo factory";
-    for (name in [channels.arc, channels.wireSpeed, channels.voltage])
-      if (name == null || StringTools.trim(name).length == 0) throw "Contact probe needs three valid torch channels";
-    if (channels.arc == channels.wireSpeed || channels.arc == channels.voltage || channels.wireSpeed == channels.voltage)
-      throw "Contact probe torch channels must be distinct";
+      throw "Contact probe needs one motion owner, its checked planner, an identified sensor and a fresh servo factory";
+    if (sensorKind != processkit.tool.WeldSensor.KIND && sensorKind != "tool_contact")
+      throw "Contact probe needs welding feedback or a digital tool-contact sensor";
+    if (coordinateFrame == null || coordinateFrame.length == 0) throw "Contact probe needs a measured coordinate frame";
+    var selectedSafe = safeOutputs == null ? [] : safeOutputs.copy();
+    if (channels != null) {
+      for (name in [channels.arc, channels.wireSpeed, channels.voltage])
+        if (name == null || StringTools.trim(name).length == 0) throw "Contact probe needs three valid torch channels";
+      if (channels.arc == channels.wireSpeed || channels.arc == channels.voltage || channels.wireSpeed == channels.voltage)
+        throw "Contact probe torch channels must be distinct";
+      if (selectedSafe.length == 0) selectedSafe = [MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)),
+        MotionOp.SetOutput(channels.arc, EventValue.Digital(false))];
+    }
+    if (selectedSafe.length == 0) throw "Contact probe needs explicit safe process outputs";
     this.motion = motion; this.planner = planner; this.channels = channels; this.sensor = sensor; this.makeServo = makeServo;
-    this.mappings = mappings;
+    clearanceScene = planner.clearance != null && Std.isOfType(planner.clearance, ClearanceScene)
+      ? cast planner.clearance : null;
+    this.mappings = mappings; this.sensorKind = sensorKind; this.coordinateFrame = coordinateFrame; this.safeOutputs = selectedSafe;
   }
 
   public function running():Bool return phase != Idle && phase != Done && phase != Failed;
@@ -100,7 +145,7 @@ class ContactProbeRunner {
 
   public function start(request:ContactProbeRequest):Void {
     if (request == null || running() || motion.running) throw "Contact probe cannot start without an idle exclusive motion owner";
-    this.request = request; contact = null; failure = null;
+    this.request = request; contact = null; contactMeasurement = null; failure = null;
     try {
       sourceClock = motion.robot.snapshot().sourceClockId;
       motion.reset();
@@ -114,9 +159,7 @@ class ContactProbeRunner {
         throw "Probe sensing corridor leaves the executed IK branch";
       approachGoal = move.endJoints.copy();
       // These records precede every movement; stop policy also keeps them safe through servo ownership.
-      var ops:Array<MotionOp> = [MotionOp.SetOutput(channels.wireSpeed, EventValue.Analog(0.0)),
-        MotionOp.SetOutput(channels.arc, EventValue.Digital(false))];
-      motion.run(new MotionProgram(ops.concat(move.program.ops)));
+      motion.run(new MotionProgram(safeOutputs.concat(move.program.ops)));
       phase = Approaching;
     } catch (error:Dynamic) fail(Std.string(error));
   }
@@ -131,7 +174,9 @@ class ContactProbeRunner {
     }
     try {
       search = new ContactSearchRunner(servo, sensor, cast(request, ContactProbeRequest).direction, distance, checkedSpeed,
-        SEARCH_AGE_SECONDS, 0.002, cast(request, ContactProbeRequest).contactOffset, mappings);
+        SEARCH_AGE_SECONDS, 0.002, cast(request, ContactProbeRequest).contactOffset, mappings,
+        sensorKind, coordinateFrame, cast(request, ContactProbeRequest).calibratedError,
+        checkedSpeed * SEARCH_AGE_SECONDS);
     } catch (error:Dynamic) { servo.dispose(); throw error; }
   }
 
@@ -164,7 +209,7 @@ class ContactProbeRunner {
             switch phase {
               case Approaching: holdAndHandoff(HandoffCoarse);
               case Backoff: holdAndHandoff(HandoffFine);
-              case Retreat: phase = Done;
+              case Retreat: closeContactWindow(positions()); phase = Done;
               case _:
             }
           }
@@ -178,6 +223,7 @@ class ContactProbeRunner {
           var velocity = [for (index in indices) snapshot.velocities.get(index)];
           for (speed in velocity) if (Math.abs(speed) > 1e-5) return;
           if (planner.stoppingViolation(joints, velocity, SEARCH_AGE_SECONDS) != null) return;
+          if (phase == HandoffFine) closeContactWindow(joints);
           motion.reset();
           if (phase == HandoffCoarse) {
             beginSearch(requested.coarseSpeed, requested.distance);
@@ -193,12 +239,19 @@ class ContactProbeRunner {
           var joints = [for (index in indices) snapshot.positions.get(index)];
           var velocity = [for (index in indices) snapshot.velocities.get(index)];
           var hit = planner.stoppingViolation(joints, velocity, 0.02);
+          if (hit != null && contactWindow == null && openContactWindow(hit, joints))
+            hit = planner.stoppingViolation(joints, velocity, 0.02);
           if (hit != null)
-            throw 'Contact probe predicted braking motion is obstructed: ${hit.a} against ${hit.b}, clearance ${hit.distance} m (required ${hit.required} m); joints=${joints.join(",")}; velocity=${velocity.join(",")}';
+            throw 'Contact probe predicted braking motion is obstructed: ${hit.a} against ${hit.b}, clearance ${hit.distance} m (required ${hit.required} m); '
+              + 'contact target=${requested.contactTarget}, tool prefix=${requested.contactToolPrefix}, '
+              + 'open window=${contactWindow == null ? "none" : contactWindow.a + "/" + contactWindow.b}; '
+              + 'joints=${joints.join(",")}; velocity=${velocity.join(",")}';
           active.update();
           if (active.stopped) {
             if (!active.completed()) throw active.search.failure;
             var measured:Vec3 = cast active.search.contact;
+            contactMeasurement = active.search.measurement;
+            if (contactMeasurement == null) throw "Contact probe completed without its typed measurement record";
             releaseSearch();
             pendingContact = measured;
             // A stopped velocity target still owns the native joint. Change to a position hold and await its owner tick.
@@ -228,11 +281,39 @@ class ContactProbeRunner {
   }
 
   public function cancel():Void if (running()) fail("contact probe cancelled");
+
+  function openContactWindow(hit:ClearanceViolation, joints:Array<Float>):Bool {
+    var requested:ContactProbeRequest = cast request;
+    var prefix = requested.contactToolPrefix, target = requested.contactTarget;
+    if (prefix == null || target == null) return false;
+    function isTool(name:String):Bool return name == prefix || StringTools.startsWith(name, prefix + "/");
+    function isTarget(name:String):Bool return name == target || StringTools.startsWith(name, target + "/") ||
+      StringTools.startsWith(name, target + "#");
+    var tool = isTool(hit.a) ? hit.a : isTool(hit.b) ? hit.b : null;
+    var work = isTarget(hit.a) ? hit.a : isTarget(hit.b) ? hit.b : null;
+    if (tool == null || work == null) return false;
+    if (clearanceScene == null)
+      throw "Contact probe has a named CAD target but no mutable collision scene for its contact window";
+    clearanceScene.apply(ClearanceChange.OpenWindow(tool, work, null), joints);
+    contactWindow = {a: tool, b: work};
+    return true;
+  }
+
+  function closeContactWindow(joints:Array<Float>):Void {
+    var active = contactWindow;
+    if (active == null) return;
+    if (clearanceScene == null) throw "Contact probe lost the collision scene for its open contact window";
+    clearanceScene.apply(ClearanceChange.CloseWindow(active.a, active.b), joints);
+    contactWindow = null;
+  }
+
   function fail(reason:String):Void {
     var active = search;
     if (active != null) active.cancel();
     try motion.robot.stop(StopMode.Normal) catch (_:Dynamic) {}
     try motion.abort() catch (_:Dynamic) {}
-    releaseSearch(); contact = null; failure = '$phase: $reason'; phase = Failed;
+    var cleanup = "";
+    try closeContactWindow(positions()) catch (error:Dynamic) cleanup = '; contact-window cleanup failed: ${Std.string(error)}';
+    releaseSearch(); contact = null; failure = '$phase: $reason$cleanup'; phase = Failed;
   }
 }

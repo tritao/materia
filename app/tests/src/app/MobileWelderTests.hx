@@ -9,7 +9,7 @@ import robotkit.skill.SkillStatus;
 /** The CAD mobile welding carrier loads and moves unchanged on both native backends. */
 @:access(app.ApplicationSimulation)
 @:access(app.MissionPlayer)
-@:access(processkit.skill.FindWeldWork)
+@:access(processkit.skill.FindContactWork)
 @:access(processkit.ProbePosePlanner)
 @:access(processkit.ContactProbeRunner)
 @:access(processkit.perception.ContactRegistrationSequence)
@@ -185,7 +185,7 @@ class MobileWelderTests {
             worstTipError = Math.max(worstTipError, nearest);
           }
           if (mission.stepIndex == 1) {
-            var finding:processkit.skill.FindWeldWork = cast mission.runner.activeSkill();
+            var finding:processkit.skill.FindContactWork = cast mission.runner.activeSkill();
             var registration = finding == null ? null : finding.runner;
             if (registration != null) {
               var sequence = registration.sequence;
@@ -243,8 +243,11 @@ class MobileWelderTests {
           simulation.clear(); session.dispose();
           continue;
         }
-        var measuredWorld = mission.registeredWorkWorld.get(job.frame);
-        if (!injected || !mission.finished || measuredWorld == null) throw "Mobile contact registration did not complete";
+        var registration = mission.registeredWork.get(job.frame);
+        var measuredWorld:Null<robotkit.spatial.Transform3> = registration == null ? null : registration.world;
+        if (!injected || !mission.finished || measuredWorld == null || registration == null ||
+            registration.measurements.length != 6 || !registration.envelope.containsWorkFrame(registration.rootWork))
+          throw "Mobile contact registration did not retain its accepted pose, bounds and six typed observations";
         var base = physics.linkPose(mission.robotIndex, 0);
         var root = new robotkit.spatial.Transform3(robotkit.spatial.Vec3.fromArray(base.position), robotkit.spatial.Quat.fromArray(base.rotation));
         var live = mission.assemblyParts.get("project:" + job.frame).pose();
@@ -388,7 +391,7 @@ class MobileWelderTests {
         var stepStartedAt = simulation.activeSession().simulationTime(), stepDockTrips = 0;
         var reportedProbe = "";
         var registrationDebug = "";
-        var lastFinding:Null<processkit.skill.FindWeldWork> = null;
+        var lastFinding:Null<processkit.skill.FindContactWork> = null;
         var reportedEnergyPhase = "", reportedChargeMinute = -1;
         var reportedEnergyProgressAt = stepStartedAt;
         var worst = 0.0;
@@ -475,7 +478,7 @@ class MobileWelderTests {
             }
           }
           if (mission.stepIndex < authored.steps.length && authored.steps[mission.stepIndex].kind == "findWork") {
-            var finding:processkit.skill.FindWeldWork = cast mission.runner.activeSkill();
+            var finding:processkit.skill.FindContactWork = cast mission.runner.activeSkill();
             if (finding != null) lastFinding = finding;
             if (finding != null && finding.runner != null) {
               var active = finding.runner;

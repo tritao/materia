@@ -705,6 +705,43 @@ public:
         if (would_create_cycle(desc.body_a, desc.body_b))
             return NKSIM_ERROR_INVALID_STATE;
 
+        // A joint added between ticks may attach a moved free body to a live
+        // robot link. Rebase only that body's compiled rest transform from the
+        // parent rest frame and the two explicit joint frames. The separately
+        // retained initial body state still owns reset, and the live state is
+        // restored after recompilation.
+        auto &child = bodies.at(desc.body_b);
+        const auto &parent = bodies.at(desc.body_a);
+        const auto moved = [&] {
+            for (int axis = 0; axis < 3; ++axis)
+                if (std::abs(child.state.position[axis] - child.desc.position[axis]) > 1e-8) return true;
+            const auto state_rotation = normalize(Quat{child.state.rotation[0], child.state.rotation[1],
+                child.state.rotation[2], child.state.rotation[3]});
+            const auto rest_rotation = normalize(Quat{child.desc.rotation[0], child.desc.rotation[1],
+                child.desc.rotation[2], child.desc.rotation[3]});
+            double alignment = 0.0;
+            for (int axis = 0; axis < 4; ++axis) alignment += state_rotation[axis] * rest_rotation[axis];
+            return std::abs(alignment) < 1.0 - 1e-10;
+        }();
+        if (topology_update && parent_joint_id(desc.body_b) == 0 && moved) {
+            const auto parent_position = Vec3{parent.desc.position[0], parent.desc.position[1], parent.desc.position[2]};
+            const auto parent_rotation = normalize(Quat{parent.desc.rotation[0], parent.desc.rotation[1],
+                parent.desc.rotation[2], parent.desc.rotation[3]});
+            const auto frame_a = normalize(Quat{desc.rotation_a[0], desc.rotation_a[1],
+                desc.rotation_a[2], desc.rotation_a[3]});
+            const auto frame_b = normalize(Quat{desc.rotation_b[0], desc.rotation_b[1],
+                desc.rotation_b[2], desc.rotation_b[3]});
+            const auto world_joint_rotation = normalize(multiply(parent_rotation, frame_a));
+            const auto child_rest_rotation = normalize(multiply(world_joint_rotation, conjugate(frame_b)));
+            const auto world_joint_position = add(parent_position,
+                rotate(parent_rotation, Vec3{desc.anchor_a[0], desc.anchor_a[1], desc.anchor_a[2]}));
+            const auto child_offset = rotate(child_rest_rotation,
+                Vec3{desc.anchor_b[0], desc.anchor_b[1], desc.anchor_b[2]});
+            const auto child_rest_position = subtract(world_joint_position, child_offset);
+            child.desc.position = child_rest_position;
+            child.desc.rotation = child_rest_rotation;
+        }
+
         const auto id = next_joint++;
         JointRecord record;
         record.desc = desc;
@@ -1093,6 +1130,21 @@ public:
             std::copy_n(source.frame, 3, contact.normal.begin());
             contact.distance = source.dist;
             contact.active = source.efc_address >= 0;
+            if (contact.active) {
+                mjtNum local_wrench[6]{};
+                mjtNum world_force[3]{};
+                mjtNum world_torque[3]{};
+                mj_contactForce(model, data, i, local_wrench);
+                mju_mulMatTVec3(world_force, source.frame, local_wrench);
+                mju_mulMatTVec3(world_torque, source.frame, local_wrench + 3);
+                for (std::size_t axis = 0; axis < 3; ++axis) {
+                    // MuJoCo's contact wrench is applied negatively to geom 0
+                    // and positively to geom 1 (engine_core_smooth.c).
+                    contact.force_on_body_a[axis] = -world_force[axis];
+                    contact.torque_on_body_a[axis] = -world_torque[axis];
+                }
+                contact.wrench_valid = true;
+            }
             out.push_back(contact);
         }
         // MuJoCo does not create contacts between two bodies with no dynamic

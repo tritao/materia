@@ -1,0 +1,14 @@
+{
+	"version": 1,
+	"package": {"name": "machinekit-screwdriving-drawing-preview"},
+	"entry": "ThreadDrawingPreview",
+	"sources": ["ThreadPreview.hx", "ThreadDrawingPreview.hx"],
+	"sourceRoots": ["."],
+	"dependencies": {
+		"projectkit": {"path": "../../../projectkit"},
+		"cadkit": {"path": "../../../cadkit"},
+		"machinekit": {"path": "../.."}
+	},
+	"target": "host",
+	"outputDir": "build/drawing"
+}

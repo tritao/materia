@@ -48,9 +48,11 @@ class WeldProbePatterns {
 
   public static function stages(geometry:WeldProbeGeometry, count:Int, previousNormals:Array<Vector>,
       uncertainty:WeldProbeUncertainty, clearance:Float = 3, divisions:Int = 33,
-      ?possible:WeldProbeFace->Vector->WeldProbeRegionBounds->Bool, ?onlyFace:WeldProbeFace):Array<WeldProbeStage> {
+      ?possible:WeldProbeFace->Vector->WeldProbeRegionBounds->Bool, ?onlyFace:WeldProbeFace,
+      approachClearance:Float = 0):Array<WeldProbeStage> {
     if (geometry == null || uncertainty == null || previousNormals == null || count < 1 || count > 3 ||
-        previousNormals.length != 3 - count || !Math.isFinite(clearance) || !(clearance > 0))
+        previousNormals.length != 3 - count || !Math.isFinite(clearance) || !(clearance > 0) ||
+        !Math.isFinite(approachClearance) || approachClearance < 0)
       throw "Contact patterns need CAD geometry, uncertainty and a 3-2-1 sequence of independent normals";
     var normals = [for (normal in previousNormals) normal.normalized()];
     if (normals.length == 2 && normals[0].cross(normals[1]).length() < 1e-3)
@@ -64,10 +66,10 @@ class WeldProbePatterns {
       for (point in face.samples(divisions, clearance)) {
         var bounds = uncertainty.region(face, point);
         if (!face.containsRegion(point, bounds.halfU, bounds.halfV, clearance)) continue;
-        var approach = bounds.normalTravel + clearance;
+        var approach = bounds.normalTravel + clearance + approachClearance;
         if (!geometry.exposedRegion(face, point, bounds.halfU + approach * bounds.tiltU,
           bounds.halfV + approach * bounds.tiltV, approach, clearance)) continue;
-        candidates.push(point); travel = Math.max(travel, approach);
+        candidates.push(point); travel = Math.max(travel, bounds.normalTravel + clearance);
       }
       if (candidates.length < count) continue;
       var points:Array<Vector> = [];

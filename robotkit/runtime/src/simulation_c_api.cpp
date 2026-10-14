@@ -402,6 +402,103 @@ rk_result RK_CALL rk_simulation_get_link_body(rk_simulation simulation,uint32_t 
     return value?value->get_link_body(robot_index,link_index,*out_body):RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_bind_object_to_link(rk_simulation simulation,nksim_object object,
+                                                     uint32_t robot_index,uint32_t link_index) {
+    const auto value=resolve(simulation);
+    return value?value->bind_object_to_link(object,robot_index,link_index):RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_unbind_object(rk_simulation simulation,nksim_object object) {
+    const auto value=resolve(simulation);
+    return value?value->unbind_object(object):RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_create_object_slide_follower(rk_simulation simulation,
+    const rk_simulation_object_slide_desc *desc, nksim_joint *out_joint) {
+    if (!desc || !out_joint || desc->struct_size < sizeof(*desc)) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    try {
+        return value->create_object_slide_follower(*desc, *out_joint);
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RK_ERROR_BACKEND;
+    }
+}
+
+rk_result RK_CALL rk_simulation_create_object_fixed_follower(rk_simulation simulation,
+    uint32_t robot_index, uint32_t parent_link_index, nksim_body follower_body,
+    nksim_joint *out_joint) {
+    if (!out_joint) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    try {
+        return value->create_object_fixed_follower(robot_index, parent_link_index,
+            follower_body, *out_joint);
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RK_ERROR_BACKEND;
+    }
+}
+
+rk_result RK_CALL rk_simulation_create_robot_fixed_follower(rk_simulation simulation,
+    uint32_t parent_robot_index, uint32_t parent_link_index, uint32_t child_robot_index,
+    uint32_t child_root_link_index, nksim_joint *out_joint) {
+    if (!out_joint) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    try {
+        return value->create_robot_fixed_follower(parent_robot_index, parent_link_index,
+            child_robot_index, child_root_link_index, *out_joint);
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RK_ERROR_BACKEND;
+    }
+}
+
+rk_result RK_CALL rk_simulation_create_robot_body_fixed_follower(rk_simulation simulation,
+    nksim_body parent_body, uint32_t child_robot_index, uint32_t child_root_link_index,
+    nksim_joint *out_joint) {
+    if (!out_joint) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    try {
+        return value->create_robot_body_fixed_follower(parent_body, child_robot_index,
+            child_root_link_index, *out_joint);
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RK_ERROR_BACKEND;
+    }
+}
+
+rk_result RK_CALL rk_simulation_destroy_robot_joint(rk_simulation simulation, nksim_joint joint) {
+    const auto value = resolve(simulation);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    try {
+        return value->destroy_robot_joint(joint);
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RK_ERROR_BACKEND;
+    }
+}
+
+rk_result RK_CALL rk_simulation_destroy_object_joint(rk_simulation simulation, nksim_joint joint) {
+    const auto value = resolve(simulation);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    try {
+        return value->destroy_object_joint(joint);
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RK_ERROR_BACKEND;
+    }
+}
+
 rk_result RK_CALL rk_simulation_get_robot_contacts(rk_simulation simulation,
     rk_robot_runtime runtime, rk_robot_contact *out, uint32_t capacity,
     uint32_t *out_count) {

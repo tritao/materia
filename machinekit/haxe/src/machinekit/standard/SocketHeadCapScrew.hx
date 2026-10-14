@@ -116,8 +116,13 @@ class SocketHeadCapScrew extends MachineComponent implements ScrewFastener {
 		addConnector("head", Face, Solids.axial(0, 0, 0));
 		addConnector("tip", Face, Solids.axial(0, 0, -length));
 		var floor = driveFrame().z;
-		var pieces = [machinekit.component.CollisionHullFacet.cylinder(diameter/2,-length,0),
-			machinekit.component.CollisionHullFacet.cylinder(spec.headDiameter/2,0,floor)];
+		var plainStart = -length + threadLength;
+		// Teeth are semantic, not collision geometry. Use the standard thread-root
+		// envelope where a screw must enter its mating tap-drill bore.
+		var pieces = [machinekit.component.CollisionHullFacet.cylinder(thread.externalMinorDiameter()/2,-length,plainStart)];
+		if (plainStart < 0) pieces.push(machinekit.component.CollisionHullFacet.cylinder(diameter/2,plainStart,0));
+		pieces = pieces.concat([
+			machinekit.component.CollisionHullFacet.cylinder(spec.headDiameter/2,0,floor)]);
 		var part = geometry(Preview);
 		try pieces = pieces.concat(machinekit.component.CollisionHullFacet.fromExtrusion(part,floor,spec.headHeight).hulls)
 		catch (error:Dynamic) { part.close(); throw error; }

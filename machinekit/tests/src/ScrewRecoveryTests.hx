@@ -26,6 +26,7 @@ private class RecoveryMotion implements ScrewdrivingMotion {
 	var stopping = false;
 	public var stopWait = 0;
 	public var stopRequests = 0;
+	public var synchronizations = 0;
 	public function new() {}
 	public function move(target:Transform3, contact:Bool):Void {targets.push(target); contacts.push(contact); done = false; idle = false;}
 	public function update(dt:Float):Void {
@@ -34,9 +35,22 @@ private class RecoveryMotion implements ScrewdrivingMotion {
 	}
 	public function completed():Bool return done;
 	public function failure():Null<String> return problem;
+	public function synchronize():Void synchronizations++;
 	public function stop():Void {stopRequests++; stopping = true; done = false; idle = false;}
 	public function stopped():Bool return idle && problem == null;
 	public function abort():Void {done = false; idle = false;}
+}
+private class FailedEntrySearch implements ScrewEntrySearch {
+	public var problem:Null<String> = null;
+	var active = false;
+	public function new() {}
+	public function start():Void active = true;
+	public function update(screwHeld:Bool):Void {active = false; problem = screwHeld ? "registered spiral exhausted" : "screwdriver lost the held screw during force search";}
+	public function running():Bool return active;
+	public function isComplete():Bool return false;
+	public function failureReason():Null<String> return problem;
+	public function entryPose():Null<Transform3> return null;
+	public function cancel():Void active = false;
 }
 
 private class AttemptSkillFixture implements Skill {
@@ -99,6 +113,7 @@ class ScrewRecoveryTests {
 	}
 	public static function run():Void {
 		count = 0;
+		runEntrySearchFailure();
 		var motion = new RecoveryMotion(), outputs = new RecoveryOutputs(), runner = failed(motion,outputs);
 		var reject = new Transform3(new Vec3(0.4,0.1,0.3),Quat.identity());
 		check(runner.failure() != null && outputs.vacuumOn && !outputs.startOn,"Failed tightening retains its screw with spindle stopped");
@@ -156,6 +171,50 @@ class ScrewRecoveryTests {
 		Sys.println('Screw recovery: $count checks passed');
 		runRemainingBudget();
 	}
+	static function runEntrySearchFailure():Void {
+		var motion = new RecoveryMotion(), outputs = new RecoveryOutputs(), search = new FailedEntrySearch();
+		var request = plan(), runner = new ScrewdrivingRunner(motion, outputs, () -> true, (_) -> search);
+		runner.run(request);
+		var feedback = ScrewdriverSensor.idle(); feedback.strokeMm = request.strokeMm;
+		for (_ in 0...12) if (search.problem == null) {
+			feedback.vacuum = outputs.vacuumOn;
+			runner.update(0.01, feedback);
+		}
+		check(search.problem == "registered spiral exhausted" && runner.running() && outputs.vacuumOn &&
+			!outputs.startOn && runner.tighteningResult == null,
+			"A failed force search stops tightening while retaining its measured screw");
+		feedback.vacuum = true; runner.update(0.01, feedback);
+		var safe = ScrewPlan.along(request.entry, -request.approach);
+		var retreat = motion.targets[motion.targets.length - 1];
+		var result = runner.tighteningResult;
+		check(runner.failure() != null && runner.failure().indexOf("registered spiral exhausted") >= 0 &&
+			motion.synchronizations == 1 &&
+			retreat.translation.x == safe.translation.x && retreat.translation.z == safe.translation.z &&
+			!motion.contacts[motion.contacts.length - 1] && outputs.vacuumOn && !outputs.startOn && result != null &&
+			result.outcome == ScrewdriverContract.NO_START && result.diagnostic == "registered spiral exhausted",
+			"A stopped force-search failure retracts safely and records a diagnostic no-start result");
+		var reject = new Transform3(new Vec3(0.4,0.1,0.3),Quat.identity());
+		runner.recover(reject); feedback.angle = 0; feedback.speed = 0; runner.update(0.01, feedback);
+		var recoveryApproach = motion.targets[motion.targets.length-1];
+		check(!outputs.startOn && !outputs.reverseOn && outputs.vacuumOn &&
+			recoveryApproach.translation.x == safe.translation.x && recoveryApproach.translation.z == safe.translation.z,
+			"No-start recovery skips spindle reversal and returns to its safe approach");
+		runner.update(0.01, feedback);
+		check(motion.targets[motion.targets.length-1] == reject && outputs.vacuumOn,
+			"The held screw travels to the reject bin only after safe retraction");
+		runner.update(0.01, feedback);
+		check(!outputs.vacuumOn && !runner.recoveryCompleted(),"No-start recovery releases vacuum only at the reject bin");
+		feedback.vacuum = false; runner.update(0.01, feedback); runner.update(0.01, feedback);
+		var finalResult = runner.tighteningResult;
+		check(runner.recoveryCompleted() && !runner.completed() && finalResult != null &&
+			finalResult.outcome == ScrewdriverContract.NO_START && finalResult.diagnostic == "registered spiral exhausted",
+			"Recovered no-start remains an identified failed attempt and never reports a tightened screw");
+		var report = new FasteningRunReport(request.fastening);
+		report.record(0, "force-search-screw", cast(result)); report.recovered(); report.finish();
+		check(report.failed && report.attempts[0].disposition == Rejected &&
+			report.attempts[0].result.diagnostic == "registered spiral exhausted",
+			"Fastening accounting retains the force-search diagnostic and rejected screw identity");
+	}
 	static function runRemainingBudget():Void {
 		count = 0;
 		var created = 0, outputs = new RecoveryOutputs();
@@ -183,7 +242,8 @@ class ScrewRecoveryTests {
 	static function runSkippedFinal():Void {
 		count = 0;
 		var snug = new FasteningRunReport("recovery-probe",SnugPass);
-		var result = {fastening:"recovery-probe",torqueNm:1.0,angle:0.3,outcome:ScrewdriverContract.CROSS_THREAD};
+		var result:processkit.screwdriving.ScrewdrivingRunner.TighteningResult =
+			{fastening:"recovery-probe",torqueNm:1.0,angle:0.3,outcome:ScrewdriverContract.CROSS_THREAD,diagnostic:null};
 		snug.record(0,"original",result); snug.recovered();
 		snug.record(1,"reserve",result); snug.recovered(); snug.finish();
 		var finalPass = new processkit.skill.SkippedFinalFastening(snug);
@@ -223,7 +283,7 @@ class ScrewRecoveryTests {
 		check(!runner.running() && runner.failure() != null && motion.failure() == null && !motion.completed(),
 			"Confirmed rest finishes the lost-screw attempt without fabricating an arm fault or a completed program");
 		runner.recover(Transform3.identity()); runner.update(0.01,feedback);
-		var from = pickup ? requested.pickup : requested.entry;
+		var from = pickup ? requested.pickupPose() : requested.entry;
 		var retreat = motion.targets[motion.targets.length-1];
 		check(retreat.translation.x == from.translation.x && retreat.translation.z == from.translation.z-requested.approach &&
 			!motion.contacts[motion.contacts.length-1] && !outputs.reverseOn,

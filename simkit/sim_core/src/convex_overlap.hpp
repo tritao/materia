@@ -77,13 +77,24 @@ inline double ray_hull(const std::vector<std::array<double, 4>> &planes,
 // affine projections (at most fifteen) handles degenerate edges and faces
 // without choosing a special tetrahedron orientation or discarding a face.
 struct Simplex {
-    std::array<Point, 4> points{};
+    struct SupportPoint {
+        Point difference{};
+        Point first{};
+        Point second{};
+    };
+    std::array<SupportPoint, 4> points{};
     unsigned count = 0;
 };
 
-inline Point closest(Simplex &simplex) {
+struct ClosestWitness {
+    Point difference{};
+    Point first{};
+    Point second{};
+};
+
+inline ClosestWitness closest(Simplex &simplex) {
     double best = std::numeric_limits<double>::infinity();
-    Point nearest{};
+    ClosestWitness nearest{};
     Simplex retained;
     for (unsigned mask = 1; mask < (1u << simplex.count); ++mask) {
         std::array<unsigned, 4> indices{};
@@ -91,12 +102,12 @@ inline Point closest(Simplex &simplex) {
         for (unsigned i = 0; i < simplex.count; ++i)
             if (mask & (1u << i)) indices[count++] = i;
         const unsigned dimensions = count - 1;
-        const Point origin = simplex.points[indices[0]];
+        const Point origin = simplex.points[indices[0]].difference;
         Point edges[3]{};
         double matrix[3][4]{};
         double scale = 0.0;
         for (unsigned i = 0; i < dimensions; ++i)
-            edges[i] = subtract(simplex.points[indices[i + 1]], origin);
+            edges[i] = subtract(simplex.points[indices[i + 1]].difference, origin);
         for (unsigned i = 0; i < dimensions; ++i) {
             for (unsigned j = 0; j < dimensions; ++j) {
                 matrix[i][j] = dot(edges[i], edges[j]);
@@ -134,11 +145,15 @@ inline Point closest(Simplex &simplex) {
             total += weights[i];
         }
         if (outside) continue;
-        Point point{};
+        ClosestWitness point{};
         for (unsigned i = 0; i < count; ++i)
-            for (unsigned axis = 0; axis < 3; ++axis)
-                point[axis] += simplex.points[indices[i]][axis] * weights[i] / total;
-        const double squared = dot(point, point);
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                const double weight = weights[i] / total;
+                point.difference[axis] += simplex.points[indices[i]].difference[axis] * weight;
+                point.first[axis] += simplex.points[indices[i]].first[axis] * weight;
+                point.second[axis] += simplex.points[indices[i]].second[axis] * weight;
+            }
+        const double squared = dot(point.difference, point.difference);
         if (squared < best) {
             best = squared;
             nearest = point;
@@ -152,26 +167,43 @@ inline Point closest(Simplex &simplex) {
 }
 
 /** GJK against a support function for the Minkowski difference. A separating
- * plane proves absence; a simplex within one nanometre proves contact. Failure
- * to converge is explicit, never silently reported as absence. */
+ * plane proves absence; a simplex within two nanometres proves contact. This
+ * covers float-backed CAD vertices meeting at a shared boundary. Failure to
+ * converge is explicit, never silently reported as absence. */
 template<class Support>
-Overlap overlap(Support support) {
-    constexpr double tolerance = 1e-9;
+Overlap overlap_with_witness(Support support, Point &witness) {
+    constexpr double tolerance = 2e-9;
     Simplex simplex;
     simplex.points[simplex.count++] = support(Point{1.0, 0.0, 0.0});
-    Point nearest = simplex.points[0];
+    ClosestWitness nearest{simplex.points[0].difference, simplex.points[0].first,
+                          simplex.points[0].second};
     for (unsigned iteration = 0; iteration < 64; ++iteration) {
-        const double squared = dot(nearest, nearest);
-        if (squared <= tolerance * tolerance) return Overlap::intersecting;
-        const Point point = support(Point{-nearest[0], -nearest[1], -nearest[2]});
-        if (dot(nearest, point) > tolerance * std::sqrt(squared)) return Overlap::separated;
+        const double squared = dot(nearest.difference, nearest.difference);
+        if (squared <= tolerance * tolerance) {
+            for (unsigned axis = 0; axis < 3; ++axis)
+                witness[axis] = (nearest.first[axis] + nearest.second[axis]) * 0.5;
+            return Overlap::intersecting;
+        }
+        const Point point_direction{-nearest.difference[0], -nearest.difference[1], -nearest.difference[2]};
+        const auto point = support(point_direction);
+        if (dot(nearest.difference, point.difference) > tolerance * std::sqrt(squared))
+            return Overlap::separated;
         for (unsigned i = 0; i < simplex.count; ++i)
-            if (simplex.points[i] == point) return Overlap::unresolved;
+            if (simplex.points[i].difference == point.difference) return Overlap::unresolved;
         if (simplex.count >= 4) return Overlap::unresolved;
         simplex.points[simplex.count++] = point;
         nearest = closest(simplex);
     }
     return Overlap::unresolved;
+}
+
+template<class Support>
+Overlap overlap(Support support) {
+    Point witness{};
+    return overlap_with_witness([&](const Point &direction) {
+        const Point point = support(direction);
+        return Simplex::SupportPoint{point, point, Point{}};
+    }, witness);
 }
 
 } // namespace nksim::geometry

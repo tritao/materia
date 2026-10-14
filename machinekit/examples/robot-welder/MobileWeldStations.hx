@@ -1,5 +1,6 @@
 import robotkit.collision.CollisionSceneBuilder;
 import cadbridge.CellCollisionSnapshot;
+import haxe.Int64;
 import collisionkit.native.NativeCollisionWorld;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
@@ -29,6 +30,7 @@ import processkit.WeldScenePlan;
 import processkit.ProbeMotionPlanner;
 import processkit.ProbeWire;
 import processkit.ContactProbeRunner.ContactProbeRequest;
+import processkit.perception.ContactMeasurement;
 import machinekit.welding.WeldContactSelection;
 import machinekit.welding.WeldProbeGeometry;
 import machinekit.welding.WeldProbeGeometry.WeldProbeFace;
@@ -189,7 +191,8 @@ class MobileWeldStations {
       nominal: {x: work.translation.x, y: work.translation.y, z: work.translation.z,
         qx: work.rotation.x, qy: work.rotation.y, qz: work.rotation.z, qw: work.rotation.w},
       translation: [0.02, 0.02, 0.0], rotation: [0.0, 0.0, 2 * Math.PI / 180],
-      measurementError: 0.00001, contactOffset: processkit.tool.WeldArcModel.TOUCH_TOLERANCE, faces: probeFaces};
+      measurementError: 0.00001, calibratedError: 0.0,
+      contactOffset: processkit.tool.WeldArcModel.TOUCH_TOLERANCE, faces: probeFaces};
   }
 
   /** Prove a nominal 3-2-1 sequence with each selected checkpoint and the final ready return. */
@@ -242,7 +245,12 @@ class MobileWeldStations {
         if (!patch) throw "Nominal contact ray misses the selected target CAD patch";
         if (request.approachJoints == null) throw "CAD registration plan has no checked probe posture";
         registrationJoints = request.approachJoints.copy();
-        request = sequence.observe(measured);
+        // This is a geometric preflight, so label its nominal ray intersection as
+        // synthetic instead of passing an untyped point through the runtime API.
+        var timestamp = Int64.ofInt(contacts);
+        request = sequence.observeMeasurement(new ContactMeasurement("registration-preflight", "preflight/tool-tcp",
+          processkit.tool.WeldSensor.KIND, "robot/root", timestamp, timestamp, "nominal-preflight",
+          timestamp, Int64.ofInt(0), measured, contactWork().measurementError));
         if (request == null && sequence.stageTransitionPending) {
           request = sequence.selectNextStage();
           var nextStage = sequence.activeStage();

@@ -21,6 +21,14 @@ import robotkit.manipulation.KinematicGroup;
 import robotkit.model.LinkId;
 import robotkit.spatial.Transform3;
 
+private typedef ClearanceWindow = {
+  var aName:String;
+  var bName:String;
+  var a:Array<Int>;
+  var b:Array<Int>;
+  var margin:Null<Float>;
+}
+
 /**
  * Point and motion clearance against one CollisionDescription. Standalone
  * hull fixtures use the shared builder before entering this adapter.
@@ -51,8 +59,8 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   final objects:Array<Int> = [];
   var checkedPairs = 0;
   final poses:Array<Float> = [];
-  /** Open windows: their two hulls and margin (null: contact allowed). */
-  final windows:Array<{a:Int, b:Int, margin:Null<Float>}> = [];
+  /** Open windows name every piece on both CAD members and retain their exact pair policy. */
+  final windows:Array<ClearanceWindow> = [];
   var airMarginCache:Null<{wanted:Null<Float>, table:CollisionMargins}> = null;
   var contactMarginCache:Null<{wanted:Null<Float>, table:CollisionMargins}> = null;
 
@@ -194,22 +202,41 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
       case Detach(body):
         move(hull(body), arm.rootLink, q, [], true);
       case OpenWindow(a, b, margin):
-        var i = hull(a), j = hull(b);
-        for (window in windows) if (window.a == i || window.b == i || window.a == j || window.b == j)
+        if (a == b) throw 'Clearance window needs two different named bodies, got "$a"';
+        var first = objectsNamed(a), second = objectsNamed(b);
+        for (window in windows) if (overlaps(first, window.a) || overlaps(first, window.b) ||
+            overlaps(second, window.a) || overlaps(second, window.b))
           throw 'Clearance window $a / $b overlaps an open window';
         if (margin != null && !(margin >= 0.0)) throw 'Clearance window $a / $b needs a nonnegative margin';
-        windows.push({a: i, b: j, margin: margin});
+        windows.push({aName: a, bName: b, a: first, b: second, margin: margin});
         invalidateMarginCaches();
-        descriptionBuild().openContactWindow(i, j, margin);
+        descriptionBuild().openObjectWindow(first, second, margin);
       case CloseWindow(a, b):
-        var i = hull(a), j = hull(b);
         var found = -1;
-        for (k in 0...windows.length) if ((windows[k].a == i && windows[k].b == j) || (windows[k].a == j && windows[k].b == i)) found = k;
+        for (k in 0...windows.length) if ((windows[k].aName == a && windows[k].bName == b) ||
+            (windows[k].aName == b && windows[k].bName == a)) found = k;
         if (found < 0) throw 'No clearance window is open for $a / $b';
-        windows.splice(found, 1);
-        restoreRule(i, j);
+        var window = windows.splice(found, 1)[0];
+        descriptionBuild().closeObjectWindow(window.a, window.b);
         invalidateMarginCaches();
     }
+  }
+
+  function objectsNamed(name:String):Array<Int> {
+    var result:Array<Int> = [];
+    for (i in 0...data.objects.length) {
+      var object = data.objects[i];
+      if (object.name == name || object.member == name ||
+          StringTools.startsWith(object.name, name + "#") ||
+          (object.member != null && StringTools.startsWith(object.member, name + "#"))) result.push(i);
+    }
+    if (result.length == 0) throw 'Clearance world has no body "$name"';
+    return result;
+  }
+
+  static function overlaps(first:Array<Int>, second:Array<Int>):Bool {
+    for (index in first) if (second.indexOf(index) >= 0) return true;
+    return false;
   }
 
   function hull(name:String):Int {
@@ -218,8 +245,8 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   }
 
   function move(i:Int, link:LinkId, q:Array<Float>, contacts:Array<Int>, detached:Bool):Void {
-    for (window in windows) if (window.a == i || window.b == i)
-      throw "Close contact windows before transferring their body";
+    for (window in windows) for (index in window.a.concat(window.b))
+      if (data.objects[index].body == i) throw 'Close contact window ${window.aName} / ${window.bName} before transferring its body';
     var source = mapping;
     var carrier = source.model.bodyIndex(link);
     if (carrier < 0) throw 'Clearance attachment has unknown link "$link"';
@@ -240,10 +267,6 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
       detached || !arm.moves(link), detached ? -1 : carrier, contacts, detached ? data : null);
     bodyLinks[i] = link; moving[i] = !detached && arm.moves(link);
     invalidateMarginCaches();
-  }
-
-  function restoreRule(i:Int, j:Int):Void {
-    descriptionBuild().closeContactWindow(i, j);
   }
 
   /** Windows use only sparse object overrides; only the cached query tables change. */
@@ -401,6 +424,9 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   function margins(contact:Bool, wanted:Null<Float>):CollisionMargins {
     if (wanted != null && (!Math.isFinite(wanted) || wanted < 0))
       throw "Clearance margin must be finite and nonnegative";
+    // A window's margin is a pair override, which a tighter requested margin still lowers.
+    for (window in windows) if (window.margin != null)
+      descriptionBuild().openObjectWindow(window.a, window.b, wanted == null ? window.margin : Math.min(window.margin, wanted));
     var original = contact ? data.contactMargins : data.margins;
     if (windows.length == 0 && wanted == null) return original;
     var cached = contact ? contactMarginCache : airMarginCache;

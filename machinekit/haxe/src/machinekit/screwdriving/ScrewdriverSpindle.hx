@@ -15,11 +15,12 @@ class ScrewdriverSpindle extends MachineAssembly {
 		var carrier = new ScrewdriverCarrier(bit, maxTorque, maxSpeed, strokeMm, springRate);
 		capability = cast ScrewdriverFacet.of(carrier);
 		addComponent("body", new ScrewdriverHousing('Screwdriver motor gearbox ${machinekit.component.Dimension.format(maxTorque)}Nm-${machinekit.component.Dimension.format(maxSpeed)}radps', 120, 25, true));
-		addComponent("slide", new ScrewdriverHousing("Screwdriver feed slide", 25, 12));
+		// At full feed extension keep 1 mm beyond the arm planner's 5 mm tool clearance.
+		addComponent("slide", new ScrewdriverHousing("Screwdriver feed slide", strokeMm + 6, 12));
 		addComponent("carrier", carrier);
 		addComponent("bit", bit);
 		addMateOnAxis("feed", "prismatic", "body", "end", "slide", "mount", {x: 0, y: 1, z: 0}, 0,
-			{lower: -strokeMm, upper: 0, velocity: 100, effort: springRate * strokeMm});
+			{lower: -strokeMm, upper: 0, velocity: 100, effort: springRate * strokeMm, overtravel: 1.1});
 		addMateOnAxis("spindle", "continuous", "slide", "end", "carrier", "mount", {x: 0, y: 1, z: 0}, 0,
 			{lower: null, upper: null, velocity: maxSpeed, effort: maxTorque});
 		addMate("bit-mount", "fixed", "carrier", "bit", "bit", "mount");

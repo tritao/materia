@@ -196,6 +196,7 @@ class RobotWorldTests {
 
   public static function main():Void {
     assertions += SensorStreamTests.run();
+    assertions += ForceTorqueMeasurementTests.run();
     assertions += RobotAuthorizationTests.run();
     if (Sys.getEnv("ROBOTKIT_REGENERATE_FIXTURES") == "1") {
       var root = Sys.getCwd();

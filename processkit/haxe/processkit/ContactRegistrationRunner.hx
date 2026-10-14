@@ -75,7 +75,11 @@ class ContactRegistrationRunner {
       probe.update(dt);
       if (probe.failure != null) throw probe.failure;
       if (!probe.completed()) return;
-      var next = sequence.observe(cast probe.contact);
+      var measurement = probe.contactMeasurement;
+      if (measurement == null || measurement.sensorId != probe.sensor || measurement.sensorKind != probe.sensorKind ||
+          measurement.coordinateFrame != probe.coordinateFrame)
+        throw "Contact registration lost the identified, framed measurement from its selected probe sensor";
+      var next = sequence.observeMeasurement(measurement);
       if (next != null) {
         probe.start(next);
         if (probe.failure != null) throw probe.failure;

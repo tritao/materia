@@ -20,6 +20,8 @@ class SimulationSpace {
 	public static inline var MUJOCO:Int = 1;
 
 	public final session:SimSession;
+	/** Backend selected when this space was created; sensor contracts use it to reject unsupported observations. */
+	public final backend:Int;
 	final scene:Scene;
 	final releaseWorld:Void->Void;
 	final configureWorld:(Int, Int)->Void;
@@ -29,13 +31,14 @@ class SimulationSpace {
 	var disposed:Bool = false;
 
 	function new(scene:Scene, session:SimSession, releaseWorld:Void->Void,
-		configureWorld:(Int, Int)->Void, timestep:Float, substeps:Int, integrator:Int) {
+		configureWorld:(Int, Int)->Void, timestep:Float, substeps:Int, backend:Int, integrator:Int) {
 		this.scene = scene;
 		this.session = session;
 		this.releaseWorld = releaseWorld;
 		this.configureWorld = configureWorld;
 		this.timestep = timestep;
 		this.requiredSubsteps = substeps;
+		this.backend = backend;
 		this.integrator = integrator;
 	}
 
@@ -59,11 +62,11 @@ class SimulationSpace {
 			if (backend == MUJOCO) {
 				var world = MujocoSimWorld.create(scene, options);
 				return new SimulationSpace(scene, new SimSession(scene, world.nativeHandle()), world.dispose,
-					world.configureIntegration, timestep, physicsSubsteps, integrator);
+					world.configureIntegration, timestep, physicsSubsteps, backend, integrator);
 			}
 			var world = new SimWorld(scene, options);
 			return new SimulationSpace(scene, new SimSession(scene, world.nativeHandle()), world.dispose,
-					world.configureIntegration, timestep, physicsSubsteps, integrator);
+					world.configureIntegration, timestep, physicsSubsteps, backend, integrator);
 		} catch (error:Dynamic) {
 			scene.dispose();
 			throw error;

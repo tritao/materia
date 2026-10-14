@@ -53,7 +53,7 @@ class RobotRuntimeSensorBlueprint {
   public static function isExternalKind(kind:String):Bool
     return kind == "camera" || kind == "gnss_pose" ||
       kind == "digital_input" || kind == "presence_input" || kind == "zone_input" || kind == "trip_switch" ||
-      kind == "tool_contact" || kind == "tool_vacuum_kpa" || kind == "tool_weld" ||
+      kind == "tool_contact" || kind == "force_torque" || kind == "tool_vacuum_kpa" || kind == "tool_weld" ||
       kind == "tool_heater" || kind == robotkit.tool.ScrewdriverContract.SENSOR_KIND;
 
   /** True for sensors the native runtime samples itself. */

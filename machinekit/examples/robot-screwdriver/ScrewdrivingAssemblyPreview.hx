@@ -6,6 +6,10 @@ import machinekit.assembly.MachineAssembly;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyDefinitionFlattener;
 import cadkit.modeling.AssemblyState;
+import cadkit.modeling.Part;
+import cadkit.modeling.Location;
+import cadkit.modeling.Plane;
+import cadkit.modeling.Vector;
 import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactData;
 import materia.project.SceneScrewDefinition.SceneScrew;
@@ -25,10 +29,18 @@ typedef ScrewdrivingDesign = {
 
 /** Every flange fastening has its own supported supply and one physically separate replacement. */
 class ScrewdrivingAssemblyPreview {
-	public static function design(bowlFed:Bool = false, blowFed:Bool = false):ScrewdrivingDesign {
-		var cell = new ScrewdrivingCell(new machinekit.screwdriving.ScrewdriverBit(HexSocket(5),45,6,0.05),0,
-			machinekit.standard.DeepGrooveBearing.metric("6003"),bowlFed,blowFed);
-		var positions = [[250.0,-450.0],[180.0,-380.0],[250.0,-380.0],[110.0,-450.0],[110.0,-380.0],[320.0,-450.0],[320.0,-380.0]];
+	public static function design(bowlFed:Bool = false, blowFed:Bool = false, registered:Bool = false,
+		forceSearch:Bool = false):ScrewdrivingDesign {
+		var bitLength = forceSearch ? 85 : 45;
+		var cell = new ScrewdrivingCell(new machinekit.screwdriving.ScrewdriverBit(HexSocket(5),bitLength,6,0.05),0,
+			machinekit.standard.DeepGrooveBearing.metric("6003"),bowlFed,blowFed,registered ? 80 : 10,registered ? 80 : 15,
+			registered ? 300 : 180, -450, registered);
+		var positions = registered
+			? [[-300.0,-360.0],[-220.0,-360.0],[-140.0,-360.0],[-60.0,-360.0],[60.0,-360.0],[140.0,-360.0],[220.0,-360.0]]
+			: [[250.0,-450.0],[180.0,-380.0],[250.0,-380.0],[100.0,-450.0],[110.0,-380.0],[320.0,-450.0],[320.0,-380.0]];
+		var reservePositions = registered
+			? [positions[3],positions[4],positions[5],positions[6]]
+			: [[320.0,-520.0],[320.0,-450.0],[320.0,-380.0],[320.0,-340.0]];
 		var supplyNames = bowlFed || blowFed ? ["presenter","presenter","presenter","presenter"] : ["presenter","supply2","supply3","supply4"];
 		var spareNames = ["reserve1","reserve2","reserve3","reserve4"];
 		var additional = bowlFed || blowFed ? spareNames.copy() : supplyNames.slice(1).concat(spareNames);
@@ -45,10 +57,14 @@ class ScrewdrivingAssemblyPreview {
 		}
 		for (i in 0...additional.length) {
 			var name = additional[i];
-			cell.include(name,new ScrewPresenter(cell.presenter.screw),AssemblyFrames.translation(positions[i][0],positions[i][1],RobotArm.TABLE_TOP));
+			var reserve = spareNames.indexOf(name);
+			var position = reserve < 0 ? positions[i] : reservePositions[reserve];
+			cell.include(name,new ScrewPresenter(cell.presenter.screw),AssemblyFrames.translation(position[0],position[1],RobotArm.TABLE_TOP));
 			cell.exposePort(name+"Control",name+"/escapement","control");
 		}
-		cell.include("reject",new ScrewRejectBin(),AssemblyFrames.translation(-180,-450,RobotArm.TABLE_TOP));
+		// Keep the reject drop clear of reserve1, whose pickup nest occupies the
+		// normal cell's former -180 mm bin station.
+		cell.include("reject",new ScrewRejectBin(),AssemblyFrames.translation(-300,-450,RobotArm.TABLE_TOP));
 		var initial = cell.work.fastenings().require();
 		for (fastening in initial) {var qualification = cell.work.join(fastening.screw.member,null,{minimum:0.2,maximum:1.0});}
 		ScrewdrivingChecks.check(cell);
@@ -56,10 +72,13 @@ class ScrewdrivingAssemblyPreview {
 		var scene = AssemblyPreview.scene(cell,"screwdriving-assembly");
 		scene.assemblyState = ScrewdrivingPreview.state(cell,"screwdriving-assembly").record();
 		scene.robotTools = RobotScene.robotTools(cell.arm.tool,"arm/tool");
+		scene.robotSensors = RobotScene.robotSensors(cell,"");
 		var definition = scene.assemblyDefinition;
 		if (definition == null) throw "Whole screw cell lost its assembly";
 		var flat = AssemblyDefinitionFlattener.flatten(definition), state = new AssemblyState(flat,scene.assemblyState);
-		ScrewdrivingExecution.align(cell,state,"presenter/screw"); scene.assemblyState = state.record();
+		if (!registered && !bowlFed && !blowFed) for (name in spareNames)
+			Sys.println('Reserve diagnostic $name ${haxe.Json.stringify(state.worldPose(name+"/screw"))}');
+		ScrewdrivingExecution.align(cell,state,blowFed ? null : "presenter/screw"); scene.assemblyState = state.record();
 		var jobs:Array<SceneScrew> = [], staging:Array<ScrewdrivingExecution.ScrewStaging> = [];
 		for (index in 0...ordered.length) {
 			var fastening = ordered[index], supply = supplyNames[index], reserve = spareNames[index];
@@ -80,8 +99,9 @@ class ScrewdrivingAssemblyPreview {
 		return {cell:cell,scene:scene,state:state,found:found,jobs:jobs,staging:staging};
 	}
 
-	public static function scene(twoStage:Bool = false, bowlFed:Bool = false, blowFed:Bool = false):SceneArtifactData {
-		var design = design(bowlFed,blowFed), cell = design.cell, scene = design.scene, state = design.state;
+	public static function scene(twoStage:Bool = false, bowlFed:Bool = false, blowFed:Bool = false,
+		registered:Bool = false, forceSearch:Bool = false):SceneArtifactData {
+		var design = design(bowlFed,blowFed,registered,forceSearch), cell = design.cell, scene = design.scene, state = design.state;
 		var jobs = design.jobs, staging = design.staging, found = design.found;
 		var tools = [for (tool in scene.robotTools) if (tool.screwdriver != null) tool];
 		if (tools.length != 1) throw "Whole screw access lost its feed capability";
@@ -122,11 +142,33 @@ class ScrewdrivingAssemblyPreview {
 			}
 			scene.assemblyState = execution.record();
 		}
+		if (registered) {
+			var stagedDefinition = scene.assemblyDefinition;
+			if (stagedDefinition == null) throw "Registered screw cell lost its staged assembly";
+			var parked = new AssemblyState(AssemblyDefinitionFlattener.flatten(stagedDefinition),scene.assemblyState);
+			var ready = cell.readyPose();
+			for (index in 0...ready.length) parked.setJoint('arm/j${index+1}',ready[index]);
+			scene.assemblyState = parked.record();
+			var probeTools = [for (tool in scene.robotTools) if (tool.kind == "screwdriver") tool];
+			if (probeTools.length != 1 || scene.mission == null) throw "Registered screw cell needs its one mounted screwdriver and mission";
+			scene.mission.steps.insert(0, {kind: "findWork", at: probeTools[0].contact,
+				contactWork: contactWork(cell, state, scene)});
+		}
 		var controllers = scene.controllers;
 		if (controllers != null) {
 			var owners = [for (controller in controllers) if (controller.kind == "robot" && controller.joints.indexOf("arm/j1") >= 0) controller];
 			if (owners.length != 1) throw "Whole screw cell lost its arm controller";
 			scene.mission.controllerId = owners[0].id;
+		}
+		if (forceSearch) {
+			if (scene.robotTools == null || scene.robotSensors == null || scene.mission == null)
+				throw "Force-search example lost its screwdriver, sensors or mission";
+			var drivers = [for (tool in scene.robotTools) if (tool.kind == "screwdriver") tool];
+			if (drivers.length != 1) throw "Force-search example needs its unique screwdriver";
+			var contact = drivers[0].contact;
+			var sensorId = "arm/tool/force-torque";
+			scene.robotSensors.push({kind: "force_torque", id: sensorId, mount: contact});
+			scene.mission.screwEntrySearch = forceSearchProfile(sensorId);
 		}
 		return scene;
 	}
@@ -134,10 +176,84 @@ class ScrewdrivingAssemblyPreview {
 	public static function staged():Bytes return SceneArtifact.encode(scene(true));
 	public static function fed():Bytes return SceneArtifact.encode(scene(false,true));
 	public static function blown():Bytes return SceneArtifact.encode(scene(false,false,true));
+	public static function registered():Bytes return SceneArtifact.encode(scene(false,false,false,true));
+	public static function registeredForceSearch():Bytes return SceneArtifact.encode(scene(false,false,false,true,true));
+	public static function forceSearch():Bytes return SceneArtifact.encode(scene(false,false,false,false,true));
+
+	/** Simulation-only commissioning data for the force-search example, not a hardware safety recipe. */
+	static function forceSearchProfile(sensor:String):materia.project.SceneArtifact.SceneArtifactScrewEntrySearch {
+		var targetLoadN = 3.0;
+		var maximumLinearSpeed = 0.00015;
+		// Commission a 50 ms linear relaxation and a zero-load correction at half
+		// the linear speed cap. Small force errors must not flip a saturated servo.
+		var linearDamping = 2.0 * targetLoadN / maximumLinearSpeed;
+		var linearMass = linearDamping * 0.05;
+		// A 0.4 mm U preload supplies face contact; the runner first contracts toward the CAD axis,
+		// then sweeps outward around that axis if the inward pass does not find the entry. It holds
+		// measured axial compression while sweeping and advances only at a captured candidate.
+		// The 41 mm TCP bound covers the CAD entry pose and registered-region diagonal; relief retracts toward the origin.
+		// 12 initial turns cross the narrow M6 entry with at most 0.083 mm radial miss;
+		// bounded inward refinement and region fallback use at most 10 and 14 turns.
+		// An unvalidated M6 candidate probes its 1 mm lead within half of the 30 s progress bound.
+		// Reserve one bounded retract-and-reposition retry for stalled spiral tracking.
+		// The long-reach force-search variant clears the robot wrist above the flange housing.
+		return {sensor:sensor,maximumAgeSeconds:0.02,targetWrench:[0,0,-targetLoadN,0,0,0],
+			virtualMass:[linearMass,linearMass,linearMass,1,1,1],damping:[linearDamping,linearDamping,linearDamping,20,20,20],
+			maximumLinearSpeed:maximumLinearSpeed,maximumSearchAxialSpeed:0.000125,contactReliefMeters:0.005,
+			maximumAngularSpeed:0.000012,maximumStepSeconds:0.01,
+			maximumForceN:25,maximumTorqueNm:2,maximumTravelMeters:0.041,maximumTravelRadians:0.05,
+			maximumRunSeconds:3600,regionHalfUMeters:0.0021,regionHalfVMeters:0.0021,
+			contactSeedOffsetUMeters:0.0004,spiralRadiusMeters:0.0016,spiralTurns:12.0,spiralDurationSeconds:880,
+			spiralMaximumLateralSpeed:0.00014,spiralTrackingGainPerSecond:6,
+			minimumContactLoadN:targetLoadN,requiredLoadDropN:1,candidateProgressTimeoutSeconds:30.0,confirmationSamples:2};
+	}
+
+	/** The side stops move with the plate and provide exposed CAD reference faces. */
+	static function contactWork(cell:ScrewdrivingCell, state:AssemblyState, scene:SceneArtifactData):materia.project.SceneContactRegistration.SceneContactWork {
+		var frame = "work/plate";
+		var parts:Map<String,Part> = new Map();
+		parts.set(frame, cell.work.plate.geometry(machinekit.component.ComponentDetail.Envelope));
+		var inverse = AssemblyFrames.inverse(state.worldPose(frame));
+		for (name in ["fixtureLeft","fixtureRight"]) {
+			var matches = [for (item in cell.components()) if (item.id == name) item];
+			if (matches.length != 1) {
+				for (part in parts) part.close();
+				throw 'Touch registration needs one CAD reference stop named "$name"';
+			}
+			var relative = AssemblyFrames.compose(inverse,state.worldPose(name));
+			var x = AssemblyFrames.transformVector(relative,1,0,0), z = AssemblyFrames.transformVector(relative,0,0,1);
+			var local = matches[0].component.geometry(machinekit.component.ComponentDetail.Envelope);
+			var placed:Part;
+			try placed = local.placed(new Location(new Plane(new Vector(relative.x,relative.y,relative.z),
+				new Vector(x.x,x.y,x.z),new Vector(z.x,z.y,z.z)))) catch (error:Dynamic) {
+				local.close(); for (part in parts) part.close(); throw error;
+			}
+			local.close(); parts.set(name,placed);
+		}
+		var faces:Array<materia.project.SceneContactRegistration.SceneContactFace>;
+		try faces = machinekit.welding.WeldProbeGeometry.of(parts, ["work/plate","fixtureLeft","fixtureRight"]).contactFaces(scene.metresPerUnit)
+		catch (error:Dynamic) { for (part in parts) part.close(); throw error; }
+		for (part in parts) part.close();
+		var pose = state.worldPose(frame), scale = scene.metresPerUnit;
+		var measurementError = 0.00001;
+		return {frame: frame, nominal: {x: pose.x * scale, y: pose.y * scale, z: pose.z * scale,
+			qx: pose.qx, qy: pose.qy, qz: pose.qz, qw: pose.qw}, translation: [0.02, 0.02, measurementError],
+			rotation: [0, 0, 2 * Math.PI / 180], measurementError: measurementError, calibratedError: 0.0,
+			contactOffset: 0.0, faces: faces};
+	}
 }
 function main():Void {
 	var decoded = SceneArtifact.decode(ScrewdrivingAssemblyPreview.assembly());
 	if (decoded.mission == null || decoded.mission.steps.length != 4) throw "Whole screw mission lost its four fastenings";
+	var registered = SceneArtifact.decode(ScrewdrivingAssemblyPreview.registered());
+	if (registered.mission == null || registered.mission.steps.length != 5 || registered.mission.steps[0].kind != "findWork" ||
+		registered.mission.steps[0].contactWork == null || registered.robotSensors == null ||
+		[for (sensor in registered.robotSensors) if (sensor.kind == "tool_contact") sensor].length != 1)
+		throw "Touch-registration project lost its CAD references, typed sensor or four named fastenings";
+	var forceSearch = SceneArtifact.decode(ScrewdrivingAssemblyPreview.forceSearch());
+	if (forceSearch.mission == null || forceSearch.mission.screwEntrySearch == null || forceSearch.robotSensors == null ||
+		[for (sensor in forceSearch.robotSensors) if (sensor.id == "arm/tool/force-torque" && sensor.kind == "force_torque") sensor].length != 1)
+		throw "Force-search project lost its commissioned sensor profile or CAD fastenings";
 	ScrewdrivingAccessTests.run();
 	trace("Screwdriving assembly CAD mission passed");
 }

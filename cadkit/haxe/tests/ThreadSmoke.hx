@@ -25,6 +25,10 @@ class ThreadSmoke {
 	public static function main():Void run();
 	public static function run():Void {
 		var spec = new ThreadSpec("M6", 6, 1, 1, RightHand, true);
+		near(spec.mating().externalMinorDiameter(), 4.773131);
+		var internalRootRejected = false;
+		try spec.externalMinorDiameter() catch (_:Dynamic) internalRootRejected = true;
+		check(internalRootRejected, "only an external ISO metric thread has this basic minor-diameter envelope");
 		var top = new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z(), 1);
 		var d = new Document();
 		var plate = d.add(new BoxFeature(60, 40, 30));

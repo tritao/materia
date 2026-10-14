@@ -71,24 +71,35 @@ class CollisionBuild {
   /** A temporary contact window overrides object rules as well as body rules. */
   public function openContactWindow(first:Int, second:Int, ?margin:Float):Void {
     if (margin == null) world.setBodyRule(bodies[first], bodies[second], CollisionPairRule.Allow, CollisionPairStatus.ProcessContact);
-    for (a in 0...description.objects.length) if (description.objects[a].body == first)
-      for (b in 0...description.objects.length) if (description.objects[b].body == second) {
-        if (margin == null) world.setObjectRule(objects[a], objects[b], CollisionPairRule.Allow, CollisionPairStatus.ProcessContact);
-        else world.setObjectMargins(objects[a], objects[b], margin, margin);
-      }
+    openObjectWindow(objectsOfBody(first), objectsOfBody(second), margin);
   }
 
   /** Restore the live description's policy after a contact window closes. */
   public function closeContactWindow(first:Int, second:Int):Void {
     restoreBodyRule(first, second);
-    for (a in 0...description.objects.length) if (description.objects[a].body == first)
-      for (b in 0...description.objects.length) if (description.objects[b].body == second) {
-        var rule = description.objectRule(a, b);
-        world.setObjectRule(objects[a], objects[b], rule == null ? CollisionPairRule.Default : rule.rule,
-          rule == null ? CollisionPairStatus.Checked : rule.reason);
-        description.applyObjectMargins(world, objects, a, b);
-      }
+    closeObjectWindow(objectsOfBody(first), objectsOfBody(second));
   }
+
+  /** A window between two sets of described objects: contact allowed (no margin) or the margin between them. */
+  public function openObjectWindow(first:Array<Int>, second:Array<Int>, ?margin:Float):Void {
+    for (a in first) for (b in second) if (a != b) {
+      if (margin == null) world.setObjectRule(objects[a], objects[b], CollisionPairRule.Allow, CollisionPairStatus.ProcessContact);
+      else world.setObjectMargins(objects[a], objects[b], margin, margin);
+    }
+  }
+
+  /** Restore the described rules and margins between two sets of objects. */
+  public function closeObjectWindow(first:Array<Int>, second:Array<Int>):Void {
+    for (a in first) for (b in second) if (a != b) {
+      var rule = description.objectRule(a, b);
+      world.setObjectRule(objects[a], objects[b], rule == null ? CollisionPairRule.Default : rule.rule,
+        rule == null ? CollisionPairStatus.Checked : rule.reason);
+      description.applyObjectMargins(world, objects, a, b);
+    }
+  }
+
+  function objectsOfBody(body:Int):Array<Int>
+    return [for (i in 0...description.objects.length) if (description.objects[i].body == body) i];
 
   /** The described object a world object came from, or -1. */
   public function objectOf(worldObject:Int):Int return objects.indexOf(worldObject);

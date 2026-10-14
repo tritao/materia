@@ -76,6 +76,7 @@ class RobotRuntimeBlueprint {
     var owned = [for (_ in joints) false];
     for (joint in processModelJoints) {
       if (joint < 0 || joint >= joints.length) throw "Process model joint is outside the blueprint";
+      if (joints[joint].passive) throw 'Process model cannot command passive joint $joint';
       owned[joint] = true;
     }
     for (drive in cylinderDrives) {
@@ -392,7 +393,10 @@ class RobotRuntimeBlueprint {
       value.set_joint_servo(index, servo);
     }
     var processOwned = processJoints();
-    for (index in 0...processOwned.length) value.set_external_joint(index, (processOwned[index] || joints[index].passive) ? 1 : 0);
+    for (index in 0...processOwned.length) {
+      value.set_external_joint(index, (processOwned[index] || joints[index].passive) ? 1 : 0);
+      value.set_process_joint(index, processOwned[index] ? 1 : 0);
+    }
     if (links.length != linkCount) throw "RobotKit runtime blueprint is missing link physical properties";
     for (index in 0...links.length) value.set_links(index, links[index].nativeValue());
     return value;

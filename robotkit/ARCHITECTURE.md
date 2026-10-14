@@ -1082,9 +1082,23 @@ and `Vacuum` (enable/disable, observed holding state). `ToolRuntime` pairs
 one mounted `Tool` with any combination of these typed capabilities, so
 one end effector can grip and apply vacuum independently. `ChannelToolAdapter`
 maps digital process channels to gripper and vacuum commands. `ToolRuntimeSelection`
-routes events to one active configuration and applies each old channel's safe
-value when switching tools. Every command
-method takes the caller's `timestampNs` explicitly —
+routes events to one active configuration and initializes each selected
+configuration's declared outputs to their safe values. A named live process can
+lease the selected tool; its events go through `applyFor(owner, event)`,
+unowned events are rejected, and the selection cannot change until that process
+releases its lease. The outgoing lease can be released only after every
+declared output is at its configured safe value. Switching also applies the
+outgoing configuration's safe values before selecting the new one. Configurations with an
+automatic changer must share the same `ChangerLock` instance, and the next
+configuration is selected only when that lock reports engagement with the
+requested tool identity. `ChangerLock.observation()` returns measured tool ID,
+lock state, source clock and acquisition time.
+Physical adapters must reject unavailable or stale observations and must never
+echo the requested identity or last lock command as feedback; the in-memory
+implementation models dock attach/detach for simulation. Selection rejects a
+feedback clock mismatch, future observation, unlocked state or wrong tool ID.
+This is the runtime selection boundary, not the cell's dock-motion and recovery
+sequence. Every command method takes the caller's `timestampNs` explicitly —
 simulated implementations never read a wall clock, keeping planners
 deterministic. `Simulated*` classes implement each interface by recording
 every commanded state change, with its timestamp, into a `history` array

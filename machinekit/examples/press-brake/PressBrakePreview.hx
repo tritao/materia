@@ -51,7 +51,7 @@ class PressBrakePreview {
 		var extended = start + press.phaseSpeeds.extensionTime(0, travel);
 		var retract = extended + 0.2;
 		var returned = retract + press.phaseSpeeds.returnTime(press.stroke, 0);
-		return {durationSec: returned + 0.2, loop: true, events: [
+		return {durationSec: returned + 0.3, loop: true, events: [
 			{timeSec: 0, channel: "ramValve/coilA", value: false},
 			{timeSec: 0, channel: "ramValve/coilB", value: false},
 			{timeSec: start, channel: "ramValve/coilA", value: true},

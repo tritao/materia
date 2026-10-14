@@ -2141,10 +2141,105 @@ class ProjectSourceTests {
     Sys.println("Screwdriving whole assembly passed on both backends with cross-thread replacement recovery");
   }
 
+  /** Register a known displaced CAD fixture by screwdriver touch before its named screws run. */
+  static function checkScrewdriverTouchRegistration(root:String):Void {
+    var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.registered.project.json");
+    var backends = Sys.getEnv("PROJECT_SOURCE_DETERMINISTIC_ONLY") == "1"
+      ? [ApplicationSimulation.DETERMINISTIC] : [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC];
+    for (backend in backends) {
+      var generated = MateriaProjectRunner.loadProject(manifest), missionDefinition = generated.mission;
+      var definition = generated.assemblyDefinition, stateRecord = generated.assemblyState;
+      if (missionDefinition == null || missionDefinition.steps.length != 5 || definition == null || stateRecord == null)
+        throw "Touch-registration cell lost its probe step, four fastenings or assembly state";
+      var find = missionDefinition.steps[0], job = find.contactWork;
+      if (find.kind != "findWork" || job == null || job.frame != "work/plate")
+        throw "Touch-registration cell lost its named CAD work frame";
+      var tools = generated.robotTools;
+      if (tools == null || tools.length != 1 || tools[0].kind != "screwdriver") throw "Touch-registration cell lost its screwdriver";
+      var sensors = generated.robotSensors == null ? [] : [for (sensor in generated.robotSensors)
+        if (sensor.kind == "tool_contact" && sensor.mount.occurrence == tools[0].contact.occurrence &&
+          sensor.mount.connector == tools[0].contact.connector) sensor];
+      if (sensors.length != 1) throw "Touch-registration cell needs one digital sensor at its screwdriver TCP";
+
+      var flat = materia.assembly.AssemblyDefinitionFlattener.flatten(definition);
+      var original = new AssemblyState(flat,stateRecord), nominal = original.worldPose(job.frame);
+      var joints = flat.joints;
+      var released = ["work-mount", "fixtureLeft-mount", "fixtureRight-mount"];
+      if (joints == null || [for (id in released) if ([for (joint in joints) if (joint.id == id) joint].length == 1) id].length != released.length)
+        throw "Touch-registration test cannot release the fixture and side stops from their authored table mates";
+      flat.joints = [for (joint in joints) if (released.indexOf(joint.id) < 0) joint];
+      generated.assemblyDefinition = flat;
+      var displaced = new AssemblyState(flat);
+      for (coordinate in stateRecord.jointCoordinates) displaced.setJoint(coordinate.joint,coordinate.value);
+      for (pose in stateRecord.rootPoses) displaced.setRootPose(pose.occurrence,pose.pose);
+      var turn = robotkit.spatial.Quat.fromAxisAngle(new robotkit.spatial.Vec3(0,0,1),Math.PI/360);
+      var rotation = turn.multiply(new robotkit.spatial.Quat(nominal.qx,nominal.qy,nominal.qz,nominal.qw));
+      var roots = materia.assembly.AssemblyDefinitionCodec.rootOccurrences(flat);
+      var fixtureRoots = ["work/plate", "fixtureLeft", "fixtureRight"];
+      for (rootId in fixtureRoots) if (!roots.exists(rootId))
+        throw 'Touch-registration test cannot identify movable fixture root "$rootId"';
+      var movedFrame = {x:nominal.x-10,y:nominal.y+7,z:nominal.z,
+        qx:rotation.x,qy:rotation.y,qz:rotation.z,qw:rotation.w};
+      var delta = AssemblyFrames.compose(movedFrame,AssemblyFrames.inverse(nominal));
+      for (rootId in fixtureRoots) displaced.setRootPose(rootId,AssemblyFrames.compose(delta,original.worldPose(rootId)));
+      generated.assemblyState = displaced.record();
+      var knownPose = displaced.worldPose(job.frame), scale = generated.metresPerUnit;
+      var knownWork = new robotkit.spatial.Transform3(new robotkit.spatial.Vec3(
+        knownPose.x*scale,knownPose.y*scale,knownPose.z*scale),
+        new robotkit.spatial.Quat(knownPose.qx,knownPose.qy,knownPose.qz,knownPose.qw));
+
+      var session = new ProjectDocumentSession(null,false), simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.setBackend(backend);
+      try {
+        session.openGeneratedProject(generated,manifest);
+        check(simulation.rebuild(session.sensors,session.scene,session),
+          'Displaced touch-registration cell builds on backend $backend: ${simulation.error}');
+        var mission = simulation.missionPlayer(), clock = simulation.activeSession();
+        if (mission == null || clock == null) throw "Touch-registration cell has no live mission";
+        var touched = false;
+        while (!mission.finished && mission.failure == null && clock.simulationTime() < 900) {
+          simulation.step();
+          var snapshot = mission.robot.runtime.snapshot();
+          for (index in 0...snapshot.sensors.length) {
+            var frame = snapshot.sensors.get(index);
+            if (frame.sensorId == sensors[0].id && frame.kind == "tool_contact" && frame.values.length == 1 && frame.values.get(0) == 1.0)
+              touched = true;
+          }
+        }
+        var evidence = mission.registeredWork.get(job.frame);
+        check(mission.finished && mission.failure == null && mission.completed == 5 && touched && evidence != null,
+          'Touch registration and named fastening complete on backend $backend: ${mission.failure}, time ${clock.simulationTime()}');
+        if (evidence == null) throw "Touch-registration mission lost its accepted evidence";
+        check(evidence.measurements.length == 6 && evidence.envelope.containsWorkFrame(evidence.rootWork),
+          "Six typed observations and their remaining pose bounds authorize the measured work frame");
+        for (measurement in evidence.measurements) check(measurement.sensorId == sensors[0].id &&
+          measurement.sensorKind == "tool_contact" && measurement.coordinateFrame == mission.robot.rootLink &&
+          measurement.unit == "m" && measurement.sourceClockId != "unspecified" &&
+          measurement.uncertaintyMeters <= job.measurementError,
+          "Accepted screwdriver touch retains its identified, fresh metric source record");
+        check(evidence.world.translation.sub(knownWork.translation).norm() < 0.0005 &&
+          evidence.world.rotation.angularDistance(knownWork.rotation) < 0.002,
+          "Registration follows the known translated and rotated fixture without editing nominal CAD");
+        var firstJob = materia.project.SceneScrewInvocation.job(missionDefinition.steps[1].screw,missionDefinition.steps);
+        if (firstJob == null) throw "Touch-registration mission lost its first canonical fastening";
+        check(mission.screwRuns.length == 4 && mission.screwRuns[0].fastening == firstJob.fastening,
+          "The first physical screw report preserves its named CAD fastening identity");
+      } catch (error:Dynamic) { simulation.clear(); session.dispose(); throw error; }
+      simulation.clear(); session.dispose();
+      Sys.println('Screwdriver touch registration passed on backend $backend');
+    }
+  }
+
   /** Buffered supply deposits each identified screw; pickup and tightening remain physical. */
   static function checkScrewFeeder(root:String):Void {
     var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.feeder.project.json");
-    for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (jam in [false,true]) {
+    var backendFilter = Sys.getEnv("PROJECT_SOURCE_FEEDER_BACKEND");
+    var backends = backendFilter == "mujoco" ? [ApplicationSimulation.MUJOCO]
+      : backendFilter == "deterministic" ? [ApplicationSimulation.DETERMINISTIC]
+      : [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC];
+    var failureFilter = Sys.getEnv("PROJECT_SOURCE_FEEDER_FAILURE");
+    var failures = failureFilter == "normal" ? [false] : failureFilter == "jam" ? [true] : [false,true];
+    for (backend in backends) for (jam in failures) {
       Sys.println('Screw feeder CAD: begin backend $backend, jam $jam');
       var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.mission;
       if (definition == null || definition.screwFeeders == null || definition.screwFeeders.length != 1)
@@ -2166,7 +2261,12 @@ class ProjectSourceTests {
         var feeder = tools.screwFeeders[0];
         var injected = false, witnessed:Map<String,Bool> = [];
         while (!mission.finished && mission.failure == null && clock.simulationTime() < 600) {
-          simulation.step();
+          try simulation.step() catch (error:Dynamic) {
+            Sys.println('Screw feeder step failed: backend=$backend, jam=$jam, time=${clock.simulationTime()}, ' +
+              'step=${mission.stepIndex}, completed=${mission.completed}, deliveries=${feeder.model.deliveries}, ' +
+              'delivered=${feeder.model.delivered}: $error');
+            throw error;
+          }
           var delivered = feeder.model.delivered;
           var feedback = feeder.model.reading();
           if (delivered != null && feedback != null && feedback.present) witnessed.set(delivered,true);
@@ -2199,7 +2299,10 @@ class ProjectSourceTests {
     var work = portable.mission;
     check(work != null && work.screwFeeders != null && work.screwFeeders.length == 1 && work.screwFeeders[0].inventory.length == 4,
       "Portable fed flange retains one material path and all four inventory identities");
-    Sys.println("Screw feeder CAD passed on both backends with physical replenishment and jam diagnostics");
+    if (backendFilter == null && failureFilter == null)
+      Sys.println("Screw feeder CAD passed on both backends with physical replenishment and jam diagnostics");
+    else
+      Sys.println("Selected screw feeder CAD cases passed");
   }
 
   /** Air delivery reaches the actual tool socket; the arm never visits a remote pickup nest. */
@@ -2228,8 +2331,12 @@ class ProjectSourceTests {
         if (failure == "missing") feeder.model.setTransitLoss(true);
         if (failure == "blocked") feeder.model.setBlocked(true);
         if (failure == "nose-jam") feeder.model.setNoseJam(true);
-        var stopped = false, damaged = false, witnessed:Map<String,Bool> = [];
+        var stopped = false, damaged = false, witnessed:Map<String,Bool> = [], observedStep = -1;
         while (!mission.finished && mission.failure == null && clock.simulationTime() < 600) {
+          if (mission.stepIndex != observedStep) {
+            observedStep = mission.stepIndex;
+            Sys.println('Blow-feed transition $observedStep at ${clock.simulationTime()}');
+          }
           simulation.step();
           var reading = feeder.model.reading(), delivered = feeder.model.transport.delivered;
           if (reading != null && reading.present && delivered != null) witnessed.set(delivered,true);
@@ -2251,8 +2358,14 @@ class ProjectSourceTests {
             break;
           }
         }
+        var currentScrew = @:privateAccess mission.screwing;
+        var currentPhase = currentScrew == null ? "none" : Std.string(@:privateAccess currentScrew.phase);
+        var currentResult = currentScrew == null ? null : currentScrew.tighteningResult;
+        var screwDetail = currentResult == null ? "none" :
+          'outcome ${currentResult.outcome}, torque ${currentResult.torqueNm}, angle ${currentResult.angle}, cause ${currentScrew.failure()}';
         if (failure == "none") {
-          check(mission.finished && mission.failure == null && feeder.model.transport.deliveries == 4,'Blown flange tightens four delivered screws: ${mission.failure}');
+          check(mission.finished && mission.failure == null && feeder.model.transport.deliveries == 4,
+            'Blown flange tightens four delivered screws: ${mission.failure}, time ${clock.simulationTime()}, step ${mission.stepIndex}, phase ${currentPhase}, screw ${screwDetail}, deliveries ${feeder.model.transport.deliveries}, joints ${(@:privateAccess mission.robot).robot.description().joints.join(",")}, q ${(@:privateAccess mission.robot).runtime.snapshot().q.toArray()}');
           check(mission.screwResults.length == 4,"Blown flange records the unchanged qualified controller outcomes");
           for (result in mission.screwResults) check(result.outcome == robotkit.tool.ScrewdriverContract.OK && Math.abs(result.torqueNm-16.5) < 1e-8,"Blow feed preserves the published M6 tightening target");
           check([for (id in witnessed.keys()) id].length == 4,"Every actual received body is witnessed at the tool");
@@ -2277,6 +2390,458 @@ class ProjectSourceTests {
     var portable = materia.project.SceneArtifact.decode(MateriaProjectRunner.exportArtifact(manifest));
     check(portable.mission != null && portable.mission.blowFeeds != null && portable.mission.blowFeeds.length == 1,"Portable CAD retains the receiving path");
     Sys.println("Blow-feed CAD passed on both backends with measured receipt, faults and explicit stop recovery");
+  }
+
+  /** MuJoCo contact wrenches must drive the first named CAD fastening into an offset hole. */
+  static function checkScrewEntrySearch(root:String):Void {
+    var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.force-search.project.json");
+    var registrationManifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.registered-force-search.project.json");
+    var forceCase = Sys.getEnv("PROJECT_SOURCE_FORCE_CASE");
+    var offsets = forceCase == "nominal" ? [0.0] : forceCase == "offset" ? [0.001] : [0.0,0.001];
+    for (offsetMeters in offsets) {
+      Sys.println('Force-search CAD: begin lateral offset ${offsetMeters*1000} mm');
+      var forceProject = MateriaProjectRunner.loadProject(manifest), forceMission = forceProject.mission;
+      var generated = MateriaProjectRunner.loadProject(registrationManifest), missionDefinition = generated.mission;
+      var definition = generated.assemblyDefinition, stateRecord = generated.assemblyState;
+      if (missionDefinition == null || missionDefinition.steps.length != 5 || missionDefinition.steps[0].kind != "findWork" ||
+          missionDefinition.steps[0].contactWork == null || forceMission == null || forceMission.screwEntrySearch == null ||
+          definition == null || stateRecord == null)
+        throw "Force-search cell lost its profile, registration step, four named fastenings or CAD assembly";
+      var carrierOccurrences = [for (occurrence in definition.occurrences)
+        if (occurrence.id == "arm/tool/driver/carrier") occurrence];
+      if (carrierOccurrences.length != 1) throw "Registered force-search cell lost its screwdriver carrier";
+      var carrierDefinition = [for (component in definition.definitions)
+        if (component.id == carrierOccurrences[0].definition) component];
+      var carrierTcp = carrierDefinition.length != 1 ? [] : [for (connector in carrierDefinition[0].connectors)
+        if (connector.name == "tcp") connector];
+      if (carrierTcp.length != 1 || Math.abs(carrierTcp[0].frame.z - 100) > 1e-8)
+        throw "Registered force-search screwdriver nose reach is " +
+          (carrierTcp.length == 1 ? Std.string(carrierTcp[0].frame.z) : "missing") +
+          " mm; expected 100 mm to clear the robot wrist";
+      missionDefinition.steps = [missionDefinition.steps[0], missionDefinition.steps[1]];
+      var candidateProfile = forceMission.screwEntrySearch;
+      if (candidateProfile == null) throw "Force-search project lost its commissioned search profile";
+      var profile:materia.project.SceneArtifact.SceneArtifactScrewEntrySearch = cast candidateProfile;
+      Sys.println('Force-search commissioned run bound: ${profile.maximumRunSeconds} s');
+      missionDefinition.screwEntrySearch = profile;
+      var forceSensors = forceProject.robotSensors == null ? [] : [for (sensor in forceProject.robotSensors)
+        if (sensor.id == profile.sensor && sensor.kind == "force_torque") sensor];
+      if (forceSensors.length != 1) throw "Force-search cell lost its unique mounted force/torque sensor";
+      if (generated.robotSensors == null) throw "Registered force-search cell lost its robot sensor declarations";
+      var registeredForceSensors = [for (sensor in generated.robotSensors)
+        if (sensor.id == profile.sensor && sensor.kind == "force_torque") sensor];
+      if (registeredForceSensors.length == 0) generated.robotSensors.push(forceSensors[0]);
+      else if (registeredForceSensors.length != 1)
+        throw 'Registered force-search cell has ${registeredForceSensors.length} copies of sensor "${profile.sensor}"';
+
+      var session = new ProjectDocumentSession(null,false), simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.setBackend(ApplicationSimulation.MUJOCO);
+      try {
+        session.openGeneratedProject(generated,registrationManifest);
+        check(simulation.rebuild(session.sensors,session.scene,session),
+          'Registered force-search CAD builds with touch and wrench observers: ${simulation.error}');
+        var mission = simulation.missionPlayer(), clock = simulation.activeSession();
+        if (mission == null || clock == null) throw "Force-search cell lost its live mission or session";
+        var shifted = offsetMeters == 0.0, searchPrepared = false, sawCompression = false, sawEntry = false;
+        var maximumSearchForce = 0.0;
+        var runnerForceBound = 0.0, runnerSearchFailure = "none", runnerSearchComplete = false;
+        var runnerFailureContacts = "not captured";
+        var runnerFailureWrench = "not captured";
+        var runnerFailureMotion = "not captured";
+        var observedSearch:Null<processkit.ContactAdmittanceRunner> = null;
+        var firstEntry:Null<robotkit.spatial.Transform3> = null, firstSearchStart:Null<robotkit.spatial.Transform3> = null;
+        var searchU:Null<robotkit.spatial.Vec3> = null, searchV:Null<robotkit.spatial.Vec3> = null;
+        var confirmedEntryDepth:Null<Float> = null, expectedEntryDepth:Null<Float> = null, entryDepthTolerance = 0.0;
+        var expectedHoleOffsetWorld:Null<robotkit.spatial.Vec3> = null;
+        var maximumObservedLateral = 0.0;
+        var firstCandidateTrace = "none";
+        var firstCandidateMaximumDepth = 0.0;
+        var candidateCaptureCount = 0, candidateRecoveryCount = 0;
+        var previousCandidateActive = false, previousCandidateRelief = false;
+        var forceSearchStartedAt:Null<Float> = null;
+        var forceSearchCompletedAt:Null<Float> = null;
+        var nextForceSearchDiagnosticAt = 300.0;
+        while (!mission.finished && mission.failure == null &&
+          (forceSearchStartedAt == null ? clock.simulationTime() < profile.maximumRunSeconds :
+            forceSearchCompletedAt == null ? clock.simulationTime() < cast(forceSearchStartedAt, Float) + profile.maximumRunSeconds :
+              clock.simulationTime() < cast(forceSearchCompletedAt, Float) + 600.0)) {
+          var registration = @:privateAccess mission.registeredWork.get("work/plate");
+          if (!searchPrepared && registration != null) {
+            var searchWorld = registration.world;
+            if (offsetMeters > 0) {
+              var workU = registration.world.transformVector(new robotkit.spatial.Vec3(1,0,0)).normalized();
+              expectedHoleOffsetWorld = workU.scale(-offsetMeters);
+              searchWorld = new robotkit.spatial.Transform3(
+                registration.world.translation.add(workU.scale(offsetMeters)), registration.world.rotation);
+              shifted = true;
+            }
+            // Preserve the saved uncertainty budget for spiral planning after
+            // registration; the offset case injects a residual inside that bound.
+            var searchEnvelope = new processkit.perception.ContactPoseEnvelope(
+              registration.envelope.nominalWork, registration.envelope.translationBound,
+              registration.envelope.rotationBound, registration.envelope.measurementError);
+            @:privateAccess mission.registeredWork.set("work/plate", {world:searchWorld,
+              rootWork:registration.rootWork, envelope:searchEnvelope, measurements:registration.measurements});
+            searchPrepared = true;
+          }
+          try simulation.step() catch (error:Dynamic) {
+            var tools = @:privateAccess simulation.tools;
+            if (tools != null && tools.screwdrivers.length == 1) {
+              var driver = tools.screwdrivers[0], supply = driver.supply;
+              var selected = @:privateAccess driver.selected;
+              var attached = @:privateAccess driver.physicalThreadObject;
+              var controls = supply == null ? null : supply.controls();
+              var names = ["work/flange/screw1","work/flange/screw2","work/flange/screw3","work/flange/screw4"];
+              var attachedName = "none", selectedName = "none";
+              for (name in names) {
+                var object = simulation.environmentObject("project:"+name);
+                if (object != null && object == attached) attachedName = name;
+                if (object != null && selected != null && object == selected.screw) selectedName = name;
+              }
+              Sys.println('Force-search observer failure step=${mission.stepIndex} time=${clock.simulationTime()} ' +
+                'active=${mission.screwing == null ? "none" : Std.string(@:privateAccess mission.screwing.phase)} ' +
+                'slot=${controls == null ? -1 : controls.program} vacuum=${controls == null ? false : controls.vacuum} ' +
+                'selected=$selectedName attached=$attachedName attachedFlag=${driver.physicalThreadAttached()} error=$error');
+              var live:robotkit.runtime.Simulation = @:privateAccess simulation.simulation;
+              var runtimes:Array<robotkit.runtime.RobotRuntime> = @:privateAccess live.robots;
+              if (runtimes.length > 0) {
+                var missionRobot:AssemblyRobot = @:privateAccess mission.robot;
+                for (contact in live.robotContacts(runtimes[0])) if (contact.active) {
+                  var otherParts = [for (part in missionRobot.parts) if (part.linkIndex == contact.otherLink) part.id];
+                  Sys.println('Force-search contact link=${contact.linkIndex} toolPiece=${contact.toolPieceIndex} ' +
+                    'otherKind=${contact.otherKind} otherRobot=${contact.otherRobot} otherLink=${contact.otherLink} ' +
+                    'object=${contact.otherObject} otherPiece=${contact.otherPieceIndex} otherParts=${otherParts.join(",")} ' +
+                    'distance=${contact.distance} position=${contact.position.x},${contact.position.y},${contact.position.z} ' +
+                    'force=${contact.force.x},${contact.force.y},${contact.force.z}');
+                }
+              }
+            }
+            throw error;
+          }
+          var active = @:privateAccess mission.screwing;
+          if (active != null && mission.stepIndex == 1) {
+            var candidate:Null<processkit.screwdriving.ScrewEntrySearch> = @:privateAccess active.entrySearch;
+            if (candidate != null && Std.isOfType(candidate,processkit.ContactAdmittanceRunner)) {
+              var search:processkit.ContactAdmittanceRunner = cast candidate;
+              if (forceSearchStartedAt == null) {
+                forceSearchStartedAt = clock.simulationTime();
+                nextForceSearchDiagnosticAt = forceSearchStartedAt + 300.0;
+              }
+              if (search.complete && forceSearchCompletedAt == null) forceSearchCompletedAt = clock.simulationTime();
+              var searchInitial:Null<robotkit.spatial.Transform3> = @:privateAccess search.initialTcp;
+              if (searchInitial != null) {
+                observedSearch = search;
+                expectedEntryDepth = search.expectedEntryDepthMeters;
+                entryDepthTolerance = search.entryDepthToleranceMeters;
+                var snapshot = search.servo.robot.snapshot();
+                var joints = [for (index in search.servo.manipulator.jointIndices()) snapshot.positions.get(index)];
+                var tcp = search.servo.manipulator.tcpPose(joints);
+                var origin = searchInitial;
+                var delta = tcp.translation.sub(origin.translation);
+                var jointVelocity = [for (index in search.servo.manipulator.jointIndices()) snapshot.velocities.get(index)];
+                var servoVelocity:Array<Float> = @:privateAccess search.servo.commanded;
+                var requestedTwist:Array<Float> = @:privateAccess search.servo.twist;
+                var localVelocity:Array<Float> = @:privateAccess search.controller.velocity;
+                var lastCommanded:Null<motionkit.kinematics.Twist6> = @:privateAccess search.lastCommanded;
+                var lastServoVelocity:Array<Float> = @:privateAccess search.lastServoVelocity;
+                var displacement = tcp.translation.sub(searchInitial.translation);
+                if (clock.simulationTime() >= nextForceSearchDiagnosticAt) {
+                  var measuredForce = search.lastMeasurement == null ? 0.0 : search.lastMeasurement.wrench.force.norm();
+                  Sys.println('Force-search progress time=${clock.simulationTime()} depth=' +
+                    '${displacement.dot(search.entry.loadAxis.scale(-1))} force=$measuredForce N ' +
+                    'peak=${search.peakForceN} N spiral=${@:privateAccess search.spiralElapsedSeconds} ' +
+                    'candidate=${@:privateAccess search.candidateHoleOffset} ' +
+                    'catchup=${@:privateAccess search.spiralCatchupElapsedSeconds} ' +
+                    'catchupRecoveries=${@:privateAccess search.spiralCatchupRecoveryCount}');
+                  nextForceSearchDiagnosticAt = clock.simulationTime() + 300.0;
+                }
+                var expectedOffset = expectedHoleOffsetWorld;
+                var actualU = displacement.dot(search.spiral.axisU), actualV = displacement.dot(search.spiral.axisV);
+                var expectedU = expectedOffset == null ? 0.0 : expectedOffset.dot(search.spiral.axisU);
+                var expectedV = expectedOffset == null ? 0.0 : expectedOffset.dot(search.spiral.axisV);
+                var cadEntryDelta = search.expectedEntry.translation.sub(searchInitial.translation);
+                var cadEntryU = cadEntryDelta.dot(search.spiral.axisU), cadEntryV = cadEntryDelta.dot(search.spiral.axisV);
+                maximumObservedLateral = Math.max(maximumObservedLateral,
+                  Math.sqrt(actualU*actualU+actualV*actualV));
+                var candidateOffset:Null<robotkit.spatial.Vec3> = @:privateAccess search.candidateHoleOffset;
+                if (candidateOffset != null && !previousCandidateActive) candidateCaptureCount++;
+                previousCandidateActive = candidateOffset != null;
+                var candidateReliefActive:Bool = @:privateAccess search.candidateReliefActive;
+                if (candidateReliefActive && !previousCandidateRelief) candidateRecoveryCount++;
+                previousCandidateRelief = candidateReliefActive;
+                if (candidateOffset != null) {
+                  var candidateDepth:Float = @:privateAccess search.candidateMaximumDepth;
+                  firstCandidateMaximumDepth = Math.max(firstCandidateMaximumDepth,candidateDepth);
+                  if (firstCandidateTrace == "none") {
+                    var measurement = search.lastMeasurement;
+                    var requested = lastCommanded == null ? "missing" : lastCommanded.toArray().join(",");
+                    firstCandidateTrace = 'offset=${candidateOffset.x},${candidateOffset.y},${candidateOffset.z} ' +
+                      'tcpU=${actualU} tcpV=${actualV} depth=${candidateDepth} ' +
+                      'start=${@:privateAccess search.candidateStartDepth} ' +
+                      'elapsed=${@:privateAccess search.candidateElapsedSeconds} ' +
+                      'drop=${@:privateAccess search.entry.confirmedLoadDrop} ' +
+                      'baselineLoad=${@:privateAccess search.entry.baselineLoadN} ' +
+                      'axialLoad=${@:privateAccess search.entry.lastLoadN} ' +
+                      'sensor=${measurement == null ? "missing" : measurement.wrench.force.toArray().join(",")} ' +
+                      'requested=${requested}';
+                  }
+                }
+                runnerFailureMotion = 'start=${searchInitial.translation.x},${searchInitial.translation.y},${searchInitial.translation.z} ' +
+                  'tcp=${tcp.translation.x},${tcp.translation.y},${tcp.translation.z} ' +
+                  'delta=${displacement.x},${displacement.y},${displacement.z} q=${joints.join(",")} ' +
+                  'qd=${jointVelocity.join(",")} servoQd=${servoVelocity.join(",")} ' +
+                  'requestedTwist=${requestedTwist.join(",")} controllerVelocity=${localVelocity.join(",")} ' +
+                  'lastRequested=${lastCommanded == null ? "missing" : lastCommanded.toArray().join(",")} ' +
+                  'lastServoVelocity=${lastServoVelocity.join(",")} ' +
+                  'spiralU=${actualU} spiralV=${actualV} expectedHoleU=${expectedU} expectedHoleV=${expectedV} ' +
+                  'cadEntryU=${cadEntryU} cadEntryV=${cadEntryV} ' +
+                  'maximumObservedLateral=${maximumObservedLateral} contactRelief=${search.contactReliefMeters} ' +
+                  'expectedDepth=${search.expectedEntryDepthMeters} entryDepthTolerance=${search.entryDepthToleranceMeters} ' +
+                  'maximumRunSeconds=${search.maximumRunSeconds} ' +
+                  'spiralElapsed=${@:privateAccess search.spiralElapsedSeconds} candidateOffset=${@:privateAccess search.candidateHoleOffset} ' +
+                  'candidateCaptures=${candidateCaptureCount} candidateRecoveries=${candidateRecoveryCount} ' +
+                  'candidateRelief=${@:privateAccess search.candidateReliefActive} suppressCapture=${@:privateAccess search.suppressCandidateCapture} ' +
+                  'rejectedCandidate=${@:privateAccess search.rejectedCandidateOffset} catchup=${@:privateAccess search.spiralCatchupElapsedSeconds} ' +
+                  'candidateValidated=${@:privateAccess search.candidateValidated} candidateDepth=${@:privateAccess search.candidateMaximumDepth} ' +
+                  'candidateStartDepth=${@:privateAccess search.candidateStartDepth} candidateElapsed=${@:privateAccess search.candidateElapsedSeconds}';
+                runnerFailureMotion += ' entryBaseline=${@:privateAccess search.entry.baselineLoadN} ' +
+                  'entryLoad=${@:privateAccess search.entry.lastLoadN} loadAxis=${search.entry.loadAxis.x},' +
+                  '${search.entry.loadAxis.y},${search.entry.loadAxis.z} ' +
+                  'entryPlaneAdvance=${@:privateAccess search.entryPlaneAdvanceActive} ' +
+                  'entryPlaneAdvanceElapsed=${@:privateAccess search.entryPlaneAdvanceElapsedSeconds} ' +
+                  'entryPlaneAdvanceLastDepth=${@:privateAccess search.entryPlaneAdvanceLastDepth} ' +
+                  'entryPlaneAdvanceWindow=${@:privateAccess search.entryPlaneAdvanceWindowActive} ' +
+                  'firstCandidate=${firstCandidateTrace} ' +
+                  'firstCandidateMaxDepth=${firstCandidateMaximumDepth}';
+                runnerForceBound = search.maximumForceN;
+                runnerSearchFailure = search.failure == null ? "none" : search.failure;
+                runnerSearchComplete = search.complete;
+                if (search.peakForceN > maximumSearchForce) maximumSearchForce = search.peakForceN;
+                if (search.failure != null && runnerFailureContacts == "not captured") {
+                var live:robotkit.runtime.Simulation = @:privateAccess simulation.simulation;
+                var runtimes:Array<robotkit.runtime.RobotRuntime> = @:privateAccess live.robots;
+                var objectNames = new Map<Int, String>();
+                var objectCarrierLinks = new Map<Int, String>();
+                var missionRobot:AssemblyRobot = @:privateAccess mission.robot;
+                var rootPieces = [for (shape in missionRobot.shapes) if (shape.link == 0) shape.shape.name];
+                for (record in session.scene.records()) {
+                  var object = simulation.environmentObject(record.id);
+                  if (object == null) object = simulation.environmentObject("project:" + record.id);
+                  if (object != null) {
+                    var raw = object.handle.rawValue();
+                    objectNames.set(raw, record.id);
+                    var carrier = live.objectCarrier(object), owner = "free";
+                    for (linkIndex in 0...missionRobot.model.links.length)
+                      if (carrier == live.linkBody(0, linkIndex)) owner = Std.string(linkIndex);
+                    objectCarrierLinks.set(raw, owner);
+                  }
+                }
+                var measurement = search.lastMeasurement;
+                var tools:Null<SimulatedTools> = @:privateAccess simulation.tools;
+                var observerWrench = "missing", driverState = "missing";
+                if (measurement != null) runnerFailureWrench =
+                  'sensor=${measurement.sensorId}/${measurement.frameId} sequence=${measurement.sequence} ' +
+                  'source=${measurement.sourceTimestampNs} force=${measurement.wrench.force.x},' +
+                  '${measurement.wrench.force.y},${measurement.wrench.force.z} torque=' +
+                  '${measurement.wrench.torque.x},${measurement.wrench.torque.y},${measurement.wrench.torque.z}';
+                var samples:Null<Array<robotkit.runtime.RobotContact>> = null;
+                if (measurement != null && tools != null) {
+                  var probes:Array<SimulatedToolForceTorque> = @:privateAccess tools.forceTorqueProbes;
+                  if (probes.length == 1) {
+                    samples = probes[0].contactsForSequence(measurement.sequence);
+                    var published = probes[0].wrenchForSequence(measurement.sequence);
+                    if (published != null) observerWrench = '${published.force.x},${published.force.y},${published.force.z}';
+                  }
+                  if (tools.screwdrivers.length == 1) {
+                    var driver = tools.screwdrivers[0];
+                    driverState = 'thread=${driver.physicalThreadAttached()} link=${@:privateAccess driver.linkIndex}';
+                  }
+                }
+                runnerFailureWrench += ' observer=$observerWrench driver=$driverState';
+                var sampleContacts = samples == null && runtimes.length > 0
+                  ? live.robotContacts(runtimes[0]) : (samples == null ? [] : cast samples);
+                var contacts:Array<String> = [], activeCount = 0, summedForce = robotkit.spatial.Vec3.zero();
+                var linkCounts = new Map<Int, Int>(), linkForces = new Map<Int, robotkit.spatial.Vec3>();
+                for (contact in sampleContacts) if (contact.active) {
+                  activeCount++;
+                  summedForce = summedForce.add(contact.force);
+                  var previousCount = linkCounts.get(contact.linkIndex);
+                  linkCounts.set(contact.linkIndex, previousCount == null ? 1 : previousCount + 1);
+                  var previousForce = linkForces.get(contact.linkIndex);
+                  linkForces.set(contact.linkIndex, (previousForce == null ? robotkit.spatial.Vec3.zero() : previousForce).add(contact.force));
+                  if (contact.force.norm() > 1 && contacts.length < 20) {
+                    var objectName = objectNames.get(contact.otherObject);
+                    var toolPart = contact.toolPieceIndex < 0 ? "link-geometry" : 'tool-piece-${contact.toolPieceIndex}';
+                    var otherLinkName = contact.otherKind == robotkit.runtime.RobotContactOtherKind.RobotLink &&
+                      contact.otherRobot == 0 && contact.otherLink >= 0 && contact.otherLink < missionRobot.model.links.length
+                      ? missionRobot.model.links[contact.otherLink].id : "none";
+                    var otherShape = contact.otherPieceIndex >= 0 && contact.otherPieceIndex < missionRobot.shapes.length
+                      ? missionRobot.shapes[contact.otherPieceIndex].shape.name : "unmapped";
+                    contacts.push('link=${contact.linkIndex} toolPiece=${contact.toolPieceIndex} ' +
+                      'toolPart=$toolPart ' +
+                      'other=${contact.otherKind}:${contact.otherObject}:${contact.otherPieceIndex} ' +
+                      'otherShape=$otherShape ' +
+                      'carrierLink=${objectCarrierLinks.get(contact.otherObject)} ' +
+                      'name=${objectName == null ? "unknown" : objectName} ' +
+                      'otherLinkName=$otherLinkName ' +
+                      'linkName=${missionRobot.model.links[contact.linkIndex].id} step=${contact.stepIndex} ' +
+                      'position=${contact.position.x},${contact.position.y},${contact.position.z} ' +
+                      'force=${contact.force.x},${contact.force.y},${contact.force.z}');
+                  }
+                }
+                var links:Array<String> = [];
+                for (linkIndex in linkCounts.keys()) {
+                  var force:Null<robotkit.spatial.Vec3> = linkForces.get(linkIndex);
+                  var total:robotkit.spatial.Vec3 = force == null ? robotkit.spatial.Vec3.zero() : cast force;
+                  links.push('${missionRobot.model.links[linkIndex].id}[$linkIndex] contacts=${linkCounts.get(linkIndex)} ' +
+                    'sum=${total.x},${total.y},${total.z}');
+                }
+                var carrierIndex = -1;
+                for (index in 0...missionRobot.model.links.length)
+                  if (missionRobot.model.links[index].id == "arm/tool/driver/carrier") carrierIndex = index;
+                var carrierPose = carrierIndex < 0 ? null : live.linkPose(0,carrierIndex);
+                var carrierFrame = missionRobot.toolFrames.get("arm/tool/driver/carrier");
+                var carrierShapes:Array<String> = [];
+                for (shape in missionRobot.shapes) if (shape.link == carrierIndex) {
+                  var points = shape.shape.convexVertices(), minZ = 1e30, maxZ = -1e30;
+                  for (index in 2...points.length) if (index % 3 == 2) {
+                    minZ = Math.min(minZ,points[index]); maxZ = Math.max(maxZ,points[index]);
+                  }
+                  carrierShapes.push('${shape.shape.name}@${shape.shape.position.join(",")}[${minZ},${maxZ}]');
+                }
+                runnerFailureContacts = 'sequence=${measurement == null ? "none" : Std.string(measurement.sequence)} ' +
+                  'matched=${samples != null} active=$activeCount sum=${summedForce.x},${summedForce.y},' +
+                  '${summedForce.z} rootPieces12=${rootPieces.length > 12 ? rootPieces[12] : "missing"} ' +
+                  'rootPieces13=${rootPieces.length > 13 ? rootPieces[13] : "missing"} ' +
+                  'carrierIndex=$carrierIndex carrierPose=${carrierPose == null ? "missing" : carrierPose.position.join(",")} ' +
+                  'carrierTcpLocal=${carrierFrame == null ? "missing" : carrierFrame.position.join(",")} ' +
+                  'carrierShapes=${carrierShapes.join(";")} ' +
+                  'links=${links.join("; ")} ${contacts.join("; ")}';
+              }
+                if (@:privateAccess search.entry.searchStartedNs != null) sawCompression = true;
+                if (search.entryFound && !sawEntry) {
+                  confirmedEntryDepth = search.confirmedEntryDepthMeters;
+                  var measurement = search.lastMeasurement;
+                  var tools:Null<SimulatedTools> = @:privateAccess simulation.tools;
+                  if (measurement != null && tools != null && tools.forceTorqueProbes.length == 1) {
+                    var probe = tools.forceTorqueProbes[0];
+                    var samples = probe.contactsForSequence(measurement.sequence), contactLinks:Map<Int,Bool> = @:privateAccess probe.contactLinks;
+                    var missionRobot:AssemblyRobot = @:privateAccess mission.robot;
+                    var objectNames = new Map<Int,String>();
+                    for (record in session.scene.records()) {
+                      var object = simulation.environmentObject(record.id);
+                      if (object == null) object = simulation.environmentObject("project:"+record.id);
+                      if (object != null) objectNames.set(object.handle.rawValue(),record.id);
+                    }
+                    Sys.println('Force-search entry wrench offset=${offsetMeters*1000}mm ' +
+                      '${measurement.wrench.force.x},${measurement.wrench.force.y},${measurement.wrench.force.z}');
+                    var shown = 0;
+                    for (contact in samples) if (contact.active && contactLinks.exists(contact.linkIndex) && shown < 12) {
+                      var toolPart = contact.toolPieceIndex < 0 ? "link-geometry" : 'tool-piece-${contact.toolPieceIndex}';
+                      var otherPart = contact.otherPieceIndex < 0 ? "unpartitioned" : 'other-piece-${contact.otherPieceIndex}';
+                      var linkName = missionRobot.model.links[contact.linkIndex].id;
+                      Sys.println('Force-search entry contact offset=${offsetMeters*1000}mm link=$linkName ' +
+                        'toolPart=$toolPart object=${objectNames.get(contact.otherObject)} otherPiece=${contact.otherPieceIndex} otherPart=$otherPart ' +
+                        'position=${contact.position.x},${contact.position.y},${contact.position.z} ' +
+                        'force=${contact.force.x},${contact.force.y},${contact.force.z} distance=${contact.distance}');
+                      shown++;
+                    }
+                  }
+                  sawEntry = true;
+                }
+                if (search.complete && search.measuredEntry != null && firstEntry == null) {
+                  firstEntry = search.measuredEntry;
+                  firstSearchStart = @:privateAccess search.initialTcp;
+                  searchU = search.spiral.axisU; searchV = search.spiral.axisV;
+                }
+                if (search.failure != null) break;
+              }
+            }
+          }
+        }
+        if (firstEntry == null && observedSearch != null) {
+          var completedSearch:processkit.ContactAdmittanceRunner = cast observedSearch;
+          firstEntry = completedSearch.entryPose();
+          firstSearchStart = @:privateAccess completedSearch.initialTcp;
+          searchU = completedSearch.spiral.axisU; searchV = completedSearch.spiral.axisV;
+          Sys.println('Force-search observer retained final search state: entryFound=${completedSearch.entryFound} ' +
+            'complete=${completedSearch.complete} failure=${completedSearch.failure} pose=${firstEntry == null ? "missing" : "measured"}');
+          if (firstEntry == null) {
+            var snapshot = completedSearch.servo.robot.snapshot();
+            var joints = [for (index in completedSearch.servo.manipulator.jointIndices()) snapshot.positions.get(index)];
+            var tcp = completedSearch.servo.manipulator.tcpPose(joints);
+            var origin:Null<robotkit.spatial.Transform3> = @:privateAccess completedSearch.initialTcp;
+            var axialDepth = origin == null ? 0.0 : tcp.translation.sub(origin.translation)
+              .dot(completedSearch.entry.loadAxis.scale(-1));
+            Sys.println('Force-search end phase: depth=$axialDepth expected=${completedSearch.expectedEntryDepthMeters} ' +
+              'candidate=${@:privateAccess completedSearch.candidateHoleOffset} ' +
+              'candidateCaptures=${candidateCaptureCount} candidateRecoveries=${candidateRecoveryCount} ' +
+              'rejectedCandidate=${@:privateAccess completedSearch.rejectedCandidateOffset} ' +
+              'catchup=${@:privateAccess completedSearch.spiralCatchupElapsedSeconds} ' +
+              'validated=${@:privateAccess completedSearch.candidateValidated} ' +
+              'final=${@:privateAccess completedSearch.finalEntrySearchActive} ' +
+              'fallback=${@:privateAccess completedSearch.entryPlaneSearchActive} ' +
+              'relief=${@:privateAccess completedSearch.contactReliefTargetDepth} ' +
+              'searchActive=${@:privateAccess completedSearch.spiralSearchActive} ' +
+              'entryPlaneAdvance=${@:privateAccess completedSearch.entryPlaneAdvanceActive} ' +
+              'entryPlaneAdvanceElapsed=${@:privateAccess completedSearch.entryPlaneAdvanceElapsedSeconds} ' +
+              'entryPlaneAdvanceLastDepth=${@:privateAccess completedSearch.entryPlaneAdvanceLastDepth} ' +
+              'entryPlaneAdvanceWindow=${@:privateAccess completedSearch.entryPlaneAdvanceWindowActive} ' +
+              'loadAxis=${completedSearch.entry.loadAxis.x},${completedSearch.entry.loadAxis.y},' +
+              '${completedSearch.entry.loadAxis.z} ' +
+              'center=${@:privateAccess completedSearch.searchCenterOffset} ' +
+              'elapsed=${@:privateAccess completedSearch.spiralElapsedSeconds} ' +
+              'turns=${completedSearch.spiral.turns} duration=${completedSearch.spiral.durationSeconds} ' +
+              'baseline=${@:privateAccess completedSearch.entry.baselineLoadN} ' +
+              'load=${@:privateAccess completedSearch.entry.lastLoadN}');
+          }
+        }
+        if (firstEntry != null && firstSearchStart != null) {
+          var located:robotkit.spatial.Transform3 = cast firstEntry;
+          var approach:robotkit.spatial.Transform3 = cast firstSearchStart;
+          Sys.println('Force-search measured TCP offset ${offsetMeters*1000} mm: entry=${located.translation.x},${located.translation.y},${located.translation.z} ' +
+            'approach=${approach.translation.x},${approach.translation.y},${approach.translation.z}');
+        }
+        check(shifted,"The bounded registration estimate is biased before the first screwdriver approach");
+        check(runnerSearchFailure == "none", 'Nominal force search stays inside its commissioned bound; peak ${maximumSearchForce} N, ' +
+          'failure=${runnerSearchFailure}; wrench=${runnerFailureWrench}; motion=${runnerFailureMotion}; contacts=${runnerFailureContacts}');
+        check(mission.finished && mission.failure == null && mission.screwRuns.length == 1 && mission.screwResults.length >= 1,
+          'Force search hands the first CAD fastening to the qualified driver: ${mission.failure}, finished ${mission.finished}, ' +
+          'completed ${mission.completed}, step ${mission.stepIndex}, runs ${mission.screwRuns.length}, ' +
+          'results ${mission.screwResults.length}, time ${clock.simulationTime()}, peak ${maximumSearchForce} N; ' +
+          'search state: ${runnerFailureMotion}');
+        check(firstEntry != null && firstSearchStart != null && sawCompression && sawEntry &&
+          maximumSearchForce >= profile.minimumContactLoadN && maximumSearchForce <= profile.maximumForceN,
+          'MuJoCo supplies a fresh physical compression baseline and confirmed entry; peak force ${maximumSearchForce} N, ' +
+          'commissioned bounds ${profile.minimumContactLoadN}–${profile.maximumForceN} N; ' +
+          'runner bound=${runnerForceBound} failure=${runnerSearchFailure} complete=${runnerSearchComplete}; ' +
+          'failure wrench=${runnerFailureWrench}; failure contacts=${runnerFailureContacts}');
+        check(confirmedEntryDepth != null && expectedEntryDepth != null &&
+          Math.abs(cast(confirmedEntryDepth, Float)-cast(expectedEntryDepth, Float)) <= entryDepthTolerance,
+          'Confirmed force drop is within the registered CAD entry-depth window: measured ${confirmedEntryDepth}, ' +
+          'expected ${expectedEntryDepth} +/- ${entryDepthTolerance} m');
+        Sys.println('Force-search CAD: offset ${offsetMeters*1000} mm measured peak ${maximumSearchForce} N');
+        for (result in mission.screwResults)
+          check(result.outcome == robotkit.tool.ScrewdriverContract.OK && Math.abs(result.torqueNm-16.5) < 1e-8,
+            'Force-search entry preserves the unchanged qualified tightening program: ${result.fastening}, ' +
+            'outcome ${result.outcome}, torque ${result.torqueNm}');
+        if (offsetMeters > 0) {
+          var measuredEntry:robotkit.spatial.Transform3 = cast firstEntry;
+          var approachEntry:robotkit.spatial.Transform3 = cast firstSearchStart;
+          var delta = measuredEntry.translation.sub(approachEntry.translation);
+          var lateralU = delta.dot(cast searchU), lateralV = delta.dot(cast searchV);
+          var lateral = Math.sqrt(lateralU*lateralU+lateralV*lateralV);
+          check(lateral > 0.0005 && lateral <= profile.spiralRadiusMeters+profile.contactSeedOffsetUMeters+0.0005,
+            'A 1 mm physical hole offset is recovered within the commissioned spiral: ${lateral*1000} mm');
+        }
+        simulation.clear(); session.dispose();
+      } catch (error:Dynamic) {simulation.clear(); session.dispose(); throw error;}
+      Sys.println('Force-search CAD: end lateral offset ${offsetMeters*1000} mm');
+    }
+    if (forceCase == null)
+      Sys.println("Force-search CAD passed with measured MuJoCo contact and offset-hole tightening handover");
+    else
+      Sys.println("Selected force-search CAD case passed");
   }
 
   /** Staged execution shares physical supplies and preserves the installed body's measured engagement. */

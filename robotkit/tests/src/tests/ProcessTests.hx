@@ -15,6 +15,11 @@ import robotkit.tool.SimulatedVacuum;
 import robotkit.tool.Tool;
 import robotkit.tool.ToolRuntime;
 import robotkit.tool.ToolRuntimeSelection;
+import robotkit.tool.ToolChangeTransaction;
+import robotkit.tool.ToolChangeTransaction.ToolChangePhase;
+import robotkit.tool.ChangerLock;
+import robotkit.tool.ChangerLockObservation;
+import robotkit.tool.SimulatedChangerLock;
 import robotkit.tool.SimulatedToolSensorAdapter;
 import robotkit.execution.FiredProcessEvent;
 import robotkit.execution.ProcessEventValue;
@@ -31,6 +36,10 @@ class ProcessTests {
     testScheduledToolEvents();
     testMultiCapabilityTool();
     testSelectedToolSensorFrames();
+    testToolProcessOwnership();
+    testToolChangeTransaction();
+    testToolChangeCommandRetry();
+    testToolChangeRejectsStaleObservation();
     testSimulationSensorClock();
     Sys.println('RobotKit process tests passed ($assertions assertions)');
     return assertions;
@@ -209,6 +218,171 @@ class ProcessTests {
     check(wrongClock, "pressure feedback rejects a clock different from tool selection");
   }
 
+  static function testToolProcessOwnership():Void {
+    var gripper = new SimulatedGripper();
+    var first = new ToolRuntime(new Tool("gripper", "gripper", Transform3.identity()), gripper);
+    first.bindGripper("gripper.close");
+    var second = new ToolRuntime(new Tool("screwdriver", "screwdriver", Transform3.identity()));
+    var selection = new ToolRuntimeSelection();
+    selection.select(first, Int64.ofInt(10));
+    selection.beginProcess("pick:part-17");
+    check(selection.activeProcessOwner() == "pick:part-17" &&
+      selection.activeProcessToolId() == "gripper", "a process leases the selected tool identity");
+
+    var rejected = false;
+    try selection.select(second, Int64.ofInt(20)) catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("owns tool") >= 0;
+    check(rejected && selection.active() == first,
+      "tool identity cannot change while its process still owns outputs");
+    rejected = false;
+    try selection.apply(new FiredProcessEvent(Int64.ofInt(1), "gripper.close",
+      ProcessEventValue.Digital(true), Int64.ofInt(11), Int64.ofInt(11), 1)) catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("needs owner") >= 0;
+    check(rejected && gripper.isOpen(), "unowned output cannot enter a live process");
+    rejected = false;
+    try selection.applyFor("fastening:screw-4", new FiredProcessEvent(Int64.ofInt(1), "gripper.close",
+      ProcessEventValue.Digital(true), Int64.ofInt(12), Int64.ofInt(12), 1)) catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("does not own") >= 0;
+    check(rejected && gripper.isOpen(), "another process cannot write the leased tool");
+
+    selection.applyFor("pick:part-17", new FiredProcessEvent(Int64.ofInt(1), "gripper.close",
+      ProcessEventValue.Digital(true), Int64.ofInt(13), Int64.ofInt(13), 1));
+    check(!gripper.isOpen(), "the owning process can write its selected tool");
+    rejected = false;
+    try selection.finishProcess("fastening:screw-4") catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("cannot release") >= 0;
+    check(rejected && selection.activeProcessOwner() == "pick:part-17",
+      "a different process cannot release the tool lease");
+    rejected = false;
+    try selection.finishProcess("pick:part-17") catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("outputs are unsafe") >= 0;
+    check(rejected && selection.activeProcessOwner() == "pick:part-17",
+      "a process cannot release its lease while a tool output remains active");
+    selection.applyFor("pick:part-17", new FiredProcessEvent(Int64.ofInt(2), "gripper.close",
+      ProcessEventValue.Digital(false), Int64.ofInt(14), Int64.ofInt(14), 1));
+    selection.finishProcess("pick:part-17");
+    selection.select(second, Int64.ofInt(20));
+    check(selection.active() == second && selection.activeProcessOwner() == null,
+      "a stopped process releases the outgoing tool for a confirmed exchange");
+  }
+
+  static function testToolChangeTransaction():Void {
+    var lock = new SimulatedChangerLock("gripper");
+    var gripper = new ToolRuntime(new Tool("gripper", "gripper", Transform3.identity()),
+      new SimulatedGripper(), null, null, null, null, lock, "gripper");
+    gripper.bindChangerLock("changer.lock");
+    var screwdriver = new ToolRuntime(new Tool("screwdriver", "screwdriver", Transform3.identity()),
+      null, null, null, null, null, lock, "screwdriver");
+    screwdriver.bindChangerLock("changer.lock");
+    var selection = new ToolRuntimeSelection();
+    selection.select(gripper, Int64.ofInt(5));
+    var change = new ToolChangeTransaction(selection, [gripper, screwdriver], Int64.ofInt(10));
+    change.begin("screwdriver", Int64.ofInt(10));
+    check(change.phase == ToolChangePhase.UnlockRequested && selection.active() == null &&
+      !lock.observation().locked, "tool exchange safes routing and requests unlock after docking");
+    var rejected = false;
+    try change.confirmUnlocked(Int64.ofInt(9)) catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("event time moved backwards") >= 0;
+    check(rejected && change.phase == ToolChangePhase.UnlockRequested,
+      "tool exchange rejects lock feedback events that move backward in time");
+    change.confirmUnlocked(Int64.ofInt(10));
+    check(change.phase == ToolChangePhase.OutgoingUnlocked,
+      "tool exchange waits for measured unlocked feedback");
+    rejected = false;
+    try change.confirmAttached(Int64.ofInt(11)) catch (_:Dynamic) rejected = true;
+    check(rejected && change.phase == ToolChangePhase.OutgoingUnlocked,
+      "incoming attachment cannot skip outgoing detachment");
+    lock.detachTool(Int64.ofInt(12));
+    change.confirmDetached(Int64.ofInt(12));
+    lock.attachTool("screwdriver", Int64.ofInt(13));
+    change.confirmAttached(Int64.ofInt(13));
+    check(change.phase == ToolChangePhase.LockRequested && lock.observation().locked,
+      "tool exchange requests lock only after measured incoming identity");
+    var lockCommands = lock.history.length;
+    change.requestLock(Int64.ofInt(13));
+    check(lock.history.length == lockCommands,
+      "retrying an already confirmed lock does not issue another command");
+    change.confirmLocked(Int64.ofInt(13));
+    check(change.phase == ToolChangePhase.Complete && selection.active() == screwdriver &&
+      lock.observation().toolId == "screwdriver",
+      "tool exchange selects the new runtime only after measured lock confirmation");
+  }
+
+  static function testToolChangeCommandRetry():Void {
+    var lock = new RetryChangerLock("gripper");
+    var gripper = new ToolRuntime(new Tool("gripper", "gripper", Transform3.identity()),
+      null, null, null, null, null, lock, "gripper");
+    gripper.bindChangerLock("changer.lock");
+    var screwdriver = new ToolRuntime(new Tool("screwdriver", "screwdriver", Transform3.identity()),
+      null, null, null, null, null, lock, "screwdriver");
+    screwdriver.bindChangerLock("changer.lock");
+    var selection = new ToolRuntimeSelection();
+    selection.select(gripper, Int64.ofInt(5));
+    var change = new ToolChangeTransaction(selection, [gripper, screwdriver], Int64.ofInt(10));
+    lock.failNextUnlock = true;
+    var interrupted = false;
+    try change.begin("screwdriver", Int64.ofInt(10)) catch (_:Dynamic) interrupted = true;
+    check(interrupted && change.phase == ToolChangePhase.UnlockRequested && selection.active() == null,
+      "failed unlock command retains the exchange phase and safe runtime selection");
+    change.requestUnlock(Int64.ofInt(11));
+    change.confirmUnlocked(Int64.ofInt(11));
+    lock.detachTool(Int64.ofInt(12));
+    change.confirmDetached(Int64.ofInt(12));
+    lock.attachTool("screwdriver", Int64.ofInt(13));
+    lock.failNextLock = true;
+    interrupted = false;
+    try change.confirmAttached(Int64.ofInt(13)) catch (_:Dynamic) interrupted = true;
+    check(interrupted && change.phase == ToolChangePhase.LockRequested &&
+      !lock.observation().locked && selection.active() == null,
+      "failed lock command retains the incoming mount without selecting its runtime");
+    change.requestLock(Int64.ofInt(14));
+    change.confirmLocked(Int64.ofInt(14));
+    check(change.phase == ToolChangePhase.Complete && selection.active() == screwdriver,
+      "a retried physical lock completes the exchange before selecting the new runtime");
+  }
+
+  static function testToolChangeRejectsStaleObservation():Void {
+    var lock = new SimulatedChangerLock("gripper");
+    var gripper = new ToolRuntime(new Tool("gripper", "gripper", Transform3.identity()),
+      null, null, null, null, null, lock, "gripper");
+    gripper.bindChangerLock("changer.lock");
+    var screwdriver = new ToolRuntime(new Tool("screwdriver", "screwdriver", Transform3.identity()),
+      null, null, null, null, null, lock, "screwdriver");
+    screwdriver.bindChangerLock("changer.lock");
+    var selection = new ToolRuntimeSelection();
+    selection.select(gripper, Int64.ofInt(5));
+    var rejectedAge = false;
+    try new ToolChangeTransaction(selection, [gripper, screwdriver], Int64.ofInt(0))
+    catch (error:Dynamic) rejectedAge = Std.string(error).indexOf("positive commissioned") >= 0;
+    check(rejectedAge && selection.active() == gripper,
+      "tool exchange requires an explicit positive lock-feedback freshness limit");
+    var change = new ToolChangeTransaction(selection, [gripper, screwdriver], Int64.ofInt(2));
+    var rejected = false;
+    try change.begin("screwdriver", Int64.ofInt(10)) catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("stale") >= 0;
+    check(rejected && change.phase == ToolChangePhase.Idle && selection.active() == gripper,
+      "stale lock and tool-identity feedback cannot begin a tool exchange");
+
+    var advancingLock = new SimulatedChangerLock("gripper");
+    var advancingGripper = new ToolRuntime(new Tool("gripper", "gripper", Transform3.identity()),
+      null, null, null, null, null, advancingLock, "gripper");
+    advancingGripper.bindChangerLock("changer.lock");
+    var advancingScrewdriver = new ToolRuntime(new Tool("screwdriver", "screwdriver", Transform3.identity()),
+      null, null, null, null, null, advancingLock, "screwdriver");
+    advancingScrewdriver.bindChangerLock("changer.lock");
+    var advancingSelection = new ToolRuntimeSelection();
+    advancingSelection.select(advancingGripper, Int64.ofInt(5));
+    var advancing = new ToolChangeTransaction(advancingSelection,
+      [advancingGripper, advancingScrewdriver], Int64.ofInt(10));
+    advancing.begin("screwdriver", Int64.ofInt(10));
+    rejected = false;
+    try advancing.confirmUnlocked(Int64.ofInt(21)) catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("stale") >= 0;
+    check(rejected && advancing.phase == ToolChangePhase.UnlockRequested &&
+      advancingSelection.active() == null,
+      "tool exchange rechecks feedback freshness after unlock while preserving its retryable phase");
+  }
+
   static function toolSensor(id:String, kind:String, sequence:Int, timestamp:Int, value:Float):SensorFrame
     return new SensorFrame(id, kind, "tool", Int64.ofInt(sequence), Int64.ofInt(timestamp),
       [value], Int64.ofInt(timestamp), "", null, null, "robotkit.monotonic");
@@ -220,4 +394,34 @@ class ProcessTests {
     assertions++;
     if (!value) throw 'assertion failed: $message';
   }
+}
+
+private class RetryChangerLock implements ChangerLock {
+  final simulated:SimulatedChangerLock;
+  public var failNextUnlock:Bool = false;
+  public var failNextLock:Bool = false;
+
+  public function new(initialToolId:String) {
+    simulated = new SimulatedChangerLock(initialToolId);
+  }
+
+  public function lock(timestampNs:Int64):Void {
+    if (failNextLock) {
+      failNextLock = false;
+      throw "simulated changer lock command interruption";
+    }
+    simulated.lock(timestampNs);
+  }
+
+  public function unlock(timestampNs:Int64):Void {
+    if (failNextUnlock) {
+      failNextUnlock = false;
+      throw "simulated changer unlock command interruption";
+    }
+    simulated.unlock(timestampNs);
+  }
+
+  public function observation():ChangerLockObservation return simulated.observation();
+  public function detachTool(timestampNs:Int64):Void simulated.detachTool(timestampNs);
+  public function attachTool(toolId:String, timestampNs:Int64):Void simulated.attachTool(toolId, timestampNs);
 }

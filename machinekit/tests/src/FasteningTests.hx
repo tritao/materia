@@ -10,6 +10,7 @@ import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.assembly.FlangeTappedPlate;
 import machinekit.component.MachineComponent;
 import machinekit.component.ComponentDetail;
+import machinekit.component.CollisionHullFacet;
 import machinekit.component.Solids;
 import machinekit.standard.SocketHeadCapScrew;
 import machinekit.standard.DeepGrooveBearing;
@@ -88,6 +89,63 @@ class FasteningTests {
 	static var assertions = 0;
 	static function check(value:Bool, message:String):Void { assertions++; if (!value) throw message; }
 	static function near(a:Float, b:Float):Void check(Math.abs(a - b) < 1e-4, 'fastening expected $b, got $a');
+	static function convexHull(points:Array<Vector>):Array<Vector> {
+		var sorted:Array<Vector> = [];
+		for (point in points) {
+			var duplicate = false;
+			for (existing in sorted) if (Math.abs(existing.x-point.x) < 1e-8 && Math.abs(existing.y-point.y) < 1e-8) duplicate = true;
+			if (!duplicate) sorted.push(point);
+		}
+		sorted.sort(function(a,b) {
+			if (a.x < b.x) return -1;
+			if (a.x > b.x) return 1;
+			if (a.y < b.y) return -1;
+			if (a.y > b.y) return 1;
+			return 0;
+		});
+		var lower:Array<Vector> = [];
+		for (point in sorted) {
+			while (lower.length >= 2 && cross(lower[lower.length-2],lower[lower.length-1],point) <= 1e-10) lower.pop();
+			lower.push(point);
+		}
+		var upper:Array<Vector> = [], cursor = sorted.length - 1;
+		while (cursor >= 0) {
+			var point = sorted[cursor];
+			while (upper.length >= 2 && cross(upper[upper.length-2],upper[upper.length-1],point) <= 1e-10) upper.pop();
+			upper.push(point);
+			cursor--;
+		}
+		if (lower.length > 0) lower.pop();
+		if (upper.length > 0) upper.pop();
+		return lower.concat(upper);
+	}
+	static function cross(origin:Vector, first:Vector, second:Vector):Float
+		return (first.x-origin.x)*(second.y-origin.y)-(first.y-origin.y)*(second.x-origin.x);
+	static function hullContainsAt(hull:Array<Float>, x:Float, y:Float, z:Float):Bool {
+		if (hull == null || hull.length % 3 != 0) return false;
+		var points:Array<Vector> = [], lower = Math.POSITIVE_INFINITY, upper = Math.NEGATIVE_INFINITY;
+		for (index in 0...Std.int(hull.length/3)) {
+			var px = hull[index*3], py = hull[index*3+1], pz = hull[index*3+2];
+			if (pz < lower) lower = pz;
+			if (pz > upper) upper = pz;
+			points.push(new Vector(px,py));
+		}
+		if (z < lower-1e-8 || z > upper+1e-8) return false;
+		var polygon = convexHull(points), sign = 0;
+		if (polygon.length < 3) return false;
+		for (index in 0...polygon.length) {
+			var side = cross(polygon[index],polygon[(index+1)%polygon.length],new Vector(x,y));
+			if (Math.abs(side) <= 1e-8) continue;
+			var next = side > 0 ? 1 : -1;
+			if (sign != 0 && sign != next) return false;
+			sign = next;
+		}
+		return true;
+	}
+	static function hullsContainAt(hulls:Array<Array<Float>>, x:Float, y:Float, z:Float):Bool {
+		for (hull in hulls) if (hullContainsAt(hull,x,y,z)) return true;
+		return false;
+	}
 	static function error(result:FasteningsResult, code:String, validCount:Int = 0):Void {
 		var found = false;
 		for (item in result.diagnostics.items) if (item.code == code) found = true;
@@ -108,6 +166,18 @@ class FasteningTests {
 		var flange = new FlangeBearingMount(DeepGrooveBearing.metric("608"));
 		var found = flange.fastenings().require();
 		check(found.length == 4, "flange gives four fastenings");
+		var housingCollision = CollisionHullFacet.of(flange.flange.housing), plateCollision = CollisionHullFacet.of(flange.plate);
+		if (housingCollision == null || plateCollision == null) throw "Flange fixture needs authored collision pieces";
+		check(housingCollision.hulls.length < 128 && plateCollision.hulls.length < 128,
+			'Flange collision decomposition stays compact: housing ${housingCollision.hulls.length}, plate ${plateCollision.hulls.length}');
+		check(!hullsContainAt(housingCollision.hulls,0,0,flange.flange.housing.depth/2),
+			"Flange collision pieces preserve the bearing bore");
+		for (point in flange.flange.housing.boltPattern()) {
+			check(!hullsContainAt(housingCollision.hulls,point.x,point.y,flange.flange.housing.depth/2),
+				"Flange collision pieces preserve a mounting clearance");
+			check(!hullsContainAt(plateCollision.hulls,point.x,point.y,flange.plate.thickness-1),
+				"Plate collision pieces preserve each tapped entrance");
+		}
 		for (fastening in found) {
 			near(fastening.engagementLength, flange.flange.screw.length - flange.flange.housing.depth);
 			near(fastening.minimumEngagement, 1.5 * flange.flange.screw.diameter);
@@ -133,6 +203,11 @@ class FasteningTests {
 		check(moved.fastenings.length == 0, "offset holes never match by radius"); error(moved, "fastening.no-thread");
 
 		var six = SocketHeadCapScrew.metric("M6", 12);
+		var screwCollision = machinekit.component.CollisionHullFacet.of(six);
+		if (screwCollision == null) throw "M6 screw has no authored collision envelope";
+		var threadedHull = screwCollision.hulls[0];
+		near(2 * Math.sqrt(threadedHull[0] * threadedHull[0] + threadedHull[1] * threadedHull[1]),
+			six.thread.externalMinorDiameter());
 		var basic = fixture(six);
 		var one = basic.fastenings().require()[0];
 		near(one.engagementLength, 7); near(one.minimumEngagement, 6);

@@ -81,7 +81,7 @@ class WeldProbeTests {
     var savedFaces = work.contactFaces(0.001);
     materia.project.SceneContactRegistration.validate({frame: weldment.reference, nominal: AssemblyFrames.identity(),
       translation: [0.02, 0.02, 0.0], rotation: [0.0, 0.0, 2 * Math.PI / 180],
-      measurementError: 0.00001, contactOffset: 0.0005, faces: savedFaces},
+      measurementError: 0.00001, calibratedError: 0.000002, contactOffset: 0.0005, faces: savedFaces},
       [for (face in work.faces) face.member].concat([weldment.reference]));
     var reconstructed = WeldProbeGeometry.fromContactFaces(savedFaces, 0.001);
     check(reconstructed.faces.length == work.faces.length, "Saved nominal CAD faces preserve fixtures and registration targets");

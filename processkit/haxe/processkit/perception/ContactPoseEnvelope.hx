@@ -37,6 +37,8 @@ class ContactRegionBounds {
   public final tiltU:Float;
   public final tiltV:Float;
   public function new(halfU:Float, halfV:Float, normalTravel:Float, tiltU:Float, tiltV:Float) {
+    for (value in [halfU, halfV, normalTravel, tiltU, tiltV])
+      if (!Math.isFinite(value) || value < 0) throw "Contact region bounds must be finite and non-negative";
     this.halfU = halfU; this.halfV = halfV; this.normalTravel = normalTravel; this.tiltU = tiltU; this.tiltV = tiltV;
   }
 }
@@ -49,16 +51,21 @@ class ContactRegionBounds {
  */
 class ContactPoseEnvelope {
   public final nominalWork:Transform3;
+  /** Component-wise chassis error bounds from the saved registration request. */
+  public final translationBound:Vec3;
+  public final rotationBound:Vec3;
   public final measurementError:Float;
   public var cells(get, never):Int;
   var boxes:Array<PoseBox>;
+  var lastConstraints:Array<PlaneConstraint> = [];
 
   public function new(nominalWork:Transform3, translation:Vec3, rotation:Vec3, measurementError:Float) {
     if (nominalWork == null || translation == null || rotation == null || translation.x < 0 || translation.y < 0 || translation.z < 0 ||
         rotation.x < 0 || rotation.y < 0 || rotation.z < 0 || rotation.x >= Math.PI / 2 || rotation.y >= Math.PI / 2 || rotation.z >= Math.PI / 2 ||
         !Math.isFinite(measurementError) || !(measurementError > 0))
       throw "Contact pose envelope needs a finite bounded chassis error and positive calibrated observation error";
-    this.nominalWork = nominalWork; this.measurementError = measurementError;
+    this.nominalWork = nominalWork; this.translationBound = translation; this.rotationBound = rotation;
+    this.measurementError = measurementError;
     var limits = [translation.x, translation.y, translation.z, rotation.x, rotation.y, rotation.z];
     boxes = [{lo: [for (limit in limits) -limit], hi: limits.copy()}];
   }
@@ -67,9 +74,75 @@ class ContactPoseEnvelope {
 
   /** Independent planning branch with the same conservative pose set. */
   public function fork():ContactPoseEnvelope {
-    var result = new ContactPoseEnvelope(nominalWork, new Vec3(), new Vec3(), measurementError);
+    var result = new ContactPoseEnvelope(nominalWork, translationBound, rotationBound, measurementError);
     result.boxes = [for (box in boxes) {lo: box.lo.copy(), hi: box.hi.copy()}];
     return result;
+  }
+
+  /** True only when a candidate satisfies the authored root bounds and every retained plane observation. */
+  public function containsWorkFrame(work:Transform3):Bool {
+    if (work == null) return false;
+    var error = nominalWork.compose(work.inverse());
+    var rpy = error.rotation.toRollPitchYaw();
+    var values = [error.translation.x, error.translation.y, error.translation.z, rpy.roll, rpy.pitch, rpy.yaw];
+    var limits = [translationBound.x, translationBound.y, translationBound.z,
+      rotationBound.x, rotationBound.y, rotationBound.z];
+    for (index in 0...6) if (values[index] < -limits[index] - 1e-10 || values[index] > limits[index] + 1e-10) return false;
+    for (constraint in lastConstraints) {
+      var mapped = error.rotation.rotate(constraint.point);
+      if (constraint.translated) mapped = mapped.add(error.translation);
+      var residual = constraint.normal.dot(mapped) - constraint.offset;
+      if (Math.abs(residual) > constraint.tolerance + 1e-10) return false;
+    }
+    return true;
+  }
+
+  /** Clamp a noisy point-to-plane fit to authored root bounds, then prove it against every observation. */
+  public function constrainWorkFrame(work:Transform3):Null<Transform3> {
+    if (work == null) return null;
+    var error = nominalWork.compose(work.inverse()), angles = error.rotation.toRollPitchYaw();
+    function clamp(value:Float, bound:Float):Float return Math.max(-bound, Math.min(bound, value));
+    var boundedError = new Transform3(new Vec3(clamp(error.translation.x, translationBound.x),
+      clamp(error.translation.y, translationBound.y), clamp(error.translation.z, translationBound.z)),
+      Quat.fromRollPitchYaw(clamp(angles.roll, rotationBound.x), clamp(angles.pitch, rotationBound.y),
+        clamp(angles.yaw, rotationBound.z)));
+    var bounded = boundedError.inverse().compose(nominalWork);
+    return containsWorkFrame(bounded) ? bounded : null;
+  }
+
+  /** Largest direct residual against the retained source observations for a candidate work frame. */
+  public function maximumPlaneResidual(work:Transform3):Float {
+    if (work == null) return Math.POSITIVE_INFINITY;
+    var error = nominalWork.compose(work.inverse()), maximum = 0.0;
+    for (constraint in lastConstraints) {
+      var mapped = error.rotation.rotate(constraint.point);
+      if (constraint.translated) mapped = mapped.add(error.translation);
+      maximum = Math.max(maximum, Math.abs(constraint.normal.dot(mapped) - constraint.offset));
+    }
+    return maximum;
+  }
+
+  /** Explain a rejected provisional fit without treating its marginal ranges as authorization. */
+  public function describeWorkFrame(work:Transform3):String {
+    if (work == null) return "missing work frame";
+    var error = nominalWork.compose(work.inverse()), angles = error.rotation.toRollPitchYaw();
+    var values = [error.translation.x, error.translation.y, error.translation.z, angles.roll, angles.pitch, angles.yaw];
+    var maximumPlaneResidual = 0.0;
+    for (constraint in lastConstraints) {
+      var mapped = error.rotation.rotate(constraint.point);
+      if (constraint.translated) mapped = mapped.add(error.translation);
+      var residual = constraint.normal.dot(mapped) - constraint.offset;
+      maximumPlaneResidual = Math.max(maximumPlaneResidual, Math.abs(residual));
+    }
+    var low = [for (_ in 0...6) Math.POSITIVE_INFINITY], high = [for (_ in 0...6) Math.NEGATIVE_INFINITY];
+    for (box in boxes) for (index in 0...6) {
+      low[index] = Math.min(low[index], box.lo[index]);
+      high[index] = Math.max(high[index], box.hi[index]);
+    }
+    var labels = ["x", "y", "z", "roll", "pitch", "yaw"];
+    var ranges = [for (index in 0...6) '${labels[index]}=${values[index]} in [${low[index]},${high[index]}]'];
+    return 'root-frame candidate with ${boxes.length} retained pose cells: ${ranges.join("; ")}; '
+      + 'maximum measured-plane residual $maximumPlaneResidual m against $measurementError m';
   }
 
   static function dot(vector:Array<Span>, axis:Vec3):Span return vector[0].scale(axis.x).add(vector[1].scale(axis.y)).add(vector[2].scale(axis.z));
@@ -172,6 +245,7 @@ class ContactPoseEnvelope {
     }
     if (kept.length == 0) throw "Contact observations are inconsistent with the bounded chassis pose error";
     boxes = kept;
+    lastConstraints = constraints;
   }
 
   /** A provisional centre for placing probes; this never authorizes welding or discards the set-valued bounds. */

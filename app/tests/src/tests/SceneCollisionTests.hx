@@ -5,6 +5,7 @@ import app.EditorPerspectiveViewport;
 import app.EditorScene;
 import app.Main.ReferenceEditorApp;
 import app.SceneCollision;
+import app.SceneCollision.SceneCollisionPair;
 import collisionkit.native.NativeCollisionWorld;
 import haxeon.platform.NativeKitEvents;
 import haxeon.ui.properties.PropertyValue;
@@ -103,6 +104,14 @@ class SceneCollisionTests {
     check(shownKey != before && viewport.collisionPairCount() == 2, "new pairs change the viewport's key");
     viewport.setCollisions(pairs);
     check(viewport.presentationKey() == shownKey, "the same query result keeps the rendered image");
+    var equivalent = [for (pair in pairs) new SceneCollisionPair(pair.a, pair.b,
+      pair.distance, pair.pointA.copy(), pair.pointB.copy(), pair.colliding())];
+    viewport.setCollisions(equivalent);
+    check(viewport.presentationKey() == shownKey, "equivalent query results keep the rendered image");
+    viewport.setCollisions([]);
+    var emptyKey = viewport.presentationKey();
+    viewport.setCollisions([]);
+    check(viewport.presentationKey() == emptyKey, "repeated empty queries keep the rendered image");
     collision.dispose();
   }
 

@@ -212,6 +212,7 @@ rk_result from_sim(nksim_result result) {
     case NKSIM_ERROR_INVALID_ARGUMENT: return RK_ERROR_INVALID_ARGUMENT;
     case NKSIM_ERROR_INVALID_HANDLE: return RK_ERROR_INVALID_HANDLE;
     case NKSIM_ERROR_INVALID_STATE: return RK_ERROR_INVALID_STATE;
+    case NKSIM_ERROR_WRONG_THREAD: return RK_ERROR_INVALID_STATE;
     case NKSIM_ERROR_OUT_OF_MEMORY: return RK_ERROR_OUT_OF_MEMORY;
     default: return RK_ERROR_BACKEND;
     }
@@ -1765,6 +1766,305 @@ rk_result Simulation::get_link_body(uint32_t robot_index,uint32_t link_index,
     return RK_OK;
 }
 
+rk_result Simulation::bind_object_to_link(nksim_object object, uint32_t robot_index,
+        uint32_t link_index) {
+    Lock lock(session_);
+    if (object == 0 || robot_index >= bindings_.size()) return RK_ERROR_INVALID_ARGUMENT;
+    const auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    if (link_index >= binding->bodies_.size()) return RK_ERROR_INVALID_ARGUMENT;
+    nksim_body body = 0;
+    if (nksim_session_get_object_body(session_, object, &body) != NKSIM_OK || body == 0)
+        return RK_ERROR_INVALID_HANDLE;
+    for (auto &owner : object_carriers_) if (owner.object == object) {
+        owner.body = body;
+        owner.robot_index = robot_index;
+        owner.link_index = link_index;
+        return RK_OK;
+    }
+    try {
+        object_carriers_.push_back({object, body, robot_index, link_index});
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    }
+    return RK_OK;
+}
+
+rk_result Simulation::unbind_object(nksim_object object) {
+    Lock lock(session_);
+    if (object == 0) return RK_ERROR_INVALID_ARGUMENT;
+    const auto found = std::find_if(object_carriers_.begin(), object_carriers_.end(),
+        [object](const ObjectCarrierOwner &owner) { return owner.object == object; });
+    if (found != object_carriers_.end()) object_carriers_.erase(found);
+    return RK_OK;
+}
+
+rk_result Simulation::create_object_slide_follower(const rk_simulation_object_slide_desc &request,
+        nksim_joint &out_joint) {
+    Lock lock(session_);
+    out_joint = 0;
+    if (request.struct_size < sizeof(request) || request.reserved[0] || request.reserved[1] ||
+        request.follower_body == 0 || !std::isfinite(request.lower_limit) ||
+        !std::isfinite(request.upper_limit) || !(request.lower_limit < request.upper_limit) ||
+        !std::isfinite(request.max_force) || !(request.max_force > 0.0) ||
+        !std::isfinite(request.ratio) || request.ratio == 0.0 || !std::isfinite(request.offset) ||
+        request.robot_index >= bindings_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    double axis_norm = 0.0;
+    for (int i = 0; i < 3; ++i) {
+        if (!std::isfinite(request.anchor_a[i]) || !std::isfinite(request.anchor_b[i]) ||
+            !std::isfinite(request.axis_a[i]))
+            return RK_ERROR_INVALID_ARGUMENT;
+        axis_norm += request.axis_a[i] * request.axis_a[i];
+    }
+    if (std::abs(axis_norm - 1.0) > 1e-8) return RK_ERROR_INVALID_ARGUMENT;
+    const auto world = stopped_world();
+    if (world == 0) return RK_ERROR_INVALID_STATE;
+    const auto binding = bindings_[request.robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    const auto &blueprint = runtimes_[request.robot_index]->blueprint();
+    if (request.parent_link_index >= binding->bodies_.size() ||
+        request.driver_joint_index >= binding->joints_.size() ||
+        request.driver_joint_index >= blueprint.joint_count ||
+        blueprint.joints[request.driver_joint_index].type != RK_RUNTIME_JOINT_REVOLUTE ||
+        blueprint.joints[request.driver_joint_index].child_link != request.parent_link_index)
+        return RK_ERROR_INVALID_ARGUMENT;
+    try {
+        object_joints_.reserve(object_joints_.size() + 1);
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    }
+
+    nksim_body_state parent_state{}, follower_state{};
+    parent_state.struct_size = follower_state.struct_size = sizeof(nksim_body_state);
+    if (nksim_body_get_state(world,binding->bodies_[request.parent_link_index],&parent_state) != NKSIM_OK ||
+        nksim_body_get_state(world,request.follower_body,&follower_state) != NKSIM_OK)
+        return RK_ERROR_BACKEND;
+    const auto began = nksim_world_begin_topology_update(world);
+    if (began != NKSIM_OK) return from_sim(began);
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_PRISMATIC;
+    joint_desc.body_a = binding->bodies_[request.parent_link_index];
+    joint_desc.body_b = request.follower_body;
+    joint_desc.rotation_a[3] = 1.0;
+    const double inverse_follower_rotation[] = {-follower_state.rotation[0],-follower_state.rotation[1],
+        -follower_state.rotation[2],follower_state.rotation[3]};
+    quat_multiply(inverse_follower_rotation,parent_state.rotation,joint_desc.rotation_b);
+    std::copy_n(request.anchor_a, 3, joint_desc.anchor_a);
+    std::copy_n(request.anchor_b, 3, joint_desc.anchor_b);
+    std::copy_n(request.axis_a, 3, joint_desc.axis_a);
+    joint_desc.lower_limit = request.lower_limit;
+    joint_desc.upper_limit = request.upper_limit;
+    joint_desc.max_force = request.max_force;
+    nksim_joint follower = 0;
+    auto result = nksim_joint_create(world, &joint_desc, &follower);
+    if (result == NKSIM_OK) {
+        nksim_joint_coupling_desc coupling{};
+        coupling.struct_size = sizeof(coupling);
+        coupling.leader = binding->joints_[request.driver_joint_index];
+        coupling.follower = follower;
+        coupling.ratio = request.ratio;
+        coupling.offset = request.offset;
+        result = nksim_joint_couple(world, &coupling);
+    }
+    if (result != NKSIM_OK && follower != 0) nksim_joint_destroy(world, follower);
+    const auto committed = nksim_world_end_topology_update(world);
+    if (result != NKSIM_OK) return from_sim(result);
+    if (committed != NKSIM_OK) return from_sim(committed);
+    object_joints_.push_back({follower, request.follower_body, request.robot_index,
+        request.parent_link_index});
+    out_joint = follower;
+    return RK_OK;
+}
+
+rk_result Simulation::create_object_fixed_follower(uint32_t robot_index,
+        uint32_t parent_link_index, nksim_body follower_body, nksim_joint &out_joint) {
+    Lock lock(session_);
+    out_joint = 0;
+    if (follower_body == 0 || robot_index >= bindings_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto world = stopped_world();
+    if (world == 0) return RK_ERROR_INVALID_STATE;
+    const auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    if (parent_link_index >= binding->bodies_.size()) return RK_ERROR_INVALID_ARGUMENT;
+    try {
+        object_joints_.reserve(object_joints_.size() + 1);
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    }
+
+    nksim_body_state parent_state{}, follower_state{};
+    parent_state.struct_size = follower_state.struct_size = sizeof(nksim_body_state);
+    if (nksim_body_get_state(world, binding->bodies_[parent_link_index], &parent_state) != NKSIM_OK ||
+        nksim_body_get_state(world, follower_body, &follower_state) != NKSIM_OK)
+        return RK_ERROR_BACKEND;
+
+    // Capture the measured transform at the interlocked mount. Creating this
+    // fixed joint therefore preserves the seated CAD body instead of snapping
+    // it to a nominal connector or the link origin.
+    const auto parent = xform_from(parent_state.position, parent_state.rotation);
+    const auto follower = xform_from(follower_state.position, follower_state.rotation);
+    const auto relative = xform_compose(xform_inverse(parent), follower);
+
+    const auto began = nksim_world_begin_topology_update(world);
+    if (began != NKSIM_OK) return from_sim(began);
+    nksim_joint_desc description{};
+    description.struct_size = sizeof(description);
+    description.type = NKSIM_JOINT_FIXED;
+    description.body_a = binding->bodies_[parent_link_index];
+    description.body_b = follower_body;
+    std::copy_n(relative.pos, 3, description.anchor_a);
+    std::copy_n(relative.rot, 4, description.rotation_a);
+    description.rotation_b[3] = 1.0;
+    nksim_joint joint = 0;
+    const auto created = nksim_joint_create(world, &description, &joint);
+    if (created != NKSIM_OK && joint != 0) nksim_joint_destroy(world, joint);
+    const auto committed = nksim_world_end_topology_update(world);
+    if (created != NKSIM_OK) return from_sim(created);
+    if (committed != NKSIM_OK) return from_sim(committed);
+    object_joints_.push_back({joint, follower_body, robot_index, parent_link_index});
+    out_joint = joint;
+    return RK_OK;
+}
+
+rk_result Simulation::create_robot_fixed_follower(uint32_t parent_robot_index,
+        uint32_t parent_link_index, uint32_t child_robot_index,
+        uint32_t child_root_link_index, nksim_joint &out_joint) {
+    out_joint = 0;
+    nksim_body parent_body = 0;
+    {
+        Lock lock(session_);
+        if (parent_robot_index >= bindings_.size()) return RK_ERROR_INVALID_ARGUMENT;
+        const auto parent = bindings_[parent_robot_index].lock();
+        if (!parent) return RK_ERROR_INVALID_HANDLE;
+        if (parent_link_index >= parent->bodies_.size()) return RK_ERROR_INVALID_ARGUMENT;
+        parent_body = parent->bodies_[parent_link_index];
+    }
+    return create_robot_body_fixed_follower(parent_body, child_robot_index,
+        child_root_link_index, out_joint);
+}
+
+rk_result Simulation::create_robot_body_fixed_follower(nksim_body parent_body,
+        uint32_t child_robot_index, uint32_t child_root_link_index, nksim_joint &out_joint) {
+    Lock lock(session_);
+    out_joint = 0;
+    if (parent_body == 0 || child_robot_index >= bindings_.size() ||
+        child_robot_index >= robot_floating_.size() || !robot_floating_[child_robot_index])
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto world = stopped_world();
+    if (world == 0) return RK_ERROR_INVALID_STATE;
+    const auto child = bindings_[child_robot_index].lock();
+    if (!child) return RK_ERROR_INVALID_HANDLE;
+    if (child_root_link_index >= child->bodies_.size() ||
+        child->bodies_[child_root_link_index] != robot_base_bodies_[child_robot_index])
+        return RK_ERROR_INVALID_ARGUMENT;
+    for (const auto &owner : robot_joints_)
+        if (owner.child_robot_index == child_robot_index)
+            return RK_ERROR_INVALID_STATE;
+
+    // Environment bodies can hold a tool at a dock. Robot-body parents also
+    // keep their mount graph acyclic, including a robot already mounted to a dock.
+    const auto no_parent_robot = std::numeric_limits<uint32_t>::max();
+    uint32_t parent_robot_index = no_parent_robot;
+    for (uint32_t robot = 0; robot < bindings_.size(); ++robot) {
+        const auto binding = bindings_[robot].lock();
+        if (!binding) continue;
+        for (uint32_t link = 0; link < binding->bodies_.size(); ++link)
+            if (binding->bodies_[link] == parent_body) {
+                parent_robot_index = robot;
+                break;
+            }
+        if (parent_robot_index != no_parent_robot) break;
+    }
+    if (parent_robot_index == child_robot_index) return RK_ERROR_INVALID_ARGUMENT;
+    if (parent_robot_index != no_parent_robot) {
+        auto ancestor = parent_robot_index;
+        while (ancestor != no_parent_robot) {
+            if (ancestor == child_robot_index) return RK_ERROR_INVALID_ARGUMENT;
+            const auto mounted = std::find_if(robot_joints_.begin(), robot_joints_.end(),
+                [ancestor](const RobotJointOwner &owner) {
+                    return owner.child_robot_index == ancestor;
+                });
+            if (mounted == robot_joints_.end()) break;
+            ancestor = mounted->parent_robot_index;
+        }
+    }
+    try {
+        robot_joints_.reserve(robot_joints_.size() + 1);
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    }
+
+    const auto child_body = child->bodies_[child_root_link_index];
+    nksim_body_state parent_state{}, child_state{};
+    parent_state.struct_size = child_state.struct_size = sizeof(nksim_body_state);
+    if (nksim_body_get_state(world, parent_body, &parent_state) != NKSIM_OK ||
+        nksim_body_get_state(world, child_body, &child_state) != NKSIM_OK)
+        return RK_ERROR_BACKEND;
+
+    // Capture the measured connector pose so docking never moves either
+    // articulated runtime when its fixed mount is created.
+    const auto parent_pose = xform_from(parent_state.position, parent_state.rotation);
+    const auto child_pose = xform_from(child_state.position, child_state.rotation);
+    const auto relative = xform_compose(xform_inverse(parent_pose), child_pose);
+    const auto began = nksim_world_begin_topology_update(world);
+    if (began != NKSIM_OK) return from_sim(began);
+    nksim_joint_desc description{};
+    description.struct_size = sizeof(description);
+    description.type = NKSIM_JOINT_FIXED;
+    description.body_a = parent_body;
+    description.body_b = child_body;
+    std::copy_n(relative.pos, 3, description.anchor_a);
+    std::copy_n(relative.rot, 4, description.rotation_a);
+    description.rotation_b[3] = 1.0;
+    nksim_joint joint = 0;
+    const auto created = nksim_joint_create(world, &description, &joint);
+    if (created != NKSIM_OK && joint != 0) nksim_joint_destroy(world, joint);
+    const auto committed = nksim_world_end_topology_update(world);
+    if (created != NKSIM_OK) return from_sim(created);
+    if (committed != NKSIM_OK) return from_sim(committed);
+    robot_joints_.push_back({joint, parent_body, parent_robot_index, child_robot_index,
+        child_root_link_index});
+    out_joint = joint;
+    return RK_OK;
+}
+
+rk_result Simulation::destroy_robot_joint(nksim_joint joint) {
+    Lock lock(session_);
+    const auto found = std::find_if(robot_joints_.begin(), robot_joints_.end(),
+        [joint](const RobotJointOwner &owner) { return owner.joint == joint; });
+    if (found == robot_joints_.end()) return RK_ERROR_INVALID_HANDLE;
+    const auto world = stopped_world();
+    if (world == 0) return RK_ERROR_INVALID_STATE;
+    nksim_joint_state state{};
+    state.struct_size = sizeof(state);
+    if (nksim_joint_get_state(world, joint, &state) != NKSIM_OK) return RK_ERROR_INVALID_HANDLE;
+    if (nksim_world_begin_topology_update(world) != NKSIM_OK) return RK_ERROR_INVALID_STATE;
+    nksim_joint_destroy(world, joint);
+    if (nksim_world_end_topology_update(world) != NKSIM_OK) return RK_ERROR_BACKEND;
+    robot_joints_.erase(found);
+    return RK_OK;
+}
+
+rk_result Simulation::destroy_object_joint(nksim_joint joint) {
+    Lock lock(session_);
+    const auto found = std::find_if(object_joints_.begin(), object_joints_.end(),
+        [joint](const ObjectJointOwner &owner) { return owner.joint == joint; });
+    if (found == object_joints_.end()) return RK_ERROR_INVALID_HANDLE;
+    const auto world = stopped_world();
+    if (world == 0) return RK_ERROR_INVALID_STATE;
+    nksim_joint_state state{};
+    state.struct_size = sizeof(state);
+    if (nksim_joint_get_state(world, joint, &state) != NKSIM_OK) return RK_ERROR_INVALID_HANDLE;
+    if (nksim_world_begin_topology_update(world) != NKSIM_OK) return RK_ERROR_INVALID_STATE;
+    nksim_joint_destroy(world, joint);
+    if (nksim_world_end_topology_update(world) != NKSIM_OK) return RK_ERROR_BACKEND;
+    object_joints_.erase(found);
+    return RK_OK;
+}
+
 rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
                                          std::vector<rk_robot_contact> &out,
                                          uint64_t *step_index) const {
@@ -1797,6 +2097,62 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
     uint64_t count = 0;
     if (nksim_snapshot_get_contact_count(snapshot, &count) != NKSIM_OK)
         result_code = RK_ERROR_BACKEND;
+    auto append_contact = [&](const nksim_contact &source, nksim_body body,
+                              uint32_t link_index, int32_t tool_piece_index) {
+        if (source.body_a != body && source.body_b != body) return;
+        const bool body_is_a = source.body_a == body;
+        const auto other_body = body_is_a ? source.body_b : source.body_a;
+        rk_robot_contact result{};
+        result.struct_size = sizeof(result);
+        result.other_robot = UINT32_MAX;
+        result.other_link = UINT32_MAX;
+        result.link_index = link_index;
+        result.tool_piece_index = tool_piece_index;
+        result.other_piece_index = body_is_a ? source.part_b : source.part_a;
+        nksim_object other_object = 0;
+        if (nksim_session_find_object(session_, other_body, &other_object) == NKSIM_OK) {
+            result.other_object = other_object;
+            result.other_kind = RK_CONTACT_OTHER_OBJECT;
+        } else {
+            result.other_kind = RK_CONTACT_OTHER_WORLD;
+            for (uint32_t other_robot = 0; other_robot < bindings_.size(); ++other_robot) {
+                const auto other_binding = bindings_[other_robot].lock();
+                if (!other_binding) continue;
+                const auto &other_bodies = other_binding->bodies_;
+                const auto found = std::find(other_bodies.begin(), other_bodies.end(), other_body);
+                if (found == other_bodies.end()) continue;
+                result.other_kind = RK_CONTACT_OTHER_ROBOT_LINK;
+                result.other_robot = other_robot;
+                result.other_link = static_cast<uint32_t>(found - other_bodies.begin());
+                break;
+            }
+        }
+        result.distance = source.distance;
+        std::copy_n(source.position, 3, result.position);
+        std::copy_n(source.normal, 3, result.normal);
+        if (source.wrench_valid) {
+            result.wrench_valid = 1;
+            std::copy_n(source.force_on_body_a, 3, result.force_on_link);
+            std::copy_n(source.torque_on_body_a, 3, result.torque_on_link);
+        }
+        if (!body_is_a) {
+            for (double &axis : result.normal) axis = -axis;
+            for (double &axis : result.force_on_link) axis = -axis;
+            for (double &axis : result.torque_on_link) axis = -axis;
+        }
+        result.active = source.active;
+        out.push_back(result);
+    };
+    auto internal_to_tool = [&](nksim_body body, uint32_t link_index) {
+        if (link_index < binding->bodies_.size() && body == binding->bodies_[link_index]) return true;
+        for (const auto &owner : object_joints_)
+            if (owner.robot_index == robot_index && owner.parent_link_index == link_index &&
+                owner.follower == body) return true;
+        for (const auto &owner : object_carriers_)
+            if (owner.robot_index == robot_index && owner.link_index == link_index && owner.body == body)
+                return true;
+        return false;
+    };
     for (uint64_t i = 0; result_code == RK_OK && i < count; ++i) {
         nksim_contact source{};
         source.struct_size = sizeof(source);
@@ -1806,42 +2162,38 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
         }
         for (uint32_t link = 0; link < binding->bodies_.size(); ++link) {
             const auto body = binding->bodies_[link];
-            if (source.body_a != body && source.body_b != body) continue;
-            const auto part = source.body_a == body ? source.part_a : source.part_b;
-            rk_robot_contact result{};
-            result.struct_size = sizeof(result);
-            result.other_robot = UINT32_MAX;
-            result.other_link = UINT32_MAX;
-            result.link_index = link;
-            result.tool_piece_index = link == binding->tool_link_ && part >= binding->tool_part_start_ &&
-                part < binding->tool_part_start_ + binding->tool_part_count_
-                ? static_cast<int32_t>(part - binding->tool_part_start_) : -1;
-            const auto other_body = source.body_a == body ? source.body_b : source.body_a;
-            nksim_object other_object = 0;
-            if (nksim_session_find_object(session_, other_body, &other_object) == NKSIM_OK) {
-                result.other_object = other_object;
-                result.other_kind = RK_CONTACT_OTHER_OBJECT;
-            } else {
-                result.other_kind = RK_CONTACT_OTHER_WORLD;
-                for (uint32_t other_robot = 0; other_robot < bindings_.size(); ++other_robot) {
-                    const auto other_binding = bindings_[other_robot].lock();
-                    if (!other_binding) continue;
-                    const auto &bodies = other_binding->bodies_;
-                    const auto found = std::find(bodies.begin(), bodies.end(), other_body);
-                    if (found == bodies.end()) continue;
-                    result.other_kind = RK_CONTACT_OTHER_ROBOT_LINK;
-                    result.other_robot = other_robot;
-                    result.other_link = static_cast<uint32_t>(found - bodies.begin());
-                    break;
-                }
+            if (source.body_a == body && !internal_to_tool(source.body_b, link)) {
+                const auto part = source.part_a;
+                const auto tool_piece = link == binding->tool_link_ && part >= binding->tool_part_start_ &&
+                    part < binding->tool_part_start_ + binding->tool_part_count_
+                    ? static_cast<int32_t>(part - binding->tool_part_start_) : -1;
+                append_contact(source, body, link, tool_piece);
+            } else if (source.body_b == body && !internal_to_tool(source.body_a, link)) {
+                const auto part = source.part_b;
+                const auto tool_piece = link == binding->tool_link_ && part >= binding->tool_part_start_ &&
+                    part < binding->tool_part_start_ + binding->tool_part_count_
+                    ? static_cast<int32_t>(part - binding->tool_part_start_) : -1;
+                append_contact(source, body, link, tool_piece);
             }
-            result.distance = source.distance;
-            std::copy_n(source.position, 3, result.position);
-            std::copy_n(source.normal, 3, result.normal);
-            if (source.body_b == body)
-                for (double &axis : result.normal) axis = -axis;
-            result.active = source.active;
-            out.push_back(result);
+        }
+        for (const auto &owner : object_joints_) {
+            if (owner.robot_index != robot_index ||
+                (source.body_a != owner.follower && source.body_b != owner.follower))
+                continue;
+            const auto other_body = source.body_a == owner.follower ? source.body_b : source.body_a;
+            // Contacts with the same carrier or its sibling fasteners are
+            // internal to the local tool assembly. A workpiece on another
+            // robot link remains an external load at this tool.
+            if (!internal_to_tool(other_body, owner.parent_link_index))
+                append_contact(source, owner.follower, owner.parent_link_index, -1);
+        }
+        for (const auto &owner : object_carriers_) {
+            if (owner.robot_index != robot_index ||
+                (source.body_a != owner.body && source.body_b != owner.body))
+                continue;
+            const auto other_body = source.body_a == owner.body ? source.body_b : source.body_a;
+            if (!internal_to_tool(other_body, owner.link_index))
+                append_contact(source, owner.body, owner.link_index, -1);
         }
     }
     if (owned != 0) nksim_snapshot_destroy(owned);
@@ -2114,6 +2466,8 @@ void Simulation::cleanup() noexcept {
     if (world != 0) {
         // One model recompile for the whole robot, not one per joint and body.
         const bool batched = nksim_world_begin_topology_update(world) == NKSIM_OK;
+        for (const auto &owner : object_joints_) nksim_joint_destroy(world, owner.joint);
+        for (const auto &owner : robot_joints_) nksim_joint_destroy(world, owner.joint);
         for (const auto joint : joints_) nksim_joint_destroy(world, joint);
         for (const auto body : bodies_) nksim_body_destroy(world, body);
         if (batched) nksim_world_end_topology_update(world);
@@ -2129,6 +2483,9 @@ void Simulation::cleanup() noexcept {
         }
     }
     joints_.clear();
+    object_joints_.clear();
+    robot_joints_.clear();
+    object_carriers_.clear();
     bodies_.clear();
     link_shapes_.clear();
     nodes_.clear();

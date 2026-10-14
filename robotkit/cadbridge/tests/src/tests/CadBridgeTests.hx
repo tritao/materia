@@ -93,8 +93,10 @@ class CadBridgeTests {
     testSchmalzEndEffector();
     testEndEffectorRuntimeBridge();
     testDerivedRuntimeBindings();
+    testSharedChangerLock();
     testTorchBindings();
     testAssemblySimulationBridge();
+    testAssemblySimulationSubtree();
     testDerivedExternalAxes();
     testMobileBaseBridge();
     testFaceBridgeOnPlainBoxFace();
@@ -525,9 +527,11 @@ class CadBridgeTests {
     selected.select(derived.runtime, Int64.ofInt(0));
     selected.apply(new FiredProcessEvent(Int64.ofInt(1), "short/robot/master.lock",
       ProcessEventValue.Digital(false), Int64.ofInt(1), Int64.ofInt(2), 1));
-    check(!derived.runtime.changerLock.isLocked(), "declared changer lock accepts release command");
+    check(!derived.runtime.changerLock.observation().locked, "declared changer lock accepts release command");
     selected.select(null, Int64.ofInt(3));
-    check(derived.runtime.changerLock.isLocked(), "inactive changer returns to safe locked state");
+    check(selected.active() == null && derived.runtime.changerLock.observation().locked &&
+      derived.runtime.changerLock.observation().toolId == "short",
+      "software deselection safes the lock without claiming physical tool detachment");
 
     var set = new EndEffectorSet();
     set.addComponent("base", new BridgeServiceSourcePart());
@@ -596,6 +600,98 @@ class CadBridgeTests {
     check(derivedGripper.runtime.gripper != null &&
       derivedGripper.runtime.channelDeclarations()[0].id == "gripper/tool/gripper/body.close",
       "gripper valve command derives from declared open and close ports");
+  }
+
+  static function testSharedChangerLock():Void {
+    var set = EndEffectorExample.build();
+    var staleLock = new robotkit.tool.SimulatedChangerLock("short");
+    var staleRejected = false;
+    try EndEffectorRuntimeBridge.toChangerRuntimeFromDesign(set, "contact", "short",
+      Int64.ofInt(11), Int64.ofInt(10), null, staleLock)
+    catch (error:Dynamic) staleRejected = Std.string(error).indexOf("stale") >= 0;
+    check(staleRejected, "CAD changer factory rejects stale initial lock and identity feedback");
+    var changer = EndEffectorRuntimeBridge.toChangerRuntimeFromDesign(set,
+      "contact", "short", Int64.ofInt(0), Int64.ofInt(10));
+    var shortBundle = changer.tools.get("short"), longBundle = changer.tools.get("long");
+    if (shortBundle == null || longBundle == null)
+      throw "CAD changer factory omitted one of its declared tools";
+    var checkedShortBundle = shortBundle, checkedLongBundle = longBundle;
+    check(changer.selection.active() == checkedShortBundle.runtime &&
+      checkedShortBundle.runtime.changerLock == changer.lock && checkedLongBundle.runtime.changerLock == changer.lock,
+      "CAD changer factory builds every tool on one measured lock and selects its declared initial tool");
+    changer.transaction.begin("long", Int64.ofInt(0));
+    var simulatedLock:robotkit.tool.SimulatedChangerLock = cast changer.lock;
+    changer.transaction.confirmUnlocked(Int64.ofInt(1));
+    simulatedLock.detachTool(Int64.ofInt(2));
+    changer.transaction.confirmDetached(Int64.ofInt(2));
+    simulatedLock.attachTool("long", Int64.ofInt(3));
+    changer.transaction.confirmAttached(Int64.ofInt(3));
+    changer.transaction.confirmLocked(Int64.ofInt(3));
+    check(changer.selection.active() == checkedLongBundle.runtime &&
+      checkedLongBundle.runtime.tool.flangeTTcp.translation.z != checkedShortBundle.runtime.tool.flangeTTcp.translation.z &&
+      simulatedLock.observation().toolId == "long",
+      "confirmed CAD tool exchange switches the live runtime TCP with measured physical identity");
+
+    var independentShort = EndEffectorRuntimeBridge.toRuntimeFromDesign(set, "short", "contact").runtime;
+    var independentLong = EndEffectorRuntimeBridge.toRuntimeFromDesign(set, "long", "contact").runtime;
+    var independentSelection = new ToolRuntimeSelection();
+    independentSelection.select(independentShort, Int64.ofInt(5));
+    var rejected = false;
+    try independentSelection.select(independentLong, Int64.ofInt(6)) catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("share one changer lock") >= 0;
+    check(rejected && independentSelection.active() == independentShort,
+      "separate per-configuration lock simulations cannot masquerade as one changer");
+
+    var lock = new robotkit.tool.SimulatedChangerLock("short");
+    var shortTool = EndEffectorRuntimeBridge.toRuntimeFromDesign(set, "short", "contact", null, lock).runtime;
+    var longTool = EndEffectorRuntimeBridge.toRuntimeFromDesign(set, "long", "contact", null, lock).runtime;
+    check(shortTool.changerLock == lock && longTool.changerLock == lock,
+      "interchangeable configurations share the physical changer lock");
+    var foreignClockLock = new robotkit.tool.SimulatedChangerLock("short", "cell.device");
+    var foreignClockTool = EndEffectorRuntimeBridge.toRuntimeFromDesign(set,
+      "short", "contact", null, foreignClockLock).runtime;
+    var foreignClockSelection = new ToolRuntimeSelection();
+    rejected = false;
+    try foreignClockSelection.select(foreignClockTool, Int64.ofInt(5)) catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("does not match selection clock") >= 0;
+    check(rejected, "tool selection rejects changer feedback from another clock");
+
+    var selection = new ToolRuntimeSelection();
+    selection.select(shortTool, Int64.ofInt(10));
+    selection.beginProcess("short:qualification");
+    check(selection.activeProcessToolId() == "short",
+      "process ownership captures the physical changer tool identity");
+    selection.finishProcess("short:qualification");
+    selection.apply(new FiredProcessEvent(Int64.ofInt(1), "short/robot/master.lock",
+      ProcessEventValue.Digital(false), Int64.ofInt(11), Int64.ofInt(11), 1));
+    rejected = false;
+    try selection.select(longTool, Int64.ofInt(12)) catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("state reports engagement") >= 0;
+    check(rejected && selection.active() == shortTool && !lock.observation().locked,
+      "unlocked changer state prevents premature TCP and capability selection");
+    lock.detachTool(Int64.ofInt(12));
+    lock.attachTool("wrong", Int64.ofInt(13));
+    selection.apply(new FiredProcessEvent(Int64.ofInt(2), "short/robot/master.lock",
+      ProcessEventValue.Digital(true), Int64.ofInt(14), Int64.ofInt(14), 1));
+    rejected = false;
+    try selection.select(longTool, Int64.ofInt(15)) catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("selection requested") >= 0;
+    check(rejected && selection.active() == shortTool,
+      "locked changer with the wrong measured identity cannot select another TCP");
+    selection.apply(new FiredProcessEvent(Int64.ofInt(3), "short/robot/master.lock",
+      ProcessEventValue.Digital(false), Int64.ofInt(16), Int64.ofInt(16), 1));
+    lock.detachTool(Int64.ofInt(17));
+    lock.attachTool("long", Int64.ofInt(18));
+    selection.apply(new FiredProcessEvent(Int64.ofInt(4), "short/robot/master.lock",
+      ProcessEventValue.Digital(true), Int64.ofInt(19), Int64.ofInt(19), 1));
+    rejected = false;
+    try selection.select(longTool, Int64.ofInt(18)) catch (error:Dynamic)
+      rejected = Std.string(error).indexOf("newer than the tool selection event") >= 0;
+    check(rejected, "tool selection rejects changer feedback newer than its event time");
+    selection.select(longTool, Int64.ofInt(20));
+    check(selection.active() == longTool && lock.observation().locked &&
+      lock.observation().toolId == "long",
+      "tool configuration changes only after the shared lock state reports engaged");
   }
 
   /** A welding torch derives an arc control, bound to its signal inlet, and its other channels. */
@@ -913,16 +1009,51 @@ class CadBridgeTests {
       "nested assembly flattens before RobotKit translation");
   }
 
-  /**
-   * M9 fallback (see CONSTRUCTION_ROADMAP.md, "Simulated wall-finishing
-   * robot"): the M9 scenario test builds its design WorkSurface directly in
-   * robotkit/tests to keep that project's own dependency on nativekit only
-   * (robotkit's CAD-agnostic-core rule). This test instead starts from an
-   * actual BIM wall and carries it all the way through WallBridge and
-   * robotkit.manipulation's own WorkPatchPlanner, so the BIM-to-patch-plan
-   * path this milestone's fallback describes is exercised by at least one
-   * test even though the M9 scenario itself never imports cadbridge.
-   */
+  /** A tool root is detached from its robot attachment while its internal CAD joints remain articulated. */
+  static function testAssemblySimulationSubtree():Void {
+    var assembly = new AssemblyModel();
+    assembly.add("arm", AssemblyFrames.translation(500, 0, 0));
+    assembly.add("toolBase");
+    assembly.add("jaw");
+    assembly.connector("arm", "flange", AssemblyFrames.identity());
+    assembly.connector("toolBase", "mount", AssemblyFrames.identity());
+    assembly.connector("toolBase", "hinge", AssemblyFrames.translation(0, 0, 10));
+    assembly.connector("jaw", "hinge", AssemblyFrames.identity());
+    assembly.mate("robot-tool-mount", "fixed", "arm", "flange", "toolBase", "mount");
+    assembly.mateOnAxis("jaw-axis", "revolute", "toolBase", "hinge", "jaw", "hinge",
+      {x: 0, y: 0, z: 1}, 0, {lower: -1, upper: 1, velocity: 2, effort: 5});
+    var definition = assembly.definition("detachable-tool-test");
+    var saved = new cadkit.modeling.AssemblyState(definition);
+    saved.setJoint("jaw-axis", 0.35);
+    var subtree = AssemblySimulationBridge.subtree(definition, "toolBase", saved.record());
+    var subtreeState = subtree.state;
+    check(subtree.occurrences.length == 2 && subtree.occurrences.indexOf("arm") < 0 &&
+      subtree.occurrences.indexOf("toolBase") >= 0 && subtree.occurrences.indexOf("jaw") >= 0,
+      "detached tool subtree excludes its robot flange and keeps articulated CAD members");
+    check(subtree.joints.length == 1 && subtree.joints[0] == "jaw-axis" &&
+      subtreeState != null && subtreeState.jointCoordinates.length == 1 &&
+      Math.abs(subtreeState.jointCoordinates[0].value - 0.35) < 1e-12,
+      "detached tool subtree retains its internal joint and saved coordinate");
+    var root = subtree.definition.occurrences[0];
+    check(Math.abs(root.initialPose.x) < 1e-12 && Math.abs(root.initialPose.y) < 1e-12 &&
+      Math.abs(root.initialPose.z) < 1e-12 && Math.abs(subtree.rootPose.x - 500) < 1e-9,
+      "detached tool geometry is rebased while its CAD world pose remains available");
+    check(subtree.definition.joints.length == 1 && subtree.definition.joints[0].parent == "toolBase" &&
+      subtree.definition.joints[0].child == "jaw",
+      "detached tool CAD definition removes only the external attachment edge");
+    var physical:cadbridge.AssemblySimulationBridge.AssemblyPhysicalData = {metresPerUnit: 0.001,
+      parts: [for (id in ["arm", "toolBase", "jaw"]) {id: id, materialId: "machined-steel",
+        volume: 1000.0, centerOfMass: [0.0, 0.0, 0.0],
+        inertia: [1.0e6, 0, 0, 0, 1.0e6, 0, 0, 0, 1.0e6], density: 7850.0}]};
+    var floating = AssemblySimulationBridge.toFloatingRobotModel(definition, physical,
+      "toolBase", saved.record());
+    check(floating.converted.model.floatingBase && floating.converted.model.links.length == 2 &&
+      floating.converted.model.joints.length == 1 &&
+      floating.converted.partLinks.exists("toolBase") && floating.converted.partLinks.exists("jaw") &&
+      !floating.converted.partLinks.exists("arm"),
+      "detached tool compiles as a floating articulated runtime with only its CAD mass and parts");
+  }
+
   /**
    * The mobile base example drives as a wheeled robot: the bridge makes its chassis the root link that
    * the drive rolls over the floor, each wheel turns about its own outward shaft, and the chassis
@@ -978,6 +1109,16 @@ class CadBridgeTests {
     harness.dispose();
   }
 
+  /**
+   * M9 fallback (see CONSTRUCTION_ROADMAP.md, "Simulated wall-finishing
+   * robot"): the M9 scenario test builds its design WorkSurface directly in
+   * robotkit/tests to keep that project's own dependency on nativekit only
+   * (robotkit's CAD-agnostic-core rule). This test instead starts from an
+   * actual BIM wall and carries it all the way through WallBridge and
+   * robotkit.manipulation's own WorkPatchPlanner, so the BIM-to-patch-plan
+   * path this milestone's fallback describes is exercised by at least one
+   * test even though the M9 scenario itself never imports cadbridge.
+   */
   static function testBimWallToPatchPlanEndToEnd():Void {
     var bim = new BimDocument();
     // A 6m x 0.3m wall band, the same proportions PlacementTests' (M8) own

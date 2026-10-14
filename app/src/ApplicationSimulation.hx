@@ -1157,7 +1157,7 @@ class ApplicationSimulation {
     var source = cadbridge.AssemblySimulationBridge.collisionPieces(occurrence.id,component,null);
     var pieces = [for (vertices in source)
       [for (i in 0...vertices.length) (vertices[i]-center[i%3])*physical.metresPerUnit]];
-    return pieces.length == 1 ? SimShape.convex(pieces[0]) : SimShape.compound(pieces);
+    return pieces.length == 1 ? SimShape.convex(pieces[0]) : SimShape.compoundConvex(pieces);
   }
 
   public function clear():Void {

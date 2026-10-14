@@ -171,6 +171,114 @@ void turned_box_contacts_reach_only_the_box() {
     nkscene_scene_destroy(scene);
 }
 
+void kinematic_tool_contacts_are_reported_without_resolving_motion() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto target_node = make_node(scene, 0.0);
+    const auto tool_node = make_node(scene, 0.018);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 2;
+    nksim_world world = 0;
+    assert(nksim_world_create(&world_desc, &world) == NKS_OK);
+    const double target_half[] = {0.1, 0.1, 0.01};
+    const double tool_half[] = {0.003, 0.003, 0.01};
+    nksim_shape target_shape = 0, tool_shape = 0;
+    assert(nksim_shape_create_box(world, target_half, &target_shape) == NKS_OK);
+    assert(nksim_shape_create_box(world, tool_half, &tool_shape) == NKS_OK);
+    nksim_body_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.node = target_node;
+    desc.shape = target_shape;
+    desc.motion_type = NKSIM_MOTION_STATIC;
+    desc.collision_layer = desc.collision_mask = 1;
+    nksim_body target = 0;
+    assert(nksim_body_create(world, &desc, &target) == NKSIM_OK);
+    desc.node = tool_node;
+    desc.shape = tool_shape;
+    desc.motion_type = NKSIM_MOTION_KINEMATIC;
+    nksim_body tool = 0;
+    assert(nksim_body_create(world, &desc, &tool) == NKSIM_OK);
+
+    nksim_step_result step{};
+    step.struct_size = sizeof(step);
+    assert(nksim_world_step(world, &step) == NKSIM_OK);
+    if (step.scene_changes) nkscene_change_set_destroy(step.scene_changes);
+    uint32_t count = 0;
+    assert(nksim_world_get_contacts(world, nullptr, 0, &count) == NKSIM_OK && count == 1);
+    nksim_contact contact{};
+    contact.struct_size = sizeof(contact);
+    assert(nksim_world_get_contacts(world, &contact, 1, &count) == NKSIM_OK && count == 1);
+    assert(contact.body_a == tool && contact.body_b == target && contact.active && contact.distance < 0.0);
+    assert(contact.normal[2] < -0.99 && std::abs(contact.position[0]) < 0.003 &&
+           std::abs(contact.position[1]) < 0.003 && std::abs(contact.position[2] - 0.009) < 1e-9);
+    assert(!contact.wrench_valid);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+void kinematic_tool_contacts_exclude_empty_convex_bounds() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto target_node = make_node(scene, 0.0);
+    const auto outside_node = make_node_at(scene, 0.03, 0.0, 0.07);
+    const auto touching_node = make_node_at(scene, 0.02, 0.0, 0.057);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 1;
+    nksim_world world = 0;
+    assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+    const double vertices[] = {
+        -0.04, -0.05, 0.0,  0.04, -0.05, 0.0,
+        -0.04,  0.05, 0.0,  0.04,  0.05, 0.0,
+        -0.04, -0.05, 0.08, -0.02, -0.05, 0.08,  0.04, -0.05, 0.045,
+        -0.04,  0.05, 0.08, -0.02,  0.05, 0.08,  0.04,  0.05, 0.045,
+    };
+    nksim_shape hull = 0, tool_shape = 0;
+    assert(nksim_shape_create_convex(world, vertices, 30, &hull) == NKSIM_OK);
+    const double tool_half[] = {0.002, 0.002, 0.002};
+    assert(nksim_shape_create_box(world, tool_half, &tool_shape) == NKSIM_OK);
+    nksim_body_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.node = target_node;
+    desc.shape = hull;
+    desc.motion_type = NKSIM_MOTION_STATIC;
+    desc.collision_layer = desc.collision_mask = 1;
+    nksim_body target = 0;
+    assert(nksim_body_create(world, &desc, &target) == NKSIM_OK);
+    desc.shape = tool_shape;
+    desc.motion_type = NKSIM_MOTION_KINEMATIC;
+    desc.node = outside_node;
+    nksim_body outside = 0;
+    assert(nksim_body_create(world, &desc, &outside) == NKSIM_OK);
+    desc.node = touching_node;
+    nksim_body touching = 0;
+    assert(nksim_body_create(world, &desc, &touching) == NKSIM_OK);
+
+    nksim_step_result step{};
+    step.struct_size = sizeof(step);
+    assert(nksim_world_step(world, &step) == NKSIM_OK);
+    if (step.scene_changes) nkscene_change_set_destroy(step.scene_changes);
+    uint32_t count = 0;
+    assert(nksim_world_get_contacts(world, nullptr, 0, &count) == NKSIM_OK && count == 1);
+    nksim_contact contact{};
+    contact.struct_size = sizeof(contact);
+    assert(nksim_world_get_contacts(world, &contact, 1, &count) == NKSIM_OK && count == 1);
+    assert(contact.body_a == touching && contact.body_b == target && contact.active);
+    assert(contact.body_a != outside);
+    // The reported point comes from the intersecting convex hulls. The local
+    // AABB contact would put it well inside the hull's empty upper-right bound.
+    assert(contact.position[0] > 0.016 && contact.position[0] < 0.024);
+    assert(std::abs(contact.position[1]) < 0.003);
+    assert(contact.position[2] > 0.053 && contact.position[2] < 0.060);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 struct NestedNodes {
     nkscene_node_id parent{};
     nkscene_node_id child{};
@@ -1002,6 +1110,8 @@ void a_follower_with_two_leaders_is_the_sum_of_its_terms() {
 int main() {
     offset_convex_fallback_uses_its_bounds_center();
     turned_box_contacts_reach_only_the_box();
+    kinematic_tool_contacts_are_reported_without_resolving_motion();
+    kinematic_tool_contacts_exclude_empty_convex_bounds();
     falling_body_updates_scene_and_snapshot();
     nested_dynamic_body_updates_local_transform();
     repeated_replays_are_identical();

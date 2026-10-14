@@ -689,7 +689,9 @@ class RobotRuntime {
    * time; later snapshots carry the latest frame for each such sensor.
    * A `gnss_pose` frame carries latitude and longitude in degrees and ENU yaw
    * in radians; a `camera` frame carries an image and no values. Tool contact
-   * carries one digital value; tool vacuum carries one non-negative kPa value.
+   * carries one digital value; force/torque carries XYZ newtons followed by
+   * XYZ newton-metres in the mounted sensor frame; tool vacuum carries one
+   * non-negative kPa value.
    */
   public function publishSensorFrame(sensorId:String, values:Array<Float>, sequence:Int64,
       sourceTimestampNs:Int64, sourceClockId:String, ?image:CameraImage):Void {
@@ -727,6 +729,9 @@ class RobotRuntime {
       case "tool_contact":
         if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
           throw 'Contact "$sensorId" publication requires one digital value';
+      case "force_torque":
+        if (image != null || values.length != 6)
+          throw 'Force/torque "$sensorId" publication requires three newtons and three newton-metres';
       case "digital_input":
         if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
           throw 'Digital input "$sensorId" publication requires one digital value';

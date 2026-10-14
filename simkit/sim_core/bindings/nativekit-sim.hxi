@@ -458,10 +458,11 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	}
 	/**
 	 * A detected contact. Distance is signed surface separation in metres;
-	 * active is false when the backend reports it without a force constraint.
+	 * normal points from body_a toward body_b. active is false when the backend
+	 * reports it without a force constraint.
 	 * Body handles are zero for backend-owned world geometry.
 	 */
-	struct nksim_contact @layout(88, 8) {
+	struct nksim_contact @layout(136, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		body_a: nksim_body @offset(4);
 		body_b: nksim_body @offset(8);
@@ -471,6 +472,9 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		normal: array<f64, 3> @offset(48);
 		distance: f64 @offset(72);
 		active: u32 @offset(80);
+		wrench_valid: u32 @offset(84);
+		force_on_body_a: array<f64, 3> @offset(88);
+		torque_on_body_a: array<f64, 3> @offset(112);
 	}
 	/**
 	 * A contact between one part of each of two bodies' shapes (the part index

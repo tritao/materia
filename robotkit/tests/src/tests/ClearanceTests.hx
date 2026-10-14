@@ -7,6 +7,7 @@ import robotkit.spatial.Vec3;
 
 import robotkit.collision.CollisionClearance;
 import CollisionFixture;
+import robotkit.manipulation.ClearanceChange;
 import robotkit.manipulation.Manipulator;
 import robotkit.model.Frame;
 import robotkit.model.Joint;
@@ -29,6 +30,7 @@ class ClearanceTests {
     testLinkNamedStructuralRules();
     testPosesAndPath();
     testMargins();
+    testMultiHullContactWindow();
     testTouchingByDesign();
     testCoupledDriveContact();
     testMovingRackContact();
@@ -219,6 +221,41 @@ class ClearanceTests {
     var strict = wideFixture.clearance();
     var found = strict.violation([0.0, 0.0]);
     check(found != null && Math.abs(found.distance - 0.0123) < 1e-6, 'the distance between parallel faces is measured, got ${found == null ? -1 : found.distance}');
+  }
+
+  static function testMultiHullContactWindow():Void {
+    var model = new RobotModel("multi-hull-contact-window");
+    var base = model.addLink(new Link("base"));
+    var upper = model.addLink(new Link("upper"));
+    var tool = model.addLink(new Link("tool-link"));
+    var shoulder = model.addJoint(new Joint("shoulder", JointType.Revolute, base, upper));
+    shoulder.axis = [0.0, 0.0, 1.0];
+    var elbow = model.addJoint(new Joint("elbow", JointType.Revolute, upper, tool));
+    elbow.parentFramePosition = [0.3, 0.0, 0.0];
+    elbow.axis = [0.0, 0.0, 1.0];
+    var tip = model.addFrame(new Frame("tip", tool));
+    var arm = new Manipulator(model, base.id, tip.id);
+    var toolHull = box(0.0, 0.3, -0.01, 0.01, -0.01, 0.01);
+    var bodies = CollisionClearance.combine([
+      CollisionClearance.convex("tool", tool.id, toolHull, true),
+      CollisionClearance.convex("tool", tool.id, toolHull.copy(), true),
+      CollisionClearance.convex("fixture", base.id, box(0.4, 0.42, -0.01, 0.01, 0.01025, 0.03)),
+      CollisionClearance.convex("fixture", base.id, box(0.43, 0.45, -0.01, 0.01, 0.01025, 0.03)),
+      CollisionClearance.convex("other", base.id, box(0.46, 0.48, -0.01, 0.01, 0.01025, 0.03))
+    ]);
+    var clearance = new CollisionClearance(arm, bodies, [0.0, 0.0], () -> new NativeCollisionWorld());
+    var initial = clearance.violation([0.0, 0.0], true);
+    check(initial != null && (initial.a == "fixture" || initial.b == "fixture"),
+      "named CAD member initially violates the contact margin across its compound hulls");
+    clearance.apply(ClearanceChange.OpenWindow("tool", "fixture", null), [0.0, 0.0]);
+    var outsideWindow = clearance.violation([0.0, 0.0], true);
+    check(outsideWindow != null && (outsideWindow.a == "other" || outsideWindow.b == "other"),
+      "a contact window covers every tool/target hull but keeps other obstacle pairs checked");
+    clearance.apply(ClearanceChange.CloseWindow("tool", "fixture"), [0.0, 0.0]);
+    var restored = clearance.violation([0.0, 0.0], true);
+    check(restored != null && (restored.a == "fixture" || restored.b == "fixture"),
+      "closing a compound contact window restores the original checks");
+    clearance.world.dispose();
   }
 
   static function testTouchingByDesign():Void {

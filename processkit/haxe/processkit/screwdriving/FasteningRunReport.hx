@@ -41,7 +41,8 @@ class FasteningRunReport {
         !Math.isFinite(result.angle) || result.angle < 0 || result.outcome < ScrewdriverContract.OK || result.outcome > ScrewdriverContract.SCREW_LOST)
       throw "Fastening report needs an ordered measured attempt for its exact connection";
     for (previous in attempts) if (previous.screw == screw) throw "A replacement must be a new identified screw";
-    attempts.push({attempt:attempt,screw:screw,result:{fastening:result.fastening,torqueNm:result.torqueNm,angle:result.angle,outcome:result.outcome},
+    attempts.push({attempt:attempt,screw:screw,result:{fastening:result.fastening,torqueNm:result.torqueNm,angle:result.angle,
+      outcome:result.outcome,diagnostic:result.diagnostic},
       disposition:result.outcome == ScrewdriverContract.OK ? Tightened : PendingRecovery});
   }
   public function recovered():Void {

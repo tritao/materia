@@ -354,8 +354,9 @@ typedef struct nksim_contact_pair_desc {
 } nksim_contact_pair_desc;
 
 /** A detected contact. Distance is signed surface separation in metres;
- * active is false when the backend reports it without a force constraint.
- * Body handles are zero for backend-owned world geometry.
+ * normal points from body_a toward body_b. active is false when the backend
+ * reports it without a force constraint. Body handles are zero for
+ * backend-owned world geometry.
  */
 typedef struct nksim_contact {
     uint32_t struct_size NK_STRUCT_SIZE;
@@ -367,6 +368,10 @@ typedef struct nksim_contact {
     double normal[3];
     double distance;
     uint32_t active NK_BOOL32;
+    uint32_t wrench_valid NK_BOOL32;
+    /** Contact wrench acting on body_a, in world axes, about position; SI units. */
+    double force_on_body_a[3];
+    double torque_on_body_a[3];
 } nksim_contact;
 
 enum { NKSIM_SNAPSHOT_PAGE_CAPACITY = 64u };

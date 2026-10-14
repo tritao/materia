@@ -50,7 +50,7 @@ typedef ArcTorchControl = {
  */
 typedef ScrewdriverControl = {
 	member:String, channel:String, directionChannel:String, programChannel:String, vacuumChannel:String,
-	sensor:String, controlPort:String, tcpConnector:String, feedJoint:String, spindleJoint:String,
+	sensor:String, controlPort:String, tcpConnector:String, bitMember:String, feedJoint:String, spindleJoint:String,
 	strokeEncoder:String, bit:materia.project.SceneArtifact.SceneArtifactScrewdriverBit,
 	maxTorque:Float, maxSpeed:Float, strokeMm:Float, springRate:Float
 };
@@ -175,11 +175,13 @@ class EndEffectorControls {
 				var driver:machinekit.screwdriving.ScrewdriverFacet = cast facet;
 				requireInlet(configuration, member.id, driver.controlPort, [PortKind.Signal]);
 				if (drivers.length > 0) throw "Ambiguous screwdriver runtime ports";
+				var bitMembers = [for (candidate in configuration.components()) if (candidate.component == driver.bit) candidate.id];
+				if (bitMembers.length != 1) throw 'Screwdriver "${member.id}" lost its unique CAD bit occurrence';
 				var scope = name.substr(0, name.lastIndexOf("/") + 1);
 				controls.push(Driver('$name.drive', '$name.direction', '$name.program', '$name.vacuum', member.id, driver.controlPort));
 				drivers.push({member: member.id, channel: '$name.drive', directionChannel: '$name.direction',
 					programChannel: '$name.program', vacuumChannel: '$name.vacuum', sensor: '$name.screwdriver',
-					controlPort: driver.controlPort, tcpConnector: driver.tcpConnector,
+					controlPort: driver.controlPort, tcpConnector: driver.tcpConnector, bitMember: bitMembers[0],
 					feedJoint: scope + driver.feedJoint, spindleJoint: scope + driver.spindleJoint, strokeEncoder: scope + driver.strokeEncoder,
 					bit: driver.bit.driveData(), maxTorque: driver.maxTorque, maxSpeed: driver.maxSpeed,
 					strokeMm: driver.strokeMm, springRate: driver.springRate});

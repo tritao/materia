@@ -79,6 +79,8 @@ class SimulatedSuctionTool implements SimulationStepObserver {
 
   /** The session reset restored every object and the robot's channels: forget what was held. */
   public function reset():Void {
+    var object = held;
+    if (object != null) simulation.unbindObjectFromLink(object);
     held = null;
     scripted = false;
   }

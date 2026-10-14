@@ -25,6 +25,9 @@ class ScrewdrivingArmMotion implements ScrewdrivingMotion {
   var waiting = 0.0;
   var waitProblem:Null<String> = null;
   public function move(target:Transform3, contact:Bool):Void {
+    startMove(target, contact);
+  }
+  function startMove(target:Transform3, contact:Bool):Void {
     var p = target.translation, q = target.rotation;
     var pose = new Pose3(p.x,p.y,p.z,q.x,q.y,q.z,q.w);
     var prepare = prepareTravel;
@@ -51,6 +54,11 @@ class ScrewdrivingArmMotion implements ScrewdrivingMotion {
   }
   public function completed():Bool return pending == null && motion.completed;
   public function failure():Null<String> return motion.failure;
+  public function synchronize():Void {
+    if (motion.sessionState() != motionkit.robot.SessionState.Idle)
+      throw "Screwdriving arm can only synchronize after motion reaches rest";
+    motion.reset();
+  }
   public function stop():Void {pending = null; waiting = 0; motion.stop();}
   public function stopped():Bool return motion.failure == null && motion.sessionState() == motionkit.robot.SessionState.Idle;
   public function abort():Void {pending = null; waiting = 0; motion.abort();}

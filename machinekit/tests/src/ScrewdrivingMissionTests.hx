@@ -50,6 +50,9 @@ class ScrewdrivingMissionTests {
 			"work/flange/screw1,work/flange/screw3,work/flange/screw2,work/flange/screw4","Jobs retain exact source body identities");
 		check([for (job in jobs(mission)) job.threadFace].join(",") ==
 			[for (fastening in mission.fastenings) fastening.threaded.faceName].join(","),"Jobs retain the exact named CAD faces");
+		check([for (job in jobs(mission)) job.clamped].join(",") ==
+			[for (fastening in mission.fastenings) "work/"+fastening.clamped.member].join(","),
+			"Jobs retain the exact CAD clamped members after the seated screw mate is removed");
 		var reversed = found.fastenings.copy(); reversed.reverse();
 		var reordered = ScrewdrivingMission.generate(new FasteningsResult(reversed,new Diagnostics()),job);
 		check([for (fastening in reordered.fastenings) fastening.name()].join(",") ==

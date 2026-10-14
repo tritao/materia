@@ -102,7 +102,8 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
         if (!is_finite(blueprint->joint_overtravel[joint]) || blueprint->joint_overtravel[joint] < 0.0 ||
             !is_finite(servo.stiffness) || servo.stiffness < 0.0 ||
             !is_finite(servo.damping) || servo.damping < 0.0 ||
-            blueprint->external_joint[joint] > 1)
+            blueprint->external_joint[joint] > 1 || blueprint->process_joint[joint] > 1 ||
+            (blueprint->process_joint[joint] && !blueprint->external_joint[joint]))
             return RK_ERROR_INVALID_ARGUMENT;
     }
     for (uint32_t i = 0; i < blueprint->channel_count; ++i) {
@@ -123,7 +124,8 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             blueprint->joints[c.follower].type == RK_RUNTIME_JOINT_FIXED ||
             !is_finite(blueprint->coupling_stiffness[i]) || blueprint->coupling_stiffness[i] < 0.0 ||
             !is_finite(blueprint->coupling_damping_ratio[i]) || blueprint->coupling_damping_ratio[i] < 0.0 ||
-            blueprint->external_joint[c.leader] != blueprint->external_joint[c.follower])
+            blueprint->external_joint[c.leader] != blueprint->external_joint[c.follower] ||
+            blueprint->process_joint[c.leader] != blueprint->process_joint[c.follower])
             return RK_ERROR_INVALID_ARGUMENT;
         for (uint32_t j = 0; j < i; ++j)
             if (c.follower == blueprint->couplings[j].follower && c.leader == blueprint->couplings[j].leader)

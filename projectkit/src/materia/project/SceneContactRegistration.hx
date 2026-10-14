@@ -18,7 +18,10 @@ typedef SceneContactWork = {
   var nominal:AssemblyFrame;
   var translation:Array<Float>;
   var rotation:Array<Float>;
+  /** Maximum total observation uncertainty after calibration and clock-age error, in metres. */
   var measurementError:Float;
+  /** Commissioned sensor-threshold uncertainty before acquisition-age error, in metres. */
+  var calibratedError:Float;
   var contactOffset:Float;
   var faces:Array<SceneContactFace>;
 }
@@ -59,7 +62,8 @@ class SceneContactRegistration {
     }];
     return {frame: text(Reflect.field(raw, "frame")), nominal: nominal,
       translation: vector(Reflect.field(raw, "translation")), rotation: vector(Reflect.field(raw, "rotation")),
-      measurementError: number(Reflect.field(raw, "measurementError")), contactOffset: number(Reflect.field(raw, "contactOffset")), faces: faces};
+      measurementError: number(Reflect.field(raw, "measurementError")), calibratedError: number(Reflect.field(raw, "calibratedError")),
+      contactOffset: number(Reflect.field(raw, "contactOffset")), faces: faces};
   }
   static function finiteVector(value:Array<Float>):Bool {
     if (value == null || value.length != 3) return false;
@@ -70,7 +74,8 @@ class SceneContactRegistration {
   public static function validate(work:SceneContactWork, occurrences:Array<String>):Void {
     if (work == null || occurrences == null || occurrences.indexOf(work.frame) < 0 || work.nominal == null ||
         !finiteVector(work.translation) || !finiteVector(work.rotation) || !Math.isFinite(work.measurementError) ||
-        !(work.measurementError > 0) || !Math.isFinite(work.contactOffset) || work.contactOffset < 0 || work.contactOffset > 0.002 ||
+        !(work.measurementError > 0) || !Math.isFinite(work.calibratedError) || work.calibratedError < 0 ||
+        work.calibratedError >= work.measurementError || !Math.isFinite(work.contactOffset) || work.contactOffset < 0 || work.contactOffset > 0.002 ||
         work.faces == null || work.faces.length < 3 || work.faces.length > 256) fail();
     for (i in 0...3) if (work.translation[i] < 0 || work.rotation[i] < 0 || work.rotation[i] >= Math.PI / 2) fail();
     var pose = work.nominal;

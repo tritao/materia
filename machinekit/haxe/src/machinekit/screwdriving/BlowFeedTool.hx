@@ -33,7 +33,13 @@ class BlowFeedTool extends ArmScrewdrivingTool {
 	override public function build(flange:RobotFlange):EndEffector {
 		var result = super.build(flange), nose = new ReceivingNose(screw,innerDiameter,outerDiameter);
 		result.addComponent("receiver",nose);
-		result.addMemberConnector("driver/slide","receiverMount",AssemblyFrames.translation(0,0,15+spindle.bit.length-20));
+		var spindlePoses = spindle.solvedPoses(), slide = spindlePoses.get("slide"), carrier = spindlePoses.get("carrier");
+		if (slide == null || carrier == null) throw "Blow-feed receiver cannot resolve the fitted slide and carrier poses";
+		var tcp = AssemblyFrames.compose(carrier,spindle.memberConnectorFrame("carrier","tcp"));
+		var receiverMount = AssemblyFrames.compose(AssemblyFrames.inverse(slide),
+			AssemblyFrames.compose(tcp,AssemblyFrames.inverse(nose.connector("receipt").frame)));
+		// The named receipt datum meets the fitted bit TCP, including the slide's end connector offset.
+		result.addMemberConnector("driver/slide","receiverMount",receiverMount);
 		result.addMate("receiver-mount","fixed","driver/slide","receiverMount","receiver","mount");
 		// This straight local section is carried by the non-rotating feed slide.
 		result.addComponent("feedTube",new machinekit.pneumatic.RoutedHose("CUSTOM-SCREW-FEED-TUBE",

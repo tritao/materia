@@ -6,13 +6,18 @@ import materia.project.SceneArtifact.SceneArtifactData;
 typedef ScrewStaging = {var body:String; var template:String; var like:String;}
 
 class ScrewdrivingExecution {
-	public static function align(cell:ScrewdrivingCell, state:AssemblyState, presented:String):Void {
+	public static function align(cell:ScrewdrivingCell, state:AssemblyState, ?presented:String):Void {
+		var initialJoints = [for (i in 1...7) 'arm/j$i'];
+		if (presented == null) {
+			var ready = cell.readyPose();
+			for (i in 0...ready.length) state.setJoint(initialJoints[i],ready[i]);
+			return;
+		}
 		// Start above the presenter rather than sweeping the parked tool through
 		// the workpiece on its first Cartesian move.
 		var pick = state.worldPose(presented);
 		var initialTarget = materia.assembly.AssemblyFrames.compose(pick,cell.presenter.screw.driveFrame());
 		var initialDirection = materia.assembly.AssemblyFrames.transformVector(initialTarget,0,0,1);
-		var initialJoints = [for (i in 1...7) 'arm/j$i'];
 		var initialLimits = [for (spec in cell.arm.specs) {lower:spec.lower,upper:spec.upper}];
 		var initial = machinekit.robot.ToolAxisReach.solve(state,initialJoints,initialLimits,
 			{x:initialTarget.x-initialDirection.x*40,y:initialTarget.y-initialDirection.y*40,z:initialTarget.z-initialDirection.z*40},

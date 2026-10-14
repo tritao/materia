@@ -641,8 +641,8 @@ Here:
 ## Follow-on plan (2026-10-11)
 
 SD0–SD8 are complete. The decisions above describe that completed scope;
-SD9–SD15 below extend that scope. SD9 is complete; SD10 is in progress. SD11–SD15
-remain proposed and unstarted. SD9 automates replenishment of the existing presenter before changing
+SD9–SD15 below extend that scope. SD9 is complete; SD10–SD14 are in progress.
+SD15's landed-interface audit is complete; its runtime integration remains. SD9 automates replenishment of the existing presenter before changing
 how the robot receives a screw. The other extensions have their own acceptance
 boundaries and need not all be implemented to use automatic feeding.
 
@@ -696,9 +696,10 @@ boundaries and need not all be implemented to use automatic feeding.
 
 **SD11. Hole location using vision or touch.**
 - Reuse the welder's registration boundary to relate measured workpiece
-  coordinates to CAD. Support camera-derived reference features or probing of
-  reference surfaces/hole entrances; define measurement identity, units,
-  coordinate frame, timestamp and uncertainty.
+  coordinates to CAD. This implementation uses touch probes on CAD reference
+  surfaces; camera-derived references wait for a calibrated camera feature
+  source. Define measurement identity, units, coordinate frame, timestamp and
+  uncertainty at the shared boundary.
 - Derive corrected hole approaches from registration on every rebuild/run.
   Keep the nominal CAD fastening and the measured placement distinct. Reject
   missing, stale, ambiguous or inconsistent observations rather than guessing
@@ -720,7 +721,9 @@ boundaries and need not all be implemented to use automatic feeding.
   gains, travel/speed limits and entry criteria; no invented safe defaults.
 - Approach under controlled axial force, search a bounded spiral when the
   screw misses the entrance, recognize entry, and hand over to the qualified
-  tightening cycle. Stop on stale feedback, excess force/travel, exhausted
+  tightening cycle. Entry requires a fresh measured compression baseline and
+  the commissioned force drop; low-force axial travel alone cannot prove that
+  a hole is present. Stop on stale feedback, excess force/travel, exhausted
   search, lost screw or invalid contact. Retract/recover explicitly.
 - This extends the original position-controlled arm and may supplement or
   replace reliance on the compliant feed slide. Identify which configuration
@@ -749,10 +752,12 @@ boundaries and need not all be implemented to use automatic feeding.
   requires these physical reactions, not as an automatic feeding dependency.
 
 **SD14. Cosmetic threads in drawings.**
-- Project conventional thread lines, limits and end representation into
-  drawing views from the same named-face `ThreadedFace` data already used by
-  the editor. Derive size/pitch/depth callouts from that specification where
-  the drawing annotation system supports them.
+- First provide an engineering drawing projection foundation: the repository
+  currently has no drawing-view or projection subsystem. Then project
+  conventional thread lines, limits and end representation into drawing views
+  from the same named-face `ThreadedFace` data already used by the editor.
+  Derive size/pitch/depth callouts from that specification where the drawing
+  annotation system supports them.
 - Define visibility in projected and section views, including internal/external
   threads and partially threaded faces. A drawing must not maintain a second
   thread specification or require helical solid geometry.
@@ -781,8 +786,8 @@ boundaries and need not all be implemented to use automatic feeding.
 
 Follow-on dependencies:
 - SD9 is complete and keeps the existing screwdriver pickup/mission boundary.
-  SD10 (blow-feed delivery) is next.
-- SD10 builds on SD9; SD11 and SD14 can proceed independently.
+  SD10 (blow-feed delivery) remains the next validation target.
+- SD10 builds on SD9; SD11 and SD14 proceed independently.
 - SD12 uses a known or SD11-registered approach. SD13 is conditional on needing
   physical thread reactions for SD12 or another compliance experiment.
 - SD15 integrates the landed machine-tending interfaces and automatic tool
@@ -903,6 +908,15 @@ inputs: 0.2 s air pulse, 0.4 s delivery, 3 s receipt timeout, 4 bar,
 0.01 rad/s angular and 0.001 m/s feed readiness limits. They are independent of
 published tightening guidance. Stop cancels pending metering and air; recovery
 is explicit. Stock and body poses rewind together only on a cell reset.
+The blow-fed preview starts from the authored clear arm-ready pose; only the
+presenter-fed cell aligns the tool over a pickup nest before its first move.
+
+The receiving nose and local tube are carried by the 20 mm feed slide. On the
+first MuJoCo gravity tick they settle the slide 1.002 mm past its nominal zero,
+slightly beyond the generic 1 mm simulation end-stop allowance. The feed joint
+now states 1.1 mm of end-stop overtravel explicitly; commanded motion remains
+inside the original 20 mm range. This is a simulation boundary allowance, not
+extra feed stroke or a published equipment rating.
 
 Initial `sd10-core-retry-build` / `sd10-core-proof` compile and pass 29
 model/scripted-I/O checks. Later transit-loss and application integration
@@ -934,9 +948,593 @@ exclusively from this worktree reclaimed 394,964,718 bytes, but available disk
 fell below the reserve again. App compilation, actual CAD delivery/fault/stop
 checks, the quick/full gates, retained-number/size accounting and desktop
 inspection remain pending. The new example is
-`materia.blow-feed.project.json`; it is a draft until those checks pass. SD11
-and later steps are unstarted. Resume SD10 with sufficient free disk for the
-rebuilds and final suite while preserving at least 3 GB.
+`materia.blow-feed.project.json`; it is a draft until those checks pass. Resume
+SD10 validation with sufficient free disk while preserving at least 3 GB.
+
+The `sd10-current-retry` quick gate now passes CadKit, ProjectKit and MachineKit.
+ProjectKit reports 201 assertions (the 180-assertion starting baseline plus the
+new contact-work checks), and MachineKit reports the new fastener, fastening,
+and blow-feed checks followed by `MachineKit smoke passed`. The app's
+compiler-only project-source build also succeeds; its focused
+`screwdriver-blow-feed` acceptance passes on MuJoCo and the deterministic
+backend for normal, cross-thread rejection with reserve replenishment, missing,
+blocked, nose-jam and stop scenarios, plus portable export. These app checks
+use the existing native libraries. The full gate, native rebuild, desktop
+inspection and retained numerical/artifact-size accounting are still pending.
+Earlier full attempts do not count as passing gates: `sd10-app-retry2` built the
+app and editor tests but hit an editor cache-key assertion and then lacked the
+collisionkit runtime library; `sd10-full-final-fixed` compiled the 2,497-source
+app project but the native app target ended with a generic Ninja failure and no
+underlying compiler diagnostic in its log. The required app native libraries
+were produced later in this worktree (2026-10-13 09:38); the full gate should
+retry that target and report any specific failure. The worktree's
+`build/sd-suite-local.sh` includes the native runtime library directories and
+passed the starting full baseline. The editor test now moves the pointer to a
+stable hover location before comparing the stationary orbit cache key; that
+correction has not been run yet. The disk reserve has recovered to 6.6 GB, but
+an unrelated machine-tending app test is still using a heavy-run slot, so the
+full gate has not started.
+
+### SD10 interrupted full-gate follow-up (2026-10-14)
+
+The copied `sd-suite-screwdriving-applib.sh` full run under tag
+`sd10-app-final` corrected the app/editor native library path, but the launch
+did not set `CADKIT_BUILD_ROOT`. Its default pointed to the topological-naming
+worktree, where `libcadkit-core.so` is absent; CadKit and MachineKit therefore
+failed before their smoke tests. ProjectKit passed 331 assertions, the app and
+editor builds compiled 2,499 and 2,459 sources, and the editor runtime passed
+its CAD workflows.
+
+The app project-source runtime passed the complete four-fastener cell with
+cross-thread replacement recovery on both backends, touch registration on both
+backends, and the feeder's normal and jam cases on both backends. Blow-feed
+normal delivery and rejected-screw recovery passed on MuJoCo. The run was
+interrupted with SIGINT after free space fell to 2.82 GB while starting the
+MuJoCo missing-screw case; its `app` stage exited 130, so this tag is not a
+passing full gate. The focused `PROJECT_SOURCE_ONLY=screwdriver-blow-feed` run
+subsequently passed delivery, damaged/missing screw, blocked tube, nosepiece
+jam and explicit-stop recovery on both backends (log
+`sd10-blowfeed-final.log`, peak RSS 640 MB). Rerun the suite with
+`CADKIT_BUILD_ROOT` set to this worktree's `cadkit/build/debug`, preserve the 3
+GB reserve, and avoid concurrent suites in this worktree.
+
+### SD10 CAD-contact retention follow-up (2026-10-14)
+
+A post-rebase runtime retry exposed that the screw-driving preview removes a
+seated screw's fixed head-seat mate when it makes the screw movable. Runtime
+therefore cannot rediscover the clamped member from the flattened assembly.
+Keep that CAD-derived identity on `SceneScrew`, populated from
+`Fastening.clamped.member`, and carry it through replacement screws. The
+collision policy can then declare only the screw/clamp and screw/thread pairs
+from each fastening job. The same v46 record retains the screwdriver's exact
+CAD bit occurrence, found by the component identity referenced from its
+`ScrewdriverFacet`; validation requires it to be a tool member fixed directly
+to the spindle. During an active fastening, the planner checks all tool/screw
+pairs with contact margins, then permits only that named bit member to engage
+the active screw's drive socket. Other tool members and the active screw's
+clamp/thread contacts remain checked. Since other screws stay CAD-seated and
+fixed during a fastening plan, only their named screw/clamp and screw/thread
+pairs are treated as stationary declared contacts. This models the designed
+drive contact without exempting the rest of the spindle envelope. Old v45
+artifacts remain rebuild-only under the repository's one-version policy.
+
+ProjectKit compiles and passes 341 assertions, the app project-source compiler
+builds 2,511 sources, and the focused `screwdriver-blow-feed` acceptance passes
+delivery, rejection/replenishment, missing/blocked delivery, nosepiece jam and
+explicit stop on both backends. In quick-gate tag `sd10-bit-final`, CadKit and
+ProjectKit passed, but MachineKit was interrupted (exit 130) after its example
+build began compiling native CadKit libraries while free space was 2.0 GB. Its
+configure log confirms the prebuilt OCCT was selected, and no OCCT build was
+started. The quick gate must be rerun with at least 3 GB free; the full gate,
+desktop review and retained-number accounting also remain pending.
+
+### SD11 touch-registration draft (2026-10-12)
+
+The in-progress route selects a digital `tool_contact` sensor mounted at the
+screwdriver TCP and reuses the CAD-derived 3-2-1 probe stages. Vision is deferred
+because this worktree has no calibrated camera reference-feature pipeline. Each
+accepted touch retains the sensor ID, sensor frame and kind, coordinate frame,
+metre-valued point, source sequence/time/clock, mapped joint time, clock error
+and the combined calibrated plus sampling uncertainty. One registration must
+use a single sensor stream. The fitted placement is checked against the
+remaining set-valued chassis bounds, and the per-run pose, bounds and six source
+observations stay together for the later bounded-search step. `findWork` now
+supports a screwdriver probe only when its digital contact sensor is mounted
+at the selected TCP; all registration steps in one mission must use the same
+probe tool. The simulation observer reports only CAD object contacts on the
+screwdriver's bit-front region.
+
+SceneArtifact is now v36 for the digital sensor kind, omission of LiDAR-only
+scan settings, and separate calibrated-threshold and total observation-error
+bounds. Fine-search speed spends only the budget left after calibrated error;
+sampling and mapped-clock uncertainty are added to each retained measurement.
+The generated digital sensor is noise-free in simulation; hardware work must
+provide its commissioned calibrated bound. `materia.registered.project.json` exercises CAD reference faces,
+the tool-contact sensor and four named fastenings; the app test also displaces
+the fixture before running it on both backends. The ProcessKit contact suite
+now compiles and passes 109 registration assertions plus 14 admittance/spiral
+checks; ProjectKit passes 201 assertions, and the app project-source compiles.
+The focused registered fastening passes on MuJoCo but the deterministic
+backend does not publish articulated-tool contacts, so its named-fastening
+check fails there. A deterministic geometric contact-reporting implementation
+and regression test are drafted; the native runtime checks and end-to-end
+status are recorded in the follow-up below. SD11 remains open pending
+translated/rotated workpiece acceptance and the full gate. Camera support
+remains unimplemented.
+
+### SD11 deterministic contact native regression (2026-10-13)
+
+After the normal-direction and final-substep corrections, the incremental
+SimKit native build passes both `sim_core` and `sim_core_c_api`, including
+kinematic tool contact reporting, exclusion of empty convex-hull bounds, and
+the expanded contact C-ABI layout. The production app target `robotkit_runtime`
+also rebuilds successfully, including the updated SimKit and MuJoCo libraries.
+A later contract review aligned deterministic contact
+normals with MuJoCo's body_a-to-body_b direction and updated the corresponding
+contact-point calculation and regression expectation. Geometric sensor
+contacts now run only on the final physics substep, because only that snapshot
+is returned to observers; the regression uses two substeps to cover that path.
+Before those latest contact-contract edits, the `sd10-app-final` app runtime
+passed the displaced-fixture registration and four named fastenings on both
+backends. A deterministic-only rerun with
+`PROJECT_SOURCE_ONLY=screwdriver-registration` was later started, but stopped
+with SIGINT when shared root free space fell to 2.5 GB, below the required
+3 GB reserve. That rerun is incomplete, not a test failure; rebuild and rerun
+the deterministic-only app mission and pass the full gate.
+
+### SD12 force-search draft (2026-10-12)
+
+The source draft adds a `force_torque` sensor measurement with explicit
+environment-on-sensor sign, N and N*m units, named sensor frame, source
+sequence/time/clock, mapped robot time and bounded clock error. Freshness checks
+reject an unknown clock, future interval, stale sample and invalid six-value
+payload. `CartesianAdmittance` integrates the commissioned six-axis virtual
+mass/damper equation, limits linear/angular speed, and rejects a sample period
+outside its stability bound. `ContactAdmittanceRunner` adds fresh-source,
+force/torque, measured TCP travel, angular travel and run-time limits around
+`ServoSession`. The optional spiral must fit within the SD11 contact-region
+bounds and speed limit; it starts only after a measured compression baseline
+and reports entry only after the commissioned force drop repeats for the
+configured sample count. Low-force axial travel without a compression baseline
+is not evidence of a hole: the focused regression rejects this case so a
+missing or obstructed workpiece cannot be accepted as successful entry.
+
+An app-level CAD acceptance is drafted in `app/tests/src/app/ProjectSourceTests.hx`.
+It combines the touch-registered project with the force-search profile and runs
+the first named fastening on MuJoCo. The 1 mm case biases the accepted work
+placement after registration; it exercises residual registration error without
+moving the CAD fixture. The test compiles in Haxeon compiler-only mode. Earlier
+setup attempts incorrectly tried to teleport the fixed `work/plate` occurrence
+as an independent `SimObject`; that approach was removed. The fixture's actual
+pose remains available through `mission.assemblyParts`.
+
+Source inspection showed that `SimSession.holdObject` changes a picked screw
+from dynamic to kinematic and that the work plate is fixed to the assembly
+base. SD13 now drafts an explicitly selected physical screw engagement that
+keeps the screw dynamic after the measured entry handoff. Its native reaction
+regression is not yet built or run. The force-search test reaches `EntrySearch`
+using the currently available native libraries, but both nominal and
+replacement attempts are rejected by the unchanged 25 N limit: measured peaks
+are 325.813 N and 304.570 N. At the first peak, four contacts join the
+screwdriver carrier link to `assembly-root`, at about 2.5 mm radial distance
+and z=+33.1 mm in the sensor/TCP frame, with 37–38 microns of penetration.
+This localizes the measured load to a tool/root collision but does not yet
+identify the exact CAD face or validate the unbuilt native wrench changes. The
+limit has not been raised. The reversed-contact-order wrench regression is
+still unrun. C++ syntax-only checks pass. Disk availability is 1.4 GB, below
+the required 3 GB reserve for native builds and the full gate.
+
+The pure ProcessKit contact suite compiles and passes its 16 admittance/spiral
+checks, including sensor-to-TCP wrench rotation and moment-arm conversion.
+ProjectKit's focused compiler-only runtime passes 209 assertions, including
+eight new profile validation and mission-wire checks. A mission may now carry
+an explicit force-search profile, validated
+against a uniquely mounted force/torque sensor and screwdriver; SceneArtifact
+is v37. `materia.force-search.project.json` supplies a visibly simulation-only
+commissioning example, and `MissionPlayer` derives its entry axes from the CAD
+fastening and intersects the spiral with any retained SD11 registration bounds.
+The app project-source and screwdriver-example compiler-only builds pass.
+Native source now obtains MuJoCo
+contact wrenches with `mj_contactForce`, carries the signed wrench through the
+robot-contact bridge, and adds a simulated TCP force/torque observer. Those
+native changes and their regression tests have not been built or run; the three
+modified C++ translation units do pass `g++ -fsyntax-only`, which does not
+verify linking or runtime behavior. The
+MuJoCo robot-contact regression now also requires a finite, nonzero downward
+reaction when the tool is contacted from above, with the obstacle created both
+before and after the robot to cover either contact-body ordering. Its test source
+passes `g++ -fsyntax-only`; runtime sign and force checks still need the native
+build and test run.
+The deterministic backend reports geometric contact only and intentionally has no
+force response; hardware binding and physical force-search behavior remain
+outstanding. The previous `sd12-search-recovery` gate passed at 201 ProjectKit
+assertions before these mission-profile changes and has not been rerun. The
+configured prebuilt CadKit build directory is absent; a direct example runtime
+now passes using an existing scratch-cache CadKit library: the force-search
+example builds and its v37 artifact encodes/decodes. This does not run the
+simulation force-search mission. The root still has only 2.2 GB free, below the
+required 3 GB reserve for a native build. Entry-search failure
+recovery retracts to the commissioned safe approach before producing
+`NO_START` or `SCREW_LOST`.
+`NO_START` bypasses spindle reverse, travels to the reject bin, and releases the
+retained screw identity only there; the report preserves the search diagnostic.
+The focused recovery suite passes 58 checks. `sd12-search-recovery` passes
+CadKit, ProjectKit (201 assertions) and MachineKit smoke (peak 0.6 GB). This
+validates the Haxe runner/recovery path, not the unbuilt native wrench bridge or
+a force-search mission. The root has 2.2 GB free, below the required 3 GB
+reserve, so native builds and the full gate remain pending. The focused
+force-search runtime now reaches the search but fails at its commissioned force
+bound as recorded above. SD12 remains a draft.
+
+### SD12 entry-window timing follow-up (2026-10-13)
+
+The first 12-turn offset run kept the force below 25 N (peak 24.61 N) but hit
+the 2 N m torque bound by 0.025 N m while refining a candidate before the CAD
+entry window. Refinement now waits for the measured TCP to enter that window.
+With that change, the original-speed run reached its 3600 s *global mission*
+cutoff without a runner fault or confirmed entry. A trace at global 1800 s was
+0.039900 m deep against a 0.040027 m CAD entry depth, with a validated
+candidate and a measured load drop. The trace shows the test cutoff included
+the preceding registration time and therefore did not allow the runner its
+commissioned 3600 s. The acceptance loop now starts its deadline when the
+force-search runner starts and allows up to 600 s for the tightening handoff;
+at that checkpoint, the test edit had not compiled or run. The fast diagnostic profile was
+discarded: its increased axial speed hit the housing at 27.32 N before the
+spiral began. Free disk is 2.3 GB, below the 3 GB reserve; rebuild and full
+acceptance remain pending.
+
+### SD12 compiler-only follow-up (2026-10-13)
+
+The runner-relative acceptance deadline and the current simulation-only search
+profile compile in Haxeon: the app project-source compiles 2,498 sources and
+the screwdriver assembly preview compiles 1,718 sources. The current preview
+profile uses a 0.12 mm/s axial cap, 12 initial turns, a 1,100 s initial spiral
+and a 3,600 s runner limit; it has not been run. The earlier 1,660 s runtime
+trace was from a prior profile and reached 39.899 mm against a 40.022 mm CAD
+entry depth under the 25 N force cap, then timed out before confirming entry.
+The deadline and profile edits have compile-only evidence, not runtime
+acceptance. Native wrench changes and the reversed contact-order regression
+remain unbuilt and unrun. Free disk is 1.5 GB, so the native rebuild and full
+gate remain pending the 3 GB reserve.
+
+### SD12 run-bound coverage check (2026-10-14)
+
+For the observed 40.022 mm CAD entry depth, 5 mm contact relief, 0.12 mm/s
+axial cap, 1,100 s initial spiral, 12-turn search, 0.14 mm/s lateral cap and
+12 s candidate-progress timeout, `ScrewEntrySearchBounds.minimumRunSeconds`
+derives 3,547.56 s. The current 3,600 s runner bound clears that arithmetic
+minimum by 52.44 s; the previous 1,660 s bound does not. The current ProjectKit
+runtime passes this regression within 339 assertions. That arithmetic does not
+establish physical entry, completion, or successful tightening. The 25 N force
+cap is unchanged.
+
+### SD12 measured-travel envelope correction (2026-10-14)
+
+The runner's travel limit measures Euclidean TCP displacement from the initial
+approach pose, not cumulative path length. Relief retracts toward that pose and
+the registered lateral search occurs at the CAD entry plane, so summing those
+segments would reject a valid path. The shared `requiredTravelMeters` bound now
+combines the larger of CAD approach depth and relief with the larger of the
+registered-region diagonal and seeded-spiral reach plus acquisition drift, then
+adds one maximum controller step. Scene validation, mission construction and
+the live runner use this same calculation. The new seed and bound still need a
+fresh nominal MuJoCo run; the earlier travel-cap failure remains the latest
+physical evidence.
+
+### SD12 bounded tracking recovery follow-up (2026-10-14)
+
+The current simulation-only profile uses a 0.125 mm/s axial cap, an 880 s
+initial spiral, 1.6 mm radius, 12 turns and a 30 s candidate-progress timeout.
+The shared minimum-run calculation includes one catch-up relief retry and
+derives 3,592.01 s for the 40.0217 mm representative entry depth, within the
+3,600 s cap. This arithmetic is a configuration check, not physical acceptance.
+Axial feed reserves vector-force headroom after separating measured lateral
+load; the 25 N force cap is unchanged.
+
+An offset-hole run peaked at 18.494 N but stalled near 22.9 mm depth. Brief
+tracking recoveries kept resetting the catch-up timer, preventing its explicit
+relief retry. Catch-up time now accumulates across those brief recoveries and
+candidate/fallback transitions, pauses during deliberate relief, and permits
+one recovery before a further exhausted allowance fails explicitly.
+The recovery has its own deadline: one candidate-progress window plus two
+commissioned relief traversals, 110 s for this profile. Its first physical run
+exposed an absolute-depth target that demanded a 27.9 mm retraction, exhausting
+that deadline after retracting only 13.75 mm. Catch-up recovery now retracts
+the configured 5 mm from the measured stall depth; startup and rejected-screw
+relief still clear above the approach origin. The relative-relief physical
+rerun completed the relief but then stopped at 26.473 N during resumed lateral
+search, before confirming entry. Its housing-contact trace exposed another
+priority error: only spiral feedforward was tapered by force headroom; a large
+position-tracking error could still saturate the search command. The complete
+position-search velocity is now speed-capped before applying the measured
+force-headroom taper, while admittance retains its unscaled priority. The
+focused ProcessKit suite passes all 35 bounded admittance/spiral checks,
+including the large-tracking-error regression. The physical rerun of that
+change remains pending.
+
+The complete-position taper alone did not establish physical acceptance:
+`sd12-all-motion-offset` stopped at 53.158 N near 22.899 mm depth, before the
+40.027 mm CAD entry plane. Inspection found that the example's 1 kg virtual
+mass saturated its 0.15 mm/s correction in one 10 ms step for a 0.015 N force
+error. The simulation-only linear gains now derive from an explicit 50 ms
+relaxation and a zero-load correction at half the speed cap: 2,000 kg virtual
+mass and 40,000 N s/m damping per translation axis. The 3 N target, all angular
+gains, travel/speed limits and 25 N force cap stay unchanged. Nominal physical
+entry and the offset case must both be rerun with these gains.
+
+Disk availability subsequently rose to 7.1 GB. Rebuilding the current native
+RobotKit/MuJoCo targets reported `ninja: no work to do`: the libraries are
+already newer than the changed sources. The full native RobotKit MuJoCo test
+now compiles after correcting the tool-change fixture's `target` field. Its
+follower tests now stop the world before topology changes and allow the
+effort-limited coupled joints two seconds to settle without relaxing their
+position tolerance. It reaches, but fails, the SD15 static-dock reattachment;
+the dedicated SD12 contact-order/wrench regression is queued separately.
+
+Compiler diagnostics can overflow for this app build: allocation bytes and heap
+print as `-2147483648`. `haxeon/src/compiler/tools/CompilerServer.hx:65` rounds
+the floating-point GC counters with `Math.round`, whose result is a 32-bit
+`Int`. This affects the reported statistics, not compilation; resource checks
+use the heavy-run scope's measured memory instead. Haxeon is not patched.
+
+### SD13 physical reaction-path draft (2026-10-12)
+
+The first physical-thread regression uses the rotating spindle link as the
+leader and the dynamic screw body as the follower: a prismatic joint lets the
+screw slide along the spindle while locking its rotation to the spindle, and a
+joint coupling sets slide travel to `-lead / (2π)` per spindle radian. This
+retains the screw as a dynamic body, so a workpiece contact can return through
+the coupled axes to the spindle actuator. It does not add a second axial command
+or a second torque-resistance model. The process-model mode remains the default.
+
+`physical_screw_lead_transmits_workpiece_reaction` checks the lead relation,
+nonzero contact wrench on the workpiece, and nonzero spindle effort at 1 ms and
+2 ms fixed steps. The test source passes `g++ -fsyntax-only`; no test binary is
+available in this worktree. The simulation still lacks mission-selected
+physical engagement, lead-in/seating/reverse/disengagement transitions, and
+handover from suction holding to the dynamic joint. The test is a design
+regression draft, not SD13 acceptance. Free disk is 2.1 GB, below the required
+3 GB reserve, so native execution and the full gate remain pending.
+
+### SD13 mission-selection follow-up (2026-10-13)
+
+The earlier draft stored `engagementMode` and the physical axial-force cap in
+SD12's optional force-search profile, which made thread reactions unavailable
+to an ordinary CAD fastening mission. SceneArtifact v44 moves these facts to
+the optional mission-level `screwEngagement` record. Absence selects the
+existing process model; `physical_thread` requires an explicit positive axial
+force cap and can be selected without force-search sensing. The physical
+attachment window is derived for each screw from the tool stroke and the CAD
+thread lead-in instead of borrowing the unrelated force-search travel bound.
+
+The ProjectKit suite passes 331 assertions, including the v44 wire round-trip,
+force-cap validation and rejection of the previous scene schema. Haxeon
+compiler-only builds pass for the app project-source (2,498 sources) and
+screwdriver assembly (1,718 sources). The screwdriver assembly runtime also
+passes its v44 normal, registered and force-search artifact round-trips, plus
+the CAD access checks for an unreachable reserve, a real cell obstruction and
+pose restoration. This verifies the mission plumbing and generated example,
+not a live physical-thread mission. The native joint-reaction test, 1 ms/2 ms
+solver run and full gate remain pending; only 973 MB is free, below the 3 GB
+native-build reserve.
+
+### SD15 machine-tending interface audit (2026-10-13)
+
+Local `main` has the required MT8 physical-jaw assembly and `gripper` tool
+binding, MT6/MT7 controller-signal wiring and wait/retry mission steps, and
+MT9 pocketed trays with per-slot measured presence and identified free blanks.
+MT10–MT11 supplies the checked single-part tray-to-vise-to-outfeed sequence;
+the two-part exchange and dual-gripper throughput work remains MT12 and is not
+needed for this screwdriver cell. These are landed interfaces, not dependencies
+to recreate.
+
+MachineKit already has CAD-side `ToolChangerMaster`, `ToolChangerTool` and
+`EndEffectorSet`. The set validates coupling identity and mapped pneumatic and
+signal ports and can build one static robot/tool assembly configuration. The
+RobotKit also has a lower-level `EndEffectorRuntimeBridge`, `ToolRuntimeSelection`
+and `ChangerLock`: the bridge constructs one runtime per static configuration,
+and selection makes the previous configuration's declared outputs safe before
+routing future outputs and sensor frames to the new one. The runtime still
+needs a cell transaction around that primitive. No mission step approaches a
+dock, waits for measured unlock/lock feedback, or records a recoverable physical
+mount state. Each bridge call previously created its own simulated lock; the
+current source draft allows configurations to receive one shared lock. The app
+also keeps one static `RobotScene`/articulated tool chain; it does not swap
+collision geometry, TCP or capabilities while the robot runs.
+
+The current SD15 source draft extends `ToolRuntimeSelection` with an explicit
+process lease: outputs require the owning process, and selection is rejected
+while that process still owns the tool. Selection also rejects a configuration
+whose changer does not share the active lock or whose lock does not report
+engaged. The current follow-up replaces the bare lock boolean with a timestamped
+observation containing measured mounted-tool identity, lock state, source clock
+and acquisition time. Selection checks the expected tool ID, rejects clock
+mismatch and future observations, and the simulation models attach/detach while
+unlocked. Tool outputs are initialized safe on selection, and a process cannot
+release its lease while any declared output remains unsafe. Regressions cover
+wrong identity, clock/time ordering and unsafe lease release. Compiler-only
+checks pass; focused runtime checks for this follow-up are pending. The
+remaining runtime boundary must connect lock commands to fresh measured cell
+feedback, attach and detach the CAD tool geometry, and preserve the exact mount
+and process state on interruption. The cell should reuse MT8/MT9 geometry and
+MT6/MT7 signals; adding multiple `robotTools` records or choosing a static
+`EndEffectorSet.configuration` alone does not model that exchange.
+
+### SD15 process-ownership follow-up (2026-10-13)
+
+`ToolRuntimeSelection` already routed process outputs and tool sensor frames
+per selected end-effector, but a caller could switch configurations while an
+outgoing process was still active. The draft now gives one named process an
+exclusive lease on the selected tool, routes owned output events explicitly,
+rejects unowned or mismatched writes, and refuses tool selection until the
+owner releases the lease with every declared output at its safe value.
+Configuration selection initializes its declared outputs to those values.
+`EndEffectorRuntimeBridge` now accepts a shared lock
+instance, and selection requires the next tool to share that instance and
+report fresh, clocked lock feedback for the requested physical tool identity.
+The simulated lock models docking by detaching and attaching a named tool while
+unlocked. Compiler-only checks pass for 1,741 RobotKit sources and 1,804
+CadBridge sources, including process ownership, safe outputs, identity, clock
+and time-order checks. The first retry reported Haxeon E1005 when code
+re-read the nullable selected-tool field after a null guard; copying it to a
+checked local fixed the source typing error. This is not established as a
+compiler bug. Focused runtime tests have not run. An earlier RobotKit compile
+also exposed a stale clearance test still using the replaced
+`CollisionClearance` constructor; it now builds the portable collision
+description expected by the current API. A physical adapter must report measured
+feedback and reject unavailable or stale observations before selection proceeds.
+
+`ToolRuntimeSelection.select(null, ...)` is software deselection only: it
+safes the selected runtime and its lock output but does not report physical
+detachment. The dock transaction must separately confirm the measured mounted
+tool identity and unlock/lock sequence before selecting another runtime.
+
+The attempted RobotKit tool-capability runtime command produced no test result:
+`haxeon run` configured and built transitive native CMake dependencies even
+though this test project's manifest has no native block, then exited 1. It is
+not runtime evidence. The generated `build/host/native` subtree was removed.
+Its CadKit configure cache had an empty `CADKIT_OCCT_DIR` and
+`CADKIT_BUILD_OCCT_FROM_SOURCE=OFF`; no OCCT source build was run. Under the
+current disk reserve, runtime verification must use already-built native
+libraries directly or wait until the native/full-gate reserve is available.
+
+### SD15 tool-change transaction draft (2026-10-14)
+
+RobotKit now has an unverified `ToolChangeTransaction` draft around the shared
+changer lock and `ToolRuntimeSelection`. It refuses unknown or unmanaged
+physical tool identities, safes and deselects the outgoing runtime before
+unlock, and advances only through measured outgoing-unlocked, empty-changer,
+incoming-attached and incoming-locked observations. A process lease or unsafe
+outgoing outputs prevent the exchange. Lock commands can be retried after an
+I/O interruption, and lock feedback and transaction events must remain
+nondecreasing on their source clock. Focused checks cover skipped attachment,
+backward event time, idempotent lock retry, and recoverable lock/unlock command
+interruptions; the transaction also requires a positive commissioned maximum
+observation age and rejects stale lock/tool identity feedback both before
+beginning and after an unlock request, retaining its retryable phase on stale
+feedback. The focused transaction checks compile and pass within the RobotKit
+capability suite recorded below, but this primitive still does not perform dock
+motion, exchange live TCP/collision geometry, or integrate with MissionPlayer.
+
+The current Haxe-only project-source build compiles 2,500 sources. The
+RobotKit tool-capability target compiles 1,742 sources and its direct runtime
+passes 660 assertions (tool 36, process 54, weld 161, clearance 409). CadBridge
+compiles 1,805 sources and its direct runtime passes 194 assertions, including
+the shared-lock exchange and detached-subtree conversion checks. The first
+CadBridge compile caught E1005 at a nullable map result in the new test; an
+explicit non-null guard and fresh locals fixed it, so this was a source typing
+error rather than a Haxeon defect. A source build without `--compiler-only`
+unexpectedly entered transitive native CMake; it was stopped after the
+`robotkit_runtime` target rebuilt. No OCCT build ran. Native follower tests and
+the app-level exchange remain unverified; the full-gate/native-build reserve is
+still below 3 GB.
+
+The app/native boundary audit narrows this gap: the existing removable-body
+API attaches one dynamic environment `SimObject` to a robot link, while
+`AssemblyRobot` compiles robot-linked CAD parts and their joints into one
+`RobotRuntimeBlueprint`. The simulated physical gripper and screwdriver bind
+to those robot-model links, sensors and joints. Making either complete tool a
+free rigid body would therefore lose its jaw or feed/spindle articulation.
+
+An unverified native source draft now adds a removable fixed joint between a
+link of one robot runtime and the floating root of a second articulated robot
+runtime. It captures the measured relative pose, retains the child runtime's
+internal joints, and rejects duplicate mounts and cycles. SimKit and MuJoCo
+regressions cover no-snap attachment, following, internal joint actuation and
+release. These sources have not been compiled or run. The app still needs to
+build each changer tool as its own articulated runtime, move it between its
+CAD dock and flange at tick boundaries, and bind the measured mount state to
+the active TCP and process capabilities. The robot-to-robot joint is a
+candidate foundation; only end-to-end acceptance on both backends can show
+whether it covers the complete physical exchange.
+
+CadBridge now has a source draft that builds every configuration in a CAD
+`EndEffectorSet` against one shared changer lock, initializes selection only
+from fresh locked identity feedback, and provides one sensor router and
+retryable transaction for those runtimes. The bridge test now exercises a
+measured short-to-long exchange, verifies the selected TCP changes with the
+reported physical identity, and rejects stale initial feedback. This factory
+and test have not been compiled or run; MissionPlayer consumption of the
+mission contract, dock motion and free CAD-body exchange remain open.
+
+The SceneArtifact source draft now advances v44 to v45 for an explicit mission
+tool-changer record and `changeTool` step. The record names the master and dock
+connectors, removable CAD occurrences, work channels, unique nonzero identity
+codes (zero means empty; input order is least-significant bit first), lock
+command and measured lock/identity inputs, initial mounted tool, and a positive
+feedback-age limit. ProjectKit validation checks those references and the
+tool-selection sequence across handling steps; a focused fixture covers a
+two-tool handling exchange and its failure cases. These source checks and the
+new saved version have not been compiled or run, and v44 examples still need
+regeneration after the runtime path is integrated.
+
+Runtime review found an existing but unsuitable shortcut: SimKit can make a
+scene object follow a robot link, but the object becomes kinematic, trails the
+link by one tick, and does not contribute tool mass to the robot. RobotKit's
+threaded screw follower instead creates and removes a dynamic object joint only
+between ticks while the physics host is stopped. RobotKit/SimKit now has a
+source draft for a removable fixed CAD-body follower: it captures the measured
+relative pose at attachment and destroys the joint without snapping the live
+body on release. The generated FFI audit passes all four configured ABI
+targets. SimKit and MuJoCo native regressions now both exercise no-snap
+attachment, position and orientation follow on a moving link, host-stop
+enforcement, and position/orientation retention on detach; the MuJoCo regression
+is wired into its test runner. Neither backend regression has been rebuilt or
+run. `ApplicationSimulation.runTicks`
+calls `stepPaced`, whose observers run
+after the native tick has returned; the owner-paced app can therefore mutate
+topology at that post-tick boundary without stopping the session. A separately
+threaded physics host must be stopped before the same API is called. MissionPlayer
+still needs to stage the exchange at that safe boundary, connect the joint to
+measured dock/lock state, and exchange active TCP, collision geometry and
+capabilities. Static tool selection or suction-style carrying cannot represent
+the physical changer. The root reserve is 2.5 GB while unrelated suite jobs are
+active, below the required native-build reserve.
+
+The next source draft makes the CAD split concrete: `AssemblySimulationBridge.subtree`
+derives a named root and all of its tree descendants, removes the incoming
+attachment edge, rebases geometry at that root, and retains internal joint
+coordinates. `toFloatingRobotModel` compiles the result with CAD mass and
+collision data as a floating articulated runtime. A CadBridge fixture now
+covers a fixed robot mount, an internal jaw joint, a saved joint coordinate,
+root-frame rebasing and the floating model; it is not compiled yet. RobotKit
+also drafts a fixed follower from any session body to a floating robot root,
+so a static CAD dock can support the complete articulated tool between mounts.
+Both native backend tests cover attachment to a static dock and parked pose
+retention. These new Haxe and native changes have not been compiled or tested,
+and the generated FFI audit must be rerun. App runtime creation, dock-motion
+planning, MissionPlayer staging and active TCP/capability exchange remain open.
+
+### SD14 drawing-foundation audit (2026-10-12)
+
+There is no engineering drawing-view/projection subsystem in the non-vendor
+repository sources. Existing orthographic cameras are scene-rendering features,
+and the sheet-cut SVG export is a manufacturing cut plan rather than a drawing
+view. SD14 therefore needs to establish orthographic and section drawing
+projections before adding cosmetic thread lines and callouts; it cannot start as
+a thread-only overlay on an existing drawing API.
+
+### SD14 drawing-projection draft (2026-10-13)
+
+ProjectKit now projects orthographic views and retained-half section views from
+the portable CAD mesh, classifies hidden edges by exact segment/triangle
+overlap, and exports physical-page SVG. Section cuts hatch the projected
+coplanar cut-face triangles (preserving holes) or, when the cut crosses no
+existing planar face, the closed projected cut loops. An open loop fails with a
+named section diagnostic. The 45-degree hatch spacing is 3 mm. Each SVG prints
+the fitted view scale. Cosmetic thread symbols and size/pitch/tolerance/depth
+callouts come only from the current named `ThreadedFace` packets; no thread
+specification is duplicated and no helix is made. The example exports a tapped
+plate section, a plate end view and a screw side view.
+
+The ProjectKit suite passes 327 assertions, including hidden spans shorter than
+the old fixed edge-sample interval and hatches constrained to a synthetic cut
+region. `haxeon.drawing.json` runs against the real CAD preview and emits three
+well-formed SVG files; all three were rendered for inspection. The section
+artifact shows both tapped depths, leaves the plain hole unannotated and leaves
+all three holes clear of section hatching. The required full gate remains
+pending: only 2.2 GB is free, below the 3 GB native-build reserve. SD14 is not
+accepted until that gate passes.
 
 ## Order
 
@@ -1829,17 +2427,22 @@ still required. The earlier 21-test proof predates this wire extension.
 
 | Step | State | Commits |
 | --- | --- | --- |
-| SD0 | done — post-rebase full gate passed | `8c0088848`, `ea8fc7bb9`, `fb01efe0c` |
-| SD1 | done — post-rebase full gate passed | `86181a642`, `a6b9ccd55` |
-| SD2 | done — post-rebase full gate passed | `154ca5491`, `35a195269`, `24b5d1a02` |
-| SD3 | done — post-rebase full gate passed | `fbbe14d0c`, `6c338344d`, `ffee5362f` |
-| SD4 | done — full gate passed | `fdc6da0c0` |
-| SD5 | done — full gate passed | `bc00c869a`, `e4655adc1` |
-| SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `95a9dbb28`, `70d24f220`, `58d15bfff` |
-| SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `a6123a912`, `c0bedd1b3`, `20c52bb69`, `98afa7c40`, `091f0a97a`, `b0b4743ba`, `6ae7b158a`, `2b7d15c71`, `7038a4fee` |
-| SD8 | done — virtual unchanged CAD mission, hardware owner/acquisition binding, scripted/TCP controller and repeated-STOP proofs pass; final full gate passed | `f19115ae0`, `84c004fab`, `40d2f9b66` |
-| SD9 | done — buffered bowl supply, scripted I/O, physical replenishment/jam/reset on both backends and portable export pass; final full gate passed | SD9 implementation in this commit |
-| SD10 | in progress — initial model/I/O and current wire checks pass; reject-bin accounting and a cross-thread CAD scenario added but unverified; app/CAD/quick/full acceptance blocked by disk reserve | SD10 draft checkpoint |
+| SD0 | done — post-rebase full gate passed | `c201c6476`, `797a76f3e`, `c11345627` |
+| SD1 | done — post-rebase full gate passed | `288e73e6d`, `d058b5d5d` |
+| SD2 | done — post-rebase full gate passed | `e5c41a88f`, `6295201fd`, `059d50696` |
+| SD3 | done — post-rebase full gate passed | `8a5e803b5`, `f62c04739`, `eb9b110cb`, `4d1cb577e`, `50ee0ed7c` |
+| SD4 | done — full gate passed | `6fb00e8dc`, `041e0c09f` |
+| SD5 | done — full gate passed | `962102cdc`, `d6dc16f31`, `63c4215d8` |
+| SD6 | done — actual M6 CAD mission and empty presenter pass both backends; full gate passed | `62ff473d9`, `b99a36b09`, `651932f2d`, `ac187ae11` |
+| SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `c08f852a1`, `b98eca82b`, `2dce4da17`, `be142c1f0`, `713755d22`, `3af09d5ef`, `07b0afca7`, `d88eb97a9`, `5e5efaae2`, `fe82a6629`, `2ae4dedc4`, `652993445`, `b0c88a850`, `dd32c9a02`, `1ae44a740`, `9b9095a56`, `2a290de5c` |
+| SD8 | done — virtual unchanged CAD mission, hardware owner/acquisition binding, scripted/TCP controller and repeated-STOP proofs pass; final full gate passed | `3d1ec4d79`, `100856d98`, `96dfb9f95`, `5c9a441aa`, `f4b7b4d90` |
+| SD9 | done — buffered bowl supply, scripted I/O, physical replenishment/jam/reset on both backends and portable export pass; final full gate passed | `979d54b44` |
+| SD10 | in progress — blow-feed delivery/fault/stop acceptance passes both backends; CAD clamped-member retention and exact screwdriver-bit identity compile and pass focused runtime acceptance; CadKit and ProjectKit passed quick-gate attempt `sd10-bit-final`, MachineKit was interrupted at 2.0 GB free; full gate, desktop review and retained-number accounting remain pending | `4fd49844d`, `8f68f6b0a`; `sd10-current-retry`; `sd10-bit-projectkit`; `sd10-bit-app-runtime-retry2`; `sd10-bit-final`; `sd10-app-final`; `sd-machinekit-haxe-only` |
+| SD11 | in progress — displaced-fixture registration and four named fastenings passed on both backends in the `sd10-app-final` app stage; corrected native `sim_core` and C-ABI regressions pass and production RobotKit/SimKit rebuild succeeds; latest deterministic-only mission rerun was stopped below the 3 GB reserve; full gate remains pending | SD11 touch-registration draft; `sd11-simcore-final-test`; `sd11-simcore-final-abi-test`; `sd11-production-native-rebuild`; `sd10-app-final` |
+| SD12 | in progress — 35 focused admittance/spiral checks and the dedicated project-source compile pass; the latest offset run stops at 53.158 N before entry, so the simulation-only linear gains have been corrected and nominal/offset acceptance remain pending; native libraries are current, with contact-order/wrench regression queued separately from the failing SD15 dock test | SD12 bounded tracking recovery follow-up; `sd12-all-motion-offset`; `sd12-native-rebuild`; `sd12-native-mujoco-run` |
+| SD13 | in progress — mission-level `screwEngagement` is independent of force search and requires a physical axial-force cap; ProjectKit now passes 339 assertions including the later engagement and run-bound checks; app and screwdriver assembly compile, and v44 assembly/access runtime passes; native reaction test and 1 ms/2 ms runtime await an exclusive native-build/test window | SD13 physical reaction-path draft; SD13 mission-selection follow-up; `sd-projectkit-runtime` |
+| SD14 | in progress — orthographic/section SVG projection and CAD-derived thread symbols/callouts pass within the current 339 ProjectKit assertions; three real CAD SVG exports rendered and inspected; full gate awaits at least 3 GB free | SD14 projection draft; `projectkit/tests/haxeon.json`; `machinekit/examples/robot-screwdriver/haxeon.drawing.json`; `sd-projectkit-runtime` |
+| SD15 | in progress — landed MT8 jaws, MT6/MT7 signals, MT9 trays and the MT10–MT11 single-part cycle audited; Haxe-only app, RobotKit and CadBridge builds pass (2,500/1,742/1,805 sources); ProjectKit passes 339 assertions; RobotKit tool-capability runtime passes 660 assertions and CadBridge runtime passes 194; RobotKit native runtime is current; the native MuJoCo follower test reaches static-dock reattachment and fails, while SimKit follower tests and the generated FFI audit remain pending; CAD-subtree/floating-tool and removable dock-mount drafts compile at the Haxe level; app runtime creation, dock motion, measured lock I/O, active TCP/capability exchange and MissionPlayer integration remain pending | `sd-project-source-haxe-only`; `sd-toolcap-haxe-only`; `sd-toolcap-runtime`; `sd-cadbridge-haxe-only-retry`; `sd-cadbridge-runtime`; `sd-projectkit-runtime`; SD15 interface audit; SD15 process-ownership follow-up; SD15 tool-change transaction draft |
 
 ### SD8 hardware integration work (2026-10-11)
 
@@ -1975,3 +2578,32 @@ NativeKit TCP loopback, as allowed by SD8. The SD2 web screenshot remains
 unrun because its web toolchain was unavailable, as recorded above. No saved
 format, published value or submodule pin changed in this final checkpoint;
 no new Haxeon defect was found.
+
+### Integrated gate and runtime-library follow-up (2026-10-13)
+
+The full suite tag `sd-integrated-local` used this worktree's existing
+`cadkit/build/debug` tree. Its cache points to the prebuilt OCCT release and
+has `CADKIT_BUILD_OCCT_FROM_SOURCE=OFF`; no OCCT build ran. CadKit named-thread
+tests, ProjectKit (331 assertions), the complete MachineKit smoke, the app
+project-source build and the editor-test build all passed. MachineKit smoke
+peaked at 705 MB. The editor and project-source runtime stages then failed to
+load `libcollisionkit_core.so`: the shared suite script's `APPLIB` omits
+`app/build/host/native/collisionkit-native` (and the corresponding
+kinematicskit directory). The failure is in the runner's library path, not a
+test assertion. The original script remains unchanged; a scratch copy,
+`/home/joao/dev/materia-cache/claude-scratch/sd-suite-screwdriving-applib.sh`,
+adds those native directories for the next complete gate.
+
+With the corrected native path, the editor-test executable passed, including
+scene collisions, CAD part workflows and all 855 cosmetic-thread checks. The
+project-source executable passed screwdriver simulation (80 checks), retained
+engagement (108), head-seat continuation (52), the blow-feed equipment project,
+and the CAD screwdriver mission on both backends including the empty
+presenter. Its whole-cell MuJoCo cases also completed normal and damaged
+fastening. The run was stopped before the deterministic-backend whole-cell
+cases when free disk reached 3.09 GB, to preserve the required 3 GB reserve.
+This does not establish a complete project-source runtime or a passing full
+gate; rerun those remaining cases and save their output after disk space
+recovers. The initial suite summary and logs are
+`/home/joao/dev/materia-cache/claude-scratch/sd-suite-sd-integrated-local.txt`
+and its `sd-s-*.log` files.

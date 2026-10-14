@@ -24,7 +24,7 @@ class RobotScene {
 			kind: "screwdriver", members: members.copy(),
 			contact: {occurrence: prefix + "/" + driver.member, connector: driver.tcpConnector},
 			channel: driver.channel, sensor: driver.sensor,
-			screwdriver: {bit: driver.bit, directionChannel: driver.directionChannel,
+			screwdriver: {bit: driver.bit, bitMember: prefix + "/" + driver.bitMember, directionChannel: driver.directionChannel,
 				programChannel: driver.programChannel, vacuumChannel: driver.vacuumChannel,
 				feedJoint: driver.feedJoint, spindleJoint: driver.spindleJoint, strokeEncoder: driver.strokeEncoder,
 				maxTorque: driver.maxTorque, maxSpeed: driver.maxSpeed, strokeMm: driver.strokeMm, springRate: driver.springRate}
@@ -76,8 +76,8 @@ class RobotScene {
 	}
 
 	/**
-	 * The sensors `robot` declares, its members' occurrences under `prefix`: each planar scanner,
-	 * mounted at its scan connector and named after its occurrence.
+	 * The sensors `robot` declares, its members' occurrences under `prefix`: planar scanners and the
+	 * screwdriver's calibrated digital contact input at its TCP.
 	 */
 	public static function robotSensors(robot:MachineAssembly, prefix:String):Array<SceneArtifactRobotSensor> {
 		var result:Array<SceneArtifactRobotSensor> = [];
@@ -86,6 +86,9 @@ class RobotScene {
 			if (scanner != null) result.push({kind: "lidar", id: prefix + entry.id,
 				mount: {occurrence: prefix + entry.id, connector: scanner.scanConnector},
 				rayCount: scanner.rayCount, maxRange: scanner.maxRangeMeters, updateRate: scanner.rateHz});
+			var driver = machinekit.screwdriving.ScrewdriverFacet.of(entry.component);
+			if (driver != null) result.push({kind: "tool_contact", id: prefix + entry.id + "/contact",
+				mount: {occurrence: prefix + entry.id, connector: driver.tcpConnector}});
 		}
 		return result;
 	}

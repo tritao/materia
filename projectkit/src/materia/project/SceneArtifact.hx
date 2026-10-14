@@ -206,15 +206,16 @@ typedef SceneArtifactProjectMotion = {
  * A sensor on the assembly's robot, as its part declares it. A `lidar` scans the
  * horizontal plane of the connector `mount.connector` of the occurrence `mount.occurrence`, `rayCount`
  * rays round the full circle from the connector's +X axis, seeing out to `maxRange` metres and scanning
- * `updateRate` times a second. `id` names it in the robot's observations.
+ * `updateRate` times a second. A `force_torque` sensor reports XYZ newtons and XYZ newton-metres at its
+ * named frame. `id` names it in the robot's observations.
  */
 typedef SceneArtifactRobotSensor = {
 	var kind:String;
 	var id:String;
 	var mount:SceneArtifactPlace;
-	var rayCount:Int;
-	var maxRange:Float;
-	var updateRate:Float;
+	@:optional var rayCount:Int;
+	@:optional var maxRange:Float;
+	@:optional var updateRate:Float;
 }
 
 /**
@@ -247,6 +248,8 @@ typedef SceneArtifactScrewdriverBit = {var kind:String; var size:String;}
 /** Tool capacity in Nm and rad/s, travel in mm, spring rate in N/mm. Joint names identify real tool motion. */
 typedef SceneArtifactScrewdriver = {
 	var bit:SceneArtifactScrewdriverBit;
+	/** Exact CAD occurrence of the replaceable bit, derived from the mounted spindle assembly. */
+	var bitMember:String;
 	var directionChannel:String;
 	var programChannel:String;
 	var vacuumChannel:String;
@@ -377,11 +380,96 @@ typedef SceneArtifactMission = {
 	/** Optional replenishing screw supplies, each declared once for its pickup nest. */
 	@:optional var screwFeeders:Array<materia.project.SceneScrewFeeder>;
 	@:optional var blowFeeds:Array<materia.project.SceneBlowFeed>;
+	/** Optional simulated screw/thread reaction; absence keeps the qualified process model. */
+	@:optional var screwEngagement:SceneArtifactScrewEngagement;
+	/** Physical changer identity, dock and feedback contract for missions that swap tools. */
+	@:optional var toolChanger:SceneArtifactToolChanger;
+	/** Explicit commissioned force/spiral profile shared by the mission's CAD fastenings. */
+	@:optional var screwEntrySearch:SceneArtifactScrewEntrySearch;
 	var steps:Array<SceneArtifactMissionStep>;
 	@:optional var loop:Bool;
 	@:optional var powerUpOffsets:Array<SceneArtifactPowerUpOffset>;
 	@:optional var powerUpSideOffsets:Array<SceneArtifactPowerUpSideOffset>;
 	@:optional var controllerId:String;
+}
+
+/** One interchangeable physical end effector and its CAD docking interface. */
+typedef SceneArtifactToolChangerTool = {
+	var id:String;
+	/** Channel of the corresponding robotTools capability record. */
+	var channel:String;
+	/** Root CAD occurrence of the removable articulated tool subtree; it is fixed to a dock or changer at runtime. */
+	var occurrence:String;
+	/** Tool-side connector mated to the changer master or the matching dock connector. */
+	var connector:String;
+	var dock:SceneArtifactPlace;
+	/** Positive measured identity code; zero is reserved for an empty changer. */
+	var identityCode:Int;
+}
+
+/** Commissioned changer I/O and the CAD interfaces of every interchangeable tool. */
+typedef SceneArtifactToolChanger = {
+	/** Changer master connector on the robot. */
+	var master:SceneArtifactPlace;
+	/** Digital command: true requests the engaged lock. */
+	var lockOutput:String;
+	/** Digital feedback: true confirms the engaged lock. */
+	var lockedInput:String;
+	/** Measured tool identity bits, least-significant bit first; all-zero means empty. */
+	var identityInputs:Array<String>;
+	var initialToolId:String;
+	/** Maximum age of lock and identity feedback, in seconds. */
+	var maximumObservationAgeSeconds:Float;
+	var tools:Array<SceneArtifactToolChangerTool>;
+}
+
+/** Selects whether thread reaction comes from the qualified process model or a physical coupled screw joint. */
+enum abstract SceneArtifactScrewEngagementMode(String) from String to String {
+	var ProcessModel = "process_model";
+	var PhysicalThread = "physical_thread";
+}
+
+/** Mission-level thread-reaction selection, independent of hole-search sensing. */
+typedef SceneArtifactScrewEngagement = {
+	var mode:SceneArtifactScrewEngagementMode;
+	/** Required axial constraint-force cap for the physical simulation mode. */
+	@:optional var maximumAxialForceN:Float;
+}
+
+/** Commissioned Cartesian force search. Wrenches and gains use sensor axes at the screwdriver TCP origin. */
+typedef SceneArtifactScrewEntrySearch = {
+	var sensor:String;
+	var maximumAgeSeconds:Float;
+	var targetWrench:Array<Float>;
+	var virtualMass:Array<Float>;
+	var damping:Array<Float>;
+	var maximumLinearSpeed:Float;
+	/** Axial feed cap while the admittance loop searches and verifies an entry candidate. */
+	var maximumSearchAxialSpeed:Float;
+	/** Clearance distance above the approach pose after premature bore contact. */
+	var contactReliefMeters:Float;
+	var maximumAngularSpeed:Float;
+	var maximumStepSeconds:Float;
+	var maximumForceN:Float;
+	var maximumTorqueNm:Float;
+	/** Maximum TCP displacement from search start, including the CAD-authored controlled approach. */
+	var maximumTravelMeters:Float;
+	var maximumTravelRadians:Float;
+	var maximumRunSeconds:Float;
+	var regionHalfUMeters:Float;
+	var regionHalfVMeters:Float;
+	/** Deliberate U-axis offset used to establish a measured preload before the search. */
+	var contactSeedOffsetUMeters:Float;
+	var spiralRadiusMeters:Float;
+	var spiralTurns:Float;
+	var spiralDurationSeconds:Float;
+	var spiralMaximumLateralSpeed:Float;
+	var spiralTrackingGainPerSecond:Float;
+	var minimumContactLoadN:Float;
+	var requiredLoadDropN:Float;
+	/** Maximum time a candidate entry may hold position without measured axial progress. */
+	var candidateProgressTimeoutSeconds:Float;
+	var confirmationSamples:Int;
 }
 
 /** Generic geometric labels, with optional physical arm turn counts. */
@@ -427,6 +515,7 @@ typedef SceneArtifactMissionWaypoint = {
  * - `weld`: weld the seam `weld` describes with the robot's torch.
  * - `screw`: pick and drive the named CAD fastening with the robot's screwdriver.
  * - `findWork`: measure the named work frame from contact probes on saved nominal CAD faces.
+ * - `changeTool`: dock the current tool and select the named physical tool after measured lock feedback.
  * - `stow`: return the welding arm to its CAD ready posture using its measured joints and live cell clearance.
  */
 typedef SceneArtifactMissionStep = {
@@ -452,6 +541,8 @@ typedef SceneArtifactMissionStep = {
 	@:optional var approachDistance:Float;
 	/** Logical tool channel used when a robot has more than one handling tool. */
 	@:optional var tool:String;
+	/** Physical changer identity selected by a `changeTool` step. */
+	@:optional var targetToolId:String;
 }
 
 /** Absolute mechanical joint position, in radians or metres. */
@@ -710,7 +801,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 38;
+	public static inline var VERSION:Int = 39;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -1303,6 +1394,12 @@ class SceneArtifact {
 					driverProblem("needs one screwdriver, a sensor and no other process description");
 				var driver = tool.screwdriver;
 				if (driver == null) { driverProblem("has no screwdriver description"); return; }
+				if (driver.bitMember == null || !memberIds.exists(driver.bitMember))
+					driverProblem('needs its exact screwdriver bit member, "${driver.bitMember}"');
+				var bitMounts = [for (joint in flat.joints) if (joint.type == "fixed" &&
+					((joint.parent == contact.occurrence && joint.child == driver.bitMember) ||
+					 (joint.child == contact.occurrence && joint.parent == driver.bitMember))) joint];
+				if (bitMounts.length != 1) driverProblem('needs its bit member "${driver.bitMember}" fixed directly to the spindle');
 				if (driver.bit == null || ["hex-socket", "hexalobular", "cross", "hex-head", "slot"].indexOf(driver.bit.kind) < 0 ||
 					driver.bit.size == null || driver.bit.size.length == 0) driverProblem("has an invalid bit drive");
 				if (driver.bit.kind != "hexalobular") {
@@ -1415,7 +1512,8 @@ class SceneArtifact {
 		var flat = AssemblyDefinitionFlattener.flattenView(cast definition);
 		var ids = new Map<String, Bool>();
 		for (sensor in sensors) {
-			if (sensor == null || sensor.kind != "lidar") fail('kind "${sensor == null ? null : sensor.kind}" is unknown');
+			if (sensor == null || (sensor.kind != "lidar" && sensor.kind != "tool_contact" && sensor.kind != "force_torque"))
+				fail('kind "${sensor == null ? null : sensor.kind}" is unknown');
 			if (sensor.id == null || sensor.id.length == 0 || ids.exists(sensor.id)) fail("needs an id of its own");
 			ids.set(sensor.id, true);
 			var mount = sensor.mount;
@@ -1425,9 +1523,13 @@ class SceneArtifact {
 			for (component in flat.definitions) if (component.id == occurrence[0].definition)
 				for (connector in component.connectors) if (connector.name == mount.connector) found = true;
 			if (!found) fail('"${sensor.id}" has no mount connector "${mount.connector}" on "${mount.occurrence}"');
-			if (sensor.rayCount < 2 || sensor.rayCount > 360) fail('"${sensor.id}" needs 2 to 360 rays');
-			if (!finite(sensor.maxRange) || sensor.maxRange <= 0 || !finite(sensor.updateRate) || sensor.updateRate <= 0)
-				fail('"${sensor.id}" needs a positive range and rate');
+			if (sensor.kind == "lidar") {
+				var rays = sensor.rayCount, range = sensor.maxRange, rate = sensor.updateRate;
+				if (rays == null || rays < 2 || rays > 360) fail('"${sensor.id}" needs 2 to 360 rays');
+				if (range == null || !finite(range) || range <= 0 || rate == null || !finite(rate) || rate <= 0)
+					fail('"${sensor.id}" needs a positive range and rate');
+			} else if (sensor.rayCount != null || sensor.maxRange != null || sensor.updateRate != null)
+				fail('"${sensor.id}" contact or force/torque source cannot carry LiDAR scan settings');
 		}
 	}
 
@@ -1442,15 +1544,22 @@ class SceneArtifact {
 			var item:Dynamic = Reflect.field(value, name);
 			return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
 		}
+		function optionalNumber(value:Dynamic, name:String):Null<Float> {
+			var item:Dynamic = Reflect.field(value, name);
+			if (item == null) return null;
+			return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
+		}
 		if (!Std.isOfType(decoded, Array)) fail();
 		return [for (raw in (cast decoded:Array<Dynamic>)) {
 			var mount:Dynamic = Reflect.field(raw, "mount");
 			if (mount == null) fail();
-			var rays = number(raw, "rayCount");
-			if (rays != Math.floor(rays)) fail();
+			var rays = optionalNumber(raw, "rayCount"), range = optionalNumber(raw, "maxRange"), rate = optionalNumber(raw, "updateRate");
+			if (rays != null && rays != Math.floor(rays)) fail();
 			var sensor:SceneArtifactRobotSensor = {kind: text(raw, "kind"), id: text(raw, "id"),
-				mount: {occurrence: text(mount, "occurrence"), connector: text(mount, "connector")},
-				rayCount: Std.int(rays), maxRange: number(raw, "maxRange"), updateRate: number(raw, "updateRate")};
+				mount: {occurrence: text(mount, "occurrence"), connector: text(mount, "connector")}};
+			if (rays != null) sensor.rayCount = Std.int(rays);
+			if (range != null) sensor.maxRange = range;
+			if (rate != null) sensor.updateRate = rate;
 			sensor;
 		}];
 	}
@@ -1601,6 +1710,7 @@ class SceneArtifact {
 				var bit:Dynamic = Reflect.field(driver, "bit");
 				if (bit == null) fail();
 				tool.screwdriver = {bit: {kind: text(bit, "kind"), size: text(bit, "size")},
+					bitMember: text(driver, "bitMember"),
 					directionChannel: text(driver, "directionChannel"), programChannel: text(driver, "programChannel"),
 					vacuumChannel: text(driver, "vacuumChannel"), feedJoint: text(driver, "feedJoint"),
 					spindleJoint: text(driver, "spindleJoint"), strokeEncoder: text(driver, "strokeEncoder"),
@@ -1646,6 +1756,112 @@ class SceneArtifact {
 		return haxe.Json.stringify(envelope);
 	}
 
+static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySearch>, hasScrews:Bool,
+			maximumApproachMeters:Float, maximumCandidateAdvanceMeters:Float,
+			data:SceneArtifactData, fail:String -> Void):Void {
+		if (search == null) return;
+		if (!hasScrews) fail("has a screw entry-search profile but no screw steps");
+		if (search.sensor == null || search.sensor.length == 0) fail("entry search needs a force/torque sensor ID");
+		var drivers = data.robotTools == null ? [] : [for (tool in data.robotTools) if (tool.kind == "screwdriver") tool];
+		if (drivers.length != 1) fail("entry search needs exactly one screwdriver tool");
+		var sensor = data.robotSensors == null ? [] : [for (item in data.robotSensors)
+			if (item.id == search.sensor && item.kind == "force_torque") item];
+		if (sensor.length != 1) fail('entry search sensor "${search.sensor}" must name one force/torque sensor');
+		if (drivers.length == 1 && sensor.length == 1 &&
+			sensor[0].mount.occurrence != drivers[0].contact.occurrence)
+			fail("entry search force/torque sensor must be mounted on the screwdriver tool occurrence");
+		for (value in [search.maximumAgeSeconds, search.maximumLinearSpeed, search.maximumSearchAxialSpeed,
+			search.contactReliefMeters, search.maximumAngularSpeed,
+			search.maximumStepSeconds, search.maximumForceN, search.maximumTorqueNm, search.maximumTravelMeters,
+			search.maximumTravelRadians, search.maximumRunSeconds, search.regionHalfUMeters,
+			search.regionHalfVMeters, search.spiralRadiusMeters, search.spiralTurns,
+			search.spiralDurationSeconds, search.spiralMaximumLateralSpeed,
+			search.spiralTrackingGainPerSecond, search.minimumContactLoadN, search.requiredLoadDropN])
+			if (!finite(value) || value <= 0) fail("entry search needs finite positive commissioned limits and thresholds");
+		if (!finite(search.candidateProgressTimeoutSeconds) || search.candidateProgressTimeoutSeconds <= 0 ||
+			search.candidateProgressTimeoutSeconds > search.maximumRunSeconds)
+			fail("entry search candidate-progress timeout must fit inside its run bound");
+		if (!finite(search.contactSeedOffsetUMeters)) fail("entry-search contact seed must be finite");
+		if (search.maximumAgeSeconds > 3600 || search.maximumRunSeconds > 3600)
+			fail("entry-search freshness and run bounds cannot exceed one hour");
+		if (search.confirmationSamples < 1 || search.confirmationSamples > 1000)
+			fail("entry search needs between one and 1000 confirming samples");
+		if (search.targetWrench == null || search.targetWrench.length != 6 ||
+			search.virtualMass == null || search.virtualMass.length != 6 ||
+			search.damping == null || search.damping.length != 6)
+			fail("entry search needs six target wrench and gain values in sensor axes");
+		if (search.targetWrench != null && search.targetWrench.length == 6) {
+			for (value in search.targetWrench) if (!finite(value)) fail("entry-search target wrench must be finite");
+			var forceSquared = search.targetWrench[0] * search.targetWrench[0] +
+				search.targetWrench[1] * search.targetWrench[1] + search.targetWrench[2] * search.targetWrench[2];
+			if (!(forceSquared > 0)) fail("entry search needs a nonzero axial target force");
+			var torqueSquared = search.targetWrench[3] * search.targetWrench[3] +
+				search.targetWrench[4] * search.targetWrench[4] + search.targetWrench[5] * search.targetWrench[5];
+			if (forceSquared > search.maximumForceN * search.maximumForceN ||
+				torqueSquared > search.maximumTorqueNm * search.maximumTorqueNm)
+				fail("entry-search target wrench exceeds its commissioned force or torque bound");
+		}
+		if (search.virtualMass != null && search.virtualMass.length == 6 &&
+			search.damping != null && search.damping.length == 6)
+			for (axis in 0...6) {
+				var mass = search.virtualMass[axis], damping = search.damping[axis];
+				if (!finite(mass) || mass <= 0 || !finite(damping) || damping <= 0)
+					fail('entry-search axis $axis needs positive finite virtual mass and damping');
+				else if (search.maximumStepSeconds * damping / mass > 1.0)
+					fail('entry-search timestep is unstable on axis $axis');
+			}
+		var seed = Math.abs(search.contactSeedOffsetUMeters);
+		var freshnessDrift = search.spiralMaximumLateralSpeed * search.maximumAgeSeconds;
+		var requiredTravel = ScrewEntrySearchBounds.requiredTravelMeters(maximumApproachMeters,
+			search.contactReliefMeters, search.regionHalfUMeters, search.regionHalfVMeters,
+			search.contactSeedOffsetUMeters, search.spiralRadiusMeters, freshnessDrift,
+			search.maximumLinearSpeed * search.maximumStepSeconds);
+		var minimumSpiralSeconds = ScrewEntrySearchBounds.minimumSpiralSeconds(
+			maximumApproachMeters, search.contactReliefMeters, search.maximumSearchAxialSpeed);
+		var minimumRunSeconds = ScrewEntrySearchBounds.minimumRunSeconds(maximumApproachMeters,
+			search.contactReliefMeters, search.maximumSearchAxialSpeed, search.spiralDurationSeconds,
+			search.spiralRadiusMeters, search.spiralTurns, search.spiralMaximumLateralSpeed,
+			search.candidateProgressTimeoutSeconds);
+		if (search.maximumRunSeconds < minimumRunSeconds || search.spiralDurationSeconds < minimumSpiralSeconds ||
+			search.maximumTravelMeters < requiredTravel ||
+			search.maximumAngularSpeed * search.maximumRunSeconds > search.maximumTravelRadians + 1e-12 ||
+			search.maximumSearchAxialSpeed > search.maximumLinearSpeed ||
+			(search.maximumSearchAxialSpeed * search.candidateProgressTimeoutSeconds < maximumCandidateAdvanceMeters) ||
+			seed + search.spiralRadiusMeters + freshnessDrift > search.regionHalfUMeters ||
+			search.spiralRadiusMeters + freshnessDrift > search.regionHalfVMeters ||
+			search.spiralMaximumLateralSpeed > search.maximumLinearSpeed ||
+			search.maximumForceN <= search.minimumContactLoadN ||
+			search.requiredLoadDropN >= search.minimumContactLoadN)
+			fail("entry-search approach, region, force, linear/angular travel, speed and time bounds are inconsistent");
+		var spiralSpeed = search.spiralRadiusMeters / search.spiralDurationSeconds +
+			search.spiralRadiusMeters * 2.0 * Math.PI * search.spiralTurns / search.spiralDurationSeconds;
+		if (spiralSpeed > search.spiralMaximumLateralSpeed + 1e-12)
+			fail("entry-search spiral exceeds its commissioned lateral speed bound");
+	}
+
+	static function validateScrewEngagement(engagement:Null<SceneArtifactScrewEngagement>,
+			hasScrews:Bool, fail:String -> Void):Void {
+		if (engagement == null) return;
+		if (engagement.mode == SceneArtifactScrewEngagementMode.ProcessModel) {
+			if (engagement.maximumAxialForceN != null)
+				fail("process-model screw engagement cannot declare a physical axial-force cap");
+			return;
+		}
+		if (engagement.mode != SceneArtifactScrewEngagementMode.PhysicalThread) {
+			fail("screw engagement needs a supported simulation mode");
+			return;
+		}
+		if (!hasScrews) fail("physical screw engagement needs screw steps");
+		var force = engagement.maximumAxialForceN;
+		if (force == null) {
+			fail("physical screw engagement needs an explicit positive axial-force cap");
+			return;
+		}
+		var forceN:Float = cast force;
+		if (!finite(forceN) || forceN <= 0)
+			fail("physical screw engagement needs an explicit positive axial-force cap");
+	}
+
 	static function validateMission(mission:SceneArtifactMission, data:SceneArtifactData):Void {
 		materia.project.SceneScrewFeeder.SceneScrewFeeders.validate(mission.screwFeeders,data);
 		materia.project.SceneBlowFeed.SceneBlowFeeds.validate(mission.blowFeeds,data);
@@ -1674,6 +1890,13 @@ class SceneArtifact {
 			// another controller. Both are inputs owned by this controller.
 			return (missionController != null && missionController.sensors.indexOf(name) >= 0) || hasSignal(name, false);
 		}
+		function hasDigitalInput(name:String):Bool {
+			if (missionController != null && missionController.sensors.indexOf(name) >= 0 && flat != null && flat.sensors != null)
+				for (sensor in flat.sensors) if (sensor.id == name &&
+					(sensor.kind == "presence" || sensor.kind == "joint_switch" ||
+					 sensor.kind == "at_speed" || sensor.kind == "brake_released")) return true;
+			return hasSignal(name, false);
+		}
 		/** Whether `place` names an existing connector of an existing occurrence. */
 		function exists(place:Null<SceneArtifactPlace>):Bool {
 			if (place == null || flat == null) return false;
@@ -1683,7 +1906,88 @@ class SceneArtifact {
 				for (connector in component.connectors) if (connector.name == place.connector) return true;
 			return false;
 		}
-		var handles = false, welds = false, screws = false;
+		var changer = mission.toolChanger;
+		var changerHasHandlingTool = false, changerHasScrewdriverTool = false;
+		if (changer != null) {
+			if (!exists(changer.master)) fail("tool changer names no CAD master connector");
+			if (changer.lockOutput == null || changer.lockOutput.length == 0 || !hasSignal(changer.lockOutput, true))
+				fail("tool changer lock output is not wired from the robot mission controller");
+			if (changer.lockedInput == null || changer.lockedInput.length == 0 || !hasDigitalInput(changer.lockedInput))
+				fail("tool changer lock feedback is not an input of the robot mission controller");
+			if (!finite(changer.maximumObservationAgeSeconds) || changer.maximumObservationAgeSeconds <= 0 ||
+				changer.maximumObservationAgeSeconds > 3600)
+				fail("tool changer feedback age must be finite and between zero and one hour");
+			if (changer.identityInputs == null || changer.identityInputs.length < 1 || changer.identityInputs.length > 16)
+				fail("tool changer needs between one and 16 identity inputs");
+			var inputNames = new Map<String, Bool>();
+			if (changer.lockedInput != null) inputNames.set(changer.lockedInput, true);
+			if (changer.identityInputs != null) for (input in changer.identityInputs) {
+				if (input == null || input.length == 0 || inputNames.exists(input) || !hasDigitalInput(input))
+					fail('tool changer identity input "$input" is empty, repeated or not wired to the robot mission controller');
+				else inputNames.set(input, true);
+			}
+			if (changer.tools == null || changer.tools.length < 2 || changer.tools.length > 16)
+				fail("tool changer needs between two and 16 physical tools");
+			var maxCode = changer.identityInputs == null || changer.identityInputs.length < 1 || changer.identityInputs.length > 16 ?
+				0x7fffffff : (1 << changer.identityInputs.length) - 1;
+			var toolIds = new Map<String, Bool>(), toolChannels = new Map<String, Bool>();
+			var identityCodes = new Map<Int, Bool>(), docks = new Map<String, Bool>();
+			if (changer.tools != null) for (tool in changer.tools) {
+				if (tool == null || tool.id == null || tool.id.length == 0 || toolIds.exists(tool.id)) {
+					fail("tool changer has an empty or repeated physical tool identity");
+					continue;
+				}
+				toolIds.set(tool.id, true);
+				if (tool.channel == null || tool.channel.length == 0 || toolChannels.exists(tool.channel))
+					fail('tool changer tool "${tool.id}" needs a unique robot tool channel');
+				else toolChannels.set(tool.channel, true);
+				if (tool.identityCode <= 0 || tool.identityCode > maxCode || identityCodes.exists(tool.identityCode))
+					fail('tool changer tool "${tool.id}" needs a unique nonzero identity code within its input width');
+				else identityCodes.set(tool.identityCode, true);
+				if (tool.occurrence == null || tool.occurrence.length == 0 || tool.connector == null ||
+					tool.connector.length == 0 || !exists({occurrence: tool.occurrence, connector: tool.connector}))
+					fail('tool changer tool "${tool.id}" needs a CAD body occurrence and connector');
+				if (!exists(tool.dock)) fail('tool changer tool "${tool.id}" names no CAD dock connector');
+				else {
+					var dockKey = tool.dock.occurrence + "/" + tool.dock.connector;
+					if (docks.exists(dockKey)) fail('tool changer tools share dock connector "$dockKey"');
+					docks.set(dockKey, true);
+				}
+				var matching = data.robotTools == null ? [] : [for (candidate in data.robotTools)
+					if (candidate.channel == tool.channel) candidate];
+				if (matching.length != 1) fail('tool changer tool "${tool.id}" names no unique robot tool channel "${tool.channel}"');
+				else {
+					var robotTool = matching[0];
+					if (robotTool.kind != "gripper" && robotTool.kind != "suction" && robotTool.kind != "screwdriver")
+						fail('tool changer tool "${tool.id}" has unsupported robot tool kind "${robotTool.kind}"');
+					if (robotTool.kind == "gripper" || robotTool.kind == "suction") changerHasHandlingTool = true;
+					if (robotTool.kind == "screwdriver") changerHasScrewdriverTool = true;
+					if (robotTool.contact == null)
+						fail('tool changer tool "${tool.id}" has no robot working contact');
+					else if (tool.occurrence != null && robotTool.contact.occurrence != tool.occurrence &&
+						!StringTools.startsWith(robotTool.contact.occurrence, tool.occurrence + "/"))
+						fail('tool changer tool "${tool.id}" CAD occurrence does not contain its declared working contact');
+				}
+			}
+			if (changer.initialToolId == null || !toolIds.exists(changer.initialToolId))
+				fail("tool changer initial identity does not name one of its physical tools");
+		}
+		function changerToolById(id:Null<String>):Null<SceneArtifactToolChangerTool> {
+			if (changer == null || id == null || changer.tools == null) return null;
+			for (tool in changer.tools) if (tool != null && tool.id == id) return tool;
+			return null;
+		}
+		function changerRobotTool(id:Null<String>):Null<SceneArtifactRobotTool> {
+			var configured = changerToolById(id);
+			if (configured == null || data.robotTools == null) return null;
+			for (tool in data.robotTools) if (tool.channel == configured.channel) return tool;
+			return null;
+		}
+		var handles = false, welds = false, screws = false, registrations = false, screwdriverRegistrations = false;
+		var activeToolId:Null<String> = changer == null ? null : changer.initialToolId;
+		var hasToolChanges = false;
+		var registrationOccurrence:Null<String> = null, registrationConnector:Null<String> = null,
+			registrationToolKind:Null<String> = null;
 		var handlingTools:Array<SceneArtifactRobotTool> = data.robotTools == null ? [] : [for (tool in data.robotTools)
 			if (tool.kind == "gripper" || tool.kind == "suction") tool];
 		for (index in 0...mission.steps.length) {
@@ -1692,7 +1996,7 @@ class SceneArtifact {
 			if (step.configuration != null) {
 				var pin:SceneArtifactArmConfiguration = step.configuration;
 				if (step.kind != "pick" && step.kind != "place" && step.kind != "weld" && step.kind != "screw" &&
-					step.kind != "moveJoints" && step.kind != "moveVia")
+					step.kind != "moveJoints" && step.kind != "moveVia" && step.kind != "changeTool")
 					fail('step $index cannot carry an arm configuration pin');
 				if ((pin.shoulder != "front" && pin.shoulder != "back") ||
 					(pin.elbow != "up" && pin.elbow != "down") || (pin.wrist != "no-flip" && pin.wrist != "flip"))
@@ -1709,6 +2013,8 @@ class SceneArtifact {
 				fail('step $index needs a finite handling approach between 0 and 1 metre');
 			if (step.tool != null && step.kind != "pick" && step.kind != "place")
 				fail('step $index can select a tool only for pick or place');
+			if (step.targetToolId != null && step.kind != "changeTool")
+				fail('step $index can select a physical tool identity only with changeTool');
 			if (step.toolYaw != null && step.kind != "pick" && step.kind != "place")
 				fail('step $index can set a tool yaw only for pick or place');
 			switch step.kind {
@@ -1721,10 +2027,17 @@ class SceneArtifact {
 					if (step.toolYaw != null && !finite(step.toolYaw)) fail('step $index needs a finite tool yaw');
 					if (!exists(step.at)) fail('step $index names no connector of an occurrence in the assembly');
 					if (handlingTools.length == 0) fail('step $index needs a handling tool');
-					if (handlingTools.length > 1 && step.tool == null)
+					if (handlingTools.length > 1 && step.tool == null && changer == null)
 						fail('step $index must select a tool because this robot has multiple handling tools');
 					if (step.tool != null && [for (tool in handlingTools) if (tool.channel == step.tool) tool].length != 1)
 						fail('step $index names no unique handling tool channel "${step.tool}"');
+					if (changer != null) {
+						var selected = changerRobotTool(activeToolId);
+						if (selected == null || (selected.kind != "gripper" && selected.kind != "suction"))
+							fail('step $index needs an active changer tool that can handle parts');
+						else if (step.tool != null && step.tool != selected.channel)
+							fail('step $index selects handling channel "${step.tool}" while physical tool "${activeToolId}" exposes "${selected.channel}"');
+					}
 				case "moveJoints":
 					if (!exists(step.at)) fail('step $index names no connector of an occurrence in the assembly');
 					if (step.joints == null || step.joints.length == 0 || step.joints.length > 64)
@@ -1823,19 +2136,60 @@ class SceneArtifact {
 					}
 				case "screw":
 					screws = true;
+					if (changer != null) {
+						var selected = changerRobotTool(activeToolId);
+						if (selected == null || selected.kind != "screwdriver")
+							fail('step $index needs the active changer tool to be a screwdriver');
+					}
 					var screw = SceneScrewInvocation.job(step.screw,mission.steps);
 					if (screw == null || flat == null) fail('step $index needs a screw definition and assembly');
 					else SceneScrewDefinition.validateScene(screw,flat,data);
+
+				case "changeTool":
+					hasToolChanges = true;
+					requiresRobotController(index);
+					if (step.timeoutSeconds == null)
+						fail('step $index needs a finite timeout for physical tool exchange');
+					if (changer == null) fail('step $index changes a tool, but the mission has no commissioned changer');
+					if (step.targetToolId == null || step.targetToolId.length == 0)
+						fail('step $index needs a physical target tool identity');
+					else if (changerToolById(step.targetToolId) == null)
+						fail('step $index names unknown changer tool "${step.targetToolId}"');
+					else if (step.targetToolId == activeToolId)
+						fail('step $index already has physical tool "${step.targetToolId}" selected');
+					else activeToolId = step.targetToolId;
 
 				case "weld":
 					welds = true;
 					validateWeld(step.weld, index, flat, fail);
 				case "findWork":
-					welds = true;
+					registrations = true;
 					if (!exists(step.at)) fail('step $index names no contact connector');
-					var contactTool = data.robotTools == null ? [] : [for (tool in data.robotTools)
-						if (tool.kind == "torch" && step.at != null && tool.contact.occurrence == step.at.occurrence && tool.contact.connector == step.at.connector) tool];
-					if (contactTool.length != 1) fail('step $index needs the torch contact connector');
+					var contactTools = data.robotTools == null ? [] : [for (tool in data.robotTools)
+						if ((tool.kind == "torch" || tool.kind == "screwdriver") && step.at != null &&
+							tool.contact.occurrence == step.at.occurrence && tool.contact.connector == step.at.connector) tool];
+					if (contactTools.length != 1) fail('step $index needs one torch or screwdriver contact connector');
+					else {
+						var selected = contactTools[0];
+						if (registrationOccurrence != null && (registrationOccurrence != selected.contact.occurrence ||
+							registrationConnector != selected.contact.connector || registrationToolKind != selected.kind))
+							fail("all contact-registration steps must use the same mounted probe tool");
+						registrationOccurrence = selected.contact.occurrence;
+						registrationConnector = selected.contact.connector;
+						registrationToolKind = selected.kind;
+						if (changer != null) {
+							var selectedChangerTool = changerRobotTool(activeToolId);
+							if (selectedChangerTool == null || selectedChangerTool.channel != selected.channel)
+								fail('step $index probes with a tool that is not the measured active changer identity');
+						}
+						if (selected.kind == "screwdriver") {
+							screwdriverRegistrations = true;
+							var sensor = data.robotSensors == null || step.at == null ? [] : [for (item in data.robotSensors)
+								if (item.kind == "tool_contact" && item.mount.occurrence == step.at.occurrence &&
+									item.mount.connector == step.at.connector) item];
+							if (sensor.length != 1) fail('step $index needs one digital tool-contact sensor mounted at the screwdriver TCP');
+						}
+					}
 					SceneContactRegistration.validate(cast step.contactWork, flat == null ? [] : [for (item in flat.occurrences) item.id]);
 				case "stow":
 					welds = true;
@@ -1845,7 +2199,7 @@ class SceneArtifact {
 		var suctions = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "suction") tool].length;
 		var grippers = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "gripper") tool].length;
 		if (handles && suctions + grippers == 0) fail("picks and places, but the robot has no suction or gripper tool");
-		if (handles && suctions > 0 && grippers > 0)
+		if (handles && suctions > 0 && grippers > 0 && changer == null)
 			fail("picks and places with both suction and gripper tools; the robot must use one handling tool type");
 		var torches = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "torch") tool].length;
 		if (welds && torches != 1) fail('welds, but the robot has $torches torches, not one');
@@ -1859,8 +2213,30 @@ class SceneArtifact {
 						fail('step $index pass "${pass.name}" needs ${pass.process.wireSpeed} m/min of wire, past the feeder\'s top speed of ${feeder.maxWireSpeedMPerMin} m/min');
 			}
 		}
+		var maximumApproachMeters = 0.0;
+		for (step in mission.steps) if (step.kind == "screw") {
+			var job = SceneScrewInvocation.job(step.screw, mission.steps);
+			if (job != null) maximumApproachMeters = Math.max(maximumApproachMeters, job.approach);
+		}
 		var drivers = data.robotTools == null ? [] : [for (tool in data.robotTools) if (tool.kind == "screwdriver") tool];
-		if (screws && (drivers.length != 1 || handles || welds)) fail("screwdriving needs one screwdriver and one tool type");
+		if (screws && (drivers.length != 1 || (handles && changer == null) || welds))
+			fail("screwdriving needs one screwdriver and a commissioned changer to share a handling mission");
+		if (handles && screws && changer != null && !hasToolChanges)
+			fail("a mission that alternates handling and screwdriving needs an explicit changeTool step");
+		if (handles && screws && changer != null && (!changerHasHandlingTool || !changerHasScrewdriverTool))
+			fail("combined handling and screwdriving changer must declare both tool capabilities");
+		var maximumCandidateAdvanceMeters = 0.0;
+		for (step in mission.steps) if (step.kind == "screw") {
+			var job = SceneScrewInvocation.job(step.screw,mission.steps);
+			if (job != null) maximumCandidateAdvanceMeters = Math.max(maximumCandidateAdvanceMeters,job.leadMm/1000.0);
+		}
+		validateScrewEntrySearch(mission.screwEntrySearch, screws, maximumApproachMeters,
+			maximumCandidateAdvanceMeters, data, fail);
+		validateScrewEngagement(mission.screwEngagement, screws, fail);
+		if ((screws || screwdriverRegistrations) && torches > 0)
+			fail("screwdriving registration and torch work need an automatic tool change before they can share a mission");
+		if (screws && registrations && registrationToolKind != "screwdriver")
+			fail("a named screw mission needs screwdriver touch registration at its selected tool TCP");
 		if (screws && drivers.length == 1) {
 			var capacity = drivers[0].screwdriver;
 			if (capacity == null) fail("screwdriver capacity is missing");
@@ -1873,7 +2249,8 @@ class SceneArtifact {
 			}
 		}
 
-		if (welds && handles) fail("picks and places and welds: the robot's arm carries one tool, a suction cup or a torch");
+		if (handles && (welds || registrations)) fail("picks and places and probes or welds: the robot's arm carries one tool at a time");
+		if (welds && screwdriverRegistrations) fail("a mission cannot weld and probe with a screwdriver before automatic tool change is commissioned");
 	}
 
 	static function validateWeld(weld:Null<SceneArtifactWeld>, index:Int, flat:Null<AssemblyDefinition>, fail:String -> Void):Void {
@@ -2099,6 +2476,89 @@ class SceneArtifact {
 		}
 	}
 
+	static function decodeScrewEntrySearch(raw:Dynamic):SceneArtifactScrewEntrySearch {
+		function fail():Dynamic throw "Scene artifact screw entry-search profile is invalid";
+		function number(name:String):Float {
+			var value:Dynamic = Reflect.field(raw, name);
+			return Std.isOfType(value, Int) || Std.isOfType(value, Float) ? (value:Float) : fail();
+		}
+		function vector(name:String):Array<Float> {
+			var value:Dynamic = Reflect.field(raw, name);
+			if (!Std.isOfType(value, Array) || (cast value:Array<Dynamic>).length != 6) fail();
+			return [for (component in (cast value:Array<Dynamic>))
+				Std.isOfType(component, Int) || Std.isOfType(component, Float) ? (component:Float) : fail()];
+		}
+		var sensor:Dynamic = Reflect.field(raw, "sensor");
+		var samples:Dynamic = Reflect.field(raw, "confirmationSamples");
+		if (!Std.isOfType(sensor, String) || !Std.isOfType(samples, Int)) fail();
+		return {sensor: sensor, maximumAgeSeconds: number("maximumAgeSeconds"), targetWrench: vector("targetWrench"),
+			virtualMass: vector("virtualMass"), damping: vector("damping"),
+			maximumLinearSpeed: number("maximumLinearSpeed"), maximumSearchAxialSpeed: number("maximumSearchAxialSpeed"),
+			contactReliefMeters: number("contactReliefMeters"),
+			maximumAngularSpeed: number("maximumAngularSpeed"),
+			maximumStepSeconds: number("maximumStepSeconds"), maximumForceN: number("maximumForceN"),
+			maximumTorqueNm: number("maximumTorqueNm"), maximumTravelMeters: number("maximumTravelMeters"),
+			maximumTravelRadians: number("maximumTravelRadians"), maximumRunSeconds: number("maximumRunSeconds"),
+			regionHalfUMeters: number("regionHalfUMeters"), regionHalfVMeters: number("regionHalfVMeters"),
+			contactSeedOffsetUMeters: number("contactSeedOffsetUMeters"),
+			spiralRadiusMeters: number("spiralRadiusMeters"), spiralTurns: number("spiralTurns"),
+			spiralDurationSeconds: number("spiralDurationSeconds"),
+			spiralMaximumLateralSpeed: number("spiralMaximumLateralSpeed"),
+			spiralTrackingGainPerSecond: number("spiralTrackingGainPerSecond"),
+			minimumContactLoadN: number("minimumContactLoadN"), requiredLoadDropN: number("requiredLoadDropN"),
+			candidateProgressTimeoutSeconds: number("candidateProgressTimeoutSeconds"),
+			confirmationSamples: samples};
+	}
+
+	static function decodeScrewEngagement(raw:Dynamic):SceneArtifactScrewEngagement {
+		function fail():Dynamic throw "Scene artifact screw engagement is invalid";
+		var mode:Dynamic = Reflect.field(raw, "mode");
+		if (!Std.isOfType(mode, String)) fail();
+		var result:SceneArtifactScrewEngagement = {mode: mode};
+		var maximumAxialForce:Dynamic = Reflect.field(raw, "maximumAxialForceN");
+		if (maximumAxialForce != null) {
+			if (!Std.isOfType(maximumAxialForce, Int) && !Std.isOfType(maximumAxialForce, Float)) fail();
+			result.maximumAxialForceN = maximumAxialForce;
+		}
+		return result;
+	}
+
+	static function decodeToolChanger(raw:Dynamic):SceneArtifactToolChanger {
+		function fail():Dynamic throw "Scene artifact tool changer is invalid";
+		function name(value:Dynamic):String return Std.isOfType(value, String) ? value : fail();
+		function place(value:Dynamic):SceneArtifactPlace {
+			if (value == null) fail();
+			return {occurrence: name(Reflect.field(value, "occurrence")),
+				connector: name(Reflect.field(value, "connector"))};
+		}
+		var identity:Dynamic = Reflect.field(raw, "identityInputs");
+		var tools:Dynamic = Reflect.field(raw, "tools");
+		if (!Std.isOfType(identity, Array) || !Std.isOfType(tools, Array)) fail();
+		var initial:Dynamic = Reflect.field(raw, "initialToolId");
+		var output:Dynamic = Reflect.field(raw, "lockOutput");
+		var locked:Dynamic = Reflect.field(raw, "lockedInput");
+		var age:Dynamic = Reflect.field(raw, "maximumObservationAgeSeconds");
+		if (!Std.isOfType(initial, String) || !Std.isOfType(output, String) || !Std.isOfType(locked, String) ||
+			(!Std.isOfType(age, Float) && !Std.isOfType(age, Int))) fail();
+		var initialId:String = cast initial, outputName:String = cast output, lockedName:String = cast locked;
+		var maximumAge:Float = cast age;
+		return {master: place(Reflect.field(raw, "master")), lockOutput: outputName, lockedInput: lockedName,
+			identityInputs: [for (input in (cast identity:Array<Dynamic>)) name(input)],
+			initialToolId: initialId, maximumObservationAgeSeconds: maximumAge,
+			tools: [for (item in (cast tools:Array<Dynamic>)) {
+				var id:Dynamic = Reflect.field(item, "id"), channel:Dynamic = Reflect.field(item, "channel");
+				var occurrence:Dynamic = Reflect.field(item, "occurrence"), connector:Dynamic = Reflect.field(item, "connector");
+				var code:Dynamic = Reflect.field(item, "identityCode");
+				if (!Std.isOfType(id, String) || !Std.isOfType(channel, String) ||
+					!Std.isOfType(occurrence, String) || !Std.isOfType(connector, String) || !Std.isOfType(code, Int)) fail();
+				var toolId:String = cast id, toolChannel:String = cast channel,
+					toolOccurrence:String = cast occurrence, toolConnector:String = cast connector,
+					identityCode:Int = cast code;
+				{id: toolId, channel: toolChannel, occurrence: toolOccurrence, connector: toolConnector,
+					dock: place(Reflect.field(item, "dock")), identityCode: identityCode};
+			}]};
+	}
+
 	static function decodeMission(decoded:Dynamic):SceneArtifactMission {
 		function fail():Dynamic throw "Scene artifact mission is invalid";
 		function number(value:Dynamic, name:String):Float {
@@ -2216,6 +2676,11 @@ class SceneArtifact {
 				if (!Std.isOfType(tool, String) || (tool:String).length == 0) fail();
 				step.tool = tool;
 			}
+			var targetToolId:Dynamic = Reflect.field(raw, "targetToolId");
+			if (targetToolId != null) {
+				if (!Std.isOfType(targetToolId, String) || (targetToolId:String).length == 0) fail();
+				step.targetToolId = targetToolId;
+			}
 			step;
 		}]};
 		var loop:Dynamic = Reflect.field(decoded, "loop");
@@ -2230,6 +2695,12 @@ class SceneArtifact {
 		if (blow != null) mission.blowFeeds = materia.project.SceneBlowFeed.SceneBlowFeeds.decode(blow);
 		var feeders:Dynamic = Reflect.field(decoded,"screwFeeders");
 		if (feeders != null) mission.screwFeeders = materia.project.SceneScrewFeeder.SceneScrewFeeders.decode(feeders);
+		var search:Dynamic = Reflect.field(decoded, "screwEntrySearch");
+		if (search != null) mission.screwEntrySearch = decodeScrewEntrySearch(search);
+		var engagement:Dynamic = Reflect.field(decoded, "screwEngagement");
+		if (engagement != null) mission.screwEngagement = decodeScrewEngagement(engagement);
+		var changer:Dynamic = Reflect.field(decoded, "toolChanger");
+		if (changer != null) mission.toolChanger = decodeToolChanger(changer);
 		return mission;
 	}
 

@@ -18,7 +18,7 @@ class SceneScrewTests {
     if (!ok) throw message;
   }
   static function job():SceneScrew {
-    return {delivery:Presented,fastening:"work/screw1:bore", screw:"screw1", frame:"work", threadFace:"bore:cyl.side",
+    return {delivery:Presented,fastening:"work/screw1:bore", screw:"screw1", clamped:"clamp", frame:"work", threadFace:"bore:cyl.side",
       presenter:"nest", presentSensor:"nest/present", socket:AssemblyFrames.identity(),
       pickup:AssemblyFrames.translation(0,0,0.1), entry:AssemblyFrames.translation(0,0,-0.01),
       seat:AssemblyFrames.identity(), hole:AssemblyFrames.identity(), leadMm:1, hand:1, slot:1, approach:0.04,
@@ -29,12 +29,12 @@ class SceneScrewTests {
   static function bad(change:SceneScrew->Void, diagnostic:String):Void {
     var candidate = job(); change(candidate);
     var error = "";
-    try SceneScrewDefinition.validate(candidate,["screw1","work","nest"]) catch (value:Dynamic) error = Std.string(value);
+    try SceneScrewDefinition.validate(candidate,["screw1","work","clamp","nest"]) catch (value:Dynamic) error = Std.string(value);
     check(error.indexOf(diagnostic) >= 0, 'Expected "$diagnostic", got "$error"');
   }
   public static function namedFace(data:SceneArtifactData, thread:ThreadRenderData):Void {
     var flat:AssemblyDefinition = {schemaVersion:AssemblyDefinitionCodec.VERSION,id:"screw-test",lengthUnit:"mm",
-      definitions:[], joints:[], occurrences:[for (id in ["screw1","work","nest"])
+      definitions:[], joints:[], occurrences:[for (id in ["screw1","work","clamp","nest"])
         {id:id,definition:"part",initialPose:AssemblyFrames.identity()}],
       sensors:[{id:"nest/present",kind:"presence",occurrence:"nest",connector:"sense",range:8}]};
     var candidate = job();
@@ -67,6 +67,7 @@ class SceneScrewTests {
     flat.occurrences.push({id:"spare",definition:"part",initialPose:AssemblyFrames.identity()});
     flat.occurrences.push({id:"reserve",definition:"nest",initialPose:AssemblyFrames.identity()});
     flat.occurrences.push({id:"bin",definition:"bin",initialPose:AssemblyFrames.identity()});
+    var spare = [for (item in flat.occurrences) if (item.id == "spare") item][0];
     var sensors = flat.sensors;
     if (sensors == null) throw "Recovery fixture lost its presence sensors";
     sensors.push({id:"reserve/present",kind:"presence",occurrence:"reserve",connector:"sense",range:8});
@@ -74,9 +75,9 @@ class SceneScrewTests {
       rejectMember:"bin",reject:AssemblyFrames.translation(0,0,0.1)};
     SceneScrewDefinition.validateScene(candidate,flat,data);
     check(true,"The replacement resolves its exact component and scoped presence sensor");
-    flat.occurrences[3].definition = "similar-part";
+    spare.definition = "similar-part";
     refused("exact screw component definition");
-    flat.occurrences[3].definition = "part";
+    spare.definition = "part";
     sensors[1].occurrence = "nest";
     refused("replacement presenter sensor");
     sensors[1].occurrence = "reserve";
@@ -90,8 +91,9 @@ class SceneScrewTests {
   public static function run():Void {
     var source = job();
     var restored = SceneScrewDefinition.decode(haxeon.wire.JsonWire.encode(source));
-    SceneScrewDefinition.validate(restored,["screw1","work","nest"]);
-    check(restored.screw == "screw1" && restored.threadFace == "bore:cyl.side", "Named screw and face survive decoding");
+    SceneScrewDefinition.validate(restored,["screw1","work","clamp","nest"]);
+    check(restored.screw == "screw1" && restored.clamped == "clamp" && restored.threadFace == "bore:cyl.side",
+      "Named screw, clamped member and face survive decoding");
     check(SceneScrewDefinition.runDownMm(restored) == 10 && restored.approach == 0.04,
       "Run-down converts metre frames to mm without changing approach units");
     check(restored.program.targetTorque == 10 && restored.simulation.stiffnessNmPerRad == 20,
@@ -99,6 +101,8 @@ class SceneScrewTests {
     bad(s -> s.screw = "missing", 'occurrence "missing"');
     bad(s -> s.threadFace = "", "topological face names");
     bad(s -> s.screw = "work", "own occurrence");
+    bad(s -> s.clamped = "missing", 'occurrence "missing"');
+    bad(s -> s.clamped = "work", "distinct");
     bad(s -> s.entry.qw = 2, "unit rotation");
     bad(s -> s.entry.x = 0.001, "named thread axis");
     bad(s -> s.entry.z = 0.001, "behind the thread entry");
@@ -120,19 +124,20 @@ class SceneScrewTests {
     recovering.recovery = {replacement:{screw:"spare",presenter:"reserve",presentSensor:"reserve/present",pickup:AssemblyFrames.translation(0,0,0.1)},
       rejectMember:"bin",reject:AssemblyFrames.translation(0,0,0.1)};
     var restoredRecovery = SceneScrewDefinition.decode(haxeon.wire.JsonWire.encode(recovering));
-    SceneScrewDefinition.validate(restoredRecovery,["screw1","work","nest","spare","reserve","bin"]);
+    SceneScrewDefinition.validate(restoredRecovery,["screw1","work","clamp","nest","spare","reserve","bin"]);
     var replacement = SceneScrewDefinition.replacement(restoredRecovery);
-    check(replacement.screw == "spare" && replacement.fastening == recovering.fastening && replacement.threadFace == recovering.threadFace,
-      "A replacement changes only supply identity while preserving the exact connection");
+    check(replacement.screw == "spare" && replacement.fastening == recovering.fastening &&
+      replacement.threadFace == recovering.threadFace && replacement.clamped == recovering.clamped,
+      "A replacement changes only supply identity while preserving the exact CAD connection");
     var same = recovering.recovery;
     if (same == null) throw "Recovery fixture lost its supply";
     same.replacement.screw = "screw1";
     var rejected = false;
-    try SceneScrewDefinition.validate(recovering,["screw1","work","nest","reserve","bin"]) catch (_:Dynamic) rejected = true;
+    try SceneScrewDefinition.validate(recovering,["screw1","work","clamp","nest","reserve","bin"]) catch (_:Dynamic) rejected = true;
     check(rejected,"A replacement cannot reuse the original occurrence");
     same.replacement.screw = "spare"; same.reject.qw = 2;
     rejected = false;
-    try SceneScrewDefinition.validate(recovering,["screw1","work","nest","spare","reserve","bin"]) catch (_:Dynamic) rejected = true;
+    try SceneScrewDefinition.validate(recovering,["screw1","work","clamp","nest","spare","reserve","bin"]) catch (_:Dynamic) rejected = true;
     check(rejected,"Reject frames require a unit rotation");
     Sys.println('Scene screw definitions: $checks checks passed');
     runInvocations();

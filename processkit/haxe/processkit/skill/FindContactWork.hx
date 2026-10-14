@@ -6,16 +6,15 @@ import robotkit.skill.SkillLifecycle;
 import robotkit.skill.SkillStatus;
 import robotkit.skill.SkillResult;
 import robotkit.core.RobotSnapshot;
-import robotkit.spatial.Transform3;
 
-/** Acquire a work frame through executed contact probes before any station weld can start. */
-class FindWeldWork implements Skill {
+/** Acquire an accepted work frame through executed, source-identified contact probes. */
+class FindContactWork implements Skill {
   final make:Void->ContactRegistrationRunner;
-  final accept:Transform3->Void;
+  final accept:ContactRegistrationRunner->Void;
   final lifecycle = new SkillLifecycle();
   var runner:Null<ContactRegistrationRunner> = null;
-  public function new(make:Void->ContactRegistrationRunner, accept:Transform3->Void) {
-    if (make == null || accept == null) throw "Finding weld work needs an executed registration factory and frame consumer";
+  public function new(make:Void->ContactRegistrationRunner, accept:ContactRegistrationRunner->Void) {
+    if (make == null || accept == null) throw "Finding work needs an executed registration factory and evidence consumer";
     this.make = make; this.accept = accept;
   }
   public function start():Void {
@@ -30,8 +29,8 @@ class FindWeldWork implements Skill {
       active.update(durationSeconds);
       if (active.failure != null) lifecycle.fail(cast active.failure);
       else if (active.completed()) {
-        accept(cast active.workFrame);
-        lifecycle.succeed("weld work measured from contacts");
+        accept(active);
+        lifecycle.succeed("work frame measured from contacts");
       }
     } catch (error:Dynamic) {
       var active = runner; if (active != null) active.cancel();

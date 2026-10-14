@@ -11,6 +11,10 @@ The examples in this directory are:
 - `materia.project.json`: equipment and idle tool feedback.
 - `materia.drive.project.json`: one qualified M6 fastening.
 - `materia.assembly.project.json`: all four flange fastenings with recovery.
+- `materia.registered.project.json`: six touch measurements locate the flange
+  from CAD reference faces before the four named fastenings run.
+- `materia.force-search.project.json`: a commissioned force/spiral profile
+  searches for screw entry after the CAD-derived approach.
 - `materia.staged.project.json`: snug, then final tightening of installed screws.
 - `materia.feeder.project.json`: a bowl and buffered track replenish one pickup
   nest for all four primary screws. Replacement presenters remain separate.
@@ -18,6 +22,8 @@ The examples in this directory are:
   CAD fastenings; app/CAD acceptance is pending (see SD10 in the plan).
 - `materia.threads.project.json` and `materia.fastenings.project.json`: cosmetic
   threads and CAD fastening discovery.
+- `haxeon.drawing.json`: exports section, end and screw-side SVG drawing views
+  from the same CAD artifact and named thread data.
 
 The automatic feeder waits for geometry-backed presence before pickup. It
 replenishes only after the tool holds the delivered identity clear of the nest.
@@ -48,5 +54,12 @@ and measured receipt before direct travel to the hole. Presenter jobs remain
 available through an explicit acquisition mode. The tube dimensions, local
 mass, pressure, timing, receiving-speed limits and external dress-pack routing
 are demonstration/commissioning assumptions recorded in [PLAN.md](PLAN.md).
-The scene format is v34. The draft is not accepted until its app/CAD and final
-gates pass; the disk reserve stopped that validation run.
+SD11's draft uses the screwdriver's digital TCP contact source and retains its
+typed measurement provenance and remaining pose bounds. Vision is deferred
+until a calibrated camera reference source is available. The scene format is
+v44. The generated touch sensor assumes a noise-free simulation contact; a
+hardware project must provide its commissioned calibration bound. The force-
+search example carries simulation-only commissioned limits and requires a
+fresh measured compression baseline followed by a confirmed force drop; it is
+not a hardware safety recipe. SD10–SD12 remain unaccepted until their
+native/app gates and required review pass; the disk reserve stopped validation.

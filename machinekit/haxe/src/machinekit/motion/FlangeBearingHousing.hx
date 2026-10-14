@@ -53,6 +53,12 @@ class FlangeBearingHousing extends MachineComponent {
 		addConnector("bore", Axis, Solids.axial(0, 0, depth / 2));
 		var i = 1;
 		for (point in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(point.x, point.y, 0));
+		// A single convex hull would fill the bearing bore and all four bolt
+		// clearances, making seated screws collide with the housing in simulation.
+		var collision = geometry(Preview);
+		try addFacet(machinekit.component.CollisionHullFacet.fromExtrusion(collision, 0, depth))
+		catch (error:Dynamic) { collision.close(); throw error; }
+		collision.close();
 	}
 
 	/** Bolt centres on the mounting face, counter-clockwise from (+,+). */

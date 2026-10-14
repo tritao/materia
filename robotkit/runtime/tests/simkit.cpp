@@ -1347,6 +1347,228 @@ void dual_home_removes_one_millimetre_startup_racking(bool full_targets) {
     assert(std::abs((after.position[1] - after.position[2]) / 1000.0) < 0.00002);
 }
 
+void threaded_object_slide_is_owned_by_the_shared_robot_simulation() {
+    SessionFixture fixture(0.001, 4);
+    auto model = blueprint(302);
+    rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(fixture.simulation, &model, nullptr, &robot) == RK_OK);
+    const double position[] = {0.0, 0.0, 0.02};
+    const double rotation[] = {0.0, 0.0, 0.0, 1.0};
+    const double half_extents[] = {0.003, 0.003, 0.01};
+    const auto screw = spawn_object(fixture.session, NKSIM_MOTION_DYNAMIC, position,
+        rotation, half_extents, 0.01);
+    nksim_body screw_body = 0;
+    assert(nksim_session_get_object_body(fixture.session, screw, &screw_body) == NKSIM_OK);
+
+    rk_simulation_object_slide_desc description{};
+    description.struct_size = sizeof(description);
+    description.parent_link_index = 1;
+    description.driver_joint_index = 0;
+    description.follower_body = screw_body;
+    description.axis_a[2] = 1.0;
+    description.lower_limit = -0.02;
+    description.upper_limit = 0.02;
+    description.max_force = 100.0;
+    description.ratio = 0.001 / (2.0 * 3.14159265358979323846);
+    nksim_joint slide = 0;
+    assert(rk_simulation_create_object_slide_follower(fixture.simulation, &description, &slide) == RK_OK);
+    assert(slide != 0);
+
+    // Topology may change between manual ticks, but never while the host owns the world.
+    assert(start(fixture.session) == RK_OK);
+    nksim_joint forbidden = 0;
+    assert(rk_simulation_create_object_slide_follower(fixture.simulation, &description, &forbidden) == RK_ERROR_INVALID_STATE);
+    assert(rk_simulation_destroy_object_joint(fixture.simulation, slide) == RK_ERROR_INVALID_STATE);
+    assert(stop(fixture.session) == RK_OK);
+    assert(rk_simulation_destroy_object_joint(fixture.simulation, slide) == RK_OK);
+    remove_object(fixture.session, screw);
+}
+
+void fixed_object_follower_tracks_and_releases_a_live_cad_body() {
+    SessionFixture fixture(0.001, 4);
+    auto model = blueprint(305);
+    rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(fixture.simulation, &model, nullptr, &robot) == RK_OK);
+    nksim_body parent_body = 0;
+    assert(rk_simulation_get_link_body(fixture.simulation, 0, 1, &parent_body) == RK_OK);
+    nksim_body_state parent_before{};
+    parent_before.struct_size = sizeof(parent_before);
+    assert(nksim_session_get_body_state(fixture.session, parent_body, &parent_before) == NKSIM_OK);
+    const double position[] = {parent_before.position[0] + 0.04, parent_before.position[1],
+        parent_before.position[2]};
+    const double rotation[] = {parent_before.rotation[0], parent_before.rotation[1],
+        parent_before.rotation[2], parent_before.rotation[3]};
+    const double half_extents[] = {0.005, 0.005, 0.005};
+    const auto tool = spawn_object(fixture.session, NKSIM_MOTION_DYNAMIC, position,
+        rotation, half_extents, 0.2);
+    nksim_body tool_body = 0;
+    assert(nksim_session_get_object_body(fixture.session, tool, &tool_body) == NKSIM_OK);
+    nksim_body_state seated_before{};
+    seated_before.struct_size = sizeof(seated_before);
+    assert(nksim_session_get_body_state(fixture.session, tool_body, &seated_before) == NKSIM_OK);
+
+    nksim_joint attachment = 0;
+    assert(rk_simulation_create_object_fixed_follower(fixture.simulation, 0, 1,
+        tool_body, &attachment) == RK_OK);
+    assert(attachment != 0);
+    nksim_body_state seated_after{};
+    seated_after.struct_size = sizeof(seated_after);
+    assert(nksim_session_get_body_state(fixture.session, tool_body, &seated_after) == NKSIM_OK);
+    for (uint32_t axis = 0; axis < 3; ++axis)
+        assert(std::abs(seated_after.position[axis] - seated_before.position[axis]) < 1e-10);
+
+    assert(start(fixture.session) == RK_OK);
+    nksim_joint forbidden = 0;
+    assert(rk_simulation_create_object_fixed_follower(fixture.simulation, 0, 1,
+        tool_body, &forbidden) == RK_ERROR_INVALID_STATE);
+    assert(stop(fixture.session) == RK_OK);
+
+    const auto command = target(0.5, 1);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    for (uint64_t tick = 1; tick <= 500; ++tick)
+        assert(step(fixture.session, tick * 1000000) == RK_OK);
+    nksim_body_state parent_after{}, tool_after{};
+    parent_after.struct_size = tool_after.struct_size = sizeof(nksim_body_state);
+    assert(nksim_session_get_body_state(fixture.session, parent_body, &parent_after) == NKSIM_OK);
+    assert(nksim_session_get_body_state(fixture.session, tool_body, &tool_after) == NKSIM_OK);
+    double distance_squared = 0.0;
+    for (uint32_t axis = 0; axis < 3; ++axis) {
+        const auto delta = tool_after.position[axis] - parent_after.position[axis];
+        distance_squared += delta * delta;
+    }
+    assert(std::abs(std::sqrt(distance_squared) - 0.04) < 1e-4);
+    double relative_orientation_dot = 0.0;
+    for (uint32_t axis = 0; axis < 4; ++axis)
+        relative_orientation_dot += parent_after.rotation[axis] * tool_after.rotation[axis];
+    assert(std::abs(std::abs(relative_orientation_dot) - 1.0) < 1e-4);
+
+    assert(rk_simulation_destroy_object_joint(fixture.simulation, attachment) == RK_OK);
+    nksim_body_state released{};
+    released.struct_size = sizeof(released);
+    assert(nksim_session_get_body_state(fixture.session, tool_body, &released) == NKSIM_OK);
+    for (uint32_t axis = 0; axis < 3; ++axis)
+        assert(std::abs(released.position[axis] - tool_after.position[axis]) < 1e-8);
+    remove_object(fixture.session, tool);
+}
+
+void articulated_robot_follower_tracks_and_releases_without_losing_tool_joints() {
+    SessionFixture fixture(0.001, 4);
+    auto arm = blueprint(306);
+    auto tool = blueprint(307);
+    tool.floating_base = 1;
+    assert(rk_robot_runtime_blueprint_validate(&tool) == RK_OK);
+    rk_robot_runtime arm_runtime = RK_INVALID_ROBOT_RUNTIME;
+    rk_robot_runtime tool_runtime = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(fixture.simulation, &arm, nullptr, &arm_runtime) == RK_OK);
+    assert(rk_simulation_add_robot(fixture.simulation, &tool, nullptr, &tool_runtime) == RK_OK);
+
+    rk_simulation_pose tool_before{};
+    tool_before.struct_size = sizeof(rk_simulation_pose);
+    assert(rk_simulation_get_link_pose(fixture.simulation, 1, 0, &tool_before) == RK_OK);
+    nksim_joint mount = 0;
+    assert(rk_simulation_create_robot_fixed_follower(fixture.simulation, 0, 1, 1, 0,
+        &mount) == RK_OK);
+    assert(mount != 0);
+    nksim_joint duplicate = 0;
+    assert(rk_simulation_create_robot_fixed_follower(fixture.simulation, 0, 1, 1, 0,
+        &duplicate) == RK_ERROR_INVALID_STATE);
+    assert(rk_simulation_create_robot_fixed_follower(fixture.simulation, 1, 1, 0, 0,
+        &duplicate) == RK_ERROR_INVALID_ARGUMENT);
+    rk_simulation_pose tool_seated{};
+    tool_seated.struct_size = sizeof(tool_seated);
+    assert(rk_simulation_get_link_pose(fixture.simulation, 1, 0, &tool_seated) == RK_OK);
+    for (uint32_t axis = 0; axis < 3; ++axis)
+        assert(std::abs(tool_seated.position[axis] - tool_before.position[axis]) < 1e-10);
+    for (uint32_t axis = 0; axis < 4; ++axis)
+        assert(std::abs(tool_seated.rotation[axis] - tool_before.rotation[axis]) < 1e-10);
+
+    assert(start(fixture.session) == RK_OK);
+    nksim_joint forbidden = 0;
+    assert(rk_simulation_create_robot_fixed_follower(fixture.simulation, 0, 1, 1, 0,
+        &forbidden) == RK_ERROR_INVALID_STATE);
+    assert(rk_simulation_destroy_robot_joint(fixture.simulation, mount) == RK_ERROR_INVALID_STATE);
+    assert(stop(fixture.session) == RK_OK);
+
+    const auto arm_command = target(0.5, 1);
+    const auto tool_command = target(0.3, 1);
+    assert(rk_robot_runtime_submit(arm_runtime, &arm_command) == RK_OK);
+    assert(rk_robot_runtime_submit(tool_runtime, &tool_command) == RK_OK);
+    for (uint64_t tick = 1; tick <= 500; ++tick)
+        assert(step(fixture.session, tick * 1000000) == RK_OK);
+    rk_simulation_pose parent_after{}, tool_after{};
+    parent_after.struct_size = tool_after.struct_size = sizeof(rk_simulation_pose);
+    assert(rk_simulation_get_link_pose(fixture.simulation, 0, 1, &parent_after) == RK_OK);
+    assert(rk_simulation_get_link_pose(fixture.simulation, 1, 0, &tool_after) == RK_OK);
+    double distance_squared = 0.0, orientation_dot = 0.0;
+    for (uint32_t axis = 0; axis < 3; ++axis) {
+        const auto delta = tool_after.position[axis] - parent_after.position[axis];
+        distance_squared += delta * delta;
+    }
+    for (uint32_t axis = 0; axis < 4; ++axis)
+        orientation_dot += parent_after.rotation[axis] * tool_after.rotation[axis];
+    assert(std::abs(std::sqrt(distance_squared) - 1.0) < 1e-4);
+    assert(std::abs(std::abs(orientation_dot) - 1.0) < 1e-4);
+    assert(std::abs(snapshot(tool_runtime).position[0] - 0.3) < 0.02);
+
+    assert(rk_simulation_destroy_robot_joint(fixture.simulation, mount) == RK_OK);
+    rk_simulation_pose released{};
+    released.struct_size = sizeof(released);
+    assert(rk_simulation_get_link_pose(fixture.simulation, 1, 0, &released) == RK_OK);
+    for (uint32_t axis = 0; axis < 3; ++axis)
+        assert(std::abs(released.position[axis] - tool_after.position[axis]) < 1e-8);
+    for (uint32_t axis = 0; axis < 4; ++axis)
+        assert(std::abs(released.rotation[axis] - tool_after.rotation[axis]) < 1e-8);
+
+    const double dock_position[3] = {0.0, 0.0, 0.0};
+    const double identity[4] = {0.0, 0.0, 0.0, 1.0};
+    const double dock_size[3] = {0.1, 0.1, 0.1};
+    const auto dock = spawn_object(fixture.session, NKSIM_MOTION_STATIC,
+        dock_position, identity, dock_size);
+    nksim_body dock_body = 0;
+    assert(nksim_session_get_object_body(fixture.session, dock, &dock_body) == NKSIM_OK);
+    nksim_joint dock_mount = 0;
+    assert(rk_simulation_create_robot_body_fixed_follower(fixture.simulation, dock_body, 1, 0,
+        &dock_mount) == RK_OK);
+    rk_simulation_pose docked{};
+    docked.struct_size = sizeof(docked);
+    assert(rk_simulation_get_link_pose(fixture.simulation, 1, 0, &docked) == RK_OK);
+    for (uint32_t axis = 0; axis < 3; ++axis)
+        assert(std::abs(docked.position[axis] - released.position[axis]) < 1e-10);
+    assert(start(fixture.session) == RK_OK);
+    for (uint64_t tick = 501; tick <= 550; ++tick)
+        assert(step(fixture.session, tick * 1000000) == RK_OK);
+    assert(stop(fixture.session) == RK_OK);
+    rk_simulation_pose parked{};
+    parked.struct_size = sizeof(parked);
+    assert(rk_simulation_get_link_pose(fixture.simulation, 1, 0, &parked) == RK_OK);
+    for (uint32_t axis = 0; axis < 3; ++axis)
+        assert(std::abs(parked.position[axis] - docked.position[axis]) < 1e-5);
+    assert(rk_simulation_destroy_robot_joint(fixture.simulation, dock_mount) == RK_OK);
+    remove_object(fixture.session, dock);
+}
+
+void process_joint_drive_requires_process_ownership() {
+    SessionFixture fixture(0.001, 1);
+    auto process = blueprint(303);
+    process.joints[0].type = RK_RUNTIME_JOINT_PRISMATIC;
+    process.joints[0].lower_limit = -0.1;
+    process.joints[0].upper_limit = 0.1;
+    process.external_joint[0] = 1;
+    process.process_joint[0] = 1;
+    assert(rk_robot_runtime_blueprint_validate(&process) == RK_OK);
+    rk_robot_runtime process_runtime = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(fixture.simulation, &process, nullptr, &process_runtime) == RK_OK);
+
+    auto ordinary = blueprint(304);
+    rk_robot_runtime ordinary_runtime = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(fixture.simulation, &ordinary, nullptr, &ordinary_runtime) == RK_OK);
+    assert(start(fixture.session) == RK_OK);
+    assert(rk_simulation_drive_process_joint(fixture.simulation, 0, 0, 0.05, 0.0) == RK_OK);
+    assert(rk_simulation_drive_process_joint(fixture.simulation, 0, 0, 0.2, 0.0) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_drive_process_joint(fixture.simulation, 1, 0, 0.05, 0.0) == RK_ERROR_INVALID_ARGUMENT);
+    assert(stop(fixture.session) == RK_OK);
+}
+
 int main() {
     dual_home_removes_one_millimetre_startup_racking(true);
     dual_home_removes_one_millimetre_startup_racking(false);
@@ -1365,5 +1587,9 @@ int main() {
     differential_drive_keeps_authored_tilt();
     omni_drive_follows_applied_wheel_targets();
     robots_attach_to_a_shared_session();
+    threaded_object_slide_is_owned_by_the_shared_robot_simulation();
+    fixed_object_follower_tracks_and_releases_a_live_cad_body();
+    articulated_robot_follower_tracks_and_releases_without_losing_tool_joints();
+    process_joint_drive_requires_process_ownership();
     return 0;
 }

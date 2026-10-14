@@ -23,7 +23,7 @@ class ContactWorkTests {
   static function job():SceneContactWork {
     return {frame: "plate", nominal: AssemblyFrames.translation(1.7, -0.2, 0.6),
       translation: [0.02, 0.02, 0.0], rotation: [0.0, 0.0, 2 * Math.PI / 180],
-      measurementError: 0.00001, contactOffset: 0.0005,
+      measurementError: 0.00001, calibratedError: 0.000002, contactOffset: 0.0005,
       faces: [for (axis in 0...3) {member: "plate", face: 'face$axis', target: true,
         normal: [for (i in 0...3) i == axis ? 1.0 : 0.0], centre: [0.0, 0.0, 0.0],
         chords: axis == 2 ? square(axis, 0.05).concat(square(axis, 0.01)) : square(axis, 0.05)}]};
@@ -40,6 +40,8 @@ class ContactWorkTests {
       "Contact mission preserves nominal assembly/work frame independently of scene millimetres");
     check(back.translation[0] == 0.02 && back.rotation[2] == 2 * Math.PI / 180 &&
       back.measurementError == 0.00001 && back.contactOffset == 0.0005, "Parking and contact calibration round trip in metres/radians");
+    check(back.calibratedError == work.calibratedError,
+      "Contact work retains the commissioned sensor threshold bound separately from total observation error");
     check(back.faces.length == 3 && back.faces[2].chords.length == 8 && back.faces[2].chords[4][0][0] == -0.01,
       "CAD contour edges preserve the hole and target normals");
     bytes.setInt32(4, 16);
@@ -54,6 +56,7 @@ class ContactWorkTests {
     bad(w -> w.translation[0] = -0.02, "Negative parking uncertainty is rejected");
     bad(w -> w.rotation[2] = Math.PI / 2, "Unsupported angular intervals are rejected");
     bad(w -> w.measurementError = 0, "Zero observation tolerance is rejected");
+    bad(w -> w.calibratedError = w.measurementError, "Sensor threshold error cannot consume the entire observation budget");
     bad(w -> w.contactOffset = 0.003, "Unbounded contact calibration offset is rejected");
     bad(w -> { var face:SceneContactFace = w.faces[0]; face.member = "missing"; }, "Unknown face occurrence is rejected");
     bad(w -> { var face:SceneContactFace = w.faces[1]; var first:SceneContactFace = w.faces[0]; face.face = first.face; }, "Repeated CAD face identity is rejected");

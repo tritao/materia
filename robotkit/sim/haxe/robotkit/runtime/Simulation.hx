@@ -4,6 +4,7 @@ import NativeKitSim;
 import RobotKitSimKit;
 import haxe.Int64;
 import nativekit.sim.SimFrame;
+import nativekit.sim.MotionType;
 import nativekit.sim.SimSession;
 import robotkit.mobile.Pose2;
 import collisionkit.CollisionGeometry;
@@ -506,6 +507,10 @@ class Simulation {
     return runtime != null && robots.indexOf(runtime) >= 0;
   }
 
+  /** MuJoCo provides solved contact wrenches; the deterministic backend does not model them. */
+  public function supportsContactWrenches():Bool
+    return space != null && space.backend == SimulationSpace.MUJOCO;
+
   public function robotContacts(runtime:RobotRuntime):Array<RobotContact> {
     ensureLive();
     if (runtime == null || robots.indexOf(runtime) < 0)
@@ -528,10 +533,14 @@ class Simulation {
         value = result.out_contact;
         contacts.push({linkIndex: value.get_link_index(),
           toolPieceIndex: value.get_tool_piece_index(),
+          otherPieceIndex: value.get_other_piece_index(),
           otherObject: value.get_other_object().rawValue(),
           distance: value.get_distance(),
           position: new Vec3(value.get_position(0), value.get_position(1), value.get_position(2)),
           normal: new Vec3(value.get_normal(0), value.get_normal(1), value.get_normal(2)),
+          wrenchValid: value.get_wrench_valid() != 0,
+          force: new Vec3(value.get_force_on_link(0), value.get_force_on_link(1), value.get_force_on_link(2)),
+          torque: new Vec3(value.get_torque_on_link(0), value.get_torque_on_link(1), value.get_torque_on_link(2)),
           active: value.get_active() != 0,
           stepIndex: stepResult.out_step_index,
           otherKind: cast value.get_other_kind(),
@@ -932,6 +941,94 @@ class Simulation {
     return result.out_body;
   }
 
+  /** Releases the host between ticks so the next explicit step recompiles a changed joint topology. */
+  public function stopForTopologyChange():Void {
+    ensureLive();
+    session.stop();
+  }
+
+  /** Couples a dynamic object slide to one revolute joint on its parent tool link. */
+  public function createObjectSlideFollower(robotIndex:Int, parentLinkIndex:Int, driverJointIndex:Int,
+      follower:nativekit.sim.SimObject, anchorA:Array<Float>, anchorB:Array<Float>, axis:Array<Float>,
+      lowerLimit:Float, upperLimit:Float, maxForce:Float, ratio:Float, offset:Float):nksim_joint {
+    ensureLive();
+    if (follower == null || anchorA == null || anchorA.length != 3 || anchorB == null || anchorB.length != 3 ||
+        axis == null || axis.length != 3)
+      throw "Object slide follower needs a session object and three-component local joint frames";
+    var desc = new rk_simulation_object_slide_desc();
+    desc.set_struct_size(rk_simulation_object_slide_desc.size());
+    desc.set_robot_index(robotIndex);
+    desc.set_parent_link_index(parentLinkIndex);
+    desc.set_driver_joint_index(driverJointIndex);
+    desc.set_follower_body(session.objectBody(follower));
+    for (index in 0...3) {
+      desc.set_anchor_a(index, anchorA[index]);
+      desc.set_anchor_b(index, anchorB[index]);
+      desc.set_axis_a(index, axis[index]);
+    }
+    desc.set_lower_limit(lowerLimit);
+    desc.set_upper_limit(upperLimit);
+    desc.set_max_force(maxForce);
+    desc.set_ratio(ratio);
+    desc.set_offset(offset);
+    var result = RobotKitSimKit.rk_simulation_create_object_slide_follower(owner.borrow(), desc);
+    check(result.status, "simulation.createObjectSlideFollower");
+    return result.out_joint;
+  }
+
+  /**
+   * Attaches a dynamic CAD body to a robot link at its current measured pose.
+   * The physics host must be stopped between ticks; destroy the returned joint
+   * at the next docked release to preserve the body's live pose and mass.
+   */
+  public function createObjectFixedFollower(robotIndex:Int, parentLinkIndex:Int,
+      follower:nativekit.sim.SimObject):nksim_joint {
+    ensureLive();
+    if (follower == null || follower.motion != MotionType.Dynamic)
+      throw "Fixed object follower needs a dynamic session object";
+    var result = RobotKitSimKit.rk_simulation_create_object_fixed_follower(owner.borrow(),
+      robotIndex, parentLinkIndex, session.objectBody(follower));
+    check(result.status, "simulation.createObjectFixedFollower");
+    return result.out_joint;
+  }
+
+  /** Removes one runtime-created object joint while the physics host is stopped. */
+  public function destroyObjectJoint(joint:nksim_joint):Void {
+    ensureLive();
+    check(RobotKitSimKit.rk_simulation_destroy_object_joint(owner.borrow(), joint),
+      "simulation.destroyObjectJoint");
+  }
+
+  /** Attach a floating articulated robot root to another robot link without snapping.
+   * The host must be stopped between ticks; a child runtime can have only one mount.
+   */
+  public function createRobotFixedFollower(parentRobotIndex:Int, parentLinkIndex:Int,
+      childRobotIndex:Int, childRootLinkIndex:Int):nksim_joint {
+    ensureLive();
+    var result = RobotKitSimKit.rk_simulation_create_robot_fixed_follower(owner.borrow(),
+      parentRobotIndex, parentLinkIndex, childRobotIndex, childRootLinkIndex);
+    check(result.status, "simulation.createRobotFixedFollower");
+    return result.out_joint;
+  }
+
+  /** Attach a floating articulated tool root to a session body, such as its fixed CAD dock, at a stopped tick boundary. */
+  public function createRobotBodyFixedFollower(parent:nativekit.sim.SimObject,
+      childRobotIndex:Int, childRootLinkIndex:Int):nksim_joint {
+    ensureLive();
+    if (parent == null) throw "Robot body follower needs a session object as its parent";
+    var result = RobotKitSimKit.rk_simulation_create_robot_body_fixed_follower(owner.borrow(),
+      session.objectBody(parent), childRobotIndex, childRootLinkIndex);
+    check(result.status, "simulation.createRobotBodyFixedFollower");
+    return result.out_joint;
+  }
+
+  /** Release an articulated robot mount at a stopped tick boundary, preserving the child's live pose. */
+  public function destroyRobotJoint(joint:nksim_joint):Void {
+    ensureLive();
+    check(RobotKitSimKit.rk_simulation_destroy_robot_joint(owner.borrow(), joint),
+      "simulation.destroyRobotJoint");
+  }
+
   /** The native body carrying an environment object, or zero while free. */
   public function objectCarrier(object:nativekit.sim.SimObject):nksim_body {
     ensureLive();
@@ -957,12 +1054,23 @@ class Simulation {
       relative:nativekit.sim.SimPose):Void {
     ensureLive();
     session.holdObject(object, linkBody(robotIndex, linkIndex), relative);
+    check(RobotKitSimKit.rk_simulation_bind_object_to_link(owner.borrow(), object.handle,
+      robotIndex, linkIndex), "simulation.bindObjectToLink");
   }
 
   /** Lets go of a session object some link carries. */
   public function releaseObject(object:nativekit.sim.SimObject):Void {
     ensureLive();
     session.releaseObject(object);
+    unbindObjectFromLink(object);
+  }
+
+  /** Stops attributing a session object's contact load to its former robot carrier. */
+  public function unbindObjectFromLink(object:nativekit.sim.SimObject):Void {
+    ensureLive();
+    if (object == null) throw "A carried-object binding needs an object";
+    check(RobotKitSimKit.rk_simulation_unbind_object(owner.borrow(), object.handle),
+      "simulation.unbindObjectFromLink");
   }
 
   /** Retains a part in an identified environment object's body frame. */

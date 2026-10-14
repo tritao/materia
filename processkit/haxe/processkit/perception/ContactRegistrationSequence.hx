@@ -28,9 +28,12 @@ class ContactRegistrationStage {
 /** Measured 3-2-1 registration policy; selection receives only CAD/observed uncertainty, never physical work poses. */
 class ContactRegistrationSequence {
   public final envelope:ContactPoseEnvelope;
+  /** Typed source observations retained with the accepted pose for downstream uncertainty checks. */
+  public var measurements(get, never):Array<ContactMeasurement>;
   public var result(default, null):Null<ContactRegistrationResult> = null;
   final select:Int->Array<Vec3>->ContactPoseEnvelope->ContactRegistrationStage;
   final contacts:Array<PlaneContact> = [];
+  final observedMeasurements:Array<ContactMeasurement> = [];
   final normals:Array<Vec3> = [];
   var stage:Null<ContactRegistrationStage> = null;
   var index = 0;
@@ -39,6 +42,7 @@ class ContactRegistrationSequence {
 
   /** The selected CAD plane and its checked probes, while the sequence works on that plane. */
   public function activeStage():Null<ContactRegistrationStage> return stage;
+  function get_measurements():Array<ContactMeasurement> return observedMeasurements.copy();
 
   public function new(envelope:ContactPoseEnvelope,
       select:Int->Array<Vec3>->ContactPoseEnvelope->ContactRegistrationStage) {
@@ -71,10 +75,28 @@ class ContactRegistrationSequence {
     return selectStage();
   }
 
-  /** Called only after an executed probe has completed its checked retreat. */
-  public function observe(measured:Vec3):Null<ContactProbeRequest> {
-    if (!started || stage == null || result != null || measured == null)
-      throw "Contact registration has no pending observation";
+  /** Production observations retain sensor identity, units, frame, acquisition time and error bound. */
+  public function observeMeasurement(measurement:ContactMeasurement):Null<ContactProbeRequest> {
+    if (!started || stage == null || result != null || measurement == null)
+      throw "Contact registration has no pending typed observation";
+    if (measurement.unit != "m" || measurement.coordinateFrame.length == 0 ||
+        (measurement.sensorKind != processkit.tool.WeldSensor.KIND && measurement.sensorKind != "tool_contact") ||
+        measurement.uncertaintyMeters > envelope.measurementError)
+      throw 'Contact registration measurement "${measurement.sensorId}" has unsupported units, frame or uncertainty';
+    if (observedMeasurements.length > 0) {
+      var previous = observedMeasurements[observedMeasurements.length - 1];
+      if (measurement.sensorId != previous.sensorId || measurement.sensorKind != previous.sensorKind ||
+          measurement.sensorFrame != previous.sensorFrame || measurement.coordinateFrame != previous.coordinateFrame ||
+          measurement.sourceClockId != previous.sourceClockId ||
+          measurement.unit != previous.unit || measurement.sequence <= previous.sequence ||
+          measurement.sourceTimestampNs <= previous.sourceTimestampNs || measurement.jointTimestampNs <= previous.jointTimestampNs)
+        throw 'Contact registration measurement "${measurement.sensorId}" is ambiguous or inconsistent with the accepted source stream';
+    }
+    observedMeasurements.push(measurement);
+    return observePoint(measurement.point);
+  }
+
+  function observePoint(measured:Vec3):Null<ContactProbeRequest> {
     var active:ContactRegistrationStage = cast stage;
     contacts.push(new PlaneContact(active.normal, active.offset, measured));
     index++;
@@ -87,9 +109,24 @@ class ContactRegistrationSequence {
       stageTransitionPending = true;
       return null;
     }
-    var fitted = ContactRegistration.fit(contacts, envelope.nominalWork, envelope.measurementError);
+    var rotation = envelope.rotationBound;
+    var rotationLimit = Math.max(1e-12, Math.min(Math.PI,
+      Math.abs(rotation.x) + Math.abs(rotation.y) + Math.abs(rotation.z)));
+    // Fit translation is expressed at the work origin, while saved bounds are
+    // chassis-origin motion. Include the rotation lever arm about that origin.
+    var translationLimit = Math.max(1e-12, envelope.translationBound.norm() +
+      2 * envelope.nominalWork.translation.norm() * Math.sin(rotationLimit * 0.5));
+    var fitted = ContactRegistration.fit(contacts, envelope.nominalWork, envelope.measurementError,
+      translationLimit, rotationLimit);
     fitted.require();
-    result = fitted;
+    var bounded = envelope.constrainWorkFrame(fitted.estimate);
+    if (bounded == null) {
+      throw 'Contact registration fit lies outside the retained chassis pose-error bounds '
+        + '(${envelope.describeWorkFrame(fitted.estimate)}; fit residual ${fitted.maxResidual} m)';
+    }
+    var correction = envelope.nominalWork.inverse().compose(bounded);
+    result = new ContactRegistrationResult(bounded, correction, fitted.rank,
+      envelope.maximumPlaneResidual(bounded), true, null);
     return null;
   }
 }

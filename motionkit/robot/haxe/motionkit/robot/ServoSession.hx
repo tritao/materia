@@ -73,6 +73,10 @@ class ServoSession {
   var lastSequence = 0;
   var lastNs:Null<Int64> = null;
   var commanded:Array<Float>;
+  var hasSubmittedTarget = false;
+  var lastSubmittedAtRest = false;
+  var velocityControlActive = false;
+  var positionHoldSubmittedAt:Null<Int64> = null;
   final plan:Null<ServoPlan>;
 
   /**
@@ -117,6 +121,7 @@ class ServoSession {
     this.deadlineNs = deadlineNs;
     twist = values;
     live = true;
+    positionHoldSubmittedAt = null;
     return null;
   }
 
@@ -142,7 +147,7 @@ class ServoSession {
     var q = [for (index in indices) snapshot.positions.get(index)];
     if (!(dt > 0.0)) {
       // First tick (or no time passed): hold what was commanded.
-      return new ServoTick(commanded.copy(), !live, isAtRest(commanded), null);
+      return new ServoTick(commanded.copy(), !live, !live && !velocityControlActive && isAtRest(commanded), null);
     }
     var requested = new Twist6(twist[0], twist[1], twist[2], twist[3], twist[4], twist[5]);
     var step = servo.step(q, requested, dt, null, 1000, 1.0, commanded);
@@ -150,12 +155,42 @@ class ServoSession {
     // Joint targets are sticky in the runtime: when braking, a speed below the rest threshold becomes an
     // exact zero, or the last tiny command would keep the arm creeping.
     if (!live) for (i in 0...commanded.length) if (Math.abs(commanded[i]) <= restVelocity) commanded[i] = 0.0;
+    var atRest = !live && isAtRest(commanded);
+    if (atRest && velocityControlActive) {
+      var holdSubmittedAt = positionHoldSubmittedAt;
+      if (holdSubmittedAt != null) {
+        if (now > cast(holdSubmittedAt, Int64) && measuredAtRest(snapshot)) {
+          velocityControlActive = false;
+          positionHoldSubmittedAt = null;
+          return new ServoTick(commanded.copy(), true, true, step);
+        }
+        return new ServoTick(commanded.copy(), true, false, step);
+      }
+      if (!measuredAtRest(snapshot)) {
+        if (hasSubmittedTarget && lastSubmittedAtRest)
+          return new ServoTick(commanded.copy(), true, false, step);
+        var zeroTargets = [for (index in 0...indices.length) JointTarget.velocity(indices[index], 0.0)];
+        robot.submit(RobotCommand.JointTargets(zeroTargets, null));
+        hasSubmittedTarget = true;
+        lastSubmittedAtRest = true;
+        return new ServoTick(commanded.copy(), true, false, step);
+      }
+      var positionTargets = [for (index in 0...indices.length)
+        JointTarget.position(indices[index], snapshot.positions.get(indices[index]))];
+      robot.submit(RobotCommand.JointTargets(positionTargets, null));
+      positionHoldSubmittedAt = now;
+      return new ServoTick(commanded.copy(), true, false, step);
+    }
+    if (atRest) return new ServoTick(commanded.copy(), true, true, step);
     var targets = [for (i in 0...indices.length) JointTarget.velocity(indices[i], commanded[i])];
     // The runtime enforces the deadline if this host stalls; a brake in progress gets a short keepalive.
     var expiry:Null<Int64> = live ? deadlineNs
       : isAtRest(commanded) ? null : now + Int64.fromFloat(2.0 * controlPeriod * 1e9);
     robot.submit(RobotCommand.JointTargets(targets, expiry));
-    return new ServoTick(commanded.copy(), !live, !live && isAtRest(commanded), step);
+    hasSubmittedTarget = true;
+    lastSubmittedAtRest = isAtRest(commanded);
+    velocityControlActive = true;
+    return new ServoTick(commanded.copy(), !live, false, step);
   }
 
   function updatePlan(snapshot:robotkit.core.RobotSnapshot):ServoTick {
@@ -212,6 +247,11 @@ class ServoSession {
 
   function isAtRest(velocity:Array<Float>):Bool {
     for (value in velocity) if (Math.abs(value) > restVelocity) return false;
+    return true;
+  }
+
+  function measuredAtRest(snapshot:robotkit.core.RobotSnapshot):Bool {
+    for (index in indices) if (Math.abs(snapshot.velocities.get(index)) > restVelocity) return false;
     return true;
   }
 }

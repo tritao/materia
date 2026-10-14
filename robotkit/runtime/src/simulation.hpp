@@ -88,6 +88,19 @@ public:
     rk_result get_link_pose(uint32_t robot_index, uint32_t link_index,
                             rk_simulation_pose &out_pose) const;
     rk_result get_link_body(uint32_t robot_index, uint32_t link_index, nksim_body &out_body) const;
+    rk_result bind_object_to_link(nksim_object object, uint32_t robot_index, uint32_t link_index);
+    rk_result unbind_object(nksim_object object);
+    rk_result create_object_slide_follower(const rk_simulation_object_slide_desc &desc,
+        nksim_joint &out_joint);
+    rk_result create_object_fixed_follower(uint32_t robot_index, uint32_t parent_link_index,
+        nksim_body follower_body, nksim_joint &out_joint);
+    rk_result destroy_object_joint(nksim_joint joint);
+    /** Attaches a floating articulated robot root to another robot link without snapping. */
+    rk_result create_robot_fixed_follower(uint32_t parent_robot_index, uint32_t parent_link_index,
+        uint32_t child_robot_index, uint32_t child_root_link_index, nksim_joint &out_joint);
+    rk_result create_robot_body_fixed_follower(nksim_body parent_body,
+        uint32_t child_robot_index, uint32_t child_root_link_index, nksim_joint &out_joint);
+    rk_result destroy_robot_joint(nksim_joint joint);
     rk_result get_robot_contacts(rk_robot_runtime runtime,
                                  std::vector<rk_robot_contact> &out,
                                  uint64_t *step_index = nullptr) const;
@@ -182,6 +195,25 @@ private:
         double tilt[4] = {0.0, 0.0, 0.0, 1.0};
         double rates[3] = {0.0, 0.0, 0.0};
     };
+    struct ObjectJointOwner {
+        nksim_joint joint = 0;
+        nksim_body follower = 0;
+        uint32_t robot_index = 0;
+        uint32_t parent_link_index = 0;
+    };
+    struct RobotJointOwner {
+        nksim_joint joint = 0;
+        nksim_body parent_body = 0;
+        uint32_t parent_robot_index = 0;
+        uint32_t child_robot_index = 0;
+        uint32_t child_root_link_index = 0;
+    };
+    struct ObjectCarrierOwner {
+        nksim_object object = 0;
+        nksim_body body = 0;
+        uint32_t robot_index = 0;
+        uint32_t link_index = 0;
+    };
 
     nksim_session session_ = 0;
     nksim_participant participant_ = 0;
@@ -198,6 +230,9 @@ private:
     std::vector<nkscene_node_id> nodes_;
     std::vector<nksim_body> bodies_;
     std::vector<nksim_joint> joints_;
+    std::vector<ObjectJointOwner> object_joints_;
+    std::vector<RobotJointOwner> robot_joints_;
+    std::vector<ObjectCarrierOwner> object_carriers_;
     std::vector<std::weak_ptr<SimulationRobot>> bindings_;
     std::vector<std::shared_ptr<SimulationRobot>> virtual_bindings_;
     std::vector<std::shared_ptr<VirtualDeviceEndpoint>> virtual_devices_;

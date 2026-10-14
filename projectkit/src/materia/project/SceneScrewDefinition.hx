@@ -74,6 +74,8 @@ import materia.project.SceneArtifact.SceneArtifactData;
 	@:id(17) var approach:Float;
 	@:id(18) @:optional var recovery:ScrewRecovery;
 	@:id(19) var delivery:ScrewDeliveryMode;
+	/** CAD-derived member under the screw head, selected by the fixed head-seat mate. */
+	@:id(20) var clamped:String;
 }
 
 /** Strict saved-data boundary, shared with the live process program. No CAD or process dependency. */
@@ -113,9 +115,11 @@ class SceneScrewDefinition {
 		function fail(detail:String):Void throw 'Scene screw "${screw == null ? "missing" : screw.fastening}": $detail';
 		if (screw == null) { fail("definition is missing"); return; }
 		if (!named(screw.fastening) || !named(screw.threadFace)) fail("fastening and topological face names are required");
-		for (member in [screw.screw,screw.frame])
+		for (member in [screw.screw,screw.frame,screw.clamped])
 			if (!named(member) || occurrences.indexOf(member) < 0) fail('occurrence "$member" does not exist');
-		if (screw.screw == screw.frame || screw.screw == screw.presenter) fail("the screw must have its own occurrence");
+		if (screw.screw == screw.frame || screw.screw == screw.clamped || screw.screw == screw.presenter)
+			fail("the screw must have its own occurrence");
+		if (screw.clamped == screw.frame) fail("clamped and threaded members must be distinct");
 		if (screw.delivery == null) fail("delivery arrangement is missing");
 		switch screw.delivery {
 			case Presented:
@@ -154,7 +158,8 @@ class SceneScrewDefinition {
 			if (supply == null) {fail("replacement supply is missing"); return;}
 			for (member in [supply.screw,supply.presenter,recovery.rejectMember])
 				if (!named(member) || occurrences.indexOf(member) < 0) fail('recovery occurrence "$member" does not exist');
-			if (supply.screw == screw.screw || supply.screw == screw.frame || supply.screw == supply.presenter || supply.screw == recovery.rejectMember)
+			if (supply.screw == screw.screw || supply.screw == screw.clamped || supply.screw == screw.frame ||
+				supply.screw == supply.presenter || supply.screw == recovery.rejectMember)
 				fail("replacement must be a distinct screw occurrence");
 			if (!named(supply.presentSensor) || !validFrame(supply.pickup) || !validFrame(recovery.reject))
 				fail("replacement sensor and recovery frames must be valid");
@@ -166,7 +171,7 @@ class SceneScrewDefinition {
 		var recovery = job.recovery;
 		if (recovery == null) throw 'Scene screw "${job.fastening}" has no declared replacement';
 		var supply = recovery.replacement;
-		return {delivery:Presented,fastening:job.fastening,screw:supply.screw,frame:job.frame,threadFace:job.threadFace,
+		return {delivery:Presented,fastening:job.fastening,screw:supply.screw,frame:job.frame,threadFace:job.threadFace,clamped:job.clamped,
 			presenter:supply.presenter,presentSensor:supply.presentSensor,pickup:supply.pickup,socket:job.socket,
 			entry:job.entry,seat:job.seat,hole:job.hole,leadMm:job.leadMm,hand:job.hand,slot:job.slot,
 			program:job.program,simulation:job.simulation,approach:job.approach};

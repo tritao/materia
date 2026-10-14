@@ -29,12 +29,15 @@ class ScrewdrivingScene {
 		if (definition == null) throw '${fastening.name()}: screw mission needs an exported assembly';
 		var flat = AssemblyDefinitionFlattener.flatten(definition);
 		var state = new AssemblyState(flat,scene.assemblyState);
-		var screwId = prefix+fastening.screw.member, frameId = prefix+fastening.threaded.member;
+		var screwId = prefix+fastening.screw.member, frameId = prefix+fastening.threaded.member,
+			clampedId = prefix+fastening.clamped.member;
 		var members = [for (item in source.components()) if (item.id == fastening.screw.member) item.component];
 		if (members.length != 1 || !Std.isOfType(members[0],ScrewFastener)) throw '${fastening.name()}: driven component is missing';
 		var screw:ScrewFastener = cast members[0];
 		var occurrences = [for (item in flat.occurrences) if (item.id == frameId) item];
 		if (occurrences.length != 1) throw '${fastening.name()}: threaded occurrence "$frameId" is missing';
+		var clampedOccurrences = [for (item in flat.occurrences) if (item.id == clampedId) item];
+		if (clampedOccurrences.length != 1) throw '${fastening.name()}: clamped occurrence "$clampedId" is missing';
 		var packets:Array<ThreadRenderData> = [];
 		for (part in scene.parts) if (part.id == occurrences[0].definition) {
 			var threads = part.threads;
@@ -54,7 +57,8 @@ class ScrewdrivingScene {
 			qx:seat.qx,qy:seat.qy,qz:seat.qz,qw:seat.qw};
 		var pickup = scaled(AssemblyFrames.compose(AssemblyFrames.inverse(state.worldPose(presenter)),
 			AssemblyFrames.compose(state.worldPose(presentedScrew),socket)),metres);
-		var job:SceneScrew = {delivery:Presented,fastening:fastening.name(),screw:screwId,frame:frameId,threadFace:fastening.threaded.faceName,
+		var job:SceneScrew = {delivery:Presented,fastening:fastening.name(),screw:screwId,frame:frameId,
+			threadFace:fastening.threaded.faceName,clamped:clampedId,
 			presenter:presenter,presentSensor:presentSensor,socket:scaled(socket,metres),pickup:pickup,entry:entry,seat:seat,hole:lead,
 			leadMm:fastening.thread.pitch*fastening.thread.starts,hand:switch fastening.thread.hand {case RightHand:1;case LeftHand:-1;},
 			slot:slot,program:TighteningPrograms.fromFastening(fastening,policy).settings,simulation:simulation,approach:approach};

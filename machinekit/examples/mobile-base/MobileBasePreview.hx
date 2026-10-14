@@ -144,7 +144,9 @@ class MobileBaseChecks {
 		if (sensors == null || sensors.length != 1) throw "Mobile base preview should declare its lidar";
 		if (sensors[0].mount.occurrence != "lidar" || sensors[0].mount.connector != "scan" || sensors[0].kind != "lidar")
 			throw "Mobile base lidar should be mounted at the puck's scan connector";
-		near(sensors[0].maxRange, LidarPuck.RANGE, "declared lidar range", 1e-12);
+		var lidarRange = sensors[0].maxRange;
+		if (lidarRange == null) throw "Mobile base lidar should declare its maximum range";
+		near(lidarRange, LidarPuck.RANGE, "declared lidar range", 1e-12);
 
 		// Each wheel joint turns its wheel about its own motor's shaft, which points outward. Spinning
 		// about +Y rolls a wheel forward, so a positive speed drives the left wheel forward and the right one back.

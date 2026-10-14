@@ -4,6 +4,7 @@ import app.AssemblyRobot.AssemblyPart;
 import app.SimulatedTools.GripObject;
 import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
+import NativeKitSim;
 import nativekit.sim.SimObject;
 import nativekit.sim.SimPose;
 import robotkit.runtime.Simulation;
@@ -18,6 +19,7 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
   final simulation:Simulation;
   final part:Null<AssemblyPart>;
   final object:Null<SimObject>;
+  var fixedFollower:Null<nksim_joint>;
 
   public function new(id:String, simulation:Simulation, center:Array<Float>, pieces:Array<Array<Float>>,
       part:Null<AssemblyPart>, object:Null<SimObject>) {
@@ -58,9 +60,29 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
   /** The independently simulated body of this exact screw occurrence. */
   public function freeBody():SimObject {
     var body = object;
-    if (body == null) throw 'Assembly occurrence "$id" has no independent screw body';
+    if (body == null) throw 'Assembly occurrence "$id" has no independent CAD body';
     return body;
   }
+
+  /** Attach this dynamic CAD occurrence to a robot link while the session is between physics ticks. */
+  public function attachFixedToLink(robotIndex:Int, linkIndex:Int):Void {
+    if (part != null || object == null)
+      throw 'Assembly occurrence "$id" is not an independent CAD body';
+    if (fixedFollower != null)
+      throw 'Assembly occurrence "$id" is already attached to a robot link';
+    fixedFollower = simulation.createObjectFixedFollower(robotIndex, linkIndex, object);
+  }
+
+  /** Release this CAD body at its measured world pose while the session is between physics ticks. */
+  public function detachFixedFromLink():Void {
+    var joint = fixedFollower;
+    if (joint == null) throw 'Assembly occurrence "$id" has no fixed robot-link attachment';
+    simulation.destroyObjectJoint(joint);
+    fixedFollower = null;
+  }
+
+  public var attachedToRobotLink(get, never):Bool;
+  function get_attachedToRobotLink():Bool return fixedFollower != null;
 
   /** Fasten at the actual seated pose, preserving the member's live carrier and all offsets. */
   public function retain(body:SimObject, world:SimPose):Void {

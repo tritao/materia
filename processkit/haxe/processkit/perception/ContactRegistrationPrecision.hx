@@ -17,11 +17,11 @@ class ContactRegistrationPrecision {
   }
 
   /** Smaller patterns need finer contacts; near-parallel planes also consume the pose-error budget. */
-  public function contactError(points:Array<Vec3>, normal:Vec3, previous:Array<Vec3>, calibratedError:Float):Float {
+  public function contactError(points:Array<Vec3>, normal:Vec3, previous:Array<Vec3>, maximumError:Float):Float {
     if (points == null || previous == null || points.length != 3 - previous.length || points.length < 1 ||
         normal == null || !Math.isFinite(normal.norm()) || normal.norm() < 1e-12 ||
-        !Math.isFinite(calibratedError) || !(calibratedError > 0))
-      throw "Registration precision needs an observable 3-2-1 stage and calibrated error";
+        !Math.isFinite(maximumError) || !(maximumError > 0))
+      throw "Registration precision needs an observable 3-2-1 stage and a total observation-error bound";
     var n = normal.normalized();
     var gain = 1.0;
     if (points.length == 3) {
@@ -53,6 +53,6 @@ class ContactRegistrationPrecision {
       if (!(independence > 1e-3)) throw "Registration precision needs three independent planes";
       gain = 1.0 / independence;
     }
-    return Math.min(calibratedError, workError / (3 * gain));
+    return Math.min(maximumError, workError / (3 * gain));
   }
 }

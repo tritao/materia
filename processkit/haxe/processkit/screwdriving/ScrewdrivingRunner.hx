@@ -10,10 +10,13 @@ typedef TighteningResult = {
   /** Unwrapped cycle angle, in radians; not an angle inferred from target torque. */
   var angle:Float;
   var outcome:Int;
+  /** Process diagnostic such as a bounded force-search failure. */
+  @:optional var diagnostic:Null<String>;
 };
 private enum ScrewPhase {
   Idle; ToolReceipt; PickupApproach; PickupContact; Sealing; PickupRetract;
-  WorkApproach; Engage; Driving; Stopping; Releasing; Retracting; Done; Failed;
+  WorkApproach; EntrySearch; EntrySearchStopping; EntrySearchRecoveryRetraction;
+  Engage; Driving; Stopping; Releasing; Retracting; Done; Failed;
   FinalApproach; FinalContact; FinalSealing; FinalEngage;
   ProcessStop; RecoveryStop; Reversing; ReverseStop; RecoveryRetract; RejectTravel; RejectRelease; RejectRetract; Recovered;
 }
@@ -23,10 +26,16 @@ class ScrewdrivingRunner {
   public final motion:ScrewdrivingMotion;
   public final outputs:ScrewdriverOutputs;
   final present:Void -> Bool;
+  final entrySearchFactory:Null<ScrewPlan -> Null<ScrewEntrySearch>>;
+  var entrySearch:Null<ScrewEntrySearch>;
   var phase:ScrewPhase = Idle;
   var plan:Null<ScrewPlan> = null;
   var elapsed = 0.0;
   var followDepth = 0.0;
+  var searchedEntry:Null<Transform3> = null;
+  var entrySearchStartPending = false;
+  var entrySearchFailure:Null<String> = null;
+  var entrySearchHeld = false;
   var failureMessage:Null<String> = null;
   var reject:Null<Transform3> = null;
   var reverseAngle = 0.0;
@@ -37,17 +46,31 @@ class ScrewdrivingRunner {
   static inline var ANGLE_RESOLUTION:Float = 1e-6;
   public var tighteningResult(default, null):Null<TighteningResult> = null;
 
-  public function new(motion:ScrewdrivingMotion, outputs:ScrewdriverOutputs, present:Void -> Bool) {
+  public function new(motion:ScrewdrivingMotion, outputs:ScrewdriverOutputs, present:Void -> Bool,
+	  ?entrySearchFactory:ScrewPlan -> Null<ScrewEntrySearch>) {
     if (motion == null || outputs == null || present == null) throw "Screw runner needs arm motion, tool outputs and presenter presence";
-    this.motion = motion; this.outputs = outputs; this.present = present;
+    this.motion = motion; this.outputs = outputs; this.present = present; this.entrySearchFactory = entrySearchFactory;
   }
   public function running():Bool return phase != Idle && phase != Done && phase != Failed && phase != Recovered;
+  /** True after the work approach, while the force-search handoff can be prepared. */
+  public function searchingForEntry():Bool return phase == EntrySearch;
+  /** The force-controlled arm owns axial motion during search and its recovery. */
+  public function forceSearchOwnsAxialMotion():Bool return phase == EntrySearch || phase == EntrySearchStopping ||
+		phase == EntrySearchRecoveryRetraction;
+  /** Physical threads attach only after measured entry and the axial engagement move. */
+  public function physicalThreadEngagementAllowed():Bool {
+    var search = entrySearch;
+    return phase == Driving && (search == null || search.isComplete());
+  }
   public function completed():Bool return phase == Done;
   public function recoveryCompleted():Bool return phase == Recovered;
   public function failure():Null<String> return failureMessage;
   public function run(requested:ScrewPlan):Void {
     if (running() || requested == null) throw "Screw runner needs an idle runner and qualified plan";
-    plan = requested; tighteningResult = null; failureMessage = null; elapsed = 0; followDepth = 0; lossAtPickup = false;
+    var entrySearch = entrySearchFactory == null ? null : entrySearchFactory(requested);
+    plan = requested; tighteningResult = null; failureMessage = null; elapsed = 0; followDepth = 0;
+    this.entrySearch = entrySearch;
+    searchedEntry = null; entrySearchStartPending = false; entrySearchFailure = null; entrySearchHeld = false; lossAtPickup = false;
     outputs.start(false); outputs.reverse(false); outputs.vacuum(requested.finalContact == null && requested.toolFed); outputs.selectProgram(requested.slot);
     var contact = requested.finalContact;
     if (contact == null && requested.toolFed) {
@@ -120,7 +143,43 @@ class ScrewdrivingRunner {
         case WorkApproach:
           if (!reading.vacuum) { finishFailure(reading,ScrewdriverContract.SCREW_LOST); return; }
           if (motion.completed()) {
-            phase = Engage; motion.move(ScrewPlan.along(selected.entry,selected.strokeMm/1000),true);
+            if (entrySearch != null) {phase = EntrySearch; entrySearchStartPending = true;}
+            else {phase = Engage; motion.move(ScrewPlan.along(selected.entry,selected.strokeMm/1000),true);}
+          }
+        case EntrySearch:
+          var search:ScrewEntrySearch = cast entrySearch;
+          if (entrySearchStartPending) {
+            entrySearchStartPending = false;
+            search.start();
+            return;
+          }
+          search.update(reading.vacuum);
+          var searchFailure = search.failureReason();
+          if (searchFailure != null) {
+            if (search.running()) {phase = EntrySearchStopping; elapsed = 0;}
+            else beginEntrySearchRecovery(selected, searchFailure, reading.vacuum);
+          } else if (search.isComplete()) {
+            searchedEntry = search.entryPose();
+            var located = searchedEntry;
+            if (located == null) throw "Force search completed without its stopped measured entry pose";
+            motion.synchronize();
+            phase = Engage; motion.move(ScrewPlan.along(located,selected.strokeMm/1000),true);
+          }
+        case EntrySearchStopping:
+          var search:ScrewEntrySearch = cast entrySearch;
+          search.update(reading.vacuum);
+          if (!search.running()) {
+            var reason = search.failureReason();
+            beginEntrySearchRecovery(selected, reason == null
+              ? "Force search stopped without a measured entry" : reason, reading.vacuum);
+          } else if (elapsed > 2) throw "Arm did not stop after force-search failure";
+        case EntrySearchRecoveryRetraction:
+          if (motion.completed()) {
+            var reason = entrySearchFailure;
+            if (reason == null) throw "Force-search recovery lost its failure diagnostic";
+            var outcome = entrySearchHeld ? ScrewdriverContract.NO_START : ScrewdriverContract.SCREW_LOST;
+            tighteningResult = {fastening:selected.fastening,torqueNm:0.0,angle:0.0,outcome:outcome,diagnostic:reason};
+            fail('Force search: $reason');
           }
         case Engage:
           if (motion.completed()) { followDepth = selected.strokeMm/1000; outputs.start(true); phase = Driving; elapsed = 0; }
@@ -139,7 +198,7 @@ class ScrewdrivingRunner {
             var band = Math.min(0.0005,(selected.program.settings.maximumStroke-selected.program.settings.minimumStroke)/4000);
             if (motion.completed() && correction > band) {
               followDepth += correction;
-              motion.move(ScrewPlan.along(selected.entry,followDepth),true);
+              motion.move(ScrewPlan.along(driveEntry(selected),followDepth),true);
             }
           }
         case Stopping:
@@ -150,7 +209,7 @@ class ScrewdrivingRunner {
             outputs.vacuum(false); phase = Releasing; elapsed = 0;
           } else if (elapsed > 2) throw 'Fastening "${selected.fastening}" spindle did not stop';
         case Releasing:
-          if (!reading.vacuum) { phase = Retracting; motion.move(ScrewPlan.along(selected.entry,-selected.approach),true); }
+          if (!reading.vacuum) { phase = Retracting; motion.move(ScrewPlan.along(driveEntry(selected),-selected.approach),true); }
           else if (elapsed > 2) throw 'Fastening "${selected.fastening}" vacuum did not release';
         case Retracting:
           if (motion.completed()) phase = Done;
@@ -166,11 +225,20 @@ class ScrewdrivingRunner {
             if (result == null) throw "Recovery lost its tightening result";
             recoveryHeld = reading.vacuum;
             if (!reading.vacuum) {
+              if (result.outcome == ScrewdriverContract.NO_START) {
+                result = {fastening:result.fastening,torqueNm:result.torqueNm,angle:result.angle,
+                  outcome:ScrewdriverContract.SCREW_LOST,diagnostic:result.diagnostic};
+                tighteningResult = result;
+              }
               if (result.outcome != ScrewdriverContract.NO_SCREW && result.outcome != ScrewdriverContract.SCREW_LOST)
                 throw "Failed screw lost vacuum before recovery";
               phase = RecoveryRetract;
-              var from = !selected.toolFed && (result.outcome == ScrewdriverContract.NO_SCREW || lossAtPickup) ? selected.pickupPose() : selected.entry;
+              var from = !selected.toolFed && (result.outcome == ScrewdriverContract.NO_SCREW || lossAtPickup) ? selected.pickupPose() : driveEntry(selected);
               motion.move(ScrewPlan.along(from,-selected.approach),result.outcome != ScrewdriverContract.SCREW_LOST);
+            } else if (result.outcome == ScrewdriverContract.NO_START) {
+              outputs.start(false); outputs.reverse(false);
+              phase = RecoveryRetract;
+              motion.move(ScrewPlan.along(selected.entry,-selected.approach),false);
             } else {
               if (!Math.isFinite(reading.angle) || reading.angle < 0) throw "Stopped recovery spindle has no valid measured angle";
               reverseAngle = reading.angle; previousReverseAngle = reading.angle;
@@ -191,14 +259,14 @@ class ScrewdrivingRunner {
             var band = Math.min(0.0005,(selected.program.settings.maximumStroke-selected.program.settings.minimumStroke)/4000);
             if (motion.completed() && correction < -band) {
               followDepth += correction;
-              motion.move(ScrewPlan.along(selected.entry,followDepth),true);
+              motion.move(ScrewPlan.along(driveEntry(selected),followDepth),true);
             }
           }
         case ReverseStop:
           if (!reading.vacuum) throw "Failed screw lost vacuum before withdrawal";
           if (Math.abs(reading.speed) <= STOP_SPEED && motion.completed()) {
             phase = RecoveryRetract;
-            motion.move(ScrewPlan.along(selected.entry,-selected.approach),true);
+            motion.move(ScrewPlan.along(driveEntry(selected),-selected.approach),true);
           } else if (elapsed > 2) throw "Reversed spindle did not stop";
         case RecoveryRetract:
           if (recoveryHeld && !reading.vacuum) throw "Failed screw lost vacuum during withdrawal";
@@ -224,7 +292,9 @@ class ScrewdrivingRunner {
     } catch (error:Dynamic) fail(Std.string(error));
   }
   public function abort():Void {
-    outputs.start(false); outputs.reverse(false); motion.abort(); phase = Failed;
+    outputs.start(false); outputs.reverse(false);
+    if (entrySearch != null && entrySearch.running()) entrySearch.cancel();
+    motion.abort(); phase = Failed;
     failureMessage = "screwdriving cancelled";
   }
   function finishFailure(reading:ScrewdriverReading, outcome:Int):Void {
@@ -244,9 +314,25 @@ class ScrewdrivingRunner {
   }
   function fail(message:String):Void {
     outputs.start(false); outputs.reverse(false);
+    if (entrySearch != null && entrySearch.running()) try entrySearch.cancel() catch (_:Dynamic) {}
     try motion.abort() catch (_:Dynamic) {}
     phase = Failed;
     var selected = plan;
     failureMessage = selected == null ? message : 'Fastening "${selected.fastening}": $message';
+  }
+
+  /** Search has stopped at rest; retract the still-held screw to its qualified safe approach before failing. */
+  function beginEntrySearchRecovery(selected:ScrewPlan, reason:String, screwHeld:Bool):Void {
+    if (reason == null || reason.length == 0) throw "Force-search recovery needs its measured failure diagnostic";
+    entrySearchFailure = reason;
+    entrySearchHeld = screwHeld;
+    motion.synchronize();
+    phase = EntrySearchRecoveryRetraction;
+    elapsed = 0;
+    motion.move(ScrewPlan.along(selected.entry, -selected.approach), false);
+  }
+
+  function driveEntry(selected:ScrewPlan):Transform3 {
+    return searchedEntry == null ? selected.entry : cast searchedEntry;
   }
 }

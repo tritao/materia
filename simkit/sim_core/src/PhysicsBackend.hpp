@@ -133,9 +133,14 @@ struct BackendContact {
     std::int32_t part_a = -1;
     std::int32_t part_b = -1;
     std::array<double, 3> position{};
+    /** Unit normal from body_a toward body_b. */
     std::array<double, 3> normal{};
     double distance = 0.0;
     bool active = false;
+    /** Wrench acting on body_a, expressed in world axes at position. */
+    std::array<double, 3> force_on_body_a{};
+    std::array<double, 3> torque_on_body_a{};
+    bool wrench_valid = false;
 };
 
 /** Internal backend contract. It is intentionally not part of the C ABI. */

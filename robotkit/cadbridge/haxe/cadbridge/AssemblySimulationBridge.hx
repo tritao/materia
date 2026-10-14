@@ -66,6 +66,21 @@ typedef AssemblySimulationClosure = {
   var axisParent:Array<Float>;
 }
 
+/** A detached CAD subtree rebased at its named root, with its current pose retained separately. */
+typedef AssemblySimulationSubtree = {
+  var definition:AssemblyDefinition;
+  var state:Null<AssemblyStateRecord>;
+  var rootOccurrence:String;
+  var rootPose:AssemblyFrame;
+  var occurrences:Array<String>;
+  var joints:Array<String>;
+}
+
+typedef AssemblySimulationFloatingModel = {
+  var subtree:AssemblySimulationSubtree;
+  var converted:AssemblySimulationModel;
+}
+
 typedef AssemblyPhysicalPart = {
   var id:String;
   var materialId:String;
@@ -108,6 +123,130 @@ class AssemblySimulationBridge {
         throw 'Assembly occurrence "$occurrence" has a non-finite collision hull';
     }
     return pieces;
+  }
+
+  /**
+   * Isolate a named occurrence and its tree descendants as an independently simulated CAD body.
+   * The incoming attachment joint is removed, internal articulation and saved coordinates stay,
+   * and geometry is rebased at the root occurrence. This keeps a removable robot tool's CAD mass,
+   * collision pieces and internal joints in one floating runtime.
+   */
+  public static function subtree(definition:AssemblyDefinition, rootOccurrence:String,
+      ?savedState:AssemblyStateRecord):AssemblySimulationSubtree {
+    if (definition == null || rootOccurrence == null || rootOccurrence.length == 0)
+      throw "Assembly subtree needs a definition and named root occurrence";
+    var flat = AssemblyDefinitionFlattener.flatten(definition);
+    AssemblyDefinitionCodec.validate(flat);
+    var rootFound = false;
+    for (occurrence in flat.occurrences) if (occurrence.id == rootOccurrence) rootFound = true;
+    if (!rootFound) throw 'Assembly subtree root "$rootOccurrence" does not exist';
+
+    var flatState = savedState == null ? null : AssemblyDefinitionFlattener.flattenState(definition, savedState);
+    var rest = new AssemblyState(flat);
+    var current = new AssemblyState(flat, flatState);
+    var rootRest = rest.worldPose(rootOccurrence);
+    var rootPose = current.worldPose(rootOccurrence);
+    var rootInverse = AssemblyFrames.inverse(rootRest);
+
+    var occurrenceSet = new Map<String, Bool>();
+    occurrenceSet.set(rootOccurrence, true);
+    var pending = [rootOccurrence];
+    while (pending.length > 0) {
+      var parent = pending.pop();
+      if (parent == null) continue;
+      for (joint in flat.joints) if (joint.role == AssemblyJointRole.Tree && joint.parent == parent &&
+          !occurrenceSet.exists(joint.child)) {
+        occurrenceSet.set(joint.child, true);
+        pending.push(joint.child);
+      }
+    }
+
+    var jointSet = new Map<String, Bool>();
+    var selectedJoints:Array<String> = [];
+    var selectedEdges:Array<materia.assembly.AssemblyDefinition.KinematicJoint> = [];
+    for (joint in flat.joints) {
+      var parentInside = occurrenceSet.exists(joint.parent);
+      var childInside = occurrenceSet.exists(joint.child);
+      if (joint.role == AssemblyJointRole.Closure && parentInside != childInside)
+        throw 'Assembly closure "${joint.id}" crosses detached subtree "$rootOccurrence"';
+      if (!parentInside || !childInside) continue;
+      jointSet.set(joint.id, true);
+      selectedJoints.push(joint.id);
+      selectedEdges.push(joint);
+    }
+
+    var sub:AssemblyDefinition = {schemaVersion: flat.schemaVersion,
+      id: flat.id + "/tool/" + rootOccurrence, lengthUnit: flat.lengthUnit,
+      definitions: [for (component in flat.definitions) component], occurrences: [], joints: selectedEdges};
+    for (occurrence in flat.occurrences) if (occurrenceSet.exists(occurrence.id)) {
+      var local = AssemblyFrames.compose(rootInverse, rest.worldPose(occurrence.id));
+      sub.occurrences.push({id: occurrence.id, definition: occurrence.definition,
+        initialPose: local, grounded: occurrence.id == rootOccurrence ? false : occurrence.grounded,
+        includePath: occurrence.includePath});
+    }
+    sub.definitions = [for (component in flat.definitions)
+      if ([for (occurrence in sub.occurrences) if (occurrence.definition == component.id) occurrence].length > 0) component];
+    if (flat.couplings != null) {
+      sub.couplings = [];
+      for (coupling in flat.couplings) {
+        var sourceInside = jointSet.exists(coupling.source), targetInside = jointSet.exists(coupling.target);
+        if (sourceInside != targetInside)
+          throw 'Assembly coupling "${coupling.id}" crosses detached subtree "$rootOccurrence"';
+        if (sourceInside) sub.couplings.push(coupling);
+      }
+    }
+    if (flat.exposedConnectors != null)
+      sub.exposedConnectors = [for (entry in flat.exposedConnectors)
+        if (occurrenceSet.exists(entry.occurrence)) entry];
+    if (flat.mates != null)
+      sub.mates = [for (mate in flat.mates)
+        if (occurrenceSet.exists(mate.first) && occurrenceSet.exists(mate.second)) mate];
+    if (flat.actuators != null)
+      sub.actuators = [for (actuator in flat.actuators) if (jointSet.exists(actuator.joint)) actuator];
+    if (flat.encoders != null)
+      sub.encoders = [for (encoder in flat.encoders) if (jointSet.exists(encoder.joint)) encoder];
+    if (flat.sensors != null)
+      sub.sensors = [for (sensor in flat.sensors)
+        if ((sensor.joint != null && jointSet.exists(sensor.joint)) ||
+            (sensor.occurrence != null && occurrenceSet.exists(sensor.occurrence))) sensor];
+    if (flat.switches != null) {
+      sub.switches = [];
+      for (contact in flat.switches) if (jointSet.exists(contact.joint)) {
+        if (!occurrenceSet.exists(contact.part) || !occurrenceSet.exists(contact.trigger))
+          throw 'Assembly switch "${contact.id}" crosses detached subtree "$rootOccurrence"';
+        sub.switches.push(contact);
+      }
+    }
+    if (flat.elasticNetworks != null) {
+      sub.elasticNetworks = [];
+      for (network in flat.elasticNetworks) {
+        var inside = 0, outside = 0;
+        for (span in network.spans) for (term in span.terms)
+          if (jointSet.exists(term.joint)) inside++; else outside++;
+        if (inside > 0 && outside > 0)
+          throw 'Assembly elastic network "${network.id}" crosses detached subtree "$rootOccurrence"';
+        if (inside > 0) sub.elasticNetworks.push(network);
+      }
+    }
+    AssemblyDefinitionCodec.validate(sub);
+
+    var subState:Null<AssemblyStateRecord> = null;
+    if (flatState != null) subState = {schemaVersion: sub.schemaVersion, definition: sub.id,
+      jointCoordinates: [for (coordinate in flatState.jointCoordinates)
+        if (jointSet.exists(coordinate.joint)) coordinate], rootPoses: []};
+    return {definition: sub, state: subState, rootOccurrence: rootOccurrence,
+      rootPose: rootPose, occurrences: [for (occurrence in sub.occurrences) occurrence.id],
+      joints: selectedJoints};
+  }
+
+  /** Convert a detached CAD subtree to one floating articulated robot runtime. */
+  public static function toFloatingRobotModel(definition:AssemblyDefinition,
+      artifact:AssemblyPhysicalData, rootOccurrence:String, ?savedState:AssemblyStateRecord,
+      ?massOf:String->Null<Float>):AssemblySimulationFloatingModel {
+    var isolated = subtree(definition, rootOccurrence, savedState);
+    var converted = toRobotModel(isolated.definition, artifact, isolated.state, null, massOf);
+    converted.model.floatingBase = true;
+    return {subtree: isolated, converted: converted};
   }
 
   /**

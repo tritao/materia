@@ -1,4 +1,5 @@
 #include "PhysicsBackend.hpp"
+#include "convex_overlap.hpp"
 
 #include <algorithm>
 #include <array>
@@ -99,6 +100,46 @@ struct TestBody {
     std::array<double, 3> force{};
     std::array<double, 3> torque{};
 };
+
+/** Exact overlap for convex hulls; the deterministic backend's OBB remains
+ * useful for its kinematic response, but must not invent sensor contacts in
+ * the empty corners of a CAD hull's bounds. */
+geometry::Overlap convex_overlap(const TestBody &a, int a_piece,
+                                 const TestBody &b, int b_piece, Vec3 &witness) {
+    const auto support = [](const TestBody &body, int piece, const Vec3 &world_direction) {
+        const auto *part = piece < 0 ? nullptr : &body.desc.shape_parts[piece];
+        const auto type = part ? part->type : body.desc.shape_type;
+        const auto &parameters = part ? part->parameters : body.desc.shape_parameters;
+        const auto &vertices = part ? part->vertices : body.desc.shape_vertices;
+        auto position = body.state.position;
+        auto rotation = body.state.rotation;
+        if (part) {
+            position = add(position, rotate(rotation, part->position));
+            rotation = multiply(rotation, part->rotation);
+        }
+        const auto local_direction = rotate(conjugate(rotation), world_direction);
+        Vec3 local_point{};
+        if (type == NKSIM_SHAPE_BOX) {
+            for (int axis = 0; axis < 3; ++axis)
+                local_point[axis] = local_direction[axis] >= 0.0 ? parameters[axis] : -parameters[axis];
+        } else if (type == NKSIM_SHAPE_CONVEX && vertices.size() >= 12 && vertices.size() % 3 == 0) {
+            double best = -std::numeric_limits<double>::infinity();
+            for (std::size_t index = 0; index < vertices.size(); index += 3) {
+                const Vec3 point{vertices[index], vertices[index + 1], vertices[index + 2]};
+                const double projection = local_direction[0] * point[0] +
+                    local_direction[1] * point[1] + local_direction[2] * point[2];
+                if (projection > best) { best = projection; local_point = point; }
+            }
+        }
+        return add(position, rotate(rotation, local_point));
+    };
+    return geometry::overlap_with_witness([&](const geometry::Point &direction) {
+        const auto point_a = support(a, a_piece, direction);
+        const Vec3 opposite{-direction[0], -direction[1], -direction[2]};
+        const auto point_b = support(b, b_piece, opposite);
+        return geometry::Simplex::SupportPoint{sub(point_a, point_b), point_a, point_b};
+    }, witness);
+}
 
 struct TestJoint {
     std::uint64_t id = 0;
@@ -301,6 +342,7 @@ public:
             return NKSIM_ERROR_INVALID_ARGUMENT;
         const double substep = dt / static_cast<double>(substeps);
         for (std::uint32_t iteration = 0; iteration < substeps; ++iteration) {
+            contacts.clear();
             for (auto &body : bodies) {
                 if (body.desc.motion_type != NKSIM_MOTION_DYNAMIC)
                     continue;
@@ -444,6 +486,99 @@ public:
                     }
                 }
             }
+            // Contacts are observed once after the complete physics step. The
+            // next substep clears this snapshot, so skip the all-pairs sensor
+            // narrow phase on intermediate substeps.
+            if (iteration + 1 < substeps) continue;
+            // The kinematic test backend does not resolve robot contact forces, but
+            // contact sensors still need the same geometric hit observations as
+            // MuJoCo. Publish overlap points for articulated and kinematic links;
+            // keep these observations separate from the free-body response above.
+            auto contact_point = [&](const Box &a, const Box &b, const Vec3 &normal) {
+                Vec3 reference = std::abs(normal[2]) < 0.9 ? Vec3{0.0, 0.0, 1.0} : Vec3{1.0, 0.0, 0.0};
+                auto tangent_u = cross3(normal, reference);
+                const double tangent_length = std::sqrt(dot3(tangent_u, tangent_u));
+                for (double &axis : tangent_u) axis /= tangent_length;
+                auto tangent_v = cross3(normal, tangent_u);
+                const double normal_position = (dot3(a.center, normal) + radius(a, normal) +
+                    dot3(b.center, normal) - radius(b, normal)) * 0.5;
+                auto overlap_midpoint = [&](const Vec3 &axis) {
+                    const double a_center = dot3(a.center, axis), b_center = dot3(b.center, axis);
+                    const double low = std::max(a_center - radius(a, axis), b_center - radius(b, axis));
+                    const double high = std::min(a_center + radius(a, axis), b_center + radius(b, axis));
+                    return low <= high ? (low + high) * 0.5 : (a_center + b_center) * 0.5;
+                };
+                return add(add(scale(normal, normal_position), scale(tangent_u, overlap_midpoint(tangent_u))),
+                           scale(tangent_v, overlap_midpoint(tangent_v)));
+            };
+            for (auto &moving : bodies) {
+                if ((moving.desc.motion_type != NKSIM_MOTION_KINEMATIC && parent_joint(moving.id) == nullptr) ||
+                    (moving.desc.shape_type != NKSIM_SHAPE_BOX && moving.desc.shape_type != NKSIM_SHAPE_CONVEX))
+                    continue;
+                for (const auto &obstacle : bodies) {
+                    if (obstacle.id == moving.id ||
+                        excluded_pairs.count({std::min(moving.id, obstacle.id), std::max(moving.id, obstacle.id)}) != 0 ||
+                        (obstacle.desc.shape_type != NKSIM_SHAPE_BOX && obstacle.desc.shape_type != NKSIM_SHAPE_CONVEX) ||
+                        (moving.desc.collision_mask & obstacle.desc.collision_layer) == 0 ||
+                        (obstacle.desc.collision_mask & moving.desc.collision_layer) == 0)
+                        continue;
+                    const int moving_count = std::max(1, static_cast<int>(moving.desc.shape_parts.size()));
+                    const int obstacle_count = std::max(1, static_cast<int>(obstacle.desc.shape_parts.size()));
+                    for (int mi = 0; mi < moving_count; ++mi) for (int oi = 0; oi < obstacle_count; ++oi) {
+                        const int m = moving.desc.shape_parts.empty() ? -1 : mi;
+                        const int o = obstacle.desc.shape_parts.empty() ? -1 : oi;
+                        auto supported = [](uint32_t type) { return type == NKSIM_SHAPE_BOX || type == NKSIM_SHAPE_CONVEX; };
+                        if ((m >= 0 && !supported(moving.desc.shape_parts[m].type)) ||
+                            (o >= 0 && !supported(obstacle.desc.shape_parts[o].type))) continue;
+                        const auto a = box_of(moving, m), b = box_of(obstacle, o);
+                        const Vec3 between = sub(a.center, b.center);
+                        std::array<Vec3, 15> candidates{};
+                        int count = 0;
+                        for (int i = 0; i < 3; ++i) candidates[count++] = a.axes[i];
+                        for (int i = 0; i < 3; ++i) candidates[count++] = b.axes[i];
+                        for (int i = 0; i < 3; ++i) for (int j = 0; j < 3; ++j)
+                            candidates[count++] = cross3(a.axes[i], b.axes[j]);
+                        bool separated = false;
+                        double least = std::numeric_limits<double>::infinity();
+                        Vec3 normal{};
+                        for (int k = 0; k < count && !separated; ++k) {
+                            auto axis = candidates[k];
+                            const double length = std::sqrt(dot3(axis, axis));
+                            if (length < 1e-9) continue;
+                            for (double &component : axis) component /= length;
+                            const double distance = dot3(between, axis);
+                            const double penetration = radius(a, axis) + radius(b, axis) - std::abs(distance);
+                            if (penetration <= 0.0) { separated = true; break; }
+                            const double weighted = k < 6 ? penetration : penetration * 1.05 + 1e-9;
+                            if (weighted < least) {
+                                least = weighted;
+                                // Contact normals point from body_a (moving) toward body_b (obstacle).
+                                const double sign = distance >= 0.0 ? -1.0 : 1.0;
+                                normal = scale(axis, sign);
+                            }
+                        }
+                        if (separated) continue;
+                        const auto moving_type = m < 0 ? moving.desc.shape_type : moving.desc.shape_parts[m].type;
+                        const auto obstacle_type = o < 0 ? obstacle.desc.shape_type : obstacle.desc.shape_parts[o].type;
+                        Vec3 position = contact_point(a, b, normal);
+                        if (moving_type == NKSIM_SHAPE_CONVEX || obstacle_type == NKSIM_SHAPE_CONVEX) {
+                            const auto overlap = convex_overlap(moving, m, obstacle, o, position);
+                            if (overlap == geometry::Overlap::separated) continue;
+                            if (overlap == geometry::Overlap::unresolved) return NKSIM_ERROR_BACKEND;
+                        }
+                        BackendContact contact{};
+                        contact.body_a = moving.id;
+                        contact.body_b = obstacle.id;
+                        contact.part_a = m;
+                        contact.part_b = o;
+                        contact.position = position;
+                        contact.normal = normal;
+                        contact.distance = -least;
+                        contact.active = true;
+                        contacts.push_back(contact);
+                    }
+                }
+            }
         }
         for (auto &body : bodies) {
             body.force.fill(0.0);
@@ -475,6 +610,11 @@ public:
                 return NKSIM_ERROR_INVALID_HANDLE;
             states[index] = joint->state;
         }
+        return NKSIM_OK;
+    }
+
+    nksim_result read_contacts(std::vector<BackendContact> &out) override {
+        out = contacts;
         return NKSIM_OK;
     }
 
@@ -646,6 +786,7 @@ private:
 
     std::array<double, 3> gravity{};
     std::vector<TestBody> bodies;
+    std::vector<BackendContact> contacts;
     std::set<std::pair<std::uint64_t, std::uint64_t>> excluded_pairs;
     std::vector<TestJoint> joints;
     std::vector<BackendJointCoupling> couplings;

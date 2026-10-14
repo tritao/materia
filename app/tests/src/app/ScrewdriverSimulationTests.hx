@@ -143,7 +143,7 @@ class ScrewdriverSimulationTests {
       var freeFixture = harness.space.session.createObject(nativekit.sim.MotionType.Kinematic,
         nativekit.sim.SimShape.box(0.001,0.001,0.001),new SimPose(0.02,0.01,0.1),0);
       var channels:ScrewdriverChannelNames = {start:"start",direction:"reverse",program:"program",vacuum:"vacuum"};
-      var observer = new SimulatedScrewdriver(harness.simulation,runtime,0,3,1,2,[0,0,0.103],[0,0,1],channels,"driver",20,60,20,2);
+      var observer = new SimulatedScrewdriver(harness.simulation,runtime,0,3,1,2,[0,0,0.103],[0,0,1],channels,"driver",20,60,20,2,1);
       var head = new SimPose(0.02,0,0.1,0,0,0,1);
       var body = new SimPose(0.02,0,0.101,0,0,0,1);
       var fixture = new SimulationAssemblyPart("work-fixture",harness.simulation,[0.0,0.0,0.0],[],
@@ -338,7 +338,7 @@ class ScrewdriverSimulationTests {
       harness.spawnBox([0,0,0.0959],[0.005,0.005,0.005]);
       var screw = harness.spawnBox([0,0,0.101],[0.0001,0.0001,0.0001],true,0.01);
       var channels:ScrewdriverChannelNames = {start:"start",direction:"reverse",program:"program",vacuum:"vacuum"};
-      var observer = new SimulatedScrewdriver(harness.simulation,runtime,0,3,1,2,[0,0,0.103],[0,0,1],channels,"driver",20,60,20,2);
+      var observer = new SimulatedScrewdriver(harness.simulation,runtime,0,3,1,2,[0,0,0.103],[0,0,1],channels,"driver",20,60,20,2,1);
       var head = new SimPose(0,0,0.1,0,0,0,1);
       var bodyPose = new SimPose(0,0,0.101,0,0,0,1);
       observer.configure(1,{program:program(),joint:joint(),screw:screw,hand:1,
@@ -437,6 +437,7 @@ private class DriverMotionFixture implements ScrewdrivingMotion {
   public function update(durationSeconds:Float):Void {idle = true; done = !stopping; stopping = false;}
   public function completed():Bool return done;
   public function failure():Null<String> return null;
+  public function synchronize():Void {}
   public function stop():Void {stopping = true; idle = false; done = false;}
   public function stopped():Bool return idle;
   public function abort():Void {done = false; idle = false;}

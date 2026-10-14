@@ -311,7 +311,7 @@ class ContactSearchMotionTests {
     var prepared = new Transform3(new Vec3(0, 0, 0.01), arm.tcpPose([0.0]).rotation);
     var requested = new ContactProbeRequest(prepared, new Vec3(0, 0, -1), 0.04, 0.005, 0.0005, 0.002,
       WeldArcModel.TOUCH_TOLERANCE);
-    if (precision) requested = requested.withPrecision(0.000001, ContactProbeRunner.SEARCH_AGE_SECONDS);
+    if (precision) requested = requested.withPrecision(0.000001, 0.0, ContactProbeRunner.SEARCH_AGE_SECONDS);
     var registrationRunner = new processkit.ContactRegistrationRunner(probe,
       new processkit.perception.ContactRegistrationSequence(
         new processkit.perception.ContactPoseEnvelope(Transform3.identity(), new Vec3(0, 0, 0.001), new Vec3(), 0.00001),

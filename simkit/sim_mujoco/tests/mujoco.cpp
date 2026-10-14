@@ -381,6 +381,19 @@ void plane_shape_stops_dynamic_body() {
     assert(state.position[2] > 0.20 && state.position[2] < 0.60);
     assert(std::abs(state.linear_velocity[2]) < 0.1);
 
+    nksim_contact contacts[16]{};
+    uint32_t count = 0;
+    assert(nksim_world_get_contacts(world, contacts, 16, &count) == NKSIM_OK);
+    double vertical_contact_force = 0.0;
+    for (uint32_t index = 0; index < count; ++index) {
+        const auto &contact = contacts[index];
+        if (!contact.active || (contact.body_a != cube && contact.body_b != cube)) continue;
+        assert(contact.wrench_valid != 0);
+        vertical_contact_force += contact.body_a == cube ? contact.force_on_body_a[2] : -contact.force_on_body_a[2];
+    }
+    assert(vertical_contact_force > 5.0 && vertical_contact_force < 15.0);
+    // The resting body carries its weight through the reported environment-on-body contact wrench.
+
     nksim_body_destroy(world, cube);
     nksim_body_destroy(world, floor);
     nksim_shape_destroy(world, cube_shape);
@@ -1991,6 +2004,117 @@ void a_belt_carriage_rings_at_its_belt_frequency() {
     }
 }
 
+// A rotating screwdriver spindle and the screw slide form a helical pair. The
+// screw stays dynamic, so a workpiece contact closes the reaction path through
+// the lead coupling and back into the spindle actuator.
+void physical_screw_lead_transmits_workpiece_reaction() {
+    const double timesteps[] = {0.001, 0.002};
+    for (const double timestep : timesteps) {
+        nkscene_scene scene = 0;
+        assert(nkscene_scene_create(&scene) == NKS_OK);
+        nksim_world_desc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.scene = scene;
+        desc.fixed_timestep = timestep;
+        desc.physics_substeps = 8;
+        desc.gravity[2] = 0.0;
+        nksim_world world = 0;
+        assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+
+        const double plate_half_extents[] = {0.05, 0.05, 0.002};
+        nksim_shape plate_shape = 0;
+        assert(nksim_shape_create_box(world, plate_half_extents, &plate_shape) == NKSIM_OK);
+        const auto plate = make_body(world, make_node_xyz(scene, 0.0, 0.0, -0.002),
+                                     NKSIM_MOTION_STATIC, 0.0, plate_shape);
+        const auto spindle_base = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.03505),
+                                            NKSIM_MOTION_STATIC, 0.0);
+        const auto spindle = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.03505),
+                                       NKSIM_MOTION_DYNAMIC, 0.1);
+        nksim_shape screw_shape = 0;
+        assert(nksim_shape_create_cylinder(world, 0.003, 0.01, &screw_shape) == NKSIM_OK);
+        const auto screw = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.00505),
+                                     NKSIM_MOTION_DYNAMIC, 0.01, screw_shape);
+
+        nksim_joint_desc spindle_desc{};
+        spindle_desc.struct_size = sizeof(spindle_desc);
+        spindle_desc.type = NKSIM_JOINT_REVOLUTE;
+        spindle_desc.body_a = spindle_base;
+        spindle_desc.body_b = spindle;
+        spindle_desc.axis_a[2] = 1.0;
+        spindle_desc.lower_limit = -10.0;
+        spindle_desc.upper_limit = 10.0;
+        spindle_desc.max_force = 0.02;
+        nksim_joint spindle_joint = 0;
+        assert(nksim_joint_create(world, &spindle_desc, &spindle_joint) == NKSIM_OK);
+
+        nksim_joint_desc slide_desc{};
+        slide_desc.struct_size = sizeof(slide_desc);
+        slide_desc.type = NKSIM_JOINT_PRISMATIC;
+        slide_desc.body_a = spindle;
+        slide_desc.body_b = screw;
+        slide_desc.anchor_a[2] = -0.03;
+        slide_desc.axis_a[2] = 1.0;
+        slide_desc.lower_limit = -0.02;
+        slide_desc.upper_limit = 0.02;
+        slide_desc.max_force = 200.0;
+        nksim_joint screw_slide = 0;
+        assert(nksim_joint_create(world, &slide_desc, &screw_slide) == NKSIM_OK);
+
+        constexpr double lead_m = 0.002;
+        nksim_joint_coupling_desc thread{};
+        thread.struct_size = sizeof(thread);
+        thread.leader = spindle_joint;
+        thread.follower = screw_slide;
+        thread.ratio = -lead_m / (2.0 * 3.14159265358979323846);
+        assert(nksim_joint_couple(world, &thread) == NKSIM_OK);
+
+        nksim_joint_target drive{};
+        drive.struct_size = sizeof(drive);
+        drive.joint = spindle_joint;
+        drive.mode = NKSIM_JOINT_TARGET_POSITION;
+        drive.target = 2.0;
+        drive.max_force = 0.02;
+        assert(nksim_world_set_joint_targets(world, &drive, 1) == NKSIM_OK);
+
+        double peak_spindle_effort = 0.0;
+        double peak_contact_force = 0.0;
+        nksim_contact contacts[16]{};
+        for (int tick = 0; tick < 800; ++tick) {
+            step_world(world, 1);
+            nksim_joint_state spindle_state{}, slide_state{};
+            spindle_state.struct_size = slide_state.struct_size = sizeof(spindle_state);
+            assert(nksim_joint_get_state(world, spindle_joint, &spindle_state) == NKSIM_OK);
+            assert(nksim_joint_get_state(world, screw_slide, &slide_state) == NKSIM_OK);
+            peak_spindle_effort = std::max(peak_spindle_effort, std::abs(spindle_state.effort));
+            assert(std::abs(slide_state.position - thread.ratio * spindle_state.position) < 2e-5);
+
+            uint32_t count = 0;
+            assert(nksim_world_get_contacts(world, contacts, 16, &count) == NKSIM_OK);
+            for (uint32_t index = 0; index < count && index < 16; ++index) {
+                const auto &contact = contacts[index];
+                if (!contact.active || !contact.wrench_valid ||
+                    (contact.body_a != plate && contact.body_b != plate)) continue;
+                const double force = std::sqrt(contact.force_on_body_a[0] * contact.force_on_body_a[0] +
+                    contact.force_on_body_a[1] * contact.force_on_body_a[1] +
+                    contact.force_on_body_a[2] * contact.force_on_body_a[2]);
+                peak_contact_force = std::max(peak_contact_force, force);
+            }
+        }
+
+        nksim_joint_state final_spindle{}, final_slide{};
+        final_spindle.struct_size = final_slide.struct_size = sizeof(final_spindle);
+        assert(nksim_joint_get_state(world, spindle_joint, &final_spindle) == NKSIM_OK);
+        assert(nksim_joint_get_state(world, screw_slide, &final_slide) == NKSIM_OK);
+        assert(final_spindle.position > 0.1);
+        assert(final_slide.position < 0.0);
+        assert(peak_contact_force > 0.1);
+        assert(peak_spindle_effort > 1e-4);
+
+        nksim_world_destroy(world);
+        nkscene_scene_destroy(scene);
+    }
+}
+
 // A follower with two leaders is held by a fixed tendon and a tendon equality, like a CoreXY
 // motor turning with both axes.
 void a_follower_with_two_leaders_uses_a_tendon_equality() {
@@ -3026,6 +3150,7 @@ int main() {
     applied_force_and_torque_act_on_their_own_axes();
     coupled_prismatic_joints_use_equality_and_convex_collision();
     rigid_coupling_holds_under_high_effort();
+    physical_screw_lead_transmits_workpiece_reaction();
     a_follower_with_two_leaders_uses_a_tendon_equality();
     a_coupling_rings_as_its_damping_ratio_says();
     a_belt_carriage_rings_at_its_belt_frequency();

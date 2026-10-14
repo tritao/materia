@@ -34,8 +34,12 @@ class ContactRegistrationPrecisionTests {
     }
     var request = new ContactProbeRequest(Transform3.identity(), new Vec3(0, 0, -1), 0.1, 0.01,
       0.0005, 0.002, 0.0005);
-    var refined = request.withPrecision(errors[0], 0.02);
-    check(refined.fineSpeed * 0.04 <= errors[0], "Fine speed includes sampling and feedback skew in the contact budget");
+    var calibratedError = errors[0] * 0.5;
+    var refined = request.withPrecision(errors[0], calibratedError, 0.02);
+    check(refined.fineSpeed * 0.02 <= errors[0] - calibratedError + 1e-15,
+      "Fine speed keeps worst-case sampling and feedback skew within the remaining contact budget");
+    check(refined.calibratedError == calibratedError,
+      "Contact measurement records its calibrated sensor bound separately from timing uncertainty");
     check(refined.backoff > request.contactOffset + request.coarseSpeed * 0.04 && refined.backoff < request.backoff,
       "Fine entry clears the bounded coarse observation without a long precision search");
     var rejected = false;
@@ -43,8 +47,11 @@ class ContactRegistrationPrecisionTests {
       catch (_:Dynamic) rejected = true;
     check(rejected, "A degenerate triangle cannot receive a precision budget");
     rejected = false;
-    try request.withPrecision(0, 0.02) catch (_:Dynamic) rejected = true;
+    try request.withPrecision(0, 0, 0.02) catch (_:Dynamic) rejected = true;
     check(rejected, "Zero contact precision is rejected");
+    rejected = false;
+    try request.withPrecision(0.00001, 0.00001, 0.02) catch (_:Dynamic) rejected = true;
+    check(rejected, "Calibrated error cannot consume the whole budget and leave no room for acquisition age");
     Sys.println('Contact registration precision: $checks assertions passed');
   }
 }

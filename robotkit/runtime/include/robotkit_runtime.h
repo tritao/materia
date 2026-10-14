@@ -35,6 +35,7 @@
 #define RK_IN_ARRAY(count) __attribute__((annotate("hxi:in_array")))
 #define RK_OUT_BUFFER(size) __attribute__((annotate("hxi:out_buffer")))
 #define RK_STRUCT_SIZE __attribute__((annotate("hxi:struct_size")))
+#define RK_BOOL32 __attribute__((annotate("hxi:bool32")))
 #else
 #define RK_OUT
 #define RK_INOUT
@@ -45,6 +46,7 @@
 #define RK_IN_ARRAY(count)
 #define RK_OUT_BUFFER(size)
 #define RK_STRUCT_SIZE
+#define RK_BOOL32
 #endif
 
 #if defined(_WIN32)
@@ -89,7 +91,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 33 /**< Typed fluid drives and passive/process joint ownership. */
+    RK_API_VERSION = 35 /**< Typed fluid drives, deployment wiring, brakes, collision surfaces, process ownership, and articulated tool mounts. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -498,6 +500,8 @@ typedef struct rk_robot_runtime_blueprint {
     double coupling_stiffness[RK_MAX_JOINT_COUPLINGS];
     /** Command ownership: passive and process joints accept no host or trajectory targets. */
     uint32_t external_joint[RK_MAX_JOINTS];
+    /** Process joints are a subset of external_joint and may be driven by a simulation process model. */
+    uint32_t process_joint[RK_MAX_JOINTS];
     /** Metadata for joint switches and speed sensors; ordinary sensor slots use UINT32_MAX. */
     uint32_t sensor_joint[RK_MAX_SENSORS];
     double sensor_window_lower[RK_MAX_SENSORS];

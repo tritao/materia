@@ -25,15 +25,24 @@ import materia.project.SceneArtifact.SceneArtifactMobileBase;
 import materia.project.SceneArtifact.SceneArtifactMobileEnergy;
 import materia.project.SceneArtifact.SceneArtifactPlace;
 import materia.project.SceneArtifact.SceneArtifactRobotTool;
+import materia.project.SceneArtifact.SceneArtifactScrewEntrySearch;
 import materia.project.SceneArtifact.SceneArtifactTorch;
 import materia.project.SceneArtifact.SceneArtifactTorchPose;
 import materia.project.SceneArtifact.SceneArtifactMissionWaypoint;
 import materia.project.SceneArtifact.SceneArtifactWeld;
 import materia.project.SceneContactRegistration.SceneContactWork;
+import processkit.perception.ContactPoseEnvelope;
+import processkit.perception.ContactMeasurement;
+import processkit.perception.ContactPoseEnvelope.ContactRegionBounds;
+import processkit.perception.SpiralSearchTrajectory;
+import processkit.ContactAdmittanceRunner;
+import processkit.ContactAdmittanceRunner.SpiralEntryCriterion;
 import motionkit.robot.HandlingPlanRunner;
 import motionkit.kinematics.IkTolerance;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.ManipulatorKinematics;
+import motionkit.robot.CartesianAdmittance;
+import motionkit.robot.ServoSession;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.StartTolerances;
 import motionkit.robot.MotionProgramSkill;
@@ -55,6 +64,8 @@ import motionkit.robot.PlanningLimits;
 import processkit.WeldingPlanRunner;
 import processkit.screwdriving.ScrewScenePlan;
 import processkit.screwdriving.ScrewdrivingRunner;
+import processkit.screwdriving.ScrewPlan;
+import processkit.screwdriving.ScrewEntrySearch;
 import processkit.screwdriving.ScrewdrivingArmMotion;
 import processkit.screwdriving.ScrewdriverArmKinematics;
 import processkit.screwdriving.ChannelScrewdriverOutputs;
@@ -84,6 +95,7 @@ import robotkit.model.Frame;
 import robotkit.model.SteadyLoads;
 import robotkit.skill.HandlePart;
 import robotkit.spatial.Vec3;
+import robotkit.spatial.Wrench3;
 import robotkit.localization.SimulationTruthLocalization;
 import robotkit.localization.Localization;
 import robotkit.localization.WheelOdometryLocalization;
@@ -120,6 +132,13 @@ typedef FloorObstacle = robotkit.navigation.FloorMap.FloorBox;
 private typedef InterfaceAlarmRead = {
   var valid:Bool;
   var code:RobotInterfaceAlarm;
+}
+
+private typedef RegisteredWorkEvidence = {
+  var world:Transform3;
+  var rootWork:Transform3;
+  var envelope:ContactPoseEnvelope;
+  var measurements:Array<ContactMeasurement>;
 }
 
 /**
@@ -375,8 +394,8 @@ class MissionPlayer implements SessionMember {
   final newWelding:Null<Void->WeldingPlanRunner>;
   final weldSensor:Null<String>;
   final newRegistration:Null<SceneContactWork->processkit.ContactRegistrationRunner>;
-  /** Contact-registered work frames in the map frame, retained across dock excursions. */
-  var registeredWorkWorld = new Map<String, Transform3>();
+  /** Accepted pose, remaining bounds and source observations retained across dock excursions. */
+  var registeredWork = new Map<String, RegisteredWorkEvidence>();
   /** What welds are planned clear of, and where the arm's joints are among the robot's. */
   var clearance:Null<CollisionClearance> = null;
   var clearanceJoints:Array<Int> = [];
@@ -456,7 +475,21 @@ class MissionPlayer implements SessionMember {
     this.screwdrivers = screwdrivers == null ? new Array<SimulatedScrewdriver>() : screwdrivers.copy();
     this.screwFeeders = screwFeeders == null ? new Array<SimulatedScrewFeeder>() : screwFeeders.copy();
     this.blowFeeds = blowFeeds == null ? new Array<SimulatedBlowFeed>() : blowFeeds.copy();
-    if ([for (step in mission.steps) if (step.kind == "screw") step].length > 0) {
+    var workSteps = [for (step in mission.steps) if (step.kind == "screw" || step.kind == "findWork") step];
+    var needsScrewArm = false;
+    for (step in workSteps) {
+      if (step.kind == "screw") needsScrewArm = true;
+      else {
+        var at = step.at;
+        if (at != null) for (tool in project.robotTools) if (tool.kind == "screwdriver" &&
+            tool.contact.occurrence == at.occurrence && tool.contact.connector == at.connector) {
+          needsScrewArm = true;
+          break;
+        }
+      }
+      if (needsScrewArm) break;
+    }
+    if (needsScrewArm) {
       var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
       if (tools.length != 1) throw "Screw mission needs exactly one screwdriver";
       var tool = tools[0], capacity = tool.screwdriver, tcp = robot.toolFrames.get(tool.contact.occurrence);
@@ -512,8 +545,9 @@ class MissionPlayer implements SessionMember {
       wheels = new WheelOdometryLocalization(base, FRAME, robot.rootLink);
     }
     var handles = [for (step in mission.steps) if (step.kind == "pick" || step.kind == "place") step].length > 0;
-    var welds = [for (step in mission.steps) if (step.kind == "weld" || step.kind == "findWork") step].length > 0;
-    if (handles && welds) throw "A mission picks and places, or it welds: the robot works with one tool on its arm";
+    var welds = [for (step in mission.steps) if (step.kind == "weld" || step.kind == "stow") step].length > 0;
+    var registrations = [for (step in mission.steps) if (step.kind == "findWork") step].length > 0;
+    if (handles && (welds || registrations)) throw "A mission picks and places, or it probes or welds: the robot works with one tool on its arm";
     var suctions = [for (tool in project.robotTools) if (tool.kind == "suction") tool];
     var grippers = [for (tool in project.robotTools) if (tool.kind == "gripper") tool];
     var torches = [for (tool in project.robotTools) if (tool.kind == "torch") tool];
@@ -554,11 +588,11 @@ class MissionPlayer implements SessionMember {
         handlingRunners.set(selectedTool.channel, makeRunner());
       }
     }
+    var registrationFactory:Null<SceneContactWork->processkit.ContactRegistrationRunner> = null;
     if (!welds) {
       welding = null;
       newWelding = null;
       weldSensor = null;
-      newRegistration = null;
     } else {
       if (torches.length != 1) throw 'A mission that welds needs one torch, the robot has ${torches.length}';
       var tool = torches[0];
@@ -586,10 +620,9 @@ class MissionPlayer implements SessionMember {
           PlanningLimits.ofGroup(arm, new SteadyLoads(), weldAcceleration, null, state.modelRevision, state.calibrationRevision), 3, planned);
       };
       welding = newWelding();
-      newRegistration = (job) -> {
-        var odometry = wheels;
-        var observed = odometry == null ? null : odometry.state();
-        if (observed == null) throw "Contact registration requires an initialized wheel pose estimate";
+      registrationFactory = (job) -> {
+        var observed = localization.state();
+        if (observed == null) throw "Contact registration requires an initialized map pose estimate";
         var nominal = job.nominal;
         var rootWork = Transform3.fromPose2(observed.pose).inverse().compose(new Transform3(
           new Vec3(nominal.x, nominal.y, nominal.z), new Quat(nominal.qx, nominal.qy, nominal.qz, nominal.qw)));
@@ -608,12 +641,121 @@ class MissionPlayer implements SessionMember {
         var selection = new machinekit.welding.WeldContactSelection(job, probes, () -> {
           var snapshot = robot.robot.snapshot();
           return [for (index in indices) snapshot.positions.get(index)];
-        });
+        }, tool.contact.occurrence);
         var probe = new processkit.ContactProbeRunner(motion, probes, channels, sensorId,
-          () -> new motionkit.robot.ServoSession(robot.robot, arm));
+          () -> new motionkit.robot.ServoSession(robot.robot, arm), null, processkit.tool.WeldSensor.KIND, robot.rootLink);
         return new processkit.ContactRegistrationRunner(probe, selection.sequence(rootWork));
       };
     }
+    if (registrations && registrationFactory == null) {
+      var steps = [for (step in mission.steps) if (step.kind == "findWork") step];
+      var first:SceneArtifactMissionStep = steps[0], at = first.at;
+      if (at == null) throw "Contact registration needs its selected tool connector";
+      for (step in steps) if (step.at == null || step.at.occurrence != at.occurrence || step.at.connector != at.connector)
+        throw "One contact-registration mission must use one consistently mounted probe tool";
+      var selected = [for (tool in project.robotTools) if ((tool.kind == "torch" || tool.kind == "screwdriver") &&
+        tool.contact.occurrence == at.occurrence && tool.contact.connector == at.connector) tool];
+      if (selected.length != 1) throw "Contact registration needs one declared torch or screwdriver at its selected connector";
+      var tool:SceneArtifactRobotTool = selected[0];
+      var sensorId:String = "", sensorKind:String = "";
+      var channels:Null<processkit.WelderProcessDevice.WelderChannels> = null;
+      var safeOutputs:Array<MotionOp> = [];
+      if (tool.kind == "torch") {
+        if (tool.sensor == null || tool.torch == null) throw "Contact registration lost its torch sensor or capability";
+        sensorId = tool.sensor; sensorKind = processkit.tool.WeldSensor.KIND;
+        channels = {arc: tool.channel, wireSpeed: tool.torch.wireSpeedChannel, voltage: tool.torch.voltageChannel};
+      } else {
+        var capability = tool.screwdriver;
+        if (capability == null) throw "Contact registration lost its screwdriver capability";
+        var contacts = [for (sensor in project.robotSensors) if (sensor.kind == "tool_contact" &&
+          sensor.mount.occurrence == at.occurrence && sensor.mount.connector == at.connector) sensor];
+        if (contacts.length != 1) throw "Contact registration needs one fresh digital contact sensor at the screwdriver TCP";
+        sensorId = contacts[0].id; sensorKind = "tool_contact";
+        safeOutputs = [MotionOp.SetOutput(tool.channel, EventValue.Digital(false)),
+          MotionOp.SetOutput(capability.directionChannel, EventValue.Digital(false)),
+          MotionOp.SetOutput(capability.programChannel, EventValue.Analog(0.0)),
+          MotionOp.SetOutput(capability.vacuumChannel, EventValue.Digital(false))];
+      }
+      if (sensorId.length == 0 || sensorKind.length == 0)
+        throw "Contact registration did not select a typed probe sensor";
+      var arm = toolArm(tool), carrier = robot.part("project:" + tool.contact.occurrence), tip = robot.toolFrames.get(tool.contact.occurrence);
+      if (tip == null) throw "Contact registration lost its selected probe TCP";
+      var probeTip:Frame = cast tip;
+      var toolKinematicsEntry = toolKinematics.get(tool.channel);
+      if (toolKinematicsEntry == null) toolKinematics.set(tool.channel, {link: carrier.linkIndex, tip: {
+        x: tip.position[0], y: tip.position[1], z: tip.position[2], qx: tip.rotation[0],
+        qy: tip.rotation[1], qz: tip.rotation[2], qw: tip.rotation[3]}});
+      var selectedKinematics = toolKinematics.get(tool.channel);
+      if (selectedKinematics == null) throw "Contact registration lost the selected tool's link and TCP";
+      if (tool.kind == "screwdriver") {
+        var capability = tool.screwdriver;
+        if (capability == null) throw "Contact registration lost its screwdriver capability";
+        var drivers = [for (driver in screwdrivers) if (driver.runtime == robot.runtime &&
+          driver.sensorId == tool.sensor && driver.channels.start == tool.channel) driver];
+        if (drivers.length != 1) throw "Contact registration needs one mounted screwdriver observer";
+        arm = ScrewdriverArmKinematics.atSpindle(robot.model, robot.rootLink, tip.id,
+          capability.feedJoint, capability.spindleJoint, drivers[0].spindlePosition());
+        screwArm = arm;
+      }
+      var selectedTool = tool, selectedSensor = sensorId, selectedKind = sensorKind, selectedArm = arm;
+      var selectedScrewdriver = tool.screwdriver;
+      var selectedChannels = channels, selectedSafe = safeOutputs.copy();
+      var contactMember:Null<String> = null;
+      if (selectedTool.kind == "screwdriver") {
+        if (selectedScrewdriver == null) throw "Contact registration lost its screwdriver bit occurrence";
+        contactMember = selectedScrewdriver.bitMember;
+      }
+      var selectedContactMember = contactMember;
+      registrationFactory = (job) -> {
+        var observed = localization.state();
+        if (observed == null) throw "Contact registration requires an initialized map pose estimate";
+        var nominal = job.nominal;
+        var rootWork = Transform3.fromPose2(observed.pose).inverse().compose(new Transform3(
+          new Vec3(nominal.x, nominal.y, nominal.z), new Quat(nominal.qx, nominal.qy, nominal.qz, nominal.qw)));
+        var planningArm = selectedArm;
+        if (selectedTool.kind == "screwdriver") {
+          var capability = selectedScrewdriver;
+          if (capability == null) throw "Contact registration lost its screwdriver capability";
+          var drivers = [for (driver in screwdrivers) if (driver.runtime == robot.runtime &&
+            driver.sensorId == selectedTool.sensor && driver.channels.start == selectedTool.channel) driver];
+          if (drivers.length != 1) throw "Contact registration lost its mounted screwdriver observer";
+          planningArm = ScrewdriverArmKinematics.atSpindle(robot.model, robot.rootLink, probeTip.id,
+            capability.feedJoint, capability.spindleJoint, drivers[0].spindlePosition());
+          screwArm = planningArm;
+        }
+        // Capture the post-probe-axis arm separately: haxeon has retained the
+        // initial value when a reassigned local is captured by a closure.
+        var probeArm:Manipulator = planningArm;
+        var scene = weldCollisionScene(probeArm, selectedTool.contact.occurrence, []);
+        var wire:Null<processkit.ProbeWire> = null;
+        if (selectedTool.kind == "torch") {
+          var capability = selectedTool.torch;
+          if (capability == null) throw "Contact registration lost its torch probe dimensions";
+          var kinematics = selectedKinematics;
+          if (kinematics == null) throw "Contact registration lost the torch TCP collision link";
+          var tcp = kinematics.tip;
+          wire = processkit.ProbeWire.describe(scene, probeArm, robot.model.links[kinematics.link].id,
+            new Transform3(new Vec3(tcp.x, tcp.y, tcp.z), new Quat(tcp.qx, tcp.qy, tcp.qz, tcp.qw)),
+            capability.wireDiameterMm * 0.001, capability.stickoutMm * 0.001,
+            scene.memberObjects(selectedTool.members), scene.memberObjects(weldingMembers()));
+        }
+        var planned = scene.clearance(() -> new NativeCollisionWorld());
+        clearance = planned;
+        var planning = WeldingPlanRunner.planning(probeArm, weldAcceleration, planned);
+        var indices = probeArm.jointIndices();
+        var motion = new ManipulatorMotion(robot.robot, planning.compiler, (_) -> null,
+          () -> robot.runtime.pollEvents(), indices);
+        var probes = new processkit.ProbeMotionPlanner(probeArm, planning.compiler, planned, wire);
+        var selection = new machinekit.welding.WeldContactSelection(job, probes, () -> {
+          var snapshot = robot.robot.snapshot();
+          return [for (index in indices) snapshot.positions.get(index)];
+        }, selectedTool.contact.occurrence, selectedContactMember);
+        var probe = new processkit.ContactProbeRunner(motion, probes, selectedChannels, selectedSensor,
+          () -> new motionkit.robot.ServoSession(robot.robot, probeArm), null, selectedKind, robot.rootLink, selectedSafe);
+        return new processkit.ContactRegistrationRunner(probe, selection.sequence(rootWork));
+      };
+    }
+    newRegistration = registrationFactory;
     configureHoming();
   }
 
@@ -644,7 +786,7 @@ class MissionPlayer implements SessionMember {
   }
 
   /** Read live poses and carrier facts; CadBridge owns the collision geometry collection. */
-  function cellCollisionSnapshot(ignored:Array<String>):CellCollisionSnapshot {
+  function cellCollisionSnapshot(ignored:Array<String>, ?forcedCarriers:Map<String, String>):CellCollisionSnapshot {
     function linkPose(index:Int, link:Int):Transform3 {
       var pose = simulation.linkPose(index, link);
       return Transform3.fromArrays(pose.position, pose.rotation);
@@ -662,6 +804,8 @@ class MissionPlayer implements SessionMember {
     }
     function carrier(entry:GripObject):Null<String> {
       var name = StringTools.startsWith(entry.id, "project:") ? entry.id.substr(8) : entry.id;
+      var forced = forcedCarriers == null ? null : forcedCarriers.get(name);
+      if (forced != null) return forced;
       var confirmed = heldCarriers.get(name);
       if (confirmed != null) return confirmed;
       var body = simulation.objectCarrier(entry.object);
@@ -1147,7 +1291,7 @@ class MissionPlayer implements SessionMember {
       energyStage = NoEnergyTransfer;
       return;
     }
-    if (job != null && !registeredWorkWorld.exists(job.frame)) {
+    if (job != null && !registeredWork.exists(job.frame)) {
       failure = "Energy return lost the map-anchored contact registration for the clamped workpiece";
       energyStage = NoEnergyTransfer;
       return;
@@ -1349,7 +1493,7 @@ class MissionPlayer implements SessionMember {
     deenergizeMissionOutputs();
     runner = new SkillRunner();
     clearJointMotions();
-    registeredWorkWorld = new Map<String, Transform3>();
+    registeredWork = new Map<String, RegisteredWorkEvidence>();
     stepIndex = 0;
     completed = 0;
     screwResults.resize(0); screwRuns.resize(0); screwing = null; recordedScrew = null; screwRun = null; recordedScrewRun = null;
@@ -1627,7 +1771,7 @@ class MissionPlayer implements SessionMember {
       case "stow":
         return stow();
       case "goTo":
-        registeredWorkWorld = new Map<String, Transform3>();
+        registeredWork = new Map<String, RegisteredWorkEvidence>();
         var activeNavigator:Navigator = cast navigator;
         var contact:Null<SceneContactWork> = null;
         if (stepIndex + 1 < mission.steps.length) {
@@ -1673,10 +1817,10 @@ class MissionPlayer implements SessionMember {
       case "findWork":
         var job = step.contactWork;
         if (job == null) throw "Contact mission step has no work definition";
-        registeredWorkWorld.remove(job.frame);
+        registeredWork.remove(job.frame);
         var factory = newRegistration;
         if (factory == null) throw "Contact mission has no registration runner";
-        return new processkit.skill.FindWeldWork(() -> factory(job), (frame) -> acceptRegisteredWork(job, frame));
+        return new processkit.skill.FindContactWork(() -> factory(job), (registration) -> acceptRegisteredWork(job, registration));
       default:
         throw 'Mission step kind "${step.kind}" is not supported';
     }
@@ -1756,6 +1900,81 @@ class MissionPlayer implements SessionMember {
     screwRun = sequence; return sequence;
   }
 
+  function screwEntrySearchFactory(job:SceneScrew, arm:Manipulator,
+      tool:SceneArtifactRobotTool):Null<ScrewPlan -> Null<ScrewEntrySearch>> {
+    var profile:Null<SceneArtifactScrewEntrySearch> = mission.screwEntrySearch;
+    if (profile == null) return null;
+    if (project.robotSensors == null) throw 'Fastening "${job.fastening}" force search has no declared robot sensors';
+    var declarations = [for (sensor in project.robotSensors) if (sensor.id == profile.sensor && sensor.kind == "force_torque") sensor];
+    if (declarations.length != 1 || declarations[0].mount.occurrence != tool.contact.occurrence)
+      throw 'Fastening "${job.fastening}" force search sensor "${profile.sensor}" is not mounted on its screwdriver';
+    var runtimeSensors = [for (sensor in robot.model.sensors) if (sensor.id == profile.sensor) sensor];
+    if (runtimeSensors.length != 1 || runtimeSensors[0].kind != "force_torque" || runtimeSensors[0].frame == null)
+      throw 'Fastening "${job.fastening}" has no mounted force/torque frame for sensor "${profile.sensor}"';
+    var mountedSensorFrame:Null<Frame> = runtimeSensors[0].frame;
+    var tcp:Null<Frame> = robot.toolFrames.get(tool.contact.occurrence);
+    if (mountedSensorFrame == null || tcp == null || mountedSensorFrame.link != tcp.link)
+      throw 'Fastening "${job.fastening}" force/torque sensor must share the screwdriver TCP link';
+    var sensorFrame:Frame = cast mountedSensorFrame;
+    var sensorPose = new Transform3(new Vec3(sensorFrame.position[0], sensorFrame.position[1], sensorFrame.position[2]),
+      new Quat(sensorFrame.rotation[0], sensorFrame.rotation[1], sensorFrame.rotation[2], sensorFrame.rotation[3]));
+    var tcpPose = new Transform3(new Vec3(tcp.position[0], tcp.position[1], tcp.position[2]),
+      new Quat(tcp.rotation[0], tcp.rotation[1], tcp.rotation[2], tcp.rotation[3]));
+    var tcpFromSensor = ContactAdmittanceRunner.sensorTransformAtTcp(sensorPose, tcpPose);
+    return (plan:ScrewPlan) -> {
+      if (plan == null || plan.fastening != job.fastening) throw "Force search received a different CAD fastening plan";
+      var requiredTravel = materia.project.ScrewEntrySearchBounds.requiredTravelMeters(plan.approach,
+        profile.contactReliefMeters, profile.regionHalfUMeters, profile.regionHalfVMeters,
+        profile.contactSeedOffsetUMeters, profile.spiralRadiusMeters,
+        profile.spiralMaximumLateralSpeed * profile.maximumAgeSeconds,
+        profile.maximumLinearSpeed * profile.maximumStepSeconds);
+      var minimumSpiralSeconds = materia.project.ScrewEntrySearchBounds.minimumSpiralSeconds(
+        plan.approach, profile.contactReliefMeters, profile.maximumSearchAxialSpeed);
+      var minimumRunSeconds = materia.project.ScrewEntrySearchBounds.minimumRunSeconds(plan.approach,
+        profile.contactReliefMeters, profile.maximumSearchAxialSpeed, profile.spiralDurationSeconds,
+        profile.spiralRadiusMeters, profile.spiralTurns, profile.spiralMaximumLateralSpeed,
+        profile.candidateProgressTimeoutSeconds);
+      if (profile.maximumTravelMeters < requiredTravel ||
+          profile.spiralDurationSeconds < minimumSpiralSeconds ||
+          profile.maximumRunSeconds < minimumRunSeconds)
+        throw 'Fastening "${job.fastening}" force-search bounds cannot cover its CAD approach and spiral';
+      var nominalEntry = ScrewScenePlan.frame(job.entry);
+      var halfU = profile.regionHalfUMeters, halfV = profile.regionHalfVMeters;
+      var entryDepthTolerance = profile.maximumLinearSpeed *
+        (profile.maximumAgeSeconds + profile.maximumStepSeconds);
+      var evidence = registeredWork.get(job.frame);
+      if (evidence != null) {
+        var nominalNormal = nominalEntry.transformVector(new Vec3(0, 0, 1)).normalized();
+        var nominalU = nominalEntry.transformVector(new Vec3(1, 0, 0)).normalized();
+        var nominalV = nominalEntry.transformVector(new Vec3(0, 1, 0)).normalized();
+        var registered = evidence.envelope.region(nominalEntry.translation, nominalNormal,
+          nominalU, nominalV, evidence.rootWork);
+        halfU = Math.min(halfU, registered.halfU);
+        halfV = Math.min(halfV, registered.halfV);
+        entryDepthTolerance += registered.normalTravel;
+      }
+      var region = new ContactRegionBounds(halfU, halfV, profile.maximumTravelMeters, 0, 0);
+      var axisU = plan.entry.transformVector(new Vec3(1, 0, 0)).normalized();
+      var axisV = plan.entry.transformVector(new Vec3(0, 1, 0)).normalized();
+      var compressionAxis = plan.entry.transformVector(new Vec3(0, 0, -1)).normalized();
+      var spiral = new SpiralSearchTrajectory(axisU, axisV, region, profile.spiralRadiusMeters,
+        profile.spiralTurns, profile.spiralDurationSeconds, profile.spiralMaximumLateralSpeed,
+        profile.contactSeedOffsetUMeters);
+      var criterion = new SpiralEntryCriterion(compressionAxis, profile.minimumContactLoadN,
+        profile.requiredLoadDropN, profile.confirmationSamples);
+      var wrench = profile.targetWrench;
+      var controller = new CartesianAdmittance(new Wrench3(new Vec3(wrench[0], wrench[1], wrench[2]),
+        new Vec3(wrench[3], wrench[4], wrench[5])), profile.virtualMass, profile.damping,
+        profile.maximumLinearSpeed, profile.maximumAngularSpeed, profile.maximumStepSeconds);
+      return new ContactAdmittanceRunner(new ServoSession(robot.robot, arm), controller, profile.sensor,
+        sensorFrame.id, tcpFromSensor, Int64.fromFloat(profile.maximumAgeSeconds * 1e9), profile.maximumForceN,
+        profile.maximumTorqueNm, profile.maximumSearchAxialSpeed, profile.contactReliefMeters,
+        profile.maximumTravelMeters, profile.maximumTravelRadians,
+        profile.maximumRunSeconds, profile.spiralTrackingGainPerSecond, null, spiral, criterion,
+        plan.entry, entryDepthTolerance, profile.candidateProgressTimeoutSeconds, job.leadMm / 1000.0);
+    };
+  }
+
   function screwAttempt(job:SceneScrew, configuration:Null<motionkit.kinematics.SixAxisConfiguration>, plannedTravel:Bool = false, retightening:Bool = false, stopAtSeat:Bool = false, slot:Int = 0):processkit.skill.DriveScrew {
     var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
     var arm = screwArm;
@@ -1771,11 +1990,36 @@ class MissionPlayer implements SessionMember {
     arm = ScrewdriverArmKinematics.atSpindle(robot.model,robot.rootLink,tcp.id,capacity.feedJoint,capacity.spindleJoint,driver.spindlePosition());
     screwArm = arm;
     var work = assemblyParts.get("project:"+job.frame), presenter = job.delivery == Presented ? assemblyParts.get("project:"+job.presenter) : null;
+    var registeredFrame = requiresScrewRegistration(job);
+    var workPose = () -> {
+      if (registeredFrame) {
+        var evidence = registeredWork.get(job.frame);
+        if (evidence == null) throw 'Fastening "${job.fastening}" has no accepted measured placement for work frame "${job.frame}"';
+        return evidence.world;
+      }
+      return livePart(work);
+    };
     var qualifiedSlot = slot == 0 ? job.slot : slot;
-    var finalContact = driver.configure(qualifiedSlot,{program:new TighteningProgram(job.program,stopAtSeat),joint:ScrewScenePlan.joint(job,capacity.springRate),
+    var screwJoint = ScrewScenePlan.joint(job,capacity.springRate);
+    var threadEngagement = mission.screwEngagement;
+    var physicalThread = threadEngagement != null &&
+      threadEngagement.mode == materia.project.SceneArtifact.SceneArtifactScrewEngagementMode.PhysicalThread;
+    var finalContact = driver.configure(qualifiedSlot,{program:new TighteningProgram(job.program,stopAtSeat),joint:screwJoint,
       screw:screw.freeBody(),hand:job.hand,fixture:work,retightening:retightening,
+      physicalThread:physicalThread,
+      threadLeadMm:job.leadMm,
+      physicalEngagementRangeMm:physicalThread ? capacity.strokeMm + screwJoint.leadInMm : null,
+      physicalThreadMaxForceN:threadEngagement == null ? null : threadEngagement.maximumAxialForceN,
+      physicalThreadEngagementAllowed:() -> {
+        var currentRunner = screwing;
+        return currentRunner != null && currentRunner.physicalThreadEngagementAllowed();
+      },
+      armOwnsAxialMotion:() -> {
+        var currentRunner = screwing;
+        return currentRunner != null && currentRunner.forceSearchOwnsAxialMotion();
+      },
       connection:{fastening:job.fastening,member:job.frame,face:job.threadFace},
-      work:() -> ScrewScenePlan.work(job,livePart(work),screw.center)});
+      work:() -> ScrewScenePlan.work(job,workPose(),screw.center)});
     if (retightening && finalContact == null) throw "Final setup lost its measured installed socket";
     var state = robot.runtime.snapshot();
     var planning = PlanningLimits.ofGroup(arm,new SteadyLoads(),ARM_ACCELERATION,null,state.modelRevision,state.calibrationRevision);
@@ -1804,7 +2048,17 @@ class MissionPlayer implements SessionMember {
           if (spindle.length != 1) throw "Lost-screw escape needs its identified spindle joint";
           escape = {screw:job.screw,link:spindle[0].child.id,contacts:job.delivery == Presented ? [job.presenter,job.frame] : [job.frame]};
         }
-        var planned = missionMotionPlanner(planningArm, reference, cellCollisionSnapshot([]), escape);
+        var physicalThreadAttached = driver.physicalThreadAttached();
+        var forcedCarriers:Null<Map<String, String>> = null;
+        if (physicalThreadAttached) {
+          var threadLink = robot.part("project:"+tool.contact.occurrence).linkIndex;
+          if (threadLink < 0 || threadLink >= robot.model.links.length)
+            throw 'Physical thread has invalid tool carrier link $threadLink';
+          forcedCarriers = new Map<String, String>();
+          forcedCarriers.set(job.screw, robot.model.links[threadLink].id);
+        }
+        var planned = missionMotionPlanner(planningArm, reference, cellCollisionSnapshot([], forcedCarriers), escape,
+          job.screw);
         cached.space = planned.space; compiler.motionPlanner = planned.planner;
         return null;
       };
@@ -1821,13 +2075,14 @@ class MissionPlayer implements SessionMember {
     }
     var deliveryDevice = blowing;
     var outputs = new ChannelScrewdriverOutputs(robot.runtime,driver.channels);
+    var searchFactory = screwEntrySearchFactory(job, arm, tool);
     var active = new ScrewdrivingRunner(motion,outputs,() -> {
       if (deliveryDevice != null) {
         var receipt = deliveryDevice.reading(); return receipt != null && receipt.present;
       }
       var present = missionInput(job.presentSensor);
       return present == null ? false : switch present {case Digital(value):value;case _:false;};
-    });
+    }, searchFactory);
     screwing = active;
     var supplies = [for (feeder in screwFeeders) if (feeder.definition.presenter == job.presenter && feeder.definition.inventory.indexOf(job.screw) >= 0) feeder];
     if (supplies.length > 1) throw "Screw attempt has ambiguous feeder ownership";
@@ -1836,7 +2091,7 @@ class MissionPlayer implements SessionMember {
     if (deliveryDevice != null && !retightening) preparation = new processkit.skill.ReceiveBlownScrew(deliveryDevice.select(job),
       deliveryDevice.definition.deliveryTimeout+deliveryDevice.definition.trackDelay,outputs,qualifiedSlot);
     return new processkit.skill.DriveScrew(active,localization,
-      () -> ScrewScenePlan.plan(job,presenter == null ? null : livePart(presenter),livePart(work),finalContact,stopAtSeat,qualifiedSlot),sensor,preparation);
+      () -> ScrewScenePlan.plan(job,presenter == null ? null : livePart(presenter),workPose(),finalContact,stopAtSeat,qualifiedSlot),sensor,preparation);
   }
 
   function handlingToolChannel(step:SceneArtifactMissionStep):String {
@@ -1860,7 +2115,15 @@ class MissionPlayer implements SessionMember {
     return approachDistance == null ? active : active.withApproachDistance(approachDistance);
   }
 
-  function acceptRegisteredWork(job:SceneContactWork, measured:Transform3):Void {
+  function acceptRegisteredWork(job:SceneContactWork, registration:processkit.ContactRegistrationRunner):Void {
+    if (registration == null || registration.workFrame == null || registration.sequence == null ||
+        registration.sequence.result == null)
+      throw "Contact registration completed without its accepted pose and source evidence";
+    var measured:Transform3 = cast registration.workFrame;
+    var envelope = registration.sequence.envelope;
+    var measurements = registration.sequence.measurements;
+    if (!envelope.containsWorkFrame(measured) || measurements.length != 6)
+      throw "Contact registration pose or six typed source observations fall outside the saved uncertainty contract";
     var estimate = localization.state();
     var snapshot = robot.robot.snapshot();
     if (estimate == null || estimate.referenceFrame != FRAME || estimate.bodyFrame != robot.rootLink ||
@@ -1880,7 +2143,9 @@ class MissionPlayer implements SessionMember {
       throw 'Contact registration map uncertainty exceeds the saved contact envelope: ' +
         '3σ position=${positionThreeSigma} m / ${positionEnvelope} m, ' +
         'heading=${headingThreeSigma} rad / ${headingEnvelope} rad';
-    registeredWorkWorld.set(job.frame, Transform3.fromPose2(estimate.pose).compose(measured));
+    var worldFromRoot = Transform3.fromPose2(estimate.pose);
+    registeredWork.set(job.frame, {world: worldFromRoot.compose(measured), rootWork: measured,
+      envelope: envelope, measurements: measurements});
   }
 
   /** Plans absolute mechanical coordinates on the chain ending at the named connector. */
@@ -2035,11 +2300,24 @@ class MissionPlayer implements SessionMember {
   }
 
   function missionMotionPlanner(arm:Manipulator, reference:Array<Float>, snapshot:CellCollisionSnapshot,
-      ?escape:{screw:String, link:String, contacts:Array<String>}):{planner:MotionPlanner, space:ManipulatorPlannerSpace} {
+      ?escape:{screw:String, link:String, contacts:Array<String>}, ?contactScrew:String):{planner:MotionPlanner, space:ManipulatorPlannerSpace} {
     var scene = snapshot.describe(arm, reference, CollisionClearance.MARGIN);
     var members = weldingMembers();
     if (members.length > 0)
-      processkit.WeldCollisionPolicy.apply(scene, scene.memberObjects(members), processkit.WeldPathPlanner.AIR_MARGIN, CollisionClearance.CONTACT_MARGIN);
+      processkit.ToolWorkCollisionPolicy.apply(scene, scene.memberObjects(members), processkit.WeldPathPlanner.AIR_MARGIN,
+        processkit.WeldPathPlanner.AIR_MARGIN, CollisionClearance.CONTACT_MARGIN);
+    var screwConnections = fasteningCollisionConnections();
+    if (screwConnections.length > 0 || contactScrew != null) {
+      var bitMember:Null<String> = null;
+      if (contactScrew != null) {
+        var driverTools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
+        if (driverTools.length != 1 || driverTools[0].screwdriver == null)
+          throw 'Fastening collision for "$contactScrew" needs exactly one screwdriver with CAD bit identity';
+        bitMember = driverTools[0].screwdriver.bitMember;
+      }
+      processkit.screwdriving.ScrewCollisionPolicy.apply(scene, screwConnections, contactScrew, bitMember,
+        CollisionClearance.MARGIN);
+    }
     for (channel in carryingTools.keys()) if (carryingTools.get(channel) == true) {
       var held = heldParts.get(channel), tool = handlingTools.get(channel);
       if (held == null || tool == null) throw "Confirmed payload lost its named tool or workpiece";
@@ -2053,6 +2331,9 @@ class MissionPlayer implements SessionMember {
     var world = new NativeCollisionWorld();
     var build = scene.build(world);
     var collisionSpace = new CollisionPlannerSpace(scene.description, build, scene.bodies, scene.margins());
+    // The CAD-seated spindle envelope can start close to the active screw;
+    // refine its remaining checked contacts to prove approach and retreat.
+    if (contactScrew != null) collisionSpace.depthLimit = 16;
     var space = new ManipulatorPlannerSpace(collisionSpace, arm, reference, scene.bodies.reference.q);
     var planner:MotionPlanner = new RrtConnect(space, 17);
     if (escape != null) {
@@ -2109,6 +2390,35 @@ class MissionPlayer implements SessionMember {
       planner = new ScrewEscapePlanner(space, space, new ManipulatorKinematics(arm,1e-8), world, escapeMargins);
     }
     return {planner: planner, space: space};
+  }
+
+  /** Rebuild exact screw/clamp and screw/thread pairs carried by CAD-derived fastening jobs. */
+  function fasteningCollisionConnections():Array<{screw:String, member:String}> {
+    var result:Array<{screw:String, member:String}> = [];
+    var keys = new Map<String, Bool>();
+    function add(screw:String, member:String):Void {
+      var key = '${screw.length}:$screw${member.length}:$member';
+      if (keys.exists(key)) return;
+      keys.set(key, true);
+      result.push({screw:screw, member:member});
+    }
+    var jobs:Array<SceneScrew> = [], seenJobs = new Map<String, Bool>();
+    for (step in mission.steps) if (step.screw != null) {
+      var job = materia.project.SceneScrewInvocation.job(step.screw, mission.steps);
+      if (job != null && !seenJobs.exists(job.fastening)) {
+        seenJobs.set(job.fastening, true);
+        jobs.push(job);
+      }
+    }
+    if (jobs.length == 0) return result;
+    for (job in jobs) {
+      var replacement = job.recovery == null ? null : job.recovery.replacement.screw;
+      for (screw in [job.screw, replacement]) if (screw != null) {
+        add(screw, job.clamped);
+        add(screw, job.frame);
+      }
+    }
+    return result;
   }
 
   function writeMissionOutput(name:String, value:Bool):Void {
@@ -2185,13 +2495,18 @@ class MissionPlayer implements SessionMember {
     return false;
   }
 
+  function requiresScrewRegistration(job:SceneScrew):Bool {
+    for (step in mission.steps) if (step.kind == "findWork" && step.contactWork != null && step.contactWork.frame == job.frame) return true;
+    return false;
+  }
+
   /** The world pose of a weld's reference member now, or the world's own when the weld names none. */
   function referenceFrame(weld:SceneArtifactWeld):Transform3 {
     if (weld.frame == null || weld.frame == "") return Transform3.identity();
     if (requiresRegistration(weld)) {
-      var measured = registeredWorkWorld.get(weld.frame);
-      if (measured == null) throw "Weld work has no accepted map-frame registration at this station";
-      return measured;
+      var evidence = registeredWork.get(weld.frame);
+      if (evidence == null) throw "Weld work has no accepted map-frame registration at this station";
+      return evidence.world;
     }
     var live = assemblyParts.get("project:" + weld.frame).pose();
     return new Transform3(new Vec3(live.position[0], live.position[1], live.position[2]),

@@ -55,8 +55,9 @@ class ScrewdrivingEquipmentTests {
 		var tool = tools[0], data = tool.screwdriver;
 		if (data == null) throw "Missing driver capability after artifact round trip";
 		check(tool.kind == "screwdriver" && tool.sensor == driver.sensor && data.springRate == driver.springRate &&
-			data.strokeMm == driver.strokeMm && data.bit.kind == driver.bit.kind && data.bit.size == driver.bit.size,
-			"Driver, bit, spring and sensed stroke survive the current artifact format");
+			data.strokeMm == driver.strokeMm && data.bit.kind == driver.bit.kind && data.bit.size == driver.bit.size &&
+			data.bitMember == "arm/tool/driver/bit",
+			"Driver, exact CAD bit member, spring and sensed stroke survive the current artifact format");
 		// A portable stroke is in mm even when its mechanical joint uses metres.
 		var metric = SceneArtifact.decode(encoded);
 		var metricDefinition = AssemblyDefinitionFlattener.flatten(cast metric.assemblyDefinition);
@@ -76,6 +77,8 @@ class ScrewdrivingEquipmentTests {
 		rejects(() -> { var old = SceneArtifact.decode(previous); }, "schema v28 is unsupported");
 		var bad = scene.robotTools[0].screwdriver;
 		if (bad == null) throw "Missing fixture driver";
+		bad.bitMember = "arm/tool/driver/carrier";
+		rejects(() -> { var bytes = SceneArtifact.encode(scene); }, "fixed directly to the spindle"); bad.bitMember = data.bitMember;
 		bad.springRate = 0; rejects(() -> { var bytes = SceneArtifact.encode(scene); }, "finite positive"); bad.springRate = data.springRate;
 		bad.maxTorque += 1; rejects(() -> { var bytes = SceneArtifact.encode(scene); }, "spindle limits"); bad.maxTorque = data.maxTorque;
 		bad.springRate += 1; rejects(() -> { var bytes = SceneArtifact.encode(scene); }, "feed effort"); bad.springRate = data.springRate;

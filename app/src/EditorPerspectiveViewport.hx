@@ -381,9 +381,23 @@ class EditorPerspectiveViewport implements View {
 
   /** The pairs to tint and draw; an unchanged query result keeps the rendered image. */
   public function setCollisions(pairs:Array<SceneCollision.SceneCollisionPair>):Void {
-    if (pairs == collisionPairs) return;
+    if (sameCollisionPairs(collisionPairs, pairs)) return;
     collisionPairs = pairs;
     collisionRevision++;
+  }
+
+  static function sameCollisionPairs(a:Array<SceneCollision.SceneCollisionPair>,
+      b:Array<SceneCollision.SceneCollisionPair>):Bool {
+    if (a == b) return true;
+    if (a == null || b == null || a.length != b.length) return false;
+    for (index in 0...a.length) {
+      var left = a[index], right = b[index];
+      if (left.a != right.a || left.b != right.b || left.distance != right.distance ||
+          left.colliding() != right.colliding()) return false;
+      for (axis in 0...3)
+        if (left.pointA[axis] != right.pointA[axis] || left.pointB[axis] != right.pointB[axis]) return false;
+    }
+    return true;
   }
 
   public function collisionPairCount():Int return collisionPairs.length;

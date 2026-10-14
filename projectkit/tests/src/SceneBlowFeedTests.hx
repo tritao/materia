@@ -13,14 +13,14 @@ class SceneBlowFeedTests {
     checks = 0;
     var job = @:privateAccess SceneScrewTests.job();
     job.delivery = BlowFeed("blow"); job.presenter = null; job.presentSensor = null; job.pickup = null;
-    SceneScrewDefinition.validate(job,["screw1","work"]); check(true,"Blow mode needs no remote presenter");
-    job.pickup = AssemblyFrames.identity(); rejects(() -> SceneScrewDefinition.validate(job,["screw1","work"]),"Blow mode rejects a fake pickup"); job.pickup = null;
+    SceneScrewDefinition.validate(job,["screw1","work","clamp"]); check(true,"Blow mode needs no remote presenter");
+    job.pickup = AssemblyFrames.identity(); rejects(() -> SceneScrewDefinition.validate(job,["screw1","work","clamp"]),"Blow mode rejects a fake pickup"); job.pickup = null;
     var path:SceneBlowFeed = {id:"blow",receiver:"nose",socketConnector:"receipt",receiptSensor:"nose/present",inventory:["screw1"],
       bufferCapacity:2,trackDelay:0.1,deliveryDelay:0.4,deliveryTimeout:3,airPulse:0.2,airPressureBar:4,tube:"tube",
       externalTubeLengthMm:2500,minimumBendRadiusMm:200,receivingAngularSpeed:0.01,receivingFeedSpeed:0.001};
     var flat:materia.assembly.AssemblyDefinition = {schemaVersion:materia.assembly.AssemblyDefinitionCodec.VERSION,
       id:"blow-test",lengthUnit:"mm",definitions:[{id:"same",connectors:[{name:"receipt",frame:AssemblyFrames.identity()}]}],joints:[],
-      occurrences:[for (id in ["screw1","work","nose","tube"]) {id:id,definition:"same",initialPose:AssemblyFrames.identity()}],
+      occurrences:[for (id in ["screw1","work","clamp","nose","tube"]) {id:id,definition:"same",initialPose:AssemblyFrames.identity()}],
       sensors:[{id:"nose/present",kind:"presence",occurrence:"nose",connector:"receipt",range:10}]};
     var scene:materia.project.SceneArtifact.SceneArtifactData = {metresPerUnit:0.001,parts:[],assemblyDefinition:flat,
       mission:{steps:[{kind:"screw",screw:Single(job)}],blowFeeds:[path]}};

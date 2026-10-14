@@ -27,6 +27,7 @@ import motionkit.planner.BoxClearanceSpace;
 class CollisionPlannerSpace implements BoxClearanceSpace {
   /** Bound world-pose buffers and visit deep halves before expanding every edge. */
   static inline var EDGE_BATCH_STATES:Int = 64;
+  static inline final MAX_BATCH_POSES = 8388608;
   public final bodies:ModelBodies;
   public final build:CollisionBuild;
   public final description:CollisionDescription;
@@ -108,9 +109,11 @@ class CollisionPlannerSpace implements BoxClearanceSpace {
       pending.push({edge: e, a: edges.slice(2 * e * n, (2 * e + 1) * n), b: edges.slice((2 * e + 1) * n, (2 * e + 2) * n), depth: 0});
     var worldBodies = build.bodies.length;
     var all = bodies.all();
+    // Respect the native per-array limit even for unusually large worlds.
+    var batchLimit = Std.int(Math.max(1, Math.min(EDGE_BATCH_STATES, MAX_BATCH_POSES / (7 * worldBodies))));
     while (pending.length > 0) {
       var live = [];
-      while (pending.length > 0 && live.length < EDGE_BATCH_STATES) {
+      while (pending.length > 0 && live.length < batchLimit) {
         var p = pending.pop();
         if (result[p.edge]) live.push(p);
       }

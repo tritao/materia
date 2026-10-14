@@ -22,7 +22,8 @@ class ContactSearchRunner {
   /** A fresh servo session takes over after the caller approaches the CAD region with arc and wire off. */
   public function new(servo:ServoSession, sensor:String, direction:Vec3, distance:Float, speed:Float,
       maxAgeSeconds:Float = 0.02, lateralTolerance:Float = 0.002, contactOffset:Float = 0.0,
-      ?mappings:robotkit.time.ClockMappings) {
+      ?mappings:robotkit.time.ClockMappings, sensorKind:String = processkit.tool.WeldSensor.KIND,
+      coordinateFrame:String = "root", calibratedError:Float = 0.0, maximumOvershoot:Float = 0.0) {
     if (servo == null || sensor == null || sensor.length == 0)
       throw "Contact search runner needs a servo owner and the torch sensor";
     if (servo.robot.snapshot().trajectoryActive)
@@ -33,7 +34,7 @@ class ContactSearchRunner {
     sourceClock = snapshot.sourceClockId;
     var joints = [for (index in servo.manipulator.jointIndices()) snapshot.positions.get(index)];
     search = new ContactSearch(servo.manipulator.tcpPose(joints).translation, direction, distance, speed,
-      maxAgeSeconds, lateralTolerance, contactOffset);
+      maxAgeSeconds, lateralTolerance, contactOffset, sensorKind, coordinateFrame, calibratedError, maximumOvershoot);
   }
 
   /** Contact is captured before braking from measured FK, rather than the stopping setpoint. */

@@ -1251,13 +1251,17 @@ class SceneEditingTests {
       check(viewport.camera.yaw != yaw, "docked middle drag orbits");
       check(viewportPaintNode(app.submit(frame)).retainedPaintKey() != before,
         "docked orbit rebuilds retained paint instructions");
+      app.ui.pointerMove(x, y);
+      viewportPaintNode(app.submit(frame));
       before = viewportPaintNode(app.submit(frame)).retainedPaintKey();
       app.ui.pointerDown(x, y, 2);
       check(viewportPaintNode(app.submit(frame)).retainedPaintKey() != before,
         "stationary orbit press shows pivot ring through dock cache");
       app.ui.pointerUp(x, y, 2);
-      check(viewportPaintNode(app.submit(frame)).retainedPaintKey() == before,
-        "stationary orbit release removes pivot ring through dock cache");
+      var afterOrbitRelease = viewportPaintNode(app.submit(frame)).retainedPaintKey();
+      check(afterOrbitRelease == before,
+        'stationary orbit release removes pivot ring through dock cache; before=$before after=$afterOrbitRelease ' +
+          'presentation=${viewport.presentationKey()} hover=${viewport.hoverRevision} camera=${viewport.camera.revision}');
       var target = viewport.camera.targetX;
       app.ui.pointerDown(x, y, 0, haxeon.ui.core.UiModifier.Alt | haxeon.ui.core.UiModifier.Shift);
       check(!viewport.orbiting(), "panning does not show the orbit pivot");

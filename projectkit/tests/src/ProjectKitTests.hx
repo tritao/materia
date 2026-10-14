@@ -16,6 +16,7 @@ import materia.project.Appearance.Appearances;
 import materia.project.MaterialLibrary;
 import materia.project.MaterialDef;
 import materia.project.SceneArtifact;
+import materia.project.ScrewEntrySearchBounds;
 import materia.units.LengthUnit;
 
 class ProjectKitTests {
@@ -36,6 +37,166 @@ class ProjectKitTests {
   static function refusal(action:Void->Void):String {
     try action() catch (error:Dynamic) return Std.string(error);
     return "";
+  }
+
+  /** Force-search commissioning data is explicit, sensor-bound and stable before it reaches a mission. */
+  static function screwEntrySearchProfile():Void {
+    var profile:materia.project.SceneArtifact.SceneArtifactScrewEntrySearch = {
+      sensor: "tool/force-torque", maximumAgeSeconds: 0.02, targetWrench: [0, 0, -5, 0, 0, 0],
+      virtualMass: [1, 1, 1, 1, 1, 1], damping: [20, 20, 20, 20, 20, 20],
+      maximumLinearSpeed: 0.003, maximumSearchAxialSpeed: 0.0015,
+      contactReliefMeters: 0.002,
+      maximumAngularSpeed: 0.0008, maximumStepSeconds: 0.01,
+      maximumForceN: 25, maximumTorqueNm: 2, maximumTravelMeters: 0.045, maximumTravelRadians: 0.06,
+		maximumRunSeconds: 65, regionHalfUMeters: 0.002, regionHalfVMeters: 0.002,
+      contactSeedOffsetUMeters: 0.0004, spiralRadiusMeters: 0.001, spiralTurns: 1.5, spiralDurationSeconds: 35,
+      spiralMaximumLateralSpeed: 0.003, spiralTrackingGainPerSecond: 6,
+      minimumContactLoadN: 3, requiredLoadDropN: 1, candidateProgressTimeoutSeconds: 1.0, confirmationSamples: 2};
+    var sensor:materia.project.SceneArtifact.SceneArtifactRobotSensor = {kind: "force_torque",
+      id: "tool/force-torque", mount: {occurrence: "tool", connector: "tcp"}};
+    var tool:materia.project.SceneArtifact.SceneArtifactRobotTool = {kind: "screwdriver", members: ["tool"],
+      contact: {occurrence: "tool", connector: "tcp"}, channel: "tool/start",
+      screwdriver: {bit: {kind: "hex", size: "5"}, bitMember: "tool", directionChannel: "tool/direction",
+        programChannel: "tool/program", vacuumChannel: "tool/vacuum", feedJoint: "tool/feed",
+        spindleJoint: "tool/spindle", strokeEncoder: "tool/stroke", maxTorque: 20,
+        maxSpeed: 1, strokeMm: 20, springRate: 10}};
+    var data:materia.project.SceneArtifact.SceneArtifactData = {metresPerUnit: 0.001,
+      lengthUnit: "mm", parts: [], robotTools: [tool], robotSensors: [sensor]};
+    function accepted(hasScrews:Bool, approachMeters:Float = 0.0, candidateAdvanceMeters:Float = 0.001):Bool {
+      try {
+        @:privateAccess SceneArtifact.validateScrewEntrySearch(profile, hasScrews, approachMeters,
+          candidateAdvanceMeters, data,
+          function(detail:String):Void throw detail);
+        return true;
+      } catch (_:Dynamic) return false;
+    }
+	check(ScrewEntrySearchBounds.refinementTurns(12.0) == 10.0 &&
+		ScrewEntrySearchBounds.fallbackTurns(12.0) == 14.0 &&
+		Math.abs(ScrewEntrySearchBounds.fallbackDurationSeconds(0.002, 12.0, 0.00014) -
+			0.002 * (1.0 + 2.0 * Math.PI * 14.0) / 0.00014) < 1e-8,
+      "candidate refinement and the full-region fallback share their coverage and duration bounds");
+	var fullSearchMinimum = ScrewEntrySearchBounds.minimumRunSeconds(0.0400217, 0.005,
+		0.000125, 880, 0.0016, 12, 0.00014, 30);
+	check(1660 < fullSearchMinimum && Math.abs(fullSearchMinimum - 3592.01) < 0.01 &&
+		Math.abs(3600 - fullSearchMinimum - 7.99) < 0.01,
+		"The 1.6 mm contact-plane spiral, candidate checks, registered sweeps and one relief retry fit inside the force-search run bound");
+	check(Math.abs(ScrewEntrySearchBounds.catchupRecoverySeconds(0.005, 0.000125, 30) - 110.0) < 1e-8,
+		"One catch-up recovery reserves its timeout and bounded retract/reapproach travel");
+	check(Math.abs(ScrewEntrySearchBounds.catchupReliefDepthMeters(0.0229, 0.005) - 0.0179) < 1e-12 &&
+		ScrewEntrySearchBounds.catchupReliefDepthMeters(-0.004, 0.005) == -0.005,
+		"Catch-up relief is relative to the measured stall and stays inside the commissioned approach clearance");
+    check(accepted(true), "a bounded force-search profile matches one mounted screwdriver sensor");
+    check(!accepted(false), "force-search profile requires a screw step");
+    check(!accepted(true,0.05), "force-search travel covers the authored approach and spiral");
+    profile.maximumTravelMeters = 0.0401;
+    profile.maximumRunSeconds = 300;
+    profile.maximumTravelRadians = 0.3;
+    check(!accepted(true,0.04), "travel includes CAD approach, contact relief and the full registered spiral region");
+    profile.maximumTravelMeters = 0.041;
+    check(accepted(true,0.04), "travel covers the combined CAD entry and registered search displacement");
+    profile.maximumTravelMeters = 0.06;
+    profile.maximumRunSeconds = 90;
+    profile.maximumTravelRadians = 0.2;
+    profile.maximumAngularSpeed = 0.0008;
+    check(!accepted(true,0.05), "force-search time covers the authored approach and spiral");
+	profile.maximumRunSeconds = 170;
+    check(accepted(true,0.05), "force-search time covers relief, approach, candidate validation and both bounded entry searches");
+    profile.spiralDurationSeconds = 30;
+	profile.maximumRunSeconds = 155;
+    check(!accepted(true,0.05), "force-search spiral lasts through the relief-to-entry axial approach");
+    profile.spiralDurationSeconds = 35;
+    profile.maximumRunSeconds = 20;
+    check(!accepted(true,0.02), "force-search time includes its commissioned early-contact relief");
+    profile.maximumRunSeconds = 50;
+    check(!accepted(true,0.02), "force-search time reserves both bounded entry searches");
+	profile.maximumRunSeconds = 105;
+    check(accepted(true,0.02), "force-search time covers relief, approach, candidate validation and both entry searches");
+    profile.maximumTravelMeters = 0.045;
+    profile.maximumRunSeconds = 20;
+    profile.maximumTravelRadians = 0.05;
+    profile.maximumAngularSpeed = 0.004;
+    check(!accepted(true), "angular speed over the run cannot exceed the commissioned angular travel bound");
+    profile.maximumAngularSpeed = 0.002;
+    profile.maximumSearchAxialSpeed = 0.004;
+    check(!accepted(true), "unvalidated search feed cannot exceed the overall linear speed bound");
+    profile.maximumSearchAxialSpeed = 0.0015;
+    profile.candidateProgressTimeoutSeconds = 0.5;
+    check(!accepted(true), "candidate progress timeout can cover the configured thread lead at search feed speed");
+    profile.candidateProgressTimeoutSeconds = 1.0;
+    sensor.id = "other-sensor";
+    check(!accepted(true), "force-search profile rejects a missing named sensor");
+    sensor.id = profile.sensor;
+    sensor.mount.occurrence = "other-tool";
+    check(!accepted(true), "force-search profile rejects a sensor mounted off the screwdriver");
+    sensor.mount.occurrence = "tool";
+    profile.maximumForceN = 4;
+    check(!accepted(true), "force-search target cannot exceed its measured force bound");
+    profile.maximumForceN = 25; profile.maximumStepSeconds = 0.1;
+    check(!accepted(true), "force-search profile rejects an unstable admittance step");
+    profile.maximumStepSeconds = 0.01; profile.spiralMaximumLateralSpeed = 0.004;
+    check(!accepted(true), "spiral speed must fit the overall linear speed bound");
+    profile.spiralMaximumLateralSpeed = 0.003;
+    profile.contactSeedOffsetUMeters = 0.0011;
+    check(!accepted(true), "force-search seed, spiral and acquisition freshness fit the registered region");
+    profile.contactSeedOffsetUMeters = 0.0004;
+    profile.candidateProgressTimeoutSeconds = 0;
+    check(!accepted(true), "candidate progress must be verified within a positive commissioned timeout");
+    profile.candidateProgressTimeoutSeconds = 1.0;
+    var engagement:materia.project.SceneArtifact.SceneArtifactScrewEngagement = {
+      mode: materia.project.SceneArtifact.SceneArtifactScrewEngagementMode.PhysicalThread,
+      maximumAxialForceN: 25};
+    var mission:materia.project.SceneArtifact.SceneArtifactMission = {
+      steps: [{kind: "screw"}], screwEntrySearch: profile, screwEngagement: engagement};
+    var serialized = @:privateAccess SceneArtifact.encodeMission(mission);
+    var decoded:materia.project.SceneArtifact.SceneArtifactMission = @:privateAccess
+      SceneArtifact.decodeMission(haxe.Json.parse(serialized));
+    check(decoded.screwEntrySearch != null && decoded.screwEntrySearch.sensor == profile.sensor &&
+      decoded.screwEntrySearch.targetWrench[2] == -5 && decoded.screwEntrySearch.spiralTurns == 1.5 &&
+      decoded.screwEntrySearch.maximumSearchAxialSpeed == profile.maximumSearchAxialSpeed &&
+      decoded.screwEntrySearch.contactReliefMeters == profile.contactReliefMeters &&
+      decoded.screwEntrySearch.candidateProgressTimeoutSeconds == profile.candidateProgressTimeoutSeconds &&
+      decoded.screwEntrySearch.contactSeedOffsetUMeters == profile.contactSeedOffsetUMeters &&
+      decoded.screwEngagement != null && decoded.screwEngagement.mode == engagement.mode &&
+      decoded.screwEngagement.maximumAxialForceN == engagement.maximumAxialForceN,
+      "mission force-search and physical-thread selections survive their independent JSON fields");
+    var toolChanger:materia.project.SceneArtifact.SceneArtifactToolChanger = {
+      master: {occurrence: "robot/master", connector: "tool"}, lockOutput: "changer.lock",
+      lockedInput: "changer.locked", identityInputs: ["changer.id0", "changer.id1"],
+      initialToolId: "gripper", maximumObservationAgeSeconds: 0.1,
+      tools: [
+        {id: "gripper", channel: "grip.close", occurrence: "robot/gripper", connector: "mount",
+          dock: {occurrence: "dock/gripper", connector: "seat"}, identityCode: 1},
+        {id: "screwdriver", channel: "driver.start", occurrence: "robot/driver", connector: "mount",
+          dock: {occurrence: "dock/driver", connector: "seat"}, identityCode: 2}
+      ]};
+    var changerMission:materia.project.SceneArtifact.SceneArtifactMission = {
+      steps: [{kind: "changeTool", targetToolId: "screwdriver"}], toolChanger: toolChanger};
+    var changerJson = @:privateAccess SceneArtifact.encodeMission(changerMission);
+    var changerDecoded:materia.project.SceneArtifact.SceneArtifactMission = @:privateAccess
+      SceneArtifact.decodeMission(haxe.Json.parse(changerJson));
+    check(changerDecoded.toolChanger != null && changerDecoded.toolChanger.initialToolId == "gripper" &&
+      changerDecoded.toolChanger.identityInputs[1] == "changer.id1" &&
+      changerDecoded.toolChanger.tools[1].identityCode == 2 &&
+      changerDecoded.steps[0].targetToolId == "screwdriver",
+      "tool changer CAD interfaces, measured identity and change step round trip independently");
+    rejects(() -> @:privateAccess SceneArtifact.decodeMission(haxe.Json.parse(
+      StringTools.replace(changerJson, "\"identityCode\":2", "\"identityCode\":2.5"))),
+      "tool changer decoder rejects fractional physical identity codes");
+    var noThreadForce:materia.project.SceneArtifact.SceneArtifactScrewEngagement = {
+      mode: materia.project.SceneArtifact.SceneArtifactScrewEngagementMode.PhysicalThread};
+    rejects(() -> @:privateAccess SceneArtifact.validateScrewEngagement(noThreadForce, true,
+      function(detail:String):Void throw detail), "Physical thread mode requires an explicit force cap");
+    engagement.maximumAxialForceN = 0;
+    rejects(() -> @:privateAccess SceneArtifact.validateScrewEngagement(engagement, true,
+      function(detail:String):Void throw detail), "Physical thread mode rejects a non-positive force cap");
+    engagement.maximumAxialForceN = 25;
+    rejects(() -> @:privateAccess SceneArtifact.validateScrewEngagement(engagement, false,
+      function(detail:String):Void throw detail), "Physical thread mode requires a screw mission");
+    var processWithForce:materia.project.SceneArtifact.SceneArtifactScrewEngagement = {
+      mode: materia.project.SceneArtifact.SceneArtifactScrewEngagementMode.ProcessModel,
+      maximumAxialForceN: 25};
+    rejects(() -> @:privateAccess SceneArtifact.validateScrewEngagement(processWithForce, true,
+      function(detail:String):Void throw detail), "Process-model mode cannot declare a physical thread force cap");
   }
 
   static function definition():AssemblyDefinition {
@@ -243,7 +404,7 @@ class ProjectKitTests {
     rejects(function() AssemblyDefinitionCodec.encode(lowCeiling), "hydraulic phase speed exceeds ceiling");
   }
 
-  static function scene():Void {
+  static function sceneData():materia.project.SceneArtifact.SceneArtifactData {
     var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
     vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
     var corners = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
@@ -255,15 +416,32 @@ class ProjectKitTests {
         indices: indices, faceRanges: [], faceDescriptors: "[{\"index\":0}]",
         physicalMassKg: 2.4, physicalMassDeclared: true,
         physicalInertiaKgM2: [0.2, 0, 0, 0, 0.3, 0, 0, 0, 0.4]}], recipeDocument: "cube", recipeDiagnostics: ["ok"]};
+    return data;
+  }
+
+  static function scene():Void {
+    var data = sceneData();
     var encoded = SceneArtifact.encode(data);
     check(encoded.getInt32(4) == SceneArtifact.VERSION, "current scene version");
     var legacy = Bytes.alloc(encoded.length - 4);
     legacy.blit(0, encoded, 0, legacy.length);
-    legacy.setInt32(4, 29);
+    var rejectedVersion = SceneArtifact.VERSION - 1;
+    legacy.setInt32(4, rejectedVersion);
     var oldRefusal = refusal(() -> SceneArtifact.decodeView(legacy));
-    check(oldRefusal.indexOf("schema v29 is unsupported") >= 0 &&
+    check(oldRefusal.indexOf('schema v$rejectedVersion is unsupported') >= 0 &&
       oldRefusal.indexOf('expected v${SceneArtifact.VERSION}') >= 0,
-      "clean scene format break rejects v29 and names the current version");
+      "clean scene format break rejects the previous schema and names the current version");
+    data.parts[0].id = "body";
+    data.assemblyDefinition = definition();
+    data.robotSensors = [{kind: "tool_contact", id: "arm/tool/tip-contact",
+      mount: {occurrence: "base", connector: "pin"}}];
+    var contactSensor = SceneArtifact.decode(SceneArtifact.encode(data)).robotSensors[0];
+    check(contactSensor.kind == "tool_contact" && contactSensor.id == "arm/tool/tip-contact" &&
+      contactSensor.mount.occurrence == "base" && contactSensor.rayCount == null && contactSensor.maxRange == null,
+      "A mounted digital contact source round trips without LiDAR scan fields");
+    data.robotSensors[0].updateRate = 10;
+    rejects(() -> SceneArtifact.encode(data), "Digital contact sources cannot carry LiDAR scan settings");
+    data.parts[0].id = "part"; data.assemblyDefinition = null; data.robotSensors = null;
     var thread:materia.project.ThreadRenderData = {faceName: "bore:cyl.side", faceIndex: 7,
       spec: {designation: "M6", majorDiameter: 6, pitch: 1, starts: 2,
         hand: materia.project.ThreadSpecData.ThreadHand.LeftHand, internal: true,
@@ -709,6 +887,62 @@ class ProjectKitTests {
     rejects(function() SceneArtifact.encode(data), "mobile base without its robot");
   }
 
+  static function toolChangerMission():Void {
+    var data = sceneData();
+    data.parts[0].id = "body";
+    var assembly = definition();
+    var frame = AssemblyFrames.identity();
+    for (id in ["master", "toolA", "toolB", "dockA", "dockB"])
+      assembly.occurrences.push({id: id, definition: "body", initialPose: frame});
+    assembly.sensors = [
+      {id: "changer/locked", kind: "presence", occurrence: "master", connector: "pin", range: 0.01},
+      {id: "changer/id0", kind: "presence", occurrence: "master", connector: "pin", range: 0.01},
+      {id: "changer/id1", kind: "presence", occurrence: "master", connector: "pin", range: 0.01}
+    ];
+    data.assemblyDefinition = assembly;
+    data.robotTools = [
+      {kind: "suction", members: ["toolA"], contact: {occurrence: "toolA", connector: "pin"}, channel: "grip-a"},
+      {kind: "suction", members: ["toolB"], contact: {occurrence: "toolB", connector: "pin"}, channel: "grip-b"}
+    ];
+    data.controllers = [{id: "robotController", kind: "robot", joints: ["hinge"],
+      sensors: ["changer/locked", "changer/id0", "changer/id1"], channels: ["changer.lock"]}];
+    data.signals = [{name: "changer.lock", from: {controller: "robotController", port: "lock"},
+      to: {controller: "robotController", port: "lock-command"}}];
+    var changer:materia.project.SceneArtifact.SceneArtifactToolChanger = {
+      master: {occurrence: "master", connector: "pin"}, lockOutput: "changer.lock",
+      lockedInput: "changer/locked", identityInputs: ["changer/id0", "changer/id1"],
+      initialToolId: "gripper", maximumObservationAgeSeconds: 0.1,
+      tools: [
+        {id: "gripper", channel: "grip-a", occurrence: "toolA", connector: "pin",
+          dock: {occurrence: "dockA", connector: "pin"}, identityCode: 1},
+        {id: "cup", channel: "grip-b", occurrence: "toolB", connector: "pin",
+          dock: {occurrence: "dockB", connector: "pin"}, identityCode: 2}
+      ]};
+    var mission:materia.project.SceneArtifact.SceneArtifactMission = {controllerId: "robotController",
+      toolChanger: changer, steps: [
+        {kind: "pick", at: {occurrence: "arm", connector: "pin"}},
+        {kind: "changeTool", targetToolId: "cup", timeoutSeconds: 30},
+        {kind: "pick", at: {occurrence: "arm", connector: "pin"}}
+      ]};
+    data.mission = mission;
+    var restored = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    check(restored != null && restored.toolChanger != null && restored.steps.length == 3 &&
+      restored.steps[1].kind == "changeTool" && restored.steps[1].targetToolId == "cup",
+      "CAD tool changer validates and round trips an explicit handling-tool exchange");
+
+    mission.steps[2].tool = "grip-a";
+    rejects(function() SceneArtifact.encode(data), "handling step cannot select a parked physical tool channel");
+    mission.steps[2].tool = null;
+    mission.steps[1].targetToolId = "gripper";
+    rejects(function() SceneArtifact.encode(data), "tool changer cannot exchange to its already-mounted identity");
+    mission.steps[1].targetToolId = "cup";
+    changer.tools[1].identityCode = 1;
+    rejects(function() SceneArtifact.encode(data), "tool changer identity codes are unique");
+    changer.tools[1].identityCode = 2;
+    data.signals = [];
+    rejects(function() SceneArtifact.encode(data), "tool changer lock command must be wired from the robot controller");
+  }
+
   /** A torch tool carries its welder with it, and names only what the assembly has. */
   static function torchTool():Void {
     var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
@@ -1073,6 +1307,7 @@ class ProjectKitTests {
   }
 
   static function main():Void {
+    assertions += DrawingProjectionTests.run();
     SceneScrewTests.run();
     SceneScrewFeederTests.run();
     SceneBlowFeedTests.run();
@@ -1081,7 +1316,8 @@ class ProjectKitTests {
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");
     rejects(function() LengthUnit.metresPerUnit("feet"), "unsupported unit");
     assembly(); hydraulic();
-    homingDependencies(); frames(); scene(); machineMetadata(); machining(); printing(); mobileBase(); torchTool(); bodies();
+    homingDependencies(); frames(); scene(); screwEntrySearchProfile(); machineMetadata(); machining(); printing();
+    mobileBase(); toolChangerMission(); torchTool(); bodies();
     check(MaterialLibrary.require("steel-c45").physical.density == 7850, "steel density");
     check(MaterialLibrary.fromSpec("steel C45") == "steel-c45", "material lookup");
     rejects(function() MaterialLibrary.require("unknown"), "unknown material");

@@ -39,7 +39,8 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	const RK_SIMULATION_ROBOT_HOLD_AT_REST = 1;
 	/**
-	 * Contact involving one robot link. tool_piece_index is -1 for link geometry.
+	 * Contact involving one robot link. Physically coupled object followers are attributed to their carrier link.
+	 * tool_piece_index is -1 for link geometry.
 	 * other_object is nonzero only for Object contacts. RobotLink contacts carry
 	 * zero-based other_robot/other_link; World covers unowned geometry.
 	 */
@@ -86,6 +87,10 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_apply_robot_force(simulation: rk_simulation, robot_index: u32, wrench: ptr<const<rk_simulation_wrench>>) -> rk_result;
 	/**
+	 * Records that a session object is physically carried by one robot link for contact-wrench attribution.
+	 */
+	extern fn rk_simulation_bind_object_to_link(simulation: rk_simulation, object: nksim_object, robot_index: u32, link_index: u32) -> rk_result;
+	/**
 	 * Copies the complete clock and every presentation pose under one simulation lock.
 	 */
 	extern fn rk_simulation_capture_presentation(simulation: rk_simulation, out_presentation: ptr<rk_simulation_presentation> @out @owned) -> rk_result;
@@ -111,6 +116,30 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_create_in_session(session: nksim_session, out_simulation: ptr<rk_simulation> @out @owned) -> rk_result;
 	/**
+	 * Attaches a dynamic session body to a robot link with a removable fixed joint.
+	 * Its current measured relative pose is captured without snapping. The session
+	 * must be between ticks with its physics host stopped.
+	 */
+	extern fn rk_simulation_create_object_fixed_follower(simulation: rk_simulation, robot_index: u32, parent_link_index: u32, follower_body: nksim_body, out_joint: ptr<nksim_joint> @out) -> rk_result;
+	/**
+	 * Adds a prismatic child to a robot link and couples its slide to one robot revolute joint.
+	 * The session must be between ticks with its physics host stopped; ratio and offset follow
+	 * `follower = ratio * leader + offset` in native joint coordinates.
+	 */
+	extern fn rk_simulation_create_object_slide_follower(simulation: rk_simulation, desc: ptr<const<rk_simulation_object_slide_desc>>, out_joint: ptr<nksim_joint> @out) -> rk_result;
+	/**
+	 * Attaches a floating articulated robot root to a session body, such as a fixed tool dock, without snapping.
+	 * The session must be between ticks with its physics host stopped.
+	 */
+	extern fn rk_simulation_create_robot_body_fixed_follower(simulation: rk_simulation, parent_body: nksim_body, child_robot_index: u32, child_root_link_index: u32, out_joint: ptr<nksim_joint> @out) -> rk_result;
+	/**
+	 * Attaches the floating root of one articulated robot to a link on another
+	 * robot with a removable fixed joint. Its measured relative pose is captured
+	 * without snapping. The child robot may have only one mount; mounts cannot
+	 * form cycles. The session must be between ticks with its physics host stopped.
+	 */
+	extern fn rk_simulation_create_robot_fixed_follower(simulation: rk_simulation, parent_robot_index: u32, parent_link_index: u32, child_robot_index: u32, child_root_link_index: u32, out_joint: ptr<nksim_joint> @out) -> rk_result;
+	/**
 	 * Disconnects or reconnects one virtual RKD6 device in a simulation.
 	 */
 	extern fn rk_simulation_cut_virtual_device_link(simulation: rk_simulation, robot_index: u32, cut: u32) -> rk_result;
@@ -122,6 +151,14 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * simulation become invalid after this call.
 	 */
 	extern fn rk_simulation_destroy(simulation: rk_simulation) -> void;
+	/**
+	 * Removes an object follower created by this simulation while the host is stopped.
+	 */
+	extern fn rk_simulation_destroy_object_joint(simulation: rk_simulation, joint: nksim_joint) -> rk_result;
+	/**
+	 * Removes an articulated robot mount created by this simulation while the host is stopped.
+	 */
+	extern fn rk_simulation_destroy_robot_joint(simulation: rk_simulation, joint: nksim_joint) -> rk_result;
 	/**
 	 * Drives one process-owned tool joint without changing other joints or their commands.
 	 * Called between physics ticks. Only prismatic and rotary tool coordinates are admitted.
@@ -317,10 +354,14 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_teleport_robot(simulation: rk_simulation, robot_index: u32, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
 	/**
+	 * Removes a session object's carried-link contact attribution; repeated removal is allowed.
+	 */
+	extern fn rk_simulation_unbind_object(simulation: rk_simulation, object: nksim_object) -> rk_result;
+	/**
 	 * Whether the virtual device has an observation and a qualified plan clock.
 	 */
 	extern fn rk_simulation_virtual_device_ready(simulation: rk_simulation, robot_index: u32, out_ready: ptr<u32> @out) -> rk_result;
-	struct rk_robot_contact @layout(96, 8) {
+	struct rk_robot_contact @layout(152, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		link_index: u32 @offset(4);
 		tool_piece_index: i32 @offset(8);
@@ -333,7 +374,16 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		other_kind: rk_contact_other_kind @offset(80);
 		other_robot: u32 @offset(84);
 		other_link: u32 @offset(88);
-		reserved2: u32 @offset(92);
+		/**
+		 * Zero-based compound part on the contacted body, or -1 for unpartitioned geometry.
+		 */
+		other_piece_index: i32 @offset(92);
+		wrench_valid: u32 @offset(96);
+		/**
+		 * Wrench acting on the robot link, in world axes, about position; SI units.
+		 */
+		force_on_link: array<f64, 3> @offset(104);
+		torque_on_link: array<f64, 3> @offset(128);
 	}
 	/**
 	 * Simulation-owned spring-applied friction brake; all values are SI units.
@@ -518,6 +568,34 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		contact_filter: u32 @offset(132);
 		vertex_count: u32 @offset(136);
 		vertices: array<f64, 192> @offset(144);
+	}
+	/**
+	 * Prismatic child and lead relation for one dynamic object carried by a robot link.
+	 */
+	struct rk_simulation_object_slide_desc @layout(152, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		robot_index: u32 @offset(4);
+		parent_link_index: u32 @offset(8);
+		driver_joint_index: u32 @offset(12);
+		follower_body: nksim_body @offset(16);
+		/**
+		 * < Local to the parent link.
+		 */
+		anchor_a: array<f64, 3> @offset(24);
+		/**
+		 * < Local to the follower body.
+		 */
+		anchor_b: array<f64, 3> @offset(48);
+		/**
+		 * < Unit slide axis in the parent link.
+		 */
+		axis_a: array<f64, 3> @offset(72);
+		lower_limit: f64 @offset(96);
+		upper_limit: f64 @offset(104);
+		max_force: f64 @offset(112);
+		ratio: f64 @offset(120);
+		offset: f64 @offset(128);
+		reserved: array<u64, 2> @offset(136);
 	}
 	/**
 	 * Ideal rolling omni-wheel coupling for one robot's kinematic base.

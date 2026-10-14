@@ -17,3 +17,6 @@ haxeon="$materia_root/haxeon/scripts/haxeon"
 
 "$haxeon" build --project "$repo_root/examples/track-arm/haxeon.json"
 "$haxeon" build --project "$repo_root/examples/overhead-arm/haxeon.json"
+
+MATERIA_DRAWING_OUTPUT_DIR="$repo_root/examples/robot-screwdriver/build/drawing" \
+	"$haxeon" run --project "$repo_root/examples/robot-screwdriver/haxeon.drawing.json"

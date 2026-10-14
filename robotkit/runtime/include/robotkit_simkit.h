@@ -694,8 +694,69 @@ RK_API rk_result RK_CALL rk_simulation_get_link_pose(
 RK_API rk_result RK_CALL rk_simulation_get_link_body(
     rk_simulation simulation, uint32_t robot_index, uint32_t link_index,
     nksim_body *out_body RK_OUT);
+/** Records that a session object is physically carried by one robot link for contact-wrench attribution. */
+RK_API rk_result RK_CALL rk_simulation_bind_object_to_link(
+    rk_simulation simulation, nksim_object object, uint32_t robot_index, uint32_t link_index);
+/** Removes a session object's carried-link contact attribution; repeated removal is allowed. */
+RK_API rk_result RK_CALL rk_simulation_unbind_object(
+    rk_simulation simulation, nksim_object object);
+/** Prismatic child and lead relation for one dynamic object carried by a robot link. */
+typedef struct rk_simulation_object_slide_desc {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t robot_index;
+    uint32_t parent_link_index;
+    uint32_t driver_joint_index;
+    nksim_body follower_body;
+    double anchor_a[3]; /**< Local to the parent link. */
+    double anchor_b[3]; /**< Local to the follower body. */
+    double axis_a[3]; /**< Unit slide axis in the parent link. */
+    double lower_limit;
+    double upper_limit;
+    double max_force;
+    double ratio;
+    double offset;
+    uint64_t reserved[2];
+} rk_simulation_object_slide_desc;
 /**
- * Contact involving one robot link. tool_piece_index is -1 for link geometry.
+ * Adds a prismatic child to a robot link and couples its slide to one robot revolute joint.
+ * The session must be between ticks with its physics host stopped; ratio and offset follow
+ * `follower = ratio * leader + offset` in native joint coordinates.
+ */
+RK_API rk_result RK_CALL rk_simulation_create_object_slide_follower(
+    rk_simulation simulation, const rk_simulation_object_slide_desc *desc,
+    nksim_joint *out_joint RK_OUT);
+/**
+ * Attaches a dynamic session body to a robot link with a removable fixed joint.
+ * Its current measured relative pose is captured without snapping. The session
+ * must be between ticks with its physics host stopped.
+ */
+RK_API rk_result RK_CALL rk_simulation_create_object_fixed_follower(
+    rk_simulation simulation, uint32_t robot_index, uint32_t parent_link_index,
+    nksim_body follower_body, nksim_joint *out_joint RK_OUT);
+/** Removes an object follower created by this simulation while the host is stopped. */
+RK_API rk_result RK_CALL rk_simulation_destroy_object_joint(
+    rk_simulation simulation, nksim_joint joint);
+/**
+ * Attaches the floating root of one articulated robot to a link on another
+ * robot with a removable fixed joint. Its measured relative pose is captured
+ * without snapping. The child robot may have only one mount; mounts cannot
+ * form cycles. The session must be between ticks with its physics host stopped.
+ */
+RK_API rk_result RK_CALL rk_simulation_create_robot_fixed_follower(
+    rk_simulation simulation, uint32_t parent_robot_index, uint32_t parent_link_index,
+    uint32_t child_robot_index, uint32_t child_root_link_index,
+    nksim_joint *out_joint RK_OUT);
+/** Attaches a floating articulated robot root to a session body, such as a fixed tool dock, without snapping.
+ * The session must be between ticks with its physics host stopped. */
+RK_API rk_result RK_CALL rk_simulation_create_robot_body_fixed_follower(
+    rk_simulation simulation, nksim_body parent_body, uint32_t child_robot_index,
+    uint32_t child_root_link_index, nksim_joint *out_joint RK_OUT);
+/** Removes an articulated robot mount created by this simulation while the host is stopped. */
+RK_API rk_result RK_CALL rk_simulation_destroy_robot_joint(
+    rk_simulation simulation, nksim_joint joint);
+/**
+ * Contact involving one robot link. Physically coupled object followers are attributed to their carrier link.
+ * tool_piece_index is -1 for link geometry.
  * other_object is nonzero only for Object contacts. RobotLink contacts carry
  * zero-based other_robot/other_link; World covers unowned geometry.
  */
@@ -717,7 +778,12 @@ typedef struct rk_robot_contact {
     rk_contact_other_kind other_kind;
     uint32_t other_robot;
     uint32_t other_link;
-    uint32_t reserved2;
+    /** Zero-based compound part on the contacted body, or -1 for unpartitioned geometry. */
+    int32_t other_piece_index;
+    uint32_t wrench_valid RK_BOOL32;
+    /** Wrench acting on the robot link, in world axes, about position; SI units. */
+    double force_on_link[3];
+    double torque_on_link[3];
 } rk_robot_contact;
 typedef uint32_t rk_robot_contact_list RK_HANDLE RK_HANDLE_DESTROY(rk_robot_contact_list_destroy);
 #define RK_INVALID_ROBOT_CONTACT_LIST ((rk_robot_contact_list)0)
