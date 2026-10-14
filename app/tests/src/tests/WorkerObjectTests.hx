@@ -44,6 +44,7 @@ class WorkerObjectTests {
       var seconds = property(app.scene,"Seconds");
       switch new PropertyBinding(seconds, app.scene.context()).apply(PropertyValue.Float(2.0)) {
         case Rejected(message): throw 'Step edit rejected: $message';
+        case Pending(_): throw 'An editor property edit stayed pending; scene edits commit at once';
         case Applied, Unchanged:
       }
       check(worker(app.scene,workerId).job.indexOf('"seconds":2') >= 0,
@@ -56,6 +57,7 @@ class WorkerObjectTests {
       var hand = property(app.scene,"Hand");
       switch new PropertyBinding(hand, app.scene.context()).apply(PropertyValue.Enum("left")) {
         case Rejected(message): throw 'Paired hand edit rejected: $message';
+        case Pending(_): throw 'An editor property edit stayed pending; scene edits commit at once';
         case Applied, Unchanged:
       }
       var paired = humankit.job.HumanJobSpec.parse(worker(app.scene,workerId).job);
@@ -73,6 +75,7 @@ class WorkerObjectTests {
       if (action == null) throw "Missing second worker step action";
       switch new PropertyBinding(action, app.scene.context()).apply(PropertyValue.Enum("place")) {
         case Rejected(message): throw 'Changing wait to place rejected: $message';
+        case Pending(_): throw 'An editor property edit stayed pending; scene edits commit at once';
         case Applied, Unchanged:
       }
       var defaulted = humankit.job.HumanJobSpec.parse(worker(app.scene,workerId).job);
@@ -84,6 +87,7 @@ class WorkerObjectTests {
       var yaw = property(app.scene,"Yaw");
       switch new PropertyBinding(yaw, app.scene.context()).apply(PropertyValue.Float(90.0)) {
         case Rejected(message): throw 'Yaw edit rejected: $message';
+        case Pending(_): throw 'An editor property edit stayed pending; scene edits commit at once';
         case Applied, Unchanged:
       }
       var turned = app.scene.object(workerId);

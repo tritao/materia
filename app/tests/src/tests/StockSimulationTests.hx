@@ -14,6 +14,7 @@ class StockSimulationTests {
     for (descriptor in scene.properties()) if (descriptor.label == label) {
       switch new PropertyBinding(descriptor, scene.context()).apply(value) {
         case Rejected(message): throw 'Stock simulation property "$label" rejected the edit: $message';
+        case Pending(_): throw 'An editor property edit stayed pending; scene edits commit at once';
         case Applied, Unchanged:
       }
       return;

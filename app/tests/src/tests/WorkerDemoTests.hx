@@ -159,6 +159,7 @@ class WorkerDemoTests {
     switch new haxeon.ui.properties.PropertyBinding(missingZoneField, editor.scene.context())
       .apply(haxeon.ui.properties.PropertyValue.Bool(false)) {
       case Rejected(message): throw 'Removing dangling zone failed: $message';
+      case Pending(_): throw 'An editor property edit stayed pending; scene edits commit at once';
       case Applied, Unchanged:
     }
     var cleaned = editor.scene.object("worker-demo");
