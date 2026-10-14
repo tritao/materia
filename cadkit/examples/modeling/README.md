@@ -190,6 +190,20 @@ The save/reopen integration check uses the app's native build:
   --output="$PWD/app/build/host/project-source.hl"
 ```
 
+That runs every default case in one process. The suite is a list of named
+cases (`ProjectSourceTests.cases`): `PROJECT_SOURCE_LIST=1` prints the
+default ones, `PROJECT_SOURCE_ONLY=a,b` runs named cases or groups, and
+`PROJECT_SOURCE_FROM=a` resumes the default suite at `a`. Each case prints
+its time, resident and peak memory and heap. To run the cases as separate
+processes, several at once, longest first and within the free memory:
+
+```sh
+python3 app/tools/project-source-suite.py --jobs 4
+```
+
+It records each case's time and peak memory in
+`app/build/host/project-source-timings.json` to schedule the next run.
+
 The same `materia.project.json` structure can later select other entrypoint
 kinds, such as a robot simulation, while each runtime continues to use its own
 Haxeon package manifest.

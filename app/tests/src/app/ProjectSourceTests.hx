@@ -3916,7 +3916,7 @@ class ProjectSourceTests {
   }
 
   /** Four real blank-to-outfeed cycles through the saved robot mission and wired CNC interface. */
-  static function checkMachineTending(root:String, routeOnly:Bool = false):Void {
+  static function checkMachineTending(root:String, scope:TendingCheck):Void {
     TendingCyclePlan.TendingCyclePlanChecks.run();
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/machine-tending/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
@@ -3937,10 +3937,10 @@ class ProjectSourceTests {
       var mission = simulation.missionPlayer(), cnc = simulation.cncPlayer();
       if (mission == null || cnc == null) throw "Playable tending project lost its mission or CNC player";
       checkTendingHandlingOrientations(mission);
-      if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-reach") {
+      if (scope == TendingCheck.Reach) {
         simulation.clear(); return;
       }
-      if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-vise") {
+      if (scope == TendingCheck.Vise) {
         var nativeSession = simulation.activeSession();
         var freeBlank = simulation.environmentObject("project:infeed/blank-0-0");
         var station:Null<materia.project.SceneArtifact.SceneArtifactPlace> = null;
@@ -3989,7 +3989,7 @@ class ProjectSourceTests {
       var originalBlank = new nativekit.sim.SimPose(blankPose[0].position[0], blankPose[0].position[1],
         blankPose[0].position[2], blankPose[0].rotation[0], blankPose[0].rotation[1],
         blankPose[0].rotation[2], blankPose[0].rotation[3]);
-      if (routeOnly) {
+      if (scope == TendingCheck.Route) {
         var clampCommand = -1;
         for (index in 0...mission.mission.steps.length) {
           var step = mission.mission.steps[index];
@@ -4472,7 +4472,7 @@ class ProjectSourceTests {
         return count;
       }
       var phaseStep = mission.stepIndex, phaseStart = productionStart;
-      var exchangeOnly = Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-exchange";
+      var exchangeOnly = scope == TendingCheck.Exchange;
       var lastCycleStart = 0.0, lastCycleTime = 0.0, wasCycleActive = false;
       var cycleTimes:Array<Float> = [];
       var expectedRemoval = expectedBearingBlockRemoval();
@@ -5588,39 +5588,96 @@ class ProjectSourceTests {
     if (!missingRejected) throw "Joint-motion policy must not fabricate a mechanical speed cap";
   }
 
-  /** Checks after the physical tending mission, also available as a resumed app phase. */
-  static function checkAfterMachineTending(root:String):Void {
-    checkVirtualRouterHoming(root);
-    checkCncRouter(root);
-    checkBeltRouter(root);
-    checkCoreXyPlotter(root);
-    checkMobileBase(root);
-    checkMobileMission(root);
-    checkMobileObstacle(root);
-    checkMissionOverlayEdge();
-    checkCncControls(root);
-    checkBackgroundLaunch(root);
-  }
-
-  /** Checks after the controller-cell build, also available as a resumed app phase. */
-  static function checkAfterTendingControllers(root:String):Void {
-    checkTendingRobotInterface(root);
-    checkMachineTending(root);
-    checkAfterMachineTending(root);
-  }
-
-  /** The remaining full-suite checks, also available after a repaired track or gantry gate. */
-  static function checkAfterTrack(root:String):Void {
-    checkRobotWelder(root);
-    checkMates(root);
-    checkBenchMill(root);
-    checkEnclosedMillProject(root);
-    checkTendingControllers(root);
-    checkAfterTendingControllers(root);
-  }
-
   static function checks():Int {
-    // Focused project-source filters skip unrelated physics setup and run only the selected checks.
+    var root = Sys.getCwd();
+    while (!FileSystem.exists(root + "/cadkit/examples/modeling/materia.project.json")) {
+      var parent = haxe.io.Path.directory(root);
+      if (parent == root || parent.length == 0) throw "Could not locate Materia repository";
+      root = parent;
+    }
+    Sys.setCwd(root);
+    return ProjectSourceSuite.run(root, cases());
+  }
+
+  /** Every project-source case: the default suite in order, then focused variants and groups. */
+  static function cases():Array<ProjectSourceCase> {
+    var suite = ProjectSourceCase.suite, focused = ProjectSourceCase.focused, group = ProjectSourceCase.group;
+    return [
+      suite("core", checkCore),
+      suite("press-brake", checkPressBrake),
+      suite("press-controller", checkPressController),
+      suite("sheet-press", root -> PressBrakeSimulationChecks.run(root, true)),
+      suite("arm", checkRobotArm),
+      suite("gripper", checkParallelGripperMission),
+      suite("cobot", root -> checkCobotArms(root)),
+      suite("gantry", root -> checkGantryPicker(root)),
+      suite("gantry-yaw", root -> checkGantryPicker(root, true)),
+      suite("gantry-welder", checkGantryWelder),
+      suite("track-arm", checkTrackArm),
+      suite("overhead-arm", OverheadArmTests.run),
+      suite("clearance", root -> { checkJointSceneClearance(root); checkHeldJointSceneClearance(root); }),
+      suite("welder", checkRobotWelder),
+      suite("mates", checkMates),
+      suite("bench-mill", checkBenchMill),
+      suite("enclosed-mill", checkEnclosedMillProject),
+      suite("router-device-home", checkVirtualRouterHoming),
+      suite("cell", checkTendingControllers),
+      suite("interface", checkTendingRobotInterface),
+      suite("tending", root -> checkMachineTending(root, TendingCheck.Production)),
+      suite("cnc-router", root -> checkCncRouter(root)),
+      suite("belts", checkBeltRouter),
+      suite("corexy", checkCoreXyPlotter),
+      suite("printer-project", checkPrinter),
+      suite("printer-cube-short", root -> checkPrinterCube(root, "cube-short", 4.0, true)),
+      suite("printer-shaping", checkPrinterShaping),
+      suite("printer-mirror", checkPrinterMirror),
+      suite("mobile-base", checkMobileBase),
+      suite("mobile-mission", checkMobileMission),
+      suite("mobile-obstacle", checkMobileObstacle),
+      suite("overlay-edge", _ -> checkMissionOverlayEdge()),
+      suite("controls", checkCncControls),
+      suite("background", checkBackgroundLaunch),
+      focused("mobile-welder-registration-boundary", root -> MobileWelderTests.runRegistration(root, true)),
+      focused("mobile-welder-registration-boundary-mujoco", root -> MobileWelderTests.runRegistration(root, true, false, ApplicationSimulation.MUJOCO)),
+      focused("mobile-welder-registration", root -> MobileWelderTests.runRegistration(root)),
+      focused("mobile-welder-voltage-cutoff", root -> MobileWelderTests.runRegistration(root, false, true)),
+      focused("mobile-welder-wire-clearance", MobileWelderTests.runWireClearance),
+      focused("mobile-welder-frames", MobileWelderTests.runFrames),
+      focused("mobile-welder-mission", root -> MobileWelderTests.runMission(root)),
+      focused("mobile-welder-mission-mujoco", root -> MobileWelderTests.runMission(root, ApplicationSimulation.MUJOCO)),
+      focused("mobile-welder-energy", root -> MobileWelderTests.runMission(root, ApplicationSimulation.MUJOCO, true)),
+      focused("mobile-welder-energy-test-backend", root -> MobileWelderTests.runMission(root, ApplicationSimulation.DETERMINISTIC, true)),
+      focused("mobile-welder-joint-handoff", MobileWelderTests.runJointHandoff),
+      focused("mobile-welder", MobileWelderTests.run),
+      focused("printer-cube", root -> checkPrinterCube(root, "cube", 20.0, false)),
+      focused("track-weld", root -> checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "track MuJoCo", "track-arm")),
+      focused("gantry-starts", root -> { checkGantryPicker(root, false, false, "far"); checkGantryPicker(root, false, false, "unreferenced"); }),
+      focused("gantry-realtime", root -> checkGantryPicker(root, false, true)),
+      focused("cobot-analytic", checkCobotAnalytic),
+      focused("arm-analytic", checkRobotArmAnalytic),
+      focused("gantry-analytic", checkCartesianAnalyticExamples),
+      focused("welder-whole", root -> { checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "MuJoCo"); checkWholeWeldment(root, ApplicationSimulation.DETERMINISTIC, "test backend"); }),
+      focused("cobot850", root -> checkCobotArms(root, [850])),
+      focused("brake", checkMillBrakeProject),
+      focused("tending-plan", _ -> TendingCyclePlan.TendingCyclePlanChecks.run()),
+      focused("tending-route", root -> checkMachineTending(root, TendingCheck.Route)),
+      focused("tending-reach", root -> checkMachineTending(root, TendingCheck.Reach)),
+      focused("tending-vise", root -> checkMachineTending(root, TendingCheck.Vise)),
+      focused("tending-exchange", root -> checkMachineTending(root, TendingCheck.Exchange)),
+      focused("identity", checkEnclosedCabinetIdentity),
+      focused("welder-plate", checkFarPlateWeld),
+      focused("welder-air", checkWeldInTheAir),
+      focused("welder-quality", checkWeldQualities),
+      focused("welder-seam", root -> { checkRobotWelderOn(root, ApplicationSimulation.MUJOCO, "MuJoCo"); checkRobotWelderOn(root, ApplicationSimulation.DETERMINISTIC, "test backend"); }),
+      group("mill", ["bench-mill", "enclosed-mill", "interface"]),
+      group("printer", ["printer-project", "printer-shaping", "printer-mirror"]),
+      group("mobile", ["mobile-base", "mobile-mission", "mobile-obstacle", "overlay-edge"]),
+      group("router", ["cnc-router", "belts"])
+    ];
+  }
+
+  /** The kit-level checks and the generated-project editor session round trip. */
+  static function checkCore(root:String):Void {
     checkJointMotionPolicy();
     // Four joints and two segments distinguish per-joint stopping limits from
     // per-segment storage, including the constructor's default path.
@@ -5636,323 +5693,6 @@ class ProjectSourceTests {
       null, null, null, null, null, true, null, false, null, [1.0, 2.0, 3.0, 4.0]);
     check(explicitStops.controlAcceleration.get(3) == 4.0,
       "explicit stopping acceleration accepts all four joints in a two-segment plan");
-    var root = Sys.getCwd();
-    while (!FileSystem.exists(root + "/cadkit/examples/modeling/materia.project.json")) {
-      var parent = haxe.io.Path.directory(root);
-      if (parent == root || parent.length == 0) throw "Could not locate Materia repository";
-      root = parent;
-    }
-    Sys.setCwd(root);
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "sheet-press") {
-      PressBrakeSimulationChecks.run(root, true);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "press-controller") {
-      checkPressController(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "press-brake") {
-      checkPressBrake(root);
-      return 0;
-    }
-    // PROJECT_SOURCE_ONLY=mobile, =arm or =welder runs just those example's checks, for iterating on them.
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-registration-boundary") {
-      MobileWelderTests.runRegistration(root, true);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-registration-boundary-mujoco") {
-      MobileWelderTests.runRegistration(root, true, false, ApplicationSimulation.MUJOCO);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-registration") {
-      MobileWelderTests.runRegistration(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-voltage-cutoff") {
-      MobileWelderTests.runRegistration(root, false, true);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-wire-clearance") {
-      MobileWelderTests.runWireClearance(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-frames") {
-      MobileWelderTests.runFrames(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-mission") {
-      MobileWelderTests.runMission(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-mission-mujoco") {
-      MobileWelderTests.runMission(root, ApplicationSimulation.MUJOCO);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-energy") {
-      MobileWelderTests.runMission(root, ApplicationSimulation.MUJOCO, true);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-energy-test-backend") {
-      MobileWelderTests.runMission(root, ApplicationSimulation.DETERMINISTIC, true);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder-joint-handoff") {
-      MobileWelderTests.runJointHandoff(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile-welder") {
-      MobileWelderTests.run(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile") {
-      checkMobileBase(root);
-      checkMobileMission(root);
-      checkMobileObstacle(root);
-      checkMissionOverlayEdge();
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer-cube") {
-      checkPrinterCube(root, "cube", 20.0, false);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer-cube-short") {
-      checkPrinterCube(root, "cube-short", 4.0, true);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer-shaping") {
-      checkPrinterShaping(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer-mirror") {
-      checkPrinterMirror(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "printer") {
-      checkPrinter(root);
-      checkPrinterShaping(root);
-      checkPrinterMirror(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "corexy") {
-      checkCoreXyPlotter(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "track-weld") {
-      checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "track MuJoCo", "track-arm");
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "track-arm") {
-      checkTrackArm(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "overhead-arm") {
-      OverheadArmTests.run(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-welder") {
-      checkGantryWelder(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-yaw") {
-      checkGantryPicker(root, true);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-starts") {
-      checkGantryPicker(root, false, false, "far");
-      checkGantryPicker(root, false, false, "unreferenced");
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-realtime") {
-      checkGantryPicker(root, false, true);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry") {
-      checkGantryPicker(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cobot-analytic") {
-      checkCobotAnalytic(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm-analytic") {
-      checkRobotArmAnalytic(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gantry-analytic") {
-      checkCartesianAnalyticExamples(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {
-      checkRobotArm(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-whole") {
-      checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "MuJoCo");
-      checkWholeWeldment(root, ApplicationSimulation.DETERMINISTIC, "test backend");
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "gripper") {
-      checkParallelGripperMission(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "after-track") {
-      checkAfterTrack(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "after-mill") {
-      checkEnclosedMillProject(root);
-      checkTendingControllers(root);
-      checkAfterTendingControllers(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "after-cell") {
-      checkAfterTendingControllers(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "after-tending") {
-      checkAfterMachineTending(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder") {
-      checkRobotWelder(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "clearance") {
-      checkJointSceneClearance(root);
-      checkHeldJointSceneClearance(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cobot") {
-      checkCobotArms(root);
-      checkJointSceneClearance(root);
-      checkHeldJointSceneClearance(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cobot850") {
-      checkCobotArms(root, [850]);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mill") {
-      checkBenchMill(root);
-      checkEnclosedMillProject(root);
-      checkTendingRobotInterface(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "brake") {
-      var generated = MateriaProjectRunner.loadProject(FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.project.json"));
-      var definition = generated.assemblyDefinition;
-      if (definition == null) throw "Mill brake check has no assembly definition";
-      checkMillBrake(AssemblySimulationBridge.toRobotModel(definition, generated.physical).model);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "cell") {
-      checkTendingControllers(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "interface") {
-      checkTendingRobotInterface(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-plan") {
-      TendingCyclePlan.TendingCyclePlanChecks.run();
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending" || Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-reach" ||
-        Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-vise" || Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-exchange") {
-      checkMachineTending(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "tending-route") {
-      checkMachineTending(root, true);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "identity") {
-      var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.enclosed.project.json");
-      checkSingleCabinetMotion(MateriaProjectRunner.loadProject(manifest), manifest);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "pneumatic") {
-      checkEnclosedMillProject(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-plate") {
-      checkFarPlateWeld(root);
-      return 0;
-    }
-    // Resume the phase gate after the whole-weldment and seam checks.
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "after-welder-seam") {
-      checkWeldInTheAir(root);
-      checkWeldCraterFault(root);
-      checkWeldFollowsWorkpiece(root);
-      checkWeldPost(root);
-      checkWeldQualities(root);
-      checkMates(root);
-      checkBenchMill(root);
-      checkEnclosedMillProject(root);
-      checkVirtualRouterHoming(root);
-      checkCncRouter(root);
-      checkBeltRouter(root);
-      checkCoreXyPlotter(root);
-      checkPrinter(root);
-      checkPrinterCube(root, "cube-short", 4.0, true);
-      checkPrinterShaping(root);
-      checkPrinterMirror(root);
-      checkMobileBase(root);
-      checkMobileMission(root);
-      checkMobileObstacle(root);
-      checkMissionOverlayEdge();
-      checkCncControls(root);
-      checkBackgroundLaunch(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-air") {
-      checkWeldInTheAir(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-quality") {
-      checkWeldQualities(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "welder-seam") {
-      checkRobotWelderOn(root, ApplicationSimulation.MUJOCO, "MuJoCo");
-      checkRobotWelderOn(root, ApplicationSimulation.DETERMINISTIC, "test backend");
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router-device-home") {
-      checkVirtualRouterHoming(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "remaining") {
-      checkCncRouter(root);
-      checkBeltRouter(root);
-      checkCoreXyPlotter(root);
-      checkMobileBase(root);
-      checkMobileMission(root);
-      checkMobileObstacle(root);
-      checkMissionOverlayEdge();
-      checkCncControls(root);
-      checkBackgroundLaunch(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "router") {
-      checkCncRouter(root);
-      checkBeltRouter(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "belts") {
-      checkBeltRouter(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "controls") {
-      checkCncControls(root);
-      checkBackgroundLaunch(root);
-      return 0;
-    }
-    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "background") {
-      checkBackgroundLaunch(root);
-      return 0;
-    }
-
     var flat = Bytes.alloc(4 * 24);
     for (index in 0...4) {
       flat.setDouble(index * 24, (index & 1) == 0 ? 0.0 : 2.0);
@@ -6246,38 +5986,31 @@ class ProjectSourceTests {
     }
     session.dispose();
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
-    checkPressBrake(root);
-    checkPressController(root);
-    PressBrakeSimulationChecks.run(root, true);
-    checkRobotArm(root);
-    checkParallelGripperMission(root);
-    checkCobotArms(root);
-    checkGantryPicker(root);
-    checkGantryPicker(root, true);
-    checkGantryWelder(root);
-    checkTrackArm(root);
-    OverheadArmTests.run(root);
-    checkJointSceneClearance(root);
-    checkHeldJointSceneClearance(root);
-    checkRobotWelder(root);
-    checkMates(root);
-    checkBenchMill(root);
-    checkEnclosedMillProject(root);
-    checkVirtualRouterHoming(root);
-    checkTendingControllers(root);
-    checkCncRouter(root);
-    checkBeltRouter(root);
-    checkCoreXyPlotter(root);
-    checkPrinter(root);
-    checkPrinterCube(root, "cube-short", 4.0, true);
-    checkPrinterShaping(root);
-    checkPrinterMirror(root);
-    checkMobileBase(root);
-    checkMobileMission(root);
-    checkMobileObstacle(root);
-    checkMissionOverlayEdge();
-    checkCncControls(root);
-    checkBackgroundLaunch(root);
-    return 0;
   }
+
+  static function checkMillBrakeProject(root:String):Void {
+    var generated = MateriaProjectRunner.loadProject(FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.project.json"));
+    var definition = generated.assemblyDefinition;
+    if (definition == null) throw "Mill brake check has no assembly definition";
+    checkMillBrake(AssemblySimulationBridge.toRobotModel(definition, generated.physical).model);
+  }
+
+  static function checkEnclosedCabinetIdentity(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/bench-mill/materia.enclosed.project.json");
+    checkSingleCabinetMotion(MateriaProjectRunner.loadProject(manifest), manifest);
+  }
+}
+
+/** How much of the physical tending check runs: the whole production, or a focused part of it. */
+enum TendingCheck {
+  /** Startup, fault recovery and the four-part production with its acceptance numbers. */
+  Production;
+  /** The certified routes only, without physics. */
+  Route;
+  /** The playable cell builds and its handling orientations hold. */
+  Reach;
+  /** Seating a blank in the vise. */
+  Vise;
+  /** Production up to the first two-part exchange. */
+  Exchange;
 }
