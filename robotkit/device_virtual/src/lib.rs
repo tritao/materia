@@ -21,7 +21,7 @@ const MINIMAL_CAPACITY: usize = 8;
 
 pub struct VirtualDevice {
     board: VirtualBoard<ACTUATORS, CHANNELS>,
-    core: Option<ScheduledCore<ACTUATORS, CAPACITY>>,
+    core: Option<Box<ScheduledCore<ACTUATORS, CAPACITY>>>,
     events: Option<DeviceEvents<EVENT_CAPACITY>>,
     final_safe_applied: bool,
     steps: StepGenerator<ACTUATORS>,
@@ -349,12 +349,13 @@ impl VirtualDevice {
                     let link_loss_ticks = ((begin.link_loss_timeout_ns as u128
                         * self.board.tick_hz() as u128)
                         / 1_000_000_000) as u64;
-                    let mut core = ScheduledCore::new(
+                    let mut core = ScheduledCore::with_steps_per_unit(
                         self.board.tick_hz(),
                         limits,
                         [-1.0e12; ACTUATORS],
                         [1.0e12; ACTUATORS],
                         link_loss_ticks.max(1),
+                        steps_per_unit,
                     );
                     core.initialize_clock(self.board.now_ticks());
                     if let Some(welder) = self.welder.as_mut() { welder.reset(); }
@@ -369,7 +370,7 @@ impl VirtualDevice {
                     self.control_sequence = 0;
                     self.output_sequence = 0;
                     self.homing_stop = false;
-                    self.core = Some(core);
+                    self.core = Some(Box::new(core));
                     self.events = Some(DeviceEvents::new(&begin));
                     self.final_safe_applied = false;
                     self.active_count = begin.actuator_count as usize;
@@ -519,6 +520,7 @@ impl VirtualDevice {
                     return false;
                 }
                 let mut coefficients = [[0.0f32; 6]; ACTUATORS];
+                let mut base_steps = [0i64; ACTUATORS];
                 for (i, slot) in coefficients.iter_mut().enumerate().take(self.active_count) {
                     let start = Segment6Header::SIZE + i * Segment6Coefficients::SIZE;
                     let Ok(row) = Segment6Coefficients::decode(
@@ -530,6 +532,7 @@ impl VirtualDevice {
                         return false;
                     }
                     *slot = [row.c0, row.c1, row.c2, row.c3, row.c4, row.c5];
+                    base_steps[i] = row.base_steps;
                 }
                 let Ok(segment) = ScheduledSegment::new_with_purpose(
                     header.plan_id,
@@ -541,6 +544,7 @@ impl VirtualDevice {
                 ) else {
                     return false;
                 };
+                let segment = segment.with_base_steps(base_steps);
                 self.core.as_mut().unwrap()
                     .push_segment_for_revision(header.queue_revision, segment).is_ok()
             }
@@ -707,7 +711,7 @@ impl VirtualDevice {
         header.encode(&mut body[..State6Header::SIZE]).unwrap();
         for i in 0..self.active_count {
             let row = ActuatorState6 {
-                position: if self.profile == 2 { targets[i] } else { self.steps.counter_position(&self.board, i).unwrap() as f32 },
+                position: if self.profile == 2 { targets[i] } else { self.steps.counter_position(&self.board, i).unwrap() },
                 velocity: velocity[i],
                 effort: 0.0,
                 step_count: counts[i],
@@ -1123,6 +1127,7 @@ mod tests {
         };
         let row = Segment6Coefficients {
             actuator: 0,
+            base_steps: 0,
             c0: 0.0,
             c1: 0.5,
             c2: 0.0,
@@ -1369,7 +1374,7 @@ mod tests {
         assert!(send::<QueueBegin6>(&mut d, 5, &q));
         let header = Segment6Header { queue_revision: 1, plan_id: 1, t0_ticks: 0,
             duration_ticks, degree: 0, actuator_count: 1, ends_at_rest: 1, purpose: 0 };
-        let row = Segment6Coefficients { actuator: 0, c0: 0.0, c1: 0.0, c2: 0.0,
+        let row = Segment6Coefficients { actuator: 0, base_steps: 0, c0: 0.0, c1: 0.0, c2: 0.0,
             c3: 0.0, c4: 0.0, c5: 0.0 };
         let mut segment = vec![0; Segment6Header::SIZE + Segment6Coefficients::SIZE];
         header.encode(&mut segment[..Segment6Header::SIZE]).unwrap();
@@ -1502,7 +1507,7 @@ mod tests {
             let mut segment = vec![0; Segment6Header::SIZE + 2 * Segment6Coefficients::SIZE];
             header.encode(&mut segment[..Segment6Header::SIZE]).unwrap();
             for actuator in 0..2 {
-                let row = Segment6Coefficients { actuator, c0: position, c1: speed,
+                let row = Segment6Coefficients { actuator, base_steps: 0, c0: position as f32, c1: speed,
                     c2: 0.0, c3: 0.0, c4: 0.0, c5: 0.0 };
                 let start = Segment6Header::SIZE + actuator as usize * Segment6Coefficients::SIZE;
                 row.encode(&mut segment[start..start + Segment6Coefficients::SIZE]).unwrap();
@@ -1586,7 +1591,7 @@ mod tests {
         assert!(send::<QueueBegin6>(&mut d, 5, &q));
         let header = Segment6Header { queue_revision: 1, plan_id: 1, t0_ticks: 0,
             duration_ticks, degree: 0, actuator_count: 1, ends_at_rest: 1, purpose: 0 };
-        let row = Segment6Coefficients { actuator: 0, c0: 0.0, c1: 0.0, c2: 0.0, c3: 0.0, c4: 0.0, c5: 0.0 };
+        let row = Segment6Coefficients { actuator: 0, base_steps: 0, c0: 0.0, c1: 0.0, c2: 0.0, c3: 0.0, c4: 0.0, c5: 0.0 };
         let mut segment = vec![0; Segment6Header::SIZE + Segment6Coefficients::SIZE];
         header.encode(&mut segment[..Segment6Header::SIZE]).unwrap();
         row.encode(&mut segment[Segment6Header::SIZE..]).unwrap();

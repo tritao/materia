@@ -3,7 +3,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error { ShortBuffer, WrongLength }
 
-pub const PROTOCOL_VERSION: u8 = 15;
+pub const PROTOCOL_VERSION: u8 = 16;
 pub const MAX_ACTUATORS: u8 = 64;
 
 #[repr(u8)]
@@ -596,13 +596,13 @@ impl TimeSyncReply {
 pub struct QueueBegin6 {
     pub queue_revision: u64,
     pub replace_after_ticks: u64,
-    pub expected_position: [f32; 64],
+    pub expected_position: [f64; 64],
     pub expected_velocity: [f32; 64],
     pub actuator_count: u8,
 }
 
 impl QueueBegin6 {
-    pub const SIZE: usize = 529;
+    pub const SIZE: usize = 785;
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
@@ -612,8 +612,8 @@ impl QueueBegin6 {
         out[offset..offset + 8].copy_from_slice(&self.replace_after_ticks.to_le_bytes());
         offset += 8;
         for value in self.expected_position {
-            out[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
-            offset += 4;
+            out[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
+            offset += 8;
         }
         for value in self.expected_velocity {
             out[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
@@ -635,12 +635,12 @@ impl QueueBegin6 {
         bytes.copy_from_slice(&input[offset..offset + 8]);
         let replace_after_ticks = u64::from_le_bytes(bytes);
         offset += 8;
-        let mut expected_position = [0 as f32; 64];
+        let mut expected_position = [0 as f64; 64];
         for item in &mut expected_position {
-            let mut bytes = [0u8; 4];
-            bytes.copy_from_slice(&input[offset..offset + 4]);
-            *item = f32::from_le_bytes(bytes);
-            offset += 4;
+            let mut bytes = [0u8; 8];
+            bytes.copy_from_slice(&input[offset..offset + 8]);
+            *item = f64::from_le_bytes(bytes);
+            offset += 8;
         }
         let mut expected_velocity = [0 as f32; 64];
         for item in &mut expected_velocity {
@@ -738,6 +738,7 @@ impl Segment6Header {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Segment6Coefficients {
     pub actuator: u8,
+    pub base_steps: i64,
     pub c0: f32,
     pub c1: f32,
     pub c2: f32,
@@ -747,13 +748,15 @@ pub struct Segment6Coefficients {
 }
 
 impl Segment6Coefficients {
-    pub const SIZE: usize = 25;
+    pub const SIZE: usize = 33;
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
         let mut offset = 0usize;
         out[offset..offset + 1].copy_from_slice(&self.actuator.to_le_bytes());
         offset += 1;
+        out[offset..offset + 8].copy_from_slice(&self.base_steps.to_le_bytes());
+        offset += 8;
         out[offset..offset + 4].copy_from_slice(&self.c0.to_le_bytes());
         offset += 4;
         out[offset..offset + 4].copy_from_slice(&self.c1.to_le_bytes());
@@ -776,6 +779,10 @@ impl Segment6Coefficients {
         bytes.copy_from_slice(&input[offset..offset + 1]);
         let actuator = u8::from_le_bytes(bytes);
         offset += 1;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let base_steps = i64::from_le_bytes(bytes);
+        offset += 8;
         let mut bytes = [0u8; 4];
         bytes.copy_from_slice(&input[offset..offset + 4]);
         let c0 = f32::from_le_bytes(bytes);
@@ -801,7 +808,7 @@ impl Segment6Coefficients {
         let c5 = f32::from_le_bytes(bytes);
         offset += 4;
         let _ = offset;
-        Ok(Self { actuator, c0, c1, c2, c3, c4, c5 })
+        Ok(Self { actuator, base_steps, c0, c1, c2, c3, c4, c5 })
     }
 }
 
@@ -1031,20 +1038,20 @@ impl State6Header {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ActuatorState6 {
-    pub position: f32,
+    pub position: f64,
     pub velocity: f32,
     pub effort: f32,
     pub step_count: i64,
 }
 
 impl ActuatorState6 {
-    pub const SIZE: usize = 20;
+    pub const SIZE: usize = 24;
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
         let mut offset = 0usize;
-        out[offset..offset + 4].copy_from_slice(&self.position.to_le_bytes());
-        offset += 4;
+        out[offset..offset + 8].copy_from_slice(&self.position.to_le_bytes());
+        offset += 8;
         out[offset..offset + 4].copy_from_slice(&self.velocity.to_le_bytes());
         offset += 4;
         out[offset..offset + 4].copy_from_slice(&self.effort.to_le_bytes());
@@ -1057,10 +1064,10 @@ impl ActuatorState6 {
     pub fn decode(input: &[u8]) -> Result<Self, Error> {
         if input.len() != Self::SIZE { return Err(Error::WrongLength); }
         let mut offset = 0usize;
-        let mut bytes = [0u8; 4];
-        bytes.copy_from_slice(&input[offset..offset + 4]);
-        let position = f32::from_le_bytes(bytes);
-        offset += 4;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let position = f64::from_le_bytes(bytes);
+        offset += 8;
         let mut bytes = [0u8; 4];
         bytes.copy_from_slice(&input[offset..offset + 4]);
         let velocity = f32::from_le_bytes(bytes);

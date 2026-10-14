@@ -1,12 +1,12 @@
 use robotkit_device_protocol::{Board, ScheduledCore, ScheduledSegment, QueueError, StopReason};
 
 #[derive(Default)]
-struct TestBoard { tick: u64, position: f32, velocity: f32, stopped: bool }
+struct TestBoard { tick: u64, position: f64, velocity: f32, stopped: bool }
 impl Board for TestBoard {
     fn read_input(&self, _channel: usize) -> bool { false }
     fn now_ticks(&self) -> u64 { self.tick }
     fn tick_hz(&self) -> u64 { 1_000 }
-    fn position_target(&mut self, _: usize, value: f32) { self.position = value; }
+    fn position_target(&mut self, _: usize, value: f64) { self.position = value; }
     fn velocity_target(&mut self, _: usize, value: f32) { self.velocity = value; }
     fn step_pulse(&mut self, _: usize, _: bool) {}
     fn step_count(&self, _: usize) -> i64 { 0 }
@@ -172,7 +172,7 @@ fn controlled_stop_clamps_at_travel_limit() {
     core.tick(&mut board);
     core.stop(StopReason::Stop);
     for t in 401..=1_000 { board.tick = t; core.tick(&mut board); }
-    assert!(board.position <= 0.6);
+    assert!(board.position <= f64::from(0.6f32));
     assert_eq!(board.velocity, 0.0);
 }
 
@@ -319,4 +319,40 @@ fn segment_purpose_is_retained_and_invalid_purpose_is_rejected() {
         [[0.0; 6]], true, 3).is_err());
     let program = ScheduledSegment::<1>::new(10, 100, 100, 1, [[0.0; 6]], true).unwrap();
     assert_eq!(program.purpose, 0);
+}
+
+/// An extruder that has fed 60 m of filament sits millions of steps from zero, where an f32 position cannot name a
+/// step. A segment relative to an integer step base keeps every step, and a queue that begins there is checked
+/// against an expected position that is not rounded either.
+#[test]
+fn a_position_millions_of_steps_from_zero_keeps_every_step() {
+    let steps_per_unit = [1_000.0];
+    let base: i64 = 60_000_000_007;
+    let mut core = ScheduledCore::<1, 4>::with_steps_per_unit(1_000, [10.0], [-1.0e12], [1.0e12], 5_000, steps_per_unit);
+    let mut board = TestBoard::default();
+    let start = base as f64 / 1_000.0;
+    core.stop(StopReason::Stop);
+    core.tick(&mut board);
+    assert!(core.is_stopped());
+    board.tick = 0;
+    core.prepare_stopped_queue(0, [start]).unwrap();
+    core.queue_begin_with_state(1, 0, [start], [0.0]).unwrap();
+    // 0.001 units a tick: one step a tick, from the base.
+    let segment = ScheduledSegment::new(1, 0, 1_000, 1, [[0.0, 1.0, 0.0, 0.0, 0.0, 0.0]], true).unwrap()
+        .with_base_steps([base]);
+    core.push_segment(segment).unwrap();
+    core.commit(1_000).unwrap();
+    let mut last = start;
+    for tick in 1..=1_000u64 {
+        board.tick = tick;
+        core.tick(&mut board);
+        let steps = board.position * 1_000.0 - base as f64;
+        assert!((steps - tick as f64).abs() < 1e-3, "tick {tick}: {steps} steps from the base");
+        assert!(board.position >= last);
+        last = board.position;
+    }
+    // Without the base an f32 position holds the start to a step of 8 or more (ulp of 6e7 steps), not a thousandth.
+    assert!((start as f32 as f64 - start).abs() > 0.0);
+    // A queue replacing the path states its position exactly: the f64 the wire carries, not an f32.
+    assert!(core.queue_begin_with_state(2, 1_000, [start + 1.0], [0.0]).is_ok());
 }

@@ -5,7 +5,7 @@ pub trait Board {
     fn read_input(&self, channel: usize) -> bool;
     fn now_ticks(&self) -> u64;
     fn tick_hz(&self) -> u64;
-    fn position_target(&mut self, actuator: usize, position: f32);
+    fn position_target(&mut self, actuator: usize, position: f64);
     fn velocity_target(&mut self, actuator: usize, velocity: f32);
     fn step_pulse(&mut self, actuator: usize, forward: bool);
     fn step_count(&self, actuator: usize) -> i64;

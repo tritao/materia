@@ -1,9 +1,9 @@
-# RobotKit scheduled device protocol (generation 6, wire revision 15)
+# RobotKit scheduled device protocol (generation 6, wire revision 16)
 
-The protocol name is **RKD generation 6, wire revision 15**. The four-byte sync
+The protocol name is **RKD generation 6, wire revision 16**. The four-byte sync
 marker `RKD6` identifies the scheduled-execution generation, not the wire revision.
 `PROTOCOL_VERSION` identifies the wire revision; peers must agree on its exact value
-(currently 15). A receiver never infers a revision from the marker or accepts an older
+(currently 16). A receiver never infers a revision from the marker or accepts an older
 revision. The `6` suffix in `device_wire6`, `device_frame6`, `Rkd6Endpoint`,
 `rkd6_endpoint`, `device_compiler6`, `robotkit_device_compiler6` and the serial C API
 likewise means generation 6. Keep these generation names when incrementing a wire
@@ -56,7 +56,17 @@ and the motor's speed (`robotkit.runtime.StepTicks`), and plans at the rate it
 reaches; the device only enforces it. As a rate, the tick ceiling could round
 under itself in f32 and cost a whole tick, halving the motor's speed. Revision
 13 is rejected rather than migrated.
-Wire revision 15 adds `CONTROLLER_OUTPUT6` (message 18). Its fixed record
+Wire revision 16 carries an actuator's position as an integer and a small float. A `Segment6Coefficients`
+row gains `base_steps` (`i64`, the position's whole steps), and `c0` to `c5` are relative to
+`base_steps / steps_per_unit`; the device adds the base in 64 bits. An extruder is a continuous joint whose angle
+grows the whole print, and one f32 cannot name a step of it past a few thousand radians (4,096 rad is 5 m of
+filament): half the float's step there is more than a tenth of a motor step, so a long print was refused
+or stepped with jitter. The absolute positions the wire carries elsewhere are 64-bit floats too: `QueueBegin6`'s
+`expected_position` and `ActuatorState6.position`. The device's scheduled core holds positions as `f64`
+(`Board::position_target` takes one), and the step generator multiplies them by steps per unit in 64 bits.
+Velocities, accelerations and the polynomial's coefficients stay `f32`. Revisions 14 and 15 are rejected rather than migrated.
+
+The same revision adds `CONTROLLER_OUTPUT6` (message 18). Its fixed record
 carries the session, a strictly increasing per-session output sequence, a
 declared channel, kind and canonical digital or float analog value. These
 controller-owned outputs execute when the board receives them, independently
@@ -69,10 +79,11 @@ stops accept safe values only. A controlled arm stop may preserve vacuum and
 accept independent process controls, which still require the owner link lease.
 The runtime records a controller output only after the endpoint accepts its
 transmission. Measured device feedback remains the authority for execution,
-not that host record. Revision 14 is rejected rather than migrated. The
+not that host record. Revisions 14 and 15 are rejected rather than migrated. The
 current schema lock and shared fixtures are regenerated; reproduce the fixtures
 with `cargo run --manifest-path robotkit/device_protocol/Cargo.toml --example
 frame_vectors`. Native and Rust framing validate the same record.
+
 
 Protocol version 8 also carries steps per actuator unit, actuator rate limits,
 direction setup ticks, source joint indices, transmission ratios and dual-drive

@@ -8,7 +8,7 @@
 
 namespace robotkit::device_wire6 {
 
-inline constexpr std::uint8_t PROTOCOL_VERSION = 15;
+inline constexpr std::uint8_t PROTOCOL_VERSION = 16;
 inline constexpr std::uint8_t MAX_ACTUATORS = 64;
 
 enum class MessageType6 : std::uint8_t {
@@ -765,12 +765,12 @@ inline bool decode(std::span<const std::uint8_t> input, TimeSyncReply &value) {
     return true;
 }
 
-inline constexpr std::size_t QueueBegin6_SIZE = 529;
+inline constexpr std::size_t QueueBegin6_SIZE = 785;
 struct QueueBegin6 {
     static constexpr std::size_t SIZE = QueueBegin6_SIZE;
     std::uint64_t queue_revision{};
     std::uint64_t replace_after_ticks{};
-    std::array<float, 64> expected_position{};
+    std::array<double, 64> expected_position{};
     std::array<float, 64> expected_velocity{};
     std::uint8_t actuator_count{};
 };
@@ -797,11 +797,15 @@ inline bool encode(const QueueBegin6 &value, std::span<std::uint8_t> out) {
     out[offset++] = static_cast<std::uint8_t>(bits_replace_after_ticks >> 48);
     out[offset++] = static_cast<std::uint8_t>(bits_replace_after_ticks >> 56);
     for (std::size_t i = 0; i < 64; ++i) {
-        const std::uint32_t bits_expected_position = std::bit_cast<std::uint32_t>(value.expected_position[i]);
+        const std::uint64_t bits_expected_position = std::bit_cast<std::uint64_t>(value.expected_position[i]);
         out[offset++] = static_cast<std::uint8_t>(bits_expected_position >> 0);
         out[offset++] = static_cast<std::uint8_t>(bits_expected_position >> 8);
         out[offset++] = static_cast<std::uint8_t>(bits_expected_position >> 16);
         out[offset++] = static_cast<std::uint8_t>(bits_expected_position >> 24);
+        out[offset++] = static_cast<std::uint8_t>(bits_expected_position >> 32);
+        out[offset++] = static_cast<std::uint8_t>(bits_expected_position >> 40);
+        out[offset++] = static_cast<std::uint8_t>(bits_expected_position >> 48);
+        out[offset++] = static_cast<std::uint8_t>(bits_expected_position >> 56);
     }
     for (std::size_t i = 0; i < 64; ++i) {
         const std::uint32_t bits_expected_velocity = std::bit_cast<std::uint32_t>(value.expected_velocity[i]);
@@ -839,12 +843,16 @@ inline bool decode(std::span<const std::uint8_t> input, QueueBegin6 &value) {
     bits_replace_after_ticks |= static_cast<std::uint64_t>(input[offset++]) << 56;
     value.replace_after_ticks = bits_replace_after_ticks;
     for (std::size_t i = 0; i < 64; ++i) {
-        std::uint32_t bits_expected_position = 0;
-        bits_expected_position |= static_cast<std::uint32_t>(input[offset++]) << 0;
-        bits_expected_position |= static_cast<std::uint32_t>(input[offset++]) << 8;
-        bits_expected_position |= static_cast<std::uint32_t>(input[offset++]) << 16;
-        bits_expected_position |= static_cast<std::uint32_t>(input[offset++]) << 24;
-        value.expected_position[i] = std::bit_cast<float>(bits_expected_position);
+        std::uint64_t bits_expected_position = 0;
+        bits_expected_position |= static_cast<std::uint64_t>(input[offset++]) << 0;
+        bits_expected_position |= static_cast<std::uint64_t>(input[offset++]) << 8;
+        bits_expected_position |= static_cast<std::uint64_t>(input[offset++]) << 16;
+        bits_expected_position |= static_cast<std::uint64_t>(input[offset++]) << 24;
+        bits_expected_position |= static_cast<std::uint64_t>(input[offset++]) << 32;
+        bits_expected_position |= static_cast<std::uint64_t>(input[offset++]) << 40;
+        bits_expected_position |= static_cast<std::uint64_t>(input[offset++]) << 48;
+        bits_expected_position |= static_cast<std::uint64_t>(input[offset++]) << 56;
+        value.expected_position[i] = std::bit_cast<double>(bits_expected_position);
     }
     for (std::size_t i = 0; i < 64; ++i) {
         std::uint32_t bits_expected_velocity = 0;
@@ -981,10 +989,11 @@ inline bool decode(std::span<const std::uint8_t> input, Segment6Header &value) {
     return true;
 }
 
-inline constexpr std::size_t Segment6Coefficients_SIZE = 25;
+inline constexpr std::size_t Segment6Coefficients_SIZE = 33;
 struct Segment6Coefficients {
     static constexpr std::size_t SIZE = Segment6Coefficients_SIZE;
     std::uint8_t actuator{};
+    std::int64_t base_steps{};
     float c0{};
     float c1{};
     float c2{};
@@ -998,6 +1007,15 @@ inline bool encode(const Segment6Coefficients &value, std::span<std::uint8_t> ou
     std::size_t offset = 0;
     const std::uint8_t bits_actuator = static_cast<std::uint8_t>(value.actuator);
     out[offset++] = static_cast<std::uint8_t>(bits_actuator >> 0);
+    const std::uint64_t bits_base_steps = std::bit_cast<std::uint64_t>(value.base_steps);
+    out[offset++] = static_cast<std::uint8_t>(bits_base_steps >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_base_steps >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_base_steps >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_base_steps >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_base_steps >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_base_steps >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_base_steps >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_base_steps >> 56);
     const std::uint32_t bits_c0 = std::bit_cast<std::uint32_t>(value.c0);
     out[offset++] = static_cast<std::uint8_t>(bits_c0 >> 0);
     out[offset++] = static_cast<std::uint8_t>(bits_c0 >> 8);
@@ -1037,6 +1055,16 @@ inline bool decode(std::span<const std::uint8_t> input, Segment6Coefficients &va
     std::uint8_t bits_actuator = 0;
     bits_actuator |= static_cast<std::uint8_t>(input[offset++]) << 0;
     value.actuator = bits_actuator;
+    std::uint64_t bits_base_steps = 0;
+    bits_base_steps |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_base_steps |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_base_steps |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_base_steps |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_base_steps |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_base_steps |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_base_steps |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_base_steps |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.base_steps = std::bit_cast<std::int64_t>(bits_base_steps);
     std::uint32_t bits_c0 = 0;
     bits_c0 |= static_cast<std::uint32_t>(input[offset++]) << 0;
     bits_c0 |= static_cast<std::uint32_t>(input[offset++]) << 8;
@@ -1445,10 +1473,10 @@ inline bool decode(std::span<const std::uint8_t> input, State6Header &value) {
     return true;
 }
 
-inline constexpr std::size_t ActuatorState6_SIZE = 20;
+inline constexpr std::size_t ActuatorState6_SIZE = 24;
 struct ActuatorState6 {
     static constexpr std::size_t SIZE = ActuatorState6_SIZE;
-    float position{};
+    double position{};
     float velocity{};
     float effort{};
     std::int64_t step_count{};
@@ -1457,11 +1485,15 @@ struct ActuatorState6 {
 inline bool encode(const ActuatorState6 &value, std::span<std::uint8_t> out) {
     if (out.size() < ActuatorState6_SIZE) return false;
     std::size_t offset = 0;
-    const std::uint32_t bits_position = std::bit_cast<std::uint32_t>(value.position);
+    const std::uint64_t bits_position = std::bit_cast<std::uint64_t>(value.position);
     out[offset++] = static_cast<std::uint8_t>(bits_position >> 0);
     out[offset++] = static_cast<std::uint8_t>(bits_position >> 8);
     out[offset++] = static_cast<std::uint8_t>(bits_position >> 16);
     out[offset++] = static_cast<std::uint8_t>(bits_position >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_position >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_position >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_position >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_position >> 56);
     const std::uint32_t bits_velocity = std::bit_cast<std::uint32_t>(value.velocity);
     out[offset++] = static_cast<std::uint8_t>(bits_velocity >> 0);
     out[offset++] = static_cast<std::uint8_t>(bits_velocity >> 8);
@@ -1487,12 +1519,16 @@ inline bool encode(const ActuatorState6 &value, std::span<std::uint8_t> out) {
 inline bool decode(std::span<const std::uint8_t> input, ActuatorState6 &value) {
     if (input.size() != ActuatorState6_SIZE) return false;
     std::size_t offset = 0;
-    std::uint32_t bits_position = 0;
-    bits_position |= static_cast<std::uint32_t>(input[offset++]) << 0;
-    bits_position |= static_cast<std::uint32_t>(input[offset++]) << 8;
-    bits_position |= static_cast<std::uint32_t>(input[offset++]) << 16;
-    bits_position |= static_cast<std::uint32_t>(input[offset++]) << 24;
-    value.position = std::bit_cast<float>(bits_position);
+    std::uint64_t bits_position = 0;
+    bits_position |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_position |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_position |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_position |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_position |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_position |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_position |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_position |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.position = std::bit_cast<double>(bits_position);
     std::uint32_t bits_velocity = 0;
     bits_velocity |= static_cast<std::uint32_t>(input[offset++]) << 0;
     bits_velocity |= static_cast<std::uint32_t>(input[offset++]) << 8;

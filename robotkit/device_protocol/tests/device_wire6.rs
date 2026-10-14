@@ -77,6 +77,13 @@ fn session_begin_carries_per_actuator_acceleration_limits() {
     assert_eq!(decode_frame6(&frame[..size]), Ok((1, &body[..])));
     assert_eq!(encode_frame6(1, &body[..body.len() - 1], &mut frame),
                Err(Frame6Error::BadLength));
+    // Both independent revision-15 branches are obsolete after the combined schema is published.
+    for revision in [14, 15] {
+        let mut obsolete = begin;
+        obsolete.protocol_version = revision;
+        obsolete.encode(&mut body).unwrap();
+        assert_eq!(encode_frame6(1, &body, &mut frame), Err(Frame6Error::BadPayload));
+    }
 }
 
 #[test]
@@ -107,7 +114,7 @@ fn shared_frame_vectors() {
             .collect();
         let (kind, payload) = decode_frame6(&bytes).unwrap();
         let expected = match name { "time_sync_request" => 3, "hold" => 8, "stop" => 11,
-            "session_begin6_v15" => 1, "digital_event" => 16, "sensor6" => 17, "controller_output" => 18,
+            "session_begin6_v16" => 1, "digital_event" => 16, "sensor6" => 17, "controller_output" => 18,
             _ => panic!("unknown vector") };
         assert_eq!(kind, expected);
         let mut encoded = [0; MAX_FRAME_SIZE];

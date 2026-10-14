@@ -10,14 +10,6 @@
 namespace robotkit {
 namespace {
 
-float evaluate_f32(const device_wire6::Segment6Coefficients &c,
-                   std::uint8_t degree, float tau) {
-    const float coefficients[] = {c.c0, c.c1, c.c2, c.c3, c.c4, c.c5};
-    float q = coefficients[degree];
-    for (int k = degree - 1; k >= 0; --k) q = q * tau + coefficients[k];
-    return q;
-}
-
 double evaluate_f64(const robotkit::SegmentCoefficients &c, std::uint8_t degree, double tau) {
     double q = c.value[degree];
     for (int k = degree - 1; k >= 0; --k) q = q * tau + c.value[k];
@@ -70,8 +62,6 @@ robotkit::TrajectorySegment through_run(std::span<const robotkit::TrajectorySegm
 
 /** The accuracy a merged run of segments must keep on every motor: a tenth of a step of position, a percent of the step rate in speed. */
 constexpr double MERGE_POSITION_STEPS = 0.1;
-/** What a position may be off by in the float the wire carries it in, in steps, where that is more than the declared error. */
-constexpr double CONVERSION_STEPS = 0.1;
 constexpr double MERGE_SPEED_FRACTION = 0.01;
 /**
   Only segments shorter than this are merged, and a merged segment is no longer than the next: a link refills a
@@ -262,6 +252,7 @@ CompiledDevicePlan6 compile_once(
     };
     std::uint64_t expected_ns = 0;
     std::int64_t converted_time_ns = 0;
+    double seam_allowance = target_error;
     for (std::size_t i = 0; i < segments.size(); ++i) {
         auto source = segments[i];
         if (source.joint_count != blueprint.joint_count || source.degree > max_degree ||
@@ -351,8 +342,9 @@ CompiledDevicePlan6 compile_once(
         for (std::uint32_t joint = 0; joint < source.joint_count; ++joint) {
             double factor = 1.0;
             for (std::uint32_t k = 0; k <= source.degree; ++k) {
-                converted.coefficients[joint].value[k] =
-                    static_cast<float>(source.coefficients[joint].value[k] * factor);
+                // The position goes unrounded: the wire carries it as an integer step base and a small float.
+                converted.coefficients[joint].value[k] = k == 0 ? source.coefficients[joint].value[k] * factor :
+                    static_cast<double>(static_cast<float>(source.coefficients[joint].value[k] * factor));
                 factor *= scale;
             }
         }
@@ -367,8 +359,16 @@ CompiledDevicePlan6 compile_once(
             float *fields[] = {&c.c0, &c.c1, &c.c2, &c.c3, &c.c4, &c.c5};
             double factor = 1.0;
             for (std::uint32_t k = 0; k <= source.degree; ++k) {
-                const auto value = ratio * (source.coefficients[joint].value[k] -
+                auto value = ratio * (source.coefficients[joint].value[k] -
                     (k == 0 ? offset : 0.0)) * factor;
+                if (k == 0 && !layout.empty()) {
+                    // The position's whole steps go as an integer, so that the float that carries the rest is small
+                    // however far the actuator has turned (an extruder past a few thousand radians).
+                    const auto steps = std::round(value * layout[actuator].steps_per_unit);
+                    if (!std::isfinite(steps) || std::abs(steps) > 9.0e15) return reject("step base overflow");
+                    c.base_steps = static_cast<std::int64_t>(steps);
+                    value -= steps / layout[actuator].steps_per_unit;
+                }
                 if (!std::isfinite(value) || std::abs(value) > std::numeric_limits<float>::max())
                     return reject("f32 coefficient overflow");
                 *fields[k] = static_cast<float>(value);
@@ -395,17 +395,18 @@ CompiledDevicePlan6 compile_once(
                 const auto joint = layout.empty() ? actuator : layout[actuator].joint;
                 const auto ratio = layout.empty() ? 1.0 : layout[actuator].ratio;
                 const auto offset = layout.empty() ? 0.0 : layout[actuator].offset;
-                const auto actual = static_cast<double>(evaluate_f32(wire.coefficients[actuator],
-                    wire.header.degree, static_cast<float>(device_elapsed_seconds)));
+                const auto device_tau = static_cast<float>(device_elapsed_seconds);
+                const auto actual = wire_position(wire.coefficients[actuator], wire.header.degree, device_tau,
+                    layout.empty() ? 1.0 : layout[actuator].steps_per_unit);
                 const auto exact = evaluate_f64(reference.coefficients[joint], reference.degree, reference_tau);
                 const auto error = std::abs(actual / ratio + offset - exact);
                 result.worst_position_error = std::max(result.worst_position_error, error);
-                // The conversion may be off by the declared error, or by a tenth of a step where that is more (a position
-                // far from zero, an extruder that has turned a thousand times, is held in a float that cannot say better);
-                // a merged segment keeps to a tenth of a step of the originals on top of that.
+                // The conversion may be off by the declared error; a merged segment keeps to a tenth of a step of the
+                // originals on top of that. The wire's integer step base keeps the float that carries the rest small
+                // however far the actuator has turned, so no allowance for the float's range is needed.
                 const auto one_step = layout.empty() ? 0.0 : 1.0 / (std::abs(ratio) * layout[actuator].steps_per_unit);
-                const auto allowed = std::max(target_error, CONVERSION_STEPS * one_step) +
-                    (is_merged[i] ? MERGE_POSITION_STEPS * one_step : 0.0);
+                const auto allowed = target_error + (is_merged[i] ? MERGE_POSITION_STEPS * one_step : 0.0);
+                seam_allowance = std::max(seam_allowance, allowed);
                 if (error > allowed) return reject("converted trajectory exceeds target_error");
                 if (!layout.empty()) {
                     double velocity = 0.0;
@@ -428,12 +429,9 @@ CompiledDevicePlan6 compile_once(
     limits.struct_size = sizeof(limits);
     limits.joint_count = blueprint.joint_count;
     limits.executor_time_resolution_ns = resolution_ns;
-    // Both neighbouring float segments approximate the same authored seam within
-    // target_error, so their positions may differ by twice that declared error.
-    double seam = target_error;
-    for (const auto &actuator : layout)
-        seam = std::max(seam, CONVERSION_STEPS / (std::abs(actuator.ratio) * actuator.steps_per_unit));
-    limits.max_continuity_jump[0] = 2.0 * seam;
+    // Both neighbouring float segments approximate the same authored seam within what each was allowed,
+    // so their positions may differ by twice that.
+    limits.max_continuity_jump[0] = 2.0 * seam_allowance;
     for (std::uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
         const auto &source = blueprint.joints[joint];
         limits.position_claimed[joint] = 1;
@@ -481,6 +479,14 @@ CompiledDevicePlan6 compile_device_segments6(
     if (merged.ok) return merged;
     return compile_once(segments, plan_id, ends_at_rest, host_plan_start_ns, clock, blueprint, device_tick_hz,
         step_tick_hz, max_degree, target_error, layout, anchor_ticks, homing, start_tolerance, false);
+}
+
+double wire_position(const device_wire6::Segment6Coefficients &c, std::uint8_t degree, float tau,
+                     double steps_per_unit) {
+    const float coefficients[] = {c.c0, c.c1, c.c2, c.c3, c.c4, c.c5};
+    float q = coefficients[degree];
+    for (int k = degree - 1; k >= 0; --k) q = q * tau + coefficients[k];
+    return static_cast<double>(c.base_steps) / steps_per_unit + static_cast<double>(q);
 }
 
 } // namespace robotkit

@@ -52,6 +52,13 @@ struct CompiledDevicePlan6 {
 };
 
 /**
+  An actuator's position `tau` seconds into a segment, as the device computes it: the polynomial in 32-bit float,
+  added in 64 bits to the integer step base over `steps_per_unit` (a base of zero leaves the polynomial absolute).
+**/
+double wire_position(const device_wire6::Segment6Coefficients &c, std::uint8_t degree, float tau,
+                     double steps_per_unit);
+
+/**
   Compiles host segments starting at `host_plan_start_ns` into device segments.
   Clock mapping schedules the start; durations round conservatively without
   compressing physical motion. A nonzero `anchor_ticks` starts the plan on

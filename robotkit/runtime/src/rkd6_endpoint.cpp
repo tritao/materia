@@ -617,8 +617,8 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         begin.actuator_count = ack_.actuator_count;
         for (std::size_t i = 0; i < ack_.actuator_count; ++i) {
             const auto mapping = layout_.empty() ? DeviceActuator6{static_cast<std::uint8_t>(i)} : layout_[i];
-            begin.expected_position[i] = static_cast<float>(mapping.ratio *
-                (plan.start_position[mapping.joint] - mapping.offset));
+            begin.expected_position[i] = mapping.ratio *
+                (plan.start_position[mapping.joint] - mapping.offset);
             begin.expected_velocity[i] = static_cast<float>(mapping.ratio * plan.start_velocity[mapping.joint]);
         }
         // A continuation starts at the previous wire polynomial's endpoint.
@@ -632,9 +632,8 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
                 for (std::size_t i = 0; i < ack_.actuator_count; ++i) {
                     const auto &row = segment.coefficients[i];
                     const float c[]{row.c0, row.c1, row.c2, row.c3, row.c4, row.c5};
-                    float position = c[degree];
-                    for (std::size_t k = degree; k-- > 0;)
-                        position = position * tau + c[k];
+                    const auto position = wire_position(row, segment.header.degree, tau,
+                        layout_.empty() ? 1.0 : layout_[i].steps_per_unit);
                     float velocity = 0.0f;
                     if (degree != 0) {
                         velocity = static_cast<float>(degree) * c[degree];

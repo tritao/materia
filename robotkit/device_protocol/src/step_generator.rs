@@ -148,7 +148,7 @@ impl<const A: usize> StepGenerator<A> {
     /// Individual motor measurements remain separate; paired queue coordinates
     /// share their leader, as they do in host feedback reconstruction.
     pub fn stopped_targets<B: Board>(&self, board: &B, joints: &[u8; A],
-        ratios: &[f32; A], count: usize) -> Option<[f32; A]> {
+        ratios: &[f32; A], count: usize) -> Option<[f64; A]> {
         if count > A { return None; }
         let mut positions = [0.0; A];
         for a in 0..count {
@@ -163,17 +163,17 @@ impl<const A: usize> StepGenerator<A> {
                 numerator += r * self.counter_position(board, b)?;
                 denominator += r * r;
             }
-            positions[a] = (ratio * numerator / denominator) as f32;
+            positions[a] = ratio * numerator / denominator;
         }
         Some(positions)
     }
 
     /// Adopt a new stationary queue frame without issuing a physical step.
     /// The owner must validate rest and the queue's expected state first.
-    pub fn anchor_stopped_targets<B: Board>(&mut self, board: &B, targets: [f32; A]) -> bool {
+    pub fn anchor_stopped_targets<B: Board>(&mut self, board: &B, targets: [f64; A]) -> bool {
         if targets.iter().any(|v| !v.is_finite()) { return false; }
         for a in 0..A {
-            self.nominal_steps[a] = targets[a] as f64 * self.steps_per_unit[a];
+            self.nominal_steps[a] = targets[a] * self.steps_per_unit[a];
             self.alignment_steps[a] = board.step_count(a) as f64 -
                 self.counter_origin_steps[a] - self.nominal_steps[a];
         }
@@ -187,19 +187,19 @@ impl<const A: usize> StepGenerator<A> {
         self.end_squaring();
     }
 
-    pub fn tick<B: Board>(&mut self, board: &mut B, targets: [f32; A]) -> Result<(), StepFault> {
+    pub fn tick<B: Board>(&mut self, board: &mut B, targets: [f64; A]) -> Result<(), StepFault> {
         self.tick_active_with_purpose(board, targets, A, 0)
     }
 
-    pub fn tick_with_purpose<B: Board>(&mut self, board: &mut B, targets: [f32; A], purpose: u8) -> Result<(), StepFault> {
+    pub fn tick_with_purpose<B: Board>(&mut self, board: &mut B, targets: [f64; A], purpose: u8) -> Result<(), StepFault> {
         self.tick_active_with_purpose(board, targets, A, purpose)
     }
 
-    pub fn tick_active<B: Board>(&mut self, board: &mut B, targets: [f32; A], count: usize) -> Result<(), StepFault> {
+    pub fn tick_active<B: Board>(&mut self, board: &mut B, targets: [f64; A], count: usize) -> Result<(), StepFault> {
         self.tick_active_with_purpose(board, targets, count, 0)
     }
 
-    pub fn tick_active_with_purpose<B: Board>(&mut self, board: &mut B, targets: [f32; A], count: usize, purpose: u8) -> Result<(), StepFault> {
+    pub fn tick_active_with_purpose<B: Board>(&mut self, board: &mut B, targets: [f64; A], count: usize, purpose: u8) -> Result<(), StepFault> {
         if count > A { return Err(StepFault::InvalidActuatorCount); }
         if self.homing_pair.is_some() && purpose != 2 {
             self.end_homing_pair();
@@ -209,17 +209,17 @@ impl<const A: usize> StepGenerator<A> {
         let now = board.now_ticks();
         self.step_tick += 1;
         for a in 0..count {
-            self.nominal_steps[a] = targets[a] as f64 * self.steps_per_unit[a];
+            self.nominal_steps[a] = targets[a] * self.steps_per_unit[a];
             if let Some(physical) = self.held[a] {
                 self.alignment_steps[a] = physical as f64 - self.nominal_steps[a] - self.counter_origin_steps[a];
                 continue;
             }
             let raw = self.nominal_steps[a] + self.counter_origin_steps[a] + self.alignment_steps[a];
-            // A captured integer counter converted to f32 can fall just below
+            // A captured integer counter converted to units and back can fall just below
             // its own step boundary. Preserve that boundary when the excess
             // is only representation error, without rounding ordinary targets.
             let nearest = (raw + if raw >= 0.0 { 0.5 } else { -0.5 }) as i64 as f64;
-            let boundary_error = (f32::EPSILON as f64 * raw.abs().max(1.0)).min(1e-4);
+            let boundary_error = (4.0 * f64::EPSILON * raw.abs().max(1.0)).min(1e-4);
             let raw = if (raw - nearest).abs() <= boundary_error { nearest } else { raw };
             let truncated = raw as i64;
             let desired = truncated.saturating_sub(i64::from(raw < truncated as f64));

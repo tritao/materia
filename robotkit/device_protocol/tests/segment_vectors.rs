@@ -9,7 +9,7 @@ fn f32_evaluator_matches_motionkit_core_vectors() {
         let tick: u64 = fields.next().unwrap().parse().unwrap();
         let position: f64 = fields.next().unwrap().parse().unwrap();
         let velocity: f64 = fields.next().unwrap().parse().unwrap();
-        let (q, v) = segment.evaluate(tick, 1_000);
+        let (q, v) = segment.evaluate(tick, 1_000, &[1.0]);
         assert!((q[0] as f64 - position).abs() < 2e-6);
         assert!((v[0] as f64 - velocity).abs() < 2e-6);
     }

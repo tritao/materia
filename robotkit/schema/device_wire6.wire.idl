@@ -1,6 +1,6 @@
 # RKD generation 6 scheduled payload records; independent wire revision below.
 # Outer frame uses the generation marker RKD6, length and CRC32.
-const PROTOCOL_VERSION : u8 = 15;
+const PROTOCOL_VERSION : u8 = 16;
 const MAX_ACTUATORS : u8 = 64;
 
 enum MessageType6 : u8 {
@@ -101,7 +101,7 @@ packed TimeSyncReply endian little {
 packed QueueBegin6 endian little {
     queue_revision : u64
     replace_after_ticks : u64
-    expected_position : f32[64]
+    expected_position : f64[64]
     expected_velocity : f32[64]
     actuator_count : u8
 }
@@ -120,6 +120,8 @@ packed Segment6Header endian little {
 
 packed Segment6Coefficients endian little {
     actuator : u8
+    # The position's whole steps: c0 to c5 are relative to base_steps / steps_per_unit.
+    base_steps : i64
     c0 : f32
     c1 : f32
     c2 : f32
@@ -163,7 +165,7 @@ packed State6Header endian little {
 }
 
 packed ActuatorState6 endian little {
-    position : f32
+    position : f64
     velocity : f32
     effort : f32
     step_count : i64

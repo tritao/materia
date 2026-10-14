@@ -40,7 +40,7 @@ const HSI_CYCLES_PER_MICROSECOND: u64 = 16;
 
 struct StubBoard {
     ticks: u64,
-    position: [f32; ACTUATORS],
+    position: [f64; ACTUATORS],
     velocity: [f32; ACTUATORS],
     input_pins: [AnyPin<Input>; INPUTS],
     inputs: InputCapture,
@@ -64,7 +64,7 @@ impl Board for StubBoard {
     }
     fn now_ticks(&self) -> u64 { self.ticks }
     fn tick_hz(&self) -> u64 { TICK_HZ }
-    fn position_target(&mut self, i: usize, value: f32) { self.position[i] = value; }
+    fn position_target(&mut self, i: usize, value: f64) { self.position[i] = value; }
     fn velocity_target(&mut self, i: usize, value: f32) { self.velocity[i] = value; }
     fn step_pulse(&mut self, _i: usize, _forward: bool) {}
     fn step_count(&self, _i: usize) -> i64 { 0 }
@@ -148,8 +148,10 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
                 let mut limits = [1.0; ACTUATORS];
                 limits[..begin.actuator_count as usize].copy_from_slice(&begin.actuator_max_acceleration[..begin.actuator_count as usize]);
                 let link_ticks = begin.link_loss_timeout_ns / 1_000;
-                let mut next = ScheduledCore::new(TICK_HZ, limits,
-                    [-1.0e12; ACTUATORS], [1.0e12; ACTUATORS], link_ticks.max(1));
+                let mut steps_per_unit = [1.0f64; ACTUATORS];
+                for i in 0..begin.actuator_count as usize { steps_per_unit[i] = begin.steps_per_unit[i] as f64; }
+                let mut next = ScheduledCore::with_steps_per_unit(TICK_HZ, limits,
+                    [-1.0e12; ACTUATORS], [1.0e12; ACTUATORS], link_ticks.max(1), steps_per_unit);
                 next.initialize_clock(board.ticks);
                 let mut inputs = InputCapture::new();
                 for i in 0..begin.input_count as usize {
@@ -193,14 +195,17 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
             let Ok(header) = Segment6Header::decode(&payload[..Segment6Header::SIZE]) else { return; };
             if header.degree > 1 || header.actuator_count as usize != *active_count { return; }
             let mut coefficients = [[0.0; 6]; ACTUATORS];
+            let mut base_steps = [0i64; ACTUATORS];
             for (i, slot) in coefficients.iter_mut().enumerate().take(*active_count) {
                 let offset = Segment6Header::SIZE + i * Segment6Coefficients::SIZE;
                 let Ok(row) = Segment6Coefficients::decode(&payload[offset..offset + Segment6Coefficients::SIZE]) else { return; };
                 if row.actuator as usize != i { return; }
                 *slot = [row.c0, row.c1, 0.0, 0.0, 0.0, 0.0];
+                base_steps[i] = row.base_steps;
             }
             let Ok(segment) = ScheduledSegment::new_with_purpose(header.plan_id, header.t0_ticks,
                 header.duration_ticks, header.degree, coefficients, header.ends_at_rest != 0, header.purpose) else { return; };
+            let segment = segment.with_base_steps(base_steps);
             if let Some(core) = core.as_mut() {
                 core.push_segment_for_revision(header.queue_revision, segment).ok();
             }

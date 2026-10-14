@@ -12,6 +12,9 @@ pub struct ScheduledSegment<const A: usize> {
     pub t0_ticks: u64,
     pub duration_ticks: u64,
     pub degree: u8,
+    /// Each actuator's whole steps: the coefficients are relative to this base, which the device adds in
+    /// integers (see `with_base_steps`). Zero means they are absolute.
+    pub base_steps: [i64; A],
     pub coefficients: [[f32; 6]; A],
     pub ends_at_rest: bool,
     pub purpose: u8,
@@ -25,7 +28,7 @@ impl<const A: usize> ScheduledSegment<A> {
             return Err(QueueError::InvalidSegment);
         }
         t0_ticks.checked_add(duration_ticks).ok_or(QueueError::InvalidSegment)?;
-        Ok(Self { plan_id, t0_ticks, duration_ticks, degree, coefficients, ends_at_rest, purpose: 0 })
+        Ok(Self { plan_id, t0_ticks, duration_ticks, degree, base_steps: [0; A], coefficients, ends_at_rest, purpose: 0 })
     }
     pub fn new_with_purpose(plan_id: u64, t0_ticks: u64, duration_ticks: u64, degree: u8,
         coefficients: [[f32; 6]; A], ends_at_rest: bool, purpose: u8) -> Result<Self, QueueError> {
@@ -34,17 +37,24 @@ impl<const A: usize> ScheduledSegment<A> {
         segment.purpose = purpose;
         Ok(segment)
     }
+    /// The segment's polynomials are relative to `base_steps`, whole steps of each actuator.
+    pub fn with_base_steps(mut self, base_steps: [i64; A]) -> Self {
+        self.base_steps = base_steps;
+        self
+    }
     pub fn end_ticks(&self) -> u64 { self.t0_ticks + self.duration_ticks }
-    pub fn evaluate(&self, path_ticks: u64, tick_hz: u64) -> ([f32; A], [f32; A]) {
+    /// Position (absolute, in actuator units: the integer base over `steps_per_unit` plus the polynomial's value,
+    /// in 64 bits so a position of millions of steps keeps its fraction) and velocity.
+    pub fn evaluate(&self, path_ticks: u64, tick_hz: u64, steps_per_unit: &[f64; A]) -> ([f64; A], [f32; A]) {
         let elapsed = path_ticks.saturating_sub(self.t0_ticks).min(self.duration_ticks);
         let tau = elapsed as f32 / tick_hz as f32;
-        let mut position = [0.0; A];
+        let mut position = [0.0f64; A];
         let mut velocity = [0.0; A];
         for a in 0..A {
             let c = &self.coefficients[a];
             let mut q = c[self.degree as usize];
             for k in (0..self.degree as usize).rev() { q = q * tau + c[k]; }
-            position[a] = q;
+            position[a] = self.base_steps[a] as f64 / steps_per_unit[a] + q as f64;
             if self.degree != 0 {
                 let mut v = self.degree as f32 * c[self.degree as usize];
                 for k in (1..self.degree as usize).rev() { v = v * tau + k as f32 * c[k]; }
@@ -73,14 +83,16 @@ impl<const A: usize> ScheduledSegment<A> {
 pub struct ScheduledCore<const A: usize, const CAP: usize> {
     tick_hz: u64,
     max_acceleration: [f32; A],
-    lower: [f32; A],
-    upper: [f32; A],
+    lower: [f64; A],
+    upper: [f64; A],
+    /// Steps per actuator unit: what turns a segment's integer base into a position.
+    steps_per_unit: [f64; A],
     link_loss_ticks: u64,
     segments: [Option<ScheduledSegment<A>>; CAP],
     len: usize,
     revision: u64,
     replace_after: u64,
-    expected_start_position: [f32; A],
+    expected_start_position: [f64; A],
     committed_until: u64,
     path_clock: u64,
     path_fraction: f32,
@@ -88,7 +100,7 @@ pub struct ScheduledCore<const A: usize, const CAP: usize> {
     target_rate: f32,
     last_device_tick: u64,
     last_frame_tick: u64,
-    position: [f32; A],
+    position: [f64; A],
     velocity: [f32; A],
     stopping: Option<StopReason>,
     stopped: bool,
@@ -99,10 +111,16 @@ pub struct ScheduledCore<const A: usize, const CAP: usize> {
 impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
     pub fn new(tick_hz: u64, max_acceleration: [f32; A], lower: [f32; A], upper: [f32; A],
                link_loss_ticks: u64) -> Self {
+        Self::with_steps_per_unit(tick_hz, max_acceleration, lower, upper, link_loss_ticks, [1.0; A])
+    }
+    /// A core whose segments carry integer step bases over `steps_per_unit` (the actuators' steps per unit).
+    pub fn with_steps_per_unit(tick_hz: u64, max_acceleration: [f32; A], lower: [f32; A], upper: [f32; A],
+               link_loss_ticks: u64, steps_per_unit: [f64; A]) -> Self {
         assert!(A > 0 && A <= 64 && CAP > 0 && tick_hz > 0 &&
+                steps_per_unit.iter().all(|v| v.is_finite() && *v > 0.0) &&
                 max_acceleration.iter().all(|a| a.is_finite() && *a > 0.0) &&
                 lower.iter().zip(upper.iter()).all(|(lo, hi)| lo.is_finite() && hi.is_finite() && lo < hi));
-        Self { tick_hz, max_acceleration, lower, upper, link_loss_ticks,
+        Self { tick_hz, max_acceleration, lower: lower.map(f64::from), upper: upper.map(f64::from), steps_per_unit, link_loss_ticks,
             segments: [None; CAP], len: 0, revision: 0, replace_after: 0,
             expected_start_position: [0.0; A], committed_until: 0,
             path_clock: 0, path_fraction: 0.0, rate: 1.0, target_rate: 1.0,
@@ -121,7 +139,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
     pub fn stop_reason(&self) -> Option<StopReason> { self.stopping }
     pub fn is_stopped(&self) -> bool { self.stopped }
     pub fn remaining_capacity(&self) -> usize { CAP - self.len }
-    pub fn positions(&self) -> [f32; A] { self.position }
+    pub fn positions(&self) -> [f64; A] { self.position }
     pub fn velocities(&self) -> [f32; A] { self.velocity }
     pub fn executing_purpose(&self) -> Option<u8> {
         if self.stopped { return None; }
@@ -174,7 +192,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         }
         self.expected_start_position = if keep == 0 { self.position } else {
             let previous = self.segments[keep - 1].unwrap();
-            previous.evaluate(previous.end_ticks(), self.tick_hz).0
+            previous.evaluate(previous.end_ticks(), self.tick_hz, &self.steps_per_unit).0
         };
         for slot in &mut self.segments[keep..] { *slot = None; }
         self.len = keep;
@@ -190,7 +208,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
     }
     /// After a normal Stop, a new queue starts at the held physical counters.
     /// Rebase time so the first tick excludes the interval spent stopped.
-    pub fn prepare_stopped_queue(&mut self, now_ticks: u64, positions: [f32; A])
+    pub fn prepare_stopped_queue(&mut self, now_ticks: u64, positions: [f64; A])
         -> Result<(), QueueError> {
         if !self.stopped || self.stopping != Some(StopReason::Stop) || self.len != 0 ||
             self.velocity.iter().any(|v| v.abs() > 1e-6) {
@@ -204,15 +222,16 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         Ok(())
     }
     pub fn queue_begin_with_state(&mut self, revision: u64, replace_after: u64,
-                                  expected_position: [f32; A], expected_velocity: [f32; A])
+                                  expected_position: [f64; A], expected_velocity: [f32; A])
                                   -> Result<(), QueueError> {
-        if !expected_position.iter().chain(expected_velocity.iter()).all(|v| v.is_finite()) {
+        if !expected_position.iter().all(|v| v.is_finite()) ||
+           !expected_velocity.iter().all(|v| v.is_finite()) {
             return Err(QueueError::BadExpectedState);
         }
         let mut anchor = (self.position, self.velocity);
         for segment in self.segments[..self.len].iter().flatten() {
             if segment.end_ticks() == replace_after {
-                anchor = segment.evaluate(replace_after, self.tick_hz);
+                anchor = segment.evaluate(replace_after, self.tick_hz, &self.steps_per_unit);
                 if segment.ends_at_rest { anchor.1.fill(0.0); }
                 break;
             }
@@ -230,15 +249,15 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
             if segment.t0_ticks != self.replace_after || segment.t0_ticks < self.path_clock {
                 return Err(QueueError::BadBoundary);
             }
-            let (start_position, _) = segment.evaluate(segment.t0_ticks, self.tick_hz);
+            let (start_position, _) = segment.evaluate(segment.t0_ticks, self.tick_hz, &self.steps_per_unit);
             if (0..A).any(|a| (start_position[a] - self.expected_start_position[a]).abs() > 1e-4) {
                 return Err(QueueError::BadBoundary);
             }
         } else {
             let previous = self.segments[self.len - 1].unwrap();
             if segment.t0_ticks != previous.end_ticks() { return Err(QueueError::BadBoundary); }
-            let (end_position, _) = previous.evaluate(previous.end_ticks(), self.tick_hz);
-            let (start_position, _) = segment.evaluate(segment.t0_ticks, self.tick_hz);
+            let (end_position, _) = previous.evaluate(previous.end_ticks(), self.tick_hz, &self.steps_per_unit);
+            let (start_position, _) = segment.evaluate(segment.t0_ticks, self.tick_hz, &self.steps_per_unit);
             if (0..A).any(|a| (end_position[a] - start_position[a]).abs() > 1e-4) {
                 return Err(QueueError::BadBoundary);
             }
@@ -329,7 +348,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
                 let old = self.velocity[a];
                 let decel = self.max_acceleration[a] * dt;
                 let new = if old > 0.0 { (old - decel).max(0.0) } else { (old + decel).min(0.0) };
-                let proposed = self.position[a] + (old + new) * 0.5 * dt;
+                let proposed = self.position[a] + f64::from((old + new) * 0.5 * dt);
                 self.position[a] = proposed.clamp(self.lower[a], self.upper[a]);
                 self.velocity[a] = if proposed != self.position[a] { 0.0 } else { new };
                 board.position_target(a, self.position[a]);
@@ -346,7 +365,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         let mut rate_step = 1.0f32;
         for segment in self.segments[..self.committed_len()].iter().flatten() {
             if self.path_clock <= segment.end_ticks() {
-                let (_, path_velocity) = segment.evaluate(self.path_clock, self.tick_hz);
+                let (_, path_velocity) = segment.evaluate(self.path_clock, self.tick_hz, &self.steps_per_unit);
                 let path_acceleration = segment.acceleration(self.path_clock, self.tick_hz);
                 for a in 0..A {
                     // On HOLD, spend the actuator's acceleration budget on
@@ -386,7 +405,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         let committed_len = self.committed_len();
         for segment in self.segments[..committed_len].iter().flatten() {
             if self.path_clock < segment.t0_ticks {
-                let (position, _) = segment.evaluate(segment.t0_ticks, self.tick_hz);
+                let (position, _) = segment.evaluate(segment.t0_ticks, self.tick_hz, &self.steps_per_unit);
                 self.position = position;
                 self.velocity.fill(0.0);
                 for a in 0..A { board.position_target(a, position[a]); board.velocity_target(a, 0.0); }
@@ -395,7 +414,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
             if self.path_clock <= segment.end_ticks() { current = Some(*segment); break; }
         }
         if let Some(segment) = current {
-            let (position, velocity) = segment.evaluate(self.path_clock, self.tick_hz);
+            let (position, velocity) = segment.evaluate(self.path_clock, self.tick_hz, &self.steps_per_unit);
             for a in 0..A {
                 self.position[a] = position[a].clamp(self.lower[a], self.upper[a]);
                 self.velocity[a] = velocity[a] * self.rate;
@@ -414,7 +433,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         } else if committed_len != 0 {
             let final_segment = self.segments[committed_len - 1].as_ref().unwrap();
             if final_segment.ends_at_rest {
-                let (position, _) = final_segment.evaluate(final_segment.end_ticks(), self.tick_hz);
+                let (position, _) = final_segment.evaluate(final_segment.end_ticks(), self.tick_hz, &self.steps_per_unit);
                 self.position = position;
                 self.velocity.fill(0.0);
                 for a in 0..A { board.position_target(a, position[a]); board.velocity_target(a, 0.0); }

@@ -18,7 +18,7 @@ fn main() {
     begin.steps_per_unit.fill(400.0); begin.min_step_ticks[..2].fill(1);
     begin.actuator_ratio.fill(1.0); begin.link_loss_timeout_ns = 500000000;
     let mut body = [0;SessionBegin6::SIZE]; begin.encode(&mut body).unwrap();
-    emit("session_begin6_v15",1,&body);
+    emit("session_begin6_v16",1,&body);
     let event = Event6 {queue_revision:1,plan_id:7,path_ticks:123,channel:0,kind:1,
         hold_policy:2,digital:1,analog:0.0,argument:0.0,command:[0;48]};
     let mut body = [0;Event6::SIZE]; event.encode(&mut body).unwrap(); emit("digital_event",16,&body);

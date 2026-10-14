@@ -3,7 +3,7 @@ use std::vec::Vec;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Output {
-    Position(usize, f32), Velocity(usize, f32), Direction(usize, bool), Step(usize, bool),
+    Position(usize, f64), Velocity(usize, f32), Direction(usize, bool), Step(usize, bool),
     Digital(usize, bool), Analog(usize, f32), Process(usize, [u8; 48], f32), Stop,
 }
 
@@ -33,7 +33,7 @@ pub struct VirtualBoard<const ACTUATORS: usize, const CHANNELS: usize> {
     steps_per_unit: [f64; ACTUATORS],
     steps: [i64; ACTUATORS],
     missed_steps: [u32; ACTUATORS],
-    targets: [f32; ACTUATORS],
+    targets: [f64; ACTUATORS],
     velocities: [f32; ACTUATORS],
     digital: [bool; CHANNELS],
     analog: [f32; CHANNELS],
@@ -91,7 +91,7 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
     pub fn actuator_positions(&self) -> [f64; A] {
         std::array::from_fn(|i| self.steps[i] as f64 / self.steps_per_unit[i])
     }
-    pub fn position_targets(&self) -> [f32; A] { self.targets }
+    pub fn position_targets(&self) -> [f64; A] { self.targets }
     pub fn velocity_targets(&self) -> [f32; A] { self.velocities }
     pub fn steps_per_unit(&self) -> [f64; A] { self.steps_per_unit }
     pub fn records(&self) -> &[OutputRecord] { &self.records }
@@ -130,7 +130,7 @@ impl<const A: usize, const C: usize> Board for VirtualBoard<A, C> {
     }
     fn now_ticks(&self) -> u64 { self.ticks }
     fn tick_hz(&self) -> u64 { self.tick_hz }
-    fn position_target(&mut self, i: usize, value: f32) {
+    fn position_target(&mut self, i: usize, value: f64) {
         if i >= self.actuator_count { return; }
         self.targets[i] = value; self.record(Output::Position(i, value));
     }

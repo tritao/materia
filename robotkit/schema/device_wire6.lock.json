@@ -6,7 +6,7 @@
     },
     "PROTOCOL_VERSION": {
       "type": "u8",
-      "value": 15
+      "value": 16
     }
   },
   "enums": {
@@ -46,7 +46,7 @@
         {
           "length": 1,
           "name": "position",
-          "type": "f32"
+          "type": "f64"
         },
         {
           "length": 1,
@@ -64,7 +64,7 @@
           "type": "i64"
         }
       ],
-      "size": 20
+      "size": 24
     },
     "Commit6": {
       "endian": "little",
@@ -350,7 +350,7 @@
         {
           "length": 64,
           "name": "expected_position",
-          "type": "f32"
+          "type": "f64"
         },
         {
           "length": 64,
@@ -363,7 +363,7 @@
           "type": "u8"
         }
       ],
-      "size": 529
+      "size": 785
     },
     "QueueStatus6": {
       "endian": "little",
@@ -441,6 +441,11 @@
         },
         {
           "length": 1,
+          "name": "base_steps",
+          "type": "i64"
+        },
+        {
+          "length": 1,
           "name": "c0",
           "type": "f32"
         },
@@ -470,7 +475,7 @@
           "type": "f32"
         }
       ],
-      "size": 25
+      "size": 33
     },
     "Segment6Header": {
       "endian": "little",

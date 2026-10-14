@@ -113,8 +113,11 @@ int main() {
         std::span(&segment, 1), 8, true, 1'000'000'000ULL,
         clock, blueprint, 1'000'000, 40'000, 5, 1e-6, layout);
     assert(transmitted.ok && transmitted.segments[0].coefficients.size() == 2);
-    assert(std::abs(transmitted.segments[0].coefficients[0].c0 - 0.01f) < 1e-7);
-    assert(std::abs(transmitted.segments[0].coefficients[1].c0 - 0.02f) < 1e-7);
+    // The whole steps go as an integer base: 0.01 m at 400,000 steps a metre is 4,000 steps, and the float keeps the rest.
+    assert(transmitted.segments[0].coefficients[0].base_steps == 4'000 &&
+        std::abs(transmitted.segments[0].coefficients[0].c0) < 1e-7f);
+    assert(std::abs(robotkit::wire_position(transmitted.segments[0].coefficients[0], 1, 0.0f, 400'000.0) - 0.01) < 1e-12);
+    assert(std::abs(robotkit::wire_position(transmitted.segments[0].coefficients[1], 1, 0.0f, 400'000.0) - 0.02) < 1e-12);
     assert(std::abs(transmitted.segments[0].coefficients[1].c1 - 0.008f) < 1e-7);
     second.min_step_ticks = 1'000;
     const robotkit::DeviceActuator6 slow[] = {first, second};
@@ -238,7 +241,8 @@ int main() {
     // The pieces meet where the motion does: the last one ends where the ramp does (position 0.4 m... 2 x 0.5 x 10 x 0.02^2).
     const auto &last = many.segments.back();
     const double tau = static_cast<double>(last.header.duration_ticks) / 1e6;
-    const double end = last.coefficients[0].c0 + last.coefficients[0].c1 * tau + last.coefficients[0].c2 * tau * tau +
+    const double end = static_cast<double>(last.coefficients[0].base_steps) / 10'000.0 +
+        last.coefficients[0].c0 + last.coefficients[0].c1 * tau + last.coefficients[0].c2 * tau * tau +
         last.coefficients[0].c3 * tau * tau * tau + last.coefficients[0].c4 * std::pow(tau, 4) + last.coefficients[0].c5 * std::pow(tau, 5);
     assert(std::abs(end - position) < 1e-6);
     // A path that turns inside a piece is not merged across the turn: a speed reversal every 0.1 ms.
@@ -249,4 +253,57 @@ int main() {
     auto zigzag = robotkit::compile_device_segments6(ramp, 13, true, 1'000'000'000ULL, clock, blueprint, 1'000'000, 40'000,
         5, 1e-5, motors);
     assert(!zigzag.ok || zigzag.segments.size() == ramp.size());
+    // An extruder that has fed 50 m of filament has turned some 40,000 rad: past 4,096 rad half a float's step (2.4e-4 rad
+    // there, 2.4e-3 at 40,000) is more than a tenth of a step of the motor (1.95e-4 rad at 512 steps a radian), so a
+    // position held as one float is refused or jitters. The wire carries the whole steps as an integer base.
+    {
+        auto extruder_blueprint = blueprint;
+        extruder_blueprint.joint_count = 1;
+        extruder_blueprint.coupling_count = 0;
+        extruder_blueprint.owner_period_ns = 10'000'000;
+        extruder_blueprint.joints[0].lower_limit = -1.0e6;
+        extruder_blueprint.joints[0].upper_limit = 1.0e6;
+        extruder_blueprint.joints[0].max_velocity = (extruder_blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY, 100.0);
+        extruder_blueprint.joints[0].max_acceleration = (extruder_blueprint.joints[0].limit_flags |= RK_LIMIT_ACCELERATION, 1000.0);
+        const robotkit::DeviceActuator6 extruder_motor{0, 1.0, 0.0, 512.0, 1};
+        const robotkit::DeviceActuator6 extruder[] = {extruder_motor};
+        // 40,000 rad to 40,010 rad in ten 100 ms quintics: a smooth rise and fall of speed, rest to rest.
+        std::vector<robotkit::TrajectorySegment> feed(10);
+        const double start = 40'000.0;
+        for (std::size_t i = 0; i < feed.size(); ++i) {
+            auto &f = feed[i];
+            f.time_from_start_ns = i * 100'000'000ULL; f.duration_ns = 100'000'000; f.degree = 5; f.joint_count = 1;
+            // Position from s(u) = 10 (10u^3 - 15u^4 + 6u^5) over u in [0, 1] of the second, in each tenth's own time.
+            const double u0 = i / 10.0, T = 0.1;
+            auto s = [](double u) { return 10.0 * (10 * u * u * u - 15 * u * u * u * u + 6 * u * u * u * u * u); };
+            auto ds = [](double u) { return 10.0 * (30 * u * u - 60 * u * u * u + 30 * u * u * u * u); };
+            auto d2s = [](double u) { return 10.0 * (60 * u - 180 * u * u + 120 * u * u * u); };
+            auto d3s = [](double u) { return 10.0 * (60 - 360 * u + 360 * u * u); };
+            auto d4s = [](double u) { return 10.0 * (-360 + 720 * u); };
+            auto d5s = [](double) { return 10.0 * 720.0; };
+            f.coefficients[0].value[0] = start + s(u0);
+            f.coefficients[0].value[1] = ds(u0);
+            f.coefficients[0].value[2] = d2s(u0) / 2;
+            f.coefficients[0].value[3] = d3s(u0) / 6;
+            f.coefficients[0].value[4] = d4s(u0) / 24;
+            f.coefficients[0].value[5] = d5s(u0) / 120;
+            (void)T;
+        }
+        auto fed = robotkit::compile_device_segments6(feed, 20, true, 1'000'000'000ULL, clock, extruder_blueprint,
+            1'000'000, 40'000, 5, 1e-6, extruder);
+        assert(fed.ok);
+        // The device's own arithmetic replays the plan to a tenth of a step (1.95e-4 rad) everywhere.
+        for (const auto &piece : fed.segments) {
+            const double seconds = static_cast<double>(piece.header.duration_ticks) / 1e6;
+            for (int k = 0; k <= 20; ++k) {
+                const double tau = seconds * k / 20.0;
+                const double got = robotkit::wire_position(piece.coefficients[0], piece.header.degree,
+                    static_cast<float>(tau), 512.0);
+                const double at = static_cast<double>(piece.host_time_from_start_ns) * 1e-9 + tau;
+                const double u = at;
+                const double want = start + 10.0 * (10 * u * u * u - 15 * u * u * u * u + 6 * u * u * u * u * u);
+                assert(std::abs(got - want) < 0.1 / 512.0);
+            }
+        }
+    }
 }

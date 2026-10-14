@@ -160,7 +160,7 @@ void unseen_backlog_holds_segments(const rk_robot_runtime_blueprint &blueprint) 
     // noise, put the device's count ahead of the host's: that is no backlog.
     observed->reported_received = observed->received_bytes + 100;
     observed->push(14, status);
-    assert(endpoint->sample(160'000'000, state) == RK_OK);
+    assert(endpoint->sample(175'000'000, state) == RK_OK);
     assert(observed->segment_frames == 1);
     // An established clock update must not sit behind an unseen serial backlog:
     // asymmetric queuing would masquerade as clock drift in the RTT midpoint.
