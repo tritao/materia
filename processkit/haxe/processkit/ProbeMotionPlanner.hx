@@ -317,7 +317,8 @@ class ProbeMotionPlanner {
       if (wire != null) throw "Wire sensing needs a positive calibrated stopping stand-off";
       return requested;
     }
-    var reserve = compiler.ikTolerance.position + (wire == null ? 0.0 : wire.envelopeExcess);
+    // The cut wire is described exactly, so only the IK tolerance is reserved.
+    var reserve = compiler.ikTolerance.position;
     var budget = contactOffset - reserve;
     if (!(budget > 0)) throw "Probe calibration leaves no wire stopping reserve";
     var indices = arm.jointIndices();

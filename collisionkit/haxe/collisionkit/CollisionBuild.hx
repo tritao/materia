@@ -10,7 +10,6 @@ class CollisionBuild {
   public final world:CollisionWorld;
   /** Live geometry and policy after transfers; the original build input remains reusable. */
   public final description:CollisionDescription;
-  final rules:Map<String, Int> = new Map();
   public final bodies:Array<Int>;
   public final objects:Array<Int>;
   public final overlapsAtReference:Int;
@@ -19,10 +18,6 @@ class CollisionBuild {
   public function new(world:CollisionWorld, bodies:Array<Int>, objects:Array<Int>, overlapsAtReference:Int,
       layoutErrors:Array<CollisionPair>, description:CollisionDescription) {
     this.description = description.copy();
-    for (i in 0...description.bodyRules.length) {
-      var rule = description.bodyRules[i];
-      rules.set(pairKey(rule.a, rule.b), i);
-    }
     this.world = world;
     this.bodies = bodies;
     this.objects = objects;
@@ -60,10 +55,6 @@ class CollisionBuild {
     description.bodies[body] = new DescribedBody(previous.name, previous.group, fixed, target);
     world.setBodyPose(bodies[body], target);
     world.setBodyStatic(bodies[body], fixed);
-    for (index in 0...description.bodyRules.length) {
-      var rule = description.bodyRules[index];
-      if (rule.a == body || rule.b == body) rules.set(pairKey(rule.a, rule.b), index);
-    }
     for (other in 0...bodies.length) if (other != body) restoreBodyRule(body, other);
     for (rule in description.objectRules)
       if (description.objects[rule.a].body == body || description.objects[rule.b].body == body)
@@ -72,8 +63,7 @@ class CollisionBuild {
 
   /** Restore an authored rule after a temporary process window. */
   public function restoreBodyRule(first:Int, second:Int):Void {
-    var index = rules.get(pairKey(first, second));
-    var rule = index == null ? null : description.bodyRules[index];
+    var rule = description.bodyRule(first, second);
     world.setBodyRule(bodies[first], bodies[second], rule == null ? CollisionPairRule.Default : rule.rule,
       rule == null ? CollisionPairStatus.Checked : rule.reason);
   }
@@ -99,8 +89,6 @@ class CollisionBuild {
         description.applyObjectMargins(world, objects, a, b);
       }
   }
-
-  static function pairKey(first:Int, second:Int):String return first < second ? '$first\n$second' : '$second\n$first';
 
   /** The described object a world object came from, or -1. */
   public function objectOf(worldObject:Int):Int return objects.indexOf(worldObject);

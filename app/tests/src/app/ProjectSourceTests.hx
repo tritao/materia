@@ -5520,7 +5520,7 @@ class ProjectSourceTests {
         'ram returns to its measured top switch: q=${returned.positions.get(ram)} m, switch=${pressSignal(returned, "ram-top")}');
       var homeDeflection = Math.abs(returned.positions.get(ram));
       check(homeDeflection <= PressBrake.RAM_STOP_DEFLECTION_MM * 0.001,
-        'ram cap meets its declared deflection allowance: $homeDeflection m');
+        'settled ram home is within its declared cap deflection allowance: $homeDeflection m');
       Sys.println('press ram home: $homeDeflection m cap deflection');
       check(simulation.reset() && player.passes == 0, "press reset clears its timed program completion");
       for (_ in 0...25) simulation.step();

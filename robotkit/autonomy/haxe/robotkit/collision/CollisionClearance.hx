@@ -107,7 +107,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
     return data.bodies[object.body].name;
   }
 
-  public static function isTool(data:CollisionDescription, object:DescribedObject):Bool
+  public static function isTool(object:DescribedObject):Bool
     return object.tool;
 
   static function transform(p:CollisionPose):Transform3
@@ -199,7 +199,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
           throw 'Clearance window $a / $b overlaps an open window';
         if (margin != null && !(margin >= 0.0)) throw 'Clearance window $a / $b needs a nonnegative margin';
         windows.push({a: i, b: j, margin: margin});
-        regroup();
+        invalidateMarginCaches();
         descriptionBuild().openContactWindow(i, j, margin);
       case CloseWindow(a, b):
         var i = hull(a), j = hull(b);
@@ -208,7 +208,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
         if (found < 0) throw 'No clearance window is open for $a / $b';
         windows.splice(found, 1);
         restoreRule(i, j);
-        regroup();
+        invalidateMarginCaches();
     }
   }
 
@@ -239,15 +239,15 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
       new CollisionPose(target.x, target.y, target.z, target.qx, target.qy, target.qz, target.qw),
       detached || !arm.moves(link), detached ? -1 : carrier, contacts, detached ? data : null);
     bodyLinks[i] = link; moving[i] = !detached && arm.moves(link);
-    regroup();
+    invalidateMarginCaches();
   }
 
   function restoreRule(i:Int, j:Int):Void {
     descriptionBuild().closeContactWindow(i, j);
   }
 
-  /** Windows use only sparse object overrides; margin classes do not change. */
-  function regroup():Void {
+  /** Windows use only sparse object overrides; only the cached query tables change. */
+  function invalidateMarginCaches():Void {
     airMarginCache = null;
     contactMarginCache = null;
   }
@@ -401,7 +401,6 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
   function margins(contact:Bool, wanted:Null<Float>):CollisionMargins {
     if (wanted != null && (!Math.isFinite(wanted) || wanted < 0))
       throw "Clearance margin must be finite and nonnegative";
-    var source = mapping;
     var original = contact ? data.contactMargins : data.margins;
     if (windows.length == 0 && wanted == null) return original;
     var cached = contact ? contactMarginCache : airMarginCache;
@@ -439,7 +438,7 @@ class CollisionClearance implements ClearanceWorld implements ClearanceScene {
 
   function named(found:Null<CollisionViolation>):Null<ClearanceViolation> {
     if (found == null) return null;
-    var source = mapping, built = descriptionBuild();
+    var built = descriptionBuild();
     var a = built.objectOf(found.a), b = built.objectOf(found.b);
     if (a < 0 || b < 0) throw "Clearance violation lost its described object";
     return {a: data.objects[a].name, b: data.objects[b].name,

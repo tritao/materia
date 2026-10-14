@@ -113,7 +113,7 @@ class PressBrakeChecks {
 				var joints = [for (joint in definition.joints) if (joint.id == name) joint];
 				if (joints.length != 1 || joints[0].stop == null) throw 'Ram "$name" lost its hard-cap response';
 				var stop = joints[0].stop;
-				if (stop.timeConstantSec <= 0 || stop.dampingRatio != 1) throw "Ram stops need a positive critical response";
+				if (stop.timeConstantSec <= 0 || Math.abs(stop.dampingRatio - 1) > 1e-12) throw "Ram stops need a positive critical response";
 			}
 			var switches = definition.sensors;
 			if (switches == null) throw "Press lost its measured switches";

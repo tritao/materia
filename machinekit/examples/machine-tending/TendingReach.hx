@@ -168,6 +168,8 @@ private class ReachPlannerStates implements motionkit.planner.PlannerSpace {
 class TendingReach {
 	static inline var SEATED_STOCK:String = "machine:mill/seated-stock";
 	static inline var MIN_JOINT_MARGIN:Float = 0.1;
+	/** Base stand-off behind the door opening certified by MT12, in millimetres; a drift is a layout change. */
+	static inline var CERTIFIED_STAND_OFF_MM:Float = 541.0;
 	// Improvements use a smaller search budget after a feasible incumbent is certified.
 	static inline var APPROACH_SEARCH_ITERATIONS:Int = 256;
 	/** Assumed fixture placement allowance on each side, beyond collision clearance. */
@@ -232,7 +234,12 @@ class TendingReach {
 		var toolPoseDelta = 0.0;
 		for (joint in 0...viseA.length) toolPoseDelta = Math.max(toolPoseDelta, Math.abs(viseA[joint] - viseB[joint]));
 		if (toolPoseDelta < 0.01) throw "The reach study did not account for the second gripper's TCP offset";
+		if (Math.abs(infeed.slots[1].frame.x - infeed.slots[0].frame.x - infeed.pitchX) > 1e-6 ||
+			Math.abs(infeed.slots[3].frame.y - infeed.slots[0].frame.y - infeed.pitchY) > 1e-6)
+			throw 'Reach tray slots do not step by their pitch ${infeed.pitchX} x ${infeed.pitchY} mm';
 		var baseStandOff = cell.opening.y - result.armPlacement.y;
+		if (Math.abs(baseStandOff - CERTIFIED_STAND_OFF_MM) > 0.5)
+			throw 'Tending reach moved the base stand-off to $baseStandOff mm from $CERTIFIED_STAND_OFF_MM mm';
 		trace('Tending reach: ${result.cls}, ${result.riser} mm riser, ${result.poses.length} poses, ' +
 			'${baseStandOff} mm base stand-off, ' +
 			'${result.jointMargin * 100}% joint margin, wrist |sin(q5)| ${result.wristSine}, ' +

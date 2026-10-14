@@ -36,7 +36,7 @@ class CollisionFixture {
     var scene = new CollisionSceneBuilder(arm, reference, "fixture", margin, arm.stateOf(reference),
       [for (entry in hulls) entry.hull]);
     for (entry in hulls)
-      scene.identify(entry.hull.name, Mechanism("fixture", arm.robot.links[entry.hull.link].id), entry.tool);
+      scene.identify(entry.hull.name, Mechanism("fixture", arm.robot.links[entry.hull.link].id));
     for (part in fixtures) {
       var at = part.pose;
       scene.addGeometry(part.name, part.work ? Loose : Fixture, CollisionGeometry.Convex(part.vertices),

@@ -51,7 +51,7 @@ class TrackWelderCollisionFixture {
     var scene = captured.describe(arm, reference, 0.005);
     var members:Array<String> = [];
     for (segment in weld.path) for (face in segment.faces) if (members.indexOf(face.member) < 0) members.push(face.member);
-    processkit.WeldCollisionPolicy.apply(scene, scene.memberObjects(members), processkit.WeldPathPlanner.AIR_MARGIN, 0.0005);
+    processkit.WeldCollisionPolicy.apply(scene, scene.memberObjects(members), processkit.WeldPathPlanner.AIR_MARGIN, robotkit.collision.CollisionClearance.CONTACT_MARGIN);
     var build = scene.build(new NativeCollisionWorld());
     try {
       for (fixture in interfaces) {

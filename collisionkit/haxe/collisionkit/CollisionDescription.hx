@@ -61,7 +61,9 @@ class CollisionDescription {
     for (articulation in other.articulations)
       addArticulation(articulation.name, [for (body in articulation.bodies) bodyIds[body]], articulation.reference);
     for (margin in other.pairMargins) setGroupMargins(margin.first, margin.second, margin.air, margin.contact);
-    for (margin in other.objectMargins) setObjectMargins(objectIds[margin.first], objectIds[margin.second], margin.air, margin.contact);
+    // Stored sides are -1 where unset; a contact-only margin must stay contact-only.
+    for (margin in other.objectMargins) setObjectMargins(objectIds[margin.first], objectIds[margin.second],
+      margin.air < 0 ? null : margin.air, margin.contact < 0 ? null : margin.contact);
     for (base in other.heldMarginBases) {
       var a = objectIds[base.first], b = objectIds[base.second], original = base.authored;
       heldMarginBases.set(pairKey(a, b), {body: bodyIds[base.body], first: a, second: b,

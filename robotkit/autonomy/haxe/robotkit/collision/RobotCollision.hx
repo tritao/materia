@@ -212,7 +212,7 @@ class RobotCollision {
       data:CollisionDescription):Array<Int> {
     return [for (object in data.objects) {
       var link = CollisionClearance.link(data, object);
-      var tool = CollisionClearance.isTool(data, object);
+      var tool = CollisionClearance.isTool(object);
       var on = tool ? robot.toolBody : robot.linkBody(link);
       if (tool && on < 0) throw 'Tool shape "${object.name}" needs a declared tool body';
       if (tool && robot.model.bodyIndex(link) != robot.bodies.followed[robot.bodies.followers.indexOf(on)])

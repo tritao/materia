@@ -49,7 +49,12 @@ class ModelBodies {
     snapshot = new KinematicSnapshot(model);
   }
 
-  /** Bind authored link-named bodies without replacing their geometry or pair policy. */
+  /**
+   * Bind authored link-named bodies without replacing their geometry. The
+   * model's rigid, adjacent and closure pairs become rules, as in
+   * `describe`, and a second body on one link follows it, as in `follow`.
+   * A rule the description already authors for a pair is kept.
+   */
   public static function bind(description:CollisionDescription, model:KinematicModel,
       reference:KinematicState):ModelBodies {
     if (reference.model != model) throw "Collision mapping needs a state of its model";
@@ -62,6 +67,19 @@ class ModelBodies {
       if (carrier < 0) throw 'Collision body "${body.name}" needs a named mechanical carrier';
       if (direct[carrier] < 0) direct[carrier] = i;
       else { result.followers.push(i); result.followed.push(carrier); }
+    }
+    function structural(a:Int, b:Int, reason:CollisionPairStatus):Void
+      if (description.bodyRule(a, b) == null) description.setBodyRule(a, b, CollisionPairRule.Allow, reason);
+    for (pair in KinematicBodyPairs.of(model))
+      if (direct[pair.a] >= 0 && direct[pair.b] >= 0) structural(direct[pair.a], direct[pair.b], reasonOf(pair.relation));
+    for (i in 0...result.followers.length) {
+      var follower = result.followers[i], target = direct[result.followed[i]];
+      structural(target, follower, CollisionPairStatus.Rigid);
+      for (rule in description.bodyRules.copy()) {
+        if (rule.rule != CollisionPairRule.Allow) continue;
+        if (rule.a == target && rule.b != follower) structural(follower, rule.b, rule.reason);
+        else if (rule.b == target && rule.a != follower) structural(rule.a, follower, rule.reason);
+      }
     }
     return result;
   }

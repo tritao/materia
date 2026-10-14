@@ -265,7 +265,7 @@ class CellCollisionSnapshot {
 		// Observed independent geometry is already in the controller root's
 		// frame. The selected arm group's root can be a descendant of it.
 		for (hull in hulls) switch hull.owner {
-			case Mechanism(owner, _) if (owner == controller): scene.identify(hull.id, hull.owner, hull.tool);
+			case Mechanism(owner, _) if (owner == controller): scene.identify(hull.id, hull.owner);
 			case _: scene.add(hull.id, hull.owner, hull.vertices, hull.pose, hull.tool, hull.member);
 		}
 		for (part in parts) {
@@ -281,7 +281,7 @@ class CellCollisionSnapshot {
 				case _: throw "A CAD part observation must be independent fixture or loose stock";
 			};
 			var indices = CadCollision.describePart(scene.description, part.member, posed, scale, part.collision, group);
-			scene.register(indices, owner, false);
+			scene.register(indices, owner);
 		}
 		// Initial held objects get the same collision policy as a live transfer;
 		// subsequent process policy names the actual permitted contacts.

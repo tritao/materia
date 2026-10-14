@@ -84,12 +84,16 @@ class CollisionSceneBuilder {
 		for (i in 0...description.objects.length) objects.set(description.objects[i].name, i);
 	}
 
+	/** Tool identity follows the margin class its source adapter gave the object's body. */
+	function toolClass(object:collisionkit.DescribedObject):Bool
+		return object.body >= 0 && description.bodies[object.body].group == CollisionMarginClass.Tool;
+
 	/** Ownership facts for an object already emitted by a canonical source adapter. */
-	public function identify(id:String, owner:CollisionOwner, tool:Bool):Void {
+	public function identify(id:String, owner:CollisionOwner):Void {
 		var index = object(id);
 		ownership.set(id, {owner: owner});
 		var object = description.objects[index];
-		description.objects[index] = new collisionkit.DescribedObject(object.name, object.body, object.offset, object.geometry, object.inflation, object.source, object.member, tool);
+		description.objects[index] = new collisionkit.DescribedObject(object.name, object.body, object.offset, object.geometry, object.inflation, object.source, object.member, toolClass(object));
 		memberBodies.set(description.objects[index].member, description.objects[index].body);
 	}
 
@@ -190,7 +194,7 @@ class CollisionSceneBuilder {
 	}
 
 	/** Register identities emitted by a source adapter; the description retains all geometry. */
-	public function register(indices:Array<Int>, owner:CollisionOwner, tool:Bool):Void {
+	public function register(indices:Array<Int>, owner:CollisionOwner):Void {
 		if (sealed) throw "Cell collision scene is already built";
 		for (index in indices) {
 			if (index < 0 || index >= description.objects.length) throw "Collision adapter returned an unknown object";
@@ -198,7 +202,7 @@ class CollisionSceneBuilder {
 			if (objects.exists(object.name)) throw 'Duplicate cell collision id "${object.name}"';
 			objects.set(object.name, index);
 			ownership.set(object.name, {owner: owner});
-			description.objects[index] = new collisionkit.DescribedObject(object.name, object.body, object.offset, object.geometry, object.inflation, object.source, object.member, tool);
+			description.objects[index] = new collisionkit.DescribedObject(object.name, object.body, object.offset, object.geometry, object.inflation, object.source, object.member, toolClass(object));
 			memberBodies.set(object.member, object.body);
 		}
 	}

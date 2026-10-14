@@ -26,6 +26,7 @@ class ClearanceTests {
   public static function run():Int {
     assertions = 0;
     testDescribedShapesAndRules();
+    testLinkNamedStructuralRules();
     testPosesAndPath();
     testMargins();
     testTouchingByDesign();
@@ -61,6 +62,36 @@ class ClearanceTests {
     clearance.reset();
     check(clearance.violation([0.02]) != null, "an explicit description check restores collision checking");
     clearance.world.dispose();
+  }
+
+  /** Link-named descriptions get the model's structural rules: a link, its neighbour and a tool on it touch by design. */
+  static function testLinkNamedStructuralRules():Void {
+    var model = new RobotModel("link-named structure");
+    var base = model.addLink(new Link("base")), upper = model.addLink(new Link("upper"));
+    var hinge = model.addJoint(new Joint("hinge", JointType.Revolute, base, upper));
+    hinge.axis = [0,0,1]; hinge.limits.lower = -1.0; hinge.limits.upper = 1.0;
+    var frame = model.addFrame(new Frame("tip", upper));
+    var arm = new Manipulator(model, base.id, frame.id);
+    function cube(name:String, x:Float):robotkit.model.CollisionShape {
+      var shape = new robotkit.model.CollisionShape(collisionkit.CollisionGeometry.Box(0.02,0.02,0.02),
+        [x, 0, 0], [0, 0, 0, 1]);
+      shape.name = name;
+      return shape;
+    }
+    var scene = CollisionClearance.combine([
+      CollisionClearance.shapes(base.id, [cube("base block", 0.0)]),
+      CollisionClearance.shapes(upper.id, [cube("upper block", 0.015)]),
+      CollisionClearance.shapes(upper.id, [cube("tool block", 0.03)], true)]);
+    var copy = scene.copy();
+    var clearance = new CollisionClearance(arm, scene, [0.0], () -> new NativeCollisionWorld());
+    check(clearance.violation([0.0]) == null, "adjacent links and a tool on its link are not checked against each other");
+    check(clearance.violation([0.5]) == null, "the structural rules hold away from the reference");
+    clearance.world.dispose();
+    copy.setObjectMargins(0, 2, null, 0.001);
+    var copied = copy.copy();
+    check(copied.marginBetweenObjects(0, 2, true) == 0.001 &&
+      copied.marginBetweenObjects(0, 2) == copy.marginBetweenObjects(0, 2),
+      "a contact-only object margin survives a description copy");
   }
 
   static function testCoupledDriveContact():Void {

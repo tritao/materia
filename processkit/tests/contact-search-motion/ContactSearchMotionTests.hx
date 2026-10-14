@@ -169,7 +169,7 @@ class ContactSearchMotionTests {
         "Native collision geometry puts the flat-ended cylinder's distal surface at the physical sensing tip");
       var safeSpeed = wireGuarded.sensingSpeed([0.0], new Vec3(0, 0, 1), 0.04, 0.02, 0.0005);
       check(safeSpeed > 0 && safeSpeed < 0.02, "Calibration and CAD wire extent bound requested sensing speed");
-      check(safeSpeed * 0.04 + safeSpeed * safeSpeed / 2 <= 0.0005 - planning.compiler.ikTolerance.position - wire.envelopeExcess + 1e-10,
+      check(safeSpeed * 0.04 + safeSpeed * safeSpeed / 2 <= 0.0005 - planning.compiler.ikTolerance.position + 1e-10,
         "The derived prismatic speed fits the entire deadline and braking travel inside touch stand-off");
       var rimScene = new robotkit.collision.CollisionSceneBuilder(arm, [0.0], "cut-wire", 0.003);
       rimScene.addGeometry("rim obstacle", robotkit.collision.CollisionSceneBuilder.CollisionOwner.Fixture,

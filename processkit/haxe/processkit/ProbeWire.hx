@@ -15,8 +15,6 @@ import robotkit.spatial.Quat;
 class ProbeWire {
   public static inline var NAME:String = "contact sensing wire";
   public final arm:Manipulator;
-  /** Extra reach beyond the exact flat-ended cut-wire profile. */
-  public final envelopeExcess:Float;
   public final object:Int;
   final link:LinkId;
   final centre:Vec3;
@@ -24,7 +22,6 @@ class ProbeWire {
 
   function new(arm:Manipulator, link:LinkId, centre:Vec3, radius:Float, halfLength:Float, object:Int) {
     this.arm = arm; this.link = link; this.centre = centre; this.object = object;
-    envelopeExcess = 0.0;
     extent = Math.sqrt(halfLength * halfLength + radius * radius);
   }
 
