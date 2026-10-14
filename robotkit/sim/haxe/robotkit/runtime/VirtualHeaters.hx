@@ -5,10 +5,38 @@ import robotkit.tool.HeaterSensor;
 import robotkit.tool.HeaterSensor.HeaterReading;
 
 /**
- * One virtual heater: where the host reaches it, how its controller is tuned and what its thermal plant is. The
- * defaults are a 100k NTC 3950 thermistor under a 4.7k pull-up on a 3.3 V ADC and Marlin-like watchdog windows; the
- * values of the plant are assumed per part and set by whoever builds the machine.
+ * Everything a heater's board and thermal plant are told, none of it defaulted: the thermistor and its front end, the PID
+ * and its band and watchdog, and the plant (its heat capacity, power, loss to the room and the fan's). The caller states
+ * every one, from the part or the job, so a heater cannot run on numbers nobody chose.
  */
+typedef HeaterTuning = {
+  /** The thermistor: its resistance at `t0Celsius`, and beta. */
+  final r0Ohm:Float;
+  final t0Celsius:Float;
+  final beta:Float;
+  /** The controller's ADC front end: the pull-up to the reference voltage. */
+  final pullupOhm:Float;
+  final vRef:Float;
+  final kp:Float;
+  final ki:Float;
+  final kd:Float;
+  final maxDuty:Float;
+  final maxTemperature:Float;
+  final bandCelsius:Float;
+  final pidRangeCelsius:Float;
+  final gainWindowSeconds:Float;
+  final gainMinCelsius:Float;
+  final hysteresisCelsius:Float;
+  final hysteresisWindowSeconds:Float;
+  /** The thermal plant: heat capacity (J/K), power at full duty (W), loss to the room (W/K), extra loss with the fan on (W/K), the room (C). */
+  final heatCapacity:Float;
+  final power:Float;
+  final loss:Float;
+  final fanLoss:Float;
+  final ambient:Float;
+}
+
+/** One heater of the virtual device: where it is wired, and its `HeaterTuning`. */
 class HeaterSetup {
   public final name:String;
   /** The external `tool_heater` sensor the readings are published to, and the board's slot (0 to 7) that feeds it. */
@@ -19,33 +47,38 @@ class HeaterSetup {
   public var fanChannel:Null<String> = null;
   /** The extruder this heater feeds (pushing filament while cold is a fault), or null. */
   public var extruder:Null<HeaterExtruder> = null;
-  public var r0Ohm:Float = 100000.0;
-  public var t0Celsius:Float = 25.0;
-  public var beta:Float = 3950.0;
-  public var pullupOhm:Float = 4700.0;
-  public var vRef:Float = 3.3;
-  public var kp:Float = 0.08;
-  public var ki:Float = 0.004;
-  public var kd:Float = 0.5;
-  public var maxDuty:Float = 1.0;
-  public var maxTemperature:Float = 275.0;
+  public var r0Ohm:Float;
+  public var t0Celsius:Float;
+  public var beta:Float;
+  public var pullupOhm:Float;
+  public var vRef:Float;
+  public var kp:Float;
+  public var ki:Float;
+  public var kd:Float;
+  public var maxDuty:Float;
+  public var maxTemperature:Float;
   /** The material's minimum extrusion temperature; 0 leaves cold extrusion unchecked. */
   public var minExtrusionTemperature:Float = 0.0;
-  public var bandCelsius:Float = 3.0;
-  public var pidRangeCelsius:Float = 10.0;
-  public var gainWindowSeconds:Float = 20.0;
-  public var gainMinCelsius:Float = 2.0;
-  public var hysteresisCelsius:Float = 15.0;
-  public var hysteresisWindowSeconds:Float = 10.0;
-  /** The thermal plant: heat capacity (J/K), power at full duty (W), loss to the room (W/K), extra loss with the fan on (W/K). */
-  public var heatCapacity:Float = 10.0;
-  public var power:Float = 40.0;
-  public var loss:Float = 0.06;
-  public var fanLoss:Float = 0.0;
-  public var ambient:Float = 22.0;
+  public var bandCelsius:Float;
+  public var pidRangeCelsius:Float;
+  public var gainWindowSeconds:Float;
+  public var gainMinCelsius:Float;
+  public var hysteresisCelsius:Float;
+  public var hysteresisWindowSeconds:Float;
+  public var heatCapacity:Float;
+  public var power:Float;
+  public var loss:Float;
+  public var fanLoss:Float;
+  public var ambient:Float;
 
-  public function new(name:String, sensorId:String, sensorSlot:Int, targetChannel:String) {
+  public function new(name:String, sensorId:String, sensorSlot:Int, targetChannel:String, tuning:HeaterTuning) {
     this.name = name; this.sensorId = sensorId; this.sensorSlot = sensorSlot; this.targetChannel = targetChannel;
+    r0Ohm = tuning.r0Ohm; t0Celsius = tuning.t0Celsius; beta = tuning.beta; pullupOhm = tuning.pullupOhm; vRef = tuning.vRef;
+    kp = tuning.kp; ki = tuning.ki; kd = tuning.kd; maxDuty = tuning.maxDuty; maxTemperature = tuning.maxTemperature;
+    bandCelsius = tuning.bandCelsius; pidRangeCelsius = tuning.pidRangeCelsius; gainWindowSeconds = tuning.gainWindowSeconds;
+    gainMinCelsius = tuning.gainMinCelsius; hysteresisCelsius = tuning.hysteresisCelsius;
+    hysteresisWindowSeconds = tuning.hysteresisWindowSeconds; heatCapacity = tuning.heatCapacity; power = tuning.power;
+    loss = tuning.loss; fanLoss = tuning.fanLoss; ambient = tuning.ambient;
   }
 }
 

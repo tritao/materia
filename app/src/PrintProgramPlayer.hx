@@ -71,21 +71,18 @@ class PrintProgramPlayer extends ToolpathPlayer {
 	public static function heaterSetups(job:SceneArtifactPrinting, extruder:robotkit.runtime.VirtualHeaters.HeaterExtruder):Array<HeaterSetup> {
 		var result:Array<HeaterSetup> = [];
 		for (heater in job.heaters) {
-			var setup = new HeaterSetup(heater.name, heater.sensor, heater.slot, heater.target);
+			var setup = new HeaterSetup(heater.name, heater.sensor, heater.slot, heater.target, {
+				r0Ohm: heater.r0Ohm, t0Celsius: heater.t0Celsius, beta: heater.beta, pullupOhm: heater.pullupOhm, vRef: heater.vRef,
+				kp: heater.kp, ki: heater.ki, kd: heater.kd, maxDuty: heater.maxDuty, maxTemperature: heater.maxTemperature,
+				bandCelsius: heater.bandCelsius, pidRangeCelsius: heater.pidRangeCelsius, gainWindowSeconds: heater.gainWindowSeconds,
+				gainMinCelsius: heater.gainMinCelsius, hysteresisCelsius: heater.hysteresisCelsius,
+				hysteresisWindowSeconds: heater.hysteresisWindowSeconds, heatCapacity: heater.heatCapacity, power: heater.power,
+				loss: heater.loss, fanLoss: heater.fanLoss, ambient: heater.ambient});
 			setup.fanChannel = heater.fan;
 			if (heater.feedsExtruder) {
 				setup.extruder = extruder;
 				setup.minExtrusionTemperature = job.minExtrusionTemperature;
 			}
-			setup.r0Ohm = heater.r0Ohm; setup.t0Celsius = heater.t0Celsius; setup.beta = heater.beta;
-			setup.pullupOhm = heater.pullupOhm; setup.vRef = heater.vRef;
-			setup.kp = heater.kp; setup.ki = heater.ki; setup.kd = heater.kd; setup.maxDuty = heater.maxDuty;
-			setup.maxTemperature = heater.maxTemperature; setup.bandCelsius = heater.bandCelsius;
-			setup.pidRangeCelsius = heater.pidRangeCelsius; setup.gainWindowSeconds = heater.gainWindowSeconds;
-			setup.gainMinCelsius = heater.gainMinCelsius; setup.hysteresisCelsius = heater.hysteresisCelsius;
-			setup.hysteresisWindowSeconds = heater.hysteresisWindowSeconds;
-			setup.heatCapacity = heater.heatCapacity; setup.power = heater.power; setup.loss = heater.loss;
-			setup.fanLoss = heater.fanLoss; setup.ambient = heater.ambient;
 			result.push(setup);
 		}
 		return result;

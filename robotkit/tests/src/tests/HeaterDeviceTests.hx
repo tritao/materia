@@ -51,13 +51,16 @@ class HeaterDeviceTests {
   }
 
   static function setups(feed:Int):Array<HeaterSetup> {
-    var hotend = new HeaterSetup("hotend", "hotend", 0, HOTEND);
+    // A 100 k NTC of beta 3950 on a 4.7 k pull-up to 3.3 V, as the printer's controller wires it.
+    var hotend = new HeaterSetup("hotend", "hotend", 0, HOTEND, {r0Ohm: 100000.0, t0Celsius: 25.0, beta: 3950.0, pullupOhm: 4700.0, vRef: 3.3,
+      kp: 0.08, ki: 0.004, kd: 0.5, maxDuty: 1.0, maxTemperature: 275.0, bandCelsius: 3.0, pidRangeCelsius: 10.0, gainWindowSeconds: 20.0,
+      gainMinCelsius: 2.0, hysteresisCelsius: 15.0, hysteresisWindowSeconds: 10.0, heatCapacity: 10.0, power: 40.0, loss: 0.06,
+      fanLoss: 0.05, ambient: 22.0});
     hotend.fanChannel = FAN; hotend.extruder = new HeaterExtruder(0, feed); hotend.minExtrusionTemperature = 170.0;
-    hotend.fanLoss = 0.05;
-    var bed = new HeaterSetup("bed", "bed", 1, BED);
-    bed.kp = 0.2; bed.ki = 0.0008; bed.kd = 2.0; bed.maxTemperature = 120.0; bed.gainWindowSeconds = 120.0;
-    bed.hysteresisCelsius = 10.0; bed.hysteresisWindowSeconds = 20.0;
-    bed.heatCapacity = 500.0; bed.power = 250.0; bed.loss = 0.7;
+    var bed = new HeaterSetup("bed", "bed", 1, BED, {r0Ohm: 100000.0, t0Celsius: 25.0, beta: 3950.0, pullupOhm: 4700.0, vRef: 3.3,
+      kp: 0.2, ki: 0.0008, kd: 2.0, maxDuty: 1.0, maxTemperature: 120.0, bandCelsius: 3.0, pidRangeCelsius: 10.0, gainWindowSeconds: 120.0,
+      gainMinCelsius: 2.0, hysteresisCelsius: 10.0, hysteresisWindowSeconds: 20.0, heatCapacity: 500.0, power: 250.0, loss: 0.7,
+      fanLoss: 0.0, ambient: 22.0});
     return [hotend, bed];
   }
 
