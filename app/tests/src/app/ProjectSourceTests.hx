@@ -532,6 +532,52 @@ class ProjectSourceTests {
   }
 
   /**
+   * Where the printer's bed settles under its own weight on MuJoCo at three physics steps. The z screws are rigid couplings
+   * (a trapezoidal thread has no stiffness), so any sag is the solver's softness of an ideal constraint, which scales with the
+   * step squared (the equality's reference time constant is two substeps), not a spring: the bed sags `g T^2 (1 - d) dmax^2 / d`
+   * with `T` that time constant and `d` the constraint's impedance. Reports the sag and its ratio to the step squared.
+   */
+  static function checkPrinterSag(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/materia.project.json");
+    var results:Array<Float> = [];
+    for (dt in [0.01, 0.0025]) {
+      var generated = MateriaProjectRunner.loadProject(manifest);
+      var session = new ProjectDocumentSession(null, false);
+      session.openGeneratedProject(generated, manifest);
+      var definition = session.projectAssemblyDefinition, physical = session.projectPhysical;
+      if (definition == null || physical == null) throw "the printer has no assembly";
+      var model = AssemblySimulationBridge.toRobotModel(definition, physical, session.projectAssemblyState).model;
+      var world = new RobotWorld();
+      var simulation = new ApplicationSimulation(world);
+      simulation.setBackend(ApplicationSimulation.MUJOCO);
+      simulation.setTimestep(dt);
+      check(simulation.rebuild(session.sensors, session.scene, session), "the printer builds: " + simulation.error);
+      var bed = model.links.indexOf([for (joint in model.joints) if (joint.id == "z") joint][0].child);
+      // The bed's height at 0.1, 1, 3, 10, 30 and 100 s, against its height at 1 s (where the print player references the machine).
+      var heights:Array<Float> = [], marks = [0.1, 1.0, 3.0, 10.0, 30.0, 100.0], tick = 0;
+      for (mark in marks) {
+        while (tick * dt < mark - 1e-9) { simulation.step(); tick++; }
+        heights.push(simulation.physicalLinkPosition(0, bed)[2]);
+      }
+      var sag = heights[1] - heights[5], settledBy = 0.0;
+      Sys.println('printer sag: step ${dt * 1000} ms: the bed is, against its height at 1 s, ' + [for (k in 0...marks.length) '${marks[k]} s: ${Math.round((heights[k] - heights[1]) * 1e7) / 10} um'].join(", "));
+      var load = robotkit.model.DriveLoads.forAxis(DeviceBinding.planningModel(model, 40000), "z", new SteadyLoads());
+      if (dt == 0.01) {
+        for (coupling in model.couplings) if (coupling.stiffness > 0.0 || coupling.follower.indexOf("z") >= 0 || coupling.leader.indexOf("z") >= 0)
+          Sys.println('printer sag: coupling ${coupling.id} ${coupling.leader} -> ${coupling.follower} ratio ${coupling.ratio} stiffness ${coupling.stiffness} damping ${coupling.dampingRatio} backlash ${coupling.backlash} drag ${coupling.drag}');
+        for (joint in model.joints) if (joint.id.indexOf("z") >= 0)
+          Sys.println('printer sag: joint ${joint.id} ${joint.type} damping ${joint.damping} friction ${joint.frictionLoss} armature ${joint.armature}');
+        for (actuator in model.actuators)
+          Sys.println('printer sag: actuator ${actuator.id} servoStiffness ${actuator.servoStiffness} servoDamping ${actuator.servoDamping} drive ${actuator.drive == null ? "none" : actuator.drive.kind()}');
+      }
+      results.push(sag);
+      Sys.println('printer sag: step ${dt * 1000} ms: sags ${Math.round(sag * 1e7) / 10} um between 1 s and 100 s (bed axis ${load == null ? 0 : Math.round(load.mass * 1000) / 1000} kg, stiffness ${load == null ? 0 : load.stiffness} N/m)');
+      simulation.dispose();
+      session.dispose();
+    }
+  }
+
+  /**
    * SmallTab, the project's small print, on `backend`: printed to the end and measured (its volume and box in the tab's
    * own square, the nozzle's largest distance from the commanded one). Without a reference it is the ideal print the
    * regression checks hold exactly; with one (the deterministic print) the physical print is compared to it.
@@ -560,18 +606,19 @@ class ProjectSourceTests {
     if (laid == null) throw "the tab print laid no material";
     var tab = measurePrinted(laid.stock, 0.105, 0.115, 0.105, 0.115, 0.0005, laid.center);
     var run:PartRun = {volume: tab.volume, low: tab.low, high: tab.high, deviation: player.nozzleDeviation, deviationAt: player.nozzleDeviationAt,
-      printSeconds: ticks * dt, wallSeconds: Sys.time() - wall, stretch: stretchBound(model)};
+      printSeconds: ticks * dt, wallSeconds: Sys.time() - wall, stretch: stretchModel(model).bound};
     var label = backend == ApplicationSimulation.MUJOCO ? "MuJoCo" : "deterministic";
     Sys.println('printer tab on $label: printed in ${Math.round(run.printSeconds * 10) / 10} s (${Math.round(run.wallSeconds * 10) / 10} s wall, ${Math.round(run.printSeconds / run.wallSeconds * 10) / 10}x real time), ' +
       '${Math.round(run.volume * 1e10) / 10} mm^3, spans ${[for (a in 0...3) Math.round(run.low[a] * 1e6)]}..${[for (a in 0...3) Math.round(run.high[a] * 1e6)]} um, ' +
       'nozzle at most ${Math.round(run.deviation * 1e6)} um from where its pulleys put it (the drive stretch) at ${Math.round(run.deviationAt * 10) / 10} s');
     if (reference != null) {
-      var bound = STRETCH_MARGIN * run.stretch, raster = laid.stock.lattice.spacing, wallArea = 40.0 * 1.2 * 1e-6, mm = 1000.0;
+      var bound = run.stretch, raster = laid.stock.lattice.spacing, wallArea = 40.0 * 1.2 * 1e-6, mm = 1000.0;
       var dVolume = run.volume - reference.volume;
       Sys.println('printer tab physical against ideal: volume ${Math.round(dVolume * 1e10) / 10} mm^3 (${Math.round(dVolume / reference.volume * 1e4) / 100} %), ' +
         'box low ${[for (a in 0...3) Math.round((run.low[a] - reference.low[a]) * 1e6)]} high ${[for (a in 0...3) Math.round((run.high[a] - reference.high[a]) * 1e6)]} um; ' +
-        'nozzle ${Math.round(run.deviation * 1e6)} um (stretch m a / K ${Math.round(run.stretch * 1e6)} um, bound ${Math.round(bound * 1e6)} um)');
+        'nozzle ${Math.round(run.deviation * 1e6)} um at G-code line ${player.nozzleDeviationLine} (${player.nozzleDeviationDetail}) (derived bound ${Math.round(bound * 1e6)} um from ${stretchModel(model).text})');
       check(run.deviation <= bound, 'the physical nozzle stays within the belt stretch of where its pulleys put it: ${run.deviation * mm} mm against ${bound * mm}');
+      check(Math.abs((run.low[2] - reference.low[2]) - (run.high[2] - reference.high[2])) <= raster, 'the bed stands off by the same amount at the bottom and top of the part (a constant offset of the position loop, not a drift): ${(run.low[2] - reference.low[2]) * mm} and ${(run.high[2] - reference.high[2]) * mm} mm');
       check(Math.abs(dVolume) <= wallArea * bound, 'the physical tab holds ${run.volume * 1e9} mm^3 against the ideal ${reference.volume * 1e9}, within the wall area times the stretch');
       for (axis in 0...3) check(Math.abs(run.low[axis] - reference.low[axis]) <= bound + raster && Math.abs(run.high[axis] - reference.high[axis]) <= bound + raster,
         'the physical tab spans ${run.low[axis] * mm}..${run.high[axis] * mm} mm on axis $axis, the ideal ${reference.low[axis] * mm}..${reference.high[axis] * mm}');
@@ -582,22 +629,33 @@ class ProjectSourceTests {
   }
 
   /**
-   * How far the largest drive stretch may exceed m a / K of the heaviest axis at its planned acceleration: a step of
-   * acceleration overshoots an undamped spring to twice its static stretch (the belts' 0.1 damping gives 1.73), and a
-   * CoreXY pulley carries the force of both axes (the carriage and the gantry it rides), up to twice one axis's.
+   * The margin on the derived stretch bound, a tenth: what the model leaves out (the belts' spans are stiffer near a pulley than
+   * mid-travel, so the axis stiffness the drive model samples is an average; the stepper hold in series).
    */
-  static inline final STRETCH_MARGIN = 4.0;
+  static inline final STRETCH_MARGIN = 1.1;
 
-  /** The most any axis of `model` stretches its drive at the accelerations the printer plans with: its mass times the acceleration over the drive's stiffness. */
-  static function stretchBound(model:RobotModel):Float {
+  /**
+   * The largest stretch a belt pulley can show, derived. A pulley's belt carries both axes of a CoreXY (its rim position is
+   * x +- y), so its stretch is the sum of the two axes' deflections, `m a / K` each at its planned acceleration (the motion
+   * can ask both at once on a diagonal). A step of acceleration overshoots a damped spring to `1 + exp(-pi z / sqrt(1 - z^2))`
+   * times its static deflection (1.73 at the belts' 0.1), the most a plan's acceleration changes can ask. The bound is that
+   * times `STRETCH_MARGIN`. The pieces are in `text`.
+   */
+  static function stretchModel(model:RobotModel):{sum:Float, amplification:Float, bound:Float, text:String} {
     var planning = DeviceBinding.planningModel(model, 40000);
-    var worst = 0.0;
+    var sum = 0.0, parts:Array<String> = [];
     for (load in robotkit.model.DriveLoads.of(model)) {
       if (!(load.stiffness > 0.0)) continue;
       var limits = planning.coupledLimits(load.axis, new SteadyLoads(), true);
-      worst = Math.max(worst, load.mass * limits.requireAcceleration() / load.stiffness);
+      var deflection = load.mass * limits.requireAcceleration() / load.stiffness;
+      sum += deflection;
+      parts.push('${load.axis} ${Math.round(load.mass * 100) / 100} kg x ${Math.round(limits.requireAcceleration() * 100) / 100} m/s^2 / ${Math.round(load.stiffness)} N/m = ${Math.round(deflection * 1e6)} um');
     }
-    return worst;
+    var damping = Math.POSITIVE_INFINITY;
+    for (coupling in model.couplings) if (coupling.stiffness > 0.0) damping = Math.min(damping, coupling.dampingRatio);
+    var amplification = 1.0 + (damping < 1.0 ? Math.exp(-Math.PI * damping / Math.sqrt(1.0 - damping * damping)) : 0.0);
+    return {sum: sum, amplification: amplification, bound: sum * amplification * STRETCH_MARGIN,
+      text: parts.join(" + ") + ' = ${Math.round(sum * 1e6)} um, x ${Math.round(amplification * 100) / 100} for overshoot (damping ${damping}), x $STRETCH_MARGIN'};
   }
 
   /**
@@ -771,20 +829,21 @@ class ProjectSourceTests {
       '${laid.beads} beads laid in ${Math.round(player.depositSeconds * 10) / 10} s');
     var run:CubeRun = {volume: cube.volume, low: cube.low, high: cube.high, holeDiameter: holeDiameter, holeOffCentre: holeOffCentre,
       deviation: player.nozzleDeviation, deviationAt: player.nozzleDeviationAt, printSeconds: ticks * dt, wallSeconds: Sys.time() - wall,
-      stretch: stretchBound(model)};
+      stretch: stretchModel(model).bound};
     if (reference != null) {
       // The physical part against the ideal one. Everything the belts do to the nozzle is within the stretch their springs
       // allow, m a / K at the print's accelerations, times STRETCH_MARGIN, and a measurement's raster spacing on top.
-      var bound = STRETCH_MARGIN * run.stretch, raster = laid.stock.lattice.spacing;
+      var bound = run.stretch, raster = laid.stock.lattice.spacing;
       var dVolume = run.volume - reference.volume;
       var wallArea = (80.0 + Math.PI * 6.0) * height * 1e-6;
       var mm = 1000.0;
       Sys.println('printer $project physical against ideal: volume ${Math.round(dVolume * 1e10) / 10} mm^3 (${Math.round(dVolume / reference.volume * 1e4) / 100} %), ' +
         'box low ${[for (a in 0...3) Math.round((run.low[a] - reference.low[a]) * 1e6)]} high ${[for (a in 0...3) Math.round((run.high[a] - reference.high[a]) * 1e6)]} um, ' +
         'hole ${Math.round((run.holeDiameter - reference.holeDiameter) * 1e6)} um wider and ${Math.round((run.holeOffCentre - reference.holeOffCentre) * 1e6)} um further off centre, ' +
-        'nozzle ${Math.round(run.deviation * 1e6)} um from where its pulleys put it at ${Math.round(run.deviationAt * 10) / 10} s (stretch m a / K ${Math.round(run.stretch * 1e6)} um, bound ${Math.round(bound * 1e6)} um); ' +
+        'nozzle ${Math.round(run.deviation * 1e6)} um from where its pulleys put it at ${Math.round(run.deviationAt * 10) / 10} s, G-code line ${player.nozzleDeviationLine} (${player.nozzleDeviationDetail}) (derived bound ${Math.round(bound * 1e6)} um from ${stretchModel(model).text}); ' +
         '${Math.round(run.printSeconds * 10) / 10} s printed in ${Math.round(run.wallSeconds * 10) / 10} s wall, ${Math.round(run.printSeconds / run.wallSeconds * 10) / 10}x real time (ideal: ${Math.round(reference.printSeconds / reference.wallSeconds * 10) / 10}x)');
       check(run.deviation <= bound, 'the physical nozzle stays within the belt stretch of where its pulleys put it: ${run.deviation * mm} mm against ${bound * mm}');
+      check(Math.abs((run.low[2] - reference.low[2]) - (run.high[2] - reference.high[2])) <= raster, 'the bed stands off by the same amount at the bottom and top of the part (a constant offset of the position loop, not a drift): ${(run.low[2] - reference.low[2]) * mm} and ${(run.high[2] - reference.high[2]) * mm} mm');
       check(Math.abs(dVolume) <= wallArea * bound, 'the physical cube holds ${run.volume * 1e9} mm^3 against the ideal ${reference.volume * 1e9}, within the wall area times the stretch');
       for (axis in 0...3) check(Math.abs(run.low[axis] - reference.low[axis]) <= bound + raster && Math.abs(run.high[axis] - reference.high[axis]) <= bound + raster,
         'the physical cube spans ${run.low[axis] * mm}..${run.high[axis] * mm} mm on axis $axis, the ideal ${reference.low[axis] * mm}..${reference.high[axis] * mm}');
@@ -7068,6 +7127,7 @@ class ProjectSourceTests {
       focused("mobile-welder", MobileWelderTests.run),
       focused("printer-cube", root -> checkPrinterCube(root, "cube", 20.0, false)),
       focused("printer-cube-short", root -> checkPrinterCube(root, "cube-short", 4.0, true)),
+      focused("printer-sag", checkPrinterSag),
       focused("printer-physical", root -> checkPrinterTab(root, ApplicationSimulation.MUJOCO, checkPrinterTab(root, ApplicationSimulation.DETERMINISTIC))),
       focused("track-weld", root -> checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "track MuJoCo", "track-arm")),
       focused("gantry-starts", root -> { checkGantryPicker(root, false, false, "far"); checkGantryPicker(root, false, false, "unreferenced"); }),

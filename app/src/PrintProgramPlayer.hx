@@ -126,6 +126,9 @@ class PrintProgramPlayer extends ToolpathPlayer {
 	 */
 	public var nozzleDeviation(default, null):Float = 0.0;
 	public var nozzleDeviationAt(default, null):Float = 0.0;
+	/** The G-code line under way when the largest stretch happened, and the stretch of each spring coupling then (metres). */
+	public var nozzleDeviationLine(default, null):Int = 0;
+	public var nozzleDeviationDetail(default, null):String = "";
 	/** What the program says of each G-code line: the layer height in force and the feature printed. */
 	var heightLines:Array<Int> = [];
 	var heights:Array<Float> = [];
@@ -298,6 +301,11 @@ class PrintProgramPlayer extends ToolpathPlayer {
 		return [for (value in known) value < 0 ? POSITION_TOLERANCE : value];
 	}
 
+	function indexOfJoint(id:String):Int {
+		for (index in 0...robot.model.joints.length) if (robot.model.joints[index].id == id) return index;
+		return 0;
+	}
+
 	/** The frequency (rad/s) each joint hangs on its drive's spring at, sqrt(K / m) of the axis it is, or 0 for a joint with none. */
 	static function springFrequencies(model:robotkit.model.RobotModel):Array<Float> {
 		var frequencies = [for (_ in model.joints) 0.0];
@@ -363,7 +371,17 @@ class PrintProgramPlayer extends ToolpathPlayer {
 				scale = Math.max(scale, Math.abs(springRatios[spring][leader]));
 			}
 			var stretch = Math.abs(actual[springFollowers[spring]] - put) / scale;
-			if (stretch > nozzleDeviation) { nozzleDeviation = stretch; nozzleDeviationAt = session.simulationTime(); }
+			if (stretch > nozzleDeviation) {
+				nozzleDeviation = stretch; nozzleDeviationAt = session.simulationTime(); nozzleDeviationLine = currentLine;
+				nozzleDeviationDetail = [for (other in 0...springFollowers.length) {
+					var sum = springOffsets[other], largest = 0.0;
+					for (leader in 0...springLeaders[other].length) {
+						sum += springRatios[other][leader] * actual[springLeaders[other][leader]];
+						largest = Math.max(largest, Math.abs(springRatios[other][leader]));
+					}
+					robot.model.joints[springFollowers[other]].id + " " + Math.round((actual[springFollowers[other]] - sum) / largest * 1e6) + " um";
+				}].join(", ") + ", reported speeds " + [for (axis in job.axes) Math.round(snapshot.velocities.get(indexOfJoint(axis)) * 1e3) + " mm/s"].join(" ");
+			}
 		}
 		stock.follow(new Point3(pose.x, pose.y, pose.z), fed, heightAt(currentLine), session.fixedTimestep(), at.op,
 			provenance == null ? new Provenance(0, 0, 0) : provenance);
