@@ -6,37 +6,37 @@ import robotkit.runtime.RobotRuntimeBlueprint;
 /** Expand independent task axes through the compiled physical coupling graph. */
 class MotionAxisCouplings {
   /**
-   * The joints that follow more than one axis and so belong to none, in an order where each follows only axis joints
-   * or earlier entries. `axes` are the expanded axes.
+   * The joints that follow more than one axis and so belong to none, as one projection (each after the joints it follows,
+   * the axes' joints first). `axes` are the expanded axes. A joint that follows joints no axis drives (an extruder's gear
+   * train) stays where it is and is not in it, unless it mixes those with driven joints, which needs coordinated planning.
+   * A cycle among the couplings is an error.
    */
   public static function derived(axes:Array<MotionAxisBlueprint>, runtime:RobotRuntimeBlueprint,
-      jointNames:Array<String>):Array<DerivedJoint> {
+      jointNames:Array<String>):CouplingProjection {
     var owned = [for (_ in jointNames) false];
     for (axis in axes) for (id in axis.jointIds) owned[jointNames.indexOf(id)] = true;
-    var result:Array<DerivedJoint> = [];
-    var placed = owned.copy();
-    var remaining = [for (joint in 0...runtime.jointCount) if (!owned[joint]) joint];
+    var termsOf = [for (joint in 0...runtime.jointCount) [for (term in runtime.couplings) if (term.follower == joint)
+      {leader: term.leader, follower: joint, ratio: term.ratio, offset: term.offset}]];
+    var included = owned.copy();
+    var remaining = [for (joint in 0...runtime.jointCount) if (!owned[joint] && termsOf[joint].length > 0) joint];
     var progress = true;
     while (remaining.length > 0 && progress) {
       progress = false;
       for (joint in remaining.copy()) {
-        var terms = [for (term in runtime.couplings) if (term.follower == joint) {leader: term.leader, ratio: term.ratio, offset: term.offset}];
-        if (terms.length == 0) { remaining.remove(joint); progress = true; continue; }
         var ready = true;
-        for (term in terms) if (!placed[term.leader]) ready = false;
+        for (term in termsOf[joint]) if (!included[term.leader]) ready = false;
         if (!ready) continue;
-        result.push({joint: joint, terms: terms});
-        placed[joint] = true;
+        included[joint] = true;
         remaining.remove(joint);
         progress = true;
       }
     }
-    // What is left follows joints no axis drives (an extruder's gear train, say): it stays where it is, unless it
-    // mixes those with driven joints, which needs coordinated planning.
     for (joint in remaining)
-      for (term in runtime.couplings) if (term.follower == joint && placed[term.leader])
-        throw "A partially mapped follower requires coordinated polynomial planning";
-    return result;
+      for (term in termsOf[joint]) if (included[term.leader]) throw "A partially mapped follower requires coordinated polynomial planning";
+    // The joints left follow only joints nothing drives: they stay put, but a cycle among them is still an error.
+    CouplingProjection.of([for (joint in remaining) for (term in termsOf[joint]) term], runtime.jointCount);
+    return CouplingProjection.of([for (joint in 0...runtime.jointCount) if (!owned[joint] && included[joint])
+      for (term in termsOf[joint]) term], runtime.jointCount);
   }
 
   public static function expand(axes:Array<MotionAxisBlueprint>, runtime:RobotRuntimeBlueprint,

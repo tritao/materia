@@ -303,11 +303,11 @@ class CoreXyTests extends MotionKitTestSupport {
     var blueprints = [for (id in ["x", "y"]) new motionkit.axis.MotionAxisBlueprint(id, [id], -0.05, 0.05, 0.5, 5.0, 0.0)];
     var expanded = motionkit.robot.MotionAxisCouplings.expand(blueprints, runtime, names);
     var derived = motionkit.robot.MotionAxisCouplings.derived(expanded, runtime, names);
-    var ids = [for (joint in derived) names[joint.joint]];
+    var ids = [for (joint in derived.followers) names[joint]];
     ids.sort(Reflect.compare);
     check(ids.join(",") == "idlerAFront-turn,idlerARear-turn,idlerBFront-turn,idlerBRear-turn,pulleyA-turn,pulleyB-turn",
       'the motor pulleys and the idlers that turn with both belts follow both axes, got $ids');
-    for (joint in derived) check(joint.terms.length == 2, "each follows two axes");
+    for (joint in derived.followers) check(derived.termsOf(joint).length == 2, "each follows two axes");
     var owned = [for (axis in expanded) for (id in axis.jointIds) id];
     check(owned.indexOf("pulleyA-turn") < 0 && owned.indexOf("idlerAStart-turn") >= 0,
       "a gantry idler belongs to the one axis it follows, a motor pulley to none");
@@ -320,11 +320,11 @@ class CoreXyTests extends MotionKitTestSupport {
     var steps = 40;
     for (step in 0...steps + 1) {
       var state = trajectory.evaluate(trajectory.durationSeconds() * step / steps);
-      for (joint in derived) {
+      for (joint in derived.followers) {
         var wanted = 0.0;
-        for (term in joint.terms) wanted += term.ratio * state.positions[term.leader] + term.offset;
-        worst = Math.max(worst, Math.abs(state.positions[joint.joint] - wanted));
-        moved = Math.max(moved, Math.abs(state.positions[joint.joint]));
+        for (term in derived.termsOf(joint)) wanted += term.ratio * state.positions[term.leader] + term.offset;
+        worst = Math.max(worst, Math.abs(state.positions[joint] - wanted));
+        moved = Math.max(moved, Math.abs(state.positions[joint]));
       }
     }
     check(moved > 0.1, 'the motor pulleys turn with the move: $moved rad');

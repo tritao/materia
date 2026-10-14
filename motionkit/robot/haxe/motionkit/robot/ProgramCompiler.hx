@@ -39,6 +39,8 @@ import motionkit.trajectory.ExecutionPlan;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.InputShaper;
 import motionkit.trajectory.ShaperImpulses;
+import motionkit.robot.TimedMotionTransforms;
+import motionkit.robot.TimedMotionTransforms.TimedMotion;
 import motionkit.trajectory.ValidationLimits;
 
 /** A joint-space sample of a path: where, on which primitive, and the primitive arriving there. */
@@ -66,14 +68,8 @@ class ProgramCompiler {
 
   public final maxJointJump:Float;
   public final perJointMaxJump:Array<Float>;
-  final couplingIndices:Array<{leader:Int, follower:Int, ratio:Float, offset:Float}>;
-  /** The coupling terms grouped by follower, each follower after the joints it follows (`projectionOrder`). */
-  final projectionFollowers:Array<Int> = [];
-  final projectionLeaders:Array<Int> = [];
-  final projectionRatios:Array<Float> = [];
-  final projectionOffsets:Array<Float> = [];
-  /** The coupled joints, each after the coupled joints among its leaders: a follower is the sum of its terms. */
-  final projectionOrder:Array<Int>;
+  /** The couplings as one projection (a follower is the sum of its terms, each after the joints it follows), or null for none. */
+  final projection:Null<CouplingProjection>;
   public final positionTolerance:Float;
   public final orientationTolerance:Float;
   public final ikTolerance:IkTolerance;
@@ -292,40 +288,22 @@ class ProgramCompiler {
     for (jump in this.perJointMaxJump)
       if (!Math.isFinite(jump) || jump <= 0.0)
         throw "Program compiler joint jump limits must be finite and positive";
-    couplingIndices = [];
-    projectionOrder = [];
+    var projected:Null<CouplingProjection> = null;
     if (couplings != null) {
       if (jointIds == null || jointIds.length != count)
         throw "Program compiler couplings need joint IDs in solver order";
-      var pending:Array<{leader:Int, follower:Int, ratio:Float, offset:Float}> = [];
+      var terms:Array<{leader:Int, follower:Int, ratio:Float, offset:Float}> = [];
       for (coupling in couplings) {
         var leader = jointIds.indexOf(coupling.leader);
         var follower = jointIds.indexOf(coupling.follower);
         if (leader < 0 || follower < 0)
           throw 'Program compiler coupling "${coupling.id}" references an unknown joint';
-        pending.push({leader: leader, follower: follower,
-          ratio: coupling.ratio, offset: coupling.offset});
+        terms.push({leader: leader, follower: follower, ratio: coupling.ratio, offset: coupling.offset});
       }
-      while (pending.length > 0) {
-        var next = -1;
-        for (index in 0...pending.length) {
-          var depends = false;
-          for (other in pending)
-            if (other.follower == pending[index].leader) depends = true;
-          if (!depends) { next = index; break; }
-        }
-        if (next < 0) throw "Program compiler joint couplings contain a cycle";
-        couplingIndices.push(pending.splice(next, 1)[0]);
-      }
-      // A follower is complete once its last term is placed, which is after every leader is.
-      var remaining = [for (_ in 0...count) 0];
-      for (term in couplingIndices) remaining[term.follower]++;
-      for (term in couplingIndices) if (--remaining[term.follower] == 0) projectionOrder.push(term.follower);
-      for (follower in projectionOrder) for (term in couplingIndices) if (term.follower == follower) {
-        projectionFollowers.push(follower); projectionLeaders.push(term.leader);
-        projectionRatios.push(term.ratio); projectionOffsets.push(term.offset);
-      }
+      projected = CouplingProjection.of(terms, count);
+      if (projected.isEmpty()) projected = null;
     }
+    projection = projected;
     this.jointIds = jointIds == null ? null : jointIds.copy();
     this.couplings = couplings == null ? null : couplings.copy();
     this.positionTolerance = positionTolerance;
@@ -608,7 +586,7 @@ class ProgramCompiler {
     var motors = motorSpace;
     var generated = motors == null ? Trajectory.generateStateToState(from,zeros(),zeros(),to,
       maxVelocity,maxAcceleration,maxJerk) : motors.move(from,to,maxVelocity,maxAcceleration,maxJerk);
-    if (couplingIndices.length > 0) {
+    if (projection != null) {
       try { var projected = projectCouplings(generated); generated.dispose(); return projected; }
       catch (error:Dynamic) { generated.dispose(); throw error; }
     }
@@ -765,56 +743,14 @@ class ProgramCompiler {
       profileBegan = now;
     };
     var plan:Null<ExecutionPlan> = null;
-    var projected:Null<Trajectory> = null;
-    var shaped:Null<Trajectory> = null;
-    var merged:Null<Trajectory> = null;
+    var motion:Null<TimedMotion> = null;
     try {
       var motors = motorSpace;
       if (motors != null) motors.validate(pending.trajectory);
-      // Pressure advance runs the driven joint ahead of itself, and what follows it follows.
-      var advanced:Null<Trajectory> = null;
-      var drive = pending.path == null ? null : pending.path.drive;
-      if (pressureAdvance > 0.0 && drive != null) advanced = pending.trajectory.advanceJoint(drive.joint, pressureAdvance, pressureAdvanceWindow);
-      mark("pressureAdvance");
-      var timed = advanced == null ? pending.trajectory : advanced;
-      if (couplingIndices.length > 0) projected = projectCouplings(timed);
-      else if (advanced != null) { projected = advanced; advanced = null; }
-      if (advanced != null) advanced.dispose();
-      mark("advanceCouplings");
-      // Input shaping: each shaped joint's motion becomes the weighted sum of delayed copies of itself, rest to rest,
-      // and the plan ends the shaper's tail later. What the plan does at a given instant is the lowered motion's some
-      // `shapingDelay` earlier, so the events and the times that locate the plan on its path move with it.
-      var impulses = shaping;
-      if (impulses != null && pending.path != null) {
-        // The pressure advance cuts every plan into three times the segments, and the shaper cuts each at every delay: the
-        // cuts of the advance are merged away first, so the shaper (and the projection after it) works on the plan's own
-        // segments. The shaper is a weighted sum with weights adding to 1, so the pre-merge's error stays within its tolerance.
-        var coarse:Null<Trajectory> = null;
-        if (projected != null && mergeSegmentsSeconds > 0.0) {
-          var runs = mergeRuns(projected);
-          if (couplingIndices.length > 0) { coarse = projectCouplings(runs); runs.dispose(); } else coarse = runs;
-        }
-        mark("preShapeMerge");
-        var cut = (coarse != null ? coarse : (projected == null ? pending.trajectory : projected)).shape(
-          [for (joint in impulses) joint.delays], [for (joint in impulses) joint.amplitudes]);
-        if (coarse != null) coarse.dispose();
-        mark("shapeConvolution");
-        if (couplingIndices.length > 0) { shaped = projectCouplings(cut); cut.dispose(); } else shaped = cut;
-        var lag = Trajectory.nanoseconds(shapingDelay);
-        var later = [for (event in pending.events) new TimedEvent(Int64.add(event.timeNs, lag), event.channel, event.value, event.holdPolicy)];
-        pending.events.splice(0, pending.events.length);
-        for (event in later) pending.events.push(event);
-        for (index in 0...pending.times.length) pending.times[index] += shapingDelay;
-        for (index in 0...pending.checkTimes.length) pending.checkTimes[index] += shapingDelay;
-      }
-      mark("inputShaping");
-      var timedMotion = shaped != null ? shaped : (projected == null ? pending.trajectory : projected);
-      if (mergeSegmentsSeconds > 0.0 && pending.path != null) {
-        var runs = mergeRuns(timedMotion);
-        // The followers are again exactly the sum of their terms, in the merged coefficients.
-        if (couplingIndices.length > 0) { merged = projectCouplings(runs); runs.dispose(); } else merged = runs;
-      }
-      mark("segmentMerge");
+      var transforms = TimedMotionTransforms.apply({pressureAdvance: pressureAdvance, pressureAdvanceWindow: pressureAdvanceWindow,
+        shaping: shaping, shapingDelay: shapingDelay, mergeSeconds: mergeSegmentsSeconds, mergeRuns: mergeRuns}, projection, pending, mark);
+      motion = transforms;
+      var timedMotion = transforms.executed, shaped = transforms.shaped;
       if(pending.geometryCurve!=null && pending.geometryClearance && Sys.getEnv("PROCESS_PATH_VERIFY_CLEARANCE")=="1"){
         var curve:JointPathSamples=cast pending.geometryCurve;
         if(Std.isOfType(curve.clearanceProof,JointCurveClearance)){var proof:JointCurveClearance=cast curve.clearanceProof;
@@ -835,15 +771,14 @@ class ProgramCompiler {
       var mergedPlan:Null<ExecutionPlan> = null;
       // A merged path follows what it replaces closely but not exactly: should it break a limit anyway, it is a
       // refusal, and the path goes as it was lowered.
-      if (merged != null) {
+      if (transforms.merged != null) {
         try {
-          mergedPlan = ExecutionPlan.create(merged, planLimits, id, pending.startQ, zeros(), zeros(),
+          mergedPlan = ExecutionPlan.create(transforms.merged, planLimits, id, pending.startQ, zeros(), zeros(),
             startTolerances.position, startTolerances.velocity, startTolerances.acceleration, pending.events);
         } catch (error:Dynamic) {
           mergeRefusals++;
           lastMergeRefusal = Std.string(error);
-          merged.dispose();
-          merged = null;
+          transforms.dropMerged();
         }
       }
       var completedPlan:ExecutionPlan = mergedPlan != null ? mergedPlan : ExecutionPlan.create(timedMotion,
@@ -855,7 +790,7 @@ class ProgramCompiler {
       var taskProof:Null<JointCurveTask> = null;
       if(pending.path!=null && pending.geometryRefined && pending.geometryCurve!=null &&
           pending.authoredPolyline==null && Std.isOfType(timing,ToppraPathTiming) &&
-          couplingIndices.length==0 && motorSpace==null){
+          projection==null && motorSpace==null){
         var arm:Null<robotkit.manipulation.KinematicGroup> = null;
         if(Std.isOfType(solver,ManipulatorKinematics))arm=cast(solver,ManipulatorKinematics).manipulator;
         else if(Std.isOfType(solver,EaikKinematics))arm=cast(solver,EaikKinematics).manipulator;
@@ -866,7 +801,7 @@ class ProgramCompiler {
       var auditTask=Sys.getEnv("PROCESS_PATH_VERIFY_TASK")=="1";
       if(pending.path!=null && (taskProof==null || auditTask))checkTaskSpace(completedPlan,pending.path,pending.checkDistances,
         pending.checkTimes,pending.opIndex,pending.authoredPolyline,pending.blendTolerance,pending.taskSampleDistances,taskProof,
-        shaped != null ? shapingDelay : 0.0, shaped != null ? shapingTail : 0.0, shaped != null ? shapingDeviation : 0.0);
+        shaped ? shapingDelay : 0.0, shaped ? shapingTail : 0.0, shaped ? shapingDeviation : 0.0);
       if(taskProof!=null)completedPlan.report.setTaskSpaceBound(taskProof.positionBound,taskProof.positionTolerance);
       if(profiling && pending.path!=null)Sys.println("PROCESS_PATH_TASK_CERTIFICATE "+haxe.Json.stringify({
         op:pending.opIndex,certified:taskProof!=null,audited:auditTask && taskProof!=null,
@@ -886,15 +821,11 @@ class ProgramCompiler {
       mark("planCheck");
       if (profiling) Sys.println("PROCESS_PATH_COMPILE_CHECKS " + haxe.Json.stringify({op:pending.opIndex, stages:profileRows}));
       pending.trajectory.dispose();
-      if (projected != null) projected.dispose();
-      if (shaped != null) shaped.dispose();
-      if (merged != null) merged.dispose();
+      transforms.dispose();
       return completedPlan;
     } catch (error:Dynamic) {
       if (plan != null) plan.dispose();
-      if (projected != null) projected.dispose();
-      if (shaped != null) shaped.dispose();
-      if (merged != null) merged.dispose();
+      if (motion != null) motion.dispose();
       throw 'Motion program op ${pending.opIndex}: $error';
     }
   }
@@ -1067,20 +998,10 @@ class ProgramCompiler {
 
   /** Keep the follower polynomial exact after independent Hermite lowering. */
   function projectCouplings(source:Trajectory):Trajectory
-    return source.projectCouplings(projectionFollowers, projectionLeaders, projectionRatios, projectionOffsets);
+    return projection.trajectory(source);
 
   /** Sets every coupled joint to the sum of its terms, in dependency order. */
-  function completeCoupled(q:Array<Float>):Void {
-    var at = 0;
-    while (at < projectionFollowers.length) {
-      var follower = projectionFollowers[at], sum = 0.0;
-      while (at < projectionFollowers.length && projectionFollowers[at] == follower) {
-        sum += projectionRatios[at] * q[projectionLeaders[at]] + projectionOffsets[at];
-        at++;
-      }
-      q[follower] = sum;
-    }
-  }
+  function completeCoupled(q:Array<Float>):Void projection.complete(q);
 
   function resolveTarget(target:MoveTarget, start:Array<Float>, index:Int):Array<Float> {
     return switch target {
@@ -1247,7 +1168,7 @@ class ProgramCompiler {
     }
     var jointPath = refined==null ? new JointPathSamples(distances, positions, first, second, secondBefore) : refined;
     var geometryClearance=false;
-    if(jointPathPlanner!=null && Std.isOfType(timing,ToppraPathTiming) && couplingIndices.length==0){
+    if(jointPathPlanner!=null && Std.isOfType(timing,ToppraPathTiming) && projection==null){
       var nativeTiming:ToppraPathTiming=cast timing;
       geometryClearance=jointPathPlanner.checkPathClearance(jointPath,nativeTiming.loweringTolerance);
     }

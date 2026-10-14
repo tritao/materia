@@ -27,7 +27,7 @@ class RuntimeHomingDriver implements HomingDriver {
 
   /** afterLatch resets the caller-owned encoder and stepper-slip monitors. */
   public function new(robot:Robot, runtime:RobotRuntime, homes:Array<HomingAxis>,
-      motionAxes:Array<MotionAxis>, afterLatch:Void -> Void, ?deviceStop:Void -> Bool, ?derived:Array<DerivedJoint>) {
+      motionAxes:Array<MotionAxis>, afterLatch:Void -> Void, ?deviceStop:Void -> Bool, ?derived:CouplingProjection) {
     if (robot == null || runtime == null || homes == null || homes.length == 0 ||
         motionAxes == null || afterLatch == null) throw "Homing driver requires runtime, axes and latch monitor reset";
     this.robot = robot; this.runtime = runtime; this.afterLatch = afterLatch;

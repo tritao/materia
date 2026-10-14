@@ -21,8 +21,7 @@ class AxisKinematics implements KinematicsSolver {
     The joints no axis owns that follow other joints (a CoreXY motor's pulley follows both axes): each is the sum
     of its couplings' terms, placed after the joints it follows.
   **/
-  final derived:Array<Int> = [];
-  final terms:Array<Array<{leader:Int, ratio:Float, offset:Float}>> = [];
+  final derived:CouplingProjection;
   /** Every coupling between joints of the model, by index, for `solvePose`'s check that followers keep their ratio. */
   final couplingLeaders:Array<Int> = [];
   final couplingFollowers:Array<Int> = [];
@@ -47,26 +46,14 @@ class AxisKinematics implements KinematicsSolver {
       used.set(joint, true);
     }
     var ids = [for (joint in blueprint.model.joints) joint.id];
-    for (_ in ids) terms.push([]);
+    var terms:Array<{leader:Int, follower:Int, ratio:Float, offset:Float}> = [];
     for (coupling in blueprint.model.couplings) {
       var leader = ids.indexOf(coupling.leader), follower = ids.indexOf(coupling.follower);
-      if (leader >= 0 && follower >= 0) terms[follower].push({leader: leader, ratio: coupling.ratio, offset: coupling.offset});
+      if (leader >= 0 && follower >= 0 && !used.exists(follower))
+        terms.push({leader: leader, follower: follower, ratio: coupling.ratio, offset: coupling.offset});
     }
-    for (index in 0...ids.length) if (terms[index].length > 0 && !used.exists(index)) derived.push(index);
-    // Each derived joint after the derived joints it follows, so one pass completes them all.
-    var placed:Array<Int> = [];
-    while (placed.length < derived.length) {
-      var before = placed.length;
-      for (index in derived) {
-        if (placed.indexOf(index) >= 0) continue;
-        var ready = true;
-        for (term in terms[index]) if (derived.indexOf(term.leader) >= 0 && placed.indexOf(term.leader) < 0) ready = false;
-        if (ready) placed.push(index);
-      }
-      if (placed.length == before) { for (index in derived) if (placed.indexOf(index) < 0) placed.push(index); break; }
-    }
-    derived.splice(0, derived.length);
-    for (index in placed) derived.push(index);
+    // Each derived joint after the derived joints it follows, so one pass completes them all (a cycle throws).
+    derived = CouplingProjection.of(terms, ids.length);
     for (coupling in blueprint.model.couplings) {
       var leader = ids.indexOf(coupling.leader), follower = ids.indexOf(coupling.follower);
       if (leader >= 0 && follower >= 0) {
@@ -189,11 +176,7 @@ class AxisKinematics implements KinematicsSolver {
     first, and its followers (the motor behind its gears) come out here.
   **/
   public function completeDerived(q:Array<Float>, positions:Bool):Void {
-    for (index in derived) {
-      var sum = 0.0;
-      for (term in terms[index]) sum += term.ratio * q[term.leader] + (positions ? term.offset : 0.0);
-      q[index] = sum;
-    }
+    derived.complete(q, positions);
   }
 
   function requireJoints(q:Array<Float>):Void {

@@ -41,7 +41,7 @@ class MotionSystem {
   function get_planChecks():PlanCheckSummary return stream.planChecks;
   public final axes:Array<MotionAxis>;
   final axisPlanner:AxisPlanner;
-  final derivedJoints:Array<DerivedJoint>;
+  final derivedJoints:CouplingProjection;
   final homingAxes:Array<HomingAxis> = [];
   var homingDriver:Null<HomingDriver> = null;
   var homingSides:Null<robotkit.runtime.HomingSideControl> = null;
@@ -111,7 +111,7 @@ class MotionSystem {
     for (contact in blueprint.runtime.switches) if (contact.role == "home") hasHomes = true;
     var resolvedAxes = hasHomes
       ? MotionAxisCouplings.expand(blueprint.axes, blueprint.runtime, description.joints) : blueprint.axes;
-    derivedJoints = hasHomes ? MotionAxisCouplings.derived(resolvedAxes, blueprint.runtime, description.joints) : [];
+    derivedJoints = hasHomes ? MotionAxisCouplings.derived(resolvedAxes, blueprint.runtime, description.joints) : CouplingProjection.of([], 0);
     for (axisBlueprint in resolvedAxes) {
       var axis = new MotionAxis(axisBlueprint, description.joints);
       if (axisIds.exists(axis.id)) throw 'Duplicate motion axis "${axis.id}"';

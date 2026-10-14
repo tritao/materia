@@ -110,19 +110,20 @@ class ToolpathMotionBinding {
     // Its acceleration is the sum alone: the drive's torque limit is the plan check's, since a pulley's own inertia says
     // nothing of the carriage its belt moves.
     var ids = [for (joint in blueprint.model.joints) joint.id];
-    for (_ in 0...count) for (joint in 0...count) if (velocity[joint] <= 0.0) {
-      var terms = [for (coupling in blueprint.model.couplings) if (coupling.follower == ids[joint]) coupling];
-      if (terms.length == 0) continue;
+    var projection = motionkit.robot.CouplingProjection.of([for (coupling in blueprint.model.couplings)
+      {leader: ids.indexOf(coupling.leader), follower: ids.indexOf(coupling.follower), ratio: coupling.ratio, offset: coupling.offset}], count);
+    for (joint in projection.followers) if (velocity[joint] <= 0.0) {
+      var terms = projection.termsOf(joint);
       var ready = true;
-      for (term in terms) if (velocity[ids.indexOf(term.leader)] <= 0.0) ready = false;
+      for (term in terms) if (velocity[term.leader] <= 0.0) ready = false;
       if (!ready) continue;
       velocity[joint] = 0.0; acceleration[joint] = 0.0; jerk[joint] = 0.0; jump[joint] = 0.0;
       for (term in terms) {
-        var leader = ids.indexOf(term.leader), scale = Math.abs(term.ratio);
-        velocity[joint] += scale * velocity[leader];
-        acceleration[joint] += scale * acceleration[leader];
-        jerk[joint] += scale * jerk[leader];
-        jump[joint] += scale * jump[leader];
+        var scale = Math.abs(term.ratio);
+        velocity[joint] += scale * velocity[term.leader];
+        acceleration[joint] += scale * acceleration[term.leader];
+        jerk[joint] += scale * jerk[term.leader];
+        jump[joint] += scale * jump[term.leader];
       }
       var own = blueprint.model.coupledLimits(ids[joint], null, true).velocity;
       if (own != null && own > 0.0) velocity[joint] = Math.min(velocity[joint], own);
