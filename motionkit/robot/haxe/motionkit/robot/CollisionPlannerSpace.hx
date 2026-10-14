@@ -5,7 +5,7 @@ import collisionkit.CollisionDescription;
 import collisionkit.CollisionMargins;
 import collisionkit.kinematics.ModelBodies;
 import kinematicskit.MotionReach;
-import motionkit.planner.PlannerSpace;
+import motionkit.planner.BoxClearanceSpace;
 
 /**
  * A `PlannerSpace` over a collisionkit world (COLLISION.md CL-D5, CL-D7):
@@ -19,8 +19,12 @@ import motionkit.planner.PlannerSpace;
  * open at the limit, is blocked. Each level of halving, over every pending
  * edge of a batch, is one native call for the inflated checks and one for
  * the midpoints as they are.
+ *
+ * The same inflated check proves a whole box of configurations clear: every
+ * configuration within the per-joint travel of the centre stays inside the
+ * inflated bodies (`boxesClear`).
  */
-class CollisionPlannerSpace implements PlannerSpace {
+class CollisionPlannerSpace implements BoxClearanceSpace {
   public final bodies:ModelBodies;
   public final build:CollisionBuild;
   public final description:CollisionDescription;
@@ -127,6 +131,29 @@ class CollisionPlannerSpace implements PlannerSpace {
       pending = next;
     }
     return result;
+  }
+
+  public function boxesClear(centres:Array<Float>, halfWidths:Array<Float>, count:Int):Array<Bool> {
+    var n = dimension();
+    if (centres == null || halfWidths == null || centres.length != count * n || halfWidths.length != count * n)
+      throw "Collision planner boxes have the wrong dimension";
+    if (count == 0) return [];
+    var worldBodies = build.bodies.length, all = bodies.all();
+    var poses:Array<Float> = [], inflation:Array<Float> = [];
+    for (box in 0...count) {
+      var travel = [for (k in 0...n) {
+        var half = halfWidths[box * n + k];
+        if (!(half >= 0.0) || !Math.isFinite(half)) throw "Collision planner box half widths must be finite and nonnegative";
+        half * (1 + 1e-9) + 1e-12;
+      }];
+      appendWorld(centres.slice(box * n, (box + 1) * n), poses);
+      var offset = inflation.length;
+      for (_ in 0...worldBodies) inflation.push(0.0);
+      for (i in 0...all.length) inflation[offset + build.bodies[all[i]]] = reach.bound(modelBody[i], radius[i], travel);
+    }
+    queries += count;
+    var blocked = build.world.violations(poses, margins, inflation);
+    return [for (box in 0...count) !blocked[box]];
   }
 
   /**

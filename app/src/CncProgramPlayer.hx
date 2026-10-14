@@ -183,6 +183,8 @@ class CncProgramPlayer extends ToolpathPlayer {
 	var lastInterfaceOutputs:Null<RobotInterfaceOutputs> = null;
 	/** The interlock alarm currently published by the machine's robot interface. */
 	public var interfaceAlarm(default, null):RobotInterfaceAlarm = RobotInterfaceAlarm.None;
+	/** The machine's zone scanner reading at the last interface update: a robot body is in its zone. */
+	public var robotInZone(default, null):Bool = false;
 	final recipe:MachiningRecipe;
 	/** Sensor selected from the assembled machine; null on routers without at-speed feedback. */
 	public final atSpeedSensorId:Null<String>;
@@ -554,6 +556,7 @@ class CncProgramPlayer extends ToolpathPlayer {
 			}
 			return false;
 		}
+		robotInZone = readSensor(ids.robotZone);
 		var input = new RobotInterfaceInput(
 			cellDigital(RobotInterfaceChannels.REQUEST_DOOR_OPEN),
 			cellDigital(RobotInterfaceChannels.REQUEST_DOOR_CLOSE),
@@ -561,7 +564,7 @@ class CncProgramPlayer extends ToolpathPlayer {
 			cellDigital(RobotInterfaceChannels.REQUEST_UNCLAMP),
 			cellDigital(RobotInterfaceChannels.CYCLE_START),
 			// The robot is clear when the machine's own zone scanner sees no robot body in its zone.
-			!readSensor(ids.robotZone),
+			!robotInZone,
 			cellDigital(RobotInterfaceChannels.FAULT_RESET),
 			readSensor(ids.doorOpen), readSensor(ids.doorClosed),
 			readSensor(ids.viseClamped), readSensor(ids.viseOpen), readSensor(ids.presence),

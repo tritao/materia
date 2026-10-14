@@ -1712,7 +1712,10 @@ class MissionPlayer implements SessionMember {
       if (waypoint.joints != null) {
         var goal = q.copy();
         setJointTargets(goal, waypoint.joints, context);
-        ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(0, 0, 0, true), Blend.ExactStop));
+        // Pass intermediate joint waypoints without stopping where the compiler certifies the curve.
+        var next = waypointIndex + 1 < waypoints.length ? waypoints[waypointIndex + 1] : null;
+        var blend = next != null && next.joints != null ? Blend.FlyBy : Blend.ExactStop;
+        ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(0, 0, 0, true), blend));
         q = goal;
       } else {
         var pose = waypoint.pose;
@@ -1783,6 +1786,7 @@ class MissionPlayer implements SessionMember {
     var planned = missionMotionPlanner(arm, reference, cellCollisionSnapshot([]));
     cached.space = planned.space;
     motion.compiler.motionPlanner = planned.planner;
+    motion.compiler.flyByCertificate = planned.space;
     return {motion: motion, arm: arm, indices: indices};
   }
 

@@ -3916,7 +3916,7 @@ class ProjectSourceTests {
   }
 
   /** MT14 C6: measured first clamp to fourth outfeed of the four-part job, seconds (machine-tending PLAN). */
-  static inline var TENDING_FOURTH_OUTFEED_SECONDS:Float = 285.98;
+  static inline var TENDING_FOURTH_OUTFEED_SECONDS:Float = 284.06;
 
   /** Four real blank-to-outfeed cycles through the saved robot mission and wired CNC interface. */
   static function checkMachineTending(root:String, scope:TendingCheck):Void {
@@ -4494,7 +4494,10 @@ class ProjectSourceTests {
         if (heldNow > maxSimultaneousHeld) maxSimultaneousHeld = heldNow;
         var signalBus = simulation.cellSignals;
         if (mission.failure != null)
-          throw 'Tending mission failed at step ${mission.stepIndex}/${mission.mission.steps.length}: ${mission.failure}';
+          throw 'Tending mission failed at step ${mission.stepIndex}/${mission.mission.steps.length} after ' +
+            '${simulation.activeSession().simulationTime()} s: ${mission.failure} ' +
+            '(CNC interface alarm ${cnc.interfaceAlarm}, robot zone ${cnc.robotInZone ? "occupied" : "clear"}, ' +
+            'CNC failure ${cnc.failure})';
         if (mission.stepIndex != phaseStep) {
           var phase = mission.mission.steps[phaseStep];
           var seconds = simulation.activeSession().simulationTime() - phaseStart;

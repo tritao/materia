@@ -4,4 +4,9 @@ package motionkit.program;
 enum Blend {
   ExactStop;
   ToleranceBlend(metres:Float);
+  /**
+   * Pass a planned joint target without stopping where the curved motion through it can be
+   * certified clear; otherwise stop there. Joins consecutive planned `MoveJ` operations.
+   */
+  FlyBy;
 }

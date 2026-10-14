@@ -26,7 +26,8 @@ class ProgramCompilation {
   var nextId:Int64;
   var cursor:Int;
   var currentIndex:Int = -1;
-  var skipNext:Bool = false;
+  /** Following ops already compiled into the motion just lowered (blends and fly-bys). */
+  var skip:Int = 0;
   var pending:Null<ProgramCompiler.PendingMotion> = null;
   var leadingOutputs:Array<{channel:String, value:EventValue}> = [];
   /** The current path op's stretches between sharp corners, planned one a step. */

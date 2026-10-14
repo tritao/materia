@@ -100,11 +100,12 @@ class Trajectory implements TimedJointTrajectory {
    * Offline, jerk-limited synchronized state-to-state motion. With `phase`,
    * every joint follows one profile scaled to its distance, so a move from
    * rest to rest is a straight line in joint space (a planned edge).
+   * `targetVelocity` (default rest) lets the motion pass its target moving.
    */
   public static function generateStateToState(currentPosition:Array<Float>,
       currentVelocity:Array<Float>, currentAcceleration:Array<Float>, targetPosition:Array<Float>,
       maximumVelocity:Array<Float>, maximumAcceleration:Array<Float>,
-      maximumJerk:Array<Float>, ?phase:Bool = false):Trajectory {
+      maximumJerk:Array<Float>, ?phase:Bool = false, ?targetVelocity:Array<Float>):Trajectory {
     if (currentPosition == null || currentPosition.length < 1 ||
         currentPosition.length > TrajectoryCoreConstants.MK_MAX_JOINTS)
       throw "Invalid generated trajectory joint count";
@@ -113,6 +114,7 @@ class Trajectory implements TimedJointTrajectory {
         maximumVelocity, maximumAcceleration, maximumJerk])
       if (values == null || values.length != count)
         throw "Generated trajectory vector count mismatch";
+    if (targetVelocity != null && targetVelocity.length != count) throw "Generated trajectory vector count mismatch";
     var request = new mk_state_to_state_request();
     request.set_struct_size(mk_state_to_state_request.size());
     request.set_joint_count(count);
@@ -124,7 +126,7 @@ class Trajectory implements TimedJointTrajectory {
       request.set_current_velocity(joint, currentVelocity[joint]);
       request.set_current_acceleration(joint, currentAcceleration[joint]);
       request.set_target_position(joint, targetPosition[joint]);
-      request.set_target_velocity(joint, 0.0);
+      request.set_target_velocity(joint, targetVelocity == null ? 0.0 : targetVelocity[joint]);
       request.set_target_acceleration(joint, 0.0);
       request.set_max_velocity(joint, maximumVelocity[joint]);
       request.set_max_acceleration(joint, maximumAcceleration[joint]);

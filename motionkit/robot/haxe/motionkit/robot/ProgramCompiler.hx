@@ -140,6 +140,11 @@ class ProgramCompiler {
   public var angularResolution:Float = 0.25;
   /** Plans the path of a joint move whose options ask for it (`MotionOptions.planned`; COLLISION.md CL7). */
   public var motionPlanner:Null<motionkit.planner.MotionPlanner> = null;
+  /**
+   * Certifies the curved motion of planned joint moves joined by `Blend.FlyBy`; it must be the
+   * space `motionPlanner` checks its edges in. Without it a fly-by stops at its target.
+   */
+  public var flyByCertificate:Null<motionkit.planner.BoxClearanceSpace> = null;
 
   /**
     Shapes the motion of the joints that have a shaper (`shapers`, one entry per joint in joint order, null for a joint
@@ -206,6 +211,7 @@ class ProgramCompiler {
     into.clearanceEvents = clearanceEvents.copy();
     into.clearanceDepthLimit = clearanceDepthLimit;
     into.motionPlanner = motionPlanner;
+    into.flyByCertificate = flyByCertificate;
     into.angularResolution = angularResolution;
   }
 
@@ -433,12 +439,22 @@ class ProgramCompiler {
         return false;
       }
       var index = c.cursor++;
-      if (c.skipNext) { c.skipNext = false; return true; }
+      if (c.skip > 0) { c.skip--; return true; }
       c.currentIndex = index;
       var q = c.q;
       switch program.ops[index] {
         case MoveJ(target, options, blend):
           retire(c);
+          var chainEnd = flyByChainEnd(program, index);
+          if (chainEnd > index) {
+            var pending = flyBy(program, index, chainEnd, q);
+            c.pending = pending;
+            attachLeadingOutputs(pending, c.leadingOutputs);
+            c.q = pending.endQ.copy();
+            c.skip = chainEnd - index;
+            c.sink.note('Motion program ops $index to $chainEnd fly by their joint targets where certified clear');
+            return true;
+          }
           noteBlend(blend, index, c.sink);
           var goal = resolveTarget(target, q, index);
           checkJointPosition(goal, index, null);
@@ -484,7 +500,8 @@ class ProgramCompiler {
                   }
                 case _:
               }
-            case ExactStop:
+            // Program validation admits a fly-by only between planned joint moves.
+            case ExactStop, FlyBy:
           }
           var pending:PendingMotion;
           if (blended != null) {
@@ -494,7 +511,7 @@ class ProgramCompiler {
             };
             pending = lowerPath(speedScale, blended, q, Math.max(feed, nextFeed), [], index,
               [solver.forward(q), pose, cast blendNextPose], blendTolerance);
-            c.skipNext = true;
+            c.skip = 1;
             c.sink.note('Motion program ops $index and ${index + 1} tolerance blended');
           } else {
             noteBlend(blend, index, c.sink);
@@ -887,6 +904,60 @@ class ProgramCompiler {
     var timing = new JointPathTiming([for (joint in 0...velocity.length)
       {velocity: velocity[joint], acceleration: acceleration[joint], jerk: jerk[joint]}]);
     return timing.trajectory(path);
+  }
+
+  /** The last op of the planned joint moves joined by fly-bys from `index`, or `index` when none can fly by. */
+  function flyByChainEnd(program:MotionProgram, index:Int):Int {
+    if (motionPlanner == null || flyByCertificate == null || motorSpace != null) return index;
+    var end = index;
+    while (end + 1 < program.ops.length) {
+      var joins = switch program.ops[end] {
+        case MoveJ(JointTarget(_), options, FlyBy): options.planned;
+        case _: false;
+      }
+      if (!joins) break;
+      var next = switch program.ops[end + 1] {
+        case MoveJ(JointTarget(_), options, _): options.planned;
+        case _: false;
+      }
+      if (!next) break;
+      end++;
+    }
+    return end;
+  }
+
+  /**
+   * Planned joint moves `first` to `last` as one motion: each edge planned and certified as for
+   * a single planned move, the joined path timed through its waypoints by
+   * `JointPathTiming.blended`, which certifies the curved motion near each waypoint with
+   * `flyByCertificate` or stops there. Uses the strictest limits of the joined moves.
+   */
+  function flyBy(program:MotionProgram, first:Int, last:Int, start:Array<Float>):PendingMotion {
+    var planner = motionPlanner, space = flyByCertificate;
+    if (planner == null || space == null) throw 'Motion program op $first fly-by needs a motion planner and its space';
+    var path = [start.copy()], at = start;
+    var velocity = maxVelocity.copy(), acceleration = maxAcceleration.copy(), jerk = maxJerk.copy();
+    for (index in first...last + 1) switch program.ops[index] {
+      case MoveJ(target, options, _):
+        var goal = resolveTarget(target, at, index);
+        checkJointPosition(goal, index, null);
+        var v = effective(maxVelocity, options.maxVelocity), a = effective(maxAcceleration, options.maxAcceleration),
+          j = effective(maxJerk, options.maxJerk);
+        for (joint in 0...velocity.length) {
+          velocity[joint] = Math.min(velocity[joint], v[joint]);
+          acceleration[joint] = Math.min(acceleration[joint], a[joint]);
+          jerk[joint] = Math.min(jerk[joint], j[joint]);
+        }
+        var plan = planner.plan(at, goal);
+        var waypoints = plan.waypoints;
+        if (waypoints == null) throw 'Motion program op $index has no planned path: ${plan.failure}';
+        for (waypoint in 1...waypoints.length) path.push(waypoints[waypoint]);
+        at = goal;
+      case _: throw 'Motion program op $index cannot fly by';
+    }
+    var timing = new JointPathTiming([for (joint in 0...velocity.length)
+      {velocity: velocity[joint], acceleration: acceleration[joint], jerk: jerk[joint]}]);
+    return new PendingMotion(first, start, at, timing.blended(path, space), [], null, null);
   }
 
   function hasClearanceEvents(op:Int):Bool {
@@ -1477,6 +1548,7 @@ class ProgramCompiler {
   static function noteBlend(blend:Blend, index:Int, sink:ProgramSink):Void {
     switch blend {
       case ToleranceBlend(_): sink.note('Motion program op $index tolerance blend uses exact stop');
+      case FlyBy: sink.note('Motion program op $index fly-by uses exact stop');
       case ExactStop:
     }
   }

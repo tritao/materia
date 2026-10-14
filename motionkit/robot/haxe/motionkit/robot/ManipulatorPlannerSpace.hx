@@ -1,10 +1,10 @@
 package motionkit.robot;
 
-import motionkit.planner.PlannerSpace;
+import motionkit.planner.BoxClearanceSpace;
 import robotkit.manipulation.Manipulator;
 
 /** Maps the active manipulator coordinates into the complete robot's collision-planner state. */
-class ManipulatorPlannerSpace implements PlannerSpace {
+class ManipulatorPlannerSpace implements BoxClearanceSpace {
   final inner:CollisionPlannerSpace;
   final arm:Manipulator;
   final reference:Array<Float>;
@@ -55,6 +55,20 @@ class ManipulatorPlannerSpace implements PlannerSpace {
       for (value in full(q)) mapped.push(value);
     }
     return inner.edgesClear(mapped, count);
+  }
+
+  public function boxesClear(centres:Array<Float>, halfWidths:Array<Float>, count:Int):Array<Bool> {
+    var n = dimension(), fullCentres:Array<Float> = [], fullWidths:Array<Float> = [];
+    if (centres == null || halfWidths == null || centres.length != count * n || halfWidths.length != count * n)
+      throw "Manipulator planner boxes have the wrong dimension";
+    for (box in 0...count) {
+      for (value in full(centres.slice(box * n, (box + 1) * n))) fullCentres.push(value);
+      // Held coordinates do not move: only the manipulator's own coordinates span the box.
+      var widths = [for (_ in reference) 0.0];
+      for (i in 0...n) widths[dofs[i]] = halfWidths[box * n + i];
+      for (value in widths) fullWidths.push(value);
+    }
+    return inner.boxesClear(fullCentres, fullWidths, count);
   }
 
   public function dispose():Void inner.build.world.dispose();

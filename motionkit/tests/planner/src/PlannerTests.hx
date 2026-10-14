@@ -44,6 +44,7 @@ class PlannerTests {
     testEndpointRounding();
     testDeterministicFromSeed();
     testPlannedMoveThroughValidation();
+    testFlyByThroughGap();
     var bench = Sys.getEnv("PLANNER_BENCH_DIR");
     if (bench != null && bench != "") benchmark(bench);
     Sys.println('Planner tests passed ($assertions assertions)');
@@ -91,6 +92,48 @@ class PlannerTests {
     var d = 0.0;
     for (k in 0...p.length) d += Math.pow(p[k] - (a[k] + t * (b[k] - a[k])), 2);
     return Math.sqrt(d);
+  }
+
+  /**
+   * Through the wall's gap without stopping: the corners before and after the gap are passed
+   * moving where the curve can be covered by clear boxes, and every point of the timed motion
+   * stays clear. Stopping at the corners is the certified fallback, so fly-by is never slower.
+   */
+  static function testFlyByThroughGap():Void {
+    var scene = maze();
+    var path = [[-0.8, 0.6], [-0.1, 0.0], [0.1, 0.0], [0.8, 0.5]];
+    var edges:Array<Float> = [];
+    for (k in 1...path.length) edges = edges.concat(path[k - 1]).concat(path[k]);
+    for (clear in scene.space.edgesClear(edges, path.length - 1)) check(clear, "the gap path's straight edges are clear");
+    var rates = [for (_ in 0...2) {velocity: 0.5, acceleration: 2.0, jerk: 20.0}];
+    var timing = new motionkit.robot.JointPathTiming(rates);
+    var stopped = timing.trajectory(path), blended = timing.blended(path, scene.space);
+    check(blended.durationSeconds() < stopped.durationSeconds() - 0.1,
+      'fly-by through the gap is faster than stopping at its corners (${blended.durationSeconds()} vs ${stopped.durationSeconds()} s)');
+    var worst = "";
+    for (i in 0...2001) {
+      var q = blended.evaluate(blended.durationSeconds() * i / 2000).positions.copy();
+      var found = scene.space.invalid(q);
+      if (found != null && worst == "") worst = '$found at $q';
+    }
+    check(worst == "", 'the fly-by motion stays clear of the wall: $worst');
+    // The runtime admits a plan only if its segments join within 1e-9 in position.
+    var pieces = blended.segments(), jump = 0.0;
+    for (k in 1...pieces.length) {
+      var before = pieces[k - 1], seconds = Int64.toInt(before.durationNs) * 1e-9;
+      for (joint in 0...2) {
+        var reached = 0.0, power = 1.0;
+        for (c in before.coefficients[joint]) { reached += c * power; power *= seconds; }
+        jump = Math.max(jump, Math.abs(reached - pieces[k].coefficients[joint][0]));
+      }
+    }
+    check(jump <= 1e-9, 'fly-by segments join in position (worst jump $jump)');
+    var end = blended.evaluate(blended.durationSeconds());
+    check(Math.abs(end.positions[0] - 0.8) < 1e-9 && Math.abs(end.positions[1] - 0.5) < 1e-9 &&
+      Math.abs(end.velocities[0]) < 1e-9 && Math.abs(end.velocities[1]) < 1e-9, "the fly-by motion stops at its goal");
+    Sys.println('Fly-by gap: ${blended.durationSeconds()} s, stopping at each corner ${stopped.durationSeconds()} s');
+    stopped.dispose(); blended.dispose();
+    scene.world.dispose();
   }
 
   static function testNarrowPassage():Void {
@@ -304,6 +347,21 @@ class PlannerTests {
     motion.dispose();
     check(path.length > 2 && worst < 1e-6, 'the timed path follows the ${path.length - 1} checked edges (worst ${worst} rad)');
     Sys.println('CL7 planned move: ${path.length - 1} edges, ${plan.report.collisionPair.nameA}/${plan.report.collisionPair.nameB} ${plan.report.collision.value} m, method ${plan.report.collision.method}');
+    // The same route as planned joint moves joined by fly-bys: one motion through the detour, validated, faster.
+    compiler.flyByCertificate = space;
+    var ops = [for (k in 1...path.length) MotionOp.MoveJ(MoveTarget.JointTarget(path[k]), new MotionOptions(0, 0, 0, true),
+      k + 1 < path.length ? Blend.FlyBy : Blend.ExactStop)];
+    var flown = compiler.compile(new MotionProgram(ops), START, Int64.ofInt(2));
+    var flownPlans = [for (block in flown.blocks) for (each in block.plans) each];
+    check(flownPlans.length == 1 && flownPlans[0].report.collision.status == TrajectoryCoreConstants.MK_CHECK_PASSED,
+      "the fly-by route compiles to one validated motion");
+    var flownMotion = motionkit.trajectory.Trajectory.fromSegments(flownPlans[0].segments());
+    var stoppedMotion = motionkit.trajectory.Trajectory.fromSegments(plan.segments());
+    check(flownMotion.durationSeconds() <= stoppedMotion.durationSeconds(),
+      'flying by the detour is no slower (${flownMotion.durationSeconds()} vs ${stoppedMotion.durationSeconds()} s)');
+    Sys.println('CL7 fly-by: ${flownMotion.durationSeconds()} s against ${stoppedMotion.durationSeconds()} s stopping at each waypoint');
+    flownMotion.dispose(); stoppedMotion.dispose();
+    flown.dispose();
     compiled.dispose();
     world.dispose();
   }

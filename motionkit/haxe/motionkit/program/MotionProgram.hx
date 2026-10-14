@@ -103,6 +103,10 @@ class MotionProgram {
         else if (index + 1 >= ops.length || !isMove(ops[index + 1]))
           'Motion program op $index tolerance blend requires consecutive moves';
         else null;
+      case FlyBy:
+        if (index + 1 >= ops.length || !plannedJointMove(ops[index]) || !plannedJointMove(ops[index + 1]))
+          'Motion program op $index fly-by joins a planned joint move to the next one';
+        else null;
     };
   }
 
@@ -136,6 +140,14 @@ class MotionProgram {
     } catch (error:Dynamic) {
       return Std.string(error);
     }
+  }
+
+  static function plannedJointMove(op:MotionOp):Bool {
+    if (op == null) return false;
+    return switch op {
+      case MoveJ(JointTarget(_), options, _): options != null && options.planned;
+      case _: false;
+    };
   }
 
   static function isMove(op:MotionOp):Bool {
