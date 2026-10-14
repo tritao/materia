@@ -441,6 +441,14 @@ CompiledDevicePlan6 compile_once(
         limits.position_lower[joint] = source.lower_limit - travel;
         limits.position_upper[joint] = source.upper_limit + travel;
         if (start_tolerance != nullptr) limits.position_start_tolerance[joint] = start_tolerance[joint];
+        // What a drive can miss its target by is one step of the finest motor on the joint, not the planner's start mismatch: a
+        // start outside a claimed bound is admitted by that, so a homed axis whose coordinate sits one step off its limit
+        // starts, and one further does not.
+        double resolution = std::numeric_limits<double>::infinity();
+        for (const auto &actuator : layout)
+            if (actuator.joint == joint)
+                resolution = std::min(resolution, 1.0 / (std::abs(actuator.ratio) * actuator.steps_per_unit));
+        if (std::isfinite(resolution)) limits.position_start_tolerance[joint] = resolution;
         limits.max_velocity[joint] = source.max_velocity;
         limits.max_acceleration[joint] = source.max_acceleration;
         limits.derivative_claimed[joint] = ((source.limit_flags & RK_LIMIT_VELOCITY) ? 1u : 0u) |

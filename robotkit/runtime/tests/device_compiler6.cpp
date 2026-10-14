@@ -306,4 +306,26 @@ int main() {
             }
         }
     }
+    // The start rule's tolerance is the drive's resolution (one step of the finest motor on the joint), not the planner's
+    // start mismatch: a plan may start half a step past the joint's limit, three steps past it is refused, whatever
+    // start tolerance the plan carries.
+    {
+        auto limited = blueprint;
+        limited.joint_count = 1;
+        limited.coupling_count = 0;
+        limited.joints[0].lower_limit = -10.0;
+        limited.joints[0].upper_limit = 10.0;
+        const robotkit::DeviceActuator6 stepper{0, 1.0, 0.0, 10'000.0, 1};
+        const robotkit::DeviceActuator6 stepper_layout[] = {stepper};
+        const double loose[robotkit::device_wire6::MAX_ACTUATORS] = {1e-3};
+        auto start_at = [&](double position) {
+            robotkit::TrajectorySegment rest{};
+            rest.duration_ns = 100'000'000; rest.degree = 1; rest.joint_count = 1;
+            rest.coefficients[0].value[0] = position;
+            return robotkit::compile_device_segments6(std::span(&rest, 1), 30, true, 1'000'000'000ULL, clock, limited,
+                1'000'000, 40'000, 5, 1e-6, stepper_layout, 0, false, loose);
+        };
+        assert(start_at(10.00005).ok);
+        assert(!start_at(10.0003).ok);
+    }
 }
