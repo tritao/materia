@@ -1037,7 +1037,8 @@ Safety and decisions:
 - [ ] B9: Assert that the statically certified grasp equals the runtime handling grasp.
 
 Tests and physical truth:
-- [ ] C1: At every production `CYCLE_START`, assert blank-to-seat alignment near 0.1 mm/2 mrad and settled contact on both jaw faces.
+- [x] C1: At every production `CYCLE_START`, assert blank-to-seat alignment near 0.1 mm/2 mrad and settled contact on both jaw faces.
+  - At each of the four cycle starts the tending check measures the blank against the vise `seat` connector and reads the mill's link contacts: the moving jaw must touch the blank, and another vise contact must oppose it along the same normal. Measured **0.017 mm** and at most **0.00007 mrad** at every start, 4 moving-jaw and 16 vise contacts.
 - [ ] C2: Measure settled MuJoCo jaw–blank normal force against p·A, using a real blank rather than a joint limit. Apply a modelled/equivalent cutting wrench to stock and reassert clamped hold.
 - [ ] C3: Restore a relative clamp-time bound; explain or fix the measured −18% discrepancy. The current ±30 ms bound is about ±31%, compared with the former ±10% requirement.
 - [ ] C4: Accumulate slip, both-pad contact and free-body evidence separately for every gripper channel inside the four-part production loop with the actual tending blank and dual gripper.

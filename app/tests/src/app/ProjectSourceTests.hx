@@ -4473,6 +4473,41 @@ class ProjectSourceTests {
             count++;
         return count;
       }
+      // MT14 C1: at every cycle start the blank sits on the vise seat within 0.1 mm / 2 mrad, and both
+      // jaws touch it: the moving jaw, and an opposing contact along the same normal on the fixed side.
+      var seatChecks = 0;
+      var jawJoints = [for (joint in cnc.robot.model.joints) if (joint.id == "mill/mill/vise/jaw") joint];
+      if (jawJoints.length != 1) throw "Tending cell lost its vise jaw joint";
+      var movingJaw = cnc.robot.model.links.indexOf(jawJoints[0].child);
+      if (movingJaw < 0) throw "Tending cell lost its moving vise jaw link";
+      var blankNames = [for (row in 0...2) for (column in 0...3) 'infeed/blank-$row-$column'];
+      function checkSeatedAtCycleStart():Void {
+        var seat = mission.liveConnectorFrame({occurrence: "mill/mill/vise/body", connector: "seat"});
+        var nearest = "", offset = Math.POSITIVE_INFINITY;
+        for (name in blankNames) {
+          var frame = mission.partFrame(name);
+          var distance = Math.sqrt(Math.pow(frame.x - seat.x, 2) + Math.pow(frame.y - seat.y, 2) + Math.pow(frame.z - seat.z, 2));
+          if (distance < offset) { offset = distance; nearest = name; }
+        }
+        var placed = mission.partFrame(nearest);
+        var dot = Math.abs(placed.qx * seat.qx + placed.qy * seat.qy + placed.qz * seat.qz + placed.qw * seat.qw);
+        var tilt = 2 * Math.acos(Math.min(1.0, dot));
+        var object = simulation.environmentObject("project:" + nearest);
+        if (object == null) throw 'Seated blank $nearest has no physics object';
+        var handle = object.handle.rawValue();
+        var touching = [for (contact in cnc.robot.runtime.contacts())
+          if (contact.active && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object && contact.otherObject == handle) contact];
+        var moving = [for (contact in touching) if (contact.linkIndex == movingJaw) contact];
+        var opposed = moving.length > 0 && [for (contact in touching) if (contact.linkIndex != movingJaw &&
+          Math.abs(contact.normal.dot(moving[0].normal)) > 0.9) contact].length > 0;
+        seatChecks++;
+        check(offset <= 1e-4 && tilt <= 2e-3,
+          'cycle start $seatChecks: $nearest sits on the vise seat within 0.1 mm / 2 mrad (${offset * 1000} mm, ${tilt * 1000} mrad)');
+        check(moving.length > 0 && opposed,
+          'cycle start $seatChecks: both vise jaws touch $nearest (${moving.length} moving-jaw contacts, opposed=$opposed)');
+        Sys.println('tending seat at cycle start $seatChecks: $nearest ${offset * 1000} mm, ${tilt * 1000} mrad, ' +
+          '${moving.length} moving-jaw / ${touching.length} vise contacts');
+      }
       var phaseStep = mission.stepIndex, phaseStart = productionStart;
       var exchangeOnly = scope == TendingCheck.Exchange;
       var lastCycleStart = 0.0, lastCycleTime = 0.0, wasCycleActive = false;
@@ -4505,6 +4540,9 @@ class ProjectSourceTests {
             Sys.println('tending phase $phaseStep: ${phase.kind}, ' +
               '${phase.at == null ? "signals" : phase.at.occurrence}, $seconds s');
           phaseStep = mission.stepIndex; phaseStart = simulation.activeSession().simulationTime();
+          var next = mission.mission.steps[mission.stepIndex];
+          if (next.kind == "signal" && next.signal != null && next.signal.name == RobotInterfaceChannels.CYCLE_START &&
+              next.signal.value) checkSeatedAtCycleStart();
         }
         var machine:Null<Robot> = null;
         for (id in simulation.simulatedRobotIds()) if (StringTools.endsWith(id, ":mill/cncController"))
