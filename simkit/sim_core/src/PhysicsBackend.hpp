@@ -85,6 +85,11 @@ struct BackendJointDesc {
     double limit_time_constant = 0.0;
     double limit_damping_ratio = 0.0;
     std::array<double, 5> limit_impedance{};
+    /** NKSIM_JOINT_HELICAL: advance per revolution, and the helix's spring and advance armature. */
+    double lead = 0.0;
+    double lead_stiffness = 0.0;
+    double lead_damping_ratio = 0.0;
+    double lead_armature = 0.0;
 };
 
 struct BackendJointState {

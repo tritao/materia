@@ -2006,7 +2006,17 @@ void a_belt_carriage_rings_at_its_belt_frequency() {
 
 // A rotating screwdriver spindle and the screw slide form a helical pair. The
 // screw stays dynamic, so a workpiece contact closes the reaction path through
-// the lead coupling and back into the spindle actuator.
+// the lead coupling and back into the spindle actuator: the torque-limited
+// spindle stalls with the screw seated, and the plate carries 2 pi torque / lead.
+//
+// Both the thread and the steel contact state their stiffness. MuJoCo scales a
+// soft constraint's impedance by the effective mass it acts on, and here that
+// is a 10 g screw: an unstiffened coupling slips by millimetres under tens of
+// newtons and a default contact lets the screw sink through the plate. A stiff
+// thread spring on a bare 10 g body is too fast for the step and chatters, so
+// the slide carries armature: a tenth of the spindle inertia that a rigid
+// thread reflects onto the screw axis (I / ratio^2), which adds a tenth to the
+// spindle's own effective inertia.
 void physical_screw_lead_transmits_workpiece_reaction() {
     const double timesteps[] = {0.001, 0.002};
     for (const double timestep : timesteps) {
@@ -2024,16 +2034,47 @@ void physical_screw_lead_transmits_workpiece_reaction() {
         const double plate_half_extents[] = {0.05, 0.05, 0.002};
         nksim_shape plate_shape = 0;
         assert(nksim_shape_create_box(world, plate_half_extents, &plate_shape) == NKSIM_OK);
+        // The stiffest contact MuJoCo keeps stable: a time constant of two substeps.
+        nksim_surface steel{};
+        steel.struct_size = sizeof(steel);
+        steel.friction_dimensions = 3;
+        steel.friction[0] = 0.15;
+        steel.contact_time_constant = 2.0 * timestep / 8.0;
+        steel.contact_damping_ratio = 1.0;
+        assert(nksim_shape_set_surface(world, plate_shape, &steel) == NKSIM_OK);
         const auto plate = make_body(world, make_node_xyz(scene, 0.0, 0.0, -0.002),
                                      NKSIM_MOTION_STATIC, 0.0, plate_shape);
         const auto spindle_base = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.03505),
                                             NKSIM_MOTION_STATIC, 0.0);
-        const auto spindle = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.03505),
-                                       NKSIM_MOTION_DYNAMIC, 0.1);
+        // Real inertias: without them a dynamic body is given a nominal 1 kg m^2 per axis, a flywheel that the
+        // 0.02 N m drive cannot turn within the run.
+        auto inertial = [&](const nksim_body_desc &base, double radius, double length) {
+            nksim_body_desc desc = base;
+            desc.has_inertial_properties = 1;
+            const double axial = 0.5 * desc.mass * radius * radius;
+            const double transverse = desc.mass * (3.0 * radius * radius + length * length) / 12.0;
+            desc.inertia_tensor[0] = desc.inertia_tensor[4] = transverse;
+            desc.inertia_tensor[8] = axial;
+            nksim_body body = 0;
+            assert(nksim_body_create(world, &desc, &body) == NKSIM_OK);
+            return body;
+        };
+        nksim_body_desc spindle_body{};
+        spindle_body.struct_size = sizeof(spindle_body);
+        spindle_body.node = make_node_xyz(scene, 0.0, 0.0, 0.03505);
+        spindle_body.motion_type = NKSIM_MOTION_DYNAMIC;
+        spindle_body.mass = 0.1;
+        spindle_body.collision_layer = 1;
+        spindle_body.collision_mask = 1;
+        const auto spindle = inertial(spindle_body, 0.01, 0.05);  // axial inertia 0.5 m r^2 = spindle_inertia
         nksim_shape screw_shape = 0;
         assert(nksim_shape_create_cylinder(world, 0.003, 0.01, &screw_shape) == NKSIM_OK);
-        const auto screw = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.00505),
-                                     NKSIM_MOTION_DYNAMIC, 0.01, screw_shape);
+        assert(nksim_shape_set_surface(world, screw_shape, &steel) == NKSIM_OK);
+        nksim_body_desc screw_body = spindle_body;
+        screw_body.node = make_node_xyz(scene, 0.0, 0.0, 0.00505);
+        screw_body.mass = 0.01;
+        screw_body.shape = screw_shape;
+        const auto screw = inertial(screw_body, 0.003, 0.01);
 
         nksim_joint_desc spindle_desc{};
         spindle_desc.struct_size = sizeof(spindle_desc);
@@ -2057,15 +2098,22 @@ void physical_screw_lead_transmits_workpiece_reaction() {
         slide_desc.lower_limit = -0.02;
         slide_desc.upper_limit = 0.02;
         slide_desc.max_force = 200.0;
+        constexpr double lead_m = 0.002;
+        constexpr double spindle_inertia = 0.5 * 0.1 * 0.01 * 0.01;
+        const double lead_ratio = lead_m / (2.0 * 3.14159265358979323846);
+        slide_desc.armature = 0.1 * spindle_inertia / (lead_ratio * lead_ratio);
         nksim_joint screw_slide = 0;
         assert(nksim_joint_create(world, &slide_desc, &screw_slide) == NKSIM_OK);
 
-        constexpr double lead_m = 0.002;
         nksim_joint_coupling_desc thread{};
         thread.struct_size = sizeof(thread);
         thread.leader = spindle_joint;
         thread.follower = screw_slide;
-        thread.ratio = -lead_m / (2.0 * 3.14159265358979323846);
+        thread.ratio = -lead_ratio;
+        // Axial stiffness of an engaged steel M6 thread, critically damped.
+        constexpr double thread_stiffness = 1.0e7;
+        thread.stiffness = thread_stiffness;
+        thread.damping_ratio = 1.0;
         assert(nksim_joint_couple(world, &thread) == NKSIM_OK);
 
         nksim_joint_target drive{};
@@ -2077,7 +2125,7 @@ void physical_screw_lead_transmits_workpiece_reaction() {
         assert(nksim_world_set_joint_targets(world, &drive, 1) == NKSIM_OK);
 
         double peak_spindle_effort = 0.0;
-        double peak_contact_force = 0.0;
+        double peak_contact_force = 0.0, final_contact_force = 0.0;
         nksim_contact contacts[16]{};
         for (int tick = 0; tick < 800; ++tick) {
             step_world(world, 1);
@@ -2086,9 +2134,12 @@ void physical_screw_lead_transmits_workpiece_reaction() {
             assert(nksim_joint_get_state(world, spindle_joint, &spindle_state) == NKSIM_OK);
             assert(nksim_joint_get_state(world, screw_slide, &slide_state) == NKSIM_OK);
             peak_spindle_effort = std::max(peak_spindle_effort, std::abs(spindle_state.effort));
-            assert(std::abs(slide_state.position - thread.ratio * spindle_state.position) < 2e-5);
+            // The thread yields by its compliance under the peak load seen so far, plus what spinning it up takes.
+            assert(std::abs(slide_state.position - thread.ratio * spindle_state.position) <
+                   std::max(peak_contact_force, 1.0) / thread_stiffness + 1e-5);
 
             uint32_t count = 0;
+            final_contact_force = 0.0;
             assert(nksim_world_get_contacts(world, contacts, 16, &count) == NKSIM_OK);
             for (uint32_t index = 0; index < count && index < 16; ++index) {
                 const auto &contact = contacts[index];
@@ -2098,6 +2149,7 @@ void physical_screw_lead_transmits_workpiece_reaction() {
                     contact.force_on_body_a[1] * contact.force_on_body_a[1] +
                     contact.force_on_body_a[2] * contact.force_on_body_a[2]);
                 peak_contact_force = std::max(peak_contact_force, force);
+                final_contact_force += force;
             }
         }
 
@@ -2105,10 +2157,181 @@ void physical_screw_lead_transmits_workpiece_reaction() {
         final_spindle.struct_size = final_slide.struct_size = sizeof(final_spindle);
         assert(nksim_joint_get_state(world, spindle_joint, &final_spindle) == NKSIM_OK);
         assert(nksim_joint_get_state(world, screw_slide, &final_slide) == NKSIM_OK);
-        assert(final_spindle.position > 0.1);
-        assert(final_slide.position < 0.0);
-        assert(peak_contact_force > 0.1);
-        assert(peak_spindle_effort > 1e-4);
+        // Seated: the 50 um gap closes after 0.157 rad, and the stalled spindle stays far from its 2 rad target.
+        assert(final_spindle.position > 0.15 && final_spindle.position < 0.25);
+        assert(final_slide.position < -4.0e-5);
+        assert(peak_spindle_effort >= 0.02 * 0.99);
+        const double static_load = 2.0 * 3.14159265358979323846 * drive.max_force / lead_m;
+        assert(final_contact_force > 0.75 * static_load && final_contact_force < 1.25 * static_load);
+
+        nksim_world_destroy(world);
+        nkscene_scene_destroy(scene);
+    }
+}
+
+// A screw on a helical joint in its tapped member, turned through a socket coupling, runs down by
+// its lead and clamps its head against the seat with 2 pi torque / lead. Nothing ties it to the
+// spindle axially: the reaction stays between the screw and the work.
+void a_helical_screw_turned_through_its_socket_clamps_its_seat() {
+    constexpr double pi = 3.14159265358979323846;
+    const double timesteps[] = {0.001, 0.002};
+    for (const double timestep : timesteps) {
+        nkscene_scene scene = 0;
+        assert(nkscene_scene_create(&scene) == NKS_OK);
+        nksim_world_desc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.scene = scene;
+        desc.fixed_timestep = timestep;
+        desc.physics_substeps = 8;
+        desc.gravity[2] = 0.0;
+        nksim_world world = 0;
+        assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+
+        nksim_surface steel{};
+        steel.struct_size = sizeof(steel);
+        steel.friction_dimensions = 3;
+        steel.friction[0] = 0.15;
+        steel.contact_time_constant = 2.0 * timestep / 8.0;
+        steel.contact_damping_ratio = 1.0;
+        // The seat's face is at z = 0; the tapped member below it carries the thread.
+        const double seat_half_extents[] = {0.02, 0.02, 0.002};
+        nksim_shape seat_shape = 0;
+        assert(nksim_shape_create_box(world, seat_half_extents, &seat_shape) == NKSIM_OK);
+        assert(nksim_shape_set_surface(world, seat_shape, &steel) == NKSIM_OK);
+        const auto seat = make_body(world, make_node_xyz(scene, 0.0, 0.0, -0.002), NKSIM_MOTION_STATIC, 0.0, seat_shape);
+        const auto nut = make_body(world, make_node_xyz(scene, 0.0, 0.0, -0.01), NKSIM_MOTION_STATIC, 0.0);
+        const auto spindle_base = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.03), NKSIM_MOTION_STATIC, 0.0);
+
+        auto inertial = [&](nksim_body_desc body, double radius, double length) {
+            body.has_inertial_properties = 1;
+            body.inertia_tensor[0] = body.inertia_tensor[4] = body.mass * (3.0 * radius * radius + length * length) / 12.0;
+            body.inertia_tensor[8] = 0.5 * body.mass * radius * radius;
+            nksim_body handle = 0;
+            assert(nksim_body_create(world, &body, &handle) == NKSIM_OK);
+            return handle;
+        };
+        nksim_body_desc spindle_body{};
+        spindle_body.struct_size = sizeof(spindle_body);
+        spindle_body.node = make_node_xyz(scene, 0.0, 0.0, 0.03);
+        spindle_body.motion_type = NKSIM_MOTION_DYNAMIC;
+        spindle_body.mass = 0.1;
+        spindle_body.collision_layer = 1;
+        spindle_body.collision_mask = 1;
+        const auto spindle = inertial(spindle_body, 0.01, 0.05);
+        // The head: 50 um above the seat.
+        constexpr double gap = 5.0e-5;
+        nksim_shape head_shape = 0;
+        assert(nksim_shape_create_cylinder(world, 0.005, 0.002, &head_shape) == NKSIM_OK);
+        assert(nksim_shape_set_surface(world, head_shape, &steel) == NKSIM_OK);
+        nksim_body_desc screw_body = spindle_body;
+        const double screw_z = 0.001 + gap;
+        screw_body.node = make_node_xyz(scene, 0.0, 0.0, screw_z);
+        screw_body.mass = 0.01;
+        screw_body.shape = head_shape;
+        const auto screw = inertial(screw_body, 0.003, 0.01);
+
+        nksim_joint_desc spindle_desc{};
+        spindle_desc.struct_size = sizeof(spindle_desc);
+        spindle_desc.type = NKSIM_JOINT_REVOLUTE;
+        spindle_desc.body_a = spindle_base;
+        spindle_desc.body_b = spindle;
+        spindle_desc.axis_a[2] = -1.0;
+        spindle_desc.lower_limit = -10.0;
+        spindle_desc.upper_limit = 10.0;
+        spindle_desc.max_force = 0.02;
+        nksim_joint spindle_joint = 0;
+        assert(nksim_joint_create(world, &spindle_desc, &spindle_joint) == NKSIM_OK);
+
+        // Right-hand, 1 mm lead, advancing down (+axis) as it turns about the axis.
+        constexpr double lead = 0.001;
+        constexpr double spindle_inertia = 0.5 * 0.1 * 0.01 * 0.01;
+        const double per_radian = lead / (2.0 * pi);
+        nksim_joint_desc helix{};
+        helix.struct_size = sizeof(helix);
+        helix.type = NKSIM_JOINT_HELICAL;
+        helix.body_a = nut;
+        helix.body_b = screw;
+        helix.anchor_a[2] = screw_z + 0.01;
+        helix.axis_a[2] = -1.0;
+        helix.lower_limit = -20.0;
+        helix.upper_limit = 20.0;
+        helix.lead = lead;
+        constexpr double thread_stiffness = 1.0e7;
+        helix.lead_stiffness = thread_stiffness;
+        helix.lead_damping_ratio = 1.0;
+        helix.lead_armature = 0.1 * spindle_inertia / (per_radian * per_radian);
+        nksim_joint thread = 0;
+        {
+            // A lead on any other joint, or none on a helix, is refused.
+            nksim_joint_desc wrong = spindle_desc;
+            wrong.lead = lead;
+            nksim_joint refused = 0;
+            assert(nksim_joint_create(world, &wrong, &refused) == NKSIM_ERROR_INVALID_ARGUMENT);
+            wrong = helix;
+            wrong.lead = 0.0;
+            assert(nksim_joint_create(world, &wrong, &refused) == NKSIM_ERROR_INVALID_ARGUMENT);
+        }
+        assert(nksim_joint_create(world, &helix, &thread) == NKSIM_OK);
+
+        // The socket: the screw turns with the spindle.
+        nksim_joint_coupling_desc socket{};
+        socket.struct_size = sizeof(socket);
+        socket.leader = spindle_joint;
+        socket.follower = thread;
+        socket.ratio = 1.0;
+        assert(nksim_joint_couple(world, &socket) == NKSIM_OK);
+
+        nksim_joint_target drive{};
+        drive.struct_size = sizeof(drive);
+        drive.joint = spindle_joint;
+        drive.mode = NKSIM_JOINT_TARGET_POSITION;
+        drive.target = 2.0;
+        drive.max_force = 0.02;
+        assert(nksim_world_set_joint_targets(world, &drive, 1) == NKSIM_OK);
+
+        double final_force = 0.0;
+        nksim_contact contacts[16]{};
+        for (int tick = 0; tick < 800; ++tick) {
+            step_world(world, 1);
+            nksim_joint_state turn{};
+            turn.struct_size = sizeof(turn);
+            assert(nksim_joint_get_state(world, thread, &turn) == NKSIM_OK);
+            nksim_body_state body{};
+            body.struct_size = sizeof(body);
+            assert(nksim_body_get_state(world, screw, &body) == NKSIM_OK);
+            // Running down free, the screw stands where its lead puts it (the flank carries only what
+            // accelerating the advance takes), on the axis.
+            const double advance = screw_z - body.position[2];
+            if (advance < gap - 2.0e-6) assert(std::abs(advance - per_radian * turn.position) < 2.0e-6);
+            assert(std::abs(body.position[0]) < 1e-6 && std::abs(body.position[1]) < 1e-6);
+            uint32_t count = 0;
+            final_force = 0.0;
+            assert(nksim_world_get_contacts(world, contacts, 16, &count) == NKSIM_OK);
+            for (uint32_t index = 0; index < count && index < 16; ++index) {
+                const auto &contact = contacts[index];
+                if (!contact.active || !contact.wrench_valid || (contact.body_a != seat && contact.body_b != seat)) continue;
+                final_force += std::abs(contact.force_on_body_a[2]);
+            }
+        }
+        nksim_joint_state spindle_state{}, turn{};
+        spindle_state.struct_size = turn.struct_size = sizeof(turn);
+        assert(nksim_joint_get_state(world, spindle_joint, &spindle_state) == NKSIM_OK);
+        assert(nksim_joint_get_state(world, thread, &turn) == NKSIM_OK);
+        // The socket held the screw to the spindle; the 50 um gap closes after 0.314 rad and the drive stalls there.
+        // The socket turns the screw with the spindle. As an ideal constraint on a light coordinate it winds up by
+        // MuJoCo's constraint impedance, about 1.4 mrad at the stall torque, close to a real bit's torsion.
+        assert(std::abs(turn.position - spindle_state.position) < 5e-3);
+        // The 50 um gap closes after 0.314 rad; the flank then stretches by the clamp load over its stiffness
+        // (0.08 rad more) and the torque-limited drive stalls, far from its 2 rad target.
+        assert(spindle_state.position > 0.35 && spindle_state.position < 0.45);
+        const double clamp = 2.0 * pi * drive.max_force / lead;
+        assert(final_force > 0.75 * clamp && final_force < 1.25 * clamp);
+        // Seated, the flank yields by the clamp load over its stiffness.
+        nksim_body_state seated{};
+        seated.struct_size = sizeof(seated);
+        assert(nksim_body_get_state(world, screw, &seated) == NKSIM_OK);
+        const double stretch = per_radian * turn.position - (screw_z - seated.position[2]);
+        assert(stretch > 0.5 * clamp / thread_stiffness && stretch < 1.5 * clamp / thread_stiffness);
 
         nksim_world_destroy(world);
         nkscene_scene_destroy(scene);
@@ -3151,6 +3374,7 @@ int main() {
     coupled_prismatic_joints_use_equality_and_convex_collision();
     rigid_coupling_holds_under_high_effort();
     physical_screw_lead_transmits_workpiece_reaction();
+    a_helical_screw_turned_through_its_socket_clamps_its_seat();
     a_follower_with_two_leaders_uses_a_tendon_equality();
     a_coupling_rings_as_its_damping_ratio_says();
     a_belt_carriage_rings_at_its_belt_frequency();

@@ -76,6 +76,8 @@ struct RestBox {
     Vec3 axis[3]{};
 };
 
+constexpr double kTwoPi = 6.28318530717958647692;
+
 struct JointRecord {
     nksim::BackendJointDesc desc{};
     nksim::BackendJointState state{};
@@ -93,6 +95,9 @@ struct JointRecord {
     double reference_duration = 0.0;
     double reference_epoch = 0.0;
     std::optional<nksim::BrakeState> brake;
+    /** NKSIM_JOINT_HELICAL: the advance coordinate, kept across recompilation like `state`. */
+    double advance = 0.0;
+    double advance_velocity = 0.0;
 };
 
 double dot(const Vec3 &a, const Vec3 &b) {
@@ -404,6 +409,7 @@ public:
     nksim_result begin_topology_update() override {
         if (topology_update)
             return NKSIM_ERROR_INVALID_STATE;
+        capture_advances();
         try {
             saved_bodies = bodies;
             saved_body_order = body_order;
@@ -537,6 +543,11 @@ public:
             if (joint_id >= 0) {
                 data->qpos[model->jnt_qposadr[joint_id]] = 0.0;
                 data->qvel[model->jnt_dofadr[joint_id]] = 0.0;
+            }
+            joint.advance = joint.advance_velocity = 0.0;
+            if (const auto advance = model_advance_id(joint); advance >= 0) {
+                data->qpos[model->jnt_qposadr[advance]] = 0.0;
+                data->qvel[model->jnt_dofadr[advance]] = 0.0;
             }
             apply_joint_targets();
         } else {
@@ -700,7 +711,7 @@ public:
         if (desc.body_a == desc.body_b || parent_joint_id(desc.body_b) != 0)
             return NKSIM_ERROR_INVALID_STATE;
         if (desc.type != NKSIM_JOINT_FIXED && desc.type != NKSIM_JOINT_REVOLUTE &&
-            desc.type != NKSIM_JOINT_PRISMATIC)
+            desc.type != NKSIM_JOINT_PRISMATIC && desc.type != NKSIM_JOINT_HELICAL)
             return NKSIM_ERROR_UNSUPPORTED;
         if (would_create_cycle(desc.body_a, desc.body_b))
             return NKSIM_ERROR_INVALID_STATE;
@@ -738,6 +749,28 @@ public:
             const auto child_offset = rotate(child_rest_rotation,
                 Vec3{desc.anchor_b[0], desc.anchor_b[1], desc.anchor_b[2]});
             const auto child_rest_position = subtract(world_joint_position, child_offset);
+            // The child's articulated descendants keep their rest frames relative to it: carry the whole subtree
+            // rigidly, delta = new rest * old rest^-1, or their own joints no longer meet at rest.
+            const auto old_position = Vec3{child.desc.position[0], child.desc.position[1], child.desc.position[2]};
+            const auto old_rotation = normalize(Quat{child.desc.rotation[0], child.desc.rotation[1],
+                child.desc.rotation[2], child.desc.rotation[3]});
+            const auto delta_rotation = normalize(multiply(child_rest_rotation, conjugate(old_rotation)));
+            std::vector<std::uint64_t> subtree{desc.body_b};
+            for (std::size_t index = 0; index < subtree.size(); ++index)
+                for (const auto joint_id : joint_order) {
+                    const auto &joint = joints.at(joint_id);
+                    if (joint.desc.body_a == subtree[index]) subtree.push_back(joint.desc.body_b);
+                }
+            for (std::size_t index = 1; index < subtree.size(); ++index) {
+                auto &descendant = bodies.at(subtree[index]).desc;
+                const auto offset = rotate(delta_rotation, subtract(Vec3{descendant.position[0],
+                    descendant.position[1], descendant.position[2]}, old_position));
+                const auto position = add(child_rest_position, offset);
+                const auto rotation = normalize(multiply(delta_rotation, Quat{descendant.rotation[0],
+                    descendant.rotation[1], descendant.rotation[2], descendant.rotation[3]}));
+                for (int axis = 0; axis < 3; ++axis) descendant.position[axis] = position[axis];
+                for (int axis = 0; axis < 4; ++axis) descendant.rotation[axis] = rotation[axis];
+            }
             child.desc.position = child_rest_position;
             child.desc.rotation = child_rest_rotation;
         }
@@ -1073,6 +1106,12 @@ public:
         data->qvel[model->jnt_dofadr[joint_id]] = velocity;
         found->second.state.position = position;
         found->second.state.velocity = velocity;
+        // A set helix stands unloaded: its advance is where the lead puts it.
+        if (const auto advance = model_advance_id(found->second); advance >= 0) {
+            const double per_radian = found->second.desc.lead / kTwoPi;
+            found->second.advance = data->qpos[model->jnt_qposadr[advance]] = per_radian * position;
+            found->second.advance_velocity = data->qvel[model->jnt_dofadr[advance]] = per_radian * velocity;
+        }
         derived_stale = true;
         return NKSIM_OK;
     }
@@ -1098,6 +1137,10 @@ public:
                 state.effort = data->qfrc_actuator[model->jnt_dofadr[joint_id]];
             }
             found->second.state = state;
+            if (const auto advance = model_advance_id(found->second); advance >= 0) {
+                found->second.advance = data->qpos[model->jnt_qposadr[advance]];
+                found->second.advance_velocity = data->qvel[model->jnt_dofadr[advance]];
+            }
         }
         return NKSIM_OK;
     }
@@ -1704,6 +1747,29 @@ private:
             // the default 20 ms response lets high-force drives stretch it.
             if (follower_inverse > 0.0) coupling_responses.push_back({equality, 0.0, 1.0});
         }
+        for (const auto &[joint_id, joint] : joints) {
+            if (joint.desc.type != NKSIM_JOINT_HELICAL) continue;
+            const int hinge = model_joint_id(joint), advance = model_advance_id(joint);
+            if (hinge < 0 || advance < 0) continue;
+            const auto name = "nksim_helix_" + std::to_string(joint_id);
+            const double advance_inverse = model->dof_invweight0[model->jnt_dofadr[advance]];
+            const int tendon = mj_name2id(model, mjOBJ_TENDON, name.c_str());
+            if (tendon < 0) {
+                // An ideal helix takes the stiffest stable response, as an ideal coupling does.
+                const int equality = mj_name2id(model, mjOBJ_EQUALITY, name.c_str());
+                if (equality >= 0 && advance_inverse > 0.0) coupling_responses.push_back({equality, 0.0, 1.0});
+                continue;
+            }
+            const double per_radian = joint.desc.lead / kTwoPi;
+            const double load = per_radian * per_radian * model->dof_invweight0[model->jnt_dofadr[hinge]];
+            const double inverse = advance_inverse + load;
+            if (!(inverse > 0.0)) continue;
+            const double stiffness = joint.desc.lead_stiffness;
+            coupling_interval = std::min(coupling_interval, 0.5 / std::sqrt(stiffness * inverse));
+            model->tendon_stiffness[tendon] = stiffness;
+            model->tendon_damping[tendon] = 2.0 * joint.desc.lead_damping_ratio * std::sqrt(stiffness / inverse);
+            model->tendon_lengthspring[2 * tendon] = model->tendon_lengthspring[2 * tendon + 1] = 0.0;
+        }
     }
 
     // F2: a single motor actuator per non-fixed joint. apply_joint_targets
@@ -1932,6 +1998,44 @@ private:
         return NKSIM_OK;
     }
 
+    // A helix is the hinge that is its coordinate plus a slide along the same axis, held to lead / 2 pi per radian.
+    // With a stiffness and damping ratio the relation is a spring: a fixed tendon of the advance less the lead's,
+    // carrying MuJoCo's passive spring and damper (see `rebuild_coupling_responses` for why not a soft equality).
+    // Without one it is an ideal joint equality.
+    nksim_result add_helix(mjsBody &body, const JointRecord &record, std::uint64_t joint_id, const mjsJoint &hinge) {
+        auto *slide = mjs_addJoint(&body, nullptr);
+        if (!slide) return NKSIM_ERROR_OUT_OF_MEMORY;
+        const auto slide_name = record.name + "_advance";
+        if (mjs_setName(slide->element, slide_name.c_str()) != 0) return NKSIM_ERROR_BACKEND;
+        slide->type = mjJNT_SLIDE;
+        std::copy(hinge.pos, hinge.pos + 3, slide->pos);
+        std::copy(hinge.axis, hinge.axis + 3, slide->axis);
+        slide->limited = mjLIMITED_FALSE;
+        slide->armature = record.desc.lead_armature;
+        const double per_radian = record.desc.lead / kTwoPi;
+        if (record.desc.lead_stiffness > 0.0 && record.desc.lead_damping_ratio > 0.0) {
+            auto *tendon = mjs_addTendon(spec, nullptr);
+            if (!tendon) return NKSIM_ERROR_OUT_OF_MEMORY;
+            const auto tendon_name = "nksim_helix_" + std::to_string(joint_id);
+            if (mjs_setName(tendon->element, tendon_name.c_str()) != 0) return NKSIM_ERROR_BACKEND;
+            if (!mjs_wrapJoint(tendon, slide_name.c_str(), 1.0) ||
+                !mjs_wrapJoint(tendon, record.name.c_str(), -per_radian))
+                return NKSIM_ERROR_BACKEND;
+            return NKSIM_OK;
+        }
+        auto *equality = mjs_addEquality(spec, nullptr);
+        if (!equality) return NKSIM_ERROR_OUT_OF_MEMORY;
+        const auto equality_name = "nksim_helix_" + std::to_string(joint_id);
+        mjs_setName(equality->element, equality_name.c_str());
+        equality->type = mjEQ_JOINT;
+        equality->objtype = mjOBJ_JOINT;
+        mjs_setString(equality->name1, slide_name.c_str());
+        mjs_setString(equality->name2, record.name.c_str());
+        equality->data[0] = 0.0;
+        equality->data[1] = per_radian;
+        return NKSIM_OK;
+    }
+
     nksim_result add_body(std::uint64_t id, mjsBody *parent,
                           std::unordered_set<std::uint64_t> &added) {
         const auto found = bodies.find(id);
@@ -2077,8 +2181,8 @@ private:
                 return NKSIM_ERROR_OUT_OF_MEMORY;
             if (mjs_setName(joint->element, incoming->name.c_str()) != 0)
                 return NKSIM_ERROR_BACKEND;
-            joint->type = incoming->desc.type == NKSIM_JOINT_REVOLUTE
-                ? mjJNT_HINGE : mjJNT_SLIDE;
+            joint->type = incoming->desc.type == NKSIM_JOINT_PRISMATIC
+                ? mjJNT_SLIDE : mjJNT_HINGE;
             // Place the joint at the joint frame in body-local (child)
             // coordinates: anchor_b/rotation_b, per F1. axis_a is the
             // joint-frame axis rotated into body_a's frame by rotation_a;
@@ -2108,6 +2212,10 @@ private:
             const auto &impedance = incoming->desc.limit_impedance;
             if (std::any_of(impedance.begin(), impedance.end(), [](double v) { return v != 0.0; }))
                 std::copy(impedance.begin(), impedance.end(), joint->solimp_limit);
+            if (incoming->desc.type == NKSIM_JOINT_HELICAL) {
+                const auto result = add_helix(body, *incoming, parent_joint_id(incoming->desc.body_b), *joint);
+                if (result != NKSIM_OK) return result;
+            }
         }
 
         if (desc.shape_parts.empty())
@@ -2224,6 +2332,21 @@ private:
                 continue;
             data->qpos[model->jnt_qposadr[model_id]] = found->second.state.position;
             data->qvel[model->jnt_dofadr[model_id]] = found->second.state.velocity;
+            if (const auto advance = model_advance_id(found->second); advance >= 0) {
+                data->qpos[model->jnt_qposadr[advance]] = found->second.advance;
+                data->qvel[model->jnt_dofadr[advance]] = found->second.advance_velocity;
+            }
+        }
+    }
+
+    /** Records each helix's live advance before the model is rebuilt. */
+    void capture_advances() {
+        if (!model || !data) return;
+        for (auto &[id, joint] : joints) {
+            const auto advance = model_advance_id(joint);
+            if (advance < 0) continue;
+            joint.advance = data->qpos[model->jnt_qposadr[advance]];
+            joint.advance_velocity = data->qvel[model->jnt_dofadr[advance]];
         }
     }
 
@@ -2433,6 +2556,13 @@ private:
         if (!model)
             return -1;
         return mj_name2id(model, mjOBJ_JOINT, joint.name.c_str());
+    }
+
+    /** A helical joint's advance: a slide on the same body, beside the hinge that is its coordinate. */
+    int model_advance_id(const JointRecord &joint) const noexcept {
+        if (!model || joint.desc.type != NKSIM_JOINT_HELICAL)
+            return -1;
+        return mj_name2id(model, mjOBJ_JOINT, (joint.name + "_advance").c_str());
     }
 
     int model_actuator_id(const JointRecord &joint, const char *mode) const noexcept {

@@ -38,7 +38,7 @@ bool valid_inertial_properties(const nksim_body_desc &desc) noexcept {
 
 bool valid_joint_type(std::uint32_t type) noexcept {
     return type == NKSIM_JOINT_FIXED || type == NKSIM_JOINT_REVOLUTE ||
-        type == NKSIM_JOINT_PRISMATIC;
+        type == NKSIM_JOINT_PRISMATIC || type == NKSIM_JOINT_HELICAL;
 }
 
 bool valid_shape_desc(const nksim_shape_desc &desc) noexcept {
@@ -1152,6 +1152,25 @@ nksim_result World::create_joint(const nksim_joint_desc &desc, nksim_joint *out_
                   std::begin(joint->desc.limit_impedance));
         std::copy(std::begin(desc.limit_impedance), std::end(desc.limit_impedance),
                   backend_desc.limit_impedance.begin());
+    }
+    {
+        // A helix needs a finite nonzero lead; every other joint states none.
+        const bool helical = desc.type == NKSIM_JOINT_HELICAL;
+        const bool finite = std::isfinite(desc.lead) && std::isfinite(desc.lead_stiffness) &&
+            std::isfinite(desc.lead_damping_ratio) && std::isfinite(desc.lead_armature);
+        const bool valid = finite && (helical
+            ? desc.lead != 0.0 && desc.lead_stiffness >= 0.0 && desc.lead_damping_ratio >= 0.0 &&
+                desc.lead_armature >= 0.0
+            : desc.lead == 0.0 && desc.lead_stiffness == 0.0 && desc.lead_damping_ratio == 0.0 &&
+                desc.lead_armature == 0.0);
+        if (!valid) {
+            joints.remove(handle);
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        }
+        joint->desc.lead = backend_desc.lead = desc.lead;
+        joint->desc.lead_stiffness = backend_desc.lead_stiffness = desc.lead_stiffness;
+        joint->desc.lead_damping_ratio = backend_desc.lead_damping_ratio = desc.lead_damping_ratio;
+        joint->desc.lead_armature = backend_desc.lead_armature = desc.lead_armature;
     }
     std::uint64_t backend_joint = 0;
     const auto result = backend->joint_create(backend_desc, &backend_joint);

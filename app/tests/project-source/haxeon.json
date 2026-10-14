@@ -6,11 +6,6 @@
   "entry": "app.ProjectSourceTests",
   "sourceRoots": [
     "../src",
-    "../../../machinekit/examples/bench-mill",
-    "../../../machinekit/examples/cnc-router",
-    "../../../machinekit/examples/machine-tending",
-    "../../../machinekit/examples/robot-arm",
-    "../../../processkit/tests/modbus",
     "../../../machinekit/examples/press-brake"
   ],
   "scopeSourceRoots": false,
@@ -23,5 +18,5 @@
     }
   },
   "target": "host",
-  "outputDir": "../../build"
+  "outputDir": "build"
 }

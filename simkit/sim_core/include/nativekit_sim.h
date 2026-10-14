@@ -83,7 +83,9 @@ enum {
     /* Closures only (see nksim_closure_desc): */
     NKSIM_JOINT_SPHERICAL = 4,   /**< A shared point. */
     NKSIM_JOINT_CYLINDRICAL = 5, /**< A shared axis line, free to slide and turn along it. */
-    NKSIM_JOINT_PLANAR = 6       /**< body_b slides and turns in body_a's plane through anchor_a with normal axis_a. */
+    NKSIM_JOINT_PLANAR = 6,      /**< body_b slides and turns in body_a's plane through anchor_a with normal axis_a. */
+    /** A tree joint: body_b turns about axis_a and advances `lead` along it per revolution. Its coordinate is the turn. */
+    NKSIM_JOINT_HELICAL = 7
 };
 
 enum {
@@ -231,6 +233,16 @@ typedef struct nksim_joint_desc {
     double limit_time_constant;
     double limit_damping_ratio;
     double limit_impedance[5];
+    /*
+     * NKSIM_JOINT_HELICAL only, zero otherwise. lead is the metres body_b advances along axis_a per positive
+     * revolution (negative for a left-hand thread). With lead_stiffness (N/m along the axis) and a positive
+     * lead_damping_ratio the helix is a spring, a loaded thread flank's compliance; a zero stiffness keeps it an
+     * ideal constraint. lead_armature (kg) is inertia on the advance, beyond body_b's own mass.
+     */
+    double lead;
+    double lead_stiffness;
+    double lead_damping_ratio;
+    double lead_armature;
 } nksim_joint_desc;
 
 /**

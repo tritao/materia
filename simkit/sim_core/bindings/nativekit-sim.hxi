@@ -43,6 +43,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	const NKSIM_JOINT_CYLINDRICAL = 5;
 	const NKSIM_JOINT_FIXED = 1;
 	/**
+	 * A tree joint: body_b turns about axis_a and advances `lead` along it per revolution. Its coordinate is the turn.
+	 */
+	const NKSIM_JOINT_HELICAL = 7;
+	/**
 	 * < body_b slides and turns in body_a's plane through anchor_a with normal axis_a.
 	 */
 	const NKSIM_JOINT_PLANAR = 6;
@@ -459,8 +463,8 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	/**
 	 * A detected contact. Distance is signed surface separation in metres;
 	 * normal points from body_a toward body_b. active is false when the backend
-	 * reports it without a force constraint.
-	 * Body handles are zero for backend-owned world geometry.
+	 * reports it without a force constraint. Body handles are zero for
+	 * backend-owned world geometry.
 	 */
 	struct nksim_contact @layout(136, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -473,6 +477,9 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		distance: f64 @offset(72);
 		active: u32 @offset(80);
 		wrench_valid: u32 @offset(84);
+		/**
+		 * Contact wrench acting on body_a, in world axes, about position; SI units.
+		 */
 		force_on_body_a: array<f64, 3> @offset(88);
 		torque_on_body_a: array<f64, 3> @offset(112);
 	}
@@ -517,7 +524,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		 */
 		damping_ratio: f64 @offset(40);
 	}
-	struct nksim_joint_desc @layout(288, 8) {
+	struct nksim_joint_desc @layout(320, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		type: u32 @offset(4);
 		body_a: nksim_body @offset(8);
@@ -547,6 +554,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		limit_time_constant: f64 @offset(232);
 		limit_damping_ratio: f64 @offset(240);
 		limit_impedance: array<f64, 5> @offset(248);
+		lead: f64 @offset(288);
+		lead_stiffness: f64 @offset(296);
+		lead_damping_ratio: f64 @offset(304);
+		lead_armature: f64 @offset(312);
 	}
 	struct nksim_joint_state @layout(56, 8) {
 		struct_size: u32 @offset(0) @struct_size;

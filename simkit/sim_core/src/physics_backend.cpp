@@ -69,9 +69,15 @@ Xform inverse(const Xform &a) {
     return {rotate(inv_rot, scale(a.pos, -1.0)), inv_rot};
 }
 
-Xform motion(std::uint32_t type, const Vec3 &axis, double q) {
+Xform motion(std::uint32_t type, const Vec3 &axis, double q, double lead) {
     if (type == NKSIM_JOINT_PRISMATIC)
         return {scale(axis, q), {0.0, 0.0, 0.0, 1.0}};
+    if (type == NKSIM_JOINT_HELICAL) {
+        constexpr double two_pi = 6.28318530717958647692;
+        const double half = q * 0.5;
+        const double s = std::sin(half);
+        return {scale(axis, lead * q / two_pi), {axis[0]*s, axis[1]*s, axis[2]*s, std::cos(half)}};
+    }
     if (type == NKSIM_JOINT_REVOLUTE) {
         const double half = q * 0.5;
         const double s = std::sin(half);
@@ -722,7 +728,7 @@ private:
                 const Xform anchor_b{joint.desc.anchor_b, normalize(joint.desc.rotation_b)};
                 const auto axis_joint_frame = rotate(conjugate(normalize(joint.desc.rotation_a)), joint.desc.axis_a);
                 const Xform new_pose = compose(
-                    compose(compose(parent_pose, anchor_a), motion(joint.desc.type, axis_joint_frame, joint.state.position)),
+                    compose(compose(parent_pose, anchor_a), motion(joint.desc.type, axis_joint_frame, joint.state.position, joint.desc.lead)),
                     inverse(anchor_b));
                 const auto previous_position = child.state.position;
                 const auto previous_rotation = child.state.rotation;
