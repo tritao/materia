@@ -6,6 +6,7 @@ import motionkit.program.InputPredicate;
 import motionkit.program.MotionProgram;
 import motionkit.trajectory.ExecutionPlan;
 import robotkit.execution.FiredProcessEvent;
+import RobotKitRuntime;
 import robotkit.core.Robot;
 import motionkit.robot.SessionState;
 
@@ -161,7 +162,10 @@ class ManipulatorMotion {
   }
 
   public function update(dtSeconds:Float):Void {
-    if (!running) return;
+    if (!running) {
+      drainIdleEvents();
+      return;
+    }
     if (!Math.isFinite(dtSeconds) || dtSeconds <= 0.0)
       throw "Manipulator update duration must be finite and positive";
     if (starting && !startWhenPlanned()) return;
@@ -395,6 +399,18 @@ class ManipulatorMotion {
     if (session.isFaulted()) { pendingProgram = null; release(); executor.clear(); }
     else if (session.state == Idle) release();
   }
+  /**
+   * Between programs the runtime still records every output change, the controller's own writes
+   * included, in a bounded log. Reading it each tick keeps those writes from overflowing the log
+   * before the next program; a late event of the last program is kept for `firedEvents`.
+   */
+  function drainIdleEvents():Void {
+    var batch = eventSource();
+    for (event in batch.events)
+      if (event.cause != RobotKitRuntimeConstants.RK_EVENT_CONTROLLER) events.push(event);
+    if (batch.overflow) { failure = "Runtime process event overflow"; programCompleted = false; }
+  }
+
   function collectEvents():Void {
     var batch = eventSource();
     for (event in batch.events) events.push(event);
