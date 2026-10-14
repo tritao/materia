@@ -6,6 +6,8 @@
 	"entry": "TendingReach",
 	"sources": [
 		"TendingReach.hx",
+		"TendingReachLayout.hx",
+		"TendingReachCertificate.hx",
 		"TendingControllers.hx",
 		"TendingBlank.hx",
 		"TendingMission.hx",

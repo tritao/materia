@@ -40,7 +40,7 @@ class TendingControllers extends MachineAssembly {
 		this.production = production == null ? TendingCyclePlan.bearingBlocks() : production;
 		// Tended stock enters as a free infeed blank; keep the vise empty in the machine body.
 		mill = new EnclosedBenchMill(false);
-		reach = TendingReach.study(mill, this.production);
+		reach = TendingReachLayout.certified(this.production);
 		var infeed = [for (tray in reach.trays) if (tray.id == "infeedTray") tray][0];
 		var outfeed = [for (tray in reach.trays) if (tray.id == "outfeedTray") tray][0];
 		infeedTray = new PartTray(this.production.rows, this.production.columns, BenchMill.STOCK_WIDTH, BenchMill.STOCK_DEPTH,

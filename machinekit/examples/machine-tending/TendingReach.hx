@@ -201,10 +201,11 @@ class TendingReach {
 		return AssemblyFrames.compose(slot, AssemblyFrames.translation(presenceHeadOffsetX(), outwardY, 10));
 	}
 
+	/** Checks the stored layout against the current cell, with the acceptance numbers the study certified. */
 	public static function run():Void {
 		var cell = new EnclosedBenchMill();
 		var production = TendingCyclePlan.bearingBlocks();
-		var result = study(cell, production);
+		var result = TendingReachLayout.certified(production);
 		for (needed in production.transferRequests()) {
 			var path = transferPositions(result, needed.station, needed.tool, needed.fromTool);
 			if (path.length < 2) throw 'Tending production has no complete path for ${needed.station}';
@@ -244,6 +245,53 @@ class TendingReach {
 			'${baseStandOff} mm base stand-off, ' +
 			'${result.jointMargin * 100}% joint margin, wrist |sin(q5)| ${result.wristSine}, ' +
 			'tray pitch ${infeed.pitchX} x ${infeed.pitchY} mm');
+	}
+
+	/** The arm with its pneumatic service, as the study models it. */
+	public static function armAssembly(source:CobotArm):MachineAssembly {
+		var reachAssembly = new MachineAssembly();
+		reachAssembly.include("arm", source);
+		reachAssembly.addComponent("airSupply", new AirSupply(), AssemblyFrames.translation(1200, -500, 0));
+		reachAssembly.connectPorts("arm-air", "airSupply", "air", "arm", "compressedAir");
+		if (reachAssembly.validate().length != 0) throw "Reach arm pneumatic service does not validate";
+		return reachAssembly;
+	}
+
+	/** The study's own tuning, part of the stored layout's fingerprint. */
+	public static function studyConstants():String
+		return 'jointMargin=$MIN_JOINT_MARGIN approach=$APPROACH_SEARCH_ITERATIONS tray=$TRAY_PLACEMENT_ALLOWANCE_MM ' +
+			'presence=$PRESENCE_HEAD_MOUNT_ALLOWANCE_MM';
+
+	/** Solves the layout again and stores it, with its input fingerprint, as `TendingReachCertificate`. */
+	public static function store():Void {
+		var production = TendingCyclePlan.bearingBlocks();
+		var fingerprint = TendingReachLayout.fingerprint(production);
+		var source = TendingReachLayout.certificateSource(study(new EnclosedBenchMill(), production), fingerprint);
+		var path = certificatePath();
+		sys.io.File.saveContent(path, source);
+		trace('Stored the tending reach layout in $path ($fingerprint)');
+	}
+
+	/** Solves the layout again and fails unless it equals the stored one: the study and its inputs agree. */
+	public static function check():Void {
+		var production = TendingCyclePlan.bearingBlocks();
+		var fingerprint = TendingReachLayout.fingerprint(production);
+		var stored = TendingReachLayout.decode(TendingReachCertificate.JSON);
+		if (stored.fingerprint != fingerprint) throw 'The stored tending reach layout is for other inputs; run `${TendingReachLayout.REGENERATE}`';
+		var solved = TendingReachLayout.encode(study(new EnclosedBenchMill(), production), fingerprint);
+		if (solved != TendingReachLayout.encode(stored.result, fingerprint))
+			throw 'The tending reach study no longer reproduces its stored layout; run `${TendingReachLayout.REGENERATE}`';
+		trace("The tending reach study reproduces its stored layout");
+	}
+
+	static function certificatePath():String {
+		var root = Sys.getCwd();
+		while (!sys.FileSystem.exists(root + "/machinekit/examples/machine-tending/TendingReach.hx")) {
+			var parent = haxe.io.Path.directory(root);
+			if (parent == root || parent.length == 0) throw "Could not locate the Materia repository to store the reach layout";
+			root = parent;
+		}
+		return root + "/machinekit/examples/machine-tending/TendingReachCertificate.hx";
 	}
 
 	public static function toolPose(result:TendingReachResult, name:String, channel:String):Array<Float> {
@@ -499,11 +547,7 @@ class TendingReach {
 		// below the blank and missed the collision body the arm would actually meet.
 		// Free blanks change pockets and follow the robot during a cycle; the mission
 		// planner checks their live poses rather than baking one occupancy into this study.
-		var reachAssembly = new MachineAssembly();
-		reachAssembly.include("arm", source);
-		reachAssembly.addComponent("airSupply", new AirSupply(), AssemblyFrames.translation(1200, -500, 0));
-		reachAssembly.connectPorts("arm-air", "airSupply", "air", "arm", "compressedAir");
-		if (reachAssembly.validate().length != 0) throw "Reach arm pneumatic service does not validate";
+		var reachAssembly = armAssembly(source);
 		var armScene = SceneArtifact.decode(SceneArtifact.encode(AssemblyPreview.scene(reachAssembly, "reach-arm")));
 		var armPhysical = AssemblyPhysicalPartView.fromSceneArtifact(armScene);
 		var tools = machinekit.robot.RobotScene.robotTools(source.tool, "arm/tool");
@@ -1699,4 +1743,10 @@ class TendingReach {
 		new Vec3(frame.x / 1000, frame.y / 1000, frame.z / 1000), new Quat(frame.qx, frame.qy, frame.qz, frame.qw));
 }
 
-function main():Void TendingReach.run();
+/** `--store` solves and stores the layout, `--check` solves and compares it; otherwise checks the stored layout. */
+function main():Void {
+	var args = Sys.args();
+	if (args.indexOf("--store") >= 0) TendingReach.store();
+	else if (args.indexOf("--check") >= 0) TendingReach.check();
+	else TendingReach.run();
+}
