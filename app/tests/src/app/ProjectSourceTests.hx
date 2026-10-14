@@ -72,6 +72,20 @@ import materia.project.SceneArtifact.SceneArtifactMissionStep;
 import cnckit.controller.RobotInterfaceAlarm;
 import cnckit.controller.RobotInterfaceChannels;
 
+/** One printed part, measured: its material, how far the nozzle was from where it was commanded, and what the run cost. */
+typedef PartRun = {
+  volume:Float, low:Array<Float>, high:Array<Float>,
+  deviation:Float, deviationAt:Float, printSeconds:Float, wallSeconds:Float,
+  /** The most the drives' springs let an axis stretch at the print's accelerations, m a / K, in metres. */
+  stretch:Float
+}
+
+/** A printed cube: the part, and the hole through it. */
+typedef CubeRun = {
+  volume:Float, low:Array<Float>, high:Array<Float>, holeDiameter:Float, holeOffCentre:Float,
+  deviation:Float, deviationAt:Float, printSeconds:Float, wallSeconds:Float, stretch:Float
+}
+
 /** Save and reopen a generated project without persisting its mesh buffers. */
 @:access(app.MissionPlayer)
 @:access(motionkit.robot.ManipulatorMotion)
@@ -506,6 +520,87 @@ class ProjectSourceTests {
   }
 
   /**
+   * The printer's physical prints against its ideal ones (RF3). Deposition follows the physical nozzle, the links in
+   * MuJoCo, where the belts stretch and the carriage swings; the deterministic runs keep the ideal drives and are the
+   * exact regression. SmallTab and the short cube are printed on MuJoCo and compared to them: volume, box, hole and the
+   * most the drives stretched, within the belts' m a / K times `STRETCH_MARGIN`. `ideal` is the short cube's
+   * deterministic run, printed by the caller.
+   */
+  static function checkPrinterPhysical(root:String, ideal:CubeRun):Void {
+    checkPrinterTab(root, ApplicationSimulation.MUJOCO, checkPrinterTab(root, ApplicationSimulation.DETERMINISTIC));
+    checkPrinterCube(root, "cube-short", 4.0, true, ApplicationSimulation.MUJOCO, ideal);
+  }
+
+  /**
+   * SmallTab, the project's small print, on `backend`: printed to the end and measured (its volume and box in the tab's
+   * own square, the nozzle's largest distance from the commanded one). Without a reference it is the ideal print the
+   * regression checks hold exactly; with one (the deterministic print) the physical print is compared to it.
+   */
+  static function checkPrinterTab(root:String, backend:Int, ?reference:PartRun):PartRun {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var definition = session.projectAssemblyDefinition, physical = session.projectPhysical;
+    if (definition == null || physical == null) throw "the printer has no assembly";
+    var model = AssemblySimulationBridge.toRobotModel(definition, physical, session.projectAssemblyState).model;
+    var world = new RobotWorld();
+    var simulation = new ApplicationSimulation(world);
+    simulation.setBackend(backend);
+    check(simulation.rebuild(session.sensors, session.scene, session), "the printer builds: " + simulation.error);
+    var player = simulation.printPlayer(), job = session.printJob;
+    if (player == null || job == null) throw "the printer has no print player";
+    player.showPrint = false;
+    player.stockSpacing = 0.00005;
+    var dt = simulation.timestep, ticks = 0, limit = Math.round(1500.0 / dt), wall = Sys.time();
+    while (player.passes == 0 && player.failure == null && ticks++ < limit) simulation.step();
+    check(player.failure == null, "the printer prints the tab: " + player.failure);
+    check(player.passes == 1, 'the tab is done in ${ticks * dt} s');
+    var laid = player.stock;
+    if (laid == null) throw "the tab print laid no material";
+    var tab = measurePrinted(laid.stock, 0.105, 0.115, 0.105, 0.115, 0.0005, laid.center);
+    var run:PartRun = {volume: tab.volume, low: tab.low, high: tab.high, deviation: player.nozzleDeviation, deviationAt: player.nozzleDeviationAt,
+      printSeconds: ticks * dt, wallSeconds: Sys.time() - wall, stretch: stretchBound(model)};
+    var label = backend == ApplicationSimulation.MUJOCO ? "MuJoCo" : "deterministic";
+    Sys.println('printer tab on $label: printed in ${Math.round(run.printSeconds * 10) / 10} s (${Math.round(run.wallSeconds * 10) / 10} s wall, ${Math.round(run.printSeconds / run.wallSeconds * 10) / 10}x real time), ' +
+      '${Math.round(run.volume * 1e10) / 10} mm^3, spans ${[for (a in 0...3) Math.round(run.low[a] * 1e6)]}..${[for (a in 0...3) Math.round(run.high[a] * 1e6)]} um, ' +
+      'nozzle at most ${Math.round(run.deviation * 1e6)} um from where its pulleys put it (the drive stretch) at ${Math.round(run.deviationAt * 10) / 10} s');
+    if (reference != null) {
+      var bound = STRETCH_MARGIN * run.stretch, raster = laid.stock.lattice.spacing, wallArea = 40.0 * 1.2 * 1e-6, mm = 1000.0;
+      var dVolume = run.volume - reference.volume;
+      Sys.println('printer tab physical against ideal: volume ${Math.round(dVolume * 1e10) / 10} mm^3 (${Math.round(dVolume / reference.volume * 1e4) / 100} %), ' +
+        'box low ${[for (a in 0...3) Math.round((run.low[a] - reference.low[a]) * 1e6)]} high ${[for (a in 0...3) Math.round((run.high[a] - reference.high[a]) * 1e6)]} um; ' +
+        'nozzle ${Math.round(run.deviation * 1e6)} um (stretch m a / K ${Math.round(run.stretch * 1e6)} um, bound ${Math.round(bound * 1e6)} um)');
+      check(run.deviation <= bound, 'the physical nozzle stays within the belt stretch of where its pulleys put it: ${run.deviation * mm} mm against ${bound * mm}');
+      check(Math.abs(dVolume) <= wallArea * bound, 'the physical tab holds ${run.volume * 1e9} mm^3 against the ideal ${reference.volume * 1e9}, within the wall area times the stretch');
+      for (axis in 0...3) check(Math.abs(run.low[axis] - reference.low[axis]) <= bound + raster && Math.abs(run.high[axis] - reference.high[axis]) <= bound + raster,
+        'the physical tab spans ${run.low[axis] * mm}..${run.high[axis] * mm} mm on axis $axis, the ideal ${reference.low[axis] * mm}..${reference.high[axis] * mm}');
+    }
+    simulation.dispose();
+    session.dispose();
+    return run;
+  }
+
+  /**
+   * How far the largest drive stretch may exceed m a / K of the heaviest axis at its planned acceleration: a step of
+   * acceleration overshoots an undamped spring to twice its static stretch (the belts' 0.1 damping gives 1.73), and a
+   * CoreXY pulley carries the force of both axes (the carriage and the gantry it rides), up to twice one axis's.
+   */
+  static inline final STRETCH_MARGIN = 4.0;
+
+  /** The most any axis of `model` stretches its drive at the accelerations the printer plans with: its mass times the acceleration over the drive's stiffness. */
+  static function stretchBound(model:RobotModel):Float {
+    var planning = DeviceBinding.planningModel(model, 40000);
+    var worst = 0.0;
+    for (load in robotkit.model.DriveLoads.of(model)) {
+      if (!(load.stiffness > 0.0)) continue;
+      var limits = planning.coupledLimits(load.axis, new SteadyLoads(), true);
+      worst = Math.max(worst, load.mass * limits.requireAcceleration() / load.stiffness);
+    }
+    return worst;
+  }
+
+  /**
    * What a printed stock holds in the box `[x0, x1] x [y0, y1]` grown by `margin`: the volume, the extent of the material
    * from the exact ends of the X and Y rays and the Z rays' intervals, and the volume in the ring `margin` .. 3 mm
    * outside (where only the skirt may be). Metres, in the stock's frame shifted to its preview centre: the stock's
@@ -566,14 +661,16 @@ class ProjectSourceTests {
    * slicer's default infill, slow; `cube-short`: 4 mm, solid, the regular check), `height` its height in millimetres.
    * Runs on the deterministic backend and by itself (`PROJECT_SOURCE_ONLY=printer-cube-short` or `printer-cube`).
    */
-  static function checkPrinterCube(root:String, project:String, height:Float, solid:Bool):Void {
+  static function checkPrinterCube(root:String, project:String, height:Float, solid:Bool, backend:Int = ApplicationSimulation.DETERMINISTIC,
+      ?reference:CubeRun):CubeRun {
+    var absolute = reference == null;
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/" + project + "/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedProject(generated, manifest);
     var world = new RobotWorld();
     var simulation = new ApplicationSimulation(world);
-    simulation.setBackend(ApplicationSimulation.DETERMINISTIC);
+    simulation.setBackend(backend);
     check(simulation.rebuild(session.sensors, session.scene, session), "the cube printer builds: " + simulation.error);
     var player = simulation.printPlayer(), job = session.printJob;
     if (player == null || job == null) throw "the cube printer has no print player";
@@ -609,14 +706,16 @@ class ProjectSourceTests {
     var cad = (20.0 * 20.0 * height - Math.PI * 3.0 * 3.0 * height) * 1e-9;
     check(Math.abs(laid.deposited - fed) <= 0.02 * fed, 'the print laid ${laid.deposited * 1e9} mm^3 in ${laid.beads} beads for ${fed * 1e9} mm^3 of filament');
     check(cube.volume <= laid.deposited && cube.volume >= 0.9 * laid.deposited, 'the cube holds ${cube.volume * 1e9} mm^3 of the ${laid.deposited * 1e9} laid');
-    if (solid) check(Math.abs(cube.volume - cad) <= 0.03 * cad, 'the solid cube holds ${cube.volume * 1e9} mm^3, its CAD volume is ${cad * 1e9}');
-    else check(cube.volume < cad && cube.volume > 0.25 * cad, 'the sparse cube holds ${cube.volume * 1e9} mm^3 of its solid CAD volume ${cad * 1e9}');
-    for (axis in 0...3) {
-      var wanted = [[0.100, 0.120], [0.100, 0.120], [0.0, tall]][axis];
-      check(Math.abs(cube.low[axis] - wanted[0]) <= 0.0002 && Math.abs(cube.high[axis] - wanted[1]) <= 0.0002,
-        'the cube spans ${cube.low[axis] * 1000}..${cube.high[axis] * 1000} mm on axis $axis, CAD ${wanted[0] * 1000}..${wanted[1] * 1000}');
+    if (absolute) {
+      if (solid) check(Math.abs(cube.volume - cad) <= 0.03 * cad, 'the solid cube holds ${cube.volume * 1e9} mm^3, its CAD volume is ${cad * 1e9}');
+      else check(cube.volume < cad && cube.volume > 0.25 * cad, 'the sparse cube holds ${cube.volume * 1e9} mm^3 of its solid CAD volume ${cad * 1e9}');
+      for (axis in 0...3) {
+        var wanted = [[0.100, 0.120], [0.100, 0.120], [0.0, tall]][axis];
+        check(Math.abs(cube.low[axis] - wanted[0]) <= 0.0002 && Math.abs(cube.high[axis] - wanted[1]) <= 0.0002,
+          'the cube spans ${cube.low[axis] * 1000}..${cube.high[axis] * 1000} mm on axis $axis, CAD ${wanted[0] * 1000}..${wanted[1] * 1000}');
+      }
+      check(cube.outside <= 1e-12, 'nothing is laid next to the cube but the skirt: ${cube.outside * 1e9} mm^3');
     }
-    check(cube.outside <= 1e-12, 'nothing is laid next to the cube but the skirt: ${cube.outside * 1e9} mm^3');
     // The hole: every wall point that the X and the Y rays crossing it meet, over the middle half of the part's height
     // (a ray's interval ends are exact, so each is a point of the printed wall), fitted with a circle by least squares.
     // Its centre is the part's centre (0.110, 0.110) plus the hole's offset (2, -1) mm.
@@ -659,17 +758,42 @@ class ProjectSourceTests {
     var holeDiameter = 2.0 * Math.sqrt(dCoef * dCoef / 4.0 + eCoef * eCoef / 4.0 - fCoef);
     var holeOffCentre = Math.sqrt(dCoef * dCoef + eCoef * eCoef) / 2.0;
     check(holeWall.length > 100, 'the hole has a printed holeWall to measure: ${holeWall.length} points');
-    check(Math.abs(holeDiameter - 0.006) <= 0.0003, 'the hole measures ${holeDiameter * 1000} mm across, CAD 6');
-    check(holeOffCentre <= 0.0002, 'the hole is ${holeOffCentre * 1e6} um from where CAD has it');
-    Sys.println('printer $project: printed in ${Math.round(ticks * dt * 10) / 10} s (${Math.round((Sys.time() - wall) * 10) / 10} s wall), ' +
+    if (absolute) {
+      check(Math.abs(holeDiameter - 0.006) <= 0.0003, 'the hole measures ${holeDiameter * 1000} mm across, CAD 6');
+      check(holeOffCentre <= 0.0002, 'the hole is ${holeOffCentre * 1e6} um from where CAD has it');
+    }
+    Sys.println('printer $project${absolute ? "" : " on MuJoCo"}: printed in ${Math.round(ticks * dt * 10) / 10} s (${Math.round((Sys.time() - wall) * 10) / 10} s wall), ' +
       '${Math.round(cube.volume * 1e10) / 10} mm^3 in the cube of ${Math.round(laid.deposited * 1e10) / 10} laid for ${Math.round(fed * 1e10) / 10} fed (CAD ${Math.round(cad * 1e10) / 10}, ' +
       '${Math.round((cube.volume / cad - 1.0) * 1000) / 10} %), spans ' +
       '${Math.round(cube.low[0] * 1e4) / 10}..${Math.round(cube.high[0] * 1e4) / 10} x ${Math.round(cube.low[1] * 1e4) / 10}..${Math.round(cube.high[1] * 1e4) / 10} x ' +
       '${Math.round(cube.low[2] * 1e4) / 10}..${Math.round(cube.high[2] * 1e4) / 10} mm (to the um: ${[for (a in 0...3) Math.round(cube.low[a] * 1e6)]}..${[for (a in 0...3) Math.round(cube.high[a] * 1e6)]}), ' +
       'hole ${Math.round(holeDiameter * 1e6)} um across, ${Math.round(holeOffCentre * 1e6)} um off its CAD centre (${holeWall.length} holeWall points), ' +
       '${laid.beads} beads laid in ${Math.round(player.depositSeconds * 10) / 10} s');
+    var run:CubeRun = {volume: cube.volume, low: cube.low, high: cube.high, holeDiameter: holeDiameter, holeOffCentre: holeOffCentre,
+      deviation: player.nozzleDeviation, deviationAt: player.nozzleDeviationAt, printSeconds: ticks * dt, wallSeconds: Sys.time() - wall,
+      stretch: stretchBound(model)};
+    if (reference != null) {
+      // The physical part against the ideal one. Everything the belts do to the nozzle is within the stretch their springs
+      // allow, m a / K at the print's accelerations, times STRETCH_MARGIN, and a measurement's raster spacing on top.
+      var bound = STRETCH_MARGIN * run.stretch, raster = laid.stock.lattice.spacing;
+      var dVolume = run.volume - reference.volume;
+      var wallArea = (80.0 + Math.PI * 6.0) * height * 1e-6;
+      var mm = 1000.0;
+      Sys.println('printer $project physical against ideal: volume ${Math.round(dVolume * 1e10) / 10} mm^3 (${Math.round(dVolume / reference.volume * 1e4) / 100} %), ' +
+        'box low ${[for (a in 0...3) Math.round((run.low[a] - reference.low[a]) * 1e6)]} high ${[for (a in 0...3) Math.round((run.high[a] - reference.high[a]) * 1e6)]} um, ' +
+        'hole ${Math.round((run.holeDiameter - reference.holeDiameter) * 1e6)} um wider and ${Math.round((run.holeOffCentre - reference.holeOffCentre) * 1e6)} um further off centre, ' +
+        'nozzle ${Math.round(run.deviation * 1e6)} um from where its pulleys put it at ${Math.round(run.deviationAt * 10) / 10} s (stretch m a / K ${Math.round(run.stretch * 1e6)} um, bound ${Math.round(bound * 1e6)} um); ' +
+        '${Math.round(run.printSeconds * 10) / 10} s printed in ${Math.round(run.wallSeconds * 10) / 10} s wall, ${Math.round(run.printSeconds / run.wallSeconds * 10) / 10}x real time (ideal: ${Math.round(reference.printSeconds / reference.wallSeconds * 10) / 10}x)');
+      check(run.deviation <= bound, 'the physical nozzle stays within the belt stretch of where its pulleys put it: ${run.deviation * mm} mm against ${bound * mm}');
+      check(Math.abs(dVolume) <= wallArea * bound, 'the physical cube holds ${run.volume * 1e9} mm^3 against the ideal ${reference.volume * 1e9}, within the wall area times the stretch');
+      for (axis in 0...3) check(Math.abs(run.low[axis] - reference.low[axis]) <= bound + raster && Math.abs(run.high[axis] - reference.high[axis]) <= bound + raster,
+        'the physical cube spans ${run.low[axis] * mm}..${run.high[axis] * mm} mm on axis $axis, the ideal ${reference.low[axis] * mm}..${reference.high[axis] * mm}');
+      check(Math.abs(run.holeDiameter - reference.holeDiameter) <= bound && Math.abs(run.holeOffCentre - reference.holeOffCentre) <= bound,
+        'the physical hole measures ${run.holeDiameter * mm} mm, ${run.holeOffCentre * mm} mm off centre; the ideal ${reference.holeDiameter * mm}, ${reference.holeOffCentre * mm}');
+    }
     simulation.dispose();
     session.dispose();
+    return run;
   }
 
   /**
@@ -6916,7 +7040,8 @@ class ProjectSourceTests {
       suite("belts", checkBeltRouter),
       suite("corexy", checkCoreXyPlotter),
       suite("printer-project", checkPrinter),
-      suite("printer-cube-short", root -> checkPrinterCube(root, "cube-short", 4.0, true)),
+      // The short cube's ideal print, then SmallTab and the short cube on MuJoCo against their ideal prints (RF3).
+      suite("printer-cube-short-physical", root -> checkPrinterPhysical(root, checkPrinterCube(root, "cube-short", 4.0, true))),
       suite("printer-shaping", checkPrinterShaping),
       suite("printer-mirror", checkPrinterMirror),
       suite("mobile-base", checkMobileBase),
@@ -6938,6 +7063,8 @@ class ProjectSourceTests {
       focused("mobile-welder-joint-handoff", MobileWelderTests.runJointHandoff),
       focused("mobile-welder", MobileWelderTests.run),
       focused("printer-cube", root -> checkPrinterCube(root, "cube", 20.0, false)),
+      focused("printer-cube-short", root -> checkPrinterCube(root, "cube-short", 4.0, true)),
+      focused("printer-physical", root -> checkPrinterTab(root, ApplicationSimulation.MUJOCO, checkPrinterTab(root, ApplicationSimulation.DETERMINISTIC))),
       focused("track-weld", root -> checkWholeWeldment(root, ApplicationSimulation.MUJOCO, "track MuJoCo", "track-arm")),
       focused("gantry-starts", root -> { checkGantryPicker(root, false, false, "far"); checkGantryPicker(root, false, false, "unreferenced"); }),
       focused("gantry-realtime", root -> checkGantryPicker(root, false, true)),

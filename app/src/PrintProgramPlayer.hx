@@ -112,6 +112,23 @@ class PrintProgramPlayer extends ToolpathPlayer {
 	var stockShownAt = Math.NEGATIVE_INFINITY;
 	final extruderIndex:Int;
 	final gearRadius:Float;
+	/** The machine's axes and the extruder where physics has them (the links), not where the device reconstructs them. */
+	final physicalJoints:PhysicalJoints;
+	/** The joints (indices into the robot's) `physicalJoints` reads, in its order. */
+	final physicalSlots:Array<Int>;
+	/** Each spring coupling (a stiffness): its follower's and leaders' indices among the joints, with the leaders' ratios and the offset. */
+	final springFollowers:Array<Int> = [];
+	final springLeaders:Array<Array<Int>> = [];
+	final springRatios:Array<Array<Float>> = [];
+	final springOffsets:Array<Float> = [];
+	/**
+	 * The most any drive spring was ever stretched, as the distance the nozzle's axis is from where the spring's own pulley
+	 * puts it (the follower's physical value against its leaders' through the coupling, over the leaders' largest ratio), in
+	 * metres, and the time of it. Where the controller's view of the nozzle lags the physical one by the device's reporting
+	 * latency (a speed times the interval), the stretch is time-aligned: all of it is physics.
+	 */
+	public var nozzleDeviation(default, null):Float = 0.0;
+	public var nozzleDeviationAt(default, null):Float = 0.0;
 	/** What the program says of each G-code line: the layer height in force and the feature printed. */
 	var heightLines:Array<Int> = [];
 	var heights:Array<Float> = [];
@@ -220,6 +237,24 @@ class PrintProgramPlayer extends ToolpathPlayer {
 			stockObject = "project:" + shown;
 		}
 		var robotIndex = robot.parts[0].robotIndex;
+		var wanted = job.axes.concat([job.extruder]);
+		function indexOf(id:String):Int return [for (index in 0...robot.model.joints.length) if (robot.model.joints[index].id == id) index][0];
+		var springs = new Map<String, Int>();
+		for (coupling in robot.model.couplings) if (coupling.stiffness > 0.0) {
+			var at = springs.get(coupling.follower);
+			if (at == null) {
+				at = springFollowers.length;
+				springs.set(coupling.follower, at);
+				springFollowers.push(indexOf(coupling.follower)); springLeaders.push([]); springRatios.push([]); springOffsets.push(0.0);
+				if (wanted.indexOf(coupling.follower) < 0) wanted.push(coupling.follower);
+			}
+			springLeaders[at].push(indexOf(coupling.leader));
+			springRatios[at].push(coupling.ratio);
+			springOffsets[at] += coupling.offset;
+			if (wanted.indexOf(coupling.leader) < 0) wanted.push(coupling.leader);
+		}
+		physicalSlots = [for (id in wanted) indexOf(id)];
+		physicalJoints = new PhysicalJoints(simulation, robotIndex, robot.model, physicalSlots);
 		var axisJoint = new Map<String, Int>();
 		for (index in 0...job.axes.length)
 			for (joint in 0...joints) if (machineModel.joints[joint].id == job.axes[index]) axisJoint.set(job.axes[index], joint);
@@ -305,10 +340,24 @@ class PrintProgramPlayer extends ToolpathPlayer {
 		if (newStock == null || extruderIndex < 0) return;
 		if (stock == null) stock = newStock();
 		var clock = Sys.time();
-		// What the machine did, not what was asked: the joints where the simulation has them.
-		var positions = robot.robot.snapshot().positions;
-		var pose = solver.forward([for (index in axisJoints) positions.get(index)]);
-		var fed = positions.get(extruderIndex) * gearRadius;
+		// What the machine did, not what was asked, and not what the controller believes: the axes and the extruder where
+		// physics has them (the links), so a belt's stretch or a carriage's swing reaches the deposit.
+		var snapshot = robot.robot.snapshot();
+		var reported = [for (index in axisJoints) snapshot.positions.get(index)];
+		var actual = reported.copy();
+		var values = physicalJoints.read([for (slot in physicalSlots) reported[slot]], session.simulationTime());
+		for (slot in 0...physicalSlots.length) actual[physicalSlots[slot]] = values[slot];
+		var pose = solver.forward(actual);
+		var fed = actual[extruderIndex] * gearRadius;
+		for (spring in 0...springFollowers.length) {
+			var put = springOffsets[spring], scale = 0.0;
+			for (leader in 0...springLeaders[spring].length) {
+				put += springRatios[spring][leader] * actual[springLeaders[spring][leader]];
+				scale = Math.max(scale, Math.abs(springRatios[spring][leader]));
+			}
+			var stretch = Math.abs(actual[springFollowers[spring]] - put) / scale;
+			if (stretch > nozzleDeviation) { nozzleDeviation = stretch; nozzleDeviationAt = session.simulationTime(); }
+		}
 		stock.follow(new Point3(pose.x, pose.y, pose.z), fed, heightAt(currentLine), session.fixedTimestep(), at.op,
 			provenance == null ? new Provenance(0, 0, 0) : provenance);
 		depositSeconds += Sys.time() - clock;
@@ -407,6 +456,7 @@ class PrintProgramPlayer extends ToolpathPlayer {
 		}
 		if (stockObject != null) project.scene.clearRuntimeGeometry(stockObject);
 		lastHeight = 0.0;
+		nozzleDeviation = 0.0;
 		heaters.reset();
 		readings.clear();
 		layer = 0;
