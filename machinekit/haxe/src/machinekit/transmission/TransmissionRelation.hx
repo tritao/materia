@@ -7,7 +7,7 @@ class TransmissionRelation {
 	public var ratio:Float;
 	public var efficiency:Float;
 	public var stiffness:Null<Float>;
-	/** How damped the coupling's response is, as a ratio of critical damping; null is the simulation's default (critical). */
+	/** How damped the coupling's response is, as a ratio of critical damping (of a coupling with a stiffness); the part states it. */
 	public var dampingRatio:Null<Float>;
 	public var backlash:Null<Float>;
 	public var drag:Null<Float>;

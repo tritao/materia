@@ -124,8 +124,7 @@ class TimingBelt extends MachineComponent {
 	public final statedCordRigidity:Float;
 	/**
 	 * The belt drive's damping as a ratio of critical damping, stated by whoever knows the belt (a rubber belt on a
-	 * carriage rings, about 0.1; a stated value rides into the simulation, which makes the belt a spring). Zero is not
-	 * stated, and the simulation keeps the belt an ideal constraint (`JointCoupling.isSpring`).
+	 * carriage rings, about 0.1). Zero is not stated: the belt part's assumed damping (`ASSUMED_DAMPING_RATIO`) is used.
 	 */
 	public final statedDampingRatio:Float;
 
@@ -238,12 +237,17 @@ class TimingBelt extends MachineComponent {
 	/** Assumed rolling-bearing drag at a free idler, N m. */
 	public static inline var IDLER_BEARING_DRAG:Float = 0.0002;
 
+	/** The damping of a rubber timing belt, as a ratio of critical damping: a carriage on one rings (assumed, not a datasheet value). */
+	public static inline var ASSUMED_DAMPING_RATIO:Float = 0.1;
+
 	/** Resolve from the current loop geometry and width, never a saved stiffness. */
 	public static function relation(belt:TimingBelt, pulley:TimingPulley, alignment:Float, idler:Bool = false):TransmissionRelation {
 		if (belt.beltProfile != pulley.beltProfile) throw new machinekit.transmission.TransmissionDesignError("Belt and pulley profiles differ; update the belt to match the pulley");
 		var result = new TransmissionRelation(alignment * 2 / pulley.pitchDiameter, idler ? 1.0 : DEFAULT_EFFICIENCY,
 			null, null, idler ? IDLER_BEARING_DRAG : DEFAULT_DRAG);
 		if (!idler) {
+			result.dampingRatio = ASSUMED_DAMPING_RATIO;
+			result.setBasis("dampingRatio", ValueBasis.Assumed, "belt damping");
 			result.setBasis("stiffness", ValueBasis.Assumed, "belt stiffness");
 			result.setBasis("efficiency", ValueBasis.Assumed, "belt efficiency");
 		}
@@ -266,6 +270,8 @@ class TimingBelt extends MachineComponent {
 			toothClearance(belt.beltProfile) / (followerPulley.pitchDiameter / 2) / Math.abs(ratio), DEFAULT_DRAG);
 		result.setBasis("efficiency", ValueBasis.Assumed, "belt efficiency");
 		result.setBasis("drag", ValueBasis.Assumed, "belt drag");
+		result.dampingRatio = ASSUMED_DAMPING_RATIO;
+		result.setBasis("dampingRatio", ValueBasis.Assumed, "belt damping");
 		result.setBasis("stiffness", ValueBasis.Assumed, "belt stiffness with pretension");
 		result.setBasis("backlash", ValueBasis.Assumed, "belt tooth clearance");
 		return result;

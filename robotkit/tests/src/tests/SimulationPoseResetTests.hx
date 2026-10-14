@@ -86,12 +86,12 @@ class SimulationPoseResetTests {
   }
 
   /**
-   * A servo that turns a belt's pulley: with the belt a spring (a stiffness and a stated damping ratio) the pulley turns
+   * A servo that turns a belt's pulley: with the belt a spring (any stiffness; only zero is rigid) the pulley turns
    * without the carriage, so the servo's spring is integrated against the pulley and its rotor alone, a much shorter
    * stability interval than against the carriage it would carry through a rigid belt.
    */
   static function compliantServoLoad():Void {
-    function build(dampingRatio:Float):RobotRuntimeBlueprint {
+    function build(stiffness:Float):RobotRuntimeBlueprint {
       var model = new RobotModel("servo belt");
       var base = model.addLink(new Link("base"));
       var carriage = model.addLink(new Link("carriage"));
@@ -107,8 +107,8 @@ class SimulationPoseResetTests {
       pulley.axis = [0, 0, 1];
       // A 10 mm pulley: 100 rad a metre of belt.
       var belt = new JointCoupling("belt", x.id, pulley.id, 100.0, 0.0);
-      belt.stiffness = 80000.0;
-      belt.dampingRatio = dampingRatio;
+      belt.stiffness = stiffness;
+      belt.dampingRatio = 0.1;
       model.addCoupling(belt);
       var actuator = new Actuator("servo", 0, 0, Transmission.SimpleTransmission(pulley.id, 1, 0));
       actuator.drive = new ServoDrive(1, 2, 100, 200, 5e-6, 4096);
@@ -118,7 +118,7 @@ class SimulationPoseResetTests {
       model.addActuator(actuator);
       return RobotRuntimeCompiler.compile(model, new robotkit.profile.RobotProfile());
     }
-    var spring = build(0.1), rigid = build(0.0);
+    var spring = build(80000.0), rigid = build(0.0);
     var springPulley = spring.joints[1], rigidPulley = rigid.joints[1];
     if (!springPulley.compliantLoad || rigidPulley.compliantLoad)
       throw "Only a pulley a spring belt stretches from is a compliant load";

@@ -20,6 +20,9 @@ import machinekit.component.Solids;
  * the flank profile, reliefs and machined ends are not generated.
  */
 class LeadScrew extends MachineComponent {
+	/** The damping of a steel screw drive, as a ratio of critical damping (assumed: a ball screw shaft rings a little). */
+	public static inline var ASSUMED_DAMPING_RATIO:Float = 0.03;
+
 	/** Resolve the coupling from these parts. */
 	public static function relation(screw:LeadScrew, nut:LeadScrewNut, alignment:Float):machinekit.transmission.TransmissionRelation {
 		if (screw.thread.designation != nut.thread.designation) throw new machinekit.transmission.TransmissionDesignError("Lead screw and nut threads differ; update the nut to match the screw");
@@ -28,6 +31,10 @@ class LeadScrew extends MachineComponent {
 			nut.efficiency(), screw.thread.family == Ball ? screw.axialStiffness() * 1000 : null, nut.backlash(), nut.drag());
 		result.setBasis("stiffness", machinekit.transmission.ValueBasis.Assumed,
 			screw.thread.family == Ball ? "ball screw shaft stiffness (nut and bearing compliance omitted)" : "rigid");
+		if (screw.thread.family == Ball) {
+			result.dampingRatio = ASSUMED_DAMPING_RATIO;
+			result.setBasis("dampingRatio", machinekit.transmission.ValueBasis.Assumed, "steel screw damping");
+		}
 		result.setBasis("efficiency", machinekit.transmission.ValueBasis.Assumed, screw.thread.family == Ball ? "ball screw efficiency" : "nut friction");
 		result.setBasis("backlash", machinekit.transmission.ValueBasis.Assumed, "nut backlash");
 		result.setBasis("drag", machinekit.transmission.ValueBasis.Assumed, "nut drag");

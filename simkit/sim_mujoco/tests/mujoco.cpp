@@ -1810,7 +1810,7 @@ void rigid_coupling_holds_under_high_effort() {
 // constant lag (F / 2k, the pair accelerating together) after ringing about it. With a damping ratio of 0.1 the lag
 // overshoots its final value by tens of percent; with the ratio left unset, the default, it is critically damped
 // and hardly does.
-double coupling_overshoot(double damping_ratio, bool ideal = false) {
+double coupling_overshoot(double damping_ratio, bool ideal = false, double stiffness = 400.0) {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
     nksim_world_desc desc{};
@@ -1841,7 +1841,7 @@ double coupling_overshoot(double damping_ratio, bool ideal = false) {
     coupling.leader = source;
     coupling.follower = target;
     coupling.ratio = 1.0;
-    coupling.stiffness = 400.0;
+    coupling.stiffness = stiffness;
     coupling.damping_ratio = damping_ratio;
     assert(nksim_joint_couple(world, &coupling) == NKSIM_OK);
     nksim_joint_target push{};
@@ -1871,11 +1871,13 @@ double coupling_overshoot(double damping_ratio, bool ideal = false) {
 }
 
 void a_coupling_rings_as_its_damping_ratio_says() {
-    // With a damping ratio the coupling is a spring and rings. With stiffness alone (critical damping, the default) it is an
+    // Any stiffness makes the coupling a spring, and the damping ratio says how it rings. Only a stiffness of zero is an
     // ideal constraint, which keeps the follower at the leader's side: no lag at all.
-    const double ideal = coupling_overshoot(0.0, true), ringing = coupling_overshoot(0.1);
+    const double ideal = coupling_overshoot(0.1, true, 0.0), ringing = coupling_overshoot(0.1);
     assert(ideal < 0.05);
     assert(ringing > 0.5);
+    // A spring with no damping rings further than a damped one: zero is no damping, not "unstated".
+    assert(coupling_overshoot(0.0) > ringing);
     nksim_joint_coupling_desc invalid{};
     invalid.struct_size = sizeof(invalid);
     invalid.damping_ratio = -1.0;
@@ -1889,6 +1891,63 @@ void a_coupling_rings_as_its_damping_ratio_says() {
     nksim_world world = 0;
     assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
     assert(nksim_joint_couple(world, &invalid) != NKSIM_OK);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+// A stiff coupling is a spring too: a vertical follower of 10 kg on a 100 kN/m coupling hangs m g / K below where its
+// leader (held by its drive) puts it, about a millimetre, whatever the damping ratio of the steel it is made of.
+void a_vertical_follower_sags_by_its_weight_over_the_stiffness() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.002;
+    desc.physics_substeps = 4;
+    desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const double mass = 10.0, stiffness = 1.0e5;
+    const auto base = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_STATIC, 0.0);
+    const auto leader_body = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0);
+    const auto follower_body = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, mass);
+    nksim_joint_desc joint{};
+    joint.struct_size = sizeof(joint);
+    joint.type = NKSIM_JOINT_PRISMATIC;
+    joint.body_a = base;
+    joint.axis_a[2] = 1.0;
+    joint.lower_limit = -10.0;
+    joint.upper_limit = 10.0;
+    joint.max_force = 10000.0;
+    nksim_joint source = 0, target = 0;
+    joint.body_b = leader_body;
+    assert(nksim_joint_create(world, &joint, &source) == NKSIM_OK);
+    joint.body_b = follower_body;
+    assert(nksim_joint_create(world, &joint, &target) == NKSIM_OK);
+    nksim_joint_coupling_desc coupling{};
+    coupling.struct_size = sizeof(coupling);
+    coupling.leader = source;
+    coupling.follower = target;
+    coupling.ratio = 1.0;
+    coupling.stiffness = stiffness;
+    coupling.damping_ratio = 0.03;
+    assert(nksim_joint_couple(world, &coupling) == NKSIM_OK);
+    nksim_joint_target hold{};
+    hold.struct_size = sizeof(hold);
+    hold.joint = source;
+    hold.mode = NKSIM_JOINT_TARGET_POSITION;
+    hold.target = 0.0;
+    hold.max_force = 10000.0;
+    assert(nksim_world_set_joint_targets(world, &hold, 1) == NKSIM_OK);
+    step_world(world, 2000);
+    nksim_joint_state leader{}, follower{};
+    leader.struct_size = follower.struct_size = sizeof(leader);
+    assert(nksim_joint_get_state(world, source, &leader) == NKSIM_OK);
+    assert(nksim_joint_get_state(world, target, &follower) == NKSIM_OK);
+    const double sag = leader.position - follower.position, expected = mass * 9.81 / stiffness;
+    std::printf("vertical follower sag %.6g m against m g / K = %.6g m\n", sag, expected);
+    assert(std::abs(sag - expected) < 0.02 * expected);
     nksim_world_destroy(world);
     nkscene_scene_destroy(scene);
 }
@@ -3399,6 +3458,7 @@ int main() {
     a_helical_screw_turned_through_its_socket_clamps_its_seat();
     a_follower_with_two_leaders_uses_a_tendon_equality();
     a_coupling_rings_as_its_damping_ratio_says();
+    a_vertical_follower_sags_by_its_weight_over_the_stiffness();
     a_belt_carriage_rings_at_its_belt_frequency();
     convex_hulls_overlapping_at_rest_do_not_collide();
     mounted_contact_groups_span_articulations_only();

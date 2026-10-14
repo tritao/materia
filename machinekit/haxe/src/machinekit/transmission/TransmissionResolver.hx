@@ -66,6 +66,10 @@ class TransmissionResolver {
 			relation.stiffness = record.stiffness;
 			relation.setBasis("stiffness", ValueBasis.Stated);
 		}
+		if (record.dampingRatio != null) {
+			relation.dampingRatio = record.dampingRatio;
+			relation.setBasis("dampingRatio", ValueBasis.Stated);
+		}
 		if (record.backlash != null) {
 			relation.backlash = record.backlash;
 			relation.setBasis("backlash", ValueBasis.Stated);

@@ -56,6 +56,8 @@ class MachiningStock {
 	public var removed(default, null):Float = 0.0;
 	/** Segments that rapid moves cut, and segments whose shank or holder met the stock. */
 	public var rapidContacts(default, null):Int = 0;
+	/** What those segments cut, in cubic metres. */
+	public var rapidVolume(default, null):Float = 0.0;
 	public var collisions(default, null):Int = 0;
 
 	/**
@@ -118,7 +120,10 @@ class MachiningStock {
 		var volume = report.removedVolume();
 		if (volume > 0) meshes.markChanged();
 		removed += volume;
-		rapidContacts += report.rapidContacts(CONTACT_VOLUME).length;
+		for (outcome in report.rapidContacts(CONTACT_VOLUME)) {
+			rapidContacts++;
+			rapidVolume += outcome.removed;
+		}
 		collisions += report.collisions(CONTACT_VOLUME).length;
 	}
 

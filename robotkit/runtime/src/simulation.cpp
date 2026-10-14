@@ -40,12 +40,9 @@ void require_scene(nkscene_result result, const char *operation) {
         throw std::runtime_error(operation);
 }
 
-/**
- * A coupling the physics simulates as a spring: a stiffness and an authored damping ratio (a timing belt). Any other
- * coupling is an ideal constraint, whatever compliance it carries for planning and plan checks.
- */
+/** A coupling the physics simulates as a spring: any stiffness. Only a stiffness of zero is an ideal constraint. */
 bool spring_coupling(const rk_robot_runtime_blueprint &blueprint, uint32_t index) {
-    return blueprint.coupling_stiffness[index] > 0.0 && blueprint.coupling_damping_ratio[index] > 0.0;
+    return blueprint.coupling_stiffness[index] > 0.0;
 }
 
 nksim_shape create_collision_shape(nksim_world world, const rk_simulation_link_shape &source) {

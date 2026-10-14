@@ -71,6 +71,7 @@ class PlanExecutor {
     jerkUnchecked = plan.report.checks[TrajectoryCoreConstants.MK_CHECK_JERK].status ==
       TrajectoryCoreConstants.MK_CHECK_UNCHECKED;
     completed = false;
+    lastSettleCheckNs = null;
     stream.beginSegments(new TrajectoryStream.NativeStreamSegments(arrays), plan.durationSeconds);
     deferredRefill = false;
     if (session.state == Idle) session.begin();
@@ -128,10 +129,18 @@ class PlanExecutor {
     var tolerance = completionPositionTolerance;
     if (!endsAtRest || tolerance == null) return true;
     var target = active.evaluate(active.durationSeconds).positions;
-    for (joint in 0...jointIndices.length)
-      if (Math.abs(observation.positions.get(jointIndices[joint]) - target[joint]) > tolerance[joint]) return false;
+    // A carriage on a spring swings through the tolerance band: settled also means that it does not leave the band
+    // within the interval between observations at the speed it has (a joint at rest never does).
+    var interval = lastSettleCheckNs == null ? 0.0 : Int64.toInt(Int64.sub(observation.sourceTimestampNs, lastSettleCheckNs)) * 1e-9;
+    lastSettleCheckNs = observation.sourceTimestampNs;
+    for (joint in 0...jointIndices.length) {
+      var index = jointIndices[joint];
+      if (Math.abs(observation.positions.get(index) - target[joint]) > tolerance[joint]) return false;
+      if (Math.abs(observation.velocities.get(index)) * interval > tolerance[joint]) return false;
+    }
     return true;
   }
+  var lastSettleCheckNs:Null<Int64> = null;
 
   public function hold():Void {
     if (!session.hold() || plan == null) return;

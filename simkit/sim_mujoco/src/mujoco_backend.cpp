@@ -1687,10 +1687,9 @@ private:
         }
     }
 
-    // Whether a coupling is a spring to simulate: one with a stiffness and an authored damping ratio, an oscillator (a
-    // timing belt). A stiffness alone is a compliance for planning and plan checks (a lead screw's stretch is far above
-    // anything a step resolves, and critical damping, the default, does not ring): the coupling stays an ideal constraint.
-    static bool is_spring(const nksim::BackendJointCoupling &term) { return term.stiffness > 0.0 && term.damping_ratio > 0.0; }
+    // Whether a coupling is a spring to simulate: any stiffness. Only a stiffness of zero is an ideal constraint; a damping
+    // ratio of zero is an undamped spring.
+    static bool is_spring(const nksim::BackendJointCoupling &term) { return term.stiffness > 0.0; }
 
     // A coupling with stiffness and a damping ratio is a belt, and a belt is a spring: the fixed tendon of the stretch (the leaders'
     // motion less the follower's) carries MuJoCo's own passive spring and damper, so the force is the belt's whatever
@@ -1699,7 +1698,7 @@ private:
     // impedance that lets the drive's own force through; a belt built on it came out a hundred times too soft or
     // not a spring at all.) A tendon wraps every term, so a follower with several leaders (a CoreXY pulley) is one
     // belt: its stiffness is the terms' mean, each term's being the belt's seen from its leader, and its damping
-    // ratios are weighted by stiffness (an unset ratio is critical). The damping ratio is the load's: the leaders
+    // ratios are weighted by stiffness. The damping ratio is the load's: the leaders
     // carry an inverse inertia L = sum(ratio^2 / m_leader) in the follower's coordinate, so C = 2 zeta sqrt(K / L),
     // the damping the carriage rings with whatever the pulley weighs. A coupling without stiffness stays an equality
     // with MuJoCo's standard reference and the follower's inertia.
