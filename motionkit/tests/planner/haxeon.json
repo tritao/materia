@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "motionkit-planner-tests"},
   "entry": "PlannerTests",
-  "sourceRoots": ["src", "../../../processkit/tests/src"],
+  "sourceRoots": ["src", "../../../processkit/tests/src", "../../../robotkit/tests/support"],
   "dependencies": {
     "processkit": {"path": "../../../processkit"},
     "collisionkit-native": {"path": "../../../collisionkit/native"}
