@@ -130,6 +130,7 @@ class ToolpathMotionTests {
   }
 
   static function main():Void {
+    PressureAdvanceLimitsTests.main();
     if (Sys.getEnv("TOOLPATH_VIRTUAL_CNC_ONLY") == "1") {
       new ToolpathProcessTests().testVirtualCncProgram();
       Sys.println('Virtual CNC tests passed (${MotionKitTestSupport.assertions} assertions)');
