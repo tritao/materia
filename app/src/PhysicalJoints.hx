@@ -30,9 +30,17 @@ class PhysicalJoints {
 	var lastValues:Array<Float> = [];
 	var referenced = false;
 	var stillSince = 0.0;
-	/** How long the links stand still before the machine is taken to be referenced, seconds. */
+	/**
+	 * How long the links stand still before the machine is taken to be referenced, seconds. A mode of frequency `w` and
+	 * amplitude `A` moves a joint by up to `A w dt` between readings `dt` apart, and it does so somewhere in every half period;
+	 * so links that moved less than `STILL` per reading for half the slowest mode's period `pi / w` swing by less than
+	 * `STILL / (w dt)`. The slowest mode when a device takes a machine over is the backend's generic position law of a driven
+	 * joint (`apply_joint_targets`: 10 Hz, a half period of 50 ms; the belts ring at tens of hertz), so half a second is ten
+	 * of its half periods, and the referencing error is at most 1.6 um at a 1 ms step. RF13 replaces that law with the motors'
+	 * own holds, which are stiffer, so the window still covers them.
+	 */
 	static inline final SETTLE = 0.5;
-	/** The most a joint may move between readings and still be still, in its unit (a tenth of a micrometre). */
+	/** The most a joint may move between readings and still be still, in its unit (a tenth of a micrometre; see `SETTLE`). */
 	static inline final STILL = 1e-7;
 	var turned:Array<Float> = [];
 
