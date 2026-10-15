@@ -38,6 +38,10 @@ void compare(ck::World &loop,ck::World &tree) {
         bool fa=false,fb=false;ck::PairResult pa,pb;
         expect(loop.violation(margins,extra,fa,pa)==tree.violation(margins,extra,fb,pb),"violation support identical");
         expect(fa==fb && (!fa || equal(pa,pb)),"first violation and per-group/body required margin identical");
+        bool any=false;
+        expect(tree.any_violation(margins,extra,any) && any==fa,"boolean planner query agrees with ordered query");
+        expect(loop.any_violation(margins,extra,any) && any==fa,"boolean pair loop agrees with ordered query");
+        expect(tree.any_violation(margins,extra,any) && any==fa,"recent blocker is rechecked");
     }
     bool fa=false,fb=false;ck::PairResult pa,pb;
     expect(loop.closest(margins,fa,pa)==tree.closest(margins,fb,pb),"closest support identical");
@@ -133,6 +137,28 @@ int main() {
     expect(a.size()==1 && b.size()==1,"zero-margin boundary contact retained");
     small.check(0.25,a);large.check(0.25,b);
     expect(a.size()==2 && b.size()==2,"exact positive-margin contact retained");
+    // Flags do not expose a pair order, but must retain all margin contexts
+    // and must not reuse a stale answer from the recent-blocker hint.
+    for(double margin : {0.0,0.25,0.5}) for(double ceiling : {-1.0,0.0,0.1}) {
+        double table[1]={margin};ck::Margins margins{1,table,false,ceiling};
+        for(bool contact : {false,true}) {
+            margins.contact=contact;
+            bool ordered=false,any=false;ck::PairResult pair;
+            expect(large.violation(margins,nullptr,ordered,pair) && large.any_violation(margins,nullptr,any) && ordered==any,
+                   "boolean boundary and ceiling contexts agree");
+        }
+    }
+    for(auto *world : {&small,&large}) {
+        double away[7]={10,0,0,0,0,0,1};world->set_body_pose(0,away);
+    }
+    compare(small,large);
+    // Unsupported checked pairs must still refuse, even after a supported
+    // query found a blocker that could otherwise short-circuit the query.
+    coal::MatrixXs unsupportedHeights=coal::MatrixXs::Zero(3,3);
+    large.add(-1,identity,std::make_shared<coal::HeightField<coal::OBBRSS>>(2,2,unsupportedHeights,-1),true);
+    large.add(0,identity,std::make_shared<coal::HeightField<coal::OBBRSS>>(2,2,unsupportedHeights,-1),true);
+    double table[1]={0.005};ck::Margins margins{1,table};bool found=false;
+    expect(!large.any_violation(margins,nullptr,found),"unsupported pairs refuse the boolean query");
     if(failures)return EXIT_FAILURE;
     std::printf("broadphase: loop and tree results are exactly identical\n");
 }

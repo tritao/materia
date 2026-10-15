@@ -6,6 +6,7 @@
 #include <coal/broadphase/broadphase_dynamic_AABB_tree.h>
 
 #include <cstdint>
+#include <algorithm>
 #include <map>
 #include <memory>
 #include <set>
@@ -87,6 +88,8 @@ public:
      * its margin plus both bodies' `inflation` (null: none), the first in id order going into `out`.
      */
     bool violation(const Margins &margins, const double *inflation, bool &found, PairResult &out);
+    /** Boolean-only planner query. Rechecks a recent blocker, then stops traversal at any violation. */
+    bool any_violation(const Margins &margins, const double *inflation, bool &found);
     /** As `violation`, for the closest checked pair; `found` is false only when none is checked. */
     bool closest(const Margins &margins, bool &found, PairResult &out);
 
@@ -142,6 +145,8 @@ private:
     };
     Candidates candidates(double radius);
     void rebuild_tree();
+    void update_tree();
+    double query_radius(const Margins &margins, const double *inflation) const;
     bool use_tree() const { return pairs_.size() > broadphase_threshold_; }
     /** A pair for coal's queries, or false when coal cannot compare the two. */
     bool make_pair(uint32_t a, uint32_t b, Pair &out);
@@ -165,7 +170,11 @@ private:
     bool tree_dirty_ = true, checked_fixed_pairs_ = false;
     std::set<coal::CollisionObject *> moved_;
     std::unordered_map<const coal::CollisionObject *, uint32_t> object_ids_;
-    std::map<Key, size_t> pair_indices_;
+    std::unordered_map<uint64_t, size_t> pair_indices_;
+    static uint64_t pair_index_key(uint32_t a, uint32_t b) {
+        return (uint64_t(std::min(a,b)) << 32) | std::max(a,b);
+    }
+    size_t recent_blocker_ = size_t(-1);
     /** Infinite shapes stay outside the finite tree and are always considered. */
     std::vector<size_t> unbounded_pairs_;
 };

@@ -228,6 +228,7 @@ bool World::make_pair(uint32_t a, uint32_t b, Pair &pair) {
 
 void World::rebuild_pairs() {
     if (!pairs_dirty_) return;
+    recent_blocker_ = size_t(-1);
     pairs_.clear();
     unsupported_ = false;
     for (auto first = objects_.begin(); first != objects_.end(); ++first) {
@@ -258,7 +259,7 @@ bool bounded(const coal::CollisionObject *object) {
  * first or the closest one visited by the tree. The caller restores id order. */
 struct CandidateCallback : coal::DistanceCallBackBase {
     const std::unordered_map<const coal::CollisionObject *, uint32_t> &ids;
-    const std::map<std::pair<uint32_t,uint32_t>, size_t> &indices;
+    const std::unordered_map<uint64_t, size_t> &indices;
     const double radius;
     std::vector<size_t> &result;
     CandidateCallback(const decltype(ids) ids, const decltype(indices) indices,
@@ -270,9 +271,21 @@ struct CandidateCallback : coal::DistanceCallBackBase {
         distance = std::nextafter(radius, std::numeric_limits<double>::infinity());
         auto first = ids.at(a), second = ids.at(b);
         if (first > second) std::swap(first, second);
-        auto pair = indices.find({first, second});
+        auto pair = indices.find((uint64_t(first) << 32) | second);
         if (pair != indices.end() && box_gap(*a, *b) <= radius) result.push_back(pair->second);
         return false;
+    }
+};
+
+template<class Predicate>
+struct AnyViolationCallback : coal::DistanceCallBackBase {
+    Predicate &test;
+    const double radius;
+    bool found = false;
+    AnyViolationCallback(Predicate &test, double radius) : test(test), radius(radius) {}
+    bool distance(coal::CollisionObject *a, coal::CollisionObject *b, coal::CoalScalar &distance) override {
+        distance = std::nextafter(radius, std::numeric_limits<double>::infinity());
+        return found = test(a,b);
     }
 };
 
@@ -295,7 +308,7 @@ void World::rebuild_tree() {
         const auto &pair = pairs_[i];
         if (!bounded(pair.first) || !bounded(pair.second)) unbounded_pairs_.push_back(i);
         else {
-            pair_indices_.emplace(Key(pair.a,pair.b),i);
+            pair_indices_.emplace(pair_index_key(pair.a,pair.b),i);
             if (is_static(pair.body_a) && is_static(pair.body_b)) checked_fixed_pairs_ = true;
         }
     }
@@ -303,13 +316,7 @@ void World::rebuild_tree() {
     moved_.clear(); tree_dirty_ = false;
 }
 
-World::Candidates World::candidates(double radius) {
-    radius = std::max(radius, 0.0);
-    Candidates result(pairs_.size());
-    // Keep the original pair loop without allocation on small scenes and
-    // unbounded searches. Dirty poses remain pending for the next tree query.
-    if (!use_tree() || !std::isfinite(radius)) return result;
-    result.filtered = true;
+void World::update_tree() {
     rebuild_tree();
     if (!moved_.empty()) {
         std::vector<coal::CollisionObject *> moving, fixed;
@@ -322,6 +329,16 @@ World::Candidates World::candidates(double radius) {
         if (!fixed.empty()) fixed_tree_->update(fixed);
         moved_.clear();
     }
+}
+
+World::Candidates World::candidates(double radius) {
+    radius = std::max(radius, 0.0);
+    Candidates result(pairs_.size());
+    // Keep the original pair loop without allocation on small scenes and
+    // unbounded searches. Dirty poses remain pending for the next tree query.
+    if (!use_tree() || !std::isfinite(radius)) return result;
+    result.filtered = true;
+    update_tree();
     result.indices = unbounded_pairs_;
     CandidateCallback callback(object_ids_,pair_indices_,radius,result.indices);
     moving_tree_->distance(&callback);
@@ -461,11 +478,7 @@ double World::required_margin(const Pair &pair, const Margins &classes) const {
     return classes.ceiling < 0 ? required : std::min(required, classes.ceiling);
 }
 
-bool World::violation(const Margins &margins, const double *inflation, bool &found, PairResult &out) {
-    found = false;
-    rebuild_pairs();
-    if (unsupported_) return false;
-    coal::CollisionRequest request(coal::NO_REQUEST, 1);
+double World::query_radius(const Margins &margins, const double *inflation) const {
     double radius = 0.0;
     for (uint32_t g = 0; g < margins.groups; ++g)
         for (uint32_t h = g; h < margins.groups; ++h) radius = std::max(radius,margins.between(g,h));
@@ -478,7 +491,53 @@ bool World::violation(const Margins &margins, const double *inflation, bool &fou
         for (size_t i = 0; i < bodies_.size(); ++i) most = std::max(most,inflation[i]);
         radius += 2*most;
     }
-    const auto nearby = candidates(radius);
+    return radius;
+}
+
+bool World::any_violation(const Margins &margins, const double *inflation, bool &found) {
+    found = false;
+    rebuild_pairs();
+    if (unsupported_) return false;
+    coal::CollisionRequest request(coal::NO_REQUEST, 1);
+    auto blocked = [&](size_t index) {
+        Pair &pair = pairs_[index];
+        double required = required_margin(pair,margins);
+        if (inflation && pair.body_a != pair.body_b) {
+            if (pair.body_a >= 0) required += inflation[pair.body_a];
+            if (pair.body_b >= 0) required += inflation[pair.body_b];
+        }
+        if (box_gap(*pair.first,*pair.second) > required || !collides(pair,required,request)) return false;
+        recent_blocker_ = index;
+        return true;
+    };
+    // This is a hint, never a cached answer: current poses, margins and motion
+    // bounds are checked again. Pair/topology rebuilds invalidate the index.
+    if (recent_blocker_ < pairs_.size() && blocked(recent_blocker_)) { found = true; return true; }
+    const double radius = query_radius(margins,inflation);
+    if (!use_tree() || !std::isfinite(radius)) {
+        for (size_t i=0;i<pairs_.size();++i) if (blocked(i)) { found = true; break; }
+        return true;
+    }
+    update_tree();
+    for (size_t index : unbounded_pairs_) if (blocked(index)) { found = true; return true; }
+    auto test = [&](coal::CollisionObject *a, coal::CollisionObject *b) {
+        auto pair = pair_indices_.find(pair_index_key(object_ids_.at(a),object_ids_.at(b)));
+        return pair != pair_indices_.end() && blocked(pair->second);
+    };
+    AnyViolationCallback<decltype(test)> callback(test,radius);
+    moving_tree_->distance(&callback);
+    if (!callback.found) moving_tree_->distance(fixed_tree_.get(),&callback);
+    if (!callback.found && checked_fixed_pairs_) fixed_tree_->distance(&callback);
+    found = callback.found;
+    return true;
+}
+
+bool World::violation(const Margins &margins, const double *inflation, bool &found, PairResult &out) {
+    found = false;
+    rebuild_pairs();
+    if (unsupported_) return false;
+    coal::CollisionRequest request(coal::NO_REQUEST, 1);
+    const auto nearby = candidates(query_radius(margins,inflation));
     for (size_t i = 0; i < nearby.size(); ++i) {
         Pair &pair = pairs_[nearby[i]];
         double required = required_margin(pair, margins);

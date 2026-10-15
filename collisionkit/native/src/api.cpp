@@ -630,8 +630,7 @@ CK_API ck_result CK_CALL ck_violation_sets(ck_world_handle handle, const double 
                 world.set_body_pose(body, pose);
             }
             bool found = false;
-            ck::PairResult pair;
-            if (!world.violation(table, inflation_count ? inflation + size_t(s) * bodies : nullptr, found, pair))
+            if (!world.any_violation(table, inflation_count ? inflation + size_t(s) * bodies : nullptr, found))
                 return CK_ERROR_UNSUPPORTED;
             out_flags[s] = found ? 1 : 0;
         }

@@ -5,21 +5,26 @@
 
 namespace {
 volatile size_t observed = 0;
-double run(size_t n, size_t threshold) {
+double run(size_t n, size_t threshold, bool boolean=false, double motion=0.0) {
     ck_test::Cell cell(n,threshold);
     const double table[4]={0.005,0.0005,0.0005,0.0005};
     ck::Margins margins{2,table};
     ck::PairResult result;
     bool found=false;
+    std::vector<double> inflation(cell.world.body_count(),motion);
+    auto query = [&] {
+        return boolean ? cell.world.any_violation(margins,inflation.data(),found) :
+            cell.world.violation(margins,inflation.data(),found,result);
+    };
     // Setup/topology is excluded: a posed cell is queried repeatedly, as in
     // the planner. Every timed query includes six-link FK and pose updates.
-    for(int i=0;i<50;++i) {cell.move(i*0.013);cell.world.violation(margins,nullptr,found,result);}
+    for(int i=0;i<50;++i) {cell.move(i*0.013);query();}
     constexpr int iterations=3000;
     auto start=std::chrono::steady_clock::now();
     for(int i=0;i<iterations;++i) {
         cell.move(i*0.013);
-        if(!cell.world.violation(margins,nullptr,found,result)) std::abort();
-        observed+=found ? result.a : 0;
+        if(!query()) std::abort();
+        observed+=found ? 1 : 0;
     }
     return std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-start).count()/iterations;
 }
@@ -35,5 +40,14 @@ int main() {
         }
         std::sort(loop.begin(),loop.end());std::sort(tree.begin(),tree.end());
         std::printf("%zu, %zu, %.3f, %.3f\n",n,6*n+10,loop[2],tree[2]);
+    }
+    std::printf("N boxes, body motion bound, ordered us/query, boolean us/query, speedup (median of 5)\n");
+    for(size_t n : {100u,1000u}) for(double motion : {0.0,0.03,0.3}) {
+        std::array<double,5> ordered,boolean;
+        for(size_t i=0;i<ordered.size();++i) {
+            ordered[i]=run(n,0,false,motion);boolean[i]=run(n,0,true,motion);
+        }
+        std::sort(ordered.begin(),ordered.end());std::sort(boolean.begin(),boolean.end());
+        std::printf("%zu, %.2f, %.3f, %.3f, %.2fx\n",n,motion,ordered[2],boolean[2],ordered[2]/boolean[2]);
     }
 }
