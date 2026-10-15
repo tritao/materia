@@ -1038,10 +1038,12 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
             out_report->windows = static_cast<uint32_t>(window_first.size());
             out_report->boundary_lowerings = 0;
         }
+        std::vector<std::unique_ptr<toppra::algorithm::TOPPRA>> retained(window_first.size());
         std::vector<toppra::Bound> controllable(window_first.size() + 1);
         controllable.back().setConstant(end_speed * end_speed);
         // The first window computes its backward pass in the forward call below. Propagate only later
-        // windows here, keeping their interface intervals; solver memory stays bounded by one window.
+        // windows here, retaining compact backward results but releasing constraint tables.
+        // Solver workspace stays bounded by one window in both sweeps.
         if (window_first.size() > 1) for (size_t window = window_first.size() - 1; window > 0; --window) {
             auto algorithm = make_window(window);
             const auto result = algorithm->computeControllableSetsFromSquaredSpeed(controllable[window + 1]);
@@ -1052,12 +1054,16 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
                 return MK_ERROR_GENERATION;
             }
             controllable[window] = algorithm->getParameterizationData().controllable_sets.row(0);
+            algorithm->releaseSolverWorkspace();
+            retained[window] = std::move(algorithm);
         }
         std::vector<double> speeds(grid_values.size(), 0.0);
         double reached_squared = start_speed * start_speed;
         for (size_t window = 0; window < window_first.size(); ++window) {
-            auto algorithm = make_window(window);
-            const auto result = algorithm->computePathParametrizationFromSquaredSpeed(reached_squared, controllable[window + 1]);
+            auto algorithm = window == 0 ? make_window(window) : std::move(retained[window]);
+            const auto result = window == 0
+                ? algorithm->computePathParametrizationFromSquaredSpeed(reached_squared, controllable[window + 1])
+                : algorithm->computeForwardFromControllableSets(reached_squared, std::make_shared<toppra::solver::Seidel>());
             if (result != toppra::ReturnCode::OK) {
                 if (std::getenv("PROCESS_PATH_PROFILE"))
                     std::fprintf(stderr, "PROCESS_PATH_WINDOW window=%zu result=%d %s\n", window,

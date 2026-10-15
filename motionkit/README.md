@@ -155,7 +155,11 @@ search-window contract. Displaced authored poses with known coordinates remain s
 Long TOPP-RA paths use bounded solver windows. A backward sweep propagates the
 complete interval of squared speeds that can still reach the final condition;
 a forward sweep chooses the fastest reachable speed inside the next interval.
-The first window's backward pass is performed by its forward call. Both interval
+The first window's backward pass is performed by its forward call. Later windows
+retain their compact controllable intervals and upper controls, release the solver
+constraint tables, then reconstruct one solver workspace at a time for the forward
+pass. The backward LPs are not repeated. Retained state grows with the path grid;
+large constraint tables remain bounded by one window. Both interval
 ends travel between windows, and squared speeds stay squared at interfaces to
 avoid a square-root round trip. The old boundary shares and retry ladder are
 removed. `mk_timing_report.boundary_lowerings` remains in the ABI and is zero.
@@ -164,6 +168,12 @@ The TOPP-RA fork exposes `computeControllableSetsFromSquaredSpeed` for the
 backward-only pass and `computePathParametrizationFromSquaredSpeed` for a fixed
 start and a terminal interval. Both APIs use squared-speed units throughout;
 the legacy C++ entry point retains its historical mixed endpoint convention.
+`releaseSolverWorkspace` and `computeForwardFromControllableSets` reuse a successful
+backward pass on its owning algorithm. Grid, stage count, initial bounds and solver
+setters invalidate reuse; a failed backward pass cannot leave a usable cache. Paths
+and constraint objects must remain immutable for the algorithm's lifetime. No cache
+can be transferred between problems. This currently reuses an unchanged terminal
+condition; incremental backward updates for changed endpoints remain a follow-up.
 Free terminal intervals are intersected with the physical final-point limits.
 A fixed start is checked by its stage LP, avoiding rejection from an inward
 rounded projected interval endpoint. Exactly fixed Seidel coordinates reduce to
