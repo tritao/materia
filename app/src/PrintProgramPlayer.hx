@@ -303,7 +303,7 @@ class PrintProgramPlayer extends ToolpathPlayer {
 
 	function indexOfJoint(id:String):Int {
 		for (index in 0...robot.model.joints.length) if (robot.model.joints[index].id == id) return index;
-		return 0;
+		throw 'The printer has no joint "$id"';
 	}
 
 	/** The frequency (rad/s) each joint hangs on its drive's spring at, sqrt(K / m) of the axis it is, or 0 for a joint with none. */

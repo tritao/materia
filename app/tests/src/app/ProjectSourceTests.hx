@@ -671,14 +671,13 @@ class ProjectSourceTests {
   }
 
   /**
-   * Where the printer's bed settles under its own weight on MuJoCo at three physics steps. The z screws are rigid couplings
-   * (a trapezoidal thread has no stiffness), so any sag is the solver's softness of an ideal constraint, which scales with the
-   * step squared (the equality's reference time constant is two substeps), not a spring: the bed sags `g T^2 (1 - d) dmax^2 / d`
-   * with `T` that time constant and `d` the constraint's impedance. Reports the sag and its ratio to the step squared.
+   * The printer's bed does not creep under its own weight on MuJoCo, at two physics steps. The z screws are rigid couplings
+   * (a trapezoidal thread has no stiffness), so a sag would be the solver's softness of an ideal constraint, which scales with
+   * the step squared; the bed settles in the first tenth of a second after the device takes over and then stays: between 1 s
+   * (about where the print player references the machine) and 100 s it moves less than a micrometre at either step.
    */
   static function checkPrinterSag(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/materia.project.json");
-    var results:Array<Float> = [];
     for (dt in [0.01, 0.0025]) {
       var generated = MateriaProjectRunner.loadProject(manifest);
       var session = new ProjectDocumentSession(null, false);
@@ -698,18 +697,9 @@ class ProjectSourceTests {
         while (tick * dt < mark - 1e-9) { simulation.step(); tick++; }
         heights.push(simulation.physicalLinkPosition(0, bed)[2]);
       }
-      var sag = heights[1] - heights[5], settledBy = 0.0;
+      var sag = heights[1] - heights[5];
       Sys.println('printer sag: step ${dt * 1000} ms: the bed is, against its height at 1 s, ' + [for (k in 0...marks.length) '${marks[k]} s: ${Math.round((heights[k] - heights[1]) * 1e7) / 10} um'].join(", "));
       var load = robotkit.model.DriveLoads.forAxis(DeviceBinding.planningModel(model, 40000), "z", new SteadyLoads());
-      if (dt == 0.01) {
-        for (coupling in model.couplings) if (coupling.stiffness > 0.0 || coupling.follower.indexOf("z") >= 0 || coupling.leader.indexOf("z") >= 0)
-          Sys.println('printer sag: coupling ${coupling.id} ${coupling.leader} -> ${coupling.follower} ratio ${coupling.ratio} stiffness ${coupling.stiffness} damping ${coupling.dampingRatio} backlash ${coupling.backlash} drag ${coupling.drag}');
-        for (joint in model.joints) if (joint.id.indexOf("z") >= 0)
-          Sys.println('printer sag: joint ${joint.id} ${joint.type} damping ${joint.damping} friction ${joint.frictionLoss} armature ${joint.armature}');
-        for (actuator in model.actuators)
-          Sys.println('printer sag: actuator ${actuator.id} servoStiffness ${actuator.servoStiffness} servoDamping ${actuator.servoDamping} drive ${actuator.drive == null ? "none" : actuator.drive.kind()}');
-      }
-      results.push(sag);
       Sys.println('printer sag: step ${dt * 1000} ms: sags ${Math.round(sag * 1e7) / 10} um between 1 s and 100 s (bed axis ${load == null ? 0 : Math.round(load.mass * 1000) / 1000} kg, stiffness ${load == null ? 0 : load.stiffness} N/m)');
       simulation.dispose();
       session.dispose();
