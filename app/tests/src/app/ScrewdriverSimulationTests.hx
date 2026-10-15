@@ -28,6 +28,7 @@ class ScrewdriverSimulationTests {
     springRate:2,prevailingTorque:0.2,stiffnessNmPerRad:19.4,stripTorque:20};
   public static function run():Void {
     count = 0;
+    runTiltedSeat();
     for (backend in [SimulationSpace.DETERMINISTIC,SimulationSpace.MUJOCO]) {
       runBackend(backend);
       runTransport(backend,false,false,false);
@@ -59,6 +60,41 @@ class ScrewdriverSimulationTests {
     count = 0;
     for (backend in [SimulationSpace.DETERMINISTIC,SimulationSpace.MUJOCO]) runTransport(backend,true,false,true);
     Sys.println('Screwdriver head-seat continuation: $count checks passed on both backends');
+  }
+  // Exercise the process travel computed at a tilted thread entry, then the actual
+  // seated-pose correction. A 20 mm lever arm at 0.0004 rad leaves 1.6 nm if only
+  // the orientation is corrected. Run away from world axes with an offset head.
+  static function runTiltedSeat():Void {
+    var frame = new Transform3(new Vec3(0.31,-0.12,0.47),Quat.fromAxisAngle(new Vec3(1,2,3).normalized(),0.7));
+    var axis = frame.transformVector(new Vec3(0,0,1));
+    var bodyToHead = new Transform3(new Vec3(0,0,-0.001),Quat.identity());
+    var lead = new Vec3(0,0,0.02);
+    var entry = frame.transformPoint(lead);
+    for (tilt in [0.0,0.0004,-0.0004]) {
+      var head = frame.compose(new Transform3(new Vec3(0.0002,-0.0001,0),Quat.fromAxisAngle(new Vec3(0,1,0),tilt)));
+      var body = head.compose(bodyToHead.inverse());
+      var along = head.transformPoint(lead).sub(entry).dot(axis);
+      var model = new TighteningModel(program(),joint());
+      model.step({screwPresent:true,vacuum:true,start:true,angle:0,strokeMm:2,
+        radialErrorMm:0.2,axialErrorMm:along*1000,axisAngle:Math.abs(tilt),damagedLeadIn:false});
+      var reading = model.step({screwPresent:true,vacuum:true,start:true,angle:20,strokeMm:2,
+        radialErrorMm:0.2,axialErrorMm:along*1000,axisAngle:Math.abs(tilt),damagedLeadIn:false});
+      check(reading.result == ScrewdriverContract.OK,"Tilted thread entry completes its qualified tightening process");
+      var advance = model.advanceAtAngle(reading.angle)/1000;
+      var plane = frame.translation.add(axis.scale(joint().runDownMm/1000));
+      var seated = @:privateAccess SimulatedScrewdriver.seatedOnPlane(body,bodyToHead,axis,plane,advance);
+      var placed = @:privateAccess SimulatedScrewdriver.turnedPose(seated,seated.compose(bodyToHead).translation,
+        [axis.x,axis.y,axis.z],reading.angle,advance);
+      var actualHead = new Transform3(new Vec3(placed.x,placed.y,placed.z),
+        new Quat(placed.qx,placed.qy,placed.qz,placed.qw)).compose(bodyToHead);
+      check(Math.abs(actualHead.translation.sub(plane).dot(axis)) < 1e-12,
+        "The seated bearing point lies on its plane after tilted thread-entry travel");
+      var expected = head.translation.add(axis.scale(plane.sub(head.translation).dot(axis)));
+      check(actualHead.translation.sub(expected).norm() < 1e-12,
+        "Seating retains the head's lateral contact offset");
+      check(actualHead.transformVector(new Vec3(0,0,1)).sub(axis).norm() < 1e-12,
+        "The seated head is aligned with the seat normal");
+    }
   }
   static function runSequencing():Void {
     var device = new DriverDeviceFixture();

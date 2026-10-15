@@ -564,6 +564,43 @@ int main() {
         ck_world_destroy(contact);
     }
 
+    // A flush seat away from the axes: a screw head (a 32-sided prism) on a face,
+    // both turned by the same arbitrary rotation, touches; two nanometres into
+    // the face is beyond the one-nanometre allowance.
+    {
+        ck_world_handle seat{0};
+        expect(ck_world_create(&seat) == CK_OK, "seat world created");
+        const double qx = 0.2, qy = -0.35, qz = 0.6, qw = 0.69;
+        const double qn = std::sqrt(qx * qx + qy * qy + qz * qz + qw * qw);
+        const double q[4] = {qx / qn, qy / qn, qz / qn, qw / qn};
+        auto placed = [&](double x, double y, double z) {
+            const double tx = 2 * (q[1] * z - q[2] * y), ty = 2 * (q[2] * x - q[0] * z), tz = 2 * (q[0] * y - q[1] * x);
+            std::vector<double> pose(7);
+            pose[0] = 0.31 + x + q[3] * tx + q[1] * tz - q[2] * ty;
+            pose[1] = -0.12 + y + q[3] * ty + q[2] * tx - q[0] * tz;
+            pose[2] = 0.47 + z + q[3] * tz + q[0] * ty - q[1] * tx;
+            for (int k = 0; k < 4; ++k) pose[3 + k] = q[k];
+            return pose;
+        };
+        std::vector<double> head, face;
+        for (int i = 0; i < 32; ++i) {
+            const double a = 2 * M_PI * i / 32;
+            for (double z : {0.0, 0.004}) head.insert(head.end(), {0.004 * std::cos(a), 0.004 * std::sin(a), z});
+            for (double z : {-0.01, 0.0}) face.insert(face.end(), {0.02 * std::cos(a), 0.02 * std::sin(a), z});
+        }
+        uint32_t base = 0, screw = 0;
+        const auto face_at = placed(0, 0, 0);
+        const auto head_at = placed(0.0013, -0.0007, 0);
+        expect(ck_add_convex(seat, -1, face_at.data(), 7, face.data(), uint32_t(face.size()), &base) == CK_OK, "seat face");
+        expect(ck_add_convex(seat, -1, head_at.data(), 7, head.data(), uint32_t(head.size()), &screw) == CK_OK, "screw head");
+        expect(ck_set_object_rule(seat, base, screw, CK_RULE_TOUCH, CK_PAIR_CHECKED) == CK_OK, "seat contact declared");
+        expect(!violation(seat, {0.0}, {}).found, "a turned flush seat touches");
+        const auto pressed = placed(0.0013, -0.0007, -2e-9);
+        expect(ck_attach(seat, screw, -1, pressed.data(), 7) == CK_OK, "head pressed into its seat");
+        expect(violation(seat, {0.0}, {}).found, "a turned seat rejects two nanometres of penetration");
+        ck_world_destroy(seat);
+    }
+
     // A rotated convex whose inflation alone reaches a box must agree with
     // signed distances, including when that inflation is removed again.
     {

@@ -632,14 +632,15 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
         var seatedPhase = observed.phase == ScrewdriverContract.SNUG || observed.phase == ScrewdriverContract.FINAL ||
           observed.result == ScrewdriverContract.OK;
         if (threadedScrew() != null && seatedPhase) seat(setup);
-        // A head bearing on its seat sits flat: the clamp turns it onto the hole axis about the head, keeping
-        // its lateral offset. The aligned pose becomes the anchor a later pass continues from.
+        // Seated heads bear on the authored plane. Thread-entry axial error includes the
+        // tilted lead-in's lever arm, so aligning the head alone leaves a residual gap.
+        // Keep the corrected pose as the anchor for subsequent tightening passes.
         if (seatedPhase && anchoredBody != null && setup.physicalThread != true) {
-          var aligned = seatedOnAxis(startingBody, bodyToHead, Vec3.fromArray(holeAxis));
-          if (aligned != null) {
-            startingBody = aligned;
-            anchoredBody = referenceHead.inverse().compose(aligned);
-          }
+          var axis = Vec3.fromArray(holeAxis);
+          startingBody = seatedOnPlane(startingBody, bodyToHead, axis,
+            referenceHead.translation.add(axis.scale(setup.joint.runDownMm/1000)), process.advanceAtAngle(angle)/1000);
+          head = startingBody.compose(bodyToHead).translation;
+          anchoredBody = referenceHead.inverse().compose(startingBody);
         }
       }
       if (!start) { driveSpeed = 0; if (reversed) reverseTargetAngle = angle; }
@@ -686,6 +687,14 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     var turn = Quat.fromAxisAngle(cross.scale(1/sine), Math.atan2(sine, cosine));
     var offset = turn.rotate(body.translation.sub(head.translation));
     return new Transform3(head.translation.add(offset), turn.multiply(body.rotation));
+  }
+  /** Align a seated head and constrain its advanced bearing point to its seat, preserving lateral offset. */
+  static function seatedOnPlane(body:Transform3, bodyToHead:Transform3, axis:Vec3, seatPlane:Vec3, advance:Float):Transform3 {
+    var aligned = seatedOnAxis(body, bodyToHead, axis);
+    var seated = aligned == null ? body : aligned;
+    var reached = seated.compose(bodyToHead).translation.add(axis.scale(advance));
+    var gap = seatPlane.sub(reached).dot(axis);
+    return new Transform3(seated.translation.add(axis.scale(gap)), seated.rotation);
   }
   static function quaternionDot(a:Quat,b:Quat):Float return a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w;
   static function turnedPose(startingBody:Transform3,head:Vec3,holeAxis:Array<Float>,angle:Float,advance:Float):SimPose {
