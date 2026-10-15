@@ -62,6 +62,8 @@ robotkit::TrajectorySegment through_run(std::span<const robotkit::TrajectorySegm
 
 /** The accuracy a merged run of segments must keep on every motor: a tenth of a step of position, a percent of the step rate in speed. */
 constexpr double MERGE_POSITION_STEPS = 0.1;
+/** The largest step base the wire carries: 2^53, past which a double no longer holds every whole step it is rounded from. */
+constexpr double MAX_BASE_STEPS = 9007199254740992.0;
 constexpr double MERGE_SPEED_FRACTION = 0.01;
 /**
   Only segments shorter than this are merged, and a merged segment is no longer than the next: a link refills a
@@ -365,7 +367,7 @@ CompiledDevicePlan6 compile_once(
                     // The position's whole steps go as an integer, so that the float that carries the rest is small
                     // however far the actuator has turned (an extruder past a few thousand radians).
                     const auto steps = std::round(value * layout[actuator].steps_per_unit);
-                    if (!std::isfinite(steps) || std::abs(steps) > 9.0e15) return reject("step base overflow");
+                    if (!std::isfinite(steps) || std::abs(steps) > MAX_BASE_STEPS) return reject("step base overflow");
                     c.base_steps = static_cast<std::int64_t>(steps);
                     value -= steps / layout[actuator].steps_per_unit;
                 }

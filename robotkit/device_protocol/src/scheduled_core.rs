@@ -12,8 +12,10 @@ pub struct ScheduledSegment<const A: usize> {
     pub t0_ticks: u64,
     pub duration_ticks: u64,
     pub degree: u8,
-    /// Each actuator's whole steps: the coefficients are relative to this base, which the device adds in
-    /// integers (see `with_base_steps`). Zero means they are absolute.
+    /// Each actuator's whole steps: the coefficients are relative to this base. The device adds it in 64-bit floating
+    /// point (`base / steps_per_unit + poly`, see `evaluate`), which resolves a position to `|base| * 2^-52` of a step:
+    /// a millionth of a step up to 4.5e9 steps (an extruder's lifetime of filament), a thousandth up to 4.5e12.
+    /// Zero means the coefficients are absolute.
     pub base_steps: [i64; A],
     pub coefficients: [[f32; 6]; A],
     pub ends_at_rest: bool,
