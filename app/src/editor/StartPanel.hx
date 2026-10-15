@@ -15,6 +15,7 @@ import haxe.io.Path as StartPath;
 import haxeon.ui.core.TextStyleOverride;
 import haxeon.ui.core.View;
 import haxeon.ui.icons.IconName;
+import haxeon.ui.widgets.Icon;
 import haxeon.ui.widgets.KeyedView;
 import haxeon.ui.widgets.commands.CommandButton;
 import haxeon.ui.widgets.controls.Button;
@@ -160,10 +161,16 @@ class StartPanel {
     var details = [new KeyedView("title", new Text(title, null, tokens.text, TextStyleOverride.text(14.0)))];
     details = details.concat(description(app, entry.id, entry.description, exampleBadge(entry)));
     var actionLabel = switch (entry.kind) {
-      case Project(_): "Open project →";
-      case Script(_) | WorkerRackToTable | WorkerGallery: "Open example →";
+      case Project(_): "Open project";
+      case Script(_) | WorkerRackToTable | WorkerGallery: "Open example";
     };
-    details.push(new KeyedView("open-label", new Text(actionLabel, null, tokens.accent, TextStyleOverride.text(12.0))));
+    var actionStyle = new LayoutStyle();
+    actionStyle.childAlignY = LayoutAlignmentY.Center;
+    actionStyle.childGap = 4.0;
+    details.push(new KeyedView("open-label", new Row("example-action:" + entry.id, [
+      new KeyedView("label", new Text(actionLabel, null, tokens.accent, TextStyleOverride.text(12.0))),
+      new KeyedView("icon", new Icon("example-action-icon:" + entry.id, IconName.ArrowRight, 12.0, tokens.accent))
+    ], actionStyle)));
     var labelStyle = new LayoutStyle();
     labelStyle.width = LayoutAxis.grow();
     labelStyle.height = LayoutAxis.fit();
