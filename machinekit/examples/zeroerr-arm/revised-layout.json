@@ -1,0 +1,1270 @@
+{
+  "schema": 1,
+  "source": {
+    "url": "https://www.zeroerr.cn/d/file/arms/cn/20260522/5KG机械臂图纸模型.zip",
+    "sha256": "88927870963572c67fd7b185a042c1b84e1f3e766d2945c9edce7dd78bfefaf4",
+    "assembly": "eRobot 5.STEP",
+    "assemblySha256": "c3f80736eedaedcc3569db6d4b55ffe6cad05577f972bee0a5c83d68fc6a5508"
+  },
+  "notes": [
+    "Placements extracted from supplier AP214 assembly, with matrix coefficients rounded to 12 decimal places.",
+    "Module solid groups identify external housing, output flange and attached output fasteners, not internal drive construction.",
+    "J1 and J2 have the output flange upstream; positive model coordinates describe downstream-body motion, not vendor motor command signs.",
+    "Gear ratios, brake/encoder options, joint limits, cable flex loops and motor command signs remain uncommissioned.",
+    "Engineering wrist revision, not an unchanged supplier assembly. J4/J5/J6 use the supplier 80T chain; the matched hollow forearm is shortened 189 mm with preserved supplier end sections and a 40 mm hollow transition loft, retaining both end interfaces. Shoulder remains original 110T until a suitable faster drive is selected."
+  ],
+  "assets": [
+    {
+      "id": "asset0",
+      "file": "2-091-001 5kg底座.STEP",
+      "sha256": "963de829332e69b18ff7ddf18c098e7dd3f44a0ffc2328611523342b3a81de02",
+      "solidCount": 1
+    },
+    {
+      "id": "asset1",
+      "file": "3-091-001 底座钣金.STEP",
+      "sha256": "f082586d675bbd630c3134a631f62d42375db77b8d7f6e22fe753ee4a7e6730b",
+      "solidCount": 1
+    },
+    {
+      "id": "asset2",
+      "file": "eRob110H××T.STEP",
+      "sha256": "78aaa05e56656359ee35069e44b4d6e56d58bf5a94795904ce6666791910bea6",
+      "solidCount": 11,
+      "partitionOutputSpigot": true
+    },
+    {
+      "id": "asset3",
+      "file": "2-091-002 5kg二关节连杆.STEP",
+      "sha256": "15d8b6b1db96bfedab93ec016f7b0d27d3070adbe641068fb4a5b98e7fc6179f",
+      "solidCount": 1
+    },
+    {
+      "id": "asset4",
+      "file": "2-130-003 机器人三轴输出转接.STEP",
+      "sha256": "78c541e59a1e8515545feb5dc0759a2e84a6c9afbaec0cfb2fb4292365e48e28",
+      "solidCount": 1
+    },
+    {
+      "id": "asset5",
+      "file": "2-130-004 机器人三轴外壳转接.STEP",
+      "sha256": "80265c633342b710cb1a6db3313246a59a03c385b14856d9e46383c52b2122cb",
+      "solidCount": 1
+    },
+    {
+      "id": "asset6",
+      "file": "110假轴.STEP",
+      "sha256": "5a6e047d436aa7205b18342a23f2cda6e96813929540c8652fc7973265462672",
+      "solidCount": 2
+    },
+    {
+      "id": "asset10",
+      "file": "航插.STEP",
+      "sha256": "c0b795ac42aa993368309a1653525136ada0d2255df1b1e2cc3cd1f122ddf679",
+      "solidCount": 1
+    },
+    {
+      "id": "asset11",
+      "file": "航插公头.STEP",
+      "sha256": "b79d828360d839517b1e3617ce62f61aeb7f347d2692a90fa4d904fa51eb7a0b",
+      "solidCount": 1
+    },
+    {
+      "id": "asset12",
+      "file": "线缆保护套.STEP",
+      "sha256": "2da65a5879f8ebec3d728d2f71a461e0ce629f337783825e3a4d2d30fe547f40",
+      "solidCount": 1
+    },
+    {
+      "id": "asset13",
+      "file": "过线钣金+8mm双面护线圈.STEP",
+      "sha256": "c75cb40d48b8370fb1b265c6f8b1f54f228cf304a0488385488d442fcf7a89fd",
+      "solidCount": 2
+    },
+    {
+      "id": "asset14",
+      "file": "2-130-005 10kg三关节连杆 -腰形.STEP",
+      "sha256": "cac983fea13f05b2ef60f9fe15524398af1417d79384ce25c0b85982b0c4743a",
+      "solidCount": 1,
+      "shortenMm": 189
+    },
+    {
+      "id": "asset15",
+      "file": "eRob80H××T.STEP",
+      "sha256": "8a9dc5afe15b6e1b88fab7787fec8ef62aa8094e72ce55f7694fb3aa158953b6",
+      "solidCount": 8,
+      "partitionOutputSpigot": true,
+      "partitionSolid": 1
+    },
+    {
+      "id": "asset16",
+      "file": "2-130-006 10kg末端法兰.STEP",
+      "sha256": "1e6eb8b893e9369b78509a544d1ba5e3dbadd2e7aeaed4d636dfbb5cecfb2e5d",
+      "solidCount": 1
+    }
+  ],
+  "occurrences": [
+    {
+      "id": "base",
+      "sourceOccurrence": 452234,
+      "asset": "asset0",
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      "parent": ""
+    },
+    {
+      "id": "baseCover",
+      "sourceOccurrence": 452235,
+      "asset": "asset1",
+      "matrix": [
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        -1.0,
+        -0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        4.0
+      ],
+      "parent": "base"
+    },
+    {
+      "id": "joint1",
+      "sourceOccurrence": 452236,
+      "asset": "asset2",
+      "matrix": [
+        0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        -1.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.0,
+        0.0,
+        1.0,
+        54.3
+      ],
+      "statorSolid": 0,
+      "rotorSolid": 3,
+      "rotorDetails": []
+    },
+    {
+      "id": "joint2",
+      "sourceOccurrence": 452237,
+      "asset": "asset2",
+      "matrix": [
+        -0.0,
+        -0.0,
+        1.0,
+        76.0,
+        1.0,
+        -0.0,
+        0.0,
+        -0.0,
+        0.0,
+        1.0,
+        0.0,
+        112.3
+      ],
+      "statorSolid": 0,
+      "rotorSolid": 3,
+      "rotorDetails": []
+    },
+    {
+      "id": "upperArm",
+      "sourceOccurrence": 452238,
+      "asset": "asset3",
+      "matrix": [
+        -1.0,
+        -0.0,
+        -0.0,
+        134.0,
+        -0.0,
+        -0.0,
+        1.0,
+        -0.0,
+        -0.0,
+        1.0,
+        0.0,
+        477.3
+      ],
+      "parent": "joint2-stator"
+    },
+    {
+      "id": "joint3",
+      "sourceOccurrence": 452239,
+      "asset": "asset2",
+      "matrix": [
+        0.0,
+        0.0,
+        1.0,
+        76.0,
+        -1.0,
+        0.0,
+        0.0,
+        -1e-12,
+        -0.0,
+        -1.0,
+        0.0,
+        537.3
+      ],
+      "statorSolid": 0,
+      "rotorSolid": 3,
+      "rotorDetails": []
+    },
+    {
+      "id": "elbowOutputAdapter",
+      "sourceOccurrence": 452240,
+      "asset": "asset4",
+      "matrix": [
+        0.0,
+        1.0,
+        0.0,
+        75.4,
+        0.0,
+        0.0,
+        -1.0,
+        -1e-12,
+        -1.0,
+        0.0,
+        -0.0,
+        537.3
+      ],
+      "parent": "joint3-rotor"
+    },
+    {
+      "id": "elbowHousingAdapter",
+      "sourceOccurrence": 452241,
+      "asset": "asset5",
+      "matrix": [
+        0.0,
+        1.0,
+        -0.0,
+        42.2,
+        -0.965925826289,
+        0.0,
+        0.258819045103,
+        -1e-12,
+        0.258819045103,
+        0.0,
+        0.965925826289,
+        537.3
+      ],
+      "parent": "elbowHousing"
+    },
+    {
+      "id": "elbowHousing",
+      "sourceOccurrence": 452242,
+      "asset": "asset6",
+      "matrix": [
+        0.0,
+        -0.0,
+        -1.0,
+        57.6,
+        -1.0,
+        -0.0,
+        -0.0,
+        -1e-12,
+        -0.0,
+        1.0,
+        -0.0,
+        537.3
+      ],
+      "parent": "elbowOutputAdapter"
+    },
+    {
+      "id": "forearm",
+      "sourceOccurrence": 664440,
+      "asset": "asset14",
+      "matrix": [
+        1.0,
+        0.0,
+        -0.0,
+        -0.4,
+        0.0,
+        0.0,
+        1.0,
+        -2e-12,
+        0.0,
+        -1.0,
+        0.0,
+        597.3
+      ],
+      "parent": "elbowHousing",
+      "sourcePackage": "10kg"
+    },
+    {
+      "id": "joint4",
+      "sourceOccurrence": 664441,
+      "asset": "asset15",
+      "matrix": [
+        -0.0,
+        0.0,
+        -1.0,
+        42.1,
+        1.0,
+        0.0,
+        -0.0,
+        -9e-12,
+        0.0,
+        -1.0,
+        -0.0,
+        938.3
+      ],
+      "statorSolid": 1,
+      "rotorSolid": 0,
+      "rotorDetails": [],
+      "sourcePackage": "10kg"
+    },
+    {
+      "id": "joint5",
+      "sourceOccurrence": 664442,
+      "asset": "asset15",
+      "matrix": [
+        0.0,
+        -1.0,
+        0.0,
+        97.600000000007,
+        -1.0,
+        -0.0,
+        -0.0,
+        -9e-12,
+        0.0,
+        -0.0,
+        -1.0,
+        980.799999999999
+      ],
+      "statorSolid": 1,
+      "rotorSolid": 0,
+      "rotorDetails": [],
+      "sourcePackage": "10kg"
+    },
+    {
+      "id": "joint6",
+      "sourceOccurrence": 664443,
+      "asset": "asset15",
+      "matrix": [
+        0.0,
+        0.0,
+        -1.0,
+        140.100000000007,
+        1.0,
+        -0.0,
+        0.0,
+        -1e-11,
+        -0.0,
+        -1.0,
+        -0.0,
+        1036.300000000006
+      ],
+      "statorSolid": 1,
+      "rotorSolid": 0,
+      "rotorDetails": [],
+      "sourcePackage": "10kg"
+    },
+    {
+      "id": "toolFlange",
+      "sourceOccurrence": 664444,
+      "asset": "asset16",
+      "matrix": [
+        0.0,
+        -1.0,
+        -0.0,
+        176.100000000013,
+        1.0,
+        0.0,
+        -0.0,
+        -3.2e-11,
+        0.0,
+        -0.0,
+        1.0,
+        1036.300000000007
+      ],
+      "parent": "joint6-rotor",
+      "sourcePackage": "10kg"
+    },
+    {
+      "id": "baseSocketA",
+      "sourceOccurrence": 452248,
+      "asset": "asset10",
+      "matrix": [
+        0.0,
+        -0.0,
+        1.0,
+        -62.0,
+        -0.0,
+        1.0,
+        0.0,
+        16.25,
+        -1.0,
+        -0.0,
+        0.0,
+        19.75
+      ],
+      "parent": "base"
+    },
+    {
+      "id": "basePlugA",
+      "sourceOccurrence": 452249,
+      "asset": "asset11",
+      "matrix": [
+        -1.0,
+        -0.0,
+        -0.0,
+        -59.0,
+        0.0,
+        0.381849318687,
+        -0.924224592736,
+        16.25,
+        0.0,
+        -0.924224592736,
+        -0.381849318687,
+        19.75
+      ],
+      "parent": "base"
+    },
+    {
+      "id": "baseSocketB",
+      "sourceOccurrence": 452250,
+      "asset": "asset10",
+      "matrix": [
+        0.0,
+        -0.0,
+        1.0,
+        -62.0,
+        -0.0,
+        1.0,
+        0.0,
+        -16.25,
+        -1.0,
+        -0.0,
+        0.0,
+        19.75
+      ],
+      "parent": "base"
+    },
+    {
+      "id": "basePlugB",
+      "sourceOccurrence": 452251,
+      "asset": "asset11",
+      "matrix": [
+        -1.0,
+        -0.0,
+        -0.0,
+        -59.0,
+        0.0,
+        0.381849318687,
+        -0.924224592736,
+        -16.25,
+        0.0,
+        -0.924224592736,
+        -0.381849318687,
+        19.75
+      ],
+      "parent": "base"
+    },
+    {
+      "id": "cableExit6",
+      "sourceOccurrence": 664449,
+      "asset": "asset12",
+      "matrix": [
+        -0.0,
+        1.0,
+        -0.0,
+        60.300000000007,
+        -0.358367949545,
+        -0.0,
+        -0.933580426497,
+        -2.4e-11,
+        -0.933580426497,
+        0.0,
+        0.358367949545,
+        1036.300000000007
+      ],
+      "parent": "joint6-stator",
+      "sourcePackage": "10kg"
+    },
+    {
+      "id": "cableExit5",
+      "sourceOccurrence": 664450,
+      "asset": "asset12",
+      "matrix": [
+        -0.933580426497,
+        -0.0,
+        0.358367949545,
+        97.600000000006,
+        0.358367949545,
+        0.0,
+        0.933580426497,
+        -8e-12,
+        -0.0,
+        1.0,
+        -0.0,
+        901.0
+      ],
+      "parent": "joint5-stator",
+      "sourcePackage": "10kg"
+    },
+    {
+      "id": "cableExit4",
+      "sourceOccurrence": 664451,
+      "asset": "asset12",
+      "matrix": [
+        0.0,
+        1.0,
+        0.0,
+        -37.7,
+        -0.35020738126,
+        0.0,
+        -0.936672189248,
+        6e-12,
+        -0.936672189248,
+        0.0,
+        0.35020738126,
+        938.3
+      ],
+      "parent": "joint4-stator",
+      "sourcePackage": "10kg"
+    },
+    {
+      "id": "cableExit3",
+      "sourceOccurrence": 452255,
+      "asset": "asset12",
+      "matrix": [
+        0.0,
+        -1.0,
+        0.0,
+        183.2,
+        0.294114672539,
+        0.0,
+        0.955770139415,
+        -2e-12,
+        -0.955770139415,
+        -0.0,
+        0.294114672539,
+        537.3
+      ],
+      "parent": "joint3-stator"
+    },
+    {
+      "id": "cableExit2",
+      "sourceOccurrence": 452256,
+      "asset": "asset12",
+      "matrix": [
+        0.0,
+        -1.0,
+        0.0,
+        183.2,
+        -0.294114672539,
+        -0.0,
+        -0.955770139415,
+        -0.0,
+        0.955770139415,
+        0.0,
+        -0.294114672539,
+        112.3
+      ],
+      "parent": "joint2-stator"
+    },
+    {
+      "id": "cableExit1",
+      "sourceOccurrence": 452257,
+      "asset": "asset12",
+      "matrix": [
+        0.958300348747,
+        0.0,
+        -0.285762911504,
+        -0.0,
+        0.285762911504,
+        0.0,
+        0.958300348747,
+        -0.0,
+        0.0,
+        -1.0,
+        0.0,
+        161.5
+      ],
+      "parent": "joint1-stator"
+    },
+    {
+      "id": "cableBracket2",
+      "sourceOccurrence": 452258,
+      "asset": "asset13",
+      "matrix": [
+        -0.980785280403,
+        0.0,
+        -0.195090322016,
+        151.654135047258,
+        0.195090322016,
+        0.0,
+        -0.980785280403,
+        -3.51162579629,
+        -0.0,
+        -1.0,
+        -0.0,
+        177.3
+      ],
+      "parent": "joint2-stator"
+    },
+    {
+      "id": "cableBracket3",
+      "sourceOccurrence": 452259,
+      "asset": "asset13",
+      "matrix": [
+        -0.980785280403,
+        -0.0,
+        0.195090322016,
+        151.654135047258,
+        0.195090322016,
+        -0.0,
+        0.980785280403,
+        -3.511625796291,
+        -0.0,
+        1.0,
+        0.0,
+        472.3
+      ],
+      "parent": "joint3-stator"
+    },
+    {
+      "id": "cableBracket4",
+      "sourceOccurrence": 664457,
+      "asset": "asset13",
+      "matrix": [
+        0.980785280403,
+        -0.0,
+        0.195090322016,
+        -17.563742407057,
+        0.195090322016,
+        -0.0,
+        -0.980785280403,
+        -3.414080635284,
+        0.0,
+        1.0,
+        -0.0,
+        600.3
+      ],
+      "parent": "elbowHousing",
+      "sourcePackage": "10kg"
+    },
+    {
+      "id": "cableBracket4Distal",
+      "asset": "asset13",
+      "parent": "elbowHousing",
+      "sourceOccurrence": 664458,
+      "sourcePackage": "10kg",
+      "matrix": [
+        0.951056516295,
+        -0.0,
+        0.309016994375,
+        -8.008452130361,
+        0.309016994375,
+        -0.0,
+        -0.951056516295,
+        -2.472135955008,
+        0.0,
+        1.0,
+        -0.0,
+        888.299999999999
+      ]
+    }
+  ],
+  "joints": [
+    {
+      "id": "j1",
+      "parent": "joint1-rotor",
+      "child": "joint1-stator",
+      "module": "joint1"
+    },
+    {
+      "id": "j2",
+      "parent": "joint2-rotor",
+      "child": "joint2-stator",
+      "module": "joint2"
+    },
+    {
+      "id": "j3",
+      "parent": "joint3-stator",
+      "child": "joint3-rotor",
+      "module": "joint3"
+    },
+    {
+      "id": "j4",
+      "parent": "joint4-stator",
+      "child": "joint4-rotor",
+      "module": "joint4"
+    },
+    {
+      "id": "j5",
+      "parent": "joint5-stator",
+      "child": "joint5-rotor",
+      "module": "joint5"
+    },
+    {
+      "id": "j6",
+      "parent": "joint6-stator",
+      "child": "joint6-rotor",
+      "module": "joint6"
+    }
+  ],
+  "fixedModuleMounts": [
+    {
+      "parent": "base",
+      "child": "joint1-rotor"
+    },
+    {
+      "parent": "joint1-stator",
+      "child": "joint2-rotor"
+    },
+    {
+      "parent": "upperArm",
+      "child": "joint3-stator"
+    },
+    {
+      "parent": "forearm",
+      "child": "joint4-stator"
+    },
+    {
+      "parent": "joint4-rotor",
+      "child": "joint5-stator"
+    },
+    {
+      "parent": "joint5-rotor",
+      "child": "joint6-stator"
+    }
+  ],
+  "outputSpigotPartition": {
+    "asset": "asset2",
+    "sourceSolid": 0,
+    "casingDatumLocalZMm": 0,
+    "spigotOutsideDiameterMaxMm": 98,
+    "basis": "Exterior kinematic partition at the front casing datum; source STEP merges the projecting output spigot into the housing solid. Bearing internals are not inferred.",
+    "drawingUrl": "https://www.zeroerr.cn/static/download/eRobT/eRob110T/V4/eRob110H××T-XX-18EX_V4_MC2B.BX.XX.zip",
+    "drawingPdfSha256": "7ad75e3fe8754e97c5449a7963934b42558931e7d74a89a518f74b2c8c53b93d"
+  },
+  "revision": {
+    "name": "wrist80",
+    "basis": "5 kg proximal arm; supplier 10 kg forearm/wrist interface chain shortened to 401 mm forearm axis distance",
+    "additionalSource": {
+      "url": "https://www.zeroerr.cn/d/file/arms/cn/20260522/10KG机械臂图纸模型.zip",
+      "sha256": "87d992f2843e527ae16a41df68826cdf9725ddacc4e25c065cf8f7287d6ac343",
+      "assembly": "eRobot 10.STEP",
+      "assemblySha256": "942655a34bc8e028b090790bc462f0b70e275686a1f136ee4058f732acf205e8"
+    },
+    "originalPlacements": [
+      {
+        "sourceOccurrence": 664431,
+        "matrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "sourceOccurrence": 664432,
+        "matrix": [
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          1.0,
+          -0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.0,
+          4.0
+        ]
+      },
+      {
+        "sourceOccurrence": 664433,
+        "matrix": [
+          -0.0,
+          -1.0,
+          0.0,
+          0.0,
+          1.0,
+          -0.0,
+          0.0,
+          0.0,
+          -0.0,
+          0.0,
+          1.0,
+          48.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664434,
+        "matrix": [
+          0.0,
+          0.0,
+          -1.0,
+          -90.999999999913,
+          -1.0,
+          0.0,
+          -0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          122.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664435,
+        "matrix": [
+          -1.0,
+          -0.0,
+          0.0,
+          -164.999999999913,
+          -0.0,
+          -0.0,
+          -1.0,
+          0.0,
+          0.0,
+          -1.0,
+          0.0,
+          200.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664436,
+        "matrix": [
+          -0.0,
+          -0.0,
+          -1.0,
+          -106.999999999913,
+          1.0,
+          -0.0,
+          -0.0,
+          0.0,
+          -0.0,
+          -1.0,
+          0.0,
+          734.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664437,
+        "matrix": [
+          -0.0,
+          -1.0,
+          -0.0,
+          -106.399999999913,
+          -0.0,
+          -0.0,
+          1.0,
+          0.0,
+          -1.0,
+          0.0,
+          -0.0,
+          734.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664438,
+        "matrix": [
+          -0.0,
+          -1.0,
+          0.0,
+          -73.199999999913,
+          0.965925826289,
+          -0.0,
+          -0.258819045103,
+          0.0,
+          0.258819045103,
+          0.0,
+          0.965925826289,
+          734.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664439,
+        "matrix": [
+          -0.0,
+          0.0,
+          1.0,
+          -88.599999999913,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          -0.0,
+          1.0,
+          -0.0,
+          734.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664440,
+        "matrix": [
+          -1.0,
+          -0.0,
+          0.0,
+          -30.599999999913,
+          -0.0,
+          -0.0,
+          -1.0,
+          1e-12,
+          0.0,
+          -1.0,
+          0.0,
+          794.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664441,
+        "matrix": [
+          0.0,
+          -0.0,
+          1.0,
+          -73.099999999912,
+          -1.0,
+          -0.0,
+          0.0,
+          9e-12,
+          0.0,
+          -1.0,
+          -0.0,
+          1324.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664442,
+        "matrix": [
+          -0.0,
+          1.0,
+          -0.0,
+          -128.599999999919,
+          1.0,
+          0.0,
+          0.0,
+          9e-12,
+          0.0,
+          -0.0,
+          -1.0,
+          1367.499999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664443,
+        "matrix": [
+          -0.0,
+          -0.0,
+          1.0,
+          -171.099999999919,
+          -1.0,
+          0.0,
+          -0.0,
+          9e-12,
+          -0.0,
+          -1.0,
+          -0.0,
+          1422.99999999992
+        ]
+      },
+      {
+        "sourceOccurrence": 664444,
+        "matrix": [
+          -0.0,
+          1.0,
+          0.0,
+          -207.099999999926,
+          -1.0,
+          -0.0,
+          0.0,
+          3.2e-11,
+          0.0,
+          -0.0,
+          1.0,
+          1422.99999999992
+        ]
+      },
+      {
+        "sourceOccurrence": 664445,
+        "matrix": [
+          0.0,
+          -0.0,
+          -1.0,
+          -76.0,
+          -0.0,
+          1.0,
+          -0.0,
+          16.25,
+          1.0,
+          0.0,
+          0.0,
+          19.75
+        ]
+      },
+      {
+        "sourceOccurrence": 664446,
+        "matrix": [
+          -1.0,
+          -0.0,
+          -0.0,
+          -75.0,
+          0.0,
+          0.381849318687,
+          -0.924224592736,
+          16.25,
+          0.0,
+          -0.924224592736,
+          -0.381849318687,
+          19.75
+        ]
+      },
+      {
+        "sourceOccurrence": 664447,
+        "matrix": [
+          0.0,
+          -0.0,
+          -1.0,
+          -76.0,
+          -0.0,
+          1.0,
+          -0.0,
+          -16.25,
+          1.0,
+          0.0,
+          0.0,
+          19.75
+        ]
+      },
+      {
+        "sourceOccurrence": 664448,
+        "matrix": [
+          -1.0,
+          -0.0,
+          -0.0,
+          -75.0,
+          0.0,
+          0.381849318687,
+          -0.924224592736,
+          -16.25,
+          0.0,
+          -0.924224592736,
+          -0.381849318687,
+          19.75
+        ]
+      },
+      {
+        "sourceOccurrence": 664449,
+        "matrix": [
+          0.0,
+          -1.0,
+          0.0,
+          -91.299999999919,
+          0.358367949545,
+          0.0,
+          0.933580426497,
+          2.3e-11,
+          -0.933580426497,
+          0.0,
+          0.358367949545,
+          1422.99999999992
+        ]
+      },
+      {
+        "sourceOccurrence": 664450,
+        "matrix": [
+          0.933580426497,
+          0.0,
+          -0.358367949545,
+          -128.599999999919,
+          -0.358367949545,
+          -0.0,
+          -0.933580426497,
+          8e-12,
+          -0.0,
+          1.0,
+          0.0,
+          1287.699999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664451,
+        "matrix": [
+          -0.0,
+          -1.0,
+          -0.0,
+          6.700000000088,
+          0.35020738126,
+          -0.0,
+          0.936672189248,
+          -6e-12,
+          -0.936672189248,
+          0.0,
+          0.35020738126,
+          1324.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664452,
+        "matrix": [
+          -0.0,
+          1.0,
+          0.0,
+          -214.199999999913,
+          -0.294114672539,
+          0.0,
+          -0.955770139415,
+          -4e-12,
+          -0.955770139415,
+          -0.0,
+          0.294114672539,
+          734.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664453,
+        "matrix": [
+          -0.0,
+          1.0,
+          0.0,
+          -216.599999999913,
+          0.313336521596,
+          -0.0,
+          0.949642155885,
+          -0.0,
+          0.949642155885,
+          0.0,
+          -0.313336521596,
+          122.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664454,
+        "matrix": [
+          -0.949642155885,
+          -0.0,
+          0.313336521596,
+          0.0,
+          -0.313336521596,
+          -0.0,
+          -0.949642155885,
+          0.0,
+          0.0,
+          -1.0,
+          0.0,
+          174.599999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664455,
+        "matrix": [
+          1.0,
+          0.0,
+          0.0,
+          -189.999999999913,
+          0.0,
+          0.0,
+          -1.0,
+          0.0,
+          -0.0,
+          1.0,
+          0.0,
+          199.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664456,
+        "matrix": [
+          0.980785280403,
+          0.0,
+          -0.195090322016,
+          -186.085013643384,
+          -0.195090322016,
+          0.0,
+          -0.980785280403,
+          4.203836804212,
+          -0.0,
+          1.0,
+          0.0,
+          669.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664457,
+        "matrix": [
+          -0.980785280403,
+          0.0,
+          -0.195090322016,
+          -13.436257592856,
+          -0.195090322016,
+          0.0,
+          0.980785280403,
+          3.414080635283,
+          0.0,
+          1.0,
+          -0.0,
+          797.999999999913
+        ]
+      },
+      {
+        "sourceOccurrence": 664458,
+        "matrix": [
+          -0.951056516295,
+          0.0,
+          -0.309016994375,
+          -22.991547869551,
+          -0.309016994375,
+          0.0,
+          0.951056516295,
+          2.472135955008,
+          0.0,
+          1.0,
+          -0.0,
+          1274.999999999913
+        ]
+      }
+    ],
+    "sourceToArmMatrix": [
+      -1.0,
+      -0.0,
+      0.0,
+      -30.999999999913,
+      0.0,
+      -1.0,
+      0.0,
+      -1e-12,
+      0.0,
+      0.0,
+      1.0,
+      -197.699999999913
+    ],
+    "forearmRemovedMm": 189,
+    "nearCutY": -130,
+    "farCutY": -359,
+    "hardwareStatus": "shoulder not qualified; no powered mission; actual production module revisions unconfirmed",
+    "transitionLengthMm": 40
+  }
+}

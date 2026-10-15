@@ -1,0 +1,427 @@
+{
+  "schema": 1,
+  "status": "provisional_screening_not_procurement_release",
+  "application": {
+    "payloadKg": 4,
+    "toolKg": 1,
+    "combinedCogAlongToolNormalMm": 150,
+    "jointSpeedDegS": 180,
+    "jointAccelerationDegS2": 60,
+    "designFactor": 1.2,
+    "massSensitivityFactor": 1.25,
+    "sampleCount": 256,
+    "syntheticJointRangeDeg": [
+      -170,
+      170
+    ],
+    "loadBasis": "5 kg total at flange including 1 kg tool; split and 150 mm combined CoG are study assumptions",
+    "accelerationBasis": "60 deg/s^2 screening assumption, not a claimed UR/FAIRINO acceleration rating"
+  },
+  "requestedOptions": {
+    "brake": true,
+    "bus": "EtherCAT",
+    "outputEncoder": "HM high precision multiturn; revision availability unconfirmed",
+    "supplyV": 48,
+    "boreMm": 18,
+    "torqueSensor": "no independent load-side torque sensor assumed",
+    "orderingCode": null,
+    "revisionCompatibilityWithReferenceCad": "unconfirmed"
+  },
+  "jointCandidates": [
+    {
+      "joint": "j1",
+      "family": "eRob110T",
+      "nominalRatio": 100
+    },
+    {
+      "joint": "j2",
+      "family": "eRob110T",
+      "nominalRatio": 100
+    },
+    {
+      "joint": "j3",
+      "family": "eRob110T",
+      "nominalRatio": 100
+    },
+    {
+      "joint": "j4",
+      "family": "eRob80T",
+      "nominalRatio": 100
+    },
+    {
+      "joint": "j5",
+      "family": "eRob80T",
+      "nominalRatio": 100
+    },
+    {
+      "joint": "j6",
+      "family": "eRob80T",
+      "nominalRatio": 100
+    }
+  ],
+  "catalog": {
+    "eRob110T": {
+      "revision": "V4 MC2B.XX.XX",
+      "brakeMassKg": 4.47,
+      "motorRotorInertiaGmm2": 285402,
+      "ratios": [
+        50,
+        80,
+        100,
+        120,
+        160
+      ],
+      "ratedTorqueNm": [
+        51,
+        82,
+        87,
+        87,
+        87
+      ],
+      "startStopPeakNm": [
+        127,
+        178,
+        204,
+        217,
+        229
+      ],
+      "ratedLoadSpeedRpm48V": [
+        60,
+        37.5,
+        30,
+        25,
+        18.75
+      ],
+      "drawingUrl": "https://www.zeroerr.cn/static/download/eRobT/eRob110T/V4/eRob110H××T-XX-18EX_V4_MC2B.BX.XX.zip",
+      "pdfSha256": "7ad75e3fe8754e97c5449a7963934b42558931e7d74a89a518f74b2c8c53b93d",
+      "productUrl": "https://www.zeroerr.cn/eRob/eRob110T.html"
+    },
+    "eRob70T": {
+      "revision": "V4 MC2B.XX.XX",
+      "brakeMassKg": 1.16,
+      "motorRotorInertiaGmm2": 50996,
+      "ratios": [
+        50,
+        80,
+        100,
+        120
+      ],
+      "ratedTorqueNm": [
+        7,
+        10,
+        10,
+        10
+      ],
+      "startStopPeakNm": [
+        23,
+        30,
+        36,
+        36
+      ],
+      "ratedLoadSpeedRpm48V": [
+        60,
+        37.5,
+        30,
+        25
+      ],
+      "drawingUrl": "https://www.zeroerr.cn/static/download/eRobT/eRob70T/V4/eRob70H××T-XX-18EX_V4_MC2B.CX.XX.zip",
+      "pdfSha256": "2ea9ccd39ec38dbeb4ed5a02170b6a08d78d2327adb4f54f0dc23a68e1a03cd4",
+      "archiveSha256": "d4bc1e01484d07e3b8d2f6eb2fc0f2e2c896cdbdad65fd5a8f1f84ea9c00979b",
+      "productUrl": "https://www.zeroerr.cn/eRob/eRob70T.html"
+    },
+    "eRob80T": {
+      "revision": "V5 MC2D.XX.XX (envelope evidence; reference STEP revision not commissioned)",
+      "brakeMassKg": 1.75,
+      "motorRotorInertiaGmm2": 70637,
+      "ratios": [
+        50,
+        80,
+        100,
+        120
+      ],
+      "ratedTorqueNm": [
+        21,
+        29,
+        31,
+        31
+      ],
+      "startStopPeakNm": [
+        44,
+        56,
+        70,
+        70
+      ],
+      "ratedLoadSpeedRpm48V": [
+        60,
+        37.5,
+        30,
+        25
+      ],
+      "drawingUrl": "https://www.zeroerr.cn/static/download/eRobT/eRob80T/V5/eRob80H××T-XX-18EX_V5_MC2D.CX.XX.zip",
+      "pdfSha256": "20546bef0cdc5853efcbccb34e9832a515d1cb07945007fe8bb56b59c9e6e604",
+      "productUrl": "https://www.zeroerr.cn/eRob/eRob80T.html"
+    }
+  },
+  "manual": {
+    "url": "https://download.zeroerr.cn/static/download/eRob机器人关节模组用户手册_V3.44.pdf?=20260823",
+    "sha256": "73e138369aa2780c980e0652008c8311c95d26ac3b4142ce2f05afdc1bf0e7b5",
+    "relevantSections": [
+      "2 model nomenclature and parameters",
+      "3 supply and regeneration",
+      "6.6 cable routing",
+      "7 brake",
+      "12 nominal ratio plus one",
+      "17 bearings",
+      "21 STO",
+      "Appendix 3 whole-module mass/CoG/inertia; not a moving-side mass split"
+    ]
+  },
+  "benchmarks": [
+    {
+      "model": "UR5e",
+      "totalFlangeLoadKg": 5,
+      "reachMm": 850,
+      "maximumJointSpeedDegS": 180,
+      "repeatabilityMm": 0.03,
+      "jointTravel": "published +/-360 degrees; flange continuous rotation is revision-dependent",
+      "source": "https://www.universal-robots.com/manuals/EN/HTML/SW10_6/Content/prod-usr-man/hardware/arm_e-Series/UR5e/H_g5_sections/appendix_g5/tech_spec_sheet.htm"
+    },
+    {
+      "model": "FAIRINO FR5",
+      "totalFlangeLoadKg": 5,
+      "reachMm": 922,
+      "maximumJointSpeedDegS": 180,
+      "repeatabilityMm": 0.02,
+      "jointTravelDeg": [
+        [
+          -175,
+          175
+        ],
+        [
+          -265,
+          85
+        ],
+        [
+          -160,
+          160
+        ],
+        [
+          -265,
+          85
+        ],
+        [
+          -175,
+          175
+        ],
+        [
+          -175,
+          175
+        ]
+      ],
+      "source": "https://www.fairino.com/FR/4.html",
+      "note": "5 kg nominal; published 7 kg maximum not adopted as unconditional payload"
+    }
+  ],
+  "payloadDefinitionSource": "https://www.universal-robots.com/manuals/EN/HTML/SW5_25_1/Content/prod-usr-man/complianceUR3e/H_g5_sections/mechanical_interface_g5/maximum_payload_en_3e.htm",
+  "reviewedOn": "2026-10-15",
+  "decision": {
+    "status": "wrist80_geometry_variant_shoulder_still_fails_target",
+    "screeningFailures": [
+      "j2 shoulder full-workspace gravity exceeds the reviewed continuous-torque rating; wrist revision passes this preliminary rated-torque screen"
+    ],
+    "preferredWristBenchCandidate": {
+      "family": "eRob80T",
+      "nominalRatio": 100,
+      "ratedTorqueNm": 31,
+      "startStopPeakNm": 70,
+      "catalogSpeedRpm": 30,
+      "source": "https://www.zeroerr.cn/eRob/eRob80T.html",
+      "status": "implemented in revised CAD using supplier 10 kg interfaces; V5 production revision compatibility still requires confirmation"
+    },
+    "shoulderCandidateReview": {
+      "family": "eRob142T",
+      "source": "https://www.zeroerr.cn/eRob/eRob142T.html",
+      "ratios": [
+        50,
+        80,
+        100,
+        120,
+        160
+      ],
+      "ratedTorqueNm": [
+        99,
+        153,
+        178,
+        178,
+        178
+      ],
+      "publishedSpeedRpm": [
+        40,
+        25,
+        20,
+        16.7,
+        12.5
+      ],
+      "finding": "V4 drawing now confirms product page: 20 rpm at ratio 100; fails the 180 deg/s target. I-type V4 drawing also confirms the same speeds."
+    },
+    "nextRequiredEvidence": [
+      "revision-specific shoulder continuous torque-speed-temperature curves at 48 V and 30 rpm or faster",
+      "actual module CoG/inertia frames and moving-side mass distribution",
+      "tool mass, CoG and intrinsic inertia; measured mission duty",
+      "revision-specific mounting and bearing limits, ESI and firmware",
+      "revised CAD/load study if modules or offsets change"
+    ],
+    "hardwarePurchaseReleased": false,
+    "revisionEvidence": [
+      {
+        "key": "142t-v4",
+        "url": "https://www.zeroerr.cn/static/download/eRobT/eRob142T/V4/eRob142H××T-XX-18EX_V4_MC2B.9X.XX.zip",
+        "file": "eRob142H××T-XX-18EX_V4_MC2B.9X.XX/eRob142H××T-XX-18XX_V4_MC2B.XX.XX.pdf",
+        "pdfSha256": "910430b1a7e6e78ca23da16ea6184641c5f4788e12ff4e2f8a39e5e6e2569073"
+      },
+      {
+        "key": "142i-v4",
+        "url": "https://www.zeroerr.cn/static/download/eRobI/eRob142I/V4/eRob142H××I-XX-18EX_V4_MC2B.9X.XX.zip",
+        "file": "eRob142H××I-XX-18EX_V4_MC2B.9X.XX/eRob142H××I-XX-18EX_V4_MC2B.9X.XX.pdf",
+        "pdfSha256": "52926dbf4bb39c803b86728f42aa5d122725579dacca9cf670825b63cebf3b26"
+      },
+      {
+        "key": "80t-v5",
+        "url": "https://www.zeroerr.cn/static/download/eRobT/eRob80T/V5/eRob80H××T-XX-18EX_V5_MC2D.CX.XX.zip",
+        "file": "eRob80H××T-XX-18EX_V5_MC2D.CX.XX/eRob80H××T-XX-18XX_V5_MC2D.XX.XX.pdf",
+        "pdfSha256": "20546bef0cdc5853efcbccb34e9832a515d1cb07945007fe8bb56b59c9e6e604"
+      },
+      {
+        "key": "170i-v3",
+        "url": "https://www.zeroerr.cn/static/download/eRobI/eRob170I/V3/eRob170H××I-XX-18EX_V3_MC2A.AX.XX.zip",
+        "file": "eRob170H××I-XX-18EX_V3_MC2A.AX.XX/eRob170H××I-XX-18EX_V3_MC2A.AX.XX.pdf",
+        "pdfSha256": "3b2ab44d4c2c9b939788142a50e6e78dd3a9182ef4b7fc7783f9da9e32d7dc96"
+      },
+      {
+        "key": "170i-v3-f",
+        "url": "https://www.zeroerr.cn/static/download/eRobI/eRob170I/V3/eRob170H××I-XX-18EX_V3_MC2A.FX.XX.zip",
+        "file": "eRob170H××I-XX-18EX_V3_MC2A.FX.XX.pdf",
+        "pdfSha256": "bf9931ee7f20794d6e7616db9ef7a7ab880fdae41400b0fd4ad63b9818687ab8"
+      }
+    ],
+    "additionalShoulderReview": {
+      "family": "eRob170I",
+      "revision": "V3 MC2A AX and FX drawings",
+      "ratios": [
+        50,
+        80,
+        100,
+        120,
+        160
+      ],
+      "ratedTorqueNm": [
+        137,
+        206,
+        265,
+        294,
+        294
+      ],
+      "ratedLoadSpeedRpm48V": [
+        40,
+        25,
+        20,
+        16.7,
+        12.5
+      ],
+      "brakeMassKg": 9.5,
+      "finding": "Only nominal 50 reaches the speed target, but 137 Nm does not provide required design/sensitivity reserve at revised-arm loads. Larger size alone does not solve the combined requirement. Not integrated or selected."
+    },
+    "boundedCycleFinding": "110T100 remains a prototype candidate for the recorded synthetic cycle only: nominal shoulder RMS around 58 Nm and heavier-arm RMS around 68 Nm. Real cell, thermal duty, friction, payload inertia and hardware limits remain unqualified"
+  },
+  "mechanicalRevision": {
+    "layout": "revised-layout.json",
+    "forearmAxisDistanceMm": 401,
+    "proximalUpperArmAxisDistanceMm": 425,
+    "newWrist": "supplier 10 kg wrist chain: three 80T modules and its matching terminal flange",
+    "forearm": "preserved supplier 10 kg end sections with 40 mm hollow loft; 189 mm shorter",
+    "physicalLimits": "uncommissioned; +/-170 degree exploratory screen is not commanded hardware travel"
+  },
+  "missionStudy": {
+    "description": "Exploratory tending surrogate, no real cell registration or hardware commands",
+    "samplesPerSegment": 7,
+    "waypointsRad": [
+      [
+        0.2,
+        -0.8,
+        1,
+        0.1,
+        -0.6,
+        0.2
+      ],
+      [
+        0.5,
+        -0.9,
+        1.2,
+        0.2,
+        -0.5,
+        0.1
+      ],
+      [
+        0.5,
+        -1,
+        1.3,
+        0.2,
+        -0.6,
+        0.1
+      ],
+      [
+        0.5,
+        -0.9,
+        1.2,
+        0.2,
+        -0.5,
+        0.1
+      ],
+      [
+        -0.4,
+        -0.7,
+        0.8,
+        -0.1,
+        -0.7,
+        0.2
+      ],
+      [
+        -0.4,
+        -0.8,
+        0.9,
+        -0.1,
+        -0.8,
+        0.2
+      ],
+      [
+        -0.4,
+        -0.7,
+        0.8,
+        -0.1,
+        -0.7,
+        0.2
+      ],
+      [
+        0.2,
+        -0.8,
+        1,
+        0.1,
+        -0.6,
+        0.2
+      ]
+    ]
+  },
+  "partDensitiesKgM3": {
+    "upperArm": 2810,
+    "forearm": 2700
+  },
+  "componentMaterialEvidence": {
+    "part": "forearm",
+    "source": "revised-layout.json",
+    "archive": "10 kg reference pinned in revised-layout.json",
+    "drawing": "2-130-005 10kg三关节连杆 - 腰形.pdf",
+    "pdfSha256": "ebece987c1f03258f91b84efc925760878ff57fe97059230a8c7f12842b1c348",
+    "specifiedMaterial": "AL6061-T6",
+    "assumedDensityKgM3": 2700
+  }
+}

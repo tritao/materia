@@ -1,0 +1,62 @@
+{
+  "status": "draft_only_not_sent_not_ordered",
+  "quantity": 1,
+  "manufacturer": "ZeroErr",
+  "requestedFamily": "eRob80H100T",
+  "configuration": {
+    "nominalRatio": 100,
+    "brake": true,
+    "bus": "EtherCAT",
+    "outputFeedback": "HM high precision multiturn requested; exact availability and complete code to be confirmed",
+    "supplyV": 48
+  },
+  "mechanicalDrawing": {
+    "key": "80t-v5",
+    "url": "https://www.zeroerr.cn/static/download/eRobT/eRob80T/V5/eRob80H××T-XX-18EX_V5_MC2D.CX.XX.zip",
+    "file": "eRob80H××T-XX-18EX_V5_MC2D.CX.XX/eRob80H××T-XX-18XX_V5_MC2D.XX.XX.pdf",
+    "pdfSha256": "20546bef0cdc5853efcbccb34e9832a515d1cb07945007fe8bb56b59c9e6e604"
+  },
+  "fixtureBasis": {
+    "supplierForearmEnd": "2-130-005 10kg三关节连杆 -腰形.STEP",
+    "source": "10 kg reference pinned in revised-layout.json",
+    "use": "Retained distal mounting end; do not copy generic CobotJoint fastener patterns",
+    "limits": "Fixture clamp/base/load catch require mechanical review; no fabricated fixture is claimed"
+  },
+  "testLoad": {
+    "calibratedMassKg": 1,
+    "leverLengthMm": 100,
+    "loadMomentNm": 0.980665,
+    "leverOwnMass": "measure and include"
+  },
+  "startupTest": {
+    "sweepDeg": [
+      -15,
+      15
+    ],
+    "speedDegS": 5,
+    "accelerationDegS2": 10,
+    "brakeEnableWaitMsMinimum": 500,
+    "disableToReenableWaitMsMinimum": 300,
+    "sequencingSource": "V3.44 section 7; verify against delivered communications manual"
+  },
+  "supplierConfirmationRequired": [
+    "complete ordering code and current lead time/quotation",
+    "V5 mounting CAD with brake and requested feedback; match pilot/hole patterns to fixture drawing",
+    "rated torque-speed curve, thermal duty and holding-brake limits",
+    "ESI and firmware revision, encoder counts/direction, ratio-plus-one convention",
+    "regenerative supply requirements and STO wiring/behavior"
+  ],
+  "acceptanceRecord": [
+    "serial/order code/hardware and firmware revisions",
+    "external gauge lost motion and load deflection",
+    "input/output encoder agreement across power cycle",
+    "current, bus voltage and temperature against time",
+    "brake holding with load independently caught",
+    "full application duty test after basic bench acceptance"
+  ],
+  "shoulderFollowUp": {
+    "status": "no reviewed stock ZeroErr revision selected for full-workspace target",
+    "screeningRequest": "Provide a versioned option supporting at least 190 Nm continuous at 30 rpm or faster on the specified supply, plus the complete speed/torque/thermal and peak-duty curves. This is a screening request, not sufficient hardware qualification.",
+    "existingPrototypeOption": "110T100 only within a separately validated, bounded tending duty; current synthetic cycle is not registered to a real cell"
+  }
+}

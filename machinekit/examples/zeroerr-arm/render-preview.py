@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Optional static review image from exported CAD meshes (numpy + matplotlib)."""
 import json
+import sys
 from pathlib import Path
 import numpy as np
 import matplotlib
@@ -8,8 +9,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
+revised = "--revised" in sys.argv
 root = Path(__file__).resolve().parent / "build"
-parts = json.loads((root / "zeroerr5.mesh.json").read_text())
+if revised: root /= "revised"
+stem = "zeroerr5-wrist80" if revised else "zeroerr5"
+parts = json.loads((root / (stem+".mesh.json")).read_text())
 triangles, colors, points = [], [], []
 light = np.array([-0.3, -0.6, 1])
 light /= np.linalg.norm(light)
@@ -39,11 +43,11 @@ ax.set_box_aspect((1, 1, 1))
 ax.set_proj_type("ortho")
 ax.view_init(elev=20, azim=-60)
 ax.set_axis_off()
-fig.suptitle("ZeroErr 5 kg reference · articulated CAD", fontsize=20, y=0.96)
+fig.suptitle("ZeroErr · 80T wrist engineering revision" if revised else "ZeroErr 5 kg reference · articulated CAD", fontsize=20, y=0.96)
 fig.text(0.5, 0.91, "T-shaped joint modules · straight hollow links · supplier mounting geometry",
          ha="center", fontsize=12, color="#44515c")
 fig.text(0.5, 0.035, "Mechanical review model · motor configuration and load capability remain to be validated",
          ha="center", fontsize=10, color="#44515c")
 fig.subplots_adjust(left=0, right=1, bottom=0.04, top=0.91)
-fig.savefig(root / "zeroerr5-preview.png", dpi=160)
-print("Saved", root / "zeroerr5-preview.png")
+fig.savefig(root / (stem+"-preview.png"), dpi=160)
+print("Saved", root / (stem+"-preview.png"))

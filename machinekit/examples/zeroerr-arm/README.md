@@ -287,3 +287,133 @@ The completed motion screen reports zero positive structural overlaps at all
 maxima of 114.31/12.17/10.53 Nm, respectively, before the design factor. The torque
 concerns therefore also occur within this structurally checked pose set.
 This is not clearance certification for the wider UR/FR5 travel ranges.
+
+## 80T wrist engineering revision
+
+`revised-layout.json` keeps the 5 kg reference's proximal arm and 425 mm upper-arm
+axis spacing, and substitutes the supplier 10 kg forearm/wrist chain at the
+common 110T elbow interface. J4–J6 are all 80T modules, with the matching supplier
+terminal flange: retaining the complete chain avoids inventing a mixed 80T/70T
+adapter. The 10 kg archive, every added STEP, original assembly placements and
+the rigid alignment to our elbow are pinned and verified independently.
+
+The forearm axis spacing remains 401 mm. Its supplier mounting ends are retained;
+189 mm is removed from the longer reference link. The tapered sections cannot be
+joined directly, so a 40 mm hollow loft joins the retained end portions at local
+Y=-130 and Y=-170 mm. The result must be one valid connected solid with one inner
+and one outer section wire. This is a new link design requiring manufacturing,
+wall-thickness, stiffness and fatigue review, not an unchanged supplier part.
+Factory mounting features remain in the retained portions. CAD-derived aluminium
+mass is still an estimate.
+
+The 80T STEP also merges its output spigot into the housing. Its T mounting foot
+crosses the front datum outside the 71 mm pilot, so a whole-plane partition would
+incorrectly rotate part of the mounting foot. The preparation selects the main
+connected spigot within the pilot cylinder at local Z=0; all other source
+material stays in the casing. Both halves must be valid single solids and the
+reunited material set must match the source. No bearing internals are inferred.
+
+Build the baseline example and prepare its vendor files first, then:
+
+```sh
+python3 machinekit/examples/zeroerr-arm/prepare-revised.py
+./haxeon/scripts/haxeon build --project=machinekit/examples/zeroerr-arm/haxeon.json
+./haxeon/scripts/haxeon run --project=machinekit/examples/zeroerr-arm/haxeon.json -- --revised --engineering --export
+python3 machinekit/examples/zeroerr-arm/engineering-study.py --revised
+python3 machinekit/examples/zeroerr-arm/plot-sizing.py --revised
+python3 machinekit/examples/zeroerr-arm/render-preview.py --revised
+```
+
+Generated files are separate in `build/revised/`; the scene is
+`zeroerr5-wrist80.scene`. Baseline CAD and reports remain available.
+The revised arm has 90 source-derived/engineered solid instances and six passive
+joints. Validity is checked once per shared geometry; independent nine-pose FK
+checks include every output spigot. Revised zero placements are checked against
+the tracked engineering layout, not falsely compared to the unchanged supplier
+assembly's overall bounds. The original baseline still checks its supplier bounds.
+
+Run `--revised --motion-screen` for 33 pose observations: zero/ready, twelve
+Halton samples across a synthetic +/-170 degree range, twelve one-axis endpoint
+excursions from ready, and seven tending-surrogate waypoint observations
+(including repeated approach poses). These are exploration inputs, not hardware
+limits. `--shard=0 --shards=2` and `--shard=1 --shards=2` split the same list
+between independent processes, writing separate `motion-screen-0.json` and
+`motion-screen-1.json`. Fixed-body volumes are reused within each process.
+The wider exploration finds folded self-collisions; observations must be used
+as exclusions rather than interpreted as blanket travel approval. The structural
+check includes all six output spigots but does not certify every fastener or
+joint-crossing cable.
+
+`revised-engineering-config.json` pins the 80T V5 drawing: 31 Nm rated at nominal
+100, catalog 30 rpm at 48 V, and 1.75 kg with brake. The reference STEP's exact
+production revision remains unconfirmed; a shared envelope is not proof that
+all revision-specific mounting/encoder options match. Bench acquisition must
+resolve the delivered revision and complete code.
+
+The wider 270-pose load screen estimates a 25.277 kg arm. Nominal J2 gravity
+reaches about 134 Nm; J4/J5 reach about 13.3/11.4 Nm against their new 31 Nm
+rated candidates. The wrist screen improves, while the shoulder load increases.
+The +25% arm-mass case and design factor still prevent release of the existing
+110T shoulder for the full-workspace target.
+
+## Shoulder decision and tending surrogate
+
+The individually downloaded, hash-pinned drawings now resolve the generic-table
+ambiguity: 142T V4 and 142I V4 list 20 rpm at ratio 100. 170I V3, in both the AX
+and FX drawing packages, lists 137 Nm at 40 rpm for ratio 50, or 206 Nm at 25 rpm
+for ratio 80. The latter misses 180 degrees/s; the former lacks the required
+full-workspace design/sensitivity torque reserve. Neither a larger T module nor
+an I-package substitution is selected on the basis of the faster generic table.
+The evidence URLs and hashes are in `revised-engineering-config.json`.
+
+The current 110T100 shoulder remains an operating-envelope candidate for a
+bounded tending prototype, not a frozen UR5e/FR5-equivalent BOM. The synthetic
+cycle uses eight explicitly recorded joint-space waypoints, stopping at each,
+with quintic interpolation limited by the study speed and acceleration inputs.
+Its calculated duration is 9.33 s; its peak joint speed is only about 43.4 degrees/s.
+It is not a comparable production cycle-time or maximum-speed test. No real
+fixture, tool TCP, cell registration, IK or actual tending mission is claimed.
+
+The study includes finite-difference Christoffel velocity coupling for this cycle
+and checks its kinetic-energy identity. It retains the estimated exterior mass
+distribution, point payload, and diagonal reflected motor-inertia approximation;
+friction, drive efficiency, flexibility, thermal limits and tool intrinsic
+inertia remain unmodeled. Sampled nominal shoulder RMS/peak torque is about
+57.6/66.6 Nm; the heavier-arm case gives about 67.7/78.2 Nm. These numbers support
+further prototype study of the current shoulder within this cycle. They do not
+qualify thermal duty, prolonged extended holds, the entire workspace, or swept
+clearance between collision samples. Confirm actual cycle poses and load inertia
+before using them for hardware sizing.
+
+`bench-request.json` is a concrete, unsent acquisition/fixture review request for
+one 80T100 joint with brake, EtherCAT and HM feedback requested. It pins the V5
+mounting drawing, identifies the retained supplier forearm end as the fixture
+interface basis, records the 1 kg/100 mm load and low-speed startup procedure,
+and lists the ordering/ESI/brake/regeneration confirmations required before
+purchase. It is not a fabricated fixture, confirmed ordering code, sent inquiry
+or performed bench test.
+
+The revised forearm drawing specifies AL6061-T6. Its engineering density is
+therefore overridden to 2700 kg/m³; the retained upper arm uses the earlier
+7075-T6/2810 kg/m³ assumption. The forearm drawing hash and density override are
+recorded in `revised-engineering-config.json`.
+
+The overlap reporter now records per-pair OCCT failures as `indeterminatePairs`
+and writes a checkpoint after every pose. Such failures are never counted as
+clear. `--pose-file=/path/to/probes.json` accepts an explicit array of six-coordinate
+poses for witness rechecks and writes `motion-screen-custom-<shard>.json`.
+Scene export precedes the long motion screen when both are requested.
+`review-motion.py` merges observation files conservatively and can require a
+complete probe list with `--required`; missing observations fail collection.
+Completed clear observations from this review's original fail-closed run logs
+were retained, while positive/error witnesses were rerun with detailed pair
+reporting. The generated `build/revised/motion-report.json` records source hashes
+and the resulting exclusions; the original logs remain beside it.
+
+The completed wider review covers 30 unique configurations (33 observations
+including repeated approach waypoints): 27 have no observed structural overlap
+and three folded configurations collide. One of those colliding configurations
+also contains an indeterminate OCCT pair. The witness pairs include the wrist
+against shoulder/base housings; none is silently exempted. All five unique
+waypoints of the synthetic tending cycle have no observed structural overlap.
+The interpolated load-study samples are not a swept collision certificate.

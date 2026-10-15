@@ -13,6 +13,8 @@ typedef ZeroErrAsset = {
   var sha256:String;
   var solidCount:Int;
   var partitionOutputSpigot:Bool;
+  var partitionSolid:Int;
+  var shortenMm:Float;
 }
 typedef ZeroErrOccurrence = {
   var id:String;
@@ -79,8 +81,8 @@ class ZeroErrReferenceArm extends MachineAssembly {
           if (fileDigest(path) != Std.string(r.sha256)) throw "Derived supplier CAD changed";
           var shape:Shape;
           if (original[0].partitionOutputSpigot) {
-            if (index != 0 || r.partitionZ != 0 || r.partitionDifferenceSolids != 0)
-              throw "Missing or changed 110T front-datum partition";
+            if (index != original[0].partitionSolid || r.partitionZ != 0 || r.partitionDifferenceSolids != 0)
+              throw "Missing or changed output-spigot datum partition";
             var statorPath = vendorDirectory + "/" + key + "-stator.STEP";
             var rotorPath = vendorDirectory + "/" + key + "-rotor.STEP";
             if (fileDigest(statorPath) != Std.string(r.statorSha256) || fileDigest(rotorPath) != Std.string(r.rotorSha256))
@@ -92,6 +94,23 @@ class ZeroErrReferenceArm extends MachineAssembly {
           if (shape.subshapeCount(CadKit.ShapeKind.Solid) != 1) throw "Prepared CAD must contain one solid";
         }
       }
+      var derivedPath = vendorDirectory + "/derived-links.json";
+      if (sys.FileSystem.exists(derivedPath)) {
+        var records:Array<Dynamic> = haxe.Json.parse(sys.io.File.getContent(derivedPath));
+        for (record in records) {
+          var asset = Std.string(record.asset);
+          var originals = [for (a in layout.assets) if (a.id == asset) a];
+          if (originals.length != 1 || originals[0].shortenMm != 189 || originals[0].sha256 != record.sourceSha256 ||
+              record.removedMm != 189 || record.nearCutY != -130 || record.farCutY != -359 ||
+              record.validConnectedSolid != true || record.transitionLengthMm != 40 || record.method != "preserve-ends-and-hollow-loft")
+            throw "Unreviewed derived link";
+          var path = vendorDirectory + "/" + asset + "-shortened.STEP";
+          if (fileDigest(path) != record.sha256) throw "Derived link changed";
+          shapes.set(asset+"-solid0",Shape.importStep(path));
+        }
+      }
+      for (asset in layout.assets) if (asset.shortenMm > 0 && !shapes.exists(asset.id+"-solid0"))
+        throw "Missing derived hollow link; run prepare-revised.py";
       // Restrict source topology once per unique solid, then share it across
       // joint instances and scene/check passes. Re-exporting otherwise valid
       // STEP solids can introduce fresh round-trip tolerance problems.
@@ -103,7 +122,7 @@ class ZeroErrReferenceArm extends MachineAssembly {
         }
       }
       for (asset in layout.assets) if (asset.partitionOutputSpigot && !shapes.exists(asset.id + "-spigot"))
-        throw "Missing 110T output spigot; rerun prepare-reference.py --repair";
+        throw "Missing output spigot; rerun the corresponding CAD preparation";
       for (occurrence in layout.occurrences) {
         var pose = matrixFrame(occurrence.matrix);
         var count:Int = cast assetCounts.get(occurrence.asset);
@@ -162,7 +181,7 @@ class ZeroErrReferenceArm extends MachineAssembly {
     var assets:Array<ZeroErrAsset> = [];
     var rawAssets:Array<Dynamic> = value.assets;
     for (a in rawAssets) assets.push({id:Std.string(a.id),sha256:Std.string(a.sha256),solidCount:Std.int(a.solidCount),
-      partitionOutputSpigot:a.partitionOutputSpigot == true});
+      shortenMm:a.shortenMm == null ? 0 : a.shortenMm,partitionSolid:a.partitionSolid == null ? 0 : Std.int(a.partitionSolid),partitionOutputSpigot:a.partitionOutputSpigot == true});
     var occurrences:Array<ZeroErrOccurrence> = [];
     var rawOccurrences:Array<Dynamic> = value.occurrences;
     for (o in rawOccurrences) {

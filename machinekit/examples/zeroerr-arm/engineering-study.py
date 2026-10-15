@@ -63,7 +63,9 @@ class Study:
             else:
                 # Assumed 7075 density for links; other exterior fittings approximated
                 # as aluminium. No claim of known fastener/connector material.
-                mass = v*(2.81e-6 if s['id'] in ('upperArm', 'forearm') else 2.70e-6)
+                density = config.get('partDensitiesKgM3', {}).get(s['id'],
+                    2810 if s['id'] in ('upperArm', 'forearm') else 2700)
+                mass = v*density*1e-9
             inertia = np.array(s['inertiaMm5'])*(mass/v)*1e-6
             self.bodies.append((s['id'], mass, np.array(s['centroidMm'])/1000,
                                 inertia, ancestors(s['id'])))
@@ -112,11 +114,59 @@ class Study:
         return gravity, matrix, payload_gravity, potential
 
 
-def run(config_path):
+def cycle_study(study, config):
+    mission = config.get('missionStudy')
+    if not mission:
+        return None
+    waypoints = np.asarray(mission['waypointsRad'], dtype=float)
+    speed = np.deg2rad(config['application']['jointSpeedDegS'])
+    accel = np.deg2rad(config['application']['jointAccelerationDegS2'])
+    reports = []
+    for mass_factor in (1., config['application']['massSensitivityFactor']):
+        times, torques, speeds, accelerations = [], [], [], []
+        elapsed = 0.
+        for start, end in zip(waypoints[:-1], waypoints[1:]):
+            delta = end-start
+            duration = max(1., 1.875*np.max(np.abs(delta))/speed,
+                           np.sqrt((10*np.sqrt(3)/3)*np.max(np.abs(delta))/accel))
+            for u in np.linspace(0, 1, mission['samplesPerSegment']):
+                position = start+delta*(10*u**3-15*u**4+6*u**5)
+                velocity = delta*(30*u**2-60*u**3+30*u**4)/duration
+                acceleration = delta*(60*u-180*u**2+120*u**3)/duration**2
+                gravity, matrix, _, _ = study.terms(position, mass_factor)
+                derivatives = []
+                for k in range(6):
+                    h = np.eye(6)[k]*1e-5
+                    derivatives.append((study.terms(position+h,mass_factor)[1]-
+                                        study.terms(position-h,mass_factor)[1])/2e-5)
+                derivatives = np.asarray(derivatives)
+                mdot = np.einsum('k,kij->ij',velocity,derivatives)
+                coriolis = mdot@velocity-.5*np.einsum('kij,i,j->k',derivatives,velocity,velocity)
+                np.testing.assert_allclose(velocity@coriolis, .5*velocity@mdot@velocity,atol=1e-7,rtol=1e-6)
+                times.append(elapsed+u*duration)
+                torques.append(gravity+matrix@acceleration+coriolis)
+                speeds.append(velocity);accelerations.append(acceleration)
+            elapsed += duration
+        tau = np.array(torques);time = np.array(times)
+        rms = np.sqrt(np.sum(np.diff(time)[:,None]*(tau[1:]**2+tau[:-1]**2)/2,axis=0)/elapsed)
+        reports.append(dict(structuralMassFactor=mass_factor,durationS=elapsed,
+            sampledPeakTorqueNm=np.max(np.abs(tau),axis=0).tolist(),sampledRmsTorqueNm=rms.tolist(),
+            peakJointSpeedDegS=np.rad2deg(np.max(np.abs(speeds),axis=0)).tolist(),
+            peakJointAccelerationDegS2=np.rad2deg(np.max(np.abs(accelerations),axis=0)).tolist()))
+    return dict(scope='Unregistered synthetic joint-space tending cycle. Rigid-body exterior mass surrogate, '
+                     'point payload, diagonal reflected motor inertia; friction, flexibility, drive efficiency '
+                     'and thermal limits not modeled. No cell IK or swept collision certificate.',
+                waypointCount=len(waypoints),samplesPerSegment=mission['samplesPerSegment'],
+                coriolisEnergyIdentityChecked=True,studies=reports)
+
+
+def run(config_path, build_path=None, layout_path=None):
+    build_path = build_path or HERE/'build'
+    layout_path = layout_path or HERE/'reference-layout.json'
     config = json.loads(config_path.read_text())
-    raw = (HERE/'build/engineering-input.json').read_bytes()
+    raw = (build_path/'engineering-input.json').read_bytes()
     geometry = json.loads(raw)
-    layout_hash = hashlib.sha256((HERE/'reference-layout.json').read_bytes()).hexdigest()
+    layout_hash = hashlib.sha256(layout_path.read_bytes()).hexdigest()
     if geometry['layoutSha256'] != layout_hash:
         raise ValueError('Stale engineering geometry; export --engineering again')
     study = Study(geometry, config)
@@ -195,7 +245,8 @@ def run(config_path):
             meetsSpeedTarget=cat['ratedLoadSpeedRpm48V'][i]*6 >= app['jointSpeedDegS'])
             for i, r in enumerate(cat['ratios'])] for family, cat in config['catalog'].items()},
         studies=reports, mechanicsChecks='potential gradient, mass symmetry/PSD, analytical point-load moment passed')
-    out = HERE/'build/sizing-report.json'
+    result['cycleStudy'] = cycle_study(study,config)
+    out = build_path/'sizing-report.json'
     out.write_text(json.dumps(result, indent=2, allow_nan=False)+'\n')
     print(f'Screened {len(poses)} poses; estimated arm mass {result["nominalArmMassKg"]:.3f} kg')
     print('Joint | gravity Nm | payload-only Nm | zero-speed accel Nm | static*f/rated')
@@ -207,5 +258,9 @@ def run(config_path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', type=Path, default=HERE/'engineering-config.json')
-    run(parser.parse_args().config)
+    parser.add_argument('--config', type=Path)
+    parser.add_argument('--revised', action='store_true')
+    args = parser.parse_args()
+    run(args.config or HERE/('revised-engineering-config.json' if args.revised else 'engineering-config.json'),
+        HERE/('build/revised' if args.revised else 'build'),
+        HERE/('revised-layout.json' if args.revised else 'reference-layout.json'))

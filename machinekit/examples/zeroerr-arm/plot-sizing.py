@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Plot the engineering screen without interpreting it as hardware qualification."""
 import json
+import sys
 from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')
@@ -8,7 +9,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 here = Path(__file__).resolve().parent
-report = json.loads((here/'build/sizing-report.json').read_text())
+root = here/'build'
+if '--revised' in sys.argv: root /= 'revised'
+report = json.loads((root/'sizing-report.json').read_text())
 nominal, heavier = [study['joints'] for study in report['studies']]
 factor = report['assumptions']['designFactor']
 x = np.arange(6)
@@ -32,6 +35,6 @@ fig.suptitle(f"{a['payloadKg']+a['toolKg']:g} kg total flange load · {a['combin
 fig.text(.5, .018, 'Preliminary exterior mass distribution. No velocity coupling, thermal qualification or full-travel clearance.',
          ha='center', fontsize=9)
 fig.tight_layout(rect=(0, .04, 1, .95))
-path = here/'build/sizing-preview.png'
+path = root/'sizing-preview.png'
 fig.savefig(path, dpi=150)
 print(path)
