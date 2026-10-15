@@ -362,6 +362,8 @@ static void tool_piece_contact_is_reported(double obstacle_z, bool expected_acti
             assert(contact.link_index == 0);
             assert(contact.other_object == object);
             assert(contact.other_kind == RK_CONTACT_OTHER_OBJECT);
+            // The link's own tool geometry touches; no payload carries this load.
+            assert(contact.carried_object == 0);
             assert((contact.wrench_valid != 0) == expected_active);
             if (contact.wrench_valid) {
                 double force_squared = 0.0;
@@ -579,6 +581,8 @@ static void carried_object_contact_wrench_is_attributed_to_tool_link() {
             if (contact.link_index != 0 || contact.other_kind != RK_CONTACT_OTHER_ROBOT_LINK ||
                 contact.other_robot != 0 || contact.other_link != 1) continue;
             found = true;
+            // The carried screw transmits this load, and the contact names it.
+            assert(contact.carried_object == screw);
             assert(contact.wrench_valid != 0);
             double force_squared = 0.0;
             for (double value : contact.force_on_link) {

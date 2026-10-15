@@ -541,6 +541,7 @@ class Simulation {
           wrenchValid: value.get_wrench_valid() != 0,
           force: new Vec3(value.get_force_on_link(0), value.get_force_on_link(1), value.get_force_on_link(2)),
           torque: new Vec3(value.get_torque_on_link(0), value.get_torque_on_link(1), value.get_torque_on_link(2)),
+          carriedObject: value.get_carried_object().rawValue(),
           active: value.get_active() != 0,
           stepIndex: stepResult.out_step_index,
           otherKind: cast value.get_other_kind(),

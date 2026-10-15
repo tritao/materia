@@ -1584,12 +1584,17 @@ class ProjectSourceTests {
         for (contact in mission.simulation.robotContacts(mission.robot.runtime)) {
           if (!contact.active || contact.distance >= -0.0005) continue;
           // Tables and seats belong to the fixed root. Cartons settle on their
-          // own authored pads; allow only shallow, vertical support there.
+          // own authored pads; allow only shallow, vertical support there. The
+          // fixed root reports it against the carton, and a held carton reports
+          // the same support as a payload load on its carrying link.
           var supported = false;
           var supportDepth = currentHandling.pressDepth + 0.002;
-          if (contact.linkIndex == 0 && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object &&
-              contact.distance >= -supportDepth && Math.abs(contact.normal.z) >= 0.99) {
-            for (seat in supports) if (contact.otherObject == seat.object &&
+          var carton = contact.carriedObject != 0 ? contact.carriedObject
+            : contact.linkIndex == 0 && contact.otherKind == robotkit.runtime.RobotContactOtherKind.Object ? contact.otherObject : 0;
+          var onFixedRoot = contact.carriedObject == 0 ||
+            (contact.otherKind == robotkit.runtime.RobotContactOtherKind.RobotLink && contact.otherLink == 0);
+          if (carton != 0 && onFixedRoot && contact.distance >= -supportDepth && Math.abs(contact.normal.z) >= 0.99) {
+            for (seat in supports) if (carton == seat.object &&
                 Math.abs(contact.position.x - seat.x) <= 0.0451 &&
                 Math.abs(contact.position.y - seat.y) <= 0.0451 &&
                 Math.abs(contact.position.z - seat.z) <= supportDepth) supported = true;

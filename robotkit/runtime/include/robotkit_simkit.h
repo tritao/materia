@@ -808,6 +808,8 @@ typedef struct rk_robot_contact {
     /** Wrench acting on the robot link, in world axes, about position; SI units. */
     double force_on_link[3];
     double torque_on_link[3];
+    /** The held session object whose contact loads this link, or 0 when the link's own geometry touches. */
+    nksim_object carried_object;
 } rk_robot_contact;
 typedef uint32_t rk_robot_contact_list RK_HANDLE RK_HANDLE_DESTROY(rk_robot_contact_list_destroy);
 #define RK_INVALID_ROBOT_CONTACT_LIST ((rk_robot_contact_list)0)

@@ -17,6 +17,8 @@ typedef RobotContact = {
   wrenchValid:Bool,
   force:Vec3,
   torque:Vec3,
+  /** Held session object whose contact loads this link (a carried payload), or 0 for the link's own geometry. */
+  carriedObject:Int,
   active:Bool,
   stepIndex:haxe.Int64,
   otherKind:RobotContactOtherKind,

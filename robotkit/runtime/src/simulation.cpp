@@ -2147,7 +2147,7 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
     if (nksim_snapshot_get_contact_count(snapshot, &count) != NKSIM_OK)
         result_code = RK_ERROR_BACKEND;
     auto append_contact = [&](const nksim_contact &source, nksim_body body,
-                              uint32_t link_index, int32_t tool_piece_index) {
+                              uint32_t link_index, int32_t tool_piece_index, nksim_body carried_body = 0) {
         if (source.body_a != body && source.body_b != body) return;
         const bool body_is_a = source.body_a == body;
         const auto other_body = body_is_a ? source.body_b : source.body_a;
@@ -2190,6 +2190,9 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
             for (double &axis : result.torque_on_link) axis = -axis;
         }
         result.active = source.active;
+        // A held payload's contact loads the link through it; name the payload so callers can tell it apart.
+        if (carried_body != 0 && nksim_session_find_object(session_, carried_body, &result.carried_object) != NKSIM_OK)
+            result.carried_object = 0;
         out.push_back(result);
     };
     auto internal_to_tool = [&](nksim_body body, uint32_t link_index) {
@@ -2234,7 +2237,7 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
             // internal to the local tool assembly. A workpiece on another
             // robot link remains an external load at this tool.
             if (!internal_to_tool(other_body, owner.parent_link_index))
-                append_contact(source, owner.follower, owner.parent_link_index, -1);
+                append_contact(source, owner.follower, owner.parent_link_index, -1, owner.follower);
         }
         for (const auto &owner : object_carriers_) {
             if (owner.robot_index != robot_index ||
@@ -2242,7 +2245,7 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
                 continue;
             const auto other_body = source.body_a == owner.body ? source.body_b : source.body_a;
             if (!internal_to_tool(other_body, owner.link_index))
-                append_contact(source, owner.body, owner.link_index, -1);
+                append_contact(source, owner.body, owner.link_index, -1, owner.body);
         }
     }
     if (owned != 0) nksim_snapshot_destroy(owned);

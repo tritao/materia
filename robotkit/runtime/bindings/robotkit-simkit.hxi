@@ -369,7 +369,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Whether the virtual device has an observation and a qualified plan clock.
 	 */
 	extern fn rk_simulation_virtual_device_ready(simulation: rk_simulation, robot_index: u32, out_ready: ptr<u32> @out) -> rk_result;
-	struct rk_robot_contact @layout(152, 8) {
+	struct rk_robot_contact @layout(160, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		link_index: u32 @offset(4);
 		tool_piece_index: i32 @offset(8);
@@ -392,6 +392,10 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		 */
 		force_on_link: array<f64, 3> @offset(104);
 		torque_on_link: array<f64, 3> @offset(128);
+		/**
+		 * The held session object whose contact loads this link, or 0 when the link's own geometry touches.
+		 */
+		carried_object: nksim_object @offset(152);
 	}
 	/**
 	 * Simulation-owned spring-applied friction brake; all values are SI units.
