@@ -74,7 +74,7 @@ mk_result merge_polynomials(const PolynomialSource &source, const MergeOptions &
     if (!source.segment || !output.append || !position_tolerance || !velocity_tolerance || !acceleration_tolerance ||
         !velocity_limit || !acceleration_limit || !position_lower || !position_upper || joints == 0 || joints > MK_MAX_JOINTS ||
         !std::isfinite(options.max_duration_seconds) || options.max_duration_seconds <= 0 ||
-        options.max_duration_seconds >= static_cast<double>(INT64_MAX) * 1e-9 || options.merge_below_ns <= 0 || options.sliver_ns < 0)
+        options.max_duration_seconds >= static_cast<double>(INT64_MAX) * 1e-9 || options.merge_below_ns <= 0)
         return MK_ERROR_INVALID_ARGUMENT;
     for (uint32_t j = 0; j < joints; ++j)
         if (!(position_tolerance[j] > 0) || !(velocity_tolerance[j] > 0) || !(acceleration_tolerance[j] > 0) ||
@@ -119,10 +119,6 @@ mk_result merge_polynomials(const PolynomialSource &source, const MergeOptions &
     try {
         std::vector<int64_t> start(count), duration(count);
         std::vector<uint8_t> smooth(count);
-        // The segment held back until the next one shows whether a too-short one is to be joined to it.
-        std::unique_ptr<mk_segment> held;
-        const int64_t kSliver = options.sliver_ns;
-        uint32_t held_first = 0, held_last = 0;
         auto first_segment = std::make_unique<mk_segment>(), last_segment = std::make_unique<mk_segment>();
         auto candidate = std::make_unique<mk_segment>(), best_segment = std::make_unique<mk_segment>();
         for (uint32_t i = 0; i < count; ++i) {
@@ -291,43 +287,9 @@ mk_result merge_polynomials(const PolynomialSource &source, const MergeOptions &
                 if (result != MK_ERROR_GENERATION) { return result; }
                 failed = middle;
             }
-            // A run that came out shorter than a device's clock can resolve is joined to its neighbour, through the two
-            // together's end states (so the path stays continuous and the sliver's own few microseconds of motion are all
-            // that is smoothed over): the cuts of a shaped path land a few nanoseconds from each other now and then.
-            if (held && (held->duration_ns < kSliver || best_segment->duration_ns < kSliver) && held->degree >= 2 &&
-                best_segment->degree >= 2) {
-                const double span = static_cast<double>(held->duration_ns + best_segment->duration_ns) * 1e-9;
-                const double end = static_cast<double>(best_segment->duration_ns) * 1e-9;
-                mk_segment joined = *held;
-                joined.duration_ns = held->duration_ns + best_segment->duration_ns;
-                joined.degree = 5;
-                for (uint32_t joint = 0; joint < joints; ++joint) {
-                    const auto from = kin_of(held->coefficients[joint], held->degree, 0.0);
-                    const auto to = kin_of(best_segment->coefficients[joint], best_segment->degree, end);
-                    const double V0 = from.velocity * span, A0 = from.acceleration * span * span;
-                    const double V1 = to.velocity * span, A1 = to.acceleration * span * span;
-                    const double D = to.position - from.position - V0 - 0.5 * A0, E = V1 - V0 - A0, F = A1 - A0;
-                    const double normalized[6] = {from.position, V0, 0.5 * A0, 10.0 * D - 4.0 * E + 0.5 * F,
-                        -15.0 * D + 7.0 * E - F, 6.0 * D - 3.0 * E + 0.5 * F};
-                    double scale = 1.0;
-                    for (int k = 0; k < 6; ++k) { joined.coefficients[joint].value[k] = normalized[k] / scale; scale *= span; }
-                }
-                *held = joined;
-                held_last = best;
-            } else {
-                if (held) {
-                    status = output.append(output.context, *held, held_first, held_last);
-                    if (status != MK_OK) { return status; }
-                }
-                if (!held) held = std::make_unique<mk_segment>();
-                *held = *best_segment;
-                held_first = first; held_last = best;
-            }
+            status = output.append(output.context, *best_segment, first, best);
+            if (status != MK_OK) return status;
             first = best + 1;
-        }
-        if (held) {
-            status = output.append(output.context, *held, held_first, held_last);
-            if (status != MK_OK) { return status; }
         }
     } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
     return MK_OK;

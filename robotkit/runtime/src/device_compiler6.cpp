@@ -170,7 +170,7 @@ CompiledDevicePlan6 compile_once(
         struct Output { std::vector<TrajectorySegment> &segments; std::vector<bool> &changed; } output{merged, is_merged};
         const auto status = motionkit::merge_polynomials(view, {pt.data(), vt.data(), at.data(), vl.data(), al.data(),
             lo.data(), hi.data(), static_cast<double>(window.up_to_ns) * 1e-9,
-            static_cast<int64_t>(window.below_ns), 0}, {&output,
+            static_cast<int64_t>(window.below_ns)}, {&output,
             [](void *context, const mk_segment &piece, uint32_t first, uint32_t last) -> mk_result {
                 auto &out = *static_cast<Output *>(context);
                 TrajectorySegment s{};
@@ -278,7 +278,10 @@ CompiledDevicePlan6 compile_once(
             result.segments.back().header.t0_ticks + result.segments.back().header.duration_ticks;
         const auto mapped_start = device_ticks(host_start);
         const auto mapped_end = device_ticks(host_plan_start_ns + expected_ns);
-        if (mapped_end <= mapped_start) return reject(DeviceCompileFailure6::Clock, "device tick mapping collapsed segment");
+        // Positive sub-tick segments can map both endpoints to the same clock tick.
+        // The duration ceiling below gives them one tick, just as it rounds longer
+        // fractional durations up; reject only a clock mapping that runs backwards.
+        if (mapped_end < mapped_start) return reject(DeviceCompileFailure6::Clock, "device tick mapping reversed segment");
         const auto mapped_duration = mapped_end - mapped_start;
         const long double minimum_ticks = std::ceil(
             static_cast<long double>(source.duration_ns) * device_tick_hz / 1'000'000'000.0L);

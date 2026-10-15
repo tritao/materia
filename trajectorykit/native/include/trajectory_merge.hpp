@@ -33,8 +33,6 @@ struct MergeOptions {
     const double *velocity_limit, *acceleration_limit, *position_lower, *position_upper;
     double max_duration_seconds;
     int64_t merge_below_ns = INT64_MAX;
-    // MotionKit's existing shaped-path clock-sliver policy. Device callers disable it.
-    int64_t sliver_ns = 4000;
 };
 TC_API mk_result merge_polynomials(const PolynomialSource &, const MergeOptions &, const PolynomialOutput &);
 TC_API mk_result merge_trajectory(mk_trajectory_handle, const MergeOptions &, mk_trajectory_handle *);

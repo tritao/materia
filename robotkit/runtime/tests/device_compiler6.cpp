@@ -67,6 +67,24 @@ int main() {
     assert(accepted.ok && accepted.segments.size() == 1);
     assert(accepted.segments[0].header.t0_ticks == 1'050'000);
     assert(accepted.segments[0].header.duration_ticks == 1'000'000);
+    // A positive sub-tick segment may have equal mapped endpoints. Preserve it
+    // for one clock tick, without shortening it or smoothing away its polynomial.
+    auto tiny = segment;
+    tiny.duration_ns = 100;
+    tiny.coefficients[0].value[1] = 0.025;
+    auto next_tiny = tiny;
+    next_tiny.time_from_start_ns = tiny.duration_ns;
+    next_tiny.coefficients[0].value[0] = 0.025 * tiny.duration_ns / 1e9;
+    const robotkit::TrajectorySegment sub_ticks[] = {tiny, next_tiny};
+    auto sub_tick_plan = robotkit::compile_device_segments6(
+        sub_ticks, 8, false, 1'000'000'000ULL,
+        clock, blueprint, 1'000'000, 40'000, 5, 1e-6);
+    assert(sub_tick_plan.ok && sub_tick_plan.segments.size() == 2);
+    assert(sub_tick_plan.segments[0].header.duration_ticks == 1);
+    assert(sub_tick_plan.segments[1].header.duration_ticks == 1);
+    assert(sub_tick_plan.segments[1].header.t0_ticks == sub_tick_plan.segments[0].header.t0_ticks + 1);
+    assert(sub_tick_plan.segments[0].host_duration_ns == 100);
+
     // A non-integral duration must round up, including continuations, so a
     // trajectory at the speed ceiling cannot be accelerated by tick rounding.
     auto ceiling_blueprint = blueprint;

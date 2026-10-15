@@ -51,6 +51,23 @@ template<class Merge> void merge_cases(Merge merge) {
         source[i].coefficients[0].value[1] = i ? -1 : 1;
     }
     assert(merge(source, options).size() == 2);
+    // A clock sliver is not permission to erase an acceleration transition. These
+    // two 2 us parabolas agree in position and velocity but change acceleration.
+    // Their endpoint-state quintic violates the acceleration approximation budget.
+    for (unsigned i = 0; i < 2; ++i) {
+        auto &s = source[i];
+        s.t0_ns = i * 2000; s.duration_ns = 2000; s.degree = 2;
+        s.coefficients[0] = {};
+        s.coefficients[0].value[0] = i ? 2e-12 : 0;
+        s.coefficients[0].value[1] = i ? 2e-6 : 0;
+        s.coefficients[0].value[2] = i ? -0.5 : 0.5;
+    }
+    assert(merge(source, options).size() == 2);
+    // Even an exact parabola cannot exceed the caller's maximum merge duration.
+    source[1].coefficients[0].value[2] = 0.5;
+    assert(merge(source, options).size() == 1);
+    options.max_duration_seconds = 3e-6;
+    assert(merge(source, options).size() == 2);
     // Two monotone halves stay inside [0,1]. Their common endpoint-state quintic reaches 1.25.
     // Even permissive approximation tolerances must not authorize that travel overshoot.
     const double loose_p[] = {10}, loose_v[] = {10}, loose_a[] = {100};
