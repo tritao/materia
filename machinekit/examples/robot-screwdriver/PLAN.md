@@ -641,7 +641,8 @@ Here:
 ## Follow-on plan (2026-10-11)
 
 SD0–SD8 are complete. The decisions above describe that completed scope;
-SD9–SD15 below extend that scope. SD9 is complete; SD10–SD14 are in progress.
+SD9–SD15 below extend that scope. SD9, SD10, SD11 and SD14 are complete.
+SD12 and SD13 have their MuJoCo acceptance and integrated gate results recorded below.
 SD15's landed-interface audit is complete; its runtime integration remains. SD9 automates replenishment of the existing presenter before changing
 how the robot receives a screw. The other extensions have their own acceptance
 boundaries and need not all be implemented to use automatic feeding.
@@ -2652,11 +2653,11 @@ still required. The earlier 21-test proof predates this wire extension.
 | SD7 | done — four CAD fastenings, recovery/access/transport loss and staged installed-body execution pass both backends; final full gate passed | `c08f852a1`, `b98eca82b`, `2dce4da17`, `be142c1f0`, `713755d22`, `3af09d5ef`, `07b0afca7`, `d88eb97a9`, `5e5efaae2`, `fe82a6629`, `2ae4dedc4`, `652993445`, `b0c88a850`, `dd32c9a02`, `1ae44a740`, `9b9095a56`, `2a290de5c` |
 | SD8 | done — virtual unchanged CAD mission, hardware owner/acquisition binding, scripted/TCP controller and repeated-STOP proofs pass; final full gate passed | `3d1ec4d79`, `100856d98`, `96dfb9f95`, `5c9a441aa`, `f4b7b4d90` |
 | SD9 | done — buffered bowl supply, scripted I/O, physical replenishment/jam/reset on both backends and portable export pass; final full gate passed | `979d54b44` |
-| SD10 | in progress — blow-feed delivery/fault/stop acceptance passes both backends; CAD clamped-member retention and exact screwdriver-bit identity compile and pass focused runtime acceptance; CadKit and ProjectKit passed quick-gate attempt `sd10-bit-final`, MachineKit was interrupted at 2.0 GB free; full gate, desktop review and retained-number accounting remain pending | `4fd49844d`, `8f68f6b0a`; `sd10-current-retry`; `sd10-bit-projectkit`; `sd10-bit-app-runtime-retry2`; `sd10-bit-final`; `sd10-app-final`; `sd-machinekit-haxe-only` |
-| SD11 | in progress — displaced-fixture registration and four named fastenings passed on both backends in the `sd10-app-final` app stage; corrected native `sim_core` and C-ABI regressions pass and production RobotKit/SimKit rebuild succeeds; latest deterministic-only mission rerun was stopped below the 3 GB reserve; full gate remains pending | SD11 touch-registration draft; `sd11-simcore-final-test`; `sd11-simcore-final-abi-test`; `sd11-production-native-rebuild`; `sd10-app-final` |
-| SD12 | MuJoCo acceptance passes (Claude, 2026-10-14). Hybrid force/position entry search with spring feed, welded carriage and plan-streamed servo. Nominal seats in 32.9 s at 0 N; the 1 mm offset seats in 34.7 s, 7.5 N peak, 2 searched surfaces. Both hand over to the qualified OK tightening. Full gate pending. | uncommitted |
-| SD13 | MuJoCo acceptance passes (Claude, 2026-10-14). Screw-to-work helical joint (`NKSIM_JOINT_HELICAL`, `rk_simulation_create_object_screw_joint`) with socket coupling and a `Seated` hand-off. SimKit and RobotKit native suites pass; all 4 CAD fastenings seat with OK torque. Full gate pending. | uncommitted |
-| SD14 | in progress — orthographic/section SVG projection and CAD-derived thread symbols/callouts pass within the current 339 ProjectKit assertions; three real CAD SVG exports rendered and inspected; full gate awaits at least 3 GB free | SD14 projection draft; `projectkit/tests/haxeon.json`; `machinekit/examples/robot-screwdriver/haxeon.drawing.json`; `sd-projectkit-runtime` |
+| SD10 | done — blow-feed delivery, fault/stop handling, CAD clamped-member retention and exact bit identity pass on both backends; integrated gate results and baseline exceptions are recorded below | `04f4527f5`, `8769a4e54`, `98549c3dd`; `sd-main-sync` |
+| SD11 | done — displaced-fixture touch registration and named fastening execution pass on both backends; native MuJoCo/SimKit contact and carried-payload regressions pass | `98549c3dd`, `2daab4c6c`; `sd-main-sync` |
+| SD12 | MuJoCo acceptance passes (Claude, 2026-10-14). Hybrid force/position entry search with spring feed, welded carriage and plan-streamed servo. Nominal seats in 32.9 s at 0 N; the 1 mm offset seats in 34.7 s, 7.5 N peak, 2 searched surfaces. Both hand over to the qualified OK tightening. Integrated acceptance passes; gate baseline exceptions are below. | `fef536bc7`, `92100bc7c`; `sd-main-sync` |
+| SD13 | MuJoCo acceptance passes (Claude, 2026-10-14). Screw-to-work helical joint (`NKSIM_JOINT_HELICAL`, `rk_simulation_create_object_screw_joint`) with socket coupling and a `Seated` hand-off. SimKit and RobotKit native suites pass; all 4 CAD fastenings seat with OK torque. Integrated acceptance passes; gate baseline exceptions are below. | `d8f548d09`, `fef536bc7`; `sd-main-sync` |
+| SD14 | done — drawing projection, CAD-derived thread symbols and callouts pass; ProjectKit passes 370 assertions and the editor passes all 855 cosmetic-thread checks; the three CAD SVG exports were previously rendered and inspected | `projectkit/tests/haxeon.json`; `machinekit/examples/robot-screwdriver/haxeon.drawing.json`; `sd-main-sync` |
 | SD15 | split (2026-10-14). SD15a is pick, place and fasten without a tool change; the tool change moved to `robotkit/plans/TOOL_CHANGE.md` (TC0 to TC6), seeded from the SD15 drafts. | SD15 drafts in `5a6ac41ae` |
 
 ### SD8 hardware integration work (2026-10-11)
@@ -2822,3 +2823,53 @@ gate; rerun those remaining cases and save their output after disk space
 recovers. The initial suite summary and logs are
 `/home/joao/dev/materia-cache/claude-scratch/sd-suite-sd-integrated-local.txt`
 and its `sd-s-*.log` files.
+
+
+### Local-main integration and completed gate (2026-10-15)
+
+The branch was rebased onto local main, including `17ff7b2a1`. The last two main
+commits add the ZeroErr reference arm and its engineering study; they do not
+change the code exercised by the completed gate. The reference-arm example was
+also compiled separately after that rebase.
+
+`92100bc7c` constrains a seated head's bearing point to its authored seat plane
+while preserving its lateral offset. Thread-entry travel includes a tilted
+lead-in's lever-arm error; correcting orientation alone left a nanometre-scale
+residual. The process regression covers aligned and oppositely tilted entries
+away from world axes. It passes with the correction and was verified to fail
+when the plane correction was removed. The rotated flush-seat CollisionKit
+check also passes. Coal's distance tolerance is unchanged.
+
+The tending certificate was regenerated by revalidating all 96 poses and
+production paths against the combined inputs (`a7b419668`). Integration also
+preserves main's playback handling, bounded planner batches and reusable pose
+buffers, transfers every prepared controller program, and retains virtual
+nutrunner selection. The scripted inspector test now pumps the editor's tick
+and frame loop while background simulation preparation completes (`f1b6e8ccb`).
+
+CadKit, ProjectKit (370 assertions), MachineKit, the native RobotKit MuJoCo and
+SimKit suites, CollisionKit's collision-world test, and the full editor suite
+pass. The final project-source run completed 46 cases: 44 pass, including all
+ten staged scenarios on both backends, assembly, blow feed, feeding,
+registration, force search, physical threading, lost-screw recovery, gantry,
+gantry-yaw and the machine interface. Tracked source hashes match throughout
+the final editor/project-source run. Earlier library results cover the same
+library sources; the intervening change only fixes the editor test's async wait.
+
+Two failures remain reproducible on isolated committed main:
+
+| Case | Integrated branch | Committed main baseline |
+| --- | --- | --- |
+| `tending` | 289.28 s, 73.9768% cutting utilisation | `fa9a50dd1`: 289.51 s, 73.9180%; both below the unchanged 75% target |
+| `printer-cube-short` | Motion program op 23, layer 3: `path.time` error -6 | `17ff7b2a1`: same operation, layer and MotionKit error |
+
+These baseline failures remain open; the integrated gate is not all green.
+Logs and source hashes are in
+`/home/joao/dev/materia-cache/claude-scratch/sd-main-sync/`, including
+`summary.txt`, `runtime-summary.txt`, `projectsource.log`, the two
+`main-baseline-*.log` results, and the native `sd-sync-robotkit-*.log` files in
+the parent scratch directory.
+
+The SD15a.3 work remains in the stash named
+`SD15a.3 wip: unfitted bearing option and plan constraints`; restoring it and
+continuing the two-arm cell is separate follow-on work.
