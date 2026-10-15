@@ -9,6 +9,12 @@ class JointPathTiming {
 	final velocity:Array<Float>;
 	final acceleration:Array<Float>;
 	final jerk:Array<Float>;
+	var edgeTimes:Map<String,Int64> = [];
+	var lowerTimes:Map<String,Float> = [];
+	var edgeTimeCount = 0;
+	var lowerTimeCount = 0;
+	public var durationCacheHits(default, null):Int = 0;
+	public var lowerBoundCacheHits(default, null):Int = 0;
 
 	public function new(rates:Array<JointMotionRates>) {
 		if (rates == null || rates.length == 0) throw "Joint path timing needs joint rates";
@@ -165,9 +171,21 @@ class JointPathTiming {
 		for (index in 1...path.length) for (joint in 0...velocity.length)
 			if (path[index - 1][joint] != path[index][joint]) moving = true;
 		if (!moving) return 0.0;
-		var motion = trajectory(path), seconds = motion.durationSeconds();
-		motion.dispose();
-		return seconds;
+		var total = Int64.ofInt(0);
+		for (index in 1...path.length) {
+			var from = path[index - 1], to = path[index];
+			var key = motionkit.planner.PlannerQueryKey.of(from) + motionkit.planner.PlannerQueryKey.of(to);
+			var duration = edgeTimes.get(key);
+			if (duration == null) {
+				var zero = [for (_ in velocity) 0.0];
+				var edge = Trajectory.generateStateToState(from, zero, zero, to, velocity, acceleration, jerk, true);
+				duration = edge.durationNanoseconds(); edge.dispose();
+				if (edgeTimeCount >= 8192) { edgeTimes = []; edgeTimeCount = 0; }
+				edgeTimes.set(key, duration); edgeTimeCount++;
+			} else durationCacheHits++;
+			total = total + duration;
+		}
+		return Int64.toFloat(total) * 1e-9;
 	}
 
 	/** Improve bends using executed edge time, while certifying every replacement edge. */
@@ -222,6 +240,8 @@ class JointPathTiming {
 	public function lowerBound(from:Array<Float>, to:Array<Float>):Float {
 		if (from.length != velocity.length || to.length != velocity.length)
 			throw "Joint timing endpoints must match the joint rates";
+		var key = motionkit.planner.PlannerQueryKey.of(from) + motionkit.planner.PlannerQueryKey.of(to);
+		if (lowerTimes.exists(key)) { lowerBoundCacheHits++; return lowerTimes.get(key); }
 		var seconds = 0.0;
 		for (joint in 0...velocity.length) {
 			var motion = Trajectory.generateStateToState([from[joint]], [0.0], [0.0], [to[joint]],
@@ -229,6 +249,8 @@ class JointPathTiming {
 			seconds = Math.max(seconds, motion.durationSeconds());
 			motion.dispose();
 		}
+		if (lowerTimeCount >= 8192) { lowerTimes = []; lowerTimeCount = 0; }
+		lowerTimes.set(key, seconds); lowerTimeCount++;
 		return seconds;
 	}
 }

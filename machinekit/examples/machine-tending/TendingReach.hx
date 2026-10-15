@@ -131,9 +131,22 @@ private typedef ReachPlacementCandidate = {var height:Float; var baseXOffset:Flo
 private typedef ReachHoldingPath = {var position:Array<Float>; var entry:Array<Array<Float>>; var exterior:Array<Array<Float>>;}
 
 /** One reversible route must be clear in each physical state in which it is used. */
+private class ReachReuseFailure {
+	public final reason:String;
+	public function new(reason:String) this.reason = reason;
+	public function toString():String return "Saved reach cannot be reused: " + reason;
+}
+
+/** These worlds are fixed for the lifetime of one placement evaluation. */
+private class ReachCachedSpace extends motionkit.planner.CachedPlannerSpace {
+	final source:ManipulatorPlannerSpace;
+	public function new(source:ManipulatorPlannerSpace) { super(source); this.source = source; }
+	public function dispose():Void source.dispose();
+}
+
 private class ReachPlannerStates implements motionkit.planner.PlannerSpace {
-	final states:Array<ManipulatorPlannerSpace>;
-	public function new(states:Array<ManipulatorPlannerSpace>) {
+	final states:Array<ReachCachedSpace>;
+	public function new(states:Array<ReachCachedSpace>) {
 		if (states.length == 0) throw "A reach route needs its physical states";
 		this.states = states;
 		var first = states[0], low = first.lower(), high = first.upper();
@@ -263,33 +276,42 @@ class TendingReach {
 		return 'jointMargin=$MIN_JOINT_MARGIN approach=$APPROACH_SEARCH_ITERATIONS tray=$TRAY_PLACEMENT_ALLOWANCE_MM ' +
 			'presence=$PRESENCE_HEAD_MOUNT_ALLOWANCE_MM';
 
-	/** Solves the layout again and stores it, with its input fingerprint, as `TendingReachCertificate`. */
-	public static function store(fresh:Bool = false):Void {
+	/** Revalidate saved poses/routes, repairing routes or falling back to search; store the current fingerprint. */
+	public static function store(fresh:Bool = false, search:Bool = false):Void {
 		Sys.println("Reach search: fingerprinting current cell inputs");
 		Sys.stdout().flush();
 		var production = TendingCyclePlan.bearingBlocks();
 		var fingerprint = TendingReachLayout.fingerprint(production);
-		// A stale certificate supplies only a placement hint, never collision
-		// answers or paths. All geometry, poses and routes are solved again.
-		var preferred:Null<AssemblyFrame> = null;
+		// Saved poses and paths are proposals, never cached collision answers.
+		// Every physical state is rebuilt from current geometry. Pose/layout
+		// changes fall back to the coupled study; blocked routes are repaired.
+		var preferred:Null<AssemblyFrame> = null, previous:Null<TendingReachResult> = null;
 		if (!fresh) {
-			var previous = TendingReachLayout.decode(TendingReachCertificate.JSON).result;
+			previous = TendingReachLayout.decode(TendingReachCertificate.JSON).result;
 			if (previous.cls == Reach1300 && previous.riser == 550) preferred = previous.armPlacement;
 		}
-		var source = TendingReachLayout.certificateSource(study(new EnclosedBenchMill(), production, preferred), fingerprint);
+		var result:Null<TendingReachResult> = null;
+		if (previous != null && !search) {
+			try result = revalidate(new EnclosedBenchMill(), production, previous) catch (error:Dynamic) {
+				if (!Std.isOfType(error, ReachReuseFailure)) throw error;
+				Sys.println(Std.string(error) + "; searching again");
+			}
+		}
+		if (result == null) result = study(new EnclosedBenchMill(), production, preferred);
+		var source = TendingReachLayout.certificateSource(result, fingerprint);
 		var path = certificatePath();
 		sys.io.File.saveContent(path, source);
 		trace('Stored the tending reach layout in $path ($fingerprint)');
 	}
 
 	/** Solves the layout again and fails unless it equals the stored one: the study and its inputs agree. */
-	public static function check(fresh:Bool = false):Void {
+	public static function check(fresh:Bool = false, search:Bool = false):Void {
 		var production = TendingCyclePlan.bearingBlocks();
 		var fingerprint = TendingReachLayout.fingerprint(production);
 		var stored = TendingReachLayout.decode(TendingReachCertificate.JSON);
 		if (stored.fingerprint != fingerprint) throw 'The stored tending reach layout is for other inputs; run `${TendingReachLayout.REGENERATE}`';
 		var solved = TendingReachLayout.encode(study(new EnclosedBenchMill(), production,
-			fresh ? null : stored.result.armPlacement), fingerprint);
+			fresh ? null : stored.result.armPlacement, fresh || search ? null : stored.result), fingerprint);
 		if (solved != TendingReachLayout.encode(stored.result, fingerprint))
 			throw 'The tending reach study no longer reproduces its stored layout; run `${TendingReachLayout.REGENERATE}`';
 		trace("The tending reach study reproduces its stored layout");
@@ -449,7 +471,11 @@ class TendingReach {
 		return false;
 	}
 
-	public static function study(cell:EnclosedBenchMill, production:TendingCyclePlan, ?preferredPlacement:AssemblyFrame):TendingReachResult {
+	public static function revalidate(cell:EnclosedBenchMill, production:TendingCyclePlan, previous:TendingReachResult):TendingReachResult
+		return study(cell, production, previous.armPlacement, previous);
+
+	public static function study(cell:EnclosedBenchMill, production:TendingCyclePlan, ?preferredPlacement:AssemblyFrame,
+		?reuse:TendingReachResult):TendingReachResult {
 		var searchStarted = Sys.time();
 		function progress(message:String):Void {
 			Sys.println('Reach search (${Math.round(Sys.time() - searchStarted)} s): $message');
@@ -458,7 +484,7 @@ class TendingReach {
 		progress("building geometry and collision states");
 		// Reach uses the same physical blank hull as machining, but the tending cell starts with an
 		// empty vise. Study a loaded reference machine so the stock remains geometry input only.
-		if (!cell.includesWorkpiece) return study(new EnclosedBenchMill(), production, preferredPlacement);
+		if (!cell.includesWorkpiece) return study(new EnclosedBenchMill(), production, preferredPlacement, reuse);
 		var transferRequests = production.transferRequests();
 		var trayEntries = new Map<String, TendingTransferRequest>();
 		for (needed in transferRequests) if (needed.role == Inventory)
@@ -814,6 +840,8 @@ class TendingReach {
 			]).concat(remainingTrayTargets);
 			// Exact contact interfaces need IK accuracy below their numerical tolerance.
 			var options = new IkOptions(1e-10, 1e-10, 250, 0.001).reaching();
+			// A saved pose must satisfy the original task before any IK step.
+			var verificationOptions = new IkOptions(1e-10, 1e-10, 1, 0.001).reaching();
 			var mountedTools = new AssemblyState(reachAssembly.definition());
 			var tcpA = mountedTools.worldConnector("arm/tool/gripperA/body", "tcp");
 			var tcpB = mountedTools.worldConnector("arm/tool/gripperB/body", "tcp");
@@ -853,6 +881,17 @@ class TendingReach {
 					classBaseY + baseYOffset, height),
 					AssemblyFrames.fromRotationMatrix(0, 0, 0, [0.0, 1, 0, -1, 0, 0, 0, 0, 1]));
 				var baseFlange = mountedBaseFlange(source, armPlacement);
+				if (reuse != null) {
+					var layout:TendingReachResult = {cls: cls, riser: height, armPlacement: armPlacement, armBaseFlange: baseFlange,
+						jointMargin: 0, wristSine: 0, parkPose: parkPose, trayClearanceMm: trayClearanceMm,
+						poses: [], transfers: [], trays: trayLayouts, handlingApproachMm: approach,
+						tableFrame: tableFrame, tableOffset: tableOffset, tableWidth: tableWidth, tableDepth: tableDepth, tableTop: tableTop};
+					if (TendingReachReuse.layoutKey(reuse) != TendingReachReuse.layoutKey(layout) || reuse.poses.length != requests.length) {
+						clearance.space.dispose();
+						throw new ReachReuseFailure("layout, fixtures or request coverage changed");
+					}
+					progress("revalidating saved poses and routes against current geometry");
+				}
 				// AssemblySimulationBridge's root link is the arm assembly origin;
 				// the base-flange part is offset within it and is checked separately.
 				var inverse = transform(armPlacement).inverse();
@@ -862,6 +901,27 @@ class TendingReach {
 				var poseResults:Array<TendingReachPose> = [];
 				for (pointIndex in 0...requests.length) {
 					var request = requests[pointIndex], point = request.point;
+					if (reuse != null) {
+						var found = TendingReachReuse.findPose(reuse, request.name, request.tool);
+						var saved:TendingReachPose = cast found;
+						var problem:Null<String> = found == null ? "missing or duplicate pose" : null;
+						if (problem == null) {
+							if (!TendingReachReuse.validPosition(saved.position, arm.dofCount()) || !withinMargins(arm, saved.position) ||
+								!Math.isFinite(saved.toolYaw) || graspYaws.indexOf(saved.toolYaw) < 0) problem = "joint, wrist or roll constraint changed";
+							else {
+								var desired = request.name == "outside staging" ? saved.target : graspFrame(point, graspWorld, saved.toolYaw);
+								var target = inverse.compose(transform(desired).compose(request.toolOffset.inverse()));
+								var verified = arm.solve(target, saved.position, verificationOptions);
+								if (!TendingReachReuse.sameFrame(saved.target, desired)) problem = "target frame changed";
+								else if (!verified.converged || verified.iterations != 0)
+									problem = 'forward kinematics changed: ${verified.positionError} m / ${verified.orientationError} rad';
+								else if (clearanceViolation(clearance, saved.position) != null) problem = "saved pose has self interference";
+							}
+						}
+						if (problem != null) { valid = false; failedAt = request.name; failedReason = problem; break; }
+						solved.push(saved.position.copy()); targets.push(TendingReachReuse.copyFrame(saved.target)); yawsSolved.push(saved.toolYaw);
+						continue;
+					}
 					var selected:Null<Array<Float>> = null, selectedTarget:Null<AssemblyFrame> = null;
 					var selectedYaw = 0.0;
 					var selectionFailure = "no tool roll candidate";
@@ -953,11 +1013,11 @@ class TendingReach {
 						failedReason = 'clearance ${readyHit.a}/${readyHit.b} (${readyHit.distance} m)';
 						valid = false;
 					}
-					var transitSpaces = new Map<String, ManipulatorPlannerSpace>();
-					var closedTransitSpaces = new Map<String, ManipulatorPlannerSpace>();
-					var exchangeSpaces = new Map<String, ManipulatorPlannerSpace>();
+					var transitSpaces = new Map<String, ReachCachedSpace>();
+					var closedTransitSpaces = new Map<String, ReachCachedSpace>();
+					var exchangeSpaces = new Map<String, ReachCachedSpace>();
 					var viseSpaces = new Map<String, ReachPlannerStates>();
-					var startupSpace:Null<ManipulatorPlannerSpace> = null;
+					var startupSpace:Null<ReachCachedSpace> = null;
 					var exteriorAnchors = new Map<String, Array<Float>>();
 					var certifiedEntries = new Map<String, TendingReachTransfer>();
 					var retainedPoses = new Map<Int, Bool>();
@@ -1050,7 +1110,7 @@ class TendingReach {
 							if (from < 0) throw "Tray selection lost its production entry posture";
 							turnReference = solved[from];
 						}
-						preferNearbyTurns(arm, solved[i], turnReference);
+						if (reuse == null) preferNearbyTurns(arm, solved[i], turnReference);
 						var activeTool = toolRecord(tools, request.tool);
 						var activeGripper = activeTool.gripper;
 						if (activeGripper == null) throw "Reach station needs typed gripper collision members";
@@ -1166,6 +1226,26 @@ class TendingReach {
 							for (body in sweptDoorBodies) stagingBodies.push(body);
 							stagingChecks = reachClearances(arm, stagingBodies, parkPose, [], false,
 								converted.jointInterfaces, pointPayloads, null, null, null, seatMembers);
+						}
+						if (reuse != null) {
+							var problem:Null<String> = hit == null ? null : "saved pose collides with the current cell";
+							if (problem == null && paired >= 0) {
+								if (yawsSolved[i] != yawsSolved[paired]) problem = "approach and contact have different rolls";
+								else if (firstViolation(pairedClearance, solved[paired]) != null) problem = "saved contact collides";
+								else if (rankEntry) problem = insertionFailure(arm, solved[i], solved[paired]);
+							}
+							if (problem == null && incoming != null && yaws.indexOf(yawsSolved[i]) < 0) problem = "inventory grasp roll changed";
+							if (problem == null && i > 0 && requests[i - 1].tool == request.tool && transitWaypoint(request.name))
+								problem = transitSpaces.get(request.tool).invalid(solved[i]);
+							if (problem == null && request.name == "outside staging" &&
+								!outsideFront(arm, solved[i], pointBodies, transform(armPlacement), cell.opening.y - CollisionClearance.MARGIN * 1000))
+								problem = "saved holding posture extends into the enclosure";
+							if (problem == null && prepareStaging && firstViolation(stagingChecks, solved[stagingIndex]) != null)
+								problem = "saved staging posture no longer clears its physical states";
+							disposeClearances(pointClearance); disposeClearances(pairedClearance); disposeClearances(stagingChecks);
+							if (problem != null) { valid = false; failedAt = request.name; failedReason = problem; break; }
+							resolvedPoses.set(i, true);
+							continue;
 						}
 						var evaluated:Array<Array<Float>> = [];
 						// Preserve the preceding route branch before trying other IK branches.
@@ -1459,10 +1539,17 @@ class TendingReach {
 						var retained = certifiedEntries.get(certificateKey(needed));
 						var positions = retained == null ? null : retained.positions;
 						var failure = "";
-						if (positions == null) {
+						if (reuse != null) {
+							var proposal = TendingReachReuse.findRoute(reuse, needed);
+							var repaired = TendingReachReuse.route(space, proposal, fromPosition, solved[to], timing);
+							positions = repaired.positions;
+							failure = repaired.failure == null ? "" : repaired.failure;
+							progress((repaired.reused ? "revalidated " : repaired.positions == null ? "repair failed " : "repaired ") + needed.station + "@" + needed.tool);
+						}
+						if (positions == null && reuse == null) {
 							var transfer = new RrtConnect(space, 17).plan(fromPosition, solved[to]);
 							positions = transfer.waypoints == null ? null : timing.refine(space, transfer.waypoints); failure = transfer.failure;
-						} else if (!samePosition(positions[0], fromPosition) || !samePosition(positions[positions.length - 1], solved[to]))
+						} else if (positions != null && (!samePosition(positions[0], fromPosition) || !samePosition(positions[positions.length - 1], solved[to])))
 							throw "Approach selection changed an endpoint of its certified entry";
 						if (positions == null) {
 							valid = false; failedAt = needed.station + "@" + needed.tool + " from " + needed.fromTool;
@@ -1510,8 +1597,10 @@ class TendingReach {
 						riserFailures.push(failure);
 					}
 				}
+				if (reuse != null) break;
 			}
 			clearance.space.dispose();
+			if (reuse != null) throw new ReachReuseFailure(firstClassFailure == null ? "saved layout is not a design candidate" : firstClassFailure);
 		if (firstClassFailure != null && lastClassFailure != null)
 			failures.push('$cls first ${firstClassFailure}, 550 mm candidates [${riserFailures.join("; ")}], ' +
 				'first failures by riser [${[for (height in riserHeights) if (firstFailureByHeight.exists(Std.int(height)))
@@ -1520,6 +1609,21 @@ class TendingReach {
 		throw 'The selected Reach1300/550 mm cell layout (tray pitch ${spacing.x} x ${spacing.y} mm) ' +
 			'does not reach every required pose with the joint and wrist margins' +
 			(failures.length == 0 ? "" : '; candidates: ${failures.join("; ")}');
+	}
+
+	static function outsideFront(arm:Manipulator, q:Array<Float>, data:Array<CellHullObservation>, placement:Transform3, frontMm:Float):Bool {
+		var moving = [for (body in data) if (switch body.owner { case Mechanism(_, _) | Held(_, _): true; case _: false; }) body];
+		var links = [for (body in moving) switch body.owner { case Mechanism(_, link) | Held(_, link): link; case _: throw "Moving hull has no carrier"; }];
+		var poses = arm.linkPoses(q, links);
+		for (i in 0...moving.length) {
+			var world = placement.compose(poses[i]).compose(moving[i].pose), hull = moving[i].vertices, r = world.rotation;
+			for (v in 0...Std.int(hull.length / 3)) {
+				var x = hull[3*v], y = hull[3*v+1], z = hull[3*v+2];
+				var tx = 2.0*(r.y*z-r.z*y), ty = 2.0*(r.z*x-r.x*z), tz = 2.0*(r.x*y-r.y*x);
+				if ((world.translation.y + (y+r.w*ty+r.z*tx-r.x*tz))*1000 > frontMm) return false;
+			}
+		}
+		return true;
 	}
 
 	/** Candidate holding postures along an already certified retreat, nearest the vise first.
@@ -1701,7 +1805,7 @@ class TendingReach {
 	}
 
 	static function transitSpace(arm:Manipulator, data:Array<CellHullObservation>,
-			reference:Array<Float>, payloads:Array<ReachPayload>, seatMembers:Array<String>):ManipulatorPlannerSpace {
+			reference:Array<Float>, payloads:Array<ReachPayload>, seatMembers:Array<String>):ReachCachedSpace {
 		var snapshot = reachSnapshot(data);
 		var scene = snapshot.describe(arm, reference, CollisionClearance.MARGIN);
 		processkit.HandlingCollisionPolicy.seatedStock(scene, scene.memberObjects([SEATED_STOCK]), scene.memberObjects(seatMembers));
@@ -1710,8 +1814,8 @@ class TendingReach {
 			scene.payload(payload.body.id, contacts, CollisionPairRule.Allow, CollisionPairStatus.DeclaredContact, 0.0);
 		}
 		var build = scene.build(new NativeCollisionWorld());
-		return new ManipulatorPlannerSpace(new CollisionPlannerSpace(scene.description, build, scene.bodies,
-			scene.margins()), arm, reference, scene.bodies.reference.q);
+		return new ReachCachedSpace(new ManipulatorPlannerSpace(new CollisionPlannerSpace(scene.description, build, scene.bodies,
+			scene.margins()), arm, reference, scene.bodies.reference.q));
 	}
 
 	static function samePosition(a:Array<Float>, b:Array<Float>):Bool {
@@ -1787,11 +1891,12 @@ class TendingReach {
 		new Vec3(frame.x / 1000, frame.y / 1000, frame.z / 1000), new Quat(frame.qx, frame.qy, frame.qz, frame.qw));
 }
 
-/** `--store` solves/stores and `--check` solves/compares, with the saved placement first. `--fresh` uses the original order. */
+/** Revalidate/repair by default. `--search` reruns optimization; `--fresh` also resets placement order. */
 function main():Void {
 	var args = Sys.args();
-	if (args.indexOf("--placement-tests") >= 0) TendingReachPlacementChecks.run();
-	else if (args.indexOf("--store") >= 0) TendingReach.store(args.indexOf("--fresh") >= 0);
-	else if (args.indexOf("--check") >= 0) TendingReach.check(args.indexOf("--fresh") >= 0);
+	if (args.indexOf("--reuse-tests") >= 0) TendingReachReuseChecks.run();
+	else if (args.indexOf("--placement-tests") >= 0) TendingReachPlacementChecks.run();
+	else if (args.indexOf("--store") >= 0) TendingReach.store(args.indexOf("--fresh") >= 0, args.indexOf("--search") >= 0);
+	else if (args.indexOf("--check") >= 0) TendingReach.check(args.indexOf("--fresh") >= 0, args.indexOf("--search") >= 0);
 	else TendingReach.run();
 }

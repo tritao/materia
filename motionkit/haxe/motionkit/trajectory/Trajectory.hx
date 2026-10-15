@@ -263,10 +263,14 @@ class Trajectory implements TimedJointTrajectory {
   }
 
   public function durationSeconds():Float {
+    return Int64.toFloat(durationNanoseconds()) * 1e-9;
+  }
+
+  public function durationNanoseconds():Int64 {
     ensureLive();
     var result = TrajectoryCore.mk_trajectory_duration_ns(owner.borrow());
     check(result.status, "trajectory.duration");
-    return Int64.toFloat(result.out_duration_ns) * 1e-9;
+    return result.out_duration_ns;
   }
 
   public function duration():Float return durationSeconds();

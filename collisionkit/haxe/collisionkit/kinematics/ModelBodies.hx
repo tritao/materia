@@ -36,6 +36,7 @@ class ModelBodies {
   public final referenceName:String;
   final description:CollisionDescription;
   final snapshot:KinematicSnapshot;
+  final poseScratch:Array<Float> = [for (_ in 0...7) 0.0];
   var articulation = -1;
 
   function new(description:CollisionDescription, model:KinematicModel, name:String, bodies:Array<Int>,
@@ -181,11 +182,23 @@ class ModelBodies {
     return state;
   }
 
+  /** Update caller-owned scratch, including the reference's current root poses. */
+  public function stateInto(q:Array<Float>, state:KinematicState):KinematicState {
+    if (state == null || q == null || state.model != model || q.length != model.dofCount())
+      throw "Collision scratch state has the wrong model or dimension";
+    for (i in 0...q.length) {
+      if (!Math.isFinite(q[i])) throw "Collision coordinates must be finite";
+      state.q[i] = q[i];
+    }
+    for (body in 0...model.bodyCount()) if (model.bodyParentJoint[body] < 0) state.setRootPose(body, reference.rootPose(body));
+    return state;
+  }
+
   /** Poses the built world's bodies of this model for `state` (its root poses included: see `state`). */
   public function place(build:CollisionBuild, state:KinematicState):Void {
     if (state.model != model) throw 'State must be of the model of "$name"';
     snapshot.evaluate(state);
-    var poses:Array<Float> = [for (_ in 0...7) 0.0];
+    var poses = poseScratch;
     for (body in 0...bodies.length) if (bodies[body] >= 0) {
       snapshot.bodyPoseInto(body, poses, 0);
       build.world.setBodyPoses(build.bodies[bodies[body]], poses);
@@ -198,11 +211,17 @@ class ModelBodies {
 
   /** Every body's pose for `state` (seven numbers each, in `all()` order): a pose set for batched checks. */
   public function poses(state:KinematicState):Array<Float> {
+    var out:Array<Float> = [];
+    posesInto(state, out);
+    return out;
+  }
+
+  /** Write a batch pose set into caller-owned storage without allocating another array. */
+  public function posesInto(state:KinematicState, out:Array<Float>):Void {
     snapshot.evaluate(state);
-    var out:Array<Float> = [for (_ in 0...7 * (bodies.length + followers.length)) 0.0];
+    out.resize(7 * (bodies.length + followers.length));
     for (body in 0...bodies.length) snapshot.bodyPoseInto(body, out, 7 * body);
     for (i in 0...followers.length) snapshot.bodyPoseInto(followed[i], out, 7 * (bodies.length + i));
-    return out;
   }
 
   /**

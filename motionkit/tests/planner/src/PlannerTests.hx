@@ -25,6 +25,21 @@ import robotkit.collision.CollisionClearance;
 import collisionkit.CollisionDescription;
 import robotkit.manipulation.Manipulator;
 
+private class CountingSpace implements motionkit.planner.PlannerSpace {
+  public var points = 0;
+  public var edges = 0;
+  public var blocked = false;
+  public function new() {}
+  public function dimension():Int return 1;
+  public function lower():Array<Float> return [-2.0];
+  public function upper():Array<Float> return [2.0];
+  public function invalid(q:Array<Float>):Null<String> { points++; return q[0] > 1.0 ? "past boundary" : null; }
+  public function edgesClear(values:Array<Float>, count:Int):Array<Bool> {
+    edges += count;
+    return [for (i in 0...count) !blocked && Math.max(values[2*i], values[2*i+1]) <= 1.0];
+  }
+}
+
 /**
  * Free-space planning (COLLISION.md CL-D7, CL7): RRT-Connect over a
  * collisionkit world through a narrow passage; start and goal in collision,
@@ -41,6 +56,10 @@ class PlannerTests {
   public static function main():Void {
     testNarrowPassage();
     testLargeEdgeBatch();
+    testExactQueryCache();
+    testSavedRoutes();
+    testTimingCache();
+    testScratchRoots();
     testEndpointsInCollision();
     testEndpointRounding();
     testDeterministicFromSeed();
@@ -49,6 +68,61 @@ class PlannerTests {
     var bench = Sys.getEnv("PLANNER_BENCH_DIR");
     if (bench != null && bench != "") benchmark(bench);
     Sys.println('Planner tests passed ($assertions assertions)');
+  }
+
+  static function testExactQueryCache():Void {
+    var raw = new CountingSpace(), cached = new motionkit.planner.CachedPlannerSpace(raw, 2);
+    check(cached.invalid([1.0]) == null && cached.invalid([1.0]) == null && raw.points == 1, "valid point answers are cached");
+    check(cached.invalid([1.0 + 2.220446049250313e-16]) != null && raw.points == 2, "adjacent floating-point values have distinct cache keys");
+    var flags = cached.edgesClear([0.0, 0.5, 0.0, 0.5, 0.0, 1.5], 3);
+    check(flags[0] && flags[1] && !flags[2] && raw.edges == 2, "duplicate edges are checked once, including blocked results");
+    cached.edgesClear([0.0, 1.5], 1);
+    check(raw.edges == 2, "blocked edge answer is cached");
+    raw.blocked = true; cached.clear();
+    check(!cached.edgesClear([0.0, 0.5], 1)[0], "clearing the context discards old answers");
+    var fresh = new motionkit.planner.CachedPlannerSpace(raw);
+    check(!fresh.edgesClear([0.0, 0.5], 1)[0], "another scene instance cannot inherit cached clearance");
+    cached.invalid([-1.0]); cached.invalid([-0.5]); cached.invalid([0.0]);
+    check(cached.invalid([1.5]) != null, "bounded cache eviction preserves query semantics");
+  }
+
+  static function testSavedRoutes():Void {
+    var scene = maze(), from = [-0.8, 0.6], to = [0.8, 0.5];
+    var path = [from, [-0.1, 0.0], [0.1, 0.0], to];
+    check(motionkit.planner.SavedPathValidation.failure(scene.space, path, from, to) == null, "saved complete route through the gap is recertified");
+    check(motionkit.planner.SavedPathValidation.failure(scene.space, [from, to], from, to) != null, "valid endpoints cannot hide an interior wall crossing");
+    check(motionkit.planner.SavedPathValidation.failure(scene.space, path, from, [0.8, 0.4]) != null, "changed route endpoint is rejected");
+    check(motionkit.planner.SavedPathValidation.failure(scene.space, [from, [0.0, 0.6], to], from, to) != null, "colliding saved waypoint is rejected");
+    check(motionkit.planner.SavedPathValidation.failure(scene.space, [from, [2.0, 0.0], to], from, to) != null, "saved overtravel is rejected");
+    check(motionkit.planner.SavedPathValidation.failure(scene.space, [from, [Math.NaN, 0.0], to], from, to) != null, "nonfinite route is rejected");
+    check(motionkit.planner.SavedPathValidation.failure(scene.space, null, from, to) != null, "missing route requires planning");
+    scene.world.dispose();
+  }
+
+  static function testTimingCache():Void {
+    var rates = [for (_ in 0...2) {velocity:0.7, acceleration:1.5, jerk:5.0}];
+    var timing = new motionkit.robot.JointPathTiming(rates);
+    var path = [[0.0,0.0], [0.2,0.3], [0.2,0.3], [-0.3,0.8], [0.0,0.0]];
+    var original = timing.trajectory(path), expected = original.durationSeconds(); original.dispose();
+    check(timing.duration(path) == expected && timing.duration(path) == expected, "cached duration exactly matches the original nanosecond trajectory");
+    check(timing.durationCacheHits > 0, "repeated edge timings reuse native results");
+    var lower = timing.lowerBound(path[0], path[1]);
+    check(timing.lowerBound(path[0], path[1]) == lower && timing.lowerBoundCacheHits > 0, "repeated lower bounds are cached");
+    var slower = new motionkit.robot.JointPathTiming([for (_ in 0...2) {velocity:0.1, acceleration:0.2, jerk:0.5}]);
+    check(slower.duration(path) > expected, "timing caches do not cross rate configurations");
+  }
+
+  static function testScratchRoots():Void {
+    var scene = maze(), q = [-0.8, 0.0];
+    check(scene.space.invalid(q) == null, "scratch FK starts at the reference root");
+    scene.space.bodies.reference.setRootPose(0, Transform.translation(0.8,0.6,0));
+    check(scene.space.invalid(q) != null, "scratch FK observes an updated reference root");
+    scene.space.bodies.reference.setRootPose(0, Transform.identity());
+    check(scene.space.invalid(q) == null, "scratch FK clears after restoring the root");
+    var expected = scene.space.bodies.poses(scene.space.bodies.state(q)), out:Array<Float> = [42.0];
+    scene.space.bodies.posesInto(scene.space.bodies.state(q), out);
+    check(expected.join(",") == out.join(","), "caller-owned FK output matches allocating FK");
+    scene.world.dispose();
   }
 
   static function testLargeEdgeBatch():Void {

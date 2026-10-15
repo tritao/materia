@@ -9,6 +9,9 @@ class ManipulatorPlannerSpace implements BoxClearanceSpace {
   final arm:Manipulator;
   final reference:Array<Float>;
   final dofs:Array<Int>;
+  final pointBuffer:Array<Float> = [];
+  final mappedBuffer:Array<Float> = [];
+  final widthBuffer:Array<Float> = [];
 
   public function new(inner:CollisionPlannerSpace, arm:Manipulator, reference:Array<Float>, ?fullReference:Array<Float>) {
     this.inner = inner;
@@ -36,7 +39,9 @@ class ManipulatorPlannerSpace implements BoxClearanceSpace {
 
   function full(q:Array<Float>):Array<Float> {
     if (q == null || q.length != dofs.length) throw "Manipulator planner received the wrong manipulator dimension";
-    var result = reference.copy();
+    var result = pointBuffer;
+    result.resize(reference.length);
+    for (i in 0...reference.length) result[i] = reference[i];
     for (i in 0...dofs.length) result[dofs[i]] = q[i];
     return result;
   }
@@ -48,25 +53,30 @@ class ManipulatorPlannerSpace implements BoxClearanceSpace {
   public function violation(q:Array<Float>):Null<collisionkit.CollisionViolation> return inner.violation(full(q));
 
   public function edgesClear(edges:Array<Float>, count:Int):Array<Bool> {
-    var n = dimension(), mapped:Array<Float> = [];
+    var n = dimension(), mapped = mappedBuffer;
+    mapped.resize(0);
     if (edges == null || edges.length != count * n * 2) throw "Manipulator planner edges have the wrong dimension";
     for (edge in 0...count) for (endpoint in 0...2) {
-      var q = [for (i in 0...n) edges[(edge * 2 + endpoint) * n + i]];
-      for (value in full(q)) mapped.push(value);
+      var offset = mapped.length;
+      for (value in reference) mapped.push(value);
+      for (i in 0...n) mapped[offset + dofs[i]] = edges[(edge * 2 + endpoint) * n + i];
     }
     return inner.edgesClear(mapped, count);
   }
 
   public function boxesClear(centres:Array<Float>, halfWidths:Array<Float>, count:Int):Array<Bool> {
-    var n = dimension(), fullCentres:Array<Float> = [], fullWidths:Array<Float> = [];
+    var n = dimension(), fullCentres = mappedBuffer, fullWidths = widthBuffer;
+    fullCentres.resize(0); fullWidths.resize(0);
     if (centres == null || halfWidths == null || centres.length != count * n || halfWidths.length != count * n)
       throw "Manipulator planner boxes have the wrong dimension";
     for (box in 0...count) {
-      for (value in full(centres.slice(box * n, (box + 1) * n))) fullCentres.push(value);
+      var offset = fullCentres.length;
+      for (value in reference) { fullCentres.push(value); fullWidths.push(0.0); }
       // Held coordinates do not move: only the manipulator's own coordinates span the box.
-      var widths = [for (_ in reference) 0.0];
-      for (i in 0...n) widths[dofs[i]] = halfWidths[box * n + i];
-      for (value in widths) fullWidths.push(value);
+      for (i in 0...n) {
+        fullCentres[offset + dofs[i]] = centres[box * n + i];
+        fullWidths[offset + dofs[i]] = halfWidths[box * n + i];
+      }
     }
     return inner.boxesClear(fullCentres, fullWidths, count);
   }

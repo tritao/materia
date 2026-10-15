@@ -1108,6 +1108,52 @@ checks with `haxeon run --project=machinekit/examples/machine-tending/haxeon.jso
 -- --placement-tests` and the full comparison with the same project and
 `-- --check`. `-- --store --fresh` retains a fresh search in the original order.
 
+### Saved-path recertification and query reuse (2026-10-15)
+
+The default reach study now treats the saved poses and routes as proposals.
+It rebuilds the current physical-state worlds, verifies every pose against the
+current task, joint/wrist margins, collision geometry, insertion and holding
+constraints, then certifies every complete transfer edge. Clear endpoints alone
+are insufficient. Missing or rejected routes are planned and refined individually;
+valid routes retain their exact waypoints. Changed layout metadata or invalid
+poses fall back to the coupled study because grasp roll and staging choices
+depend on one another. Unexpected native errors propagate rather than being
+treated as a failed reuse attempt.
+
+`--store` uses this recertification/repair path before saving; `--check` uses it
+and compares the complete result to the stored certificate. `--check --search`
+independently reruns optimization with the saved placement first. `--fresh`
+bypasses saved solutions and restores the original placement order. These
+commands supersede the default-check behavior described in the preceding
+historical measurement. Ordinary cell builds still use the fingerprint gate.
+
+Point and edge answers have bounded, exact IEEE-coordinate caches scoped to
+each immutable physical-state planner space. Geometry, root poses, bounds,
+rules, margins or subdivision policy changes require clearing or replacing the
+cache. The tending study creates these wrappers privately after constructing
+each world; it does not attach caches to mutable live simulation spaces.
+Duplicate edges in a batch share one query. Joint timing has separate bounded
+caches per fixed rate set, and sums native edge durations in integer nanoseconds
+before converting to seconds. FK states, body poses and manipulator mapping
+buffers are reused inside synchronous queries; current reference root poses
+are still refreshed each time.
+
+The same 96-pose, 23-transfer certificate was reproduced in **39.24 s** by the
+default check, versus **375.99 s** previously (**9.58x faster**), including
+fingerprinting and geometry setup and excluding compilation. This measures
+reuse of an existing feasible solution, not optimization of a new layout.
+An independent `--check --search` also reproduced the certificate exactly in
+**364.79 s**: caches and buffer reuse give a modest full-search gain; skipping
+unnecessary optimization supplies the main improvement. These are individual
+host measurements, not guaranteed runtimes.
+
+Validation: 310 planner assertions, 383 collision assertions, 104 CadBridge
+assertions and 37 reuse assertions pass. Reuse tests include an interior wall
+crossing with clear endpoints, changed fixture dimensions, incorrect poses,
+duplicate/missing poses and malformed rotations. Removing one real-cell route
+repairs it while preserving all 22 unaffected routes exactly. Run the reuse
+checks with the tending project and `-- --reuse-tests`.
+
 ### Plan revision (2026-10-01, after CL1)
 
 A review of the plan against CL1 and the code around it changed:

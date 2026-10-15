@@ -43,6 +43,8 @@ class CollisionPlannerSpace implements BoxClearanceSpace {
   final poseBuffer:Array<Float> = [];
   final inflationBuffer:Array<Float> = [];
   final exactBuffer:Array<Float> = [];
+  final stateScratch:kinematicskit.KinematicState;
+  final modelPoses:Array<Float> = [];
   /** Halvings run for the edges checked so far (diagnostics). */
   public var queries(default, null):Int = 0;
 
@@ -51,6 +53,7 @@ class CollisionPlannerSpace implements BoxClearanceSpace {
     this.build = build;
     this.bodies = bodies;
     this.margins = margins;
+    stateScratch = new kinematicskit.KinematicState(bodies.model);
     reach = new MotionReach(bodies.model);
     var model = bodies.model;
     bodyLower = [for (dof in 0...model.dofCount()) model.dofLower[dof]];
@@ -87,7 +90,7 @@ class CollisionPlannerSpace implements BoxClearanceSpace {
 
   /** Structured diagnostics for callers that need the actual contact pair. */
   public function violation(q:Array<Float>):Null<collisionkit.CollisionViolation> {
-    bodies.place(build, bodies.state(q));
+    bodies.place(build, bodies.stateInto(q, stateScratch));
     return build.world.violation(margins);
   }
 
@@ -173,7 +176,8 @@ class CollisionPlannerSpace implements BoxClearanceSpace {
    * the model at `q`: the other bodies where the description has them.
    */
   function appendWorld(q:Array<Float>, out:Array<Float>):Void {
-    var model = bodies.poses(bodies.state(q));
+    bodies.posesInto(bodies.stateInto(q, stateScratch), modelPoses);
+    var model = modelPoses;
     var all = bodies.all();
     var start = out.length;
     for (body in 0...build.bodies.length) {
