@@ -25,19 +25,25 @@ class FlangeBearingAssembly extends MachineAssembly {
 	public final bearing:DeepGrooveBearing;
 	public final screw:SocketHeadCapScrew;
 
-	public function new(bearing:DeepGrooveBearing) {
+	/**
+	 * `bearingFitted` false leaves the bore empty, as a housing is fastened before a later station presses its
+	 * bearing in; the housing stays sized for that bearing.
+	 */
+	public function new(bearing:DeepGrooveBearing, bearingFitted:Bool = true) {
 		super();
 		this.bearing = bearing;
 		housing = new FlangeBearingHousing(bearing);
 		var diameter = housing.mountScrewPart(10).diameter;
 		screw = housing.mountScrewPart(standardScrewLength(housing.depth + ENGAGEMENT_DIAMETERS * diameter));
 		addComponent("housing", housing);
-		addComponent("bearing", bearing);
-		addMate("bearing-seat", "fixed", "housing", "bore", "bearing", "axis");
 		exposeConnector("housingBore", "housing", "bore");
-		exposeConnector("bearingAxis", "bearing", "axis");
-		exposeConnector("bearingFront", "bearing", "front");
-		exposeConnector("bearingBack", "bearing", "back");
+		if (bearingFitted) {
+			addComponent("bearing", bearing);
+			addMate("bearing-seat", "fixed", "housing", "bore", "bearing", "axis");
+			exposeConnector("bearingAxis", "bearing", "axis");
+			exposeConnector("bearingFront", "bearing", "front");
+			exposeConnector("bearingBack", "bearing", "back");
+		}
 		for (i in 1...5) {
 			var bolt = housing.connector('bolt$i').frame;
 			addMemberConnector("housing", 'bolt${i}Head', {x: bolt.x, y: bolt.y, z: bolt.z + housing.depth,

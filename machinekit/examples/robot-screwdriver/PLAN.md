@@ -1527,6 +1527,30 @@ Steps:
     1. The cell CAD and controllers.
     2. Both programs with the plate fixed and only the housing handled.
     3. The plate handled and the unload.
+  - **Constraints found in the code (2026-10-15):**
+    - The fastening analysis (`FastenedAssembly`) derives the CAD screw seats
+      from the flange seated on the plate, so the `flange-seat` mate stays in
+      the design.
+    - The free housing follows the screws' pattern instead: a dynamic part
+      that the runtime stages at its supply (here the infeed slot), with
+      planning still using the designed seat.
+    - The bearing is a separate occurrence inside the housing, so it must
+      travel with it as one rigid body. Either the bearing becomes a fixed
+      member of the housing's body, or the free part is the flange
+      subassembly as a whole.
+    - **Decision:** `dynamicParts` are per occurrence, so a housing listed as
+      dynamic would leave its bearing behind. The SD15a part is the housing
+      before its bearing is fitted, as lines that fasten housings before a
+      later press station do. It is sized from the same bearing, with the
+      same CAD fastenings. Free rigid subassemblies (one dynamic body from a
+      subtree's rigidly joined members) are a separate, general feature, not
+      needed here.
+    - `ControllerWiring` requires every motor in a cell with a cabinet to be
+      wired to one. Both arms get a `RobotController`, each wired to its six
+      drivers. The screwdriver tool declares no motors, so it needs no
+      cabinet.
+    - The gripper valves and air go to the handling controller and an air
+      supply.
 - **SD15a.4 Checks.** On both backends:
   - a full tray-to-finished-assembly cycle;
   - fixture not ready;

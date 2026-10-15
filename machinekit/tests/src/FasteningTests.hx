@@ -166,6 +166,16 @@ class FasteningTests {
 		var flange = new FlangeBearingMount(DeepGrooveBearing.metric("608"));
 		var found = flange.fastenings().require();
 		check(found.length == 4, "flange gives four fastenings");
+		var unfitted = new FlangeBearingMount(DeepGrooveBearing.metric("608"), 10, false);
+		check(flange.components().filter(item -> item.id == "flange/bearing").length == 1 &&
+			unfitted.components().filter(item -> item.id == "flange/bearing").length == 0,
+			"An unfitted housing omits the bearing while the default assembly retains it");
+		var unfittedFastenings = unfitted.fastenings().require();
+		check(unfittedFastenings.length == found.length, "Unfitted housing retains all CAD fastenings");
+		for (i in 0...found.length) {
+			check(unfittedFastenings[i].name() == found[i].name(), "Bearing fitting does not change fastening identity");
+			near(unfittedFastenings[i].engagementLength, found[i].engagementLength);
+		}
 		var housingCollision = CollisionHullFacet.of(flange.flange.housing), plateCollision = CollisionHullFacet.of(flange.plate);
 		if (housingCollision == null || plateCollision == null) throw "Flange fixture needs authored collision pieces";
 		check(housingCollision.hulls.length < 128 && plateCollision.hulls.length < 128,
