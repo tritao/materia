@@ -274,6 +274,52 @@ int main() {
     mk_time_law_destroy(law);
     mk_path_destroy(path);
 
+    // RF10: make direction-turn sampling dominate profile sampling. The weak first axis bounds
+    // path acceleration, while the second axis has a low velocity limit and ample acceleration.
+    // In velocity-normalized coordinates (1, 20(s-1)) turns 2*atan(20) > 3 radians
+    // over this single quadratic span. The profile criterion asks for fewer than two stages;
+    // MAX_STAGE_TURN=0.6 must supply six, even with nonzero entry and exit speeds.
+    {
+        mk_path_sample turning[2]{};
+        for (int i = 0; i < 2; ++i) {
+            auto &q = turning[i];
+            q.struct_size = sizeof(q);
+            q.joint_count = 2;
+            q.s = 2.0 * i;
+            q.position[0] = q.s;
+            q.first[0] = 1.0;
+            q.position[1] = (q.s - 1.0) * (q.s - 1.0);
+            q.first[1] = 2.0 * (q.s - 1.0);
+            q.second[1] = q.second_before[1] = 2.0;
+        }
+        assert(mk_path_create(turning, 2, &path) == MK_OK);
+        const double v[2] = {1.0, 0.1}, a[2] = {1e-5, 100.0};
+        const double feed[1] = {1.0};
+        mk_timing_report report{};
+        mk_trajectory_handle trajectory{};
+        assert(mk_time_path(path, v, a, 2, feed, 1, 0.045, 0.045, 1e-9, 1,
+            &report, &law, &trajectory) == MK_OK);
+        assert(report.adjustments == 0);
+        uint32_t count = 0;
+        assert(mk_time_law_binding_count(law, &count) == MK_OK);
+        assert(count == 6);
+        mk_limits limits{};
+        limits.struct_size = sizeof(limits);
+        limits.joint_count = 2;
+        for (int j = 0; j < 2; ++j) {
+            limits.derivative_claimed[j] = 3u;
+            limits.max_velocity[j] = v[j];
+            limits.max_acceleration[j] = a[j];
+        }
+        mk_validation_report validation{};
+        validation.struct_size = sizeof(validation);
+        assert(mk_validate(trajectory, &limits, &validation) == MK_OK);
+        assert(validation.checks[MK_CHECK_ACCELERATION].value < 0.81);
+        mk_trajectory_destroy(trajectory);
+        mk_time_law_destroy(law);
+        mk_path_destroy(path);
+    }
+
     // A printer's tightest corner, a 135 degree arc of 50 um radius sampled a quarter radian apart: ten spans of 12 um
     // that the speed profile and the collocation resolve with a few stages each, where a fixed 32 gave 320 of 0.4 um.
     // The law passes at once, and keeps its stage count to a quarter of that. A coarser grid reaches more of the limit

@@ -440,8 +440,9 @@ private:
 // no more than `PROFILE_STEP` of itself, `a ds <= PROFILE_STEP v^2`, with `a` the path acceleration the joints allow
 // and `v` the fastest the span can be taken (a joint's velocity limit, the centripetal bound of its curvature, the
 // span's cap). And the collocation: the acceleration constraint is imposed at the grid points, and between them the
-// joint-space direction turns; a stage turns it by at most `MAX_STAGE_TURN`, which bounds the missed peak well inside
-// the margin (about turn^2 / 8 of it, 4.5 % at 0.6 rad). A straight span of a few micrometres needs two stages, a
+// velocity-normalized joint-space direction turns. `MAX_STAGE_TURN` targets the mean turn per stage; uniform s spacing
+// does not bound each stage's turn when that direction changes nonuniformly. For uniform turning the missed peak is
+// about turn^2 / 8 (4.5 % at 0.6 rad); continuous validation, not this estimate, enforces the limits. A straight span of a few micrometres needs two stages, a
 // quarter circle of fifty micrometres' radius four.
 //
 // Measured on a 135 degree arc of 50 micrometres (tests/path.cpp), the acceleration the lowered law reaches over what
