@@ -1025,6 +1025,89 @@ Order: CL9a, CL9b, CL9c, CL9d, CL9e. Each step is one commit.
   mission behaviour changes, pushes or OCCT rebuilds.
 - **CL9 is done:** CL9a–CL9e, one commit each, synced onto local main.
 
+### Planner boolean-query performance (2026-10-15)
+
+The tending worktree's MT14 B7a certificate cache is already on main: ordinary
+cell builds check the fingerprint rather than repeat the offline reach search.
+Changing the robot's collision geometry still requires regenerating that
+certificate. Its full search exposed unnecessary ordered-report work in the
+planner's boolean batch queries.
+
+Regeneration also tries the saved base placement first, provided it exactly
+matches one of the current design's generated candidates (including rotation).
+The saved certificate supplies no collision answers, poses or paths: all are
+solved again against the current geometry. Every other candidate remains in its
+original relative order if that placement fails. `--store --fresh` ignores the
+hint; `--check` independently resolves with the saved placement first and compares
+the complete certificate, while `--check --fresh` uses the original search order.
+Keeping a feasible previous layout can therefore retain it even if an earlier
+placement has become feasible after a geometry change; use `--fresh` to revisit
+that preference.
+
+`ck_violation_sets` now uses `World::any_violation`: it rechecks a recent
+blocking pair with the current poses, margins and motion bounds, and otherwise
+stops broadphase traversal at any blocker. It does not collect and sort every
+nearby pair or compute unused distance witnesses. Topology changes invalidate
+the hint. Checked unsupported pairs still refuse the query. Diagnostic queries
+keep their original first-pair ordering and signed-distance output. Broadphase
+pair indices use a hash table. No collision margin or subdivision limit changes.
+
+`CollisionPlannerSpace.edgesClear` processes at most 64 interval midpoints per
+batch, retaining pending intervals on a stack. This bounds pose/inflation
+buffers and avoids expanding every surviving edge across an entire subdivision
+level before returning to its halves. Pose/inflation buffers retain their
+capacity between synchronous queries rather than reallocating on each RRT edge.
+An edge still passes only when all of its
+intervals have conservative motion-bound certificates; a colliding midpoint or
+unresolved depth-limit interval still rejects it. The reach search reports
+elapsed time, placement and pose progress.
+
+Vise-entry holding-posture enumeration now calls the selection visitor lazily,
+in the original edge/sample order, stopping at the same first faster connected
+posture. It no longer eagerly builds candidates that the caller would discard.
+Its front-plane test computes only the world Y coordinate, with the same
+quaternion arithmetic as `transformPoint().y`, avoiding three temporary vectors
+per hull vertex. These changes leave the candidate grid and connectivity tests
+unchanged.
+
+The extended Release `ck_broadphase_benchmark` compares ordered and boolean
+queries on the same six-joint cell, including FK and body updates (median of
+five 3,000-query runs, microseconds/query):
+
+| Boxes | Per-body motion bound | Ordered | Boolean | Speedup |
+| ---: | ---: | ---: | ---: | ---: |
+| 100 | 0 m | 1.411 | 1.379 | 1.02x |
+| 100 | 0.03 m | 2.051 | 1.874 | 1.09x |
+| 100 | 0.30 m | 5.183 | 0.824 | 6.29x |
+| 1000 | 0 m | 4.725 | 1.191 | 3.97x |
+| 1000 | 0.03 m | 9.234 | 1.048 | 8.82x |
+| 1000 | 0.30 m | 53.060 | 0.513 | 103.53x |
+
+These are synthetic query timings, not a whole-study speedup. Tests compare
+boolean flags with ordered-query results through poses, inflation, pair-rule
+changes, reattachment, removals, explicit static checks, unbounded shapes,
+height fields, margin ceilings and boundary contacts. Unsupported pairs refuse
+the boolean query. The planner test adds 257 interleaved clear and blocked
+edges through the analytic wall/gap fixture to cover multiple bounded batches.
+
+The complete refined Reach1300 tending study measured **2705.60 s** with the
+original solver/order and **375.99 s** with the new solver and saved-placement
+hint (**7.20x faster**). Both timings exclude compilation and include input
+fingerprinting and geometry setup. The new run was `--check`: it regenerated
+all 96 poses and production paths and reproduced the complete baseline
+certificate exactly, including fingerprint
+`79de7641eb28255dfe94412280cf62e38433f0754742df46412db16e29bae3e9`.
+These are single full-study measurements under host load. The gain includes
+avoiding previously rejected placements; it is not a claim that a fresh search
+over a new cell will be 7.20x faster. The optimized run peaked at 2,052,068 KiB RSS.
+
+Validation passes: four standalone native suites, 383 Haxe collision assertions,
+288 planner assertions, 26 placement-hint assertions, the saved-cell acceptance
+check and the independent full-study certificate comparison. Run the hint
+checks with `haxeon run --project=machinekit/examples/machine-tending/haxeon.json
+-- --placement-tests` and the full comparison with the same project and
+`-- --check`. `-- --store --fresh` retains a fresh search in the original order.
+
 ### Plan revision (2026-10-01, after CL1)
 
 A review of the plan against CL1 and the code around it changed:

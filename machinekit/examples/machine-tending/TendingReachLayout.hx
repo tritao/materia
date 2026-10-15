@@ -26,6 +26,8 @@ import robotkit.collision.CollisionClearance;
  * and the study's clearance constants. A cell build checks that fingerprint and uses the stored
  * layout; when the inputs change it refuses and names the command that solves and stores it again.
  * Live planning still checks every executed edge against the actual scene.
+ * Regeneration tries the saved placement first, rebuilding and recertifying all poses and paths;
+ * `--store --fresh` ignores that hint and searches in the original order.
  */
 class TendingReachLayout {
 	/** Bump when the study's acceptance rules change without any of its fingerprinted inputs changing. */

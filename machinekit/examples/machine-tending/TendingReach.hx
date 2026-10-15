@@ -127,6 +127,7 @@ private typedef ReachPayload = {
 	var active:Bool;
 }
 private typedef ReachEnvironmentHull = {var id:String; var vertices:Array<Float>; var frame:AssemblyFrame; var scale:Float; var loose:Bool;}
+private typedef ReachPlacementCandidate = {var height:Float; var baseXOffset:Float; var baseYOffset:Float;}
 private typedef ReachHoldingPath = {var position:Array<Float>; var entry:Array<Array<Float>>; var exterior:Array<Array<Float>>;}
 
 /** One reversible route must be clear in each physical state in which it is used. */
@@ -263,22 +264,32 @@ class TendingReach {
 			'presence=$PRESENCE_HEAD_MOUNT_ALLOWANCE_MM';
 
 	/** Solves the layout again and stores it, with its input fingerprint, as `TendingReachCertificate`. */
-	public static function store():Void {
+	public static function store(fresh:Bool = false):Void {
+		Sys.println("Reach search: fingerprinting current cell inputs");
+		Sys.stdout().flush();
 		var production = TendingCyclePlan.bearingBlocks();
 		var fingerprint = TendingReachLayout.fingerprint(production);
-		var source = TendingReachLayout.certificateSource(study(new EnclosedBenchMill(), production), fingerprint);
+		// A stale certificate supplies only a placement hint, never collision
+		// answers or paths. All geometry, poses and routes are solved again.
+		var preferred:Null<AssemblyFrame> = null;
+		if (!fresh) {
+			var previous = TendingReachLayout.decode(TendingReachCertificate.JSON).result;
+			if (previous.cls == Reach1300 && previous.riser == 550) preferred = previous.armPlacement;
+		}
+		var source = TendingReachLayout.certificateSource(study(new EnclosedBenchMill(), production, preferred), fingerprint);
 		var path = certificatePath();
 		sys.io.File.saveContent(path, source);
 		trace('Stored the tending reach layout in $path ($fingerprint)');
 	}
 
 	/** Solves the layout again and fails unless it equals the stored one: the study and its inputs agree. */
-	public static function check():Void {
+	public static function check(fresh:Bool = false):Void {
 		var production = TendingCyclePlan.bearingBlocks();
 		var fingerprint = TendingReachLayout.fingerprint(production);
 		var stored = TendingReachLayout.decode(TendingReachCertificate.JSON);
 		if (stored.fingerprint != fingerprint) throw 'The stored tending reach layout is for other inputs; run `${TendingReachLayout.REGENERATE}`';
-		var solved = TendingReachLayout.encode(study(new EnclosedBenchMill(), production), fingerprint);
+		var solved = TendingReachLayout.encode(study(new EnclosedBenchMill(), production,
+			fresh ? null : stored.result.armPlacement), fingerprint);
 		if (solved != TendingReachLayout.encode(stored.result, fingerprint))
 			throw 'The tending reach study no longer reproduces its stored layout; run `${TendingReachLayout.REGENERATE}`';
 		trace("The tending reach study reproduces its stored layout");
@@ -420,10 +431,34 @@ class TendingReach {
 	static function disposeClearances(checks:Array<ReachClearanceCheck>):Void
 		for (check in checks) check.space.dispose();
 
-	public static function study(cell:EnclosedBenchMill, production:TendingCyclePlan):TendingReachResult {
+	/** Reorder existing design candidates only; a previous certificate cannot add a new placement. */
+	static function prioritizePlacement(candidates:Array<ReachPlacementCandidate>, p:Null<AssemblyFrame>,
+		d4:Float, baseY:Float):Bool {
+		if (p == null) return false;
+		for (value in [p.x, p.y, p.z, p.qx, p.qy, p.qz, p.qw]) if (!Math.isFinite(value)) return false;
+		var rotation = AssemblyFrames.fromRotationMatrix(0, 0, 0, [0.0, 1, 0, -1, 0, 0, 0, 0, 1]);
+		if (Math.abs(p.qx - rotation.qx) >= 1e-12 || Math.abs(p.qy - rotation.qy) >= 1e-12 ||
+			Math.abs(p.qz - rotation.qz) >= 1e-12 || Math.abs(p.qw - rotation.qw) >= 1e-12) return false;
+		for (index in 0...candidates.length) {
+			var c = candidates[index];
+			if (Math.abs(p.x - d4 - c.baseXOffset) > 1e-6 ||
+				Math.abs(p.y - baseY - c.baseYOffset) > 1e-6 || Math.abs(p.z - c.height) > 1e-6) continue;
+			candidates.splice(index, 1); candidates.insert(0, c);
+			return true;
+		}
+		return false;
+	}
+
+	public static function study(cell:EnclosedBenchMill, production:TendingCyclePlan, ?preferredPlacement:AssemblyFrame):TendingReachResult {
+		var searchStarted = Sys.time();
+		function progress(message:String):Void {
+			Sys.println('Reach search (${Math.round(Sys.time() - searchStarted)} s): $message');
+			Sys.stdout().flush();
+		}
+		progress("building geometry and collision states");
 		// Reach uses the same physical blank hull as machining, but the tending cell starts with an
 		// empty vise. Study a loaded reference machine so the stock remains geometry input only.
-		if (!cell.includesWorkpiece) return study(new EnclosedBenchMill(), production);
+		if (!cell.includesWorkpiece) return study(new EnclosedBenchMill(), production, preferredPlacement);
 		var transferRequests = production.transferRequests();
 		var trayEntries = new Map<String, TendingTransferRequest>();
 		for (needed in transferRequests) if (needed.role == Inventory)
@@ -803,11 +838,16 @@ class TendingReach {
 			// The physical cell fixes this riser height. MotionKit certifies each
 			// generated polynomial separately when it admits the mission route.
 			var riserHeights = [550.0];
-			var candidates:Array<{height:Float, baseXOffset:Float, baseYOffset:Float}> = [];
+			var candidates:Array<ReachPlacementCandidate> = [];
 			for (height in riserHeights) for (baseXOffset in lateralOffsets)
 				for (baseYOffset in [0.0, -toolDepth / 2, toolDepth / 2, -toolDepth, -2 * toolDepth])
 				candidates.push({height: height, baseXOffset: baseXOffset, baseYOffset: baseYOffset});
+			if (prioritizePlacement(candidates, preferredPlacement, source.reference.d[3], classBaseY))
+				progress("trying the previous placement first; all poses and paths will be recertified");
+
 			for (candidate in candidates) {
+				progress('placement ${candidates.indexOf(candidate) + 1}/${candidates.length}: ' +
+					'X ${candidate.baseXOffset}, Y ${candidate.baseYOffset}, riser ${candidate.height} mm');
 				var height = candidate.height, baseXOffset = candidate.baseXOffset, baseYOffset = candidate.baseYOffset;
 				var armPlacement = AssemblyFrames.compose(AssemblyFrames.translation(source.reference.d[3] + baseXOffset,
 					classBaseY + baseYOffset, height),
@@ -989,6 +1029,7 @@ class TendingReach {
 						if (!valid) break;
 						if (retainedPoses.exists(i)) continue;
 						var request = requests[i];
+						progress('pose ${selectionOrder.indexOf(i) + 1}/${selectionOrder.length}: ${request.name}@${request.tool}');
 						var incoming = trayEntries.get(request.name + "@" + request.tool);
 						var clearanceIndex = -1;
 						if (incoming != null) for (index in 0...requests.length)
@@ -1290,9 +1331,9 @@ class TendingReach {
 										if (prepareStaging) {
 											var anchor = exteriorAnchors.get(request.tool);
 											if (anchor == null) throw "Holding posture lost its exterior transport anchor";
-											for (holding in holdingPaths(arm, candidateEntry, pointBodies, transform(armPlacement),
-												cell.opening.y - CollisionClearance.MARGIN * 1000, stagingChecks)) {
-												if (timing.duration(holding.entry) >= timing.duration(candidateEntry)) continue;
+											visitHoldingPaths(arm, candidateEntry, pointBodies, transform(armPlacement),
+												cell.opening.y - CollisionClearance.MARGIN * 1000, stagingChecks, function(holding:ReachHoldingPath):Bool {
+												if (timing.duration(holding.entry) >= timing.duration(candidateEntry)) return false;
 												var connected = true;
 												for (closedSpace in closedTransitSpaces) {
 													// Reuse the remainder of the known retreat as a connectivity
@@ -1314,14 +1355,14 @@ class TendingReach {
 													outsidePlanner.shortcutRounds = 0;
 													if (!outsidePlanner.plan(anchor, holding.position).found()) { connected = false; break; }
 												}
-												if (!connected) continue;
+												if (!connected) return false;
 												var world = transform(armPlacement).compose(arm.forwardKinematics(holding.position).compose(request.toolOffset));
 												candidateStaging = {name: requests[stagingIndex].name, tool: request.tool, position: holding.position,
 													target: {x: world.translation.x * 1000, y: world.translation.y * 1000, z: world.translation.z * 1000,
 														qx: world.rotation.x, qy: world.rotation.y, qz: world.rotation.z, qw: world.rotation.w}, toolYaw: yaw};
 												candidateEntry = timing.refine(space, holding.entry);
-												break;
-											}
+												return true;
+											});
 										}
 										// Static collision rules and rest-to-rest limits are reversible.
 										candidateSeconds = 2 * timing.duration(candidateEntry);
@@ -1435,6 +1476,7 @@ class TendingReach {
 					for (space in closedTransitSpaces) space.dispose();
 					if (startupSpace != null) startupSpace.dispose();
 					if (valid) {
+						progress("all poses and production paths certified");
 						clearance.space.dispose();
 						margin = 1; wrist = 1;
 						for (q in solved) {
@@ -1483,13 +1525,13 @@ class TendingReach {
 	/** Candidate holding postures along an already certified retreat, nearest the vise first.
 	 * Orientation is free here: every moving hull must be outside the mill front plane,
 	 * and the complete native scene/door sweep must clear. The grid only selects candidates;
-	 * it never replaces a continuous edge certificate.
+	 * it never replaces a continuous edge certificate. Stop when the visitor accepts one.
 	 */
-	static function holdingPaths(arm:Manipulator, entry:Array<Array<Float>>,
+	static function visitHoldingPaths(arm:Manipulator, entry:Array<Array<Float>>,
 		data:Array<CellHullObservation>, placement:Transform3, frontMm:Float,
-		checks:Array<ReachClearanceCheck>):Array<ReachHoldingPath> {
+		checks:Array<ReachClearanceCheck>, visit:ReachHoldingPath->Bool):Void {
 		var moving = [for (body in data) if (switch body.owner { case Mechanism(_, _) | Held(_, _): true; case _: false; }) body];
-		var links = [for (body in moving) switch body.owner { case Mechanism(_, link) | Held(_, link): link; case _: throw "Holding geometry lost its carrier"; }], result:Array<ReachHoldingPath> = [];
+		var links = [for (body in moving) switch body.owner { case Mechanism(_, link) | Held(_, link): link; case _: throw "Holding geometry lost its carrier"; }];
 		for (offset in 0...entry.length - 1) {
 			var edge = entry.length - 2 - offset, from = entry[edge], to = entry[edge + 1];
 			for (sample in 0...17) {
@@ -1501,8 +1543,11 @@ class TendingReach {
 				for (index in 0...moving.length) {
 					var world = placement.compose(poses[index]).compose(moving[index].pose), hull = moving[index].vertices;
 					for (vertex in 0...Std.int(hull.length / 3)) {
-						var point = world.transformPoint(new Vec3(hull[3 * vertex], hull[3 * vertex + 1], hull[3 * vertex + 2]));
-						if (point.y * 1000 > frontMm) { outside = false; break; }
+						var x = hull[3 * vertex], y = hull[3 * vertex + 1], z = hull[3 * vertex + 2], r = world.rotation;
+						// Same operations as transformPoint().y without temporary vectors.
+						var tx = 2.0 * (r.y * z - r.z * y), ty = 2.0 * (r.z * x - r.x * z), tz = 2.0 * (r.x * y - r.y * x);
+						var worldY = world.translation.y + (y + r.w * ty + r.z * tx - r.x * tz);
+						if (worldY * 1000 > frontMm) { outside = false; break; }
 					}
 					if (!outside) break;
 				}
@@ -1512,11 +1557,10 @@ class TendingReach {
 				if (tail.length > 0) {
 					var outside = entry.slice(0, edge + 1); outside.reverse();
 					if (outside.length > 0 && samePosition(q, outside[0])) outside = outside.slice(1);
-					result.push({position: q, entry: [q].concat(tail), exterior: [q].concat(outside)});
+					if (visit({position: q, entry: [q].concat(tail), exterior: [q].concat(outside)})) return;
 				}
 			}
 		}
-		return result;
 	}
 
 	/** A production edge owns its certificate, including cross-tool edges. */
@@ -1743,10 +1787,11 @@ class TendingReach {
 		new Vec3(frame.x / 1000, frame.y / 1000, frame.z / 1000), new Quat(frame.qx, frame.qy, frame.qz, frame.qw));
 }
 
-/** `--store` solves and stores the layout, `--check` solves and compares it; otherwise checks the stored layout. */
+/** `--store` solves/stores and `--check` solves/compares, with the saved placement first. `--fresh` uses the original order. */
 function main():Void {
 	var args = Sys.args();
-	if (args.indexOf("--store") >= 0) TendingReach.store();
-	else if (args.indexOf("--check") >= 0) TendingReach.check();
+	if (args.indexOf("--placement-tests") >= 0) TendingReachPlacementChecks.run();
+	else if (args.indexOf("--store") >= 0) TendingReach.store(args.indexOf("--fresh") >= 0);
+	else if (args.indexOf("--check") >= 0) TendingReach.check(args.indexOf("--fresh") >= 0);
 	else TendingReach.run();
 }
