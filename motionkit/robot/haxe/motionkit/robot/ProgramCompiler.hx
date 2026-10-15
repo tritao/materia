@@ -396,13 +396,16 @@ class ProgramCompiler {
     c.sink.barrier(barrier);
   }
 
-  /** A copy of `trajectory` in which runs of segments are one quintic each within the merge tolerances (the followers not yet projected). */
-  function mergeRuns(trajectory:Trajectory):Trajectory {
+  /**
+    A copy of `trajectory` in which runs of segments are one quintic each within `share` of the merge tolerances (the
+    followers not yet projected). Merges applied one after the other add their errors, so together they share one budget.
+  **/
+  function mergeRuns(trajectory:Trajectory, share:Float):Trajectory {
     var count = maxVelocity.length;
     return trajectory.mergeSegments(
-      [for (joint in 0...count) MERGE_TIMING * maxVelocity[joint]],
-      [for (joint in 0...count) 0.01 * maxVelocity[joint]],
-      [for (joint in 0...count) 0.1 * maxAcceleration[joint]],
+      [for (joint in 0...count) share * MERGE_TIMING * maxVelocity[joint]],
+      [for (joint in 0...count) share * 0.01 * maxVelocity[joint]],
+      [for (joint in 0...count) share * 0.1 * maxAcceleration[joint]],
       maxVelocity.slice(0, count), maxAcceleration.slice(0, count), positionBounds(count, false), positionBounds(count, true),
       mergeSegmentsSeconds);
   }
@@ -770,7 +773,7 @@ class ProgramCompiler {
       var planLimits = pending.path == null ? limits : limits.withoutJerk();
       var mergedPlan:Null<ExecutionPlan> = null;
       // A merged path follows what it replaces closely but not exactly: should it break a limit anyway, it is a
-      // refusal, and the path goes as it was lowered.
+      // refusal, and the path goes unmerged (`transforms.executed`: as lowered, or shaped from the pre-shape merge).
       if (transforms.merged != null) {
         try {
           mergedPlan = ExecutionPlan.create(transforms.merged, planLimits, id, pending.startQ, zeros(), zeros(),

@@ -8,7 +8,11 @@ import motionkit.trajectory.Trajectory;
 
 /** What `TimedMotionTransforms` makes of a timed motion; it owns the trajectories it made (not the motion it was given). */
 class TimedMotion {
-	/** What is executed: the shaped motion when there is shaping, else the coupled (and advanced) one, else the lowered one. */
+	/**
+	 * What is executed when the merged form is refused: the shaped motion when there is shaping (shaped from the pre-shape
+	 * merge, so already within half the merge tolerances of the advanced one), else the coupled (and advanced) one, else the
+	 * lowered one.
+	 */
 	public final executed:Trajectory;
 	/** `executed` merged into longer pieces, or null when merging is off or was refused. */
 	public var merged(default, null):Null<Trajectory>;
@@ -20,7 +24,7 @@ class TimedMotion {
 		this.executed = executed; this.merged = merged; this.shaped = shaped; this.owned = owned;
 	}
 
-	/** The merged path broke a limit: it goes as it was lowered. */
+	/** The merged path broke a limit: it goes as `executed`. */
 	public function dropMerged():Void {
 		if (merged != null) merged.dispose();
 		merged = null;
@@ -43,8 +47,8 @@ typedef TimedMotionSettings = {
 	var shapingDelay:Float;
 	/** The longest merged piece, seconds; zero for no merging. */
 	var mergeSeconds:Float;
-	/** Merges runs of segments of a trajectory (the followers not yet projected). */
-	var mergeRuns:Trajectory->Trajectory;
+	/** Merges runs of segments of a trajectory (the followers not yet projected) within the given share of the merge tolerances. */
+	var mergeRuns:Trajectory->Float->Trajectory;
 }
 
 /**
@@ -65,6 +69,7 @@ class TimedMotionTransforms {
 		var projected:Null<Trajectory> = null;
 		var shaped:Null<Trajectory> = null;
 		var merged:Null<Trajectory> = null;
+		var premerged = false;
 		try {
 			// Pressure advance runs the driven joint ahead of itself, and what follows it follows.
 			var advanced:Null<Trajectory> = null;
@@ -85,11 +90,12 @@ class TimedMotionTransforms {
 			if (impulses != null && pending.path != null) {
 				// The pressure advance cuts every plan into three times the segments, and the shaper cuts each at every delay:
 				// the cuts of the advance are merged away first, so the shaper (and the projection after it) works on the
-				// plan's own segments. The shaper is a weighted sum with weights adding to 1, so the pre-merge's error stays
-				// within its tolerance.
+				// plan's own segments. The shaper is a weighted sum with positive weights adding to 1, so it passes the
+				// pre-merge's error on unchanged, and the merge after it adds its own: each takes half the merge tolerances.
 				var coarse:Null<Trajectory> = null;
 				if (projected != null && settings.mergeSeconds > 0.0) {
-					var runs = settings.mergeRuns(projected);
+					var runs = settings.mergeRuns(projected, 0.5);
+					premerged = true;
 					if (projection != null) { coarse = project(runs); runs.dispose(); } else coarse = runs;
 				}
 				mark("preShapeMerge");
@@ -115,7 +121,7 @@ class TimedMotionTransforms {
 			mark("inputShaping");
 			var executed = shaped != null ? shaped : (projected == null ? pending.trajectory : projected);
 			if (settings.mergeSeconds > 0.0 && pending.path != null) {
-				var runs = settings.mergeRuns(executed);
+				var runs = settings.mergeRuns(executed, premerged ? 0.5 : 1.0);
 				// The followers are again exactly the sum of their terms, in the merged coefficients.
 				if (projection != null) { merged = project(runs); runs.dispose(); } else merged = runs;
 			}
