@@ -95,7 +95,6 @@ class ApplicationSimulation {
   var pressBrake:Null<PressBrakeControllerPlayer> = null;
   /** The project's wheeled assembly's drive, when it has one. */
   var mobile:Null<robotkit.mobile.MobileBase> = null;
-  /** The robot programs the cell runs, one per robot controller, when its project ships any. */
   /** One program per robot controller, run side by side and coordinated only through the cell's wired signals. */
   var missions:Array<MissionPlayer> = [];
   var cellSignals:Null<CellSignals> = null;
@@ -698,6 +697,7 @@ class ApplicationSimulation {
     target.appliedRevision = appliedRevision;
     target.preparationOnly = true;
     target.virtualWelder = virtualWelder;
+    target.virtualNutrunner = virtualNutrunner;
     target.welderSupplyFactory = welderSupplyFactory;
     return target;
   }
@@ -743,7 +743,7 @@ class ApplicationSimulation {
     digitalProgram = prepared.digitalProgram;
     pressBrake = prepared.pressBrake;
     mobile = prepared.mobile;
-    mission = prepared.mission;
+    missions = prepared.missions;
     cellSignals = prepared.cellSignals;
     beads = prepared.beads;
     workforce = prepared.workforce;
