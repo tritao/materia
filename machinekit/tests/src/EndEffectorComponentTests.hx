@@ -256,6 +256,15 @@ class EndEffectorComponentTests {
 		measuredBox.close();
 		if (measuredFaces.length != 6) throw "Saved CAD face descriptors must decode as typed planar faces";
 		var dualTool = new DualArmGripperTool(32, 60, 60, 16);
+		var mixedTool = new DualArmGripperTool(32, 50, 60, 16, false, 20, 6, null,
+			new ParallelGripperSpec(25, 90, 45, 12, false, 15, 6));
+		var mixedEffector = mixedTool.build(new RobotFlange(50));
+		var mixedTools = RobotScene.robotTools(mixedEffector, "tool");
+		var mixedA = [for (tool in mixedTools) if (tool.channel == "tool/gripperA/body.close") tool.gripper][0];
+		var mixedB = [for (tool in mixedTools) if (tool.channel == "tool/gripperB/body.close") tool.gripper][0];
+		if (mixedA == null || mixedB == null || mixedA.nominalPartWidthMm != 50 || mixedB.nominalPartWidthMm != 90 ||
+			mixedA.fingerLengthMm != 60 || mixedB.fingerLengthMm != 45)
+			throw "Independently commissioned grippers must preserve their distinct physical width feedback";
 		var dualEffector = dualTool.build(new RobotFlange(50));
 		var dualControls = EndEffectorControls.derive(dualEffector, "tool");
 		var dualPoses = dualEffector.solvedPoses();

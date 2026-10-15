@@ -25,6 +25,8 @@ class DualArmGripperTool implements ArmTool {
 	static inline var HOSE_CLEARANCE_MM:Float = 5.0;
 
 	public final spec:ParallelGripperSpec;
+	/** B can handle a different commissioned part width from A. */
+	public final specB:ParallelGripperSpec;
 	/** Half-spacing of opposing stations on the adapter's tool bolt circle. */
 	public final mountOffsetMm:Float;
 	/** Actual thickness of the flange adapter plate, including the assumed wrist stand-off. */
@@ -35,27 +37,34 @@ class DualArmGripperTool implements ArmTool {
 
 	public function new(size:Int = 32, expectedPartWidth:Float = 60, fingerLength:Float = 60,
 			openingTravel:Float = 16, supportStep:Bool = false, ?fingerDepth:Float, ?fingerWidth:Float,
-			?adapterThicknessMm:Float) {
+			?adapterThicknessMm:Float, ?secondSpec:ParallelGripperSpec) {
 		spec = new ParallelGripperSpec(size, expectedPartWidth, fingerLength, openingTravel,
 			supportStep, fingerDepth, fingerWidth);
+		specB = secondSpec == null ? spec : secondSpec;
 		this.adapterThicknessMm = adapterThicknessMm == null ? 12.0 : adapterThicknessMm;
 		if (!Math.isFinite(this.adapterThicknessMm) || this.adapterThicknessMm <= 0)
 			throw "Dual gripper adapter thickness must be finite and positive";
 		var valve = new SolenoidValve(true, false);
-		var inwardReach = Math.max(spec.openJawCentre() + spec.jawWidth / 2,
-			Math.max(spec.bodyWidth / 2, spec.valveSeatX() + valve.bodyWidth / 2));
-		var crossAxisReach = Math.max(spec.bodyDepth / 2,
-			Math.max(spec.fingerDepth / 2, valve.bodyDepth / 2));
+		var inwardReach = 0.0, crossAxisReach = 0.0;
+		for (grip in [spec, specB]) {
+			inwardReach = Math.max(inwardReach, Math.max(grip.openJawCentre() + grip.jawWidth / 2,
+				Math.max(grip.bodyWidth / 2, grip.valveSeatX() + valve.bodyWidth / 2)));
+			crossAxisReach = Math.max(crossAxisReach, Math.max(grip.bodyDepth / 2,
+				Math.max(grip.fingerDepth / 2, valve.bodyDepth / 2)));
+		}
 		// The grippers sit opposite one another on one diameter and turn 90 degrees.
 		// Their inward X projections clear by the assumed edge gap.
 		mountOffsetMm = (inwardReach + crossAxisReach + INTER_GRIPPER_CLEARANCE_MM) / 2;
-		var hoseSideEnvelope = spec.bodyWidth / 2 + HOSE_OUTER_DIAMETER_MM + HOSE_CLEARANCE_MM;
-		var cylinder = spec.cylinder();
-		var jawAxisMin = -spec.openJawCentre() - cylinder.bodyLength - cylinder.stemLength;
-		var jawAxisMax = Math.max(spec.bodyWidth / 2, Math.max(spec.openJawCentre() + spec.jawWidth / 2,
-			spec.valveSeatX() + valve.bodyWidth / 2));
+		var hoseSideEnvelope = Math.max(spec.bodyWidth, specB.bodyWidth) / 2 + HOSE_OUTER_DIAMETER_MM + HOSE_CLEARANCE_MM;
+		var jawAxisMin = 0.0, jawAxisMax = 0.0;
+		for (grip in [spec, specB]) {
+			var cylinder = grip.cylinder();
+			jawAxisMin = Math.min(jawAxisMin, -grip.openJawCentre() - cylinder.bodyLength - cylinder.stemLength);
+			jawAxisMax = Math.max(jawAxisMax, Math.max(grip.bodyWidth / 2, Math.max(grip.openJawCentre() + grip.jawWidth / 2,
+				grip.valveSeatX() + valve.bodyWidth / 2)));
+		}
 		var sideMin = -hoseSideEnvelope;
-		var sideMax = Math.max(spec.bodyDepth / 2, spec.fingerDepth / 2);
+		var sideMax = Math.max(Math.max(spec.bodyDepth, specB.bodyDepth) / 2, Math.max(spec.fingerDepth, specB.fingerDepth) / 2);
 		// A sits at -X with its cylinder outward; B sits at +X turned 90°,
 		// with its hose branch outward. Union their projected part envelopes.
 		envelopeWidthMm = 2 * mountOffsetMm + hoseSideEnvelope - jawAxisMin;
@@ -79,7 +88,7 @@ class DualArmGripperTool implements ArmTool {
 		result.addMemberConnector("plate", "gripperASeat", seatA);
 		result.addMemberConnector("plate", "gripperBSeat", seatB);
 		result.include("gripperA", new ParallelGripper(spec));
-		result.include("gripperB", new ParallelGripper(spec));
+		result.include("gripperB", new ParallelGripper(specB));
 		// Each body's logical open/close inputs are supplied at the tool boundary,
 		// just as they are for the single-gripper tool. The runtime binds these
 		// independent controls to the corresponding valve coils.
@@ -98,7 +107,7 @@ class DualArmGripperTool implements ArmTool {
 		result.connectPorts("manifold-valve-a", "manifold", "out1", "valveA", "P");
 		result.connectPorts("manifold-valve-b", "manifold", "out2", "valveB", "P");
 		var cylinderA:PneumaticCylinder = spec.cylinder();
-		var cylinderB:PneumaticCylinder = spec.cylinder();
+		var cylinderB:PneumaticCylinder = specB.cylinder();
 		var poses = result.solvedPoses();
 		for (name in ["A", "B"]) {
 			var valve = name == "A" ? "valveA" : "valveB";
