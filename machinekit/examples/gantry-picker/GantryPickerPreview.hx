@@ -18,8 +18,8 @@ class GantryPickerPreview {
 			if (yaw) { pick.yaw = 0.0; place.yaw = (index % 2 == 0 ? 1 : -1) * Math.PI / 2; }
 			steps.push(pick); steps.push(place);
 		}
-		scene.mission = {loop: false, steps: steps,
-			powerUpSideOffsets: [{homeSwitch: "switchYRighthome", offset: 0.001}]};
+		scene.missions = [{loop: false, steps: steps,
+			powerUpSideOffsets: [{homeSwitch: "switchYRighthome", offset: 0.001}]}];
 		return SceneArtifact.encode(scene);
 	}
 }
@@ -28,7 +28,7 @@ class GantryPickerChecks {
 	public static function run():Void {
 		var scene = SceneArtifact.decode(GantryPickerPreview.picker());
 		var definition = scene.assemblyDefinition;
-		if (definition == null || scene.mission == null || scene.mission.steps.length != 12)
+		if (definition == null || scene.missions == null || scene.missions[0].steps.length != 12)
 			throw "Gantry picker needs six pick/place pairs";
 		if (scene.robotTools == null || scene.robotTools.length != 1 || scene.robotTools[0].sensor == null)
 			throw "Gantry picker needs a sensed suction tool";
@@ -43,10 +43,10 @@ class GantryPickerChecks {
 		if (!rejected) throw "A picker mission must reject simultaneous machining";
 		scene.machining = null;
 		var yawScene = SceneArtifact.decode(GantryPickerPreview.yawPicker());
-		if (yawScene.mission == null || yawScene.mission.steps[1].yaw != Math.PI / 2 ||
-			yawScene.mission.steps[3].yaw != -Math.PI / 2)
+		if (yawScene.missions == null || yawScene.missions[0].steps[1].yaw != Math.PI / 2 ||
+			yawScene.missions[0].steps[3].yaw != -Math.PI / 2)
 			throw "The C-head picker must retain its requested pallet headings";
-		var yawMission:materia.project.SceneArtifact.SceneArtifactMission = cast yawScene.mission;
+		var yawMission:materia.project.SceneArtifact.SceneArtifactMission = cast yawScene.missions[0];
 		var yawDefinition = yawScene.assemblyDefinition;
 		if (yawDefinition == null || [for (joint in yawDefinition.joints) if (joint.id == "head/c") joint].length != 1)
 			throw "The yaw picker needs an included C head";

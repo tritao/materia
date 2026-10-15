@@ -15,9 +15,9 @@ class TrackArmPreview {
 			for (joint in cell.arm.specs) targets.push({joint: "arm/" + joint.id, position: joint.initial});
 			return {kind: "moveJoints", at: {occurrence: "arm/tool/cup", connector: "contact"}, joints: targets};
 		}
-		scene.mission = {loop: false, steps: [ready(0),
+		scene.missions = [{loop: false, steps: [ready(0),
 			{kind: "pick", at: {occurrence: "workpiece", connector: "top"}}, ready(0), ready(3000),
-			{kind: "place", at: {occurrence: "padPlace", connector: "top"}}, ready(3000)]};
+			{kind: "place", at: {occurrence: "padPlace", connector: "top"}}, ready(3000)]}];
 		return SceneArtifact.encode(scene);
 	}
 }
@@ -25,7 +25,7 @@ class TrackArmPreview {
 class TrackArmChecks {
 	public static function run():Void {
 		var scene = SceneArtifact.decode(TrackArmPreview.cell());
-		if (scene.mission == null || scene.mission.steps.length != 6 || scene.robotTools == null || scene.robotTools.length != 1)
+		if (scene.missions == null || scene.missions[0].steps.length != 6 || scene.robotTools == null || scene.robotTools.length != 1)
 			throw "Track arm needs a sensed suction tool and six positioning steps";
 		var definition = scene.assemblyDefinition;
 		if (definition == null || definition.actuators == null || definition.actuators.length != 7)

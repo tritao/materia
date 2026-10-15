@@ -30,14 +30,14 @@ class GantryWelderPreview {
 		var mission = WeldingMission.generate(weldment, found,
 			{diameterMm: feeder.wireDiameterMm, depositionEfficiency: feeder.depositionEfficiency,
 				maxSpeedMPerMin: feeder.maxSpeedMPerMin}, WeldMetal.carrierOf(cell, weldment), scene.metresPerUnit, home);
-		scene.mission = {steps: mission.require()};
+		scene.missions = [{steps: mission.require()}];
 		return SceneArtifact.encode(scene);
 	}
 }
 
 function main():Void {
 	var scene = SceneArtifact.decode(GantryWelderPreview.cell());
-	var mission:materia.project.SceneArtifact.SceneArtifactMission = cast scene.mission;
+	var mission:materia.project.SceneArtifact.SceneArtifactMission = cast scene.missions[0];
 	var seams = 0;
 	for (step in mission.steps) {
 		var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast step.weld;

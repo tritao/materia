@@ -9,8 +9,8 @@ class TendingCell {
 	public static function preview():Bytes {
 		var cell = new TendingControllers();
 		var scene = SceneArtifact.decode(cell.previewArtifact());
-		scene.mission = {controllerId: TendingMission.ROBOT_CONTROLLER, loop: false,
-			steps: TendingMission.generate(cell)};
+		scene.missions = [{controllerId: TendingMission.ROBOT_CONTROLLER, loop: false,
+			steps: TendingMission.generate(cell)}];
 		return SceneArtifact.encode(scene);
 	}
 }
@@ -19,7 +19,7 @@ class TendingMissionChecks {
 	public static function run():Void {
 		TendingCyclePlan.TendingCyclePlanChecks.run();
 		var scene = SceneArtifact.decode(TendingCell.preview());
-		check(scene.mission);
+		check(scene.missions[0]);
 	}
 
 	/** Validate the shipped sequence without constructing another CAD cell. */

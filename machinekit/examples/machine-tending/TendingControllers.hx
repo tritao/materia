@@ -122,6 +122,7 @@ class TendingControllers extends MachineAssembly {
 		var scene = AssemblyPreview.scene(cell, "tending-controllers");
 		if (cell.arm.tool == null) throw "Tending cell has no physical gripper tool";
 		scene.robotTools = RobotScene.robotTools(cell.arm.tool, "arm/tool");
+		materia.project.SceneArtifact.assignToolControllers(scene);
 		var millProject = SceneArtifact.decode(BenchMillPreview.enclosed());
 		var job = millProject.machining;
 		if (job == null || job.target == null) throw "Tending cell needs the bench mill's CNC job and target";

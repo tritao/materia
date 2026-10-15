@@ -1451,6 +1451,88 @@ Results (2026-10-14):
 - On the way, `TOOL_CHANGE.md` TC0's static-dock reattachment failure was
   diagnosed and fixed (subtree rest frames).
 
+### SD15a design: one program per robot controller (2026-10-15)
+
+Today one mission cannot pick, place and fasten:
+- the validator only lets screwing share a mission with handling through a
+  tool changer;
+- a scene holds one `mission`, bound to one robot controller;
+- the player resolves every tool against that robot's frames, and
+  `robotTools` has no owner;
+- `signal` writes only the mission controller's outputs.
+
+Decision: **each robot controller runs its own program, and programs
+coordinate only through wired cell signals.** A real cell works this way: each
+robot controller runs its own program and handshakes over I/O, as the CNC
+already runs its own program beside the robot mission (`CncProgramPlayer`).
+The rejected alternative, steps that name an arm in one shared mission, has no
+real controller behind it and couples two arms' planning into one sequence.
+
+Steps:
+- **SD15a.1 Schema (done, uncommitted).**
+  - `mission` became `missions`, one per robot controller.
+  - Every robot tool records its controller. One derivation,
+    `SceneArtifact.toolController`, finds the controller that drives a joint on
+    the tool's path to the assembly root (a changeable tool goes through its
+    changer master). Validation checks the recorded owner against it, and
+    generators fill it with `assignToolControllers`.
+  - Each program is validated against its own tools. Screwdriver and torch
+    limits are per controller.
+  - A scene without modelled controllers is one robot with an implicit
+    controller: one program, and tools without a controller.
+  - SceneArtifact is v41; older ones are rejected.
+  - ProjectKit tests cover:
+    - two controllers' programs round-tripping;
+    - another controller's tool refused;
+    - two programs on one controller refused;
+    - a tool claiming a controller that does not carry it;
+    - two programs without controllers.
+- **SD15a.2 Player (done, uncommitted).**
+  - `ApplicationSimulation` runs one `MissionPlayer` per program. Each has its
+    controller's robot, tools, screwdrivers and welders, feeders and blow
+    feeds, and cell I/O.
+  - `MissionPlayer` resolves only its own controller's tools.
+  - `missionPlayer(controllerId)` names a program; `missionPlayer()` stays
+    the accessor for single-program cells.
+  - Retry resets the failed program's robot.
+  - The editor's mission panel follows one program and offers a selector
+    when there are several.
+- **SD15a.3 Cell.** A pick, place and fasten example beside the screwdriving
+  cell:
+  - **Handling robot.** A second `RobotArm` with its own controller carries
+    the MT12 dual gripper (`DualArmGripperTool`). Gripper A is sized to the
+    flange housing and gripper B to the tapped plate, as commissioned part
+    widths (`ParallelGripperSpec`).
+  - **Free parts.** The plate and the housing are free parts. The fixture
+    stops locate the plate, and a presence sensor confirms it is seated.
+  - **Trays.** MT9 pocketed trays with presence sensing: an infeed tray holds
+    plates and housings, and an outfeed tray takes finished assemblies.
+  - **Handling program:**
+    1. Pick the plate (B) and place it in the fixture.
+    2. Wait for plate-present.
+    3. Pick the housing (A) and place it on the plate.
+    4. Signal `part-ready`.
+    5. Wait for `fastened`.
+    6. Pick the fastened assembly by its plate (B) and place it in the
+       outfeed slot.
+  - **Screwdriving program:** wait for `part-ready`, fasten the four CAD
+    screws from presenters or the blow feed, then signal `fastened`.
+  - **Fastened assembly in simulation.** Screws and housing are retained on
+    the plate when fastened, so gripping the plate carries the whole assembly.
+    This needs the plate to be a dynamic carrier for retained bodies.
+  - **Wiring.** Handshakes are wires between the two robot controllers' I/O,
+    declared in CAD with `connectPorts`.
+  - **Order of work:**
+    1. The cell CAD and controllers.
+    2. Both programs with the plate fixed and only the housing handled.
+    3. The plate handled and the unload.
+- **SD15a.4 Checks.** On both backends:
+  - a full tray-to-finished-assembly cycle;
+  - fixture not ready;
+  - a missing or misplaced part;
+  - screw supply failure;
+  - an interrupted fastening, with resume and recovery.
+
 ### SD15 machine-tending interface audit (2026-10-13)
 
 Local `main` has the required MT8 physical-jaw assembly and `gripper` tool

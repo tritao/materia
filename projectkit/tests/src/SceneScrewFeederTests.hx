@@ -48,11 +48,11 @@ class SceneScrewFeederTests {
       occurrences:[for (id in ["screw1","work","nest","stock"]) {id:id,definition:"same",initialPose:AssemblyFrames.identity()}],
       sensors:[{id:"nest/present",kind:"presence",occurrence:"nest",connector:"sense",range:8}]};
     var scene:materia.project.SceneArtifact.SceneArtifactData = {metresPerUnit:0.001,parts:[],assemblyDefinition:flat,
-      mission:{steps:[{kind:"screw",screw:Single(job)}],screwFeeders:[feed]}};
-    SceneScrewFeeders.validate([feed],scene); check(true,"Feeder packet resolves its named free supply and sensor");
+      missions: [{steps:[{kind:"screw",screw:Single(job)}],screwFeeders:[feed]}]};
+    SceneScrewFeeders.validate([feed],scene.missions[0],scene); check(true,"Feeder packet resolves its named free supply and sensor");
     function invalid(change:Void->Void, restore:Void->Void):Void {
       change(); var failed = false;
-      try SceneScrewFeeders.validate([feed],scene) catch (_:Dynamic) failed = true;
+      try SceneScrewFeeders.validate([feed],scene.missions[0],scene) catch (_:Dynamic) failed = true;
       restore(); check(failed,"Invalid feeder ownership or commissioning must be rejected");
     }
     invalid(() -> feed.deposit.x = 0.1,() -> feed.deposit.x = 0);

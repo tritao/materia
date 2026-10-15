@@ -10,6 +10,9 @@ typedef MissionViewState = {
   var selectedJob:Null<String>;
   var summary:String;
   var mission:Null<SceneArtifactMission>;
+  /** Every program's robot controller, in authored order; empty for the one implicit controller. */
+  var programs:Array<String>;
+  var selectedProgram:String;
   var progress:Null<MissionProgress>;
   var status:String;
   var switchAllowed:Bool;
@@ -33,6 +36,8 @@ class MissionController {
   var loading:Null<ProjectLoadJob> = null;
   var reference:Null<String>;
   var loadGeneration = -1;
+  /** The robot controller whose program the views follow; null follows the first. */
+  var program:Null<String> = null;
 
   public function new(session:ProjectDocumentSession, simulation:ApplicationSimulation,
       requestChange:(Void->Void)->Void, changed:Void->Void, installed:Void->Void,
@@ -54,20 +59,35 @@ class MissionController {
 
   public function snapshot():MissionViewState {
     sync();
-    var player = simulation.missionPlayer();
+    // The one implicit controller of a scene without modelled controllers is "".
+    var programs:Array<String> = session.missions == null ? [] :
+      [for (work in session.missions) work.controllerId == null ? "" : work.controllerId];
+    var chosen:String = program == null || programs.indexOf(program) < 0 ? (programs.length == 0 ? "" : programs[0]) : program;
+    var player = programs.length == 0 ? null : chosen == "" ? simulation.missionPlayer() : simulation.missionPlayer(chosen);
     var progress:Null<MissionProgress> = player == null ? null : player.progress();
     var status = player == null ? "Ready · Play to start" : player.statusLabel(true);
     if (progress != null && !simulation.isRunning() && progress.phase != "complete" && progress.phase != "failed")
       status = "Paused · " + status;
-    var mission = player == null ? session.mission : player.mission;
+    var mission:Null<SceneArtifactMission> = player != null ? player.mission : null;
+    if (mission == null && session.missions != null)
+      for (work in session.missions) if (mission == null && (work.controllerId == null ? "" : work.controllerId) == chosen) mission = work;
     if (mission != null && mission.loop == true) status += " · Loop " + (progress == null ? 1 : progress.loop);
     var summary = "";
     for (job in jobs) if (job.id == session.projectJob) summary = job.summary;
     var task = loading;
     if (task != null) status = "Loading job · " + task.control.currentPhase();
     return {generation:generation, jobs:jobs.copy(), selectedJob:session.projectJob, summary:summary,
-      mission:mission, progress:progress, status:status, switchAllowed:!simulation.isActive() && task == null && !blocked(),
+      mission:mission, programs:programs, selectedProgram:chosen,
+      progress:progress, status:status, switchAllowed:!simulation.isActive() && task == null && !blocked(),
       simulationActive:simulation.isActive(), loading:task != null, error:failure};
+  }
+
+  /** Follow the program of robot controller `id`. */
+  public function selectProgram(id:String):Void {
+    if (session.missions == null || [for (work in session.missions) if (work.controllerId == id) work].length != 1)
+      throw 'No program runs on controller "$id"';
+    program = id;
+    changed();
   }
 
   public function selectJob(id:String):Void {

@@ -22,7 +22,7 @@ class RobotArmPreview {
 		function onto(pad:String):Array<materia.project.SceneArtifact.SceneArtifactMissionStep>
 			return [{kind: "pick", at: {occurrence: "workpiece", connector: "top"}},
 				{kind: "place", at: {occurrence: pad, connector: "top"}}];
-		scene.mission = {loop: true, steps: onto("padPlace").concat(onto("padPick"))};
+		scene.missions = [{loop: true, steps: onto("padPlace").concat(onto("padPick"))}];
 		return SceneArtifact.encode(scene);
 	}
 }
@@ -68,7 +68,7 @@ class RobotArmChecks {
 		var definition = scene.assemblyDefinition;
 		if (scene.robotTools == null || scene.robotTools.length != 1 || scene.robotTools[0].sensor == null)
 			throw "Robot arm should carry one suction tool with a vacuum sensor";
-		if (scene.mission == null || scene.mission.steps.length != 4)
+		if (scene.missions == null || scene.missions[0].steps.length != 4)
 			throw "Robot arm should carry the workpiece to the other pad and back";
 		var robot = new RobotArm();
 		if (definition == null || definition.occurrences.length != robot.components().length)

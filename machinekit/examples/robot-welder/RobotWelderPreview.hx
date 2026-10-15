@@ -60,7 +60,7 @@ class RobotWelderPreview {
 		var scene = AssemblyPreview.scene(cell, ASSEMBLY_ID);
 		scene.assemblyState = readyState(cell).record();
 		scene.robotTools = RobotScene.robotTools(cell.arm.tool, TOOL_PREFIX, cell.equipment());
-		scene.mission = {steps: steps(cell, scene)};
+		scene.missions = [{steps: steps(cell, scene)}];
 		return SceneArtifact.encode(scene);
 	}
 
@@ -288,7 +288,7 @@ class RobotWelderChecks {
 	 */
 	static function checkSeamMission(cell:WeldingCell):Void {
 		var scene = SceneArtifact.decode(RobotWelderPreview.seamCell());
-		var mission = scene.mission;
+		var mission = scene.missions[0];
 		if (mission == null || mission.steps.length != 1 || mission.steps[0].kind != "weld" || mission.steps[0].weld == null)
 			throw "The single-seam cell should carry a mission that welds one seam";
 		var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast mission.steps[0].weld;
@@ -326,7 +326,7 @@ class RobotWelderChecks {
 	static function checkWholeMission(cell:WeldingCell, scene:SceneArtifactData, state:AssemblyState, ready:ArmPose):Void {
 		var weldment = cell.weldment();
 		var found = RobotWelderPreview.seamsOf(cell).require();
-		var mission = scene.mission;
+		var mission = scene.missions[0];
 		var chains = WeldSeams.chains(found);
 		if (mission == null || mission.steps.length != chains.length)
 			throw 'The default mission should weld the weldment\'s ${chains.length} runs, one step each, got ${mission == null ? 0 : mission.steps.length}';
@@ -409,7 +409,7 @@ class RobotWelderChecks {
 		for (_ in names.keys()) count++;
 		if (count != 4) throw "The four sides of a post should be four seams";
 		var scene = SceneArtifact.decode(RobotWelderPreview.postCell());
-		if (scene.mission == null || scene.mission.steps.length != 1) throw "The post cell should carry a mission of one weld";
+		if (scene.missions == null || scene.missions[0].steps.length != 1) throw "The post cell should carry a mission of one weld";
 		Sys.println('robot welder: post mission welds ${weld.path.length} sides as one step');
 	}
 

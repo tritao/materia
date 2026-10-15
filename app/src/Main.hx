@@ -2354,10 +2354,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     mode = next;
     // The mode's default layout backs "Reset workspace" while it is active.
     workspace.setDefaultLayout(next == EditorMode.Simulate
-      ? EditorWorkspaceLayout.simulateLayout(session.mission != null) : next.layout());
+      ? EditorWorkspaceLayout.simulateLayout(session.missions != null) : next.layout());
     var saved = modeSnapshots.get(next.id);
     if (saved != null) workspace.restorePersisted(saved);
-    if (next == EditorMode.Simulate && session.mission != null) {
+    if (next == EditorMode.Simulate && session.missions != null) {
       if (!workspace.isOpen("mission")) workspace.open("mission", "sensors");
       workspace.activate("mission");
     }

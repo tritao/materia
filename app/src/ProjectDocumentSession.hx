@@ -100,7 +100,8 @@ class ProjectDocumentSession {
   /** The project's assembly is a wheeled robot that drives on the floor in the simulation. */
   public var mobileBase(default, null):Null<SceneArtifactMobileBase> = null;
   /** Work the project's robot does on its own in the simulation. */
-  public var mission(default, null):Null<SceneArtifactMission> = null;
+  /** One program per robot controller, or null when the project ships none. */
+  public var missions(default, null):Null<Array<SceneArtifactMission>> = null;
   /** The tools the project's robot works with, simulated on their links. */
   public var robotTools(default, null):Array<SceneArtifactRobotTool> = [];
   /** The sensors on the project's robot, simulated where their parts mount them. */
@@ -267,7 +268,7 @@ class ProjectDocumentSession {
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions,
-      generated.faceDescriptorsByDefinition, generated.cncJob, generated.mobileBase, generated.mission, generated.robotTools,
+      generated.faceDescriptorsByDefinition, generated.cncJob, generated.mobileBase, generated.missions, generated.robotTools,
       generated.robotSensors, generated.machineMotion, generated.assemblyModel, generated.controllers, generated.signals,
       generated.printJob);
     projectJob = generated.projectJob;
@@ -280,7 +281,7 @@ class ProjectDocumentSession {
       ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0,
       ?physical:AssemblyPhysicalData, ?recipeText:String, ?motions:Array<RobotMotionTrack>,
       ?faceDescriptors:Map<String, String>, ?cnc:CncJob,
-      ?mobile:SceneArtifactMobileBase, ?work:SceneArtifactMission, ?tools:Array<SceneArtifactRobotTool>,
+      ?mobile:SceneArtifactMobileBase, ?work:Array<SceneArtifactMission>, ?tools:Array<SceneArtifactRobotTool>,
       ?sensors:Array<SceneArtifactRobotSensor>, ?machine:materia.project.SceneArtifact.SceneArtifactMachineMotion,
       ?model:cadkit.modeling.CompiledAssembly,
       ?cellControllers:Array<materia.project.SceneArtifact.SceneArtifactCellController>,
@@ -322,7 +323,7 @@ class ProjectDocumentSession {
     robotMotions = motions == null ? [] : motions.copy();
     cncJob = cnc;
     mobileBase = mobile;
-    mission = work;
+    missions = work == null ? null : work.copy();
     robotTools = tools == null ? [] : tools.copy();
     robotSensors = sensors == null ? [] : sensors.copy();
     machineMotion = machine;
@@ -414,7 +415,7 @@ class ProjectDocumentSession {
     robotMotions = generated.robotMotions == null ? [] : generated.robotMotions.copy();
     cncJob = generated.cncJob;
     mobileBase = generated.mobileBase;
-    mission = generated.mission;
+    missions = generated.missions;
     robotTools = generated.robotTools == null ? [] : generated.robotTools.copy();
     robotSensors = generated.robotSensors == null ? [] : generated.robotSensors.copy();
     machineMotion = generated.machineMotion;
@@ -1040,7 +1041,7 @@ class ProjectDocumentSession {
     robotMotions = [];
     cncJob = null;
     mobileBase = null;
-    mission = null;
+    missions = null;
     robotTools = [];
     robotSensors = [];
     machineMotion = null;

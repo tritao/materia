@@ -20,7 +20,7 @@ class MobileWelderTests {
   public static function runWireClearance(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.mobilemission.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
-    var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.missions[0];
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedProject(generated, manifest);
     var simulation = new ApplicationSimulation(new RobotWorld());
@@ -109,10 +109,10 @@ class MobileWelderTests {
   public static function runRegistration(root:String, boundary:Bool = false, voltageCutoff:Bool = false, ?onlyBackend:Int):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.mobilemission.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
-    var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.missions[0];
     if (authored.steps[1].kind != "findWork") throw "Mobile mission lacks contact registration after parking";
     var job:materia.project.SceneContactRegistration.SceneContactWork = cast authored.steps[1].contactWork;
-    generated.mission = {steps: authored.steps.slice(0, 3)};
+    generated.missions = [{steps: authored.steps.slice(0, 3)}];
     var backends:Array<Int> = onlyBackend == null ?
       [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO] : [cast onlyBackend];
     for (backend in backends) {
@@ -292,7 +292,7 @@ class MobileWelderTests {
     var tool = generated.robotTools[0];
     var first:materia.project.SceneArtifact.SceneArtifactMissionStep = {kind: "moveJoints", at: tool.contact,
       joints: [{joint: "robot/arm/j1", position: 0.2}]};
-    generated.mission = {steps: [first]};
+    generated.missions = [{steps: [first]}];
     for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
       var session = new ProjectDocumentSession(null, false);
       session.openGeneratedProject(generated, manifest);
@@ -347,7 +347,7 @@ class MobileWelderTests {
       energy.capacityWh = 1800.0;
       energy.initialChargeFraction = 0.25;
     }
-    var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var authored:materia.project.SceneArtifact.SceneArtifactMission = cast generated.missions[0];
     var expected = new Map<String, Bool>();
     var stations = 0;
     for (step in authored.steps) {
@@ -668,7 +668,7 @@ class MobileWelderTests {
     var manifest = FileSystem.fullPath(folder + "materia.mobile.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var seam = MateriaProjectRunner.loadProject(FileSystem.fullPath(folder + "materia.seam.project.json"));
-    generated.mission = seam.mission;
+    generated.missions = seam.missions;
     for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
       var session = new ProjectDocumentSession(null, false);
       session.openGeneratedProject(generated, manifest);
@@ -679,7 +679,7 @@ class MobileWelderTests {
         var mission = simulation.missionPlayer();
         var beads = simulation.weldBeads();
         if (mission == null || beads == null) throw "External mobile weld has no mission or bead host";
-        var step:materia.project.SceneArtifact.SceneArtifactWeld = cast cast(generated.mission,
+        var step:materia.project.SceneArtifact.SceneArtifactWeld = cast cast(generated.missions[0],
           materia.project.SceneArtifact.SceneArtifactMission).steps[0].weld;
         var frame = mission.assemblyParts.get("project:" + step.frame);
         var host = mission.assemblyParts.get("project:" + step.metal);

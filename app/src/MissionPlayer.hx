@@ -404,6 +404,8 @@ class MissionPlayer implements SessionMember {
   final weldAcceleration:Float;
   final objects:Array<GripObject>;
   final project:ProjectDocumentSession;
+  /** The tools this program's controller carries; other controllers' tools belong to their own programs. */
+  final ownTools:Array<SceneArtifactRobotTool>;
   final assembly:Null<AssemblyDefinition>;
   final placement:Null<AssemblyState>;
   final metres:Float;
@@ -470,6 +472,7 @@ class MissionPlayer implements SessionMember {
     this.objects = objects;
     this.robotIndex = robotIndex;
     this.project = project;
+    ownTools = [for (tool in project.robotTools) if (tool.controller == mission.controllerId) tool];
     this.screwdrivers = screwdrivers == null ? new Array<SimulatedScrewdriver>() : screwdrivers.copy();
     this.screwFeeders = screwFeeders == null ? new Array<SimulatedScrewFeeder>() : screwFeeders.copy();
     this.blowFeeds = blowFeeds == null ? new Array<SimulatedBlowFeed>() : blowFeeds.copy();
@@ -479,7 +482,7 @@ class MissionPlayer implements SessionMember {
       if (step.kind == "screw") needsScrewArm = true;
       else {
         var at = step.at;
-        if (at != null) for (tool in project.robotTools) if (tool.kind == "screwdriver" &&
+        if (at != null) for (tool in ownTools) if (tool.kind == "screwdriver" &&
             tool.contact.occurrence == at.occurrence && tool.contact.connector == at.connector) {
           needsScrewArm = true;
           break;
@@ -488,7 +491,7 @@ class MissionPlayer implements SessionMember {
       if (needsScrewArm) break;
     }
     if (needsScrewArm) {
-      var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
+      var tools = [for (tool in ownTools) if (tool.kind == "screwdriver") tool];
       if (tools.length != 1) throw "Screw mission needs exactly one screwdriver";
       var tool = tools[0], capacity = tool.screwdriver, tcp = robot.toolFrames.get(tool.contact.occurrence);
       if (capacity == null || tcp == null) throw "Screw mission lost its declared tool joints or TCP";
@@ -546,9 +549,9 @@ class MissionPlayer implements SessionMember {
     var welds = [for (step in mission.steps) if (step.kind == "weld" || step.kind == "stow") step].length > 0;
     var registrations = [for (step in mission.steps) if (step.kind == "findWork") step].length > 0;
     if (handles && (welds || registrations)) throw "A mission picks and places, or it probes or welds: the robot works with one tool on its arm";
-    var suctions = [for (tool in project.robotTools) if (tool.kind == "suction") tool];
-    var grippers = [for (tool in project.robotTools) if (tool.kind == "gripper") tool];
-    var torches = [for (tool in project.robotTools) if (tool.kind == "torch") tool];
+    var suctions = [for (tool in ownTools) if (tool.kind == "suction") tool];
+    var grippers = [for (tool in ownTools) if (tool.kind == "gripper") tool];
+    var torches = [for (tool in ownTools) if (tool.kind == "torch") tool];
     if (handles) {
       if (suctions.length > 0 && grippers.length > 0)
         throw "A handling mission cannot mix suction and physical gripper tools";
@@ -651,7 +654,7 @@ class MissionPlayer implements SessionMember {
       if (at == null) throw "Contact registration needs its selected tool connector";
       for (step in steps) if (step.at == null || step.at.occurrence != at.occurrence || step.at.connector != at.connector)
         throw "One contact-registration mission must use one consistently mounted probe tool";
-      var selected = [for (tool in project.robotTools) if ((tool.kind == "torch" || tool.kind == "screwdriver") &&
+      var selected = [for (tool in ownTools) if ((tool.kind == "torch" || tool.kind == "screwdriver") &&
         tool.contact.occurrence == at.occurrence && tool.contact.connector == at.connector) tool];
       if (selected.length != 1) throw "Contact registration needs one declared torch or screwdriver at its selected connector";
       var tool:SceneArtifactRobotTool = selected[0];
@@ -791,7 +794,7 @@ class MissionPlayer implements SessionMember {
     }
     var captured = new CellCollisionSnapshot(robot.robot.id(), linkPose(robotIndex, 0), ignored);
     var toolMembers:Array<String> = [];
-    for (tool in project.robotTools) for (member in tool.members) if (toolMembers.indexOf(member) < 0) toolMembers.push(member);
+    for (tool in ownTools) for (member in tool.members) if (toolMembers.indexOf(member) < 0) toolMembers.push(member);
     captured.mechanism(robot.robot.id(), robot.model, robot.shapes,
       [for (index in 0...robot.model.links.length) linkPose(robotIndex, index)], toolMembers,
       robotkit.kinematics.RobotKinematics.observedState(robot.model, robot.robot.snapshot().positions.toArray()));
@@ -1391,7 +1394,7 @@ class MissionPlayer implements SessionMember {
 
   /** Conservative energy for a full CAD seam, its passes, pauses and arm load envelope. */
   function weldEnergyWh(weld:SceneArtifactWeld, energy:materia.project.SceneArtifact.SceneArtifactMobileEnergy):Float {
-    var tools = project.robotTools;
+    var tools = ownTools;
     var torches = [for (tool in tools) if (tool.kind == "torch") tool];
     if (torches.length != 1 || torches[0].torch == null) throw "Energy reservation needs the CAD torch process profile";
     var torch:SceneArtifactTorch = cast torches[0].torch;
@@ -1424,7 +1427,7 @@ class MissionPlayer implements SessionMember {
   function minimumVoltageSupportWh(weld:SceneArtifactWeld,
       energy:SceneArtifactMobileEnergy):Float {
     var torch:SceneArtifactTorch = null;
-    for (tool in project.robotTools) if (tool.kind == "torch" && tool.torch != null) torch = cast tool.torch;
+    for (tool in ownTools) if (tool.kind == "torch" && tool.torch != null) torch = cast tool.torch;
     if (torch == null) throw "Voltage reserve needs the CAD torch process profile";
     var arc = new WeldArcModel({maxCurrentA: torch.maxCurrentA, efficiency: torch.efficiency,
       wireDiameterMm: torch.wireDiameterMm, stickoutMm: torch.stickoutMm});
@@ -1885,7 +1888,7 @@ class MissionPlayer implements SessionMember {
     if (previous != null && (previous.attempts.length < 1 || previous.attempts.length > 2 ||
         (previous.attempts.length == 2 && installed != recovery.replacement.screw)))
       throw 'Final fastening "${job.fastening}" has an inconsistent snug supply history';
-    var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
+    var tools = [for (tool in ownTools) if (tool.kind == "screwdriver") tool];
     if (tools.length != 1 || tools[0].sensor == null) throw "Fastening recovery lost its screwdriver sensor";
     var sensor:String = cast tools[0].sensor;
     var bin = assemblyParts.get("project:"+recovery.rejectMember);
@@ -1976,7 +1979,7 @@ class MissionPlayer implements SessionMember {
   }
 
   function screwAttempt(job:SceneScrew, configuration:Null<motionkit.kinematics.SixAxisConfiguration>, plannedTravel:Bool = false, retightening:Bool = false, stopAtSeat:Bool = false, slot:Int = 0):processkit.skill.DriveScrew {
-    var tools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
+    var tools = [for (tool in ownTools) if (tool.kind == "screwdriver") tool];
     var arm = screwArm;
     if (tools.length != 1 || arm == null) throw 'Fastening "${job.fastening}" has no configured screwdriver arm';
     var tool = tools[0], capacity = tool.screwdriver, sensor = tool.sensor;
@@ -2307,7 +2310,7 @@ class MissionPlayer implements SessionMember {
     if (screwConnections.length > 0 || contactScrew != null) {
       var bitMember:Null<String> = null;
       if (contactScrew != null) {
-        var driverTools = [for (tool in project.robotTools) if (tool.kind == "screwdriver") tool];
+        var driverTools = [for (tool in ownTools) if (tool.kind == "screwdriver") tool];
         if (driverTools.length != 1 || driverTools[0].screwdriver == null)
           throw 'Fastening collision for "$contactScrew" needs exactly one screwdriver with CAD bit identity';
         bitMember = driverTools[0].screwdriver.bitMember;
@@ -2452,7 +2455,7 @@ class MissionPlayer implements SessionMember {
 
   /** Plan the mobile welding stow from measured joints against the live work and deposited bead geometry. */
   function stow():Skill {
-    var torches = [for (tool in project.robotTools) if (tool.kind == "torch") tool];
+    var torches = [for (tool in ownTools) if (tool.kind == "torch") tool];
     if (torches.length != 1) throw 'A welding stow needs one torch, the robot has ${torches.length}';
     var tool = torches[0];
     var arm = toolArm(tool);

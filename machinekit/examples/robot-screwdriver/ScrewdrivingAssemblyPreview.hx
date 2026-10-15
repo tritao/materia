@@ -72,6 +72,7 @@ class ScrewdrivingAssemblyPreview {
 		var scene = AssemblyPreview.scene(cell,"screwdriving-assembly");
 		scene.assemblyState = ScrewdrivingPreview.state(cell,"screwdriving-assembly").record();
 		scene.robotTools = RobotScene.robotTools(cell.arm.tool,"arm/tool");
+		materia.project.SceneArtifact.assignToolControllers(scene);
 		scene.robotSensors = RobotScene.robotSensors(cell,"");
 		var definition = scene.assemblyDefinition;
 		if (definition == null) throw "Whole screw cell lost its assembly";
@@ -115,16 +116,16 @@ class ScrewdrivingAssemblyPreview {
 		},access,twoStage ? (_) -> 2 : null) catch (error:Dynamic) {parts.close(); throw error;}
 		parts.close();
 		ScrewdrivingExecution.stage(scene,staging);
-		scene.mission = {steps:mission.require()};
+		scene.missions = [{steps:mission.require()}];
 		if (bowlFed || blowFed) {
 			var metres = scene.metresPerUnit;
 			var deposit = AssemblyFrames.compose(AssemblyFrames.inverse(state.worldPose("presenter/nest")),state.worldPose("presenter/screw"));
 			deposit.x *= metres; deposit.y *= metres; deposit.z *= metres;
-			if (bowlFed) scene.mission.screwFeeders = [{id:"bowl",presenter:"presenter/nest",presentSensor:"presenter/part-present",
+			if (bowlFed) scene.missions[0].screwFeeders = [{id:"bowl",presenter:"presenter/nest",presentSensor:"presenter/part-present",
 				inventory:[for (job in jobs) job.screw],deposit:deposit,bufferCapacity:2,trackDelay:0.2,deliveryDelay:0.3,deliveryTimeout:3}];
 			if (blowFed) {
 				var tool:machinekit.screwdriving.BlowFeedTool = cast cell.tool;
-				scene.mission.blowFeeds = [{id:"blow",receiver:"arm/tool/receiver",socketConnector:"receipt",
+				scene.missions[0].blowFeeds = [{id:"blow",receiver:"arm/tool/receiver",socketConnector:"receipt",
 					receiptSensor:"arm/tool/screw-receipt",inventory:[for (job in jobs) job.screw],bufferCapacity:2,
 					trackDelay:0.2,deliveryDelay:0.4,deliveryTimeout:3,airPulse:0.2,airPressureBar:4,
 					tube:"arm/tool/feedTube",externalTubeLengthMm:tool.externalTubeLength,minimumBendRadiusMm:tool.minimumBendRadius,
@@ -150,25 +151,25 @@ class ScrewdrivingAssemblyPreview {
 			for (index in 0...ready.length) parked.setJoint('arm/j${index+1}',ready[index]);
 			scene.assemblyState = parked.record();
 			var probeTools = [for (tool in scene.robotTools) if (tool.kind == "screwdriver") tool];
-			if (probeTools.length != 1 || scene.mission == null) throw "Registered screw cell needs its one mounted screwdriver and mission";
-			scene.mission.steps.insert(0, {kind: "findWork", at: probeTools[0].contact,
+			if (probeTools.length != 1 || scene.missions == null) throw "Registered screw cell needs its one mounted screwdriver and mission";
+			scene.missions[0].steps.insert(0, {kind: "findWork", at: probeTools[0].contact,
 				contactWork: contactWork(cell, state, scene)});
 		}
 		var controllers = scene.controllers;
 		if (controllers != null) {
 			var owners = [for (controller in controllers) if (controller.kind == "robot" && controller.joints.indexOf("arm/j1") >= 0) controller];
 			if (owners.length != 1) throw "Whole screw cell lost its arm controller";
-			scene.mission.controllerId = owners[0].id;
+			scene.missions[0].controllerId = owners[0].id;
 		}
 		if (forceSearch) {
-			if (scene.robotTools == null || scene.robotSensors == null || scene.mission == null)
+			if (scene.robotTools == null || scene.robotSensors == null || scene.missions == null)
 				throw "Force-search example lost its screwdriver, sensors or mission";
 			var drivers = [for (tool in scene.robotTools) if (tool.kind == "screwdriver") tool];
 			if (drivers.length != 1) throw "Force-search example needs its unique screwdriver";
 			var contact = drivers[0].contact;
 			var sensorId = "arm/tool/force-torque";
 			scene.robotSensors.push({kind: "force_torque", id: sensorId, mount: contact});
-			scene.mission.screwEntrySearch = forceSearchProfile(sensorId);
+			scene.missions[0].screwEntrySearch = forceSearchProfile(sensorId);
 		}
 		return scene;
 	}
@@ -237,14 +238,14 @@ class ScrewdrivingAssemblyPreview {
 }
 function main():Void {
 	var decoded = SceneArtifact.decode(ScrewdrivingAssemblyPreview.assembly());
-	if (decoded.mission == null || decoded.mission.steps.length != 4) throw "Whole screw mission lost its four fastenings";
+	if (decoded.missions == null || decoded.missions[0].steps.length != 4) throw "Whole screw mission lost its four fastenings";
 	var registered = SceneArtifact.decode(ScrewdrivingAssemblyPreview.registered());
-	if (registered.mission == null || registered.mission.steps.length != 5 || registered.mission.steps[0].kind != "findWork" ||
-		registered.mission.steps[0].contactWork == null || registered.robotSensors == null ||
+	if (registered.missions == null || registered.missions[0].steps.length != 5 || registered.missions[0].steps[0].kind != "findWork" ||
+		registered.missions[0].steps[0].contactWork == null || registered.robotSensors == null ||
 		[for (sensor in registered.robotSensors) if (sensor.kind == "tool_contact") sensor].length != 1)
 		throw "Touch-registration project lost its CAD references, typed sensor or four named fastenings";
 	var forceSearch = SceneArtifact.decode(ScrewdrivingAssemblyPreview.forceSearch());
-	if (forceSearch.mission == null || forceSearch.mission.screwEntrySearch == null || forceSearch.robotSensors == null ||
+	if (forceSearch.missions == null || forceSearch.missions[0].screwEntrySearch == null || forceSearch.robotSensors == null ||
 		[for (sensor in forceSearch.robotSensors) if (sensor.id == "arm/tool/force-torque" && sensor.kind == "force_torque") sensor].length != 1)
 		throw "Force-search project lost its commissioned sensor profile or CAD fastenings";
 	ScrewdrivingAccessTests.run();

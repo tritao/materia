@@ -19,6 +19,7 @@ class ScrewdrivingOnePreview {
 		var scene = AssemblyPreview.scene(cell,"screwdriving-one");
 		scene.assemblyState = ScrewdrivingPreview.state(cell,"screwdriving-one").record();
 		scene.robotTools = RobotScene.robotTools(cell.arm.tool,"arm/tool");
+		materia.project.SceneArtifact.assignToolControllers(scene);
 		// These values qualify this simulation example, not the published torque table.
 		var job = ScrewdrivingScene.fromFastening(cell.work,found[0],"work/",scene,
 			"presenter/nest","presenter/screw","presenter/part-present",1,
@@ -51,12 +52,12 @@ class ScrewdrivingOnePreview {
 		for (root in previous.rootPoses) if (root.occurrence != "presenter/screw" && root.occurrence != job.screw)
 			execution.setRootPose(root.occurrence,root.pose);
 		scene.assemblyState = execution.record();
-		scene.mission = {steps:[{kind:"screw",screw:materia.project.SceneScrewInvocation.ScrewInvocation.Single(job)}]};
+		scene.missions = [{steps:[{kind:"screw",screw:materia.project.SceneScrewInvocation.ScrewInvocation.Single(job)}]}];
 		var controllers = scene.controllers;
 		if (controllers != null && controllers.length > 0) {
 			var owners = [for (controller in controllers) if (controller.kind == "robot" && controller.joints.indexOf("arm/j1") >= 0) controller];
 			if (owners.length != 1) throw "Drive-one cell needs its declared arm controller";
-			scene.mission.controllerId = owners[0].id;
+			scene.missions[0].controllerId = owners[0].id;
 		}
 		return scene;
 	}
@@ -64,6 +65,6 @@ class ScrewdrivingOnePreview {
 }
 function main():Void {
 	var restored = SceneArtifact.decode(ScrewdrivingOnePreview.one());
-	if (restored.mission == null || restored.mission.steps[0].screw == null) throw "Drive-one scene lost its fastening";
+	if (restored.missions == null || restored.missions[0].steps[0].screw == null) throw "Drive-one scene lost its fastening";
 	trace("Screwdriving one-screw CAD mission passed");
 }

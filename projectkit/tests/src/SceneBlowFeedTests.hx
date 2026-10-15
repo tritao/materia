@@ -23,17 +23,17 @@ class SceneBlowFeedTests {
       occurrences:[for (id in ["screw1","work","clamp","nose","tube"]) {id:id,definition:"same",initialPose:AssemblyFrames.identity()}],
       sensors:[{id:"nose/present",kind:"presence",occurrence:"nose",connector:"receipt",range:10}]};
     var scene:materia.project.SceneArtifact.SceneArtifactData = {metresPerUnit:0.001,parts:[],assemblyDefinition:flat,
-      mission:{steps:[{kind:"screw",screw:Single(job)}],blowFeeds:[path]}};
-    SceneBlowFeeds.validate([path],scene); check(true,"Named tube/receiver, actual sensor and owned inventory qualify");
-    var source = @:privateAccess materia.project.SceneArtifact.encodeMission(scene.mission);
+      missions: [{steps:[{kind:"screw",screw:Single(job)}],blowFeeds:[path]}]};
+    SceneBlowFeeds.validate([path],scene.missions[0],scene); check(true,"Named tube/receiver, actual sensor and owned inventory qualify");
+    var source = @:privateAccess materia.project.SceneArtifact.encodeMission(scene.missions[0]);
     var decoded = @:privateAccess materia.project.SceneArtifact.decodeMission(haxe.Json.parse(source));
     var paths = decoded.blowFeeds;
     check(paths != null && paths.length == 1 && paths[0].inventory[0] == "screw1" && paths[0].airPulse == 0.2,"Mission wire retains inventory and air timing");
     var again = materia.project.SceneScrewInvocation.job(decoded.steps[0].screw,decoded.steps);
     check(again != null && again.presenter == null && again.pickup == null,"Saved blow delivery never grows presenter fields");
-    rejects(() -> SceneBlowFeeds.validate(null,scene),"Blow job cannot lose its delivery path");
+    rejects(() -> SceneBlowFeeds.validate(null,scene.missions[0],scene),"Blow job cannot lose its delivery path");
     function invalid(change:Void->Void,restore:Void->Void):Void {
-      change(); rejects(() -> SceneBlowFeeds.validate([path],scene),"Invalid blow-feed commissioning or ownership rejected"); restore();
+      change(); rejects(() -> SceneBlowFeeds.validate([path],scene.missions[0],scene),"Invalid blow-feed commissioning or ownership rejected"); restore();
     }
     invalid(() -> path.receiptSensor = "missing",() -> path.receiptSensor = "nose/present");
     invalid(() -> path.socketConnector = "missing",() -> path.socketConnector = "receipt");

@@ -19,9 +19,9 @@ class OverheadArmPreview {
 				targets.push({joint: "arm/" + cell.arm.specs[index].id, position: cell.ready[index]});
 			return {kind: "moveJoints", at: {occurrence: "arm/tool/cup", connector: "contact"}, joints: targets};
 		}
-		scene.mission = {loop: false, steps: [ready(200, 0),
+		scene.missions = [{loop: false, steps: [ready(200, 0),
 			{kind: "pick", at: {occurrence: "workpiece", connector: "top"}}, ready(200, 0), ready(2800, 1500),
-			{kind: "place", at: {occurrence: "padPlace", connector: "top"}}, ready(2800, 1500)]};
+			{kind: "place", at: {occurrence: "padPlace", connector: "top"}}, ready(2800, 1500)]}];
 		return SceneArtifact.encode(scene);
 	}
 }
@@ -39,7 +39,7 @@ class OverheadArmChecks {
 		for (id in logical) if ([for (joint in definition.joints) if (joint.id == id) joint].length != 1)
 			throw 'The overhead arm lacks logical joint $id';
 		var scene = SceneArtifact.decode(OverheadArmPreview.cell());
-		if (scene.mission == null || scene.mission.steps.length != 6 || scene.robotTools == null || scene.robotTools.length != 1)
+		if (scene.missions == null || scene.missions[0].steps.length != 6 || scene.robotTools == null || scene.robotTools.length != 1)
 			throw "The overhead arm needs two stations and its sensed suction tool";
 		Sys.println('Overhead arm: inverted industrial arm, XYZ external axes, 3 x 1.5 m table travel; mount ${floor.z} mm');
 	}

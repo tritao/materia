@@ -1060,8 +1060,8 @@ class ProjectSourceTests {
     var section:materia.project.SceneArtifact.SceneArtifactMobileBase = cast drive;
     var wheelRadius:Float = section.wheelRadius;
     // Driven by hand here: without its mission the robot waits for commands.
-    check(generated.mission != null, "the mobile base cell ships a mission");
-    generated.mission = null;
+    check(generated.missions != null, "the mobile base cell ships a mission");
+    generated.missions = null;
     function pose(simulation:ApplicationSimulation, id:String):{position:Array<Float>, rotation:Array<Float>} {
       for (entry in simulation.capturePresentationSnapshot().environment) if (entry.id == id)
         return {position: entry.position, rotation: entry.rotation};
@@ -1150,7 +1150,7 @@ class ProjectSourceTests {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/mobile-base/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var section:materia.project.SceneArtifact.SceneArtifactMobileBase = cast generated.mobileBase;
-    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.missions[0];
     var steps = work.steps;
     var definition = requiredAssemblyDefinition(generated.assemblyDefinition);
     var placement = new AssemblyState(definition, generated.assemblyState);
@@ -1247,7 +1247,7 @@ class ProjectSourceTests {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/mobile-base/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var section:materia.project.SceneArtifact.SceneArtifactMobileBase = cast generated.mobileBase;
-    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.missions[0];
     var halfLength:Float = cast section.footprintLength, halfWidth:Float = cast section.footprintWidth;
     halfLength /= 2; halfWidth /= 2;
     var session = new ProjectDocumentSession(null, false);
@@ -1473,8 +1473,8 @@ class ProjectSourceTests {
       displaced.setJoint("x", 300); displaced.setJoint("y", 200);
       generated.assemblyState = displaced.record();
     } else if (startup == "unreferenced") {
-      if (generated.mission == null) throw "Picker startup test needs a mission";
-      generated.mission.powerUpOffsets = [{joint: "x", offset: 0.3}, {joint: "y", offset: 0.2}];
+      if (generated.missions == null) throw "Picker startup test needs a mission";
+      generated.missions[0].powerUpOffsets = [{joint: "x", offset: 0.3}, {joint: "y", offset: 0.2}];
     }
     var placement = new AssemblyState(definition, generated.assemblyState);
     var session = new ProjectDocumentSession(null, false);
@@ -1900,7 +1900,7 @@ class ProjectSourceTests {
     var definition = requiredAssemblyDefinition(generated.assemblyDefinition);
     var initial = new AssemblyState(definition, generated.assemblyState);
     var ending = new AssemblyState(definition, generated.assemblyState);
-    var task = generated.mission;
+    var task = generated.missions[0];
     if (task == null) throw "Held-clearance fixture needs its joint mission";
     var targets = task.steps[0].joints;
     if (targets == null) throw "Held-clearance fixture needs joint targets";
@@ -1953,7 +1953,7 @@ class ProjectSourceTests {
     if (tools == null || tools.length != 1 || tools[0].kind != "screwdriver") throw "Equipment project must carry one screwdriver";
     var tool = tools[0], driver = tool.screwdriver;
     if (driver == null) throw "Equipment project lost its screwdriver description";
-    check(generated.mission == null, "The equipment preview has no tightening mission yet");
+    check(generated.missions == null, "The equipment preview has no tightening mission yet");
     var session = new ProjectDocumentSession(null, false);
     try {
       session.openGeneratedProject(generated, manifest);
@@ -1983,7 +1983,7 @@ class ProjectSourceTests {
     var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.assembly.project.json");
     for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (pickup in [true,false]) {
       Sys.println('Screwdriving CAD: begin transport loss backend $backend, pickup $pickup');
-      var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.mission;
+      var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.missions[0];
       if (definition == null || definition.steps.length != 4) throw "Transport-loss cell lost its CAD mission";
       var job = materia.project.SceneScrewInvocation.job(definition.steps[0].screw,definition.steps);
       if (job == null) throw "Transport-loss cell lost its first fastening";
@@ -2053,7 +2053,7 @@ class ProjectSourceTests {
     var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.assembly.project.json");
     for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (damaged in [false,true]) {
       Sys.println('Screwdriving CAD: begin whole backend $backend, damaged $damaged');
-      var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.mission;
+      var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.missions[0];
       if (definition == null || definition.steps.length != 4) throw "Whole screw cell lost its mission";
       var jobs:Array<materia.project.SceneScrewDefinition.SceneScrew> = [];
       for (step in definition.steps) {var job = materia.project.SceneScrewInvocation.job(step.screw,definition.steps); if (job == null) throw "Whole cell lost a fastening"; jobs.push(job);}
@@ -2129,7 +2129,7 @@ class ProjectSourceTests {
     }
     Sys.println("Screwdriving CAD: begin whole portable export");
     var portable = materia.project.SceneArtifact.decode(MateriaProjectRunner.exportArtifact(manifest));
-    var flags = portable.project, mission = portable.mission;
+    var flags = portable.project, mission = portable.missions[0];
     check(flags != null && flags.dynamicParts.length == 8 && mission != null && mission.steps.length == 4,
       "Portable assembly retains all eight identified screw supplies and four CAD fastenings");
     if (mission == null) throw "Portable assembly lost its mission";
@@ -2147,7 +2147,7 @@ class ProjectSourceTests {
    */
   static function checkScrewPhysicalThread(root:String):Void {
     var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.assembly.project.json");
-    var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.mission;
+    var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.missions[0];
     if (definition == null || definition.steps.length != 4) throw "Whole screw cell lost its mission";
     definition.screwEngagement = {mode: materia.project.SceneArtifact.SceneArtifactScrewEngagementMode.PhysicalThread,
       maximumAxialForceN: 200, threadStiffnessNPerM: 1.0e7};
@@ -2210,7 +2210,7 @@ class ProjectSourceTests {
     var backends = Sys.getEnv("PROJECT_SOURCE_DETERMINISTIC_ONLY") == "1"
       ? [ApplicationSimulation.DETERMINISTIC] : [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC];
     for (backend in backends) {
-      var generated = MateriaProjectRunner.loadProject(manifest), missionDefinition = generated.mission;
+      var generated = MateriaProjectRunner.loadProject(manifest), missionDefinition = generated.missions[0];
       var definition = generated.assemblyDefinition, stateRecord = generated.assemblyState;
       if (missionDefinition == null || missionDefinition.steps.length != 5 || definition == null || stateRecord == null)
         throw "Touch-registration cell lost its probe step, four fastenings or assembly state";
@@ -2304,7 +2304,7 @@ class ProjectSourceTests {
     var failures = failureFilter == "normal" ? [false] : failureFilter == "jam" ? [true] : [false,true];
     for (backend in backends) for (jam in failures) {
       Sys.println('Screw feeder CAD: begin backend $backend, jam $jam');
-      var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.mission;
+      var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.missions[0];
       if (definition == null || definition.screwFeeders == null || definition.screwFeeders.length != 1)
         throw "Fed flange lost its one replenishing material path";
       var jobs:Array<materia.project.SceneScrewDefinition.SceneScrew> = [];
@@ -2359,7 +2359,7 @@ class ProjectSourceTests {
       Sys.println('Screw feeder CAD: end backend $backend, jam $jam');
     }
     var portable = materia.project.SceneArtifact.decode(MateriaProjectRunner.exportArtifact(manifest));
-    var work = portable.mission;
+    var work = portable.missions[0];
     check(work != null && work.screwFeeders != null && work.screwFeeders.length == 1 && work.screwFeeders[0].inventory.length == 4,
       "Portable fed flange retains one material path and all four inventory identities");
     if (backendFilter == null && failureFilter == null)
@@ -2373,7 +2373,7 @@ class ProjectSourceTests {
     var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.blow-feed.project.json");
     for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (failure in ["none","damaged","missing","blocked","nose-jam","stop"]) {
       Sys.println('Blow-feed CAD: begin backend $backend, $failure');
-      var generated = MateriaProjectRunner.loadProject(manifest), work = generated.mission;
+      var generated = MateriaProjectRunner.loadProject(manifest), work = generated.missions[0];
       if (work == null || work.blowFeeds == null || work.blowFeeds.length != 1) throw "Blown flange lost its receiving path";
       for (step in work.steps) {
         var job = materia.project.SceneScrewInvocation.job(step.screw,work.steps);
@@ -2451,7 +2451,7 @@ class ProjectSourceTests {
       Sys.println('Blow-feed CAD: end backend $backend, $failure');
     }
     var portable = materia.project.SceneArtifact.decode(MateriaProjectRunner.exportArtifact(manifest));
-    check(portable.mission != null && portable.mission.blowFeeds != null && portable.mission.blowFeeds.length == 1,"Portable CAD retains the receiving path");
+    check(portable.missions != null && portable.missions[0].blowFeeds != null && portable.missions[0].blowFeeds.length == 1,"Portable CAD retains the receiving path");
     Sys.println("Blow-feed CAD passed on both backends with measured receipt, faults and explicit stop recovery");
   }
 
@@ -2483,8 +2483,8 @@ class ProjectSourceTests {
     var offsets = forceCase == "nominal" ? [0.0] : forceCase == "offset" ? [0.001] : [0.0,0.001];
     for (offsetMeters in offsets) {
       Sys.println('Force-search CAD: begin lateral offset ${offsetMeters*1000} mm');
-      var forceProject = MateriaProjectRunner.loadProject(manifest), forceMission = forceProject.mission;
-      var generated = MateriaProjectRunner.loadProject(registrationManifest), missionDefinition = generated.mission;
+      var forceProject = MateriaProjectRunner.loadProject(manifest), forceMission = forceProject.missions[0];
+      var generated = MateriaProjectRunner.loadProject(registrationManifest), missionDefinition = generated.missions[0];
       var definition = generated.assemblyDefinition, stateRecord = generated.assemblyState;
       if (missionDefinition == null || missionDefinition.steps.length != 5 || missionDefinition.steps[0].kind != "findWork" ||
           missionDefinition.steps[0].contactWork == null || forceMission == null || forceMission.screwEntrySearch == null ||
@@ -2693,7 +2693,7 @@ class ProjectSourceTests {
     var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.staged.project.json");
     for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (scenario in 0...5) {
       Sys.println('Screwdriving CAD: begin staged backend $backend, scenario $scenario');
-      var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.mission;
+      var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.missions[0];
       if (definition == null || definition.steps.length != 8) throw "Staged CAD cell needs four snug and four final passes";
       var jobs:Array<materia.project.SceneScrewDefinition.SceneScrew> = [];
       for (index in 0...4) {
@@ -2810,7 +2810,7 @@ class ProjectSourceTests {
       Sys.println('Screwdriving CAD: end staged backend $backend, scenario $scenario');
     }
     var portable = materia.project.SceneArtifact.decode(MateriaProjectRunner.exportArtifact(manifest));
-    var mission = portable.mission, flags = portable.project;
+    var mission = portable.missions[0], flags = portable.project;
     check(mission != null && mission.steps.length == 8 && flags != null && flags.dynamicParts.length == 8,
       "Portable staged CAD keeps eight passes and exactly eight distinct supplies");
     Sys.println("Screwdriving staged assembly passed on both backends with retained engagement and shared replacement recovery");
@@ -2822,7 +2822,7 @@ class ProjectSourceTests {
       if (virtualNutrunner) Sys.println('Virtual nutrunner CAD: begin backend $backend, absent $absent');
       else Sys.println('Screwdriving CAD: begin backend $backend, absent $absent');
       var generated = MateriaProjectRunner.loadProject(manifest);
-      var work = generated.mission;
+      var work = generated.missions[0];
       if (work == null || work.steps.length != 1) throw "Drive-one CAD must publish one mission step";
       var authoredMission = virtualNutrunner ? haxe.Json.stringify(work) : null;
       var step = work.steps[0], job = materia.project.SceneScrewInvocation.job(step.screw,work.steps);
@@ -2954,7 +2954,7 @@ class ProjectSourceTests {
     if (virtualNutrunner) Sys.println("Virtual nutrunner CAD: begin portable export");
     else Sys.println("Screwdriving CAD: begin portable export");
     var portable = materia.project.SceneArtifact.decode(MateriaProjectRunner.exportArtifact(manifest));
-    var flags = portable.project, task = portable.mission;
+    var flags = portable.project, task = portable.missions[0];
     check(flags != null && flags.dynamicParts.length == 1 && flags.dynamicParts[0] == "work/flange/screw1" &&
       task != null && task.steps.length == 1 && task.steps[0].screw != null,
       "The portable artifact retains the identified free screw and its CAD mission");
@@ -2971,7 +2971,7 @@ class ProjectSourceTests {
     check(generated.robotMotions == null || generated.robotMotions.length == 0, "the arm project ships no joint tracks");
     var tools = generated.robotTools;
     check(tools != null && tools.length == 1 && tools[0].sensor != null, "the arm's suction tool reports on a vacuum sensor");
-    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.missions[0];
     check(work != null && work.loop == true && [for (step in work.steps) step.kind].join(",") == "pick,place,pick,place",
       "the arm project carries the workpiece to the other pad and back, on repeat");
     var steps = work.steps;
@@ -3250,7 +3250,7 @@ class ProjectSourceTests {
   /** The plate fillet on the side away from the arm: its nearest endpoint can have no reachable approach. */
   static function checkFarPlateWeld(root:String):Void {
     var cell = openWelder(root, "materia.project.json", function(generated) {
-      var mission = cast(generated.mission, materia.project.SceneArtifact.SceneArtifactMission);
+      var mission = cast(generated.missions[0], materia.project.SceneArtifact.SceneArtifactMission);
       var singles:Array<{step:materia.project.SceneArtifact.SceneArtifactMissionStep, y:Float}> = [];
       for (step in mission.steps) {
         var weld = step.weld;
@@ -3286,7 +3286,7 @@ class ProjectSourceTests {
   static function checkWholeWeldment(root:String, backend:Int, label:String, example:String = "robot-welder"):Void {
     var onlyStep = example == "gantry-welder" ? Sys.getEnv("GANTRY_WELD_ONLY_STEP") : null;
     var cell = openWelder(root, example == "track-arm" ? "materia.welder.project.json" : "materia.project.json", onlyStep == null ? null : function(generated) {
-      var mission:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+      var mission:materia.project.SceneArtifact.SceneArtifactMission = cast generated.missions[0];
       var index = Std.parseInt(onlyStep);
       if (index == null || index < 0 || index >= mission.steps.length) throw "Invalid gantry weld step filter";
       mission.steps = [mission.steps[index]];
@@ -3508,7 +3508,7 @@ class ProjectSourceTests {
     });
     var simulation = cell.simulation, mission = cell.mission, welder = cell.welder, beads = cell.beads;
     var generated = MateriaProjectRunner.loadProject(FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.seam.project.json"));
-    var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast cast(generated.mission, materia.project.SceneArtifact.SceneArtifactMission).steps[0].weld;
+    var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast cast(generated.missions[0], materia.project.SceneArtifact.SceneArtifactMission).steps[0].weld;
     var live = beads.referenceOf(0);
     // Where the plate stood as designed: the seam's start in the world is the start in the plate's frame placed by the plate's pose.
     var designed = new cadkit.modeling.AssemblyState(cast generated.assemblyDefinition, generated.assemblyState).worldPose("work/basePlate");
@@ -3557,7 +3557,7 @@ class ProjectSourceTests {
     var cell = openWelder(root, "materia.post.project.json");
     var simulation = cell.simulation, mission = cell.mission, welder = cell.welder, beads = cell.beads;
     var generated = MateriaProjectRunner.loadProject(FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.post.project.json"));
-    var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast cast(generated.mission, materia.project.SceneArtifact.SceneArtifactMission).steps[0].weld;
+    var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast cast(generated.missions[0], materia.project.SceneArtifact.SceneArtifactMission).steps[0].weld;
     check(weld.path.length == 4, "the post's step is a path of four sides");
     var path = beads.beadOf(0);
     var strayed = 0.0;
@@ -3605,7 +3605,7 @@ class ProjectSourceTests {
   static function checkWeldInTheAir(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.seam.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
-    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.missions[0];
     var seam:materia.project.SceneArtifact.SceneArtifactWeld = cast work.steps[0].weld;
     // Move the seam off the work, 30 mm out of the corner on its open side: the torch follows it 30 mm above the plate and
     // 30 mm from the upright.
@@ -3641,7 +3641,7 @@ class ProjectSourceTests {
     var generated = MateriaProjectRunner.loadProject(manifest);
     var tools = generated.robotTools;
     check(tools != null && tools.length == 1 && tools[0].kind == "torch" && tools[0].torch != null, "the cell carries a torch tool");
-    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.missions[0];
     check(work != null && work.steps.length == 1 && work.steps[0].kind == "weld", "the cell's mission welds one seam");
     var seam:materia.project.SceneArtifact.SceneArtifactWeld = cast work.steps[0].weld;
     var session = new ProjectDocumentSession(null, false);
@@ -3880,7 +3880,7 @@ class ProjectSourceTests {
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
       generated.recipeDocument, generated.robotMotions, null, generated.cncJob,
-      generated.mobileBase, generated.mission, generated.robotTools, generated.robotSensors,
+      generated.mobileBase, generated.missions, generated.robotTools, generated.robotSensors,
       generated.machineMotion, generated.assemblyModel, generated.controllers, generated.signals);
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     try {
@@ -3975,7 +3975,7 @@ class ProjectSourceTests {
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
       generated.recipeDocument, generated.robotMotions, null, generated.cncJob,
-      generated.mobileBase, generated.mission, generated.robotTools, generated.robotSensors,
+      generated.mobileBase, generated.missions, generated.robotTools, generated.robotSensors,
       generated.machineMotion, generated.assemblyModel, generated.controllers, generated.signals);
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     try {
@@ -4287,12 +4287,12 @@ class ProjectSourceTests {
     cell.connectPorts("gripper-air", "airSupply", "air", "arm", "compressedAir");
     var artifact = AssemblyPreview.scene(cell, "mt8-parallel-gripper");
     artifact.robotTools = RobotScene.robotTools(arm.tool, "arm/tool");
-    artifact.mission = {loop: true, steps: [
+    artifact.missions = [{loop: true, steps: [
       {kind: "pick", at: {occurrence: "arm/workpiece", connector: "top"}},
       {kind: "place", at: {occurrence: "arm/padPlace", connector: "top"}},
       {kind: "pick", at: {occurrence: "arm/workpiece", connector: "top"}},
       {kind: "place", at: {occurrence: "arm/padPick", connector: "top"}}
-    ]};
+    ]}];
     var generated = new ProjectArtifactLoader().load(SceneArtifact.encode(artifact));
     var blanks = [for (object in generated.objects) if (object.id == "project:arm/workpiece") object];
     if (blanks.length != 1) throw "Physical-gripper fixture needs one generated blank";
@@ -5005,7 +5005,7 @@ class ProjectSourceTests {
     var loadControl = scope == TendingCheck.Performance ? new ProjectLoadControl() : null;
     var generated = MateriaProjectRunner.loadProject(manifest, null, loadControl);
     var loadSeconds = Sys.time() - loadStarted;
-    var savedMission = generated.mission;
+    var savedMission = generated.missions[0];
     if (savedMission == null || savedMission.steps.length == 0)
       throw "The playable tending project does not save its robot mission";
     TendingMissionChecks.check(savedMission);
@@ -6513,7 +6513,7 @@ class ProjectSourceTests {
     check(!editor.openingProject(), "the launch project finishes building");
     check(editor.session.projectReference != null && editor.scene.items().length > 0,
       "tick() opens the launch project once its build ends");
-    check(editor.session.mission != null, "the launch project brings its mission");
+    check(editor.session.missions != null, "the launch project brings its mission");
     check(!editor.workspace.isOpen("start"), "the Start page closes once the launch project opens");
     editor.dispose();
     var missing = new ReferenceEditorApp();

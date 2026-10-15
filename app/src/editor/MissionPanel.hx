@@ -40,6 +40,10 @@ class MissionPanel {
     style.background = tokens.surface;
     var items = [new KeyedView("heading", new Text("MISSION", null, tokens.textSecondary))];
     items.push(new KeyedView("job", MissionJobView.build(controller, tokens, "mission-panel-job")));
+    // A cell with several robot controllers runs one program on each; the panel follows one at a time.
+    if (state.programs.length > 1) for (id in state.programs)
+      items.push(new KeyedView("program-" + id, new Button((id == state.selectedProgram ? "● " : "○ ") + id, null,
+        function() controller.selectProgram(id), "mission-program-" + id)));
     if (mission == null || mission.steps.length == 0) {
       items.push(new KeyedView("empty", new Text("This project has no mission.")));
       return new Column("mission-panel", items, style);

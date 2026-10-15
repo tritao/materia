@@ -140,7 +140,7 @@ class ProjectArtifactLoader {
       localCentersByDefinition: localCentersByDefinition, faceDescriptorsByDefinition: faceDescriptorsByDefinition,
       metresPerUnit: scale, physical: {metresPerUnit: scale, parts: physicalParts},
       recipeDocument: artifact.recipeDocument, recipeDiagnostics: artifact.recipeDiagnostics,
-      cncJob: machiningJob(artifact, records, scale), mobileBase: artifact.mobileBase, mission: artifact.mission,
+      cncJob: machiningJob(artifact, records, scale), mobileBase: artifact.mobileBase, missions: artifact.missions,
       robotTools: artifact.robotTools, robotSensors: artifact.robotSensors, machineMotion: artifact.machineMotion,
       controllers: artifact.controllers, signals: artifact.signals, printJob: artifact.printing};
   }

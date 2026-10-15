@@ -3,6 +3,7 @@ package materia.project;
 import haxeon.wire.JsonWire;
 import materia.assembly.AssemblyDefinitionFlattener;
 import materia.project.SceneArtifact.SceneArtifactData;
+import materia.project.SceneArtifact.SceneArtifactMission;
 import materia.project.SceneScrewDefinition.SceneScrew;
 
 /** One commissioned tube/receiver path; seconds, bar and millimetres are explicit. */
@@ -33,8 +34,7 @@ class SceneBlowFeeds {
 		for (i in 0...result.length) SceneWireJson.integerFields(inputs[i],outputs[i],["bufferCapacity"]);
 		return result;
 	}
-	public static function validate(paths:Array<SceneBlowFeed>, scene:SceneArtifactData):Void {
-		var mission = scene.mission;
+	public static function validate(paths:Array<SceneBlowFeed>, mission:SceneArtifactMission, scene:SceneArtifactData):Void {
 		if (mission == null) return;
 		var jobs = [for (step in mission.steps) if (step.kind == "screw") SceneScrewInvocation.job(step.screw,mission.steps)];
 		var ids:Map<String,Bool> = [], bodies:Map<String,Bool> = [], receivers:Map<String,Bool> = [];

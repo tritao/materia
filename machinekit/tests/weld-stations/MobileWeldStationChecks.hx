@@ -18,9 +18,9 @@ class MobileWeldStationChecks {
     var expected = cell.weldment().findIn(cell, cell.solvedPoses()).require();
     for (seam in expected) if (!names.exists(seam.name())) throw 'Mobile mission omits ${seam.name()}';
     if (stations == 0 || steps[0].kind != "goTo") throw "Mobile weld mission never parks";
-    scene.mission = {steps: steps};
+    scene.missions = [{steps: steps}];
     var decoded = SceneArtifact.decode(SceneArtifact.encode(scene));
-    var mission:materia.project.SceneArtifact.SceneArtifactMission = cast decoded.mission;
+    var mission:materia.project.SceneArtifact.SceneArtifactMission = cast decoded.missions[0];
     if (mission.steps.length != steps.length) throw "Mobile mission failed current-schema round trip";
     Sys.println('Mobile station CAD checks pass: $stations stations, ${expected.length} seams, ${steps.length} steps');
   }

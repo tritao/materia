@@ -31,9 +31,9 @@ class CobotArmPreview {
 		scene.assemblyState = placed.record();
 		var excursions = [[0.12, 0.08, -0.1, 0.08, 0.1, -0.12],
 			[-0.12, -0.08, 0.1, -0.08, -0.1, 0.12], [0.0, 0, 0, 0, 0, 0]];
-		scene.mission = {loop: true, steps: [for (offset in excursions)
+		scene.missions = [{loop: true, steps: [for (offset in excursions)
 			{kind: "moveJoints", at: {occurrence: "toolFlange", connector: "face"},
-				joints: [for (i in 0...6) {joint: 'j${i + 1}', position: ready[i] + offset[i]}]}]};
+				joints: [for (i in 0...6) {joint: 'j${i + 1}', position: ready[i] + offset[i]}]}]}];
 		return SceneArtifact.encode(scene);
 	}
 	public static function reach500():Bytes return arm(Reach500);

@@ -31,9 +31,9 @@ class ContactWorkTests {
   public static function run(data:SceneArtifactData, torch:SceneArtifactRobotTool):Void {
     data.robotTools = [torch];
     var work = job();
-    data.mission = {steps: [{kind: "findWork", at: torch.contact, contactWork: work}]};
+    data.missions = [{steps: [{kind: "findWork", at: torch.contact, contactWork: work}]}];
     var bytes = SceneArtifact.encode(data);
-    var restored = SceneArtifact.decode(bytes).mission;
+    var restored = SceneArtifact.decode(bytes).missions[0];
     if (restored == null || restored.steps[0].contactWork == null) throw "Contact mission lost its job";
     var back:SceneContactWork = cast restored.steps[0].contactWork;
     check(restored.steps[0].kind == "findWork" && back.frame == "plate" && back.nominal.x == 1.7 && back.nominal.qw == 1,
@@ -48,7 +48,7 @@ class ContactWorkTests {
     rejects(() -> SceneArtifact.decode(bytes), "Previous scene schema is rejected without migration");
     function bad(change:SceneContactWork->Void, message:String):Void {
       var candidate = job(); change(candidate);
-      data.mission = {steps: [{kind: "findWork", at: torch.contact, contactWork: candidate}]};
+      data.missions = [{steps: [{kind: "findWork", at: torch.contact, contactWork: candidate}]}];
       rejects(() -> SceneArtifact.encode(data), message);
     }
     bad(w -> w.frame = "missing", "Unknown registration frame is rejected");
@@ -64,13 +64,13 @@ class ContactWorkTests {
     bad(w -> { var face:SceneContactFace = w.faces[0]; var edge:Array<Array<Float>> = face.chords[0]; var point:Array<Float> = edge[0]; point[0] = 0.001; }, "Boundary vertices off the CAD plane are rejected");
     bad(w -> { var face:SceneContactFace = w.faces[0]; face.chords.pop(); }, "Open CAD contour is rejected");
     bad(w -> { var face:SceneContactFace = w.faces[0]; face.target = false; }, "Unobservable target plane basis is rejected");
-    data.mission = {steps: [{kind: "findWork", at: {occurrence: "plate", connector: "tcp"}, contactWork: job()}]};
+    data.missions = [{steps: [{kind: "findWork", at: {occurrence: "plate", connector: "tcp"}, contactWork: job()}]}];
     rejects(() -> SceneArtifact.encode(data), "Contact probing needs the actual torch connector");
     var malformed:Dynamic = haxe.Json.parse(haxe.Json.stringify(job()));
     var wrongNumbers:Array<Dynamic> = ["0.02", 0.02, 0.0];
     Reflect.setField(malformed, "translation", wrongNumbers);
     rejects(() -> SceneContactRegistration.decode(malformed), "Numeric strings are rejected by the saved contact decoder");
-    data.mission = null;
+    data.missions = null;
     Sys.println('Contact work saved format: $checks assertions passed');
   }
 }

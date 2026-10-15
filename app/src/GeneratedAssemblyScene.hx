@@ -28,7 +28,7 @@ typedef GeneratedAssemblyScene = {
   /** The assembly is a wheeled robot driving on the floor, when the generator says so. */
   @:optional var mobileBase:materia.project.SceneArtifact.SceneArtifactMobileBase;
   /** Work the assembly's robot does on its own, when the generator ships some. */
-  @:optional var mission:materia.project.SceneArtifact.SceneArtifactMission;
+  @:optional var missions:Array<materia.project.SceneArtifact.SceneArtifactMission>;
   /** The tools the assembly's robot works with, as its parts declare them. */
   @:optional var robotTools:Array<materia.project.SceneArtifact.SceneArtifactRobotTool>;
   /** The sensors on the assembly's robot, as its parts declare them. */

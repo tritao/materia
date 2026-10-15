@@ -15,7 +15,7 @@ class MobileWelderPreview {
   public static function plannedCell():Bytes {
     var cell = new MobileWelderCell();
     var scene = design(cell);
-    scene.mission = {steps: new MobileWeldStations(cell, scene).mission()};
+    scene.missions = [{steps: new MobileWeldStations(cell, scene).mission()}];
     return SceneArtifact.encode(scene);
   }
 

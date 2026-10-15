@@ -95,8 +95,9 @@ class ApplicationSimulation {
   var pressBrake:Null<PressBrakeControllerPlayer> = null;
   /** The project's wheeled assembly's drive, when it has one. */
   var mobile:Null<robotkit.mobile.MobileBase> = null;
-  /** The work the assembly robot does on its own, when its project ships a mission. */
-  var mission:Null<MissionPlayer> = null;
+  /** The robot programs the cell runs, one per robot controller, when its project ships any. */
+  /** One program per robot controller, run side by side and coordinated only through the cell's wired signals. */
+  var missions:Array<MissionPlayer> = [];
   var cellSignals:Null<CellSignals> = null;
   /** The weld metal the mission's welds lay, when it welds. */
   var beads:Null<WeldBeads> = null;
@@ -178,7 +179,7 @@ class ApplicationSimulation {
     if (machineProgram != null) members.push(machineProgram);
     if (digitalProgram != null) members.push(digitalProgram);
     if (pressBrake != null) members.push(pressBrake);
-    if (mission != null) members.push(mission);
+    for (program in missions) members.push(program);
     if (beads != null) members.push(beads);
     if (workforce != null) members.push(workforce);
     for (participant in participants) members.push(participant);
@@ -210,7 +211,7 @@ class ApplicationSimulation {
     var candidatePress:Null<PressBrakeControllerPlayer> = null;
     var candidateMobile:Null<robotkit.mobile.MobileBase> = null;
     var candidatePower:Null<SimulatedMobilePower> = null;
-    var candidateMission:Null<MissionPlayer> = null;
+    var candidateMissions:Array<MissionPlayer> = [];
     var candidateSignals:Null<CellSignals> = null;
     var candidateBeads:Null<WeldBeads> = null;
     var candidateAssembly:Null<AssemblyRobot> = null;
@@ -309,7 +310,7 @@ class ApplicationSimulation {
           }
           if (built.mobile != null) candidateMobile = built.mobile;
           if (candidateAssembly == null || control == null ||
-              (session.mission != null && session.mission.controllerId == control.id)) {
+              (session.missions != null && session.missions[0].controllerId == control.id)) {
             candidateAssembly = built;
             assemblyIndex = robotIndex;
           }
@@ -340,7 +341,7 @@ class ApplicationSimulation {
           }
           if (machine != null && machine.digitalProgram != null) {
             if (candidateDigital != null || session.controllers.length > 1 || job != null ||
-                machine.program != null || session.mission != null || built.mobile != null)
+                machine.program != null || session.missions != null || built.mobile != null)
               throw "Machine digital program needs exclusive assembly execution ownership";
             candidateDigital = new MachineDigitalProgramPlayer(machine.digitalProgram, built);
           }
@@ -470,6 +471,8 @@ class ApplicationSimulation {
           candidate.addStepObserver(zone);
         }
       }
+      var driverByChannel = new Map<String, processkit.simulation.SimulatedScrewdriver>();
+      var welderByChannel = new Map<String, processkit.simulation.SimulatedWelder>();
       if (session != null && candidateAssembly != null) for (tool in session.robotTools) {
         var toolRobot = candidateAssembly;
         var toolIndex = assemblyIndex;
@@ -487,6 +490,7 @@ class ApplicationSimulation {
           if (virtualNutrunner) driver.supply = new processkit.simulation.VirtualNutrunnerSupply(candidate,toolRobot.runtime,
             toolIndex,tool.sensor,toolRobot.blueprint,driver.channels,@:privateAccess driver.feedJoint,@:privateAccess driver.spindleJoint);
           candidate.addStepObserver(candidateTools.addScrewdriver(driver));
+          driverByChannel.set(tool.channel, driver);
           continue;
         }
         if (tool.kind == "torch") {
@@ -495,6 +499,7 @@ class ApplicationSimulation {
             toolRobot.runtime, toolIndex, tool.sensor);
           else if (welderSupplyFactory != null) welder.supply = welderSupplyFactory(welder);
           candidate.addStepObserver(candidateTools.addWelder(welder));
+          welderByChannel.set(tool.channel, welder);
           continue;
         }
         if (tool.kind == "gripper") {
@@ -507,36 +512,54 @@ class ApplicationSimulation {
         candidate.addStepObserver(candidateTools.add(new robotkit.runtime.SimulatedSuctionTool(candidate,
           toolRobot.runtime, toolIndex, carrier.linkIndex, tool.channel, freeObjects, tool.sensor)));
       }
-      var work = session == null ? null : session.mission;
-      if (work != null) {
-        var feeders = work.screwFeeders;
-        if (feeders != null) {
-          if (candidateAssembly == null || candidateTools.screwdrivers.length != 1)
-            throw "Screw feeding needs one assembly and mounted screwdriver";
-          var feederParts = new SimulationAssemblyParts(candidate,[candidateAssembly],candidateTools.objectsByScene(),session);
-          for (definition in feeders) {
-            var feeder = new SimulatedScrewFeeder(definition,candidate,candidateAssembly.runtime,feederParts,candidateTools.screwdrivers[0]);
-            candidateTools.screwFeeders.push(feeder); candidate.addStepObserver(feeder);
+      var programs = session == null || session.missions == null ? [] : session.missions;
+      var cellTools = session == null ? [] : session.robotTools;
+      for (work in programs) {
+        // Each program runs on its own controller's robot with that controller's tools, feeders and cell I/O.
+        var programRobot = work.controllerId == null ? candidateAssembly : candidateByController.get(work.controllerId);
+        var programIndex = work.controllerId == null ? assemblyIndex : indexByController.get(work.controllerId);
+        if (programRobot == null || programIndex == null) throw 'A mission needs the robot of controller "${work.controllerId}"';
+        var robotIndex:Int = programIndex;
+        var ownTools = [for (tool in cellTools) if (tool.controller == work.controllerId) tool];
+        var drivers:Array<processkit.simulation.SimulatedScrewdriver> = [];
+        var welders:Array<processkit.simulation.SimulatedWelder> = [];
+        for (tool in ownTools) {
+          var driver = driverByChannel.get(tool.channel), welder = welderByChannel.get(tool.channel);
+          if (tool.kind == "screwdriver") {
+            if (driver == null) throw 'Screwdriver "${tool.channel}" has no simulated driver';
+            drivers.push(driver);
+          }
+          if (tool.kind == "torch") {
+            if (welder == null) throw 'Torch "${tool.channel}" has no simulated welder';
+            welders.push(welder);
+          }
+        }
+        var feeders:Array<SimulatedScrewFeeder> = [], deliveries:Array<SimulatedBlowFeed> = [];
+        if (work.screwFeeders != null) {
+          if (drivers.length != 1) throw "Screw feeding needs the program's one mounted screwdriver";
+          var feederParts = new SimulationAssemblyParts(candidate,[programRobot],candidateTools.objectsByScene(),session);
+          for (definition in work.screwFeeders) {
+            var feeder = new SimulatedScrewFeeder(definition,candidate,programRobot.runtime,feederParts,drivers[0]);
+            candidateTools.screwFeeders.push(feeder); feeders.push(feeder); candidate.addStepObserver(feeder);
           }
         }
         if (work.blowFeeds != null) {
-          if (candidateAssembly == null || candidateTools.screwdrivers.length != 1) throw "Blow feed needs its assembly and one mounted screwdriver";
-          var parts = new SimulationAssemblyParts(candidate,[candidateAssembly],candidateTools.objectsByScene(),session);
+          if (drivers.length != 1) throw "Blow feed needs the program's one mounted screwdriver";
+          var parts = new SimulationAssemblyParts(candidate,[programRobot],candidateTools.objectsByScene(),session);
           for (definition in work.blowFeeds) {
-            var delivery = new SimulatedBlowFeed(definition,candidateAssembly.runtime,parts,candidateTools.screwdrivers[0]);
-            candidateTools.blowFeeds.push(delivery); candidate.addStepObserver(delivery);
+            var delivery = new SimulatedBlowFeed(definition,programRobot.runtime,parts,drivers[0]);
+            candidateTools.blowFeeds.push(delivery); deliveries.push(delivery); candidate.addStepObserver(delivery);
           }
         }
-        if (candidateAssembly == null) throw "A mission needs the project's assembly";
         var pairedScrews:Map<String,Bool> = [];
         for (step in work.steps) if (step.kind == "screw") {
           var job = materia.project.SceneScrewInvocation.job(step.screw,work.steps);
-          if (job == null || candidateTools.screwdrivers.length != 1)
+          if (job == null || drivers.length != 1)
             throw "A screw mission needs its named screw and one declared screwdriver";
           var identities = [job.screw];
           var recovery = job.recovery;
           if (recovery != null) identities.push(recovery.replacement.screw);
-          var holder = candidateTools.screwdrivers[0].holding;
+          var holder = drivers[0].holding;
           // Only declared bit/screw couplings exclude mutual contact; fixture contacts remain physical.
           for (identity in identities) {
             if (pairedScrews.exists(identity)) continue;
@@ -549,22 +572,23 @@ class ApplicationSimulation {
         var welds = [for (step in work.steps) if (step.kind == "weld") step].length > 0;
         var mobileProfile = session == null ? null : session.mobileBase;
         if (welds && mobileProfile != null && mobileProfile.energy != null) {
-          if (candidateTools.welders.length != 1) throw "A powered mobile welding mission needs one simulated welder";
-          candidatePower = new SimulatedMobilePower(mobileProfile.energy, mobileProfile, candidateAssembly,
-            candidate, assemblyIndex, timestep, candidateTools.welders[0]);
+          if (welders.length != 1) throw "A powered mobile welding mission needs one simulated welder";
+          candidatePower = new SimulatedMobilePower(mobileProfile.energy, mobileProfile, programRobot,
+            candidate, robotIndex, timestep, welders[0]);
         }
-        candidateMission = new MissionPlayer(work, candidateAssembly, candidate, assemblyIndex, timestep, heldBoxes,
+        var player = new MissionPlayer(work, programRobot, candidate, robotIndex, timestep, heldBoxes,
           candidateTools.objectsByScene(), session, [for (id in candidateByController.keys()) candidateByController.get(id)],
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.inputFor(work.controllerId),
           candidateSignals == null || work.controllerId == null ? null : candidateSignals.outputFor(work.controllerId), null,
           virtualWelder || virtualNutrunner ? MissionPlayer.ARM_ACCELERATION * robotkit.runtime.VirtualServoOptions.ACCELERATION_SCALE
-            : MissionPlayer.ARM_ACCELERATION, candidatePower,candidateTools.screwdrivers,candidateTools.screwFeeders,candidateTools.blowFeeds);
-        // A mission that welds lays the weld metal as the welder deposits it.
+            : MissionPlayer.ARM_ACCELERATION, candidatePower, drivers, feeders, deliveries);
+        candidateMissions.push(player);
+        // A program that welds lays the weld metal as its welder deposits it.
         if (welds) {
-          var active:ProjectDocumentSession = cast session;
-          var torch = [for (tool in active.robotTools) if (tool.kind == "torch") tool][0].torch;
-          if (candidateTools.welders.length != 1 || torch == null) throw "A mission that welds needs the robot's one simulated welder";
-          candidateBeads = new WeldBeads(candidateMission, candidateTools.welders[0], candidate, scene,
+          var torch = [for (tool in ownTools) if (tool.kind == "torch") tool][0].torch;
+          if (welders.length != 1 || torch == null) throw "A mission that welds needs the robot's one simulated welder";
+          if (candidateBeads != null) throw "Only one program in a cell may weld";
+          candidateBeads = new WeldBeads(player, welders[0], candidate, scene,
             timestep, torch.wireDiameterMm, torch.depositionEfficiency);
         }
       }
@@ -579,7 +603,7 @@ class ApplicationSimulation {
       if (control != null) control.throwIfCancelled();
       var previousSpace = space;
       // Finish the old mission's planning before retiring its native worlds.
-      if (mission != null) mission.beforeReset();
+      for (program in missions) program.beforeReset();
       var previousWorkforce = workforce;
       var previousIds = simulatedIds.copy();
       var previousRobots:Array<Robot> = [];
@@ -626,7 +650,7 @@ class ApplicationSimulation {
       zoneMonitors = candidateZones;
       print = candidatePrint;
       mobile = candidateMobile;
-      mission = candidateMission;
+      missions = candidateMissions;
       cellSignals = candidateSignals;
       if (beads != null) beads.dispose();
       beads = candidateBeads;
@@ -881,11 +905,12 @@ class ApplicationSimulation {
 
   /** Reset only the failed mission robot, then ask its cell controller to retry the failed step. */
   public function retryMission():Bool {
-    if (mission == null || mission.failure == null || simulation == null) return false;
+    var failed = [for (program in missions) if (program.failure != null) program];
+    if (failed.length != 1 || simulation == null) return false;
     var resume = playbackActive;
     if (resume) { stopPlayback(); var active = space; if (active != null) active.session.stop(); }
-    if (!resetRobotSafety(mission.robotId())) return false;
-    var retried = mission.retryFailedStep();
+    if (!resetRobotSafety(failed[0].robotId())) return false;
+    var retried = failed[0].retryFailedStep();
     if (resume) start();
     return retried;
   }
@@ -920,8 +945,17 @@ class ApplicationSimulation {
   }
   /** The drive of the project's wheeled assembly, for twist commands; null when it has none. */
   public function mobileBase():Null<robotkit.mobile.MobileBase> return mobile;
-  /** The mission the assembly robot is running, or null when its project ships none. */
-  public function missionPlayer():Null<MissionPlayer> return mission;
+  /** The cell's one program, or null when its project ships none; a cell with several programs names one. */
+  public function missionPlayer(?controllerId:String):Null<MissionPlayer> {
+    if (controllerId != null) {
+      for (program in missions) if (program.mission.controllerId == controllerId) return program;
+      return null;
+    }
+    if (missions.length > 1) throw "The cell runs several programs; name the controller whose program is wanted";
+    return missions.length == 0 ? null : missions[0];
+  }
+  /** Every robot controller's program, in authored order. */
+  public function missionPlayers():Array<MissionPlayer> return missions.copy();
   /** The weld metal the mission has laid, or null when it does not weld. */
   public function weldBeads():Null<WeldBeads> return beads;
   /** The simulated welder on the assembly's torch, or null when it has none. */
@@ -1053,7 +1087,7 @@ class ApplicationSimulation {
     if (virtualNutrunner && !virtualDevicePrepared && simulation != null && tools != null && tools.screwdrivers.length > 0)
       virtualDevicePrepared = simulation.virtualDeviceReady(@:privateAccess tools.screwdrivers[0].robotIndex);
     for (member in members) {
-      if ((virtualWelder || virtualNutrunner) && !virtualDevicePrepared && member == mission) continue;
+      if ((virtualWelder || virtualNutrunner) && !virtualDevicePrepared && Std.isOfType(member, MissionPlayer)) continue;
       // The editor's realtime run plans a program's first plan beside the simulation; a deterministic step waits for it.
       if (Std.isOfType(member, ToolpathPlayer)) {
         var toolpath:ToolpathPlayer = cast member;
@@ -1199,7 +1233,7 @@ class ApplicationSimulation {
 
   public function clear():Void {
     stop();
-    if (mission != null) mission.beforeReset();
+    for (program in missions) program.beforeReset();
     for (participant in participants) participant.leave();
     var retired = workforce;
     if (retired != null) {
@@ -1218,7 +1252,7 @@ class ApplicationSimulation {
     digitalProgram = null;
     if (pressBrake != null) pressBrake.beforeReset();
     pressBrake = null;
-    cnc = null; print = null; mobile = null; mission = null; beads = null; cellSignals = null; refreshMembers();
+    cnc = null; print = null; mobile = null; missions = []; beads = null; cellSignals = null; refreshMembers();
     // A mission's programs are planned on worker threads that finish the plan they are on after they are cancelled; the
     // world they plan for goes now, so wait for them (see ProgramPlanner).
     if (!preparationOnly) motionkit.robot.ProgramPlanner.shutdown();

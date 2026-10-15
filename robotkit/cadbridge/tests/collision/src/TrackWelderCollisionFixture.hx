@@ -24,7 +24,7 @@ class TrackWelderCollisionFixture {
   ];
   public static function run(check:(Bool, String)->Void):Void {
     var artifact = SceneArtifact.decode(TrackWelderPreview.cell());
-    var definition = artifact.assemblyDefinition, mission = artifact.mission, tools = artifact.robotTools;
+    var definition = artifact.assemblyDefinition, mission = artifact.missions[0], tools = artifact.robotTools;
     if (definition == null || mission == null || tools == null || tools.length != 1)
       throw "Track-welder corpus needs its CAD definition, weld mission and physical tool";
     var weld = mission.steps[0].weld;

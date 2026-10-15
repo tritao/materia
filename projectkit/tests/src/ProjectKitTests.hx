@@ -718,12 +718,12 @@ class ProjectKitTests {
     base.robot = null; base.origin = {x: 1.0, y: -0.5, yaw: 0.25};
     var jointStep:materia.project.SceneArtifact.SceneArtifactMissionStep = {
       kind: "moveJoints", at: {occurrence: "mast", connector: "pin"}, joints: [{joint: "lift", position: 0.02}]};
-    data.mission = {steps: [jointStep]};
-    var jointBack = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    data.missions = [{steps: [jointStep]}];
+    var jointBack = SceneArtifact.decode(SceneArtifact.encode(data)).missions[0];
     check(jointBack != null && jointBack.steps[0].joints[0].position == 0.02 &&
       jointBack.steps[0].joints[0].joint == "lift", "absolute joint mission round trip in metres");
     jointStep.configuration={shoulder:"front",elbow:"up",wrist:"no-flip",turns:[0,0,0,0,0,2]};
-    var pinnedMission=SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    var pinnedMission=SceneArtifact.decode(SceneArtifact.encode(data)).missions[0];
     if(pinnedMission==null || pinnedMission.steps[0].configuration==null)throw "Mission configuration was lost";
     var restoredPin:materia.project.SceneArtifact.SceneArtifactArmConfiguration=cast pinnedMission.steps[0].configuration;
     var restoredTurns:Array<Int> =cast restoredPin.turns;
@@ -746,9 +746,9 @@ class ProjectKitTests {
     robot.joints[2].limits.upper = null;
     var mission:materia.project.SceneArtifact.SceneArtifactMission = {loop: true, steps: [
       {kind: "goTo", pose: {x: 2.0, y: 1.0, yaw: Math.PI}}, {kind: "goTo", pose: {x: 0.0, y: 0.0, yaw: 0.0}}]};
-    data.mission = mission;
+    data.missions = [mission];
     var decoded = SceneArtifact.decode(SceneArtifact.encode(data));
-    var placed = decoded.mobileBase, restoredMission = decoded.mission;
+    var placed = decoded.mobileBase, restoredMission = decoded.missions[0];
     if (placed == null || placed.origin == null || restoredMission == null) throw "mobile base mission round trip lost data";
     var firstPose:materia.project.SceneArtifact.SceneArtifactFloorPose = cast restoredMission.steps[0].pose;
     var origin:materia.project.SceneArtifact.SceneArtifactFloorPose = cast placed.origin;
@@ -767,7 +767,7 @@ class ProjectKitTests {
     data.robotTools = [{kind: "suction", members: ["chassis"], contact: {occurrence: "chassis", connector: "pin"}, channel: "tool/cup.enable",
       sensor: "tool/sensor.pressureSignal"}];
     var picked = SceneArtifact.decode(SceneArtifact.encode(data));
-    var picking = picked.mission, tools = picked.robotTools;
+    var picking = picked.missions[0], tools = picked.robotTools;
     if (picking == null || tools == null || picking.steps[2].at == null) throw "picking mission round trip lost data";
     var pickAt:materia.project.SceneArtifact.SceneArtifactPlace = cast picking.steps[2].at;
     check(pickAt.occurrence == "mast" && picking.steps[2].yaw == 0.3 && picking.steps[2].toolYaw == Math.PI / 2 &&
@@ -775,7 +775,7 @@ class ProjectKitTests {
       tools[0].contact.connector == "pin" && tools[0].sensor == "tool/sensor.pressureSignal", "picking mission and tool round trip");
     data.robotTools.push({kind: "suction", members: ["mast"], contact: {occurrence: "mast", connector: "pin"}, channel: "tool/cup2.enable"});
     mission.steps[2].tool = "tool/cup2.enable";
-    var selectedTool = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    var selectedTool = SceneArtifact.decode(SceneArtifact.encode(data)).missions[0];
     check(selectedTool != null && selectedTool.steps[2].tool == "tool/cup2.enable",
       "handling mission can select one of multiple physical tools");
     mission.steps[2].tool = null;
@@ -834,9 +834,9 @@ class ProjectKitTests {
     data.controllers = [{id: "robotController", kind: "robot", joints: ["wheel_l", "wheel_r", "lift"],
       sensors: ["chassis/presence"], channels: []}];
     data.signals = [];
-    data.mission = {controllerId: "robotController", steps: [{kind: "waitFor",
-      waitFor: {name: "chassis/presence", value: true, timeout: 1.0}}]};
-    var localSensorMission = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    data.missions = [{controllerId: "robotController", steps: [{kind: "waitFor",
+      waitFor: {name: "chassis/presence", value: true, timeout: 1.0}}]}];
+    var localSensorMission = SceneArtifact.decode(SceneArtifact.encode(data)).missions[0];
     var localSensorWaitName = "";
     if (localSensorMission != null && localSensorMission.steps.length > 0) {
       var localSensorWait = localSensorMission.steps[0].waitFor;
@@ -844,7 +844,7 @@ class ProjectKitTests {
     }
     check(localSensorWaitName == "chassis/presence",
       "robot mission can wait on a locally owned field sensor");
-    var localInputMission = data.mission;
+    var localInputMission = data.missions[0];
     if (localInputMission == null || localInputMission.steps.length == 0 ||
         localInputMission.steps[0].waitFor == null)
       throw "local sensor wait fixture was not retained";
@@ -853,11 +853,62 @@ class ProjectKitTests {
     var unownedInput = refusal(function() SceneArtifact.encode(data));
     check(unownedInput.indexOf("reads no input signal or sensor") >= 0,
       "robot mission cannot wait on an input owned by no signal or sensor");
-    data.mission = mission; data.controllers = null; data.signals = null; robot.sensors = null;
+    data.missions = [mission]; data.controllers = null; data.signals = null; robot.sensors = null;
     data.mobileBase = null;
     rejects(function() SceneArtifact.encode(data), "driving mission without a mobile base");
-    data.mobileBase = base; data.mission = null; data.assemblyDefinition = null;
+    data.mobileBase = base; data.missions = null; data.assemblyDefinition = null;
     rejects(function() SceneArtifact.encode(data), "mobile base without its robot");
+  }
+
+  /** Each robot controller runs its own program with its own tools; programs meet only through wired signals. */
+  static function perControllerPrograms():Void {
+    var data = sceneData();
+    data.parts[0].id = "body";
+    var assembly = definition();
+    var frame = AssemblyFrames.identity();
+    for (id in ["arm2", "toolA", "toolB", "fixture"]) assembly.occurrences.push({id: id, definition: "body", initialPose: frame});
+    assembly.joints.push({id: "hinge2", type: AssemblyJointType.Revolute, role: AssemblyJointRole.Tree,
+      parent: "base", parentConnector: "pin", child: "arm2", childConnector: "pin", axis: {x: 0.0, y: 0.0, z: 1.0},
+      limits: {lower: -1.0, upper: 1.0, velocity: null, effort: null}, defaultValue: 0.0});
+    for (mount in [["arm", "toolA"], ["arm2", "toolB"]])
+      assembly.joints.push({id: mount[1] + "-mount", type: AssemblyJointType.Fixed, role: AssemblyJointRole.Tree,
+        parent: mount[0], parentConnector: "pin", child: mount[1], childConnector: "pin", axis: {x: 0.0, y: 0.0, z: 1.0},
+        limits: {lower: null, upper: null, velocity: null, effort: null}, defaultValue: 0.0});
+    data.assemblyDefinition = assembly;
+    data.controllers = [
+      {id: "handler", kind: "robot", joints: ["hinge"], sensors: [], channels: ["placed"]},
+      {id: "driver", kind: "robot", joints: ["hinge2"], sensors: [], channels: []}];
+    data.signals = [{name: "placed", from: {controller: "handler", port: "placed"}, to: {controller: "driver", port: "placed"}}];
+    data.robotTools = [
+      {kind: "suction", members: ["toolA"], contact: {occurrence: "toolA", connector: "pin"}, channel: "grip-a"},
+      {kind: "suction", members: ["toolB"], contact: {occurrence: "toolB", connector: "pin"}, channel: "grip-b"}];
+    materia.project.SceneArtifact.assignToolControllers(data);
+    check(data.robotTools[0].controller == "handler" && data.robotTools[1].controller == "driver",
+      "Each tool belongs to the controller whose arm carries it");
+    var handling:materia.project.SceneArtifact.SceneArtifactMission = {controllerId: "handler", steps: [
+      {kind: "pick", at: {occurrence: "fixture", connector: "pin"}},
+      {kind: "signal", signal: {name: "placed", value: true}}]};
+    var driving:materia.project.SceneArtifact.SceneArtifactMission = {controllerId: "driver", steps: [
+      {kind: "waitFor", waitFor: {name: "placed", value: true, timeout: 30}},
+      {kind: "pick", at: {occurrence: "fixture", connector: "pin"}}]};
+    data.missions = [handling, driving];
+    var back = SceneArtifact.decode(SceneArtifact.encode(data));
+    check(back.missions != null && back.missions.length == 2 && back.missions[0].controllerId == "handler" &&
+      back.missions[1].controllerId == "driver" && back.robotTools[1].controller == "driver",
+      "Two robot controllers keep their own programs and tools through the wire");
+    driving.steps[1].tool = "grip-a";
+    rejects(() -> SceneArtifact.encode(data), "A program cannot use another controller's tool");
+    driving.steps[1].tool = null;
+    data.missions = [handling, {controllerId: "handler", steps: [{kind: "pick", at: {occurrence: "fixture", connector: "pin"}}]}];
+    rejects(() -> SceneArtifact.encode(data), "A controller runs one program");
+    data.missions = [handling, driving];
+    data.robotTools[1].controller = "handler";
+    rejects(() -> SceneArtifact.encode(data), "A tool cannot name a controller that does not carry it");
+    data.robotTools[1].controller = "driver";
+    data.controllers = null; data.signals = null;
+    for (tool in data.robotTools) tool.controller = null;
+    data.missions = [{steps: handling.steps.slice(0, 1)}, {steps: driving.steps.slice(1)}];
+    rejects(() -> SceneArtifact.encode(data), "Without controllers the scene's one robot runs one program");
   }
 
   static function toolChangerMission():Void {
@@ -867,6 +918,10 @@ class ProjectKitTests {
     var frame = AssemblyFrames.identity();
     for (id in ["master", "toolA", "toolB", "dockA", "dockB"])
       assembly.occurrences.push({id: id, definition: "body", initialPose: frame});
+    // The changer master is fixed on the arm; changeable tools ride it.
+    assembly.joints.push({id: "master-mount", type: AssemblyJointType.Fixed, role: AssemblyJointRole.Tree,
+      parent: "arm", parentConnector: "pin", child: "master", childConnector: "pin", axis: {x: 0.0, y: 0.0, z: 1.0},
+      limits: {lower: null, upper: null, velocity: null, effort: null}, defaultValue: 0.0});
     assembly.sensors = [
       {id: "changer/locked", kind: "presence", occurrence: "master", connector: "pin", range: 0.01},
       {id: "changer/id0", kind: "presence", occurrence: "master", connector: "pin", range: 0.01},
@@ -874,8 +929,8 @@ class ProjectKitTests {
     ];
     data.assemblyDefinition = assembly;
     data.robotTools = [
-      {kind: "suction", members: ["toolA"], contact: {occurrence: "toolA", connector: "pin"}, channel: "grip-a"},
-      {kind: "suction", members: ["toolB"], contact: {occurrence: "toolB", connector: "pin"}, channel: "grip-b"}
+      {kind: "suction", controller: "robotController", members: ["toolA"], contact: {occurrence: "toolA", connector: "pin"}, channel: "grip-a"},
+      {kind: "suction", controller: "robotController", members: ["toolB"], contact: {occurrence: "toolB", connector: "pin"}, channel: "grip-b"}
     ];
     data.controllers = [{id: "robotController", kind: "robot", joints: ["hinge"],
       sensors: ["changer/locked", "changer/id0", "changer/id1"], channels: ["changer.lock"]}];
@@ -897,8 +952,8 @@ class ProjectKitTests {
         {kind: "changeTool", targetToolId: "cup", timeoutSeconds: 30},
         {kind: "pick", at: {occurrence: "arm", connector: "pin"}}
       ]};
-    data.mission = mission;
-    var restored = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    data.missions = [mission];
+    var restored = SceneArtifact.decode(SceneArtifact.encode(data)).missions[0];
     check(restored != null && restored.toolChanger != null && restored.steps.length == 3 &&
       restored.steps[1].kind == "changeTool" && restored.steps[1].targetToolId == "cup",
       "CAD tool changer validates and round trips an explicit handling-tool exchange");
@@ -1005,8 +1060,8 @@ class ProjectKitTests {
     function mission(weld:materia.project.SceneArtifact.SceneArtifactWeld):materia.project.SceneArtifact.SceneArtifactMission
       return {steps: [{kind: "weld", weld: weld}]};
     data.robotTools = [torch()];
-    data.mission = mission(seam());
-    var back = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    data.missions = [mission(seam())];
+    var back = SceneArtifact.decode(SceneArtifact.encode(data)).missions[0];
     if (back == null || back.steps.length != 1 || back.steps[0].weld == null) throw "weld mission round trip lost the weld";
     var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast back.steps[0].weld;
     check(weld.frame == "plate" && weld.path.length == 1 && weld.path[0].seam == "plate:f3|upright:f7" && weld.path[0].joint == "fillet" &&
@@ -1015,15 +1070,15 @@ class ProjectKitTests {
       weld.path[0].normals[1][1] == -1.0 && weld.legSize == 0.005 && weld.passes[0].process.wireSpeed == 8.0 && weld.passes[0].process.travelSpeed == 0.01 &&
       weld.passes[0].process.startDwell == 0.2 && weld.passes[0].process.craterDwell == 0.3 &&
       weld.passes[0].process.burnback == 0.1, "weld mission round trip including both dwells");
-    data.mission = {steps: [{kind: "weld", weld: seam()}, {kind: "stow"}]};
-    var stowBack = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    data.missions = [{steps: [{kind: "weld", weld: seam()}, {kind: "stow"}]}];
+    var stowBack = SceneArtifact.decode(SceneArtifact.encode(data)).missions[0];
     check(stowBack != null && stowBack.steps.length == 2 && stowBack.steps[1].kind == "stow",
       "welding stow mission round trip");
     // A chained seam is one weld of several segments, each with its own faces.
     var chain = seam();
     chain.path = [line(), second()];
-    data.mission = mission(chain);
-    var chainBack = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    data.missions = [mission(chain)];
+    var chainBack = SceneArtifact.decode(SceneArtifact.encode(data)).missions[0];
     if (chainBack == null) throw "chained weld round trip lost the mission";
     var chained:materia.project.SceneArtifact.SceneArtifactWeld = cast chainBack.steps[0].weld;
     check(chained.path.length == 2 && chained.path[1].normals[1][0] == -1.0 && chained.path[1].stop.position[1] == 0.06,
@@ -1038,7 +1093,7 @@ class ProjectKitTests {
     function bad(change:materia.project.SceneArtifact.SceneArtifactWeld -> Void, message:String):Void {
       var weld = seam();
       change(weld);
-      data.mission = mission(weld);
+      data.missions = [mission(weld)];
       rejects(function() SceneArtifact.encode(data), message);
     }
     bad(function(w) { var g = first(w); g.faces = [{member: "plate", face: "f3"}]; }, "weld of a seam with one face");
@@ -1067,8 +1122,8 @@ class ProjectKitTests {
     var multipass = seam();
     multipass.passes.push({name: "cap", offset: [0.002, 0.003], interpassDwell: 0.5,
       process: multipass.passes[0].process, weave: {pattern: "triangle", amplitude: 0.001, cyclesPerMetre: 100, edgeDwell: 0.05}});
-    data.mission = mission(multipass);
-    var passesBack = SceneArtifact.decode(SceneArtifact.encode(data)).mission;
+    data.missions = [mission(multipass)];
+    var passesBack = SceneArtifact.decode(SceneArtifact.encode(data)).missions[0];
     if (passesBack == null || passesBack.steps[0].weld == null) throw "multi-pass weld lost";
     var restored:materia.project.SceneArtifact.SceneArtifactWeld = cast passesBack.steps[0].weld;
     var cap = restored.passes[1];
@@ -1081,15 +1136,15 @@ class ProjectKitTests {
     bad(function(w) { var process = w.passes[0].process; process.approach = 0.0; }, "weld with no approach");
     bad(function(w) { var process = w.passes[0].process; process.craterDwell = -1.0; }, "weld with a negative crater dwell");
     bad(function(w) { var process = w.passes[0].process; process.burnback = 0.0; }, "weld with no burnback");
-    data.mission = mission(seam());
+    data.missions = [mission(seam())];
     // The robot's arm carries one tool: a mission cannot both pick and weld.
-    data.mission = {steps: [{kind: "weld", weld: seam()}, {kind: "pick", at: {occurrence: "plate", connector: "tcp"}}]};
+    data.missions = [{steps: [{kind: "weld", weld: seam()}, {kind: "pick", at: {occurrence: "plate", connector: "tcp"}}]}];
     data.robotTools = [torch(), {kind: "suction", members: ["upright"], contact: {occurrence: "upright", connector: "tcp"}, channel: "cup.enable"}];
     rejects(function() SceneArtifact.encode(data), "a mission that picks and welds");
-    data.mission = mission(seam());
+    data.missions = [mission(seam())];
     data.robotTools = null;
     rejects(function() SceneArtifact.encode(data), "weld mission without a torch");
-    data.mission = null;
+    data.missions = null;
   }
 
   /** A machining job travels with its machine and names only what the scene has. */
@@ -1290,7 +1345,7 @@ class ProjectKitTests {
     rejects(function() LengthUnit.metresPerUnit("feet"), "unsupported unit");
     assembly(); hydraulic();
     homingDependencies(); frames(); scene(); screwEntrySearchProfile(); machineMetadata(); machining(); printing();
-    mobileBase(); toolChangerMission(); torchTool(); bodies();
+    mobileBase(); toolChangerMission(); perControllerPrograms(); torchTool(); bodies();
     check(MaterialLibrary.require("steel-c45").physical.density == 7850, "steel density");
     check(MaterialLibrary.fromSpec("steel C45") == "steel-c45", "material lookup");
     rejects(function() MaterialLibrary.require("unknown"), "unknown material");

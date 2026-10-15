@@ -41,12 +41,12 @@ class MobileBasePreview {
 		scene.mobileBase = section;
 		scene.robotTools = robotTools(cell.robot, "robot/");
 		scene.robotSensors = RobotScene.robotSensors(cell.robot, "robot/");
-		scene.mission = {loop: true,
+		scene.missions = [{loop: true,
 			steps: [for (step in MobileBaseCell.ROUND) switch step {
 				case GoTo(pose): {kind: "goTo", pose: metres(pose)};
 				case Pick(part, grasp): {kind: "pick", at: {occurrence: part, connector: grasp}};
 				case Place(table, seat): {kind: "place", at: {occurrence: table, connector: seat}};
-			}]};
+			}]}];
 		return SceneArtifact.encode(scene);
 	}
 
@@ -198,7 +198,7 @@ class MobileBaseChecks {
 	 */
 	static function checkCell():Void {
 		var scene = SceneArtifact.decode(MobileBasePreview.cell());
-		if (scene.mobileBase == null || scene.mission == null) throw "Mobile base cell should carry its drive and mission";
+		if (scene.mobileBase == null || scene.missions == null) throw "Mobile base cell should carry its drive and mission";
 		if (scene.robotSensors == null || scene.robotSensors[0].mount.occurrence != "robot/lidar")
 			throw "Mobile base cell should carry its lidar, mounted on the robot's puck";
 		var cell = new MobileBaseCell();

@@ -63,7 +63,7 @@ class MissionJobsTests {
     var editor = new ReferenceEditorApp(fonts, directory + "/workspace.json", null, null, null, null, null, null, true);
     var generated:GeneratedAssemblyScene = {objects:editor.scene.records(), geometryBySnapshot:new Map(),
       assemblyDefinition:null, assemblyState:null, localCentersByDefinition:new Map(), metresPerUnit:1.0,
-      physical:null, recipeDocument:null, projectJob:"single-seam", mission:null};
+      physical:null, recipeDocument:null, projectJob:"single-seam", missions:null};
     editor.session.openGeneratedProject(generated, source);
     editor.documentChanged();
     var controller = editor.missionController;
@@ -104,9 +104,9 @@ class MissionJobsTests {
     var editor = new ReferenceEditorApp(null, directory + "/integration-workspace.json");
     var first = ProjectSourceLoader.load(manifest, null, null, "single-seam");
     editor.session.openGeneratedProject(first, manifest); editor.documentChanged();
-    check(editor.session.projectJob == "single-seam" && editor.session.mission != null, "real seam job installs");
+    check(editor.session.projectJob == "single-seam" && editor.session.missions != null, "real seam job installs");
     var original = editor.session.document;
-    var originalMission = Json.stringify(editor.session.mission);
+    var originalMission = Json.stringify(editor.session.missions[0]);
     editor.missionController.selectJob("multipass");
     check(editor.session.document == original, "real job retains current document during preparation");
     var deadline = Sys.time() + 240.0;
@@ -114,12 +114,12 @@ class MissionJobsTests {
     check(!editor.missionController.isLoading() && editor.missionController.snapshot().error == null,
       "real job replacement succeeds: " + editor.missionController.snapshot().error);
     check(editor.session.projectJob == "multipass" && editor.session.document != original &&
-      Json.stringify(editor.session.mission) != originalMission, "replacement installs selected process and mission");
+      Json.stringify(editor.session.missions[0]) != originalMission, "replacement installs selected process and mission");
     var file = directory + "/real-job.materia";
     editor.session.save(file);
     editor.session.newDocument();
     editor.session.open(file); editor.documentChanged();
-    check(editor.session.projectJob == "multipass" && editor.session.mission != null,
+    check(editor.session.projectJob == "multipass" && editor.session.missions != null,
       "reopening saved document regenerates the selected job");
     editor.dispose(); FileSystem.deleteFile(file);
     Sys.println("Real welding job switch and saved-document reopen passed");

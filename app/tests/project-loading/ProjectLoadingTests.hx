@@ -97,7 +97,7 @@ class ProjectLoadingTests {
         var warm = Sys.time() - started;
         check(first.objects.length > 0 && second.objects.length == first.objects.length, "cached Gantry components");
         check(Json.stringify(first.assemblyDefinition) == Json.stringify(second.assemblyDefinition), "cached Gantry assembly");
-        check(Json.stringify(first.mission) == Json.stringify(second.mission), "cached Gantry mission");
+        check(Json.stringify(first.missions[0]) == Json.stringify(second.missions[0]), "cached Gantry mission");
         Sys.println(relative + ": first=" + cold + " s, repeat=" + warm + " s, components=" + first.objects.length);
       }
       return 0;

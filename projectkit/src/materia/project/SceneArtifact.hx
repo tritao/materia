@@ -73,7 +73,11 @@ typedef SceneArtifactData = {
 	/** The assembly is a wheeled robot that drives on the floor; see SceneArtifactMobileBase. */
 	@:optional var mobileBase:SceneArtifactMobileBase;
 	/** Work the assembly's robot does on its own; see SceneArtifactMission. */
-	@:optional var mission:SceneArtifactMission;
+	/**
+	 * One program per robot controller, each naming its controller. Programs coordinate only through the cell's
+	 * wired signals, as the robot controllers of a real cell do.
+	 */
+	@:optional var missions:Array<SceneArtifactMission>;
 	/** The tools the assembly's robot works with; see SceneArtifactRobotTool. */
 	@:optional var robotTools:Array<SceneArtifactRobotTool>;
 	/** The sensors on the assembly's robot; see SceneArtifactRobotSensor. */
@@ -233,6 +237,11 @@ typedef SceneArtifactRobotSensor = {
  */
 typedef SceneArtifactRobotTool = {
 	var kind:String;
+	/**
+	 * The robot controller whose arm carries the tool; only that controller's program uses it. A scene without
+	 * modelled controllers is one robot with an implicit controller, and its tools name none.
+	 */
+	@:optional var controller:String;
 	/** Exact CAD members of the complete mounted tool, including its plate and services. */
 	var members:Array<String>;
 	var contact:SceneArtifactPlace;
@@ -809,7 +818,7 @@ typedef SceneArtifactHeater = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 40;
+	public static inline var VERSION:Int = 41;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -836,7 +845,8 @@ class SceneArtifact {
 		var machining = data.machining == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.machining));
 		if (machining.length > 8000000) throw "Scene artifact machining job is too large";
 		var mobileBase = data.mobileBase == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.mobileBase));
-		var mission = data.mission == null ? Bytes.alloc(0) : Bytes.ofString(encodeMission(data.mission));
+		var mission = data.missions == null ? Bytes.alloc(0)
+			: Bytes.ofString("[" + [for (program in data.missions) encodeMission(program)].join(",") + "]");
 		if (mission.length > 1000000) throw "Scene artifact mission is too large";
 		var robotTools = data.robotTools == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.robotTools));
 		if (robotTools.length > 100000) throw "Scene artifact robot tools are too large";
@@ -1147,7 +1157,7 @@ class SceneArtifact {
     }
     var digital = motion.digitalProgram;
     if (digital != null) {
-      if (motion.program != null || motion.virtualDevice == true || data.machining != null || data.mission != null)
+      if (motion.program != null || motion.virtualDevice == true || data.machining != null || data.missions != null)
         throw "Machine digital program needs exclusive execution ownership";
       if (!finite(digital.durationSec) || digital.durationSec <= 0 || digital.durationSec * 1e9 > 9007199254740991.0 ||
           digital.events == null || digital.events.length == 0 || digital.events.length > 10000)
@@ -1221,11 +1231,12 @@ class SceneArtifact {
 				AssemblyDefinitionCodec.validateState(assemblyDefinition, data.assemblyState);
 		}
 		if (data.project != null) validateProject(data.project, data);
-		if (data.machining != null && data.mission != null &&
-			(data.machining.controllerId == null || data.mission.controllerId == null ||
-			 data.machining.controllerId == data.mission.controllerId))
-			throw "Scene artifact CNC job and mission need distinct controller owners";
-		if (data.printing != null && (data.machining != null || data.mission != null))
+		var missions = data.missions;
+		if (data.machining != null && missions != null) for (program in missions)
+			if (data.machining.controllerId == null || program.controllerId == null ||
+				data.machining.controllerId == program.controllerId)
+				throw "Scene artifact CNC job and mission need distinct controller owners";
+		if (data.printing != null && (data.machining != null || missions != null))
 			throw "Scene artifact cannot combine a print job with machining or a mission";
 		if (data.printing != null) validatePrinting(data.printing, data);
 		if (data.machining != null) validateMachining(data.machining, ids, data.assemblyDefinition);
@@ -1234,7 +1245,20 @@ class SceneArtifact {
 		if (data.robotSensors != null) validateRobotSensors(data.robotSensors, data);
     if (data.machineMotion != null) validateMachineMotion(data.machineMotion, data);
 		if (data.controllers != null || data.signals != null) validateCell(data);
-		if (data.mission != null) validateMission(data.mission, data);
+		if (missions != null) {
+			if (missions.length == 0) throw "Scene artifact missions are empty";
+			// Without modelled controllers the scene is one robot with one implicit controller and one program.
+			if (data.controllers == null && (missions.length != 1 || missions[0].controllerId != null))
+				throw "Scene artifact without controllers holds one program for its one robot";
+			var owners = new Map<String, Bool>();
+			for (program in missions) {
+				var owner = program.controllerId;
+				if (data.controllers != null && (owner == null || owners.exists(owner)))
+					throw 'Scene artifact missions need one program per robot controller, not "$owner" again';
+				if (owner != null) owners.set(owner, true);
+				validateMission(program, data);
+			}
+		}
 	}
 
 	static function validateCell(data:SceneArtifactData):Void {
@@ -1332,8 +1356,8 @@ class SceneArtifact {
 		var printing = data.printing;
 		if (printing != null) for (axis in printing.axes) if (owners.get(axis) != owners.get(printing.extruder))
 			throw 'Scene artifact print axis "$axis" and the extruder belong to different controllers';
-		if (data.mission != null && (data.mission.controllerId == null ||
-			[for (c in controllers) if (c.id == data.mission.controllerId && c.kind == "robot") c].length != 1))
+		if (data.missions != null) for (program in data.missions) if (program.controllerId == null ||
+			[for (c in controllers) if (c.id == program.controllerId && c.kind == "robot") c].length != 1)
 			throw "Scene artifact mission needs its robot controller";
 	}
 
@@ -1366,13 +1390,55 @@ class SceneArtifact {
 		}];
 	}
 
+	/**
+	 * The robot controller that carries `tool`: the one driving a joint on the path from the tool (or, for a
+	 * changeable tool, its changer master) to the assembly root. Null without modelled controllers or when none does.
+	 */
+	public static function toolController(data:SceneArtifactData, tool:SceneArtifactRobotTool):Null<String> {
+		var controllers = data.controllers, definition = data.assemblyDefinition;
+		if (controllers == null || definition == null || tool == null || tool.contact == null) return null;
+		var flat = AssemblyDefinitionFlattener.flattenView(cast definition);
+		var start = tool.contact.occurrence;
+		if (data.missions != null) for (program in data.missions) {
+			// A changeable tool rides the changer master on the arm, not a joint of its own.
+			var changer = program.toolChanger;
+			if (changer != null) for (candidate in changer.tools)
+				if (candidate.occurrence == tool.contact.occurrence) start = changer.master.occurrence;
+		}
+		var current = start, visited = new Map<String, Bool>();
+		while (current != null && !visited.exists(current)) {
+			visited.set(current, true);
+			var incoming = [for (joint in flat.joints) if (joint.child == current) joint];
+			if (incoming.length == 0) return null;
+			for (controller in controllers)
+				if (controller.kind == "robot" && controller.joints.indexOf(incoming[0].id) >= 0) return controller.id;
+			current = incoming[0].parent;
+		}
+		return null;
+	}
+
+	/** Records each tool's carrying controller (`toolController`) in a scene with modelled controllers. */
+	public static function assignToolControllers(data:SceneArtifactData):Void {
+		if (data.controllers == null || data.robotTools == null) return;
+		for (tool in data.robotTools) {
+			var owner = toolController(data, tool);
+			if (owner == null) throw 'Robot tool "${tool.contact.occurrence}" is carried by no robot controller';
+			tool.controller = owner;
+		}
+	}
+
 	static function validateRobotTools(tools:Array<SceneArtifactRobotTool>, data:SceneArtifactData):Void {
 		function fail(detail:String):Void throw 'Scene artifact robot tool $detail';
 		var definition = data.assemblyDefinition;
 		if (definition == null) fail("needs the robot's assembly definition");
 		var flat = AssemblyDefinitionFlattener.flattenView(cast definition);
 		var channels = new Map<String, Bool>();
-		var torches = 0, drivers = 0;
+		var torches = new Map<String, Int>(), drivers = new Map<String, Int>();
+		function count(counts:Map<String, Int>, owner:String):Int {
+			var next = (counts.exists(owner) ? counts.get(owner) : 0) + 1;
+			counts.set(owner, next);
+			return next;
+		}
 		for (tool in tools) {
 			if (tool == null || (tool.kind != "suction" && tool.kind != "gripper" && tool.kind != "torch" && tool.kind != "screwdriver"))
 				fail('kind "${tool == null ? null : tool.kind}" is unknown');
@@ -1394,11 +1460,22 @@ class SceneArtifact {
 			if (tool.channel == null || tool.channel.length == 0 || channels.exists(tool.channel))
 				fail("needs a channel of its own");
 			channels.set(tool.channel, true);
+			// The tool belongs to the robot controller whose arm carries it: a joint that controller drives lies on
+			// the tool's path to the assembly root.
+			if (data.controllers == null) {
+				if (tool.controller != null) fail('"${contact.occurrence}" names controller "${tool.controller}" in a scene without controllers');
+			} else {
+				var owners = [for (candidate in data.controllers) if (candidate.id == tool.controller) candidate];
+				if (owners.length != 1 || owners[0].kind != "robot")
+					fail('"${contact.occurrence}" names no robot controller "${tool.controller}"');
+				if (toolController(data, tool) != tool.controller)
+					fail('"${contact.occurrence}" is not carried by an arm of controller "${tool.controller}"');
+			}
 			if (tool.sensor != null && tool.sensor.length == 0) fail("has an empty sensor name");
 			if (tool.kind != "screwdriver" && tool.screwdriver != null) fail("has screwdriver data on another tool kind");
 			if (tool.kind == "screwdriver") {
 				function driverProblem(detail:String):Void fail('"${contact.occurrence}" $detail');
-				if (++drivers > 1 || tool.torch != null || tool.gripper != null || tool.sensor == null)
+				if (count(drivers, tool.controller == null ? "" : tool.controller) > 1 || tool.torch != null || tool.gripper != null || tool.sensor == null)
 					driverProblem("needs one screwdriver, a sensor and no other process description");
 				var driver = tool.screwdriver;
 				if (driver == null) { driverProblem("has no screwdriver description"); return; }
@@ -1485,7 +1562,7 @@ class SceneArtifact {
 				return;
 			}
 			if (tool.sensor == null) fail("is a torch with no weld sensor");
-			if (++torches > 1) fail("is a second torch: the robot welds with one");
+			if (count(torches, tool.controller == null ? "" : tool.controller) > 1) fail("is a second torch: the robot welds with one");
 			for (name in [welder.wireSpeedChannel, welder.voltageChannel]) {
 				if (name == null || name.length == 0 || channels.exists(name)) fail("needs wire speed and voltage channels of its own");
 				channels.set(name, true);
@@ -1697,6 +1774,7 @@ class SceneArtifact {
 				contact: {occurrence: text(contact, "occurrence"), connector: text(contact, "connector")},
 				channel: text(raw, "channel")};
 			if (Reflect.field(raw, "sensor") != null) tool.sensor = text(raw, "sensor");
+			if (Reflect.field(raw, "controller") != null) tool.controller = text(raw, "controller");
 			var gripper:Dynamic = Reflect.field(raw, "gripper");
 			if (gripper != null) {
 				function number(name:String):Float {
@@ -1843,9 +1921,11 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 	}
 
 	static function validateMission(mission:SceneArtifactMission, data:SceneArtifactData):Void {
-		materia.project.SceneScrewFeeder.SceneScrewFeeders.validate(mission.screwFeeders,data);
-		materia.project.SceneBlowFeed.SceneBlowFeeds.validate(mission.blowFeeds,data);
+		materia.project.SceneScrewFeeder.SceneScrewFeeders.validate(mission.screwFeeders,mission,data);
+		materia.project.SceneBlowFeed.SceneBlowFeeds.validate(mission.blowFeeds,mission,data);
 		function fail(detail:String):Void throw 'Scene artifact mission $detail';
+		// A program works only with its own controller's tools.
+		var ownedTools = data.robotTools == null ? [] : [for (tool in data.robotTools) if (tool.controller == mission.controllerId) tool];
 		validatePowerUpOffsets(mission.powerUpOffsets, data.assemblyDefinition);
 		validatePowerUpSideOffsets(mission.powerUpSideOffsets, data.assemblyDefinition);
 		if (mission.steps == null || mission.steps.length == 0) fail("has no steps");
@@ -1933,7 +2013,7 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 					if (docks.exists(dockKey)) fail('tool changer tools share dock connector "$dockKey"');
 					docks.set(dockKey, true);
 				}
-				var matching = data.robotTools == null ? [] : [for (candidate in data.robotTools)
+				var matching = ownedTools == null ? [] : [for (candidate in ownedTools)
 					if (candidate.channel == tool.channel) candidate];
 				if (matching.length != 1) fail('tool changer tool "${tool.id}" names no unique robot tool channel "${tool.channel}"');
 				else {
@@ -1959,8 +2039,8 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 		}
 		function changerRobotTool(id:Null<String>):Null<SceneArtifactRobotTool> {
 			var configured = changerToolById(id);
-			if (configured == null || data.robotTools == null) return null;
-			for (tool in data.robotTools) if (tool.channel == configured.channel) return tool;
+			if (configured == null || ownedTools == null) return null;
+			for (tool in ownedTools) if (tool.channel == configured.channel) return tool;
 			return null;
 		}
 		var handles = false, welds = false, screws = false, registrations = false, screwdriverRegistrations = false;
@@ -1968,7 +2048,7 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 		var hasToolChanges = false;
 		var registrationOccurrence:Null<String> = null, registrationConnector:Null<String> = null,
 			registrationToolKind:Null<String> = null;
-		var handlingTools:Array<SceneArtifactRobotTool> = data.robotTools == null ? [] : [for (tool in data.robotTools)
+		var handlingTools:Array<SceneArtifactRobotTool> = ownedTools == null ? [] : [for (tool in ownedTools)
 			if (tool.kind == "gripper" || tool.kind == "suction") tool];
 		for (index in 0...mission.steps.length) {
 			var step = mission.steps[index];
@@ -2145,7 +2225,7 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 				case "findWork":
 					registrations = true;
 					if (!exists(step.at)) fail('step $index names no contact connector');
-					var contactTools = data.robotTools == null ? [] : [for (tool in data.robotTools)
+					var contactTools = ownedTools == null ? [] : [for (tool in ownedTools)
 						if ((tool.kind == "torch" || tool.kind == "screwdriver") && step.at != null &&
 							tool.contact.occurrence == step.at.occurrence && tool.contact.connector == step.at.connector) tool];
 					if (contactTools.length != 1) fail('step $index needs one torch or screwdriver contact connector');
@@ -2176,14 +2256,14 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 				default: fail('step $index has unknown kind "${step.kind}"');
 			}
 		}
-		var suctions = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "suction") tool].length;
-		var grippers = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "gripper") tool].length;
+		var suctions = ownedTools == null ? 0 : [for (tool in ownedTools) if (tool.kind == "suction") tool].length;
+		var grippers = ownedTools == null ? 0 : [for (tool in ownedTools) if (tool.kind == "gripper") tool].length;
 		if (handles && suctions + grippers == 0) fail("picks and places, but the robot has no suction or gripper tool");
 		if (handles && suctions > 0 && grippers > 0 && changer == null)
 			fail("picks and places with both suction and gripper tools; the robot must use one handling tool type");
-		var torches = data.robotTools == null ? 0 : [for (tool in data.robotTools) if (tool.kind == "torch") tool].length;
+		var torches = ownedTools == null ? 0 : [for (tool in ownedTools) if (tool.kind == "torch") tool].length;
 		if (welds && torches != 1) fail('welds, but the robot has $torches torches, not one');
-		var tools = data.robotTools;
+		var tools = ownedTools;
 		if (welds && torches == 1 && tools != null) {
 			var feeder = [for (tool in tools) if (tool.kind == "torch") tool][0].torch;
 			if (feeder != null) for (index in 0...mission.steps.length) {
@@ -2198,7 +2278,7 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 			var job = SceneScrewInvocation.job(step.screw, mission.steps);
 			if (job != null) maximumApproachMeters = Math.max(maximumApproachMeters, job.approach);
 		}
-		var drivers = data.robotTools == null ? [] : [for (tool in data.robotTools) if (tool.kind == "screwdriver") tool];
+		var drivers = ownedTools == null ? [] : [for (tool in ownedTools) if (tool.kind == "screwdriver") tool];
 		if (screws && (drivers.length != 1 || (handles && changer == null) || welds))
 			fail("screwdriving needs one screwdriver and a commissioned changer to share a handling mission");
 		if (handles && screws && changer != null && !hasToolChanges)
@@ -3090,11 +3170,14 @@ private class SceneArtifactReader {
 		if (mobileLength < 0 || mobileLength > 100000) throw "Scene artifact mobile base is too large";
 		if (mobileLength > 0)
 			mobileBase = @:privateAccess SceneArtifact.decodeMobileBase(haxe.Json.parse(readString(mobileLength)));
-		var mission:Null<SceneArtifactMission> = null;
+		var missions:Null<Array<SceneArtifactMission>> = null;
 		var missionLength = readInt();
 		if (missionLength < 0 || missionLength > 1000000) throw "Scene artifact mission is too large";
-		if (missionLength > 0)
-			mission = @:privateAccess SceneArtifact.decodeMission(haxe.Json.parse(SceneWireJson.preserveNumbers(readString(missionLength))));
+		if (missionLength > 0) {
+			var programs:Dynamic = haxe.Json.parse(SceneWireJson.preserveNumbers(readString(missionLength)));
+			if (!Std.isOfType(programs, Array)) throw "Scene artifact missions are invalid";
+			missions = [for (program in (cast programs:Array<Dynamic>)) @:privateAccess SceneArtifact.decodeMission(program)];
+		}
 		var robotTools:Null<Array<SceneArtifactRobotTool>> = null;
 		var toolsLength = readInt();
 		if (toolsLength < 0 || toolsLength > 100000) throw "Scene artifact robot tools are too large";
@@ -3134,7 +3217,7 @@ private class SceneArtifactReader {
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts,
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
-			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase, mission: mission,
+			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase, missions: missions,
 			robotTools: robotTools, robotSensors: robotSensors, machineMotion: machineMotion,
 			controllers: controllers, signals: signals, project: project,
 			printing: printing};

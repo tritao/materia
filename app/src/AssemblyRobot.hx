@@ -39,6 +39,14 @@ typedef AssemblyPart = {id:String, robotIndex:Int, linkIndex:Int, offset:materia
  * physical data and the scene's part objects.
  */
 class AssemblyRobot {
+  /** The program of `control` (or of the one implicit controller), or null when it runs none. */
+  static function programOf(session:ProjectDocumentSession, control:Null<materia.project.SceneArtifact.SceneArtifactCellController>)
+      :Null<materia.project.SceneArtifact.SceneArtifactMission> {
+    if (session.missions == null) return null;
+    for (program in session.missions) if (control == null || program.controllerId == control.id) return program;
+    return null;
+  }
+
   public static function missionFrameName(at:SceneArtifactPlace):String return "mission:" + at.occurrence + "/" + at.connector;
   public final robot:SimulatedRobot;
   public final runtime:RobotRuntime;
@@ -457,8 +465,9 @@ class AssemblyRobot {
       if (wire.to.controller == control.id)
         converted.model.addSensor(new robotkit.model.Sensor(wire.name, "digital_input", 0.0, wire.name));
     var missionFrames = new Map<String, robotkit.model.Frame>();
-    if (session.mission != null && (control == null || session.mission.controllerId == control.id))
-      for (step in session.mission.steps) if (step.kind == "moveJoints" || step.kind == "moveVia") {
+    var program = programOf(session, control);
+    if (program != null)
+      for (step in program.steps) if (step.kind == "moveJoints" || step.kind == "moveVia") {
       var at:SceneArtifactPlace = cast step.at;
       var name = missionFrameName(at);
       if (!missionFrames.exists(name)) missionFrames.set(name, mountFrame(name, at));
@@ -564,9 +573,9 @@ class AssemblyRobot {
     var runtime = candidate.addRobotAtPose(blueprint, position, rotation, device, null, closures, null, null, null, null,
       true, simulationExcludes(converted.model, simulationShapes), restContactGroup);
     var authored:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpOffset>> = session.cncJob != null ? session.cncJob.powerUpOffsets :
-      session.mission == null ? null : session.mission.powerUpOffsets;
+      program == null ? null : program.powerUpOffsets;
     var sideOffsets:Null<Array<materia.project.SceneArtifact.SceneArtifactPowerUpSideOffset>> = session.cncJob != null ? session.cncJob.powerUpSideOffsets :
-      session.mission == null ? null : session.mission.powerUpSideOffsets;
+      program == null ? null : program.powerUpSideOffsets;
     if ((authored != null && authored.length > 0) || (sideOffsets != null && sideOffsets.length > 0)) {
       var named = new Map<String, Float>();
       if (authored != null) for (entry in authored) {

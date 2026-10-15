@@ -4,6 +4,7 @@ import haxeon.wire.JsonWire;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.assembly.AssemblyDefinitionFlattener;
 import materia.project.SceneArtifact.SceneArtifactData;
+import materia.project.SceneArtifact.SceneArtifactMission;
 
 /** One commissioned simulated material path; poses are metres in the named nest frame. */
 @:wire typedef SceneScrewFeeder = {
@@ -29,7 +30,7 @@ class SceneScrewFeeders {
 		for (i in 0...result.length) SceneWireJson.integerFields(inputs[i],outputs[i],["bufferCapacity"]);
 		return result;
 	}
-	public static function validate(feeders:Array<SceneScrewFeeder>, scene:SceneArtifactData):Void {
+	public static function validate(feeders:Array<SceneScrewFeeder>, mission:SceneArtifactMission, scene:SceneArtifactData):Void {
 		if (feeders == null) return;
 		var definition = scene.assemblyDefinition;
 		if (definition == null || feeders.length == 0 || feeders.length > 32) throw "Screw feeders need an assembly and bounded material paths";
@@ -46,7 +47,6 @@ class SceneScrewFeeders {
 				throw 'Screw feeder "${feeder.id}" needs a physical presence sensor';
 			if (feeder.inventory == null || feeder.inventory.length == 0 || feeder.inventory.length > 256
 				|| feeder.bufferCapacity < 1 || feeder.bufferCapacity > 256) throw "Screw feeder needs bounded identified inventory and buffering";
-			var mission = scene.mission;
 			if (mission == null) throw "Screw feeder needs its authored fastening mission";
 			var jobs:Array<materia.project.SceneScrewDefinition.SceneScrew> = [];
 			for (step in mission.steps) if (step.kind == "screw") {

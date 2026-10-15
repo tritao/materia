@@ -23,10 +23,10 @@ class TrackWelderPreview {
 		var seams = [for (seam in found) if (seam.name() == "work/basePlate:box.+z|work/upright:box.+y") seam];
 		if (seams.length != 1) throw "The long T-joint must have one near-side seam";
 		var feeder = cell.feeder;
-		scene.mission = {steps: [WeldingRecipe.passStep(5,
+		scene.missions = [{steps: [WeldingRecipe.passStep(5,
 			{diameterMm: feeder.wireDiameterMm, depositionEfficiency: feeder.depositionEfficiency,
 				maxSpeedMPerMin: feeder.maxSpeedMPerMin}, seams, weldment.reference,
-			WeldMetal.carrierOf(cell, weldment), scene.metresPerUnit)]};
+			WeldMetal.carrierOf(cell, weldment), scene.metresPerUnit)]}];
 		return SceneArtifact.encode(scene);
 	}
 }
