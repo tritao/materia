@@ -301,6 +301,7 @@ class AssemblyDefinitionFlattener {
 				target: scoped(prefix, coupling.target), ratio: coupling.ratio, offset: coupling.offset};
 			if (coupling.efficiency != null) expanded.efficiency = coupling.efficiency;
 			if (coupling.stiffness != null) expanded.stiffness = coupling.stiffness;
+			if (coupling.calibration != null) expanded.calibration = BeltCalibration.BeltCalibrations.copy(coupling.calibration,id->scoped(prefix,id));
 			if (coupling.stiffnessLaw != null) expanded.stiffnessLaw = copyComplianceLaw(coupling.stiffnessLaw,id->scoped(prefix,id));
 			if (coupling.dampingRatio != null) expanded.dampingRatio = coupling.dampingRatio;
 			if (coupling.backlash != null) expanded.backlash = coupling.backlash;

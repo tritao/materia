@@ -248,6 +248,25 @@ class DriveSystem {
 				}
 			case _:
 		}
+		if (record.calibration != null) {
+			var measured = record.calibration;
+			materia.assembly.BeltCalibration.BeltCalibrations.validate(measured);
+			if (record.stiffness != null || record.dampingRatio != null)
+				throw new TransmissionDesignError("Measured belt calibration conflicts with explicit transmission overrides");
+			var beltId = switch record.source {
+				case TimingBelt(id,_): id;
+				case _: throw new TransmissionDesignError("Resonance calibration requires a carriage timing belt");
+			};
+			var belt:machinekit.transmission.TimingBelt = cast flat.member(beltId);
+			var factor = measured.rigidityPerWidth/belt.cordRigidityPerWidth();
+			if (!(factor>0) || !Math.isFinite(factor)) throw new TransmissionDesignError("Invalid measured rigidity correction");
+			if (relation.stiffnessLaw == null) throw new TransmissionDesignError("Measured belt needs its physical span law");
+			relation.stiffnessLaw = new materia.assembly.PositionStiffness(relation.stiffnessLaw).scaled(1.0/factor,_ -> 1.0,_ -> 0.0).springs;
+			relation.dampingRatio = measured.dampingRatio;
+			relation.calibration = materia.assembly.BeltCalibration.BeltCalibrations.copy(measured,id -> id);
+			relation.setBasis("stiffness",ValueBasis.Measured);
+			relation.setBasis("dampingRatio",ValueBasis.Measured);
+		}
 		if (relation.stiffnessLaw != null) relation.stiffness = new materia.assembly.PositionStiffness(relation.stiffnessLaw).range(id -> {
 			for (joint in mechanical.joints) if (joint.id == id) {
 				var lower = joint.limits.lower, upper = joint.limits.upper;
@@ -282,6 +301,7 @@ class DriveSystem {
 		coupling.efficiency = relation.efficiency;
 		coupling.stiffness = relation.stiffness;
 		coupling.stiffnessLaw = relation.stiffnessLaw;
+		coupling.calibration = relation.calibration;
 		coupling.dampingRatio = relation.dampingRatio;
 		coupling.backlash = relation.backlash;
 		coupling.drag = relation.drag;
@@ -748,6 +768,7 @@ class DriveSystem {
 			leaderZero: transmission.leaderZero};
 		copy.stiffness = transmission.stiffness;
 		copy.dampingRatio = transmission.dampingRatio;
+		if (transmission.calibration != null) copy.calibration = materia.assembly.BeltCalibration.BeltCalibrations.copy(transmission.calibration,map);
 		copy.backlash = transmission.backlash;
 		copy.drag = transmission.drag;
 		copy.near = transmission.near;

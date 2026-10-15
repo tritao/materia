@@ -52,3 +52,85 @@ Acquisitions publish on the owner thread with the provider's sequence, clock
 and acquisition time. Repeated polls do not refresh the frame. Close the
 binding before disposing its robot runtime. Hardware transport/profile choices
 remain deployment configuration; the authored CAD mission stays unchanged.
+
+## Klipper resonance measurements
+
+`processkit.moonraker.ResonanceImport.read` downloads recorded CSV artifacts
+through Moonraker's file API. `PrinterLink.readResonance` exposes this on the
+application's existing connection. Importing runs no G-code, moves no hardware,
+and writes no printer configuration.
+
+Acquisition has two inputs:
+
+1. A spectrum from Klipper's `TEST_RESONANCES ... OUTPUT=resonances` or
+   `SHAPER_CALIBRATE`, with `freq,psd_x,psd_y,psd_z,psd_xyz` columns. Extra shaper
+   columns are accepted. The recommended shaper frequency is not a measured
+   mechanical natural frequency, and its configured damping is not a damping
+   measurement.
+2. An unshaped free-decay capture from `ACCELEROMETER_MEASURE`, with Klipper's
+   `#time,accel_x,accel_y,accel_z` columns. Identify an interval **after excitation
+   stops**, while the motors hold position; pass its capture timestamps to the
+   importer. A moving frequency sweep is not free decay. Record the physical
+   joint pose and payload at acquisition, rather than using the printer's live
+   position later.
+
+Klipper writes these files under `/tmp`; Moonraker does not expose that directory
+as a file root. Publish the selected artifacts under a configured `config` or
+`gcodes` directory before importing. The caller supplies those relative paths;
+there is no automatic copying, path discovery or interpretation of arbitrary
+G-code log messages. Downloads encode individual path segments and reject
+traversal. A capture is limited to 16 MiB and one million rows.
+
+The fitter uses the spectrum to select a mode, then fits a continuous damped
+sinusoid to the free trace, solving amplitude, phase and sensor bias linearly.
+It rejects irregular sample clocks, insufficient cycles/sample resolution,
+no identifiable amplitude decay, mismatched modes and waveform RMS error above
+5%. This single-mode fit is deliberately narrower than Klipper's multimode
+shaper selection. It does not claim a confidence interval from that RMS score.
+The result preserves both content hashes, the selected decay interval and the
+fit method.
+
+`cadbridge.BeltResonanceCalibration` combines the measurement with the matching
+assembly/RobotModel and its acquisition pose (physical RobotKit coordinates in
+SI). It identifies one **common rigidity correction** for an explicit group of
+carriage belts: for the CoreXY printer use `['beltA', 'beltB']`. A partial group,
+an unrelated mechanism, explicit competing overrides or an elastic network is
+refused. A single carriage mode cannot identify each CoreXY belt independently.
+Mass/inertia and mode attribution remain model inputs; the resulting effective
+cord rigidity is inferred from that measured mode, not a material test.
+
+```haxe
+link.readResonance("config", "resonances/x.csv", "resonances/ring_x.csv",
+  "x", freeStart, freeEnd, measurement -> {
+    var update = new cadbridge.BeltResonanceCalibration(
+      assembly, robotModel, ["beltA", "beltB"], measurement, acquisitionPose);
+    sys.io.File.saveContent("printer-calibration.json", update.encode());
+    update.apply();
+  });
+```
+
+`beforeFrequency`, `afterFrequency`, `rigidityFactor`, `fitted`, and a copied
+`values` map expose the result before applying it. Applying changes the local
+model, retaining its position-dependent span laws; every relation of each
+selected belt updates together with basis `Measured`. Motor/mass/efficiency
+assumptions remain. Changed source or model data invalidates the proposal.
+Rebuild planning/simulation and derive fixed shaping from the resulting full
+frequency range; this operation never installs the shaper on firmware.
+
+Normal MachineAssembly descriptions preserve the calibration. Source-defined
+printers may contain CAD members without rebuild recipes; the standalone overlay
+above also covers them. After regenerating the original source assembly/model,
+use `BeltResonanceCalibration.applySaved(assembly, robotModel, savedText)`.
+It checks both source and physical-model hashes (including mass), and refuses
+reapplication to an already calibrated or changed model. Use
+`assembly.clearBeltCalibration(beltId)` before deliberately authoring a competing
+transmission override.
+
+Build the focused check programs with:
+`./haxeon/scripts/haxeon build --project robotkit/cadbridge/tests/haxeon.resonance.json` and
+`./haxeon/scripts/haxeon build --project processkit/tests/moonraker/haxeon.json`.
+
+Upstream formats and assumptions:
+[Klipper resonance measurement](https://www.klipper3d.org/Measuring_Resonances.html),
+[Klipper shaper calibration implementation](https://github.com/Klipper3d/klipper/blob/master/klippy/extras/shaper_calibrate.py),
+[Moonraker file API](https://moonraker.readthedocs.io/en/latest/external_api/file_manager/).

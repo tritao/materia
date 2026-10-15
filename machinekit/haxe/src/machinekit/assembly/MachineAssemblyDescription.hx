@@ -98,6 +98,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 	@:id(10) @:optional var unsupported:Null<Float>;
 	/** Stated damping of the coupling's response, as a ratio of critical damping. */
 	@:id(11) @:optional var dampingRatio:Null<Float>;
+	@:id(12) @:optional var calibration:Null<materia.assembly.BeltCalibration>;
 }
 
 /**

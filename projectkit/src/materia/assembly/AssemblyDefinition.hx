@@ -167,6 +167,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(12) @:optional var dampingRatio:Null<Float>;
 	/** Reciprocal affine compliances in the leader's units per effort, evaluated at physical assembly joint coordinates. */
 	@:id(13) @:optional var stiffnessLaw:Null<Array<AssemblyComplianceSpring>>;
+	@:id(14) @:optional var calibration:Null<materia.assembly.BeltCalibration>;
 }
 
 /** Series compliance of one parallel spring, in source-coordinate units per effort. */

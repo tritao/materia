@@ -137,6 +137,7 @@ class MechanicalAssembly {
 			target: map(coupling.target), ratio: coupling.ratio, offset: coupling.offset};
 		if (coupling.efficiency != null) copy.efficiency = coupling.efficiency;
 		if (coupling.stiffness != null) copy.stiffness = coupling.stiffness;
+		if (coupling.calibration != null) copy.calibration = materia.assembly.BeltCalibration.BeltCalibrations.copy(coupling.calibration,map);
 		if (coupling.stiffnessLaw != null) copy.stiffnessLaw = materia.assembly.AssemblyDefinitionFlattener.copyComplianceLaw(coupling.stiffnessLaw,map);
 		if (coupling.dampingRatio != null) copy.dampingRatio = coupling.dampingRatio;
 		if (coupling.backlash != null) copy.backlash = coupling.backlash;

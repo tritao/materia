@@ -47,11 +47,11 @@ class MoonrakerClient {
     sendBody(method, target, null, null, complete);
 
   /** Sends a request with a body of `contentType` (none when null) when the ones before it have been answered. */
-  public function sendBody(method:String, target:String, contentType:Null<String>, body:Null<Bytes>, complete:HttpResponse->Void):Void {
+  public function sendBody(method:String, target:String, contentType:Null<String>, body:Null<Bytes>, complete:HttpResponse->Void, accept:String = "application/json"):Void {
     if (closed || fault != null) throw "Moonraker client is disconnected";
     if (queue.length >= 64) throw "Moonraker request queue exceeded";
     var headers = new Map<String, String>();
-    headers.set("Accept", "application/json");
+    headers.set("Accept", accept);
     if (contentType != null) headers.set("Content-Type", contentType);
     queue.push(new Pending(new HttpRequest(method, target, headers, body == null ? Bytes.alloc(0) : body), complete));
   }
@@ -109,6 +109,19 @@ class MoonrakerClient {
       else out.add("%" + StringTools.hex(code, 2));
     }
     return out.toString();
+  }
+
+  /** Read an explicitly published artifact. Klipper's /tmp is not a Moonraker file root. */
+  public function downloadFile(root:String,path:String,complete:String->Void):Void {
+    if (root!="config" && root!="gcodes") throw "Download requires an explicit config or gcodes root";
+    if (path == null || path.length == 0) throw "Download needs a relative file path";
+    var segments=path.split("/");
+    for (segment in segments) if (segment.length == 0 || segment == "." || segment == ".." || segment.indexOf("\\")>=0)
+      throw "Download path must stay within its named file root";
+    sendBody("GET","/server/files/"+root+"/"+[for (segment in segments) percentEncode(segment)].join("/"),null,null,reply -> {
+      if (reply.status<200 || reply.status>=300) throw 'Moonraker artifact download failed: ${reply.status} ${reply.reason}';
+      complete(reply.text());
+    },"*/*");
   }
 
   /** Runs G-code or a Klipper command on the machine. */

@@ -57,7 +57,7 @@ class ArmJoint extends MachineComponent implements MotorDrive {
 	public static function recipeType():ComponentType {
 		if (recipeTypeCache == null) recipeTypeCache = new ComponentType("machinekit.robotics.arm-joint", [ComponentRecipeSupport.length("diameter", 100), ComponentRecipeSupport.length("length", 70), ComponentRecipeSupport.length("flangePitchCircle", 0),
 			ComponentRecipeSupport.choice("servo", ["none"].concat([for (rating in machinekit.motion.ServoMotor.ratings()) rating.designation]), "none"),
-			ComponentRecipeSupport.choice("servoBasis", ["derived", "catalog", "stated", "assumed"], "assumed")],
+			ComponentRecipeSupport.choice("servoBasis", ["derived", "catalog", "stated", "assumed", "measured"], "assumed")],
 			v -> new ArmJoint(v.number("diameter"), v.number("length"),
 				v.number("flangePitchCircle") > 0 ? new machinekit.robotics.RobotFlange(v.number("flangePitchCircle")) : null,
 				v.token("servo") == "none" ? null : machinekit.motion.ServoMotor.model(v.token("servo"), machinekit.motion.ServoMotor.basisFromToken(v.token("servoBasis")))), true);

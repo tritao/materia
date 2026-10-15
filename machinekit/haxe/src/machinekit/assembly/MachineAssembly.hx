@@ -272,7 +272,7 @@ class MachineAssembly {
 
 	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
 			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float, ?assumed:haxe.ds.ReadOnlyArray<String>,
-			?assumptions:haxe.ds.ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>, ?dampingRatio:Float, ?stiffnessLaw:Array<materia.assembly.AssemblyDefinition.AssemblyComplianceSpring>):Void {
+			?assumptions:haxe.ds.ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>, ?dampingRatio:Float, ?stiffnessLaw:Array<materia.assembly.AssemblyDefinition.AssemblyComplianceSpring>, ?calibration:materia.assembly.BeltCalibration):Void {
 		if (drives.transmission(id) != null) throw 'Transmission coupling "$id" is read-only; edit its parts or allowances';
 		requireOperationId(id);
 		if (source == null || source.length == 0 || target == null || target.length == 0)
@@ -282,6 +282,7 @@ class MachineAssembly {
 		if (efficiency != null) coupling.efficiency = efficiency;
 		if (stiffness != null) coupling.stiffness = stiffness;
 		if (stiffnessLaw != null) coupling.stiffnessLaw = materia.assembly.AssemblyDefinitionFlattener.copyComplianceLaw(stiffnessLaw, id -> id);
+		if (calibration != null) coupling.calibration = materia.assembly.BeltCalibration.BeltCalibrations.copy(calibration,same);
 		if (dampingRatio != null) coupling.dampingRatio = dampingRatio;
 		if (backlash != null) coupling.backlash = backlash;
 		if (drag != null) coupling.drag = drag;
@@ -423,6 +424,40 @@ class MachineAssembly {
 		entry.backlash = proposed.backlash;
 		entry.drag = proposed.drag;
 		DriveSystem.write(mechanical.couplings, mechanical.joints, entry, relation);
+		changed();
+	}
+
+	/** Apply measured effective cord properties to every local motion relation of each selected physical belt.
+	 * Preflight against complete geometry before mutation; callers receive a new derived snapshot on next use. */
+	public function calibrateBelts(values:Map<String,materia.assembly.BeltCalibration>):Void {
+		var proposals:Array<TransmissionRecord> = [];
+		var flat = derived();
+		flat.diagnostics.throwIfErrors();
+		for (belt in values.keys()) {
+			var found = false;
+			for (entry in drives.transmissions) switch entry.source {
+				case TimingBelt(id,_) if (id == belt):
+					var proposed = DriveSystem.copyTransmission(entry,same);
+					proposed.calibration = materia.assembly.BeltCalibration.BeltCalibrations.copy(values.get(belt),same);
+					DriveSystem.resolve(flat,proposed,null,true);
+					proposals.push(proposed); found=true;
+				case _:
+			}
+			if (!found) throw 'No local carriage timing belt "$belt"';
+		}
+		if (proposals.length == 0) throw "Calibration needs at least one physical belt";
+		for (proposed in proposals) ownTransmission(proposed.coupling).calibration = proposed.calibration;
+		changed();
+	}
+
+	/** Clear a measured property deliberately before authoring a competing override. */
+	public function clearBeltCalibration(belt:String):Void {
+		var found=false;
+		for (entry in drives.transmissions) switch entry.source {
+			case TimingBelt(id,_) if (id == belt): entry.calibration=null; found=true;
+			case _:
+		}
+		if (!found) throw 'No local carriage timing belt "$belt"';
 		changed();
 	}
 
@@ -763,7 +798,8 @@ class MachineAssembly {
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),
 				join(prefix, coupling.target), coupling.ratio, coupling.offset, coupling.efficiency,
 				coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions, coupling.dampingRatio,
-				coupling.stiffnessLaw == null ? null : materia.assembly.AssemblyDefinitionFlattener.copyComplianceLaw(coupling.stiffnessLaw, id -> join(prefix,id)));
+				coupling.stiffnessLaw == null ? null : materia.assembly.AssemblyDefinitionFlattener.copyComplianceLaw(coupling.stiffnessLaw, id -> join(prefix,id)),
+				coupling.calibration == null ? null : materia.assembly.BeltCalibration.BeltCalibrations.copy(coupling.calibration,id -> join(prefix,id)));
 		if (mechanical.elasticNetworks != null) for (network in mechanical.elasticNetworks)
 			model.addElasticNetwork(materia.assembly.AssemblyDefinitionFlattener.copyElasticNetwork(network, id -> join(prefix, id)));
 		if (mechanical.switches != null) for (contact in mechanical.switches)

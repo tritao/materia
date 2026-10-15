@@ -385,6 +385,11 @@ class RobotModelCodec {
             {joint:text(coordinate,"joint"),coefficient:number(coordinate,"coefficient")}]}]);
         coupling.setStiffnessLaw(law,model.joints);
       }
+      if (Reflect.hasField(record,"calibration")) {
+        var measured:materia.assembly.BeltCalibration = JsonWire.decode(Json.stringify(Reflect.field(record,"calibration")));
+        materia.assembly.BeltCalibration.BeltCalibrations.validate(measured);
+        coupling.calibration = measured;
+      }
       coupling.assumed = readAssumed(record);
       coupling.assumptions = readAssumptions(record);
       if (!joints.exists(coupling.leader) || !joints.exists(coupling.follower))
@@ -639,6 +644,8 @@ class RobotModelCodec {
       id: coupling.id, leader: coupling.leader, follower: coupling.follower,
       ratio: coupling.ratio, offset: coupling.offset, efficiency: coupling.efficiency
     };
+    var measured=coupling.calibration;
+    if (measured != null) record.calibration = Json.parse(JsonWire.encode(measured));
     if (coupling.stiffnessLaw != null) record.stiffnessLaw = coupling.stiffnessLaw.springs;
     if (coupling.stiffness != 0.0) record.stiffness = nonNegative(coupling.stiffness, "coupling stiffness");
     if (coupling.dampingRatio != 0.0) record.dampingRatio = nonNegative(coupling.dampingRatio, "coupling damping ratio");

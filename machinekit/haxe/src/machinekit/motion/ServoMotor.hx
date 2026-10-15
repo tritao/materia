@@ -120,6 +120,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 		case "catalog": Catalog;
 		case "stated": Stated;
 		case "assumed": Assumed;
+		case "measured": Measured;
 		case _: throw 'Unknown servo ratings basis "$token"';
 	};
 
@@ -128,6 +129,7 @@ class ServoMotor extends MachineComponent implements MotorDrive {
 		case Catalog: "catalog";
 		case Stated: "stated";
 		case Assumed: "assumed";
+		case Measured: "measured";
 	};
 
 	public function new(rating:ServoRating, ratingsBasis:machinekit.transmission.ValueBasis = Stated) {

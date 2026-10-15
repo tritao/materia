@@ -181,6 +181,7 @@ class AssemblyDefinitionCodec {
 				(coupling.backlash != null && !(coupling.backlash >= 0 && Math.isFinite(coupling.backlash))) ||
 				(coupling.drag != null && !(coupling.drag >= 0 && Math.isFinite(coupling.drag))))
 				throw "Assembly has an invalid coupled joint";
+			if (coupling.calibration != null) BeltCalibration.BeltCalibrations.validate(coupling.calibration);
 			if (coupling.stiffnessLaw != null) {
 				if (coupling.stiffnessLaw.length == 0 || coupling.stiffness == null || !(coupling.stiffness>0.0))
 					throw "A position stiffness law needs a positive planning stiffness";

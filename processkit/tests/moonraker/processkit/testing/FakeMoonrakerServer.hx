@@ -319,7 +319,14 @@ class FakeMoonrakerServer {
         if (state == "printing" || state == "paused") { state = "cancelled"; extruder.target = 0.0; bed.target = 0.0; }
         sendHttp(link, 200, "OK", {result: "ok"});
         push();
-      case _: sendHttp(link, 404, "Not Found", {error: {message: "no such endpoint"}});
+      case _:
+        if (request.method == "GET" && StringTools.startsWith(path,"/server/files/")) {
+          var parts=path.substr(14).split("/"), root=parts.shift();
+          var name=[for (part in parts) percentDecode(part)].join("/");
+          var content=root == "config" ? configFiles.get(name) : root == "gcodes" ? files.get(name) : null;
+          if (content == null) sendHttp(link,404,"Not Found",{error:{message:"file not found"}});
+          else NativeTransport.send(link.transport,HttpResponse.encode(200,"OK","text/csv",Bytes.ofString(content)));
+        } else sendHttp(link, 404, "Not Found", {error: {message: "no such endpoint"}});
     }
   }
 

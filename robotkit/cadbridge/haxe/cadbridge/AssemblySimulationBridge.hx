@@ -541,6 +541,7 @@ class AssemblySimulationBridge {
       var offset = (coupling.ratio * placement.joint(coupling.source) + coupling.offset - placed) * followerScale;
       var added = model.addCoupling(new JointCoupling(coupling.id, coupling.source,
         coupling.target, ratio, offset));
+      if (coupling.calibration != null) added.calibration = materia.assembly.BeltCalibration.BeltCalibrations.copy(coupling.calibration,id -> id);
       if (coupling.efficiency != null) added.efficiency = coupling.efficiency;
       // Stiffness and backlash are in the leader's units, which a sliding leader measures in assembly units.
       var stiffness = coupling.stiffness, backlash = coupling.backlash, drag = coupling.drag;

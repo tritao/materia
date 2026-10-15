@@ -27,6 +27,7 @@ class JointCoupling {
    * sliding leader, N m/rad for a turning one), such as a timing belt's stretch. Zero means rigid.
    */
   public var stiffness:Float = 0.0;
+  public var calibration:Null<materia.assembly.BeltCalibration> = null;
   /** Physical-pose constitutive law; stiffness is its certified minimum over travel for planning. */
   public var stiffnessLaw(default,null):Null<PositionStiffness> = null;
   /**

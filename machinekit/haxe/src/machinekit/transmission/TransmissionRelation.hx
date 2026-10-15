@@ -4,6 +4,7 @@ import haxe.ds.ReadOnlyArray;
 
 /** Resolved motion and engineering allowances, in the coupling's units. */
 class TransmissionRelation {
+	public var calibration:Null<materia.assembly.BeltCalibration> = null;
 	public var ratio:Float;
 	public var efficiency:Float;
 	public var stiffness:Null<Float>;

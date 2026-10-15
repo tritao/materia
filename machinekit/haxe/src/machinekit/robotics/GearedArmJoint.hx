@@ -34,7 +34,7 @@ class GearedArmJoint extends ArmJoint {
 			ComponentRecipeSupport.length("pocketDiameter", 61), ComponentRecipeSupport.length("pocketLength", 36),
 			ComponentRecipeSupport.scalar("flangePitchCircle", 0),
 			ComponentRecipeSupport.choice("servo", ["none"].concat([for (rating in ServoMotor.ratings()) rating.designation]), "GENERIC-SERVO-200W"),
-			ComponentRecipeSupport.choice("servoBasis", ["derived", "catalog", "stated", "assumed"], "assumed")
+			ComponentRecipeSupport.choice("servoBasis", ["derived", "catalog", "stated", "assumed", "measured"], "assumed")
 		], v -> new GearedArmJoint(v.number("diameter"), v.number("length"), v.number("pocketDiameter"),
 			v.number("pocketLength"), v.number("flangePitchCircle") == 0 ? null : new RobotFlange(v.number("flangePitchCircle")),
 			v.token("servo") == "none" ? null : ServoMotor.model(v.token("servo"), ServoMotor.basisFromToken(v.token("servoBasis")))));

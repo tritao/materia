@@ -30,6 +30,7 @@ class MoonrakerTests {
   }
 
   public static function main():Void {
+    ResonanceTests.run();
     framing();
     webSocketFraming();
     status();
@@ -233,6 +234,20 @@ class MoonrakerTests {
     client.serverInfo(function(result) info = result);
     run(() -> info != null, "server info");
     check(Reflect.field(info, "klippy_state") == "ready", "Klippy is ready");
+
+    // Recorded artifacts are explicitly published in a Moonraker root, not read from Klipper's /tmp.
+    fake.configFiles.set("resonances/spectrum.csv",ResonanceTests.spectrum(57));
+    fake.configFiles.set("resonances/decay x.csv",ResonanceTests.decay(57,0.085));
+    var measured:Null<materia.assembly.BeltCalibration.ResonanceMeasurement> = null;
+    processkit.moonraker.ResonanceImport.read(client,"config","resonances/spectrum.csv","resonances/decay x.csv","x",0,0.2,value->measured=value);
+    run(()->measured!=null,"recorded resonance import");
+    if (measured == null) throw "No imported measurement";
+    check(Math.abs(measured.frequencyHz-57)<0.001 && Math.abs(measured.dampingRatio-0.085)<0.0001,
+      "downloaded Klipper artifacts yield measured frequency and damping");
+    check(fake.scripts.length==0 && fake.restarts==0,"import sends no movement, shaper changes or firmware writes");
+    var unsafe=false;
+    try client.downloadFile("config","../outside.csv",_->{}) catch (_:Dynamic) unsafe=true;
+    check(unsafe,"artifact path cannot escape the named Moonraker root");
 
     // An upload that starts a print: a file large enough to cross several reads.
     var program = [for (index in 0...6000) 'G1 X${index % 100} Y${index % 90} E0.01'].join("\n");

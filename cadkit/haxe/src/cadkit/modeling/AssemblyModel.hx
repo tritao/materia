@@ -204,11 +204,12 @@ class AssemblyModel {
 	 */
 	public function couple(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
 			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float, ?assumed:ReadOnlyArray<String>, ?assumptions:ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>,
-			?dampingRatio:Float, ?stiffnessLaw:Array<materia.assembly.AssemblyDefinition.AssemblyComplianceSpring>):Void {
+			?dampingRatio:Float, ?stiffnessLaw:Array<materia.assembly.AssemblyDefinition.AssemblyComplianceSpring>, ?calibration:materia.assembly.BeltCalibration):Void {
 		var coupling:materia.assembly.AssemblyDefinition.AssemblyJointCoupling = {id: id, source: source,
 			target: target, ratio: ratio, offset: offset};
 		if (efficiency != null) coupling.efficiency = efficiency;
 		if (stiffness != null) coupling.stiffness = stiffness;
+		if (calibration != null) coupling.calibration = materia.assembly.BeltCalibration.BeltCalibrations.copy(calibration,id -> id);
 		if (stiffnessLaw != null) coupling.stiffnessLaw = materia.assembly.AssemblyDefinitionFlattener.copyComplianceLaw(stiffnessLaw, id -> id);
 		if (dampingRatio != null) coupling.dampingRatio = dampingRatio;
 		if (backlash != null) coupling.backlash = backlash;

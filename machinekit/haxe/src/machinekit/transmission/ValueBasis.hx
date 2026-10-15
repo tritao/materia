@@ -6,4 +6,5 @@ package machinekit.transmission;
 	@:id(2) Catalog;
 	@:id(3) Stated;
 	@:id(4) Assumed;
+	@:id(5) Measured;
 }

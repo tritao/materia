@@ -116,6 +116,14 @@ class PrinterLink {
     note = 'Installing $name (${text.length} bytes)';
   }
 
+  /** Import explicitly published measurement artifacts. The caller reviews and applies the returned model proposal. */
+  public function readResonance(root:String,spectrum:String,decay:String,axis:String,start:Float,end:Float,
+      complete:materia.assembly.BeltCalibration.ResonanceMeasurement->Void):Void {
+    if (installer != null && !installer.done) throw "Wait for the configuration install before importing resonance data";
+    processkit.moonraker.ResonanceImport.read(live(),root,spectrum,decay,axis,start,end,complete);
+    note="Reading resonance measurement";
+  }
+
   public function pause():Void live().pause(function() note = "Print paused");
 
   public function resume():Void live().resume(function() note = "Print resumed");
