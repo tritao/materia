@@ -56,10 +56,14 @@ class MateriaProjectFingerprint {
 		var binaries = [Path.join([home, ".tools", "haxe", "haxe"]),
 				Path.join([home, ".tools", "hashlink", "hl"]),
 				Path.join([home, "out", "haxeon_runtime.hdll"])];
-		var nativeDirectory = Path.join([Path.directory(args[3]), "build", "host", "native", "app"]);
-		if (FileSystem.exists(nativeDirectory)) for (name in FileSystem.readDirectory(nativeDirectory))
-			if (StringTools.endsWith(name, ".hdll") || name.indexOf(".so") >= 0)
-				binaries.push(Path.join([nativeDirectory, name]));
+		// The generator loads every package's native libraries (CadKit's, StockKit's, ...), each built in its own directory.
+		var nativeRoot = Path.join([Path.directory(args[3]), "build", "host", "native"]);
+		if (FileSystem.exists(nativeRoot)) for (kit in FileSystem.readDirectory(nativeRoot)) {
+			var nativeDirectory = Path.join([nativeRoot, kit]);
+			if (FileSystem.isDirectory(nativeDirectory)) for (name in FileSystem.readDirectory(nativeDirectory))
+				if (StringTools.endsWith(name, ".hdll") || name.indexOf(".so") >= 0)
+					binaries.push(Path.join([nativeDirectory, name]));
+		}
 		binaries.sort(Reflect.compare);
 		for (path in binaries) {
 			if (!FileSystem.exists(path)) continue;
