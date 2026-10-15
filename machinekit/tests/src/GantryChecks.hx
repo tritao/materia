@@ -104,6 +104,9 @@ class GantryChecks {
 			for (joint in extended.joints) if (joint.limits.overtravel != null) {
 				if (joint.limits.lower != null) joint.limits.lower -= joint.limits.overtravel;
 				if (joint.limits.upper != null) joint.limits.upper += joint.limits.overtravel;
+				// The allowance is now inside the bounds; do not certify a second allowance
+				// when AssemblyState validates the physical compliance laws.
+				joint.limits.overtravel = 0.0;
 			}
 			state = new AssemblyState(extended);
 		}
