@@ -44,8 +44,24 @@ struct DeviceSegment6 {
     std::vector<device_wire6::Segment6Coefficients> coefficients;
 };
 
+enum class DeviceCompileFailure6 { None, InvalidInput, Clock, Limits, StepRate, Precision, Coupling, Overflow, Resource, MergeRefused };
+
+/** UART is 8N1 (ten bits per byte). A zero description disables optional merging. */
+struct DeviceLink6 {
+    std::uint32_t segment_frame_bytes = 0;
+    std::uint64_t baud = 0;
+    std::uint32_t queue_capacity = 0;
+    double segment_rate = 0;
+    std::uint64_t refill_delay_ns = 0;
+};
+struct DeviceMergeWindow6 { std::uint64_t below_ns = 0, up_to_ns = 0; };
+DeviceMergeWindow6 device_merge_window6(const DeviceLink6 &link);
+
 struct CompiledDevicePlan6 {
     bool ok = false;
+    DeviceCompileFailure6 failure = DeviceCompileFailure6::None;
+    DeviceCompileFailure6 merge_cause = DeviceCompileFailure6::None;
+    bool retried_without_merge = false;
     std::string error;
     double worst_position_error = 0;
     std::vector<DeviceSegment6> segments;
@@ -77,6 +93,6 @@ CompiledDevicePlan6 compile_device_segments6(
     std::uint8_t max_degree, double target_error,
     std::span<const DeviceActuator6> layout = {},
     std::uint64_t anchor_ticks = 0, bool homing = false,
-    const double *start_tolerance = nullptr);
+    const double *start_tolerance = nullptr, const DeviceLink6 &link = {});
 
 } // namespace robotkit

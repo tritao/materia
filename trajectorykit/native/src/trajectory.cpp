@@ -1,4 +1,5 @@
 #include "trajectory_core.hpp"
+#include "trajectory_merge.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -612,3 +613,28 @@ mk_result MK_CALL mk_plan_evaluate(mk_plan_handle plan, int64_t time_ns,
 }
 
 } // extern "C"
+
+namespace motionkit {
+mk_result merge_trajectory(mk_trajectory_handle handle, const MergeOptions &options, mk_trajectory_handle *out) {
+    if (!out) return MK_ERROR_INVALID_ARGUMENT;
+    out->id = 0;
+    const auto source = find(handle);
+    if (!source) return MK_ERROR_INVALID_HANDLE;
+    try {
+        auto merged = std::make_unique<Trajectory>(source->joint_count());
+        const PolynomialSource view{source.get(), source->segment_count(), source->joint_count(),
+            [](const void *context, uint32_t index) {
+                const auto &t = *static_cast<const Trajectory *>(context);
+                return PolynomialSegmentView{t.segment_start(index), t.segment_duration(index), t.segment_degree(index),
+                    t.joint_count(), t.segment_coefficients(index), sizeof(mk_joint_coefficients)};
+            }};
+        const auto status = merge_polynomials(view, options, {merged.get(),
+            [](void *context, const mk_segment &segment, uint32_t, uint32_t) -> mk_result {
+                return static_cast<Trajectory *>(context)->append(segment) ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
+            }});
+        if (status != MK_OK) return status;
+        std::lock_guard lock(registry_mutex);
+        return register_trajectory(std::move(merged), out);
+    } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
+}
+}

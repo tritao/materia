@@ -1,4 +1,5 @@
 #include "motionkit.h"
+#include "trajectory_merge.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1432,20 +1433,6 @@ mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joi
     return MK_OK;
 }
 
-namespace {
-
-struct Kin { double position, velocity, acceleration; };
-
-Kin kin_of(const mk_joint_coefficients &c, uint32_t degree, double tau) {
-    double p = 0.0, v = 0.0, a = 0.0;
-    for (int k = static_cast<int>(degree); k >= 0; --k) p = p * tau + c.value[k];
-    for (int k = static_cast<int>(degree) - 1; k >= 0; --k) v = v * tau + (k + 1.0) * c.value[k + 1];
-    for (int k = static_cast<int>(degree) - 2; k >= 0; --k) a = a * tau + (k + 2.0) * (k + 1.0) * c.value[k + 2];
-    return {p, v, a};
-}
-
-} // namespace
-
 mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const double *position_tolerance,
                                     const double *velocity_tolerance, const double *acceleration_tolerance,
                                     const double *velocity_limit, const double *acceleration_limit,
@@ -1454,226 +1441,12 @@ mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const doubl
                                     mk_trajectory_handle *out_trajectory) {
     if (!out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
     out_trajectory->id = 0;
-    if (!position_tolerance || !velocity_tolerance || !acceleration_tolerance || !velocity_limit || !acceleration_limit ||
-        !position_lower || !position_upper || joint_count == 0 ||
-        !std::isfinite(max_duration_seconds) || max_duration_seconds <= 0.0)
-        return MK_ERROR_INVALID_ARGUMENT;
-    for (uint32_t j = 0; j < joint_count; ++j)
-        if (!(position_tolerance[j] > 0.0) || !(velocity_tolerance[j] > 0.0) || !(acceleration_tolerance[j] > 0.0) ||
-            !(velocity_limit[j] > 0.0) || !(acceleration_limit[j] > 0.0) || std::isnan(position_lower[j]) ||
-            std::isnan(position_upper[j]) || position_lower[j] > position_upper[j])
-            return MK_ERROR_INVALID_ARGUMENT;
-    uint32_t joints = 0, count = 0;
-    auto status = mk_trajectory_joint_count(trajectory, &joints);
+    uint32_t joints = 0;
+    const auto status = mk_trajectory_joint_count(trajectory, &joints);
     if (status != MK_OK) return status;
     if (joints != joint_count) return MK_ERROR_INVALID_ARGUMENT;
-    status = mk_trajectory_segment_count(trajectory, &count);
-    if (status != MK_OK) return status;
-    const int64_t longest = static_cast<int64_t>(std::llround(max_duration_seconds * 1e9));
-    mk_trajectory_handle merged{};
-    status = mk_trajectory_create(joints, &merged);
-    if (status != MK_OK) return status;
-    try {
-        std::vector<int64_t> start(count), duration(count);
-        std::vector<uint8_t> smooth(count);
-        // The segment held back until the next one shows whether a too-short one is to be joined to it.
-        std::unique_ptr<mk_segment> held;
-        constexpr int64_t kSliver = 4000;
-        auto first_segment = std::make_unique<mk_segment>(), last_segment = std::make_unique<mk_segment>();
-        auto candidate = std::make_unique<mk_segment>(), best_segment = std::make_unique<mk_segment>();
-        for (uint32_t i = 0; i < count; ++i) {
-            *first_segment = mk_segment{};
-            first_segment->struct_size = sizeof(mk_segment);
-            status = mk_trajectory_get_segment(trajectory, i, first_segment.get());
-            if (status != MK_OK) { mk_trajectory_destroy(merged); return status; }
-            start[i] = first_segment->t0_ns;
-            duration[i] = first_segment->duration_ns;
-            // A chord (degree 1) knows no acceleration to match: it is never merged.
-            smooth[i] = first_segment->degree >= 2 ? 1 : 0;
-        }
-        // The quintic through the first segment's start state and the last one's end state.
-        auto through = [&](uint32_t last) {
-            const double T = static_cast<double>(start[last] + duration[last] - first_segment->t0_ns) * 1e-9;
-            const double end = static_cast<double>(duration[last]) * 1e-9;
-            *candidate = *first_segment;
-            candidate->t0_ns = first_segment->t0_ns;
-            candidate->duration_ns = start[last] + duration[last] - first_segment->t0_ns;
-            candidate->degree = 5;
-            for (uint32_t joint = 0; joint < joints; ++joint) {
-                const auto from = kin_of(first_segment->coefficients[joint], first_segment->degree, 0.0);
-                const auto to = kin_of(last_segment->coefficients[joint], last_segment->degree, end);
-                const double V0 = from.velocity * T, A0 = from.acceleration * T * T;
-                const double V1 = to.velocity * T, A1 = to.acceleration * T * T;
-                const double D = to.position - from.position - V0 - 0.5 * A0, E = V1 - V0 - A0, F = A1 - A0;
-                const double normalized[6] = {from.position, V0, 0.5 * A0, 10.0 * D - 4.0 * E + 0.5 * F,
-                    -15.0 * D + 7.0 * E - F, 6.0 * D - 3.0 * E + 0.5 * F};
-                double scale = 1.0;
-                for (int k = 0; k < 6; ++k) { candidate->coefficients[joint].value[k] = normalized[k] / scale; scale *= T; }
-            }
-        };
-        mk_trajectory_state state{};
-        state.struct_size = sizeof(state);
-        // Whether the quintic follows the segments it replaces at their joins and at fifteen even steps across.
-        auto follows = [&](uint32_t first, uint32_t last) -> mk_result {
-            std::vector<double> peak_velocity(joints, 0.0), peak_acceleration(joints, 0.0);
-            std::vector<int64_t> times;
-            const uint32_t stride = std::max<uint32_t>(1, (last - first + 1) / 24);
-            for (uint32_t i = first; i <= last; i += stride) times.push_back(start[i]);
-            for (int step = 1; step < 16; ++step)
-                times.push_back(candidate->t0_ns + candidate->duration_ns * step / 16);
-            for (const auto time : times) {
-                const auto result = mk_trajectory_evaluate(trajectory, time, &state);
-                if (result != MK_OK) return result;
-                const double tau = static_cast<double>(time - candidate->t0_ns) * 1e-9;
-                for (uint32_t joint = 0; joint < joints; ++joint) {
-                    const auto mine = kin_of(candidate->coefficients[joint], 5, tau);
-                    if (std::abs(mine.position - state.position[joint]) > position_tolerance[joint] ||
-                        std::abs(mine.velocity - state.velocity[joint]) > velocity_tolerance[joint] ||
-                        std::abs(mine.acceleration - state.acceleration[joint]) > acceleration_tolerance[joint])
-                        return MK_ERROR_GENERATION;
-                    // A merged run does not take a joint past a limit that the segments it replaces keep to, nor, where they
-                    // are past it themselves (a plateau at the limit, as a timed path cruises), past what they are by
-                    // more than rounding (1e-9 of the limit, the validator's own floor: a plan cruising at the limit is
-                    // checked against it). The same for the position bounds, to a nanometre.
-                    if (mine.position < position_lower[joint] && mine.position < state.position[joint] - 1e-9) return MK_ERROR_GENERATION;
-                    if (mine.position > position_upper[joint] && mine.position > state.position[joint] + 1e-9) return MK_ERROR_GENERATION;
-                    if ((std::abs(mine.velocity) > velocity_limit[joint] &&
-                         std::abs(mine.velocity) > std::abs(state.velocity[joint]) + 1e-9 * velocity_limit[joint]) ||
-                        (std::abs(mine.acceleration) > acceleration_limit[joint] &&
-                         std::abs(mine.acceleration) > std::abs(state.acceleration[joint]) + 1e-9 * acceleration_limit[joint]))
-                        return MK_ERROR_GENERATION;
-                    peak_velocity[joint] = std::max(peak_velocity[joint], std::abs(state.velocity[joint]));
-                    peak_acceleration[joint] = std::max(peak_acceleration[joint],
-                        std::abs(state.acceleration[joint]));
-                }
-            }
-            // Samples can miss the quintic's own peaks between them, as on a plateau at a limit: bound its speed and
-            // acceleration exactly, at its stationary points.
-            const double T = static_cast<double>(candidate->duration_ns) * 1e-9;
-            for (uint32_t joint = 0; joint < joints; ++joint) {
-                Poly p(6);
-                double scale = 1.0;
-                for (int k = 0; k < 6; ++k) { p[k] = candidate->coefficients[joint].value[k] * scale; scale *= T; }
-                // A joint that holds still, or moves at a constant speed, has nothing to find the peaks of.
-                if (p[2] == 0.0 && p[3] == 0.0 && p[4] == 0.0 && p[5] == 0.0) {
-                    if (std::abs(p[1]) / T > velocity_limit[joint] * (1.0 + 1e-9) &&
-                        std::abs(p[1]) / T > peak_velocity[joint] + 1e-9 * velocity_limit[joint])
-                        return MK_ERROR_GENERATION;
-                    continue;
-                }
-                const Poly v = derivative(p), a = derivative(v);
-                // The control points of the Bernstein form bound a polynomial on [0,1]: when they keep within the
-                // limit, or within what the segments replaced already reach, there are no peaks to find.
-                auto hull = [](const Poly &q) {
-                    const int n = static_cast<int>(q.size()) - 1;
-                    double bound = 0.0;
-                    for (int k = 0; k <= n; ++k) {
-                        double control = 0.0, ratio = 1.0;
-                        for (int i = 0; i <= k; ++i) {
-                            if (i) ratio *= static_cast<double>(k - i + 1) / static_cast<double>(n - i + 1);
-                            control += ratio * q[static_cast<size_t>(i)];
-                        }
-                        bound = std::max(bound, std::abs(control));
-                    }
-                    return bound;
-                };
-                auto peak = [](const Poly &q) {
-                    double worst = std::max(std::abs(eval(q, 0.0)), std::abs(eval(q, 1.0)));
-                    for (double x : roots(derivative(q))) worst = std::max(worst, std::abs(eval(q, x)));
-                    return worst;
-                };
-                const double v_hull = hull(v) / T, a_hull = hull(a) / (T * T);
-                const bool v_open = v_hull > velocity_limit[joint] * (1.0 + 1e-9) &&
-                    v_hull > peak_velocity[joint] + 1e-9 * velocity_limit[joint];
-                const bool a_open = a_hull > acceleration_limit[joint] * (1.0 + 1e-9) &&
-                    a_hull > peak_acceleration[joint] + 1e-9 * acceleration_limit[joint];
-                if (!v_open && !a_open) continue;
-                const double v_peak = v_open ? peak(v) / T : 0.0, a_peak = a_open ? peak(a) / (T * T) : 0.0;
-                if ((v_open && v_peak > velocity_limit[joint] * (1.0 + 1e-9) &&
-                     v_peak > peak_velocity[joint] + 1e-9 * velocity_limit[joint]) ||
-                    (a_open && a_peak > acceleration_limit[joint] * (1.0 + 1e-9) &&
-                     a_peak > peak_acceleration[joint] + 1e-9 * acceleration_limit[joint]))
-                    return MK_ERROR_GENERATION;
-            }
-            return MK_OK;
-        };
-        for (uint32_t first = 0; first < count;) {
-            *first_segment = mk_segment{};
-            first_segment->struct_size = sizeof(mk_segment);
-            status = mk_trajectory_get_segment(trajectory, first, first_segment.get());
-            if (status != MK_OK) { mk_trajectory_destroy(merged); return status; }
-            *best_segment = *first_segment;
-            uint32_t best = first, limit = first;
-            if (smooth[first])
-                while (limit + 1 < count && smooth[limit + 1] &&
-                       start[limit + 1] + duration[limit + 1] - start[first] <= longest) ++limit;
-            auto accepts = [&](uint32_t last) -> mk_result {
-                *last_segment = mk_segment{};
-                last_segment->struct_size = sizeof(mk_segment);
-                auto result = mk_trajectory_get_segment(trajectory, last, last_segment.get());
-                if (result != MK_OK) return result;
-                through(last);
-                result = follows(first, last);
-                if (result != MK_OK) return result;
-                best = last;
-                *best_segment = *candidate;
-                return MK_OK;
-            };
-            // The longest run that works, found by doubling and then bisecting.
-            uint32_t step = 1, failed = limit + 1;
-            while (best + step <= limit) {
-                const auto result = accepts(best + step);
-                if (result == MK_OK) step *= 2;
-                else if (result == MK_ERROR_GENERATION) { failed = best + step; break; }
-                else { mk_trajectory_destroy(merged); return result; }
-            }
-            while (failed > best + 1) {
-                const uint32_t middle = best + (failed - best) / 2;
-                if (middle == best) break;
-                const auto result = accepts(middle);
-                if (result == MK_OK) continue;
-                if (result != MK_ERROR_GENERATION) { mk_trajectory_destroy(merged); return result; }
-                failed = middle;
-            }
-            // A run that came out shorter than a device's clock can resolve is joined to its neighbour, through the two
-            // together's end states (so the path stays continuous and the sliver's own few microseconds of motion are all
-            // that is smoothed over): the cuts of a shaped path land a few nanoseconds from each other now and then.
-            if (held && (held->duration_ns < kSliver || best_segment->duration_ns < kSliver) && held->degree >= 2 &&
-                best_segment->degree >= 2) {
-                const double span = static_cast<double>(held->duration_ns + best_segment->duration_ns) * 1e-9;
-                const double end = static_cast<double>(best_segment->duration_ns) * 1e-9;
-                mk_segment joined = *held;
-                joined.duration_ns = held->duration_ns + best_segment->duration_ns;
-                joined.degree = 5;
-                for (uint32_t joint = 0; joint < joints; ++joint) {
-                    const auto from = kin_of(held->coefficients[joint], held->degree, 0.0);
-                    const auto to = kin_of(best_segment->coefficients[joint], best_segment->degree, end);
-                    const double V0 = from.velocity * span, A0 = from.acceleration * span * span;
-                    const double V1 = to.velocity * span, A1 = to.acceleration * span * span;
-                    const double D = to.position - from.position - V0 - 0.5 * A0, E = V1 - V0 - A0, F = A1 - A0;
-                    const double normalized[6] = {from.position, V0, 0.5 * A0, 10.0 * D - 4.0 * E + 0.5 * F,
-                        -15.0 * D + 7.0 * E - F, 6.0 * D - 3.0 * E + 0.5 * F};
-                    double scale = 1.0;
-                    for (int k = 0; k < 6; ++k) { joined.coefficients[joint].value[k] = normalized[k] / scale; scale *= span; }
-                }
-                *held = joined;
-            } else {
-                if (held) {
-                    status = mk_trajectory_append_segment(merged, held.get());
-                    if (status != MK_OK) { mk_trajectory_destroy(merged); return status; }
-                }
-                if (!held) held = std::make_unique<mk_segment>();
-                *held = *best_segment;
-            }
-            first = best + 1;
-        }
-        if (held) {
-            status = mk_trajectory_append_segment(merged, held.get());
-            if (status != MK_OK) { mk_trajectory_destroy(merged); return status; }
-        }
-    } catch (const std::bad_alloc &) { mk_trajectory_destroy(merged); return MK_ERROR_OUT_OF_MEMORY; }
-    *out_trajectory = merged;
-    return MK_OK;
+    return motionkit::merge_trajectory(trajectory, {position_tolerance, velocity_tolerance, acceleration_tolerance,
+        velocity_limit, acceleration_limit, position_lower, position_upper, max_duration_seconds}, out_trajectory);
 }
 
 mk_result MK_CALL mk_shape_trajectory(mk_trajectory_handle trajectory, const uint32_t *impulse_counts,

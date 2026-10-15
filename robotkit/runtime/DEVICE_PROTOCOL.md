@@ -259,3 +259,27 @@ stop or abort cannot clear an existing fault or emergency-stop reason. Host
 output writes transmit even when the desired host value is unchanged, because
 the device may have made it safe independently; unchanged values do not add
 another host output-change record.
+
+The host's optional segment merge uses `trajectory_core` directly. Its position
+budget is one tenth of the finest actuator step on each joint; its velocity
+budget is one percent of the allowed actuator step rate (including
+`min_step_ticks`), and its acceleration budget is one percent of the claimed
+joint acceleration. Original follower coefficients are checked before merging;
+merged coefficients retain a check in normalized segment time before projection.
+
+Merge windows derive from the actual transport, including the virtual UART.
+For frame size `B` bytes, baud `b`, service rate `r`, queue capacity `Q`, and
+refill delay `D`, the service time is `s = max(10 B / b, 1/r)` seconds.
+The threshold is `ceil((Q s + D)/(Q-1))`, in nanoseconds: refill `Q` rows while
+`Q-1` queued rows remain behind the active row. A replacement may span twice
+that threshold so two adjacent short rows can fit. The endpoint derives `r`
+from whole segment frames per owner period after reserving a commit frame;
+`D` uses the same processing, commit and backlog margins as link qualification.
+A missing link description disables optional merging. These windows guide
+consolidation; the existing queue-delivery qualification still admits or refuses
+the actual sequence.
+
+Compiler failures have typed reasons. A conversion or limit failure involving a
+merged row (or its seam) may retry the original rows. Clock failures, invalid
+source data, and failures confined to untouched rows return directly. The result
+records whether a retry occurred and its cause. None of this changes wire records.

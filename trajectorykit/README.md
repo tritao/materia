@@ -36,3 +36,19 @@ native build and redirect its output to
 `robotkit/runtime/tests/runtime_trajectory_fixtures.hpp`. The fixtures retain the
 planner's exact nanosecond knots and coefficients while keeping runtime and device
 builds independent of the planner toolchain.
+
+`trajectory_merge.hpp` exposes the shared quintic merge to C++ callers. A
+`PolynomialSource` borrows strided coefficient rows from either compact planner
+storage or runtime segment arrays; `PolynomialOutput` writes to caller-owned
+storage and identifies the source range replaced by each result. The algorithm
+keeps the planner's longest-first search and velocity/acceleration plateau rule,
+checks candidate extrema at stationary points, and retains the sampled fit check
+against the originals. Device conversion additionally checks against the original
+motion at the step-clock interval. The existing MotionKit C entry point is a thin
+wrapper; runtime merging needs no MotionKit objects or planner library.
+
+The shared merge corpus runs against compact storage in `trajectory_core_merge`
+and RobotKit arrays in `robotkit_device_compiler6`. MotionKit's path tests retain
+its timed-path plateau regression. The existing shaped-path sliver policy is
+explicit in `MergeOptions`; device compilation disables that policy and keeps its
+own clock validation.

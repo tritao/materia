@@ -526,11 +526,22 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
             revision_ticks = within->header.t0_ticks;
         }
     }
+    const auto segment_bytes = device_frame6::HEADER_SIZE + device_frame6::CRC_SIZE +
+        device_wire6::Segment6Header::SIZE + ack_.actuator_count * device_wire6::Segment6Coefficients::SIZE;
+    const long double service_ns = std::ceil(10.0L * segment_bytes * 1e9L / transport_->baud());
+    const long double commit_ns = std::ceil(10.0L * (device_frame6::HEADER_SIZE + device_frame6::CRC_SIZE +
+        device_wire6::Commit6::SIZE) * 1e9L / transport_->baud());
+    const auto period_ns = owner_period_ns_ ? owner_period_ns_ : 10'000'000ULL;
+    const auto frames_per_period = std::floor(std::max(0.0L, period_ns - commit_ns) / service_ns);
+    const DeviceLink6 link{static_cast<std::uint32_t>(segment_bytes), transport_->baud(), ack_.segment_capacity,
+        static_cast<double>(frames_per_period * 1e9L / period_ns),
+        (blueprint.serial_processing_allowance_ns ? blueprint.serial_processing_allowance_ns : 2'000'000ULL) +
+            commit_margin_ns() + segment_backlog_budget_ns()};
     auto compiled = compile_device_segments6(
         std::span(plan.segments.segments), plan.plan_id,
         plan.ends_at_rest != 0, host_epoch_ns_ + base_time_ns, clock_, blueprint,
         ack_.device_tick_hz, ack_.step_tick_hz, ack_.max_degree, target_error_, layout_,
-        anchor_ticks, (plan.flags & RK_PLAN_HOMING) != 0, plan.position_tolerance);
+        anchor_ticks, (plan.flags & RK_PLAN_HOMING) != 0, plan.position_tolerance, link);
     if (!compiled.ok) {
         std::fprintf(stderr, "Rkd6Endpoint: device plan conversion failed: %s\n", compiled.error.c_str());
         return RK_ERROR_LIMIT;

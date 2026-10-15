@@ -1,9 +1,44 @@
 #include "device_compiler6.hpp"
+#include "../../../trajectorykit/native/tests/merge_cases.hpp"
 #include <cassert>
 #include <cmath>
 #include <vector>
 
 int main() {
+    merge_cases([](const std::vector<mk_segment> &segments, const motionkit::MergeOptions &options) {
+        std::vector<robotkit::TrajectorySegment> host;
+        for (const auto &s : segments) {
+            robotkit::TrajectorySegment out{};
+            out.time_from_start_ns = s.t0_ns; out.duration_ns = s.duration_ns;
+            out.degree = s.degree; out.joint_count = s.joint_count;
+            for (uint32_t j = 0; j < s.joint_count; ++j)
+                std::copy_n(s.coefficients[j].value, s.degree + 1, out.coefficients[j].value);
+            host.push_back(out);
+        }
+        motionkit::PolynomialSource source{host.data(), static_cast<uint32_t>(host.size()), 1,
+            [](const void *context, uint32_t i) {
+                const auto &s = static_cast<const robotkit::TrajectorySegment *>(context)[i];
+                return motionkit::PolynomialSegmentView{static_cast<int64_t>(s.time_from_start_ns),
+                    static_cast<int64_t>(s.duration_ns), s.degree, s.joint_count,
+                    s.coefficients, sizeof(robotkit::SegmentCoefficients)};
+            }};
+        std::vector<mk_segment> out;
+        assert(motionkit::merge_polynomials(source, options, {&out,
+            [](void *context, const mk_segment &s, uint32_t, uint32_t) -> mk_result {
+                static_cast<std::vector<mk_segment> *>(context)->push_back(s); return MK_OK;
+            }}) == MK_OK);
+        return out;
+    });
+    // 100 bytes at 1 Mbaud is 1 ms on the wire; the stated 500 Hz segment service is limiting.
+    const robotkit::DeviceLink6 link{100, 1000000, 128, 500, 0};
+    const auto window = robotkit::device_merge_window6(link);
+    assert(window.below_ns == 2015749 && window.up_to_ns == 4031498);
+    auto slow_link = link; slow_link.baud /= 4;
+    assert(robotkit::device_merge_window6(slow_link).below_ns > window.below_ns);
+    auto shallow_link = link; shallow_link.queue_capacity = 2;
+    assert(robotkit::device_merge_window6(shallow_link).below_ns == 4000000);
+    assert(robotkit::device_merge_window6({}).below_ns == 0);
+
     robotkit::ClockEstimator6 clock(1'000'000, 500'000);
     for (int i = 0; i < 8; ++i) {
         const auto host = 1'000'000'000ULL + i * 100'000'000ULL;
@@ -11,6 +46,8 @@ int main() {
         clock.observe(host, host + 200'000, ticks + 100, ticks + 100);
     }
     assert(clock.may_commit());
+    robotkit::ClockEstimator6 unsynced(1000000, 500000);
+
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
     blueprint.joint_count = 1;
@@ -151,6 +188,7 @@ int main() {
         std::span(&segment, 1), 9, true, 1'000'000'000ULL,
         clock, blueprint, 1'000'000, 40'000, 5, 1e-6);
     assert(!inconsistent.ok && inconsistent.error == "coupled follower trajectory mismatch");
+    assert(inconsistent.failure == robotkit::DeviceCompileFailure6::Coupling && !inconsistent.retried_without_merge);
     // A follower with two leaders: 2 a - 3 b + 0.1 + 0.05.
     blueprint.joint_count = 3;
     blueprint.joints[2] = blueprint.joints[1];
@@ -227,12 +265,15 @@ int main() {
         speed += acceleration * dt;
     }
     auto many = robotkit::compile_device_segments6(ramp, 12, true, 1'000'000'000ULL, clock, blueprint, 1'000'000, 40'000,
-        5, 1e-5, motors);
+        5, 1e-5, motors, 0, false, nullptr, link);
+    auto no_clock = robotkit::compile_device_segments6(ramp, 12, true, 1000000000, unsynced, blueprint,
+        1000000, 40000, 5, 1e-5, motors, 0, false, nullptr, link);
+    assert(!no_clock.ok && no_clock.failure == robotkit::DeviceCompileFailure6::Clock && !no_clock.retried_without_merge);
     assert(many.ok);
     assert(many.segments.size() <= 14);
     std::uint64_t covered = 0;
     for (const auto &piece : many.segments) {
-        assert(piece.host_duration_ns <= 4'000'000);
+        assert(piece.host_duration_ns <= window.up_to_ns);
         assert(piece.host_time_from_start_ns == covered);
         covered += piece.host_duration_ns;
     }
@@ -245,14 +286,69 @@ int main() {
         last.coefficients[0].c0 + last.coefficients[0].c1 * tau + last.coefficients[0].c2 * tau * tau +
         last.coefficients[0].c3 * tau * tau * tau + last.coefficients[0].c4 * std::pow(tau, 4) + last.coefficients[0].c5 * std::pow(tau, 5);
     assert(std::abs(end - position) < 1e-6);
+    // A limit violation in an untouched long segment is unrelated to earlier successful merges.
+    {
+        auto invalid = ramp;
+        robotkit::TrajectorySegment outside{};
+        outside.time_from_start_ns = 40000000; outside.duration_ns = 20000000000;
+        outside.joint_count = 1; outside.degree = 1; outside.coefficients[0].value[0] = position;
+        outside.coefficients[0].value[1] = 2;
+        invalid.push_back(outside);
+        auto refused = robotkit::compile_device_segments6(invalid, 15, true, 1000000000, clock, blueprint,
+            1000000, 40000, 5, 1e-5, motors, 0, false, nullptr, link);
+        assert(!refused.ok && refused.failure == robotkit::DeviceCompileFailure6::Limits);
+        assert(!refused.retried_without_merge);
+    }
+    // Coupled quintics retain the follower check despite high inverse-duration coefficients.
+    // Validate original evidence first so an inconsistent short piece cannot disappear in a merged run.
+    {
+        auto coupled_limits = blueprint;
+        coupled_limits.joint_count = 2; coupled_limits.joints[1] = blueprint.joints[0];
+        coupled_limits.coupling_count = 1; coupled_limits.couplings[0] = {0, 1, 2, .1};
+        auto coupled_ramp = ramp;
+        for (auto &s : coupled_ramp) {
+            s.joint_count = 2;
+            for (unsigned k = 0; k <= s.degree; ++k)
+                s.coefficients[1].value[k] = 2 * s.coefficients[0].value[k] + (k == 0 ? .1 : 0);
+        }
+        auto valid = robotkit::compile_device_segments6(coupled_ramp, 16, true, 1000000000, clock, coupled_limits,
+            1000000, 40000, 5, 1e-5, motors, 0, false, nullptr, link);
+        assert(valid.ok && valid.segments.size() < coupled_ramp.size());
+        coupled_ramp[17].coefficients[1].value[0] += .01;
+        auto bad = robotkit::compile_device_segments6(coupled_ramp, 17, true, 1000000000, clock, coupled_limits,
+            1000000, 40000, 5, 1e-5, motors, 0, false, nullptr, link);
+        assert(!bad.ok && bad.failure == robotkit::DeviceCompileFailure6::Coupling && !bad.retried_without_merge);
+    }
     // A path that turns inside a piece is not merged across the turn: a speed reversal every 0.1 ms.
     for (std::size_t i = 0; i < ramp.size(); ++i) {
         ramp[i].degree = 1; ramp[i].coefficients[0].value[0] = (i % 2 == 0 ? 0.0 : 0.0005);
         ramp[i].coefficients[0].value[1] = (i % 2 == 0 ? 5.0 : -5.0); ramp[i].coefficients[0].value[2] = 0.0;
     }
     auto zigzag = robotkit::compile_device_segments6(ramp, 13, true, 1'000'000'000ULL, clock, blueprint, 1'000'000, 40'000,
-        5, 1e-5, motors);
+        5, 1e-5, motors, 0, false, nullptr, link);
     assert(!zigzag.ok || zigzag.segments.size() == ramp.size());
+    // A narrow original excursion between the merge's fit samples is caught by the dense wire check.
+    // Only this merge-caused precision failure retries; the source itself remains valid.
+    {
+        auto limits = blueprint;
+        limits.joints[0].max_velocity = 1; limits.joints[0].max_acceleration = 100;
+        std::vector<robotkit::TrajectorySegment> pulse(40);
+        for (std::size_t i = 0; i < pulse.size(); ++i) {
+            pulse[i].time_from_start_ns = i * 100000; pulse[i].duration_ns = 100000;
+            pulse[i].joint_count = 1; pulse[i].degree = 5;
+        }
+        // u^3 (1-u)^2 peaks at u=.6. Its start position, velocity and acceleration are zero.
+        const double amplitude = 2e-9 / .03456, dt = 1e-4;
+        pulse[17].coefficients[0].value[3] = amplitude / std::pow(dt, 3);
+        pulse[17].coefficients[0].value[4] = -2 * amplitude / std::pow(dt, 4);
+        pulse[17].coefficients[0].value[5] = amplitude / std::pow(dt, 5);
+        const robotkit::DeviceActuator6 fine_motor{0, 1, 0, 1e8, 1};
+        auto retried = robotkit::compile_device_segments6(pulse, 14, true, 1000000000, clock, limits,
+            1000000, 40000, 5, 1e-12, std::span(&fine_motor, 1), 0, false, nullptr, link);
+        assert(retried.ok && retried.retried_without_merge);
+        assert(retried.merge_cause == robotkit::DeviceCompileFailure6::Precision);
+        assert(retried.segments.size() == pulse.size());
+    }
     // An extruder that has fed 50 m of filament has turned some 40,000 rad: past 4,096 rad half a float's step (2.4e-4 rad
     // there, 2.4e-3 at 40,000) is more than a tenth of a step of the motor (1.95e-4 rad at 512 steps a radian), so a
     // position held as one float is refused or jitters. The wire carries the whole steps as an integer base.

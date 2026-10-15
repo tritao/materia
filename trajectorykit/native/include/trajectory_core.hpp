@@ -141,6 +141,13 @@ public:
             result.coefficients);
         return result;
     }
+    // Borrowed compact storage for shared polynomial algorithms.
+    const mk_joint_coefficients *segment_coefficients(uint32_t index) const {
+        return coefficients_.data() + static_cast<size_t>(index) * joint_count_;
+    }
+    int64_t segment_start(uint32_t index) const { return records_.at(index).t0_ns; }
+    int64_t segment_duration(uint32_t index) const { return records_.at(index).duration_ns; }
+    uint32_t segment_degree(uint32_t index) const { return records_.at(index).degree; }
     int64_t duration_ns() const noexcept {
         if (records_.empty()) return 0;
         return records_.back().t0_ns + records_.back().duration_ns - records_.front().t0_ns;
