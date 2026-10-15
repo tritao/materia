@@ -3,18 +3,15 @@ import machinekit.assembly.Transmission;
 import machinekit.component.ComponentDetail;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyBodies;
-import materia.assembly.AssemblyFrames;
 import cadkit.modeling.AssemblyState;
 import cadkit.modeling.Part;
-import cadkit.modeling.Location;
-import cadkit.modeling.Plane;
-import cadkit.modeling.Vector;
-
-private typedef ClearanceBox = {minX:Float, minY:Float, minZ:Float, maxX:Float, maxY:Float, maxZ:Float};
+import machinekit.assembly.PosedParts;
+import machinekit.assembly.PosedParts.PartBox;
 
 /** OCCT checks across moving bodies; fixed-body contacts and declared drive meshes are interfaces. */
 class GantryClearanceChecks {
 	final localParts = new Map<String, Part>();
+	final localBoxes = new Map<String, PartBox>();
 	final body = new Map<String, String>();
 	final interfaces = new Map<String, Bool>();
 	final sensors = new Map<String, Bool>();
@@ -45,7 +42,9 @@ class GantryClearanceChecks {
 		try {
 			for (member in gantry.components()) {
 				if (!body.exists(member.id)) throw 'Gantry body ownership is missing for ${member.id}';
-				localParts.set(member.id, member.component.geometry(ComponentDetail.Preview));
+				var part = member.component.geometry(ComponentDetail.Preview);
+				localParts.set(member.id, part);
+				localBoxes.set(member.id, PosedParts.boxOf(part));
 			}
 		} catch (error:Dynamic) { close(); throw error; }
 	}
@@ -58,36 +57,37 @@ class GantryClearanceChecks {
 		for (part in localParts) if (!part.shape.isClosed()) part.close();
 	}
 
-	static function bounds(part:Part):ClearanceBox {
-		var box = part.shape.bounds(), lo = box.get_min(), hi = box.get_max();
-		return {minX: lo.get_x(), minY: lo.get_y(), minZ: lo.get_z(), maxX: hi.get_x(), maxY: hi.get_y(), maxZ: hi.get_z()};
-	}
-	static function boxesOverlap(a:ClearanceBox, b:ClearanceBox):Bool
+	static function boxesOverlap(a:PartBox, b:PartBox):Bool
 		return Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX) > 1e-7 &&
 			Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY) > 1e-7 &&
 			Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ) > 1e-7;
 
+	/** Members are moved to their poses only for pairs whose boxes, the local boxes carried to the poses, overlap. */
 	public function check(state:AssemblyState):Void {
 		var placed = new Map<String, Part>();
-		var boxes = new Map<String, ClearanceBox>();
+		var boxes = new Map<String, PartBox>();
 		var ids:Array<String> = [];
 		function dispose():Void { for (part in placed) if (!part.shape.isClosed()) part.close(); }
+		function at(id:String):Part {
+			var world = placed.get(id);
+			if (world != null) return world;
+			var part = localParts.get(id);
+			if (part == null) throw "Gantry clearance member is missing";
+			var moved = PosedParts.moved(part, state.worldPose(id));
+			placed.set(id, moved);
+			return moved;
+		}
 		function overlap(a:String, b:String):Float {
-			var first = placed.get(a), second = placed.get(b);
-			if (first == null || second == null) throw "Gantry clearance member is missing";
+			var first = at(a), second = at(b);
 			var common = first.intersect(second);
 			try { var volume = common.volume(); common.close(); return volume; }
 			catch (error:Dynamic) { common.close(); throw error; }
 		}
 		try {
 			for (id in localParts.keys()) {
-				var part = localParts.get(id);
-				if (part == null) throw "Missing gantry geometry";
-				var pose = state.worldPose(id);
-				var x = AssemblyFrames.transformVector(pose, 1, 0, 0), z = AssemblyFrames.transformVector(pose, 0, 0, 1);
-				var world = part.placed(new Location(new Plane(new Vector(pose.x, pose.y, pose.z),
-					new Vector(x.x, x.y, x.z), new Vector(z.x, z.y, z.z))));
-				placed.set(id, world); boxes.set(id, bounds(world)); ids.push(id);
+				var local = localBoxes.get(id);
+				if (local == null) throw "Missing gantry geometry";
+				boxes.set(id, PosedParts.carried(local, state.worldPose(id))); ids.push(id);
 			}
 			var clashes:Array<String> = [];
 			for (i in 0...ids.length) for (j in i + 1...ids.length) {

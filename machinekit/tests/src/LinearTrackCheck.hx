@@ -93,18 +93,9 @@ class LinearTrackCheck {
 				state.setJoint("track", coordinate);
 				near(state.worldPose("carriage").x, coordinate, "carriage reaches both travel ends");
 				near(state.joint("pinion-turn"), -coordinate / 20, "pinion follows each travel end");
-				for (movingId in moving) {
-					var first = posed.posed(track.component(movingId), state.worldPose(movingId), ComponentDetail.Preview);
-					try {
-						for (fixedId in fixed) {
-							var second = posed.posed(track.component(fixedId), state.worldPose(fixedId), ComponentDetail.Preview);
-							try check(PosedParts.commonVolume(first, PosedParts.boxOf(first), second, PosedParts.boxOf(second)) < 1e-5,
-								'$movingId clears $fixedId at $coordinate mm') catch (error:Dynamic) { second.close(); throw error; }
-							second.close();
-						}
-					} catch (error:Dynamic) { first.close(); throw error; }
-					first.close();
-				}
+				for (movingId in moving) for (fixedId in fixed)
+					check(posed.overlap(track.component(movingId), state.worldPose(movingId), track.component(fixedId), state.worldPose(fixedId),
+						ComponentDetail.Preview) < 1e-5, '$movingId clears $fixedId at $coordinate mm');
 			}
 		} catch (error:Dynamic) { posed.close(); throw error; }
 		posed.close();

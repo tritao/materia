@@ -24,66 +24,114 @@ typedef PartBox = {
  * Parts of an assembly placed at poses for clearance checks, which pose the same part again and again (against each of
  * several others, at each position of a sweep).
  *
- * A component's geometry is built once per `geometryKey` and kept; each pose is a new part made by moving it, so the
- * expensive solid construction is not repeated. The kept shapes are native and belong to this object: close it when the
- * check is done. Poses it returned are the caller's to close and stay valid after it is closed.
+ * A component's geometry is built once per `geometryKey` and kept, with its box; each pose is a new part made by moving it, so
+ * the expensive solid construction is not repeated. Pair checks (`overlap`, `volume`, `checkClear`) first compare the posed
+ * boxes (`box`, the kept box carried to the pose) and move geometry only for pairs that may touch: moving a solid copies it
+ * and measuring its tight box afterwards is an optimisation over its surfaces, and most posed pairs are far apart. The kept
+ * shapes are native and belong to this object: close it when the check is done. Poses it returned are the caller's to close
+ * and stay valid after it is closed.
  */
 class PosedParts {
 	/** Parts whose boxes are further apart than this (mm) are not tested with a boolean. */
 	public static inline final APART_MARGIN = 1.0;
 
 	final locals:Map<String, Part> = [];
+	final localBoxes:Map<String, PartBox> = [];
 
 	public function new() {}
 
-	/** `component`'s geometry moved to `pose`: a new owned part. */
-	public function posed(component:MachineComponent, pose:AssemblyFrame, detail:ComponentDetail = Preview):Part {
+	/** `component`'s geometry in its own frame, built on first use and kept by this object (do not close it). */
+	public function local(component:MachineComponent, detail:ComponentDetail = Preview):Part {
 		var key = component.geometryKey(detail), local = locals.get(key);
 		if (local == null) {
 			local = component.geometry(detail);
 			locals.set(key, local);
 		}
+		return local;
+	}
+
+	/** `component`'s geometry moved to `pose`: a new owned part. */
+	public function posed(component:MachineComponent, pose:AssemblyFrame, detail:ComponentDetail = Preview):Part
+		return moved(local(component, detail), pose);
+
+	/** `part` moved to `pose`: a new owned part. */
+	public static function moved(part:Part, pose:AssemblyFrame):Part {
 		var x = AssemblyFrames.transformVector(pose, 1, 0, 0), z = AssemblyFrames.transformVector(pose, 0, 0, 1);
-		return local.placed(new Location(new Plane(new Vector(pose.x, pose.y, pose.z), new Vector(x.x, x.y, x.z), new Vector(z.x, z.y, z.z))));
+		return part.placed(new Location(new Plane(new Vector(pose.x, pose.y, pose.z), new Vector(x.x, x.y, x.z), new Vector(z.x, z.y, z.z))));
 	}
 
-	/** The member `id` of `assembly` at its pose in `state`: a new owned part. `label` names the assembly in the error for an unknown id. */
-	public function member(assembly:MachineAssembly, state:AssemblyState, label:String, id:String):Part {
-		for (entry in assembly.components()) if (entry.id == id) return posed(entry.component, state.worldPose(id));
-		throw '$label has no member "$id"';
+	/**
+	 * A box holding `component` at `pose`, without moving its geometry: the box of its kept geometry carried to the pose. It
+	 * contains the box `boxOf` measures on the posed part and is larger when the pose rotates the part, so a pair whose boxes
+	 * are `apart` here is apart in fact.
+	 */
+	public function box(component:MachineComponent, pose:AssemblyFrame, detail:ComponentDetail = Preview):PartBox {
+		var key = component.geometryKey(detail), own = localBoxes.get(key);
+		if (own == null) {
+			own = boxOf(local(component, detail));
+			localBoxes.set(key, own);
+		}
+		return carried(own, pose);
 	}
 
-	/** The volume (mm³) members `a` and `b` of `assembly` share at the poses in `state`. */
-	public function volume(assembly:MachineAssembly, state:AssemblyState, label:String, a:String, b:String):Float {
-		var first = member(assembly, state, label, a), second = member(assembly, state, label, b);
-		var shared = commonVolume(first, boxOf(first), second, boxOf(second));
+	/**
+	 * The volume (mm³) `a` at `poseA` shares with `b` at `poseB`. Pairs whose posed boxes are `apart` share none, which is
+	 * settled without moving either part.
+	 */
+	public function overlap(a:MachineComponent, poseA:AssemblyFrame, b:MachineComponent, poseB:AssemblyFrame,
+			detail:ComponentDetail = Preview):Float {
+		if (apart(box(a, poseA, detail), box(b, poseB, detail))) return 0;
+		var first = posed(a, poseA, detail), second = posed(b, poseB, detail);
+		var shared = sharedVolume(first, second);
 		first.close();
 		second.close();
 		return shared;
 	}
 
+	/** The member `id` of `assembly` at its pose in `state`: a new owned part. `label` names the assembly in the error for an unknown id. */
+	public function member(assembly:MachineAssembly, state:AssemblyState, label:String, id:String):Part
+		return posed(component(assembly, label, id), state.worldPose(id));
+
+	/** The volume (mm³) members `a` and `b` of `assembly` share at the poses in `state`. */
+	public function volume(assembly:MachineAssembly, state:AssemblyState, label:String, a:String, b:String):Float
+		return overlap(component(assembly, label, a), state.worldPose(a), component(assembly, label, b), state.worldPose(b));
+
 	/**
 	 * Throws, worded by `describe(moving, other, volume)`, for the first member of `moving` that shares more than `limit` mm³
-	 * with a member of `others`, trying pairs in order. Each member is posed once for all its pairs.
+	 * with a member of `others`, trying pairs in order. Each member is posed at most once for all its pairs, and only when a
+	 * pair's boxes are not apart.
 	 */
 	public function checkClear(assembly:MachineAssembly, state:AssemblyState, label:String, moving:Array<String>, others:Array<String>,
 			describe:(String, String, Float) -> String, limit:Float = 1e-3):Void {
-		var first:Array<Part> = [], second:Array<Part> = [];
+		var ids = moving.concat(others), components = [for (id in ids) component(assembly, label, id)];
+		var poses = [for (id in ids) state.worldPose(id)];
+		var boxes = [for (index in 0...ids.length) box(components[index], poses[index])];
+		var placed:Array<Null<Part>> = [for (_ in ids) null];
+		function at(index:Int):Part {
+			var part = placed[index];
+			if (part == null) {
+				part = posed(components[index], poses[index]);
+				placed[index] = part;
+			}
+			return part;
+		}
+		function dispose():Void for (part in placed) if (part != null) part.close();
 		try {
-			for (id in moving) first.push(member(assembly, state, label, id));
-			for (id in others) second.push(member(assembly, state, label, id));
-			var firstBoxes = [for (part in first) boxOf(part)], secondBoxes = [for (part in second) boxOf(part)];
-			for (a in 0...first.length) for (b in 0...second.length) {
-				var shared = commonVolume(first[a], firstBoxes[a], second[b], secondBoxes[b]);
-				if (shared > limit) throw describe(moving[a], others[b], shared);
+			for (a in 0...moving.length) for (b in moving.length...ids.length) {
+				if (apart(boxes[a], boxes[b])) continue;
+				var shared = sharedVolume(at(a), at(b));
+				if (shared > limit) throw describe(ids[a], ids[b], shared);
 			}
 		} catch (error:Dynamic) {
-			closeAll(first);
-			closeAll(second);
+			dispose();
 			throw error;
 		}
-		closeAll(first);
-		closeAll(second);
+		dispose();
+	}
+
+	static function component(assembly:MachineAssembly, label:String, id:String):MachineComponent {
+		for (entry in assembly.components()) if (entry.id == id) return entry.component;
+		throw '$label has no member "$id"';
 	}
 
 	/** Runs `body` with a new `PosedParts` and closes it afterwards, including when `body` throws. */
@@ -100,6 +148,7 @@ class PosedParts {
 	public function close():Void {
 		for (part in locals) part.close();
 		locals.clear();
+		localBoxes.clear();
 	}
 
 	public static function boxOf(part:Part):PartBox {
@@ -124,12 +173,27 @@ class PosedParts {
 	 * expensive part of a check across many pairs. The boxes are the parts' own (see `boxOf`), computed once by a caller that
 	 * tests a part against several others.
 	 */
-	public static function commonVolume(first:Part, firstBox:PartBox, second:Part, secondBox:PartBox):Float {
-		if (apart(firstBox, secondBox)) return 0;
+	public static function commonVolume(first:Part, firstBox:PartBox, second:Part, secondBox:PartBox):Float
+		return apart(firstBox, secondBox) ? 0 : sharedVolume(first, second);
+
+	static function sharedVolume(first:Part, second:Part):Float {
 		var common = first.intersect(second);
 		var volume = common.volume();
 		common.close();
 		return volume;
+	}
+
+	/** The axis-aligned box holding `box` moved by the rigid `pose`: the box around its eight moved corners. */
+	public static function carried(box:PartBox, pose:AssemblyFrame):PartBox {
+		var corner = {x: 0.0, y: 0.0, z: 0.0};
+		var minX = Math.POSITIVE_INFINITY, minY = Math.POSITIVE_INFINITY, minZ = Math.POSITIVE_INFINITY;
+		var maxX = Math.NEGATIVE_INFINITY, maxY = Math.NEGATIVE_INFINITY, maxZ = Math.NEGATIVE_INFINITY;
+		for (x in [box.minX, box.maxX]) for (y in [box.minY, box.maxY]) for (z in [box.minZ, box.maxZ]) {
+			AssemblyFrames.transformPointInto(pose, x, y, z, corner);
+			minX = Math.min(minX, corner.x); minY = Math.min(minY, corner.y); minZ = Math.min(minZ, corner.z);
+			maxX = Math.max(maxX, corner.x); maxY = Math.max(maxY, corner.y); maxZ = Math.max(maxZ, corner.z);
+		}
+		return {minX: minX, minY: minY, minZ: minZ, maxX: maxX, maxY: maxY, maxZ: maxZ};
 	}
 
 	public static function closeAll(parts:Array<Part>):Void

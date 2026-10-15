@@ -1,6 +1,8 @@
 import machinekit.robotics.CobotArm;
 import machinekit.robotics.CobotClass;
 import machinekit.assembly.AssemblyPreview;
+import machinekit.assembly.PosedParts;
+import machinekit.assembly.PosedParts.PartBox;
 import machinekit.component.MachineComponent;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Solids;
@@ -43,57 +45,60 @@ class CobotArmChecks {
 		if (!(Math.abs(a - b) <= tolerance)) throw '$label: expected $b, got $a';
 
 	public static function run():Void {
-		for (cls in [Reach500, Reach850, Reach900, Reach1300]) {
-			var arm = new CobotArm(cls);
-			var model = new AssemblyModel("mm");
-			arm.addTo(model, "");
-			var definition = model.definition("cobot-arm");
-			var state = new AssemblyState(definition);
-			var poses = [[0.0, 0, 0, 0, 0, 0], arm.ready(), [0.2, -1, 0.8, -0.5, -0.7, 0.3],
-				[-0.4, -0.8, 0.5, 0.6, -1.2, -0.2], [0.6, -1.4, 1.2, -0.4, -0.9, 0.1]];
-			for (q in poses) {
-				for (i in 0...6) state.setJoint('j${i + 1}', q[i]);
-				var expected = dh(arm, q), actual = state.worldPose("toolFlange");
-				near(actual.x, expected.x, "DH flange X"); near(actual.y, expected.y, "DH flange Y");
-				near(actual.z, expected.z, "DH flange Z");
-				var a = AssemblyFrames.toRotationMatrix(actual), b = AssemblyFrames.toRotationMatrix(expected);
-				for (i in 0...9) near(a[i], b[i], "DH flange orientation", 1e-8);
-				checkOverlap(arm, state);
-			}
-			for (i in 0...6) {
-				var exported = [for (joint in definition.joints) if (joint.id == 'j${i + 1}') joint];
-				if (exported.length != 1) throw "Cobot must export each joint exactly once";
-				var lower = exported[0].limits.lower, upper = exported[0].limits.upper;
-				if (lower == null || upper == null) throw "Cobot must export finite mechanical joint limits";
-				near(lower, -2 * Math.PI, "Exported lower joint limit", 1e-10);
-				near(upper, 2 * Math.PI, "Exported upper joint limit", 1e-10);
-			}
-			var ready = arm.ready();
-			for (i in 0...6) state.setJoint('j${i + 1}', ready[i]);
-			checkOverlap(arm, state);
-			for (i in 0...6) state.setJoint('j${i + 1}', 0);
-			var shoulder = state.worldPose("joint2"), flange = state.worldPose("toolFlange");
-			var dx = flange.x - shoulder.x, dy = flange.y - shoulder.y, dz = flange.z - shoulder.z;
-			var reach = Math.sqrt(dx * dx + dy * dy + dz * dz);
-			var length = Math.abs(arm.reference.a[1]) + Math.abs(arm.reference.a[2]);
-			var offset = arm.reference.d[3] + arm.reference.d[5];
-			near(reach, Math.sqrt(length * length + offset * offset + arm.reference.d[4] * arm.reference.d[4]),
-				"DH-zero shoulder reference distance");
-			var torques = arm.holdingTorques(state, arm.reference.payload);
-			for (i in 0...6) if (Math.abs(torques[i]) > arm.modules[i].outputRatedTorque)
-				throw '${arm.reference.designation} joint ${i + 1} needs ${Math.abs(torques[i])} N m, exceeds ${arm.modules[i].outputRatedTorque} N m rated torque';
-			var mass = arm.armMass();
-			var checkedMass = switch cls {
-				case Reach500: 14.725839279605855;
-				case Reach850: 21.12096867189879;
-				case Reach900: 37.394304785203424;
-				case Reach1300: 37.73141399994982;
-			};
-			if (!Math.isFinite(mass) || Math.abs(mass - checkedMass) > 0.02)
-				throw '${arm.reference.designation} assembled mass $mass kg differs from its checked assumed assembly mass $checkedMass kg';
-			if (definition.encoders == null || definition.encoders.length != 6) throw "Cobot needs six output encoders";
-			Sys.println('${arm.reference.designation}: $mass kg assembled (published reference ${arm.reference.mass} kg), DH-zero shoulder distance $reach mm, holding N m $torques, DH FK and CAD overlap at five poses, exported limits passed');
+		for (cls in [Reach500, Reach850, Reach900, Reach1300]) PosedParts.scope(parts -> checkClass(cls, parts));
+	}
+
+	/** One class's DH, overlap, limit, torque and mass checks; its link geometry is built once in `parts` for all poses. */
+	static function checkClass(cls:CobotClass, parts:PosedParts):Void {
+		var arm = new CobotArm(cls);
+		var model = new AssemblyModel("mm");
+		arm.addTo(model, "");
+		var definition = model.definition("cobot-arm");
+		var state = new AssemblyState(definition);
+		var poses = [[0.0, 0, 0, 0, 0, 0], arm.ready(), [0.2, -1, 0.8, -0.5, -0.7, 0.3],
+			[-0.4, -0.8, 0.5, 0.6, -1.2, -0.2], [0.6, -1.4, 1.2, -0.4, -0.9, 0.1]];
+		for (q in poses) {
+			for (i in 0...6) state.setJoint('j${i + 1}', q[i]);
+			var expected = dh(arm, q), actual = state.worldPose("toolFlange");
+			near(actual.x, expected.x, "DH flange X"); near(actual.y, expected.y, "DH flange Y");
+			near(actual.z, expected.z, "DH flange Z");
+			var a = AssemblyFrames.toRotationMatrix(actual), b = AssemblyFrames.toRotationMatrix(expected);
+			for (i in 0...9) near(a[i], b[i], "DH flange orientation", 1e-8);
+			checkOverlap(arm, state, parts);
 		}
+		for (i in 0...6) {
+			var exported = [for (joint in definition.joints) if (joint.id == 'j${i + 1}') joint];
+			if (exported.length != 1) throw "Cobot must export each joint exactly once";
+			var lower = exported[0].limits.lower, upper = exported[0].limits.upper;
+			if (lower == null || upper == null) throw "Cobot must export finite mechanical joint limits";
+			near(lower, -2 * Math.PI, "Exported lower joint limit", 1e-10);
+			near(upper, 2 * Math.PI, "Exported upper joint limit", 1e-10);
+		}
+		var ready = arm.ready();
+		for (i in 0...6) state.setJoint('j${i + 1}', ready[i]);
+		checkOverlap(arm, state, parts);
+		for (i in 0...6) state.setJoint('j${i + 1}', 0);
+		var shoulder = state.worldPose("joint2"), flange = state.worldPose("toolFlange");
+		var dx = flange.x - shoulder.x, dy = flange.y - shoulder.y, dz = flange.z - shoulder.z;
+		var reach = Math.sqrt(dx * dx + dy * dy + dz * dz);
+		var length = Math.abs(arm.reference.a[1]) + Math.abs(arm.reference.a[2]);
+		var offset = arm.reference.d[3] + arm.reference.d[5];
+		near(reach, Math.sqrt(length * length + offset * offset + arm.reference.d[4] * arm.reference.d[4]),
+			"DH-zero shoulder reference distance");
+		var torques = arm.holdingTorques(state, arm.reference.payload);
+		for (i in 0...6) if (Math.abs(torques[i]) > arm.modules[i].outputRatedTorque)
+			throw '${arm.reference.designation} joint ${i + 1} needs ${Math.abs(torques[i])} N m, exceeds ${arm.modules[i].outputRatedTorque} N m rated torque';
+		var mass = arm.armMass();
+		var checkedMass = switch cls {
+			case Reach500: 14.725839279605855;
+			case Reach850: 21.12096867189879;
+			case Reach900: 37.394304785203424;
+			case Reach1300: 37.73141399994982;
+		};
+		if (!Math.isFinite(mass) || Math.abs(mass - checkedMass) > 0.02)
+			throw '${arm.reference.designation} assembled mass $mass kg differs from its checked assumed assembly mass $checkedMass kg';
+		if (definition.encoders == null || definition.encoders.length != 6) throw "Cobot needs six output encoders";
+		Sys.println('${arm.reference.designation}: $mass kg assembled (published reference ${arm.reference.mass} kg), DH-zero shoulder distance $reach mm, holding N m $torques, DH FK and CAD overlap at five poses, exported limits passed');
 	}
 
 	static function dh(arm:CobotArm, q:Array<Float>):AssemblyFrame {
@@ -108,28 +113,39 @@ class CobotArmChecks {
 		return result;
 	}
 
-	static function checkOverlap(arm:CobotArm, state:AssemblyState):Void {
-		var ids:Array<String> = [], parts:Array<Part> = [];
-		for (entry in arm.components()) {
-			var pose = state.worldPose(entry.id);
-			var x = AssemblyFrames.transformVector(pose, 1, 0, 0), z = AssemblyFrames.transformVector(pose, 0, 0, 1);
-			var local = entry.component.geometry();
+	/**
+	 * No two links share volume. Pairs are tested with a boolean only when their boxes (each link's own box carried to its
+	 * pose, see `PosedParts.box`) are not `PosedParts.apart`, and each link is moved to its pose only for such a pair.
+	 */
+	static function checkOverlap(arm:CobotArm, state:AssemblyState, parts:PosedParts):Void {
+		var entries = arm.components(), boxes:Array<PartBox> = [], placed:Array<Null<Part>> = [];
+		for (entry in entries) {
+			var local = parts.local(entry.component);
 			if (!local.valid() || local.solidCount() != 1)
 				throw '${arm.reference.designation}: ${entry.id} must be one valid solid';
-			parts.push(local.placed(new Location(new Plane(new Vector(pose.x, pose.y, pose.z),
-				new Vector(x.x, x.y, x.z), new Vector(z.x, z.y, z.z)))));
-			local.close(); ids.push(entry.id);
+			boxes.push(parts.box(entry.component, state.worldPose(entry.id)));
+			placed.push(null);
 		}
-		for (i in 0...parts.length) for (j in i + 1...parts.length) {
-			var a = parts[i].shape.bounds(), b = parts[j].shape.bounds();
-			if (a.get_max().get_x() <= b.get_min().get_x() + 1e-5 || b.get_max().get_x() <= a.get_min().get_x() + 1e-5 ||
-				a.get_max().get_y() <= b.get_min().get_y() + 1e-5 || b.get_max().get_y() <= a.get_min().get_y() + 1e-5 ||
-				a.get_max().get_z() <= b.get_min().get_z() + 1e-5 || b.get_max().get_z() <= a.get_min().get_z() + 1e-5) continue;
-			var common = parts[i].intersect(parts[j]), volume = common.volume();
-			common.close();
-			if (volume > 1e-3) throw '${arm.reference.designation}: ${ids[i]} overlaps ${ids[j]} by $volume mm³';
+		function at(index:Int):Part {
+			var part = placed[index];
+			if (part == null) {
+				part = parts.posed(entries[index].component, state.worldPose(entries[index].id));
+				placed[index] = part;
+			}
+			return part;
 		}
-		for (part in parts) part.close();
+		try {
+			for (i in 0...entries.length) for (j in i + 1...entries.length) {
+				if (PosedParts.apart(boxes[i], boxes[j])) continue;
+				var common = at(i).intersect(at(j)), volume = common.volume();
+				common.close();
+				if (volume > 1e-3) throw '${arm.reference.designation}: ${entries[i].id} overlaps ${entries[j].id} by $volume mm³';
+			}
+		} catch (error:Dynamic) {
+			PosedParts.closeAll([for (part in placed) if (part != null) part]);
+			throw error;
+		}
+		PosedParts.closeAll([for (part in placed) if (part != null) part]);
 	}
 }
 

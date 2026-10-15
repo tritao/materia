@@ -121,16 +121,9 @@ class RotaryHeadCheck {
 				for (c in [-Math.PI, 0.0, Math.PI]) for (a in (head.hasTilt ? [-Math.PI / 2, 0.0, Math.PI / 2] : [0.0])) {
 					state.setJoint("head/c", c);
 					if (head.hasTilt) state.setJoint("head/a", a);
-					for (member in moving) {
-						var shape = parts.posed(member.component, state.worldPose(member.id));
-						var box = PosedParts.boxOf(shape);
-						for (id in carriers) {
-							var fixed = parts.posed(gantry.component(id), state.worldPose(id));
-							var overlap = PosedParts.commonVolume(shape, box, fixed, PosedParts.boxOf(fixed));
-							fixed.close();
-							if (overlap > 1e-3) { shape.close(); throw 'Head collision ${member.id}/$id at $x,$y,$z C=$c A=$a: $overlap mm³'; }
-						}
-						shape.close();
+					for (member in moving) for (id in carriers) {
+						var overlap = parts.overlap(member.component, state.worldPose(member.id), gantry.component(id), state.worldPose(id));
+						if (overlap > 1e-3) throw 'Head collision ${member.id}/$id at $x,$y,$z C=$c A=$a: $overlap mm³';
 					}
 				}
 			}
