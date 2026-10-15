@@ -632,6 +632,15 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
         var seatedPhase = observed.phase == ScrewdriverContract.SNUG || observed.phase == ScrewdriverContract.FINAL ||
           observed.result == ScrewdriverContract.OK;
         if (threadedScrew() != null && seatedPhase) seat(setup);
+        // A head bearing on its seat sits flat: the clamp turns it onto the hole axis about the head, keeping
+        // its lateral offset. The aligned pose becomes the anchor a later pass continues from.
+        if (seatedPhase && anchoredBody != null && setup.physicalThread != true) {
+          var aligned = seatedOnAxis(startingBody, bodyToHead, Vec3.fromArray(holeAxis));
+          if (aligned != null) {
+            startingBody = aligned;
+            anchoredBody = referenceHead.inverse().compose(aligned);
+          }
+        }
       }
       if (!start) { driveSpeed = 0; if (reversed) reverseTargetAngle = angle; }
       if (armOwnsAxialMotion) springFeed();
@@ -668,6 +677,16 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       runtime.snapshot().sourceTimestampNs, runtime.endpoint.sourceClockId());
   }
   static function dot(a:Array<Float>,b:Array<Float>):Float return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+  /** `body` turned about its head point so the head's +Z lies on `holeAxis`; null when it already does. */
+  static function seatedOnAxis(body:Transform3, bodyToHead:Transform3, holeAxis:Vec3):Null<Transform3> {
+    var head = body.compose(bodyToHead);
+    var axis = head.transformVector(new Vec3(0,0,1)).normalized(), target = holeAxis.normalized();
+    var cross = axis.cross(target), sine = cross.norm(), cosine = axis.dot(target);
+    if (sine < 1e-12) return null;
+    var turn = Quat.fromAxisAngle(cross.scale(1/sine), Math.atan2(sine, cosine));
+    var offset = turn.rotate(body.translation.sub(head.translation));
+    return new Transform3(head.translation.add(offset), turn.multiply(body.rotation));
+  }
   static function quaternionDot(a:Quat,b:Quat):Float return a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w;
   static function turnedPose(startingBody:Transform3,head:Vec3,holeAxis:Array<Float>,angle:Float,advance:Float):SimPose {
     var rotation = Quat.fromAxisAngle(new Vec3(holeAxis[0],holeAxis[1],holeAxis[2]),angle);
