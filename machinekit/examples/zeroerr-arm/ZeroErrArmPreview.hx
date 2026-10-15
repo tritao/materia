@@ -105,7 +105,7 @@ class ZeroErrArmPreview {
   public static function ready():Array<Float> return [0.2,-0.8,1.0,0.1,-0.6,0.2];
 
   /** Exact overlap observations; positive volumes are reported, never silently exempted. */
-  static function clearance(arm:ZeroErrReferenceArm):Void {
+  static function clearance(arm:ZeroErrReferenceArm, screen:Bool = false):Void {
     var model = new AssemblyModel("mm"); arm.addTo(model, "");
     var state = new AssemblyState(model.definition("zeroerr-clearance"));
     // Structural solids and output flanges; supplier fasteners are separately
@@ -115,8 +115,39 @@ class ZeroErrArmPreview {
       "joint4-stator","joint4-rotor","joint5-stator","joint5-rotor","joint6-stator","joint6-rotor","toolFlange"];
     var entries = [for (id in ids) [for (e in arm.components()) if (e.id == id) e][0]];
     var report:Array<Dynamic> = [];
+    var samples:Array<Array<Float>> = [[0.0,0,0,0,0,0],ready()];
+    if (screen) {
+      // Synthetic +/-90 degree exploration, explicitly not commissioned limits.
+      var primes = [2,3,5,7,11,13];
+      for (n in 1...25) {
+        var q:Array<Float> = [];
+        for (b in primes) {
+          var index = n, factor = 1.0, h = 0.0;
+          while (index > 0) { factor /= b; h += factor*(index%b); index = Std.int(index/b); }
+          q.push((2*h-1)*Math.PI/2);
+        }
+        samples.push(q);
+      }
+      for (j in 0...6) for (sign in [-1,1]) {
+        var q = ready(); q[j] = sign*Math.PI/2; samples.push(q);
+      }
+    }
+    // Cache fixed-body pair results; moving pairs remain checked at every pose.
+    var roots:Map<String,String> = [];
+    var joints = model.definition("clearance-roots").joints;
+    for (id in ids) {
+      var cursor = id, searching = true;
+      while (searching) {
+        searching = false;
+        for (j in joints) if (j.child == cursor && j.type == "fixed") {
+          cursor = j.parent; searching = true; break;
+        }
+      }
+      roots.set(id,cursor);
+    }
+    var fixedVolumes:Map<String,Float> = [];
     PosedParts.scope(parts -> {
-      for (q in [[0.0,0,0,0,0,0],ready()]) {
+      for (q in samples) {
         Sys.println('Checking structural overlap at $q'); Sys.stdout().flush();
         for (i in 0...6) state.setJoint('j${i+1}',q[i]);
         var overlaps:Array<Dynamic> = [];
@@ -125,7 +156,17 @@ class ZeroErrArmPreview {
         var placed:Array<Null<Part>> = [for (_ in entries) null];
         try {
           for (i in 0...entries.length) for (j in i+1...entries.length) {
-            if (PosedParts.apart(boxes[i],boxes[j])) continue;
+            var key = entries[i].id + "/" + entries[j].id;
+            var fixedPair = roots.get(entries[i].id) == roots.get(entries[j].id);
+            if (fixedPair && fixedVolumes.exists(key)) {
+              var v:Float = cast fixedVolumes.get(key);
+              if (v > 1e-3) overlaps.push({a:entries[i].id,b:entries[j].id,volumeMm3:v});
+              continue;
+            }
+            if (PosedParts.apart(boxes[i],boxes[j])) {
+              if (fixedPair) fixedVolumes.set(key,0);
+              continue;
+            }
             if (placed[i] == null) placed[i] = parts.posed(entries[i].component,poses[i]);
             if (placed[j] == null) placed[j] = parts.posed(entries[j].component,poses[j]);
             var first:Part = cast placed[i], second:Part = cast placed[j];
@@ -136,6 +177,7 @@ class ZeroErrArmPreview {
               v = common.subshapeCount(CadKit.ShapeKind.Solid) == 0 ? 0 : common.volume(1e-8);
               common.close();
             } catch(error:Dynamic) { common.close(); throw error; }
+            if (fixedPair) fixedVolumes.set(key,v);
             if (v > 1e-3) overlaps.push({a:entries[i].id,b:entries[j].id,volumeMm3:v});
           }
         } catch(error:Dynamic) {
@@ -147,7 +189,37 @@ class ZeroErrArmPreview {
         Sys.println('${overlaps.length} positive overlap observations'); Sys.stdout().flush();
       }
     });
-    sys.io.File.saveContent(DIRECTORY+"/build/clearance-report.json",haxe.Json.stringify(report,null,"  "));
+    sys.io.File.saveContent(DIRECTORY+"/build/"+(screen ? "motion-screen.json" : "clearance-report.json"),haxe.Json.stringify(report,null,"  "));
+  }
+
+  /** Exterior properties for an explicitly estimated engineering mass model. */
+  static function engineering(arm:ZeroErrReferenceArm):Void {
+    var model = new AssemblyModel("mm"); arm.addTo(model, "");
+    var definition = model.definition("engineering-input");
+    var records:Array<Dynamic> = [];
+    PosedParts.scope(parts -> {
+      for (entry in arm.components()) {
+        var p = parts.posed(entry.component,arm.referencePoses.get(entry.id));
+        var props = p.massProperties(), c = props.centerOfMass, t = props.inertia;
+        records.push({id:entry.id,volumeMm3:props.volume,centroidMm:[c.x,c.y,c.z],
+          inertiaMm5:[[t.xx,t.xy,t.xz],[t.xy,t.yy,t.yz],[t.xz,t.yz,t.zz]]});
+        p.close();
+      }
+    });
+    var axes:Array<Dynamic> = [];
+    for (i in 0...6) {
+      var id = 'j${i+1}', f:AssemblyFrame = arm.jointFrames.get(id);
+      var a = AssemblyFrames.transformVector(f,0,1,0);
+      axes.push({id:id,originMm:[f.x,f.y,f.z],axis:[a.x,a.y,a.z]});
+    }
+    var tool:AssemblyFrame = arm.referencePoses.get("toolFlange");
+    var normal = AssemblyFrames.transformVector(tool,0,-1,0);
+    sys.io.File.saveContent(DIRECTORY+"/build/engineering-input.json",haxe.Json.stringify({
+      layoutSha256:haxe.crypto.Sha256.encode(sys.io.File.getContent(DIRECTORY+"/reference-layout.json")),
+      solids:records,joints:definition.joints,axes:axes,
+      toolFaceMm:[tool.x,tool.y,tool.z],toolNormal:[normal.x,normal.y,normal.z]
+    },null,"  "));
+    Sys.println("Exported exterior engineering properties; supplier actuator masses must replace CAD mass");
   }
 
   public static function export(arm:ZeroErrReferenceArm):Void {
@@ -183,6 +255,8 @@ class ZeroErrArmPreview {
     try {
       check(arm);
       if (Sys.args().indexOf("--clearance") >= 0) clearance(arm);
+      if (Sys.args().indexOf("--engineering") >= 0) engineering(arm);
+      if (Sys.args().indexOf("--motion-screen") >= 0) clearance(arm,true);
       if (Sys.args().indexOf("--export") >= 0) export(arm);
       arm.close();
     } catch(error:Dynamic) { arm.close(); throw error; }

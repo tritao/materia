@@ -223,6 +223,14 @@
         "scope": "Structural members, output flanges and spigots at supplier zero and bent review poses; not a complete travel, fastener or hardware load qualification"
       },
       "outputSpigotPartition": "Supplier 110T solid merges the projecting output spigot into the casing; partitioned at local z=0 and checked against the V4 drawing and zero-solid Boolean differences."
+    },
+    "engineering_follow_up": {
+      "config": "machinekit/examples/zeroerr-arm/engineering-config.json",
+      "study": "machinekit/examples/zeroerr-arm/engineering-study.py",
+      "target": "UR5e / FAIRINO FR5 class: 5 kg total flange load and published 180 deg/s peak joint speed",
+      "status": "5 kg total at assumed 150 mm combined CoG fails shoulder and two wrist rated-torque screen; whole-arm BOM not released",
+      "preferred_next_wrist_bench_candidate": "eRob80T nominal 100, brake/EtherCAT/HM requested; exact revision and fit unresolved",
+      "original_80I_bench": "separate actuator/communications reference, not a T-module mechanical validation"
     }
   }
 }
