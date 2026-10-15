@@ -28,6 +28,7 @@ class GantryChecks {
 	}
 	public static function run():Void {
 		checkGearBore();
+		runBallScrew();
 		var thread = new LeadScrewThread(MetricTrapezoidal, 12, 3);
 		var drives:Array<GantryDrive> = [Screw(thread), Belt(TimingBeltProfile.GT2, 20, 9), Rack(1, 20, 8)];
 		var failures:Array<String> = [];
@@ -39,6 +40,9 @@ class GantryChecks {
 		for (member in table.components()) check(!StringTools.startsWith(member.id, "post"), "table-mounted variant omits posts");
 		check(table.check().hasErrors() == false, "single-Y table variant is mechanically and electrically valid");
 	}
+	public static function runBallScrew():Void
+		runDrive(Screw(new LeadScrewThread(Ball, 16, 10, 1, RightHand, 13)));
+
 	static function checkGearBore():Void {
 		var legacy = new ComponentValues().setNumber("moduleSize", 1).setInteger("teeth", 20).setNumber("faceWidth", 8)
 			.setNumber("pressureAngle", SpurGear.STANDARD_PRESSURE_ANGLE).setNumber("profileShift", 0).setNumber("backlash", 0);
@@ -129,6 +133,19 @@ class GantryChecks {
 		for (axis in gantry.axes) check(gantry.axisOvertravel(axis.id) > 0, "each guide leaves room beyond both travel ends");
 		var couplings = definition.couplings;
 		if (couplings == null) throw "Gantry has no physical drive couplings";
+		if (switch drive { case Screw(thread): thread.family == Ball; case _: false; }) {
+			for (id in ["screwX", "screwYLeft", "screwYRight", "screwZ"]) {
+				var screw:machinekit.motion.LeadScrew = cast gantry.component(id);
+				var support:machinekit.motion.ScrewSupportUnit = cast gantry.component(id + "Fixed");
+				var nut:machinekit.motion.LeadScrewNut = cast gantry.component(id + "Nut");
+				near(support.boreDiameter, screw.thread.screwDiameter, "fixed bearing fits the actual generic shaft");
+				check(support.fixed && nut.axialStiffness() != null, "ball screw has a bearing and a ball nut");
+				var rebuilt:machinekit.motion.ScrewSupportUnit = cast support.componentType().create(support.values());
+				near(rebuilt.boreDiameter, support.boreDiameter, "bearing bore survives the component recipe");
+			}
+			for (coupling in couplings) check(coupling.stiffnessLaw != null,
+				"every ball-screw coupling carries its physical position-dependent stiffness");
+		}
 		var expectedMagnitude:Float = switch drive {
 			case Screw(thread): 2 * Math.PI / thread.lead;
 			case Belt(profile, teeth, _): 2 * Math.PI / (TimingPulley.profileDimensions(profile).pitch * teeth);

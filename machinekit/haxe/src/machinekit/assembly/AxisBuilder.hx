@@ -221,9 +221,11 @@ class AxisBuilder extends MachineAssembly {
 	 * The coupling is centred on the shaft tip and turns inside the mount's pilot bore.
 	 */
 	public function driveScrew(axis:AxisSpec, id:String, motor:String, screw:LeadScrew, pose:AssemblyFrame,
-			along:Array<Float>, flangedNut:Bool, driverForMotor:String->String):Void {
+			along:Array<Float>, flangedNut:Bool, driverForMotor:String->String, ?coupling:ShaftCoupling):Void {
 		var shaft = cast(component(motor), NemaStepper).variant.shaftDiameter;
-		var coupling = new ShaftCoupling(shaft, screw.thread.screwDiameter);
+		if (coupling == null) coupling = new ShaftCoupling(shaft, screw.thread.screwDiameter);
+		if (coupling.boreA != shaft || coupling.boreB != screw.thread.screwDiameter)
+			throw "Screw coupling bores must fit the motor and screw shaft";
 		var grip = coupling.length / 2;
 		var couplingId = id + "Coupling";
 		addComponent(couplingId, coupling);
@@ -232,14 +234,18 @@ class AxisBuilder extends MachineAssembly {
 		connect(motor, couplingId);
 		attach(id, screw, pose, couplingId);
 		// The screw's thread sets the ratio; the joint starts where the axis puts it.
-		addComponent(id + "Nut", new LeadScrewNut(screw.thread, 4, flangedNut));
+		var nut = new LeadScrewNut(screw.thread, 4, flangedNut,
+			screw.thread.family == machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.Ball ?
+				machinekit.motion.LeadScrewNutKind.BallNut : machinekit.motion.LeadScrewNutKind.AntiBacklash);
+		if (screw.thread.family == machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.Ball) nut.setMaterial("steel");
+		addComponent(id + "Nut", nut);
 		var ratio = addTransmission('$id-lead', axis.id, '$id-turn', Transmission.LeadScrew(id, id + "Nut"),
 			screwSense(axis.id, along));
 		addMateOnAxis('$id-turn', "continuous", motor, 'to-$couplingId', couplingId, 'attach-$couplingId',
 			{x: along[0], y: along[1], z: along[2]}, ratio * axis.initial);
-		// The motor holds the screw's input end through the coupling. Nothing holds the far end, and the
-		// nut floats on the carriage, so it is no support: fixed at the motor, free at the far end, over
-		// the whole screw. That is what sets the screw's top speed.
+		// The input is fixed and the far end free; the moving nut is no bending support. Use the whole
+		// shaft as a conservative unsupported length. Ball-screw layouts must also place the physical
+		// fixed bearing whose axial load path is resolved by ScrewStretch.
 		supportScrew('$id-lead', Fixed, Free);
 		addMotor(motor, '$id-turn', motor, driverForMotor(motor));
 	}

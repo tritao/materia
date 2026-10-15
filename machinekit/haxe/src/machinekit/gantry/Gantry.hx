@@ -21,6 +21,8 @@ import machinekit.motion.MotorDriver;
 import machinekit.motion.PowerSupply;
 import machinekit.motion.LeadScrew;
 import machinekit.motion.LeadScrewNut;
+import machinekit.motion.ScrewSupportUnit;
+import machinekit.motion.ShaftCoupling;
 import machinekit.transmission.TimingBelt;
 import machinekit.transmission.TimingPulley;
 import machinekit.transmission.Rack;
@@ -34,6 +36,8 @@ private typedef GantryBox = {min:Array<Float>, max:Array<Float>};
 
 /** Three translational axes assembled from real guides, drives and a standard robot tool flange. */
 class Gantry extends AxisBuilder {
+	static inline var MOTOR_PLATE_THICKNESS:Float = 6;
+	static inline var DRIVE_CLEARANCE:Float = 3;
 	public final spec:GantrySpec;
 	public final axes:Array<AxisSpec>;
 	public final flangeZero:AssemblyFrame;
@@ -345,7 +349,7 @@ class Gantry extends AxisBuilder {
 
 	function mountMotor(id:String, parent:String, face:AssemblyFrame, ?clearanceDiameter:Float):NemaStepper {
 		var motor = NemaStepper.frame(spec.motorFrame);
-		var plate = new GantryPlate("motor mount", motor.spec.face + 12, motor.spec.face + 12, 6, motor, AssemblyFrames.identity());
+		var plate = new GantryPlate("motor mount", motor.spec.face + 12, motor.spec.face + 12, MOTOR_PLATE_THICKNESS, motor, AssemblyFrames.identity());
 		var support = supportMotor(id + "Support", parent, plate, face, motor, clearanceDiameter);
 		attach(id + "Plate", plate, face, support);
 		attach(id, motor, face, id + "Plate");
@@ -489,11 +493,51 @@ class Gantry extends AxisBuilder {
 			origin[1] + direction[1] * distance, origin[2] + direction[2] * distance];
 		switch drive {
 			case Screw(thread):
-				var start = point(-railMargin), face = point(-railMargin - shaft);
+				var ball = thread.family == machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.Ball;
+				var unit = ball ? new ScrewSupportUnit(true, thread.screwDiameter) : null;
+				var coupling = new ShaftCoupling(selectedMotor.variant.shaftDiameter, thread.screwDiameter);
+				// Short-shaft motors cannot bury a long sleeve inside their pilot or mounting plate.
+				if (ball) {
+					var engagement = Math.min(coupling.length / 2, shaft - MOTOR_PLATE_THICKNESS - DRIVE_CLEARANCE);
+					coupling = new ShaftCoupling(selectedMotor.variant.shaftDiameter, thread.screwDiameter, null, 2 * engagement);
+				}
+				var grip = coupling.length / 2;
+				// The bearing follows the coupling's screw-side grip. Keep its far face clear of the
+				// nut at the guide's full declared overtravel, without reducing usable guide travel.
+				var endRoom = 0.0;
+				if (unit != null) {
+					var bounds = mountBounds(component(moving), zeroPose(moving));
+					var leading = Math.POSITIVE_INFINITY;
+					for (x in [bounds.min[0], bounds.max[0]]) for (y in [bounds.min[1], bounds.max[1]])
+						for (z in [bounds.min[2], bounds.max[2]])
+							leading = Math.min(leading, (x-origin[0])*direction[0] + (y-origin[1])*direction[1] + (z-origin[2])*direction[2]);
+					// The switch trigger extends 3 mm beyond the carriage along travel (buildSwitches).
+					leading -= axisOvertravel(axis.id) + 3;
+					endRoom = Math.max(0, grip + unit.length + DRIVE_CLEARANCE - railMargin - leading);
+				}
+				var start = point(-railMargin - endRoom), face = point(-railMargin - endRoom - shaft);
 				mountMotor(motorId, fixed, AxisBuilder.orient(face[0], face[1], face[2], transverse, direction));
 				var screwId = "screw" + suffix;
-				driveScrew(axis, screwId, motorId, new LeadScrew(thread, axis.upper + 2 * railMargin),
-					AxisBuilder.orient(start[0], start[1], start[2], transverse, direction), direction, true, addDriver);
+				driveScrew(axis, screwId, motorId, new LeadScrew(thread, axis.upper + 2 * railMargin + endRoom),
+					AxisBuilder.orient(start[0], start[1], start[2], transverse, direction), direction, true, addDriver, coupling);
+				if (unit != null) {
+					// Generic screws retain their nominal cylindrical end, unlike the SFU1605's 12 mm journal.
+					// A fixed bearing fits that actual shaft; its foot is carried back to the motor mounting plate.
+					var bearing = point(-railMargin - endRoom + grip + unit.length / 2);
+					var bearingPose = AxisBuilder.orient(bearing[0], bearing[1], bearing[2], transverse, direction);
+					var motorPlate:GantryPlate = cast component(motorId + "Plate");
+					var foot = unit.connector("mount").frame.y;
+					var thickness = motorPlate.height;
+					var begin = point(-railMargin - endRoom - shaft + thickness);
+					var bracketLength = shaft - thickness + grip + unit.length;
+					var bracketPose = AxisBuilder.orient(begin[0] + transverse[0] * (foot - thickness / 2),
+						begin[1] + transverse[1] * (foot - thickness / 2),
+						begin[2] + transverse[2] * (foot - thickness / 2), transverse, direction);
+					var bracketId = screwId + "FixedBracket";
+					attach(bracketId, new GantryPlate("fixed bearing bracket", unit.width, thickness, bracketLength),
+						bracketPose, motorId + "Plate");
+					attach(screwId + "Fixed", unit, bearingPose, bracketId);
+				}
 				var nut:LeadScrewNut = cast component(screwId + "Nut");
 				var faceDistance = nut.bodyLength + nut.flangeThickness;
 				var nutFace = point(faceDistance);
