@@ -2003,3 +2003,28 @@ compositor logs, and process maps). Reproduction harnesses are `nested.py`,
 `damage.c`, `apply-deadline-patch.py`, and `check-deadline.py` at the parent root.
 The reviewed patch, focused checks, and this report are preserved in the repository;
 large build/capture artifacts remain temporary.
+
+### Opt-in acknowledgement bypass for local debugging (2026-10-15)
+
+A later machine-tending run reproduced approximately two-second GTK frame-clock
+stalls on the X11/NVIDIA desktop while application frame work took milliseconds.
+Bypassing compositor acknowledgements removed those stalls. This has not been
+shown to be the same defect as Muffin's urgent-deadline scheduling issue above.
+
+NativeKit now provides an explicit, disabled-by-default mitigation:
+
+```sh
+NK_X11_DISABLE_FRAME_SYNC=1 ./app/run-built.sh
+```
+
+It disables GTK's compositor acknowledgement wait for the application's X11
+top-level window, while retaining GTK frame-clock and on-demand scheduling.
+It does not change compositor settings, install the Muffin patch, or establish
+physical presentation FPS. Without the variable (or with a value other than
+`1`), normal synchronization remains enabled. Wayland is unaffected.
+
+The machine-tending application sustained about 56 callback frames/s with the
+bypass; this is an application throughput measurement, not a scanout measurement.
+The GTK regression checks repeated callbacks with the mitigation enabled and
+verifies that idle rendering stops. The Muffin patch still needs controlled
+hardware validation before replacing this local mitigation.
