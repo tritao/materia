@@ -758,8 +758,11 @@ class ProjectSourceTests {
   }
 
   /**
-   * The margin on the derived stretch bound, a tenth: what the model leaves out (the belts' spans are stiffer near a pulley than
-   * mid-travel, so the axis stiffness the drive model samples is an average; the stepper hold in series).
+   * The margin on the derived stretch bound, a tenth: a stated factor, not derived. It covers what the model leaves out, the
+   * belts' spans being stiffer near a pulley than mid-travel (the drive model's stiffness is the loop's at the assembly's
+   * pose, one number for the whole travel). The stepper hold is not a term: the pulleys are driven at their targets and the
+   * stretch is measured between pulley and carriage. Measured peaks are 93 % of the bound. It goes when the coupling's
+   * stiffness follows the position (PLAN RF12 item 1): the bound then takes the least stiffness over the travel.
    */
   static inline final STRETCH_MARGIN = 1.1;
 
