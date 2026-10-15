@@ -19,6 +19,8 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 	public static inline var EFFICIENCY:Float = 0.85;
 	public final size:Int;
 	public final inputPilotDepth:Float;
+	public final wristStator:Bool;
+	public final wristRotor:Bool;
 	public final gearbox:Gearbox;
 	public final motor:ServoMotor;
 	public final outputRatedTorque:Float;
@@ -27,7 +29,8 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 	public final driverCurrent:machinekit.power.PhaseRmsCurrent;
 	static var recipe:Null<ComponentType>;
 
-	public function new(size:Int, speedDegrees:Float = 180, inputPilotDepth:Float = 0) {
+	public function new(size:Int, speedDegrees:Float = 180, inputPilotDepth:Float = 0,
+			wristStator:Bool = false, wristRotor:Bool = false) {
 		if (size < 0 || size > 4 || !(speedDegrees > 0) || !Math.isFinite(speedDegrees) ||
 			inputPilotDepth < 0 || !Math.isFinite(inputPilotDepth))
 			throw "Cobot module needs size 0–4 and a positive joint speed";
@@ -50,6 +53,8 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 		this.size = size;
 		driverCurrent = new machinekit.power.PhaseRmsCurrent([6.0, 8, 16, 40, 100][size]);
 		this.inputPilotDepth = inputPilotDepth;
+		this.wristStator = wristStator;
+		this.wristRotor = wristRotor;
 		addConnector("gearheadSeat", Mount, machinekit.component.Solids.axial(0, 0, 0.5 + inputPilotDepth));
 		outputRatedTorque = torques[size];
 		outputPeakTorque = 2 * outputRatedTorque;
@@ -66,8 +71,10 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 			edges.close(); body.close(); throw error;
 		}
 		edges.close(); body.close();
-		return Solids.cut(Solids.named(rounded, "body"),
-			[Solids.named(Part.cylinderSpan(pocketDiameter / 2, -1, pocketLength), "pocket")]);
+		var cuts = [Solids.named(Part.cylinderSpan(pocketDiameter / 2, -1, pocketLength), "pocket")];
+		if (wristStator) cuts = cuts.concat(CobotWristMount.housingCuts(this, false));
+		if (wristRotor) cuts = cuts.concat(CobotWristMount.rotorPocket(this));
+		return Solids.cut(Solids.named(rounded, "body"), cuts);
 	}
 
 	/** Explicit physical drive gains select CSP interpolation, including on an
@@ -94,8 +101,10 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 	public static function moduleRecipeType():ComponentType {
 		if (recipe == null) recipe = new ComponentType("machinekit.robotics.cobot-joint", [
 			ComponentRecipeSupport.scalar("size", 2), ComponentRecipeSupport.scalar("speedDegrees", 180),
-			ComponentRecipeSupport.length("inputPilotDepth", 0)
-		], v -> new CobotJoint(Std.int(v.number("size")), v.number("speedDegrees"), v.number("inputPilotDepth")));
+			ComponentRecipeSupport.length("inputPilotDepth", 0),
+			ComponentRecipeSupport.flag("wristStator", false), ComponentRecipeSupport.flag("wristRotor", false)
+		], v -> new CobotJoint(Std.int(v.number("size")), v.number("speedDegrees"), v.number("inputPilotDepth"),
+			v.boolean("wristStator"), v.boolean("wristRotor")));
 		return recipe;
 	}
 	override public function componentType():Null<ComponentType> return moduleRecipeType();
@@ -103,6 +112,7 @@ class CobotJoint extends GearedArmJoint implements machinekit.motion.EncoderPart
 		return new ComponentValues().setNumber("size", size)
 			.setNumber("speedDegrees", motor.rating.maxSpeed / RATIO * 180 / Math.PI)
 			.setNumber("inputPilotDepth", inputPilotDepth)
+			.setBoolean("wristStator", wristStator).setBoolean("wristRotor", wristRotor)
 			.setToken("material", materialSpec());
 	}
 }

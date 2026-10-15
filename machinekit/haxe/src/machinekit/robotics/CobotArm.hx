@@ -2,6 +2,8 @@ package machinekit.robotics;
 
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.Solids;
+import machinekit.component.MachineComponent;
+import machinekit.standard.SocketHeadCapScrew;
 import machinekit.motion.MotorDriver;
 import machinekit.motion.PowerSupply;
 import materia.assembly.AssemblyFrames;
@@ -14,7 +16,7 @@ class CobotArm extends MachineAssembly {
 	public final cls:CobotClass;
 	public final reference:CobotReference.CobotReferenceRow;
 	public final modules:Array<CobotJoint>;
-	public final links:Array<CobotLink>;
+	public final links:Array<MachineComponent>;
 	public final baseFlange:RobotFlange;
 	public final toolFlange:RobotFlange;
 	public final tool:Null<EndEffector>;
@@ -27,7 +29,7 @@ class CobotArm extends MachineAssembly {
 		links = [];
 		baseFlange = new RobotFlange(63);
 		for (i in 0...6) modules.push(new CobotJoint(reference.modules[i], reference.speeds[i],
-			i == 0 ? baseFlange.pilotHeight : 0));
+			i == 0 ? baseFlange.pilotHeight : 0, i == 4 || i == 5, i >= 3));
 		toolFlange = new RobotFlange(50);
 		addComponent("baseFlange", baseFlange, AssemblyFrames.translation(0, 0, baseFlange.thickness));
 		addMemberConnector("baseFlange", "moduleSeat", Solids.axial(0, 0, 0));
@@ -37,7 +39,10 @@ class CobotArm extends MachineAssembly {
 		for (i in 0...6) {
 			var nextRadius = i < 5 ? modules[i + 1].diameter / 2 : toolFlange.flangeDiameter / 2;
 			var d = reference.d[i] - (i == 5 ? toolFlange.thickness : 0);
-			var link = new CobotLink(reference.a[i], d, reference.alpha[i], modules[i], nextRadius);
+			var link:MachineComponent = i == 3 || i == 4
+				? new CobotWristLink(d, reference.alpha[i], modules[i], modules[i + 1])
+				: i == 5 ? new CobotToolLink(reference.d[i], modules[i], toolFlange)
+				: new CobotLink(reference.a[i], d, reference.alpha[i], modules[i], nextRadius);
 			links.push(link);
 			var linkId = 'link${i + 1}', jointId = 'j${i + 1}', moduleId = 'joint${i + 1}';
 			addComponent(linkId, link);
@@ -51,6 +56,16 @@ class CobotArm extends MachineAssembly {
 				addComponent("toolFlange", toolFlange);
 				addMemberConnector("toolFlange", "back", Solids.axial(0, 0, -toolFlange.thickness));
 				addMate("tool-flange", "fixed", linkId, "end", "toolFlange", "back");
+			}
+			if (i >= 3) {
+				var rotorId = 'wristRotor${i + 1}';
+				addComponent(rotorId, new CobotWristRotor(modules[i], i == 5 ? CobotToolLink.CLOCKING : 0));
+				addMate('$rotorId-mount', "fixed", linkId, "start", rotorId, "face");
+			}
+			if (i >= 3) for (side in (i == 5 ? ["input"] : ["input", "output"])) for (bolt in 1...CobotWristMount.COUNT + 1) {
+				var id = 'wristBolt${i + 1}-${side}-$bolt';
+				addComponent(id, SocketHeadCapScrew.metric("M4", CobotWristLink.HUB_DEPTH + CobotWristMount.ENGAGEMENT));
+				addMate('$id-mount', "fixed", linkId, '${side}Bolt$bolt', id, "head");
 			}
 			var gearboxId = 'gearbox${i + 1}';
 			addComponent(gearboxId, modules[i].gearbox);
@@ -83,6 +98,8 @@ class CobotArm extends MachineAssembly {
 		var mass = baseFlange.massProperties().mass + toolFlange.massProperties().mass;
 		for (module in modules) mass += module.massProperties().mass + module.gearbox.massProperties().mass;
 		for (link in links) mass += link.massProperties().mass;
+		for (entry in components()) if (StringTools.startsWith(entry.id, "wristBolt") || StringTools.startsWith(entry.id, "wristRotor"))
+			mass += entry.component.massProperties().mass;
 		return mass;
 	}
 

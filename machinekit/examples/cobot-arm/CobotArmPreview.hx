@@ -1,5 +1,8 @@
 import machinekit.robotics.CobotArm;
 import machinekit.robotics.CobotClass;
+import machinekit.robotics.CobotWristLink;
+import machinekit.robotics.CobotToolLink;
+import machinekit.robotics.CobotJoint;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.PosedParts;
 import machinekit.assembly.PosedParts.PartBox;
@@ -55,8 +58,19 @@ class CobotArmChecks {
 		arm.addTo(model, "");
 		var definition = model.definition("cobot-arm");
 		var state = new AssemblyState(definition);
+		checkWristConstruction(arm, state, parts);
 		var poses = [[0.0, 0, 0, 0, 0, 0], arm.ready(), [0.2, -1, 0.8, -0.5, -0.7, 0.3],
 			[-0.4, -0.8, 0.5, 0.6, -1.2, -0.2], [0.6, -1.4, 1.2, -0.4, -0.9, 0.1]];
+		var oppositeWrist = arm.ready();
+		oppositeWrist[4] = Math.PI / 2;
+		poses.push(oppositeWrist);
+		var turnedWrist = oppositeWrist.copy();
+		turnedWrist[3] = Math.PI / 2;
+		poses.push(turnedWrist);
+		var readyPose = arm.ready();
+		var excursion = [0.12, 0.08, -0.1, 0.08, 0.1, -0.12];
+		for (fraction in [-1.0, -0.5, 0.5, 1.0])
+			poses.push([for (i in 0...6) readyPose[i] + fraction * excursion[i]]);
 		for (q in poses) {
 			for (i in 0...6) state.setJoint('j${i + 1}', q[i]);
 			var expected = dh(arm, q), actual = state.worldPose("toolFlange");
@@ -90,15 +104,76 @@ class CobotArmChecks {
 			throw '${arm.reference.designation} joint ${i + 1} needs ${Math.abs(torques[i])} N m, exceeds ${arm.modules[i].outputRatedTorque} N m rated torque';
 		var mass = arm.armMass();
 		var checkedMass = switch cls {
-			case Reach500: 14.725839279605855;
-			case Reach850: 21.12096867189879;
-			case Reach900: 37.394304785203424;
-			case Reach1300: 37.73141399994982;
+			case Reach500: 15.026405673873528;
+			case Reach850: 21.47042990709948;
+			case Reach900: 36.89230654642542;
+			case Reach1300: 37.229415761171815;
 		};
 		if (!Math.isFinite(mass) || Math.abs(mass - checkedMass) > 0.02)
 			throw '${arm.reference.designation} assembled mass $mass kg differs from its checked assumed assembly mass $checkedMass kg';
 		if (definition.encoders == null || definition.encoders.length != 6) throw "Cobot needs six output encoders";
-		Sys.println('${arm.reference.designation}: $mass kg assembled (published reference ${arm.reference.mass} kg), DH-zero shoulder distance $reach mm, holding N m $torques, DH FK and CAD overlap at five poses, exported limits passed');
+		Sys.println('${arm.reference.designation}: $mass kg assembled (published reference ${arm.reference.mass} kg), DH-zero shoulder distance $reach mm, holding N m $torques, DH FK and CAD overlap at ${poses.length} poses, exported limits passed');
+	}
+
+	/** Contacts and actual CAD section properties complement the overlap test:
+	 * empty space passes a collision check just as readily as a connected elbow.
+	 * Section stiffness is compared with the old neck; this is a geometry
+	 * regression, not a substitute for whole-elbow FEA or bearing selection.
+	 */
+	static function checkWristConstruction(arm:CobotArm, state:AssemblyState, parts:PosedParts):Void {
+		for (i in [3, 4]) {
+			if (!Std.isOfType(arm.links[i], CobotWristLink)) throw "Cobot wrist needs structural elbows";
+			var elbow:CobotWristLink = cast arm.links[i];
+			var local = parts.local(elbow), minimum = Math.POSITIVE_INFINITY;
+			var gap = elbow.seat.z - elbow.output.diameter / 2;
+			var oldRadius = Math.min(Math.max(12, elbow.input.diameter * 0.23), (gap - 4) * 0.8);
+			var oldWall = Math.max(1, Math.min(2, oldRadius * 0.12));
+			var oldInertia = Math.PI / 4 * (Math.pow(oldRadius, 4) - Math.pow(oldRadius - oldWall, 4));
+			for (z in [CobotWristLink.HUB_DEPTH + 0.5, elbow.seat.z / 2, elbow.seat.z - CobotWristLink.HUB_DEPTH - 0.5]) {
+				var thickness = 0.2;
+				var blank = Part.box(4 * elbow.output.diameter, 4 * elbow.output.diameter, thickness);
+				var cutter = blank.translated(new Vector(0, 0, z)); blank.close();
+				var section = local.intersect(cutter); cutter.close();
+				var mass = section.massProperties(); section.close();
+				if (!(mass.volume > 0)) throw "Wrist elbow has an empty load section";
+				var tensor = mass.inertia;
+				var lower = (tensor.xx + tensor.yy - Math.sqrt(Math.pow(tensor.xx - tensor.yy, 2) + 4 * tensor.xy * tensor.xy)) / 2;
+				var inertia = lower / thickness - mass.volume * thickness / 12;
+				minimum = Math.min(minimum, inertia);
+			}
+			if (!(minimum > 2 * oldInertia))
+				throw '${arm.reference.designation} wrist elbow ${i + 1} section stiffness $minimum mm^4 must exceed twice the old neck $oldInertia mm^4';
+			for (pair in [["wristRotor" + (i + 1), "link" + (i + 1)], ["link" + (i + 1), "joint" + (i + 2)]]) {
+				checkContact(arm, state, parts, pair[0], pair[1]);
+			}
+			var rebuilt:CobotJoint = cast elbow.input.componentType().create(elbow.input.values());
+			if (rebuilt.wristRotor != elbow.input.wristRotor || rebuilt.wristStator != elbow.input.wristStator ||
+				rebuilt.geometryKey() != elbow.input.geometryKey()) throw "Wrist interface must survive a saved module recipe";
+			Sys.println('${arm.reference.designation} elbow ${i + 1}: minimum sampled section $minimum mm^4 (old neck $oldInertia mm^4)');
+		}
+		if (!Std.isOfType(arm.links[5], CobotToolLink)) throw "Cobot tool flange needs an enclosed output housing";
+		var terminal:CobotToolLink = cast arm.links[5];
+		checkContact(arm, state, parts, "wristRotor6", "link6");
+		checkContact(arm, state, parts, "link6", "toolFlange");
+		var local = parts.local(terminal), envelope = terminal.geometry(Envelope);
+		var outside = local.subtract(envelope); envelope.close();
+		var escapedVolume = outside.volume(); outside.close();
+		if (escapedVolume > 1e-3) throw "Tool housing preview must fit inside its collision envelope";
+		var toolRejected = false;
+		try new CobotToolLink(arm.modules[5].length + arm.toolFlange.thickness,
+			arm.modules[5], arm.toolFlange) catch (_:Dynamic) toolRejected = true;
+		if (!toolRejected) throw "An undersized tool housing must fail before constructing geometry";
+		var rejected = false;
+		try new CobotWristLink(arm.modules[4].length + arm.modules[5].diameter / 2,
+			-Math.PI / 2, arm.modules[4], arm.modules[5]) catch (_:Dynamic) rejected = true;
+		if (!rejected) throw "An undersized wrist layout must fail instead of shrinking its structural section";
+	}
+
+	static function checkContact(arm:CobotArm, state:AssemblyState, parts:PosedParts, first:String, second:String):Void {
+		var a = parts.member(arm, state, "wrist", first), b = parts.member(arm, state, "wrist", second);
+		var joined = a.combine(b); a.close(); b.close();
+		var connected = joined.solidCount() == 1; joined.close();
+		if (!connected) throw 'Wrist interface $first / $second must share a mounting face';
 	}
 
 	static function dh(arm:CobotArm, q:Array<Float>):AssemblyFrame {

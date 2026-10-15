@@ -1,0 +1,37 @@
+{
+  "retrieved_utc": "2026-10-15T13:44:51.074947+00:00",
+  "fairino_catalogue": "https://www.fairino.com/DOWNLOAD2",
+  "fairino_step_url": "https://fairino-doc-en.readthedocs.io/latest/_downloads/49cdf31534d0899683fd176e86a223d1/FRCobots-V6.0%20STEP%20Models.zip",
+  "fairino_drawings_url": "https://fairino-doc-en.readthedocs.io/latest/_downloads/d0aec4a78c7e5520e502d33d18425649/FR5%20Drawings.zip",
+  "ur_repository": "https://github.com/UniversalRobots/Universal_Robots_ROS2_Description",
+  "ur_revision": "d4042c1f5123c86645cc5dbd650b4f461f697ee9",
+  "ur_source_directory": "meshes/ur5e/visual",
+  "ur_step_access": "Official STEP download requires login; no STEP obtained. Official ROS meshes used instead.",
+  "measurements": {
+    "fairino_fr5_wrist_barrel_diameter_mm": {
+      "value": 80,
+      "method": "Cylindrical-face radius 40 mm in STEP solids 22, 26, 32 and 36; external bounding width corroborates."
+    },
+    "ur5e_wrist_mesh_width_mm": {
+      "value": 78.7,
+      "method": "Wrist2.dae native mesh X extents -39.35 to +39.35 mm, rounded to 0.01 mm. Mesh extent, not a nominal drawing dimension."
+    },
+    "materia_reach850_module_diameter_mm": {
+      "value": 96,
+      "method": "CobotJoint size 1 diameter; retained in refinement."
+    }
+  },
+  "sha256": {
+    "fairino-step.zip": "1f6f28e7a62bfb70eab7066733c0f7bad0695a943597dcdda70261a0a4d0f392",
+    "fr5-drawings.zip": "26dedb01518855a40bf33ec8de1618eb326d25fe7aa3424df247d6bdab175e1d",
+    "ur5e/base.dae": "c30e4d7228ef633dca2a02c26df2316741f6642cb6333e8289dba6e6d0b22819",
+    "ur5e/wrist3.dae": "7a7664ac4adcd53b0870fe6a2b8b975693d846dd4d07a5f44194c7d16f4890ba",
+    "ur5e/upperarm.dae": "c040a05bb224f14cfab6aa6704d70cbb773ada940eca9a3e34e6ce486c4c4c29",
+    "ur5e/forearm.dae": "04694bf57dac46e9b8bc7c30f2eec75a1bc762e1f1a879ea30c944f24cacbad8",
+    "ur5e/wrist1.dae": "a07a3d96d2540f9be12e4a07bcb8577d9f1e36005920c396a407804343a3b588",
+    "ur5e/wrist2.dae": "982fa42933c6f81629882ad7975e9ba5dac5d474a6b56694e233708376cf840e",
+    "ur5e/shoulder.dae": "c581bfa55b86061d9b99d315ed53817b6b693e6a500643bbf9bbb783322d585d",
+    "ur5e/default_kinematics.yaml": "4ffc6086bb0118a5a8e4a3576ef41de878de946710799ea4835789063fa9c0bc",
+    "ur5e/visual_parameters.yaml": "87e8adba0d4e40cc9a994e7ca2264671cc6b6c732649b675b553639cb275a16d"
+  }
+}

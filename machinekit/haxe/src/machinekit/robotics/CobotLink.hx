@@ -30,6 +30,7 @@ class CobotLink extends MachineComponent {
 			var gap = d - previous.length - nextRadius;
 			if (!(gap > cap)) throw "Cobot module seats leave no room for their link";
 			radius = Math.min(radius, (gap - cap) * 0.8);
+			if (radius < 12) throw "Cobot tube section is too small; use a relieved structural elbow";
 		}
 		// Wider links use a lightweight 2 mm shell rather than scaling their wall with diameter.
 		var wall = Math.max(1, Math.min(2, radius * 0.12));
