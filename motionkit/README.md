@@ -151,3 +151,30 @@ Homing retains the runtime's finite coordinate search window. A cold start whose
 origin places the switch outside that window faults at the boundary; it does not expand travel
 blindly. Full-stroke homing from arbitrary unknown origins requires a matching runtime/device
 search-window contract. Displaced authored poses with known coordinates remain supported.
+
+Long TOPP-RA paths use bounded solver windows. A backward sweep propagates the
+complete interval of squared speeds that can still reach the final condition;
+a forward sweep chooses the fastest reachable speed inside the next interval.
+The first window's backward pass is performed by its forward call. Both interval
+ends travel between windows, and squared speeds stay squared at interfaces to
+avoid a square-root round trip. The old boundary shares and retry ladder are
+removed. `mk_timing_report.boundary_lowerings` remains in the ABI and is zero.
+
+The TOPP-RA fork exposes `computeControllableSetsFromSquaredSpeed` for the
+backward-only pass and `computePathParametrizationFromSquaredSpeed` for a fixed
+start and a terminal interval. Both APIs use squared-speed units throughout;
+the legacy C++ entry point retains its historical mixed endpoint convention.
+Free terminal intervals are intersected with the physical final-point limits.
+A fixed start is checked by its stage LP, avoiding rejection from an inward
+rounded projected interval endpoint. Exactly fixed Seidel coordinates reduce to
+a scalar LP. A cached backward control is used early only when it also reaches
+the next upper bound, which certifies the forward optimum; velocity plateaus
+with multiple controls still solve the forward problem.
+
+This window composition is exact for the selected discrete constraints, subject
+to solver arithmetic. The adaptive grid, curvature reserve, nanosecond lowering,
+and continuous validation retain their separate roles. An interpolation trial
+without the reserve exceeded the 12.5 m/s² limit on the 50 µm corner (12.5107 m/s²),
+so collocation and the existing curvature reserve remain in use. Interpolation
+adoption needs another continuous-error argument or refinement before it can
+replace that policy.

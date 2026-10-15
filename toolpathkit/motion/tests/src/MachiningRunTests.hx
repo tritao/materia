@@ -126,13 +126,23 @@ class MachiningRunTests {
     if (motion.sessionState() != SessionState.Held)
       throw "machining feed hold did not reach rest";
     var continuation = run.prepareRestart(target, heldAt);
-    // Up to the clearance first (the restart point is right below), then the
-    // program's tool, then the spindle.
-    switch [continuation.program.ops[0], continuation.program.ops[1]] {
-      case [MotionOp.MoveL(up, _, _, _), MotionOp.WaitInput("cnc.tool_change.3", _, _)]:
-        if (Math.abs(up.z - 0.014) > 1e-12) throw "a restart moves up to the clearance height";
-      case _: throw 'a restart clears the work and reloads its tool first, got ${continuation.program.ops.slice(0, 2)}';
+    // A held stop can be beyond the restart point. Clear the work and allow a
+    // traverse at clearance before reloading the tool and restoring process outputs.
+    var toolIndex = 0;
+    while (toolIndex < continuation.program.ops.length) {
+      var toolFound = false;
+      switch continuation.program.ops[toolIndex] {
+        case MotionOp.MoveL(clear, _, _, _):
+          if (Math.abs(clear.z - 0.014) > 1e-12)
+            throw "restart approach stays at the recipe's clearance height";
+        case MotionOp.WaitInput("cnc.tool_change.3", _, _): toolFound = true;
+        case _: throw "restart must clear the work before reloading the tool or restoring process outputs";
+      }
+      if (toolFound) break;
+      toolIndex++;
     }
+    if (toolIndex >= continuation.program.ops.length || toolIndex < 1 || toolIndex > 2)
+      throw "restart needs a clearance lift, at most one clearance traverse, then the tool";
     var slicedLength = 0.0;
     for (op in continuation.program.ops) switch op {
       case MotionOp.FollowPath(path, _, _, _):

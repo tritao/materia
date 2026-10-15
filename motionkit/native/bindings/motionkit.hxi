@@ -587,8 +587,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		 */
 		windows: u32 @offset(40);
 		/**
-		 * How many times the windows' boundary speeds were lowered before they could be timed (0: at the first share; 3:
-		 * at zero, where the path rests at each boundary as if it had been cut there).
+		 * Retained for ABI compatibility. Exact controllable/reachable window sweeps always report zero.
 		 */
 		boundary_lowerings: u32 @offset(44);
 	}

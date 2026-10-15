@@ -557,10 +557,7 @@ typedef struct mk_timing_report {
     double sustainable_scale;
     /** How many windows the path was timed in (one for a path that is not cut). */
     uint32_t windows;
-    /**
-     * How many times the windows' boundary speeds were lowered before they could be timed (0: at the first share; 3:
-     * at zero, where the path rests at each boundary as if it had been cut there).
-     */
+    /** Retained for ABI compatibility. Exact controllable/reachable window sweeps always report zero. */
     uint32_t boundary_lowerings;
 } mk_timing_report;
 /** Reachability-based TOPP-RA timing and its validated lowered trajectory.
