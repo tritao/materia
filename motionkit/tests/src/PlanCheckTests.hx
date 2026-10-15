@@ -182,6 +182,20 @@ class PlanCheckTests extends MotionKitTestSupport {
   }
 
   public function testPlanningLimits():Void {
+    // Same slide and acceleration: weaker springs and lower damping must reserve more rapid clearance.
+    var stiff = machine([1.0, 0.0, 0.0], false, 10.0);
+    stiff.couplings[0].dampingRatio = 1.0;
+    var critical = robotkit.model.DriveLoads.rapidDisplacement(stiff, ["slide"])[0];
+    stiff.couplings[0].dampingRatio = 0.1;
+    var ringing = robotkit.model.DriveLoads.rapidDisplacement(stiff, ["slide"])[0];
+    check(ringing > critical * 2.0, "rapid clearance covers bounded repeated excitation, not just a single step overshoot");
+    stiff.couplings[0].stiffness = 1.0;
+    check(robotkit.model.DriveLoads.rapidDisplacement(stiff, ["slide"])[0] > ringing,
+      "a softer drive needs more rapid clearance at the same acceleration");
+    stiff.couplings[0].dampingRatio = 0.0;
+    var undamped = false;
+    try robotkit.model.DriveLoads.rapidDisplacement(stiff, ["slide"]) catch (_:Dynamic) undamped = true;
+    check(undamped, "an undamped spring cannot claim a finite bounded-input rapid displacement");
     var model = machine([1.0, 0.0, 0.0], false);
     var armLink = model.addLink(new Link("arm-link"));
     var arm = model.addJoint(new Joint("arm", JointType.Revolute, model.links[0], armLink));

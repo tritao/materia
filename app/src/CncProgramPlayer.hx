@@ -133,7 +133,8 @@ class CncProgramPlayer extends ToolpathPlayer {
 	final job:CncJob;
 	final simulation:Simulation;
 	final assemblyParts:SimulationAssemblyParts;
-	final kindByLine = new Map<Int, MoveKind>();
+	var kindBySource = new haxe.ds.ObjectMap<Provenance, MoveKind>();
+	public var rapidDisplacement(default, null):Array<Float> = [];
 	final stockSources:Map<String, {part:SimulationAssemblyPart, source:CncJobStock}> = new Map();
 	var stockObject:Null<String>;
 	var activeStockOccurrence:Null<String>;
@@ -258,6 +259,22 @@ class CncProgramPlayer extends ToolpathPlayer {
 		recipe = new MachiningRecipe(0.01, 0.0, top * metresPerUnit - 0.001);
 		var planning = planningModel(machineModel, job.axes, steady);
 		var machine = new MachineBinding("machine", job.axes[0], job.axes[1], job.axes[2], rapid, channels);
+		rapidDisplacement = interfaceManaged ? [0.0, 0.0, 0.0] : robotkit.model.DriveLoads.rapidDisplacement(machineModel, job.axes, steady);
+		var clearanceStocks:Array<toolpathkit.motion.RapidClearance.ClearanceStock> = [];
+		// Fixed stock has a known machine frame at compile time. Robot-tended blanks move before their CNC cycle;
+		// those retain their existing cell planning until its active-stock pose is available to the compiler.
+		if (!interfaceManaged) for (source in job.stockSources) {
+			var relative = AssemblyFrames.compose(AssemblyFrames.inverse(placement.worldPose(job.spindle)), placement.worldPose(source.occurrence));
+			var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+			var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+			for (x in [source.minimum[0], source.maximum[0]]) for (y in [source.minimum[1], source.maximum[1]])
+				for (z in [source.minimum[2], source.maximum[2]]) {
+					var point = AssemblyFrames.transformPoint(relative, x/metresPerUnit, y/metresPerUnit, z/metresPerUnit);
+					var coordinates = [point.x*metresPerUnit+start[0], point.y*metresPerUnit+start[1], point.z*metresPerUnit+start[2]];
+					for (axis in 0...3) { low[axis] = Math.min(low[axis], coordinates[axis]); high[axis] = Math.max(high[axis], coordinates[axis]); }
+				}
+			clearanceStocks.push({minimum:low, maximum:high});
+		}
 		var binding = new ToolpathMotionBinding(machine,
 			new MotionSystemBlueprint(planning.model, robot.blueprint, axes, session.fixedTimestep()));
 		// Every plan the compiler makes is checked against the motors' drives: torque along the plan and
@@ -281,7 +298,14 @@ class CncProgramPlayer extends ToolpathPlayer {
 			}];
 			if (errors.length > 0) throw 'The machining program from [${position.x}, ${position.y}, ${position.z}] with G54 ${job.workOffset}: ${errors.join("; ")}';
 			loadPosition = finalMachinePosition(compiled.program);
-			var lowered = ToolpathMotion.lower(compiled.program, machine);
+			var protectedProgram = toolpathkit.motion.RapidClearance.apply(compiled.program, clearanceStocks, rapidDisplacement,
+				job.loadedTool == null ? -1 : job.loadedTool);
+			kindBySource = new haxe.ds.ObjectMap<Provenance, MoveKind>();
+			for (op in protectedProgram.ops) switch op {
+				case Move(kind, _, _, _, provenance), MachineMove(kind, _, _, _, provenance): kindBySource.set(provenance, kind);
+				case _:
+			}
+			var lowered = ToolpathMotion.lower(protectedProgram, machine);
 			if (lowered.program == null)
 				throw 'The machining program: ${[for (diagnostic in lowered.diagnostics) diagnostic.message].join("; ")}';
 			program = lowered.program;
@@ -347,10 +371,6 @@ class CncProgramPlayer extends ToolpathPlayer {
 			var parkProgram = loweredPark.program;
 			if (parkProgram == null) throw "Machine load-position move did not lower";
 			parkingProgram = parkProgram;
-		}
-		for (op in compiled.ops) switch op {
-			case Move(kind, _, _, _, provenance), MachineMove(kind, _, _, _, provenance): kindByLine.set(provenance.line, kind);
-			case _:
 		}
 		initialTool = job.loadedTool == null ? -1 : job.loadedTool;
 		loadedTool = initialTool;
@@ -524,14 +544,15 @@ class CncProgramPlayer extends ToolpathPlayer {
 		var cutting = activeStock;
 		if (cutting == null) return;
 		var clock = Sys.time();
-		var kind = provenance == null ? null : kindByLine.get(provenance.line);
+		var kind = provenance == null ? null : kindBySource.get(provenance);
 		var now = kind == null ? MoveKind.Rapid : kind;
 		var nowProvenance = provenance == null ? new Provenance(0, 0, 0) : provenance;
 		// The tool moved on the last tick under the move commanded before it, so the segment it
 		// just cut belongs to that move; the move under way now labels the next segment. A tick
 		// that runs from a rapid into a cutting move cut under the cutting move: the rapid's part
 		// of it is at most one tick, and a rapid that does enter the stock cuts on the ticks after.
-		if (commandedKind == MoveKind.Rapid && now != MoveKind.Rapid)
+		if ((commandedKind == MoveKind.Rapid || commandedKind == MoveKind.Link || commandedKind == MoveKind.Retract) &&
+				now != MoveKind.Rapid && now != MoveKind.Link && now != MoveKind.Retract)
 			cutting.follow(now, at.op, nowProvenance);
 		else
 			cutting.follow(commandedKind, commandedOp, commandedProvenance);

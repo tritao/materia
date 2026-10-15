@@ -135,6 +135,7 @@ class ToolpathMotionTests {
       Sys.println('Virtual CNC tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    RapidClearanceTests.main();
     acceptsBinding(null);
     var origin = Provenance.cam(7, "face:2");
     var machine = new MachineBinding("work", "x", "y", "z", 0.2, new toolpathkit.motion.ToolpathChannels(""));

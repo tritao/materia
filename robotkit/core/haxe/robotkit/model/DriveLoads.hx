@@ -73,6 +73,18 @@ class AxisLoad {
     this.friction = friction;
   }
 
+  /** Largest emitted motor step reflected into this axis's units; zero when it has no steppers. */
+  public function stepResolution():Float {
+    var resolution = 0.0;
+    for (motor in motors) {
+      var actuator = motor.actuator;
+      if (actuator.fullStepsPerRevolution > 0.0 && actuator.microsteps != null && actuator.microsteps > 0)
+        resolution = Math.max(resolution, 2.0 * Math.PI /
+          (actuator.fullStepsPerRevolution * actuator.microsteps * Math.abs(motor.ratio)));
+    }
+    return resolution;
+  }
+
   /**
    * Force the whole drive must put on the axis, N: inertia, gravity and the resisting forces
    * `resisting` (friction, cutting), which oppose `velocity`.
@@ -124,6 +136,41 @@ class DriveLoads {
   public static function forAxis(model:RobotModel, id:JointId, ?steady:SteadyLoads):Null<AxisLoad> {
     for (load in of(model, steady)) if (load.axis == id) return load;
     return null;
+  }
+
+  /** Axis displacement reserved around a rapid, metres for Cartesian axes.
+   * The absolute compliance matrix maps worst inertial/steady forces to travel. For damping zeta < 1 the L1 gain of
+   * the spring's impulse response is coth(pi*zeta/(2*sqrt(1-zeta^2))); unlike a single-step overshoot this also covers
+   * repeated bounded acceleration reversals. A pulse adds its resolution; motor-hold compliance belongs to the RF13 follow-up.
+   */
+  public static function rapidDisplacement(model:RobotModel, axes:Array<String>, ?steady:SteadyLoads):Array<Float> {
+    var loads = of(model, steady, axes);
+    var connected = new Map<String, Bool>();
+    for (axis in axes) connected.set(axis, true);
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (coupling in model.couplings) if (connected.exists(coupling.leader) != connected.exists(coupling.follower)) {
+        connected.set(coupling.leader, true); connected.set(coupling.follower, true); changed = true;
+      }
+    }
+    var damping = 1.0;
+    for (coupling in model.couplings) if (coupling.stiffness > 0.0 && connected.exists(coupling.leader))
+      damping = Math.min(damping, coupling.dampingRatio);
+    if (!(damping > 0.0)) throw "An undamped compliant drive has no finite rapid displacement bound";
+    var decay = damping < 1.0 ? Math.exp(-Math.PI*damping/Math.sqrt(1.0-damping*damping)) : 0.0;
+    var gain = (1.0+decay)/(1.0-decay);
+    var forces = [for (load in loads) load.mass * model.coupledLimits(load.axis, steady).requireAcceleration() +
+      Math.abs(load.gravityForce) + load.friction];
+    return [for (id in axes) {
+      var index = -1;
+      for (i in 0...loads.length) if (loads[i].axis == id) index = i;
+      if (index < 0) throw 'Rapid axis "$id" has no motor load';
+      var load = loads[index], displacement = load.backlash + load.stepResolution();
+      if (load.elastic != null) for (column in 0...loads.length)
+        displacement += gain * Math.abs(load.elastic.compliance[index][column]) * forces[column];
+      displacement;
+    }];
   }
 
   /** Steady force needs this axis's drag and gravity, not a shared stiffness inversion. */
