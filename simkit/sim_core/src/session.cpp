@@ -489,7 +489,10 @@ public:
             running_ = false;
             stopping_ = false;
         }
-        return release_host();
+        const auto result = release_host();
+        if (result == NKSIM_OK)
+            if (const auto world = nksim::resolve_world(world_)) world->claim_thread();
+        return result;
     }
 
     nksim_result reset() {

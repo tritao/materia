@@ -1918,17 +1918,16 @@ rk_result Simulation::cut_virtual_device_link(uint32_t robot_index, bool cut) {
 }
 
 rk_result Simulation::prepare(const nksim_tick &tick) {
-    // Realtime ticks apply every mailbox at the owner's monotonic time; manual
-    // ticks give virtual devices the fixed simulation time they run on.
+    // Simulated endpoints apply commands and publish feedback on the fixed
+    // simulation clock, including when the owner paces ticks using wall time.
+    // Brake deadlines and feedback freshness must advance with physics.
     // A robot whose commands cannot be applied faults alone: the others still
     // apply theirs and the tick goes ahead. Rejecting the whole tick would let
     // one robot, for instance a fallen humanoid whose policy keeps commanding
     // it, stop every machine that shares the session.
     const auto simulation_ns = tick.step_index * static_cast<std::uint64_t>(period_.count());
     for (std::size_t index = 0; index < runtimes_.size(); ++index) {
-        const auto time = !tick.realtime && virtual_devices_[index] ? simulation_ns
-                                                                    : tick.owner_time_ns;
-        if (runtimes_[index]->apply_pending_commands(time) != RK_OK)
+        if (runtimes_[index]->apply_pending_commands(simulation_ns) != RK_OK)
             runtimes_[index]->fail_tick();
     }
     return RK_OK;
@@ -2018,7 +2017,7 @@ rk_result Simulation::publish(const nksim_tick &tick) {
         const auto sample_result = virtual_devices_[index]
             ? runtimes_[index]->publish_presampled(simulation_ns, virtual_samples_[index],
                                                   virtual_sample_results_[index])
-            : runtimes_[index]->publish_sample(tick.owner_time_ns);
+            : runtimes_[index]->publish_sample(simulation_ns);
         if (sample_result != RK_OK)
             runtimes_[index]->fail_tick();
     }

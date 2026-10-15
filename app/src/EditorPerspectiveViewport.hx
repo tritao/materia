@@ -612,8 +612,20 @@ class EditorPerspectiveViewport implements View {
       if (simulationActive) {
         var index = clipBounds.length;
         if (index == clipBoundsScratch.length) clipBoundsScratch.push([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
-        clipBounds.push(transformedBounds(displayTransform(item), item.width, item.height, item.depth,
-          clipBoundsScratch[index]));
+        // Bounds only need the pose's numbers. Building a native transform and
+        // reading its matrix back for every object adds thousands of FFI calls per frame.
+        var pose = simulationPoseById.get(item.id);
+        var position = pose == null ? [item.x, item.y, item.z] : pose.position;
+        var rotation = pose == null ? [0.0, 0.0, 0.0, 1.0] : pose.rotation;
+        var x = rotation[0], y = rotation[1], z = rotation[2], w = rotation[3];
+        var hx = Math.abs(item.width) / 2, hy = Math.abs(item.height) / 2, hz = Math.abs(item.depth) / 2;
+        var ex = Math.abs(1 - 2 * (y*y + z*z)) * hx + Math.abs(2 * (x*y - z*w)) * hy + Math.abs(2 * (x*z + y*w)) * hz;
+        var ey = Math.abs(2 * (x*y + z*w)) * hx + Math.abs(1 - 2 * (x*x + z*z)) * hy + Math.abs(2 * (y*z - x*w)) * hz;
+        var ez = Math.abs(2 * (x*z - y*w)) * hx + Math.abs(2 * (y*z + x*w)) * hy + Math.abs(1 - 2 * (x*x + y*y)) * hz;
+        var bounds = clipBoundsScratch[index];
+        bounds[0] = position[0] - ex; bounds[1] = position[1] - ey; bounds[2] = position[2] - ez;
+        bounds[3] = position[0] + ex; bounds[4] = position[1] + ey; bounds[5] = position[2] + ez;
+        clipBounds.push(bounds);
       } else {
         var world = scene.info(item.id).bounds();
         if (world.valid)

@@ -26,6 +26,11 @@ import nativekit.sim.SimContactFilter;
 import nativekit.sim.SimContactSurface;
 import app.CncProgramPlayer.CncJob;
 import motionkit.event.EventValue;
+import sys.thread.Mutex;
+#if !wasm
+import sys.thread.Thread;
+import sys.thread.Lock;
+#end
 
 typedef SimulationRobotVisual={
   var id:String;
@@ -69,6 +74,9 @@ class ApplicationSimulation {
   var space:Null<SimulationSpace> = null;
   var simulation:Null<Simulation> = null;
   var simulatedIds:Array<String> = [];
+  var ownedRobots:Array<Robot> = [];
+  var detachedPreparedRobots:Null<Array<Robot>>;
+  var preparationOnly = false;
   var simulatedLinks:Array<Array<String>> = [];
   var simulatedObjects:Array<{id:String,object:SimObject}> = [];
   var motions:Null<RobotMotionPlayer> = null;
@@ -96,6 +104,18 @@ class ApplicationSimulation {
   var members:Array<SessionMember> = [];
   var assemblyParts:Array<AssemblyVisual> = [];
   var running:Bool = false;
+  /** Desktop playback owns its ticks on a worker; headless callers keep explicit stepping. */
+  public var backgroundPacing:Bool = false;
+  final playbackMutex = new Mutex();
+  var playbackActive = false;
+  var playbackStop = false;
+  var playbackCommands:Array<Void->Void> = [];
+  var playbackFailure:Null<String>;
+  var playbackFrame:Null<ApplicationPresentationSnapshot>;
+  var presentedPlaybackRevision = -1;
+  #if !wasm
+  var playbackDone:Null<Lock>;
+  #end
   /** Wall-clock stamp of the previous pump, or negative when pacing restarts. */
   var pumpStamp:Float = -1.0;
   /** Most ticks one pump runs; a slower owner loses simulation time instead of bursting. */
@@ -165,8 +185,9 @@ class ApplicationSimulation {
 
   /** Builds the complete candidate before changing any live world adapter. */
   public function rebuild(configuration:SensorConfiguration, scene:EditorScene,
-      ?session:ProjectDocumentSession):Bool {
+      ?session:ProjectDocumentSession, publishVisuals:Bool = true, ?control:ProjectLoadControl):Bool {
     var candidateSpace:Null<SimulationSpace> = null;
+    var environmentTopologyOpen = false;
     var candidate:Null<Simulation> = null;
     var candidateRobots:Array<SimulatedRobot> = [];
     var candidateLinks:Array<Array<String>> = [];
@@ -197,6 +218,7 @@ class ApplicationSimulation {
 		var indexByController = new Map<String, Int>();
     var heldBoxes:Array<MissionPlayer.FloorObstacle> = [];
     try {
+      if (control != null) { control.throwIfCancelled(); control.phase("Building controllers"); }
       var models = configuration.robotModels();
       var hasWorkers = false;
       for (record in scene.records()) if (record.type == "human-worker") { hasWorkers = true; break; }
@@ -236,6 +258,7 @@ class ApplicationSimulation {
           });
       }
       for (index in 0...models.length) {
+        if (control != null) control.throwIfCancelled();
         var editable=models[index];
         var blueprint = RobotRuntimeCompiler.compile(editable.model, editable.profile, appliedRevision + 1);
         var runtime = candidate.addRobotAtPose(blueprint, editable.position, editable.rotation);
@@ -335,6 +358,7 @@ class ApplicationSimulation {
         for (track in resolvedMotions) if (track.robotId == candidatePress.robotId())
           throw "Press control cannot share its controller with a robot motion track";
       var environmentRecords = scene.records();
+      if (control != null) { control.throwIfCancelled(); control.phase("Building environment"); }
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
       var hasPneumaticActuator = candidateAssembly != null &&
         hasPneumaticCylinder(candidateAssembly.blueprint);
@@ -352,7 +376,10 @@ class ApplicationSimulation {
         : new SimContactSurface(null, 0, 0, 0, SimContactFilter.PairsAndEnvironment);
       var assemblyOwned = new Map<String, Bool>();
       for (part in candidateAssemblyParts) assemblyOwned.set(part.id, true);
+      createdSpace.session.beginTopologyUpdate();
+      environmentTopologyOpen = true;
       for (object in environmentRecords) if ((object.collisionEnabled || object.dynamicBody) && !assemblyOwned.exists(object.id)) {
+        if (control != null) control.throwIfCancelled();
         var centerX=object.x,centerY=object.y,centerZ=object.z;
         var halfX=object.width/2.0,halfY=object.height/2.0,halfZ=object.depth/2.0;
         var shape = SimShape.box(halfX, halfY, halfZ);
@@ -397,8 +424,11 @@ class ApplicationSimulation {
           yaw: Math.atan2(2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
             1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]))});
       }
+      environmentTopologyOpen = false;
+      createdSpace.session.endTopologyUpdate();
       // The robot's tools act on the free objects after each step, as their channels say.
       var candidateTools = new SimulatedTools([for (entry in candidateObjects) {id: entry.id, object: entry.object}], candidate);
+      if (control != null) { control.throwIfCancelled(); control.phase("Preparing programs and mission"); }
       var cncToBuild = pendingCnc;
       if (cncToBuild != null) {
         var cncParts = new SimulationAssemblyParts(candidate, [cncToBuild.robot],
@@ -495,6 +525,7 @@ class ApplicationSimulation {
       for (warning in candidateWorkforce.warnings) candidateWarnings.push(warning);
 
       var previousSimulation = simulation;
+      if (control != null) control.throwIfCancelled();
       var previousSpace = space;
       // Finish the old mission's planning before retiring its native worlds.
       if (mission != null) mission.beforeReset();
@@ -521,6 +552,7 @@ class ApplicationSimulation {
       virtualDevicePrepared = false;
       space = candidateSpace;
       simulatedIds = [for (robot in candidateRobots) robot.id()];
+      ownedRobots = [for (robot in candidateRobots) (robot:Robot)];
       simulatedLinks = candidateLinks;
       simulatedObjects = candidateObjects;
       motions = resolvedMotions.length == 0 ? null :
@@ -559,7 +591,7 @@ class ApplicationSimulation {
       collisionWarnings = candidateWarnings;
       presentAssemblyPhysics = running;
       presentationEpoch++;
-      scene.setWorkerVisualsVisible(false);
+      if (publishVisuals) scene.setWorkerVisualsVisible(false);
       if (previousWorkforce != null) previousWorkforce.dispose();
       releaseSpace(previousSpace, previousSimulation);
       for (zone in previousZones) zone.dispose();
@@ -567,12 +599,98 @@ class ApplicationSimulation {
       return true;
     } catch (failure:Dynamic) {
       error = Std.string(failure);
+      if (environmentTopologyOpen && candidateSpace != null)
+        try candidateSpace.session.endTopologyUpdate() catch (_:Dynamic) {}
       if (candidateWorkforce != null) candidateWorkforce.dispose();
       if (candidateSpace != null && candidateSpace != space)
         releaseSpace(candidateSpace, candidate);
       for (zone in candidateZones) zone.dispose();
       return false;
     }
+  }
+
+  /** Custom participants and character visuals retain their existing owner-thread lifecycle. */
+  public function supportsBackgroundBuild(scene:EditorScene):Bool {
+    if (participants.length > 0) return false;
+    for (record in scene.records()) if (record.type == "human-worker") return false;
+    return true;
+  }
+
+  /** Prepare in a separate world, preserving the live simulation until installation. */
+  public function preparationTarget():ApplicationSimulation {
+    var target = new ApplicationSimulation(new RobotWorld(), backend);
+    target.setTimestep(timestep);
+    target.appliedRevision = appliedRevision;
+    target.preparationOnly = true;
+    target.virtualWelder = virtualWelder;
+    target.welderSupplyFactory = welderSupplyFactory;
+    return target;
+  }
+
+  /** Release logical-world ownership on the builder before publishing its result. */
+  public function detachPreparedRobots():Void {
+    detachedPreparedRobots = [];
+    for (id in simulatedIds) {
+      var robot = world.detach(id);
+      if (robot == null) throw 'Prepared robot "$id" is unavailable';
+      detachedPreparedRobots.push(robot);
+    }
+    world.close();
+  }
+
+  /** Called on the UI thread after preparation has finished; transport keeps this object's identity. */
+  public function installPrepared(prepared:ApplicationSimulation, scene:EditorScene):Void {
+    for (id in prepared.simulatedIds)
+      if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
+        throw 'Robot "$id" is remote and read-only';
+    var readySpace = prepared.space;
+    if (readySpace == null) throw "Prepared simulation has no native world";
+    readySpace.session.stop(); // Return the prepared native world to this thread.
+    var robots = prepared.detachedPreparedRobots;
+    if (robots == null || robots.length != prepared.simulatedIds.length)
+      throw "Prepared robots were not released by their builder";
+    clear();
+    for (robot in robots) world.attach(robot);
+    space = prepared.space;
+    simulation = prepared.simulation;
+    simulatedIds = prepared.simulatedIds;
+    ownedRobots = prepared.ownedRobots;
+    simulatedLinks = prepared.simulatedLinks;
+    simulatedObjects = prepared.simulatedObjects;
+    motions = prepared.motions == null ? null : prepared.motions.inWorld(world);
+    tools = prepared.tools;
+    power = prepared.power;
+    cnc = prepared.cnc;
+    zoneMonitors = prepared.zoneMonitors;
+    print = prepared.print;
+    beltVisuals = prepared.beltVisuals;
+    machineProgram = prepared.machineProgram;
+    digitalProgram = prepared.digitalProgram;
+    pressBrake = prepared.pressBrake;
+    mobile = prepared.mobile;
+    mission = prepared.mission;
+    cellSignals = prepared.cellSignals;
+    beads = prepared.beads;
+    workforce = prepared.workforce;
+    assemblyParts = prepared.assemblyParts;
+    appliedRevision = prepared.appliedRevision;
+    appliedDocumentRevision = prepared.appliedDocumentRevision;
+    appliedEnvironmentRevision = prepared.appliedEnvironmentRevision;
+    appliedBackend = prepared.appliedBackend;
+    appliedTimestep = prepared.appliedTimestep;
+    appliedParticipantRevision = participantRevision;
+    collisionWarnings = prepared.collisionWarnings;
+    virtualDevicePrepared = false;
+    presentAssemblyPhysics = false;
+    pumpStamp = -1.0;
+    error = null;
+    presentationEpoch++;
+    refreshMembers();
+    scene.setWorkerVisualsVisible(false);
+    prepared.space = null;
+    prepared.simulation = null;
+    prepared.simulatedIds = [];
+    prepared.detachedPreparedRobots = null;
   }
 
   /** Stops a space, removes its robots, then releases the space itself. */
@@ -615,14 +733,19 @@ class ApplicationSimulation {
     if (active == null) throw "Apply the pending simulation configuration first";
     if (!running) { pumpStamp = -1.0; presentationEpoch++; }
     running = true; presentAssemblyPhysics = true;
+    #if !wasm
+    if (backgroundPacing && !playbackActive && motions == null && participants.length == 0 &&
+        (workforce == null || workforce.ids().length == 0)) startPlayback();
+    #end
   }
-  public function stop():Void { var active = space; if (active != null) active.session.stop(); running = false; pumpStamp = -1.0;
+  public function stop():Void { stopPlayback(); var active = space; if (active != null) active.session.stop(); running = false; pumpStamp = -1.0;
     if (tools != null) tools.safeWelders();
     if (presentAssemblyPhysics) presentationEpoch++;
     presentAssemblyPhysics = false; }
   public function reset():Bool {
     var active = space;
     if (active == null) return false;
+    stopPlayback();
     active.session.stop();
     // Members stop what they run while the robots' runtimes still answer; the session's reset starts them over.
     for (member in members) member.beforeReset();
@@ -635,6 +758,14 @@ class ApplicationSimulation {
     presentationEpoch++; return true;
   }
   public function isRunning():Bool return running;
+
+  /** Operator changes execute between ticks on their playback owner. */
+  public function control(action:Void->Void):Void {
+    if (!playbackActive) { action(); return; }
+    playbackMutex.acquire();
+    playbackCommands.push(action);
+    playbackMutex.release();
+  }
 
   /** Latch an emergency stop on every robot in this shared simulated cell. */
   public function emergencyStop():Bool {
@@ -666,8 +797,12 @@ class ApplicationSimulation {
   /** Reset only the failed mission robot, then ask its cell controller to retry the failed step. */
   public function retryMission():Bool {
     if (mission == null || mission.failure == null || simulation == null) return false;
+    var resume = playbackActive;
+    if (resume) { stopPlayback(); var active = space; if (active != null) active.session.stop(); }
     if (!resetRobotSafety(mission.robotId())) return false;
-    return mission.retryFailedStep();
+    var retried = mission.retryFailedStep();
+    if (resume) start();
+    return retried;
   }
 
   /** Scene ids of the objects the tool links are holding right now. */
@@ -723,13 +858,32 @@ class ApplicationSimulation {
    * per tick, so a slow frame cannot starve them of motion.
    */
   public function pump():Void {
+    if (playbackActive) {
+      playbackMutex.acquire();
+      var failure = playbackFailure, frame = playbackFrame;
+      playbackMutex.release();
+      if (failure != null) { stop(); error = failure; return; }
+      if (frame != null && frame.revision != presentedPlaybackRevision) {
+        // Logical-world events and subscribed streams remain on their UI owner.
+        world.pump();
+        for (robot in ownedRobots) robot.streams();
+        world.pump();
+        presentMembers();
+        presentedPlaybackRevision = frame.revision;
+      }
+      return;
+    }
+    pumpOwner(true);
+  }
+
+  function pumpOwner(present:Bool):Void {
     var active = space;
     if (active == null || !running) return;
     var now = Sys.time();
     var elapsed = pumpStamp < 0.0 ? 0.0 : Math.max(0.0, now - pumpStamp);
     pumpStamp = now;
     var due = active.session.dueTicks(haxe.Int64.fromFloat(elapsed * 1.0e9), MAX_TICKS_PER_PUMP);
-    runTicks(due);
+    runOwnerTicks(due, present);
   }
 
   /**
@@ -737,13 +891,75 @@ class ApplicationSimulation {
    * so the cost of a frame can be measured without waiting on the wall clock.
    */
   public function runTicks(count:Int):Void {
+    if (playbackActive) throw "Background playback owns the simulation ticks";
+    runOwnerTicks(count, true);
+  }
+
+  function runOwnerTicks(count:Int, present:Bool):Void {
     var active = space;
     if (active == null || !running) return;
     for (_ in 0...count) {
       feedMembers();
       active.session.stepPaced();
     }
-    if (count > 0) presentMembers();
+    if (present && count > 0) presentMembers();
+  }
+
+  #if !wasm
+  function startPlayback():Void {
+    var active = space;
+    if (active == null) throw "Apply the pending simulation configuration first";
+    playbackFrame = captureOwnerSnapshot();
+    playbackStop = false;
+    playbackFailure = null;
+    playbackDone = new Lock();
+    playbackActive = true;
+    var done = playbackDone;
+    Thread.create(function() {
+      try {
+        active.session.stop(); // Transfer the prepared world to the playback owner.
+        var previous = -1;
+        while (true) {
+          playbackMutex.acquire();
+          var stop = playbackStop;
+          var commands = playbackCommands;
+          playbackCommands = [];
+          playbackMutex.release();
+          for (command in commands) command();
+          if (stop) break;
+          pumpOwner(false);
+          var revision = haxe.Int64.toInt(active.session.stepIndex());
+          if (revision != previous) {
+            var frame = captureOwnerSnapshot();
+            playbackMutex.acquire();
+            playbackFrame = frame;
+            playbackMutex.release();
+            previous = revision;
+          }
+          Sys.sleep(0.001);
+        }
+      } catch (failure:Dynamic) {
+        playbackMutex.acquire();
+        playbackFailure = Std.string(failure);
+        playbackMutex.release();
+      }
+      done.release();
+    });
+  }
+  #end
+
+  function stopPlayback():Void {
+    #if !wasm
+    if (!playbackActive) return;
+    playbackMutex.acquire();
+    playbackStop = true;
+    playbackMutex.release();
+    playbackDone.wait();
+    playbackDone = null;
+    playbackActive = false;
+    playbackFrame = null;
+    presentedPlaybackRevision = -1;
+    #end
   }
 
   function feedMembers():Void {
@@ -781,6 +997,16 @@ class ApplicationSimulation {
   public function simulatedRobotIds():Array<String> return simulatedIds.copy();
   /** Captures physics poses once, then combines them with the matching sensor streams. */
   public function capturePresentationSnapshot():ApplicationPresentationSnapshot {
+    if (playbackActive) {
+      playbackMutex.acquire();
+      var frame = playbackFrame;
+      playbackMutex.release();
+      if (frame != null) return frame;
+    }
+    return captureOwnerSnapshot();
+  }
+
+  function captureOwnerSnapshot():ApplicationPresentationSnapshot {
     var active = space, robotsInSession = simulation;
     var frame = active == null ? null : active.session.capture();
     var physics = frame == null || robotsInSession == null ? null : robotsInSession.presentFrame(frame);
@@ -797,14 +1023,15 @@ class ApplicationSimulation {
       // Poll every attached robot as before, but avoid constructing a WorldSnapshot that this
       // presentation never reads. Streams already observe the runtime snapshot and return the
       // immutable frames needed by the viewport.
-      world.pump();
-      for (robot in world.robots()) {
+      if (!playbackActive) world.pump();
+      var observedRobots = playbackActive ? ownedRobots : world.robots();
+      for (robot in observedRobots) {
         var id = robot.id();
         var frames = robot.streams().latestFrames();
         var index = simulatedIds.indexOf(id);
         if (index >= 0) robotSensorFrames[index] = frames;
       }
-      world.pump();
+      if (!playbackActive) world.pump();
     } catch (error:Dynamic) {
       if (physics != null) physics.dispose();
       if (frame != null) frame.dispose();
@@ -886,8 +1113,12 @@ class ApplicationSimulation {
     cnc = null; print = null; mobile = null; mission = null; beads = null; cellSignals = null; refreshMembers();
     // A mission's programs are planned on worker threads that finish the plan they are on after they are cancelled; the
     // world they plan for goes now, so wait for them (see ProgramPlanner).
-    motionkit.robot.ProgramPlanner.shutdown();
-    for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
+    if (!preparationOnly) motionkit.robot.ProgramPlanner.shutdown();
+    if (detachedPreparedRobots != null) {
+      for (robot in detachedPreparedRobots) robot.close();
+      detachedPreparedRobots = null;
+    } else for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
+    ownedRobots = [];
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);
     assemblyParts.resize(0);

@@ -58,20 +58,21 @@ class CncPanel {
     var status = failure != null ? 'Stopped: $failure' :
       (held ? "Held" : "Running") + (player.currentLine > 0 ? ' · line ${player.currentLine}' : "") +
       player.statusDetail() + ' · speed ${Math.round(player.speedOverride * 100)}%';
-    var hold = new Button("Hold", null, () -> player.hold(), "cnc-hold");
+    var hold = new Button("Hold", null, () -> simulation.control(() -> player.hold()), "cnc-hold");
     hold.enabled = !held && failure == null;
-    var resume = new Button("Resume", null, () -> player.resume(), "cnc-resume");
+    var resume = new Button("Resume", null, () -> simulation.control(() -> player.resume()), "cnc-resume");
     resume.enabled = held;
     var restart = new Button(selectedLine > 0 ? 'Restart at line $selectedLine' : "Restart at line", null,
       () -> {
-        if (selectedLine > 0) player.restartFromLine(selectedLine);
+        var line = selectedLine;
+        if (line > 0) simulation.control(() -> player.restartFromLine(line));
       }, "cnc-restart");
     restart.enabled = selectedLine > 0 && player.canRestart();
     var buttonsStyle = new LayoutStyle();
     buttonsStyle.width = LayoutAxis.grow();
     buttonsStyle.childGap = 6.0;
     var speed = new Slider("cnc-speed", "Speed override", player.speedOverride, 0.05, 2.0, 0.05,
-      value -> player.setSpeedOverride(value));
+      value -> simulation.control(() -> player.setSpeedOverride(value)));
     var listStyle = fill();
     listStyle.clipVertical = true;
     var list = new ListView("cnc-gcode", model, listStyle, scroll, 300.0, selectedLine - 1,

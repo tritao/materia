@@ -318,6 +318,7 @@ class Main {
       if (ready && playOnOpen && activeEditor != null) {
         playOnOpen = false;
         activeEditor.commands.execute("sim.play");
+        ready = !activeEditor.openingProject();
       }
       if (ready && frameId != null && activeEditor != null && activeEditor.perspectiveViewport != null) {
         var id:String = cast frameId;
@@ -587,6 +588,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public final workspacePath:String;
   public final world:RobotWorld;
   public final simulation:ApplicationSimulation;
+  public var simulationBuild(default, null):Null<SimulationBuildJob>;
+  var afterSimulationBuild:Null<Void->Void>;
+  var resumeAfterSimulationBuild = false;
   public var bimModel(get, never):BimDocument;
   function get_bimModel():BimDocument return session.bim;
   var bimEditor:BimModelEditor;
@@ -740,6 +744,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     this.world = world == null ? new RobotWorld() : world;
     externalWorldHasRobots = this.world.robotIds().length > 0;
     simulation = new ApplicationSimulation(this.world,ApplicationSimulation.MUJOCO);
+    simulation.backgroundPacing = hostContext != null;
     session = new ProjectDocumentSession(demo ? BimEditorDemo.create() : null, demo);
     attachSceneRecorder();
     storage = new FileDockWorkspacePersistence(workspacePath);
@@ -778,7 +783,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       function() { documentChanged(); commands.execute("scene.fit-all"); },
       function() return documents.blocked(),
       function(id) { scene.selectTreeKey("project:" + id); invalidateView(); });
-    documents.busy = function() return startLoading != null || missionController.isLoading();
+    documents.busy = function() return startLoading != null || missionController.isLoading() || simulationBuild != null;
     documents.openArtifact = openProjectInBackground;
     if (hostContext != null) hostContext.onCloseRequested = function(close) {
       missionController.cancel();
@@ -1016,13 +1021,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     // Keep live simulation, component stories, and externally populated worlds
     // on the normal path because their presentation can change independently
     // of the UI revision counters.
-    if (componentLab != null || startLoading != null || simulation.isActive() || externalWorldHasRobots)
+    if (componentLab != null || startLoading != null || simulationBuild != null || simulation.isActive() || externalWorldHasRobots)
       return ui.submit(view(), frame);
     return ui.submitCached(function() return view(), frame, editorSubmitKey());
   }
 
   /** Advance the character preview, then CAD preview refinement after a rendered frame. */
   public function tick():Void {
+    pollSimulationBuild();
     missionController.tick();
     var queued = startLoading;
     if (queued != null) {
@@ -1093,7 +1099,56 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   /** True from launch until the project named on the command line has opened, failed, or been cancelled. */
-  public function openingProject():Bool return startLoading != null;
+  public function openingProject():Bool return startLoading != null || simulationBuild != null;
+
+  /** Prepare without blocking transport input; install only a complete candidate on this thread. */
+  public function prepareSimulation(?after:Void->Void):Void {
+    if (simulationBuild != null) return;
+    #if !wasm
+    if (simulation.supportsBackgroundBuild(scene)) {
+      resumeAfterSimulationBuild = simulation.isRunning();
+      afterSimulationBuild = after;
+      simulationBuild = new SimulationBuildJob(simulation, sensors, scene, session);
+      invalidateView();
+      return;
+    }
+    #end
+    if (simulation.rebuild(sensors, scene, session)) {
+      log("Shared simulation configuration applied");
+      if (after != null) after();
+    } else log("Simulation rebuild rejected: " + simulation.error);
+  }
+
+  public function cancelSimulationBuild():Void {
+    if (simulationBuild != null) simulationBuild.control.cancel();
+    invalidateView();
+  }
+
+  function pollSimulationBuild():Void {
+    var job = simulationBuild;
+    if (job == null) return;
+    if (!job.isFinished()) {
+      if (hostContext != null) hostContext.requestFrame();
+      return;
+    }
+    var after = afterSimulationBuild, resume = resumeAfterSimulationBuild;
+    simulationBuild = null;
+    afterSimulationBuild = null;
+    var prepared:Null<ApplicationSimulation> = null;
+    try {
+      prepared = job.take();
+      simulation.installPrepared(prepared, scene);
+      prepared = null;
+      log("Shared simulation configuration applied");
+      if (after != null) after();
+      else if (resume) simulation.start();
+    } catch (error:Dynamic) {
+      if (prepared != null) prepared.dispose();
+      log(job.control.isCancelled() ? "Cancelled simulation preparation" : "Simulation rebuild rejected: " + Std.string(error));
+    }
+    commands.refresh();
+    invalidateView();
+  }
 
   /**
    * Queues a project as if it had been chosen on the Start page, and shows that page so the build's
@@ -1199,6 +1254,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function context():UiContext return ui;
 
   public function dispose():Void {
+    if (simulationBuild != null) { simulationBuild.close(); simulationBuild = null; }
     missionController.cancel();
     if (projectUiExtension != null) projectUiExtension.dispose();
     if (sceneCollision != null) sceneCollision.dispose();
@@ -1446,6 +1502,17 @@ class ReferenceEditorApp implements DesktopUiApplication {
     style.direction = LayoutDirection.LeftToRight;
     style.childAlignY = LayoutAlignmentY.Center;
     style.childGap = 4.0;
+    var pending = simulationBuild;
+    if (pending != null) {
+      var cancel = new Button("Cancel", null, cancelSimulationBuild, "simulation-build-cancel");
+      cancel.variant = ButtonVariant.Secondary;
+      return new Row("editor-transport", [
+        new KeyedView("spinner", new haxeon.ui.widgets.controls.Spinner("simulation-build-spinner", "Preparing simulation")),
+        new KeyedView("status", new Text(pending.control.currentPhase(), null, appearance.theme.tokens.textSecondary,
+          TextStyleOverride.text(12.0))),
+        new KeyedView("cancel", cancel)
+      ], style);
+    }
     var running = simulation.isRunning();
     // Labels appear when the bar has room; every button always explains itself on hover.
     var items:Array<KeyedView> = [new KeyedView("play-pause", running

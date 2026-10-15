@@ -9,6 +9,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <memory>
 
 namespace {
 
@@ -618,6 +619,28 @@ void planes_and_cylinders_are_objects() {
 }
 
 int main() {
+    // A completed background builder hands an unstarted world to the UI owner.
+    {
+        std::unique_ptr<Space> prepared;
+        nksim_object object = 0;
+        std::thread builder([&] {
+            prepared = std::make_unique<Space>();
+            nksim_object_desc desc{};
+            desc.struct_size = sizeof(desc);
+            desc.motion_type = NKSIM_MOTION_DYNAMIC;
+            desc.mass = 1.0;
+            desc.shape = capsule(0.1, 0.2);
+            desc.pose = pose_at(0.0, 0.0, 1.0);
+            assert(nksim_session_create_object(prepared->session, &desc, &object) == NKSIM_OK);
+        });
+        builder.join();
+        assert(nksim_world_begin_topology_update(prepared->world) == NKSIM_ERROR_WRONG_THREAD);
+        assert(nksim_session_stop(prepared->session) == NKSIM_OK);
+        assert(nksim_world_begin_topology_update(prepared->world) == NKSIM_OK);
+        assert(nksim_world_end_topology_update(prepared->world) == NKSIM_OK);
+        assert(nksim_session_step(prepared->session, 0, nullptr) == NKSIM_OK);
+        assert(nksim_session_reset(prepared->session) == NKSIM_OK);
+    }
     owner_paced_ticks();
     {
         Space space;

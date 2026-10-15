@@ -78,6 +78,7 @@ import cnckit.controller.RobotInterfaceChannels;
 @:access(motionkit.robot.PlanExecutor)
 @:access(processkit.WeldingPlanRunner)
 @:access(app.ApplicationSimulation)
+@:access(app.Main.ReferenceEditorApp)
 @:access(app.CellSignals)
 @:access(robotkit.runtime.RuntimeRobotAdapter)
 class ProjectSourceTests {
@@ -3918,11 +3919,75 @@ class ProjectSourceTests {
   /** MT14 C6: measured first clamp to fourth outfeed of the four-part job, seconds (machine-tending PLAN). */
   static inline var TENDING_FOURTH_OUTFEED_SECONDS:Float = 284.06;
 
+  /** Play prepares on a worker; UI frames, cancellation and transport remain usable. */
+  static function checkTendingInteractive(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/machine-tending/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var work = "/tmp/materia-tending-interactive-" + Sys.getPid();
+    FileSystem.createDirectory(work);
+    var fonts = FontCollection.create();
+    fonts.add(root + "/haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf");
+    var editor = new ReferenceEditorApp(fonts, work + "/workspace.json");
+    editor.simulation.backgroundPacing = true;
+    try {
+      editor.session.openGeneratedProject(generated, manifest);
+      editor.documentChanged();
+      var queued = Sys.time();
+      editor.commands.execute("sim.play");
+      var playMilliseconds = (Sys.time() - queued) * 1000;
+      check(editor.simulationBuild != null, "Play queues preparation without building on the UI thread");
+      editor.cancelSimulationBuild();
+      var deadline = Sys.time() + 60.0;
+      while (editor.simulationBuild != null && Sys.time() < deadline) { editor.tick(); Sys.sleep(0.001); }
+      check(editor.simulationBuild == null && !editor.simulation.isActive(), "Cancelled preparation installs no partial simulation");
+      editor.commands.execute("sim.play");
+      var frames = 0, slowestFrame = 0.0;
+      deadline = Sys.time() + 60.0;
+      while (editor.simulationBuild != null && Sys.time() < deadline) {
+        var started = Sys.time();
+        editor.tick();
+        editor.submit(new LayoutFrame(1320.0, 900.0));
+        slowestFrame = Math.max(slowestFrame, Sys.time() - started);
+        frames++;
+        Sys.sleep(0.005);
+      }
+      check(editor.simulationBuild == null && editor.simulation.isRunning(),
+        "Completed preparation starts background playback: " + editor.logLines.join(" | ") +
+        "; simulation error=" + editor.simulation.error);
+      check(frames > 0, "The editor renders while simulation preparation is pending");
+      var simulation = editor.simulation;
+      deadline = Sys.time() + 15.0;
+      while (simulation.capturePresentationSnapshot().simulationTime < 0.2 && Sys.time() < deadline) {
+        editor.tick(); editor.submit(new LayoutFrame(1320.0, 900.0)); Sys.sleep(0.005);
+      }
+      check(simulation.capturePresentationSnapshot().simulationTime >= 0.2 && simulation.error == null,
+        "Background playback advances and publishes complete presentation snapshots");
+      editor.commands.execute("sim.pause");
+      var paused = simulation.activeSession().simulationTime();
+      Sys.sleep(0.02);
+      check(simulation.activeSession().simulationTime() == paused, "Pause joins playback before returning");
+      editor.commands.execute("sim.step");
+      check(simulation.activeSession().simulationTime() > paused, "Paused playback can step on the UI owner");
+      editor.commands.execute("sim.reset");
+      check(simulation.activeSession().simulationTime() == 0, "Reset restores the fixed simulation clock");
+      editor.commands.execute("sim.play");
+      Sys.sleep(0.03);
+      editor.commands.execute("sim.stop");
+      check(!simulation.isActive(), "Stop retires background playback before its native worlds");
+      Sys.println(haxe.Json.stringify({tendingInteractive: true, playMilliseconds: playMilliseconds,
+        preparationFrames: frames, slowestPreparationFrameMilliseconds: slowestFrame * 1000}));
+    } catch (error:Dynamic) { editor.dispose(); fonts.dispose(); throw error; }
+    editor.dispose(); fonts.dispose();
+  }
+
   /** Four real blank-to-outfeed cycles through the saved robot mission and wired CNC interface. */
   static function checkMachineTending(root:String, scope:TendingCheck):Void {
     TendingCyclePlan.TendingCyclePlanChecks.run();
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/machine-tending/materia.project.json");
-    var generated = MateriaProjectRunner.loadProject(manifest);
+    var loadStarted = Sys.time();
+    var loadControl = scope == TendingCheck.Performance ? new ProjectLoadControl() : null;
+    var generated = MateriaProjectRunner.loadProject(manifest, null, loadControl);
+    var loadSeconds = Sys.time() - loadStarted;
     var savedMission = generated.mission;
     if (savedMission == null || savedMission.steps.length == 0)
       throw "The playable tending project does not save its robot mission";
@@ -3935,10 +4000,34 @@ class ProjectSourceTests {
     var simulation = new ApplicationSimulation(new RobotWorld());
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     try {
+      var buildStarted = Sys.time();
       check(simulation.rebuild(session.sensors, session.scene, session),
         "the playable tending cell builds: " + simulation.error);
+      var buildSeconds = Sys.time() - buildStarted;
       var mission = simulation.missionPlayer(), cnc = simulation.cncPlayer();
       if (mission == null || cnc == null) throw "Playable tending project lost its mission or CNC player";
+      if (scope == TendingCheck.Performance) {
+        var feedSeconds = 0.0, physicsSeconds = 0.0, presentationSeconds = 0.0;
+        simulation.start();
+        for (_ in 0...200) {
+          var started = Sys.time();
+          simulation.feedMembers();
+          feedSeconds += Sys.time() - started;
+          started = Sys.time();
+          simulation.activeSession().stepPaced();
+          physicsSeconds += Sys.time() - started;
+        }
+        for (_ in 0...20) {
+          var started = Sys.time();
+          simulation.capturePresentationSnapshot();
+          presentationSeconds += Sys.time() - started;
+        }
+        Sys.println(haxe.Json.stringify({tendingPerformance: true, loadSeconds: loadSeconds,
+          buildSeconds: buildSeconds, feedMilliseconds: feedSeconds * 5,
+          physicsMilliseconds: physicsSeconds * 5, presentationMilliseconds: presentationSeconds * 50,
+          loading: loadControl.profile(), records: session.scene.records().length}));
+        simulation.dispose(); session.dispose(); return;
+      }
       checkTendingHandlingOrientations(mission);
       if (scope == TendingCheck.Reach) {
         simulation.clear(); return;
@@ -3992,7 +4081,20 @@ class ProjectSourceTests {
       var originalBlank = new nativekit.sim.SimPose(blankPose[0].position[0], blankPose[0].position[1],
         blankPose[0].position[2], blankPose[0].rotation[0], blankPose[0].rotation[1],
         blankPose[0].rotation[2], blankPose[0].rotation[3]);
-      if (scope == TendingCheck.Route) {
+      if (scope == TendingCheck.Route || scope == TendingCheck.RealtimeRoute) {
+        var realtime = scope == TendingCheck.RealtimeRoute;
+        if (realtime) simulation.start();
+        function advanceRoute():Void {
+          if (realtime) {
+            var current = mission.mission.steps[mission.stepIndex];
+            // Slow frames during the door handshake must not age CNC brake
+            // feedback faster than the simulated door and controller advance.
+            if (current.kind == "waitFor" && current.waitFor != null &&
+                current.waitFor.name == RobotInterfaceChannels.DOOR_OPEN)
+              Sys.sleep(0.04);
+            simulation.runTicks(1);
+          } else simulation.step();
+        }
         var clampCommand = -1;
         for (index in 0...mission.mission.steps.length) {
           var step = mission.mission.steps[index];
@@ -4013,7 +4115,7 @@ class ProjectSourceTests {
         if (clampConfirmed < 0) throw "Tending route has no physical clamp confirmation";
         var routeTicks = 0, checkedPayloadCarrier = false;
         while (mission.stepIndex <= clampConfirmed && mission.failure == null && routeTicks < routeTickBudget) {
-          simulation.step(); routeTicks++;
+          advanceRoute(); routeTicks++;
           if (!checkedPayloadCarrier && checkTendingPayloadCarriers(mission) > 0) checkedPayloadCarrier = true;
         }
         var signals = simulation.cellSignals;
@@ -4030,7 +4132,8 @@ class ProjectSourceTests {
           'the robot stages outside, enters after confirmed opening, seats the blank and confirms physical clamping ' +
             '(failure=${mission.failure}, step=${mission.stepIndex}/$clampCommand, ticks=$routeTicks/$routeTickBudget, ' +
             'time=${simulation.activeSession().simulationTime()} s, ' +
-            'doorOpen=$doorOpen, runner=${mission.runner.status()})');
+            'doorOpen=$doorOpen, cncAlarm=${cnc.interfaceAlarm}, cncFailure=${cnc.failure}, ' +
+            'runner=${mission.runner.status()})');
         check(checkedPayloadCarrier, "The startup route checks its confirmed payload carrier before placement");
         var cycleCommand = -1;
         for (index in clampConfirmed...mission.mission.steps.length) {
@@ -4045,7 +4148,7 @@ class ProjectSourceTests {
         // Check machining alignment at the authored start boundary, after the arm
         // retreats and the door closes; do not add a test-only settling delay.
         while (mission.stepIndex < cycleCommand && mission.failure == null && routeTicks < routeTickBudget) {
-          simulation.step(); routeTicks++;
+          advanceRoute(); routeTicks++;
         }
         var doorClosed = signals != null && switch signals.input("robotController", RobotInterfaceChannels.DOOR_CLOSED) {
           case Digital(value): value;
@@ -5710,6 +5813,9 @@ class ProjectSourceTests {
       focused("brake", checkMillBrakeProject),
       focused("tending-plan", _ -> TendingCyclePlan.TendingCyclePlanChecks.run()),
       focused("tending-route", root -> checkMachineTending(root, TendingCheck.Route)),
+      focused("tending-realtime-route", root -> checkMachineTending(root, TendingCheck.RealtimeRoute)),
+      focused("tending-performance", root -> checkMachineTending(root, TendingCheck.Performance)),
+      focused("tending-interactive", checkTendingInteractive),
       focused("tending-reach", root -> checkMachineTending(root, TendingCheck.Reach)),
       focused("tending-vise", root -> checkMachineTending(root, TendingCheck.Vise)),
       focused("tending-exchange", root -> checkMachineTending(root, TendingCheck.Exchange)),
@@ -6056,6 +6162,10 @@ enum TendingCheck {
   Production;
   /** The certified routes only, without physics. */
   Route;
+  /** The same physical startup route using the editor's paced simulation ticks. */
+  RealtimeRoute;
+  /** Separately measure generator loading, physics construction, ticks and presentation. */
+  Performance;
   /** The playable cell builds and its handling orientations hold. */
   Reach;
   /** Seating a blank in the vise. */

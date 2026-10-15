@@ -15,7 +15,8 @@
 		"cell": {
 			"kind": "cad-preview",
 			"module": "TendingCell",
-			"function": "preview"
+			"function": "preview",
+			"cache": {"inputs": []}
 		}
 	}
 }

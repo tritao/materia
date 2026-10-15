@@ -22,6 +22,10 @@ class RobotMotionPlayer implements SessionMember {
 		this.tracks = tracks;
 	}
 
+	/** Rebind prepared tracks when their simulation is installed in the editor's world. */
+	public function inWorld(world:RobotWorld):RobotMotionPlayer
+		return new RobotMotionPlayer(world, session, tracks);
+
 	/**
 	 * Checks each track against the robots it names and returns the tracks with
 	 * their joint indexes resolved. Throws for a robot or joint that does not

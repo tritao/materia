@@ -42,6 +42,7 @@ class ScenePresentation {
 
   // Scratch transforms are copied into each SceneView, never published by reference.
   final poseTransformScratch:Array<Transform> = [];
+  final poseValuesScratch:Array<Array<Float>> = [];
 
   public function new() bridge = new SceneBridge();
 
@@ -210,8 +211,20 @@ class ScenePresentation {
         var runtime = bridge.runtime(pose.id);
         if (runtime != null) {
           poseNodes.push(runtime.node);
-          if (poseIndex == poseTransformScratch.length) poseTransformScratch.push(Transform.identity());
-          poseTransforms.push(EditorScene.poseTransform(pose.position, pose.rotation, poseTransformScratch[poseIndex++]));
+          if (poseIndex == poseTransformScratch.length) {
+            poseTransformScratch.push(Transform.identity());
+            poseValuesScratch.push([Math.NaN, Math.NaN, Math.NaN, Math.NaN, Math.NaN, Math.NaN, Math.NaN]);
+          }
+          var previous = poseValuesScratch[poseIndex], changed = previous.length == 0;
+          for (axis in 0...3) if (previous[axis] != pose.position[axis]) changed = true;
+          for (axis in 0...4) if (previous[axis + 3] != pose.rotation[axis]) changed = true;
+          var transform = poseTransformScratch[poseIndex++];
+          if (changed) {
+            EditorScene.poseTransform(pose.position, pose.rotation, transform);
+            for (axis in 0...3) previous[axis] = pose.position[axis];
+            for (axis in 0...4) previous[axis + 3] = pose.rotation[axis];
+          }
+          poseTransforms.push(transform);
           // The face overlay is a child of its object with an identity transform, but a pose
           // override moves only its own node, so the overlay needs the object's pose as well.
           if (faceHoverShown && pose.id == hoveredId) {

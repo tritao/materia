@@ -5,8 +5,11 @@
 #include <cstring>
 #include <memory>
 #include <cstdio>
+#include <chrono>
+#include <thread>
 
-void check_brake(double holding_force, bool holds, bool implicit_clock = false, bool jammed = false) {
+void check_brake(double holding_force, bool holds, bool implicit_clock = false, bool jammed = false,
+                 bool paced = false) {
     nkscene_scene scene = 0;
     nksim_world world = 0;
     nksim_session session = 0;
@@ -67,7 +70,12 @@ void check_brake(double holding_force, bool holds, bool implicit_clock = false, 
     uint64_t tick = 0;
     auto step = [&]() {
         tick += 10'000'000;
-        const auto result = nksim_session_step(session, implicit_clock ? 0 : tick, nullptr);
+        // A slow editor frame must not age feedback or release deadlines faster
+        // than the physical brake advances on its fixed simulation ticks.
+        if (paced && !jammed && tick <= 120'000'000)
+            std::this_thread::sleep_for(std::chrono::milliseconds(40));
+        const auto result = paced ? nksim_session_step_paced(session, nullptr)
+                                  : nksim_session_step(session, implicit_clock ? 0 : tick, nullptr);
         if (result != NKSIM_OK) {
             const auto snapshot_result = rk_robot_runtime_snapshot_full(runtime, &state);
             std::fprintf(stderr, "brake step %llu: result %d, snapshot %d, fault %d, safety %u\n",
@@ -148,4 +156,6 @@ int main() {
     check_brake(50.0, false);
     check_brake(150.0, true, true, true);
     check_brake(150.0, true, true); // every phase must share the default owner clock
+    check_brake(150.0, true, false, false, true); // editor pacing must keep simulated feedback fresh
+    check_brake(150.0, true, false, true, true); // release deadlines still use simulation time
 }

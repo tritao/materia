@@ -12,6 +12,7 @@ import robotkit.core.RobotId;
 import robotkit.core.RobotSensorFrames;
 import robotkit.core.RobotSnapshot;
 import robotkit.core.RobotStatus;
+import robotkit.core.RobotThreadToken;
 import robotkit.core.SensorFrame;
 import robotkit.core.StopMode;
 import robotkit.world.RobotWorld;
@@ -30,6 +31,7 @@ class RuntimeRobotAdapter implements Robot {
   final ownsRuntime:Bool;
   final faultMessage:String;
   var changeListener:Null < RobotId -> Void > = null;
+  var observationOwner:RobotThreadToken;
   var commandSequence:Int = 0;
   var observedSequence:Int64 = Int64.ofInt(-1);
   var observedReceipt:Int64 = Int64.ofInt(-1);
@@ -48,6 +50,7 @@ class RuntimeRobotAdapter implements Robot {
     if (runtime == null)
       throw "RuntimeRobotAdapter requires a runtime";
     logicalId = id;
+    observationOwner = RobotThreadToken.current();
     this.runtime = runtime;
     this.ownsRuntime = ownsRuntime;
     this.faultMessage = faultMessage;
@@ -91,16 +94,20 @@ class RuntimeRobotAdapter implements Robot {
   public function snapshot():RobotSnapshot {
     ensureOpen();
     var value = runtime.snapshot();
-    observe(value);
+    var owner = RobotThreadToken.current() == observationOwner;
+    if (owner) observe(value);
+    var sensors = owner ? currentSensors : sensorFrames(value);
+    var sequences = owner ? sensorStreams.sequences() : [for (frame in sensors)
+      new robotkit.streams.StreamSequence(frame.sensorId, frame.kind, frame.sequence, frame.sourceClockId)];
     return new RobotSnapshot(logicalId, value.sequence, value.sourceTimestampNs,
       value.q.toArray(), value.dq.toArray(), value.effort.toArray(), value.mode,
-      value.faultCode, value.receivedTimestampNs, currentSensors,
+      value.faultCode, value.receivedTimestampNs, sensors,
       runtime.endpoint.sourceClockId(), "robotkit.monotonic", value.safety,
       value.trajectoryQueueDepth, value.trajectoryActive,
       value.trajectoryTimeNs, value.trajectoryDurationNs,
       value.trajectoryTag, value.trajectoryTagTimeNs,
       value.sessionState, value.activePlanId,
-      value.committedUntilNs, value.queueEndTimeNs, value.setpoint.toArray(), sensorStreams.sequences());
+      value.committedUntilNs, value.queueEndTimeNs, value.setpoint.toArray(), sequences);
   }
 
   public function fault():Null<RobotFault> {
@@ -178,11 +185,18 @@ class RuntimeRobotAdapter implements Robot {
 
   public function streams():robotkit.streams.SensorStreams {
     ensureOpen();
+    // Playback reads immutable samples; owner-thread subscribers are only notified by their owner.
+    if (RobotThreadToken.current() != observationOwner) {
+      var snapshot = new robotkit.streams.SensorStreams();
+      snapshot.publishFrames(sensorFrames(runtime.snapshot()));
+      return snapshot;
+    }
     observe(runtime.snapshot());
     return sensorStreams;
   }
 
   public function setChangeListener(listener:Null < RobotId -> Void >):Void {
+    if (listener != null) observationOwner = RobotThreadToken.current();
     changeListener = listener;
   }
 
@@ -193,7 +207,7 @@ class RuntimeRobotAdapter implements Robot {
     if (ownsRuntime) runtime.dispose();
   }
 
-  function observe(value:robotkit.runtime.RobotSnapshot):Void {
+  function sensorFrames(value:robotkit.runtime.RobotSnapshot):Array<SensorFrame> {
     // Externally published sensors (cameras, GNSS) update without a native
     // state change, so compare the sensor frames as well as the sequence.
     var sensors = RobotSensorFrames.fromRuntimeSnapshot(value);
@@ -207,6 +221,11 @@ class RuntimeRobotAdapter implements Robot {
           frame.linkId, frame.mountPosition.toArray(), frame.mountRotation.toArray(),
           runtime.endpoint.sourceClockId(), frame.receivedClockId, frame.image)
       else frame];
+    return sensors;
+  }
+
+  function observe(value:robotkit.runtime.RobotSnapshot):Void {
+    var sensors = sensorFrames(value);
     var clock = runtime.endpoint.sourceClockId();
     if (clock == observedClock && value.sequence == observedSequence && value.receivedTimestampNs == observedReceipt &&
         sameSensors(currentSensors, sensors))
