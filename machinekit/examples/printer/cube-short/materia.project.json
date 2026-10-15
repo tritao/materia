@@ -8,7 +8,8 @@
 		"cube-short": {
 			"kind": "cad-preview",
 			"module": "CoreXyPrinterPreview",
-			"function": "cubeShort"
+			"function": "cubeShort",
+			"cache": {"inputs": []}
 		}
 	}
 }

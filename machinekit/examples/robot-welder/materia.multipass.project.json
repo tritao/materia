@@ -11,7 +11,8 @@
 		"cell": {
 			"kind": "cad-preview",
 			"module": "RobotWelderPreview",
-			"function": "multipassCell"
+			"function": "multipassCell",
+			"cache": {"inputs": []}
 		}
 	}
 }

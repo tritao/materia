@@ -6,6 +6,6 @@
   "build": {"system": "haxeon", "manifest": "haxeon.json"},
   "dynamicParts": ["workpiece"],
   "entrypoints": {
-    "cell": {"kind": "cad-preview", "module": "OverheadArmPreview", "function": "cell"}
+    "cell": {"kind": "cad-preview", "module": "OverheadArmPreview", "function": "cell", "cache": {"inputs": []}}
   }
 }

@@ -11,27 +11,32 @@
 		"cell": {
 			"kind": "cad-preview",
 			"module": "RobotWelderPreview",
-			"function": "cell"
+			"function": "cell",
+			"cache": {"inputs": []}
 		},
 		"single-seam": {
 			"kind": "cad-preview",
 			"module": "RobotWelderPreview",
-			"function": "seamCell"
+			"function": "seamCell",
+			"cache": {"inputs": []}
 		},
 		"tube-post": {
 			"kind": "cad-preview",
 			"module": "RobotWelderPreview",
-			"function": "postCell"
+			"function": "postCell",
+			"cache": {"inputs": []}
 		},
 		"woven-seam": {
 			"kind": "cad-preview",
 			"module": "RobotWelderPreview",
-			"function": "wovenCell"
+			"function": "wovenCell",
+			"cache": {"inputs": []}
 		},
 		"multipass": {
 			"kind": "cad-preview",
 			"module": "RobotWelderPreview",
-			"function": "multipassCell"
+			"function": "multipassCell",
+			"cache": {"inputs": []}
 		}
 	},
 	"defaultJob": "complete",

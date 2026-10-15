@@ -8,7 +8,8 @@
 		"printer": {
 			"kind": "cad-preview",
 			"module": "CoreXyPrinterPreview",
-			"function": "printer"
+			"function": "printer",
+			"cache": {"inputs": []}
 		}
 	}
 }

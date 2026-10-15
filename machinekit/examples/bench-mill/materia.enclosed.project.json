@@ -11,7 +11,8 @@
 		"enclosure": {
 			"kind": "cad-preview",
 			"module": "BenchMillPreview",
-			"function": "enclosure"
+			"function": "enclosure",
+			"cache": {"inputs": []}
 		}
 	}
 }

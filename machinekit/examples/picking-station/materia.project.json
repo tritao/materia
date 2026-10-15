@@ -15,7 +15,8 @@
 		"station": {
 			"kind": "cad-preview",
 			"module": "PickingStationPreview",
-			"function": "station"
+			"function": "station",
+			"cache": {"inputs": []}
 		},
 		"layout": {
 			"kind": "cad-preview",

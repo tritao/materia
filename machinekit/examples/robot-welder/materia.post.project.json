@@ -8,7 +8,8 @@
 		"cell": {
 			"kind": "cad-preview",
 			"module": "RobotWelderPreview",
-			"function": "postCell"
+			"function": "postCell",
+			"cache": {"inputs": []}
 		}
 	}
 }

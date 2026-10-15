@@ -11,7 +11,8 @@
 		"press-controller": {
 			"kind": "cad-preview",
 			"module": "PressBrakePreview",
-			"function": "controlledPressBrake"
+			"function": "controlledPressBrake",
+			"cache": {"inputs": []}
 		}
 	}
 }

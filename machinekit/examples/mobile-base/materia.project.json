@@ -9,12 +9,14 @@
 		"cell": {
 			"kind": "cad-preview",
 			"module": "MobileBasePreview",
-			"function": "cell"
+			"function": "cell",
+			"cache": {"inputs": []}
 		},
 		"base": {
 			"kind": "cad-preview",
 			"module": "MobileBasePreview",
-			"function": "base"
+			"function": "base",
+			"cache": {"inputs": []}
 		}
 	}
 }

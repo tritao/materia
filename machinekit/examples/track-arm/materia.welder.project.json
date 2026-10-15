@@ -12,7 +12,8 @@
     "cell": {
       "kind": "cad-preview",
       "module": "TrackWelderPreview",
-      "function": "cell"
+      "function": "cell",
+      "cache": {"inputs": []}
     }
   }
 }

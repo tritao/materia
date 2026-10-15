@@ -11,12 +11,14 @@
 		"mill": {
 			"kind": "cad-preview",
 			"module": "BenchMillPreview",
-			"function": "mill"
+			"function": "mill",
+			"cache": {"inputs": []}
 		},
 		"enclosed": {
 			"kind": "cad-preview",
 			"module": "BenchMillPreview",
-			"function": "enclosed"
+			"function": "enclosed",
+			"cache": {"inputs": []}
 		}
 	}
 }

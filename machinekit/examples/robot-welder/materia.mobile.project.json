@@ -11,7 +11,8 @@
     "cell": {
       "kind": "cad-preview",
       "module": "MobileWelderPreview",
-      "function": "cell"
+      "function": "cell",
+      "cache": {"inputs": []}
     }
   }
 }

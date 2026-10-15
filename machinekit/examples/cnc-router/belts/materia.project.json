@@ -8,7 +8,8 @@
 		"router": {
 			"kind": "cad-preview",
 			"module": "CncRouterPreview",
-			"function": "beltRouter"
+			"function": "beltRouter",
+			"cache": {"inputs": []}
 		}
 	}
 }
