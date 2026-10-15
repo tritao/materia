@@ -2339,9 +2339,9 @@ class MissionPlayer implements SessionMember {
     if (escape != null) {
       var modelLink = scene.bodies.model.bodyIndex(escape.link);
       if (modelLink < 0) throw 'Lost-screw escape has no spindle link "${escape.link}"';
-      var spindleBody = scene.bodies.bodies[modelLink];
+      // Each physical member on the link is its own described body following it.
       var spindleObjects = [for (i in 0...scene.description.objects.length)
-        if (scene.description.objects[i].body == spindleBody) i];
+        if (scene.description.objects[i].body >= 0 && scene.bodies.carrier(scene.description.objects[i].body) == modelLink) i];
       var screwObjects = [for (name in scene.contacts([escape.screw])) scene.object(name)];
       if (spindleObjects.length == 0) throw 'Lost-screw escape has no collision geometry on spindle link "${escape.link}"';
       if (screwObjects.length == 0) throw 'Lost-screw escape has no observed geometry for screw "${escape.screw}"';
