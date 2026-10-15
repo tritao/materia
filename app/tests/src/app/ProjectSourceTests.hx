@@ -532,6 +532,66 @@ class ProjectSourceTests {
   }
 
   /**
+   * The frame is structure: every member of the printer's frame (the rings, the posts, the base plate) stands at its authored
+   * pose in what the editor renders, at load and after the simulation has run, on both backends. The rendered pose of a part is
+   * its body's pose composed with the part's offset (`capturePresentationSnapshot`); the authored one is the assembly state's world
+   * pose of the occurrence carrying the geometry's centre. Within a micrometre and a microradian.
+   */
+  static function checkPrinterFrame(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/materia.project.json");
+    for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
+      var generated = MateriaProjectRunner.loadProject(manifest);
+      var session = new ProjectDocumentSession(null, false);
+      session.openGeneratedProject(generated, manifest);
+      var definition = session.projectAssemblyDefinition, physical = session.projectPhysical;
+      if (definition == null || physical == null) throw "the printer has no assembly";
+      var placement = new AssemblyState(definition, session.projectAssemblyState);
+      var scale = physical.metresPerUnit;
+      var world = new RobotWorld();
+      var simulation = new ApplicationSimulation(world);
+      simulation.setBackend(backend);
+      check(simulation.rebuild(session.sensors, session.scene, session), "the printer builds: " + simulation.error);
+      var members = [for (item in definition.occurrences) if (item.id.indexOf("side") == 0 || (item.id.indexOf("cross") == 0 && item.id != "crossbar") || item.id.indexOf("post") == 0 || item.id == "basePlate") item];
+      check(members.length == 13, 'the frame has its thirteen members: ${members.length}');
+      // The assembly places each member at its authored initial pose (the pose solve and the saved scene keep it).
+      var authored = 0.0, authoredTurn = 0.0;
+      for (item in members) {
+        var wanted = item.initialPose, got = placement.worldPose(item.id);
+        authored = Math.max(authored, Math.max(Math.abs(got.x - wanted.x), Math.max(Math.abs(got.y - wanted.y), Math.abs(got.z - wanted.z))));
+        authoredTurn = Math.max(authoredTurn, new robotkit.spatial.Quat(got.qx, got.qy, got.qz, got.qw).angularDistance(new robotkit.spatial.Quat(wanted.qx, wanted.qy, wanted.qz, wanted.qw)));
+      }
+      Sys.println('printer frame: the assembly places the members ${authored * scale * 1e6} um and ${authoredTurn * 1e6} urad from their authored initial poses');
+      check(authored * scale < 1e-6 && authoredTurn < 1e-6, "the assembly keeps the frame where the printer authors it");
+      var label = backend == ApplicationSimulation.MUJOCO ? "MuJoCo" : "deterministic";
+      for (seconds in (backend == ApplicationSimulation.MUJOCO ? [0.0, 0.5, 2.0, 20.0, 60.0, 105.0, 125.0, 160.0] : [0.0, 0.5, 2.0])) {
+        simulation.step();
+        while (simulation.activeSession().simulationTime() < seconds) simulation.step();
+        var shown = new Map<String, Dynamic>();
+        for (visual in simulation.capturePresentationSnapshot().environment) shown.set(visual.id, visual);
+        var worst = 0.0, worstTurn = 0.0, worstId = "";
+        for (item in members) {
+          var visual:{id:String, position:Array<Float>, rotation:Array<Float>} = shown.get("project:" + item.id);
+          if (visual == null) throw 'the frame member "${item.id}" is not rendered';
+          var pose = placement.worldPose(item.id);
+          var center = session.assemblyPreviewCenter(item.definition);
+          if (center == null) throw 'no preview center for ${item.definition}';
+          var turn = new robotkit.spatial.Quat(pose.qx, pose.qy, pose.qz, pose.qw);
+          var expected = turn.rotate(new robotkit.spatial.Vec3(center[0], center[1], center[2]));
+          var want = [(pose.x + expected.x) * scale, (pose.y + expected.y) * scale, (pose.z + expected.z) * scale];
+          var distance = Math.sqrt(Math.pow(visual.position[0] - want[0], 2) + Math.pow(visual.position[1] - want[1], 2) + Math.pow(visual.position[2] - want[2], 2));
+          var angle = new robotkit.spatial.Quat(visual.rotation[0], visual.rotation[1], visual.rotation[2], visual.rotation[3]).angularDistance(turn);
+          if (distance > worst) { worst = distance; worstId = item.id; }
+          worstTurn = Math.max(worstTurn, angle);
+        }
+        Sys.println('printer frame on $label at $seconds s: the worst member ($worstId) is ${Math.round(worst * 1e9) / 1e3} um and ${Math.round(worstTurn * 1e6)} urad from its authored pose');
+        check(worst < 1e-6 && worstTurn < 1e-6, 'the frame stays at its authored pose on $label at $seconds s: $worstId ${worst * 1e6} um, ${worstTurn * 1e6} urad');
+      }
+      simulation.dispose();
+      session.dispose();
+    }
+  }
+
+  /**
    * Where the printer's bed settles under its own weight on MuJoCo at three physics steps. The z screws are rigid couplings
    * (a trapezoidal thread has no stiffness), so any sag is the solver's softness of an ideal constraint, which scales with the
    * step squared (the equality's reference time constant is two substeps), not a spring: the bed sags `g T^2 (1 - d) dmax^2 / d`
@@ -7107,6 +7167,7 @@ class ProjectSourceTests {
       suite("printer-cube-short-physical", root -> checkPrinterPhysical(root, checkPrinterCube(root, "cube-short", 4.0, true))),
       suite("printer-shaping", checkPrinterShaping),
       suite("printer-mirror", checkPrinterMirror),
+      suite("printer-frame", checkPrinterFrame),
       suite("mobile-base", checkMobileBase),
       suite("mobile-mission", checkMobileMission),
       suite("mobile-obstacle", checkMobileObstacle),
@@ -7153,7 +7214,7 @@ class ProjectSourceTests {
       focused("welder-quality", checkWeldQualities),
       focused("welder-seam", root -> { checkRobotWelderOn(root, ApplicationSimulation.MUJOCO, "MuJoCo"); checkRobotWelderOn(root, ApplicationSimulation.DETERMINISTIC, "test backend"); }),
       group("mill", ["bench-mill", "enclosed-mill", "interface"]),
-      group("printer", ["printer-project", "printer-shaping", "printer-mirror"]),
+      group("printer", ["printer-project", "printer-shaping", "printer-mirror", "printer-frame"]),
       group("mobile", ["mobile-base", "mobile-mission", "mobile-obstacle", "overlay-edge"]),
       group("router", ["cnc-router", "belts"]),
       group("screwdriver-process", ["screwdriver-simulation", "screwdriver-equipment"]),
