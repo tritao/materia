@@ -28,7 +28,7 @@ class AxisBuilderChecks {
 		var pinion = new SpurGear(1, 20, 8);
 		var rack = new Rack(1, 100, 8);
 		builder.driveRack(axis, "pinion", "motor", pinion, AxisBuilder.orient(60, 0, 10, up, [0, 1, 0]),
-			[0.0, 1, 0], "rack", rack, AxisBuilder.orient(0, 0, 0, up, along), "rail", 1.0,
+			[0.0, 0, -1], "rack", rack, "rail",
 			_ -> {
 				builder.attach("driver", new MotorDriver("GENERIC-TMC2209",
 					new machinekit.power.PhaseRmsCurrent(1.5), 16, new machinekit.power.DcVoltage(24)),

@@ -533,11 +533,11 @@ FC7 ── FC8 ── FC9 ───────────────┴──
 | Step | State | Commits |
 |---|---|---|
 | FC0 | planned | |
-| FC1a | done: `cad_shape_distance`, CadKit core smoke passes | 20c53b08d |
-| FC1b | planned | |
-| FC1c | planned | |
-| FC1d | planned | |
-| FC1e | planned | |
+| FC1a | done: `cad_shape_distance`, CadKit core smoke passes | `CadKit: distance between shapes (foam cutter FC1a)` |
+| FC1b | done: support, rest overlap with transmission allowances, sampled sweeps, drive consistency | `MachineKit: AssemblyIntegrity, seats and drives that derive their geometry (foam cutter FC1b–FC1e)` |
+| FC1c | done: rack pose, phase and sense derived; LinearTrack and Gantry racks were a face width off and reversed | `MachineKit: AssemblyIntegrity, seats and drives that derive their geometry (foam cutter FC1b–FC1e)` |
+| FC1d | done: `addHomeSwitch` with a `BlockBracket`; printer and router ported | `MachineKit: AssemblyIntegrity, seats and drives that derive their geometry (foam cutter FC1b–FC1e)` |
+| FC1e | done: `seat`/`mount`/`slideOn`, `SeatedPlate` (mobile base plate part numbers change), `WeldedFrame` | `MachineKit: AssemblyIntegrity, seats and drives that derive their geometry (foam cutter FC1b–FC1e)` |
 | FC1f | planned (a draft of the parts and machine exists uncommitted in the worktree) | |
 | FC2 | planned | |
 | FC3 | planned (after printer RF5) | |

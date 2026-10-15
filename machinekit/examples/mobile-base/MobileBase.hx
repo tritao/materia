@@ -14,57 +14,10 @@ import machinekit.motion.DriveWheel;
 import machinekit.motion.Gearbox;
 import machinekit.motion.NemaStepper;
 import machinekit.structural.RectTube;
+import machinekit.structural.SeatedPlate;
+import machinekit.structural.SeatedPlate.PlateSeat;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
-
-/** Where something mounts on a plate: a connector frame and the through-holes it bolts through, in plate coordinates. */
-typedef PlateSeat = {
-	var name:String;
-	var frame:AssemblyFrame;
-	var holes:Array<{x:Float, y:Float, diameter:Float}>;
-}
-
-/**
- * A flat plate lying on its base (z=0), centred on its origin. It owns the layout of what mounts on it:
- * each seat is a connector and the holes for its fasteners, so moving a seat moves both. Slots
- * (centre x, centre y, length along X, width along Y) are cut clean through.
- */
-class ChassisPlate extends MachineComponent {
-	public final length:Float;
-	public final width:Float;
-	public final thickness:Float;
-	public final slots:Array<{x:Float, y:Float, length:Float, width:Float}>;
-	public final seats:Array<PlateSeat>;
-
-	public function new(length:Float, width:Float, thickness:Float, name:String, seats:Array<PlateSeat>,
-			?slots:Array<{x:Float, y:Float, length:Float, width:Float}>) {
-		if (!(length > 0) || !(width > 0) || !(thickness > 0)) throw "Chassis plate needs positive dimensions";
-		this.slots = slots == null ? [] : slots;
-		this.seats = seats;
-		super('${name.toUpperCase()}-${Dimension.format(length)}x${Dimension.format(width)}x${Dimension.format(thickness)}',
-			name, "aluminium 6061", true);
-		this.length = length;
-		this.width = width;
-		this.thickness = thickness;
-		for (seat in seats) addConnector(seat.name, Mount, seat.frame);
-	}
-
-	/** Seat frame on the top face at (x, y), facing up. */
-	public static function onTop(x:Float, y:Float, thickness:Float):AssemblyFrame return Solids.axial(x, y, thickness);
-
-	/** Seat frame on the underside at (x, y), facing up like the parts hung from it. */
-	public static function underneath(x:Float, y:Float):AssemblyFrame return Solids.axial(x, y, 0);
-
-	override public function hasGeometry():Bool return true;
-
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var plate = Solids.named(Part.box(length, width, thickness), "plate");
-		if (detail == Envelope) return plate;
-		var tools = [for (slot in slots) Part.box(slot.length, slot.width, thickness + 2).translated(new Vector(slot.x, slot.y, -1))];
-		for (seat in seats) for (hole in seat.holes) tools.push(Part.cylinderSpan(hole.diameter / 2, -1, thickness + 1, hole.x, hole.y));
-		return Solids.cut(plate, tools);
-	}
-}
 
 /**
  * L-shaped motor bracket hanging under the base plate. Origin on the motor axis at the plate's inner
@@ -293,7 +246,7 @@ class MobileBase extends MachineAssembly {
 		post = new TubePost(new RectTube(40, 40, 3), DECK_Z - BASE_Z - BASE_THICKNESS);
 
 		for (slot in wheelSlots()) if (width / 2 - Math.abs(slot.y) - slot.width / 2 < MINIMUM_WEB) throw "Base plate needs its minimum wheel-slot web";
-		addComponent("basePlate", new ChassisPlate(length, width, BASE_THICKNESS, "Base plate", baseSeats(),
+		addComponent("basePlate", new SeatedPlate(length, width, BASE_THICKNESS, "Base plate", baseSeats(),
 			wheelSlots()), AssemblyFrames.translation(0, 0, BASE_Z));
 
 		addComponent("battery", battery);
@@ -340,7 +293,7 @@ class MobileBase extends MachineAssembly {
 			addMate('post${corner.name}-mount', "fixed", "basePlate", 'post${corner.name}', 'post${corner.name}', "base");
 		}
 		// The deck rests on all four posts; one carries it in the mate tree.
-		addComponent("deck", new ChassisPlate(length, width, DECK_THICKNESS, "Deck", deckSeats()));
+		addComponent("deck", new SeatedPlate(length, width, DECK_THICKNESS, "Deck", deckSeats()));
 		addMate("deck-mount", "fixed", "postFrontLeft", "top", "deck", "postFrontLeft");
 		addComponent("lidar", lidar);
 		addMate("lidar-mount", "fixed", "deck", "lidar", "lidar", "base");
@@ -369,12 +322,12 @@ class MobileBase extends MachineAssembly {
 		}
 		var casterHoles = caster.plateSize / 2 - 8;
 		for (end in [{name: "Front", x: length / 2 - 70}, {name: "Rear", x: -length / 2 + 70}])
-			seats.push({name: 'caster${end.name}', frame: ChassisPlate.underneath(end.x, 0),
+			seats.push({name: 'caster${end.name}', frame: SeatedPlate.underneath(end.x, 0),
 				holes: [for (dx in [-1, 1]) for (dy in [-1, 1]) {x: end.x + dx * casterHoles, y: dy * casterHoles, diameter: 6.6}]});
-		seats.push({name: "battery", frame: ChassisPlate.onTop(batteryX, 0, BASE_THICKNESS), holes: []});
+		seats.push({name: "battery", frame: SeatedPlate.onTop(batteryX, 0, BASE_THICKNESS), holes: []});
 		for (corner in CORNERS) {
 			var x = corner.x * (length / 2 - 40), y = corner.y * (width / 2 - (WIDTH / 2 - POST_Y));
-			seats.push({name: 'post${corner.name}', frame: ChassisPlate.onTop(x, y, BASE_THICKNESS),
+			seats.push({name: 'post${corner.name}', frame: SeatedPlate.onTop(x, y, BASE_THICKNESS),
 				holes: [{x: x, y: y, diameter: 8.4}]});
 		}
 		return seats;
@@ -383,11 +336,11 @@ class MobileBase extends MachineAssembly {
 	/** Seats on the deck: the post tops underneath, the lidar and a payload mount on top. */
 	function deckSeats():Array<PlateSeat> {
 		var seats:Array<PlateSeat> = [for (corner in CORNERS) {name: 'post${corner.name}',
-			frame: ChassisPlate.underneath(corner.x * (length / 2 - 40), corner.y * (width / 2 - (WIDTH / 2 - POST_Y))),
+			frame: SeatedPlate.underneath(corner.x * (length / 2 - 40), corner.y * (width / 2 - (WIDTH / 2 - POST_Y))),
 			holes: [{x: corner.x * (length / 2 - 40), y: corner.y * (width / 2 - (WIDTH / 2 - POST_Y)), diameter: 8.4}]}];
-		seats.push({name: "lidar", frame: ChassisPlate.onTop(length / 2 - 80, 0, DECK_THICKNESS), holes: []});
+		seats.push({name: "lidar", frame: SeatedPlate.onTop(length / 2 - 80, 0, DECK_THICKNESS), holes: []});
 		// The arm's own cell lies along its -Y; a quarter turn about the seat's up axis brings that ahead.
-		seats.push({name: "payload", frame: AssemblyFrames.compose(ChassisPlate.onTop(payloadX, 0, DECK_THICKNESS),
+		seats.push({name: "payload", frame: AssemblyFrames.compose(SeatedPlate.onTop(payloadX, 0, DECK_THICKNESS),
 			AssemblyFrames.turnY(ARM_TURN)), holes: []});
 		return seats;
 	}

@@ -1951,7 +1951,8 @@ class MachineKitSmoke {
 		near(blockBounds3D.get_max().get_y() - railBottom, 13,
 			"profile block height measured from rail bottom");
 		blockPart.close();
-		check(guide.blocks[0].connectors().length == 6, "profile block has four mount connectors and two axes");
+		check(guide.blocks[0].connectors().length == 7, "profile block has four mount connectors, two axes and its top");
+		check(guide.blocks[0].connector("top") != null, "profile block names its top");
 		near(guide.blocks[0].connector("mount1").frame.x, -7.5, "profile block first mount X");
 		near(guide.blocks[0].connector("mount1").frame.z, -10, "profile block first mount Z");
 		near(guide.blocks[0].connector("mount2").frame.x, -7.5, "profile block second mount X");
@@ -2558,6 +2559,7 @@ class MachineKitSmoke {
 		var everything = Shards.run([
 			{name: "TendingCell.TendingMissionChecks.run", run: () -> TendingCell.TendingMissionChecks.run(), weight: 1.0},
 			{name: "AxisBuilderChecks.run", run: () -> AxisBuilderChecks.run(), weight: 1.0},
+			{name: "AssemblyIntegrityTests.run", run: () -> AssemblyIntegrityTests.run(), weight: 1.0},
 			{name: "GantryChecks.run", run: () -> GantryChecks.run(), weight: 1.0},
 			{name: "RotaryHeadCheck.run", run: () -> RotaryHeadCheck.run(), weight: 1.0},
 			{name: "LinearTrackCheck.run", run: () -> LinearTrackCheck.run(), weight: 1.0},

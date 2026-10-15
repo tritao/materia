@@ -50,6 +50,8 @@ class LinearRail extends MachineComponent {
 			position += spec.railHolePitch;
 		}
 		addConnector("axis", Axis, Solids.axial(0, 0, 0));
+		// The face the rail is bolted down by, at its start: +Y (a connector's axis) up into the rail, +Z along it.
+		addConnector("base", Mount, AssemblyFrames.translation(0, -spec.railHeight, 0));
 		for (i in 0...holePositions.length)
 			addConnector('mount${i + 1}', Mount,
 				AssemblyFrames.alongY(0, 0, holePositions[i], 0, 1, 0));

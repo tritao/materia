@@ -27,12 +27,14 @@ class LinearTrackCheck {
 		var couplings = definition.couplings;
 		if (couplings == null) throw "Linear track has no rack coupling";
 		check(couplings.length == 1, "one physical rack coupling");
-		near(couplings[0].ratio, -0.05, "module 2 / 20 teeth derive the shaft ratio");
+		// The pinion's shaft points along +Y and it rolls on the rack below it as the carriage runs along +X, so it turns
+		// positively about +Y: 1/20 rad per mm, its pitch radius being 20 mm (the earlier -0.05 had the pinion sliding the wrong way round).
+		near(couplings[0].ratio, 0.05, "module 2 / 20 teeth derive the shaft ratio");
 		check(definition.actuators != null && definition.actuators.length == 1 &&
 			definition.actuators[0].joint == "pinion-turn", "motor drives the pinion");
 		var state = new AssemblyState(definition);
 		near(state.worldPose("carriage").x, 300, "initial track coordinate");
-		near(state.joint("pinion-turn"), -15, "initial shaft follows the rack");
+		near(state.joint("pinion-turn"), 15, "initial shaft follows the rack");
 		endClearance(track, state);
 		var arm = new RobotArm(false);
 		track.includeArm("arm", arm);
@@ -92,7 +94,7 @@ class LinearTrackCheck {
 			for (coordinate in [0.0, 3000.0]) {
 				state.setJoint("track", coordinate);
 				near(state.worldPose("carriage").x, coordinate, "carriage reaches both travel ends");
-				near(state.joint("pinion-turn"), -coordinate / 20, "pinion follows each travel end");
+				near(state.joint("pinion-turn"), coordinate / 20, "pinion follows each travel end");
 				for (movingId in moving) for (fixedId in fixed)
 					check(posed.overlap(track.component(movingId), state.worldPose(movingId), track.component(fixedId), state.worldPose(fixedId),
 						ComponentDetail.Preview) < 1e-5, '$movingId clears $fixedId at $coordinate mm');

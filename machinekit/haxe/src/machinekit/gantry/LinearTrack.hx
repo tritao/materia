@@ -90,17 +90,16 @@ class LinearTrack extends AxisBuilder {
 		var rackMargin = Math.ceil((railMargin + blockOffset) / rackPitch) * rackPitch;
 		var rack = new Rack(moduleSize, Std.int(Math.ceil((travel + 2 * rackMargin) / rackPitch)), width,
 			SpurGear.STANDARD_PRESSURE_ANGLE, 12);
-		var rackZ = motorFace.z - pinion.pitchDiameter / 2;
+		var pinionPose = AxisBuilder.orient(0, pinionY, motorFace.z, up, [0.0, 1, 0]);
+		// The rack lies under the pinion where driveRack puts it; its support runs under the rack's bar.
+		var rackPose = rackPlacement(axis, pinion, pinionPose, [0.0, 0, -1], rack).pose;
 		attach("rackSupport", new GantryExtrusion(new TSlotExtrusion(30), rack.length),
-			AxisBuilder.orient(-rackMargin, pinionY + width / 2, rackZ - 1.25 * moduleSize - rack.barHeight - 15, up, along), "frameLeft");
+			AxisBuilder.orient(rackPose.x, rackPose.y + width / 2, rackPose.z - 1.25 * moduleSize - rack.barHeight - 15, up, along), "frameLeft");
 		for (end in [0, 1]) attach('rackFoot$end', new GantryPlate("track rack foot", 60, 155, 30),
 			AssemblyFrames.translation(end == 0 ? start + 30 : start + length - 30, -227.5, 20), "frameLeft");
-		var pinionPose = AssemblyFrames.compose(AxisBuilder.orient(0, pinionY, motorFace.z, up, [0.0, 1, 0]),
-			AssemblyFrames.fromRotationMatrix(0, 0, 0, [0.0, 1, 0, -1, 0, 0, 0, 0, 1]));
 		attach("powerSupply", new PowerSupply(new machinekit.power.DcVoltage(48),
 			new machinekit.power.DcCurrent(10), 1), AssemblyFrames.translation(start, 550, 0), "frameLeft");
-		driveRack(axis, "pinion", "motor", pinion, pinionPose, [0.0, 1, 0], "rack", rack,
-			AxisBuilder.orient(-rackMargin, pinionY + width, rackZ, up, along), "rackSupport", -1.0, _ -> {
+		driveRack(axis, "pinion", "motor", pinion, pinionPose, [0.0, 0, -1], "rack", rack, "rackSupport", _ -> {
 				attach("driver", new MotorDriver("GENERIC-DM542",
 					new machinekit.power.PhaseRmsCurrent(driverCurrent), 16),
 					AssemblyFrames.translation(start + 150, 550, 0), "frameLeft");

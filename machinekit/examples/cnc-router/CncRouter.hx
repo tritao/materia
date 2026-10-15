@@ -537,8 +537,6 @@ class CncRouter extends AxisBuilder {
 			place('motorPlateY$name', new RouterPlate(66, 8, 62, "aluminium 6061", "Motor plate", motorY,
 				AssemblyFrames.compose(AssemblyFrames.inverse(platePose), motorPose)), platePose);
 			place('motorY$name', side < 0 ? motorY : NemaStepper.frame(23), motorPose);
-			driveRouterScrew(specs[1], 'screwY$name', 'motorY$name', new LeadScrew(thread, FRAME_LENGTH + 8 - shaft - 10),
-				AxisBuilder.orient(side * 295, halfFrame + 8 - shaft, Y_SCREW_Z, up, [0, -1, 0]), [0, -1, 0], [0, 1, 0]);
 		}
 		var inner = 2 * (SIDE_X - 20);
 		for (entry in [{id: "crossFront", y: -halfFrame + 20}, {id: "crossMiddle", y: 0.0}, {id: "crossBack", y: halfFrame - 20}])
@@ -555,6 +553,12 @@ class CncRouter extends AxisBuilder {
 		var yb = MACHINE_ZERO_Y + TOOL_OFFSET_Y;
 		var ySpec = specs[1];
 		slide(ySpec, "railYLeft", "blockYLeft", LinearRailBlock.metric(RAIL), AxisBuilder.orient(-SIDE_X, yb, railTop, up, alongY), {x: 0, y: 1, z: 0});
+		// The screws' sense follows from the slide's direction, so they are driven once it exists.
+		if (!belts) for (side in [-1, 1]) {
+			var name = side < 0 ? "Left" : "Right";
+			driveRouterScrew(specs[1], 'screwY$name', 'motorY$name', new LeadScrew(thread, FRAME_LENGTH + 8 - shaft - 10),
+				AxisBuilder.orient(side * 295, halfFrame + 8 - shaft, Y_SCREW_Z, up, [0, -1, 0]), [0, -1, 0]);
+		}
 		var uprightTop = railTop + railSpec.blockHeight - railSpec.railHeight;
 		var upright = new RouterPlate(12, 100, 200, "aluminium 6061", "Gantry upright");
 		attach("uprightLeft", upright, AssemblyFrames.translation(-SIDE_X, yb, uprightTop), "blockYLeft");
@@ -586,8 +590,6 @@ class CncRouter extends AxisBuilder {
 		if (belts) mountBeltX(yb, shaft);
 		else {
 			attach("motorX", NemaStepper.frame(23), motorXPose, "uprightRight");
-			driveRouterScrew(specs[0], "screwX", "motorX", new LeadScrew(thread, outside - shaft + beamLength / 2 - 4),
-				AxisBuilder.orient(outside - shaft, yb, X_SCREW_Z, up, [-1, 0, 0]), [-1, 0, 0], [1, 0, 0]);
 		}
 
 		// X carriage, riding the X rails on the beams' front faces.
@@ -595,6 +597,9 @@ class CncRouter extends AxisBuilder {
 		var blockFace = railXFace - (railSpec.blockHeight - railSpec.railHeight);
 		slide(specs[0], "railXUpper", "blockXUpper", LinearRailBlock.metric(RAIL), AxisBuilder.orient(xc, railXFace, beamZ[0], front, alongX),
 			{x: 1, y: 0, z: 0});
+		if (!belts)
+			driveRouterScrew(specs[0], "screwX", "motorX", new LeadScrew(thread, outside - shaft + beamLength / 2 - 4),
+				AxisBuilder.orient(outside - shaft, yb, X_SCREW_Z, up, [-1, 0, 0]), [-1, 0, 0]);
 		var plateThickness = 12.0;
 		var xPlateBottom = 128.0, xPlateHeight = 140.0;
 		attach("xPlate", new RouterPlate(120, plateThickness, xPlateHeight, "aluminium 6061", "X carriage plate"),
@@ -618,8 +623,7 @@ class CncRouter extends AxisBuilder {
 		var bracketTop = xPlateTop + 8;
 		var coupling = new ShaftCoupling(motorY.variant.shaftDiameter, thread.screwDiameter);
 		var zFace = bracketTop + 1 + coupling.length / 2 + shaft;
-		if (foldedZ) foldedZDrive(specs[2], thread, xc, screwZY, xPlateBottom, bracketPose, bracketTop, shaft);
-		else {
+		if (!foldedZ) {
 			var motorZPose = AxisBuilder.orient(xc, screwZY, zFace, [0, 1, 0], [0, 0, -1]);
 			attach("motorBracketZ", new RouterPlate(70, 49, 8, "aluminium 6061", "Z motor bracket", motorY,
 				AssemblyFrames.compose(AssemblyFrames.inverse(bracketPose), motorZPose)), bracketPose, "xPlate");
@@ -630,14 +634,15 @@ class CncRouter extends AxisBuilder {
 				attach('standoffZ${corner++}', standoff, AssemblyFrames.translation(at.x, at.y, bracketTop), "motorBracketZ");
 			}
 			attach("motorZ", NemaStepper.frame(23), motorZPose, "motorBracketZ");
-			driveRouterScrew(specs[2], "screwZ", "motorZ", new LeadScrew(thread, zFace - shaft - (xPlateBottom + 2)),
-				AxisBuilder.orient(xc, screwZY, zFace - shaft, [0, 1, 0], [0, 0, -1]), [0, 0, -1], [0, 0, 1]);
 		}
 		// Z slide and spindle. The Z blocks sit at the top of their rails at z = 0.
 		var zBlock = xPlateTop - railSpec.railEndMargin - railSpec.blockLength / 2 - 0.5;
 		var zBlockFace = railZFace - (railSpec.blockHeight - railSpec.railHeight);
 		slide(specs[2], "railZLeft", "blockZLeft", LinearRailBlock.metric(RAIL), AxisBuilder.orient(xc - 40, railZFace, zBlock, front, vertical),
 			{x: 0, y: 0, z: 1});
+		if (foldedZ) foldedZDrive(specs[2], thread, xc, screwZY, xPlateBottom, bracketPose, bracketTop, shaft);
+		else driveRouterScrew(specs[2], "screwZ", "motorZ", new LeadScrew(thread, zFace - shaft - (xPlateBottom + 2)),
+			AxisBuilder.orient(xc, screwZY, zFace - shaft, [0, 1, 0], [0, 0, -1]), [0, 0, -1]);
 		var zPlateBottom = zBlock - 50;
 		attach("zPlate", new RouterPlate(120, plateThickness, 75, "aluminium 6061", "Z plate"),
 			AssemblyFrames.translation(xc, zBlockFace - plateThickness / 2, zPlateBottom), "blockZLeft");
@@ -659,72 +664,20 @@ class CncRouter extends AxisBuilder {
 			for (name in ["Left", "Right"]) attachBeltPath("beltY" + name, "beltBracketY" + name, "pulleyY" + name, "idlerY" + name);
 		}
 		// Independent Y contacts support squaring; Z homes upward before lateral travel.
-		buildHome(specs[1], "YLeft", "sideLeft", "uprightLeft", [-SIDE_X - 18.0, yb, 70.0],
-			[40.0, 6.0, 6.0], [0.0, 1, 0], -1, (belts ? "pulley" : "screw") + "YLeft-turn");
-		buildHome(specs[1], "YRight", "sideRight", "uprightRight", [SIDE_X + 18.0, yb, 70.0],
-			[40.0, 6.0, 6.0], [0.0, 1, 0], -1, (belts ? "pulley" : "screw") + "YRight-turn");
+		addHomeSwitch(specs[1], "YLeft", "sideLeft", "uprightLeft", [-SIDE_X - 18.0, yb, 70.0],
+			[40.0, 6.0, 6.0], [0.0, 1, 0], -1, [1.0, 0, 0], true, (belts ? "pulley" : "screw") + "YLeft-turn");
+		addHomeSwitch(specs[1], "YRight", "sideRight", "uprightRight", [SIDE_X + 18.0, yb, 70.0],
+			[40.0, 6.0, 6.0], [0.0, 1, 0], -1, [1.0, 0, 0], true, (belts ? "pulley" : "screw") + "YRight-turn", 2);
 		// Put the X contact in the gap behind its plate and ahead of the beam.
 		// A contact in front of X lies inside the independent Z plate's sweep.
-		buildHome(specs[0], "X", "beamUpper", "xPlate", [xc, blockFace + 6.0, 250.0],
-			[6.0, 12.0, 6.0], [1.0, 0, 0], -1, (belts ? "pulleyX-turn" : "screwX-turn"));
-		buildHome(specs[2], "Z", "xPlate", "zPlate", [xc + 75.0, zBlockFace, zPlateBottom + 35.0],
-			[40.0, 6.0, 6.0], [0.0, 0, 1], 1, foldedZ ? "motorZ-turn" : "screwZ-turn");
+		addHomeSwitch(specs[0], "X", "beamUpper", "xPlate", [xc, blockFace + 6.0, 250.0],
+			[6.0, 12.0, 6.0], [1.0, 0, 0], -1, [0.0, 1, 0], true, (belts ? "pulleyX-turn" : "screwX-turn"));
+		addHomeSwitch(specs[2], "Z", "xPlate", "zPlate", [xc + 75.0, zBlockFace, zPlateBottom + 35.0],
+			[40.0, 6.0, 6.0], [0.0, 0, 1], 1, [1.0, 0, 0], true, foldedZ ? "motorZ-turn" : "screwZ-turn");
 		homeAfter("x", ["z"]);
 		homeAfter("y", ["z"]);
 		exposeConnector("nose", "spindle", "nose");
 		exposeConnector("toolTip", "tool", "tip");
-	}
-
-	/** Physical outboard steel target and supported proximity sensor at a guide's home end. */
-	function buildHome(axis:RouterAxisSpec, suffix:String, fixed:String, moving:String,
-			point:Array<Float>, dimensions:Array<Float>, direction:Array<Float>, side:Int, shaft:String):Void {
-		var room = axisOvertravel(axis.id);
-		var sensor = new machinekit.motion.ProximitySwitch();
-		if (!Math.isFinite(room) || room <= 4 * sensor.switchRepeatability())
-			throw "Router home uncertainty does not fit its physical guide overtravel";
-		var trigger = "homeTrigger" + suffix;
-		// Each target's trip connector follows its axis; distinct definitions retain those frames.
-		attach(trigger, new RouterPlate(dimensions[0], dimensions[1], dimensions[2], "steel", "Home trigger " + suffix),
-			AssemblyFrames.translation(point[0], point[1], point[2] - dimensions[2] / 2), moving);
-		var half = 0.0;
-		for (i in 0...3) half += Math.abs(direction[i]) * dimensions[i] / 2;
-		addMemberConnector(trigger, "trip", AssemblyFrames.translation(direction[0] * side * half,
-			direction[1] * side * half, dimensions[2] / 2 + direction[2] * side * half));
-		var travel = (side < 0 ? axis.lower : axis.upper) + side * room * 0.25;
-		var normal = [for (value in direction) -side * value];
-		var face = [for (i in 0...3) point[i] + direction[i] * (travel + side * half)];
-		var origin = [for (i in 0...3) face[i] - normal[i] * (sensor.spec.length + sensor.spec.sensingDistance)];
-		var transverse = suffix == "X" ? [0.0, 1, 0] : [1.0, 0, 0];
-		var pose = AxisBuilder.orient(origin[0], origin[1], origin[2], transverse, normal);
-		var host = switchMountBounds(fixed);
-		var anchor = [for (i in 0...3) Math.max(host.min[i], Math.min(host.max[i], origin[i]))];
-		var lo = [for (i in 0...3) Math.min(anchor[i], origin[i]) - 3];
-		var hi = [for (i in 0...3) Math.max(anchor[i], origin[i]) + 3];
-		var id = "home" + suffix, mount = id + "Mount";
-		attach(mount, new RouterPlate(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2], "aluminium 6061", "Home switch mount"),
-			AssemblyFrames.translation((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]), fixed);
-		attach(id, sensor, pose, mount);
-		addTripSwitch(id, axis.id, id, {instanceId: trigger, connectorName: "trip"}, side, "home",
-			suffix == "YRight" ? 2 : 1, shaft);
-	}
-
-	function switchMountBounds(id:String):{min:Array<Float>, max:Array<Float>} {
-		var member = component(id), min:Array<Float>, max:Array<Float>;
-		if (Std.isOfType(member, ExtrusionMember)) {
-			var frame:ExtrusionMember = cast member;
-			min = [-frame.profile.size / 2, -frame.profile.height / 2, 0.0];
-			max = [frame.profile.size / 2, frame.profile.height / 2, frame.length];
-		} else if (Std.isOfType(member, RouterPlate)) {
-			var plate:RouterPlate = cast member;
-			min = [-plate.width / 2, -plate.depth / 2, 0.0]; max = [plate.width / 2, plate.depth / 2, plate.height];
-		} else throw "Router switch mount requires a frame or plate";
-		var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
-		var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
-		for (x in [min[0], max[0]]) for (y in [min[1], max[1]]) for (z in [min[2], max[2]]) {
-			var point = AssemblyFrames.transformPoint(zeroPose(id), x, y, z), values = [point.x, point.y, point.z];
-			for (i in 0...3) { lo[i] = Math.min(lo[i], values[i]); hi[i] = Math.max(hi[i], values[i]); }
-		}
-		return {min: lo, max: hi};
 	}
 
 	/** The Z screw and motor are two distinct shafts joined by one pretensioned belt loop. */
@@ -756,7 +709,7 @@ class CncRouter extends AxisBuilder {
 		zeroPoses.set("screwZ", screwPose);
 		connect("motorBracketZ", "screwZ");
 		addComponent("screwZNut", new LeadScrewNut(thread, 4, false));
-		var lead = addTransmission("screwZ-lead", axis.id, "screwZ-turn", Transmission.LeadScrew("screwZ", "screwZNut"), SenseTools.fromAlignment(-1));
+		var lead = addTransmission("screwZ-lead", axis.id, "screwZ-turn", Transmission.LeadScrew("screwZ", "screwZNut"), screwSense(axis.id, [0.0, 0, -1]));
 		addMateOnAxis("screwZ-turn", "continuous", "motorBracketZ", "to-screwZ", "screwZ", "attach-screwZ",
 			{x: 0, y: 0, z: -1}, lead * axis.initial);
 		supportScrew("screwZ-lead", Fixed, Free);
@@ -812,8 +765,8 @@ class CncRouter extends AxisBuilder {
 
 	/** Router nut shape and frame-mounted electrical driver. */
 	function driveRouterScrew(axis:RouterAxisSpec, id:String, motor:String, screw:LeadScrew, pose:AssemblyFrame,
-			along:Array<Float>, axisDirection:Array<Float>):Void
-		driveScrew(axis, id, motor, screw, pose, along, axisDirection, axis.id != "z", addDriver);
+			along:Array<Float>):Void
+		driveScrew(axis, id, motor, screw, pose, along, axis.id != "z", addDriver);
 
 	/** Pitch radius of the 20-tooth GT2 belt pulleys, in millimetres. */
 	static function beltRadius():Float

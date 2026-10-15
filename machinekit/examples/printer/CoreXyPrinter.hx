@@ -12,7 +12,6 @@ import machinekit.gantry.GantryParts.GantryIdlerPin;
 import machinekit.gantry.GantryParts.GantryPlate;
 import machinekit.motion.LeadScrew;
 import machinekit.motion.LeadScrewThread;
-import machinekit.motion.LimitSwitch;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
 import machinekit.motion.MotorDriver;
@@ -358,7 +357,7 @@ class CoreXyPrinter extends AxisBuilder {
 			var motorId = 'motor' + entry.id.substr(5);
 			attach(motorId, NemaStepper.frame(17), AxisBuilder.orient(entry.x, entry.y, motorBase, [0.0, 1, 0], up), "basePlate");
 			driveScrew(axis, entry.id, motorId, new LeadScrew(thread, screwLength), AxisBuilder.orient(entry.x, entry.y, screwBottom, [0.0, 1, 0], up),
-				up, [0.0, 0, -1], false, driverFor);
+				up, false, driverFor);
 			mountNut(entry.id, "carrier", AxisBuilder.orient(entry.x, entry.y, carrierBottom + 8, [0.0, 1, 0], up));
 		}
 	}
@@ -372,16 +371,16 @@ class CoreXyPrinter extends AxisBuilder {
 	 */
 	function addHoming(xSpec:PrinterAxisSpec, ySpec:PrinterAxisSpec, zSpec:PrinterAxisSpec, gy:Float, xc:Float, railZ:Float,
 			blockFront:Float, plateY:Float, railXFace:Float, railTop:Float, blockTop:Float):Void {
-		buildHome(xSpec, "X", "crossbar", "carriagePlate", [xc - 24.0, plateY, railZ - 6.0], [8.0, 8.0, 12.0], [1.0, 0, 0], -1,
-			null, [0.0, 1, 0]);
-		buildHome(ySpec, "Y", "sideTopLeft", "bracketLeft", [-RAIL_X - 2.0, gy - 22.0, blockTop + 6.0], [8.0, 8.0, 10.0], [0.0, 1, 0], -1,
-			null, [1.0, 0, 0]);
+		addHomeSwitch(xSpec, "X", "crossbar", "carriagePlate", [xc - 24.0, plateY, railZ - 6.0], [8.0, 8.0, 12.0], [1.0, 0, 0], -1,
+			[0.0, 1, 0]);
+		addHomeSwitch(ySpec, "Y", "sideTopLeft", "bracketLeft", [-RAIL_X - 2.0, gy - 22.0, blockTop + 6.0], [8.0, 8.0, 10.0], [0.0, 1, 0], -1,
+			[1.0, 0, 0]);
 		// Z homes with the bed lowered, so that X and Y never find the nozzle over a bed that is up: an inductive
 		// sensor on a pillar from the base plate senses a steel flag under the bed's carrier. Pre-homing the bed
 		// away from the nozzle is also why a probe at the nozzle cannot be the home switch: it would trip inside
 		// the travel, and a home switch must trip beyond it, in the room before the end stop.
-		buildHome(zSpec, "Z", "basePlate", "carrier", [60.0, -60.0, carrierBottomZero() - 6.0], [12.0, 12.0, 6.0], [0.0, 0, -1], 1,
-			null, [1.0, 0, 0], true);
+		addHomeSwitch(zSpec, "Z", "basePlate", "carrier", [60.0, -60.0, carrierBottomZero() - 6.0], [12.0, 12.0, 6.0], [0.0, 0, -1], 1,
+			[1.0, 0, 0], true);
 		// A probe beside the nozzle for levelling the bed: its face is a millimetre above the nozzle tip.
 		var probe = new ProximitySwitch();
 		var nx = xc, ny = gy - TOOL_OFFSET_Y;
@@ -398,74 +397,6 @@ class CoreXyPrinter extends AxisBuilder {
 	/** Where the probe stands relative to the nozzle, millimetres: to the right of it and a little in front. */
 	public static inline var PROBE_X:Float = 38;
 	public static inline var PROBE_Y:Float = -4;
-
-	/**
-	 * A roller switch on `fixed`, pressed by a flag on `moving` at `point` (the flag's base centre, zero pose) as axis
-	 * `axis` reaches the end named by `side`. The flag is `size` big and its face towards the switch carries the trip
-	 * connector; the switch stands on a small block from the nearest point of `fixed`, a quarter of the axis's overtravel
-	 * beyond its end of travel.
-	 */
-	function buildHome(axis:PrinterAxisSpec, suffix:String, fixed:String, moving:String, point:Array<Float>, size:Array<Float>,
-			direction:Array<Float>, side:Int, shaft:Null<String>, transverse:Array<Float>, ?inductive:Bool = false):Void {
-		var room = axisOvertravel(axis.id);
-		var sensor:machinekit.component.MachineComponent = inductive ? new ProximitySwitch() : new LimitSwitch();
-		var contact:machinekit.motion.SwitchPart = cast sensor;
-		if (!Math.isFinite(room) || room <= 4 * contact.switchRepeatability())
-			throw "Printer home uncertainty does not fit its physical guide overtravel";
-		var trigger = "homeTrigger" + suffix;
-		attach(trigger, new GantryPlate("Home flag " + suffix, size[0], size[1], size[2]),
-			AssemblyFrames.translation(point[0], point[1], point[2] - size[2] / 2), moving);
-		var half = 0.0;
-		for (i in 0...3) half += Math.abs(direction[i]) * size[i] / 2;
-		addMemberConnector(trigger, "trip", AssemblyFrames.translation(direction[0] * side * half,
-			direction[1] * side * half, size[2] / 2 + direction[2] * side * half));
-		var travel = (side < 0 ? axis.lower : axis.upper) + side * room * 0.25;
-		var normal = [for (value in direction) -side * value];
-		var face = [for (i in 0...3) point[i] + direction[i] * (travel + side * half)];
-		// The roller's trip point sits at the flag's face; the housing stands behind it.
-		var tripLocal = if (inductive) {
-			var spec = cast(sensor, ProximitySwitch).spec;
-			{x: 0.0, z: spec.length + spec.sensingDistance};
-		} else {
-			var spec = cast(sensor, LimitSwitch).spec;
-			{x: spec.width * 0.4, z: spec.depth + spec.rollerDiameter - spec.pretravel};
-		}
-		var across = [normal[1] * transverse[2] - normal[2] * transverse[1], normal[2] * transverse[0] - normal[0] * transverse[2],
-			normal[0] * transverse[1] - normal[1] * transverse[0]];
-		// orient(up = transverse, along = normal): local x is up x along.
-		var localX = [transverse[1] * normal[2] - transverse[2] * normal[1], transverse[2] * normal[0] - transverse[0] * normal[2],
-			transverse[0] * normal[1] - transverse[1] * normal[0]];
-		var origin = [for (i in 0...3) face[i] - localX[i] * tripLocal.x - normal[i] * tripLocal.z];
-		var pose = AxisBuilder.orient(origin[0], origin[1], origin[2], transverse, normal);
-		var host = switchMountBounds(fixed);
-		var anchor = [for (i in 0...3) Math.max(host.min[i], Math.min(host.max[i], origin[i]))];
-		var lo = [for (i in 0...3) Math.min(anchor[i], origin[i]) - 3];
-		var hi = [for (i in 0...3) Math.max(anchor[i], origin[i]) + 3];
-		var id = "home" + suffix, mount = id + "Mount";
-		attach(mount, new GantryPlate("Home switch mount " + suffix, hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]),
-			AssemblyFrames.translation((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]), fixed);
-		attach(id, sensor, pose, mount);
-		addTripSwitch(id, axis.id, id, {instanceId: trigger, connectorName: "trip"}, side, "home", 1, shaft);
-	}
-
-	function switchMountBounds(id:String):{min:Array<Float>, max:Array<Float>} {
-		var member = component(id), min:Array<Float>, max:Array<Float>;
-		if (Std.isOfType(member, GantryExtrusion)) {
-			var frame:GantryExtrusion = cast member;
-			min = [-frame.profile.size / 2, -frame.profile.height / 2, 0.0];
-			max = [frame.profile.size / 2, frame.profile.height / 2, frame.length];
-		} else if (Std.isOfType(member, GantryPlate)) {
-			var plate:GantryPlate = cast member;
-			min = [-plate.width / 2, -plate.depth / 2, 0.0]; max = [plate.width / 2, plate.depth / 2, plate.height];
-		} else throw "Printer switch mount requires a frame member or a plate";
-		var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
-		var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
-		for (x in [min[0], max[0]]) for (y in [min[1], max[1]]) for (z in [min[2], max[2]]) {
-			var point = AssemblyFrames.transformPoint(zeroPose(id), x, y, z), values = [point.x, point.y, point.z];
-			for (i in 0...3) { lo[i] = Math.min(lo[i], values[i]); hi[i] = Math.max(hi[i], values[i]); }
-		}
-		return {min: lo, max: hi};
-	}
 
 	// ---- electronics --------------------------------------------------------------------------------------------------
 

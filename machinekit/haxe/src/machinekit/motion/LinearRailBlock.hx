@@ -45,6 +45,8 @@ class LinearRailBlock extends MachineComponent {
 		this.spec = spec;
 		addConnector("rail", Axis, Solids.axial(0, 0, 0));
 		addConnector("axis", Axis, Solids.axial(0, 0, 0));
+		// The face a carriage bolts to: +Y (a connector's axis) up out of the block, +Z along the rail.
+		addConnector("top", Mount, AssemblyFrames.translation(0, spec.blockHeight - spec.railHeight, 0));
 		var index = 1;
 		for (x in [-spec.blockHolePitchC / 2, spec.blockHolePitchC / 2])
 			for (z in [-spec.blockHolePitchB / 2, spec.blockHolePitchB / 2])

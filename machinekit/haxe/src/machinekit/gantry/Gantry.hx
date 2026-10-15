@@ -493,7 +493,7 @@ class Gantry extends AxisBuilder {
 				mountMotor(motorId, fixed, AxisBuilder.orient(face[0], face[1], face[2], transverse, direction));
 				var screwId = "screw" + suffix;
 				driveScrew(axis, screwId, motorId, new LeadScrew(thread, axis.upper + 2 * railMargin),
-					AxisBuilder.orient(start[0], start[1], start[2], transverse, direction), direction, direction, true, addDriver);
+					AxisBuilder.orient(start[0], start[1], start[2], transverse, direction), direction, true, addDriver);
 				var nut:LeadScrewNut = cast component(screwId + "Nut");
 				var faceDistance = nut.bodyLength + nut.flangeThickness;
 				var nutFace = point(faceDistance);
@@ -551,19 +551,13 @@ class Gantry extends AxisBuilder {
 				var face = [origin[0] - normal[0] * (shaft - width), origin[1] - normal[1] * (shaft - width), origin[2] - normal[2] * (shaft - width)];
 				var pinion = new SpurGear(moduleSize, teeth, width, SpurGear.STANDARD_PRESSURE_ANGLE, 0, 0, selectedMotor.variant.shaftDiameter);
 				mountMotor(motorId, moving, AxisBuilder.orient(face[0], face[1], face[2], transverse, normal), pinion.outsideDiameter + 2);
-				// At coordinate zero a pinion tooth meets a rack gap. Round the end margin
-				// to full rack pitches to retain this phase for every module and travel.
+				// driveRack places the rack under the pinion, phases a gap to the pinion's tooth and derives the sense.
 				var rackPitch = Math.PI * moduleSize;
 				var rackMargin = Math.ceil(railMargin / rackPitch) * rackPitch;
 				var rackTeeth = Std.int(Math.ceil((axis.upper + 2 * rackMargin) / rackPitch));
-				var start = point(-rackMargin);
-				var rackPose = AxisBuilder.orient(start[0] - transverse[0] * pinion.pitchDiameter / 2 + normal[0] * width,
-					start[1] - transverse[1] * pinion.pitchDiameter / 2 + normal[1] * width,
-					start[2] - transverse[2] * pinion.pitchDiameter / 2 + normal[2] * width, transverse, direction);
-				var pinionPose = AssemblyFrames.compose(AxisBuilder.orient(origin[0], origin[1], origin[2], transverse, normal),
-					AssemblyFrames.fromRotationMatrix(0, 0, 0, [0.0, 1, 0, -1, 0, 0, 0, 0, 1]));
-				driveRack(axis, "pinion" + suffix, motorId, pinion, pinionPose, normal,
-					"rack" + suffix, new Rack(moduleSize, rackTeeth, width), rackPose, fixed, -1.0, addDriver);
+				var pinionPose = AxisBuilder.orient(origin[0], origin[1], origin[2], transverse, normal);
+				driveRack(axis, "pinion" + suffix, motorId, pinion, pinionPose, [-transverse[0], -transverse[1], -transverse[2]],
+					"rack" + suffix, new Rack(moduleSize, rackTeeth, width), fixed, addDriver);
 		}
 	}
 }
