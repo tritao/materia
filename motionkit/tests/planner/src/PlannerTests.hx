@@ -40,6 +40,7 @@ class PlannerTests {
 
   public static function main():Void {
     testNarrowPassage();
+    testLargeEdgeBatch();
     testEndpointsInCollision();
     testEndpointRounding();
     testDeterministicFromSeed();
@@ -48,6 +49,26 @@ class PlannerTests {
     var bench = Sys.getEnv("PLANNER_BENCH_DIR");
     if (bench != null && bench != "") benchmark(bench);
     Sys.println('Planner tests passed ($assertions assertions)');
+  }
+
+  static function testLargeEdgeBatch():Void {
+    var scene = maze(), edges:Array<Float> = [];
+    // More edges than the bounded native buffers, interleaving wall crossings,
+    // same-side travel and travel through the gap. Clear chunks must not end
+    // the query early, and one blocked edge must not discard another edge.
+    for (i in 0...257) {
+      var a = i % 3 == 2 ? [-0.8, 0.0] : [-0.8, 0.6];
+      var b = i % 3 == 0 ? [-0.8, -0.6] : i % 3 == 1 ? [0.8, 0.6] : [0.8, 0.0];
+      edges = edges.concat(a).concat(b);
+    }
+    var checked = scene.space.edgesClear(edges, 257);
+    check(checked.length == 257, "all large-batch edges have a result");
+    for (i in 0...257) check(checked[i] == (i % 3 != 1), 'large-batch edge $i agrees with the wall and gap');
+    check(scene.space.boxesClear([0.0, 0.6], [0.01, 0.01], 1)[0] == false, "reused box buffer detects the wall");
+    check(scene.space.edgesClear([-0.8, 0.0, 0.8, 0.0], 1)[0], "small edge batch clears after a large blocked batch");
+    check(scene.space.boxesClear([-0.8, 0.0], [0.01, 0.01], 1)[0], "reused box buffer clears after the blocked query");
+    check(!scene.space.edgesClear([-0.8, 0.6, 0.8, 0.6], 1)[0], "reused edge buffer still rejects a later crossing");
+    scene.world.dispose();
   }
 
   static function testEndpointRounding():Void {

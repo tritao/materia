@@ -16,15 +16,17 @@ import motionkit.planner.BoxClearanceSpace;
  * `MotionReach` bound over half the edge's per-joint travel: then no point
  * of any body comes closer along the whole edge. Otherwise it is halved, to
  * `depthLimit`; an edge whose midpoint collides as it is, or that is still
- * open at the limit, is blocked. Each level of halving, over every pending
- * edge of a batch, is one native call for the inflated checks and one for
- * the midpoints as they are.
+ * open at the limit, is blocked. Each bounded batch of pending intervals
+ * uses one native call for the inflated checks and one for flagged
+ * midpoints as they are.
  *
  * The same inflated check proves a whole box of configurations clear: every
  * configuration within the per-joint travel of the centre stays inside the
  * inflated bodies (`boxesClear`).
  */
 class CollisionPlannerSpace implements BoxClearanceSpace {
+  /** Bound world-pose buffers and visit deep halves before expanding every edge. */
+  static inline var EDGE_BATCH_STATES:Int = 64;
   public final bodies:ModelBodies;
   public final build:CollisionBuild;
   public final description:CollisionDescription;
@@ -36,6 +38,11 @@ class CollisionPlannerSpace implements BoxClearanceSpace {
   /** Per described body of the model (`bodies.all()` order): its model body and radius about its frame. */
   final modelBody:Array<Int> = [];
   final radius:Array<Float> = [];
+  // Native queries consume these synchronously. Retain their capacity across
+  // RRT edges instead of reallocating full-world pose arrays at every halving.
+  final poseBuffer:Array<Float> = [];
+  final inflationBuffer:Array<Float> = [];
+  final exactBuffer:Array<Float> = [];
   /** Halvings run for the edges checked so far (diagnostics). */
   public var queries(default, null):Int = 0;
 
@@ -99,9 +106,14 @@ class CollisionPlannerSpace implements BoxClearanceSpace {
     var worldBodies = build.bodies.length;
     var all = bodies.all();
     while (pending.length > 0) {
-      var live = [for (p in pending) if (result[p.edge]) p];
+      var live = [];
+      while (pending.length > 0 && live.length < EDGE_BATCH_STATES) {
+        var p = pending.pop();
+        if (result[p.edge]) live.push(p);
+      }
       if (live.length == 0) break;
-      var poses:Array<Float> = [], inflation:Array<Float> = [], middles:Array<Array<Float>> = [];
+      var poses = poseBuffer, inflation = inflationBuffer, middles:Array<Array<Float>> = [];
+      poses.resize(0); inflation.resize(0);
       for (p in live) {
         var middle = [for (k in 0...n) 0.5 * (p.a[k] + p.b[k])];
         middles.push(middle);
@@ -114,21 +126,20 @@ class CollisionPlannerSpace implements BoxClearanceSpace {
       queries += live.length;
       var inflated = build.world.violations(poses, margins, inflation);
       var flagged = [for (k in 0...live.length) if (inflated[k]) k];
-      if (flagged.length == 0) break;
-      var exact:Array<Float> = [];
+      if (flagged.length == 0) continue;
+      var exact = exactBuffer;
+      exact.resize(0);
       for (k in flagged) appendWorld(middles[k], exact);
       var real = build.world.violations(exact, margins);
-      var next:Array<{edge:Int, a:Array<Float>, b:Array<Float>, depth:Int}> = [];
       for (i in 0...flagged.length) {
         var p = live[flagged[i]];
         if (real[i] || p.depth >= depthLimit) {
           result[p.edge] = false;
           continue;
         }
-        next.push({edge: p.edge, a: p.a, b: middles[flagged[i]], depth: p.depth + 1});
-        next.push({edge: p.edge, a: middles[flagged[i]], b: p.b, depth: p.depth + 1});
+        pending.push({edge: p.edge, a: p.a, b: middles[flagged[i]], depth: p.depth + 1});
+        pending.push({edge: p.edge, a: middles[flagged[i]], b: p.b, depth: p.depth + 1});
       }
-      pending = next;
     }
     return result;
   }
@@ -139,7 +150,8 @@ class CollisionPlannerSpace implements BoxClearanceSpace {
       throw "Collision planner boxes have the wrong dimension";
     if (count == 0) return [];
     var worldBodies = build.bodies.length, all = bodies.all();
-    var poses:Array<Float> = [], inflation:Array<Float> = [];
+    var poses = poseBuffer, inflation = inflationBuffer;
+    poses.resize(0); inflation.resize(0);
     for (box in 0...count) {
       var travel = [for (k in 0...n) {
         var half = halfWidths[box * n + k];
