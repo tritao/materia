@@ -12,6 +12,9 @@
 #include <new>
 #include <stdexcept>
 #include <vector>
+#include <mutex>
+#include <string>
+#include <unordered_map>
 
 using ck::World;
 
@@ -19,6 +22,11 @@ namespace {
 
 ck::Handles<World> worlds;
 ck::Handles<ck::Decomposition> decompositions;
+
+// Only the validated, immutable vertex backing is shared. Each PointConvex keeps
+// its own swept-sphere radius/AABB, so inflation in another world is independent.
+std::mutex convex_cache_mutex;
+std::unordered_map<std::string, std::weak_ptr<std::vector<coal::Vec3s>>> convex_points;
 
 bool finite(const double *values, uint32_t count) {
     for (uint32_t i = 0; i < count; ++i)
@@ -255,9 +263,28 @@ CK_API ck_result CK_CALL ck_add_convex(ck_world_handle world, int32_t body, cons
     return add_geometry(world, body, offset, offset_count, out_object, false,
                         [&]() -> std::shared_ptr<coal::CollisionGeometry> {
         if (!points || point_count < 12 || point_count % 3 != 0 || !finite(points, point_count)) return nullptr;
+        // Bound both retained key bytes and entries; large exceptional hulls skip interning.
+        std::unique_lock<std::mutex> lock(convex_cache_mutex, std::defer_lock);
+        std::string key;
+        if (point_count <= 12288) {
+            key.assign(reinterpret_cast<const char *>(points), size_t(point_count) * sizeof(double));
+            lock.lock();
+            auto found = convex_points.find(key);
+            if (found != convex_points.end())
+                if (auto shared = found->second.lock()) return std::make_shared<ck::PointConvex>(std::move(shared));
+        }
         auto vertices = std::make_shared<std::vector<coal::Vec3s>>();
+        vertices->reserve(point_count / 3);
         for (uint32_t i = 0; i < point_count; i += 3) vertices->emplace_back(points[i], points[i + 1], points[i + 2]);
         if (!spans_volume(*vertices)) return nullptr;
+        if (lock.owns_lock()) {
+            if (convex_points.size() >= 1024) {
+                for (auto it = convex_points.begin(); it != convex_points.end(); )
+                    if (it->second.expired()) it = convex_points.erase(it); else ++it;
+                if (convex_points.size() >= 1024) convex_points.clear();
+            }
+            convex_points[key] = vertices;
+        }
         return std::make_shared<ck::PointConvex>(std::move(vertices));
     });
 }

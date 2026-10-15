@@ -120,6 +120,33 @@ Violation violation(ck_world_handle world, const std::vector<double> &margins, c
 } // namespace
 
 int main() {
+    // Identical hull backing is shared across worlds, but poses and inflation are local.
+    {
+        ck_world_handle first{0}, second{0};
+        expect(ck_world_create(&first) == CK_OK && ck_world_create(&second) == CK_OK, "hull-sharing worlds created");
+        std::vector<double> cube;
+        for (double x : {-0.5, 0.5}) for (double y : {-0.5, 0.5}) for (double z : {-0.5, 0.5})
+            cube.insert(cube.end(), {x, y, z});
+        uint32_t objects[2][2];
+        int index = 0;
+        for (auto world : {first, second}) {
+            for (int i = 0; i < 2; ++i) {
+                uint32_t body;
+                expect(ck_add_body(world, i, &body) == CK_OK, "shared hull body added");
+                auto offset = at(i * 3.0, 0, 0);
+                expect(ck_add_convex(world, int32_t(body), offset.data(), 7, cube.data(), uint32_t(cube.size()),
+                                     &objects[index][i]) == CK_OK, "shared hull added");
+            }
+            ++index;
+        }
+        near(distance_of(second, objects[1][0], objects[1][1], 4)[0], 2, 1e-9, "shared hull baseline");
+        expect(ck_set_inflation(first, objects[0][0], 0.25) == CK_OK, "first world hull inflated");
+        near(distance_of(first, objects[0][0], objects[0][1], 4)[0], 1.75, 1e-9, "inflation affects its own hull");
+        near(distance_of(second, objects[1][0], objects[1][1], 4)[0], 2, 1e-9, "other world's hull stays unchanged");
+        ck_world_destroy(first);
+        near(distance_of(second, objects[1][0], objects[1][1], 4)[0], 2, 1e-9, "shared hull survives owner's destruction");
+        ck_world_destroy(second);
+    }
     // A body's motion cannot change the distance between two shapes fixed on it.
     // Explicit checks still enforce their margin and geometric inflation.
     {

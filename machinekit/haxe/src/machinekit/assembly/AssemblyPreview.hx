@@ -174,6 +174,7 @@ class AssemblyPreview {
 			var result:SceneArtifactPart = {
 				id: id, name: name, red: color[0], green: color[1], blue: color[2],
 				appearance: MaterialLibrary.appearance(materialId), materialId: materialId,
+				materialDensity: material.physical.density, materialSpec: material.physical.spec,
 				vertexCount: mesh.vertexCount, indexCount: mesh.indexCount,
 				volume: physical.volume,
 				centerOfMass: [centre.x, centre.y, centre.z], inertia: [physical.inertia.xx, physical.inertia.xy,

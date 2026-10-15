@@ -6,6 +6,9 @@
 	"entry": "TendingReach",
 	"sources": [
 		"TendingReach.hx",
+		"TendingReachInputs.hx",
+		"TendingGeometryCache.hx",
+		"TendingReachSetupChecks.hx",
 		"TendingReachReuse.hx",
 		"TendingReachReuseChecks.hx",
 		"TendingReachPlacementChecks.hx",

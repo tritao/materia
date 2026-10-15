@@ -281,7 +281,8 @@ class TendingReach {
 		Sys.println("Reach search: fingerprinting current cell inputs");
 		Sys.stdout().flush();
 		var production = TendingCyclePlan.bearingBlocks();
-		var fingerprint = TendingReachLayout.fingerprint(production);
+		var inputs = new TendingReachInputs(null, true);
+		var fingerprint = TendingReachLayout.fingerprint(production, inputs);
 		// Saved poses and paths are proposals, never cached collision answers.
 		// Every physical state is rebuilt from current geometry. Pose/layout
 		// changes fall back to the coupled study; blocked routes are repaired.
@@ -292,12 +293,12 @@ class TendingReach {
 		}
 		var result:Null<TendingReachResult> = null;
 		if (previous != null && !search) {
-			try result = revalidate(new EnclosedBenchMill(), production, previous) catch (error:Dynamic) {
+			try result = revalidate(inputs.cell, production, previous, inputs) catch (error:Dynamic) {
 				if (!Std.isOfType(error, ReachReuseFailure)) throw error;
 				Sys.println(Std.string(error) + "; searching again");
 			}
 		}
-		if (result == null) result = study(new EnclosedBenchMill(), production, preferred);
+		if (result == null) result = study(inputs.cell, production, preferred, null, inputs);
 		var source = TendingReachLayout.certificateSource(result, fingerprint);
 		var path = certificatePath();
 		sys.io.File.saveContent(path, source);
@@ -307,11 +308,12 @@ class TendingReach {
 	/** Solves the layout again and fails unless it equals the stored one: the study and its inputs agree. */
 	public static function check(fresh:Bool = false, search:Bool = false):Void {
 		var production = TendingCyclePlan.bearingBlocks();
-		var fingerprint = TendingReachLayout.fingerprint(production);
+		var inputs = new TendingReachInputs(null, true);
+		var fingerprint = TendingReachLayout.fingerprint(production, inputs);
 		var stored = TendingReachLayout.decode(TendingReachCertificate.JSON);
 		if (stored.fingerprint != fingerprint) throw 'The stored tending reach layout is for other inputs; run `${TendingReachLayout.REGENERATE}`';
-		var solved = TendingReachLayout.encode(study(new EnclosedBenchMill(), production,
-			fresh ? null : stored.result.armPlacement, fresh || search ? null : stored.result), fingerprint);
+		var solved = TendingReachLayout.encode(study(inputs.cell, production,
+			fresh ? null : stored.result.armPlacement, fresh || search ? null : stored.result, inputs), fingerprint);
 		if (solved != TendingReachLayout.encode(stored.result, fingerprint))
 			throw 'The tending reach study no longer reproduces its stored layout; run `${TendingReachLayout.REGENERATE}`';
 		trace("The tending reach study reproduces its stored layout");
@@ -471,11 +473,12 @@ class TendingReach {
 		return false;
 	}
 
-	public static function revalidate(cell:EnclosedBenchMill, production:TendingCyclePlan, previous:TendingReachResult):TendingReachResult
-		return study(cell, production, previous.armPlacement, previous);
+	public static function revalidate(cell:EnclosedBenchMill, production:TendingCyclePlan, previous:TendingReachResult,
+		?inputs:TendingReachInputs):TendingReachResult
+		return study(cell, production, previous.armPlacement, previous, inputs);
 
 	public static function study(cell:EnclosedBenchMill, production:TendingCyclePlan, ?preferredPlacement:AssemblyFrame,
-		?reuse:TendingReachResult):TendingReachResult {
+		?reuse:TendingReachResult, ?inputs:TendingReachInputs):TendingReachResult {
 		var searchStarted = Sys.time();
 		function progress(message:String):Void {
 			Sys.println('Reach search (${Math.round(Sys.time() - searchStarted)} s): $message');
@@ -485,6 +488,8 @@ class TendingReach {
 		// Reach uses the same physical blank hull as machining, but the tending cell starts with an
 		// empty vise. Study a loaded reference machine so the stock remains geometry input only.
 		if (!cell.includesWorkpiece) return study(new EnclosedBenchMill(), production, preferredPlacement, reuse);
+		if (inputs == null) inputs = new TendingReachInputs(cell);
+		if (inputs.cell != cell) throw "Reach inputs belong to another cell";
 		var transferRequests = production.transferRequests();
 		var trayEntries = new Map<String, TendingTransferRequest>();
 		for (needed in transferRequests) if (needed.role == Inventory)
@@ -492,10 +497,10 @@ class TendingReach {
 		var failures:Array<String> = [];
 		var firstSeat = production.rowOf(production.firstSlot) + "-" + production.columnOf(production.firstSlot);
 		var firstStation = "infeed-" + firstSeat;
-		var armTool = tendingTool();
+		var source = inputs.source;
+		var armTool = inputs.tool;
 		var gripper = armTool.spec;
-		var source = new CobotArm(Reach1300, armTool);
-		var millScene = SceneArtifact.decode(SceneArtifact.encode(AssemblyPreview.scene(cell, "reach-mill")));
+		var millScene = inputs.millScene;
 		var millPhysical = AssemblyPhysicalPartView.fromSceneArtifact(millScene);
 		var flat = AssemblyDefinitionFlattener.flatten(millScene.assemblyDefinition);
 		var toolWidth = armTool.envelopeWidthMm;
@@ -608,8 +613,8 @@ class TendingReach {
 		// below the blank and missed the collision body the arm would actually meet.
 		// Free blanks change pockets and follow the robot during a cycle; the mission
 		// planner checks their live poses rather than baking one occupancy into this study.
-		var reachAssembly = armAssembly(source);
-		var armScene = SceneArtifact.decode(SceneArtifact.encode(AssemblyPreview.scene(reachAssembly, "reach-arm")));
+		var reachAssembly = inputs.assembly;
+		var armScene = inputs.armScene;
 		var armPhysical = AssemblyPhysicalPartView.fromSceneArtifact(armScene);
 		var tools = machinekit.robot.RobotScene.robotTools(source.tool, "arm/tool");
 		var toolMembers = tools[0].members;
@@ -1894,7 +1899,8 @@ class TendingReach {
 /** Revalidate/repair by default. `--search` reruns optimization; `--fresh` also resets placement order. */
 function main():Void {
 	var args = Sys.args();
-	if (args.indexOf("--reuse-tests") >= 0) TendingReachReuseChecks.run();
+	if (args.indexOf("--setup-tests") >= 0) TendingReachSetupChecks.run();
+	else if (args.indexOf("--reuse-tests") >= 0) TendingReachReuseChecks.run();
 	else if (args.indexOf("--placement-tests") >= 0) TendingReachPlacementChecks.run();
 	else if (args.indexOf("--store") >= 0) TendingReach.store(args.indexOf("--fresh") >= 0, args.indexOf("--search") >= 0);
 	else if (args.indexOf("--check") >= 0) TendingReach.check(args.indexOf("--fresh") >= 0, args.indexOf("--search") >= 0);

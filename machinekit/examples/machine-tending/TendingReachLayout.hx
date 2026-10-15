@@ -49,7 +49,8 @@ class TendingReachLayout {
 	}
 
 	/** A digest of every input `TendingReach.study` reads for `production`. */
-	public static function fingerprint(production:TendingCyclePlan):String {
+	public static function fingerprint(production:TendingCyclePlan, ?inputs:TendingReachInputs):String {
+		if (inputs == null) inputs = new TendingReachInputs(null, true);
 		var buffer = new BytesBuffer();
 		function text(value:String):Void {
 			var bytes = Bytes.ofString(value);
@@ -58,9 +59,8 @@ class TendingReachLayout {
 		}
 		text(FORMAT + "/" + STUDY_VERSION);
 		// The study reads the loaded reference mill, whatever the cell's own vise holds.
-		buffer.add(SceneArtifact.encode(AssemblyPreview.scene(new EnclosedBenchMill(), "reach-mill")));
-		buffer.add(SceneArtifact.encode(AssemblyPreview.scene(TendingReach.armAssembly(
-			new CobotArm(Reach1300, TendingReach.tendingTool())), "reach-arm")));
+		buffer.add(inputs.millBytes);
+		buffer.add(inputs.armBytes);
 		text('${production.rows}x${production.columns}@${production.firstSlot}');
 		for (request in production.transferRequests()) text(requestKey(request));
 		text('margin=${CollisionClearance.MARGIN} ' + TendingReach.studyConstants());

@@ -1154,6 +1154,52 @@ duplicate/missing poses and malformed rotations. Removing one real-cell route
 repairs it while preserving all 22 unaffected routes exactly. Run the reuse
 checks with the tending project and `-- --reuse-tests`.
 
+### Reach setup and persistent geometry reuse (2026-10-15)
+
+`TendingReachInputs` owns one invocation's reference mill, arm, assembled scenes
+and canonical artifact bytes. Fingerprinting and validation use these same
+inputs instead of constructing both scenes twice. `AssemblyPreview.part` now
+resolves material density/specification directly, so the physical-part view
+can consume its output without an encode/decode round trip. The canonical
+scene bytes and the reach certificate remain unchanged.
+
+The fixed reference scenes also have an optional persistent geometry cache.
+Each process keys it by SHA-256 of the loaded bytecode, executable and mapped
+native code files, including shared libraries and HashLink modules. Cache
+entries have a payload digest and are decoded/validated on load. Corrupt or
+truncated entries rebuild from source, and unavailable identity/hash tools or
+unwritable cache storage fall back to direct construction. A supplied custom
+study cell always bypasses persistent reuse. This stores geometry only: all
+poses, physical-state constraints and complete routes are still revalidated.
+The standard fingerprint gate also benefits from this cache.
+
+On Linux the cache lives below
+`$XDG_CACHE_HOME/materia/tending-geometry-v1/` (default
+`~/.cache/materia/tending-geometry-v1/`). It requires `cat` and `sha256sum`;
+platforms without the loaded-code identity path build directly. Pass
+`--no-geometry-cache` to bypass it. Rebuilding the program or changing a loaded
+native binary changes the key, deliberately causing a cold geometry build.
+
+Native convex construction interns validated vertex backing by exact point
+bytes through a bounded weak cache. Identical hulls in different worlds share
+the immutable points, while each hull keeps its own inflation radius and
+local AABB. Bodies, transforms, rules, pairs and query results stay local to
+each world. Destroying one world does not invalidate another's hull.
+
+The complete check measured **26.29 s cold** and **13.27 s warm**, versus the
+previous **39.24 s**, including setup and fingerprinting and excluding
+compilation. Both reproduce the same 96-pose, 23-transfer certificate exactly.
+These are individual host measurements; cache reuse accounts for the warm
+result, and it is not a fresh-search timing.
+
+Validation includes the four native suites, 383 collision assertions, 310
+planner assertions, 104 CadBridge assertions, the 37 reuse assertions and 11
+new setup assertions. The setup tests cover canonical artifact equivalence,
+cache hits without construction, nested directory creation, truncated and
+same-length corruption, bypass, unwritable storage and same-length code
+changes. Run them with the tending project and `-- --setup-tests`. Native
+tests also verify inflation isolation and hull lifetime across shared worlds.
+
 ### Plan revision (2026-10-01, after CL1)
 
 A review of the plan against CL1 and the code around it changed:
