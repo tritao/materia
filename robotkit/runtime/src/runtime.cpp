@@ -2508,8 +2508,7 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
         return result != RK_OK ? result : RK_ERROR_BACKEND;
     }
     const double tolerance = blueprint_.observed_limit_tolerance;
-    // The endpoint's own precision: a float link's epsilon, or the physics solver's tolerance (a carriage pressed into its
-    // stop stands at the limit to that).
+    // Position representation roundoff only. Physical stop compliance belongs to the explicit model tolerance/overtravel.
     const double precision = endpoint_->observed_position_precision();
     for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
         const auto &limits = blueprint_.joints[joint];

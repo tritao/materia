@@ -7,6 +7,7 @@
 #include <chrono>
 #include <thread>
 #include <memory>
+#include <limits>
 
 /** One sensor slot of a state or snapshot, its values copied out of the pool for reading. */
 struct SensorView {
@@ -1100,6 +1101,37 @@ static rk_result arm_on_its_stop(double tolerance, double &position) {
     return result;
 }
 
+// Numerical precision is independent of constraint loading. At rated effort a soft stop can compress by a real
+// distance; that must not be silently admitted as floating-point noise by the backend's precision report.
+static void rated_stop_load_is_not_position_roundoff() {
+    SessionFixture fixture(0.001, 5);
+    double precision = -1.0;
+    assert(nksim_world_get_position_precision(fixture.world, nullptr) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(nksim_world_get_position_precision(0, &precision) == NKSIM_ERROR_INVALID_HANDLE);
+    assert(nksim_world_get_position_precision(fixture.world, &precision) == NKSIM_OK);
+    assert(precision == 16.0 * std::numeric_limits<double>::epsilon());
+    auto model = gravity_arm(20.0);
+    model.joints[0].lower_limit = -0.3;
+    model.joints[0].upper_limit = 0.3;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(fixture.simulation, &model, nullptr, &robot) == RK_OK);
+    auto command = arm_command(RK_TARGET_EFFORT, 20.0);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    bool limit_fault = false;
+    for (int tick = 0; tick < 1000; ++tick) {
+        assert(fixture.step(static_cast<uint64_t>(tick) * 1'000'000u) == RK_OK);
+        const auto observed = state(robot);
+        if (observed.safety == RK_SAFETY_FAULT) {
+            limit_fault = true;
+            break;
+        }
+    }
+    assert(limit_fault);
+    double after = 0.0;
+    assert(nksim_world_get_position_precision(fixture.world, &after) == NKSIM_OK);
+    assert(after == precision); // Neither applied force nor the optimizer's current residual changes coordinate roundoff.
+}
+
 static void observed_limit_tolerance_allows_compliant_stops() {
     double position = 0.0;
     assert(arm_on_its_stop(0.0, position) == RK_ERROR_LIMIT);
@@ -1515,6 +1547,7 @@ int main() {
     fixed_object_follower_tracks_and_releases_a_live_cad_body();
     articulated_robot_follower_tracks_and_releases_without_losing_tool_joints();
     robots_start_in_a_joint_pose();
+    rated_stop_load_is_not_position_roundoff();
     observed_limit_tolerance_allows_compliant_stops();
     joint_overtravel_moves_stops_past_the_limits();
     fixed_joint_targets_are_ignored();

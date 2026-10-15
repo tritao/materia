@@ -8,6 +8,8 @@
 
 namespace robotkit {
 
+double SimulationRobot::observed_position_precision() const noexcept { return simulation_.position_precision(); }
+
 rk_result SimulationRobot::rebase_counters(const uint32_t *joints, const double *deltas,
                                           uint32_t count) {
     if (!joints || !deltas || count == 0 || count > counter_origin_.size())

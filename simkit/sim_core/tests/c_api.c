@@ -16,6 +16,12 @@ int main(void) {
     nksim_world world = 0;
     assert(nksim_world_create(&desc, &world) == NKSIM_OK);
 
+    double precision = -1.0;
+    assert(nksim_world_get_position_precision(world, &precision) == NKSIM_OK);
+    assert(precision == 16.0 * 0x1p-52); /* Preserve the double-precision runtime allowance. */
+    assert(nksim_world_get_position_precision(world, 0) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(nksim_world_get_position_precision(0, &precision) == NKSIM_ERROR_INVALID_HANDLE);
+
     nksim_clock clock = {0};
     clock.struct_size = sizeof(clock);
     assert(nksim_world_get_clock(world, &clock) == NKSIM_OK);

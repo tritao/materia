@@ -23,11 +23,8 @@ public:
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override;
     rk_result rebase_counters(const uint32_t *joints, const double *deltas, uint32_t count) override;
-    /** Double-precision physics may leave an exact stop a few ULPs outside its bound.
-     * This observation precision does not relax command limits or authored overtravel. */
-    double observed_position_precision() const noexcept override {
-        return 16.0 * std::numeric_limits<double>::epsilon();
-    }
+    /** Floating-point position roundoff; physical soft-stop penetration is not numerical precision. */
+    double observed_position_precision() const noexcept override;
     double physical_position(uint32_t joint, double counter_position) const noexcept override {
         return counter_position + (joint < counter_origin_.size() ? counter_origin_[joint] : 0.0);
     }

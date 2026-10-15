@@ -418,10 +418,10 @@ enum {
 };
 NKSIM_API nksim_result NKSIM_CALL nksim_world_get_features(nksim_world world, uint32_t *out_features NK_OUT);
 /**
- * The tolerance of the backend's constraint solver: how far from exact its solution may be, as the scale of a position error
- * (metres or radians) that a body resting on a joint limit may show. Zero when the backend is exact.
+ * Relative floating-point roundoff allowance in reported joint positions, scaled by max(1, abs(limit)) by the caller.
+ * This is not a constraint-solver cost tolerance or an allowance for physical soft-stop penetration. Zero when exact.
  */
-NKSIM_API nksim_result NKSIM_CALL nksim_world_get_solver_tolerance(nksim_world world, double *out_tolerance NK_OUT);
+NKSIM_API nksim_result NKSIM_CALL nksim_world_get_position_precision(nksim_world world, double *out_precision NK_OUT);
 /** Stages body and joint additions before the first world step. */
 NKSIM_API nksim_result NKSIM_CALL nksim_world_begin_topology_update(nksim_world world);
 /** Commits a staged topology update with one backend rebuild. */

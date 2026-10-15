@@ -15,11 +15,11 @@ nksim_result NKSIM_CALL nksim_world_get_features(nksim_world world, uint32_t *ou
     return NKSIM_OK;
 }
 
-nksim_result NKSIM_CALL nksim_world_get_solver_tolerance(nksim_world world, double *out_tolerance) {
-    if (!out_tolerance) return NKSIM_ERROR_INVALID_ARGUMENT;
+nksim_result NKSIM_CALL nksim_world_get_position_precision(nksim_world world, double *out_precision) {
+    if (!out_precision) return NKSIM_ERROR_INVALID_ARGUMENT;
     const auto value = nksim::resolve_world(world);
     if (!value) return NKSIM_ERROR_INVALID_HANDLE;
-    *out_tolerance = value->solver_tolerance();
+    *out_precision = value->position_precision();
     return NKSIM_OK;
 }
 

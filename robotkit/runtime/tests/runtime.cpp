@@ -2161,6 +2161,34 @@ void single_precision_reading_at_a_limit_is_not_a_fault(const rk_robot_runtime_b
     }
 }
 
+void double_position_roundoff_does_not_hide_limit_motion(const rk_robot_runtime_blueprint &source) {
+    struct RoundedEndpoint final : robotkit::RobotEndpoint {
+        double position = 0.0;
+        rk_result apply(const rk_robot_command &) override { return RK_OK; }
+        rk_result sample(uint64_t timestamp, rk_robot_state &out) override {
+            out.struct_size = sizeof(out); out.source_timestamp_ns = timestamp; out.joint_count = 2;
+            out.position[0] = position;
+            return RK_OK;
+        }
+        double observed_position_precision() const noexcept override {
+            return 8.0 * std::numeric_limits<double>::epsilon();
+        }
+    };
+    for (double scale : {1e-3, 1.0, 1e3}) for (double sign : {-1.0, 1.0}) {
+        for (double multiples : {0.5, 2.0}) {
+            auto blueprint = source;
+            blueprint.joints[0].lower_limit = -scale;
+            blueprint.joints[0].upper_limit = scale;
+            blueprint.observed_limit_tolerance = 0.0;
+            blueprint.joint_overtravel[0] = 0.0;
+            auto endpoint = std::make_shared<RoundedEndpoint>();
+            endpoint->position = sign * (scale + multiples * endpoint->observed_position_precision() * std::max(1.0, scale));
+            auto runtime = std::make_unique<robotkit::RobotRuntime>(blueprint, endpoint);
+            assert(runtime->publish_sample(1) == (multiples < 1.0 ? RK_OK : RK_ERROR_LIMIT));
+        }
+    }
+}
+
 void stated_zero_speed_stops_position_commands(const rk_robot_runtime_blueprint &source) {
     auto blueprint = source;
     blueprint.joints[0].limit_flags |= RK_LIMIT_VELOCITY;
@@ -2500,6 +2528,7 @@ int main() {
     expired_velocity_targets_brake_within_limits(blueprint);
     plan_end_does_not_restore_earlier_targets(blueprint);
     single_precision_reading_at_a_limit_is_not_a_fault(blueprint);
+    double_position_roundoff_does_not_hide_limit_motion(blueprint);
     faulted_batch_skips_commands_before_reset(blueprint);
     invalid_trajectory_chunk_is_atomic(blueprint);
     trajectory_chunk_speed_is_limited(blueprint);

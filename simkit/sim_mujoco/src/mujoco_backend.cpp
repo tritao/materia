@@ -837,7 +837,11 @@ public:
     }
 
     std::uint32_t features() const noexcept override { return NKSIM_WORLD_FEATURE_COMPLIANT_COUPLINGS; }
-    double solver_tolerance() const noexcept override { return model ? model->opt.tolerance : 0.0; }
+    double position_precision() const noexcept override {
+        // qpos is mjtNum. Preserve the runtime's sixteen representation roundoffs at the coordinate scale, not opt.tolerance:
+        // the latter is a dimensionless optimization stopping criterion. Soft limits still require model overtravel.
+        return 16.0 * std::numeric_limits<mjtNum>::epsilon();
+    }
 
     nksim_result joint_couple(const nksim::BackendJointCoupling &coupling) override {
         if (joints.find(coupling.leader) == joints.end() ||
