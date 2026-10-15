@@ -1,0 +1,228 @@
+{
+  "reviewed_on": "2026-10-15",
+  "scope": "Reach850 wrist reference and single-joint bench prototype; other joints require separate sizing",
+  "status": "selected_for_cad_and_bench_validation",
+  "selected": {
+    "manufacturer": "ZeroErr",
+    "model": "eRob80H100I",
+    "revision": "V6 / MC2E.EX.XX",
+    "configuration": {
+      "brake": true,
+      "bus": "EtherCAT",
+      "output_encoder": "HM high-precision multiturn requested; supplier must confirm complete ordering code",
+      "nominal_supply_v": 48,
+      "nominal_catalog_ratio": 100
+    },
+    "ordering_code": null,
+    "mechanical_integration": "not yet applied to CobotArm",
+    "purchase_status": "not ordered; quotation, availability and revision confirmation pending",
+    "selection_reasons": [
+      "Catalog rated and start/stop peak torque exceed the current assumed wrist ratings",
+      "V6 drawing states 30 rpm at rated torque and 48 V for the 100-ratio option",
+      "Brake, dual absolute feedback, EtherCAT and 18 mm cable bore",
+      "Shorter brake-equipped package than the compared MYACTUATOR RH-17",
+      "Supplier CAD and versioned installation, brake, bearing and communications documentation"
+    ],
+    "scope_clarification": "Single-joint bench only; evaluate eRob70T wrist construction from the eRobot 5 reference before committing whole-arm actuator sizes or mounts."
+  },
+  "current_assumed_wrist": {
+    "source": "machinekit/haxe/src/machinekit/robotics/CobotJoint.hx size 1, Reach850",
+    "rated_torque_nm": 28,
+    "peak_torque_nm": 56,
+    "motor_derived_rated_output_rpm": 24,
+    "maximum_output_rpm": 30,
+    "diameter_mm": 96,
+    "module_length_mm": 40,
+    "basis": "generic engineering assumptions, not validated hardware requirements"
+  },
+  "candidates": [
+    {
+      "id": "zeroerr-erob80h100i-v6-brake",
+      "transmission": "strain-wave",
+      "rated_torque_nm": 31,
+      "start_stop_peak_torque_nm": 70,
+      "momentary_allowable_torque_nm": 143,
+      "output_speed_at_rated_torque_48v_rpm": 30,
+      "catalog_diameter_mm": 80,
+      "catalog_length_mm": 64.2,
+      "drawing_axial_extent_mm": 67.5,
+      "cable_bore_mm": 18,
+      "brake_equipped_mass_kg": 1.09,
+      "brake": "manufacturer holding-brake configuration; dynamic stopping restrictions in manual section 7",
+      "feedback": "motor and output absolute encoders; HM option requested",
+      "backlash_arcmin": null,
+      "precision_note": "Encoder repeatability and positioning accuracy are not mechanical backlash or whole-arm repeatability",
+      "source": "https://www.zeroerr.cn/download/eRob.html",
+      "drawing": "2D/eRob80HxxI-XX-18EX_V6_MC2E.EX.XX.pdf in zeroerr_v6_cad"
+    },
+    {
+      "id": "myactuator-eps-rh-17-100-e-b-d",
+      "transmission": "strain-wave",
+      "rated_torque_nm": 35,
+      "peak_torque_nm": 54,
+      "rated_output_rpm": 25,
+      "no_load_output_rpm": 30,
+      "diameter_mm": 80,
+      "brake_equipped_length_mm": 104,
+      "brake_equipped_mass_kg": 1.28,
+      "brake_equipped_bore_mm": 12,
+      "backlash_arcsec_max": 40,
+      "feedback": "dual 17-bit absolute encoders",
+      "bus": "CAN BUS and EtherCAT",
+      "assessment": "Alternative; longer package and peak rating 2 Nm below the existing assumed wrist peak",
+      "source": "https://www.myactuator.com/rh-17details",
+      "parameter_revision": "RH-17 product manual 260805.pdf"
+    },
+    {
+      "id": "cubemars-akh70-48-v1-kv41",
+      "transmission": "three-stage planetary",
+      "rated_torque_nm": 74,
+      "peak_torque_nm": 222,
+      "rated_output_rpm": 28,
+      "no_load_output_rpm": 35,
+      "diameter_mm": 90,
+      "length_mm": 81.5,
+      "mass_kg": 1.396,
+      "cable_bore_mm": 7,
+      "backlash_arcmin": 12,
+      "feedback": "dual 21-bit magnetic encoders",
+      "bus": "CAN",
+      "power_off_holding_brake": "not verified in the reviewed specification",
+      "assessment": "Useful motion prototype alternative; mechanical backlash, smaller bore and unverified brake make it less suitable for this precision-arm reference",
+      "source": "https://www.cubemars.com/product/akh70-48-v-1-0-kv41-hollow-shaft-planetary-actuator.html"
+    },
+    {
+      "id": "cubemars-ak80-64-kv80",
+      "transmission": "planetary",
+      "rated_torque_nm": 48,
+      "peak_torque_nm": 120,
+      "rated_output_at_48v_rpm": 48,
+      "diameter_mm": 98,
+      "length_mm": 61.9,
+      "mass_kg": 0.85,
+      "backlash_deg": 0.18,
+      "feedback": "single 14-bit motor-side magnetic encoder",
+      "power_off_holding_brake": "not verified in the reviewed specification",
+      "assessment": "Torque-capable prototype alternative; no output encoder in the reviewed version",
+      "source": "https://www.cubemars.com/goods.php?id=1143"
+    }
+  ],
+  "integration_requirements": [
+    "Use V6 vendor STEP and mounting drawing; do not stretch the generic CobotJoint or reuse its six-M4 interface",
+    "Resolve mounting planes and connector insertion/bend space; 64.2 mm nominal length is not the full installed envelope",
+    "Recompute wrist offsets, downstream mass, gravity torque and full motion clearance after integration",
+    "Confirm joint-specific bearing combined loads, duty-cycle thermal limits, precision under load and brake rating for V6",
+    "Use manufacturer startup/brake sequencing and a DC supply with regenerative-energy handling",
+    "Validate one joint on a fixture before committing the whole arm to this actuator family"
+  ],
+  "commercial_comparison": "Comparable delivered quotes and lead times for the exact brake/encoder/bus configurations are not available; selection is technical, not a price comparison",
+  "downloaded_evidence": [
+    {
+      "id": "zeroerr_v6_cad",
+      "url": "https://www.zeroerr.cn/static/download/eRobI/eRob80I/V6/eRob80HxxI-XX-18EX_V6_MC2E.EX.XX.zip",
+      "sha256": "4545d42897f2293e1ad0c78e90508178a777501e744733b7a23f7c663073a0a3"
+    },
+    {
+      "id": "zeroerr_manual_v3_44",
+      "url": "https://download.zeroerr.cn/static/download/eRob机器人关节模组用户手册_V3.44.pdf?=20260823",
+      "sha256": "73e138369aa2780c980e0652008c8311c95d26ac3b4142ce2f05afdc1bf0e7b5"
+    },
+    {
+      "id": "myactuator_rh17_cad_and_parameters",
+      "url": "https://www.myactuator.com/_files/archives/cab28a_e83c5096831240dbb0f680b9f6b2cfeb.zip",
+      "sha256": "191a25ef0734ee5d81ad7b7fb13f3af86f5e134d5e2610f779fa8a3dba08f654"
+    }
+  ],
+  "reference_design_review": {
+    "reviewed_on": "2026-10-15",
+    "source": "https://www.zeroerr.cn/download/eRob.html",
+    "archive_directory_date": "20260522",
+    "finding": "Use the eRobot 5 reference as the mechanical baseline for a 5 kg arm; the previously selected 80H100I V6 remains a separate single-joint bench reference, not a frozen six-axis bill of materials.",
+    "joint_assignments": [
+      {
+        "payload_label_kg": 3,
+        "j1_j2_j3": "eRob80T",
+        "j4_j5_j6": "eRob70T",
+        "drawing": "eRobot 3.pdf / ZCT-eRobot 3-0"
+      },
+      {
+        "payload_label_kg": 5,
+        "j1_j2_j3": "eRob110T",
+        "j4_j5_j6": "eRob70T",
+        "drawing": "eRobot 5.pdf / ZCT-eRobot 5-0"
+      },
+      {
+        "payload_label_kg": 10,
+        "j1_j2": "eRob142T",
+        "j3": "eRob110T",
+        "j4_j5_j6": "eRob80T",
+        "drawing": "eRobot 10.pdf / ZCT-eRobot 10-0"
+      }
+    ],
+    "five_kg_observations": {
+      "joint_style": "T-shaped joint housing supplies perpendicular structural attachment; not the cylindrical I module selected for the bench",
+      "upper_arm_axis_distance_mm": 425,
+      "forearm_axis_distance_mm": 401,
+      "upper_arm_physical_link_length_mm": 305,
+      "wrist_axis_offsets_mm": [
+        86,
+        86
+      ],
+      "upper_arm_drawing": "2-091-002 5kg二关节连杆.pdf / ZCT0082-091-002-0",
+      "upper_arm_material": "7075-T6, natural anodizing per drawing",
+      "construction": "Straight hollow links with thickened locating ends and radial fastener patterns; separate third-axis housing/output adapters and a dummy shaft housing at the elbow",
+      "archive_contents": "Assembly and component STEP files, dimensioned PDF and SolidWorks drawings, joint envelopes and cable/connector pieces",
+      "step_export_timestamp": "2026-05-21T03:49:12",
+      "step_joint_product_labels": [
+        " 'eRob110H××T', 'eRob110H××T', '', ( #132558 ) ",
+        " 'eRobot 5', 'eRobot 5', '', ( #219585 ) ",
+        " 'eRob70H××T', 'eRob70H××T', '', ( #78074 ) "
+      ]
+    },
+    "unresolved": [
+      "Joint ratios, complete brake/encoder ordering codes and compatibility of reference joint CAD with the current revisions are not established by the assembly labels",
+      "Payload labels do not establish our required tool centre of gravity, inertia, dynamic duty or achieved repeatability",
+      "Reference hole patterns and fits must be used; axis distances are not physical tube lengths"
+    ],
+    "drawing_evidence": [
+      {
+        "archive_url": "https://www.zeroerr.cn/d/file/arms/cn/20260522/3KG机械臂图纸模型.zip",
+        "assembly_pdf": "eRobot 3.pdf",
+        "assembly_pdf_sha256": "ec5e5afbbefbbc8406f7a17c961f964720468059a7e6a5746b5c8b29c294c91e",
+        "archive_sha256": "686e8cfe93dfd84fd0671014be5a4bd6318ad739bb09f5a56871e3999aab4636",
+        "archive_bytes": 28873296
+      },
+      {
+        "archive_url": "https://www.zeroerr.cn/d/file/arms/cn/20260522/5KG机械臂图纸模型.zip",
+        "assembly_pdf": "eRobot 5.pdf",
+        "assembly_pdf_sha256": "14b70632a78f1b4a30f4ec3f2c55e470b0e5f55a0029e277c3b58985136dbeff",
+        "archive_sha256": "88927870963572c67fd7b185a042c1b84e1f3e766d2945c9edce7dd78bfefaf4",
+        "archive_bytes": 34343333
+      },
+      {
+        "archive_url": "https://www.zeroerr.cn/d/file/arms/cn/20260522/10KG机械臂图纸模型.zip",
+        "assembly_pdf": "eRobot 10.pdf",
+        "assembly_pdf_sha256": "ed1e29c8849216e92abb57ac327b4992e1c3247a9d450d0a0d1d91c0d6ead306",
+        "archive_sha256": "87d992f2843e527ae16a41df68826cdf9725ddacc4e25c065cf8f7287d6ac343",
+        "archive_bytes": 44985113
+      }
+    ],
+    "mechanical_variant": {
+      "class": "machinekit.robotics.ZeroErrReferenceArm",
+      "example": "machinekit/examples/zeroerr-arm",
+      "layout": "machinekit/examples/zeroerr-arm/reference-layout.json",
+      "status": "articulated CAD; six passive joints; hardware configurations uncommissioned",
+      "validation": {
+        "sourceDerivedSolidInstances": 127,
+        "uniquePreparedGeometries": 48,
+        "kinematicPosesChecked": 9,
+        "sourceZeroPoseAndBoundsReproduced": true,
+        "structuralMembersCheckedForOverlap": 22,
+        "overlapPoses": 2,
+        "positiveOverlapObservations": 0,
+        "scope": "Structural members, output flanges and spigots at supplier zero and bent review poses; not a complete travel, fastener or hardware load qualification"
+      },
+      "outputSpigotPartition": "Supplier 110T solid merges the projecting output spigot into the casing; partitioned at local z=0 and checked against the V4 drawing and zero-solid Boolean differences."
+    }
+  }
+}
