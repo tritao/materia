@@ -6,7 +6,7 @@ import sys.thread.Thread;
 
 import haxe.io.Bytes;
 import nativekit.ffi.NativeKitTypes;
-import robotkit.transport.NativeTransport;
+import haxeon.platform.NativeTransport;
 import processkit.modbus.ModbusFrame;
 import processkit.modbus.ModbusFrameStream;
 import processkit.modbus.ModbusWelderMap;

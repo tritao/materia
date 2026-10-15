@@ -1135,7 +1135,7 @@ class ProjectSourceTests {
     if (job == null || definition == null) throw "the printer project has no print to send";
     var runtime = NativeKitRuntime.start();
     var fake = FakeMoonrakerServer.start(runtime, 36292);
-    var link = new PrinterLink();
+    var link = new PrinterLink(runtime.events);
     var seen:Array<MoonrakerStatus> = [];
     link.onStatus = function(status) {
       seen.push(status);
@@ -1155,7 +1155,7 @@ class ProjectSourceTests {
     function pump(until:Void->Bool, what:String):Void {
       var limit = Sys.time() + 5.0;
       while (!until() && Sys.time() < limit && link.error == null) {
-        runtime.events.poll(); fake.poll(); link.poll(Sys.time()); runtime.events.wait(0.001);
+        while (runtime.events.poll()) {} fake.poll(); link.poll(Sys.time()); runtime.events.wait(0.001);
       }
       check(link.error == null, '$what: ${link.error}');
       check(until(), '$what timed out');

@@ -601,7 +601,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final workspaceSaves:WorkspaceSaveWorker;
   public final session:ProjectDocumentSession;
   /** The link to a real printer, and whether the project's printer model follows it. */
-  public final printerLink = new PrinterLink();
+  public final printerLink:PrinterLink;
   public var mirrorPrinter:Bool = false;
   var reportedPrinterSummary:String = "";
 
@@ -733,6 +733,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       ?world:RobotWorld, ?hostContext:DesktopUiHostContext,?setupScript:String,?projectPath:String,
       ?recordPath:String, demo:Bool = false) {
     this.hostContext = hostContext;
+    printerLink = new PrinterLink(hostContext == null ? null : hostContext.events);
     semanticRecordPath = recordPath;
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     preferences = AppPreferences.besideWorkspace(workspacePath);

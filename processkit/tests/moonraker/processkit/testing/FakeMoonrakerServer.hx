@@ -9,7 +9,7 @@ import nativekit.ffi.NativeKitTypes;
 import processkit.moonraker.HttpFrames;
 import processkit.moonraker.MoonrakerStatus.MoonrakerHeater;
 import processkit.moonraker.WebSocketFrames;
-import robotkit.transport.NativeTransport;
+import haxeon.platform.NativeTransport;
 
 private class Link {
   public final transport:TransportHandle;
@@ -65,6 +65,8 @@ class FakeMoonrakerServer {
   public final warnings:Array<String> = [];
   public final scripts:Array<String> = [];
   public var restarts(default, null) = 0;
+  public var fragmentedSocketMessages = false;
+  public var pongs(default,null) = 0;
   var settings:Dynamic = {};
   var startupLeft = 0;
   var travelled = 0.0;
@@ -189,10 +191,22 @@ class FakeMoonrakerServer {
   }
 
   function sendHttp(link:Link, status:Int, reason:String, value:Dynamic):Void
-    NativeTransport.send(link.transport, HttpResponse.encode(status, reason, "application/json", Bytes.ofString(Json.stringify(value))));
+    NativeTransport.send(link.transport, FakeHttpResponse.encode(status, reason, "application/json", Bytes.ofString(Json.stringify(value))));
 
-  function sendSocket(link:Link, value:Dynamic):Void
-    NativeTransport.send(link.transport, WebSocketFrames.encode(WebSocketMessage.TEXT, Bytes.ofString(Json.stringify(value))));
+  function sendSocket(link:Link, value:Dynamic):Void {
+    var payload = Bytes.ofString(Json.stringify(value));
+    if (!fragmentedSocketMessages) {
+      NativeTransport.send(link.transport, WebSocketFrames.encode(WebSocketMessage.TEXT, payload));
+      return;
+    }
+    var first = WebSocketFrames.encode(WebSocketMessage.TEXT,payload.sub(0,3));
+    first.set(0,WebSocketMessage.TEXT); // FIN clear, followed by a control frame and a continuation.
+    var wire = new haxe.io.BytesBuffer();
+    wire.add(first);
+    wire.add(WebSocketFrames.encode(WebSocketMessage.PING,Bytes.ofString("alive")));
+    wire.add(WebSocketFrames.encode(0,payload.sub(3,payload.length-3)));
+    NativeTransport.send(link.transport,wire.getBytes());
+  }
 
   /** Tells each subscriber the fields that changed since it was last told. */
   function push():Void {
@@ -228,7 +242,14 @@ class FakeMoonrakerServer {
   public function poll():Void {
     for (link in links.copy()) {
       if (link.dropped) continue;
-      var bytes = NativeTransport.receive(link.transport, 65536);
+      var buffer = Bytes.alloc(65536);
+      var received = nativekit.ffi.NativeKit.nk_transport_receive(link.transport, buffer);
+      if (received.status == -205) continue;
+      if (received.status == -206) {
+        NativeTransport.close(link.transport); link.dropped = true; continue;
+      }
+      if (received.status != Result.Ok) throw 'Fake Moonraker receive failed: ${received.status}';
+      var bytes = Bytes.view(buffer,0,haxe.Int64.toInt(received.out_received));
       var socket = link.socket;
       if (socket != null) {
         socket.feed(bytes);
@@ -237,6 +258,7 @@ class FakeMoonrakerServer {
           if (message == null) break;
           if (message.opcode == WebSocketMessage.TEXT) rpc(link, Json.parse(message.text()));
           else if (message.opcode == WebSocketMessage.PING) NativeTransport.send(link.transport, WebSocketFrames.encode(WebSocketMessage.PONG, message.payload));
+          else if (message.opcode == WebSocketMessage.PONG) { if (message.text() == "alive") pongs++; }
           else if (message.opcode == WebSocketMessage.CLOSE) { NativeTransport.close(link.transport); link.dropped = true; }
         }
         continue;
@@ -325,7 +347,7 @@ class FakeMoonrakerServer {
           var name=[for (part in parts) percentDecode(part)].join("/");
           var content=root == "config" ? configFiles.get(name) : root == "gcodes" ? files.get(name) : null;
           if (content == null) sendHttp(link,404,"Not Found",{error:{message:"file not found"}});
-          else NativeTransport.send(link.transport,HttpResponse.encode(200,"OK","text/csv",Bytes.ofString(content)));
+          else NativeTransport.send(link.transport,FakeHttpResponse.encode(200,"OK","text/csv",Bytes.ofString(content)));
         } else sendHttp(link, 404, "Not Found", {error: {message: "no such endpoint"}});
     }
   }

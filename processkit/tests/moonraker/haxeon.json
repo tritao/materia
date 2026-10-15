@@ -19,35 +19,17 @@
   "outputDir": "build",
   "native": {
     "cmake": {
-      "source": "../../../robotkit/robotd/native",
-      "target": "robotd_native",
+      "source": "native",
+      "target": "moonraker_native",
       "libraries": [
-        "nativekit",
-        "nativekit_scene",
-        "nativekit_sim_core",
-        "trajectory_core",
-        "robotkit_runtime",
-        "robotkit_inference"
+        "nativekit"
       ],
       "inputs": [
-        "../../../robotkit/robotd/native/CMakeLists.txt",
-        "../../../robotkit/CMakeLists.txt",
-        "../../../robotkit/runtime/CMakeLists.txt",
-        "../../../robotkit/runtime/include/robotkit_runtime.h",
-        "../../../robotkit/runtime/include/robotkit_simkit.h",
-        "../../../trajectorykit/native/src/trajectory.cpp",
-        "../../../trajectorykit/native/src/validation.cpp",
-        "../../../trajectorykit/native/CMakeLists.txt",
-        "../../../trajectorykit/native/include/trajectory_core.h",
-        "../../../trajectorykit/native/include/trajectory_core.hpp",
+        "native/CMakeLists.txt",
         "../../../haxeon/vendor/nativekit/CMakeLists.txt",
-        "../../../simkit/CMakeLists.txt",
-        "../../../robotkit/inference/CMakeLists.txt",
-        "../../../robotkit/inference/src/inference.cpp",
-        "../../../robotkit/inference/include/robotkit_inference.h",
-        "../../../robotkit/policy/CMakeLists.txt",
-        "../../../robotkit/policy/src/policy.cpp",
-        "../../../robotkit/policy/include/robotkit_policy.h"
+        "../../../haxeon/vendor/nativekit/include/nativekit_transport.h",
+        "../../../haxeon/vendor/nativekit/src/transport/transport.cpp",
+        "../../../haxeon/vendor/nativekit/src/transport/transport_web.cpp"
       ]
     }
   }

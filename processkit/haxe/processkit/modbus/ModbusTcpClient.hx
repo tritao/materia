@@ -2,7 +2,7 @@ package processkit.modbus;
 
 import haxe.io.Bytes;
 import nativekit.ffi.NativeKitTypes;
-import robotkit.transport.NativeTransport;
+import haxeon.platform.NativeTransport;
 
 private class Request {
   public final pdu:Bytes;

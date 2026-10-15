@@ -7,7 +7,7 @@ import nativekit.ffi.NativeKitTypes;
 import robotkit.protocol.RobotFrame;
 import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.StreamSubscription;
-import robotkit.transport.NativeTransport;
+import haxeon.platform.NativeTransport;
 
 /** The sole outbound RKF1 family classification. New families register here. */
 class OutboundPolicy {

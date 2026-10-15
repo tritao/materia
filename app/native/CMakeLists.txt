@@ -27,7 +27,12 @@ get_filename_component(MATERIA_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." A
 set(MATERIA_NATIVEKIT_DIR "${MATERIA_SOURCE_ROOT}/haxeon/vendor/nativekit")
 set(MATERIA_UIKIT_DIR "${MATERIA_SOURCE_ROOT}/haxeon/packages/ui")
 
+set(NK_USE_SYSTEM_CURL ON CACHE BOOL "Enable HTTP for Moonraker" FORCE)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(CURL REQUIRED)
+endif()
 add_subdirectory("${MATERIA_NATIVEKIT_DIR}" nativekit)
+
 set(NKUI_NATIVEKIT_DIR "${MATERIA_NATIVEKIT_DIR}" CACHE PATH "NativeKit source for the UI package" FORCE)
 add_subdirectory("${MATERIA_UIKIT_DIR}" uikit)
 

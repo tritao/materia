@@ -7,7 +7,7 @@ import nativekit.ffi.NativeKitTypes;
 import haxeon.platform.NativeKitRuntime;
 import haxeon.platform.NativeKitEventValue;
 import haxeon.platform.NativeKitEventBytes;
-import robotkit.transport.NativeTransport;
+import haxeon.platform.NativeTransport;
 
 private class ScriptedTighteningController implements OpenProtocolTransport {
 	public final requests:Array<OpenProtocolFrame> = [];

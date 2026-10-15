@@ -32,7 +32,9 @@ class PrinterLink {
   var installer:Null<ConfigInstaller> = null;
   var clock = 0.0;
 
-  public function new() {}
+  final events:Null<haxeon.platform.NativeKitEvents>;
+
+  public function new(?events:haxeon.platform.NativeKitEvents) { this.events = events; }
 
   /**
    * The host and port of an endpoint, `host` or `host:port`. An IPv6 literal is written in brackets with an optional port
@@ -62,18 +64,25 @@ class PrinterLink {
   /** Opens the connections to `endpoint` (closing any other) and subscribes to the machine's state. */
   public function connect(endpoint:String):Void {
     disconnect();
+    if (events == null) throw "Printer connection requires a NativeKit event pump";
     var where = parse(endpoint);
     this.endpoint = endpoint;
-    client = new MoonrakerClient(where.host, where.port);
-    var opened = new MoonrakerSocket(where.host, where.port);
-    opened.onUpdate = function(reply) {
-      status = reply;
-      statusAt = clock;
-      var listener = onStatus;
-      if (listener != null) listener(reply);
-    };
-    opened.subscribe();
-    socket = opened;
+    try {
+      client = new MoonrakerClient(where.host, where.port, events);
+      var opened = new MoonrakerSocket(where.host, where.port, events);
+      socket = opened;
+      opened.onUpdate = function(reply) {
+        status = reply;
+        statusAt = clock;
+        var listener = onStatus;
+        if (listener != null) listener(reply);
+      };
+      opened.subscribe();
+    } catch (failure:Dynamic) {
+      disconnect();
+      error = Std.string(failure);
+      throw failure;
+    }
     error = null;
     note = 'Connecting to ${where.host}:${where.port}';
   }

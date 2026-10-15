@@ -5,7 +5,8 @@
   },
   "entry": "tests.AppTests",
   "sourceRoots": [
-    "src"
+    "src",
+    "../../processkit/tests/moonraker"
   ],
   "scopeSourceRoots": false,
   "dependencies": {

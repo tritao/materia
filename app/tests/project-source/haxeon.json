@@ -6,7 +6,21 @@
   "entry": "app.ProjectSourceTests",
   "sourceRoots": [
     "../src",
-    "../../../machinekit/examples/press-brake"
+    "../../../machinekit/examples/press-brake",
+    "../../../processkit/tests/moonraker",
+    "../../../machinekit/examples/robot-arm",
+    "../../../machinekit/examples/bench-mill",
+    "../../../machinekit/examples/machine-tending",
+    "../../../machinekit/examples",
+    "../../../machinekit/examples/cnc-router",
+    "../../../machinekit/examples/mobile-base",
+    "../../../machinekit/examples/robot-welder",
+    "../../../machinekit/examples/corexy",
+    "../../../machinekit/examples/printer",
+    "../../../machinekit/examples/cobot-arm",
+    "../../../machinekit/examples/gantry-picker",
+    "../../../machinekit/examples/track-arm",
+    "../../../machinekit/examples/overhead-arm"
   ],
   "scopeSourceRoots": false,
   "dependencies": {

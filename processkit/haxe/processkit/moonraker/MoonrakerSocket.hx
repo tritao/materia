@@ -3,9 +3,9 @@ package processkit.moonraker;
 import haxe.Json;
 import haxe.io.Bytes;
 import nativekit.ffi.NativeKitTypes;
-import processkit.moonraker.HttpFrames;
-import processkit.moonraker.WebSocketFrames;
-import robotkit.transport.NativeTransport;
+import haxeon.platform.NativeTransport;
+import haxeon.platform.NativeKitEvents;
+import haxeon.platform.NativeKitEvents.NativeKitEventSubscription;
 
 private class Call {
   public final id:Int;
@@ -15,7 +15,7 @@ private class Call {
 }
 
 /**
- * Moonraker's JSON-RPC WebSocket, on NativeKit's TCP transport and polled by whoever owns the clock. After the opening
+ * Moonraker's JSON-RPC WebSocket, on NativeKit's message transport and polled by whoever owns the clock. After the opening
  * handshake it subscribes (`printer.objects.subscribe`) to the objects `MoonrakerStatus` reads: Moonraker answers with
  * their state and then pushes `notify_status_update` with the fields that changed, each of which is merged into the state
  * kept here, so a twin is told the moment the machine reports instead of when it next asks. A handshake or a call that is
@@ -23,6 +23,8 @@ private class Call {
  */
 class MoonrakerSocket {
   final transport:OwnedTransportHandle;
+  final subscription:NativeKitEventSubscription;
+  var transportError:Null<String> = null;
   public final host:String;
   public final port:Int;
   public final timeout:Float;
@@ -34,9 +36,6 @@ class MoonrakerSocket {
   /** How many updates have arrived (the answer to the subscription counts), and the clock of the latest. */
   public var updates(default, null) = 0;
   public var updatedAt(default, null) = Math.NEGATIVE_INFINITY;
-  final http = new HttpFrameStream();
-  final reader = new WebSocketReader();
-  final key = WebSocketFrames.newKey();
   final waiting:Array<{method:String, params:Dynamic, call:Call}> = [];
   final calls = new Map<Int, Call>();
   final merged:Dynamic = {};
@@ -48,10 +47,19 @@ class MoonrakerSocket {
   var started = false;
   var subscribed = false;
 
-  public function new(host:String, port:Int, timeout:Float = 2.0) {
+  public function new(host:String, port:Int, events:NativeKitEvents, timeout:Float = 2.0, secure:Bool = false) {
     if (!Math.isFinite(timeout) || timeout <= 0.0) throw "Invalid Moonraker timeout";
     this.host = host; this.port = port; this.timeout = timeout;
-    transport = NativeTransport.connect(host, port);
+    if (events == null || events.isDisposed()) throw "Moonraker requires the owner's NativeKit event pump";
+    transport = NativeTransport.websocket(host, port, "/websocket", timeout, secure);
+    subscription = events.listen(event -> switch event {
+      case Raw(kind, source, _, result, _, _, _):
+        if (closed || source.rawValue() != transport.borrow().rawValue()) return;
+        if (kind == EventKind.TransportConnected) open = true;
+        else if (kind == EventKind.TransportFailed || kind == EventKind.TransportClosed)
+          transportError = 'Moonraker WebSocket transport closed: $result';
+      case _:
+    });
   }
 
   public function isOpen():Bool return open && fault == null;
@@ -77,6 +85,10 @@ class MoonrakerSocket {
     if (closed) return;
     closed = true;
     waiting.splice(0, waiting.length);
+    subscription.dispose();
+    calls.clear();
+    outstanding = 0;
+    open = false;
     transport.close();
   }
 
@@ -106,31 +118,23 @@ class MoonrakerSocket {
     if (code != 0) throw 'Moonraker transport send failed: $code';
   }
 
-  function handle(message:WebSocketMessage, now:Float):Void {
-    if (message.opcode == WebSocketMessage.PING) {
-      var mask = Bytes.alloc(4);
-      for (index in 0...4) mask.set(index, Std.random(256));
-      sendFrame(WebSocketFrames.encode(WebSocketMessage.PONG, message.payload, mask));
-    } else if (message.opcode == WebSocketMessage.CLOSE) {
-      throw "Moonraker closed the connection";
-    } else if (message.opcode == WebSocketMessage.TEXT) {
-      var body:Dynamic = Json.parse(message.text());
-      var id:Dynamic = Reflect.field(body, "id");
-      if (id != null) {
-        var pending = calls.get(id);
-        if (pending == null) throw "Unexpected Moonraker reply";
-        calls.remove(id);
-        outstanding--;
-        var problem:Dynamic = Reflect.field(body, "error");
-        if (problem != null) throw 'Moonraker error: ${Reflect.field(problem, "message")}';
-        pending.complete(Reflect.field(body, "result"));
-      } else if (Reflect.field(body, "method") == "notify_status_update") {
-        var params:Array<Dynamic> = Reflect.field(body, "params");
-        if (params == null || params.length < 1) throw "Moonraker status notification has no parameters";
-        merge(params[0]);
-        updatedAt = now;
-        announce();
-      }
+  function handle(message:Bytes, now:Float):Void {
+    var body:Dynamic = Json.parse(message.toString());
+    var id:Dynamic = Reflect.field(body, "id");
+    if (id != null) {
+      var pending = calls.get(id);
+      if (pending == null) throw "Unexpected Moonraker reply";
+      calls.remove(id);
+      outstanding--;
+      var problem:Dynamic = Reflect.field(body, "error");
+      if (problem != null) throw 'Moonraker error: ${Reflect.field(problem, "message")}';
+      pending.complete(Reflect.field(body, "result"));
+    } else if (Reflect.field(body, "method") == "notify_status_update") {
+      var params:Array<Dynamic> = Reflect.field(body, "params");
+      if (params == null || params.length < 1) throw "Moonraker status notification has no parameters";
+      merge(params[0]);
+      updatedAt = now;
+      announce();
     }
   }
 
@@ -138,32 +142,15 @@ class MoonrakerSocket {
   public function poll(now:Float):Void {
     if (closed || fault != null) return;
     try {
-      if (!started) {
-        started = true;
-        deadline = now + timeout;
-        var headers = new Map<String, String>();
-        headers.set("Upgrade", "websocket");
-        headers.set("Connection", "Upgrade");
-        headers.set("Sec-WebSocket-Key", key);
-        headers.set("Sec-WebSocket-Version", "13");
-        sendFrame(new HttpRequest("GET", "/websocket", headers, Bytes.alloc(0)).encode(HttpRequest.authority(host, port)));
-      }
-      var bytes = NativeTransport.receive(transport.borrow(), 65536);
-      if (!open) {
-        if (bytes.length > 0) http.feed(bytes);
-        var reply = http.nextResponse();
-        if (reply != null) {
-          if (reply.status != 101 || reply.header("Sec-WebSocket-Accept") != WebSocketFrames.acceptFor(key))
-            throw 'Moonraker refused the WebSocket upgrade: ${reply.status} ${reply.reason}';
-          open = true;
-          reader.feed(http.takeRest());
-        } else if (now >= deadline) throw "Moonraker WebSocket handshake timed out";
-      } else if (bytes.length > 0) reader.feed(bytes);
+      if (transportError != null) throw transportError;
+      if (!started) { started = true; deadline = now + timeout; }
+      if (!open && now >= deadline) throw "Moonraker WebSocket handshake timed out";
       if (open) {
         while (true) {
-          var message = reader.next();
+          var message = NativeTransport.receiveMessage(transport.borrow());
           if (message == null) break;
           handle(message, now);
+          if (closed) return;
         }
         while (waiting.length > 0) {
           var next = waiting.shift();
@@ -171,7 +158,7 @@ class MoonrakerSocket {
           next.call.deadline = now + timeout;
           calls.set(next.call.id, next.call);
           outstanding++;
-          sendFrame(WebSocketFrames.clientText(Json.stringify({jsonrpc: "2.0", method: next.method, params: next.params, id: next.call.id})));
+          sendFrame(Bytes.ofString(Json.stringify({jsonrpc: "2.0", method: next.method, params: next.params, id: next.call.id})));
         }
         for (pending in calls) if (now >= pending.deadline) throw "Moonraker call timed out";
       }

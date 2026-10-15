@@ -38,7 +38,7 @@ import robotkit.protocol.PlanSubmission;
 import robotkit.protocol.PathControl;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.protocol.SensorFrameMsg;
-import robotkit.transport.NativeTransport;
+import haxeon.platform.NativeTransport;
 import robotkit.core.RobotSensorFrames;
 import robotkit.runtime.RuntimeRobotAdapter;
 import robotkit.core.RobotEvent;

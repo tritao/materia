@@ -8,7 +8,7 @@ import nativekit.ffi.NativeKitTypes;
 import haxeon.platform.NativeKitRuntime;
 import haxeon.platform.NativeKitEventValue;
 import haxeon.platform.NativeKitEventBytes;
-import robotkit.transport.NativeTransport;
+import haxeon.platform.NativeTransport;
 import processkit.modbus.ModbusTcpClient;
 import processkit.modbus.ModbusWelder;
 import processkit.modbus.ModbusWelderMap;

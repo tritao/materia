@@ -134,3 +134,21 @@ Upstream formats and assumptions:
 [Klipper resonance measurement](https://www.klipper3d.org/Measuring_Resonances.html),
 [Klipper shaper calibration implementation](https://github.com/Klipper3d/klipper/blob/master/klippy/extras/shaper_calibrate.py),
 [Moonraker file API](https://moonraker.readthedocs.io/en/latest/external_api/file_manager/).
+
+## Moonraker networking
+
+`MoonrakerClient(host, port, events, timeout, secure)` uses NativeKit HTTP; `MoonrakerSocket` uses its WebSocket message
+transport at `/websocket`. Pass the same `NativeKitEvents` that the application owns and drain it every frame, then call
+`poll(now)` on the clients. Client callbacks run from `poll`, after native response data has been copied into managed memory.
+Closing disposes event subscriptions and native handles and suppresses late completions. Reconnect by creating new clients.
+The optional `secure` flag selects HTTPS/WSS with normal certificate verification; it defaults to plain HTTP/WS for Klipper's
+usual local endpoint. NativeKit supplies the browser transport and fetch backend under its ABI32 bindings; browser CORS and
+mixed-content rules apply. The editor still accepts its existing host/port address format.
+
+Multipart bodies and Moonraker JSON-RPC id matching remain here. HTTP framing, WebSocket negotiation, message reassembly,
+masking and control frames belong to NativeKit. The old wire helpers exist only in the loopback fake-server tests.
+`sentBytes` counts submitted request-body bytes; NativeKit owns wire-header accounting.
+
+The Moonraker test's native provider builds NativeKit with HTTP enabled, without the robotd aggregate. Linux builds require
+libcurl development files. Run the loopback suite with `haxeon build --project processkit/tests/moonraker/haxeon.json` and
+its generated binary. `bash processkit/tests/moonraker/web/check-compile.sh` checks the production client against ABI32.

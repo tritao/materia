@@ -38,7 +38,7 @@ class HttpRequest {
 }
 
 /** A response: status, headers and body. */
-class HttpResponse {
+class FakeHttpResponse {
   public final status:Int;
   public final reason:String;
   public final headers:Map<String, String>;
@@ -149,14 +149,14 @@ class HttpFrameStream {
   }
 
   /** The next whole response, or null. */
-  public function nextResponse():Null<HttpResponse> {
+  public function nextResponse():Null<FakeHttpResponse> {
     var message = next();
     if (message == null) return null;
     var parts = message.start.split(" ");
     if (parts.length < 2 || !StringTools.startsWith(parts[0], "HTTP/")) throw 'HTTP status line "${message.start}" is malformed';
     var status = Std.parseInt(parts[1]);
     if (status == null) throw 'HTTP status "${parts[1]}" is not a number';
-    return new HttpResponse(status, parts.slice(2).join(" "), message.headers, message.body);
+    return new FakeHttpResponse(status, parts.slice(2).join(" "), message.headers, message.body);
   }
 
   /** The next whole request, or null. */

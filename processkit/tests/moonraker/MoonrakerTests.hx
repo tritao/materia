@@ -13,7 +13,7 @@ import processkit.moonraker.MoonrakerStatus;
 import processkit.moonraker.Sha1;
 import processkit.moonraker.WebSocketFrames;
 import processkit.testing.FakeMoonrakerServer;
-import robotkit.transport.NativeTransport;
+import haxeon.platform.NativeTransport;
 
 /**
  * The Moonraker client against a fake server on a real socket: the HTTP and WebSocket framing, the status it reads
@@ -208,8 +208,8 @@ class MoonrakerTests {
   static function conversation():Void {
     var runtime = NativeKitRuntime.start();
     var fake = FakeMoonrakerServer.start(runtime, 36291);
-    var client = new MoonrakerClient("127.0.0.1", 36291, 0.5);
-    var socket = new MoonrakerSocket("127.0.0.1", 36291, 0.5);
+    var client = new MoonrakerClient("127.0.0.1", 36291, runtime.events, 0.5);
+    var socket = new MoonrakerSocket("127.0.0.1", 36291, runtime.events, 0.5);
     var installer:Null<ConfigInstaller> = null;
     function live():MoonrakerStatus {
       var current = socket.status;
@@ -217,7 +217,7 @@ class MoonrakerTests {
       return current;
     }
     function turn():Void {
-      runtime.events.poll(); fake.poll(); client.poll(Sys.time()); socket.poll(Sys.time());
+      while (runtime.events.poll()) {} fake.poll(); client.poll(Sys.time()); socket.poll(Sys.time());
       var current = installer;
       if (current != null) current.poll(Sys.time());
       runtime.events.wait(0.001);
@@ -234,6 +234,17 @@ class MoonrakerTests {
     client.serverInfo(function(result) info = result);
     run(() -> info != null, "server info");
     check(Reflect.field(info, "klippy_state") == "ready", "Klippy is ready");
+
+    var parallel = new MoonrakerClient("127.0.0.1",36291,runtime.events,0.5);
+    var mainReply = false, otherReply = false;
+    client.serverInfo(_ -> mainReply = true);
+    parallel.status(_ -> otherReply = true);
+    var parallelLimit = Sys.time() + 3;
+    while ((!mainReply || !otherReply) && Sys.time() < parallelLimit) {
+      turn(); parallel.poll(Sys.time());
+    }
+    check(mainReply && otherReply && parallel.fault == null,"HTTP completions route by globally unique request id across owners");
+    parallel.close();
 
     // Recorded artifacts are explicitly published in a Moonraker root, not read from Klipper's /tmp.
     fake.configFiles.set("resonances/spectrum.csv",ResonanceTests.spectrum(57));
@@ -279,6 +290,7 @@ class MoonrakerTests {
     check(socket.updates == 1 && live().position[0] == fake.position[0], "the subscription answers with the state");
     var mirrored:Array<MoonrakerStatus> = [];
     socket.onUpdate = function(value) mirrored.push(value);
+    fake.fragmentedSocketMessages = true;
     for (step in 0...5) {
       var count = socket.updates;
       fake.advance(0.1);
@@ -290,7 +302,15 @@ class MoonrakerTests {
       check(seen.queuedPosition[0] > seen.position[0] || seen.queuedPosition[1] > seen.position[1], "and not the queued end, which is ahead of it");
       check(seen.extruder.temperature == fake.extruder.temperature, "the heater changes with it");
     }
-    check(mirrored.length == 5, "the listener was told each time");
+    check(mirrored.length == 5, "the listener was told each time through fragmented messages");
+    run(() -> fake.pongs >= 5, "NativeKit answers interleaved control pings");
+    var large = [for (_ in 0...70000) "x"].join("");
+    var largeCount = socket.updates;
+    fake.message = large; fake.advance(0);
+    run(() -> socket.updates > largeCount,"message larger than the initial receive buffer");
+    check(live().message == large,"a large fragmented message is resized and consumed whole");
+    fake.message = ""; fake.advance(0);
+    run(() -> live().message == "","clearing the large message");
     // An update leaves out what did not change, and the socket keeps it.
     var calm = socket.updates;
     fake.bed.target = 60.0;
@@ -364,34 +384,51 @@ class MoonrakerTests {
     installer = null;
 
     // An error status is the client's fault; a silent server times out; a closed one ends the socket.
-    var missing = new MoonrakerClient("127.0.0.1", 36291, 0.5);
+    var missing = new MoonrakerClient("127.0.0.1", 36291, runtime.events, 0.5);
     fake.klippyState = "ready";
     var answered = false;
     missing.start("nothing.gcode", function() answered = true);
     var limit = Sys.time() + 3.0;
-    while (missing.fault == null && Sys.time() < limit) { runtime.events.poll(); fake.poll(); missing.poll(Sys.time()); runtime.events.wait(0.001); }
+    while (missing.fault == null && Sys.time() < limit) { while (runtime.events.poll()) {} fake.poll(); missing.poll(Sys.time()); runtime.events.wait(0.001); }
     check(missing.fault != null && missing.fault.indexOf("404") >= 0 && !answered, "an error status is the client's fault");
     // An install whose upload cannot go out ends with the client's fault; it does not wait for ever.
-    var nowhere = new MoonrakerClient("127.0.0.1", 1, 0.3);
+    var nowhere = new MoonrakerClient("127.0.0.1", 1, runtime.events, 0.3);
     var unsent = new ConfigInstaller(nowhere, "printer.cfg", "[x]\n", new Map<String, Map<String, String>>(), 0.01, 3.0);
     unsent.start(Sys.time());
     limit = Sys.time() + 3.0;
-    while (!unsent.done && Sys.time() < limit) { runtime.events.poll(); nowhere.poll(Sys.time()); unsent.poll(Sys.time()); runtime.events.wait(0.001); }
+    while (!unsent.done && Sys.time() < limit) { while (runtime.events.poll()) {} nowhere.poll(Sys.time()); unsent.poll(Sys.time()); runtime.events.wait(0.001); }
     check(unsent.done && unsent.mismatches.length == 1 && unsent.mismatches[0].indexOf("Moonraker connection failed") >= 0,
       'a failed upload ends the install: ${unsent.mismatches}');
     nowhere.close();
     var quiet = false;
     client.status(function(_) quiet = true);
     limit = Sys.time() + 3.0;
-    while (client.fault == null && Sys.time() < limit) { runtime.events.poll(); client.poll(Sys.time()); runtime.events.wait(0.001); }
+    while (client.fault == null && Sys.time() < limit) { while (runtime.events.poll()) {} client.poll(Sys.time()); runtime.events.wait(0.001); }
     check(client.fault != null && client.fault.indexOf("timed out") >= 0 && !quiet, "a silent server times out");
     fake.drop();
     limit = Sys.time() + 3.0;
     while (socket.fault == null && Sys.time() < limit) turn();
     check(socket.fault != null, "a closed connection ends the socket");
-    var late = new MoonrakerSocket("127.0.0.1", 1, 0.3);
+    // New owners reconnect after a drop; stale terminal events must not poison them.
+    var reconnected = new MoonrakerSocket("127.0.0.1",36291,runtime.events,0.5);
+    reconnected.onUpdate = _ -> reconnected.close();
+    reconnected.subscribe();
+    limit = Sys.time() + 3;
+    while (reconnected.status == null && reconnected.fault == null && Sys.time() < limit) {
+      while (runtime.events.poll()) {} fake.poll(); reconnected.poll(Sys.time()); runtime.events.wait(0.001);
+    }
+    check(reconnected.fault == null && reconnected.status != null,"a fresh socket reconnects and subscribes after a drop");
+    reconnected.close();
+    // Closing an in-flight HTTP owner must suppress callbacks from queued completions.
+    var abandoned = new MoonrakerClient("127.0.0.1",36291,runtime.events,0.5);
+    var calledAfterClose = false;
+    abandoned.status(_ -> calledAfterClose = true);
+    abandoned.poll(Sys.time()); abandoned.close();
+    for (_ in 0...10) { while (runtime.events.poll()) {} fake.poll(); abandoned.poll(Sys.time()); runtime.events.wait(0.001); }
+    check(!calledAfterClose,"closed HTTP owners do not receive late callbacks");
+    var late = new MoonrakerSocket("127.0.0.1", 1, runtime.events, 0.3);
     limit = Sys.time() + 3.0;
-    while (late.fault == null && Sys.time() < limit) { runtime.events.poll(); late.poll(Sys.time()); runtime.events.wait(0.001); }
+    while (late.fault == null && Sys.time() < limit) { while (runtime.events.poll()) {} late.poll(Sys.time()); runtime.events.wait(0.001); }
     check(late.fault != null, "a socket to nothing faults");
     late.close();
     missing.close();

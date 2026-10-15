@@ -4,6 +4,7 @@
   "sourceRoots": ["haxe"],
   "scopeSourceRoots": false,
   "dependencies": {
+    "haxeon-platform": { "path": "../haxeon/packages/platform" },
     "projectkit": { "path": "../projectkit" },
     "motionkit": { "path": "../motionkit" },
     "motionkit-robot": { "path": "../motionkit/robot" },

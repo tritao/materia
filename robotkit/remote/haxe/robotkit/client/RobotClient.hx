@@ -28,7 +28,7 @@ import robotkit.protocol.Stop;
 import robotkit.protocol.StreamSubscription;
 import robotkit.protocol.PlanSubmission;
 import robotkit.protocol.PathControl;
-import robotkit.transport.NativeTransport;
+import haxeon.platform.NativeTransport;
 
 /**
  * Typed editor/CLI client for the RobotKit process boundary.

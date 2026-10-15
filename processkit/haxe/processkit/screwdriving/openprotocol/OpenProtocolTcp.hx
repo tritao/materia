@@ -2,7 +2,7 @@ package processkit.screwdriving.openprotocol;
 
 import haxe.io.Bytes;
 import nativekit.ffi.NativeKitTypes;
-import robotkit.transport.NativeTransport;
+import haxeon.platform.NativeTransport;
 
 /** NativeKit's asynchronous TCP transport; the process owner services the client. */
 class OpenProtocolTcp implements OpenProtocolTransport {

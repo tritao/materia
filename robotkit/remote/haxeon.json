@@ -10,6 +10,9 @@
   "dependencies": {
     "robotkit-core": {
       "path": "../core"
+    },
+    "haxeon-platform": {
+      "path": "../../haxeon/packages/platform"
     }
   },
   "target": "host"

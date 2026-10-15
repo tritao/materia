@@ -4,39 +4,66 @@ import haxe.Json;
 import haxe.io.Bytes;
 import haxe.io.BytesBuffer;
 import nativekit.ffi.NativeKitTypes;
-import processkit.moonraker.HttpFrames;
-import robotkit.transport.NativeTransport;
+import haxe.Int64;
+import haxeon.platform.NativeKitEvents;
+import haxeon.platform.NativeKitEvents.NativeKitEventSubscription;
+import nativekit.ffi.NativeKitNet;
+import nativekit.ffi.NativeKitNetTypes;
+import processkit.moonraker.HttpResponse;
 
 private class Pending {
-  public final request:HttpRequest;
+  public final request:{method:String, target:String, headers:Map<String,String>, body:Bytes};
   public final complete:HttpResponse->Void;
-  public function new(request:HttpRequest, complete:HttpResponse->Void) { this.request = request; this.complete = complete; }
+  public function new(request:{method:String, target:String, headers:Map<String,String>, body:Bytes}, complete:HttpResponse->Void) { this.request = request; this.complete = complete; }
 }
 
 /**
- * A nonblocking Moonraker client over NativeKit's TCP transport, polled by whoever owns the clock (the application's
- * frame, a test's loop). One request is in flight at a time on a kept-alive HTTP/1.1 connection; the rest wait their
+ * A nonblocking Moonraker client over NativeKit's HTTP backend, polled by whoever owns the clock (the application's
+ * frame, a test's loop). One request is in flight at a time; the rest wait their
  * turn. A transport failure, a reply that does not come within `timeout` seconds, an error status or a body that is
  * not what the request asked for is the client's `fault`, and ends it: a machine that answers wrongly is to be
  * reconnected to, not argued with.
  */
 class MoonrakerClient {
-  final transport:OwnedTransportHandle;
+  final transport:OwnedHttpClientHandle;
+  final subscription:NativeKitEventSubscription;
+  final secure:Bool;
+  var requestId = Int64.ofInt(0);
+  var completed:Null<HttpResponse> = null;
+  var networkError:Null<String> = null;
   public final host:String;
   public final port:Int;
   public final timeout:Float;
   public var fault(default, null):Null<String> = null;
-  final stream = new HttpFrameStream();
   final queue:Array<Pending> = [];
   var pending:Null<Pending> = null;
   var deadline = 0.0;
   var closed = false;
+  /** Application body bytes submitted (wire headers are owned by the HTTP backend). */
   public var sentBytes(default, null) = 0;
 
-  public function new(host:String, port:Int, timeout:Float = 2.0) {
+  public function new(host:String, port:Int, events:NativeKitEvents, timeout:Float = 2.0, secure:Bool = false) {
     if (!Math.isFinite(timeout) || timeout <= 0.0) throw "Invalid Moonraker timeout";
     this.host = host; this.port = port; this.timeout = timeout;
-    transport = NativeTransport.connect(host, port);
+    if (events == null || events.isDisposed()) throw "Moonraker requires the owner's NativeKit event pump";
+    if (host == null || host.length == 0 || port <= 0 || port > 65535) throw "Invalid Moonraker endpoint";
+    this.secure = secure;
+    var options = new HttpClientOptions();
+    options.set_flags(secure ? 0 : 1); // Explicit opt-in for Moonraker's plain HTTP endpoint.
+    var created = NativeKitNet.nk_http_client_create(options);
+    if (created.status != Result.Ok) throw 'Moonraker HTTP client creation failed: ${created.status}';
+    transport = created.out_client;
+    subscription = events.listen(event -> switch event {
+      case HttpComplete(source, id, code, response):
+        if (closed || Int64.compare(id, requestId) != 0) return;
+        if (code != Result.Ok) networkError = code == HttpError.Timeout ? "Moonraker reply timed out" : 'Moonraker HTTP transport failed: $code';
+        else {
+          var headers = new Map<String,String>();
+          for (header in response.headers) headers.set(header.name,header.value);
+          completed = new HttpResponse(response.statusCode, "", headers, response.body);
+        }
+      case _:
+    });
   }
 
   /** Nothing is in flight or waiting. */
@@ -53,7 +80,7 @@ class MoonrakerClient {
     var headers = new Map<String, String>();
     headers.set("Accept", accept);
     if (contentType != null) headers.set("Content-Type", contentType);
-    queue.push(new Pending(new HttpRequest(method, target, headers, body == null ? Bytes.alloc(0) : body), complete));
+    queue.push(new Pending({method:method, target:target, headers:headers, body:body == null ? Bytes.alloc(0) : body}, complete));
   }
 
   /** The reply's JSON, or a thrown description of why it is not one (an error status, a body that is not JSON). */
@@ -164,6 +191,9 @@ class MoonrakerClient {
     closed = true;
     queue.splice(0, queue.length);
     pending = null;
+    completed = null;
+    requestId = Int64.ofInt(0);
+    subscription.dispose();
     transport.close();
   }
 
@@ -171,15 +201,15 @@ class MoonrakerClient {
   public function poll(now:Float):Void {
     if (closed || fault != null) return;
     try {
-      var bytes = NativeTransport.receive(transport.borrow(), 65536);
-      if (bytes.length > 0) stream.feed(bytes);
-      while (true) {
-        var reply = stream.nextResponse();
-        if (reply == null) break;
+      if (networkError != null) throw networkError;
+      var reply = completed;
+      if (reply != null) {
+        completed = null;
         var request = pending;
         if (request == null) throw "Unexpected Moonraker reply";
         pending = null;
         request.complete(reply);
+        if (closed) return;
       }
       if (pending != null && now >= deadline) throw "Moonraker reply timed out";
       if (pending == null && queue.length > 0) {
@@ -187,10 +217,33 @@ class MoonrakerClient {
         if (next != null) {
           pending = next;
           deadline = now + timeout;
-          var encoded = next.request.encode(HttpRequest.authority(host, port));
-          var status = NativeTransport.sendStatus(transport.borrow(), encoded);
-          if (status != 0) throw 'Moonraker transport send failed: $status';
-          sentBytes += encoded.length;
+          var options = new HttpRequestOptions();
+          options.set_method(switch next.request.method {
+            case "GET": HttpMethod.Get;
+            case "POST": HttpMethod.Post;
+            case "PUT": HttpMethod.Put;
+            case "PATCH": HttpMethod.Patch;
+            case "DELETE": HttpMethod.Delete;
+            case "HEAD": HttpMethod.Head;
+            case "OPTIONS": HttpMethod.Options;
+            case "TRACE": HttpMethod.Trace;
+            case "CONNECT": HttpMethod.Connect;
+            case _: throw "Unsupported Moonraker HTTP method";
+          });
+          var authority = (host.indexOf(":") >= 0 ? "[" + host + "]" : host) + ":" + port;
+          options.set_url((secure ? "https://" : "http://") + authority + next.request.target);
+          options.set_headers([for (name => value in next.request.headers) {
+            var header = new HttpHeader();
+            header.set_name_bytes(Bytes.ofString(name)); header.set_value_bytes(Bytes.ofString(value)); header;
+          }]);
+          options.set_body_bytes(next.request.body);
+          options.set_mode(HttpRequestMode.Buffered);
+          options.set_timeout_ms(Std.int(timeout * 1000));
+          options.set_max_response_size(64 * 1024 * 1024);
+          var sent = NativeKitNet.nk_http_request(transport.borrow(), options);
+          if (sent.status != Result.Ok) throw 'Moonraker HTTP request failed: ${sent.status}';
+          requestId = sent.out_request;
+          sentBytes += next.request.body.length;
         }
       }
     } catch (error:Dynamic) {

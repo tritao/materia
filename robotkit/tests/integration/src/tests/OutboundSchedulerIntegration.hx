@@ -14,7 +14,7 @@ import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.Hello;
 import robotkit.protocol.RobotProtocol;
 import robotkit.protocol.StreamSubscription;
-import robotkit.transport.NativeTransport;
+import haxeon.platform.NativeTransport;
 
 /** Exercises real NativeKit queue/transport behavior with a bounded dispatch step. */
 class OutboundSchedulerIntegration {
