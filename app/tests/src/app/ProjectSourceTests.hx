@@ -6574,8 +6574,10 @@ class ProjectSourceTests {
     // Both routers settle their measured axes before advancing an exact-stop move, so a rapid
     // may not remove stock even when a belt carriage lags during its preceding move.
     // A belt carriage is a spring now (its stretch is simulated, and the plan check below finds the drive off by more
-    // than the tolerance): a rapid that ends beside a wall may graze it by the stretch. Such grazes stay slivers (as
-    // little as the leftover the plate may keep), and the screw router, whose drive does not stretch, has none.
+    // than the tolerance): a rapid that ends beside a wall may graze it by the stretch. The bound on the belt router's grazes
+    // is not derived from the stretch: it is the leftover's sliver allowance (2 % of the recesses) borrowed, interim until
+    // the planner keeps the drives' dynamic stretch as clearance for rapids (PLAN RF14), when it returns to zero like the
+    // screw router's, whose drive does not stretch.
     var grazes = belts ? stock.rapidVolume <= recesses * 0.02 : stock.rapidContacts == 0;
     check(grazes && stock.collisions == 0,
       'no rapid runs through the stock and the holder never touches it (${stock.rapidContacts} ticks, ${stock.rapidVolume * 1e9} mm³, ${stock.collisions})');
