@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "ur": {
+    "repository": "UniversalRobots/Universal_Robots_ROS2_Description",
+    "revision": "d4042c1f5123c86645cc5dbd650b4f461f697ee9",
+    "archiveSha256": "22808f246740023d17cdfab4cfccef270609265c515d27aed62ac2858a0026c2",
+    "package": "ur_description",
+    "models": ["ur3", "ur5", "ur10", "ur3e", "ur5e", "ur7e", "ur10e", "ur12e", "ur16e", "ur8long", "ur15", "ur18", "ur20", "ur30"],
+    "licence": "BSD-3-Clause except ur8long/ur15/ur18/ur20/ur30 meshes, which use UR Graphical Documentation terms; preserve source notices."
+  },
+  "fairino": {
+    "repository": "FAIR-INNOVATION/frcobot_ros2",
+    "revision": "fcf0c7f0d60d949d8a9a4238f929a44d07f60379",
+    "package": "fairino_description",
+    "models": ["fairino3_v6", "fairino5_v6", "fairino10_v6", "fairino16_v6", "fairino20_v6", "fairino30_v6", "fairino3_mt_v6", "FR3WML", "FR3WMS", "FR5WML"],
+    "licence": "Unresolved: package.xml contains TODO: License declaration. Fetch into local ignored build directory; do not bundle assets for redistribution."
+  }
+}

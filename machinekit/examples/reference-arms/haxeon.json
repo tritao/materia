@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "package": {"name": "machinekit-reference-arms"},
+  "entry": "ReferenceArmsPreview",
+  "sourceRoots": ["."],
+  "dependencies": {
+    "projectkit": {"path": "../../../projectkit"},
+    "cadbridge": {"path": "../../../robotkit/cadbridge"},
+    "motionkit-robot": {"path": "../../../motionkit/robot"}
+  },
+  "target": "host",
+  "outputDir": "build"
+}

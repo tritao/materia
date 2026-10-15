@@ -1,0 +1,5 @@
+xacro==2.1.1
+trimesh==4.12.2
+pycollada==0.9.3
+numpy==2.5.4
+PyYAML==6.0.3
