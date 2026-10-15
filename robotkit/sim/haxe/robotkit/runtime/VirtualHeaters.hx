@@ -47,38 +47,14 @@ class HeaterSetup {
   public var fanChannel:Null<String> = null;
   /** The extruder this heater feeds (pushing filament while cold is a fault), or null. */
   public var extruder:Null<HeaterExtruder> = null;
-  public var r0Ohm:Float;
-  public var t0Celsius:Float;
-  public var beta:Float;
-  public var pullupOhm:Float;
-  public var vRef:Float;
-  public var kp:Float;
-  public var ki:Float;
-  public var kd:Float;
-  public var maxDuty:Float;
-  public var maxTemperature:Float;
   /** The material's minimum extrusion temperature; 0 leaves cold extrusion unchecked. */
   public var minExtrusionTemperature:Float = 0.0;
-  public var bandCelsius:Float;
-  public var pidRangeCelsius:Float;
-  public var gainWindowSeconds:Float;
-  public var gainMinCelsius:Float;
-  public var hysteresisCelsius:Float;
-  public var hysteresisWindowSeconds:Float;
-  public var heatCapacity:Float;
-  public var power:Float;
-  public var loss:Float;
-  public var fanLoss:Float;
-  public var ambient:Float;
+  /** The thermistor, controller and plant, as the caller stated them. */
+  public final tuning:HeaterTuning;
 
   public function new(name:String, sensorId:String, sensorSlot:Int, targetChannel:String, tuning:HeaterTuning) {
     this.name = name; this.sensorId = sensorId; this.sensorSlot = sensorSlot; this.targetChannel = targetChannel;
-    r0Ohm = tuning.r0Ohm; t0Celsius = tuning.t0Celsius; beta = tuning.beta; pullupOhm = tuning.pullupOhm; vRef = tuning.vRef;
-    kp = tuning.kp; ki = tuning.ki; kd = tuning.kd; maxDuty = tuning.maxDuty; maxTemperature = tuning.maxTemperature;
-    bandCelsius = tuning.bandCelsius; pidRangeCelsius = tuning.pidRangeCelsius; gainWindowSeconds = tuning.gainWindowSeconds;
-    gainMinCelsius = tuning.gainMinCelsius; hysteresisCelsius = tuning.hysteresisCelsius;
-    hysteresisWindowSeconds = tuning.hysteresisWindowSeconds; heatCapacity = tuning.heatCapacity; power = tuning.power;
-    loss = tuning.loss; fanLoss = tuning.fanLoss; ambient = tuning.ambient;
+    this.tuning = tuning;
   }
 }
 
@@ -142,14 +118,15 @@ class VirtualHeaters {
     var parameters:Array<Float> = [setups.length];
     var slots:Array<Int> = [];
     for (setup in setups) {
+      var tuning = setup.tuning;
       slots.push(setup.sensorSlot);
       parameters = parameters.concat([setup.sensorSlot, channelIndex(setup.targetChannel),
         setup.fanChannel == null ? -1 : channelIndex(setup.fanChannel),
         setup.extruder == null ? -1 : setup.extruder.actuator, setup.extruder == null ? 0 : setup.extruder.feed,
-        setup.r0Ohm, setup.t0Celsius, setup.beta, setup.pullupOhm, setup.vRef, setup.kp, setup.ki, setup.kd, setup.maxDuty,
-        setup.maxTemperature, setup.minExtrusionTemperature, setup.bandCelsius, setup.pidRangeCelsius,
-        setup.gainWindowSeconds, setup.gainMinCelsius, setup.hysteresisCelsius, setup.hysteresisWindowSeconds,
-        setup.heatCapacity, setup.power, setup.loss, setup.fanLoss, setup.ambient]);
+        tuning.r0Ohm, tuning.t0Celsius, tuning.beta, tuning.pullupOhm, tuning.vRef, tuning.kp, tuning.ki, tuning.kd, tuning.maxDuty,
+        tuning.maxTemperature, setup.minExtrusionTemperature, tuning.bandCelsius, tuning.pidRangeCelsius,
+        tuning.gainWindowSeconds, tuning.gainMinCelsius, tuning.hysteresisCelsius, tuning.hysteresisWindowSeconds,
+        tuning.heatCapacity, tuning.power, tuning.loss, tuning.fanLoss, tuning.ambient]);
     }
     options.peripheralKind = 2;
     options.externalSensorSlots = slots;
