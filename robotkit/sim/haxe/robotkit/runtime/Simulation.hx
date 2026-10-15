@@ -479,8 +479,31 @@ class Simulation {
       for (index in 0...linkExcludes.length) desc.set_link_excludes(index, linkExcludes[index]);
       desc.set_flags(desc.get_flags() | RobotKitSimKitConstants.RK_SIMULATION_ROBOT_EXPLICIT_EXCLUDES);
     }
+    // Validate descriptor capacity before adding a robot, so a malformed law leaves no partial robot.
+    for (coupling in blueprint.couplings) if (coupling.stiffnessLaw != null) {
+      if (coupling.stiffnessLaw.length > NativeKitSimConstants.NKSIM_MAX_COMPLIANCE_SPRINGS)
+        throw "Simulation compliance has too many parallel springs";
+      for (spring in coupling.stiffnessLaw)
+        if (spring.coordinates.length > NativeKitSimConstants.NKSIM_MAX_COMPLIANCE_COORDINATES)
+          throw "Simulation compliance has too many coordinates per spring";
+    }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");
+    for (coupling in blueprint.couplings) if (coupling.stiffnessLaw != null) {
+      var springs = coupling.stiffnessLaw;
+      var law = new rk_simulation_coupling_law_desc();
+      law.set_struct_size(rk_simulation_coupling_law_desc.size());
+      law.set_leader(coupling.leader); law.set_follower(coupling.follower); law.set_spring_count(springs.length);
+      for (index in 0...springs.length) {
+        var spring = springs[index];
+        law.set_compliance(index,spring.compliance); law.set_coordinate_count(index,spring.coordinates.length);
+        for (c in 0...spring.coordinates.length) {
+          law.set_coordinate_joint(index*NativeKitSimConstants.NKSIM_MAX_COMPLIANCE_COORDINATES+c,spring.coordinates[c].joint);
+          law.set_gradient(index*NativeKitSimConstants.NKSIM_MAX_COMPLIANCE_COORDINATES+c,spring.coordinates[c].coefficient);
+        }
+      }
+      check(RobotKitSimKit.rk_simulation_set_coupling_law(owner.borrow(),robots.length,law),"simulation.setCouplingLaw");
+    }
     var runtime:RobotRuntime = null;
     var capture = () -> robotContacts(runtime);
     var endpoint = virtualDevice == null

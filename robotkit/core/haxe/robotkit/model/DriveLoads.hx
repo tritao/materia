@@ -180,10 +180,10 @@ class DriveLoads {
     return null;
   }
 
-  public static function of(model:RobotModel, ?steady:SteadyLoads, ?axisIds:Array<String>):Array<AxisLoad> {
-    var result = basic(model, steady);
+  public static function of(model:RobotModel, ?steady:SteadyLoads, ?axisIds:Array<String>, ?stiffness:JointCoupling->Float):Array<AxisLoad> {
+    var result = basic(model, steady, stiffness);
     if (result.length > 0) {
-      var elastic = new DriveCompliance(result, model);
+      var elastic = new DriveCompliance(result, model, null, stiffness);
       if (axisIds != null) {
         var selected = [for (load in result) if (axisIds.indexOf(load.axis) >= 0) load];
         var projected = DriveCompliance.project(elastic, result, selected);
@@ -193,15 +193,33 @@ class DriveLoads {
     return result;
   }
 
+  /** Physical-pose stiffness for inspection/calibration; the default of() uses the certified minimum for planning. */
+  public static function atPosition(model:RobotModel, position:String->Float, ?steady:SteadyLoads, ?axes:Array<String>):Array<AxisLoad>
+    return of(model,steady,axes,coupling -> coupling.stiffnessLaw == null ? coupling.stiffness : coupling.stiffnessLaw.at(position));
+
+  /** Stiffest envelope, paired with of()'s softest envelope when validating a fixed shaper over travel. */
+  public static function stiffest(model:RobotModel, ?steady:SteadyLoads, ?axes:Array<String>):Array<AxisLoad> {
+    var maxima = new Map<String,Float>();
+    for (coupling in model.couplings) if (coupling.stiffnessLaw != null) {
+      var range = coupling.stiffnessLaw.range(id -> {
+        for (joint in model.joints) if (joint.id == id) return {lower:joint.limits.lower-joint.limits.overtravel,
+          upper:joint.limits.upper+joint.limits.overtravel};
+        throw 'Unknown stiffness joint "$id"';
+      });
+      maxima.set(coupling.id,range.maximum);
+    }
+    return of(model,steady,axes,coupling -> maxima.exists(coupling.id) ? maxima.get(coupling.id) : coupling.stiffness);
+  }
+
   /** Build force loads and their motor Jacobian without solving elasticity. */
-  public static function basic(model:RobotModel, ?steady:SteadyLoads):Array<AxisLoad> {
+  public static function basic(model:RobotModel, ?steady:SteadyLoads, ?stiffness:JointCoupling->Float):Array<AxisLoad> {
     var loads = steady == null ? new SteadyLoads() : steady;
     var followers = new Map<String, Bool>();
     for (coupling in model.couplings) followers.set(coupling.follower, true);
     var result:Array<AxisLoad> = [];
     for (joint in model.joints) {
       if (followers.exists(joint.id)) continue;
-      var load = axisLoad(model, joint, loads);
+      var load = axisLoad(model, joint, loads, stiffness);
       if (load != null) result.push(load);
     }
     return result;
@@ -262,7 +280,7 @@ class DriveLoads {
     return result;
   }
 
-  static function axisLoad(model:RobotModel, axis:Joint, steady:SteadyLoads):Null<AxisLoad> {
+  static function axisLoad(model:RobotModel, axis:Joint, steady:SteadyLoads, ?stiffness:JointCoupling->Float):Null<AxisLoad> {
     var reached:Array<Joint> = [axis];
     var ratios:Array<Float> = [1.0];
     var efficiencies:Array<Float> = [1.0];
@@ -293,8 +311,9 @@ class DriveLoads {
         efficiencies.push(efficiencies[at] * coupling.efficiency);
         // Stiffness is at the coupling's leader, which moves |leaderRatio| per unit of the axis.
         var leaderScale = Math.abs(leaderRatio);
-        var soft = coupling.stiffness > 0.0;
-        compliance.push(compliance[at] + (soft ? 1.0 / (coupling.stiffness * leaderScale * leaderScale) : 0.0));
+        var value = stiffness == null ? coupling.stiffness : stiffness(coupling);
+        var soft = value > 0.0;
+        compliance.push(compliance[at] + (soft ? 1.0 / (value * leaderScale * leaderScale) : 0.0));
         backlash.push(backlash[at] + coupling.backlash / leaderScale);
         // Drag is in the follower's units; further down the chain it reaches the motor through the ratios.
         drag.push(drag[at] * Math.abs(coupling.ratio) + coupling.drag);

@@ -51,7 +51,35 @@ class BenchMillPreview {
 }
 
 class BenchMillChecks {
+	/** Verify each moving nut's physical series load path independently of the transmission derivation. */
+	public static function stiffness():Void {
+		var mill = new BenchMill(), model = new AssemblyModel("mm");
+		mill.addTo(model, "");
+		var definition = model.definition(BenchMillPreview.ASSEMBLY_ID), state = new AssemblyState(definition);
+		for (drive in mill.axisDrives) {
+			var spec = drive.spec, id = "screw" + spec.id.toUpperCase();
+			var coupling = [for (c in definition.couplings) if (c.source == spec.id && c.target == id+"-turn") c][0];
+			if (coupling.stiffnessLaw == null) throw '$id lost its changing shaft load path';
+			var law = new materia.assembly.PositionStiffness(coupling.stiffnessLaw), values:Array<Float> = [];
+			for (q in [spec.lower,(spec.lower+spec.upper)*0.5,spec.upper]) {
+				state.setJoint(spec.id,q); state.forwardKinematics();
+				var inverse = AssemblyFrames.inverse(state.worldPose(id));
+				var fixed = state.worldConnector(id+"Fixed","axis"), nut = state.worldConnector(id+"Nut","bore");
+				var bearingStation = AssemblyFrames.transformPoint(inverse,fixed.x,fixed.y,fixed.z).z;
+				var nutStation = AssemblyFrames.transformPoint(inverse,nut.x,nut.y,nut.z).z;
+				var shaft = drive.screw.axialComplianceBetween(bearingStation,nutStation);
+				var expected = 1.0/(shaft+1.0/200000.0+1.0/300000.0), actual = law.at(joint->state.joint(joint));
+				if (Math.abs(actual-expected)>expected*1e-9) throw '$id stiffness $actual differs from its shaft, nut and bearing series $expected';
+				if (!(actual<1.0/shaft)) throw '$id omitted its nut or bearing compliance';
+				values.push(actual*1000);
+			}
+			if (Math.abs(values[0]-values[2])<values[1]*0.01) throw '$id stiffness must vary with nut station';
+			Sys.println('bench mill ${spec.id} stiffness ends/middle: $values N/m');
+		}
+	}
+
 	public static function run():Void {
+		stiffness();
 		var mill = new BenchMill();
 		var model = new AssemblyModel("mm");
 		mill.addTo(model, "");

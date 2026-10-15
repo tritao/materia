@@ -20,6 +20,23 @@ class BallScrew extends LeadScrew {
 		if (length <= INPUT_JOURNAL_LENGTH + JOURNAL_LENGTH) throw "Ball screw needs a race between its journals";
 	}
 
+	override public function axialRigidityAt(position:Float):Float {
+		if (position>=INPUT_JOURNAL_LENGTH && position<=totalLength-JOURNAL_LENGTH) return super.axialRigidityAt(position);
+		return YOUNGS_MODULUS/1e6*Math.PI*JOURNAL_DIAMETER*JOURNAL_DIAMETER/4.0;
+	}
+
+	override public function axialComplianceBetween(from:Float, to:Float):Float {
+		if (!Math.isFinite(from) || !Math.isFinite(to) || Math.min(from,to)<0 || Math.max(from,to)>totalLength)
+			throw "Axial load path must lie on the ball screw shaft";
+		var low = Math.min(from,to), high = Math.max(from,to), compliance = 0.0;
+		var boundaries = [0.0,INPUT_JOURNAL_LENGTH,totalLength-JOURNAL_LENGTH,totalLength];
+		for (index in 0...3) {
+			var a = Math.max(low,boundaries[index]), b = Math.min(high,boundaries[index+1]);
+			if (b>a) compliance += (b-a)/axialRigidityAt((a+b)*0.5);
+		}
+		return compliance;
+	}
+
 	override public function geometry(detail:machinekit.component.ComponentDetail = Preview):cadkit.modeling.Part {
 		return machinekit.component.Solids.union([
 			machinekit.component.Solids.named(cadkit.modeling.Part.cylinderSpan(JOURNAL_DIAMETER / 2, 0, INPUT_JOURNAL_LENGTH), "input-journal"),

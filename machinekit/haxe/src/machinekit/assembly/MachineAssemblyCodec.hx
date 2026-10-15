@@ -392,7 +392,7 @@ class MachineAssemblyCodec {
 		}
 		for (coupling in level.couplings)
 			target.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset,
-				coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions, coupling.dampingRatio);
+				coupling.efficiency, coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions, coupling.dampingRatio, coupling.stiffnessLaw);
 		for (path in machine.beltPaths) target.addBeltPath(path);
 		// A transmission whose coupling is gone goes too. The rest take their ratios from their parts as
 		// they are now, not as they were saved; a change is reported.
@@ -406,7 +406,7 @@ class MachineAssemblyCodec {
 				var saved = target.mechanical.coupling(transmission.coupling);
 				if (saved == null) continue;
 				var current = derivedCoupling(flat, saved);
-				if (!Equality.equals(couplingValues(saved), couplingValues(current)) || !Equality.equals(saved.assumed, current.assumed))
+				if (!Equality.equals(couplingValues(saved), couplingValues(current)) || !Equality.equals(saved.stiffnessLaw,current.stiffnessLaw) || !Equality.equals(saved.assumed, current.assumed))
 					target.diagnostics.warning("transmission.snapshot", transmission.coupling,
 						'Transmission "${transmission.coupling}" changed; its current parts replace the stored coupling');
 			}

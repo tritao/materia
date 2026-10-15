@@ -525,6 +525,21 @@ RK_API rk_result RK_CALL rk_simulation_set_joint_slip(
  * The caller owns homing authorization and must release holds on cancellation or fault. */
 RK_API rk_result RK_CALL rk_simulation_set_squaring_hold(
     rk_simulation simulation, uint32_t robot_index, uint32_t joint, uint32_t active, double position);
+/** Physical constitutive law; this metadata belongs to simulation, not the device timing blueprint.
+ * Coordinates are physical robot joint indices, independent of calibrated counters and stepper slip. */
+typedef struct rk_simulation_coupling_law_desc {
+    uint32_t struct_size NK_STRUCT_SIZE;
+    uint32_t leader;
+    uint32_t follower;
+    uint32_t spring_count;
+    double compliance[NKSIM_MAX_COMPLIANCE_SPRINGS];
+    uint32_t coordinate_count[NKSIM_MAX_COMPLIANCE_SPRINGS];
+    uint32_t coordinate_joint[NKSIM_MAX_COMPLIANCE_SPRINGS * NKSIM_MAX_COMPLIANCE_COORDINATES];
+    double gradient[NKSIM_MAX_COMPLIANCE_SPRINGS * NKSIM_MAX_COMPLIANCE_COORDINATES];
+} rk_simulation_coupling_law_desc;
+RK_API rk_result RK_CALL rk_simulation_set_coupling_law(rk_simulation simulation, uint32_t robot_index,
+    const rk_simulation_coupling_law_desc *desc);
+
 /** Place a cold/reset robot at a coupling-consistent physical offset while keeping its counter origin.
  * Full joint vector in SI units; accepted only in a stopped world before the first runtime sample. */
 RK_API rk_result RK_CALL rk_simulation_set_power_up_offsets(rk_simulation simulation,

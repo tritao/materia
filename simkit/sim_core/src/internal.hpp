@@ -307,6 +307,7 @@ public:
     nksim_result reset();
     nksim_result create_joint(const nksim_joint_desc &desc, nksim_joint *out_joint);
     nksim_result couple_joint(const nksim_joint_coupling_desc &desc);
+    nksim_result set_coupling_law(const nksim_coupling_law_desc &desc);
     nksim_result create_closure(const nksim_closure_desc &desc);
     nksim_result destroy_joint(nksim_joint joint);
     nksim_result get_joint_state(nksim_joint joint, nksim_joint_state *out_state) const;

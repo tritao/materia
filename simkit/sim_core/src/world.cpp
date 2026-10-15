@@ -1239,6 +1239,38 @@ nksim_result World::couple_joint(const nksim_joint_coupling_desc &desc) {
                                   desc.ratio, desc.offset, stiffness, desc.damping_ratio});
 }
 
+nksim_result World::set_coupling_law(const nksim_coupling_law_desc &desc) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (desc.struct_size != sizeof(desc) || desc.spring_count == 0 || desc.spring_count > NKSIM_MAX_COMPLIANCE_SPRINGS)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto *leader = joints.get(desc.leader), *follower = joints.get(desc.follower);
+    if (!leader || !follower) return NKSIM_ERROR_INVALID_HANDLE;
+    std::vector<BackendComplianceSpring> springs;
+    for (std::uint32_t s = 0; s < desc.spring_count; ++s) {
+        if (!std::isfinite(desc.compliance[s]) || desc.coordinate_count[s] > NKSIM_MAX_COMPLIANCE_COORDINATES)
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        BackendComplianceSpring spring{desc.compliance[s], {}};
+        double least = spring.compliance;
+        for (std::uint32_t c = 0; c < desc.coordinate_count[s]; ++c) {
+            const auto index = s * NKSIM_MAX_COMPLIANCE_COORDINATES + c;
+            const auto *joint = joints.get(desc.coordinate_joint[index]);
+            const double gradient = desc.gradient[index];
+            if (!joint) return NKSIM_ERROR_INVALID_HANDLE;
+            if ((joint->desc.type != NKSIM_JOINT_REVOLUTE && joint->desc.type != NKSIM_JOINT_PRISMATIC) ||
+                !std::isfinite(joint->desc.lower_limit) || !std::isfinite(joint->desc.upper_limit) ||
+                joint->desc.lower_limit > joint->desc.upper_limit || !std::isfinite(gradient) || gradient == 0.0)
+                return NKSIM_ERROR_INVALID_ARGUMENT;
+            for (const auto &existing : spring.coordinates) if (existing.joint == joint->backend_joint)
+                return NKSIM_ERROR_INVALID_ARGUMENT;
+            least += gradient * (gradient > 0.0 ? joint->desc.lower_limit : joint->desc.upper_limit);
+            spring.coordinates.push_back({joint->backend_joint, gradient});
+        }
+        if (!(least > 0.0) || !std::isfinite(least)) return NKSIM_ERROR_INVALID_ARGUMENT;
+        springs.push_back(std::move(spring));
+    }
+    return backend->set_coupling_law(leader->backend_joint, follower->backend_joint, std::move(springs));
+}
+
 nksim_result World::create_closure(const nksim_closure_desc &desc) {
     if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
     if (desc.type < NKSIM_JOINT_FIXED || desc.type > NKSIM_JOINT_PLANAR)

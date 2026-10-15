@@ -181,7 +181,19 @@ class AssemblyDefinitionCodec {
 				(coupling.backlash != null && !(coupling.backlash >= 0 && Math.isFinite(coupling.backlash))) ||
 				(coupling.drag != null && !(coupling.drag >= 0 && Math.isFinite(coupling.drag))))
 				throw "Assembly has an invalid coupled joint";
-			if (movable.get(coupling.target).driven == true)
+			if (coupling.stiffnessLaw != null) {
+				if (coupling.stiffnessLaw.length == 0 || coupling.stiffness == null || !(coupling.stiffness>0.0))
+					throw "A position stiffness law needs a positive planning stiffness";
+				new PositionStiffness(coupling.stiffnessLaw).range(id -> {
+					var joint = movable.get(id);
+					if (joint == null || joint.limits.lower == null || joint.limits.upper == null)
+						throw "Position stiffness needs bounded joint coordinates";
+					var overtravel = joint.limits.overtravel == null ? 0.0 : joint.limits.overtravel;
+					return {lower:joint.limits.lower-overtravel,upper:joint.limits.upper+overtravel};
+				});
+			}
+			var targetJoint:KinematicJoint = movable.get(coupling.target);
+			if (targetJoint.driven == true)
 				throw 'Assembly joint "${coupling.target}" is driven by a coupling, so it cannot also be an input';
 			names.set(coupling.id, true);
 			targets.set(coupling.target, true);

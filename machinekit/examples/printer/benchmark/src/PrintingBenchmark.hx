@@ -380,7 +380,12 @@ class PrintingBenchmark {
       resonances.set(data.axis, found);
       var ratio = data.frequency / found.frequency;
       check(Math.abs(ratio - 1.0) < 0.1, 'the ${data.axis} shaper says ${data.frequency} Hz, the model gives ${found.frequency} Hz (${found.mass} kg on ${found.stiffness} N/m)');
-      tails.set(data.axis, InputShaper.named(data.kind, data.frequency, data.damping).impulses.tail());
+      var upper = [for (load in robotkit.model.DriveLoads.stiffest(machine.planning,null,[data.axis])) load][0];
+      var upperHz = Math.sqrt(upper.stiffness/upper.mass)/(2*Math.PI);
+      var shaper = InputShaper.named(data.kind,data.frequency,data.damping);
+      check(Math.abs(data.frequency/upperHz-1.0)<0.1,"fixed tuning covers the stiffest travel pose too");
+      check(shaper.impulses.residualBound(0.9*found.frequency,1.1*upperHz,data.damping)<=0.2,"fixed tuning covers the continuous resonance band and uncertainty");
+      tails.set(data.axis, shaper.impulses.tail());
     }
     var report:Array<String> = [];
     for (move in [{name: "x", dx: 1.0, dy: 0.0}, {name: "y", dx: 0.0, dy: 1.0}, {name: "45", dx: 1.0, dy: 1.0}]) {

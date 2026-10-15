@@ -116,6 +116,9 @@ struct BackendJointTarget {
     double reference_duration = 0.0;
 };
 
+struct BackendComplianceCoordinate { std::uint64_t joint; double gradient; };
+struct BackendComplianceSpring { double compliance; std::vector<BackendComplianceCoordinate> coordinates; };
+
 struct BackendJointCoupling {
     std::uint64_t leader = 0;
     std::uint64_t follower = 0;
@@ -181,6 +184,9 @@ public:
     virtual nksim_result joint_destroy(std::uint64_t joint) = 0;
     virtual nksim_result joint_configure_brake(std::uint64_t joint, BrakeParameters parameters) = 0;
     virtual nksim_result joint_set_brake_release(std::uint64_t joint, bool energized) = 0;
+    virtual nksim_result set_coupling_law(std::uint64_t, std::uint64_t, std::vector<BackendComplianceSpring>) {
+        return NKSIM_ERROR_UNSUPPORTED;
+    }
     virtual nksim_result joint_couple(const BackendJointCoupling &coupling) = 0;
     virtual nksim_result closure_create(const BackendClosure &closure) = 0;
     /** Backends without explicit pairs keep their own contact rules. */

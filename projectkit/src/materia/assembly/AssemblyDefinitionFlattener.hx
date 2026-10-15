@@ -198,6 +198,12 @@ class AssemblyDefinitionFlattener {
 		homeAfter: contact.homeAfter == null ? null : [for (id in contact.homeAfter) map(id)]
 	};
 
+	/** Copy every compliance coordinate into its containing joint namespace. */
+	public static function copyComplianceLaw(law:Array<materia.assembly.AssemblyDefinition.AssemblyComplianceSpring>, map:String->String)
+			:Array<materia.assembly.AssemblyDefinition.AssemblyComplianceSpring>
+		return [for (spring in law) {compliance:spring.compliance,coordinates:[for (coordinate in spring.coordinates)
+			{joint:map(coordinate.joint),coefficient:coordinate.coefficient}]}];
+
 	/** Keep every coordinate and motion-source reference in a network's namespace. */
 	public static function copyElasticNetwork(network:materia.assembly.AssemblyDefinition.AssemblyElasticNetwork,
 			map:String->String):materia.assembly.AssemblyDefinition.AssemblyElasticNetwork return {
@@ -295,6 +301,7 @@ class AssemblyDefinitionFlattener {
 				target: scoped(prefix, coupling.target), ratio: coupling.ratio, offset: coupling.offset};
 			if (coupling.efficiency != null) expanded.efficiency = coupling.efficiency;
 			if (coupling.stiffness != null) expanded.stiffness = coupling.stiffness;
+			if (coupling.stiffnessLaw != null) expanded.stiffnessLaw = copyComplianceLaw(coupling.stiffnessLaw,id->scoped(prefix,id));
 			if (coupling.dampingRatio != null) expanded.dampingRatio = coupling.dampingRatio;
 			if (coupling.backlash != null) expanded.backlash = coupling.backlash;
 			if (coupling.drag != null) expanded.drag = coupling.drag;

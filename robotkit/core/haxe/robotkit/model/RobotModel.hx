@@ -395,6 +395,7 @@ class RobotModel {
         if (joint.id == coupling.leader) hasLeader = true;
         if (joint.id == coupling.follower) hasFollower = true;
       }
+      try coupling.validateStiffnessLaw(joints) catch (error:Dynamic) errors.push(Std.string(error));
       if (!hasLeader || !hasFollower)
         errors.push('joint coupling ${coupling.id} references an unknown joint');
     }

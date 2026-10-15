@@ -1,5 +1,7 @@
 package robotkit.model;
 
+import materia.assembly.PositionStiffness;
+
 
 import haxe.Json;
 import haxeon.wire.JsonWire;
@@ -377,6 +379,12 @@ class RobotModelCodec {
       if (Reflect.hasField(record, "dampingRatio")) coupling.dampingRatio = nonNegative(number(record, "dampingRatio"), "coupling damping ratio");
       if (Reflect.hasField(record, "backlash")) coupling.backlash = nonNegative(number(record, "backlash"), "coupling backlash");
       if (Reflect.hasField(record, "drag")) coupling.drag = nonNegative(number(record, "drag"), "coupling drag");
+      if (Reflect.hasField(record, "stiffnessLaw")) {
+        var law = new PositionStiffness([for (spring in array(record,"stiffnessLaw"))
+          {compliance:number(spring,"compliance"),coordinates:[for (coordinate in array(spring,"coordinates"))
+            {joint:text(coordinate,"joint"),coefficient:number(coordinate,"coefficient")}]}]);
+        coupling.setStiffnessLaw(law,model.joints);
+      }
       coupling.assumed = readAssumed(record);
       coupling.assumptions = readAssumptions(record);
       if (!joints.exists(coupling.leader) || !joints.exists(coupling.follower))
@@ -631,6 +639,7 @@ class RobotModelCodec {
       id: coupling.id, leader: coupling.leader, follower: coupling.follower,
       ratio: coupling.ratio, offset: coupling.offset, efficiency: coupling.efficiency
     };
+    if (coupling.stiffnessLaw != null) record.stiffnessLaw = coupling.stiffnessLaw.springs;
     if (coupling.stiffness != 0.0) record.stiffness = nonNegative(coupling.stiffness, "coupling stiffness");
     if (coupling.dampingRatio != 0.0) record.dampingRatio = nonNegative(coupling.dampingRatio, "coupling damping ratio");
     if (coupling.backlash != 0.0) record.backlash = nonNegative(coupling.backlash, "coupling backlash");

@@ -70,6 +70,8 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	const NKSIM_JOINT_TARGET_SERVO = 4;
 	const NKSIM_JOINT_TARGET_VELOCITY = 2;
+	const NKSIM_MAX_COMPLIANCE_COORDINATES = 8;
+	const NKSIM_MAX_COMPLIANCE_SPRINGS = 8;
 	const NKSIM_MOTION_DYNAMIC = 2;
 	const NKSIM_MOTION_KINEMATIC = 1;
 	const NKSIM_MOTION_STATIC = 0;
@@ -139,6 +141,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * Digital release coil; zero de-energizes, one energizes.
 	 */
 	extern fn nksim_joint_set_brake_release(world: nksim_world, joint: nksim_joint, energized: u32) -> nksim_result;
+	extern fn nksim_joint_set_coupling_law(world: nksim_world, desc: ptr<const<nksim_coupling_law_desc>>) -> nksim_result;
 	/**
 	 * Places a one-DOF joint at a position and velocity, moving the bodies it
 	 * carries, as a pose to start from; it is not a target. Coupled followers are
@@ -507,6 +510,16 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		 */
 		surface: nksim_surface @offset(24);
 	}
+	struct nksim_coupling_law_desc @layout(880, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		leader: nksim_joint @offset(4);
+		follower: nksim_joint @offset(8);
+		spring_count: u32 @offset(12);
+		compliance: array<f64, 8> @offset(16);
+		coordinate_count: array<u32, 8> @offset(80);
+		coordinate_joint: array<nksim_joint, 64> @offset(112);
+		gradient: array<f64, 64> @offset(368);
+	}
 	/**
 	 * One term of a follower's value, in joint coordinates: ratio * leader + offset. A follower with
 	 * several couplings is the sum of their terms (a CoreXY motor follows both axes). Each leader and
@@ -526,7 +539,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		stiffness: f64 @offset(32);
 		/**
 		 * How damped the coupling's response is, as a ratio of critical damping (a timing belt's is small, 0.1 or so,
-		 * so a carriage on it rings); zero preserves the backend default: the coupling is not simulated as a spring. With several couplings
+		 * so a carriage on it rings); zero is an undamped spring. With several couplings
 		 * on one follower the backend takes the mean of their ratios weighted by stiffness.
 		 */
 		damping_ratio: f64 @offset(40);

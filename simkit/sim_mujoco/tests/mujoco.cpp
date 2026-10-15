@@ -1964,7 +1964,8 @@ struct BeltRing {
 };
 
 BeltRing belt_ring(double mass, double stiffness, double damping_ratio, double ratio, uint32_t motor_type,
-                   double timestep, uint32_t substeps, double follower_mass, double servo_stiffness) {
+                   double timestep, uint32_t substeps, double follower_mass, double servo_stiffness,
+                   bool position_law = false, double station = 0.0) {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
     nksim_world_desc desc{};
@@ -1982,12 +1983,13 @@ BeltRing belt_ring(double mass, double stiffness, double damping_ratio, double r
     joint.type = NKSIM_JOINT_PRISMATIC;
     joint.body_a = base;
     joint.axis_a[0] = 1.0;
-    joint.lower_limit = -100.0;
-    joint.upper_limit = 100.0;
+    joint.lower_limit = position_law ? -0.45 : -100.0;
+    joint.upper_limit = position_law ? 0.45 : 100.0;
     joint.max_force = 1.0e5;
     nksim_joint carriage = 0, motor = 0;
     joint.body_b = carriage_body;
     assert(nksim_joint_create(world, &joint, &carriage) == NKSIM_OK);
+    joint.lower_limit = -100.0; joint.upper_limit = 100.0;
     joint.body_b = motor_body;
     joint.type = motor_type;
     assert(nksim_joint_create(world, &joint, &motor) == NKSIM_OK);
@@ -1999,15 +2001,36 @@ BeltRing belt_ring(double mass, double stiffness, double damping_ratio, double r
     coupling.stiffness = stiffness / (ratio * ratio);
     coupling.damping_ratio = damping_ratio;
     assert(nksim_joint_couple(world, &coupling) == NKSIM_OK);
+    if (position_law) {
+        nksim_coupling_law_desc law{};
+        law.struct_size = sizeof(law); law.leader = carriage; law.follower = motor; law.spring_count = 2;
+        for (int spring = 0; spring < 2; ++spring) {
+            law.compliance[spring] = 0.5 * ratio * ratio / 1000.0;
+            law.coordinate_count[spring] = 1;
+            law.coordinate_joint[spring * NKSIM_MAX_COMPLIANCE_COORDINATES] = carriage;
+            law.gradient[spring * NKSIM_MAX_COMPLIANCE_COORDINATES] = (spring == 0 ? 1.0 : -1.0) * ratio * ratio / 1000.0;
+        }
+        assert(nksim_joint_set_coupling_law(world, &law) == NKSIM_OK);
+        auto invalid = law; invalid.compliance[0] = 0.0;
+        assert(nksim_joint_set_coupling_law(world, &invalid) == NKSIM_ERROR_INVALID_ARGUMENT);
+        // A refused physical pose must not retain a partial stiffness-gradient force when repaired.
+        assert(nksim_joint_set_state(world, carriage, 0.6, 0.0) == NKSIM_OK);
+        nksim_step_result rejected{}; rejected.struct_size = sizeof(rejected);
+        assert(nksim_world_step(world, &rejected) == NKSIM_ERROR_BACKEND);
+        // The failed replacement and failed step must leave the original law intact.
+        assert(nksim_joint_set_state(world, carriage, station, 0.0) == NKSIM_OK);
+        assert(nksim_joint_set_state(world, motor, station * ratio, 0.0) == NKSIM_OK);
+    }
     // The drive moves the belt a millimetre in four milliseconds and holds. Its stiffness (in the carriage's metres) is
     // in series with the belt's.
-    const double step = 1.0e-3 * ratio;
+    const double distance = position_law ? 1.0e-4 : 1.0e-3;
+    const double step = distance * ratio;
     nksim_joint_target hold{};
     hold.struct_size = sizeof(hold);
     hold.joint = motor;
     hold.mode = NKSIM_JOINT_TARGET_SERVO;
-    hold.target = 0.0;
-    hold.end_position = step;
+    hold.target = station * ratio;
+    hold.end_position = station * ratio + step;
     hold.reference_duration = 0.004;
     hold.max_force = 1.0e5;
     hold.stiffness = servo_stiffness / (ratio * ratio);
@@ -2020,7 +2043,7 @@ BeltRing belt_ring(double mass, double stiffness, double damping_ratio, double r
     for (int tick = 0; tick < ticks; ++tick) {
         step_world(world, 1);
         assert(nksim_joint_get_state(world, carriage, &state) == NKSIM_OK);
-        position.push_back(state.position - 1.0e-3);
+        position.push_back(state.position - station - distance);
     }
     nksim_world_destroy(world);
     nkscene_scene_destroy(scene);
@@ -2042,6 +2065,26 @@ BeltRing belt_ring(double mass, double stiffness, double damping_ratio, double r
     ring.damping_ratio = decrement / std::sqrt(4.0 * M_PI * M_PI + decrement * decrement);
     ring.frequency = 1.0 / period / std::sqrt(1.0 - ring.damping_ratio * ring.damping_ratio);
     return ring;
+}
+
+
+void belt_stiffness_follows_physical_span_lengths() {
+    for (double station : {-0.4, 0.0, 0.4}) {
+        const double q = station + 1e-4;
+        const double k = 1000.0 * (1.0 / (0.5 + q) + 1.0 / (0.5 - q));
+        const double servo = 1e7, effective = k * servo / (k + servo);
+        const double expected = std::sqrt(effective) / (2 * M_PI);
+        double previous = 0.0;
+        for (uint32_t substeps : {16u, 32u}) {
+            const auto ring = belt_ring(1.0, 4000.0, 0.1, -10.0, NKSIM_JOINT_PRISMATIC, 0.001, substeps, 0.02, servo, true, station);
+            std::fprintf(stderr,"position belt q=%g: %g Hz, expected %g, damping %g\n", station, ring.frequency, expected, ring.damping_ratio);
+            assert(ring.crossings >= 3);
+            assert(std::abs(ring.frequency / expected - 1.0) < 0.015);
+            assert(std::abs(ring.damping_ratio - 0.1) < 0.02);
+            if (previous > 0.0) assert(std::abs(ring.frequency / previous - 1.0) < 0.005);
+            previous = ring.frequency;
+        }
+    }
 }
 
 
@@ -3459,6 +3502,7 @@ int main() {
     a_follower_with_two_leaders_uses_a_tendon_equality();
     a_coupling_rings_as_its_damping_ratio_says();
     a_vertical_follower_sags_by_its_weight_over_the_stiffness();
+    belt_stiffness_follows_physical_span_lengths();
     a_belt_carriage_rings_at_its_belt_frequency();
     convex_hulls_overlapping_at_rest_do_not_collide();
     mounted_contact_groups_span_articulations_only();

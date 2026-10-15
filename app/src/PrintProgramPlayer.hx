@@ -184,8 +184,20 @@ class PrintProgramPlayer extends ToolpathPlayer {
 		machine.setRapidsAtFeed(true);
 		var printer = new PrinterBinding(job.extruder, job.filamentDiameter, job.gearRadius, job.maxFlow, job.rampLength,
 			job.pressureAdvance, job.pressureAdvanceWindow);
-		if (job.shaping != null) for (shaper in job.shaping)
-			printer.shapers.set(shaper.axis, InputShaper.named(shaper.kind, shaper.frequency, shaper.damping));
+		if (job.shaping != null) {
+			var soft = robotkit.model.DriveLoads.of(machineModel,null,[for (shaper in job.shaping) shaper.axis]);
+			var hard = robotkit.model.DriveLoads.stiffest(machineModel,null,[for (shaper in job.shaping) shaper.axis]);
+			for (shaper in job.shaping) {
+				var shaped = InputShaper.named(shaper.kind,shaper.frequency,shaper.damping);
+				for (load in soft) if (load.axis == shaper.axis && load.stiffness>0.0 && load.mass>0.0) {
+					var upper = [for (candidate in hard) if (candidate.axis == load.axis) candidate][0];
+					var lowerHz = Math.sqrt(load.stiffness/load.mass)/(2*Math.PI), upperHz = Math.sqrt(upper.stiffness/upper.mass)/(2*Math.PI);
+					if (shaped.impulses.residualBound(lowerHz,upperHz,shaper.damping)>0.2)
+						throw 'Fixed shaper for ${shaper.axis} does not cover physical travel: $lowerHz..$upperHz Hz';
+				}
+				printer.shapers.set(shaper.axis,shaped);
+			}
+		}
 		machine.setPrinter(printer);
 		var binding = new ToolpathMotionBinding(machine, blueprint);
 		// Every plan is checked against the drives: the plan's joints are all of the machine's, the axes' and the extruder's motors are loaded.

@@ -7,7 +7,7 @@ class ElasticSolve {
   public final compliance:Array<Array<Float>>;
   public final backlash:Array<Float>;
 
-  public function new(model:RobotModel, loads:Array<AxisLoad>) {
+  public function new(model:RobotModel, loads:Array<AxisLoad>, ?response:JointCoupling->Float) {
     var ids:Array<String> = [];
     for (load in loads) ids.push(load.axis);
     // A saved model may contain a separate, unactuated mechanism. It cannot
@@ -72,8 +72,9 @@ class ElasticSolve {
           throw "A summed follower cannot mix a network motion term and an independent scalar transmission";
         row[ids.indexOf(coupling.leader)] -= coupling.ratio;
         loss = Math.max(loss, Math.abs(coupling.ratio) * coupling.backlash);
-        if (coupling.stiffness > 0) {
-          var reflected = coupling.stiffness / (coupling.ratio * coupling.ratio);
+        var value = response == null ? coupling.stiffness : response(coupling);
+        if (value > 0) {
+          var reflected = value / (coupling.ratio * coupling.ratio);
           k = k == 0.0 ? reflected : Math.min(k, reflected);
         }
       }

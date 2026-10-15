@@ -264,11 +264,27 @@ typedef struct nksim_joint_coupling_desc {
     double stiffness;
     /**
      * How damped the coupling's response is, as a ratio of critical damping (a timing belt's is small, 0.1 or so,
-     * so a carriage on it rings); zero preserves the backend default: the coupling is not simulated as a spring. With several couplings
+     * so a carriage on it rings); zero is an undamped spring. With several couplings
      * on one follower the backend takes the mean of their ratios weighted by stiffness.
      */
     double damping_ratio;
 } nksim_joint_coupling_desc;
+
+/** Pose-dependent constitutive response, configured while stopped. K(q) = sum_s 1/(c_s + sum_j gradient_sj*q_j).
+ * Compliance is measured in the follower coordinate per effort; q uses physical SI joint coordinates.
+ * Bounds are checked against physical joint travel; zero/negative span compliance is invalid. */
+enum { NKSIM_MAX_COMPLIANCE_SPRINGS = 8, NKSIM_MAX_COMPLIANCE_COORDINATES = 8 };
+typedef struct nksim_coupling_law_desc {
+    uint32_t struct_size NK_STRUCT_SIZE;
+    nksim_joint leader;
+    nksim_joint follower;
+    uint32_t spring_count;
+    double compliance[NKSIM_MAX_COMPLIANCE_SPRINGS];
+    uint32_t coordinate_count[NKSIM_MAX_COMPLIANCE_SPRINGS];
+    nksim_joint coordinate_joint[NKSIM_MAX_COMPLIANCE_SPRINGS * NKSIM_MAX_COMPLIANCE_COORDINATES];
+    double gradient[NKSIM_MAX_COMPLIANCE_SPRINGS * NKSIM_MAX_COMPLIANCE_COORDINATES];
+} nksim_coupling_law_desc;
+NKSIM_API nksim_result NKSIM_CALL nksim_joint_set_coupling_law(nksim_world world, const nksim_coupling_law_desc *desc);
 
 /** Closed-loop fixed, revolute, or prismatic joint between tree bodies. */
 typedef struct nksim_closure_desc {

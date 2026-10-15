@@ -187,6 +187,15 @@ class RobotRuntimeCompiler {
         leader, follower, coupling.ratio, coupling.offset);
       compiledCoupling.stiffness = coupling.stiffness / (coupling.ratio * coupling.ratio);
       compiledCoupling.dampingRatio = coupling.dampingRatio;
+      if (coupling.stiffnessLaw != null) compiledCoupling.stiffnessLaw = [
+        for (spring in coupling.stiffnessLaw.springs) {compliance:spring.compliance*coupling.ratio*coupling.ratio,
+          coordinates:[for (coordinate in spring.coordinates) {
+            var joint = -1;
+            for (index in 0...robot.joints.length) if (robot.joints[index].id == coordinate.joint) joint = index;
+            if (joint<0) throw 'Unknown stiffness joint "${coordinate.joint}"';
+            {joint:joint,coefficient:coordinate.coefficient*coupling.ratio*coupling.ratio};
+          }]}
+      ];
       result.couplings.push(compiledCoupling);
     }
     var children = [for (joint in robot.joints) joint.child];
@@ -495,6 +504,8 @@ class RobotRuntimeCompiler {
           joint.type == JointType.Fixed)
         diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_FIXED", path,
           "joint coupling requires movable joints"));
+      try coupling.validateStiffnessLaw(robot.joints) catch (error:Dynamic)
+        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_STIFFNESS", path, Std.string(error)));
       if (!Math.isFinite(coupling.ratio) || coupling.ratio == 0.0 || !Math.isFinite(coupling.offset))
         diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_VALUE", path, "invalid coupling ratio or offset"));
     }

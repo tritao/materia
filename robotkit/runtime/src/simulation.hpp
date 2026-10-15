@@ -51,6 +51,7 @@ public:
      * Holds one robot joint `offset` behind (or ahead of) its commanded position from the next
      * command on, as a stepper that has lost steps is. Reset clears it.
      */
+    rk_result set_coupling_law(uint32_t robot_index, const rk_simulation_coupling_law_desc &desc);
     rk_result set_joint_slip(uint32_t robot_index, uint32_t joint, double offset);
     /** Hold one actuated shaft at a physical position while its coupled leader continues. */
     rk_result set_squaring_hold(uint32_t robot_index, uint32_t joint, bool active, double position);

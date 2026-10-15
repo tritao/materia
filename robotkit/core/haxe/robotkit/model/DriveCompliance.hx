@@ -6,7 +6,7 @@ import robotkit.model.DriveLoads.AxisLoad;
 class DriveCompliance {
   public final compliance:Array<Array<Float>>;
 
-  public function new(loads:Array<AxisLoad>, ?model:RobotModel, ?matrix:Array<Array<Float>>) {
+  public function new(loads:Array<AxisLoad>, ?model:RobotModel, ?matrix:Array<Array<Float>>, ?response:JointCoupling->Float) {
     if (matrix != null) {
       compliance = matrix;
       for (load in loads) load.elastic = this;
@@ -40,7 +40,7 @@ class DriveCompliance {
         var matrix:Array<Array<Float>>;
         var losses:Array<Float> = [];
         if (hasNetwork) {
-          var solved = new ElasticSolve(model, block);
+          var solved = new ElasticSolve(model, block, response);
           matrix = solved.compliance;
           losses = solved.backlash;
         } else {

@@ -19,6 +19,9 @@ class MillPartTests {
 		near(screw.axialStiffness(), 200000 * Math.PI * 13 * 13 / 1600, "Shaft axial stiffness");
 		near(new BallScrew(200).axialStiffness(), 2 * screw.axialStiffness(), "Shorter shaft stiffness");
 		// The coupling carries it in the linear axis's units, N/m (it once took the N/mm value as N/m: a thousand times soft).
+		var journalEA = 200000 * Math.PI * 12 * 12 / 4, raceEA = 200000 * Math.PI * 13 * 13 / 4;
+		near(screw.axialComplianceBetween(37.5,200),12.5/journalEA+150/raceEA,"actual shaft path integrates its journal and race");
+		near(screw.axialComplianceBetween(200,37.5),screw.axialComplianceBetween(37.5,200),"shaft path is independent of direction");
 		var stiffness = relation.stiffness;
 		// The shaft, the preloaded nut (300 N/um) and the support bearings (200 N/um) are springs in series, in N/m.
 		var series = 1.0 / (1.0 / screw.axialStiffness() + 1.0 / 200000.0 + 1.0 / 300000.0);

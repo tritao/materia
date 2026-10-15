@@ -165,7 +165,16 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(11) @:optional var assumptions:Null<ReadOnlyArray<QuantityAssumption>>;
 	/** How damped the coupling's response is, as a ratio of critical damping (a timing belt's is about 0.1); absent is critical. */
 	@:id(12) @:optional var dampingRatio:Null<Float>;
+	/** Reciprocal affine compliances in the leader's units per effort, evaluated at physical assembly joint coordinates. */
+	@:id(13) @:optional var stiffnessLaw:Null<Array<AssemblyComplianceSpring>>;
 }
+
+/** Series compliance of one parallel spring, in source-coordinate units per effort. */
+@:wire typedef AssemblyComplianceSpring = {
+	@:id(1) var compliance:Float;
+	@:id(2) var coordinates:Array<AssemblyComplianceCoordinate>;
+}
+typedef AssemblyComplianceCoordinate = AssemblyElasticTerm;
 
 /** A derived elastic span; displacement coefficients use assembly length per joint unit. */
 @:wire typedef AssemblyElasticTerm = {

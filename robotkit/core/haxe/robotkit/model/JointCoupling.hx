@@ -1,5 +1,7 @@
 package robotkit.model;
 
+import materia.assembly.PositionStiffness;
+
 import robotkit.model.EngineeringAssumptions.QuantityAssumption;
 
 /**
@@ -25,12 +27,36 @@ class JointCoupling {
    * sliding leader, N m/rad for a turning one), such as a timing belt's stretch. Zero means rigid.
    */
   public var stiffness:Float = 0.0;
+  /** Physical-pose constitutive law; stiffness is its certified minimum over travel for planning. */
+  public var stiffnessLaw(default,null):Null<PositionStiffness> = null;
   /**
    * How damped the coupling's response is, as a ratio of critical damping: a timing belt's is small (about 0.1), so a
    * carriage on it rings after a push, a steel screw's smaller (about 0.03). It comes from the part (an assumption
    * stated per kind of transmission); zero is no damping at all, not "unstated".
    */
   public var dampingRatio:Float = 0.0;
+
+  public function setStiffnessLaw(law:PositionStiffness, joints:Array<Joint>):Void {
+    var envelope = stiffnessRange(law,joints);
+    stiffnessLaw = law;
+    stiffness = envelope.minimum;
+  }
+
+  /** Re-evaluate after joint-limit edits; a cached planning stiffness must remain conservative. */
+  public function validateStiffnessLaw(joints:Array<Joint>):Void {
+    if (stiffnessLaw == null) return;
+    var envelope = stiffnessRange(stiffnessLaw,joints);
+    if (!(stiffness > 0.0) || stiffness > envelope.minimum)
+      throw 'Coupling "$id" stiffness exceeds its travel envelope; reattach its stiffness law after editing joint limits';
+  }
+
+  static function stiffnessRange(law:PositionStiffness,joints:Array<Joint>):{minimum:Float,maximum:Float} {
+    return law.range(id -> {
+      for (joint in joints) if (joint.id == id) return {lower:joint.limits.lower-joint.limits.overtravel,
+        upper:joint.limits.upper+joint.limits.overtravel};
+      throw 'Coupling "$id" has an unknown stiffness coordinate';
+    });
+  }
 
   /** Whether a simulation makes this coupling a spring: any stiffness. Only a stiffness of zero is rigid. */
   public function isSpring():Bool return stiffness > 0.0;

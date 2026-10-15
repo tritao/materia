@@ -937,6 +937,55 @@ static void actuator_limit_stalls_then_lifts() {
 
 // A servo target is a plain PD with feedforward: it sags by load / stiffness,
 // feedforward cancels the load, and validation bounds its terms.
+// Independent gantry drives have kinematic fan-out relations. A position-
+// dependent spring must follow the same topology policy as a constant spring.
+static void kinematic_fanout_accepts_a_coupling_law() {
+    SessionFixture fixture(0.01);
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 4;
+    model.joint_count = 3;
+    for (auto &link : model.links) {
+        link.mass = 1.0;
+        link.inertia_tensor[0] = link.inertia_tensor[4] = link.inertia_tensor[8] = 0.1;
+    }
+    for (uint32_t i = 0; i < model.joint_count; ++i) {
+        auto &joint = model.joints[i];
+        joint.joint = i;
+        joint.type = RK_RUNTIME_JOINT_PRISMATIC;
+        joint.parent_link = 0;
+        joint.child_link = i + 1;
+        joint.lower_limit = -1.0;
+        joint.upper_limit = 1.0;
+        joint.max_effort = 100.0;
+        joint.limit_flags = RK_LIMIT_EFFORT;
+        joint.axis[0] = 1.0;
+        joint.parent_frame_rotation[3] = joint.child_frame_rotation[3] = 1.0;
+    }
+    model.coupling_count = 2;
+    model.couplings[0] = {0, 1, 1.0, 0.0};
+    model.couplings[1] = {0, 2, 1.0, 0.0};
+    model.coupling_stiffness[0] = model.coupling_stiffness[1] = 1000.0;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(fixture.simulation, &model, nullptr, &robot) == RK_OK);
+    rk_simulation_coupling_law_desc law{};
+    law.struct_size = sizeof(law);
+    law.leader = 0;
+    law.follower = 1;
+    law.spring_count = 1;
+    law.compliance[0] = 0.001;
+    law.coordinate_count[0] = 1;
+    law.coordinate_joint[0] = 1;
+    law.gradient[0] = 0.0001;
+    assert(rk_simulation_set_coupling_law(fixture.simulation, 0, &law) == RK_OK);
+    law.spring_count = 0;
+    assert(rk_simulation_set_coupling_law(fixture.simulation, 0, &law) == RK_ERROR_INVALID_ARGUMENT);
+    law.spring_count = 1;
+    law.leader = 1;
+    law.follower = 2;
+    assert(rk_simulation_set_coupling_law(fixture.simulation, 0, &law) == RK_ERROR_INVALID_ARGUMENT);
+}
+
 static void servo_target_runs_through_the_runtime() {
     const double load = 9.81 * 0.5;
     auto command = arm_command(RK_TARGET_SERVO, 0.0);
@@ -1554,6 +1603,7 @@ int main() {
     link_hulls_all_collide();
     actuator_limit_stalls_then_lifts();
     servo_target_runs_through_the_runtime();
+    kinematic_fanout_accepts_a_coupling_law();
     blueprint_joint_friction_holds_an_arm();
     link_shape_contact_softness_reaches_the_backend();
     link_primitives_collide_in_link_frame();

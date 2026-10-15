@@ -8,9 +8,11 @@ class RobotRuntimeJointCouplingBlueprint {
   public final follower:Int;
   public final ratio:Float;
   public final offset:Float;
-  /** Follower-coordinate stiffness; zero keeps the backend default. */
+  /** Follower-coordinate stiffness; zero is an ideal coupling constraint. */
   public var stiffness:Float = 0.0;
-  /** Damping of the coupling's response as a ratio of critical damping; zero keeps the backend default (critical). */
+  /** Simulation constitutive law in physical runtime joint indices. */
+  public var stiffnessLaw:Null<Array<{compliance:Float,coordinates:Array<{joint:Int,coefficient:Float}>}>> = null;
+  /** Damping of the coupling's response as a ratio of critical damping; zero is undamped. */
   public var dampingRatio:Float = 0.0;
 
   public function new(leader:Int, follower:Int, ratio:Float, offset:Float) {

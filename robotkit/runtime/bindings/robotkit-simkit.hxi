@@ -278,6 +278,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Restores one attached robot's bodies and clears its runtime state.
 	 */
 	extern fn rk_simulation_reset_robot(simulation: rk_simulation, robot_index: u32) -> rk_result;
+	extern fn rk_simulation_set_coupling_law(simulation: rk_simulation, robot_index: u32, desc: ptr<const<rk_simulation_coupling_law_desc>>) -> rk_result;
 	/**
 	 * Couples one robot's wheel velocity targets to its kinematic base.
 	 *
@@ -443,6 +444,20 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		contact_damping_ratio: f64 @offset(40);
 		friction_dimensions: u32 @offset(48);
 		reserved0: u32 @offset(52);
+	}
+	/**
+	 * Physical constitutive law; this metadata belongs to simulation, not the device timing blueprint.
+	 * Coordinates are physical robot joint indices, independent of calibrated counters and stepper slip.
+	 */
+	struct rk_simulation_coupling_law_desc @layout(880, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		leader: u32 @offset(4);
+		follower: u32 @offset(8);
+		spring_count: u32 @offset(12);
+		compliance: array<f64, 8> @offset(16);
+		coordinate_count: array<u32, 8> @offset(80);
+		coordinate_joint: array<u32, 64> @offset(112);
+		gradient: array<f64, 64> @offset(368);
 	}
 	/**
 	 * A simulation-owned cylinder and valve acting on one process joint. SI units.

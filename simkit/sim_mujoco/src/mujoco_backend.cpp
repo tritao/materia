@@ -804,6 +804,12 @@ public:
         const auto found = joints.find(id);
         if (found == joints.end())
             return NKSIM_ERROR_INVALID_HANDLE;
+        for (auto law = coupling_laws.begin(); law != coupling_laws.end();) {
+            bool dependent = law->first.first == id || law->first.second == id;
+            for (const auto &spring : law->second) for (const auto &coordinate : spring.coordinates)
+                dependent |= coordinate.joint == id;
+            if (dependent) law = coupling_laws.erase(law); else ++law;
+        }
         joints.erase(found);
         joint_order.erase(std::remove(joint_order.begin(), joint_order.end(), id), joint_order.end());
         couplings.erase(std::remove_if(couplings.begin(), couplings.end(),
@@ -857,6 +863,24 @@ public:
             return NKSIM_ERROR_INVALID_ARGUMENT;
         }
         return topology_update ? NKSIM_OK : rebuild();
+    }
+
+    nksim_result set_coupling_law(std::uint64_t leader, std::uint64_t follower,
+                                  std::vector<nksim::BackendComplianceSpring> springs) override {
+        const auto found = std::find_if(couplings.begin(), couplings.end(), [&](const auto &term) {
+            return term.leader == leader && term.follower == follower;
+        });
+        if (found == couplings.end() || !is_spring(*found)) return NKSIM_ERROR_INVALID_ARGUMENT;
+        const auto key = std::make_pair(leader, follower);
+        const auto previous = coupling_laws.find(key);
+        auto saved = previous == coupling_laws.end() ? std::vector<nksim::BackendComplianceSpring>{} : previous->second;
+        coupling_laws[key] = std::move(springs);
+        const auto result = topology_update ? NKSIM_OK : rebuild();
+        if (result != NKSIM_OK) {
+            if (saved.empty()) coupling_laws.erase(key); else coupling_laws[key] = std::move(saved);
+            if (!topology_update) (void)rebuild();
+        }
+        return result;
     }
 
     nksim_result closure_create(const nksim::BackendClosure &closure) override {
@@ -1053,6 +1077,7 @@ public:
                 place_kinematic_drives(drives,
                     static_cast<double>(substeps - index) * model->opt.timestep);
             apply_joint_targets();
+            if (!update_position_stiffness()) return NKSIM_ERROR_BACKEND;
             mj_step(model, data);
             // MuJoCo can auto-reset an unstable state and return finite values.
             // Treat that as a failed tick instead of presenting a fresh fling.
@@ -1692,6 +1717,39 @@ private:
         }
     }
 
+    bool update_position_stiffness() {
+        if (position_springs.empty()) return true;
+        std::fill(next_position_force.begin(), next_position_force.end(), 0.0);
+        for (const auto &response : position_springs) {
+            double stretch = data->qpos[response.follower_qpos] - response.offset;
+            for (const auto &leader : response.leaders) stretch -= leader.second * data->qpos[leader.first];
+            double stiffness = 0.0, damped = 0.0;
+            for (const auto &part : response.parts) {
+                double value = part.law.empty() ? part.stiffness : 0.0;
+                for (const auto &spring : part.law) {
+                    double compliance = spring.compliance;
+                    for (const auto &coordinate : spring.coordinates)
+                        compliance += coordinate.gradient * data->qpos[coordinate.qpos];
+                    if (!(compliance > 0.0) || !std::isfinite(compliance)) return false;
+                    value += 1.0 / compliance;
+                    // U = K(q) * stretch^2 / 2. The ordinary tendon supplies -K*stretch*J;
+                    // the geometry derivative supplies the remaining -stretch^2*grad(K)/2.
+                    for (const auto &coordinate : spring.coordinates)
+                        next_position_force[coordinate.dof] += 0.5 * stretch * stretch * coordinate.gradient /
+                            (compliance * compliance * response.parts.size());
+                }
+                stiffness += value; damped += part.damping * value;
+            }
+            const double ratio = damped / stiffness;
+            stiffness /= response.parts.size();
+            model->tendon_stiffness[response.tendon] = stiffness;
+            model->tendon_damping[response.tendon] = 2.0 * ratio * std::sqrt(stiffness / response.load_inverse);
+        }
+        for (int dof = 0; dof < model->nv; ++dof) data->qfrc_applied[dof] += next_position_force[dof] - position_force[dof];
+        position_force.swap(next_position_force);
+        return true;
+    }
+
     // Whether a coupling is a spring to simulate: any stiffness. Only a stiffness of zero is an ideal constraint; a damping
     // ratio of zero is an undamped spring.
     static bool is_spring(const nksim::BackendJointCoupling &term) { return term.stiffness > 0.0; }
@@ -1709,6 +1767,9 @@ private:
     // with MuJoCo's standard reference and the follower's inertia.
     void rebuild_coupling_responses() {
         coupling_responses.clear();
+        position_springs.clear();
+        position_force.assign(model->nv, 0.0);
+        next_position_force.assign(model->nv, 0.0);
         coupling_interval = std::numeric_limits<double>::infinity();
         std::map<std::uint64_t, double> stiffnesses, damped;
         std::map<std::uint64_t, int> softs;
@@ -1743,7 +1804,40 @@ private:
                 const double rest = model->tendon_length0[tendon] - offsets.at(follower_id);
                 // The stretch turns at sqrt(K A) with A the inverse inertia of the follower and its load; half a radian a step
                 // keeps the explicit spring stable and its period resolved.
-                coupling_interval = std::min(coupling_interval, 0.5 / std::sqrt(stiffness * (follower_inverse + load)));
+                PositionSpringResponse response{};
+                response.tendon = tendon;
+                response.load_inverse = load;
+                response.follower_qpos = model->jnt_qposadr[jid];
+                response.offset = offsets.at(follower_id);
+                double largest = 0.0;
+                for (const auto &term : couplings) if (term.follower == follower_id) {
+                    const int leader = model_joint_id(joints.at(term.leader));
+                    response.leaders.push_back({model->jnt_qposadr[leader], term.ratio});
+                    if (!is_spring(term)) continue;
+                    PositionSpringTerm part{term.stiffness, term.damping_ratio, {}};
+                    const auto law = coupling_laws.find({term.leader, term.follower});
+                    double maximum = term.stiffness;
+                    if (law != coupling_laws.end()) {
+                        maximum = 0.0;
+                        for (const auto &spring : law->second) {
+                            PositionCompliance cached{spring.compliance, {}};
+                            double least = spring.compliance;
+                            for (const auto &coordinate : spring.coordinates) {
+                                const auto &joint = joints.at(coordinate.joint);
+                                const int id = model_joint_id(joint);
+                                cached.coordinates.push_back({model->jnt_qposadr[id], model->jnt_dofadr[id], coordinate.gradient});
+                                least += coordinate.gradient * (coordinate.gradient > 0.0 ? joint.desc.lower_limit : joint.desc.upper_limit);
+                            }
+                            maximum += 1.0 / least;
+                            part.law.push_back(std::move(cached));
+                        }
+                        response.variable = true;
+                    }
+                    largest += maximum;
+                    response.parts.push_back(std::move(part));
+                }
+                coupling_interval = std::min(coupling_interval, 0.5 / std::sqrt((largest / softs.at(follower_id)) * (follower_inverse + load)));
+                if (response.variable) position_springs.push_back(std::move(response));
                 model->tendon_stiffness[tendon] = stiffness;
                 model->tendon_damping[tendon] = 2.0 * ratio * std::sqrt(stiffness / load);
                 model->tendon_lengthspring[2 * tendon] = model->tendon_lengthspring[2 * tendon + 1] = rest;
@@ -2615,6 +2709,21 @@ private:
         }
         return false;
     }
+    struct PositionCoordinate { int qpos; int dof; double gradient; };
+    struct PositionCompliance { double compliance; std::vector<PositionCoordinate> coordinates; };
+    struct PositionSpringTerm { double stiffness; double damping; std::vector<PositionCompliance> law; };
+    struct PositionSpringResponse {
+        int tendon = -1;
+        int follower_qpos = -1;
+        double offset = 0.0;
+        double load_inverse = 0.0;
+        bool variable = false;
+        std::vector<std::pair<int, double>> leaders;
+        std::vector<PositionSpringTerm> parts;
+    };
+    std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<nksim::BackendComplianceSpring>> coupling_laws;
+    std::vector<PositionSpringResponse> position_springs;
+    std::vector<double> position_force, next_position_force;
     std::vector<nksim::BackendJointCoupling> couplings;
     // How the solver treats a rigid coupling's equality: MuJoCo's standard reference, a time constant and a damping
     // ratio, floored at two steps.

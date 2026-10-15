@@ -272,7 +272,7 @@ class MachineAssembly {
 
 	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0,
 			?efficiency:Float, ?stiffness:Float, ?backlash:Float, ?drag:Float, ?assumed:haxe.ds.ReadOnlyArray<String>,
-			?assumptions:haxe.ds.ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>, ?dampingRatio:Float):Void {
+			?assumptions:haxe.ds.ReadOnlyArray<materia.assembly.AssemblyDefinition.QuantityAssumption>, ?dampingRatio:Float, ?stiffnessLaw:Array<materia.assembly.AssemblyDefinition.AssemblyComplianceSpring>):Void {
 		if (drives.transmission(id) != null) throw 'Transmission coupling "$id" is read-only; edit its parts or allowances';
 		requireOperationId(id);
 		if (source == null || source.length == 0 || target == null || target.length == 0)
@@ -281,6 +281,7 @@ class MachineAssembly {
 			target: target, ratio: ratio, offset: offset};
 		if (efficiency != null) coupling.efficiency = efficiency;
 		if (stiffness != null) coupling.stiffness = stiffness;
+		if (stiffnessLaw != null) coupling.stiffnessLaw = materia.assembly.AssemblyDefinitionFlattener.copyComplianceLaw(stiffnessLaw, id -> id);
 		if (dampingRatio != null) coupling.dampingRatio = dampingRatio;
 		if (backlash != null) coupling.backlash = backlash;
 		if (drag != null) coupling.drag = drag;
@@ -761,7 +762,8 @@ class MachineAssembly {
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),
 				join(prefix, coupling.target), coupling.ratio, coupling.offset, coupling.efficiency,
-				coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions, coupling.dampingRatio);
+				coupling.stiffness, coupling.backlash, coupling.drag, coupling.assumed, coupling.assumptions, coupling.dampingRatio,
+				coupling.stiffnessLaw == null ? null : materia.assembly.AssemblyDefinitionFlattener.copyComplianceLaw(coupling.stiffnessLaw, id -> join(prefix,id)));
 		if (mechanical.elasticNetworks != null) for (network in mechanical.elasticNetworks)
 			model.addElasticNetwork(materia.assembly.AssemblyDefinitionFlattener.copyElasticNetwork(network, id -> join(prefix, id)));
 		if (mechanical.switches != null) for (contact in mechanical.switches)

@@ -37,6 +37,17 @@ class InputShaper {
     return new InputShaper(found, frequency, damping);
   }
 
+  /** A fixed shaper centered on a physical travel envelope; refuses a band this impulse family cannot suppress. */
+  public static function forFrequencyBand(kind:InputShaperKind,lower:Float,upper:Float,damping:Float,
+      uncertainty:Float = 0.1,maximumResidual:Float = 0.2):InputShaper {
+    if (!(lower>0.0) || upper<lower || !Math.isFinite(upper) || !Math.isFinite(uncertainty) || uncertainty<0.0 || uncertainty>=1.0 ||
+        !(maximumResidual>0.0) || maximumResidual>=1.0) throw "Invalid input shaping frequency envelope";
+    var shaped = new InputShaper(kind,Math.sqrt(lower*upper),damping);
+    var residual = shaped.impulses.residualBound(lower*(1-uncertainty),upper*(1+uncertainty),damping);
+    if (residual>maximumResidual) throw 'Fixed input shaper cannot cover $lower..$upper Hz with $uncertainty uncertainty: residual $residual';
+    return shaped;
+  }
+
   public function new(kind:InputShaperKind, frequency:Float, damping:Float = 0.1) {
     if (!(frequency > 0.0) || !Math.isFinite(frequency)) throw "An input shaper needs a positive frequency";
     if (!(damping >= 0.0) || !(damping < 1.0)) throw "An input shaper needs a damping ratio from 0 up to 1";

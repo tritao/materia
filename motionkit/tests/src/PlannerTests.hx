@@ -609,6 +609,8 @@ class PlannerTests extends MotionKitTestSupport {
     }
     check(rejects([0.0, 0.01], [0.5, -0.5]) && rejects([-0.01], [1.0]) && rejects([], []) && rejects([for (i in 0...9) i * 0.001], [for (i in 0...9) 1.0]),
       "impulses with a non-positive amplitude, a negative delay, none or nine are refused");
+    check(rejects([0.01,0.0],[1.0,1.0]) && rejects([0.0],[Math.POSITIVE_INFINITY]),
+      "unordered delays and infinite amplitudes cannot invalidate the continuous residual bound");
     var refused = false;
     try original.shape([impulses.delays], [impulses.amplitudes]) catch (_:Dynamic) refused = true;
     check(refused, "shaping needs impulses for every joint");
@@ -624,6 +626,15 @@ class PlannerTests extends MotionKitTestSupport {
       if (kind == motionkit.trajectory.InputShaper.InputShaperKind.MZV)
         check(each.impulses.residual(45.0, 0.1) < 0.1 && each.impulses.residual(55.0, 0.1) < 0.1, "MZV keeps under 10 % for a frequency 10 % off");
     }
+    var band = motionkit.trajectory.InputShaper.forFrequencyBand(motionkit.trajectory.InputShaper.InputShaperKind.EI,50.0,60.0,0.1);
+    var bound = band.impulses.residualBound(45.0,66.0,0.1);
+    check(bound<=0.2,"a fixed EI shaper covers the physical band and frequency uncertainty");
+    for (index in 0...1001)
+      check(band.impulses.residual(45.0+21.0*index/1000,0.1)<=bound,"continuous residual bound encloses a dense independent scan");
+    var bandRefused = false;
+    try motionkit.trajectory.InputShaper.forFrequencyBand(motionkit.trajectory.InputShaper.InputShaperKind.ZV,10.0,200.0,0.1)
+      catch (_:Dynamic) bandRefused = true;
+    check(bandRefused,"an impulse family that cannot suppress the requested band must be refused");
     original.dispose(); shaped.dispose();
   }
 

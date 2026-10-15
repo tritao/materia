@@ -38,6 +38,9 @@ class ScrewSupportUnit extends MachineComponent {
 			AssemblyFrames.alongY(i == 0 ? -23 : 23, -25, 0, 0, -1, 0));
 	}
 
+	/** Assumed catalogue-typical axial rigidity of the preloaded fixed pair, N/mm; floating supports carry no axial load. */
+	public function axialStiffness():Null<Float> return fixed ? LeadScrew.SUPPORT_BEARING_STIFFNESS : null;
+
 	override public function hasGeometry():Bool return true;
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Solids.named(Part.box(width, height, length).translated(new Vector(0, height / 2 - 25, -length / 2)), "body");

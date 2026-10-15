@@ -10,7 +10,9 @@
 		"machinekit": { "path": "../../" },
 		"toolpathkit": { "path": "../../../toolpathkit" },
 		"camkit": { "path": "../../../camkit" },
-		"cnckit": { "path": "../../../cnckit" }
+		"cnckit": { "path": "../../../cnckit" },
+		"cadbridge": { "path": "../../../robotkit/cadbridge" },
+		"motionkit": { "path": "../../../motionkit" }
 	},
 	"target": "host",
 	"outputDir": "build"

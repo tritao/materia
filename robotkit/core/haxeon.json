@@ -8,6 +8,7 @@
   ],
   "scopeSourceRoots": false,
   "dependencies": {
+    "projectkit": { "path": "../../projectkit" },
     "haxeon-platform": {
       "path": "../../haxeon/packages/platform"
     },

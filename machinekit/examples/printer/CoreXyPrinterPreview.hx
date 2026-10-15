@@ -25,16 +25,14 @@ class CoreXyPrinterPreview {
 	public static function cube():Bytes {
 		var printer = new CoreXyPrinter();
 		var scene = AssemblyPreview.scene(printer, ASSEMBLY_ID);
-		scene.printing = CoreXyPrinterJob.calibrationCube(printer, 20.0, 0.15);
-		return SceneArtifact.encode(scene);
+		return withPrinting(scene,CoreXyPrinterJob.calibrationCube(printer, 20.0, 0.15));
 	}
 
 	/** The same block 4 mm tall and solid (20 layers): the regular dimensional check, a few minutes of printing. */
 	public static function cubeShort():Bytes {
 		var printer = new CoreXyPrinter();
 		var scene = AssemblyPreview.scene(printer, ASSEMBLY_ID);
-		scene.printing = CoreXyPrinterJob.calibrationCube(printer, 4.0, 1.0);
-		return SceneArtifact.encode(scene);
+		return withPrinting(scene,CoreXyPrinterJob.calibrationCube(printer, 4.0, 1.0));
 	}
 
 	/**
@@ -44,9 +42,26 @@ class CoreXyPrinterPreview {
 	public static function printer():Bytes {
 		var printer = new CoreXyPrinter();
 		var scene = AssemblyPreview.scene(printer, ASSEMBLY_ID);
-		scene.printing = CoreXyPrinterJob.smallTab(printer);
+		return withPrinting(scene,CoreXyPrinterJob.smallTab(printer));
+	}
+	/** Tune once from the complete physical travel range, then keep the kernel fixed through queued motion. */
+	static function withPrinting(scene:materia.project.SceneArtifact.SceneArtifactData,job:materia.project.SceneArtifact.SceneArtifactPrinting):Bytes {
+		var model = cadbridge.AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition,
+			cadbridge.AssemblyPhysicalPartView.fromSceneArtifact(scene),scene.assemblyState).model;
+		var soft = robotkit.model.DriveLoads.of(model,null,["x","y"]);
+		var hard = robotkit.model.DriveLoads.stiffest(model,null,["x","y"]);
+		var damping = 1.0;
+		for (coupling in model.couplings) if (coupling.stiffness>0.0) damping=Math.min(damping,coupling.dampingRatio);
+		job.shaping = [for (load in soft) {
+			var upper = [for (candidate in hard) if (candidate.axis == load.axis) candidate][0];
+			var lowerHz = Math.sqrt(load.stiffness/load.mass)/(2*Math.PI), upperHz = Math.sqrt(upper.stiffness/upper.mass)/(2*Math.PI);
+			var shaper = motionkit.trajectory.InputShaper.forFrequencyBand(motionkit.trajectory.InputShaper.InputShaperKind.EI,lowerHz,upperHz,damping);
+			{axis:Std.string(load.axis),kind:"ei",frequency:shaper.frequency,damping:damping};
+		}];
+		scene.printing = job;
 		return SceneArtifact.encode(scene);
 	}
+
 }
 
 /**
@@ -87,9 +102,7 @@ class CoreXyPrinterJob {
 			filamentDiameter: hotend.filamentDiameter * 1e-3, gearRadius: printer.extruder.spec.hobDiameter * 0.5e-3,
 			maxFlow: hotend.maxVolumetricFlow * 1e-9, pressureAdvance: hotend.pressureLag, pressureAdvanceWindow: 0.04, meltLag: hotend.pressureLag, rampLength: 0.0005,
 			minExtrusionTemperature: hotend.minExtrusionTemperature, heaters: [hotendHeater, bedHeater],
-			controller: {stepTickHz: STEP_TICK_HZ}, deposit: "printed",
-			shaping: [{axis: "x", kind: "mzv", frequency: CoreXyPrinter.SHAPER_X_HZ, damping: CoreXyPrinter.SHAPER_DAMPING},
-				{axis: "y", kind: "mzv", frequency: CoreXyPrinter.SHAPER_Y_HZ, damping: CoreXyPrinter.SHAPER_DAMPING}]};
+			controller: {stepTickHz: STEP_TICK_HZ}, deposit: "printed"};
 	}
 
 	/**

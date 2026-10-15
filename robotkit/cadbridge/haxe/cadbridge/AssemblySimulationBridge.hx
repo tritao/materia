@@ -545,6 +545,16 @@ class AssemblySimulationBridge {
       // Stiffness and backlash are in the leader's units, which a sliding leader measures in assembly units.
       var stiffness = coupling.stiffness, backlash = coupling.backlash, drag = coupling.drag;
       if (stiffness != null) added.stiffness = stiffness / leaderScale;
+      if (coupling.stiffnessLaw != null) {
+        var raw = new materia.assembly.PositionStiffness([for (spring in coupling.stiffnessLaw)
+          {compliance:spring.compliance,coordinates:[for (coordinate in spring.coordinates)
+            {joint:coordinate.joint,coefficient:coordinate.coefficient}]}]);
+        var law = raw.scaled(leaderScale, id -> {
+          for (joint in definition.joints) if (joint.id == id) return joint.type == AssemblyJointType.Prismatic ? scale : 1.0;
+          throw 'Unknown stiffness coordinate "$id"';
+        }, id -> placement.joint(id));
+        added.setStiffnessLaw(law,model.joints);
+      }
       if (coupling.dampingRatio != null) added.dampingRatio = coupling.dampingRatio;
       if (backlash != null) added.backlash = backlash * leaderScale;
       if (drag != null) added.drag = drag * followerScale;

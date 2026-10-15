@@ -271,6 +271,7 @@ class RobotWorldTests {
     testSensorAndClockContracts();
     testSensorResetPublication();
     testRobotResetPose();
+    PositionStiffnessTests.run();
     SimulationPoseResetTests.run(0);
     SimulationPoseResetTests.coupledLimits();
     assertions += DeviceBindingTests.run();

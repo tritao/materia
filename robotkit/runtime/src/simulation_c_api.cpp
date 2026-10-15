@@ -263,6 +263,13 @@ rk_result RK_CALL rk_simulation_set_power_up_sides(rk_simulation simulation,
                  : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_set_coupling_law(rk_simulation simulation, uint32_t robot_index,
+        const rk_simulation_coupling_law_desc *desc) {
+    if (!desc) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->set_coupling_law(robot_index, *desc) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_set_joint_slip(rk_simulation simulation, uint32_t robot_index,
                                                 uint32_t joint, double offset) {
     const auto value = resolve(simulation);

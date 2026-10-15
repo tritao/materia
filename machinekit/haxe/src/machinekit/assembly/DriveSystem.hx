@@ -197,6 +197,18 @@ class DriveSystem {
 		var mechanical = flat.definition;
 		var relation = TransmissionResolver.resolve(record, flat.member);
 		switch record.source {
+			case LeadScrew(screwId,nutId):
+				var screw:machinekit.motion.LeadScrew = cast flat.member(screwId);
+				// During addTransmission the screw's rotary mate may not exist yet. The complete
+				// assembly derivation resolves the physical bearing/nut path after all mates are present.
+				if (strict && record.stiffness == null && screw.thread.family == machinekit.motion.LeadScrewThread.LeadScrewThreadFamily.Ball) {
+					if (leader == null) {
+						var coupling = findCoupling(mechanical,record.coupling);
+						if (coupling != null) leader = coupling.source;
+					}
+					if (leader == null) throw new TransmissionDesignError("Ball screw law needs its carriage joint");
+					relation.stiffnessLaw = machinekit.transmission.ScrewStretch.law(flat,screwId,nutId,leader,context);
+				}
 			case TimingBelt(beltId, pulley):
 				if (leader == null) {
 					var coupling = findCoupling(mechanical, record.coupling);
@@ -208,8 +220,8 @@ class DriveSystem {
 						'Belt "$beltId" needs its clamp and wrap attachments; add a belt path');
 				} else {
 					var belt:machinekit.transmission.TimingBelt = cast flat.member(beltId);
-					var derived = machinekit.transmission.BeltStretch.stiffness(belt, paths[0], leader, pulley, mechanical, context);
-					if (record.stiffness == null) relation.stiffness = derived;
+					if (record.stiffness == null)
+						relation.stiffnessLaw = machinekit.transmission.BeltStretch.law(belt, paths[0], leader, pulley, mechanical, context);
 					beltDamping(relation, belt, record);
 				}
 			case BeltReduction(beltId, driver, driven):
@@ -236,6 +248,15 @@ class DriveSystem {
 				}
 			case _:
 		}
+		if (relation.stiffnessLaw != null) relation.stiffness = new materia.assembly.PositionStiffness(relation.stiffnessLaw).range(id -> {
+			for (joint in mechanical.joints) if (joint.id == id) {
+				var lower = joint.limits.lower, upper = joint.limits.upper;
+				if (lower == null || upper == null) throw new TransmissionDesignError("Position stiffness needs bounded joint travel");
+				var overtravel = joint.limits.overtravel == null ? 0.0 : joint.limits.overtravel;
+				return {lower:lower-overtravel,upper:upper+overtravel};
+			}
+			throw new TransmissionDesignError('Missing stiffness coordinate "$id"');
+		}).minimum;
 		return relation;
 	}
 
@@ -260,6 +281,7 @@ class DriveSystem {
 		coupling.offset = -relation.ratio * transmission.leaderZero;
 		coupling.efficiency = relation.efficiency;
 		coupling.stiffness = relation.stiffness;
+		coupling.stiffnessLaw = relation.stiffnessLaw;
 		coupling.dampingRatio = relation.dampingRatio;
 		coupling.backlash = relation.backlash;
 		coupling.drag = relation.drag;

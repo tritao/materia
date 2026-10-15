@@ -1184,6 +1184,42 @@ rk_result Simulation::set_power_up_offsets(uint32_t robot_index, const double *o
     return RK_OK;
 }
 
+rk_result Simulation::set_coupling_law(uint32_t robot_index, const rk_simulation_coupling_law_desc &desc) {
+    Lock lock(session_);
+    if (robot_index >= bindings_.size() || desc.struct_size != sizeof(desc) ||
+        desc.spring_count == 0 || desc.spring_count > NKSIM_MAX_COMPLIANCE_SPRINGS) return RK_ERROR_INVALID_ARGUMENT;
+    const auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    if (desc.leader >= binding->joints_.size() || desc.follower >= binding->joints_.size()) return RK_ERROR_INVALID_ARGUMENT;
+    const auto world = stopped_world();
+    if (!world) return RK_ERROR_INVALID_STATE;
+    nksim_coupling_law_desc law{};
+    law.struct_size = sizeof(law);
+    law.leader = binding->joints_[desc.leader]; law.follower = binding->joints_[desc.follower];
+    law.spring_count = desc.spring_count;
+    for (uint32_t spring = 0; spring < law.spring_count; ++spring) {
+        if (desc.coordinate_count[spring] > NKSIM_MAX_COMPLIANCE_COORDINATES) return RK_ERROR_INVALID_ARGUMENT;
+        law.compliance[spring] = desc.compliance[spring]; law.coordinate_count[spring] = desc.coordinate_count[spring];
+        for (uint32_t c = 0; c < law.coordinate_count[spring]; ++c) {
+            const auto index = spring * NKSIM_MAX_COMPLIANCE_COORDINATES + c;
+            if (desc.coordinate_joint[index] >= binding->joints_.size()) return RK_ERROR_INVALID_ARGUMENT;
+            law.coordinate_joint[index] = binding->joints_[desc.coordinate_joint[index]];
+            law.gradient[index] = desc.gradient[index];
+        }
+    }
+    // Independent fan-out drives are represented by kinematic targets, not a
+    // backend transmission. Like their constant stiffness, a constitutive law
+    // has no physical response until the coupling is simulated physically.
+    for (const auto &coupling : binding->kinematic_couplings_)
+        if (coupling.leader == desc.leader && coupling.follower == desc.follower)
+            return RK_OK;
+    uint32_t features = 0;
+    if (nksim_world_get_features(world, &features) != NKSIM_OK) return RK_ERROR_BACKEND;
+    // The reference backend is deliberately kinematic: it ignores physical spring responses, including variable ones.
+    if (!(features & NKSIM_WORLD_FEATURE_COMPLIANT_COUPLINGS)) return RK_OK;
+    return from_sim(nksim_joint_set_coupling_law(world, &law));
+}
+
 rk_result Simulation::set_joint_slip(uint32_t robot_index, uint32_t joint, double offset) {
     // The tick lock orders this between completed host steps, like a base drive.
     Lock lock(session_);

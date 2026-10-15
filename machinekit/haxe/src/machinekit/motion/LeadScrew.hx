@@ -63,6 +63,17 @@ class LeadScrew extends MachineComponent {
 		return YOUNGS_MODULUS / 1e6 * Math.PI * root * root / (4 * totalLength);
 	}
 
+	/** Axial rigidity EA at a shaft station, N. */
+	public function axialRigidityAt(position:Float):Float
+		return YOUNGS_MODULUS/1e6*Math.PI*thread.rootDiameter()*thread.rootDiameter()/4.0;
+
+	/** Shaft compliance between physical bearing/nut stations, mm/N. */
+	public function axialComplianceBetween(from:Float, to:Float):Float {
+		if (!Math.isFinite(from) || !Math.isFinite(to) || Math.min(from,to)<0 || Math.max(from,to)>totalLength)
+			throw "Axial load path must lie on the screw shaft";
+		return Math.abs(to-from)/axialRigidityAt((from+to)*0.5);
+	}
+
 	public final thread:LeadScrewThread;
 	public final totalLength:Float;
 

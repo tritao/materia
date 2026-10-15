@@ -189,6 +189,23 @@ class ProjectKitTests {
     var model = definition();
     var decoded = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(model));
     check(decoded.joints[0].role == AssemblyJointRole.Tree, "tree role round trip");
+    var springModel = definition();
+    springModel.occurrences.push({id:"rotor",definition:"body",initialPose:frame});
+    var motor = definition().joints[0];
+    motor.id = "motor"; motor.child = "rotor";
+    springModel.joints.push(motor);
+    springModel.couplings = [{id:"belt",source:"hinge",target:"motor",ratio:2.0,offset:0.0,stiffness:4000.0,
+      stiffnessLaw:[{compliance:0.001,coordinates:[{joint:"hinge",coefficient:0.0001}]}]}];
+    var savedSpring = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(springModel));
+    near(savedSpring.couplings[0].stiffnessLaw[0].coordinates[0].coefficient,0.0001,"compliance wire round trip");
+    var nestedSpring:AssemblyDefinition = {schemaVersion:AssemblyDefinitionCodec.VERSION,id:"cell",lengthUnit:"mm",
+      definitions:[],occurrences:[{id:"printer",definition:springModel.id,assembly:springModel.id,initialPose:frame}],joints:[],
+      assemblies:[{id:springModel.id,definitions:springModel.definitions,occurrences:springModel.occurrences,
+        joints:springModel.joints,couplings:springModel.couplings}]};
+    var flatSpring = AssemblyDefinitionFlattener.flatten(AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(nestedSpring)));
+    check(flatSpring.couplings[0].stiffnessLaw[0].coordinates[0].joint == "printer/hinge","nested compliance coordinate follows joint scope");
+    flatSpring.couplings[0].stiffnessLaw[0].coordinates[0].coefficient = 1.0;
+    near(springModel.couplings[0].stiffnessLaw[0].coordinates[0].coefficient,0.0001,"flattened compliance owns its data");
     var response:AssemblyJointStop = {timeConstantSec: 0.001, dampingRatio: 1.0};
     model.joints[0].stop = response;
     var stopped = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(model));
