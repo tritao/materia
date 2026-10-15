@@ -315,8 +315,15 @@ class ScriptedSetupTests {
     check(selected.updateRate == 21.0 && ownership.sensorRateOrigin("materia/robot", selected.id)
       == "override", "inspector changes one scripted sensor rate");
     click(editor, frame, "sensor-apply");
-    check(editor.simulation.isActive() && editor.simulation.simulatedRobotIds().length == 2,
-      "inspector applies both scripted robots to the shared simulation");
+    // Apply prepares on a worker; pump frames until the UI installs its completed candidate.
+    var deadline = Sys.time() + 30;
+    while (editor.openingProject() && Sys.time() < deadline) {
+      editor.tick();
+      editor.submit(frame);
+      Sys.sleep(0.001);
+    }
+    check(!editor.openingProject() && editor.simulation.isActive() && editor.simulation.simulatedRobotIds().length == 2,
+      "inspector applies both scripted robots to the shared simulation: " + editor.simulation.error);
     click(editor, frame, "sensor-run");
     check(editor.simulation.isRunning(), "inspector starts the scripted simulation");
     click(editor, frame, "sensor-pause");
