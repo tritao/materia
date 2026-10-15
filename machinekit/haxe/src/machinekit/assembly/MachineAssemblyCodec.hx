@@ -186,6 +186,7 @@ class MachineAssemblyCodec {
 			saved.childConnector = child.connector;
 			level.joints.push(saved);
 		}
+		MechanicalAssembly.groundPlaced(level.occurrences, level.joints);
 		for (coupling in mechanical.couplings)
 			level.couplings.push(MechanicalAssembly.copyCoupling(derivedCoupling(flat, coupling), id -> id));
 		for (exposure in mechanical.connectorExposures) {

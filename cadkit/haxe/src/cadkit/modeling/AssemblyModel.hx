@@ -65,6 +65,16 @@ class AssemblyModel {
 		return AssemblyFrames.transformPoint(pose(id), frame.x, frame.y, frame.z);
 	}
 
+	/**
+		Fixes root instance `id` where it stands: mates (`AssemblyMateSolver`, the editor's mate drags) never move it.
+		An instance a joint carries cannot be grounded, nor can a grounded one hang from a joint.
+	*/
+	public function ground(id:String):Void {
+		var occurrence = require(id);
+		if (attached.exists(id)) throw 'Joint-owned instance "$id" cannot be grounded';
+		occurrence.grounded = true;
+	}
+
 	public function place(id:String, pose:AssemblyFrame):Void {
 		if (attached.exists(id)) throw 'Joint-owned instance "$id" cannot be placed independently';
 		AssemblyCodec.validateFrame(pose);
@@ -105,6 +115,7 @@ class AssemblyModel {
 		validateLimits(limits, value);
 		requireConnector(parent, parentConnector);
 		requireConnector(child, childConnector);
+		if (require(child).grounded == true) throw 'Grounded instance "$child" cannot hang from joint "$id"';
 		attached.set(child, true);
 		data.joints.push({id: id, type: cast kind, role: AssemblyJointRole.Tree,
 			parent: parent, parentConnector: parentConnector, child: child,

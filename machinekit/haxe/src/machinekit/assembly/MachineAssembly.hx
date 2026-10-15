@@ -757,6 +757,7 @@ class MachineAssembly {
 			if (joint.passive == true) model.setPassive(join(prefix, joint.id));
 			if (joint.stop != null) model.setJointStop(join(prefix, joint.id), joint.stop);
 		}
+		for (occurrence in mechanical.occurrences) if (occurrence.grounded == true) model.ground(join(prefix, occurrence.id));
 		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
 			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),
 				join(prefix, coupling.target), coupling.ratio, coupling.offset, coupling.efficiency,
@@ -833,6 +834,7 @@ class MachineAssembly {
 		if (cached != null) return cached;
 		var result = new FlatAssembly();
 		flattenInto(result, "", null, true);
+		MechanicalAssembly.groundPlaced(result.definition.occurrences, result.definition.joints);
 		flatCache = result;
 		return result;
 	}

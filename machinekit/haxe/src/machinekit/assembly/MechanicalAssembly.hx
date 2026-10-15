@@ -4,6 +4,7 @@ import machinekit.component.MachineComponent;
 import machinekit.assembly.MachineAssembly.MachineSubassembly;
 import machinekit.assembly.MachineAssemblyDescription.ConnectorExposureRecord;
 import machinekit.assembly.MachineAssemblyDescription.MemberConnectorRecord;
+import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
 import materia.assembly.AssemblyDefinition.AssemblyJointCoupling;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.KinematicJoint;
@@ -17,6 +18,18 @@ typedef LevelMember = {var id:String; var component:MachineComponent; var pose:A
  * below this level, so a joint may attach a member of a subassembly (`arm/link1`).
  */
 class MechanicalAssembly {
+	/**
+		Grounds each component occurrence that no tree joint carries. A placed member stays where its assembly puts it
+		(the simulation bolts it to the world), so the editor's mates never move it; without the flag the mate solver
+		grounds only the first root and floats every other placed member.
+	*/
+	public static function groundPlaced(occurrences:Array<AssemblyComponentOccurrence>, joints:Array<KinematicJoint>):Void {
+		var carried = new Map<String, Bool>();
+		for (joint in joints) if (joint.role == AssemblyJointRole.Tree) carried.set(joint.child, true);
+		for (occurrence in occurrences)
+			if (occurrence.assembly == null && !carried.exists(occurrence.id)) occurrence.grounded = true;
+	}
+
 	public final members:Array<LevelMember> = [];
 	public final subassemblies:Array<MachineSubassembly> = [];
 	/** Members and subassemblies by local id, in the order they were added. */

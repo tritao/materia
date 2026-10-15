@@ -532,10 +532,13 @@ class ProjectSourceTests {
   }
 
   /**
-   * The frame is structure: every member of the printer's frame (the rings, the posts, the base plate) stands at its authored
-   * pose in what the editor renders, at load and after the simulation has run, on both backends. The rendered pose of a part is
-   * its body's pose composed with the part's offset (`capturePresentationSnapshot`); the authored one is the assembly state's world
-   * pose of the occurrence carrying the geometry's centre. Within a micrometre and a microradian.
+   * The frame is structure: every member of the printer's frame (the rings, the posts, the base plate) is where the frame's own
+   * structure puts it (`printerFrameDeparture`) in the editor's scene as opened and in what the editor renders at load and after the
+   * simulation has run, on both backends; it stays at its authored pose throughout; and it is grounded, so the editor's mates never
+   * move it. The rendered pose of a part is its body's pose composed with the part's offset (`capturePresentationSnapshot`); the
+   * authored one is the assembly state's world pose of the occurrence carrying the geometry's centre. Within a micrometre and a
+   * microradian. Comparing with the authored pose alone proves nothing about a wrong authored pose (the posts once stood on a singular
+   * rotation, tipped 53 degrees out of the frame, and matched it to 0 um), hence the structure.
    */
   static function checkPrinterFrame(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/printer/materia.project.json");
@@ -562,12 +565,26 @@ class ProjectSourceTests {
       }
       Sys.println('printer frame: the assembly places the members ${authored * scale * 1e6} um and ${authoredTurn * 1e6} urad from their authored initial poses');
       check(authored * scale < 1e-6 && authoredTurn < 1e-6, "the assembly keeps the frame where the printer authors it");
+      var floating = [for (item in members) if (item.grounded != true) item.id];
+      check(floating.length == 0, 'every frame member is grounded, so mates never move it: ${floating.join(", ")} are not');
+      var opened = new Map<String, {position:Array<Float>, rotation:Array<Float>}>();
+      for (record in session.scene.records()) opened.set(record.id, {position: [record.x, record.y, record.z],
+        rotation: record.rotation == null ? [0.0, 0, 0, 1] : record.rotation});
+      var structure = printerFrameDeparture(opened);
+      Sys.println('printer frame as opened: the worst member is ${Math.round(structure.distance * 1e9) / 1e3} um (${structure.distanceMember}) and '
+        + '${Math.round(structure.angle * 1e6)} urad (${structure.angleMember}) from where the structure of the frame puts it');
+      check(structure.distance < 1e-6 && structure.angle < 1e-6, 'the editor opens the frame square and closed: ${structure.distanceMember} '
+        + '${structure.distance * 1e6} um, ${structure.angleMember} ${structure.angle * 1e6} urad');
       var label = backend == ApplicationSimulation.MUJOCO ? "MuJoCo" : "deterministic";
       for (seconds in (backend == ApplicationSimulation.MUJOCO ? [0.0, 0.5, 2.0, 20.0, 60.0, 105.0, 125.0, 160.0] : [0.0, 0.5, 2.0])) {
         simulation.step();
         while (simulation.activeSession().simulationTime() < seconds) simulation.step();
         var shown = new Map<String, Dynamic>();
-        for (visual in simulation.capturePresentationSnapshot().environment) shown.set(visual.id, visual);
+        var rendered = new Map<String, {position:Array<Float>, rotation:Array<Float>}>();
+        for (visual in simulation.capturePresentationSnapshot().environment) {
+          shown.set(visual.id, visual);
+          rendered.set(visual.id, {position: visual.position, rotation: visual.rotation});
+        }
         var worst = 0.0, worstTurn = 0.0, worstId = "";
         for (item in members) {
           var visual:{id:String, position:Array<Float>, rotation:Array<Float>} = shown.get("project:" + item.id);
@@ -585,10 +602,72 @@ class ProjectSourceTests {
         }
         Sys.println('printer frame on $label at $seconds s: the worst member ($worstId) is ${Math.round(worst * 1e9) / 1e3} um and ${Math.round(worstTurn * 1e6)} urad from its authored pose');
         check(worst < 1e-6 && worstTurn < 1e-6, 'the frame stays at its authored pose on $label at $seconds s: $worstId ${worst * 1e6} um, ${worstTurn * 1e6} urad');
+        var drawn = printerFrameDeparture(rendered);
+        check(drawn.distance < 1e-6 && drawn.angle < 1e-6, 'the rendered frame is square and closed on $label at $seconds s: '
+          + '${drawn.distanceMember} ${drawn.distance * 1e6} um, ${drawn.angleMember} ${drawn.angle * 1e6} urad');
       }
       simulation.dispose();
       session.dispose();
     }
+  }
+
+  /**
+   * How far the printer's frame members are from where the frame's own structure puts them, read from `shown` (scene id to the
+   * part's world centre in metres and its rotation as x, y, z, w), not from the poses the artifact carries. Every member is square to
+   * the world; each ring is level, its sides run along y between its crosses and its crosses along x between its sides; the posts
+   * stand vertical at the corners where a side and a cross meet, halfway between the rings; the base plate lies flat at the bottom
+   * ring's centre. An extrusion's length is its local z (`AxisBuilder.orient`'s `along`), as is the plate's normal.
+   */
+  static function printerFrameDeparture(shown:Map<String, {position:Array<Float>, rotation:Array<Float>}>):{distance:Float,
+      distanceMember:String, angle:Float, angleMember:String} {
+    var result = {distance: 0.0, distanceMember: "", angle: 0.0, angleMember: ""};
+    function part(id:String) {
+      var item = shown.get("project:" + id);
+      if (item == null) throw 'the frame member "$id" is not shown';
+      return item;
+    }
+    function centre(id:String, axis:Int):Float return part(id).position[axis];
+    function at(id:String, axis:Int, wanted:Float):Void {
+      var distance = Math.abs(centre(id, axis) - wanted);
+      if (distance > result.distance) { result.distance = distance; result.distanceMember = id; }
+    }
+    function turned(id:String, local:Int):robotkit.spatial.Vec3 {
+      var r = part(id).rotation;
+      return new robotkit.spatial.Quat(r[0], r[1], r[2], r[3]).rotate(new robotkit.spatial.Vec3(local == 0 ? 1 : 0, local == 1 ? 1 : 0, local == 2 ? 1 : 0));
+    }
+    function angled(id:String, angle:Float):Void
+      if (angle > result.angle) { result.angle = angle; result.angleMember = id; }
+    // Square to the world: each local axis lies along some world axis.
+    function square(id:String):Void
+      for (local in 0...3) {
+        var v = turned(id, local);
+        angled(id, Math.acos(Math.min(1.0, Math.max(Math.abs(v.x), Math.max(Math.abs(v.y), Math.abs(v.z))))));
+      }
+    function along(id:String, world:Int):Void {
+      var v = turned(id, 2);
+      angled(id, Math.acos(Math.min(1.0, Math.abs(world == 0 ? v.x : world == 1 ? v.y : v.z))));
+    }
+    for (level in ["Bottom", "Top"]) {
+      var left = 'side${level}Left', right = 'side${level}Right', front = 'cross${level}Front', rear = 'cross${level}Rear';
+      var z = centre(front, 2);
+      for (id in [left, right]) { square(id); along(id, 1); at(id, 2, z); at(id, 1, (centre(front, 1) + centre(rear, 1)) / 2); }
+      for (id in [front, rear]) { square(id); along(id, 0); at(id, 2, z); at(id, 0, (centre(left, 0) + centre(right, 0)) / 2); }
+    }
+    for (side in ["Left", "Right"]) for (end in ["Front", "Rear"]) {
+      var post = 'post$side$end';
+      square(post);
+      along(post, 2);
+      at(post, 0, centre('sideBottom$side', 0));
+      at(post, 0, centre('sideTop$side', 0));
+      at(post, 1, centre('crossBottom$end', 1));
+      at(post, 1, centre('crossTop$end', 1));
+      at(post, 2, (centre('crossBottom$end', 2) + centre('crossTop$end', 2)) / 2);
+    }
+    square("basePlate");
+    along("basePlate", 2);
+    at("basePlate", 0, (centre("sideBottomLeft", 0) + centre("sideBottomRight", 0)) / 2);
+    at("basePlate", 1, (centre("crossBottomFront", 1) + centre("crossBottomRear", 1)) / 2);
+    return result;
   }
 
   /**

@@ -12,13 +12,32 @@ class AssemblyFrames {
 	public static function translation(x:Float, y:Float, z:Float):AssemblyFrame
 		return {x: x, y: y, z: z, qx: 0, qy: 0, qz: 0, qw: 1};
 
-	/** Build a frame from a row-major 3x3 rotation matrix and an origin. */
+	/**
+		How far a rotation matrix may be from orthonormal (the largest entry of RᵀR − I) and still be taken as a
+		rotation: the rounding of entries written to six decimal places. Computed matrices are within 1e-15.
+	*/
+	public static inline var ROTATION_TOLERANCE:Float = 1e-6;
+
+	/**
+		Build a frame from a row-major 3x3 rotation matrix and an origin. The matrix must be a proper rotation
+		(orthonormal columns, determinant +1, within `ROTATION_TOLERANCE`): a singular or scaled matrix has a
+		quaternion, but not one that means anything, so it is refused rather than normalized into some turn.
+	*/
 	public static function fromRotationMatrix(x:Float, y:Float, z:Float, matrix:Array<Float>):AssemblyFrame {
 		if (matrix == null || matrix.length != 9) throw "Assembly rotation matrix must have nine values";
 		for (value in matrix) if (!Math.isFinite(value)) throw "Assembly rotation matrix must be finite";
 		var m00 = matrix[0], m01 = matrix[1], m02 = matrix[2];
 		var m10 = matrix[3], m11 = matrix[4], m12 = matrix[5];
 		var m20 = matrix[6], m21 = matrix[7], m22 = matrix[8];
+		var departure = 0.0;
+		for (i in 0...3) for (j in 0...3) {
+			var dot = matrix[i] * matrix[j] + matrix[3 + i] * matrix[3 + j] + matrix[6 + i] * matrix[6 + j];
+			departure = Math.max(departure, Math.abs(dot - (i == j ? 1.0 : 0.0)));
+		}
+		var determinant = m00 * (m11 * m22 - m12 * m21) - m01 * (m10 * m22 - m12 * m20) + m02 * (m10 * m21 - m11 * m20);
+		if (departure > ROTATION_TOLERANCE || determinant < 0)
+			throw 'Assembly rotation matrix [${matrix.join(", ")}] is not a rotation: its columns are $departure from orthonormal'
+				+ ' and its determinant is $determinant';
 		var qx:Float, qy:Float, qz:Float, qw:Float;
 		var trace = m00 + m11 + m22;
 		if (trace > 0) {

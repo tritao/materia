@@ -57,7 +57,7 @@ class AxisBuilder extends MachineAssembly {
 		return room;
 	}
 
-	/** Frame whose local +Y points along `up` and local +Z along `along`. */
+	/** Frame whose local +Y points along `up` and local +Z along `along`: perpendicular unit vectors (a parallel pair is refused). */
 	public static function orient(x:Float, y:Float, z:Float, up:Array<Float>, along:Array<Float>):AssemblyFrame {
 		var xx = up[1] * along[2] - up[2] * along[1];
 		var xy = up[2] * along[0] - up[0] * along[2];

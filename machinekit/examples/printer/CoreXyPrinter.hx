@@ -153,7 +153,7 @@ class CoreXyPrinter extends AxisBuilder {
 		}
 		for (x in [-1, 1]) for (entry in [{name: "Front", y: FRONT_Y}, {name: "Rear", y: REAR_Y}])
 			place('post${x < 0 ? "Left" : "Right"}${entry.name}', new GantryExtrusion(profile, postLength),
-				AxisBuilder.orient(x * RAIL_X, entry.y, 20, up, up));
+				AxisBuilder.orient(x * RAIL_X, entry.y, 20, front, vertical));
 		var baseDepth = REAR_Y - FRONT_Y - 20;
 		place("basePlate", new GantryPlate("Base plate", 2 * (RAIL_X - 10), baseDepth, 6), AssemblyFrames.translation(0, (FRONT_Y + REAR_Y) / 2, 20));
 
@@ -338,10 +338,12 @@ class CoreXyPrinter extends AxisBuilder {
 				first = false;
 			}
 		}
-		var wingWidth = 40.0, wingDepth = 70.0;
-		attach("wingLeft", new GantryPlate("Bed wing", wingWidth, wingDepth, 8), AssemblyFrames.translation(-RAIL_X, postFront - wingDepth / 2 + 5, carrierBottom), "blockZLeft");
+		// Each wing butts against its block's mounting face (the block stands `blockHeight` in front of the post's face), so it
+		// reaches forward under the carrier and stays clear of the post and the rail behind the block.
+		var wingWidth = 40.0, wingDepth = 70.0, wingRear = postFront - railSpec.blockHeight;
+		attach("wingLeft", new GantryPlate("Bed wing", wingWidth, wingDepth, 8), AssemblyFrames.translation(-RAIL_X, wingRear - wingDepth / 2, carrierBottom), "blockZLeft");
 		attach("carrier", new GantryPlate("Bed carrier", 360, 300, 8), AssemblyFrames.translation(0, -10, carrierBottom), "wingLeft");
-		attach("wingRight", new GantryPlate("Bed wing", wingWidth, wingDepth, 8), AssemblyFrames.translation(RAIL_X, postFront - wingDepth / 2 + 5, carrierBottom), "carrier");
+		attach("wingRight", new GantryPlate("Bed wing", wingWidth, wingDepth, 8), AssemblyFrames.translation(RAIL_X, wingRear - wingDepth / 2, carrierBottom), "carrier");
 		attach("blockZRight", LinearRailBlock.metric(Z_RAIL), AxisBuilder.orient(RAIL_X, postFront, blockMid, [0.0, -1, 0], vertical), "wingRight");
 		attach("bedSupport", new GantryPlate("Bed support", 250, 250, 6), AssemblyFrames.translation(0, 0, supportBottom), "carrier");
 		attach("bed", bed, AssemblyFrames.translation(0, 0, bedTop), "bedSupport");
