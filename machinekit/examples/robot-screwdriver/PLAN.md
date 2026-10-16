@@ -3921,3 +3921,18 @@ same 292 assertions pass. Three local complete-probe measurements have median
 this is not whole-cell performance acceptance. Its separate pending patch is
 `sd15-friction-metric-pending.patch`. Apply/validate these candidates after the
 frozen cell run ends, then run the required final gate and local-main sync.
+
+### SD15a full native MuJoCo gate preparation (2026-10-16)
+
+The full SimKit MuJoCo native test source also rebuilds and passes against the
+current integrated libraries (`sd15-dynamics-mujoco-core-build.log`,
+`sd15-dynamics-mujoco-core.log`). This supplements the already passing six core
+groups, RobotKit suites and session wrappers. The prepared final-gate runner now
+includes these native builds/runs before its original library/app/editor/project
+stages, and its shell syntax check passes. The full frozen-source gate has not
+started.
+
+The same `sd15-deterministic-native10` process remains live at H10/F1, with the
+first screw vacuum pickup confirmed. Its bytecode/native/source fingerprint
+still matches. Neither pending correction has been applied while it runs;
+complete fastening, unload and fault acceptance remain unproven.
