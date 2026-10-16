@@ -40,7 +40,7 @@ class PrinterBinding {
     this.pressureAdvanceWindow = pressureAdvanceWindow;
   }
 
-  public function filamentArea():Float return Math.PI * filamentDiameter * filamentDiameter / 4.0;
+  public function filamentArea():Float return toolpathkit.path.BeadSection.filamentArea(filamentDiameter);
 
   /** Radians of the extruder gear per metre of path laying a bead of `area`. */
   public function radiansPerMetre(area:Float):Float return area / filamentArea() / gearRadius;

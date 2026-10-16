@@ -77,7 +77,7 @@ class PrintingStock {
 	 */
 	public function new(minimum:Array<Float>, maximum:Array<Float>, center:Array<Float>, spacing:Float,
 			filamentDiameter:Float, meltLag:Float, featureOfLine:Int->Null<PrintFeature>) {
-		this.filamentArea = Math.PI * filamentDiameter * filamentDiameter / 4.0;
+		this.filamentArea = toolpathkit.path.BeadSection.filamentArea(filamentDiameter);
 		this.meltLag = meltLag;
 		this.featureOfLine = featureOfLine;
 		var low = [for (axis in 0...3) minimum[axis] - center[axis]];

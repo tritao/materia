@@ -169,7 +169,7 @@ private class SliceRun {
     if (profile.purgePrimeLength > 0.0)
       ops.push(ToolpathOp.FilamentMove(profile.purgePrimeLength, settings.retractSpeed, start));
     var purgeWidth = profile.purgeWidth, purgeHeight = profile.purgeHeight;
-    var area = purgeHeight * (purgeWidth - purgeHeight) + Math.PI * purgeHeight * purgeHeight / 4.0;
+    var area = toolpathkit.path.BeadSection.area(purgeWidth,purgeHeight);
     ops.push(ToolpathOp.Deposit(area, purgeWidth, purgeHeight, start));
     ops.push(ToolpathOp.Feature(Skirt, start));
     ops.push(ToolpathOp.Move(Cut, PathGeometry.Line(from, to), profile.purgeSpeed, settings.pathTolerance, start));

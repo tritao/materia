@@ -309,8 +309,8 @@ class PrinterInterpreter {
   function deposit(area:Float, span:Provenance):Void {
     if (depositArea > 0.0 && Math.abs(area / depositArea - 1.0) <= settings.ratioTolerance) return;
     // A rounded bead as tall as the layer: a stadium of area h(w - h) + pi h^2 / 4.
-    var height = Math.min(layerHeight, Math.sqrt(4.0 * area / Math.PI));
-    var width = area / height + height * (1.0 - Math.PI / 4.0);
+    var height = toolpathkit.path.BeadSection.heightForArea(area,layerHeight);
+    var width = toolpathkit.path.BeadSection.width(area,height);
     ops.push(ToolpathOp.Deposit(area, width, height, span));
     depositArea = area;
   }

@@ -44,10 +44,10 @@ class SlicerSettings {
   public function new() {}
 
   /** The distance between neighbouring beads that fills a layer exactly: a rounded bead of this width and height holds `height * spacing`. */
-  public function beadSpacing(height:Float):Float return lineWidth - height * (1.0 - Math.PI / 4.0);
+  public function beadSpacing(height:Float):Float return toolpathkit.path.BeadSection.spacing(lineWidth,height);
 
   /** Cross-section of a bead `height` tall: a rectangle with semicircular sides, `lineWidth` wide over all. */
-  public function beadArea(height:Float):Float return height * (lineWidth - height) + Math.PI * height * height / 4.0;
+  public function beadArea(height:Float):Float return toolpathkit.path.BeadSection.area(lineWidth,height);
 
   public function validate():Void {
     for (value in [nozzleDiameter, layerHeight, firstLayerHeight, lineWidth, externalPerimeterSpeed, perimeterSpeed, infillSpeed,

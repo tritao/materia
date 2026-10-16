@@ -45,5 +45,5 @@ class PrinterSettings {
   }
 
   /** Cross-section of the filament, in m^2. */
-  public function filamentArea():Float return Math.PI * filamentDiameter * filamentDiameter / 4.0;
+  public function filamentArea():Float return toolpathkit.path.BeadSection.filamentArea(filamentDiameter);
 }
