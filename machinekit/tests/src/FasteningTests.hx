@@ -161,8 +161,40 @@ class FasteningTests {
 		return assembly;
 	}
 	public static function main():Void run();
+	static function compactPlateProxy():Void {
+		var centers = [for (x in [-5.0, 5.0]) for (y in [-5.0, 5.0]) new Vector(x,y)];
+		var proxy = CollisionHullFacet.aroundCircularOpenings(20,20,0,2,centers,1);
+		check(proxy.hulls.length <= 10, "Four openings do not retain a separate collision body for every grid cell");
+		var boxes = [for (hull in proxy.hulls) {
+			var bounds = [Math.POSITIVE_INFINITY,Math.POSITIVE_INFINITY,Math.POSITIVE_INFINITY,
+				Math.NEGATIVE_INFINITY,Math.NEGATIVE_INFINITY,Math.NEGATIVE_INFINITY];
+			for (i in 0...Std.int(hull.length/3)) for (axis in 0...3) {
+				bounds[axis] = Math.min(bounds[axis],hull[i*3+axis]);
+				bounds[axis+3] = Math.max(bounds[axis+3],hull[i*3+axis]);
+			}
+			bounds;
+		}];
+		var volume = 0.0, disjoint = true, footprint = true;
+		for (i in 0...boxes.length) {
+			var a = boxes[i]; volume += (a[3]-a[0])*(a[4]-a[1])*(a[5]-a[2]);
+			for (j in (i+1)...boxes.length) {
+				var b = boxes[j];
+				if (Math.min(a[3],b[3]) > Math.max(a[0],b[0]) &&
+					Math.min(a[4],b[4]) > Math.max(a[1],b[1])) disjoint = false;
+			}
+		}
+		near(volume, (20*20-4*2*2)*2);
+		check(disjoint, "Merged plate collision pieces have disjoint interiors");
+		for (xi in 0...40) for (yi in 0...40) {
+			var x = -9.75+xi*0.5, y = -9.75+yi*0.5, material = true;
+			for (center in centers) if (Math.abs(x-center.x) < 1 && Math.abs(y-center.y) < 1) material = false;
+			if (hullsContainAt(proxy.hulls,x,y,1) != material) footprint = false;
+		}
+		check(footprint, "The compact proxy preserves solid material and every authored square opening");
+	}
 	public static function run():Void {
 		assertions = 0;
+		compactPlateProxy();
 		var flange = new FlangeBearingMount(DeepGrooveBearing.metric("608"));
 		var found = flange.fastenings().require();
 		check(found.length == 4, "flange gives four fastenings");

@@ -51,6 +51,28 @@ class CollisionHullFacet implements ComponentFacet {
 			if (!cutout) boxes.push([x0,y0,lower,x1,y1,upper]);
 		}
 		if (boxes.length == 0) throw "Collision plate openings leave no authored material";
+		// Grid lines locate the holes, not physical seams. Coalesce adjacent rectangles without
+		// changing their union so a flush seat does not create a contact manifold per grid cell.
+		var merged = true;
+		while (merged) {
+			merged = false;
+			for (i in 0...boxes.length) {
+				for (j in (i+1)...boxes.length) {
+					var a = boxes[i], b = boxes[j];
+					for (axis in 0...2) {
+						var other = 1-axis;
+						if (a[other] != b[other] || a[other+3] != b[other+3] ||
+							a[2] != b[2] || a[5] != b[5]) continue;
+						if (a[axis+3] != b[axis] && b[axis+3] != a[axis]) continue;
+						a[axis] = Math.min(a[axis], b[axis]);
+						a[axis+3] = Math.max(a[axis+3], b[axis+3]);
+						boxes.splice(j, 1); merged = true; break;
+					}
+					if (merged) break;
+				}
+				if (merged) break;
+			}
+		}
 		return fromBoxes(boxes);
 	}
 	static function compareCoordinate(a:Float, b:Float):Int return a < b ? -1 : a > b ? 1 : 0;
