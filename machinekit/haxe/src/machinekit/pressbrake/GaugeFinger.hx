@@ -14,7 +14,8 @@ import materia.project.SceneContactFilter;
  * Assumed gravity-return contact finger. Its stock datum is z=0, its hinge is
  * 50 mm behind the front face and 20 mm below the datum. The top projects 1 mm
  * above the datum so thin stock can engage it after the finger drops.
- * Contact compliance is an explicit simulation assumption, not a material rating.
+ * Frictionless stock registration and contact compliance are explicit simulation
+ * assumptions, not material ratings.
  */
 class GaugeFinger extends MachineComponent {
 	static var recipe:Null<ComponentType>;
@@ -42,7 +43,8 @@ class GaugeFinger extends MachineComponent {
 			.translated(new Vector(0, DEPTH_MM / 2, -DATUM_HEIGHT_MM)), "finger");
 
 	override public function simulationContact():Null<SceneContactSurface>
-		return {friction: [0, 0, 0], frictionDimensions: 0, contactTimeConstant: stopResponse().timeConstantSec,
+		// Zero selects backend defaults; one explicitly disables tangential friction.
+		return {friction: [0, 0, 0], frictionDimensions: 1, contactTimeConstant: stopResponse().timeConstantSec,
 			contactDampingRatio: 1, filter: SceneContactFilter.PairsAndEnvironment};
 
 	/** Assumed elastic contact absorbs the complete gravity-drop energy within the declared compression. */
