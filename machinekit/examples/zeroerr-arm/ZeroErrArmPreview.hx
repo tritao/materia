@@ -298,6 +298,11 @@ class ZeroErrArmPreview {
     var artifact = SceneArtifact.encode(scene);
     sys.io.File.saveBytes(stem+".scene",artifact);
     sys.io.File.saveBytes(stem+".mtrg",artifact);
+    var hash = haxe.crypto.Sha256.make(artifact), hex = new StringBuf();
+    for (i in 0...hash.length) hex.add(StringTools.hex(hash.get(i),2).toLowerCase());
+    sys.io.File.saveContent(stem+".provenance.json",haxe.Json.stringify({
+      artifactSha256:hex.toString(),layoutSha256:haxe.crypto.Sha256.encode(sys.io.File.getContent(layoutPath())),
+      exporterSha256:haxe.crypto.Sha256.encode(sys.io.File.getContent(DIRECTORY+"/ZeroErrArmPreview.hx"))},null,"  "));
     var meshes:Array<Dynamic> = [];
     for (occurrence in definition.occurrences) {
       var pose = state.worldPose(occurrence.id);

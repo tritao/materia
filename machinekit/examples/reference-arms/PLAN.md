@@ -7,14 +7,14 @@ Active goal: finish the agreed plan, committing coherent changes as work complet
 - [x] Reproducible official UR and FAIRINO description/mesh acquisition, pinned provenance and licence records; generated vendor assets excluded from Git.
 - [x] UR5e and FR5 articulated scene exports with correct scale, axes, limits, base and flange frames.
 - [ ] Existing FK/IK integration checked against independent URDF FK, multiple branches and joint limits; joint jogging and Cartesian trajectories.
-- [ ] Shared comparison scene with actual-scale robots, common tool/task frames, switchable mounting and overview/close-up previews.
+- [x] Shared comparison scene with actual-scale robots, common tool/task frames, switchable mounting and overview/close-up previews.
 - [x] Extend the working importer to the available UR and FAIRINO ranges; report model-specific gaps honestly.
-- [ ] Separate straight-link ZeroErr variant preserving 425/401 mm axis spacing and supplier interfaces, with structural adapters, fastening/cable access and separate covers.
-- [ ] Valid connected solids, mass/inertia, stiffness/connection-load estimates and comparison against tapered baseline.
-- [ ] Updated workspace/tending load reports; unresolved shoulder sizing clearly retained.
+- [x] Separate straight-link ZeroErr variant preserving 425/401 mm axis spacing and supplier interfaces, with structural adapters, fastening/cable access and separate covers.
+- [x] Valid connected solids, mass/inertia, stiffness/connection-load estimates and comparison against tapered baseline.
+- [x] Updated workspace/tending load reports; unresolved shoulder sizing clearly retained.
 - [ ] Diagnostic and interpolated tending clearance review, with collisions and failed queries recorded and long work checkpointed.
 - [ ] Actual fixture/TCP registration required for real-cell feasibility; no invented cell certificate.
-- [ ] Draft prototype BOM, interface drawings, missing supplier data and single-joint bench procedure updated.
+- [x] Draft prototype BOM, interface drawings, missing supplier data and single-joint bench procedure updated.
 - [ ] Relevant commits, runnable commands, artifact paths and final completion audit.
 
 No purchase, supplier messages or physical tests are authorized by this software/design task.
@@ -60,7 +60,7 @@ redistribution permission is unresolved. UR mesh terms vary by model.
   their mesh bounds. Those source inertias remain unqualified.
 - Still pending: combined scene with our arm, a physical common tool and actual
   task/fixture registration, wider STEP correspondence, straight-variant motion/continuous-clearance review,
-  and final bench deliverable audit.
+  and final deliverable audit.
 
 ## Straight-link stage
 
@@ -90,3 +90,20 @@ redistribution permission is unresolved. UR mesh terms vary by model.
 - Deterministic diagnostic plus quintic intermediate set contains 60 unique
   configurations. Two exact-CAD shards are running with per-pose checkpoints;
   full collection and collision/exclusion review remain pending.
+
+## Combined comparison stage
+
+- Our straight arm, UR5e and FR5 coexist at actual scale with an identical
+  40 x 40 x 150 mm / 1 kg physical tool envelope and mapped flange/TCP.
+- Floor, wall and ceiling source jobs and prebuilt artifacts retain 82 shared
+  geometries, 137 occurrences and 18 moving joints. Six ZeroErr joints remain
+  passive. The 1.2 m display spacing is not a registered cell layout.
+- All three solve the same base-relative 20 mm downward Cartesian line at 21
+  samples, checked residuals/limits/jumps and tool-inclusive sampled hulls.
+  No sampled violations observed. Our +/-pi planning window is an assumption.
+- Saved merged poses/rotations at both task endpoints, independent mounting/TCP
+  transforms, mesh unit scaling and declared SI masses are checked. Overview
+  and tool close-up previews are generated from exported combined-scene meshes.
+- The application integration check loads all three source jobs and saved
+  artifacts and preserves our passive joints. Final provenance/cache rerun
+  and full application build pass. Final completion audit remains pending.

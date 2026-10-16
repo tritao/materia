@@ -83,7 +83,7 @@ class ExampleBrowser {
     case "printer": "3D printing";
     case "motor-shaft-bearings", "cad-modeling": "CAD & design";
     case "two-robot", "worker-rack-to-table", "worker-gallery": "People & simulation";
-    case "robot-screwdriver", "robot-screw-registration", "robot-screw-feeder", "robot-screw-blow-feed", "picking-station", "robot-arm", "reference-arms", "cobot-reach500", "cobot-reach850", "cobot-reach900", "cobot-reach1300", "gantry-picker", "overhead-arm", "mobile-base", "tending-controllers", "machine-tending": "Robotics & handling";
+    case "robot-screwdriver", "robot-screw-registration", "robot-screw-feeder", "robot-screw-blow-feed", "picking-station", "robot-arm", "reference-arms", "arm-comparison", "cobot-reach500", "cobot-reach850", "cobot-reach900", "cobot-reach1300", "gantry-picker", "overhead-arm", "mobile-base", "tending-controllers", "machine-tending": "Robotics & handling";
     default: throw 'Example "$id" needs a Start-page category';
   };
 

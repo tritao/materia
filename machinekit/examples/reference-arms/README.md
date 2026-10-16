@@ -133,3 +133,55 @@ to fetch the pinned 12-model FAIRINO STEP archive and FR5 drawings into `build/c
 UR's current STEP download page requires login; its STEP archive has not been fetched.
 
 The remaining work and completion gates are tracked in [PLAN.md](PLAN.md).
+
+## Our arm alongside UR5e and FR5
+
+Prepare and export the straight ZeroErr variant using its README, then run:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.json -- --comparison
+python3 machinekit/examples/reference-arms/render-comparison.py
+python3 machinekit/examples/reference-arms/render-comparison.py --closeup
+./app/run-built.sh --project=machinekit/examples/reference-arms/comparison.project.json
+```
+
+The **Robot arm comparison** Start-page example opens the same source project.
+Its job selector switches floor, wall and ceiling mounting. Portable prebuilt
+artifacts are `build/comparison/floor.mtrg`, `wall.mtrg` and `ceiling.mtrg`.
+All three robots coexist in each scene, separated by 1.2 m along display X.
+That spacing is a viewing arrangement, not a registered cell or clearance study.
+The panel previews remove display spacing and retain identical scale/axes.
+The millimetre ZeroErr meshes, connectors, poses, volume and unit-density inertia
+are converted to metres; declared physical masses/inertias remain SI.
+
+Each robot carries the same 40 x 40 x 150 mm solid tool envelope, with a TCP
+150 mm along its mapped flange +Z. This is a physical mesh/collision body with
+an assumed uniform 1 kg mass and 75 mm CoG; its mounting hardware is unspecified.
+FR5 uses the drawing-based nominal flange frame; its source visual mesh remains
+1 mm short of that face. The envelope is not a vendor gripper, fabricated
+adapter or the 4 kg workpiece. The existing sizing study's combined 5 kg/150 mm
+CoG load assumption remains separate and is not silently replaced by this tool.
+
+Existing EAIK/DLS solves a common base-relative downward TCP line from
+(0.45, 0.15, 0.45) to (0.47, 0.15, 0.45) m, in 21 samples for each arm.
+The task rotates with wall/ceiling mounting. Every sample is checked for FK
+residual, joint limits and discontinuous branch jumps, and against the source
+collision hulls plus tool envelope. The generated `*-task.json` records any
+violations and numerical fallback use. Our uncommissioned joints use an
+explicit +/-pi study planning window; this does not add physical stops.
+
+`build/comparison/validation.json` records saved binary reconstruction, all
+occurrence poses/rotations at both task endpoints, independent mounting/TCP
+checks, mesh scale and declared mass checks. Each scene contains 82 shared
+geometries, 137 instances and 18 moving joints. Our six joints remain passive;
+these are static comparison views, without a powered prototype mission.
+The separate UR5e/FR5 Cartesian playback remains available as described above.
+
+Source task fingerprints reject stale prepared tasks. The ZeroErr export also
+binds its artifact to its prepared layout and exporter; changed design inputs
+require preparation/export again. The application project declares mesh streams,
+task records and ZeroErr source/provenance files as cache inputs.
+Application integration tests load all three source jobs and all three prebuilt
+artifacts, verify all 137 instances/18 joints and preserve our passive joints.
+No dynamic benchmark, manufacturing release or physical cell qualification is
+inferred from these visual/kinematic comparisons.

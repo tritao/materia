@@ -10,6 +10,7 @@ class ReferenceArmsApplicationTests {
     var root = app.editor.WorkerAssetPath.resolve("machinekit/examples/reference-arms");
     var entry = ExampleCatalog.find("reference-arms");
     check(entry != null,"Reference library must appear in the application catalogue");
+    check(ExampleCatalog.find("arm-comparison") != null,"Comparison must appear in the application catalogue");
     var reports:Array<{model:String,parts:Int,jointMotion:Float,maxTrackingError:Float}> = [];
     for (id in ["ur5e","fairino5_v6"]) {
       var generated = ProjectSourceLoader.load(root+"/materia.project.json",null,null,id);
@@ -41,7 +42,22 @@ class ReferenceArmsApplicationTests {
         editor.dispose();
       } catch (error:Dynamic) {editor.dispose(); throw error;}
     }
-    var text = haxe.Json.stringify({scope:"source selection and 200 actual simulator steps; tracking errors are observations, not qualification",robots:reports},null,"  ");
+    var comparisonMountings:Array<String> = [];
+    for (mounting in ["floor","wall","ceiling"]) {
+      var generated = ProjectSourceLoader.load(root+"/comparison.project.json",null,null,mounting);
+      check(generated.objects.length==137 && generated.projectJob==mounting,"Comparison source job must load every occurrence");
+      var saved = ProjectSourceLoader.load(root+"/build/comparison/"+mounting+".mtrg");
+      check(saved.objects.length==137,"Combined saved artifact must load every occurrence");
+      var definition:materia.assembly.AssemblyDefinition = generated.assemblyDefinition;
+      var moving = [for (joint in definition.joints) if (joint.type != "fixed") joint];
+      check(moving.length==18,"Combined scene must retain eighteen moving joints");
+      var ours = [for (joint in moving) if (StringTools.startsWith(joint.id,"zeroerr/")) joint];
+      check(ours.length==6,"Combined scene must retain our six joints");
+      for (joint in ours) check(joint.passive==true,"Comparison must preserve passive prototype joints");
+      comparisonMountings.push(mounting);
+    }
+    var text = haxe.Json.stringify({scope:"source selection and 200 actual simulator steps for UR5e/FR5; static comparison source/saved imports; no hardware qualification",robots:reports,
+      comparisonMountings:comparisonMountings},null,"  ");
     File.saveContent(root+"/build/application-validation.json",text);
     Sys.println(text);
     // The editor's background project workers outlive this headless check.
