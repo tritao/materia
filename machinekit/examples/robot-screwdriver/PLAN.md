@@ -3413,3 +3413,32 @@ reapplies all 14 currently modified tracked main files cleanly over the feature
 tip. No main working files were changed. Its evidence is in scratch directory
 `sd15-main-preview.XRC85F`; main state must be rechecked immediately before any
 actual integration, and its untracked work and dirty submodules preserved.
+
+### SD15a deterministic effort prototype (2026-10-16)
+
+The both-backend requirement remains intact. An isolated experimental copy of
+`simkit/sim_core/src/physics_backend.cpp` now assembles generalized inertia and
+bias for effort-controlled joints, coupled followers and free roots, while
+retaining prescribed motion for the other axes. It has not changed production
+sources or the running MuJoCo checks.
+
+`build/sd-dynamics-prototype/probe.cpp` passes nine analytical scenarios with
+25 numerical assertions: the original 10 N / 1 kg slider now has v=1 m/s and
+semi-implicit displacement 0.0505 m after 0.1 s; armature and unequal mirrored
+jaw masses contribute correctly; an internal drive gives equal/opposite
+floating-body reactions; helical inertia includes its lead; rotated gravity,
+COM-offset gravity moments, root quaternion integration and gyroscopic
+acceleration are checked. Results are in `sd15-dynamics-prototype.log`; the
+experimental patch and input hashes are saved in scratch.
+
+This is a prerequisite study, not default-backend cell acceptance. Contact
+manifolds, generalized contact impulses, friction, force-aware limits,
+inertial fallbacks, velocity/reset history and scaling remain to be implemented
+and validated before integrating it. The prototype README records the next
+steps and references. No assumed grasp signal or object attachment substitutes
+for the physical gripping requirement.
+
+The fixed-plate nominal stage also passes with the current production code:
+`sd15-housing-physical1`, four accepted fastenings and both programs complete at
+185.64 simulated seconds (1184.8 s wall, 549 MB peak). Its targeted-interruption
+variant remains running.
