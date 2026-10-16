@@ -4740,8 +4740,6 @@ class ProjectSourceTests {
       // accelerates into its carry motion.
       var freeCarryCenterZ = (RobotArm.TABLE_TOP + RobotArm.PAD_HEIGHT +
         RobotArm.WORKPIECE_HEIGHT) / 1000.0;
-      var pickupTopZ = freeCarryCenterZ - RobotArm.WORKPIECE_HEIGHT / 2000.0 +
-        motionkit.robot.HandlingPlanRunner.DEFAULT_APPROACH_HEIGHT - 0.002;
       var worstSlip = 0.0, carrySlip = 0.0, carryTranslationSlip = 0.0, carryRotationSlip = 0.0;
       var worstPickupSeatSlip = 0.0, carryPickupSeatSlip = 0.0;
       var peakArmTorque = 0.0;
@@ -4817,7 +4815,11 @@ class ProjectSourceTests {
             }
             worstPickupSeatSlip = Math.max(worstPickupSeatSlip, carryPickupSeatSlip);
           }
-          if (carryStart == null && objectPose.z >= pickupTopZ) {
+          // This fixture alternates pick/place. A successful pick certifies the
+          // stopped lift; a height threshold can fire during its deceleration
+          // and mix pickup seating into the tighter transport-slip bound.
+          if (carryStart == null && mission.completed % 2 == 1) {
+            check(!runtimeSnapshot.trajectoryActive, "carry slip begins at the stopped pickup handoff");
             carryStart = relative;
             carryStartTool = tcp;
             carrySlip = 0.0;
