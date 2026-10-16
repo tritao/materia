@@ -92,10 +92,14 @@ class PickPlaceFastenTests {
           if (observedHandling != handling.stepIndex || observedFastening != fastening.stepIndex) {
             observedHandling = handling.stepIndex; observedFastening = fastening.stepIndex;
             printProgress('Assembly cell transition H=$observedHandling F=$observedFastening at ${clock.simulationTime()}');
+            if (Sys.getEnv("PICK_PLACE_TRACE") == "1") for (name in ["work/plate","work/flange/housing"])
+              printProgress('Assembly transition body $name: ${haxe.Json.stringify(handling.assemblyParts.get("project:"+name).pose())}');
           }
           simulation.step();
           if (clock.simulationTime() >= nextProgress) {
             printProgress('Assembly cell running H=${handling.stepIndex} F=${fastening.stepIndex} at ${clock.simulationTime()}');
+            if (Sys.getEnv("PICK_PLACE_TRACE") == "1") for (name in ["work/plate","work/flange/housing"])
+              printProgress('Assembly running body $name: ${haxe.Json.stringify(handling.assemblyParts.get("project:"+name).pose())}');
             var tools = @:privateAccess simulation.tools;
             if (tools != null) for (driver in tools.screwdrivers)
               printProgress('Assembly tool feedback: ${haxe.Json.stringify(driver.reading())}');

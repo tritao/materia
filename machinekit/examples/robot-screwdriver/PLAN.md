@@ -3268,3 +3268,13 @@ pocket datums. `sd15-outfeed-clear-head2` passes the isolated rigid-assembly
 unload with all five children retained and a measured final position error of
 0.200 mm (48.2 s wall, 417 MB). This proves the placement correction in that
 diagnostic; the complete fastening cycle must still be rerun for acceptance.
+
+The subsequent nominal `sd15-full7` run is failed (403.1 s wall, 500 MB),
+not a full-cycle acceptance pass. The first fastening completes, but the
+second reports NO_START and its recovery path is rejected by clearance:
+`work/flange/housing#14 / work/flange/screw3#1`, overlap 1.67 micrometres.
+The plate has pitched about 7.7 degrees and its origin is
+(-1.410, -504.504, 257.403) mm. The rigidly retained housing shares that tilt.
+Trace mode now also prints measured work poses at controller transitions and
+periodic feedback, so the next run can locate when seating is lost. The
+isolated outfeed pass remains valid only for its correctly staged assembly.
