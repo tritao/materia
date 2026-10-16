@@ -8,6 +8,10 @@ The original ZeroErr 5 kg supplier geometry is the development baseline. UR5e an
 FAIRINO FR5 are commercial references for checking our software and setting design
 benchmarks. A reference model is not a substitute for a calibrated delivered robot.
 
+The [module and mass audit](../zeroerr-arm/MODULE-MASS-AUDIT.md) records the
+documented mass conflicts, part material corrections and standalone payload
+sensitivity. Exact drive codes and moving-side mass data remain unconfirmed.
+
 ## Requirements sheet
 
 The machine-readable source is [arm-design-requirements.json](arm-design-requirements.json).

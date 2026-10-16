@@ -3,6 +3,8 @@
 Current priority: [standalone arm-design requirements and validation](../reference-arms/ARM-DESIGN.md),
 using the original supplier geometry. CNC tending is deferred. See the
 [joint and connection bench plan](ARM-BENCH-PLAN.md) for the next physical evidence.
+The [module and mass audit](MODULE-MASS-AUDIT.md) records source discrepancies,
+part material corrections and the standalone payload sensitivity results.
 
 This is an articulated CAD variant based on ZeroErr's eRobot 5 reference:
 eRob110T at J1–J3, eRob70T at J4–J6, straight hollow links, the supplied elbow

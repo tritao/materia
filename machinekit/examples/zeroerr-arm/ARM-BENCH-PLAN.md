@@ -4,6 +4,11 @@ This is the next physical-validation plan for the original 110T/70T arm. No
 hardware is ordered, supplier inquiry sent, fixture fabricated or test performed.
 It follows the [standalone requirements and evidence gates](../reference-arms/ARM-DESIGN.md).
 
+The [module and mass audit](MODULE-MASS-AUDIT.md) supplies the current register,
+source conflicts, drawing materials and load witnesses. Measure the J2 moving
+housing and upstream output separately; whole-module Appendix 3 data cannot
+resolve that split by itself.
+
 ## Freeze the test article
 
 Start with the original shoulder module family, **110T**, because its assumed
