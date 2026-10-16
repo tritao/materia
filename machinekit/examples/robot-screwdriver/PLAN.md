@@ -3594,3 +3594,21 @@ index aliasing possible when deleting and adding joints without changing their
 count; dedicated topology/reset dynamics coverage remains due. Prescribed-root
 acceleration, full reset/mode history, soft-contact behavior, scaling and
 production integration remain open.
+
+### SD15a moving-carrier and history dynamics (2026-10-16)
+
+The isolated generalized solver now includes measured prescribed-root linear
+and angular acceleration in its bias recursion, using stable body-ID history.
+A free slider preserves world velocity when its carrier accelerates, maintains
+constant velocity and stops; a free rotor preserves world angular momentum
+when its carrier starts rotating. Ordinary prescribed-only steps also record
+history so returning to force dynamics does not reuse an obsolete sample.
+
+Dedicated physical tests replace a joint while preserving total joint count
+and verify the surviving prescribed parent's correct acceleration history and
+child momentum. Further checks explicitly reset a joint, start motion again,
+and switch an axis from effort through velocity control back to effort.
+All 95 physical assertions and 12557 checked API operations pass
+(`sd15-dynamics-history.log`). This validates the covered history cases, not
+all possible reset/topology combinations. Soft contacts, scaling, production
+integration and both-backend whole-cell/fault acceptance remain open.
