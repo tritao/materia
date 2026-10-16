@@ -39,7 +39,65 @@ class ReferenceArmsApplicationTests {
     } catch(error:Dynamic) {editor.dispose();throw error;}
   }
 
+  static function checkSlowReference():Void {
+    var root=app.editor.WorkerAssetPath.resolve("machinekit/examples/reference-arms"),path=root+"/build/arm-design/zeroerr-slow.mtrg";
+    var loaded=ProjectSourceLoader.load(path);
+    var editor=new ReferenceEditorApp(null,root+"/build/slow-test-workspace.json",null,null,null,null,null,null,true);
+    try {
+      editor.session.openGeneratedProject(loaded,path);
+      check(editor.simulation.rebuild(editor.sensors,editor.scene,editor.session),"Slow preview rebuild: "+editor.simulation.error);
+      var ids=editor.simulation.snapshot().robotIds();check(ids.length==1,"Expected one reference arm");
+      var robot=editor.world.robot(ids[0]);if(robot==null) throw "Missing reference robot";
+      var program=editor.simulation.programPlayer();if(program==null) throw "Missing single-pass program";
+      var maximumMotion=0.0,maximumSpeed=0.0,maximumEffort=0.0,released=false,finishedAt=-1;
+      var initial=robot.snapshot().positions.toArray(),samples:Array<Dynamic> = [];
+      for(i in 0...2000) {
+        editor.simulation.step();
+        var state=robot.snapshot(),q=state.positions.toArray(),v=state.velocities.toArray(),effort=state.efforts.toArray();
+        check(state.faultCode==0,"Slow move fault "+state.faultCode);
+        check(program.failure==null,"Slow program: "+program.failure);
+        maximumMotion=Math.max(maximumMotion,q[1]-initial[1]);
+        for(x in v) maximumSpeed=Math.max(maximumSpeed,Math.abs(x));
+        for(x in effort) maximumEffort=Math.max(maximumEffort,Math.abs(x));
+        var contacts=[for(sensor in state.sensors.toArray()) if(sensor.kind=="brake_released") sensor.values.toArray()[0]];
+        if(contacts.length==6 && [for(x in contacts) if(x==1) x].length==6) released=true;
+        if(i%10==0) samples.push({t:(i+1)*0.01,q:q,velocity:v,effort:effort,brakeReleased:contacts});
+        if(program.passes==1 && finishedAt<0) finishedAt=i;
+        if(finishedAt>=0 && i-finishedAt>=100) break;
+      }
+      check(released,"All six release contacts must acknowledge");
+      check(program.passes==1,"One out-and-back pass must complete");
+      check(maximumMotion>4*Math.PI/180 && maximumMotion<6*Math.PI/180,"J2 must execute the 5 degree excursion");
+      check(maximumSpeed<2.5*Math.PI/180,"Measured speed must remain slow: "+maximumSpeed);
+      var returned=robot.snapshot().positions.toArray();
+      for(j in 0...returned.length) check(Math.abs(returned[j]-initial[j])<0.005,"Must return to inspection pose");
+      // Exercise the existing latched power-off handoff only after the move has stopped.
+      robot.stop(robotkit.core.StopMode.Normal);
+      for(_ in 0...100) editor.simulation.step();
+      robot.stop(robotkit.core.StopMode.Emergency);
+      for(_ in 0...100) editor.simulation.step();
+      var parked=robot.snapshot(),parkedQ=parked.positions.toArray();
+      var contacts=[for(sensor in parked.sensors.toArray()) if(sensor.kind=="brake_released") sensor.values.toArray()[0]];
+      check(contacts.length==6 && [for(x in contacts) if(x==0) x].length==6,"Power-off must confirm all brakes applied");
+      var drift=0.0;
+      for(_ in 0...1000) {
+        editor.simulation.step();var state=robot.snapshot(),q=state.positions.toArray();
+        check(state.faultCode==0,"Parked arm must remain fault-free");
+        for(j in 0...q.length) drift=Math.max(drift,Math.abs(q[j]-parkedQ[j]));
+        for(x in state.efforts.toArray()) check(Math.abs(x)<1e-6,"Motor effort must be off after brake handoff");
+      }
+      check(drift<1e-5,"Brakes must retain parked pose");
+      File.saveContent(root+"/build/arm-design/zeroerr-slow-review.json",haxe.Json.stringify({
+        scope:"Simulation only, 1 kg comparison tool, nominal-100 ratings and simulator servo defaults; no hardware qualification",
+        passes:program.passes,maxMotionRad:maximumMotion,maxSpeedRadS:maximumSpeed,maxEffortNm:maximumEffort,
+        parked10SecondDriftRad:drift,brakesApplied:contacts,samples:samples},null,"  "));
+      Sys.println("One slow J2 out-and-back passed; max speed="+maximumSpeed+" rad/s; parked drift="+drift+" rad");
+      editor.dispose();
+    } catch(error:Dynamic) {editor.dispose();throw error;}
+  }
+
   public static function main():Void {
+    if(Sys.args().indexOf("--slow-reference")>=0) {checkSlowReference();return;}
     if(Sys.args().indexOf("--braked-reference")>=0) {checkBrakedReference();return;}
     var root = app.editor.WorkerAssetPath.resolve("machinekit/examples/reference-arms");
     var entry = ExampleCatalog.find("reference-arms");

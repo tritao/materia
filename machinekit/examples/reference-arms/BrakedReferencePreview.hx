@@ -4,8 +4,23 @@ import materia.assembly.AssemblyDefinition;
 import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.AssemblySimulationBridge;
 
-/** Frozen supplier geometry with whole-module inertials and unpowered, applied brakes. */
+/** Frozen supplier geometry with whole-module inertials and brake-capable drives. */
 class BrakedReferencePreview {
+  public static function slowMove():Void {
+    var root=ReferenceAssetLocation.DIRECTORY+"/arm-design";
+    var scene=SceneArtifact.decode(sys.io.File.getBytes(root+"/zeroerr-braked.mtrg"));
+    var definition:AssemblyDefinition=scene.assemblyDefinition;
+    var joints=[for(j in definition.joints) if(j.type!="fixed") j];
+    var distance=5*Math.PI/180;
+    for(j in joints) {j.limits.velocity=2*Math.PI/180;j.limits.acceleration=4*Math.PI/180;}
+    var out=[for(_ in joints) 0.0];out[1]=distance;
+    // Runtime coordinates start at the saved inspection pose, not the supplier zero.
+    scene.machineMotion={belts:[],program:{axes:[for(j in joints) j.id],
+      waypoints:[out,[for(_ in joints) 0.0]],loop:false,positionTolerance:0.005}};
+    sys.io.File.saveBytes(root+"/zeroerr-slow.mtrg",SceneArtifact.encode(scene));
+    Sys.println("Single J2 excursion: +5 degrees and return; 2 deg/s, 4 deg/s^2; one pass, then powered hold");
+  }
+
   public static function run():Void {
     var root=ReferenceAssetLocation.DIRECTORY, vendor=root+"/../../zeroerr-arm";
     var baseline:Dynamic=haxe.Json.parse(sys.io.File.getContent(vendor+"/reference-baseline.json"));
@@ -57,21 +72,21 @@ class BrakedReferencePreview {
       var joint=joints[i],family=i<3 ? "eRob110T" : "eRob70T";
       var rating:Dynamic=Reflect.field(baseline.ratingsAtAssumedNominal100,family);
       var catalog:Dynamic=Reflect.field(config.catalog,family);
-      // Keep power off. The existing brake simulation owns the holding effort.
+      // The native runtime owns servo holding and its brake release interlock.
       joint.passive=false;
       var inertia:Float=catalog.motorRotorInertiaGmm2*1e-9*Math.pow(baseline.nominalRatioForDiagnostics+1,2);
       definition.actuators.push({id:joint.id+"-module",joint:joint.id,drive:"servo",
         maxEffort:rating.ratedNm,maxRate:Math.PI,rotorInertia:inertia,
-        // Existing simulator servo defaults satisfy the brake interface; never enabled here.
+        // Existing simulator defaults, not measured vendor gains.
         servoStiffness:rating.repeatedStartStopPeakNm/0.01,servoDamping:rating.repeatedStartStopPeakNm,
         ratedTorque:rating.ratedNm,peakTorque:rating.repeatedStartStopPeakNm,ratedSpeed:Math.PI,maxSpeed:Math.PI,
-        assumed:["Brake-held inspection only; nominal ratio 100; not approved for powered motion"],
+        assumed:["Offline preview only; nominal ratio 100 and simulator servo gains; not hardware tuning"],
         brake:{id:joint.id+"-brake",releaseChannel:joint.id+"-release",releasedSensor:joint.id+"-released",
           holdingEffort:rating.brakeStaticAcceptanceNm,releaseDelay:0.0,applicationDelay:0.0,
           releaseTimeoutMs:1000,feedbackMaxAgeMs:100}});
       definition.sensors.push({id:joint.id+"-released",kind:"brake_released",joint:joint.id});
     }
-    // Dedicated offline cabinet; no release program or hardware connection.
+    // Dedicated offline cabinet; native brake interlock, no hardware connection.
     scene.controllers=[{id:"zeroerr-inspection",kind:"robot",joints:[for(j in joints) j.id],
       sensors:[for(s in definition.sensors) s.id],channels:[for(j in joints) j.id+"-release"]}];
     scene.project={dynamicParts:[],motions:[]};
@@ -92,6 +107,6 @@ class BrakedReferencePreview {
         rotation:AssemblyFrames.toRotationMatrix(pose),localInertia:part.physicalInertiaKgM2});
     }
     sys.io.File.saveContent(root+"/arm-design/zeroerr-braked-inertials.json",haxe.Json.stringify({totalMassKg:mass,bodies:bodies},null,"  "));
-    Sys.println("Brake-held original preview: "+out+"; total mass="+mass+" kg; brakes="+converted.model.brakes.length);
+    Sys.println("Stationary original preview: "+out+"; total mass="+mass+" kg; brakes="+converted.model.brakes.length);
   }
 }

@@ -7,8 +7,9 @@ CNC tending and the inherited 23 transfers remain deferred.
 
 For inspection in the app, open
 `../reference-arms/build/arm-design/zeroerr-braked.mtrg`. Play holds the saved
-pose with applied brakes and reconciled module inertials; no motion program
-runs. See [preview physics and validation](../reference-arms/PASSIVE-DYNAMICS.md#brake-held-inspection-preview).
+pose with brake-capable drives and reconciled module inertials; no motion program
+runs. The runtime enables servo holding and releases brakes on Play. For a
+single slow J2 excursion and return, use `zeroerr-slow.mtrg` in the same folder. See [preview physics and validation](../reference-arms/PASSIVE-DYNAMICS.md#stationary-inspection-preview-with-brake-capable-drives).
 
 ## Six separately committed steps
 
