@@ -3861,3 +3861,32 @@ and 40659 checked API operations. All six core groups are green
 implementation also passed refreshed sanitizers and native RobotKit/session
 checks (`sd15-dynamics-implicit-*.log`). Actual deterministic cell/fault
 acceptance and the final gate/main integration remain open.
+
+### SD15a first physical pick and prescribed substep path (2026-10-16)
+
+`sd15-deterministic-native9` completes the actual first plate pick: B stays in
+its measured grip window and the free plate rises about 80 mm by H3 at 4.20 s.
+It subsequently slips during transfer, rotates and lands short of the fixture;
+B closes empty and H4 waits for absent fixture presence. The run was explicitly
+stopped after this diagnosed transport loss, not counted as whole-cell
+acceptance. Refreshed position-cycle implementation sanitizer and native
+RobotKit/session checks pass (`sd15-dynamics-position-*.log`).
+
+A focused four-kg narrow-pad turn test isolates the prescribed-motion path:
+position targets previously jumped to the cycle end before every physical
+substep. Substeps now interpolate from the previous completed position to the
+cycle target, using the same measured cycle velocity. Immediate target queries
+and final cycle positions retain their existing values; worlds without force
+axes retain their old path.
+
+With the same smooth quarter-turn input, observed height drift falls from
+1.46 mm to 0.28 mm and yaw error from about 0.216 degrees to 0.0016 degrees.
+The unchanged 1 mm/0.01 rad physical limits pass. The initial standalone setup
+was corrected to mirror the follower's travel bounds and allow its sub-millimetre
+support-removal transient before evaluating turning. All 286 physical assertions
+and 42280 checked API operations pass, with all six core groups green
+(`sd15-dynamics-position-path-ctest.log`). A fresh full-cell run remains due.
+
+A fresh read-only temporary-index main integration preview also succeeds
+(`sd15-main-preview-current._rohrqj6`); main remains `bc3658a91` with its working
+changes untouched. Final acceptance and main merge are not yet complete.

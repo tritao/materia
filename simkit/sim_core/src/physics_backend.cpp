@@ -375,10 +375,19 @@ public:
         const double substep = dt / static_cast<double>(substeps);
         // Position targets arrive before the physical cycle. Their measured cycle
         // displacement supplies the prescribed contact velocity for every substep.
+        struct PositionCycle {
+            std::uint64_t joint;
+            double start, end;
+        };
+        std::vector<PositionCycle> position_cycles;
         if (has_effort_axes()) {
             for (auto &joint : joints)
                 if (joint.target_mode == NKSIM_JOINT_TARGET_POSITION) {
                     const auto previous = previous_joint_position.find(joint.id);
+                    position_cycles.push_back(
+                        {joint.id,
+                         previous == previous_joint_position.end() ? joint.state.position : previous->second,
+                         joint.state.position});
                     joint.state.velocity = previous == previous_joint_position.end()
                                                ? 0
                                                : (joint.state.position - previous->second) / dt;
@@ -386,6 +395,16 @@ public:
             enforce_couplings();
         }
         for (std::uint32_t iteration = 0; iteration < substeps; ++iteration) {
+            if (!position_cycles.empty()) {
+                const double fraction = static_cast<double>(iteration + 1) / substeps;
+                for (const auto &cycle : position_cycles)
+                    find_joint(cycle.joint)->state.position =
+                        cycle.start + fraction * (cycle.end - cycle.start);
+                enforce_couplings();
+                const auto result = recompute_articulated_poses(0);
+                if (result != NKSIM_OK)
+                    return result;
+            }
             contacts.clear();
             const bool force_mode = has_effort_axes();
             if (force_mode) {

@@ -227,6 +227,62 @@ void grip_probe(bool frictionless, double damping = 0, bool position_carrier = f
     std::printf("friction grip height %.9g -> %.9g -> %.9g\n", initial.position[2], lifted.position[2],
                 released.position[2]);
 }
+void rotating_grip_probe() {
+    auto b = world(0, 0, -9.81);
+    auto anchor = body(*b, false, 0), root = body(*b, true, 1);
+    auto turn = joint(*b, anchor, root, NKSIM_JOINT_REVOLUTE);
+    auto left = collider(*b, NKSIM_MOTION_DYNAMIC, .05, {-.116, 0, .3}, {.02, .006, .03}),
+         right = collider(*b, NKSIM_MOTION_DYNAMIC, .05, {.116, 0, .3}, {.02, .006, .03});
+    auto object = collider(*b, NKSIM_MOTION_DYNAMIC, 4, {0, 0, .3}, {.08, .16, .01});
+    auto support = collider(*b, NKSIM_MOTION_STATIC, 0, {0, 0, .24}, {.04, .04, .05});
+    auto jaw = [&](std::uint64_t id, double x) {
+        BackendJointDesc d;
+        d.type = NKSIM_JOINT_PRISMATIC;
+        d.body_a = root;
+        d.body_b = id;
+        d.axis_a = {1, 0, 0};
+        d.anchor_a = {x, 0, .3};
+        d.lower_limit = x < 0 ? -.01 : -.04;
+        d.upper_limit = x < 0 ? .04 : .01;
+        d.damping = 10000;
+        std::uint64_t j;
+        ok(b->joint_create(d, &j));
+        return j;
+    };
+    auto leader = jaw(left, -.116), follower = jaw(right, .116);
+    BackendJointCoupling coupling;
+    coupling.leader = leader;
+    coupling.follower = follower;
+    coupling.ratio = -1;
+    ok(b->joint_couple(coupling));
+    effort(*b, leader, 480);
+    for (int i = 0; i < 1000; ++i)
+        ok(b->step(.001, 1));
+    auto before = pose(*b, object), lp = pose(*b, left), rp = pose(*b, right);
+    std::printf("before removal q=%.12g object=%.12g,%.12g,%.12g pads=%.12g,%.12g force=%.12g\n",
+                state(*b, leader).position, before.position[0], before.position[1], before.position[2],
+                lp.position[0], rp.position[0], contact_force(*b, object)[2]);
+    ok(b->body_destroy(support));
+    for (int i = 0; i < 200; ++i)
+        ok(b->step(.001, 1));
+    near_contact(pose(*b, object).position[2], .3, .001, "narrow pads hold four kg before turning");
+    for (int i = 0; i < 200; ++i) {
+        double t = (i + 1) / 200.;
+        BackendJointTarget target;
+        target.backend_joint = turn;
+        target.mode = NKSIM_JOINT_TARGET_POSITION;
+        target.target = std::acos(-1.0) / 4 * (1 - std::cos(std::acos(-1.0) * t));
+        ok(b->set_joint_targets(&target, 1));
+        ok(b->step(.01, 20));
+    }
+    auto result = pose(*b, object);
+    double yaw = 2 * std::atan2(result.rotation[2], result.rotation[3]);
+    std::printf("Rotating narrow-pad grip: height %.12g yaw %.12g joint %.12g\n", result.position[2], yaw,
+                state(*b, leader).position);
+    near_contact(result.position[2], .3, .001, "narrow pads retain the load through a smooth quarter turn");
+    near_contact(yaw, std::acos(-1.0) / 2, .01, "load follows prescribed rotation through real pad friction");
+}
+
 int main() {
     {
         auto b = world();
@@ -965,6 +1021,7 @@ int main() {
         near(state(*b, j).velocity, .01, "stiff damping reaches the physical terminal speed");
         near(state(*b, j).position, .00999, "stiff damping preserves finite integrated displacement");
     }
+    rotating_grip_probe();
     grip_probe(false);
     grip_probe(true);
     grip_probe(false, 1000);
