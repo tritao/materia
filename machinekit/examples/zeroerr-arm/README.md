@@ -477,3 +477,39 @@ outward tool-face normal. This is a semantic frame for comparison and TCP work;
 all six joints remain passive, and vendor drive signs/travel are uncommissioned.
 The straight variant still needs its own diagnostic/interpolated and continuous
 clearance review; the tapered revision's collision observations do not transfer.
+
+For the straight variant's reproducible discrete review, prepare the probes and
+run the two independent shards (each command can run in its own terminal):
+
+```sh
+python3 machinekit/examples/zeroerr-arm/prepare-motion-review.py
+./machinekit/examples/zeroerr-arm/run-built.sh --straight --motion-screen --pose-file="$PWD/machinekit/examples/zeroerr-arm/build/straight/probes-0.json" --shard=0 --shards=2
+./machinekit/examples/zeroerr-arm/run-built.sh --straight --motion-screen --pose-file="$PWD/machinekit/examples/zeroerr-arm/build/straight/probes-1.json" --shard=1 --shards=2
+python3 machinekit/examples/zeroerr-arm/review-motion.py --straight \
+  --required machinekit/examples/zeroerr-arm/build/straight/required-probes.json \
+  --output machinekit/examples/zeroerr-arm/build/straight/motion-report.json \
+  machinekit/examples/zeroerr-arm/build/straight/motion-screen-custom-0.json \
+  machinekit/examples/zeroerr-arm/build/straight/motion-screen-custom-1.json
+```
+
+These 60 unique configurations cover zero/ready, twelve wider Halton samples,
+twelve endpoint excursions and the synthetic cycle at seven quintic intervals
+per segment. Shard files are already split: the explicit pose file overrides
+internal pose generation/sharding. Checkpoints preserve collisions and failed
+queries. The collector fails if any required pose is missing. A completed
+collection is not necessarily clear; inspect its exclusions.
+
+With the reference-arm project prepared, continuous collision-hull review runs:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.json -- --straight-clearance
+```
+
+`build/straight/continuous-clearance.json` records the source artifact/config
+hashes, exact stop-to-stop quintic knots, 0.5 mm collision margin, lowering
+reserve and query count. The current eight-waypoint, 9.332 s synthetic cycle
+passes with 849 conservative subdivision queries. This uses enclosing visual
+hulls and the standard articulation exclusions, including adjacent bodies.
+It includes no physical tool, fixtures or flexible harness; exact sampled CAD
+checks address a different scope and remain required. This is neither a real
+cell certificate nor complete CAD swept clearance.

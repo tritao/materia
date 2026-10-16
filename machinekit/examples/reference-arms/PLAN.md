@@ -80,3 +80,13 @@ redistribution permission is unresolved. UR mesh terms vary by model.
 - Next: straight-variant diagnostic/intermediate and continuous hull clearance,
   combined comparison with our arm and physical common tool, actual task/fixture
   registration, and completion audit. Previous tapered clearance does not transfer.
+
+## Motion review in progress
+
+- Continuous straight-arm synthetic-cycle hull review passes: eight waypoints,
+  9.332 s, 849 subdivision queries, 0.5 mm margin. Source artifact/config hashes
+  are recorded. Adjacent-body articulation exclusions apply; no tool, fixtures,
+  harness or full CAD swept proof is claimed.
+- Deterministic diagnostic plus quintic intermediate set contains 60 unique
+  configurations. Two exact-CAD shards are running with per-pose checkpoints;
+  full collection and collision/exclusion review remain pending.

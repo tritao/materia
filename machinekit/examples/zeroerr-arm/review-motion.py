@@ -17,11 +17,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('inputs', nargs='+', type=Path)
     parser.add_argument('--required', type=Path)
+    parser.add_argument('--straight', action='store_true')
     parser.add_argument('--output', type=Path, default=HERE/'build/revised/motion-report.json')
     args = parser.parse_args()
     observations = {}
     for path in args.inputs:
         for row in json.loads(path.read_text()):
+            if not all(field in row for field in ('joints', 'overlaps', 'indeterminatePairs')):
+                raise ValueError('Incomplete observation in '+str(path))
             target = observations.setdefault(key(row['joints']), dict(joints=row['joints'],overlaps=[],indeterminatePairs=[]))
             # Preserve every positive/indeterminate observation across repeated probes.
             for field in ('overlaps', 'indeterminatePairs'):
@@ -32,18 +35,30 @@ def main():
     missing = sorted(required-set(observations))
     rows = list(observations.values())
     digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+    layout = HERE/'revised-layout.json'
+    engineering = HERE/'build/revised/engineering-input.json'
+    if args.straight:
+        current = json.loads((HERE/'build/straight/current.json').read_text())
+        layout = Path(current['layoutPath'])
+        engineering = HERE/'build/straight/engineering-input.json'
+        prepared = json.loads((HERE/'build/straight/probe-preparation.json').read_text())
+        if prepared['layoutSha256'] != digest(layout):
+            raise ValueError('Probe preparation refers to an older straight layout')
+        for name, expected in prepared['probeFiles'].items():
+            if digest(HERE/'build/straight'/name) != expected:
+                raise ValueError('Changed prepared probe file: '+name)
     result = dict(status='incomplete' if missing else 'complete_with_exclusions' if any(
             r['overlaps'] or r['indeterminatePairs'] for r in rows) else 'sampled_structures_clear',
-        scope='25 structural solids at discrete exploratory poses, including six output spigots. '
+        scope=('29 structural solids including adapters/covers' if args.straight else '25 structural solids')+' at discrete exploratory poses, including six output spigots. '
               'Not swept clearance, all detail fasteners, cable clearance, hardware travel, or real cell reach.',
         uniqueRequiredPoses=len(required),uniqueObservedPoses=len(rows),missingPosesRad=missing,
         clearPoses=sum(not r['overlaps'] and not r['indeterminatePairs'] for r in rows),
         collisionPoses=sum(bool(r['overlaps']) for r in rows),
         indeterminatePoses=sum(bool(r['indeterminatePairs']) for r in rows),
         inputSha256={str(p):digest(p) for p in args.inputs},
-        layoutSha256=digest(HERE/'revised-layout.json'),
-        engineeringInputSha256=digest(HERE/'build/revised/engineering-input.json'),
-        provenance='Collected within this review. Completed legacy clear rows can originate from the '
+        layoutSha256=digest(layout),
+        engineeringInputSha256=digest(engineering),
+        provenance='Current straight-variant checkpoint files.' if args.straight else 'Collected within this review. Completed legacy clear rows can originate from the '
                    'fail-closed initial logs; positive and failed witnesses are rechecked for pair details.',
         observations=rows)
     args.output.write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
