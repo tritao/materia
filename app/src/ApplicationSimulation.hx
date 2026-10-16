@@ -994,7 +994,10 @@ class ApplicationSimulation {
       }
       return;
     }
-    pumpOwner(true);
+    try pumpOwner(true) catch (failure:Dynamic) {
+      stop();
+      error = "Physics playback stopped: " + Std.string(failure);
+    }
   }
 
   function pumpOwner(present:Bool):Void {

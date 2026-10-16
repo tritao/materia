@@ -1049,6 +1049,11 @@ public:
                     static_cast<double>(substeps - index) * model->opt.timestep);
             apply_joint_targets();
             mj_step(model, data);
+            // MuJoCo can auto-reset an unstable state and return finite values.
+            // Treat that as a failed tick instead of presenting a fresh fling.
+            if (data->warning[mjWARN_BADQPOS].number || data->warning[mjWARN_BADQVEL].number ||
+                data->warning[mjWARN_BADQACC].number || data->warning[mjWARN_BADCTRL].number)
+                return NKSIM_ERROR_BACKEND;
         }
         // Any reaction mj_step computed back onto a kinematic root's free
         // joint (it has real mass so the contact solve treats it like any

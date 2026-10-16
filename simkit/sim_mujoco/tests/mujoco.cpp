@@ -3333,7 +3333,29 @@ void pressure_limited_speed_source_carries_load_and_stalls_at_capacity() {
     assert(std::abs(closed.effort) <= 2000.0001);
 }
 
+// Finite inputs can still overflow the dynamics; MuJoCo's auto-reset is a failed tick.
+void unstable_dynamics_reject_the_tick() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const auto body = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0, make_box(world));
+    const auto force = body_force(body, {1e20, 0.0, 0.0}, {});
+    assert(nksim_world_apply_forces(world, &force, 1) == NKSIM_OK);
+    nksim_step_result result{};
+    result.struct_size = sizeof(result);
+    assert(nksim_world_step(world, &result) == NKSIM_ERROR_BACKEND);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 int main() {
+    unstable_dynamics_reject_the_tick();
     pressure_limited_speed_source_carries_load_and_stalls_at_capacity();
     spring_applied_brake_holds_without_a_motor_target();
     joint_limit_softness_reaches_the_backend();
