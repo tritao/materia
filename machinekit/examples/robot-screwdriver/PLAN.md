@@ -3983,3 +3983,26 @@ serializing the entire matrix inside one case. The app compiles and its default
 case listing verifies all 14 distinct names alongside the other 48 cases.
 This registry verification does not establish cell acceptance; the complete
 frozen-source gate remains required.
+
+### SD15a rejection feedback regression (2026-10-16)
+
+The frozen `sd15-final-matrix1` gate passed the six native core groups,
+RobotKit/backend/session groups, CADKit, ProjectKit and the complete editor
+suite. MachineKit hit its 6 GiB cap because persistent compiler workers
+accumulated; the next invocation disables compiler-server reuse throughout.
+Its separate no-server retry was intentionally stopped with this gate after
+an actionable integration failure; neither partial run is acceptance.
+
+`screwdriver-required` failed on MuJoCo with “Reject vacuum did not release”.
+After reversal stops, the simulated tool retained its previous vacuum reading
+instead of publishing the current measured seal. The reading now updates on
+every selected cycle, including stopped reversal. The existing reverse/release
+probe additionally requires cleared vacuum feedback. That assertion fails on
+the old implementation (`sd-cases-sd15-vacuum-regression-red`), and the fixed
+`screwdriver-simulation` passes on both backends. The required-fastening
+integration passes MuJoCo with both actual rejected attempts; its deterministic
+run is still pending (`sd-cases-sd15-vacuum-regression-green`).
+
+The failed gate was intentionally stopped to apply this diagnosed correction;
+its source and runner checks both exit zero. Its partial two-arm cases are not
+full acceptance. The complete matrix and a fresh frozen-source gate remain due.

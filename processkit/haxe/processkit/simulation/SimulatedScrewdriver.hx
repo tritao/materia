@@ -669,6 +669,9 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
           anchoredBody = referenceHead.inverse().compose(startingBody);
         }
       }
+      // Vacuum feedback remains live after reversal has stopped, even though
+      // the tightening result and driven angle are retained for recovery.
+      observed.vacuum = sealed;
       if (!start) { driveSpeed = 0; if (reversed) reverseTargetAngle = angle; }
       if (armOwnsAxialMotion) springFeed();
       else simulation.driveProcessJoint(robotIndex, feedJoint, -Math.min(strokeLimitMm,stroke)/1000, 0);

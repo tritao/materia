@@ -504,7 +504,8 @@ class ScrewdriverSimulationTests {
       check(observer.reading().angle == 0 && observer.carried() == screw,"Reverse backs out the driven angle without releasing the screw");
       outputs.reverse(false); refuses(() -> harness.step());
       outputs.start(false); outputs.reverse(false); outputs.vacuum(false); harness.step();
-      check(observer.carried() == null,"Vacuum off releases the screw");
+      check(observer.carried() == null && !observer.reading().vacuum,
+        "Vacuum off releases the reversed screw and clears measured seal feedback");
       observer.reset();
       check(observer.reading().phase == ScrewdriverContract.IDLE && observer.model == null,"Reset clears the process and holding state");
       observer.configure(2,{program:program(),joint:joint(),screw:null,hand:1,
