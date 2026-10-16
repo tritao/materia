@@ -9,7 +9,7 @@ by the earlier completed software checklist.
 
 - [x] 1. Freeze original supplier geometry, archive modification experiments, replace shell masses with whole-module lumps and reconcile 5 kg static/duty checks. See [reconciliation](../zeroerr-arm/REFERENCE-RECONCILIATION.md).
 - [x] 2. Final [supplier-confirmation request](../zeroerr-arm/SUPPLIER-CONFIRMATION.txt); ready-to-send text saved, not sent.
-- [ ] 3. STEP-derived BOM, assembly/cable/EtherCAT wiring and rough cost.
+- [x] 3. [STEP-derived BOM, assembly/cable/EtherCAT wiring and rough cost](../zeroerr-arm/REFERENCE-BUILD.md); exact installed screws, harness details and quote remain supplier gaps.
 - [ ] 4. Drive profile, timed simulation/control integration and EtherCAT/eRob stub; unknown commissioned limits remain explicit.
 - [ ] 5. One 110T J2 bench package, measured load, before six-module purchase.
 - [ ] 6. Independent FR5 manufacturer kinematics validation beside UR5e.

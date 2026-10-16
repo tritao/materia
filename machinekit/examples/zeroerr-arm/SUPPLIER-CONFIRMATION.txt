@@ -12,7 +12,7 @@ We also have eRob module manual V3.44 and the T-module drawings.
 
 We accept the reference arm's 5 kg rating and want to reproduce its intended hardware, control settings and operating conditions. Please provide or confirm:
 
-1. Six-axis configuration/BOM: the complete ordering code and drawing/hardware revision for J1–J6, actual harmonic ratios, brake and encoder options, supported 48 V supply, EtherCAT firmware and matching ESI XML. Are eRob110H100T-BM-18EN (J1–J3) and eRob70H100T-BM-18EN (J4–J6) appropriate configurations, or does the reference use other ratios/options? These codes are questions, not an order.
+1. Six-axis configuration/BOM: the complete ordering code and drawing/hardware revision for J1–J6, actual harmonic ratios, brake and encoder options, supported 48 V supply, EtherCAT firmware and matching ESI XML. Manual V3.44 figure 6-7 labels the 5 kg wiring example with eRob110H120I proximally and eRob70H100I distally. Does this STEP T-arm use corresponding eRob110H120T-BM-18EN (J1–J3) and eRob70H100T-BM-18EN (J4–J6), or other ratios/options? These codes are questions, not an order.
 
 2. Reference coordinates and limits: mechanical zero, motor/output command signs, absolute output encoder units and zero offsets, permitted multi-turn travel, physical stops, and cable-limited soft limits for each joint in this specific assembled arm. Please supply maximum/recommended velocity, acceleration, deceleration and jerk settings for the reference payload.
 
