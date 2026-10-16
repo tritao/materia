@@ -4006,3 +4006,29 @@ run is still pending (`sd-cases-sd15-vacuum-regression-green`).
 The failed gate was intentionally stopped to apply this diagnosed correction;
 its source and runner checks both exit zero. Its partial two-arm cases are not
 full acceptance. The complete matrix and a fresh frozen-source gate remain due.
+
+### SD15a complete cell matrix and latest-main integration (2026-10-16)
+
+The frozen `sd15-final-matrix2` run passed all 14 physical two-arm cell
+acceptance cases: housing, full, recovery, supply, fixture, interruption and
+interruption-full on both MuJoCo and the deterministic backend. The four full
+cycle checks measured outfeed errors below 1 mm (MuJoCo about 0.201 mm;
+deterministic about 0.016 mm). Interruption cases stopped an actually rotating
+screw and retained the qualified attempt through retry. The required-fastening
+regression also completed both backends in the preceding focused green run.
+
+The native core/backend/session, CADKit, ProjectKit, MachineKit, app build and
+editor stages passed. The broader project-source stage was intentionally stopped
+before completion because local main gained overlapping asynchronous simulation
+retirement changes (`861c3e4fc`). Its completed matrix evidence is retained in
+`sd15-final-matrix2/cell-matrix-complete.json`; it is not a completed full gate.
+Both final source and runner integrity checks passed. Tending reproduced its
+previously documented utilization failure.
+
+All 66 feature commits were rebased onto `861c3e4fc` without textual conflicts;
+range-diff shows the patches unchanged. Temporary generated native objects and
+archives offloaded during disk pressure were all restored (2504 files, no
+unexpected replacements). The combined asynchronous stop, controller-local
+recovery and retained physical-thread behavior still require focused validation
+and a fresh complete frozen-source gate before final completion and local-main
+integration.
