@@ -65,3 +65,38 @@ not a hardware safety recipe. SD0–SD14 acceptance evidence and the outstanding
 project-wide gate failures are recorded in [PLAN.md](PLAN.md). The SD15 two-arm
 pick, place and fasten cell is still being commissioned; its complete cycle and
 fault/recovery acceptance remain open.
+
+## Two-arm cell commissioning
+
+`materia.pick-place.project.json` loads a plate and an unfitted flange housing
+from sensed trays, fastens the four screws, and unloads the retained assembly
+to the outfeed pocket. `materia.housing-handling.project.json` is the earlier
+commissioning stage with the plate fixed in its fixture. The housing uses the
+same bearing-derived CAD and screw pattern; its bearing is fitted at a later
+station.
+
+The handling robot has independently sized fixed A/B grippers for the housing
+and plate. The fastening robot has its fixed screwdriver. Each robot has its
+own cabinet and program; CAD wires carry `part-ready` and `fastened`. Handling
+confirms plate presence and parks before asserting readiness. Fastening requires
+an accepted result for every screw and parks before asserting completion.
+Handling acknowledges completion before unloading. The accepted screws and
+housing retain their identities while following the plate.
+
+The pressure-driven grippers currently need MuJoCo. The deterministic test
+backend stores joint effort without integrating it, so it cannot execute the
+physical gripping cycle. Its both-backend acceptance requirement remains open
+in [PLAN.md](PLAN.md); the missing-housing presence wait and local stop/retry
+checks pass on both backends. The full cell remains under commissioning.
+
+CAD and controller-program checks run with:
+
+```sh
+./haxeon/scripts/haxeon run --project machinekit/examples/robot-screwdriver/haxeon.pick-place.json
+```
+
+The app `screwdriver-pick-place` case runs the commissioning stages and fault
+checks. During development, `PICK_PLACE_STAGE` selects `housing`, `full`,
+`recovery`, `fixture`, `supply` or `interruption`; `PICK_PLACE_BACKEND` selects
+`0` or `1`. The default selection exercises both backends. These selectors do
+not turn an unsupported or incomplete scenario into an acceptance pass.

@@ -3101,3 +3101,40 @@ case and `sd-cases-sd15-tending-reset`: `tending-exchange` passes in 391.6 s wal
 door-jam and machine-alarm recovery checks before two physical machining cycles.
 The independently registered `robot-recovery` regression is still queued for
 compilation; its pending state does not replace the above integration evidence.
+
+### SD15a measured fault cases and physical retention diagnosis (2026-10-16)
+
+The standalone `robot-recovery` regression now passes both backends in 1 s,
+273 MB peak (`sd-cases-sd15-robot-recovery2`). It waits for an unconnected start
+input to isolate controller recovery from demonstration motion planning. The
+earlier motion-based fixture failed to establish its expected emergency alarm;
+it was not accepted as evidence for or against the reset fix.
+
+The current app acceptance scenarios compile and provide these MuJoCo results:
+- `sd-cases-sd15-fixture2`: remove the actually released plate before the
+  measured fixture wait; the handler stops before part-ready, no screw runs.
+  Pass, 85.4 s wall, 414 MB peak.
+- `sd-cases-sd15-supply2`: remove both identified screws for the first supply
+  to separate off-cell positions; stop before accepted fastening and keep the
+  physical fastened wire low. Pass, 166.9 s wall, 544 MB peak.
+- `sd-cases-sd15-interruption1`: on the fixed-plate commissioning stage, stop
+  the fastening controller after measured screw rotation begins, retry its
+  owning step, then complete all four accepted fastenings and the controller
+  acknowledgement. Pass, 757.7 s wall, 602 MB peak. Full free-plate interruption
+  acceptance remains due after its nominal cycle works.
+
+`sd-cases-sd15-full3` repeats the full free-plate timeout at exactly 101.54 s.
+The failure CAD pose is plate (19.33, -445.65, 243.06) mm rather than its seated
+(0, -500, 250) mm, with substantial yaw and tilt; the retained housing follows
+it. A read-only native snapshot at 84.38 s shows 26.7 mm plate/table penetration
+and 478 housing/plate contacts. Session `hold_object` changes a retained child
+to kinematic motion and drives it from its free parent's last measured pose.
+That is unsuitable as the final physical fastening of a housing onto a dynamic
+plate: the child can push its own free parent while following it with a lag.
+Investigate a real rigid connection for accepted clamped members, preserving
+the actual seated transform, dynamic mass and carrier ownership. Do not freeze
+the plate, relax contacts, or extend tightening time to mask this motion.
+
+Logs: the case directories above and `sd15-full3-native-contacts.log` in the
+scratch directory. The whole free-plate cycle, unload, default-backend physical
+support, final catalogue/gate and main integration remain open.

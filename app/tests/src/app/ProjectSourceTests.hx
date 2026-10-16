@@ -6878,6 +6878,7 @@ class ProjectSourceTests {
       suite("screwdriver-assembly", checkScrewdrivingAssembly),
       suite("screwdriver-required", RequiredFasteningTests.run),
       suite("robot-recovery", RobotOnlyRecoveryTests.run),
+      suite("screwdriver-pick-place", PickPlaceFastenTests.run),
       suite("screwdriver-registration", checkScrewdriverTouchRegistration),
       suite("screwdriver-feeder", checkScrewFeeder),
       suite("screwdriver-blow-feed", checkBlowFeed),
@@ -6957,7 +6958,7 @@ class ProjectSourceTests {
       group("router", ["cnc-router", "belts"]),
       group("screwdriver-process", ["screwdriver-simulation", "screwdriver-equipment"]),
       group("screwdriver", ["screwdriver-simulation", "screwdriver-equipment", "screwdriver-cad", "screwdriver-virtual",
-        "screwdriver-assembly", "screwdriver-required", "screwdriver-registration", "screwdriver-feeder", "screwdriver-blow-feed",
+        "screwdriver-assembly", "screwdriver-required", "screwdriver-pick-place", "screwdriver-registration", "screwdriver-feeder", "screwdriver-blow-feed",
         "screwdriver-force-search", "screwdriver-physical-thread", "screwdriver-staged", "screwdriver-loss"])
     ];
   }
