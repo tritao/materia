@@ -712,8 +712,12 @@ class ProgramCompiler {
         for (event in authoredEvents) lead = Math.max(lead,event.leadSeconds);
         context = new TimedMotionBuffer(filterSettings(),projection,
           section.path.drive == null ? null : section.path.drive.joint,maximumPathPlanSeconds,lead);
+        // Every publication shares this immutable section's geometry proof.
+        // A custom factory may depend on the individual chunk, so keep calling it there.
+        var mergeProof = mergeSegmentsSeconds>0 && mergeBudgetForMotion==null && Std.isOfType(solver,AxisKinematics)
+          ? new PathMergeBudget(cast solver,timing,section.path,prepared.jointPath,mergeSegmentsSeconds,projection) : null;
         work = new StreamingPathMotion(stream,context,section.path,prepared,pathStart,c.currentIndex,
-          c.sectionFeed,section.offset,authoredEvents,solver.affineMap()!=null);
+          c.sectionFeed,section.offset,authoredEvents,solver.affineMap()!=null,mergeProof);
         var moved = false;
         for (joint in 0...c.q.length) if (Math.abs(pathStart[joint]-c.q[joint]) > 1e-7) moved = true;
         if (moved) {
@@ -831,10 +835,15 @@ class ProgramCompiler {
     pending.events.sort(function(a, b) return Int64.compare(a.timeNs, b.timeNs));
     var profiling = Sys.getEnv("PROCESS_PATH_PROFILE") == "1";
     var profileBegan = Sys.time();
+    var profileCpu = profiling ? Sys.cpuTime() : 0.0;
     var profileRows:Array<Dynamic> = [];
     var mark = function(stage:String) {
       var now = Sys.time();
-      if (profiling) profileRows.push({stage:stage, seconds:now-profileBegan});
+      if (profiling) {
+        var cpu=Sys.cpuTime();
+        profileRows.push({stage:stage, seconds:now-profileBegan,cpuSeconds:cpu-profileCpu});
+        profileCpu=cpu;
+      }
       profileBegan = now;
     };
     var plan:Null<ExecutionPlan> = null;
@@ -842,15 +851,18 @@ class ProgramCompiler {
     try {
       var motors = motorSpace;
       if (motors != null) motors.validate(pending.trajectory);
+      mark("motorValidation");
       var budget:Null<MergeErrorBudget> = null;
       if(mergeSegmentsSeconds>0 && pending.path!=null){
         if(mergeBudgetForMotion!=null)budget=mergeBudgetForMotion(pending);
+        else if(pending.geometryMergeBudget!=null)budget=pending.geometryMergeBudget.budget;
         else if(Std.isOfType(solver,AxisKinematics))
           budget=PathMergeBudget.derive(cast solver,timing,pending,mergeSegmentsSeconds,projection);
         if(budget!=null && (budget.position.length!=maxVelocity.length || budget.seconds>mergeSegmentsSeconds))
           throw "Merge budget does not match the compiler's joints or window";
         if(budget==null)mergeBudgetRefusals++;
       }
+      mark("mergeBudgetProof");
       var transforms = TimedMotionTransforms.apply({filters:filterSettings(), mergeSeconds: budget==null ? 0.0 : budget.seconds,
         mergeRuns: function(trajectory,share)return mergeRuns(trajectory,share,budget)}, projection, pending, mark);
       motion = transforms;
@@ -1395,6 +1407,7 @@ class PendingMotion {
   public var geometryClearance:Bool = false;
   public var geometryRefined:Bool = false;
   public var geometryCurve:Null<JointPathSamples> = null;
+  public var geometryMergeBudget:Null<PathMergeBudget> = null;
 
   public function new(opIndex:Int, startQ:Array<Float>, endQ:Array<Float>,
       trajectory:Trajectory, events:Array<TimedEvent>, path:Null<PosePath>,

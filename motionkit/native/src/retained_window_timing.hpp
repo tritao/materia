@@ -1,6 +1,7 @@
 #ifndef MOTIONKIT_RETAINED_WINDOW_TIMING_HPP
 #define MOTIONKIT_RETAINED_WINDOW_TIMING_HPP
 
+#include "planning_profile.hpp"
 #include <toppra/algorithm/toppra.hpp>
 #include <toppra/solver/seidel.hpp>
 #include <cmath>
@@ -49,12 +50,14 @@ public:
     void retireFirst() {
         if (!valid_) throw std::logic_error("Retirement needs current backward state");
         if (windows_.size() < 2) throw std::logic_error("Dispose timing after its final window");
+        if (leased_ == windows_.front().get()) releaseWorkspace();
         windows_.erase(windows_.begin());
         intervals_.erase(intervals_.begin());
         --cached_windows_;
     }
 
     toppra::ReturnCode backward(const toppra::Bound& terminal) {
+        PathProfilePhase profile("stream_toppra_backward");
         const std::size_t reusable = cached_windows_;
         cached_windows_ = 0;
         valid_ = false;
@@ -64,6 +67,7 @@ public:
         intervals_.back() = terminal;
         for (std::size_t i = windows_.size(); i-- > 0;) {
             auto& algorithm = windows_[i];
+            leaseWorkspace(algorithm.get());
             const bool reuse = i < reusable;
             toppra::ReturnCode status;
             try {
@@ -72,8 +76,7 @@ public:
                     algorithm->solver(workspace_);
                     status = algorithm->computeControllableSetsFromSquaredSpeed(intervals_[i + 1]);
                 }
-            } catch (...) { algorithm->releaseSolverWorkspace(); throw; }
-            algorithm->releaseSolverWorkspace();
+            } catch (...) { releaseWorkspace(); throw; }
             if (status != toppra::ReturnCode::OK) {
                 error_ = algorithm->getErrorMessage();
                 return status;
@@ -97,6 +100,7 @@ public:
     // not alias a future backward update or retirement. Publication remains external.
     toppra::ReturnCode forwardPrefix(double start_squared, std::size_t count,
             std::vector<toppra::Vector>& result, std::vector<toppra::Vector>* controls = nullptr) {
+        PathProfilePhase profile("stream_toppra_forward");
         if (!valid_) throw std::logic_error("Timing needs a successful backward pass");
         if (!std::isfinite(start_squared) || start_squared < 0)
             throw std::invalid_argument("Initial squared speed must be finite and nonnegative");
@@ -105,10 +109,10 @@ public:
         profiles.reserve(count);if (controls) forward_controls.reserve(count);
         for (std::size_t i = 0; i < count; ++i) {
             auto& algorithm = windows_[i];
+            leaseWorkspace(algorithm.get());
             toppra::ReturnCode status;
             try { status = algorithm->computeForwardFromControllableSets(start_squared, workspace_); }
-            catch (...) { algorithm->releaseSolverWorkspace(); throw; }
-            algorithm->releaseSolverWorkspace();
+            catch (...) { releaseWorkspace(); throw; }
             if (status != toppra::ReturnCode::OK) {
                 error_ = algorithm->getErrorMessage();
                 return status;
@@ -129,6 +133,17 @@ public:
     const std::string& error() const { return error_; }
 
 private:
+    // Keep the immutable head problem initialized across adjacent backward /
+    // forward previews. Switching windows still releases the single workspace;
+    // the fork's generation check protects any subsequent reinitialization.
+    void releaseWorkspace() {
+        if (leased_) leased_->releaseSolverWorkspace();
+        leased_ = nullptr;
+    }
+    void leaseWorkspace(Algorithm* algorithm) {
+        if (leased_ != algorithm) { releaseWorkspace();leased_ = algorithm; }
+    }
+    Algorithm* leased_ = nullptr;
     std::vector<std::unique_ptr<Algorithm>> windows_;
     std::vector<toppra::Bound> intervals_;
     std::shared_ptr<toppra::solver::Seidel> workspace_;

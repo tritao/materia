@@ -26,6 +26,7 @@ class StreamingPathMotion {
   final affine:Bool;
   final offset:Float;
   final authored:Array<PathEvent>;
+  final mergeBudget:Null<PathMergeBudget>;
   final assigned:Array<Bool>;
   final events:Array<TimedEvent> = [];
   final laws = new TimedPathSeries();
@@ -40,18 +41,25 @@ class StreamingPathMotion {
 
   public function new(timing:PathTimingStream, buffer:TimedMotionBuffer, path:PosePath,
       prepared:PreparedProgramPath, startQ:Array<Float>, index:Int, feed:Float,
-      offset:Float, authored:Array<PathEvent>, affine:Bool) {
+      offset:Float, authored:Array<PathEvent>, affine:Bool, ?mergeBudget:PathMergeBudget) {
     this.timing = timing; this.buffer = buffer; this.path = path; this.prepared = prepared;
     this.startQ = startQ.copy(); startV = [for (_ in startQ) 0.0]; startA = startV.copy();
     this.index = index; this.feed = feed; this.offset = offset; this.affine = affine;
+    this.mergeBudget=mergeBudget;
     this.authored = authored.copy(); assigned = [for (_ in authored) false];
   }
 
   /** Null means this bounded step has not produced publishable execution yet. */
   public function step():Null<PendingMotion> {
     if (disposed || chunk != null) throw "Streaming motion cannot advance with an outstanding chunk";
+    var profiling=Sys.getEnv("PROCESS_PATH_PROFILE")=="1";
+    var began=profiling ? Sys.cpuTime() : 0.0;
+    var mark=function(stage:String) {
+      if (profiling) { var now=Sys.cpuTime();Sys.println("PROCESS_PATH_STAGE "+haxe.Json.stringify({stage:stage,cpuSeconds:now-began}));began=now; }
+    };
     var candidate = buffer.preview();
-    if (candidate != null) return offer(candidate);
+    mark("stream_filter_preview");
+    if (candidate != null) { var offered=offer(candidate);mark("stream_offer");return offered; }
     if (sourceFinished) throw "Final streaming input produced no execution chunk";
     switch timing.step() {
       case Waiting: return null;
@@ -60,6 +68,7 @@ class StreamingPathMotion {
         var raw:Null<TimedPath> = null;
         try {
           raw = preview.commitTiming();
+          mark("stream_timing_commit");
           var next = Int64.add(end,raw.trajectory.durationNanoseconds());
           var timed = raw;
           laws.append(timed,preview.startDistance,preview.endDistance,preview.firstStage);raw = null;
@@ -78,7 +87,9 @@ class StreamingPathMotion {
             assigned[i] = true;
           }
           if (sourceFinished) for (done in assigned) if (!done) throw "Streaming event lies beyond the timed path";
+          mark("stream_laws_events");
           buffer.append(timed.trajectory,sourceFinished);
+          mark("stream_buffer_append");
           timed.trajectory.dispose(); end = next;
           preview.dispose();
           return null;
@@ -118,6 +129,7 @@ class StreamingPathMotion {
     pending.continues = !candidate.finalChunk;
     pending.filtered = true; pending.filteredShaped = candidate.shaped;
     pending.distanceOffset = offset; pending.endDistance = sampled[sampled.length-1];
+    pending.geometryMergeBudget=mergeBudget;
     pending.geometryCurve = prepared.jointPath; pending.geometryRefined = prepared.refined;
     pending.feed = feed;
     pending.accept = accept; pending.abandon = dispose;

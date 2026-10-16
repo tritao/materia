@@ -5,13 +5,32 @@ import motionkit.planner.PathTimingBackend;
 import motionkit.planner.ToppraPathTiming;
 import motionkit.planner.JointPathPolynomial;
 import motionkit.path.PosePositionBound;
+import motionkit.path.PosePath;
+import motionkit.planner.JointPathSamples;
 
 /** Spend only the Cartesian path allowance not already used by geometry and native lowering. */
 class PathMergeBudget {
+  /** One immutable section's proof, including a proved absence of remaining budget. */
+  public final budget:Null<MergeErrorBudget>;
+
+  public function new(solver:AxisKinematics,timing:PathTimingBackend,path:PosePath,curve:JointPathSamples,
+      seconds:Float,projection:Null<CouplingProjection>) {
+    var profiling=Sys.getEnv("PROCESS_PATH_PROFILE")=="1";
+    var wall=profiling ? Sys.time() : 0.0, cpu=profiling ? Sys.cpuTime() : 0.0;
+    budget=calculate(solver,timing,path,curve,seconds,projection);
+    if (profiling) Sys.println("PROCESS_PATH_STAGE "+haxe.Json.stringify({stage:"geometry_merge_budget",
+      seconds:Sys.time()-wall,cpuSeconds:Sys.cpuTime()-cpu}));
+  }
+
   public static function derive(solver:AxisKinematics,timing:PathTimingBackend,pending:PendingMotion,
       seconds:Float,projection:Null<CouplingProjection>):Null<MergeErrorBudget> {
-    var path=pending.path,curve=pending.geometryCurve;
-    if(path==null || curve==null || pending.authoredPolyline!=null || !Std.isOfType(timing,ToppraPathTiming))return null;
+    if (pending.authoredPolyline!=null) return null;
+    return calculate(solver,timing,pending.path,pending.geometryCurve,seconds,projection);
+  }
+
+  static function calculate(solver:AxisKinematics,timing:PathTimingBackend,path:Null<PosePath>,
+      curve:Null<JointPathSamples>,seconds:Float,projection:Null<CouplingProjection>):Null<MergeErrorBudget> {
+    if(path==null || curve==null || !Std.isOfType(timing,ToppraPathTiming))return null;
     var used=0.0,allowed=Math.POSITIVE_INFINITY;
     if(path.authoredGeometry!=null){
       if(path.geometryDeviationBound==null)return null;

@@ -3,12 +3,14 @@
 #include "retained_window_timing.hpp"
 #include "window_timing_stream.hpp"
 #include "clock_profile_cursor.hpp"
+#include "planning_profile.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <chrono>
 #include <cstdint>
+#include <ctime>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -40,30 +42,7 @@ struct NativeResultOwner {
     Handle release() { const Handle result = value; value = {}; return result; }
 };
 
-// Opt-in wall-clock stage measurements; disabled runs perform no clock reads.
-class PathProfilePhase {
-    using Clock=std::chrono::steady_clock;
-    const bool enabled_;
-    const char* stage_;
-    Clock::time_point began_{};
-public:
-    explicit PathProfilePhase(const char* stage):enabled_([] {
-        const char* value=std::getenv("PROCESS_PATH_PROFILE");
-        return value && std::strcmp(value,"1")==0;
-    }()),stage_(stage) { if (enabled_) began_=Clock::now(); }
-    void mark(const char* next) {
-        if (enabled_) {
-            const auto now=Clock::now();
-            std::fprintf(stderr,"PROCESS_PATH_STAGE {\"stage\":\"%s\",\"seconds\":%.9g}\n",
-                stage_,std::chrono::duration<double>(now-began_).count());
-            began_=now;
-        }
-        stage_=next;
-    }
-    bool enabled() const { return enabled_; }
-    ~PathProfilePhase() { if (enabled_) mark(stage_); }
-};
-
+using motionkit::PathProfilePhase;
 
 using Poly = std::vector<double>; // ascending powers on the unit interval
 
@@ -577,26 +556,71 @@ private:
 // q''(s)*x(s)+q'(s)*u is a quartic polynomial, linear in (u,x0).
 // Bounding every Bernstein control bounds the complete interval, including
 // peaks that collocation misses. Final execution validation remains mandatory.
+// Keep the repeated head/successor proofs, with a fixed memory budget even
+// when a longer pending suffix needs recomputation. Each worker owns its cache.
+class IntervalAccelerationProofCache {
+public:
+    struct Key {};
+private:
+    struct Entry {
+        std::shared_ptr<const Key> key;
+        toppra::Vector grid;
+        toppra::Matrices F;
+        toppra::Vectors g;
+        toppra::Bounds controls;
+    };
+    std::array<Entry,2> entries_;
+public:
+    bool load(const std::shared_ptr<const Key>& key, const toppra::Vector& grid,
+            toppra::Matrices& F, toppra::Vectors& g, toppra::Bounds& controls) {
+        for (size_t i=0;i<entries_.size();++i) {
+            auto& entry=entries_[i];
+            if (entry.key!=key || entry.grid.size()!=grid.size() ||
+                    !(entry.grid.array()==grid.array()).all()) continue;
+            F=entry.F;g=entry.g;controls=entry.controls;
+            if (i) std::swap(entries_[0],entries_[i]);
+            return true;
+        }
+        return false;
+    }
+    void retain(const std::shared_ptr<const Key>& key, const toppra::Vector& grid,
+            const toppra::Matrices& F, const toppra::Vectors& g, const toppra::Bounds& controls) {
+        Entry entry{key,grid,F,g,controls};
+        entries_[1]=std::move(entries_[0]);entries_[0]=std::move(entry);
+    }
+};
+
 class IntervalJointAcceleration final : public toppra::LinearConstraint {
     toppra::Vector lower_, upper_, velocity_;
     toppra::Matrices coefficients_;
     std::vector<double> knots_, caps_;
+    std::shared_ptr<IntervalAccelerationProofCache> cache_;
+    const std::shared_ptr<const IntervalAccelerationProofCache::Key> key_=
+        std::make_shared<const IntervalAccelerationProofCache::Key>();
 public:
     IntervalJointAcceleration(const toppra::Vector& lower, const toppra::Vector& upper,
             const toppra::Vector& velocity, const toppra::Matrices& coefficients, const std::vector<double>& knots,
-            const std::vector<double>& caps, size_t first, size_t after)
+            const std::vector<double>& caps, size_t first, size_t after,
+            std::shared_ptr<IntervalAccelerationProofCache> cache)
         : LinearConstraint(14*lower.size(), 2, false, true, false), lower_(lower), upper_(upper), velocity_(velocity),
           coefficients_(coefficients.begin()+(first ? first-1 : 0),
               coefficients.begin()+std::min(after+1,coefficients.size())),
           knots_(knots.begin()+(first ? first-1 : 0),
               knots.begin()+std::min(after+2,knots.size())),
           caps_(caps.begin()+(first ? first-1 : 0),
-              caps.begin()+std::min(after+1,caps.size())) {}
+              caps.begin()+std::min(after+1,caps.size())),cache_(std::move(cache)) {}
 protected:
     void computeParams_impl(const toppra::GeometricPath& path, const toppra::Vector& grid,
             toppra::Vectors& a, toppra::Vectors& b, toppra::Vectors& c,
             toppra::Matrices& F, toppra::Vectors& g, toppra::Bounds& control_limits, toppra::Bounds&) override {
+        PathProfilePhase profile("interval_acceleration_constraints");
         (void)path;
+        if (cache_ && cache_->load(key_,grid,F,g,control_limits)) {
+            for (Eigen::Index i=0;i<grid.size();++i) {
+                a[i]<<1.0,0.0;b[i]<<0.0,1.0;c[i].setZero();
+            }
+            return;
+        }
         toppra::Matrix derivatives(5,lower_.size());
         for (Eigen::Index i=0;i<grid.size();++i) {
             const double h=i+1<grid.size() ? grid[i+1]-grid[i] : 0.0;
@@ -676,6 +700,11 @@ protected:
             auto upward=[&](long double value){return std::nextafter(value,infinity);};
             long double control_bound=infinity;
             for (Eigen::Index row=0;row<F[i].rows();row+=2) {
+                // Repeated Bernstein controls on an affine span contribute the
+                // same candidate bound. Keep every LP row and its order, but
+                // evaluate that outward-rounded proof only once per run.
+                if (row>0 && F[i](row,0)==F[i](row-2,0) && F[i](row,1)==F[i](row-2,1) &&
+                        g[i][row]==g[i][row-2] && g[i][row+1]==g[i][row-1]) continue;
                 const long double slope=std::abs(F[i](row,0));
                 if (slope>0) {
                     const long double term=upward(std::abs(static_cast<long double>(F[i](row,1)))*xmax);
@@ -693,9 +722,17 @@ protected:
             // drop it: replace its contribution by its proved worst case over
             // the finite control domain, tightening both inequalities. Only do
             // this when that contribution fits the arithmetic reserve.
+            double previous_slope=0;
+            long double contribution=0;
             for (Eigen::Index row=0;row<F[i].rows();row+=2) {
-                if (F[i](row,0)==0.0) continue;
-                const long double contribution=upward(std::abs(static_cast<long double>(F[i](row,0)))*control_bound);
+                const double slope=std::abs(F[i](row,0));
+                if (slope==0.0) continue;
+                // The domain is fixed for this node. Reusing the exact same
+                // rounded product leaves each inequality's tightening intact.
+                if (slope!=previous_slope) {
+                    contribution=upward(static_cast<long double>(slope)*control_bound);
+                    previous_slope=slope;
+                }
                 // Tightening may consume only roundoff of the physical
                 // acceleration budget, never a large cancellation against Ax.
                 // In particular the feasible stationary state must survive.
@@ -709,6 +746,7 @@ protected:
                 }
             }
         }
+        if (cache_) cache_->retain(key_,grid,F,g,control_limits);
     }
 };
 
@@ -1225,6 +1263,8 @@ namespace {
 // Prepared geometry, adaptive grid and constraints have one owner independent of any
 // endpoint solve/result. A session can retain this object without capturing a caller's stack.
 class PreparedTimingPath {
+    const std::shared_ptr<IntervalAccelerationProofCache> acceleration_proofs=
+        std::make_shared<IntervalAccelerationProofCache>();
 public:
     std::vector<double> knots, caps, grid_values;
     toppra::Matrices coefficients;
@@ -1408,7 +1448,7 @@ public:
             const size_t first_span=window_first[window];
             const size_t after_span=window+1<window_first.size() ? window_first[window+1] : span_count;
             constraints.push_back(std::make_shared<IntervalJointAcceleration>(lower_acceleration,upper_acceleration,upper_velocity,
-                coefficients,knots,caps,first_span,after_span));
+                coefficients,knots,caps,first_span,after_span,window_first.size()>1 ? acceleration_proofs : nullptr));
         }
         else constraints.push_back(std::make_shared<toppra::constraint::LinearJointAcceleration>(
             lower_acceleration, upper_acceleration));
@@ -2197,6 +2237,7 @@ mk_result MK_CALL mk_path_timing_stream_step(mk_path_timing_stream_handle handle
             *out_progress=progress;out_preview->id=id;*out_law=law.release();*out_trajectory=trajectory.release();
             return MK_OK;
         }
+        PathProfilePhase stream_profile("stream_queue_append");
         const auto& prepared = *stream->prepared;
         progress.total_windows = static_cast<uint32_t>(prepared.window_first.size());
         if (stream->queue->finished()) {
@@ -2210,12 +2251,14 @@ mk_result MK_CALL mk_path_timing_stream_step(mk_path_timing_stream_handle handle
         if (stream->end_speed > 0 && stream->next < prepared.window_first.size()) {
             progress.state = MK_TIMING_STREAM_WAITING; *out_progress = progress; return MK_OK;
         }
+        stream_profile.mark("stream_queue_preview");
         auto candidate = stream->queue->preview();
         if (!candidate) {
             if (stream->queue->pendingWindows() == stream->capacity && stream->next < prepared.window_first.size())
                 return MK_ERROR_LIMIT;
             progress.state = MK_TIMING_STREAM_WAITING; *out_progress = progress; return MK_OK;
         }
+        stream_profile.mark("stream_clock_construction");
         if (!stream->clock) stream->clock=std::make_shared<const motionkit::ClockProfileCursor>(
             stream->samples->front().s,stream->start_speed);
         if (!stream->head_slice) stream->head_slice = std::make_unique<PathProfileSlice>(stream->samples, prepared, stream->head);
@@ -2285,11 +2328,13 @@ mk_result MK_CALL mk_path_timing_stream_step(mk_path_timing_stream_handle handle
         NativeResultOwner<mk_time_law_handle, mk_time_law_destroy> law;
         NativeResultOwner<mk_trajectory_handle, mk_trajectory_destroy> trajectory;
         if (out_report) { out_report->windows = 1; out_report->boundary_lowerings = 0; }
+        stream_profile.mark("stream_lowering_total");
         auto status = lower_timed_profile(slice.view(), {stream->velocity.data(), stream->acceleration.data(),
             static_cast<uint32_t>(stream->velocity.size())}, {progress.start_speed, progress.end_speed,
             stream->lowering_tolerance, stream->require_feasible_path}, std::move(speeds), out_report,
             &law.value, &trajectory.value, &clock_stages, &stream->samples);
         if (status != MK_OK) return status;
+        stream_profile.mark("stream_preview_registration");
         auto token = std::make_shared<PathTimingPreview>(PathTimingPreview{std::move(*candidate), stream->head,
             std::move(next_clock),nullptr});
         uint32_t id;
