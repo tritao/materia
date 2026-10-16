@@ -98,6 +98,7 @@ class TrajectoryStream {
   var referenceTags:Array<Int64> = [];
   var nextMotionTag:Int64 = Int64.ofInt(1);
   final programTags:Bool;
+  var tagBeforeSubmission:Int64 = Int64.ofInt(0);
 
   public function new(robot:Robot, ?programTags:Bool = false) {
     this.robot = robot;
@@ -109,6 +110,7 @@ class TrajectoryStream {
 
   public function beginSegments(segments:StreamSegments, durationSeconds:Float):Void {
     checkedTrajectory = null;
+    tagBeforeSubmission = programTags && segments.count()>0 ? robot.snapshot().trajectoryTag : Int64.ofInt(0);
     this.segments = segments;
     this.durationSeconds = durationSeconds;
     elapsedSeconds = 0.0;
@@ -136,14 +138,16 @@ class TrajectoryStream {
 
   public function sync():RobotSnapshot {
     var observation = robot.snapshot();
-    // Program tags are monotonic publication identities. Axis replacement and
-    // hold paths can revisit earlier references, so keep their existing policy.
-    while (programTags && referenceTags.length>0 && Int64.compare(referenceTags[0],observation.trajectoryTag)<0) {
-      var retired=referenceTags[0];referenceTags.shift();references.remove(Int64.toStr(retired));
-    }
     var start = references.get(Int64.toStr(observation.trajectoryTag));
-    if (start != null)
+    if (start != null) {
+      // Retire only after observing one of this stream's own publications.
+      // Before the owner applies a new command, its snapshot can still carry
+      // a numerically larger homing tag from a different identity domain.
+      while (programTags && referenceTags.length>0 && Int64.compare(referenceTags[0],observation.trajectoryTag)<0) {
+        var retired=referenceTags[0];referenceTags.shift();references.remove(Int64.toStr(retired));
+      }
       elapsedSeconds = elapsedFromSnapshot(observation, start, durationSeconds);
+    }
     return observation;
   }
 
@@ -387,6 +391,8 @@ class TrajectoryStream {
 
   public function finishedProgram(observation:RobotSnapshot, endsAtRest:Bool = true):Bool {
     if (Int64.compare(finalTag,Int64.ofInt(0))==0) return false;
+    // A previous owner's retained tag is not evidence that this plan ran.
+    if (programTags && Int64.compare(observation.trajectoryTag,tagBeforeSubmission)==0) return false;
     var tagOrder = Int64.compare(observation.trajectoryTag,finalTag);
     if (!endsAtRest && tagOrder>0) return true;
     if (tagOrder!=0 || Int64.compare(observation.trajectoryTagTimeNs,finalDurationNs)<0) return false;

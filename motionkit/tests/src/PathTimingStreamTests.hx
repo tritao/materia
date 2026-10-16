@@ -146,19 +146,25 @@ class PathTimingStreamTests extends MotionKitTestSupport {
     entry.dispose();compiled.dispose();
   }
   function execution():Void {
-    for (mode in 0...5) {
+    for (mode in 0...6) {
       var fixture=buildContractArmFixture();
       for (joint in fixture.model.joints) joint.limits.maxAcceleration=4.0;
-      var harness=new robotkit.runtime.SimulationHarness(0.001);
+      var dt=mode==5 ? 0.01 : 0.001;
+      var harness=new robotkit.runtime.SimulationHarness(dt);
       var blueprint=robotkit.runtime.RobotRuntimeCompiler.compile(fixture.model,new robotkit.profile.RobotProfile());
       blueprint.channels.push(new robotkit.execution.ProcessChannelDeclaration("tool.enabled",
         robotkit.execution.ProcessEventValue.Digital(false)));
       var runtime=harness.simulation.addRobot(blueprint);
-      var robot=new robotkit.simulation.SimulatedRobot("streamed-arm",runtime,fixture.model.name,
+      var robot:robotkit.core.Robot=new robotkit.simulation.SimulatedRobot("streamed-arm",runtime,fixture.model.name,
         [for (link in fixture.model.links) link.name],[for (joint in fixture.model.joints) joint.name]);
+      var stale:Null<MotionKitTestSupport.SessionTransitionRobot> = null;
+      if (mode==5) {
+        stale=new MotionKitTestSupport.SessionTransitionRobot(robot);
+        stale.tagOverride=Int64.ofInt(200000011);robot=stale;
+      }
       var limits=new motionkit.trajectory.ValidationLimits(6,Int64.ofInt(1),Int64.ofInt(0));
       var compiler=new motionkit.robot.ProgramCompiler(new MotionKitTestSupport.PlanarSolver(),limits,"work",
-        [for (_ in 0...6) 2.0],[for (_ in 0...6) 4.0],[for (_ in 0...6) 20.0],
+        [for (_ in 0...6) 2.0],[for (_ in 0...6) 4.0],[for (_ in 0...6) mode==5 ? 0.001 : 20.0],
         motionkit.robot.StartTolerances.uniform(6,0.02,0.02,0.02),null,0.05);
       compiler.maximumPathPlanSeconds=0.05;
       var path=new motionkit.path.PosePath("work",[new motionkit.path.PoseLine(
@@ -170,6 +176,12 @@ class PathTimingStreamTests extends MotionKitTestSupport {
           [new motionkit.event.PathEvent(0.05,"tool.enabled",motionkit.event.EventValue.Digital(true))]),
         motionkit.program.MotionOp.SetOutput("tool.enabled",motionkit.event.EventValue.Digital(false)),
         motionkit.program.MotionOp.Dwell(0.01)]);
+      if (mode==5) program=new motionkit.program.MotionProgram([
+        motionkit.program.MotionOp.MoveJ(motionkit.program.MoveTarget.JointTarget([0.1,0.0,0.0,0.0,0.0,0.0]),
+          new motionkit.MotionOptions(),motionkit.program.Blend.ExactStop),
+        motionkit.program.MotionOp.SetOutput("tool.enabled",motionkit.event.EventValue.Digital(true)),
+        motionkit.program.MotionOp.SetOutput("tool.enabled",motionkit.event.EventValue.Digital(false)),
+        motionkit.program.MotionOp.Dwell(10*dt)]);
       var origin=[for (_ in 0...6) 0.0];
       if (mode==2) {
         var compiled=compiler.compile(program,origin,Int64.ofInt(900));
@@ -194,11 +206,15 @@ class PathTimingStreamTests extends MotionKitTestSupport {
           check(compiled.blocks[0].plans.length>2,"runtime test has multiple moving publication cuts");
           motion.runCompiled(compiled);compiled.dispose();
         } else motion.run(program);
+        if (stale!=null) {
+          // Poll before the runtime owner applies the first queued command.
+          motion.update(dt);stale.tagOverride=null;
+        }
         var previous=0.0,samples=0,sawBarrier=false;
         var held=false,resumed=false,heldTicks=0,stopped=false;
         for (tick in 0...3000) {
           if (motion.progress().barrier!=null) sawBarrier=true;
-          motion.update(0.001);harness.step(Int64.ofInt(tick+1));
+          motion.update(dt);harness.step(Int64.ofInt(tick+1));
           var current=robot.snapshot().setpointPositions.get(0);
           if (previous>0.01 && current<0.09 && current>0.01) {
             if (mode<2) check(current-previous>0.00005,"moving publication cuts do not insert a physical stop");
@@ -213,7 +229,7 @@ class PathTimingStreamTests extends MotionKitTestSupport {
           if (mode==4 && !stopped && current>0.02) {motion.stop();stopped=true;}
           previous=current;
           if (motion.completed || motion.failure!=null || (stopped && !motion.running)) break;
-          if (mode!=0 && mode!=1) Sys.sleep(0.001);
+          if (mode==3 || mode==4) Sys.sleep(0.001);
         }
         if (mode==4) {
           check(stopped && !motion.running && !motion.completed && motion.failure==null,

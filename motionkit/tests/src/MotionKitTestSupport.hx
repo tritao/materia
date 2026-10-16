@@ -509,6 +509,7 @@ class SessionTransitionRobot implements Robot {
   public final commands:Array<RobotCommand> = [];
   public var stops:Int = 0;
   public var faultOverride:Int = 0;
+  public var tagOverride:Null<Int64> = null;
   public var rejectNext:Bool = false;
 
   public function new(inner:Robot) this.inner = inner;
@@ -518,13 +519,13 @@ class SessionTransitionRobot implements Robot {
   public function capabilities():RobotCapabilities return inner.capabilities();
   public function snapshot():RobotSnapshot {
     var value = inner.snapshot();
-    if (faultOverride == 0) return value;
+    if (faultOverride == 0 && tagOverride==null) return value;
     return new RobotSnapshot(value.id, value.sourceSequence, value.sourceTimestampNs,
       value.positions.toArray(), value.velocities.toArray(), value.efforts.toArray(),
-      value.mode, faultOverride, value.receivedTimestampNs, value.sensors.toArray(),
+      value.mode, faultOverride==0 ? value.faultCode : faultOverride, value.receivedTimestampNs, value.sensors.toArray(),
       value.sourceClockId, value.receivedClockId, value.safety,
       value.trajectoryQueueDepth, value.trajectoryActive, value.trajectoryTimeNs,
-      value.trajectoryDurationNs, value.trajectoryTag, value.trajectoryTagTimeNs,
+      value.trajectoryDurationNs, tagOverride==null ? value.trajectoryTag : tagOverride, value.trajectoryTagTimeNs,
       value.sessionState, value.activePlanId, value.committedUntilNs,
       value.queueEndTimeNs, value.setpointPositions.toArray());
   }
