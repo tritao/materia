@@ -61,7 +61,7 @@ need confirmation. Sources are the SHA-pinned manual V3.44 sections 2, 7, 12,
 Each complete module is one lump using manual Appendix 3 mass, CoG and inertia.
 No module mass is distributed over exterior CAD shells. Output-origin inertia is
 converted from g·mm² to kg·m², translated to the CoG using the parallel-axis
- theorem, then rotated into the supplier assembly. T-frame axes follow manual
+theorem, then rotated into the supplier assembly. T-frame axes follow manual
 X toward shaft, Y toward mounting base, Z by right-hand rule. The source STEP
 output-face datums are z=−16 mm (110T) and z=47 mm (70T); their shaft/base directions
 differ. Those coordinate choices are recorded explicitly in the baseline JSON.
@@ -81,6 +81,20 @@ brake acceptance and repeated gearbox loading. The report also records loads 0�
 kg, each pose index and joint torque. This is the sampled static envelope. It is
 not an exhaustive vendor payload/reach curve, physical joint travel or a
 continuous collision certificate.
+
+At 5 kg, each tested CoG offset passes in the following horizontal flange-reach
+groups. These are sampled coordinates, not an interpolated vendor reach curve:
+
+| Observed reach group | Actual sampled reach | Passing / sampled |
+| --- | --- | --- |
+| Below 350 mm | 54.9–342.4 mm | 58/58 |
+| 350–600 mm | 353.9–596.4 mm | 35/35 |
+| At least 600 mm | 602.2–914.6 mm | 25/25 |
+
+`build/reference-reconciliation/static-operating-envelope.csv` records all 2,124
+load/CoG/pose combinations, actual flange XYZ/reach, joint coordinates, gravity
+torques and the braked-static/repeated-gear pass flag. It must not be read as a
+motion rating or a continuous collision-free workspace.
 
 **A stated moving duty at 5 kg:** upright arm, J1 0→20°→0, four seconds each leg,
 then 12 seconds braked dwell, repeated as a 20-second cycle. Peak joint speed is

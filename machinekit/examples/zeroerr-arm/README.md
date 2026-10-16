@@ -1,5 +1,7 @@
 # ZeroErr 5 kg reference arm
 
+[Current results, commits and remaining supplier inputs](FROZEN-REFERENCE-STATUS.md).
+
 Current priority: the **frozen, trusted supplier 5 kg reference**, with 110T at
 J1–J3 and 70T at J4–J6. See [load reconciliation](REFERENCE-RECONCILIATION.md).
 [80T/straight/cover/resize experiments are archived](EXPERIMENTS-ARCHIVED.md);

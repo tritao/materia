@@ -94,5 +94,6 @@ bash machinekit/examples/reference-arms/run-built.sh --frozen-control --replay-a
 Outputs under `build/reference-control/`: `timed-paths.json`, `validation.json`,
 `approved-commands.json`, `replay.json`. The validator checks profile, source-path
 and timing-producer hashes; replay checks the profile and approved timed-source
-hashes. Regenerate validation whenever model, curves, profile or timing changes.
+hashes and all approved dynamics/curve dependency hashes. Regenerate validation
+whenever model, curves, profile or timing changes.
 No existing CobotArm or tending edits are involved.
