@@ -1,7 +1,9 @@
 package motionkit.path;
 
 /** Circular TCP arc through three non-collinear points in three dimensions. */
-class PoseArc implements PosePrimitive {
+class PoseArc implements PosePrimitive implements PosePositionBound {
+  public function positionErrorBound(control:Array<Array<Float>>,from:Float,to:Float):Float
+    return HermitePositionBound.of(this,control,from,to,HermitePositionBound.circle(radius,(to-from)/radius));
   public final start:PoseWaypoint;
   public final via:PoseWaypoint;
   public final end:PoseWaypoint;

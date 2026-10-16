@@ -88,19 +88,20 @@ class ProgramCompiler {
   public var motorSpace:Null<MotorSpaceConstraints> = null;
   /**
     When positive, runs of a lowered path's segments are merged into one quintic each, up to this long, where the
-    quintic follows them to a few microseconds of motion (`MERGE_TIMING`) in position, a percent of the speed limit
-    and a tenth of the acceleration limit. A printer's curves lower to thousands of segments a second, which would
+    quintic stays inside the path's remaining approximation budget. A printer's curves lower to thousands of segments a second, which would
     fill the robot's queue and a device's link; the default of zero leaves a path as it was lowered.
   **/
   public var mergeSegmentsSeconds:Float = 0.0;
+  /** Optional pure, worker-safe budget factory for other kinematics; affine XYZ paths derive theirs from geometry. */
+  public var mergeBudgetForMotion:Null<PendingMotion->Null<MergeErrorBudget>> = null;
+  /** Requested merges retained as authored because no positive geometric remainder could be proved. */
+  public var mergeBudgetRefusals:Int = 0;
   /**
     How many plans were built from the lowered path because their merged form broke a limit, and why the last one did. A
     plan that was not merged (merging off, a joint move) is not a refusal.
   **/
   public var mergeRefusals:Int = 0;
   public var lastMergeRefusal:String = "";
-  /** The position error a merged segment may have, as seconds of motion at the joint's speed limit. */
-  public static inline var MERGE_TIMING:Float = 10e-6;
   /**
     The impulses each joint's motion is convolved with (see `shapeJoints`), in joint order; null shapes nothing. Their
     amplitudes are positive and add up to one, so shaping blends delayed copies of a plan's motion and cannot raise a
@@ -199,6 +200,7 @@ class ProgramCompiler {
     into.planCheck = planCheck == null ? null : planCheck.fork();
     into.motorSpace = motorSpace;
     into.mergeSegmentsSeconds = mergeSegmentsSeconds;
+    into.mergeBudgetForMotion = mergeBudgetForMotion;
     into.shaping = shaping; into.shapingDelay = shapingDelay; into.shapingTail = shapingTail; into.shapingDeviation = shapingDeviation;
     into.pressureAdvance = pressureAdvance;
     into.pressureAdvanceWindow = pressureAdvanceWindow;
@@ -400,14 +402,12 @@ class ProgramCompiler {
     A copy of `trajectory` in which runs of segments are one quintic each within `share` of the merge tolerances (the
     followers not yet projected). Merges applied one after the other add their errors, so together they share one budget.
   **/
-  function mergeRuns(trajectory:Trajectory, share:Float):Trajectory {
+  function mergeRuns(trajectory:Trajectory, share:Float,budget:MergeErrorBudget):Trajectory {
     var count = maxVelocity.length;
-    return trajectory.mergeSegments(
-      [for (joint in 0...count) share * MERGE_TIMING * maxVelocity[joint]],
-      [for (joint in 0...count) share * 0.01 * maxVelocity[joint]],
-      [for (joint in 0...count) share * 0.1 * maxAcceleration[joint]],
+    return trajectory.mergePositionBudget(
+      [for (joint in 0...count) share * budget.position[joint]],
       maxVelocity.slice(0, count), maxAcceleration.slice(0, count), positionBounds(count, false), positionBounds(count, true),
-      mergeSegmentsSeconds);
+      budget.seconds);
   }
 
   /** Plans the next op of `c`; at the end, finishes its last plan and block. Returns false once done. */
@@ -750,8 +750,18 @@ class ProgramCompiler {
     try {
       var motors = motorSpace;
       if (motors != null) motors.validate(pending.trajectory);
+      var budget:Null<MergeErrorBudget> = null;
+      if(mergeSegmentsSeconds>0 && pending.path!=null){
+        if(mergeBudgetForMotion!=null)budget=mergeBudgetForMotion(pending);
+        else if(Std.isOfType(solver,AxisKinematics))
+          budget=PathMergeBudget.derive(cast solver,timing,pending,mergeSegmentsSeconds,projection);
+        if(budget!=null && (budget.position.length!=maxVelocity.length || budget.seconds>mergeSegmentsSeconds))
+          throw "Merge budget does not match the compiler's joints or window";
+        if(budget==null)mergeBudgetRefusals++;
+      }
       var transforms = TimedMotionTransforms.apply({pressureAdvance: pressureAdvance, pressureAdvanceWindow: pressureAdvanceWindow,
-        shaping: shaping, shapingDelay: shapingDelay, mergeSeconds: mergeSegmentsSeconds, mergeRuns: mergeRuns}, projection, pending, mark);
+        shaping: shaping, shapingDelay: shapingDelay, mergeSeconds: budget==null ? 0.0 : budget.seconds,
+        mergeRuns: function(trajectory,share)return mergeRuns(trajectory,share,budget)}, projection, pending, mark);
       motion = transforms;
       var timedMotion = transforms.executed, shaped = transforms.shaped;
       if(pending.geometryCurve!=null && pending.geometryClearance && Sys.getEnv("PROCESS_PATH_VERIFY_CLEARANCE")=="1"){
@@ -1390,7 +1400,7 @@ class ProgramCompiler {
     if (sections.length == 1) return [{path: path, offset: 0.0}];
     var authored = path.authoredGeometry;
     if (authored != null) for (section in sections)
-      section.path.withAuthoredGeometry(authored, path.blendTolerance);
+      section.path.withAuthoredGeometry(authored, path.blendTolerance,path.geometryDeviationBound);
     return sections;
   }
 

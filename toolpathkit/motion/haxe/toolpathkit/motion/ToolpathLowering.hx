@@ -256,7 +256,7 @@ class ToolpathLowering {
       events.push(new PathEvent(eventDistance, event.channel, event.value));
     }
     var path = new PosePath(machine.frameId, primitives);
-    if (authored != null) path.withAuthoredGeometry(authored, blend);
+    if (authored != null) path.withAuthoredGeometry(authored, blend,blend*CornerBlender.GEOMETRY_SHARE);
     var printer = machine.printer;
     if (printer != null && rates != null) {
       var intervals:Array<DriveInterval> = [];

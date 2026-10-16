@@ -204,11 +204,14 @@ class PrintingBenchmark {
     var compileBegan = Sys.cpuTime();
     sink.reset();
     var failure:Null<String> = null;
+    var budgetsBefore=machine.binding.compiler.mergeBudgetRefusals;
     var compilation = machine.binding.compiler.begin(motion, machine.start, Int64.ofInt(1), 0, 1.0, sink);
     try {
       while (compilation.step()) {}
     } catch (error:Dynamic) { failure = Std.string(error); compilation.dispose(); }
     var compileSeconds = Sys.cpuTime() - compileBegan;
+    var unproved=machine.binding.compiler.mergeBudgetRefusals-budgetsBefore;
+    if(unproved>0 && failure==null)failure='$unproved sections have no proven remaining merge budget';
     var planned = 0.0;
     for (seconds in sink.run) planned += seconds;
     // The worst stretch of 10 s of print time: the plans in it, and what they cost to plan.
@@ -518,10 +521,12 @@ class PrintingBenchmark {
     check(targets >= 2 && waits == 2, 'the job heats the bed and the hotend and waits for both: $targets targets, $waits waits');
     check(offsets >= 2 && driven >= 3, 'retractions are extruder moves and beads drive the extruder: $offsets moves, $driven driven paths');
     var refusals = machine.binding.compiler.mergeRefusals;
+    var budgetRefusals = machine.binding.compiler.mergeBudgetRefusals;
     var compiled = machine.binding.compiler.compile(motion, machine.start, Int64.ofInt(1));
     // Retractions are joint moves, which are never merged: not merging them is not a refusal.
     check(machine.binding.compiler.mergeRefusals == refusals,
       'the tab keeps every merged plan: ${machine.binding.compiler.mergeRefusals - refusals} refused (${machine.binding.compiler.lastMergeRefusal})');
+    check(machine.binding.compiler.mergeBudgetRefusals==budgetRefusals,"Every tab section has a proven remaining merge budget");
     var extruder = machine.printer.extruderIndex, taken = 0.0;
     var shortest = 1e9, under = 0, total = 0, seconds = 0.0, plans = 0;
     var all:Array<Float> = [];
@@ -546,7 +551,9 @@ class PrintingBenchmark {
     check(Math.abs(taken / expected - 1.0) < 0.002, 'the extruder takes what the program lays: $taken against $expected rad');
     // The app plans on the planner thread, through `forWorker`: a worker plans what the compiler itself plans, pressure
     // advance and shaping included (a worker once planned every print without its pressure advance).
-    var worker = machine.binding.compiler.forWorker().compile(motion, machine.start, Int64.ofInt(1));
+    var workerCompiler=machine.binding.compiler.forWorker();
+    var worker = workerCompiler.compile(motion, machine.start, Int64.ofInt(1));
+    check(workerCompiler.mergeBudgetRefusals==0,"Worker retains every tab budget proof");
     var workerPlans = [for (block in worker.blocks) for (plan in block.plans) plan];
     var directPlans = [for (block in compiled.blocks) for (plan in block.plans) plan];
     check(workerPlans.length == directPlans.length, 'a worker makes the same plans: ${workerPlans.length} against ${directPlans.length}');

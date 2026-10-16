@@ -131,6 +131,10 @@ class ToolpathMotionTests {
 
   static function main():Void {
     PressureAdvanceLimitsTests.main();
+    MergeBudgetTests.main();
+    if(Sys.getEnv("TOOLPATH_MERGE_BUDGET_ONLY")=="1"){
+      PathMergeBudgetChecks.run(PathMergeBudgetChecks.fixture());return;
+    }
     if (Sys.getEnv("TOOLPATH_VIRTUAL_CNC_ONLY") == "1") {
       new ToolpathProcessTests().testVirtualCncProgram();
       Sys.println('Virtual CNC tests passed (${MotionKitTestSupport.assertions} assertions)');
@@ -202,11 +206,9 @@ class ToolpathMotionTests {
     if (Math.abs(endX(new Point3(0.003, 0, 0)) -
         endX(new Point3(0, 0, 0)) - 0.003) > 1e-9)
       throw "probed origin must move the lowered path by the probe difference";
-    var blueprint = MachineKitRobotCompiler.compileGantry(
-      new machinekit.gantry.Gantry(new machinekit.gantry.GantrySpec(200, 200, 200)),
-      0.1, 0.4);
-    var robotBinding = new ToolpathMotionBinding(
-      new MachineBinding("work", "x", "y", "z", 0.08, new toolpathkit.motion.ToolpathChannels("")), blueprint);
+    var robotBinding=PathMergeBudgetChecks.fixture();
+    var blueprint=robotBinding.blueprint;
+    PathMergeBudgetChecks.run(robotBinding);
     var compiled = robotBinding.compile(pathProgram([
       ToolpathOp.Move(Cut,
         PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),

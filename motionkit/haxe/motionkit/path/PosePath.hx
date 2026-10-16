@@ -12,6 +12,8 @@ class PosePath implements MotionPath {
   /** Original geometry for paths that replace corners with tolerance blends. */
   public var authoredGeometry(default, null):Null<GeometricPath> = null;
   public var blendTolerance(default, null):Float = 0.0;
+  /** Proven deviation of the rounded geometry itself; null when the author supplies no bound. */
+  public var geometryDeviationBound(default, null):Null<Float> = null;
   /** A joint driven by distance along the path (an extruder), if any. */
   public var drive(default, null):Null<DistanceDrive> = null;
   final totalLength:Float;
@@ -45,11 +47,14 @@ class PosePath implements MotionPath {
 
   public function length():Float return totalLength;
 
-  public function withAuthoredGeometry(geometry:GeometricPath, tolerance:Float):PosePath {
+  public function withAuthoredGeometry(geometry:GeometricPath, tolerance:Float, ?deviationBound:Float):PosePath {
     if (geometry == null || !Math.isFinite(tolerance) || tolerance <= 0.0)
       throw "Authored geometry needs a positive blend tolerance";
     authoredGeometry = geometry;
     blendTolerance = tolerance;
+    if(deviationBound!=null && (!Math.isFinite(deviationBound) || deviationBound<0 || deviationBound>tolerance))
+      throw "Authored geometry deviation must fit its tolerance";
+    geometryDeviationBound=deviationBound;
     return this;
   }
   public function withDrive(value:DistanceDrive):PosePath {
@@ -63,7 +68,7 @@ class PosePath implements MotionPath {
   public function sub(first:Int, last:Int):PosePath {
     if (first < 0 || last > primitives.length || first >= last) throw "Path slice is out of range";
     var result = new PosePath(frameId, primitives.slice(first, last));
-    if (authoredGeometry != null) result.withAuthoredGeometry(authoredGeometry, blendTolerance);
+    if (authoredGeometry != null) result.withAuthoredGeometry(authoredGeometry, blendTolerance,geometryDeviationBound);
     if (drive != null) {
       var from = startOf(first), to = ends[last - 1];
       var driven = drive.slice(from, to);

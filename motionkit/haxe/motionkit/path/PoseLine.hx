@@ -1,7 +1,9 @@
 package motionkit.path;
 
 /** Straight TCP move. Rotation-to-length weight is metres per radian. */
-class PoseLine implements PosePrimitive {
+class PoseLine implements PosePrimitive implements PosePositionBound {
+  public function positionErrorBound(control:Array<Array<Float>>,from:Float,to:Float):Float
+    return HermitePositionBound.of(this,control,from,to,0.0);
   public final start:PoseWaypoint;
   public final end:PoseWaypoint;
   public final policy:OrientationPolicy;

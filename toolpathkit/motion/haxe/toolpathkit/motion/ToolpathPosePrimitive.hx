@@ -9,7 +9,20 @@ import motionkit.path.PoseWaypoint;
 import motionkit.path.PoseDerivatives;
 
 /** Keeps exact line, arc, helix, or fillet geometry for ProgramCompiler. */
-class ToolpathPosePrimitive implements PosePrimitive {
+class ToolpathPosePrimitive implements PosePrimitive implements motionkit.path.PosePositionBound {
+  public function positionErrorBound(control:Array<Array<Float>>,from:Float,to:Float):Float {
+    var remainder=switch geometry.kind() {
+      case Line:0.0;
+      case Arc:
+        var arc:motionkit.path.ArcSegment=cast geometry;
+        motionkit.path.HermitePositionBound.circle(arc.radius,(to-from)/arc.radius);
+      case Circular:
+        var arc:motionkit.path.CircularSegment=cast geometry;
+        motionkit.path.HermitePositionBound.circle(arc.radius,arc.sweepAngle*(to-from)/arc.length());
+      case Blend:return (cast geometry:motionkit.path.QuinticBlend).positionErrorBound(control,from,to);
+    };
+    return motionkit.path.HermitePositionBound.of(this,control,from,to,remainder);
+  }
   public final geometry:PathPrimitive;
   public final feed:Float;
   public final positionTolerance:Float;

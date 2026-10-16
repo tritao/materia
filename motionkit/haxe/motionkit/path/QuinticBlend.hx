@@ -2,6 +2,22 @@ package motionkit.path;
 
 /** Planar quintic Hermite blend, parameterized numerically by arc length. */
 class QuinticBlend implements PathPrimitive {
+  /** The arc-length table is piecewise affine, so each table cell is an exact quintic in distance. */
+  public function positionErrorBound(actual:Array<Array<Float>>,from:Float,to:Float):Float {
+    var reference=[for(axis in 0...3)[for(point in controls)axis==0 ? point.x : axis==1 ? point.y : point.z]];
+    var bound=0.0;
+    for(cell in 0...SAMPLES){
+      var low=Math.max(from,distances[cell]),high=Math.min(to,distances[cell+1]);
+      if(high<=low)continue;
+      var width=distances[cell+1]-distances[cell];
+      var a=(cell+(low-distances[cell])/width)/SAMPLES,b=(cell+(high-distances[cell])/width)/SAMPLES;
+      var left=motionkit.math.QuinticPolynomial.slice(actual,
+        Math.max(0,Math.min(1,(low-from)/(to-from))),Math.max(0,Math.min(1,(high-from)/(to-from))));
+      var right=motionkit.math.QuinticPolynomial.slice(reference,Math.max(0,Math.min(1,a)),Math.max(0,Math.min(1,b)));
+      bound=Math.max(bound,motionkit.math.QuinticPolynomial.differenceBound(left,right));
+    }
+    return bound;
+  }
   public function kind():PathPrimitiveKind return PathPrimitiveKind.Blend;
   final controls:Array<PathPoint>;
   final distances:Array<Float>;

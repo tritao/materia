@@ -1,7 +1,12 @@
 package motionkit.path;
 
 /** An exact interval of an authored primitive, preserving its parameterization. */
-class PoseSlice implements PosePrimitive {
+class PoseSlice implements PosePrimitive implements PosePositionBound {
+  public function positionErrorBound(control:Array<Array<Float>>,start:Float,end:Float):Float {
+    if(!Std.isOfType(source,PosePositionBound))return Math.POSITIVE_INFINITY;
+    var low=Math.min(to,Math.max(from,from+start)),high=Math.min(to,Math.max(from,from+end));
+    return high<=low ? Math.POSITIVE_INFINITY : (cast source:PosePositionBound).positionErrorBound(control,low,high);
+  }
   public final source:PosePrimitive;
   public final from:Float;
   public final to:Float;

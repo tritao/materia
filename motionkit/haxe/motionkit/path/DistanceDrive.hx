@@ -67,6 +67,10 @@ class DistanceDrive {
 
   /** The distances at which the rate changes slope: a path must be sampled at them. */
   public function stations():Array<Float> return distances.copy();
+  /** The rate is piecewise affine, so its absolute maximum occurs at a station, including startup overshoot. */
+  public function maximumRate():Float {
+    var bound=0.0;for(rate in rates)bound=Math.max(bound,Math.abs(rate));return bound;
+  }
 
   /** The joint's position change from the path's start, at `distance`. */
   public function offsetAt(distance:Float):Float {
