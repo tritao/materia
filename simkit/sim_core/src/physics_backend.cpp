@@ -1099,7 +1099,9 @@ private:
                 std::sort(block.begin(), block.end());
                 force_blocks.push_back(std::move(block));
             }
-        std::vector<double> lower(n * n, 0), acceleration(n, 0);
+        force_lower.assign(n * n, 0);
+        auto &lower = force_lower;
+        std::vector<double> acceleration(n, 0);
         for (const auto &block : force_blocks) {
             for (std::size_t ii = 0; ii < block.size(); ++ii)
                 for (std::size_t jj = 0; jj <= ii; ++jj) {
@@ -1135,8 +1137,6 @@ private:
                 acceleration[i] = value / lower[i * n + i];
             }
         }
-        force_coordinates = coordinates;
-        force_lower = lower;
         force_velocity.resize(n);
         for (std::size_t k = 0; k < n; ++k) {
             const auto &d = coordinates[k];
@@ -1167,8 +1167,10 @@ private:
         std::vector<std::size_t> active_j, active_response;
         double known = 0, inverse_effective = 0;
     };
+    struct FrictionMetric {double uu=0,uv=0,vv=0;};
     struct ImpulseContact {
         BackendContact contact;
+        FrictionMetric sliding_metric,rolling_metric;
         ImpulseRow normal, tangent_u, tangent_v;
         std::array<ImpulseRow, 3> angular;
         std::array<double, 3> angular_impulse{};
@@ -1408,31 +1410,32 @@ private:
         return make_impulse_row(std::move(row), known);
     }
     void apply_impulse(const ImpulseRow &row, double impulse) {
+        if (impulse == 0)
+            return;
         for (auto i : row.active_response)
             force_velocity[i] += row.response[i] * impulse;
     }
-    void solve_friction_disk(const ImpulseRow &u, const ImpulseRow &v, double &iu, double &iv, double cap) {
+    static FrictionMetric friction_metric(const ImpulseRow &u, const ImpulseRow &v) {
+        const double uu = u.inverse_effective > 0 ? 1 / u.inverse_effective : 0,
+                     vv = v.inverse_effective > 0 ? 1 / v.inverse_effective : 0;
+        double uv = 0;
+        for (auto i : u.active_j)
+            uv += u.j[i] * v.response[i];
+        const double det = uu * vv - uv * uv;
+        return det > 1e-20 ? FrictionMetric{vv / det, -uv / det, uu / det}
+                           : FrictionMetric{u.inverse_effective, 0, v.inverse_effective};
+    }
+    void solve_friction_disk(const ImpulseRow &u, const ImpulseRow &v, const FrictionMetric &metric,
+                             double &iu, double &iv, double cap) {
         if (cap <= 0) {
             apply_impulse(u, -iu);
             apply_impulse(v, -iv);
             iu = iv = 0;
             return;
         }
-        const double uu = u.inverse_effective > 0 ? 1 / u.inverse_effective : 0,
-                     vv = v.inverse_effective > 0 ? 1 / v.inverse_effective : 0;
-        double uv = 0;
-        for (auto i : u.active_j)
-            uv += u.j[i] * v.response[i];
-        double du = 0, dv = 0;
-        const double determinant = uu * vv - uv * uv;
-        if (determinant > 1e-20) {
-            const double speed_u = row_velocity(u), speed_v = row_velocity(v);
-            du = (-vv * speed_u + uv * speed_v) / determinant;
-            dv = (uv * speed_u - uu * speed_v) / determinant;
-        } else {
-            du = -row_velocity(u) * u.inverse_effective;
-            dv = -row_velocity(v) * v.inverse_effective;
-        }
+        const double speed_u = row_velocity(u), speed_v = row_velocity(v);
+        const double du = -metric.uu * speed_u - metric.uv * speed_v,
+                     dv = -metric.uv * speed_u - metric.vv * speed_v;
         double nu = iu + du, nv = iv + dv;
         const double magnitude = std::sqrt(nu * nu + nv * nv);
         if (magnitude > cap && magnitude > 0) {
@@ -2100,16 +2103,24 @@ private:
                                 contacts.push_back(c.contact);
                                 continue;
                             }
-                            c.tangent_u = contact_row(a.id, b.id, point, c.u);
-                            c.tangent_v = contact_row(a.id, b.id, point, c.v);
+                            if (c.friction > 0) {
+                                c.tangent_u = contact_row(a.id, b.id, point, c.u);
+                                c.tangent_v = contact_row(a.id, b.id, point, c.v);
+                                c.sliding_metric = friction_metric(c.tangent_u, c.tangent_v);
+                            }
                             if (c.time_constant > 0 && c.normal.inverse_effective > 0) {
                                 const double rate = 2 * c.damping_ratio / c.time_constant +
                                                     h / (c.time_constant * c.time_constant);
                                 c.compliance = 1 / (c.normal.inverse_effective * h * rate);
                                 c.bias_factor = 1 / (2 * c.damping_ratio * c.time_constant + h);
                             }
-                            c.angular = {angular_row(a.id, b.id, normal), angular_row(a.id, b.id, c.u),
-                                         angular_row(a.id, b.id, c.v)};
+                            if (c.torsion > 0)
+                                c.angular[0] = angular_row(a.id, b.id, normal);
+                            if (c.rolling > 0) {
+                                c.angular[1] = angular_row(a.id, b.id, c.u);
+                                c.angular[2] = angular_row(a.id, b.id, c.v);
+                                c.rolling_metric = friction_metric(c.angular[1], c.angular[2]);
+                            }
                             rows.push_back(std::move(c));
                         }
                     }
@@ -2158,14 +2169,14 @@ private:
                 c.normal_impulse =
                     std::max(0.0, old + (bias - row_velocity(c.normal) - c.compliance * old) * response);
                 apply_impulse(c.normal, c.normal_impulse - old);
-                solve_friction_disk(c.tangent_u, c.tangent_v, c.impulse_u, c.impulse_v,
+                solve_friction_disk(c.tangent_u, c.tangent_v, c.sliding_metric, c.impulse_u, c.impulse_v,
                                     c.friction * c.normal_impulse);
                 const double cap = c.torsion * c.normal_impulse, old_torsion = c.angular_impulse[0];
                 c.angular_impulse[0] = std::clamp(
                     old_torsion - row_velocity(c.angular[0]) * c.angular[0].inverse_effective, -cap, cap);
                 apply_impulse(c.angular[0], c.angular_impulse[0] - old_torsion);
-                solve_friction_disk(c.angular[1], c.angular[2], c.angular_impulse[1], c.angular_impulse[2],
-                                    c.rolling * c.normal_impulse);
+                solve_friction_disk(c.angular[1], c.angular[2], c.rolling_metric, c.angular_impulse[1],
+                                    c.angular_impulse[2], c.rolling * c.normal_impulse);
             }
         }
         // Write the solved velocities, then integrate once, after contact resolution.

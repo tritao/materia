@@ -3956,3 +3956,19 @@ positive override, overriding the sentinel and unspecified force.
 All 292 assertions and the six standard core groups pass after integration
 (`sd15-dynamics-force-cap-integrated-ctest.log`). The performance candidates
 remain to be integrated and verified, then sources frozen for the complete gate.
+
+### SD15a integrated constraint-solve optimization (2026-10-16)
+
+The previously isolated performance changes are now integrated: constant two-axis
+friction metrics are prepared once per contact, absent friction directions do
+not allocate solver rows, zero impulses do not traverse response vectors, and
+the Cholesky buffer is reused instead of copied each substep. These preserve
+the same constraints and iteration budget.
+
+All 292 assertions and six core groups pass
+(`sd15-dynamics-cache-integrated-ctest.log`), and refreshed ASan/UBSan with leak
+detection passes (`sd15-dynamics-final-cache-sanitizer.log`). The independent
+factor-buffer comparison has median 0.658 s before versus 0.562 s after on the
+same complete probe (`sd15-dynamics-factor-reuse-comparison.json`). All pending
+native correctness/performance candidates are now integrated; the complete
+frozen-source gate remains required.
