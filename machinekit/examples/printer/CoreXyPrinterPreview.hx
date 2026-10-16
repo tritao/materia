@@ -73,6 +73,14 @@ class CoreXyPrinterJob {
 	public static inline var STEP_TICK_HZ:Int = 40000;
 	/** The room, degrees Celsius. */
 	public static inline var AMBIENT:Float = 22.0;
+	/** Assumed first-order blocks: settle within 3 C, PI within 10 C of target;
+	 * demand 2 C gain over max(20 s, tau/4); once at target, fault after 10 s more than 15 C low.
+	 * Response and integral times are tau/20 and tau/8. Both heaters use this authored policy.
+	 */
+	public static final HEATER_POLICY = new machinekit.printing.HeaterControlPolicy({
+		responseTimeFraction: 1.0 / 20, integralTimeFraction: 1.0 / 8, maxDuty: 1.0,
+		bandCelsius: 3.0, pidRangeCelsius: 10.0, gainWindowFraction: 0.25, gainWindowMinSeconds: 20.0,
+		gainMinCelsius: 2.0, hysteresisCelsius: 15.0, hysteresisWindowSeconds: 10.0});
 
 	/** The slicer's `SmallTab` (10 x 10 x 1.2 mm, six layers) with its default settings. */
 	public static function smallTab(printer:CoreXyPrinter):SceneArtifactPrinting {
@@ -105,24 +113,18 @@ class CoreXyPrinterJob {
 			controller: {stepTickHz: STEP_TICK_HZ}, deposit: "printed"};
 	}
 
-	/**
-	 * A heater on the controller whose plant is a block of `capacity` J/K, heated by `power` W at full duty and losing
-	 * `loss` W/K to the room (`fanLoss` more with the part fan on): a first-order lag of time constant
-	 * `tau = capacity / loss`. The PI closes the loop in a twentieth of `tau` (`kp = capacity / (power tau / 20)`) with
-	 * an integral time of an eighth of it, so the integral has made up the duty the block needs to hold its target
-	 * (`loss (target - room) / power`) before the watchdog's window is over; there is no derivative, as the plant has no
-	 * dead time to lead. The output is at full power outside the PID range and let down gently inside it. The watchdog
-	 * expects 2 degrees of gain in a quarter of `tau` while heating (never less than 20 s).
+	/** Build a heater from its sensor and thermal plant using the shared HEATER_POLICY.
+	 * Capacity is J/K, power is W at full duty, loss and fanLoss are W/K to the room.
 	 */
 	static function heater(name:String, mount:String, slot:Int, fan:Null<String>, feedsExtruder:Bool, sensor:ThermistorSpec,
 			capacity:Float, power:Float, loss:Float, fanLoss:Float, maxTemperature:Float):SceneArtifactHeater {
-		var timeConstant = capacity / loss;
-		var lambda = timeConstant / 20.0;
+		var control = HEATER_POLICY.settings(capacity, power, loss);
 		var heater:SceneArtifactHeater = {name: name, sensor: name, slot: slot, mount: mount, target: 'heater.$name.target',
 			feedsExtruder: feedsExtruder, r0Ohm: sensor.ohmsAt25, t0Celsius: 25.0, beta: sensor.beta, pullupOhm: 4700.0, vRef: 3.3,
-			kp: capacity / (power * lambda), ki: capacity / (power * lambda) / (timeConstant / 8.0), kd: 0.0, maxDuty: 1.0, maxTemperature: maxTemperature,
-			bandCelsius: 3.0, pidRangeCelsius: 10.0, gainWindowSeconds: Math.max(20.0, timeConstant / 4.0), gainMinCelsius: 2.0,
-			hysteresisCelsius: 15.0, hysteresisWindowSeconds: 10.0, heatCapacity: capacity, power: power, loss: loss,
+			kp: control.kp, ki: control.ki, kd: control.kd, maxDuty: control.maxDuty, maxTemperature: maxTemperature,
+			bandCelsius: control.bandCelsius, pidRangeCelsius: control.pidRangeCelsius,
+			gainWindowSeconds: control.gainWindowSeconds, gainMinCelsius: control.gainMinCelsius,
+			hysteresisCelsius: control.hysteresisCelsius, hysteresisWindowSeconds: control.hysteresisWindowSeconds, heatCapacity: capacity, power: power, loss: loss,
 			fanLoss: fanLoss, ambient: AMBIENT};
 		if (fan != null) heater.fan = fan;
 		return heater;

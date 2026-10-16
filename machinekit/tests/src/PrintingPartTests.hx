@@ -17,6 +17,7 @@ class PrintingPartTests {
 	}
 
 	public static function run():Void {
+		HeaterPolicyTests.run();
 		// The 100k beta-3950 curve: 100k at 25 C, and the usual round numbers at 60, 100 and 210 C.
 		var thermistor = new Thermistor();
 		close(thermistor.resistance(25), 100000, "100k at 25 C");
