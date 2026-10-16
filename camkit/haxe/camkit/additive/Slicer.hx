@@ -89,6 +89,7 @@ private class SliceRun {
   var y = 0.0;
   var z = 0.0;
   var retracted = false;
+  var hasDeposited = false;
   var beadWidth = 0.0;
   var beadHeight = 0.0;
   var fan = 0.0;
@@ -164,12 +165,15 @@ private class SliceRun {
     // A purge line along the front of the bed: one bead, laid at the purge height.
     var from = profile.purgeStart, to = profile.purgeEnd;
     travelTo(from.x, from.y, from.z, start);
-    ops.push(ToolpathOp.FilamentMove(0.0015, settings.retractSpeed, start));
+    unretract(start);
+    if (profile.purgePrimeLength > 0.0)
+      ops.push(ToolpathOp.FilamentMove(profile.purgePrimeLength, settings.retractSpeed, start));
     var purgeWidth = profile.purgeWidth, purgeHeight = profile.purgeHeight;
     var area = purgeHeight * (purgeWidth - purgeHeight) + Math.PI * purgeHeight * purgeHeight / 4.0;
     ops.push(ToolpathOp.Deposit(area, purgeWidth, purgeHeight, start));
     ops.push(ToolpathOp.Feature(Skirt, start));
     ops.push(ToolpathOp.Move(Cut, PathGeometry.Line(from, to), profile.purgeSpeed, settings.pathTolerance, start));
+    hasDeposited = true;
     report.moves += 1;
     report.extrudedLength += from.distanceTo(to);
     x = to.x; y = to.y; z = to.z;
@@ -429,18 +433,22 @@ private class SliceRun {
   }
 
   function retract(tag:Provenance):Void {
-    if (retracted || settings.retractLength <= 0.0) return;
+    if (!hasDeposited || retracted || settings.retractLength <= 0.0) return;
     ops.push(ToolpathOp.FilamentMove(-settings.retractLength, settings.retractSpeed, tag));
     retracted = true;
     report.retractions += 1;
   }
 
-  function extrude(segments:Array<PlanarSegment>, top:Float, thickness:Float, speed:Float, tag:Provenance, scale:Float):Void {
+  function unretract(tag:Provenance):Void {
     if (retracted) {
       // A retraction made before a travel is undone where the next bead starts.
       ops.push(ToolpathOp.FilamentMove(settings.retractLength, settings.retractSpeed, tag));
       retracted = false;
     }
+  }
+
+  function extrude(segments:Array<PlanarSegment>, top:Float, thickness:Float, speed:Float, tag:Provenance, scale:Float):Void {
+    unretract(tag);
     var width = settings.lineWidth;
     if (beadWidth != width || beadHeight != thickness) {
       ops.push(ToolpathOp.Deposit(settings.beadArea(thickness), width, thickness, tag));
@@ -455,6 +463,7 @@ private class SliceRun {
       var length = segment.length() * scale;
       if (length < 1e-9) continue;
       ops.push(ToolpathOp.Move(Cut, geometry, speed, settings.pathTolerance, tag));
+      hasDeposited = true;
       report.moves += 1;
       report.extrudedLength += length;
       x = b.x; y = b.y; z = top;

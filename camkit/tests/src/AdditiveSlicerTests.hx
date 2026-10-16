@@ -65,6 +65,24 @@ class AdditiveSlicerTests {
     return heights;
   }
 
+  static function withPrime(length:Float):PrinterProfile {
+    var p = PrinterProfile.bed220();
+    return new PrinterProfile(p.bedCenterX,p.bedCenterY,p.purgeStart,p.purgeEnd,
+      p.purgeHeight,p.purgeWidth,p.purgeSpeed,p.home,p.parkLift,length);
+  }
+
+  static function startupPrime(program:ToolpathProgram):Float {
+    var length = 0.0;
+    for (op in program.ops) switch op {
+      case FilamentMove(value,_,_):
+        check(value>=0,"startup never retracts before its first deposited bead");
+        length += value;
+      case Deposit(_,_,_,_): return length;
+      case _:
+    }
+    throw "Sliced program has no purge bead";
+  }
+
   static function gcode(program:ToolpathProgram):String
     return PrinterWriter.write(program, new CncController(Printer), Klipper);
 
@@ -73,6 +91,18 @@ class AdditiveSlicerTests {
     var settings = new SlicerSettings();
     var result = Slicer.slice(part, settings);
     var program = result.program;
+    near(startupPrime(program),0.0015,"default startup prime stays 1.5 mm",1e-12);
+    for (prime in [0.0,0.0027]) {
+      var custom = Slicer.slice(part,settings,withPrime(prime)).program;
+      near(startupPrime(custom),prime,"profile controls startup filament",1e-12);
+      near(custom.depositedVolume(),program.depositedVolume(),"prime does not alter path deposition",1e-18);
+      var roundTrip = CncCompiler.compileDetailed(gcode(custom),new CncController(Printer));
+      near(startupPrime(roundTrip.program),prime,"startup prime survives G-code round trip",1e-9);
+    }
+    for (bad in [-1.0,Math.NaN,Math.POSITIVE_INFINITY]) {
+      var rejected = false; try withPrime(bad) catch (_:Dynamic) rejected = true;
+      check(rejected,"invalid profile prime rejected before slicing");
+    }
     Sys.println('slicing: SmallTab ${result.report.layers} layers in ${Math.round(result.report.seconds * 1000)} ms, ${program.ops.length} operations, ${Math.round(program.depositedVolume() * 1e9 * 10) / 10} mm^3');
     if (Sys.getEnv("SLICER_DEBUG") == "1") Sys.println(gcode(program));
     check(result.report.layers == 6, "SmallTab is six layers");

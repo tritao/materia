@@ -12,21 +12,25 @@ class PrinterProfile {
   /** The purge line along the front of the bed, printed before the first layer. */
   public final purgeStart:Point3;
   public final purgeEnd:Point3;
-  /** Height and width of the purge bead, and the filament primed before it, as filament length. */
+  /** Height and width of the purge bead. */
   public final purgeHeight:Float;
   public final purgeWidth:Float;
   public final purgeSpeed:Float;
+  /** Stationary filament prime before the purge bead, metres; zero disables it. */
+  public final purgePrimeLength:Float;
   /** Where homing leaves the nozzle, and where it goes when the print is done (after lifting `parkLift`). */
   public final home:Point3;
   public final parkLift:Float;
 
   public function new(bedCenterX:Float, bedCenterY:Float, purgeStart:Point3, purgeEnd:Point3,
-      ?purgeHeight:Float = 0.0003, ?purgeWidth:Float = 0.00045, ?purgeSpeed:Float = 0.02, ?home:Point3, ?parkLift:Float = 0.02) {
+      ?purgeHeight:Float = 0.0003, ?purgeWidth:Float = 0.00045, ?purgeSpeed:Float = 0.02, ?home:Point3, ?parkLift:Float = 0.02, ?purgePrimeLength:Float = 0.0015) {
     if (!Math.isFinite(bedCenterX) || !Math.isFinite(bedCenterY)) throw "the bed centre must be finite";
     if (purgeStart == null || purgeEnd == null || purgeStart.distanceTo(purgeEnd) < 0.001)
       throw "the purge line needs two distinct ends";
     for (value in [purgeHeight, purgeWidth, purgeSpeed, parkLift])
       if (!Math.isFinite(value) || value <= 0.0) throw "profile heights, widths and speeds must be positive";
+    if (!Math.isFinite(purgePrimeLength) || purgePrimeLength < 0.0) throw "purge prime must be a non-negative finite filament length";
+    this.purgePrimeLength = purgePrimeLength;
     this.bedCenterX = bedCenterX;
     this.bedCenterY = bedCenterY;
     this.purgeStart = purgeStart;
