@@ -1498,7 +1498,7 @@ Steps:
   - Retry resets the failed program's robot.
   - The editor's mission panel follows one program and offers a selector
     when there are several.
-- **SD15a.3 Cell.** A pick, place and fasten example beside the screwdriving
+- **SD15a.3 Cell (done, 2026-10-16).** A pick, place and fasten example beside the screwdriving
   cell:
   - **Handling robot.** A second `RobotArm` with its own controller carries
     the MT12 dual gripper (`DualArmGripperTool`). Gripper A is sized to the
@@ -1551,7 +1551,7 @@ Steps:
       cabinet.
     - The gripper valves and air go to the handling controller and an air
       supply.
-- **SD15a.4 Checks.** On both backends:
+- **SD15a.4 Checks (done, 2026-10-16).** On both backends:
   - a full tray-to-finished-assembly cycle;
   - fixture not ready;
   - a missing or misplaced part;
@@ -2682,7 +2682,7 @@ still required. The earlier 21-test proof predates this wire extension.
 | SD12 | MuJoCo acceptance passes (Claude, 2026-10-14). Hybrid force/position entry search with spring feed, welded carriage and plan-streamed servo. Nominal seats in 32.9 s at 0 N; the 1 mm offset seats in 34.7 s, 7.5 N peak, 2 searched surfaces. Both hand over to the qualified OK tightening. Integrated acceptance passes; gate baseline exceptions are below. | `fef536bc7`, `92100bc7c`; `sd-main-sync` |
 | SD13 | MuJoCo acceptance passes (Claude, 2026-10-14). Screw-to-work helical joint (`NKSIM_JOINT_HELICAL`, `rk_simulation_create_object_screw_joint`) with socket coupling and a `Seated` hand-off. SimKit and RobotKit native suites pass; all 4 CAD fastenings seat with OK torque. Integrated acceptance passes; gate baseline exceptions are below. | `d8f548d09`, `fef536bc7`; `sd-main-sync` |
 | SD14 | done — drawing projection, CAD-derived thread symbols and callouts pass; ProjectKit passes 370 assertions and the editor passes all 855 cosmetic-thread checks; the three CAD SVG exports were previously rendered and inspected | `projectkit/tests/haxeon.json`; `machinekit/examples/robot-screwdriver/haxeon.drawing.json`; `sd-main-sync` |
-| SD15 | in progress (2026-10-16). SD15a.1–2 landed; SD15a.3–4 runtime scenarios pass on both backends. Final combined-code gate and local-main integration remain open. Automatic tool change has its separate `robotkit/plans/TOOL_CHANGE.md` (TC0 to TC6). | SD15 drafts in `5a6ac41ae`; controller programs in `3bf6cca0c` |
+| SD15 | done (2026-10-16). SD15a.1–4 pass: all 14 physical two-arm cases on both backends, completed frozen full gate, and targeted validation after the latest-main rebase. The two confirmed main baseline failures are recorded below. Automatic tool change has its separate `robotkit/plans/TOOL_CHANGE.md` (TC0 to TC6). | SD15 drafts in `5a6ac41ae`; controller programs in `3bf6cca0c`; final acceptance below |
 
 ### SD8 hardware integration work (2026-10-11)
 
@@ -4100,3 +4100,69 @@ jobs passed within the same cap. The fresh full-gate runner uses these
 build limits and runs native tests from its evidence directory so the
 intentional MuJoCo instability warning log does not alter source files.
 The full combined-code gate remains required before final sign-off.
+
+### Final two-arm acceptance and latest-main integration (2026-10-16)
+
+The frozen `sd15-final-db8-1` gate at `fd1044a56` completed every one of
+its 62 unique default project-source cases: 60 passed. All 14 independent
+cell cases passed, covering housing commissioning, the full free-plate cycle,
+missing-part local retry, exhausted screw supply, measured fixture removal,
+and both fixed-plate and full-cycle interruption/retry on both backends.
+The two controllers complete their own programs through the wired handshake.
+All four identified physical threads are accepted, the housing and screws
+remain carried by the plate, and the finished assembly reaches the actual
+outfeed pocket. Full-cycle outfeed errors were 0.0159211 mm on the deterministic
+backend and 0.200321 mm on MuJoCo; interrupted/retried cycles measured
+0.0159211 mm and 0.200870 mm respectively, all below the 1 mm limit.
+
+All ten staged scenarios, four assembly/replacement scenarios, twelve blow-feed
+scenarios, feeder recovery, touch registration, lost-screw recovery, required
+fastening, physical threads and force search passed. Native core, backend and
+session suites, CADKit, ProjectKit, MachineKit, editor and interactive Stop
+checks passed. Source and runner fingerprints both remained unchanged through
+the entire gate. The seat-plane fix is retained; Coal's distance tolerance was
+not changed. This completes SD15a.3 and SD15a.4, including the physical handling
+and fault/recovery requirements, rather than only a generated-scene check.
+
+The gate's two failures are confirmed main baselines. Tending reproduces the
+same 73.97676991150381% utilization and production intervals as the archived
+control. Printer-cube-short fails at operation 23, `path.time`, MotionKit error
+-6, layer 3. A separate checkout of committed main `32baef253`, with a fresh
+complete native build, reproduces that failure twice. Its final printed
+40-line infeasible LP diagnostic matches the gate. The exception text is not
+identical: the gate reports G-code line 445, current main line 440, and the
+older archived main control line 455, with different heater readings. These
+failures remain visible; no assertion or tolerance was relaxed to hide them.
+The initial control using older existing main libraries failed earlier at
+coupling projection and was superseded by the fresh native build.
+
+All 70 feature patches then rebased identically onto `32baef253`, producing
+runtime head `fc0cd453d`; the frozen gate is preserved on
+`backup/screwdriving-gate-db8-1-20261016`. Incoming main changes only imported
+reference-arm materials and their visual-only representation. Its shared
+loader branch applies to explicit empty collision-hull lists, which the old
+codec rejected. Artifact decoding validates before loading, and assembly
+flattening preserves absent versus authored hulls, so previously valid default
+case inputs retain their existing path. No native runtime source changed in
+this rebase. The completed gate is carried with that compatibility boundary,
+not presented as a second full run on the rebased head.
+
+On the rebased code, ProjectKit's 370 assertions and the editor suite, including
+855 cosmetic-thread checks, pass. Both reference-arm exporters and the app,
+editor and reference-application builds pass. Verified UR5e and Fairino input
+geometry was re-exported with current code, including Cartesian playback.
+The application checks pass for material regions, conserved link mass,
+collision-disabled visual-only regions, UR blue/black appearance, saved motion
+tracks and 200 actual simulator steps per arm. They observe 27 UR5e visual
+parts and seven Fairino parts with fault-free joint motion. The import Python
+suite also passes all eight tests using its pinned dependencies. An initial
+application check lacked the Cartesian exports; generating them with the
+current exporter resolved that setup omission without a source change.
+
+Evidence is retained under `sd15-final-db8-1`, including the completed gate,
+cell matrix, full-cycle interruption checks, printer control comparison,
+post-rebase results and unchanged-patch range-diff. Integration uses a local
+fast-forward with content-hashed backups of unrelated main working changes
+and no feature-path overlap. The existing SD15a stash is only a safety copy;
+it has already been applied. Automatic tool change remains the separate
+TC0–TC6 plan; these checks make no hardware qualification claim.

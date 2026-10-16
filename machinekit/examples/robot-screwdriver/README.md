@@ -64,8 +64,9 @@ fresh measured compression baseline followed by a confirmed force drop; it is
 not a hardware safety recipe. Acceptance evidence through SD15a and known
 project-wide baseline failures are recorded in [PLAN.md](PLAN.md). The two-arm
 cell completes physical handling, fastening, outfeed and fault/recovery checks
-on both simulation backends. The complete baseline gate finished; final
-integration validation against the latest shared runtime is in progress.
+on both simulation backends. The final frozen gate completed all 62 default
+cases: 60 passed, with two confirmed main baseline failures recorded in the
+plan. Integration checks after rebasing onto the latest local main also pass.
 
 ## Two-arm pick, place and fasten cell
 
