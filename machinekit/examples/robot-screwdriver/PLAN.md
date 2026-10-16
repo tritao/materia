@@ -3545,3 +3545,18 @@ contact couple. All 65 physical assertions and 9511 checked API operations pass
 independent physical acceptance remain unverified. Full contact-filter/softness
 semantics, caching, history/reset, scaling and production integration remain
 open; this evidence does not establish deterministic whole-cell acceptance.
+
+### SD15a oblique rolling-friction prototype (2026-10-16)
+
+Rolling resistance now solves its two angular directions together and projects
+the accumulated couple onto one circular limit, reusing the sliding-friction
+block solver. It no longer gives each rolling axis the full independent limit.
+An oblique 0.02 N m load per axis is held with the measured opposing couple;
+0.09 N m per axis exceeds the combined limit and rotates in both directions.
+The measured couple magnitude stays below coefficient times normal force.
+
+All 72 physical assertions and 9931 checked API operations pass, including the
+previous torsional, grip, convex/compound and inertia checks
+(`sd15-dynamics-rolling.log`). The experiment still needs contact-filter and
+soft-contact semantics, topology caching, reset/history and scaling work before
+production integration and actual deterministic cell/fault acceptance.
