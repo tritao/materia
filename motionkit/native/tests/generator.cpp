@@ -343,9 +343,38 @@ void stopped_phase_intersects_all_joint_limits() {
     mk_trajectory_destroy(trajectory);
 }
 
+void stopped_phase_preserves_microscopic_moves() {
+    auto request = standard(7);
+    request.synchronization = MK_SYNCHRONIZATION_PHASE;
+    const double start[] = {0.0, 6.201636426617085e-17, -5.702903427273753e-17,
+        -8.760353553682876e-17, 2.9937821067954734e-16,
+        -1.734723475976807e-17, 7.068998164605489e-17};
+    for (uint32_t joint = 0; joint < 7; ++joint) {
+        request.current_position[joint] = start[joint];
+        request.target_position[joint] = 0.0;
+        request.max_velocity[joint] = 2.0;
+        request.max_acceleration[joint] = 2.0;
+        request.max_jerk[joint] = 20.0;
+    }
+    mk_trajectory_handle trajectory{};
+    int32_t result = -999;
+    assert(mk_generate_state_to_state(&request, &trajectory, &result) == MK_OK);
+    expect_all_pass(trajectory, request);
+    int64_t duration = 0;
+    assert(mk_trajectory_duration_ns(trajectory, &duration) == MK_OK && duration > 1);
+    mk_trajectory_state state{};
+    state.struct_size = sizeof(state);
+    assert(mk_trajectory_evaluate(trajectory, 0, &state) == MK_OK);
+    for (uint32_t joint = 0; joint < 7; ++joint) assert(state.position[joint] == start[joint]);
+    assert(mk_trajectory_evaluate(trajectory, duration, &state) == MK_OK);
+    for (uint32_t joint = 0; joint < 7; ++joint) near(state.position[joint], 0.0, 1e-25);
+    mk_trajectory_destroy(trajectory);
+}
+
 } // namespace
 
 int main() {
+    stopped_phase_preserves_microscopic_moves();
     stopped_phase_intersects_all_joint_limits();
     baseline_and_multiaxis();
     moving_start_and_reversal();

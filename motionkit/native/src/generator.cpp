@@ -136,11 +136,35 @@ mk_result generate(const mk_state_to_state_request &request, Trajectory &traject
     }
     ruckig::Ruckig<ruckig::DynamicDOFs> calculator(dofs);
     ruckig::Trajectory<ruckig::DynamicDOFs> reference(dofs);
-    const auto result = calculator.calculate(input, reference);
+    auto result = calculator.calculate(input, reference);
+    double time_scale = 1.0;
+    if (map_result(result) != MK_OK && dofs == 1 && request.control_mode == MK_CONTROL_POSITION &&
+        request.current_velocity[0] == 0.0 && request.current_acceleration[0] == 0.0 &&
+        request.target_velocity[0] == 0.0 && request.target_acceleration[0] == 0.0) {
+        // Unit progress on a microscopic move has enormous derivative limits.
+        // Solve the identical problem in its natural jerk time unit instead.
+        // Keep the coordinate: shrinking it can trigger Ruckig's no-move cutoff.
+        const double distance = std::abs(input.target_position[0] - input.current_position[0]);
+        const double scale = std::cbrt(distance) / std::cbrt(input.max_jerk[0]);
+        auto conditioned = input;
+        conditioned.max_velocity[0] *= scale;
+        conditioned.max_acceleration[0] *= scale * scale;
+        conditioned.max_jerk[0] *= scale * scale * scale;
+        if (std::isfinite(scale) && scale > 0.0 && scale != 1.0 &&
+            std::isfinite(conditioned.max_velocity[0]) && conditioned.max_velocity[0] > 0.0 &&
+            std::isfinite(conditioned.max_acceleration[0]) && conditioned.max_acceleration[0] > 0.0 &&
+            std::isfinite(conditioned.max_jerk[0]) && conditioned.max_jerk[0] > 0.0) {
+            const auto retried = calculator.calculate(conditioned, reference);
+            if (map_result(retried) == MK_OK && reference.get_duration() > 0.0) {
+                result = retried;
+                time_scale = scale;
+            }
+        }
+    }
     ruckig_result = static_cast<int32_t>(result);
     if (const auto mapped = map_result(result); mapped != MK_OK) return mapped;
 
-    const double duration = reference.get_duration();
+    const double duration = reference.get_duration() * time_scale;
     if (!std::isfinite(duration) || duration < 0.0 ||
         duration >= static_cast<double>(INT64_MAX - 1024) / 1e9) return MK_ERROR_GENERATION;
     // An unchanged state still needs one positive-duration native segment.
@@ -151,6 +175,7 @@ mk_result generate(const mk_state_to_state_request &request, Trajectory &traject
         return MK_ERROR_GENERATION; // Waypoint/cloud profiles are intentionally unsupported.
     for (const auto &profile : profiles.front()) {
         auto add_boundary = [&](double seconds) {
+            seconds *= time_scale;
             if (std::isfinite(seconds) && seconds > 0.0 && seconds < duration) {
                 const auto rounded = std::llround(seconds * 1e9);
                 if (rounded > 0 && rounded < final_ns) boundaries.push_back(rounded);
@@ -172,8 +197,13 @@ mk_result generate(const mk_state_to_state_request &request, Trajectory &traject
         if (end <= begin) continue; // Sub-nanosecond phases collapse deterministically.
         const double begin_seconds = static_cast<double>(begin) / 1e9;
         const double midpoint_seconds = static_cast<double>(begin + (end - begin) / 2.0) / 1e9;
-        reference.at_time(midpoint_seconds, midpoint_position, midpoint_velocity,
+        reference.at_time(midpoint_seconds / time_scale, midpoint_position, midpoint_velocity,
             midpoint_acceleration, midpoint_jerk, section);
+        if (time_scale != 1.0) for (uint32_t joint = 0; joint < dofs; ++joint) {
+            midpoint_velocity[joint] /= time_scale;
+            midpoint_acceleration[joint] /= time_scale * time_scale;
+            midpoint_jerk[joint] /= time_scale * time_scale * time_scale;
+        }
         mk_segment segment{};
         segment.struct_size = sizeof(segment);
         segment.t0_ns = begin;
