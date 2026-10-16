@@ -803,16 +803,25 @@ class MissionPlayer implements SessionMember {
       var held = heldParts.get(channel), tool = toolKinematics.get(channel);
       if (held != null && tool != null) heldCarriers.set(held.occurrence, robot.model.links[tool.link].id);
     }
+    var objectsByBody = new Map<Int, GripObject>();
+    for (entry in objects) objectsByBody.set(simulation.objectBody(entry.object).rawValue(), entry);
     function carrier(entry:GripObject):Null<String> {
-      var name = StringTools.startsWith(entry.id, "project:") ? entry.id.substr(8) : entry.id;
-      var forced = forcedCarriers == null ? null : forcedCarriers.get(name);
-      if (forced != null) return forced;
-      var confirmed = heldCarriers.get(name);
-      if (confirmed != null) return confirmed;
-      var body = simulation.objectCarrier(entry.object);
-      for (index in 0...robot.model.links.length)
-        if (simulation.linkBody(robotIndex, index) == body) return robot.model.links[index].id;
-      return null;
+      var current:Null<GripObject> = entry;
+      // A fastened housing and its screws follow the plate, including while a planned pickup
+      // forces only the plate's future carrier. Preserve each descendant's own measured geometry.
+      for (_ in 0...(objects.length+1)) {
+        if (current == null) return null;
+        var name = StringTools.startsWith(current.id, "project:") ? current.id.substr(8) : current.id;
+        var forced = forcedCarriers == null ? null : forcedCarriers.get(name);
+        if (forced != null) return forced;
+        var confirmed = heldCarriers.get(name);
+        if (confirmed != null) return confirmed;
+        var body = simulation.objectCarrier(current.object);
+        for (index in 0...robot.model.links.length)
+          if (simulation.linkBody(robotIndex, index) == body) return robot.model.links[index].id;
+        current = objectsByBody.get(body.rawValue());
+      }
+      throw "Collision capture found a cycle in the physical object carrier graph";
     }
     for (other in cellRobots) if (other != robot && other.parts.length > 0) {
       var index = other.parts[0].robotIndex;

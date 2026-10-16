@@ -1899,7 +1899,7 @@ class ProjectSourceTests {
   }
 
   /** A held blank's swept path follows its carrier, rather than remaining a fixed scene obstacle. */
-  static function checkHeldJointSceneClearance(root:String):Void {
+  static function checkHeldJointSceneClearance(root:String, nested:Bool = false):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/cobot-arm/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
     var definition = requiredAssemblyDefinition(generated.assemblyDefinition);
@@ -1923,6 +1923,10 @@ class ProjectSourceTests {
         width: 0.01, height: 0.01, depth: 0.01, collisionEnabled: true, dynamicBody: held,
         mass: held ? 0.001 : 0.0, red: 1.0, green: 0.0, blue: 0.0, visible: true});
     }
+    if (nested) generated.objects.push({id:"held-clearance-carrier", label:"Retained assembly carrier",
+      type:"rectangle", x:start.x*0.001-0.08, y:start.y*0.001, z:start.z*0.001,
+      width:0.01, height:0.01, depth:0.01, collisionEnabled:true, dynamicBody:true,
+      mass:0.001, red:0.0, green:1.0, blue:0.0, visible:true});
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedProject(generated, manifest);
     var simulation = new ApplicationSimulation(new RobotWorld());
@@ -1937,11 +1941,36 @@ class ProjectSourceTests {
       new robotkit.spatial.Quat(pose.rotation[0], pose.rotation[1], pose.rotation[2], pose.rotation[3]));
     var relative = carrier.inverse().compose(new robotkit.spatial.Transform3(
       new robotkit.spatial.Vec3(start.x * 0.001, start.y * 0.001, start.z * 0.001), robotkit.spatial.Quat.identity()));
-    mission.simulation.holdObjectOnLink(object, mission.robotIndex, link,
-      new nativekit.sim.SimPose(relative.translation.x, relative.translation.y, relative.translation.z,
-        relative.rotation.x, relative.rotation.y, relative.rotation.z, relative.rotation.w));
-    check(mission.simulation.objectCarrier(object) == mission.simulation.linkBody(mission.robotIndex, link),
-      "the probe has its physical robot carrier");
+    if (nested) {
+      var parent = simulation.environmentObject("held-clearance-carrier");
+      if (parent == null) throw "Retained clearance fixture lost its independent carrier";
+      mission.simulation.holdObjectOnObject(object,parent,new nativekit.sim.SimPose(0.08,0,0));
+      var forced = new Map<String,String>();
+      forced.set("held-clearance-carrier",mission.robot.model.links[link].id);
+      function checkLeaf(snapshot:cadbridge.CellCollisionSnapshot):Void {
+        var leaf = [for (hull in snapshot.hulls) if (hull.member == "held-clearance-probe") hull];
+        check(leaf.length > 0,"The retained child keeps its own clearance geometry");
+        for (hull in leaf) check(switch hull.owner {
+          case Held(owner,body):owner == mission.robotId() && body == mission.robot.model.links[link].id;
+          case _:false;
+        },"Retained child collision ownership reaches the plate's actual or planned robot link");
+      }
+      checkLeaf(mission.cellCollisionSnapshot([],forced));
+      var parentRelative = carrier.inverse().compose(new robotkit.spatial.Transform3(
+        new robotkit.spatial.Vec3(start.x*0.001-0.08,start.y*0.001,start.z*0.001),robotkit.spatial.Quat.identity()));
+      mission.simulation.holdObjectOnLink(parent,mission.robotIndex,link,
+        new nativekit.sim.SimPose(parentRelative.translation.x,parentRelative.translation.y,parentRelative.translation.z,
+          parentRelative.rotation.x,parentRelative.rotation.y,parentRelative.rotation.z,parentRelative.rotation.w));
+      check(mission.simulation.objectCarrier(object) == mission.simulation.objectBody(parent),
+        "The child retains its physical parent instead of being rebound directly to the robot");
+      checkLeaf(mission.cellCollisionSnapshot([]));
+    } else {
+      mission.simulation.holdObjectOnLink(object, mission.robotIndex, link,
+        new nativekit.sim.SimPose(relative.translation.x, relative.translation.y, relative.translation.z,
+          relative.rotation.x, relative.rotation.y, relative.rotation.z, relative.rotation.w));
+      check(mission.simulation.objectCarrier(object) == mission.simulation.linkBody(mission.robotIndex, link),
+        "the probe has its physical robot carrier");
+    }
     var ticks = 0;
     while (mission.failure == null && ticks < 300) { simulation.step(); ticks++; }
     var failure = mission.failure;
@@ -6863,7 +6892,7 @@ class ProjectSourceTests {
       suite("gantry-welder", checkGantryWelder),
       suite("track-arm", checkTrackArm),
       suite("overhead-arm", OverheadArmTests.run),
-      suite("clearance", root -> { checkJointSceneClearance(root); checkHeldJointSceneClearance(root); }),
+      suite("clearance", root -> { checkJointSceneClearance(root); checkHeldJointSceneClearance(root); checkHeldJointSceneClearance(root,true); }),
       suite("welder", checkRobotWelder),
       suite("mates", checkMates),
       suite("bench-mill", checkBenchMill),
@@ -6916,6 +6945,7 @@ class ProjectSourceTests {
       focused("tending-vise", root -> checkMachineTending(root, TendingCheck.Vise)),
       focused("tending-exchange", root -> checkMachineTending(root, TendingCheck.Exchange)),
       focused("identity", checkEnclosedCabinetIdentity),
+      focused("clearance-retained", root -> checkHeldJointSceneClearance(root,true)),
       focused("welder-plate", checkFarPlateWeld),
       focused("welder-air", checkWeldInTheAir),
       focused("welder-quality", checkWeldQualities),
