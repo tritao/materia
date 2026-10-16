@@ -3890,3 +3890,34 @@ and 42280 checked API operations pass, with all six core groups green
 A fresh read-only temporary-index main integration preview also succeeds
 (`sd15-main-preview-current._rohrqj6`); main remains `bc3658a91` with its working
 changes untouched. Final acceptance and main merge are not yet complete.
+
+### SD15a deterministic physical handling acceptance in progress (2026-10-16)
+
+The frozen-input `sd15-deterministic-native10` run completes the plate pick,
+turn/transfer, placement and actual fixture-presence check. It then completes
+the housing pick and placement, reaching H8 at 21.24 simulated seconds with
+both free parts at the fixture and both grippers released. This proves the
+observed handling segment, not the complete fastening/unload cycle; the same
+run remains active. Fixture acceptance here is presence-based. The explicit
+1 mm position assertion belongs to final outfeed and remains unchanged.
+
+All six core groups and the 286-assertion suite passed before this run. Fresh
+native RobotKit tests on both backends, both session wrappers and ASan/UBSan
+with leak detection also pass against the substep implementation
+(`sd15-dynamics-substep-*.log`). Its running source/library hashes are in
+`sd15-deterministic-native10-inputs.sha256` and remain unchanged.
+
+An isolated follow-up finds that a declared negative force ceiling (the explicit
+unpowered sentinel) is ignored without a per-command override. A two-line
+correction matches the pinned MuJoCo ceiling selection; six declared/override
+cases and the complete combined 292-assertion suite pass. It is staged only as
+scratch patch `sd15-force-cap-pending.patch`, not applied during the active run.
+
+A live profile now identifies friction solves as the largest native cost.
+An isolated candidate precomputes their constant two-axis effective-mass inverse,
+skips zero impulses and omits angular rows for absent angular friction. The
+same 292 assertions pass. Three local complete-probe measurements have median
+0.915 s before versus 0.694 s after (`sd15-dynamics-friction-metric-comparison.json`);
+this is not whole-cell performance acceptance. Its separate pending patch is
+`sd15-friction-metric-pending.patch`. Apply/validate these candidates after the
+frozen cell run ends, then run the required final gate and local-main sync.
