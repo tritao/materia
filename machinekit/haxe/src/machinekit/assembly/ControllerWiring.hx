@@ -72,6 +72,11 @@ class ControllerWiring {
 			owned(cabinet).channels.push(cylinder.valve + "/coilA");
 			if (other != null) owned(cabinet).channels.push(cylinder.valve + "/coilB");
 		}
+		// Process equipment can drive its own joint through a discrete control service rather than a motor bus.
+		for (joint in definition.joints) if (Std.string(joint.role) == "tree" && Std.string(joint.type) != "fixed") {
+			var cabinet = terminal(joint.child, "control");
+			if (cabinet != null) claim(joint.id, cabinet);
+		}
 		// A transmission follower is part of the same motion domain as its leader.
 		var changed = true;
 		while (changed) {
@@ -82,6 +87,26 @@ class ControllerWiring {
 				else if (target != null && source == null) {claim(coupling.source, target); changed = true;}
 				else if (source != null && target != null && source != target)
 					throw 'Coupling "${coupling.id}" crosses controllers';
+			}
+		}
+		// Unactuated tool joints (a screwdriver's spring feed and process spindle, for example) live in
+		// the carrying arm's runtime. Motors and cylinders were required to have explicit wiring above;
+		// only the remaining passive/process joints inherit their nearest driven ancestor's domain.
+		var bodyOwner = new Map<String, String>();
+		for (joint in definition.joints) if (Std.string(joint.role) == "tree") {
+			var cabinet = owner.get(joint.id);
+			if (cabinet != null) bodyOwner.set(joint.child, cabinet);
+		}
+		changed = true;
+		while (changed) {
+			changed = false;
+			for (joint in definition.joints) if (Std.string(joint.role) == "tree" && !bodyOwner.exists(joint.child)) {
+				var cabinet = bodyOwner.get(joint.parent);
+				if (cabinet != null) {
+					bodyOwner.set(joint.child, cabinet);
+					if (Std.string(joint.type) != "fixed") claim(joint.id, cabinet);
+					changed = true;
+				}
 			}
 		}
 		for (joint in definition.joints) if (Std.string(joint.role) == "tree" && Std.string(joint.type) != "fixed") {

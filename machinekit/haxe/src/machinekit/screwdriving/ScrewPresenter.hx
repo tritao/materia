@@ -12,7 +12,7 @@ import materia.assembly.AssemblyFrames;
 class ScrewPresenter extends MachineAssembly {
 	public final screw:SocketHeadCapScrew;
 
-	public function new(screw:SocketHeadCapScrew) {
+	public function new(screw:SocketHeadCapScrew, fieldHead:Bool = false) {
 		super(); this.screw = screw;
 		addComponent("nest", new PresenterNest(screw));
 		addComponent("escapement", new PresenterGate());
@@ -22,6 +22,11 @@ class ScrewPresenter extends MachineAssembly {
 		addMate("presented-screw", "fixed", "nest", "seat", "screw", "head");
 		exposeConnector("mount", "nest", "mount"); exposeConnector("pick", "screw", "head");
 		addPresence("part-present", "nest/sense", screw.spec.headHeight + 2);
+		if (fieldHead) {
+			addComponent("part-present", new machinekit.control.DigitalSensor("presence"),
+				AssemblyFrames.translation(35, 0, screw.length+5));
+			exposePort("presence", "part-present", "signal");
+		}
 		exposePort("escapement", "escapement", "control");
 	}
 }
