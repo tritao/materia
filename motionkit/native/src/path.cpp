@@ -1036,6 +1036,9 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
         for (size_t span = 1; span < span_count && !reference; ++span)
             if (span_first[span] - span_first[window_first.back()] >= WINDOW_NODES &&
                 span_first[span_count] - span_first[span] >= WINDOW_NODES / 4) window_first.push_back(span);
+        // One mutable workspace per planning call, shared only by sequential sweeps.
+        // Each retained algorithm releases it before the next problem initializes it.
+        auto workspace = std::make_shared<toppra::solver::Seidel>();
         auto make_window = [&](size_t window) {
             const size_t first_node = span_first[window_first[window]];
             const size_t last_node = window + 1 < window_first.size() ? span_first[window_first[window + 1]]
@@ -1053,7 +1056,7 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
                 window_path = std::make_shared<toppra::PiecewisePolyPath>(window_coefficients, window_knots);
             }
             auto algorithm = std::make_unique<toppra::algorithm::TOPPRA>(constraints, window_path);
-            algorithm->solver(std::make_shared<toppra::solver::Seidel>());
+            algorithm->solver(workspace);
             algorithm->setGridpoints(window_grid);
             algorithm->setInitialXBounds(toppra::Bound{0.0, 1e16});
             return algorithm;
@@ -1087,7 +1090,7 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
             auto algorithm = window == 0 ? make_window(window) : std::move(retained[window]);
             const auto result = window == 0
                 ? algorithm->computePathParametrizationFromSquaredSpeed(reached_squared, controllable[window + 1])
-                : algorithm->computeForwardFromControllableSets(reached_squared, std::make_shared<toppra::solver::Seidel>());
+                : algorithm->computeForwardFromControllableSets(reached_squared, workspace);
             if (result != toppra::ReturnCode::OK) {
                 if (std::getenv("PROCESS_PATH_PROFILE"))
                     std::fprintf(stderr, "PROCESS_PATH_WINDOW window=%zu result=%d %s\n", window,
