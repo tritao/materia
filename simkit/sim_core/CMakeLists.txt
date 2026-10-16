@@ -48,6 +48,11 @@ if(NK_BUILD_EXAMPLES)
 endif()
 
 if(NK_BUILD_TESTS)
+    add_executable(nativekit_sim_convex_overlap_tests tests/convex_overlap.cpp)
+    target_compile_features(nativekit_sim_convex_overlap_tests PRIVATE cxx_std_20)
+    add_test(NAME sim_convex_overlap COMMAND nativekit_sim_convex_overlap_tests)
+    set_tests_properties(sim_convex_overlap PROPERTIES LABELS "sim;geometry" TIMEOUT 30)
+
     add_executable(nativekit_sim_core_benchmark bench/benchmark.cpp)
     target_compile_features(nativekit_sim_core_benchmark PRIVATE cxx_std_20)
     target_link_libraries(nativekit_sim_core_benchmark PRIVATE NativeKit::sim_core)

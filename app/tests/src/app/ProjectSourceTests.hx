@@ -2437,9 +2437,10 @@ class ProjectSourceTests {
   }
 
   /** Four actual CAD screws, separate replacements and physical reject-bin recovery. */
-  static function checkScrewdrivingAssembly(root:String):Void {
+  static function checkScrewdrivingAssembly(root:String, ?selectedBackend:Int, ?selectedDamaged:Bool):Void {
     var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.assembly.project.json");
     for (backend in [ApplicationSimulation.MUJOCO,ApplicationSimulation.DETERMINISTIC]) for (damaged in [false,true]) {
+      if (selectedBackend!=null && backend!=selectedBackend || selectedDamaged!=null && damaged!=selectedDamaged) continue;
       Sys.println('Screwdriving CAD: begin whole backend $backend, damaged $damaged');
       var generated = MateriaProjectRunner.loadProject(manifest), definition = generated.missions[0];
       if (definition == null || definition.steps.length != 4) throw "Whole screw cell lost its mission";
@@ -2459,6 +2460,7 @@ class ProjectSourceTests {
           if (mission.stepIndex != observedStep) {
             observedStep = mission.stepIndex;
             Sys.println('Whole screw transition $observedStep at ${clock.simulationTime()}');
+            Sys.stdout().flush();
           }
           simulation.step();
           if (damaged && !injected) {
@@ -2526,7 +2528,9 @@ class ProjectSourceTests {
       check(job != null && job.recovery != null,"Portable assembly preserves each exact replacement and reject frame");
     }
     Sys.println("Screwdriving CAD: end whole portable export");
-    Sys.println("Screwdriving whole assembly passed on both backends with cross-thread replacement recovery");
+    if (selectedBackend == null && selectedDamaged == null)
+      Sys.println("Screwdriving whole assembly passed on both backends with cross-thread replacement recovery");
+    else Sys.println('Screwdriving whole assembly focused check passed: backend $selectedBackend, damaged $selectedDamaged');
   }
 
   /**
@@ -7238,7 +7242,8 @@ class ProjectSourceTests {
       suite("screwdriver-equipment", checkScrewdrivingEquipment),
       suite("screwdriver-cad", root -> checkScrewdrivingOne(root)),
       suite("screwdriver-virtual", root -> checkScrewdrivingOne(root, true)),
-      suite("screwdriver-assembly", checkScrewdrivingAssembly),
+      suite("screwdriver-assembly", root -> checkScrewdrivingAssembly(root)),
+      focused("screwdriver-assembly-deterministic-damaged", root -> checkScrewdrivingAssembly(root,ApplicationSimulation.DETERMINISTIC,true)),
       suite("screwdriver-required", RequiredFasteningTests.run),
       suite("robot-recovery", RobotOnlyRecoveryTests.run),
       focused("screwdriver-pick-place", PickPlaceFastenTests.run),

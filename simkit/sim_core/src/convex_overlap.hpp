@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <vector>
+#include <type_traits>
 
 namespace nksim::geometry {
 
@@ -92,8 +93,13 @@ struct ClosestWitness {
     Point second{};
 };
 
+template<class Scalar = double>
 inline ClosestWitness closest(Simplex &simplex) {
-    double best = std::numeric_limits<double>::infinity();
+    using WorkingPoint = std::array<Scalar, 3>;
+    auto product = [](const WorkingPoint &a, const WorkingPoint &b) {
+        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    };
+    Scalar best = std::numeric_limits<Scalar>::infinity();
     ClosestWitness nearest{};
     Simplex retained;
     for (unsigned mask = 1; mask < (1u << simplex.count); ++mask) {
@@ -102,61 +108,69 @@ inline ClosestWitness closest(Simplex &simplex) {
         for (unsigned i = 0; i < simplex.count; ++i)
             if (mask & (1u << i)) indices[count++] = i;
         const unsigned dimensions = count - 1;
-        const Point origin = simplex.points[indices[0]].difference;
-        Point edges[3]{};
-        double matrix[3][4]{};
-        double scale = 0.0;
+        WorkingPoint origin{};
+        for (unsigned axis = 0; axis < 3; ++axis) origin[axis] = simplex.points[indices[0]].difference[axis];
+        WorkingPoint edges[3]{};
+        Scalar matrix[3][4]{};
+        Scalar scale = 0.0;
         for (unsigned i = 0; i < dimensions; ++i)
-            edges[i] = subtract(simplex.points[indices[i + 1]].difference, origin);
+            for (unsigned axis = 0; axis < 3; ++axis)
+                edges[i][axis] = Scalar(simplex.points[indices[i + 1]].difference[axis]) - origin[axis];
         for (unsigned i = 0; i < dimensions; ++i) {
             for (unsigned j = 0; j < dimensions; ++j) {
-                matrix[i][j] = dot(edges[i], edges[j]);
+                matrix[i][j] = product(edges[i], edges[j]);
                 scale = std::max(scale, std::abs(matrix[i][j]));
             }
-            matrix[i][dimensions] = -dot(edges[i], origin);
+            matrix[i][dimensions] = -product(edges[i], origin);
         }
+        constexpr Scalar pivot_tolerance = std::is_same_v<Scalar, double>
+            ? Scalar(1e-14) : Scalar(64) * std::numeric_limits<Scalar>::epsilon();
         bool singular = false;
         for (unsigned column = 0; column < dimensions; ++column) {
             unsigned pivot = column;
             for (unsigned row = column + 1; row < dimensions; ++row)
                 if (std::abs(matrix[row][column]) > std::abs(matrix[pivot][column])) pivot = row;
-            if (std::abs(matrix[pivot][column]) <= scale * 1e-14) {singular = true; break;}
+            if (std::abs(matrix[pivot][column]) <= scale * pivot_tolerance) {singular = true; break;}
             for (unsigned j = column; j <= dimensions; ++j)
                 std::swap(matrix[column][j], matrix[pivot][j]);
-            const double divisor = matrix[column][column];
+            const Scalar divisor = matrix[column][column];
             for (unsigned j = column; j <= dimensions; ++j) matrix[column][j] /= divisor;
             for (unsigned row = 0; row < dimensions; ++row) if (row != column) {
-                const double factor = matrix[row][column];
+                const Scalar factor = matrix[row][column];
                 for (unsigned j = column; j <= dimensions; ++j)
                     matrix[row][j] -= factor * matrix[column][j];
             }
         }
         if (singular) continue; // Its lower-dimensional faces are also enumerated.
-        double weights[4] = {1.0, 0.0, 0.0, 0.0};
+        Scalar weights[4] = {1.0, 0.0, 0.0, 0.0};
         for (unsigned i = 0; i < dimensions; ++i) {
             weights[i + 1] = matrix[i][dimensions];
             weights[0] -= weights[i + 1];
         }
         bool outside = false;
-        double total = 0.0;
+        Scalar total = 0.0;
         for (unsigned i = 0; i < count; ++i) {
             if (weights[i] < -1e-12) outside = true;
-            weights[i] = std::max(0.0, weights[i]);
+            weights[i] = std::max(Scalar(0), weights[i]);
             total += weights[i];
         }
         if (outside) continue;
-        ClosestWitness point{};
+        WorkingPoint difference{}, first{}, second{};
         for (unsigned i = 0; i < count; ++i)
             for (unsigned axis = 0; axis < 3; ++axis) {
-                const double weight = weights[i] / total;
-                point.difference[axis] += simplex.points[indices[i]].difference[axis] * weight;
-                point.first[axis] += simplex.points[indices[i]].first[axis] * weight;
-                point.second[axis] += simplex.points[indices[i]].second[axis] * weight;
+                const Scalar weight = weights[i] / total;
+                difference[axis] += simplex.points[indices[i]].difference[axis] * weight;
+                first[axis] += simplex.points[indices[i]].first[axis] * weight;
+                second[axis] += simplex.points[indices[i]].second[axis] * weight;
             }
-        const double squared = dot(point.difference, point.difference);
+        const Scalar squared = product(difference, difference);
         if (squared < best) {
             best = squared;
-            nearest = point;
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                nearest.difference[axis] = double(difference[axis]);
+                nearest.first[axis] = double(first[axis]);
+                nearest.second[axis] = double(second[axis]);
+            }
             retained.count = 0;
             for (unsigned i = 0; i < count; ++i)
                 if (weights[i] > 0.0) retained.points[retained.count++] = simplex.points[indices[i]];
@@ -170,8 +184,8 @@ inline ClosestWitness closest(Simplex &simplex) {
  * plane proves absence; a simplex within two nanometres proves contact. This
  * covers float-backed CAD vertices meeting at a shared boundary. Failure to
  * converge is explicit, never silently reported as absence. */
-template<class Support>
-Overlap overlap_with_witness(Support support, Point &witness) {
+template<class Scalar, class Support>
+Overlap overlap_with_witness_precision(Support support, Point &witness) {
     constexpr double tolerance = 2e-9;
     Simplex simplex;
     simplex.points[simplex.count++] = support(Point{1.0, 0.0, 0.0});
@@ -192,9 +206,18 @@ Overlap overlap_with_witness(Support support, Point &witness) {
             if (simplex.points[i].difference == point.difference) return Overlap::unresolved;
         if (simplex.count >= 4) return Overlap::unresolved;
         simplex.points[simplex.count++] = point;
-        nearest = closest(simplex);
+        nearest = closest<Scalar>(simplex);
     }
     return Overlap::unresolved;
+}
+
+/** Retry only unresolved contact queries with extended affine arithmetic. The
+ * geometric tolerance, support function and explicit failure contract are unchanged. */
+template<class Support>
+Overlap overlap_with_witness(Support support, Point &witness) {
+    const auto ordinary = overlap_with_witness_precision<double>(support, witness);
+    return ordinary == Overlap::unresolved
+        ? overlap_with_witness_precision<long double>(support, witness) : ordinary;
 }
 
 template<class Support>
