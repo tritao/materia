@@ -3442,3 +3442,25 @@ The fixed-plate nominal stage also passes with the current production code:
 `sd15-housing-physical1`, four accepted fastenings and both programs complete at
 185.64 simulated seconds (1184.8 s wall, 549 MB peak). Its targeted-interruption
 variant remains running.
+
+### SD15a fixed-plate interruption and differential dynamics checks (2026-10-16)
+
+The current production fixed-plate interruption case passes on MuJoCo:
+`sd15-interruption-fixed-physical1`, four accepted fastenings and both controller
+programs complete at 185.60 simulated seconds (1128.2 s wall, 552 MB peak).
+Together with the previously recorded loose-plate interrupted cycle this covers
+both authored physical interruption variants on MuJoCo.
+
+The isolated deterministic prototype now passes 48 physical assertions across
+16 scenarios, with 6854 checked API operations. New differential checks exercise
+one follower driven by the sum of two independently force-controlled masters.
+Both unequal body inertia and follower armature contribute the required coupled
+mass terms: measured master velocities match 5/11 and -3/11 m/s without added
+armature, and 7/17 and -5/17 m/s with 2 kg-equivalent follower armature. The
+follower velocity and displacement match the sum in each case. Box-contact
+checks also prove measured weight support, frictional lift and release; explicit
+zero friction lets the work fall. No production backend sources were changed.
+Evidence: `sd15-dynamics-differential.log`; the experimental patch and source
+hashes in scratch have been refreshed. Convex/compound geometry, full material
+semantics, inertial fallbacks, reset/history and scaling remain prerequisites
+before production integration and actual deterministic cell acceptance.
