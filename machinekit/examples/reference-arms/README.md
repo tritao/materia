@@ -132,7 +132,8 @@ performance results. Run `python3 machinekit/examples/reference-arms/prepare-cad
 to fetch the pinned 12-model FAIRINO STEP archive and FR5 drawings into `build/cad/`.
 UR's current STEP download page requires login; its STEP archive has not been fetched.
 
-The remaining work and completion gates are tracked in [PLAN.md](PLAN.md).
+The acceptance checklist is in [PLAN.md](PLAN.md); consolidated evidence and
+engineering findings are in [REVIEW.md](REVIEW.md).
 
 ## Our arm alongside UR5e and FR5
 
@@ -297,3 +298,14 @@ The separate full-workspace 5 kg benchmark and unresolved shoulder sizing remain
 and assumptions. `registered-cells.png` provides the common-scale overview. A
 revision-matched tool adapter, physical installation, harness and hardware testing
 remain prerequisites for a real-cell claim.
+
+After the documented native and application checks, audit current deliverables:
+
+```sh
+python3 machinekit/examples/reference-arms/audit-deliverables.py
+```
+
+This verifies artifact integrity and expected review coverage and writes
+`build/completion-audit.json`. It preserves explicit false flags for physical
+qualification, complete tending-cycle feasibility and a full-target shoulder
+selection; a passing artifact audit does not change those engineering findings.
