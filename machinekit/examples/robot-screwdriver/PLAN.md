@@ -3278,3 +3278,22 @@ The plate has pitched about 7.7 degrees and its origin is
 Trace mode now also prints measured work poses at controller transitions and
 periodic feedback, so the next run can locate when seating is lost. The
 isolated outfeed pass remains valid only for its correctly staged assembly.
+
+### SD15a interrupted drive continuation prerequisite (2026-10-16)
+
+`ce7cfccf7` adds a resumable cancelled-skill contract and retains an unfinished
+screw drive's qualified plan and feed depth. Resume restores contact at work
+before spindle restart; it does not revisit supply, reconfigure the simulated
+joint model, erase accumulated angle, or create a replacement attempt. A
+process NOK is not eligible. The motion owner observes its outstanding stop
+acknowledgement and resets its motion session before contact restoration.
+The fastening report clears only its cancellation fault while preserving the
+attempt identity and prior dispositions.
+
+The focused native-backed Haxe harness `sd15-resume-focused4` passes 91 checks:
+70 recovery, 5 remaining-supply budget, 5 skipped-final and 11 final-pass checks.
+New assertions cover preserved vacuum, contact/feed restoration, spindle
+restart ordering, cumulative angle and reuse of the exact active attempt
+without calling the supply factory again. The mission's emergency-stop retry
+integration remains uncommitted pending app compilation and the complete
+loose-plate interruption test. This prerequisite is not SD15a.4 acceptance.
