@@ -59,8 +59,10 @@ class PickPlaceFastenCell extends ScrewdrivingCell {
 		presence("housing-present", "housingTray", housing.face, housing.depth+5, 2);
 		presence("plate-present", "plateTray", work.plate.width, work.plate.thickness+5, 3);
 		presence("outfeed-present", "outfeedTray", work.plate.width, work.plate.thickness+5, 4);
+		// Leave the middle of the plate edge clear for B's contact pad during unload.
+		var fixtureHeadX = gripper.specB.fingerDepth/2 + DigitalSensor.BODY_WIDTH/2 + 5;
 		addComponent("fixture-present", new DigitalSensor("presence"),
-			AssemblyFrames.translation(0, -500-work.plate.width/2-9, RobotArm.TABLE_TOP));
+			AssemblyFrames.translation(fixtureHeadX, -500-work.plate.width/2-9, RobotArm.TABLE_TOP));
 		addPresence("fixture-present", "table/plateSeat", work.plate.thickness+5);
 		connectPorts("fixture-presence-input", "fixture-present", "signal", HANDLING_CONTROLLER, "input5");
 		configureSupplies();

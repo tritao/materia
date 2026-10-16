@@ -3200,3 +3200,34 @@ Its first test attempt had an alias still bound to the robot link; that fixture
 was corrected to share the dynamic member's actual native parent. No check was
 relaxed. The fresh nominal cell run `sd-cases-sd15-full5` remains active; full
 tray-to-outfeed acceptance is still open.
+
+### SD15a unload clearance commissioning (2026-10-16)
+
+`8684042ce` commits physical retention of accepted screws and their qualified
+continuation release. `sd-cases-sd15-full5` completes all four required
+fastenings, parks the screwdriver and completes the acknowledgement handshake.
+It then fails the handler's unload pick at step 14, 203.64 s simulation time
+(540.6 s wall, 543 MB peak). This establishes the fastening improvement but is
+not a tray-to-outfeed pass.
+
+The `unload` diagnostic stages the same CAD-seated rigid assembly and runs the
+actual unload tail, without making a fastening acceptance claim. Its first
+two traces reproduce the empty-grasp failure from an initially level assembly.
+They show one pad contacting object 3 (`project:fixture-present`) while the
+other contacts the plate; the gripped-width switch briefly asserts, then the
+assembly slips during lift. Object 53 is the table. This is a field-head
+clearance error, not a reason to reduce load or loosen grasp confirmation.
+
+The fixture head now moves sideways by B's half finger depth, the sensor's
+half width and 5 mm clearance. Its wired plate-seat presence volume is
+unchanged. `sd-cases-sd15-unload2` passes the diagnostic at 11.41 s simulation
+time (51.5 s wall, 418 MB peak), retaining all five children through measured
+pickup, placement and outfeed presence. The preceding diagnostic fails with
+the head at its old position. Contact tracing is optional with
+`PICK_PLACE_TRACE=1`; normal acceptance remains the complete cycle.
+
+Fresh MuJoCo runs are active: `sd-cases-sd15-full6` for the nominal complete
+cycle, and `sd-cases-sd15-interruption-full1` for stop/retry during actual screw
+rotation followed by the full unload. The latter is also in the default
+acceptance case. Their outcomes remain open. The both-backend physical-cycle
+scope question remains unanswered; the plan's requirement is unchanged.
