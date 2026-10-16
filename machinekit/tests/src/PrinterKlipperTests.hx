@@ -29,8 +29,21 @@ class PrinterKlipperTests {
 		assertions = 0;
 		var printer = new CoreXyPrinter();
 		var customFrontEnd = new machinekit.control.ThermistorInput(2200,new machinekit.power.DcVoltage(5.0),2,30,20,4);
-		var customPrinter = new CoreXyPrinter(customFrontEnd);
+		var material = new machinekit.printing.PrintMaterialSpec("Custom feedstock / calibrated setup",0.00173,180,0.065);
+		var customPrinter = new CoreXyPrinter(customFrontEnd,material);
 		var customJob = CoreXyPrinterPreview.CoreXyPrinterJob.job(customPrinter,"G90\n");
+		near(customJob.filamentDiameter,0.00173,"job uses the selected feedstock diameter");
+		near(customJob.minExtrusionTemperature,180,"job uses the material's cold-extrusion threshold");
+		near(customJob.meltLag,0.065,"job uses the material/setup response lag");
+		near(customJob.pressureAdvance,0.065,"default advance follows the selected response lag");
+		var materialJob = CoreXyPrinterPreview.CoreXyPrinterJob.smallTab(customPrinter);
+		var materialController = new cnckit.CncController(Printer,null,new cnckit.PrinterSettings(material.filamentDiameter));
+		var materialRead = cnckit.CncCompiler.compileDetailed(materialJob.source,materialController);
+		var materialPart = camkit.additive.TestParts.smallTab();
+		var materialSlice = camkit.additive.Slicer.slice(materialPart,new camkit.additive.SlicerSettings());
+		materialPart.close();
+		check(Math.abs(materialRead.program.depositedVolume()/materialSlice.program.depositedVolume()-1)<0.001,
+			"Material-aware job G-code preserves the sliced volume");
 		for (heater in customJob.heaters) {
 			near(heater.pullupOhm,2200,"job reads the model's pull-up");
 			near(heater.vRef,5.0,"job reads the model's ADC reference");
@@ -80,6 +93,12 @@ class PrinterKlipperTests {
 		var config = KlipperConfig.parse(text);
 		var customConfig = KlipperConfig.parse(KlipperConfig.render(CoreXyPrinterKlipper.printer(customPrinter,customJob,
 			limits[0],limits[1],limits[2],cartesian,inscribed)));
+		var customExtruder = customConfig.get("extruder");
+		if (customExtruder == null) throw "Material config lost its extruder";
+		var materialDiameter = customExtruder.get("filament_diameter"), materialThreshold = customExtruder.get("min_extrude_temp");
+		if (materialDiameter == null || materialThreshold == null) throw "Material config lost feedstock properties";
+		near(Std.parseFloat(materialDiameter),1.73,"Klipper filament diameter comes from the job in millimetres");
+		near(Std.parseFloat(materialThreshold),180,"Klipper cold-extrusion guard comes from the selected material");
 		for (name in ["extruder","heater_bed"]) {
 			var heaterSection = customConfig.get(name);
 			if (heaterSection == null) throw "Custom config lost a heater";
@@ -174,6 +193,11 @@ class PrinterKlipperTests {
 		check(written.length == 3, "the export writes three files");
 		for (path in written) check(FileSystem.exists(path) && File.getContent(path).length > 100, 'the export wrote $path');
 		var gcode = File.getContent(directory + "/" + CoreXyPrinterExport.BRACKET);
+		var materialBracket = CoreXyPrinterExport.bracketProgram(customJob);
+		var defaultBracket = cnckit.CncCompiler.compileDetailed(gcode,new cnckit.CncController(Printer));
+		var customBracket = cnckit.CncCompiler.compileDetailed(materialBracket,materialController);
+		check(Math.abs(customBracket.program.depositedVolume()/defaultBracket.program.depositedVolume()-1)<0.001,
+			"Bracket export uses the job material instead of a default filament");
 		check(gcode.indexOf("M83") >= 0 && gcode.indexOf("EXCLUDE_OBJECT_DEFINE") >= 0 && gcode.indexOf("M109 S210") >= 0,
 			"the bracket is Klipper G-code: relative extrusion, excluded objects, a wait for the hotend");
 		check(File.getContent(directory + "/" + CoreXyPrinterExport.CONFIG) == text, "the written config is the rendered one");

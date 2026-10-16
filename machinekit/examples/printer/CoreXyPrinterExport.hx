@@ -19,12 +19,13 @@ class CoreXyPrinterExport {
 	public static inline var BRACKET:String = "nema17-mount-bracket.gcode";
 
 	/** The demo bracket sliced with the default settings, as Klipper G-code. */
-	public static function bracketProgram():String {
+	public static function bracketProgram(?job:SceneArtifactPrinting):String {
 		var bracket = new NemaMountBracket(NemaStepper.frame(17));
 		var part = bracket.geometry();
 		var sliced = Slicer.slice(part, new SlicerSettings(), null, "bracket");
 		part.close();
-		return PrinterWriter.write(sliced.program, new CncController(Printer), Klipper);
+		var diameter = job == null ? machinekit.printing.PrintMaterialSpec.assumedPla175().filamentDiameter : job.filamentDiameter;
+		return PrinterWriter.write(sliced.program, new CncController(Printer,null,new cnckit.PrinterSettings(diameter)), Klipper);
 	}
 
 	/** Writes the config, the pin report and the bracket's G-code into `directory`; returns the paths. */
@@ -40,7 +41,7 @@ class CoreXyPrinterExport {
 		}
 		save(CONFIG, KlipperConfig.render(model));
 		save(PINS, KlipperConfig.pinReport(model));
-		save(BRACKET, bracketProgram());
+		save(BRACKET, bracketProgram(job));
 		return written;
 	}
 }

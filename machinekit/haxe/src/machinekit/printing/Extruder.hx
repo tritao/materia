@@ -20,6 +20,7 @@ typedef ExtruderSpec = {
 	var depth:Float;
 	/** Effective diameter of the hobbed gear where it grips the filament, mm: filament travels `pi * hob` per turn. */
 	var hobDiameter:Float;
+	/** Nominal grip-path geometry, mm; feedstock volume/calibration belongs to PrintMaterialSpec. */
 	var filamentDiameter:Float;
 }
 

@@ -18,6 +18,7 @@ class PrintingPartTests {
 
 	public static function run():Void {
 		HeaterPolicyTests.run();
+		PrintMaterialTests.run();
 		// The 100k beta-3950 curve: 100k at 25 C, and the usual round numbers at 60, 100 and 210 C.
 		var thermistor = new Thermistor();
 		var frontEnd = new machinekit.control.ThermistorInput(4700,new machinekit.power.DcVoltage(3.3),2,30,20,4);
@@ -65,7 +66,7 @@ class PrintingPartTests {
 		close(hotend.loss(210, 25, 1), 0.17 * 185, "and with the fan at full duty");
 		if (!(hotend.loss(210, 25, 0) < cartridge.spec.watts)) throw "the cartridge can hold 210 C in still air";
 		close(hotend.maxSpeed(0.45e-3 * 0.2e-3), 15e-9 / 9e-8, "melt rate over a bead area is the speed limit", 1e-9);
-		if (!(hotend.spec.minExtrusionTemperature < 210)) throw "210 C is above the cold-extrusion limit";
+		if (!(machinekit.printing.PrintMaterialSpec.assumedPla175().minExtrusionTemperature < 210)) throw "210 C is above the cold-extrusion limit";
 
 		// The extruder: a 7.3 mm hob feeds pi * 7.3 mm of filament a turn.
 		var extruder = new Extruder();

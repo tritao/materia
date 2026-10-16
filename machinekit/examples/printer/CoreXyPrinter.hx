@@ -102,6 +102,7 @@ class CoreXyPrinter extends AxisBuilder {
 	/** Pitch radius of the belt pulleys, in millimetres. */
 	public final pulleyRadius:Float;
 	public final hotend = new Hotend();
+	public final printMaterial:machinekit.printing.PrintMaterialSpec;
 	public final nozzle = new Nozzle();
 	public final extruder = new Extruder();
 	public final bed = new HeatedBed();
@@ -122,8 +123,9 @@ class CoreXyPrinter extends AxisBuilder {
 	var driverIndex:Int = 0;
 	var supplyAdded:Bool = false;
 
-	public function new(?frontEnd:machinekit.control.ThermistorInput) {
+	public function new(?frontEnd:machinekit.control.ThermistorInput, ?material:machinekit.printing.PrintMaterialSpec) {
 		super();
+		printMaterial = material == null ? machinekit.printing.PrintMaterialSpec.assumedPla175() : material;
 		thermistorInput = frontEnd == null ? new machinekit.control.ThermistorInput(4700,new machinekit.power.DcVoltage(3.3),2,30,20,4) : frontEnd;
 		thermistorInput.inputName(BED_THERMISTOR_CHANNEL);
 		motor = NemaStepper.frame(17);

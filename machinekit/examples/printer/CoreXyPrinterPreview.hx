@@ -66,7 +66,7 @@ class CoreXyPrinterPreview {
 
 /**
  * The print job of the printer example (see SceneArtifactPrinting): the slicer's program as Klipper G-code, and the
- * printer's own numbers for the extruder, the hotend and the bed, taken from the parts that are in it.
+ * printer's own hardware parameters and the selected material's process parameters.
  */
 class CoreXyPrinterJob {
 	/** The step rate of the controller the steppers are wired to, as the router's. */
@@ -82,10 +82,14 @@ class CoreXyPrinterJob {
 		bandCelsius: 3.0, pidRangeCelsius: 10.0, gainWindowFraction: 0.25, gainWindowMinSeconds: 20.0,
 		gainMinCelsius: 2.0, hysteresisCelsius: 15.0, hysteresisWindowSeconds: 10.0});
 
+	/** G-code E distances are lengths of the selected feedstock. */
+	static function gcodeController(printer:CoreXyPrinter):CncController
+		return new CncController(Printer,null,new cnckit.PrinterSettings(printer.printMaterial.filamentDiameter));
+
 	/** The slicer's `SmallTab` (10 x 10 x 1.2 mm, six layers) with its default settings. */
 	public static function smallTab(printer:CoreXyPrinter):SceneArtifactPrinting {
 		var sliced = Slicer.slice(TestParts.smallTab(), new SlicerSettings());
-		return job(printer, PrinterWriter.write(sliced.program, new CncController(Printer), Klipper));
+		return job(printer, PrinterWriter.write(sliced.program, gcodeController(printer), Klipper));
 	}
 
 	/** The slicer's calibration block (20 mm square, `height` millimetres tall, with a 6 mm hole through it) at infill `density`. */
@@ -93,13 +97,14 @@ class CoreXyPrinterJob {
 		var settings = new SlicerSettings();
 		settings.infillDensity = density;
 		var sliced = Slicer.slice(TestParts.calibrationCube(height), settings);
-		return job(printer, PrinterWriter.write(sliced.program, new CncController(Printer), Klipper));
+		return job(printer, PrinterWriter.write(sliced.program, gcodeController(printer), Klipper));
 	}
 
 	/** `source` (printer G-code in machine coordinates) as a job on this printer. */
 	public static function job(printer:CoreXyPrinter, source:String):SceneArtifactPrinting {
 		// The heaters are the printer's own parts, not new ones: a part changed in the printer changes the job.
 		var hotend = printer.hotend.spec, cartridge = printer.cartridge, thermistor = printer.hotendThermistor;
+		var material = printer.printMaterial;
 		var hotendHeater = heater(printer.thermistorInput, "hotend", "thermistor", CoreXyPrinter.HOTEND_THERMISTOR_CHANNEL, "fan.part", true, thermistor.spec,
 			hotend.heatCapacity, cartridge.power(cartridge.spec.volts), hotend.lossCoefficient, hotend.fanLossCoefficient,
 			Math.min(hotend.maxTemperature, Math.min(cartridge.spec.maxTemperature, thermistor.spec.maxTemperature)) - 10.0);
@@ -107,9 +112,9 @@ class CoreXyPrinterJob {
 		var bedHeater = heater(printer.thermistorInput, "bed", "bedThermistor", CoreXyPrinter.BED_THERMISTOR_CHANNEL, null, false, printer.bedThermistor.spec,
 			bed.heatCapacity, bed.watts, bed.lossCoefficient, 0.0, bed.maxTemperature);
 		return {source: source, axes: ["x", "y", "z"], extruder: "e",
-			filamentDiameter: hotend.filamentDiameter * 1e-3, gearRadius: printer.extruder.spec.hobDiameter * 0.5e-3,
-			maxFlow: hotend.maxVolumetricFlow * 1e-9, pressureAdvance: hotend.pressureLag, pressureAdvanceWindow: 0.04, meltLag: hotend.pressureLag, rampLength: 0.0005,
-			minExtrusionTemperature: hotend.minExtrusionTemperature, heaters: [hotendHeater, bedHeater],
+			filamentDiameter: material.filamentDiameter, gearRadius: printer.extruder.spec.hobDiameter * 0.5e-3,
+			maxFlow: hotend.maxVolumetricFlow * 1e-9, pressureAdvance: material.meltLag, pressureAdvanceWindow: 0.04, meltLag: material.meltLag, rampLength: 0.0005,
+			minExtrusionTemperature: material.minExtrusionTemperature, heaters: [hotendHeater, bedHeater],
 			controller: {stepTickHz: STEP_TICK_HZ}, deposit: "printed"};
 	}
 

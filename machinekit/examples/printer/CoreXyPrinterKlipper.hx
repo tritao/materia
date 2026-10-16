@@ -54,14 +54,13 @@ class CoreXyPrinterKlipper {
 		var steppers = [stepper("x", belt, x, travel[0], false), stepper("y", belt, y, travel[1], false)];
 		// One screw to each corner of the bed's carrier: three motors that turn together, the first with the switch.
 		for (name in ["z", "z1", "z2"]) steppers.push(stepper(name, screw, z, travel[2], true, name == "z"));
-		var hotend = source.hotend.spec;
 		return {name: "CoreXY printer", maxVelocity: Math.min(Math.min(x.speed, y.speed), cartesianSpeed) * 1000.0,
 			maxAccel: Math.min(Math.min(x.acceleration, y.acceleration), cartesianAcceleration) * 1000.0, maxZVelocity: z.speed * 1000.0,
 			maxZAccel: z.acceleration * 1000.0, squareCornerVelocity: SQUARE_CORNER_VELOCITY, steppers: steppers,
 			extruder: {rotationDistance: Math.PI * source.extruder.spec.hobDiameter,
 				gearRatio: '${source.bigGear.teeth}:${source.pinion.teeth}', microsteps: CoreXyPrinter.MICROSTEPS,
 				runCurrent: CoreXyPrinter.EXTRUDER_DRIVER_CURRENT, nozzleDiameter: source.nozzle.spec.orifice,
-				filamentDiameter: hotend.filamentDiameter, minExtrudeTemp: job.minExtrusionTemperature,
+				filamentDiameter: job.filamentDiameter * 1000.0, minExtrudeTemp: job.minExtrusionTemperature,
 				pressureAdvance: job.pressureAdvance, pressureAdvanceSmoothTime: job.pressureAdvanceWindow,
 				heater: klipper(heater("hotend"))},
 			bed: klipper(heater("bed")),
