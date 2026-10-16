@@ -5032,18 +5032,23 @@ class ProjectSourceTests {
       check(simulation.activeSession().simulationTime() > paused, "Paused playback can step on the UI owner");
       editor.commands.execute("sim.reset");
       check(simulation.activeSession().simulationTime() == 0, "Reset restores the fixed simulation clock");
+      // Queue the controlled delay while playback is paused, before its first tick can
+      // start motion planning. Otherwise waiting for that plan races the Stop test setup.
+      var entered = new sys.thread.Lock();
+      stopGate = new sys.thread.Lock();
+      var gate = stopGate;
+      simulation.playbackMutex.acquire();
+      simulation.playbackCommands.push(function() { entered.release(); gate.wait(10.0); });
+      simulation.playbackMutex.release();
       editor.commands.execute("sim.play");
       deadline = Sys.time() + 60.0;
       while (editor.simulationBuild != null && Sys.time() < deadline) { editor.tick(); Sys.sleep(0.001); }
       check(simulation.isRunning(), "Playback starts before the delayed Stop check: " + editor.logLines.join(" | "));
-      Sys.sleep(0.03);
-      // Hold playback inside a command to prove Stop never joins it on the UI thread.
-      var entered = new sys.thread.Lock();
-      stopGate = new sys.thread.Lock();
-      var gate = stopGate;
-      simulation.control(function() { entered.release(); gate.wait(10.0); });
       check(entered.wait(5.0), "The controlled playback delay starts: " + editor.logLines.join(" | ") +
-        "; error=" + simulation.error + "; playback=" + simulation.playbackFailure);
+        "; error=" + simulation.error + "; playback=" + simulation.playbackFailure +
+        "; active=" + @:privateAccess simulation.playbackActive +
+        "; queued=" + @:privateAccess simulation.playbackCommands.length +
+        "; time=" + simulation.activeSession().simulationTime());
       var stopStarted = Sys.time();
       editor.commands.execute("sim.stop");
       var stopMilliseconds = (Sys.time() - stopStarted) * 1000;

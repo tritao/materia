@@ -4032,3 +4032,23 @@ unexpected replacements). The combined asynchronous stop, controller-local
 recovery and retained physical-thread behavior still require focused validation
 and a fresh complete frozen-source gate before final completion and local-main
 integration.
+
+### Latest-main Stop test setup race (2026-10-16)
+
+On the rebased app, focused core, background loading, robot-only recovery,
+screwdriver simulation and required fastening passed; the latter completed
+both backends (`sd15-main861-focused`). Main's new interactive Stop test
+failed before issuing Stop: playback had advanced to 0.01 seconds and its
+controlled-delay command remained queued. A captured native/Haxe stack showed
+playback waiting for motion planning (`ManipulatorMotion.waitForPlans`),
+not a simulation error. An isolated diagnostic run passed, then another
+reproduced the setup race.
+
+The test now queues its deliberate blocking command while playback is paused,
+before restarting it. This establishes the intended blocked-worker condition
+before a first tick can start planning. Stop's existing prompt-return, UI-frame,
+transport exclusion, retirement and restart assertions remain intact. The
+original failure logs and captured stacks are retained. Two consecutive
+corrected runs pass (`sd15-stop-setup-green-1.log` and `-2.log`): Stop returns
+in 0.108/0.231 ms and the slowest shutdown frames are 10.9/13.8 ms. Both
+complete retirement and restart. The fresh complete gate remains pending.
