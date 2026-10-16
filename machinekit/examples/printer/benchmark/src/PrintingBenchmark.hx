@@ -140,6 +140,24 @@ class TimedSink implements ProgramSink {
   public function finish(nextPlanId:Int64):Void blocks.finish(nextPlanId);
 }
 
+/** Scalar-only consumer for bounded-memory stream acceptance. */
+class StreamClockSink implements ProgramSink {
+  public var nanoseconds:Int64=Int64.ofInt(0);
+  public var plans:Int=0;
+  public var peakHeap:Float=0;
+  public var notes:Int=0;
+  public function new() {}
+  public function plan(plan:ExecutionPlan, opIndex:Int, length:Float, distances:Array<Float>, times:Array<Float>):Void {
+    var starts=plan.segmentStarts(),durations=plan.segmentDurations(),last=durations.length()-1;
+    nanoseconds=Int64.add(nanoseconds,Int64.add(starts.get(last),durations.get(last)));
+    plans++;peakHeap=Math.max(peakHeap,hl.Gc.heapBytes());
+    plan.dispose();
+  }
+  public function barrier(barrier:ProgramBarrier):Void {}
+  public function note(text:String):Void {notes++;Sys.println("STREAM_NOTE "+text);}
+  public function finish(nextPlanId:Int64):Void {}
+}
+
 /**
  * Planning benchmark: a sliced job through lowering and the program compiler, planning only (no simulation, no plan
  * check), on the printer's axes. Prints moves, planned time, planning wall time and real-time ratio (overall and for
@@ -596,6 +614,98 @@ class PrintingBenchmark {
     }
   }
 
+  /** Input CAD/slicing precede the planning clock; RSS includes the whole process.
+   * First-motion startup runs the native simulation. The scalar drain then checks
+   * every window without retaining a whole-program plan or timing history.
+   */
+  static function streamingProgram(machine:PrinterAxes, settings:SlicerSettings,
+      profile:PrinterProfile, scale:Int):motionkit.program.MotionProgram {
+    var gear=Sys.getEnv("PRINTING_BENCHMARK_ONLY")=="stream-gear";
+    var part=gear ? new SpurGear(1.5,40,8).geometry() : TestParts.calibrationCube(20*scale);
+    var sliced=Slicer.slice(part,settings,profile,gear ? "stream-gear" : "stream-cube");part.close();
+    var lowered=ToolpathMotion.lower(motionOnly(sliced.program),machine.binding.machine);
+    if (lowered.program==null) throw "Stream acceptance produced no motion";
+    return lowered.program;
+  }
+
+  static function streamingAcceptance(machine:PrinterAxes, settings:SlicerSettings, profile:PrinterProfile):Void {
+    var value=Sys.getEnv("PRINTING_BENCHMARK_SCALE");
+    var scale=value==null ? 1 : Std.parseInt(value);
+    if (scale!=1 && scale!=4 && scale!=8) throw "Stream cube scale must be 1, 4 or 8";
+    var program=streamingProgram(machine,settings,profile,scale);
+    var bounded=Sys.getEnv("PRINTING_BENCHMARK_WINDOW_SECONDS")!="whole";
+    machine.binding.compiler.maximumPathPlanSeconds=bounded ? motionkit.robot.ManipulatorMotion.LOOKAHEAD_SECONDS : null;
+    var firstMotion:Null<Float> = null;
+    var firstCommand:Null<Float> = null, firstAdmission:Null<Float> = null;
+    if (Sys.getEnv("PRINTING_BENCHMARK_FIRST_MOTION")=="1") {
+      var dt=machine.blueprint.fixedTimestepSeconds;
+      var harness=new robotkit.runtime.SimulationHarness(dt);
+      var runtime=harness.simulation.addRobot(machine.blueprint.runtime);
+      var robot=new robotkit.simulation.SimulatedRobot("stream-printer",runtime,machine.planning.name,
+        [for (link in machine.planning.links) link.name],[for (joint in machine.planning.joints) joint.name]);
+      var motion=new motionkit.robot.ManipulatorMotion(robot,machine.binding.compiler,_ -> null,() -> runtime.pollEvents());
+      var tick=0;
+      // Match the planner's initial pose through the ordinary command path;
+      // teleporting physics does not update the runtime's commanded setpoint.
+      var began=0.0;
+      try {
+      var homing=new motionkit.robot.MotionSystem(robot,machine.blueprint);
+      homing.configureRuntimeHoming(runtime,() -> {},harness.simulation.homingSides(0));
+      harness.step(Int64.ofInt(++tick));homing.home();
+      while (homing.homingStatus()!="Complete" && tick<60000) {
+        harness.step(Int64.ofInt(++tick));homing.update(dt);
+      }
+      if (homing.homingStatus()!="Complete") throw "Startup homing failed: "+homing.homingStatus();
+      var referenced=runtime.snapshot();
+      var executionBinding=new ToolpathMotionBinding(machine.binding.machine,machine.blueprint,
+        referenced.modelRevision,referenced.calibrationRevision);
+      executionBinding.compiler.maximumPathPlanSeconds=machine.binding.compiler.maximumPathPlanSeconds;
+      motion=new motionkit.robot.ManipulatorMotion(robot,executionBinding.compiler,_ -> null,() -> runtime.pollEvents());
+      var positionDeadline=tick+10000;
+      motion.run(new motionkit.program.MotionProgram([motionkit.program.MotionOp.MoveJ(
+        motionkit.program.MoveTarget.JointTarget(machine.start),new motionkit.MotionOptions(),
+        motionkit.program.Blend.ExactStop)]));
+      while (motion.running && tick<positionDeadline) {motion.update(dt);harness.step(Int64.ofInt(++tick));}
+      if (!motion.completed || motion.failure!=null) throw "Startup positioning failed: "+motion.failure;
+      for (_ in 0...100) harness.step(Int64.ofInt(++tick));
+      began=Sys.time();
+        motion.run(program,false);
+        while (firstMotion==null && Sys.time()-began<30) {
+          motion.update(dt);
+          // Submission is the planning/executor latency; observed movement also includes runtime stepping.
+          if (firstCommand == null && (@:privateAccess motion.startedPlans) > 0) firstCommand = Sys.time() - began;
+          harness.step(Int64.ofInt(++tick));
+          if (motion.failure!=null) throw motion.failure;
+          var snapshot=robot.snapshot(),moved=false;
+          if (firstAdmission == null && (snapshot.trajectoryActive || snapshot.trajectoryQueueDepth > 0))
+            firstAdmission = Sys.time() - began;
+          for (joint in 0...machine.start.length)
+            if (Math.abs(snapshot.setpointPositions.get(joint)-machine.start[joint])>1e-12) moved=true;
+          if (snapshot.trajectoryActive && moved) firstMotion=Sys.time()-began;
+          else Sys.sleep(0.001);
+        }
+        if (firstMotion==null) throw "No first motion within the startup deadline";
+        motion.stop();
+        while (motion.running && Sys.time()-began<35) {
+          motion.update(dt);harness.step(Int64.ofInt(++tick));
+        }
+        if (motion.failure!=null || motion.running) throw "Startup probe failed to stop cleanly: "+motion.failure;
+        if (motion.shutdownPlanning()!=0) throw "Startup probe retained a planner worker";
+      } catch (error:Dynamic) {
+        motion.shutdownPlanning();harness.dispose();throw error;
+      }
+      harness.dispose();
+    }
+    var sink=new StreamClockSink(),began=Sys.time(),cpu=Sys.cpuTime();
+    var work=machine.binding.compiler.begin(program,machine.start,Int64.ofInt(1),0,1.0,sink);
+    try {while (work.step()) {}} catch (error:Dynamic) {work.dispose();throw error;}
+    work.dispose();
+    Sys.println("PRINTING_STREAM_ACCEPTANCE "+haxe.Json.stringify({load:Sys.getEnv("PRINTING_BENCHMARK_ONLY"),scale:scale,bounded:bounded,
+      firstCommandSeconds:firstCommand,firstAdmissionSeconds:firstAdmission,
+      firstMotionSeconds:firstMotion,planningSeconds:Sys.time()-began,planningCpuSeconds:Sys.cpuTime()-cpu,
+      plannedNanoseconds:Int64.toStr(sink.nanoseconds),plans:sink.plans,notes:sink.notes,peakManagedBytes:sink.peakHeap}));
+  }
+
   static function mainLoads():Void {
     var only = Sys.getEnv("PRINTING_BENCHMARK_ONLY");
     var machine = new PrinterAxes();
@@ -606,6 +716,7 @@ class PrintingBenchmark {
       'z ${Math.round(machine.speed[2] * 1e4) / 10} mm/s ${Math.round(machine.acceleration[2] * 100) / 100} m/s2');
     var settings = new SlicerSettings();
     var profile = PrinterProfile.bed220();
+    if (only=="stream-cube" || only=="stream-gear") {streamingAcceptance(machine,settings,profile);return;}
     // Without a named load the run is the gate, which the suites run; the loads are for measuring.
     if (only == null && Sys.getEnv("PRINTING_BENCHMARK_GCODE") == null || only == "gate") {
       gate(machine, settings, profile);
