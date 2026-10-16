@@ -64,6 +64,11 @@ class FasteningRunReport {
     if (!finished || failed || attempts.length == 0) return null;
     return attempts[attempts.length-1].screw;
   }
+  /** Resume only cancellation of the current unfinished attempt, preserving prior dispositions. */
+  public function resumeAfterStop():Void {
+    if (finished || fault != "cancelled") throw "Fastening report cannot resume this fault";
+    fault = null; failed = false;
+  }
   public function stop(message:String):Void {
     fault = message; failed = true;
     if (attempts.length > 0) {

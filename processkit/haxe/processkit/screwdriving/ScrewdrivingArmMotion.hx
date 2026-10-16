@@ -61,5 +61,13 @@ class ScrewdrivingArmMotion implements ScrewdrivingMotion {
   }
   public function stop():Void {pending = null; waiting = 0; motion.stop();}
   public function stopped():Bool return motion.failure == null && motion.sessionState() == motionkit.robot.SessionState.Idle;
+  public function resetAfterSafety():Void {
+    // The cancelled skill has not polled its outstanding stop acknowledgement.
+    // Observe it before resetting; this never advances the physical simulation.
+    if (motion.sessionState() != motionkit.robot.SessionState.Idle) motion.update(0.000001);
+    motion.reset();
+    if (motion.sessionState() != motionkit.robot.SessionState.Idle)
+      throw "Screw resume needs a stopped, reset motion session";
+  }
   public function abort():Void {pending = null; waiting = 0; motion.abort();}
 }

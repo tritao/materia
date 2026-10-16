@@ -14,5 +14,7 @@ interface ScrewdrivingMotion {
   function stop():Void;
   /** True only after motion update confirms physical rest, with no fault. */
   function stopped():Bool;
+  /** Rebase an aborted motion after the owning controller has cleared its safety stop. */
+  function resetAfterSafety():Void;
   function abort():Void;
 }

@@ -12,7 +12,7 @@ import processkit.screwdriving.ScrewdrivingRunner;
 import processkit.screwdriving.ScrewdriverFrames;
 
 /** Drives one CAD fastening, reading the same tool sensor in simulation and on a controller. */
-class DriveScrew implements Skill {
+class DriveScrew implements robotkit.skill.ResumableSkill {
   public final runner:ScrewdrivingRunner;
   final localization:Localization;
   final plan:Void -> ScrewPlan;
@@ -26,7 +26,13 @@ class DriveScrew implements Skill {
       throw "DriveScrew needs a runner, localization, fastening plan and screwdriver sensor";
     this.runner = runner; this.localization = localization; this.plan = plan; this.prepare = prepare; frames = new ScrewdriverFrames(sensor);
   }
+  public function canResume():Bool return (switch lifecycle.status() {case Cancelled:true; case _:false;}) && prepared && runner.canResume();
   public function start():Void {
+    if (canResume()) {
+      lifecycle.begin(); frames.reset();
+      try runner.resume() catch (error:Dynamic) fail(Std.string(error));
+      return;
+    }
     lifecycle.begin(); frames.reset(); prepared = prepare == null;
     try {
       if (prepare != null) {prepare.start(); return;}

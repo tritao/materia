@@ -11,7 +11,7 @@ import processkit.screwdriving.FasteningRunReport.FasteningPass;
 typedef ScrewAttempt = {var screw:String; var skill:Skill; var runner:ScrewdrivingRunner;}
 
 /** Try an identified screw, recover a NOK, then use one identified replacement before reporting and moving on. */
-class DriveFastening implements FasteningExecution {
+class DriveFastening implements FasteningExecution implements ResumableSkill {
   public final report:FasteningRunReport;
   final attempt:Int -> ScrewAttempt;
   final recover:ScrewdrivingRunner -> Skill;
@@ -28,7 +28,15 @@ class DriveFastening implements FasteningExecution {
     report = new FasteningRunReport(fastening,pass); this.attempt = attempt; this.recover = recover;
     this.attemptLimit = attemptLimit;
   }
+  public function canResume():Bool return (switch lifecycle.status() {case Cancelled:true; case _:false;}) && !recovering &&
+    Std.isOfType(active,ResumableSkill) && cast(active,ResumableSkill).canResume();
   public function start():Void {
+    if (canResume()) {
+      lifecycle.begin(); report.resumeAfterStop();
+      var selected:Skill = cast active;
+      try selected.start() catch (error:Dynamic) fail(Std.string(error));
+      return;
+    }
     lifecycle.begin(); report.reset(); index = 0; recovering = false; active = null; runner = null;
     beginAttempt();
   }

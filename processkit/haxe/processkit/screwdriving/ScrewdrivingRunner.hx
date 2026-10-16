@@ -42,6 +42,7 @@ class ScrewdrivingRunner {
   var previousReverseAngle = 0.0;
   var recoveryHeld = false;
   var lossAtPickup = false;
+  var interruptedDriving = false;
   static inline var STOP_SPEED:Float = 0.01;
   static inline var ANGLE_RESOLUTION:Float = 1e-6;
   public var tighteningResult(default, null):Null<TighteningResult> = null;
@@ -60,8 +61,20 @@ class ScrewdrivingRunner {
   public function completed():Bool return phase == Done;
   public function recoveryCompleted():Bool return phase == Recovered;
   public function failure():Null<String> return failureMessage;
+  /** Only an interrupted drive retains enough process state to resume in place. */
+  public function canResume():Bool return interruptedDriving && phase == Failed && plan != null && tighteningResult == null;
+  public function resume():Void {
+    if (!canResume()) throw "Screw resume needs an interrupted, unfinished drive";
+    var selected:ScrewPlan = cast plan;
+    motion.resetAfterSafety();
+    outputs.start(false); outputs.reverse(false); outputs.vacuum(true);
+    // Restore the compliant feed at the retained work entry, never return to supply.
+    motion.move(ScrewPlan.along(driveEntry(selected),followDepth),true);
+    interruptedDriving = false; failureMessage = null; elapsed = 0; phase = FinalEngage;
+  }
   public function run(requested:ScrewPlan):Void {
     if (running() || requested == null) throw "Screw runner needs an idle runner and qualified plan";
+    interruptedDriving = false;
     var entrySearch = entrySearchFactory == null ? null : entrySearchFactory(requested);
     plan = requested; tighteningResult = null; failureMessage = null; elapsed = 0; followDepth = 0;
     this.entrySearch = entrySearch;
@@ -287,6 +300,7 @@ class ScrewdrivingRunner {
     } catch (error:Dynamic) fail(Std.string(error));
   }
   public function abort():Void {
+    interruptedDriving = phase == Driving && tighteningResult == null;
     outputs.start(false); outputs.reverse(false);
     if (entrySearch != null && entrySearch.running()) entrySearch.cancel();
     motion.abort(); phase = Failed;

@@ -38,6 +38,7 @@ private class RecoveryMotion implements ScrewdrivingMotion {
 	public function synchronize():Void synchronizations++;
 	public function stop():Void {stopRequests++; stopping = true; done = false; idle = false;}
 	public function stopped():Bool return idle && problem == null;
+	public function resetAfterSafety():Void {done = false; idle = true;}
 	public function abort():Void {done = false; idle = false;}
 }
 private class FailedEntrySearch implements ScrewEntrySearch {
@@ -64,6 +65,24 @@ private class AttemptSkillFixture implements Skill {
 		return failure != null ? Failed(failure) : (runner.completed() ? Succeeded : Running);
 	}
 	public function result():Null<SkillResult> return null;
+}
+private class ResumableAttemptFixture implements ResumableSkill {
+	final runner:ScrewdrivingRunner;
+	final lifecycle = new SkillLifecycle();
+	public function new(runner:ScrewdrivingRunner) this.runner = runner;
+	public function canResume():Bool return (switch lifecycle.status() {case Cancelled:true; case _:false;}) && runner.canResume();
+	public function start():Void {
+		if (canResume()) runner.resume();
+		lifecycle.begin();
+	}
+	public function update(snapshot:RobotSnapshot, dt:Float):SkillStatus {
+		if (runner.completed()) lifecycle.succeed("tightened");
+		else if (runner.failure() != null) lifecycle.fail(runner.failure());
+		return status();
+	}
+	public function cancel():Void {runner.abort(); lifecycle.cancel();}
+	public function status():SkillStatus return lifecycle.status();
+	public function result():Null<SkillResult> return lifecycle.result();
 }
 private class RecoverySkillFixture implements Skill {
 	final runner:ScrewdrivingRunner;
@@ -111,8 +130,66 @@ class ScrewRecoveryTests {
 		result.strokeMm = plan().strokeMm; result.result = ScrewdriverContract.CROSS_THREAD;
 		return result;
 	}
+	static function runInterruptedAttempt():Void {
+		var motion = new RecoveryMotion(), outputs = new RecoveryOutputs();
+		var drive = new ScrewdrivingRunner(motion,outputs,() -> true), request = plan(), created = 0;
+		var skill = new DriveFastening(request.fastening,(_) -> {
+			created++; drive.run(request);
+			return {screw:"original",runner:drive,skill:new ResumableAttemptFixture(drive)};
+		},(_) -> {throw "An interrupted unfinished drive must not invoke NOK recovery";});
+		skill.start();
+		var feedback = ScrewdriverSensor.idle(); feedback.strokeMm = request.strokeMm;
+		for (_ in 0...20) if (!outputs.startOn) {feedback.vacuum = outputs.vacuumOn; drive.update(0.01,feedback);}
+		feedback.angle = 0.4; drive.update(0.01,feedback);
+		skill.cancel();
+		check(skill.canResume() && skill.report.fault == "cancelled" && skill.report.attempts.length == 0,
+			"Cancellation retains an unfinished attempt without inventing a measured failure result");
+		skill.start();
+		check(created == 1 && skill.report.fault == null && !skill.report.failed,
+			"Resume reuses its exact attempt without configuring a new screw or replacement");
+		drive.update(0.01,feedback);
+		feedback.angle = 0.8; feedback.result = ScrewdriverContract.OK;
+		for (_ in 0...10) {feedback.vacuum = outputs.vacuumOn; drive.update(0.01,feedback);}
+		skill.update(null,0.01);
+		check(skill.report.finished && skill.report.installed() == "original" && skill.report.attempts.length == 1 &&
+			skill.report.attempts[0].result.angle == 0.8,"Resumed fastening reports one exact installed screw and its cumulative angle");
+	}
+	static function runInterruptedDrive():Void {
+		var motion = new RecoveryMotion(), outputs = new RecoveryOutputs();
+		var runner = new ScrewdrivingRunner(motion,outputs,() -> true), request = plan();
+		refuses(() -> runner.resume());
+		runner.run(request);
+		var feedback = ScrewdriverSensor.idle(); feedback.strokeMm = request.strokeMm;
+		for (_ in 0...20) if (!outputs.startOn) {
+			feedback.vacuum = outputs.vacuumOn; runner.update(0.01,feedback);
+		}
+		check(outputs.startOn,"Interruption probe reaches actual driving");
+		feedback.angle = 0.4; feedback.strokeMm -= 1;
+		runner.update(0.01,feedback);
+		var depth = motion.targets[motion.targets.length-1].translation.z;
+		runner.abort();
+		check(runner.canResume() && outputs.vacuumOn && !outputs.startOn && !outputs.reverseOn,
+			"Interrupted driving retains its screw with spindle stopped");
+		var before = motion.targets.length;
+		runner.resume();
+		check(motion.targets.length == before+1 && motion.contacts[motion.contacts.length-1] &&
+			Math.abs(motion.targets[motion.targets.length-1].translation.z-depth) < 1e-12,
+			"Resume restores measured feed depth at work instead of returning to pickup");
+		check(!outputs.startOn && outputs.vacuumOn && !runner.canResume(),"Resume restores feed before restarting the spindle");
+		feedback.strokeMm = request.strokeMm; runner.update(0.01,feedback);
+		check(outputs.startOn,"Spindle resumes after contact motion completes");
+		feedback.angle = 0.8; feedback.result = ScrewdriverContract.OK; feedback.speed = 0;
+		for (_ in 0...10) {feedback.vacuum = outputs.vacuumOn; runner.update(0.01,feedback);}
+		check(runner.completed() && runner.tighteningResult != null && runner.tighteningResult.angle == 0.8,
+			"Resumed driving reports the original accumulated shaft angle");
+		refuses(() -> runner.resume());
+		var failedRunner = failed(new RecoveryMotion(),new RecoveryOutputs()); failedRunner.abort();
+		check(!failedRunner.canResume(),"A process NOK cannot masquerade as an interrupted drive");
+	}
 	public static function run():Void {
 		count = 0;
+		runInterruptedDrive();
+		runInterruptedAttempt();
 		runEntrySearchFailure();
 		var motion = new RecoveryMotion(), outputs = new RecoveryOutputs(), runner = failed(motion,outputs);
 		var reject = new Transform3(new Vec3(0.4,0.1,0.3),Quat.identity());

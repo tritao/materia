@@ -24,6 +24,7 @@ private class FinalMotion implements ScrewdrivingMotion {
 	public function synchronize():Void {}
 	public function stop():Void {stopRequests++; idle = false; done = false;}
 	public function stopped():Bool return idle;
+	public function resetAfterSafety():Void {}
 	public function abort():Void done = false;
 }
 
