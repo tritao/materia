@@ -3678,3 +3678,21 @@ The initial integrated dynamics suite also passed AddressSanitizer and
 UndefinedBehaviorSanitizer with leak detection before this collection change
 (`sd15-dynamics-sanitizer.log`). Sanitizer acceptance must be refreshed if needed
 for the final implementation.
+
+### SD15a convex separating-axis collection (2026-10-16)
+
+The second actual backend-0 diagnostic run (`sd15-deterministic-native2`)
+confirmed that compound descriptor allocation was no longer dominant. A fresh
+live profile attributes most samples to repeated hull vertex projections in
+separating-axis tests (`sd15-deterministic-native2-profile.txt`). The run was
+explicitly stopped to fix that diagnosed cost; it is not cell acceptance.
+The compound-collection implementation also passes refreshed ASan/UBSan with
+leak detection (`sd15-dynamics-broadphase-sanitizer.log`).
+
+The native hull manifold now deduplicates parallel edge directions before their
+cross products and avoids projecting vertices repeatedly onto equivalent axes.
+Original edge indices remain available for actual support-edge witnesses.
+A new 64-vertex, 32-sided free convex prism settles and reports its full 9.81 N
+weight. All 243 physical assertions and 27523 checked API operations pass; all
+six standard core groups remain green (`sd15-dynamics-prism-ctest.log`).
+Actual deterministic cell/fault acceptance and the final gate are still due.

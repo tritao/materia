@@ -1546,11 +1546,18 @@ private:
         double best = std::numeric_limits<double>::infinity(), penetration = 0;
         int kind = -1;
         std::size_t edge_a = 0, edge_b = 0;
+        std::vector<Vec3> tested_axes;
         auto axis_test = [&](Vec3 axis, int candidate, std::size_t ea = 0, std::size_t eb = 0) {
             double length = std::sqrt(dot3(axis, axis));
             if (length < 1e-12)
                 return true;
             axis = scale(axis, 1 / length);
+            for (const auto &tested : tested_axes) {
+                const auto cross = cross3(axis, tested);
+                if (dot3(cross, cross) < 1e-24)
+                    return true;
+            }
+            tested_axes.push_back(axis);
             double amin = std::numeric_limits<double>::infinity(), amax = -amin, bmin = amin, bmax = -amin;
             for (const auto &p : a.vertices) {
                 double x = dot3(p, axis);
@@ -1586,14 +1593,33 @@ private:
         for (const auto &n : b.normals)
             if (!axis_test(n, 1))
                 return {};
-        for (std::size_t i = 0; i < a.edges.size(); ++i)
-            for (std::size_t j = 0; j < b.edges.size(); ++j) {
-                auto x = a.edges[i], y = b.edges[j];
-                if (!axis_test(cross3(sub(a.vertices[x.second], a.vertices[x.first]),
-                                      sub(b.vertices[y.second], b.vertices[y.first])),
-                               2, i, j))
-                    return {};
+        auto distinct_edges = [](const ForceHull &hull) {
+            std::vector<std::pair<std::size_t, Vec3>> result;
+            for (std::size_t i = 0; i < hull.edges.size(); ++i) {
+                auto edge = hull.edges[i];
+                auto direction = sub(hull.vertices[edge.second], hull.vertices[edge.first]);
+                const double norm = std::sqrt(dot3(direction, direction));
+                if (norm < 1e-14)
+                    continue;
+                direction = scale(direction, 1 / norm);
+                bool duplicate = false;
+                for (const auto &item : result) {
+                    const auto cross = cross3(direction, item.second);
+                    if (dot3(cross, cross) < 1e-24) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!duplicate)
+                    result.push_back({i, direction});
             }
+            return result;
+        };
+        const auto edges_a = distinct_edges(a), edges_b = distinct_edges(b);
+        for (const auto &[i, x] : edges_a)
+            for (const auto &[j, y] : edges_b)
+                if (!axis_test(cross3(x, y), 2, i, j))
+                    return {};
         if (kind == 2) {
             auto x = a.edges[edge_a], y = b.edges[edge_b];
             // Select support edges parallel to the winning edge directions.

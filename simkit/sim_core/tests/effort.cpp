@@ -795,6 +795,35 @@ int main() {
             near_contact(contact_force(*b, object)[2], 9.81, 1e-5,
                          "compliant impulse reports real supported weight");
         }
+    {
+        auto b = world(0, 0, -9.81);
+        auto base = body(*b, false, 0), dummy = body(*b, true, 1);
+        auto j = joint(*b, base, dummy);
+        effort(*b, j, 0);
+        collider(*b, NKSIM_MOTION_STATIC, 0, {0, 0, 0}, {1, 1, .05});
+        BackendBodyDesc d;
+        d.motion_type = NKSIM_MOTION_DYNAMIC;
+        d.mass = 1;
+        d.shape_type = NKSIM_SHAPE_CONVEX;
+        d.position = {0, 0, .2};
+        d.collision_layer = d.collision_mask = 1;
+        for (int side = 0; side < 32; ++side) {
+            const double angle = side * 2 * std::acos(-1.0) / 32;
+            for (double z : {-.05, .05}) {
+                d.shape_vertices.push_back(.05 * std::cos(angle));
+                d.shape_vertices.push_back(.05 * std::sin(angle));
+                d.shape_vertices.push_back(z);
+            }
+        }
+        std::uint64_t object;
+        ok(b->body_create(d, &object));
+        for (int i = 0; i < 500; ++i)
+            ok(b->step(.001, 1));
+        near_contact(pose(*b, object).position[2], .1, 2e-6,
+                     "many-edge convex prism rests after axis deduplication");
+        near_contact(contact_force(*b, object)[2], 9.81, .01,
+                     "many-edge convex prism reports its supported weight");
+    }
     grip_probe(false);
     grip_probe(true);
     std::printf("Generalized effort: %d analytical assertions and %d API operations passed; box, convex and "
