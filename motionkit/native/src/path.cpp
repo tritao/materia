@@ -556,71 +556,50 @@ private:
 // q''(s)*x(s)+q'(s)*u is a quartic polynomial, linear in (u,x0).
 // Bounding every Bernstein control bounds the complete interval, including
 // peaks that collocation misses. Final execution validation remains mandatory.
-// Keep the repeated head/successor proofs, with a fixed memory budget even
-// when a longer pending suffix needs recomputation. Each worker owns its cache.
-class IntervalAccelerationProofCache {
-public:
-    struct Key {};
-private:
-    struct Entry {
-        std::shared_ptr<const Key> key;
-        toppra::Vector grid;
-        toppra::Matrices F;
-        toppra::Vectors g;
-        toppra::Bounds controls;
-    };
-    std::array<Entry,2> entries_;
-public:
-    bool load(const std::shared_ptr<const Key>& key, const toppra::Vector& grid,
-            toppra::Matrices& F, toppra::Vectors& g, toppra::Bounds& controls) {
-        for (size_t i=0;i<entries_.size();++i) {
-            auto& entry=entries_[i];
-            if (entry.key!=key || entry.grid.size()!=grid.size() ||
-                    !(entry.grid.array()==grid.array()).all()) continue;
-            F=entry.F;g=entry.g;controls=entry.controls;
-            if (i) std::swap(entries_[0],entries_[i]);
-            return true;
-        }
-        return false;
-    }
-    void retain(const std::shared_ptr<const Key>& key, const toppra::Vector& grid,
-            const toppra::Matrices& F, const toppra::Vectors& g, const toppra::Bounds& controls) {
-        Entry entry{key,grid,F,g,controls};
-        entries_[1]=std::move(entries_[0]);entries_[0]=std::move(entry);
-    }
+// A window owns its immutable interval table until retirement. A shared solver
+// can revisit any pending window without rebuilding its Bernstein proofs. Table
+// storage follows the existing pending-window / section sample budget, rather
+// than an LRU whose evictions turn backward propagation into repeated work.
+struct IntervalAccelerationProofTable {
+    toppra::Vector grid;
+    toppra::Matrices F;
+    toppra::Vectors g;
+    toppra::Bounds controls;
 };
 
 class IntervalJointAcceleration final : public toppra::LinearConstraint {
     toppra::Vector lower_, upper_, velocity_;
     toppra::Matrices coefficients_;
     std::vector<double> knots_, caps_;
-    std::shared_ptr<IntervalAccelerationProofCache> cache_;
-    const std::shared_ptr<const IntervalAccelerationProofCache::Key> key_=
-        std::make_shared<const IntervalAccelerationProofCache::Key>();
+    const bool retain_table_;
+    std::unique_ptr<const IntervalAccelerationProofTable> table_;
 public:
     IntervalJointAcceleration(const toppra::Vector& lower, const toppra::Vector& upper,
             const toppra::Vector& velocity, const toppra::Matrices& coefficients, const std::vector<double>& knots,
             const std::vector<double>& caps, size_t first, size_t after,
-            std::shared_ptr<IntervalAccelerationProofCache> cache)
+            bool retain_table)
         : LinearConstraint(14*lower.size(), 2, false, true, false), lower_(lower), upper_(upper), velocity_(velocity),
           coefficients_(coefficients.begin()+(first ? first-1 : 0),
               coefficients.begin()+std::min(after+1,coefficients.size())),
           knots_(knots.begin()+(first ? first-1 : 0),
               knots.begin()+std::min(after+2,knots.size())),
           caps_(caps.begin()+(first ? first-1 : 0),
-              caps.begin()+std::min(after+1,caps.size())),cache_(std::move(cache)) {}
+              caps.begin()+std::min(after+1,caps.size())),retain_table_(retain_table) {}
 protected:
     void computeParams_impl(const toppra::GeometricPath& path, const toppra::Vector& grid,
             toppra::Vectors& a, toppra::Vectors& b, toppra::Vectors& c,
             toppra::Matrices& F, toppra::Vectors& g, toppra::Bounds& control_limits, toppra::Bounds&) override {
         PathProfilePhase profile("interval_acceleration_constraints");
         (void)path;
-        if (cache_ && cache_->load(key_,grid,F,g,control_limits)) {
+        if (table_ && table_->grid.size()==grid.size() && (table_->grid.array()==grid.array()).all()) {
+            PathProfilePhase copy("interval_acceleration_table_copy");
+            F=table_->F;g=table_->g;control_limits=table_->controls;
             for (Eigen::Index i=0;i<grid.size();++i) {
                 a[i]<<1.0,0.0;b[i]<<0.0,1.0;c[i].setZero();
             }
             return;
         }
+        PathProfilePhase construction("interval_acceleration_table_build");
         toppra::Matrix derivatives(5,lower_.size());
         for (Eigen::Index i=0;i<grid.size();++i) {
             const double h=i+1<grid.size() ? grid[i+1]-grid[i] : 0.0;
@@ -746,7 +725,11 @@ protected:
                 }
             }
         }
-        if (cache_) cache_->retain(key_,grid,F,g,control_limits);
+        if (retain_table_) {
+            PathProfilePhase retain("interval_acceleration_table_retain");
+            table_=std::make_unique<const IntervalAccelerationProofTable>(
+                IntervalAccelerationProofTable{grid,F,g,control_limits});
+        }
     }
 };
 
@@ -1263,8 +1246,6 @@ namespace {
 // Prepared geometry, adaptive grid and constraints have one owner independent of any
 // endpoint solve/result. A session can retain this object without capturing a caller's stack.
 class PreparedTimingPath {
-    const std::shared_ptr<IntervalAccelerationProofCache> acceleration_proofs=
-        std::make_shared<IntervalAccelerationProofCache>();
 public:
     std::vector<double> knots, caps, grid_values;
     toppra::Matrices coefficients;
@@ -1448,7 +1429,7 @@ public:
             const size_t first_span=window_first[window];
             const size_t after_span=window+1<window_first.size() ? window_first[window+1] : span_count;
             constraints.push_back(std::make_shared<IntervalJointAcceleration>(lower_acceleration,upper_acceleration,upper_velocity,
-                coefficients,knots,caps,first_span,after_span,window_first.size()>1 ? acceleration_proofs : nullptr));
+                coefficients,knots,caps,first_span,after_span,window_first.size()>1));
         }
         else constraints.push_back(std::make_shared<toppra::constraint::LinearJointAcceleration>(
             lower_acceleration, upper_acceleration));
