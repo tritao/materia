@@ -4064,17 +4064,11 @@ class ProjectSourceTests {
         // Observe the actual host barriers, after their native plans finish, rather than inferring dwell from cycle time.
         var active = @:privateAccess mission.welding;
         if (active != null) {
-          var planning = @:privateAccess active.motion.planner;
-          var progress = active.motion.progress();
-          if (planning != null && progress.block >= 0 && progress.block < planning.blocks.blocks.length) {
-            var block = planning.blocks.blocks[progress.block];
-            var index = @:privateAccess active.motion.planIndex;
-            if (index >= block.plans.length && block.barrier != null) switch block.barrier {
-              case Dwell(seconds):
-                check(Math.abs(seconds - 0.15) < 1e-8, "executed weld dwell preserves recipe duration");
-                if (bead.extent() < bead.length / 2) startDwellTicks++; else craterDwellTicks++;
-              case _: {}
-            }
+          switch active.motion.progress().barrier {
+            case Dwell(seconds):
+              check(Math.abs(seconds - 0.15) < 1e-8, "executed weld dwell preserves recipe duration");
+              if (bead.extent() < bead.length / 2) startDwellTicks++; else craterDwellTicks++;
+            case _:
           }
         }
         if (reading.arc) {
