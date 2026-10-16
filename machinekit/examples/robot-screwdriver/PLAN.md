@@ -3472,3 +3472,22 @@ degenerate segments) pass 18 coordinate assertions; the existing 48 physical
 assertions still pass. Evidence: `sd15-dynamics-edge.log`. This remains scratch
 implementation; generic convex/compound contacts and production integration
 are not yet accepted.
+
+### SD15a convex manifold prototype (2026-10-16)
+
+The isolated force solver now accepts primitive convex bodies as well as boxes.
+Hull planes produce ordered faces and actual boundary edges; separating face
+and edge axes select a clipped face manifold or closest support-edge witnesses.
+Geometry checks cover cube/tetrahedron topology, four-point face clipping,
+separation and containment; a box overlapping only the empty corner of a
+tetrahedron's bounds is correctly separated. The geometry evidence is
+`sd15-dynamics-convex-geometry.log`.
+
+An actual free convex cube under gravity settles on its four-point floor
+manifold, reaches rest and reports 9.81 N support from solved impulses. The
+physical probe now passes 51 assertions and 7864 checked API operations
+(`sd15-dynamics-convex-load.log`), including all existing effort/gripping tests.
+The prototype currently derives hull topology during contact collection;
+caching is required before application-scale use. Compound parts, full surface
+semantics, generic inertial fallbacks, history/reset and scaling are still open.
+Production sources remain unchanged; this is not both-backend cell acceptance.
