@@ -3172,3 +3172,31 @@ native ownership graph. The earlier `sd-cases-sd15-rigid-clamp` also passes
 `robot-recovery` and `clearance-retained` with the new native/API integration.
 The fresh full MuJoCo run `sd-cases-sd15-full4` is still active; do not infer
 full-cycle acceptance from these focused checks.
+
+`665f7ea68` commits the physical clamped-member retention. The full4 native
+snapshot after the first fastening confirms six fewer free coordinates,
+220 rather than 746 contacts, and plate/table penetration reduced from 26.7 mm
+to 0.175 mm. Screw two now completes. However, the full run still times out
+on screw three at 148.01 s (681.1 s wall, 507 MB peak). The plate then has a
+large yaw/tilt and CAD origin (-27.33,-575.73,212.15) mm: accepted screws still
+remain kinematic followers and can reproduce the internal-contact feedback.
+The housing-only change is therefore a verified prerequisite, not the full fix.
+
+The next uncommitted integration physically retains accepted screws as well,
+including snug releases, and detaches only the qualified retained screw at
+measured bit recontact for a continuation. The fixture owns the native joints;
+ordinary static-fixture retention stays compatible. A new dynamic-fixture
+retightening variant checks that path alongside the existing transport,
+ownership and head-seat checks. Build `sd15-rigid-screws-build` is running;
+its tests and the next full cell run remain due. No completed SD15a.3/4 claim
+is made from the partial improvement above.
+
+The screw-retention integration builds and passes `sd-cases-sd15-rigid-screws2`:
+374 process checks across both backends (130 transport, 184 retained engagement,
+60 head-seat continuation; 2 s wall, 257 MB peak). The added dynamic-fixture
+variant covers retained-body identity, actual-parent alias rejection, rigid
+release at qualified recontact, higher-target continuation and later carrying.
+Its first test attempt had an alias still bound to the robot link; that fixture
+was corrected to share the dynamic member's actual native parent. No check was
+relaxed. The fresh nominal cell run `sd-cases-sd15-full5` remains active; full
+tray-to-outfeed acceptance is still open.

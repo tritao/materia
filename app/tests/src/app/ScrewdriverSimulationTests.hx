@@ -55,6 +55,7 @@ class ScrewdriverSimulationTests {
     for (backend in [SimulationSpace.DETERMINISTIC,SimulationSpace.MUJOCO]) {
       runTransport(backend,true,false,false);
       runTransport(backend,true,true,false);
+      runTransport(backend,true,false,false,true);
     }
     Sys.println('Screwdriver retained engagement: $count checks passed on both backends');
     count = 0;
@@ -139,7 +140,8 @@ class ScrewdriverSimulationTests {
     refuses(() -> { var invalid = new processkit.skill.DriveScrew(null,null,null,""); });
   }
   /** A distant lead-in cannot pull a screw out of the presenter or compress its feed. */
-  static function runTransport(backend:Int, retighten:Bool = false, detached:Bool = false, headSeat:Bool = false):Void {
+  static function runTransport(backend:Int, retighten:Bool = false, detached:Bool = false, headSeat:Bool = false,
+      dynamicFixture:Bool = false):Void {
     var expectedTorque = headSeat ? joint().prevailingTorque : 9.9;
     var harness = new SimulationHarness(0.01,1,backend);
     try {
@@ -188,6 +190,13 @@ class ScrewdriverSimulationTests {
       var body = new SimPose(0.02,0,0.101,0,0,0,1);
       var fixture = new SimulationAssemblyPart("work-fixture",harness.simulation,[0.0,0.0,0.0],[],
         {id:"work-fixture",robotIndex:0,linkIndex:4,offset:materia.assembly.AssemblyFrames.identity(),center:[0.0,0.0,0.0]},null);
+      var fixtureObject:Null<nativekit.sim.SimObject> = null;
+      if (dynamicFixture) {
+        var member = harness.spawnBox([0,0.07,0.01],[0.001,0.001,0.001],true,0.1);
+        fixture.retain(member,harness.simulation.objectPose(member));
+        fixtureObject = member;
+        fixture = new SimulationAssemblyPart("work-fixture",harness.simulation,[0.0,0.0,0.0],[],null,member);
+      }
       observer.configure(1,{program:new TighteningProgram(program().settings,headSeat),joint:joint(),screw:screw,hand:1,
         fixture:fixture,clamped:clamped,
         connection:{fastening:"transport-probe",member:"work-fixture",face:"bore"},
@@ -269,7 +278,9 @@ class ScrewdriverSimulationTests {
         refuses(() -> {var contact = observer.configure(2,misplaced);});
         // CAD members can share a native rigid parent. That parent alone does
         // not identify the member on which this particular joint was released.
-        var alias = new SimulationAssemblyPart("another-member",harness.simulation,[0.0,0.0,0.0],[],
+        var alias = fixtureObject != null
+          ? new SimulationAssemblyPart("another-member",harness.simulation,[0.0,0.0,0.0],[],null,fixtureObject)
+          : new SimulationAssemblyPart("another-member",harness.simulation,[0.0,0.0,0.0],[],
           {id:"another-member",robotIndex:0,linkIndex:4,offset:materia.assembly.AssemblyFrames.identity(),center:[0.0,0.0,0.0]},null);
         var aliased:ScrewdriverSetup = {program:qualified.program,joint:qualified.joint,screw:screw,hand:1,
           fixture:alias,connection:identity,retightening:true,work:qualified.work};
@@ -313,7 +324,7 @@ class ScrewdriverSimulationTests {
         check(eligible != null,"Ownership and reset tests start from a valid higher-target continuation");
         if (detached) {
           var actual = harness.simulation.objectPose(screw);
-          harness.simulation.releaseObject(screw);
+          fixture.releaseRigid(screw);
           check(!fixture.carries(screw),"Native detachment removes the joint even when its body pose is unchanged");
           refuses(() -> {var contact = observer.configure(3,higher);});
           fixture.retain(screw,actual);
@@ -335,7 +346,7 @@ class ScrewdriverSimulationTests {
       check(fixture.carries(clamped) && Math.abs(harness.simulation.objectPose(clamped).y-clampedBefore.y-0.01) < 0.0001,
         "The clamped member travels with the threaded fixture after accepted final tightening");
       var member = new SimulationAssemblyPart("free-fixture",harness.simulation,[0.0,0.0,0.0],[],null,freeFixture);
-      harness.simulation.releaseObject(screw);
+      fixture.releaseRigid(screw);
       member.retain(screw,moved);
       freeFixture.drive(new SimPose(0.02,0.02,0.1));
       harness.step(); harness.step();
@@ -344,10 +355,10 @@ class ScrewdriverSimulationTests {
       refuses(() -> harness.simulation.holdObjectOnObject(screw,screw,new SimPose(0,0,0)));
       var plate = harness.spawnBox([0.05,0.05,0.1],[0.0001,0.0001,0.0001],true,0.01);
       var assembly = new SimulationAssemblyPart("dynamic-plate",harness.simulation,[0.0,0.0,0.0],[],null,plate);
-      harness.simulation.releaseObject(screw);
-      harness.simulation.releaseObject(clamped);
+      member.releaseRigid(screw);
+      fixture.releaseRigid(clamped);
       var screwBeforeCarry = harness.simulation.objectPose(screw), housingBeforeCarry = harness.simulation.objectPose(clamped);
-      assembly.retain(screw,screwBeforeCarry);
+      assembly.retainRigid(screw);
       var plateBeforeJoining = harness.simulation.objectPose(plate);
       assembly.retainRigid(clamped);
       var plateAfterJoining = harness.simulation.objectPose(plate), housingAfterJoining = harness.simulation.objectPose(clamped);

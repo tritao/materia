@@ -20,6 +20,7 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
   final part:Null<AssemblyPart>;
   final object:Null<SimObject>;
   var fixedFollower:Null<nksim_joint>;
+  final rigidRetentions:Map<Int,nativekit.sim.SimFixedJoint> = [];
 
   public function new(id:String, simulation:Simulation, center:Array<Float>, pieces:Array<Array<Float>>,
       part:Null<AssemblyPart>, object:Null<SimObject>) {
@@ -105,10 +106,23 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
   public function retainRigid(body:SimObject):Void {
     var carrier = object;
     if (carrier != null && carrier.motion == nativekit.sim.MotionType.Dynamic) {
-      if (carries(body)) return;
+      var key = body.handle.rawValue();
+      if (carries(body) && rigidRetentions.exists(key)) return;
       simulation.stopForTopologyChange();
-      simulation.createObjectMeasuredFixedJoint(carrier,body);
+      // A physical-thread seat may still be held by the process. Convert it only at accepted release.
+      if (carries(body)) simulation.releaseObject(body);
+      rigidRetentions.set(key,simulation.createObjectMeasuredFixedJoint(carrier,body));
     } else retain(body,simulation.objectPose(body));
+  }
+
+  public function releaseRigid(body:SimObject):Void {
+    if (!carries(body)) throw 'Assembly occurrence "$id" does not retain this body';
+    var key = body.handle.rawValue(), joint = rigidRetentions.get(key);
+    if (joint != null) {
+      simulation.stopForTopologyChange();
+      joint.dispose();
+      rigidRetentions.remove(key);
+    } else simulation.releaseObject(body);
   }
 
   /** Whether this occurrence's exact native carrier retains the fastened body. */

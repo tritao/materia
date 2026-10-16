@@ -9,6 +9,8 @@ interface SimulationObjectFixture {
   function retain(body:SimObject, world:SimPose):Void;
   /** Final rigid retention at the measured pose; dynamic fixtures must retain the member's physical mass. */
   function retainRigid(body:SimObject):Void;
+  /** Release this fixture's retained body at its measured pose for a qualified continuation. */
+  function releaseRigid(body:SimObject):Void;
   function carries(body:SimObject):Bool;
   /** The native body a fastener threads into: the member's own, or its robot link's. */
   function threadedBody():nksim_body;

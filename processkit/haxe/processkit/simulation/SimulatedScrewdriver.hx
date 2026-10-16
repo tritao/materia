@@ -474,7 +474,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
         var connection = oldSetup.connection;
         if (releasedPose == null || anchor == null || state == null || connection == null)
           throw "Successful physical thread release lost its qualified engagement";
-        fixture.retain(threaded,releasedPose);
+        fixture.retainRigid(threaded);
         if (!fixture.carries(threaded)) throw "Successful physical thread release did not retain its screw on the named fixture";
         retainClamped(oldSetup);
         var head = transform(state.head);
@@ -528,7 +528,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       var releasedPose = letGo();
       if (fastened && fixture != null) {
         if (released == null || releasedPose == null) throw "Successful release lost the identified screw body or its live pose";
-        fixture.retain(released,releasedPose);
+        fixture.retainRigid(released);
         if (!fixture.carries(released)) throw "Successful release did not retain the screw on its named fixture";
         if (setup == null) throw "Successful release lost its qualified setup";
         retainClamped(setup);
@@ -572,7 +572,11 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       // identified body can seal; another screw near the bit is never substituted.
       if (vacuum && screw != null && carried() == null &&
           pickError.norm() <= SimulatedSuctionTool.REACH &&
-          pickAlignment <= setup.joint.maximumAxisAngle) grip(screw, pose(actualBody));
+          pickAlignment <= setup.joint.maximumAxisAngle) {
+        if (pendingEngagement != null && setup.fixture != null && setup.fixture.carries(screw))
+          setup.fixture.releaseRigid(screw);
+        grip(screw, pose(actualBody));
+      }
       var lead = actualHead.transformPoint(leadInHead);
       var leadError = lead.sub(Vec3.fromArray(state.hole));
       var along = leadError.dot(Vec3.fromArray(holeAxis));
