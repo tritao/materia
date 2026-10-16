@@ -12,6 +12,8 @@ by the earlier completed software checklist.
 - [x] FR5 manufacturer drawing/interface checks, with full independent FK still explicitly pending.
 - [x] Original ZeroErr standalone motion, collision/conditioning observations and CoG-dependent load screens.
 - [x] Define original shoulder/connection bench evidence and acceptance-budget gaps.
+- [x] Audit module/mass sources and compare retained modules with eight isolated shoulder/wrist sizing options; record speed and workspace compromises in [ARM-OPTIONS.md](../zeroerr-arm/ARM-OPTIONS.md).
+- [ ] Integrate a separate resized shoulder/J4/J5 CAD concept after delivered specifications and operating limits are resolved; repeat mass, clearance, timed-load and connection checks.
 - [ ] Obtain FR5 controller/full independent FK evidence and resolve reference travel discrepancies.
 - [ ] Confirm original drive codes, moving masses/inertias, coupled torque-speed-duty and bearing limits.
 - [ ] Allocate whole-arm accuracy/stiffness budgets and qualify connections/harness.

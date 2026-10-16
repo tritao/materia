@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "scope": "Standalone original-axis sizing trade study; candidate geometry and hardware unqualified",
+  "catalog": {
+    "eRob142T": {
+      "revision": "V4 MC2B.9X.XX archive / MC2B.XX.XX drawing",
+      "drawingKey": "142t-v4", "pdfSha256": "910430b1a7e6e78ca23da16ea6184641c5f4788e12ff4e2f8a39e5e6e2569073",
+      "massKg": 8.22, "motorRotorInertiaGmm2": 1273287,
+      "ratios": [50,80,100,120,160], "ratedTorqueNm": [99,153,178,178,178],
+      "peakSpeedRpm": [40,25,20,16.7,12.5], "diameterMm": 148, "lengthMm": 163,
+      "outputPilotMm": 127, "outputFasteners": "15 x M5, 15 mm drawing depth",
+      "source": "https://www.zeroerr.cn/eRob/eRob142T.html"
+    },
+    "eRob80T": {
+      "revision": "V5 MC2D.CX.XX archive / MC2D.XX.XX drawing",
+      "drawingKey": "80t-v5", "pdfSha256": "20546bef0cdc5853efcbccb34e9832a515d1cb07945007fe8bb56b59c9e6e604",
+      "massKg": 1.75, "motorRotorInertiaGmm2": 70637,
+      "ratios": [50,80,100,120], "ratedTorqueNm": [21,29,31,31],
+      "peakSpeedRpm": [60,37.5,30,25], "diameterMm": 85, "lengthMm": 111.8,
+      "outputPilotMm": 71, "outputFasteners": "12 x M3, 6 mm drawing depth",
+      "source": "https://www.zeroerr.cn/eRob/eRob80T.html"
+    },
+    "eRob170I": {
+      "revision": "V3 MC2A.AX.XX drawing",
+      "drawingKey": "170i-v3", "pdfSha256": "3b2ab44d4c2c9b939788142a50e6e78dd3a9182ef4b7fc7783f9da9e32d7dc96",
+      "massKg": 9.5, "motorRotorInertiaGmm2": 1545541,
+      "ratios": [50,80,100,120,160], "ratedTorqueNm": [137,206,265,294,294],
+      "peakSpeedRpm": [40,25,20,16.7,12.5], "diameterMm": 170, "lengthMm": 144.9,
+      "outputPilotMm": 135, "outputFasteners": "16 x M6; cylindrical mounting needs a new angle bracket",
+      "source": "https://www.zeroerr.cn/eRob/eRob170I.html"
+    }
+  },
+  "publicMassSensitivityKg": {"eRob110T":4.64,"eRob70T":1.24,"eRob80T":1.94,"eRob142T":8.22,"eRob170I":9.5},
+  "publicMassEvidence": {
+    "checkedOn": "2026-10-16",
+    "qualification": "Mixed public-page revisions; mass sensitivity only, not a verified matched BOM",
+    "sources": ["https://www.zeroerr.cn/eRob/eRob110T.html","https://www.zeroerr.cn/eRob/eRob70T.html","https://www.zeroerr.cn/eRob/eRob80T.html","https://www.zeroerr.cn/eRob/eRob142T.html"]
+  },
+  "assumptions": {
+    "resizedBodyDistribution": "Preserve original external body fractions and CoGs; enlarge central-inertia surrogate by squared maximum diameter/length ratio. Original axes retained for load isolation only.",
+    "connectionMassAllowanceKgPerChangedJoint": 0.25,
+    "connectionMassOffsetMm": 75,
+    "connectionAllowanceStatus": "Unverified point mass along downstream zero-pose link direction; included in all resized options, not a designed or weighed adapter",
+    "pathInteriorSamplesPerSegment": 5,
+    "accelerationScenariosDegS2": [0,30,60],
+    "cogOffsetsMm": [0,100,150],
+    "massScenarios": ["drawing_materials","public_module_masses","drawing_plus25percent"],
+    "clearanceForResizedModules": "Not evaluated; original-arm sample clearance does not transfer to new envelopes",
+    "torqueSpeedQualification": "Independent torque and peak-speed screens only; no coupled curve, thermal or velocity-dependent validation"
+  },
+  "options": [
+    {"id":"original","changes":{}},
+    {"id":"wrist80_only","changes":{"j4":["eRob80T",100],"j5":["eRob80T",100]}},
+    {"id":"shoulder142_r50","changes":{"j2":["eRob142T",50],"j4":["eRob80T",100],"j5":["eRob80T",100]}},
+    {"id":"shoulder142_r80","changes":{"j2":["eRob142T",80],"j4":["eRob80T",100],"j5":["eRob80T",100]}},
+    {"id":"shoulder142_r100","changes":{"j2":["eRob142T",100],"j4":["eRob80T",100],"j5":["eRob80T",100]}},
+    {"id":"shoulder142_all_wrist80","changes":{"j2":["eRob142T",100],"j4":["eRob80T",100],"j5":["eRob80T",100],"j6":["eRob80T",100]}},
+    {"id":"shoulder170_r50","changes":{"j2":["eRob170I",50],"j4":["eRob80T",100],"j5":["eRob80T",100]}},
+    {"id":"shoulder170_r80","changes":{"j2":["eRob170I",80],"j4":["eRob80T",100],"j5":["eRob80T",100]}}
+  ],
+  "release": {"candidateCadIntegrated":false,"hardwareQualified":false,"cncTendingInScope":false}
+}
