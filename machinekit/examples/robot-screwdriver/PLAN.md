@@ -1470,7 +1470,7 @@ The rejected alternative, steps that name an arm in one shared mission, has no
 real controller behind it and couples two arms' planning into one sequence.
 
 Steps:
-- **SD15a.1 Schema (done, uncommitted).**
+- **SD15a.1 Schema (done, committed in `3bf6cca0c`).**
   - `mission` became `missions`, one per robot controller.
   - Every robot tool records its controller. One derivation,
     `SceneArtifact.toolController`, finds the controller that drives a joint on
@@ -1488,7 +1488,7 @@ Steps:
     - two programs on one controller refused;
     - a tool claiming a controller that does not carry it;
     - two programs without controllers.
-- **SD15a.2 Player (done, uncommitted).**
+- **SD15a.2 Player (done, committed in `3bf6cca0c`).**
   - `ApplicationSimulation` runs one `MissionPlayer` per program. Each has its
     controller's robot, tools, screwdrivers and welders, feeders and blow
     feeds, and cell I/O.
@@ -2682,7 +2682,7 @@ still required. The earlier 21-test proof predates this wire extension.
 | SD12 | MuJoCo acceptance passes (Claude, 2026-10-14). Hybrid force/position entry search with spring feed, welded carriage and plan-streamed servo. Nominal seats in 32.9 s at 0 N; the 1 mm offset seats in 34.7 s, 7.5 N peak, 2 searched surfaces. Both hand over to the qualified OK tightening. Integrated acceptance passes; gate baseline exceptions are below. | `fef536bc7`, `92100bc7c`; `sd-main-sync` |
 | SD13 | MuJoCo acceptance passes (Claude, 2026-10-14). Screw-to-work helical joint (`NKSIM_JOINT_HELICAL`, `rk_simulation_create_object_screw_joint`) with socket coupling and a `Seated` hand-off. SimKit and RobotKit native suites pass; all 4 CAD fastenings seat with OK torque. Integrated acceptance passes; gate baseline exceptions are below. | `d8f548d09`, `fef536bc7`; `sd-main-sync` |
 | SD14 | done — drawing projection, CAD-derived thread symbols and callouts pass; ProjectKit passes 370 assertions and the editor passes all 855 cosmetic-thread checks; the three CAD SVG exports were previously rendered and inspected | `projectkit/tests/haxeon.json`; `machinekit/examples/robot-screwdriver/haxeon.drawing.json`; `sd-main-sync` |
-| SD15 | split (2026-10-14). SD15a is pick, place and fasten without a tool change; the tool change moved to `robotkit/plans/TOOL_CHANGE.md` (TC0 to TC6), seeded from the SD15 drafts. | SD15 drafts in `5a6ac41ae` |
+| SD15 | in progress (2026-10-16). SD15a.1–2 landed; SD15a.3 two-arm cell is being commissioned, SD15a.4 acceptance remains open. Automatic tool change has its separate `robotkit/plans/TOOL_CHANGE.md` (TC0 to TC6). | SD15 drafts in `5a6ac41ae`; controller programs in `3bf6cca0c` |
 
 ### SD8 hardware integration work (2026-10-11)
 
@@ -2897,3 +2897,74 @@ the parent scratch directory.
 The SD15a.3 work remains in the stash named
 `SD15a.3 wip: unfitted bearing option and plan constraints`; restoring it and
 continuing the two-arm cell is separate follow-on work.
+
+
+### SD15a two-arm cell commissioning (2026-10-16)
+
+The SD15a.3 stash was applied without dropping its safety copy. Work continues in
+`/home/joao/dev/materia-worktrees/screwdriving`, based on local main `4a4996565`.
+The separate main working tree and its existing edits are untouched.
+
+Committed prerequisites:
+- `9724b8c26`: optional unfitted housing; all 95 fastening assertions pass,
+  including unchanged identities and engagement with the bearing omitted.
+- `28ab8b488`: independently commissioned A/B gripper widths and finger lengths;
+  the end-effector component group passes.
+- `75c577af3`: accepted final preload retains the named dynamic clamped member;
+  a snug-only pass leaves it free. The app screwdriver simulation case passes
+  306 checks across both backends, including a dynamic plate carrying its
+  retained housing and screw through the native carrier graph.
+- `552a543e1`: automatic preview sharing keeps separate definitions when same-name
+  connectors have different frames. Compatible occurrences still share geometry.
+- `05fa027c7`: explicitly wired discrete process joints own their cabinet runtime;
+  unactuated carried tool joints inherit the nearest driven ancestor's domain.
+  Presenters can include wired physical presence heads. The wiring and preview
+  sharing regression groups pass (85-group MachineKit build).
+- `982baf9cd`: free-body staging restores saved configurations through the state
+  record boundary, preserving coupled gripper jaws without commanding followers.
+- `2b061dbe1`: flush bit/socket CAD access uses an explicit 1e-6 mm weighted pose
+  residual, keeping the existing collision-volume threshold. Coarser reach checks
+  keep their existing defaults. No collision-engine tolerance was changed.
+
+The uncommitted cell has separate handling/fastening cabinets, independently
+sized dual grippers, sensed housing/plate/outfeed pockets, fixture presence, and
+CAD `part-ready` / `fastened` wires. Both programs use an acknowledgement handshake:
+handling parks before asserting readiness, fastening parks before asserting
+completion, and handling acknowledges before unloading. The first commissioning
+variant keeps the plate fixed; the full variant also loads and unloads it.
+
+CAD generation and the first two-controller MuJoCo rebuild succeed. Runtime
+commissioning is still incomplete: the first attempt waited on a fixture sensor
+whose placement connector pointed its sensing volume sideways. Its frame is
+corrected and is being rerun. The complete nominal cycle, required fault/recovery
+cases on both backends, example documentation/catalogue, and final frozen-source
+gate are still due. Do not mark SD15a.3 or SD15a.4 complete from the prerequisite
+checks above.
+
+Logs: `/home/joao/dev/materia-cache/claude-scratch/sd15-*.log` and
+`sd-cases-sd15-*`. The saved SD15a.3 stash remains available as a safety copy.
+
+
+Further commissioning evidence:
+- Native presence volumes intentionally observe only dynamic, unheld objects
+  (`simkit/sim_core/src/session.cpp`, `object_overlaps_volume`). The fixed-plate
+  commissioning variant therefore treats its bolted plate as a mechanical
+  precondition; the production variant still requires measured fixture presence
+  after loading its dynamic plate. The fixture sensing frame now points upward.
+- `sd-cases-sd15-housing7` builds in MuJoCo and picks the housing, then rejects the
+  placement path as unreachable. The handling base has moved from x=-700 to
+  x=-550 mm, with a half-turn of the housing TCP roll to bring the wrist closer
+  to the arm. `sd-cases-sd15-housing8` is the live rerun; its outcome remains open.
+- The production program must not assert `fastened` after an exhausted NOK.
+  An uncommitted `ScrewInvocation.Required(job)` wire constructor (ID 4) makes
+  that single-pass success requirement explicit while preserving the existing
+  batch/staged reporting semantics. Unknown enum constructors fail decoding in
+  older readers; no permissively ignored mission flag or format-version change
+  is used. ProjectKit passes, including 16 invocation checks. The app builds;
+  actual exhausted-NOK and downstream-signal acceptance still need testing.
+- Local robot recovery also needs no invented CNC reset output. The uncommitted
+  retry change sends a PLC fault-reset pulse only when the current controller
+  owns that declared wire. Robot-only retry and the existing tending reset
+  handshake both still need their integration checks.
+
+The above cell/runtime additions are work in progress, not SD15 acceptance.
