@@ -420,8 +420,8 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
   function seat(setup:ScrewdriverSetup):Void {
     var screw = threadedScrew(), fixture = setup.fixture;
     if (screw == null || fixture == null) throw "Seating a physical thread lost its screw or fixture";
-    var seated = unjoin(false);
-    fixture.retain(screw, seated);
+    unjoin(false);
+    fixture.retainRigid(screw);
     if (!fixture.carries(screw)) throw "Seating a physical thread did not retain the screw on its member";
     carriage = Seated(screw);
   }

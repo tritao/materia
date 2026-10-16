@@ -83,6 +83,12 @@ an accepted result for every screw and parks before asserting completion.
 Handling acknowledges completion before unloading. The accepted screws and
 housing retain their identities while following the plate.
 
+Run-down uses a physical thread joint between the screw and plate. At seating,
+the screw retains its measured pose through a physical joint; accepted final
+preload also retains the housing. The moving assembly keeps its physical mass.
+The 200 N axial-force cap and 1.0e7 N/m thread stiffness are the SD13 example's
+simulation commissioning inputs.
+
 The pressure-driven grippers currently need MuJoCo. The deterministic test
 backend stores joint effort without integrating it, so it cannot execute the
 physical gripping cycle. Its both-backend acceptance requirement remains open
@@ -103,4 +109,4 @@ checks. During development, `PICK_PLACE_STAGE` selects `housing`, `full`,
 not turn an unsupported or incomplete scenario into an acceptance pass.
 `unload` stages the CAD-seated rigid assembly for handling diagnostics; it
 does not qualify fastening. `PICK_PLACE_TRACE=1` adds jaw and contact traces
-for that diagnostic.
+for that diagnostic, and measured work poses during the complete cycle.

@@ -58,6 +58,7 @@ class PickPlaceFastenTests {
         var nextProgress = 10.0;
         var fixtureFaultInjected = false;
         var fasteningInterrupted = false;
+        var physicalThreadStarts = 0, threadAttached = false;
         while ((!handling.finished || !fastening.finished) && handling.failure == null && fastening.failure == null && clock.simulationTime() < 600) {
           if (interruption && !fasteningInterrupted && fastening.stepIndex == 1) {
             var tools = @:privateAccess simulation.tools;
@@ -96,6 +97,10 @@ class PickPlaceFastenTests {
               printProgress('Assembly transition body $name: ${haxe.Json.stringify(handling.assemblyParts.get("project:"+name).pose())}');
           }
           simulation.step();
+          var physicalTools = @:privateAccess simulation.tools;
+          var attached = physicalTools != null && physicalTools.screwdrivers.length == 1 && physicalTools.screwdrivers[0].physicalThreadAttached();
+          if (attached && !threadAttached) physicalThreadStarts++;
+          threadAttached = attached;
           if (clock.simulationTime() >= nextProgress) {
             printProgress('Assembly cell running H=${handling.stepIndex} F=${fastening.stepIndex} at ${clock.simulationTime()}');
             if (Sys.getEnv("PICK_PLACE_TRACE") == "1") for (name in ["work/plate","work/flange/housing"])
@@ -141,6 +146,7 @@ class PickPlaceFastenTests {
         if (fastening.screwRuns.length != 4 || [for (report in fastening.screwRuns) if (!report.finished || report.failed || report.installed() == null) report].length > 0)
           throw "Assembly cell needs four accepted, identified installed screws";
         if (interruption && !fasteningInterrupted) throw "Interruption check must stop an actually rotating screw";
+        if (physicalThreadStarts < 4) throw 'Assembly cell must engage at least four physical screw threads, observed $physicalThreadStarts';
         var plate = fastening.assemblyParts.get("project:work/plate");
         var housing = simulation.environmentObject("project:work/flange/housing");
         if (housing == null || !plate.carries(housing)) throw "The completed housing must be retained on its named plate";

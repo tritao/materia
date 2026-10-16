@@ -3297,3 +3297,32 @@ restart ordering, cumulative angle and reuse of the exact active attempt
 without calling the supply factory again. The mission's emergency-stop retry
 integration remains uncommitted pending app compilation and the complete
 loose-plate interruption test. This prerequisite is not SD15a.4 acceptance.
+
+### SD15a complete physical-thread cycle (2026-10-16)
+
+`sd15-full8` passes the complete loose-plate MuJoCo cycle: loading both parts,
+all four required accepted fastenings with observed physical thread attachments,
+both controller handshakes, and unloading all five retained children to outfeed.
+The final measured plate-origin error is 0.2003 mm against the unchanged 1 mm
+limit. Completion is at 209.10 simulated seconds (583.1 s wall, 585 MB peak).
+
+The cell now uses SD13's physical thread engagement, with its explicit 200 N
+axial cap and 1.0e7 N/m thread stiffness. Process-model kinematic retention of
+an actively advancing screw is inappropriate on the free dynamic plate: it
+can feed contact forces back through its lagging carrier pose. Physical thread
+joints carry run-down reactions, and seating converts to measured physical
+rigid retention rather than another kinematic follower. Final accepted preload
+still retains the named housing. No collision or acceptance tolerance changed.
+
+The trace also establishes that the plate's short placement tilt settles
+before readiness: its pose is flat at H8 and throughout fastening. The fixture
+therefore does not need a speculative additional clamp to explain this failure.
+The `sd15-resume-regressions` run passes the four-fastening physical-thread
+regression (272.5 s, 460 MB), plus all 374 screwdriver simulation checks across
+both backends. `sd15-physical-cell-cad` passes CAD and controller-program checks.
+
+The full-cell interrupted-drive run `sd15-interruption-full2` is running against
+the same compiled bytecode and recorded source hashes. Its mission integration
+remains uncommitted until validation. The remaining fault matrix, deterministic
+physical-handling gap, frozen-source full gate and local-main integration remain
+open; this nominal MuJoCo pass alone does not close SD15a.4.

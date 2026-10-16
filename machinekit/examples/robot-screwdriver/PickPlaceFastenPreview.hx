@@ -31,6 +31,10 @@ class PickPlaceFastenPreview {
 			throw "Assembly cycle lost its fastening program or CAD definition";
 		var state = new AssemblyState(definition, scene.assemblyState);
 		var fastening = scene.missions[0];
+		// A free plate must receive thread reactions through the physical screw joint.
+		// These are the SD13 simulation commissioning limits, not a hardware clamp recipe.
+		fastening.screwEngagement = {mode:materia.project.SceneArtifact.SceneArtifactScrewEngagementMode.PhysicalThread,
+			maximumAxialForceN:200, threadStiffnessNPerM:1.0e7};
 		for (step in fastening.steps) if (step.screw != null) switch step.screw {
 			case Single(job): step.screw = materia.project.SceneScrewInvocation.ScrewInvocation.Required(job);
 			case _: throw "Assembly cycle expects independently qualified single-pass fastenings";
