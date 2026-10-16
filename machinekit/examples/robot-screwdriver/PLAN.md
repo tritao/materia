@@ -3389,3 +3389,27 @@ after the current frozen-input runs finish.
 The updated physical-thread regression is still running. Both-backend physical
 handling acceptance, the remaining matrix, the final frozen-source gate and
 local-main integration remain open.
+
+### SD15a measured fixture-fault stimulus (2026-10-16)
+
+The test-only correction is validated by `sd15-fixture-ready1`: remove the
+ungripped plate while the actual fixture-presence input detects it during
+placement, rather than requiring an exact level pose before removal. The
+plate is removed at 7.60 simulated seconds; handling reaches H4 and stops at
+its absent-fixture wait without starting fastening. The unchanged fault
+assertions pass (82.5 s wall, 415 MB). No controller behavior, sensing volume,
+collision setting or acceptance threshold changed.
+
+The updated four-fastening physical-thread regression also passes with the
+safe-output/observed-vacuum changes (`sd15-safety-physical-thread`, 297.2 s,
+460 MB). Missing-housing and local safety retry pass on both backends
+(`sd15-safety-recovery`, 613.4 s, 386 MB). The fixed-plate nominal and interrupted
+variants are now running on MuJoCo. Full-cycle and fault acceptance on the
+deterministic backend, the complete frozen-source gate and local-main sync
+remain open.
+
+A read-only temporary-index integration preview against local main `bc3658a91`
+reapplies all 14 currently modified tracked main files cleanly over the feature
+tip. No main working files were changed. Its evidence is in scratch directory
+`sd15-main-preview.XRC85F`; main state must be rechecked immediately before any
+actual integration, and its untracked work and dirty submodules preserved.

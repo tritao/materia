@@ -81,10 +81,10 @@ class PickPlaceFastenTests {
           if (fixtureFailure && !fixtureFaultInjected && handling.stepIndex == 3 &&
               simulation.heldObjectIds().indexOf("project:work/plate") < 0) {
             var plate = simulation.environmentObject("project:work/plate");
-            var pose = plate == null ? null : initialPlate.pose();
-            // Remove the released plate while the place skill retreats, before its fixture wait.
-            if (plate != null && pose != null && Math.abs(pose.position[0]) < 0.001 && Math.abs(pose.position[1]+0.5) < 0.001 &&
-                Math.abs(pose.position[2]-0.25) < 0.001) {
+            var presence = @:privateAccess handling.missionInput("fixture-present");
+            var detected = presence != null && (switch presence {case Digital(value):value; case _:false;});
+            // Remove the released, detected plate before the fixture wait consumes that presence.
+            if (plate != null && detected) {
               plate.setPoseForNextTick(new nativekit.sim.SimPose(3,3,0.3));
               fixtureFaultInjected = true;
               printProgress('Assembly fixture plate removed at ${clock.simulationTime()}');
