@@ -34,6 +34,8 @@ typedef KlipperProbe = {
 typedef KlipperHeater = {
 	/** The thermistor's table: `Generic 3950` is a 100k NTC of beta 3950. */
 	var sensorType:String;
+	/** Physical thermistor pull-up; the ADC conversion is ratiometric. */
+	var pullupOhm:Float;
 	var minTemp:Float;
 	var maxTemp:Float;
 	var kp:Float;
@@ -119,6 +121,8 @@ class KlipperConfig {
 	}
 
 	public static function render(printer:KlipperPrinter):String {
+		for (heater in [printer.extruder.heater,printer.bed])
+			if (!Math.isFinite(heater.pullupOhm) || heater.pullupOhm<=0) throw "Klipper thermistor pull-up must be finite and positive";
 		var lines:Array<String> = ["# Klipper configuration for " + printer.name + ", generated from its model.",
 			"# Every PIN_* below is a placeholder for the board's pin; see the pin report.", ""];
 		function section(title:String, entries:Array<Array<String>>):Void {
@@ -153,7 +157,8 @@ class KlipperConfig {
 			["microsteps", Std.string(extruder.microsteps)], ["rotation_distance", number(extruder.rotationDistance)],
 			["gear_ratio", extruder.gearRatio], ["nozzle_diameter", number(extruder.nozzleDiameter)],
 			["filament_diameter", number(extruder.filamentDiameter)], ["heater_pin", "PIN_EXTRUDER_HEATER"],
-			["sensor_type", extruder.heater.sensorType], ["sensor_pin", "PIN_EXTRUDER_SENSOR"], ["control", "pid"],
+			["sensor_type", extruder.heater.sensorType], ["sensor_pin", "PIN_EXTRUDER_SENSOR"],
+			["pullup_resistor", number(extruder.heater.pullupOhm)], ["control", "pid"],
 			["pid_Kp", number(scaled(extruder.heater.kp))], ["pid_Ki", number(scaled(extruder.heater.ki))],
 			["pid_Kd", number(scaled(extruder.heater.kd))], ["min_temp", number(extruder.heater.minTemp)],
 			["max_temp", number(extruder.heater.maxTemp)], ["min_extrude_temp", number(extruder.minExtrudeTemp)],
@@ -162,7 +167,7 @@ class KlipperConfig {
 		section("tmc2209 extruder", [["uart_pin", "PIN_EXTRUDER_UART"], ["run_current", number(extruder.runCurrent)]]);
 		var bed = printer.bed;
 		section("heater_bed", [["heater_pin", "PIN_BED_HEATER"], ["sensor_type", bed.sensorType], ["sensor_pin", "PIN_BED_SENSOR"],
-			["control", "pid"], ["pid_Kp", number(scaled(bed.kp))], ["pid_Ki", number(scaled(bed.ki))], ["pid_Kd", number(scaled(bed.kd))],
+			["pullup_resistor", number(bed.pullupOhm)], ["control", "pid"], ["pid_Kp", number(scaled(bed.kp))], ["pid_Ki", number(scaled(bed.ki))], ["pid_Kd", number(scaled(bed.kd))],
 			["min_temp", number(bed.minTemp)], ["max_temp", number(bed.maxTemp)]]);
 		var probe = printer.probe;
 		section("probe", [["pin", "PIN_PROBE"], ["x_offset", number(probe.xOffset)], ["y_offset", number(probe.yOffset)],

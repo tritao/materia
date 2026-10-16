@@ -2579,6 +2579,12 @@ class MachineKitSmoke {
 			MillPartTests.run();
 			return;
 		}
+		if (Sys.getEnv("MACHINEKIT_PRINTING_ONLY") == "1") {
+			PrintingPartTests.run();
+			CoreXyPrinterChecks.run();
+			PrinterKlipperTests.run();
+			return;
+		}
 		if (Sys.getEnv("MACHINEKIT_KLIPPER_ONLY") == "1") {
 			PrinterKlipperTests.run();
 			return;

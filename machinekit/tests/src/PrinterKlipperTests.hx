@@ -28,6 +28,15 @@ class PrinterKlipperTests {
 	public static function run():Void {
 		assertions = 0;
 		var printer = new CoreXyPrinter();
+		var customFrontEnd = new machinekit.control.ThermistorInput(2200,new machinekit.power.DcVoltage(5.0),2,30,20,4);
+		var customPrinter = new CoreXyPrinter(customFrontEnd);
+		var customJob = CoreXyPrinterPreview.CoreXyPrinterJob.job(customPrinter,"G90\n");
+		for (heater in customJob.heaters) {
+			near(heater.pullupOhm,2200,"job reads the model's pull-up");
+			near(heater.vRef,5.0,"job reads the model's ADC reference");
+		}
+		check(customJob.heaters[0].slot==CoreXyPrinter.HOTEND_THERMISTOR_CHANNEL &&
+			customJob.heaters[1].slot==CoreXyPrinter.BED_THERMISTOR_CHANNEL,"job slots match the circuit wiring");
 		var scene = SceneArtifact.decode(CoreXyPrinterPreview.printer());
 		var job = scene.printing;
 		if (job == null || scene.assemblyDefinition == null) throw "the printer example carries no print job";
@@ -69,6 +78,15 @@ class PrinterKlipperTests {
 			'max_accel is no more than the weaker axis or the motors in the worst direction: ${klipper.maxAccel}');
 		var text = KlipperConfig.render(klipper);
 		var config = KlipperConfig.parse(text);
+		var customConfig = KlipperConfig.parse(KlipperConfig.render(CoreXyPrinterKlipper.printer(customPrinter,customJob,
+			limits[0],limits[1],limits[2],cartesian,inscribed)));
+		for (name in ["extruder","heater_bed"]) {
+			var heaterSection = customConfig.get(name);
+			if (heaterSection == null) throw "Custom config lost a heater";
+			var pullup = heaterSection.get("pullup_resistor");
+			if (pullup == null) throw "Custom config lost its pull-up";
+			near(Std.parseFloat(pullup),2200,"custom circuit survives Klipper export");
+		}
 
 		// The belts, the screws and the extruder's gears, in Klipper's terms.
 		function section(name:String):Map<String, String> {
@@ -116,6 +134,8 @@ class PrinterKlipperTests {
 
 		// The heaters' gains are the controller's, times 255; the extruder takes the job's pressure advance and minimum temperature.
 		var hotend = job.heaters[0], bed = job.heaters[1];
+		near(value("extruder","pullup_resistor"),hotend.pullupOhm,"hotend pull-up follows the job");
+		near(value("heater_bed","pullup_resistor"),bed.pullupOhm,"bed pull-up follows the job");
 		near(value("extruder", "pid_Kp"), hotend.kp * 255.0, "the hotend's proportional gain", 1e-5);
 		near(value("extruder", "pid_Ki"), hotend.ki * 255.0, "its integral gain", 1e-5);
 		near(value("heater_bed", "pid_Kp"), bed.kp * 255.0, "the bed's proportional gain", 1e-5);

@@ -100,11 +100,11 @@ class CoreXyPrinterJob {
 	public static function job(printer:CoreXyPrinter, source:String):SceneArtifactPrinting {
 		// The heaters are the printer's own parts, not new ones: a part changed in the printer changes the job.
 		var hotend = printer.hotend.spec, cartridge = printer.cartridge, thermistor = printer.hotendThermistor;
-		var hotendHeater = heater("hotend", "thermistor", 0, "fan.part", true, thermistor.spec,
+		var hotendHeater = heater(printer.thermistorInput, "hotend", "thermistor", CoreXyPrinter.HOTEND_THERMISTOR_CHANNEL, "fan.part", true, thermistor.spec,
 			hotend.heatCapacity, cartridge.power(cartridge.spec.volts), hotend.lossCoefficient, hotend.fanLossCoefficient,
 			Math.min(hotend.maxTemperature, Math.min(cartridge.spec.maxTemperature, thermistor.spec.maxTemperature)) - 10.0);
 		var bed = printer.bed.spec;
-		var bedHeater = heater("bed", "bedThermistor", 1, null, false, printer.bedThermistor.spec,
+		var bedHeater = heater(printer.thermistorInput, "bed", "bedThermistor", CoreXyPrinter.BED_THERMISTOR_CHANNEL, null, false, printer.bedThermistor.spec,
 			bed.heatCapacity, bed.watts, bed.lossCoefficient, 0.0, bed.maxTemperature);
 		return {source: source, axes: ["x", "y", "z"], extruder: "e",
 			filamentDiameter: hotend.filamentDiameter * 1e-3, gearRadius: printer.extruder.spec.hobDiameter * 0.5e-3,
@@ -116,11 +116,12 @@ class CoreXyPrinterJob {
 	/** Build a heater from its sensor and thermal plant using the shared HEATER_POLICY.
 	 * Capacity is J/K, power is W at full duty, loss and fanLoss are W/K to the room.
 	 */
-	static function heater(name:String, mount:String, slot:Int, fan:Null<String>, feedsExtruder:Bool, sensor:ThermistorSpec,
+	static function heater(frontEnd:machinekit.control.ThermistorInput, name:String, mount:String, slot:Int, fan:Null<String>, feedsExtruder:Bool, sensor:ThermistorSpec,
 			capacity:Float, power:Float, loss:Float, fanLoss:Float, maxTemperature:Float):SceneArtifactHeater {
+		frontEnd.inputName(slot); // Validate the job slot against the actual wired front end.
 		var control = HEATER_POLICY.settings(capacity, power, loss);
 		var heater:SceneArtifactHeater = {name: name, sensor: name, slot: slot, mount: mount, target: 'heater.$name.target',
-			feedsExtruder: feedsExtruder, r0Ohm: sensor.ohmsAt25, t0Celsius: 25.0, beta: sensor.beta, pullupOhm: 4700.0, vRef: 3.3,
+			feedsExtruder: feedsExtruder, r0Ohm: sensor.ohmsAt25, t0Celsius: 25.0, beta: sensor.beta, pullupOhm: frontEnd.pullupOhm, vRef: frontEnd.reference.volts(),
 			kp: control.kp, ki: control.ki, kd: control.kd, maxDuty: control.maxDuty, maxTemperature: maxTemperature,
 			bandCelsius: control.bandCelsius, pidRangeCelsius: control.pidRangeCelsius,
 			gainWindowSeconds: control.gainWindowSeconds, gainMinCelsius: control.gainMinCelsius,
@@ -299,8 +300,10 @@ class CoreXyPrinterChecks {
 		var toolhead = carriage.filter(id -> id != "homeTriggerX");
 		for (at in [[0.0, 0, 0], [220.0, 220, 0], [110.0, 110, 0], [0.0, 220, 0], [220.0, 0, 0]]) checkClear(printer, state, at, toolhead, bedParts);
 		var below = ["basePlate", "motorZFront", "motorZRearLeft", "motorZRearRight", "screwZFrontCoupling", "screwZRearLeftCoupling", "screwZRearRightCoupling",
-			"powerSupply", "motorADriver", "homeZ", "homeZMount", "postLeftFront", "postRightFront", "postLeftRear", "postRightRear",
+			"powerSupply", "thermistorInput", "motorADriver", "homeZ", "homeZMount", "postLeftFront", "postRightFront", "postLeftRear", "postRightRear",
 			"sideBottomLeft", "sideBottomRight", "crossBottomFront", "crossBottomRear"];
+		checkClear(printer,state,[110.0,110,10],["thermistorInput"],
+			["basePlate","powerSupply","motorADriver","motorBDriver","motorEDriver","motorZFrontDriver","motorZRearLeftDriver","motorZRearRightDriver"]);
 		for (z in [0.0, 100, 220]) {
 			checkClear(printer, state, [110.0, 110, z], bedParts.filter(id -> id != "homeTriggerZ"), below);
 			checkClear(printer, state, [110.0, 110, z], ["blockZLeft", "blockZRight"], ["postLeftRear", "postRightRear", "crossTopRear", "crossBottomRear"]);

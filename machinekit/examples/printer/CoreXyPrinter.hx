@@ -109,6 +109,10 @@ class CoreXyPrinter extends AxisBuilder {
 	public final cartridge = new HeaterCartridge();
 	public final hotendThermistor = new Thermistor();
 	public final bedThermistor = new Thermistor();
+	public static inline var HOTEND_THERMISTOR_CHANNEL:Int = 0;
+	public static inline var BED_THERMISTOR_CHANNEL:Int = 1;
+	/** Assumed controller NTC input circuit; 30 x 20 x 4 mm is its generic envelope. */
+	public final thermistorInput:machinekit.control.ThermistorInput;
 	/** Pinion on the extruder motor and the gear on the hobbed shaft: a 3:1 reduction. */
 	public final pinion = new SpurGear(0.5, 18, 6, SpurGear.STANDARD_PRESSURE_ANGLE, 0, 0, 5);
 	public final bigGear = new SpurGear(0.5, 54, 6, SpurGear.STANDARD_PRESSURE_ANGLE, 0, 0, 5);
@@ -118,8 +122,10 @@ class CoreXyPrinter extends AxisBuilder {
 	var driverIndex:Int = 0;
 	var supplyAdded:Bool = false;
 
-	public function new() {
+	public function new(?frontEnd:machinekit.control.ThermistorInput) {
 		super();
+		thermistorInput = frontEnd == null ? new machinekit.control.ThermistorInput(4700,new machinekit.power.DcVoltage(3.3),2,30,20,4) : frontEnd;
+		thermistorInput.inputName(BED_THERMISTOR_CHANNEL);
 		motor = NemaStepper.frame(17);
 		var shaft = motor.variant.shaftLength;
 		pulleyRadius = TimingPulley.profileDimensions(GT2).pitch * TEETH / (2 * Math.PI);
@@ -266,6 +272,9 @@ class CoreXyPrinter extends AxisBuilder {
 
 		// ---- Z: the bed on three screws and two MGN9 rails on the rear posts. --------------------------------------------
 		addBed(zAxis, zSpec, shaft);
+		attach("thermistorInput",thermistorInput,AssemblyFrames.translation(140,FRONT_Y+80,26),"basePlate");
+		connectPorts("hotend-thermistor-input","thermistor","signal","thermistorInput",thermistorInput.inputName(HOTEND_THERMISTOR_CHANNEL));
+		connectPorts("bed-thermistor-input","bedThermistor","signal","thermistorInput",thermistorInput.inputName(BED_THERMISTOR_CHANNEL));
 
 		// ---- Switches, drivers and the supply. -----------------------------------------------------------------------------
 		addHoming(xSpec, ySpec, zAxis, gy, xc, railZ, blockFront, plateY, railXFace, railTop, blockTop);

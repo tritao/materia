@@ -48,7 +48,7 @@ class CoreXyPrinterKlipper {
 		function klipper(item:SceneArtifactHeater):KlipperHeater {
 			// A 100k NTC of beta 3950 is Klipper's "Generic 3950"; another thermistor needs its own table.
 			if (item.beta != 3950.0 || item.r0Ohm != 100000.0) throw 'Heater "${item.name}" has a thermistor Klipper has no table for';
-			return {sensorType: "Generic 3950", minTemp: 0.0, maxTemp: item.maxTemperature, kp: item.kp, ki: item.ki, kd: item.kd};
+			return {sensorType: "Generic 3950", pullupOhm: item.pullupOhm, minTemp: 0.0, maxTemp: item.maxTemperature, kp: item.kp, ki: item.ki, kd: item.kd};
 		}
 		var travel = [for (spec in source.specs) spec.upper];
 		var steppers = [stepper("x", belt, x, travel[0], false), stepper("y", belt, y, travel[1], false)];

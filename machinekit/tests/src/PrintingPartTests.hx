@@ -20,6 +20,25 @@ class PrintingPartTests {
 		HeaterPolicyTests.run();
 		// The 100k beta-3950 curve: 100k at 25 C, and the usual round numbers at 60, 100 and 210 C.
 		var thermistor = new Thermistor();
+		var frontEnd = new machinekit.control.ThermistorInput(4700,new machinekit.power.DcVoltage(3.3),2,30,20,4);
+		close(frontEnd.voltage(4700),1.65,"matched NTC and pull-up halve the reference");
+		close(frontEnd.voltage(0),0,"shorted NTC reaches ground");
+		close(frontEnd.voltage(Math.POSITIVE_INFINITY),3.3,"open NTC reaches the reference");
+		for (temperature in [25.0,60.0,100.0,210.0,285.0]) {
+			var resistance = thermistor.resistance(temperature);
+			close(thermistor.temperature(frontEnd.resistance(frontEnd.voltage(resistance))),temperature,
+				"divider and beta curve invert at temperature",1e-9);
+		}
+		var channelRejected = false;
+		try frontEnd.inputName(2) catch (_:Dynamic) channelRejected = true;
+		if (!channelRejected) throw "ADC front end accepted an unwired channel";
+		var frontEndRecipe = frontEnd.componentType();
+		if (frontEndRecipe == null) throw "Controller front end has no recipe";
+		var custom:machinekit.control.ThermistorInput = cast frontEndRecipe.create(frontEnd.values()
+			.setNumber("pullupOhm",2200).setNumber("referenceVolts",5.0));
+		close(custom.pullupOhm,2200,"recipe retains custom pull-up");
+		close(custom.reference.volts(),5,"recipe retains custom reference");
+		close(custom.voltage(2200),2.5,"custom divider uses its own circuit");
 		close(thermistor.resistance(25), 100000, "100k at 25 C");
 		close(thermistor.resistance(60), 100000 * Math.exp(3950 * (1 / 333.15 - 1 / 298.15)), "the beta model at 60 C", 1e-9);
 		close(thermistor.resistance(60), 24861.65, "about 24.9k at 60 C", 1e-5);
@@ -83,7 +102,7 @@ class PrintingPartTests {
 
 		// Every part builds, has volume, a mass, and rebuilds from its recipe.
 		var registry = MachineKitComponents.defaultRegistry();
-		for (component in [cast(thermistor, machinekit.component.MachineComponent), cartridge, hotend, nozzle, extruder, bed, blower, axial]) {
+		for (component in [cast(thermistor, machinekit.component.MachineComponent), cartridge, hotend, nozzle, extruder, bed, blower, axial, frontEnd]) {
 			var part = component.geometry(ComponentDetail.Preview);
 			if (!(part.volume() > 0)) throw '${component.designation} has no volume';
 			part.close();
