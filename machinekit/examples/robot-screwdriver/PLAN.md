@@ -3630,3 +3630,29 @@ blocked (`sd15-dynamics-block-comparison.log`); this is a focused measurement,
 not a whole-cell performance result. Matrix storage and contact broad-phase
 remain dense/quadratic. Soft-contact semantics, production code cleanup/native
 integration and actual deterministic cell/fault acceptance remain open.
+
+### SD15a deterministic dynamics native integration (2026-10-16)
+
+The generalized effort/contact implementation is now in the production
+`simkit/sim_core/src/physics_backend.cpp`, with the analytical/physical probe
+promoted to `simkit/sim_core/tests/effort.cpp` and the standard CMake/CTest target
+`nativekit_sim_effort_tests` / `sim_effort`. Worlds without effort axes retain
+their existing prescribed-motion path. Force worlds include coupled body inertia,
+free-root reactions, polyhedral contacts, measured friction wrenches, joint
+limits, declared compliant normal contacts, cached hulls and inertia blocks.
+
+Declared time constant/damping use an implicit spring/damper normal constraint.
+Two time constants across 0.5, 1 and 2 ms physical steps settle at the predicted
+four-point spring equilibrium and report the supported weight. The integrated
+suite passes 241 physical assertions and 27014 checked API operations. All six
+standard core CTest groups pass after code formatting: dynamics, brake, core,
+C ABI, host and session (`sd15-dynamics-core-final-ctest.log`). The native
+RobotKit SimKit and MuJoCo suites and session wrapper also pass against the
+initial integrated build (`sd15-dynamics-native-*.log`); source hashes are in
+`sd15-dynamics-native-inputs.sha256`.
+
+This commits the tested native foundation, not whole-cell acceptance. Actual
+backend-0 cell/gripping and the fault matrix must now be rebuilt/run, with
+remaining integration issues fixed from those observations. Contact margins/gaps,
+non-polyhedral shapes and broader topology/reset combinations are not proven by
+this suite. The final editor/native/full gate and local-main merge remain due.

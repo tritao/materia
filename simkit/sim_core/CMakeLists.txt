@@ -54,6 +54,14 @@ if(NK_BUILD_TESTS)
 endif()
 
 if(NK_BUILD_TESTS)
+    # Direct backend tests cover analytical dynamics independently of the C ABI.
+    add_executable(nativekit_sim_effort_tests tests/effort.cpp src/physics_backend.cpp)
+    target_compile_features(nativekit_sim_effort_tests PRIVATE cxx_std_20)
+    target_include_directories(nativekit_sim_effort_tests PRIVATE src include)
+    target_link_libraries(nativekit_sim_effort_tests PRIVATE NativeKit::scene)
+    add_test(NAME sim_effort COMMAND nativekit_sim_effort_tests)
+    set_tests_properties(sim_effort PROPERTIES LABELS "sim;dynamics" TIMEOUT 30)
+
     add_executable(nativekit_sim_brake_state_tests tests/brake_state.cpp)
     target_compile_features(nativekit_sim_brake_state_tests PRIVATE cxx_std_20)
     add_test(NAME sim_brake_state COMMAND nativekit_sim_brake_state_tests)
