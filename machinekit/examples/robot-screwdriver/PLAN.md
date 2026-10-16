@@ -2682,7 +2682,7 @@ still required. The earlier 21-test proof predates this wire extension.
 | SD12 | MuJoCo acceptance passes (Claude, 2026-10-14). Hybrid force/position entry search with spring feed, welded carriage and plan-streamed servo. Nominal seats in 32.9 s at 0 N; the 1 mm offset seats in 34.7 s, 7.5 N peak, 2 searched surfaces. Both hand over to the qualified OK tightening. Integrated acceptance passes; gate baseline exceptions are below. | `fef536bc7`, `92100bc7c`; `sd-main-sync` |
 | SD13 | MuJoCo acceptance passes (Claude, 2026-10-14). Screw-to-work helical joint (`NKSIM_JOINT_HELICAL`, `rk_simulation_create_object_screw_joint`) with socket coupling and a `Seated` hand-off. SimKit and RobotKit native suites pass; all 4 CAD fastenings seat with OK torque. Integrated acceptance passes; gate baseline exceptions are below. | `d8f548d09`, `fef536bc7`; `sd-main-sync` |
 | SD14 | done — drawing projection, CAD-derived thread symbols and callouts pass; ProjectKit passes 370 assertions and the editor passes all 855 cosmetic-thread checks; the three CAD SVG exports were previously rendered and inspected | `projectkit/tests/haxeon.json`; `machinekit/examples/robot-screwdriver/haxeon.drawing.json`; `sd-main-sync` |
-| SD15 | in progress (2026-10-16). SD15a.1–2 landed; SD15a.3 two-arm cell is being commissioned, SD15a.4 acceptance remains open. Automatic tool change has its separate `robotkit/plans/TOOL_CHANGE.md` (TC0 to TC6). | SD15 drafts in `5a6ac41ae`; controller programs in `3bf6cca0c` |
+| SD15 | in progress (2026-10-16). SD15a.1–2 landed; SD15a.3–4 runtime scenarios pass on both backends. Final combined-code gate and local-main integration remain open. Automatic tool change has its separate `robotkit/plans/TOOL_CHANGE.md` (TC0 to TC6). | SD15 drafts in `5a6ac41ae`; controller programs in `3bf6cca0c` |
 
 ### SD8 hardware integration work (2026-10-11)
 
@@ -4081,3 +4081,22 @@ brake-held and slow-move reference scenes from a source-verified geometry
 fixture. Application reference checks and a fresh complete frozen gate on
 the combined code remain pending. SD15a final acceptance and local-main
 integration remain open.
+
+### Combined reference application checks (2026-10-16)
+
+At `fb3317c5a` (runtime code `1ff09a208`), both application checks pass
+using scenes exported by the rebased reference binary. The 60-second
+brake-held scene has maximum joint drift `3.2987987800299555e-8` rad.
+The slow J2 out-and-back and stationary brake handoff pass, with maximum
+speed `0.03335391981513514` rad/s and ten-second parked drift
+`9.134707729600986e-10` rad. These checks exercise the new zero-mass
+pieces, positive aggregate inertials and brake startup behavior through
+the actual application loader and simulator. They remain simulation checks
+with the reference's documented assumptions, not hardware qualification.
+
+The initial new application native build exceeded its isolated 6 GiB
+cap. An incremental rebuild with one Haxeon job and two native compiler
+jobs passed within the same cap. The fresh full-gate runner uses these
+build limits and runs native tests from its evidence directory so the
+intentional MuJoCo instability warning log does not alter source files.
+The full combined-code gate remains required before final sign-off.

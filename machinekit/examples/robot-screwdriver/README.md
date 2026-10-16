@@ -61,12 +61,13 @@ v41. The generated touch sensor assumes a noise-free simulation contact; a
 hardware project must provide its commissioned calibration bound. The force-
 search example carries simulation-only commissioned limits and requires a
 fresh measured compression baseline followed by a confirmed force drop; it is
-not a hardware safety recipe. SD0–SD14 acceptance evidence and the outstanding
-project-wide gate failures are recorded in [PLAN.md](PLAN.md). The SD15 two-arm
-pick, place and fasten cell is still being commissioned; its complete cycle and
-fault/recovery acceptance remain open.
+not a hardware safety recipe. Acceptance evidence through SD15a and known
+project-wide baseline failures are recorded in [PLAN.md](PLAN.md). The two-arm
+cell completes physical handling, fastening, outfeed and fault/recovery checks
+on both simulation backends. The complete baseline gate finished; final
+integration validation against the latest shared runtime is in progress.
 
-## Two-arm cell commissioning
+## Two-arm pick, place and fasten cell
 
 `materia.pick-place.project.json` loads a plate and an unfitted flange housing
 from sensed trays, fastens the four screws, and unloads the retained assembly
@@ -83,17 +84,18 @@ an accepted result for every screw and parks before asserting completion.
 Handling acknowledges completion before unloading. The accepted screws and
 housing retain their identities while following the plate.
 
-Run-down uses a physical thread joint between the screw and plate. At seating,
-the screw retains its measured pose through a physical joint; accepted final
-preload also retains the housing. The moving assembly keeps its physical mass.
+Run-down uses a physical thread joint between the screw and plate. Seated
+screws and the accepted housing are retained on the plate at their measured
+relative poses. The moving assembly keeps its physical mass.
 The 200 N axial-force cap and 1.0e7 N/m thread stiffness are the SD13 example's
 simulation commissioning inputs.
 
-The pressure-driven grippers currently need MuJoCo. The deterministic test
-backend stores joint effort without integrating it, so it cannot execute the
-physical gripping cycle. Its both-backend acceptance requirement remains open
-in [PLAN.md](PLAN.md); the missing-housing presence wait and local stop/retry
-checks pass on both backends. The full cell remains under commissioning.
+Both MuJoCo and the deterministic backend execute the physical pressure-driven
+gripping cycle. The cell acceptance matrix runs seven scenarios on each backend:
+housing handling, the full cycle, missing-part recovery, screw-supply failure,
+fixture not ready, interrupted fastening and the interrupted full cycle. Full
+cycles require four accepted identified screws, physical retention of the
+assembly and measured outfeed error within 1 mm.
 
 CAD and controller-program checks run with:
 
@@ -101,12 +103,15 @@ CAD and controller-program checks run with:
 ./haxeon/scripts/haxeon run --project machinekit/examples/robot-screwdriver/haxeon.pick-place.json
 ```
 
-The app `screwdriver-pick-place` case runs the commissioning stages and fault
-checks. During development, `PICK_PLACE_STAGE` selects `housing`, `full`,
+The default project-source suite exposes 14
+`screwdriver-pick-place-<stage>-<backend>` cases. The focused
+`screwdriver-pick-place` aggregate runs the same scenario matrix. During
+development, `PICK_PLACE_STAGE` selects `housing`, `full`,
 `recovery`, `fixture`, `supply`, `interruption` (fixed plate), or
 `interruption-full` (including plate loading and unload); `PICK_PLACE_BACKEND` selects
-`0` or `1`. The default selection exercises both backends. These selectors do
-not turn an unsupported or incomplete scenario into an acceptance pass.
+`0` or `1`. With no selectors, the focused aggregate exercises both backends.
+The 14 default cases bind their own stage and backend, so these environment
+selectors cannot reduce full-suite coverage.
 `unload` stages the CAD-seated rigid assembly for handling diagnostics; it
 does not qualify fastening. `PICK_PLACE_TRACE=1` adds jaw and contact traces
 for that diagnostic, and measured work poses during the complete cycle.
