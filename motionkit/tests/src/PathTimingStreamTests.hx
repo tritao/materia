@@ -340,6 +340,8 @@ class PathTimingStreamTests extends MotionKitTestSupport {
         check(Int64.compare(candidate.startNs,published) == 0,"filter chunks share one global integer clock");
         var duration = candidate.trajectory.durationSeconds();
         check(duration <= 0.1+1e-9,"filter publication obeys its application budget");
+        if (!candidate.finalChunk)
+          check(duration >= 0.1-2e-9,"moving filter suffix waits for a full publication budget");
         var origin = Int64.toFloat(candidate.startNs)*1e-9;
         for (sample in 0...11) {
           var time = duration*sample/10;
@@ -381,7 +383,7 @@ class PathTimingStreamTests extends MotionKitTestSupport {
     check(events.preview() == null,"event lead prevents premature prefix publication");
     events.dispose();
     var ticks = new TimedMotionBuffer({pressureAdvance:0.0,pressureAdvanceWindow:0.04,
-      shaping:[ShaperImpulses.delay(0.4e-9)],shapingDelay:0.4e-9},null,null,0.1,1.6e-9);
+      shaping:[ShaperImpulses.delay(0.4e-9)],shapingDelay:0.4e-9},null,null,null,1.6e-9);
     var tiny = source.sliceTicks(Int64.ofInt(0),Int64.ofInt(10));
     ticks.append(tiny,false); tiny.dispose();
     var quantized = ticks.preview();

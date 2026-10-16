@@ -119,6 +119,11 @@ class TimedMotionBuffer {
     var available = finalInput ? Int64.add(end,tailNs) : Int64.sub(end,futureNs);
     if (Int64.compare(available,published) <= 0) return null;
     var limit = maximumNs, wanted = available;
+    // Future input can extend a short stable suffix. Publishing it now creates
+    // a moving chunk shorter than the executor/device refill horizon. Keep it
+    // until the configured publication budget is ready; the true final tail
+    // may be shorter because its endpoint is independently certified at rest.
+    if (!finalInput && limit != null && Int64.compare(Int64.sub(available,published),limit) < 0) return null;
     if (limit != null && Int64.compare(limit,Int64.sub(available,published)) < 0) wanted = Int64.add(published,limit);
     var current = new BufferRevision();
     var owned:Array<Trajectory> = [];
