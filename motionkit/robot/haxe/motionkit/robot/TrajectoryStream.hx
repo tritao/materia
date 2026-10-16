@@ -258,7 +258,7 @@ class TrajectoryStream {
   public function motionSubmission(trajectory:Trajectory, first:Int, last:Int, tag:Int64,
       startNs:Int64, modelRevision:Int64, calibrationRevision:Int64,
       jerkUnchecked:Bool, jointTolerances:Array<Float>,
-      ?purpose:ExecutionPlanPurpose = Program):ExecutionPlanSubmission {
+      ?purpose:ExecutionPlanPurpose = Program, ?positionTolerances:Array<Float>):ExecutionPlanSubmission {
     checkMotion(trajectory);
     var startSeconds = Int64.toFloat(startNs) * 1e-9;
     var payload:Array<TrajectorySegment> = [];
@@ -295,7 +295,7 @@ class TrajectoryStream {
     }
     return new ExecutionPlanSubmission(tag, modelRevision, calibrationRevision, 1,
       state.positions, velocity, acceleration, payload, null, null,
-      jointTolerances, jointTolerances,
+      first == 0 && positionTolerances != null ? positionTolerances : jointTolerances, jointTolerances,
       accelerationTolerance, last == segments.count(), null, jerkUnchecked, null, trajectory.controlAcceleration, purpose);
   }
 

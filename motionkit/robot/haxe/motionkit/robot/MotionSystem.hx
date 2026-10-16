@@ -61,6 +61,7 @@ class MotionSystem {
   var queuedTrajectories:Array<Trajectory> = [];
   final stream:TrajectoryStream;
   final jointTolerances:Array<Float>;
+  final jointPositionTolerances:Array<Float>;
   final session:MotionSession = new MotionSession();
   var activeStationary:Bool = false;
   var elapsedSeconds(get, never):Float;
@@ -106,6 +107,7 @@ class MotionSystem {
     this.replacementOwnerPeriodSeconds = blueprint.replacementOwnerPeriodSeconds;
     this.axes = [];
     jointTolerances = [for (_ in description.joints) 1e-6];
+    jointPositionTolerances = jointTolerances.copy();
     var axisIds = new Map<String, Bool>();
     var hasHomes = false;
     for (contact in blueprint.runtime.switches) if (contact.role == "home") hasHomes = true;
@@ -120,6 +122,15 @@ class MotionSystem {
       var tolerance = [for (_ in description.joints) 0.0];
       axis.writeLogicalDelta(tolerance, 1e-6);
       for (joint in axis.jointIndices) jointTolerances[joint] = Math.abs(tolerance[joint]);
+      // Discrete drive targets can differ from analytic setpoints by one emitted step.
+      // Derive admission from the machine's drives, independently of simulated counters.
+      var resolution = 0.0;
+      for (slot in 0...axis.jointIndices.length) {
+        var load = robotkit.model.DriveLoads.basicForAxis(blueprint.model, description.joints[axis.jointIndices[slot]]);
+        if (load != null) resolution = Math.max(resolution, load.stepResolution() / Math.abs(axis.jointScale(slot)));
+      }
+      axis.writeLogicalDelta(tolerance, Math.max(1e-6, resolution));
+      for (joint in axis.jointIndices) jointPositionTolerances[joint] = Math.abs(tolerance[joint]);
     }
     for (axis in this.axes) {
       var joint = axis.jointIndices[0];
@@ -730,7 +741,7 @@ class MotionSystem {
         (first, last, tag, startNs, _) -> stream.motionSubmission(
           trajectoryValue, first, last, tag, startNs, modelRevision,
           calibrationRevision, jerkUnchecked, jointTolerances,
-          jogTrajectories.exists(trajectoryValue) ? robotkit.execution.ExecutionPlanPurpose.Jog : robotkit.execution.ExecutionPlanPurpose.Program),
+          jogTrajectories.exists(trajectoryValue) ? robotkit.execution.ExecutionPlanPurpose.Jog : robotkit.execution.ExecutionPlanPurpose.Program, jointPositionTolerances),
         (first, last, error) ->
           'plan chunk [$first,$last] of ${trajectoryValue.segments().length}: $error');
     } catch (error:Dynamic) {

@@ -961,6 +961,27 @@ class PlannerTests extends MotionKitTestSupport {
         PathPlanningOptions.exactStopMode(), new MotionOptions(0.04, 0.4));
       check(timed.durationSeconds() > 0.0,
         'helical $plane is timed as joint motion');
+      // Quantized startup position admission must not change derivatives or later chunk seams.
+      var stream = new motionkit.robot.TrajectoryStream(rig.robot);
+      var pieces = timed.segments();
+      stream.begin(pieces, timed.durationSeconds());
+      var ordinary = [for (_ in measured) 1e-6];
+      var quantized = [for (_ in measured) 1e-5];
+      for (first in 0...2) {
+        var plain = stream.motionSubmission(timed, first, first + 1, Int64.ofInt(1),
+          pieces[first].timeFromStartNs, Int64.ofInt(1), Int64.ofInt(0), true, ordinary);
+        var bounded = stream.motionSubmission(timed, first, first + 1, Int64.ofInt(1),
+          pieces[first].timeFromStartNs, Int64.ofInt(1), Int64.ofInt(0), true, ordinary,
+          robotkit.execution.ExecutionPlanPurpose.Program, quantized);
+        for (joint in 0...measured.length) {
+          near(bounded.positionTolerances.get(joint), first == 0 ? quantized[joint] : ordinary[joint],
+            "only the startup chunk receives drive-position admission", 0);
+          near(bounded.velocityTolerances.get(joint), plain.velocityTolerances.get(joint),
+            "drive-position admission preserves velocity tolerance", 0);
+          near(bounded.accelerationTolerances.get(joint), plain.accelerationTolerances.get(joint),
+            "drive-position admission preserves acceleration tolerance", 0);
+        }
+      }
       var timedEnd = timed.evaluate(timed.durationSeconds()).positions;
       near(rig.machine.axis("x").logicalPosition(timedEnd), circular.end.x,
         'helical $plane reaches X', 1e-5);
