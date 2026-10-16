@@ -3,8 +3,15 @@
 Current priority: the **frozen, trusted supplier 5 kg reference**, with 110T at
 J1–J3 and 70T at J4–J6. See [load reconciliation](REFERENCE-RECONCILIATION.md).
 [80T/straight/cover/resize experiments are archived](EXPERIMENTS-ARCHIVED.md);
-geometry modification and CNC tending are stopped. Supplier confirmation,
-buildability, controls and bench evidence follow this original geometry.
+geometry modification and CNC tending are stopped. See the active packages:
+
+- [Supplier request — final text, not sent](SUPPLIER-CONFIRMATION.txt)
+- [STEP BOM, wiring and rough cost](REFERENCE-BUILD.md)
+- [Timed controls and eRob simulation stub](REFERENCE-CONTROLS.md)
+- [One-module J2 bench package](J2-BENCH.md)
+- [Independent UR5e/FR5 kinematics](../reference-arms/COMMERCIAL-REFERENCE-VALIDATION.md)
+
+Supplier confirmation, buildability, controls and bench evidence follow this original geometry.
 
 This is an articulated CAD variant based on ZeroErr's eRobot 5 reference:
 eRob110T at J1–J3, eRob70T at J4–J6, straight hollow links, the supplied elbow

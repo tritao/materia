@@ -12,7 +12,7 @@ by the earlier completed software checklist.
 - [x] 3. [STEP-derived BOM, assembly/cable/EtherCAT wiring and rough cost](../zeroerr-arm/REFERENCE-BUILD.md); exact installed screws, harness details and quote remain supplier gaps.
 - [x] 4. [Drive profile, native timed paths, inverse-dynamics guards and EtherCAT/eRob stub](../zeroerr-arm/REFERENCE-CONTROLS.md); four simulation runs pass. Vendor assembled limits, exact curves/ESI and hardware backend remain pending.
 - [x] 5. [One 110T J2 bench package](../zeroerr-arm/J2-BENCH.md), measured-load template and validated reducer; physical test not performed.
-- [ ] 6. Independent FR5 manufacturer kinematics validation beside UR5e.
+- [x] 6. [Independent manufacturer-DH validation](COMMERCIAL-REFERENCE-VALIDATION.md): 141 configurations per UR5e/FR5, native/Jacobian checks and frozen goldens; serial calibration remains outside scope.
 
 No geometry modifications. Treat the supplier 5 kg rating as trusted. CNC tending
 and the old 23 transfers are deferred; eventual cell design uses shared commercial

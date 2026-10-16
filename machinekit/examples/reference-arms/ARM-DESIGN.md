@@ -2,6 +2,8 @@
 
 Current authority: [frozen trusted ZeroErr 5 kg reference and reconciled load model](../zeroerr-arm/REFERENCE-RECONCILIATION.md). Geometry modification is stopped. The resize/straight/cover recommendations below are historical and superseded by the user's frozen-baseline instruction.
 
+UR5e and FR5 now both pass [independent nominal manufacturer-DH regressions](COMMERCIAL-REFERENCE-VALIDATION.md); the earlier FR5 oracle gap described below is closed at the nominal-geometry level.
+
 The active work is arm design. CNC tending, cell reconfiguration and the inherited
 23 transfers are deferred application studies. Their historical results remain
 available, but they do not define acceptance for this arm or rank commercial robots.

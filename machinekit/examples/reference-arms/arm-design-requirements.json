@@ -2,37 +2,107 @@
   "schema": 1,
   "scope": "Standalone six-axis arm design; CNC tending and cell layout deferred",
   "designBaseline": "zeroerr-original",
-  "commercialReferences": ["ur5e", "fairino5_v6"],
+  "commercialReferences": [
+    "ur5e",
+    "fairino5_v6"
+  ],
   "targets": {
-    "totalFlangeLoadKg": {"value": 5, "status": "user_target_class", "includes": "tool and workpiece together"},
-    "nominalReachMm": {"minimum": 850, "referenceRange": [850, 922], "status": "provisional_design_target", "basis": "UR5e/FR5 class; usable oriented workspace must be evaluated separately"},
-    "peakJointSpeedDegS": {"value": 180, "status": "class_benchmark", "qualification": "Not simultaneous rated load/speed/acceleration in every configuration"},
-    "poseRepeatabilityMm": {"value": 0.03, "status": "aspirational_benchmark_not_verified", "verification": "Measured repeated motion with calibrated external metrology; not CAD/FK residual"},
-    "jointTravel": {"value": null, "status": "not_frozen", "verification": "Supplier physical limits, zero/sign convention, self-collision and harness review"},
-    "flange": {"status": "revision_matched_interface_required", "verification": "Drawing/STEP agreement, pilot, bolts, dowel and normal; no generic adapter assumed qualified"},
-    "dutyCycle": {"value": null, "status": "not_frozen", "verification": "Standalone motion duty and supplier thermal/torque-speed curves before actuator selection"}
+    "totalFlangeLoadKg": {
+      "value": 5,
+      "status": "user_target_class",
+      "includes": "tool and workpiece together"
+    },
+    "nominalReachMm": {
+      "minimum": 850,
+      "referenceRange": [
+        850,
+        922
+      ],
+      "status": "provisional_design_target",
+      "basis": "UR5e/FR5 class; usable oriented workspace must be evaluated separately"
+    },
+    "peakJointSpeedDegS": {
+      "value": 180,
+      "status": "class_benchmark",
+      "qualification": "Not simultaneous rated load/speed/acceleration in every configuration"
+    },
+    "poseRepeatabilityMm": {
+      "value": 0.03,
+      "status": "aspirational_benchmark_not_verified",
+      "verification": "Measured repeated motion with calibrated external metrology; not CAD/FK residual"
+    },
+    "jointTravel": {
+      "value": null,
+      "status": "not_frozen",
+      "verification": "Supplier physical limits, zero/sign convention, self-collision and harness review"
+    },
+    "flange": {
+      "status": "revision_matched_interface_required",
+      "verification": "Drawing/STEP agreement, pilot, bolts, dowel and normal; no generic adapter assumed qualified"
+    },
+    "dutyCycle": {
+      "value": null,
+      "status": "not_frozen",
+      "verification": "Standalone motion duty and supplier thermal/torque-speed curves before actuator selection"
+    }
   },
   "screeningAssumptions": {
     "toolKg": 1,
     "payloadKg": 4,
-    "combinedCogOffsetsMm": [0, 100, 150],
+    "combinedCogOffsetsMm": [
+      0,
+      100,
+      150
+    ],
     "jointAccelerationDegS2": 60,
     "designFactor": 1.2,
     "massSensitivityFactor": 1.25,
-    "originalJointWindowDeg": [-170, 170],
+    "originalJointWindowDeg": [
+      -170,
+      170
+    ],
     "haltonSamples": 128,
     "collisionMarginMetres": 0.0005,
-    "commonTool": {"lengthMm": 150, "widthMm": 40, "massKg": 1, "status": "synthetic box; point-load mass screening excludes its intrinsic inertia"},
+    "commonTool": {
+      "lengthMm": 150,
+      "widthMm": 40,
+      "massKg": 1,
+      "status": "synthetic box; point-load mass screening excludes its intrinsic inertia"
+    },
     "jacobianCharacteristicLengthM": 0.85,
     "nearSingularSigmaThreshold": 0.01,
     "note": "Assumptions are diagnostics, not supplier ratings or commissioned travel. Sampling densities/fractions are not robot rankings."
   },
   "gates": [
-    {"id": "reference_integrity", "requires": "Pinned official description, meshes, source frames, dimensions and limit discrepancies recorded"},
-    {"id": "kinematic_validation", "requires": "UR manufacturer DH oracle; FR5 source-consistency plus drawing checks, with missing independent controller oracle explicit"},
-    {"id": "standalone_motion", "requires": "Oriented target grid, sampled self-clearance, Jacobian conditioning and continuous basic paths; no cell fixtures"},
-    {"id": "mechanical_release", "requires": "Confirmed module codes/masses/CoGs, coupled torque-speed-duty, bearing/connection/stiffness and harness checks"},
-    {"id": "bench_validation", "requires": "Single joint and connection: measured hold/deflection/lost motion/temperature; then full-arm metrology"}
+    {
+      "id": "reference_integrity",
+      "requires": "Pinned official description, meshes, source frames, dimensions and limit discrepancies recorded"
+    },
+    {
+      "id": "kinematic_validation",
+      "requires": "UR5e and FR5 independent manufacturer nominal-DH checks; explicit FR5 source-precision bound; serial controller calibration separate"
+    },
+    {
+      "id": "standalone_motion",
+      "requires": "Oriented target grid, sampled self-clearance, Jacobian conditioning and continuous basic paths; no cell fixtures"
+    },
+    {
+      "id": "mechanical_release",
+      "requires": "Confirmed module codes/masses/CoGs, coupled torque-speed-duty, bearing/connection/stiffness and harness checks"
+    },
+    {
+      "id": "bench_validation",
+      "requires": "Single joint and connection: measured hold/deflection/lost motion/temperature; then full-arm metrology"
+    }
   ],
-  "release": {"hardwareQualified": false, "cobotSafetyQualified": false, "cellIntegrationInScope": false}
+  "release": {
+    "hardwareQualified": false,
+    "cobotSafetyQualified": false,
+    "cellIntegrationInScope": false
+  },
+  "designBaselineStatus": "Frozen trusted original supplier 5 kg arm; investigate model assumptions before proposing geometry changes",
+  "validationAuthority": {
+    "commercial": "COMMERCIAL-REFERENCE-VALIDATION.md",
+    "originalLoads": "../zeroerr-arm/REFERENCE-RECONCILIATION.md"
+  }
 }

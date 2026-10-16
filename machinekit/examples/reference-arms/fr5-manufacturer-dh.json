@@ -1,0 +1,20 @@
+{
+  "schema":1,
+  "source":"https://fairino-doc-en.readthedocs.io/latest/CobotsManual/robot_brief_introduction.html",
+  "documentVersion":"FAIRINO Collaborative Robot User Manual 4.0.0",
+  "section":"2.4, table 2.4-5, FR5 (not FR5-C or FR5-WML)",
+  "checkedOn":"2026-10-16",
+  "captureMethod":"Normalized numeric table transcribed from official documentation through web reader; direct HTTP capture returned 403. This is not raw HTML or controller-recorded output.",
+  "convention":"Standard DH: Rz(theta) Tz(d) Tx(a) Rx(alpha); millimetres converted to metres",
+  "rows":[
+    ["Joint1","0","0","152","π/2"],
+    ["Joint2","0","-425","0","0"],
+    ["Joint3","0","-395","0","0"],
+    ["Joint4","0","0","102","π/2"],
+    ["Joint5","0","0","102","-π/2"],
+    ["Joint6","0","0","100","0"]
+  ],
+  "baseRotationZRad":0,
+  "terminalFrame":"Manufacturer physical flange, including 100 mm d6; common simulation TCP adds 150 mm along flange Z",
+  "calibrationClaim":false
+}

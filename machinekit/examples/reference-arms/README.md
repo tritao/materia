@@ -1,5 +1,7 @@
 # Imported reference arms
 
+Current authority: [independent UR5e/FR5 manufacturer validation](COMMERCIAL-REFERENCE-VALIDATION.md) and the [frozen ZeroErr 5 kg reference](../zeroerr-arm/REFERENCE-RECONCILIATION.md). Geometry experiments and CNC tending are deferred/archived. Older load-screen and FR5-pending statements below are historical.
+
 The active work is the [standalone arm-design baseline](ARM-DESIGN.md).
 CNC tending and cell reconfiguration are deferred; their existing results are
 application-specific historical evidence. The new suite checks commercial
