@@ -3037,3 +3037,31 @@ The uncommitted park now selects `arm/toolFlange:face`, commanding only the six
 arm joints. Fresh deterministic housing-only and full-cycle runs are in
 progress; this is not yet accepted. A focused missing-housing and robot-only
 stop/retry check is also being built. SD15a.3 and SD15a.4 remain open.
+
+### SD15a physical handling backend gap (2026-10-16)
+
+The fresh deterministic runs `sd-cases-sd15-housing10` and `sd-cases-sd15-full1`
+both reject their first pick with measured grasp unconfirmed, at 4.32 s and
+4.20 s respectively. This is a distinct prerequisite gap: the default SimKit
+`TestPhysicsBackend` stores `NKSIM_JOINT_TARGET_EFFORT`, but its step loop only
+advances existing joint velocities, without integrating joint effort. The
+parallel gripper's pressure drive correctly submits effort, so this backend
+cannot close those jaws. A standalone native probe applying 10 N to a 1 kg
+prismatic slider for 0.1 s returns q=0, velocity=0, stored effort=10. Its source
+and output are `sd15-effort-probe.cpp` / `.txt` in the scratch directory.
+The existing tending physical-gripper integration also explicitly selects
+MuJoCo; it does not establish default-backend pressure support.
+
+Do not substitute an assumed width switch, a kinematic attachment or a renamed
+MuJoCo backend for the required default-backend handling acceptance. Joint
+effort response and contact-constrained jaw motion need a sound implementation
+before the both-backend SD15a.4 requirement can pass.
+
+The MuJoCo full-cycle run `sd-cases-sd15-full2` has loaded the free plate,
+confirmed its fixture presence, placed the free housing and reached fastening;
+its final outcome is pending. `sd-cases-sd15-recovery` passes the missing-housing,
+targeted handling stop, local retry and measured restocking checks on MuJoCo;
+the deterministic counterpart remains running. The reset-wire change remains
+uncommitted pending its full verification. The first diagnostic build was
+terminated by earlyoom at 2696 MB under concurrent load; a retry is queued with
+12 GB required host headroom. Neither interrupted build is a test failure.
