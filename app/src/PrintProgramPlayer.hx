@@ -2,17 +2,13 @@ package app;
 
 import cadkit.modeling.AssemblyState;
 import cnckit.CncCompiler;
-import cnckit.CncController;
 import cnckit.CncDiagnostic.CncSeverity;
 import materia.project.SceneArtifact.SceneArtifactPrinting;
-import motionkit.axis.MotionAxisBlueprint;
 import motionkit.event.EventValue;
 import motionkit.robot.ManipulatorMotion;
-import motionkit.robot.MotionSystemBlueprint;
 import motionkit.robot.PlanCheck;
 import motionkit.robot.PlanCheck.PlanCheckOptions;
 import motionkit.robot.StepperSlip;
-import motionkit.trajectory.InputShaper;
 import nativekit.sim.SimSession;
 import robotkit.device.DeviceBinding;
 import robotkit.runtime.EncoderMonitor;
@@ -21,8 +17,6 @@ import robotkit.runtime.VirtualHeaters;
 import robotkit.runtime.VirtualHeaters.HeaterSetup;
 import robotkit.tool.HeaterSensor;
 import robotkit.tool.HeaterSensor.HeaterReading;
-import toolpathkit.motion.MachineBinding;
-import toolpathkit.motion.PrinterBinding;
 import toolpathkit.motion.ToolpathChannels;
 import toolpathkit.motion.ToolpathMotion;
 import toolpathkit.motion.ToolpathMotionBinding;
@@ -159,50 +153,16 @@ class PrintProgramPlayer extends ToolpathPlayer {
 		var steady = checkOptions.steady;
 		// The controller's step tick caps the stepper axes; the planner holds each joint to its own limits.
 		var machineModel = DeviceBinding.planningModel(robot.model, job.controller.stepTickHz);
-		var axes:Array<MotionAxisBlueprint> = [];
-		var start:Array<Float> = [];
-		var rapid = 0.0;
-		for (id in job.axes) {
-			var joint = [for (joint in definition.joints) if (joint.id == id) joint];
-			if (joint.length != 1 || Std.string(joint[0].type) != "prismatic") throw 'Print axis "$id" must be a prismatic joint of the printer';
-			var limits = joint[0].limits;
-			var lower = limits.lower, upper = limits.upper;
-			if (lower == null || upper == null) throw 'Print axis "$id" needs travel limits';
-			var initial = placement.joint(id) * metresPerUnit;
-			start.push(initial);
-			// The axis is as fast as the joints turning with it and their motors allow: belts, screws and the motors at their full rate.
-			// What both motors of a CoreXY ask together is bounded by their rows in the plan (the pulleys' columns), not by a share here.
-			var coupled = machineModel.coupledLimits(id, steady, true);
-			if (coupled.velocity == null || coupled.maxAcceleration == null || !(coupled.velocity > 0) || !(coupled.maxAcceleration > 0))
-				throw 'Print axis "$id" needs velocity and acceleration limits, its own or its motors\'';
-			rapid = Math.max(rapid, coupled.velocity);
-			axes.push(new MotionAxisBlueprint(id, [id], lower * metresPerUnit, upper * metresPerUnit,
-				coupled.velocity, coupled.maxAcceleration, initial, [1.0], [-initial]));
-		}
-		var blueprint = new MotionSystemBlueprint(machineModel, robot.blueprint, axes, session.fixedTimestep());
-		var machine = new MachineBinding("machine", job.axes[0], job.axes[1], job.axes[2], rapid, channels, 1e-4);
-		machine.setRapidsAtFeed(true);
-		var printer = new PrinterBinding(job.extruder, job.filamentDiameter, job.gearRadius, job.maxFlow, job.rampLength,
-			job.pressureAdvance, job.pressureAdvanceWindow);
-		if (job.shaping != null) {
-			var soft = robotkit.model.DriveLoads.of(machineModel,null,[for (shaper in job.shaping) shaper.axis]);
-			var hard = robotkit.model.DriveLoads.stiffest(machineModel,null,[for (shaper in job.shaping) shaper.axis]);
-			for (shaper in job.shaping) {
-				var shaped = InputShaper.named(shaper.kind,shaper.frequency,shaper.damping);
-				for (load in soft) if (load.axis == shaper.axis && load.stiffness>0.0 && load.mass>0.0) {
-					var upper = [for (candidate in hard) if (candidate.axis == load.axis) candidate][0];
-					var lowerHz = Math.sqrt(load.stiffness/load.mass)/(2*Math.PI), upperHz = Math.sqrt(upper.stiffness/upper.mass)/(2*Math.PI);
-					if (shaped.impulses.residualBound(lowerHz,upperHz,shaper.damping)>0.2)
-						throw 'Fixed shaper for ${shaper.axis} does not cover physical travel: $lowerHz..$upperHz Hz';
-				}
-				printer.shapers.set(shaper.axis,shaped);
-			}
-		}
-		machine.setPrinter(printer);
-		var binding = new ToolpathMotionBinding(machine, blueprint);
+		var configured = new toolpathkit.motion.PrintingMotionBinding(job, {
+			definition: definition, initialPositions: [for (id in job.axes) placement.joint(id)],
+			metresPerUnit: metresPerUnit, model: machineModel, runtime: robot.blueprint,
+			fixedTimestepSeconds: session.fixedTimestep(), channels: channels, steady: steady});
+		var blueprint = configured.blueprint, machine = configured.machine, printer = configured.printer;
+		var binding = configured.binding;
+		var start = configured.initialPositions;
 		// Every plan is checked against the drives: the plan's joints are all of the machine's, the axes' and the extruder's motors are loaded.
 		binding.compiler.planCheck = new PlanCheck(machineModel, [for (joint in machineModel.joints) joint.id], checkOptions);
-		var controller = new CncController(Printer);
+		var controller = configured.gcodeController();
 		// A program runs from wherever the machine is, so each pass compiles it from there.
 		compileFrom = position -> {
 			var compiled = CncCompiler.compileDetailed(job.source, controller, position, machine.travel);

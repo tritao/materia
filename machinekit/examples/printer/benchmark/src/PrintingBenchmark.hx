@@ -11,7 +11,6 @@ import cnckit.printer.PrinterWriter;
 import haxe.Int64;
 import machinekit.transmission.SpurGear;
 import materia.project.SceneArtifact;
-import motionkit.axis.MotionAxisBlueprint;
 import motionkit.robot.ProgramBlocks;
 import motionkit.trajectory.InputShaper;
 import motionkit.robot.ProgramCompiler;
@@ -20,9 +19,7 @@ import motionkit.robot.MotionSystemBlueprint;
 import motionkit.robot.ProgramBarrier;
 import motionkit.trajectory.ExecutionPlan;
 import robotkit.device.DeviceBinding;
-import robotkit.model.JointType;
 import robotkit.model.SteadyLoads;
-import toolpathkit.motion.MachineBinding;
 import toolpathkit.motion.PrinterBinding;
 import toolpathkit.motion.ToolpathMotion;
 import toolpathkit.motion.ToolpathMotionBinding;
@@ -31,55 +28,40 @@ import toolpathkit.path.ToolpathProgram;
 
 /** The CoreXY printer's three axes as the planner sees them. */
 class PrinterAxes {
-  /**
-    Joint values are relative to the assembly's initial pose, which has the nozzle over the bed's middle and 10 mm
-    above it: the bed's front left corner at the surface is joint (-0.11, -0.11, -0.01), the work origin.
-  **/
-  public static inline var ORIGIN_X:Float = -0.11;
-  public static inline var ORIGIN_Y:Float = -0.11;
-  public static inline var ORIGIN_Z:Float = -0.01;
+  /** Logical coordinates are machine metres; the shared job adapter maps the assembly's initial pose. */
   public final binding:ToolpathMotionBinding;
   public final blueprint:MotionSystemBlueprint;
   public final speed:Array<Float> = [];
   public final acceleration:Array<Float> = [];
   public final start:Array<Float>;
   public final printer:PrinterBinding;
+  public final controller:CncController;
   /** The printer job's input shapers (machine data), whether or not this machine applies them. */
   public final shaping:Array<materia.project.SceneArtifact.SceneArtifactShaper>;
 
   /** `shaped` plans with the printer's input shapers, as the app does; without it the motion is as the planner times it. */
   public function new(?pressureAdvance:Float = 0.0, ?shaped:Bool = false) {
     var scene = SceneArtifact.decode(CoreXyPrinterPreview.printer());
-    var job = scene.printing;
-    if (job == null || job.shaping == null) throw "the printer example states no input shapers";
+    var job = scene.printing,definition = scene.assemblyDefinition;
+    if (job == null || job.shaping == null || definition == null) throw "the printer example states no shaped print job";
     shaping = job.shaping;
-    var model = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition, AssemblyPhysicalPartView.fromSceneArtifact(scene),
-      scene.assemblyState).model;
-    var planning = DeviceBinding.planningModel(model, 40000);
-    var axes = [for (id in ["x", "y", "z"]) {
-      var joint = planning.joints[[for (j in planning.joints) j.id].indexOf(id)];
-      if (joint.type != JointType.Prismatic) throw 'printer joint $id is not an axis';
-      // The motors' full rate: the pulleys' columns of the plan bound a move by both motors' rows (AM5b item 7).
-      var limits = planning.coupledLimits(id, new SteadyLoads(), true);
-      speed.push(limits.requireVelocity());
-      acceleration.push(limits.requireAcceleration());
-      new MotionAxisBlueprint(id, [id], joint.limits.lower, joint.limits.upper, limits.requireVelocity(), limits.requireAcceleration(),
-        joint.limits.lower);
-    }];
-    blueprint = MotionSystemBlueprint.fromRobotModel(planning, axes);
-    var machine = new MachineBinding("work", "x", "y", "z", 0.25, new toolpathkit.motion.ToolpathChannels(""), 1e-4);
-    machine.setRapidsAtFeed(true);
-    // The extruder: a hobbed gear of the printer's own extruder part, feeding the hotend's filament.
-    var printed = new CoreXyPrinter();
-    printer = new PrinterBinding("e", printed.hotend.spec.filamentDiameter * 1e-3, printed.extruder.spec.hobDiameter * 0.5e-3,
-      printed.hotend.spec.maxVolumetricFlow * 1e-9, 0.0005, pressureAdvance);
-    if (shaped) for (shaper in shaping) printer.shapers.set(shaper.axis, InputShaper.named(shaper.kind, shaper.frequency, shaper.damping));
-    machine.setPrinter(printer);
-    binding = new ToolpathMotionBinding(machine, blueprint);
-    // Where homing leaves the nozzle (the slicer's profile).
-    ids = [for (joint in planning.joints) joint.id];
+    var physical = AssemblyPhysicalPartView.fromSceneArtifact(scene);
+    var placement = new cadkit.modeling.AssemblyState(definition,scene.assemblyState);
+    var model = AssemblySimulationBridge.toRobotModel(definition,physical,scene.assemblyState).model;
+    var planning = DeviceBinding.planningModel(model,job.controller.stepTickHz);
+    var runtime = robotkit.runtime.RobotRuntimeCompiler.compile(planning,new robotkit.profile.RobotProfile());
+    var configured = new toolpathkit.motion.PrintingMotionBinding(job,{
+      definition:definition,initialPositions:[for(id in job.axes)placement.joint(id)],metresPerUnit:physical.metresPerUnit,
+      model:planning,runtime:runtime,fixedTimestepSeconds:0.01,channels:new toolpathkit.motion.ToolpathChannels(""),
+      steady:new SteadyLoads()},pressureAdvance,shaped);
+    blueprint = configured.blueprint;
+    for (axis in blueprint.axes) { speed.push(axis.maxVelocity); acceleration.push(axis.maxAcceleration); }
+    printer = configured.printer;
+    controller = configured.gcodeController();
+    binding = configured.binding;
+    ids = [for(joint in planning.joints)joint.id];
     this.planning = planning;
-    start = stateAt(0.0, 0.0, 0.01);
+    start = stateAt(0.0,0.0,0.01);
   }
 
   public final planning:robotkit.model.RobotModel;
@@ -88,20 +70,10 @@ class PrinterAxes {
   /** Every joint's value with the nozzle at (x, y, z) of the bed's frame, each coupled joint where its leaders put it. */
   public function stateAt(x:Float, y:Float, z:Float):Array<Float> {
     var q = [for (_ in ids) 0.0];
-    q[ids.indexOf("x")] = ORIGIN_X + x;
-    q[ids.indexOf("y")] = ORIGIN_Y + y;
-    q[ids.indexOf("z")] = ORIGIN_Z + z;
-    var known = [for (id in ids) id == "x" || id == "y" || id == "z"];
-    for (_ in 0...ids.length) for (follower in 0...ids.length) if (!known[follower]) {
-      var sum = 0.0, any = false, ready = true;
-      for (coupling in planning.couplings) if (coupling.follower == ids[follower]) {
-        any = true;
-        var leader = ids.indexOf(coupling.leader);
-        if (!known[leader]) ready = false;
-        else sum += coupling.ratio * q[leader] + coupling.offset;
-      }
-      if (any && ready) { q[follower] = sum; known[follower] = true; }
-    }
+    binding.solver.x.writeLogicalPosition(q,x);
+    binding.solver.y.writeLogicalPosition(q,y);
+    binding.solver.z.writeLogicalPosition(q,z);
+    binding.solver.completeDerived(q,true);
     return q;
   }
 }
@@ -179,13 +151,12 @@ class PrintingBenchmark {
     var ops:Array<ToolpathOp> = [];
     for (op in program.ops) {
       switch op {
-        case Move(_, _, _, _, _), MachineMove(_, _, _, _, _): ops.push(op);
+        case Move(_, _, _, _, _), MachineMove(_, _, _, _, _), SetSetup(_, _): ops.push(op);
         case Layer(_, _, _): if (layers >= 0 && ++seen > layers) break;
         case _:
       }
     }
-    return new ToolpathProgram(ops, program.tools, [new toolpathkit.setup.Setup("1",
-      new toolpathkit.path.Point3(PrinterAxes.ORIGIN_X, PrinterAxes.ORIGIN_Y, PrinterAxes.ORIGIN_Z))]);
+    return new ToolpathProgram(ops,program.tools,program.setups);
   }
 
   /** What a load came to: the numbers `report` prints. */
@@ -256,6 +227,7 @@ class PrintingBenchmark {
    * breaks a limit or strays from the path's tolerance).
    */
   static function gate(machine:PrinterAxes, settings:SlicerSettings, profile:PrinterProfile):Void {
+    setupChecks(machine);
     motorChecks(machine);
     shapingChecks(machine, settings, profile);
     extruderChecks(machine, settings, profile);
@@ -287,6 +259,28 @@ class PrintingBenchmark {
    * drives' plan check on, and sampled every millisecond: no motor turns faster than its own rate allows, none is asked
    * for more torque than it gives, and the axes' own limits are kept.
    */
+  /** Filtering a job for timing must retain its selected work-coordinate frame. */
+  static function setupChecks(machine:PrinterAxes):Void {
+    var tag=new toolpathkit.path.Provenance(1,1,0);
+    var source=new ToolpathProgram([
+      ToolpathOp.SetSetup("offset",tag),
+      ToolpathOp.Move(Cut,toolpathkit.path.PathGeometry.Line(new toolpathkit.path.Point3(0.01,0.01,0.01),
+        new toolpathkit.path.Point3(0.02,0.01,0.01)),0.02,0,tag)],new toolpathkit.tool.ToolLibrary(),[
+      new toolpathkit.setup.Setup("1",new toolpathkit.path.Point3(0,0,0)),
+      new toolpathkit.setup.Setup("offset",new toolpathkit.path.Point3(0.1,0.1,0))]);
+    var lowered=ToolpathMotion.lower(motionOnly(source),machine.binding.machine);
+    var motion=lowered.program;
+    if(motion==null)throw "Offset setup did not lower";
+    var end=machine.stateAt(0.11,0.11,0.01);
+    var compiled=machine.binding.compiler.compile(motion,end,Int64.ofInt(1));
+    for(block in compiled.blocks)for(plan in block.plans)end=plan.evaluate(plan.durationSeconds).positions;
+    var pose=machine.binding.solver.forward(end);
+    compiled.dispose();
+    check(Math.abs(pose.x-0.12)<1e-9 && Math.abs(pose.y-0.11)<1e-9 && Math.abs(pose.z-0.01)<1e-9,
+      "Timing-only job lost its selected work offset");
+    Sys.println("setups: timing-only job preserves its work-coordinate selection");
+  }
+
   static function motorChecks(machine:PrinterAxes):Void {
     var model = machine.blueprint.model;
     var ids = [for (joint in model.joints) joint.id];
@@ -294,7 +288,7 @@ class PrintingBenchmark {
     machine.binding.compiler.planCheck = new motionkit.robot.PlanCheck(model, ids, options);
     var motors = ["pulleyA-turn", "pulleyB-turn"];
     var rates = [for (id in motors) model.coupledLimits(id, null, true).requireVelocity()];
-    var origin = new toolpathkit.path.Point3(PrinterAxes.ORIGIN_X, PrinterAxes.ORIGIN_Y, PrinterAxes.ORIGIN_Z);
+    var origin = new toolpathkit.path.Point3(0,0,0);
     var report:Array<String> = [];
     var seconds = new Map<String, Float>();
     for (move in [{name: "x", dx: 1.0, dy: 0.0}, {name: "y", dx: 0.0, dy: 1.0}, {name: "45", dx: 1.0, dy: 1.0}, {name: "135", dx: -1.0, dy: 1.0}]) {
@@ -374,7 +368,7 @@ class PrintingBenchmark {
    */
   static function shapingChecks(machine:PrinterAxes, settings:SlicerSettings, profile:PrinterProfile):Void {
     var shaped = new PrinterAxes(0.0, true);
-    var origin = new toolpathkit.path.Point3(PrinterAxes.ORIGIN_X, PrinterAxes.ORIGIN_Y, PrinterAxes.ORIGIN_Z);
+    var origin = new toolpathkit.path.Point3(0,0,0);
     var ids = [for (joint in machine.planning.joints) joint.id];
     var resonances = new Map<String, {mass:Float, stiffness:Float, frequency:Float}>();
     var tails = new Map<String, Float>();
@@ -505,8 +499,7 @@ class PrintingBenchmark {
     var part = TestParts.smallTab();
     var sliced = Slicer.slice(part, settings, profile, "tab");
     part.close();
-    var program = new ToolpathProgram(sliced.program.ops, sliced.program.tools, [new toolpathkit.setup.Setup("1",
-      new toolpathkit.path.Point3(PrinterAxes.ORIGIN_X, PrinterAxes.ORIGIN_Y, PrinterAxes.ORIGIN_Z))]);
+    var program = sliced.program;
     var lowered = ToolpathMotion.lower(program, machine.binding.machine);
     var motion = lowered.program;
     if (motion == null) throw "the tab lowers to nothing";
@@ -620,14 +613,14 @@ class PrintingBenchmark {
       var sliced = Slicer.slice(part, settings, profile, name);
       part.close();
       if (dump != null)
-        sys.io.File.saveContent('$dump/$name.gcode', PrinterWriter.write(sliced.program, new CncController(Printer), PrinterFlavour.Klipper));
+        sys.io.File.saveContent('$dump/$name.gcode', PrinterWriter.write(sliced.program, machine.controller, PrinterFlavour.Klipper));
       return sliced;
     }
     /** G-code written earlier (`PRINTING_BENCHMARK_DUMP`) stands in for slicing: `PRINTING_BENCHMARK_GCODE=file`. */
     var file = Sys.getEnv("PRINTING_BENCHMARK_GCODE");
     if (file != null) {
       var began = Sys.time();
-      var read = CncCompiler.compileDetailed(sys.io.File.getContent(file), new CncController(Printer), new toolpathkit.path.Point3(0.0, 0.0, 0.01));
+      var read = CncCompiler.compileDetailed(sys.io.File.getContent(file), machine.controller, new toolpathkit.path.Point3(0.0, 0.0, 0.01));
       for (item in read.diagnostics) if (item.severity == cnckit.CncDiagnostic.CncSeverity.Error) throw "G-code: " + item.message;
       report(file, machine, read.program, Sys.time() - began);
       return;
@@ -642,10 +635,10 @@ class PrintingBenchmark {
     }
     if (only == "all" || only == "gcode") {
       var sliced = sliceNamed("tower", TestParts.testTower());
-      var controller = new CncController(Printer);
+      var controller = machine.controller;
       var text = PrinterWriter.write(sliced.program, controller, PrinterFlavour.Klipper);
       var began = Sys.time();
-      var read = CncCompiler.compileDetailed(text, new CncController(Printer), new toolpathkit.path.Point3(0.0, 0.0, 0.01));
+      var read = CncCompiler.compileDetailed(text, machine.controller, new toolpathkit.path.Point3(0.0, 0.0, 0.01));
       for (item in read.diagnostics) if (item.severity == cnckit.CncDiagnostic.CncSeverity.Error) throw "G-code round trip: " + item.message;
       Sys.println('  G-code: ${text.split("\n").length} lines, read back in ${Math.round((Sys.time() - began) * 1000)} ms');
       report("test tower from G-code", machine, read.program, Sys.time() - began);

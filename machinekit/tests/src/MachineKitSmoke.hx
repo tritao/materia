@@ -2581,6 +2581,7 @@ class MachineKitSmoke {
 		}
 		if (Sys.getEnv("MACHINEKIT_PRINTING_ONLY") == "1") {
 			PrintingPartTests.run();
+			PrintingJobBindingTests.run();
 			CoreXyPrinterChecks.run();
 			PrinterKlipperTests.run();
 			return;
@@ -2646,6 +2647,7 @@ class MachineKitSmoke {
 			{name: "CoreXyPlotterChecks.run", run: CoreXyPlotterChecks.run, weight: 2.7},
 			{name: "CoreXyDriveTests.run", run: CoreXyDriveTests.run, weight: 0.5},
 			{name: "PrintingPartTests.run", run: PrintingPartTests.run, weight: 0.3},
+			{name: "PrintingJobBindingTests.run", run: PrintingJobBindingTests.run, weight: 0.5},
 			{name: "CoreXyPrinterChecks.run", run: CoreXyPrinterChecks.run, weight: 4},
 			{name: "PrinterKlipperTests.run", run: PrinterKlipperTests.run, weight: 3},
 			{name: "assemblyPreviewSharing", run: assemblyPreviewSharing, weight: 0.05},

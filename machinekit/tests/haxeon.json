@@ -17,6 +17,7 @@
 		"robotkit": { "path": "../../robotkit" },
 		"cadbridge": { "path": "../../robotkit/cadbridge" },
 		"toolpathkit": { "path": "../../toolpathkit" },
+		"toolpathkit-motion": { "path": "../../toolpathkit/motion" },
 		"camkit": { "path": "../../camkit" },
 		"cnckit": { "path": "../../cnckit" }
 	},

@@ -19,6 +19,12 @@
     },
     "processkit": {
       "path": "../../processkit"
+    },
+    "projectkit": {
+      "path": "../../projectkit"
+    },
+    "cnckit": {
+      "path": "../../cnckit"
     }
   },
   "target": "host"
