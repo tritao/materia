@@ -3715,3 +3715,25 @@ editor build and complete editor regression suite also pass, including the
 resumable mission integration (`sd15-editor-current-build.log`,
 `sd15-editor-current.log`). Deterministic whole-cell/fault acceptance and the
 final frozen-source full gate remain open.
+
+### SD15a relative-pose contact geometry cache (2026-10-16)
+
+Fresh native RobotKit SimKit/MuJoCo and both session wrappers pass against the
+indexed-axis implementation (`sd15-dynamics-current-*.log`). The fourth actual
+deterministic diagnostic run still spends most sampled time repeatedly deriving
+hull manifolds (`sd15-deterministic-native4-profile.txt`); it was explicitly
+stopped for a targeted geometry-cache change, not counted as acceptance.
+
+Manifolds are now cached by body/piece IDs and relative body pose, with points
+and normals stored in the first body's coordinates. Changed relative pose
+invalidates geometry; common rigid motion transforms the cached result. Solved
+impulses are never cached. Destruction removes related entries and the cache is
+bounded. The 1e-12 relative-pose tolerance only suppresses numerical pose noise.
+
+A new physical probe raises an existing support, checks the recomputed seated
+height and weight, then removes it and requires free fall with zero contact
+force. Its first 0.2 s observation was during the flight launched by the abrupt
+floor step; extending settling time to 2 s passes the unchanged height/force
+limits. All 247 physical assertions and 29937 checked API operations pass, as do
+all six core groups (`sd15-dynamics-manifold-motion2-ctest.log`). Actual
+whole-cell/fault acceptance and the final frozen-source gate remain open.

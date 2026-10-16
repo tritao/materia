@@ -824,6 +824,32 @@ int main() {
         near_contact(contact_force(*b, object)[2], 9.81, .01,
                      "many-edge convex prism reports its supported weight");
     }
+    {
+        auto b = world(0, 0, -9.81);
+        auto base = body(*b, false, 0), dummy = body(*b, true, 1);
+        auto j = joint(*b, base, dummy);
+        effort(*b, j, 0);
+        auto floor = collider(*b, NKSIM_MOTION_STATIC, 0, {0, 0, 0}, {1, 1, .05});
+        auto object = collider(*b, NKSIM_MOTION_DYNAMIC, 1, {0, 0, .1}, {.05, .05, .05});
+        for (int i = 0; i < 200; ++i)
+            ok(b->step(.001, 1));
+        auto moved = pose(*b, floor);
+        moved.position[2] = .01;
+        ok(b->body_set_state(floor, moved));
+        // The discontinuous floor step launches the body; allow its flight to settle.
+        for (int i = 0; i < 2000; ++i)
+            ok(b->step(.001, 1));
+        near_contact(pose(*b, object).position[2], .11, 2e-6,
+                     "relative motion invalidates cached contact depth");
+        near_contact(contact_force(*b, object)[2], 9.81, .01,
+                     "recomputed manifold supports moved-floor load");
+        moved.position[0] = 3;
+        ok(b->body_set_state(floor, moved));
+        for (int i = 0; i < 200; ++i)
+            ok(b->step(.001, 1));
+        check(pose(*b, object).position[2] < -.05, "moving support away cannot preserve cached attachment");
+        near_contact(contact_force(*b, object)[2], 0, 1e-12, "removed support has no cached force");
+    }
     grip_probe(false);
     grip_probe(true);
     std::printf("Generalized effort: %d analytical assertions and %d API operations passed; box, convex and "

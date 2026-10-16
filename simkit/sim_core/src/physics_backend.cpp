@@ -182,6 +182,7 @@ public:
 
     nksim_result body_destroy(std::uint64_t id) override {
         previous_root_velocity.erase(id);
+        for(auto it=contact_geometry.begin();it!=contact_geometry.end();)if(it->first[0]==id||it->first[2]==id)it=contact_geometry.erase(it);else ++it;
         for(auto it=local_hulls.begin();it!=local_hulls.end();)if(it->first.first==id)it=local_hulls.erase(it);else ++it;
         const auto before = bodies.size();
         bodies.erase(std::remove_if(bodies.begin(), bodies.end(),
@@ -1793,6 +1794,45 @@ private:
         }
         return false;
     }
+    struct CachedManifold {
+        Vec3 relative_position{}, normal{};
+        Quat relative_rotation{};
+        std::vector<std::pair<Vec3, double>> points;
+        bool valid = false;
+    };
+    std::map<std::array<std::uint64_t, 4>, CachedManifold> contact_geometry;
+    std::vector<std::pair<Vec3, double>> geometry_manifold(const TestBody &a, int pa, const TestBody &b,
+                                                           int pb, const TestBody &piece_a,
+                                                           const TestBody &piece_b, Vec3 &normal) {
+        auto &cached = contact_geometry[{a.id, static_cast<std::uint64_t>(pa + 1), b.id,
+                                         static_cast<std::uint64_t>(pb + 1)}];
+        const auto inverse = conjugate(a.state.rotation);
+        const auto position = rotate(inverse, sub(b.state.position, a.state.position));
+        const auto rotation = multiply(inverse, b.state.rotation);
+        bool unchanged = cached.valid;
+        for (int i = 0; i < 3; ++i)
+            unchanged = unchanged && std::abs(position[i] - cached.relative_position[i]) < 1e-12;
+        for (int i = 0; i < 4; ++i)
+            unchanged = unchanged && std::abs(rotation[i] - cached.relative_rotation[i]) < 1e-12;
+        if (!unchanged) {
+            auto points =
+                piece_a.desc.shape_type == NKSIM_SHAPE_BOX && piece_b.desc.shape_type == NKSIM_SHAPE_BOX
+                    ? box_manifold(force_box(piece_a), force_box(piece_b), normal)
+                    : hull_manifold(cached_world_hull(a, pa), cached_world_hull(b, pb), normal);
+            cached.relative_position = position;
+            cached.relative_rotation = rotation;
+            cached.normal = rotate(inverse, normal);
+            cached.points = std::move(points);
+            cached.valid = true;
+            for (auto &point : cached.points)
+                point.first = rotate(inverse, sub(point.first, a.state.position));
+        }
+        normal = rotate(a.state.rotation, cached.normal);
+        auto points = cached.points;
+        for (auto &point : points)
+            point.first = add(a.state.position, rotate(a.state.rotation, point.first));
+        return points;
+    }
     struct ForceBounds {
         Vec3 minimum{INFINITY, INFINITY, INFINITY}, maximum{-INFINITY, -INFINITY, -INFINITY};
         void include(const Vec3 &p) {
@@ -1830,6 +1870,8 @@ private:
         auto outcome = advance_efforts(h);
         if (outcome != NKSIM_OK)
             return outcome;
+        if (contact_geometry.size() > 16384)
+            contact_geometry.clear();
         std::vector<ImpulseContact> rows;
         std::vector<std::vector<TestBody>> pieces(bodies.size());
         std::vector<std::vector<ForceBounds>> bounds(bodies.size());
@@ -1895,11 +1937,7 @@ private:
                         if (!supported(piece_a.desc.shape_type) || !supported(piece_b.desc.shape_type))
                             return NKSIM_ERROR_UNSUPPORTED;
                         Vec3 normal{};
-                        auto manifold =
-                            piece_a.desc.shape_type == NKSIM_SHAPE_BOX &&
-                                    piece_b.desc.shape_type == NKSIM_SHAPE_BOX
-                                ? box_manifold(force_box(piece_a), force_box(piece_b), normal)
-                                : hull_manifold(cached_world_hull(a, pa), cached_world_hull(b, pb), normal);
+                        auto manifold = geometry_manifold(a, pa, b, pb, piece_a, piece_b, normal);
                         for (const auto &[point, depth] : manifold) {
                             ImpulseContact c;
                             auto surface = [&](const BackendShapePart &value) {
