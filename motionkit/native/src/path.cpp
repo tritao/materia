@@ -457,14 +457,32 @@ constexpr double MAX_STAGE_TURN = 0.6;
 // A straight span (every joint affine in s: a line of a Cartesian machine, however long) has the same limits
 // everywhere, so its speed profile changes only in the stretch next to each end where it speeds up to its fastest or
 // slows from it, `Z = v^2 / 2a` long (`v` the fastest it can go, `a` the path acceleration the joints allow): beyond
-// that it cruises, and one stage covers the middle. The stretches get `ZONE_STAGES` stages each, so the stages of a line
-// do not grow with its length, where a stage per few micrometres of a hundred millimetres was a million for a cube.
-constexpr size_t ZONE_STAGES = 10;
+// that it cruises, and one stage covers the middle. Grid size stays independent of a long line's length.
+//
+// For fixed boundary speeds, the exact squared-speed envelope is min(v0^2+2As,
+// v1^2+2A(L-s), V^2). The discrete optimum interpolates that envelope at nodes.
+// Only intervals containing a switch lose time. With spacing h, their combined
+// integral squared-speed deficit is <= A*h^2 (one triangular switch, or two
+// ramp/cruise switches). The derivative of x^(-1/2) bounds the time loss by
+// A*h^2/(2*x_min^(3/2)). Use N stages per end zone, or 2N uniformly when L<=2Z.
+// In either case, normalizing by the exact time gives a relative loss bounded by
+// 1/(8*N^2*(1-1/N)^(3/2)) <= 1/(8*(N-1)^2), N>=2. On short spans, peak^2>=A*L;
+// on long spans, T>=V/A and every switch lies in an end zone. In switch intervals
+// x_min >= peak^2*(1-1/N). This bounds discretization, not later polynomial lowering;
+// the latter retains its independent validation. Two-stage short asymmetric
+// triangles can lose over 4%, even though symmetric rest-to-rest triangles are exact.
+// Make the existing straight-line regression's 0.4% accuracy target explicit.
+constexpr double STRAIGHT_GRID_TIME_ERROR = 0.004;
+constexpr size_t straight_zone_stages() {
+    size_t count = 2;
+    while (8.0 * static_cast<double>((count - 1) * (count - 1)) * STRAIGHT_GRID_TIME_ERROR < 1.0) ++count;
+    return count;
+}
+constexpr size_t STRAIGHT_ZONE_STAGES = straight_zone_stages();
 
 // Keep each solver's constraint tables bounded. Window boundaries propagate complete squared-speed
 // controllable intervals backwards and the actually reachable squared speed forwards.
 constexpr size_t WINDOW_NODES = 8192;
-constexpr double ZONE_REACH = 1.5;
 
 // Stage positions within a span, chosen from its local velocity, curvature and acceleration bounds.
 struct SpanGrid {
@@ -518,14 +536,16 @@ SpanGrid nodes_for_span(const std::vector<mk_path_sample> &samples, size_t span,
     if (reference) return uniform(MAX_STAGES_PER_SPAN);
     if (!moving) return uniform(MIN_STAGES_PER_SPAN);
     if (straight && std::isfinite(accelerating) && std::isfinite(fastest) && fastest > 0.0) {
-        // The stretch where the speed changes, with room to spare: the profile may start slowing a little before the
-        // distance the limits give (their margins are not the whole story), and a node must not come after it.
+        // At constant path acceleration A, reaching any speed <= V from any
+        // nonnegative entry speed takes at most V^2/(2A) distance; braking is
+        // symmetric. `margin` includes the exact moving-boundary acceleration
+        // reserve used by the solver, so no empirical reach multiplier is needed.
         const double exact = fastest * fastest / (2.0 * margin * accelerating);
-        const double step = exact / static_cast<double>(ZONE_STAGES);
-        const size_t zone_stages = static_cast<size_t>(std::lround(ZONE_REACH * static_cast<double>(ZONE_STAGES)));
+        const double step = exact / static_cast<double>(STRAIGHT_ZONE_STAGES);
+        const size_t zone_stages = STRAIGHT_ZONE_STAGES;
         const double zone = step * static_cast<double>(zone_stages);
-        if (length <= 2.0 * zone + step)
-            return uniform(std::clamp(static_cast<size_t>(std::ceil(length / step)), MIN_STAGES_PER_SPAN, 2 * zone_stages + 1));
+        if (length <= 2.0 * zone)
+            return uniform(2 * zone_stages);
         for (size_t k = 0; k <= zone_stages; ++k) grid.nodes.push_back(step * static_cast<double>(k) / length);
         for (size_t k = 0; k < zone_stages; ++k) grid.nodes.push_back((length - zone + step * static_cast<double>(k)) / length);
         return grid;
@@ -967,14 +987,19 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
         // path. Reserve room for those peaks; final validation still uses the
         // caller's exact acceleration limit.
         const double interpolation_margin = nonlinear ? 0.8 : 1.0;
+        const double moving_boundary_margin = (start_speed > 0.0 || end_speed > 0.0)
+            ? 0.98 : 1.0;
+        std::vector<double> grid_velocity(joint_count);
+        for (uint32_t j = 0; j < joint_count; ++j)
+            grid_velocity[j] = max_velocity[j] * moving_boundary_margin;
         // Stages per span, and the grid they make: each span's first point is a path sample (an anchor).
         std::vector<size_t> span_first(samples.size(), 0);
         std::vector<uint32_t> stage_span;
         std::vector<double> grid_values;
         for (size_t span = 0; span + 1 < samples.size(); ++span) {
             span_first[span] = stage_span.size();
-            const auto span_grid = nodes_for_span(samples, span, max_velocity, max_acceleration, joint_count,
-                speed_cap_count ? speed_caps[span] : 0.0, interpolation_margin, reference);
+            const auto span_grid = nodes_for_span(samples, span, grid_velocity.data(), max_acceleration, joint_count,
+                speed_cap_count ? speed_caps[span] : 0.0, interpolation_margin * moving_boundary_margin, reference);
             const double begin = samples[span].s, length = samples[span + 1].s - begin;
             for (const double node : span_grid.nodes) {
                 stage_span.push_back(static_cast<uint32_t>(span));
@@ -984,8 +1009,6 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
         span_first.back() = stage_span.size();
         grid_values.push_back(samples.back().s);
         toppra::Vector grid = Eigen::Map<const toppra::Vector>(grid_values.data(), static_cast<Eigen::Index>(grid_values.size()));
-        const double moving_boundary_margin = (start_speed > 0.0 || end_speed > 0.0)
-            ? 0.98 : 1.0;
         toppra::Vector lower_velocity(dof), upper_velocity(dof);
         toppra::Vector lower_acceleration(dof), upper_acceleration(dof);
         for (uint32_t j = 0; j < joint_count; ++j) {

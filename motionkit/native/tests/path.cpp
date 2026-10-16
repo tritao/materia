@@ -431,12 +431,15 @@ int main() {
     // optimum under the same solver margins. Exercise switches throughout the
     // end zones, including triangular profiles that never reach the feed cap.
     {
-        for(double length : {0.0001, 0.001, 0.1})
-        for(double entry_fraction : {0.0, 0.3, 0.8})
-        for(double exit_fraction : {0.0, 0.3, 0.8}) {
-            const double feed=0.06, joint_velocity=0.25, joint_acceleration=12.5;
-            const double entry=entry_fraction*feed, exit=exit_fraction*feed;
+        for(double length : {0.00001, 0.0001, 0.001, 0.1})
+        for(double feed : {0.06, 0.25})
+        for(double entry_fraction : {0.0, 0.15, 0.3, 0.6, 0.8})
+        for(double exit_fraction : {0.0, 0.15, 0.3, 0.6, 0.8}) {
+            const double joint_velocity=0.25, joint_acceleration=12.5;
+            const double boundary_scale=std::min(feed,std::sqrt(2*0.98*joint_acceleration*length));
+            const double entry=entry_fraction*boundary_scale, exit=exit_fraction*boundary_scale;
             const double effective_acceleration=joint_acceleration*((entry>0 || exit>0) ? 0.98 : 1.0);
+            const double effective_velocity=std::min(feed,joint_velocity*((entry>0 || exit>0) ? 0.98 : 1.0));
             if(std::abs(exit*exit-entry*entry)>2*effective_acceleration*length)continue;
             mk_path_sample line[2]{};
             for(unsigned i=0;i<2;++i){
@@ -448,7 +451,7 @@ int main() {
             assert(mk_time_path(path,&joint_velocity,&joint_acceleration,1,&feed,1,
                 entry,exit,1e-6,0,nullptr,&law,&trajectory)==MK_OK);
             int64_t ns=0;assert(mk_trajectory_duration_ns(trajectory,&ns)==MK_OK);
-            const double peak=std::min(feed,std::sqrt(effective_acceleration*length+(entry*entry+exit*exit)/2));
+            const double peak=std::min(effective_velocity,std::sqrt(effective_acceleration*length+(entry*entry+exit*exit)/2));
             const double ramp_distance=(2*peak*peak-entry*entry-exit*exit)/(2*effective_acceleration);
             const double ideal=(2*peak-entry-exit)/effective_acceleration+std::max(0.0,length-ramp_distance)/peak;
             const double actual=ns*1e-9;
