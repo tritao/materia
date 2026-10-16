@@ -3737,3 +3737,24 @@ floor step; extending settling time to 2 s passes the unchanged height/force
 limits. All 247 physical assertions and 29937 checked API operations pass, as do
 all six core groups (`sd15-dynamics-manifold-motion2-ctest.log`). Actual
 whole-cell/fault acceptance and the final frozen-source gate remain open.
+
+### SD15a per-step body Jacobians and ineffective constraints (2026-10-16)
+
+The cached-contact implementation passes refreshed ASan/UBSan with leak detection
+(`sd15-dynamics-cached-sanitizer.log`). Its actual backend-0 diagnostic run
+`sd15-deterministic-native5` confirms that hull work is no longer dominant;
+allocation, contact Jacobians and friction solves now dominate the live profile
+(`sd15-deterministic-native5-profile.txt`). That run was explicitly stopped for
+these measured costs and is not a functional acceptance result.
+
+Body-origin linear/angular Jacobians are now cached per physical substep and
+used to derive contact-point rows. Rows without active coordinates return early;
+zero friction bounds release accumulated tangential impulse without solving an
+ineffective block. Contacts with zero normal response still publish geometric
+observations, but do not allocate/iterate unsolvable friction constraints.
+
+A dedicated prescribed-only overlap test requires all four contact observations,
+the exact penetration and an invalid measured-wrench flag. All 256 physical
+assertions and 29946 checked API operations pass, and all six core groups are
+green (`sd15-dynamics-prescribed-observation-ctest.log`). The actual deterministic
+cell/fault matrix, final frozen-source gate and local-main merge remain open.

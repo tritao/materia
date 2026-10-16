@@ -1181,7 +1181,7 @@ private:
                 }
         return result;
     }
-    std::vector<Vec3> point_jacobian(std::uint64_t id, const Vec3 &point) const {
+    std::vector<Vec3> raw_point_jacobian(std::uint64_t id, const Vec3 &point) const {
         std::vector<Vec3> result(force_coordinates.size());
         const auto *current = find_body(id);
         while (current) {
@@ -1260,6 +1260,7 @@ private:
         for (std::size_t i = 0; i < n; ++i)
             if (row.j[i] != 0)
                 row.active_j.push_back(i);
+        if(row.active_j.empty())return row;
         for (const auto &block : force_blocks) {
             bool active = false;
             for (auto i : block)
@@ -1307,7 +1308,7 @@ private:
         }
         return make_impulse_row(std::move(row), known);
     }
-    std::vector<Vec3> angular_jacobian(std::uint64_t id) const {
+    std::vector<Vec3> raw_angular_jacobian(std::uint64_t id) const {
         std::vector<Vec3> result(force_coordinates.size());
         const auto *current = find_body(id);
         while (current) {
@@ -1328,8 +1329,29 @@ private:
         }
         return result;
     }
+    struct BodyJacobian {
+        std::vector<Vec3> linear, angular;
+    };
+    mutable std::map<std::uint64_t, BodyJacobian> step_jacobians;
+    const BodyJacobian &body_jacobian(std::uint64_t id) const {
+        auto found = step_jacobians.find(id);
+        if (found == step_jacobians.end())
+            found = step_jacobians
+                        .emplace(id, BodyJacobian{raw_point_jacobian(id, find_body(id)->state.position),
+                                                  raw_angular_jacobian(id)})
+                        .first;
+        return found->second;
+    }
+    std::vector<Vec3> point_jacobian(std::uint64_t id, const Vec3 &point) const {
+        const auto &jac = body_jacobian(id);
+        auto result = jac.linear;
+        const auto offset = sub(point, find_body(id)->state.position);
+        for (std::size_t i = 0; i < result.size(); ++i)
+            result[i] = add(result[i], cross3(jac.angular[i], offset));
+        return result;
+    }
     ImpulseRow angular_row(std::uint64_t a, std::uint64_t b, const Vec3 &direction) const {
-        const auto ja = angular_jacobian(a), jb = angular_jacobian(b);
+        const auto &ja = body_jacobian(a).angular, &jb = body_jacobian(b).angular;
         std::vector<double> row(ja.size());
         double known = dot3(sub(body_velocity(b).w, body_velocity(a).w), direction);
         for (std::size_t i = 0; i < row.size(); ++i) {
@@ -1343,6 +1365,12 @@ private:
             force_velocity[i] += row.response[i] * impulse;
     }
     void solve_friction_disk(const ImpulseRow &u, const ImpulseRow &v, double &iu, double &iv, double cap) {
+        if (cap <= 0) {
+            apply_impulse(u, -iu);
+            apply_impulse(v, -iv);
+            iu = iv = 0;
+            return;
+        }
         const double uu = u.inverse_effective > 0 ? 1 / u.inverse_effective : 0,
                      vv = v.inverse_effective > 0 ? 1 / v.inverse_effective : 0;
         double uv = 0;
@@ -1867,6 +1895,7 @@ private:
         return bounds;
     }
     nksim_result force_step(double h) {
+        step_jacobians.clear();
         auto outcome = advance_efforts(h);
         if (outcome != NKSIM_OK)
             return outcome;
@@ -1984,6 +2013,10 @@ private:
                             c.u = scale(c.u, 1 / std::sqrt(dot3(c.u, c.u)));
                             c.v = cross3(normal, c.u);
                             c.normal = contact_row(a.id, b.id, point, normal);
+                            if (c.normal.inverse_effective == 0) {
+                                contacts.push_back(c.contact);
+                                continue;
+                            }
                             c.tangent_u = contact_row(a.id, b.id, point, c.u);
                             c.tangent_v = contact_row(a.id, b.id, point, c.v);
                             if (c.time_constant > 0 && c.normal.inverse_effective > 0) {

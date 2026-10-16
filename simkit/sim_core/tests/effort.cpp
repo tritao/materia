@@ -850,6 +850,26 @@ int main() {
         check(pose(*b, object).position[2] < -.05, "moving support away cannot preserve cached attachment");
         near_contact(contact_force(*b, object)[2], 0, 1e-12, "removed support has no cached force");
     }
+    {
+        auto b = world();
+        auto base = body(*b, false, 0), dummy = body(*b, true, 1);
+        auto j = joint(*b, base, dummy);
+        effort(*b, j, 0);
+        auto floor = collider(*b, NKSIM_MOTION_STATIC, 0, {0, 0, 0}, {1, 1, .05});
+        auto prescribed = collider(*b, NKSIM_MOTION_KINEMATIC, 1, {0, 0, .09}, {.05, .05, .05});
+        ok(b->step(.001, 1));
+        std::vector<BackendContact> contacts;
+        ok(b->read_contacts(contacts));
+        int count = 0;
+        for (const auto &contact : contacts)
+            if (contact.body_a == floor && contact.body_b == prescribed) {
+                ++count;
+                check(!contact.wrench_valid, "prescribed-only overlap has no invented measured wrench");
+                near_contact(contact.distance, -.01, 1e-12,
+                             "unsolved prescribed contact retains geometric penetration");
+            }
+        check(count == 4, "prescribed-only contacts remain observable without ineffective solver rows");
+    }
     grip_probe(false);
     grip_probe(true);
     std::printf("Generalized effort: %d analytical assertions and %d API operations passed; box, convex and "
