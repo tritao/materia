@@ -108,6 +108,11 @@ class ProjectArtifactLoader {
     }
 
     if (artifact.assemblyDefinition != null) {
+      var assembly:materia.assembly.AssemblyDefinition = artifact.assemblyDefinition;
+      var visualOnly = new Map<String, Bool>();
+      for (componentDefinition in assembly.definitions)
+        if (componentDefinition.collisionHulls != null && componentDefinition.collisionHulls.length == 0)
+          visualOnly.set(componentDefinition.id, true);
       var parts = new Map<String, SceneArtifactPart>();
       for (part in artifact.parts) parts.set(part.id, part);
       for (occurrence in artifact.assemblyDefinition.occurrences) {
@@ -116,6 +121,8 @@ class ProjectArtifactLoader {
         addOccurrenceRecord(records, component, occurrence.id, occurrence.definition,
           poses.get(occurrence.id), componentUseCount.get(occurrence.definition),
           boundsByDefinition, geometryKeyByDefinition, scale);
+        // Empty authored hulls explicitly mark a visual-only assembly component.
+        if (visualOnly.exists(occurrence.definition)) records[records.length - 1].collisionEnabled = false;
       }
     } else {
       for (component in artifact.parts)

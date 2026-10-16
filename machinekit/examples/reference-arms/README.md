@@ -55,8 +55,20 @@ declaration`; redistribution permission remains unresolved and its assets are no
 
 Visual meshes and source collision meshes are prepared separately. Imported collision
 pieces currently use enclosing 26-DOPs of source collision meshes. These are conservative
-convex approximations, not exact B-rep clearance evidence. Render colors currently use
-the URDF material or a neutral fallback; embedded DAE textures are not reproduced.
+convex approximations, not exact B-rep clearance evidence. Visual material regions
+retain URDF colors (including named materials), or embedded DAE base colors and
+metallic/roughness values. Each region is a fixed visual part; the link's declared
+mass/inertia and source collision pieces are assigned once. Explicit empty
+`collisionHulls` marks the additional pieces as visual-only.
+
+The prepared UR5e has 27 visual pieces, seven physical links, six moving joints,
+and four source colors (including blue and black). FR5 has seven pale-grey visual
+pieces, as declared in its source. Neither model's current assets contain image
+textures. Sources with embedded image textures are rejected explicitly until UV
+and image import is implemented; they are not silently converted to flat grey.
+Regenerate with `prepare.py ur5e fairino5_v6`, then export with `--cartesian`.
+The app integration check `--commercial-only` verifies colors, mass and playback
+without running the archived cell-comparison cases.
 
 Source mass/inertia is preserved explicitly, including inertial-frame rotation. Exterior
 mesh volume is retained only as geometric metadata; its placeholder density must not be
@@ -82,8 +94,8 @@ promise complete branches or persistent geometric branch labels.
 Initial range verification exported 22 scenes: 14 UR models, seven standard FAIRINO
 models and FR5-WML. All passed 39 source-pose checks each (858 total). FR3-WML and
 FR3-WMS source URDFs reference an undeclared `tool_Link` and are rejected explicitly.
-Five importer tests cover source hash rejection, coordinate conventions, finite input,
-safe mesh paths and generated wire-field mapping. Run them with the preparation venv:
+Importer tests cover source hash rejection, coordinate conventions, finite input,
+safe mesh paths, material regions and generated wire-field mapping. Run them with the preparation venv:
 
 ```sh
 python -m unittest discover -s machinekit/examples/reference-arms -p 'test_*.py'

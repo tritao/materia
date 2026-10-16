@@ -81,7 +81,7 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(2) var connectors:Array<AssemblyConnector>;
 	/** Standard robot tool flange face, declared by the component. */
 	@:id(3) @:optional var robotFlangeConnector:String;
-	/** Authored convex collision pieces in the component's local length unit. */
+	/** Authored convex collision pieces in local units; empty explicitly disables collision for visual-only pieces. */
 	@:id(4) @:optional var collisionHulls:Array<Array<Float>>;
 }
 

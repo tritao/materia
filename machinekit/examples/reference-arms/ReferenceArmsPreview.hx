@@ -35,6 +35,12 @@ class ReferenceArmsPreview {
       sys.io.File.saveBytes(ROOT+id+"/"+id+".mtrg",bytes);
       var scene = SceneArtifact.decode(bytes);
       var converted = AssemblySimulationBridge.toRobotModel(scene.assemblyDefinition,AssemblyPhysicalPartView.fromSceneArtifact(scene));
+      var expectedMass=0.001,expectedCollisions=0;
+      for(link in source.manifest.links) if(link.visuals.length>0) {expectedMass+=(cast link.massKg:Float);expectedCollisions+=link.collisions.length;}
+      var mass=0.0,collisions=0;for(link in converted.model.links) {mass+=link.mass;collisions+=link.collisionShapes.length;}
+      check(converted.model.links.length==7,"Visual materials must retain seven physical links");
+      check(Math.abs(mass-expectedMass)<1e-8,"Visual materials must not duplicate mass");
+      check(collisions==expectedCollisions,"Visual materials must retain source collision pieces exactly once");
       var planningWindows:Array<String> = [];
       for (joint in converted.model.joints) if (joint.type == robotkit.model.JointType.Continuous) {
         // Analytic turn enumeration needs a finite study window. The saved source

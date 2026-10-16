@@ -106,7 +106,17 @@ class ReferenceArmsApplicationTests {
     var reports:Array<{model:String,parts:Int,jointMotion:Float,maxTrackingError:Float}> = [];
     for (id in ["ur5e","fairino5_v6"]) {
       var generated = ProjectSourceLoader.load(root+"/materia.project.json",null,null,id);
-      check(generated.objects.length == 7 && generated.projectJob == id,"Source model job must load seven visible links");
+      var manifest:Dynamic=haxe.Json.parse(File.getContent(root+"/build/"+id+"/manifest.json"));
+      var links:Array<Dynamic> = manifest.links,expectedVisuals=0,expectedMass=0.0;
+      for(link in links) {var visuals:Array<Dynamic> = link.visuals;expectedVisuals+=visuals.length;if(visuals.length>0) expectedMass+=link.massKg;}
+      check(generated.objects.length==expectedVisuals && generated.projectJob==id,"Source job must retain every visual material region");
+      var mass=0.0;for(object in generated.objects) mass+=object.mass;
+      check(Math.abs(mass-expectedMass)<1e-8,"Visual regions must not duplicate link mass");
+      for(object in generated.objects) if(object.mass==0) check(!object.collisionEnabled,"Visual-only material regions must not appear as editor collisions");
+      if(id=="ur5e") {
+        check([for(o in generated.objects) if(o.blue>0.7 && o.red<0.55 && o.green>0.6) o].length>0,"UR blue must survive the app loader");
+        check([for(o in generated.objects) if(o.red<0.05 && o.green<0.05 && o.blue<0.05) o].length>0,"UR black must survive the app loader");
+      }
       var path = root+"/build/"+id+"/"+id+"-cartesian.mtrg";
       var moving = ProjectSourceLoader.load(path);
       check(moving.robotMotions != null && moving.robotMotions.length == 6,"Cartesian artifact must retain six tracks");
@@ -134,6 +144,7 @@ class ReferenceArmsApplicationTests {
         editor.dispose();
       } catch (error:Dynamic) {editor.dispose(); throw error;}
     }
+    if(Sys.args().indexOf("--commercial-only")>=0) {Sys.println(haxe.Json.stringify(reports));return;}
     var comparisonMountings:Array<String> = [];
     for (mounting in ["floor","wall","ceiling"]) {
       var generated = ProjectSourceLoader.load(root+"/comparison.project.json",null,null,mounting);

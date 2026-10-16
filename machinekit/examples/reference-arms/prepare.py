@@ -180,6 +180,47 @@ def geometry(element, package, package_name):
     return mesh
 
 
+def visual_geometry(visual, robot, package, package_name):
+    """Keep embedded mesh material regions, applying each scene-node transform once."""
+    material = visual.find("material")
+    color_node = None if material is None else material.find("color")
+    if color_node is None and material is not None and material.get("name"):
+        named = next((m for m in robot.findall("material") if m.get("name") == material.get("name")), None)
+        color_node = None if named is None else named.find("color")
+        if named is not None and named.find("texture") is not None:
+            raise ValueError("URDF texture needs UV/texture import")
+    if material is not None and material.find("texture") is not None:
+        raise ValueError("URDF texture needs UV/texture import")
+    override = None if color_node is None else numbers(color_node.get("rgba"), 4)
+    mesh_node = visual.find("geometry/mesh")
+    if mesh_node is None:
+        return [(geometry(visual, package, package_name), override or [0.65, 0.7, 0.74, 1], 0.0, 0.65)]
+    path = mesh_relative(mesh_node.attrib["filename"], package, package_name)
+    loaded = trimesh.load(package / path, force="scene", process=False)
+    result = []
+    for node in loaded.graph.nodes_geometry:
+        transform, name = loaded.graph[node]
+        mesh = loaded.geometry[name].copy()
+        source = getattr(mesh.visual, "material", None)
+        if source is not None and (getattr(source, "baseColorTexture", None) is not None or getattr(source, "image", None) is not None):
+            raise ValueError(f"Image-textured source needs UV/texture import: {path}")
+        factor = None if source is None else getattr(source, "baseColorFactor", None)
+        if factor is None and source is not None:
+            factor = getattr(source, "diffuse", None)
+        color = override or (np.asarray(factor, dtype=float).tolist() if factor is not None else [0.65, 0.7, 0.74, 1])
+        if override is None and factor is not None:
+            color = (np.asarray(factor, dtype=float) / 255).tolist()
+        metallic = getattr(source, "metallicFactor", None)
+        roughness = getattr(source, "roughnessFactor", None)
+        mesh.apply_transform(transform)
+        mesh.apply_scale(numbers(mesh_node.get("scale"), 3, [1, 1, 1]))
+        mesh.apply_transform(origin(visual.find("origin")))
+        if not len(mesh.faces) or not np.isfinite(mesh.vertices).all():
+            raise ValueError("Empty/nonfinite visual material region")
+        result.append((mesh, color, 0.0 if metallic is None else float(metallic), 0.65 if roughness is None else float(roughness)))
+    return result
+
+
 def compile_model(family, model):
     spec = SOURCES[family]
     robot, xml, package, used = description(family, model)
@@ -253,11 +294,11 @@ def compile_model(family, model):
                 raise ValueError(f"Invalid source inertia: {name}")
             inertia = inertia.flatten().tolist()
         visuals = element.findall("visual")
-        # One part per link, preserving per-visual colors in the mesh records.
+        # Split visual material regions; physical and collision properties stay per link.
         meshes = []
         visual_low, visual_high = np.full(3, np.inf), np.full(3, -np.inf)
-        for i, visual in enumerate(visuals):
-            mesh = geometry(visual, package, spec["package"])
+        regions = [region for visual in visuals for region in visual_geometry(visual, robot, package, spec["package"])]
+        for i, (mesh, color, metallic, roughness) in enumerate(regions):
             visual_low = np.minimum(visual_low, mesh.vertices.min(0))
             visual_high = np.maximum(visual_high, mesh.vertices.max(0))
             stem = f"{name}-{i}"
@@ -270,10 +311,8 @@ def compile_model(family, model):
             normals /= np.maximum(np.linalg.norm(normals, axis=1, keepdims=True), 1e-20)
             normals.astype("<f8").tofile(destination / (stem + ".normals"))
             mesh.faces.astype("<i4").tofile(destination / (stem + ".indices"))
-            color_node = visual.find("material/color")
-            color = numbers(color_node.get("rgba"), 4) if color_node is not None else [0.65, 0.7, 0.74, 1]
             meshes.append({"stem": stem, "vertexCount": len(mesh.vertices), "indexCount": mesh.faces.size,
-                           "color": color, "volume": max(abs(float(mesh.volume)), 1e-12),
+                           "color": color, "metallic": metallic, "roughness": roughness, "volume": max(abs(float(mesh.volume)), 1e-12),
                            "sha256": {ext: digest(destination / (stem + "." + ext))
                                       for ext in ("vertices", "normals", "indices")}})
         if meshes and mass is not None and (np.any(np.array(center) < visual_low - 0.005) or

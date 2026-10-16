@@ -34,6 +34,8 @@ import materia.project.SceneArtifact.SceneArtifactPart;
   @:id(4) @:optional var volume:Float;
   @:id(5) @:optional var color:Array<Float>;
   @:id(6) var sha256:ReferenceDigests;
+  @:id(7) @:optional var metallic:Null<Float>;
+  @:id(8) @:optional var roughness:Null<Float>;
 }
 @:wire typedef ReferenceLink = {
   @:id(1) var id:String;
@@ -157,32 +159,30 @@ class ReferenceRobot {
         grounded: link.id == root.id});
       if (link.visuals.length == 0) continue;
       if (link.massKg == null || link.inertiaKgM2 == null) throw 'Visible link lacks source mass/inertia: ${link.id}';
-      var vertexCount = 0, indexCount = 0;
-      for (mesh in link.visuals) {vertexCount += mesh.vertexCount; indexCount += mesh.indexCount;}
-      var vertices = Bytes.alloc(vertexCount*24), normals = Bytes.alloc(vertexCount*24), indices = Bytes.alloc(indexCount*4);
-      var vertexOffset = 0, indexOffset = 0, volume = 0.0;
-      for (mesh in link.visuals) {
-        var v = stream(mesh,"vertices",mesh.vertexCount*24), n = stream(mesh,"normals",mesh.vertexCount*24);
-        var ix = stream(mesh,"indices",mesh.indexCount*4);
-        vertices.blit(vertexOffset*24,v,0,v.length); normals.blit(vertexOffset*24,n,0,n.length);
-        for (i in 0...mesh.indexCount) {
-          var index = ix.getInt32(i*4);
-          if (index < 0 || index >= mesh.vertexCount) throw "Mesh index out of bounds";
-          indices.setInt32((indexOffset+i)*4,index+vertexOffset);
+      for (index in 0...link.visuals.length) {
+        var mesh=link.visuals[index],id=index==0 ? link.id : link.id+"-visual"+index;
+        if(index>0) {
+          definition.definitions.push({id:id,connectors:[{name:"origin",frame:AssemblyFrames.identity()}],collisionHulls:[]});
+          definition.occurrences.push({id:id,definition:id,initialPose:link.pose});
+          definition.joints.push({id:id+"-mount",type:"fixed",role:"tree",parent:link.id,parentConnector:"origin",
+            child:id,childConnector:"origin",axis:{x:0,y:0,z:1},
+            limits:{lower:null,upper:null,velocity:null,effort:null},defaultValue:0});
         }
-        vertexOffset += mesh.vertexCount; indexOffset += mesh.indexCount;
-        var meshVolume:Float = cast mesh.volume;
-        volume += meshVolume;
+        var color=mesh.color,volume:Float=cast mesh.volume;
+        var vertices=stream(mesh,"vertices",mesh.vertexCount*24),normals=stream(mesh,"normals",mesh.vertexCount*24),
+          indices=stream(mesh,"indices",mesh.indexCount*4);
+        for(i in 0...mesh.indexCount) if(indices.getInt32(i*4)<0 || indices.getInt32(i*4)>=mesh.vertexCount)
+          throw "Mesh index out of bounds";
+        parts.push({id:id,name:manifest.id+" / "+id,red:color[0],green:color[1],blue:color[2],
+          appearance:{finish:"vendor",metallic:mesh.metallic==null ? 0.0 : mesh.metallic,roughness:mesh.roughness==null ? 0.65 : mesh.roughness},
+          materialId:"neutral",materialSpec:"Source URDF mass/inertia, assigned once per link; vendor visual material regions",
+          materialDensity:1,volume:volume,centerOfMass:link.centerOfMass.copy(),
+          inertia:[for(v in link.inertiaKgM2) v*volume/(cast link.massKg:Float)],
+          physicalMassKg:index==0 ? link.massKg : 0.0,physicalMassDeclared:true,
+          physicalInertiaKgM2:index==0 ? link.inertiaKgM2.copy() : [for(_ in 0...9) 0.0],
+          vertexCount:mesh.vertexCount,indexCount:mesh.indexCount,vertices:vertices,normals:normals,indices:indices,
+          faceRanges:[{faceIndex:0,firstIndex:0,indexCount:mesh.indexCount}]});
       }
-      var color = link.visuals[0].color;
-      parts.push({id: link.id, name: manifest.id + " / " + link.id,
-        red: color[0], green: color[1], blue: color[2], materialId: "neutral",
-        materialSpec: "Source URDF declared mass/inertia; exterior mesh volume is not a material model",
-        materialDensity: 1, volume: volume, centerOfMass: link.centerOfMass.copy(),
-        inertia: [for(v in link.inertiaKgM2) v * volume / (cast link.massKg:Float)],
-        physicalMassKg: link.massKg, physicalMassDeclared: true, physicalInertiaKgM2: link.inertiaKgM2.copy(),
-        vertexCount: vertexCount, indexCount: indexCount, vertices: vertices, normals: normals, indices: indices,
-        faceRanges: [{faceIndex: 0, firstIndex: 0, indexCount: indexCount}]});
     }
     for (joint in manifest.joints) if (joint.type != "fixed") definition.joints.push({id: joint.id, type: cast joint.type, role: "tree",
       parent: anchorOf(joint.parent).id, parentConnector: joint.id, child: joint.child, childConnector: "origin",
