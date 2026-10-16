@@ -463,7 +463,10 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     // slot guard below, while its qualified process and fixture are still live.
     var threadedBody = threadedScrew();
     if (threadedBody == null) threadedBody = seatedScrew();
-    if (!vacuum && threadedBody != null) {
+    // Removing vacuum cannot unscrew a mechanically engaged thread. Keep its
+    // qualified model through an idle safety image until it is backed out or accepted.
+    var unfinishedThread = threadedBody != null && model != null && model.reading.result != ScrewdriverContract.OK;
+    if (!vacuum && threadedBody != null && !unfinishedThread) {
       var oldSetup = selected, oldProcess = model, threaded:SimObject = threadedBody;
       if (oldSetup == null || oldProcess == null)
         throw "Physical thread release lost its qualified screw setup";
@@ -484,7 +487,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       }
       anchoredBody = null;
     }
-    if (slot != activeSlot || (start && selected == null)) {
+    if ((slot != activeSlot || (start && selected == null)) && !(slot == 0 && !start && unfinishedThread)) {
       var setup = setups.get(slot);
       if (setup == null && start) throw 'Screwdriver slot $slot has no qualified joint program';
       if ((threadedScrew() != null || seatedScrew() != null) && (setup == null || carried() != setup.screw))
@@ -521,7 +524,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       if (angle < 1e-6) angle = 0;
       if (angle == 0) unjoin(true);
     }
-    if (!vacuum) {
+    if (!vacuum && !(physicalThreadAttached() && process != null && process.reading.result != ScrewdriverContract.OK)) {
       var released = carried();
       var fixture = setup == null ? null : setup.fixture;
       var fastened = process != null && process.reading.result == ScrewdriverContract.OK && anchoredBody != null;
@@ -581,6 +584,8 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       var leadError = lead.sub(Vec3.fromArray(state.hole));
       var along = leadError.dot(Vec3.fromArray(holeAxis));
       var radial = Math.sqrt(Math.max(0,leadError.dot(leadError)-along*along))*1000;
+      var sealed = vacuum && carried() == screw && (!physicalThreadAttached() ||
+        (pickError.norm() <= SimulatedSuctionTool.REACH && pickAlignment <= setup.joint.maximumAxisAngle));
       var screwAlignment = Math.acos(Math.max(-1,Math.min(1,headAxis.x*holeAxis[0]+headAxis.y*holeAxis[1]+headAxis.z*holeAxis[2])));
       var alignment = Math.max(pickAlignment,screwAlignment);
       var linkFrame = new Transform3(Vec3.fromArray(link.position), new Quat(link.rotation[0],link.rotation[1],link.rotation[2],link.rotation[3]));
@@ -642,11 +647,11 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
         observed.torqueNm = 0; observed.angle = angle; observed.speed = -setup.program.settings.runDownSpeed;
         if (angle == 0) observed.speed = 0;
         driveSpeed = observed.speed;
-        observed.strokeMm = stroke; observed.vacuum = carried() != null;
+        observed.strokeMm = stroke; observed.vacuum = sealed;
       } else if (!reversed) {
         if (start) angle = Math.max(angle, setup.hand*((joints == null ? q.get(spindleJoint) : joints.spindlePosition)-origin));
         var screwRetained = setup.screw != null && carried() == setup.screw;
-        observed = process.step({screwPresent:setup.screw != null && screwRetained, vacuum:vacuum && screwRetained,
+        observed = process.step({screwPresent:setup.screw != null && screwRetained, vacuum:sealed && screwRetained,
           start:start, angle:angle, strokeMm:stroke, radialErrorMm:radial, axialErrorMm:along*1000, axisAngle:alignment, damagedLeadIn:state.damagedLeadIn});
         if (observed.result != ScrewdriverContract.NONE) angle = observed.angle;
         driveSpeed = observed.speed;
@@ -684,7 +689,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
       var measured = runtime.snapshot();
       observed.strokeMm = Math.max(0,-(joints == null ? measured.q.get(feedJoint) : joints.feedPosition)*1000);
       observed.speed = joints == null ? measured.dq.get(spindleJoint) : joints.spindleSpeed;
-      observed.vacuum = carried() != null;
+      observed.vacuum = vacuum && carried() != null;
       simulation.driveProcessJoint(robotIndex,feedJoint,0,0);
       simulation.driveProcessJoint(robotIndex,spindleJoint,joints == null ? measured.q.get(spindleJoint) : joints.spindlePosition,0);
     }
@@ -693,7 +698,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     var measuredAngle = selected == null ? observed.angle : Math.max(0,selected.hand*((joints == null ? runtime.snapshot().q.get(spindleJoint) : joints.spindlePosition)-origin));
     observed = {torqueNm:observed.torqueNm,angle:measuredAngle,speed:observed.speed,
       strokeMm:observed.strokeMm,phase:observed.phase,result:observed.result,
-      vacuum:carried() != null};
+      vacuum:observed.vacuum};
     if (supply != null) supply.publish(observed);
     else runtime.publishSensorFrame(sensorId, ScrewdriverSensor.values(observed), Int64.ofInt(++sequence),
       runtime.snapshot().sourceTimestampNs, runtime.endpoint.sourceClockId());

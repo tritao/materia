@@ -147,7 +147,7 @@ class ScrewRecoveryTests {
 		skill.start();
 		check(created == 1 && skill.report.fault == null && !skill.report.failed,
 			"Resume reuses its exact attempt without configuring a new screw or replacement");
-		drive.update(0.01,feedback);
+		drive.update(0.01,feedback); drive.update(0.01,feedback);
 		feedback.angle = 0.8; feedback.result = ScrewdriverContract.OK;
 		for (_ in 0...10) {feedback.vacuum = outputs.vacuumOn; drive.update(0.01,feedback);}
 		skill.update(null,0.01);
@@ -172,6 +172,9 @@ class ScrewRecoveryTests {
 			"Interrupted driving retains its screw with spindle stopped");
 		var before = motion.targets.length;
 		runner.resume();
+		feedback.vacuum = false; runner.update(0.01,feedback);
+		check(motion.targets.length == before && !outputs.startOn,"Resume waits for measured vacuum before moving at work");
+		feedback.vacuum = true; runner.update(0.01,feedback);
 		check(motion.targets.length == before+1 && motion.contacts[motion.contacts.length-1] &&
 			Math.abs(motion.targets[motion.targets.length-1].translation.z-depth) < 1e-12,
 			"Resume restores measured feed depth at work instead of returning to pickup");

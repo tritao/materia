@@ -61,6 +61,9 @@ class ScrewdriverSimulationTests {
     count = 0;
     for (backend in [SimulationSpace.DETERMINISTIC,SimulationSpace.MUJOCO]) runTransport(backend,true,false,true);
     Sys.println('Screwdriver head-seat continuation: $count checks passed on both backends');
+    count = 0;
+    runTransport(SimulationSpace.MUJOCO,false,false,false,false,true);
+    Sys.println('Screwdriver physical-thread safety continuation: $count checks passed');
   }
   // Exercise the process travel computed at a tilted thread entry, then the actual
   // seated-pose correction. A 20 mm lever arm at 0.0004 rad leaves 1.6 nm if only
@@ -141,7 +144,7 @@ class ScrewdriverSimulationTests {
   }
   /** A distant lead-in cannot pull a screw out of the presenter or compress its feed. */
   static function runTransport(backend:Int, retighten:Bool = false, detached:Bool = false, headSeat:Bool = false,
-      dynamicFixture:Bool = false):Void {
+      dynamicFixture:Bool = false, physicalStop:Bool = false):Void {
     var expectedTorque = headSeat ? joint().prevailingTorque : 9.9;
     var harness = new SimulationHarness(0.01,1,backend);
     try {
@@ -198,35 +201,61 @@ class ScrewdriverSimulationTests {
         fixture = new SimulationAssemblyPart("work-fixture",harness.simulation,[0.0,0.0,0.0],[],null,member);
       }
       observer.configure(1,{program:new TighteningProgram(program().settings,headSeat),joint:joint(),screw:screw,hand:1,
-        fixture:fixture,clamped:clamped,
+        fixture:fixture,clamped:clamped,physicalThread:physicalStop,threadLeadMm:1,
+        physicalThreadMaxForceN:200,physicalThreadStiffnessNPerM:1.0e7,
         connection:{fastening:"transport-probe",member:"work-fixture",face:"bore"},
         work:() -> ({head:head,screwPose:body,engagementPoint:[0.02,0.0,0.1],hole:[0.02,0.0,0.1],direction:[0.0,0.0,1.0],damagedLeadIn:false})});
       var id = harness.simulation.addStepObserver(observer);
       var outputs = new ChannelScrewdriverOutputs(runtime,channels);
+      function step():Void {if (physicalStop) observer.prepareCarriage(); harness.step();}
       outputs.selectProgram(1);
       // Let gravity and the physical nest settle before the pickup command.
-      for (_ in 0...100) harness.step();
-      outputs.vacuum(true); harness.step();
+      for (_ in 0...100) step();
+      outputs.vacuum(true); step();
       var pickupBody = harness.simulation.objectPose(screw);
       check(observer.carried() == screw,"Pickup uses the actual identified socket, away from the work frame");
       check(Math.abs(harness.simulation.objectPose(screw).x) < 1e-5 && observer.reading().strokeMm == 0,
         "Pickup leaves the screw in the nest and the compliant feed uncompressed");
       refuses(() -> harness.simulation.driveProcessJoint(0,1,1e-15,0));
       runtime.submitPosition(0,0.01,1);
-      for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(0)-0.01) > 1e-5) harness.step();
+      for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(0)-0.01) > 1e-5) step();
       // Native holding consumes the carrier pose on the following physics tick.
-      harness.step();
+      step();
       var carried = harness.simulation.objectPose(screw);
       check(Math.abs(carried.x-0.01) < 0.0001 && Math.abs(carried.z-pickupBody.z) < 0.00001 && observer.reading().strokeMm == 0,
         'The screw follows the physical bit halfway to the hole without being pinned to the work (backend $backend, body ${haxe.Json.stringify(carried)}, reading ${haxe.Json.stringify(observer.reading())}, q ${haxe.Json.stringify(runtime.snapshot().q.toArray())}, safety ${runtime.snapshot().safety}, fault ${runtime.snapshot().faultCode}, program ${Std.string(runtime.channelValue("program"))}, vacuum ${Std.string(runtime.channelValue("vacuum"))})');
       runtime.submitPosition(0,0.02,2);
-      for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(0)-0.02) > 1e-5) harness.step();
-      harness.step();
-      var actualCompression = (0.104-pickupBody.z)*1000;
+      for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(0)-0.02) > 1e-5) step();
+      step();
+      if (physicalStop) {
+        // Topology is attached before a physics step, after the carried body's arrival is observed.
+        for (_ in 0...100) if (!observer.physicalThreadAttached()) step();
+        check(observer.physicalThreadAttached(),"The measured lead-in acquires its physical thread before starting the probe");
+      }
+      var compressionBody = physicalStop ? harness.simulation.objectPose(screw) : pickupBody;
+      var actualCompression = (0.104-compressionBody.z)*1000;
       check(Math.abs(observer.reading().strokeMm-actualCompression) < 0.01,
-        "The slide compresses only after the carried screw reaches the lead-in");
+        'The slide compresses against its measured lead-in (physical $physicalStop, expected $actualCompression, actual ${observer.reading().strokeMm}, body ${haxe.Json.stringify(compressionBody)})');
       outputs.start(true);
-      for (_ in 0...5000) if (observer.reading().result == ScrewdriverContract.NONE) harness.step();
+      if (physicalStop) {
+        for (_ in 0...1000) if (observer.reading().angle < 0.2 && observer.reading().result == 0) step();
+        var activeModel = observer.model, interruptedAngle = observer.reading().angle;
+        check(observer.physicalThreadAttached() && interruptedAngle >= 0.2 && observer.reading().result == 0,
+          "Physical stop probe interrupts an actually advancing thread");
+        // The same output image the runtime declares for emergency stop, without altering its policy.
+        outputs.start(false); outputs.reverse(false); outputs.vacuum(false);
+        runtime.writeOutput("program",Analog(0));
+        for (_ in 0...10) step();
+        check(observer.physicalThreadAttached() && observer.carried() == screw && observer.model == activeModel &&
+          observer.reading().result == 0 && !observer.reading().vacuum,
+          'Idle safety outputs retain only mechanical engagement (attached ${observer.physicalThreadAttached()}, same model ${observer.model == activeModel}, carried ${observer.carried() == screw}, reading ${haxe.Json.stringify(observer.reading())})');
+        outputs.selectProgram(1); outputs.vacuum(true);
+        for (_ in 0...10) step();
+        check(observer.model == activeModel && observer.reading().angle >= interruptedAngle && observer.reading().vacuum,
+          'Resealing restores the same thread (same model ${observer.model == activeModel}, previous angle $interruptedAngle, reading ${haxe.Json.stringify(observer.reading())})');
+        outputs.start(true);
+      }
+      for (_ in 0...5000) if (observer.reading().result == ScrewdriverContract.NONE) step();
       check(observer.reading().result == ScrewdriverContract.OK &&
         observer.reading().torqueNm == expectedTorque,
         'A screw carried from the presenter completes its qualified pass on the real tool joints (head-seat $headSeat, measured torque ${observer.reading().torqueNm})');
@@ -245,14 +274,14 @@ class ScrewdriverSimulationTests {
         continuation = qualified;
         refuses(() -> {var contact = observer.configure(2,qualified);});
       }
-      outputs.start(false); harness.step();
+      outputs.start(false); step();
       if (retighten) {
-        for (_ in 0...100) if (Math.abs(observer.reading().speed)>0.01) harness.step();
-        harness.step();
+        for (_ in 0...100) if (Math.abs(observer.reading().speed)>0.01) step();
+        step();
       }
-      outputs.vacuum(false); harness.step();
+      outputs.vacuum(false); step();
       runtime.submitPosition(0,0,3);
-      for (_ in 0...1000) if (runtime.snapshot().q.get(0) > 1e-5) harness.step();
+      for (_ in 0...1000) if (runtime.snapshot().q.get(0) > 1e-5) step();
       var released = harness.simulation.objectPose(screw);
       check(observer.carried() == null && Math.abs(released.x-seated.x) < 0.0001 && Math.abs(released.z-seated.z) < 0.0001,
         "Vacuum release retains the actual seated screw through retraction and gravity");
@@ -292,28 +321,28 @@ class ScrewdriverSimulationTests {
         var prior = observer.model;
         if (prior == null) throw "Retightening probe lost its engaged model";
         var retainedAngle = prior.reading.angle;
-        outputs.selectProgram(2); harness.step();
+        outputs.selectProgram(2); step();
         check(observer.reading().result == ScrewdriverContract.NONE && Math.abs(observer.reading().angle-retainedAngle)<1e-9 &&
           observer.reading().torqueNm == retainedTorque && observer.reading().strokeMm == 0 && fixture.carries(screw),
           "Selecting final retains preload and angle without moving or acquiring the seated body");
         runtime.submitPosition(0,0.02,5);
-        for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(0)-0.02)>1e-5) harness.step();
-        outputs.vacuum(true); harness.step(); harness.step();
+        for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(0)-0.02)>1e-5) step();
+        outputs.vacuum(true); step(); step();
         // Still seated in its thread, the screw stays on its member while the bit takes it in the socket.
         check(observer.carried() == screw && fixture.carries(screw) && observer.reading().strokeMm > 0.5,
           'Final recontact acquires the same body and compresses the physical feed before starting ' +
           '(carried ${observer.carried() == screw}, member ${fixture.carries(screw)}, stroke ${observer.reading().strokeMm})');
         outputs.start(true);
-        for (_ in 0...5000) if (observer.reading().result == ScrewdriverContract.NONE) harness.step();
+        for (_ in 0...5000) if (observer.reading().result == ScrewdriverContract.NONE) step();
         check(observer.reading().result == ScrewdriverContract.OK && observer.reading().torqueNm == 14 &&
           Math.abs(observer.reading().angle-retainedAngle-(14-retainedTorque)/19.4)<0.02 &&
           Math.abs(harness.simulation.objectPose(screw).z-released.z)<0.00001,
           'Final adds only remaining elastic rotation, preserves the original snug window and leaves the body seated (backend $backend, head-seat $headSeat, source torque $retainedTorque, source angle $retainedAngle, result ${haxe.Json.stringify(observer.reading())}, seat ${seated.z}, actual ${harness.simulation.objectPose(screw).z})');
         outputs.start(false);
-        for (_ in 0...100) if (Math.abs(observer.reading().speed)>0.01) harness.step();
-        outputs.vacuum(false); harness.step();
+        for (_ in 0...100) if (Math.abs(observer.reading().speed)>0.01) step();
+        outputs.vacuum(false); step();
         runtime.submitPosition(0,0,6);
-        for (_ in 0...1000) if (runtime.snapshot().q.get(0)>1e-5) harness.step();
+        for (_ in 0...1000) if (runtime.snapshot().q.get(0)>1e-5) step();
         check(fixture.carries(screw) && observer.carried() == null,
           "Successful final release returns the exact screw to its named fixture");
         var settings = program().settings;
@@ -338,8 +367,8 @@ class ScrewdriverSimulationTests {
       }
       var clampedBefore = harness.simulation.objectPose(clamped);
       runtime.submitPosition(3,0.01,retighten ? 7 : 4);
-      for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(3)-0.01) > 1e-5) harness.step();
-      harness.step();
+      for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(3)-0.01) > 1e-5) step();
+      step();
       var moved = harness.simulation.objectPose(screw);
       check(Math.abs(moved.y-released.y-0.01) < 0.0001 && Math.abs(moved.z-released.z) < 0.0001,
         "The seated screw follows its moving fixture independently of the withdrawn bit");
@@ -349,7 +378,7 @@ class ScrewdriverSimulationTests {
       fixture.releaseRigid(screw);
       member.retain(screw,moved);
       freeFixture.drive(new SimPose(0.02,0.02,0.1));
-      harness.step(); harness.step();
+      step(); step();
       check(member.carries(screw) && Math.abs(harness.simulation.objectPose(screw).y-moved.y-0.01) < 0.0001,
         "A named environment fixture also carries its fastened screw without a robot-link guess");
       refuses(() -> harness.simulation.holdObjectOnObject(screw,screw,new SimPose(0,0,0)));
@@ -369,8 +398,8 @@ class ScrewdriverSimulationTests {
         "Physical housing retention preserves both measured body positions before pickup");
       fixture.retain(plate,harness.simulation.objectPose(plate));
       runtime.submitPosition(3,0.02,retighten ? 8 : 5);
-      for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(3)-0.02) > 1e-5) harness.step();
-      harness.step();
+      for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(3)-0.02) > 1e-5) step();
+      step();
       check(fixture.carries(plate) && assembly.carries(screw) && assembly.carries(clamped) &&
         Math.abs(harness.simulation.objectPose(screw).y-screwBeforeCarry.y-0.01) < 0.0001 &&
         Math.abs(harness.simulation.objectPose(clamped).y-housingBeforeCarry.y-0.01) < 0.0001,

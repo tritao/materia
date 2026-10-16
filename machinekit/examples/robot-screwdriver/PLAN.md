@@ -3326,3 +3326,35 @@ the same compiled bytecode and recorded source hashes. Its mission integration
 remains uncommitted until validation. The remaining fault matrix, deterministic
 physical-handling gap, frozen-source full gate and local-main integration remain
 open; this nominal MuJoCo pass alone does not close SD15a.4.
+
+### SD15a safe output image and unfinished thread (2026-10-16)
+
+`sd15-interruption-full2` failed at 37.47 simulated seconds after targeted e-stop
+and retry (211.0 s wall, 494 MB). The safe channel image correctly turns vacuum
+off and selects program zero. The model incorrectly treated this as removal
+of the unfinished mechanical thread, then retried with lost screw feedback;
+its recovery clearance rejection at 5.48 nm was a downstream symptom. The
+runtime's declared stop policies remain unchanged.
+
+An unfinished physical thread now retains its mechanical engagement and exact
+qualified model through the idle safety image. Vacuum loss alone cannot unscrew
+it. Accepted release still transfers the screw to its member, and reversal can
+back out an unfinished thread. Feedback publishes the observed seal, independently
+of mechanical ownership: a screw may remain threaded with vacuum off. Seal
+confirmation uses the identified socket's measured distance and axis alignment.
+Resume restores the selected program, requests vacuum, and waits for fresh seal
+feedback before restoring contact motion and spindle operation.
+
+The isolated probe invokes the same pre-step carriage preparation as
+`SimulatedTools.feed()` before physics. It checks actual thread attachment and
+rotation, applies the declared idle output image, verifies the same screw and
+model with vacuum off, reseals without resetting accumulated angle, and finishes
+the qualified tightening. `sd15-safety-simulation5` passes all 396 checks:
+130 transport/process, 184 retained engagement, 60 head-seat continuation across
+both backends, plus 22 physical-thread safety-continuation checks on MuJoCo.
+The focused recovery/final-pass suite also passes 92 checks, including the new
+measured-seal wait. App compilation passes. The source hashes are recorded in
+`sd15-safety5-inputs.sha256`.
+
+The actual full-cell e-stop/retry case `sd15-interruption-full3` is running;
+its mission integration remains uncommitted pending that acceptance result.

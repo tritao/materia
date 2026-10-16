@@ -17,7 +17,7 @@ private enum ScrewPhase {
   Idle; ToolReceipt; PickupApproach; PickupContact; Sealing; PickupRetract;
   WorkApproach; EntrySearch; EntrySearchStopping; EntrySearchRecoveryRetraction;
   Engage; Driving; Stopping; Releasing; Retracting; Done; Failed;
-  FinalApproach; FinalContact; FinalSealing; FinalEngage;
+  FinalApproach; FinalContact; FinalSealing; FinalEngage; ResumeSealing;
   ProcessStop; RecoveryStop; Reversing; ReverseStop; RecoveryRetract; RejectTravel; RejectRelease; RejectRetract; Recovered;
 }
 
@@ -67,10 +67,8 @@ class ScrewdrivingRunner {
     if (!canResume()) throw "Screw resume needs an interrupted, unfinished drive";
     var selected:ScrewPlan = cast plan;
     motion.resetAfterSafety();
-    outputs.start(false); outputs.reverse(false); outputs.vacuum(true);
-    // Restore the compliant feed at the retained work entry, never return to supply.
-    motion.move(ScrewPlan.along(driveEntry(selected),followDepth),true);
-    interruptedDriving = false; failureMessage = null; elapsed = 0; phase = FinalEngage;
+    outputs.start(false); outputs.reverse(false); outputs.selectProgram(selected.slot); outputs.vacuum(true);
+    interruptedDriving = false; failureMessage = null; elapsed = 0; phase = ResumeSealing;
   }
   public function run(requested:ScrewPlan):Void {
     if (running() || requested == null) throw "Screw runner needs an idle runner and qualified plan";
@@ -115,6 +113,12 @@ class ScrewdrivingRunner {
         case ToolReceipt:
           if (present() && reading.vacuum) {phase = WorkApproach; motion.move(ScrewPlan.along(selected.entry,-selected.approach),false);}
           else if (elapsed > 2) finishFailure(reading,ScrewdriverContract.NO_SCREW);
+        case ResumeSealing:
+          if (reading.vacuum) {
+            // Restore feed only after the safety-cleared tool confirms its actual seal.
+            motion.move(ScrewPlan.along(driveEntry(selected),followDepth),true);
+            phase = FinalEngage; elapsed = 0;
+          } else if (elapsed > 2) finishFailure(reading,ScrewdriverContract.NO_SCREW);
         case FinalApproach:
           if (motion.completed()) {
             var contact = selected.finalContact;
