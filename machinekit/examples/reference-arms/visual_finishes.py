@@ -126,7 +126,24 @@ def paint_regions(link, regions, profile):
         for ring in rings:
             if ring.get('innerAtMeshEdge'):
                 ring['_innerPlanes'] = mesh_ring_planes(mesh, ring)
-        for triangle in triangles:
+        # Select whole source triangles inside each measured screw-head rim.
+        # Adjacent cover triangles extend outside these bounds and keep their paint.
+        screws = np.zeros(len(triangles), dtype=bool)
+        for ring in rings:
+            hardware = ring.get('screws')
+            if hardware is None:
+                continue
+            axis = ring['axis']
+            radial_axes = [i for i in range(3) if i != axis]
+            within_slab = ((triangles[:, :, axis].min(axis=1) >= ring['axial'][0]) &
+                           (triangles[:, :, axis].max(axis=1) <= ring['axial'][1]))
+            for center in hardware['radialCenters']:
+                radius = np.linalg.norm(triangles[:, :, radial_axes] - center, axis=2)
+                screws |= within_slab & (radius.max(axis=1) <= hardware['radius'])
+        for index, triangle in enumerate(triangles):
+            if screws[index]:
+                buckets[2].append(triangle)
+                continue
             white = [triangle]
             for ring in rings:
                 pending = []

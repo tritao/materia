@@ -1,18 +1,26 @@
 {
   "model": "fairino5_v6",
-  "basis": "User-supplied product photograph: white housings, coral-red cover rims, silver tool flange. Appearance approximation, not source URDF material data. Cover borders follow existing mesh rims; aluminium covers the entire terminal head up to its existing part seam.",
+  "basis": "User-supplied product photograph: white housings, coral-red cover rims, silver tool flange. Appearance approximation, not source URDF material data. Cover borders follow existing mesh rims; aluminium covers the entire terminal head up to its existing part seam. Existing cover screw surfaces are isolated from the paint using locations measured from the pinned supplier mesh.",
   "white": {"color": [0.95, 0.955, 0.96, 1], "metallic": 0.0, "roughness": 0.38},
   "red": {"color": [1.0, 0.32, 0.28, 1], "metallic": 0.0, "roughness": 0.4},
   "silver": {"color": [0.72, 0.74, 0.76, 1], "metallic": 0.85, "roughness": 0.28},
   "rings": {
-    "shoulder_link": [{"axis": 2, "center": [0, 0, 0.2137], "axial": [0.209, 0.2175], "radius": [0.0475, 0.0582], "innerAtMeshEdge": true}],
-    "upperarm_link": [
-      {"axis": 2, "center": [0, 0, 0.2], "axial": [0.199, 0.2035], "radius": [0.0475, 0.0582], "innerAtMeshEdge": true},
-      {"axis": 2, "center": [-0.425, 0, 0.2], "axial": [0.199, 0.2035], "radius": [0.0475, 0.0582], "innerAtMeshEdge": true}
+    "shoulder_link": [
+      {"axis": 2, "center": [0, 0, 0.2137], "axial": [0.209, 0.2175], "radius": [0.0475, 0.0582], "innerAtMeshEdge": true, "screws": {"radialCenters": [[-0.03684554, -0.03669341], [0.03669341, -0.03684554], [0.03684554, 0.03669341], [-0.03669341, 0.03684554]], "radius": 0.003}}
     ],
-    "forearm_link": [{"axis": 2, "center": [-0.39501, 0, -0.046], "axial": [-0.0496, -0.0434], "radius": [0.03125, 0.0402], "innerAtMeshEdge": true}],
-    "wrist1_link": [{"axis": 1, "center": [0, 0.046, 0.1021], "axial": [0.0434, 0.0496], "radius": [0.03125, 0.0402], "innerAtMeshEdge": true}],
-    "wrist2_link": [{"axis": 1, "center": [0, -0.046, 0.102], "axial": [-0.0496, -0.0434], "radius": [0.03125, 0.0402], "innerAtMeshEdge": true}]
+    "upperarm_link": [
+      {"axis": 2, "center": [0, 0, 0.2], "axial": [0.199, 0.2035], "radius": [0.0475, 0.0582], "innerAtMeshEdge": true, "screws": {"radialCenters": [[0.03669341, -0.03684554], [0.03684554, 0.03669341], [-0.03669341, 0.03684554], [-0.03684554, -0.03669341]], "radius": 0.003}},
+      {"axis": 2, "center": [-0.425, 0, 0.2], "axial": [0.199, 0.2035], "radius": [0.0475, 0.0582], "innerAtMeshEdge": true, "screws": {"radialCenters": [[-0.46169344, 0.03684554], [-0.38815449, 0.03669341], [-0.38830662, -0.03684554], [-0.46184558, -0.03669341]], "radius": 0.003}}
+    ],
+    "forearm_link": [
+      {"axis": 2, "center": [-0.39501, 0, -0.046], "axial": [-0.0496, -0.0434], "radius": [0.03125, 0.0402], "innerAtMeshEdge": true, "screws": {"radialCenters": [[-0.4204807, -0.02544099], [-0.42045099, 0.02547069], [-0.36953929, 0.02544099], [-0.369569, -0.02547069]], "radius": 0.003}}
+    ],
+    "wrist1_link": [
+      {"axis": 1, "center": [0, 0.046, 0.1021], "axial": [0.0434, 0.0496], "radius": [0.03125, 0.0402], "innerAtMeshEdge": true, "screws": {"radialCenters": [[0.0254707, 0.12754102], [0.02544102, 0.07662933], [-0.0254707, 0.07665903], [-0.02544099, 0.12757071]], "radius": 0.003}}
+    ],
+    "wrist2_link": [
+      {"axis": 1, "center": [0, -0.046, 0.102], "axial": [-0.0496, -0.0434], "radius": [0.03125, 0.0402], "innerAtMeshEdge": true, "screws": {"radialCenters": [[-0.0254707, 0.12744099], [-0.02544099, 0.07652931], [0.0254707, 0.07655901], [0.02544102, 0.12747069]], "radius": 0.003}}
+    ]
   },
   "flange": {"link": "wrist3_link", "wholeLink": true}
 }

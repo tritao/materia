@@ -68,8 +68,11 @@ cover trim and a metallic flange, approximating the supplied product photo.
 The profile clips paint boundaries across the existing triangle surfaces in
 link-local coordinates, following the existing polygonal cover rim for the inner paint edge and using
 128-sided clipping for the outer radius. Aluminium covers the entire terminal
-head link up to its existing part seam. New vertices stay within the original
-triangles; surface area, volume and bounds are preserved. It produces 12 visual pieces while preserving all seven physical
+head link up to its existing part seam. All 24 existing cover screw heads (four per
+ring) keep a metallic finish, using screw locations measured from the pinned mesh.
+The screw finish follows whole source triangles rather than adding screw geometry.
+New vertices stay within the original
+triangles; surface area, volume and bounds are preserved. It produces 17 visual pieces while preserving all seven physical
 links, six joints, source mass/inertia and collision shapes. Its basis and hash
 are recorded in the manifest diagnostics; it is not claimed as vendor material
 data. Neither model's current assets contain image textures.
