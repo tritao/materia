@@ -1,0 +1,18 @@
+{
+  "model": "fairino5_v6",
+  "basis": "User-supplied product photograph: white housings, coral-red cover rims, silver tool flange. Appearance approximation, not source URDF material data.",
+  "white": {"color": [0.95, 0.955, 0.96, 1], "metallic": 0.0, "roughness": 0.38},
+  "red": {"color": [1.0, 0.32, 0.28, 1], "metallic": 0.0, "roughness": 0.4},
+  "silver": {"color": [0.72, 0.74, 0.76, 1], "metallic": 0.85, "roughness": 0.28},
+  "rings": {
+    "shoulder_link": [{"axis": 2, "center": [0, 0, 0.2137], "axial": [0.209, 0.2175], "radius": [0.05, 0.0582]}],
+    "upperarm_link": [
+      {"axis": 2, "center": [0, 0, 0.2], "axial": [0.199, 0.2035], "radius": [0.05, 0.0582]},
+      {"axis": 2, "center": [-0.425, 0, 0.2], "axial": [0.199, 0.2035], "radius": [0.05, 0.0582]}
+    ],
+    "forearm_link": [{"axis": 2, "center": [-0.39501, 0, -0.046], "axial": [-0.0496, -0.0434], "radius": [0.034, 0.0402]}],
+    "wrist1_link": [{"axis": 1, "center": [0, 0.046, 0.1021], "axial": [0.0434, 0.0496], "radius": [0.034, 0.0402]}],
+    "wrist2_link": [{"axis": 1, "center": [0, -0.046, 0.102], "axial": [-0.0496, -0.0434], "radius": [0.034, 0.0402]}]
+  },
+  "flange": {"link": "wrist3_link", "axis": 2, "minimum": 0.083}
+}

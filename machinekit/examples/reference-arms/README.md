@@ -62,9 +62,14 @@ mass/inertia and source collision pieces are assigned once. Explicit empty
 `collisionHulls` marks the additional pieces as visual-only.
 
 The prepared UR5e has 27 visual pieces, seven physical links, six moving joints,
-and four source colors (including blue and black). FR5 has seven pale-grey visual
-pieces, as declared in its source. Neither model's current assets contain image
-textures. Sources with embedded image textures are rejected explicitly until UV
+and four source colors (including blue and black). FR5's raw URDF declares pale grey. The user-requested
+`fairino5-appearance.json` overrides it with white housings, coral-red annular
+cover trim and a metallic flange, approximating the supplied product photo.
+The profile selects existing triangles in link-local coordinates and adds no
+geometry. It produces 13 visual pieces while preserving all seven physical
+links, six joints, source mass/inertia and collision shapes. Its basis and hash
+are recorded in the manifest diagnostics; it is not claimed as vendor material
+data. Neither model's current assets contain image textures. Sources with embedded image textures are rejected explicitly until UV
 and image import is implemented; they are not silently converted to flat grey.
 Regenerate with `prepare.py ur5e fairino5_v6`, then export with `--cartesian`.
 The app integration check `--commercial-only` verifies colors, mass and playback

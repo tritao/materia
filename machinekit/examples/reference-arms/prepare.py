@@ -221,6 +221,31 @@ def visual_geometry(visual, robot, package, package_name):
     return result
 
 
+def paint_reference_regions(link, regions, profile):
+    """Assign a photo-matching finish to existing triangles; never alter topology."""
+    painted = []
+    for mesh, _, _, _ in regions:
+        centers = mesh.triangles_center
+        labels = np.zeros(len(mesh.faces), dtype=np.uint8)
+        for ring in profile["rings"].get(link, []):
+            axis = ring["axis"]
+            radial = np.delete(centers - np.array(ring["center"]), axis, axis=1)
+            radius = np.linalg.norm(radial, axis=1)
+            labels[(centers[:, axis] >= ring["axial"][0]) & (centers[:, axis] <= ring["axial"][1]) &
+                   (radius >= ring["radius"][0]) & (radius <= ring["radius"][1])] = 1
+        flange = profile["flange"]
+        if link == flange["link"]:
+            labels[centers[:, flange["axis"]] >= flange["minimum"]] = 2
+        for label, finish in enumerate(["white", "red", "silver"]):
+            faces = np.flatnonzero(labels == label)
+            if not len(faces):
+                continue
+            part = mesh.submesh([faces], append=True, repair=False)
+            material = profile[finish]
+            painted.append((part, material["color"], material["metallic"], material["roughness"]))
+    return painted
+
+
 def compile_model(family, model):
     spec = SOURCES[family]
     robot, xml, package, used = description(family, model)
@@ -231,6 +256,12 @@ def compile_model(family, model):
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "robot.urdf").write_text(xml)
     links, joints, source_warnings = [], [], []
+    appearance_path = ROOT / "fairino5-appearance.json"
+    appearance = json.loads(appearance_path.read_text()) if model == "fairino5_v6" else None
+    if appearance is not None:
+        if appearance["model"] != model:
+            raise ValueError("Appearance profile model mismatch")
+        source_warnings.append(appearance["basis"] + " Profile SHA256: " + digest(appearance_path))
     names = [e.attrib["name"] for e in robot.findall("link")]
     if len(names) != len(set(names)):
         raise ValueError("Duplicate link")
@@ -298,6 +329,8 @@ def compile_model(family, model):
         meshes = []
         visual_low, visual_high = np.full(3, np.inf), np.full(3, -np.inf)
         regions = [region for visual in visuals for region in visual_geometry(visual, robot, package, spec["package"])]
+        if appearance is not None:
+            regions = paint_reference_regions(name, regions, appearance)
         for i, (mesh, color, metallic, roughness) in enumerate(regions):
             visual_low = np.minimum(visual_low, mesh.vertices.min(0))
             visual_high = np.maximum(visual_high, mesh.vertices.max(0))

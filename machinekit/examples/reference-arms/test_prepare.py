@@ -64,6 +64,19 @@ class ImportChecks(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "texture"):
             prepare.visual_geometry(visual, ET.fromstring('<robot/>'), Path('/tmp/package'), 'description')
 
+    def test_photo_finish_partitions_existing_triangles_without_changing_geometry(self):
+        mesh = prepare.trimesh.creation.box()
+        profile = {"rings": {"test": [{"axis": 2, "center": [0, 0, 0], "axial": [0, 0.5], "radius": [0, 1]}]},
+                   "flange": {"link": "test", "axis": 2, "minimum": 0.25}}
+        for name, color in [("white", [1, 1, 1, 1]), ("red", [1, 0, 0, 1]), ("silver", [0.7, 0.7, 0.7, 1])]:
+            profile[name] = {"color": color, "metallic": 0, "roughness": 0.4}
+        regions = prepare.paint_reference_regions("test", [(mesh, None, 0, 0)], profile)
+        self.assertEqual(len(regions), 3)
+        joined = prepare.trimesh.util.concatenate([region[0] for region in regions])
+        self.assertEqual(len(joined.faces), len(mesh.faces))
+        a, b = mesh.triangles_center, joined.triangles_center
+        np.testing.assert_allclose(a[np.lexsort(a.T)], b[np.lexsort(b.T)])
+
     def test_wire_fields_come_from_consumer_schema(self):
         value = {"schema": 1, "id": "test", "family": "ur", "root": "base", "tip": "tip",
                  "tipStatus": "test", "metresPerUnit": 1, "urdfSha256": "hash",
