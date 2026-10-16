@@ -9,12 +9,14 @@ class ToolAxisReach {
 	/** The joint values that put the tip on `target` with the wire along `direction`, or null. */
 	public static function solve(state:AssemblyState, joints:Array<String>, limits:Array<{lower:Float, upper:Float}>,
 			target:{x:Float, y:Float, z:Float}, direction:{x:Float, y:Float, z:Float}, seed:Array<Float>, occurrence:String, connector:String,
-			?xDirection:{x:Float, y:Float, z:Float}):Null<Array<Float>> {
+			?xDirection:{x:Float, y:Float, z:Float}, ?residualTolerance:Float):Null<Array<Float>> {
+		if (residualTolerance != null && (!Math.isFinite(residualTolerance) || residualTolerance <= 0))
+			throw "Tool reach residual tolerance must be finite and positive";
 		var q = [for (j in 0...joints.length) Math.min(limits[j].upper, Math.max(limits[j].lower, seed[j]))];
 		var residual = evaluate(state, joints, q, target, direction, occurrence, connector, xDirection);
 		var damping = 1.0;
 		for (iteration in 0...120) {
-			if (norm(residual) < (xDirection == null ? 0.05 : 0.005)) return q;
+			if (norm(residual) < (residualTolerance == null ? (xDirection == null ? 0.05 : 0.005) : residualTolerance)) return q;
 			var jacobian:Array<Array<Float>> = [];
 			for (j in 0...joints.length) {
 				var step = q.copy();
@@ -46,14 +48,15 @@ class ToolAxisReach {
 				damping = Math.max(1e-6, damping * 0.5);
 			} else damping *= 4;
 		}
-		return norm(residual) < (xDirection == null ? 0.5 : 0.005) ? q : null;
+		return norm(residual) < (residualTolerance == null ? (xDirection == null ? 0.5 : 0.005) : residualTolerance) ? q : null;
 	}
 
 	/** Full socket orientation, including roll; the free-axis solver's existing tolerance is unchanged. */
 	public static function solveFrame(state:AssemblyState, joints:Array<String>, limits:Array<{lower:Float, upper:Float}>,
-			target:materia.assembly.AssemblyRecord.AssemblyFrame, seed:Array<Float>, occurrence:String, connector:String):Null<Array<Float>>
+			target:materia.assembly.AssemblyRecord.AssemblyFrame, seed:Array<Float>, occurrence:String, connector:String,
+			residualTolerance:Float = 0.005):Null<Array<Float>>
 		return solve(state,joints,limits,{x:target.x,y:target.y,z:target.z},
-			AssemblyFrames.transformVector(target,0,0,1),seed,occurrence,connector,AssemblyFrames.transformVector(target,1,0,0));
+			AssemblyFrames.transformVector(target,0,0,1),seed,occurrence,connector,AssemblyFrames.transformVector(target,1,0,0),residualTolerance);
 
 	static function evaluate(state:AssemblyState, joints:Array<String>, q:Array<Float>, target:{x:Float, y:Float, z:Float},
 			direction:{x:Float, y:Float, z:Float}, occurrence:String, connector:String,

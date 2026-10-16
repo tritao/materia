@@ -128,7 +128,9 @@ class ScrewdrivingAccess implements ScrewAccess {
 			for (shoulder in [0.4,0.8,1.2]) for (elbow in [0.17,0.67,1.17])
 				seeds.push([0.0,shoulder,elbow,0.0,Math.PI/2-shoulder+elbow,0.0]);
 			for (seed in seeds) if (!found) {
-				var q = machinekit.robot.ToolAxisReach.solveFrame(state,joints,limits,socket,seed,tcpMember,tcpConnector);
+				// The bit end is flush with the socket floor at pickup. Solve that authored contact accurately
+				// enough that positional IK residual cannot become a spurious CAD intersection volume.
+				var q = machinekit.robot.ToolAxisReach.solveFrame(state,joints,limits,socket,seed,tcpMember,tcpConnector,1e-6);
 				if (q == null) continue;
 				for (i in 0...joints.length) state.setJoint(joints[i],q[i]);
 				// The active screw is staged, not simultaneously seated in its CAD
