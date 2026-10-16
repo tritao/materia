@@ -144,16 +144,7 @@ class PickPlaceFastenTests {
           var screw = simulation.environmentObject("project:"+report.installed());
           if (screw == null || !plate.carries(screw)) throw "Every installed screw must travel with the plate";
         }
-        if (!housingOnly) {
-          var actual = plate.pose();
-          var seat = handling.assemblyParts.get("project:outfeedTray/seat-r0-c0-x-1-y-1");
-          var frame = seat.pose();
-          var target = AssemblyFrames.compose({x:frame.position[0], y:frame.position[1], z:frame.position[2],
-            qx:frame.rotation[0], qy:frame.rotation[1], qz:frame.rotation[2], qw:frame.rotation[3]},
-            handling.assemblyParts.connectorFrame(seat.id,"seat"));
-          var dx = actual.position[0]-target.x, dy = actual.position[1]-target.y, dz = actual.position[2]-target.z;
-          if (Math.sqrt(dx*dx+dy*dy+dz*dz) > 0.001) throw "The completed assembly must occupy the measured outfeed pocket";
-        }
+        if (!housingOnly) checkOutfeed(handling);
         printProgress('Assembly cell passed backend $backend, housing-only $housingOnly at ${clock.simulationTime()}');
         simulation.dispose(); session.dispose();
       } catch (error:Dynamic) {
@@ -167,6 +158,19 @@ class PickPlaceFastenTests {
       runSelected(root,"interruption");
       runSelected(root,"interruption-full");
     }
+  }
+
+  static function checkOutfeed(handling:MissionPlayer):Void {
+    var actual = handling.assemblyParts.get("project:work/plate").pose();
+    var seat = handling.assemblyParts.get("project:outfeedTray/seat-r0-c0-x-1-y-1");
+    var frame = seat.pose();
+    var target = AssemblyFrames.compose({x:frame.position[0], y:frame.position[1], z:frame.position[2],
+      qx:frame.rotation[0], qy:frame.rotation[1], qz:frame.rotation[2], qw:frame.rotation[3]},
+      handling.assemblyParts.connectorFrame(seat.id,"seat"));
+    var dx = actual.position[0]-target.x, dy = actual.position[1]-target.y, dz = actual.position[2]-target.z;
+    var error = Math.sqrt(dx*dx+dy*dy+dz*dz);
+    printProgress('Outfeed measured error ${error*1000} mm: actual=${haxe.Json.stringify(actual)}, target=${haxe.Json.stringify(target)}');
+    if (error > 0.001) throw "The completed assembly must occupy the measured outfeed pocket";
   }
 
   /** Diagnostic only: commission handling of the CAD-seated rigid assembly without claiming fastening acceptance. */
@@ -219,7 +223,7 @@ class PickPlaceFastenTests {
       var nextTrace = 0.25;
       while (!mission.finished && mission.failure == null && clock.simulationTime() < 60) {
         simulation.step();
-        if (tracing && clock.simulationTime() >= nextTrace && mission.stepIndex == 0) {
+        if (tracing && clock.simulationTime() >= nextTrace && mission.stepIndex <= 1) {
           var snapshot = mission.robot.runtime.snapshot();
           var jaw = [for (index in 0...mission.robot.model.joints.length)
             if (StringTools.contains(mission.robot.model.joints[index].name,"gripperB/jaw"))
@@ -231,7 +235,7 @@ class PickPlaceFastenTests {
             var contacts = [for (contact in mission.simulation.robotContacts(gripper.runtime))
               if (contact.active && gripper.contactLinks.indexOf(contact.linkIndex) >= 0)
                 {link:contact.linkIndex,object:contact.otherObject,distance:contact.distance,force:contact.force.toArray()}];
-            printProgress('Unload trace ${clock.simulationTime()} plate=${haxe.Json.stringify(plate.pose())} jaws=${haxe.Json.stringify(jaw)} sensors=${haxe.Json.stringify(bits)} contacts=${haxe.Json.stringify(contacts)}');
+            printProgress('Unload trace step=${mission.stepIndex} ${clock.simulationTime()} plate=${haxe.Json.stringify(plate.pose())} jaws=${haxe.Json.stringify(jaw)} sensors=${haxe.Json.stringify(bits)} contacts=${haxe.Json.stringify(contacts)}');
           }
           nextTrace += 0.25;
         }
@@ -246,6 +250,7 @@ class PickPlaceFastenTests {
       if (!plate.carries(housing.freeBody())) throw "Unload diagnostic detached the housing";
       for (job in jobs) if (job != null && !plate.carries(mission.assemblyParts.get("project:"+job.screw).freeBody()))
         throw "Unload diagnostic detached an installed screw";
+      checkOutfeed(mission);
       printProgress('Unload diagnostic passed backend $backend at ${clock.simulationTime()}');
       simulation.dispose(); session.dispose();
     } catch (error:Dynamic) {simulation.dispose(); session.dispose(); throw error;}
