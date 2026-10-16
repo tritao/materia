@@ -1,0 +1,31 @@
+Subject: Confirm original eRobot 5 reference configuration, operating envelope and single J2 test module
+
+Hello ZeroErr team,
+
+We are preparing to reproduce your original eRobot 5 / 5 kg reference arm using the supplied STEP assembly, without modifying its geometry: eRob110T at J1–J3 and eRob70T at J4–J6, with the original 425 mm upper arm, 401 mm forearm, adapters and flange.
+
+Reference archive:
+https://www.zeroerr.cn/d/file/arms/cn/20260522/5KG机械臂图纸模型.zip
+Assembly: eRobot 5.STEP
+Archive SHA-256: 88927870963572c67fd7b185a042c1b84e1f3e766d2945c9edce7dd78bfefaf4
+We also have eRob module manual V3.44 and the T-module drawings.
+
+We accept the reference arm's 5 kg rating and want to reproduce its intended hardware, control settings and operating conditions. Please provide or confirm:
+
+1. Six-axis configuration/BOM: the complete ordering code and drawing/hardware revision for J1–J6, actual harmonic ratios, brake and encoder options, supported 48 V supply, EtherCAT firmware and matching ESI XML. Are eRob110H100T-BM-18EN (J1–J3) and eRob70H100T-BM-18EN (J4–J6) appropriate configurations, or does the reference use other ratios/options? These codes are questions, not an order.
+
+2. Reference coordinates and limits: mechanical zero, motor/output command signs, absolute output encoder units and zero offsets, permitted multi-turn travel, physical stops, and cable-limited soft limits for each joint in this specific assembled arm. Please supply maximum/recommended velocity, acceleration, deceleration and jerk settings for the reference payload.
+
+3. Five-kilogram operating envelope: does 5 kg include tool and workpiece together? Please supply payload versus reach, tool CoG offset/inertia, mounting orientation, velocity/acceleration, cycle duration, duty and temperature/cooling conditions. A demonstrated reference cycle and its drive settings would help us validate our simulation.
+
+4. Torque and holding interpretation: please provide revision-matched digital continuous and intermittent torque–speed curves, permitted overload duration/repetition, permissible average gearbox load calculation, and drive-current/temperature limits. Our whole-module model gives about 120 Nm J2 gravity torque with the arm horizontal and 5 kg at the flange. We understand 87 Nm rated gearbox torque at its specified input speed is separate from the nominal-100 204 Nm repeated start/stop allowance and 206 Nm unpowered brake acceptance. Please confirm the intended servo/brake holding strategy, brake engagement/release delays, load-transfer sequence and limits. We do not intend to use the brake for ordinary dynamic stopping.
+
+5. Physical masses and interfaces: please confirm Appendix 3 whole-module mass/CoG/inertia frames for the supplied T revisions, including the 110T mass discrepancy (4.47 kg drawing / 4.49 kg Appendix 3 / 4.64 kg product page) and 70T (1.16 / 1.24 kg). Please provide housing-side versus output-side masses/CoGs/inertias if available. In the reference assembly J1/J2 have the output upstream and housing downstream; please confirm this mounting/control convention and the applicable bearing limits.
+
+6. Build package: the reference fastener/washer/dowel/seal BOM, screw grades/lengths/torques and pilot fits; cable/connector part numbers and harness lengths/routing; pinouts and shielding/grounding; required power/regeneration unit, fusing, STO/emergency-stop arrangement and EtherCAT topology/PDO map. Please identify parts included with each module versus purchased separately.
+
+7. First bench article and quotation: please quote one revision-matched 110T J2 module with brake, EtherCAT, required feedback, its mating cables/connectors, commissioning tool and suitable supply/regeneration equipment. We will first verify mass, holding, torque/current, deflection and temperature with a measured-load fixture. Please include your commissioning and brake test procedures. Also provide a separate indicative quote and lead time for the complete original six-module reference configuration and any available link/adapter/harness kit.
+
+We will validate the original reference and one joint before purchasing all six. No substitution to 80T/142T modules or altered links is requested.
+
+Thank you.
