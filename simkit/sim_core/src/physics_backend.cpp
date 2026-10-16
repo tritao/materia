@@ -1069,10 +1069,10 @@ private:
             if (mapping.empty())
                 continue;
             double effort = j.target_mode == NKSIM_JOINT_TARGET_EFFORT ? j.state.effort : 0;
-            const double cap = j.effort_limit > 0 ? j.effort_limit : j.desc.max_force;
+            const double cap = j.effort_limit != 0 ? j.effort_limit : j.desc.max_force;
             if (cap > 0)
                 effort = std::clamp(effort, -cap, cap);
-            if (j.effort_limit < 0)
+            if (cap < 0)
                 effort = 0;
             for (const auto &[col, ratio] : mapping) {
                 force[col] += ratio * (effort - j.desc.damping * j.state.velocity);

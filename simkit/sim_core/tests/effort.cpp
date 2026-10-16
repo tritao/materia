@@ -283,6 +283,35 @@ void rotating_grip_probe() {
     near_contact(yaw, std::acos(-1.0) / 2, .01, "load follows prescribed rotation through real pad friction");
 }
 
+void force_cap_probe() {
+    const double declared[] = {-1, 10, 2, 2, -1, 0}, requested[] = {0, -1, 0, 5, 3, 0},
+                 expected[] = {0, 0, .2, .5, .3, 1};
+    for (int i = 0; i < 6; ++i) {
+        auto b = world();
+        auto a = body(*b, false, 0), c = body(*b, true, 1);
+        BackendJointDesc d;
+        d.type = NKSIM_JOINT_PRISMATIC;
+        d.body_a = a;
+        d.body_b = c;
+        d.axis_a = {1, 0, 0};
+        d.lower_limit = -10;
+        d.upper_limit = 10;
+        d.max_force = declared[i];
+        std::uint64_t j;
+        ok(b->joint_create(d, &j));
+        BackendJointTarget t;
+        t.backend_joint = j;
+        t.mode = NKSIM_JOINT_TARGET_EFFORT;
+        t.target = 10;
+        t.max_force = requested[i];
+        ok(b->set_joint_targets(&t, 1));
+        advance(*b);
+        auto result = state(*b, j);
+        std::printf("force cap case %d: velocity %.12g expected %.12g\n", i, result.velocity, expected[i]);
+        near(result.velocity, expected[i], "declared/per-command effort ceiling");
+    }
+}
+
 int main() {
     {
         auto b = world();
@@ -1021,6 +1050,7 @@ int main() {
         near(state(*b, j).velocity, .01, "stiff damping reaches the physical terminal speed");
         near(state(*b, j).position, .00999, "stiff damping preserves finite integrated displacement");
     }
+    force_cap_probe();
     rotating_grip_probe();
     grip_probe(false);
     grip_probe(true);

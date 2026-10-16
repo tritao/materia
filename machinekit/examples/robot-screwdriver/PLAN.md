@@ -3936,3 +3936,23 @@ The same `sd15-deterministic-native10` process remains live at H10/F1, with the
 first screw vacuum pickup confirmed. Its bytecode/native/source fingerprint
 still matches. Neither pending correction has been applied while it runs;
 complete fastening, unload and fault acceptance remain unproven.
+
+### SD15a first deterministic fastening and force-ceiling correction (2026-10-16)
+
+The same frozen `sd15-deterministic-native10` diagnostic run reports qualified
+OK at 16.5 N m and advances F1 to F2 at 48.10 simulated seconds. Both physical
+picks/transfers/placements and the first required fastening are therefore
+observed end to end. It was explicitly ended at that checkpoint to integrate
+the already proven pending corrections before the final gate. It is not a
+complete nominal-cycle or fault-matrix pass; the final gate must run all of it.
+
+The declared unpowered force ceiling is now honored when no command override
+is supplied. Ceiling selection matches the pinned MuJoCo implementation:
+nonzero command overrides select that ceiling, otherwise the declared limit
+applies; negative disables actuation, positive clamps it and zero is unspecified.
+Six analytical cases cover both disabled paths, declared positive limit,
+positive override, overriding the sentinel and unspecified force.
+
+All 292 assertions and the six standard core groups pass after integration
+(`sd15-dynamics-force-cap-integrated-ctest.log`). The performance candidates
+remain to be integrated and verified, then sources frozen for the complete gate.
