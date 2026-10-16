@@ -163,6 +163,20 @@ class CellRegistration {
     if (Std.string(data.configSha256)!=haxe.crypto.Sha256.encode(configText)) throw "Changed candidate registration inputs; rerun fixture export";
     var config:Dynamic = haxe.Json.parse(configText);
     var planning=Sys.args().indexOf("--plan-transfers")>=0;
+    var candidateCount=1;
+    for(arg in Sys.args()) if(StringTools.startsWith(arg,"--plan-candidate-count=")) {
+      var parsed=Std.parseInt(arg.substr(23));
+      if(parsed==null || parsed<1 || parsed>9) throw "Planning candidate count must be 1..9";
+      candidateCount=parsed;
+    }
+    var selected:Null<String> = null,reused:Dynamic=null;
+    for(arg in Sys.args()) if(StringTools.startsWith(arg,"--registration-model=")) selected=arg.substr(21);
+    if(selected!=null) {
+      if(["zeroerr","ur5e","fairino5_v6"].indexOf(selected)<0) throw "Unknown registration model";
+      reused=haxe.Json.parse(sys.io.File.getContent(ROOT+(planning ? "/registration-planned.json" : "/registration-review.json")));
+      if(Std.string(reused.fixtureSha256)!=haxe.crypto.Sha256.encode(rawText) || Std.string(reused.configSha256)!=haxe.crypto.Sha256.encode(configText))
+        throw "Cannot reuse registration results with changed fixtures/configuration";
+    }
     var previous:Dynamic=null;
     if(planning) {
       previous=haxe.Json.parse(sys.io.File.getContent(ROOT+"/registration-review.json"));
@@ -213,6 +227,12 @@ class CellRegistration {
     var reports:Array<Dynamic> = [];
     for (id in ["zeroerr","ur5e","fairino5_v6"]) {
       var source = ComparisonProject.source(id), sourceHash = ComparisonReview.fingerprint(source);
+      if(selected!=null && selected!=id) {
+        var oldModels:Array<Dynamic> = reused.models;
+        var old=[for(m in oldModels) if(Std.string(m.model)==id) m];
+        if(old.length!=1 || Std.string(old[0].sourceFingerprint)!=sourceHash) throw "Cannot reuse changed model: "+id;
+        reports.push(old[0]);continue;
+      }
       var converted = AssemblySimulationBridge.toRobotModel(source.assemblyDefinition,AssemblyPhysicalPartView.fromSceneArtifact(source));
       var flange = [for (f in converted.model.frames) if (StringTools.endsWith(f.name," robot flange")) f][0];
       for (joint in converted.model.joints) if (joint.limits.lower< -1e8 || joint.limits.upper>1e8) {
@@ -241,8 +261,11 @@ class CellRegistration {
           return clear*1000+Std.int(choice.clearPoses);
         }
         choices.sort((a,b) -> score(b)-score(a));
-        var best=readFrame(choices[0].baseWorldMetres);
-        scanCandidates=[[best.x*1000,best.y*1000,best.z*1000]];
+        scanCandidates=[];
+        for(choice in choices.slice(0,candidateCount)) {
+          var base=readFrame(choice.baseWorldMetres);
+          scanCandidates.push([base.x*1000,base.y*1000,base.z*1000]);
+        }
       }
       for (candidate in scanCandidates) {
         var yaw:Float = config.baseYawRad;
@@ -371,11 +394,6 @@ class CellRegistration {
             door:request.door,status:start==null || end==null ? "endpoint_unproven" : "sampled_joint_route_reviewed",states:states,
             path:routePath,continuous:proof,planner:planner});
         }
-        if(planning) {
-          var stage=[for(p in solved) if(p.name=="outside staging" && p.channel=="A" && p.q!=null) p];
-          var visible=stage.length>0 ? stage[0].q : reference;
-          RegisteredCellPreview.save(id,base,visible,mount,frameA,(cast config.pedestalWidthMm:Float)/1000,seats);
-        }
         for(value in worlds) value.world.dispose();
         var report={baseWorldMetres:base,poses:solved,routes:routes,
           rigidGraspContacts:rigidContacts,
@@ -386,7 +404,22 @@ class CellRegistration {
           fixtureSha256:haxe.crypto.Sha256.encode(rawText),configSha256:haxe.crypto.Sha256.encode(configText),candidates:modelReports},null,"  "));
         Sys.println(id+" registration base "+candidate+": "+report.clearPoses+"/"+report.totalPoses+" target poses; "+report.reviewedRoutes+"/"+routes.length+" sampled routes");Sys.stdout().flush();
       }
-      reports.push({model:id,sourceFingerprint:sourceHash,candidates:modelReports});
+      var examined:Array<Dynamic> = [];
+      if(planning) {
+        function continuousCount(candidate:Dynamic):Int {
+          var routes:Array<Dynamic> = candidate.routes;
+          return [for(route in routes) if(route.continuous!=null && route.continuous.clear==true) route].length;
+        }
+        examined=[for(candidate in modelReports) {baseWorldMetres:candidate.baseWorldMetres,
+          continuousRoutes:continuousCount(candidate),clearPoses:candidate.clearPoses,reviewedRoutes:candidate.reviewedRoutes}];
+        modelReports.sort((a,b) -> (continuousCount(b)-continuousCount(a))*1000+Std.int(b.clearPoses)-Std.int(a.clearPoses));
+        modelReports=[modelReports[0]];
+        var best=modelReports[0],poses:Array<RegisteredPose> = cast best.poses;
+        var stage=[for(p in poses) if(p.name=="outside staging" && p.channel=="A" && p.q!=null) p];
+        var visible=stage.length>0 ? stage[0].q : id=="zeroerr" ? [0.2,-0.8,1.0,0.1,-0.6,0.2] : [0.0,-1.0,1.3,-1.5,-1.0,0.0];
+        RegisteredCellPreview.save(id,readFrame(best.baseWorldMetres),visible,mount,frameA,(cast config.pedestalWidthMm:Float)/1000,seats);
+      }
+      reports.push({model:id,sourceFingerprint:sourceHash,candidates:modelReports,examinedCandidates:examined});
     }
     sys.io.File.saveContent(ROOT+(planning ? "/registration-planned.json" : "/registration-review.json"),haxe.Json.stringify({status:"candidate_review_not_cell_certificate",
       fixtureSha256:haxe.crypto.Sha256.encode(rawText),configSha256:haxe.crypto.Sha256.encode(configText),models:reports,

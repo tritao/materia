@@ -5,6 +5,11 @@ import sys.io.File;
 
 /** Optional prepared-asset integration check, using the actual project loader and simulator. */
 class ReferenceArmsApplicationTests {
+  static function digest(path:String):String {
+    var hash=haxe.crypto.Sha256.make(File.getBytes(path)),out=new StringBuf();
+    for(i in 0...hash.length) out.add(StringTools.hex(hash.get(i),2).toLowerCase());
+    return out.toString();
+  }
   static function check(condition:Bool,message:String):Void {if (!condition) throw message;}
   public static function main():Void {
     var root = app.editor.WorkerAssetPath.resolve("machinekit/examples/reference-arms");
@@ -54,6 +59,18 @@ class ReferenceArmsApplicationTests {
       var ours = [for (joint in moving) if (StringTools.startsWith(joint.id,"zeroerr/")) joint];
       check(ours.length==6,"Combined scene must retain our six joints");
       for (joint in ours) check(joint.passive==true,"Comparison must preserve passive prototype joints");
+      var planning:Dynamic=haxe.Json.parse(File.getContent(root+"/../zeroerr-arm/straight-planning-window.json"));
+      for(id in ["j3","j4"]) {
+        var restricted=[for(joint in ours) if(StringTools.endsWith(joint.id,"/"+id)) joint];
+        var range:Array<Float> = Reflect.field(planning.limitsDeg,id);
+        check(restricted.length==1,"Comparison needs the restricted joint");
+        var lower:Float=cast restricted[0].limits.lower,upper:Float=cast restricted[0].limits.upper;
+        check(Math.abs(lower-range[0]*Math.PI/180)<1e-12 &&
+          Math.abs(upper-range[1]*Math.PI/180)<1e-12,"Comparison must preserve reviewed planning window");
+        var state=new cadkit.modeling.AssemblyState(definition),rejected=false;
+        try state.setJoint(restricted[0].id,upper+1e-4) catch(error:Dynamic) rejected=true;
+        check(rejected,"Imported prototype must reject coordinates beyond the planning window");
+      }
       comparisonMountings.push(mounting);
     }
     var registeredModels:Array<String> = [];
@@ -63,11 +80,24 @@ class ReferenceArmsApplicationTests {
       check(definition.lengthUnit=="m" && generated.objects.length>100,"Registered cell imports must retain metre-scale fixtures and tool");
       var moving=[for(joint in definition.joints) if(joint.type!="fixed") joint];
       check(moving.length==6,"Frozen fixture/tool states must leave only six arm joints");
-      if(id=="zeroerr") for(joint in moving) check(joint.passive==true,"Registered prototype must remain passive");
+      if(id=="zeroerr") {
+        for(joint in moving) check(joint.passive==true,"Registered prototype must remain passive");
+        var planning:Dynamic=haxe.Json.parse(File.getContent(root+"/../zeroerr-arm/straight-planning-window.json"));
+        for(name in ["j3","j4"]) {
+          var restricted=[for(joint in moving) if(StringTools.endsWith(joint.id,"/"+name)) joint];
+          var range:Array<Float> = Reflect.field(planning.limitsDeg,name);
+          check(restricted.length==1,"Registered scene needs the restricted joint");
+          var lower:Float=cast restricted[0].limits.lower,upper:Float=cast restricted[0].limits.upper;
+          check(Math.abs(lower-range[0]*Math.PI/180)<1e-12 &&
+            Math.abs(upper-range[1]*Math.PI/180)<1e-12,"Registered scene must preserve planning restrictions");
+        }
+      }
       registeredModels.push(id);
     }
     var text = haxe.Json.stringify({scope:"source selection and 200 actual simulator steps for UR5e/FR5; static comparison and registered-cell imports; no hardware qualification",robots:reports,
-      comparisonMountings:comparisonMountings,registeredModels:registeredModels},null,"  ");
+      comparisonMountings:comparisonMountings,registeredModels:registeredModels,
+      prototypeArtifactSha256:digest(root+"/../zeroerr-arm/build/straight/zeroerr5-straight80.mtrg"),
+      prototypePlanningWindowSha256:digest(root+"/../zeroerr-arm/straight-planning-window.json")},null,"  ");
     File.saveContent(root+"/build/application-validation.json",text);
     Sys.println(text);
     // The editor's background project workers outlive this headless check.

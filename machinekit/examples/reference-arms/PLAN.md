@@ -36,9 +36,15 @@ The study retains these negative findings:
   registered actual-tool configuration screen also exceeds the current shoulder
   candidate under its conservative assumptions.
 - None of the three candidate layouts establishes a complete tending cycle:
-  5/23, 10/23 and 18/23 transfers have continuous checks for our arm, UR5e and
+  4/23, 10/23 and 18/23 transfers have continuous checks for our restricted arm, UR5e and
   FR5 respectively. Failed endpoints/routes and search limits remain recorded.
 - Folded self-collisions and distal-cover contact limit the explored envelope.
+  The follow-up interference review reduces cover overhang and adds J3/J4
+  simulation restrictions; all 54 retained observed poses are clear. The five
+  extreme collision witnesses remain recorded outside the window. All nine
+  candidate bases were planned again, with a 4/23 best restricted result versus
+  the previous unrestricted 5/23; shoulder demand reaches 166.01 Nm on the
+  conservative registered-configuration screen.
 - Mechanical fits, cover retention, cables, physical commissioning and hardware
   qualification remain open; prototype drawings/BOM/bench request remain drafts.
 - Two malformed FAIRINO long-reach URDFs, unavailable UR STEP access, unverified

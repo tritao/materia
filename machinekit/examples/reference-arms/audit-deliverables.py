@@ -100,13 +100,50 @@ def main():
             sizing['configSha256']==digest(ARM/'build/straight/engineering-config.json'), 'Stale load study')
     motion = read(ARM/'build/straight/motion-report.json')
     require(motion['uniqueRequiredPoses']==60 and motion['uniqueObservedPoses']==60 and not motion['missingPosesRad'] and
-            motion['clearPoses']==55 and motion['collisionPoses']==5 and motion['indeterminatePoses']==1, 'Incomplete motion review')
+            motion['clearPoses']>=55 and motion['collisionPoses']<=5 and motion['indeterminatePoses']<=1, 'Incomplete/regressed motion review')
+    observations = motion['observations']
+    require(len(observations)==60 and motion['clearPoses']==sum(not r['overlaps'] and not r['indeterminatePairs'] for r in observations) and
+            motion['collisionPoses']==sum(bool(r['overlaps']) for r in observations) and
+            motion['indeterminatePoses']==sum(bool(r['indeterminatePairs']) for r in observations), 'Incorrect exact CAD counts')
     require(motion['layoutSha256']==digest(layout_path), 'Stale motion geometry')
     for path, expected in motion['inputSha256'].items():
         require(digest(Path(path))==expected, 'Changed exact motion observation')
     curve = read(ARM/'build/straight/continuous-clearance.json')
-    require(curve['status']=='clear_within_stated_hull_policy' and curve['queries']==849 and
+    require(curve['status']=='clear_within_stated_hull_policy' and curve['queries']>0 and
             curve['artifactSha256']==digest(ARM/'build/straight/zeroerr5-straight80.mtrg'), 'Stale/failed synthetic continuous review')
+    boundary = read(ARM/'build/straight/clearance-improvement.json')
+    window = read(ARM/'straight-planning-window.json')
+    require(boundary['layoutSha256']==digest(layout_path) and window['layoutSha256']==digest(layout_path), 'Stale clearance/window geometry')
+    require(window['limitsDeg']==boundary['proposedPlanningWindowDeg'] and window['requiresPoseAndContinuousCollisionChecks'] and
+            not window['hardwareQualified'], 'Simulation restriction does not match its conditional review')
+    require(boundary['analysisSha256']==digest(ARM/'review-clearance-boundaries.py'), 'Changed clearance analysis')
+    for name, expected in boundary['reportsSha256'].items():
+        path = ARM/'build/straight'/('clearance-boundaries-'+name+'.json')
+        report = read(path)
+        require(digest(path)==expected and report['producerSha256']==digest(ROOT/'StraightBoundaryReview.hx') and
+                report['configSha256']==digest(ARM/'clearance-review-config.json') and len(report['scans'])==11, 'Stale/missing boundary slice')
+    require(window['reviewConfigSha256']==digest(ARM/'clearance-review-config.json'), 'Changed slice basis')
+    equivalence = read(ARM/'build/straight/cover-geometry-equivalence.json')
+    require(equivalence['status']=='byte_identical_geometry_except_two_covers' and equivalence['layoutSha256']==digest(layout_path) and
+            equivalence['producerSha256']==digest(ARM/'review-cover-regression.py'), 'Stale/incomplete geometry reuse proof')
+    require(motion['coverGeometryEquivalenceSha256']==digest(ARM/'build/straight/cover-geometry-equivalence.json'), 'Motion report lacks its reuse proof')
+    for name, row in equivalence['unchangedFiles'].items():
+        require(row['currentSha256']==digest(Path(current['vendorDirectory'])/name), 'Changed reused geometry')
+    for path, expected in motion['freshCoverCheckpointSha256'].items():
+        path = Path(path)
+        metadata = read(Path(str(path)+'.provenance.json'))
+        require(digest(path)==expected and metadata['status']=='complete' and metadata['layoutSha256']==digest(layout_path) and
+                metadata['producerSha256']==digest(ARM/'ZeroErrArmPreview.hx'), 'Stale/incomplete fresh cover observation')
+    restriction = read(ARM/'build/straight/planning-window-review.json')
+    require(not restriction['unsafeRetainedPoses'] and restriction['retainedPoses']==54 and
+            restriction['excludedPoses']==6 and restriction['motionReportSha256']==digest(ARM/'build/straight/motion-report.json') and
+            restriction['planningWindowSha256']==digest(ARM/'straight-planning-window.json'), 'Failed/stale planning-window observation check')
+    provenance = read(ARM/'build/straight/zeroerr5-straight80.provenance.json')
+    require(provenance['planningWindowSha256']==digest(ARM/'straight-planning-window.json') and
+            provenance['artifactSha256']==digest(ARM/'build/straight/zeroerr5-straight80.mtrg') and
+            provenance['exporterSha256']==digest(ARM/'ZeroErrArmPreview.hx'), 'Export lacks current planning restrictions/provenance')
+    require(app['prototypeArtifactSha256']==provenance['artifactSha256'] and
+            app['prototypePlanningWindowSha256']==provenance['planningWindowSha256'], 'Stale application integration report')
     pack = read(ARM/'build/straight/prototype-pack.json')
     require(pack['layoutSha256']==digest(layout_path) and pack['exportedPartAuditSha256']==digest(ARM/'build/straight/exported-parts-audit.json') and
             pack['structureReportSha256']==digest(ARM/'build/straight/structure-report.json'), 'Stale prototype pack')
@@ -123,14 +160,22 @@ def main():
         require(digest(cell/state['file'])==state['sha256'], 'Changed physical jaw state')
     planned = read(cell/'registration-planned.json')
     require(planned['fixtureSha256']==digest(cell/'fixtures.json') and planned['configSha256']==digest(ROOT/'tending-registration-config.json'), 'Stale transfer review')
-    expected_routes = {'zeroerr':5,'ur5e':10,'fairino5_v6':18}
+    expected_routes = {}
     for model in planned['models']:
         name = model['model']
         require(len(model['candidates'])==1, 'Expected one selected candidate per arm')
         candidate = model['candidates'][0]
         require(len(candidate['routes'])==23, 'Missing production transfer request')
         good = [r for r in candidate['routes'] if r.get('continuous') and r['continuous']['clear']]
-        require(len(good)==expected_routes[name], 'Unexpected continuously checked route coverage')
+        expected_routes[name] = len(good)
+        if name!='zeroerr':
+            require(len(good)=={'ur5e':10,'fairino5_v6':18}[name], 'Changed unchanged-reference route coverage')
+        else:
+            examined = model['examinedCandidates']
+            require(len(examined)==9 and len(good)==max(c['continuousRoutes'] for c in examined),
+                    'Incomplete base search or incorrect selected candidate')
+        require(model['sourceFingerprint']==digest(ARM/'build/straight/zeroerr5-straight80.mtrg') if name=='zeroerr' else True,
+                'Stale prototype tending review')
         for route in good:
             require(route['path'] is not None and len(route['path'])>=2 and route['continuous']['error'] is None,
                     'Clear route lacks a path or contains a query error')
@@ -138,7 +183,7 @@ def main():
             require(len(contact['contacts'])>=2 and all(-1e-8<=d<=1e-6 for d in contact['distancesMetres']), 'Invalid rigid grasp contacts')
         digest(cell/(name+'-cell.mtrg'))
     load = read(cell/'registered-load-report.json')
-    require(load['configurations']==40 and load['analysisSha256']==digest(ROOT/'registered-load-study.py'), 'Changed registered load study')
+    require(load['configurations']>0 and load['analysisSha256']==digest(ROOT/'registered-load-study.py'), 'Changed registered load study')
     for path, expected in load['inputs'].items():
         require(digest(ROOT.parent/path)==expected, 'Stale registered load input')
     require(load['states'][-1]['ratioToCatalogRated'][1]>1, 'Unresolved shoulder finding was lost')

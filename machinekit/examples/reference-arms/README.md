@@ -222,6 +222,7 @@ It does not reuse the old Reach1300 arm poses or certificate. Generate in order:
 ./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.fixtures.json
 ./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.json -- --registration
 ./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.json -- --registration --plan-transfers
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.json -- --registration --plan-transfers --registration-model=zeroerr --plan-candidate-count=9
 ./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.json -- --registration-properties
 ./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.json -- --registration-previews
 python3 machinekit/examples/reference-arms/registered-load-study.py
@@ -244,8 +245,13 @@ and the mill stock remain conservatively occupied; these inventories overbound
 the actual four-part production sequence and can reject otherwise usable routes.
 Door geometry follows each production transfer's open/closed requirement.
 
-The best base per arm is selected using routes clear in all four sampled states,
-then target coverage. Final planning uses a continuous quintic clearance check,
+Candidate priority uses routes clear in all four sampled states, then target
+coverage. By default the best sampled candidate is planned. The current restricted
+prototype review instead plans all nine bases with `--plan-candidate-count=9`
+and selects the most continuously checked routes, then target coverage. Use
+`--registration-model=zeroerr` on the scan and planning commands when only our
+arm changed: unchanged other-model results are retained only if their source,
+fixture and configuration hashes still match. Final planning uses a continuous quintic clearance check,
 with deterministic RRT-Connect fallback capped at 256 iterations. The resulting
 piecewise stop-to-stop quintics are checked again in every holding state, with
 5 mm normal clearance and a 1e-6 rad lowering reserve. Adjacent-body articulation
@@ -260,11 +266,14 @@ Current results for the selected candidates:
 
 | Arm | Base XYZ (mm) | Continuously checked transfers | Outcome |
 | --- | --- | --- | --- |
-| Our straight ZeroErr arm | 145, -950, 750 | 5 / 23 | 18 transfer endpoints remain unproven |
+| Our restricted straight ZeroErr arm | 145, -950, 1050 | 4 / 23 | 18 endpoints and one additional route remain unproven |
 | UR5e | 145, -950, 900 | 10 / 23 | Endpoints found; remaining routes unproven |
 | FAIRINO FR5 | 145, -950, 1050 | 18 / 23 | Endpoints found; remaining routes unproven |
 
-Two ZeroErr routes and four FR5 routes required RRT repairs. These counts are
+Three ZeroErr routes and four FR5 routes required RRT repairs. The earlier
+unrestricted prototype study checked 5/23 routes at a different base. The
+conservative J3/J4 restrictions reduce the selected result to 4/23; smaller
+covers do not establish an improvement in complete task feasibility. These counts are
 results for this candidate study and conservative inventory, not robot rankings,
 production cycle times or complete cell certificates. In particular, our arm's
 arm/table and wrist/enclosure conflicts remain design issues. Contact insertion,
@@ -287,10 +296,13 @@ exported tool components' declared/CAD mass, CoG and inertia in each jaw state.
 The external air supply is excluded. Estimated tool mass is 2.781 kg; each current
 60 x 60 x 20 mm aluminium blank is 0.1944 kg, giving 3.170 kg with two blanks.
 Mass aggregation is checked against the native tool estimate; tensor symmetry/PSD
-and gravity/potential-gradient identities are checked. At 40 evaluated prototype
-poses/path vertices, the heaviest state's nominal shoulder gravity reaches 77.44 Nm.
+and gravity/potential-gradient identities are checked. At 37 evaluated prototype
+poses/path vertices, the heaviest state's nominal shoulder gravity reaches 102.49 Nm.
 The +25% arm-mass, 60 degrees/s² zero-speed acceleration envelope and design factor
-reach 128.94 Nm, about 1.48 times the current shoulder's 87 Nm catalog rating.
+reach 166.01 Nm, about 1.91 times the current shoulder's 87 Nm catalog rating.
+This candidate is worse on this screen than the earlier unrestricted base's
+128.94 Nm result; the current shoulder is inadequate even at nominal gravity
+in some reviewed configurations.
 This is a configuration load screen, not an executed duty/RMS or thermal result.
 The separate full-workspace 5 kg benchmark and unresolved shoulder sizing remain.
 
