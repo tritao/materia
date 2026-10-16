@@ -1,0 +1,15 @@
+{
+  "schema":1,
+  "status":"template_not_a_test_result",
+  "article":{"family":"eRob110T","requestedCode":"eRob110H120T-BM-18EN","serial":null,"revision":null,"nominalRatio":null,"confirmed":false},
+  "fixture":{"outputMountedUpstream":true,"movingHousing":true,"approvedCapacityNm":null,"reviewed":false},
+  "conditions":{"ambientC":null,"calibrationIds":[],"supplierProcedureRevision":null},
+  "measuredBodies":[
+    {"name":"test lever","massKg":null,"signedHorizontalCogMm":null},
+    {"name":"test weight and hanger","massKg":null,"signedHorizontalCogMm":null},
+    {"name":"moving module housing contribution","massKg":null,"signedHorizontalCogMm":null}
+  ],
+  "measurements":[],
+  "acceptance":{"torqueResidualNm":null,"angularDeflectionRad":null,"temperatureC":null},
+  "notes":"Replace nulls with measured quantities; do not treat Appendix 3 whole-module data as a measured moving-side split. No hardware command is generated."
+}

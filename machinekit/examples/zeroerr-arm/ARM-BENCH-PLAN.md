@@ -1,5 +1,7 @@
 # Joint and connection bench plan
 
+Active implementation: [one 110T J2 bench package](J2-BENCH.md), with measured-load template and reducer. The trusted supplier geometry is frozen; modified-module experiments are archived.
+
 This is the next physical-validation plan for the original 110T/70T arm. No
 hardware is ordered, supplier inquiry sent, fixture fabricated or test performed.
 It follows the [standalone requirements and evidence gates](../reference-arms/ARM-DESIGN.md).
