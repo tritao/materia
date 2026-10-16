@@ -4,21 +4,133 @@
   "source": "Manual V3.44 section 25.3, printed pages 92-93 (PDF pages 103-104)",
   "manualSha256": "73e138369aa2780c980e0652008c8311c95d26ac3b4142ce2f05afdc1bf0e7b5",
   "nominalRatio": 100,
-  "voltageV":48,
+  "voltageV": 48,
   "scope": "Published H100I plots; manual states I/T share parameters except mounting. Delivered T revision, voltage, cooling and overload duration must be confirmed. Rounded inner-envelope points read visually, not supplier digital curves.",
   "hardwareValidated": false,
   "curves": {
     "eRob110T": {
-      "continuousRpmNm": [[0,85],[30,85],[36,0]],
-      "accelerationRpmNm": [[0,200],[18,200],[30,85],[36,0]],
-      "ratedNm":87, "repeatedPeakNm":204, "averageLoadNm":140, "brakeNm":206,
-      "maximumSpeedDegS":180, "minimumRampTimeS":0.3
+      "continuousRpmNm": [
+        [
+          0,
+          85
+        ],
+        [
+          30,
+          85
+        ],
+        [
+          36,
+          0
+        ]
+      ],
+      "accelerationRpmNm": [
+        [
+          0,
+          200
+        ],
+        [
+          18,
+          200
+        ],
+        [
+          30,
+          85
+        ],
+        [
+          36,
+          0
+        ]
+      ],
+      "ratedNm": 87,
+      "repeatedPeakNm": 204,
+      "averageLoadNm": 140,
+      "brakeNm": 206,
+      "maximumSpeedDegS": 180,
+      "minimumRampTimeS": 0.3
     },
     "eRob70T": {
-      "continuousRpmNm": [[0,9.5],[30,9.5],[37.5,0]],
-      "accelerationRpmNm": [[0,35],[20,35],[30,18],[37.5,0]],
-      "ratedNm":10, "repeatedPeakNm":36, "averageLoadNm":14, "brakeNm":50,
-      "maximumSpeedDegS":180, "minimumRampTimeS":0.3
+      "continuousRpmNm": [
+        [
+          0,
+          9.5
+        ],
+        [
+          30,
+          9.5
+        ],
+        [
+          37.5,
+          0
+        ]
+      ],
+      "accelerationRpmNm": [
+        [
+          0,
+          35
+        ],
+        [
+          20,
+          35
+        ],
+        [
+          30,
+          18
+        ],
+        [
+          37.5,
+          0
+        ]
+      ],
+      "ratedNm": 10,
+      "repeatedPeakNm": 36,
+      "averageLoadNm": 14,
+      "brakeNm": 50,
+      "maximumSpeedDegS": 180,
+      "minimumRampTimeS": 0.3
+    }
+  },
+  "curvesByNominalRatio": {
+    "120": {
+      "eRob110T": {
+        "continuousRpmNm": [
+          [
+            0,
+            85
+          ],
+          [
+            24,
+            85
+          ],
+          [
+            31,
+            0
+          ]
+        ],
+        "accelerationRpmNm": [
+          [
+            0,
+            210
+          ],
+          [
+            15,
+            210
+          ],
+          [
+            24,
+            85
+          ],
+          [
+            31,
+            0
+          ]
+        ],
+        "ratedNm": 87,
+        "repeatedPeakNm": 217,
+        "averageLoadNm": 140,
+        "brakeNm": 246,
+        "maximumSpeedDegS": 150,
+        "minimumRampTimeS": 0.3
+      }
     }
   }
 }
