@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "package": {
+    "name": "reference-arm-fixture-export"
+  },
+  "entry": "FixtureExport",
+  "sourceRoots": [
+    ".",
+    "../bench-mill",
+    "../cnc-router",
+    "build/assets"
+  ],
+  "dependencies": {
+    "robotkit-autonomy": {
+      "path": "../../../robotkit/autonomy"
+    },
+    "projectkit": {
+      "path": "../../../projectkit"
+    },
+    "cadkit": {
+      "path": "../../../cadkit"
+    },
+    "machinekit": {
+      "path": "../../"
+    },
+    "manufacturingkit": {
+      "path": "../../../manufacturingkit"
+    },
+    "toolpathkit": {
+      "path": "../../../toolpathkit"
+    },
+    "camkit": {
+      "path": "../../../camkit"
+    },
+    "cnckit": {
+      "path": "../../../cnckit"
+    }
+  },
+  "target": "host",
+  "outputDir": "build/fixture-export"
+}

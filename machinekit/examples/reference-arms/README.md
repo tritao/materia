@@ -185,3 +185,28 @@ Application integration tests load all three source jobs and all three prebuilt
 artifacts, verify all 137 instances/18 joints and preserve our passive joints.
 No dynamic benchmark, manufacturing release or physical cell qualification is
 inferred from these visual/kinematic comparisons.
+
+## Current tending fixture inputs
+
+Export the current mill and the existing tending dual-gripper geometry separately:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.fixtures.json
+```
+
+`build/cell-registration/mill.mtrg` contains the current loaded reference mill at
+its loading-axis positions, with door and jaw open. `tool.mtrg` contains the
+physical dual gripper and its modelled air supply; the supply is an external
+service, not carried tool mass. `fixtures.json` records both artifact hashes,
+the producing bytecode hash, stock dimensions, vise load and stock frames, and
+both gripper TCP frames. Saved-frame positions are checked after decoding.
+The tool mount is recorded in both MachineKit's +Y-normal convention and the
++Z-normal convention used by the imported arms; the conversion checks that the
+physical normal is preserved.
+
+This export neither reads nor regenerates the generic arm's reach certificate.
+The tool uses the existing generic 50-4-M6 mounting plate; a revision-matched
+ZeroErr adapter remains unverified. The arm base, trays, held stock, contact
+states and complete transfers still need registration and fresh clearance
+checks before any tending feasibility claim. The combined comparison's simple
+tool envelope does not substitute for this dual-gripper geometry.

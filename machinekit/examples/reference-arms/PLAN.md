@@ -119,3 +119,14 @@ redistribution permission is unresolved. UR mesh terms vary by model.
 - Complete the deliverable/command/provenance audit and record unresolved
   supplier/manufacturing/hardware data. No physical-cell certificate, hardware
   qualification, purchase or supplier contact is part of this software task.
+
+## Current fixture export
+
+- Separate native fixture export generates the current mill loading state and
+  existing physical dual-gripper template with modelled external air supply.
+  It never reads or regenerates the generic arm certificate.
+- Saved frames and +Y-normal to +Z-normal mount conversion pass; artifact and
+  producing bytecode hashes are recorded in cell-registration/fixtures.json.
+- Candidate base/tray/held-stock/contact-state registration and full transfer
+  feasibility are still pending. The generic 50-4-M6 tool plate is not a
+  verified ZeroErr production adapter.
