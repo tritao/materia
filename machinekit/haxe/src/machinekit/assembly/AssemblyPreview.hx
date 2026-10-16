@@ -33,7 +33,9 @@ class AssemblyPreview {
     }
     if (contacts.length > 0) machineMotion.contacts = contacts;
 		var definitionByOccurrence = new Map<String, String>();
-		var definitionByDesignation = new Map<String, String>();
+		var definition = model.definition(assemblyId);
+		var definitions:Map<String, AssemblyComponentDefinition> = [for (item in definition.definitions) item.id => item];
+		var definitionByDesignation = new Map<String, Array<String>>();
 		for (entry in assembly.components()) {
 			var collision = machinekit.component.CollisionHullFacet.of(entry.component);
 			var mass = entry.component.massProperties();
@@ -46,10 +48,22 @@ class AssemblyPreview {
 				inertia: inertiaKey, declared: declared});
 			var designationKey = entry.component.designation + "|" + entry.component.materialId + "|" + massKey +
 				(collision == null ? "" : haxe.Json.stringify(collision.hulls));
-			var definitionId = definitionByDesignation.get(designationKey);
+			var candidates = definitionByDesignation.get(designationKey);
+			var component = definitions.get(entry.id);
+			if (component == null) throw 'Preview has no definition for "${entry.id}"';
+			var definitionId:Null<String> = null;
+			if (candidates != null) for (candidate in candidates) {
+				var owner = definitions.get(candidate);
+				if (owner == null) throw 'Preview lost shared definition "$candidate"';
+				var compatible = true;
+				for (connector in component.connectors) for (existing in owner.connectors)
+					if (connector.name == existing.name && !sameFrame(connector.frame, existing.frame)) compatible = false;
+				if (compatible) {definitionId = candidate; break;}
+			}
 			if (definitionId == null) {
 				definitionId = entry.id;
-				definitionByDesignation.set(designationKey, definitionId);
+				if (candidates == null) {candidates = []; definitionByDesignation.set(designationKey, candidates);}
+				candidates.push(definitionId);
 				var rendered = part(definitionId, entry.component.designation,
 					entry.component.geometry(ComponentDetail.Preview), entry.component.materialId, null,
 					mass);
@@ -62,8 +76,13 @@ class AssemblyPreview {
         parts.push(rendered);
 			}
 			definitionByOccurrence.set(entry.id, definitionId);
+			// Accumulate connector names while choosing candidates: a later occurrence must also agree with
+			// connectors contributed by an earlier sharer, not just those of the original component.
+			var owner = definitions.get(definitionId);
+			if (owner != null && owner != component) for (connector in component.connectors)
+				if (owner.connectors.filter(existing -> existing.name == connector.name).length == 0)
+					owner.connectors.push(connector);
 		}
-		var definition = model.definition(assemblyId);
 		var state = model.initialState(assemblyId).record();
 		preserveOwnership(definition, assembly.derived().definition);
 		shareDefinitions(definition, definitionByOccurrence);

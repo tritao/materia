@@ -2548,6 +2548,19 @@ class MachineKitSmoke {
 		check([for (occurrence in merged.occurrences) occurrence.definition].join(",") == "a,a", "both occurrences use it");
 		throws(() -> AssemblyPreview.shareDefinitions(model(Solids.axial(0, 0, 5)), ["b" => "a"]),
 			'give connector "shared" different frames');
+		var assembly = new MachineAssembly();
+		for (id in ["a", "b", "c"]) assembly.addComponent(id, new MassTestBlock());
+		assembly.addMemberConnector("a", "seat", Solids.axial(0, 0, 10));
+		assembly.addMemberConnector("b", "seat", Solids.axial(0, 0, 20));
+		assembly.addMemberConnector("c", "seat", Solids.axial(0, 0, 20));
+		var scene = SceneArtifact.decode(SceneArtifact.encode(AssemblyPreview.scene(assembly, "different-seats")));
+		var saved:materia.assembly.AssemblyDefinition = cast scene.assemblyDefinition;
+		check(scene.parts.length == 2 && saved.definitions.length == 2,
+			"Automatic sharing splits incompatible seat frames while retaining compatible geometry sharing");
+		var state = new cadkit.modeling.AssemblyState(saved, scene.assemblyState);
+		near(state.worldConnector("a", "seat").z, 10, "First occurrence retains its own seat");
+		near(state.worldConnector("b", "seat").z, 20, "Second occurrence retains its different seat");
+		near(state.worldConnector("c", "seat").z, 20, "Compatible third occurrence shares the second definition");
 	}
 
 	/** The groups of this suite, each independent of the others, so that the workspace can run them as parallel shards. */
