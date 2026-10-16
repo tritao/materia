@@ -64,7 +64,10 @@ class StreamingPathMotion {
           var timed = raw;
           laws.append(timed,preview.startDistance,preview.endDistance,preview.firstStage);raw = null;
           sourceFinished = preview.windowIndex+1 == preview.totalWindows;
-          for (i in 0...authored.length) if (!assigned[i] && authored[i].distance <= preview.endDistance) {
+          // Final source readiness owns the authored endpoint event even if
+          // integer-clock integration lands a few ULPs before that endpoint.
+          // The unchanged native inverse law handles final rest quantization.
+          for (i in 0...authored.length) if (!assigned[i] && (sourceFinished || authored[i].distance <= preview.endDistance)) {
             var event = authored[i];
             var tick = Int64.add(end,Trajectory.nanoseconds(timed.distanceToTime(event.distance)));
             tick = Int64.sub(tick,Trajectory.nanoseconds(event.leadSeconds));
