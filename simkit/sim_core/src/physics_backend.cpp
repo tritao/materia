@@ -1901,6 +1901,33 @@ private:
             return outcome;
         if (contact_geometry.size() > 16384)
             contact_geometry.clear();
+        std::vector<std::size_t> welded(bodies.size());
+        for (std::size_t i = 0; i < welded.size(); ++i)
+            welded[i] = i;
+        auto weld_root = [&](std::size_t i) {
+            while (welded[i] != i)
+                i = welded[i];
+            return i;
+        };
+        for (const auto &joint : joints)
+            if (joint.desc.type == NKSIM_JOINT_FIXED) {
+                const auto a = body_index(joint.desc.body_a), b = body_index(joint.desc.body_b);
+                if (a >= 0 && b >= 0)
+                    welded[weld_root(b)] = weld_root(a);
+            }
+        for (auto &group : welded)
+            group = weld_root(group);
+        std::set<std::pair<std::size_t, std::size_t>> adjacent;
+        for (const auto &joint : joints)
+            if (joint.desc.type != NKSIM_JOINT_FIXED) {
+                const auto ai = body_index(joint.desc.body_a), bi = body_index(joint.desc.body_b);
+                if (ai >= 0 && bi >= 0) {
+                    auto a = welded[ai], b = welded[bi];
+                    if (a > b)
+                        std::swap(a, b);
+                    adjacent.insert({a, b});
+                }
+            }
         std::vector<ImpulseContact> rows;
         std::vector<std::vector<TestBody>> pieces(bodies.size());
         std::vector<std::vector<ForceBounds>> bounds(bodies.size());
@@ -1948,6 +1975,15 @@ private:
                                  pair.part_a == static_cast<unsigned>(ib) &&
                                  pair.part_b == static_cast<unsigned>(ia)))
                                 explicit_pair = &pair;
+                        auto group_a = welded[ai], group_b = welded[bi];
+                        if (group_a > group_b)
+                            std::swap(group_a, group_b);
+                        const bool adjacent_moving =
+                            adjacent.count({group_a, group_b}) &&
+                            bodies[group_a].desc.motion_type != NKSIM_MOTION_STATIC &&
+                            bodies[group_b].desc.motion_type != NKSIM_MOTION_STATIC;
+                        if (!explicit_pair && (group_a == group_b || adjacent_moving))
+                            continue;
                         const bool environment =
                             layered &&
                             ((part_a.contact_filter == NKSIM_CONTACT_PAIRS_AND_ENVIRONMENT &&

@@ -3758,3 +3758,32 @@ the exact penetration and an invalid measured-wrench flag. All 256 physical
 assertions and 29946 checked API operations pass, and all six core groups are
 green (`sd15-dynamics-prescribed-observation-ctest.log`). The actual deterministic
 cell/fault matrix, final frozen-source gate and local-main merge remain open.
+
+### SD15a deterministic first-grasp failure and structural collision filtering (2026-10-16)
+
+`sd15-deterministic-native6` reaches a genuine terminal failure at 4.20 simulated
+seconds: handling H2 does not confirm the plate grasp (210.0 s wall, 350 MB).
+Both jaw sensors report closed-empty and the plate is displaced downward. The
+measured contacts include a 5 mm jaw/carrier overlap with about 414.7 N self
+reaction. This is not a passing acceptance result.
+
+The pinned MuJoCo collision driver filters same-weld contacts and adjacent
+non-world moving weld groups; the deterministic force path lacked that filter.
+It now derives fixed-body groups and their moving-joint adjacency per substep.
+Implicit contacts follow that structural filter, while explicit pairs override
+it and world-static parent contacts remain possible. No grasp signal or test
+threshold was changed.
+
+Five dedicated physical cases verify direct and fixed-alias carrier/jaw
+filtering, preserve nonadjacent self-contact and explicit pair contact, and
+retain world-parent contact. All 263 physical assertions and 29988 checked API
+operations pass, with all six core groups green
+(`sd15-dynamics-adjacent-regression-ctest.log`). Earlier Jacobian implementation
+ASan/UBSan and native RobotKit/session checks also pass
+(`sd15-dynamics-jacobian-*.log`). A fresh actual deterministic cell run is due.
+
+The final-gate runner is prepared as ignored local helper
+`build/sd15-final-gate.sh`: fresh evidence directories, measured memory sizing,
+and recursive source fingerprints including nested submodules. Shell syntax,
+Python syntax and a complete preview fingerprint succeed. It has not run and
+is not final-gate acceptance.

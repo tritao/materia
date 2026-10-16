@@ -870,6 +870,47 @@ int main() {
             }
         check(count == 4, "prescribed-only contacts remain observable without ineffective solver rows");
     }
+    for (int mode = 0; mode < 5; ++mode) {
+        auto b = world();
+        auto root = collider(*b, mode == 4 ? NKSIM_MOTION_STATIC : NKSIM_MOTION_KINEMATIC, 0, {0, 0, 0},
+                             {.1, .1, .1});
+        auto parent = root;
+        if (mode == 1 || mode == 2) {
+            parent = body(*b, true, 1);
+            joint(*b, root, parent, mode == 1 ? NKSIM_JOINT_FIXED : NKSIM_JOINT_PRISMATIC);
+        }
+        auto jaw = collider(*b, NKSIM_MOTION_DYNAMIC, 1, {.12, 0, 0}, {.05, .05, .05});
+        BackendJointDesc d;
+        d.type = NKSIM_JOINT_PRISMATIC;
+        d.body_a = parent;
+        d.body_b = jaw;
+        d.axis_a = {1, 0, 0};
+        d.anchor_a = {.12, 0, 0};
+        d.lower_limit = -1;
+        d.upper_limit = 1;
+        std::uint64_t j;
+        ok(b->joint_create(d, &j));
+        effort(*b, j, 10);
+        if (mode == 3) {
+            BackendContactPair pair;
+            pair.body_a = root;
+            pair.body_b = jaw;
+            pair.surface.friction_dimensions = 1;
+            ok(b->contact_pair_create(pair));
+        }
+        ok(b->step(.001, 1));
+        std::vector<BackendContact> contacts;
+        ok(b->read_contacts(contacts));
+        bool observed = false;
+        for (const auto &c : contacts)
+            if (c.body_a == root && c.body_b == jaw)
+                observed = true;
+        if (mode < 2) {
+            check(!observed, "adjacent moving weld groups do not self-collide");
+            near(state(*b, j).velocity, .01, "own carrier collision cannot block its jaw drive");
+        } else
+            check(observed, "nonadjacent, explicit and world-parent contacts remain enabled");
+    }
     grip_probe(false);
     grip_probe(true);
     std::printf("Generalized effort: %d analytical assertions and %d API operations passed; box, convex and "
