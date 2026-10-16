@@ -115,14 +115,40 @@ void near_contact(double actual, double expected, double tolerance, const char *
         std::fprintf(stderr, "%s: %.15g vs %.15g tolerance %.4g\n", what, actual, expected, tolerance);
     check(std::abs(actual - expected) <= tolerance, what);
 }
-void grip_probe(bool frictionless, double damping = 0) {
+void grip_probe(bool frictionless, double damping = 0, bool position_carrier = false,
+                std::uint32_t substeps = 1) {
     auto b = world(0, 0, -9.81);
     BackendBodyDesc base;
-    base.motion_type = NKSIM_MOTION_KINEMATIC;
+    base.motion_type = position_carrier ? NKSIM_MOTION_DYNAMIC : NKSIM_MOTION_KINEMATIC;
+    base.mass = position_carrier ? 1 : 0;
+    base.has_inertial_properties = true;
+    base.inertia_tensor = {1, 0, 0, 0, 1, 0, 0, 0, 1};
     base.shape_type = NKSIM_SHAPE_BOX;
     base.shape_parameters = {.001, .001, .001, 0};
     std::uint64_t root;
     ok(b->body_create(base, &root));
+    std::uint64_t carrier_joint = 0;
+    if (position_carrier) {
+        auto anchor = body(*b, false, 0);
+        BackendJointDesc d;
+        d.type = NKSIM_JOINT_PRISMATIC;
+        d.body_a = anchor;
+        d.body_b = root;
+        d.axis_a = {0, 0, 1};
+        d.lower_limit = -1;
+        d.upper_limit = 1;
+        ok(b->joint_create(d, &carrier_joint));
+    }
+    auto move_carrier = [&](const BackendBodyState &state) {
+        if (position_carrier) {
+            BackendJointTarget t;
+            t.backend_joint = carrier_joint;
+            t.mode = NKSIM_JOINT_TARGET_POSITION;
+            t.target = state.position[2];
+            ok(b->set_joint_targets(&t, 1));
+        } else
+            ok(b->body_set_state(root, state));
+    };
     auto left = collider(*b, NKSIM_MOTION_DYNAMIC, 1, {-.09, 0, .3}, {.02, .06, .05});
     auto right = collider(*b, NKSIM_MOTION_DYNAMIC, 1, {.09, 0, .3}, {.02, .06, .05});
     auto object = collider(*b, NKSIM_MOTION_DYNAMIC, 1, {0, 0, .3}, {.05, .05, .05});
@@ -161,11 +187,11 @@ void grip_probe(bool frictionless, double damping = 0) {
         }
     effort(*b, leader, 80);
     for (int i = 0; i < (damping > 0 ? 1000 : 200); ++i)
-        ok(b->step(.001, 1));
+        ok(b->step(.001, substeps));
     if (support) {
         ok(b->body_destroy(support));
         for (int i = 0; i < 200; ++i)
-            ok(b->step(.001, 1));
+            ok(b->step(.001, substeps));
     }
     auto initial = pose(*b, object);
     if (frictionless) {
@@ -180,21 +206,21 @@ void grip_probe(bool frictionless, double damping = 0) {
     carrier.linear_velocity = {0, 0, .1};
     for (int i = 0; i < 1000; ++i) {
         carrier.position[2] += .0001;
-        ok(b->body_set_state(root, carrier));
-        ok(b->step(.001, 1));
+        move_carrier(carrier);
+        ok(b->step(.001, substeps));
     }
     auto lifted = pose(*b, object);
     near_contact(lifted.position[2] - initial.position[2], .1, .001,
                  "friction transfers moving carrier velocity without object attachment");
     near_contact(lifted.linear_velocity[2], .1, 1e-5, "gripped work follows measured carrier speed");
     carrier.linear_velocity = {0, 0, 0};
-    ok(b->body_set_state(root, carrier));
+    move_carrier(carrier);
     for (int i = 0; i < 100; ++i)
-        ok(b->step(.001, 1));
+        ok(b->step(.001, substeps));
     auto held = pose(*b, object);
     effort(*b, leader, -80);
     for (int i = 0; i < 200; ++i)
-        ok(b->step(.001, 1));
+        ok(b->step(.001, substeps));
     auto released = pose(*b, object);
     check(released.position[2] < held.position[2] - .15 && released.linear_velocity[2] < -1.5,
           "opening real jaw contacts releases the work to gravity");
@@ -942,6 +968,8 @@ int main() {
     grip_probe(false);
     grip_probe(true);
     grip_probe(false, 1000);
+    grip_probe(false, 1000, true);
+    grip_probe(false, 1000, true, 4);
     std::printf("Generalized effort: %d analytical assertions and %d API operations passed; box, convex and "
                 "compound contacts\n",
                 checks - api_operations, api_operations);

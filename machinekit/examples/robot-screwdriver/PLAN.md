@@ -3836,3 +3836,28 @@ core groups are green (`sd15-dynamics-implicit-damping-ctest.log`). This fixes
 the proven numerical instability; a fresh actual cell run must establish its
 application effect. Whole-cell/fault acceptance, final gate and main merge
 remain open.
+
+### SD15a prescribed position-cycle velocity (2026-10-16)
+
+`sd15-deterministic-native8` remains a first-grasp failure at 4.20 simulated
+seconds. Implicit damping fixes its independent analytical instability but does
+not complete the application grasp. A focused position-driven carrier probe
+reproduces a second defect: moving through position targets supplies zero
+prescribed contact velocity, so friction leaves the workpiece on its support.
+The former kinematic-carrier probe explicitly provided velocity and therefore
+did not cover the robot's position-target path.
+
+In force worlds, position-controlled joint velocity is now measured from the
+previous completed cycle's position and the full cycle duration, then retained
+across its physical substeps. First samples initialize without inventing a
+velocity; explicit reset and joint destruction clear the corresponding history.
+Worlds without effort axes keep their existing behavior.
+
+The physical grip test now also uses a position-controlled carrier, verifying
+measured weight/normal force, about 100 mm friction lift and release with one
+and four physical substeps. Both pass, along with all 283 physical assertions
+and 40659 checked API operations. All six core groups are green
+(`sd15-dynamics-position-velocity-ctest.log`). The preceding implicit-damping
+implementation also passed refreshed sanitizers and native RobotKit/session
+checks (`sd15-dynamics-implicit-*.log`). Actual deterministic cell/fault
+acceptance and the final gate/main integration remain open.

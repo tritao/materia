@@ -212,6 +212,7 @@ public:
                     return NKSIM_ERROR_UNSUPPORTED;
             incoming->state.position = incoming->state.velocity = incoming->state.effort = 0.0;
             previous_joint_velocity[incoming->id]=0;
+            previous_joint_position[incoming->id]=0;
         }
         body->state = state;
         body->state.backend_body = id;
@@ -281,6 +282,7 @@ public:
 
     nksim_result joint_destroy(std::uint64_t id) override {
         previous_joint_velocity.erase(id);
+        previous_joint_position.erase(id);
         const auto before = joints.size();
         joints.erase(std::remove_if(joints.begin(), joints.end(),
                                     [id](const TestJoint &joint) { return joint.id == id; }),
@@ -360,17 +362,38 @@ public:
     nksim_result contact_pair_create(const BackendContactPair &pair) override {
         const auto *a=find_body(pair.body_a),*b=find_body(pair.body_b);
         if(!a||!b)return NKSIM_ERROR_INVALID_HANDLE;
-        if(pair.part_a>=std::max(std::size_t(1),a->desc.shape_parts.size())||pair.part_b>=std::max(std::size_t(1),b->desc.shape_parts.size())||!std::isfinite(pair.surface.friction[0])||pair.surface.friction[0]<0)return NKSIM_ERROR_INVALID_ARGUMENT;
-        force_pairs.push_back(pair);return NKSIM_OK;
+        if (pair.part_a >= std::max(std::size_t(1), a->desc.shape_parts.size()) ||
+            pair.part_b >= std::max(std::size_t(1), b->desc.shape_parts.size()) ||
+            !std::isfinite(pair.surface.friction[0]) || pair.surface.friction[0] < 0)
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        force_pairs.push_back(pair);
+        return NKSIM_OK;
     }
     nksim_result step(double dt, std::uint32_t substeps) override {
         if (!std::isfinite(dt) || dt <= 0.0 || substeps == 0)
             return NKSIM_ERROR_INVALID_ARGUMENT;
         const double substep = dt / static_cast<double>(substeps);
+        // Position targets arrive before the physical cycle. Their measured cycle
+        // displacement supplies the prescribed contact velocity for every substep.
+        if (has_effort_axes()) {
+            for (auto &joint : joints)
+                if (joint.target_mode == NKSIM_JOINT_TARGET_POSITION) {
+                    const auto previous = previous_joint_position.find(joint.id);
+                    joint.state.velocity = previous == previous_joint_position.end()
+                                               ? 0
+                                               : (joint.state.position - previous->second) / dt;
+                }
+            enforce_couplings();
+        }
         for (std::uint32_t iteration = 0; iteration < substeps; ++iteration) {
             contacts.clear();
             const bool force_mode = has_effort_axes();
-            if(force_mode) {const auto result = force_step(substep); if(result != NKSIM_OK) return result;continue;}
+            if (force_mode) {
+                const auto result = force_step(substep);
+                if (result != NKSIM_OK)
+                    return result;
+                continue;
+            }
             for (auto &body : bodies) {
                 if (body.desc.motion_type != NKSIM_MOTION_DYNAMIC)
                     continue;
@@ -380,8 +403,9 @@ public:
                     continue;
                 const double inverse_mass = body.desc.mass > 0.0 ? 1.0 / body.desc.mass : 0.0;
                 for (int axis = 0; axis < 3; ++axis) {
-                    if(!force_mode) body.state.linear_velocity[axis] +=
-                        (gravity[axis] + body.force[axis] * inverse_mass) * substep;
+                    if (!force_mode)
+                        body.state.linear_velocity[axis] +=
+                            (gravity[axis] + body.force[axis] * inverse_mass) * substep;
                     body.state.position[axis] += body.state.linear_velocity[axis] * substep;
                 }
                 if(force_mode) {
@@ -616,6 +640,7 @@ public:
             }
             record_velocity_history();
         }
+        for(const auto &joint:joints)previous_joint_position[joint.id]=joint.state.position;
         for (auto &body : bodies) {
             body.force.fill(0.0);
             body.torque.fill(0.0);
@@ -837,6 +862,7 @@ private:
         bool ready = false;
     };
     std::map<std::uint64_t, double> previous_joint_velocity;
+    std::map<std::uint64_t, double> previous_joint_position;
     std::map<std::uint64_t, std::pair<Vec3, Vec3>> previous_root_velocity;
     void record_velocity_history() {
         for (const auto &j : joints)
