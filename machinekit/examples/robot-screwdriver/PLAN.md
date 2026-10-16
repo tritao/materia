@@ -3065,3 +3065,32 @@ the deterministic counterpart remains running. The reset-wire change remains
 uncommitted pending its full verification. The first diagnostic build was
 terminated by earlyoom at 2696 MB under concurrent load; a retry is queued with
 12 GB required host headroom. Neither interrupted build is a test failure.
+
+### SD15a commissioning checkpoint (2026-10-16)
+
+`17f456949` checkpoints the two-controller CAD, sensed trays, fixed dual tools,
+programs and project manifests. It is a commissioning milestone, not complete
+SD15a.3 acceptance. The fresh full MuJoCo run `sd-cases-sd15-full2` places the
+plate and housing, confirms fixture readiness and completes the first screw,
+then times out on the second fastening at 101.54 s simulation time (714.7 s
+wall, 493 MB peak). The handler remains at its completion wait. Investigate the
+live work/tool state rather than weakening the tightening qualification.
+
+`sd-cases-sd15-recovery` now passes both backends (625.2 s total wall, 390 MB
+peak): missing housing, targeted handling emergency stop, local safety retry,
+measured empty-pocket timeout, restocking and retry of the presence wait.
+The reset-wire fix is still uncommitted while `tending-exchange` checks the
+existing CNC reset handshake. An independent small robot-only regression is
+queued for compilation so this fix need not depend on the cell's open nominal
+cycle acceptance.
+
+The fixture, supply and mid-fastening emergency-stop cases are being developed
+in the app test. `sd-cases-sd15-fixture1` was explicitly cancelled after its
+stimulus failed to fire: the test compared a collision-centre height with the
+CAD-origin height. The corrected trigger uses the CAD pose. No fixture-fault
+acceptance is claimed from that run. The live interruption case has observed
+actual screw rotation, stopped its controller and cleared the fault by retry;
+its successful fastening and downstream completion remain unproven.
+
+The default-backend full physical-cycle requirement remains unchanged. A scope
+question about its absent effort dynamics is pending; no answer is assumed.
