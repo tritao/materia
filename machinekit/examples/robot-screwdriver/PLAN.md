@@ -3560,3 +3560,20 @@ previous torsional, grip, convex/compound and inertia checks
 (`sd15-dynamics-rolling.log`). The experiment still needs contact-filter and
 soft-contact semantics, topology caching, reset/history and scaling work before
 production integration and actual deterministic cell/fault acceptance.
+
+### SD15a contact-filter prototype (2026-10-16)
+
+The isolated force contact path now distinguishes layer contacts, explicit
+piece pairs and pairs-plus-environment surfaces. Explicit pairs are matched in
+either body order and operate independently of layer masks. Environment contacts
+use the declared surface, honor exclusions and stay outside the owning
+articulation. Ordinary layers accept either directed layer/mask match, matching
+the native MuJoCo path. Pairs-only pieces do not receive implicit contacts.
+
+Six new physical cases cover absent masks, pairs-only without a pair, a reversed
+explicit pair with zero masks, environment contact, excluded bodies and a single
+directed layer match. Enabled cases settle and report 9.81 N; disabled cases
+fall and report no support. The complete probe passes 84 physical assertions
+and 12387 checked API operations (`sd15-dynamics-filter.log`). Separate
+same-articulation environment acceptance, soft-contact semantics, caching,
+reset/history, scaling and production integration remain unverified.
