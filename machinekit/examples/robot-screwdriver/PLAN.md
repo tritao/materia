@@ -3019,3 +3019,21 @@ then continue the complete two-arm cycle and the SD15a.4 fault/recovery cases on
 both backends. Required fastening success is accepted; the full two-arm cell,
 its fault/recovery matrix, documentation/catalogue and final frozen-source gate
 are not complete.
+
+### SD15a retained clearance acceptance (2026-10-16)
+
+`66d8a076a` commits the app carrier-chain collision capture and retained-child
+regression. The completed app build passes `clearance-retained` (28 s), the
+complete `clearance` case (2.5 s with the generated-project cache warm), and
+`screwdriver-simulation` (2 s). Both planned pickup ownership and actual nested
+ownership preserve the child's geometry and reject its future obstacle contact.
+Logs are `sd-cases-sd15-retained` and `sd-cases-sd15-clearance` in the scratch
+directory above.
+
+The terminal `sd-cases-sd15-housing9` diagnostic completed all four required
+fastenings, then rejected its parking move with `Motion program op 0 joint
+limit 6`. The selected TCP included the process spindle in that move's chain.
+The uncommitted park now selects `arm/toolFlange:face`, commanding only the six
+arm joints. Fresh deterministic housing-only and full-cycle runs are in
+progress; this is not yet accepted. A focused missing-housing and robot-only
+stop/retry check is also being built. SD15a.3 and SD15a.4 remain open.
