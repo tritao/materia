@@ -391,7 +391,7 @@ class AssemblySimulationBridge {
         if (!Math.isFinite(part.volume) || part.volume <= 0 || !Math.isFinite(part.density) ||
             part.density <= 0 || part.centerOfMass == null || part.centerOfMass.length != 3 ||
             part.inertia == null || part.inertia.length != 9 ||
-            part.physicalMassKg != null && (!Math.isFinite(part.physicalMassKg) || part.physicalMassKg <= 0) ||
+            part.physicalMassKg != null && (!Math.isFinite(part.physicalMassKg) || part.physicalMassKg < 0) ||
             part.physicalInertiaKgM2 != null && part.physicalInertiaKgM2.length != 9)
           throw 'Assembly occurrence "$id" has invalid mass properties';
         for (coordinate in part.centerOfMass) if (!Math.isFinite(coordinate))
@@ -412,9 +412,10 @@ class AssemblySimulationBridge {
         var chosen = massOf == null ? null : massOf(id);
         var resolvedMass = part.physicalMassKg;
         var mass = chosen == null ? (resolvedMass == null ? baseMass : resolvedMass) : chosen;
-        if (!Math.isFinite(mass) || mass <= 0) throw 'Assembly occurrence "$id" has an invalid mass';
-        var inertia = part.physicalInertiaKgM2;
-        var tensor:Array<Float> = inertia == null
+        if (!Math.isFinite(mass) || mass < 0) throw 'Assembly occurrence "$id" has an invalid mass';
+        var inertia = resolvedMass == 0.0 ? null : part.physicalInertiaKgM2;
+        // Zero-mass visual/collision pieces are accounted for by a module lump.
+        var tensor:Array<Float> = mass == 0.0 ? [for (_ in 0...9) 0.0] : inertia == null
           ? rotated(part.inertia, offset, part.density * Math.pow(scale, 5) * mass / baseMass)
           : rotated(inertia, offset, mass / (resolvedMass == null ? mass : resolvedMass));
         masses[index].push({mass: mass, center: [center.x * scale, center.y * scale, center.z * scale],
@@ -899,6 +900,7 @@ class AssemblySimulationBridge {
       mass += piece.mass;
       for (axis in 0...3) center[axis] += piece.mass * piece.center[axis];
     }
+    if (!(mass > 0.0)) throw 'Assembly body "${link.id}" needs a positive total mass';
     for (axis in 0...3) center[axis] /= mass;
     var inertia = [for (_ in 0...9) 0.0];
     for (piece in pieces) {

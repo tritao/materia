@@ -11,7 +11,36 @@ class ReferenceArmsApplicationTests {
     return out.toString();
   }
   static function check(condition:Bool,message:String):Void {if (!condition) throw message;}
+  static function checkBrakedReference():Void {
+    var root=app.editor.WorkerAssetPath.resolve("machinekit/examples/reference-arms");
+    var path=root+"/build/arm-design/zeroerr-braked.mtrg";
+    var loaded=ProjectSourceLoader.load(path);
+    check(loaded.robotMotions==null || loaded.robotMotions.length==0,"Inspection must have no motion program");
+    var editor=new ReferenceEditorApp(null,root+"/build/braked-test-workspace.json",null,null,null,null,null,null,true);
+    try {
+      editor.session.openGeneratedProject(loaded,path);
+      check(editor.simulation.rebuild(editor.sensors,editor.scene,editor.session),"Brake-held rebuild: "+editor.simulation.error);
+      var ids=editor.simulation.snapshot().robotIds();
+      check(ids.length==1,"Inspection needs one robot");
+      var initial=editor.simulation.snapshot().robot(ids[0]);
+      if(initial==null) throw "Missing inspection robot";
+      var before=initial.positions.toArray(),maximumDrift=0.0;
+      for(_ in 0...6000) {
+        editor.simulation.step();
+        var observed=editor.simulation.snapshot().robot(ids[0]);
+        if(observed==null) throw "Missing inspection observation";
+        check(observed.faultCode==0,"Brake-held simulation must remain fault-free");
+        var q=observed.positions.toArray();
+        for(i in 0...q.length) maximumDrift=Math.max(maximumDrift,Math.abs(q[i]-before[i]));
+      }
+      check(maximumDrift<0.005,"Applied brakes must hold pose for 60 seconds: "+maximumDrift);
+      editor.dispose();
+      Sys.println("Brake-held application scene: 60 seconds; maximum joint drift="+maximumDrift+" rad");
+    } catch(error:Dynamic) {editor.dispose();throw error;}
+  }
+
   public static function main():Void {
+    if(Sys.args().indexOf("--braked-reference")>=0) {checkBrakedReference();return;}
     var root = app.editor.WorkerAssetPath.resolve("machinekit/examples/reference-arms");
     var entry = ExampleCatalog.find("reference-arms");
     check(entry != null,"Reference library must appear in the application catalogue");

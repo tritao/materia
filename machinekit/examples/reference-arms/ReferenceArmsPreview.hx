@@ -11,6 +11,7 @@ class ReferenceArmsPreview {
   static final ROOT:String = ReferenceAssetLocation.DIRECTORY + "/";
   static function check(value:Bool, message:String):Void {if (!value) throw message;}
   public static function main():Void {
+    if (Sys.args().indexOf("--braked-preview")>=0) {BrakedReferencePreview.run();return;}
     if (Sys.args().indexOf("--passive-dynamics")>=0) {PassiveDynamicsReview.run();return;}
     if (Sys.args().indexOf("--manufacturer-checks")>=0) {CommercialManufacturerChecks.run();return;}
     if (Sys.args().indexOf("--frozen-control")>=0) {FrozenReferenceControl.run();return;}

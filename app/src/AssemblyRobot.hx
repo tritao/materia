@@ -274,7 +274,7 @@ class AssemblyRobot {
         if (density == null) density = MaterialLibrary.require(record.materialId).physical.density;
         chosenMass = part.volume * density * Math.pow(physical.metresPerUnit, 3);
       }
-      if (!Math.isFinite(chosenMass) || chosenMass <= 0)
+      if (!Math.isFinite(chosenMass) || chosenMass < 0)
         throw 'Assembly occurrence "${occurrence.id}" has an invalid mass';
       masses.set(occurrence.id, chosenMass);
     }

@@ -5,6 +5,11 @@ J1–J3, 70T J4–J6, unchanged STEP geometry and placements**. All modification
 experiments are archived; no resize/straight/cover experiment was extended.
 CNC tending and the inherited 23 transfers remain deferred.
 
+For inspection in the app, open
+`../reference-arms/build/arm-design/zeroerr-braked.mtrg`. Play holds the saved
+pose with applied brakes and reconciled module inertials; no motion program
+runs. See [preview physics and validation](../reference-arms/PASSIVE-DYNAMICS.md#brake-held-inspection-preview).
+
 ## Six separately committed steps
 
 | Step | Delivered package | Commit |

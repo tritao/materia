@@ -1003,7 +1003,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             // A servo motor is held at rest by its servo, wherever it sits in its couplings.
             for (uint32_t index = 0; index < blueprint.joint_count; ++index) {
                 if (binding->servo_[index].stiffness > 0.0) held[index] = binding->actuated_joints_[index];
-                if (binding->passive_[index] || binding->device_free_[index]) held[index] = 0;
+                // An applied brake holds its joint mechanically until explicitly released.
+                if (binding->passive_[index] || binding->device_free_[index] || binding->brake_group_[index]) held[index] = 0;
             }
             for (uint32_t index = 0; index < blueprint.joint_count; ++index)
                     if (blueprint.external_joint[index]) held[index] = 0;

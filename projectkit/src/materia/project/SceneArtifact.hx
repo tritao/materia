@@ -33,7 +33,7 @@ typedef SceneArtifactPart = {
 	@:optional var volume:Float;
 	@:optional var centerOfMass:Array<Float>;
 	@:optional var inertia:Array<Float>;
-	/** Resolved physical mass; assembly coordinates still follow the scene unit. */
+	/** Resolved physical mass; zero for geometry whose mass is included in another part of its module. */
 	@:optional var physicalMassKg:Float;
 	/** Whether the mass is explicitly declared, so a later material edit does not replace it. */
 	@:optional var physicalMassDeclared:Bool;
@@ -3013,7 +3013,7 @@ static function validateScrewEntrySearch(search:Null<SceneArtifactScrewEntrySear
 		if (part.volume != null && (!finite(part.volume) || part.volume <= 0) ||
 			part.centerOfMass != null && part.centerOfMass.length != 3 ||
 			part.inertia != null && part.inertia.length != 9 ||
-			part.physicalMassKg != null && (!finite(part.physicalMassKg) || part.physicalMassKg <= 0) ||
+			part.physicalMassKg != null && (!finite(part.physicalMassKg) || part.physicalMassKg < 0) ||
 			part.physicalInertiaKgM2 != null && part.physicalInertiaKgM2.length != 9)
 			throw 'Scene artifact part "${part.id}" has invalid mass properties';
 		if (part.centerOfMass != null) for (coordinate in part.centerOfMass)

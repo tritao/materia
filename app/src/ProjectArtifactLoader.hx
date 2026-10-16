@@ -245,7 +245,7 @@ class ProjectArtifactLoader {
       ? MaterialLibrary.require(materialId).physical.density : component.materialDensity;
     var mass = component.physicalMassKg == null
       ? volume * scale * scale * scale * density : cast component.physicalMassKg;
-    if (!Math.isFinite(mass) || mass <= 0) throw 'Invalid mass for generated part "$occurrenceId"';
+    if (!Math.isFinite(mass) || mass < 0) throw 'Invalid mass for generated part "$occurrenceId"';
     records.push({id: "project:" + occurrenceId, label: label, type: "cad-preview",
       x: center.x * scale, y: center.y * scale, z: center.z * scale,
       width: Math.max(0.000001, (maximum[0] - minimum[0]) * scale),
