@@ -475,8 +475,8 @@ bench testing; no test, purchase or supplier contact has occurred.
 Exported terminal flanges include a `flangeZ` connector whose local +Z is the
 outward tool-face normal. This is a semantic frame for comparison and TCP work;
 all six joints remain passive, and vendor drive signs/travel are uncommissioned.
-The straight variant still needs its own diagnostic/interpolated and continuous
-clearance review; the tapered revision's collision observations do not transfer.
+The straight variant has its own diagnostic/interpolated and continuous
+clearance review below; the tapered revision's collision observations do not transfer.
 
 For the straight variant's reproducible discrete review, prepare the probes and
 run the two independent shards (each command can run in its own terminal):
@@ -513,3 +513,15 @@ hulls and the standard articulation exclusions, including adjacent bodies.
 It includes no physical tool, fixtures or flexible harness; exact sampled CAD
 checks address a different scope and remain required. This is neither a real
 cell certificate nor complete CAD swept clearance.
+
+The completed straight-variant exact CAD collection covers all 60 required
+configurations: 55 clear, five colliding, and one of the colliding configurations
+also has an indeterminate Boolean query. All 35 unique synthetic-cycle
+configurations are clear with no failed queries. Deep elbow folds bring the
+wrist against the shoulder/base; the +/-170 degree J4 endpoint explorations
+also reveal wrist contact with the distal cover (and small forearm/adapter
+intersections at the positive endpoint). These are recorded exclusions, not
+commissioned joint stops. Covers therefore affect the usable envelope and must
+be included in later travel/cable review. The current result does not establish
+UR/FR5-equivalent travel. Full witnesses and failed queries remain in
+`build/straight/motion-report.json`, bound to the current layout and input files.

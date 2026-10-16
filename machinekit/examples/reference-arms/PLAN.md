@@ -6,13 +6,13 @@ Active goal: finish the agreed plan, committing coherent changes as work complet
 
 - [x] Reproducible official UR and FAIRINO description/mesh acquisition, pinned provenance and licence records; generated vendor assets excluded from Git.
 - [x] UR5e and FR5 articulated scene exports with correct scale, axes, limits, base and flange frames.
-- [ ] Existing FK/IK integration checked against independent URDF FK, multiple branches and joint limits; joint jogging and Cartesian trajectories.
+- [x] Existing FK/IK integration checked against independent URDF FK, multiple branches and joint limits; joint jogging and Cartesian trajectories.
 - [x] Shared comparison scene with actual-scale robots, common tool/task frames, switchable mounting and overview/close-up previews.
 - [x] Extend the working importer to the available UR and FAIRINO ranges; report model-specific gaps honestly.
 - [x] Separate straight-link ZeroErr variant preserving 425/401 mm axis spacing and supplier interfaces, with structural adapters, fastening/cable access and separate covers.
 - [x] Valid connected solids, mass/inertia, stiffness/connection-load estimates and comparison against tapered baseline.
 - [x] Updated workspace/tending load reports; unresolved shoulder sizing clearly retained.
-- [ ] Diagnostic and interpolated tending clearance review, with collisions and failed queries recorded and long work checkpointed.
+- [x] Diagnostic and interpolated tending clearance review, with collisions and failed queries recorded and long work checkpointed.
 - [ ] Actual fixture/TCP registration required for real-cell feasibility; no invented cell certificate.
 - [x] Draft prototype BOM, interface drawings, missing supplier data and single-joint bench procedure updated.
 - [ ] Relevant commits, runnable commands, artifact paths and final completion audit.
@@ -81,15 +81,17 @@ redistribution permission is unresolved. UR mesh terms vary by model.
   combined comparison with our arm and physical common tool, actual task/fixture
   registration, and completion audit. Previous tapered clearance does not transfer.
 
-## Motion review in progress
+## Completed synthetic motion review
 
 - Continuous straight-arm synthetic-cycle hull review passes: eight waypoints,
   9.332 s, 849 subdivision queries, 0.5 mm margin. Source artifact/config hashes
   are recorded. Adjacent-body articulation exclusions apply; no tool, fixtures,
   harness or full CAD swept proof is claimed.
 - Deterministic diagnostic plus quintic intermediate set contains 60 unique
-  configurations. Two exact-CAD shards are running with per-pose checkpoints;
-  full collection and collision/exclusion review remain pending.
+  configurations. Two exact-CAD shards completed with per-pose checkpoints: 55 clear, five
+  colliding, one colliding pose also has an indeterminate Boolean query. All 35
+  unique cycle configurations are clear with no failed queries. Folded J4 wrist
+  contact includes the distal cover; no full-travel approval is claimed.
 
 ## Combined comparison stage
 
@@ -107,3 +109,13 @@ redistribution permission is unresolved. UR mesh terms vary by model.
 - The application integration check loads all three source jobs and saved
   artifacts and preserves our passive joints. Final provenance/cache rerun
   and full application build pass. Final completion audit remains pending.
+
+## Remaining work
+
+- Export current tending mill and physical dual-gripper geometry independently
+  of the generic arm certificate, then register candidate base/tool/task frames
+  for the imported arms. Report unreachable/colliding targets honestly; the old
+  Reach1300 certificate does not apply to any of these models.
+- Complete the deliverable/command/provenance audit and record unresolved
+  supplier/manufacturing/hardware data. No physical-cell certificate, hardware
+  qualification, purchase or supplier contact is part of this software task.
