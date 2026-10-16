@@ -3577,3 +3577,20 @@ fall and report no support. The complete probe passes 84 physical assertions
 and 12387 checked API operations (`sd15-dynamics-filter.log`). Separate
 same-articulation environment acceptance, soft-contact semantics, caching,
 reset/history, scaling and production integration remain unverified.
+
+### SD15a hull topology caching (2026-10-16)
+
+The isolated contact solver caches each body's local piece hull topology and
+transforms its vertices/normals into world space during contact collection.
+Repeated steps no longer derive all support planes and face/edge connectivity.
+Body destruction removes its cached entries. Twenty-four coordinate assertions
+verify translated/rotated vertices and normals, plus cache reuse and destruction
+(`sd15-dynamics-cache-transform.log`). All 84 physical assertions and 12387
+checked API operations remain green (`sd15-dynamics-cached.log`).
+
+Joint acceleration history is now keyed by stable joint IDs rather than vector
+indices, and removed/reset entries are cleared explicitly. This prevents the
+index aliasing possible when deleting and adding joints without changing their
+count; dedicated topology/reset dynamics coverage remains due. Prescribed-root
+acceleration, full reset/mode history, soft-contact behavior, scaling and
+production integration remain open.
