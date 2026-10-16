@@ -61,10 +61,14 @@ class ScrewdrivingExecution {
 		if (exposed != null) flat.exposedConnectors = [for (item in exposed) if (removed.indexOf(item.occurrence) < 0) item];
 		var previous = scene.assemblyState;
 		if (previous == null) throw "Screw execution lost its initial state";
-		var execution = new AssemblyState(flat);
-		for (coordinate in previous.jointCoordinates) execution.setJoint(coordinate.joint,coordinate.value);
-		for (root in previous.rootPoses) if (removed.indexOf(root.occurrence) < 0 && freed.indexOf(root.occurrence) < 0)
-			execution.setRootPose(root.occurrence,root.pose);
+		// Restore a configuration through the record boundary, including coupled follower coordinates.
+		// Calling setJoint on each saved coordinate incorrectly commands the gripper's driven jaw.
+		var joints = [for (joint in flat.joints) joint.id];
+		var execution = new AssemblyState(flat, {
+			schemaVersion:previous.schemaVersion, definition:flat.id,
+			jointCoordinates:[for (coordinate in previous.jointCoordinates) if (joints.indexOf(coordinate.joint) >= 0) coordinate],
+			rootPoses:[for (root in previous.rootPoses) if (removed.indexOf(root.occurrence) < 0 && freed.indexOf(root.occurrence) < 0) root]
+		});
 		scene.assemblyDefinition = flat; scene.assemblyState = execution.record();
 	}
 }
