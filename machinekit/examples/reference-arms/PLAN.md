@@ -5,21 +5,18 @@ The cell/tending work below is historical and deferred. A complete commercial
 controller oracle, hardware capability and physical qualification are not implied
 by the earlier completed software checklist.
 
-## Active arm-design gates
+## Active frozen-reference steps
 
-- [x] Separate requirements, provisional targets and screening assumptions.
-- [x] UR5e manufacturer nominal-DH oracle, independent source FK/Jacobians and positive standalone motion regressions.
-- [x] FR5 manufacturer drawing/interface checks, with full independent FK still explicitly pending.
-- [x] Original ZeroErr standalone motion, collision/conditioning observations and CoG-dependent load screens.
-- [x] Define original shoulder/connection bench evidence and acceptance-budget gaps.
-- [x] Audit module/mass sources and compare retained modules with eight isolated shoulder/wrist sizing options; record speed and workspace compromises in [ARM-OPTIONS.md](../zeroerr-arm/ARM-OPTIONS.md).
-- [ ] Integrate a separate resized shoulder/J4/J5 CAD concept after delivered specifications and operating limits are resolved; repeat mass, clearance, timed-load and connection checks.
-- [ ] Obtain FR5 controller/full independent FK evidence and resolve reference travel discrepancies.
-- [ ] Confirm original drive codes, moving masses/inertias, coupled torque-speed-duty and bearing limits.
-- [ ] Allocate whole-arm accuracy/stiffness budgets and qualify connections/harness.
-- [ ] Perform joint/connection bench work and then full-arm metrology.
+- [x] 1. Freeze original supplier geometry, archive modification experiments, replace shell masses with whole-module lumps and reconcile 5 kg static/duty checks. See [reconciliation](../zeroerr-arm/REFERENCE-RECONCILIATION.md).
+- [ ] 2. Final supplier-confirmation request; draft only, never send.
+- [ ] 3. STEP-derived BOM, assembly/cable/EtherCAT wiring and rough cost.
+- [ ] 4. Drive profile, timed simulation/control integration and EtherCAT/eRob stub; unknown commissioned limits remain explicit.
+- [ ] 5. One 110T J2 bench package, measured load, before six-module purchase.
+- [ ] 6. Independent FR5 manufacturer kinematics validation beside UR5e.
 
-CNC cell layout and tending-cycle work are deferred.
+No geometry modifications. Treat the supplier 5 kg rating as trusted. CNC tending
+and the old 23 transfers are deferred; eventual cell design uses shared commercial
+and original-arm workspace.
 
 ## Historical comparison and tending work
 

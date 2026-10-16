@@ -1,5 +1,7 @@
 # Original-arm module and mass audit
 
+> Historical experiment / superseded load interpretation. See [the frozen reference reconciliation](REFERENCE-RECONCILIATION.md) and [archive policy](EXPERIMENTS-ARCHIVED.md). Do not extend resize or geometry variants.
+
 The original 110T/70T arm remains the geometry baseline. The available documents
 confirm the module families and several part materials. They do **not** identify
 the six delivered ordering codes, ratios or moving-side mass properties. The

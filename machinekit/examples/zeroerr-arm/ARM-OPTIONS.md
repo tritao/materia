@@ -1,5 +1,7 @@
 # Retain or resize the original arm
 
+> Historical experiment / superseded load interpretation. See [the frozen reference reconciliation](REFERENCE-RECONCILIATION.md) and [archive policy](EXPERIMENTS-ARCHIVED.md). Do not extend resize or geometry variants.
+
 The comparison supports a **separate, bounded-workspace prototype concept** with
 an eRob142T nominal-100 shoulder (J2), eRob80T nominal-100 at J4/J5, and the original
 110T at J1/J3 and 70T at J6. This is the preferred next CAD investigation if a

@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "status": "frozen_trusted_vendor_5kg_reference",
+  "layout": "reference-layout.json",
+  "layoutSha256": "46c8cb94fc2ed992b25d392c0a0464cb4994132cbbd4a593c927168d2f212466",
+  "assemblySha256": "c3f80736eedaedcc3569db6d4b55ffe6cad05577f972bee0a5c83d68fc6a5508",
+  "ratedTotalFlangeLoadKg": 5,
+  "geometryChangesAllowed": false,
+  "modules": ["eRob110T","eRob110T","eRob110T","eRob70T","eRob70T","eRob70T"],
+  "nominalRatioForDiagnostics": 100,
+  "ratioStatus": "supplier_confirmation_required",
+  "manualSha256": "73e138369aa2780c980e0652008c8311c95d26ac3b4142ce2f05afdc1bf0e7b5",
+  "wholeModuleLumps": {
+    "eRob110T": {
+      "massKg": 4.49, "cogMm": [59.08,4.09,-0.02],
+      "inertiaAtOutputGmm2": [7932281.31,23979335.11,24380530.78,1340312.33,-11423.88,1693.37],
+      "manualToAssetRotation": [[0,0,-1],[0,1,0],[1,0,0]],
+      "outputOriginAssetMm": [0,0,-16], "source": "Manual A3-7/A3-8; STEP output face z=-16, T mounting base toward +Y"
+    },
+    "eRob70T": {
+      "massKg": 1.24, "cogMm": [40.06,2.62,-0.06],
+      "inertiaAtOutputGmm2": [955610.80,3098889.83,3157219.00,152791.69,-5421.69,875.15],
+      "manualToAssetRotation": [[0,0,-1],[0,-1,0],[-1,0,0]],
+      "outputOriginAssetMm": [0,0,47], "source": "Manual A3-1/A3-2; STEP output face z=47, T mounting base toward -Y"
+    }
+  },
+  "lumpAssumption": "Each complete module follows its housing: J1/J2 downstream, J3-J6 upstream. Internal/output relative motion omitted except diagonal reflected rotor inertia. Supplier moving-side split remains requested.",
+  "ratingsAtAssumedNominal100": {
+    "eRob110T": {"ratedNm":87,"repeatedStartStopPeakNm":204,"averageLoadNm":140,"momentaryNm":369,"brakeStaticAcceptanceNm":206,"maximumSpeedDegS":180},
+    "eRob70T": {"ratedNm":10,"repeatedStartStopPeakNm":36,"averageLoadNm":14,"momentaryNm":70,"brakeStaticAcceptanceNm":50,"maximumSpeedDegS":180}
+  },
+  "ratingPolicy": {
+    "brakedRest": "Check unpowered static brake acceptance AND repeated gear loading allowance; no dynamic use of brake",
+    "motion": "Check speed-dependent continuous/acceleration curve, rated-torque RMS proxy with motion duty, repeated peaks and speed-weighted cubic average gearbox load",
+    "caveat": "Repeated peak is not continuous servo holding. RMS torque is a screening proxy, not measured current/temperature qualification. No emergency momentary allowance in normal motion."
+  },
+  "jointPositionLimitsRad": null,
+  "physicalZeroSigns": null,
+  "vendorAcceleration": {"basis":"Manual section 12 recommends acceleration/deceleration time >=0.3 s; acceleration = requested speed / ramp time", "minimumRampTimeS":0.3},
+  "experiments": "EXPERIMENTS-ARCHIVED.md",
+  "cncTendingInScope": false
+}

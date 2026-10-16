@@ -1,12 +1,10 @@
 # ZeroErr 5 kg reference arm
 
-Current priority: [standalone arm-design requirements and validation](../reference-arms/ARM-DESIGN.md),
-using the original supplier geometry. CNC tending is deferred. See the
-[joint and connection bench plan](ARM-BENCH-PLAN.md) for the next physical evidence.
-The [module and mass audit](MODULE-MASS-AUDIT.md) records source discrepancies,
-part material corrections and the standalone payload sensitivity results.
-The [retain-versus-resize comparison](ARM-OPTIONS.md) evaluates restricted loads
-and a separate larger-shoulder/selected-wrist sizing concept.
+Current priority: the **frozen, trusted supplier 5 kg reference**, with 110T at
+J1–J3 and 70T at J4–J6. See [load reconciliation](REFERENCE-RECONCILIATION.md).
+[80T/straight/cover/resize experiments are archived](EXPERIMENTS-ARCHIVED.md);
+geometry modification and CNC tending are stopped. Supplier confirmation,
+buildability, controls and bench evidence follow this original geometry.
 
 This is an articulated CAD variant based on ZeroErr's eRobot 5 reference:
 eRob110T at J1–J3, eRob70T at J4–J6, straight hollow links, the supplied elbow
