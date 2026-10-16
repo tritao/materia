@@ -14,6 +14,7 @@
     "cmake": {
       "source": "native",
       "target": "humankit_sim_tests_native",
+      "libraries": ["nativekit", "nativekit_gpu", "nativekit_scene", "nativekit_scene_render", "nativekit_sim_core", "nativekit_sim_mujoco", "animkit_core"],
       "inputs": ["native/CMakeLists.txt", "../../../simkit/CMakeLists.txt", "../../../haxeon/packages/animation/native/CMakeLists.txt"]
     }
   },
