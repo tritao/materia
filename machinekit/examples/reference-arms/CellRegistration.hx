@@ -160,6 +160,8 @@ class CellRegistration {
   }
   public static function run():Void {
     var original=Sys.args().indexOf("--original-reference")>=0;
+    var refining=Sys.args().indexOf("--refine-routes")>=0;
+    if(refining && !original) throw "Route refinement is isolated to the original reference";
     var unrestricted=Sys.args().indexOf("--unrestricted-modified-reference")>=0;
     var numericOnly=Sys.args().indexOf("--numeric-only")>=0;
     var candidateIndex:Null<Int> = null;
@@ -174,7 +176,8 @@ class CellRegistration {
     var configText = sys.io.File.getContent(ReferenceAssetLocation.DIRECTORY+"/../tending-registration-config.json");
     if (Std.string(data.configSha256)!=haxe.crypto.Sha256.encode(configText)) throw "Changed candidate registration inputs; rerun fixture export";
     var config:Dynamic = haxe.Json.parse(configText);
-    var planning=Sys.args().indexOf("--plan-transfers")>=0;
+    var planning=Sys.args().indexOf("--plan-transfers")>=0 || refining;
+    if(refining && (numericOnly || candidateIndex!=null)) throw "Refine the selected original base only";
     if(candidateIndex!=null && (!planning || numericOnly)) throw "Candidate workers require ordinary original transfer planning";
     var candidateCount=1;
     for(arg in Sys.args()) if(StringTools.startsWith(arg,"--plan-candidate-count=")) {
@@ -193,7 +196,7 @@ class CellRegistration {
     }
     var previous:Dynamic=null;
     if(planning) {
-      previous=haxe.Json.parse(sys.io.File.getContent(ROOT+reportStem+"-review.json"));
+      previous=haxe.Json.parse(sys.io.File.getContent(ROOT+reportStem+(refining ? "-planned.json" : "-review.json")));
       if(Std.string(previous.fixtureSha256)!=haxe.crypto.Sha256.encode(rawText) || Std.string(previous.configSha256)!=haxe.crypto.Sha256.encode(configText))
         throw "Run the current candidate registration scan before transfer planning";
     }
@@ -241,7 +244,7 @@ class CellRegistration {
     var reports:Array<Dynamic> = [];
     for (id in (original ? ["zeroerr-original"] : unrestricted ? ["zeroerr-unrestricted"] : ["zeroerr","ur5e","fairino5_v6"])) {
       var source = ComparisonProject.source(id), sourceHash = ComparisonReview.fingerprint(source);
-      if((original || unrestricted) && candidateIndex==null) sys.io.File.saveBytes(ROOT+"/"+id+"-study-source.mtrg",SceneArtifact.encode(source));
+      if((original || unrestricted) && candidateIndex==null && !refining) sys.io.File.saveBytes(ROOT+"/"+id+"-study-source.mtrg",SceneArtifact.encode(source));
       if(selected!=null && selected!=id) {
         var oldModels:Array<Dynamic> = reused.models;
         var old=[for(m in oldModels) if(Std.string(m.model)==id) m];
@@ -277,7 +280,7 @@ class CellRegistration {
           }
           return clear*1000+Std.int(choice.clearPoses);
         }
-        choices.sort((a,b) -> score(b)-score(a));
+        if(!refining) choices.sort((a,b) -> score(b)-score(a));
         scanCandidates=[];
         var first=candidateIndex==null ? 0 : candidateIndex;
         for(choice in choices.slice(first,candidateIndex==null ? candidateCount : first+1)) {
@@ -285,6 +288,7 @@ class CellRegistration {
           scanCandidates.push([base.x*1000,base.y*1000,base.z*1000]);
         }
       }
+      var roadmap=new OriginalRouteRefinement();
       for (candidate in scanCandidates) {
         var yaw:Float = config.baseYawRad;
         var base = {x:candidate[0]/1000,y:candidate[1]/1000,z:candidate[2]/1000,qx:0.0,qy:0.0,qz:Math.sin(yaw/2),qw:Math.cos(yaw/2)};
@@ -341,8 +345,18 @@ class CellRegistration {
           }
           worlds.set(key,result);return result;
         }
+        var baseline:Dynamic=null;
+        if(refining) {
+          var oldModels:Array<Dynamic> = previous.models,oldCandidates:Array<Dynamic> = oldModels[0].candidates;
+          baseline=oldCandidates[0];
+        }
         var solved:Array<RegisteredPose> = [];
-        for (target in targets) for (c in ["A","B"]) {
+        if(refining) {
+          var oldPoses:Array<Dynamic> = baseline.poses;
+          for(p in oldPoses) solved.push({name:Std.string(p.name),channel:Std.string(p.channel),q:p.q,
+            reason:Std.string(p.reason),witness:p.witness,yawRad:p.yawRad});
+        }
+        if(!refining) for (target in targets) for (c in ["A","B"]) {
           var available:ReferenceKinematics=solvers.get(c);
           var solver:motionkit.robot.ManipulatorKinematics=numericOnly ? numerical.get(c) : available;
           var exact:Null<motionkit.robot.EaikKinematics> = numericOnly ? null : available.exact;
@@ -374,6 +388,31 @@ class CellRegistration {
           }
           solved.push({name:target.name,channel:c,q:selected,reason:reason,witness:witness,yawRad:selectedYaw});
         }
+        var waypointPool:Array<Array<Float>> = [],portal:Dynamic=null,branchReviews:Array<Dynamic> = [];
+        if(refining) {
+          for(spec in [{station:"outfeed-0-1",channel:"B",from:"A"},{station:"outfeed-0-2",channel:"A",from:"B"}]) {
+            var upper=[for(p in solved) if(p.name==spec.station+"-clearance" && p.channel==spec.channel) p][0];
+            var lower=[for(p in solved) if(p.name==spec.station+"-approach" && p.channel==spec.channel) p][0];
+            var stage=[for(p in solved) if(p.name=="outside staging" && p.channel==spec.from) p][0];
+            var oldUpper=upper.q.copy(),oldLower=lower.q.copy();
+            var selection=OriginalOutfeedBranches.select(solvers.get(spec.channel),stage.q,upper.q,lower.q,
+              [for(holding in ["empty","A","B","AB"]) world("Closed",holding)]);
+            if(selection.clearance!=null) {upper.q=selection.clearance;lower.q=selection.approach;}
+            branchReviews.push({station:spec.station,channel:spec.channel,originalClearance:oldUpper,originalApproach:oldLower,selection:selection});
+            Sys.println("Original outfeed branch selection "+spec.station+": "+(selection.clearance!=null ? "both segments clear" : "unproven"));Sys.stdout().flush();
+          }
+          for(p in solved) if(p.q!=null && (StringTools.endsWith(p.name,"-approach") || StringTools.endsWith(p.name,"-clearance") || p.name=="outside staging")) waypointPool.push(p.q);
+          var goals:Map<String,Array<Float>> = [];
+          for(p in solved) if(p.name=="vise-approach" && p.q!=null) goals.set(p.channel,p.q);
+          portal=OriginalPortalWaypoints.generate(solvers,goals,base,[for(holding in ["empty","A","B","AB"]) world("Open",holding)]);
+          var portalPoints:Array<Array<Float>> = portal.points;
+          for(q in portalPoints) waypointPool.push(q);
+          Sys.println("Original front-entry waypoint IK: "+portalPoints.length+" clear configurations");Sys.stdout().flush();
+          var oldRoutes:Array<Dynamic> = baseline.routes;
+          for(r in oldRoutes) if(r.continuous!=null && r.continuous.clear==true) {
+            var path:Array<Array<Float>> = r.path;for(q in path) waypointPool.push(q);
+          }
+        }
         var routes:Array<Dynamic> = [];
         for (request in transfers) {
           var c=channel(Std.string(request.tool)),fromC=channel(Std.string(request.fromTool));
@@ -384,7 +423,7 @@ class CellRegistration {
           var start:Null<Array<Float>> = fromName=="ready" ? (parked.length==0 ? null : parked[0].q) : from.length==0 ? null : from[0].q;
           var end:Null<Array<Float>> = to.length==0 ? null : to[0].q;
           var states:Array<Dynamic> = [];
-          if(start!=null && end!=null) for(holding in ["empty","A","B","AB"]) {
+          if(!refining && start!=null && end!=null) for(holding in ["empty","A","B","AB"]) {
             var clearance=world(Std.string(request.door),holding),violation:Dynamic=null;
             for(index in 0...33) {
               var u=index/32.0,blend=10*u*u*u-15*u*u*u*u+6*u*u*u*u*u;
@@ -395,7 +434,29 @@ class CellRegistration {
             states.push({holding:holding,clear:violation==null,violation:violation});
           }
           var routePath:Null<Array<Array<Float>>> = null,proof:Dynamic=null,planner:Dynamic=null;
-          if(planning && start!=null && end!=null) {
+          if(refining) {
+            var oldRoutes:Array<Dynamic> = baseline.routes;
+            var old:Dynamic=oldRoutes[routes.length];
+            states=old.states;
+            var checks=[for(holding in ["empty","A","B","AB"]) world(Std.string(request.door),holding)];
+            if(old.continuous!=null && old.continuous.clear==true) {
+              var oldPath:Array<Array<Float>> = old.path;
+              routePath=[for(q in oldPath) q.copy()];routePath[0]=start;routePath[routePath.length-1]=end;
+              proof=curveReview(checks,routePath);
+              if(proof.clear!=true) throw "Previously clear original route failed fresh review";
+              planner={method:"baseline_path_freshly_rechecked"};
+            } else if(start!=null && end!=null) {
+              routePath=[start,end];proof=curveReview(checks,routePath);
+              if(proof.clear==true) planner={method:"compatible_endpoint_branches"};
+              else {
+                var improved=roadmap.refine(Std.string(request.door),checks,start,end,waypointPool);
+                routePath=improved.path;proof=improved.continuous;planner=improved.planner;
+                if(proof==null) proof=old.continuous;
+              }
+            }
+            Sys.println("Original route "+routes.length+": "+(proof!=null && proof.clear==true ? "continuously clear" : "unproven")+"; "+roadmap.edgeChecks+" distinct roadmap edges");Sys.stdout().flush();
+          }
+          if(planning && !refining && start!=null && end!=null) {
             var checks=[for(holding in ["empty","A","B","AB"]) world(Std.string(request.door),holding)];
             var space=new RegisteredRouteSpace(arms.get("A"),checks);
             if(space.invalid(start)==null && space.invalid(end)==null) {
@@ -413,14 +474,15 @@ class CellRegistration {
           routes.push({station:request.station,tool:c,fromTool:fromC,fromPose:fromName,toPose:toName,
             door:request.door,status:start==null || end==null ? "endpoint_unproven" : "sampled_joint_route_reviewed",states:states,
             path:routePath,continuous:proof,planner:planner});
+          if(refining) sys.io.File.saveContent(ROOT+"/original-refinement-progress.json",haxe.Json.stringify({routes:routes,edgeChecks:roadmap.edgeChecks,cacheHits:roadmap.cacheHits},null,"  "));
         }
         for(value in worlds) value.world.dispose();
         var report={baseWorldMetres:base,poses:solved,routes:routes,
-          rigidGraspContacts:rigidContacts,
+          rigidGraspContacts:rigidContacts,portalWaypoints:portal,outfeedBranchReviews:branchReviews,
           clearPoses:[for(p in solved) if(p.q!=null) p].length,totalPoses:solved.length,
           reviewedRoutes:[for(r in routes) if(r.status=="sampled_joint_route_reviewed") r].length};
         modelReports.push(report);
-        sys.io.File.saveContent(ROOT+"/"+id+(numericOnly ? "-numeric" : "")+(candidateIndex==null ? "" : "-candidate"+candidateIndex)+(planning ? "-planned-progress.json" : "-registration-progress.json"),haxe.Json.stringify({model:id,sourceFingerprint:sourceHash,
+        sys.io.File.saveContent(ROOT+"/"+id+(refining ? "-refinement" : "")+(numericOnly ? "-numeric" : "")+(candidateIndex==null ? "" : "-candidate"+candidateIndex)+(planning ? "-planned-progress.json" : "-registration-progress.json"),haxe.Json.stringify({model:id,sourceFingerprint:sourceHash,
           fixtureSha256:haxe.crypto.Sha256.encode(rawText),configSha256:haxe.crypto.Sha256.encode(configText),candidates:modelReports},null,"  "));
         Sys.println(id+" registration base "+candidate+": "+report.clearPoses+"/"+report.totalPoses+" target poses; "+report.reviewedRoutes+"/"+routes.length+" sampled routes");Sys.stdout().flush();
       }
@@ -437,15 +499,20 @@ class CellRegistration {
         var best=modelReports[0],poses:Array<RegisteredPose> = cast best.poses;
         var stage=[for(p in poses) if(p.name=="outside staging" && p.channel=="A" && p.q!=null) p];
         var visible=stage.length>0 ? stage[0].q : StringTools.startsWith(id,"zeroerr") ? [0.2,-0.8,1.0,0.1,-0.6,0.2] : [0.0,-1.0,1.3,-1.5,-1.0,0.0];
-        if(candidateIndex==null) RegisteredCellPreview.save(id,readFrame(best.baseWorldMetres),visible,mount,frameA,(cast config.pedestalWidthMm:Float)/1000,seats);
+        if(candidateIndex==null && !refining) RegisteredCellPreview.save(id,readFrame(best.baseWorldMetres),visible,mount,frameA,(cast config.pedestalWidthMm:Float)/1000,seats);
       }
       var selectedSolver:ReferenceKinematics=solvers.get("A");
       reports.push({model:id,sourceFingerprint:sourceHash,candidates:modelReports,examinedCandidates:examined,
         solverMode:numericOnly ? "numeric_only_control" : selectedSolver.exact==null ? "numeric_fallback" : "analytic_with_numeric_fallback",
         unsupportedDiagnostic:selectedSolver.unsupportedDiagnostic});
     }
-    sys.io.File.saveContent(ROOT+reportStem+(candidateIndex==null ? "" : "-candidate"+candidateIndex)+(planning ? "-planned.json" : "-review.json"),haxe.Json.stringify({status:"candidate_review_not_cell_certificate",
+    sys.io.File.saveContent(ROOT+reportStem+(refining ? "-refinement" : "")+(candidateIndex==null ? "" : "-candidate"+candidateIndex)+(planning ? "-planned.json" : "-review.json"),haxe.Json.stringify({status:"candidate_review_not_cell_certificate",
       fixtureSha256:haxe.crypto.Sha256.encode(rawText),configSha256:haxe.crypto.Sha256.encode(configText),models:reports,
+      baselineSha256:refining ? digest(sys.io.File.getBytes(ROOT+"/original-registration-planned.json")) : null,
+      refinementProducerSha256:refining ? digest(sys.io.File.getBytes(ReferenceAssetLocation.DIRECTORY+"/../OriginalRouteRefinement.hx")) : null,
+      outfeedProducerSha256:refining ? digest(sys.io.File.getBytes(ReferenceAssetLocation.DIRECTORY+"/../OriginalOutfeedBranches.hx")) : null,
+      portalProducerSha256:refining ? digest(sys.io.File.getBytes(ReferenceAssetLocation.DIRECTORY+"/../OriginalPortalWaypoints.hx")) : null,
+      registrationProducerSha256:refining ? digest(sys.io.File.getBytes(ReferenceAssetLocation.DIRECTORY+"/../CellRegistration.hx")) : null,
       scope:"Current CAD fixtures and dual gripper; nine proposed bases, or best per model for planning; source 23 transfer requests; empty/A/B/AB jaw and payload states. 33 quintic route samples; optional continuous proof and bounded RRT. Standard articulation exclusions. All tray pockets and mill stock conservatively present. No physical mount qualification, contact insertion, thermal or hardware qualification."},null,"  "));
   }
 }

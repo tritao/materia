@@ -176,3 +176,7 @@ both original imports, six passive joints and absence of modified restrictions.
 The evaluation audit binds the geometry, checkpoints, independent candidate
 reports, load inputs and application evidence; passing it validates evidence
 consistency and coverage, not hardware suitability.
+
+The subsequent [selected-base refinement](ORIGINAL-REFINEMENT.md) recovers four
+vise transfers with explicit entry waypoints and reviews the remaining supplier
+data. Its additional planning work is separate from the equal-budget table above.

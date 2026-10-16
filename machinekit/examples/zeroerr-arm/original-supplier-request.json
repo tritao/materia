@@ -1,0 +1,85 @@
+{
+  "status": "draft_not_sent_not_ordered",
+  "reference": "Unchanged ZeroErr eRobot 5 assembly",
+  "sourceArchive": {
+    "url": "https://www.zeroerr.cn/d/file/arms/cn/20260522/5KG机械臂图纸模型.zip",
+    "sha256": "88927870963572c67fd7b185a042c1b84e1f3e766d2945c9edce7dd78bfefaf4",
+    "assembly": "eRobot 5.STEP",
+    "assemblySha256": "c3f80736eedaedcc3569db6d4b55ffe6cad05577f972bee0a5c83d68fc6a5508"
+  },
+  "jointFamilies": [
+    {
+      "joint": "j1",
+      "family": "eRob110T",
+      "completeOrderingCode": null,
+      "nominalRatioAssumedForSimulation": 100
+    },
+    {
+      "joint": "j2",
+      "family": "eRob110T",
+      "completeOrderingCode": null,
+      "nominalRatioAssumedForSimulation": 100
+    },
+    {
+      "joint": "j3",
+      "family": "eRob110T",
+      "completeOrderingCode": null,
+      "nominalRatioAssumedForSimulation": 100
+    },
+    {
+      "joint": "j4",
+      "family": "eRob70T",
+      "completeOrderingCode": null,
+      "nominalRatioAssumedForSimulation": 100
+    },
+    {
+      "joint": "j5",
+      "family": "eRob70T",
+      "completeOrderingCode": null,
+      "nominalRatioAssumedForSimulation": 100
+    },
+    {
+      "joint": "j6",
+      "family": "eRob70T",
+      "completeOrderingCode": null,
+      "nominalRatioAssumedForSimulation": 100
+    }
+  ],
+  "questions": [
+    "Six complete drive ordering codes and physical joint travel/signs",
+    "Revision-matched torque-speed-temperature and continuous holding/duty limits",
+    "Original 5 kg arm payload/CoG/inertia envelope and specified operating conditions",
+    "Measured moving-side mass, centers of mass and inertia tensors",
+    "Flange drawing, harness travel and delivered brake/encoder/ESI configuration"
+  ],
+  "comparisonApplication": {
+    "payloadKg": 4,
+    "toolKg": 1,
+    "combinedCogAlongToolNormalMm": 150,
+    "jointSpeedDegS": 180,
+    "jointAccelerationDegS2": 60,
+    "designFactor": 1.2,
+    "massSensitivityFactor": 1.25,
+    "sampleCount": 256,
+    "syntheticJointRangeDeg": [
+      -170,
+      170
+    ],
+    "loadBasis": "5 kg total at flange including 1 kg tool; split and 150 mm combined CoG are study assumptions",
+    "accelerationBasis": "60 deg/s^2 screening assumption, not a claimed UR/FAIRINO acceleration rating"
+  },
+  "actualCellTool": {
+    "toolMassKg": 2.780898306004626,
+    "blankMassKg": 0.19440000000000002,
+    "doubleHeldFlangeLoadKg": 3.169698306004626
+  },
+  "originalCellLoadReportSha256": "6c06512d8ee091604f6b7aba0140a960d5d19cd72ed344c2c30c74314b971b92",
+  "refinedCellLoadReportSha256": "fb71cd510805022aa91503f174850efdde058d61405455b00fe1c665f452c3c2",
+  "shoulderScreen": {
+    "nominalGravityNm": 87.96654292213606,
+    "conservativeEnvelopeNm": 142.47804171872312,
+    "assumedRatedNm": 87
+  },
+  "sizingQuestion": "Please supply delivered-drive duty/holding curves; gearbox average/peak values are not treated as continuous motor ratings.",
+  "configurationBoundary": "Retain original axes and mounting geometry until specifications are confirmed. No 80T substitution requested."
+}

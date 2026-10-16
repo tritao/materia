@@ -52,11 +52,12 @@ def placed(body, frame):
 
 
 def main():
-    original = '--original-reference' in sys.argv
+    refinement = '--original-refinement' in sys.argv
+    original = '--original-reference' in sys.argv or refinement
     unrestricted = '--unrestricted-modified-reference' in sys.argv
     if original and unrestricted:
         raise ValueError('Choose one reference study')
-    prefix = 'original-' if original else 'unrestricted-' if unrestricted else ''
+    prefix = 'original-refined-' if refinement else 'original-' if original else 'unrestricted-' if unrestricted else ''
     fixture_path = DIRECTORY/'fixtures.json'
     fixtures = json.loads(fixture_path.read_text())
     registration_config = ROOT/'tending-registration-config.json'
@@ -86,11 +87,20 @@ def main():
     sizing = json.loads((ARM/('build/sizing-report.json' if original else 'build/straight/sizing-report.json')).read_text())
     if sizing['configSha256'] != digest(config_path) or sizing['geometrySha256'] != digest(geometry_path):
         raise ValueError('Stale arm load basis')
-    report_path = DIRECTORY/(prefix+'registration-planned.json')
+    report_path = DIRECTORY/('original-registration-refinement-planned.json' if refinement else prefix+'registration-planned.json')
     registration = json.loads(report_path.read_text())
     if registration['fixtureSha256'] != digest(fixture_path) or registration['configSha256'] != digest(registration_config):
         raise ValueError('Stale candidate registration')
-    scan = json.loads((DIRECTORY/(prefix+'registration-review.json')).read_text())
+    scan = json.loads((DIRECTORY/('original-registration-review.json' if refinement else prefix+'registration-review.json')).read_text())
+    if refinement:
+        if registration['baselineSha256'] != digest(DIRECTORY/'original-registration-planned.json'):
+            raise ValueError('Changed original route baseline')
+        for key, filename in [('refinementProducerSha256','OriginalRouteRefinement.hx'),
+                              ('portalProducerSha256','OriginalPortalWaypoints.hx'),
+                              ('outfeedProducerSha256','OriginalOutfeedBranches.hx'),
+                              ('registrationProducerSha256','CellRegistration.hx')]:
+            if registration[key] != digest(ROOT/filename):
+                raise ValueError('Stale route refinement: '+filename)
     model_id = 'zeroerr-original' if original else 'zeroerr-unrestricted' if unrestricted else 'zeroerr'
     model = next(m for m in registration['models'] if m['model']==model_id)
     baseline = next(m for m in scan['models'] if m['model']==model_id)

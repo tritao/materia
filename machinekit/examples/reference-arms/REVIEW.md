@@ -6,6 +6,9 @@ The prototype results below must not be generalized to the supplier architecture
 The original now reaches 80/82 targets and 17/23 continuously checked transfers
 after all nine base searches; the unrestricted modified control reaches 26/82
 and 5/23. Its original actual-tool load screen still leaves shoulder sizing open.
+A subsequent [selected-base refinement](../zeroerr-arm/ORIGINAL-REFINEMENT.md)
+recovers four vise transfers, reaching 21/23 with additional waypoint planning.
+All 17 prior routes are freshly checked; the two outfeed routes remain unproven.
 
 The agreed software/model study is implemented. This is a prototype review,
 not a manufacturing, procurement, hardware-performance or complete tending-cell

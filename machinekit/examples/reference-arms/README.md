@@ -329,3 +329,8 @@ for matched original/modified loads, all nine base searches, a numerical-only
 IK control and reproduction commands. `--original-reference` and
 `--unrestricted-modified-reference` use isolated reports and projects; the
 standard three-arm comparison and modified planning restrictions remain intact.
+
+The [original-arm follow-up](../zeroerr-arm/ORIGINAL-REFINEMENT.md) adds
+`--refine-routes`, explicit entry waypoints, paired outfeed IK branch checks,
+configuration-load refresh and a source-bound supplier review. Baseline reports
+are preserved; the four recovered vise transfers use additional planning work.
