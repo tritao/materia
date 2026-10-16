@@ -206,7 +206,94 @@ physical normal is preserved.
 
 This export neither reads nor regenerates the generic arm's reach certificate.
 The tool uses the existing generic 50-4-M6 mounting plate; a revision-matched
-ZeroErr adapter remains unverified. The arm base, trays, held stock, contact
-states and complete transfers still need registration and fresh clearance
-checks before any tending feasibility claim. The combined comparison's simple
+ZeroErr adapter remains unverified. The candidate study below registers arm bases, proposed trays and holding
+states and performs fresh transfer checks. It does not establish a complete
+feasible tending cycle. The combined comparison's simple
 tool envelope does not substitute for this dual-gripper geometry.
+
+## Candidate tending registration and transfer review
+
+The registration study uses current native mill, tray, table and dual-gripper
+geometry, with explicit candidate dimensions in `tending-registration-config.json`.
+It does not reuse the old Reach1300 arm poses or certificate. Generate in order:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.fixtures.json
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.json -- --registration
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.json -- --registration --plan-transfers
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.json -- --registration-properties
+./haxeon/scripts/haxeon run --project=machinekit/examples/reference-arms/haxeon.json -- --registration-previews
+python3 machinekit/examples/reference-arms/registered-load-study.py
+python3 machinekit/examples/reference-arms/render-registered-cells.py
+./app/run-built.sh --project=machinekit/examples/reference-arms/build/cell-registration/zeroerr-cell.mtrg
+```
+
+The scan considers nine front-mounted bases (three setbacks and three heights),
+82 TCP targets per model, square-stock grasp rolls, and the production plan's
+23 transfer requests. Geometry and tool frames come from the actual exported
+assemblies. A face-derived grasp uses the current stock collision hull and jaw
+width/finger-length limits. Unbounded prototype joints receive only a study
+planning window. IK residuals are checked; numerical sampling is not exhaustive
+and a failed search is not proof of physical impossibility.
+
+Transfer endpoints and routes are checked in four physical states: open empty
+grippers, A loaded, B loaded, and both loaded. Closed jaws use the travel for the
+actual blank width. Payload geometry is the actual stock hull. Other tray pockets
+and the mill stock remain conservatively occupied; these inventories overbound
+the actual four-part production sequence and can reject otherwise usable routes.
+Door geometry follows each production transfer's open/closed requirement.
+
+The best base per arm is selected using routes clear in all four sampled states,
+then target coverage. Final planning uses a continuous quintic clearance check,
+with deterministic RRT-Connect fallback capped at 256 iterations. The resulting
+piecewise stop-to-stop quintics are checked again in every holding state, with
+5 mm normal clearance and a 1e-6 rad lowering reserve. Adjacent-body articulation
+exclusions apply. The two intended finger/blank contacts are measured with signed
+distance, then excluded from independent motion inflation because their offsets
+on the same flange link are invariant. The report records these specific contacts
+and their measured distances. All other tool, payload and fixture pairs remain
+checked. This assumes an ideal rigid grasp; force closure, slip and flexibility
+are not qualified.
+
+Current results for the selected candidates:
+
+| Arm | Base XYZ (mm) | Continuously checked transfers | Outcome |
+| --- | --- | --- | --- |
+| Our straight ZeroErr arm | 145, -950, 750 | 5 / 23 | 18 transfer endpoints remain unproven |
+| UR5e | 145, -950, 900 | 10 / 23 | Endpoints found; remaining routes unproven |
+| FAIRINO FR5 | 145, -950, 1050 | 18 / 23 | Endpoints found; remaining routes unproven |
+
+Two ZeroErr routes and four FR5 routes required RRT repairs. These counts are
+results for this candidate study and conservative inventory, not robot rankings,
+production cycle times or complete cell certificates. In particular, our arm's
+arm/table and wrist/enclosure conflicts remain design issues. Contact insertion,
+release, door motion during transfers and a complete executable production cycle
+are not established by this transfer review.
+
+`build/cell-registration/registration-review.json` retains every candidate,
+endpoint failure and sampled witness. `registration-planned.json` contains the
+selected bases, route waypoints, continuous proof results, bounded search failures
+and rigid contact evidence. Progress files checkpoint each completed candidate.
+`zeroerr-cell.mtrg`, `ur5e-cell.mtrg`, and `fairino5_v6-cell.mtrg` are static review
+projects with current mill geometry, proposed trays, conservative stock inventory,
+and physical open grippers attached to the arm. Frozen fixtures leave six moving
+arm joints; our joints stay passive. The pedestal is a clearance envelope, not a
+fabrication design. Saved physical TCP placement is checked independently.
+The app integration test loads all three registered projects.
+
+The registered load study replaces the earlier point-tool assumption with the
+exported tool components' declared/CAD mass, CoG and inertia in each jaw state.
+The external air supply is excluded. Estimated tool mass is 2.781 kg; each current
+60 x 60 x 20 mm aluminium blank is 0.1944 kg, giving 3.170 kg with two blanks.
+Mass aggregation is checked against the native tool estimate; tensor symmetry/PSD
+and gravity/potential-gradient identities are checked. At 40 evaluated prototype
+poses/path vertices, the heaviest state's nominal shoulder gravity reaches 77.44 Nm.
+The +25% arm-mass, 60 degrees/s² zero-speed acceleration envelope and design factor
+reach 128.94 Nm, about 1.48 times the current shoulder's 87 Nm catalog rating.
+This is a configuration load screen, not an executed duty/RMS or thermal result.
+The separate full-workspace 5 kg benchmark and unresolved shoulder sizing remain.
+
+`tool-properties.json` and `registered-load-report.json` bind their source artifacts
+and assumptions. `registered-cells.png` provides the common-scale overview. A
+revision-matched tool adapter, physical installation, harness and hardware testing
+remain prerequisites for a real-cell claim.

@@ -11,6 +11,9 @@ class ReferenceArmsPreview {
   static final ROOT:String = ReferenceAssetLocation.DIRECTORY + "/";
   static function check(value:Bool, message:String):Void {if (!value) throw message;}
   public static function main():Void {
+    if (Sys.args().indexOf("--registration-previews")>=0) {CellRegistration.previews();return;}
+    if (Sys.args().indexOf("--registration-properties")>=0) {CellRegistration.properties();return;}
+    if (Sys.args().indexOf("--registration")>=0) {CellRegistration.run();return;}
     if (Sys.args().indexOf("--comparison")>=0) {ComparisonReview.run();return;}
     if (Sys.args().indexOf("--straight-clearance")>=0) {StraightCurveReview.run();return;}
     var models = [for (arg in Sys.args()) if (!StringTools.startsWith(arg,"--")) arg];

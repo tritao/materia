@@ -13,7 +13,7 @@ Active goal: finish the agreed plan, committing coherent changes as work complet
 - [x] Valid connected solids, mass/inertia, stiffness/connection-load estimates and comparison against tapered baseline.
 - [x] Updated workspace/tending load reports; unresolved shoulder sizing clearly retained.
 - [x] Diagnostic and interpolated tending clearance review, with collisions and failed queries recorded and long work checkpointed.
-- [ ] Actual fixture/TCP registration required for real-cell feasibility; no invented cell certificate.
+- [x] Actual fixture/TCP registration required for real-cell feasibility; no invented cell certificate.
 - [x] Draft prototype BOM, interface drawings, missing supplier data and single-joint bench procedure updated.
 - [ ] Relevant commits, runnable commands, artifact paths and final completion audit.
 
@@ -110,14 +110,10 @@ redistribution permission is unresolved. UR mesh terms vary by model.
   artifacts and preserves our passive joints. Final provenance/cache rerun
   and full application build pass. Final completion audit remains pending.
 
-## Remaining work
+## Remaining audit
 
-- Export current tending mill and physical dual-gripper geometry independently
-  of the generic arm certificate, then register candidate base/tool/task frames
-  for the imported arms. Report unreachable/colliding targets honestly; the old
-  Reach1300 certificate does not apply to any of these models.
-- Complete the deliverable/command/provenance audit and record unresolved
-  supplier/manufacturing/hardware data. No physical-cell certificate, hardware
+- Complete the deliverable/command/provenance audit and retain the negative
+  hardware and cell-feasibility findings. No physical-cell certificate, hardware
   qualification, purchase or supplier contact is part of this software task.
 
 ## Current fixture export
@@ -127,6 +123,30 @@ redistribution permission is unresolved. UR mesh terms vary by model.
   It never reads or regenerates the generic arm certificate.
 - Saved frames and +Y-normal to +Z-normal mount conversion pass; artifact and
   producing bytecode hashes are recorded in cell-registration/fixtures.json.
-- Candidate base/tray/held-stock/contact-state registration and full transfer
-  feasibility are still pending. The generic 50-4-M6 tool plate is not a
-  verified ZeroErr production adapter.
+- Candidate base/tray/holding-state registration and transfer review are now
+  performed below. Full cycle feasibility is unproven. The generic 50-4-M6
+  tool plate is not a verified ZeroErr production adapter.
+
+## Registered candidate cell review
+
+- Current native trays/table and a nine-base candidate layout are registered to
+  mill and dual-tool frames. Face-derived stock grasp, four jaw/payload states,
+  door-open/closed geometry and the actual 23 production transfers are checked.
+- All other tray pockets and the mill stock conservatively remain occupied.
+  This can reject feasible production-specific inventories; no impossibility
+  or complete executable-cell claim is made.
+- Continuous path checks plus bounded deterministic RRT prove 5/23 transfers
+  for our arm, 10/23 for UR5e and 18/23 for FR5 at their selected bases. Our
+  remaining 18 endpoints are unproven. All failures/witnesses remain in reports.
+- Intended rigid finger/blank contacts are validated with signed distance and
+  invariant offsets on the same flange before excluding independent motion
+  inflation for those exact contacts. Other pairs remain checked.
+- Three static cell projects retain physical tool geometry and six arm joints,
+  preserve our passive joints, and pass actual application import checks.
+- Actual tool estimate is 2.781 kg; two 0.1944 kg blanks give 3.170 kg total.
+  Component CoG/inertia aggregation and gravity identities pass. At 40 reviewed
+  prototype configurations, the conservative shoulder screen reaches 128.94 Nm
+  against 87 Nm rated. Full-workspace and registered-task shoulder release fail.
+- Complete production feasibility, contact insertion/release, moving doors,
+  physical mounting, grip force/slip, harness and hardware qualification remain
+  open engineering decisions; the software study records these findings.

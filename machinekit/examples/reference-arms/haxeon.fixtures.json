@@ -8,7 +8,8 @@
     ".",
     "../bench-mill",
     "../cnc-router",
-    "build/assets"
+    "build/assets",
+    "../machine-tending"
   ],
   "dependencies": {
     "robotkit-autonomy": {
@@ -34,6 +35,9 @@
     },
     "cnckit": {
       "path": "../../../cnckit"
+    },
+    "cadbridge": {
+      "path": "../../../robotkit/cadbridge"
     }
   },
   "target": "host",

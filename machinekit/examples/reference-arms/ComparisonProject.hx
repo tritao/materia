@@ -97,7 +97,7 @@ class ComparisonProject {
       limits:{lower:null,upper:null,velocity:null,effort:null},defaultValue:0});
     return scene;
   }
-  static function append(target:SceneArtifactData,source:SceneArtifactData,prefix:String,mount:AssemblyFrame):Void {
+  public static function append(target:SceneArtifactData,source:SceneArtifactData,prefix:String,mount:AssemblyFrame):Void {
     var definition:AssemblyDefinition = source.assemblyDefinition;
     var out:AssemblyDefinition = target.assemblyDefinition;
     var factor = source.metresPerUnit;

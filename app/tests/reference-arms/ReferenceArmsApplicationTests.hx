@@ -56,8 +56,18 @@ class ReferenceArmsApplicationTests {
       for (joint in ours) check(joint.passive==true,"Comparison must preserve passive prototype joints");
       comparisonMountings.push(mounting);
     }
-    var text = haxe.Json.stringify({scope:"source selection and 200 actual simulator steps for UR5e/FR5; static comparison source/saved imports; no hardware qualification",robots:reports,
-      comparisonMountings:comparisonMountings},null,"  ");
+    var registeredModels:Array<String> = [];
+    for (id in ["zeroerr","ur5e","fairino5_v6"]) {
+      var generated=ProjectSourceLoader.load(root+"/build/cell-registration/"+id+"-cell.mtrg");
+      var definition:materia.assembly.AssemblyDefinition=generated.assemblyDefinition;
+      check(definition.lengthUnit=="m" && generated.objects.length>100,"Registered cell imports must retain metre-scale fixtures and tool");
+      var moving=[for(joint in definition.joints) if(joint.type!="fixed") joint];
+      check(moving.length==6,"Frozen fixture/tool states must leave only six arm joints");
+      if(id=="zeroerr") for(joint in moving) check(joint.passive==true,"Registered prototype must remain passive");
+      registeredModels.push(id);
+    }
+    var text = haxe.Json.stringify({scope:"source selection and 200 actual simulator steps for UR5e/FR5; static comparison and registered-cell imports; no hardware qualification",robots:reports,
+      comparisonMountings:comparisonMountings,registeredModels:registeredModels},null,"  ");
     File.saveContent(root+"/build/application-validation.json",text);
     Sys.println(text);
     // The editor's background project workers outlive this headless check.

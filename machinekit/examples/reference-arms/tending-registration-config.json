@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "status": "candidate_simulation_layout_not_physical_registration",
+  "baseCandidatesMm": [
+    [
+      145,
+      -750,
+      750
+    ],
+    [
+      145,
+      -750,
+      900
+    ],
+    [
+      145,
+      -750,
+      1050
+    ],
+    [
+      145,
+      -850,
+      750
+    ],
+    [
+      145,
+      -850,
+      900
+    ],
+    [
+      145,
+      -850,
+      1050
+    ],
+    [
+      145,
+      -950,
+      750
+    ],
+    [
+      145,
+      -950,
+      900
+    ],
+    [
+      145,
+      -950,
+      1050
+    ]
+  ],
+  "baseYawRad": -1.5707963267948966,
+  "pedestalWidthMm": 200,
+  "trayRows": 2,
+  "trayColumns": 3,
+  "trayPitchMm": [
+    140,
+    180
+  ],
+  "trayTableCenterMm": [
+    145,
+    -650,
+    0
+  ],
+  "trayTableTopMm": 1005,
+  "trayBankOffsetMm": 300,
+  "approachMm": 70,
+  "clearanceLiftMm": 140,
+  "stagingMm": [
+    145,
+    -600,
+    1200
+  ],
+  "collisionMarginMetres": 0.005,
+  "contactMarginMetres": 0.0005,
+  "notes": "Dimensions are explicit study choices. Native tray/table geometry is exported from existing cell components. Bases, bolt patterns, cable service and physical installation remain unqualified."
+}
