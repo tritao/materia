@@ -427,6 +427,37 @@ int main() {
         assert(stage_count[0] <= 40 && stage_count[0] * 10 < stage_count[1]);
     }
 
+    // Affine spans with moving boundaries have an analytic bang/cruise/bang
+    // optimum under the same solver margins. Exercise switches throughout the
+    // end zones, including triangular profiles that never reach the feed cap.
+    {
+        for(double length : {0.0001, 0.001, 0.1})
+        for(double entry_fraction : {0.0, 0.3, 0.8})
+        for(double exit_fraction : {0.0, 0.3, 0.8}) {
+            const double feed=0.06, joint_velocity=0.25, joint_acceleration=12.5;
+            const double entry=entry_fraction*feed, exit=exit_fraction*feed;
+            const double effective_acceleration=joint_acceleration*((entry>0 || exit>0) ? 0.98 : 1.0);
+            if(std::abs(exit*exit-entry*entry)>2*effective_acceleration*length)continue;
+            mk_path_sample line[2]{};
+            for(unsigned i=0;i<2;++i){
+                line[i].struct_size=sizeof(line[i]);line[i].joint_count=1;
+                line[i].s=i*length;line[i].position[0]=i*length;line[i].first[0]=1;
+            }
+            assert(mk_path_create(line,2,&path)==MK_OK);
+            mk_trajectory_handle trajectory{};
+            assert(mk_time_path(path,&joint_velocity,&joint_acceleration,1,&feed,1,
+                entry,exit,1e-6,0,nullptr,&law,&trajectory)==MK_OK);
+            int64_t ns=0;assert(mk_trajectory_duration_ns(trajectory,&ns)==MK_OK);
+            const double peak=std::min(feed,std::sqrt(effective_acceleration*length+(entry*entry+exit*exit)/2));
+            const double ramp_distance=(2*peak*peak-entry*entry-exit*exit)/(2*effective_acceleration);
+            const double ideal=(2*peak-entry-exit)/effective_acceleration+std::max(0.0,length-ramp_distance)/peak;
+            const double actual=ns*1e-9;
+            assert(actual>=ideal*(1-1e-6));
+            assert(actual<=ideal*1.005);
+            mk_trajectory_destroy(trajectory);mk_time_law_destroy(law);mk_path_destroy(path);
+        }
+    }
+
     // A long smooth path is timed in windows that carry their boundary speeds: six joints over twenty thousand spans
     // (forty thousand grid points, five windows) are timed in one go, never come to rest where a window ends, and take
     // less than the same path in two halves, each from and to rest.
