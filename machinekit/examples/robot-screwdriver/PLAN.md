@@ -3612,3 +3612,21 @@ All 95 physical assertions and 12557 checked API operations pass
 (`sd15-dynamics-history.log`). This validates the covered history cases, not
 all possible reset/topology combinations. Soft contacts, scaling, production
 integration and both-backend whole-cell/fault acceptance remain open.
+
+### SD15a inertia-block scaling prototype (2026-10-16)
+
+The isolated generalized solver partitions the mass matrix into independent
+components using every nonzero coupling, factors each component separately and
+solves contact responses only in touched components. Contact rows retain active
+Jacobian/response indices so iterative impulses skip unrelated inventory axes.
+Coupled armature, differential jaws and floating-parent reactions remain covered
+by the existing analytical probes.
+
+A new 64-body physical case verifies each independent mass's acceleration and
+displacement. Both the saved dense implementation and the block implementation
+pass the identical 223 physical assertions and 12954 checked API operations.
+One local comparison of the complete probe takes 0.554 s dense versus 0.213 s
+blocked (`sd15-dynamics-block-comparison.log`); this is a focused measurement,
+not a whole-cell performance result. Matrix storage and contact broad-phase
+remain dense/quadratic. Soft-contact semantics, production code cleanup/native
+integration and actual deterministic cell/fault acceptance remain open.
