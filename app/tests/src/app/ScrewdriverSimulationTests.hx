@@ -176,6 +176,9 @@ class ScrewdriverSimulationTests {
         Math.abs(planningArm.tcpPose([0.01]).translation.z-0.103) < 1e-9,
         "Arm IK exposes the uncompressed bit while excluding the process-owned feed and spindle");
       var screw = harness.spawnBox([0,0,0.101],[0.0001,0.0001,0.0001],true,0.01);
+      // A separate supported member under the head: gravity acts until a qualified final preload joins it.
+      harness.spawnBox([0.03,0.03,0.0959],[0.005,0.005,0.005]);
+      var clamped = harness.spawnBox([0.03,0.03,0.101],[0.0001,0.0001,0.0001],true,0.01);
       var freeFixture = harness.space.session.createObject(nativekit.sim.MotionType.Kinematic,
         nativekit.sim.SimShape.box(0.001,0.001,0.001),new SimPose(0.02,0.01,0.1),0);
       var channels:ScrewdriverChannelNames = {start:"start",direction:"reverse",program:"program",vacuum:"vacuum"};
@@ -186,7 +189,7 @@ class ScrewdriverSimulationTests {
       var fixture = new SimulationAssemblyPart("work-fixture",harness.simulation,[0.0,0.0,0.0],[],
         {id:"work-fixture",robotIndex:0,linkIndex:4,offset:materia.assembly.AssemblyFrames.identity(),center:[0.0,0.0,0.0]},null);
       observer.configure(1,{program:new TighteningProgram(program().settings,headSeat),joint:joint(),screw:screw,hand:1,
-        fixture:fixture,
+        fixture:fixture,clamped:clamped,
         connection:{fastening:"transport-probe",member:"work-fixture",face:"bore"},
         work:() -> ({head:head,screwPose:body,engagementPoint:[0.02,0.0,0.1],hole:[0.02,0.0,0.1],direction:[0.0,0.0,1.0],damagedLeadIn:false})});
       var id = harness.simulation.addStepObserver(observer);
@@ -228,7 +231,7 @@ class ScrewdriverSimulationTests {
         // Explicit probe qualification; this does not add a production torque table entry.
         settings.targetTorque = 14; settings.finalTorqueLimit = 16; settings.minimumAngle = 0.6; settings.maximumAngle = 0.8;
         var qualified:ScrewdriverSetup = {program:new TighteningProgram(settings),joint:joint(),screw:screw,hand:1,
-          fixture:fixture,connection:{fastening:"transport-probe",member:"work-fixture",face:"bore"},retightening:true,
+          fixture:fixture,clamped:clamped,connection:{fastening:"transport-probe",member:"work-fixture",face:"bore"},retightening:true,
           work:() -> ({head:head,screwPose:body,engagementPoint:[0.02,0.0,0.1],hole:[0.02,0.0,0.1],direction:[0.0,0.0,1.0],damagedLeadIn:false})};
         continuation = qualified;
         refuses(() -> {var contact = observer.configure(2,qualified);});
@@ -246,6 +249,8 @@ class ScrewdriverSimulationTests {
         "Vacuum release retains the actual seated screw through retraction and gravity");
       check(fixture.carries(screw),
         "The named fixture owns the fastened screw after the bit releases it");
+      check(fixture.carries(clamped) == !headSeat,
+        "Final preload retains the named clamped member; a snug-only pass leaves it free");
       if (retighten) {
         if (continuation == null) throw "Retightening probe lost its qualification";
         var qualified:ScrewdriverSetup = cast continuation;
@@ -320,12 +325,15 @@ class ScrewdriverSimulationTests {
           outputs.selectProgram(1);
         }
       }
+      var clampedBefore = harness.simulation.objectPose(clamped);
       runtime.submitPosition(3,0.01,retighten ? 7 : 4);
       for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(3)-0.01) > 1e-5) harness.step();
       harness.step();
       var moved = harness.simulation.objectPose(screw);
       check(Math.abs(moved.y-released.y-0.01) < 0.0001 && Math.abs(moved.z-released.z) < 0.0001,
         "The seated screw follows its moving fixture independently of the withdrawn bit");
+      check(fixture.carries(clamped) && Math.abs(harness.simulation.objectPose(clamped).y-clampedBefore.y-0.01) < 0.0001,
+        "The clamped member travels with the threaded fixture after accepted final tightening");
       var member = new SimulationAssemblyPart("free-fixture",harness.simulation,[0.0,0.0,0.0],[],null,freeFixture);
       harness.simulation.releaseObject(screw);
       member.retain(screw,moved);
@@ -334,6 +342,21 @@ class ScrewdriverSimulationTests {
       check(member.carries(screw) && Math.abs(harness.simulation.objectPose(screw).y-moved.y-0.01) < 0.0001,
         "A named environment fixture also carries its fastened screw without a robot-link guess");
       refuses(() -> harness.simulation.holdObjectOnObject(screw,screw,new SimPose(0,0,0)));
+      var plate = harness.spawnBox([0.05,0.05,0.1],[0.0001,0.0001,0.0001],true,0.01);
+      var assembly = new SimulationAssemblyPart("dynamic-plate",harness.simulation,[0.0,0.0,0.0],[],null,plate);
+      harness.simulation.releaseObject(screw);
+      harness.simulation.releaseObject(clamped);
+      var screwBeforeCarry = harness.simulation.objectPose(screw), housingBeforeCarry = harness.simulation.objectPose(clamped);
+      assembly.retain(screw,screwBeforeCarry);
+      assembly.retain(clamped,housingBeforeCarry);
+      fixture.retain(plate,harness.simulation.objectPose(plate));
+      runtime.submitPosition(3,0.02,retighten ? 8 : 5);
+      for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(3)-0.02) > 1e-5) harness.step();
+      harness.step();
+      check(fixture.carries(plate) && assembly.carries(screw) && assembly.carries(clamped) &&
+        Math.abs(harness.simulation.objectPose(screw).y-screwBeforeCarry.y-0.01) < 0.0001 &&
+        Math.abs(harness.simulation.objectPose(clamped).y-housingBeforeCarry.y-0.01) < 0.0001,
+        "Picking the dynamic plate carries its retained screw and housing through the native carrier chain");
       var adapter = new RuntimeRobotAdapter("screw-sensor-probe",runtime,"Screw sensor probe",
         [for (link in model.links) Std.string(link.id)],[for (joint in model.joints) Std.string(joint.id)]);
       var state = adapter.snapshot();

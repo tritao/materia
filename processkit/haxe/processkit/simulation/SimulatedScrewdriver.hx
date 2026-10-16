@@ -36,6 +36,8 @@ typedef ScrewdriverSetup = {
   var hand:Float;
   /** On successful release, retain the actual seated body on its identified threaded member. */
   @:optional var fixture:SimulationObjectFixture;
+  /** CAD member under this head, when it is a free dynamic part. Final preload retains it on the fixture. */
+  @:optional var clamped:SimObject;
   /** Exact CAD connection; required when a released joint can be continued. */
   @:optional var connection:{fastening:String,member:String,face:String};
   @:optional var retightening:Bool;
@@ -167,6 +169,9 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     var checked = new TighteningModel(setup.program, setup.joint);
     if (carried() != null && carried() != setup.screw) throw "Qualified slot does not describe the held screw";
     var connection = setup.connection;
+    if (setup.clamped != null && (setup.fixture == null || setup.clamped == setup.screw ||
+        setup.clamped.motion != nativekit.sim.MotionType.Dynamic))
+      throw "A clamped member needs its own dynamic body and identified threaded fixture";
     if (setup.physicalThread == true) {
       requiredPositive(setup.threadLeadMm,"Physical screw engagement needs a positive CAD thread lead");
       requiredPositive(setup.physicalThreadMaxForceN,"Physical screw engagement needs an explicit positive axial force cap");
@@ -193,6 +198,16 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     if (activeSlot == slot) { activeSlot = 0; selected = null; model = null; }
     return contact;
   }
+  /** Only an accepted final preload joins the clamped member; snug and failed attempts leave it free. */
+  function retainClamped(setup:ScrewdriverSetup):Void {
+    var body = setup.clamped, fixture = setup.fixture;
+    if (body == null || fixture == null || setup.program.stopAtSeat || fixture.carries(body)) return;
+    if (simulation.objectCarrier(body).rawValue() != 0)
+      throw "Cannot fasten a clamped member still owned by another carrier";
+    fixture.retain(body, simulation.objectPose(body));
+    if (!fixture.carries(body)) throw "Final preload did not retain its named clamped member";
+  }
+
   function retainedFor(setup:ScrewdriverSetup):RetainedEngagement {
     var connection = setup.connection;
     if (connection == null || setup.screw == null) throw "Final setup needs its identified released screw and connection";
@@ -461,6 +476,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
           throw "Successful physical thread release lost its qualified engagement";
         fixture.retain(threaded,releasedPose);
         if (!fixture.carries(threaded)) throw "Successful physical thread release did not retain its screw on the named fixture";
+        retainClamped(oldSetup);
         var head = transform(state.head);
         retained.push({fastening:connection.fastening,member:connection.member,face:connection.face,screw:threaded,
           hand:oldSetup.hand,model:oldProcess,anchor:anchor,bodyToHead:transform(state.screwPose).inverse().compose(head),
@@ -515,6 +531,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
         fixture.retain(released,releasedPose);
         if (!fixture.carries(released)) throw "Successful release did not retain the screw on its named fixture";
         if (setup == null) throw "Successful release lost its qualified setup";
+        retainClamped(setup);
         var connection = setup.connection, anchor = anchoredBody;
         if (connection == null || anchor == null || process == null || state == null) throw "Successful release lost its qualified engagement";
         var head = transform(state.head);

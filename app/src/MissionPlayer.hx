@@ -1993,6 +1993,9 @@ class MissionPlayer implements SessionMember {
     arm = ScrewdriverArmKinematics.atSpindle(robot.model,robot.rootLink,tcp.id,capacity.feedJoint,capacity.spindleJoint,driver.spindlePosition());
     screwArm = arm;
     var work = assemblyParts.get("project:"+job.frame), presenter = job.delivery == Presented ? assemblyParts.get("project:"+job.presenter) : null;
+    var clamped = assemblyParts.get("project:"+job.clamped);
+    var clampedBody = clamped.freeObject ? clamped.freeBody() : null;
+    if (clampedBody != null && clampedBody.motion != nativekit.sim.MotionType.Dynamic) clampedBody = null;
     var registeredFrame = requiresScrewRegistration(job);
     var workPose = () -> {
       if (registeredFrame) {
@@ -2009,6 +2012,7 @@ class MissionPlayer implements SessionMember {
       threadEngagement.mode == materia.project.SceneArtifact.SceneArtifactScrewEngagementMode.PhysicalThread;
     var finalContact = driver.configure(qualifiedSlot,{program:new TighteningProgram(job.program,stopAtSeat),joint:screwJoint,
       screw:screw.freeBody(),hand:job.hand,fixture:work,retightening:retightening,
+      clamped:clampedBody,
       physicalThread:physicalThread,
       threadLeadMm:job.leadMm,
       physicalThreadMaxForceN:threadEngagement == null ? null : threadEngagement.maximumAxialForceN,
