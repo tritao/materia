@@ -46,6 +46,12 @@ class ProgramBlocks implements ProgramSink {
     return result;
   }
 
+  public function retireFirstBlock():Void {
+    if (blocks.length==0 || !blocks[0].complete || blocks[0].plans.length!=0)
+      throw "Program block is not consumed";
+    blocks.shift();
+  }
+
   public function dispose():Void
     for (block in blocks) for (plan in block.plans) plan.dispose();
 }

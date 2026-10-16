@@ -33,7 +33,9 @@ class ManipulatorMotion {
   public var slip:Null<StepperSlip> = null;
   final input:String -> Null<EventValue>;
   final eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool};
-  final executor:PlanExecutor;
+  var executor:PlanExecutor;
+  var successorExecutor:PlanExecutor;
+  var successorQueued:Bool = false;
   public final jointIndices:Array<Int>;
   /** Seconds of planned motion kept ahead of the machine. */
   public static inline final LOOKAHEAD_SECONDS = 1.0;
@@ -42,6 +44,7 @@ class ManipulatorMotion {
   /** Plans of the running program started so far. */
   var startedPlans:Int = 0;
   var blockIndex:Int = 0;
+  var completedBlockCount:Int = 0;
   var planIndex:Int = 0;
   var barrierElapsed:Float = 0.0;
   var pendingProgram:Null<MotionProgram>;
@@ -84,10 +87,13 @@ class ManipulatorMotion {
       seen.set(index, true);
     }
     executor = new PlanExecutor(robot, this.jointIndices, session, completionPositionTolerance, springFrequencies);
+    successorExecutor = new PlanExecutor(robot, this.jointIndices, session, completionPositionTolerance, springFrequencies);
   }
 
   /** A program started with `run(program, false)` whose first plan is still being made. */
   var starting:Bool = false;
+  /** Deterministic stepping waits for successor planning before advancing its clock. */
+  var waitForPlanning:Bool = true;
   /** Operator intent retained until asynchronous planning can start the session. */
   var startupHeld:Bool = false;
   function get_running():Bool return starting || session.isActive();
@@ -125,8 +131,8 @@ class ManipulatorMotion {
       return;
     }
     if (running) throw "Manipulator program is already running";
-    release(); programCompleted = false; failure = null; events = [];
-    blockIndex = 0; planIndex = 0; barrierElapsed = 0.0; planStarted = false; startedPlans = 0;
+    release(); programCompleted = false; failure = null; events = []; waitForPlanning=waitForFirstPlan;
+    blockIndex = 0; completedBlockCount = 0; planIndex = 0; barrierElapsed = 0.0; planStarted = false; startedPlans = 0;
     try {
       var positions = robot.snapshot().setpointPositions;
       var started = new ProgramPlanner(compiler, program, lastCommandedQ == null
@@ -156,7 +162,7 @@ class ManipulatorMotion {
       expected=Int64.add(plan.planId,Int64.ofInt(1));
     }
     release();programCompleted=false;failure=null;events=[];
-    blockIndex=0;planIndex=0;barrierElapsed=0.0;planStarted=false;startedPlans=0;
+    blockIndex=0;completedBlockCount=0;planIndex=0;barrierElapsed=0.0;planStarted=false;startedPlans=0;
     try {
       planner=ProgramPlanner.fromCompiled(compiled,nextPlanId);
       session.begin();advance(0.0);
@@ -199,7 +205,22 @@ class ManipulatorMotion {
       }
       var carrying = slip;
       if (carrying != null && planStarted) carrying.update(executor.completed ? plansEnd : executor.elapsedSeconds);
-      if (executor.completed && planStarted) { planIndex++; planStarted = false; }
+      if (successorQueued && session.state==Running) successorExecutor.update();
+      while (executor.completed && planStarted) {
+        if (planning==null || blockIndex>=planning.blocks.blocks.length) throw "Completed plan has no owner";
+        var block=planning.blocks.blocks[blockIndex];
+        var consumed=block.plans[planIndex];
+        lastCommandedQ=consumed.evaluate(consumed.durationSeconds).positions;
+        if (planIndex!=0) throw "Consumed program prefix was not retired";
+        block.retireFirstPlan();
+        planStarted=false;
+        if (successorQueued) {
+          var old=executor;executor=successorExecutor;successorExecutor=old;
+          successorQueued=false;planStarted=true;
+          startDiagnostics(block.plans[0]);
+          if (executor.completed && carrying!=null) carrying.update(plansEnd);
+        }
+      }
       advance(dtSeconds);
     } catch (error:Dynamic) { fail(Std.string(error), !session.isFaulted()); }
   }
@@ -309,7 +330,7 @@ class ManipulatorMotion {
   public function progress():ManipulatorProgress {
     var planning = planner;
     if (planning == null || blockIndex >= planning.blocks.blocks.length)
-      return new ManipulatorProgress(blockIndex, -1, 0.0);
+      return new ManipulatorProgress(completedBlockCount+blockIndex, -1, 0.0);
     var block = planning.blocks.blocks[blockIndex];
     var op = planIndex < block.opIndices.length ? block.opIndices[planIndex] : -1;
     var distance = 0.0;
@@ -329,7 +350,7 @@ class ManipulatorMotion {
           }
       }
     }
-    return new ManipulatorProgress(blockIndex, op, distance,
+    return new ManipulatorProgress(completedBlockCount+blockIndex, op, distance,
       planIndex < block.plans.length ? block.plans[planIndex].guarantees() : null,
       planIndex < block.plans.length ? null : block.barrier);
   }
@@ -342,14 +363,27 @@ class ManipulatorMotion {
       var block = source.blocks[blockIndex];
       if (planIndex < block.plans.length) {
         if (!planStarted) {
-          var checked = block.plans[planIndex].checked;
-          if (checked != null) checks.add(checked);
-          var carrying = slip;
-          if (carrying != null) carrying.start(checked);
-          executor.start(block.plans[planIndex], true);
+          startDiagnostics(block.plans[planIndex]);
+          executor.start(block.plans[planIndex], block.plans[planIndex].endsAtRest);
           planStarted = true;
           startedPlans++;
           planning.started(startedPlans);
+        }
+        // Only continuous publication cuts can share the runtime queue. An
+        // authored exact stop or barrier retains its settling behavior.
+        if (!block.plans[planIndex].endsAtRest && executor.allSubmitted() && !successorQueued &&
+            planIndex+1>=block.plans.length && !block.complete && waitForPlanning) {
+          // A fixed-step owner can consume simulated time faster than its
+          // worker receives CPU. Preserve deterministic stepping at moving
+          // cuts just as at authored stops; live hosts keep bounded underflow.
+          waitForPlans(planning);
+          continue;
+        }
+        if (!block.plans[planIndex].endsAtRest && executor.allSubmitted() && !successorQueued &&
+            planIndex+1<block.plans.length) {
+          var next=block.plans[planIndex+1];
+          successorExecutor.start(next,next.endsAtRest);
+          successorQueued=true;startedPlans++;planning.started(startedPlans);
         }
         return;
       }
@@ -382,14 +416,10 @@ class ManipulatorMotion {
         };
         if (!ready) return;
       }
-      blockIndex++; planIndex = 0; barrierElapsed = 0.0;
+      if (blockIndex!=0) throw "Consumed program blocks were not retired";
+      source.retireFirstBlock(); completedBlockCount++; planIndex = 0; barrierElapsed = 0.0;
     }
     if (session.state == Running) {
-      for (block in source.blocks)
-        if (block.plans.length > 0) {
-          var last = block.plans[block.plans.length - 1];
-          lastCommandedQ = last.evaluate(last.durationSeconds).positions;
-        }
       var next = source.nextPlanId;
       if (next != null) nextPlanId = next;
       programCompleted = true; session.completed(); release();
@@ -446,7 +476,16 @@ class ManipulatorMotion {
       else { failure = "Runtime process event overflow"; programCompleted = false; }
     }
   }
+  function startDiagnostics(plan:ExecutionPlan):Void {
+    var checked=plan.checked;
+    if (checked!=null) checks.add(checked);
+    var carrying=slip;
+    if (carrying!=null) carrying.start(checked);
+  }
+
   function release():Void {
+    // Detach borrowed native arrays before the planner releases its plans.
+    executor.clear();successorExecutor.clear();successorQueued=false;
     starting = false;
     startupHeld = false;
     var planning = planner;

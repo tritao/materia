@@ -82,7 +82,8 @@ typedef BenchmarkResult = {
   var failure:Null<String>;
   var planned:Float;
   var reference:Float;
-  var wall:Float;
+  var cpuSeconds:Float;
+  var elapsedSeconds:Float;
   /** Seconds of motion planned per second of planning, over the whole print and over its worst 10 s. */
   var overall:Float;
   var worstWindow:Float;
@@ -116,6 +117,14 @@ class TimedSink implements ProgramSink {
     last = now;
     run.push(plan.durationSeconds);
     var durations = plan.segmentDurations();
+    if (Sys.getEnv("PRINTING_BENCHMARK_TIMING_BITS") == "1") {
+      var durationNs = haxe.Int64.ofInt(0);
+      for (index in 0...durations.length()) durationNs += durations.get(index);
+      // Exact evidence for matched native-provider runs, without decimal rounding.
+      Sys.println("PRINTING_PLAN_TIME " + haxe.Json.stringify({op:opIndex,
+        nanoseconds:haxe.Int64.toStr(durationNs),
+        seconds:plan.durationSeconds}));
+    }
     segments += durations.length();
     for (index in 0...durations.length()) {
       var nanoseconds = haxe.Int64.toInt(durations.get(index));
@@ -173,6 +182,7 @@ class PrintingBenchmark {
     var sink = new TimedSink();
     var heapBefore = hl.Gc.heapBytes(), allocatedBefore = hl.Gc.totalAllocated();
     var compileBegan = Sys.cpuTime();
+    var compileBeganWall = Sys.time();
     sink.reset();
     var failure:Null<String> = null;
     var budgetsBefore=machine.binding.compiler.mergeBudgetRefusals;
@@ -181,6 +191,7 @@ class PrintingBenchmark {
       while (compilation.step()) {}
     } catch (error:Dynamic) { failure = Std.string(error); compilation.dispose(); }
     var compileSeconds = Sys.cpuTime() - compileBegan;
+    var compileElapsed = Sys.time() - compileBeganWall;
     var unproved=machine.binding.compiler.mergeBudgetRefusals-budgetsBefore;
     if(unproved>0 && failure==null)failure='$unproved sections have no proven remaining merge budget';
     var planned = 0.0;
@@ -212,11 +223,12 @@ class PrintingBenchmark {
       'planned is ${Math.round((planned / estimate.seconds - 1.0) * 1000) / 10} % above it');
     Sys.println('  planning: ${Math.round(compileSeconds * 100) / 100} s of processor time, ${Math.round(planned / compileSeconds * 100) / 100}x real time overall' +
       (worstRatio < Math.POSITIVE_INFINITY ? ', worst 10 s window ${Math.round(worstRatio * 100) / 100}x (from print time ${Math.round(worstAt * 10) / 10} s)' : ', print shorter than 10 s'));
+    Sys.println('  planning elapsed: ${Math.round(compileElapsed * 1000) / 1000} s');
     Sys.println('  exact stops by reason: ${stops.length == 0 ? "none" : stops.join(", ")}; $notes planner notes');
     Sys.println('  memory: managed heap peak ${Math.round(sink.peakHeap / 1048576)} MB (${Math.round(heapBefore / 1048576)} MB before planning), ' +
       '${Math.round((hl.Gc.totalAllocated() - allocatedBefore) / 1048576)} MB allocated while planning');
     sink.blocks.dispose();
-    return {failure: failure, planned: planned, reference: estimate.seconds, wall: compileSeconds,
+    return {failure: failure, planned: planned, reference: estimate.seconds, cpuSeconds: compileSeconds, elapsedSeconds: compileElapsed,
       overall: planned / Math.max(compileSeconds, 1e-9), worstWindow: worstRatio, sections: sink.run.length, segments: sink.segments};
   }
 
@@ -479,15 +491,18 @@ class PrintingBenchmark {
     var sink = new TimedSink();
     sink.reset();
     var failure:Null<String> = null;
+    var cpuBegan = Sys.cpuTime(), elapsedBegan = Sys.time();
     var compilation = machine.binding.compiler.begin(motion, machine.start, Int64.ofInt(1), 0, 1.0, sink);
     try {
       while (compilation.step()) {}
     } catch (error:Dynamic) { failure = Std.string(error); compilation.dispose(); }
+    var cpuSeconds = Sys.cpuTime() - cpuBegan, elapsedSeconds = Sys.time() - elapsedBegan;
     var planned = 0.0;
     for (seconds in sink.run) planned += seconds;
     sink.blocks.dispose();
+    Sys.println('  $name: planning ${Math.round(elapsedSeconds * 1000) / 1000} s elapsed, ${Math.round(cpuSeconds * 1000) / 1000} s processor time');
     Sys.println('  $name: segments shorter than 0.1 / 0.5 / 1 / 2 / 4 ms: ${sink.shorter.join(" / ")} of ${sink.segments}');
-    return {failure: failure, planned: planned, reference: 0.0, wall: 0.0, overall: 0.0, worstWindow: 0.0, sections: sink.run.length, segments: sink.segments};
+    return {failure: failure, planned: planned, reference: 0.0, cpuSeconds: cpuSeconds, elapsedSeconds: elapsedSeconds, overall: 0.0, worstWindow: 0.0, sections: sink.run.length, segments: sink.segments};
   }
 
   /**

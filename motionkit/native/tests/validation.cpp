@@ -31,6 +31,35 @@ mk_trajectory_handle cubic() {
     return trajectory;
 }
 
+// Padding a polynomial to the ABI's maximum degree must preserve its extrema,
+// including non-monotone lower-degree position polynomials.
+void padded_polynomial_extrema() {
+    for (unsigned degree=0;degree<5;++degree) {
+        mk_validation_report reports[2]{};
+        for (unsigned padded=0;padded<2;++padded) {
+            mk_trajectory_handle trajectory{};
+            assert(mk_trajectory_create(1,&trajectory)==MK_OK);
+            mk_segment segment{};segment.struct_size=sizeof(segment);segment.joint_count=1;
+            segment.duration_ns=2'000'000'000;segment.degree=padded ? 5 : degree;
+            const double coefficients[]={0.1,-0.3,0.9,-0.6,0.1};
+            for (unsigned k=0;k<=degree;++k) segment.coefficients[0].value[k]=coefficients[k];
+            assert(mk_trajectory_append_segment(trajectory,&segment)==MK_OK);
+            mk_limits limits{};limits.struct_size=sizeof(limits);limits.joint_count=1;
+            limits.position_claimed[0]=1;limits.position_lower[0]=-0.5;limits.position_upper[0]=0.5;
+            limits.derivative_claimed[0]=7;limits.max_velocity[0]=0.4;
+            limits.max_acceleration[0]=1.0;limits.max_jerk[0]=2.0;
+            reports[padded].struct_size=sizeof(mk_validation_report);
+            assert(mk_validate(trajectory,&limits,&reports[padded])==MK_OK);
+            mk_trajectory_destroy(trajectory);
+        }
+        for (unsigned kind=MK_CHECK_POSITION;kind<=MK_CHECK_JERK;++kind) {
+            const auto &a=reports[0].checks[kind], &b=reports[1].checks[kind];
+            assert(a.status==b.status);near(a.value,b.value);near(a.time_seconds,b.time_seconds);
+            near(a.tolerance,b.tolerance);
+        }
+    }
+}
+
 void velocity_extremum_and_plan_rejection() {
     const auto trajectory = cubic();
     mk_limits limits{};
@@ -354,11 +383,12 @@ void execution_certificate_parity() {
     };
     const char *previous=std::getenv("PROCESS_PATH_VERIFY_EXECUTION");
     const bool had_previous=previous!=nullptr;const std::string saved=previous?previous:"";
-    for(unsigned fixture=0;fixture<200;++fixture){
+    for(unsigned fixture=0;fixture<260;++fixture){
         mk_trajectory_handle trajectory{};assert(mk_trajectory_create(2,&trajectory)==MK_OK);
         mk_segment segment{};segment.struct_size=sizeof(segment);segment.joint_count=2;
         segment.duration_ns=100'000'000+fixture*10'000'000;segment.degree=5;
-        for(unsigned j=0;j<2;++j)for(unsigned k=0;k<6;++k)
+        const unsigned polynomial_degree=fixture<200 ? 5 : fixture%6;
+        for(unsigned j=0;j<2;++j)for(unsigned k=0;k<=polynomial_degree;++k)
             segment.coefficients[j].value[k]=fixture<100 ? (k?(j==0?1.0:-0.1)*(fixture%7+1)/(k+1):0.0) : std::sin((fixture+1)*(j+2)*(k+3))*5;
         assert(mk_trajectory_append_segment(trajectory,&segment)==MK_OK);
         mk_limits limits{};limits.struct_size=sizeof(limits);limits.joint_count=2;
@@ -370,7 +400,12 @@ void execution_certificate_parity() {
         for(unsigned i=0;i<MK_CHECK_COUNT;++i){auto &a=certified.checks[i],&b=reference.checks[i];
             assert(a.status==b.status && a.method==b.method && a.joint==b.joint && a.derivative_order==b.derivative_order);
             assert(std::abs(a.value-b.value)<=1e-9 && std::abs(a.time_seconds-b.time_seconds)<=1e-9);
-            assert(std::abs(a.tolerance-b.tolerance)<=1e-9 && std::abs(a.margin-b.margin)<=1e-9);}
+            assert(std::abs(a.tolerance-b.tolerance)<=1e-9 && std::abs(a.margin-b.margin)<=1e-9);
+            // Low-degree shortcuts must retain the exhaustive report exactly,
+            // including the winning endpoint and its quantization reserve.
+            if (fixture>=200) assert(a.value==b.value && a.time_seconds==b.time_seconds &&
+                a.tolerance==b.tolerance && a.margin==b.margin);
+        }
         mk_trajectory_destroy(trajectory);
     }
 #ifdef _WIN32
@@ -523,6 +558,7 @@ int main() {
     continuity_position_units_and_origin();
     velocity_extremum_and_plan_rejection();
     position_extremum_between_samples();
+    padded_polynomial_extrema();
     quintic_quartic_critical_point();
     explicit_quantization_tolerance();
     executor_resolution_and_tolerance_cap();

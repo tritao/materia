@@ -38,13 +38,17 @@ class TimedMotion {
 }
 
 /** The settings of the transforms, from the compiler. */
-typedef TimedMotionSettings = {
+typedef MotionFilterSettings = {
 	/** The extruder's lead on its velocity averaged over the window, seconds; zero for none. */
 	var pressureAdvance:Float;
 	var pressureAdvanceWindow:Float;
 	/** Each shaped joint's impulses, or null for no shaping, and the mean delay the shaped motion lags the lowered one by, seconds. */
 	var shaping:Null<Array<ShaperImpulses>>;
 	var shapingDelay:Float;
+}
+
+typedef TimedMotionSettings = {
+	var filters:MotionFilterSettings;
 	/** The longest merged piece, seconds; zero for no merging. */
 	var mergeSeconds:Float;
 	/** Merges runs of segments of a trajectory (the followers not yet projected) within the given share of the merge tolerances. */
@@ -64,6 +68,17 @@ class TimedMotionTransforms {
 	 */
 	public static function apply(settings:TimedMotionSettings, projection:Null<CouplingProjection>, pending:PendingMotion,
 			mark:String->Void):TimedMotion {
+		if (pending.filtered) {
+			var merged:Null<Trajectory> = null;
+			if (settings.mergeSeconds > 0.0) {
+				var runs = settings.mergeRuns(pending.trajectory,1.0);
+				if (projection == null) merged = runs;
+				else try { merged = projection.trajectory(runs); runs.dispose(); }
+				catch (error:Dynamic) { runs.dispose(); throw error; }
+			}
+			mark("segmentMerge");
+			return new TimedMotion(pending.trajectory,merged,pending.filteredShaped,[]);
+		}
 		var owned:Array<Trajectory> = [];
 		function project(source:Trajectory):Trajectory return projection.trajectory(source);
 		var projected:Null<Trajectory> = null;
@@ -74,8 +89,8 @@ class TimedMotionTransforms {
 			// Pressure advance runs the driven joint ahead of itself, and what follows it follows.
 			var advanced:Null<Trajectory> = null;
 			var drive = pending.path == null ? null : pending.path.drive;
-			if (settings.pressureAdvance > 0.0 && drive != null)
-				advanced = pending.trajectory.advanceJoint(drive.joint, settings.pressureAdvance, settings.pressureAdvanceWindow);
+			if (settings.filters.pressureAdvance > 0.0 && drive != null)
+				advanced = pending.trajectory.advanceJoint(drive.joint, settings.filters.pressureAdvance, settings.filters.pressureAdvanceWindow);
 			mark("pressureAdvance");
 			var timed = advanced == null ? pending.trajectory : advanced;
 			if (projection != null) projected = project(timed);
@@ -86,7 +101,7 @@ class TimedMotionTransforms {
 			// Input shaping: each shaped joint's motion becomes the weighted sum of delayed copies of itself, rest to rest,
 			// and the plan ends the shaper's tail later. What the plan does at a given instant is the lowered motion's some
 			// `shapingDelay` earlier, so the events and the times that locate the plan on its path move with it.
-			var impulses = settings.shaping;
+			var impulses = settings.filters.shaping;
 			if (impulses != null && pending.path != null) {
 				// The pressure advance cuts every plan into three times the segments, and the shaper cuts each at every delay:
 				// the cuts of the advance are merged away first, so the shaper (and the projection after it) works on the
@@ -111,12 +126,12 @@ class TimedMotionTransforms {
 				mark("shapeConvolution");
 				if (projection != null) { shaped = project(cut); cut.dispose(); } else shaped = cut;
 				owned.push(shaped);
-				var lag = Trajectory.nanoseconds(settings.shapingDelay);
+				var lag = Trajectory.nanoseconds(settings.filters.shapingDelay);
 				var later = [for (event in pending.events) new TimedEvent(Int64.add(event.timeNs, lag), event.channel, event.value, event.holdPolicy)];
 				pending.events.splice(0, pending.events.length);
 				for (event in later) pending.events.push(event);
-				for (index in 0...pending.times.length) pending.times[index] += settings.shapingDelay;
-				for (index in 0...pending.checkTimes.length) pending.checkTimes[index] += settings.shapingDelay;
+				for (index in 0...pending.times.length) pending.times[index] += settings.filters.shapingDelay;
+				for (index in 0...pending.checkTimes.length) pending.checkTimes[index] += settings.filters.shapingDelay;
 			}
 			mark("inputShaping");
 			var executed = shaped != null ? shaped : (projected == null ? pending.trajectory : projected);

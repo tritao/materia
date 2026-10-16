@@ -138,9 +138,72 @@ void path_derivative_estimate_selects_segment_degree() {
     mk_trajectory_destroy(trajectory);
 }
 
+void owned_ranges() {
+    mk_trajectory_handle source{};
+    assert(mk_trajectory_create(1,&source)==MK_OK);
+    mk_segment piece{}; piece.struct_size=sizeof(piece); piece.joint_count=1;
+    piece.t0_ns=-125'000'000; piece.duration_ns=1'000'000'000; piece.degree=5;
+    const double first[]={1,2,3,4,0.5,0.25}, second[]={10.75,23.25,20.5,8.5,1.75,0.25};
+    for (int i=0;i<6;++i) piece.coefficients[0].value[i]=first[i];
+    assert(mk_trajectory_append_segment(source,&piece)==MK_OK);
+    piece.t0_ns+=piece.duration_ns;
+    for (int i=0;i<6;++i) piece.coefficients[0].value[i]=second[i];
+    assert(mk_trajectory_append_segment(source,&piece)==MK_OK);
+    int64_t interior=-1; uint32_t found=0;
+    assert(mk_trajectory_interior_time(source,1'000'000'000,&interior,&found)==MK_OK && found==1 && interior==999'999'999);
+    assert(mk_trajectory_interior_time(source,1'000'000'001,&interior,&found)==MK_OK && found==1 && interior==1'000'000'001);
+    assert(mk_trajectory_interior_time(source,0,&interior,&found)==MK_OK && found==0 && interior==0);
+    const uint32_t joints[]={0,0};
+    mk_trajectory_handle selected{},rejected{123};
+    assert(mk_trajectory_select_joints(source,joints,2,&selected)==MK_OK);
+    const uint32_t invalid_joint=1;
+    assert(mk_trajectory_select_joints(source,&invalid_joint,1,&rejected)==MK_ERROR_INVALID_ARGUMENT && rejected.id==0);
+    mk_segment selected_piece{}; selected_piece.struct_size=sizeof(selected_piece);
+    assert(mk_trajectory_get_segment(selected,0,&selected_piece)==MK_OK);
+    assert(selected_piece.t0_ns==piece.t0_ns-piece.duration_ns && selected_piece.joint_count==2);
+    for (int p=0;p<6;++p) {
+        near(selected_piece.coefficients[0].value[p],first[p]);
+        near(selected_piece.coefficients[1].value[p],first[p]);
+    }
+    mk_trajectory_destroy(selected);
+    mk_trajectory_handle sliced{123};
+    assert(mk_trajectory_slice(source,250'000'000,1'750'000'000,&sliced)==MK_OK);
+    int64_t duration=0;
+    assert(mk_trajectory_duration_ns(sliced,&duration)==MK_OK && duration==1'500'000'000);
+    for (int i=0;i<=60;++i) {
+        const int64_t time=i*25'000'000LL;
+        mk_trajectory_state a{},b{}; a.struct_size=sizeof(a); b.struct_size=sizeof(b);
+        assert(mk_trajectory_evaluate(source,125'000'000+time,&a)==MK_OK);
+        assert(mk_trajectory_evaluate(sliced,time,&b)==MK_OK);
+        near(a.position[0],b.position[0]); near(a.velocity[0],b.velocity[0]);
+        near(a.acceleration[0],b.acceleration[0]); near(a.jerk[0],b.jerk[0]);
+    }
+    mk_trajectory_handle invalid{123};
+    assert(mk_trajectory_slice(source,-1,1,&invalid)==MK_ERROR_INVALID_ARGUMENT && invalid.id==0);
+    invalid.id=123;
+    assert(mk_trajectory_slice(source,0,2'000'000'001,&invalid)==MK_ERROR_INVALID_ARGUMENT && invalid.id==0);
+    invalid.id=123;
+    assert(mk_trajectory_slice({},0,1,&invalid)==MK_ERROR_INVALID_HANDLE && invalid.id==0);
+    mk_trajectory_handle joined{},wrong{};
+    assert(mk_trajectory_create(1,&joined)==MK_OK && mk_trajectory_create(2,&wrong)==MK_OK);
+    assert(mk_trajectory_append_copy(joined,sliced)==MK_OK);
+    assert(mk_trajectory_append_copy(joined,wrong)==MK_ERROR_INVALID_ARGUMENT);
+    assert(mk_trajectory_append_copy(joined,{})==MK_ERROR_INVALID_HANDLE);
+    assert(mk_trajectory_duration_ns(joined,&duration)==MK_OK && duration==1'500'000'000);
+    assert(mk_trajectory_append_copy(joined,joined)==MK_OK);
+    assert(mk_trajectory_duration_ns(joined,&duration)==MK_OK && duration==3'000'000'000);
+    mk_trajectory_destroy(source); mk_trajectory_destroy(sliced); mk_trajectory_destroy(wrong);
+    mk_trajectory_state a{},b{}; a.struct_size=sizeof(a); b.struct_size=sizeof(b);
+    assert(mk_trajectory_evaluate(joined,250'000'000,&a)==MK_OK);
+    assert(mk_trajectory_evaluate(joined,1'750'000'000,&b)==MK_OK);
+    near(a.position[0],b.position[0]); near(a.velocity[0],b.velocity[0]);
+    mk_trajectory_destroy(joined);
+}
+
 } // namespace
 
 int main() {
+    owned_ranges();
     cubic_and_boundaries();
     samples_and_rejections();
     path_derivative_estimate_selects_segment_degree();

@@ -145,6 +145,8 @@ class MotionKitBootstrapTests {
     var freedomTests = new ToolFreedomTests();
     // Each group is independent of the others, so that the workspace can run them as parallel shards.
     var everything = Shards.run([
+      {name: "PathTimingStreamTests.run", run: () -> PathTimingStreamTests.run(), weight: 0.1},
+      {name: "DistanceDriveCompilerTests.run", run: () -> DistanceDriveCompilerTests.run(), weight: 0.1},
       {name: "RevoluteReachBoundTests.main", run: () -> RevoluteReachBoundTests.main(), weight: 1.0},
       {name: "CandidateSeedTests.main", run: () -> CandidateSeedTests.main(), weight: 1.0},
       {name: "HomingTests.run", run: () -> HomingTests.run(), weight: 1.0},

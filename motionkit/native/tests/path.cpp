@@ -535,6 +535,77 @@ int main() {
         mk_trajectory_destroy(second_half);
     }
 
+    // Enough short spans to form windows, but too little distance to reach the
+    // first interface's admissible maximum from rest. A parallel candidate must
+    // be retimed from the actual entry; accepting the interval cap would shorten
+    // this triangle illegally. An unreachable moving end also exercises cleanup
+    // when the caller fails while candidate work may still be outstanding.
+    {
+        constexpr int spans = 9000;
+        constexpr double step = 1e-6;
+        std::vector<mk_path_sample> samples(spans + 1);
+        for (int i = 0; i <= spans; ++i) {
+            auto& sample = samples[i];
+            sample.struct_size = sizeof(sample); sample.joint_count = 1;
+            sample.s = sample.position[0] = i * step;
+            sample.first[0] = 1;
+        }
+        mk_path_handle path{};
+        assert(mk_path_create(samples.data(), static_cast<uint32_t>(samples.size()), &path) == MK_OK);
+        const double velocity[] = {1}, acceleration[] = {1};
+        mk_time_law_handle law{}, reference_law{};
+        mk_trajectory_handle trajectory{}, reference{};
+        mk_timing_report report{}; report.struct_size = sizeof(report);
+        assert(mk_time_path(path, velocity, acceleration, 1, nullptr, 0,
+            0, 0, 1e-6, 0, &report, &law, &trajectory) == MK_OK);
+        assert(report.windows > 1 && report.boundary_lowerings == 0);
+        assert(mk_time_path_reference(path, velocity, acceleration, 1, nullptr, 0,
+            0, 0, 1e-6, 0, nullptr, &reference_law, &reference) == MK_OK);
+        int64_t duration{}, reference_duration{};
+        assert(mk_trajectory_duration_ns(trajectory, &duration) == MK_OK);
+        assert(mk_trajectory_duration_ns(reference, &reference_duration) == MK_OK);
+        assert(std::abs(static_cast<double>(duration - reference_duration)) <= 0.005 * reference_duration);
+        for (int sample = 0; sample <= 20; ++sample) {
+            mk_trajectory_state state{}; state.struct_size = sizeof(state);
+            assert(mk_trajectory_evaluate(trajectory, duration * sample / 20, &state) == MK_OK);
+            assert(state.position[0] >= -1e-9 && state.position[0] <= spans * step + 1e-9);
+            assert(std::abs(state.velocity[0]) <= 1 + 1e-9);
+            assert(std::abs(state.acceleration[0]) <= 1 + 1e-6);
+        }
+        mk_trajectory_destroy(reference); mk_time_law_destroy(reference_law);
+        mk_trajectory_destroy(trajectory); mk_time_law_destroy(law);
+        law = {}; trajectory = {};
+        assert(mk_time_path(path, velocity, acceleration, 1, nullptr, 0,
+            0, 0.5, 1e-6, 0, nullptr, &law, &trajectory) == MK_ERROR_GENERATION);
+        mk_path_destroy(path);
+    }
+
+    // A feed-limit change on affine geometry still needs an exact clock anchor.
+    {
+        mk_path_sample samples[3]{};
+        const double distances[] = {0, 0.003, 0.009};
+        for (int i = 0; i < 3; ++i) {
+            samples[i].struct_size = sizeof(samples[i]); samples[i].joint_count = 1;
+            samples[i].s = samples[i].position[0] = distances[i];
+            samples[i].first[0] = 1;
+        }
+        mk_path_handle path{};
+        assert(mk_path_create(samples, 3, &path) == MK_OK);
+        const double velocity[] = {1}, acceleration[] = {1}, caps[] = {0.02, 0.04};
+        mk_time_law_handle law{}; mk_trajectory_handle trajectory{};
+        assert(mk_time_path(path, velocity, acceleration, 1, caps, 2,
+            0, 0, 1e-6, 0, nullptr, &law, &trajectory) == MK_OK);
+        double seconds{};
+        assert(mk_path_distance_to_time(law, distances[1], &seconds) == MK_OK);
+        const double clock = seconds * 1e9;
+        assert(std::abs(clock - std::round(clock)) < 1e-5);
+        mk_trajectory_state state{}; state.struct_size = sizeof(state);
+        assert(mk_trajectory_evaluate(trajectory, static_cast<int64_t>(std::llround(clock)), &state) == MK_OK);
+        assert(std::abs(state.position[0] - distances[1]) < 1e-12);
+        assert(std::abs(state.velocity[0]) <= caps[0] * (1 + 1e-7));
+        mk_trajectory_destroy(trajectory); mk_time_law_destroy(law); mk_path_destroy(path);
+    }
+
     // A slow 1 mm-radius arc sampled every 1.5 um, as a printer's corner arcs
     // are: TOPP-RA's stages on it last ~2 us. Deriving each stage's
     // acceleration from its nanosecond-rounded duration made errors of several

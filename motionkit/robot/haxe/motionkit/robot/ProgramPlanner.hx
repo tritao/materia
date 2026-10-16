@@ -97,7 +97,10 @@ class ProgramPlanner {
       return;
     }
     // The worker plans on kinematics of its own: the caller keeps evaluating the arm meanwhile.
-    var compilation = compiler.forWorker().begin(program, initialQ, firstPlanId, firstOp, speedScale,
+    var workerCompiler = compiler.forWorker();
+    if (workerCompiler.maximumPathPlanSeconds == null || workerCompiler.maximumPathPlanSeconds > lookaheadSeconds)
+      workerCompiler.maximumPathPlanSeconds = lookaheadSeconds;
+    var compilation = workerCompiler.begin(program, initialQ, firstPlanId, firstOp, speedScale,
       new WorkerSink(this));
     var self = this;
     registry.acquire();
@@ -176,6 +179,10 @@ class ProgramPlanner {
   /** Execution has started `count` plans in all; the worker stays `lookaheadSeconds` past them. */
   public function started(count:Int):Void {
     condition.acquire();
+    if (count<startedPlans || (!fixedPlans && count-startedPlans>plannedSeconds.length)) {
+      condition.release();throw "Started plan count is outside the delivered prefix";
+    }
+    if (!fixedPlans) plannedSeconds.splice(0,count-startedPlans);
     startedPlans = count;
     condition.broadcast();
     condition.release();
@@ -290,7 +297,7 @@ class ProgramPlanner {
   /** Seconds of planned motion after the started plans; call under `condition`. */
   function secondsAhead():Float {
     var ahead = 0.0;
-    for (index in startedPlans...plannedSeconds.length) ahead += plannedSeconds[index];
+    for (seconds in plannedSeconds) ahead += seconds;
     return ahead;
   }
 

@@ -63,6 +63,59 @@ mk_result generate(const mk_state_to_state_request &request, Trajectory &traject
         ruckig_result = ruckig::Result::ErrorInvalidInput;
         return MK_ERROR_INVALID_ARGUMENT;
     }
+    // Ruckig's Phase mode may fall back to independently synchronized axes
+    // when the fastest individual profile cannot be shared under every limit.
+    // For stopped straight moves, solve one progress coordinate instead: its
+    // limits are the intersection of every scaled joint limit. This guarantees
+    // the requested phase relationship even when no individual axis supplies
+    // the limiting velocity, acceleration and jerk simultaneously.
+    bool stopped_phase = request.synchronization == MK_SYNCHRONIZATION_PHASE &&
+        request.control_mode == MK_CONTROL_POSITION;
+    for (uint32_t joint = 0; joint < request.joint_count; ++joint)
+        stopped_phase = stopped_phase && request.current_velocity[joint] == 0.0 &&
+            request.current_acceleration[joint] == 0.0 &&
+            request.target_velocity[joint] == 0.0 && request.target_acceleration[joint] == 0.0;
+    if (stopped_phase) {
+        auto progress_request = request;
+        progress_request.joint_count = 1;
+        progress_request.synchronization = MK_SYNCHRONIZATION_TIME;
+        progress_request.current_position[0] = 0.0;
+        progress_request.target_position[0] = 1.0;
+        double speed = std::numeric_limits<double>::infinity();
+        double acceleration = speed, jerk = speed;
+        bool moving = false;
+        for (uint32_t joint = 0; joint < request.joint_count; ++joint) {
+            const double distance = std::abs(request.target_position[joint] -
+                request.current_position[joint]);
+            if (distance == 0.0) continue;
+            moving = true;
+            speed = std::min(speed, request.max_velocity[joint] / distance);
+            acceleration = std::min(acceleration, request.max_acceleration[joint] / distance);
+            jerk = std::min(jerk, request.max_jerk[joint] / distance);
+        }
+        if (moving) {
+            progress_request.max_velocity[0] = speed;
+            progress_request.max_acceleration[0] = acceleration;
+            progress_request.max_jerk[0] = jerk;
+            Trajectory progress(1);
+            const auto status = generate(progress_request, progress, ruckig_result);
+            if (status != MK_OK) return status;
+            for (uint32_t index = 0; index < progress.segment_count(); ++index) {
+                const auto source = progress.segment(index);
+                auto segment = source;
+                segment.joint_count = request.joint_count;
+                for (uint32_t joint = 0; joint < request.joint_count; ++joint) {
+                    const double delta = request.target_position[joint] - request.current_position[joint];
+                    for (uint32_t power = 0; power <= source.degree; ++power)
+                        segment.coefficients[joint].value[power] =
+                            (power == 0 ? request.current_position[joint] : 0.0) +
+                            delta * source.coefficients[0].value[power];
+                }
+                if (!trajectory.append(segment)) return MK_ERROR_GENERATION;
+            }
+            return MK_OK;
+        }
+    }
     const auto dofs = request.joint_count;
     ruckig::InputParameter<ruckig::DynamicDOFs> input(dofs);
     input.synchronization = request.synchronization == MK_SYNCHRONIZATION_PHASE ?

@@ -112,7 +112,7 @@ class PlanExecutor {
     if (session.state == Held) return false;
     var active = plan;
     if (active == null) return !awaitingResume;
-    if (stream.finishedProgram(observation) && settled(active, observation)) {
+    if (stream.finishedProgram(observation,endsAtRest) && (!endsAtRest || settled(active, observation))) {
       stream.markCompleted();
       completed = true;
       plan = null;
@@ -195,6 +195,9 @@ class PlanExecutor {
     completed = false;
     deferredRefill = false;
   }
+
+  /** All current coefficients are queued, so a certified successor may be queued. */
+  public function allSubmitted():Bool return plan!=null && stream.allSubmitted();
 
   function get_elapsedSeconds():Float return stream.elapsedSeconds;
 

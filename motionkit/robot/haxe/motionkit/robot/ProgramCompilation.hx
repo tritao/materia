@@ -33,6 +33,10 @@ class ProgramCompilation {
   /** The current path op's stretches between sharp corners, planned one a step. */
   var sections:Array<{path:PosePath, offset:Float}> = [];
   var sectionIndex:Int = 0;
+  var sectionCursor:Null<motionkit.robot.PathSampler.TimingSectionCursor> = null;
+  var streaming:Null<StreamingPathMotion> = null;
+  var streamingComplete:Null<Void->Void> = null;
+  var streamingCleanup:Null<Void->Void> = null;
   var sectionCurves:Null<Array<motionkit.planner.JointPathSamples>> = null;
   var sectionFeed:Float = 0.0;
   var sectionEvents:Array<PathEvent> = [];
@@ -63,8 +67,14 @@ class ProgramCompilation {
   /** Disposes the motion not yet delivered; delivered plans belong to the sink. */
   public function dispose():Void {
     var unfinished = pending;
-    if (unfinished != null) unfinished.trajectory.dispose();
+    if (unfinished != null) {
+      unfinished.trajectory.dispose();
+      var abandon = unfinished.abandon; if (abandon != null) abandon();
+    }
+    if (streaming != null) streaming.dispose();
+    var cleanup = streamingCleanup; if (cleanup != null) cleanup();
+    streaming = null; streamingComplete = null; streamingCleanup = null;
     pending = null;
-    sectionCurves = null;
+    sectionCurves = null;sectionCursor = null;sections = [];
   }
 }

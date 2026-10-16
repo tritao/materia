@@ -332,6 +332,11 @@ class PlannerTests extends MotionKitTestSupport {
       "the rate's slope jumps at a ramp's corner, and the two sides say so");
     var stations = drive.stations();
     check(stations.length > 10 && stations[0] == 0.0 && stations[stations.length - 1] == 0.1, "the path is sampled at the ramp corners");
+    // Callers may edit their snapshot without invalidating the indexed intervals.
+    var exported=drive.intervals;
+    exported[0].end=0.1;exported[0].rate=999.0;exported.reverse();
+    near(drive.intervals[0].end,0.05,"distance-drive interval snapshots own their records",1e-15);
+    near(drive.slice(0.0,0.03).total(),0.04,"snapshot edits cannot change indexed slicing",1e-12);
     // A cut path: each piece starts and ends at rest and keeps its own share of the feed.
     var left = drive.slice(0.0, 0.03), right = drive.slice(0.03, 0.1);
     if (left == null || right == null) throw "a cut of the drive lost a piece";

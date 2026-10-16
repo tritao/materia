@@ -3,7 +3,6 @@ package motionkit.robot;
 import haxe.Int64;
 import TrajectoryCore;
 import motionkit.kinematics.Twist6;
-import motionkit.path.PosePrimitive;
 import motionkit.path.PoseDerivatives;
 import robotkit.model.JointCoupling;
 import motionkit.MotionOptions;
@@ -41,15 +40,8 @@ import motionkit.trajectory.InputShaper;
 import motionkit.trajectory.ShaperImpulses;
 import motionkit.robot.TimedMotionTransforms;
 import motionkit.robot.TimedMotionTransforms.TimedMotion;
+import motionkit.robot.TimedMotionTransforms.MotionFilterSettings;
 import motionkit.trajectory.ValidationLimits;
-
-/** A joint-space sample of a path: where, on which primitive, and the primitive arriving there. */
-private typedef PathSample = {
-  var distance:Float;
-  var primitive:PosePrimitive;
-  var local:Float;
-  var arriving:Null<{primitive:PosePrimitive, local:Float}>;
-}
 
 /** Lowers an authored program to validated, exact-stop plans. */
 class ProgramCompiler {
@@ -92,6 +84,8 @@ class ProgramCompiler {
     fill the robot's queue and a device's link; the default of zero leaves a path as it was lowered.
   **/
   public var mergeSegmentsSeconds:Float = 0.0;
+  /** Maximum continuous path publication duration, supplied by the owning planner. Null leaves it unbounded. */
+  public var maximumPathPlanSeconds:Null<Float> = null;
   /** Optional pure, worker-safe budget factory for other kinematics; affine XYZ paths derive theirs from geometry. */
   public var mergeBudgetForMotion:Null<PendingMotion->Null<MergeErrorBudget>> = null;
   /** Requested merges retained as authored because no positive geometric remainder could be proved. */
@@ -200,6 +194,7 @@ class ProgramCompiler {
     into.planCheck = planCheck == null ? null : planCheck.fork();
     into.motorSpace = motorSpace;
     into.mergeSegmentsSeconds = mergeSegmentsSeconds;
+    into.maximumPathPlanSeconds = maximumPathPlanSeconds;
     into.mergeBudgetForMotion = mergeBudgetForMotion;
     into.shaping = shaping; into.shapingDelay = shapingDelay; into.shapingTail = shapingTail; into.shapingDeviation = shapingDeviation;
     into.pressureAdvance = pressureAdvance;
@@ -374,7 +369,10 @@ class ProgramCompiler {
   function retire(c:ProgramCompilation):Void {
     var pending = c.pending;
     if (pending == null) return;
-    c.sink.plan(finish(pending, c.nextId), pending.opIndex,
+    var plan = finish(pending,c.nextId);
+    try { var accept = pending.accept; if (accept != null) accept(plan); }
+    catch (error:Dynamic) { plan.dispose(); throw error; }
+    c.sink.plan(plan, pending.opIndex,
       pathLength(pending), pending.opDistances(), pending.times.copy());
     c.nextId = Int64.add(c.nextId, Int64.ofInt(1));
     c.pending = null;
@@ -417,7 +415,12 @@ class ProgramCompiler {
     var program = c.program;
     var speedScale = c.speedScale;
     try {
-      if (c.sectionIndex < c.sections.length) {
+      if (c.streaming != null) {
+        retire(c);
+        advanceStreaming(c);
+        return true;
+      }
+      if (c.sectionCursor!=null || c.sectionIndex < c.sections.length) {
         lowerSection(c);
         return true;
       }
@@ -468,7 +471,7 @@ class ProgramCompiler {
           var motors = motorSpace;
           var generated = options.planned ? plannedMove(q, goal, velocity, acceleration, jerk, index)
             : motors == null ? Trajectory.generateStateToState(q, zeros(), zeros(), goal,
-            velocity, acceleration, jerk) : motors.move(q, goal, velocity, acceleration, jerk);
+            velocity, acceleration, jerk, projection!=null && !projection.isEmpty()) : motors.move(q, goal, velocity, acceleration, jerk);
           var pending = new PendingMotion(index, q, goal, generated, [], null, null);
           c.pending = pending;
           attachLeadingOutputs(pending, c.leadingOutputs);
@@ -548,7 +551,11 @@ class ProgramCompiler {
             throw 'Motion program op $index path frame does not match $frameId';
           // Following a sharp corner exactly means stopping there, so each
           // stretch between corners is its own plan of this op, one a step.
-          c.sections = timingSections(path);
+          if (Std.isOfType(jointPathPlanner,StructuredJointPathPlanner)) {
+            c.sections=timingSections(path);c.sectionCursor=null;
+          } else {
+            c.sections=[];c.sectionCursor=new PathSampler.TimingSectionCursor(path);
+          }
           c.sectionCurves = null;
           c.sectionIndex = 0;
           c.sectionFeed = feed;
@@ -588,7 +595,7 @@ class ProgramCompiler {
     }]);
     var motors = motorSpace;
     var generated = motors == null ? Trajectory.generateStateToState(from,zeros(),zeros(),to,
-      maxVelocity,maxAcceleration,maxJerk) : motors.move(from,to,maxVelocity,maxAcceleration,maxJerk);
+      maxVelocity,maxAcceleration,maxJerk,projection!=null && !projection.isEmpty()) : motors.move(from,to,maxVelocity,maxAcceleration,maxJerk);
     if (projection != null) {
       try { var projected = projectCouplings(generated); generated.dispose(); return projected; }
       catch (error:Dynamic) { generated.dispose(); throw error; }
@@ -598,9 +605,15 @@ class ProgramCompiler {
 
   function lowerSection(c:ProgramCompilation):Void {
     retire(c);
+    var cursor=c.sectionCursor;
+    var lazyLast=false;
+    if (cursor!=null) {
+      var next=cursor.next();c.sections=[{path:next.path,offset:next.offset}];c.sectionIndex=0;lazyLast=next.last;
+    }
     var k = c.sectionIndex++;
-    var section = c.sections[k], last = k == c.sections.length - 1;
+    var section = c.sections[k], last = cursor==null ? k == c.sections.length - 1 : lazyLast;
     var end = section.offset + section.path.length();
+    var distanceColumns = DistanceDriveColumns.forPath(section.path, c.q, solver, projection);
     var curve:Null<JointPathSamples> = null;
     var pathStart = c.q;
     var entryTrajectory:Null<Trajectory> = null;
@@ -626,7 +639,7 @@ class ProgramCompiler {
           }
           plannedOffset+=part.path.length();
         }
-        if(distances.length>MAX_SECTION_SAMPLES+1)throw 'Motion program op ${c.currentIndex} exceeds Cartesian sample budget';
+        PathSampler.requireBudget(distances.length - 1, false, c.currentIndex);
         var destination=structured.retreatTarget();
         c.sectionCurves=structured.planSections([for(part in c.sections)part.path],new PathRequest(
           distances,poses,c.q,ikTolerance,perJointMaxJump,maxVelocity,48,freedoms),
@@ -651,14 +664,16 @@ class ProgramCompiler {
         }
       }
       if(c.sectionCurves!=null){
-        curve=c.sectionCurves[k];pathStart=curve.q[0];
+        curve=c.sectionCurves[k];
+        if (distanceColumns != null) distanceColumns.applyOwned(curve);
+        pathStart=curve.q[0];
         if(k>0)for(joint in 0...c.q.length)if(Math.abs(pathStart[joint]-c.q[joint])>1e-7)
           throw "Globally selected timing sections disagree at their shared configuration";
       }
       if (c.sectionCurves == null && jointPathPlanner != null && (k == 0 && jointPathPlanner.allowsFreeStart() || retreat != null)) {
         var freeStart = k == 0 && jointPathPlanner.allowsFreeStart();
         var samples = pathSamples(section.path);
-        if (samples.length > MAX_SECTION_SAMPLES + 1) throw 'Motion program op ${c.currentIndex} exceeds Cartesian sample budget';
+        PathSampler.requireBudget(samples.length - 1, false, c.currentIndex);
         curve = jointPathPlanner.plan(section.path,new PathRequest(
           [for (sample in samples) sample.distance],
           [for (sample in samples) sample.primitive.waypointAt(sample.local).pose],
@@ -672,9 +687,56 @@ class ProgramCompiler {
             exitTrajectory = generateEntry(from,retreat);
             return jointPathPlanner.checkMotion(exitTrajectory);
           });
+        if (distanceColumns != null) distanceColumns.applyOwned(curve);
         pathStart = curve.q[0];
       }
     } catch (error:Dynamic) { releaseTransitions(); throw error; }
+    // IK checked transitions before the process columns were written. Rebuild from the actual endpoints.
+    if (distanceColumns != null) releaseTransitions();
+    var authoredEvents = [for (event in c.sectionEvents)
+      if (event.distance >= section.offset && (last || event.distance < end))
+        new PathEvent(event.distance-section.offset,event.channel,event.value,event.leadSeconds,event.holdPolicy)];
+    // Whole-section scheduling callbacks retain their existing contract; native TOPP-RA paths otherwise stream.
+    if (Std.isOfType(timing,ToppraPathTiming) && pathEventSchedule == null) {
+      var work:Null<StreamingPathMotion> = null;
+      var stream:Null<motionkit.planner.PathTimingStream> = null;
+      var context:Null<TimedMotionBuffer> = null;
+      try {
+        var prepared = preparePath(c.speedScale,section.path,pathStart,c.sectionFeed,c.currentIndex,curve);
+        var native:ToppraPathTiming = cast timing;
+        // The immutable sample budget bounds the queue without duplicating native grid-window constants.
+        var capacity = prepared.jointPath.s.length-1;
+        stream = motorSpace == null ? native.prepareStream(prepared.jointPath,prepared.limits,capacity) :
+          motorSpace.prepareStream(native,prepared.jointPath,prepared.limits,capacity);
+        var lead = 0.0;
+        for (event in authoredEvents) lead = Math.max(lead,event.leadSeconds);
+        context = new TimedMotionBuffer(filterSettings(),projection,
+          section.path.drive == null ? null : section.path.drive.joint,maximumPathPlanSeconds,lead);
+        work = new StreamingPathMotion(stream,context,section.path,prepared,pathStart,c.currentIndex,
+          c.sectionFeed,section.offset,authoredEvents,solver.affineMap()!=null);
+        var moved = false;
+        for (joint in 0...c.q.length) if (Math.abs(pathStart[joint]-c.q[joint]) > 1e-7) moved = true;
+        if (moved) {
+          checkJointPosition(pathStart,c.currentIndex,null);
+          var generated = entryTrajectory == null ? generateEntry(c.q,pathStart) : entryTrajectory;
+          entryTrajectory = null;
+          c.pending = new PendingMotion(c.currentIndex,c.q,pathStart,generated,[],null,null);
+          attachLeadingOutputs(c.pending,c.leadingOutputs); retire(c);
+        }
+        if (entryTrajectory != null) { entryTrajectory.dispose(); entryTrajectory = null; }
+        c.streaming = work;
+        c.streamingCleanup = releaseTransitions;
+        c.streamingComplete = () -> {
+          var exit = exitTrajectory; exitTrajectory = null;
+          completeSection(c,last,retreat,distanceColumns,exit,releaseTransitions);
+        };
+        return;
+      } catch (error:Dynamic) {
+        if (work != null) work.dispose();
+        else { if (stream != null) stream.dispose(); if (context != null) context.dispose(); }
+        releaseTransitions(); throw error;
+      }
+    }
     var pending:PendingMotion;
     try {
       pending = lowerPath(c.speedScale, section.path, pathStart, c.sectionFeed, [for (event in c.sectionEvents)
@@ -703,8 +765,15 @@ class ProgramCompiler {
     c.pending = pending;
     c.q = pending.endQ.copy();
     if (k == 0) attachLeadingOutputs(pending, c.leadingOutputs);
+    var exit = exitTrajectory; exitTrajectory = null;
+    completeSection(c,last,retreat,distanceColumns,exit,releaseTransitions);
+  }
+
+  function completeSection(c:ProgramCompilation, last:Bool, retreat:Null<Array<Float>>,
+      distanceColumns:Null<DistanceDriveColumns>, exitTrajectory:Null<Trajectory>, releaseTransitions:Void->Void):Void {
     if (retreat != null) {
       try {
+        if (distanceColumns != null) distanceColumns.holdPosition(retreat, c.q);
         var moved = false;
         for (joint in 0...c.q.length) if (Math.abs(retreat[joint]-c.q[joint]) > 1e-7) moved = true;
         if (moved) {
@@ -715,18 +784,38 @@ class ProgramCompiler {
           exitTrajectory = null;
           c.q = retreat.copy();
         }
-      } catch (error:Dynamic) { releaseTransitions(); throw error; }
+      } catch (error:Dynamic) {
+        if (exitTrajectory != null) exitTrajectory.dispose();
+        releaseTransitions(); throw error;
+      }
     }
+    if (exitTrajectory != null) exitTrajectory.dispose();
     releaseTransitions();
     if (last) {
-      c.sections = [];
+      c.sections = [];c.sectionCursor = null;
       c.sectionIndex = 0;
       c.sectionEvents = [];
     }
   }
 
+  function advanceStreaming(c:ProgramCompilation):Void {
+    var work = c.streaming;
+    if (work == null) throw "No active streaming motion";
+    var pending = work.step();
+    if (pending == null) return;
+    c.pending = pending; c.q = pending.endQ.copy();
+    attachLeadingOutputs(pending,c.leadingOutputs);
+    if (work.offeredFinal) {
+      c.streaming = null;
+      var complete = c.streamingComplete; c.streamingComplete = null;
+      var cleanup = c.streamingCleanup; c.streamingCleanup = null;
+      try { if (complete != null) complete(); }
+      catch (error:Dynamic) { if (cleanup != null) cleanup(); throw error; }
+    }
+  }
+
   static function pathLength(pending:PendingMotion):Float
-    return pending.path == null ? 0.0 : pending.distanceOffset + pending.path.length();
+    return pending.path == null ? 0.0 : pending.distanceOffset + (pending.endDistance == null ? pending.path.length() : pending.endDistance);
 
   static function attachLeadingOutputs(pending:PendingMotion,
       leading:Array<{channel:String, value:EventValue}>):Void {
@@ -734,6 +823,9 @@ class ProgramCompiler {
       pending.events.push(new TimedEvent(Int64.ofInt(0), output.channel, output.value));
     while (leading.length > 0) leading.pop();
   }
+
+  function filterSettings():MotionFilterSettings return {pressureAdvance:pressureAdvance,
+    pressureAdvanceWindow:pressureAdvanceWindow,shaping:shaping,shapingDelay:shapingDelay};
 
   function finish(pending:PendingMotion, id:Int64):ExecutionPlan {
     pending.events.sort(function(a, b) return Int64.compare(a.timeNs, b.timeNs));
@@ -759,79 +851,30 @@ class ProgramCompiler {
           throw "Merge budget does not match the compiler's joints or window";
         if(budget==null)mergeBudgetRefusals++;
       }
-      var transforms = TimedMotionTransforms.apply({pressureAdvance: pressureAdvance, pressureAdvanceWindow: pressureAdvanceWindow,
-        shaping: shaping, shapingDelay: shapingDelay, mergeSeconds: budget==null ? 0.0 : budget.seconds,
+      var transforms = TimedMotionTransforms.apply({filters:filterSettings(), mergeSeconds: budget==null ? 0.0 : budget.seconds,
         mergeRuns: function(trajectory,share)return mergeRuns(trajectory,share,budget)}, projection, pending, mark);
       motion = transforms;
-      var timedMotion = transforms.executed, shaped = transforms.shaped;
-      if(pending.geometryCurve!=null && pending.geometryClearance && Sys.getEnv("PROCESS_PATH_VERIFY_CLEARANCE")=="1"){
-        var curve:JointPathSamples=cast pending.geometryCurve;
-        if(Std.isOfType(curve.clearanceProof,JointCurveClearance)){var proof:JointCurveClearance=cast curve.clearanceProof;
-          proof.auditTrajectory(curve,pending.trajectory,pending.taskSampleDistances);}
-      }
-      // With changes to the cell in this op, the conservative check below replays them instead.
-      if (jointPathPlanner != null && (!pending.geometryClearance || Sys.getEnv("PROCESS_PATH_VERIFY_CLEARANCE")=="1") &&
-          !hasClearanceEvents(pending.opIndex)) {
-        // What is checked is what is executed: the shaped motion, when there is shaping.
-        var failure = jointPathPlanner.checkMotion(timedMotion);
-        if (failure != null)
-          throw 'compiled trajectory clearance (${failure.a}, ${failure.b}): ${failure.distance} < ${failure.required}';
-      }
-      mark("trajectoryClearance");
-      if(configurationConstraint!=null)configurationConstraint.checkTrajectory(timedMotion,controllerPeriodSeconds);
-      mark("configurationCheck");
-      var planLimits = pending.path == null ? limits : limits.withoutJerk();
-      var mergedPlan:Null<ExecutionPlan> = null;
-      // A merged path follows what it replaces closely but not exactly: should it break a limit anyway, it is a
-      // refusal, and the path goes unmerged (`transforms.executed`: as lowered, or shaped from the pre-shape merge).
-      if (transforms.merged != null) {
-        try {
-          mergedPlan = ExecutionPlan.create(transforms.merged, planLimits, id, pending.startQ, zeros(), zeros(),
-            startTolerances.position, startTolerances.velocity, startTolerances.acceleration, pending.events);
-        } catch (error:Dynamic) {
-          mergeRefusals++;
-          lastMergeRefusal = Std.string(error);
-          transforms.dropMerged();
-        }
-      }
-      var completedPlan:ExecutionPlan = mergedPlan != null ? mergedPlan : ExecutionPlan.create(timedMotion,
-        planLimits, id, pending.startQ,
-        zeros(), zeros(), startTolerances.position, startTolerances.velocity,
-        startTolerances.acceleration, pending.events);
-      plan=completedPlan;
-      mark("executionPlanCreation");
-      var taskProof:Null<JointCurveTask> = null;
-      if(pending.path!=null && pending.geometryRefined && pending.geometryCurve!=null &&
-          pending.authoredPolyline==null && Std.isOfType(timing,ToppraPathTiming) &&
-          projection==null && motorSpace==null){
-        var arm:Null<robotkit.manipulation.KinematicGroup> = null;
-        if(Std.isOfType(solver,ManipulatorKinematics))arm=cast(solver,ManipulatorKinematics).manipulator;
-        else if(Std.isOfType(solver,EaikKinematics))arm=cast(solver,EaikKinematics).manipulator;
-        if(arm!=null){var nativeTiming:ToppraPathTiming=cast timing;
-          taskProof=JointCurveTask.prove(arm,pending.path,pending.geometryCurve,nativeTiming.loweringTolerance);}
-      }
-      mark("taskSpaceCertificate");
-      var auditTask=Sys.getEnv("PROCESS_PATH_VERIFY_TASK")=="1";
-      if(pending.path!=null && (taskProof==null || auditTask))checkTaskSpace(completedPlan,pending.path,pending.checkDistances,
-        pending.checkTimes,pending.opIndex,pending.authoredPolyline,pending.blendTolerance,pending.taskSampleDistances,taskProof,
-        shaped ? shapingDelay : 0.0, shaped ? shapingTail : 0.0, shaped ? shapingDeviation : 0.0);
-      if(taskProof!=null)completedPlan.report.setTaskSpaceBound(taskProof.positionBound,taskProof.positionTolerance);
-      if(profiling && pending.path!=null)Sys.println("PROCESS_PATH_TASK_CERTIFICATE "+haxe.Json.stringify({
-        op:pending.opIndex,certified:taskProof!=null,audited:auditTask && taskProof!=null,
-        queries:taskProof==null?0:taskProof.queries,positionBound:taskProof==null?null:taskProof.positionBound,
-        orientationBound:taskProof==null?null:taskProof.orientationBound}));
-      mark("taskSpaceCheck");
-      recordClearance(completedPlan, pending, timedMotion);
-      mark("clearanceReport");
-      var check = planCheck;
-      if (check != null && check.checks()) {
-        var result = check.check(completedPlan, pending.opIndex, pending.feed);
-        result.locate(pending.times, pending.opDistances());
-        completedPlan.checked = result;
-        if (check.options.rejects && result.diagnostics.length > 0)
-          throw 'plan check: ${[for (diagnostic in result.diagnostics) diagnostic.describe()].join("; ")}';
-      }
-      mark("planCheck");
+      var certification = new PlanCertification({
+        solver: solver,
+        limits: limits,
+        timing: timing,
+        projection: projection,
+        motorSpace: motorSpace,
+        jointPathPlanner: jointPathPlanner,
+        configurationConstraint: configurationConstraint,
+        controllerPeriodSeconds: controllerPeriodSeconds,
+        startTolerances: startTolerances,
+        positionTolerance: positionTolerance,
+        clearanceEvents: clearanceEvents,
+        clearanceDepthLimit: clearanceDepthLimit,
+        planCheck: planCheck,
+        shapingDelay: shapingDelay,
+        shapingTail: shapingTail,
+        shapingDeviation: shapingDeviation,
+        mergeRefused: function(reason:String):Void { mergeRefusals++; lastMergeRefusal = reason; }
+      });
+      var completedPlan = certification.certify(pending, transforms, id, mark, profiling);
+      plan = completedPlan;
       if (profiling) Sys.println("PROCESS_PATH_COMPILE_CHECKS " + haxe.Json.stringify({op:pending.opIndex, stages:profileRows}));
       pending.trajectory.dispose();
       transforms.dispose();
@@ -923,11 +966,6 @@ class ProgramCompiler {
     return new PendingMotion(first, start, at, timing.blended(path, space), [], null, null);
   }
 
-  function hasClearanceEvents(op:Int):Bool {
-    for (event in clearanceEvents) if (event.op == op) return true;
-    return false;
-  }
-
   function resetClearanceScene():Void {
     if (clearanceEvents.length == 0 || jointPathPlanner == null) return;
     var world = jointPathPlanner.clearanceWorld();
@@ -935,78 +973,6 @@ class ProgramCompiler {
       var scene:robotkit.manipulation.ClearanceScene = cast world;
       scene.reset();
     }
-  }
-
-  /**
-   * Records the clearance check in the plan's report (COLLISION.md CL4b). A refined process path
-   * certified by `JointCurveClearance` is a bound. Any other motion (a joint move, a generated
-   * entry, exit or hold) gets `TrajectoryClearanceProof`: a bound when it closes every interval,
-   * else sampled (the sampled check above passed) with the first open interval named; a real
-   * violation it finds between samples is recorded and throws. Without a clearance world the check
-   * stays unchecked.
-   */
-  function recordClearance(plan:ExecutionPlan, pending:PendingMotion, motion:Trajectory):Void {
-    var planner = jointPathPlanner;
-    if (planner == null) return;
-    var world = planner.clearanceWorld();
-    if (world == null) return;
-    var duration = motion.durationSeconds();
-    if (pending.geometryClearance) {
-      var closest:Null<robotkit.manipulation.ClearanceViolation> = null, when = 0.0;
-      for (i in 0...8) {
-        var t = duration * (i + 0.5) / 8, q = motion.evaluate(t).positions;
-        var found = world.closest(q, false);
-        if (found != null && (closest == null || found.distance < (cast closest : robotkit.manipulation.ClearanceViolation).distance)) {
-          closest = found;
-          when = t;
-        }
-      }
-      setClearance(plan, TrajectoryCoreConstants.MK_CHECK_PASSED, TrajectoryCoreConstants.MK_CHECK_METHOD_BOUND, closest, when,
-        0.0, duration);
-      return;
-    }
-    var events = [for (event in clearanceEvents) if (event.op == pending.opIndex) event];
-    var proof = planner.proveMotion(motion, velocityBounds(motion), events, clearanceDepthLimit);
-    if (proof == null) return;
-    var failure = proof.failure;
-    if (failure != null) {
-      setClearance(plan, TrajectoryCoreConstants.MK_CHECK_FAILED, TrajectoryCoreConstants.MK_CHECK_METHOD_BOUND, failure,
-        proof.failureTime, proof.failureTime, proof.failureTime);
-      throw 'trajectory clearance bound (${failure.a}, ${failure.b}): ${failure.distance} < ${failure.required} at ${proof.failureTime} s';
-    }
-    if (proof.closed)
-      setClearance(plan, TrajectoryCoreConstants.MK_CHECK_PASSED, TrajectoryCoreConstants.MK_CHECK_METHOD_BOUND, proof.closest,
-        proof.closestTime, 0.0, duration);
-    else
-      setClearance(plan, TrajectoryCoreConstants.MK_CHECK_PASSED, TrajectoryCoreConstants.MK_CHECK_METHOD_SAMPLED, proof.closest,
-        proof.closestTime, proof.openStart, proof.openEnd, Int64.ofInt(10000000));
-  }
-
-  static function setClearance(plan:ExecutionPlan, status:Int, method:Int, pair:Null<robotkit.manipulation.ClearanceViolation>,
-      time:Float, start:Float, end:Float, ?resolutionNs:Int64):Void {
-    var resolution = resolutionNs == null ? Int64.ofInt(0) : resolutionNs;
-    if (pair == null) plan.report.setCollision(status, method, 0.0, 0.0, time, start, end, resolution, "", "");
-    else plan.report.setCollision(status, method, pair.distance, pair.required, time, start, end, resolution, pair.a, pair.b);
-  }
-
-  /**
-   * Each joint's largest speed over the motion, bounded from its polynomials: on a segment of
-   * duration d, |p'(t)| <= sum over k of k |c_k| d^(k-1).
-   */
-  static function velocityBounds(motion:Trajectory):Array<Float> {
-    var bounds:Array<Float> = [];
-    for (segment in motion.segments()) {
-      var d = Int64.toFloat(segment.durationNs) / 1e9;
-      for (joint in 0...segment.coefficients.length) {
-        var c = segment.coefficients[joint], speed = 0.0, power = 1.0;
-        for (k in 1...c.length) {
-          speed += k * Math.abs(c[k]) * power;
-          power *= d;
-        }
-        if (joint >= bounds.length) bounds.push(speed) else bounds[joint] = Math.max(bounds[joint], speed);
-      }
-    }
-    return bounds;
   }
 
   /** Keep the follower polynomial exact after independent Hermite lowering. */
@@ -1092,18 +1058,16 @@ class ProgramCompiler {
       orientation.qx, orientation.qy, orientation.qz, orientation.qw),
       positionTolerance, orientationTolerance);
 
-  function lowerPath(speedScale:Float, path:PosePath, startQ:Array<Float>, feed:Float,
-      authoredEvents:Array<PathEvent>, index:Int,
-      ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0,
-      ?preplannedCurve:JointPathSamples, eventOffset:Float=0.0, eventLast:Bool=true):PendingMotion {
+  function preparePath(speedScale:Float, path:PosePath, startQ:Array<Float>, feed:Float,
+      index:Int, ?preplannedCurve:JointPathSamples):PreparedProgramPath {
+    var profile = Sys.getEnv("PROCESS_PATH_PROFILE") == "1";
+    var samplingBegan = profile ? Sys.time() : 0.0;
     if (path.length() <= 0.0) throw 'Motion program op $index has zero path length';
-    if (path.drive != null && (jointPathPlanner == null || !jointPathPlanner.appliesDistanceDrive()))
-      throw 'Motion program op $index drives a joint by path distance, which this machine\'s joint path planner does not apply';
     var samples = pathSamples(path);
+    var distanceColumns = DistanceDriveColumns.forPath(path, startQ, solver, projection);
     var exactMap = solver.affineMap();
     var count = samples.length - 1;
-    if (count > (exactMap == null ? MAX_SECTION_SAMPLES : MAX_AFFINE_SECTION_SAMPLES))
-      throw 'Motion program op $index exceeds Cartesian sample budget';
+    PathSampler.requireBudget(count, exactMap != null, index);
     var distances = [for (sample in samples) sample.distance];
     var positions:Array<Array<Float>> = [];
     var caps:Array<Float> = [];
@@ -1120,6 +1084,7 @@ class ProgramCompiler {
         throw 'Motion program op $index joint planner returned incompatible samples';
       for(sample in 0...distances.length)if(refined.s[sample]!=distances[sample])
         throw 'Motion program op $index joint planner changed path distance at sample $sample';
+      if (distanceColumns != null) distanceColumns.applyOwned(refined);
       for(joint in 0...startQ.length)if(Math.abs(refined.q[0][joint]-startQ[joint])>1e-7)
         throw 'Motion program op $index joint planner changed the pinned start';
       for(q in refined.q)selected.push(q);
@@ -1138,11 +1103,16 @@ class ProgramCompiler {
       var solved = selected[sample];
       if (solved == null || solved.length != startQ.length)
         throw 'Motion program op $index unreachable pose at path distance $distance${solverFailure()}';
+      if (refined == null && distanceColumns != null) {
+        solved = solved.copy();
+        distanceColumns.position(solved, distance);
+      }
       checkJointPosition(solved, index, distance, startQ);
       if (sample > 0) {
         // An exact affine map has one solution per pose: no branch to flip, and a long piece is one span.
         if (exactMap == null) for (joint in 0...startQ.length)
-          if (Math.abs(solved[joint] - previous[joint]) > perJointMaxJump[joint])
+          if ((distanceColumns == null || !distanceColumns.affects(joint)) &&
+              Math.abs(solved[joint] - previous[joint]) > perJointMaxJump[joint])
             throw 'Motion program op $index IK discontinuity at path distance $distance';
         caps.push(speedScale * Math.min(feed, primitiveSpeedAt(path,
           (distance + distances[sample-1]) * 0.5)));
@@ -1161,10 +1131,15 @@ class ProgramCompiler {
       var redundancy = redundancyRates == null ? null : redundancyRates[k];
       var rate = jointRate(q, leaving.linear, leaving.angular, redundancy, freedoms[k]);
       if (rate == null) throw 'Motion program op $index has no joint velocity along the path at distance ${sample.distance}${solverFailure()}';
+      if (distanceColumns != null) distanceColumns.velocity(rate, sample.distance);
       first.push(rate);
       second.push(jointCurvature(q, rate, leaving, redundancy, freedoms[k]));
+      if (distanceColumns != null) distanceColumns.acceleration(second[k], sample.distance, true);
       var arriving = sample.arriving;
-      if (arriving == null) secondBefore.push(second[k]);
+      if (arriving == null) {
+        secondBefore.push(distanceColumns == null ? second[k] : second[k].copy());
+        if (distanceColumns != null) distanceColumns.acceleration(secondBefore[k], sample.distance, false);
+      }
       else {
         var before = arriving.primitive.derivativesAt(arriving.local);
         var pose = solver.forward(q);
@@ -1177,6 +1152,7 @@ class ProgramCompiler {
         if (turn > 1e-6)
           throw 'Motion program op $index turns a corner at path distance ${sample.distance}: blend it or stop there';
         secondBefore.push(jointCurvature(q, rate, before, redundancy, arriving.primitive.orientationPolicy()));
+        if (distanceColumns != null) distanceColumns.acceleration(secondBefore[k], sample.distance, false);
       }
     }
     var jointPath = refined==null ? new JointPathSamples(distances, positions, first, second, secondBefore) : refined;
@@ -1186,10 +1162,24 @@ class ProgramCompiler {
       geometryClearance=jointPathPlanner.checkPathClearance(jointPath,nativeTiming.loweringTolerance);
     }
     var timingLimits = new PathTimingLimits(maxVelocity, maxAcceleration, caps,0,0,requireFeasiblePath!=null && requireFeasiblePath(index));
+    if (profile) Sys.println("PROCESS_PATH_STAGE " + haxe.Json.stringify({stage:"geometry_ik_sampling",seconds:Sys.time()-samplingBegan}));
+    return {jointPath:jointPath,limits:timingLimits,positions:positions,distances:distances,
+      geometryClearance:geometryClearance,refined:refined!=null};
+  }
+
+  function lowerPath(speedScale:Float, path:PosePath, startQ:Array<Float>, feed:Float,
+      authoredEvents:Array<PathEvent>, index:Int,
+      ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0,
+      ?preplannedCurve:JointPathSamples, eventOffset:Float=0.0, eventLast:Bool=true):PendingMotion {
+    var profile = Sys.getEnv("PROCESS_PATH_PROFILE") == "1";
+    var prepared = preparePath(speedScale,path,startQ,feed,index,preplannedCurve);
+    var jointPath = prepared.jointPath, timingLimits = prepared.limits;
+    var distances = prepared.distances, positions = prepared.positions, count = positions.length-1;
     var motors = motorSpace;
     var timingBegan = Sys.time();
     var timed = motors == null ? timing.time(jointPath, timingLimits) : motors.time(timing, jointPath, timingLimits);
     if (Sys.getEnv("PROCESS_PATH_PROFILE") == "1") Sys.println("PROCESS_PATH_TIME_LAW " + haxe.Json.stringify({op:index, seconds:Sys.time()-timingBegan}));
+    var contractBegan = profile ? Sys.time() : 0.0;
     try {
       var events:Array<TimedEvent> = [];
       var timeMap = [for (distance in distances) timed.distanceToTime(distance)];
@@ -1257,8 +1247,9 @@ class ProgramCompiler {
       var made = new PendingMotion(index, startQ, positions[count], timed.trajectory, events,
         path, distances, timeMap, authoredPolyline, blendTolerance,
         taskSampleDistances, checkDistances, checkTimes);
-      made.geometryClearance=geometryClearance;made.geometryCurve=jointPath;made.geometryRefined=refined!=null;
+      made.geometryClearance=prepared.geometryClearance;made.geometryCurve=jointPath;made.geometryRefined=prepared.refined;
       made.feed = feed;
+      if (profile) Sys.println("PROCESS_PATH_STAGE " + haxe.Json.stringify({stage:"haxe_path_contract",seconds:Sys.time()-contractBegan}));
       return made;
     } catch (error:Dynamic) {
       timed.releaseDistanceMap();
@@ -1266,75 +1257,6 @@ class ProgramCompiler {
       throw error;
     }
   }
-
-  /** `checkDistances` along the path, each at its exact `checkTimes`, then the trajectory clock at 1 ms. */
-  function checkTaskSpace(plan:ExecutionPlan, path:PosePath,
-      checkDistances:Array<Float>, checkTimes:Array<Float>, index:Int,
-      authoredPolyline:Null<Array<Pose3>>, blendTolerance:Float,
-      taskSampleDistances:Array<Float>,?certificate:JointCurveTask, ?lag:Float = 0.0, ?tail:Float = 0.0, ?spread:Float = 0.0):Void {
-    var worst = 0.0, worstTime = 0.0,worstOrientation=0.0;
-    var tolerance = authoredPolyline == null && path.authoredGeometry == null ?
-      positionTolerance : authoredPolyline == null ? path.blendTolerance : blendTolerance;
-    var failure:Null<String> = null;
-    function inspect(distance:Float, time:Float):Void {
-      var desired = path.waypointAt(distance);
-      var actual = solver.forward(plan.evaluate(time).positions);
-      var error = authoredPolyline != null ?
-        Math.min(distanceToSegment(actual, authoredPolyline[0], authoredPolyline[1]),
-          distanceToSegment(actual, authoredPolyline[1], authoredPolyline[2])) :
-        path.authoredGeometry != null ?
-          distanceToGeometry(actual, path.authoredGeometry) :
-          PoseMath.distance(actual, desired.pose);
-      var allowed = spread + (authoredPolyline != null ? blendTolerance :
-        path.authoredGeometry != null ? path.blendTolerance :
-          desired.positionTolerance);
-      var angle = orientationError(actual, desired.pose,
-        path.orientationPolicyAt(distance));
-      worstOrientation=Math.max(worstOrientation,angle);
-      if(certificate!=null && (error>certificate.positionBound+1e-9 || angle>certificate.orientationBound+1e-9))
-        throw 'Task certificate audit exceeded its continuous bound at op $index: $error / ${certificate.positionBound}, $angle / ${certificate.orientationBound}';
-      if (error > worst) { worst = error; worstTime = time; tolerance = allowed; }
-      if (error > allowed + 1e-9 ||
-          angle > desired.orientationTolerance + 1e-9)
-        failure = 'Motion program op $index task-space tolerance exceeded at path distance $distance (position $error / $allowed, orientation $angle / ${desired.orientationTolerance})';
-    }
-    for (sample in 0...checkDistances.length) inspect(checkDistances[sample], checkTimes[sample]);
-    // Cover the trajectory clock as well as the authored path geometry.
-    var timeSteps = taskSampleDistances.length - 1;
-    for (sample in 0...(timeSteps + 1)) {
-      // The lowered motion's clock: the shaped plan runs `lag` behind it and `tail` longer.
-      var time = lag + (plan.durationSeconds - tail) * sample / timeSteps;
-      inspect(taskSampleDistances[sample], time);
-    }
-    plan.report.setTaskSpace(failure == null ? TrajectoryCoreConstants.MK_CHECK_PASSED :
-      TrajectoryCoreConstants.MK_CHECK_FAILED, worst, worstTime, tolerance,
-      Trajectory.nanoseconds(plan.durationSeconds / timeSteps));
-    if(certificate!=null)Sys.println("PROCESS_PATH_TASK_AUDIT "+haxe.Json.stringify({op:index,
-      samples:checkDistances.length+timeSteps+1,positionError:worst,positionBound:certificate.positionBound,
-      orientationError:worstOrientation,orientationBound:certificate.orientationBound}));
-    if (failure != null) throw failure;
-  }
-
-  static function distanceToSegment(point:Pose3, start:Pose3, end:Pose3):Float
-    return pointToSegmentDistance(point.x, point.y, point.z, start.x, start.y, start.z,
-      end.x, end.y, end.z);
-
-  /** Distance uses coordinates directly; authored polylines are checked at every trajectory sample. */
-  static function pointToSegmentDistance(px:Float, py:Float, pz:Float,
-      sx:Float, sy:Float, sz:Float, ex:Float, ey:Float, ez:Float):Float {
-    var dx = ex - sx, dy = ey - sy, dz = ez - sz;
-    var lengthSquared = dx * dx + dy * dy + dz * dz;
-    var fraction = lengthSquared <= 0.0 ? 0.0 : Math.max(0.0, Math.min(1.0,
-      ((px - sx) * dx + (py - sy) * dy +
-        (pz - sz) * dz) / lengthSquared));
-    var x = px - sx - fraction * dx;
-    var y = py - sy - fraction * dy;
-    var z = pz - sz - fraction * dz;
-    return Math.sqrt(x * x + y * y + z * z);
-  }
-
-  static function distanceToGeometry(point:Pose3, geometry:GeometricPath):Float
-    return geometry.distanceTo(new motionkit.path.PathPoint(point.x, point.y, point.z));
 
   function requireFrame(requested:String, index:Int):Void {
     if (requested != frameId)
@@ -1361,90 +1283,16 @@ class ProgramCompiler {
         }
       }
   }
-  /**
-    Most samples one timed section holds. An arm's samples each cost an inverse-kinematics search, so its budget is
-    small; on a machine whose joints are an exact affine map a straight piece is one sample, and what a section costs is
-    native memory (a sample is 2 KB).
-  **/
-  public static inline final MAX_SECTION_SAMPLES = 10000;
-  public static inline final MAX_AFFINE_SECTION_SAMPLES = 100000;
+  /** Sampling budgets retained here for callers of the compiler's existing API. */
+  public static inline final MAX_SECTION_SAMPLES = PathSampler.MAX_SECTION_SAMPLES;
+  public static inline final MAX_AFFINE_SECTION_SAMPLES = PathSampler.MAX_AFFINE_SECTION_SAMPLES;
 
-  /**
-    `path` split at its sharp corners, where one primitive's end tangent is not the next one's start tangent (authored
-    task-velocity discontinuities, each timed from rest to rest), with each section's distance along it.
-  **/
-  public static function timingSections(path:PosePath):Array<{path:PosePath, offset:Float}> {
-    var sections:Array<{path:PosePath, offset:Float}> = [];
-    var start = 0, offset = 0.0, sectionOffset = 0.0;
-    for (k in 0...path.primitives.length) {
-      var primitive = path.primitives[k];
-      if (k > start) {
-        var before = path.primitives[k - 1];
-        var arriving = before.derivativesAt(before.length()), leaving = primitive.derivativesAt(0.0);
-        var beforeAngular = ToolFreedom.requiredAngular(before.endWaypoint().pose, arriving.angular, before.orientationPolicy());
-        var leavingAngular = ToolFreedom.requiredAngular(primitive.startWaypoint().pose, leaving.angular, primitive.orientationPolicy());
-        var turn = 0.0;
-        for (axis in 0...3) turn = Math.max(turn, Math.max(
-          Math.abs(arriving.linear[axis] - leaving.linear[axis]),
-          Math.abs(beforeAngular[axis] - leavingAngular[axis])));
-        // A path rests only where it turns: a long smooth one is timed in windows that carry their boundary speeds.
-        if (turn > 1e-6) {
-          sections.push({path: path.sub(start, k), offset: sectionOffset});
-          start = k;
-          sectionOffset = offset;
-        }
-      }
-      offset += primitive.length();
-    }
-    sections.push({path: path.sub(start, path.primitives.length), offset: sectionOffset});
-    if (sections.length == 1) return [{path: path, offset: 0.0}];
-    var authored = path.authoredGeometry;
-    if (authored != null) for (section in sections)
-      section.path.withAuthoredGeometry(authored, path.blendTolerance,path.geometryDeviationBound);
-    return sections;
-  }
+  /** Split a path at authored task-velocity discontinuities, preserving section distances. */
+  public static function timingSections(path:PosePath):Array<{path:PosePath, offset:Float}>
+    return PathSampler.timingSections(path);
 
-  /**
-    Where to sample a path in joint space: every primitive boundary, so that
-    each span lies on one primitive, and inside each primitive at most
-    `cartesianResolution` apart and a quarter radian of turning apart. A
-    boundary sample also names the primitive arriving at it.
-  **/
-  function pathSamples(path:PosePath):Array<PathSample> {
-    var first = path.primitives[0];
-    // On a machine whose joints are an exact affine map of the pose a straight piece needs no samples inside it.
-    var exact = solver.affineMap() != null;
-    var samples:Array<PathSample> = [{distance: 0.0, primitive: first, local: 0.0, arriving: null}];
-    var start = 0.0;
-    // A distance-driven joint changes its rate's slope at its stations: they are sampled too.
-    var stations = path.drive == null ? [] : path.drive.stations();
-    var stationAt = 0;
-    for (k in 0...path.primitives.length) {
-      var primitive = path.primitives[k], length = primitive.length();
-      var pieces = motionkit.path.PoseSampling.pieces(primitive,cartesianResolution,angularResolution,exact);
-      var locals = [for (piece in 1...pieces) length * piece / pieces];
-      while (stationAt < stations.length && stations[stationAt] <= start + 1e-12) stationAt++;
-      var extra = stationAt;
-      while (extra < stations.length && stations[extra] < start + length - 1e-12) { locals.push(stations[extra] - start); extra++; }
-      if (extra > stationAt) locals.sort(Reflect.compare);
-      // Exactly the end: `length * pieces / pieces` can round one ulp past it.
-      locals.push(length);
-      var previous = 0.0;
-      for (index in 0...locals.length) {
-        var local = locals[index], last = index == locals.length - 1;
-        if (!last && local - previous <= 1e-12) continue;
-        previous = local;
-        var next = last && k + 1 < path.primitives.length ? path.primitives[k + 1] : null;
-        samples.push(next == null ?
-          {distance: start + local, primitive: primitive, local: local, arriving: null} :
-          {distance: start + length, primitive: next, local: 0.0,
-            arriving: {primitive: primitive, local: length}});
-      }
-      start += length;
-    }
-    samples[samples.length - 1].distance = path.length();
-    return samples;
-  }
+  function pathSamples(path:PosePath):Array<motionkit.robot.PathSampler.PathSample>
+    return PathSampler.samples(path, cartesianResolution, angularResolution, solver.affineMap() != null);
 
   function requireFixedOrientation(start:Pose3, targets:Array<Pose3>, freedom:Null<OrientationPolicy>, index:Int):Void {
     switch freedom {
@@ -1508,6 +1356,15 @@ class ProgramCompiler {
 }
 
 /** A planned motion waiting for the ops that may still add to it (internal to compilation). */
+typedef PreparedProgramPath = {
+  var jointPath:JointPathSamples;
+  var limits:PathTimingLimits;
+  var positions:Array<Array<Float>>;
+  var distances:Array<Float>;
+  var geometryClearance:Bool;
+  var refined:Bool;
+}
+
 class PendingMotion {
   public final opIndex:Int;
   public final startQ:Array<Float>;
@@ -1527,6 +1384,14 @@ class PendingMotion {
   public var distanceOffset:Float = 0.0;
   /** The programmed speed of a path move in m/s, 0 for a joint move. */
   public var feed:Float = 0.0;
+  public var startVelocity:Array<Float>;
+  public var startAcceleration:Array<Float>;
+  public var continues:Bool = false;
+  public var filtered:Bool = false;
+  public var filteredShaped:Bool = false;
+  public var endDistance:Null<Float> = null;
+  public var accept:Null<ExecutionPlan->Void> = null;
+  public var abandon:Null<Void->Void> = null;
   public var geometryClearance:Bool = false;
   public var geometryRefined:Bool = false;
   public var geometryCurve:Null<JointPathSamples> = null;
@@ -1538,6 +1403,7 @@ class PendingMotion {
       ?taskSampleDistances:Array<Float>, ?checkDistances:Array<Float>, ?checkTimes:Array<Float>) {
     this.opIndex = opIndex; this.startQ = startQ.copy(); this.endQ = endQ.copy();
     this.trajectory = trajectory; this.events = events;
+    startVelocity = [for (_ in startQ) 0.0]; startAcceleration = startVelocity.copy();
     this.path = path;
     this.distances = distances == null ? [] : distances;
     this.times = times == null ? [] : times;

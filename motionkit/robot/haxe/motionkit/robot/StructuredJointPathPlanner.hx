@@ -108,7 +108,6 @@ class StructuredJointPathPlanner implements JointPathPlanner {
   }
   public function retreatTarget():Null<Array<Float>> return retreat == null ? null : retreat.copy();
   public function allowsFreeStart():Bool return sampling != null && !sampling.pinStart;
-  public function appliesDistanceDrive():Bool return false;
   function contactAt(q:Array<Float>):Bool {
     if (contactPose == null) return contact;
     var fk = group.tcpPose(q);

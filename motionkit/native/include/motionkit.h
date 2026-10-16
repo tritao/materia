@@ -25,6 +25,12 @@ typedef struct mk_path_handle { uint32_t id; } mk_path_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_path_destroy);
 typedef struct mk_time_law_handle { uint32_t id; } mk_time_law_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_time_law_destroy);
+typedef struct mk_path_timing_session_handle { uint32_t id; } mk_path_timing_session_handle
+    MK_HANDLE MK_HANDLE_DESTROY(mk_path_timing_session_destroy);
+typedef struct mk_path_timing_stream_handle { uint32_t id; } mk_path_timing_stream_handle
+    MK_HANDLE MK_HANDLE_DESTROY(mk_path_timing_stream_destroy);
+typedef struct mk_path_timing_preview_handle { uint32_t id; } mk_path_timing_preview_handle
+    MK_HANDLE MK_HANDLE_DESTROY(mk_path_timing_preview_destroy);
 
 /** Compiled 6R zero-pose axes H, link displacements P and terminal rotation. */
 typedef struct mk_eaik_model {
@@ -570,6 +576,98 @@ MK_API mk_result MK_CALL mk_time_path(mk_path_handle path,
     mk_timing_report *out_report MK_OUT,
     mk_time_law_handle *out_law MK_OUT MK_OWNED,
     mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+/** Snapshot one immutable path/limits/cap table for repeated endpoint timing.
+ * The source path may be destroyed after creation. Session calls are serialized;
+ * session timing uses one serial solver workspace, independent of helper settings.
+ * Endpoints are speeds (not squared speeds). Switching between stopped and moving
+ * endpoints rebuilds the endpoint-dependent grid/constraints. A failed call drops
+ * retained backward state. Every successful law/trajectory is independently owned
+ * and survives later calls or session destruction. Removing a session handle does
+ * not cancel an already active call; subsequent calls reject the removed handle.
+ */
+MK_API mk_result MK_CALL mk_path_timing_session_create(mk_path_handle path,
+    const double *max_velocity MK_IN_ARRAY(joint_count),
+    const double *max_acceleration MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    const double *speed_caps MK_IN_ARRAY(speed_cap_count), uint32_t speed_cap_count,
+    double lowering_tolerance, uint32_t require_feasible_path,
+    mk_path_timing_session_handle *out_session MK_OUT MK_OWNED);
+MK_API void MK_CALL mk_path_timing_session_destroy(mk_path_timing_session_handle session);
+MK_API mk_result MK_CALL mk_path_timing_session_time(mk_path_timing_session_handle session,
+    double start_speed, double end_speed, mk_timing_report *out_report MK_OUT,
+    mk_time_law_handle *out_law MK_OUT MK_OWNED,
+    mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+/** Fastest timing to any speed in the requested terminal interval. Unlike a
+ * fixed endpoint, its upper bound need not be attainable. out_reached_speed is
+ * the actual reached endpoint, which the next window must use as its entry.
+ * All speeds are unsquared SI path speeds. Failure clears every result output.
+ */
+MK_API mk_result MK_CALL mk_path_timing_session_time_to_interval(mk_path_timing_session_handle session,
+    double start_speed, double end_lower_speed, double end_upper_speed,
+    double *out_reached_speed MK_OUT, mk_timing_report *out_report MK_OUT,
+    mk_time_law_handle *out_law MK_OUT MK_OWNED,
+    mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+/** Complete feasible entry-speed interval for a requested terminal interval.
+ * This performs a backward pass only, reusing retained state when possible.
+ * entry_may_move=1 uses the conservative moving-boundary grid/constraints when
+ * entry speed is not yet known; 0 restricts the returned interval to rest and
+ * refuses a terminal request that cannot be reached from rest. A later
+ * fully stopped timing call may rebuild the less conservative stopped problem.
+ * Returned bounds are values, independent of later session updates/disposal.
+ */
+MK_API mk_result MK_CALL mk_path_timing_session_entry_interval(mk_path_timing_session_handle session,
+    double end_lower_speed, double end_upper_speed, uint32_t entry_may_move,
+    double *out_lower_speed MK_OUT, double *out_upper_speed MK_OUT);
+enum { MK_TIMING_STREAM_WAITING = 0, MK_TIMING_STREAM_READY = 1, MK_TIMING_STREAM_DONE = 2 };
+typedef struct mk_path_timing_stream_progress {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t state;
+    uint32_t window_index;
+    uint32_t total_windows;
+    uint32_t first_span;
+    uint32_t span_count;
+    uint32_t first_stage;
+    double start_s;
+    double end_s;
+    double start_speed;
+    double end_speed;
+} mk_path_timing_stream_progress;
+/** Immutable whole-path snapshot with guarded, validated window previews.
+ * All windows use the same global grid, normalization and reserve policy.
+ * max_pending_windows is a hard count budget. A moving final speed requires
+ * the complete horizon before the first preview, and therefore that budget
+ * must cover every window. Ordinary stopped-final paths may retire a proven
+ * stable prefix earlier. No preview is published to execution by this API.
+ */
+MK_API mk_result MK_CALL mk_path_timing_stream_create(mk_path_handle path,
+    const double *max_velocity MK_IN_ARRAY(joint_count),
+    const double *max_acceleration MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    const double *speed_caps MK_IN_ARRAY(speed_cap_count), uint32_t speed_cap_count,
+    double start_speed, double end_speed, double lowering_tolerance, uint32_t require_feasible_path,
+    uint32_t max_pending_windows, mk_path_timing_stream_handle *out_stream MK_OUT MK_OWNED);
+MK_API void MK_CALL mk_path_timing_stream_destroy(mk_path_timing_stream_handle stream);
+/** Advances by at most one input window, then offers a candidate if proven.
+ * WAITING/DONE return empty owned handles. READY returns independently owned
+ * law/trajectory data and a guard token. Another step supersedes older tokens.
+ * Progress distances/speeds are the actual clock-boundary states in the original
+ * path coordinate. Numerical solver interfaces need not fall on integer ticks:
+ * an owned fractional tail continues into the next preview. Span/stage metadata
+ * describes the nominal solver window, whose binding indices remain local.
+ * Feed/process caps and transformation context still require external certification.
+ * Laws/trajectories survive source/stream/token disposal. Calls are serialized.
+ */
+MK_API mk_result MK_CALL mk_path_timing_stream_step(mk_path_timing_stream_handle stream,
+    mk_path_timing_stream_progress *out_progress MK_OUT,
+    mk_path_timing_preview_handle *out_preview MK_OUT MK_OWNED,
+    mk_timing_report *out_report MK_OUT,
+    mk_time_law_handle *out_law MK_OUT MK_OWNED,
+    mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+/** Retire stable raw timing into unpublished transform context. This is not execution
+ * publication: transformed output still requires task/clearance/drive/seam/event certification.
+ * Tokens remain caller-owned and must be destroyed, including after commit.
+ */
+MK_API mk_result MK_CALL mk_path_timing_stream_commit(mk_path_timing_stream_handle stream,
+    mk_path_timing_preview_handle preview);
+MK_API void MK_CALL mk_path_timing_preview_destroy(mk_path_timing_preview_handle preview);
 /**
  * The same timing on the grid the adaptive one replaces: 32 TOPP-RA stages a span and the whole path in one window,
  * whatever its length. It is the reference the adaptive grid and the windows are tested against (their timing within a
@@ -661,6 +759,15 @@ MK_API mk_result MK_CALL mk_shape_trajectory(mk_trajectory_handle trajectory, co
  */
 MK_API mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joint, double lead_seconds,
     double window_seconds, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+/** Pressure advance on a normalized context range from one continuous motion.
+ * origin_ns is its elapsed offset from the true motion start; only final_context
+ * applies the true end taper. Publish only where half a filter window of source
+ * exists on each side, except at the true start/end. Artificial context edges
+ * are not process stops. The result still needs drive/task/seam certification.
+ */
+MK_API mk_result MK_CALL mk_advance_joint_context(mk_trajectory_handle trajectory, uint32_t joint,
+    double lead_seconds, double window_seconds, int64_t origin_ns, uint32_t final_context,
+    mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
 MK_API mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,
     uint32_t *out_count MK_OUT);
 MK_API mk_result MK_CALL mk_time_law_get_binding(mk_time_law_handle law,

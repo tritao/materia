@@ -35,6 +35,7 @@ class AxisBuilderChecks {
 					AssemblyFrames.translation(0, -100, 0), "rail");
 				return "driver";
 			});
+		builder.setJointStop("x", {timeConstantSec: 0.002, dampingRatio: 1.0});
 		var model = new AssemblyModel("mm");
 		builder.addTo(model, "");
 		var definition = model.definition("rack-axis");
@@ -57,6 +58,16 @@ class AxisBuilderChecks {
 			check(Math.abs(state.joint("pinion-turn") - coordinate * 0.1) < 1e-10,
 				"the pinion follows the carriage through the physical rack relation");
 		}
+		// Transmission geometry probes need unconstrained coordinates even when the real machine has stops.
+		var probe = new machinekit.transmission.BeltPoseContext(definition);
+		probe.state.setJoint("x", 150.0);
+		check(Math.abs(probe.state.joint("x") - 150.0) < 1e-12, "the private pose probe can move beyond machine travel");
+		probe.reset();
+		check(Math.abs(probe.state.joint("x") - axis.initial) < 1e-12, "pose reset restores the authored coordinate");
+		var original = [for (joint in definition.joints) if (joint.id == "x") joint][0];
+		check(original.limits.lower == 0.0 && original.limits.upper == 100.0 && original.stop != null &&
+			original.stop.timeConstantSec == 0.002 && original.stop.dampingRatio == 1.0,
+			"probing preserves the source machine's bounded travel and physical stop response");
 		check(builder.axisOvertravel("x") > 0, "the block has rail room beyond both travel ends");
 		var rejected = false;
 		try builder.slide({id: "overrun", lower: -100.0, upper: 100.0, initial: 0.0}, "rail", "badCarriage",

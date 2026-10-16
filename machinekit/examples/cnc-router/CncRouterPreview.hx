@@ -316,6 +316,9 @@ class CncRouterChecks {
 		for (joint in definition.joints) if (joint.limits.overtravel != null) {
 			if (joint.limits.lower != null) joint.limits.lower -= joint.limits.overtravel;
 			if (joint.limits.upper != null) joint.limits.upper += joint.limits.overtravel;
+			// This private geometry probe already includes physical overtravel in its bounds.
+			// Keeping the allowance would make stiffness validation expand the travel twice.
+			joint.limits.overtravel = 0;
 		}
 		var state = new AssemblyState(definition);
 		// Include the interior pose that blocked physical homing, and both guide ends.

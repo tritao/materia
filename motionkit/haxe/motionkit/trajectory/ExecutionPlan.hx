@@ -20,6 +20,9 @@ class ExecutionPlan implements NativeSpanOwner implements TimedJointTrajectory {
   public final report:ValidationReport;
   /** What a plan check found, set by the compiler that made the plan when it ran one. */
   public var checked:Null<PlanCheckResult> = null;
+  /** False only for a certified publication cut inside continuous motion. */
+  @:allow(motionkit.robot.PlanCertification)
+  public var endsAtRest(default,null):Bool = true;
   /** Validation claims carried with this plan's telemetry. */
   public function guarantees():ValidationGuarantees return report.guarantees();
   public final planId:Int64;

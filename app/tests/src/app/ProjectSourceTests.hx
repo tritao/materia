@@ -787,11 +787,11 @@ class ProjectSourceTests {
   }
 
   /**
-   * The margin on the derived stretch bound, a tenth: a stated factor, not derived. It covers what the model leaves out, the
-   * belts' spans being stiffer near a pulley than mid-travel (the drive model's stiffness is the loop's at the assembly's
-   * pose, one number for the whole travel). The stepper hold is not a term: the pulleys are driven at their targets and the
-   * stretch is measured between pulley and carriage. Measured peaks are 93 % of the bound. It goes when the coupling's
-   * stiffness follows the position (PLAN RF12 item 1): the bound then takes the least stiffness over the travel.
+   * Empirical allowance retained while the dynamic response bound is revisited
+   * (printer PLAN, RF3). RF12 already uses the least stiffness over travel, so
+   * position-independent stiffness no longer justifies this factor. The formula
+   * below describes one acceleration step; it does not prove a bound for repeated
+   * reversals, coupled modes or finite-step replay. Do not describe 1.1 as derived.
    */
   static inline final STRETCH_MARGIN = 1.1;
 

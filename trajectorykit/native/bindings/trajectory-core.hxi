@@ -81,6 +81,12 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 	 * peak time/resolution is claimed. The planner owns the geometric proof.
 	 */
 	extern fn mk_report_set_task_space_bound(report: ptr<mk_validation_report>, upper_bound: f64, tolerance: f64) -> mk_result;
+	/**
+	 * Append an owned copy, normalizing source time zero to the destination end.
+	 * Requires matching joint counts and nonempty source. Rejection leaves destination unchanged.
+	 * This copies polynomials; callers remain responsible for boundary certification.
+	 */
+	extern fn mk_trajectory_append_copy(destination: mk_trajectory_handle, source: mk_trajectory_handle) -> mk_result;
 	extern fn mk_trajectory_append_segment(trajectory: mk_trajectory_handle, segment: ptr<const<mk_segment>>) -> mk_result;
 	extern fn mk_trajectory_boundary_continuity(trajectory: mk_trajectory_handle, boundary_index: u32, out_continuity: ptr<mk_continuity>) -> mk_result;
 	extern fn mk_trajectory_create(joint_count: u32, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
@@ -96,8 +102,24 @@ interface TrajectoryCore @target("portable-abi64") @library("trajectory_core") {
 	 */
 	extern fn mk_trajectory_from_samples(joint_count: u32, samples: ptr<const<mk_sample>> @in_array("sample_count"), sample_count: u32, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	extern fn mk_trajectory_get_segment(trajectory: mk_trajectory_handle, index: u32, out_segment: ptr<mk_segment>) -> mk_result;
+	/**
+	 * Latest integer time <= latest_ns strictly inside a polynomial segment.
+	 * Times are relative to the source origin. found=0 means no such tick exists;
+	 * this lets a caller avoid introducing a plan seam at a derivative discontinuity.
+	 */
+	extern fn mk_trajectory_interior_time(source: mk_trajectory_handle, latest_ns: i64, out_time_ns: ptr<i64> @out, out_found: ptr<u32> @out) -> mk_result;
 	extern fn mk_trajectory_joint_count(trajectory: mk_trajectory_handle, out_joint_count: ptr<u32> @out) -> mk_result;
 	extern fn mk_trajectory_segment_count(trajectory: mk_trajectory_handle, out_segment_count: ptr<u32> @out) -> mk_result;
+	/**
+	 * Copy selected joints, preserving polynomial coefficients and the original clock origin.
+	 * Reordering and repeated indices are allowed. The result owns its data independently.
+	 */
+	extern fn mk_trajectory_select_joints(source: mk_trajectory_handle, joints: ptr<const<u32>> @in_array("joint_count"), joint_count: u32, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	/**
+	 * Copy [begin_ns,end_ns] relative to the source's first segment, rebased to time zero.
+	 * Partial segments are translated algebraically; no sampling or retiming occurs.
+	 */
+	extern fn mk_trajectory_slice(source: mk_trajectory_handle, begin_ns: i64, end_ns: i64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	/**
 	 * Reports exact polynomial extrema; failed checks return MK_OK with failed status.
 	 */

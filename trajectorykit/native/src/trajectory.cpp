@@ -181,6 +181,100 @@ mk_result MK_CALL mk_trajectory_append_segment(mk_trajectory_handle trajectory,
     }
 }
 
+mk_result MK_CALL mk_trajectory_append_copy(mk_trajectory_handle destination, mk_trajectory_handle source) {
+    try {
+        auto target=find(destination), input=find(source);
+        if (!target || !input) return MK_ERROR_INVALID_HANDLE;
+        return target->append_copy(*input) ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
+    } catch (const std::bad_alloc&) { return MK_ERROR_OUT_OF_MEMORY; }
+    catch (...) { return MK_ERROR_INVALID_ARGUMENT; }
+}
+
+mk_result MK_CALL mk_trajectory_select_joints(mk_trajectory_handle source, const uint32_t* joints,
+        uint32_t joint_count, mk_trajectory_handle* out_trajectory) {
+    if (!out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
+    out_trajectory->id=0;
+    try {
+        auto input=find(source);
+        if (!input) return MK_ERROR_INVALID_HANDLE;
+        if (!joints || joint_count==0 || joint_count>MK_MAX_JOINTS || input->segment_count()==0)
+            return MK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t joint=0;joint<joint_count;++joint)
+            if (joints[joint]>=input->joint_count()) return MK_ERROR_INVALID_ARGUMENT;
+        auto result=std::make_unique<motionkit::Trajectory>(joint_count);
+        for (uint32_t i=0;i<input->segment_count();++i) {
+            const auto original=input->segment(i);
+            auto selected=original;
+            selected.joint_count=joint_count;
+            for (uint32_t joint=0;joint<joint_count;++joint)
+                selected.coefficients[joint]=original.coefficients[joints[joint]];
+            if (!result->append(selected)) return MK_ERROR_INVALID_ARGUMENT;
+        }
+        std::lock_guard lock(registry_mutex);
+        return register_trajectory(std::move(result),out_trajectory);
+    } catch (const std::bad_alloc&) { return MK_ERROR_OUT_OF_MEMORY; }
+    catch (...) { return MK_ERROR_INVALID_ARGUMENT; }
+}
+
+mk_result MK_CALL mk_trajectory_slice(mk_trajectory_handle source, int64_t begin_ns, int64_t end_ns,
+        mk_trajectory_handle* out_trajectory) {
+    if (!out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
+    out_trajectory->id=0;
+    try {
+        auto input=find(source);
+        if (!input) return MK_ERROR_INVALID_HANDLE;
+        if (begin_ns<0 || begin_ns>=end_ns || end_ns>input->duration_ns()) return MK_ERROR_INVALID_ARGUMENT;
+        auto result=std::make_unique<motionkit::Trajectory>(input->joint_count());
+        const int64_t origin=input->segment_start(0);
+        const int64_t first=origin+begin_ns, last=origin+end_ns;
+        for (uint32_t i=0;i<input->segment_count();++i) {
+            auto piece=input->segment(i);
+            const int64_t left=std::max(first,piece.t0_ns), right=std::min(last,piece.t0_ns+piece.duration_ns);
+            if (left>=right) continue;
+            const long double shift=(left-piece.t0_ns)*1e-9L;
+            if (shift!=0) for (uint32_t joint=0;joint<piece.joint_count;++joint) {
+                const auto original=piece.coefficients[joint];
+                for (uint32_t power=0;power<=piece.degree;++power) {
+                    long double value=0;
+                    for (int degree=static_cast<int>(piece.degree);degree>=static_cast<int>(power);--degree) {
+                        long double binomial=1;
+                        for (uint32_t k=1;k<=power;++k) binomial=binomial*(degree-k+1)/k;
+                        value=value*shift+binomial*original.value[degree];
+                    }
+                    piece.coefficients[joint].value[power]=static_cast<double>(value);
+                }
+            }
+            piece.t0_ns=left-first; piece.duration_ns=right-left;
+            if (!result->append(piece)) return MK_ERROR_INVALID_ARGUMENT;
+        }
+        std::lock_guard lock(registry_mutex);
+        return register_trajectory(std::move(result),out_trajectory);
+    } catch (const std::bad_alloc&) { return MK_ERROR_OUT_OF_MEMORY; }
+    catch (...) { return MK_ERROR_INVALID_ARGUMENT; }
+}
+
+mk_result MK_CALL mk_trajectory_interior_time(mk_trajectory_handle source, int64_t latest_ns,
+        int64_t* out_time_ns, uint32_t* out_found) {
+    if (out_time_ns) *out_time_ns=0;
+    if (out_found) *out_found=0;
+    if (!out_time_ns || !out_found) return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        auto input=find(source);
+        if (!input) return MK_ERROR_INVALID_HANDLE;
+        if (latest_ns<0 || latest_ns>input->duration_ns()) return MK_ERROR_INVALID_ARGUMENT;
+        if (!input->segment_count()) return MK_OK;
+        const int64_t origin=input->segment_start(0);
+        for (uint32_t i=input->segment_count();i-->0;) {
+            const int64_t start=input->segment_start(i)-origin;
+            if (latest_ns<=start) continue;
+            const int64_t end=start+input->segment_duration(i);
+            const int64_t candidate=std::min(latest_ns,end-1);
+            if (candidate>start) { *out_time_ns=candidate; *out_found=1; return MK_OK; }
+        }
+        return MK_OK;
+    } catch (...) { return MK_ERROR_INVALID_ARGUMENT; }
+}
+
 mk_result MK_CALL mk_trajectory_evaluate(mk_trajectory_handle trajectory,
                                           int64_t time_ns, mk_trajectory_state *out_state) {
     if (out_state == nullptr || out_state->struct_size < sizeof(mk_trajectory_state))

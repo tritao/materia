@@ -44,6 +44,14 @@ class ProgramBlock {
     pathTimes.push(times);
   }
 
+  /** Retire consumed native coefficients and their aligned path/event metadata. */
+  public function retireFirstPlan():Void {
+    if (plans.length==0) throw "No consumed plan to retire";
+    var plan=plans[0];
+    plans.shift();opIndices.shift();pathLengths.shift();pathDistances.shift();pathTimes.shift();
+    plan.dispose();
+  }
+
   public function close(barrier:Null<ProgramBarrier>):Void {
     if (complete) throw "Program block is already complete";
     this.barrier = barrier;

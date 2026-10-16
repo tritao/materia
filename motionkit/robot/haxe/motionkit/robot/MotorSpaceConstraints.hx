@@ -5,6 +5,8 @@ import motionkit.planner.JointPathSamples;
 import motionkit.planner.PathTimingBackend;
 import motionkit.planner.PathTimingLimits;
 import motionkit.planner.TimedPath;
+import motionkit.planner.ToppraPathTiming;
+import motionkit.planner.PathTimingStream;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ValidationLimits;
 import robotkit.model.RobotModel;
@@ -166,22 +168,30 @@ class MotorSpaceConstraints {
   /** Time the axes and linear motor coordinates together; return only the authored joints. */
   public function time(backend:PathTimingBackend, path:JointPathSamples, limits:PathTimingLimits):TimedPath {
     if (rows.length == 0) return backend.time(path, limits);
+    var problem = augmented(path,limits);
+    var timed = backend.time(problem.path,problem.limits);
+    try return timed.takeSelectedJoints([for (i in 0...path.jointCount) i]);
+    catch (error:Dynamic) { timed.trajectory.dispose(); timed.releaseDistanceMap(); throw error; }
+  }
+
+  /** Keep shared-drive rows in every streaming solve, selecting physical joints only after timing. */
+  public function prepareStream(backend:ToppraPathTiming, path:JointPathSamples,
+      limits:PathTimingLimits, maximumPendingWindows:Int):PathTimingStream {
+    if (rows.length == 0) return backend.prepareStream(path,limits,maximumPendingWindows);
+    var problem = augmented(path,limits);
+    var stream = backend.prepareStream(problem.path,problem.limits,maximumPendingWindows);
+    try return stream.selectJoints([for (i in 0...path.jointCount) i]);
+    catch (error:Dynamic) { stream.dispose(); throw error; }
+  }
+
+  function augmented(path:JointPathSamples, limits:PathTimingLimits):{path:JointPathSamples,limits:PathTimingLimits} {
     function augment(samples:Array<Array<Float>>):Array<Array<Float>>
       return [for (sample in samples) sample.concat([for (row in rows) dot(row, sample)])];
-    var timed = backend.time(new JointPathSamples(path.s, augment(path.q), augment(path.qPrime),
-      augment(path.qDoublePrime), augment(path.qDoublePrimeBefore)),
-      new PathTimingLimits(limits.maxVelocity.concat(rates),
-        limits.maxAcceleration.concat([for (_ in rows) 1e12]), limits.speedCaps,
-        limits.startPathSpeed, limits.endPathSpeed,limits.requireFeasiblePath));
-    try {
-      var trajectory = Trajectory.fromSegments([for (segment in timed.trajectory.segments()) {
-        timeFromStartNs: segment.timeFromStartNs, durationNs: segment.durationNs,
-        coefficients: segment.coefficients.slice(0, path.jointCount)
-      }]);
-      timed.trajectory.dispose();
-      return new TimedPath(trajectory, distance -> timed.distanceToTime(distance), timed.bindingConstraints,
-        () -> timed.releaseDistanceMap(), timed.hasDirectInverse() ? seconds -> timed.timesToDistances(seconds) : null);
-    } catch (error:Dynamic) { timed.trajectory.dispose(); timed.releaseDistanceMap(); throw error; }
+    return {path:new JointPathSamples(path.s,augment(path.q),augment(path.qPrime),
+      augment(path.qDoublePrime),augment(path.qDoublePrimeBefore)),
+      limits:new PathTimingLimits(limits.maxVelocity.concat(rates),
+        limits.maxAcceleration.concat([for (_ in rows) 1e12]),limits.speedCaps,
+        limits.startPathSpeed,limits.endPathSpeed,limits.requireFeasiblePath)};
   }
 
   /** Check polynomial extrema after lowering, including between path timing samples. */

@@ -175,6 +175,9 @@ class AxisKinematics implements KinematicsSolver {
     (`positions` false) without. They are held in dependency order, so one pass puts each after what it follows. A driven joint (an extruder) is set
     first, and its followers (the motor behind its gears) come out here.
   **/
+  /** Shared read-only projection used when a process coordinate is written after IK. */
+  public function derivedProjection():CouplingProjection return derived;
+
   public function completeDerived(q:Array<Float>, positions:Bool):Void {
     derived.complete(q, positions);
   }

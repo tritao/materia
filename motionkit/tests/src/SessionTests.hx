@@ -553,14 +553,16 @@ class SessionTests extends MotionKitTestSupport {
       var tick = 0;
       var positions:Array<Float> = [];
       for (_ in 0...holdTick) {
-        machine.update();
+        try machine.update() catch (error:Dynamic)
+          throw 'Hold sweep at hold=$holdTick tick=$tick fault=${robot.snapshot().faultCode}: $error';
         simulationHarness.step();
         tick++;
         positions.push(robot.snapshot().positions.get(0));
       }
       machine.hold();
       for (_ in 0...40) {
-        machine.update();
+        try machine.update() catch (error:Dynamic)
+          throw 'Hold sweep at hold=$holdTick tick=$tick fault=${robot.snapshot().faultCode}: $error';
         simulationHarness.step();
         tick++;
         positions.push(robot.snapshot().positions.get(0));

@@ -44,7 +44,6 @@ class SelectedJointPathPlanner implements JointPathPlanner {
     return worker;
   }
   public function allowsFreeStart():Bool return false;
-  public function appliesDistanceDrive():Bool return false;
   public function retreatTarget():Null<Array<Float>> return null;
   public function checkPathClearance(path:JointPathSamples,tolerance:Float):Bool
     return checking.checkPathClearance(path,tolerance);

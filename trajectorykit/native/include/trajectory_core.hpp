@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <stdexcept>
 #include <vector>
 
 namespace motionkit {
@@ -124,7 +125,9 @@ inline bool estimate_path_derivatives(const std::vector<mk_segment> &segments,
  */
 class Trajectory {
 public:
-    explicit Trajectory(uint32_t joint_count) : joint_count_(joint_count) {}
+    explicit Trajectory(uint32_t joint_count) : joint_count_(joint_count) {
+        if (!joint_count || joint_count>MK_MAX_JOINTS) throw std::invalid_argument("Invalid trajectory joint count");
+    }
 
     uint32_t joint_count() const noexcept { return joint_count_; }
     uint32_t segment_count() const noexcept { return static_cast<uint32_t>(records_.size()); }
@@ -170,6 +173,7 @@ public:
         for (uint32_t joint = 0; joint < joint_count_; ++joint)
             for (uint32_t degree = 0; degree <= segment.degree; ++degree)
                 if (!std::isfinite(segment.coefficients[joint].value[degree])) return false;
+        reserve_segments(records_.size()+1);
         records_.push_back({segment.t0_ns, segment.duration_ns, segment.degree});
         for (uint32_t joint = 0; joint < joint_count_; ++joint) {
             mk_joint_coefficients kept{};
@@ -178,6 +182,27 @@ public:
             coefficients_.push_back(kept);
         }
         ++revision_;
+        return true;
+    }
+
+    // Normalize the source's origin to the destination's end. All validation
+    // and allocation precede mutation; source storage is never borrowed.
+    bool append_copy(const Trajectory& source) {
+        const size_t count=source.records_.size();
+        if (!count || source.joint_count_!=joint_count_) return false;
+        const int64_t length=source.duration_ns();
+        const int64_t end=records_.empty() ? 0 : records_.back().t0_ns+records_.back().duration_ns;
+        if (length>std::numeric_limits<int64_t>::max()-duration_ns() ||
+                end>std::numeric_limits<int64_t>::max()-length) return false;
+        reserve_segments(records_.size()+count);
+        const int64_t origin=source.records_.front().t0_ns;
+        for (size_t i=0;i<count;++i) {
+            auto piece=source.segment(static_cast<uint32_t>(i));
+            piece.t0_ns=end+(piece.t0_ns-origin);
+            // These segments are already valid; capacity and timestamp bounds
+            // were checked above, including when source aliases this object.
+            if (!append(piece)) throw std::logic_error("Validated trajectory copy failed");
+        }
         return true;
     }
 
@@ -202,6 +227,17 @@ public:
     }
 
 private:
+    void reserve_segments(size_t count) {
+        const size_t maximum=std::min<size_t>(UINT32_MAX,
+            std::min(records_.max_size(),coefficients_.max_size()/joint_count_));
+        if (count>maximum) throw std::length_error("Trajectory segment count is out of range");
+        if (count<=records_.capacity() && count*joint_count_<=coefficients_.capacity()) return;
+        const size_t capacity=records_.capacity();
+        const size_t growth=std::min(maximum-capacity,std::max<size_t>(capacity/2,1));
+        const size_t wanted=std::max(count,capacity+growth);
+        records_.reserve(wanted);
+        coefficients_.reserve(wanted*joint_count_);
+    }
     struct Record {
         int64_t t0_ns;
         int64_t duration_ns;

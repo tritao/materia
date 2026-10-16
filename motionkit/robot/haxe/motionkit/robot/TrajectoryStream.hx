@@ -95,6 +95,7 @@ class TrajectoryStream {
   static inline var QUEUE_MARGIN:Int = 128;
   var durationSeconds:Float = 0.0;
   var references:Map<String, Float> = new Map();
+  var referenceTags:Array<Int64> = [];
   var nextMotionTag:Int64 = Int64.ofInt(1);
   final programTags:Bool;
 
@@ -119,15 +120,27 @@ class TrajectoryStream {
     finalTag = Int64.ofInt(0);
     finalEndSeconds = 0.0;
     finalDurationNs = Int64.ofInt(0);
-    references = new Map();
+    references = new Map();referenceTags = [];
   }
 
   public function clear():Void begin([], 0.0);
 
-  public function markCompleted():Void elapsedSeconds = durationSeconds;
+  public function markCompleted():Void {
+    elapsedSeconds = durationSeconds;
+    // Release borrowed native arrays before the owner disposes a consumed plan.
+    segments = new ArrayStreamSegments([]);
+    references = new Map();referenceTags = [];
+  }
+
+  public function allSubmitted():Bool return submitted && nextSegment >= segments.count();
 
   public function sync():RobotSnapshot {
     var observation = robot.snapshot();
+    // Program tags are monotonic publication identities. Axis replacement and
+    // hold paths can revisit earlier references, so keep their existing policy.
+    while (programTags && referenceTags.length>0 && Int64.compare(referenceTags[0],observation.trajectoryTag)<0) {
+      var retired=referenceTags[0];referenceTags.shift();references.remove(Int64.toStr(retired));
+    }
     var start = references.get(Int64.toStr(observation.trajectoryTag));
     if (start != null)
       elapsedSeconds = elapsedFromSnapshot(observation, start, durationSeconds);
@@ -243,7 +256,7 @@ class TrajectoryStream {
       throw describeFailure(first, last, error);
     if (!programTags) nextMotionTag = Int64.add(nextMotionTag, Int64.ofInt(1));
     var startSeconds = Int64.toFloat(startNs) * 1e-9;
-    references.set(Int64.toStr(tag), startSeconds);
+    references.set(Int64.toStr(tag), startSeconds);referenceTags.push(tag);
     submitted = true;
     nextSegment = last;
     chunkStartSeconds = startSeconds;
@@ -372,11 +385,13 @@ class TrajectoryStream {
       !observation.trajectoryActive && observation.trajectoryQueueDepth == 0;
   }
 
-  public function finishedProgram(observation:RobotSnapshot):Bool
-    return Int64.compare(finalTag, Int64.ofInt(0)) != 0 &&
-      Int64.compare(observation.trajectoryTag, finalTag) == 0 &&
-      Int64.compare(observation.trajectoryTagTimeNs, finalDurationNs) >= 0 &&
-      !observation.trajectoryActive && observation.trajectoryQueueDepth == 0;
+  public function finishedProgram(observation:RobotSnapshot, endsAtRest:Bool = true):Bool {
+    if (Int64.compare(finalTag,Int64.ofInt(0))==0) return false;
+    var tagOrder = Int64.compare(observation.trajectoryTag,finalTag);
+    if (!endsAtRest && tagOrder>0) return true;
+    if (tagOrder!=0 || Int64.compare(observation.trajectoryTagTimeNs,finalDurationNs)<0) return false;
+    return !endsAtRest || (!observation.trajectoryActive && observation.trajectoryQueueDepth==0);
+  }
 
   public function shouldRefill(dt:Float, fixedTimestepSeconds:Float):Bool {
     if (nextSegment >= segments.count()) return false;
@@ -396,7 +411,7 @@ class TrajectoryStream {
     finalTag = tag;
     finalEndSeconds = durationSeconds;
     finalDurationNs = Trajectory.nanoseconds(durationSeconds);
-    references.set(Int64.toStr(tag), 0.0);
+    references.set(Int64.toStr(tag), 0.0);referenceTags.push(tag);
   }
 
   public function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,

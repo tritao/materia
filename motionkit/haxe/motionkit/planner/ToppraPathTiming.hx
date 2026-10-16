@@ -1,6 +1,8 @@
 package motionkit.planner;
 
 import motionkit.path.NativeJointPath;
+import motionkit.path.PathTimeLaw;
+import motionkit.trajectory.Trajectory;
 
 /** Reachability timing using the native TOPP-RA Seidel LP backend. */
 class ToppraPathTiming implements PathTimingBackend {
@@ -19,33 +21,49 @@ class ToppraPathTiming implements PathTimingBackend {
     this.loweringTolerance = loweringTolerance;
   }
 
-  public function time(path:JointPathSamples, limits:PathTimingLimits):TimedPath {
+  public function prepareStream(path:JointPathSamples, limits:PathTimingLimits,
+      maxPendingWindows:Int):PathTimingStream {
+    validate(path, limits);
+    var nativePath = new NativeJointPath(path);
+    try {
+      var stream = nativePath.prepareTimingStream(limits, loweringTolerance, maxPendingWindows);
+      stream.windowObserver = windows -> { if (windows > 1) windowedPaths++; };
+      nativePath.dispose();
+      return stream;
+    } catch (error:Dynamic) { nativePath.dispose(); throw error; }
+  }
+
+  @:allow(motionkit.planner.PathTimingStream)
+  static function ownResult(law:PathTimeLaw, trajectory:Trajectory):TimedPath {
+    try return new TimedPath(trajectory, distance -> law.distanceToTime(distance), [],
+      () -> law.dispose(), seconds -> law.timesToDistances(seconds), () -> law.bindingConstraints());
+    catch (error:Dynamic) { trajectory.dispose(); law.dispose(); throw error; }
+  }
+
+  static function validate(path:JointPathSamples, limits:PathTimingLimits):Void {
     if (path == null || limits == null) throw "TOPP-RA needs a path and limits";
     if (limits.maxVelocity.length != path.jointCount)
       throw "TOPP-RA joint-limit count does not match the path";
     if (limits.speedCaps.length != 0 && limits.speedCaps.length != path.s.length - 1)
       throw "TOPP-RA needs one speed cap per path span";
-    var nativePath = new NativeJointPath(path);
+  }
+
+  /** Whole-path timing is the same stream drained to completion, retaining its exact distance laws. */
+  public function time(path:JointPathSamples, limits:PathTimingLimits):TimedPath {
+    var stream = prepareStream(path,limits,path.s.length-1);
+    var series = new TimedPathSeries();
     try {
-      var timed = nativePath.time(limits, loweringTolerance);
-      if (timed.windows > 1) windowedPaths++;
-      boundaryLowerings += timed.boundaryLowerings;
-      var law = timed.law;
-      try {
-        var result = new TimedPath(timed.trajectory, function(distance:Float):Float
-          return law.distanceToTime(distance), [], function():Void law.dispose(),
-          function(seconds:Array<Float>):Array<Float> return law.timesToDistances(seconds),
-          function():Array<motionkit.planner.BindingConstraint> return law.bindingConstraints());
-        nativePath.dispose();
-        return result;
-      } catch (error:Dynamic) {
-        timed.trajectory.dispose();
-        law.dispose();
-        throw error;
+      var done = false;
+      while (!done) switch stream.step() {
+        case Waiting:
+        case Done: done = true;
+        case Ready(preview):
+          var timed = preview.commitTiming();
+          try series.append(timed,preview.startDistance,preview.endDistance,preview.firstStage);
+          catch (error:Dynamic) { timed.releaseDistanceMap();timed.trajectory.dispose();throw error; }
       }
-    } catch (error:Dynamic) {
-      nativePath.dispose();
-      throw error;
-    }
+      stream.dispose();
+      return series.finish();
+    } catch (error:Dynamic) { stream.dispose();series.dispose();throw error; }
   }
 }

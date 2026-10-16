@@ -310,9 +310,43 @@ void collapsed_initial_phase_keeps_requested_state() {
     mk_trajectory_destroy(trajectory);
 }
 
+void stopped_phase_intersects_all_joint_limits() {
+    auto request = standard(4);
+    request.synchronization = MK_SYNCHRONIZATION_PHASE;
+    const double delta[] = {1.0, 1.0, 2.0, 0.0};
+    const double velocity[] = {1.0, 1.0, 1.4, 0.5};
+    const double acceleration[] = {4.0, 1.0, 1.5, 4.0};
+    const double jerk[] = {20.0, 2.0, 3.0, 20.0};
+    for (uint32_t joint = 0; joint < 4; ++joint) {
+        request.current_position[joint] = 0.25 * joint;
+        request.target_position[joint] = request.current_position[joint] + delta[joint];
+        request.max_velocity[joint] = velocity[joint];
+        request.max_acceleration[joint] = acceleration[joint];
+        request.max_jerk[joint] = jerk[joint];
+    }
+    mk_trajectory_handle trajectory{};
+    int32_t result = -999;
+    assert(mk_generate_state_to_state(&request, &trajectory, &result) == MK_OK);
+    expect_all_pass(trajectory, request);
+    int64_t duration = 0;
+    assert(mk_trajectory_duration_ns(trajectory, &duration) == MK_OK);
+    for (int tick = 0; tick <= 100; ++tick) {
+        mk_trajectory_state state{};
+        state.struct_size = sizeof(state);
+        assert(mk_trajectory_evaluate(trajectory, duration * tick / 100, &state) == MK_OK);
+        for (uint32_t joint = 1; joint < 4; ++joint) {
+            near(state.position[joint] - request.current_position[joint], delta[joint] * state.position[0]);
+            near(state.velocity[joint], delta[joint] * state.velocity[0]);
+            near(state.acceleration[joint], delta[joint] * state.acceleration[0]);
+        }
+    }
+    mk_trajectory_destroy(trajectory);
+}
+
 } // namespace
 
 int main() {
+    stopped_phase_intersects_all_joint_limits();
     baseline_and_multiaxis();
     moving_start_and_reversal();
     retarget_and_stop();

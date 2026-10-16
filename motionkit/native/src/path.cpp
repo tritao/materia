@@ -1,9 +1,13 @@
 #include "motionkit.h"
 #include "trajectory_merge.hpp"
+#include "retained_window_timing.hpp"
+#include "window_timing_stream.hpp"
+#include "clock_profile_cursor.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -13,6 +17,8 @@
 #include <memory>
 #include <mutex>
 #include <new>
+#include <optional>
+#include <system_error>
 #include <unordered_map>
 #include <vector>
 
@@ -23,6 +29,41 @@
 #include <toppra/solver/seidel.hpp>
 
 namespace {
+template<class Handle, auto Destroy>
+struct NativeResultOwner {
+    Handle value{};
+    NativeResultOwner() = default;
+    NativeResultOwner(const NativeResultOwner&) = delete;
+    NativeResultOwner& operator=(const NativeResultOwner&) = delete;
+    ~NativeResultOwner() { reset(); }
+    void reset() { if (value.id) Destroy(value); value = {}; }
+    Handle release() { const Handle result = value; value = {}; return result; }
+};
+
+// Opt-in wall-clock stage measurements; disabled runs perform no clock reads.
+class PathProfilePhase {
+    using Clock=std::chrono::steady_clock;
+    const bool enabled_;
+    const char* stage_;
+    Clock::time_point began_{};
+public:
+    explicit PathProfilePhase(const char* stage):enabled_([] {
+        const char* value=std::getenv("PROCESS_PATH_PROFILE");
+        return value && std::strcmp(value,"1")==0;
+    }()),stage_(stage) { if (enabled_) began_=Clock::now(); }
+    void mark(const char* next) {
+        if (enabled_) {
+            const auto now=Clock::now();
+            std::fprintf(stderr,"PROCESS_PATH_STAGE {\"stage\":\"%s\",\"seconds\":%.9g}\n",
+                stage_,std::chrono::duration<double>(now-began_).count());
+            began_=now;
+        }
+        stage_=next;
+    }
+    bool enabled() const { return enabled_; }
+    ~PathProfilePhase() { if (enabled_) mark(stage_); }
+};
+
 
 using Poly = std::vector<double>; // ascending powers on the unit interval
 
@@ -271,6 +312,9 @@ Small small_hermite(const mk_path_sample &a, const mk_path_sample &b, uint32_t j
     q.n = 6;
     q.c[0] = p0; q.c[1] = v0; q.c[2] = 0.5 * a0; q.c[3] = 10.0 * d - 4.0 * e + 0.5 * f;
     q.c[4] = -15.0 * d + 7.0 * e - f; q.c[5] = 6.0 * d - 3.0 * e + 0.5 * f;
+    // Exact zero coefficients carry no geometry. Preserve every nonzero term,
+    // including tiny process/rounding terms, while avoiding fictitious degree five work.
+    while (q.n > 1 && q.c[q.n-1] == 0.0) --q.n;
     return q;
 }
 
@@ -278,6 +322,15 @@ Small small_hermite(const mk_path_sample &a, const mk_path_sample &b, uint32_t j
 Small small_compose(const Small &outer, const double inner[3], int keep) {
     Small result{};
     result.n = 1;
+    if (outer.n <= 2) {
+        result.c[0] = outer.c[0];
+        if (outer.n == 2) {
+            result.n = std::min(3,keep);
+            result.c[0] = outer.c[1]*inner[0]+outer.c[0];
+            for (int k=1;k<result.n;++k) result.c[k] = outer.c[1]*inner[k];
+        }
+        return result;
+    }
     for (int k = outer.n - 1; k >= 0; --k) {
         double product[13] = {};
         const int size = std::min(result.n + 2, keep);
@@ -324,10 +377,31 @@ struct SpanCache {
     }
 };
 
+// An authored sample needs its own integer-clock anchor when geometry or the
+// feed limit changes. Consecutive spans representing exactly the same affine
+// function share a clock region: forcing every redundant sample onto a separate
+// nanosecond duration creates unnecessary acceleration corrections on tiny spans.
+// All authored samples remain in the path and in lowering/binding lookup tables.
+bool timing_anchor_required(const std::vector<mk_path_sample>& samples,
+                            const std::vector<double>& caps, std::size_t index) {
+    if (index == 0 || index + 1 == samples.size()) return true;
+    if (caps[index-1] != caps[index]) return true;
+    const double before = samples[index].s - samples[index-1].s;
+    const double after = samples[index+1].s - samples[index].s;
+    for (uint32_t joint = 0; joint < samples[index].joint_count; ++joint) {
+        const Small left = small_hermite(samples[index-1], samples[index], joint);
+        const Small right = small_hermite(samples[index], samples[index+1], joint);
+        for (int power = 2; power < 6; ++power)
+            if (left.c[power] != 0.0 || right.c[power] != 0.0) return true;
+        if (left.c[1] / before != right.c[1] / after) return true;
+    }
+    return false;
+}
+
 bool append_interval(const std::vector<mk_path_sample> &path, SpanCache &cache,
                      const mk_time_stage &stage, int64_t t0, int64_t t1,
                      double tolerance, mk_trajectory_handle trajectory,
-                     uint32_t depth) {
+                     uint32_t depth, const mk_limits* physical_limits = nullptr) {
     if (t1 <= t0) return true;
     const double s0 = stage_s(stage, t0), s1 = stage_s(stage, t1);
     auto found = std::upper_bound(path.begin(), path.end(), 0.5 * (s0 + s1),
@@ -351,6 +425,7 @@ bool append_interval(const std::vector<mk_path_sample> &path, SpanCache &cache,
     segment.degree = 5;
     segment.joint_count = a.joint_count;
     double worst = 0.0;
+    bool approximated = false;
     for (uint32_t joint = 0; joint < a.joint_count; ++joint) {
         const Small &authored = cache.poly[joint];
         if (cache.exact[joint]) {
@@ -358,15 +433,36 @@ bool append_interval(const std::vector<mk_path_sample> &path, SpanCache &cache,
             for (int i = 0; i < 6; ++i) segment.coefficients[joint].value[i] = fit.c[i] / duration_power[i];
             continue;
         }
-        const auto left = small_state(authored, ds, std::clamp((s0 - a.s) / ds, 0.0, 1.0));
-        const auto right = small_state(authored, ds, std::clamp((s1 - a.s) / ds, 0.0, 1.0));
+        const Small composed = small_compose(authored, normalized_s, 13);
+        double position_tail=0, velocity_tail=0, acceleration_tail=0;
+        for (int i=6;i<composed.n;++i) {
+            position_tail+=std::abs(composed.c[i]);
+            velocity_tail+=i*std::abs(composed.c[i])/duration;
+            acceleration_tail+=i*(i-1)*std::abs(composed.c[i])/(duration*duration);
+        }
+        // On a sub-tick geometric crossing, subtracting two absolute endpoint
+        // positions to refit a quintic can amplify one ULP into a large false
+        // acceleration. Use the directly composed polynomial when its omitted
+        // tail is below representation roundoff in position AND both derivatives.
+        const double roundoff=64*std::numeric_limits<double>::epsilon();
+        if (position_tail<=roundoff*std::max(1.0,std::abs(composed.c[0])) &&
+                velocity_tail<=roundoff*std::max(1.0,std::abs(composed.c[1]/duration)) &&
+                acceleration_tail<=roundoff*std::max(1.0,std::abs(2*composed.c[2]/(duration*duration)))) {
+            for (int i=0;i<6;++i) segment.coefficients[joint].value[i]=composed.c[i]/duration_power[i];
+            worst=std::max(worst,position_tail);
+            continue;
+        }
+        approximated = true;
+        const auto left = small_state(authored, ds, (s0 - a.s) / ds);
+        const auto right = small_state(authored, ds, (s1 - a.s) / ds);
         const Poly fit = hermite(left.position, left.first * v0 * duration,
             (left.second * v0 * v0 + left.first * stage.acceleration) * duration * duration,
             right.position, right.first * v1 * duration,
             (right.second * v1 * v1 + right.first * stage.acceleration) * duration * duration);
         for (size_t i = 0; i < fit.size(); ++i)
             segment.coefficients[joint].value[i] = fit[i] / duration_power[i];
-        const Small full = small_compose(authored, normalized_s, 13);
+        // The full composition above is independent of the endpoint fit.
+        const Small &full = composed;
         double residual[13] = {};
         double bound = 0.0;
         for (int i = 0; i < full.n; ++i) {
@@ -399,37 +495,221 @@ bool append_interval(const std::vector<mk_path_sample> &path, SpanCache &cache,
         for (double root : roots(derivative(extremum)))
             worst = std::max(worst, std::abs(eval(extremum, root)));
     }
-    if (worst > tolerance) {
+    // A geometric sample usually falls between integer ticks. Clamping a
+    // fitted endpoint to that sample creates a position correction over a tiny
+    // interval and an artificial acceleration spike. Instead extrapolate the
+    // selected polynomial and certify against every actual span it overlaps.
+    auto overlap=std::upper_bound(path.begin(),path.end(),s0,
+        [](double value,const mk_path_sample& sample){return value<sample.s;});
+    size_t other=overlap==path.begin() ? 0 : static_cast<size_t>(overlap-path.begin()-1);
+    for (;other+1<path.size() && path[other].s<s1;++other) {
+        if (other==index) continue;
+        const double length=path[other+1].s-path[other].s;
+        const double normalized[3]={(s0-path[other].s)/length,v0*duration/length,
+            0.5*stage.acceleration*duration*duration/length};
+        for (uint32_t joint=0;joint<a.joint_count;++joint) {
+            const auto actual=small_compose(small_hermite(path[other],path[other+1],joint),normalized,13);
+            double bound=0;
+            for (int k=0;k<actual.n;++k)
+                bound+=std::abs(actual.c[k]-(k<6 ? segment.coefficients[joint].value[k]*duration_power[k] : 0));
+            worst=std::max(worst,bound);
+        }
+    }
+    bool derivative_failure = false;
+    if (physical_limits && approximated) {
+        // A position-accurate Hermite fit can overshoot a saturated derivative.
+        // Refine only these representations, using the same exact continuous
+        // validator as the final trajectory, without changing any clock stage.
+        NativeResultOwner<mk_trajectory_handle,mk_trajectory_destroy> candidate;
+        auto local = segment; local.t0_ns = 0;
+        if (mk_trajectory_create(segment.joint_count,&candidate.value)!=MK_OK ||
+            mk_trajectory_append_segment(candidate.value,&local)!=MK_OK) return false;
+        mk_validation_report report{}; report.struct_size = sizeof(report);
+        if (mk_validate(candidate.value,physical_limits,&report)!=MK_OK) return false;
+        derivative_failure = report.checks[MK_CHECK_VELOCITY].status==MK_CHECK_FAILED ||
+            report.checks[MK_CHECK_ACCELERATION].status==MK_CHECK_FAILED;
+    }
+    if (worst > tolerance || derivative_failure) {
         if (depth >= 40 || t1 - t0 < 2) return false;
         const int64_t middle = t0 + (t1 - t0) / 2;
-        return append_interval(path, cache, stage, t0, middle, tolerance, trajectory, depth + 1) &&
-            append_interval(path, cache, stage, middle, t1, tolerance, trajectory, depth + 1);
+        return append_interval(path, cache, stage, t0, middle, tolerance, trajectory, depth + 1, physical_limits) &&
+            append_interval(path, cache, stage, middle, t1, tolerance, trajectory, depth + 1, physical_limits);
     }
     return mk_trajectory_append_segment(trajectory, &segment) == MK_OK;
 }
 
+struct PathSpeedCaps {
+    std::vector<double> knots;
+    std::vector<double> caps;
+    std::vector<double> grid, continuous_caps;
+};
+
 class VelocityWithCaps final : public toppra::constraint::LinearJointVelocity {
 public:
     VelocityWithCaps(const toppra::Vector &lower, const toppra::Vector &upper,
-                     std::vector<double> knots, std::vector<double> caps)
-        : LinearJointVelocity(lower, upper), knots_(std::move(knots)),
-          caps_(std::move(caps)) {}
+                     std::shared_ptr<const PathSpeedCaps> limits)
+        : LinearJointVelocity(lower, upper), limits_(std::move(limits)) {}
 
 protected:
     void computeVelocityLimits(double s) override {
-        auto next = std::upper_bound(knots_.begin(), knots_.end(), s);
-        size_t span = std::min(caps_.size() - 1,
-            static_cast<size_t>(std::max<int64_t>(0, next - knots_.begin() - 1)));
-        double cap = caps_[span] > 0.0 ? caps_[span] : 1e8;
-        if (span > 0 && std::abs(s - knots_[span]) < 1e-12 && caps_[span - 1] > 0.0)
-            cap = std::min(cap, caps_[span - 1]);
+        const auto& knots = limits_->knots;
+        const auto& caps = limits_->caps;
+        auto next = std::upper_bound(knots.begin(), knots.end(), s);
+        size_t span = std::min(caps.size() - 1,
+            static_cast<size_t>(std::max<int64_t>(0, next - knots.begin() - 1)));
+        double cap = caps[span] > 0.0 ? caps[span] : 1e8;
+        if (span > 0 && std::abs(s - knots[span]) < 1e-12 && caps[span - 1] > 0.0)
+            cap = std::min(cap, caps[span - 1]);
+        if (!limits_->continuous_caps.empty()) {
+            const auto node=std::lower_bound(limits_->grid.begin(),limits_->grid.end(),s);
+            if (node==limits_->grid.end() || *node!=s) throw std::logic_error("Velocity certificate grid mismatch");
+            cap=std::min(cap,limits_->continuous_caps[static_cast<size_t>(node-limits_->grid.begin())]);
+        }
         m_lower[m_lower.size() - 1] = -cap;
         m_upper[m_upper.size() - 1] = cap;
     }
 
 private:
-    std::vector<double> knots_;
-    std::vector<double> caps_;
+    std::shared_ptr<const PathSpeedCaps> limits_;
+};
+
+// For a constant-control stage, x(s)=x0+2*u*(s-s0). Joint acceleration
+// q''(s)*x(s)+q'(s)*u is a quartic polynomial, linear in (u,x0).
+// Bounding every Bernstein control bounds the complete interval, including
+// peaks that collocation misses. Final execution validation remains mandatory.
+class IntervalJointAcceleration final : public toppra::LinearConstraint {
+    toppra::Vector lower_, upper_, velocity_;
+    toppra::Matrices coefficients_;
+    std::vector<double> knots_, caps_;
+public:
+    IntervalJointAcceleration(const toppra::Vector& lower, const toppra::Vector& upper,
+            const toppra::Vector& velocity, const toppra::Matrices& coefficients, const std::vector<double>& knots,
+            const std::vector<double>& caps, size_t first, size_t after)
+        : LinearConstraint(14*lower.size(), 2, false, true, false), lower_(lower), upper_(upper), velocity_(velocity),
+          coefficients_(coefficients.begin()+(first ? first-1 : 0),
+              coefficients.begin()+std::min(after+1,coefficients.size())),
+          knots_(knots.begin()+(first ? first-1 : 0),
+              knots.begin()+std::min(after+2,knots.size())),
+          caps_(caps.begin()+(first ? first-1 : 0),
+              caps.begin()+std::min(after+1,caps.size())) {}
+protected:
+    void computeParams_impl(const toppra::GeometricPath& path, const toppra::Vector& grid,
+            toppra::Vectors& a, toppra::Vectors& b, toppra::Vectors& c,
+            toppra::Matrices& F, toppra::Vectors& g, toppra::Bounds& control_limits, toppra::Bounds&) override {
+        (void)path;
+        toppra::Matrix derivatives(5,lower_.size());
+        for (Eigen::Index i=0;i<grid.size();++i) {
+            const double h=i+1<grid.size() ? grid[i+1]-grid[i] : 0.0;
+            const auto next=std::upper_bound(knots_.begin(),knots_.end(),grid[i]);
+            const size_t span=std::min(coefficients_.size()-1,
+                static_cast<size_t>(std::max<ptrdiff_t>(0,next-knots_.begin()-1)));
+            const double offset=grid[i]-knots_[span];
+            // GeometricPath exposes derivatives only through order two. Use
+            // our owned polynomial snapshot for the complete Taylor law.
+            for (Eigen::Index joint=0;joint<lower_.size();++joint) for (int order=1;order<=5;++order) {
+                double value=0;
+                for (int power=5;power>=order;--power) {
+                    double factor=1;
+                    for (int n=0;n<order;++n) factor*=power-n;
+                    value=value*offset+coefficients_[span](5-power,joint)*factor;
+                }
+                derivatives(order-1,joint)=value;
+            }
+            a[i]<<1.0,0.0; b[i]<<0.0,1.0; c[i].setZero();
+            for (Eigen::Index joint=0;joint<lower_.size();++joint) {
+                double prime[5]{},second[5]{},control_u[5]{},control_x[5]{};
+                double factor=1.0;
+                for (int k=0;k<5;++k) {
+                    prime[k]=derivatives(k,joint)*factor;
+                    if (k<4) second[k]=derivatives(k+1,joint)*factor;
+                    factor*=h/(k+1);
+                }
+                for (int k=0;k<5;++k) {
+                    const double power_u=prime[k]+(k ? 2*h*second[k-1] : 0.0);
+                    for (int j=k;j<5;++j) {
+                        double ratio=1.0;
+                        for (int n=0;n<k;++n) ratio*=static_cast<double>(j-n)/(4-n);
+                        control_u[j]+=ratio*power_u;
+                        control_x[j]+=ratio*second[k];
+                    }
+                }
+                for (int k=0;k<5;++k) {
+                    const Eigen::Index row=14*joint+2*k;
+                    F[i](row,0)=control_u[k]; F[i](row,1)=control_x[k];
+                    F[i](row+1,0)=-control_u[k]; F[i](row+1,1)=-control_x[k];
+                    g[i][row]=upper_[joint]; g[i][row+1]=-lower_[joint];
+                }
+                // The integer clock can switch control on either side of a
+                // geometric curvature join. Enforce its incoming and outgoing
+                // accelerations as well as the nominal interval polynomial.
+                for (int side=0;side<2;++side) {
+                    const double point=side && i+1<grid.size() ? grid[i+1] : grid[i];
+                    auto after=std::upper_bound(knots_.begin(),knots_.end(),point);
+                    size_t other=std::min(coefficients_.size()-1,
+                        static_cast<size_t>(std::max<ptrdiff_t>(0,after-knots_.begin()-1)));
+                    if (!side && other>0 && point==knots_[other]) --other;
+                    double qprime=0,qsecond=0;
+                    const double offset=point-knots_[other];
+                    for (int power=5;power>=1;--power)
+                        qprime=qprime*offset+power*coefficients_[other](5-power,joint);
+                    for (int power=5;power>=2;--power)
+                        qsecond=qsecond*offset+power*(power-1)*coefficients_[other](5-power,joint);
+                    const Eigen::Index row=14*joint+10+2*side;
+                    const double u=qprime+2*(point-grid[i])*qsecond;
+                    F[i](row,0)=u; F[i](row,1)=qsecond;
+                    F[i](row+1,0)=-u; F[i](row+1,1)=-qsecond;
+                    g[i][row]=upper_[joint]; g[i][row+1]=-lower_[joint];
+                }
+            }
+            double cap=caps_[span]>0 ? caps_[span] : 1e8;
+            if (span>0 && std::abs(grid[i]-knots_[span])<1e-12 && caps_[span-1]>0)
+                cap=std::min(cap,caps_[span-1]);
+            // The collocated velocity constraints already bound this node's
+            // squared speed. Use that finite domain even without an authored
+            // feed cap, rather than the generic 1e16 path-speed ceiling.
+            for (Eigen::Index joint=0;joint<velocity_.size();++joint)
+                if (derivatives(0,joint)!=0) cap=std::min(cap,std::nextafter(
+                    std::nextafter(velocity_[joint]/std::abs(derivatives(0,joint)),std::numeric_limits<double>::infinity()),
+                    std::numeric_limits<double>::infinity()));
+            const long double xmax=std::nextafter(cap*cap,std::numeric_limits<double>::infinity());
+            const long double infinity=std::numeric_limits<long double>::infinity();
+            auto upward=[&](long double value){return std::nextafter(value,infinity);};
+            long double control_bound=infinity;
+            for (Eigen::Index row=0;row<F[i].rows();row+=2) {
+                const long double slope=std::abs(F[i](row,0));
+                if (slope>0) {
+                    const long double term=upward(std::abs(static_cast<long double>(F[i](row,1)))*xmax);
+                    const long double numerator=upward(std::max(g[i][row],g[i][row+1])+term);
+                    control_bound=std::min(control_bound,upward(numerator/slope));
+                }
+            }
+            // Retain the derived finite domain explicitly after conditioning.
+            const double bounded_control=std::nextafter(static_cast<double>(control_bound),
+                std::numeric_limits<double>::infinity());
+            control_limits[i]<<-bounded_control,bounded_control;
+            control_bound=bounded_control;
+            // At a tangent, a nonzero trigonometric remnant can turn the
+            // backward pass's rounding into an arbitrary control bound. Never
+            // drop it: replace its contribution by its proved worst case over
+            // the finite control domain, tightening both inequalities. Only do
+            // this when that contribution fits the arithmetic reserve.
+            for (Eigen::Index row=0;row<F[i].rows();row+=2) {
+                if (F[i](row,0)==0.0) continue;
+                const long double contribution=upward(std::abs(static_cast<long double>(F[i](row,0)))*control_bound);
+                // Tightening may consume only roundoff of the physical
+                // acceleration budget, never a large cancellation against Ax.
+                // In particular the feasible stationary state must survive.
+                const long double scale=std::max(g[i][row],g[i][row+1]);
+                if (std::isfinite(contribution) && contribution>0 && contribution<=
+                        512*std::numeric_limits<double>::epsilon()*scale) {
+                    F[i](row,0)=F[i](row+1,0)=0;
+                    for (int side=0;side<2;++side) g[i][row+side]=std::nextafter(
+                        static_cast<double>(static_cast<long double>(g[i][row+side])-contribution),
+                        -std::numeric_limits<double>::infinity());
+                }
+            }
+        }
+    }
 };
 
 // TOPP-RA's stages in a span of the path: enough that the profile and the acceleration peaks between its grid points
@@ -483,6 +763,8 @@ constexpr size_t STRAIGHT_ZONE_STAGES = straight_zone_stages();
 // Keep each solver's constraint tables bounded. Window boundaries propagate complete squared-speed
 // controllable intervals backwards and the actually reachable squared speed forwards.
 constexpr size_t WINDOW_NODES = 8192;
+constexpr double MAX_PATH_SQUARED_SPEED = 1e16;
+constexpr double MOVING_BOUNDARY_MARGIN = 0.98;
 
 // Stage positions within a span, chosen from its local velocity, curvature and acceleration bounds.
 struct SpanGrid {
@@ -621,8 +903,9 @@ mk_timing_binding binding_for_stage(const std::vector<mk_path_sample> &path,
 // into tens of m/s^2. A reference stage shorter than the rounding merges into
 // the next.
 //
-// Anchors (the path samples, which lowering needs at knots) are reached
-// exactly at their knots. Rounding the span's duration up leaves its stages
+// Anchors (path ends and changes in geometry or feed limits) are reached
+// exactly at their knots. Redundant affine samples share a clock region.
+// Rounding the region's duration up leaves its stages
 // up to a nanosecond of travel too far; that is taken off by scaling the
 // interior knot speeds by 1 - c*t*(L-t), a parabola in time that vanishes at
 // both anchors (least acceleration for a nearly constant speed: at most about
@@ -720,15 +1003,19 @@ bool stages_from_profile(const std::vector<double> &s, const std::vector<double>
     return true;
 }
 
-// Anchors the law's stage boundaries that are path samples.
+// Preserve required geometry/feed anchors when rebuilding an integer-clock law.
 std::vector<char> sample_anchors(const std::vector<mk_path_sample> &samples,
+                                 const std::vector<double>& caps,
                                  const std::vector<double> &positions) {
     std::vector<double> sample_s;
     sample_s.reserve(samples.size());
     for (const auto &sample : samples) sample_s.push_back(sample.s);
     std::vector<char> anchor(positions.size(), 0);
-    for (size_t i = 0; i < positions.size(); ++i)
-        anchor[i] = std::binary_search(sample_s.begin(), sample_s.end(), positions[i]);
+    for (size_t i = 0; i < positions.size(); ++i) {
+        const auto found = std::lower_bound(sample_s.begin(), sample_s.end(), positions[i]);
+        if (found != sample_s.end() && *found == positions[i])
+            anchor[i] = timing_anchor_required(samples, caps, static_cast<std::size_t>(found - sample_s.begin()));
+    }
     if (!anchor.empty()) anchor.front() = anchor.back() = 1;
     return anchor;
 }
@@ -736,7 +1023,7 @@ std::vector<char> sample_anchors(const std::vector<mk_path_sample> &samples,
 // Rebuilds the stages over their own distances, from `start_speed`, each
 // stage reaching its target end speed.
 bool retime_stages(std::vector<mk_time_stage> &stages,
-                   const std::vector<mk_path_sample> &samples, double start_speed,
+                   const std::vector<mk_path_sample> &samples, const std::vector<double>& caps, double start_speed,
                    const std::vector<double> &end_speeds) {
     std::vector<double> positions, speeds{start_speed};
     positions.reserve(stages.size() + 1);
@@ -745,24 +1032,24 @@ bool retime_stages(std::vector<mk_time_stage> &stages,
     // A law's speeds can dip below zero by rounding where it comes to rest.
     for (double speed : end_speeds) speeds.push_back(std::max(0.0, speed));
     speeds.front() = std::max(0.0, speeds.front());
-    return stages_from_profile(positions, speeds, sample_anchors(samples, positions), stages);
+    return stages_from_profile(positions, speeds, sample_anchors(samples, caps, positions), stages);
 }
 
 // Slows the whole law down uniformly by `factor`: every speed divided by it.
 bool stretch_stages(std::vector<mk_time_stage> &stages,
-                    const std::vector<mk_path_sample> &samples, double factor) {
+                    const std::vector<mk_path_sample> &samples, const std::vector<double>& caps, double factor) {
     if (stages.empty() || !(factor > 0.0)) return false;
     std::vector<double> ends;
     ends.reserve(stages.size());
     for (const auto &stage : stages)
         ends.push_back(stage_speed(stage, stage.start_ns + stage.duration_ns) / factor);
-    return retime_stages(stages, samples, stages.front().speed / factor, ends);
+    return retime_stages(stages, samples, caps, stages.front().speed / factor, ends);
 }
 
 // A collocation peak can exceed a joint bound after quintic lowering. Reduce
 // path speed around that peak, preserving all other stages' time scale.
 bool soften_stages(std::vector<mk_time_stage> &stages,
-                   const std::vector<mk_path_sample> &samples, double peak_time,
+                   const std::vector<mk_path_sample> &samples, const std::vector<double>& caps, double peak_time,
                    double factor) {
     if (stages.empty() || !std::isfinite(peak_time) || factor <= 1.0) return false;
     const int64_t peak_ns = static_cast<int64_t>(std::llround(peak_time * 1e9));
@@ -796,7 +1083,7 @@ bool soften_stages(std::vector<mk_time_stage> &stages,
         }
     }
     if (!changed) return false;
-    return retime_stages(stages, samples, speeds.front(),
+    return retime_stages(stages, samples, caps, speeds.front(),
         std::vector<double>(speeds.begin() + 1, speeds.end()));
 }
 
@@ -864,6 +1151,55 @@ mk_result MK_CALL mk_path_times_to_distances(mk_time_law_handle law, const doubl
     return MK_OK;
 }
 
+namespace {
+
+
+mk_result lower_path_samples(const std::vector<mk_path_sample>& samples,
+        const std::vector<mk_time_stage>& stages, double tolerance,
+        mk_trajectory_handle* out_trajectory, bool subrange = false, const mk_limits* physical_limits = nullptr) {
+    if (!out_trajectory || !std::isfinite(tolerance) || tolerance <= 0.0)
+        return MK_ERROR_INVALID_ARGUMENT;
+    out_trajectory->id = 0;
+    try {
+        if (subrange ? (stages.front().start_s < samples.front().s-1e-10 ||
+                end_s(stages.back()) > samples.back().s+1e-8) :
+                (std::abs(samples.front().s - stages.front().start_s) > 1e-10 ||
+                 std::abs(samples.back().s - end_s(stages.back())) > 1e-8))
+            return MK_ERROR_INVALID_ARGUMENT;
+        NativeResultOwner<mk_trajectory_handle, mk_trajectory_destroy> owner;
+        auto& trajectory = owner.value;
+        auto cache = std::make_unique<SpanCache>();
+        auto result = mk_trajectory_create(samples.front().joint_count, &trajectory);
+        if (result != MK_OK) return result;
+        for (const auto &stage : stages) {
+            std::vector<int64_t> knots{stage.start_ns,
+                stage.start_ns + stage.duration_ns};
+            const double stage_end = end_s(stage);
+            for (auto at = std::upper_bound(samples.begin(), samples.end(), stage.start_s,
+                     [](double value, const mk_path_sample &sample) { return value < sample.s; });
+                 at != samples.end() && at->s < stage_end; ++at) {
+                const auto &sample = *at;
+                double seconds = 0.0;
+                if (!inverse_time(stages, sample.s, seconds)) {
+                    return MK_ERROR_INVALID_ARGUMENT;
+                }
+                knots.push_back(static_cast<int64_t>(std::llround(seconds * 1e9)));
+            }
+            std::sort(knots.begin(), knots.end());
+            knots.erase(std::unique(knots.begin(), knots.end()), knots.end());
+            for (size_t i = 1; i < knots.size(); ++i) {
+                if (!append_interval(samples, *cache, stage, knots[i - 1], knots[i],
+                    tolerance, trajectory, 0, physical_limits)) {
+                    return MK_ERROR_GENERATION;
+                }
+            }
+        }
+        *out_trajectory = owner.release();
+        return MK_OK;
+    } catch (const std::bad_alloc&) { return MK_ERROR_OUT_OF_MEMORY; }
+}
+} // namespace
+
 mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
                                  double tolerance, mk_trajectory_handle *out_trajectory) {
     if (!out_trajectory || !std::isfinite(tolerance) || tolerance <= 0.0)
@@ -881,70 +1217,31 @@ mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
             samples = p->second;
             stages = l->second.stages;
         }
-        if (std::abs(samples.front().s - stages.front().start_s) > 1e-10 ||
-            std::abs(samples.back().s - end_s(stages.back())) > 1e-8)
-            return MK_ERROR_INVALID_ARGUMENT;
-        mk_trajectory_handle trajectory{};
-        auto cache = std::make_unique<SpanCache>();
-        auto result = mk_trajectory_create(samples.front().joint_count, &trajectory);
-        if (result != MK_OK) return result;
-        for (const auto &stage : stages) {
-            std::vector<int64_t> knots{stage.start_ns,
-                stage.start_ns + stage.duration_ns};
-            const double stage_end = end_s(stage);
-            for (auto at = std::upper_bound(samples.begin(), samples.end(), stage.start_s,
-                     [](double value, const mk_path_sample &sample) { return value < sample.s; });
-                 at != samples.end() && at->s < stage_end; ++at) {
-                const auto &sample = *at;
-                double seconds = 0.0;
-                if (!inverse_time(stages, sample.s, seconds)) {
-                    mk_trajectory_destroy(trajectory);
-                    return MK_ERROR_INVALID_ARGUMENT;
-                }
-                knots.push_back(static_cast<int64_t>(std::llround(seconds * 1e9)));
-            }
-            std::sort(knots.begin(), knots.end());
-            knots.erase(std::unique(knots.begin(), knots.end()), knots.end());
-            for (size_t i = 1; i < knots.size(); ++i) {
-                if (!append_interval(samples, *cache, stage, knots[i - 1], knots[i],
-                    tolerance, trajectory, 0)) {
-                    mk_trajectory_destroy(trajectory);
-                    return MK_ERROR_GENERATION;
-                }
-            }
-        }
-        *out_trajectory = trajectory;
-        return MK_OK;
-    } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
+        return lower_path_samples(samples, stages, tolerance, out_trajectory);
+    } catch (const std::bad_alloc&) { return MK_ERROR_OUT_OF_MEMORY; }
 }
 
 namespace {
-mk_result time_path(mk_path_handle path, const double *max_velocity,
-                    const double *max_acceleration, uint32_t joint_count,
-                    const double *speed_caps, uint32_t speed_cap_count,
-                    double start_speed, double end_speed,
-                    double lowering_tolerance, uint32_t require_feasible_path,
-                    mk_timing_report *out_report,
-                    mk_time_law_handle *out_law,
-                    mk_trajectory_handle *out_trajectory, bool reference) {
-    if (!out_law || !out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
-    out_law->id = 0;
-    out_trajectory->id = 0;
-    if(out_report){*out_report={};out_report->struct_size=sizeof(*out_report);out_report->joint=UINT32_MAX;out_report->sustainable_scale=1;}
-    if(require_feasible_path>1)return MK_ERROR_INVALID_ARGUMENT;
-    if (!std::isfinite(lowering_tolerance) || lowering_tolerance <= 0.0)
-        return MK_ERROR_INVALID_ARGUMENT;
-    std::vector<mk_path_sample> samples;
-    {
-        std::lock_guard lock(mutex);
-        const auto found = paths.find(path.id);
-        if (found == paths.end()) return MK_ERROR_INVALID_HANDLE;
-        samples = found->second;
-    }
-    if (!valid_timing_request(samples, max_velocity, max_acceleration, joint_count,
-        speed_caps, speed_cap_count, start_speed, end_speed))
-        return MK_ERROR_INVALID_ARGUMENT;
-    try {
+// Prepared geometry, adaptive grid and constraints have one owner independent of any
+// endpoint solve/result. A session can retain this object without capturing a caller's stack.
+class PreparedTimingPath {
+public:
+    std::vector<double> knots, caps, grid_values;
+    toppra::Matrices coefficients;
+    std::shared_ptr<toppra::PiecewisePolyPath> geometric;
+    bool nonlinear = false;
+    bool interval_acceleration = false;
+    std::vector<size_t> span_first, window_first;
+    std::shared_ptr<const std::vector<uint32_t>> shared_stage_span;
+    toppra::Vector grid, lower_velocity, upper_velocity, lower_acceleration, upper_acceleration;
+    std::shared_ptr<const PathSpeedCaps> window_limits;
+    size_t span_count = 0;
+
+    PreparedTimingPath(const std::vector<mk_path_sample>& samples, const double* max_velocity,
+            const double* max_acceleration, uint32_t joint_count, const double* speed_caps,
+            uint32_t speed_cap_count, bool moving_boundary, bool reference, bool bound_intervals = false) {
+        interval_acceleration = bound_intervals;
+        PathProfilePhase stage_profile("native_geometry");
         const auto dof = static_cast<Eigen::Index>(joint_count + 1);
         // Scale each joint by its velocity limit so rotary shafts and linear
         // carriages have comparable LP coefficients. The time law remains in
@@ -952,29 +1249,38 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
         std::vector<double> coordinate_scale(joint_count);
         for (uint32_t j = 0; j < joint_count; ++j)
             coordinate_scale[j] = 1.0 / max_velocity[j];
-        std::vector<double> knots, caps;
-        toppra::Matrices coefficients;
+        size_t affine_spans=0, zero_curvature_spans=0;
         knots.reserve(samples.size());
         caps.reserve(samples.size() - 1);
         coefficients.reserve(samples.size() - 1);
         for (const auto &sample : samples) knots.push_back(sample.s);
         for (size_t i = 0; i + 1 < samples.size(); ++i) {
             const double ds = samples[i + 1].s - samples[i].s;
+            bool affine_span=true, zero_curvature_span=true;
             toppra::Matrix matrix = toppra::Matrix::Zero(6, dof);
             for (uint32_t j = 0; j < joint_count; ++j) {
                 const Poly p = path_poly(samples[i], samples[i + 1], j);
+                if (stage_profile.enabled()) {
+                    if (samples[i].second[j]!=0 || samples[i+1].second_before[j]!=0 ||
+                        samples[i].first[j]!=samples[i+1].first[j]) zero_curvature_span=false;
+                    for (size_t k=2;k<p.size();++k) if (std::abs(p[k])>=1e-12) affine_span=false;
+                }
                 for (size_t k = 0; k < p.size(); ++k)
                     matrix(5 - static_cast<Eigen::Index>(k), j) =
                         p[k] * coordinate_scale[j] /
                         std::pow(ds, static_cast<int>(k));
+            }
+            if (stage_profile.enabled()) {
+                if (affine_span) ++affine_spans;
+                if (zero_curvature_span) ++zero_curvature_spans;
             }
             matrix(4, joint_count) = 1.0;
             matrix(5, joint_count) = samples[i].s;
             coefficients.push_back(std::move(matrix));
             caps.push_back(speed_cap_count ? speed_caps[i] : 0.0);
         }
-        auto geometric = std::make_shared<toppra::PiecewisePolyPath>(coefficients, knots);
-        bool nonlinear = false;
+        geometric = std::make_shared<toppra::PiecewisePolyPath>(coefficients, knots);
+        nonlinear = false;
         for (size_t span = 0; span + 1 < samples.size() && !nonlinear; ++span)
             for (uint32_t joint = 0; joint < joint_count; ++joint)
                 if (std::abs(samples[span].second[joint]) > 1e-10 ||
@@ -987,15 +1293,14 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
         // path. Reserve room for those peaks; final validation still uses the
         // caller's exact acceleration limit.
         const double interpolation_margin = nonlinear ? 0.8 : 1.0;
-        const double moving_boundary_margin = (start_speed > 0.0 || end_speed > 0.0)
-            ? 0.98 : 1.0;
+        const double moving_boundary_margin = moving_boundary ? MOVING_BOUNDARY_MARGIN : 1.0;
         std::vector<double> grid_velocity(joint_count);
         for (uint32_t j = 0; j < joint_count; ++j)
             grid_velocity[j] = max_velocity[j] * moving_boundary_margin;
+        stage_profile.mark("grid_construction");
         // Stages per span, and the grid they make: each span's first point is a path sample (an anchor).
-        std::vector<size_t> span_first(samples.size(), 0);
+        span_first.resize(samples.size(), 0);
         std::vector<uint32_t> stage_span;
-        std::vector<double> grid_values;
         for (size_t span = 0; span + 1 < samples.size(); ++span) {
             span_first[span] = stage_span.size();
             const auto span_grid = nodes_for_span(samples, span, grid_velocity.data(), max_acceleration, joint_count,
@@ -1008,9 +1313,13 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
         }
         span_first.back() = stage_span.size();
         grid_values.push_back(samples.back().s);
-        toppra::Vector grid = Eigen::Map<const toppra::Vector>(grid_values.data(), static_cast<Eigen::Index>(grid_values.size()));
-        toppra::Vector lower_velocity(dof), upper_velocity(dof);
-        toppra::Vector lower_acceleration(dof), upper_acceleration(dof);
+        if (stage_profile.enabled())
+            std::fprintf(stderr,"PROCESS_PATH_KIND {\"affine_spans\":%zu,\"zero_curvature_spans\":%zu,\"spans\":%zu,\"grid_nodes\":%zu,\"joints\":%u}\n",
+                affine_spans,zero_curvature_spans,samples.size()-1,grid_values.size(),joint_count);
+        shared_stage_span = std::make_shared<const std::vector<uint32_t>>(std::move(stage_span));
+        grid = Eigen::Map<const toppra::Vector>(grid_values.data(), static_cast<Eigen::Index>(grid_values.size()));
+        lower_velocity.resize(dof); upper_velocity.resize(dof);
+        lower_acceleration.resize(dof); upper_acceleration.resize(dof);
         for (uint32_t j = 0; j < joint_count; ++j) {
             lower_velocity[j] = -max_velocity[j] * coordinate_scale[j] * moving_boundary_margin;
             upper_velocity[j] = max_velocity[j] * coordinate_scale[j] * moving_boundary_margin;
@@ -1023,107 +1332,211 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
         upper_velocity[joint_count] = 1e8;
         lower_acceleration[joint_count] = -1e12;
         upper_acceleration[joint_count] = 1e12;
-        toppra::LinearConstraintPtrs constraints{
-            std::make_shared<VelocityWithCaps>(lower_velocity, upper_velocity, knots, caps),
-            std::make_shared<toppra::constraint::LinearJointAcceleration>(
-                lower_acceleration, upper_acceleration)};
-        for (auto &constraint : constraints)
-            constraint->discretizationType(toppra::DiscretizationType::Collocation);
+        // Cap lookup data is immutable across windows. Constraint objects retain
+        // mutable evaluation scratch, so every window owns separate instances.
+        std::vector<double> continuous_caps;
+        if (bound_intervals) {
+            continuous_caps.assign(grid_values.size(),1e8);
+            for (size_t span=0;span+1<samples.size();++span) {
+                const double ds=knots[span+1]-knots[span];
+                for (uint32_t joint=0;joint<joint_count;++joint) {
+                    const auto q=small_hermite(samples[span],samples[span+1],joint);
+                    Small prime{};prime.n=std::max(1,q.n-1);
+                    bool varying=false;
+                    for (int k=1;k<q.n;++k) {
+                        prime.c[k-1]=k*q.c[k]*coordinate_scale[joint]/ds;
+                        if (k>1 && prime.c[k-1]!=0) varying=true;
+                    }
+                    if (!varying) continue; // Existing point bounds are exact for constant tangents.
+                    for (size_t node=span_first[span];node<span_first[span+1];++node) {
+                        const double inner[3]={(grid_values[node]-knots[span])/ds,
+                            (grid_values[node+1]-grid_values[node])/ds,0};
+                        const auto local=small_compose(prime,inner,5);
+                        long double magnitude=0,bound=0;
+                        for (int k=0;k<local.n;++k) magnitude+=std::abs(static_cast<long double>(local.c[k]));
+                        for (int control=0;control<5;++control) {
+                            long double value=0;
+                            for (int k=0;k<=control;++k) {
+                                long double ratio=1;
+                                for (int n=0;n<k;++n) ratio*=static_cast<long double>(control-n)/(4-n);
+                                value+=ratio*local.c[k];
+                            }
+                            bound=std::max(bound,std::abs(value));
+                        }
+                        // Bernstein's convex hull bounds the full quartic
+                        // tangent. Both endpoint squared-speed bounds enforce
+                        // it throughout the affine x(s), without extra LP rows.
+                        bound+=512*std::numeric_limits<double>::epsilon()*magnitude;
+                        if (bound==0) continue;
+                        const double cap=std::nextafter(static_cast<double>(moving_boundary_margin/bound),0.0);
+                        continuous_caps[node]=std::min(continuous_caps[node],cap);
+                        continuous_caps[node+1]=std::min(continuous_caps[node+1],cap);
+                    }
+                }
+            }
+        }
+        window_limits = std::make_shared<const PathSpeedCaps>(PathSpeedCaps{knots,caps,grid_values,std::move(continuous_caps)});
         // Full controllable intervals matter: a following window may require a minimum entry speed to reach
         // a moving end, and a maximum computed for one fixed exit is not a valid bound for every slower exit.
-        std::vector<size_t> window_first{0};
-        const size_t span_count = samples.size() - 1;
+        window_first.push_back(0);
+        span_count = samples.size() - 1;
         for (size_t span = 1; span < span_count && !reference; ++span)
             if (span_first[span] - span_first[window_first.back()] >= WINDOW_NODES &&
                 span_first[span_count] - span_first[span] >= WINDOW_NODES / 4) window_first.push_back(span);
-        // One mutable workspace per planning call, shared only by sequential sweeps.
-        // Each retained algorithm releases it before the next problem initializes it.
+    }
+
+    std::unique_ptr<toppra::algorithm::TOPPRA> make_window(size_t window,
+            const std::shared_ptr<toppra::solver::Seidel>& workspace) const {
+        const size_t first_node = span_first[window_first[window]];
+        const size_t last_node = window + 1 < window_first.size() ? span_first[window_first[window + 1]]
+            : grid_values.size() - 1;
+        toppra::Vector window_grid = Eigen::Map<const toppra::Vector>(grid_values.data() + first_node,
+            static_cast<Eigen::Index>(last_node - first_node + 1));
+        std::shared_ptr<toppra::GeometricPath> window_path = geometric;
+        if (window_first.size() > 1) {
+            const size_t first_span = window_first[window];
+            const size_t after_span = window + 1 < window_first.size() ? window_first[window + 1] : span_count;
+            toppra::Matrices window_coefficients(coefficients.begin() + static_cast<std::ptrdiff_t>(first_span),
+                coefficients.begin() + static_cast<std::ptrdiff_t>(after_span));
+            std::vector<double> window_knots(knots.begin() + static_cast<std::ptrdiff_t>(first_span),
+                knots.begin() + static_cast<std::ptrdiff_t>(after_span) + 1);
+            window_path = std::make_shared<toppra::PiecewisePolyPath>(window_coefficients, window_knots);
+        }
+        toppra::LinearConstraintPtrs constraints{
+            std::make_shared<VelocityWithCaps>(lower_velocity, upper_velocity, window_limits)};
+        if (interval_acceleration) {
+            const size_t first_span=window_first[window];
+            const size_t after_span=window+1<window_first.size() ? window_first[window+1] : span_count;
+            constraints.push_back(std::make_shared<IntervalJointAcceleration>(lower_acceleration,upper_acceleration,upper_velocity,
+                coefficients,knots,caps,first_span,after_span));
+        }
+        else constraints.push_back(std::make_shared<toppra::constraint::LinearJointAcceleration>(
+            lower_acceleration, upper_acceleration));
+        for (auto& constraint : constraints)
+            constraint->discretizationType(toppra::DiscretizationType::Collocation);
+        auto algorithm = std::make_unique<toppra::algorithm::TOPPRA>(std::move(constraints), window_path);
+        algorithm->solver(workspace);
+        algorithm->setGridpoints(window_grid);
+        algorithm->setInitialXBounds(toppra::Bound{0.0, MAX_PATH_SQUARED_SPEED});
+        return algorithm;
+    }
+
+    std::unique_ptr<motionkit::RetainedWindowTiming> make_serial_timing() const {
         auto workspace = std::make_shared<toppra::solver::Seidel>();
-        auto make_window = [&](size_t window) {
-            const size_t first_node = span_first[window_first[window]];
-            const size_t last_node = window + 1 < window_first.size() ? span_first[window_first[window + 1]]
-                : grid_values.size() - 1;
-            toppra::Vector window_grid = Eigen::Map<const toppra::Vector>(grid_values.data() + first_node,
-                static_cast<Eigen::Index>(last_node - first_node + 1));
-            std::shared_ptr<toppra::GeometricPath> window_path = geometric;
-            if (window_first.size() > 1) {
-                const size_t first_span = window_first[window];
-                const size_t after_span = window + 1 < window_first.size() ? window_first[window + 1] : span_count;
-                toppra::Matrices window_coefficients(coefficients.begin() + static_cast<std::ptrdiff_t>(first_span),
-                    coefficients.begin() + static_cast<std::ptrdiff_t>(after_span));
-                std::vector<double> window_knots(knots.begin() + static_cast<std::ptrdiff_t>(first_span),
-                    knots.begin() + static_cast<std::ptrdiff_t>(after_span) + 1);
-                window_path = std::make_shared<toppra::PiecewisePolyPath>(window_coefficients, window_knots);
-            }
-            auto algorithm = std::make_unique<toppra::algorithm::TOPPRA>(constraints, window_path);
-            algorithm->solver(workspace);
-            algorithm->setGridpoints(window_grid);
-            algorithm->setInitialXBounds(toppra::Bound{0.0, 1e16});
-            return algorithm;
-        };
-        if (out_report) {
-            out_report->windows = static_cast<uint32_t>(window_first.size());
-            out_report->boundary_lowerings = 0;
+        std::vector<std::unique_ptr<motionkit::RetainedWindowTiming::Algorithm>> problems;
+        problems.reserve(window_first.size());
+        for (size_t window = 0; window < window_first.size(); ++window)
+            problems.push_back(make_window(window, workspace));
+        return std::make_unique<motionkit::RetainedWindowTiming>(std::move(problems));
+    }
+};
+
+struct PathTimingSession {
+    std::mutex access;
+    std::shared_ptr<const std::vector<mk_path_sample>> samples;
+    std::vector<double> velocity, acceleration, caps;
+    double lowering_tolerance;
+    uint32_t require_feasible_path;
+    bool moving_boundary = false;
+    std::unique_ptr<PreparedTimingPath> prepared;
+    std::unique_ptr<motionkit::RetainedWindowTiming> retained;
+
+    const PreparedTimingPath& prepare(bool moving) {
+        if (!prepared || moving_boundary != moving) {
+            retained.reset();
+            prepared = std::make_unique<PreparedTimingPath>(*samples, velocity.data(), acceleration.data(),
+                static_cast<uint32_t>(velocity.size()), caps.empty() ? nullptr : caps.data(),
+                static_cast<uint32_t>(caps.size()), moving, false);
+            moving_boundary = moving;
         }
-        std::vector<std::unique_ptr<toppra::algorithm::TOPPRA>> retained(window_first.size());
-        std::vector<toppra::Bound> controllable(window_first.size() + 1);
-        controllable.back().setConstant(end_speed * end_speed);
-        // The first window computes its backward pass in the forward call below. Propagate only later
-        // windows here, retaining compact backward results but releasing constraint tables.
-        // Solver workspace stays bounded by one window in both sweeps.
-        if (window_first.size() > 1) for (size_t window = window_first.size() - 1; window > 0; --window) {
-            auto algorithm = make_window(window);
-            const auto result = algorithm->computeControllableSetsFromSquaredSpeed(controllable[window + 1]);
-            if (result != toppra::ReturnCode::OK) {
-                if (std::getenv("PROCESS_PATH_PROFILE"))
-                    std::fprintf(stderr, "PROCESS_PATH_WINDOW window=%zu result=%d %s\n", window,
-                        static_cast<int>(result), algorithm->getErrorMessage().c_str());
-                return MK_ERROR_GENERATION;
-            }
-            controllable[window] = algorithm->getParameterizationData().controllable_sets.row(0);
-            algorithm->releaseSolverWorkspace();
-            retained[window] = std::move(algorithm);
-        }
-        std::vector<double> speeds(grid_values.size(), 0.0);
-        double reached_squared = start_speed * start_speed;
-        for (size_t window = 0; window < window_first.size(); ++window) {
-            auto algorithm = window == 0 ? make_window(window) : std::move(retained[window]);
-            const auto result = window == 0
-                ? algorithm->computePathParametrizationFromSquaredSpeed(reached_squared, controllable[window + 1])
-                : algorithm->computeForwardFromControllableSets(reached_squared, workspace);
-            if (result != toppra::ReturnCode::OK) {
-                if (std::getenv("PROCESS_PATH_PROFILE"))
-                    std::fprintf(stderr, "PROCESS_PATH_WINDOW window=%zu result=%d %s\n", window,
-                        static_cast<int>(result), algorithm->getErrorMessage().c_str());
-                return MK_ERROR_GENERATION;
-            }
-            const auto &data = algorithm->getParameterizationData();
-            const size_t first_node = span_first[window_first[window]];
-            const size_t last_node = window + 1 < window_first.size() ? span_first[window_first[window + 1]]
-                : grid_values.size() - 1;
-            for (size_t node = first_node; node <= last_node; ++node)
-                speeds[node] = std::sqrt(std::max(0.0, data.parametrization[static_cast<Eigen::Index>(node - first_node)]));
-            reached_squared = data.parametrization[data.parametrization.size() - 1];
-        }
-        speeds.front() = start_speed;
-        speeds.back() = end_speed;
+        return *prepared;
+    }
+    motionkit::RetainedWindowTiming& timing() {
+        if (!prepared) throw std::logic_error("Timing session has no prepared path");
+        if (!retained) retained = prepared->make_serial_timing();
+        return *retained;
+    }
+};
+std::unordered_map<uint32_t, std::shared_ptr<PathTimingSession>> timing_sessions;
+uint32_t next_timing_session = 1;
+
+// Any failed attempt invalidates incremental state, including validation/lowering
+// failures after a successful backward pass. Prepared immutable geometry survives.
+struct TimingSessionAttempt {
+    PathTimingSession* session;
+    bool accepted = false;
+    ~TimingSessionAttempt() { if (session && !accepted) session->retained.reset(); }
+};
+
+// Borrowed only for this synchronous lowering call. Returned diagnostics copy
+// shared ownership of their samples/caps/span indices, never references to this view.
+struct PathProfileView {
+    const std::shared_ptr<const std::vector<mk_path_sample>>& shared_samples;
+    const std::vector<size_t>& span_first;
+    const toppra::Vector& grid;
+    const std::shared_ptr<const std::vector<uint32_t>>& shared_stage_span;
+    const std::shared_ptr<const PathSpeedCaps>& window_limits;
+    bool nonlinear;
+};
+struct PathProfileLimits {
+    const double* velocity;
+    const double* acceleration;
+    uint32_t joint_count;
+};
+struct PathProfileBoundary {
+    double start_speed;
+    double end_speed;
+    double lowering_tolerance;
+    uint32_t require_feasible_path;
+};
+
+// Lower and validate a supplied profile without rebuilding its geometry, grid
+// or constraint policy. The same path will serve full and streamed profiles.
+mk_result lower_timed_profile(const PathProfileView& view, const PathProfileLimits& joint_limits,
+        const PathProfileBoundary& boundary, std::vector<double> speeds,
+        mk_timing_report* out_report, mk_time_law_handle* out_law, mk_trajectory_handle* out_trajectory,
+        const std::vector<mk_time_stage>* clock_stages = nullptr,
+        const std::shared_ptr<const std::vector<mk_path_sample>>* clock_geometry = nullptr) {
+    if (!out_law || !out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
+    out_law->id = 0; out_trajectory->id = 0;
+    if (speeds.size() != static_cast<size_t>(view.grid.size()) || speeds.size() < 2)
+        return MK_ERROR_INVALID_ARGUMENT;
+    const auto& shared_samples = view.shared_samples;
+    const auto& samples = *shared_samples;
+    const auto& caps = view.window_limits->caps;
+    const auto& span_first = view.span_first;
+    const auto& grid = view.grid;
+    const bool nonlinear = view.nonlinear;
+    const auto* max_velocity = joint_limits.velocity;
+    const auto* max_acceleration = joint_limits.acceleration;
+    const uint32_t joint_count = joint_limits.joint_count;
+    const double start_speed = boundary.start_speed, end_speed = boundary.end_speed;
+    const double lowering_tolerance = boundary.lowering_tolerance;
+    const uint32_t require_feasible_path = boundary.require_feasible_path;
+    try {
         std::vector<mk_time_stage> stages;
         std::vector<double> positions(grid.data(), grid.data() + grid.size());
         std::vector<char> anchors(positions.size(), 0);
-        for (size_t span = 0; span + 1 < samples.size(); ++span) anchors[span_first[span]] = 1;
+        for (size_t span = 0; span + 1 < samples.size(); ++span)
+            anchors[span_first[span]] = timing_anchor_required(samples, caps, span);
         anchors.back() = 1;
-        if (!stages_from_profile(positions, speeds, anchors, stages)) return MK_ERROR_GENERATION;
-        mk_time_law_handle created{};
+        if (clock_stages) stages=*clock_stages;
+        else if (!stages_from_profile(positions, speeds, anchors, stages)) return MK_ERROR_GENERATION;
+        NativeResultOwner<mk_time_law_handle, mk_time_law_destroy> law_owner;
+        NativeResultOwner<mk_trajectory_handle, mk_trajectory_destroy> trajectory_owner;
+        auto& created = law_owner.value;
         bool accepted = false;
         for (int attempt = 0; attempt < 24; ++attempt) {
+            PathProfilePhase stage_profile("law_registration");
             const auto result = mk_time_law_create(stages.data(),
                 static_cast<uint32_t>(stages.size()), &created);
             if (result != MK_OK) return result;
-            mk_trajectory_handle lowered{};
-            const auto lowered_result = mk_path_lower(path, created,
-                lowering_tolerance, &lowered);
+            auto& lowered = trajectory_owner.value;
+            stage_profile.mark("polynomial_lowering");
+            const auto lowered_result = lower_path_samples(clock_geometry ? **clock_geometry : samples, stages,
+                lowering_tolerance, &lowered, clock_geometry != nullptr);
             if (lowered_result != MK_OK) {
-                mk_time_law_destroy(created);
+                law_owner.reset();
                 return lowered_result;
             }
             mk_limits limits{};
@@ -1136,11 +1549,27 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
             }
             mk_validation_report report{};
             report.struct_size = sizeof(report);
+            stage_profile.mark("continuous_validation");
             const auto validation = mk_validate(lowered, &limits, &report);
+            stage_profile.mark("validation_policy");
             if (validation != MK_OK) {
-                mk_trajectory_destroy(lowered);
-                mk_time_law_destroy(created);
+                trajectory_owner.reset();
+                law_owner.reset();
                 return MK_ERROR_GENERATION;
+            }
+            if (clock_stages && (report.checks[MK_CHECK_VELOCITY].status==MK_CHECK_FAILED ||
+                    report.checks[MK_CHECK_ACCELERATION].status==MK_CHECK_FAILED)) {
+                // Try a derivative-certified representation of the unchanged
+                // law before rejecting it. Normal successful paths pay no
+                // per-piece validation cost.
+                trajectory_owner.reset();
+                stage_profile.mark("derivative_certified_lowering");
+                const auto refined = lower_path_samples(clock_geometry ? **clock_geometry : samples,
+                    stages,lowering_tolerance,&lowered,clock_geometry!=nullptr,&limits);
+                if (refined!=MK_OK) return refined;
+                stage_profile.mark("continuous_validation");
+                if (mk_validate(lowered,&limits,&report)!=MK_OK) return MK_ERROR_GENERATION;
+                stage_profile.mark("validation_policy");
             }
             double factor = 1.0;
             const auto &velocity_check = report.checks[MK_CHECK_VELOCITY];
@@ -1168,34 +1597,65 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
                     factor, velocity_check.joint, velocity_check.value, velocity_check.limit,
                     acceleration_check.joint, acceleration_check.value,
                     acceleration_check.limit, acceleration_check.time_seconds);
+                if (velocity_check.status==MK_CHECK_FAILED && velocity_check.joint<joint_count) {
+                    const auto& geometry=clock_geometry ? **clock_geometry : samples;
+                    const int64_t tick=std::llround(velocity_check.time_seconds*1e9);
+                    auto at=std::upper_bound(stages.begin(),stages.end(),tick,
+                        [](int64_t t,const mk_time_stage& stage){return t<stage.start_ns;});
+                    if (at!=stages.begin()) --at;
+                    const double distance=stage_s(*at,tick),speed=stage_speed(*at,tick);
+                    auto point=std::upper_bound(geometry.begin(),geometry.end(),distance,
+                        [](double value,const mk_path_sample& sample){return value<sample.s;});
+                    const size_t span=std::min(geometry.size()-2,point==geometry.begin() ? size_t{0} : static_cast<size_t>(point-geometry.begin()-1));
+                    const auto q=path_state(geometry[span],geometry[span+1],velocity_check.joint,distance);
+                    std::fprintf(stderr,"PROCESS_PATH_VELOCITY_FAILURE time=%.17g span=%zu distance=%.17g speed=%.17g reference=%.17g fitted=%.17g\n",
+                        velocity_check.time_seconds,span,distance,speed,q.first*speed,velocity_check.value);
+                }
+                if (acceleration_check.status==MK_CHECK_FAILED && acceleration_check.joint<joint_count) {
+                    const auto& geometry=clock_geometry ? **clock_geometry : samples;
+                    const double time=acceleration_check.time_seconds;
+                    const int64_t tick=std::llround(time*1e9);
+                    auto at=std::upper_bound(stages.begin(),stages.end(),tick,
+                        [](int64_t t,const mk_time_stage& stage){return t<stage.start_ns;});
+                    if (at!=stages.begin()) --at;
+                    const double s=stage_s(*at,tick),v=stage_speed(*at,tick);
+                    auto point=std::upper_bound(geometry.begin(),geometry.end(),s,
+                        [](double distance,const mk_path_sample& point){return distance<point.s;});
+                    size_t span=point==geometry.begin() ? 0 : static_cast<size_t>(point-geometry.begin()-1);
+                    span=std::min(span,geometry.size()-2);
+                    const auto q=path_state(geometry[span],geometry[span+1],acceleration_check.joint,s);
+                    std::fprintf(stderr,"PROCESS_PATH_ACCELERATION_FAILURE {\"span\":%zu,\"distance\":%.17g,\"speed\":%.17g,\"control\":%.17g,\"reference_acceleration\":%.17g,\"fitted_acceleration\":%.17g,\"stage_ns\":%lld,\"span_length\":%.17g}\n",
+                        span,s,v,at->acceleration,q.first*at->acceleration+q.second*v*v,
+                        acceleration_check.value,static_cast<long long>(at->duration_ns),geometry[span+1].s-geometry[span].s);
+                }
             }
             if (factor <= 1.0) {
                 accepted = true;
-                *out_trajectory = lowered;
                 break;
             }
-            mk_trajectory_destroy(lowered);
-            mk_time_law_destroy(created);
-            if(require_feasible_path)return MK_ERROR_GENERATION;
+            trajectory_owner.reset();
+            law_owner.reset();
+            // A supplied clock preview has an owned continuation cursor. A
+            // local retry must not silently retime it behind that cursor.
+            if(require_feasible_path || clock_stages)return MK_ERROR_GENERATION;
             // Uniform stretching would change an authored moving endpoint
             // speed, so report infeasibility instead of returning a law with
             // a different boundary contract.
             if (start_speed > 0.0 || end_speed > 0.0) return MK_ERROR_GENERATION;
             // Both boundaries are at rest here (checked above).
-            if (stages.size() > 1000 &&
+            if (nonlinear && stages.size() > 1000 &&
                 acceleration_check.status == MK_CHECK_FAILED && attempt < 20 &&
-                soften_stages(stages, samples, acceleration_check.time_seconds, factor * 1.002))
+                soften_stages(stages, samples, caps, acceleration_check.time_seconds, factor * 1.002))
                 continue;
-            if (!stretch_stages(stages, samples, factor * 1.002)) return MK_ERROR_GENERATION;
+            if (!stretch_stages(stages, samples, caps, factor * 1.002)) return MK_ERROR_GENERATION;
         }
         if (!accepted) return MK_ERROR_GENERATION;
         {
             // Bindings name TOPP-RA's own stages, with its own control.
-            auto shared_samples = std::make_shared<const std::vector<mk_path_sample>>(std::move(samples));
             std::vector<double> velocity_limits(max_velocity, max_velocity + joint_count);
             std::vector<double> acceleration_limits(max_acceleration, max_acceleration + joint_count);
             auto make = [shared_samples, positions = std::move(positions), speeds = std::move(speeds),
-                         stage_span = std::move(stage_span), caps = std::move(caps),
+                         stage_span = view.shared_stage_span, limits = view.window_limits,
                          velocity_limits = std::move(velocity_limits),
                          acceleration_limits = std::move(acceleration_limits)]() {
                 std::vector<mk_timing_binding> bindings;
@@ -1204,18 +1664,273 @@ mk_result time_path(mk_path_handle path, const double *max_velocity,
                     const double ds = positions[i + 1] - positions[i];
                     const double path_acceleration =
                         (speeds[i + 1] * speeds[i + 1] - speeds[i] * speeds[i]) / (2.0 * ds);
-                    const auto span = stage_span[i];
+                    const auto span = (*stage_span)[i];
                     bindings.push_back(binding_for_stage(*shared_samples, static_cast<uint32_t>(span),
                         static_cast<uint32_t>(i), 0.5 * (positions[i] + positions[i + 1]),
                         std::max(0.0, speeds[i] * speeds[i] + path_acceleration * ds),
-                        path_acceleration, velocity_limits.data(), acceleration_limits.data(), caps[span]));
+                        path_acceleration, velocity_limits.data(), acceleration_limits.data(), limits->caps[span]));
                 }
                 return bindings;
             };
             std::lock_guard lock(mutex);
             laws.at(created.id).make_bindings = std::move(make);
         }
-        *out_law = created;
+        *out_law = law_owner.release();
+        *out_trajectory = trajectory_owner.release();
+        return MK_OK;
+    } catch (const std::bad_alloc&) { return MK_ERROR_OUT_OF_MEMORY; }
+    catch (...) { return MK_ERROR_GENERATION; }
+}
+
+// A window view copies only its own sample/grid slice. It preserves the
+// prepared whole-path policy and never recomputes adaptive nodes or reserves.
+struct PathProfileSlice {
+    std::shared_ptr<const std::vector<mk_path_sample>> samples;
+    std::vector<size_t> span_first;
+    toppra::Vector grid;
+    std::shared_ptr<const std::vector<uint32_t>> stage_span;
+    std::shared_ptr<const PathSpeedCaps> caps;
+    bool nonlinear;
+    size_t first_span, after_span, first_node;
+    PathProfileSlice(const std::shared_ptr<const std::vector<mk_path_sample>>& all_samples,
+            const PreparedTimingPath& prepared, size_t window) : nonlinear(prepared.nonlinear) {
+        first_span = prepared.window_first.at(window);
+        after_span = window + 1 < prepared.window_first.size() ? prepared.window_first[window + 1] : prepared.span_count;
+        first_node = prepared.span_first[first_span];
+        const size_t last_node = prepared.span_first[after_span];
+        samples = std::make_shared<const std::vector<mk_path_sample>>(
+            all_samples->begin() + first_span, all_samples->begin() + after_span + 1);
+        for (size_t span = first_span; span <= after_span; ++span)
+            span_first.push_back(prepared.span_first[span] - first_node);
+        grid = prepared.grid.segment(static_cast<Eigen::Index>(first_node),
+            static_cast<Eigen::Index>(last_node - first_node + 1));
+        std::vector<uint32_t> spans;
+        spans.reserve(last_node - first_node);
+        for (size_t node = first_node; node < last_node; ++node)
+            spans.push_back((*prepared.shared_stage_span)[node] - static_cast<uint32_t>(first_span));
+        stage_span = std::make_shared<const std::vector<uint32_t>>(std::move(spans));
+        caps = std::make_shared<const PathSpeedCaps>(PathSpeedCaps{
+            std::vector<double>(prepared.knots.begin() + first_span, prepared.knots.begin() + after_span + 1),
+            std::vector<double>(prepared.caps.begin() + first_span, prepared.caps.begin() + after_span)});
+    }
+    PathProfileView view() const { return {samples, span_first, grid, stage_span, caps, nonlinear}; }
+};
+struct AffineTiming {
+    std::vector<mk_time_stage> stages;
+    std::vector<mk_timing_binding> bindings;
+    NativeResultOwner<mk_trajectory_handle, mk_trajectory_destroy> trajectory;
+};
+
+// The declared derivatives identify a straight joint path. Endpoint storage can
+// still add tiny Hermite terms: certify the linear replacement against that
+// polynomial instead of amplifying those terms on a short time interval.
+std::unique_ptr<AffineTiming> prepare_stopped_affine(const std::vector<mk_path_sample>& samples,
+        const double* velocity, const double* acceleration, const double* caps,
+        uint32_t cap_count, double start_speed, double end_speed, double tolerance) {
+    if (samples.size()!=2 || start_speed!=0 || end_speed!=0) return {};
+    const auto &a=samples[0], &b=samples[1];
+    const long double length=static_cast<long double>(b.s)-a.s;
+    long double V=cap_count && caps[0]>0 ? caps[0] : std::numeric_limits<long double>::infinity();
+    long double A=std::numeric_limits<long double>::infinity();
+    for (uint32_t joint=0;joint<a.joint_count;++joint) {
+        if (a.second[joint]!=0 || b.second_before[joint]!=0 || a.first[joint]!=b.first[joint]) return {};
+        const long double delta=static_cast<long double>(b.position[joint])-a.position[joint];
+        if (delta!=0) {
+            V=std::min(V,velocity[joint]*length/std::abs(delta));
+            A=std::min(A,acceleration[joint]*length/std::abs(delta));
+        }
+    }
+    if (!(V>0) || !(A>0) || !std::isfinite(V) || !std::isfinite(A)) return {};
+    PathProfilePhase profile("closed_form_timing");
+    const long double peak=std::min(V,std::sqrt(A*length));
+    const long double acceleration_time=peak/A;
+    const long double cruise_time=std::max(0.0L,length/peak-acceleration_time);
+    const long double acceleration_ticks=std::ceil(acceleration_time*1e9L);
+    const long double cruise_ticks=std::ceil(cruise_time*1e9L);
+    if (!(acceleration_ticks>=1) || 2*acceleration_ticks+cruise_ticks>=INT64_MAX/2) return {};
+    const auto ta=static_cast<int64_t>(acceleration_ticks), tc=static_cast<int64_t>(cruise_ticks);
+    const long double T=ta*1e-9L, C=tc*1e-9L;
+    // Upward phase rounding makes both A=L/(T*(T+C)) and V=L/(T+C)
+    // no larger than their continuous bounds. There is no empirical reserve.
+    const double actual_a=static_cast<double>(length/(T*(T+C)));
+    const double actual_v=static_cast<double>(length/(T+C));
+    auto result=std::make_unique<AffineTiming>();
+    auto phase=[&](int64_t start,int64_t duration,double position,double speed,double control) {
+        mk_time_stage stage{};stage.struct_size=sizeof(stage);stage.start_ns=start;stage.duration_ns=duration;
+        stage.start_s=position;stage.speed=speed;stage.acceleration=control;result->stages.push_back(stage);
+    };
+    const double half_distance=static_cast<double>(length*T/(2*(T+C)));
+    phase(0,ta,a.s,0,actual_a);
+    if (tc) phase(ta,tc,a.s+half_distance,actual_v,0);
+    phase(ta+tc,ta,b.s-half_distance,actual_v,-actual_a);
+    if (mk_trajectory_create(a.joint_count,&result->trajectory.value)!=MK_OK) return {};
+    for (size_t index=0;index<result->stages.size();++index) {
+        const auto& stage=result->stages[index];
+        mk_segment segment{};segment.struct_size=sizeof(segment);segment.joint_count=a.joint_count;
+        segment.degree=2;segment.t0_ns=stage.start_ns;segment.duration_ns=stage.duration_ns;
+        const double seconds=stage.duration_ns*1e-9;
+        const double normalized[]={static_cast<double>((stage.start_s-a.s)/length),
+            static_cast<double>(stage.speed*seconds/length),
+            static_cast<double>(0.5*stage.acceleration*seconds*seconds/length)};
+        mk_timing_binding binding{};binding.struct_size=sizeof(binding);binding.stage_index=index;
+        binding.kind=MK_TIMING_BINDING_FEED_CAP;binding.joint=UINT32_MAX;
+        binding.limit=cap_count ? caps[0] : 0;
+        const double middle_speed=stage.speed+0.5*stage.acceleration*seconds;
+        double ratio=binding.limit>0 ? middle_speed/binding.limit : -1;
+        for (uint32_t joint=0;joint<a.joint_count;++joint) {
+            const long double delta=static_cast<long double>(b.position[joint])-a.position[joint];
+            const long double rate=delta/length;
+            auto& c=segment.coefficients[joint].value;
+            c[0]=static_cast<double>(a.position[joint]+rate*(stage.start_s-a.s));
+            c[1]=static_cast<double>(rate*stage.speed);c[2]=static_cast<double>(0.5L*rate*stage.acceleration);
+            const auto original=small_compose(small_hermite(a,b,joint),normalized,13);
+            double bound=0,scale=0,power=1;
+            for (int k=0;k<original.n;++k) {
+                const double candidate=k<=2 ? c[k]*power : 0;
+                bound+=std::abs(original.c[k]-candidate);scale+=std::abs(original.c[k])+std::abs(candidate);
+                power*=seconds;
+            }
+            // Horner composition, normalization and the coefficient sum use
+            // fewer than 512 operations at degree <=5; retain that arithmetic reserve.
+            const double rounding=512*std::numeric_limits<double>::epsilon()*scale+
+                512*std::numeric_limits<double>::denorm_min();
+            if (!std::isfinite(bound) || bound+rounding>tolerance) return {};
+            const double v=std::abs(static_cast<double>(rate)*middle_speed)/velocity[joint];
+            const double acc=std::abs(static_cast<double>(rate)*stage.acceleration)/acceleration[joint];
+            if (v>ratio) {ratio=v;binding.kind=MK_TIMING_BINDING_JOINT_VELOCITY;binding.joint=joint;binding.limit=velocity[joint];}
+            if (acc>ratio) {ratio=acc;binding.kind=MK_TIMING_BINDING_JOINT_ACCELERATION;binding.joint=joint;binding.limit=acceleration[joint];}
+        }
+        if (mk_trajectory_append_segment(result->trajectory.value,&segment)!=MK_OK) return {};
+        result->bindings.push_back(binding);
+    }
+    mk_limits limits{};limits.struct_size=sizeof(limits);limits.joint_count=a.joint_count;
+    for (uint32_t j=0;j<a.joint_count;++j) {
+        limits.derivative_claimed[j]=3;limits.max_velocity[j]=velocity[j];limits.max_acceleration[j]=acceleration[j];
+    }
+    mk_validation_report report{};report.struct_size=sizeof(report);
+    if (mk_validate(result->trajectory.value,&limits,&report)!=MK_OK ||
+        report.checks[MK_CHECK_VELOCITY].status==MK_CHECK_FAILED ||
+        report.checks[MK_CHECK_ACCELERATION].status==MK_CHECK_FAILED) return {};
+    return result;
+}
+
+struct FastTimingRevision {};
+struct PathTimingStream {
+    std::mutex access;
+    std::shared_ptr<const std::vector<mk_path_sample>> samples;
+    std::vector<double> velocity, acceleration;
+    std::unique_ptr<PreparedTimingPath> prepared;
+    std::unique_ptr<AffineTiming> affine;
+    std::shared_ptr<const FastTimingRevision> fast_revision;
+    std::unique_ptr<motionkit::WindowTimingStream> queue;
+    std::unique_ptr<PathProfileSlice> head_slice;
+    std::shared_ptr<const motionkit::ClockProfileCursor> clock;
+    double start_speed, end_speed, lowering_tolerance;
+    uint32_t require_feasible_path;
+    size_t capacity, head = 0, next = 0;
+};
+struct PathTimingPreview {
+    std::optional<motionkit::WindowTimingStream::Preview> token;
+    size_t window;
+    std::shared_ptr<const motionkit::ClockProfileCursor> clock;
+    std::shared_ptr<const FastTimingRevision> fast_revision;
+};
+std::unordered_map<uint32_t, std::shared_ptr<PathTimingStream>> timing_streams;
+std::unordered_map<uint32_t, std::shared_ptr<PathTimingPreview>> timing_previews;
+uint32_t next_timing_stream = 1, next_timing_preview = 1;
+
+mk_result time_path(mk_path_handle path, const double *max_velocity,
+                    const double *max_acceleration, uint32_t joint_count,
+                    const double *speed_caps, uint32_t speed_cap_count,
+                    double start_speed, double end_speed,
+                    double lowering_tolerance, uint32_t require_feasible_path,
+                    mk_timing_report *out_report,
+                    mk_time_law_handle *out_law,
+                    mk_trajectory_handle *out_trajectory, bool reference, PathTimingSession* session = nullptr,
+                    const toppra::Bound* terminal_squared = nullptr, double* reached_speed = nullptr) {
+    TimingSessionAttempt attempt{session};
+    if (reached_speed) *reached_speed = 0;
+    if (!out_law || !out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
+    out_law->id = 0;
+    out_trajectory->id = 0;
+    if(out_report){*out_report={};out_report->struct_size=sizeof(*out_report);out_report->joint=UINT32_MAX;out_report->sustainable_scale=1;}
+    if (terminal_squared && (!terminal_squared->allFinite() || (*terminal_squared)[0] < 0 ||
+            (*terminal_squared)[0] > (*terminal_squared)[1])) return MK_ERROR_INVALID_ARGUMENT;
+    if(require_feasible_path>1)return MK_ERROR_INVALID_ARGUMENT;
+    if (!std::isfinite(lowering_tolerance) || lowering_tolerance <= 0.0)
+        return MK_ERROR_INVALID_ARGUMENT;
+    std::shared_ptr<const std::vector<mk_path_sample>> shared_samples;
+    try {
+        if (session) shared_samples = session->samples;
+        else {
+            std::lock_guard lock(mutex);
+            const auto found = paths.find(path.id);
+            if (found == paths.end()) return MK_ERROR_INVALID_HANDLE;
+            shared_samples = std::make_shared<const std::vector<mk_path_sample>>(found->second);
+        }
+    } catch (const std::bad_alloc&) { return MK_ERROR_OUT_OF_MEMORY; }
+    const auto& samples = *shared_samples;
+    if (!valid_timing_request(samples, max_velocity, max_acceleration, joint_count,
+        speed_caps, speed_cap_count, start_speed, end_speed))
+        return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        const bool moving_boundary = start_speed > 0.0 || end_speed > 0.0;
+        std::unique_ptr<PreparedTimingPath> local_prepared;
+        if (!session) local_prepared = std::make_unique<PreparedTimingPath>(samples, max_velocity, max_acceleration,
+            joint_count, speed_caps, speed_cap_count, moving_boundary, reference);
+        const auto& prepared = session ? session->prepare(moving_boundary) : *local_prepared;
+        const auto& grid_values = prepared.grid_values;
+        const auto& span_first = prepared.span_first;
+        const auto& window_first = prepared.window_first;
+        if (out_report) {
+            out_report->windows = static_cast<uint32_t>(window_first.size());
+            out_report->boundary_lowerings = 0;
+        }
+        toppra::Bound terminal;
+        if (terminal_squared) terminal = *terminal_squared;
+        else terminal.setConstant(end_speed * end_speed);
+        std::vector<double> speeds(grid_values.size(), 0.0);
+        double reached_squared = start_speed * start_speed;
+        {
+            PathProfilePhase stage_profile("solver_preparation");
+            std::unique_ptr<motionkit::RetainedWindowTiming> local_retained;
+            if (!session) local_retained = prepared.make_serial_timing();
+            auto& timing = session ? session->timing() : *local_retained;
+            stage_profile.mark("toppra_backward");
+            auto result = timing.backward(terminal);
+            std::vector<toppra::Vector> profiles;
+            stage_profile.mark("toppra_forward");
+            if (result == toppra::ReturnCode::OK) result = timing.forward(reached_squared, profiles);
+            stage_profile.mark("profile_transfer");
+            if (result != toppra::ReturnCode::OK) {
+                if (std::getenv("PROCESS_PATH_PROFILE"))
+                    std::fprintf(stderr, "PROCESS_PATH_WINDOW result=%d %s\n",
+                        static_cast<int>(result), timing.error().c_str());
+                return MK_ERROR_GENERATION;
+            }
+            for (size_t window = 0; window < profiles.size(); ++window) {
+                const size_t first_node = span_first[window_first[window]];
+                for (Eigen::Index node = 0; node < profiles[window].size(); ++node)
+                    speeds[first_node + static_cast<size_t>(node)] =
+                        std::sqrt(std::max(0.0, profiles[window][node]));
+            }
+            if (std::getenv("PROCESS_PATH_PROFILE"))
+                std::fprintf(stderr, "PROCESS_PATH_WINDOW_PREPARATION workers=0 prepared=0 windows=%zu\n",
+                    window_first.size());
+        }
+
+        speeds.front() = start_speed;
+        // A terminal interval is permission, not a promise to attain its upper bound.
+        if (terminal_squared) end_speed = speeds.back();
+        speeds.back() = end_speed;
+        const PathProfileView view{shared_samples, prepared.span_first, prepared.grid,
+            prepared.shared_stage_span, prepared.window_limits, prepared.nonlinear};
+        const auto result = lower_timed_profile(view, {max_velocity, max_acceleration, joint_count},
+            {start_speed, end_speed, lowering_tolerance, require_feasible_path}, std::move(speeds),
+            out_report, out_law, out_trajectory);
+        if (result != MK_OK) return result;
+        if (reached_speed) *reached_speed = end_speed;
+        attempt.accepted = true;
         return MK_OK;
     } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
     catch (...) { return MK_ERROR_GENERATION; }
@@ -1230,8 +1945,400 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
                                mk_timing_report *out_report,
                                mk_time_law_handle *out_law,
                                mk_trajectory_handle *out_trajectory) {
+    PathProfilePhase stage_profile("native_timing_total");
     return time_path(path, max_velocity, max_acceleration, joint_count, speed_caps, speed_cap_count, start_speed,
         end_speed, lowering_tolerance, require_feasible_path, out_report, out_law, out_trajectory, false);
+}
+
+mk_result MK_CALL mk_path_timing_session_create(mk_path_handle path,
+        const double* max_velocity, const double* max_acceleration, uint32_t joint_count,
+        const double* speed_caps, uint32_t speed_cap_count, double lowering_tolerance,
+        uint32_t require_feasible_path, mk_path_timing_session_handle* out_session) {
+    if (!out_session) return MK_ERROR_INVALID_ARGUMENT;
+    out_session->id = 0;
+    if (!std::isfinite(lowering_tolerance) || lowering_tolerance <= 0 || require_feasible_path > 1)
+        return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        auto session = std::make_shared<PathTimingSession>();
+        {
+            std::lock_guard lock(mutex);
+            const auto found = paths.find(path.id);
+            if (found == paths.end()) return MK_ERROR_INVALID_HANDLE;
+            session->samples = std::make_shared<const std::vector<mk_path_sample>>(found->second);
+        }
+        if (!valid_timing_request(*session->samples, max_velocity, max_acceleration, joint_count,
+                speed_caps, speed_cap_count, 0, 0)) return MK_ERROR_INVALID_ARGUMENT;
+        session->velocity.assign(max_velocity, max_velocity + joint_count);
+        session->acceleration.assign(max_acceleration, max_acceleration + joint_count);
+        if (speed_cap_count) session->caps.assign(speed_caps, speed_caps + speed_cap_count);
+        session->lowering_tolerance = lowering_tolerance;
+        session->require_feasible_path = require_feasible_path;
+        std::lock_guard lock(mutex);
+        while (!next_timing_session || timing_sessions.count(next_timing_session)) ++next_timing_session;
+        const uint32_t id = next_timing_session++;
+        timing_sessions.emplace(id, std::move(session));
+        out_session->id = id;
+        return MK_OK;
+    } catch (const std::bad_alloc&) { return MK_ERROR_OUT_OF_MEMORY; }
+    catch (...) { return MK_ERROR_GENERATION; }
+}
+
+void MK_CALL mk_path_timing_session_destroy(mk_path_timing_session_handle handle) {
+    std::shared_ptr<PathTimingSession> removed;
+    {
+        std::lock_guard lock(mutex);
+        const auto found = timing_sessions.find(handle.id);
+        if (found == timing_sessions.end()) return;
+        removed = std::move(found->second);
+        timing_sessions.erase(found);
+    } // Release large tables outside the global handle lock; in-flight calls own their session.
+}
+
+mk_result MK_CALL mk_path_timing_session_time(mk_path_timing_session_handle handle,
+        double start_speed, double end_speed, mk_timing_report* out_report,
+        mk_time_law_handle* out_law, mk_trajectory_handle* out_trajectory) {
+    if (out_law) out_law->id = 0;
+    if (out_trajectory) out_trajectory->id = 0;
+    if (out_report) {
+        *out_report = {};
+        out_report->struct_size = sizeof(*out_report);
+        out_report->joint = UINT32_MAX;
+        out_report->sustainable_scale = 1;
+    }
+    std::shared_ptr<PathTimingSession> session;
+    {
+        std::lock_guard lock(mutex);
+        const auto found = timing_sessions.find(handle.id);
+        if (found == timing_sessions.end()) return MK_ERROR_INVALID_HANDLE;
+        session = found->second;
+    }
+    std::lock_guard owner(session->access);
+    return time_path({}, session->velocity.data(), session->acceleration.data(),
+        static_cast<uint32_t>(session->velocity.size()), session->caps.empty() ? nullptr : session->caps.data(),
+        static_cast<uint32_t>(session->caps.size()), start_speed, end_speed, session->lowering_tolerance,
+        session->require_feasible_path, out_report, out_law, out_trajectory, false, session.get());
+}
+
+mk_result MK_CALL mk_path_timing_session_time_to_interval(mk_path_timing_session_handle handle,
+        double start_speed, double end_lower_speed, double end_upper_speed, double* out_reached_speed,
+        mk_timing_report* out_report, mk_time_law_handle* out_law, mk_trajectory_handle* out_trajectory) {
+    if (out_reached_speed) *out_reached_speed = 0;
+    if (out_law) out_law->id = 0;
+    if (out_trajectory) out_trajectory->id = 0;
+    if (out_report) {
+        *out_report = {};
+        out_report->struct_size = sizeof(*out_report);
+        out_report->joint = UINT32_MAX;
+        out_report->sustainable_scale = 1;
+    }
+    std::shared_ptr<PathTimingSession> session;
+    {
+        std::lock_guard lock(mutex);
+        const auto found = timing_sessions.find(handle.id);
+        if (found == timing_sessions.end()) return MK_ERROR_INVALID_HANDLE;
+        session = found->second;
+    }
+    std::lock_guard owner(session->access);
+    if (!out_reached_speed || !std::isfinite(end_lower_speed) || end_lower_speed < 0 ||
+            !std::isfinite(end_upper_speed) || end_upper_speed < end_lower_speed) {
+        session->retained.reset();
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+    const toppra::Bound terminal{end_lower_speed * end_lower_speed, end_upper_speed * end_upper_speed};
+    return time_path({}, session->velocity.data(), session->acceleration.data(),
+        static_cast<uint32_t>(session->velocity.size()), session->caps.empty() ? nullptr : session->caps.data(),
+        static_cast<uint32_t>(session->caps.size()), start_speed, end_upper_speed, session->lowering_tolerance,
+        session->require_feasible_path, out_report, out_law, out_trajectory, false, session.get(), &terminal,
+        out_reached_speed);
+}
+
+mk_result MK_CALL mk_path_timing_session_entry_interval(mk_path_timing_session_handle handle,
+        double end_lower_speed, double end_upper_speed, uint32_t entry_may_move,
+        double* out_lower_speed, double* out_upper_speed) {
+    if (out_lower_speed) *out_lower_speed = 0;
+    if (out_upper_speed) *out_upper_speed = 0;
+    std::shared_ptr<PathTimingSession> session;
+    {
+        std::lock_guard lock(mutex);
+        const auto found = timing_sessions.find(handle.id);
+        if (found == timing_sessions.end()) return MK_ERROR_INVALID_HANDLE;
+        session = found->second;
+    }
+    std::lock_guard owner(session->access);
+    TimingSessionAttempt attempt{session.get()};
+    if (!out_lower_speed || !out_upper_speed || entry_may_move > 1 || !std::isfinite(end_lower_speed) ||
+            end_lower_speed < 0 || !std::isfinite(end_upper_speed) || end_lower_speed > end_upper_speed)
+        return MK_ERROR_INVALID_ARGUMENT;
+    const toppra::Bound terminal{end_lower_speed * end_lower_speed, end_upper_speed * end_upper_speed};
+    if (!terminal.allFinite()) return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        session->prepare(entry_may_move || end_upper_speed > 0);
+        auto& timing = session->timing();
+        if (timing.backward(terminal) != toppra::ReturnCode::OK) return MK_ERROR_GENERATION;
+        const auto entry = timing.entrySquaredBounds();
+        if (!entry_may_move) {
+            if (entry[0] > 0 || entry[1] < 0) return MK_ERROR_GENERATION;
+        } else {
+            *out_lower_speed = std::sqrt(std::max(0.0, entry[0]));
+            *out_upper_speed = std::sqrt(std::max(0.0, entry[1]));
+        }
+        attempt.accepted = true;
+        return MK_OK;
+    } catch (const std::bad_alloc&) { return MK_ERROR_OUT_OF_MEMORY; }
+    catch (...) { return MK_ERROR_GENERATION; }
+}
+
+mk_result MK_CALL mk_path_timing_stream_create(mk_path_handle path,
+        const double* velocity, const double* acceleration, uint32_t joint_count,
+        const double* caps, uint32_t cap_count, double start_speed, double end_speed,
+        double tolerance, uint32_t require_feasible, uint32_t capacity,
+        mk_path_timing_stream_handle* out_stream) {
+    if (!out_stream) return MK_ERROR_INVALID_ARGUMENT;
+    out_stream->id = 0;
+    if (!capacity || !std::isfinite(tolerance) || tolerance <= 0 || require_feasible > 1 ||
+            !std::isfinite(start_speed * start_speed) || !std::isfinite(end_speed * end_speed) ||
+            start_speed * start_speed > MAX_PATH_SQUARED_SPEED || end_speed * end_speed > MAX_PATH_SQUARED_SPEED)
+        return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        auto stream = std::make_shared<PathTimingStream>();
+        {
+            std::lock_guard lock(mutex);
+            const auto found = paths.find(path.id);
+            if (found == paths.end()) return MK_ERROR_INVALID_HANDLE;
+            stream->samples = std::make_shared<const std::vector<mk_path_sample>>(found->second);
+        }
+        if (!valid_timing_request(*stream->samples, velocity, acceleration, joint_count,
+                caps, cap_count, start_speed, end_speed)) return MK_ERROR_INVALID_ARGUMENT;
+        stream->velocity.assign(velocity, velocity + joint_count);
+        stream->acceleration.assign(acceleration, acceleration + joint_count);
+        stream->affine=prepare_stopped_affine(*stream->samples,velocity,acceleration,caps,cap_count,
+            start_speed,end_speed,tolerance);
+        if (!stream->affine) {
+            stream->prepared = std::make_unique<PreparedTimingPath>(*stream->samples, velocity, acceleration,
+                joint_count, caps, cap_count, start_speed > 0 || end_speed > 0, false, true);
+            if (end_speed > 0 && stream->prepared->window_first.size() > capacity) return MK_ERROR_LIMIT;
+            stream->queue = std::make_unique<motionkit::WindowTimingStream>(start_speed * start_speed,
+                capacity, MAX_PATH_SQUARED_SPEED);
+        }
+        stream->capacity = capacity; stream->start_speed = start_speed; stream->end_speed = end_speed;
+        stream->lowering_tolerance = tolerance; stream->require_feasible_path = require_feasible;
+        std::lock_guard lock(mutex);
+        while (!next_timing_stream || timing_streams.count(next_timing_stream)) ++next_timing_stream;
+        const uint32_t id = next_timing_stream++;
+        timing_streams.emplace(id, std::move(stream));
+        out_stream->id = id;
+        return MK_OK;
+    } catch (const std::bad_alloc&) { return MK_ERROR_OUT_OF_MEMORY; }
+    catch (...) { return MK_ERROR_GENERATION; }
+}
+void MK_CALL mk_path_timing_stream_destroy(mk_path_timing_stream_handle handle) {
+    std::shared_ptr<PathTimingStream> removed;
+    {
+        std::lock_guard lock(mutex);
+        const auto found = timing_streams.find(handle.id);
+        if (found == timing_streams.end()) return;
+        removed = std::move(found->second); timing_streams.erase(found);
+    }
+}
+void MK_CALL mk_path_timing_preview_destroy(mk_path_timing_preview_handle handle) {
+    std::shared_ptr<PathTimingPreview> removed;
+    {
+        std::lock_guard lock(mutex);
+        const auto found = timing_previews.find(handle.id);
+        if (found == timing_previews.end()) return;
+        removed = std::move(found->second); timing_previews.erase(found);
+    }
+}
+mk_result MK_CALL mk_path_timing_stream_step(mk_path_timing_stream_handle handle,
+        mk_path_timing_stream_progress* out_progress, mk_path_timing_preview_handle* out_preview,
+        mk_timing_report* out_report, mk_time_law_handle* out_law, mk_trajectory_handle* out_trajectory) {
+    if (out_progress) { *out_progress = {}; out_progress->struct_size = sizeof(*out_progress); }
+    if (out_preview) out_preview->id = 0;
+    if (out_law) out_law->id = 0;
+    if (out_trajectory) out_trajectory->id = 0;
+    if (out_report) { *out_report = {}; out_report->struct_size = sizeof(*out_report); out_report->joint = UINT32_MAX; out_report->sustainable_scale = 1; }
+    if (!out_progress || !out_preview || !out_law || !out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
+    std::shared_ptr<PathTimingStream> stream;
+    {
+        std::lock_guard lock(mutex);
+        const auto found = timing_streams.find(handle.id);
+        if (found == timing_streams.end()) return MK_ERROR_INVALID_HANDLE;
+        stream = found->second;
+    }
+    std::lock_guard owner(stream->access);
+    try {
+        mk_path_timing_stream_progress progress{};
+        progress.struct_size = sizeof(progress);
+        progress.window_index = static_cast<uint32_t>(stream->head);
+        if (stream->affine) {
+            progress.total_windows=1;
+            if (stream->head) { progress.state=MK_TIMING_STREAM_DONE;*out_progress=progress;return MK_OK; }
+            auto& affine=*stream->affine;
+            NativeResultOwner<mk_time_law_handle,mk_time_law_destroy> law;
+            NativeResultOwner<mk_trajectory_handle,mk_trajectory_destroy> trajectory;
+            auto status=mk_time_law_create(affine.stages.data(),affine.stages.size(),&law.value);
+            if (status!=MK_OK) return status;
+            const auto &last=affine.stages.back();
+            status=mk_trajectory_slice(affine.trajectory.value,0,last.start_ns+last.duration_ns,&trajectory.value);
+            if (status!=MK_OK) return status;
+            auto revision=std::make_shared<const FastTimingRevision>();
+            auto token=std::make_shared<PathTimingPreview>(PathTimingPreview{std::nullopt,0,nullptr,revision});
+            uint32_t id;
+            {
+                std::lock_guard lock(mutex);
+                laws.at(law.value.id).bindings=affine.bindings;
+                while (!next_timing_preview || timing_previews.count(next_timing_preview)) ++next_timing_preview;
+                id=next_timing_preview++;timing_previews.emplace(id,std::move(token));
+            }
+            stream->fast_revision=std::move(revision);
+            progress.state=MK_TIMING_STREAM_READY;progress.span_count=1;
+            progress.start_s=stream->samples->front().s;progress.end_s=stream->samples->back().s;
+            if (out_report) out_report->windows=1;
+            *out_progress=progress;out_preview->id=id;*out_law=law.release();*out_trajectory=trajectory.release();
+            return MK_OK;
+        }
+        const auto& prepared = *stream->prepared;
+        progress.total_windows = static_cast<uint32_t>(prepared.window_first.size());
+        if (stream->queue->finished()) {
+            progress.state = MK_TIMING_STREAM_DONE; *out_progress = progress; return MK_OK;
+        }
+        if (stream->next < prepared.window_first.size() && stream->queue->pendingWindows() < stream->capacity) {
+            stream->queue->append(prepared.make_window(stream->next, std::make_shared<toppra::solver::Seidel>()));
+            ++stream->next;
+            if (stream->next == prepared.window_first.size()) stream->queue->finish(stream->end_speed * stream->end_speed);
+        }
+        if (stream->end_speed > 0 && stream->next < prepared.window_first.size()) {
+            progress.state = MK_TIMING_STREAM_WAITING; *out_progress = progress; return MK_OK;
+        }
+        auto candidate = stream->queue->preview();
+        if (!candidate) {
+            if (stream->queue->pendingWindows() == stream->capacity && stream->next < prepared.window_first.size())
+                return MK_ERROR_LIMIT;
+            progress.state = MK_TIMING_STREAM_WAITING; *out_progress = progress; return MK_OK;
+        }
+        if (!stream->clock) stream->clock=std::make_shared<const motionkit::ClockProfileCursor>(
+            stream->samples->front().s,stream->start_speed);
+        if (!stream->head_slice) stream->head_slice = std::make_unique<PathProfileSlice>(stream->samples, prepared, stream->head);
+        const auto& slice = *stream->head_slice;
+        const auto& squared = candidate->profiles().front();
+        std::vector<double> speeds;
+        speeds.reserve(static_cast<size_t>(squared.size()));
+        for (Eigen::Index i = 0; i < squared.size(); ++i) speeds.push_back(std::sqrt(std::max(0.0, squared[i])));
+        progress.start_speed = stream->head == 0 ? stream->start_speed : std::sqrt(stream->queue->entrySquaredSpeed());
+        progress.end_speed = stream->head + 1 == prepared.window_first.size() ? stream->end_speed :
+            std::sqrt(std::max(0.0, candidate->endSquaredSpeed()));
+        speeds.front() = progress.start_speed; speeds.back() = progress.end_speed;
+        progress.first_span = static_cast<uint32_t>(slice.first_span);
+        progress.span_count = static_cast<uint32_t>(slice.after_span - slice.first_span);
+        progress.first_stage = static_cast<uint32_t>(slice.first_node);
+        progress.start_s = slice.samples->front().s; progress.end_s = slice.samples->back().s;
+        const auto& original_controls=candidate->controls().front();
+        if (const char* profile = std::getenv("PROCESS_PATH_PROFILE"); profile && std::strcmp(profile, "1") == 0) {
+            double minimum = std::numeric_limits<double>::infinity(), maximum = -minimum;
+            for (Eigen::Index i = 0; i < original_controls.size(); ++i) {
+                const double control = original_controls[i];
+                minimum = std::min(minimum, control); maximum = std::max(maximum, control);
+            }
+            std::fprintf(stderr, "PROCESS_PATH_STREAM_PREVIEW {\"window\":%zu,\"firstSpan\":%zu,\"spanCount\":%zu,\"gridNodes\":%td,\"startDistance\":%.17g,\"endDistance\":%.17g,\"startSpeed\":%.17g,\"endSpeed\":%.17g,\"rawPathAccelerationMin\":%.17g,\"rawPathAccelerationMax\":%.17g}\n",
+                stream->head, slice.first_span, slice.after_span - slice.first_span,
+                static_cast<std::ptrdiff_t>(slice.grid.size()), progress.start_s, progress.end_s,
+                progress.start_speed, progress.end_speed, minimum, maximum);
+        }
+        const std::vector<double> controls(original_controls.data(),original_controls.data()+original_controls.size());
+        auto next_clock=std::make_shared<motionkit::ClockProfileCursor>(*stream->clock);
+        double clock_velocity_bound=0, clock_acceleration_bound=0;
+        for (size_t i=0;i<speeds.size();++i) {
+            clock_velocity_bound=std::max(clock_velocity_bound,speeds[i]);
+            if (i) clock_acceleration_bound=std::max(clock_acceleration_bound,
+                std::abs((squared[static_cast<Eigen::Index>(i)]-squared[static_cast<Eigen::Index>(i-1)]) /
+                    (2*(slice.grid[static_cast<Eigen::Index>(i)]-slice.grid[static_cast<Eigen::Index>(i-1)]))));
+        }
+        if (clock_acceleration_bound==0) {
+            // A constant-speed reference still needs a nonzero search domain
+            // to correct a fractional final clock tick. Affine joint limits
+            // supply it; curved candidates remain subject to full validation.
+            clock_acceleration_bound=std::numeric_limits<double>::infinity();
+            for (const auto& point:*slice.samples) for (size_t j=0;j<stream->acceleration.size();++j)
+                if (point.first[j]!=0) clock_acceleration_bound=std::min(clock_acceleration_bound,
+                    stream->acceleration[j]/std::abs(point.first[j]));
+        }
+        // Rounded speed endpoints and original LP controls can differ on tiny
+        // spans. Cover both in this search domain; only the original controls
+        // drive integration, and physical validation still certifies the result.
+        for (const double control:controls) clock_acceleration_bound=std::max(clock_acceleration_bound,std::abs(control));
+        // Existing moving-boundary slack supplies the final clock candidate's
+        // search domain. These scalar search bounds are not joint certificates;
+        // the unchanged continuous validator below remains authoritative.
+        const auto pieces=next_clock->append(std::vector<double>(slice.grid.data(),slice.grid.data()+slice.grid.size()),
+            speeds,stream->head+1==prepared.window_first.size(),
+            clock_velocity_bound/MOVING_BOUNDARY_MARGIN,clock_acceleration_bound/MOVING_BOUNDARY_MARGIN,&controls);
+        std::vector<mk_time_stage> clock_stages;
+        clock_stages.reserve(pieces.size());
+        for (const auto& piece:pieces) {
+            mk_time_stage stage{}; stage.struct_size=sizeof(stage);
+            stage.start_ns=piece.start_tick; stage.duration_ns=piece.duration;
+            stage.start_s=piece.position; stage.speed=piece.velocity; stage.acceleration=piece.acceleration;
+            clock_stages.push_back(stage);
+        }
+        progress.start_s=stream->clock->position(); progress.start_speed=stream->clock->velocity();
+        progress.end_s=next_clock->position(); progress.end_speed=next_clock->velocity();
+        NativeResultOwner<mk_time_law_handle, mk_time_law_destroy> law;
+        NativeResultOwner<mk_trajectory_handle, mk_trajectory_destroy> trajectory;
+        if (out_report) { out_report->windows = 1; out_report->boundary_lowerings = 0; }
+        auto status = lower_timed_profile(slice.view(), {stream->velocity.data(), stream->acceleration.data(),
+            static_cast<uint32_t>(stream->velocity.size())}, {progress.start_speed, progress.end_speed,
+            stream->lowering_tolerance, stream->require_feasible_path}, std::move(speeds), out_report,
+            &law.value, &trajectory.value, &clock_stages, &stream->samples);
+        if (status != MK_OK) return status;
+        auto token = std::make_shared<PathTimingPreview>(PathTimingPreview{std::move(*candidate), stream->head,
+            std::move(next_clock),nullptr});
+        uint32_t id;
+        {
+            std::lock_guard lock(mutex);
+            while (!next_timing_preview || timing_previews.count(next_timing_preview)) ++next_timing_preview;
+            id = next_timing_preview++;
+            timing_previews.emplace(id, std::move(token));
+        }
+        progress.state = MK_TIMING_STREAM_READY;
+        *out_progress = progress; out_preview->id = id;
+        *out_law = law.release(); *out_trajectory = trajectory.release();
+        return MK_OK;
+    } catch (const std::bad_alloc&) { return MK_ERROR_OUT_OF_MEMORY; }
+    catch (const std::length_error&) { return MK_ERROR_LIMIT; }
+    catch (const std::exception& error) {
+        if (const char* profile=std::getenv("PROCESS_PATH_PROFILE"); profile && std::strcmp(profile,"1")==0)
+            std::fprintf(stderr,"PROCESS_PATH_STREAM_FAILURE %s\n",error.what());
+        return MK_ERROR_GENERATION;
+    }
+    catch (...) { return MK_ERROR_GENERATION; }
+}
+mk_result MK_CALL mk_path_timing_stream_commit(mk_path_timing_stream_handle handle,
+        mk_path_timing_preview_handle preview) {
+    std::shared_ptr<PathTimingStream> stream;
+    std::shared_ptr<PathTimingPreview> token;
+    {
+        std::lock_guard lock(mutex);
+        const auto a = timing_streams.find(handle.id);
+        const auto b = timing_previews.find(preview.id);
+        if (a == timing_streams.end() || b == timing_previews.end()) return MK_ERROR_INVALID_HANDLE;
+        stream = a->second; token = b->second;
+    }
+    std::lock_guard owner(stream->access);
+    try {
+        if (token->window != stream->head) return MK_ERROR_INVALID_ARGUMENT;
+        if (stream->affine) {
+            if (!stream->fast_revision || token->fast_revision!=stream->fast_revision) return MK_ERROR_INVALID_ARGUMENT;
+            ++stream->head;stream->fast_revision.reset();return MK_OK;
+        }
+        if (!token->token) return MK_ERROR_INVALID_ARGUMENT;
+        // Solver state advances at its nominal geometry boundary; the owned
+        // clock cursor retains the fractional tail until the next publication.
+        stream->queue->retireCertified(*token->token);
+        stream->clock=token->clock;
+        ++stream->head; stream->head_slice.reset();
+        return MK_OK;
+    } catch (const std::logic_error&) { return MK_ERROR_INVALID_ARGUMENT; }
+    catch (...) { return MK_ERROR_GENERATION; }
 }
 
 mk_result MK_CALL mk_time_path_reference(mk_path_handle path, const double *max_velocity,
@@ -1292,11 +2399,12 @@ mk_result MK_CALL mk_project_couplings(mk_trajectory_handle trajectory,
     return MK_OK;
 }
 
-mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joint, double lead_seconds,
-                                   double window_seconds, mk_trajectory_handle *out_trajectory) {
+static mk_result advance_joint_context(mk_trajectory_handle trajectory, uint32_t joint, double lead_seconds,
+        double window_seconds, int64_t origin_ns, bool final_context, mk_trajectory_handle *out_trajectory) {
     if (!out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
     out_trajectory->id = 0;
-    if (!std::isfinite(lead_seconds) || lead_seconds < 0.0 || !std::isfinite(window_seconds) || window_seconds <= 0.0)
+    if (!std::isfinite(lead_seconds) || lead_seconds < 0.0 || !std::isfinite(window_seconds) || window_seconds <= 0.0 ||
+            origin_ns<0 || window_seconds*0.5e9>static_cast<double>(INT64_MAX/16))
         return MK_ERROR_INVALID_ARGUMENT;
     uint32_t joints = 0, segments = 0;
     int64_t duration_ns = 0;
@@ -1307,60 +2415,16 @@ mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joi
     if (status != MK_OK) return status;
     status = mk_trajectory_duration_ns(trajectory, &duration_ns);
     if (status != MK_OK) return status;
+    if (!segments || duration_ns<=0) return MK_ERROR_INVALID_ARGUMENT;
     const int64_t half_ns = std::max<int64_t>(1, static_cast<int64_t>(std::llround(window_seconds * 0.5e9)));
+    if (half_ns>INT64_MAX/16 || duration_ns>INT64_MAX-half_ns || origin_ns>INT64_MAX-duration_ns)
+        return MK_ERROR_INVALID_ARGUMENT;
     const double window = static_cast<double>(2 * half_ns) * 1e-9;
-    // The joint's position, velocity and acceleration at `t`, the trajectory held at rest beyond either end.
-    auto state_at = [&](int64_t t, double &position, double &velocity, double &acceleration) -> mk_result {
-        mk_trajectory_state state{};
-        state.struct_size = sizeof(state);
-        const int64_t clamped = std::clamp<int64_t>(t, 0, duration_ns);
-        const auto result = mk_trajectory_evaluate(trajectory, clamped, &state);
-        if (result != MK_OK) return result;
-        const bool outside = t < 0 || t > duration_ns;
-        position = state.position[joint];
-        velocity = outside ? 0.0 : state.velocity[joint];
-        acceleration = outside ? 0.0 : state.acceleration[joint];
-        return MK_OK;
-    };
-    // The taper and its first two derivatives at `t`: the product of a rise from the start and a fall to the end, each
-    // zero with both derivatives at its end and one from a window in, so a plan shorter than two windows is smooth too.
-    auto smoother = [&](double x, double &value, double &first, double &second) {
-        if (x >= 1.0) { value = 1.0; first = 0.0; second = 0.0; return; }
-        x = std::max(x, 0.0);
-        value = x * x * x * (10.0 + x * (-15.0 + 6.0 * x));
-        first = 30.0 * x * x * (1.0 - x) * (1.0 - x) / window;
-        second = 60.0 * x * (1.0 - x) * (1.0 - 2.0 * x) / (window * window);
-    };
-    auto taper = [&](int64_t t, double &value, double &first, double &second) {
-        double u = 0, du = 0, ddu = 0, v = 0, dv = 0, ddv = 0;
-        smoother(static_cast<double>(t) * 1e-9 / window, u, du, ddu);
-        smoother(static_cast<double>(duration_ns - t) * 1e-9 / window, v, dv, ddv);
-        dv = -dv;  // the fall runs backwards in time
-        value = u * v;
-        first = du * v + u * dv;
-        second = ddu * v + 2.0 * du * dv + u * ddv;
-    };
-    // The corrected position, velocity and acceleration at `t`: p + lead * mean velocity * taper.
-    auto corrected = [&](int64_t t, double &position, double &velocity, double &acceleration) -> mk_result {
-        double p = 0, v = 0, a = 0, pa = 0, va = 0, aa = 0, pb = 0, vb = 0, ab = 0;
-        auto result = state_at(t, p, v, a);
-        if (result == MK_OK) result = state_at(t + half_ns, pa, va, aa);
-        if (result == MK_OK) result = state_at(t - half_ns, pb, vb, ab);
-        if (result != MK_OK) return result;
-        const double mean = (pa - pb) / window, mean_rate = (va - vb) / window, mean_slope = (aa - ab) / window;
-        double w = 0, dw = 0, ddw = 0;
-        taper(t, w, dw, ddw);
-        position = p + lead_seconds * mean * w;
-        velocity = v + lead_seconds * (mean_rate * w + mean * dw);
-        acceleration = a + lead_seconds * (mean_slope * w + 2.0 * mean_rate * dw + mean * ddw);
-        return MK_OK;
-    };
-    // The advance changes form wherever the window's ends cross a boundary of the plan's segments, and at the taper's
-    // ends; between those instants it is a polynomial (of degree five, or nine under the taper). So the trajectory is cut
-    // at every segment boundary, each boundary half a window either side, and the taper's ends (the tapers cut eight
-    // times more), and each piece of the joint is the quintic through the advance's position, velocity and acceleration
-    // at its ends: exact where the advance is a quintic, and within a piece's rounding under the taper. The other joints
-    // keep their polynomials, re-expressed from the start of each piece.
+    // Cut at source boundaries, their half-window shifts, and the true-end taper
+    // cuts. Each piece has a known polynomial: degree five outside the taper,
+    // up to fifteen when both tapers overlap. Preserve its quintic terms directly
+    // and endpoint-fit only the higher-degree remainder. Other joints keep their
+    // polynomials, re-expressed from the start of each piece.
     std::vector<mk_segment> source;
     try {
         source.resize(segments);
@@ -1380,8 +2444,8 @@ mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joi
         }
     }
     for (int k = 1; k <= 8; ++k) {
-        cut(window_ns * k / 8);
-        cut(duration_ns - window_ns * k / 8);
+        cut(window_ns*k/8-origin_ns);
+        if (final_context) cut(duration_ns-window_ns*k/8);
     }
     cuts.push_back(0);
     cuts.push_back(duration_ns);
@@ -1393,8 +2457,6 @@ mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joi
     try {
         auto piece = std::make_unique<mk_segment>();
         size_t from = 0;
-        double position_a = 0, velocity_a = 0, acceleration_a = 0;
-        status = corrected(0, position_a, velocity_a, acceleration_a);
         for (size_t index = 0; index + 1 < cuts.size() && status == MK_OK; ++index) {
             const int64_t begin = cuts[index], finish = cuts[index + 1];
             // The plan's segment the piece lies in.
@@ -1421,29 +2483,101 @@ mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joi
                     out[m] = sum;
                 }
             }
-            double position_b = 0, velocity_b = 0, acceleration_b = 0;
-            status = corrected(finish, position_b, velocity_b, acceleration_b);
-            if (status != MK_OK) break;
-            // The quintic through both ends' position, velocity and acceleration.
-            const double h = static_cast<double>(piece->duration_ns) * 1e-9;
-            const double d = position_b - position_a - velocity_a * h - 0.5 * acceleration_a * h * h;
-            const double e = velocity_b - velocity_a - acceleration_a * h;
-            const double f = acceleration_b - acceleration_a;
-            auto &c = piece->coefficients[joint].value;
-            for (auto &value : c) value = 0.0;
-            c[0] = position_a;
-            c[1] = velocity_a;
-            c[2] = 0.5 * acceleration_a;
-            c[3] = (10.0 * d - 4.0 * e * h + 0.5 * f * h * h) / (h * h * h);
-            c[4] = (-15.0 * d + 7.0 * e * h - f * h * h) / (h * h * h * h);
-            c[5] = (6.0 * d - 3.0 * e * h + 0.5 * f * h * h) / (h * h * h * h * h);
+            // Work in normalized local time. Outside the taper the pressure
+            // advance is exactly quintic; refitting absolute positions over a
+            // one-tick piece would turn their rounding into false acceleration.
+            using Local = std::array<long double,16>;
+            const long double h=static_cast<long double>(finish-begin)*1e-9L;
+            auto shifted = [&](int64_t advance) {
+                Local result{};
+                const long double middle=static_cast<long double>(begin)+
+                    static_cast<long double>(finish-begin)*0.5L+advance;
+                if ((middle<0 && origin_ns==0) || (middle>=duration_ns && final_context)) {
+                    const auto& edge=middle<0 ? source.front() : source.back();
+                    const long double t=middle<0 ? 0.0L : edge.duration_ns*1e-9L;
+                    for (int k=static_cast<int>(edge.degree);k>=0;--k)
+                        result[0]=result[0]*t+edge.coefficients[joint].value[k];
+                    return result;
+                }
+                auto found=std::upper_bound(source.begin(),source.end(),middle,
+                    [](long double time,const mk_segment& segment){return time<segment.t0_ns;});
+                // A retained context edge is not a physical stop. Continue
+                // its polynomial outside the borrowed support; publication
+                // still crops that speculative part using the filter horizon.
+                const auto& segment=found==source.begin() ? source.front() : *(found-1);
+                const long double offset=(static_cast<long double>(begin)+advance-segment.t0_ns)*1e-9L;
+                long double time_power=1;
+                for (unsigned m=0;m<=segment.degree;++m) {
+                    long double binomial=1,power=1;
+                    for (unsigned k=m;k<=segment.degree;++k) {
+                        result[m]+=segment.coefficients[joint].value[k]*binomial*power*time_power;
+                        binomial*=static_cast<long double>(k+1)/(k+1-m);power*=offset;
+                    }
+                    time_power*=h;
+                }
+                return result;
+            };
+            auto smooth = [&](long double start,long double slope) {
+                Local result{};
+                const long double middle=start+slope*0.5L;
+                if (middle>=1) { result[0]=1;return result; }
+                if (middle<=0) return result;
+                const long double coefficients[]={0,0,0,10,-15,6};
+                long double slope_power=1;
+                for (int m=0;m<=5;++m) {
+                    long double binomial=1,power=1;
+                    for (int k=m;k<=5;++k) {
+                        result[m]+=coefficients[k]*binomial*power*slope_power;
+                        binomial*=static_cast<long double>(k+1)/(k+1-m);power*=start;
+                    }
+                    slope_power*=slope;
+                }
+                return result;
+            };
+            const long double window_ticks=2*static_cast<long double>(half_ns);
+            const auto rise=smooth((static_cast<long double>(origin_ns)+begin)/window_ticks,
+                static_cast<long double>(finish-begin)/window_ticks);
+            Local fall{};fall[0]=1;
+            if (final_context) fall=smooth(static_cast<long double>(duration_ns-begin)/window_ticks,
+                -static_cast<long double>(finish-begin)/window_ticks);
+            Local taper{},mean{},full=shifted(0);
+            for (int i=0;i<=5;++i) for (int j=0;j<=5;++j) taper[i+j]+=rise[i]*fall[j];
+            const auto plus=shifted(half_ns),minus=shifted(-half_ns);
+            for (int i=0;i<=5;++i) mean[i]=(plus[i]-minus[i])*lead_seconds/window;
+            for (int i=0;i<=5;++i) for (int j=0;j<=10;++j) full[i+j]+=mean[i]*taper[j];
+            // Fit only the high-degree remainder. It and its first two
+            // derivatives vanish at zero, so endpoint matching never subtracts
+            // the large absolute position or velocity from its own prediction.
+            long double value=0,first=0,second=0;
+            for (int k=6;k<16;++k) {
+                value+=full[k];first+=k*full[k];second+=k*(k-1)*full[k];
+            }
+            full[3]+=10*value-4*first+0.5L*second;
+            full[4]+=-15*value+7*first-second;
+            full[5]+=6*value-3*first+0.5L*second;
+            long double power=1;
+            for (int k=0;k<=5;++k) {
+                piece->coefficients[joint].value[k]=static_cast<double>(full[k]/power);
+                power*=h;
+            }
             status = mk_trajectory_append_segment(advanced, piece.get());
-            position_a = position_b; velocity_a = velocity_b; acceleration_a = acceleration_b;
         }
         if (status != MK_OK) { mk_trajectory_destroy(advanced); return status; }
     } catch (const std::bad_alloc &) { mk_trajectory_destroy(advanced); return MK_ERROR_OUT_OF_MEMORY; }
     *out_trajectory = advanced;
     return MK_OK;
+}
+
+mk_result MK_CALL mk_advance_joint(mk_trajectory_handle trajectory, uint32_t joint, double lead_seconds,
+        double window_seconds, mk_trajectory_handle* out_trajectory) {
+    return advance_joint_context(trajectory,joint,lead_seconds,window_seconds,0,true,out_trajectory);
+}
+
+mk_result MK_CALL mk_advance_joint_context(mk_trajectory_handle trajectory, uint32_t joint, double lead_seconds,
+        double window_seconds, int64_t origin_ns, uint32_t final_context, mk_trajectory_handle* out_trajectory) {
+    if (out_trajectory) out_trajectory->id=0;
+    if (final_context>1) return MK_ERROR_INVALID_ARGUMENT;
+    return advance_joint_context(trajectory,joint,lead_seconds,window_seconds,origin_ns,final_context!=0,out_trajectory);
 }
 
 mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const double *position_tolerance,

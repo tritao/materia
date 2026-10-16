@@ -24,7 +24,8 @@ class DistanceDrive {
   /** The joint index driven. */
   public final joint:Int;
   /** The nominal intervals, in order, rebased so that the path starts at 0. */
-  public final intervals:Array<DriveInterval>;
+  public var intervals(get,never):Array<DriveInterval>;
+  final nominalIntervals:Array<DriveInterval>;
   public final pathLength:Float;
   /** The ramp length the profile aims for, metres. */
   public final ramp:Float;
@@ -51,14 +52,24 @@ class DistanceDrive {
       if (last != null && Math.abs(last.end - start) <= 1e-9 && last.rate == interval.rate) last.end = end;
       else cleaned.push({start: start, end: end, rate: interval.rate});
     }
-    this.intervals = cleaned;
+    this.nominalIntervals = cleaned;
     build();
   }
+
+  function get_intervals():Array<DriveInterval>
+    return [for (interval in nominalIntervals) {start:interval.start,end:interval.end,rate:interval.rate}];
 
   /** The drive restricted to [from, to] of this path and rebased to start at 0, re-shaped so it starts and ends at rest; null if it drives nothing there. */
   public function slice(from:Float, to:Float):Null<DistanceDrive> {
     var kept:Array<DriveInterval> = [];
-    for (interval in intervals) {
+    var low=0,high=nominalIntervals.length;
+    while (low<high) {
+      var middle=low+((high-low)>>1);
+      if (nominalIntervals[middle].end<=from) low=middle+1; else high=middle;
+    }
+    var index=low;
+    while (index<nominalIntervals.length && nominalIntervals[index].start<to) {
+      var interval=nominalIntervals[index++];
       var start = Math.max(interval.start, from), end = Math.min(interval.end, to);
       if (end - start > 1e-12) kept.push({start: start - from, end: end - from, rate: interval.rate});
     }
@@ -124,23 +135,23 @@ class DistanceDrive {
     }
     // Runs: consecutive intervals that touch.
     var i = 0;
-    while (i < intervals.length) {
+    while (i < nominalIntervals.length) {
       var j = i;
-      while (j + 1 < intervals.length && Math.abs(intervals[j + 1].start - intervals[j].end) <= 1e-9) j++;
-      var begin = intervals[i].start, end = intervals[j].end;
+      while (j + 1 < nominalIntervals.length && Math.abs(nominalIntervals[j + 1].start - nominalIntervals[j].end) <= 1e-9) j++;
+      var begin = nominalIntervals[i].start, end = nominalIntervals[j].end;
       // The ramp a run can carry: its start-up and wind-down take two ramps each, and a change inside it one.
       var shortest = end - begin;
-      for (k in i...(j + 1)) shortest = Math.min(shortest, intervals[k].end - intervals[k].start);
+      for (k in i...(j + 1)) shortest = Math.min(shortest, nominalIntervals[k].end - nominalIntervals[k].start);
       var ell = Math.min(ramp, Math.min((end - begin) / 4.0, shortest / 2.5));
       put(begin, 0.0);
-      put(begin + ell, 1.5 * intervals[i].rate);
-      put(begin + 2.0 * ell, intervals[i].rate);
+      put(begin + ell, 1.5 * nominalIntervals[i].rate);
+      put(begin + 2.0 * ell, nominalIntervals[i].rate);
       for (k in i...j) {
-        var at = intervals[k].end;
-        put(at - ell / 2.0, intervals[k].rate);
-        put(at + ell / 2.0, intervals[k + 1].rate);
+        var at = nominalIntervals[k].end;
+        put(at - ell / 2.0, nominalIntervals[k].rate);
+        put(at + ell / 2.0, nominalIntervals[k + 1].rate);
       }
-      var rate = intervals[j].rate;
+      var rate = nominalIntervals[j].rate;
       put(end - 2.0 * ell, rate);
       put(end - ell, 1.5 * rate);
       put(end, 0.0);

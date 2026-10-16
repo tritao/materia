@@ -6,7 +6,7 @@ import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 
-/** One uncoupled, unbounded pose copy shared by every belt resolved in a rebuild. */
+/** One uncoupled, unbounded pose copy shared by pose-dependent transmissions in a rebuild. */
 class BeltPoseContext {
 	public final definition:AssemblyDefinition;
 	public final state:AssemblyState;
@@ -20,6 +20,8 @@ class BeltPoseContext {
 		for (joint in definition.joints) {
 			joint.limits.lower = null;
 			joint.limits.upper = null;
+			// Mechanical stops require bounded travel and belong to the source machine, not this probe copy.
+			joint.stop = null;
 		}
 		state = new AssemblyState(definition);
 	}

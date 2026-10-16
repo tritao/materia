@@ -1,8 +1,45 @@
 #include "trajectory_merge.hpp"
 #include <memory>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 namespace motionkit {
 namespace {
+struct MergeProfile {
+    bool enabled;
+    double seconds[3]{};
+    double setup_seconds=0, construction_seconds=0, output_seconds=0;
+    using Clock=std::chrono::steady_clock;
+    Clock::time_point began{};
+    size_t candidates=0;
+    MergeProfile():enabled([] { const char* value=std::getenv("PROCESS_PATH_PROFILE");
+        return value && std::strcmp(value,"1")==0; }()) { if (enabled) began=Clock::now(); }
+    ~MergeProfile() {
+        if (enabled) std::fprintf(stderr,"PROCESS_MERGE_PROFILE {\"samples_seconds\":%.9g,\"bounds_seconds\":%.9g,\"extrema_seconds\":%.9g,\"candidates\":%zu,\"setup_seconds\":%.9g,\"construction_seconds\":%.9g,\"output_seconds\":%.9g,\"total_seconds\":%.9g}\n",
+            seconds[0],seconds[1],seconds[2],candidates,setup_seconds,construction_seconds,output_seconds,
+            std::chrono::duration<double>(Clock::now()-began).count());
+    }
+};
+struct MergeProfilePhase {
+    using Clock=std::chrono::steady_clock;
+    MergeProfile& profile;
+    int stage=0;
+    Clock::time_point began{};
+    explicit MergeProfilePhase(MergeProfile& value):profile(value) {
+        if (profile.enabled) { began=Clock::now(); ++profile.candidates; }
+    }
+    void mark(int next) {
+        if (profile.enabled) {
+            const auto now=Clock::now();
+            profile.seconds[stage]+=std::chrono::duration<double>(now-began).count(); began=now;
+        }
+        stage=next;
+    }
+    ~MergeProfilePhase() { if (profile.enabled) mark(stage); }
+};
+
 using Poly = std::vector<double>;
 double eval(const Poly &p, double x) {
     double result = 0.0;
@@ -86,13 +123,20 @@ bool controls_within(const Controls &control, int degree, double tolerance, doub
 
 bool error_within(const Controls &power, const Controls &magnitude, int degree, double tolerance) {
     Controls control{};
-    double scale = 0.0;
+    double scale = 0.0, absolute = 0.0;
     for (int k = 0; k <= degree; ++k) {
         if (!std::isfinite(power[k]) || !std::isfinite(magnitude[k])) return false;
-        scale += magnitude[k];
+        scale += magnitude[k]; absolute += std::abs(power[k]);
     }
     if (!std::isfinite(scale)) return false;
     if (std::isinf(tolerance)) return true;
+    // A power-basis absolute-sum bound already encloses the polynomial on
+    // [0,1]. Use the same arithmetic reserve as the Bernstein proof below;
+    // inconclusive sums still take that tighter hull and subdivision path.
+    const double roundoff = 512*std::numeric_limits<double>::epsilon()*scale +
+        512*std::numeric_limits<double>::denorm_min();
+    if (!std::isfinite(roundoff)) return false;
+    if (std::isfinite(absolute) && absolute+roundoff <= tolerance) return true;
     for (int k = 0; k <= degree; ++k) {
         double ratio = 1.0;
         for (int i = 0; i <= k; ++i) {
@@ -104,9 +148,7 @@ bool error_within(const Controls &power, const Controls &magnitude, int degree, 
     // As in trajectory validation: reserve arithmetic error for normalization,
     // binomial conversion and summation. At degree <=5, affine composition plus
     // twelve subdivision levels stays within 512 operations per control.
-    const double roundoff = 512*std::numeric_limits<double>::epsilon()*scale +
-        512*std::numeric_limits<double>::denorm_min();
-    return std::isfinite(roundoff) && controls_within(control, degree, tolerance, roundoff, 12);
+    return controls_within(control, degree, tolerance, roundoff, 12);
 }
 
 bool piece_error_within(const double *candidate, const double *original, unsigned original_degree,
@@ -151,6 +193,7 @@ bool piece_error_within(const double *candidate, const double *original, unsigne
 
 static mk_result merge_polynomials_impl(const PolynomialSource &source, const MergeOptions &options,
                                         const PolynomialOutput &output, bool position_budget) {
+    MergeProfile profile;
     const auto *position_tolerance = options.position_tolerance, *velocity_tolerance = options.velocity_tolerance,
         *acceleration_tolerance = options.acceleration_tolerance, *velocity_limit = options.velocity_limit,
         *acceleration_limit = options.acceleration_limit, *position_lower = options.position_lower,
@@ -181,24 +224,13 @@ static mk_result merge_polynomials_impl(const PolynomialSource &source, const Me
             }
         return MK_OK;
     };
-    auto evaluate = [&](int64_t time, mk_trajectory_state &state) -> mk_result {
+    auto locate = [&](int64_t time) {
         uint32_t low = 0, high = count;
         while (low + 1 < high) {
             const auto mid = low + (high - low) / 2;
             if (source.segment(source.context, mid).start_ns <= time) low = mid; else high = mid;
         }
-        const auto view = source.segment(source.context, low);
-        const double tau = static_cast<double>(std::clamp(time - view.start_ns, int64_t{0}, view.duration_ns)) / 1e9;
-        state.joint_count = joints;
-        for (uint32_t j = 0; j < joints; ++j) {
-            const auto *c = view.joint(j);
-            double p = 0, v = 0, a = 0;
-            for (int k = static_cast<int>(view.degree); k >= 0; --k) {
-                a = a * tau + 2 * v; v = v * tau + p; p = p * tau + c[k];
-            }
-            state.position[j] = p; state.velocity[j] = v; state.acceleration[j] = a;
-        }
-        return MK_OK;
+        return source.segment(source.context, low);
     };
     mk_result status = MK_OK;
     try {
@@ -219,6 +251,7 @@ static mk_result merge_polynomials_impl(const PolynomialSource &source, const Me
             // A chord (degree 1) knows no acceleration to match: it is never merged.
             smooth[i] = first_segment->degree >= 2 ? 1 : 0;
         }
+        if (profile.enabled) profile.setup_seconds=std::chrono::duration<double>(MergeProfile::Clock::now()-profile.began).count();
         // The quintic through the first segment's start state and the last one's end state.
         auto through = [&](uint32_t last) {
             const double T = static_cast<double>(start[last] + duration[last] - first_segment->t0_ns) * 1e-9;
@@ -239,10 +272,9 @@ static mk_result merge_polynomials_impl(const PolynomialSource &source, const Me
                 for (int k = 0; k < 6; ++k) { candidate->coefficients[joint].value[k] = normalized[k] / scale; scale *= T; }
             }
         };
-        mk_trajectory_state state{};
-        state.struct_size = sizeof(state);
         // Sample first for inexpensive rejection, then bound error over every original piece.
         auto follows = [&](uint32_t first, uint32_t last) -> mk_result {
+            MergeProfilePhase phase(profile);
             std::array<double,MK_MAX_JOINTS> derived_velocity{},derived_acceleration{};
             const double *velocity_error=velocity_tolerance,*acceleration_error=acceleration_tolerance;
             if(position_budget){
@@ -264,31 +296,43 @@ static mk_result merge_polynomials_impl(const PolynomialSource &source, const Me
             for (int step = 1; step < 16; ++step)
                 times.push_back(candidate->t0_ns + (candidate->duration_ns / 16) * step + (candidate->duration_ns % 16) * step / 16);
             for (const auto time : times) {
-                const auto result = evaluate(time, state);
-                if (result != MK_OK) return result;
+                const auto view = locate(time);
+                const double reference_tau = static_cast<double>(std::clamp(time - view.start_ns,
+                    int64_t{0}, view.duration_ns)) / 1e9;
                 const double tau = static_cast<double>(time - candidate->t0_ns) * 1e-9;
                 for (uint32_t joint = 0; joint < joints; ++joint) {
+                    // Reject in joint order without evaluating the remaining
+                    // source joints. Keep the original Horner arithmetic.
+                    const auto *c = view.joint(joint);
+                    double p = 0, v = 0, a = 0;
+                    for (int k = static_cast<int>(view.degree); k >= 0; --k) {
+                        a = a * reference_tau + 2 * v;
+                        v = v * reference_tau + p;
+                        p = p * reference_tau + c[k];
+                    }
+                    const Kin reference{p, v, a};
                     const auto mine = kin_of(candidate->coefficients[joint], 5, tau);
-                    if (std::abs(mine.position - state.position[joint]) > position_tolerance[joint] ||
-                        std::abs(mine.velocity - state.velocity[joint]) > velocity_error[joint] ||
-                        std::abs(mine.acceleration - state.acceleration[joint]) > acceleration_error[joint])
+                    if (std::abs(mine.position - reference.position) > position_tolerance[joint] ||
+                        std::abs(mine.velocity - reference.velocity) > velocity_error[joint] ||
+                        std::abs(mine.acceleration - reference.acceleration) > acceleration_error[joint])
                         return MK_ERROR_GENERATION;
                     // A merged run does not take a joint past a limit that the segments it replaces keep to, nor, where they
                     // are past it themselves (a plateau at the limit, as a timed path cruises), past what they are by
                     // more than rounding (1e-9 of the limit, the validator's own floor: a plan cruising at the limit is
                     // checked against it). The same for the position bounds, to a nanometre.
-                    if (mine.position < position_lower[joint] && mine.position < state.position[joint] - 1e-9) return MK_ERROR_GENERATION;
-                    if (mine.position > position_upper[joint] && mine.position > state.position[joint] + 1e-9) return MK_ERROR_GENERATION;
+                    if (mine.position < position_lower[joint] && mine.position < reference.position - 1e-9) return MK_ERROR_GENERATION;
+                    if (mine.position > position_upper[joint] && mine.position > reference.position + 1e-9) return MK_ERROR_GENERATION;
                     if ((std::abs(mine.velocity) > velocity_limit[joint] &&
-                         std::abs(mine.velocity) > std::abs(state.velocity[joint]) + 1e-9 * velocity_limit[joint]) ||
+                         std::abs(mine.velocity) > std::abs(reference.velocity) + 1e-9 * velocity_limit[joint]) ||
                         (std::abs(mine.acceleration) > acceleration_limit[joint] &&
-                         std::abs(mine.acceleration) > std::abs(state.acceleration[joint]) + 1e-9 * acceleration_limit[joint]))
+                         std::abs(mine.acceleration) > std::abs(reference.acceleration) + 1e-9 * acceleration_limit[joint]))
                         return MK_ERROR_GENERATION;
-                    peak_velocity[joint] = std::max(peak_velocity[joint], std::abs(state.velocity[joint]));
+                    peak_velocity[joint] = std::max(peak_velocity[joint], std::abs(reference.velocity));
                     peak_acceleration[joint] = std::max(peak_acceleration[joint],
-                        std::abs(state.acceleration[joint]));
+                        std::abs(reference.acceleration));
                 }
             }
+            phase.mark(1);
             for (uint32_t i = first; i <= last; ++i) {
                 const auto view = source.segment(source.context, i);
                 const double shift = static_cast<double>(view.start_ns-candidate->t0_ns)*1e-9;
@@ -298,6 +342,7 @@ static mk_result merge_polynomials_impl(const PolynomialSource &source, const Me
                         shift, span, position_tolerance[joint], velocity_error[joint], acceleration_error[joint]))
                         return MK_ERROR_GENERATION;
             }
+            phase.mark(2);
             // Samples can miss the quintic's own peaks between them, as on a plateau at a limit: bound its speed and
             // acceleration exactly, at its stationary points.
             const double T = static_cast<double>(candidate->duration_ns) * 1e-9;
@@ -313,7 +358,18 @@ static mk_result merge_polynomials_impl(const PolynomialSource &source, const Me
                     continue;
                 }
                 const Poly v = derivative(p), a = derivative(v);
-                for (double x : roots(v)) {
+                // On [0,1], the absolute sum encloses every nonconstant term.
+                // Prove the position interval before finding stationary points;
+                // most joints have ample travel clearance. Keep an arithmetic
+                // reserve, and retain the original root proof when inconclusive.
+                double radius = 0.0;
+                for (size_t k = 1; k < p.size(); ++k) radius += std::abs(p[k]);
+                const double roundoff = 512 * std::numeric_limits<double>::epsilon() *
+                    (std::abs(p[0]) + radius) + 512 * std::numeric_limits<double>::denorm_min();
+                const bool position_proved = std::isfinite(radius) && std::isfinite(roundoff) &&
+                    p[0] - radius - roundoff >= position_lower[joint] &&
+                    p[0] + radius + roundoff <= position_upper[joint];
+                if (!position_proved) for (double x : roots(v)) {
                     const double position = eval(p, x);
                     // Position bounds are hard: reject an interior overshoot even if the sampling grid misses it.
                     if (position < position_lower[joint] - 1e-9 || position > position_upper[joint] + 1e-9)
@@ -367,9 +423,11 @@ static mk_result merge_polynomials_impl(const PolynomialSource &source, const Me
             auto accepts = [&](uint32_t last) -> mk_result {
                 *last_segment = mk_segment{};
                 last_segment->struct_size = sizeof(mk_segment);
+                const auto construction_began=profile.enabled ? MergeProfile::Clock::now() : MergeProfile::Clock::time_point{};
                 auto result = load(last, *last_segment);
                 if (result != MK_OK) return result;
                 through(last);
+                if (profile.enabled) profile.construction_seconds+=std::chrono::duration<double>(MergeProfile::Clock::now()-construction_began).count();
                 result = follows(first, last);
                 if (result != MK_OK) return result;
                 best = last;
@@ -392,7 +450,9 @@ static mk_result merge_polynomials_impl(const PolynomialSource &source, const Me
                 if (result != MK_ERROR_GENERATION) { return result; }
                 failed = middle;
             }
+            const auto output_began=profile.enabled ? MergeProfile::Clock::now() : MergeProfile::Clock::time_point{};
             status = output.append(output.context, *best_segment, first, best);
+            if (profile.enabled) profile.output_seconds+=std::chrono::duration<double>(MergeProfile::Clock::now()-output_began).count();
             if (status != MK_OK) return status;
             first = best + 1;
         }

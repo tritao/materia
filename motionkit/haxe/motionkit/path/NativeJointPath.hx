@@ -14,6 +14,8 @@ class NativeJointPath {
   public function new(samples:JointPathSamples) {
     if (samples.jointCount > TrajectoryCoreConstants.MK_MAX_JOINTS)
       throw "Native joint path exceeds the joint limit";
+    var profile = Sys.getEnv("PROCESS_PATH_PROFILE") == "1";
+    var began = profile ? Sys.time() : 0.0;
     var native:Array<mk_path_sample> = [];
     for (index in 0...samples.s.length) {
       var sample = new mk_path_sample();
@@ -31,6 +33,7 @@ class NativeJointPath {
     var created = MotionKitNative.mk_path_create(native);
     check(created.status, "path.create");
     owner = created.out_path;
+    if (profile) Sys.println("PROCESS_PATH_STAGE " + haxe.Json.stringify({stage:"haxe_native_path_transfer",seconds:Sys.time()-began}));
   }
 
   public function lower(law:PathTimeLaw, tolerance:Float):Trajectory {
@@ -41,18 +44,16 @@ class NativeJointPath {
     return new Trajectory(created.out_trajectory);
   }
 
-  public function time(limits:PathTimingLimits,
-      loweringTolerance:Float):{law:PathTimeLaw, trajectory:Trajectory, windows:Int, boundaryLowerings:Int} {
+  /** Snapshot into a bounded queue. The caller owns certification/publication. */
+  public function prepareTimingStream(limits:PathTimingLimits, loweringTolerance:Float,
+      maxPendingWindows:Int):motionkit.planner.PathTimingStream {
     if (disposed) throw "Native joint path has been disposed";
-    var created = MotionKitNative.mk_time_path(owner.borrow(), limits.maxVelocity,
-      limits.maxAcceleration, limits.speedCaps, limits.startPathSpeed,
-      limits.endPathSpeed, loweringTolerance,limits.requireFeasiblePath?1:0);
-    if(created.status!=TrajectoryCoreConstants.MK_OK && limits.requireFeasiblePath && created.out_report.get_derivative()!=0)
-      throw 'Refined process timing requires an adjustment: joint ${created.out_report.get_joint()}, derivative ${created.out_report.get_derivative()}, ${created.out_report.get_value()} > ${created.out_report.get_limit()}, sustainable feed scale ${created.out_report.get_sustainable_scale()}';
-    check(created.status, "path.time");
-    return {law: new PathTimeLaw([], created.out_law),
-      trajectory: new Trajectory(created.out_trajectory), windows: created.out_report.get_windows(),
-      boundaryLowerings: created.out_report.get_boundary_lowerings()};
+    if (maxPendingWindows <= 0) throw "Timing stream needs a positive pending-window budget";
+    var created = MotionKitNative.mk_path_timing_stream_create(owner.borrow(), limits.maxVelocity,
+      limits.maxAcceleration, limits.speedCaps, limits.startPathSpeed, limits.endPathSpeed,
+      loweringTolerance, limits.requireFeasiblePath ? 1 : 0, maxPendingWindows);
+    check(created.status, "path.timing.stream.prepare");
+    return new motionkit.planner.PathTimingStream(created.out_stream,limits.requireFeasiblePath);
   }
 
   public function dispose():Void {

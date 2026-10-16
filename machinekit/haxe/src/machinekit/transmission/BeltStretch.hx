@@ -52,6 +52,8 @@ class BeltStretch {
 		if (context == null) context = new BeltPoseContext(mechanical);
 		context.reset();
 		var state = context.state, anchor = wrapIndex(path,pulley), neutral = posedBelt(belt,path,state);
+		if (Math.abs(neutral.length - belt.length) > 1e-4)
+			throw new TransmissionDesignError("Belt length does not match its wrap attachments");
 		var phase = neutral.anchorPhase(anchor), baseline = lengths(neutral,path,state,anchor,phase);
 		var gradients:Array<{joint:String,zero:Float,lower:Float,upper:Float,a:Float,b:Float}> = [];
 		for (joint in mechanical.joints) if (joint.role == materia.assembly.AssemblyDefinition.AssemblyJointRole.Tree &&
@@ -62,8 +64,10 @@ class BeltStretch {
 			var minus = lengths(posedBelt(belt,path,state),path,state,anchor,phase);
 			var a = (plus[0]-minus[0])*0.5, b = (plus[1]-minus[1])*0.5;
 			if (Math.abs(a)<1e-7 && Math.abs(b)<1e-7) continue;
-			if (Math.abs(a-Math.round(a))>1e-7 || Math.abs(b-Math.round(b))>1e-7 || joint.limits.lower == null || joint.limits.upper == null)
-				throw new TransmissionDesignError("Moving belt spans need affine Cartesian geometry and bounded travel");
+			if (Math.abs(a-Math.round(a))>1e-7 || Math.abs(b-Math.round(b))>1e-7)
+				throw new TransmissionDesignError('Moving belt spans need affine Cartesian geometry for joint "${joint.id}"');
+			if (joint.limits.lower == null || joint.limits.upper == null)
+				throw new TransmissionDesignError('Cannot certify belt stiffness without limits for joint "${joint.id}"');
 			var overtravel = joint.limits.overtravel == null ? 0.0 : joint.limits.overtravel;
 			gradients.push({joint:joint.id,zero:joint.defaultValue,lower:joint.limits.lower-overtravel,upper:joint.limits.upper+overtravel,
 				a:Math.round(a),b:Math.round(b)});

@@ -8,6 +8,9 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	const MK_TIMING_BINDING_FEED_CAP = 3;
 	const MK_TIMING_BINDING_JOINT_ACCELERATION = 2;
 	const MK_TIMING_BINDING_JOINT_VELOCITY = 1;
+	const MK_TIMING_STREAM_DONE = 2;
+	const MK_TIMING_STREAM_READY = 1;
+	const MK_TIMING_STREAM_WAITING = 0;
 	/**
 	 * A copy of `trajectory` in which `joint` runs `lead_seconds` ahead of itself, the lead taken on its velocity averaged
 	 * over `window_seconds`: position + lead * (position(t + w/2) - position(t - w/2)) / w * taper(t). It is the
@@ -23,6 +26,14 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * `mk_project_couplings` for the joints that follow `joint`.
 	 */
 	extern fn mk_advance_joint(trajectory: mk_trajectory_handle, joint: u32, lead_seconds: f64, window_seconds: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	/**
+	 * Pressure advance on a normalized context range from one continuous motion.
+	 * origin_ns is its elapsed offset from the true motion start; only final_context
+	 * applies the true end taper. Publish only where half a filter window of source
+	 * exists on each side, except at the true start/end. Artificial context edges
+	 * are not process stops. The result still needs drive/task/seam certification.
+	 */
+	extern fn mk_advance_joint_context(trajectory: mk_trajectory_handle, joint: u32, lead_seconds: f64, window_seconds: f64, origin_ns: i64, final_context: u32, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	extern fn mk_analytic_cartesian_forward(model: ptr<const<mk_analytic_cartesian_model>>, joints: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, out_pose: ptr<mk_analytic_pose> @out) -> mk_result;
 	/**
 	 * All geometric branches, before limits/wrap enumeration by the sampler.
@@ -110,6 +121,65 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 * One call replaces a bisection of mk_path_distance_to_time per sample.
 	 */
 	extern fn mk_path_times_to_distances(law: mk_time_law_handle, seconds: ptr<const<f64>> @in_array("count"), count: u32, out_distances: ptr<f64> @out_array("count")) -> mk_result;
+	extern fn mk_path_timing_preview_destroy(preview: mk_path_timing_preview_handle) -> void;
+	/**
+	 * Snapshot one immutable path/limits/cap table for repeated endpoint timing.
+	 * The source path may be destroyed after creation. Session calls are serialized;
+	 * session timing uses one serial solver workspace, independent of helper settings.
+	 * Endpoints are speeds (not squared speeds). Switching between stopped and moving
+	 * endpoints rebuilds the endpoint-dependent grid/constraints. A failed call drops
+	 * retained backward state. Every successful law/trajectory is independently owned
+	 * and survives later calls or session destruction. Removing a session handle does
+	 * not cancel an already active call; subsequent calls reject the removed handle.
+	 */
+	extern fn mk_path_timing_session_create(path: mk_path_handle, max_velocity: ptr<const<f64>> @in_array("joint_count"), max_acceleration: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, speed_caps: ptr<const<f64>> @in_array("speed_cap_count"), speed_cap_count: u32, lowering_tolerance: f64, require_feasible_path: u32, out_session: ptr<mk_path_timing_session_handle> @out @owned) -> mk_result;
+	extern fn mk_path_timing_session_destroy(session: mk_path_timing_session_handle) -> void;
+	/**
+	 * Complete feasible entry-speed interval for a requested terminal interval.
+	 * This performs a backward pass only, reusing retained state when possible.
+	 * entry_may_move=1 uses the conservative moving-boundary grid/constraints when
+	 * entry speed is not yet known; 0 restricts the returned interval to rest and
+	 * refuses a terminal request that cannot be reached from rest. A later
+	 * fully stopped timing call may rebuild the less conservative stopped problem.
+	 * Returned bounds are values, independent of later session updates/disposal.
+	 */
+	extern fn mk_path_timing_session_entry_interval(session: mk_path_timing_session_handle, end_lower_speed: f64, end_upper_speed: f64, entry_may_move: u32, out_lower_speed: ptr<f64> @out, out_upper_speed: ptr<f64> @out) -> mk_result;
+	extern fn mk_path_timing_session_time(session: mk_path_timing_session_handle, start_speed: f64, end_speed: f64, out_report: ptr<mk_timing_report> @out, out_law: ptr<mk_time_law_handle> @out @owned, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	/**
+	 * Fastest timing to any speed in the requested terminal interval. Unlike a
+	 * fixed endpoint, its upper bound need not be attainable. out_reached_speed is
+	 * the actual reached endpoint, which the next window must use as its entry.
+	 * All speeds are unsquared SI path speeds. Failure clears every result output.
+	 */
+	extern fn mk_path_timing_session_time_to_interval(session: mk_path_timing_session_handle, start_speed: f64, end_lower_speed: f64, end_upper_speed: f64, out_reached_speed: ptr<f64> @out, out_report: ptr<mk_timing_report> @out, out_law: ptr<mk_time_law_handle> @out @owned, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	/**
+	 * Retire stable raw timing into unpublished transform context. This is not execution
+	 * publication: transformed output still requires task/clearance/drive/seam/event certification.
+	 * Tokens remain caller-owned and must be destroyed, including after commit.
+	 */
+	extern fn mk_path_timing_stream_commit(stream: mk_path_timing_stream_handle, preview: mk_path_timing_preview_handle) -> mk_result;
+	/**
+	 * Immutable whole-path snapshot with guarded, validated window previews.
+	 * All windows use the same global grid, normalization and reserve policy.
+	 * max_pending_windows is a hard count budget. A moving final speed requires
+	 * the complete horizon before the first preview, and therefore that budget
+	 * must cover every window. Ordinary stopped-final paths may retire a proven
+	 * stable prefix earlier. No preview is published to execution by this API.
+	 */
+	extern fn mk_path_timing_stream_create(path: mk_path_handle, max_velocity: ptr<const<f64>> @in_array("joint_count"), max_acceleration: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, speed_caps: ptr<const<f64>> @in_array("speed_cap_count"), speed_cap_count: u32, start_speed: f64, end_speed: f64, lowering_tolerance: f64, require_feasible_path: u32, max_pending_windows: u32, out_stream: ptr<mk_path_timing_stream_handle> @out @owned) -> mk_result;
+	extern fn mk_path_timing_stream_destroy(stream: mk_path_timing_stream_handle) -> void;
+	/**
+	 * Advances by at most one input window, then offers a candidate if proven.
+	 * WAITING/DONE return empty owned handles. READY returns independently owned
+	 * law/trajectory data and a guard token. Another step supersedes older tokens.
+	 * Progress distances/speeds are the actual clock-boundary states in the original
+	 * path coordinate. Numerical solver interfaces need not fall on integer ticks:
+	 * an owned fractional tail continues into the next preview. Span/stage metadata
+	 * describes the nominal solver window, whose binding indices remain local.
+	 * Feed/process caps and transformation context still require external certification.
+	 * Laws/trajectories survive source/stream/token disposal. Calls are serialized.
+	 */
+	extern fn mk_path_timing_stream_step(stream: mk_path_timing_stream_handle, out_progress: ptr<mk_path_timing_stream_progress> @out, out_preview: ptr<mk_path_timing_preview_handle> @out @owned, out_report: ptr<mk_timing_report> @out, out_law: ptr<mk_time_law_handle> @out @owned, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	/**
 	 * A copy of `trajectory` whose coupled joints are exactly the sum of their terms: for each term in order,
 	 * follower += ratio * leader (every degree), plus offset in the constant term. A follower's terms must come
@@ -457,6 +527,19 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 		second: array<f64, 64> @offset(1048);
 		second_before: array<f64, 64> @offset(1560);
 	}
+	struct mk_path_timing_stream_progress @layout(64, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		state: u32 @offset(4);
+		window_index: u32 @offset(8);
+		total_windows: u32 @offset(12);
+		first_span: u32 @offset(16);
+		span_count: u32 @offset(20);
+		first_stage: u32 @offset(24);
+		start_s: f64 @offset(32);
+		end_s: f64 @offset(40);
+		start_speed: f64 @offset(48);
+		end_speed: f64 @offset(56);
+	}
 	/**
 	 * Local linearized arm bound on value (0), first (1), or second (2).
 	 * Coefficients multiply the redundant coordinates at one knot.
@@ -603,5 +686,8 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	handle mk_candidate_batch_handle : u32 @destroy("mk_candidate_batch_destroy");
 	handle mk_eaik_handle : u32 @destroy("mk_eaik_destroy");
 	handle mk_path_handle : u32 @destroy("mk_path_destroy");
+	handle mk_path_timing_preview_handle : u32 @destroy("mk_path_timing_preview_destroy");
+	handle mk_path_timing_session_handle : u32 @destroy("mk_path_timing_session_destroy");
+	handle mk_path_timing_stream_handle : u32 @destroy("mk_path_timing_stream_destroy");
 	handle mk_time_law_handle : u32 @destroy("mk_time_law_destroy");
 }

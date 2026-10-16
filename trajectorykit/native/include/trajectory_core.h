@@ -276,6 +276,29 @@ TC_API mk_result MK_CALL mk_trajectory_create(uint32_t joint_count,
 TC_API void MK_CALL mk_trajectory_destroy(mk_trajectory_handle trajectory);
 TC_API mk_result MK_CALL mk_trajectory_append_segment(mk_trajectory_handle trajectory,
     const mk_segment *segment);
+/** Append an owned copy, normalizing source time zero to the destination end.
+ * Requires matching joint counts and nonempty source. Rejection leaves destination unchanged.
+ * This copies polynomials; callers remain responsible for boundary certification.
+ */
+TC_API mk_result MK_CALL mk_trajectory_append_copy(mk_trajectory_handle destination,
+    mk_trajectory_handle source);
+/** Copy selected joints, preserving polynomial coefficients and the original clock origin.
+ * Reordering and repeated indices are allowed. The result owns its data independently.
+ */
+TC_API mk_result MK_CALL mk_trajectory_select_joints(mk_trajectory_handle source,
+    const uint32_t* joints MK_IN_ARRAY(joint_count), uint32_t joint_count, mk_trajectory_handle* out_trajectory MK_OUT MK_OWNED);
+
+/** Copy [begin_ns,end_ns] relative to the source's first segment, rebased to time zero.
+ * Partial segments are translated algebraically; no sampling or retiming occurs.
+ */
+TC_API mk_result MK_CALL mk_trajectory_slice(mk_trajectory_handle source,
+    int64_t begin_ns, int64_t end_ns, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+/** Latest integer time <= latest_ns strictly inside a polynomial segment.
+ * Times are relative to the source origin. found=0 means no such tick exists;
+ * this lets a caller avoid introducing a plan seam at a derivative discontinuity.
+ */
+TC_API mk_result MK_CALL mk_trajectory_interior_time(mk_trajectory_handle source, int64_t latest_ns,
+    int64_t *out_time_ns MK_OUT, uint32_t *out_found MK_OUT);
 TC_API mk_result MK_CALL mk_trajectory_evaluate(mk_trajectory_handle trajectory,
     int64_t time_ns, mk_trajectory_state *out_state);
 /** Degree-1 uses chord differences; degree 0 and degree >= 2 use analytic derivatives. */

@@ -644,8 +644,8 @@ class ProgramTests extends MotionKitTestSupport {
     reference.releaseDistanceMap();
     reference.trajectory.dispose();
     linearPlan.dispose();
-    // A path that turns back stops at its corner: two plans, planned a step each, so a long path
-    // does not hold up the plans before it.
+    // A path that turns back keeps its authored stop. Bounded worker steps
+    // publish the first stretch before completing the second.
     var cornerPath = new PosePath("work", [
       new PoseLine(new PoseWaypoint(new Pose3(0.0), 0.005, 0.02),
         new PoseWaypoint(new Pose3(0.1), 0.005, 0.02), OrientationPolicy.Fixed, 0.1, 0.1),
@@ -656,8 +656,12 @@ class ProgramTests extends MotionKitTestSupport {
       [0.0, 0.0, 0.0, 0.0, 0.1, 0.0], Int64.ofInt(503), 0, 1.0, cornerBlocks);
     var delivered:Array<Int> = [];
     while (stepping.step()) delivered.push(cornerBlocks.blocks[0].plans.length);
-    check(delivered.join(",") == "0,1" && cornerBlocks.done && cornerBlocks.blocks[0].plans.length == 2,
-      'a path is planned one stretch between corners a step, got $delivered');
+    check(delivered.indexOf(0)>=0 && delivered.indexOf(1)>=0 && cornerBlocks.done &&
+      cornerBlocks.blocks[0].plans.length==2 && cornerBlocks.blocks[0].plans[0].endsAtRest &&
+      cornerBlocks.blocks[0].plans[1].endsAtRest,
+      'bounded planning publishes each authored stopped stretch in order, got $delivered');
+    for (i in 1...delivered.length) check(delivered[i]>=delivered[i-1] && delivered[i]-delivered[i-1]<=1,
+      "a bounded planning step preserves ordered incremental publication");
     stepping.dispose();
     cornerBlocks.dispose();
     var bounded = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));

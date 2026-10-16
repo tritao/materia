@@ -31,6 +31,21 @@ class TimedPath {
     this.releaseMap = releaseMap;
   }
 
+  /** Consume this result, transferring its distance-law ownership to a selected-joint copy.
+   * Failure leaves the original result live. The selected copy preserves lazy binding diagnostics.
+   */
+  public function takeSelectedJoints(indices:Array<Int>):TimedPath {
+    if (mapReleased) throw "Timed path distance map has been released";
+    var selected = trajectory.selectJoints(indices);
+    try {
+      var result = new TimedPath(selected,distanceToTimeMap,bindings == null ? [] : bindings,
+        releaseMap,timesToDistancesMap,bindings == null ? bindingSupplier : null);
+      mapReleased = true;
+      trajectory.dispose();
+      return result;
+    } catch (error:Dynamic) { selected.dispose(); throw error; }
+  }
+
   function get_bindingConstraints():Array<BindingConstraint> {
     if (bindings == null) {
       if (mapReleased) throw "Timed path bindings must be read before its distance map is released";
