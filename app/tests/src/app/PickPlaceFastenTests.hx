@@ -1,22 +1,39 @@
 package app;
 
 import sys.FileSystem;
+import app.ProjectSourceSuite.ProjectSourceCase;
 import robotkit.world.RobotWorld;
 import materia.assembly.AssemblyFrames;
 
 /** Exercises both controller programs against the actual free CAD bodies. */
 class PickPlaceFastenTests {
   static function printProgress(message:String):Void {Sys.println(message); Sys.stdout().flush();}
+  // The aggregate and independently scheduled cases share this exact matrix.
+  static final MATRIX_STAGES:Array<String> = ["housing", "full", "recovery", "supply", "fixture", "interruption", "interruption-full"];
+
   public static function run(root:String):Void {
-    runSelected(root,Sys.getEnv("PICK_PLACE_STAGE"));
+    var selected = Sys.getEnv("PICK_PLACE_STAGE");
+    if (selected == null) for (stage in MATRIX_STAGES) runSelected(root,stage);
+    else runSelected(root,selected);
   }
-  static function runSelected(root:String, selected:Null<String>):Void {
+
+  public static function matrixCases():Array<ProjectSourceCase> {
+    return [for (stage in MATRIX_STAGES) for (backend in [ApplicationSimulation.MUJOCO, ApplicationSimulation.DETERMINISTIC])
+      matrixCase(stage,backend)];
+  }
+
+  static function matrixCase(stage:String, backend:Int):ProjectSourceCase {
+    var name = backend == ApplicationSimulation.MUJOCO ? "mujoco" : "deterministic";
+    return ProjectSourceCase.suite('screwdriver-pick-place-$stage-$name', root -> runSelected(root,stage,backend));
+  }
+
+  static function runSelected(root:String, selected:Null<String>, ?backendOverride:Int):Void {
     var supplyFailure = selected == "supply";
     var fixtureFailure = selected == "fixture";
     var fullInterruption = selected == "interruption-full";
     var interruption = selected == "interruption" || fullInterruption;
     var stages = fullInterruption ? [false] : selected == "housing" || supplyFailure || interruption ? [true] : selected == "full" || fixtureFailure ? [false] : [true, false];
-    var backendChoice = Sys.getEnv("PICK_PLACE_BACKEND");
+    var backendChoice = backendOverride == null ? Sys.getEnv("PICK_PLACE_BACKEND") : Std.string(backendOverride);
     var backends = backendChoice == "0" ? [ApplicationSimulation.DETERMINISTIC] :
       backendChoice == "1" ? [ApplicationSimulation.MUJOCO] : [ApplicationSimulation.MUJOCO, ApplicationSimulation.DETERMINISTIC];
     if (selected == "recovery") {
@@ -168,13 +185,6 @@ class PickPlaceFastenTests {
       } catch (error:Dynamic) {
         simulation.dispose(); session.dispose(); throw error;
       }
-    }
-    if (selected == null) {
-      for (backend in backends) checkHousingRecovery(root,backend);
-      runSelected(root,"supply");
-      runSelected(root,"fixture");
-      runSelected(root,"interruption");
-      runSelected(root,"interruption-full");
     }
   }
 

@@ -3972,3 +3972,14 @@ factor-buffer comparison has median 0.658 s before versus 0.562 s after on the
 same complete probe (`sd15-dynamics-factor-reuse-comparison.json`). All pending
 native correctness/performance candidates are now integrated; the complete
 frozen-source gate remains required.
+
+### SD15a independently scheduled acceptance matrix (2026-10-16)
+
+The default project-source suite now exposes each of the seven cell scenarios
+on each backend as a separate case (14 cases). The aggregate focused case
+uses the same scenario list; all scenario assertions are retained. This lets
+the existing memory-aware runner schedule scenarios independently instead of
+serializing the entire matrix inside one case. The app compiles and its default
+case listing verifies all 14 distinct names alongside the other 48 cases.
+This registry verification does not establish cell acceptance; the complete
+frozen-source gate remains required.
