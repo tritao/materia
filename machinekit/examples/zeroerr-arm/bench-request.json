@@ -12,12 +12,12 @@
   },
   "mechanicalDrawing": {
     "key": "80t-v5",
-    "url": "https://www.zeroerr.cn/static/download/eRobT/eRob80T/V5/eRob80H××T-XX-18EX_V5_MC2D.CX.XX.zip",
-    "file": "eRob80H××T-XX-18EX_V5_MC2D.CX.XX/eRob80H××T-XX-18XX_V5_MC2D.XX.XX.pdf",
+    "url": "https://www.zeroerr.cn/static/download/eRobT/eRob80T/V5/eRob80H\u00d7\u00d7T-XX-18EX_V5_MC2D.CX.XX.zip",
+    "file": "eRob80H\u00d7\u00d7T-XX-18EX_V5_MC2D.CX.XX/eRob80H\u00d7\u00d7T-XX-18XX_V5_MC2D.XX.XX.pdf",
     "pdfSha256": "20546bef0cdc5853efcbccb34e9832a515d1cb07945007fe8bb56b59c9e6e604"
   },
   "fixtureBasis": {
-    "supplierForearmEnd": "2-130-005 10kg三关节连杆 -腰形.STEP",
+    "supplierForearmEnd": "2-130-005 10kg\u4e09\u5173\u8282\u8fde\u6746 -\u8170\u5f62.STEP",
     "source": "10 kg reference pinned in revised-layout.json",
     "use": "Retained distal mounting end; do not copy generic CobotJoint fastener patterns",
     "limits": "Fixture clamp/base/load catch require mechanical review; no fabricated fixture is claimed"
@@ -58,5 +58,16 @@
     "status": "no reviewed stock ZeroErr revision selected for full-workspace target",
     "screeningRequest": "Provide a versioned option supporting at least 190 Nm continuous at 30 rpm or faster on the specified supply, plus the complete speed/torque/thermal and peak-duty curves. This is a screening request, not sufficient hardware qualification.",
     "existingPrototypeOption": "110T100 only within a separately validated, bounded tending duty; current synthetic cycle is not registered to a real cell"
+  },
+  "straightLinkCouponReview": {
+    "status": "planned_unpowered_before_joint_bench",
+    "geometry": "straight-link-config.json; generated interface-review.pdf and STEP parts",
+    "checks": [
+      "Confirm protected supplier mounting ends against delivered revision",
+      "Review spigot and match-reamed dowel fits, thread stripping and bolt preload with machinist",
+      "Measure tube ovalisation, reversal slip and hysteresis under calibrated bending/torsion loads",
+      "Inspect screw access, cover retention and harness bend radius through intended travel"
+    ],
+    "acceptance": "Record loads, gauge resolution and measured displacement; application tolerances and allowable preload remain to be specified"
   }
 }

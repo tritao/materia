@@ -260,7 +260,30 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path)
     parser.add_argument('--revised', action='store_true')
+    parser.add_argument('--straight', action='store_true')
     args = parser.parse_args()
-    run(args.config or HERE/('revised-engineering-config.json' if args.revised else 'engineering-config.json'),
-        HERE/('build/revised' if args.revised else 'build'),
-        HERE/('revised-layout.json' if args.revised else 'reference-layout.json'))
+    if args.straight:
+        current = json.loads((HERE/'build/straight/current.json').read_text())
+        prepared = json.loads(Path(current['preparationPath']).read_text())
+        for key, path in [('configSha256', HERE/'straight-link-config.json'),
+                          ('generatorSha256', HERE/'straight-link.cpp'),
+                          ('preparerSha256', HERE/'prepare-straight.py'),
+                          ('baselineLayoutSha256', HERE/'revised-layout.json')]:
+            if prepared['inputs'][key] != hashlib.sha256(path.read_bytes()).hexdigest():
+                raise ValueError('Stale straight-arm preparation: '+key)
+        overrides_path = HERE/'straight-engineering-overrides.json'
+        overrides = json.loads(overrides_path.read_text())
+        baseline_path = HERE/overrides['baselineConfig']
+        config = json.loads(baseline_path.read_text())
+        for part in prepared['parts']:
+            config.setdefault('partDensitiesKgM3', {})[part['occurrence']] = overrides['partDensitiesKgM3ByRole'][part['role']]
+        config['straightVariant'] = {'materialBasis': overrides['materialBasis'], 'preparationInputs': prepared['inputs'],
+            'baselineConfigSha256': hashlib.sha256(baseline_path.read_bytes()).hexdigest(),
+            'overrideSha256': hashlib.sha256(overrides_path.read_bytes()).hexdigest()}
+        config_path = HERE/'build/straight/engineering-config.json'
+        config_path.write_text(json.dumps(config, indent=2, allow_nan=False)+'\n')
+        run(args.config or config_path, HERE/'build/straight', Path(current['layoutPath']))
+    else:
+        run(args.config or HERE/('revised-engineering-config.json' if args.revised else 'engineering-config.json'),
+            HERE/('build/revised' if args.revised else 'build'),
+            HERE/('revised-layout.json' if args.revised else 'reference-layout.json'))

@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "variant": "straight-forearm-80t",
+  "baselineLayout": "revised-layout.json",
+  "sourceAsset": "asset14",
+  "sourceSha256": "cac983fea13f05b2ef60f9fe15524398af1417d79384ce25c0b85982b0c4743a",
+  "sourceLengthMm": 485,
+  "removedMm": 189,
+  "protectedEndLengthMm": 30,
+  "transitionLengthMm": 15,
+  "spigotEngagementMm": 25,
+  "tubeOuterDiameterMm": 70,
+  "tubeWallMm": 4,
+  "spigotDiametralClearanceMm": 0.04,
+  "adapterCableBoreMm": 42,
+  "tubeMaterial": "AL6061-T6",
+  "adapterMaterial": "AL6061-T6 design assumption; retained source mounting geometry",
+  "fastening": {
+    "screw": "M5 x 12 socket head, ISO 4762 style, grade 8.8 design assumption",
+    "screwsPerEnd": 12,
+    "rowsFromShoulderMm": [8, 18],
+    "rowAnglesDeg": [[0, 60, 120, 180, 240, 300], [30, 90, 150, 210, 270, 330]],
+    "tubeClearanceHoleMm": 5.5,
+    "adapterTapDrillMm": 4.2,
+    "spotfaceDiameterMm": 10,
+    "spotfaceDepthMm": 0.5,
+    "dowelPerEnd": 1,
+    "dowelDiameterMm": 5,
+    "dowelLengthMm": 10,
+    "dowelAngleDeg": 15,
+    "dowelFromShoulderMm": 12.5,
+    "fitStatus": "Prototype nominal geometry only. Match-reamed dowel and spigot fits, bolt preload and joint compliance require manufacturing review."
+  },
+  "cover": {
+    "outerDiameterMm": 84,
+    "innerDiameterMm": 80,
+    "lengthMm": 30,
+    "lipThicknessMm": 1.5,
+    "tubeRadialClearanceMm": 0.2,
+    "outerEdgeFilletMm": 0.75,
+    "material": "ABS design assumption",
+    "retentionStatus": "Sliding service cover; clip/retention detail not released for manufacture."
+  },
+  "invariants": [
+    "Retain the first and last 30 mm of supplier forearm material, translating only the distal end by 189 mm.",
+    "Keep 425 mm upper-arm and 401 mm forearm joint-axis spacing and all module placements.",
+    "Keep the source upper arm: its central outer envelope is already constant at 90 mm.",
+    "Tube/adapters must be separate valid connected solids with a continuous hollow cable passage.",
+    "Threads are represented by tap drills and nominal screw cylinders, not thread-contact solids.",
+    "This does not qualify the shoulder, fatigue, bolt preload, cable flex life or production-arm repeatability."
+  ]
+}

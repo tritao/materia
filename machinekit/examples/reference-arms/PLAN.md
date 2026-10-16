@@ -4,11 +4,11 @@ Active goal: finish the agreed plan, committing coherent changes as work complet
 
 ## Acceptance checklist
 
-- [ ] Reproducible official UR and FAIRINO description/mesh acquisition, pinned provenance and licence records; generated vendor assets excluded from Git.
-- [ ] UR5e and FR5 articulated scene exports with correct scale, axes, limits, base and flange frames.
+- [x] Reproducible official UR and FAIRINO description/mesh acquisition, pinned provenance and licence records; generated vendor assets excluded from Git.
+- [x] UR5e and FR5 articulated scene exports with correct scale, axes, limits, base and flange frames.
 - [ ] Existing FK/IK integration checked against independent URDF FK, multiple branches and joint limits; joint jogging and Cartesian trajectories.
 - [ ] Shared comparison scene with actual-scale robots, common tool/task frames, switchable mounting and overview/close-up previews.
-- [ ] Extend the working importer to the available UR and FAIRINO ranges; report model-specific gaps honestly.
+- [x] Extend the working importer to the available UR and FAIRINO ranges; report model-specific gaps honestly.
 - [ ] Separate straight-link ZeroErr variant preserving 425/401 mm axis spacing and supplier interfaces, with structural adapters, fastening/cable access and separate covers.
 - [ ] Valid connected solids, mass/inertia, stiffness/connection-load estimates and comparison against tapered baseline.
 - [ ] Updated workspace/tending load reports; unresolved shoulder sizing clearly retained.
@@ -59,5 +59,24 @@ redistribution permission is unresolved. UR mesh terms vary by model.
 - Source mass/frame diagnostics identify several FAIRINO centres of mass outside
   their mesh bounds. Those source inertias remain unqualified.
 - Still pending: combined scene with our arm, a physical common tool and actual
-  task/fixture registration, wider STEP correspondence, straight-link CAD redesign,
-  stiffness/load/continuous-clearance review, and updated bench deliverables.
+  task/fixture registration, wider STEP correspondence, straight-variant motion/continuous-clearance review,
+  and final bench deliverable audit.
+
+## Straight-link stage
+
+- Separate prepared variant retains all module placements and 425/401 mm axes.
+  The upper arm already has a straight central section and stays unchanged.
+- New forearm: 70 x 4 x 206 mm tube, two protected-end adapters, twelve M5
+  screws and one dowel per end, and two separate rounded service collars.
+- 120 valid solids and independent nine-pose FK, including new adapters/covers.
+  Native structural union and independent reimport of all 31 new STEP parts pass;
+  41.998 mm axial test duct and cover checks find zero material overlap.
+- 270-pose estimated mass/load study and preliminary tube/fastener screens pass
+  their stated assumed allowables; mass increases 0.212 kg to 25.489 kg.
+  Thread stripping, preload, fatigue, fit/slip and cover retention remain open.
+- Draft BOM and dimensioned interface-review PDF/SVG generated; unpowered coupon
+  review added to the existing unsent bench request. These are not released
+  manufacturing drawings. Full-workspace shoulder sizing remains unresolved.
+- Next: straight-variant diagnostic/intermediate and continuous hull clearance,
+  combined comparison with our arm and physical common tool, actual task/fixture
+  registration, and completion audit. Previous tapered clearance does not transfer.

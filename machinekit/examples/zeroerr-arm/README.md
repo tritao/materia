@@ -417,3 +417,63 @@ also contains an indeterminate OCCT pair. The witness pairs include the wrist
 against shoulder/base housings; none is silently exempted. All five unique
 waypoints of the synthetic tending cycle have no observed structural overlap.
 The interpolated load-study samples are not a swept collision certificate.
+
+## Straight forearm prototype
+
+The separate `--straight` variant retains the existing motor packages and
+425/401 mm axis spacing. The upper arm already has a constant central section,
+so it stays unchanged. The forearm replaces the tapered middle with a 206 mm
+long, OD70/ID62 tube and two short structural adapters. Each adapter retains
+30 mm of the supplier mounting end, transitions over 15 mm and inserts 25 mm
+into the tube. Twelve radial M5 screws per end and one locating dowel are
+modelled separately. Two rounded sliding collars cover the service fasteners.
+Cover retention, thread fits and bolt preload still need detailed review.
+
+After preparing the baseline and 80T revision above, run from the repository
+root:
+
+```sh
+python3 machinekit/examples/zeroerr-arm/prepare-straight.py
+./haxeon/scripts/haxeon build --project=machinekit/examples/zeroerr-arm/haxeon.json
+./machinekit/examples/zeroerr-arm/run-built.sh --straight --engineering --export
+python3 machinekit/examples/zeroerr-arm/engineering-study.py --straight
+python3 machinekit/examples/zeroerr-arm/structure-study.py
+python3 machinekit/examples/zeroerr-arm/audit-straight.py
+python3 machinekit/examples/zeroerr-arm/prototype-pack.py
+python3 machinekit/examples/zeroerr-arm/render-preview.py --straight
+```
+
+`build/straight/current.json` identifies an immutable prepared snapshot keyed by
+source, design and generator hashes. Cache reuse verifies every generated file.
+The original baseline and tapered revision remain separate. The current variant
+contains 120 solids; the generator preserves the protected source ends and
+checks that the three structural pieces unite into one valid connected solid.
+The independent exported-part audit reimports all 31 new STEP parts, checks a
+41.998 mm axial passage through the nominal 42 mm duct, and checks cover clearance
+against the other derived parts. It does not validate the complete arm harness.
+
+The 270-pose study estimates 25.489 kg total arm mass, 0.212 kg above the tapered
+80T variant. Its conservative zero-speed load bounds give about 201.7 N and
+89.5 Nm at the supplier mounting section. With the explicitly assumed material
+and connection allowables, tube stress utilization is 0.280, bolt shear 0.234
+and local tube bearing 0.712. These are preliminary screens, not qualification.
+The ideal unperforated tube deflection estimate is 0.080 mm under the study
+bounds; it excludes holes, adapter/fastener compliance and all actuator/link
+compliance, and must not be presented as TCP accuracy. Thread stripping, preload,
+slip, fatigue and manufacturing tolerances remain open. The shoulder drive still
+fails the full-workspace target; the straight tube does not solve drive sizing.
+
+Generated review artifacts in `build/straight/` include
+`zeroerr5-straight80.mtrg` (application project), `.scene`, overview/close-up PNGs,
+`sizing-report.json`, `structure-report.json`, `exported-parts-audit.json`,
+`prototype-bom.csv`, `interface-review.pdf`/`.svg` and `prototype-pack.json`.
+The drawings are dimensioned interface reviews with symbolic protected-end
+regions, not machining releases. Prepared STEP files define the actual shapes.
+`bench-request.json` includes an unpowered adapter coupon review before joint
+bench testing; no test, purchase or supplier contact has occurred.
+
+Exported terminal flanges include a `flangeZ` connector whose local +Z is the
+outward tool-face normal. This is a semantic frame for comparison and TCP work;
+all six joints remain passive, and vendor drive signs/travel are uncommissioned.
+The straight variant still needs its own diagnostic/interpolated and continuous
+clearance review; the tapered revision's collision observations do not transfer.

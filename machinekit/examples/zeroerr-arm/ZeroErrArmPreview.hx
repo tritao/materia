@@ -10,11 +10,13 @@ import materia.project.SceneArtifact;
 
 class ZeroErrArmPreview {
   public static final DIRECTORY = "machinekit/examples/zeroerr-arm";
-  static function revised():Bool return Sys.args().indexOf("--revised") >= 0;
-  static function buildDirectory():String return DIRECTORY + (revised() ? "/build/revised" : "/build");
-  static function layoutPath():String return DIRECTORY + (revised() ? "/revised-layout.json" : "/reference-layout.json");
+  static function straight():Bool return Sys.args().indexOf("--straight") >= 0;
+  static function revised():Bool return straight() || Sys.args().indexOf("--revised") >= 0;
+  static function buildDirectory():String return DIRECTORY + (straight() ? "/build/straight" : revised() ? "/build/revised" : "/build");
+  static function layoutPath():String return straight() ? StraightArmPreparation.paths().layoutPath :
+    DIRECTORY + (revised() ? "/revised-layout.json" : "/reference-layout.json");
   public static function make():ZeroErrReferenceArm
-    return new ZeroErrReferenceArm(layoutPath(), buildDirectory() + "/vendor");
+    return new ZeroErrReferenceArm(layoutPath(), straight() ? StraightArmPreparation.paths().vendorDirectory : buildDirectory() + "/vendor");
 
   /** Independent world-axis product of exponentials, using Rodrigues rotations. */
   static function expected(arm:ZeroErrReferenceArm, id:String, q:Array<Float>, definition:materia.assembly.AssemblyDefinition):Array<Float> {
@@ -100,6 +102,7 @@ class ZeroErrArmPreview {
           "joint1-outputSpigot","joint2-outputSpigot","joint3-outputSpigot",
           "upperArm","elbowHousing","forearm","joint5-stator","joint5-rotor"];
     for(entry in arm.components()) if(StringTools.endsWith(entry.id,"-outputSpigot") && probes.indexOf(entry.id)<0) probes.push(entry.id);
+    if (straight()) for (id in ["forearm-proximal","forearm-distal","forearm-proximal-cover","forearm-distal-cover"]) probes.push(id);
     for (q in poses) {
       for (i in 0...6) state.setJoint('j${i+1}',q[i]);
       for (id in probes) {
@@ -122,6 +125,7 @@ class ZeroErrArmPreview {
       "joint3-stator","joint3-rotor","joint3-outputSpigot","elbowOutputAdapter","elbowHousingAdapter","elbowHousing","forearm",
       "joint4-stator","joint4-rotor","joint5-stator","joint5-rotor","joint6-stator","joint6-rotor","toolFlange"];
     for (entry in arm.components()) if (StringTools.endsWith(entry.id,"-outputSpigot") && ids.indexOf(entry.id)<0) ids.push(entry.id);
+    if (straight()) for (id in ["forearm-proximal","forearm-distal","forearm-proximal-cover","forearm-distal-cover"]) ids.push(id);
     var entries = [for (id in ids) [for (e in arm.components()) if (e.id == id) e][0]];
     var report:Array<Dynamic> = [];
     var samples:Array<Array<Float>> = [[0.0,0,0,0,0,0],ready()];
@@ -279,13 +283,21 @@ class ZeroErrArmPreview {
 
   public static function export(arm:ZeroErrReferenceArm):Void {
     Sys.println("Building review scene from supplier CAD"); Sys.stdout().flush();
-    var scene:materia.project.SceneArtifact.SceneArtifactData = AssemblyPreview.scene(arm,revised() ? "zeroerr-wrist80-engineering-revision" : "zeroerr-erobot5-reference");
+    var scene:materia.project.SceneArtifact.SceneArtifactData = AssemblyPreview.scene(arm,straight() ? "zeroerr-straight80-prototype" : revised() ? "zeroerr-wrist80-engineering-revision" : "zeroerr-erobot5-reference");
     var definition:materia.assembly.AssemblyDefinition = scene.assemblyDefinition;
     var state = new AssemblyState(definition);
     for (i in 0...6) state.setJoint('j${i+1}',ready()[i]);
     scene.assemblyState = state.record();
-    var stem = buildDirectory() + (revised() ? "/zeroerr5-wrist80" : "/zeroerr5");
-    sys.io.File.saveBytes(stem+".scene",SceneArtifact.encode(scene));
+    // Source tool face normal is -Y; RobotKit's flange approach axis is +Z.
+    var terminal = [for (o in definition.occurrences) if (o.id == "toolFlange") o][0];
+    for (component in definition.definitions) if (component.id == terminal.definition) {
+      component.connectors.push({name:"flangeZ",frame:AssemblyFrames.fromRotationMatrix(0,0,0,[1,0,0,0,0,-1,0,1,0])});
+      component.robotFlangeConnector = "flangeZ";
+    }
+    var stem = buildDirectory() + (straight() ? "/zeroerr5-straight80" : revised() ? "/zeroerr5-wrist80" : "/zeroerr5");
+    var artifact = SceneArtifact.encode(scene);
+    sys.io.File.saveBytes(stem+".scene",artifact);
+    sys.io.File.saveBytes(stem+".mtrg",artifact);
     var meshes:Array<Dynamic> = [];
     for (occurrence in definition.occurrences) {
       var pose = state.worldPose(occurrence.id);

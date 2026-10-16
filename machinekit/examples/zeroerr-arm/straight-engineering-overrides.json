@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "baselineConfig": "revised-engineering-config.json",
+  "partDensitiesKgM3ByRole": {"tube": 2700, "adapter": 2700, "cover": 1050, "screw": 7850, "pin": 7850},
+  "materialBasis": "AL6061-T6 tube/adapters, ABS covers and steel fasteners are design assumptions, not delivered material certificates.",
+  "elasticScreen": {
+    "youngsModulusGPa": 69,
+    "shearModulusGPa": 26,
+    "assumedYieldMPa": 200,
+    "yieldDesignFactor": 2,
+    "assumedBoltShearAllowableMPa": 150,
+    "assumedTubeBearingAllowableMPa": 40,
+    "nominalM5StressAreaMm2": 14.2,
+    "holeStressConcentrationFactor": 3,
+    "basis": "Conservative preliminary screening assumptions. Local holes, preload, fit clearance, thread stripping, joint compliance, fatigue and manufacturing effects require separate review."
+  }
+}
