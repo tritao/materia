@@ -348,7 +348,14 @@ class ScrewdriverSimulationTests {
       harness.simulation.releaseObject(clamped);
       var screwBeforeCarry = harness.simulation.objectPose(screw), housingBeforeCarry = harness.simulation.objectPose(clamped);
       assembly.retain(screw,screwBeforeCarry);
-      assembly.retain(clamped,housingBeforeCarry);
+      var plateBeforeJoining = harness.simulation.objectPose(plate);
+      assembly.retainRigid(clamped);
+      var plateAfterJoining = harness.simulation.objectPose(plate), housingAfterJoining = harness.simulation.objectPose(clamped);
+      check(Math.abs(plateAfterJoining.x-plateBeforeJoining.x) < 1e-6 &&
+        Math.abs(plateAfterJoining.y-plateBeforeJoining.y) < 1e-6 && Math.abs(plateAfterJoining.z-plateBeforeJoining.z) < 1e-6 &&
+        Math.abs(housingAfterJoining.x-housingBeforeCarry.x) < 1e-6 &&
+        Math.abs(housingAfterJoining.y-housingBeforeCarry.y) < 1e-6 && Math.abs(housingAfterJoining.z-housingBeforeCarry.z) < 1e-6,
+        "Physical housing retention preserves both measured body positions before pickup");
       fixture.retain(plate,harness.simulation.objectPose(plate));
       runtime.submitPosition(3,0.02,retighten ? 8 : 5);
       for (_ in 0...1000) if (Math.abs(runtime.snapshot().q.get(3)-0.02) > 1e-5) harness.step();
@@ -356,7 +363,7 @@ class ScrewdriverSimulationTests {
       check(fixture.carries(plate) && assembly.carries(screw) && assembly.carries(clamped) &&
         Math.abs(harness.simulation.objectPose(screw).y-screwBeforeCarry.y-0.01) < 0.0001 &&
         Math.abs(harness.simulation.objectPose(clamped).y-housingBeforeCarry.y-0.01) < 0.0001,
-        "Picking the dynamic plate carries its retained screw and housing through the native carrier chain");
+        "Picking the dynamic plate carries its retained screw and physically fastened housing through the native carrier chain");
       var adapter = new RuntimeRobotAdapter("screw-sensor-probe",runtime,"Screw sensor probe",
         [for (link in model.links) Std.string(link.id)],[for (joint in model.joints) Std.string(joint.id)]);
       var state = adapter.snapshot();

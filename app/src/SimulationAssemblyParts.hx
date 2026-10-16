@@ -101,6 +101,16 @@ class SimulationAssemblyPart implements robotkit.runtime.SimulationObjectFixture
     else if (carrier != null) simulation.holdObjectOnObject(body,carrier,pose);
   }
 
+  /** Final clamping must not drive a kinematic child against its free dynamic parent. */
+  public function retainRigid(body:SimObject):Void {
+    var carrier = object;
+    if (carrier != null && carrier.motion == nativekit.sim.MotionType.Dynamic) {
+      if (carries(body)) return;
+      simulation.stopForTopologyChange();
+      simulation.createObjectMeasuredFixedJoint(carrier,body);
+    } else retain(body,simulation.objectPose(body));
+  }
+
   /** Whether this occurrence's exact native carrier retains the fastened body. */
   public function carries(body:SimObject):Bool {
     var member = part, carrier = object;

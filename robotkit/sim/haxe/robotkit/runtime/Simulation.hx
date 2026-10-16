@@ -1010,6 +1010,16 @@ class Simulation {
     return result.out_joint;
   }
 
+  /** Physically fastens two session objects at their measured pose while stopped.
+   * The session owns the connection and removes it on reset. */
+  public function createObjectMeasuredFixedJoint(parent:nativekit.sim.SimObject,
+      child:nativekit.sim.SimObject):nativekit.sim.SimFixedJoint {
+    ensureLive();
+    if (parent == null || child == null || child.motion != MotionType.Dynamic)
+      throw "Measured object fastening needs a parent and dynamic child";
+    return session.createMeasuredFixedJoint(parent,child);
+  }
+
   /** Removes one runtime-created object joint while the physics host is stopped. */
   public function destroyObjectJoint(joint:nksim_joint):Void {
     ensureLive();

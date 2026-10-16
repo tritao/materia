@@ -204,7 +204,7 @@ class SimulatedScrewdriver implements SimulationStepObserver implements Screwdri
     if (body == null || fixture == null || setup.program.stopAtSeat || fixture.carries(body)) return;
     if (simulation.objectCarrier(body).rawValue() != 0)
       throw "Cannot fasten a clamped member still owned by another carrier";
-    fixture.retain(body, simulation.objectPose(body));
+    fixture.retainRigid(body);
     if (!fixture.carries(body)) throw "Final preload did not retain its named clamped member";
   }
 

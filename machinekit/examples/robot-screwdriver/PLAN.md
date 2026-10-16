@@ -3162,3 +3162,13 @@ retention of its clamped member when the fixture is a dynamic object. Its build
 is running; the screwdriver process regression and fresh full cell cycle remain
 due. Screws' in-process thread/holding representation is unchanged. This native
 prerequisite does not resolve the default backend's absent pressure dynamics.
+
+The app integration builds and `sd-cases-sd15-rigid-clamp-probe` passes all
+314 process assertions across both backends (130 transport, 124 retained
+engagement, 60 head-seat continuation checks; 2 s wall, 255 MB peak). The small
+dynamic-plate probe now uses physical rigid retention for its housing and
+checks both measured positions before carrying the assembly through the
+native ownership graph. The earlier `sd-cases-sd15-rigid-clamp` also passes
+`robot-recovery` and `clearance-retained` with the new native/API integration.
+The fresh full MuJoCo run `sd-cases-sd15-full4` is still active; do not infer
+full-cycle acceptance from these focused checks.
