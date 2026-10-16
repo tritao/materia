@@ -37,13 +37,19 @@ class PathPlanner {
   final fixedTimestepSeconds:Float;
   final modelRevision:Int64;
   final calibrationRevision:Int64;
+  final startPositionTolerances:Map<String, Float> = new Map();
 
   public function new(axes:Array<MotionAxis>, fixedTimestepSeconds:Float,
-      modelRevision:Int64, calibrationRevision:Int64) {
+      modelRevision:Int64, calibrationRevision:Int64, ?startPositionTolerances:Map<String, Float>) {
     this.axes = axes.copy();
     this.fixedTimestepSeconds = fixedTimestepSeconds;
     this.modelRevision = modelRevision;
     this.calibrationRevision = calibrationRevision;
+    if (startPositionTolerances != null) for (id => tolerance in startPositionTolerances) {
+      if (axis(id) == null || !Math.isFinite(tolerance) || tolerance < 0)
+        throw "Path-start tolerances need known axes and finite nonnegative distances";
+      this.startPositionTolerances.set(id, tolerance);
+    }
   }
 
   function axis(id:String):Null<MotionAxis> {
@@ -97,7 +103,8 @@ class PathPlanner {
       zAxis.logicalPosition(start)];
     var startCoordinates = [first.x, first.y, first.z];
     for (i in 0...3) {
-      if (Math.abs(starts[i] - startCoordinates[i]) > 1e-8)
+      var tolerance = startPositionTolerances.get(["x", "y", "z"][i]);
+      if (Math.abs(starts[i] - startCoordinates[i]) > (tolerance == null ? 1e-8 : tolerance))
         throw 'Cartesian path starts at ${startCoordinates[i]} but axis ${["x", "y", "z"][i]} is at ${starts[i]}';
     }
 

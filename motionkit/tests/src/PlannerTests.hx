@@ -931,6 +931,40 @@ class PlannerTests extends MotionKitTestSupport {
     reverseRig.harness.dispose();
   }
 
+  public function testPathStartAdmission():Void {
+    var rig = gantryRig(true);
+    var start = rig.robot.snapshot().positions.toArray();
+    var axes = @:privateAccess rig.machine.axes;
+    var x = rig.machine.axis("x"), y = rig.machine.axis("y"), z = rig.machine.axis("z");
+    if (x == null || y == null || z == null) throw "Start-admission fixture needs XYZ";
+    var origin = new PathPoint(x.logicalPosition(start), y.logicalPosition(start), z.logicalPosition(start));
+    var budget = 1e-5;
+    var allowances = ["x" => budget];
+    var planner = new motionkit.robot.PathPlanner(axes, 0.01, Int64.ofInt(1), Int64.ofInt(0), allowances);
+    allowances.set("x", 0.001); // The planner must own its immutable configuration snapshot.
+    function path(shift:Float):GeometricPath return GeometricPath.lines([
+      new PathPoint(origin.x + shift, origin.y, origin.z),
+      new PathPoint(origin.x + 0.001, origin.y, origin.z)]);
+    for (sign in [-1, 1]) {
+      var result = planner.plan(start, {path: path(sign*budget*0.5), pathOptions: PathPlanningOptions.exactStopMode(),
+        motionOptions: new MotionOptions(0.04, 0.4)});
+      near(x.logicalPosition(result.trajectory.evaluate(0).positions), origin.x + sign*budget*0.5,
+        "admitted quantized start preserves authored geometry", 1e-10);
+      result.trajectory.dispose();
+      throws(() -> planner.plan(start, {path: path(sign*budget*2), pathOptions: null, motionOptions: null}),
+        "path start beyond the snapshotted drive budget is rejected");
+    }
+    var strict = new motionkit.robot.PathPlanner(axes, 0.01, Int64.ofInt(1), Int64.ofInt(0));
+    throws(() -> strict.plan(start, {path: path(budget*0.5), pathOptions: null, motionOptions: null}),
+      "unconfigured path admission retains its original 10 nm bound");
+    for (invalid in [-1.0, Math.NaN, Math.POSITIVE_INFINITY])
+      throws(() -> new motionkit.robot.PathPlanner(axes, 0.01, Int64.ofInt(1), Int64.ofInt(0), ["x" => invalid]),
+        "invalid path-start budgets are rejected");
+    throws(() -> new motionkit.robot.PathPlanner(axes, 0.01, Int64.ofInt(1), Int64.ofInt(0), ["absent" => budget]),
+      "unknown-axis path-start budgets are rejected");
+    rig.harness.dispose();
+  }
+
   public function testCircularSegments():Void {
     var cases = [CircularPlane.XY, CircularPlane.XZ, CircularPlane.YZ];
     for (plane in cases) {

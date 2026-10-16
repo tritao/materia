@@ -62,6 +62,7 @@ class MotionSystem {
   final stream:TrajectoryStream;
   final jointTolerances:Array<Float>;
   final jointPositionTolerances:Array<Float>;
+  final pathStartTolerances:Map<String, Float> = new Map();
   final session:MotionSession = new MotionSession();
   var activeStationary:Bool = false;
   var elapsedSeconds(get, never):Float;
@@ -131,6 +132,7 @@ class MotionSystem {
       }
       axis.writeLogicalDelta(tolerance, Math.max(1e-6, resolution));
       for (joint in axis.jointIndices) jointPositionTolerances[joint] = Math.abs(tolerance[joint]);
+      pathStartTolerances.set(axis.id, Math.max(1e-8, resolution));
     }
     for (axis in this.axes) {
       var joint = axis.jointIndices[0];
@@ -162,7 +164,7 @@ class MotionSystem {
     }
     axisPlanner = new AxisPlanner(this.axes, fixedTimestepSeconds, derivedJoints);
     pathPlanner = new PathPlanner(this.axes, fixedTimestepSeconds,
-      modelRevision, calibrationRevision);
+      modelRevision, calibrationRevision, pathStartTolerances);
   }
 
   public function axis(id:String):Null<MotionAxis> {
@@ -492,7 +494,7 @@ class MotionSystem {
     }
     function refreshRevision():Void {
       calibrationRevision = runtime.snapshot().calibrationRevision;
-      pathPlanner = new PathPlanner(axes, fixedTimestepSeconds, modelRevision, calibrationRevision);
+      pathPlanner = new PathPlanner(axes, fixedTimestepSeconds, modelRevision, calibrationRevision, pathStartTolerances);
     }
     refreshRevision();
     refreshHomeRevision = refreshRevision;

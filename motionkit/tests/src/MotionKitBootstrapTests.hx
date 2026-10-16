@@ -50,6 +50,7 @@ class MotionKitBootstrapTests {
     }
 
     if (Sys.getEnv("MOTIONKIT_CIRCULAR_ONLY") == "1") {
+      plannerTests.testPathStartAdmission();
       plannerTests.testCircularSegments();
       Sys.println('Circular focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
@@ -209,6 +210,7 @@ class MotionKitBootstrapTests {
       {name: "plannerTests.testMergedSegmentsFollowTheOriginals", run: () -> plannerTests.testMergedSegmentsFollowTheOriginals(), weight: 0.1},
       {name: "plannerTests.testShapedTrajectoryIsTheWeightedSumOfDelays", run: () -> plannerTests.testShapedTrajectoryIsTheWeightedSumOfDelays(), weight: 0.1},
       {name: "plannerTests.testToppraCircleAcceleration", run: () -> plannerTests.testToppraCircleAcceleration(), weight: 0.05},
+      {name: "plannerTests.testPathStartAdmission", run: () -> plannerTests.testPathStartAdmission(), weight: 0.1},
       {name: "plannerTests.testCircularSegments", run: () -> plannerTests.testCircularSegments(), weight: 1.7},
       {name: "processTests.testLinearAxisCompilesToRobotModel", run: () -> processTests.testLinearAxisCompilesToRobotModel(), weight: 0.05},
       {name: "processTests.testLeadScrewActuatorRateLimitsPlans", run: () -> processTests.testLeadScrewActuatorRateLimitsPlans(), weight: 0.05},
