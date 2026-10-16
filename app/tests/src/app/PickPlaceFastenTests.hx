@@ -55,7 +55,9 @@ class PickPlaceFastenTests {
         var initialPlate = fastening.assemblyParts.get("project:work/plate");
         printProgress('Assembly plate carrier: environment=${simulation.environmentObject("project:work/plate") != null}, free=${initialPlate.freeObject}, pose=${haxe.Json.stringify(initialPlate.pose())}');
         var observedHandling = -1, observedFastening = -1;
-        var nextProgress = 10.0;
+        var tracePeriod = Std.parseFloat(Sys.getEnv("PICK_PLACE_TRACE_PERIOD"));
+        if (!Math.isFinite(tracePeriod) || tracePeriod <= 0) tracePeriod = 10.0;
+        var nextProgress = tracePeriod;
         var fixtureFaultInjected = false;
         var fasteningInterrupted = false;
         var physicalThreadStarts = 0, threadAttached = false;
@@ -108,7 +110,13 @@ class PickPlaceFastenTests {
             var tools = @:privateAccess simulation.tools;
             if (tools != null) for (driver in tools.screwdrivers)
               printProgress('Assembly tool feedback: ${haxe.Json.stringify(driver.reading())}');
-            nextProgress += 10;
+            if (Sys.getEnv("PICK_PLACE_TRACE") == "1") {
+              var snapshot = handling.robot.runtime.snapshot();
+              printProgress('Assembly handling joints: ${haxe.Json.stringify(snapshot.q.toArray())}');
+              for (frame in snapshot.sensors.toArray()) if (StringTools.contains(frame.sensorId,"gripper"))
+                printProgress('Assembly handling sensor ${frame.sensorId}: ${[for (i in 0...frame.values.length) frame.values.get(i)]}');
+            }
+            nextProgress += tracePeriod;
           }
         }
         if (fixtureFailure) {

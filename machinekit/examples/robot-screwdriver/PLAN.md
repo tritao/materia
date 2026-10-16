@@ -3787,3 +3787,28 @@ The final-gate runner is prepared as ignored local helper
 and recursive source fingerprints including nested submodules. Shell syntax,
 Python syntax and a complete preview fingerprint succeed. It has not run and
 is not final-gate acceptance.
+
+### SD15a seated plate and detailed closure trace (2026-10-16)
+
+`sd15-deterministic-native7` still fails the first plate grasp at 4.20 simulated
+seconds, but confirms the structural filtering correction: the plate stays at
+its 0.264 m seat, gripper A stays open, and the 414.7 N carrier/jaw self-contact
+is gone. Gripper B closes empty without a measured workpiece contact. Native
+RobotKit on both backends and both session wrappers pass against this filter
+(`sd15-dynamics-adjacent-*.log`).
+
+The app case now accepts optional `PICK_PLACE_TRACE_PERIOD` and traces measured
+handling joints/gripper switches when detailed tracing is enabled; the default
+progress period remains 10 s. The app rebuild passes, and
+`sd15-deterministic-trace1` is running with a 0.25 s trace period against unchanged
+native sources. Both grippers are observed open during approach; closure remains
+to be inspected.
+
+An isolated analytical probe identifies a separate explicit-damping instability:
+10 N on a 1 kg slider with 1000 N s/m damping produces -2000 m/s and a travel-limit
+hit instead of the physical 0.01 m/s terminal speed. Adding implicit damping to
+the generalized effective mass corrects terminal speed and displacement. The
+same isolated solver passes 271 assertions, including a highly damped two-jaw
+grip, actual support removal, measured load/normal forces, 100 mm friction lift
+and release (`sd15-dynamics-implicit-damping-probe.log`). That correction is not
+yet in production; the active closure trace keeps its frozen native inputs.
