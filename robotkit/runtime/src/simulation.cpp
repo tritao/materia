@@ -2196,15 +2196,42 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
             result.carried_object = 0;
         out.push_back(result);
     };
+    // Resolve the current carrier graph, not just the directly bound payloads. A gripped plate can
+    // carry a fastened housing and screws, and their external contacts load the same robot link.
+    std::unordered_map<nksim_body, int32_t> owner_links;
+    auto owning_link = [&](nksim_body body) -> int32_t {
+        std::vector<nksim_body> path;
+        int32_t result = -1;
+        while (body != 0) {
+            const auto cached = owner_links.find(body);
+            if (cached != owner_links.end()) { result = cached->second; break; }
+            if (std::find(path.begin(), path.end(), body) != path.end()) break;
+            path.push_back(body);
+            const auto link = std::find(binding->bodies_.begin(), binding->bodies_.end(), body);
+            if (link != binding->bodies_.end()) {
+                result = static_cast<int32_t>(link - binding->bodies_.begin()); break;
+            }
+            for (const auto &owner : object_joints_)
+                if (owner.tool_load && owner.robot_index == robot_index && owner.follower == body) {
+                    result = static_cast<int32_t>(owner.parent_link_index); break;
+                }
+            if (result >= 0) break;
+            for (const auto &owner : object_carriers_)
+                if (owner.robot_index == robot_index && owner.body == body) {
+                    result = static_cast<int32_t>(owner.link_index); break;
+                }
+            if (result >= 0) break;
+            nksim_object object = 0;
+            nksim_body parent = 0;
+            if (nksim_session_find_object(session_, body, &object) != NKSIM_OK ||
+                nksim_session_get_object_carrier(session_, object, &parent) != NKSIM_OK) break;
+            body = parent;
+        }
+        for (const auto part : path) owner_links.emplace(part, result);
+        return result;
+    };
     auto internal_to_tool = [&](nksim_body body, uint32_t link_index) {
-        if (link_index < binding->bodies_.size() && body == binding->bodies_[link_index]) return true;
-        for (const auto &owner : object_joints_)
-            if (owner.tool_load && owner.robot_index == robot_index && owner.parent_link_index == link_index &&
-                owner.follower == body) return true;
-        for (const auto &owner : object_carriers_)
-            if (owner.robot_index == robot_index && owner.link_index == link_index && owner.body == body)
-                return true;
-        return false;
+        return owning_link(body) == static_cast<int32_t>(link_index);
     };
     for (uint64_t i = 0; result_code == RK_OK && i < count; ++i) {
         nksim_contact source{};
@@ -2229,24 +2256,16 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
                 append_contact(source, body, link, tool_piece);
             }
         }
-        for (const auto &owner : object_joints_) {
-            if (!owner.tool_load || owner.robot_index != robot_index ||
-                (source.body_a != owner.follower && source.body_b != owner.follower))
+        for (const auto body : {source.body_a, source.body_b}) {
+            // Direct robot-link contacts were already appended above. For retained objects and
+            // removable tool subtrees, report the exact contacting leaf as the carried object.
+            if (std::find(binding->bodies_.begin(), binding->bodies_.end(), body) != binding->bodies_.end())
                 continue;
-            const auto other_body = source.body_a == owner.follower ? source.body_b : source.body_a;
-            // Contacts with the same carrier or its sibling fasteners are
-            // internal to the local tool assembly. A workpiece on another
-            // robot link remains an external load at this tool.
-            if (!internal_to_tool(other_body, owner.parent_link_index))
-                append_contact(source, owner.follower, owner.parent_link_index, -1, owner.follower);
-        }
-        for (const auto &owner : object_carriers_) {
-            if (owner.robot_index != robot_index ||
-                (source.body_a != owner.body && source.body_b != owner.body))
-                continue;
-            const auto other_body = source.body_a == owner.body ? source.body_b : source.body_a;
-            if (!internal_to_tool(other_body, owner.link_index))
-                append_contact(source, owner.body, owner.link_index, -1, owner.body);
+            const auto link = owning_link(body);
+            if (link < 0) continue;
+            const auto other_body = source.body_a == body ? source.body_b : source.body_a;
+            if (!internal_to_tool(other_body, static_cast<uint32_t>(link)))
+                append_contact(source, body, static_cast<uint32_t>(link), -1, body);
         }
     }
     if (owned != 0) nksim_snapshot_destroy(owned);

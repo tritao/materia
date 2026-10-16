@@ -42,7 +42,7 @@ struct SessionFixture {
     rk_simulation simulation = RK_INVALID_SIMULATION;
 
     explicit SessionFixture(double fixed_timestep, uint32_t physics_substeps = 1,
-                            uint32_t integrator = NKSIM_INTEGRATOR_DEFAULT) {
+                            uint32_t integrator = NKSIM_INTEGRATOR_DEFAULT, bool default_backend = false) {
         assert(nkscene_scene_create(&scene) == NKS_OK);
         nksim_world_desc world_desc{};
         world_desc.struct_size = sizeof(world_desc);
@@ -51,7 +51,8 @@ struct SessionFixture {
         world_desc.physics_substeps = physics_substeps;
         world_desc.gravity[2] = -9.81;
         world_desc.integrator = integrator;
-        assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+        assert((default_backend ? nksim_world_create(&world_desc, &world)
+                                : nksim_mujoco_world_create(&world_desc, &world)) == NKSIM_OK);
         nksim_session_desc session_desc{};
         session_desc.struct_size = sizeof(session_desc);
         session_desc.scene = scene;
@@ -513,8 +514,10 @@ static void unowned_ground_contact_reports_world() {
     rk_robot_contact_list_destroy(list);
 }
 
-static void carried_object_contact_wrench_is_attributed_to_tool_link() {
-    SessionFixture fixture(0.001);
+static void carried_object_contact_wrench_is_attributed_to_tool_link(bool nested = false,
+                                                                   bool default_backend = false) {
+    std::fprintf(stderr, "carried contact regression: nested=%d default_backend=%d\n", nested, default_backend);
+    SessionFixture fixture(0.001, 1, NKSIM_INTEGRATOR_DEFAULT, default_backend);
     auto simulation = fixture.simulation;
     auto session = fixture.session;
     rk_robot_runtime_blueprint model{};
@@ -560,8 +563,21 @@ static void carried_object_contact_wrench_is_attributed_to_tool_link() {
     offset.struct_size = sizeof(offset);
     offset.position[2] = 0.065;
     offset.rotation[3] = 1.0;
-    assert(nksim_session_hold_object(session, screw, carrier, &offset) == NKSIM_OK);
-    assert(rk_simulation_bind_object_to_link(simulation, screw, 0, 0) == RK_OK);
+    if (nested) {
+        const double plate_position[3] = {-0.1, 0.0, 0.015};
+        const double plate_half[3] = {0.002, 0.002, 0.002};
+        const auto plate = spawn_object(session, NKSIM_MOTION_DYNAMIC, plate_position, rotation, plate_half, 0.1);
+        offset.position[0] = -0.1;
+        assert(nksim_session_hold_object(session, plate, carrier, &offset) == NKSIM_OK);
+        assert(rk_simulation_bind_object_to_link(simulation, plate, 0, 0) == RK_OK);
+        nksim_body plate_body = 0;
+        assert(nksim_session_get_object_body(session, plate, &plate_body) == NKSIM_OK);
+        offset.position[0] = 0.1; offset.position[2] = 0.0;
+        assert(nksim_session_hold_object(session, screw, plate_body, &offset) == NKSIM_OK);
+    } else {
+        assert(nksim_session_hold_object(session, screw, carrier, &offset) == NKSIM_OK);
+        assert(rk_simulation_bind_object_to_link(simulation, screw, 0, 0) == RK_OK);
+    }
 
     // Drive this regression with explicit ticks so each captured contact belongs
     // to the same deterministic simulation step.
@@ -583,6 +599,11 @@ static void carried_object_contact_wrench_is_attributed_to_tool_link() {
             found = true;
             // The carried screw transmits this load, and the contact names it.
             assert(contact.carried_object == screw);
+            if (default_backend) {
+                // The geometric test backend reports contact identity without inventing a physical wrench.
+                assert(contact.wrench_valid == 0);
+                continue;
+            }
             assert(contact.wrench_valid != 0);
             double force_squared = 0.0;
             for (double value : contact.force_on_link) {
@@ -1517,6 +1538,8 @@ int main() {
     captured_contacts_survive_realtime_steps();
     unowned_ground_contact_reports_world();
     carried_object_contact_wrench_is_attributed_to_tool_link();
+    carried_object_contact_wrench_is_attributed_to_tool_link(true);
+    carried_object_contact_wrench_is_attributed_to_tool_link(true, true);
     carried_object_contact_with_its_own_link_is_not_external_load();
 
     SessionFixture fixture(0.005, 2);
