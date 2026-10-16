@@ -217,7 +217,7 @@ private class MissionWaitSkill implements Skill {
 }
 
 /** Applies a simulation-time deadline to one asynchronous handling or motion skill. */
-private class MissionTimedSkill implements Skill {
+private class MissionTimedSkill implements robotkit.skill.ResumableSkill {
   final inner:Skill;
   final label:String;
   final timeout:Float;
@@ -228,6 +228,8 @@ private class MissionTimedSkill implements Skill {
     this.inner = inner; this.label = label; this.timeout = timeout;
   }
 
+  public function canResume():Bool return (switch lifecycle.status() {case Cancelled:true; case _:false;}) &&
+    Std.isOfType(inner,robotkit.skill.ResumableSkill) && cast(inner,robotkit.skill.ResumableSkill).canResume();
   public function start():Void {
     elapsed = 0.0;
     lifecycle.begin();
@@ -363,6 +365,7 @@ class MissionPlayer implements SessionMember {
   final blowFeeds:Array<SimulatedBlowFeed>;
   var screwArm:Null<Manipulator> = null;
   var screwing:Null<ScrewdrivingRunner> = null;
+  var interruptedScrewSkill:Null<robotkit.skill.ResumableSkill> = null;
   var recordedScrew:Null<ScrewdrivingRunner> = null;
   /** Why the mission stopped, or null while it runs. */
   public var failure(default, null):Null<String> = null;
@@ -1506,7 +1509,7 @@ class MissionPlayer implements SessionMember {
     registeredWork = new Map<String, RegisteredWorkEvidence>();
     stepIndex = 0;
     completed = 0;
-    screwResults.resize(0); screwRuns.resize(0); screwing = null; recordedScrew = null; screwRun = null; recordedScrewRun = null;
+    screwResults.resize(0); screwRuns.resize(0); screwing = null; interruptedScrewSkill = null; recordedScrew = null; screwRun = null; recordedScrewRun = null;
     failure = null;
     alarmCode = null;
     failedStepIndex = -1;
@@ -1584,7 +1587,11 @@ class MissionPlayer implements SessionMember {
     // A latched mission fault must also abort the active motion or handling
     // plan; otherwise the robot would keep executing while the operator sees
     // a stopped mission.
+    var activeSkill = runner.activeSkill();
     runner.cancel();
+    interruptedScrewSkill = code == MissionAlarmCode.EmergencyStop && mission.steps[stepIndex].kind == "screw" &&
+      Std.isOfType(activeSkill,robotkit.skill.ResumableSkill) && cast(activeSkill,robotkit.skill.ResumableSkill).canResume()
+      ? cast activeSkill : null;
     deenergizeMissionOutputs();
   }
 
@@ -1688,7 +1695,11 @@ class MissionPlayer implements SessionMember {
         recoveryPending = false;
         recoveryOutputPending = false;
         runner = new SkillRunner();
-        clearJointMotions();
+        var continuation = interruptedScrewSkill;
+        interruptedScrewSkill = null;
+        if (continuation != null && continuation.canResume()) {
+          if (runner.start(continuation) != Running) settle();
+        } else clearJointMotions();
         return;
       }
     }

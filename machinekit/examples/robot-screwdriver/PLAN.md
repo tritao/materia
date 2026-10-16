@@ -3358,3 +3358,34 @@ measured-seal wait. App compilation passes. The source hashes are recorded in
 
 The actual full-cell e-stop/retry case `sd15-interruption-full3` is running;
 its mission integration remains uncommitted pending that acceptance result.
+
+### SD15a full-cell emergency-stop retry acceptance on MuJoCo (2026-10-16)
+
+`sd15-interruption-full3` passes the complete loose-plate cycle with targeted
+fastening-controller emergency stop after measured screw rotation, followed by
+local retry. The same active resumable skill and cached motion world are kept
+through recovery; retry resumes its retained work contact rather than planning
+a new pickup. The other controller remains at its handshake wait. Four required
+fastenings are accepted, both programs finish, and the whole retained assembly
+reaches outfeed with 0.2009 mm measured origin error against the unchanged 1 mm
+limit. Completion is at 208.97 simulated seconds (589.4 s wall, 587 MB peak).
+The app mission integration is now validated by that actual e-stop cycle.
+
+The fresh missing-supply case `sd15-safety-supply` also passes on MuJoCo
+(185.5 s wall, 544 MB): both declared supplies are removed, no tightening is
+accepted, and the wired fastened output remains low. The missing-housing/local
+retry check has passed on MuJoCo; its deterministic run is still in progress.
+
+The fixture-not-ready stimulus in `sd15-safety-fixture` was explicitly cancelled
+at 104.5 s wall after authoritative transitions showed it had missed its
+injection window: H4's presence wait had already passed without removal. The
+old stimulus required the released plate to be within 1 mm of its final level
+pose during placement retreat, although the trace shows it settling afterward.
+This is not a fixture-fault acceptance pass. A prepared test-only correction
+uses the actual fixture-presence input after measured release, before the wait,
+instead of that timing-dependent coordinate predicate. Apply and validate it
+after the current frozen-input runs finish.
+
+The updated physical-thread regression is still running. Both-backend physical
+handling acceptance, the remaining matrix, the final frozen-source gate and
+local-main integration remain open.
