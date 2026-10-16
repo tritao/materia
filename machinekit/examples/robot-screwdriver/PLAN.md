@@ -3528,3 +3528,20 @@ subsequent angular acceleration (`sd15-dynamics-inertia-motion.log`).
 These changes remain isolated from production. Non-polyhedral primitives,
 material/filter semantics, topology caching, reset/history and scaling still
 need review and coverage before integration and deterministic cell acceptance.
+
+### SD15a declared contact friction prototype (2026-10-16)
+
+The isolated solver now builds generalized angular-contact rows and publishes
+intrinsic contact couples from their solved impulses. Declared dimensions select
+normal-only, sliding, torsional and rolling rows. Piece settings mix symmetrically
+and an explicit pair overrides the mixed surface. The frictionless grip probe
+now uses the API's declared frictionless dimension 1, respecting its documented
+zero-field/default convention.
+
+A small supported body under 0.02 N m normal-axis torque spins with sliding-only
+contact, but declared torsional friction holds it and reports the actual opposing
+contact couple. All 65 physical assertions and 9511 checked API operations pass
+(`sd15-dynamics-torsion.log`). Rolling rows exist but their coupled limit and
+independent physical acceptance remain unverified. Full contact-filter/softness
+semantics, caching, history/reset, scaling and production integration remain
+open; this evidence does not establish deterministic whole-cell acceptance.
