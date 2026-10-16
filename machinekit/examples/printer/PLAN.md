@@ -1,1764 +1,305 @@
 # 3D printing plan
 
-**Goal.** Materia designs, slices, simulates and runs an FDM print on a CoreXY printer, and the
-same printer and job can also be handed to Klipper.
-- **Our stack.** A CoreXY printer is modelled in MachineKit, like the CNC router. A part made in
-  CadKit is sliced into a ToolpathKit program. MotionKit plans it with the extruder as a planned
-  joint, and RobotKit runs it on the simulated printer.
-  - The controller holds the hotend and bed at temperature, with thermal runaway protection.
-  - The printed part grows in StockKit from the nozzle's actual motion, and is measured against
-    the CAD part.
-- **Klipper.** The same assembly generates a Klipper `printer.cfg`, and the same job is written as
-  Klipper G-code. Materia uploads it through Moonraker, starts it, and mirrors the printer's live
-  state into the digital twin.
+Materia designs, slices, simulates and executes a CoreXY print, and exports the same assembly/job to Klipper.
+The next machine is a Cartesian pellet printer with print-then-trim capability. Units are SI internally.
+This ledger records each item's design, current decision and useful acceptance numbers. Detailed experiments,
+failed attempts and run chronology belong in commit messages; historical evidence remains in git history.
+“Complete locally” does not imply published or landed.
+
+## Execution and publication contract
+
+- Continue in the DATA1 `3d-printing` worktree. Preserve unrelated work and do not modify the dirty main checkout.
+- No push. Publish NativeKit `6168df3b8ab0b1937f87bdcc636b79744438cdad`, Haxeon
+  `e32024b6d8ae02e51ed5c6cf4d67bb8cbd2bb638`, TOPP-RA `558a3404cfd5839ad3539d07e4b5cbd361812848`,
+  then Materia. The TOPP-RA follow-up retains original forward controls atop cleaned `materia` `11a85f364`;
+  Release and Debug tests pass. The retired `materia-tr2-free-end` branch receives no new commits.
+  Future fork changes build on `materia`, with upstreamable subjects/bodies, and remain for the user to push.
+- Scope is frozen: finish the checkpoint, commit all own work and stop/report. No PL1, new features or further
+  changes to other examples' behaviour. Verify workspace without test cache, unsharded MachineKit, MotionKit
+  native/Haxe, printing, every app project-source case, editor and full cube; report the branch's own commits.
+- The branch is linearly rebased onto local main `73b480f4c0bd8419f7f4bec2c901062e7ee9dc78`. Preserve main's
+  async simulation Stop, reference-arm, screwdriving and sheet-metal behaviour. Old merge/prototype history is
+  consolidated; the reach certificate is regenerated, not hand-merged. Do not merge main or move local main.
+- The previous PL0 smoke pass is historical evidence, not proof of the final checkpoint after current changes.
+
+## Architecture
+
+The MachineAssembly and print job own configuration; exporters derive their outputs from them. ToolpathKit
+stores deposited bead area rather than a filament E coordinate. Filament diameter and screw calibration belong
+to the machine/material. Extrusion is a distance-driven process joint written after geometric IK, not a pose axis.
+Heater loops and faults run on the device; the simulator has an explicit thermal plant. Deposition uses the physical
+nozzle into the same StockKit model used for CAD comparison and later milling. Moonraker uses documented network
+interfaces; no Klipper/Moonraker source is copied. Generic assumed mechanics remain labelled as assumptions.
+
+## Core printer (AM)
+
+- **AM0 / AM0b — complete locally.** Isolated worktree, source/build separation and baseline diagnosis.
+  Changes unrelated to the printer remain separately identifiable; never infer success from an old main baseline.
+- **AM1 — complete locally.** Modal deposition, filament moves, heat, fan, layer, feature and object markers in
+  the toolpath IR. Preserve provenance and safe process states through lowering/restart.
+- **AM2 — complete locally.** Marlin/Klipper parsing and writing, absolute/relative extrusion, G92, temperature
+  waits, fan, retraction and markers. LinuxCNC behavior remains covered by its existing tests.
+- **AM3 — complete locally.** Slice exact CAD planar sections into perimeters, skins, rectilinear infill,
+  travel and retraction; holes/islands remain geometric. Mesh import/supports are later work.
+- **AM4 — complete locally.** Printing benchmark records slicing, lowering, planned time, CPU/wall time,
+  segment counts and memory, with a look-ahead estimate. Performance claims require matched measurements.
+- **AM5 — complete locally.** Short/curved/non-planar corner handling and bounded numerical timing windows
+  carry attained speed across interfaces. Current gate: cube 870.1 s plain / 881.7 s shaped, 35,216 / 55,847
+  segments; gear 1047.9 s / 165 sections; zero boundary lowerings. These are pre-TR3 acceptance numbers.
+- **AM5b — complete locally.** Three TOPP-RA rounding fixes (upstream #302), micrometre-path timing,
+  motor-derived axis rates and reduced planning/simulation overhead. Earlier matched runs found planning
+  4.6–7.3 times cheaper and the full cube about 14 times faster than real time; these are historical measurements.
+- **AM6 — complete locally.** Real CoreXY assembly, Z support, extrusion, hotend, bed, fans, homing and probe.
+  Refuse non-rotation placement frames; ground placed members and check post/bed-wing clearance with `printer-frame`.
+- **AM7 — complete locally.** Device heater control, cold-extrusion guard, watchdog/runaway faults and
+  explicit simulated plant. Heater tuning, sensor and ADC/power data are required, not inherited defaults.
+- **AM8 — complete locally.** Plan the extruder from deposited path distance and its flow/drive limits;
+  retraction/prime, pressure advance and device execution are included. Physical simulation uses the same program.
+- **AM9 / AM9b — complete locally.** Additive stock and actual-nozzle deposition, CAD volume/extent/hole
+  comparison, app job/player/panel and faster simulation. Keep physical checks distinct from deterministic replay.
+- **AM10 — complete locally.** Generate Klipper config and G-code from the model, including transmission,
+  direction, resolution, heater and shaper data. Unknown hardware information must prevent hardware export.
+- **AM11 — complete locally.** Moonraker upload/start/status and live twin, with shared event-pump networking.
+  Preserve absent status values, lifecycle/fault behavior and IPv6; nested dependency readiness is below.
+- **AM12 — complete locally.** ZV/MZV/EI shaping, including lag/tail, process-event time mapping and boundary
+  certification. MuJoCo belt dynamics ring near 52 Hz rather than the former erroneous 5 Hz; gate checks physical
+  attenuation and model/tuning agreement. Shaping consumes its share of the total path-deviation budget.
+
+## Review follow-ups (RF)
+
+- **RF1 — complete locally.** RKD6 revision 16 represents E as a float step base plus a local residual;
+  exact-base domain is 2^53 steps, with explicit soft-f64 cost on Cortex-M4F. No integer-wire claim.
+  Start-of-print tick reduced from 538 to 23 ms. Pre/post-shape merges share one deviation budget.
+- **RF2 — complete locally.** Every nonzero coupling stiffness is compliant, derived from transmission
+  geometry/material with assumption provenance; zero alone means rigid. Shared spring model drives simulation,
+  planning, observation and shaping. Mill compliance attribution and independent prediction are under RF12; rapid
+  compliance clearance is RF14.
+- **RF3 — complete locally; retain the dynamic stretch reserve.** Deposit from the physical nozzle, with
+  SmallTab and short cube in MuJoCo. Pulley/carriage deviation is distinct from motor hold and bed sag.
+  `STRETCH_MARGIN=1.1` is still empirical, not a certified error bound. RF12(1) removes its old justification
+  (constant stiffness at one pose), but does not establish the existing single-step overshoot formula for repeated
+  acceleration reversals, coupled modes or finite-step replay. Removing 1.1 requires a forcing-response derivation
+  or a demonstrated bound for these workloads, rather than silently shrinking the tolerance. RF14 already uses
+  an absolute-impulse-response bound for arbitrary bounded forcing; assess that formulation here, accounting for
+  position-varying stiffness. Recorded RF15 SmallTab: 835 um deviation / 919 um permitted, 118.1 mm^3 deposited.
+- **RF4 — implemented locally; dependency publication remains user-controlled.** NativeKit HTTP and WebSocket
+  message/text mode replace a second networking implementation; share the pump and retain cancellation/ownership.
+  NativeKit origin is `https://github.com/tritao/nativekit.git`. Pin `6168df3b` passes CI-pinned ClangFormat 18.1.8
+  and the 31 runnable Linux CTests, including transport/PTY contracts; privileged joystick input is skipped.
+  Haxeon `e32024b6` adds four printing commits on local main `1434bcea`: message transports, repository
+  formatting, the NativeKit repair pin and standalone module identities. Format, compiler/runtime, integration,
+  Wasm and fixed-point self-hosting gates pass at this exact pin. `printing-without-rf13` must fast-forward local
+  Haxeon main at publication, then be deleted. The shared base is local-only: `6464b8c9` was 87 commits ahead
+  of origin/main; `1434bcea` adds its formatter repair. Publish pins in the order above.
+- **RF5 — complete locally.** One coupling projection and separate `PathSampler`, `TimedMotionTransforms`,
+  `PlanCertification`; distance-drive columns follow IK for every solver. Preserve refinement, one-sided curvature,
+  process discontinuities, entry/retreat E, clearance-proof invalidation and held process state in transitions.
+  Full MotionKit suite passed 1,329,624 assertions at completion; printer gate passed.
+- **RF6 — complete locally.** Complete controllable intervals and the reachable forward pass determine actual
+  interface speeds, including nonzero lower bounds. No fixed share of an optimistic upper bound. TR2 supplies
+  free-end forward solving; TR1's failed interpolation experiment does not weaken continuous validation.
+- **RF7 — complete locally.** One polynomial merge in trajectory_core, typed failure causes and original-row
+  retry only for merge-attributable failures. Timing/path/link budgets are derived; clock and unrelated-limit
+  failures cannot be hidden by retry. Keep accumulated shaping/merge error inside the authored path budget.
+- **RF8 — complete locally.** Drive-resolution admission at startup and along paths; device/simulation use
+  matching nearest-step rounding. Physical re-baseline and full motion suite passed; no arbitrary homing epsilon.
+- **RF9 — complete locally.** Export Klipper's worst-direction Cartesian acceleration from the coupled axes.
+  Existing printer max_accel did not change because its own axis limits are tighter.
+- **RF10 — complete locally except the explicitly retained TR1 reserve.** Required HeaterTuning and one policy,
+  model-owned thermistor front end, pressure-advance reserves from drive limits/K, turn regression, affine adaptive
+  grid and continuous path-budget merges replace unexplained constants. Clock representability belongs to device
+  conversion, without a clock-sliver heuristic. Heater defaults cannot stand in for unknown installation data.
+- **RF11 — complete locally.** Profile-owned purge prime, one BeadSection, correct startup retraction,
+  material specification, scene/job adapter, startup feed hold and kind-based peripheral input. Preserve absent
+  Moonraker status fields and issue heater faults once. Generated build files are excluded from history.
+- **RF12 — complete locally.** Position-dependent belt/screw stiffness with certified travel minima and backend
+  updates; nut/bearings/shaft in series; energy-based settling; measured resonance acquisition/calibration.
+  Damping ratio remains the authored quantity: hysteretic loss gives zeta=eta/2 without load knowledge.
+  SFU1605/400 mm example: 66.4 N/um shaft alone, about 43 N/um with nut/support bearings; assumed catalogue
+  stiffnesses remain labelled. Shaping must cover the travel-dependent mode range. Kinematic fan-out relations
+  omit physical constitutive laws, consistently with constant stiffness; a native regression covers gantry setup.
+  Mill X/Y/Z tracking versus fresh main: .03956/.10933/.06839 versus .02384/.01478/.05993 mm. Main's unstated
+  damping made screws ideal; RF2/RF12 exposes their compliant response with declared zeta=.03. Independent CAD/
+  command-only two-body prediction: .04112/.09816/.06240 mm, roughly 4–10% gap; Y peaks at the measured 51.00 s.
+  Native ideal-screw counterfactual: .03593/.01933/.06492 mm, so compliance adds 3.6/90.0/3.5 um: it dominates Y,
+  with smaller contributions on X/Z. The remaining 12.1/4.6/5.0 um against main accompanies the changed certified/
+  clearance trajectory (118 versus 78 plans);
+  no gains, tolerance or example changed. RF15 replaces the unit-incorrect solver-cost allowance. RF3's dynamic-error
+  derivation remains separately open.
+- **RF13 — moved to follow-up branch `rf13-motor-holds`.** Physical motor holds, absolute joint referencing,
+  pulse counters and takeover/brake changes are excluded from this landing. Quantized positions overwrote analytic
+  hold-reference endpoints while retaining unquantized velocities: preserve one consistent plan sample for position,
+  velocity and acceleration; round only emitted/reported steps. Carriage-to-arm inertial feedforward regression:
+  predicted/measured missing response 50.15900180/50.15900174 urad; corrected response effectively zero.
+  Converse reaction-load check: predicted/measured carriage displacement 139.693387817 um. These native checks
+  do not explain remaining app errors: track seam 1.631 mm, overhead path 2.319 mm; gantry rejects a start
+  1.374 um below its X limit. No gains, example limits or tolerances were tuned. Mill servo policy remains a user
+  decision: derive gains from reflected inertia at a declared bandwidth, author gains on the example, or retain
+  main's ServoDrive defaults. Generic fallback at 10 Hz predicts roughly 6.75/9.85/9.63 mm X/Y/Z lag; this is not
+  a reason to change the landing's existing servo policy. The unchanged 1 um no-creep assertion moves with RF13:
+  the generic law has timestep-dependent bed creep (fresh main -16.23 um at 2.5 ms; landing with soft impedance
+  -14.19 um at 2.5 ms; max-impedance diagnostic +9.89 um at 10 ms). Landing retains the sag diagnostic and RF3 constant-offset assertions. The settled
+  reference hides a constant physical bed offset: raw commanded-versus-physical Z is 175.84 um low at 10 ms,
+  and 196.48 um low after 100 s at 2.5 ms (210.67 um at 1 s). RF13 must resolve that offset and the generic law's
+  timestep sensitivity. Maximum ideal-transmission
+  impedance and the missing follower-load correction must land together on RF13. Acceptance includes the housing
+  fourth flange screw (soft impedance completes in 185.66 s versus main 185.64 s; maximum impedance times out)
+  and the split free-rundown/frictionless/frictional screw oracle. The original screw oracle passes with the landing's
+  soft impedance; both the impedance change and its corrected oracle/regression move to the follow-up.
+- **RF14 — complete locally.** Fixed-stock CNC rapids reserve cutter envelope plus absolute compliance response,
+  backlash and one step; motor-hold displacement is deferred with RF13. Close portions become exact-stop feed moves; risky travel without
+  a cutting feed refuses. Damped bounded-force gain is coth(pi*zeta/(2*sqrt(1-zeta^2))) below critical damping,
+  otherwise 1; undamped compliance refuses a finite bound. This fixed-stock pass does not certify moving blanks.
+  Belt/screw routers: zero rapid contacts/holder collisions/stalls; 297.2/315.8 s machining, roughly 96 s extra each.
+  Belt displacement reservation [8218,11311,54] um; screw [54,54,54] um. Accuracy allowances were not borrowed
+  from a leftover-stock percentage. Bench mill: 69.0 s, 3866.3 mm^3 removed / 3.5 leftover / 0.3 gouge.
+- **RF15 — complete locally.** Observation precision is relative position representation roundoff, not MuJoCo's
+  dimensionless solver cost tolerance. MuJoCo reports eight mjtNum epsilons (1.776e-15 for double), scaled at the
+  runtime boundary by max(1,abs(limit)); rigid core reports zero. This does not bound physical soft-stop compression
+  or integration error. Rated-effort stop tests still fault without modeled allowance; tests cover both signs
+  and coordinate scales 1e-3, 1, 1e3. Backend/runtime/MuJoCo suites passed at completion.
+
+## Next after landing
+
+Simulation fidelity levels ([SF0–SF6](../../../simkit/plans/FIDELITY.md)) -> PL1–PL12, with TR6 alongside
+PL2/PL11. Resume TR1 whenever planner work resumes. Later features remain parked unless the user pulls
+stock-printer features such as bed mesh or pause/runout forward.
+[Online motion](../../../motionkit/plans/ONLINE_MOTION.md) is independent and may run in parallel with FIDELITY
+and PL: Ruckig for free/reactive motion; path stops stay on TOPP-RA/TR3; jerk on paths remains research.
+
+## Remaining planner work (TR)
+
+- **TR1 — evaluated; adoption deferred.** Keep collocation and `interpolation_margin=0.8` for nonlinear paths
+  (affine paths use 1). The 0.8 factor is an empirical 20% reserve on the acceleration constraints, also used in
+  adaptive-grid selection, originating in the curved Paint regression. It is not a universal interpolation-error
+  theorem. Polynomial lowering and strict continuous validation against the caller's original limits bound accepted
+  results; a failed check is refused or retimed according to the endpoint contract. Interpolation without reserve
+  failed the 135-degree / 50 um corner: 12.5106619431 versus 12.5 m/s^2, with zero adjustments required.
+  Removing or reducing 0.8 needs a continuous error bound/refinement and Paint/corner/printing acceptance, not
+  endpoint checks alone. Preserve this reserve while finishing TR3.
+  Payoff: up to ~20% higher cornering acceleration; removal needs a continuous interpolation-error bound with
+  refinement plus Paint/135-degree corner/printing acceptance.
+- **TR2 — complete locally.** Free-end forward solving returns the actual reached speed, not the interval upper
+  endpoint. API is in cleaned fork `11a85f364`; future upstream submission/publication remains user-controlled.
+  Upstream hungpham2511/toppra#302 (degenerate stages) is open; repoint the submodule upstream when it merges.
+  Submitting TR2 upstream is the user's decision.
+- **TR3 — adopted locally; publication remains user-controlled.** One compiler produces owned timed windows in order;
+  whole-program timing drains the same stream. Lazy exact-stop sections and indexed drive slicing permit early
+  execution. Publication preserves pressure advance, shaping, moving-cut position/velocity/acceleration checks,
+  source/event maps and one final tail. Two executors queue a moving successor and retire consumed state.
+  Authored stops settle; asynchronous starvation stops safely. Feed override/runtime retiming remain deferred.
+  Safe/optimistic native profiles compare original LP controls as well as squared speeds; closed input needs only
+  its actual terminal solve. Revision tokens reject stale/foreign/double retirement. The integer clock retains
+  controls and fractional tails; representation refinement never changes its stages or physical tolerances.
+  Bernstein interval velocity/acceleration and both curvature-join sides certify the strict constraints. Eligible
+  stopped affine moves use a certified chord and integer-clock triangle/trapezoid. Keep the shared solver leased
+  across adjacent passes and prove the default geometric merge budget once per immutable section; custom factories
+  retain their per-chunk contract. Each pending native window owns its immutable interval table until retirement:
+  solver switching reuses it, without the former two-entry LRU's repeated proofs. Retention follows the existing
+  section sample/pending-window budget, not total program duration. Resident CAD/program input is counted separately.
+  Matched CPU-5 gear/cube planning: exact b8 native baseline 12.97/10.04 s; strict whole-section single window
+  (no prefix proofs/publication cuts) 19.06/13.83 s; current streaming whole drain 21.03/14.20 s. Thus strict
+  certification contributes 6.09/3.79 s, with streaming adding 1.97/.37 s (10.3/2.7%), rather than attributing
+  the entire historical increase to streaming. The earlier 2.2% compared two drains that both paid streaming.
+  Bounded gear costs 22.91 s in 886 publications (20.2% over strict single-window, 8.9% over the whole
+  drain), with 569212 KiB RSS and the same clock; its additional cost is publication/filter work.
+  Gear backward CPU: b8 .755 s, strict single window 6.533 s, streaming 7.673 s; interval preparation nested
+  within backward/forward is 3.444/4.499 s for strict/streaming. Streaming proof construction itself is 3.43 s;
+  initial retention costs .36 s and solver-rebind copies .71 s. The previous LRU built 228 tables: window-owned
+  tables build 175, once per immutable window; switching passes copies results, and a genuinely new constrained
+  problem still needs new proofs. Matched streaming gear improves 22.70 -> 21.03 s; all 602 per-plan Float and
+  integer clocks remain bit-identical. Whole gear/cube peak RSS is 550916/476652 KiB; the diagnostic strict
+  whole-window gear needs 2047400 KiB, so it is a cost baseline, not a replacement for bounded windows.
+  Short planning entry points at b8/current: six-axis jog median .124/.123 ms, stored three-waypoint tending
+  transfer timing 1.007/.989 ms (200 samples each, CPU 5, same Haxe sources). The transfer uses its certified
+  route and a free-space oracle: these numbers exclude collision search and runtime submission. Motion clocks
+  are identical; neither entry point uses the path-stream machinery.
+  Checkpoint CPU-3 bounded/whole CPU: cube 15.36/13.86 s, gear 22.51/20.51 s. Matched 1x/4x/8x cubes
+  reach first motion in 11.1/12.4/10.9 ms with peak process RSS 512764/524000/552144 KiB. Bounded/whole clocks agree:
+  cube 874355978950 ns and six-layer gear 808918423491 ns; the strict single-window baseline agrees too.
+  Matched 1x A/B against pre-split `08d61e739` (four alternating pairs, identical harness/compiler, matching native providers)
+  separates executor submission, runtime admission and observed movement. Median CPU/wall ms, earlier -> landing:
+  submission 3.79/4.85 -> 3.69/4.76; admission 6.40/7.45 -> 6.21/7.28; observed movement 6.40/7.45 -> 8.78/10.92.
+  First-command latency is the planner acceptance metric and has not regressed. RF13's observer/counter behavior
+  reports movement at clock zero; landing reports it at the next 10 ms tick. Process CPU during the extra owner step also counts concurrent
+  planning; first-command certification has not grown. This deterministic-backend trace does not prove servo lag.
+  Keep both submission/admission and movement fields in the harness; no planner or tolerance change is warranted.
+  Earlier merge/lowering work preserved all 541 historical plan clocks and 655 reports: exact-degree polynomial
+  operations, absolute-sum error enclosures with the original exact fallback, on-demand candidate rejection and
+  reused lowering compositions. Matched gear/cube CPU improved 13.73/10.89 -> 12.30/9.64 s before stricter
+  certification; those older clocks differ from TR3 because the physical constraints were subsequently corrected.
+  The table-ownership change passes all 21 native tests and the printing gate. Checkpoint coverage includes
+  workspace no-cache, unsharded MachineKit, MotionKit native/Haxe, printing, all app cases, editor and full cube.
+  Tending's 75% target also fails main (73.9768%; landing 73.9872%); no tending behaviour changes belong here.
+  Force search is 7.49589 N versus fresh main 7.49383 N, with the 25 N bound unchanged.
+  Nine mobile-welder selectors also fail fresh main: three probe-clearance/IK errors are byte-identical;
+  registration fits leave retained zero Z/roll/pitch bounds (cutoff Z: main/landing 54.12/53.84 um; mission
+  -29.71/-27.56 um; later energy probe 35.36733/35.36721 um); the pack mass/CAD-inertia check fails identically.
+  These are inherited app-gate failures, not a green app gate or a reason to change examples/tolerances here.
+- **TR4 — removed.** Optional parallel window preparation showed no repeatable gain: matched gear elapsed
+  serial 21.171 s, one helper 17.212 s, two helpers 20.871 s; peak RSS 631444/722380/736220 KiB.
+  Keep one retained-window timing implementation and cooperative single-threaded execution. Remove the pool,
+  its optional environment switch and duplicate worker-mode runs; retain the serial path/retained-window corpus.
+- **TR5 — complete locally.** Versioned degenerate-stage replay/generated corpus and shared Seidel workspace
+  reuse across problems. Matched full-print allocation comparison found about 70% fewer allocations; this does
+  not imply a timing/RSS gain or allocation-free initialization of differently shaped problems.
+- **TR6 — planned with PL2/PL11.** Torque constraints from inverse dynamics for the heavy gantry, including
+  moving mass coupling and gravity on Z; linear axis acceleration rows alone do not establish motor feasibility.
+
+## Pellet printer
+
+PL0 is complete locally; PL1–PL12 have not been implemented. Do not start PL1 before the requested verified
+checkpoint and user report. Keep assumed drive/thermal/calibration data explicit; no hardware-interface claim.
+Previous PL0 full unsharded MachineKit smoke: exit 0, all 85 named groups completed, including P1–P5 press brake,
+routers, CoreXY, printer/Klipper, tending and recipes. Evidence: `build/pl0-corexy-fixed-machinekit.log` and
+`build/pl0-corexy-fixed-coverage.json`. This pass predates current TR3 changes.
+
+**PL0 reference facts and assumptions.**
+- Rechecked the [manufacturer catalogue](https://www.iemai3d.com/index.php/pellet-3d-extruders/) and its
+  [P10 kit parameter sheet](https://www.iemai3d.com/wp-content/uploads/2026/09/Pellet-Ext-P10-ExtruderControllerHopper-DryerCompressed-Air-Source-Components.pdf)
+  (PDF metadata dated 2026-09-10). The dryer mass is 40 kg; 25 kg is capacity. Per-zone heater loads and the controller
+  command protocol/pinout remain unspecified. Its three heater-controller ratings do not establish actual heater
+  loads. The 950 W controller and 2.1 kW head totals are not a zone-power allocation.
+- The listed controller needs more than 450 L/min inlet air, while the kit compressor lists 180 L/min. Rating conditions
+  and duty cycle are not given; do not assume the pair meets continuous demand. PL10 needs explicit air-supply data.
+- [The robot-system P10 sheet](https://www.iemai3d.com/wp-content/uploads/2026/09/Pellet-P10-KUKA210-TDS.pdf)
+  qualifies maximum throughput for high-speed PLA with a 10 mm nozzle. The derived 2.78 g/screw-turn value is a
+  reference-condition estimate, not a calibrated material/nozzle flow law. Screw-flow parameters remain PL3 inputs.
+- **Recorded simulation assumption:** command screw angle/speed through an abstract simulated servo. No step/dir,
+  analog or fieldbus interface is claimed for the vendor controller; electrical export needs a verified drive profile.
+  Zone powers, sensors, drive resolution and flow calibration remain explicit unknowns rather than heater defaults.
+  No vendor contact was sent. [Support-material terms](https://www.iemai3d.com/index.php/support/) request authorization;
+  no reusable CAD grant is established here, and vendor CAD/PDF files are not added to project history.
+- **Ideas-only references:** [ORNL/SPR-2022/2669](https://info.ornl.gov/sites/publications/Files/Pub186519.pdf)
+  studies temperature-based layer timing and exponential cooling fitted for CF/PC. This is a technical report with
+  government-report notices, not an imported software dependency; its fitted material constants are not defaults for
+  our machine. [CuraEngine's timing discussion](https://github.com/Ultimaker/CuraEngine/wiki/Inserts) covers including
+  minimum-layer waits in planned time; its [engine source licence](https://raw.githubusercontent.com/Ultimaker/CuraEngine/main/LICENSE)
+  is AGPLv3. No code or assets are copied from either reference. Our CAD slicer and thermal model remain our own.
+
+**PL1 design and acceptance constraints.**
+- Build the head as an includable `MachineAssembly`, following the existing assembly composition API rather than
+  hiding the motor/reducer/screw in a single rigid component. Expose the carriage mount and nozzle tool frame;
+  keep the screw's process joint distinct from the motor's shaft joint. The shaft joint must be supported by
+  its own `ServoMotor` member (RF13), with the 50:1 reduction represented exactly once.
+- `AssemblyInventory.massProperties` sums member masses. The 10 kg catalogue head mass is therefore a budget
+  for the complete purchased head, not an extra 10 kg housing beside a separately counted motor, reducer and screw.
+  Allocate positive member masses with their assumptions recorded; reject a configuration whose remaining housing
+  budget is non-positive. Keep gantry adapters and the trim spindle outside that head budget. Test total assembled
+  mass as well as individual parts. Centre of mass and inertia distribution remain assumptions, not vendor facts.
+- Existing `Gearbox` has an envelope-derived declared mass and assumed input inertia; existing generic servos
+  have assumed winding, encoder and torque-speed data. Reusing these requires an explicit mass allocation and
+  assumption provenance, not relabelling a generic model as a verified P10 drive. The catalogue's 1.91 Nm maximum
+  is not evidence for continuous torque, and 60 rpm at the screw with 50:1 reduction requires 3000 rpm at the motor
+  but does not establish its full torque-speed curve. Preserve these distinctions in the executable model.
+- Keep the three barrel zones independently addressable. Do not substitute the filament printer's 40 W cartridge
+  defaults or interpret the controller's channel ratings as installed heater power. Simulation thermal parameters
+  and screw mass-per-turn calibration must be explicit assumptions/inputs; hardware export needs a verified drive
+  and I/O profile. Optional cached vendor display geometry must not determine kinematics, mass or tool frames.
+- Acceptance must exercise assembly inclusion, motor-shaft ownership, reduction direction/rate, the complete-head
+  mass budget, nozzle/tool-frame placement, recipe reconstruction and independently addressed zones. These checks
+  supplement the full MachineKit baseline; they do not replace it. PL1 starts only after the requested checkpoint.
 
-Both targets come from one model and one job. Neither is hand-written.
-
-The printer example lives in `machinekit/examples/printer/`. The work touches ToolpathKit, CncKit,
-CadKit, CamKit, MotionKit, TrajectoryKit, RobotKit (runtime and device), StockKit, ProcessKit,
-ProjectKit and the app.
-
-## What exists
-
-Surveyed 2026-10-09 on main 1decbfc20.
-
-**Program pipeline**
-- `toolpathkit.path.ToolpathOp` has these ops: `Move`/`MachineMove(kind, geometry, feed, tolerance,
-  provenance)`, `Dwell`, `Spindle`, `Coolant`, `ToolChange`, `ToolLengthOffset`, stops, `End` and
-  `SetSetup`.
-  - Geometry is `Line`/`Arc`/`Circular`, in metres. There is no extra axis and no process value.
-- `cnckit` parses LinuxCNC only (`CncDialect { LinuxCnc }`). Comments are dropped in the lexer.
-  - It rejects `A/B/C/E` words, `G92`, and every M-code outside 0–9 and 30.
-  - `CncWriter` is the LinuxCNC post.
-- `toolpathkit.motion.ToolpathLowering` joins moves into one `FollowPath` until a barrier.
-  - It rounds corners only between equal speeds, through `CornerBlender.blendPerCorner`, with a
-    maximum turn of 150°.
-  - Spindle and coolant become `PathEvent`s on channels (`ToolpathChannels`), and spindle-on
-    waits on `spindle.at_speed`.
-  - `ToolpathMotionBinding` throws if any non-fixed joint is not bound to X/Y/Z.
-- `motionkit.robot.ProgramCompiler` splits a `FollowPath` at every tangent discontinuity and
-  times each section from rest to rest. It calls `PathTimingLimits(..., 0, 0, ...)`, so the
-  `startPathSpeed`/`endPathSpeed` fields exist but go unused.
-  - `CornerBlender` gives up and exact-stops on arcs, non-planar (Z-changing) lines, turns of
-    150° or more, and lines too short to blend.
-  - Each op or section has a 10000-sample budget.
-  - `pathEventSchedule` is a hook after timing. Welding uses it with
-    `processkit.ProcessRateSchedule` to make wire feed exact per distance.
-  - `ProgramPlanner` plans on a worker and streams through `TrajectoryStream`.
-- `app/src/CncProgramPlayer.hx` runs G-code: `CncCompiler`, `ToolpathMotion.lower`,
-  `ManipulatorMotion` and `ProgramPlanner`.
-  - It homes first, with `homingSeconds` counted separately.
-  - Its job is `SceneArtifact.machining`, which has three mandatory axes and cutter-specific
-    tools.
-  - `MachiningStock` cuts StockKit stock from the actual simulated tool tip. `CncPanel` provides
-    hold, resume, restart and override.
-  - `MachiningRun.continuationFrom` replays only the four spindle/coolant channels.
-
-**Machine**
-- `machinekit/examples/corexy/CoreXyPlotter` is a CoreXY pen plotter:
-  - two GT2 belt loops, 20T pulleys, `MGN12C` rails and NEMA 17 motors;
-  - `GENERIC-TMC2209` drivers and a 24 V supply;
-  - couplings with several leaders, from `AxisBuilder.turnWithBelt`.
-  - It has no Z, no switches and no homing, and travels only ±35 mm.
-  - `ProjectSourceTests` (`PROJECT_SOURCE_ONLY=corexy`) checks 16 couplings and prints
-    `axes to 649.6 mm/s`.
-- `machinekit.gantry.Gantry` has no CoreXY option.
-- Parts that exist:
-  - `NemaStepper` frames 17/23/34;
-  - rails `MGN12C` and `HGR15` only;
-  - `TimingBelt`/`TimingPulley` GT2;
-  - `LeadScrew` (Tr/Acme/Ball) and a T8-proportioned `LeadScrewNut`;
-  - `MotorDriver`, `PowerSupply`, `LimitSwitch`, `ProximitySwitch` (inductive M8/M12);
-  - `TSlotExtrusion`;
-  - `SpurGear`, `GearPair`.
-  - There are no heaters, thermistors, hotends, extruders, fans or filament.
-- Homing is in place: `HomingCycle`, `HomingSequence`, `HomingDynamics` and
-  `RuntimeHomingDriver`, plus device homing scopes.
-  - Switches come from `MachineAssembly.addTripSwitch` and `homeAfter`.
-  - `processkit.perception.ContactSearch` is a bounded "move until contact" primitive used by
-    weld touch sensing.
-
-**Process, device and simulation**
-- `ProcessDevice` (prepare/ready/fault/safe/apply) has two implementations,
-  `ChannelProcessDevice` and `WelderProcessDevice`.
-- Channel kinds are Digital, Analog and Process. Events are scheduled in path time, with
-  per-channel safe values.
-- Device `Board` trait (`robotkit/device_protocol/src/board.rs`): digital inputs; digital, analog
-  and process outputs; steps. It has no analog input and no PWM. Sensors go to the host as
-  `Sensor6` slots.
-- No closed loop on a non-motion channel exists anywhere.
-  - The precedent is `robotkit/device_protocol/boards/welder_retrofit.rs`: an IO trait (DAC out,
-    ADC in), `tick` with time-based fault latches, and `safe`/`reset`.
-  - Its virtual counterpart is `robotkit/device_virtual/src/welder.rs`.
-- The simulation is mechanical only.
-  - Pneumatics are force-only.
-  - Spindles are velocity drives in `robotkit/runtime/src/simulation_robot.cpp`.
-  - Non-mechanical models hook in through `SimulationStepObserver` (`SimulatedWelder`).
-- `processkit.tool.WeldBead` deposits `wireSpeed·A·efficiency/v` from the actual simulated tip.
-  `app/src/WeldBeads.hx` renders it as chunked runtime geometry.
-
-**Stock and CAD**
-- StockKit only subtracts. Its C API has `sk_stock_cut` and no add.
-  - `sk_sweep_ray` returns exact swept intervals for an axisymmetric profile on 3-axis moves, so
-    a stadium "bead" profile is expressible today.
-  - `StockPreviewWorker` contours changed chunks on a worker.
-- CadKit has no planar section call.
-  - It does have `cad_wire_offset` (`BRepOffsetAPI_MakeOffset`, via `Curve.offset`),
-    `Part.intersect`, `CamContour.fromFaceBoundaries` and `cad_shape_tessellate`.
-- CamKit:
-  - `CamPocketPlanner.plan(contour, radius, stepOver, islands)` is a scanline zigzag fill with
-    islands, reusable for rectilinear infill.
-  - `CamContour.inset` is convex-only.
-- `toolpathkit.path.ArcFitting.fit(ops, tolerance)` exists.
-- There is no Clipper, and no general polygon offset or boolean.
-
-**Klipper side**
-- `robotkit/remote` `NativeTransport` provides TCP connect and listen, with libwebsockets in
-  NativeKit.
-- No Klipper or Moonraker code exists. Klipper and Moonraker are GPLv3: we use only their
-  documented config format and HTTP API, and copy no code.
-
-## What is missing
-
-1. Extrusion, heaters, fans and layer/feature/object markers in the toolpath IR.
-2. A printer G-code dialect (Marlin/Klipper words, `E`, `G92 E`, `M82`/`M83`, `M104`/`M109`/
-   `M140`/`M190`/`M106`/`M107`, `G10`/`G11`, comments as markers) and a printer writer.
-3. A slicer: planar sections, perimeters, skins, infill, travel and retraction.
-4. Smooth cornering at slicer density: blends that do not give up on short, non-planar or arc
-   segments, and timing windows that carry speed across their boundaries instead of stopping.
-5. A printer: CoreXY with Z, an extruder, a hotend, a heated bed, fans, switches and a probe.
-6. An extruder joint planned from path distance, a flow limit, retraction and pressure advance.
-7. Heater control on the controller, a thermal plant model, and temperature barriers and faults.
-8. Additive stock, a deposition preview, and dimensional checks against the CAD part.
-9. A print job in the scene artifact, a player and a panel.
-10. A generated Klipper config, Klipper G-code, and a Moonraker client.
-11. Input shaping.
-
-## Decisions
-
-**AM-D1. One model, two execution targets.**
-- The printer assembly and the print job are the only sources.
-- Our stack executes them on the simulated printer (and, later, on RKD devices).
-- The Klipper exporter derives `printer.cfg` and G-code from the same assembly and job.
-- Nothing about the printer is typed twice.
-- Rejected: a separate "Klipper printer profile" data model.
-
-**AM-D2. Extrusion is a process quantity along the path, not an axis.**
-- New modal ops in `ToolpathOp`:
-  - `Deposit(area, width, height, provenance)`: every following `Cut` move lays a bead of that
-    cross-section area (m²) until the next `Deposit` or `DepositOff`. Travel kinds
-    (`Rapid`/`Link`/`Retract`) never deposit.
-  - `DepositOff(provenance)`.
-  - `FilamentMove(length, speed, provenance)`: an extruder-only move, in metres of filament.
-    Positive primes, negative retracts. It is used for retract/unretract and purge.
-  - `Heat(heater, celsius, wait, provenance)`, where `heater` is a name such as `hotend` or `bed`.
-  - `Fan(fan, duty, provenance)`.
-  - `Layer(index, z, provenance)`, `Feature(kind, provenance)` (perimeter, external perimeter,
-    infill, solid infill, skirt, travel…) and `PrintObject(name, start, provenance)`. These are
-    markers for preview, restart and cancel-object; lowering ignores them.
-- The IR stores bead area, which is machine-independent. Filament diameter belongs to the
-  material and the extruder, so importing or writing G-code converts `E` with it.
-- `Move` keeps its fields. Modal ops keep the destructuring consumers (about 15 non-test files,
-  listed by the survey) unchanged, which is how `Spindle`/`Coolant` work.
-- Rejected:
-  - an `E` coordinate on `Move` or `Point3` (filament length is not a pose coordinate, and it
-    ties the IR to one filament size);
-  - a 4th axis in `MachineBinding`.
-
-**AM-D3. The extruder is a planned joint driven by path distance.**
-- The filament drive gear is a revolute joint in the robot model. A stepper drives it through a
-  gear reduction (`Transmission.GearMesh`).
-- Along each deposited primitive its angle is linear in path distance:
-  `θ(s) = θ0 + area / filamentArea / gearRadius · s`. `FilamentMove`s are extruder-only joint
-  moves.
-- `ProgramCompiler` adds these "distance-driven joint" columns to the joint path samples after
-  IK. Timing then respects the extruder drive's speed and acceleration limits like any joint.
-- The X6 plan check, stepper slip, step rates, encoders and device streaming all apply unchanged.
-- `ToolpathMotionBinding` binds the extruder joint with an explicit role instead of throwing.
-- Melt rate is a separate limit. The hotend's maximum volumetric flow (assumed per hotend part)
-  caps each primitive's speed at `maxFlow / area`, through the per-sample caps.
-- Pressure advance is a joint-path term: `θ_cmd = θ(s(t)) + K · θ̇`, smoothed over a window
-  (Klipper's default is 0.04 s) so the extruder stays within its limits. The plan check verifies
-  it.
-- Rejected: an analog rate channel through `ProcessRateSchedule`, the welder wire-feed pattern.
-  - It is right for a feeder with its own controller.
-  - It is wrong for a stepper on the motion controller: piecewise-constant rates lose position,
-    retraction is a position move, and pressure advance needs the joint's position.
-
-**AM-D4. Cornering: smooth paths and timing windows with boundary speeds; no velocity jumps.**
-- TrajectoryKit, the runtime and the devices assume continuous joint velocity. We keep that,
-  because robots and CNC need it.
-- Instead of Klipper-style junction velocity jumps, the path is made C1 before timing:
-  - `CornerBlender` blends every corner within the move tolerance, with a blend length limited
-    to a share of each neighbouring segment.
-  - Blending handles short lines, non-planar lines, and line–arc and arc–arc corners.
-  - Exact stops remain only at near-reversals (above `maxBlendTurnAngleRadians`), at process
-    barriers, and at extruder-only moves.
-- Long smooth paths are timed in windows, not as one section. Each window's end speed is
-  bounded so that the next window could still stop (`startPathSpeed`/`endPathSpeed` in
-  `PathTimingLimits`). That keeps the sample budget, memory and lookahead bounded.
-- Slicer and G-code polylines may first be arc-fitted (`ArcFitting`) within tolerance.
-- These rules apply to CNC programs too.
-  - Router and bench mill numbers may change (fewer stops). That is acceptable only if their
-    gouge, deviation, removal and stall checks still pass. Record the new numbers.
-- Rejected: velocity discontinuities at corners hidden by input shaping (Klipper's
-  `square_corner_velocity`). They would break trajectory continuity across the whole stack.
-
-**AM-D5. Slicing is exact, from the B-rep.**
-- CadKit gains native calls:
-  - a planar section of a solid at height z, giving planar faces with holes
-    (`BRepAlgoAPI_Section`, wires assembled into faces);
-  - offset of a planar face with all its wires (`BRepOffsetAPI_MakeOffset` on the face, so
-    collisions and splits are handled);
-  - booleans between planar faces (cut, common, fuse), for top/bottom skin regions.
-- The slicer lives in CamKit as `camkit.additive`, because CamKit is "CAD to ToolpathProgram".
-  It reuses `CamContour` sampling, `CamPocketPlanner` scanlines for infill, and `ArcFitting`.
-- Rejected:
-  - slicing a tessellation (it loses exact arcs; mesh input such as STL/3MF is a later step);
-  - vendoring Clipper2 (no network here, and OCCT already does exact 2D offsets and booleans).
-
-**AM-D6. Heaters are controlled on the controller.**
-- A `heater` module in `robotkit/device_protocol` (shared, `no_std`) holds:
-  - PWM duty out and thermistor ADC in (Beta model, 100k NTC 3950);
-  - PID;
-  - a runaway watchdog that latches a fault: heating gain too low over a window, leaving a
-    hysteresis band once at target, over-temperature, and sensor open or short.
-  - Its pattern is `welder_retrofit.rs`.
-- The virtual device runs the same module against a lumped thermal plant in
-  `robotkit/device_virtual`: `C·dT/dt = P·duty − h·(T − T_amb)`, with part-fan cooling on the
-  hotend. Values are assumed per part.
-- The host sends setpoints as Analog channel events and reads temperature and state from
-  `Sensor6` slots. `heater.<name>.at_temperature` answers the `Heat(wait)` barrier, the same way
-  `spindle.at_speed` does.
-- Cold extrusion is guarded twice:
-  - a static program check (no deposition or positive `FilamentMove` before a waited `Heat` at or
-    above the material's minimum);
-  - a device fault if the hotend falls below the minimum while the extruder joint moves forward.
-- The printer example always runs with `virtualDevice = true`, so the controller logic is the
-  device's.
-- Rejected: host-side PID (a host stall would leave the heater on).
-
-**AM-D7. What was printed is measured, not assumed.**
-- Deposition comes from the actual simulated nozzle tip and the actual extruder joint motion,
-  like `MachiningStock` and `WeldBead`. Slip, flow limits and pressure-advance errors therefore
-  show.
-- StockKit gets `sk_stock_add`, a union of swept spans with provenance, starting from empty
-  stock. The bead is a revolved stadium profile of the actual layer height and the width that
-  conserves volume.
-- One representation serves both: `StockPreviewWorker` contours it for the preview, and the
-  checks compare it with the CAD part (volume, bounding box, hole diameter).
-- Rejected: separate tube meshes for the preview (a second geometry that can disagree with the
-  measured one).
-
-**AM-D8. The printer.**
-- CoreXY over a 2020 T-slot frame, about 220 × 220 × 220 mm build volume:
-  - two NEMA 17 motors, GT2 20T, 6 mm belts;
-  - MGN12 rails;
-  - a moving bed on three T8 lead screws, each with its own NEMA 17. The three are followers of
-    one `z` joint today; independent Z tilt comes later.
-- Toolhead:
-  - a geared extruder (about 3:1, hobbed drive gear about 7.3 mm, pancake NEMA 17);
-  - a hotend with a 0.4 mm nozzle, heater block, 40 W 24 V cartridge, 100k NTC, heatsink and
-    hotend fan;
-  - a 5015 part-cooling blower.
-- Bed: aluminium plate with a 24 V silicone heater and a 100k NTC.
-- Homing: X/Y limit switches, and an inductive M8 probe for Z homing at the bed centre.
-- Electrics: 24 V supply, six TMC2209-class drivers, and a controller declared as the router
-  job does (microsteps, step tick).
-- New library parts go in `machinekit.printing`: `Hotend`, `HeaterCartridge`, `Thermistor`,
-  `Nozzle`, `Extruder` (drive gear, idler, reduction), `HeatedBed`, `Fan`/`Blower`.
-  - New rail rows (MGN9, MGN12H) and a pancake NEMA 17 row are added where missing.
-  - Values that cannot be checked are marked assumed, as the existing `ServoMotor` rows are.
-- The `CoreXyPlotter` coupling code is reused, not copied: lift what the printer needs into
-  `AxisBuilder` or a small CoreXY helper.
-
-**AM-D9. The Klipper target is generated and tested offline.**
-- `printer.cfg` is derived from the assembly:
-  - `[printer] kinematics: corexy`, with `max_velocity`/`max_accel` from `coupledLimits`;
-  - for each stepper: `rotation_distance` from pulley teeth × pitch or screw lead, `microsteps`
-    from the driver, `position_min/max/endstop` from axes, overtravel and switches, and homing
-    speeds from `HomingDynamics`;
-  - `[extruder]`: `rotation_distance`/`gear_ratio` from the drive gear and reduction,
-    `nozzle_diameter`, `filament_diameter`, heater and sensor types, `max_extrude_cross_section`;
-  - `[heater_bed]`, `[fan]`, `[probe]` with offsets, `[tmc2209 …] run_current` from the driver;
-  - `[input_shaper]` when the model has a value.
-- MCU pins come from the controller's wiring when the board is a known Klipper board. Otherwise
-  each pin is a clearly marked placeholder in one alias section, and a check lists the
-  placeholders.
-- The Klipper G-code writer uses relative E (`M83`), `EXCLUDE_OBJECT_DEFINE`/`START`/`END`, and
-  heater waits.
-- The Moonraker client uses `NativeTransport` TCP with HTTP/1.1 (and the WebSocket subscription
-  if it is cheap). It covers upload, start, pause, resume, cancel and a status query
-  (`print_stats`, `toolhead`, `extruder`, `heater_bed`), and mirrors toolhead position and
-  temperatures into the twin.
-- Tests run against an in-process fake Moonraker server only. Nothing touches the network or a
-  real printer.
-
-**AM-D10. Input shaping is a trajectory filter.**
-- A ZV/MZV/EI shaper convolves the planned toolhead trajectory with impulses. It is applied in
-  TrajectoryKit/MotionKit after timing and before submission.
-- For linear couplings (CoreXY), shaping the motor joints is equivalent to shaping X/Y.
-- Validated in simulation with a compliant belt model: the residual vibration after a step at
-  the modelled resonance drops by at least 5×.
-- Shaper frequency and damping are machine data. Measuring them (accelerometer, chirp) comes
-  later.
-
-## Test parts
-
-All are built in code, so tests need no files.
-- `CalibrationCube`: 20 mm cube with a 6 mm through-hole. Used for dimensional checks.
-- `TestTower`: 20 × 20 × 12 mm. It has a boss, a counterbored hole, a 45° chamfer and a
-  cylindrical wall, which exercises arcs, islands and skins.
-- `SmallTab`: 10 × 10 × 1.2 mm, six layers at 0.2 mm. It is the fast app test.
-- Benchmark load: a `SpurGear` from MachineKit, about 60 mm, 40 teeth, 8 mm thick. Its involute
-  teeth give slicer-like short segments. Add a cylinder if more segments are needed.
-- `NemaMountBracket`: a printable L bracket for a NEMA 17, built from MachineKit companions.
-  This is the demo print.
-
-## Steps
-
-**AM0. Base.**
-- Worktree `/home/joao/dev/materia-worktrees/3d-printing`, branch `3d-printing` from main
-  1decbfc20, with every submodule populated. `coal` and `proxsuite` are symlinks (they show as
-  `T`).
-- The baseline suite results are recorded in the session prompt.
-
-**AM0b. Make main green.** Done. Seven failures were already on main 1decbfc20; each was diagnosed
-before it was fixed, and none was fixed by loosening a check.
-- **Step rate halved (MachineKit smoke and workspace, app screw and belt routers).** Not a code
-  intent: 8c9e1d026 plans at the integer pulse interval of the f32 rate and steps per unit the
-  device receives. A rate exactly at the step tick's ceiling can round below one tick per step in
-  f32, so the interval came out as two and the CoreXY plotter and both routers were planned at half
-  speed. The device derives the same interval from the same f32 values, so it would have run at
-  half speed too. `PulseRate` (in `DeviceBinding.hx`) now derives, once, the rate a planner may
-  use and the rate to deploy: a ratio within f32 rounding of an integer is that integer, and a
-  deployed rate is nudged to the nearest f32 that gives the planned interval. 2fbea0683.
-- **`testVirtualCncProgram` ("exceeds claimed limits: position on joint 0 at 0 s").** Caused by
-  efd8c5c16 (confirmed by reverting it): homed axes return to their home coordinate, which defaults
-  to the lower travel limit. A stepper cannot rest exactly on a limit; the pulse generator floors
-  its target, so the device rested one or two steps (12.5 um) below zero, within the homing
-  precision but outside the claimed bound, and four layers refused the first plan. A joint outside a
-  claimed position bound by no more than the plan's start tolerance now begins there, with its
-  bound reaching the start and no further, in each place that checks a plan against joint
-  limits: `ExecutionPlan.create`, `ProgramCompiler`'s path check, the runtime's appended-path
-  validation and the RKD6 device compiler. Rejected: returning homed axes a precision inside the
-  limits (path planners start at the home coordinate and expect to find the axis there; motionkit's
-  `PlannerTests` fail). ae6e95ec5.
-- **`DLS allocates nothing per iteration (-40.8 bytes)`.** A measurement artefact: HashLink bills
-  allocation in blocks, so a run is now and then charged a 2 KB refill. Every run allocated 752
-  bytes whatever its length. The test takes the cheapest of six runs per length. cd29b1993.
-- **processkit and robotkit-core tests ("libnativekit_scene.so" / "libnativekit.so" not found).**
-  Neither test project built the NativeKit libraries it loads. processkit's declares the native
-  build of the motionkit tests; the robotkit-core consumer builds NativeKit beside the runtime.
-  dfa6e2940.
-- **Editor tests ("Worker document tests failed: ... Could not open source file").**
-  `StartPageTests` moved the process to the repository root and never came back, so the worker
-  tests' `fixtures/worker-legacy.materia` resolved against the root. It restores the working
-  directory now. 2611087d9.
-
-Gate `am-suite.sh am0b` (full, 2395 s): every project passes. One workspace action, `toolpathkit`,
-was blocked because this session edited its sources while the suite ran; it passes alone (97
-assertions) on the committed tree. Assertion counts: RobotKit world 5439 (was 5433), terrain 3524,
-MotionKit 1,224,712, CadBridge 173, CncKit 317, CamKit 12311, ProjectKit 152, ToolpathKit 97, KinematicsKit
-325 + native 695, automationkit 86, manufacturingkit 54. Every number listed as not to move is
-unchanged. The two routers now have numbers (the new baseline for every later step):
-- **Screw router:** axes y 22.3 mm/s 5.21 m/s^2, x 25 mm/s 5.37, z 25 mm/s 5.65; plate milled in
-  232.2 s of machining (homing 38 s, total 270.2 s), 9902.1 of 9996.5 mm^3 removed, leftover 140.3
-  mm^3, gouge 63.9 mm^3; 128 plans, 0 flagged, 0 stalls, worst deviation 0.05 mm.
-- **Belt router:** axes y and x 500 mm/s 12.29 and 14.1 m/s^2; plate milled in 215.2 s (homing
-  26.2 s, total 241.4 s), same removal; 128 plans, 56 flagged, 62 over the 0.1 mm tolerance, 0
-  stalls, worst deviation 1.76 mm on y (assumed belt drag).
-  (The "last known good" values, 220.2 s and 201.6 s, predate the controller step-rate ceilings.)
-- **CoreXY plotter:** axes to 649.6 mm/s, 71.549 m/s^2 (as before).
-
-**AM1. Printer ops in the IR.**
-- Add the AM-D2 ops to `ToolpathOp`, with validation:
-  - area, width and height positive and consistent (`area ≤ width·height`);
-  - a `FilamentMove` speed is required;
-  - heater and fan names are non-empty;
-  - fan duty is in [0, 1].
-- Update every exhaustive `switch` on `ToolpathOp`:
-  - `ArcFitting` and `ToolpathFrame` pass the new ops through;
-  - `TravelEnvelope` and `Setup` ignore them;
-  - `CncWriter` refuses them with a diagnostic (LinuxCNC has no extruder);
-  - `stockkit.CutMoves` ignores them;
-  - `ToolpathLowering` refuses them for now with "needs a printer binding" (AM8 lowers them).
-- A `ToolpathProgram` query: total deposited volume, per-layer volume and per-object volume.
-- Tests: validation, pass-through, volume queries.
-
-Done. What was built and decided:
-- `ToolpathOp` gained `Deposit(area, width, height)`, `DepositOff`, `FilamentMove(length, speed)`,
-  `Heat(heater, celsius, wait)`, `Fan(fan, duty)` and the markers `Layer(index, z)`, `Feature(kind)` and
-  `PrintObject(name, start)`, as AM-D2 says. `Move` is unchanged, so no consumer that destructures it
-  changed. `PrintFeature` is the marker vocabulary (`ExternalPerimeter`, `Perimeter`, `Infill`,
-  `SolidInfill`, `TopSolidInfill`, `Skirt`, `Travel`, `Other(name)` for a slicer's own label).
-- Validation lives in `PrinterOps.validate`, run by the `ToolpathProgram` constructor with the op's
-  index in the message: area, width and height positive and finite with `area <= width * height`; a
-  nonzero `FilamentMove` length at a positive finite speed; non-empty heater, fan and object names;
-  finite non-negative temperatures; fan duty in [0, 1]; a non-negative layer index.
-- `ArcFitting`, `ToolpathFrame`, `TravelEnvelope`, `Setup` and `stockkit.CutMoves` already fell
-  through unknown ops, and pass the new ones through in place (tested). `CncWriter` refuses a program
-  holding any printer op before writing, naming its line ("LinuxCNC has no extruder, heater or
-  fan"); `CncCompensator` and the app's `StockSimulationSession` list the new ops where they were
-  exhaustive. `ToolpathLowering` ignores the markers and refuses the rest ("printing operations need
-  a printer binding"), so a printer program cannot be half-run on a CNC machine; AM8 lowers them.
-- `ToolpathProgram.depositedVolume()`, `layerVolumes()` and `objectVolumes()`: bead area times
-  length of each `Cut` move (`Cut` only: `Rapid`, `Link` and `Retract` never deposit) under the
-  `Deposit` in force, attributed to the current `Layer` (index -1 before the first marker) and
-  `PrintObject`.
-- Tests: ToolpathKit 97 -> 141 assertions (`PrinterOpCoverage`: validation, pass-through, volumes);
-  CncKit 317 -> 325 (writer refusal); toolpathkit/motion (lowering refusal and markers). Quick suite
-  `am1`: every project passes; the app project-source build compiles.
-
-**AM2. Printer G-code dialect and writer.**
-- `CncDialect` gains `Printer` (Marlin/Klipper/RepRap family). The lexer keeps comments as
-  data in this dialect, so `;LAYER_CHANGE`, `;TYPE:`, `;LAYER:` and `M117` text are not errors.
-- Words and codes:
-  - `E` on `G0`/`G1`/`G2`/`G3`; `G92` (E only, with a diagnostic for XYZ);
-  - `M82`/`M83`; `G10`/`G11` with firmware-retract settings from the controller;
-  - `M104`/`M109`/`M140`/`M190` (`S`, and `R` where supported);
-  - `M106`/`M107`; `M220`/`M221` as overrides; `M84` and `M201`–`M205` (diagnostic or ignored,
-    documented);
-  - `G28` as "require homed";
-  - PrusaSlicer/Orca/Cura feature comments as `Feature`/`Layer` markers;
-  - `EXCLUDE_OBJECT_DEFINE`/`START`/`END` and `M486` as `PrintObject`.
-- `E` deltas convert to `Deposit` area through the controller's filament diameter:
-  `area = ΔE · filamentArea / Δs`.
-  - A new `Deposit` is emitted when the ratio changes beyond a tolerance (0.5 %).
-  - An E-only move becomes a `FilamentMove`.
-  - An E move with XY whose ratio is negative (retract while moving, "wipe") becomes a
-    `FilamentMove` plus travel, with a warning.
-- `PrinterWriter` writes the IR back as printer G-code, with Klipper and Marlin flavours (only
-  the object markers and start sequence differ).
-- Tests:
-  - round trip IR → G-code → IR preserves deposited volume within 0.1 % and geometry within
-    1 µm;
-  - hand-written snippets in the style of PrusaSlicer, Cura and Orca parse;
-  - LinuxCNC behaviour is unchanged (CncKit assertion count only grows).
-
-Done. What was built and decided:
-- `CncDialect.Printer`. A printer `CncController` carries `PrinterSettings` (filament diameter, the
-  firmware retract for `G10`/`G11`, the ratio tolerance, the corner tolerance given to deposited
-  moves, whether the controller draws arcs); a LinuxCNC controller has none. `CncCompiler` hands a
-  printer controller to `PrinterInterpreter`; the LinuxCNC interpreter is untouched.
-- `CncLexer.parse(source, Printer)` keeps comments as data (`CncComment`), reads string words
-  (`A"name"`), ignores line numbers and checksums, takes the rest of `M117`/`M118` as a message and
-  reads Klipper extended commands (`NAME KEY=value ...`).
-- `PrinterInterpreter`: `E` is delta-converted (`M82`/`M83`, `G92 E`) and becomes
-  `Deposit(area, width, height)` with `area = dE * filamentArea / distance` (the arc length for
-  `G2`/`G3`), restarting when the ratio moves by more than 0.5 %; the bead is a layer tall and as wide
-  as a stadium of that area, so area <= width * height always holds. E-only moves and `G10`/`G11` are
-  `FilamentMove`s; a retract while moving becomes a `FilamentMove` plus a travel, with a warning.
-  `M104`/`M109`/`M140`/`M190`/`M141`/`M191` become `Heat`, `M106`/`M107` `Fan` (fan 0 is `part`,
-  fan n is `fan<n>`), `M220`/`M221` scale the speed and the extrusion of the moves after them, `G4`
-  a `Dwell`, `M0`/`M1`/`M2` stops. `G28` only sets `CncCompileResult.homes`. Motion limits,
-  stored settings and macros are `CNC_PRINTER_IGNORED` warnings, once each; unknown codes and
-  `G92` on an axis are errors on their line and the rest still compiles.
-- Markers: `;LAYER_CHANGE` + `;Z:`/`;HEIGHT:` (Prusa, Orca), `;LAYER:` (Cura, the height is the first
-  move's Z), `;TYPE:`/`; FEATURE:` (all three slicers' names), `;MESH:`, `; printing object`,
-  `EXCLUDE_OBJECT_START/END` and `M486`. `TEMPERATURE_WAIT` after `SET_HEATER_TEMPERATURE` is the
-  wait of that `Heat`.
-- Rapid travel carries its speed: a G0/G1 without extrusion is `Move(Rapid, ..., speed)`, so the
-  slicer's travel speed survives. A CNC `Rapid` has speed 0 and keeps the machine's rapid speed.
-  AM8's lowering uses the speed when it is positive.
-- `PrinterWriter` (Klipper and Marlin flavours) writes `G21 G90 M83 G28`, the moves with
-  `E = area * length / filamentArea`, `Layer`/`Feature` as Prusa-style comments, `EXCLUDE_OBJECT_DEFINE`
-  up front and `_START`/`_END` (Klipper) or `M486` (Marlin), `SET_HEATER_TEMPERATURE` and
-  `SET_FAN_SPEED` for generic parts (Klipper only). Controllers without arcs get chords no more than
-  2 um off the arc.
-- Tests: CncKit 325 -> 432 assertions (`PrinterGcodeTests`): PrusaSlicer, Cura and Orca snippets;
-  M220/M221, E-only, G10/G11, wipe, G92, G20; refusals; IR -> G-code -> IR keeps deposited volume
-  within 0.1 %, per-layer and per-object volumes, geometry within 1 um, markers, temperatures and
-  fans in order; writing what was read is a fixed point. LinuxCNC fixtures are unchanged.
-
-**AM3. Slicer v1.**
-- CadKit native (AM-D5): section, planar face offset, planar face booleans. Also Haxe wrappers
-  and HXI regeneration through `cadkit/scripts/generate-haxeon-hxi`.
-  - Build CadKit native inside the worktree with the prebuilt OCCT (see the session prompt).
-- `camkit.additive.Slicer(part, settings)` returns a `ToolpathProgram`. Settings:
-  - layer height and first-layer height;
-  - line width (nozzle × 1.125 by default);
-  - perimeters (2) and top/bottom layers (4);
-  - infill density and angle (rectilinear, alternating 45°/135°);
-  - speeds per feature;
-  - travel speed;
-  - retraction (length, speed, minimum travel);
-  - Z hop off by default;
-  - temperatures, fan by layer, skirt (1 loop, 3 mm).
-- Per layer:
-  - section;
-  - perimeters by face offset, (k + ½)·width inward, from the outside in;
-  - skin regions = this layer minus the union of the layers within n above (top) or below
-    (bottom);
-  - solid infill in the skin regions, sparse infill in the rest, through `CamPocketPlanner`
-    scanlines with islands;
-  - travel with retraction when a travel crosses a perimeter or exceeds the minimum;
-  - arc fitting of perimeter polylines within 5 µm.
-- The start and end sequences come from a printer profile (heat, home, purge line, then end
-  with heaters and fans off, park).
-- Tests:
-  - the cube's deposited volume is within 3 % of its CAD volume;
-  - no extrusion outside the part's footprint plus width/2;
-  - the hole stays open in every layer;
-  - layers are monotonic in Z;
-  - deterministic output for the same input;
-  - slicing time of each test part is printed.
-
-**AM4. Planning benchmark (measure, no gate yet).**
-- `motionkit/scripts/benchmark-printing` (or a test filter) runs one sliced job through
-  lowering and `ProgramCompiler` with planning only (no simulation):
-  - the gear benchmark load;
-  - the cube;
-  - one G-code file written by `PrinterWriter` and read back.
-- The machine is the CoreXY printer's axes if AM6 is done; otherwise use a three-prismatic-joint
-  stand-in with the same limits (650 mm/s, 5 m/s²), and state which.
-- It reports:
-  - moves;
-  - planned print time;
-  - planning wall time and the real-time ratio, overall and for the worst 10 s window;
-  - peak memory;
-  - number of exact stops by reason;
-  - number of timing sections.
-- A reference estimator in the benchmark gives a lower bound on time: trapezoids with Marlin
-  junction deviation 0.013 mm at the same acceleration and speeds.
-- Record all numbers in this plan. They are the "before" of AM5.
-
-Done. What was built and decided (the "before" of AM5):
-- **Benchmark** `machinekit/examples/printer/benchmark` (a project of its own, `haxeon run --project=machinekit/examples/printer/benchmark/haxeon.json`):
-  slices the load (or reads G-code), strips everything but the moves, lowers it with the printer's work origin and
-  `rapidsAtFeed`, and plans it with `ProgramCompiler` on the printer's x, y and z (no plan check, no
-  simulation). `PRINTING_BENCHMARK_ONLY=gear|cube|gcode` picks a load, `PRINTING_BENCHMARK_DUMP=dir` writes the
-  sliced G-code, `PRINTING_BENCHMARK_GCODE=file` plans a G-code file instead of slicing, `PRINTING_BENCHMARK_LAYERS=n`
-  keeps the first n layers, `PRINTING_BENCHMARK_TRACE=1` prints every plan. The reference estimator
-  (`PrintTimeEstimate`) is a look-ahead planner with Marlin's junction deviation (0.013 mm) at the printer axes'
-  limits; it is a lower bound.
-- Machine: the printer's planning model (`DeviceBinding.planningModel`, 40 kHz step tick), axes x and y 250 mm/s
-  with 24.09 and 12.56 m/s^2, z 100 mm/s with 18.1 m/s^2, from the scene artifact. (The app test, which takes
-  its physical parts from a project session, finds 30.03, 15.59 and 22.87 m/s^2: the masses differ, the cause is
-  not chased.) Joint coordinates are relative to the assembly's initial pose, so the work origin is
-  (-0.11, -0.11, -0.01) m.
-- Lowering and kinematics changes the benchmark needed, all independent of printing ops: `MachineBinding.rapidsAtFeed`
-  (travels run at their own feed and round corners), `ToolpathLoweringResult.stops` (exact stops by reason),
-  `ToolpathMotionBinding` gives joints that follow several axes (CoreXY pulleys) limits that are the sum of their
-  leaders' and takes `heldJoints` (the extruder and its motor hold still), `AxisKinematics` places such joints from
-  their couplings.
-- **Numbers before AM5** (debug CadKit, shared machine):
-
-| Load | Moves | Planned | Reference | Planning | Real time (all / worst 10 s) | Sections |
-|---|---|---|---|---|---|---|
-| Calibration cube (100 layers) | 4841 | 929.1 s | 867.6 s (+7.1 %) | 889.8 s | 1.04x / 0.75x | 4042 (4040 stops at a speed change, 1 with no tolerance) |
-| Test tower through G-code (60 layers) | 4617 | 506.7 s | 469.6 s (+7.9 %) | 511.6 s | 0.99x / 0.67x | 4271 (4269 speed changes, 1 non-planar line) |
-| Gear, layer 1 only (G-code of the sliced gear) | 2135 | 366 s | 357.6 s (+2.3 %) | 436.0 s | 0.84x / 0.12x | 554 |
-| Gear, whole (module 1.5, 40 teeth, 8 mm; 61933 moves, 81453 segments, sliced in 45 s) | 61933 | not finished | | more than 3000 s | | |
-
-  Managed heap peaks: 493 MB (cube; 48 GB allocated while planning), 503 MB (tower), 332 MB (gear layer 1).
-- **Where the time goes.** Planned time is within 8 % of the reference even with thousands of exact stops: the axes
-  are agile (12 to 24 m/s^2) against print speeds of 30 to 150 mm/s, so a stop costs a few milliseconds. The cost is
-  planning: about 220 ms for each plan of the cube, and it is quadratic in the length of a smooth section. The gear's
-  perimeter loops (about 400 mm of path, 1000 spans) take 162 to 171 s each for 20 s of motion, while 14 ms plans
-  take 10 ms. Per-sample work that scans every primitive of the authored geometry is the cause to confirm:
-  `distanceToGeometry` in the task-space check scans the whole op's authored path for each of the 1 ms samples, and
-  `primitiveSpeedAt` and `PosePathRefinement.at` search linearly too. The sliced gear also failed in TOPP-RA
-  (`path.time failed with MotionKit error -6`, the fourth plan) where the same program read back from G-code
-  (rounded to a micrometre) did not.
-
-**AM5. Cornering and windowed timing (AM-D4).**
-- `CornerBlender`: blend short lines (blend length limited to a share of each neighbour),
-  non-planar lines, and line–arc and arc–arc corners. Exact stop only above the turn limit.
-- `ProgramCompiler`: time long smooth paths in windows with boundary speeds, and keep the sample
-  budget and memory bounded.
-- Gate, on the gear benchmark load:
-  - planning at least 2× faster than real time over the worst 10 s window;
-  - planned time no more than 15 % above the reference estimator;
-  - path deviation within tolerance;
-  - no limit violations.
-- Router and bench mill checks must still pass. Record their new numbers and the reason.
-- If the gate is not met after a bounded effort (profile, and fix the top costs), record the
-  numbers and the cause, and continue. The user decides whether our stack stays a printing
-  target.
-
-Done. What was built and decided (AM3 comes before AM6 in the run order):
-- **CadKit native** (`cadkit.h`): `cad_shape_section` (the solid in common with a big plane face, so
-  holes and islands come out as OCCT builds them), `cad_planar_offset`, `cad_planar_cut/common/fuse` and
-  `cad_planar_copy_boundary_bytes` (every boundary in one call: lines and circular arcs exact, other curves
-  cut into lines within a tolerance). HXI regenerated; `cadkit.Shape` and the new `cadkit.PlanarRegion`
-  (loops oriented outer counter-clockwise, holes clockwise) wrap them. `TKShHealing` is linked.
-  CadKit was built into the worktree's `cadkit/build/debug` with the prebuilt OCCT; tested natively
-  (`planar_smoke`) and through Haxe (`PlanarRegionSmoke`).
-- Findings that shaped the native code:
-  - OCCT booleans treat a face as one side of a sheet, so two coplanar faces looking opposite ways have
-    nothing in common: every region face is turned to look along its plane's dominant axis (`looking_up`).
-  - Sections at different heights lie in different planes. `PlanarRegion.section` moves its result to z = 0 so
-    layers combine with booleans, and the boolean is run with a 1e-6 fuzzy value because two sections of one
-    prism are equal only to within the tolerance of the shapes they were cut from.
-  - `BRepOffsetAPI_MakeOffset` on a face with two separate loops that are concentric circles or arcs (a ring)
-    crashes OCCT (SIGSEGV, not an exception): `MAT2d_MiniPath::MinimumL1L2` skips the `Extrema_ExtCC2d` results
-    when `IsParallel()`, which two loops of eccentricity below about 1e-7 reach with inward offsets and both
-    joins. Filed upstream as https://github.com/Open-Cascade-SAS/OCCT/issues/1606. Rectangular frames do not
-    crash. `cad_planar_offset` therefore never offsets a face with its holes: the outer boundary is offset one
-    way, each hole the other, and the holes are cut out. A face with a single wire never reaches that code,
-    so the workaround avoids the crash completely.
-- **Slicer** (`camkit.additive`: `Slicer`, `SlicerSettings`, `PrinterProfile`, `TestParts`): as in the step, with
-  these decisions. Perimeters are exact lines and arcs from the offsets, so the plan's "arc fitting within 5 um"
-  is not needed. The bead is a stadium (rectangle with semicircular sides) of the layer height and the line
-  width, solid infill and perimeters are `lineWidth - height * (1 - pi/4)` apart (the spacing at which beads
-  fill a layer exactly), and sparse infill is `lineWidth / density`. The infill core starts at
-  `lineWidth/2 + (P - 1) * spacing + spacing/2` from the boundary. The solid region is the core less what
-  the layers above and below all cover; layers without a full window are fully solid. Scanlines lie on a
-  global lattice, so infill stacks from layer to layer. Travels retract when longer than 2 mm and leaving the
-  part (even-odd test along the travel on the layer's section). The skirt is printed before the
-  `PrintObject` marker, outside the object. `CamContour` gained a `validated` flag that skips its
-  quadratic self-intersection check (a B-rep boundary cannot cross itself) and `CamPocketPlanner.fill` gives
-  edge-to-edge scanlines.
-- Numbers (debug CadKit, prebuilt release OCCT): SmallTab 6 layers in 19 ms, 467 operations, 120.0 mm^3 in the
-  object (CAD 120). CalibrationCube (100 layers) 0.59 s solid: 7409 of 7435 mm^3 (-0.35 %); at 15 % infill
-  0.84 s, 2791 mm^3. TestTower (60 layers) 0.32 s solid: 3196 of 3202 mm^3 (-0.2 %); at 15 % infill 0.46 s,
-  51 retractions, 5029 lines of G-code. Checks: volume within 3 %, no bead outside the footprint plus half a
-  width, the hole's wall a half bead from the nearest bead on every layer (the cube) and the tower's
-  counterbore open, layer heights monotonic, deterministic output, G-code round trip within 0.1 %.
-  CamKit 12311 -> 12442 assertions.
-
-Done. What was built and decided:
-- **Where the time went** (profiled with `perf` and the allocation census, in the order they were found):
-  1. The task-space check measured each sample against the whole op's authored geometry (a scan of every primitive,
-     62 000 for the gear): `GeometricPath.distanceTo` now uses a grid of the primitives' boxes, and `PosePath`
-     finds the primitive at a distance by bisection (`indexAt`, `indexAfter`, `startOf`) instead of scanning.
-  2. `AxisKinematics.solveDifferential` gave derived joints (a CoreXY motor's pulley follows both axes) a rate of
-     zero while their positions moved, so the pulleys' joint paths were inconsistent, TOPP-RA did not see their
-     real accelerations, and the lowered trajectory broke the limits by 3 % to 60 %. Each break started a
-     smoothing retry (up to 24 whole re-lowerings); one section took 12 minutes. The rates are now the sum of the
-     leaders'.
-  3. `mk_path_lower` searched every sample for each of its 170 000 stages and every stage for each sample
-     (quadratic): both are bisections now, and a stage whose joint is affine in the path (a straight move)
-     skips the residual search, as does any stage whose coefficient sum is within the tolerance.
-  4. `ProgramCompiler.projectCouplings` copied every segment of the trajectory into Haxe arrays and back
-     (millions of boxed floats, and the collector marking them again and again): `mk_project_couplings` does it
-     in native memory.
-  5. The clock was sampled every millisecond for the task-space check; on an axis machine the executed position
-     can only differ from the path's by the lowering tolerance, which the lowering bounds, so a section's own
-     samples are checked and the clock at its ends. Timing bindings are read only when asked for.
-- **Cornering.** Moves of different speeds join in one rounded path (the corner arc goes at the slower of the two),
-  which removed the exact stop at every change of feature: the cube went from 4040 stops to 12, each of which
-  costs milliseconds at 12 to 24 m/s^2. Not rounded: turns above 150 degrees, non-planar corners (one per layer
-  change: a planar quintic cannot follow a z climb, and a stop costs a few milliseconds), and, new, corners whose
-  rounding arc would be tighter than 50 micrometres (`CornerBlender.MIN_RADIUS`; a tolerance that itself asks for a tighter arc keeps it): between moves of a few tens
-  of micrometres such a corner can only be rounded within tolerance by an arc of 8 to 15 micrometres, along which
-  no machine moves, and whose accelerations the time law could not hold (TOPP-RA broke the limits by half again
-  and retried 20 times). The tower's plan time fell from 410 s to 47 s with the rule, and its planned time from
-  10.3 % above the reference to 1 %.
-- **Windows.** A smooth path longer than `ProgramCompiler.MAX_SECTION_PRIMITIVES` (4000) is cut, and rests, at a
-  primitive boundary: the memory and the sample budget of a plan stay bounded, and a rest every few hundred
-  millimetres of path costs a few milliseconds. The plan's "windows with boundary speeds" is not done: with the
-  stops this cheap and every layer change a stop anyway, carrying a speed across windows would add a feasibility
-  fallback for no measurable time. Timing that still fails (`path.time failed`) is retried in two halves, each
-  from rest to rest, down to a single primitive. (Removed in AM5b item 2.)
-- **TOPP-RA.** The stock forward pass gave up ("forward pass" failure, seen on every load sliced from exact
-  geometry) where the speed it had reached was the greatest the controllable set allows, a vertex where two
-  constraints meet and rounding leaves no acceleration. The submodule is not ours to patch, so motionkit
-  subclasses `TOPPRA` and retries the stage with the speed lowered by 1e-9, 1e-7, 1e-5, 1e-3 (relative); the lowered
-  trajectory is still validated against the caller's limits. (Replaced by a fix in our TOPP-RA fork in AM5b item 2.)
-- Gate (`machinekit/examples/printer/benchmark`, run with no arguments; in the workspace as `printing-gate`) on a thin
-  gear (module 1.5, 40 teeth, 1.2 mm: 6 layers, 11 797 moves): planning at least 2x faster than the print over the whole
-  job and its worst 10 s, planned time within 15 % of the reference, no failure. **Passed**: 1047.9 s planned,
-  0.3 % above the reference; 94.1 s of processor time, 11.1x real time overall and 3.19x over the worst 10 s.
-- **Numbers after AM5** (processor time, so other work on the machine does not count):
-
-| Load | Planned | Reference | Planning | Real time (all / worst 10 s) | Sections | Before |
-|---|---|---|---|---|---|---|
-| Gear, whole (61 933 moves) | 2357.9 s | 2354.8 s (+0.1 %) | 350.1 s | 6.73x / 2.90x | 1004 | did not finish in 3000 s; sliced, failed in TOPP-RA |
-| Calibration cube | 872.4 s | 867.6 s (+0.6 %) | 60.1 s | 14.52x / 9.66x | 1576 | 929.1 s (+7.1 %), 1.04x / 0.75x, 4042 sections |
-| Test tower through G-code | 474.2 s | 469.6 s (+1 %) | 46.9 s | 10.12x / 1.87x | 1549 | 506.7 s (+7.9 %), 0.99x / 0.67x, 4271 sections |
-
-  The tower's worst window is just under 2x: arcs are the dearest paths to lower (each joint is curved, so every
-  stage is fitted and checked), and its 1324 corners stopped at for being below the minimum radius come from
-  micro-segments in its G-code (the sliced chamfer and boss); the slicer should not emit them.
-  Managed heap peaks 323 MB (gear), 198 MB, 213 MB.
-- **The first full run of the gate failed, and was fixed before AM7 went on.** (1) CamKit's "a blended pocket stops
-  at fewer corners" came out 90 against 90: the test asks for a 10 micrometre blend tolerance, which rounds a right
-  angle with an arc of about 19 micrometres, and the new minimum radius of 50 micrometres stopped at those corners.
-  The code was wrong, not the test: a corner whose own tolerance needs a tighter arc than the minimum keeps it
-  (`min(MIN_RADIUS, 0.5 * the radius the tolerance asks for)`); the minimum exists to stop corners squeezed by tiny
-  neighbours, not to override what was asked. (2) The CadKit suite loaded the shared `topological-naming` CadKit
-  build, which lacks the AM3 natives (`undefined symbol: cad_shape_section`): the suite script's default
-  `CADKIT_BUILD_ROOT` pointed at it. Every run since AM3 must use this worktree's `cadkit/build/debug`; the script
-  now defaults to it. Earlier runs since AM3 were not tested against the wrong library: the quick suite does not
-  run the CadKit suite, and the projects that slice (the machinekit smoke, the printing gate) build and load their
-  own `libcadkit-core` (their logs say `Build CMake target cadkit-core`), as the slicing in them proves. The full run after the fixes (`am5b`, 2587 s) passed: every workspace project, KinematicsKit, CadKit, the MachineKit smoke, the app's project-source suite (physical router, bench-mill and plotter numbers unchanged; per-tick allocation down about 15 %, the belt router's slowest update from 1582 ms to 209 ms) and the editor tests.
-- **CoreXY motor limits (coordinator review after the gate fix).** The review asked whether derived joints (a CoreXY
-  motor's pulley) are limited by the sum of their leaders' limits instead of by their motors, so that a diagonal (the
-  slicer's 45 and 135 degree infill) could drive one motor past its rate. Measured first, by `motorChecks` in the
-  printing gate: a 100 mm move along x, along y and along both diagonals, planned with the drives' plan check on and
-  sampled every millisecond. The sum is not looser than the motor: the axes' limits are shares of the motors'
-  (`RobotModel.coupledLimits` divides a motor's rate by the sum of the couplings that use it, and its force by the
-  coupling's share), so both axes at their limits turn a motor at exactly its rate. Diagonals turn the busy motor at
-  78 of 79 rad/s (the other stands still), x and y moves turn both at 39 (half: the cost of a share is that a pure
-  axis move uses half of what the motors give), the worst torque is 40 % of the pull-out curve, and the plan check
-  finds nothing. So no plan exceeded a motor's rate or torque; the change is that `ToolpathMotionBinding` bounds a
-  derived joint by its own drive's rate when the model has one (`min` with the sum), so the motor's limit is the
-  constraint and the sum only the most the axes can ask. The acceleration stays the sum (a pulley's own inertia says
-  nothing of the carriage it moves; the drive's torque is the plan check's job and it passes). Not done: axes at the
-  motors' full rate (`coupledLimits(..., motorSpaceVelocity = true)` with `MotorSpaceConstraints` rows, as the
-  plotter's machine program does) would make pure axis moves up to twice as fast. The printer plans derived joints as
-  columns of the timed path, which carry the motor rows already, so the rows would be duplicates; whether to take the
-  speed is a decision for the cube's print time (AM5b). **Taken in AM5b item 7:** the axes now run at the motors' full
-  rate (500 mm/s), the prints are unchanged.
-- Tests: `ToolpathMotionTests.printerLowering` (rounding across speeds, the arc's speed, stops by reason),
-  `PlannerTests.testLongPathQueries` (grid distance against a scan, bisection at boundaries, sections of a long
-  path), `CoreXyTests.testDerivedPulleysFollowBothAxes` (pulleys are the sums of their terms along a plan).
-
-**AM6. The CoreXY printer.**
-- `machinekit.printing` parts, plus catalogue rows (AM-D8), with unit tests: masses, connector
-  frames, heater power, thermistor curve, extruder rotation per mm of filament.
-- `machinekit/examples/printer/CoreXyPrinter`:
-  - frame, CoreXY belts, Z bed on three screws, toolhead with extruder joint, fans;
-  - switches and probe, `homeAfter` (Z after X/Y; probe at bed centre);
-  - drivers, supply, controller.
-- `CoreXyPrinterChecks` in MachineKit smoke: FK of nozzle versus axes, rails, OCCT interference,
-  coupled limits, belt and screw couplings, homing order.
-- `CoreXyPrinterPreview`, `materia.project.json`, a Start-page entry in
-  `app/src/editor/ExampleCatalog.hx`, and a `PROJECT_SOURCE_ONLY=printer` check that the
-  MuJoCo backend builds it and homes it.
-
-Done. What was built and decided:
-- **Parts** (`machinekit.printing`: `Thermistor`, `HeaterCartridge`, `Nozzle`, `Hotend`, `HeatedBed`, `Fan`,
-  `Extruder`, registered in `MachineKitComponents`): typed and catalogue-backed, their values marked assumed
-  where no datasheet is cited, every primitive named (`Solids.named`) for the naming audit. Catalogue rows
-  added: pancake stepper `17HS08-1004S`, rails `MGN12H` and `MGN9C`. The Beta thermistor gives 24861.65 ohm at
-  60 C and 6975.2 ohm at 100 C (`PrintingPartTests`).
-- **Assembly** `machinekit/examples/printer/CoreXyPrinter`: 20x20 frame, MGN12C Y rails, 40x20 crossbar with an
-  MGN12H carriage, GT2 belts A and B, two NEMA 17 on the rear posts, the toolhead (nozzle, hotend, cartridge,
-  thermistor, hotend fan, blower, extruder with its pancake motor and an 18:54 module-0.5 gear pair, joint `e`,
-  geared to the motor shaft by `GearMesh`), the bed on three Tr8x2 (4 starts) screws and two MGN9C rails, a
-  home switch per axis, drivers and the supply. 53 definitions, 100 occurrences, 53 BOM lines, 17 kg. Axes: x
-  and y 0..220 mm, z 0..220 mm; machine zero (-110, -110).
-- **Decisions.**
-  - Z homes with the bed lowered (the upper end of the joint), not at the nozzle. `DriveSystem.resolveSwitch`
-    wants a home trip strictly beyond the soft limit and collinear with the joint, so a probe at the nozzle
-    (which trips inside the travel) cannot be a home switch. An inductive sensor on a pillar from the base
-    plate senses a flag under the bed's carrier; X and Y then home with the bed away from the nozzle
-    (`homeAfter("x", ["z"])`, `homeAfter("y", ["z"])`). A second inductive probe beside the nozzle is kept for
-    levelling and has no switch yet.
-  - The CoreXY coupling helper moved from the plotter into `AxisBuilder.turnCoreXyPulley`; the plotter and
-    the printer both use it.
-  - A joint that follows several axes (a belt motor's pulley, the idlers of both belts) belongs to no axis.
-    `MotionAxisCouplings.derived` lists such joints (`DerivedJoint`: terms of `ratio * leader + offset`) and
-    `AxisPlanner` projects them from the axes' trajectories, so `MotionSystem` and `RuntimeHomingDriver` plan
-    homing, jogs and axis moves on a CoreXY machine. Before, `expand` threw "A multi-axis follower requires
-    coordinated polynomial planning" as soon as a home switch existed. Followers of joints no axis drives
-    (the extruder's gear train) stay where they are; a follower that mixes driven and undriven leaders still
-    throws. Test: `CoreXyTests.testDerivedPulleysFollowBothAxes` (six derived joints, each the sum of its belt
-    terms to 1e-9 along a plan).
-- **Checks.** `CoreXyPrinterChecks` in the MachineKit smoke (occurrences, joints, couplings, switches, forward
-  kinematics of the nozzle, rail ranges, clearances, belt clamp, gear distance), `PrintingPartTests`, the full
-  MachineKit smoke. In the app, `PROJECT_SOURCE_ONLY=printer` builds the assembly into the shared MuJoCo
-  simulation and homes it (z first, then x and y) in 8.75 s on the deterministic backend. Planning limits from
-  the motors: x 250 mm/s 30.03 m/s^2, y 250 mm/s 15.59 m/s^2, z 100 mm/s 22.87 m/s^2. A Start-page entry
-  ("3D printing" category) opens the project.
-- **Left for AM8.** Homing on MuJoCo with gravity: the bed (a follower of nothing the simulation actuates) falls
-  freely, because the screw turns do not hold it. The virtual device cannot home CoreXY switches yet: a device
-  input names one actuator whose channel joint is the switch's joint, and a CoreXY switch joint is driven by
-  two motors.
-
-**AM7. Heaters (AM-D6).**
-- Device: the `heater` module (PID, Beta thermistor, runaway watchdog, safe state) with Rust
-  unit tests for every fault path, plus a virtual thermal plant in `device_virtual`.
-  - Channel and sensor bindings go in the deployment layout; extend RKD6 only if needed, and
-    regenerate it with `python3 -B -m tools.wire generate --config robotkit/wire6.json`.
-  - Nucleo board: compile-checked (`cargo check --offline`) with placeholder pins, like the
-    welder profile.
-- Host: heater and fan channels, the `heater.<name>.at_temperature` sensor, `Heat(wait)`
-  barriers, and fault-to-stop.
-  - Add the new channels to `MachiningRun.continuationFrom` and `safeShutdown`, or to a printing
-    counterpart.
-- Tests:
-  - heat-up time of the hotend to 210 °C and of the bed to 60 °C (assumed plants; record them);
-  - steady-state ripple;
-  - runaway on a disconnected heater, a fallen-off thermistor and a fan blast;
-  - the cold-extrusion static check and device fault.
-
-Done. What was built and decided:
-- **Controller** (`robotkit/device_protocol/boards/heater.rs`, `no_std`, shared by the board and the virtual device):
-  a PWM duty out and a thermistor ADC in (Beta model: 100k NTC 3950 under a 4.7k pull-up on 3.3 V, so the
-  controller reads 0.1 degree per LSB of a 12-bit ADC at 210 C); PID with derivative on the filtered measurement
-  (2 s), integral held outside a 10 C range and anti-windup; and a watchdog that latches a fault and switches the
-  output off until a session resets it: sensor open or short (within 1 % of a rail), over-temperature, not heating
-  (a window without a 2 C gain while heating up; 20 s for the hotend, 120 s for the bed), left the band (below the
-  target by more than the hysteresis for a window after reaching it), cold extrusion (the extruder actuator steps
-  forward below the material's minimum), and a command or configuration that is not a number. The same module
-  type-checks on the Nucleo target (`heater_profile.rs`, placeholder pins; `check-mcu-build.sh` passes).
-- **Virtual device** (`robotkit/device_virtual/src/heaters.rs`): peripheral profile 2 runs the controller against a
-  lumped plant `C dT/dt = P duty - (h + h_fan fan)(T - T_amb)` with a 12-bit ADC; one or two heaters, each with a
-  sensor slot (a `tool_heater` frame of five values: temperature, target, duty, at target, fault), a target channel,
-  an optional fan channel and an optional extruder actuator. A fault stops the robot (`ProcessFault`) and takes every
-  target channel to its safe value. The session is refused unless every target channel is analog, safe at zero and
-  keeps its value through a commanded stop (a pause does not cool the hotend; a fault or an emergency stop does).
-  An experiment reaches the plant through `rkd_virtual_set_peripheral_input`: element connected, thermistor on its
-  block, a draught (W/K), wire open, wire shorted. The peripheral parameter list grew from 16 to 64 doubles
-  (`robotkit_simkit.h`, the HXI regenerated). No RKD6 wire revision: the target is an analog channel event and the
-  report a `SENSOR6` slot.
-- **Host.** `robotkit.tool.HeaterSensor` (the frame and its fault messages), `HeaterChannels` (target and fan
-  declarations: zero when safe, kept through a commanded stop), the `tool_heater` external sensor kind (the runtime
-  validates its frames), and `robotkit.runtime.VirtualHeaters` (configures the device from `HeaterSetup`s, publishes
-  its reports to the sensors, reaches the plant). The `Heat(wait)` barrier and the print-side channels
-  (`MachiningRun.continuationFrom` and `safeShutdown` counterparts) are lowered in AM8 with the printer binding;
-  `heater.<name>.at_temperature` is the frame's fourth value. The static cold-extrusion check is
-  `PrinterOps.coldExtrusion(ops, minimum)`: filament pushed or a bead laid before a waited `Heat` of the hotend to
-  the minimum (and after one that turns it down) is a finding with its source.
-- **Numbers** (assumed plants: hotend 10 J/K, 40 W, 0.06 W/K, +0.05 W/K with the part fan; bed 500 J/K, 250 W,
-  0.7 W/K; room 22 C), through the whole stack (Haxe test over the virtual device): the hotend is at 210 C
-  (within 3 C) after 65.1 s with a peak of 210.8 C; the bed is at 60 C after 84.2 s. Holding 210 C the block
-  stays within 210.01 to 210.72 C (quantized ADC), and with the part fan at full duty within 208.2 to 210.0 C.
-  The unquantized controller alone (`device_protocol` tests): hotend 63.9 s, bed 77.2 s, ripple under 0.1 C.
-- **Tests.** `device_protocol/tests/heater.rs` (7: thermistor round trip, heat-up and hold of a hotend and a bed,
-  every fault turns the output off and stays until reset, leaving the band, cold extrusion, bad commands),
-  `device_virtual` (10 new: plant times, ripple, dead element, fallen thermistor, draught, open and short wire, cold
-  extrusion, parameter lists, session channel rules, both blocks on the device with sensor frames, pause versus
-  emergency stop, fault stops the robot and clears every target), `HeaterDeviceTests` (RobotKit world 5439 -> 5469
-  assertions), `PrinterOpCoverage.coldExtrusion` (ToolpathKit 141 -> 149).
-
-**AM8. Extruder joint and the first simulated print (AM-D3).**
-- Lowering: printer binding (axes plus extruder joint, filament diameter, maximum flow, pressure
-  advance K and smoothing).
-  - Distance-driven joint columns in `ProgramCompiler`.
-  - `FilamentMove` as an extruder-only move.
-  - Flow caps.
-  - Pressure advance.
-- `SceneArtifact.printing` job: the program (G-code text, or a slicer request naming a part and
-  settings), the printer's axes and extruder joint, heaters, fans, material (filament diameter,
-  minimum extrusion temperature, temperatures) and controller.
-  - Machining and printing are mutually exclusive. Follow the one-schema-version rule.
-- App player: extract what `CncProgramPlayer` and a print player share (homing, compile, plan,
-  stream, overrides, panel) instead of copying it. The print player adds heaters, the extruder
-  and markers to the panel (layer, temperatures).
-- Test `PROJECT_SOURCE_ONLY=printer` prints `SmallTab` on MuJoCo with the virtual device.
-  - Check: no stalls, no faults; the extruder's deposited filament is within 1 % of the
-    program's; a speed override keeps volume per distance within 2 %.
-  - Print: print time, heat-up, planning ratio and plan-check results.
-
-Done. What was built and decided:
-- **Lowering and kit level** (the first commit of AM8): the extruder is a joint driven by path distance
-  (`DistanceDrive`, ramps that conserve the nominal feed), `FilamentMove` is a joint offset, flow caps, pressure advance
-  as a windowed polynomial transform (`mk_advance_joint`), `PrinterBinding` (see the commit).
-- **`SceneArtifact.printing`** (version 28, 27 rejected): the program as Klipper G-code in machine coordinates, the three
-  axes, the extruder joint, filament diameter, gear radius, melt rate, pressure advance and its window, the ramp
-  length, the minimum extrusion temperature, the controller's step rate, and the heaters (sensor slot, mount, channels,
-  PID and watchdog numbers and the thermal plant). Exclusive with machining and a mission. The "slicer request" variant
-  is not offered: the generator slices when it generates (`CoreXyPrinterJob.smallTab`), so the artifact carries the
-  program that was sliced, and a later slicer UI writes the same section. There is no work offset: printer G-code
-  is in machine coordinates (the bed's front left corner is the machine's zero), as `CncCompiler` reads it.
-- **Generator** (`CoreXyPrinterPreview.printer()`): slices `SmallTab` with the default settings and takes the numbers of
-  the extruder (hob 7.3 mm, 1.75 mm filament, 15 mm^3/s), the hotend (13.5 J/K, 0.12 W/K, +0.05 W/K with the fan,
-  cartridge 40 W, thermistor 100k beta 3950) and the bed (640 J/K, 300 W, 1.4 W/K) from the parts. The PID is derived
-  from each plant, not typed: the loop closes in a twentieth of the plant's time constant (`kp = C / (P tau / 20)`),
-  the integral time is an eighth of it, there is no derivative, and the watchdog expects 2 degrees in a quarter of the
-  time constant. (A first tuning with an integral time equal to the time constant left the hotend creeping the last
-  degrees until the watchdog called it runaway; the test caught it.)
-- **App.** `ToolpathPlayer` (new) holds what a CNC and a print player share: compile from where the machine is, homing
-  when it has switches, streaming plans to the robot, looping, speed override, feed hold, plan checks, stepper slip
-  and encoders; `CncProgramPlayer` now extends it (restart, stock and tools stay in it) and `PrintProgramPlayer` is the
-  second user. The print player plans over the whole machine (axes, belts, screws and the extruder, with the plan
-  check on all of it), reads the heaters' reports before each step, answers `heater.<name>.at_temperature` waits from
-  the `tool_heater` sensor, stops the print on a heater fault with the controller's message, and tracks the layer from
-  the G-code's layer markers. `AssemblyRobot.add` gives a project with a print job a virtual device, the heaters'
-  sensors and channels and `VirtualHeaters`. The CNC panel serves both (title, status line, restart only where the
-  player can restart).
-- **The virtual device and a CoreXY.** The device cannot read a CoreXY's home switches (a switch joint driven by two
-  motors; AM6 left this open), so a print job's model drops its switch inputs and the machine is referenced. A virtual
-  device counts steps from zero, and the assembly's actuators count from the joints' zero: the machine powers up at
-  its origin, all three axes at their lower limit (nozzle at the bed's front left corner, touching it), so the player
-  compiles from where the robot stands once the device has taken over (it waits 0.15 s for the clock sync, as the
-  machine program does), not from the assembly's initial pose. Starting exactly on the limits works because of the
-  start-at-limit rule (AM5b item 1 is about that rule).
-- **The segment density problem, measured and fixed.** The first print stopped in the device's link qualification and
-  then in the robot's queue: `SmallTab` plans to 163,392 polynomial segments over 56 s of motion (median 33 us, 140,323
-  under 1 ms, 3,000 a second), because TOPP-RA's 32 stages per path sample span lower to one segment each and the
-  extruder's ramp stations and the corner arcs make many tiny spans. The robot's queue holds 4,096 knots and the stream
-  keeps 2 s ahead; the endpoint refuses a link that cannot refill 128 segments in time. Two merges, both exact to a
-  fraction of a step: `mk_merge_segments` (MotionKit native, opt-in per compiler: `mergeSegmentsSeconds`, set to an
-  owner period by the printer binding) replaces runs of lowered segments by one quintic through the run's end states
-  where it stays within 10 microseconds of motion at the joint's speed limit, 1 % of its speed and 10 % of its
-  acceleration of the pieces, never past a limit the pieces keep to, found by doubling and bisecting; a plan whose merged
-  form breaks a limit anyway is built from the unmerged path. `SmallTab`: 163,392 -> 25,580 segments (457 a second);
-  the gate's planning also gets faster (the gear: 10.37x -> 13.36x real time overall, worst 10 s window 3.11x ->
-  4.12x, planned time unchanged, 0.3 % above the reference). `compile_device_segments6` merges again for the device's
-  link: a segment under 2 ms starts a run of up to 4 ms that one quintic follows to a tenth of a step and a percent of
-  the step rate of the originals (else the plan goes as it came, as does any plan the merge would take past a
-  deployment limit). Segments of 2 ms or more are sent as planned: a first setting that merged up to an owner period
-  everywhere also changed the gantry weldment, whose arc then could not be held. The 18,900 segments under 1 ms that
-  remain are corner arcs (AM5b item 8). The link is the board's native USB (12 Mbit/s): at the welder's 3 Mbaud the
-  qualification still refused the bursts of tiny segments at the arcs.
-- **A change of mine that broke the gantry weldment, found by the full suite.** The extruder gear needs an acceleration
-  from its motor's torque, and `RobotModel.coupledLimits` now gives a turning joint with no acceleration of its own
-  one; that also gave one to every directly driven revolute joint of the arms, which changed the gantry welder's
-  plans (the arc could not be held in three restarts). The rule now applies only to a joint whose motor is behind
-  a gear train (the motor is a follower of the joint), as the extruder's is; the weldment passes again (159.8 s
-  cycle, tip within 0.2 mm of the seams, legs of 5 mm).
-- **Fixes the print found.** The chunk-boundary acceleration tolerance (`TrajectoryStream.programSubmission`) allowed
-  the jump between chunks plus 1e-5, and a quintic with a large jerk differs between the previous segment's end and
-  the instant a nanosecond before by more than that: it now adds the jerk over that nanosecond. The motor-space check
-  (AM5 commit f91cb56cc) and a regression test for the diagonals came out of the review of CoreXY limits.
-- **The print (MuJoCo, virtual device, 100 Hz).** `SmallTab`, six layers: 169.8 s from power-up to the end, of which
-  the hotend reaches 210 C (within 3 C) at 103.6 s and the bed 60 C at 90.5 s (the program waits for both), then 66 s of
-  printing. No stall, no heater fault, no failure; the extruder feeds 56.08 mm of filament against the program's
-  56.08 mm (0.0 %); with the speed halved from layer 3 to 4 the filament per metre of path is 33.98 mm against 33.89 mm
-  at full speed (0.3 %, limit 2 %). The plan check ran on 39 plans: no stepper stall, worst torque 45 % of the
-  pull-out curve (a Z screw motor), 30 plans carry accuracy findings, worst deviation 329 micrometres on y (the belt
-  stretching under acceleration: that is what the check is for, recorded not hidden). Planning cost 54 s of processor
-  time for the 66 s of motion; the slowest tick 13.8 s, the first plan's synchronous compile: an interactive app would
-  hold still that long at the start of a print (AM5b item 9).
-- **Tests.** `PlannerTests.testMergedSegmentsFollowTheOriginals` (a ramp of 400 pieces to a few, the zigzag kept, limits
-  kept), the C++ `robotkit_device_compiler6` test (400 pieces to at most 8, durations and ends kept), `ProjectKitTests.printing`
-  (round trip and twelve rejections), `ProjectSourceTests.checkPrinter` (the print above with its assertions, and the
-  panel), the printing gate's `motorChecks`. The CNC refactor is covered by the existing router and mill checks.
-
-**AM9. Deposition and checks (AM-D7).**
-- `sk_stock_add` and empty-stock creation, with C tests.
-- App `PrintingStock` (the `MachiningStock` counterpart) deposits from the actual tip and
-  extruder motion each tick, previewed through `StockPreviewWorker`.
-- Checks for `SmallTab` (in the app test) and the cube (a slower test, or a kit-level test
-  driving the simulation without the editor):
-  - deposited volume within 3 % of CAD;
-  - bounding box within 0.2 mm;
-  - hole diameter within 0.3 mm;
-  - no deposit outside the part's footprint plus a bead.
-- Print the numbers.
-
-Done. What was built and decided:
-- **StockKit** (API version 3): `sk_stock_create_empty` and `sk_stock_add` (C ABI, HXI, `Stock.empty` and `Stock.add` in Haxe). A move's
-  swept solid is merged into each ray's intervals (all three grids, the Z grid measuring the volume added); the surfaces it makes take the
-  move's source and face out of the solid; a sweep inside material already there changes nothing; threads, ordering and determinism are
-  those of `sk_stock_cut`. C tests: 20,906 checks pass; Haxe StockKit tests 100,681 assertions.
-- **App.** `PrintingStock` (the `MachiningStock` counterpart): `follow` reads where the nozzle tip is and how much filament the extruder
-  has fed (both from the simulation, so slip, a flow the hotend cannot melt and the pressure-advance lead show), and lays the stretch as a
-  bead of the layer's height and the width that holds the fed volume (the filament per distance smoothed over 1.5 mm of travel so the stepper's few steps per tick
-  do not swell and thin the bead; filament pulled back is owed first; filament pushed while the tip stands piles up as a blob). A melt lag
-  (`Hotend.pressureLag`, assumed 40 ms, the job's `meltLag`) models the spring of filament and melt that pressure advance cancels. Shortfalls
-  of beads that overlap their neighbours are made up by the next beads, except on the outer wall and the skirt, which face the air, so
-  dimensions hold. `StockMeshes` (extracted from `MachiningStock`, now also its user) contours the stock on the preview worker; the
-  `PrintedPart` marker at the bed's front left corner is replaced by the material (`SceneArtifactPrinting.deposit`). `SceneArtifact` version
-  29 (28 rejected). Also a fix to a stale native test (`robotkit_device_compiler6`: a motor built with a double where the field became whole
-  step ticks) and the device compiler accepts the position error of a float that carries an extruder angle many turns from zero.
-- **The cube's hole, diagnosed.** The WIP check failed with "the hole measures 5.66 mm across, CAD 6". The slicer is right (its own test
-  puts the nearest bead centre 3.225 mm from the hole's axis, wall plus half a bead, and the walls are exact arcs); the deposit is right (the
-  bead's footprint conserves volume; the short cube below measures 6.0 mm both ways). The measurement was wrong: the calibration cube's hole
-  is off centre by (2, -1) mm, and the check ran its ray through the cube's centre, 1 mm from the hole's axis, where the chord of a
-  3 mm radius circle is 2 sqrt(9 - 1) = 5.657 mm. It now measures along x and along y through the hole's own centre (112, 109 mm),
-  tolerance unchanged at 0.3 mm.
-- **Checks** (`checkPrinterCube`, `measurePrinted`): the deposited material against the filament fed (2 %), the volume in the cube's footprint
-  (solid: within 3 % of CAD; sparse: below the solid volume), the bounding box within 0.2 mm, the hole's diameter within 0.3 mm, and nothing
-  laid beside the part but the skirt. `printer-cube-short` is the regular check (a 4 mm, solid block with the same hole: 20 layers), run in the
-  app suite; the full 100-layer cube (`printer-cube`, default infill) runs by itself and in the full suite only (`am-suite.sh`).
-- **Numbers.** SmallTab (`printer`): printed in 163.5 s (hotend 103.6 s, bed 90.5 s), filament 56.08 of 56.08 mm, 0.3 % flow difference at half speed;
-  plan checks on 26 plans, 17 flagged, worst torque 42 % (motor A), worst deviation 329 um (y) (AM8 notes: 169.8 s, 39 plans, 30 flagged,
-  45 %, 329 um: the planning fixes of AM5b shortened it); the print laid 135 mm^3 in 5,664 beads for 134.9 mm^3 of filament, the tab holds
-  118 mm^3 of its CAD 120 (-1.7 %), spans 104.9..115 x 104.9..115 x 0..1.2 mm, 0 mm^3 beside it. Short cube: 526 s of simulation (534 s wall),
-  1,470 mm^3 in the cube of 1,491 laid for 1,497 fed, CAD 1,487 (-1.1 %), spans 100..120 x 99.9..120 x 0..4 mm, hole 6.0 x 6.0 mm, 41,212 beads.
-
-**AM9b. The app's print simulation at real time.** The full cube simulates its heat-up at about 9x real time but prints at about 1.7x slower than
-real time (each 100 s of print costs about 155 s of wall time, steady across the 100 layers, so a constant per-tick cost, not one that grows with
-the part); SmallTab keeps up (174 s of print in about 118 s; the short cube takes 534 s of wall time for 526 s). An editor preview of a dense part therefore lags.
-Profile a slice of the cube print (from layer 10, a few minutes) with `perf` and the allocation census, split the per-tick cost between MuJoCo,
-the virtual device's stepping, planning, deposition into the dexel stock, the stock preview's remeshing and the per-tick checks, and fix the top
-costs. Done when the full cube simulates at least at real time on this machine with the same results (hole, volume, bounding box, SmallTab numbers
-unchanged).
-
-**Done (AM5b item 9's session, 2026-10-12).** The profile (`perf` over the 4 mm cube, the same per-tick work as the full one; the cube runs on the
-deterministic backend, not MuJoCo, and with the preview off) put **91 % of the time in the virtual device's Rust**
-(`ScheduledCore::tick`, `ScheduledSegment::evaluate`, and 31 % in `memmove`), planning, the stock and the Haxe side
-together under 9 %. The device library was built with `cargo build`, the debug profile: no optimisation and
-debug assertions (the symbols show `core::iter::range::spec_next_back` and `unchecked_sub::precondition_check` not inlined), a
-segment of the queue is a kilobyte (40 actuators of six coefficients) and `committed_len()` copied each one (`Option<ScheduledSegment>`
-is `Copy`) to read its end, several times a tick over a queue of up to 80. Fixed: the library is built `--release`
-(`robotkit/runtime/CMakeLists.txt`), and the queue is read by reference. Result, on this machine: the full cube **1031.1 s of
-print in 62.7 s of wall time (16x real time; it was 1040.6 s in 996 s, 1.04x)**, the short cube 530.5 s in 30.4 s (it was 559 s),
-SmallTab 163.2 s in 7.5 s (it was 59 s wall for the print, 102 s in the last full suite), peak memory 2.2 GB. Results: volume 2788.2 mm^3 in the
-cube of 2809.3 laid for 2810 fed, the same to the digit; planned/printed time 1040.6 s -> 1031.1 s (the planner's work of
-items 3 to 11, not this), the short cube 529.7 -> 530.5 s; the bounding box and the hole print one decimal differently
-(box 99.9..120 where it printed 100..120, hole 5.9 x 6 where 6 x 6, 87,811 beads where 88,415): the numbers were printed to
-a tenth of a millimetre, so a measurement near 5.95 or 99.95 mm flips its last digit on a plan a few micrometres different
-(the review corrected an earlier reading of this, that the rays 0.05 mm apart moved the edges: a ray's interval ends are
-exact); every check passes with its margin, and SmallTab's volume, spans and counts are as before
-(5,676 beads for 5,679). SmallTab's worst belt deviation went 232 -> 273 um (y): the coarser grid of item 8 lets the lowered
-plan reach 0.9 of the acceleration limit between TOPP-RA's grid points where it reached 0.82, and the belt's stretch goes with the
-acceleration (273 / 232 = 1.18 against 0.9 / 0.82 = 1.10 and the plans' other changes); it is a recorded finding, 17 of 26 plans flagged as
-before, none a stall. Not done: the allocation census (the collector is 4 % of the cube's time now), the stock preview (off in the
-test; AM9 measured it) and MuJoCo (SmallTab's check is on it, not the cube's). What is left per tick (`perf`): the device's
-tick 9 %, the segment's evaluation 9 % (40 actuators where eight are used: a clear next step), `memmove` 7 %, marking 4 %.
-
-**AM10. Klipper config and G-code (AM-D9).**
-- `PrinterKlipperConfig.generate(assembly, controller)` produces `printer.cfg` text.
-- Tests:
-  - golden values (`rotation_distance: 40` for GT2 20T, `8` for T8 screws, extruder
-    `rotation_distance` and `gear_ratio` from the gears, limits equal to `coupledLimits`);
-  - parsing the result back with a small INI reader;
-  - a placeholder pin report.
-- The Klipper G-code flavour from AM2 is used for the sliced demo bracket, written next to the
-  config as the example's export.
-
-Done. What was built and decided:
-- **`machinekit.printing.KlipperConfig`** (typed model of a CoreXY `printer.cfg`, `render`, `parse` (a small INI reader),
-  `pins`, `pinReport`) and **`CoreXyPrinterKlipper.printer(...)`**, which fills the model from the printer's parts and
-  the print job; `CoreXyPrinterExport.write` writes `printer.cfg`, `pins.txt` and the sliced `NemaMountBracket` (a
-  printable L bracket for a NEMA 17, new) as Klipper G-code into one directory.
-- **Numbers come from the parts.** Belts `rotation_distance` 40 (GT2 pitch x 20 teeth), the three bed screws 8 (the Tr8x2
-  four-start thread, now `CoreXyPrinter.zThread()` used by the model and the config), the extruder 22.93 (pi x the 7.3 mm
-  hob) with `gear_ratio: 54:18` from the two gears, 16 microsteps, `max_velocity`/`max_accel` the slower belt axis's
-  `coupledLimits` (250 mm/s, 12,563 mm/s^2), `max_z_*` the bed's (100 mm/s, 18,066 mm/s^2), the heaters' PID gains times 255
-  (Klipper's base), pressure advance and minimum extrusion temperature from the job.
-- **What the review of the unverified draft changed.** (1) The drivers' `run_current` was the model's 1.68 A times 0.7071,
-  but `PhaseRmsCurrent` is already an RMS value and Klipper's TMC `run_current` is RMS: it is the model's setting
-  (1.68 A, 1.0 A for the extruder), asserted. (2) The bed's second and third screw steppers carried their own endstop,
-  travel and homing keys; only the stepper that owns the switch does now (`leads`), the others have just their drive, so
-  the config is what Klipper accepts for several steppers on one rail and the pin report has 35 pins, not 36 (the model has
-  one Z switch). (3) Added `[probe]` from the model (offsets `CoreXyPrinter.PROBE_X/PROBE_Y`, now shared with the builder,
-  and `z_offset` = sensing distance - the face's height above the tip = 1 mm), and `[virtual_sdcard]`, `[pause_resume]`
-  and `[exclude_object]` that Moonraker needs to run a print.
-- **Homing speed** is a derived conservative value (a fifth of the axis's speed, at most 50 mm/s), not `HomingDynamics`'
-  seek speed: the homing axes are internal to `MotionSystem`; Klipper's `homing_speed` is a preference, not a limit.
-- Each pin is a `PIN_*` placeholder; the pin report lists every one and the test checks the file and the report agree.
-- **Tests.** `PrinterKlipperTests` (machinekit smoke): 122 assertions (golden rotation distances, gear ratio, limits equal to
-  `coupledLimits`, gains, drivers, probe, followers without switches, pin report against the file, INI round trip, a key outside
-  a section refused, the export directory and the bracket's Klipper G-code: `M83`, `EXCLUDE_OBJECT_DEFINE`, `M109 S210`).
-
-**AM11. Moonraker client and twin mirror (AM-D9).**
-- A client over `NativeTransport`: HTTP/1.1 requests, JSON, file upload (multipart), print
-  start/pause/resume/cancel and status query. WebSocket subscription is optional.
-- An in-process fake Moonraker for tests: it accepts uploads, runs a fake job whose progress
-  advances, and reports toolhead position and temperatures.
-- App: "Send to printer" (endpoint in the editor settings), and a live mirror that drives the
-  printer assembly's joints from the reported toolhead position and shows temperatures.
-  - Test: against the fake server, the mirror follows within one poll period.
-
-Done. What was built and decided (Moonraker and Klipper are GPL: written from their documented APIs only, none of their code):
-- **`processkit.moonraker`**: `HttpFrames` (HTTP/1.1 framing by Content-Length; chunked refused), `MoonrakerClient` (HTTP over
-  `NativeTransport`: file upload as multipart to any root, `printer/gcode/script`, print start/pause/resume/cancel,
-  `server/info`, the running configuration), `MoonrakerStatus`, and the three additions below. An error status, a transport
-  failure, a malformed body or a reply that does not come in time is the client's `fault`.
-- **Addition 1: the live position.** The mirror follows `motion_report.live_position` (and `live_velocity`,
-  `live_extruder_velocity`), where the nozzle is. `toolhead.position` is the end of the last queued move and runs ahead of the
-  nozzle by everything Klipper has planned but not stepped; it is kept apart as `queuedPosition` and nothing follows it. The
-  fake server keeps both and puts the queued end 8 mm of route ahead while printing, so the tests catch the wrong one (the app
-  check asserts the model is exactly at the nozzle and more than a unit away from the queue's end).
-- **Addition 2: the WebSocket subscription.** `Sha1` (RFC 3174, since the standard library has none) and `WebSocketFrames`
-  (RFC 6455 handshake key and answer, masked and unmasked frames, 16- and 64-bit lengths, fragments, pings; the RFC's own
-  example bytes are tests) under `MoonrakerSocket`: JSON-RPC `printer.objects.subscribe` for the objects `MoonrakerStatus`
-  reads, then `notify_status_update` pushes of only the fields that changed, merged into the state kept. HTTP stays for upload and
-  print control. `PrinterLink` has no poll period any more: an update is given to the mirror when it arrives, and the test
-  asserts one advance of the machine is exactly one update and the model is at the nozzle after it (within 1e-9).
-- **Addition 3: installing a Klipper config.** `ConfigInstaller` uploads the `printer.cfg` to the config root, sends
-  `FIRMWARE_RESTART` through the gcode script endpoint, asks `server/info` until Klippy is `ready` again (or reports its error
-  state and message, or that it did not come back in time), reads `configfile.settings` and `configfile.warnings` and
-  `ConfigReadback.compare`s them with the file it sent: a missing section or key, a value that differs (numbers to 1e-6
-  relative, booleans, text ignoring case; Klipper lower-cases keys and adds defaults) and each warning are a sentence in
-  `mismatches`. The fake models it: the file is read at the restart, Klippy answers `startup` twice, `deviations` change
-  values the way Klipper's own limits might and `warnings` warn, and a missing file leaves Klippy in `error`. The editor has
-  `Printer: Install Klipper config` (the file is the setting Machine > Printer > Klipper Config File; the printer example's
-  export writes one) and `Printer: Send to printer`, `Pause`, `Resume`, `Cancel` and `Mirror`; the address is the setting
-  Machine > Printer > Moonraker Address.
-- **What the review of the unverified draft changed.** It polled `printer/objects/query` on a timer and mirrored
-  `toolhead.position`; its fake served one connection; the mirror test measured a lag of up to one poll period. All three
-  changed as above; the fake now accepts any number of connections and `FakeMoonrakerServer.start` does the listening so
-  that the processkit test and the app check share it.
-- **Tests.** `processkit/tests/moonraker`: 164 assertions (framing, SHA-1 vectors, WebSocket frames, status parsing, readback
-  comparison, and the conversation: upload and start, HTTP status, subscription updates, pause/resume/cancel, config install
-  with a deviation and a refused config, a 404, a silent server, a closed connection). `ProjectSourceTests.checkPrinterMirror`
-  (`PROJECT_SOURCE_ONLY=printer-mirror`, also part of `printer`): the print is sent and started, then 45 updates are mirrored, each
-  leaving the model within 1e-9 of the nozzle and 8 units (mm) behind the end of the queued moves, the extruder within 1e-6 mm, and pause, resume and cancel follow; a config
-  installs and reads back clean, then a value Klipper changed is reported. 14 s wall.
-
-**AM12. Input shaping (AM-D10).**
-- ZV, MZV and EI shapers in TrajectoryKit or MotionKit, with frequency and damping as machine
-  data, on the axes or motor joints.
-- A compliant belt model in the simulation, if the X9 belt and load model does not already give
-  MuJoCo a belt spring.
-- Test: a step move on the printer; the residual vibration at the modelled resonance drops by
-  at least 5× with the shaper, and the cube's print time grows by less than 5 %.
-
-Done. What was built and decided:
-- **Shapers** (`motionkit.trajectory.InputShaper`, `ShaperImpulses`): ZV, MZV and EI from the standard impulse formulas (Singhose; the same
-  parametrisation Klipper documents: MZV at 0, 0.375 and 0.75 of the damped period, EI at 5 % tolerance), with frequency and damping as machine data.
-  `mk_shape_trajectory` (MotionKit native, `Trajectory.shape`) convolves a timed trajectory exactly: each piece of the result is the
-  sum of the delayed polynomials, cut wherever any delayed copy changes segment, held at rest beyond either end. Amplitudes are positive and add up
-  to one, so a shaped joint never goes faster or harder than the plan it came from; the result is as much longer as the longest delay
-  (the shaper's tail). A joint without a shaper (the other axis, the extruder, the bed) is only delayed by the same mean delay to stay in step.
-  CoreXY motors are shaped through their axes: the followers are projected again from the shaped leaders.
-- **Where it is applied.** `ProgramCompiler.shapeJoints` after timing and before merging (the shaper is machine data of the axes: the printer job's
-  `shaping`, `PrinterBinding.shapers`, `SceneArtifact` version 30, `CoreXyPrinter.SHAPER_X_HZ` 53.4, `SHAPER_Y_HZ` 34.4, damping 0.1, MZV). The plan's
-  events and its path-distance clock move with the motion by the mean delay; the task-space check allows the spread that the impulses open between
-  the motion and its delayed copy (a bound from the largest acceleration). The merge (`mk_merge_segments`) joins a run shorter than 4 us (a cut
-  of a shaped path landing a few nanoseconds from another) to its neighbour through the end states of both.
-- **The known gap, fixed.** With shaping on, `jointPathPlanner.checkMotion`, the configuration constraint and `recordClearance` checked the unshaped
-  motion; they now check `timedMotion`, the motion that is executed (shaped, projected), and the clearance report's times are the shaped plan's.
-- **The streaming fix a shaped print needed.** A shaped path is denser; the robot's trajectory queue filled before the stream's two seconds were
-  in it and a refusal faulted the session. `TrajectoryStream` counts what it has submitted and the plan has not yet run, keeps a margin of 128 knots
-  and treats `RK_ERROR_QUEUE_FULL` as flow control (the chunk goes again later), not a fault.
-- **Resonances come from the model.** The gate checks each axis's shaper frequency against the drive model (`DriveLoads.forAxis`: the mass the axis
-  moves on the stiffness of its belts, x 0.748 kg on 84,238 N/m = 53.4 Hz, y 1.806 kg on 84,238 N/m = 34.4 Hz) to ten percent.
-- **Acceptance (the printing gate, `shapingChecks`; also in MuJoCo, see Belts in MuJoCo below).** A 50 mm step move along x, along y and on the diagonal, planned plain and shaped; the carriage
-  (that mass on those belts, damping 0.1, the plan driving the far end of the belts, integrated at 20 us) is left shaking for 356 -> 7 um on x
-  (51.8x), 370 -> 8 um on y (48.6x), and 59 -> 1 um and 361 -> 7 um on the diagonal (44x and 48x); at the design frequency and ten percent either side
-  of it every case drops at least 5x. The shaped plan is the plain one lagging by the shaper's mean delay and ending its tail later (233 ms against
-  211 ms on x), never above the axes' velocity and acceleration limits (1.001), and keeps its merged form (no merge refusals). **The cube's planned
-  time grows from 870.3 s to 880.5 s (1.2 %, limit 5 %)**, 115,240 segments plain and 132,669 shaped (132 and 151 a second).
-- **Belts in MuJoCo (X9).** X9 gives MuJoCo a belt spring (a soft equality with the belt's compliance); its damping ratio was fixed at 1 (critical), so the
-  carriage could not ring. **Done in AM5b (belt damping):** a coupling now carries an authored damping ratio (`JointCoupling.dampingRatio`, the simulation's
-  `nksim_joint_coupling_desc.damping_ratio`, the runtime blueprint's `coupling_damping_ratio`, the belt model's `TimingBelt` statement, the assembly
-  records; zero is critical, so the default is unchanged). Saved formats: `RobotModel` 14, `AssemblyDefinitionCodec` 9, `MachineAssembly` schema 18, the
-  older ones rejected. The printer's belts state `SHAPER_DAMPING` (0.1); a simkit unit test shows a force-pushed leader overshooting 85 % at 0.1 and not at
-  the default. Two findings on the way: (1) the soft constraint's frequency came from the compliance over the inertia the leaders carry (the load), not the
-  follower's, which is a few grams of pulley held by its drive (this was not enough: see the next paragraph); (2) a virtual device drove every joint to its reconstructed state with a huge
-  force (and the rest hold kept the carriage), so no coupling could stretch: it now drives only the joints its actuators measure, and the loads of a
-  compliant coupling (carriage, gantry and the idlers that turn with them) are left to the physics. The snapshot still reports the device's view (a machine
-  knows only its motors), so the test reads the carriage's link pose (`ApplicationSimulation.physicalLinkPosition`).
-  **The 5 Hz, found and fixed (AM5b follow-up).** The carriage swung at about 5 Hz, not the belts' 53 Hz (x 0.748 kg on 84,238 N/m)
-  and 34 Hz (y). Three causes, found by a minimal simkit test (`a_belt_carriage_rings_at_its_belt_frequency`: a carriage of
-  0.748 and 1.806 kg on 84,238 N/m, a pulley of 20 g and of 200 g held by a drive, a step of the command; the test measures
-  the frequency from the upward crossings and the damping ratio from the decay, and asserts both within 3 % and 0.02):
-  1. *The soft equality was not a spring.* MuJoCo spends the force `I (a_ref - a_free) / A` on a constraint row, `A = J M^-1 J^T` the
-     inverse inertia of the constraint (the lightest body it joins, which on a belt is the pulley held by its drive: 5 g, or its
-     reflected rotor) and `I` its impedance (0.9 to 0.95 by default). The old mapping took the time constant from the
-     carriage's mass alone, so the force was the pulley's mass times the reference: a belt a hundred times too soft; and at
-     that impedance the drive's own force passes through the row (the stretch's acceleration is forced), so with a constant
-     impedance near 1 the belt does not stretch at all. A soft constraint cannot be made into a spring without knowing `A`
-     and keeping `I` small, so **a coupling with stiffness and an authored damping ratio is now a spring** (an oscillator, a timing belt; a stiffness alone, such as a lead screw's or the gantry's unauthored belts, stays an ideal constraint, because the stiffness there is a compliance for planning and plan checks: made a spring, the bench mill's screws and the machine-tending cell failed, and the gantry's search stopped on a runtime limit by micrometres): the fixed tendon of the stretch (the leaders'
-     motion less the follower's) carries MuJoCo's passive spring and damper, `K` in the follower's coordinate and
-     `C = 2 zeta sqrt(K / L)` with `L = sum(ratio^2 / m_leader)` the load's inverse inertia, so the damping ratio is the carriage's
-     whatever the pulley weighs. 
-  2. *A follower with two leaders was half as stiff.* A CoreXY pulley follows x and y; the old row took the terms' compliances in
-     series (a belt that two carriages share came out with half the stiffness the drive model gives, 42,074 N/m on x
-     against 84,238). It is one belt: the row has the terms' mean stiffness (each term's value is the belt's seen from its
-     leader), the damping ratios weighted by stiffness.
-  3. *The pulley was held by a ten hertz position loop.* The virtual device drives a stepper's pulley with the backend's default
-     position target (a computed-torque loop of 10 Hz, critically damped), which is softer than the belt it drives
-     (0.03 N m/rad against 1.7): the carriage rang on the loop, not on the belt. A stepper holds its rotor with its
-     torque-angle stiffness, the holding torque times the rotor teeth (a quarter of its full steps) per radian (0.45 N m x 50 =
-     22.5 N m/rad for the printer's), and now the device holds a pulley a belt stretches from (the follower of a coupling with
-     stiffness) with that, in series with the belt (4 % of the frequency), critically damped on the inertia it turns; where the load
-     is rigid there is no belt to be softer than and nothing changes. The ABI grows a tail on `rk_simulation_robot_desc`
-     (`virtual_device_actuator_hold_stiffness`, `_damping`; `VirtualActuatorOptions.holdStiffness`, `holdInertia`, filled by
-     `DeviceBinding` from the actuator's `StepperDrive`), and the world is stepped at the finer interval the hold needs
-     (`0.5 sqrt(I / S)`, `SimulationSpace.requireInterval`).
-  A belt's spring is integrated explicitly and the damper on a pulley of grams is stiff, so the backend steps a world with belts
-  on `implicitfast` and divides the caller's step until `0.5 / sqrt(K A)` is resolved (a free pulley on the gantry turns at 300 rad/s,
-  its picker runs at 10 ms): found when the gantry blew up at the first try. A servo that drives a belt's pulley (spring coupling) reflects only its own inertia into the stability interval (`RobotRuntimeJointBlueprint.compliantLoad`; no repository machine does yet).
-  **Numbers.** The printer's carriage in MuJoCo (the 50 mm move of `printer-shaping`, a tick of a millisecond): 247 to 251 um
-  left shaking plain, 9 to 11 um shaped (23x to 28x less), **8 um at a shaper tuned 10 % low and 22 to 24 um at 10 % high (10x to 31x
-  less)**, 30 crossings in 0.3 s (about 53 Hz) where it had 4 crossings in 0.15 s (5 Hz) and a shaped move leaving 1.8 mm against
-  3.1 mm. The gate's analytic check says 356 um plain and 7 um shaped for the same move; MuJoCo's finite holding stiffness and the
-  plan's sampling make the plain residual smaller, and the two agree on the shaper's effect. **`printer-shaping` now asserts the
-  5x in MuJoCo** (plain, shaped, 90 % and 110 % of the belts' frequency) and the gate keeps the analytic check.
-- **Tests.** `PlannerTests.testShapedTrajectoryIsTheWeightedSumOfDelays` (the sum of delays, limits not raised, the shapers' amplitudes and
-  residuals, refusals), the C++ `motionkit_path` test (`mk_shape_trajectory`: sums of delays, a delay-only joint, three refusals), `ProjectKitTests` (shaper
-  round trip and five rejections), the printing gate (`shapingChecks`; `PRINTING_BENCHMARK_ONLY=shaping` alone), `printer-shaping` in the app.
-
-**AM5b. Motion cleanup (after AM12).** Planned work, not for the AM run. Each item removes a workaround that AM3 to AM8
-left in the motion path.
-1. The start-at-limit tolerance (`ae6e95ec5`) is duplicated in four places (`ValidationLimits.admittingStart`,
-   `ProgramCompiler.checkJointPosition`, `runtime.cpp validate_appended_path`, `device_compiler6.cpp`) with a magic
-   `1e-6` fallback: move the rule into trajectorykit's shared validator (`trajectory_core`) once, and settle where a
-   homed axis should rest (a home coordinate exactly on the travel limit is the root cause). **Done.** The rule lives once,
-   in `trajectory_core` (`validation.cpp admit_start`): `mk_limits` carries a per-joint `position_start_tolerance`, and
-   `mk_validate` / `mk_plan_create` widen a claimed bound to the trajectory's first state when it rests outside by no more
-   than that, the bound reaching the start and no further; `mk_limits_admit_start` is the same rule for callers that check
-   samples before a trajectory exists (`ValidationLimits.admittedBounds`, used by `ProgramCompiler.checkJointPosition`).
-   `ExecutionPlan.create`, the runtime's appended-path validation and the RKD6 device compiler only pass the plan's start
-   tolerances; their copies and the `1e-6` fallback (a zero tolerance now admits nothing) are deleted. Test:
-   `motionkit/native/tests/validation.cpp start_at_limit_admitted_once`. Root cause: `HomingAxis.home` was the authored home,
-   which defaults to the lower limit, but homing knows the rest only to within its precision (the switch repeatability,
-   `positionTolerance`; the cycle accepts any rest within it), so half the runs rested outside the claimed bound. A homed
-   axis now rests that precision inside the travel (`HomingAxis.home`, clamped on both limits, tested in `HomingTests`);
-   the authored home coordinate is unchanged. The rule stays in the validator for any other plan that starts a hair
-   outside (a stop, drift): the toolpath motion tests pass with the rule disabled and the old home too, so the
-   homing case is no longer what keeps it needed.
-2. TOPP-RA's forward-pass failure: replace the lowered-speed retry subclass and the string-matched "path.time failed"
-   halving with a real fix of TOPP-RA's forward-pass numerics (a fork and an upstream pull request). **Fixed in our
-   fork; retry and halving deleted, one failure left (below).** The submodule now follows github.com/tritao/toppra
-   branch `materia` (8e9fe00 on 0.6.10: three fix commits and a changelog line, the same as upstream pull request
-   hungpham2511/toppra#302, branch `fix-degenerate-stages`; when it is merged, follow upstream again). Root cause, from 40 failures recorded on the gate and replayed
-   bit for bit against stock 0.6.10: the forward pass clamps each state into the next controllable set, so wherever the
-   profile follows the upper boundary (decelerating into a corner, holding an arc's limit) the state is exactly the
-   set's upper bound, the optimum of the same stage LP the backward pass solved, usually a vertex admitting a single
-   control. Re-solved with x fixed (`algorithm/toppra.cpp` computeForwardPass), rounding left it none, three ways:
-   (a) Seidel's 2D loop (`solver/seidel.cpp` solve_lp2d) moves onto the line of any constraint violated by more than
-   an absolute 1e-13 while its 1D problems accept crossings of 1e-10 relative to the line parameter, so it moves onto
-   lines it already enforces (a duplicate row); there the other CoreXY motor's row, equal to the last digits, projects
-   to a bound whose slope is the difference of slopes (4e-10) and whose offset is one rounding of 77.1 (1.4e-14),
-   placing it anywhere on the line (this also failed the backward pass, ERR_FAIL_CONTROLLABLE, on the test tower);
-   (b) a joint at rest along the path has a path-acceleration coefficient that is rounding (1.8e-16) next to its
-   curvature (5e4), so at the vertex its row bounds the control arbitrarily (empty ranges of 0.3 to 115 in path
-   acceleration); (c) the backward pass's own vertex overshoots by its tolerances (residual 1e-14 to 1.6e-8). Fixes:
-   Seidel takes a constraint violated within 1e-10 of its terms as satisfied (a); `computeControllableSets` keeps the
-   control that reaches the next set from each upper bound and the forward pass uses it when the stage fails there
-   (b, c); a step that ends on the next upper bound to within its own rounding lands on it, else the next stage sits one
-   rounding below the vertex (seen on the 8 mm gear). Four recorded spans are tests in TOPP-RA's suite
-   (`test_degenerate_stages.cpp`, each failing without its fix).
-   Before (retry subclass and halving): the gate had 146 forward-pass failures rescued by the retry; the test tower 19
-   halvings (242 sections). After: none; the tower plans in 223 sections, the gear (8 mm) and cube unchanged in planned
-   time (2356.9 s, 870.3 s, tower 471.5 s). The gate's extruder check then failed (`path.time failed`, op 15), which
-   the halving had been hiding and which was not TOPP-RA's: `mk_time_path` rounded each stage down to whole
-   nanoseconds and derived its acceleration from that, and on the 1.1 micrometre spans of a corner arc a stage lasts
-   about 1 us, so 1 ns of rounding moved the path acceleration by about 60 m/s^2 (stage 16007: -59.7 against TOPP-RA's
-   0.53), a joint acceleration 4.9x its limit that stretching and softening could not cure; each stage's speed error
-   was handed to the next with its sign flipped, so it never died out. The app's `PROJECT_SOURCE_ONLY=printer`
-   (SmallTab, op 15, layer 3) failed the same way. **Fixed** (`motionkit/native/src/path.cpp`, `stages_from_profile`):
-   only knot times are rounded, each from the exact time since its span's start; every knot keeps TOPP-RA's speed, so
-   a stage's acceleration is TOPP-RA's to 1 ns over its duration (relative); a reference stage shorter than a
-   nanosecond merges into the next; each path sample is reached exactly at a knot (lowering needs it there), the span's
-   duration rounding up and its interior knot speeds scaled by 1 - c t (L - t), the least-acceleration correction,
-   at most about 6 v (1 ns) / L^2. The captured requests now pass at once: gate op 15 at 10.47 m/s^2 against 12.56
-   (was 61.5, 24 attempts, 12 s; now 0 adjustments, 0.6 s), the app's SmallTab request the same, the gear and tower
-   requests unchanged. Laws now cruise exactly at a limit where the old ones ended a 0.2 % stretch below it, which
-   showed that `mk_merge_segments` checked merged quintics only at sample points and let a plateau rise 1e-6 above
-   the original: the merged form of the gate's step moves broke 0.25 m/s by 1.9e-7 and was refused. Merging now bounds
-   each quintic's speed and acceleration at its stationary points and allows a plateau only rounding (1e-9 of the
-   limit) above the original. Tests: `motionkit/native/tests/path.cpp` (a 1 mm arc sampled every 1.5 um, which the
-   old law missed by 3.7x; a step move cruising at its limit, merged). Gate: passes, planned 1047.2 s (unchanged;
-   294 s of CPU with the native rebuild); gear 2356.9 s, cube 870.3 s, tower 471.5 s, all unchanged (404 s of CPU for
-   the three). Item 4 would not have avoided it, only made it rarer: with an arc sampled at the same count, a larger radius lengthens its stages only as the square root of the
-   radius at the speed the radius allows, so the error (2 v (1 ns) / stage^2) falls as 1 / sqrt(r), and 4x the
-   radius still leaves 2.4x the limit; the error also hit any micrometre spans, not only arcs.
-3. Replace the `MAX_SECTION_PRIMITIVES` forced rests with timing windows that carry boundary speeds (AM-D4's original
-   design). **Done.** A path rests only where it turns now:
-   `ProgramCompiler.timingSections` no longer cuts a smooth path every 4,000 primitives, and the sample budget is a count
-   of samples, 10,000 for an arm (each costs an inverse-kinematics search) and 100,000 on an exact affine machine, where a
-   straight primitive is one sample and the cost is native memory (2 KB a sample). The windows are inside `mk_time_path`:
-   a path of more than about 8,192 grid points is timed in windows of that size, each from the speed the previous one ends
-   at to the next one's start, TOPP-RA given each window's own part of the path (it wants its grid to span the path it
-   holds). A boundary speed is `BOUNDARY_SHARE` (0.7) of the speed the path could have there, from a forward and a backward
-   pass over the spans' own limits (the fastest a span can go, and 0.4 of the acceleration its joints give along it, a curve
-   keeping the rest); if a window cannot be timed between its boundary speeds the share is halved, then quartered, then
-   zero, which is the rest this replaces. Everything after the profile (the stages, the lowering, the validation and its
-   retries) is of the whole path as before. AM-D4's wording was "the next window could still stop"; the forward and backward
-   passes give that and the look-ahead of the next window's slow spots. The shares cost a little where the path could have
-   gone faster: a synthetic six-joint path of 20,000 spans (5 windows) takes 21.555 s against 21.470 s as one window
-   (0.4 %), where a rest at each boundary costs more. Nothing in the printing loads reaches the old cut (their longest
-   smooth sections are under 4,000 primitives; the 8 mm gear has sections of eleven windows), so their planned times are
-   unchanged (gate 1047.6 s, 8 mm gear 2358.7 s, cube 870.1 s, tower 471.5 s). Tests: `PlannerTests` (a straight path of
-   8,010 primitives is one section; a turn still ends one) and the native path test (the six-joint path in one go takes
-   less than in two halves from and to rest, and is under way where the halves would stop).
-4. Derive `CornerBlender.MIN_RADIUS` from the machine (an arc whose v^2 / r exceeds the acceleration cannot be followed)
-   or from the binding, instead of a global 50 micrometre constant, and stop the slicer emitting micro-segments. **Done; the numbers do not move.**
-   `MIN_RADIUS` is gone. A machine holds an arc of radius r at no more than sqrt(a r) (centripetal acceleration v^2 / r
-   against the acceleration a it gives in the plane), so a corner is worth rounding if the machine can take it at
-   `CornerBlender.CORNER_SPEED_SHARE` (half) of the slower move's speed: `minimumRadius(speed, a) = (0.5 v)^2 / a`.
-   `ToolpathLowering` passes each corner its own (the two moves' speeds; `MachineBinding.cornerAcceleration`, the weaker of
-   the X and Y axes' limits, set by `ToolpathMotionBinding`), `PathPlanner` derives it from its axes and options, and a
-   caller that knows no acceleration sets no minimum (`blendLinear`). The rule keeps its old shape: a corner whose arc comes
-   out under that radius and under half of what its tolerance wanted is stopped at, so a corner whose own tolerance asks for
-   a tight arc keeps it. The share is a policy (half the speed), written down; it replaces a constant that was a speed
-   at one feed and acceleration only. Result on the printer (printing gate, tab, cube): no corner changes, because every
-   printer arc is within half of what its tolerance wanted (planned times and stops by reason identical: gate gear 1047.2 s,
-   cube 870.3 s plain / 879.5 s shaped, tab 48.1 / 48.5 s; segments 115,385 / 132,620 and 6,938 / 8,657). Test:
-   `PlannerTests` (the formula; a corner of 0.1 mm lines rounded without a minimum and stopped at with it).
-   The slicer part: measured, not a slicer problem. The tab holds 421 moves, none under 0.25 mm and 21 under 0.5 mm (the cube
-   4,841 with 192 under 0.5 mm); the benchmark now prints these counts (`authored moves shorter than ...`). What makes
-   micro-segments is lowering: 394 of the tab's 421 moves are corners, most of them the zigzag infill's 0.29 and 0.58 mm
-   connecting travels with 135 degree turns whose 80 micrometre tolerance gives 50 micrometre arcs of 4.7 ms, which TOPP-RA
-   cuts into 32 stages each. Connecting the lines with an extruded bead would remove them but changes the laid volume
-   (about 18 mm^3 of 135), so the slicer is left as it is and item 8 (an adaptive grid) addresses the segments.
-5. Replace `Std.isOfType(solver, AxisKinematics)` (which skips the clock-sampled task-space check) with a capability
-   the solver declares (exact, affine kinematics). **Done.** `KinematicsSolver.affineMap()` returns
-   an `AffineJointMap` (joint = offset + a column per tool coordinate) when the solver is exactly affine, else null;
-   `AxisKinematics` reads it off its axes and couplings, every other solver answers null. `ProgramCompiler` skips the
-   clock-sampled task-space check by that capability, and item 10's fast path reads the same map for its closed-form
-   limits. The planner factory (`defaultJointPathPlanner`) still chooses `AxisJointPathPlanner` by type: that is a class
-   of planner for one solver family, not a decision about which checks to skip. Test: `KinematicsTests.testAxisKinematics`
-   (the map reproduces IK and the differential, with a coupled follower; a joint-space solver declares none).
-6. RKD6: send the step interval as an integer tick count so host and device cannot disagree (`PulseRate` now mirrors
-   the device's f32 arithmetic). **Done.** The integer was already on the wire: wire revision 14 (`e7779c599`,
-   `SESSION_BEGIN6.min_step_ticks`, `robotkit.runtime.StepTicks`) replaced `max_rate`, and `PulseRate` no longer exists; the
-   device (`step_generator.rs`) only counts ticks. What was left was one mirror of the device's f32: the binding's steps
-   per unit (an f32 on the wire) was rounded again in `StepTicks.deployed`, the compiler's rate check and a test. The
-   binding now quantises its steps per unit once (`StepTicks.wire`) and plans, deploys and checks with that value, so
-   `deployed` and the compiler's `static_cast<float>` are gone; the binding tests assert the held value is the wire's.
-7. Decide whether the printer's axes take the motors' full rate with motor-space rows (see the AM5 notes on CoreXY motor
-   limits), against the cube's print time. **Done: the axes take the motors' full rate (the user's decision, the mechanically
-   correct model).** `coupledLimits(id, steady, true)` is the axis's limit at the motors' rate (a motor's rate over the
-   ratio of the pulley to the axis, not over the sum of the pulley's couplings), and the print player, the printing gate
-   (`PrinterAxes`) and the Klipper test take it. The motor-space rows are not a second place to bound a move: the plan
-   already times a derived joint (a CoreXY pulley) as a column with its own drive's rate (`ToolpathMotionBinding`: the
-   `min` of the sum of its terms and `coupledLimits(pulley, null, true)`), and those columns are `MotorSpaceConstraints`'
-   rows for the printer, so a pure x or y move is bounded by both motors (`|vx + vy|` and `|vx - vy|`, each at most
-   a motor's rate times the pulley radius) and a 45 degree move by one motor at its full rate. **Numbers, before to
-   after** (the gate's `motorChecks`, a 100 mm move sampled every millisecond, plan check on): the axes' speed 250 to
-   500 mm/s (acceleration unchanged, 24.09 m/s2 x and 12.56 y); x move 411 to 221 ms, y move 421 to 240 ms, with the
-   motors at 39 rad/s each (half of 79, the cost of a share) before and 78 and 78 of 79 after; the 45 and 135 degree
-   moves 303 ms before and after, one motor at 78 of 79 (the other still); the worst torque 29 % on x and y and
-   40 % on the diagonals before and after, and the plan check finds nothing. **The prints do not change:** the cube
-   870.1 s, the 8 mm gear 2358.7 s, SmallTab 48.13 s plain (48.48 shaped), the gate's gear 1047.6 s, all to the
-   decimal, since a print move runs at the slicer's feed (rapids run at the feed, `setRapidsAtFeed`) and no feed asks for
-   more than the old 250 mm/s on an axis. Nothing is lost and a faster profile now has room. **Klipper:**
-   `max_velocity` is one speed for every direction, so it is the speed the motors give on the worst direction,
-   `MotorSpaceConstraints.inscribedSpeed()` (the radius of the largest ball in the rows' bounds, here the axes' speed
-   over the square root of two): **250 mm/s to 353.6 mm/s** (`max_accel` 12,563 mm/s2 and the z limits unchanged;
-   the Klipper test asserts the new value against the model). There are no golden values to update: the test derives
-   every limit from the model. The planner-side limit of the axes is the larger value (500 mm/s) because the plan
-   bounds the diagonal through the pulleys' columns.
-8. The corner arcs still lower to tens of thousands of sub-millisecond segments (`SmallTab`: 18,900 of 25,580 under
-   1 ms after merging): an adaptive TOPP-RA grid by span length and curvature (the fixed 32 per span is calibrated with
-   the 0.8 margin; see the RobotKit Paint path that failed when it was coarsened), or arcs that are not made smaller
-   than the machine can follow (item 4). **Done: an adaptive grid; planning
-   time falls by a quarter to a half, planned times are unchanged.** `mk_time_path` (`motionkit/native/src/path.cpp`,
-   `stages_for_span`) gives each span as many TOPP-RA stages as it needs, from 2 to the old 32. Two things need stages:
-   the speed profile (a stage should change the squared speed by no more than `PROFILE_STEP` = 0.05 of itself:
-   `a ds <= step v^2`, `a` the path acceleration the joints allow, `v` the fastest the span can go: a joint's velocity
-   limit, the centripetal bound of its curvature `sqrt(0.8 a / |q''|)`, the span's feed cap) and the collocation (the
-   joint-space direction turns by at most `MAX_STAGE_TURN` = 0.6 rad a stage). A long straight span keeps its 32, a
-   50 micrometre arc span gets 4 to 6. **The regression test for the grid is RobotKit's Paint skill**
-   (`ConstructionSkillTests`, "Paint completes through SkillRunner"; run by `robotkit/tests`, and alone with
-   `ROBOTKIT_ONLY=construction`), the path that a first, cruder adaptive grid (4 to 32 by joint-tangent change) broke
-   with `MK_ERROR_GENERATION`; it passes on this grid, and `motionkit/native/tests/path.cpp` has a new test of the tightest
-   printer corner (135 degrees at 50 micrometres, ten quarter-radian spans: 60 stages instead of 320, the lowered law
-   under 0.92 of the limit). Why the step is 0.05 and not more: the 0.8 margin was calibrated with 32 stages a span, and
-   what a coarser grid reaches between its points grows with the step (measured on that arc, over what TOPP-RA planned:
-   2.3 % with 32 a span, 12 % at 0.05, 24 % at 0.1, the whole margin at 0.2, which would be a timing failure); a
-   uniform coarsening has nothing to say about this, so the step is the bound. Planned time at 0.05: tab 48.134 / 48.484 s
-   (48.13 / 48.48 s before), 0.1 gives +0.015 % and 0.25 +2.8 %. Numbers, before to after (processor seconds of
-   planning, planned seconds; the planned times did not change): gate gear 78.8 to 60.2 s (13.3x to 17.4x real time,
-   worst 10 s window 4.2x to 5.3x), 8 mm gear 276.0 to 209.8 s (2356.9 s), cube 59.5 to 39.5 s (870.3 s plain, 879.5 s
-   shaped), tower 49.9 to 28.3 s (471.5 s), tab 46 s to 20 s of wall time (48.1 s / 48.5 s). Segments
-   after merging (plain / shaped): tab 6,938 / 8,657 to 6,742 / 7,987, of them under 1 ms 1,165 / 2,299 to 821 / 1,530; cube
-   115,385 / 132,620 to 113,410 / 129,331, under 1 ms 13,371 / 24,605 to 10,758 / 21,095. **The "SmallTab: 18,900 of
-   25,580 under 1 ms" figure was stale** (measured before AM9's later merging; the benchmark's tab is 6,938 segments, 1,165
-   of them under 1 ms before and 821 after). The sub-millisecond segments that remain are not the grid's: the path is
-   sampled a quarter radian apart on an arc (`PoseSampling`, 10 spans of 12 micrometres on a 135 degree corner) and every
-   sample is a knot of the law, and the merge leaves a remainder at the end of each 10 ms run. Sampling an exact affine
-   machine's arcs half a radian apart (the capability of item 5) did not reduce them and cost 0.02 s of planned time
-   (a full radian 1.2 %), so it was not kept.
-9. The first plan of a print compiles synchronously inside a tick (13.8 s for `SmallTab` in the app): plan it on the
-   planner thread, as a mission's programs are, and start the print when the first plan is ready. **Done; the cost it was
-   written for is gone, and the start is asynchronous anyway.** `ManipulatorMotion.run(program, waitForFirstPlan)`: with
-   `false` it returns at once (`running` is true) and `update` begins the program when the planner thread has its first
-   plan or barrier, or fails it (`ProgramTests`: a program started this way completes; an impossible one fails once
-   planned, not at the call). `ToolpathPlayer.planAhead` selects it; `ApplicationSimulation` sets it while the realtime
-   simulation runs (`start`/`pump`), and a deterministic `step` waits as before, so a test's results do not depend on how
-   long planning takes. What the 13.8 s was: the first tick after the start, which waited for the plans the planner had
-   not yet made because planning was 3 to 5 times dearer then (items 8, 10 and 11); the planner plans a second ahead of
-   the plans started, and the print's first block is its heater barrier, which it sits at for 100 s while the next
-   plans are made. Measured in the app now (`PROJECT_SOURCE_ONLY=printer`, which prints it): the program starts in 1 ms and
-   the slowest simulated tick of the print is 26 ms (at 150 s, where the first layer's plans arrive), against 13.8 s.
-10. A fast path for machines whose kinematics are exact and affine (the capability of item 5: Cartesian, CoreXY,
-   routers, gantries). TOPP-RA costs a grid of 32 stages per span and a small LP per stage; Klipper and Marlin plan the
-   same machines with constant-cost trapezoids and a look-ahead pass, and the benchmark's Marlin-style reference is
-   only 0.3 % faster than our plan for the gear. On an affine machine the limits along a straight piece are constant
-   and along an arc depend only on its radius, so a piece's speed and acceleration bounds come in closed form from its
-   direction against every joint row and the motor-space rows (a CoreXY motor bounds `|vx ± vy|`), and centripetal
-   acceleration bounds an arc (`v^2 / r`). Plan the C1-blended path (still no velocity jumps, AM-D4) with a look-ahead
-   pass over jerk-limited (S-curve) profiles in path distance, emit the same polynomial segments, and keep the plan
-   checks (torque, stall margin, deviation) unchanged. TOPP-RA stays for every other machine and is the reference the
-   fast path is tested against. Done when, on the printing gate, the planned time is within 0.5 % of TOPP-RA's (or
-   shorter), no joint or motor limit is exceeded, the plan checks find nothing new, and planning is at least 10x faster
-   than with TOPP-RA (the worst 10 s window included), aiming at real time on a Raspberry Pi class CPU.
-   **Done as a grid, not a second solver; 4.6x to 7.3x faster than the TOPP-RA path (the 10x aim is not met).** The profile of
-   item 11 changed the question: TOPP-RA's solve is under 4 % of planning, the costs grow with the number of stages (every
-   stage is lowered, validated and a candidate of the merge), and on a line the number of stages came from the sampling,
-   not from anything the profile needs. So the fast path is the closed form TOPP-RA is given the grid for, with TOPP-RA
-   kept as the one solver and every plan check unchanged:
-   1. **One sample per straight primitive on an exact affine machine** (the capability of item 5: `PoseSampling.pieces(...,
-      exactAffine)`; the joint-jump check, which guards against a branch of an inverse flipping, is skipped there, as an exact
-      affine map has none). A 100 mm line is one span, not fifty.
-   2. **A straight span's stages follow where its speed changes** (`nodes_for_span`): its limits are constant, so the
-      profile bends only in the stretch `Z = v^2 / 2a` next to each end (v the fastest it can go, a the path acceleration
-      the joints give, both with the margins); ten stages cover each stretch (1.5 Z, so the profile cannot start bending
-      before the grid does) and one stage the cruise between, whatever the length. A line costs about 31 stages.
-   3. The Haxe side of a sample (22 % of the gate's processor time): `AxisKinematics.completeDerived` repeated its passes
-      (the derived joints are held in dependency order, one pass), `solvePose` looked its couplings up by name in a map
-      (index tables), `checkJointPosition` called the validator for every joint of every sample (only for a position
-      outside its bounds, where the start-at-limit rule matters), and `GeometricPath.distanceTo` kept a list of primitives
-      seen and searched it linearly (quadratic around a gear's teeth; a primitive measured twice costs nothing).
-   Numbers (processor seconds of planning, the TOPP-RA path with the old 32 stages a span first, then after item 8, item 11
-   and this): gate gear 78.8 -> 60.2 -> 28.7 -> **13.3 s (5.9x; 79x real time; the worst 10 s window 4.2x -> 12.1x)**; 8 mm gear
-   276.0 -> 209.8 -> 100.0 -> **60.0 s (4.6x)**; cube 59.5 -> 39.5 -> 18.1 -> **8.2 s (7.3x; 107x real time, the worst window
-   64x)**; tower 49.9 -> 28.3 -> 13.4 -> **7.5 s (6.7x)**. Segments after merging (plain / shaped): tab 6,938 / 8,657 -> 2,575 /
-   4,442 (those under 1 ms 1,165 / 2,299 -> 1,087 / 1,540: the long lines are single segments now, so the arcs' short ones
-   are most of what is left), cube 115,385 / 132,620 -> 47,059 / 71,191 (those under 1 ms 13,371 / 24,605 -> 11,392 / 20,072). **Planned times**: gate 1047.2 -> 1047.6 s (+0.04 %), 8 mm gear
-   2356.9 -> 2358.6 s (+0.07 %), cube 870.3 -> 870.1 s, tower 471.5 s, tab 48.13 / 48.48 s: within the 0.5 % of the aim, and
-   the few millisecond a plan loses are not the zone resolution (20 stages a zone gives the same) but where a long line's
-   cruise stage meets TOPP-RA's checks (a law at its acceleration limit fails the lowered check by a few millionths and is
-   slowed by 0.2 % of its whole section, whether it is one span or fifty). Not reached: 10x. What is left of the gate's
-   13.3 s, by `perf` and the Haxe sampler: the native time law (TOPP-RA, lowering, validation: 19 %), the merge of
-   arcs (14 %), the task-space check (7 %), `mk_shape_trajectory` and `mk_project_couplings` (9 %); on this machine's P cores
-   that is 79x to 107x real time, 12x to 64x in the worst window, which is real time with room on a Raspberry Pi class CPU
-   (5 to 10x slower per core), the aim behind the 10x. Tests: `PlannerTests`, the native path test (a 100 mm line as
-   one span or fifty: both a trapezoid's time to 0.4 %, the single span with a tenth of the stages).
-
-11. The general path (TOPP-RA) after item 2: every machine that is not affine keeps it (arms, the welder, the tending
-   cell, non-planar printing). AM5's profile predates AM8's segment merging, the rebase and the WIP planner changes, and
-   the gate's peak memory has grown to 11.4 GB, so profile again first (`perf` and the allocation census, the printing
-   gate and a robot-arm load), then fix the top costs. Expected, to be confirmed by the profile:
-   - the fixed 32 stages per span (each stage is an LP in both passes and a lowered segment): an adaptive grid by span
-     length and curvature (item 8), checked against the 0.8 margin that a uniform coarsening once broke on a Paint path;
-   - lowering to one segment per stage and then merging (`SmallTab`: 163,392 -> 25,580): lower straight to long
-     quintics where the path allows, so neither the surplus segments nor the merge's searches are paid for;
-   - sections start and end at rest (layer changes, turns above 150 degrees, every 4,000 primitives), so they are
-     independent: plan them on several cores, which matters most for the worst 10 s window;
-   - count the retries that remain per load (smoothing re-lowerings when a lowered trajectory breaks a limit; the
-     forward-pass retries and halvings are gone with item 2), since each one is a whole re-plan;
-   - what keeps plans and trajectories alive long enough for an 11.4 GB peak, and the collector's cost of marking it;
-   - the share of the Haxe-side checks (task-space, torque and deviation plan checks) that is left after AM5.
-   Done when the printing gate and the robot-arm load plan measurably faster (numbers before and after, processor
-   time) and use less memory, the planned times and the plan checks' results are unchanged within their tolerances,
-   and the full suite passes.
-   **Profiled and fixed (the general path; item 10 follows).** `perf` on the cube after item 8, then phase timers inside
-   `mk_time_path` (500 calls, 524 attempts, 1.08 M stages): TOPP-RA's solve was 1.4 s of 40 s of processor time (the Seidel LP
-   0.4 %), the grid's setup 0.8 s, the per-stage bindings 2.7 s, lowering 8.0 s, the validation of the lowered path
-   10.6 s, and 16 s outside (merge, plan creation, task-space check). The collector's marking (`gc_flush_mark`, 21 % of
-   samples) runs on mark threads and does not move the planner's processor time (the same 40 s with the mark threshold
-   at 0.2, 1.0 and 1000, which never collects); the Haxe side is 5 %. So a faster TOPP-RA, or a replacement, could not have
-   bought more than a few percent; the costs were in what is done with its stages. Fixed, in order of size:
-   1. Validation (`trajectory_core validate`, long double throughout, a root search for every joint of every segment): it
-      computes the derivative maxima that tolerances read only for the checks that are claimed (the planner's timing check
-      claims velocity and acceleration, so it skipped orders 1 and 4), skips a joint that holds still, and extends the
-      Bernstein-hull dominance proof (a segment whose hull stays under the worst score so far changes neither the worst
-      value nor the verdict) from positions to velocity, acceleration and jerk, computed in double with the reserve
-      already sized for it. 40 -> 31 s on the cube with the lowering below.
-   2. `mk_path_lower` composed a quintic with a quadratic through heap-allocated polynomials for every joint of every
-      interval, and cut roots of a degree-eleven residual with a recursive search; it now works on the stack, caches the
-      span's polynomials, bounds the residual by its quotient by the vanishing factor x^3 (1 - x)^3 before any root
-      search (the fit matches position, velocity and acceleration at both ends) and computes `pow` once an interval.
-   3. The merge (`mk_merge_segments`) cut a quartic and a cubic's peaks for every joint of every try; a joint that holds
-      still or moves at a constant speed is settled by its coefficients, the others by the Bernstein hull, with the
-      exact roots only when the hull is within reach of a limit.
-   4. The timing bindings (which limit bound each stage; read by the plan check's report only) are computed when asked for.
-   5. Trajectories are stored compactly (`Trajectory`: a header and `joint_count` coefficient sets a segment; an
-      `mk_segment` has room for 64 joints, 3 KB, for a machine of 8 joints and a print of a million segments).
-   Result (processor seconds of planning; the planned times are identical: gate 1047.2 s, 8 mm gear 2356.9 s, cube
-   870.3 s, tower 471.5 s, and the plans' segment counts and the tab's 48.134 / 48.484 s the same): gate gear 78.8 s
-   before AM5b item 8, 60.2 s after it, **28.7 s now (2.7x overall, 36x real time; the worst 10 s window 4.2x -> 9.6x)**;
-   8 mm gear 276.0 -> 209.8 -> **100.0 s**; cube 59.5 -> 39.5 -> **18.1 s (48x real time, worst window 30.8x)**; tower
-   49.9 -> 28.3 -> **13.4 s**. Peak resident memory of the whole gate (slicing included): 1.79 GB before this commit, 0.93 GB
-   after. The robot-arm load is a synthetic six-joint curved path timed through `mk_time_path` (20,000 spans, a
-   benchmark kept in `materia-cache/claude-scratch/pathbench`; the arm paths of the test suites are too short to time):
-   0.93 s -> 0.38 s (2.4x), and 2.57 s -> 1.16 s on 60,000 spans, with identical stages, segments and duration. Tests: the
-   motionkit, robotkit and toolpath-motion suites, the native path, trajectory, validation, generator and
-   device-compiler tests (the step-move merge test now asserts the ratio of the adaptive grid's fewer stages;
-   `Toolpath scenarios` counts 2,999 assertions instead of 3,020 because a test asserts per lowered segment).
-
-**Review (2026-10-13).** A review of the whole branch before it lands (`materia-cache/claude-scratch/am-review.md` holds the
-findings with their evidence). Fixed, one commit each:
-- **The `mill` check's "Geometric path primitive is too large to index" was this branch's, not main's.** The message and the
-  grid it guards came with AM5 (c46b3aba7); main measured the task-space check by scanning every primitive. The grid filed a
-  primitive under every 1 mm cell of its bounding box and refused more than a million, so a long three-axis move (the bench
-  mill leaving its load pose in the tending cell: about 250 x 150 x 250 mm, 9.4 million cells) could not be indexed, and a
-  long diagonal cost the volume of its box even below the limit. `GeometricPath` now files each half-cell piece of a primitive
-  by its own box: the entries grow with the path's length, the limit is gone. Test: `PlannerTests.testLongPathQueries` (a
-  full-travel three-axis rapid and a 200 mm arc measured like a scan). `PROJECT_SOURCE_ONLY=mill` passes again.
-- **A layer marker before a command that is not a move took the previous layer's height.** Cura writes `;LAYER:n`, then
-  `M106`, then the layer's first move; the fan command placed the marker at the old Z, so the layer's height (the next one's
-  `Deposit` height and width) came out doubled. A marker placed before such a command now takes its height from the next move
-  (or `;Z:`). Test: `PrinterGcodeTests.cura` (CncKit 432 -> 436 assertions).
-- **MotionKit's binding was edited by hand, not generated.** `mk_merge_segments` carried `@in_array` and `@out @owned`
-  in `motionkit.hxi` that its declaration in `motionkit.h` did not state, so regenerating the binding
-  (`motionkit/native/tools/check-hxi.sh`) dropped them and broke `Trajectory.mergeSegments`. The declaration states them
-  now and the binding is the generator's output (which also exports `MK_MAX_SHAPER_IMPULSES`).
-- **Pressure advance could not run in a plan.** `mk_advance_joint` (AM8) took the window's mean velocity across a plan's
-  ends, so the advanced extruder started away from the plan's own start, at a speed (the runtime refuses such a plan: `RK_ERROR_INVALID_STATE`,
-  which H2 below uncovered), and ended away from its end. A plan starts and ends at rest, so the
-  lead now tapers to nothing over the window next to each end (the product of a rise and a fall, each `10x^3 - 15x^4 +
-  6x^5`), and the advanced joint starts and ends exactly in the plan's state. And each segment was one cubic (now quintic)
-  through the advance at its two ends, while the advance changes form wherever the window crosses a neighbouring
-  segment's boundary: on the straight-line grid a cruise is one long segment, whose single polynomial bent the extruder
-  across the whole cruise to meet the slowing at its end (half the short cube's filament went into beads over 1.1 mm wide,
-  and 206 of 1,498 mm^3 into material already there). The result is now cut at every boundary, each boundary half a window
-  either side, and the tapers, so each piece is exact away from the tapers and continuous in position, velocity and
-  acceleration. Test: `motionkit/native/tests/path.cpp` (a smooth rate rise, a 400 ms cruise in one segment and a fall:
-  ends exact, continuous everywhere, the plan plus lead times the mean velocity to 1e-9 inside the long segment). The
-  gate's extruder check with pressure advance now takes the program's filament exactly (0 %, was -0.039 %).
-- **H2. No app print ever ran with pressure advance.** `ProgramCompiler.forWorker` and `withJointPathPlanner` copied the
-  merge period and the shaping but not `pressureAdvance`/`pressureAdvanceWindow`, and the app plans every print on the
-  planner thread (`ProgramPlanner` plans on `forWorker()`), so SmallTab and both cubes printed with the advance off while
-  the binding reserved the extruder's headroom for it and `PrintingStock` modelled the melt lag it cancels. (The gate
-  compiles directly, so it did apply it.) One `copySettings` now gives a worker every setting that is not a constructor
-  argument, so the two lists cannot drift apart. Test: the gate's extruder check with pressure advance asserts a worker
-  plans the extruder exactly as the compiler does. The app's speed-override check compared filament per path sample by
-  sample, which the advance makes uneven by design (it leads while speeding up, lags while slowing), and its path measured
-  from 50 ms samples cuts corners more at full speed; it now compares the filament of two layers with the same path, layer
-  2 at full speed and layer 4 at half. **Numbers** (with the transform fix above): SmallTab 163.2 s as before, filament
-  56.08 of 56.08 mm, a layer takes 8.24 mm of filament at full speed and 8.25 mm at half (0.1 %); laid 135.4 mm^3 in 5,666
-  beads (134.9 in 5,676), the tab holds 118.1 mm^3 of 120 (-1.6 %; was 117.8), spans unchanged; plan checks unchanged (26
-  plans, 17 flagged, 39 %, 273 um). Short cube: 1,492.8 mm^3 laid for 1,497.5 fed (1,491), 1,471.6 in the cube (1,470),
-  its x edge at 99.994 mm (99.949). The beads are more even: 71 % of the volume in beads 0.6 to 0.7 mm wide (40 % without
-  the advance), the blobs where the tip stood 11.5 mm^3 (18.7). The first plans cost more (the slowest simulated tick 552 ms
-  at 110.7 s, was 87 ms: the advance cuts each plan into three times the segments before the merge).
-- **H3. The cold-extrusion guard was inverted on the printer.** The virtual heater counted the extruder as pushing when
-  its actuator's step count rose (`heaters.rs`), but the printer's motor drives the drive gear through one gear mesh
-  (`GearPair.relation`: ratio -54/18), so its steps count down as filament goes in: a cold push never faulted, a cold
-  retraction would have. The tests drove a +1 ratio only. The wiring now carries the feed direction
-  (`ExtruderWiring.feed`, `HeaterExtruder`, one more value per heater in the peripheral parameters), taken from the sign
-  of the device channel's ratio (`PrintProgramPlayer.extruderOnDevice`). Tests: the Rust heater tests and
-  `HeaterDeviceTests` (a reversed extruder faults pushing into a cold hotend and not retracting; RobotKit world 5,515 ->
-  5,517 assertions), `checkPrinter` asserts the printer's extruder feeds at -1.
-- **H4. Ball screws were a thousand times too soft (main's, found by concern 4).** `LeadScrew.relation` passed the
-  shaft's axial stiffness, which `axialStiffness()` states in N/mm (66,366 for the bench mill's SFU1605), as the coupling's
-  stiffness, which is N/m for a sliding leader (the printer's belts give 84,238 N/m), and then overwrote its basis with
-  "rigid". This is why making screws springs (8e3372228) broke `mill` and tending-route: a 66 kN/m screw under a 15 to 20 kg
-  table rings at about 9 Hz and deflects m a / K, 0.5 to 2 mm (a vertical Z sags m g / K, 2 to 4 mm); at the real 66 MN/m
-  it is about 300 Hz and micrometres. The relation now carries N/m and the shaft's basis. Test: `MillPartTests`. The
-  mill and tending numbers do not move (screws stay ideal constraints in the simulation until the spring model of RF2;
-  the bench mill's plan checks still flag 56 of 78 plans, so those flags were not the screws).
-- **H6. On the deterministic backend a device robot's physical carriage stood still (concern 3).** 54326ccc7 let a
-  virtual device drive only the joints its actuators measure and left the rest of a stiff coupling to the physics. On the
-  printer the measured joints are the motor pulleys, the couplings' followers, so x, y and the idlers got no target. MuJoCo
-  moves them through the belt springs; the deterministic backend (on which both cubes print) keeps couplings ideal and sets
-  a follower from its leaders, so the carriage never moved and the pulleys snapped back to it. No check saw it, because
-  the deposition reads the device's reconstruction of the joints, not the physics (RF3). The other machines are not
-  affected: only the printer and the plotter run a virtual device with stiff couplings (the welder's arms have none, the
-  screw router's Tr screws have none; router, gantries, tending, mobile and the press brake run without a device). A
-  backend now says whether it simulates compliant couplings (`nksim_world_get_features`,
-  `NKSIM_WORLD_FEATURE_COMPLIANT_COUPLINGS`: MuJoCo yes, the deterministic backend no), the device frees a load only where
-  it does, and only the load of a spring (a stiffness and a stated damping ratio: one predicate,
-  `JointCoupling.isSpring` / `RobotModel.followsSpring` and `spring_coupling` in the runtime, where there were four,
-  of two definitions). The damping-ratio docs no longer say zero is critical, and MuJoCo's unused fallback to 1 is gone.
-  Tests: the simkit core and MuJoCo native tests (each backend's feature), `checkPrinterCube` (the physical carriage
-  crosses the cube). The cube's numbers do not move (its deposition reads the device's view).
-- **The servo-on-a-belt path is tested (concern 9).** 35f49ac33 made a servo that turns a spring belt's pulley integrate
-  its spring against the pulley and its rotor (`compliantLoad`), not the carriage, but no machine reaches it (the printer's
-  belts are held by steppers; the gantry picker's servo belts state no damping) and nothing tested it. It is kept, since
-  the spring model (RF2) routes the gantry through it: `SimulationPoseResetTests.compliantServoLoad` builds a carriage on a
-  damped belt driven by a servo, and checks the compliant load, the reflected inertia (the pulley's, not the carriage's),
-  and a stability interval finite and shorter than the rigid one.
-- **`mergeRefusals` counted plans that were never merged.** The compiler threw "not merged" inside its try whenever a plan
-  had no merged form (every joint move, every filament move, any compiler with merging off), counting a refusal and
-  leaving "not merged" as the reason, so the gate's `mergeRefusals == 0` measured the wrong thing. Only a merged form that
-  `ExecutionPlan.create` refuses is a refusal now. Test: the gate's extruder check (the tab's retractions are joint moves)
-  asserts no refusal.
-- **The shaping deviation bound mixed joint units with metres.** `shapeJoints` bounded how far shaping moves each joint
-  from its delayed copy (`0.5 sum a_i (T_i - d)^2` times the joint's acceleration limit), in the joint's units, took the
-  largest, and the task-space check added it to a tolerance in metres. That is right only for a prismatic axis of unit
-  scale, and the tool's error is the norm over the shaped axes, so with x and y shaped it was up to 1.4 times too tight.
-  Each shaped joint is now one Cartesian axis of the exact affine map (a joint that moves with several axes, a CoreXY
-  motor, is refused: it is shaped through its axes), its bound converted to metres along it, and the axes' bounds combined
-  as a root-sum-square. Shaping needs an exact affine machine, and says so. The gate's shaping numbers do not move.
-- **A path's distance drive was dropped silently by any joint path planner but the axis one.** Only
-  `AxisJointPathPlanner` writes the extruder's columns, and `ProgramCompiler.lowerPath` planned a path with a drive
-  through any other planner (an arm printing, listed under Later) with the extruder held still. A planner now declares
-  whether it applies a drive (`JointPathPlanner.appliesDistanceDrive`), and a path with a drive is refused otherwise.
-  Writing the columns after inverse kinematics for any solver goes with the compiler's split (RF5).
-- **The merge period was a literal 10 ms where it is the robot owner's period.** `ToolpathMotionBinding` set
-  `mergeSegmentsSeconds = 0.01`, documented as "an owner period". It is now the motion system's owner period
-  (`MotionSystemBlueprint.ownerPeriodSeconds`: the runtime's, or the fixed timestep where the runtime leaves it to that,
-  the rule `MotionSystem` already used for homing). Unchanged at the app's 10 ms tick and in the gate; in `printer-shaping`,
-  which ticks at 1 ms, runs merge to 1 ms now, and the MuJoCo carriage left 247 um shaking plain and 11 um shaped (251 and
-  11 before), 22 um and 29 um at 10 % below and above the belts' frequency (8 and 24): still at least five times less.
-- **The first layer's infill started at the normal layer's inset.** The slicer computed the core inset once, from the
-  bead spacing of `layerHeight`, while the first layer's perimeters use `firstLayerHeight`'s spacing, so a first layer of
-  its own height left a gap or an overlap between its last perimeter and its infill. Every job uses equal heights today,
-  so no number moves. The inset is per layer now. Test: `AdditiveSlicerTests.tab` (a 0.3 mm first layer's infill reaches its
-  own core; CamKit 12,442 -> 12,443 assertions).
-- **A homed axis rests at its authored home again (concern 6).** AM5b item 1 moved `HomingAxis.home` one homing precision
-  inside the travel, which made two homes: `HomingCycle` returned to the moved one while `MotionSystem.home()`,
-  `AxisKinematics` and `MotionAxisCouplings` kept `MotionAxis.homePosition`. Its stated root cause was not the cause: a
-  device floors a step target, so a rest on a lower limit lands up to a step below it whatever the switch's repeatability
-  (the precision the clamp used, with a 1e-6 fallback where it is zero). The shared validator's start rule, which item 1
-  put in one place, is what admits that step, and the toolpath motion tests passed without the clamp before. Reverted
-  here; making the rule's tolerance the drive's resolution is RF8. The question asked, whether home should be the switch
-  position with the travel limit beyond it, is answered by the model already in place: `DriveSystem.resolveSwitch` puts
-  the trip strictly between the soft limit and the end stop, with repeatability margins (Klipper's `position_endstop`
-  outside `position_min` is the same), so normal motion never trips a switch; a home is a commanded point inside the
-  travel. Test: `HomingTests`.
-- **The adaptive grid and the windows are cross-checked against the grid they replace (concern 1).** The exact-affine
-  "fast path" (43de352f0) is a grid, not a second engine: every span gets its stages from `nodes_for_span` (a straight span
-  its zones, any other its profile and turn) and all of them go to the same TOPP-RA, lowering, validation and stretch
-  loop; every plan check (motor space, clearance, configuration, the plan's limits with the merge fallback, task space,
-  the plan check) runs on the executed motion whatever the grid. The joint-jump check it skips is safe: `AxisKinematics`
-  has no branches, wraps or clamps. But nothing timed the same path both ways, and the windows' last fallback (boundary
-  speed shares 0.7, 0.35, 0.175, then 0: a rest at every boundary) was silent. `mk_time_path_reference` times a path on
-  the old grid (32 stages a span, one window), and `mk_timing_report` says how many windows a path was timed in and how
-  often their boundary speeds were lowered (`ToppraPathTiming.windowedPaths`, `boundaryLowerings`). Tests: the native
-  path test (the six-joint path of 20,000 spans in five windows, with no lowering, within 0.5 % of the reference; a 100 mm
-  line within 0.5 % of it or shorter: on one span the reference's 3 mm stages cannot follow a 0.14 mm ramp and it is 5.7 %
-  slower, on fifty it agrees), the gate (no boundary speed lowered). Exact boundaries without the shares are RF6.
-- **Three ways the Klipper config install would fail on a real machine.** (1) It restarted the firmware with
-  `FIRMWARE_RESTART` through `printer/gcode/script`; Klippy goes away while that script runs, so Moonraker answers with
-  an error and the install ended "connection failed". It uses Moonraker's `POST /printer/firmware_restart` now, and the
-  fake answers the script as Moonraker does (503, "Klippy Disconnected"). (2) Klipper reports a parsed list for
-  `gear_ratio: 54:18` (`[[54, 18]]`), which the readback compared as text, always a mismatch; it compares the numbers now,
-  and the fake reports such a value as Klipper does. (3) An install whose upload or restart failed waited for ever (the
-  client's fault was read only after the restart); it ends with the fault now. Tests: `processkit/tests/moonraker`
-  (164 -> 166 assertions: the gear ratio read back clean, a list that differs reported, a failed upload ends the install).
-- **The print job read new heater parts, not the printer's.** `CoreXyPrinterPreview.job` made its own `HeaterCartridge`
-  and `Thermistor` (and gave the bed the hotend's thermistor) while the assembly attached others, so changing a part in
-  the printer would not have changed the job (AM-D1: nothing typed twice). The printer holds its cartridge and both
-  thermistors (`CoreXyPrinter.cartridge`, `hotendThermistor`, `bedThermistor`), attaches them, and the job reads them. The
-  parts are the same today, so the heat-up times do not move (hotend 103.6 s, bed 90.5 s).
-- **The hole is measured by a circle through its whole printed wall (concern 8).** The dexel stock already gives exact
-  edges along a ray (an interval's ends), so the measurement was not the problem AM9b took it for; it measured the hole
-  on one chord along x and one along y through the CAD centre, and printed everything to a tenth of a millimetre. The check
-  now collects every wall point the X and Y rays through the hole meet over the middle half of the part's height, fits a
-  circle by least squares, and asserts its diameter (6 mm within 0.3, as before) and its centre (within 0.2 mm of CAD's),
-  and the cube's box and hole print to the micrometre. Short cube: hole 5,956 um across, 52 um off its CAD centre, from
-  8,030 wall points; box 99,994..119,994 x 99,930..120,000 x -5..4,010 um.
-- **A failed growing offset is an error, not an empty region.** `cad_planar_offset` turned any OCCT offset failure into an
-  empty result ("the region collapsed"). That is right for a region shrunk past its own width, but a grown region cannot
-  collapse: a skirt, or a hole region that grows while the part is inset (`offset_face` offsets the holes the other way),
-  would have vanished without a word, and the slicer would have printed infill over a hole. A growing offset that fails
-  or gives nothing is now a modelling error with its reason.
-- **Cleanups the review found.** `PrintingStock`'s rounded-bead path was dead (`CORNER = 0`) and its docs described
-  corners rounded to a tenth of the height: removed, the docs say what it lays (the squareness floor is the named
-  `MIN_ASPECT`). The heater fault codes are used by name in `HeaterSensor` and point at the table they mirror. The print job's
-  doc kept a version history in a one-version schema. `checkPrinterShaping`'s doc still described the 5 Hz swing that the
-  belt springs fixed. The `printer` check printed the axes' limits without the motors' rate (250 mm/s where AM5b item 7
-  made them 500 mm/s). Two misplaced doc comments (`ProgramCompiler.timingSections`, a CoreXY test). Two tests that tested
-  little: the merge test's "a limit the pieces keep to" used a limit the pieces broke and accepted almost anything (it now
-  merges a ramp at exactly its acceleration limits and asserts the merged peaks), and the lowering test passed if either
-  the hotend's or the fan's event was there (each is required now).
-
-**Review follow-ups (planned, 2026-10-13).** What the review found that is too big to do in a review commit, each with its
-design. In the order to take them.
-1. **RF1. The extruder's position on the wire.** `device_compiler6.cpp` sends each segment's absolute joint position as an
-   f32 and the device evaluates it in f32 (lines 361-373). The extruder is a continuous joint whose angle grows the whole
-   print: past about 4096 rad of motor (5 m of filament, 15 g of PLA) half an f32 rounding step (2.4e-4 rad) is more than a
-   tenth of a step (1.96e-4 rad), so a long print is refused ("converted trajectory exceeds target_error") or steps with
-   float jitter. The branch loosened the check (`CONVERSION_STEPS`, the seam bound) instead; the full cube (1.2 m of
-   filament) stays under it, so no test sees it. Design: an RKD6 wire revision that carries a segment relative to a 64-bit
-   step base (the base per segment, or per queue with a rebase command), coefficients relative to it, the device adding the
-   base in integers; then `CONVERSION_STEPS` and the seam allowance go. Test: a plan 50 m of filament from zero compiles
-   and replays to a tenth of a step.
-2. **RF2. One spring model (concern 4).** Every coupling with a stiffness is a spring, and only stiffness zero is rigid. A
-   damping ratio always comes from the part, stated as assumed per transmission kind (a rubber belt about 0.1, a ball screw
-   or steel drive about 0.03), and a transmission record may override it; zero no longer means "not a spring". Before:
-   (a) the ball screws' units (done in this review); (b) a stepper hold for every compliant follower, not only damped ones
-   (`DeviceBinding`); (c) a servo on a compliant follower integrated against its pulley (`compliantLoad`, tested in this
-   review) for every stiff coupling; (d) runtime position limits that allow the compliance overshoot `m a / K` from
-   `DriveLoads` (the gantry-starts "runtime limit by micrometres"), or plans that keep that margin; (e) re-baselining the
-   mill, tending, gantry and router numbers, which will move (the bench mill's plan checks flagged 56 of 78 plans with the
-   screws 1000 times too soft). Test: the bench mill's Z under gravity sags `m g / K` (micrometres) in MuJoCo, and the gantry
-   picker's servo pulleys stay stable on spring belts.
-3. **RF3. Deposition from the physical nozzle (AM-D7).** A device robot's snapshot is the device's reconstruction from
-   step counts, so `PrintProgramPlayer.afterStep` lays beads where the motors say the nozzle is, not where the belts put it:
-   in MuJoCo the belt swing never reaches the deposit. Design: read the nozzle's physical pose (the tool link's pose from the
-   simulation, through `Simulation.linkPose`, and the tip's offset in that link from the model) and the extruder's physical
-   joint; the device's view stays what the controller knows. SmallTab's numbers in MuJoCo will move by the belts' stretch
-   (up to about 0.3 mm), which is what the check is for.
-4. **RF4. Networking on NativeKit (concern 5).** `processkit.moonraker` frames HTTP/1.1, RFC 6455 and SHA-1 by hand over
-   robotkit's `NativeTransport`, which cannot run in the web build (no raw TCP in a browser), and the Moonraker test builds
-   the whole robotd native set for one socket. NativeKit already has an HTTP client (`nk_http_*`: curl, fetch, URLSession,
-   WinHTTP; `haxeon/packages/platform`) and a WebSocket transport (`NK_TRANSPORT_WEBSOCKET`: handshake, masking, fragments,
-   pong, close, wss). Design: (a) NativeKit's WebSocket transport gains a message mode (`NK_TRANSPORT_MESSAGES`: a send is one
-   message, a receive one whole message) and text frames, since Moonraker's JSON-RPC needs both; (b) `MoonrakerSocket`
-   connects with kind WEBSOCKET and path `/websocket` (deletes `WebSocketFrames`, `Sha1`, the handshake); (c)
-   `MoonrakerClient` sends through `nk_http`, driven by the NativeKit event pump (a multipart body builder stays in
-   processkit); (d) the transport façade moves from robotkit/remote to the haxeon platform package. JSON-RPC id matching (30
-   lines) stays in processkit; `haxeon.rpc` is MessagePack framing, not JSON-RPC. The fake server stays test-only.
-5. **RF5. Split `ProgramCompiler` (concern 7).** 1,500 lines, and `finish()` chains eight concerns; two hand-kept lists of
-   settings already planned prints without pressure advance (fixed here with one `copySettings`). Stages: `PathSampler`
-   (sections, sample budgets, drive stations), `TimedMotionTransforms` (advance, project, shape, project, merge, project;
-   owns the intermediate trajectories' disposal; returns the executed and merged motion and the lag, tail and spread),
-   `PlanCertification` (clearance, configuration, plan creation with the merge fallback, task space, plan check), with the
-   distance drive's columns written after inverse kinematics for any solver (today only `AxisJointPathPlanner` writes them;
-   the review made the others refuse a drive). And one `CouplingProjection`, built once from the model (order, positions,
-   rates, limit sums; it throws on a cycle), replacing five copies (`AxisKinematics.completeDerived`,
-   `MotionAxisCouplings.derived`, `AxisPlanner.projectDerived`, `ProgramCompiler.projection*`, `ToolpathMotionBinding`'s
-   limit loop; `AxisKinematics` silently appends the joints of a cycle). A pure refactor: every number unchanged.
-6. **RF6. Exact window boundaries.** The windows' boundary speeds are a share (`BOUNDARY_SHARE` 0.7 of a forward and
-   backward pass at `TANGENTIAL_SHARE` 0.4 of the spans' acceleration) lowered 0.35, 0.175, 0 on failure: heuristics. The
-   review made the lowerings visible (`mk_timing_report.boundary_lowerings`, asserted zero in the gate) and cross-checked
-   the windows against one window on the dense grid (`mk_time_path_reference`, within 0.5 %). Design: time the windows
-   back to front for each one's controllable set at its start (TOPP-RA's backward pass), then forward; the boundary speed
-   is the lesser of what the previous window reached and the next one's controllable bound. Exact, and both shares and the
-   ladder go.
-7. **RF7. One segment merge.** `device_compiler6.cpp` (46-125, 196-238) merges segments for the link with its own rules
-   (sampled checks, 65 samples for travel limits), retries unmerged on any failure (a lost clock sync included) and skips
-   the follower-consistency check for merged segments. Design: the device compiler calls `mk_merge_segments` with
-   tolerances in actuator steps (a tenth of a step, a percent of the step rate) and the 2 ms / 4 ms thresholds derived from
-   the link's segment rate and queue depth (the endpoint's "refill 128 segments in time" rule), retries only when the merge
-   was the cause, and keeps a scaled follower check.
-8. **RF8. The start-at-limit tolerance is the drive's resolution (concern 6).** The review returned a homed axis to its
-   authored home (one home coordinate again). The validator's start rule admits a start outside a claimed bound by the
-   plan's start tolerance, which is the planner's start mismatch (the printer's 0.1 mm, 5 mm for the handling, welding and
-   surface runners), not what a drive can miss a target by. Design: a per-joint position resolution from the drive (one
-   step: 1 / steps per unit, as `StepTicks.wire` holds it; one encoder count) passed as `position_start_tolerance`;
-   rounding a step target to the nearest step instead of flooring it (`step_generator.rs:221-225`) halves the error, as a
-   device item of its own.
-9. **RF9. Klipper's `max_accel` in the worst direction (concern 11).** `max_velocity` is right (Klipper bounds each move's
-   Euclidean speed; on CoreXY it has no per-axis XY limit, so the worst direction, `MotorSpaceConstraints.inscribedSpeed`,
-   is the value). `max_accel` is the weaker axis's acceleration, but Klipper's is one Euclidean bound too: with the motors'
-   force rows the worst direction asks more of one motor than either axis alone. Design: `inscribedAcceleration` from the
-   drive model's force rows (min over motors of its force over the norm of its row of the axes' masses), used for
-   `max_accel` and asserted against the model in `PrinterKlipperTests`. Also: write `square_corner_velocity` explicitly with
-   a comment (Klipper jumps velocity at corners, which AM-D4 rejects for our stack).
-10. **RF10. Constants still to derive or bound by a test.** `MAX_STAGE_TURN` 0.6 rad (no test exercises it: a curved path
-   sampled a radian a span, profile not binding, acceleration under the margin); `ZONE_REACH` 1.5 and `ZONE_STAGES` 10
-   (derive the reach from the moving-boundary margin, the stages from a time-error bound); `kSliver` 4 us (derive from the
-   shortest controller period); `MERGE_TIMING` 10 us and its 1 % / 10 % (from the path's remaining deviation budget, not
-   the joint's speed); the extruder's pressure-advance headroom x0.8 velocity and x0.6 acceleration and jerk = 25 x
-   acceleration (`ToolpathMotionBinding`, from K and the window: `v + K a` within the drive); `SHAPER_X_HZ` /
-   `SHAPER_Y_HZ` typed and checked against `DriveLoads` to 10 % instead of derived from it; `HeaterSetup`'s tuning defaults
-   (every caller sets every field: make them required); the PID band, range and watchdog numbers as one written policy;
-   the controller's ADC front end (4.7 k pull-up, 3.3 V) as a controller part.
-11. **RF11. Smaller items.** The slicer's purge prime (1.5 mm, a literal: a `PrinterProfile` field); one `BeadSection`
-   (`area`, `width`, `spacing`, `filamentArea`) for the slicer, the interpreter, the binding and the settings (four copies);
-   the benchmark builds its bindings from the scene's print job like the app, not by hand (origin, rapid speed, ramp);
-   material properties (minimum extrusion temperature, melt lag, filament diameter) on a material spec rather than the
-   hotend; a feed hold pressed while a print is starting is applied when it starts; `MoonrakerStatus` keeps the last value of
-   an absent field instead of zero; IPv6 literal addresses in `PrinterLink`; `validatePrinting` applies the device's
-   positivity rules; a heater fault stops the device once, not every tick; one device input entry point per peripheral kind.
-
-**Later (not in this run).**
-- Bed mesh probing (with `ContactSearch`), Z tilt with independent screws, skew correction.
-- Pause and filament change, runout sensor, cancel object, power-loss recovery.
-- STL/3MF import with mesh slicing, supports, variable width, multi-material.
-- Real hardware: Nucleo heater pins, TMC UART configuration, a Klipper-known board in the model.
-- Robot-arm and non-planar deposition, WAAM, hybrid print-then-mill.
-
-## Order
-
-```
-AM0 ── AM1 ── AM2 ──┬── AM3 ── AM4 ── AM5 ──┐
-                    └── AM6 ── AM7 ─────────┴── AM8 ── AM9 ── AM12
-                         AM6 ── AM10 ── AM11
-```
-
-- AM4 can use a stand-in machine if AM6 is not done. Its "before" numbers are for the current
-  planner.
-- AM8 needs AM5's cornering only for speed, not for correctness. If AM5's gate fails, AM8 still
-  runs and records its planning ratio.
-- AM10 and AM11 need only AM6 (and AM2's writer).
-
-## Progress
-
-| Step | State | Commits |
-|---|---|---|
-| AM0 | done: worktree and baseline | |
-| AM0b | done: main green, router baselines recorded | 2fbea0683, ae6e95ec5, cd29b1993, dfa6e2940, 2611087d9 |
-| AM1 | done | see the commit below |
-| AM2 | done | see the commit below |
-| AM3 | done | see the commits below |
-| AM4 | done | see the commit below |
-| AM5 | done: gate passed | see the commit below |
-| AM6 | done | see the commit below |
-| AM7 | done | see the commit below |
-| AM8 | done | see the commits below |
-| AM9 | done | see the commit below |
-| AM9b | done (AM5b item 9's session) | 970440ac8 |
-| AM10 | done | see the commit below |
-| AM11 | done | see the commit below |
-| AM12 | done | see the commit below |
-| AM5b | in progress: items 6, 1, 5, 4, 8, 11, 10, 3, 9 and 7 and belt damping done | item 6 c6d2df30a, 52eaa27db; item 1 7f392fd39; item 5 71b2c6c5a; item 4 1859d5f56; item 8 3891585f4; item 11 b7320e39f; item 10 43de352f0; item 3 b5a86c01d; item 9 970440ac8; belt damping 54326ccc7; item 7 (axes at the motors' rate) and the belt spring in MuJoCo with the shaping acceptance there: see the commits below |
-| Review | done 2026-10-13: 21 fixes; follow-ups RF1 to RF11 planned | see the review list (commits "(3D printing review)") |
-
-## Next: a large-format pellet printer (PL0 to PL12)
-
-Planned 2026-10-12, to start after AM0 to AM12, AM9b and the AM5b items needed for landing are done and merged. It builds
-on everything above: the extruder joint, heaters, deposition, the slicer, input shaping and the trim side of the CNC
-router.
-
-**Goal.** A gantry pellet printer of about 1.5 x 1.2 x 1 m that prints large parts from dried, fibre-filled pellets,
-then trims them to CAD with a spindle on the same gantry, simulated end to end (print, cool, deposit, trim) and driven
-by our stack. The hybrid print-then-trim cycle is what our stack does that Klipper-class tools do not.
-
-**Reference extruder: IEMAI Pellet Ext P10** (https://www.iemai3d.com/index.php/pellet-3d-extruders/). It is 10 kg and
-makes 10 kg/h. The screw is 34 x 363 mm (L/D 10.7) with a 60 rpm maximum, driven by a 600 W servo (1.91 N m) through a
-1:50 planetary reducer, which gives about 2.8 g per screw turn. It has 3 heater zones and a water-cooled feed throat, takes
-2 to 10 mm nozzles and prints 0.5 to 5 mm layers, at 220 V. Its kit adds a 12 kg controller (servo driver, heater
-controllers, cooling, feed control, compressed air at 0.6 to 0.8 MPa), a 25 kg hopper dryer and a 65 L compressor. The
-vendor's STEP files (extruder, controller, dryer, compressor) are public on Google Drive but carry no licence: they stay
-in `materia-cache` as display and collision geometry, are not committed, and the part model carries the specification.
-In the extruder's STEP the nozzle tip is at the origin and an 84 x 132 x 8 mm mounting plate sits at z of about 287 to
-419 mm. The CAD volumes overstate the mass (the barrel is one lump), so the mass is the specification's. Not documented:
-how the controller takes screw speed (pulses, analog or fieldbus); ask the vendor. Alternatives: RobotDigg PE3000S
-(3 kg/h, 7 kg) and PEA15000 (15 to 20 kg/h, 42 kg); IEMAI L35 (20 kg/h, 180 kg, with a melt pump and a melt pressure
-sensor) for a later, larger machine.
 
 **Decisions.**
 - PL-D1. Cartesian gantry, not CoreXY. The head (10 kg plus a spindle) dominates the moving mass, belts are too soft over
@@ -1782,8 +323,9 @@ sensor) for a later, larger machine.
 **Test parts.** A tall thin-walled box 600 x 300 x 400 mm with a single bead wall (layer time and slump); a mould-pattern
 segment printed oversize and trimmed (hybrid accuracy); a ribbed panel (sparse infill sized to the bead).
 
+
 **Steps.**
-- PL0. Survey and worktree: confirm the P10's drive interface and controller I/O with the vendor (or record an
+- PL0. **Complete locally, 2026-10-16.** Survey and worktree: confirm the P10's drive interface and controller I/O with the vendor (or record an
   assumption); licences of the STEP files; references for large-format slicing and layer-time control (ideas only,
   licences checked); baseline suite.
 - PL1. `PelletExtruder` part (`machinekit.printing`): screw, barrel zones, reducer, servo, feed throat, nozzle set, mount
@@ -1816,12 +358,16 @@ segment printed oversize and trimmed (hybrid accuracy); a ribbed panel (sparse i
 **Later.** Robot-arm or track-arm deposition (non-planar), the L35 class with a melt pump and closed-loop melt pressure, an IR camera in the simulation, real hardware.
 
 **Order.** PL0 -> PL1 -> PL2 -> (PL3 -> PL4) and (PL5 -> PL6) in parallel -> PL7 -> PL8 -> PL9 -> PL10 -> PL11 -> PL12.
+PL8 and PL12 use Kinematic for full-size parts and Physical on short representative sections
+([fidelity levels](../../../simkit/plans/FIDELITY.md)).
 
-**Rebased onto main f28178ac7 (2026-10-12).** Conflicts were list merges (Start-page catalog, component registry, test source roots, project-source roots) and the
-versions: main moved `SceneArtifact` to 29, `AssemblyDefinitionCodec` to 10 and kept `MachineAssembly` at 18, so ours are now 32, 11 and 19 (`RobotModel` 14
-was free), with the old projectkit hydraulic fixture and the old-version list regenerated. Full `am-suite.sh`: every stage green except main's own breakages,
-none of them in the printer's path: `humankit-sim` and `visionkit` blocked (native builds), `robotkit-mujoco` (posed tool shapes lose tool-piece identity), the
-press brake's `ram returns to its measured top switch` in the app project-source suite (the same q = -0.0001076 m on a sheet-metal worktree before the rebase,
-so not ours), and the editor's Start-page test (`press-brake` has no category in `ExampleBrowser.categoryOf`), which stops that suite at its first failure. The
-checks after the app's first failure were run one by one: printer, corexy, belts, mobile, controls and tending all pass. The full cube prints in 1031.1 s of
-simulated time in 74 s of wall time (13.9x), with the results above unchanged.
+
+## Later features
+
+Bed mesh/contact probing, independent Z tilt and skew correction; pause/filament change/runout/cancel-object/
+power-loss recovery; STL/3MF and mesh slicing, supports, variable width and multimaterial; verified real-board
+heater/TMC configuration; robot-arm/non-planar deposition, WAAM and larger melt-pump pellet systems. These remain
+explicit future scope, separate from the checkpoint and PL0–PL12 acceptance.
+
+Model-based deflection compensation for motor-encoder arms requires declared drive/reducer data and calibration;
+it is later feature work, outside this branch.
