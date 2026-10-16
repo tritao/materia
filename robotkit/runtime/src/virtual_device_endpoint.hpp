@@ -95,7 +95,7 @@ public:
     /** Recreate the board and UART queues when its simulation clock resets. */
     bool reset();
     bool stop_device();
-    bool set_peripheral_input(std::uint32_t input, double value);
+    bool set_peripheral_input(std::uint32_t kind, std::uint32_t input, double value);
     bool sensor_sample(std::uint32_t slot, rk_sensor_sample &sample, std::span<double> values) const;
     void cut_link(bool cut);
     bool miss_next_steps(std::uint32_t actuator, std::uint32_t count);

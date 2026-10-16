@@ -6,10 +6,7 @@ extern "C" {
 rkd_virtual_device *rkd_virtual_create(uint64_t, uint32_t, uint64_t, int32_t, uint32_t, const double *,
     const uint8_t *, uint8_t) { return nullptr; }
 int32_t rkd_virtual_configure_peripheral(rkd_virtual_device *, uint32_t, const double *, size_t) { return 0; }
-int32_t rkd_virtual_set_peripheral_input(rkd_virtual_device *, uint32_t, double) { return 0; }
-int32_t rkd_virtual_configure_welder(rkd_virtual_device *, uint8_t, uint32_t, uint32_t,
-    uint32_t, double, double, float) { return 0; }
-int32_t rkd_virtual_set_welder_grounded(rkd_virtual_device *, uint8_t) { return 0; }
+int32_t rkd_virtual_set_peripheral_input(rkd_virtual_device *, uint32_t, uint32_t, double) { return 0; }
 int32_t rkd_virtual_configure_switch(rkd_virtual_device *, uint32_t, uint32_t, int64_t,
     uint8_t, uint8_t) { return 0; }
 void rkd_virtual_destroy(rkd_virtual_device *) {}

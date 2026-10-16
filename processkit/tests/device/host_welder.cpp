@@ -31,9 +31,9 @@ static void run(int stop) {
     auto endpoint = VirtualDeviceEndpoint::create(*blueprint, config);
     assert(endpoint);
     assert(!endpoint->ready_for_plans());
-    assert(!endpoint->set_peripheral_input(1, 1));
-    assert(!endpoint->set_peripheral_input(0, 0.5));
-    assert(endpoint->set_peripheral_input(0, 1));
+    assert(!endpoint->set_peripheral_input(1, 1, 1));
+    assert(!endpoint->set_peripheral_input(1, 0, 0.5));
+    assert(endpoint->set_peripheral_input(1, 0, 1));
     auto state = std::make_unique<rk_robot_state>();
     for (uint64_t now = 0; now <= 120'000'000; now += 2'000'000) endpoint->sample(now, *state);
     assert(endpoint->ready_for_plans());
@@ -60,7 +60,7 @@ static void run(int stop) {
         const auto safe = endpoint->channel_values(); assert(safe[0] == 0 && safe[1] == 0);
     }
     else if (stop == 0) endpoint->cut_link(true);
-    else if (stop == -1) assert(endpoint->set_peripheral_input(0, 0));
+    else if (stop == -1) assert(endpoint->set_peripheral_input(1, 0, 0));
     else { rk_robot_command command{}; command.struct_size = sizeof(command); command.sequence = 2;
         command.kind = static_cast<rk_command_kind>(stop); assert(endpoint->apply(command) == RK_OK); }
     for (uint64_t now = 360'000'000; now <= 1'200'000'000; now += 10'000'000) endpoint->sample(now, *state);
@@ -72,7 +72,7 @@ static void run(int stop) {
     }
     assert(endpoint->reset());
     assert(!endpoint->ready_for_plans());
-    assert(endpoint->set_peripheral_input(0, 1));
+    assert(endpoint->set_peripheral_input(1, 0, 1));
 }
 int main() {
     for (int stop : {static_cast<int>(RK_COMMAND_STOP), static_cast<int>(RK_COMMAND_ABORT),

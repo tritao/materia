@@ -39,7 +39,7 @@ class VirtualWelderSupply implements SimulationWelderSupply {
   }
 
   public function observe(dt:Float, timestamp:Int64, grounded:Bool):WeldReading {
-    simulation.setVirtualDeviceInput(robotIndex, 0, grounded ? 1.0 : 0.0);
+    simulation.setVirtualDeviceInput(robotIndex, 1, 0, grounded ? 1.0 : 0.0);
     var value = simulation.virtualDeviceSensor(robotIndex, slot);
     var sample = value.get_sample();
     if (Int64.compare(sample.get_sequence(), sequence) > 0) {

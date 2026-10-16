@@ -48,8 +48,8 @@ public:
         if (!device_frame6::encode(11, {}, frame)) return false;
         return rkd_virtual_link_host_to_device(device_, frame.data(), frame.size()) != 0;
     }
-    bool set_input(std::uint32_t input, double value) {
-        return rkd_virtual_set_peripheral_input(device_, input, value) != 0;
+    bool set_input(std::uint32_t kind, std::uint32_t input, double value) {
+        return rkd_virtual_set_peripheral_input(device_, kind, input, value) != 0;
     }
     unsigned baud() const noexcept override { return config_.baud; }
     std::uint64_t received_at_ns() const noexcept override { return received_at_ns_; }
@@ -281,8 +281,8 @@ bool VirtualDeviceEndpoint::reset() {
 }
 
 bool VirtualDeviceEndpoint::stop_device() { return link_->stop_device(); }
-bool VirtualDeviceEndpoint::set_peripheral_input(std::uint32_t input, double value) {
-    return link_->set_input(input, value);
+bool VirtualDeviceEndpoint::set_peripheral_input(std::uint32_t kind, std::uint32_t input, double value) {
+    return link_->set_input(kind, input, value);
 }
 bool VirtualDeviceEndpoint::sensor_sample(std::uint32_t slot, rk_sensor_sample &sample, std::span<double> values) const {
     if (slot >= RK_MAX_SENSORS) return false;

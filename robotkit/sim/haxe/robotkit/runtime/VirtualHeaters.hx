@@ -164,7 +164,7 @@ class VirtualHeaters {
 
   /** Reaches the plant of heater `name`: see the kinds above. */
   public function setInput(name:String, kind:Int, value:Float):Void
-    simulation.setVirtualDeviceInput(robotIndex, indexOf(name) * INPUTS_PER_HEATER + kind, value);
+    simulation.setVirtualDeviceInput(robotIndex, 2, indexOf(name) * INPUTS_PER_HEATER + kind, value);
 
   function indexOf(name:String):Int {
     for (i in 0...setups.length) if (setups[i].name == name) return i;

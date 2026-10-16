@@ -91,7 +91,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 35 /**< Typed fluid drives, deployment wiring, brakes, collision surfaces, process ownership, and articulated tool mounts. */
+    RK_API_VERSION = 36 /**< Explicit peripheral input kinds and position-dependent simulation coupling laws. */
 };
 
 /** Result returned by RobotKit C ABI functions. */

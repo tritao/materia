@@ -41,7 +41,7 @@ public:
                         const rk_simulation_robot_desc *robot_desc = nullptr);
     rk_result virtual_device_ready(uint32_t robot_index, uint32_t &ready);
     rk_result stop_virtual_device(uint32_t robot_index);
-    rk_result set_virtual_device_input(uint32_t robot_index, uint32_t input, double value);
+    rk_result set_virtual_device_input(uint32_t robot_index, uint32_t kind, uint32_t input, double value);
     rk_result get_virtual_device_sensor(uint32_t robot_index, uint32_t slot, rk_simulation_device_sensor &sensor);
     rk_result get_joint_sample(uint32_t robot_index, uint32_t joint, rk_simulation_joint_sample &sample);
     rk_result get_virtual_device_channel(uint32_t robot_index, uint32_t channel, double &value);

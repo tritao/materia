@@ -346,7 +346,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * The caller owns homing authorization and must release holds on cancellation or fault.
 	 */
 	extern fn rk_simulation_set_squaring_hold(simulation: rk_simulation, robot_index: u32, joint: u32, active: u32, position: f64) -> rk_result;
-	extern fn rk_simulation_set_virtual_device_input(simulation: rk_simulation, robot_index: u32, input: u32, value: f64) -> rk_result;
+	extern fn rk_simulation_set_virtual_device_input(simulation: rk_simulation, robot_index: u32, kind: u32, input: u32, value: f64) -> rk_result;
 	/**
 	 * Makes one process-owned tool joint a passive spring: it rests at `rest_position` with `stiffness`
 	 * (N/m or N m/rad) and `damping` (N s/m or N m s/rad), its force capped by the joint's effort limit. A compliant

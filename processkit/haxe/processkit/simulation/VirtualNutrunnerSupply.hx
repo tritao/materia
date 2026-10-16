@@ -77,9 +77,9 @@ class VirtualNutrunnerSupply implements SimulationScrewdriverSupply {
       throw "Virtual nutrunner needs a new physical joint acquisition";
     var values = ScrewdriverSensor.values(reading);
     if (!ScrewdriverSensor.valid(values)) throw "Virtual nutrunner needs a measured seven-value acquisition";
-    for (i in 0...values.length) simulation.setVirtualDeviceInput(robotIndex,i,values[i]);
+    for (i in 0...values.length) simulation.setVirtualDeviceInput(robotIndex,3,i,values[i]);
     // The native profile advances its oscillator to this completed physical tick before capture.
-    simulation.setVirtualDeviceInput(robotIndex,7,Int64.toFloat(step) * Int64.toFloat(periodNs));
+    simulation.setVirtualDeviceInput(robotIndex,3,7,Int64.toFloat(step) * Int64.toFloat(periodNs));
     submittedStep = step;
     var value = simulation.virtualDeviceSensor(robotIndex,sensorSlot), sample = value.get_sample();
     if (Int64.compare(sample.get_sequence(),sequence) < 0) throw "Virtual nutrunner acquisition sequence regressed";

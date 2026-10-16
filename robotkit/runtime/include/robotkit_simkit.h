@@ -322,7 +322,7 @@ RK_API rk_result RK_CALL rk_simulation_virtual_device_ready(
 /** Deliver STOP6 before freezing the simulated board's clock. */
 RK_API rk_result RK_CALL rk_simulation_stop_virtual_device(rk_simulation simulation, uint32_t robot_index);
 RK_API rk_result RK_CALL rk_simulation_set_virtual_device_input(
-    rk_simulation simulation, uint32_t robot_index, uint32_t input, double value);
+    rk_simulation simulation, uint32_t robot_index, uint32_t kind, uint32_t input, double value);
 RK_API rk_result RK_CALL rk_simulation_get_virtual_device_sensor(
     rk_simulation simulation, uint32_t robot_index, uint32_t slot,
     rk_simulation_device_sensor *out_sensor RK_INOUT);

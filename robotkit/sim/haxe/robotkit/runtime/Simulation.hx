@@ -625,10 +625,10 @@ class Simulation {
     check(RobotKitSimKit.rk_simulation_stop_virtual_device(owner.borrow(), robotIndex), "simulation.stopVirtualDevice");
   }
 
-  /** Supplies a board-defined numeric input; meaning belongs to its peripheral profile. */
-  public function setVirtualDeviceInput(robotIndex:Int, input:Int, value:Float):Void {
+  /** Supplies a board-defined numeric input; the explicit peripheral kind owns the input index. */
+  public function setVirtualDeviceInput(robotIndex:Int, kind:Int, input:Int, value:Float):Void {
     ensureLive();
-    check(RobotKitSimKit.rk_simulation_set_virtual_device_input(owner.borrow(), robotIndex, input, value),
+    check(RobotKitSimKit.rk_simulation_set_virtual_device_input(owner.borrow(), robotIndex, kind, input, value),
       "simulation.setVirtualDeviceInput");
   }
 

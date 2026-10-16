@@ -2388,10 +2388,10 @@ rk_result Simulation::stop_virtual_device(uint32_t robot_index) {
     if (robot_index >= virtual_devices_.size() || !virtual_devices_[robot_index]) return RK_ERROR_INVALID_ARGUMENT;
     return virtual_devices_[robot_index]->stop_device() ? RK_OK : RK_ERROR_BACKEND;
 }
-rk_result Simulation::set_virtual_device_input(uint32_t robot_index, uint32_t input, double value) {
+rk_result Simulation::set_virtual_device_input(uint32_t robot_index, uint32_t kind, uint32_t input, double value) {
     Lock lock(session_);
     if (robot_index >= virtual_devices_.size() || !virtual_devices_[robot_index]) return RK_ERROR_INVALID_ARGUMENT;
-    return virtual_devices_[robot_index]->set_peripheral_input(input, value) ? RK_OK : RK_ERROR_INVALID_ARGUMENT;
+    return virtual_devices_[robot_index]->set_peripheral_input(kind, input, value) ? RK_OK : RK_ERROR_INVALID_ARGUMENT;
 }
 rk_result Simulation::get_virtual_device_sensor(uint32_t robot_index, uint32_t slot, rk_simulation_device_sensor &sensor) {
     Lock lock(session_);

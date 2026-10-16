@@ -177,7 +177,16 @@ impl VirtualDevice {
     }
 
     /// An experiment's hand on the plant: see `heaters::input`.
-    pub fn set_heater_input(&mut self, input: u32, value: f64) -> bool { self.heaters.set_input(input, value) }
+    pub fn set_peripheral_input(&mut self, kind: u32, input: u32, value: f64) -> bool {
+        match kind {
+            1 if input == 0 && (value == 0.0 || value == 1.0) => {
+                self.set_welder_grounded(value == 1.0)
+            }
+            2 => self.heaters.set_input(input, value),
+            3 => self.set_nutrunner_input(input, value),
+            _ => false,
+        }
+    }
 
     /// Heater `index`'s sensor frame: temperature, target, duty, at target, fault.
     pub fn heater_values(&self, index: usize) -> Option<[f32; 5]> { self.heaters.heaters.get(index).map(|h| h.values()) }
@@ -834,37 +843,19 @@ pub unsafe extern "C" fn rkd_virtual_configure_peripheral(
     let p = std::slice::from_raw_parts(parameters, count);
     if p.iter().any(|v| !v.is_finite()) || p[..4].iter().any(|v| *v < 0.0 || v.fract() != 0.0)
         || p[0] >= 8.0 || p[1..4].iter().any(|v| *v >= 32.0) { return 0; }
-    rkd_virtual_configure_welder(device, p[0] as u8, p[1] as u32, p[2] as u32,
-        p[3] as u32, p[4], p[5], p[6] as f32)
+    {
+        let Some(device) = device.as_mut() else { return 0; };
+        device.configure_welder(welder::WelderConfig { sensor_slot: p[0] as u8,
+            arc_channel: p[1] as usize, wire_channel: p[2] as usize, voltage_channel: p[3] as usize,
+            ignition_seconds: p[4], no_arc_seconds: p[5], efficiency: p[6] as f32 }) as i32
+    }
 }
 #[no_mangle]
 pub unsafe extern "C" fn rkd_virtual_set_peripheral_input(
-    device: *mut VirtualDevice, input: u32, value: f64,
+    device: *mut VirtualDevice, kind: u32, input: u32, value: f64,
 ) -> i32 {
     let Some(device) = device.as_mut() else { return 0; };
-    // A nutrunner or heaters take their own inputs (`heaters::input`); otherwise input 0 grounds the welding workpiece.
-    if device.nutrunner.is_some() { return device.set_nutrunner_input(input, value) as i32; }
-    if !device.heaters.heaters.is_empty() { return device.set_heater_input(input, value) as i32; }
-    if input != 0 || (value != 0.0 && value != 1.0) { return 0; }
-    rkd_virtual_set_welder_grounded(device, value as u8)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn rkd_virtual_configure_welder(
-    device: *mut VirtualDevice, sensor_slot: u8, arc_channel: u32, wire_channel: u32,
-    voltage_channel: u32, ignition_seconds: f64, no_arc_seconds: f64, efficiency: f32,
-) -> i32 {
-    let Some(device) = device.as_mut() else { return 0; };
-    device.configure_welder(welder::WelderConfig { sensor_slot, arc_channel: arc_channel as usize,
-        wire_channel: wire_channel as usize, voltage_channel: voltage_channel as usize,
-        ignition_seconds, no_arc_seconds, efficiency }) as i32
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn rkd_virtual_set_welder_grounded(device: *mut VirtualDevice, grounded: u8) -> i32 {
-    let Some(device) = device.as_mut() else { return 0; };
-    if grounded > 1 { return 0; }
-    device.set_welder_grounded(grounded != 0) as i32
+    device.set_peripheral_input(kind, input, value) as i32
 }
 
 /// Install physical switch geometry before opening the deployment session.
@@ -1237,9 +1228,9 @@ mod tests {
     }
     fn capture_nutrunner(d: &mut VirtualDevice, time: f64) -> bool {
         for (i,value) in [16.5,12.5,0.0,5.0,5.0,1.0,1.0].iter().enumerate() {
-            assert_eq!(unsafe {rkd_virtual_set_peripheral_input(d,i as u32,*value)},1);
+            assert_eq!(unsafe {rkd_virtual_set_peripheral_input(d,3,i as u32,*value)},1);
         }
-        (unsafe {rkd_virtual_set_peripheral_input(d,7,time)}) == 1
+        (unsafe {rkd_virtual_set_peripheral_input(d,3,7,time)}) == 1
     }
     #[test]
     fn nutrunner_sensor_frames_keep_the_physical_acquisition_ticks() {
@@ -1272,7 +1263,7 @@ mod tests {
         for i in [0,1,3] {assert_eq!(d.board.digital(i),Some(false));}
         assert_eq!(d.nutrunner.as_ref().unwrap().sequence,1);
         assert_eq!(d.nutrunner.as_ref().unwrap().source_ticks,50_000);
-        assert_eq!(unsafe {rkd_virtual_set_peripheral_input(&mut d,0,1.0)},0);
+        assert_eq!(unsafe {rkd_virtual_set_peripheral_input(&mut d,3,0,1.0)},0);
     }
     fn send_controller_output(d: &mut VirtualDevice, sequence: u64, channel: u8,
         kind: u8, digital: u8, analog: f32) -> bool {
@@ -1360,7 +1351,7 @@ mod tests {
             [1_000.0; ACTUATORS], [7; 16], 1).unwrap();
         assert!(d.configure_welder(welder::WelderConfig { sensor_slot: 0, arc_channel: 0, wire_channel: 1,
             voltage_channel: 2, ignition_seconds: 0.002, no_arc_seconds: 0.02, efficiency: 0.9 }));
-        assert!(d.set_welder_grounded(grounded));
+        assert!(d.set_peripheral_input(1, 0, if grounded { 1.0 } else { 0.0 }));
         let mut begin = begin_for([7; 16]);
         begin.channel_count = 3; begin.channel_kind[0] = 1; begin.channel_kind[1] = 2; begin.channel_kind[2] = 2;
         for (i, name) in [b"arc".as_slice(), b"wire".as_slice(), b"voltage".as_slice()].iter().enumerate() {
@@ -1420,7 +1411,7 @@ mod tests {
         assert_eq!(d.weld_values().unwrap()[4], 1.0);
         assert_eq!(d.core.as_ref().unwrap().stop_reason(), Some(StopReason::ProcessFault));
         let mut d = welding_device(true); assert!(d.advance(10_000_000));
-        assert!(d.set_welder_grounded(false)); assert!(d.advance(11_000_000)); assert_weld_off(&d);
+        assert!(d.set_peripheral_input(1, 0, 0.0)); assert!(d.advance(11_000_000)); assert_weld_off(&d);
         assert_eq!(d.weld_values().unwrap()[4], 2.0);
     }
 
@@ -1609,6 +1600,41 @@ mod tests {
     }
 
     #[test]
+    fn peripheral_inputs_are_routed_by_explicit_kind() {
+        let mut d = VirtualDevice::new(1_000_000, 40_000, 0, 0, 1,
+            [1_000.0; ACTUATORS], [7; 16], 1).unwrap();
+        unsafe {
+            assert_eq!(rkd_virtual_set_peripheral_input(std::ptr::null_mut(), 1, 0, 1.0), 0);
+            for kind in [0, 1, 2, 99] {
+                assert_eq!(rkd_virtual_set_peripheral_input(&mut d, kind, 0, 1.0), 0);
+            }
+        }
+        assert!(d.configure_heaters(&heater_parameters()));
+        assert!(d.configure_welder(welder::WelderConfig { sensor_slot: 2, arc_channel: 4,
+            wire_channel: 5, voltage_channel: 6, ignition_seconds: 0.02,
+            no_arc_seconds: 0.2, efficiency: 0.8 }));
+        unsafe {
+            // Both kinds have input zero. Heater presence must not redirect the welding input.
+            assert_eq!(rkd_virtual_set_peripheral_input(&mut d, 1, 0, 1.0), 1);
+            assert!(d.welder.as_ref().unwrap().grounded);
+            assert_eq!(rkd_virtual_set_peripheral_input(&mut d, 2, heaters::input::SENSOR_SHORT, 1.0), 1);
+            for (kind, input, value) in [(99, 0, 0.0), (1, 1, 0.0), (1, 0, 0.5),
+                (1, 0, f64::NAN), (2, u32::MAX, 1.0), (2, 0, f64::INFINITY)] {
+                assert_eq!(rkd_virtual_set_peripheral_input(&mut d, kind, input, value), 0);
+            }
+            assert!(d.welder.as_ref().unwrap().grounded);
+            assert_eq!(rkd_virtual_set_peripheral_input(&mut d, 2, 0, 0.0), 1);
+            assert!(d.welder.as_ref().unwrap().grounded);
+            assert_eq!(rkd_virtual_set_peripheral_input(&mut d, 1, 0, 0.0), 1);
+            assert!(!d.welder.as_ref().unwrap().grounded);
+        }
+        d.heaters.heaters[0].tick(0.1, 210.0, 0.0, None);
+        assert_eq!(d.heater_values(0).unwrap()[4],
+            robotkit_device_protocol::heater::fault::SENSOR_SHORT as f32);
+        assert!(!d.heaters.heaters[1].faulted());
+    }
+
+    #[test]
     fn heaters_need_their_target_channels_to_keep_their_value_through_a_stop() {
         assert!(heating_device(false, 0.0, 10).is_none(), "a target that is dropped by a pause cools the hotend");
         assert!(heating_device(true, 0.0, 10).is_some());
@@ -1661,7 +1687,7 @@ mod tests {
     fn a_heater_fault_stops_the_device_and_switches_every_target_off() {
         let mut d = heating_device(true, 0.0, 200).unwrap();
         assert!(d.advance(70_000_000_000));
-        assert!(d.set_heater_input(heaters::input::COUNT * 0 + heaters::input::SENSOR_OPEN, 1.0));
+        assert!(d.set_peripheral_input(2, heaters::input::COUNT * 0 + heaters::input::SENSOR_OPEN, 1.0));
         assert!(d.advance(70_200_000_000));
         assert_eq!(d.heater_values(0).unwrap()[4], robotkit_device_protocol::heater::fault::SENSOR_OPEN as f32);
         assert_eq!(d.core.as_ref().unwrap().stop_reason(), Some(StopReason::ProcessFault));
@@ -1675,7 +1701,7 @@ mod tests {
     #[test]
     fn a_dead_element_is_found_by_the_watchdog_on_the_device() {
         let mut d = heating_device(true, 0.0, 200).unwrap();
-        assert!(d.set_heater_input(heaters::input::ELEMENT, 0.0));
+        assert!(d.set_peripheral_input(2, heaters::input::ELEMENT, 0.0));
         assert!(d.advance(30_000_000_000));
         assert_eq!(d.heater_values(0).unwrap()[4], robotkit_device_protocol::heater::fault::NOT_HEATING as f32);
         assert_eq!(d.core.as_ref().unwrap().stop_reason(), Some(StopReason::ProcessFault));
