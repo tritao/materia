@@ -3812,3 +3812,27 @@ same isolated solver passes 271 assertions, including a highly damped two-jaw
 grip, actual support removal, measured load/normal forces, 100 mm friction lift
 and release (`sd15-dynamics-implicit-damping-probe.log`). That correction is not
 yet in production; the active closure trace keeps its frozen native inputs.
+
+### SD15a implicit joint damping (2026-10-16)
+
+The detailed native closure trace `sd15-deterministic-trace1` reaches the same
+terminal 4.20 s failure. Both grippers are open during approach; B briefly
+reaches its measured grip window near 3.26 s (about 8.10 mm travel), then reaches
+the empty closed stop during retreat while the plate stays on its tray. This
+narrows the failure to maintaining the physical grasp after closure; no test
+condition was relaxed.
+
+Joint damping is now implicit in the generalized effective inertia. The force
+and contact impulse solves use the same damped response so a blocked actuator's
+measured contact reaction is not attenuated by a separate damping update.
+The 10 N / 1 kg / 1000 N s/m analytical case reaches 0.01 m/s and 0.00999 m
+rather than the demonstrated explicit instability. A second, highly damped
+physical gripper case closes on a supported part, removes the support, measures
+its weight and 40 N per jaw, lifts about 100 mm through friction and releases
+the part to gravity.
+
+All 271 physical assertions and 33615 checked API operations pass, and all six
+core groups are green (`sd15-dynamics-implicit-damping-ctest.log`). This fixes
+the proven numerical instability; a fresh actual cell run must establish its
+application effect. Whole-cell/fault acceptance, final gate and main merge
+remain open.

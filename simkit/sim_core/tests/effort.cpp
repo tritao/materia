@@ -115,7 +115,7 @@ void near_contact(double actual, double expected, double tolerance, const char *
         std::fprintf(stderr, "%s: %.15g vs %.15g tolerance %.4g\n", what, actual, expected, tolerance);
     check(std::abs(actual - expected) <= tolerance, what);
 }
-void grip_probe(bool frictionless) {
+void grip_probe(bool frictionless, double damping = 0) {
     auto b = world(0, 0, -9.81);
     BackendBodyDesc base;
     base.motion_type = NKSIM_MOTION_KINEMATIC;
@@ -126,6 +126,9 @@ void grip_probe(bool frictionless) {
     auto left = collider(*b, NKSIM_MOTION_DYNAMIC, 1, {-.09, 0, .3}, {.02, .06, .05});
     auto right = collider(*b, NKSIM_MOTION_DYNAMIC, 1, {.09, 0, .3}, {.02, .06, .05});
     auto object = collider(*b, NKSIM_MOTION_DYNAMIC, 1, {0, 0, .3}, {.05, .05, .05});
+    std::uint64_t support = 0;
+    if (damping > 0)
+        support = collider(*b, NKSIM_MOTION_STATIC, 0, {0, 0, .2}, {.04, .04, .05});
     auto jaw = [&](std::uint64_t id, double x) {
         BackendJointDesc d;
         d.type = NKSIM_JOINT_PRISMATIC;
@@ -136,6 +139,7 @@ void grip_probe(bool frictionless) {
         d.lower_limit = -.04;
         d.upper_limit = .04;
         d.max_force = 100;
+        d.damping = damping;
         std::uint64_t j;
         ok(b->joint_create(d, &j));
         return j;
@@ -156,8 +160,13 @@ void grip_probe(bool frictionless) {
             ok(b->contact_pair_create(pair));
         }
     effort(*b, leader, 80);
-    for (int i = 0; i < 200; ++i)
+    for (int i = 0; i < (damping > 0 ? 1000 : 200); ++i)
         ok(b->step(.001, 1));
+    if (support) {
+        ok(b->body_destroy(support));
+        for (int i = 0; i < 200; ++i)
+            ok(b->step(.001, 1));
+    }
     auto initial = pose(*b, object);
     if (frictionless) {
         check(initial.position[2] < .2 && initial.linear_velocity[2] < -1.5,
@@ -911,8 +920,28 @@ int main() {
         } else
             check(observed, "nonadjacent, explicit and world-parent contacts remain enabled");
     }
+    {
+        auto b = world();
+        auto base = body(*b, false, 0), child = body(*b, true, 1);
+        BackendJointDesc d;
+        d.type = NKSIM_JOINT_PRISMATIC;
+        d.body_a = base;
+        d.body_b = child;
+        d.axis_a = {1, 0, 0};
+        d.lower_limit = -10;
+        d.upper_limit = 10;
+        d.damping = 1000;
+        std::uint64_t j;
+        ok(b->joint_create(d, &j));
+        effort(*b, j, 10);
+        for (int i = 0; i < 100; ++i)
+            ok(b->step(.01, 1));
+        near(state(*b, j).velocity, .01, "stiff damping reaches the physical terminal speed");
+        near(state(*b, j).position, .00999, "stiff damping preserves finite integrated displacement");
+    }
     grip_probe(false);
     grip_probe(true);
+    grip_probe(false, 1000);
     std::printf("Generalized effort: %d analytical assertions and %d API operations passed; box, convex and "
                 "compound contacts\n",
                 checks - api_operations, api_operations);

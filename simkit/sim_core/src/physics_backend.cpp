@@ -1032,7 +1032,9 @@ private:
             for (const auto &[col, ratio] : mapping) {
                 force[col] += ratio * (effort - j.desc.damping * j.state.velocity);
                 for (const auto &[other, weight] : mapping)
-                    mass[col * n + other] += ratio * weight * j.desc.armature;
+                    // Implicit viscous damping uses the same effective inertia for external
+                    // forces and contact impulses, preserving blocked-drive reaction forces.
+                    mass[col * n + other] += ratio * weight * (j.desc.armature + h * j.desc.damping);
             }
         }
         // Factor independent inertia components separately, preserving all nonzero couplings.
