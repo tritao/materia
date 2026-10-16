@@ -65,11 +65,21 @@ The prepared UR5e has 27 visual pieces, seven physical links, six moving joints,
 and four source colors (including blue and black). FR5's raw URDF declares pale grey. The user-requested
 `fairino5-appearance.json` overrides it with white housings, coral-red annular
 cover trim and a metallic flange, approximating the supplied product photo.
-The profile selects existing triangles in link-local coordinates and adds no
-geometry. It produces 13 visual pieces while preserving all seven physical
+The profile clips paint boundaries across the existing triangle surfaces in
+link-local coordinates, using 128-sided circular clipping boundaries (less than
+18 µm radial error at these cover radii). New vertices stay within the original
+triangles; surface area, volume and bounds are preserved. It produces 13 visual pieces while preserving all seven physical
 links, six joints, source mass/inertia and collision shapes. Its basis and hash
 are recorded in the manifest diagnostics; it is not claimed as vendor material
-data. Neither model's current assets contain image textures. Sources with embedded image textures are rejected explicitly until UV
+data. Neither model's current assets contain image textures.
+
+STL visuals reconstruct angle-weighted normals across coincident vertices,
+with a 40-degree crease threshold to keep cap edges and flange steps sharp.
+Paint clipping interpolates these normals, so color boundaries do not create
+shading seams. DAE visual normals are retained instead of overwritten. These
+are visual-only changes: collision meshes, mass/inertia and joint data are
+unchanged. The underlying vendor STL surface is retained; extreme close-up
+silhouettes still have the source tessellation's resolution limit. Sources with embedded image textures are rejected explicitly until UV
 and image import is implemented; they are not silently converted to flat grey.
 Regenerate with `prepare.py ur5e fairino5_v6`, then export with `--cartesian`.
 The app integration check `--commercial-only` verifies colors, mass and playback

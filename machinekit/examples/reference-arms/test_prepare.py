@@ -64,18 +64,49 @@ class ImportChecks(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "texture"):
             prepare.visual_geometry(visual, ET.fromstring('<robot/>'), Path('/tmp/package'), 'description')
 
-    def test_photo_finish_partitions_existing_triangles_without_changing_geometry(self):
-        mesh = prepare.trimesh.creation.box()
-        profile = {"rings": {"test": [{"axis": 2, "center": [0, 0, 0], "axial": [0, 0.5], "radius": [0, 1]}]},
+    def test_photo_finish_clips_paint_without_changing_the_surface(self):
+        mesh = prepare.smooth_stl(prepare.trimesh.creation.box())
+        profile = {"rings": {"test": [{"axis": 2, "center": [0, 0, 0], "axial": [0, 0.25], "radius": [0, 1]}]},
                    "flange": {"link": "test", "axis": 2, "minimum": 0.25}}
         for name, color in [("white", [1, 1, 1, 1]), ("red", [1, 0, 0, 1]), ("silver", [0.7, 0.7, 0.7, 1])]:
             profile[name] = {"color": color, "metallic": 0, "roughness": 0.4}
         regions = prepare.paint_reference_regions("test", [(mesh, None, 0, 0)], profile)
         self.assertEqual(len(regions), 3)
         joined = prepare.trimesh.util.concatenate([region[0] for region in regions])
-        self.assertEqual(len(joined.faces), len(mesh.faces))
-        a, b = mesh.triangles_center, joined.triangles_center
-        np.testing.assert_allclose(a[np.lexsort(a.T)], b[np.lexsort(b.T)])
+        self.assertGreater(len(joined.faces), len(mesh.faces))
+        self.assertAlmostEqual(joined.area, mesh.area, places=12)
+        np.testing.assert_allclose(joined.bounds, mesh.bounds)
+        # Every new point remains on an original box face.
+        np.testing.assert_allclose(np.max(np.abs(joined.vertices), axis=1), 0.5)
+
+    def test_cylinder_normals_are_smooth_but_caps_keep_their_crease(self):
+        source = prepare.trimesh.creation.cylinder(radius=1, height=2, sections=24)
+        mesh = prepare.smooth_stl(source)
+        corner_normals = mesh.vertex_normals[mesh.faces]
+        side = np.abs(mesh.face_normals[:, 2]) < 0.01
+        radial = mesh.triangles[side].copy(); radial[:, :, 2] = 0
+        radial /= np.linalg.norm(radial, axis=2, keepdims=True)
+        np.testing.assert_allclose(corner_normals[side], radial, atol=1e-12)
+        cap = ~side
+        np.testing.assert_allclose(corner_normals[cap], np.repeat(mesh.face_normals[cap, None, :], 3, axis=1), atol=1e-12)
+        np.testing.assert_array_equal(mesh.triangles, source.triangles)
+
+    def test_round_paint_boundary_cuts_across_a_coarse_triangle(self):
+        mesh = prepare.trimesh.Trimesh([[-0.1, -0.1, 0], [0.1, -0.1, 0], [0, 0.2, 0]], [[0, 1, 2]],
+                                      vertex_normals=[[0, 0, 1]]*3, process=False)
+        material = {"color": [1, 1, 1, 1], "metallic": 0, "roughness": 0.4}
+        profile = {"rings": {"test": [{"axis": 2, "center": [0, 0, 0], "axial": [-0.001, 0.001], "radius": [0.03, 0.05]}]},
+                   "flange": {"link": "other"}, "white": material, "red": material, "silver": material}
+        regions = prepare.paint_reference_regions("test", [(mesh, None, 0, 0)], profile)
+        self.assertEqual(len(regions), 2)
+        joined = prepare.trimesh.util.concatenate([r[0] for r in regions])
+        self.assertAlmostEqual(joined.area, mesh.area, places=12)
+        red = regions[1][0]
+        self.assertAlmostEqual(red.area, np.pi*(0.05**2-0.03**2), delta=2e-6)
+        radius = np.linalg.norm(red.vertices[:, :2], axis=1)
+        self.assertGreater(np.count_nonzero(np.abs(radius-0.03)<2e-5), 100)
+        self.assertGreater(np.count_nonzero(np.abs(radius-0.05)<2e-5), 100)
+        np.testing.assert_allclose(joined.vertex_normals, np.tile([0, 0, 1], (len(joined.vertices), 1)), atol=1e-12)
 
     def test_wire_fields_come_from_consumer_schema(self):
         value = {"schema": 1, "id": "test", "family": "ur", "root": "base", "tip": "tip",

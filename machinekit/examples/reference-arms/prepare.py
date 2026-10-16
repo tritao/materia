@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 import trimesh
+from visual_finishes import smooth_stl, paint_regions
 
 ROOT = Path(__file__).resolve().parent
 SOURCES = json.loads((ROOT / "sources.json").read_text())
@@ -217,33 +218,14 @@ def visual_geometry(visual, robot, package, package_name):
         mesh.apply_transform(origin(visual.find("origin")))
         if not len(mesh.faces) or not np.isfinite(mesh.vertices).all():
             raise ValueError("Empty/nonfinite visual material region")
+        if path.lower().endswith(".stl"):
+            mesh = smooth_stl(mesh)
         result.append((mesh, color, 0.0 if metallic is None else float(metallic), 0.65 if roughness is None else float(roughness)))
     return result
 
 
 def paint_reference_regions(link, regions, profile):
-    """Assign a photo-matching finish to existing triangles; never alter topology."""
-    painted = []
-    for mesh, _, _, _ in regions:
-        centers = mesh.triangles_center
-        labels = np.zeros(len(mesh.faces), dtype=np.uint8)
-        for ring in profile["rings"].get(link, []):
-            axis = ring["axis"]
-            radial = np.delete(centers - np.array(ring["center"]), axis, axis=1)
-            radius = np.linalg.norm(radial, axis=1)
-            labels[(centers[:, axis] >= ring["axial"][0]) & (centers[:, axis] <= ring["axial"][1]) &
-                   (radius >= ring["radius"][0]) & (radius <= ring["radius"][1])] = 1
-        flange = profile["flange"]
-        if link == flange["link"]:
-            labels[centers[:, flange["axis"]] >= flange["minimum"]] = 2
-        for label, finish in enumerate(["white", "red", "silver"]):
-            faces = np.flatnonzero(labels == label)
-            if not len(faces):
-                continue
-            part = mesh.submesh([faces], append=True, repair=False)
-            material = profile[finish]
-            painted.append((part, material["color"], material["metallic"], material["roughness"]))
-    return painted
+    return paint_regions(link, regions, profile)
 
 
 def compile_model(family, model):
@@ -336,12 +318,7 @@ def compile_model(family, model):
             visual_high = np.maximum(visual_high, mesh.vertices.max(0))
             stem = f"{name}-{i}"
             mesh.vertices.astype("<f8").tofile(destination / (stem + ".vertices"))
-            normals = np.zeros_like(mesh.vertices)
-            triangles = mesh.vertices[mesh.faces]
-            face_normals = np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0])
-            for column in range(3):
-                np.add.at(normals, mesh.faces[:, column], face_normals)
-            normals /= np.maximum(np.linalg.norm(normals, axis=1, keepdims=True), 1e-20)
+            normals = mesh.vertex_normals
             normals.astype("<f8").tofile(destination / (stem + ".normals"))
             mesh.faces.astype("<i4").tofile(destination / (stem + ".indices"))
             meshes.append({"stem": stem, "vertexCount": len(mesh.vertices), "indexCount": mesh.faces.size,
