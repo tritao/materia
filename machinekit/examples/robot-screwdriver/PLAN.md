@@ -3507,3 +3507,24 @@ convex/compound bodies still need supplied inertial properties; generic inertia
 fallbacks, full material/filter semantics, topology caching, reset/history and
 scaling remain before production integration. Production sources are unchanged
 and deterministic whole-cell acceptance remains open.
+
+### SD15a convex and compound inertia prototype (2026-10-16)
+
+The isolated solver derives uniform-density convex/compound mass properties by
+integrating oriented face tetrahedra, accumulating first/second moments and
+shifting inertia to the resulting center of mass. Separate collision pieces
+contribute their volumes and parallel-axis terms; empty gaps are not filled.
+Supplied inertial properties remain authoritative. Changing body mass scales
+its stored inertia with the mass ratio.
+
+Eighteen analytical assertions match the unit tetrahedron's COM and full
+inertia tensor and a separated two-box body's COM/parallel-axis inertia
+(`sd15-dynamics-inertia-analytical.log`). The physical probe now passes 62
+assertions and 9092 checked API operations: a convex body rests with correct
+measured support without supplied inertia; an actual compound body accelerates
+under torque according to its inferred inertia, and doubling mass halves its
+subsequent angular acceleration (`sd15-dynamics-inertia-motion.log`).
+
+These changes remain isolated from production. Non-polyhedral primitives,
+material/filter semantics, topology caching, reset/history and scaling still
+need review and coverage before integration and deterministic cell acceptance.
