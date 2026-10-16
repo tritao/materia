@@ -18,8 +18,8 @@ The examples in this directory are:
 - `materia.staged.project.json`: snug, then final tightening of installed screws.
 - `materia.feeder.project.json`: a bowl and buffered track replenish one pickup
   nest for all four primary screws. Replacement presenters remain separate.
-- `materia.blow-feed.project.json`: draft tube-to-tool delivery for the four
-  CAD fastenings; app/CAD acceptance is pending (see SD10 in the plan).
+- `materia.blow-feed.project.json`: tube-to-tool delivery for the four CAD
+  fastenings, with metering, an air pulse and measured receipt at the tool.
 - `materia.threads.project.json` and `materia.fastenings.project.json`: cosmetic
   threads and CAD fastening discovery.
 - `haxeon.drawing.json`: exports section, end and screw-side SVG drawing views
@@ -49,17 +49,19 @@ commissioned I/O profile and atomic timestamped acquisitions. Empty/jam inputs
 are optional: missing sensors remain unknown. The I/O host polls independently
 of planning and owns electrical polarity and its physical output watchdog.
 
-The SD10 draft adds metering and a separate air pulse, a receiving nosepiece
+The blow-feed variant adds metering and a separate air pulse, a receiving nosepiece
 and measured receipt before direct travel to the hole. Presenter jobs remain
 available through an explicit acquisition mode. The tube dimensions, local
 mass, pressure, timing, receiving-speed limits and external dress-pack routing
 are demonstration/commissioning assumptions recorded in [PLAN.md](PLAN.md).
-SD11's draft uses the screwdriver's digital TCP contact source and retains its
+Touch registration uses the screwdriver's digital TCP contact source and retains its
 typed measurement provenance and remaining pose bounds. Vision is deferred
 until a calibrated camera reference source is available. The scene format is
-v44. The generated touch sensor assumes a noise-free simulation contact; a
+v41. The generated touch sensor assumes a noise-free simulation contact; a
 hardware project must provide its commissioned calibration bound. The force-
 search example carries simulation-only commissioned limits and requires a
 fresh measured compression baseline followed by a confirmed force drop; it is
-not a hardware safety recipe. SD10–SD12 remain unaccepted until their
-native/app gates and required review pass; the disk reserve stopped validation.
+not a hardware safety recipe. SD0–SD14 acceptance evidence and the outstanding
+project-wide gate failures are recorded in [PLAN.md](PLAN.md). The SD15 two-arm
+pick, place and fasten cell is still being commissioned; its complete cycle and
+fault/recovery acceptance remain open.
