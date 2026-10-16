@@ -3094,3 +3094,10 @@ its successful fastening and downstream completion remain unproven.
 
 The default-backend full physical-cycle requirement remains unchanged. A scope
 question about its absent effort dynamics is pending; no answer is assumed.
+
+The reset-wire fix is now verified against both the cell's robot-only recovery
+case and `sd-cases-sd15-tending-reset`: `tending-exchange` passes in 391.6 s wall,
+1877 MB peak, including the existing emergency-stop, restocking, jaw/drop,
+door-jam and machine-alarm recovery checks before two physical machining cycles.
+The independently registered `robot-recovery` regression is still queued for
+compilation; its pending state does not replace the above integration evidence.

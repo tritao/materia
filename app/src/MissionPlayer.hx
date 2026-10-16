@@ -1622,7 +1622,10 @@ class MissionPlayer implements SessionMember {
     // The safety-reset command is asynchronous. Writing an energised controller
     // output in this call can race the runtime while it still reports the stop.
     // Defer the machine reset pulse until a later tick observes a ready robot.
-    recoveryOutputPending = true;
+    // A robot-only assembly cell has no CNC fault-reset wire. Reset a machine only when this
+    // controller actually owns its declared reset output; local robot safety is reset by the caller.
+    recoveryOutputPending = [for (wire in project.signals) if (wire.name == RobotInterfaceChannels.FAULT_RESET &&
+      wire.from.controller == mission.controllerId) wire].length > 0;
     recoveryPulsePending = false;
     recoveryElapsed = 0.0;
     recoveryStep = resume;
