@@ -3258,3 +3258,13 @@ starts from pickup. The interaction with an already engaged screw needs a
 qualified recovery path; the fixed-plate interruption pass is not evidence of
 full-cell recovery. Both acceptance items and the deterministic-backend force
 dynamics gap remain open. No tolerance or acceptance threshold was relaxed.
+
+The unload contact trace (`sd15-outfeed-trace1`) identifies the outfeed presence
+head, native object 18, under the B pad during placement. Contact rises to
+about 29 N as the plate shifts and tips. Tray heads now receive the relevant
+gripper's finger depth and sit laterally clear of its swept pad, just as the
+fixture head does. Their declared sensing volumes and I/O remain on their
+pocket datums. `sd15-outfeed-clear-head2` passes the isolated rigid-assembly
+unload with all five children retained and a measured final position error of
+0.200 mm (48.2 s wall, 417 MB). This proves the placement correction in that
+diagnostic; the complete fastening cycle must still be rerun for acceptance.

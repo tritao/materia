@@ -56,9 +56,9 @@ class PickPlaceFastenCell extends ScrewdrivingCell {
 		connectPorts("handling-air", "handlingAir", "air", "handling", "compressedAir");
 		connectPorts(PART_READY, HANDLING_CONTROLLER, "output1", FASTENING_CONTROLLER, "input1");
 		connectPorts(FASTENED, FASTENING_CONTROLLER, "output1", HANDLING_CONTROLLER, "input1");
-		presence("housing-present", "housingTray", housing.face, housing.depth+5, 2);
-		presence("plate-present", "plateTray", work.plate.width, work.plate.thickness+5, 3);
-		presence("outfeed-present", "outfeedTray", work.plate.width, work.plate.thickness+5, 4);
+		presence("housing-present", "housingTray", housing.face, housing.depth+5, 2, gripper.spec.fingerDepth);
+		presence("plate-present", "plateTray", work.plate.width, work.plate.thickness+5, 3, gripper.specB.fingerDepth);
+		presence("outfeed-present", "outfeedTray", work.plate.width, work.plate.thickness+5, 4, gripper.specB.fingerDepth);
 		// Leave the middle of the plate edge clear for B's contact pad during unload.
 		var fixtureHeadX = gripper.specB.fingerDepth/2 + DigitalSensor.BODY_WIDTH/2 + 5;
 		addComponent("fixture-present", new DigitalSensor("presence"),
@@ -80,11 +80,13 @@ class PickPlaceFastenCell extends ScrewdrivingCell {
 		}
 	}
 
-	function presence(name:String, tray:String, depth:Float, range:Float, input:Int):Void {
+	function presence(name:String, tray:String, depth:Float, range:Float, input:Int, fingerDepth:Float):Void {
 		var seat = connector(tray+"/slot-0-0");
 		var frame = AssemblyFrames.compose(solvedPoses().get(seat.instanceId), memberConnectorFrame(seat.instanceId, seat.connectorName));
+		// Keep the physical head outside the finger sweep; the sensed volume stays on the pocket datum.
 		addComponent(name, new DigitalSensor("presence"),
-			AssemblyFrames.translation(frame.x, frame.y-depth/2-9, frame.z));
+			AssemblyFrames.translation(frame.x + fingerDepth/2 + DigitalSensor.BODY_WIDTH/2 + 5,
+				frame.y-depth/2-9, frame.z));
 		addPresence(name, tray+"/slot-0-0", range);
 		connectPorts(name+"-input", name, "signal", HANDLING_CONTROLLER, 'input$input');
 	}
