@@ -13,13 +13,18 @@ class PickPlaceFastenTests {
   static function runSelected(root:String, selected:Null<String>):Void {
     var supplyFailure = selected == "supply";
     var fixtureFailure = selected == "fixture";
-    var interruption = selected == "interruption";
-    var stages = selected == "housing" || supplyFailure || interruption ? [true] : selected == "full" || fixtureFailure ? [false] : [true, false];
+    var fullInterruption = selected == "interruption-full";
+    var interruption = selected == "interruption" || fullInterruption;
+    var stages = fullInterruption ? [false] : selected == "housing" || supplyFailure || interruption ? [true] : selected == "full" || fixtureFailure ? [false] : [true, false];
     var backendChoice = Sys.getEnv("PICK_PLACE_BACKEND");
     var backends = backendChoice == "0" ? [ApplicationSimulation.DETERMINISTIC] :
       backendChoice == "1" ? [ApplicationSimulation.MUJOCO] : [ApplicationSimulation.MUJOCO, ApplicationSimulation.DETERMINISTIC];
     if (selected == "recovery") {
       for (backend in backends) checkHousingRecovery(root,backend);
+      return;
+    }
+    if (selected == "unload") {
+      for (backend in backends) checkUnload(root,backend);
       return;
     }
     for (housingOnly in stages) for (backend in backends) {
@@ -160,7 +165,90 @@ class PickPlaceFastenTests {
       runSelected(root,"supply");
       runSelected(root,"fixture");
       runSelected(root,"interruption");
+      runSelected(root,"interruption-full");
     }
+  }
+
+  /** Diagnostic only: commission handling of the CAD-seated rigid assembly without claiming fastening acceptance. */
+  static function checkUnload(root:String, backend:Int):Void {
+    var manifest = FileSystem.fullPath(root+"/machinekit/examples/robot-screwdriver/materia.pick-place.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var programs = generated.missions;
+    var handler = [for (program in programs) if (program.controllerId == "handlingController") program][0];
+    var fastener = [for (program in programs) if (program.controllerId == "fasteningController") program][0];
+    var jobs = [for (step in fastener.steps) if (step.screw != null)
+      materia.project.SceneScrewInvocation.job(step.screw,fastener.steps)];
+    var unload = -1;
+    for (index in 0...handler.steps.length) {
+      var step = handler.steps[index];
+      if (step.kind == "pick" && step.at != null && step.at.occurrence == "work/plate") unload = index;
+    }
+    if (unload < 0 || jobs.length != 4) throw "Unload diagnostic lost its CAD assembly or handling route";
+    handler.steps = handler.steps.slice(unload);
+    generated.missions = [handler];
+    var session = new ProjectDocumentSession(null,false), simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(backend);
+    try {
+      session.openGeneratedProject(generated,manifest);
+      if (!simulation.rebuild(session.sensors,session.scene,session)) throw 'Unload rebuild: ${simulation.error}';
+      var mission = simulation.missionPlayer("handlingController"), clock = simulation.activeSession();
+      if (mission == null || clock == null) throw "Unload diagnostic lost its controller";
+      simulation.stop();
+      var seat = @:privateAccess mission.liveConnectorFrame({occurrence:"table",connector:"plateSeat"});
+      var plate = mission.assemblyParts.get("project:work/plate"), housing = mission.assemblyParts.get("project:work/flange/housing");
+      function stage(part:SimulationAssemblyParts.SimulationAssemblyPart, origin:materia.assembly.AssemblyRecord.AssemblyFrame):Void {
+        var body = AssemblyFrames.compose(origin,AssemblyFrames.translation(part.center[0],part.center[1],part.center[2]));
+        part.freeBody().teleport(new nativekit.sim.SimPose(body.x,body.y,body.z,body.qx,body.qy,body.qz,body.qw));
+      }
+      stage(plate,seat);
+      var housingSeat = mission.assemblyParts.connectorFrame(plate.id,"housingSeat");
+      stage(housing,AssemblyFrames.compose(seat,AssemblyFrames.translation(housingSeat.x,housingSeat.y,housingSeat.z)));
+      plate.retainRigid(housing.freeBody());
+      for (job in jobs) {
+        if (job == null) throw "Unload diagnostic lost a screw identity";
+        var screw = mission.assemblyParts.get("project:"+job.screw);
+        stage(screw,AssemblyFrames.compose(AssemblyFrames.compose(seat,job.seat),AssemblyFrames.inverse(job.socket)));
+        plate.retainRigid(screw.freeBody());
+      }
+      printProgress('Unload diagnostic begins backend $backend at ${haxe.Json.stringify(plate.pose())}');
+      var tracing = Sys.getEnv("PICK_PLACE_TRACE") == "1";
+      if (tracing) printProgress('Unload plate object ${plate.freeBody().handle.rawValue()}');
+      var diagnosticTools = @:privateAccess simulation.tools;
+      if (tracing && diagnosticTools != null) for (entry in diagnosticTools.objectsByScene())
+        printProgress('Unload object ${entry.object.handle.rawValue()}: ${entry.id}');
+      var nextTrace = 0.25;
+      while (!mission.finished && mission.failure == null && clock.simulationTime() < 60) {
+        simulation.step();
+        if (tracing && clock.simulationTime() >= nextTrace && mission.stepIndex == 0) {
+          var snapshot = mission.robot.runtime.snapshot();
+          var jaw = [for (index in 0...mission.robot.model.joints.length)
+            if (StringTools.contains(mission.robot.model.joints[index].name,"gripperB/jaw"))
+              {name:mission.robot.model.joints[index].name,q:snapshot.q.get(index)}];
+          var bits = [for (frame in snapshot.sensors.toArray()) if (StringTools.contains(frame.sensorId,"gripperB"))
+            {name:frame.sensorId,value:frame.values.length == 0 ? -1.0 : frame.values.get(0)}];
+          var tools = @:privateAccess simulation.tools;
+          if (tools != null) for (gripper in tools.grippers) if (StringTools.contains(gripper.commandChannel,"gripperB")) {
+            var contacts = [for (contact in mission.simulation.robotContacts(gripper.runtime))
+              if (contact.active && gripper.contactLinks.indexOf(contact.linkIndex) >= 0)
+                {link:contact.linkIndex,object:contact.otherObject,distance:contact.distance,force:contact.force.toArray()}];
+            printProgress('Unload trace ${clock.simulationTime()} plate=${haxe.Json.stringify(plate.pose())} jaws=${haxe.Json.stringify(jaw)} sensors=${haxe.Json.stringify(bits)} contacts=${haxe.Json.stringify(contacts)}');
+          }
+          nextTrace += 0.25;
+        }
+      }
+      if (!mission.finished || mission.failure != null) {
+        var tcp = @:privateAccess mission.toolContact("handling/tool/gripperB/body.close");
+        printProgress('Unload diagnostic plate=${haxe.Json.stringify(plate.pose())}, TCP=${tcp.toArray()}');
+        for (frame in mission.robot.runtime.snapshot().sensors.toArray()) if (StringTools.contains(frame.sensorId,"gripperB"))
+          printProgress('Unload diagnostic ${frame.sensorId}: ${[for (i in 0...frame.values.length) frame.values.get(i)]}');
+        throw 'Unload diagnostic failed at step ${mission.stepIndex}: ${mission.failure}';
+      }
+      if (!plate.carries(housing.freeBody())) throw "Unload diagnostic detached the housing";
+      for (job in jobs) if (job != null && !plate.carries(mission.assemblyParts.get("project:"+job.screw).freeBody()))
+        throw "Unload diagnostic detached an installed screw";
+      printProgress('Unload diagnostic passed backend $backend at ${clock.simulationTime()}');
+      simulation.dispose(); session.dispose();
+    } catch (error:Dynamic) {simulation.dispose(); session.dispose(); throw error;}
   }
 
   /** Recover the actual controller and measured pocket wait, without a machine-reset output. */

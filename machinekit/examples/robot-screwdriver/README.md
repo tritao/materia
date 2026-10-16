@@ -97,6 +97,10 @@ CAD and controller-program checks run with:
 
 The app `screwdriver-pick-place` case runs the commissioning stages and fault
 checks. During development, `PICK_PLACE_STAGE` selects `housing`, `full`,
-`recovery`, `fixture`, `supply` or `interruption`; `PICK_PLACE_BACKEND` selects
+`recovery`, `fixture`, `supply`, `interruption` (fixed plate), or
+`interruption-full` (including plate loading and unload); `PICK_PLACE_BACKEND` selects
 `0` or `1`. The default selection exercises both backends. These selectors do
 not turn an unsupported or incomplete scenario into an acceptance pass.
+`unload` stages the CAD-seated rigid assembly for handling diagnostics; it
+does not qualify fastening. `PICK_PLACE_TRACE=1` adds jaw and contact traces
+for that diagnostic.
