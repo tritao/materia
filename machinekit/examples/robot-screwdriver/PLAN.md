@@ -3464,3 +3464,11 @@ Evidence: `sd15-dynamics-differential.log`; the experimental patch and source
 hashes in scratch have been refreshed. Convex/compound geometry, full material
 semantics, inertial fallbacks, reset/history and scaling remain prerequisites
 before production integration and actual deterministic cell acceptance.
+
+The isolated contact prototype now computes box edge-contact positions from
+closest witnesses on actual support segments, replacing the body-center
+approximation. Six analytical segment cases (skew, endpoint, parallel and
+degenerate segments) pass 18 coordinate assertions; the existing 48 physical
+assertions still pass. Evidence: `sd15-dynamics-edge.log`. This remains scratch
+implementation; generic convex/compound contacts and production integration
+are not yet accepted.
