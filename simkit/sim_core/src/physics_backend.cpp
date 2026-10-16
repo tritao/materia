@@ -1671,7 +1671,8 @@ private:
         if (index < 0)
             return body;
         const auto &part = body.desc.shape_parts[index];
-        TestBody piece = body;
+        TestBody piece;
+        piece.id = body.id;
         piece.state.position = add(body.state.position, rotate(body.state.rotation, part.position));
         piece.state.rotation = multiply(body.state.rotation, part.rotation);
         piece.desc.shape_type = part.type;
@@ -1760,14 +1761,64 @@ private:
         }
         return false;
     }
+    struct ForceBounds {
+        Vec3 minimum{INFINITY, INFINITY, INFINITY}, maximum{-INFINITY, -INFINITY, -INFINITY};
+        void include(const Vec3 &p) {
+            for (int i = 0; i < 3; ++i) {
+                minimum[i] = std::min(minimum[i], p[i]);
+                maximum[i] = std::max(maximum[i], p[i]);
+            }
+        }
+        bool overlaps(const ForceBounds &b) const {
+            for (int i = 0; i < 3; ++i)
+                if (maximum[i] < b.minimum[i] || b.maximum[i] < minimum[i])
+                    return false;
+            return true;
+        }
+    };
+    static ForceBounds piece_bounds(const TestBody &piece) {
+        ForceBounds bounds;
+        if (piece.desc.shape_type == NKSIM_SHAPE_BOX) {
+            const auto box = force_box(piece);
+            Vec3 radius{};
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 3; ++j)
+                    radius[i] += std::abs(box.axes[j][i]) * box.half[j];
+            bounds.include(sub(box.center, radius));
+            bounds.include(add(box.center, radius));
+        } else
+            for (std::size_t i = 0; i + 2 < piece.desc.shape_vertices.size(); i += 3)
+                bounds.include(add(piece.state.position,
+                                   rotate(piece.state.rotation,
+                                          {piece.desc.shape_vertices[i], piece.desc.shape_vertices[i + 1],
+                                           piece.desc.shape_vertices[i + 2]})));
+        return bounds;
+    }
     nksim_result force_step(double h) {
         auto outcome = advance_efforts(h);
         if (outcome != NKSIM_OK)
             return outcome;
         std::vector<ImpulseContact> rows;
+        std::vector<std::vector<TestBody>> pieces(bodies.size());
+        std::vector<std::vector<ForceBounds>> bounds(bodies.size());
+        std::vector<ForceBounds> body_bounds(bodies.size());
+        for (std::size_t i = 0; i < bodies.size(); ++i) {
+            const auto &body = bodies[i];
+            const int count = std::max(1, static_cast<int>(body.desc.shape_parts.size()));
+            pieces[i].reserve(count);
+            bounds[i].reserve(count);
+            for (int part = 0; part < count; ++part) {
+                pieces[i].push_back(part_body(body, body.desc.shape_parts.empty() ? -1 : part));
+                bounds[i].push_back(piece_bounds(pieces[i].back()));
+                body_bounds[i].include(bounds[i].back().minimum);
+                body_bounds[i].include(bounds[i].back().maximum);
+            }
+        }
         for (std::size_t ai = 0; ai < bodies.size(); ++ai)
             for (std::size_t bi = ai + 1; bi < bodies.size(); ++bi) {
                 const auto &a = bodies[ai], &b = bodies[bi];
+                if (!body_bounds[ai].overlaps(body_bounds[bi]))
+                    continue;
                 if (excluded_pairs.count({std::min(a.id, b.id), std::max(a.id, b.id)}))
                     continue;
                 const bool layered = (a.desc.collision_mask & b.desc.collision_layer) ||
@@ -1778,6 +1829,8 @@ private:
                           count_b = std::max(1, static_cast<int>(b.desc.shape_parts.size()));
                 for (int ia = 0; ia < count_a; ++ia)
                     for (int ib = 0; ib < count_b; ++ib) {
+                        if (!bounds[ai][ia].overlaps(bounds[bi][ib]))
+                            continue;
                         const int pa = a.desc.shape_parts.empty() ? -1 : ia,
                                   pb = b.desc.shape_parts.empty() ? -1 : ib;
                         const BackendShapePart default_surface;
@@ -1793,16 +1846,17 @@ private:
                                  pair.part_b == static_cast<unsigned>(ia)))
                                 explicit_pair = &pair;
                         const bool environment =
-                            layered && !same_articulation(a.id, b.id) &&
+                            layered &&
                             ((part_a.contact_filter == NKSIM_CONTACT_PAIRS_AND_ENVIRONMENT &&
                               part_b.contact_filter == NKSIM_CONTACT_LAYERS) ||
                              (part_b.contact_filter == NKSIM_CONTACT_PAIRS_AND_ENVIRONMENT &&
-                              part_a.contact_filter == NKSIM_CONTACT_LAYERS));
+                              part_a.contact_filter == NKSIM_CONTACT_LAYERS)) &&
+                            !same_articulation(a.id, b.id);
                         if (!explicit_pair && !environment &&
                             !(layered && part_a.contact_filter == NKSIM_CONTACT_LAYERS &&
                               part_b.contact_filter == NKSIM_CONTACT_LAYERS))
                             continue;
-                        const auto piece_a = part_body(a, pa), piece_b = part_body(b, pb);
+                        const auto &piece_a = pieces[ai][ia], &piece_b = pieces[bi][ib];
                         const auto supported = [](auto type) {
                             return type == NKSIM_SHAPE_BOX || type == NKSIM_SHAPE_CONVEX;
                         };
@@ -1955,14 +2009,30 @@ private:
                 j.state.position += h * j.state.velocity;
             clamp_joint_position(j);
         }
-        enforce_couplings();outcome=recompute_articulated_poses(0);if(outcome!=NKSIM_OK)return outcome;
-        std::vector<PointVelocity> published;for(const auto &b:bodies)published.push_back(body_velocity(b.id));
-        for(std::size_t i=0;i<bodies.size();++i)if(bodies[i].desc.motion_type==NKSIM_MOTION_DYNAMIC&&parent_joint(bodies[i].id)!=nullptr){bodies[i].state.linear_velocity=published[i].v;bodies[i].state.angular_velocity=published[i].w;}
+        enforce_couplings();
+        outcome = recompute_articulated_poses(0);
+        if (outcome != NKSIM_OK)
+            return outcome;
+        std::vector<PointVelocity> published;
+        for (const auto &b : bodies)
+            published.push_back(body_velocity(b.id));
+        for (std::size_t i = 0; i < bodies.size(); ++i)
+            if (bodies[i].desc.motion_type == NKSIM_MOTION_DYNAMIC && parent_joint(bodies[i].id) != nullptr) {
+                bodies[i].state.linear_velocity = published[i].v;
+                bodies[i].state.angular_velocity = published[i].w;
+            }
         record_velocity_history();
-        for(const auto &c:rows) {
-            auto observation=c.contact;observation.force_on_body_a=scale(add(scale(c.contact.normal,c.normal_impulse),add(scale(c.u,c.impulse_u),scale(c.v,c.impulse_v))),-1/h);
-            observation.torque_on_body_a=scale(add(scale(c.contact.normal,c.angular_impulse[0]),add(scale(c.u,c.angular_impulse[1]),scale(c.v,c.angular_impulse[2]))),-1/h);
-            observation.wrench_valid=c.normal.inverse_effective>0;contacts.push_back(observation);
+        for (const auto &c : rows) {
+            auto observation = c.contact;
+            observation.force_on_body_a = scale(add(scale(c.contact.normal, c.normal_impulse),
+                                                    add(scale(c.u, c.impulse_u), scale(c.v, c.impulse_v))),
+                                                -1 / h);
+            observation.torque_on_body_a =
+                scale(add(scale(c.contact.normal, c.angular_impulse[0]),
+                          add(scale(c.u, c.angular_impulse[1]), scale(c.v, c.angular_impulse[2]))),
+                      -1 / h);
+            observation.wrench_valid = c.normal.inverse_effective > 0;
+            contacts.push_back(observation);
         }
         return NKSIM_OK;
     }

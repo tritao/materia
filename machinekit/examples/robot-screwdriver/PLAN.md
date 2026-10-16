@@ -3656,3 +3656,25 @@ backend-0 cell/gripping and the fault matrix must now be rebuilt/run, with
 remaining integration issues fixed from those observations. Contact margins/gaps,
 non-polyhedral shapes and broader topology/reset combinations are not proven by
 this suite. The final editor/native/full gate and local-main merge remain due.
+
+### SD15a first deterministic cell profile and contact collection fix (2026-10-16)
+
+The app rebuilt its own native SimKit library and began the actual backend-0
+loose-plate cycle (`sd15-deterministic-native1`). At H2 / 0.02 simulated seconds,
+a live CPU profile identified repeated whole-compound descriptor copies in
+`part_body` and allocation overhead in contact collection. This diagnostic run
+was explicitly stopped to address that measured bottleneck; it is not a
+functional acceptance result. Profile: `sd15-deterministic-native1-profile.txt`.
+
+Contact collection now transforms each piece once per substep, copies only its
+own geometry and rejects non-overlapping body/piece world bounds before narrow
+phase. Environment articulation traversal runs only for relevant filter types.
+The broad-phase bounds conservatively enclose transformed boxes and all convex
+vertices, preserving exact narrow-phase geometry and compound gaps. All six
+standard core groups, including the 241-assertion dynamics suite, pass again
+(`sd15-dynamics-broadphase-ctest.log`). A fresh actual cell run remains required.
+
+The initial integrated dynamics suite also passed AddressSanitizer and
+UndefinedBehaviorSanitizer with leak detection before this collection change
+(`sd15-dynamics-sanitizer.log`). Sanitizer acceptance must be refreshed if needed
+for the final implementation.
