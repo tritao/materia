@@ -171,9 +171,10 @@ class ZeroErrArmPreview {
     }
     if(shards<1||shard<0||shard>=shards) throw "Invalid motion screen shard";
     samples=[for(i in 0...samples.length) if(i%shards==shard) samples[i]];
-    var custom=false;
+    var custom=false,poseFile:Null<String> = null;
     for(arg in Sys.args()) if(StringTools.startsWith(arg,"--pose-file=")) {
-      var rows:Array<Dynamic> = haxe.Json.parse(sys.io.File.getContent(arg.substr(12)));custom=true;
+      poseFile=arg.substr(12);
+      var rows:Array<Dynamic> = haxe.Json.parse(sys.io.File.getContent(poseFile));custom=true;
       samples=[];
       for(row in rows) {
         var values:Array<Dynamic> = row, q:Array<Float> = [];
@@ -184,6 +185,20 @@ class ZeroErrArmPreview {
     }
     var reportPath=buildDirectory()+"/"+(screen ? (custom ? 'motion-screen-custom-$shard.json' :
       (shards>1 ? 'motion-screen-$shard.json' : "motion-screen.json")) : "clearance-report.json");
+    var coversOnly=Sys.args().indexOf("--cover-regression")>=0;
+    if(coversOnly) {
+      if(!straight() || !screen || !custom) throw "Cover regression requires straight custom motion probes";
+      reportPath=buildDirectory()+'/cover-motion-$shard.json';
+    }
+    var provenance:Dynamic=null;
+    if(coversOnly) {
+      provenance={status:"incomplete",layoutSha256:haxe.crypto.Sha256.encode(sys.io.File.getContent(layoutPath())),
+        poseFileSha256:haxe.crypto.Sha256.encode(sys.io.File.getContent(poseFile)),
+        producerSha256:haxe.crypto.Sha256.encode(sys.io.File.getContent(DIRECTORY+"/ZeroErrArmPreview.hx")),
+        scope:"Every pair involving either service cover among the 29 structural solids",poses:samples.length};
+      sys.io.File.saveContent(reportPath,"[]\n");
+      sys.io.File.saveContent(reportPath+".provenance.json",haxe.Json.stringify(provenance,null,"  "));
+    }
     // Cache fixed-body pair results; moving pairs remain checked at every pose.
     var roots:Map<String,String> = [];
     var joints = model.definition("clearance-roots").joints;
@@ -208,6 +223,7 @@ class ZeroErrArmPreview {
         var placed:Array<Null<Part>> = [for (_ in entries) null];
         try {
           for (i in 0...entries.length) for (j in i+1...entries.length) {
+            if(coversOnly && !StringTools.endsWith(entries[i].id,"-cover") && !StringTools.endsWith(entries[j].id,"-cover")) continue;
             var key = entries[i].id + "/" + entries[j].id;
             var fixedPair = roots.get(entries[i].id) == roots.get(entries[j].id);
             if (fixedPair && fixedVolumes.exists(key)) {
@@ -249,6 +265,11 @@ class ZeroErrArmPreview {
       }
     });
     sys.io.File.saveContent(reportPath,haxe.Json.stringify(report,null,"  "));
+    if(coversOnly) {
+      provenance.status="complete";
+      provenance.observationsSha256=haxe.crypto.Sha256.encode(sys.io.File.getContent(reportPath));
+      sys.io.File.saveContent(reportPath+".provenance.json",haxe.Json.stringify(provenance,null,"  "));
+    }
   }
 
   /** Exterior properties for an explicitly estimated engineering mass model. */
@@ -285,6 +306,14 @@ class ZeroErrArmPreview {
     Sys.println("Building review scene from supplier CAD"); Sys.stdout().flush();
     var scene:materia.project.SceneArtifact.SceneArtifactData = AssemblyPreview.scene(arm,straight() ? "zeroerr-straight80-prototype" : revised() ? "zeroerr-wrist80-engineering-revision" : "zeroerr-erobot5-reference");
     var definition:materia.assembly.AssemblyDefinition = scene.assemblyDefinition;
+    var planningHash:Null<String> = null;
+    var geometryReview = Sys.args().indexOf("--geometry-review-export")>=0;
+    if(geometryReview && !straight()) throw "Geometry review export requires --straight";
+    if(straight() && !geometryReview) {
+      planningHash = StraightPlanningWindow.apply(definition,layoutPath());
+      if(scene.recipeDiagnostics==null) scene.recipeDiagnostics=[];
+      scene.recipeDiagnostics.push("J3/J4 carry additional simulation planning restrictions from conditional hull slices. Collision checks remain required; these are not commissioned physical stops.");
+    }
     var state = new AssemblyState(definition);
     for (i in 0...6) state.setJoint('j${i+1}',ready()[i]);
     scene.assemblyState = state.record();
@@ -294,7 +323,7 @@ class ZeroErrArmPreview {
       component.connectors.push({name:"flangeZ",frame:AssemblyFrames.fromRotationMatrix(0,0,0,[1,0,0,0,0,-1,0,1,0])});
       component.robotFlangeConnector = "flangeZ";
     }
-    var stem = buildDirectory() + (straight() ? "/zeroerr5-straight80" : revised() ? "/zeroerr5-wrist80" : "/zeroerr5");
+    var stem = buildDirectory() + (straight() ? "/zeroerr5-straight80" : revised() ? "/zeroerr5-wrist80" : "/zeroerr5")+(geometryReview ? "-geometry" : "");
     var artifact = SceneArtifact.encode(scene);
     sys.io.File.saveBytes(stem+".scene",artifact);
     sys.io.File.saveBytes(stem+".mtrg",artifact);
@@ -302,6 +331,7 @@ class ZeroErrArmPreview {
     for (i in 0...hash.length) hex.add(StringTools.hex(hash.get(i),2).toLowerCase());
     sys.io.File.saveContent(stem+".provenance.json",haxe.Json.stringify({
       artifactSha256:hex.toString(),layoutSha256:haxe.crypto.Sha256.encode(sys.io.File.getContent(layoutPath())),
+      planningWindowSha256:planningHash,
       exporterSha256:haxe.crypto.Sha256.encode(sys.io.File.getContent(DIRECTORY+"/ZeroErrArmPreview.hx"))},null,"  "));
     var meshes:Array<Dynamic> = [];
     for (occurrence in definition.occurrences) {
@@ -321,11 +351,43 @@ class ZeroErrArmPreview {
     Sys.println('Exported $stem.scene and $stem.mesh.json');
   }
 
+  /** Apply reviewed simulation restrictions without rebuilding unchanged CAD meshes. */
+  static function applyPlanningWindow():Void {
+    var directory=DIRECTORY+"/build/straight/zeroerr5-straight80";
+    var bytes=sys.io.File.getBytes(directory+"-geometry.mtrg");
+    var record:Dynamic=haxe.Json.parse(sys.io.File.getContent(directory+"-geometry.provenance.json"));
+    var hash=haxe.crypto.Sha256.make(bytes),hex=new StringBuf();
+    for(i in 0...hash.length) hex.add(StringTools.hex(hash.get(i),2).toLowerCase());
+    var layout=StraightArmPreparation.paths().layoutPath;
+    if(Std.string(record.artifactSha256)!=hex.toString() ||
+       Std.string(record.layoutSha256)!=haxe.crypto.Sha256.encode(sys.io.File.getContent(layout)) ||
+       Std.string(record.exporterSha256)!=haxe.crypto.Sha256.encode(sys.io.File.getContent(DIRECTORY+"/ZeroErrArmPreview.hx")))
+      throw "Geometry review export is stale";
+    var scene=SceneArtifact.decode(bytes);
+    var definition:materia.assembly.AssemblyDefinition=scene.assemblyDefinition;
+    var planningHash=StraightPlanningWindow.apply(definition,layout);
+    // Validate that the saved review configuration also respects the window.
+    var checked=new AssemblyState(definition,scene.assemblyState);
+    if(scene.recipeDiagnostics==null) scene.recipeDiagnostics=[];
+    scene.recipeDiagnostics.push("J3/J4 simulation planning restrictions from conditional hull slices; pose and continuous collision checks remain required. Physical travel is uncommissioned.");
+    bytes=SceneArtifact.encode(scene);hash=haxe.crypto.Sha256.make(bytes);hex=new StringBuf();
+    for(i in 0...hash.length) hex.add(StringTools.hex(hash.get(i),2).toLowerCase());
+    sys.io.File.saveBytes(directory+".mtrg",bytes);sys.io.File.saveBytes(directory+".scene",bytes);
+    sys.io.File.saveContent(directory+".provenance.json",haxe.Json.stringify({artifactSha256:hex.toString(),
+      layoutSha256:Std.string(record.layoutSha256),planningWindowSha256:planningHash,
+      exporterSha256:Std.string(record.exporterSha256)},null,"  "));
+    sys.io.File.saveBytes(directory+".mesh.json",sys.io.File.getBytes(directory+"-geometry.mesh.json"));
+    Sys.println("Applied reviewed J3/J4 simulation restrictions; CAD geometry unchanged");
+  }
+
   public static function run():Void {
+    if(Sys.args().indexOf("--apply-planning-window")>=0) {applyPlanningWindow();return;}
     Sys.println("Loading pinned ZeroErr reference CAD"); Sys.stdout().flush();
     var arm = make();
     try {
-      check(arm);
+      // Cover-only regressions reuse separately audited, identical source CAD.
+      // The normal export still validates every solid and independent FK.
+      if(Sys.args().indexOf("--cover-regression")<0 || Sys.args().indexOf("--export")>=0) check(arm);
       if (Sys.args().indexOf("--clearance") >= 0) clearance(arm);
       if (Sys.args().indexOf("--engineering") >= 0) engineering(arm);
       if (Sys.args().indexOf("--export") >= 0) export(arm);

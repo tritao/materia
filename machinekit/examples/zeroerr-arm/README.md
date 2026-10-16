@@ -452,7 +452,7 @@ The independent exported-part audit reimports all 31 new STEP parts, checks a
 41.998 mm axial passage through the nominal 42 mm duct, and checks cover clearance
 against the other derived parts. It does not validate the complete arm harness.
 
-The 270-pose study estimates 25.489 kg total arm mass, 0.212 kg above the tapered
+The 270-pose study estimates 25.477 kg total arm mass, 0.199 kg above the tapered
 80T variant. Its conservative zero-speed load bounds give about 201.7 N and
 89.5 Nm at the supplier mounting section. With the explicitly assumed material
 and connection allowables, tube stress utilization is 0.280, bolt shear 0.234
@@ -525,3 +525,12 @@ commissioned joint stops. Covers therefore affect the usable envelope and must
 be included in later travel/cable review. The current result does not establish
 UR/FR5-equivalent travel. Full witnesses and failed queries remain in
 `build/straight/motion-report.json`, bound to the current layout and input files.
+
+The subsequent [interference review](CLEARANCE.md) reduces the covers to OD83 x
+L24.5 mm and maps eleven conditional hull slices, including distal fasteners.
+Exported scenes now carry J3 −150/+153 and J4 ±154 degree simulation planning
+restrictions. All 54 retained observed configurations are clear; the raw five
+extreme collision witnesses remain recorded outside the window. Pose and
+continuous-motion checks remain necessary within it. Exact non-cover pair
+observations are reused only after byte-identical STEP geometry and unchanged
+tree/placement verification; every cover pair is freshly checked at all 60 poses.

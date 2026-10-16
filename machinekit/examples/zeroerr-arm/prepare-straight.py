@@ -42,8 +42,9 @@ def main():
     if config["schema"] != 1 or not fastening["screw"].startswith("M5 x 12 ") or any(fastening[key] != value for key, value in expected.items()):
         raise ValueError("Fastener edits need a matching reviewed native kernel")
     cover = config["cover"]
-    if any(cover[key] != value for key, value in {"outerDiameterMm": 84, "innerDiameterMm": 80,
-           "lengthMm": 30, "lipThicknessMm": 1.5, "tubeRadialClearanceMm": 0.2, "outerEdgeFilletMm": 0.75}.items()):
+    if any(cover[key] != value for key, value in {"outerDiameterMm": 83, "innerDiameterMm": 80,
+           "lengthMm": 24.5, "shoulderInsetMm": 2, "lipThicknessMm": 1.5,
+           "tubeRadialClearanceMm": 0.2, "outerEdgeFilletMm": 0.5}.items()):
         raise ValueError("Cover edits need a matching reviewed native kernel")
     inputs = {"configSha256": digest(config_path), "baselineLayoutSha256": digest(baseline_path),
               "sourceSha256": digest(source), "generatorSha256": digest(ROOT / "straight-link.cpp"),
@@ -79,10 +80,11 @@ def main():
     dimensions = [config[key] for key in ("sourceLengthMm", "removedMm", "protectedEndLengthMm",
                   "transitionLengthMm", "spigotEngagementMm", "tubeOuterDiameterMm", "tubeWallMm",
                   "spigotDiametralClearanceMm", "adapterCableBoreMm")]
+    dimensions += [cover[key] for key in ("outerDiameterMm", "lengthMm", "shoulderInsetMm", "outerEdgeFilletMm")]
     with (target / "native.log").open("w") as log:
         subprocess.run([str(binary), str(source), str(derived), *map(str, dimensions)], check=True, stdout=log)
     audit = json.loads((derived / "native-audit.json").read_text())
-    if audit["method"] != "protected-ends-straight-tube-radial-fasteners-v2" or audit["protectedEndsMaterialDifferenceSolids"] != 0 or not audit["joinedStructuralSolidValid"] or audit["structuralOverlapMm3"] > 1e-5:
+    if audit["method"] != "protected-ends-straight-tube-radial-fasteners-v3" or audit["protectedEndsMaterialDifferenceSolids"] != 0 or not audit["joinedStructuralSolidValid"] or audit["structuralOverlapMm3"] > 1e-5:
         raise ValueError("Derived structural/interface audit failed")
     layout = json.loads(json.dumps(baseline))
     layout["assets"] = [a for a in layout["assets"] if a["id"] != config["sourceAsset"]]

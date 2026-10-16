@@ -31,6 +31,7 @@ class ComparisonProject {
       if (Std.string(record.artifactSha256) != hex.toString() ||
           Std.string(record.layoutSha256) != haxe.crypto.Sha256.encode(sys.io.File.getContent(Std.string(current.layoutPath))) ||
           Std.string(record.exporterSha256) != haxe.crypto.Sha256.encode(sys.io.File.getContent(directory+"/ZeroErrArmPreview.hx")) ||
+          Std.string(record.planningWindowSha256) != haxe.crypto.Sha256.encode(sys.io.File.getContent(directory+"/straight-planning-window.json")) ||
           Std.string(preparation.inputs.configSha256) != haxe.crypto.Sha256.encode(sys.io.File.getContent(directory+"/straight-link-config.json")) ||
           Std.string(preparation.inputs.generatorSha256) != haxe.crypto.Sha256.encode(sys.io.File.getContent(directory+"/straight-link.cpp")) ||
           Std.string(preparation.inputs.preparerSha256) != haxe.crypto.Sha256.encode(sys.io.File.getContent(directory+"/prepare-straight.py")) ||

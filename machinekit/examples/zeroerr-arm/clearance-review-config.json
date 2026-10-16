@@ -1,0 +1,1281 @@
+{
+  "schema": 1,
+  "coarseStepDeg": 10,
+  "boundaryToleranceDeg": 0.1,
+  "rangeDeg": [
+    -170,
+    170
+  ],
+  "baselineLayoutSha256": "c9bc597d2bf77c3085be67cb42e660b550209f5f90557172fe084f0f5cc72668",
+  "baselineReportSha256": "759168af8933ad9537152e2f823712a426ba34c4b07cb5df6d77446566e9cf58",
+  "baselineFailures": [
+    {
+      "joints": [
+        0.7417649320975901,
+        1.6483665157724219,
+        -2.7296949501191317,
+        1.271597026453011,
+        -0.2697327025809416,
+        -0.6847060911670061
+      ],
+      "overlaps": [
+        {
+          "a": "joint1-stator",
+          "b": "joint6-stator",
+          "volumeMm3": 3141.789106277466
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint6-stator",
+          "volumeMm3": 32190.113478940257
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint6-rotor",
+          "volumeMm3": 3709.953178301657
+        },
+        {
+          "a": "joint2-stator",
+          "b": "toolFlange",
+          "volumeMm3": 16040.488584988188
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint6-outputSpigot",
+          "volumeMm3": 1439.6884113994897
+        },
+        {
+          "a": "joint2-rotor",
+          "b": "joint6-stator",
+          "volumeMm3": 4.654569508884919
+        }
+      ],
+      "indeterminatePairs": []
+    },
+    {
+      "joints": [
+        0.2,
+        -0.8,
+        -2.9670597283903604,
+        0.1,
+        -0.6,
+        0.2
+      ],
+      "overlaps": [
+        {
+          "a": "base",
+          "b": "joint4-stator",
+          "volumeMm3": 3795.481842495555
+        },
+        {
+          "a": "base",
+          "b": "joint6-stator",
+          "volumeMm3": 3455.280442246505
+        },
+        {
+          "a": "joint1-stator",
+          "b": "joint4-stator",
+          "volumeMm3": 103706.8439277707
+        },
+        {
+          "a": "joint1-stator",
+          "b": "joint4-rotor",
+          "volumeMm3": 3782.3454385439445
+        },
+        {
+          "a": "joint1-stator",
+          "b": "joint5-rotor",
+          "volumeMm3": 290.94691565377843
+        },
+        {
+          "a": "joint1-stator",
+          "b": "joint6-stator",
+          "volumeMm3": 1255.0306208780962
+        },
+        {
+          "a": "joint1-stator",
+          "b": "joint4-outputSpigot",
+          "volumeMm3": 1906.8894311393205
+        },
+        {
+          "a": "joint1-stator",
+          "b": "joint5-outputSpigot",
+          "volumeMm3": 11.895467215942148
+        },
+        {
+          "a": "joint1-rotor",
+          "b": "joint4-stator",
+          "volumeMm3": 198.1038126951518
+        },
+        {
+          "a": "joint1-outputSpigot",
+          "b": "joint4-stator",
+          "volumeMm3": 108.45094469317138
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint5-stator",
+          "volumeMm3": 83117.23608630945
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint5-rotor",
+          "volumeMm3": 3971.6596447590123
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint6-stator",
+          "volumeMm3": 13946.811272401159
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint6-rotor",
+          "volumeMm3": 1295.934158960574
+        },
+        {
+          "a": "joint2-stator",
+          "b": "toolFlange",
+          "volumeMm3": 13015.229631097176
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint5-outputSpigot",
+          "volumeMm3": 2265.064607476354
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint6-outputSpigot",
+          "volumeMm3": 26.156681342994304
+        },
+        {
+          "a": "joint2-rotor",
+          "b": "joint5-stator",
+          "volumeMm3": 4392.939676744557
+        },
+        {
+          "a": "joint2-rotor",
+          "b": "joint6-stator",
+          "volumeMm3": 87.68301900689833
+        },
+        {
+          "a": "joint2-outputSpigot",
+          "b": "joint5-stator",
+          "volumeMm3": 2538.9550636839504
+        },
+        {
+          "a": "joint2-outputSpigot",
+          "b": "joint6-stator",
+          "volumeMm3": 9.403669498468936
+        },
+        {
+          "a": "upperArm",
+          "b": "joint5-stator",
+          "volumeMm3": 311.6713493155246
+        }
+      ],
+      "indeterminatePairs": [
+        {
+          "a": "joint1-stator",
+          "b": "joint5-stator",
+          "error": "common failed: OCCT boolean produced invalid topology"
+        }
+      ]
+    },
+    {
+      "joints": [
+        0.2,
+        -0.8,
+        1,
+        -2.9670597283903604,
+        -0.6,
+        0.2
+      ],
+      "overlaps": [
+        {
+          "a": "joint6-stator",
+          "b": "forearm-distal-cover",
+          "volumeMm3": 24.187677791943308
+        }
+      ],
+      "indeterminatePairs": []
+    },
+    {
+      "joints": [
+        0.2,
+        -0.8,
+        2.9670597283903604,
+        0.1,
+        -0.6,
+        0.2
+      ],
+      "overlaps": [
+        {
+          "a": "joint1-stator",
+          "b": "joint4-stator",
+          "volumeMm3": 22271.646906257163
+        },
+        {
+          "a": "joint1-stator",
+          "b": "joint4-rotor",
+          "volumeMm3": 1889.1901413800083
+        },
+        {
+          "a": "joint1-stator",
+          "b": "joint5-stator",
+          "volumeMm3": 11117.960042505707
+        },
+        {
+          "a": "joint1-stator",
+          "b": "joint6-stator",
+          "volumeMm3": 106.92307841067127
+        },
+        {
+          "a": "joint1-stator",
+          "b": "joint4-outputSpigot",
+          "volumeMm3": 650.3853018186072
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint5-stator",
+          "volumeMm3": 78911.54106766473
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint5-rotor",
+          "volumeMm3": 830.776965015806
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint6-stator",
+          "volumeMm3": 2540.5930788733026
+        },
+        {
+          "a": "joint2-stator",
+          "b": "joint5-outputSpigot",
+          "volumeMm3": 83.51619260406802
+        },
+        {
+          "a": "joint2-rotor",
+          "b": "joint5-stator",
+          "volumeMm3": 3868.226792731551
+        },
+        {
+          "a": "joint2-outputSpigot",
+          "b": "joint5-stator",
+          "volumeMm3": 2168.598412635952
+        },
+        {
+          "a": "upperArm",
+          "b": "joint5-stator",
+          "volumeMm3": 560.1360126144629
+        }
+      ],
+      "indeterminatePairs": []
+    },
+    {
+      "joints": [
+        0.2,
+        -0.8,
+        1,
+        2.9670597283903604,
+        -0.6,
+        0.2
+      ],
+      "overlaps": [
+        {
+          "a": "forearm",
+          "b": "joint6-stator",
+          "volumeMm3": 1.4246040632095531
+        },
+        {
+          "a": "joint6-stator",
+          "b": "forearm-distal",
+          "volumeMm3": 0.011523798978010242
+        },
+        {
+          "a": "joint6-stator",
+          "b": "forearm-distal-cover",
+          "volumeMm3": 205.30063211612378
+        }
+      ],
+      "indeterminatePairs": []
+    }
+  ],
+  "scans": [
+    {
+      "id": "elbow-ready-shoulder-20",
+      "joint": 2,
+      "seedRad": [
+        0.2,
+        -1.149065850398866,
+        1,
+        0.1,
+        -0.6,
+        0.2
+      ],
+      "pairs": [
+        [
+          "base",
+          "joint4-stator"
+        ],
+        [
+          "base",
+          "joint6-stator"
+        ],
+        [
+          "joint1-outputSpigot",
+          "joint4-stator"
+        ],
+        [
+          "joint1-rotor",
+          "joint4-stator"
+        ],
+        [
+          "joint1-stator",
+          "joint4-outputSpigot"
+        ],
+        [
+          "joint1-stator",
+          "joint4-rotor"
+        ],
+        [
+          "joint1-stator",
+          "joint4-stator"
+        ],
+        [
+          "joint1-stator",
+          "joint5-outputSpigot"
+        ],
+        [
+          "joint1-stator",
+          "joint5-rotor"
+        ],
+        [
+          "joint1-stator",
+          "joint5-stator"
+        ],
+        [
+          "joint1-stator",
+          "joint6-stator"
+        ],
+        [
+          "joint2-outputSpigot",
+          "joint5-stator"
+        ],
+        [
+          "joint2-outputSpigot",
+          "joint6-stator"
+        ],
+        [
+          "joint2-rotor",
+          "joint5-stator"
+        ],
+        [
+          "joint2-rotor",
+          "joint6-stator"
+        ],
+        [
+          "joint2-stator",
+          "joint5-outputSpigot"
+        ],
+        [
+          "joint2-stator",
+          "joint5-rotor"
+        ],
+        [
+          "joint2-stator",
+          "joint5-stator"
+        ],
+        [
+          "joint2-stator",
+          "joint6-outputSpigot"
+        ],
+        [
+          "joint2-stator",
+          "joint6-rotor"
+        ],
+        [
+          "joint2-stator",
+          "joint6-stator"
+        ],
+        [
+          "joint2-stator",
+          "toolFlange"
+        ],
+        [
+          "joint5-stator",
+          "upperArm"
+        ]
+      ]
+    },
+    {
+      "id": "elbow-ready-shoulder+0",
+      "joint": 2,
+      "seedRad": [
+        0.2,
+        -0.8,
+        1,
+        0.1,
+        -0.6,
+        0.2
+      ],
+      "pairs": [
+        [
+          "base",
+          "joint4-stator"
+        ],
+        [
+          "base",
+          "joint6-stator"
+        ],
+        [
+          "joint1-outputSpigot",
+          "joint4-stator"
+        ],
+        [
+          "joint1-rotor",
+          "joint4-stator"
+        ],
+        [
+          "joint1-stator",
+          "joint4-outputSpigot"
+        ],
+        [
+          "joint1-stator",
+          "joint4-rotor"
+        ],
+        [
+          "joint1-stator",
+          "joint4-stator"
+        ],
+        [
+          "joint1-stator",
+          "joint5-outputSpigot"
+        ],
+        [
+          "joint1-stator",
+          "joint5-rotor"
+        ],
+        [
+          "joint1-stator",
+          "joint5-stator"
+        ],
+        [
+          "joint1-stator",
+          "joint6-stator"
+        ],
+        [
+          "joint2-outputSpigot",
+          "joint5-stator"
+        ],
+        [
+          "joint2-outputSpigot",
+          "joint6-stator"
+        ],
+        [
+          "joint2-rotor",
+          "joint5-stator"
+        ],
+        [
+          "joint2-rotor",
+          "joint6-stator"
+        ],
+        [
+          "joint2-stator",
+          "joint5-outputSpigot"
+        ],
+        [
+          "joint2-stator",
+          "joint5-rotor"
+        ],
+        [
+          "joint2-stator",
+          "joint5-stator"
+        ],
+        [
+          "joint2-stator",
+          "joint6-outputSpigot"
+        ],
+        [
+          "joint2-stator",
+          "joint6-rotor"
+        ],
+        [
+          "joint2-stator",
+          "joint6-stator"
+        ],
+        [
+          "joint2-stator",
+          "toolFlange"
+        ],
+        [
+          "joint5-stator",
+          "upperArm"
+        ]
+      ]
+    },
+    {
+      "id": "elbow-ready-shoulder+20",
+      "joint": 2,
+      "seedRad": [
+        0.2,
+        -0.45093414960113415,
+        1,
+        0.1,
+        -0.6,
+        0.2
+      ],
+      "pairs": [
+        [
+          "base",
+          "joint4-stator"
+        ],
+        [
+          "base",
+          "joint6-stator"
+        ],
+        [
+          "joint1-outputSpigot",
+          "joint4-stator"
+        ],
+        [
+          "joint1-rotor",
+          "joint4-stator"
+        ],
+        [
+          "joint1-stator",
+          "joint4-outputSpigot"
+        ],
+        [
+          "joint1-stator",
+          "joint4-rotor"
+        ],
+        [
+          "joint1-stator",
+          "joint4-stator"
+        ],
+        [
+          "joint1-stator",
+          "joint5-outputSpigot"
+        ],
+        [
+          "joint1-stator",
+          "joint5-rotor"
+        ],
+        [
+          "joint1-stator",
+          "joint5-stator"
+        ],
+        [
+          "joint1-stator",
+          "joint6-stator"
+        ],
+        [
+          "joint2-outputSpigot",
+          "joint5-stator"
+        ],
+        [
+          "joint2-outputSpigot",
+          "joint6-stator"
+        ],
+        [
+          "joint2-rotor",
+          "joint5-stator"
+        ],
+        [
+          "joint2-rotor",
+          "joint6-stator"
+        ],
+        [
+          "joint2-stator",
+          "joint5-outputSpigot"
+        ],
+        [
+          "joint2-stator",
+          "joint5-rotor"
+        ],
+        [
+          "joint2-stator",
+          "joint5-stator"
+        ],
+        [
+          "joint2-stator",
+          "joint6-outputSpigot"
+        ],
+        [
+          "joint2-stator",
+          "joint6-rotor"
+        ],
+        [
+          "joint2-stator",
+          "joint6-stator"
+        ],
+        [
+          "joint2-stator",
+          "toolFlange"
+        ],
+        [
+          "joint5-stator",
+          "upperArm"
+        ]
+      ]
+    },
+    {
+      "id": "elbow-folded-witness",
+      "joint": 2,
+      "seedRad": [
+        0.7417649320975901,
+        1.6483665157724219,
+        -2.7296949501191317,
+        1.271597026453011,
+        -0.2697327025809416,
+        -0.6847060911670061
+      ],
+      "pairs": [
+        [
+          "base",
+          "joint4-stator"
+        ],
+        [
+          "base",
+          "joint6-stator"
+        ],
+        [
+          "joint1-outputSpigot",
+          "joint4-stator"
+        ],
+        [
+          "joint1-rotor",
+          "joint4-stator"
+        ],
+        [
+          "joint1-stator",
+          "joint4-outputSpigot"
+        ],
+        [
+          "joint1-stator",
+          "joint4-rotor"
+        ],
+        [
+          "joint1-stator",
+          "joint4-stator"
+        ],
+        [
+          "joint1-stator",
+          "joint5-outputSpigot"
+        ],
+        [
+          "joint1-stator",
+          "joint5-rotor"
+        ],
+        [
+          "joint1-stator",
+          "joint5-stator"
+        ],
+        [
+          "joint1-stator",
+          "joint6-stator"
+        ],
+        [
+          "joint2-outputSpigot",
+          "joint5-stator"
+        ],
+        [
+          "joint2-outputSpigot",
+          "joint6-stator"
+        ],
+        [
+          "joint2-rotor",
+          "joint5-stator"
+        ],
+        [
+          "joint2-rotor",
+          "joint6-stator"
+        ],
+        [
+          "joint2-stator",
+          "joint5-outputSpigot"
+        ],
+        [
+          "joint2-stator",
+          "joint5-rotor"
+        ],
+        [
+          "joint2-stator",
+          "joint5-stator"
+        ],
+        [
+          "joint2-stator",
+          "joint6-outputSpigot"
+        ],
+        [
+          "joint2-stator",
+          "joint6-rotor"
+        ],
+        [
+          "joint2-stator",
+          "joint6-stator"
+        ],
+        [
+          "joint2-stator",
+          "toolFlange"
+        ],
+        [
+          "joint5-stator",
+          "upperArm"
+        ]
+      ]
+    },
+    {
+      "id": "wrist-pitch-90.000",
+      "joint": 3,
+      "seedRad": [
+        0.2,
+        -0.8,
+        1,
+        0.1,
+        -1.5707963267948966,
+        0.2
+      ],
+      "pairs": [
+        [
+          "forearm",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-cover",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw0",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw1",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw2",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw3",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw4",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw5",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw6",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw7",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw8",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw9",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw10",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw11",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-dowel",
+          "joint6-stator"
+        ]
+      ]
+    },
+    {
+      "id": "wrist-pitch-55.000",
+      "joint": 3,
+      "seedRad": [
+        0.2,
+        -0.8,
+        1,
+        0.1,
+        -0.9599310885968813,
+        0.2
+      ],
+      "pairs": [
+        [
+          "forearm",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-cover",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw0",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw1",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw2",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw3",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw4",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw5",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw6",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw7",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw8",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw9",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw10",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw11",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-dowel",
+          "joint6-stator"
+        ]
+      ]
+    },
+    {
+      "id": "wrist-pitch-34.377",
+      "joint": 3,
+      "seedRad": [
+        0.2,
+        -0.8,
+        1,
+        0.1,
+        -0.5999999999999999,
+        0.2
+      ],
+      "pairs": [
+        [
+          "forearm",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-cover",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw0",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw1",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw2",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw3",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw4",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw5",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw6",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw7",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw8",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw9",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw10",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw11",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-dowel",
+          "joint6-stator"
+        ]
+      ]
+    },
+    {
+      "id": "wrist-pitch-15.000",
+      "joint": 3,
+      "seedRad": [
+        0.2,
+        -0.8,
+        1,
+        0.1,
+        -0.2617993877991494,
+        0.2
+      ],
+      "pairs": [
+        [
+          "forearm",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-cover",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw0",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw1",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw2",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw3",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw4",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw5",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw6",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw7",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw8",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw9",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw10",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw11",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-dowel",
+          "joint6-stator"
+        ]
+      ]
+    },
+    {
+      "id": "wrist-pitch0.000",
+      "joint": 3,
+      "seedRad": [
+        0.2,
+        -0.8,
+        1,
+        0.1,
+        0.0,
+        0.2
+      ],
+      "pairs": [
+        [
+          "forearm",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-cover",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw0",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw1",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw2",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw3",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw4",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw5",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw6",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw7",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw8",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw9",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw10",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw11",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-dowel",
+          "joint6-stator"
+        ]
+      ]
+    },
+    {
+      "id": "wrist-pitch45.000",
+      "joint": 3,
+      "seedRad": [
+        0.2,
+        -0.8,
+        1,
+        0.1,
+        0.7853981633974483,
+        0.2
+      ],
+      "pairs": [
+        [
+          "forearm",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-cover",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw0",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw1",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw2",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw3",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw4",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw5",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw6",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw7",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw8",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw9",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw10",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw11",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-dowel",
+          "joint6-stator"
+        ]
+      ]
+    },
+    {
+      "id": "wrist-pitch90.000",
+      "joint": 3,
+      "seedRad": [
+        0.2,
+        -0.8,
+        1,
+        0.1,
+        1.5707963267948966,
+        0.2
+      ],
+      "pairs": [
+        [
+          "forearm",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-cover",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw0",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw1",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw2",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw3",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw4",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw5",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw6",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw7",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw8",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw9",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw10",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-screw11",
+          "joint6-stator"
+        ],
+        [
+          "forearm-distal-dowel",
+          "joint6-stator"
+        ]
+      ]
+    }
+  ],
+  "scope": "Conditional enclosing-hull distance slices of known interfering pairs. CAD diagnostic poses are checked separately. Not a full six-dimensional envelope or commissioned stops. Wrist slices also include all twelve distal screw heads and the locating pin.",
+  "overlapToleranceMm3": 0.001,
+  "angularReserveDeg": 2,
+  "marginMm": 0.5,
+  "baselineArtifactSha256": "93166ae40af4345a8d53d44bcf593adb638b72db79a852f1d275c83a90d048a2"
+}

@@ -27,6 +27,8 @@ def main():
     if audit["preparationSha256"] != digest(Path(current["preparationPath"])) or structure["layoutSha256"] != digest(layout_path):
         raise ValueError("Prototype pack requires current exported-part and structural reviews")
     config = layout["straightForearm"]["config"]
+    cover_config = config["cover"]
+    cover_description = f"OD{cover_config['outerDiameterMm']} / main ID80 / lip ID70.4 / L{cover_config['lengthMm']}; shoulder inset {cover_config['shoulderInsetMm']}; edge R{cover_config['outerEdgeFilletMm']}"
     native = prepared["audit"]
     rows = []
     for asset in layout["assets"]:
@@ -42,7 +44,7 @@ def main():
         ["forearm-distal","Distal mounting adapter",1,"AL6061-T6 assumption","Retained OEM end plus transition and 25 mm spigot; thread/fit review pending", ""],
         ["adapter-screws","M5 x 12 socket head, ISO 4762 style",2*config["fastening"]["screwsPerEnd"],"Class 8.8 assumption","Exact supplier, preload, thread stripping and fatigue not released", ""],
         ["adapter-dowels","Nominal 5 x 10 mm dowel",2,"Steel assumption","One per end; assembly match-reaming/fit specification pending", ""],
-        ["service-covers","Sliding service collar, OD84 x 30 mm",2,"ABS assumption","Rounded edges; retention details pending; slide away to access fasteners", ""]]
+        ["service-covers",cover_description,2,"ABS assumption","Rounded edges; retention details pending; slide away to access fasteners", ""]]
     with (directory / "prototype-bom.csv").open("w",newline="") as output:
         writer = csv.writer(output)
         writer.writerow(["item","description","quantity","material_basis","review_notes","supplier_geometry_sha256"])
@@ -63,8 +65,9 @@ def main():
             bottom = 21 if sign>0 else -30.98
             ax.add_patch(Rectangle((x,bottom),25,9.98,facecolor=orange,edgecolor="black",linewidth=.5))
         ax.add_patch(Rectangle((45,31 if sign>0 else -35),206,4,facecolor=steel,edgecolor="black",linewidth=.6))
-        for x in (45.5,220.5):
-            ax.add_patch(Rectangle((x,40 if sign>0 else -42),30,2,facecolor=cover))
+        radius = cover_config['outerDiameterMm']/2
+        for x in (45+cover_config['shoulderInsetMm'],251-cover_config['shoulderInsetMm']-cover_config['lengthMm']):
+            ax.add_patch(Rectangle((x,40 if sign>0 else -radius),cover_config['lengthMm'],radius-40,facecolor=cover))
     ax.axhline(0,color="#a0a7ab",linewidth=.5,linestyle="--")
     def dimension(x0,x1,y,label):
         ax.annotate("",xy=(x0,y),xytext=(x1,y),arrowprops={"arrowstyle":"<->","linewidth":.7})
@@ -84,7 +87,7 @@ def main():
         ["Spigots", "OD61.96 / bore42 / engagement25; nominal diametral clearance0.04"],
         ["Each adapter", "12 x M5 x 12, two rows at 8 and 18 from shoulder; six holes/row, 30 degree stagger"],
         ["Locating pin", "One nominal D5 x 10 per end, 12.5 from shoulder, 15 degree clocking"],
-        ["Service covers", "OD84 / main ID80 / lip ID70.4 / L30; 0.75 outer edge rounding; retention pending"],
+        ["Service covers", cover_description+"; retention pending"],
         ["Source mounting ends", "First/last 30 unchanged; protected boxes are symbolic. Use supplier/derived STEP for shape and holes."]]
     table_ax = fig.add_axes([.055,.10,.89,.25]);table_ax.axis("off")
     table = table_ax.table(cellText=table_data,colWidths=[.18,.82],loc="center",cellLoc="left")

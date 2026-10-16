@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "status": "simulation_planning_restriction_only",
+  "layoutSha256": "9c326819a28882f60c5e7797f375149224b631b883562bb82235c41f3653dd1a",
+  "reviewConfigSha256": "e435f5921831c8d47a514335d15fbb917546a290eaf1f206d3762052b0820572",
+  "limitsDeg": {
+    "j3": [
+      -150,
+      153
+    ],
+    "j4": [
+      -154,
+      154
+    ]
+  },
+  "angularReserveDeg": 2,
+  "hardwareQualified": false,
+  "requiresPoseAndContinuousCollisionChecks": true,
+  "basis": "Intersection of the sampled conditional J3/J4 intervals around zero, rounded inward with 2 degrees reserve. Does not prove other joint combinations clear."
+}

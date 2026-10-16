@@ -16,6 +16,7 @@ class ReferenceArmsPreview {
     if (Sys.args().indexOf("--registration")>=0) {CellRegistration.run();return;}
     if (Sys.args().indexOf("--comparison")>=0) {ComparisonReview.run();return;}
     if (Sys.args().indexOf("--straight-clearance")>=0) {StraightCurveReview.run();return;}
+    if (Sys.args().indexOf("--straight-boundaries")>=0) {StraightBoundaryReview.run();return;}
     var models = [for (arg in Sys.args()) if (!StringTools.startsWith(arg,"--")) arg];
     if (models.length == 0) models = ["ur5e","fairino5_v6"];
     for (id in models) {

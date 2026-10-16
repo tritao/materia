@@ -101,12 +101,17 @@ static void sameMaterial(const TopoDS_Shape&a,const TopoDS_Shape&b) {
 
 int main(int argc,char**argv) {
  try {
-  if(argc!=12)throw std::runtime_error("usage: straight-link source.STEP directory sourceLength removed protected transition engagement OD wall clearance bore");
+  if(argc!=16)throw std::runtime_error("usage: straight-link source.STEP directory sourceLength removed protected transition engagement OD wall clearance bore coverOD coverLength coverInset coverFillet");
   std::string directory=argv[2];double length=std::stod(argv[3]),removed=std::stod(argv[4]),keep=std::stod(argv[5]);
   double transition=std::stod(argv[6]),engage=std::stod(argv[7]),radius=std::stod(argv[8])/2,wall=std::stod(argv[9]);
   double clearance=std::stod(argv[10]),bore=std::stod(argv[11])/2,inner=radius-wall,pilot=inner-clearance/2;
+  double coverRadius=std::stod(argv[12])/2,coverLength=std::stod(argv[13]),coverInset=std::stod(argv[14]),coverFillet=std::stod(argv[15]);
   if(length<=removed+2*(keep+transition+engage)||keep<25||transition<=0||engage<22||wall<3||
      clearance<=0||clearance>.1||bore<15||pilot-bore<9||radius>35)throw std::runtime_error("Invalid straight-link dimensions or insufficient cover clearance");
+  // Keep both lips outside the axial screw-head envelope, 3.75..22.25 mm.
+  if(coverRadius<41.5||coverRadius>42||coverInset+1.5>3.5||coverInset<.5||
+     coverInset+coverLength-1.5<22.5||coverInset+coverLength>30.5||
+     coverFillet<=0||2*coverFillet>coverRadius-40)throw std::runtime_error("Cover wall, rounding or fastener clearance is insufficient");
   STEPControl_Reader reader;if(reader.ReadFile(argv[1])!=IFSelect_RetDone||!reader.TransferRoots())throw std::runtime_error("Source import failed");
   auto source=reader.OneShape();valid(source);
   double near=-keep,originalFar=-length+keep,far=originalFar+removed;
@@ -134,14 +139,14 @@ int main(int argc,char**argv) {
    adapter=cut(adapter,radial(angle,y,inner+.1,13.1-wall,2.5));
    parts.push_back({prefix+"-dowel","pin",radial(angle,y,seat,10,2.5)});
    // Separate sliding service cover: screw heads have 0.5 mm radial clearance.
-   double low=end==0?shoulder-30.5:shoulder+.5,high=low+30;
-   auto cover=annulus(42,40,low,high);
-   cover=fuse(cover,annulus(42,radius+.2,low,low+1.5));
-   cover=fuse(cover,annulus(42,radius+.2,high-1.5,high));
+   double low=end==0?shoulder-coverInset-coverLength:shoulder+coverInset,high=low+coverLength;
+   auto cover=annulus(coverRadius,40,low,high);
+   cover=fuse(cover,annulus(coverRadius,radius+.2,low,low+1.5));
+   cover=fuse(cover,annulus(coverRadius,radius+.2,high-1.5,high));
    BRepFilletAPI_MakeFillet rounded(cover);
    for(TopExp_Explorer edge(cover,TopAbs_EDGE);edge.More();edge.Next()) {
     auto value=TopoDS::Edge(edge.Current());BRepAdaptor_Curve curve(value);
-    if(curve.GetType()==GeomAbs_Circle&&std::abs(curve.Circle().Radius()-42)<1e-6)rounded.Add(.75,value);
+    if(curve.GetType()==GeomAbs_Circle&&std::abs(curve.Circle().Radius()-coverRadius)<1e-6)rounded.Add(coverFillet,value);
    }
    rounded.Build();if(!rounded.IsDone())throw std::runtime_error("Cover edge rounding failed");
    cover=rounded.Shape();
@@ -160,12 +165,13 @@ int main(int argc,char**argv) {
   if(overlap>1e-5)throw std::runtime_error("Structural link pieces overlap");
   parts.insert(parts.begin(),{{"tube","tube",tube},{"proximal","adapter",proximal},{"distal","adapter",distal}});
   std::ofstream audit(directory+"/native-audit.json");audit.precision(17);
-  audit<<"{\"method\":\"protected-ends-straight-tube-radial-fasteners-v2\",\"sourceVolumeMm3\":"<<volume(source)
+  audit<<"{\"method\":\"protected-ends-straight-tube-radial-fasteners-v3\",\"sourceVolumeMm3\":"<<volume(source)
    <<",\"structuralVolumeMm3\":"<<volume(tube)+volume(proximal)+volume(distal)<<",\"nearCutY\":"<<near<<",\"originalFarCutY\":"<<originalFar
    <<",\"farCutY\":"<<far<<",\"nearShoulderY\":"<<nearShoulder<<",\"farShoulderY\":"<<farShoulder
    <<",\"tubeLengthMm\":"<<nearShoulder-farShoulder<<",\"minimumCableBoreMm\":"<<2*bore
    <<",\"tubeOuterDiameterMm\":"<<2*radius<<",\"tubeWallMm\":"<<wall<<",\"spigotDiameterMm\":"<<2*pilot
-   <<",\"spigotEngagementMm\":"<<engage<<",\"screwCountPerEnd\":12,\"dowelCountPerEnd\":1,\"coverOuterDiameterMm\":84,\"coverInnerDiameterMm\":80,\"coverLengthMm\":30,\"coverFilletMm\":0.75"
+   <<",\"spigotEngagementMm\":"<<engage<<",\"screwCountPerEnd\":12,\"dowelCountPerEnd\":1,\"coverOuterDiameterMm\":"<<2*coverRadius<<",\"coverInnerDiameterMm\":80,\"coverLengthMm\":"<<coverLength
+   <<",\"coverShoulderInsetMm\":"<<coverInset<<",\"coverFilletMm\":"<<coverFillet
    <<",\"protectedEndsMaterialDifferenceSolids\":0,\"joinedStructuralSolidValid\":true,\"structuralOverlapMm3\":"<<overlap<<",\"parts\":[";
   bool first=true;
   for(auto& part:parts) {

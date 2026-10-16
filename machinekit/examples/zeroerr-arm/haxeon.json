@@ -2,7 +2,7 @@
   "version": 1,
   "package": {"name": "machinekit-zeroerr-arm-example"},
   "entry": "ZeroErrArmPreview",
-  "sources": ["ZeroErrArmPreview.hx"],
+  "sources": ["ZeroErrArmPreview.hx", "StraightArmPreparation.hx", "StraightPlanningWindow.hx"],
   "sourceRoots": ["."],
   "dependencies": {
     "projectkit": {"path": "../../../projectkit"},

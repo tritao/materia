@@ -32,12 +32,13 @@
     "fitStatus": "Prototype nominal geometry only. Match-reamed dowel and spigot fits, bolt preload and joint compliance require manufacturing review."
   },
   "cover": {
-    "outerDiameterMm": 84,
+    "outerDiameterMm": 83,
     "innerDiameterMm": 80,
-    "lengthMm": 30,
+    "lengthMm": 24.5,
+    "shoulderInsetMm": 2,
     "lipThicknessMm": 1.5,
     "tubeRadialClearanceMm": 0.2,
-    "outerEdgeFilletMm": 0.75,
+    "outerEdgeFilletMm": 0.5,
     "material": "ABS design assumption",
     "retentionStatus": "Sliding service cover; clip/retention detail not released for manufacture."
   },
