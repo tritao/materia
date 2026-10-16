@@ -28,6 +28,19 @@ template<class Merge> void merge_cases(Merge merge) {
         assert(std::abs(state.position[0] - .5 * t * t) < 1e-12);
         assert(std::abs(state.velocity[0] - t) < 1e-12);
     }
+    // A zero allowance is an exact hold, not an invalid or unlimited budget.
+    {
+        auto held = source;
+        for(auto &piece : held){piece.coefficients[0]={};piece.coefficients[0].value[0]=0.125;}
+        const double exact[] = {0};
+        auto exact_options=options;
+        exact_options.position_tolerance=exact_options.velocity_tolerance=exact_options.acceleration_tolerance=exact;
+        auto merged=merge(held,exact_options);
+        assert(merged.size()==1);
+        for(double value : merged[0].coefficients[0].value) assert(std::isfinite(value));
+        assert(merged[0].coefficients[0].value[0]==0.125);
+        for(unsigned k=1;k<=merged[0].degree;++k)assert(merged[0].coefficients[0].value[k]==0);
+    }
     // A short quartic excursion hides between the old strided joins and fifteen
     // uniform samples. Its source velocity/acceleration stay below the limits,
     // but replacing the whole run with zero loses twice the position budget.

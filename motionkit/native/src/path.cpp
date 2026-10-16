@@ -1436,6 +1436,19 @@ mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory, const doubl
         velocity_limit, acceleration_limit, position_lower, position_upper, max_duration_seconds}, out_trajectory);
 }
 
+mk_result MK_CALL mk_merge_segments_position_budget(mk_trajectory_handle trajectory,const double *position_tolerance,
+    const double *velocity_limit,const double *acceleration_limit,const double *position_lower,const double *position_upper,
+    uint32_t joint_count,double max_duration_seconds,mk_trajectory_handle *out_trajectory) {
+    if(!out_trajectory)return MK_ERROR_INVALID_ARGUMENT;
+    out_trajectory->id=0;
+    uint32_t joints=0;
+    const auto status=mk_trajectory_joint_count(trajectory,&joints);
+    if(status!=MK_OK)return status;
+    if(joints!=joint_count)return MK_ERROR_INVALID_ARGUMENT;
+    return motionkit::merge_trajectory_position_budget(trajectory,{position_tolerance,nullptr,nullptr,
+        velocity_limit,acceleration_limit,position_lower,position_upper,max_duration_seconds},out_trajectory);
+}
+
 mk_result MK_CALL mk_shape_trajectory(mk_trajectory_handle trajectory, const uint32_t *impulse_counts,
                                        const double *delays_seconds, const double *amplitudes, uint32_t joint_count,
                                        uint32_t table_size, mk_trajectory_handle *out_trajectory) {

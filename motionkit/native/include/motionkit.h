@@ -614,6 +614,19 @@ MK_API mk_result MK_CALL mk_merge_segments(mk_trajectory_handle trajectory,
                                            uint32_t joint_count, double max_duration_seconds,
                                            mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
 
+/** As mk_merge_segments, with continuous position-error allowances and derivative bounds
+ * 2*position_tolerance/T and 8*position_tolerance/T^2 for each candidate's actual duration T.
+ * Physical velocity, acceleration and position bounds are unchanged. Zero allowance requires exact preservation.
+ */
+MK_API mk_result MK_CALL mk_merge_segments_position_budget(mk_trajectory_handle trajectory,
+    const double *position_tolerance MK_IN_ARRAY(joint_count),
+    const double *velocity_limit MK_IN_ARRAY(joint_count),
+    const double *acceleration_limit MK_IN_ARRAY(joint_count),
+    const double *position_lower MK_IN_ARRAY(joint_count),
+    const double *position_upper MK_IN_ARRAY(joint_count),
+    uint32_t joint_count, double max_duration_seconds,
+    mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+
 /** The most impulses one joint's input shaper may have. */
 enum { MK_MAX_SHAPER_IMPULSES = 8 };
 /**

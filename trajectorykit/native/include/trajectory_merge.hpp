@@ -30,6 +30,7 @@ struct PolynomialOutput {
 };
 /** Approximation tolerances apply continuously on every original polynomial.
  * Inconclusive numerical bounds refuse a candidate rather than spend unproved error.
+ * Zero requests exact preservation, including stationary joints; it is not an absent claim.
  */
 struct MergeOptions {
     const double *position_tolerance, *velocity_tolerance, *acceleration_tolerance;
@@ -39,5 +40,10 @@ struct MergeOptions {
 };
 TC_API mk_result merge_polynomials(const PolynomialSource &, const MergeOptions &, const PolynomialOutput &);
 TC_API mk_result merge_trajectory(mk_trajectory_handle, const MergeOptions &, mk_trajectory_handle *);
+/** Derive derivative-error bounds from each candidate's actual duration and position_tolerance.
+ * velocity_tolerance and acceleration_tolerance are unused and may be null. Physical limits still apply.
+ */
+TC_API mk_result merge_polynomials_position_budget(const PolynomialSource &, const MergeOptions &, const PolynomialOutput &);
+TC_API mk_result merge_trajectory_position_budget(mk_trajectory_handle, const MergeOptions &, mk_trajectory_handle *);
 }
 #endif

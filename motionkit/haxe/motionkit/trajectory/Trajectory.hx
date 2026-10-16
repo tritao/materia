@@ -195,6 +195,19 @@ class Trajectory implements TimedJointTrajectory {
     return new Trajectory(created.out_trajectory);
   }
 
+  /** Merge within joint-position allowances; derivative error bounds use each candidate's actual duration. */
+  public function mergePositionBudget(positionTolerance:Array<Float>,velocityLimit:Array<Float>,accelerationLimit:Array<Float>,
+      positionLower:Array<Float>,positionUpper:Array<Float>,maxSeconds:Float):Trajectory {
+    ensureLive();
+    var count=positionTolerance.length;
+    if(velocityLimit.length!=count || accelerationLimit.length!=count || positionLower.length!=count || positionUpper.length!=count)
+      throw "Position-budget merging needs matching joint arrays";
+    var created=MotionKitNative.mk_merge_segments_position_budget(owner.borrow(),positionTolerance,velocityLimit,
+      accelerationLimit,positionLower,positionUpper,maxSeconds);
+    check(created.status,"trajectory.mergePositionBudget");
+    return new Trajectory(created.out_trajectory);
+  }
+
   /** The most impulses one joint's shaper may have (`MK_MAX_SHAPER_IMPULSES`). */
   public static inline var MAX_SHAPER_IMPULSES:Int = 8;
 

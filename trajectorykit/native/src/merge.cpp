@@ -149,19 +149,20 @@ bool piece_error_within(const double *candidate, const double *original, unsigne
 
 } // namespace
 
-mk_result merge_polynomials(const PolynomialSource &source, const MergeOptions &options, const PolynomialOutput &output) {
+static mk_result merge_polynomials_impl(const PolynomialSource &source, const MergeOptions &options,
+                                        const PolynomialOutput &output, bool position_budget) {
     const auto *position_tolerance = options.position_tolerance, *velocity_tolerance = options.velocity_tolerance,
         *acceleration_tolerance = options.acceleration_tolerance, *velocity_limit = options.velocity_limit,
         *acceleration_limit = options.acceleration_limit, *position_lower = options.position_lower,
         *position_upper = options.position_upper;
     const auto joints = source.joint_count, count = source.count;
-    if (!source.segment || !output.append || !position_tolerance || !velocity_tolerance || !acceleration_tolerance ||
+    if (!source.segment || !output.append || !position_tolerance || (!position_budget && (!velocity_tolerance || !acceleration_tolerance)) ||
         !velocity_limit || !acceleration_limit || !position_lower || !position_upper || joints == 0 || joints > MK_MAX_JOINTS ||
         !std::isfinite(options.max_duration_seconds) || options.max_duration_seconds <= 0 ||
         options.max_duration_seconds >= static_cast<double>(INT64_MAX) * 1e-9 || options.merge_below_ns <= 0)
         return MK_ERROR_INVALID_ARGUMENT;
     for (uint32_t j = 0; j < joints; ++j)
-        if (!(position_tolerance[j] > 0) || !(velocity_tolerance[j] > 0) || !(acceleration_tolerance[j] > 0) ||
+        if (!(position_tolerance[j] >= 0) || (!position_budget && (!(velocity_tolerance[j] >= 0) || !(acceleration_tolerance[j] >= 0))) ||
             !(velocity_limit[j] > 0) || !(acceleration_limit[j] > 0) || std::isnan(position_lower[j]) ||
             std::isnan(position_upper[j]) || position_lower[j] > position_upper[j]) return MK_ERROR_INVALID_ARGUMENT;
     const int64_t longest = static_cast<int64_t>(std::llround(options.max_duration_seconds * 1e9));
@@ -242,6 +243,17 @@ mk_result merge_polynomials(const PolynomialSource &source, const MergeOptions &
         state.struct_size = sizeof(state);
         // Sample first for inexpensive rejection, then bound error over every original piece.
         auto follows = [&](uint32_t first, uint32_t last) -> mk_result {
+            std::array<double,MK_MAX_JOINTS> derived_velocity{},derived_acceleration{};
+            const double *velocity_error=velocity_tolerance,*acceleration_error=acceleration_tolerance;
+            if(position_budget){
+                const double seconds=static_cast<double>(candidate->duration_ns)*1e-9;
+                for(uint32_t j=0;j<joints;++j){
+                    // Endpoint-matched position errors obey |e| <= T*|e'|/2 and T^2*|e''|/8.
+                    derived_velocity[j]=2*(position_tolerance[j]/seconds);
+                    derived_acceleration[j]=8*(position_tolerance[j]/seconds)/seconds;
+                }
+                velocity_error=derived_velocity.data();acceleration_error=derived_acceleration.data();
+            }
             for (uint32_t j = 0; j < joints; ++j)
                 for (uint32_t k = 0; k <= candidate->degree; ++k)
                     if (!std::isfinite(candidate->coefficients[j].value[k])) return MK_ERROR_GENERATION;
@@ -258,8 +270,8 @@ mk_result merge_polynomials(const PolynomialSource &source, const MergeOptions &
                 for (uint32_t joint = 0; joint < joints; ++joint) {
                     const auto mine = kin_of(candidate->coefficients[joint], 5, tau);
                     if (std::abs(mine.position - state.position[joint]) > position_tolerance[joint] ||
-                        std::abs(mine.velocity - state.velocity[joint]) > velocity_tolerance[joint] ||
-                        std::abs(mine.acceleration - state.acceleration[joint]) > acceleration_tolerance[joint])
+                        std::abs(mine.velocity - state.velocity[joint]) > velocity_error[joint] ||
+                        std::abs(mine.acceleration - state.acceleration[joint]) > acceleration_error[joint])
                         return MK_ERROR_GENERATION;
                     // A merged run does not take a joint past a limit that the segments it replaces keep to, nor, where they
                     // are past it themselves (a plateau at the limit, as a timed path cruises), past what they are by
@@ -283,7 +295,7 @@ mk_result merge_polynomials(const PolynomialSource &source, const MergeOptions &
                 const double span = static_cast<double>(view.duration_ns)*1e-9;
                 for (uint32_t joint = 0; joint < joints; ++joint)
                     if (!piece_error_within(candidate->coefficients[joint].value, view.joint(joint), view.degree,
-                        shift, span, position_tolerance[joint], velocity_tolerance[joint], acceleration_tolerance[joint]))
+                        shift, span, position_tolerance[joint], velocity_error[joint], acceleration_error[joint]))
                         return MK_ERROR_GENERATION;
             }
             // Samples can miss the quintic's own peaks between them, as on a plateau at a limit: bound its speed and
@@ -386,5 +398,11 @@ mk_result merge_polynomials(const PolynomialSource &source, const MergeOptions &
         }
     } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
     return MK_OK;
+}
+mk_result merge_polynomials(const PolynomialSource &source,const MergeOptions &options,const PolynomialOutput &output) {
+    return merge_polynomials_impl(source,options,output,false);
+}
+mk_result merge_polynomials_position_budget(const PolynomialSource &source,const MergeOptions &options,const PolynomialOutput &output) {
+    return merge_polynomials_impl(source,options,output,true);
 }
 } // namespace motionkit

@@ -615,7 +615,8 @@ mk_result MK_CALL mk_plan_evaluate(mk_plan_handle plan, int64_t time_ns,
 } // extern "C"
 
 namespace motionkit {
-mk_result merge_trajectory(mk_trajectory_handle handle, const MergeOptions &options, mk_trajectory_handle *out) {
+static mk_result merge_trajectory_impl(mk_trajectory_handle handle, const MergeOptions &options,
+                                       mk_trajectory_handle *out,bool position_budget) {
     if (!out) return MK_ERROR_INVALID_ARGUMENT;
     out->id = 0;
     const auto source = find(handle);
@@ -628,7 +629,8 @@ mk_result merge_trajectory(mk_trajectory_handle handle, const MergeOptions &opti
                 return PolynomialSegmentView{t.segment_start(index), t.segment_duration(index), t.segment_degree(index),
                     t.joint_count(), t.segment_coefficients(index), sizeof(mk_joint_coefficients)};
             }};
-        const auto status = merge_polynomials(view, options, {merged.get(),
+        const auto merger=position_budget ? merge_polynomials_position_budget : merge_polynomials;
+        const auto status = merger(view, options, {merged.get(),
             [](void *context, const mk_segment &segment, uint32_t, uint32_t) -> mk_result {
                 return static_cast<Trajectory *>(context)->append(segment) ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
             }});
@@ -636,5 +638,11 @@ mk_result merge_trajectory(mk_trajectory_handle handle, const MergeOptions &opti
         std::lock_guard lock(registry_mutex);
         return register_trajectory(std::move(merged), out);
     } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
+}
+mk_result merge_trajectory(mk_trajectory_handle handle,const MergeOptions &options,mk_trajectory_handle *out) {
+    return merge_trajectory_impl(handle,options,out,false);
+}
+mk_result merge_trajectory_position_budget(mk_trajectory_handle handle,const MergeOptions &options,mk_trajectory_handle *out) {
+    return merge_trajectory_impl(handle,options,out,true);
 }
 }

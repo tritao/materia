@@ -80,6 +80,12 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") @
 	 */
 	extern fn mk_merge_segments(trajectory: mk_trajectory_handle, position_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_tolerance: ptr<const<f64>> @in_array("joint_count"), acceleration_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_limit: ptr<const<f64>> @in_array("joint_count"), acceleration_limit: ptr<const<f64>> @in_array("joint_count"), position_lower: ptr<const<f64>> @in_array("joint_count"), position_upper: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, max_duration_seconds: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	/**
+	 * As mk_merge_segments, with continuous position-error allowances and derivative bounds
+	 * 2*position_tolerance/T and 8*position_tolerance/T^2 for each candidate's actual duration T.
+	 * Physical velocity, acceleration and position bounds are unchanged. Zero allowance requires exact preservation.
+	 */
+	extern fn mk_merge_segments_position_budget(trajectory: mk_trajectory_handle, position_tolerance: ptr<const<f64>> @in_array("joint_count"), velocity_limit: ptr<const<f64>> @in_array("joint_count"), acceleration_limit: ptr<const<f64>> @in_array("joint_count"), position_lower: ptr<const<f64>> @in_array("joint_count"), position_upper: ptr<const<f64>> @in_array("joint_count"), joint_count: u32, max_duration_seconds: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
+	/**
 	 * Count first, then allocate exactly enough output. Invalid requests fail before writing.
 	 */
 	extern fn mk_orientation_lattice_count(lattice: ptr<const<mk_orientation_lattice>>, out_count: ptr<u32> @out) -> mk_result;

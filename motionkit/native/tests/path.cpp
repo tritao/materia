@@ -602,6 +602,24 @@ int main() {
         assert(step_report.checks[MK_CHECK_VELOCITY].status != MK_CHECK_FAILED);
         assert(step_report.checks[MK_CHECK_ACCELERATION].status != MK_CHECK_FAILED);
         mk_trajectory_destroy(step_merged);
+        // The position-budget entry point shares physical validation and owns a fresh handle.
+        step_merged.id = 0;
+        assert(mk_merge_segments_position_budget(step_trajectory, position_tolerance,
+            step_velocity, step_acceleration, lower, upper, 2, 0.01, &step_merged) == MK_OK);
+        assert(step_merged.id != 0);
+        assert(mk_validate(step_merged, &step_limits, &step_report) == MK_OK);
+        assert(step_report.checks[MK_CHECK_VELOCITY].status != MK_CHECK_FAILED);
+        assert(step_report.checks[MK_CHECK_ACCELERATION].status != MK_CHECK_FAILED);
+        mk_trajectory_destroy(step_merged);
+        step_merged.id = 123;
+        assert(mk_merge_segments_position_budget(step_trajectory, position_tolerance,
+            step_velocity, step_acceleration, lower, upper, 1, 0.01, &step_merged) == MK_ERROR_INVALID_ARGUMENT);
+        assert(step_merged.id == 0);
+        assert(mk_merge_segments_position_budget(step_trajectory, nullptr,
+            step_velocity, step_acceleration, lower, upper, 2, 0.01, &step_merged) == MK_ERROR_INVALID_ARGUMENT);
+        assert(step_merged.id == 0);
+        assert(mk_merge_segments_position_budget(step_trajectory, position_tolerance,
+            step_velocity, step_acceleration, lower, upper, 2, 0.01, nullptr) == MK_ERROR_INVALID_ARGUMENT);
         mk_trajectory_destroy(step_trajectory);
         mk_time_law_destroy(law);
         mk_path_destroy(path);
