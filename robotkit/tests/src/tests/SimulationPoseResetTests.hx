@@ -276,8 +276,10 @@ class SimulationPoseResetTests {
     var sphere = new CollisionShape(collisionkit.CollisionGeometry.Sphere(0.02), [-1,0,0]);
     var runtime = harness.simulation.addRobotAtPose(blueprint, [0,0,0], [0,0,0,1],
       null, null, null, [sphere,rotated], 0);
-    var atTool = harness.spawnBox([1,0.06,0], [0.01,0.01,0.01]);
-    var atLink = harness.spawnBox([0.015,0,0], [0.01,0.01,0.01]);
+    // Physical contacts need a dynamic participant. Static/kinematic pairs
+    // without an explicit proximity shell are excluded by MuJoCo's contract.
+    var atTool = harness.spawnBox([1,0.06,0], [0.01,0.01,0.01], true);
+    var atLink = harness.spawnBox([0.015,0,0], [0.01,0.01,0.01], true);
     harness.step(Int64.ofInt(0));
     var toolContact = false, linkContact = false;
     for (contact in runtime.contacts()) {
