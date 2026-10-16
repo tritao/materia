@@ -3491,3 +3491,19 @@ The prototype currently derives hull topology during contact collection;
 caching is required before application-scale use. Compound parts, full surface
 semantics, generic inertial fallbacks, history/reset and scaling are still open.
 Production sources remain unchanged; this is not both-backend cell acceptance.
+
+### SD15a compound contact prototype (2026-10-16)
+
+The isolated solver now traverses separate box/convex collision pieces, composes
+body and part transforms, and preserves source part indices in measured
+contacts. Explicit pair lookup selects the original piece indices. A rotated,
+translated two-piece fixture supports a free body on the selected piece and
+reports its 9.81 N weight; a second body over the actual central gap falls with
+zero invented support force. The complete probe passes 60 physical assertions
+and 8683 checked API calls (`sd15-dynamics-compound.log`).
+
+This removes the primitive-only contact restriction in the experiment. Dynamic
+convex/compound bodies still need supplied inertial properties; generic inertia
+fallbacks, full material/filter semantics, topology caching, reset/history and
+scaling remain before production integration. Production sources are unchanged
+and deterministic whole-cell acceptance remains open.
