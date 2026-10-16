@@ -4065,10 +4065,15 @@ class ProjectSourceTests {
     check(robotSignals.length == RobotInterfaceChannels.robotRequests().length,
       "the robot cabinet owns every robot request output");
     var first = robotSignals[0], output = false, published = false, now = 0.0;
+    var publishedSequence = Int64.ofInt(0);
     var bus = new CellSignals(wires, () -> now,
       (controller, channel) -> channel == first.name && output,
       (controller, channel, on, sequence, stamp) -> {
-        if (channel == first.name) published = on;
+        if (channel == first.name) {
+          check(Int64.compare(sequence, publishedSequence) > 0, "Cell signal samples remain monotonic across Reset");
+          publishedSequence = sequence;
+          published = on;
+        }
       });
     bus.feed();
     var initial = bus.input(first.to.controller, first.name);
@@ -4083,6 +4088,11 @@ class ProjectSourceTests {
     var nextTick = bus.input(first.to.controller, first.name);
     check(nextTick != null && switch nextTick {case Digital(on): on; case _: false;} && published,
       "the wired digital output reaches the next controller tick and its sensor");
+    bus.reset();
+    var resetInput = bus.input(first.to.controller, first.name);
+    check(resetInput != null && switch resetInput {case Digital(on): !on; case _: false;},
+      "Reset clears the wired input before the next sample");
+    bus.feed();
     var alarmBit = RobotInterfaceChannels.alarmCodeBits()[0];
     var alarmWire = [for (wire in wires) if (wire.name == alarmBit) wire];
     check(alarmWire.length == 1, "the CNC alarm code has a declared cell output");
@@ -4951,6 +4961,7 @@ class ProjectSourceTests {
     fonts.add(root + "/haxeon/packages/ui/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf");
     var editor = new ReferenceEditorApp(fonts, work + "/workspace.json");
     editor.simulation.backgroundPacing = true;
+    var stopGate:Null<sys.thread.Lock> = null;
     try {
       editor.session.openGeneratedProject(generated, manifest);
       editor.documentChanged();
@@ -4993,12 +5004,62 @@ class ProjectSourceTests {
       editor.commands.execute("sim.reset");
       check(simulation.activeSession().simulationTime() == 0, "Reset restores the fixed simulation clock");
       editor.commands.execute("sim.play");
+      deadline = Sys.time() + 60.0;
+      while (editor.simulationBuild != null && Sys.time() < deadline) { editor.tick(); Sys.sleep(0.001); }
+      check(simulation.isRunning(), "Playback starts before the delayed Stop check: " + editor.logLines.join(" | "));
       Sys.sleep(0.03);
+      // Hold playback inside a command to prove Stop never joins it on the UI thread.
+      var entered = new sys.thread.Lock();
+      stopGate = new sys.thread.Lock();
+      var gate = stopGate;
+      simulation.control(function() { entered.release(); gate.wait(10.0); });
+      check(entered.wait(5.0), "The controlled playback delay starts: " + editor.logLines.join(" | ") +
+        "; error=" + simulation.error + "; playback=" + simulation.playbackFailure);
+      var stopStarted = Sys.time();
       editor.commands.execute("sim.stop");
-      check(!simulation.isActive(), "Stop retires background playback before its native worlds");
+      var stopMilliseconds = (Sys.time() - stopStarted) * 1000;
+      check(editor.simulationStop != null, "Stop queues shutdown without joining playback");
+      check(stopMilliseconds < 100, "Stop returns promptly while playback is still busy");
+      var shutdown = editor.simulationStop;
+      editor.commands.execute("sim.play");
+      editor.commands.execute("sim.reset");
+      editor.commands.execute("sim.step");
+      editor.commands.execute("sim.stop");
+      check(editor.simulationStop == shutdown && editor.simulationBuild == null,
+        "Transport commands cannot replace or restart an in-flight shutdown");
+      var stopFrames = 0, slowestStopFrame = 0.0;
+      for (_ in 0...5) {
+        var frameStarted = Sys.time();
+        editor.tick(); editor.submit(new LayoutFrame(1320.0, 900.0));
+        slowestStopFrame = Math.max(slowestStopFrame, Sys.time() - frameStarted);
+        stopFrames++;
+      }
+      check(editor.simulationStop != null, "UI frames continue while shutdown waits for playback");
+      gate.release();
+      stopGate = null;
+      deadline = Sys.time() + 30.0;
+      while (editor.simulationStop != null && Sys.time() < deadline) {
+        var frameStarted = Sys.time();
+        editor.tick(); editor.submit(new LayoutFrame(1320.0, 900.0));
+        slowestStopFrame = Math.max(slowestStopFrame, Sys.time() - frameStarted);
+        stopFrames++;
+        Sys.sleep(0.001);
+      }
+      check(editor.simulationStop == null && !simulation.isActive() && !simulation.isRunning(),
+        "Async Stop retires playback and native worlds: " + editor.logLines.join(" | "));
+      check(editor.logLines.indexOf("Returned to design mode") >= 0,
+        "Stop returns to design after all retirement workers finish");
+      // A second build must not overlap the process-wide planner shutdown, and app close drains retirement.
+      editor.commands.execute("sim.play");
+      deadline = Sys.time() + 60.0;
+      while (editor.simulationBuild != null && Sys.time() < deadline) { editor.tick(); Sys.sleep(0.001); }
+      check(simulation.isRunning(), "Play can build and restart after asynchronous retirement");
+      editor.commands.execute("sim.stop");
       Sys.println(haxe.Json.stringify({tendingInteractive: true, playMilliseconds: playMilliseconds,
-        preparationFrames: frames, slowestPreparationFrameMilliseconds: slowestFrame * 1000}));
-    } catch (error:Dynamic) { editor.dispose(); fonts.dispose(); throw error; }
+        preparationFrames: frames, slowestPreparationFrameMilliseconds: slowestFrame * 1000,
+        stopMilliseconds: stopMilliseconds, stopFrames: stopFrames,
+        slowestStopFrameMilliseconds: slowestStopFrame * 1000}));
+    } catch (error:Dynamic) { if (stopGate != null) stopGate.release(); editor.dispose(); fonts.dispose(); throw error; }
     editor.dispose(); fonts.dispose();
   }
 

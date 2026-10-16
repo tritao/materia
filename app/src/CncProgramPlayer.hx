@@ -866,8 +866,10 @@ class CncProgramPlayer extends ToolpathPlayer {
 	}
 
 	/** Stops cutting and gives the stock and tool parts their own geometry back. */
-	public function dispose():Void {
-		for (cut in allStocks) cut.dispose();
+	public function dispose(?releases:Array<Void->Void>):Void {
+		for (cut in allStocks) {
+			if (releases == null) cut.dispose(); else releases.push(function() cut.dispose());
+		}
 		allStocks.splice(0, allStocks.length);
 		stock = null;
 		activeStock = null;

@@ -65,11 +65,7 @@ class SimulationCommands {
           return available() && mission != null && mission.failure != null;
         }));
     app.commands.register(new Command("sim.stop", "Simulation: Stop and return to Design",
-      transport(function() {
-        simulation.clear();
-        app.log("Returned to design mode");
-        app.leaveSimulationMode();
-      }), null, function() return available() && simulation.isActive()));
+      transport(function() app.stopSimulation()), null, function() return available() && simulation.isActive()));
     app.commands.register(new Command("sim.rebuild", "Simulation: Apply / Rebuild",
       transport(function() app.prepareSimulation()), null, available));
   }

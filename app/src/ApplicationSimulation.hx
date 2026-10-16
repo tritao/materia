@@ -109,6 +109,7 @@ class ApplicationSimulation {
   public var backgroundPacing:Bool = false;
   final playbackMutex = new Mutex();
   var playbackActive = false;
+  var retirementFrame:Null<ApplicationPresentationSnapshot>;
   var playbackStop = false;
   var playbackCommands:Array<Void->Void> = [];
   var playbackFailure:Null<String>;
@@ -977,6 +978,7 @@ class ApplicationSimulation {
    * per tick, so a slow frame cannot starve them of motion.
    */
   public function pump():Void {
+    if (retirementFrame != null) return;
     if (playbackActive) {
       playbackMutex.acquire();
       var failure = playbackFailure, frame = playbackFrame;
@@ -1118,6 +1120,7 @@ class ApplicationSimulation {
   public function simulatedRobotIds():Array<String> return simulatedIds.copy();
   /** Captures physics poses once, then combines them with the matching sensor streams. */
   public function capturePresentationSnapshot():ApplicationPresentationSnapshot {
+    if (retirementFrame != null) return retirementFrame;
     if (playbackActive) {
       playbackMutex.acquire();
       var frame = playbackFrame;
@@ -1231,7 +1234,31 @@ class ApplicationSimulation {
     return pieces.length == 1 ? SimShape.convex(pieces[0]) : SimShape.compoundConvex(pieces);
   }
 
-  public function clear():Void {
+  /** Freeze presentation before the shutdown worker takes ownership. */
+  public function beginStop():Void {
+    retirementFrame = capturePresentationSnapshot();
+  }
+
+  /** Joins playback and physics without touching UI-owned scene or RobotWorld state. */
+  public function quiesceForStop():Void {
+    stopPlayback();
+    var active = space;
+    if (active != null) active.session.stop();
+  }
+
+  /** A failed retirement must not leave presentation frozen or native ownership on its worker. */
+  public function recoverFailedStop():Void {
+    retirementFrame = null;
+    stop();
+  }
+
+  /** Scene/world changes stay on their owner; blocking releases can be deferred to a worker. */
+  public function clear():Void clearWithReleases(null);
+
+  public function clearWithReleases(releases:Null<Array<Void->Void>>):Void {
+    function release(action:Void->Void):Void {
+      if (releases == null) action(); else releases.push(action);
+    }
     stop();
     for (program in missions) program.beforeReset();
     for (participant in participants) participant.leave();
@@ -1241,8 +1268,8 @@ class ApplicationSimulation {
       retired.scene.setWorkerVisualsVisible(true);
     }
     workforce = null; motions = null; tools = null; power = null;
-    if (cnc != null) cnc.dispose();
-    if (print != null) print.dispose();
+    if (cnc != null) cnc.dispose(releases);
+    if (print != null) print.dispose(releases);
     if (beads != null) beads.dispose();
     for (visual in beltVisuals) visual.reset();
     beltVisuals = [];
@@ -1255,18 +1282,21 @@ class ApplicationSimulation {
     cnc = null; print = null; mobile = null; missions = []; beads = null; cellSignals = null; refreshMembers();
     // A mission's programs are planned on worker threads that finish the plan they are on after they are cancelled; the
     // world they plan for goes now, so wait for them (see ProgramPlanner).
-    if (!preparationOnly) motionkit.robot.ProgramPlanner.shutdown();
+    if (!preparationOnly) release(function() motionkit.robot.ProgramPlanner.shutdown());
     if (detachedPreparedRobots != null) {
-      for (robot in detachedPreparedRobots) robot.close();
+      for (robot in detachedPreparedRobots) release(function() robot.close());
       detachedPreparedRobots = null;
-    } else for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
+    } else for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)release(function() robot.close()); }
     ownedRobots = [];
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);
     assemblyParts.resize(0);
     collisionWarnings = [];
     presentAssemblyPhysics = false;
-    releaseSpace(space, simulation); simulation = null; space = null;
+    var retiredSpace = space, retiredSimulation = simulation;
+    release(function() releaseSpace(retiredSpace, retiredSimulation));
+    simulation = null; space = null;
+    retirementFrame = null;
     for (zone in zoneMonitors) zone.dispose();
     zoneMonitors = [];
     appliedDocumentRevision=-1;appliedEnvironmentRevision=-1;appliedBackend=-1;appliedTimestep=-1;

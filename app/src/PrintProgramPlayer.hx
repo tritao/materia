@@ -328,8 +328,11 @@ class PrintProgramPlayer extends ToolpathPlayer {
 	}
 
 	/** Stops printing and gives the printed part's object its own geometry back. */
-	public function dispose():Void {
-		if (stock != null) stock.dispose();
+	public function dispose(?releases:Array<Void->Void>):Void {
+		var retiredStock = stock;
+		if (retiredStock != null) {
+			if (releases == null) retiredStock.dispose(); else releases.push(function() retiredStock.dispose());
+		}
 		stock = null;
 		if (stockObject != null) project.scene.clearRuntimeGeometry(stockObject);
 	}

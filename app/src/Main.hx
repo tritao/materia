@@ -589,6 +589,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public final world:RobotWorld;
   public final simulation:ApplicationSimulation;
   public var simulationBuild(default, null):Null<SimulationBuildJob>;
+  public var simulationStop(default, null):Null<SimulationStopJob>;
+  var closeAfterSimulationStop:Null<Void->Void>;
   var afterSimulationBuild:Null<Void->Void>;
   var resumeAfterSimulationBuild = false;
   public var bimModel(get, never):BimDocument;
@@ -784,7 +786,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       function() { documentChanged(); commands.execute("scene.fit-all"); },
       function() return documents.blocked(),
       function(id) { scene.selectTreeKey("project:" + id); invalidateView(); });
-    documents.busy = function() return startLoading != null || missionController.isLoading() || simulationBuild != null;
+    documents.busy = function() return startLoading != null || missionController.isLoading() || simulationBuild != null || simulationStop != null;
     documents.openArtifact = openProjectInBackground;
     if (hostContext != null) hostContext.onCloseRequested = function(close) {
       missionController.cancel();
@@ -795,10 +797,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
         startLoading = null;
       }
       // The process may not exit while a program is still being planned on a worker thread (see ProgramPlanner).
-      documents.requestClose(function() {
-        motionkit.robot.ProgramPlanner.shutdown();
-        close();
-      });
+      function finishClose():Void documents.requestClose(function() {
+          motionkit.robot.ProgramPlanner.shutdown();
+          close();
+        });
+      if (simulationStop != null) closeAfterSimulationStop = finishClose;
+      else finishClose();
     };
     treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition, session.generatedLabels());
     if (hostContext != null) {
@@ -1023,13 +1027,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     // Keep live simulation, component stories, and externally populated worlds
     // on the normal path because their presentation can change independently
     // of the UI revision counters.
-    if (componentLab != null || startLoading != null || simulationBuild != null || simulation.isActive() || externalWorldHasRobots)
+    if (componentLab != null || startLoading != null || simulationBuild != null || simulationStop != null || simulation.isActive() || externalWorldHasRobots)
       return ui.submit(view(), frame);
     return ui.submitCached(function() return view(), frame, editorSubmitKey());
   }
 
   /** Advance the character preview, then CAD preview refinement after a rendered frame. */
   public function tick():Void {
+    pollSimulationStop();
     pollSimulationBuild();
     missionController.tick();
     var queued = startLoading;
@@ -1069,7 +1074,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         invalidateView();
       }
     }
-    if (simulation.isActive() && simulation.isRunning()) {
+    if (simulationStop == null && simulation.isActive() && simulation.isRunning()) {
       simulation.pump();
       if (hostContext != null) hostContext.requestFrame();
     }
@@ -1105,7 +1110,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Prepare without blocking transport input; install only a complete candidate on this thread. */
   public function prepareSimulation(?after:Void->Void):Void {
-    if (simulationBuild != null) return;
+    if (simulationBuild != null || simulationStop != null) return;
     #if !wasm
     if (simulation.supportsBackgroundBuild(scene)) {
       resumeAfterSimulationBuild = simulation.isRunning();
@@ -1124,6 +1129,36 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function cancelSimulationBuild():Void {
     if (simulationBuild != null) simulationBuild.control.cancel();
     invalidateView();
+  }
+
+  public function stopSimulation():Void {
+    if (simulationStop != null || simulationBuild != null || !simulation.isActive()) return;
+    simulationStop = new SimulationStopJob(simulation);
+    commands.refresh();
+    invalidateView();
+  }
+
+  function pollSimulationStop():Void {
+    var job = simulationStop;
+    if (job == null) return;
+    try {
+      if (!job.poll()) {
+        if (hostContext != null) hostContext.requestFrame();
+        return;
+      }
+      simulationStop = null;
+      log("Returned to design mode");
+      leaveSimulationMode();
+    } catch (error:Dynamic) {
+      simulationStop = null;
+      try simulation.recoverFailedStop() catch (recovery:Dynamic) log("Simulation stop recovery failed: " + Std.string(recovery));
+      log("Simulation stop failed: " + Std.string(error));
+    }
+    commands.refresh();
+    invalidateView();
+    var close = closeAfterSimulationStop;
+    closeAfterSimulationStop = null;
+    if (close != null) close();
   }
 
   function pollSimulationBuild():Void {
@@ -1256,6 +1291,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function context():UiContext return ui;
 
   public function dispose():Void {
+    if (simulationStop != null) {
+      try simulationStop.close() catch (error:Dynamic) log("Simulation stop failed while closing: " + Std.string(error));
+      simulationStop = null;
+    }
     if (simulationBuild != null) { simulationBuild.close(); simulationBuild = null; }
     missionController.cancel();
     if (projectUiExtension != null) projectUiExtension.dispose();
@@ -1504,6 +1543,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     style.direction = LayoutDirection.LeftToRight;
     style.childAlignY = LayoutAlignmentY.Center;
     style.childGap = 4.0;
+    if (simulationStop != null) return new Row("editor-transport", [
+      new KeyedView("spinner", new haxeon.ui.widgets.controls.Spinner("simulation-stop-spinner", "Stopping simulation")),
+      new KeyedView("status", new Text("Stopping simulation…", null, appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0)))
+    ], style);
     var pending = simulationBuild;
     if (pending != null) {
       var cancel = new Button("Cancel", null, cancelSimulationBuild, "simulation-build-cancel");

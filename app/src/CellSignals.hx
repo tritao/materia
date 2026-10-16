@@ -75,7 +75,8 @@ class CellSignals implements SessionMember {
 
   public function beforeReset():Void {}
   public function reset():Void {
-    sequence = 0;
+    // Runtime adapters retain external sensor frames across a physics reset.
+    // Keep publication sequences monotonic for this bus's lifetime.
     for (wire in wires) values.set(wire.name, false);
   }
   public function present():Void {}
