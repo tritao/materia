@@ -6877,6 +6877,7 @@ class ProjectSourceTests {
       suite("screwdriver-virtual", root -> checkScrewdrivingOne(root, true)),
       suite("screwdriver-assembly", checkScrewdrivingAssembly),
       suite("screwdriver-required", RequiredFasteningTests.run),
+      suite("robot-recovery", RobotOnlyRecoveryTests.run),
       suite("screwdriver-registration", checkScrewdriverTouchRegistration),
       suite("screwdriver-feeder", checkScrewFeeder),
       suite("screwdriver-blow-feed", checkBlowFeed),
