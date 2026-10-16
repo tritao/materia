@@ -28,6 +28,51 @@ template<class Merge> void merge_cases(Merge merge) {
         assert(std::abs(state.position[0] - .5 * t * t) < 1e-12);
         assert(std::abs(state.velocity[0] - t) < 1e-12);
     }
+    // A short quartic excursion hides between the old strided joins and fifteen
+    // uniform samples. Its source velocity/acceleration stay below the limits,
+    // but replacing the whole run with zero loses twice the position budget.
+    {
+        auto pulse_options = options;
+        pulse_options.max_duration_seconds = 0.3;
+        const int64_t piece_ns = 4'000'000;
+        const double h = 0.004, amplitude = 2e-6;
+        std::vector<mk_segment> pulse(64);
+        for (unsigned i = 0; i < pulse.size(); ++i) {
+            auto &s = pulse[i];
+            s.struct_size = sizeof(s); s.joint_count = 1; s.degree = 4;
+            s.t0_ns = i * piece_ns; s.duration_ns = piece_ns;
+        }
+        // 16*A*x^2*(1-x)^2, x=t/h: position/velocity agree with rest on both sides.
+        auto &c = pulse[41].coefficients[0].value;
+        c[2] = 16 * amplitude / (h*h);
+        c[3] = -32 * amplitude / (h*h*h);
+        c[4] = 16 * amplitude / (h*h*h*h);
+        const double unlimited[] = {std::numeric_limits<double>::infinity()};
+        for (int order = 0; order < 3; ++order) {
+            pulse_options.position_tolerance = order == 0 ? pt : unlimited;
+            pulse_options.velocity_tolerance = order == 1 ? vt : unlimited;
+            pulse_options.acceleration_tolerance = order == 2 ? at : unlimited;
+            const auto preserved = merge(pulse, pulse_options);
+            std::size_t selected = 0;
+            for (int sample = 0; sample < 4096; ++sample) {
+                const int64_t t = 64 * piece_ns * sample / 4096;
+                while (selected+1 < preserved.size() && t >= preserved[selected].t0_ns+preserved[selected].duration_ns) ++selected;
+                const auto &piece = preserved[selected], &authored = pulse[t/piece_ns];
+                mk_trajectory_state expected{};
+                motionkit::evaluate_segment(authored, static_cast<double>(t-authored.t0_ns)*1e-9, expected);
+                motionkit::evaluate_segment(piece, static_cast<double>(t-piece.t0_ns)*1e-9, state);
+                const double error = order == 0 ? std::abs(state.position[0]-expected.position[0]) :
+                    order == 1 ? std::abs(state.velocity[0]-expected.velocity[0]) : std::abs(state.acceleration[0]-expected.acceleration[0]);
+                assert(error <= (order == 0 ? pt[0] : order == 1 ? vt[0] : at[0]) + 1e-12);
+            }
+        }
+        // An initially inconclusive Bernstein hull must refine and accept a
+        // genuinely permitted excursion, rather than refusing every curved run.
+        const double allowed_pulse[] = {2.1e-6};
+        pulse_options.position_tolerance = allowed_pulse;
+        pulse_options.velocity_tolerance = pulse_options.acceleration_tolerance = unlimited;
+        assert(merge(pulse, pulse_options).size() == 1);
+    }
     // Chords do not claim smooth acceleration and must keep their authored corners.
     for (auto &s : source) s.degree = 1;
     assert(merge(source, options).size() == source.size());

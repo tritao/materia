@@ -62,6 +62,90 @@ Kin kin_of(const mk_joint_coefficients &c, uint32_t degree, double tau) {
     return {p, v, a};
 }
 
+using Controls = std::array<double, MK_MAX_DEGREE + 1>;
+
+// A Bernstein hull encloses the entire polynomial. Subdivision tightens an
+// inconclusive hull; reaching the work bound refuses a merge, never grants one.
+bool controls_within(const Controls &control, int degree, double tolerance, double roundoff, int depth) {
+    double hull = 0.0;
+    for (int k = 0; k <= degree; ++k) {
+        if (!std::isfinite(control[k])) return false;
+        hull = std::max(hull, std::abs(control[k]));
+    }
+    if (hull + roundoff <= tolerance) return true;
+    if (std::abs(control[0]) > tolerance || std::abs(control[degree]) > tolerance || degree == 0 || depth == 0) return false;
+    Controls work = control, left{}, right{};
+    left[0] = work[0]; right[degree] = work[degree];
+    for (int row = 1; row <= degree; ++row) {
+        for (int k = 0; k <= degree-row; ++k) work[k] = work[k]*0.5+work[k+1]*0.5;
+        left[row] = work[0]; right[degree-row] = work[degree-row];
+    }
+    return controls_within(left, degree, tolerance, roundoff, depth-1) &&
+        controls_within(right, degree, tolerance, roundoff, depth-1);
+}
+
+bool error_within(const Controls &power, const Controls &magnitude, int degree, double tolerance) {
+    Controls control{};
+    double scale = 0.0;
+    for (int k = 0; k <= degree; ++k) {
+        if (!std::isfinite(power[k]) || !std::isfinite(magnitude[k])) return false;
+        scale += magnitude[k];
+    }
+    if (!std::isfinite(scale)) return false;
+    if (std::isinf(tolerance)) return true;
+    for (int k = 0; k <= degree; ++k) {
+        double ratio = 1.0;
+        for (int i = 0; i <= k; ++i) {
+            if (i) ratio *= static_cast<double>(k-i+1)/static_cast<double>(degree-i+1);
+            control[k] += ratio*power[i];
+        }
+        if (!std::isfinite(control[k])) return false;
+    }
+    // As in trajectory validation: reserve arithmetic error for normalization,
+    // binomial conversion and summation. At degree <=5, affine composition plus
+    // twelve subdivision levels stays within 512 operations per control.
+    const double roundoff = 512*std::numeric_limits<double>::epsilon()*scale +
+        512*std::numeric_limits<double>::denorm_min();
+    return std::isfinite(roundoff) && controls_within(control, degree, tolerance, roundoff, 12);
+}
+
+bool piece_error_within(const double *candidate, const double *original, unsigned original_degree,
+                       double shift, double duration, double position, double velocity, double acceleration) {
+    bool stationary = candidate[0] == original[0];
+    for (unsigned k = 1; k <= MK_MAX_DEGREE; ++k)
+        stationary = stationary && candidate[k] == 0.0 && (k > original_degree || original[k] == 0.0);
+    if (stationary) return true;
+    Controls error{}, magnitude{};
+    // Horner composition gives candidate(shift + duration*x), x in [0,1].
+    // Carry absolute contributions separately so cancellation cannot hide roundoff.
+    for (int n = MK_MAX_DEGREE; n >= 0; --n) {
+        // The partial polynomial gains only one degree at each Horner step.
+        for (int k = MK_MAX_DEGREE-n; k > 0; --k) {
+            error[k] = error[k]*shift + error[k-1]*duration;
+            magnitude[k] = magnitude[k]*std::abs(shift) + magnitude[k-1]*duration;
+        }
+        error[0] = error[0]*shift + candidate[n];
+        magnitude[0] = magnitude[0]*std::abs(shift) + std::abs(candidate[n]);
+    }
+    double power = 1.0;
+    for (unsigned k = 0; k <= original_degree; ++k) {
+        const double term = original[k]*power;
+        error[k] -= term; magnitude[k] += std::abs(term);
+        power *= duration;
+    }
+    const double tolerances[] = {position, velocity, acceleration};
+    double time_power = 1.0;
+    for (int order = 0; order < 3; ++order) {
+        const int degree = MK_MAX_DEGREE-order;
+        if (!error_within(error, magnitude, degree, tolerances[order]*time_power)) return false;
+        for (int k = 0; k < degree; ++k) {
+            error[k] = (k+1)*error[k+1]; magnitude[k] = (k+1)*magnitude[k+1];
+        }
+        time_power *= duration;
+    }
+    return true;
+}
+
 
 } // namespace
 
@@ -156,7 +240,7 @@ mk_result merge_polynomials(const PolynomialSource &source, const MergeOptions &
         };
         mk_trajectory_state state{};
         state.struct_size = sizeof(state);
-        // Whether the quintic follows the segments it replaces at their joins and at fifteen even steps across.
+        // Sample first for inexpensive rejection, then bound error over every original piece.
         auto follows = [&](uint32_t first, uint32_t last) -> mk_result {
             for (uint32_t j = 0; j < joints; ++j)
                 for (uint32_t k = 0; k <= candidate->degree; ++k)
@@ -192,6 +276,15 @@ mk_result merge_polynomials(const PolynomialSource &source, const MergeOptions &
                     peak_acceleration[joint] = std::max(peak_acceleration[joint],
                         std::abs(state.acceleration[joint]));
                 }
+            }
+            for (uint32_t i = first; i <= last; ++i) {
+                const auto view = source.segment(source.context, i);
+                const double shift = static_cast<double>(view.start_ns-candidate->t0_ns)*1e-9;
+                const double span = static_cast<double>(view.duration_ns)*1e-9;
+                for (uint32_t joint = 0; joint < joints; ++joint)
+                    if (!piece_error_within(candidate->coefficients[joint].value, view.joint(joint), view.degree,
+                        shift, span, position_tolerance[joint], velocity_tolerance[joint], acceleration_tolerance[joint]))
+                        return MK_ERROR_GENERATION;
             }
             // Samples can miss the quintic's own peaks between them, as on a plateau at a limit: bound its speed and
             // acceleration exactly, at its stationary points.

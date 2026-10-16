@@ -345,8 +345,8 @@ int main() {
     auto zigzag = robotkit::compile_device_segments6(ramp, 13, true, 1'000'000'000ULL, clock, blueprint, 1'000'000, 40'000,
         5, 1e-5, motors, 0, false, nullptr, link);
     assert(!zigzag.ok || zigzag.segments.size() == ramp.size());
-    // A narrow original excursion between the merge's fit samples is caught by the dense wire check.
-    // Only this merge-caused precision failure retries; the source itself remains valid.
+    // A narrow excursion between the old fit samples is now retained by the
+    // continuous merge-error bound, before the wire check needs to retry.
     {
         auto limits = blueprint;
         limits.joints[0].max_velocity = 1; limits.joints[0].max_acceleration = 100;
@@ -361,11 +361,42 @@ int main() {
         pulse[17].coefficients[0].value[4] = -2 * amplitude / std::pow(dt, 4);
         pulse[17].coefficients[0].value[5] = amplitude / std::pow(dt, 5);
         const robotkit::DeviceActuator6 fine_motor{0, 1, 0, 1e8, 1};
-        auto retried = robotkit::compile_device_segments6(pulse, 14, true, 1000000000, clock, limits,
+        auto preserved = robotkit::compile_device_segments6(pulse, 14, true, 1000000000, clock, limits,
             1000000, 40000, 5, 1e-12, std::span(&fine_motor, 1), 0, false, nullptr, link);
+        assert(preserved.ok && !preserved.retried_without_merge);
+        assert(preserved.segments.size() < pulse.size());
+        assert(preserved.worst_position_error <= 1e-12);
+        bool retained = false;
+        for (const auto &piece : preserved.segments)
+            if (piece.host_time_from_start_ns == pulse[17].time_from_start_ns && piece.host_duration_ns == pulse[17].duration_ns)
+                retained = true;
+        assert(retained);
+    }
+    // The f64 merge is an exact cubic, but casting its starting velocity to
+    // float lifts the interior speed peak above 1. Short local cubics limit that
+    // rounding's effect, so only the merged conversion fails and must retry.
+    {
+        auto limits = blueprint;
+        limits.joints[0].max_velocity = 1; limits.joints[0].max_acceleration = 1;
+        constexpr double mid = 0.002, bend = 0.02;
+        std::vector<robotkit::TrajectorySegment> crest(400);
+        for (std::size_t i = 0; i < crest.size(); ++i) {
+            auto &s = crest[i];
+            s.time_from_start_ns = i*10000; s.duration_ns = 10000;
+            s.joint_count = 1; s.degree = 3;
+            const double t = s.time_from_start_ns*1e-9;
+            // v(t)=1-bend*(t-mid)^2, peaking exactly at the velocity limit.
+            s.coefficients[0].value[0] = (1-bend*mid*mid)*t + bend*mid*t*t-bend*t*t*t/3;
+            s.coefficients[0].value[1] = 1-bend*(t-mid)*(t-mid);
+            s.coefficients[0].value[2] = -bend*(t-mid);
+            s.coefficients[0].value[3] = -bend/3;
+        }
+        const robotkit::DeviceActuator6 crest_motor{0,1,0,40000,1};
+        auto retried = robotkit::compile_device_segments6(crest, 18, false, 1000000000, clock, limits,
+            1000000,40000,5,1e-8,std::span(&crest_motor,1),0,false,nullptr,link);
         assert(retried.ok && retried.retried_without_merge);
-        assert(retried.merge_cause == robotkit::DeviceCompileFailure6::Precision);
-        assert(retried.segments.size() == pulse.size());
+        assert(retried.merge_cause == robotkit::DeviceCompileFailure6::Limits);
+        assert(retried.segments.size() == crest.size());
     }
     // An extruder that has fed 50 m of filament has turned some 40,000 rad: past 4,096 rad half a float's step (2.4e-4 rad
     // there, 2.4e-3 at 40,000) is more than a tenth of a step of the motor (1.95e-4 rad at 512 steps a radian), so a

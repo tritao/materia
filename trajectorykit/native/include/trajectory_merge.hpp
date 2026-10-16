@@ -28,6 +28,9 @@ struct PolynomialOutput {
     void *context;
     mk_result (*append)(void *, const mk_segment &, uint32_t first, uint32_t last);
 };
+/** Approximation tolerances apply continuously on every original polynomial.
+ * Inconclusive numerical bounds refuse a candidate rather than spend unproved error.
+ */
 struct MergeOptions {
     const double *position_tolerance, *velocity_tolerance, *acceleration_tolerance;
     const double *velocity_limit, *acceleration_limit, *position_lower, *position_upper;
