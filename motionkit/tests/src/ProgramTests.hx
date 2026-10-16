@@ -853,6 +853,34 @@ class ProgramTests extends MotionKitTestSupport {
     check(motion.running && !motion.completed && motion.failure==null,"a program started without waiting is running at once");
     for(_ in 0...600){motion.update(0.01);harness.step(Int64.ofInt(++tick));if(motion.completed || motion.failure!=null)break;}
     check(motion.completed && motion.failure==null,'a program started without waiting completes: ${motion.failure}');
+    // Hold arrives deterministically before update can consume the first asynchronous plan.
+    var heldStart = robot.snapshot().setpointPositions.toArray();
+    var startupMove = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal),new MotionOptions(),Blend.ExactStop)]);
+    motion.run(startupMove,false);
+    motion.hold(); motion.hold();
+    for(_ in 0...600){
+      motion.update(0.01);harness.step(Int64.ofInt(++tick));
+      if(motion.sessionState()==Held || motion.failure!=null)break;
+    }
+    check(motion.sessionState()==Held && motion.failure==null && !motion.completed,
+      "a hold during asynchronous startup reaches Held before executing the first plan");
+    for(_ in 0...10){motion.update(0.01);harness.step(Int64.ofInt(++tick));}
+    var heldPosition=robot.snapshot().setpointPositions;
+    for(joint in 0...heldStart.length)near(heldPosition.get(joint),heldStart[joint],
+      "startup hold preserves the commanded pose",1e-9);
+    check(!robot.snapshot().trajectoryActive,"startup hold submits no trajectory to the owner");
+    motion.resume();
+    for(_ in 0...600){motion.update(0.01);harness.step(Int64.ofInt(++tick));if(motion.completed || motion.failure!=null)break;}
+    check(motion.completed && motion.failure==null,"resuming a startup hold executes the program");
+    motion.run(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(origin),new MotionOptions(),Blend.ExactStop)]),false);
+    motion.hold();motion.resume();
+    for(_ in 0...600){motion.update(0.01);harness.step(Int64.ofInt(++tick));if(motion.completed || motion.failure!=null)break;}
+    check(motion.completed && motion.failure==null,"resume before planning finishes cancels the startup hold");
+    motion.run(startupMove,false);motion.hold();motion.abort();
+    check(!motion.running && motion.failure!=null,"abort cancels a held asynchronous startup");
+    motion.run(startupMove,false);
+    for(_ in 0...600){motion.update(0.01);harness.step(Int64.ofInt(++tick));if(motion.completed || motion.failure!=null)break;}
+    check(motion.completed && motion.failure==null,"aborted startup hold does not leak into a later program");
     // One that cannot be planned fails when its plan is not made, not at the call, and leaves the motion idle.
     motion.run(new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget([for(_ in origin)1.0e6]),new MotionOptions(),Blend.ExactStop)]),false);
     check(motion.running && motion.failure==null,"an impossible program started without waiting does not fail at the call");

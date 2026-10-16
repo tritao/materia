@@ -88,6 +88,8 @@ class ManipulatorMotion {
 
   /** A program started with `run(program, false)` whose first plan is still being made. */
   var starting:Bool = false;
+  /** Operator intent retained until asynchronous planning can start the session. */
+  var startupHeld:Bool = false;
   function get_running():Bool return starting || session.isActive();
   function get_completed():Bool return programCompleted;
   public function sessionState():SessionState return session.state;
@@ -231,6 +233,8 @@ class ManipulatorMotion {
       nextPlanId = planning.nextPlanId;
       starting = false;
       session.begin();
+      if (startupHeld) executor.hold();
+      startupHeld = false;
       advance(0.0);
       return true;
     } catch (error:Dynamic) {
@@ -240,8 +244,14 @@ class ManipulatorMotion {
     }
   }
 
-  public function hold():Void if (running && !starting) executor.hold();
-  public function resume():Void if (running && !starting) executor.resume();
+  public function hold():Void {
+    if (starting) startupHeld = true;
+    else if (running) executor.hold();
+  }
+  public function resume():Void {
+    if (starting) startupHeld = false;
+    else if (running) executor.resume();
+  }
   /** Discard the current program with a controlled stop; update confirms rest without creating or clearing a fault. */
   public function stop():Void {
     if (failure != null || session.isFaulted()) throw "Cannot request a controlled stop on a failed manipulator motion";
@@ -438,6 +448,7 @@ class ManipulatorMotion {
   }
   function release():Void {
     starting = false;
+    startupHeld = false;
     var planning = planner;
     if (planning != null) {
       nextPlanId = planning.nextPlanId;
