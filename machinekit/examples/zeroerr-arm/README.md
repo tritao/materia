@@ -1,5 +1,9 @@
 # ZeroErr 5 kg reference arm
 
+Current priority: [standalone arm-design requirements and validation](../reference-arms/ARM-DESIGN.md),
+using the original supplier geometry. CNC tending is deferred. See the
+[joint and connection bench plan](ARM-BENCH-PLAN.md) for the next physical evidence.
+
 This is an articulated CAD variant based on ZeroErr's eRobot 5 reference:
 eRob110T at J1–J3, eRob70T at J4–J6, straight hollow links, the supplied elbow
 adapters/dummy housing and terminal flange. The original solid geometry,

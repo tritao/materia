@@ -1,8 +1,14 @@
 # Imported reference arms
 
+The active work is the [standalone arm-design baseline](ARM-DESIGN.md).
+CNC tending and cell reconfiguration are deferred; their existing results are
+application-specific historical evidence. The new suite checks commercial
+references before interpreting standalone ZeroErr diagnostics.
+
 Official UR and FAIRINO robot descriptions converted to Materia's existing articulated
-scene format. The source URDF is the authority for transforms, axes, limits and declared
-inertias. There is no ROS runtime or hardware driver dependency.
+scene format. The pinned URDF defines imported transforms, axes, limits and declared
+inertias; manufacturer evidence is checked separately. Those source values are not
+a hardware qualification. There is no ROS runtime or hardware driver dependency.
 
 Run from the repository root:
 

@@ -1,4 +1,25 @@
-# Robot comparison and straight-link engineering plan
+# Robot arm design plan
+
+Current priority: [standalone arm design and reference validation](ARM-DESIGN.md).
+The cell/tending work below is historical and deferred. A complete commercial
+controller oracle, hardware capability and physical qualification are not implied
+by the earlier completed software checklist.
+
+## Active arm-design gates
+
+- [x] Separate requirements, provisional targets and screening assumptions.
+- [x] UR5e manufacturer nominal-DH oracle, independent source FK/Jacobians and positive standalone motion regressions.
+- [x] FR5 manufacturer drawing/interface checks, with full independent FK still explicitly pending.
+- [x] Original ZeroErr standalone motion, collision/conditioning observations and CoG-dependent load screens.
+- [x] Define original shoulder/connection bench evidence and acceptance-budget gaps.
+- [ ] Obtain FR5 controller/full independent FK evidence and resolve reference travel discrepancies.
+- [ ] Confirm original drive codes, moving masses/inertias, coupled torque-speed-duty and bearing limits.
+- [ ] Allocate whole-arm accuracy/stiffness budgets and qualify connections/harness.
+- [ ] Perform joint/connection bench work and then full-arm metrology.
+
+CNC cell layout and tending-cycle work are deferred.
+
+## Historical comparison and tending work
 
 Implementation and software/design review completed. Acceptance evidence and
 negative engineering findings are consolidated in [REVIEW.md](REVIEW.md).

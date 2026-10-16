@@ -1,5 +1,9 @@
 # Robot model implementation and design review
 
+Current design work is tracked in the [standalone baseline](ARM-DESIGN.md).
+The tending counts below describe one inherited cell, not general robot quality
+or design acceptance; cell reconfiguration is deferred.
+
 The subsequent [unchanged supplier evaluation](../zeroerr-arm/ORIGINAL-EVALUATION.md)
 separates the original 110T/70T assembly from our enlarged-wrist prototype.
 The prototype results below must not be generalized to the supplier architecture.

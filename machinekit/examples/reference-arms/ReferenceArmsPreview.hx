@@ -11,6 +11,7 @@ class ReferenceArmsPreview {
   static final ROOT:String = ReferenceAssetLocation.DIRECTORY + "/";
   static function check(value:Bool, message:String):Void {if (!value) throw message;}
   public static function main():Void {
+    if (Sys.args().indexOf("--arm-design")>=0) {ArmDesignReview.run();return;}
     if (Sys.args().indexOf("--original-review")>=0) {OriginalArmReview.run();return;}
     if (Sys.args().indexOf("--registration-previews")>=0) {CellRegistration.previews();return;}
     if (Sys.args().indexOf("--registration-properties")>=0) {CellRegistration.properties();return;}

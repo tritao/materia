@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "ur5e": {
+    "kind": "manufacturer_nominal_standard_DH",
+    "source": "https://www.universal-robots.com/articles/ur/application-installation/dh-parameters-for-calculations-of-kinematics-and-dynamics/",
+    "section": "UR5e/UR7e",
+    "checked": "2026-10-16",
+    "aMetres": [0, -0.425, -0.3922, 0, 0, 0],
+    "dMetres": [0.1625, 0, 0, 0.1333, 0.0997, 0.0996],
+    "alphaOverPi": [0.5, 0, 0, 0.5, -0.5, 0],
+    "baseRotationZRad": 3.141592653589793,
+    "frameBasis": "ROS base_link to manufacturer DH base is Rz(pi); source base_link_inertia fixed rotation. DH terminal frame is the physical flange/tool0; no fitted transforms.",
+    "translationToleranceM": 0.00000001,
+    "rotationMatrixTolerance": 0.00000001,
+    "physicalQualification": false,
+    "knownDifference": "Published general travel states +/-360 degrees; pinned ROS elbow is +/-180 degrees. Preserve conservative description and record discrepancy; no drive calibration verified."
+  },
+  "fairino5_v6": {
+    "kind": "independent_drawing_dimensions_only",
+    "source": "https://www.fairino.com/DOWNLOAD2",
+    "archive": "build/cad/fr5-drawings.zip",
+    "archiveSha256": "26dedb01518855a40bf33ec8de1618eb326d25fe7aa3424df247d6bdab175e1d",
+    "drawing": "FR5 Drawings/FR5 Ontology Drawing.jpg",
+    "drawingSha256": "2f5f2e30f5a3787698906fc7cf2ae5c8c5a868397873506e5b8fe02f31f621cc",
+    "dimensionsMm": {"shoulderHeight": 152, "upperArm": 425, "forearm": 395, "wristOffset1": 102, "wristOffset2": 102, "flangeOffset": 100},
+    "dimensionToleranceMm": 0.2,
+    "independentFullFkOracleAvailable": false,
+    "knownDifference": "URDF forearm 395.01 mm, wrist offset 102.1 mm and rounded rotations; 100 mm nominal flange vs 99 mm source mesh end. Retained, not corrected by fitting.",
+    "nextEvidence": "Vendor controller FK samples or independently documented full kinematic convention; source-URDF round trips alone are not this evidence."
+  }
+}
