@@ -2968,3 +2968,54 @@ Further commissioning evidence:
   handshake both still need their integration checks.
 
 The above cell/runtime additions are work in progress, not SD15 acceptance.
+
+
+### SD15a contact and failure acceptance follow-up (2026-10-16)
+
+Committed and checked:
+- `57a382ec8` coalesces adjacent rectangular plate proxy cells with exactly the
+  same solid union. All 99 fastening assertions pass, including sampled material
+  occupancy, all cutouts, disjoint interiors and total volume. MuJoCo's seated
+  housing/plate contact count falls from 881 to 594. No opening, collision
+  threshold or engine tolerance is changed.
+- `1a407d57f` resolves native payload contact attribution through object carrier
+  chains. A screw retained on a carried plate reports its own contacting identity
+  at the robot's actual carrying link. MuJoCo and SimKit native suites pass. The
+  added nested regression fails against the previous app runtime at its missing
+  contact assertion, and passes against the fixed runtime. The geometric default
+  backend verifies ownership without claiming an unavailable physical wrench;
+  MuJoCo additionally verifies a real finite nonzero contact force.
+- `248cf95c3` commits `ScrewInvocation.Required`, its strict wire checks, controller
+  alarm and runtime guard. `screwdriver-required` passes on both backends, 719.8 s
+  wall / 426 MB peak. Two actual named screws each cross-thread and are rejected;
+  the controller retains both NOK reports and stops before the downstream job.
+
+Layout commissioning now reaches actual housing placement at the plate in
+MuJoCo. The handling table has moved to y=-920 mm so its slab does not overlap
+with the fastening table; the tray footprints remain supported. The long
+`sd-cases-sd15-housing8` run was explicitly stopped after its contact bottleneck
+was identified, not treated as an acceptance pass. `sd-cases-sd15-housing9` is a
+follow-up diagnostic using the merged proxy and an earlier successful app build.
+A temporary live comparison of dense versus automatic Jacobians showed no useful
+speed gain; automatic selection was restored and no solver setting was changed
+in source. This diagnostic run is not final acceptance evidence.
+
+Uncommitted, still to verify:
+- `MissionPlayer.cellCollisionSnapshot` follows the same ownership chain, including
+  a planned carrier assigned to a plate before pickup. This prevents retained
+  housing/screw geometry being left behind as loose obstacles during unload.
+- `clearance-retained` is a focused app regression: a small retained child must
+  have the parent's planned and then actual robot owner, and its future collision
+  must reject a joint plan while the parent itself stays clear. It is also part
+  of the default `clearance` case.
+- Robot-only recovery emits a machine reset only when the controller owns the
+  declared reset wire; its local retry acceptance and the tending reset regression
+  remain due.
+
+The new app build is queued with a 6 GB cap and 9 GB required host headroom
+(`--need 4G --margin 5G`): the preceding 3.3 GB compiler was terminated by earlyoom
+under concurrent workspace load. Once it succeeds, run `clearance-retained`,
+then continue the complete two-arm cycle and the SD15a.4 fault/recovery cases on
+both backends. Required fastening success is accepted; the full two-arm cell,
+its fault/recovery matrix, documentation/catalogue and final frozen-source gate
+are not complete.
