@@ -500,6 +500,12 @@ public:
         if (running_) return NKSIM_ERROR_INVALID_STATE;
         auto result = release_host();
         if (result != NKSIM_OK) return result;
+        // Runtime fastenings belong to the completed run, unlike authored rigid trees.
+        for (auto it = measured_fixed_offsets_.begin(); it != measured_fixed_offsets_.end();) {
+            nksim_joint_destroy(world_, it->first);
+            fixed_joints_.erase(it->first);
+            it = measured_fixed_offsets_.erase(it);
+        }
         for (auto &[id, object] : objects_) {
             if (object.carrier == 0) continue;
             result = nksim::resolve_world(world_)->set_body_motion_type(
@@ -615,7 +621,8 @@ public:
         return NKSIM_OK;
     }
 
-    nksim_result create_fixed_joint(nksim_object parent, nksim_object child, nksim_joint &out) {
+    nksim_result create_fixed_joint(nksim_object parent, nksim_object child, nksim_joint &out,
+                                  bool measured = false) {
         std::lock_guard lock(mutex);
         if (host_ != 0) return NKSIM_ERROR_INVALID_STATE;
         const auto first = objects_.find(parent), second = objects_.find(child);
@@ -625,21 +632,55 @@ public:
         for (const auto &[joint, pair] : fixed_joints_)
             if (pair.second == child) return NKSIM_ERROR_INVALID_STATE;
         if (object_dependency_cycle(parent, child)) return NKSIM_ERROR_INVALID_STATE;
-        const auto &a = first->second.part.reference, &b = second->second.part.reference;
+        auto a = first->second.part.reference, b = second->second.part.reference;
+        if (measured) {
+            nksim_body_state first_state{}, second_state{};
+            first_state.struct_size = second_state.struct_size = sizeof(nksim_body_state);
+            auto result = body_state(first->second.part.body, first_state);
+            if (result != NKSIM_OK) return result;
+            result = body_state(second->second.part.body, second_state);
+            if (result != NKSIM_OK) return result;
+            a = make_pose(first_state.position, first_state.rotation);
+            b = make_pose(second_state.position, second_state.rotation);
+        }
         nksim_joint_desc desc{};
         desc.struct_size = sizeof(desc);
         desc.type = NKSIM_JOINT_FIXED;
         desc.body_a = first->second.part.body;
         desc.body_b = second->second.part.body;
         desc.rotation_a[3] = 1.0;
-        // Both joint frames coincide with the parent's creation frame.
+        // Both joint frames coincide with the selected parent frame.
         double delta[3];
         for (int axis = 0; axis < 3; ++axis) delta[axis] = a.position[axis] - b.position[axis];
         rotate(b.rotation, delta, desc.anchor_b, true);
         const double inverse_b[4] = {-b.rotation[0], -b.rotation[1], -b.rotation[2], b.rotation[3]};
         multiply(inverse_b, a.rotation, desc.rotation_b);
+        if (measured) {
+            const auto result = nksim_world_begin_topology_update(world_);
+            if (result != NKSIM_OK) return result;
+        }
         const auto result = nksim_joint_create(world_, &desc, &out);
-        if (result == NKSIM_OK) fixed_joints_.emplace(out, std::make_pair(parent, child));
+        if (measured) {
+            const auto committed = nksim_world_end_topology_update(world_);
+            if (committed != NKSIM_OK) {
+                if (result == NKSIM_OK) nksim_joint_destroy(world_, out);
+                out = 0;
+                return committed;
+            }
+        }
+        if (result == NKSIM_OK) {
+            fixed_joints_.emplace(out, std::make_pair(parent, child));
+            if (measured) {
+                nksim_pose offset{};
+                offset.struct_size = sizeof(offset);
+                offset.rotation[3] = 1.0;
+                for (int axis = 0; axis < 3; ++axis) delta[axis] = b.position[axis] - a.position[axis];
+                rotate(a.rotation, delta, offset.position, true);
+                const double inverse_a[4] = {-a.rotation[0], -a.rotation[1], -a.rotation[2], a.rotation[3]};
+                multiply(inverse_a, b.rotation, offset.rotation);
+                measured_fixed_offsets_.emplace(out, offset);
+            }
+        }
         return result;
     }
 
@@ -650,6 +691,7 @@ public:
         if (found == fixed_joints_.end()) return NKSIM_ERROR_INVALID_HANDLE;
         nksim_joint_destroy(world_, joint);
         fixed_joints_.erase(found);
+        measured_fixed_offsets_.erase(joint);
         return NKSIM_OK;
     }
 
@@ -738,6 +780,8 @@ public:
         const auto found = objects_.find(id);
         if (found == objects_.end()) return NKSIM_ERROR_INVALID_HANDLE;
         out = found->second.carrier;
+        if (out == 0) for (const auto &[joint, pair] : fixed_joints_)
+            if (pair.second == id) { out = objects_.at(pair.first).part.body; break; }
         return NKSIM_OK;
     }
 
@@ -1169,12 +1213,19 @@ private:
             out = compose_pose(carrier, object.offset);
         } else {
             nksim_object parent = 0;
+            nksim_joint rigid_joint = 0;
             for (const auto &[joint, pair] : fixed_joints_)
-                if (pair.second == id) { parent = pair.first; break; }
+                if (pair.second == id) { parent = pair.first; rigid_joint = joint; break; }
             if (parent != 0) {
                 nksim_pose parent_pose{};
                 const auto result = planned_object_pose(parent, targets, parent_pose);
                 if (result != NKSIM_OK) return result;
+                const auto measured = measured_fixed_offsets_.find(rigid_joint);
+                if (measured != measured_fixed_offsets_.end()) {
+                    out = compose_pose(parent_pose, measured->second);
+                    targets.emplace(id, out);
+                    return NKSIM_OK;
+                }
                 const auto &a = objects_.at(parent).part.reference, &b = object.part.reference;
                 nksim_pose local{}; local.struct_size = sizeof(local);
                 double delta[3];
@@ -1458,6 +1509,7 @@ private:
         batch_topology([&] {
             for (const auto &[joint, pair] : fixed_joints_) nksim_joint_destroy(world_, joint);
             fixed_joints_.clear();
+            measured_fixed_offsets_.clear();
             for (auto &[id, object] : objects_) destroy_part(object.part);
             for (auto &[id, actor] : actors_)
                 for (auto &part : actor.parts) destroy_part(part);
@@ -1485,6 +1537,7 @@ private:
     std::thread worker_;
     std::map<nksim_object, Object> objects_;
     std::map<nksim_joint, std::pair<nksim_object, nksim_object>> fixed_joints_;
+    std::map<nksim_joint, nksim_pose> measured_fixed_offsets_;
     std::map<nksim_actor, Actor> actors_;
     // Ordered by registration, so every tick visits participants alike.
     std::map<nksim_participant, nksim_participant_desc> participants_;
@@ -1655,6 +1708,14 @@ nksim_result NKSIM_CALL nksim_session_create_fixed_joint(nksim_session session,
 nksim_result NKSIM_CALL nksim_session_destroy_fixed_joint(nksim_session session, nksim_joint joint) {
     NKSIM_SESSION_OR_FAIL(value);
     return value->destroy_fixed_joint(joint);
+}
+
+nksim_result NKSIM_CALL nksim_session_create_measured_fixed_joint(nksim_session session,
+    nksim_object parent, nksim_object child, nksim_joint *out_joint) {
+    if (!out_joint) return NKSIM_ERROR_INVALID_ARGUMENT;
+    *out_joint = 0;
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->create_fixed_joint(parent, child, *out_joint, true);
 }
 
 nksim_result NKSIM_CALL nksim_session_teleport_object(nksim_session session, nksim_object object,

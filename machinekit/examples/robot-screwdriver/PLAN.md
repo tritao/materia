@@ -3138,3 +3138,27 @@ the plate, relax contacts, or extend tightening time to mask this motion.
 Logs: the case directories above and `sd15-full3-native-contacts.log` in the
 scratch directory. The whole free-plate cycle, unload, default-backend physical
 support, final catalogue/gate and main integration remain open.
+
+### SD15a measured rigid retention prerequisite (2026-10-16)
+
+SimKit now has a separate measured-pose fixed-joint API for runtime fastening.
+It leaves the authored reference-frame API unchanged, keeps both bodies'
+physical mass/motion, reports the actual parent through object carrier lookup,
+and removes runtime connections on reset. MuJoCo uses a topology transaction
+to rebase a moved child's compiled reference without snapping its measured pose.
+
+Native checks pass with assertions enabled: the complete SimKit session suite
+includes a moved/rotated measured connection, subsequent carrying and reset;
+the complete MuJoCo session suite includes a 3 N force on a 2 kg retained child
+accelerating its combined 3 kg free assembly by the expected amount. This
+checks actual force transfer and added mass, beyond geometric following. The
+RobotKit MuJoCo and SimKit suites also pass with the updated native library.
+Logs: `sd15-measured-fixed-{session,mujoco-session,robot-mujoco,robot-simkit}.log`
+in the scratch directory. Temporary native wrapper targets are `sd_session_test`
+and `sd_mujoco_session_test` in the existing `sd-robotkit-tests` build.
+
+The app integration is not accepted yet: final preload now requests rigid
+retention of its clamped member when the fixture is a dynamic object. Its build
+is running; the screwdriver process regression and fresh full cell cycle remain
+due. Screws' in-process thread/holding representation is unchanged. This native
+prerequisite does not resolve the default backend's absent pressure dynamics.

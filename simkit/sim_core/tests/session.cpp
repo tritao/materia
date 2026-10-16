@@ -181,6 +181,59 @@ void presence_uses_loose_object_shapes() {
     }
 }
 
+void measured_fixed_connections_preserve_seated_pose_and_reset() {
+    Space space;
+    nksim_object_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    desc.mass = 0.2;
+    desc.shape.type = NKSIM_SHAPE_BOX;
+    for (double &extent : desc.shape.parameters) extent = 0.05;
+    desc.pose = pose_at(0, 0, 5);
+    nksim_object parent = 0, child = 0, carrier = 0;
+    assert(nksim_session_create_object(space.session, &desc, &parent) == NKSIM_OK);
+    desc.pose = pose_at(0.4, 0, 5);
+    assert(nksim_session_create_object(space.session, &desc, &child) == NKSIM_OK);
+    auto seated_parent = pose_at(1, 2, 5), seated_child = pose_at(1, 2.3, 5);
+    seated_parent.rotation[2] = seated_parent.rotation[3] = std::sqrt(0.5);
+    seated_child.rotation[2] = seated_child.rotation[3] = std::sqrt(0.5);
+    assert(nksim_session_teleport_object(space.session, parent, &seated_parent) == NKSIM_OK);
+    assert(nksim_session_teleport_object(space.session, child, &seated_child) == NKSIM_OK);
+    nksim_joint joint = 0;
+    assert(nksim_session_create_measured_fixed_joint(space.session, parent, child, &joint) == NKSIM_OK);
+    nksim_body parent_body = 0, owner = 0;
+    assert(nksim_session_get_object_body(space.session, parent, &parent_body) == NKSIM_OK);
+    assert(nksim_session_get_object_carrier(space.session, child, &owner) == NKSIM_OK && owner == parent_body);
+    // Carry the parent through a different turn: the measured 0.3 m offset, not
+    // the authored 0.4 m separation, must follow it on the very first tick.
+    desc.motion_type = NKSIM_MOTION_STATIC;
+    desc.pose = pose_at(0, 0, 0);
+    assert(nksim_session_create_object(space.session, &desc, &carrier) == NKSIM_OK);
+    nksim_body carrier_body = 0;
+    assert(nksim_session_get_object_body(space.session, carrier, &carrier_body) == NKSIM_OK);
+    auto carried = pose_at(2, 3, 5);
+    carried.rotation[2] = 1; carried.rotation[3] = 0;
+    assert(nksim_session_hold_object(space.session, parent, carrier_body, &carried) == NKSIM_OK);
+    assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+    nksim_frame frame = 0;
+    assert(nksim_session_capture(space.session, &frame) == NKSIM_OK);
+    nksim_pose a{}, b{}; a.struct_size = b.struct_size = sizeof(a);
+    assert(nksim_frame_get_object_pose(frame, parent, &a) == NKSIM_OK);
+    assert(nksim_frame_get_object_pose(frame, child, &b) == NKSIM_OK);
+    assert(near(a.position[0], 2) && near(a.position[1], 3));
+    assert(near(b.position[0], 1.7) && near(b.position[1], 3));
+    assert(near(std::abs(b.rotation[2]), 1));
+    nksim_frame_destroy(frame);
+    assert(nksim_session_stop(space.session) == NKSIM_OK);
+    assert(nksim_session_reset(space.session) == NKSIM_OK);
+    assert(nksim_session_get_object_carrier(space.session, child, &owner) == NKSIM_OK && owner == 0);
+    assert(nksim_session_capture(space.session, &frame) == NKSIM_OK);
+    assert(nksim_frame_get_object_pose(frame, child, &b) == NKSIM_OK);
+    assert(near(b.position[0], 1) && near(b.position[1], 2.3));
+    nksim_frame_destroy(frame);
+    assert(nksim_session_destroy_object(space.session, child) == NKSIM_OK);
+}
+
 void fixed_connections_use_reference_frames_and_session_ownership() {
     Space space;
     nksim_object_desc desc{};
@@ -858,6 +911,7 @@ int main() {
     convex_objects_keep_their_actual_volume();
     compound_objects_preserve_empty_gaps();
     fixed_connections_use_reference_frames_and_session_ownership();
+    measured_fixed_connections_preserve_seated_pose_and_reset();
     compound_objects_preserve_gaps_and_identity();
     compound_contacts_support_parts_without_filling_the_gap();
     actors_follow_timed_keyframes();

@@ -202,6 +202,17 @@ class SimSession {
         return new SimFixedJoint(this, result.out_joint);
     }
 
+    /** Fasten at the current measured pose while stopped, retaining physical mass and motion.
+     * The session removes this runtime connection on reset. */
+    public function createMeasuredFixedJoint(parent:SimObject, child:SimObject):SimFixedJoint {
+        ensureLive();
+        if (parent == null || child == null || parent.session != this || child.session != this)
+            throw "A measured fixed connection needs two objects from this session";
+        var result = NativeKitSim.nksim_session_create_measured_fixed_joint(owner.borrow(), parent.handle, child.handle);
+        SimWorld.check(result.status, "session.createMeasuredFixedJoint");
+        return new SimFixedJoint(this, result.out_joint);
+    }
+
     /** Tests one free dynamic object against an oriented query box. */
     @:allow(SimObject)
     private function objectOverlapsVolume(object:SimObject, pose:SimPose,

@@ -164,6 +164,12 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_destroy_object(
 NKSIM_API nksim_result NKSIM_CALL nksim_session_create_fixed_joint(
     nksim_session session, nksim_object parent, nksim_object child,
     nksim_joint *out_joint NK_OUT);
+/** Fastens two objects at their current measured relative pose while stopped,
+ * preserving their physical motion types and masses. Unlike design-time fixed
+ * joints, this runtime connection is removed by session reset. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_create_measured_fixed_joint(
+    nksim_session session, nksim_object parent, nksim_object child,
+    nksim_joint *out_joint NK_OUT);
 /** Removes a fixed joint owned by this session while stopped. */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_destroy_fixed_joint(
     nksim_session session, nksim_joint joint);

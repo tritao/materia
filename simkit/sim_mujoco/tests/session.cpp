@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstdio>
 
 namespace {
 
@@ -411,6 +412,57 @@ void held_rigid_tree_rebuilds_and_releases_as_one_free_part() {
     nksim_session_destroy(session); nksim_world_destroy(world); nkscene_scene_destroy(scene);
 }
 
+// Runtime fastening keeps the seated transform and both masses. A force on
+// the retained child accelerates the free assembly rather than a mocap proxy
+// pushing its own parent through the worktable.
+void measured_fastening_transfers_force_through_combined_mass() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{}; desc.struct_size = sizeof(desc); desc.scene = scene;
+    desc.fixed_timestep = 0.001; desc.physics_substeps = 1;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    nksim_session_desc session_desc{}; session_desc.struct_size = sizeof(session_desc);
+    session_desc.scene = scene; session_desc.world = world;
+    nksim_session session = 0;
+    assert(nksim_session_create(&session_desc, &session) == NKSIM_OK);
+    const auto parent = make_box(session, NKSIM_MOTION_DYNAMIC, 1, pose_at(0,0,1), .05,.05,.05);
+    const auto child = make_box(session, NKSIM_MOTION_DYNAMIC, 2, pose_at(0,0,3), .05,.05,.05);
+    auto a = pose_at(.3,.4,1), b = pose_at(.3,.4,1.1);
+    a.rotation[2] = a.rotation[3] = b.rotation[2] = b.rotation[3] = std::sqrt(.5);
+    assert(nksim_session_teleport_object(session,parent,&a) == NKSIM_OK);
+    assert(nksim_session_teleport_object(session,child,&b) == NKSIM_OK);
+    nksim_joint joint = 0;
+    const auto connected = nksim_session_create_measured_fixed_joint(session,parent,child,&joint);
+    if (connected != NKSIM_OK) std::fprintf(stderr,"Measured fixed connection: %d\n",connected);
+    assert(connected == NKSIM_OK);
+    nksim_body parent_body = 0, child_body = 0, owner = 0;
+    assert(nksim_session_get_object_body(session,parent,&parent_body) == NKSIM_OK);
+    assert(nksim_session_get_object_body(session,child,&child_body) == NKSIM_OK);
+    assert(nksim_session_get_object_carrier(session,child,&owner) == NKSIM_OK && owner == parent_body);
+    assert(nksim_session_step(session,0,nullptr) == NKSIM_OK);
+    nksim_frame frame = 0;
+    assert(nksim_session_capture(session,&frame) == NKSIM_OK);
+    auto first = object_pose(frame,parent), second = object_pose(frame,child);
+    assert(std::abs(first.position[0]-.3) < 1e-8 && std::abs(first.position[1]-.4) < 1e-8);
+    assert(std::abs(first.position[2]-1) < 1e-8 && std::abs(second.position[2]-1.1) < 1e-8);
+    nksim_frame_destroy(frame);
+    nksim_body_force force{}; force.struct_size = sizeof(force); force.body = child_body; force.force[2] = 3;
+    for (int tick=0; tick<100; ++tick) {
+        assert(nksim_session_submit_forces(session,&force,1) == NKSIM_OK);
+        assert(nksim_session_step(session,0,nullptr) == NKSIM_OK);
+    }
+    assert(nksim_session_capture(session,&frame) == NKSIM_OK);
+    first = object_pose(frame,parent); second = object_pose(frame,child);
+    assert(std::abs(first.position[2]-1.00505) < 1e-5); // 3 N / (1+2) kg for 0.1 s.
+    assert(std::abs(second.position[2]-first.position[2]-.1) < 1e-8);
+    nksim_frame_destroy(frame);
+    assert(nksim_session_stop(session) == NKSIM_OK);
+    assert(nksim_session_reset(session) == NKSIM_OK);
+    assert(nksim_session_get_object_carrier(session,child,&owner) == NKSIM_OK && owner == 0);
+    nksim_session_destroy(session); nksim_world_destroy(world); nkscene_scene_destroy(scene);
+}
+
 } // namespace
 
 int main() {
@@ -419,5 +471,6 @@ int main() {
     fixed_object_tree_survives_free_motion_and_child_rebuild();
     object_inertia_and_local_center_drive_measured_dynamics();
     held_rigid_tree_rebuilds_and_releases_as_one_free_part();
+    measured_fastening_transfers_force_through_combined_mass();
     return 0;
 }
