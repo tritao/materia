@@ -1546,18 +1546,24 @@ private:
         double best = std::numeric_limits<double>::infinity(), penetration = 0;
         int kind = -1;
         std::size_t edge_a = 0, edge_b = 0;
-        std::vector<Vec3> tested_axes;
+        std::set<std::array<long long, 3>> tested_axes;
         auto axis_test = [&](Vec3 axis, int candidate, std::size_t ea = 0, std::size_t eb = 0) {
             double length = std::sqrt(dot3(axis, axis));
             if (length < 1e-12)
                 return true;
             axis = scale(axis, 1 / length);
-            for (const auto &tested : tested_axes) {
-                const auto cross = cross3(axis, tested);
-                if (dot3(cross, cross) < 1e-24)
-                    return true;
-            }
-            tested_axes.push_back(axis);
+            Vec3 canonical = axis;
+            int major = 0;
+            for (int i = 1; i < 3; ++i)
+                if (std::abs(canonical[i]) > std::abs(canonical[major]))
+                    major = i;
+            if (canonical[major] < 0)
+                canonical = scale(canonical, -1);
+            std::array<long long, 3> key{};
+            for (int i = 0; i < 3; ++i)
+                key[i] = std::llround(canonical[i] * 1e12);
+            if (!tested_axes.insert(key).second)
+                return true;
             double amin = std::numeric_limits<double>::infinity(), amax = -amin, bmin = amin, bmax = -amin;
             for (const auto &p : a.vertices) {
                 double x = dot3(p, axis);

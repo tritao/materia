@@ -3696,3 +3696,22 @@ A new 64-vertex, 32-sided free convex prism settles and reports its full 9.81 N
 weight. All 243 physical assertions and 27523 checked API operations pass; all
 six standard core groups remain green (`sd15-dynamics-prism-ctest.log`).
 Actual deterministic cell/fault acceptance and the final gate are still due.
+
+### SD15a indexed separating-axis lookup and current editor gate (2026-10-16)
+
+A live profile of `sd15-deterministic-native3` exposed quadratic scans in the
+new tested-axis list on complex hulls. That diagnostic cell run was explicitly
+stopped; it is not acceptance. Equivalent axes now use indexed canonical unit
+vectors quantized at 1e-12, avoiding the linear scan while retaining original
+feature witnesses. The 64-vertex complex-hull comparison has 124 faces and 186
+edges: indexed and dense solvers return the same contact normal, depth and
+four-point count. One measurement takes about 6 ms indexed versus 368 ms with
+linear duplicate lookup; the original dense reference takes about 4 ms on this
+mostly unique-axis hull (`sd15-dynamics-axis-lookup-comparison.log`).
+
+All six core groups pass again, including 243 physical assertions and 27523
+checked API operations (`sd15-dynamics-axis-lookup-ctest.log`). The current
+editor build and complete editor regression suite also pass, including the
+resumable mission integration (`sd15-editor-current-build.log`,
+`sd15-editor-current.log`). Deterministic whole-cell/fault acceptance and the
+final frozen-source full gate remain open.
