@@ -30,11 +30,11 @@ typedef ScrewdrivingDesign = {
 /** Every flange fastening has its own supported supply and one physically separate replacement. */
 class ScrewdrivingAssemblyPreview {
 	public static function design(bowlFed:Bool = false, blowFed:Bool = false, registered:Bool = false,
-		forceSearch:Bool = false):ScrewdrivingDesign {
+		forceSearch:Bool = false, ?equipment:ScrewdrivingCell):ScrewdrivingDesign {
 		var bitLength = forceSearch ? 85 : 45;
-		var cell = new ScrewdrivingCell(new machinekit.screwdriving.ScrewdriverBit(HexSocket(5),bitLength,6,0.05),0,
+		var cell = equipment == null ? new ScrewdrivingCell(new machinekit.screwdriving.ScrewdriverBit(HexSocket(5),bitLength,6,0.05),0,
 			machinekit.standard.DeepGrooveBearing.metric("6003"),bowlFed,blowFed,registered ? 80 : 10,registered ? 80 : 15,
-			registered ? 300 : 180, -450, registered);
+			registered ? 300 : 180, -450, registered) : equipment;
 		var positions = registered
 			? [[-300.0,-360.0],[-220.0,-360.0],[-140.0,-360.0],[-60.0,-360.0],[60.0,-360.0],[140.0,-360.0],[220.0,-360.0]]
 			: [[250.0,-450.0],[180.0,-380.0],[250.0,-380.0],[100.0,-450.0],[110.0,-380.0],[320.0,-450.0],[320.0,-380.0]];
@@ -59,12 +59,13 @@ class ScrewdrivingAssemblyPreview {
 			var name = additional[i];
 			var reserve = spareNames.indexOf(name);
 			var position = reserve < 0 ? positions[i] : reservePositions[reserve];
-			cell.include(name,new ScrewPresenter(cell.presenter.screw),AssemblyFrames.translation(position[0],position[1],RobotArm.TABLE_TOP));
+			cell.include(name,new ScrewPresenter(cell.presenter.screw, cell.fieldHeads),AssemblyFrames.translation(position[0],position[1],RobotArm.TABLE_TOP));
 			cell.exposePort(name+"Control",name+"/escapement","control");
 		}
 		// Keep the reject drop clear of reserve1, whose pickup nest occupies the
 		// normal cell's former -180 mm bin station.
 		cell.include("reject",new ScrewRejectBin(),AssemblyFrames.translation(-300,-450,RobotArm.TABLE_TOP));
+		cell.configureSupplies();
 		var initial = cell.work.fastenings().require();
 		for (fastening in initial) {var qualification = cell.work.join(fastening.screw.member,null,{minimum:0.2,maximum:1.0});}
 		ScrewdrivingChecks.check(cell);
@@ -101,8 +102,8 @@ class ScrewdrivingAssemblyPreview {
 	}
 
 	public static function scene(twoStage:Bool = false, bowlFed:Bool = false, blowFed:Bool = false,
-		registered:Bool = false, forceSearch:Bool = false):SceneArtifactData {
-		var design = design(bowlFed,blowFed,registered,forceSearch), cell = design.cell, scene = design.scene, state = design.state;
+		registered:Bool = false, forceSearch:Bool = false, ?equipment:ScrewdrivingCell):SceneArtifactData {
+		var design = design(bowlFed,blowFed,registered,forceSearch,equipment), cell = design.cell, scene = design.scene, state = design.state;
 		var jobs = design.jobs, staging = design.staging, found = design.found;
 		var tools = [for (tool in scene.robotTools) if (tool.screwdriver != null) tool];
 		if (tools.length != 1) throw "Whole screw access lost its feed capability";

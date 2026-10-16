@@ -9,8 +9,7 @@ class ScrewdrivingPreview {
 	public static function state(cell:ScrewdrivingCell, assemblyId:String = "screwdriving-cell"):AssemblyState {
 		var model = new AssemblyModel("mm"); cell.addTo(model, "");
 		var state = new AssemblyState(model.definition(assemblyId));
-		var q = cell.readyPose();
-		for (i in 0...6) state.setJoint('arm/j${i + 1}', q[i]);
+		cell.initializeState(state);
 		return state;
 	}
 	public static function cell():Bytes {

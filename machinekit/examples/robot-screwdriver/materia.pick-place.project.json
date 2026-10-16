@@ -1,0 +1,29 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Robot assembly: pick, place and fasten",
+	"defaultEntrypoint": "cycle",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.pick-place.json"
+	},
+	"entrypoints": {
+		"cycle": {
+			"kind": "cad-preview",
+			"module": "PickPlaceFastenPreview",
+			"function": "cycle"
+		}
+	},
+	"dynamicParts": [
+		"work/flange/screw1",
+		"work/flange/screw2",
+		"work/flange/screw3",
+		"work/flange/screw4",
+		"replacement/screw1",
+		"replacement/screw2",
+		"replacement/screw3",
+		"replacement/screw4",
+		"work/plate",
+		"work/flange/housing"
+	]
+}

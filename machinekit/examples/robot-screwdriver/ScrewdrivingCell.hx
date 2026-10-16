@@ -22,18 +22,20 @@ class ScrewdrivingCell extends MachineAssembly {
 	public final arm:RobotArm;
 	public final controller:TighteningController;
 	public final presenter:ScrewPresenter;
+	public final fieldHeads:Bool;
 	static inline final DATUM_STOP_WIDTH = 80.0;
 	static inline final DATUM_BEVEL_RUN = 60.0;
 	static inline final DATUM_BEVEL_DROP = 35.0;
 	public function new(?bit:ScrewdriverBit, workX:Float = 0, ?bearing:DeepGrooveBearing, automaticSupply:Bool = false,
 		blowSupply:Bool = false, plateEdgeMargin:Float = 10, fixtureHeight:Float = 15,
-		presenterX:Float = 180, presenterY:Float = -450, registrationDatums:Bool = false) {
-		super();
-		work = new FlangeBearingMount(bearing == null ? DeepGrooveBearing.metric("608") : bearing, plateEdgeMargin);
+		presenterX:Float = 180, presenterY:Float = -450, registrationDatums:Bool = false, bearingFitted:Bool = true,
+		fieldHeads:Bool = false) {
+		super(); this.fieldHeads = fieldHeads;
+		work = new FlangeBearingMount(bearing == null ? DeepGrooveBearing.metric("608") : bearing, plateEdgeMargin, bearingFitted);
 		var fitted = bit == null ? new ScrewdriverBit(work.flange.screw.screwDrive()) : bit;
 		tool = blowSupply ? new machinekit.screwdriving.BlowFeedTool(fitted,work.flange.screw,14,18,200,2500) : new ArmScrewdrivingTool(fitted);
 		arm = new RobotArm(false, tool); controller = new TighteningController();
-		presenter = automaticSupply || blowSupply ? new machinekit.screwdriving.AutomaticScrewPresenter(work.flange.screw) : new ScrewPresenter(work.flange.screw);
+		presenter = automaticSupply || blowSupply ? new machinekit.screwdriving.AutomaticScrewPresenter(work.flange.screw) : new ScrewPresenter(work.flange.screw, fieldHeads);
 		include("arm", arm);
 		addComponent("table", new ArmTable(700, 400, RobotArm.TABLE_TOP), AssemblyFrames.translation(0, -520, 0));
 		addComponent("controller", controller, AssemblyFrames.translation(-800, 200, 0));
@@ -66,6 +68,12 @@ class ScrewdrivingCell extends MachineAssembly {
 		exposePort("air", "vacuum", "air"); exposePort("presenterControl", "presenter/escapement", "control");
 	}
 	public function readyPose():Array<Float> return [0.0, 0.25, Math.PI / 2 - 1.4, 0.0, Math.PI / 2 - 0.25 + Math.PI / 2 - 1.4, 0.0];
+	/** Compose cabinet wiring after the optional primary and reserve presenters have been installed. */
+	public function configureSupplies():Void {}
+	public function initializeState(state:cadkit.modeling.AssemblyState):Void {
+		var q = readyPose();
+		for (i in 0...q.length) state.setJoint('arm/j${i+1}', q[i]);
+	}
 }
 
 /** Registered examples use broad, top-accessible angled faces as explicit CAD datums. */
